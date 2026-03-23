@@ -9,6 +9,8 @@ export enum ToolCategory {
   NETWORK = 'network',
   DEBUGGING = 'debugging',
   REVERSE_ENGINEERING = 'reverse_engineering',
+  INPUT = 'input',
+  EMULATION = 'emulation',
 }
 
 export const labels = {
@@ -16,4 +18,6 @@ export const labels = {
   [ToolCategory.NETWORK]: 'Network',
   [ToolCategory.DEBUGGING]: 'Debugging',
   [ToolCategory.REVERSE_ENGINEERING]: 'JS Reverse Engineering',
+  [ToolCategory.INPUT]: 'Input automation',
+  [ToolCategory.EMULATION]: 'Emulation',
 };
