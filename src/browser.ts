@@ -11,7 +11,12 @@ import path from 'node:path';
 import puppeteerExtra from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 
-import {StealthScripts2025, type StealthPreset, type StealthInjectionOptions} from './modules/stealth/index.js';
+import {
+  StealthScripts2025,
+  type StealthPreset,
+  type StealthInjectionOptions,
+} from './modules/stealth/index.js';
+import {HARMFUL_ARGS, DEFAULT_ARGS, STEALTH_ARGS} from './stealth-args.js';
 import {logger} from './logger.js';
 import type {
   Browser,
@@ -79,7 +84,9 @@ export async function resolveAutoConnectTarget(options?: {
       if (!response.ok) {
         continue;
       }
-      const payload = await response.json() as {webSocketDebuggerUrl?: string};
+      const payload = (await response.json()) as {
+        webSocketDebuggerUrl?: string;
+      };
       return {
         browserURL: candidate,
         wsEndpoint: payload.webSocketDebuggerUrl,
@@ -253,8 +260,14 @@ export class BrowserManager {
       isolated: false,
       useStealthScripts: false,
       devtools: false,
-      browserURL: config.browserURL ?? (remoteDebuggingUrl?.startsWith('http') ? remoteDebuggingUrl : undefined),
-      wsEndpoint: config.wsEndpoint ?? (remoteDebuggingUrl?.startsWith('ws') ? remoteDebuggingUrl : undefined),
+      browserURL:
+        config.browserURL ??
+        (remoteDebuggingUrl?.startsWith('http')
+          ? remoteDebuggingUrl
+          : undefined),
+      wsEndpoint:
+        config.wsEndpoint ??
+        (remoteDebuggingUrl?.startsWith('ws') ? remoteDebuggingUrl : undefined),
       ...config,
     };
   }
@@ -265,7 +278,9 @@ export class BrowserManager {
   static getInstance(config?: BrowserManagerConfig): BrowserManager {
     if (!browserManager) {
       if (!config) {
-        throw new Error('BrowserManager must be initialized with config on first call');
+        throw new Error(
+          'BrowserManager must be initialized with config on first call',
+        );
       }
       browserManager = new BrowserManager(config);
     }
@@ -293,7 +308,11 @@ export class BrowserManager {
     }
 
     // If we have a remote debugging URL, connect to existing browser
-    if (this.config.browserURL || this.config.wsEndpoint || this.config.remoteDebuggingUrl) {
+    if (
+      this.config.browserURL ||
+      this.config.wsEndpoint ||
+      this.config.remoteDebuggingUrl
+    ) {
       return this.connectToRemoteBrowser();
     }
 
@@ -313,7 +332,12 @@ export class BrowserManager {
    */
   private async connectToRemoteBrowser(): Promise<Browser> {
     try {
-      logger('Connecting to remote browser at:', this.config.wsEndpoint ?? this.config.browserURL ?? this.config.remoteDebuggingUrl);
+      logger(
+        'Connecting to remote browser at:',
+        this.config.wsEndpoint ??
+          this.config.browserURL ??
+          this.config.remoteDebuggingUrl,
+      );
 
       const connectOptions: Parameters<typeof puppeteer.connect>[0] = {
         targetFilter: makeTargetFilter(),
@@ -323,7 +347,8 @@ export class BrowserManager {
       if (this.config.wsEndpoint) {
         connectOptions.browserWSEndpoint = this.config.wsEndpoint;
       } else {
-        connectOptions.browserURL = this.config.browserURL ?? this.config.remoteDebuggingUrl;
+        connectOptions.browserURL =
+          this.config.browserURL ?? this.config.remoteDebuggingUrl;
       }
 
       // Add headers if provided
@@ -344,9 +369,12 @@ export class BrowserManager {
 
       return this.browser;
     } catch (error) {
-      throw new Error(`Failed to connect to remote browser: ${(error as Error).message}`, {
-        cause: error,
-      });
+      throw new Error(
+        `Failed to connect to remote browser: ${(error as Error).message}`,
+        {
+          cause: error,
+        },
+      );
     }
   }
 
@@ -354,10 +382,11 @@ export class BrowserManager {
    * Launch a new browser instance
    */
   private async launchBrowser(): Promise<Browser> {
-    const {channel, executablePath, headless, isolated, useStealthScripts} = this.config;
-    
+    const {channel, executablePath, headless, isolated, useStealthScripts} =
+      this.config;
+
     // Use puppeteer-extra with stealth plugin if stealth is enabled
-    const puppeteerInstance = useStealthScripts 
+    const puppeteerInstance = useStealthScripts
       ? puppeteerExtra.use(StealthPlugin())
       : puppeteer;
 
@@ -379,20 +408,27 @@ export class BrowserManager {
       });
     }
 
+    // Build args: start with DEFAULT_ARGS, add user args, then STEALTH_ARGS if enabled
     const args: LaunchOptions['args'] = [
+      ...DEFAULT_ARGS,
       ...(this.config.args ?? []),
       '--hide-crash-restore-bubble',
     ];
-    
+
+    // Add stealth args if useStealthScripts is enabled
+    if (useStealthScripts) {
+      args.push(...STEALTH_ARGS);
+    }
+
     if (headless) {
       args.push('--screen-info={3840x2160}');
     }
-    
+
     let puppeteerChannel: ChromeReleaseChannel | undefined;
     if (this.config.devtools) {
       args.push('--auto-open-devtools-for-tabs');
     }
-    
+
     if (!executablePath) {
       puppeteerChannel =
         channel && channel !== 'stable'
@@ -418,6 +454,8 @@ export class BrowserManager {
         pipe: true,
         headless,
         args,
+        // Remove harmful default args
+        ignoreDefaultArgs: HARMFUL_ARGS,
         acceptInsecureCerts: this.config.acceptInsecureCerts,
         handleDevToolsAsPage: true,
       });
@@ -530,7 +568,10 @@ export class BrowserManager {
    * @param preset - Platform preset (windows-chrome, mac-chrome, etc.)
    * @param options - Custom stealth options to override preset
    */
-  async injectStealth(preset?: StealthPreset, options?: StealthInjectionOptions): Promise<void> {
+  async injectStealth(
+    preset?: StealthPreset,
+    options?: StealthInjectionOptions,
+  ): Promise<void> {
     if (!this.browser) {
       throw new Error('Browser not initialized');
     }
@@ -552,7 +593,7 @@ export class BrowserManager {
       }
 
       // Listen for new pages and inject stealth
-      this.browser.on('targetcreated', async (target) => {
+      this.browser.on('targetcreated', async target => {
         if (target.type() === 'page') {
           const page = await target.page();
           if (page) {
@@ -564,16 +605,23 @@ export class BrowserManager {
       this.stealthInjected = true;
       logger('Advanced stealth scripts injected successfully');
     } catch (error) {
-      throw new Error(`Failed to inject stealth scripts: ${(error as Error).message}`, {
-        cause: error,
-      });
+      throw new Error(
+        `Failed to inject stealth scripts: ${(error as Error).message}`,
+        {
+          cause: error,
+        },
+      );
     }
   }
 
   /**
    * Get available stealth presets
    */
-  getStealthPresets(): Array<{ name: StealthPreset; userAgent: string; platform: string }> {
+  getStealthPresets(): Array<{
+    name: StealthPreset;
+    userAgent: string;
+    platform: string;
+  }> {
     return StealthScripts2025.getPresets();
   }
 
