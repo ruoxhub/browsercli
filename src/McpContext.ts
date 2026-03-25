@@ -33,12 +33,16 @@ import type {TraceResult} from './trace-processing/parse.js';
 import {WaitForHelper} from './WaitForHelper.js';
 import type {WebSocketData} from './WebSocketCollector.js';
 import {WebSocketCollector} from './WebSocketCollector.js';
+import {SessionManager} from './SessionManager.js';
 
 interface McpContextOptions {
   // Whether the DevTools windows are exposed as pages for debugging of DevTools.
   experimentalDevToolsDebugging: boolean;
   // Whether all page-like targets are exposed as pages.
   experimentalIncludeAllPages?: boolean;
+  // Session ID for page ownership isolation.
+  // When set, only pages tagged with this session ID are visible.
+  sessionId?: string;
 }
 
 const DEFAULT_TIMEOUT = 5_000;
@@ -97,6 +101,7 @@ export class McpContext implements Context {
 
   #locatorClass: typeof Locator;
   #options: McpContextOptions;
+  #sessionManager?: SessionManager;
 
   private constructor(
     browser: Browser,
@@ -108,6 +113,11 @@ export class McpContext implements Context {
     this.logger = logger;
     this.#locatorClass = locatorClass;
     this.#options = options;
+
+    // Initialize session manager if sessionId is provided
+    if (options.sessionId) {
+      this.#sessionManager = SessionManager.getInstance(options.sessionId, browser);
+    }
 
     this.#networkCollector = new NetworkCollector(
       this.browser,
@@ -151,6 +161,13 @@ export class McpContext implements Context {
     await this.#consoleCollector.init();
     await this.#webSocketCollector.init();
     await this.#initDebugger();
+
+    // Restore session tags if sessionId is provided
+    if (this.#sessionManager) {
+      await this.#sessionManager.restoreSessionTags();
+      // Re-create snapshot after restoring tags
+      await this.createPagesSnapshot();
+    }
   }
 
   async #initDebugger(): Promise<void> {
@@ -182,6 +199,10 @@ export class McpContext implements Context {
     this.#consoleCollector.dispose();
     this.#webSocketCollector.dispose();
     void this.#debuggerContext.disable();
+    // Clean up session manager if exists
+    if (this.#sessionManager && this.#options.sessionId) {
+      SessionManager.cleanup(this.#options.sessionId);
+    }
   }
 
   /**
@@ -257,7 +278,9 @@ export class McpContext implements Context {
   }
 
   async newPage(): Promise<Page> {
-    const page = await this.browser.newPage();
+    const page = await (this.#sessionManager
+      ? this.#sessionManager.newPage()
+      : this.browser.newPage());
     await this.createPagesSnapshot();
     this.selectPage(page);
     this.#networkCollector.addPage(page);
@@ -270,6 +293,10 @@ export class McpContext implements Context {
       throw new Error(CLOSE_PAGE_ERROR);
     }
     const page = this.getPageByIdx(pageIdx);
+    // Remove session tag before closing if sessionManager exists
+    if (this.#sessionManager) {
+      await this.#sessionManager.untagPage(page);
+    }
     await page.close({runBeforeUnload: false});
   }
 
@@ -400,9 +427,21 @@ export class McpContext implements Context {
    * Creates a snapshot of the pages.
    */
   async createPagesSnapshot(): Promise<Page[]> {
-    const allPages = await this.browser.pages(
+    let allPages = await this.browser.pages(
       this.#options.experimentalIncludeAllPages,
     );
+
+    // Filter pages by session ownership if sessionId is provided
+    if (this.#sessionManager) {
+      const ownedPages: Page[] = [];
+      for (const page of allPages) {
+        if (await this.#sessionManager!.ownsPage(page)) {
+          ownedPages.push(page);
+        }
+      }
+      allPages = ownedPages;
+      this.logger(`[McpContext] Session ${this.#options.sessionId} owns ${ownedPages.length} pages`);
+    }
 
     this.#pages = allPages.filter(page => {
       // If we allow debugging DevTools windows, return all pages.
@@ -424,9 +463,21 @@ export class McpContext implements Context {
 
   async detectOpenDevToolsWindows() {
     this.logger('Detecting open DevTools windows');
-    const pages = await this.browser.pages(
+    let pages = await this.browser.pages(
       this.#options.experimentalIncludeAllPages,
     );
+
+    // Filter by session ownership if sessionId is provided
+    if (this.#sessionManager) {
+      const ownedPages: Page[] = [];
+      for (const page of pages) {
+        if (await this.#sessionManager!.ownsPage(page)) {
+          ownedPages.push(page);
+        }
+      }
+      pages = ownedPages;
+    }
+
     this.#pageToDevToolsPage = new Map<Page, Page>();
     for (const devToolsPage of pages) {
       if (devToolsPage.url().startsWith('devtools://')) {

@@ -151,6 +151,12 @@ export const cliOptions = {
     describe:
       'Additional arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.',
   },
+  sessionId: {
+    type: 'string',
+    description:
+      'Session ID for page ownership isolation. When multiple server instances connect to the same browser, each session only sees and controls pages tagged with its own session ID. Can also be set via MCP_SESSION_ID environment variable.',
+    alias: 's',
+  },
   categoryNetwork: {
     type: 'boolean',
     default: true,

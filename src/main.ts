@@ -75,6 +75,10 @@ async function getContext(): Promise<McpContext> {
     extraArgs.push(`--proxy-server=${args.proxyServer}`);
   }
   const devtools = args.experimentalDevtools ?? false;
+  // Get session ID from environment variable or command line argument
+  // This is used for page ownership isolation when multiple server instances
+  // connect to the same browser instance.
+  const sessionId = process.env.MCP_SESSION_ID || args.sessionId;
   const autoConnectTarget =
     !args.browserUrl && !args.wsEndpoint && args.autoConnect
       ? await resolveAutoConnectTarget()
@@ -103,6 +107,7 @@ async function getContext(): Promise<McpContext> {
     context = await McpContext.from(browser, logger, {
       experimentalDevToolsDebugging: devtools,
       experimentalIncludeAllPages: args.experimentalIncludeAllPages,
+      sessionId,
     });
   }
   return context;
