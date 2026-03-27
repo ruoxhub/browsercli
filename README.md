@@ -119,13 +119,15 @@
 - `navigate_page`：跳转、回退、刷新当前页面。
 - `query_dom`：查询页面元素，确认选择器和节点状态。
 - `click_element` / `click`：按选择器触发点击，复现页面动作（支持单击/双击）。
-- `type_text`：向输入框写入文本，驱动表单交互。
+- `click_at`：使用真实鼠标事件点击元素（可触发文件对话框等）。
+- `type_text`：向输入框写入文本，驱动表单交互（支持延迟模拟真实输入）。
 - `take_screenshot`：截取页面当前状态，保留可视化证据。
 - `hover`：悬停在元素上，触发 hover 相关事件。
 - `fill`：填充单个输入框/文本域/下拉选择框。
 - `fill_form`：批量填充多个表单字段。
 - `drag`：拖拽元素到目标位置。
 - `upload_file`：通过文件输入框上传文件。
+- `set_files`：使用 CDP DOM.setFileInputFiles 直接设置文件（绕过文件选择对话框）。
 - `press_key`：按下键盘按键或组合键（如 `Control+A`、`Control+Shift+R`）。
 - `handle_dialog`：处理浏览器弹窗（alert/confirm/prompt），支持接受/拒绝/输入文本。
 
@@ -136,6 +138,16 @@
 - `resize_page`：调整浏览器窗口尺寸，模拟不同分辨率。
 - `emulate_network`：模拟网络条件（离线、Slow 3G、Fast 4G 等）。
 - `emulate_cpu`：模拟 CPU 降频（1-20x 降频），检测时序相关问题。
+- `emulate_mobile`：模拟移动设备（iPhone/Android/iPad），包括 viewport、user-agent 和触摸事件。
+- `set_user_agent`：设置自定义 user-agent。
+
+### 视频元素操作
+
+针对 HTMLVideoElement 的专项工具，用于处理视频网站逆向场景。
+
+- `get_video_info`：获取视频元素信息（duration、currentTime、paused 状态、src 等）。
+- `seek_video`：跳转到指定时间点（秒）。
+- `capture_video_frame`：截取视频帧（支持 PNG/JPEG 格式，可指定质量）。
 
 ### 深度分析与去混淆
 
@@ -146,12 +158,69 @@
 - `deobfuscate_code`：对混淆代码做清理、还原和辅助分析。
 - `risk_panel`：聚合代码分析、加密检测和 hook 信号，输出综合风险视图。
 
+### 性能分析
+
+性能追踪和诊断工具，用于分析页面加载性能和运行时性能问题。
+
+- `start_performance_trace`：开始性能追踪（支持 Core Web Vital 评分）。
+- `stop_performance_trace`：停止追踪并分析报告。
+- `get_performance_metrics`：获取页面性能指标（Navigation Timing、Resource Timing、Paint 事件）。
+- `performance_analyze_insight`：获取特定性能洞察的详细信息（如 LCP Breakdown、Document Latency）。
+
 ### 会话与登录态复用
 
 - `save_session_state`：保存当前页面的 cookie 和存储状态到内存快照。
 - `restore_session_state`：把快照恢复到当前页面，复用登录态和现场。
 - `dump_session_state`：把会话快照导出为 JSON 文件，便于持久化。
 - `load_session_state`：从已有 JSON 或字符串重新载入会话快照。
+
+### CDP Proxy HTTP API
+
+CDP Proxy 提供 HTTP API 来操控 Chrome DevTools Protocol，运行在 `http://localhost:3456`。
+
+**基础端点：**
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/health` | GET | 健康检查 |
+| `/targets` | GET | 列出所有页面 |
+| `/new?url=` | GET | 创建后台 tab |
+| `/close?target=` | GET | 关闭 tab |
+| `/navigate?target=&url=` | GET | 导航到 URL |
+| `/back?target=` | GET | 浏览器后退 |
+| `/info?target=` | GET | 获取页面信息（title、url、readyState） |
+| `/eval?target=` | POST | 执行 JS（body 为 JS 代码） |
+| `/click?target=` | POST | JS 点击（body 为 CSS 选择器） |
+| `/clickAt?target=` | POST | 真实鼠标点击（body 为 CSS 选择器） |
+| `/setFiles?target=` | POST | 文件上传（body 为 JSON：`{"selector": "...", "files": [...]}`） |
+| `/scroll?target=&y=&direction=` | GET | 滚动页面 |
+| `/screenshot?target=&file=` | GET | 截图 |
+
+**使用示例：**
+
+```bash
+# 健康检查
+curl http://localhost:3456/health
+
+# 列出所有页面
+curl http://localhost:3456/targets
+
+# 创建新页面
+curl "http://localhost:3456/new?url=https://example.com"
+
+# 执行 JS
+curl -X POST -d "document.title" "http://localhost:3456/eval?target=<targetId>"
+
+# 点击元素
+curl -X POST -d "#login-btn" "http://localhost:3456/click?target=<targetId>"
+
+# 截图
+curl "http://localhost:3456/screenshot?target=<targetId>&file=/tmp/screenshot.png"
+```
+
+**启动方式：**
+
+CDP Proxy 在 MCP 服务器启动时自动初始化。也可以通过 `cdp_proxy/start` 工具手动启动。
 
 完整参数说明见 [docs/reference/tool-reference.md](docs/reference/tool-reference.md)。
 按逆向流程选工具可继续看 [docs/reference/reverse-workflow.md](docs/reference/reverse-workflow.md)。
