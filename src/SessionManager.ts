@@ -19,6 +19,10 @@ const logger = debug('mcp:session');
  * - 新创建的页面会自动添加标签：`mcp-session-{sessionId}`
  * - 会话只能看到带有自己标签的页面
  * - 页面关闭时自动移除标签
+ *
+ * CDP Session 缓存：
+ * - 避免重复调用 attachToTarget
+ * - 提高并发操作稳定性
  */
 export class SessionManager {
   private static instances = new Map<string, SessionManager>();
@@ -26,6 +30,7 @@ export class SessionManager {
   private readonly sessionId: string;
   private readonly browser: Browser;
   private readonly ownedPageUrls = new Set<string>();
+  private readonly cdpSessions = new WeakMap<Page, number>(); // Page -> sessionId 缓存
 
   private constructor(sessionId: string, browser: Browser) {
     this.sessionId = sessionId;
@@ -188,5 +193,28 @@ export class SessionManager {
     } catch (error) {
       logger(`[SessionManager] Failed to restore session tags:`, error);
     }
+  }
+
+  /**
+   * 获取页面的 CDP Session ID（带缓存）
+   * 避免重复调用 attachToTarget
+   */
+  getCdpSessionId(page: Page): number | undefined {
+    return this.cdpSessions.get(page);
+  }
+
+  /**
+   * 缓存页面的 CDP Session ID
+   */
+  setSessionPage(page: Page, sessionId: number): void {
+    this.cdpSessions.set(page, sessionId);
+  }
+
+  /**
+   * 清除页面的 CDP Session 缓存
+   * 页面关闭时调用
+   */
+  clearSessionPage(page: Page): void {
+    this.cdpSessions.delete(page);
   }
 }

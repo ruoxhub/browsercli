@@ -12,6 +12,9 @@ export enum ToolCategory {
   INPUT = 'input',
   EMULATION = 'emulation',
   PERFORMANCE = 'performance',
+  DOM = 'dom',
+  SCREENSHOT = 'screenshot',
+  PAGES = 'pages',
 }
 
 export const labels = {
@@ -22,4 +25,7 @@ export const labels = {
   [ToolCategory.INPUT]: 'Input automation',
   [ToolCategory.EMULATION]: 'Emulation',
   [ToolCategory.PERFORMANCE]: 'Performance',
+  [ToolCategory.DOM]: 'DOM manipulation',
+  [ToolCategory.SCREENSHOT]: 'Screenshot',
+  [ToolCategory.PAGES]: 'Pages',
 };

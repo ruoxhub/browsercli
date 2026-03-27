@@ -95,6 +95,7 @@ export type Context = Readonly<{
   getDialog(): Dialog | undefined;
   clearDialog(): void;
   getPageByIdx(idx: number): Page;
+  getPages(): Page[];
   isPageSelected(page: Page): boolean;
   newPage(): Promise<Page>;
   closePage(pageIdx: number): Promise<void>;

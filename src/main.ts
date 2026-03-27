@@ -42,6 +42,7 @@ import * as jshookStealthTools from './tools/stealth.js';
 import type {ToolDefinition} from './tools/ToolDefinition.js';
 import {ToolRegistry} from './tools/ToolRegistry.js';
 import * as websocketTools from './tools/websocket.js';
+import * as cdpProxyTools from './tools/cdp-proxy.js';
 import {ErrorCodes, formatError} from './utils/errors.js';
 import {TokenBudgetManager} from './utils/TokenBudgetManager.js';
 import {ToolExecutionScheduler} from './utils/ToolExecutionScheduler.js';
@@ -242,6 +243,7 @@ const toolSources: Array<{source: string; tools: ToolDefinition[]}> = [
   {source: 'jshookPage', tools: asTools(jshookPageTools)},
   {source: 'jshookRebuild', tools: asTools(jshookRebuildTools)},
   {source: 'websocket', tools: asTools(websocketTools)},
+  {source: 'cdp-proxy', tools: asTools(cdpProxyTools)},
 ];
 
 const tools = toolSources.flatMap((entry) =>

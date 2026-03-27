@@ -5,6 +5,7 @@
  */
 
 import fs from 'node:fs';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -66,17 +67,161 @@ export async function ensureBrowserConnected(options: {
   return manager.ensureBrowser();
 }
 
+/**
+ * 发现 Chrome 调试端口
+ * 1. 读取 DevToolsActivePort 文件（跨平台）
+ * 2. 扫描常见端口 [9222, 9229, 9333]
+ * 3. 使用 TCP 探测避免触发 Chrome 安全弹窗
+ */
+async function discoverChromeDebugPort(): Promise<{port: number; wsPath?: string} | null> {
+  // 1. 尝试读取 DevToolsActivePort 文件
+  const possiblePaths: string[] = [];
+  const platform = os.platform();
+  const home = os.homedir();
+  const localAppData = process.env.LOCALAPPDATA || '';
+
+  if (platform === 'darwin') {
+    possiblePaths.push(
+      path.join(home, 'Library/Application Support/Google/Chrome/DevToolsActivePort'),
+      path.join(home, 'Library/Application Support/Google/Chrome Canary/DevToolsActivePort'),
+      path.join(home, 'Library/Application Support/Chromium/DevToolsActivePort'),
+    );
+  } else if (platform === 'linux') {
+    possiblePaths.push(
+      path.join(home, '.config/google-chrome/DevToolsActivePort'),
+      path.join(home, '.config/chromium/DevToolsActivePort'),
+    );
+  } else if (platform === 'win32') {
+    possiblePaths.push(
+      path.join(localAppData, 'Google/Chrome/User Data/DevToolsActivePort'),
+      path.join(localAppData, 'Chromium/User Data/DevToolsActivePort'),
+    );
+  }
+
+  for (const filePath of possiblePaths) {
+    try {
+      const content = fs.readFileSync(filePath, 'utf-8').trim();
+      const lines = content.split('\n').filter(Boolean);
+      const port = parseInt(lines[0], 10);
+      if (port > 0 && port < 65536) {
+        const ok = await checkPort(port);
+        if (ok) {
+          const wsPath = lines[1] || null;
+          logger(`[discoverChromeDebugPort] 从 DevToolsActivePort 发现端口：${port}${wsPath ? ' (带 wsPath)' : ''}`);
+          return {port, wsPath: wsPath || undefined};
+        }
+      }
+    } catch {
+      // 文件不存在，继续尝试
+    }
+  }
+
+  // 2. 扫描常见端口
+  const commonPorts = [9222, 9229, 9333];
+  for (const port of commonPorts) {
+    const ok = await checkPort(port);
+    if (ok) {
+      logger(`[discoverChromeDebugPort] 扫描发现 Chrome 调试端口：${port}`);
+      return {port, wsPath: undefined};
+    }
+  }
+
+  return null;
+}
+
+/**
+ * TCP 端口探测（避免触发 Chrome 安全弹窗）
+ */
+function checkPort(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = net.createConnection(port, '127.0.0.1');
+    const timer = setTimeout(() => {
+      socket.destroy();
+      resolve(false);
+    }, 2000);
+    socket.once('connect', () => {
+      clearTimeout(timer);
+      socket.destroy();
+      resolve(true);
+    });
+    socket.once('error', () => {
+      clearTimeout(timer);
+      resolve(false);
+    });
+  });
+}
+
+/**
+ * 使用 WebSocket 连接测试端口是否可用
+ */
+async function testWebSocketPort(port: number): Promise<boolean> {
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/json/version`, {
+      signal: AbortSignal.timeout(2000),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
 export async function resolveAutoConnectTarget(options?: {
   candidates?: string[];
   fetchImpl?: typeof fetch;
 }): Promise<{browserURL: string; wsEndpoint?: string} | undefined> {
-  const candidates = options?.candidates ?? [
+  const fetchImpl = options?.fetchImpl ?? fetch;
+
+  // 1. 如果提供了 candidates 参数，优先使用 candidates（测试模式）
+  if (options?.candidates && options.candidates.length > 0) {
+    for (const candidate of options.candidates) {
+      try {
+        const response = await fetchImpl(`${candidate}/json/version`);
+        if (!response.ok) {
+          continue;
+        }
+        const payload = (await response.json()) as {
+          webSocketDebuggerUrl?: string;
+        };
+        return {
+          browserURL: candidate,
+          wsEndpoint: payload.webSocketDebuggerUrl,
+        };
+      } catch {
+        // Keep probing the next candidate.
+      }
+    }
+    return undefined;
+  }
+
+  // 2. 自动发现 Chrome 调试端口（生产模式）
+  const discovered = await discoverChromeDebugPort();
+  if (discovered) {
+    const {port, wsPath} = discovered;
+    const browserURL = `http://127.0.0.1:${port}`;
+
+    // 尝试获取完整的 WebSocket URL
+    try {
+      const response = await fetchImpl(`${browserURL}/json/version`);
+      if (response.ok) {
+        const payload = await response.json() as {webSocketDebuggerUrl?: string};
+        return {
+          browserURL,
+          wsEndpoint: payload.webSocketDebuggerUrl || wsPath ? `ws://127.0.0.1:${port}${wsPath || '/devtools/browser'}` : undefined,
+        };
+      }
+    } catch {
+      // 如果 /json/version 失败，返回基础 URL
+      return {browserURL};
+    }
+  }
+
+  // 3. 回退到默认候选列表
+  const candidates = [
     'http://127.0.0.1:9222',
     'http://127.0.0.1:9223',
     'http://127.0.0.1:9224',
     'http://127.0.0.1:9225',
   ];
-  const fetchImpl = options?.fetchImpl ?? fetch;
 
   for (const candidate of candidates) {
     try {
