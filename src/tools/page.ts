@@ -171,6 +171,29 @@ export const waitForElement = defineTool({
   },
 });
 
+/**
+ * 🆕 方向滚动（支持懒加载触发）
+ */
+export const scrollBy = defineTool({
+  name: 'scroll_by',
+  description: 'Scroll page by direction (up/down/top/bottom). Automatically waits 800ms for lazy-loaded content to load.',
+  annotations: {category: ToolCategory.NAVIGATION, readOnlyHint: false},
+  schema: {
+    direction: zod.enum(['up', 'down', 'top', 'bottom']).describe('Scroll direction'),
+    pixels: zod.number().int().positive().optional().describe('Pixels to scroll (only for up/down, default: 1000)'),
+  },
+  handler: async (request, response) => {
+    ensureCleanupLoop();
+    cleanupExpiredSessions();
+    const runtime = getJSHookRuntime();
+    const result = await runtime.pageController.scrollBy(
+      request.params.direction,
+      request.params.pixels
+    );
+    response.appendResponseLine(result);
+  },
+});
+
 export const getPerformanceMetrics = defineTool({
   name: 'get_performance_metrics',
   description: 'Get page performance metrics from Performance API.',

@@ -129,6 +129,92 @@ export class PageController {
   }
 
   /**
+   * 🆕 真实鼠标点击 — CDP Input.dispatchMouseEvent
+   * 算作用户真实手势，能触发文件对话框、绕过部分反自动化检测
+   */
+  async clickAt(selector: string): Promise<{
+    x: number;
+    y: number;
+    tag: string;
+    text: string;
+  }> {
+    const page = await this.collector.getActivePage();
+    const client = await page.createCDPSession();
+
+    // 获取元素坐标
+    const coords = await page.evaluate((sel) => {
+      const el = document.querySelector(sel);
+      if (!el) throw new Error(`Element not found: ${sel}`);
+      el.scrollIntoView({ block: 'center' });
+      const rect = el.getBoundingClientRect();
+      return {
+        x: rect.x + rect.width / 2,
+        y: rect.y + rect.height / 2,
+        tag: el.tagName,
+        text: (el.textContent || '').slice(0, 100)
+      };
+    }, selector);
+
+    // 发送真实鼠标按下事件
+    await client.send('Input.dispatchMouseEvent', {
+      type: 'mousePressed',
+      x: coords.x,
+      y: coords.y,
+      button: 'left',
+      clickCount: 1
+    });
+
+    // 发送真实鼠标释放事件
+    await client.send('Input.dispatchMouseEvent', {
+      type: 'mouseReleased',
+      x: coords.x,
+      y: coords.y,
+      button: 'left',
+      clickCount: 1
+    });
+
+    logger.info(`Real mouse click at: ${selector} (${coords.x}, ${coords.y})`);
+    return coords;
+  }
+
+  /**
+   * 🆕 文件上传绕过对话框 — CDP DOM.setFileInputFiles
+   * 直接设置 file input 的本地文件路径，完全绕过文件对话框
+   */
+  async setFiles(selector: string, filePaths: string[]): Promise<{
+    success: boolean;
+    files: number;
+  }> {
+    const page = await this.collector.getActivePage();
+    const client = await page.createCDPSession();
+
+    // 启用 DOM 域
+    await client.send('DOM.enable', {});
+
+    // 获取文档根节点
+    const doc = await client.send('DOM.getDocument', {});
+
+    // 查找目标元素
+    const node = await client.send('DOM.querySelector', {
+      nodeId: doc.root.nodeId,
+      selector
+    });
+
+    if (!node.nodeId) {
+      throw new Error(`Element not found: ${selector}`);
+    }
+
+    // 设置文件
+    await client.send('DOM.setFileInputFiles', {
+      nodeId: node.nodeId,
+      files: filePaths
+    });
+
+    logger.info(`Set ${filePaths.length} file(s) to ${selector}`);
+    return { success: true, files: filePaths.length };
+  }
+
+  /**
    * 输入文本（薄封装page.type）
    */
   async type(selector: string, text: string, options?: TypeOptions): Promise<void> {
@@ -166,6 +252,37 @@ export class PageController {
       window.scrollTo(opts.x || 0, opts.y || 0);
     }, options);
     logger.info(`Scrolled to: x=${options.x || 0}, y=${options.y || 0}`);
+  }
+
+  /**
+   * 🆕 方向滚动（支持懒加载触发）
+   * @param direction 'up' | 'down' | 'top' | 'bottom'
+   * @param pixels 滚动像素（仅用于 up/down）
+   */
+  async scrollBy(direction: 'up' | 'down' | 'top' | 'bottom', pixels: number = 1000): Promise<string> {
+    const page = await this.collector.getActivePage();
+    const result = await page.evaluate((dir, px) => {
+      switch (dir) {
+        case 'top':
+          window.scrollTo(0, 0);
+          return 'scrolled to top';
+        case 'bottom':
+          window.scrollTo(0, document.body.scrollHeight);
+          return 'scrolled to bottom';
+        case 'up':
+          window.scrollBy(0, -Math.abs(px));
+          return `scrolled up ${Math.abs(px)}px`;
+        case 'down':
+          window.scrollBy(0, Math.abs(px));
+          return `scrolled down ${Math.abs(px)}px`;
+      }
+    }, direction, pixels);
+
+    // 等待懒加载触发（800ms 与 web-access 一致）
+    await new Promise(resolve => setTimeout(resolve, 800));
+
+    logger.info(`Scrolled ${direction}: ${result}`);
+    return result;
   }
 
   /**
@@ -286,6 +403,98 @@ export class PageController {
     });
     logger.info(`Screenshot taken${options?.path ? `: ${options.path}` : ''}`);
     return buffer as Buffer;
+  }
+
+  /**
+   * 🆕 获取视频元素信息
+   */
+  async getVideoInfo(selector: string): Promise<{
+    duration: number;
+    currentTime: number;
+    paused: boolean;
+    src: string;
+  } | null> {
+    const page = await this.collector.getActivePage();
+    return await page.evaluate((sel) => {
+      const video = document.querySelector(sel) as HTMLVideoElement;
+      if (!video) return null;
+      return {
+        duration: video.duration,
+        currentTime: video.currentTime,
+        paused: video.paused,
+        src: video.src
+      };
+    }, selector);
+  }
+
+  /**
+   * 🆕 定位视频到指定时间点
+   */
+  async seekVideo(selector: string, time: number): Promise<void> {
+    const page = await this.collector.getActivePage();
+    await page.evaluate((sel, t) => {
+      const video = document.querySelector(sel) as HTMLVideoElement;
+      if (video) {
+        video.currentTime = t;
+      }
+    }, selector, time);
+    logger.info(`Video seeked to ${time}s: ${selector}`);
+  }
+
+  /**
+   * 🆕 捕获视频当前帧（先 seek 到指定时间，然后截图）
+   */
+  async captureVideoFrame(
+    selector: string,
+    options?: {
+      seekTime?: number;
+      outputPath?: string;
+      format?: 'png' | 'jpeg';
+      quality?: number;
+    }
+  ): Promise<Buffer | string> {
+    const page = await this.collector.getActivePage();
+
+    // 先定位到指定时间点
+    if (options?.seekTime !== undefined) {
+      await this.seekVideo(selector, options.seekTime);
+      // 等待 seek 完成
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
+
+    // 获取视频帧的边界框
+    const videoBox = await page.evaluate((sel) => {
+      const video = document.querySelector(sel) as HTMLVideoElement;
+      if (!video) return null;
+      const rect = video.getBoundingClientRect();
+      return {
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+        tagName: video.tagName
+      };
+    }, selector);
+
+    if (!videoBox) {
+      throw new Error(`Video element not found: ${selector}`);
+    }
+
+    // 截图
+    const buffer = await page.screenshot({
+      path: options?.outputPath,
+      type: options?.format || 'png',
+      quality: options?.quality,
+      clip: {
+        x: Math.round(videoBox.x),
+        y: Math.round(videoBox.y),
+        width: Math.round(videoBox.width),
+        height: Math.round(videoBox.height)
+      }
+    });
+
+    logger.info(`Video frame captured${options?.outputPath ? `: ${options.outputPath}` : ''}`);
+    return options?.outputPath ? options.outputPath : (buffer as Buffer);
   }
 
   /**

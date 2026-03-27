@@ -45,6 +45,64 @@ export const click = defineTool({
 });
 
 /**
+ * 🆕 真实鼠标点击 — CDP Input.dispatchMouseEvent
+ * 算作用户真实手势，能触发文件对话框、绕过部分反自动化检测
+ */
+export const clickAt = defineTool({
+  name: 'click_at',
+  description: 'Real mouse click using CDP Input.dispatchMouseEvent. Acts as user gesture, can trigger file dialogs and bypass some anti-automation detection.',
+  annotations: {
+    category: ToolCategory.INPUT,
+    readOnlyHint: false,
+  },
+  schema: {
+    selector: zod.string().describe('CSS selector of the element to click'),
+  },
+  handler: async (request, response) => {
+    const runtime = getJSHookRuntime();
+    const result = await runtime.pageController.clickAt(request.params.selector);
+
+    response.appendResponseLine('```json');
+    response.appendResponseLine(JSON.stringify({
+      clicked: true,
+      x: result.x,
+      y: result.y,
+      tag: result.tag,
+      text: result.text
+    }, null, 2));
+    response.appendResponseLine('```');
+  },
+});
+
+/**
+ * 🆕 文件上传绕过对话框 — CDP DOM.setFileInputFiles
+ * 直接设置 file input 的本地文件路径，完全绕过文件对话框
+ */
+export const setFiles = defineTool({
+  name: 'set_files',
+  description: 'Set files to a file input element using CDP DOM.setFileInputFiles. Bypasses file chooser dialog completely.',
+  annotations: {
+    category: ToolCategory.INPUT,
+    readOnlyHint: false,
+  },
+  schema: {
+    selector: zod.string().describe('CSS selector of the file input element'),
+    filePaths: zod.array(zod.string()).describe('Array of absolute file paths to upload'),
+  },
+  handler: async (request, response) => {
+    const runtime = getJSHookRuntime();
+    const result = await runtime.pageController.setFiles(
+      request.params.selector,
+      request.params.filePaths
+    );
+
+    response.appendResponseLine('```json');
+    response.appendResponseLine(JSON.stringify(result, null, 2));
+    response.appendResponseLine('```');
+  },
+});
+
+/**
  * 悬停在元素上
  */
 export const hover = defineTool({

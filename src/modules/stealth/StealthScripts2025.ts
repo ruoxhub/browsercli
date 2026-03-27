@@ -24,7 +24,10 @@ export type StealthPreset =
   | 'mac-chrome'
   | 'mac-safari'
   | 'linux-chrome'
-  | 'windows-edge';
+  | 'windows-edge'
+  | 'android-chrome'
+  | 'ios-safari'
+  | 'linux-firefox';
 
 /** 屏幕分辨率配置 */
 export interface ScreenConfig {
@@ -180,6 +183,50 @@ const PRESETS: Record<StealthPreset, Omit<StealthInjectionOptions, 'preset'>> = 
     webglVendor: 'Google Inc. (NVIDIA)',
     webglRenderer:
       'ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, D3D11)',
+    screen: { width: 1920, height: 1080, colorDepth: 24, pixelDepth: 24 },
+    connection: { effectiveType: '4g', downlink: 10, rtt: 50, saveData: false },
+  },
+  'android-chrome': {
+    userAgent:
+      'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36',
+    navigatorPlatform: 'Linux armv8l',
+    vendor: 'Google Inc.',
+    languages: ['zh-CN', 'zh', 'en-US', 'en'],
+    hardwareConcurrency: 8,
+    deviceMemory: 6,
+    maxTouchPoints: 10,
+    webglVendor: 'Google Inc. (ARM)',
+    webglRenderer:
+      'ANGLE (ARM, Mali-G710 MC10, OpenGL ES 3.2)',
+    screen: { width: 1080, height: 2400, colorDepth: 24, pixelDepth: 24 },
+    connection: { effectiveType: '4g', downlink: 8, rtt: 80, saveData: false },
+  },
+  'ios-safari': {
+    userAgent:
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 18_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Mobile/15E148 Safari/604.1',
+    navigatorPlatform: 'iPhone',
+    vendor: 'Apple Computer, Inc.',
+    languages: ['zh-CN', 'zh', 'en-US', 'en'],
+    hardwareConcurrency: 6,
+    deviceMemory: undefined,
+    maxTouchPoints: 5,
+    webglVendor: 'Apple Inc.',
+    webglRenderer: 'Apple GPU',
+    screen: { width: 1179, height: 2556, colorDepth: 30, pixelDepth: 30 },
+    connection: undefined,
+  },
+  'linux-firefox': {
+    userAgent:
+      'Mozilla/5.0 (X11; Linux x86_64; rv:133.0) Gecko/20100101 Firefox/133.0',
+    navigatorPlatform: 'Linux x86_64',
+    vendor: '',
+    languages: ['en-US', 'en'],
+    hardwareConcurrency: 8,
+    deviceMemory: 8,
+    maxTouchPoints: 0,
+    webglVendor: 'Mozilla',
+    webglRenderer:
+      'llvmpipe (LLVM 15.0.7, 256 bits)',
     screen: { width: 1920, height: 1080, colorDepth: 24, pixelDepth: 24 },
     connection: { effectiveType: '4g', downlink: 10, rtt: 50, saveData: false },
   },
