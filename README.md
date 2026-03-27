@@ -112,17 +112,32 @@
 - `diff_env_requirements`：根据报错和观测能力比对当前缺失的环境能力。
 - `record_reverse_evidence`：把关键观察结果写入 task artifact，避免证据只留在对话里。
 
-### 页面自动化
+### 页面自动化与输入
 
 做最小必要的页面操作，复现触发条件并辅助取证。
 
 - `navigate_page`：跳转、回退、刷新当前页面。
 - `query_dom`：查询页面元素，确认选择器和节点状态。
-- `click_element`：按选择器触发点击，复现页面动作。
+- `click_element` / `click`：按选择器触发点击，复现页面动作（支持单击/双击）。
 - `type_text`：向输入框写入文本，驱动表单交互。
 - `take_screenshot`：截取页面当前状态，保留可视化证据。
+- `hover`：悬停在元素上，触发 hover 相关事件。
+- `fill`：填充单个输入框/文本域/下拉选择框。
+- `fill_form`：批量填充多个表单字段。
+- `drag`：拖拽元素到目标位置。
+- `upload_file`：通过文件输入框上传文件。
+- `press_key`：按下键盘按键或组合键（如 `Control+A`、`Control+Shift+R`）。
+- `handle_dialog`：处理浏览器弹窗（alert/confirm/prompt），支持接受/拒绝/输入文本。
 
-### 深度分析
+### 设备仿真与环境模拟
+
+模拟不同的设备环境和运行条件，用于测试响应式布局、检测竞态条件和网络依赖。
+
+- `resize_page`：调整浏览器窗口尺寸，模拟不同分辨率。
+- `emulate_network`：模拟网络条件（离线、Slow 3G、Fast 4G 等）。
+- `emulate_cpu`：模拟 CPU 降频（1-20x 降频），检测时序相关问题。
+
+### 深度分析与去混淆
 
 在拿到代码和运行时证据后，继续做结构理解与去混淆。
 

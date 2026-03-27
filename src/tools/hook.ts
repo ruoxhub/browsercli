@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -166,15 +165,24 @@ async function syncHookRecordsFromPage(runtime: ReturnType<typeof getJSHookRunti
   }
 }
 
+/**
+ * Create a hook script for function/fetch/xhr/property/cookie/websocket/eval/timer.
+ * Hooks run without pausing page execution and are the preferred approach over breakpoints for monitoring and interception.
+ *
+ * Example:
+ * - Monitor fetch: `{type: "fetch", action: "log"}`
+ * - Hook function: `{type: "function", target: "JSON.stringify", action: "log"}`
+ * - Monitor XHR: `{type: "xhr", action: "log"}`
+ */
 export const createHook = defineTool({
   name: 'create_hook',
   description: 'RECOMMENDED: Create hook script for function/fetch/xhr/property/cookie/websocket/eval/timer. Hooks run without pausing page execution and are the preferred approach over breakpoints for monitoring and interception.',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: false},
   schema: {
-    type: zod.string(),
-    params: zod.record(zod.string(), zod.unknown()).optional(),
-    description: zod.string().optional(),
-    action: zod.enum(['log', 'block', 'modify', 'passthrough']).optional(),
+    type: zod.string().describe('Hook type: function, fetch, xhr, property, cookie, websocket, eval, timer'),
+    params: zod.record(zod.string(), zod.unknown()).optional().describe('Hook parameters (e.g., target function name)'),
+    description: zod.string().optional().describe('Optional description for the hook'),
+    action: zod.enum(['log', 'block', 'modify', 'passthrough']).optional().describe('Hook action: log (default), block, modify, or passthrough'),
   },
   handler: async (request, response) => {
     const runtime = getJSHookRuntime();
@@ -185,11 +193,15 @@ export const createHook = defineTool({
   },
 });
 
+/**
+ * Inject an existing hook into the current page.
+ * The hook script will be executed and start monitoring/intercepting immediately.
+ */
 export const injectHook = defineTool({
   name: 'inject_hook',
   description: 'Inject an existing hook into the current page.',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: false},
-  schema: {hookId: zod.string()},
+  schema: {hookId: zod.string().describe('The hook ID to inject (from create_hook response)')},
   handler: async (request, response) => {
     const runtime = getJSHookRuntime();
     const hook = runtime.hookManager.getHook(request.params.hookId);
@@ -201,14 +213,19 @@ export const injectHook = defineTool({
   },
 });
 
+/**
+ * Get captured data for one hook or all hooks.
+ * Supports raw view and summary view for noise reduction.
+ * Summary view deduplicates records by target/event/method/url/body and shows counts.
+ */
 export const getHookData = defineTool({
   name: 'get_hook_data',
   description: 'Get captured data for one hook or all hooks. Supports raw view and summary view for noise reduction.',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
   schema: {
-    hookId: zod.string().optional(),
-    view: zod.enum(['raw', 'summary']).optional(),
-    maxRecords: zod.number().int().positive().optional(),
+    hookId: zod.string().optional().describe('Optional hook ID. If omitted, returns data for all hooks.'),
+    view: zod.enum(['raw', 'summary']).optional().describe('View mode: raw (all records) or summary (deduplicated with counts). Default: raw'),
+    maxRecords: zod.number().int().positive().optional().describe('Maximum records to return in summary mode. Default: 100'),
   },
   handler: async (request, response) => {
     const runtime = getJSHookRuntime();
@@ -249,11 +266,15 @@ export const getHookData = defineTool({
   },
 });
 
+/**
+ * Remove a hook by ID.
+ * This stops the hook from capturing any more data and removes it from memory.
+ */
 export const removeHook = defineTool({
   name: 'remove_hook',
   description: 'Remove a hook by id.',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: false},
-  schema: {hookId: zod.string()},
+  schema: {hookId: zod.string().describe('The hook ID to remove')},
   handler: async (request, response) => {
     const runtime = getJSHookRuntime();
     const removed = runtime.hookManager.remove(request.params.hookId);

@@ -11,6 +11,7 @@ export enum ToolCategory {
   REVERSE_ENGINEERING = 'reverse_engineering',
   INPUT = 'input',
   EMULATION = 'emulation',
+  PERFORMANCE = 'performance',
 }
 
 export const labels = {
@@ -20,4 +21,5 @@ export const labels = {
   [ToolCategory.REVERSE_ENGINEERING]: 'JS Reverse Engineering',
   [ToolCategory.INPUT]: 'Input automation',
   [ToolCategory.EMULATION]: 'Emulation',
+  [ToolCategory.PERFORMANCE]: 'Performance',
 };

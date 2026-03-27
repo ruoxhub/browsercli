@@ -808,7 +808,10 @@ ToolDefinition (基类)
 ├── dom.ts (DOM 操作)
 ├── stealth.ts (反检测)
 ├── pages.ts (页面列表)
-└── rebuild.ts (本地复现)
+├── rebuild.ts (本地复现)
+├── input.ts (输入自动化)
+├── emulation.ts (设备仿真)
+└── dialog.ts (弹窗处理)
 ```
 
 **工具注册流程**
@@ -832,14 +835,12 @@ for (const tool of registeredTools) {
 **工具分类**
 ```typescript
 enum ToolCategory {
-  DEBUGGER = 'debugger',
-  PAGE_AUTOMATION = 'page_automation',
+  NAVIGATION = 'navigation',
   NETWORK = 'network',
+  DEBUGGING = 'debugging',
   REVERSE_ENGINEERING = 'reverse_engineering',
-  HOOK = 'hook',
-  CONSOLE = 'console',
-  DOM = 'dom',
-  STEALTH = 'stealth',
+  INPUT = 'input',
+  EMULATION = 'emulation',
 }
 ```
 

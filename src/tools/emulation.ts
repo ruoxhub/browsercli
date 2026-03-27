@@ -122,3 +122,62 @@ export const resizePage = defineTool({
     );
   },
 });
+
+/**
+ * 一键切换移动设备模式（viewport + user-agent + touch）
+ */
+export const emulateMobile = defineTool({
+  name: 'emulate_mobile',
+  description: `Emulates mobile device viewport, user-agent, and touch events. Use this to test mobile layouts and touch interactions.`,
+  annotations: {
+    category: ToolCategory.EMULATION,
+    readOnlyHint: false,
+  },
+  schema: {
+    enable: zod
+      .boolean()
+      .describe('Whether to enable or disable mobile emulation'),
+    device: zod
+      .enum(['iphone', 'android', 'ipad'])
+      .optional()
+      .describe('Optional device type to emulate (default: iphone)'),
+  },
+  handler: async (request, response) => {
+    const runtime = getJSHookRuntime();
+    const page = await runtime.collector.getActivePage();
+
+    if (request.params.enable) {
+      const device = request.params.device || 'iphone';
+      let viewport: {width: number; height: number; deviceScaleFactor: number; isMobile: boolean; hasTouch: boolean};
+      let userAgent: string;
+
+      switch (device) {
+        case 'android':
+          viewport = {width: 412, height: 915, deviceScaleFactor: 2.625, isMobile: true, hasTouch: true};
+          userAgent = 'Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
+          break;
+        case 'ipad':
+          viewport = {width: 1024, height: 768, deviceScaleFactor: 2, isMobile: true, hasTouch: true};
+          userAgent = 'Mozilla/5.0 (iPad; CPU OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1';
+          break;
+        case 'iphone':
+        default:
+          viewport = {width: 390, height: 844, deviceScaleFactor: 3, isMobile: true, hasTouch: true};
+          userAgent = 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1';
+          break;
+      }
+
+      await page.setViewport(viewport);
+      await page.setUserAgent(userAgent);
+      await page.setJavaScriptEnabled(true);
+
+      response.appendResponseLine(`Mobile emulation enabled (${device})`);
+      response.appendResponseLine(`Viewport: ${viewport.width}x${viewport.height}`);
+      response.appendResponseLine(`User-Agent: ${userAgent.slice(0, 80)}...`);
+    } else {
+      await page.setViewport({width: 1280, height: 720, deviceScaleFactor: 1, isMobile: false, hasTouch: false});
+      await page.setUserAgent('');
+      response.appendResponseLine('Mobile emulation disabled');
+    }
+  },
+});

@@ -172,3 +172,5 @@ artifacts/tasks/smoke-task-*/
 # Local-only planning notes
 docs/plans/
 project/
+.gitnexus
+.claude

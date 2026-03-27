@@ -34,6 +34,7 @@ import * as dialogTools from './tools/dialog.js';
 import * as networkTools from './tools/network.js';
 import * as jshookPageTools from './tools/page.js';
 import * as pagesTools from './tools/pages.js';
+import * as performanceTools from './tools/performance.js';
 import * as jshookRebuildTools from './tools/rebuild.js';
 import * as screenshotTools from './tools/screenshot.js';
 import * as scriptTools from './tools/script.js';
@@ -230,6 +231,7 @@ const toolSources: Array<{source: string; tools: ToolDefinition[]}> = [
   {source: 'input', tools: asTools(inputTools)},
   {source: 'network', tools: asTools(networkTools)},
   {source: 'pages', tools: asTools(pagesTools)},
+  {source: 'performance', tools: asTools(performanceTools)},
   {source: 'screenshot', tools: asTools(screenshotTools)},
   {source: 'script', tools: asTools(scriptTools)},
   {source: 'jshookCollector', tools: asTools(jshookCollectorTools)},
