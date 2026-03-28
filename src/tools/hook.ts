@@ -113,9 +113,9 @@ function toHookRecordArray(data: unknown): Array<Record<string, unknown>> {
 }
 
 async function syncHookRecordsFromPage(runtime: ReturnType<typeof getJSHookRuntime>, hookId?: string): Promise<void> {
-  type EvaluatingPage = {
+  interface EvaluatingPage {
     evaluate: (fn: (id?: string) => unknown, id?: string) => Promise<unknown>;
-  };
+  }
 
   let page: EvaluatingPage | null = null;
   try {

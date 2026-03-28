@@ -7,8 +7,8 @@
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {defineTool, timeoutSchema} from './ToolDefinition.js';
 import {getJSHookRuntime} from './runtime.js';
+import {defineTool, timeoutSchema} from './ToolDefinition.js';
 
 // Default navigation timeout in milliseconds (10 seconds)
 const DEFAULT_NAV_TIMEOUT = 10000;

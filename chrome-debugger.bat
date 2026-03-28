@@ -1,1 +1,1 @@
-"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="E:\tmp\chrome-mcp"
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --remote-allow-origins=*  --user-data-dir="E:\tmp\chrome-mcp"

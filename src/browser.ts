@@ -12,13 +12,13 @@ import path from 'node:path';
 import puppeteerExtra from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 
+import {logger} from './logger.js';
 import {
   StealthScripts2025,
   type StealthPreset,
   type StealthInjectionOptions,
 } from './modules/stealth/index.js';
 import {HARMFUL_ARGS, DEFAULT_ARGS, STEALTH_ARGS} from './stealth-args.js';
-import {logger} from './logger.js';
 import type {
   Browser,
   ChromeReleaseChannel,

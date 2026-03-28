@@ -15,6 +15,7 @@ import {extractUrlLikeFromDevToolsTitle, urlsEqual} from './DevtoolsUtils.js';
 import type {TrafficSummary} from './formatters/websocketFormatter.js';
 import {NetworkCollector, ConsoleCollector} from './PageCollector.js';
 import type {ListenerMap, RequestInitiator} from './PageCollector.js';
+import {SessionManager} from './SessionManager.js';
 import {Locator} from './third_party/index.js';
 import type {
   Browser,
@@ -33,7 +34,6 @@ import type {TraceResult} from './trace-processing/parse.js';
 import {WaitForHelper} from './WaitForHelper.js';
 import type {WebSocketData} from './WebSocketCollector.js';
 import {WebSocketCollector} from './WebSocketCollector.js';
-import {SessionManager} from './SessionManager.js';
 
 interface McpContextOptions {
   // Whether the DevTools windows are exposed as pages for debugging of DevTools.

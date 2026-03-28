@@ -1,8 +1,16 @@
-import {zod} from '../third_party/index.js';
-import {defineTool} from './ToolDefinition.js';
-import {ToolCategory} from './categories.js';
+
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import {StealthScripts2025} from '../modules/stealth/StealthScripts2025.js';
+import {zod} from '../third_party/index.js';
+
+import {ToolCategory} from './categories.js';
 import {getJSHookRuntime} from './runtime.js';
+import {defineTool} from './ToolDefinition.js';
+
 
 export const injectStealth = defineTool({
   name: 'inject_stealth',

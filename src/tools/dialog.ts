@@ -5,9 +5,10 @@
  */
 
 import {zod} from '../third_party/index.js';
-import {defineTool} from './ToolDefinition.js';
+
 import {ToolCategory} from './categories.js';
 import {getJSHookRuntime} from './runtime.js';
+import {defineTool} from './ToolDefinition.js';
 
 /**
  * 处理浏览器弹窗（alert/confirm/prompt）

@@ -1,3 +1,9 @@
+
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 /**
  * HookTypeRegistry — 插件化 Hook 类型注册系统
  *
@@ -8,7 +14,8 @@
  * - HookManager 通过 registry 查找类型，无需 switch-case 硬编码
  */
 
-import { HookCodeBuilder, type BuilderConfig } from './HookCodeBuilder.js';
+import type { HookCodeBuilder} from './HookCodeBuilder.js';
+import { type BuilderConfig } from './HookCodeBuilder.js';
 
 // ==================== 插件接口 ====================
 
@@ -34,7 +41,7 @@ export interface HookTypePlugin {
 // ==================== 注册表 ====================
 
 export class HookTypeRegistry {
-  private plugins: Map<string, HookTypePlugin> = new Map();
+  private plugins = new Map<string, HookTypePlugin>();
 
   constructor() {
     this.registerBuiltins();

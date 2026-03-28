@@ -86,12 +86,12 @@ const reverseTaskParamsSchema = {
   goal: zod.string().optional().describe('Optional reverse-engineering goal for the task artifact.'),
 };
 
-type ReverseTaskParams = {
+interface ReverseTaskParams {
   taskId?: string;
   taskSlug?: string;
   targetUrl?: string;
   goal?: string;
-};
+}
 
 async function appendDebuggerEvidence(
   params: ReverseTaskParams,

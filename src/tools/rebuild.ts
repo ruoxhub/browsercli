@@ -125,13 +125,13 @@ function matchesTargetText(
 }
 
 function filterRuntimeEvidence(
-  records: Record<string, unknown>[],
+  records: Array<Record<string, unknown>>,
   targetKeywords: string[],
   targetUrlPatterns: string[],
   targetFunctionNames: string[],
   targetActionDescription: string,
   maxEvidenceItems: number,
-): Record<string, unknown>[] {
+): Array<Record<string, unknown>> {
   const filtered = (
     targetKeywords.length === 0 &&
     targetUrlPatterns.length === 0 &&

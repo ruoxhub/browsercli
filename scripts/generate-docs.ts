@@ -7,30 +7,30 @@
 import fs from 'node:fs';
 
 import {cliOptions} from '../build/src/cli.js';
+import * as jshookAnalyzerTools from '../build/src/tools/analyzer.js';
 import {ToolCategory, labels} from '../build/src/tools/categories.js';
+import * as jshookCollectorTools from '../build/src/tools/collector.js';
 import * as consoleTools from '../build/src/tools/console.js';
 import * as debuggerTools from '../build/src/tools/debugger.js';
+import * as jshookDomTools from '../build/src/tools/dom.js';
+import * as jshookHookTools from '../build/src/tools/hook.js';
 import * as networkTools from '../build/src/tools/network.js';
+import * as jshookPageTools from '../build/src/tools/page.js';
 import * as pagesTools from '../build/src/tools/pages.js';
 import * as screenshotTools from '../build/src/tools/screenshot.js';
 import * as scriptTools from '../build/src/tools/script.js';
-import * as websocketTools from '../build/src/tools/websocket.js';
-import * as jshookCollectorTools from '../build/src/tools/collector.js';
-import * as jshookAnalyzerTools from '../build/src/tools/analyzer.js';
-import * as jshookHookTools from '../build/src/tools/hook.js';
 import * as jshookStealthTools from '../build/src/tools/stealth.js';
-import * as jshookDomTools from '../build/src/tools/dom.js';
-import * as jshookPageTools from '../build/src/tools/page.js';
+import * as websocketTools from '../build/src/tools/websocket.js';
 
 const OUTPUT_PATH = './docs/tool-reference.md';
 const README_PATH = './README.md';
 
-type ToolDef = {
+interface ToolDef {
   name: string;
   description: string;
   annotations: {category: ToolCategory};
   schema: Record<string, unknown>;
-};
+}
 
 function allTools(): ToolDef[] {
   return [

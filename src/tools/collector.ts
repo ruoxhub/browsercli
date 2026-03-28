@@ -1,7 +1,14 @@
+
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import {zod} from '../third_party/index.js';
-import {defineTool} from './ToolDefinition.js';
+
 import {ToolCategory} from './categories.js';
 import {getJSHookRuntime} from './runtime.js';
+import {defineTool} from './ToolDefinition.js';
 
 export const collectCode = defineTool({
   name: 'collect_code',

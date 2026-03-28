@@ -4,11 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {CdpProxy} from '../cdp-proxy/index.js';
 import {zod} from '../third_party/index.js';
 import type {Page} from '../third_party/index.js';
+
 import {ToolCategory} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
-import {CdpProxy} from '../cdp-proxy/index.js';
 
 let proxyInstance: CdpProxy | null = null;
 

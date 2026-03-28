@@ -1,11 +1,20 @@
+
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+import {createCipheriv, createDecipheriv, createHash, randomBytes} from 'node:crypto';
+import {readFile, writeFile} from 'node:fs/promises';
+
 import {zod} from '../third_party/index.js';
-import {defineTool} from './ToolDefinition.js';
+
 import {ToolCategory} from './categories.js';
 import {getJSHookRuntime} from './runtime.js';
-import {readFile, writeFile} from 'node:fs/promises';
-import {createCipheriv, createDecipheriv, createHash, randomBytes} from 'node:crypto';
+import {defineTool} from './ToolDefinition.js';
 
-type SessionSnapshot = {
+
+interface SessionSnapshot {
   id: string;
   savedAt: string;
   expiresAt: string;
@@ -14,7 +23,7 @@ type SessionSnapshot = {
   cookies: any[];
   localStorage: Record<string, string>;
   sessionStorage: Record<string, string>;
-};
+}
 
 const sessionSnapshots = new Map<string, SessionSnapshot>();
 const sessionTtlMs = Math.max(60_000, Number(process.env.SESSION_STATE_TTL_MS ?? 30 * 60_000));

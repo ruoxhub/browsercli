@@ -1,7 +1,16 @@
+
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+import { spawn, type ChildProcess } from 'node:child_process';
+import { existsSync } from 'node:fs';
+
 import type { Browser, Page } from 'puppeteer';
 import puppeteer from 'puppeteer';
-import { spawn, type ChildProcess } from 'child_process';
-import { existsSync } from 'fs';
+
+
 import { logger } from '../../utils/logger.js';
 import { StealthScripts2025, type StealthPreset } from '../stealth/StealthScripts2025.js';
 
@@ -31,7 +40,7 @@ export class BrowserModeManager {
   private readonly config: NormalizedBrowserModeConfig;
   private sessionData: SessionData = {};
   private browserProcess: ChildProcess | null = null;
-  private autoLaunched: boolean = false;
+  private autoLaunched = false;
 
   constructor(config: BrowserModeConfig = {}) {
     const port = config.remoteDebuggingPort ?? 9222;

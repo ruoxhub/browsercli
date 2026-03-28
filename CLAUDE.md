@@ -115,7 +115,7 @@ Tests use Node.js built-in test runner. Test files mirror source structure under
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **JSReverser-MCP** (2553 symbols, 7505 relationships, 209 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **JSReverser-MCP** (2716 symbols, 7839 relationships, 223 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 

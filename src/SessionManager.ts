@@ -5,6 +5,7 @@
  */
 
 import type {Browser, Page} from 'puppeteer';
+
 import {debug} from './third_party/index.js';
 
 const logger = debug('mcp:session');

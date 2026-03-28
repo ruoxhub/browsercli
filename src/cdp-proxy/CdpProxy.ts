@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import http from 'node:http';
-import {URL} from 'node:url';
 import fs from 'node:fs';
+import http from 'node:http';
 import net from 'node:net';
+import {URL} from 'node:url';
 
 import {logger} from '../logger.js';
 import {puppeteer} from '../third_party/index.js';

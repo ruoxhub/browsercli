@@ -1,3 +1,9 @@
+
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 /**
  * TokenBudgetManager - 全局 Token 预算管理器
  * 
@@ -15,8 +21,8 @@
  * - 自动清理 - 90% 时自动触发
  */
 
-import { logger } from './logger.js';
 import { DetailedDataManager } from './detailedDataManager.js';
+import { logger } from './logger.js';
 import { safeStringify } from './safeJson.js';
 
 /**
