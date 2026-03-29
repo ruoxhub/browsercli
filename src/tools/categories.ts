@@ -15,6 +15,7 @@ export enum ToolCategory {
   DOM = 'dom',
   SCREENSHOT = 'screenshot',
   PAGES = 'pages',
+  DATA = 'data',
 }
 
 export const labels = {
@@ -28,4 +29,5 @@ export const labels = {
   [ToolCategory.DOM]: 'DOM manipulation',
   [ToolCategory.SCREENSHOT]: 'Screenshot',
   [ToolCategory.PAGES]: 'Pages',
+  [ToolCategory.DATA]: 'Data',
 };

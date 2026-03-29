@@ -14,6 +14,7 @@ import {loadIssueDescriptions} from './issue-descriptions.js';
 import {logger, saveLogsToFile} from './logger.js';
 import {McpContext} from './McpContext.js';
 import {McpResponse} from './McpResponse.js';
+import {dbService} from './services/DatabaseService.js';
 import {
   McpServer,
   StdioServerTransport,
@@ -40,6 +41,7 @@ import * as jshookRebuildTools from './tools/rebuild.js';
 import {getJSHookRuntime} from './tools/runtime.js';
 import * as screenshotTools from './tools/screenshot.js';
 import * as scriptTools from './tools/script.js';
+import * as siteExperienceTools from './tools/siteExperience.js';
 import * as jshookStealthTools from './tools/stealth.js';
 import type {ToolDefinition} from './tools/ToolDefinition.js';
 import {ToolRegistry} from './tools/ToolRegistry.js';
@@ -69,6 +71,18 @@ const server = new McpServer(
 server.server.setRequestHandler(SetLevelRequestSchema, () => {
   return {};
 });
+
+// Initialize database connection if databaseUrl is provided
+if (args.databaseUrl) {
+  try {
+    await dbService.connect(args.databaseUrl);
+    await dbService.migrate();
+    logger('[main] Database initialized');
+  } catch (error) {
+    logger('[main] Failed to initialize database', error);
+    // Continue without database - tools will return appropriate errors
+  }
+}
 
 let context: McpContext;
 async function getContext(): Promise<McpContext> {
@@ -244,6 +258,7 @@ const toolSources: Array<{source: string; tools: ToolDefinition[]}> = [
   {source: 'jshookRebuild', tools: asTools(jshookRebuildTools)},
   {source: 'websocket', tools: asTools(websocketTools)},
   {source: 'cdp-proxy', tools: asTools(cdpProxyTools)},
+  {source: 'siteExperience', tools: asTools(siteExperienceTools)},
 ];
 
 const tools = toolSources.flatMap((entry) =>

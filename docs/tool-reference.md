@@ -25,6 +25,12 @@
   - [`select_page`](#select_page)
   - [`type_text`](#type_text)
   - [`wait_for_element`](#wait_for_element)
+- **[Data](#data)** (5 tools)
+  - [`create_site_experience`](#create_site_experience)
+  - [`delete_site_experience`](#delete_site_experience)
+  - [`list_site_experiences`](#list_site_experiences)
+  - [`search_site_experience`](#search_site_experience)
+  - [`update_site_experience`](#update_site_experience)
 - **[Network](#network)** (6 tools)
   - [`analyze_websocket_messages`](#analyze_websocket_messages)
   - [`get_network_request`](#get_network_request)
@@ -814,4 +820,57 @@ so returned values have to JSON-serializable.
 **Parameters:**
 
 - `hookId`
+
+## Data
+
+### `create_site_experience`
+
+**Description:** 创建新的站点经验记录
+
+**Parameters:**
+
+- `domain` - 站点域名（例如：example.com）
+- `name` - 站点名称
+- `aliases` - 站点别名列表
+- `platformFeatures` - 平台特征描述
+- `validPatterns` - 有效模式描述
+- `knownPitfalls` - 已知陷阱描述
+
+### `delete_site_experience`
+
+**Description:** 删除站点经验记录
+
+**Parameters:**
+
+- `id` - 要删除的站点经验 ID
+
+### `list_site_experiences`
+
+**Description:** 列出所有已保存的站点经验
+
+**Parameters:**
+
+- (none)
+
+### `search_site_experience`
+
+**Description:** 按 URL 或名称搜索站点经验。支持从完整 URL 自动提取域名进行匹配。
+
+**Parameters:**
+
+- `url` - 要搜索的 URL 或域名
+- `name` - 要搜索的站点名称
+
+### `update_site_experience`
+
+**Description:** 更新现有的站点经验记录
+
+**Parameters:**
+
+- `id` - 要更新的站点经验 ID
+- `name` - 新的站点名称
+- `aliases` - 新的别名列表
+- `platformFeatures` - 新的平台特征描述
+- `validPatterns` - 新的有效模式描述
+- `knownPitfalls` - 新的已知陷阱描述
 

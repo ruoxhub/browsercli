@@ -421,6 +421,28 @@ export const loadSessionState = defineTool({
   handler: async (request, response) => {
     ensureCleanupLoop();
     cleanupExpiredSessions();
+
+    // If only sessionId is provided, try to load from memory
+    if (!request.params.path && !request.params.snapshotJson && request.params.sessionId) {
+      const existingSnapshot = sessionSnapshots.get(request.params.sessionId);
+      if (existingSnapshot) {
+        response.appendResponseLine('```json');
+        response.appendResponseLine(JSON.stringify({
+          sessionId: request.params.sessionId,
+          loaded: true,
+          source: 'memory',
+          counts: {
+            cookies: existingSnapshot.cookies.length,
+            localStorage: Object.keys(existingSnapshot.localStorage).length,
+            sessionStorage: Object.keys(existingSnapshot.sessionStorage).length,
+          },
+        }, null, 2));
+        response.appendResponseLine('```');
+        return;
+      }
+      throw new Error(`Session snapshot not found in memory: ${request.params.sessionId}. Provide path or snapshotJson to load from file or JSON string.`);
+    }
+
     const rawJson = request.params.path
       ? await readFile(request.params.path, 'utf8')
       : request.params.snapshotJson;

@@ -412,6 +412,30 @@ build/src/index.js
 npm run start
 ```
 
+### 4) 数据库配置（可选）
+
+如果需要启用站点经验 PostgreSQL 存储功能，启动时添加 `--databaseUrl` 参数：
+
+```bash
+npm run start -- --databaseUrl postgresql://user:password@localhost:5432/js_reverse_mcp
+```
+
+或在 MCP 客户端配置中添加环境变量：
+
+```json
+{
+  "mcpServers": {
+    "js-reverse": {
+      "command": "node",
+      "args": ["/path/to/build/src/index.js"],
+      "env": {
+        "DATABASE_URL": "postgresql://user:password@localhost:5432/js_reverse_mcp"
+      }
+    }
+  }
+}
+```
+
 ### 3) 配置客户端
 
 最小配置示例：

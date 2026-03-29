@@ -162,6 +162,12 @@ export const cliOptions = {
     default: true,
     describe: 'Set to false to exclude tools related to network.',
   },
+  databaseUrl: {
+    type: 'string',
+    description:
+      'PostgreSQL connection URL for site experience storage (e.g., postgresql://user:password@localhost:5432/js_reverse_mcp).',
+    alias: 'd',
+  },
 } satisfies Record<string, YargsOptions>;
 
 export function parseArguments(version: string, argv = process.argv) {

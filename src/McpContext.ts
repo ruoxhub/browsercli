@@ -573,11 +573,15 @@ export class McpContext implements Context {
   ): Promise<{filename: string}> {
     try {
       const filePath = path.resolve(filename);
+      const dir = path.dirname(filePath);
+      // Ensure directory exists before writing
+      await fs.mkdir(dir, {recursive: true});
       await fs.writeFile(filePath, data);
       return {filename};
     } catch (err) {
       this.logger(err);
-      throw new Error('Could not save a screenshot to a file', {cause: err});
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      throw new Error(`Could not save file to ${filename}: ${errorMsg}`, {cause: err});
     }
   }
 
