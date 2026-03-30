@@ -558,4 +558,78 @@ describe('debugger tools extended', () => {
     assert.ok(response.lines.some((x) => x.includes('XHR breakpoint set')));
     assert.ok(response.lines.some((x) => x.includes('XHR breakpoint removed')));
   });
+
+  it('covers xhr_to_js_breakpoint two-phase workflow', async () => {
+    const { xhrToJsBreakpoint } = await import('../../../src/tools/debugger.js');
+    const response = makeResponse();
+
+    let xhrBreakpointSet = false;
+    let xhrBreakpointRemoved = false;
+    let jsBreakpointSet = false;
+    let resumeCalled = false;
+
+    const context = makeContext({
+      debuggerContext: {
+        isEnabled: () => true,
+        getScripts: () => [],
+        getScriptsByUrlPattern: () => [],
+        getScriptSource: async () => '',
+        getScriptById: () => ({ scriptId: '1', url: 'https://app.js' }),
+        searchInScripts: async () => ({ matches: [] }),
+        setBreakpoint: async () => {
+          jsBreakpointSet = true;
+          return { breakpointId: 'js-bp-1', locations: [] };
+        },
+        setBreakpointByUrlRegex: async () => ({ breakpointId: 'bp-regex', locations: [] }),
+        removeBreakpoint: async () => undefined,
+        getBreakpoints: () => [],
+        getPausedState: () => ({
+          isPaused: true,
+          callFrames: [
+            {
+              functionName: 'fetchData',
+              url: 'https://app.js',
+              callFrameId: 'cf-1',
+              location: { scriptId: '1', lineNumber: 10, columnNumber: 5 },
+              scopeChain: [],
+            },
+          ],
+        }),
+        isPaused: () => true,
+        resume: async () => {
+          resumeCalled = true;
+        },
+        pause: async () => undefined,
+        stepOver: async () => undefined,
+        stepInto: async () => undefined,
+        stepOut: async () => undefined,
+        evaluateOnCallFrame: async () => ({ result: { value: null } }),
+        getScopeVariables: async () => [],
+        getClient: () => ({
+          send: async (method: string, params?: unknown) => {
+            if (method === 'DOMDebugger.setXHRBreakpoint') {
+              xhrBreakpointSet = true;
+            } else if (method === 'DOMDebugger.removeXHRBreakpoint') {
+              xhrBreakpointRemoved = true;
+            }
+            return undefined;
+          },
+        }),
+      } as unknown as DebuggerContextHarness,
+    });
+
+    await xhrToJsBreakpoint.handler(
+      { params: { urlPattern: '/api/data', maxWaitMs: 5000 } },
+      response as unknown as Parameters<typeof xhrToJsBreakpoint.handler>[1],
+      context as unknown as Parameters<typeof xhrToJsBreakpoint.handler>[2],
+    );
+
+    assert.ok(xhrBreakpointSet, 'XHR breakpoint should be set');
+    assert.ok(jsBreakpointSet, 'JS breakpoint should be set');
+    assert.ok(xhrBreakpointRemoved, 'XHR breakpoint should be removed');
+    assert.ok(resumeCalled, 'resume should be called');
+    assert.ok(response.lines.some((x) => x.includes('阶段 1')));
+    assert.ok(response.lines.some((x) => x.includes('阶段 2')));
+    assert.ok(response.lines.some((x) => x.includes('顶层用户代码位置')));
+  });
 });

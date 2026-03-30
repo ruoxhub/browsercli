@@ -19,6 +19,10 @@ import {zod} from '../third_party/index.js';
 import {ToolCategory} from './categories.js';
 import {getJSHookRuntime} from './runtime.js';
 import {defineTool} from './ToolDefinition.js';
+import {createAIService, getAIConfig} from '../utils/config.js';
+import {AIService} from '../services/AIService.js';
+import {DebuggerManager} from '../modules/debugger/DebuggerManager.js';
+import {AIContinuousDebugger, ContinuousDebugConfig} from '../modules/debugger/AIContinuousDebugger.js';
 
 const BREAKPOINT_STALL_HINT =
   'If execution appears stuck: run resume first. If it keeps pausing at the same location, remove_breakpoint and switch to trace_function(pause=false) or hook_function.';
@@ -2634,3 +2638,397 @@ export const traceFunction = defineTool({
     }
   },
 });
+
+/**
+ * XHR 断点到 JS 断点两阶段工作流
+ */
+export const xhrToJsBreakpoint = defineTool({
+  name: 'xhr_to_js_breakpoint',
+  description:
+    '两阶段断点工作流：先通过 XHR 断点捕获调用栈，然后在顶层用户代码位置设置 JS 断点。',
+  annotations: {
+    title: 'XHR to JS Breakpoint',
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: false,
+  },
+  schema: {
+    urlPattern: zod.string().describe('XHR 断点 URL 模式'),
+    maxWaitMs: zod
+      .number()
+      .int()
+      .optional()
+      .default(30000)
+      .describe('等待 XHR 断点触发的最大时间 (毫秒)'),
+  },
+  handler: async (request, response, context) => {
+    const {urlPattern, maxWaitMs} = request.params;
+    const debugger_ = context.debuggerContext;
+
+    if (!debugger_.isEnabled()) {
+      response.appendResponseLine(
+        'Debugger is not enabled. Please select a page first.',
+      );
+      return;
+    }
+
+    try {
+      // 设置 XHR 断点
+      const client = debugger_.getClient();
+      if (!client) {
+        response.appendResponseLine('Debugger client not available.');
+        return;
+      }
+
+      response.appendResponseLine(`阶段 1: 设置 XHR 断点 "${urlPattern}"...`);
+      await client.send('DOMDebugger.setXHRBreakpoint', {url: urlPattern});
+
+      // 等待断点触发（轮询检查暂停状态）
+      response.appendResponseLine(`等待 XHR 请求触发 (最多 ${maxWaitMs}ms)...`);
+
+      const startTime = Date.now();
+      let pausedState = debugger_.getPausedState();
+
+      while (!pausedState.isPaused && Date.now() - startTime < maxWaitMs) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        pausedState = debugger_.getPausedState();
+      }
+
+      if (!pausedState.isPaused) {
+        response.appendResponseLine('超时：XHR 断点未被触发。');
+        await client.send('DOMDebugger.removeXHRBreakpoint', {url: urlPattern});
+        return;
+      }
+
+      response.appendResponseLine(`✅ XHR 断点已触发！`);
+      response.appendResponseLine(`调用栈深度：${pausedState.callFrames.length}`);
+
+      // 识别用户代码帧
+      const targetFrame = findUserCodeFrame(pausedState.callFrames);
+      if (!targetFrame) {
+        response.appendResponseLine('错误：无法识别用户代码帧。');
+        await client.send('DOMDebugger.removeXHRBreakpoint', {url: urlPattern});
+        return;
+      }
+
+      response.appendResponseLine('');
+      response.appendResponseLine('顶层用户代码位置:');
+      response.appendResponseLine(`  函数：${targetFrame.functionName || '(anonymous)'}`);
+      response.appendResponseLine(`  脚本：${targetFrame.url || `script:${targetFrame.location.scriptId}`}`);
+      response.appendResponseLine(`  位置：行${targetFrame.location.lineNumber + 1}, 列${targetFrame.location.columnNumber}`);
+
+      // 设置 JS 断点
+      response.appendResponseLine('');
+      response.appendResponseLine('阶段 2: 设置 JS 断点...');
+      const breakpointInfo = await debugger_.setBreakpoint(
+        targetFrame.url || '',
+        targetFrame.location.lineNumber,
+        targetFrame.location.columnNumber,
+      );
+
+      // 移除 XHR 断点
+      await client.send('DOMDebugger.removeXHRBreakpoint', {url: urlPattern});
+
+      // 恢复执行
+      response.appendResponseLine('恢复执行，等待 JS 断点触发...');
+      await debugger_.resume();
+
+      response.appendResponseLine('');
+      response.appendResponseLine(`✅ 完成！JS 断点已设置：${breakpointInfo.breakpointId}`);
+      response.appendResponseLine(`XHR 断点已移除。`);
+      response.appendResponseLine('');
+      response.appendResponseLine('提示：使用 get_paused_info 查看断点命中时的状态。');
+    } catch (error) {
+      // 清理 XHR 断点
+      try {
+        const client = debugger_.getClient();
+        if (client) {
+          await client.send('DOMDebugger.removeXHRBreakpoint', {url: urlPattern});
+        }
+      } catch {}
+
+      response.appendResponseLine(
+        `错误：${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  },
+});
+
+/**
+ * 启动 AI 连续调试循环
+ */
+export const startContinuousDebugging = defineTool({
+  name: 'start_continuous_debugging',
+  description:
+    '启动 AI 辅助的连续调试循环。设置 XHR 断点（可选），然后自动分析每个断点并决定下一步。',
+  annotations: {
+    title: 'Start Continuous Debugging',
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: false,
+  },
+  schema: {
+    targetUrl: zod.string().optional().describe('可选：调试开始前导航到的目标 URL'),
+    xhrBreakPatterns: zod
+      .array(zod.string())
+      .optional()
+      .describe('可选：XHR 断点 URL 模式列表'),
+    maxIterations: zod
+      .number()
+      .int()
+      .optional()
+      .default(50)
+      .describe('最大迭代次数'),
+    timeoutMs: zod
+      .number()
+      .int()
+      .optional()
+      .default(300000)
+      .describe('超时时间 (毫秒，默认 5 分钟)'),
+    aiProvider: zod
+      .enum(['openai', 'anthropic', 'gemini'])
+      .optional()
+      .describe('AI 提供商'),
+    model: zod.string().optional().describe('模型名称'),
+    systemPrompt: zod.string().optional().describe('系统提示词覆盖'),
+  },
+  handler: async (request, response, context) => {
+    const debugger_ = context.debuggerContext;
+
+    if (!debugger_.isEnabled()) {
+      response.appendResponseLine(
+        'Debugger is not enabled. Please select a page first.',
+      );
+      return;
+    }
+
+    try {
+      // 创建 AI 服务
+      const aiConfig = getAIConfig();
+      if (!aiConfig) {
+        response.appendResponseLine('错误：未配置 AI 服务。请设置环境变量（如 OPENAI_API_KEY、ANTHROPIC_API_KEY 或 GEMINI_API_KEY）。');
+        return;
+      }
+
+      const aiService = createAIService(aiConfig);
+      if (!aiService) {
+        response.appendResponseLine('错误：无法创建 AI 服务实例。');
+        return;
+      }
+
+      // 获取 DebuggerManager 和 XHRBreakpointManager
+      const debuggerManager = debugger_ as unknown as DebuggerManager;
+      const xhrManager = (debuggerManager as any).xhrManager;
+
+      if (!xhrManager) {
+        response.appendResponseLine('错误：XHRBreakpointManager 不可用。');
+        return;
+      }
+
+      // 创建调试器实例
+      const continuousDebugger = new AIContinuousDebugger(
+        debuggerManager,
+        xhrManager,
+        aiService,
+      );
+
+      // 构建配置
+      const config: ContinuousDebugConfig = {
+        targetUrl: request.params.targetUrl,
+        xhrBreakPatterns: request.params.xhrBreakPatterns,
+        maxIterations: request.params.maxIterations,
+        timeoutMs: request.params.timeoutMs,
+        aiProvider: request.params.aiProvider,
+        model: request.params.model,
+        systemPrompt: request.params.systemPrompt,
+      };
+
+      // 导航到目标 URL（如果提供）
+      if (config.targetUrl) {
+        response.appendResponseLine(`导航到：${config.targetUrl}`);
+        const page = context.getSelectedPage();
+        if (page) {
+          await page.goto(config.targetUrl, {waitUntil: 'domcontentloaded'});
+        }
+      }
+
+      // 启动调试循环
+      response.appendResponseLine('');
+      response.appendResponseLine('🤖 启动 AI 连续调试循环...');
+      response.appendResponseLine(`最大迭代次数：${config.maxIterations}`);
+      response.appendResponseLine(`超时时间：${config.timeoutMs}ms`);
+      if (config.xhrBreakPatterns) {
+        response.appendResponseLine(`XHR 断点模式：${config.xhrBreakPatterns.join(', ')}`);
+      }
+      response.appendResponseLine('');
+      response.appendResponseLine('调试循环已启动。AI 将自动分析每个断点并决定下一步操作。');
+      response.appendResponseLine('');
+      response.appendResponseLine('使用 stop_continuous_debugging 可随时停止调试。');
+      response.appendResponseLine('使用 get_ai_debug_status 可查看当前状态和统计信息。');
+
+      // 启动调试（不等待完成）
+      continuousDebugger.start(config).catch(error => {
+        console.error('AI continuous debugging error:', error);
+      });
+
+      // 将调试器实例存储到上下文中（用于后续停止）
+      (context as any).__continuousDebugger = continuousDebugger;
+    } catch (error) {
+      response.appendResponseLine(
+        `错误：${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  },
+});
+
+/**
+ * 停止 AI 连续调试循环
+ */
+export const stopContinuousDebugging = defineTool({
+  name: 'stop_continuous_debugging',
+  description: '停止正在运行的 AI 连续调试循环。',
+  annotations: {
+    title: 'Stop Continuous Debugging',
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: false,
+  },
+  schema: {},
+  handler: async (request, response, context) => {
+    const continuousDebugger = (context as any).__continuousDebugger as AIContinuousDebugger | undefined;
+
+    if (!continuousDebugger) {
+      response.appendResponseLine('没有正在运行的 AI 调试会话。');
+      return;
+    }
+
+    try {
+      await continuousDebugger.stop();
+      response.appendResponseLine('✅ AI 连续调试已停止。');
+
+      const stats = continuousDebugger.getStats();
+      response.appendResponseLine('');
+      response.appendResponseLine('调试统计:');
+      response.appendResponseLine(`  迭代次数：${stats.iterations}`);
+      response.appendResponseLine(`  总耗时：${stats.totalTimeMs}ms`);
+      response.appendResponseLine(`  AI 平均延迟：${stats.avgAiLatencyMs}ms`);
+      response.appendResponseLine('  决策分布:');
+      for (const [action, count] of Object.entries(stats.decisions)) {
+        response.appendResponseLine(`    ${action}: ${count}`);
+      }
+      if (stats.errors.length > 0) {
+        response.appendResponseLine(`  错误：${stats.errors.length}`);
+        for (const err of stats.errors) {
+          response.appendResponseLine(`    - ${err}`);
+        }
+      }
+
+      (context as any).__continuousDebugger = undefined;
+    } catch (error) {
+      response.appendResponseLine(
+        `错误：${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  },
+});
+
+/**
+ * 获取 AI 调试状态和统计信息
+ */
+export const getAiDebugStatus = defineTool({
+  name: 'get_ai_debug_status',
+  description: '获取当前 AI 调试会话的状态和统计信息。',
+  annotations: {
+    title: 'Get AI Debug Status',
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: true,
+  },
+  schema: {},
+  handler: async (request, response, context) => {
+    const continuousDebugger = (context as any).__continuousDebugger as AIContinuousDebugger | undefined;
+
+    if (!continuousDebugger) {
+      response.appendResponseLine('没有正在运行的 AI 调试会话。');
+      response.appendResponseLine('');
+      response.appendResponseLine('使用 start_continuous_debugging 启动新的调试会话。');
+      return;
+    }
+
+    try {
+      const status = continuousDebugger.getStatus();
+      const stats = continuousDebugger.getStats();
+      const history = continuousDebugger.getIterationHistory();
+
+      response.appendResponseLine('🤖 AI 调试状态');
+      response.appendResponseLine('');
+      response.appendResponseLine(`状态：${status}`);
+      response.appendResponseLine(`迭代次数：${stats.iterations}`);
+      response.appendResponseLine(`总耗时：${stats.totalTimeMs}ms`);
+      response.appendResponseLine(`AI 平均延迟：${stats.avgAiLatencyMs}ms`);
+      response.appendResponseLine('');
+      response.appendResponseLine('决策分布:');
+      for (const [action, count] of Object.entries(stats.decisions)) {
+        response.appendResponseLine(`  ${action}: ${count}`);
+      }
+
+      if (stats.errors.length > 0) {
+        response.appendResponseLine('');
+        response.appendResponseLine(`错误 (${stats.errors.length}):`);
+        for (const err of stats.errors) {
+          response.appendResponseLine(`  - ${err}`);
+        }
+      }
+
+      if (history.length > 0) {
+        response.appendResponseLine('');
+        response.appendResponseLine('最近迭代:');
+        const recent = history.slice(-5);
+        for (let i = 0; i < recent.length; i++) {
+          const item = recent[i];
+          response.appendResponseLine(`  ${history.length - recent.length + i + 1}. ${item.decision.action} - ${item.decision.reason.slice(0, 50)}...`);
+        }
+      }
+    } catch (error) {
+      response.appendResponseLine(
+        `错误：${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  },
+});
+
+/**
+ * 从调用栈中识别用户代码帧（辅助函数）
+ */
+function findUserCodeFrame(callStack: Array<{
+  url?: string;
+  functionName?: string;
+  location: {scriptId: string; lineNumber: number; columnNumber: number};
+}>): typeof callStack[0] | null {
+  const vendorPatterns = [
+    'node_modules',
+    'vendor',
+    'webpack',
+    'cdn.',
+    'googleapis.com',
+    'cloudflare.com',
+    'amazonaws.com',
+    '/dist/',
+    '/build/',
+    'min.js',
+    '.min.',
+  ];
+
+  for (const frame of callStack) {
+    const url = frame.url || '';
+    const functionName = frame.functionName || '';
+
+    const isVendor = vendorPatterns.some(pattern =>
+      url.includes(pattern) || functionName.includes(pattern),
+    );
+
+    const isUserCode = !isVendor;
+
+    if (isUserCode) {
+      return frame;
+    }
+  }
+
+  return callStack[0] || null;
+}
