@@ -43,6 +43,14 @@ import * as screenshotTools from './tools/screenshot.js';
 import * as scriptTools from './tools/script.js';
 import * as siteExperienceTools from './tools/siteExperience.js';
 import * as jshookStealthTools from './tools/stealth.js';
+import * as antiDebugTools from './tools/anti-debug/bypassDebugger.js';
+import * as antiAntiDebugTools from './tools/anti-debug/antiAntiDebug.js';
+import * as cryptoTools from './tools/crypto/hookCryptoJS.js';
+import * as cryptoJSEncryptTools from './tools/crypto/hookJSEncrypt.js';
+import * as cryptoSMCryptoTools from './tools/crypto/hookSMCrypto.js';
+import * as vueGetRoutesTools from './tools/vue/getVueRoutes.js';
+import * as vueClearGuardsTools from './tools/vue/clearVueGuards.js';
+import * as vueActivateDevtoolsTools from './tools/vue/activateVueDevtools.js';
 import type {ToolDefinition} from './tools/ToolDefinition.js';
 import {ToolRegistry} from './tools/ToolRegistry.js';
 import * as websocketTools from './tools/websocket.js';
@@ -259,6 +267,9 @@ const toolSources: Array<{source: string; tools: ToolDefinition[]}> = [
   {source: 'websocket', tools: asTools(websocketTools)},
   {source: 'cdp-proxy', tools: asTools(cdpProxyTools)},
   {source: 'siteExperience', tools: asTools(siteExperienceTools)},
+  {source: 'anti-debug', tools: [...asTools(antiDebugTools), ...asTools(antiAntiDebugTools)]},
+  {source: 'crypto', tools: [...asTools(cryptoTools), ...asTools(cryptoJSEncryptTools), ...asTools(cryptoSMCryptoTools)]},
+  {source: 'vue', tools: [...asTools(vueGetRoutesTools), ...asTools(vueClearGuardsTools), ...asTools(vueActivateDevtoolsTools)]},
 ];
 
 const tools = toolSources.flatMap((entry) =>

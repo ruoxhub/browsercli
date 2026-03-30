@@ -78,6 +78,7 @@ export interface BuilderConfig {
   action: HookAction;
   hookId: string;
   asyncAware: boolean;
+  asyncAutoDetect?: boolean;
   /** 用于描述此 hook 的注释说明 */
   description?: string;
 }
@@ -102,6 +103,7 @@ export class HookCodeBuilder {
       action: 'log',
       hookId: hookId || `hook-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       asyncAware: false,
+      asyncAutoDetect: false,
     };
   }
 
@@ -250,6 +252,12 @@ export class HookCodeBuilder {
   /** 启用 async 感知（自动 await Promise 返回值） */
   async(enabled = true): this {
     this.config.asyncAware = enabled;
+    return this;
+  }
+
+  /** 启用 async 自动检测 */
+  autoDetectAsync(enabled = true): this {
+    this.config.asyncAutoDetect = enabled;
     return this;
   }
 
@@ -416,20 +424,57 @@ export class HookCodeBuilder {
   // ==================== 内部构建方法 ====================
 
   private buildReplaceHook(): string {
-    const { target, hookId, lifecycle, description } = this.config;
+    const { target, hookId, lifecycle, description, asyncAutoDetect } = this.config;
     const label = target.label || target.expression;
 
+    if (!asyncAutoDetect) {
+      return [
+        `// Hook (replace): ${description || label}`,
+        `// ID: ${hookId}`,
+        `(function() {`,
+        `  'use strict';`,
+        `  const __original = ${target.expression};`,
+        `  if (typeof __original !== 'function') {`,
+        `    console.warn('[${hookId}] Target is not a function: ${label}');`,
+        `    return;`,
+        `  }`,
+        `  ${target.expression} = function(...args) {`,
+        `    const originalFn = __original.bind(this);`,
+        `    ${lifecycle.replace}`,
+        `  };`,
+        `  // Preserve function properties`,
+        `  try { Object.defineProperty(${target.expression}, 'length', { value: __original.length }); } catch(e) {}`,
+        `  try { Object.defineProperty(${target.expression}, 'name', { value: __original.name }); } catch(e) {}`,
+        `  try { Object.setPrototypeOf(${target.expression}, __original); } catch(e) {}`,
+        `  console.log('[${hookId}] ✅ Replaced: ${label}');`,
+        `})();`,
+      ].join('\n');
+    }
+
+    // Async auto-detect version
     return [
       `// Hook (replace): ${description || label}`,
       `// ID: ${hookId}`,
       `(function() {`,
       `  'use strict';`,
       `  const __original = ${target.expression};`,
+      `  if (typeof __original !== 'function') {`,
+      `    console.warn('[${hookId}] Target is not a function: ${label}');`,
+      `    return;`,
+      `  }`,
+      `  const __isAsync = __original.constructor.name === 'AsyncFunction';`,
       `  ${target.expression} = function(...args) {`,
-      `    const originalFn = __original.bind(this);`,
-      `    ${lifecycle.replace}`,
+      `    if (__isAsync) {`,
+      `      return (async (...a) => { ${lifecycle.replace} }).apply(this, args);`,
+      `    } else {`,
+      `      return (function(...a) { ${lifecycle.replace} }).apply(this, args);`,
+      `    }`,
       `  };`,
-      `  console.log('[${hookId}] ✅ Replaced: ${label}');`,
+      `  // Preserve function properties`,
+      `  try { Object.defineProperty(${target.expression}, 'length', { value: __original.length }); } catch(e) {}`,
+      `  try { Object.defineProperty(${target.expression}, 'name', { value: __original.name }); } catch(e) {}`,
+      `  try { Object.setPrototypeOf(${target.expression}, __original); } catch(e) {}`,
+      `  console.log('[${hookId}] ✅ Replaced (async-aware): ${label}');`,
       `})();`,
     ].join('\n');
   }
