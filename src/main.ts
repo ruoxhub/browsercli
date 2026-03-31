@@ -18,8 +18,10 @@ import {dbService} from './services/DatabaseService.js';
 import {
   McpServer,
   StdioServerTransport,
+  StreamableHTTPServerTransport,
   type CallToolResult,
   SetLevelRequestSchema,
+  isInitializeRequest,
 } from './third_party/index.js';
 import * as jshookAnalyzerTools from './tools/analyzer.js';
 import {ToolCategory} from './tools/categories.js';
@@ -57,6 +59,9 @@ import * as websocketTools from './tools/websocket.js';
 import {ErrorCodes, formatError} from './utils/errors.js';
 import {TokenBudgetManager} from './utils/TokenBudgetManager.js';
 import {ToolExecutionScheduler} from './utils/ToolExecutionScheduler.js';
+import {randomUUID} from 'node:crypto';
+import {createServer} from 'node:http';
+import type {IncomingMessage, ServerResponse} from 'node:http';
 
 // If moved update release-please config
 // x-release-please-start-version
@@ -323,7 +328,115 @@ for (const tool of registeredTools) {
 if (features.issues) {
   await loadIssueDescriptions();
 }
-const transport = new StdioServerTransport();
-await server.connect(transport);
-logger('Chrome DevTools MCP Server connected');
-logDisclaimers();
+
+// Start server based on mode (HTTP or stdio)
+if (args.http) {
+  // HTTP mode
+  const transports: Record<string, StreamableHTTPServerTransport> = {};
+
+  const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse) => {
+    // CORS headers for browser-based clients
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, mcp-session-id');
+    res.setHeader('Access-Control-Expose-Headers', 'mcp-session-id');
+
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+
+    // Handle CORS preflight requests
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+
+    const sessionId = req.headers['mcp-session-id'] as string | undefined;
+    let transport: StreamableHTTPServerTransport;
+
+    // Read request body for POST requests
+    let body: any = null;
+    if (req.method === 'POST') {
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) {
+        chunks.push(chunk);
+      }
+      const rawData = Buffer.concat(chunks).toString();
+      body = rawData ? JSON.parse(rawData) : null;
+    }
+
+    if (sessionId && transports[sessionId]) {
+      // Reuse existing transport
+      transport = transports[sessionId];
+    } else if (!sessionId && body && isInitializeRequest(body)) {
+      // New initialization request - create session
+      transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => randomUUID(),
+        onsessioninitialized: (newSessionId: string) => {
+          transports[newSessionId] = transport;
+          logger(`[HTTP] Session initialized: ${newSessionId}`);
+        },
+      });
+
+      transport.onclose = () => {
+        if (transport.sessionId) {
+          delete transports[transport.sessionId];
+          logger(`[HTTP] Session closed: ${transport.sessionId}`);
+        }
+      };
+
+      await server.connect(transport);
+    } else if (!sessionId && req.method === 'POST') {
+      // Stateless mode - create transport per request
+      transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: undefined,
+        enableJsonResponse: true,
+      });
+
+      res.on('close', () => {
+        transport.close();
+      });
+
+      await server.connect(transport);
+    } else {
+      // Invalid request
+      res.writeHead(400, {'Content-Type': 'application/json'});
+      res.end(JSON.stringify({
+        jsonrpc: '2.0',
+        error: {
+          code: -32000,
+          message: 'Bad Request: No valid session ID provided or invalid request'
+        },
+        id: null
+      }));
+      return;
+    }
+
+    // Handle the request
+    await transport.handleRequest(req, res, body);
+  });
+
+  const port = args.port || 3000;
+  const host = args.host || '127.0.0.1';
+
+  httpServer.listen(port, host, () => {
+    logger(`Chrome DevTools MCP Server v${VERSION} running on http://${host}:${port}/mcp`);
+    console.error(`Chrome DevTools MCP Server v${VERSION} running on http://${host}:${port}/mcp`);
+    logDisclaimers();
+  });
+
+  httpServer.on('error', (error) => {
+    logger('[main] HTTP server error', error);
+    console.error('HTTP server error:', error);
+    process.exit(1);
+  });
+} else {
+  // Stdio mode (default)
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  logger('Chrome DevTools MCP Server connected');
+  logDisclaimers();
+}

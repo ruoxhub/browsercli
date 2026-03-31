@@ -175,3 +175,4 @@ project/
 .gitnexus
 .claude
 *.png
+.omc/

@@ -412,6 +412,153 @@ build/src/index.js
 npm run start
 ```
 
+### 3) HTTP 模式启动（新增）
+
+默认情况下，服务器以 stdio 模式运行（通过标准输入/输出通信）。
+如果需要以 HTTP 端口形式访问（例如通过远程 MCP 客户端或 Web 应用），可以使用 `--http` 参数：
+
+**基础用法：**
+
+```bash
+# 以 HTTP 模式启动，默认监听 http://127.0.0.1:3000/mcp
+npm run start -- --http
+
+# 自定义端口
+npm run start -- --http --port 8080
+
+# 允许外部网络访问（局域网/远程）
+npm run start -- --http --host 0.0.0.0 --port 3000
+
+# 指定绑定地址和端口
+npm run start -- --http --port 3000 --host 127.0.0.1
+```
+
+**组合参数示例：**
+
+```bash
+# HTTP 模式 + 无头浏览器 + 远程 Chrome
+npm run start -- --http --headless --browserUrl http://127.0.0.1:9222
+
+# HTTP 模式 + 数据库存储
+npm run start -- --http --databaseUrl postgresql://user:pass@localhost:5432/js_reverse_mcp
+
+# HTTP 模式 + 自定义 Chrome 通道（Beta/Canary）
+npm run start -- --http --channel beta
+
+# HTTP 模式 + 自定义 Chrome 路径
+npm run start -- --http --executablePath /Applications/Chrome.app/Contents/MacOS/Chrome
+
+# HTTP 模式 + 代理服务器
+npm run start -- --http --proxyServer http://proxy.example.com:8080
+
+# HTTP 模式 + 会话隔离（多实例场景）
+npm run start -- --http --sessionId session-abc-123
+
+# 完整参数示例
+npm run start -- --http --port 3000 --host 127.0.0.1 --headless --databaseUrl postgresql://localhost:5432/js_reverse
+```
+
+**场景 1：本地开发调试**
+```bash
+# 本地开发：只允许本机访问
+npm run start -- --http --port 3000 --host 127.0.0.1
+```
+
+**场景 2：局域网共享服务**
+```bash
+# 允许局域网访问（例如团队共享）
+npm run start -- --http --port 3000 --host 0.0.0.0
+# 访问地址：http://<你的 IP>:3000/mcp
+```
+
+**场景 3：连接现有 Chrome 实例**
+```bash
+# 先启动带远程调试的 Chrome
+# Chrome: chrome.exe --remote-debugging-port=9222
+# 然后启动 MCP 服务器连接到该实例
+npm run start -- --http --browserUrl http://127.0.0.1:9222
+```
+
+**场景 4：多实例隔离**
+```bash
+# 实例 A - 端口 3001，会话 ID 为 session-a
+npm run start -- --http --port 3001 --sessionId session-a
+
+# 实例 B - 端口 3002，会话 ID 为 session-b
+npm run start -- --http --port 3002 --sessionId session-b
+```
+
+**场景 5：Docker 容器内运行**
+```bash
+# 容器内监听所有接口
+npm run start -- --http --host 0.0.0.0 --port 3000 --no-sandbox
+# Docker 运行：docker run -p 3000:3000 your-image
+```
+
+**HTTP 模式 MCP 客户端配置：**
+
+```json
+{
+  "mcpServers": {
+    "js-reverse-http": {
+      "command": "node",
+      "args": ["/path/to/build/src/index.js", "--http", "--port", "3000"],
+      "env": {}
+    }
+  }
+}
+```
+
+**MCP Inspector 连接：**
+```bash
+npx @modelcontextprotocol/inspector
+# 在 Inspector UI 中选择 "Streamable HTTP" 并输入 http://localhost:3000/mcp
+```
+
+**Claude Code 连接：**
+```bash
+claude mcp add --transport http js-reverse http://localhost:3000/mcp
+```
+
+**VS Code 连接：**
+```json
+// settings.json
+{
+  "mcp.servers": {
+    "js-reverse": {
+      "type": "http",
+      "url": "http://localhost:3000/mcp"
+    }
+  }
+}
+```
+
+**Cursor 连接：**
+点击以下链接自动添加 MCP 服务器：
+```
+cursor://anysphere.cursor-deeplink/mcp/install?name=js-reverse&config=eyJ1cmwiOiJodHRwOi8vbG9jYWxob3N0OjMwMDAvbWNwIn0=
+```
+
+**直接 HTTP 请求测试：**
+```bash
+# 健康检查（如果使用 stdio 模式则不适用）
+# HTTP 模式下可以通过 POST /mcp 发送 JSON-RPC 请求
+
+# 使用 curl 测试连接（需要构造有效的 JSON-RPC 请求）
+curl -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "2024-11-05",
+      "capabilities": {},
+      "clientInfo": {"name": "test-client", "version": "1.0.0"}
+    }
+  }'
+```
+
 ### 4) 数据库配置（可选）
 
 如果需要启用站点经验 PostgreSQL 存储功能，启动时添加 `--databaseUrl` 参数：
@@ -436,7 +583,7 @@ npm run start -- --databaseUrl postgresql://user:password@localhost:5432/js_reve
 }
 ```
 
-### 3) 配置客户端
+### 5) 配置客户端
 
 最小配置示例：
 
@@ -482,6 +629,8 @@ args = ["/ABSOLUTE/PATH/JSReverser-MCP/build/src/index.js"]
 - 快速开始：[docs/guides/getting-started.md](docs/guides/getting-started.md)
 - 浏览器连接：[docs/guides/browser-connection.md](docs/guides/browser-connection.md)
 - 客户端配置：[docs/guides/client-configuration.md](docs/guides/client-configuration.md)
+- **LLM Provider 配置**：[docs/guides/llm-provider-config.md](docs/guides/llm-provider-config.md)
+- **HTTP 模式**：[docs/guides/http-mode.md](docs/guides/http-mode.md)
 - 逆向工作流：[docs/reference/reverse-workflow.md](docs/reference/reverse-workflow.md)
 - 补环境规范：[docs/reference/env-patching.md](docs/reference/env-patching.md)
 

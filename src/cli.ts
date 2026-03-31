@@ -168,6 +168,22 @@ export const cliOptions = {
       'PostgreSQL connection URL for site experience storage (e.g., postgresql://user:password@localhost:5432/js_reverse_mcp).',
     alias: 'd',
   },
+  http: {
+    type: 'boolean',
+    description:
+      'Enable HTTP server mode instead of stdio. When enabled, the server will listen on the specified port.',
+    default: false,
+  },
+  port: {
+    type: 'number',
+    description: 'Port to listen on when HTTP mode is enabled.',
+    default: 3000,
+  },
+  host: {
+    type: 'string',
+    description: 'Host to bind to when HTTP mode is enabled.',
+    default: '127.0.0.1',
+  },
 } satisfies Record<string, YargsOptions>;
 
 export function parseArguments(version: string, argv = process.argv) {
@@ -189,6 +205,30 @@ export function parseArguments(version: string, argv = process.argv) {
       return true;
     })
     .example([
+      [
+        '$0 --http',
+        'Start HTTP server on default port 3000',
+      ],
+      [
+        '$0 --http --port 8080',
+        'Start HTTP server on custom port 8080',
+      ],
+      [
+        '$0 --http --host 0.0.0.0 --port 3000',
+        'Start HTTP server accessible from external networks',
+      ],
+      [
+        '$0 --http --browserUrl http://127.0.0.1:9222',
+        'Start HTTP server connected to existing Chrome instance',
+      ],
+      [
+        '$0 --http --headless --port 3000',
+        'Start HTTP server in headless mode for automation',
+      ],
+      [
+        '$0 --http --databaseUrl postgresql://localhost:5432/js_reverse_mcp',
+        'Start HTTP server with PostgreSQL storage',
+      ],
       [
         '$0 --browserUrl http://127.0.0.1:9222',
         'Connect to an existing browser instance via HTTP',
