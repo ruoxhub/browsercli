@@ -54,6 +54,7 @@ import * as vueGetRoutesTools from './tools/vue/getVueRoutes.js';
 import * as vueClearGuardsTools from './tools/vue/clearVueGuards.js';
 import * as vueActivateDevtoolsTools from './tools/vue/activateVueDevtools.js';
 import * as extensionsTools from './tools/extensions.js';
+import * as skillTools from './tools/skill.js';
 import type {ToolDefinition} from './tools/ToolDefinition.js';
 import {ToolRegistry} from './tools/ToolRegistry.js';
 import * as websocketTools from './tools/websocket.js';
@@ -279,6 +280,7 @@ const toolSources: Array<{source: string; tools: ToolDefinition[]}> = [
   {source: 'crypto', tools: [...asTools(cryptoTools), ...asTools(cryptoJSEncryptTools), ...asTools(cryptoSMCryptoTools)]},
   {source: 'vue', tools: [...asTools(vueGetRoutesTools), ...asTools(vueClearGuardsTools), ...asTools(vueActivateDevtoolsTools)]},
   {source: 'extensions', tools: asTools(extensionsTools)},
+  {source: 'skills', tools: asTools(skillTools)},
 ];
 
 const tools = toolSources.flatMap((entry) =>
