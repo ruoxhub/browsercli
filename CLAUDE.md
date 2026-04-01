@@ -45,6 +45,33 @@ npm run docs
 npx @modelcontextprotocol/inspector node build/src/index.js
 ```
 
+## CLI Commands (js-reverse)
+
+```bash
+# Start daemon (background service)
+js-reverse start --browserUrl http://127.0.0.1:9222
+
+# Stop daemon
+js-reverse stop
+
+# Check daemon status
+js-reverse status
+
+# List available skills
+js-reverse list-skills
+
+# Call a skill
+js-reverse call-skill observe-flow --url https://example.com
+js-reverse call-skill auto-hook --url https://example.com
+js-reverse call-skill rebuild-bundle --url https://example.com
+
+# Start interactive REPL mode
+js-reverse repl
+
+# Create new task scaffold
+js-reverse scaffold --name jd-h5st --desc "JD H5ST signature" --url https://m.jd.com
+```
+
 ## Architecture Overview
 
 This is an MCP (Model Context Protocol) server that exposes Chrome DevTools functionality to AI coding assistants via Puppeteer.

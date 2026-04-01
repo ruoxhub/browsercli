@@ -606,6 +606,132 @@ command = "node"
 args = ["/ABSOLUTE/PATH/JSReverser-MCP/build/src/index.js"]
 ```
 
+## CLI 交互模式
+
+项目提供完整的 CLI 交互模式，支持命令行直接调用技能、交互式 REPL 和任务脚手架生成。
+
+### CLI 命令总览
+
+```bash
+js-reverse <command> [options]
+
+Commands:
+  js-reverse start                         启动后台 daemon 服务
+  js-reverse stop                          停止后台 daemon 服务
+  js-reverse status                        查看 daemon 状态
+  js-reverse call <tool> [args...]         调用 MCP 工具（需要 MCP 服务器运行）
+  js-reverse call-skill <skill> [args...]  调用逆向工程技能
+  js-reverse list-skills                   列出所有可用的逆向工程技能
+  js-reverse repl                          启动交互式 REPL 模式
+  js-reverse scaffold [args...]            创建新的逆向任务脚手架
+```
+
+### 技能调用 (call-skill)
+
+三个核心逆向技能：
+
+**1. observe-flow (观察模式)**
+```bash
+js-reverse call-skill observe-flow --url https://m.jd.com
+```
+- 收集和分析页面脚本
+- 识别加密算法和混淆代码
+- 生成安全风险评估报告
+
+**2. auto-hook (自动 Hook)**
+```bash
+js-reverse call-skill auto-hook --url https://m.jd.com
+```
+- 注入调试 Hook 和加密库 Hook
+- 辅助逆向分析
+- 记录运行时调用链
+
+**3. rebuild-bundle (本地复现)**
+```bash
+js-reverse call-skill rebuild-bundle --url https://m.jd.com
+```
+- 构建 Node.js 环境复现目标代码
+- 支持参数提取
+- 生成可运行的本地 bundle
+
+### REPL 交互模式
+
+启动交互式命令行：
+```bash
+js-reverse repl
+```
+
+**REPL 命令：**
+```
+help                    显示帮助信息
+skills                  列出所有可用技能
+skill <name> [args...]  调用指定技能
+status                  查看 daemon 状态
+clear                   清屏
+exit, quit, q           退出
+```
+
+**技能调用示例：**
+```
+skill rebuild-bundle --url https://example.com/app.js
+skill observe-flow --url https://example.com
+skill auto-hook --url https://example.com
+```
+
+### 任务脚手架 (scaffold)
+
+创建新的逆向任务模板：
+
+```bash
+# 命令行模式
+js-reverse scaffold --name jd-h5st --desc "京东 H5ST 签名逆向" --url "https://m.jd.com"
+
+# 交互模式（不带参数启动）
+js-reverse scaffold
+```
+
+**生成的目录结构：**
+```
+artifacts/tasks/<task-name>/
+├── task.json           # 任务配置
+├── README.md           # 任务说明
+├── .gitignore
+├── env/
+│   ├── env.js          # 环境配置
+│   └── polyfills.js    # Polyfills
+├── entry.js            # 入口文件
+└── run/
+    └── run-local.mjs   # 本地运行脚本
+```
+
+**安全验证：**
+- 任务名称必须以小写字母开头
+- 只能包含小写字母、数字和连字符
+- 示例：`jd-h5st` ✅，`123invalid` ❌
+
+### 端到端示例
+
+**完整流程：**
+```bash
+# 1. 启动 daemon
+js-reverse start --browserUrl http://127.0.0.1:9222
+
+# 2. 查看状态
+js-reverse status
+
+# 3. 查看技能
+js-reverse list-skills
+
+# 4. 调用技能
+js-reverse call-skill observe-flow --url https://m.jd.com
+
+# 5. 创建任务脚手架
+js-reverse scaffold --name my-task --desc "My Task" --url https://example.com
+
+# 6. 进入 REPL
+js-reverse repl
+```
+
 如果你需要接管已经打开的浏览器，请继续看：
 
 - [docs/guides/browser-connection.md](docs/guides/browser-connection.md)
