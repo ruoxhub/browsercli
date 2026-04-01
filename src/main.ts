@@ -60,6 +60,7 @@ import * as websocketTools from './tools/websocket.js';
 import {ErrorCodes, formatError} from './utils/errors.js';
 import {TokenBudgetManager} from './utils/TokenBudgetManager.js';
 import {ToolExecutionScheduler} from './utils/ToolExecutionScheduler.js';
+import {registerBuiltInSkills, SkillRegistry} from './skills/index.js';
 import {randomUUID} from 'node:crypto';
 import {createServer} from 'node:http';
 import type {IncomingMessage, ServerResponse} from 'node:http';
@@ -331,6 +332,12 @@ for (const tool of registeredTools) {
 if (features.issues) {
   await loadIssueDescriptions();
 }
+
+// 注册技能系统
+registerBuiltInSkills();
+const skillRegistry = SkillRegistry.getInstance();
+const skills = skillRegistry.list();
+logger(`Registered ${skills.length} skills`);
 
 // Start server based on mode (HTTP or stdio)
 if (args.http) {
