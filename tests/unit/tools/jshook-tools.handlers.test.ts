@@ -56,6 +56,7 @@ interface ToolResponseHarness {
   attachConsoleMessage(): void;
   setIncludeWebSocketConnections(): void;
   attachWebSocket(): void;
+  setStructuredContent(): void;
 }
 
 interface ToolDefinitionHarness {
@@ -146,6 +147,7 @@ function makeResponse(): ToolResponseHarness {
     attachConsoleMessage: () => undefined,
     setIncludeWebSocketConnections: () => undefined,
     attachWebSocket: () => undefined,
+    setStructuredContent: () => undefined,
   };
 }
 

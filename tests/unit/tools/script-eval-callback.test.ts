@@ -40,6 +40,7 @@ interface ResponseLike {
   attachConsoleMessage(): void;
   setIncludeWebSocketConnections(): void;
   attachWebSocket(): void;
+  setStructuredContent(): void;
 }
 
 describe('evaluate_script callback path', () => {
@@ -78,6 +79,7 @@ describe('evaluate_script callback path', () => {
       attachConsoleMessage: () => undefined,
       setIncludeWebSocketConnections: () => undefined,
       attachWebSocket: () => undefined,
+      setStructuredContent: () => undefined,
     };
 
     await evaluateScript.handler({ params: { function: '() => ({ ok: true })' } } as Parameters<typeof evaluateScript.handler>[0], response as Parameters<typeof evaluateScript.handler>[1], {
@@ -121,6 +123,7 @@ describe('evaluate_script callback path', () => {
       attachConsoleMessage: () => undefined,
       setIncludeWebSocketConnections: () => undefined,
       attachWebSocket: () => undefined,
+      setStructuredContent: () => undefined,
     };
 
     const runtime = getJSHookRuntime();
@@ -187,6 +190,7 @@ describe('evaluate_script callback path', () => {
       attachConsoleMessage: () => undefined,
       setIncludeWebSocketConnections: () => undefined,
       attachWebSocket: () => undefined,
+      setStructuredContent: () => undefined,
     };
 
     await evaluateScript.handler(

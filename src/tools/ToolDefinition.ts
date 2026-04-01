@@ -81,6 +81,7 @@ export interface Response {
     },
   ): void;
   attachWebSocket(wsid: number): void;
+  setStructuredContent(value: unknown | undefined): void;
 }
 
 /**

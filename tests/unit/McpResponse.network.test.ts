@@ -50,10 +50,11 @@ describe('McpResponse network detail formatting', () => {
       getNavigationTimeout: () => 30_000,
     };
 
-    const [text] = await response.handle(
+    const result = await response.handle(
       'get_network_request',
       context as never,
     );
+    const text = result.content[0];
 
     assert.strictEqual(text.type, 'text');
     assert.ok(text.text.includes('Method: POST'));
@@ -100,10 +101,11 @@ describe('McpResponse network detail formatting', () => {
       getNavigationTimeout: () => 30_000,
     };
 
-    const [text] = await response.handle(
+    const result = await response.handle(
       'get_network_request',
       context as never,
     );
+    const text = result.content[0];
 
     assert.strictEqual(text.type, 'text');
     assert.ok(text.text.includes('Method: GET'));

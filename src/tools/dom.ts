@@ -24,6 +24,10 @@ export const queryDom = defineTool({
     const result = request.params.all
       ? await runtime.domInspector.querySelectorAll(request.params.selector, request.params.limit)
       : await runtime.domInspector.querySelector(request.params.selector);
+
+    // 设置结构化返回数据
+    response.setStructuredContent(result);
+
     response.appendResponseLine('```json');
     response.appendResponseLine(JSON.stringify(result, null, 2));
     response.appendResponseLine('```');
@@ -41,6 +45,10 @@ export const getDomStructure = defineTool({
   handler: async (request, response) => {
     const runtime = getJSHookRuntime();
     const result = await runtime.domInspector.getStructure(request.params.maxDepth, request.params.includeText);
+
+    // 设置结构化返回数据
+    response.setStructuredContent(result);
+
     response.appendResponseLine('```json');
     response.appendResponseLine(JSON.stringify(result, null, 2));
     response.appendResponseLine('```');
@@ -57,6 +65,10 @@ export const findClickableElements = defineTool({
   handler: async (request, response) => {
     const runtime = getJSHookRuntime();
     const result = await runtime.domInspector.findClickable(request.params.filterText);
+
+    // 设置结构化返回数据
+    response.setStructuredContent(result);
+
     response.appendResponseLine('```json');
     response.appendResponseLine(JSON.stringify(result, null, 2));
     response.appendResponseLine('```');

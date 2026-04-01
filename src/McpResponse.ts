@@ -40,6 +40,7 @@ export class McpResponse implements Response {
   #attachedConsoleMessageId?: number;
   #textResponseLines: string[] = [];
   #images: ImageContentData[] = [];
+  #structuredContent?: unknown;
   #networkRequestsOptions?: {
     include: boolean;
     pagination?: PaginationOptions;
@@ -203,10 +204,18 @@ export class McpResponse implements Response {
     return this.#images;
   }
 
+  setStructuredContent(value: unknown | undefined): void {
+    this.#structuredContent = value as Record<string, unknown> | undefined;
+  }
+
+  get structuredContent(): unknown | undefined {
+    return this.#structuredContent;
+  }
+
   async handle(
     toolName: string,
     context: McpContext,
-  ): Promise<Array<TextContent | ImageContent>> {
+  ): Promise<{content: Array<TextContent | ImageContent>; structuredContent?: unknown}> {
     if (this.#includePages) {
       await context.createPagesSnapshot();
     }
@@ -356,7 +365,7 @@ export class McpResponse implements Response {
       consoleData: ConsoleMessageData | undefined;
       consoleListData: ConsoleMessageData[] | undefined;
     },
-  ): Array<TextContent | ImageContent> {
+  ): {content: Array<TextContent | ImageContent>; structuredContent?: unknown} {
     const response = [`# ${toolName} response`];
     for (const line of this.#textResponseLines) {
       response.push(line);
@@ -506,7 +515,10 @@ export class McpResponse implements Response {
       } as const;
     });
 
-    return [text, ...images];
+    return {
+      content: [text, ...images],
+      structuredContent: this.#structuredContent,
+    };
   }
 
   #dataWithPagination<T>(data: T[], pagination?: PaginationOptions) {

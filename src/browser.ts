@@ -477,16 +477,39 @@ export class BrowserManager {
    */
   private async connectToRemoteBrowser(): Promise<Browser> {
     try {
-      logger(
-        'Connecting to remote browser at:',
+      const debugUrl =
         this.config.wsEndpoint ??
-          this.config.browserURL ??
-          this.config.remoteDebuggingUrl,
-      );
+        this.config.browserURL ??
+        this.config.remoteDebuggingUrl;
+
+      logger('Connecting to remote browser at:', debugUrl);
+
+      // First, verify the endpoint is accessible and get version info
+      let browserURL: string | undefined;
+      if (this.config.browserURL || this.config.remoteDebuggingUrl) {
+        browserURL = this.config.browserURL ?? this.config.remoteDebuggingUrl;
+        try {
+          const response = await fetch(`${browserURL}/json/version`);
+          if (response.ok) {
+            const versionInfo = await response.json() as {
+              Browser?: string;
+              'Protocol-Version'?: string;
+              webSocketDebuggerUrl?: string;
+            };
+            logger('Browser version info:', {
+              browser: versionInfo.Browser,
+              protocolVersion: versionInfo['Protocol-Version'],
+            });
+          }
+        } catch (err) {
+          logger('Warning: Could not fetch browser version:', err);
+        }
+      }
 
       const connectOptions: Parameters<typeof puppeteer.connect>[0] = {
         targetFilter: makeTargetFilter(),
         defaultViewport: null,
+        protocolTimeout: 30000, // 30 second timeout for CDP commands
       };
 
       if (this.config.wsEndpoint) {
@@ -504,6 +527,14 @@ export class BrowserManager {
       this.browser = await puppeteer.connect(connectOptions);
       logger('Connected to remote browser');
 
+      // Verify connection by checking browser version
+      try {
+        const browserVersion = await this.browser.version();
+        logger('Browser version:', browserVersion);
+      } catch (versionErr) {
+        logger('Warning: Could not get browser version:', versionErr);
+      }
+
       // Set up crash detection
       this.setupCrashDetection();
 
@@ -514,8 +545,42 @@ export class BrowserManager {
 
       return this.browser;
     } catch (error) {
+      const errorMessage = (error as Error).message;
+
+      // Provide specific guidance for common connection issues
+      if (errorMessage.includes('Page.enable')) {
+        throw new Error(
+          `CDP 协议错误：'Page.enable' 命令未找到。
+原因：Chrome 版本与 Puppeteer 24.x 不兼容，或连接到了错误的端点。
+
+解决方法：
+1. 更新 Chrome 到最新版本
+2. 确保使用 --remote-debugging-port 启动 Chrome
+3. 检查是否连接到了正确的 WebSocket 端点
+4. 尝试重启 Chrome 后重新连接
+
+当前 Puppeteer 版本：24.31.0
+原始错误：${errorMessage}`,
+          {cause: error}
+        );
+      }
+
+      if (errorMessage.includes('connect ECONNREFUSED')) {
+        throw new Error(
+          `无法连接到 Chrome：连接被拒绝。
+
+解决方法：
+1. 确认 Chrome 已通过 --remote-debugging-port 启动
+2. 检查端口号是否正确（默认 9222）
+3. 访问 http://127.0.0.1:<端口>/json/version 验证
+
+原始错误：${errorMessage}`,
+          {cause: error}
+        );
+      }
+
       throw new Error(
-        `Failed to connect to remote browser: ${(error as Error).message}`,
+        `Failed to connect to remote browser: ${errorMessage}`,
         {
           cause: error,
         },

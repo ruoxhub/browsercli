@@ -53,6 +53,7 @@ import * as cryptoSMCryptoTools from './tools/crypto/hookSMCrypto.js';
 import * as vueGetRoutesTools from './tools/vue/getVueRoutes.js';
 import * as vueClearGuardsTools from './tools/vue/clearVueGuards.js';
 import * as vueActivateDevtoolsTools from './tools/vue/activateVueDevtools.js';
+import * as extensionsTools from './tools/extensions.js';
 import type {ToolDefinition} from './tools/ToolDefinition.js';
 import {ToolRegistry} from './tools/ToolRegistry.js';
 import * as websocketTools from './tools/websocket.js';
@@ -211,12 +212,13 @@ function registerTool(tool: ToolDefinition): void {
             context,
           );
           try {
-            const content = await response.handle(tool.name, context);
-            const wrapped = withTraceIdContent(content, traceId);
-            tokenBudgetManager.recordToolCall(tool.name, params, content);
+            const result = await response.handle(tool.name, context);
+            const wrapped = withTraceIdContent(result.content, traceId);
+            tokenBudgetManager.recordToolCall(tool.name, params, result.content);
             logToolEvent(traceId, tool.name, 'success', {durationMs: Date.now() - startedAt});
             return {
               content: wrapped,
+              structuredContent: result.structuredContent as Record<string, unknown> | undefined,
             };
           } catch (error) {
             const formatted = formatError(error, ErrorCodes.TOOL_EXECUTION_ERROR, {
@@ -275,6 +277,7 @@ const toolSources: Array<{source: string; tools: ToolDefinition[]}> = [
   {source: 'anti-debug', tools: [...asTools(antiDebugTools), ...asTools(antiAntiDebugTools)]},
   {source: 'crypto', tools: [...asTools(cryptoTools), ...asTools(cryptoJSEncryptTools), ...asTools(cryptoSMCryptoTools)]},
   {source: 'vue', tools: [...asTools(vueGetRoutesTools), ...asTools(vueClearGuardsTools), ...asTools(vueActivateDevtoolsTools)]},
+  {source: 'extensions', tools: asTools(extensionsTools)},
 ];
 
 const tools = toolSources.flatMap((entry) =>
