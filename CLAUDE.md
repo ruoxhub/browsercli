@@ -72,6 +72,29 @@ js-reverse repl
 js-reverse scaffold --name jd-h5st --desc "JD H5ST signature" --url https://m.jd.com
 ```
 
+**Windows 用户：**
+
+方案 1 - 使用批处理脚本：
+```powershell
+# 在项目目录执行
+.\js-reverse.bat start --browserUrl http://127.0.0.1:9222
+.\js-reverse.bat status
+.\js-reverse.bat stop
+```
+
+方案 2 - 使用 npm 脚本：
+```powershell
+npm run cli:daemon:start -- --browserUrl http://127.0.0.1:9222
+npm run cli:daemon:status
+npm run cli:daemon:stop
+```
+
+方案 3 - 全局安装：
+```powershell
+npm install -g .
+js-reverse start --browserUrl http://127.0.0.1:9222
+```
+
 ## Architecture Overview
 
 This is an MCP (Model Context Protocol) server that exposes Chrome DevTools functionality to AI coding assistants via Puppeteer.

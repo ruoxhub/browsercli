@@ -732,6 +732,46 @@ js-reverse scaffold --name my-task --desc "My Task" --url https://example.com
 js-reverse repl
 ```
 
+### Windows 环境特别说明
+
+在 Windows 上，如果 `js-reverse` 命令未被识别（PowerShell 报错"无法将'js-reverse'项识别为 cmdlet"），有三种解决方案：
+
+**方案 1：使用 npm 脚本（推荐）**
+```powershell
+# 从项目目录运行
+npm run cli:daemon:start -- --browserUrl http://127.0.0.1:9222
+npm run cli:daemon:status
+npm run cli:daemon:stop
+```
+
+**方案 2：全局安装 CLI**
+```powershell
+# 在项目目录执行全局安装
+npm install -g .
+
+# 安装后即可直接使用命令
+js-reverse start --browserUrl http://127.0.0.1:9222
+js-reverse status
+js-reverse stop
+
+# 如需卸载
+npm uninstall -g js-reverse-mcp
+```
+
+**方案 3：使用完整路径**
+```powershell
+# 使用 node 直接运行编译后的文件
+node build/src/bin/js-reverse.js start --browserUrl http://127.0.0.1:9222
+node build/src/bin/js-reverse.js status
+node build/src/bin/js-reverse.js stop
+```
+
+**npx 临时运行（无需安装）：**
+```powershell
+# 在项目目录使用
+npx js-reverse start --browserUrl http://127.0.0.1:9222
+```
+
 如果你需要接管已经打开的浏览器，请继续看：
 
 - [docs/guides/browser-connection.md](docs/guides/browser-connection.md)
