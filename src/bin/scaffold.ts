@@ -385,6 +385,13 @@ export async function runScaffold(args: string[]): Promise<void> {
     return;
   }
 
+  // 验证任务名称格式（防止路径遍历和非法字符）
+  const SAFE_NAME_PATTERN = /^[a-z][a-z0-9-]*$/;
+  if (!SAFE_NAME_PATTERN.test(config.name)) {
+    console.log('❌ 任务名称只能以小写字母开头，包含小写字母、数字和连字符');
+    process.exit(1);
+  }
+
   if (!config.description) {
     config.description = '未命名任务';
   }
