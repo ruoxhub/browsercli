@@ -112,6 +112,9 @@ export async function executeCommand(input: string): Promise<string> {
       if (response.success && response.result) {
         try {
           const data = JSON.parse(response.result);
+          if (typeof data !== 'object' || data === null || typeof data.pid !== 'number') {
+            return '❌ 响应格式异常';
+          }
           return `✅ Daemon 运行中
    PID: ${data.pid}
    Socket: ${data.socketPath}
@@ -130,7 +133,11 @@ export async function executeCommand(input: string): Promise<string> {
       const response = await sendCommand({method: 'list_skills'});
       if (response.success && response.result) {
         try {
-          const {skills} = JSON.parse(response.result);
+          const parsed = JSON.parse(response.result);
+          if (typeof parsed !== 'object' || parsed === null || !Array.isArray(parsed.skills)) {
+            return '❌ 响应格式异常';
+          }
+          const {skills} = parsed;
           return skills
             .map((s: any) => `  ${s.name} - ${s.description} [${s.category}]`)
             .join('\n');
@@ -162,13 +169,16 @@ export async function executeCommand(input: string): Promise<string> {
       if (response.success && response.result) {
         try {
           const result = JSON.parse(response.result);
-          if (result.success) {
+          if (typeof result !== 'object' || result === null) {
+            return '❌ 响应格式异常';
+          }
+          if (typeof result.success === 'boolean' && result.success) {
             // 格式化输出
             const lines = [`✅ 技能执行成功：${skillName}`];
-            if (result.message) {
+            if (typeof result.message === 'string') {
               lines.push(`   ${result.message}`);
             }
-            if (result.data) {
+            if (result.data && typeof result.data === 'object') {
               lines.push('', JSON.stringify(result.data, null, 2));
             }
             return lines.join('\n');
