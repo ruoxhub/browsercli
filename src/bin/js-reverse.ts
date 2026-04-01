@@ -9,6 +9,8 @@
 import process from 'node:process';
 import {yargs, hideBin} from '../third_party/index.js';
 import {sendCommand, startDaemon, stopDaemon, handleResponse} from '../daemon/client.js';
+import {startRepl} from './repl.js';
+import {runScaffold} from './scaffold.js';
 import {isDaemonRunning, serializeArgs} from '../daemon/utils.js';
 
 async function main() {
@@ -98,7 +100,7 @@ async function main() {
     // call 命令 - 调用 MCP 工具
     .command(
       'call <tool> [args...]',
-      '调用 MCP 工具',
+      '调用 MCP 工具（需要 MCP 服务器运行）',
       yargs => {
         return yargs.positional('tool', {
           type: 'string',
@@ -148,6 +150,160 @@ async function main() {
           console.error('错误:', error instanceof Error ? error.message : error);
           process.exit(1);
         }
+      }
+    )
+    // call-skill 命令 - 调用技能
+    .command(
+      'call-skill <skill> [args...]',
+      '调用逆向工程技能（observe-flow, auto-hook, rebuild-bundle）',
+      yargs => {
+        return yargs.positional('skill', {
+          type: 'string',
+          describe: '技能名称',
+        }).option('url', {
+          type: 'string',
+          describe: '目标 URL',
+          alias: 'u',
+        });
+      },
+      async argv => {
+        if (!isDaemonRunning()) {
+          console.error('Daemon 未运行，请先运行：js-reverse start');
+          process.exit(1);
+        }
+
+        const parsedArgs: Record<string, unknown> = {};
+        const args = argv.args as string[] | undefined;
+        if (args) {
+          for (let i = 0; i < args.length; i++) {
+            const arg = args[i];
+            if (arg.startsWith('--')) {
+              const key = arg.slice(2);
+              const value = args[i + 1];
+              if (value && !value.startsWith('--')) {
+                parsedArgs[key] = value;
+                i++;
+              } else {
+                parsedArgs[key] = true;
+              }
+            }
+          }
+        }
+
+        try {
+          const response = await sendCommand({
+            method: 'invoke_skill',
+            skill: argv.skill!,
+            args: {
+              ...parsedArgs,
+              url: argv.url,
+            },
+          });
+
+          if (response.success && response.result) {
+            const result = JSON.parse(response.result);
+            if (result.success) {
+              console.log(`技能执行成功：${argv.skill}`);
+              console.log(JSON.stringify(result, null, 2));
+            } else {
+              console.error(`技能执行失败：${result.error}`);
+              process.exit(1);
+            }
+          } else {
+            console.error(response.error || '技能执行失败');
+            process.exit(1);
+          }
+        } catch (error) {
+          console.error('错误:', error instanceof Error ? error.message : error);
+          process.exit(1);
+        }
+      }
+    )
+    // list-skills 命令 - 列出所有技能
+    .command(
+      'list-skills',
+      '列出所有可用的逆向工程技能',
+      () => {},
+      async () => {
+        if (!isDaemonRunning()) {
+          console.error('Daemon 未运行，请先运行：js-reverse start');
+          process.exit(1);
+        }
+
+        try {
+          const response = await sendCommand({method: 'list_skills'});
+          if (response.success && response.result) {
+            const {skills} = JSON.parse(response.result);
+            console.log('可用技能:');
+            for (const s of skills) {
+              console.log(`  ${s.name} - ${s.description} [${s.category}]`);
+            }
+          } else {
+            console.error(response.error || '获取技能列表失败');
+            process.exit(1);
+          }
+        } catch (error) {
+          console.error('错误:', error instanceof Error ? error.message : error);
+          process.exit(1);
+        }
+      }
+    )
+    // repl 命令 - 交互式模式
+    .command(
+      'repl',
+      '启动交互式 REPL 模式',
+      () => {},
+      async () => {
+        await startRepl();
+      }
+    )
+    // scaffold 命令 - 脚手架生成
+    .command(
+      'scaffold [args...]',
+      '创建新的逆向任务脚手架',
+      yargs => {
+        return yargs
+          .option('name', {
+            type: 'string',
+            describe: '任务名称',
+            alias: 'n',
+          })
+          .option('desc', {
+            type: 'string',
+            describe: '任务描述',
+            alias: 'd',
+          })
+          .option('url', {
+            type: 'string',
+            describe: '目标网站 URL',
+            alias: 'u',
+          })
+          .option('output', {
+            type: 'string',
+            describe: '输出目录',
+            alias: 'o',
+          });
+      },
+      async argv => {
+        const args = (argv.args as string[]) || [];
+        // 构建完整的参数列表
+        const allArgs: string[] = [];
+        if (argv.name) {
+          allArgs.push('--name', argv.name);
+        }
+        if (argv.desc) {
+          allArgs.push('--desc', argv.desc);
+        }
+        if (argv.url) {
+          allArgs.push('--url', argv.url);
+        }
+        if (argv.output) {
+          allArgs.push('--output', argv.output);
+        }
+        // 添加位置参数
+        allArgs.push(...args);
+
+        await runScaffold(allArgs);
       }
     )
     .help()

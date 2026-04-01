@@ -19,7 +19,7 @@ function getSocketPath(): string {
 }
 
 export async function startDaemon(args: string[]): Promise<void> {
-  const daemonPath = new URL('./js-reverse-mcp.js', import.meta.url).pathname;
+  const daemonPath = new URL('./daemon.js', import.meta.url).pathname;
   logger(`启动 Daemon: node ${daemonPath} ${args.join(' ')}`);
   await execAsync('node', [daemonPath, ...args]);
 }
@@ -44,9 +44,13 @@ export async function sendCommand(request: {
 
     socket.on('end', () => {
       try {
-        resolve(JSON.parse(response.trim()));
+        // PipeTransport uses \0 as delimiter, response may have trailing \0
+        const trimmed = response.trim();
+        const nullIndex = trimmed.indexOf('\0');
+        const jsonStr = nullIndex > 0 ? trimmed.slice(0, nullIndex) : trimmed;
+        resolve(JSON.parse(jsonStr));
       } catch (err) {
-        reject(new Error(`响应解析失败：${err}`));
+        reject(new Error(`响应解析失败：${err}. Response: ${response.slice(0, 200)}`));
       }
     });
 
@@ -56,7 +60,7 @@ export async function sendCommand(request: {
       reject(new Error('IPC 请求超时'));
     });
 
-    socket.write(JSON.stringify(request) + '\n');
+    socket.write(JSON.stringify(request) + '\0');
   });
 }
 

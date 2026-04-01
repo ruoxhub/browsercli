@@ -12,19 +12,19 @@ import path from 'node:path';
 import process from 'node:process';
 
 import {logger} from '../logger.js';
-import {Client, PipeTransport, StdioClientTransport} from '../third_party/index.js';
-import {VERSION} from '../version.js';
-
+import {PipeTransport} from '../third_party/index.js';
 import type {DaemonMessage} from './types.js';
 import {
-  DAEMON_CLIENT_NAME,
   getDaemonPid,
   getPidFilePath,
   getSocketPath,
-  INDEX_SCRIPT_PATH,
   IS_WINDOWS,
   isDaemonRunning,
 } from './utils.js';
+
+// 技能系统导入
+import {SkillRegistry, SkillRunner, registerBuiltInSkills} from '../skills/index.js';
+import {logger as skillLogger} from '../utils/logger.js';
 
 const pid = getDaemonPid();
 if (isDaemonRunning(pid)) {
@@ -44,83 +44,44 @@ const socketPath = getSocketPath();
 const startDate = new Date();
 const mcpServerArgs = process.argv.slice(2);
 
-let mcpClient: Client | null = null;
-let mcpTransport: StdioClientTransport | null = null;
+// 初始化技能系统
+registerBuiltInSkills();
+const skillRegistry = SkillRegistry.getInstance();
+skillLogger.info(`Daemon: Registered ${skillRegistry.list().length} skills`);
+
 let server: Server | null = null;
-
-async function setupMCPClient() {
-  console.log('Setting up MCP client connection...');
-
-  // Create stdio transport for js-reverse-mcp
-  // Workaround for https://github.com/modelcontextprotocol/typescript-sdk/blob/v1.x/src/client/stdio.ts#L128
-  // which causes the console window to show on Windows.
-  // @ts-expect-error no types for type.
-  process.type = 'mcp-client';
-  mcpTransport = new StdioClientTransport({
-    command: process.execPath,
-    args: [INDEX_SCRIPT_PATH, ...mcpServerArgs],
-    env: process.env as Record<string, string>,
-  });
-  mcpClient = new Client(
-    {
-      name: DAEMON_CLIENT_NAME,
-      version: VERSION,
-    },
-    {
-      capabilities: {},
-    },
-  );
-  await mcpClient.connect(mcpTransport);
-
-  console.log('MCP client connected');
-}
-
-interface McpContent {
-  type: string;
-  text?: string;
-}
-
-interface McpResult {
-  content?: McpContent[] | string;
-  text?: string;
-}
 
 async function handleRequest(msg: DaemonMessage) {
   try {
-    if (msg.method === 'invoke_tool') {
-      if (!mcpClient) {
-        throw new Error('MCP client not initialized');
+    if (msg.method === 'invoke_skill') {
+      const {skill, args = {}} = msg;
+      if (!skill) {
+        return {success: false, error: 'Missing skill name'};
       }
-      const {tool, args} = msg;
 
-      const result = (await mcpClient.callTool({
-        name: tool!,
-        arguments: args || {},
-      })) as McpResult | McpContent[];
+      const runner = new SkillRunner();
+      const result = await runner.run(skill, {
+        url: (args.url as string) || undefined,
+        options: args,
+      });
 
       return {
-        success: true,
+        success: result.success,
         result: JSON.stringify(result),
       };
-    } else if (msg.method === 'invoke_skill') {
-      if (!mcpClient) {
-        throw new Error('MCP client not initialized');
-      }
-      const {skill, args} = msg;
-
-      const result = (await mcpClient.callTool({
-        name: skill!,
-        arguments: args || {},
-      })) as McpResult | McpContent[];
-
+    } else if (msg.method === 'list_skills') {
+      const skills = skillRegistry.list();
       return {
         success: true,
-        result: JSON.stringify(result),
+        result: JSON.stringify({
+          skills: skills.map((s) => ({
+            name: s.name,
+            description: s.description,
+            category: s.category,
+          })),
+        }),
       };
     } else if (msg.method === 'stop') {
-      // Ensure we are not interrupting in-progress starting.
-      await started;
-      // Trigger cleanup asynchronously.
       setImmediate(() => {
         void cleanup();
       });
@@ -135,18 +96,15 @@ async function handleRequest(msg: DaemonMessage) {
           pid: process.pid,
           socketPath,
           startDate: startDate.toISOString(),
-          version: VERSION,
           args: mcpServerArgs,
         }),
       };
     }
-    {
-      return {
-        success: false,
-        error: `Unknown method: ${JSON.stringify(msg, null, 2)}`,
-      };
-    }
-  } catch (error: unknown) {
+    return {
+      success: false,
+      error: `Unknown method: ${msg.method}`,
+    };
+  } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     return {
       success: false,
@@ -185,16 +143,9 @@ async function startSocketServer() {
         readableAll: false,
         writableAll: false,
       },
-      async () => {
+      () => {
         console.log(`Daemon server listening on ${socketPath}`);
-
-        try {
-          // Setup MCP client
-          await setupMCPClient();
-          resolve();
-        } catch (err) {
-          reject(err);
-        }
+        resolve();
       },
     );
 
@@ -208,16 +159,6 @@ async function startSocketServer() {
 async function cleanup() {
   console.log('Cleaning up daemon...');
 
-  try {
-    await mcpClient?.close();
-  } catch (error) {
-    logger('Error closing MCP client:', error);
-  }
-  try {
-    await mcpTransport?.close();
-  } catch (error) {
-    logger('Error closing MCP transport:', error);
-  }
   if (server) {
     await new Promise<void>(resolve => {
       server!.close(() => resolve());
@@ -257,7 +198,7 @@ process.on('unhandledRejection', error => {
 });
 
 // Start the server
-const started = startSocketServer().catch(error => {
+startSocketServer().catch(error => {
   logger('Failed to start daemon server:', error);
   process.exit(1);
 });
