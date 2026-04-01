@@ -31,3 +31,8 @@ export {
 export {default as puppeteer} from 'puppeteer-core';
 export type * from 'puppeteer-core';
 export type {CdpPage} from 'puppeteer-core/internal/cdp/Page.js';
+export {PipeTransport} from 'puppeteer-core/internal/node/PipeTransport.js';
+
+// MCP Client 用于 daemon 模式
+export {Client} from '@modelcontextprotocol/sdk/client/index.js';
+export {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
