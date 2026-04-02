@@ -8,12 +8,13 @@ import assert from 'node:assert';
 import {mkdtemp, mkdir, readFile, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
-import {describe, it} from 'node:test';
+import {describe, it, after} from 'node:test';
 
 import {ReverseTaskStore} from '../../../src/reverse/ReverseTaskStore.js';
 import {analyzeTarget, recordReverseEvidence} from '../../../src/tools/analyzer.js';
 import {getHookData} from '../../../src/tools/hook.js';
 import {getJSHookRuntime} from '../../../src/tools/runtime.js';
+import {DetailedDataManager} from '../../../src/utils/detailedDataManager.js';
 import type {CollectCodeResult, DetectCryptoResult, UnderstandCodeResult} from '../../../src/types/index.js';
 
 interface ResponseShape {
@@ -262,5 +263,10 @@ describe('reverse task tools', () => {
       runtime.pageController.replayActions = originals.replayActions;
       await rm(rootDir, {recursive: true, force: true});
     }
+  });
+
+  // 清理定时器，允许测试进程退出
+  after(() => {
+    DetailedDataManager.destroy();
   });
 });

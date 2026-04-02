@@ -48,20 +48,38 @@ interface CacheEntry {
 export class DetailedDataManager {
   private static instance: DetailedDataManager;
   private cache = new Map<string, CacheEntry>();
+  private static cleanupTimer?: NodeJS.Timeout;
 
   // 🆕 优化：延长 TTL，减少令牌过期问题
-  private readonly DEFAULT_TTL = 30 * 60 * 1000; // 30分钟过期（原来10分钟）
-  private readonly MAX_TTL = 60 * 60 * 1000; // 最大1小时
-  private readonly MAX_CACHE_SIZE = 100; // 最多缓存100个对象
+  private readonly DEFAULT_TTL = 30 * 60 * 1000; // 30 分钟过期（原来 10 分钟）
+  private readonly MAX_TTL = 60 * 60 * 1000; // 最大 1 小时
+  private readonly MAX_CACHE_SIZE = 100; // 最多缓存 100 个对象
 
   // 🆕 自动续期配置
   private readonly AUTO_EXTEND_ON_ACCESS = true; // 访问时自动续期
-  private readonly EXTEND_DURATION = 15 * 60 * 1000; // 续期15分钟
+  private readonly EXTEND_DURATION = 15 * 60 * 1000; // 续期 15 分钟
 
   private constructor() {
-    // 🆕 优化：减少清理频率，从60秒改为5分钟
-    const timer = setInterval(() => this.cleanup(), 5 * 60 * 1000);
-    timer.unref();
+    // 🆕 优化：减少清理频率，从 60 秒改为 5 分钟
+    // 🆕 修复：使用静态引用，避免多实例创建多个定时器
+    if (!DetailedDataManager.cleanupTimer) {
+      DetailedDataManager.cleanupTimer = setInterval(() => this.cleanup(), 5 * 60 * 1000);
+      DetailedDataManager.cleanupTimer.unref();
+    }
+  }
+
+  /**
+   * 🆕 测试清理 API - 停止清理定时器，允许测试进程退出
+   */
+  static destroy(): void {
+    if (DetailedDataManager.cleanupTimer) {
+      clearInterval(DetailedDataManager.cleanupTimer);
+      DetailedDataManager.cleanupTimer = undefined;
+    }
+    if (DetailedDataManager.instance) {
+      DetailedDataManager.instance.cache.clear();
+      DetailedDataManager.instance = undefined as any;
+    }
   }
 
   static getInstance(): DetailedDataManager {
