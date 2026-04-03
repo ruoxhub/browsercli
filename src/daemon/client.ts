@@ -1,8 +1,9 @@
 import {createConnection} from 'node:net';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
-import {socketPath} from './utils.js';
+import {socketPath, IS_WINDOWS} from './utils.js';
 import {logger} from '../logger.js';
+import {fileURLToPath} from 'node:url';
 import type {CallToolResult} from '../third_party/index.js';
 
 const execAsync = promisify(execFile);
@@ -19,7 +20,9 @@ function getSocketPath(): string {
 }
 
 export async function startDaemon(args: string[]): Promise<void> {
-  const daemonPath = new URL('./daemon.js', import.meta.url).pathname;
+  // 使用 fileURLToPath 正确处理跨平台路径 (WSL2 → Windows)
+  const daemonUrl = new URL('./daemon.js', import.meta.url);
+  const daemonPath = IS_WINDOWS ? fileURLToPath(daemonUrl) : daemonUrl.pathname;
   logger(`启动 Daemon: node ${daemonPath} ${args.join(' ')}`);
   await execAsync('node', [daemonPath, ...args]);
 }
@@ -38,7 +41,7 @@ export async function sendCommand(request: {
     const socket = createConnection(getSocketPath());
     let response = '';
 
-    socket.on('data', (chunk) => {
+    socket.on('data', chunk => {
       response += chunk.toString();
     });
 
@@ -50,7 +53,11 @@ export async function sendCommand(request: {
         const jsonStr = nullIndex > 0 ? trimmed.slice(0, nullIndex) : trimmed;
         resolve(JSON.parse(jsonStr));
       } catch (err) {
-        reject(new Error(`响应解析失败：${err}. Response: ${response.slice(0, 200)}`));
+        reject(
+          new Error(
+            `响应解析失败：${err}. Response: ${response.slice(0, 200)}`,
+          ),
+        );
       }
     });
 
@@ -64,10 +71,16 @@ export async function sendCommand(request: {
   });
 }
 
-export function handleResponse(result: CallToolResult, format: 'text' | 'json' | 'md'): string {
+export function handleResponse(
+  result: CallToolResult,
+  format: 'text' | 'json' | 'md',
+): string {
   if (format === 'json') {
     return JSON.stringify(result, null, 2);
   }
-  const texts = result.content?.filter((c: any) => c.type === 'text').map((c: any) => c.text) || [];
+  const texts =
+    result.content
+      ?.filter((c: any) => c.type === 'text')
+      .map((c: any) => c.text) || [];
   return texts.join('\n');
 }

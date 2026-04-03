@@ -18,6 +18,7 @@
     "check-format": "eslint --cache . && prettier --check --cache .;",
     "docs": "npm run build && npm run docs:generate && npm run format",
     "docs:generate": "node --experimental-strip-types scripts/generate-docs.ts",
+    "cli:generate": "node --experimental-strip-types src/bin/generate-cli.ts",
     "start": "npm run build && node build/src/index.js",
     "start-debug": "DEBUG=mcp:* DEBUG_COLORS=false npm run build && node build/src/index.js",
     "test:node20": "node --require ./build/tests/setup.js --test-reporter spec --test-force-exit --test build/tests",

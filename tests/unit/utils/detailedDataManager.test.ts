@@ -5,7 +5,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it, beforeEach, after } from 'node:test';
 
 import { DetailedDataManager } from '../../../src/utils/detailedDataManager.js';
 
@@ -131,4 +131,9 @@ describe('DetailedDataManager', () => {
     manager.clear();
     assert.strictEqual(manager.getStats().cacheSize, 0);
   });
+});
+
+// 清理定时器，允许测试进程退出
+after(() => {
+  DetailedDataManager.destroy();
 });
