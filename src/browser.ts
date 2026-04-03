@@ -73,7 +73,10 @@ export async function ensureBrowserConnected(options: {
  * 2. 扫描常见端口 [9222, 9229, 9333]
  * 3. 使用 TCP 探测避免触发 Chrome 安全弹窗
  */
-async function discoverChromeDebugPort(): Promise<{port: number; wsPath?: string} | null> {
+async function discoverChromeDebugPort(): Promise<{
+  port: number;
+  wsPath?: string;
+} | null> {
   // 1. 尝试读取 DevToolsActivePort 文件
   const possiblePaths: string[] = [];
   const platform = os.platform();
@@ -82,9 +85,18 @@ async function discoverChromeDebugPort(): Promise<{port: number; wsPath?: string
 
   if (platform === 'darwin') {
     possiblePaths.push(
-      path.join(home, 'Library/Application Support/Google/Chrome/DevToolsActivePort'),
-      path.join(home, 'Library/Application Support/Google/Chrome Canary/DevToolsActivePort'),
-      path.join(home, 'Library/Application Support/Chromium/DevToolsActivePort'),
+      path.join(
+        home,
+        'Library/Application Support/Google/Chrome/DevToolsActivePort',
+      ),
+      path.join(
+        home,
+        'Library/Application Support/Google/Chrome Canary/DevToolsActivePort',
+      ),
+      path.join(
+        home,
+        'Library/Application Support/Chromium/DevToolsActivePort',
+      ),
     );
   } else if (platform === 'linux') {
     possiblePaths.push(
@@ -107,7 +119,9 @@ async function discoverChromeDebugPort(): Promise<{port: number; wsPath?: string
         const ok = await checkPort(port);
         if (ok) {
           const wsPath = lines[1] || null;
-          logger(`[discoverChromeDebugPort] 从 DevToolsActivePort 发现端口：${port}${wsPath ? ' (带 wsPath)' : ''}`);
+          logger(
+            `[discoverChromeDebugPort] 从 DevToolsActivePort 发现端口：${port}${wsPath ? ' (带 wsPath)' : ''}`,
+          );
           return {port, wsPath: wsPath || undefined};
         }
       }
@@ -133,7 +147,7 @@ async function discoverChromeDebugPort(): Promise<{port: number; wsPath?: string
  * TCP 端口探测（避免触发 Chrome 安全弹窗）
  */
 function checkPort(port: number): Promise<boolean> {
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     const socket = net.createConnection(port, '127.0.0.1');
     const timer = setTimeout(() => {
       socket.destroy();
@@ -203,10 +217,15 @@ export async function resolveAutoConnectTarget(options?: {
     try {
       const response = await fetchImpl(`${browserURL}/json/version`);
       if (response.ok) {
-        const payload = await response.json() as {webSocketDebuggerUrl?: string};
+        const payload = (await response.json()) as {
+          webSocketDebuggerUrl?: string;
+        };
         return {
           browserURL,
-          wsEndpoint: payload.webSocketDebuggerUrl || wsPath ? `ws://127.0.0.1:${port}${wsPath || '/devtools/browser'}` : undefined,
+          wsEndpoint:
+            payload.webSocketDebuggerUrl || wsPath
+              ? `ws://127.0.0.1:${port}${wsPath || '/devtools/browser'}`
+              : undefined,
         };
       }
     } catch {
@@ -486,12 +505,13 @@ export class BrowserManager {
 
       // First, verify the endpoint is accessible and get version info
       let browserURL: string | undefined;
+      let webSocketDebuggerUrl: string | undefined;
       if (this.config.browserURL || this.config.remoteDebuggingUrl) {
         browserURL = this.config.browserURL ?? this.config.remoteDebuggingUrl;
         try {
           const response = await fetch(`${browserURL}/json/version`);
           if (response.ok) {
-            const versionInfo = await response.json() as {
+            const versionInfo = (await response.json()) as {
               Browser?: string;
               'Protocol-Version'?: string;
               webSocketDebuggerUrl?: string;
@@ -500,21 +520,39 @@ export class BrowserManager {
               browser: versionInfo.Browser,
               protocolVersion: versionInfo['Protocol-Version'],
             });
+            webSocketDebuggerUrl = versionInfo.webSocketDebuggerUrl;
+          } else {
+            logger(
+              'Warning: /json/version returned non-OK status:',
+              response.status,
+            );
           }
         } catch (err) {
           logger('Warning: Could not fetch browser version:', err);
         }
       }
 
+      // If we got a WebSocket URL from /json/version, use it directly
+      // This avoids issues with browserURL connection mode
       const connectOptions: Parameters<typeof puppeteer.connect>[0] = {
         targetFilter: makeTargetFilter(),
         defaultViewport: null,
         protocolTimeout: 30000, // 30 second timeout for CDP commands
       };
 
+      // Prefer explicit WebSocket endpoint over browserURL
+      // This is more reliable and avoids CDP protocol issues
       if (this.config.wsEndpoint) {
         connectOptions.browserWSEndpoint = this.config.wsEndpoint;
-      } else {
+      } else if (webSocketDebuggerUrl) {
+        // Use the WebSocket URL from /json/version
+        connectOptions.browserWSEndpoint = webSocketDebuggerUrl;
+        logger(
+          'Using WebSocket endpoint from /json/version:',
+          webSocketDebuggerUrl,
+        );
+      } else if (this.config.browserURL || this.config.remoteDebuggingUrl) {
+        // Fallback to browserURL mode
         connectOptions.browserURL =
           this.config.browserURL ?? this.config.remoteDebuggingUrl;
       }
@@ -561,7 +599,7 @@ export class BrowserManager {
 
 当前 Puppeteer 版本：24.31.0
 原始错误：${errorMessage}`,
-          {cause: error}
+          {cause: error},
         );
       }
 
@@ -575,16 +613,13 @@ export class BrowserManager {
 3. 访问 http://127.0.0.1:<端口>/json/version 验证
 
 原始错误：${errorMessage}`,
-          {cause: error}
+          {cause: error},
         );
       }
 
-      throw new Error(
-        `Failed to connect to remote browser: ${errorMessage}`,
-        {
-          cause: error,
-        },
-      );
+      throw new Error(`Failed to connect to remote browser: ${errorMessage}`, {
+        cause: error,
+      });
     }
   }
 

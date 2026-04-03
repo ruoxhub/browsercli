@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -5,6 +6,9 @@
  */
 
 import {sendCommand, handleResponse} from '../daemon/client.js';
+import {fileURLToPath} from 'url';
+import path from 'path';
+import {realpath} from 'fs/promises';
 import type {CallToolResult} from '../third_party/index.js';
 
 /**
@@ -246,7 +250,29 @@ JSReverser-MCP CLI - JavaScript 逆向工程工具
   }
 }
 
-// CLI 入口
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main(process.argv.slice(2)).then(code => process.exit(code));
+// CLI 入口 - 使用 realpath 解析 symlinks
+async function checkAndRun() {
+  if (!process.argv[1]) return;
+
+  try {
+    const currentModulePath = fileURLToPath(import.meta.url);
+    const argvPath = process.argv[1];
+
+    // 解析 symlinks 后比较
+    const resolvedArgvPath = await realpath(argvPath);
+    const resolvedModulePath = await realpath(currentModulePath);
+
+    if (resolvedArgvPath === resolvedModulePath) {
+      await main(process.argv.slice(2));
+      process.exit(0);
+    }
+  } catch (e) {
+    // 如果 realpath 失败，回退到简单比较
+    if (process.argv[1] === fileURLToPath(import.meta.url)) {
+      await main(process.argv.slice(2));
+      process.exit(0);
+    }
+  }
 }
+
+checkAndRun();
