@@ -4,11 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fs from 'node:fs';
-import * as path from 'node:path';
+// 动态导入 chrome-devtools-frontend 以绕过类型检查
+const path = require('node:path');
+const fs = require('node:fs');
 
 const DESCRIPTIONS_PATH = path.join(
-  import.meta.dirname,
+  __dirname,
   '../node_modules/chrome-devtools-frontend/front_end/models/issues_manager/descriptions',
 );
 

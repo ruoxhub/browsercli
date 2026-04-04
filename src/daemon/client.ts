@@ -1,12 +1,9 @@
+import {spawn} from 'node:child_process';
 import {createConnection} from 'node:net';
-import {execFile} from 'node:child_process';
-import {promisify} from 'node:util';
 import {socketPath, IS_WINDOWS} from './utils.js';
-import {logger} from '../logger.js';
 import {fileURLToPath} from 'node:url';
 import type {CallToolResult} from '../third_party/index.js';
-
-const execAsync = promisify(execFile);
+import fs from 'node:fs';
 
 // 允许测试覆盖 socket 路径
 let _testSocketPath: string | undefined;
@@ -23,8 +20,40 @@ export async function startDaemon(args: string[]): Promise<void> {
   // 使用 fileURLToPath 正确处理跨平台路径 (WSL2 → Windows)
   const daemonUrl = new URL('./daemon.js', import.meta.url);
   const daemonPath = IS_WINDOWS ? fileURLToPath(daemonUrl) : daemonUrl.pathname;
-  logger(`启动 Daemon: node ${daemonPath} ${args.join(' ')}`);
-  await execAsync('node', [daemonPath, ...args]);
+
+  // 使用 spawn 后台启动 daemon 进程，不等待其退出
+  const child = spawn('node', [daemonPath, ...args], {
+    detached: true,
+    stdio: 'ignore',
+  });
+  child.unref();
+
+  // 等待 socket 文件创建（最多 5 秒，WSL2 环境可能需要更长时间）
+  await new Promise<void>((resolve, reject) => {
+    let attempts = 0;
+    const maxAttempts = 50; // 50 * 100ms = 5 秒
+    const targetSocketPath = getSocketPath();
+
+    const checkSocket = () => {
+      attempts++;
+      try {
+        fs.accessSync(targetSocketPath, fs.constants.F_OK);
+        resolve();
+      } catch {
+        if (attempts >= maxAttempts) {
+          reject(
+            new Error(
+              `Daemon 启动超时，socket 文件未创建：${targetSocketPath}`,
+            ),
+          );
+        } else {
+          setTimeout(checkSocket, 100);
+        }
+      }
+    };
+
+    checkSocket();
+  });
 }
 
 export async function stopDaemon(): Promise<void> {

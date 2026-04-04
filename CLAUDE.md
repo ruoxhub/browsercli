@@ -29,20 +29,8 @@ npm run typecheck
 # Lint and format
 npm run format
 
-# Start the MCP server (builds first)
-npm run start
-
-# Start with debug logging
-npm run start-debug
-
 # Generate documentation (after changing tools)
 npm run docs
-```
-
-## Testing with MCP Inspector
-
-```bash
-npx @modelcontextprotocol/inspector node build/src/index.js
 ```
 
 ## CLI Commands (js-reverse)
@@ -97,63 +85,72 @@ js-reverse start --browserUrl http://127.0.0.1:9222
 
 ## Architecture Overview
 
-This is an MCP (Model Context Protocol) server that exposes Chrome DevTools functionality to AI coding assistants via Puppeteer.
+This is a pure CLI tool for JavaScript reverse engineering with Chrome DevTools automation via Puppeteer.
 
 ### Core Components
 
-- **`src/main.ts`**: Entry point. Creates the MCP server, registers all tools, and handles tool execution with **mutex-based serialization** to prevent concurrent tool access.
+- **`src/bin/js-reverse.ts`**: CLI entry point. Imports Commander.js CLI from `src/commands/index.ts`.
 
-- **`src/McpContext.ts`**: Central state management class. Maintains:
-  - Browser and page state (selected page, page list)
-  - Accessibility tree snapshots for element interaction
-  - Network and console collectors
-  - Debugger context for script/breakpoint management
-  - Performance trace state
+- **`src/commands/index.ts`**: Commander.js CLI definition with 9 commands:
+  - `start` - Start daemon service
+  - `stop` - Stop daemon service
+  - `status` - Check daemon status
+  - `call-skill` - Execute a skill
+  - `call-tool` - Execute a tool
+  - `list-skills` - List available skills
+  - `list-tools` - List available tools
+  - `repl` - Interactive REPL mode
+  - `scaffold` - Create new task scaffold
 
-- **`src/McpResponse.ts`**: Response builder that tools use to construct their output (text, images, snapshots, network data, console data).
+- **`src/daemon/daemon.ts`**: Daemon entry point. Manages browser session and skill execution.
 
-- **`src/browser.ts`**: Browser lifecycle management. Handles launching new Chrome instances or connecting to existing ones via `browserURL`/`wsEndpoint`.
+- **`src/daemon/client.ts`**: IPC client for daemon communication (Unix Socket/Windows Named Pipe).
 
-### Tool System
+- **`src/daemon/http-server.ts`**: Optional HTTP API server (Express-based).
 
-Tools are defined in `src/tools/` using the `defineTool()` helper from `src/tools/ToolDefinition.ts`. Each tool has:
+- **`src/browser.ts`**: Browser lifecycle management. Connects to Chrome via `browserURL` or `wsEndpoint`.
 
-- `name`: Tool identifier
-- `description`: For MCP clients
-- `annotations`: Category and read-only hint
-- `schema`: Zod schema for input validation
-- `handler`: Implementation that receives request, response builder, and context
+### Daemon Architecture
 
-Tool categories are defined in `src/tools/categories.ts` and can be disabled via CLI flags (e.g., `--categoryNetwork=false`).
+The daemon runs as a background process and manages:
+- Browser connection and page management
+- Skill execution (observe-flow, auto-hook, rebuild-bundle)
+- Network and console data collection
+- IPC communication with CLI clients
+
+### Skill System
+
+Skills are defined in `src/skills/`:
+- **`observe-flow.ts`**: Observe and record browser behavior
+- **`auto-hook.ts`**: Auto-inject hooks for API monitoring
+- **`rebuild-bundle.ts`**: Rebuild JavaScript bundles
 
 ### CLI Arguments
 
-Key runtime options passed via MCP server config `env`:
-
-- `--browserUrl`: Connect to existing Chrome instance
-- `--wsEndpoint`: Connect via WebSocket endpoint
+Key runtime options for `js-reverse start`:
+- `--browserUrl <url>`: Connect to existing Chrome instance
+- `--wsEndpoint <endpoint>`: Connect via WebSocket
 - `--headless`: Run in headless mode
-- `--executablePath`: Custom Chrome path
-- `--chromeArg`: Additional Chrome flags
+- `--executablePath <path>`: Custom Chrome path
+- `--http`: Enable HTTP server mode
+- `--port <port>`: HTTP server port (default: 3000)
 
 ### Data Collection
 
-- **`src/PageCollector.ts`**: Base class for collecting page events. Extended by `NetworkCollector` and `ConsoleCollector` to track requests and console messages across pages.
-
-- **`src/formatters/`**: Convert collected data to text format for MCP responses.
+- **`src/PageCollector.ts`**: Base class for collecting page events
+- **`src/NetworkCollector`** and **`src/ConsoleCollector`**: Track requests and console messages
+- **`src/formatters/`**: Convert collected data to text format
 
 ### Third-Party Integration
 
-- **`src/third_party/index.ts`**: Re-exports from bundled dependencies (puppeteer, @modelcontextprotocol/sdk, zod).
-
-- **`chrome-devtools-frontend`**: Used for performance trace analysis and issue descriptions. Included via tsconfig.json.
+- **`src/third_party/index.ts`**: Re-exports from bundled dependencies (puppeteer, zod).
+- **`chrome-devtools-frontend`**: Used for performance trace analysis (optional dependency).
 
 ### Testing
 
 Tests use Node.js built-in test runner. Test files mirror source structure under `tests/`. Snapshots are stored alongside test files with `.snapshot` extension.
 
 - `tests/setup.ts`: Configures snapshot paths and serializers
-- `tests/server.ts`: Test utilities for MCP server testing
 - `tests/utils.ts`: Shared test helpers
 
 ## Conventions

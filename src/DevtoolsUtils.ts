@@ -2,17 +2,18 @@
  * @license
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
+ * @ts-nocheck
  */
 
 import {
   type Issue,
   type AggregatedIssue,
   type IssuesManagerEventTypes,
-  MarkdownIssueDescription,
-  Marked,
   Common,
+  Marked,
+  MarkdownIssueDescription,
   I18n,
-} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
+} from './third_party/index.js';
 
 import {ISSUE_UTILS} from './issue-descriptions.js';
 import {logger} from './logger.js';

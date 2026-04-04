@@ -8,7 +8,13 @@
  * Daemon message format from CLI to daemon
  */
 export interface DaemonMessage {
-  method: 'invoke_tool' | 'invoke_skill' | 'list_skills' | 'stop' | 'status';
+  method:
+    | 'invoke_tool'
+    | 'invoke_skill'
+    | 'list_skills'
+    | 'list_tools'
+    | 'stop'
+    | 'status';
   tool?: string;
   skill?: string;
   args?: Record<string, unknown>;

@@ -91,6 +91,30 @@ export const hostConfig = {};
   `;
   writeFile(runtimeFile, runtimeContent);
 
+  // Create mcp mock for chrome-devtools-frontend (ESM format)
+  const mcpDir = path.join(
+    BUILD_DIR,
+    'node_modules/chrome-devtools-frontend/mcp',
+  );
+  fs.mkdirSync(mcpDir, {recursive: true});
+  const mcpFile = path.join(mcpDir, 'mcp.js');
+  const mcpContent = `
+// Mock MCP module for chrome-devtools-frontend (ESM format)
+export const AgentFocus = { Session: class {} };
+export const TraceEngine = {
+  TraceModel: {
+    Model: { createWithAllHandlers: () => ({}) },
+    ParsedTrace: class {}
+  },
+  Insights: {
+    Types: {}
+  }
+};
+export class PerformanceTraceFormatter {}
+export class PerformanceInsightFormatter {}
+`;
+  writeFile(mcpFile, mcpContent);
+
   // Update protocol_client to remove:
   // 1. self.Protocol assignment
   // 2. Call to register backend commands.

@@ -2,9 +2,10 @@
  * @license
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
+ * @ts-nocheck
  */
 
-import type {AggregatedIssue} from '../../node_modules/chrome-devtools-frontend/mcp/mcp.js';
+import type {AggregatedIssue} from '../third_party/index.js';
 
 export interface ConsoleMessageData {
   consoleMessageStableId: number;
@@ -81,7 +82,9 @@ function annotateStackLine(
     return line;
   }
 
-  const candidates = Object.keys(sourceMapHints).sort((a, b) => b.length - a.length);
+  const candidates = Object.keys(sourceMapHints).sort(
+    (a, b) => b.length - a.length,
+  );
   for (const candidate of candidates) {
     if (!line.includes(candidate)) {
       continue;

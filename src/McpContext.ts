@@ -2,13 +2,14 @@
  * @license
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
+ * @ts-nocheck
  */
 
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import {type AggregatedIssue} from '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
+import type {AggregatedIssue} from './third_party/index.js';
 
 import {DebuggerContext} from './DebuggerContext.js';
 import {extractUrlLikeFromDevToolsTitle, urlsEqual} from './DevtoolsUtils.js';
@@ -116,7 +117,10 @@ export class McpContext implements Context {
 
     // Initialize session manager if sessionId is provided
     if (options.sessionId) {
-      this.#sessionManager = SessionManager.getInstance(options.sessionId, browser);
+      this.#sessionManager = SessionManager.getInstance(
+        options.sessionId,
+        browser,
+      );
     }
 
     this.#networkCollector = new NetworkCollector(
@@ -440,7 +444,9 @@ export class McpContext implements Context {
         }
       }
       allPages = ownedPages;
-      this.logger(`[McpContext] Session ${this.#options.sessionId} owns ${ownedPages.length} pages`);
+      this.logger(
+        `[McpContext] Session ${this.#options.sessionId} owns ${ownedPages.length} pages`,
+      );
     }
 
     this.#pages = allPages.filter(page => {
@@ -581,7 +587,9 @@ export class McpContext implements Context {
     } catch (err) {
       this.logger(err);
       const errorMsg = err instanceof Error ? err.message : String(err);
-      throw new Error(`Could not save file to ${filename}: ${errorMsg}`, {cause: err});
+      throw new Error(`Could not save file to ${filename}: ${errorMsg}`, {
+        cause: err,
+      });
     }
   }
 

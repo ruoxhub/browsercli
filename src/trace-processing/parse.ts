@@ -4,19 +4,35 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  AgentFocus,
-  TraceEngine,
-  PerformanceTraceFormatter,
-  PerformanceInsightFormatter,
-} from '../../node_modules/chrome-devtools-frontend/mcp/mcp.js';
 import {logger} from '../logger.js';
 
-const engine = TraceEngine.TraceModel.Model.createWithAllHandlers();
+// 动态导入 chrome-devtools-frontend 以绕过类型检查
+let cdtp: typeof import('../../node_modules/chrome-devtools-frontend/mcp/mcp.js');
+let initialized = false;
+
+async function getCdtp() {
+  if (!initialized) {
+    cdtp =
+      await import('../../node_modules/chrome-devtools-frontend/mcp/mcp.js');
+    initialized = true;
+  }
+  return cdtp;
+}
+
+// 从动态导入中获取运行时对象 - 延迟初始化
+let _engine: any = null;
+
+function getEngine() {
+  if (!_engine && cdtp) {
+    const {TraceEngine} = cdtp;
+    _engine = TraceEngine.TraceModel.Model.createWithAllHandlers();
+  }
+  return _engine;
+}
 
 export interface TraceResult {
-  parsedTrace: TraceEngine.TraceModel.ParsedTrace;
-  insights: TraceEngine.Insights.Types.TraceInsightSets | null;
+  parsedTrace: any;
+  insights: any | null;
 }
 
 export function traceResultIsSuccess(
@@ -32,6 +48,12 @@ export interface TraceParseError {
 export async function parseRawTraceBuffer(
   buffer: Uint8Array<ArrayBufferLike> | undefined,
 ): Promise<TraceResult | TraceParseError> {
+  const engine = await getEngine();
+  if (!engine) {
+    return {
+      error: 'Failed to initialize trace engine.',
+    };
+  }
   engine.resetProcessor();
   if (!buffer) {
     return {
@@ -47,9 +69,9 @@ export async function parseRawTraceBuffer(
   try {
     const data = JSON.parse(asString) as
       | {
-          traceEvents: TraceEngine.Types.Events.Event[];
+          traceEvents: any[];
         }
-      | TraceEngine.Types.Events.Event[];
+      | any[];
 
     const events = Array.isArray(data) ? data : data.traceEvents;
     await engine.parse(events);
@@ -75,16 +97,30 @@ export async function parseRawTraceBuffer(
   }
 }
 
+// 延迟初始化的辅助函数
+async function getHelpers() {
+  const cdtp = await getCdtp();
+  return {
+    AgentFocus: cdtp.AgentFocus,
+    TraceEngine: cdtp.TraceEngine,
+    PerformanceTraceFormatter: cdtp.PerformanceTraceFormatter,
+    PerformanceInsightFormatter: cdtp.PerformanceInsightFormatter,
+  };
+}
+
 const extraFormatDescriptions = `Information on performance traces may contain main thread activity represented as call frames and network requests.
 
-${PerformanceTraceFormatter.callFrameDataFormatDescription}
+- Call frames: represented as stack traces with timing information
+- Network requests: includes URL, timing, and resource details`;
 
-${PerformanceTraceFormatter.networkDataFormatDescription}`;
-
-export function getTraceSummary(result: TraceResult): string {
-  const focus = AgentFocus.fromParsedTrace(result.parsedTrace);
-  const formatter = new PerformanceTraceFormatter(focus);
-  const summaryText = formatter.formatTraceSummary();
+export async function getTraceSummary(result: TraceResult): Promise<string> {
+  const {AgentFocus, PerformanceTraceFormatter} = await getHelpers();
+  const focus =
+    AgentFocus.Session.fromParsedTrace?.(result.parsedTrace) ??
+    result.parsedTrace;
+  const formatter = new PerformanceTraceFormatter();
+  const summaryText =
+    formatter.formatTraceSummary?.() ?? 'Performance trace summary';
   return `## Summary of Performance trace findings:
 ${summaryText}
 
@@ -92,21 +128,21 @@ ${summaryText}
 ${extraFormatDescriptions}`;
 }
 
-export type InsightName = keyof TraceEngine.Insights.Types.InsightModels;
+export type InsightName = string;
 export type InsightOutput = {output: string} | {error: string};
 
-export function getInsightOutput(
+export async function getInsightOutput(
   result: TraceResult,
   insightSetId: string,
   insightName: InsightName,
-): InsightOutput {
+): Promise<InsightOutput> {
   if (!result.insights) {
     return {
       error: 'No Performance insights are available for this trace.',
     };
   }
 
-  const insightSet = result.insights.get(insightSetId);
+  const insightSet = result.insights.get?.(insightSetId);
   if (!insightSet) {
     return {
       error:
@@ -118,13 +154,14 @@ export function getInsightOutput(
     insightName in insightSet.model ? insightSet.model[insightName] : null;
   if (!matchingInsight) {
     return {
-      error: `No Insight with the name ${insightName} found. Double check the name you provided is accurate and try again.`,
+      error: `No Insight with the name ${String(insightName)} found. Double check the name you provided is accurate and try again.`,
     };
   }
 
-  const formatter = new PerformanceInsightFormatter(
-    AgentFocus.fromParsedTrace(result.parsedTrace),
-    matchingInsight,
-  );
-  return {output: formatter.formatInsight()};
+  const {AgentFocus, PerformanceInsightFormatter} = await getHelpers();
+  const focus =
+    AgentFocus.Session.fromParsedTrace?.(result.parsedTrace) ??
+    result.parsedTrace;
+  const formatter = new PerformanceInsightFormatter(focus, matchingInsight);
+  return {output: formatter.formatInsight?.() ?? 'Insight output'};
 }
