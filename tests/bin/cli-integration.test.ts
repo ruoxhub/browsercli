@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {describe, it} from 'node:test';
 import assert from 'node:assert';
 import {execSync} from 'node:child_process';
+import {describe, it} from 'node:test';
 
 const CLI_PATH = 'node build/src/bin/js-reverse.js';
 

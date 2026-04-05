@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {zod} from '../third_party/index.js';
-import {ToolCategory} from './categories.js';
 import {SkillRegistry, SkillRunner} from '../skills/index.js';
+import {zod} from '../third_party/index.js';
 import {logger} from '../utils/logger.js';
+
+import {ToolCategory} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
 
 /**

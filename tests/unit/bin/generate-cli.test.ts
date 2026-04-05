@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {describe, it} from 'node:test';
 import assert from 'node:assert';
+import {describe, it} from 'node:test';
+
 import {schemaToCLIOptions} from '../../../src/bin/generate-cli.js';
 
 describe('bin/generate-cli', () => {

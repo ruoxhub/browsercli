@@ -1,9 +1,17 @@
+
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import {spawn} from 'node:child_process';
-import {createConnection} from 'node:net';
-import {socketPath, IS_WINDOWS} from './utils.js';
-import {fileURLToPath} from 'node:url';
-import type {CallToolResult} from '../third_party/index.js';
 import fs from 'node:fs';
+import {createConnection} from 'node:net';
+import {fileURLToPath} from 'node:url';
+
+import type {CallToolResult} from '../third_party/index.js';
+
+import {socketPath, IS_WINDOWS} from './utils.js';
 
 // 允许测试覆盖 socket 路径
 let _testSocketPath: string | undefined;
@@ -21,11 +29,18 @@ export async function startDaemon(args: string[]): Promise<void> {
   const daemonUrl = new URL('./daemon.js', import.meta.url);
   const daemonPath = IS_WINDOWS ? fileURLToPath(daemonUrl) : daemonUrl.pathname;
 
-  // 使用 nohup 方式启动，避免进程挂起
-  const child = spawn('nohup', ['node', daemonPath, ...args], {
-    detached: true,
-    stdio: 'ignore',
-  });
+  // 跨平台启动 daemon：Windows 不支持 nohup，使用 detached + shell
+  const child = IS_WINDOWS
+    ? spawn('node', [daemonPath, ...args], {
+        detached: true,
+        shell: true,
+        stdio: 'ignore',
+        windowsHide: true, // 隐藏 Windows 子进程窗口
+      })
+    : spawn('nohup', ['node', daemonPath, ...args], {
+        detached: true,
+        stdio: 'ignore',
+      });
   child.unref();
 
   console.log(`Daemon PID: ${child.pid}`);

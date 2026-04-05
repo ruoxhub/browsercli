@@ -14,15 +14,16 @@
  * - Request initiator (call stack) analysis
  */
 
+import type { ContinuousDebugConfig} from '../modules/debugger/AIContinuousDebugger.js';
+import {AIContinuousDebugger} from '../modules/debugger/AIContinuousDebugger.js';
+import type {DebuggerManager} from '../modules/debugger/DebuggerManager.js';
+import {AIService} from '../services/AIService.js';
 import {zod} from '../third_party/index.js';
+import {createAIService, getAIConfig} from '../utils/config.js';
 
 import {ToolCategory} from './categories.js';
 import {getJSHookRuntime} from './runtime.js';
 import {defineTool} from './ToolDefinition.js';
-import {createAIService, getAIConfig} from '../utils/config.js';
-import {AIService} from '../services/AIService.js';
-import {DebuggerManager} from '../modules/debugger/DebuggerManager.js';
-import {AIContinuousDebugger, ContinuousDebugConfig} from '../modules/debugger/AIContinuousDebugger.js';
 
 const BREAKPOINT_STALL_HINT =
   'If execution appears stuck: run resume first. If it keeps pausing at the same location, remove_breakpoint and switch to trace_function(pause=false) or hook_function.';

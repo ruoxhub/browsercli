@@ -7,8 +7,8 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {SkillRegistry} from '../../../src/skills/SkillRunner.js';
 import {registerRebuildBundleSkill} from '../../../src/skills/rebuild-bundle.js';
+import {SkillRegistry} from '../../../src/skills/SkillRunner.js';
 
 describe('rebuild-bundle skill', () => {
   it('registers the skill with the SkillRegistry', () => {

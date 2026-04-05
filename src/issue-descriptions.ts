@@ -5,8 +5,12 @@
  */
 
 // 动态导入 chrome-devtools-frontend 以绕过类型检查
-const path = require('node:path');
-const fs = require('node:fs');
+import fs from 'node:fs';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const DESCRIPTIONS_PATH = path.join(
   __dirname,

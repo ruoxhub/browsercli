@@ -5,18 +5,15 @@
  * @ts-nocheck
  */
 
+import {ISSUE_UTILS} from './issue-descriptions.js';
+import {logger} from './logger.js';
 import {
   type Issue,
   type AggregatedIssue,
-  type IssuesManagerEventTypes,
-  Common,
   Marked,
   MarkdownIssueDescription,
   I18n,
 } from './third_party/index.js';
-
-import {ISSUE_UTILS} from './issue-descriptions.js';
-import {logger} from './logger.js';
 
 export function extractUrlLikeFromDevToolsTitle(
   title: string,
@@ -76,9 +73,28 @@ function normalizeUrl(url: string): string {
 /**
  * A mock implementation of an issues manager that only implements the methods
  * that are actually used by the IssuesAggregator
+ *
+ * Note: This is a standalone class to avoid circular dependency issues with
+ * third-party Common.ObjectWrapper in ES module loading.
  */
-export class FakeIssuesManager extends Common.ObjectWrapper
-  .ObjectWrapper<IssuesManagerEventTypes> {
+export class FakeIssuesManager {
+  #listeners: Map<string, Set<(...args: any[]) => void>> = new Map();
+
+  addEventListener(event: string, listener: (...args: any[]) => void): void {
+    if (!this.#listeners.has(event)) {
+      this.#listeners.set(event, new Set());
+    }
+    this.#listeners.get(event)!.add(listener);
+  }
+
+  removeEventListener(event: string, listener: (...args: any[]) => void): void {
+    this.#listeners.get(event)?.delete(listener);
+  }
+
+  emit(event: string, ...args: any[]): void {
+    this.#listeners.get(event)?.forEach(listener => listener(...args));
+  }
+
   issues(): Issue[] {
     return [];
   }

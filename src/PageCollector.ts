@@ -6,9 +6,10 @@
  */
 
 // 动态导入 chrome-devtools-frontend 以绕过类型检查
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const cdtp = require('../node_modules/chrome-devtools-frontend/mcp/mcp.js');
 
+import {FakeIssuesManager} from './DevtoolsUtils.js';
+import {features} from './features.js';
+import {logger} from './logger.js';
 import type {
   AggregatedIssue,
   Common,
@@ -24,9 +25,11 @@ import type {
   PageEvents,
 } from './third_party/index.js';
 
-import {FakeIssuesManager} from './DevtoolsUtils.js';
-import {features} from './features.js';
-import {logger} from './logger.js';
+// 动态导入 chrome-devtools-frontend 以绕过类型检查
+import {createRequire} from 'node:module';
+const require = createRequire(import.meta.url);
+
+const cdtp = require('../node_modules/chrome-devtools-frontend/mcp/mcp.js');
 
 // 从动态导入中获取运行时对象
 const {
@@ -288,8 +291,8 @@ export class ConsoleCollector extends PageCollector<
 }
 
 class PageIssueSubscriber {
-  #issueManager = new FakeIssuesManager();
-  #issueAggregator = new IssueAggregator(this.#issueManager);
+  #issueManager: FakeIssuesManager | null = null;
+  #issueAggregator: IssueAggregator | null = null;
   #seenKeys = new Set<string>();
   #seenIssues = new Set<AggregatedIssue>();
   #page: Page;
@@ -299,6 +302,8 @@ class PageIssueSubscriber {
     this.#page = page;
     // @ts-expect-error use existing CDP client (internal Puppeteer API).
     this.#session = this.#page._client() as CDPSession;
+    // 懒初始化 IssueAggregator，避免循环依赖
+    this.#resetIssueAggregator();
   }
 
   #resetIssueAggregator() {

@@ -12,10 +12,19 @@ import path from 'node:path';
 import process from 'node:process';
 
 import {logger} from '../logger.js';
+import {
+  SkillRegistry,
+  SkillRunner,
+  getBuiltInSkillDefinitions,
+} from '../skills/index.js';
 import {PipeTransport} from '../third_party/index.js';
-import type {DaemonMessage} from './types.js';
-import type {JSHookToolDefinition} from '../tools/ToolRegistry.js';
 import {getJSHookRuntime} from '../tools/runtime.js';
+import type {JSHookToolDefinition} from '../tools/ToolRegistry.js';
+import {logger as skillLogger} from '../utils/logger.js';
+
+import {NetworkCollector} from '../PageCollector.js';
+
+import type {DaemonMessage} from './types.js';
 import {
   getDaemonPid,
   getPidFilePath,
@@ -27,12 +36,6 @@ import {
 console.log('[DAEMON] Module loading...');
 
 // 技能系统导入 - 懒加载
-import {
-  SkillRegistry,
-  SkillRunner,
-  getBuiltInSkillDefinitions,
-} from '../skills/index.js';
-import {logger as skillLogger} from '../utils/logger.js';
 
 console.log('[DAEMON] Modules loaded, checking existing daemon...');
 
@@ -91,6 +94,9 @@ let _toolsLoaded = false;
 let _loadToolsPromise: Promise<void> | null = null;
 let _cachedToolsList: any[] | null = null;
 
+// 全局 NetworkCollector 实例（daemon 级别初始化）
+let _networkCollector: NetworkCollector | null = null;
+
 /**
  * 懒加载技能注册表
  */
@@ -145,6 +151,16 @@ async function ensureBrowserConnection() {
     const runtime = getJSHookRuntime();
     await runtime.browserManager.launch();
     console.log('[DAEMON] Browser connected successfully');
+
+    // 初始化 NetworkCollector（网络请求数据收集）
+    const browser = runtime.browserManager.getBrowser();
+    if (browser) {
+      // 类型转换：绕过 puppeteer 类型不匹配问题
+      // @ts-expect-error - Internal Puppeteer type mismatch
+      _networkCollector = new NetworkCollector(browser, undefined, false);
+      await _networkCollector.init();
+      console.log('[DAEMON] NetworkCollector initialized');
+    }
   } catch (error) {
     console.error('[DAEMON] Failed to connect browser:', error);
   }
@@ -191,6 +207,23 @@ async function handleRequest(msg: DaemonMessage) {
       const {getJSHookRuntime} = await import('../tools/runtime.js');
       const runtime = getJSHookRuntime();
 
+      // 预获取页面列表（支持同步调用）
+      let cachedPages: any[] = [];
+      try {
+        const browser = runtime.browserManager.getBrowser();
+        if (browser) {
+          cachedPages = await browser.pages();
+        }
+      } catch (e) {
+        // Ignore errors
+      }
+
+      // 如果当前没有选中页面，自动选择第一个可用页面
+      if (!runtime.browserManager.getCurrentPage() && cachedPages.length > 0) {
+        runtime.browserManager.setCurrentPage(cachedPages[0]);
+        logger('[DAEMON] Auto-selected first page:', cachedPages[0].url());
+      }
+
       const request = {params: args};
       const response: any = {
         _lines: [] as string[],
@@ -220,17 +253,11 @@ async function handleRequest(msg: DaemonMessage) {
       const context: any = {
         // 实现 Context 接口所需的方法
         getPageByIdx: async (idx: number) => {
-          const browser = runtime.browserManager.getBrowser();
-          if (!browser) throw new Error('Browser not connected');
-          const pages = await browser.pages();
-          if (!pages[idx]) throw new Error(`Page ${idx} not found`);
-          return pages[idx];
+          if (!cachedPages[idx]) throw new Error(`Page ${idx} not found`);
+          return cachedPages[idx];
         },
-        getPages: async () => {
-          const browser = runtime.browserManager.getBrowser();
-          if (!browser) return [];
-          return await browser.pages();
-        },
+        // 使用预缓存的页面列表（同步返回，避免 Promise 问题）
+        getPages: () => cachedPages,
         getSelectedPage: () => runtime.browserManager.getCurrentPage(),
         selectPage: (page: any) => runtime.browserManager.setCurrentPage(page),
         newPage: async () => await runtime.browserManager.newPage(),
@@ -264,12 +291,34 @@ async function handleRequest(msg: DaemonMessage) {
         getFrameByIdx: () => null,
         getDevToolsBackendNodeId: () => null,
         getDevToolsFrameId: () => null,
+        // 网络工具所需方法 - 返回空对象表示 DevTools 未激活
+        getDevToolsData: async () => ({}),
+        resolveCdpRequestId: () => undefined,
+        debuggerContext: {
+          pause: async () => {},
+          resume: async () => {},
+          stepInto: async () => {},
+          stepOver: async () => {},
+          stepOut: async () => {},
+          setBreakpoint: async () => ({breakpointId: ''}),
+          removeBreakpoint: async () => {},
+          getScriptSource: async () => '',
+        },
+        getRequestInitiator: () => undefined,
+        getRequestInitiatorById: () => undefined,
+        // 网络请求数据获取 - 从 NetworkCollector 获取实际数据
+        getNetworkRequests: (includePreserved?: boolean) => {
+          const page = runtime.browserManager.getCurrentPage();
+          if (!page || !_networkCollector) return [];
+          // @ts-expect-error - Internal Puppeteer type mismatch
+          return _networkCollector.getData(page, includePreserved);
+        },
       };
 
       await targetTool.handler(request, response, context);
 
       // 构建返回结果
-      let resultData: any = {};
+      const resultData: any = {};
       if (response._includePages) {
         const pages = await context.getPages();
         // 直接从 Chrome DevTools 端点获取页面信息
@@ -299,6 +348,27 @@ async function handleRequest(msg: DaemonMessage) {
             webSocketDebuggerUrl: matchedPage?.webSocketDebuggerUrl || '',
           };
         });
+      }
+      // 处理网络请求数据
+      if (response._includeNetwork) {
+        const page = runtime.browserManager.getCurrentPage();
+        if (page && _networkCollector) {
+          // 使用 NetworkCollector 收集的实际数据
+          const requests = _networkCollector.getData(page, false);
+          resultData.networkRequests = requests.map(
+            (req: any, idx: number) => ({
+              id: idx,
+              url: req.url(),
+              method: req.method(),
+              type: req.resourceType(),
+            }),
+          );
+          resultData.text = `收集到 ${requests.length} 个网络请求`;
+        } else if (page) {
+          resultData.text = 'NetworkCollector 未初始化';
+        } else {
+          resultData.text = '没有选中的页面';
+        }
       }
       if (response._lines.length > 0) {
         resultData.text = response._lines.join('\n');

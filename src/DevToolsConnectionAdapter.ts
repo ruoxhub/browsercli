@@ -14,7 +14,6 @@ import type {
   CommandParams,
   CommandResult,
 } from './third_party/index.js';
-
 import type * as puppeteer from './third_party/index.js';
 import {CDPSessionEvent} from './third_party/index.js';
 

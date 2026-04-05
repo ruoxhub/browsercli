@@ -6,7 +6,9 @@
  */
 
 import {Command} from 'commander';
+
 import {VERSION} from '../version.js';
+
 import {generateToolCommands} from './tool-commands.js';
 
 export async function createCli(): Promise<Command> {

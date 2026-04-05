@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {describe, it} from 'node:test';
 import assert from 'node:assert';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import {describe, it} from 'node:test';
+
 import {parseArgs} from '../../src/bin/scaffold.js';
 
 describe('Scaffold parseArgs', () => {

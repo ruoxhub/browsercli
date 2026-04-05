@@ -124,11 +124,14 @@ export class PerformanceInsightFormatter {}
     'protocol_client',
   );
   const clientFile = path.join(protocolClientDir, 'protocol_client.js');
-  const globalAssignment = /self\.Protocol = self\.Protocol \|\| \{\};/;
-  const registerCommands =
-    /InspectorBackendCommands\.registerCommands\(InspectorBackend\.inspectorBackend\);/;
-  sed(clientFile, globalAssignment, '');
-  sed(clientFile, registerCommands, '');
+  // Only apply sed if file exists (node_modules may not be compiled)
+  if (fs.existsSync(clientFile)) {
+    const globalAssignment = /self\.Protocol = self\.Protocol \|\| \{\};/;
+    const registerCommands =
+      /InspectorBackendCommands\.registerCommands\(InspectorBackend\.inspectorBackend\);/;
+    sed(clientFile, globalAssignment, '');
+    sed(clientFile, registerCommands, '');
+  }
 
   const devtoolsLicensePath = path.join(
     'node_modules',

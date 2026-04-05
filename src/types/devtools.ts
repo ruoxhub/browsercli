@@ -5,18 +5,18 @@
  */
 
 // DevTools 类型定义 - 本地化避免路径问题
-export type Connection = {
+export interface Connection {
   connection: () => { send: (method: string, params?: Record<string, unknown>) => Promise<unknown> };
-};
+}
 
-export type CDPSession = {
+export interface CDPSession {
   send: (method: string, params?: Record<string, unknown>) => Promise<unknown>;
   on: (event: string, callback: (...args: unknown[]) => void) => void;
-};
+}
 
-export type Page = {
+export interface Page {
   on: (event: string, callback: (...args: unknown[]) => void) => void;
-};
+}
 
 export type Browser = unknown;
 export type ConsoleMessage = unknown;
@@ -26,10 +26,10 @@ export type HTTPRequest = unknown;
 export type Protocol = unknown;
 export type Handler = unknown;
 
-export type AggregatedIssue = {
+export interface AggregatedIssue {
   code: string;
   title: () => string;
   description: () => string | null;
-};
+}
 
 export type Issue = unknown;

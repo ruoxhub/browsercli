@@ -14,8 +14,8 @@ import {ReverseTaskStore} from '../../../src/reverse/ReverseTaskStore.js';
 import {analyzeTarget, recordReverseEvidence} from '../../../src/tools/analyzer.js';
 import {getHookData} from '../../../src/tools/hook.js';
 import {getJSHookRuntime} from '../../../src/tools/runtime.js';
-import {DetailedDataManager} from '../../../src/utils/detailedDataManager.js';
 import type {CollectCodeResult, DetectCryptoResult, UnderstandCodeResult} from '../../../src/types/index.js';
+import {DetailedDataManager} from '../../../src/utils/detailedDataManager.js';
 
 interface ResponseShape {
   lines: string[];

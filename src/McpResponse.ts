@@ -5,7 +5,6 @@
  * @ts-nocheck
  */
 
-import type {McpContext} from './McpContext.js';
 import {
   formatConsoleEventShort,
   formatConsoleEventVerbose,
@@ -22,6 +21,7 @@ import {
   formatWebSocketConnectionShort,
   formatWebSocketConnectionVerbose,
 } from './formatters/websocketFormatter.js';
+import type {McpContext} from './McpContext.js';
 import type {
   ConsoleMessage,
   ImageContent,

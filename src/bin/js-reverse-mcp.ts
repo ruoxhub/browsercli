@@ -11,10 +11,6 @@ import {createServer, type Server} from 'node:net';
 import path from 'node:path';
 import process from 'node:process';
 
-import {logger} from '../logger.js';
-import {Client, PipeTransport, StdioClientTransport} from '../third_party/index.js';
-import {VERSION} from '../version.js';
-
 import type {DaemonMessage} from '../daemon/types.js';
 import {
   DAEMON_CLIENT_NAME,
@@ -25,6 +21,10 @@ import {
   IS_WINDOWS,
   isDaemonRunning,
 } from '../daemon/utils.js';
+import {logger} from '../logger.js';
+import {Client, PipeTransport, StdioClientTransport} from '../third_party/index.js';
+import {VERSION} from '../version.js';
+
 
 const pid = getDaemonPid();
 if (isDaemonRunning(pid)) {

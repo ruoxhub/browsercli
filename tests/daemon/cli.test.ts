@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {describe, it} from 'node:test';
 import assert from 'node:assert';
 import {execFile} from 'node:child_process';
+import {describe, it} from 'node:test';
 import {promisify} from 'node:util';
 
 const execAsync = promisify(execFile);

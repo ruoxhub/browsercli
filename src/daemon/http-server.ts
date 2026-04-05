@@ -6,8 +6,9 @@
  */
 
 import express from 'express';
-import {sendCommand} from './client.js';
 import type {RequestHandler, Request, Response} from 'express';
+
+import {sendCommand} from './client.js';
 
 export interface HttpServerOptions {
   port: number;

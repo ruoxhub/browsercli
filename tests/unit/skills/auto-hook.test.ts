@@ -8,8 +8,9 @@
  * 自动 Hook 技能单元测试
  */
 
-import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
+import { describe, it, beforeEach, afterEach } from 'node:test';
+
 import { registerAutoHookSkill, type AutoHookOptions, type AutoHookSkillData } from '../../../src/skills/auto-hook.js';
 import { SkillRegistry } from '../../../src/skills/SkillRunner.js';
 

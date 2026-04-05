@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { logger } from '../utils/logger.js';
+
 import type { SkillContext, SkillResult } from './SkillRunner.js';
 import { SkillRegistry } from './SkillRunner.js';
-import { logger } from '../utils/logger.js';
 
 /**
  * 观察模式技能配置

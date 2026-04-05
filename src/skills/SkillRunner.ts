@@ -49,7 +49,7 @@ export interface SkillDefinition {
  */
 export class SkillRegistry {
   private static instance: SkillRegistry;
-  private skills: Map<string, SkillDefinition> = new Map();
+  private skills = new Map<string, SkillDefinition>();
 
   private constructor() {}
 

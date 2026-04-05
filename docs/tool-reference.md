@@ -25,12 +25,6 @@
   - [`select_page`](#select_page)
   - [`type_text`](#type_text)
   - [`wait_for_element`](#wait_for_element)
-- **[Data](#data)** (5 tools)
-  - [`create_site_experience`](#create_site_experience)
-  - [`delete_site_experience`](#delete_site_experience)
-  - [`list_site_experiences`](#list_site_experiences)
-  - [`search_site_experience`](#search_site_experience)
-  - [`update_site_experience`](#update_site_experience)
 - **[Network](#network)** (6 tools)
   - [`analyze_websocket_messages`](#analyze_websocket_messages)
   - [`get_network_request`](#get_network_request)
@@ -46,7 +40,7 @@
   - [`inject_preload_script`](#inject_preload_script)
   - [`list_console_messages`](#list_console_messages)
   - [`take_screenshot`](#take_screenshot)
-- **[JS Reverse Engineering](#js-reverse-engineering)** (45 tools)
+- **[JS Reverse Engineering](#js-reverse-engineering)** (49 tools)
   - [`analyze_target`](#analyze_target)
   - [`break_on_xhr`](#break_on_xhr)
   - [`collect_code`](#collect_code)
@@ -57,6 +51,7 @@
   - [`evaluate_on_callframe`](#evaluate_on_callframe)
   - [`export_session_report`](#export_session_report)
   - [`find_in_script`](#find_in_script)
+  - [`get_ai_debug_status`](#get_ai_debug_status)
   - [`get_hook_data`](#get_hook_data)
   - [`get_paused_info`](#get_paused_info)
   - [`get_request_initiator`](#get_request_initiator)
@@ -84,14 +79,17 @@
   - [`set_breakpoint`](#set_breakpoint)
   - [`set_breakpoint_on_text`](#set_breakpoint_on_text)
   - [`set_user_agent`](#set_user_agent)
+  - [`start_continuous_debugging`](#start_continuous_debugging)
   - [`step_into`](#step_into)
   - [`step_out`](#step_out)
   - [`step_over`](#step_over)
+  - [`stop_continuous_debugging`](#stop_continuous_debugging)
   - [`stop_monitor`](#stop_monitor)
   - [`summarize_code`](#summarize_code)
   - [`trace_function`](#trace_function)
   - [`understand_code`](#understand_code)
   - [`unhook_function`](#unhook_function)
+  - [`xhr_to_js_breakpoint`](#xhr_to_js_breakpoint)
 
 ## Navigation automation
 
@@ -511,6 +509,10 @@ so returned values have to JSON-serializable.
 - `occurrence`
 - `caseSensitive`
 
+### `get_ai_debug_status`
+
+**Description:** 获取当前 AI 调试会话的状态和统计信息。
+
 ### `get_hook_data`
 
 **Description:** Get captured data for one hook or all hooks. Supports raw view and summary view for noise reduction.
@@ -756,6 +758,20 @@ so returned values have to JSON-serializable.
 
 - `userAgent`
 
+### `start_continuous_debugging`
+
+**Description:** 启动 AI 辅助的连续调试循环。设置 XHR 断点（可选），然后自动分析每个断点并决定下一步。
+
+**Parameters:**
+
+- `targetUrl`
+- `xhrBreakPatterns`
+- `maxIterations`
+- `timeoutMs`
+- `aiProvider`
+- `model`
+- `systemPrompt`
+
 ### `step_into`
 
 **Description:** Steps into the next function call. Use this to enter and debug function bodies.
@@ -767,6 +783,10 @@ so returned values have to JSON-serializable.
 ### `step_over`
 
 **Description:** Steps over to the next statement, treating function calls as a single step. Use this to move through code without entering function bodies.
+
+### `stop_continuous_debugging`
+
+**Description:** 停止正在运行的 AI 连续调试循环。
 
 ### `stop_monitor`
 
@@ -821,56 +841,12 @@ so returned values have to JSON-serializable.
 
 - `hookId`
 
-## Data
+### `xhr_to_js_breakpoint`
 
-### `create_site_experience`
-
-**Description:** 创建新的站点经验记录
+**Description:** 两阶段断点工作流：先通过 XHR 断点捕获调用栈，然后在顶层用户代码位置设置 JS 断点。
 
 **Parameters:**
 
-- `domain` - 站点域名（例如：example.com）
-- `name` - 站点名称
-- `aliases` - 站点别名列表
-- `platformFeatures` - 平台特征描述
-- `validPatterns` - 有效模式描述
-- `knownPitfalls` - 已知陷阱描述
-
-### `delete_site_experience`
-
-**Description:** 删除站点经验记录
-
-**Parameters:**
-
-- `id` - 要删除的站点经验 ID
-
-### `list_site_experiences`
-
-**Description:** 列出所有已保存的站点经验
-
-**Parameters:**
-
-- (none)
-
-### `search_site_experience`
-
-**Description:** 按 URL 或名称搜索站点经验。支持从完整 URL 自动提取域名进行匹配。
-
-**Parameters:**
-
-- `url` - 要搜索的 URL 或域名
-- `name` - 要搜索的站点名称
-
-### `update_site_experience`
-
-**Description:** 更新现有的站点经验记录
-
-**Parameters:**
-
-- `id` - 要更新的站点经验 ID
-- `name` - 新的站点名称
-- `aliases` - 新的别名列表
-- `platformFeatures` - 新的平台特征描述
-- `validPatterns` - 新的有效模式描述
-- `knownPitfalls` - 新的已知陷阱描述
+- `urlPattern`
+- `maxWaitMs`
 

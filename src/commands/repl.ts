@@ -6,6 +6,7 @@
  */
 
 import * as readline from 'node:readline';
+
 import {sendCommand} from '../daemon/client.js';
 import {logger} from '../logger.js';
 

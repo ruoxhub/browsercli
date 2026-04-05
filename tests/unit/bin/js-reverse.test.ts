@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {describe, it} from 'node:test';
 import assert from 'node:assert';
+import {describe, it} from 'node:test';
 
 describe('bin/js-reverse', () => {
   it('CLI 入口文件应该存在', () => {

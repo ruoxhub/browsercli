@@ -4,47 +4,39 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {ToolRegistry} from './ToolRegistry.js';
-import type {JSHookToolDefinition} from './ToolRegistry.js';
 
 // 导入所有工具
-import {invokeSkill, listSkills} from './skill.js';
-import {queryDom, getDomStructure, findClickableElements} from './dom.js';
-import {listNetworkRequests, getNetworkRequest} from './network.js';
+import {
+  deobfuscateCode,
+  understandCode,
+  summarizeCode,
+  detectCrypto,
+  recordReverseEvidence,
+  analyzeTarget,
+  riskPanel,
+  exportSessionReport,
+} from './analyzer.js';
+import {antiAntiDebug} from './anti-debug/antiAntiDebug.js';
+import {bypassDebugger} from './anti-debug/bypassDebugger.js';
+import {
+  cdp_start_proxy as startCdpProxy,
+  cdp_get_targets,
+  cdp_new_page,
+  cdp_close_page,
+  cdp_navigate,
+  cdp_eval,
+  cdp_click,
+  cdp_click_at,
+  cdp_screenshot,
+  cdp_scroll,
+  cdp_upload_files,
+  cdp_page_info,
+} from './cdp-proxy.js';
+import {collectCode, collectionDiff, searchInScripts} from './collector.js';
 import {listConsoleMessages, getConsoleMessage} from './console.js';
-import {
-  listWebSocketConnections,
-  getWebSocketMessages,
-  analyzeWebSocketMessages,
-} from './websocket.js';
-import {click, pressKey, fillForm, uploadFile, hover, drag} from './input.js';
-import {
-  waitForElement,
-  scrollBy,
-  saveSessionState,
-  restoreSessionState,
-  listSessionStates,
-  deleteSessionState,
-  dumpSessionState,
-  loadSessionState,
-  checkBrowserHealth,
-  clickElement,
-  typeText,
-} from './page.js';
-import {listPages, selectPage, newPage} from './pages.js';
-import {screenshot, captureVideoFrame} from './screenshot.js';
-import {
-  emulateMobile,
-  emulateNetwork,
-  emulateCpu,
-  resizePage,
-} from './emulation.js';
-import {
-  startPerformanceTrace,
-  stopPerformanceTrace,
-  getPerformanceMetrics,
-  performanceAnalyzeInsight,
-} from './performance.js';
+import {hookCryptoJS} from './crypto/hookCryptoJS.js';
+import {hookJSEncrypt} from './crypto/hookJSEncrypt.js';
+import {hookSMCrypto} from './crypto/hookSMCrypto.js';
 import {
   setBreakpoint,
   removeBreakpoint,
@@ -67,8 +59,37 @@ import {
   inspectObject,
   listHooks,
 } from './debugger.js';
-import {createHook, injectHook, getHookData, removeHook} from './hook.js';
 import {handleDialog} from './dialog.js';
+import {queryDom, getDomStructure, findClickableElements} from './dom.js';
+import {
+  emulateMobile,
+  emulateNetwork,
+  emulateCpu,
+  resizePage,
+} from './emulation.js';
+import {click, pressKey, fillForm, uploadFile, hover, drag} from './input.js';
+import {
+  waitForElement,
+  scrollBy,
+  saveSessionState,
+  restoreSessionState,
+  listSessionStates,
+  deleteSessionState,
+  dumpSessionState,
+  loadSessionState,
+  checkBrowserHealth,
+  clickElement,
+  typeText,
+} from './page.js';
+import {listPages, selectPage, newPage} from './pages.js';
+import {screenshot, captureVideoFrame} from './screenshot.js';
+import {
+  startPerformanceTrace,
+  stopPerformanceTrace,
+  getPerformanceMetrics,
+  performanceAnalyzeInsight,
+} from './performance.js';
+import {createHook, injectHook, getHookData, removeHook} from './hook.js';
 import {listFrames, selectFrame} from './frames.js';
 import {evaluateScript, injectPreloadScript} from './script.js';
 import {
@@ -79,54 +100,33 @@ import {
   deleteSiteExperience,
 } from './siteExperience.js';
 import {updateExtensions} from './extensions.js';
+import {invokeSkill, listSkills} from './skill.js';
 import {
   injectStealth,
   listStealthFeatures,
   listStealthPresets,
   setUserAgent,
 } from './stealth.js';
-import {
-  deobfuscateCode,
-  understandCode,
-  summarizeCode,
-  detectCrypto,
-  recordReverseEvidence,
-  analyzeTarget,
-  riskPanel,
-  exportSessionReport,
-} from './analyzer.js';
-import {collectCode, collectionDiff, searchInScripts} from './collector.js';
 import {exportRebuildBundle, diffEnvRequirements} from './rebuild.js';
 
 // 反调试工具
-import {antiAntiDebug} from './anti-debug/antiAntiDebug.js';
-import {bypassDebugger} from './anti-debug/bypassDebugger.js';
 
 // 加密库 Hook 工具
-import {hookCryptoJS} from './crypto/hookCryptoJS.js';
-import {hookJSEncrypt} from './crypto/hookJSEncrypt.js';
-import {hookSMCrypto} from './crypto/hookSMCrypto.js';
 
 // Vue 工具
+import type {JSHookToolDefinition} from './ToolRegistry.js';
+import {ToolRegistry} from './ToolRegistry.js';
 import {activateVueDevtools} from './vue/activateVueDevtools.js';
 import {clearVueGuards} from './vue/clearVueGuards.js';
 import {getVueRoutes} from './vue/getVueRoutes.js';
 
 // CDP 代理
+import {listNetworkRequests, getNetworkRequest} from './network.js';
 import {
-  cdp_start_proxy as startCdpProxy,
-  cdp_get_targets,
-  cdp_new_page,
-  cdp_close_page,
-  cdp_navigate,
-  cdp_eval,
-  cdp_click,
-  cdp_click_at,
-  cdp_screenshot,
-  cdp_scroll,
-  cdp_upload_files,
-  cdp_page_info,
-} from './cdp-proxy.js';
+  listWebSocketConnections,
+  getWebSocketMessages,
+  analyzeWebSocketMessages,
+} from './websocket.js';
 
 const registry = new ToolRegistry();
 

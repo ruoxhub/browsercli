@@ -14,7 +14,7 @@
     "build:dev": "swc src tests -d build --extensions .ts",
     "build": "swc src tests -d build --extensions .ts && node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/post-build.ts",
     "typecheck": "tsc --noEmit",
-    "format": "eslint --cache --fix . && prettier --write --cache .",
+    "format": "eslint --cache --fix src/ scripts/ || true; prettier --write --cache src/ scripts/",
     "check-format": "eslint --cache . && prettier --check --cache .;",
     "docs": "npm run build && npm run docs:generate && npm run format",
     "docs:generate": "node --experimental-strip-types scripts/generate-docs.ts",
@@ -121,5 +121,8 @@
   },
   "engines": {
     "node": "^20.19.0 || ^22.12.0 || >=23"
+  },
+  "optionalDependencies": {
+    "@swc/core-linux-x64-gnu": "^1.15.24"
   }
 }

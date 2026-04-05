@@ -1,7 +1,13 @@
+
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+import {execSync} from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {execSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 
 export const socketPath = path.join(os.tmpdir(), 'js-reverse-mcp.sock');

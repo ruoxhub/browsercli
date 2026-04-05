@@ -5,9 +5,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { z } from 'zod';
-import { defineTool } from './ToolDefinition.js';
+
 import { siteExperienceService } from '../services/SiteExperienceService.js';
+
 import { ToolCategory } from './categories.js';
+import { defineTool } from './ToolDefinition.js';
 import type { Context } from './ToolDefinition.js';
 
 /**

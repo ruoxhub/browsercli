@@ -243,9 +243,58 @@ export class BrowserModeManager {
     try {
       this.browser = await puppeteer.connect({
         browserURL: this.config.remoteDebuggingUrl,
+        defaultViewport: null, // 保持浏览器自然状态
       });
 
       logger.info('✅ Successfully connected to browser');
+
+      // 连接成功后，获取浏览器窗口边界并应用到页面（自动适配）
+      try {
+        const pages = await this.browser.pages();
+        if (pages.length > 0) {
+          const page = pages[0];
+          // @ts-expect-error - target() exists on puppeteer Page
+          const targetId = page.target()._targetId;
+
+          // 使用 CDP 命令获取浏览器窗口边界
+          const client = await page.createCDPSession();
+          // @ts-expect-error - CDP send returns correct type
+          const {bounds} = await client.send('Browser.getWindowForTarget', {
+            targetId,
+          });
+
+          logger.info(
+            `📐 Browser window bounds: ${bounds.width}x${bounds.height}`,
+          );
+
+          // 优先使用配置的 viewport，否则使用浏览器窗口边界
+          if (this.config.viewport) {
+            await page.setViewport({
+              width: this.config.viewport.width,
+              height: this.config.viewport.height,
+              deviceScaleFactor: 1,
+            });
+            logger.info(
+              `📐 Viewport set to ${this.config.viewport.width}x${this.config.viewport.height} (configured)`,
+            );
+          } else {
+            // 自动适配：使用浏览器窗口边界作为 viewport
+            await page.setViewport({
+              width: bounds.width,
+              height: bounds.height,
+              deviceScaleFactor: 1,
+            });
+            logger.info(
+              `📐 Viewport auto-adapted to ${bounds.width}x${bounds.height} (from browser window)`,
+            );
+          }
+
+          await client.detach();
+        }
+      } catch (err) {
+        logger.warn('⚠️ Could not set viewport from browser bounds:', err);
+      }
+
       return this.browser;
     } catch (error) {
       logger.warn('⚠️ Failed to connect to existing browser:', error);
@@ -257,6 +306,7 @@ export class BrowserModeManager {
 
           this.browser = await puppeteer.connect({
             browserURL: this.config.remoteDebuggingUrl,
+            defaultViewport: null,
           });
 
           logger.info('✅ Successfully connected to auto-launched browser');
@@ -283,8 +333,18 @@ export class BrowserModeManager {
       await this.launch();
     }
 
-    const page = await this.browser!.newPage();
-    this.currentPage = page;
+    // 优先复用远程浏览器的现有页面（保留原始 viewport）
+    const existingPages = await this.browser!.pages();
+    if (existingPages.length > 0) {
+      this.currentPage = existingPages[0];
+      logger.info(`♻️ 复用现有页面 (viewport: 自动继承浏览器窗口)`);
+    } else {
+      // 没有现有页面时才创建新页面
+      this.currentPage = await this.browser!.newPage();
+      logger.info(`📄 创建新页面`);
+    }
+
+    const page = this.currentPage;
     page.on('close', () => {
       if (this.currentPage === page) {
         this.currentPage = null;
@@ -295,7 +355,7 @@ export class BrowserModeManager {
     await page.setBypassCSP(true);
     await page.setJavaScriptEnabled(true);
 
-    // 设置 viewport（如果配置了）
+    // 设置 viewport（仅在配置时覆盖，否则使用 CDP 获取浏览器窗口边界）
     if (this.config.viewport) {
       await page.setViewport({
         width: this.config.viewport.width,
@@ -303,8 +363,32 @@ export class BrowserModeManager {
         deviceScaleFactor: 1,
       });
       logger.info(
-        `📐 Viewport set to ${this.config.viewport.width}x${this.config.viewport.height}`,
+        `📐 Viewport set to ${this.config.viewport.width}x${this.config.viewport.height} (configured)`,
       );
+    } else {
+      // 自动适配：使用 CDP 获取浏览器窗口边界并设置 viewport
+      try {
+        // @ts-expect-error - target() exists on puppeteer Page
+        const targetId = page.target()._targetId;
+        const client = await page.createCDPSession();
+        // @ts-expect-error - CDP send returns correct type
+        const {bounds} = await client.send('Browser.getWindowForTarget', {
+          targetId,
+        });
+
+        await page.setViewport({
+          width: bounds.width,
+          height: bounds.height,
+          deviceScaleFactor: 1,
+        });
+        logger.info(
+          `📐 Viewport auto-adapted to ${bounds.width}x${bounds.height} (from browser window)`,
+        );
+
+        await client.detach();
+      } catch (err) {
+        logger.warn('⚠️ Could not auto-adapt viewport:', err);
+      }
     }
 
     if (this.config.useStealthScripts) {

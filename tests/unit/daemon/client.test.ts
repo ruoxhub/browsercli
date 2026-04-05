@@ -4,11 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {describe, it, before, after} from 'node:test';
 import assert from 'node:assert';
 import {createServer} from 'node:net';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import {describe, it, before, after} from 'node:test';
+
 import {
   sendCommand,
   handleResponse,

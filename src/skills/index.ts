@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {registerObserveFlowSkill} from './observe-flow.js';
 import {registerAutoHookSkill} from './auto-hook.js';
+import {registerObserveFlowSkill} from './observe-flow.js';
 import {registerRebuildBundleSkill} from './rebuild-bundle.js';
 
 // 技能核心

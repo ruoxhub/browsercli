@@ -5,7 +5,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {Command} from 'commander';
+import type {Command} from 'commander';
+
 import {sendCommand} from '../daemon/client.js';
 
 /**

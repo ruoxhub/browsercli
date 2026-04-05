@@ -9,7 +9,6 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import type {AggregatedIssue} from './third_party/index.js';
 
 import {DebuggerContext} from './DebuggerContext.js';
 import {extractUrlLikeFromDevToolsTitle, urlsEqual} from './DevtoolsUtils.js';
@@ -18,6 +17,7 @@ import {NetworkCollector, ConsoleCollector} from './PageCollector.js';
 import type {ListenerMap, RequestInitiator} from './PageCollector.js';
 import {SessionManager} from './SessionManager.js';
 import {Locator} from './third_party/index.js';
+import type {AggregatedIssue} from './third_party/index.js';
 import type {
   Browser,
   ConsoleMessage,

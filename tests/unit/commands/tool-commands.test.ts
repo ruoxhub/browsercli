@@ -4,16 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {describe, it} from 'node:test';
 import assert from 'node:assert';
+import {describe, it} from 'node:test';
+
+
+import {Command} from 'commander';
+import {z} from 'zod';
+
 import {
   getParameterType,
   isOptional,
   formatResult,
   registerToolSchema,
 } from '../../../src/commands/tool-commands.js';
-import {Command} from 'commander';
-import {z} from 'zod';
 
 describe('commands/tool-commands', () => {
   describe('getParameterType', () => {

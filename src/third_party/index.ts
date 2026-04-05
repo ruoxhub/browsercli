@@ -37,7 +37,7 @@ export {PipeTransport} from 'puppeteer-core/internal/node/PipeTransport.js';
 
 // DevTools CDP 连接类型
 export type CDPCommand = string;
-export type CDPError = {code: number; message: string};
+export interface CDPError {code: number; message: string}
 export type CommandParams<T extends CDPCommand> = Record<string, unknown>;
 export type CommandResult<T extends CDPCommand> = Record<string, unknown>;
 
@@ -61,19 +61,19 @@ export interface CDPConnection {
 }
 
 // 本地 DevTools 类型定义 - 避免 chrome-devtools-frontend 路径问题
-export type Connection = {
+export interface Connection {
   session: (sessionId: string) => CDPSession | undefined;
-};
+}
 
-export type CDPSession = {
+export interface CDPSession {
   send: (method: string, params?: Record<string, unknown>) => Promise<unknown>;
   on: (event: string, callback: (...args: unknown[]) => void) => void;
   off: (event: string, callback: (...args: unknown[]) => void) => void;
   detach: () => Promise<void>;
   id?: string;
-};
+}
 
-export type Page = {
+export interface Page {
   on: (event: string, callback: (...args: unknown[]) => void) => void;
   off: (event: string, callback: (...args: unknown[]) => void) => void;
   url: () => string;
@@ -124,27 +124,27 @@ export type Page = {
     pageFunction: string | (() => T),
     ...args: unknown[]
   ) => Promise<T>;
-};
+}
 
-export type Browser = {
+export interface Browser {
   on: (event: string, callback: (...args: unknown[]) => void) => void;
   close: () => Promise<void>;
   connected: boolean;
   pages: () => Page[];
-};
+}
 
-export type ConsoleMessage = {
+export interface ConsoleMessage {
   type: () => string;
   text: () => string;
   args: () => Array<{jsonValue: () => Promise<unknown>}>;
-};
+}
 
 export type Dialog = unknown;
 export type Frame = unknown;
 export type HTTPRequest = unknown;
 
 // Protocol 命名空间
-// eslint-disable-next-line @typescript-eslint/no-namespace
+ 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Protocol {
   export interface Debugger {
@@ -175,7 +175,7 @@ export namespace Protocol {
   }
 
   // CDP 事件类型 - 用于 DebuggerContext.ts 中的事件处理
-  export type ScriptParsedEvent = {
+  export interface ScriptParsedEvent {
     scriptId: string;
     url: string;
     startLine: number;
@@ -184,9 +184,9 @@ export namespace Protocol {
     endColumn: number;
     hash: string;
     sourceMapURL?: string;
-  };
+  }
 
-  export type PausedCallFrame = {
+  export interface PausedCallFrame {
     callFrameId: string;
     functionName: string;
     location: {
@@ -225,18 +225,18 @@ export namespace Protocol {
       description?: string;
       objectId?: string;
     };
-  };
+  }
 
-  export type PausedEvent = {
+  export interface PausedEvent {
     callFrames: PausedCallFrame[];
     reason: string;
     data?: unknown;
     hitBreakpoints?: string[];
-  };
+  }
 
   export type ResumedEvent = void;
 
-  export type ScriptFailedToParseEvent = {
+  export interface ScriptFailedToParseEvent {
     scriptId: string;
     url: string;
     startLine: number;
@@ -245,15 +245,15 @@ export namespace Protocol {
     endColumn: number;
     hash: string;
     sourceMapURL?: string;
-  };
+  }
 
-  export type SetBreakpointByUrlRequest = {
+  export interface SetBreakpointByUrlRequest {
     urlFilter?: string;
     url?: string;
     lineNumber: number;
     columnNumber?: number;
     condition?: string;
-  };
+  }
 
   export interface Runtime {
     enable(): Promise<unknown>;
@@ -289,14 +289,14 @@ export namespace Protocol {
 
 export type Handler<T = unknown> = (event: T) => void;
 
-export type AggregatedIssue = {
+export interface AggregatedIssue {
   code: () => string;
   title: () => string;
   description: () => string | null;
   getDescription?: () => string | null;
   primaryKey: () => string;
   getAggregatedIssuesCount?: () => number;
-};
+}
 
 export type Issue = unknown;
 export type IssuesManagerEventTypes = unknown;
@@ -305,7 +305,7 @@ export type IssuesManagerEventTypes = unknown;
 // These are stub implementations to satisfy type checking after removing the dependency
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Common {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   export class ObjectWrapper<T = unknown> {
     emit(_event: string, _data?: T): void {}
     addEventListener(
@@ -347,13 +347,13 @@ export namespace I18n {
 }
 
 // MCP SDK 类型 (已移除，保留用于兼容)
-export type CallToolResult = {
+export interface CallToolResult {
   content?: Array<{type: string; text?: string; data?: unknown}>;
   isError?: boolean;
-};
+}
 
-export type ImageContent = {type: 'image'; data: string; mimeType: string};
-export type TextContent = {type: 'text'; text: string};
+export interface ImageContent {type: 'image'; data: string; mimeType: string}
+export interface TextContent {type: 'text'; text: string}
 export type ResourceType = string;
 
 // PageCollector 需要的类型

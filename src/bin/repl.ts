@@ -8,6 +8,7 @@
 
 import * as readline from 'node:readline';
 import {createInterface} from 'node:readline';
+
 import {sendCommand} from '../daemon/client.js';
 import {isDaemonRunning} from '../daemon/utils.js';
 

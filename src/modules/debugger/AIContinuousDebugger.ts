@@ -18,6 +18,7 @@
 
 import type { AIService } from '../../services/AIService.js';
 import { logger } from '../../utils/logger.js';
+
 import type { DebuggerManager, CallFrame } from './DebuggerManager.js';
 import type { XHRBreakpointManager } from './XHRBreakpointManager.js';
 
