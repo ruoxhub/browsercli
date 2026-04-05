@@ -21,34 +21,52 @@ export async function startDaemon(args: string[]): Promise<void> {
   const daemonUrl = new URL('./daemon.js', import.meta.url);
   const daemonPath = IS_WINDOWS ? fileURLToPath(daemonUrl) : daemonUrl.pathname;
 
-  // 使用 spawn 后台启动 daemon 进程，不等待其退出
-  const child = spawn('node', [daemonPath, ...args], {
+  // 使用 nohup 方式启动，避免进程挂起
+  const child = spawn('nohup', ['node', daemonPath, ...args], {
     detached: true,
     stdio: 'ignore',
   });
   child.unref();
 
-  // 等待 socket 文件创建（最多 5 秒，WSL2 环境可能需要更长时间）
+  console.log(`Daemon PID: ${child.pid}`);
+
+  // 等待 socket 文件创建（最多 25 秒）
   await new Promise<void>((resolve, reject) => {
     let attempts = 0;
-    const maxAttempts = 50; // 50 * 100ms = 5 秒
+    const maxAttempts = 250; // 250 * 100ms = 25 秒
     const targetSocketPath = getSocketPath();
 
     const checkSocket = () => {
       attempts++;
       try {
-        fs.accessSync(targetSocketPath, fs.constants.F_OK);
-        resolve();
-      } catch {
-        if (attempts >= maxAttempts) {
-          reject(
-            new Error(
-              `Daemon 启动超时，socket 文件未创建：${targetSocketPath}`,
-            ),
-          );
-        } else {
-          setTimeout(checkSocket, 100);
+        // 使用 statSync 而不仅仅是 accessSync，确保 socket 完全就绪
+        const stats = fs.statSync(targetSocketPath);
+        // 确认是 socket 文件
+        if (stats.isSocket()) {
+          // socket 创建后，再短暂等待确保 daemon 准备好接受连接
+          setTimeout(resolve, 500);
+          return;
         }
+      } catch {
+        // 文件不存在或不是 socket，继续等待
+      }
+      if (attempts >= maxAttempts) {
+        // 最后尝试一次访问检查
+        try {
+          fs.accessSync(targetSocketPath, fs.constants.F_OK);
+          const stats = fs.statSync(targetSocketPath);
+          if (stats.isSocket()) {
+            setTimeout(resolve, 500);
+            return;
+          }
+        } catch {
+          // 真正的失败
+        }
+        reject(
+          new Error(`Daemon 启动超时，socket 文件未创建：${targetSocketPath}`),
+        );
+      } else {
+        setTimeout(checkSocket, 100);
       }
     };
 

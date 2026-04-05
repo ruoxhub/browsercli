@@ -14,6 +14,16 @@ export {default as debug} from 'debug';
 export type {Debugger} from 'debug';
 export {z as zod} from 'zod';
 
+// MCP SDK
+export {Client} from '@modelcontextprotocol/sdk/client/index.js';
+export {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
+export type {
+  CallToolResult,
+  ImageContent,
+  TextContent,
+  ResourceType,
+} from '@modelcontextprotocol/sdk/types.js';
+
 // Puppeteer exports
 export {
   Locator,

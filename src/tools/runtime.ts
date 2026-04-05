@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -52,6 +51,7 @@ function toCollectorConfig(): PuppeteerConfig {
     timeout: 30000,
     remoteDebuggingUrl: browser.remoteDebuggingUrl,
     useStealthScripts: browser.useStealthScripts,
+    viewport: browser.viewport,
   };
 }
 
@@ -66,7 +66,7 @@ export function getJSHookRuntime(): JSHookRuntime {
       ? Number(process.env.REMOTE_DEBUGGING_PORT)
       : 9222,
     useStealthScripts: process.env.USE_STEALTH_SCRIPTS !== 'false',
-    autoLaunch: true,
+    autoLaunch: false, // daemon 模式下不自动启动浏览器，由用户手动启动
   });
 
   const collector = new CodeCollector(toCollectorConfig(), browserManager);
@@ -78,9 +78,13 @@ export function getJSHookRuntime(): JSHookRuntime {
   const unifiedCacheManager = UnifiedCacheManager.getInstance();
   const reverseTaskStore = new ReverseTaskStore();
 
-  unifiedCacheManager.registerCache(new DetailedDataManagerAdapter(detailedDataManager));
+  unifiedCacheManager.registerCache(
+    new DetailedDataManagerAdapter(detailedDataManager),
+  );
   unifiedCacheManager.registerCache(new CodeCacheAdapter(collector.getCache()));
-  unifiedCacheManager.registerCache(new CodeCompressorAdapter(collector.getCompressor()));
+  unifiedCacheManager.registerCache(
+    new CodeCompressorAdapter(collector.getCompressor()),
+  );
 
   runtime = {
     browserManager,
@@ -94,10 +98,10 @@ export function getJSHookRuntime(): JSHookRuntime {
     deobfuscator: new Deobfuscator(llmService),
     cryptoDetector: new CryptoDetector(llmService),
     reverseTaskStore,
-    bindPageContext: (resolver) => {
+    bindPageContext: resolver => {
       collector.setPageResolver(() => resolver());
     },
-    syncPageContext: (page) => {
+    syncPageContext: page => {
       collector.setPageResolver(() => page);
       browserManager.setCurrentPage(page);
     },

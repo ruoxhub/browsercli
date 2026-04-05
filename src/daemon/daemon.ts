@@ -15,6 +15,7 @@ import {logger} from '../logger.js';
 import {PipeTransport} from '../third_party/index.js';
 import type {DaemonMessage} from './types.js';
 import type {JSHookToolDefinition} from '../tools/ToolRegistry.js';
+import {getJSHookRuntime} from '../tools/runtime.js';
 import {
   getDaemonPid,
   getPidFilePath,
@@ -53,6 +54,36 @@ const socketPath = getSocketPath();
 
 const startDate = new Date();
 const mcpServerArgs = process.argv.slice(2);
+
+// 解析 CLI 参数并设置环境变量
+function parseDaemonArgs(args: string[]) {
+  let browserUrl: string | undefined;
+  let wsEndpoint: string | undefined;
+
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--browserUrl' && args[i + 1]) {
+      browserUrl = args[i + 1];
+      i++;
+    } else if (args[i] === '--wsEndpoint' && args[i + 1]) {
+      wsEndpoint = args[i + 1];
+      i++;
+    }
+  }
+
+  // 设置环境变量供 runtime 使用
+  if (browserUrl) {
+    process.env.REMOTE_DEBUGGING_URL = browserUrl;
+    console.log(`[DAEMON] Set REMOTE_DEBUGGING_URL=${browserUrl}`);
+  }
+  if (wsEndpoint) {
+    process.env.WS_ENDPOINT = wsEndpoint;
+    console.log(`[DAEMON] Set WS_ENDPOINT=${wsEndpoint}`);
+  }
+
+  return {browserUrl, wsEndpoint};
+}
+
+const parsedArgs = parseDaemonArgs(mcpServerArgs);
 
 // 懒加载状态
 let _skillRegistry: SkillRegistry | null = null;
@@ -105,6 +136,22 @@ async function getCachedTools(): Promise<any[]> {
 console.log('[DAEMON] Skill registry ready (lazy load)');
 
 let server: Server | null = null;
+
+// 预先建立浏览器连接（避免首次调用工具时连接失败）
+// 在 socket 服务器启动后异步执行，不阻塞主事件循环
+async function ensureBrowserConnection() {
+  try {
+    console.log('[DAEMON] Establishing browser connection...');
+    const runtime = getJSHookRuntime();
+    await runtime.browserManager.launch();
+    console.log('[DAEMON] Browser connected successfully');
+  } catch (error) {
+    console.error('[DAEMON] Failed to connect browser:', error);
+  }
+}
+
+// 在 socket 服务器启动后开始连接浏览器
+setTimeout(() => void ensureBrowserConnection(), 100);
 
 async function handleRequest(msg: DaemonMessage) {
   try {
@@ -225,11 +272,33 @@ async function handleRequest(msg: DaemonMessage) {
       let resultData: any = {};
       if (response._includePages) {
         const pages = await context.getPages();
-        resultData.pages = pages.map((p: any, i: number) => ({
-          index: i,
-          title: p.title,
-          url: p.url,
-        }));
+        // 直接从 Chrome DevTools 端点获取页面信息
+        const remoteDebuggingUrl =
+          process.env.REMOTE_DEBUGGING_URL || 'http://127.0.0.1:9222';
+        const jsonUrl = `${remoteDebuggingUrl}/json`;
+        let chromePages: any[] = [];
+        try {
+          const res = await fetch(jsonUrl);
+          chromePages = await res.json();
+        } catch (e) {
+          // Ignore fetch errors silently
+        }
+
+        resultData.pages = pages.map((p: any, i: number) => {
+          // 尝试匹配 Puppeteer page 和 Chrome /json 返回的页面
+          let matchedPage: any | undefined;
+          const pageUrl = p.url?.() || p.url || '';
+          if (pageUrl) {
+            matchedPage = chromePages.find(cp => cp.url === pageUrl);
+          }
+
+          return {
+            index: i,
+            title: matchedPage?.title || p.title || '',
+            url: matchedPage?.url || pageUrl,
+            webSocketDebuggerUrl: matchedPage?.webSocketDebuggerUrl || '',
+          };
+        });
       }
       if (response._lines.length > 0) {
         resultData.text = response._lines.join('\n');
@@ -375,8 +444,9 @@ process.on('SIGTERM', () => {
 process.on('SIGINT', () => {
   void cleanup();
 });
+// 忽略 SIGHUP 信号，防止父进程退出时意外触发 cleanup
 process.on('SIGHUP', () => {
-  void cleanup();
+  logger('Received SIGHUP, ignoring');
 });
 
 // Handle uncaught errors

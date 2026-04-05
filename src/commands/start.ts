@@ -6,6 +6,7 @@
  */
 
 import {startDaemon} from '../daemon/client.js';
+import {isDaemonRunning} from '../daemon/utils.js';
 
 export async function startCommand(options: {
   browserUrl?: string;
@@ -15,6 +16,13 @@ export async function startCommand(options: {
   http?: boolean;
   port?: string;
 }): Promise<void> {
+  // 检查 daemon 是否已经在运行
+  if (isDaemonRunning()) {
+    console.error('Daemon 已经在运行中');
+    console.error('如需重启，请先执行：js-reverse stop');
+    process.exit(1);
+  }
+
   const args: string[] = [];
 
   if (options.browserUrl) {

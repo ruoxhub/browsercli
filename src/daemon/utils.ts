@@ -29,22 +29,29 @@ export function getDaemonPid(): number | null {
 
 export function isDaemonRunning(pid?: number | null): boolean {
   if (pid === null || pid === undefined) pid = getDaemonPid() ?? undefined;
-  if (!fs.existsSync(socketPath)) return false;
-  try {
-    if (pid !== undefined && pid !== null) {
-      execSync(`lsof -p ${pid}`, {stdio: 'ignore'});
-      return true;
-    }
-    execSync(`lsof ${socketPath}`, {stdio: 'ignore'});
+
+  // 先检查 socket 文件（最可靠的指标）
+  if (fs.existsSync(socketPath)) {
     return true;
-  } catch {
-    return false;
   }
+
+  // socket 不存在时，检查 PID
+  if (pid !== undefined && pid !== null) {
+    try {
+      // 使用 kill 0 检查进程是否存在（不发送信号）
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
 }
 
 export function serializeArgs(
   options: Record<string, any>,
-  argv: Record<string, any>
+  argv: Record<string, any>,
 ): string[] {
   const args: string[] = [];
   for (const [name, opt] of Object.entries(options)) {

@@ -117,7 +117,7 @@ export async function createCli(): Promise<Command> {
       await scaffoldCommand(options);
     });
 
-  // 动态生成所有工具命令
+  // 动态生成所有工具命令 - 懒加载，不导入重型模块
   await generateToolCommands(program);
 
   return program;

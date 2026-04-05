@@ -565,6 +565,50 @@ export class BrowserManager {
       this.browser = await puppeteer.connect(connectOptions);
       logger('Connected to remote browser');
 
+      // 连接成功后，获取浏览器当前活动窗口的实际尺寸并应用（自动适配）
+      try {
+        const pages = await this.browser.pages();
+        if (pages.length > 0) {
+          const page = pages[0];
+
+          // 优先使用配置的 viewport，否则获取浏览器当前窗口尺寸
+          if (this.config.viewport) {
+            // @ts-expect-error internal API for resize
+            await page.resize({
+              contentWidth: this.config.viewport.width,
+              contentHeight: this.config.viewport.height,
+            });
+            logger(
+              `Viewport set to ${this.config.viewport.width}x${this.config.viewport.height} (configured)`,
+            );
+          } else {
+            // 自动适配：获取浏览器当前窗口尺寸
+            const viewport = await page.evaluate(() => ({
+              width: window.innerWidth,
+              height: window.innerHeight,
+            }));
+
+            // 只有当获取到有效尺寸时才应用（避免 0 或过小值）
+            if (viewport.width > 800 && viewport.height > 600) {
+              // @ts-expect-error internal API for resize
+              await page.resize({
+                contentWidth: viewport.width,
+                contentHeight: viewport.height,
+              });
+              logger(
+                `Viewport auto-adapted to ${viewport.width}x${viewport.height} (from browser window)`,
+              );
+            } else {
+              logger(
+                `Viewport detected as ${viewport.width}x${viewport.height}, using configured fallback`,
+              );
+            }
+          }
+        }
+      } catch (err) {
+        logger('Warning: Could not set viewport:', err);
+      }
+
       // Verify connection by checking browser version
       try {
         const browserVersion = await this.browser.version();
