@@ -7,16 +7,17 @@
 import * as assert from 'node:assert';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { exec } from 'node:child_process';
-import { describe, it, beforeEach, afterEach } from 'node:test';
-import { promisify } from 'node:util';
+import {fileURLToPath} from 'node:url';
+import {exec} from 'node:child_process';
+import {describe, it, beforeEach, afterEach} from 'node:test';
+import {promisify} from 'node:util';
 
 const execAsync = promisify(exec);
 
 // 导入与实际 daemon 一致的路径函数
 // @ts-ignore - 动态导入在运行时解析
-const { getSocketPath, getPidFilePath } = await import('../../../build/src/daemon/utils.js');
+const {getSocketPath, getPidFilePath} =
+  await import('../../../build/src/daemon/utils.js');
 
 const SOCKET_PATH = getSocketPath();
 const PID_FILE = getPidFilePath();
@@ -26,7 +27,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, '../../..');
 const DAEMON_SCRIPT = path.resolve(PROJECT_ROOT, 'build/src/daemon/daemon.js');
 const CLI_SCRIPT = path.resolve(PROJECT_ROOT, 'build/src/bin/js-reverse.js');
-const START_DAEMON_SCRIPT = path.resolve(PROJECT_ROOT, 'tests/daemon/start-daemon.sh');
+const START_DAEMON_SCRIPT = path.resolve(
+  PROJECT_ROOT,
+  'tests/daemon/start-daemon.sh',
+);
 
 describe('Daemon Start/Stop', () => {
   beforeEach(async () => {
@@ -76,7 +80,7 @@ describe('Daemon Start/Stop', () => {
     // Use wrapper script to start daemon with proper detachment
     await execAsync(
       `"${START_DAEMON_SCRIPT}" "${DAEMON_SCRIPT}" "http://127.0.0.1:9222"`,
-      { cwd: PROJECT_ROOT }
+      {cwd: PROJECT_ROOT},
     );
 
     // Wait for socket file to appear
@@ -111,14 +115,11 @@ describe('Daemon Start/Stop', () => {
     // Verify socket exists
     assert.ok(
       fs.existsSync(SOCKET_PATH),
-      `Socket file should exist: ${SOCKET_PATH}`
+      `Socket file should exist: ${SOCKET_PATH}`,
     );
 
     // Verify PID file exists
-    assert.ok(
-      fs.existsSync(PID_FILE),
-      `PID file should exist: ${PID_FILE}`
-    );
+    assert.ok(fs.existsSync(PID_FILE), `PID file should exist: ${PID_FILE}`);
 
     // Verify PID file contains valid number
     const pidContent = fs.readFileSync(PID_FILE, 'utf-8');
@@ -128,7 +129,7 @@ describe('Daemon Start/Stop', () => {
     // Verify process is running
     assert.doesNotThrow(
       () => process.kill(pid, 0),
-      `Process ${pid} should be running`
+      `Process ${pid} should be running`,
     );
   });
 
@@ -136,7 +137,7 @@ describe('Daemon Start/Stop', () => {
     await startDaemon();
 
     // Get status using CLI
-    const { stdout } = await execAsync(`node ${CLI_SCRIPT} status`, {
+    const {stdout} = await execAsync(`node ${CLI_SCRIPT} status`, {
       cwd: PROJECT_ROOT,
     });
 
@@ -158,17 +159,11 @@ describe('Daemon Start/Stop', () => {
     await new Promise(resolve => setTimeout(resolve, 1500));
 
     // Verify files cleaned up
-    assert.ok(
-      !fs.existsSync(SOCKET_PATH),
-      'Socket file should be cleaned up'
-    );
+    assert.ok(!fs.existsSync(SOCKET_PATH), 'Socket file should be cleaned up');
     assert.ok(!fs.existsSync(PID_FILE), 'PID file should be cleaned up');
 
     // Verify process exited
-    assert.throws(
-      () => process.kill(pid, 0),
-      `Process ${pid} should be dead`
-    );
+    assert.throws(() => process.kill(pid, 0), `Process ${pid} should be dead`);
   });
 
   it('should reject second daemon start', async () => {
@@ -181,13 +176,19 @@ describe('Daemon Start/Stop', () => {
     // Read PID from file to verify daemon is running
     const pidContent = fs.readFileSync(PID_FILE, 'utf-8');
     const firstPid = parseInt(pidContent);
-    assert.ok(!isNaN(firstPid) && firstPid > 0, 'First daemon PID should be valid');
+    assert.ok(
+      !isNaN(firstPid) && firstPid > 0,
+      'First daemon PID should be valid',
+    );
 
     // Verify socket exists
-    assert.ok(fs.existsSync(SOCKET_PATH), 'Socket should exist before second daemon test');
+    assert.ok(
+      fs.existsSync(SOCKET_PATH),
+      'Socket should exist before second daemon test',
+    );
 
     // Try to start second daemon using execSync to capture output
-    const { execSync } = await import('node:child_process');
+    const {execSync} = await import('node:child_process');
 
     try {
       // execSync with stdio:'pipe' captures both stdout and stderr
@@ -205,7 +206,11 @@ describe('Daemon Start/Stop', () => {
       const stderr = error.stderr?.toString() || '';
       const allOutput = output + stderr;
 
-      if (allOutput.includes('已经在运行') || allOutput.includes('Daemon 已经在运行') || allOutput.includes('already running')) {
+      if (
+        allOutput.includes('已经在运行') ||
+        allOutput.includes('Daemon 已经在运行') ||
+        allOutput.includes('already running')
+      ) {
         // Test passes - daemon was correctly rejected
         return;
       }
@@ -215,7 +220,9 @@ describe('Daemon Start/Stop', () => {
         return;
       }
 
-      throw new Error(`Second daemon should have been rejected. Output: ${allOutput.slice(0, 500)}`);
+      throw new Error(
+        `Second daemon should have been rejected. Output: ${allOutput.slice(0, 500)}`,
+      );
     }
   });
 });

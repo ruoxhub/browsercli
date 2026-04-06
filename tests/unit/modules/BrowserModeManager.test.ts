@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { BrowserModeManager } from '../../../src/modules/browser/BrowserModeManager.js';
+import {BrowserModeManager} from '../../../src/modules/browser/BrowserModeManager.js';
 
 interface BrowserLike {
   isConnected?(): boolean;
@@ -26,9 +26,9 @@ interface PageLike {
 interface BrowserModeManagerHarness {
   browser?: BrowserLike;
   currentPage?: PageLike;
-  sessionData?: { cookies?: Array<{ name: string; value: string }> };
+  sessionData?: {cookies?: Array<{name: string; value: string}>};
   autoLaunched?: boolean;
-  browserProcess?: { killed: boolean; kill(): void };
+  browserProcess?: {killed: boolean; kill(): void};
   launch(): Promise<BrowserLike>;
   newPage(): Promise<PageLike>;
   goto(url: string, page?: PageLike): Promise<void>;
@@ -80,7 +80,7 @@ describe('BrowserModeManager (mocked)', () => {
     } satisfies BrowserLike;
 
     manager.browser = browser;
-    manager.sessionData = { cookies: [{ name: 'sid', value: '1' }] };
+    manager.sessionData = {cookies: [{name: 'sid', value: '1'}]};
     let antiDetectionInjected = 0;
     manager.injectAntiDetectionScripts = async () => {
       antiDetectionInjected += 1;
@@ -100,12 +100,9 @@ describe('BrowserModeManager (mocked)', () => {
       autoLaunch: false,
     }) as unknown as BrowserModeManagerHarness;
 
-    await assert.rejects(
-      async () => {
-        await manager.goto('https://example.com');
-      },
-      /No page available/,
-    );
+    await assert.rejects(async () => {
+      await manager.goto('https://example.com');
+    }, /No page available/);
 
     let gotoCount = 0;
     const page = {

@@ -16,10 +16,10 @@
  * - 启动失败则输出错误并退出码 1
  */
 
-import { spawn } from 'node:child_process';
+import {spawn} from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import {fileURLToPath} from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, '../..');
@@ -28,7 +28,9 @@ const daemonScript = process.argv[2];
 const browserUrl = process.argv[3];
 
 if (!daemonScript || !browserUrl) {
-  console.error('Usage: node start-daemon-helper.js <daemon-script> <browserUrl>');
+  console.error(
+    'Usage: node start-daemon-helper.js <daemon-script> <browserUrl>',
+  );
   process.exit(1);
 }
 
@@ -36,7 +38,7 @@ if (!daemonScript || !browserUrl) {
 const utilsPath = path.resolve(PROJECT_ROOT, 'build/src/daemon/utils.js');
 console.log(`[HELPER] Utils path: ${utilsPath}`);
 console.log(`[HELPER] Project root: ${PROJECT_ROOT}`);
-const { getSocketPath } = await import(utilsPath);
+const {getSocketPath} = await import(utilsPath);
 const SOCKET_PATH = getSocketPath();
 
 console.log(`[HELPER] Starting daemon: ${daemonScript}`);
@@ -47,7 +49,7 @@ console.log(`[HELPER] Socket path: ${SOCKET_PATH}`);
 const daemon = spawn('node', [daemonScript, '--browserUrl', browserUrl], {
   cwd: PROJECT_ROOT,
   stdio: 'ignore', // 完全忽略 stdio
-  detached: true,  // 完全分离
+  detached: true, // 完全分离
   env: process.env,
 });
 
@@ -73,7 +75,12 @@ function waitForSocket() {
     console.log(`[HELPER] Socket exists: ${fs.existsSync(SOCKET_PATH)}`);
     console.log(`[HELPER] Socket path: ${SOCKET_PATH}`);
     try {
-      console.log(`[HELPER] /tmp contents: ${fs.readdirSync('/tmp').filter(f => f.includes('js-reverse')).join(', ')}`);
+      console.log(
+        `[HELPER] /tmp contents: ${fs
+          .readdirSync('/tmp')
+          .filter(f => f.includes('js-reverse'))
+          .join(', ')}`,
+      );
     } catch {}
     process.exit(1);
   }
@@ -92,12 +99,12 @@ function waitForSocket() {
 waitForSocket();
 
 // 监听 daemon 进程错误
-daemon.on('error', (err) => {
+daemon.on('error', err => {
   console.error(`[HELPER] Spawn error: ${err.message}`);
   process.exit(1);
 });
 
-daemon.on('exit', (code) => {
+daemon.on('exit', code => {
   if (!started) {
     console.error(`[HELPER] Daemon exited unexpectedly with code ${code}`);
     process.exit(1);
