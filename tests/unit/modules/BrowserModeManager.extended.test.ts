@@ -207,6 +207,7 @@ describe('BrowserModeManager extended', () => {
     };
     (manager as unknown as BrowserManagerHarness).browser = {
       newPage: async () => page,
+      pages: async () => [page],
       isConnected: () => true,
     };
 
@@ -314,7 +315,7 @@ describe('BrowserModeManager extended', () => {
 
     manager.injectAntiDetectionScripts = async () => undefined;
     manager.launch = async () => {
-      manager.browser = { newPage: async () => page, isConnected: () => true };
+      manager.browser = { newPage: async () => page, pages: async () => [page], isConnected: () => true };
       return manager.browser;
     };
     manager.sessionData = { cookies: [{ name: 'k', value: 'v' }] };

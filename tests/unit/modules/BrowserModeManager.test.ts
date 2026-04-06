@@ -76,6 +76,7 @@ describe('BrowserModeManager (mocked)', () => {
     } satisfies PageLike;
     const browser = {
       newPage: async () => page,
+      pages: async () => [page],
     } satisfies BrowserLike;
 
     manager.browser = browser;
