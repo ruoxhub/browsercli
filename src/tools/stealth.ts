@@ -19,8 +19,7 @@ export const injectStealth = defineTool({
   schema: {
     preset: zod.enum(['windows-chrome', 'mac-chrome', 'mac-safari', 'linux-chrome', 'windows-edge']).optional(),
   },
-  handler: async (request, response) => {
-    const runtime = getJSHookRuntime();
+  handler: async (request, response, context, runtime) => {
     const page = await runtime.collector.getActivePage();
     await StealthScripts2025.injectAll(page, {preset: request.params.preset});
     response.appendResponseLine('Stealth scripts injected.');
@@ -32,7 +31,7 @@ export const listStealthPresets = defineTool({
   description: 'List available stealth presets.',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
   schema: {},
-  handler: async (_request, response) => {
+  handler: async (_request, response, context, runtime) => {
     response.appendResponseLine('```json');
     response.appendResponseLine(JSON.stringify(StealthScripts2025.getPresets(), null, 2));
     response.appendResponseLine('```');
@@ -44,7 +43,7 @@ export const listStealthFeatures = defineTool({
   description: 'List available stealth feature toggles.',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
   schema: {},
-  handler: async (_request, response) => {
+  handler: async (_request, response, context, runtime) => {
     response.appendResponseLine('```json');
     response.appendResponseLine(JSON.stringify([
       'hideWebDriver', 'mockChrome', 'setUserAgent', 'fixPermissions', 'mockPlugins',
@@ -61,8 +60,7 @@ export const setUserAgent = defineTool({
   description: 'Set custom user-agent for active page.',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: false},
   schema: {userAgent: zod.string().min(1)},
-  handler: async (request, response) => {
-    const runtime = getJSHookRuntime();
+  handler: async (request, response, context, runtime) => {
     const page = await runtime.collector.getActivePage();
     await page.setUserAgent(request.params.userAgent);
     response.appendResponseLine('User-Agent updated.');

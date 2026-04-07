@@ -19,8 +19,7 @@ export const queryDom = defineTool({
     all: zod.boolean().optional(),
     limit: zod.number().int().positive().optional(),
   },
-  handler: async (request, response) => {
-    const runtime = getJSHookRuntime();
+  handler: async (request, response, context, runtime) => {
     const result = request.params.all
       ? await runtime.domInspector.querySelectorAll(request.params.selector, request.params.limit)
       : await runtime.domInspector.querySelector(request.params.selector);
@@ -42,8 +41,7 @@ export const getDomStructure = defineTool({
     maxDepth: zod.number().int().positive().optional(),
     includeText: zod.boolean().optional(),
   },
-  handler: async (request, response) => {
-    const runtime = getJSHookRuntime();
+  handler: async (request, response, context, runtime) => {
     const result = await runtime.domInspector.getStructure(request.params.maxDepth, request.params.includeText);
 
     // 设置结构化返回数据
@@ -62,8 +60,7 @@ export const findClickableElements = defineTool({
   schema: {
     filterText: zod.string().optional(),
   },
-  handler: async (request, response) => {
-    const runtime = getJSHookRuntime();
+  handler: async (request, response, context, runtime) => {
     const result = await runtime.domInspector.findClickable(request.params.filterText);
 
     // 设置结构化返回数据

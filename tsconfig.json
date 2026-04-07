@@ -1,13 +1,7 @@
 {
   "compilerOptions": {
     "target": "es2023",
-    "lib": [
-      "ES2023",
-      "DOM",
-      "ES2024.Promise",
-      "ESNext.Iterator",
-      "ESNext.Collection"
-    ],
+    "lib": ["ES2023", "DOM", "ES2024.Promise", "ESNext.Iterator", "ESNext.Collection"],
     "module": "esnext",
     "moduleResolution": "bundler",
     "outDir": "./build",
@@ -15,6 +9,9 @@
     "strict": false,
     "esModuleInterop": true,
     "skipLibCheck": true,
+    "noEmit": true,
+    "typeRoots": ["./src/types", "./node_modules/@types"],
+    "types": ["node"],
     "forceConsistentCasingInFileNames": true,
     "noImplicitReturns": false,
     "noImplicitOverride": false,
@@ -25,13 +22,9 @@
     "noImplicitAny": false,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "noPropertyAccessFromIndexSignature": false
+    "noPropertyAccessFromIndexSignature": false,
+    "ignoreDeprecations": "5.0"
   },
-  "include": [
-    "src/**/*.ts",
-    "tests/**/*.ts"
-  ],
-  "exclude": [
-    "node_modules/**"
-  ]
+  "include": ["src/**/*.ts", "tests/**/*.ts"],
+  "exclude": ["node_modules/**"]
 }

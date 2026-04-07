@@ -3,9 +3,9 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { zod } from '../../third_party/index.js';
-import { ToolCategory } from '../categories.js';
-import { defineTool, type Context, type Response } from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
+import {defineTool, type Context, type Response} from '../ToolDefinition.js';
 
 /**
  * Bypass Debugger - 绕过无限 debugger
@@ -14,7 +14,8 @@ import { defineTool, type Context, type Response } from '../ToolDefinition.js';
  */
 export const bypassDebugger = defineTool({
   name: 'bypass_debugger',
-  description: '绕过无限 debugger：自动移除 eval/Function/constructor 中的 debugger 关键字',
+  description:
+    '绕过无限 debugger：自动移除 eval/Function/constructor 中的 debugger 关键字',
   annotations: {
     title: 'Bypass Debugger',
     category: ToolCategory.REVERSE_ENGINEERING,
@@ -26,8 +27,17 @@ export const bypassDebugger = defineTool({
       .optional()
       .describe('要 Hook 的目标，默认全部'),
   },
-  handler: async (request: { params: { targets?: Array<'eval' | 'Function' | 'constructor'> } }, response: Response, context: Context) => {
-    const targets = request.params.targets || ['eval', 'Function', 'constructor'];
+  handler: async (
+    request: {params: {targets?: Array<'eval' | 'Function' | 'constructor'>}},
+    response: Response,
+    context: Context,
+    runtime,
+  ) => {
+    const targets = request.params.targets || [
+      'eval',
+      'Function',
+      'constructor',
+    ];
 
     const hookCode = `
 (function() {
@@ -97,7 +107,9 @@ export const bypassDebugger = defineTool({
         response.appendResponseLine('  - Function 构造器中的 debugger 关键字');
       }
       if (targets.includes('constructor')) {
-        response.appendResponseLine('  - Function.prototype.constructor 中的 debugger 关键字');
+        response.appendResponseLine(
+          '  - Function.prototype.constructor 中的 debugger 关键字',
+        );
       }
     } catch (error) {
       response.appendResponseLine(

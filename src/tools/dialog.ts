@@ -29,8 +29,7 @@ export const handleDialog = defineTool({
       .optional()
       .describe('Optional prompt text to enter into the dialog (for prompt dialogs)'),
   },
-  handler: async (request, response, context) => {
-    const runtime = getJSHookRuntime();
+  handler: async (request, response, context, runtime) => {
     const page = await runtime.collector.getActivePage();
 
     // 尝试从上下文获取 dialog，如果没有则使用最近打开的 dialog

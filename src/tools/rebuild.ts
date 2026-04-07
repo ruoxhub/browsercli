@@ -307,8 +307,7 @@ export const exportRebuildBundle = defineTool({
     capture: zod.record(zod.string(), zod.unknown()).optional(),
     notes: zod.array(zod.string()).default([]),
   },
-  handler: async (request, response) => {
-    const runtime = getJSHookRuntime();
+  handler: async (request, response, context, runtime) => {
     const task = await runtime.reverseTaskStore.openTask({
       taskId: request.params.taskId,
       slug: request.params.taskSlug,
@@ -379,7 +378,7 @@ export const diffEnvRequirements = defineTool({
     runtimeError: zod.string(),
     observedCapabilities: zod.array(zod.string()).default([]),
   },
-  handler: async (request, response) => {
+  handler: async (request, response, context, runtime) => {
     const missingCapabilities = inferMissingCapabilities(
       request.params.runtimeError,
       request.params.observedCapabilities,

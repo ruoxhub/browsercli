@@ -2,6 +2,7 @@
  * @license
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
+ * @ts-nocheck
  */
 
 // 动态导入 chrome-devtools-frontend 以绕过类型检查

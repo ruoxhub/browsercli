@@ -21,10 +21,10 @@ export type {
   CallToolResult,
   ImageContent,
   TextContent,
-  ResourceType,
 } from '@modelcontextprotocol/sdk/types.js';
+export type ResourceType = string;
 
-// Puppeteer exports
+// Puppeteer exports - 使用真实类型，不手写接口
 export {
   Locator,
   PredefinedNetworkConditions,
@@ -32,14 +32,20 @@ export {
 } from 'puppeteer-core';
 export {default as puppeteer} from 'puppeteer-core';
 export type * from 'puppeteer-core';
-export type {CdpPage} from 'puppeteer-core/internal/cdp/Page.js';
+export type {Page as CdpPage} from 'puppeteer-core';
 export {PipeTransport} from 'puppeteer-core/internal/node/PipeTransport.js';
 
 // DevTools CDP 连接类型
 export type CDPCommand = string;
-export interface CDPError {code: number; message: string}
+export interface CDPError {
+  code: number;
+  message: string;
+}
 export type CommandParams<T extends CDPCommand> = Record<string, unknown>;
-export type CommandResult<T extends CDPCommand> = Record<string, unknown>;
+export type CommandResult<T extends CDPCommand = CDPCommand> = Record<
+  string,
+  unknown
+>;
 
 export interface CDPConnectionObserver {
   onEvent: (event: {
@@ -61,90 +67,11 @@ export interface CDPConnection {
 }
 
 // 本地 DevTools 类型定义 - 避免 chrome-devtools-frontend 路径问题
-export interface Connection {
-  session: (sessionId: string) => CDPSession | undefined;
-}
-
-export interface CDPSession {
-  send: (method: string, params?: Record<string, unknown>) => Promise<unknown>;
-  on: (event: string, callback: (...args: unknown[]) => void) => void;
-  off: (event: string, callback: (...args: unknown[]) => void) => void;
-  detach: () => Promise<void>;
-  id?: string;
-}
-
-export interface Page {
-  on: (event: string, callback: (...args: unknown[]) => void) => void;
-  off: (event: string, callback: (...args: unknown[]) => void) => void;
-  url: () => string;
-  close: () => Promise<void>;
-  isClosed: () => boolean;
-  mainFrame: () => unknown;
-  setDefaultTimeout: (timeout: number) => void;
-  setDefaultNavigationTimeout: (timeout: number) => void;
-  getDefaultNavigationTimeout: () => number;
-  frames: () => unknown[];
-  evaluate: <T>(
-    pageFunction: string | (() => T),
-    ...args: unknown[]
-  ) => Promise<T>;
-  // CDP Session 相关方法
-  createCDPSession: () => Promise<CDPSession>;
-  // 其他常用方法
-  goto: (
-    url: string,
-    options?: {timeout?: number; waitUntil?: string},
-  ) => Promise<unknown>;
-  reload: () => Promise<unknown>;
-  goBack: () => Promise<unknown>;
-  goForward: () => Promise<unknown>;
-  title: () => Promise<string>;
-  screenshot: (options?: {
-    type?: string;
-    fullPage?: boolean;
-  }) => Promise<unknown>;
-  content: () => Promise<string>;
-  setContent: (html: string) => Promise<void>;
-  click: (selector: string) => Promise<void>;
-  type: (selector: string, text: string) => Promise<void>;
-  waitForSelector: (
-    selector: string,
-    options?: {timeout?: number},
-  ) => Promise<unknown>;
-  waitForNavigation: (options?: {timeout?: number}) => Promise<unknown>;
-  $: (selector: string) => Promise<unknown>;
-  $$: (selector: string) => Promise<unknown[]>;
-  $eval: <T>(
-    selector: string,
-    pageFunction: string | (() => T),
-    ...args: unknown[]
-  ) => Promise<T>;
-  $$eval: <T>(
-    selector: string,
-    pageFunction: string | (() => T),
-    ...args: unknown[]
-  ) => Promise<T>;
-}
-
-export interface Browser {
-  on: (event: string, callback: (...args: unknown[]) => void) => void;
-  close: () => Promise<void>;
-  connected: boolean;
-  pages: () => Page[];
-}
-
-export interface ConsoleMessage {
-  type: () => string;
-  text: () => string;
-  args: () => Array<{jsonValue: () => Promise<unknown>}>;
-}
-
-export type Dialog = unknown;
-export type Frame = unknown;
-export type HTTPRequest = unknown;
+export type Connection = import('puppeteer-core').Connection;
+export type CDPSession = import('puppeteer-core').CDPSession;
 
 // Protocol 命名空间
- 
+
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Protocol {
   export interface Debugger {
@@ -282,10 +209,90 @@ export namespace Protocol {
     requestServedFromCache: unknown;
   }
 
-  export interface Audits {
-    issueAdded: unknown;
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  export namespace Network {
+    export interface WebSocketCreatedEvent {
+      requestId: string;
+      url: string;
+    }
+    export interface WebSocketFrameSentEvent {
+      requestId: string;
+      timestamp: number;
+      response: boolean;
+      opcode: number;
+      data: string;
+    }
+    export interface WebSocketFrameReceivedEvent {
+      requestId: string;
+      timestamp: number;
+      response: boolean;
+      opcode: number;
+      data: string;
+    }
+    export interface WebSocketClosedEvent {
+      requestId: string;
+      timestamp: number;
+      wasClean: boolean;
+      statusCode: number;
+    }
+    export interface RequestWillBeSentEvent {
+      requestId: string;
+      loaderId: string;
+      documentURL?: string;
+      request: {
+        url: string;
+        method: string;
+        headers: Record<string, string>;
+      };
+      timestamp: number;
+      wallTime: number;
+      initiator?: {
+        type: string;
+        stack?: {
+          callFrames: Array<{
+            functionName: string;
+            scriptId: string;
+            url: string;
+            lineNumber: number;
+            columnNumber: number;
+          }>;
+        };
+      };
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  export namespace Audits {
+    export interface IssueAddedEvent {
+      issue: unknown;
+    }
+  }
+
+  // Page 域 - 用于 WaitForHelper.ts 和 PageCollector.ts
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  export namespace Page {
+    export interface FrameStartedNavigatingEvent {
+      navigationType: string;
+      frameId: string;
+    }
   }
 }
+
+// Puppeteer Page 事件类型 - 用于 PageCollector.ts
+export type PuppeteerPageEvents = {
+  console: unknown;
+  dialog: unknown;
+  request: unknown;
+  response: unknown;
+  requestfinished: unknown;
+  requestfailed: unknown;
+  frameattached: unknown;
+  framedetached: unknown;
+  framenavigated: unknown;
+  pageerror: unknown;
+  popup: unknown;
+  close: unknown;
+};
 
 export type Handler<T = unknown> = (event: T) => void;
 
@@ -305,7 +312,6 @@ export type IssuesManagerEventTypes = unknown;
 // These are stub implementations to satisfy type checking after removing the dependency
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Common {
-   
   export class ObjectWrapper<T = unknown> {
     emit(_event: string, _data?: T): void {}
     addEventListener(
@@ -316,6 +322,14 @@ export namespace Common {
       _event: string,
       _listener: (...args: unknown[]) => void,
     ): void {}
+  }
+
+  // EventTarget 类型 - 用于 PageCollector.ts
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  export namespace EventTarget {
+    export interface EventTargetEvent<T> {
+      data: T;
+    }
   }
 }
 
@@ -346,18 +360,8 @@ export namespace I18n {
   };
 }
 
-// MCP SDK 类型 (已移除，保留用于兼容)
-export interface CallToolResult {
-  content?: Array<{type: string; text?: string; data?: unknown}>;
-  isError?: boolean;
-}
-
-export interface ImageContent {type: 'image'; data: string; mimeType: string}
-export interface TextContent {type: 'text'; text: string}
-export type ResourceType = string;
-
 // PageCollector 需要的类型
-export type Target = unknown;
+export type Target = import('puppeteer-core').Target;
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace PageEvents {
   export type FrameNavigated = unknown;
@@ -395,8 +399,8 @@ export namespace devtools {
   }
 
   export type Command = string;
-  export type CommandParams<T extends Command> = unknown;
-  export type CommandResult<T extends Command> = unknown;
+  export type CommandParams = unknown;
+  export type CommandResult = unknown;
 
   // Protocol 命令类型
   export interface Debugger {

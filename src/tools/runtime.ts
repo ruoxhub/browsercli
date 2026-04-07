@@ -5,7 +5,7 @@
  */
 import {AISummarizer} from '../modules/analyzer/AISummarizer.js';
 import {CodeAnalyzer} from '../modules/analyzer/CodeAnalyzer.js';
-import {BrowserModeManager} from '../modules/browser/BrowserModeManager.js';
+import {BrowserManager, type BrowserManagerConfig} from '../browser.js';
 import {CodeCollector} from '../modules/collector/CodeCollector.js';
 import {DOMInspector} from '../modules/collector/DOMInspector.js';
 import {PageController} from '../modules/collector/PageController.js';
@@ -28,7 +28,7 @@ import {UnifiedCacheManager} from '../utils/UnifiedCacheManager.js';
 let runtime: JSHookRuntime | undefined;
 
 export interface JSHookRuntime {
-  browserManager: BrowserModeManager;
+  browserManager: BrowserManager;
   collector: CodeCollector;
   domInspector: DOMInspector;
   pageController: PageController;
@@ -60,14 +60,20 @@ export function getJSHookRuntime(): JSHookRuntime {
     return runtime;
   }
 
-  const browserManager = new BrowserModeManager({
-    remoteDebuggingUrl: process.env.REMOTE_DEBUGGING_URL,
+  const browser = getBrowserConfig();
+  const config: BrowserManagerConfig = {
+    remoteDebuggingUrl:
+      process.env.REMOTE_DEBUGGING_URL || browser.remoteDebuggingUrl,
     remoteDebuggingPort: process.env.REMOTE_DEBUGGING_PORT
       ? Number(process.env.REMOTE_DEBUGGING_PORT)
       : 9222,
-    useStealthScripts: process.env.USE_STEALTH_SCRIPTS !== 'false',
+    useStealthScripts:
+      process.env.USE_STEALTH_SCRIPTS !== 'false' && browser.useStealthScripts,
     autoLaunch: false, // daemon 模式下不自动启动浏览器，由用户手动启动
-  });
+    viewport: browser.viewport,
+  };
+
+  const browserManager = BrowserManager.getInstance(config);
 
   const collector = new CodeCollector(toCollectorConfig(), browserManager);
   const domInspector = new DOMInspector(collector);
@@ -103,11 +109,9 @@ export function getJSHookRuntime(): JSHookRuntime {
     },
     syncPageContext: page => {
       collector.setPageResolver(() => page);
-      browserManager.setCurrentPage(page);
     },
     clearPageContext: () => {
       collector.setPageResolver(undefined);
-      browserManager.setCurrentPage(null);
     },
   };
 

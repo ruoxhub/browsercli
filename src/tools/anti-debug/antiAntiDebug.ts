@@ -3,9 +3,9 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { zod } from '../../third_party/index.js';
-import { ToolCategory } from '../categories.js';
-import { defineTool, type Context, type Response } from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
+import {defineTool, type Context, type Response} from '../ToolDefinition.js';
 
 export type AntiAntiDebugFeature =
   | 'fixedWindowSize'
@@ -32,10 +32,23 @@ export const antiAntiDebug = defineTool({
   },
   schema: {
     features: zod
-      .array(zod.enum(['fixedWindowSize', 'fixedTime', 'preventClose', 'preventHistoryBack', 'preventConsoleClear']))
+      .array(
+        zod.enum([
+          'fixedWindowSize',
+          'fixedTime',
+          'preventClose',
+          'preventHistoryBack',
+          'preventConsoleClear',
+        ]),
+      )
       .describe('要启用的功能'),
   },
-  handler: async (request: { params: { features: AntiAntiDebugFeature[] } }, response: Response, context: Context) => {
+  handler: async (
+    request: {params: {features: AntiAntiDebugFeature[]}},
+    response: Response,
+    context: Context,
+    runtime,
+  ) => {
     const features = request.params.features;
 
     const hookCodes: string[] = [];

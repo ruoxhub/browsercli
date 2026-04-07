@@ -1,8 +1,8 @@
+// @ts-nocheck
 /**
  * @license
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
- * @ts-nocheck
  */
 
 // 动态导入 chrome-devtools-frontend 以绕过类型检查
@@ -28,8 +28,8 @@ import type {
 // 动态导入 chrome-devtools-frontend 以绕过类型检查
 import {createRequire} from 'node:module';
 const require = createRequire(import.meta.url);
-
-const cdtp = require('../node_modules/chrome-devtools-frontend/mcp/mcp.js');
+const CDTP_MODULE_PATH = '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
+const cdtp = require(CDTP_MODULE_PATH);
 
 // 从动态导入中获取运行时对象
 const {

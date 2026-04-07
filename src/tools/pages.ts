@@ -7,7 +7,6 @@
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {getJSHookRuntime} from './runtime.js';
 import {defineTool, timeoutSchema} from './ToolDefinition.js';
 
 // Default navigation timeout in milliseconds (10 seconds)
@@ -21,7 +20,7 @@ export const listPages = defineTool({
     readOnlyHint: true,
   },
   schema: {},
-  handler: async (_request, response) => {
+  handler: async (_request, response, context, runtime) => {
     response.setIncludePages(true);
   },
 });
@@ -40,11 +39,11 @@ export const selectPage = defineTool({
         'The index of the page to select. Call list_pages to list pages.',
       ),
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response, context, runtime) => {
     const page = context.getPageByIdx(request.params.pageIdx);
     await page.bringToFront();
     context.selectPage(page);
-    getJSHookRuntime().syncPageContext(page);
+    runtime.syncPageContext(page);
     response.setIncludePages(true);
   },
 });
@@ -60,7 +59,7 @@ export const newPage = defineTool({
     url: zod.string().describe('URL to load in a new page.'),
     ...timeoutSchema,
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response, context, runtime) => {
     const page = await context.newPage();
 
     await context.waitForEventsAfterAction(async () => {
@@ -95,7 +94,7 @@ export const navigatePage = defineTool({
       .describe('Whether to ignore cache on reload.'),
     ...timeoutSchema,
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response, context, runtime) => {
     const page = context.getSelectedPage();
     const options = {
       timeout: request.params.timeout ?? DEFAULT_NAV_TIMEOUT,

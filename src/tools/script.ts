@@ -49,7 +49,7 @@ Example with arguments: \`(el) => {
 `,
     ),
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response, context, runtime) => {
     let fn: JSHandle<unknown> | undefined;
     try {
       const frame = context.getSelectedFrame();
@@ -91,8 +91,7 @@ export const injectPreloadScript = defineTool({
   schema: {
     script: zod.string().describe('JavaScript source to register for future document loads.'),
   },
-  handler: async (request, response) => {
-    const runtime = getJSHookRuntime();
+  handler: async (request, response, context, runtime) => {
     await runtime.pageController.injectScriptOnNewDocument(request.params.script);
     response.appendResponseLine('Preload script registered for future documents.');
   },

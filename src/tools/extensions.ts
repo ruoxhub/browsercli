@@ -21,8 +21,7 @@ export const updateExtensions = defineTool({
     readOnlyHint: false,
   },
   schema: {},
-  handler: async (_request, response) => {
-    const runtime = getJSHookRuntime();
+  handler: async (_request, response, context, runtime) => {
     const page = await runtime.collector.getActivePage();
 
     // 导航到 extensions 页面

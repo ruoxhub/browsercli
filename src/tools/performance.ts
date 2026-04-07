@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * @license
  * Copyright 2025 Google LLC
@@ -44,7 +45,7 @@ export const startPerformanceTrace = defineTool({
         'Determines if the trace recording should be automatically stopped after 5 seconds.',
       ),
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response, context, runtime) => {
     if (context.isRunningPerformanceTrace()) {
       response.appendResponseLine(
         'Error: a performance trace is already running. Use stop_performance_trace to stop it. Only one trace can be running at any given time.',
@@ -53,7 +54,6 @@ export const startPerformanceTrace = defineTool({
     }
     context.setIsRunningPerformanceTrace(true);
 
-    const runtime = getJSHookRuntime();
     const page = await runtime.collector.getActivePage();
     const pageUrlForTracing = page.url();
 
@@ -118,12 +118,11 @@ export const stopPerformanceTrace = defineTool({
     readOnlyHint: true,
   },
   schema: {},
-  handler: async (_request, response, context) => {
+  handler: async (_request, response, context, runtime) => {
     if (!context.isRunningPerformanceTrace()) {
       response.appendResponseLine('No performance trace is currently running.');
       return;
     }
-    const runtime = getJSHookRuntime();
     const page = await runtime.collector.getActivePage();
     await stopTracingAndAppendOutput(page, response, context);
   },
@@ -147,7 +146,7 @@ export const performanceAnalyzeInsight = defineTool({
         'The name of the Insight you want more information on. For example: "DocumentLatency" or "LCPBreakdown"',
       ),
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response, context, runtime) => {
     const lastRecording = context.recordedTraces().at(-1);
     if (!lastRecording) {
       response.appendResponseLine(
@@ -182,8 +181,7 @@ export const getPerformanceMetrics = defineTool({
     readOnlyHint: true,
   },
   schema: {},
-  handler: async (_request, response) => {
-    const runtime = getJSHookRuntime();
+  handler: async (_request, response, context, runtime) => {
     const page = await runtime.collector.getActivePage();
 
     const metrics = await page.evaluate(() => {

@@ -3,9 +3,9 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { zod } from '../../third_party/index.js';
-import { ToolCategory } from '../categories.js';
-import { defineTool, type Context, type Response } from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
+import {defineTool, type Context, type Response} from '../ToolDefinition.js';
 
 export const activateVueDevtools = defineTool({
   name: 'activate_vue_devtools',
@@ -16,7 +16,12 @@ export const activateVueDevtools = defineTool({
     readOnlyHint: false,
   },
   schema: {},
-  handler: async (_request: { params: Record<string, never> }, response: Response, context: Context) => {
+  handler: async (
+    _request: {params: Record<string, never>},
+    response: Response,
+    context: Context,
+    runtime,
+  ) => {
     const hookCode = `
 (function() {
   'use strict';
@@ -68,7 +73,7 @@ export const activateVueDevtools = defineTool({
 
     try {
       const frame = context.getSelectedFrame();
-      const result = await frame.evaluate(hookCode) as {
+      const result = (await frame.evaluate(hookCode)) as {
         success: boolean;
         version?: string;
         error?: string;
@@ -79,14 +84,18 @@ export const activateVueDevtools = defineTool({
         response.appendResponseLine('❌ 激活失败');
         response.appendResponseLine(result.error || '未检测到 Vue 实例');
         response.appendResponseLine('');
-        response.appendResponseLine('提示：请确保页面已加载 Vue 框架后再执行此工具。');
+        response.appendResponseLine(
+          '提示：请确保页面已加载 Vue 框架后再执行此工具。',
+        );
         return;
       }
 
       response.appendResponseLine('✅ Vue Devtools 已激活');
       response.appendResponseLine(`- Vue 版本：${result.version}`);
       response.appendResponseLine('');
-      response.appendResponseLine('现在可以在 Chrome DevTools 中使用 Vue.js devtools 插件：');
+      response.appendResponseLine(
+        '现在可以在 Chrome DevTools 中使用 Vue.js devtools 插件：',
+      );
       response.appendResponseLine('  - Vue 2.x: 安装 "Vue.js devtools" (v5)');
       response.appendResponseLine('  - Vue 3.x: 安装 "Vue.js devtools"');
       response.appendResponseLine('');

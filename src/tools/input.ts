@@ -29,8 +29,7 @@ export const click = defineTool({
       .optional()
       .describe('Set to true for double clicks. Default is false.'),
   },
-  handler: async (request, response) => {
-    const runtime = getJSHookRuntime();
+  handler: async (request, response, context, runtime) => {
     const page = await runtime.collector.getActivePage();
 
     await page.click(request.params.selector, {
@@ -59,8 +58,7 @@ export const clickAt = defineTool({
   schema: {
     selector: zod.string().describe('CSS selector of the element to click'),
   },
-  handler: async (request, response) => {
-    const runtime = getJSHookRuntime();
+  handler: async (request, response, context, runtime) => {
     const result = await runtime.pageController.clickAt(request.params.selector);
 
     response.appendResponseLine('```json');
@@ -90,8 +88,7 @@ export const setFiles = defineTool({
     selector: zod.string().describe('CSS selector of the file input element'),
     filePaths: zod.array(zod.string()).describe('Array of absolute file paths to upload'),
   },
-  handler: async (request, response) => {
-    const runtime = getJSHookRuntime();
+  handler: async (request, response, context, runtime) => {
     const result = await runtime.pageController.setFiles(
       request.params.selector,
       request.params.filePaths
@@ -118,8 +115,7 @@ export const hover = defineTool({
       .string()
       .describe('CSS selector of the element to hover over'),
   },
-  handler: async (request, response) => {
-    const runtime = getJSHookRuntime();
+  handler: async (request, response, context, runtime) => {
     const page = await runtime.collector.getActivePage();
 
     const element = await page.$(request.params.selector);
@@ -148,8 +144,7 @@ export const fill = defineTool({
       .describe('CSS selector of the input/textarea/select element'),
     value: zod.string().describe('The value to fill in'),
   },
-  handler: async (request, response) => {
-    const runtime = getJSHookRuntime();
+  handler: async (request, response, context, runtime) => {
     const page = await runtime.collector.getActivePage();
 
     const element = await page.$(request.params.selector);
@@ -187,8 +182,7 @@ export const drag = defineTool({
     fromSelector: zod.string().describe('CSS selector of the element to drag'),
     toSelector: zod.string().describe('CSS selector of the element to drop into'),
   },
-  handler: async (request, response) => {
-    const runtime = getJSHookRuntime();
+  handler: async (request, response, context, runtime) => {
     const page = await runtime.collector.getActivePage();
 
     const fromElement = await page.$(request.params.fromSelector);
@@ -246,8 +240,7 @@ export const fillForm = defineTool({
       )
       .describe('Elements to fill out with their selectors and values'),
   },
-  handler: async (request, response) => {
-    const runtime = getJSHookRuntime();
+  handler: async (request, response, context, runtime) => {
     const page = await runtime.collector.getActivePage();
 
     for (const element of request.params.elements) {
@@ -287,8 +280,7 @@ export const uploadFile = defineTool({
       .describe('CSS selector of the file input element'),
     filePath: zod.string().describe('The absolute path of the file to upload'),
   },
-  handler: async (request, response) => {
-    const runtime = getJSHookRuntime();
+  handler: async (request, response, context, runtime) => {
     const page = await runtime.collector.getActivePage();
 
     const element = await page.$(request.params.selector);
@@ -335,8 +327,7 @@ export const pressKey = defineTool({
         'A key or a combination (e.g., "Enter", "Control+A", "Control++", "Control+Shift+R"). Modifiers: Control, Shift, Alt, Meta',
       ),
   },
-  handler: async (request, response) => {
-    const runtime = getJSHookRuntime();
+  handler: async (request, response, context, runtime) => {
     const page = await runtime.collector.getActivePage();
     const {parseKey} = await import('../utils/keyboard.js');
 

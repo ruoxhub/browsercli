@@ -5,15 +5,17 @@
  */
 
 import {logger} from '../logger.js';
+import {createRequire} from 'node:module';
 
-// 动态导入 chrome-devtools-frontend 以绕过类型检查
-let cdtp: typeof import('../../node_modules/chrome-devtools-frontend/mcp/mcp.js');
+// 动态导入 chrome-devtools-frontend 运行时模块，避免将其源码类型拉入当前 TS program。
+const require = createRequire(import.meta.url);
+const CDTP_MODULE_PATH = '../../node_modules/chrome-devtools-frontend/mcp/mcp.js';
+let cdtp: any;
 let initialized = false;
 
-async function getCdtp() {
+async function getCdtp(): Promise<any> {
   if (!initialized) {
-    cdtp =
-      await import('../../node_modules/chrome-devtools-frontend/mcp/mcp.js');
+    cdtp = require(CDTP_MODULE_PATH);
     initialized = true;
   }
   return cdtp;
@@ -22,9 +24,9 @@ async function getCdtp() {
 // 从动态导入中获取运行时对象 - 延迟初始化
 let _engine: any = null;
 
-function getEngine() {
-  if (!_engine && cdtp) {
-    const {TraceEngine} = cdtp;
+async function getEngine(): Promise<any> {
+  if (!_engine) {
+    const {TraceEngine} = await getCdtp();
     _engine = TraceEngine.TraceModel.Model.createWithAllHandlers();
   }
   return _engine;

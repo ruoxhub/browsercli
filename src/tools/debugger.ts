@@ -14,7 +14,7 @@
  * - Request initiator (call stack) analysis
  */
 
-import type { ContinuousDebugConfig} from '../modules/debugger/AIContinuousDebugger.js';
+import type {ContinuousDebugConfig} from '../modules/debugger/AIContinuousDebugger.js';
 import {AIContinuousDebugger} from '../modules/debugger/AIContinuousDebugger.js';
 import type {DebuggerManager} from '../modules/debugger/DebuggerManager.js';
 import {AIService} from '../services/AIService.js';
@@ -45,9 +45,7 @@ function formatStackFrameLocation(
     ? `${frame.url}:${frame.lineNumber + 1}:${frame.columnNumber + 1}`
     : `script ${frame.scriptId}:${frame.lineNumber + 1}:${frame.columnNumber + 1}`;
 
-  return sourceMapURL
-    ? `${location} [SourceMap: ${sourceMapURL}]`
-    : location;
+  return sourceMapURL ? `${location} [SourceMap: ${sourceMapURL}]` : location;
 }
 
 function findSourceMapURLByScriptUrl(
@@ -65,18 +63,18 @@ function findSourceMapURLByScriptUrl(
   if (!url) {
     return undefined;
   }
-  const directMatch = debugger_.getScripts().find((script) => script.url === url);
+  const directMatch = debugger_.getScripts().find(script => script.url === url);
   if (directMatch?.sourceMapURL) {
     return directMatch.sourceMapURL;
   }
   const patternMatch = debugger_
     .getScriptsByUrlPattern?.(url)
-    .find((script) => script.url === url)?.sourceMapURL;
+    .find(script => script.url === url)?.sourceMapURL;
   if (patternMatch) {
     return patternMatch;
   }
   const stackFrameMatch = stackFrames?.find(
-    (frame) => frame.url === url && frame.scriptId,
+    frame => frame.url === url && frame.scriptId,
   );
   if (stackFrameMatch?.scriptId) {
     return debugger_.getScriptById?.(stackFrameMatch.scriptId)?.sourceMapURL;
@@ -85,10 +83,26 @@ function findSourceMapURLByScriptUrl(
 }
 
 const reverseTaskParamsSchema = {
-  taskId: zod.string().optional().describe('Optional reverse task ID for writing durable evidence artifacts.'),
-  taskSlug: zod.string().optional().describe('Optional reverse task slug used when opening the task artifact directory.'),
-  targetUrl: zod.string().optional().describe('Optional target page URL associated with the reverse task.'),
-  goal: zod.string().optional().describe('Optional reverse-engineering goal for the task artifact.'),
+  taskId: zod
+    .string()
+    .optional()
+    .describe(
+      'Optional reverse task ID for writing durable evidence artifacts.',
+    ),
+  taskSlug: zod
+    .string()
+    .optional()
+    .describe(
+      'Optional reverse task slug used when opening the task artifact directory.',
+    ),
+  targetUrl: zod
+    .string()
+    .optional()
+    .describe('Optional target page URL associated with the reverse task.'),
+  goal: zod
+    .string()
+    .optional()
+    .describe('Optional reverse-engineering goal for the task artifact.'),
 };
 
 interface ReverseTaskParams {
@@ -99,13 +113,27 @@ interface ReverseTaskParams {
 }
 
 async function appendDebuggerEvidence(
+  runtime: {
+    reverseTaskStore: {
+      openTask: (options: {
+        taskId: string;
+        slug: string;
+        targetUrl: string;
+        goal: string;
+      }) => Promise<{
+        appendLog: (
+          channel: string,
+          entry: Record<string, unknown>,
+        ) => Promise<void>;
+      }>;
+    };
+  },
   params: ReverseTaskParams,
   entry: Record<string, unknown>,
 ): Promise<void> {
   if (!params.taskId || !params.taskSlug || !params.targetUrl || !params.goal) {
     return;
   }
-  const runtime = getJSHookRuntime();
   const task = await runtime.reverseTaskStore.openTask({
     taskId: params.taskId,
     slug: params.taskSlug,
@@ -135,7 +163,7 @@ export const listScripts = defineTool({
         'Optional filter string to match against script URLs (case-insensitive partial match).',
       ),
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response, context, runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -219,7 +247,7 @@ export const getScriptSource = defineTool({
         'Number of characters to return when using offset (default: 1000).',
       ),
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response, context, runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -336,7 +364,7 @@ export const findInScript = defineTool({
       .default(true)
       .describe('Whether the search is case-sensitive (default: true).'),
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response, context, runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -488,7 +516,7 @@ export const searchInSources = defineTool({
         'Only search scripts whose URL contains this string (case-insensitive).',
       ),
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response, context, runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -657,7 +685,7 @@ export const setBreakpoint = defineTool({
       .default(false)
       .describe('Whether to treat the URL as a regex pattern.'),
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response, context, runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -730,7 +758,7 @@ export const removeBreakpoint = defineTool({
         'The breakpoint ID to remove (from list_breakpoints or set_breakpoint).',
       ),
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response, context, runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -767,7 +795,7 @@ export const listBreakpoints = defineTool({
     readOnlyHint: true,
   },
   schema: {},
-  handler: async (request, response, context) => {
+  handler: async (request, response, context, runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -826,7 +854,7 @@ export const getRequestInitiator = defineTool({
       ),
     ...reverseTaskParamsSchema,
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response, context, runtime) => {
     const {requestId} = request.params;
     const debugger_ = context.debuggerContext;
 
@@ -874,7 +902,10 @@ export const getRequestInitiator = defineTool({
           const script = frame.scriptId
             ? debugger_.getScriptById(frame.scriptId)
             : undefined;
-          const location = formatStackFrameLocation(frame, script?.sourceMapURL);
+          const location = formatStackFrameLocation(
+            frame,
+            script?.sourceMapURL,
+          );
           response.appendResponseLine(
             `  ${i + 1}. ${functionName} @ ${location}`,
           );
@@ -892,7 +923,10 @@ export const getRequestInitiator = defineTool({
             const script = frame.scriptId
               ? debugger_.getScriptById(frame.scriptId)
               : undefined;
-            const location = formatStackFrameLocation(frame, script?.sourceMapURL);
+            const location = formatStackFrameLocation(
+              frame,
+              script?.sourceMapURL,
+            );
             response.appendResponseLine(
               `  ${i + 1}. ${functionName} @ ${location}`,
             );
@@ -900,7 +934,7 @@ export const getRequestInitiator = defineTool({
         }
       }
 
-      await appendDebuggerEvidence(request.params, {
+      await appendDebuggerEvidence(runtime, request.params, {
         tool: 'get_request_initiator',
         requestId,
         requestUrl: httpRequest.url(),
@@ -908,13 +942,14 @@ export const getRequestInitiator = defineTool({
         initiatorUrl: initiator.url,
         lineNumber: initiator.lineNumber,
         columnNumber: initiator.columnNumber,
-        callFrames: initiator.stack?.callFrames.map((frame) => ({
-          functionName: frame.functionName || '(anonymous)',
-          url: frame.url,
-          scriptId: frame.scriptId,
-          lineNumber: frame.lineNumber,
-          columnNumber: frame.columnNumber,
-        })) ?? [],
+        callFrames:
+          initiator.stack?.callFrames.map(frame => ({
+            functionName: frame.functionName || '(anonymous)',
+            url: frame.url,
+            scriptId: frame.scriptId,
+            lineNumber: frame.lineNumber,
+            columnNumber: frame.columnNumber,
+          })) ?? [],
       });
     } catch (error) {
       response.appendResponseLine(
@@ -949,7 +984,7 @@ export const getPausedInfo = defineTool({
       .default(2)
       .describe('Maximum scope depth to traverse (default: 2).'),
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response, context, runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -1091,7 +1126,7 @@ export const resume = defineTool({
     readOnlyHint: false,
   },
   schema: {},
-  handler: async (request, response, context) => {
+  handler: async (request, response, context, runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -1130,7 +1165,7 @@ export const pause = defineTool({
     readOnlyHint: false,
   },
   schema: {},
-  handler: async (request, response, context) => {
+  handler: async (request, response, context, runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -1171,7 +1206,7 @@ export const stepOver = defineTool({
     readOnlyHint: false,
   },
   schema: {},
-  handler: async (request, response, context) => {
+  handler: async (request, response, context, runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -1212,7 +1247,7 @@ export const stepInto = defineTool({
     readOnlyHint: false,
   },
   schema: {},
-  handler: async (request, response, context) => {
+  handler: async (request, response, context, runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -1253,7 +1288,7 @@ export const stepOut = defineTool({
     readOnlyHint: false,
   },
   schema: {},
-  handler: async (request, response, context) => {
+  handler: async (request, response, context, runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -1304,7 +1339,7 @@ export const evaluateOnCallframe = defineTool({
         'The call frame index to evaluate in (0 = top frame, default: 0).',
       ),
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response, context, runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -1411,7 +1446,7 @@ export const setBreakpointOnText = defineTool({
         'Optional condition expression. Breakpoint only triggers when this evaluates to true.',
       ),
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response, context, runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -1570,7 +1605,7 @@ export const hookFunction = defineTool({
         'Custom identifier for this hook. Used to unhook later. Defaults to target name.',
       ),
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response, context, runtime) => {
     const {target, logArgs, logResult, logStack, hookId} = request.params;
     const id = hookId || target.replace(/[^a-zA-Z0-9]/g, '_');
 
@@ -1780,7 +1815,7 @@ export const unhookFunction = defineTool({
       .string()
       .describe('The hook ID to remove (from hook_function).'),
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response, context, runtime) => {
     const {hookId} = request.params;
 
     const unhookCode = `
@@ -1833,7 +1868,7 @@ export const listHooks = defineTool({
     readOnlyHint: true,
   },
   schema: {},
-  handler: async (request, response, context) => {
+  handler: async (request, response, context, runtime) => {
     const listCode = `
 (function() {
   if (!window.__mcp_hooks__) return [];
@@ -1903,7 +1938,7 @@ export const inspectObject = defineTool({
       .default(true)
       .describe('Whether to show prototype chain (default: true).'),
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response, context, runtime) => {
     const {expression, depth, showMethods, showPrototype} = request.params;
 
     const inspectCode = `
@@ -2034,7 +2069,7 @@ export const getStorage = defineTool({
       .optional()
       .describe('Optional filter string to match against keys/names.'),
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response, context, runtime) => {
     const {type, filter} = request.params;
 
     const storageCode = `
@@ -2136,7 +2171,7 @@ export const breakOnXhr = defineTool({
   schema: {
     url: zod.string().describe('URL pattern to break on (partial match).'),
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response, context, runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -2184,7 +2219,7 @@ export const removeXhrBreakpoint = defineTool({
   schema: {
     url: zod.string().describe('The URL pattern to remove breakpoint for.'),
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response, context, runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -2245,7 +2280,7 @@ export const monitorEvents = defineTool({
       .describe('Custom ID for this monitor. Used to stop monitoring later.'),
     ...reverseTaskParamsSchema,
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response, context, runtime) => {
     const {selector, events, monitorId} = request.params;
     const id = monitorId || selector?.replace(/[^a-zA-Z0-9]/g, '_') || 'window';
 
@@ -2324,7 +2359,7 @@ export const monitorEvents = defineTool({
       if (result && typeof result === 'object') {
         if ((result as {success: boolean}).success) {
           const r = result as {monitorId: string; eventCount: number};
-          await appendDebuggerEvidence(request.params, {
+          await appendDebuggerEvidence(runtime, request.params, {
             tool: 'monitor_events',
             monitorId: r.monitorId,
             selector,
@@ -2370,7 +2405,7 @@ export const stopMonitor = defineTool({
   schema: {
     monitorId: zod.string().describe('The monitor ID to stop.'),
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response, context, runtime) => {
     const {monitorId} = request.params;
 
     const stopCode = `
@@ -2457,7 +2492,7 @@ export const traceFunction = defineTool({
       .describe('Custom ID for this trace. Used to identify in logs.'),
     ...reverseTaskParamsSchema,
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response, context, runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -2585,7 +2620,7 @@ export const traceFunction = defineTool({
         condition,
       );
 
-      await appendDebuggerEvidence(request.params, {
+      await appendDebuggerEvidence(runtime, request.params, {
         tool: 'trace_function',
         traceId: id,
         functionName,
@@ -2661,7 +2696,7 @@ export const xhrToJsBreakpoint = defineTool({
       .default(30000)
       .describe('等待 XHR 断点触发的最大时间 (毫秒)'),
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response, context, runtime) => {
     const {urlPattern, maxWaitMs} = request.params;
     const debugger_ = context.debuggerContext;
 
@@ -2701,7 +2736,9 @@ export const xhrToJsBreakpoint = defineTool({
       }
 
       response.appendResponseLine(`✅ XHR 断点已触发！`);
-      response.appendResponseLine(`调用栈深度：${pausedState.callFrames.length}`);
+      response.appendResponseLine(
+        `调用栈深度：${pausedState.callFrames.length}`,
+      );
 
       // 识别用户代码帧
       const targetFrame = findUserCodeFrame(pausedState.callFrames);
@@ -2713,9 +2750,15 @@ export const xhrToJsBreakpoint = defineTool({
 
       response.appendResponseLine('');
       response.appendResponseLine('顶层用户代码位置:');
-      response.appendResponseLine(`  函数：${targetFrame.functionName || '(anonymous)'}`);
-      response.appendResponseLine(`  脚本：${targetFrame.url || `script:${targetFrame.location.scriptId}`}`);
-      response.appendResponseLine(`  位置：行${targetFrame.location.lineNumber + 1}, 列${targetFrame.location.columnNumber}`);
+      response.appendResponseLine(
+        `  函数：${targetFrame.functionName || '(anonymous)'}`,
+      );
+      response.appendResponseLine(
+        `  脚本：${targetFrame.url || `script:${targetFrame.location.scriptId}`}`,
+      );
+      response.appendResponseLine(
+        `  位置：行${targetFrame.location.lineNumber + 1}, 列${targetFrame.location.columnNumber}`,
+      );
 
       // 设置 JS 断点
       response.appendResponseLine('');
@@ -2734,16 +2777,22 @@ export const xhrToJsBreakpoint = defineTool({
       await debugger_.resume();
 
       response.appendResponseLine('');
-      response.appendResponseLine(`✅ 完成！JS 断点已设置：${breakpointInfo.breakpointId}`);
+      response.appendResponseLine(
+        `✅ 完成！JS 断点已设置：${breakpointInfo.breakpointId}`,
+      );
       response.appendResponseLine(`XHR 断点已移除。`);
       response.appendResponseLine('');
-      response.appendResponseLine('提示：使用 get_paused_info 查看断点命中时的状态。');
+      response.appendResponseLine(
+        '提示：使用 get_paused_info 查看断点命中时的状态。',
+      );
     } catch (error) {
       // 清理 XHR 断点
       try {
         const client = debugger_.getClient();
         if (client) {
-          await client.send('DOMDebugger.removeXHRBreakpoint', {url: urlPattern});
+          await client.send('DOMDebugger.removeXHRBreakpoint', {
+            url: urlPattern,
+          });
         }
       } catch {}
 
@@ -2767,7 +2816,10 @@ export const startContinuousDebugging = defineTool({
     readOnlyHint: false,
   },
   schema: {
-    targetUrl: zod.string().optional().describe('可选：调试开始前导航到的目标 URL'),
+    targetUrl: zod
+      .string()
+      .optional()
+      .describe('可选：调试开始前导航到的目标 URL'),
     xhrBreakPatterns: zod
       .array(zod.string())
       .optional()
@@ -2791,7 +2843,7 @@ export const startContinuousDebugging = defineTool({
     model: zod.string().optional().describe('模型名称'),
     systemPrompt: zod.string().optional().describe('系统提示词覆盖'),
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response, context, runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -2805,7 +2857,9 @@ export const startContinuousDebugging = defineTool({
       // 创建 AI 服务
       const aiConfig = getAIConfig();
       if (!aiConfig) {
-        response.appendResponseLine('错误：未配置 AI 服务。请设置环境变量（如 OPENAI_API_KEY、ANTHROPIC_API_KEY 或 GEMINI_API_KEY）。');
+        response.appendResponseLine(
+          '错误：未配置 AI 服务。请设置环境变量（如 OPENAI_API_KEY、ANTHROPIC_API_KEY 或 GEMINI_API_KEY）。',
+        );
         return;
       }
 
@@ -2857,13 +2911,21 @@ export const startContinuousDebugging = defineTool({
       response.appendResponseLine(`最大迭代次数：${config.maxIterations}`);
       response.appendResponseLine(`超时时间：${config.timeoutMs}ms`);
       if (config.xhrBreakPatterns) {
-        response.appendResponseLine(`XHR 断点模式：${config.xhrBreakPatterns.join(', ')}`);
+        response.appendResponseLine(
+          `XHR 断点模式：${config.xhrBreakPatterns.join(', ')}`,
+        );
       }
       response.appendResponseLine('');
-      response.appendResponseLine('调试循环已启动。AI 将自动分析每个断点并决定下一步操作。');
+      response.appendResponseLine(
+        '调试循环已启动。AI 将自动分析每个断点并决定下一步操作。',
+      );
       response.appendResponseLine('');
-      response.appendResponseLine('使用 stop_continuous_debugging 可随时停止调试。');
-      response.appendResponseLine('使用 get_ai_debug_status 可查看当前状态和统计信息。');
+      response.appendResponseLine(
+        '使用 stop_continuous_debugging 可随时停止调试。',
+      );
+      response.appendResponseLine(
+        '使用 get_ai_debug_status 可查看当前状态和统计信息。',
+      );
 
       // 启动调试（不等待完成）
       continuousDebugger.start(config).catch(error => {
@@ -2892,8 +2954,10 @@ export const stopContinuousDebugging = defineTool({
     readOnlyHint: false,
   },
   schema: {},
-  handler: async (request, response, context) => {
-    const continuousDebugger = (context as any).__continuousDebugger as AIContinuousDebugger | undefined;
+  handler: async (request, response, context, runtime) => {
+    const continuousDebugger = (context as any).__continuousDebugger as
+      | AIContinuousDebugger
+      | undefined;
 
     if (!continuousDebugger) {
       response.appendResponseLine('没有正在运行的 AI 调试会话。');
@@ -2942,13 +3006,17 @@ export const getAiDebugStatus = defineTool({
     readOnlyHint: true,
   },
   schema: {},
-  handler: async (request, response, context) => {
-    const continuousDebugger = (context as any).__continuousDebugger as AIContinuousDebugger | undefined;
+  handler: async (request, response, context, runtime) => {
+    const continuousDebugger = (context as any).__continuousDebugger as
+      | AIContinuousDebugger
+      | undefined;
 
     if (!continuousDebugger) {
       response.appendResponseLine('没有正在运行的 AI 调试会话。');
       response.appendResponseLine('');
-      response.appendResponseLine('使用 start_continuous_debugging 启动新的调试会话。');
+      response.appendResponseLine(
+        '使用 start_continuous_debugging 启动新的调试会话。',
+      );
       return;
     }
 
@@ -2983,7 +3051,9 @@ export const getAiDebugStatus = defineTool({
         const recent = history.slice(-5);
         for (let i = 0; i < recent.length; i++) {
           const item = recent[i];
-          response.appendResponseLine(`  ${history.length - recent.length + i + 1}. ${item.decision.action} - ${item.decision.reason.slice(0, 50)}...`);
+          response.appendResponseLine(
+            `  ${history.length - recent.length + i + 1}. ${item.decision.action} - ${item.decision.reason.slice(0, 50)}...`,
+          );
         }
       }
     } catch (error) {
@@ -2997,11 +3067,13 @@ export const getAiDebugStatus = defineTool({
 /**
  * 从调用栈中识别用户代码帧（辅助函数）
  */
-function findUserCodeFrame(callStack: Array<{
-  url?: string;
-  functionName?: string;
-  location: {scriptId: string; lineNumber: number; columnNumber: number};
-}>): typeof callStack[0] | null {
+function findUserCodeFrame(
+  callStack: Array<{
+    url?: string;
+    functionName?: string;
+    location: {scriptId: string; lineNumber: number; columnNumber: number};
+  }>,
+): (typeof callStack)[0] | null {
   const vendorPatterns = [
     'node_modules',
     'vendor',
@@ -3020,8 +3092,8 @@ function findUserCodeFrame(callStack: Array<{
     const url = frame.url || '';
     const functionName = frame.functionName || '';
 
-    const isVendor = vendorPatterns.some(pattern =>
-      url.includes(pattern) || functionName.includes(pattern),
+    const isVendor = vendorPatterns.some(
+      pattern => url.includes(pattern) || functionName.includes(pattern),
     );
 
     const isUserCode = !isVendor;

@@ -176,3 +176,4 @@ project/
 .claude
 *.png
 .omc/
+.omx/

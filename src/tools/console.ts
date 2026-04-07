@@ -81,7 +81,7 @@ export const listConsoleMessages = defineTool({
         'Set to true to return the preserved messages over the last 3 navigations.',
       ),
   },
-  handler: async (request, response) => {
+  handler: async (request, response, context, runtime) => {
     response.setIncludeConsoleData(true, {
       pageSize: request.params.pageSize,
       pageIdx: request.params.pageIdx,
@@ -105,7 +105,7 @@ export const getConsoleMessage = defineTool({
         'The msgid of a console message on the page from the listed console messages',
       ),
   },
-  handler: async (request, response) => {
+  handler: async (request, response, context, runtime) => {
     response.attachConsoleMessage(request.params.msgid);
   },
 });

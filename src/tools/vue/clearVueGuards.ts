@@ -3,9 +3,9 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { zod } from '../../third_party/index.js';
-import { ToolCategory } from '../categories.js';
-import { defineTool, type Context, type Response } from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
+import {defineTool, type Context, type Response} from '../ToolDefinition.js';
 
 export const clearVueGuards = defineTool({
   name: 'clear_vue_guards',
@@ -21,7 +21,16 @@ export const clearVueGuards = defineTool({
       .optional()
       .describe('要清除的守卫，默认全部'),
   },
-  handler: async (request: { params: { guards?: Array<'beforeEach' | 'beforeResolve' | 'afterEach' | 'all'> } }, response: Response, context: Context) => {
+  handler: async (
+    request: {
+      params: {
+        guards?: Array<'beforeEach' | 'beforeResolve' | 'afterEach' | 'all'>;
+      };
+    },
+    response: Response,
+    context: Context,
+    runtime,
+  ) => {
     const guards = request.params.guards || ['all'];
 
     const hookCode = `
@@ -86,7 +95,7 @@ export const clearVueGuards = defineTool({
 
     try {
       const frame = context.getSelectedFrame();
-      const result = await frame.evaluate(hookCode) as {
+      const result = (await frame.evaluate(hookCode)) as {
         success: boolean;
         clearedGuards?: string[];
         error?: string;
@@ -99,7 +108,9 @@ export const clearVueGuards = defineTool({
       }
 
       response.appendResponseLine('✅ Vue Router 守卫已清除');
-      response.appendResponseLine(`- 已清除的守卫：${result.clearedGuards?.join(', ') || 'none'}`);
+      response.appendResponseLine(
+        `- 已清除的守卫：${result.clearedGuards?.join(', ') || 'none'}`,
+      );
       response.appendResponseLine('');
       response.appendResponseLine('现在路由跳转将不会被拦截。');
       response.appendResponseLine('如需恢复，请刷新页面。');

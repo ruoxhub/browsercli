@@ -30,7 +30,7 @@ export const listFrames = defineTool({
     readOnlyHint: true,
   },
   schema: {},
-  handler: async (_request, response, context) => {
+  handler: async (_request, response, context, runtime) => {
     const page = context.getSelectedPage();
     const frames = page.frames();
     const currentFrame = context.getSelectedFrame();
@@ -70,7 +70,7 @@ export const selectFrame = defineTool({
       .min(0)
       .describe('The frame index from list_frames. 0 = main frame.'),
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response, context, runtime) => {
     const page = context.getSelectedPage();
     const frames = page.frames();
     const {frameIdx} = request.params;

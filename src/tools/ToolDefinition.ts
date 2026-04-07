@@ -14,6 +14,7 @@ import type {PaginationOptions} from '../utils/types.js';
 import type {WebSocketData} from '../WebSocketCollector.js';
 
 import type {ToolCategory} from './categories.js';
+import type {JSHookRuntime} from './runtime.js';
 
 export interface ToolDefinition<
   Schema extends zod.ZodRawShape = zod.ZodRawShape,
@@ -34,6 +35,7 @@ export interface ToolDefinition<
     request: Request<Schema>,
     response: Response,
     context: Context,
+    runtime: JSHookRuntime,
   ) => Promise<void>;
 }
 

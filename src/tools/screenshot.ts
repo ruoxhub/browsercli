@@ -44,7 +44,7 @@ export const screenshot = defineTool({
         'The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.',
       ),
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response, context, runtime) => {
     const page = context.getSelectedPage();
 
     const format = request.params.format;
@@ -98,8 +98,7 @@ export const getVideoInfo = defineTool({
   schema: {
     selector: zod.string().describe('CSS selector of the video element'),
   },
-  handler: async (request, response) => {
-    const runtime = getJSHookRuntime();
+  handler: async (request, response, context, runtime) => {
     const info = await runtime.pageController.getVideoInfo(request.params.selector);
 
     response.appendResponseLine('```json');
@@ -122,8 +121,7 @@ export const seekVideo = defineTool({
     selector: zod.string().describe('CSS selector of the video element'),
     time: zod.number().nonnegative().describe('Time in seconds to seek to'),
   },
-  handler: async (request, response) => {
-    const runtime = getJSHookRuntime();
+  handler: async (request, response, context, runtime) => {
     await runtime.pageController.seekVideo(request.params.selector, request.params.time);
     response.appendResponseLine(`Video seeked to ${request.params.time}s`);
   },
@@ -146,8 +144,7 @@ export const captureVideoFrame = defineTool({
     format: zod.enum(['png', 'jpeg']).optional().default('png'),
     quality: zod.number().min(0).max(100).optional().describe('Image quality for JPEG (0-100)'),
   },
-  handler: async (request, response, context) => {
-    const runtime = getJSHookRuntime();
+  handler: async (request, response, context, runtime) => {
     const result = await runtime.pageController.captureVideoFrame(
       request.params.selector,
       {

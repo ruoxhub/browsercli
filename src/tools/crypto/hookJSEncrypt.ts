@@ -3,9 +3,9 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { zod } from '../../third_party/index.js';
-import { ToolCategory } from '../categories.js';
-import { defineTool, type Context, type Response } from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
+import {defineTool, type Context, type Response} from '../ToolDefinition.js';
 
 export const hookJSEncrypt = defineTool({
   name: 'hook_jsencrypt',
@@ -22,7 +22,12 @@ export const hookJSEncrypt = defineTool({
       .default('compact')
       .describe('日志输出格式'),
   },
-  handler: async (request: { params: { logFormat?: 'full' | 'compact' | 'json' } }, response: Response, context: Context) => {
+  handler: async (
+    request: {params: {logFormat?: 'full' | 'compact' | 'json'}},
+    response: Response,
+    context: Context,
+    runtime,
+  ) => {
     const logFormat = request.params.logFormat || 'compact';
 
     const hookCode = `
@@ -93,7 +98,9 @@ export const hookJSEncrypt = defineTool({
       response.appendResponseLine('  - encrypt(): 公钥加密');
       response.appendResponseLine('  - decrypt(): 私钥解密');
       response.appendResponseLine('');
-      response.appendResponseLine('输出参数：publicKey, privateKey, plaintext, ciphertext');
+      response.appendResponseLine(
+        '输出参数：publicKey, privateKey, plaintext, ciphertext',
+      );
     } catch (error) {
       response.appendResponseLine(
         `❌ 错误：${error instanceof Error ? error.message : String(error)}`,

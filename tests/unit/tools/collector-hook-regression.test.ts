@@ -26,7 +26,12 @@ interface ToolResponseHarness {
 }
 
 interface ToolDefinitionHarness {
-  handler(request: {params: Record<string, unknown>}, response: ToolResponseHarness, context: object): Promise<void>;
+  handler(
+    request: {params: Record<string, unknown>},
+    response: ToolResponseHarness,
+    context: object,
+    runtime: unknown,
+  ): Promise<void>;
 }
 
 function makeResponse(): ToolResponseHarness {
@@ -62,7 +67,12 @@ describe('collector/hook regressions', () => {
       collectCalls += 1;
       return {
         files: [
-          {url: 'https://example.com/a.js', content: 'const a=1;', size: 10, type: 'external'},
+          {
+            url: 'https://example.com/a.js',
+            content: 'const a=1;',
+            size: 10,
+            type: 'external',
+          },
         ],
         dependencies: {nodes: [], edges: []},
         totalSize: 10,
@@ -71,7 +81,12 @@ describe('collector/hook regressions', () => {
     }) as RuntimeMethod;
     runtime.collector.getTopPriorityFiles = (() => ({
       files: [
-        {url: 'https://example.com/a.js', content: 'const a=1;', size: 10, type: 'external'},
+        {
+          url: 'https://example.com/a.js',
+          content: 'const a=1;',
+          size: 10,
+          type: 'external',
+        },
       ],
       totalSize: 10,
       totalFiles: 1,
@@ -83,9 +98,14 @@ describe('collector/hook regressions', () => {
         {params: {url: 'https://example.com', returnMode: 'top-priority'}},
         response,
         {},
+        runtime,
       );
 
-      assert.strictEqual(collectCalls, 1, 'collect_code should trigger collector.collect first');
+      assert.strictEqual(
+        collectCalls,
+        1,
+        'collect_code should trigger collector.collect first',
+      );
       assert.ok(response.lines.join('\n').includes('"totalFiles": 1'));
     } finally {
       runtime.collector.collect = originalCollect;
@@ -107,7 +127,9 @@ describe('collector/hook regressions', () => {
     const originalGetActivePage = runtime.collector.getActivePage;
     runtime.hookManager.clearAll();
 
-    const created = runtime.hookManager.create({type: 'fetch'}) as {hookId: string};
+    const created = runtime.hookManager.create({type: 'fetch'}) as {
+      hookId: string;
+    };
 
     runtime.collector.getActivePage = (async () => ({
       evaluate: async (fn: (hookId?: string) => unknown, hookId?: string) => {
@@ -134,10 +156,14 @@ describe('collector/hook regressions', () => {
         {params: {hookId: created.hookId, view: 'summary'}},
         response,
         {},
+        runtime,
       );
 
       const output = response.lines.join('\n');
-      assert.ok(output.includes('"total": 1'), 'summary should include synced records');
+      assert.ok(
+        output.includes('"total": 1'),
+        'summary should include synced records',
+      );
       assert.ok(output.includes('https://example.com/api'));
     } finally {
       runtime.collector.getActivePage = originalGetActivePage;
@@ -180,6 +206,7 @@ describe('collector/hook regressions', () => {
         {params: {view: 'summary'}},
         response,
         {},
+        runtime,
       );
 
       const output = response.lines.join('\n');

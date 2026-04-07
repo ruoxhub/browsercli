@@ -11,7 +11,10 @@ import path from 'node:path';
 import {describe, it} from 'node:test';
 
 import {ReverseTaskStore} from '../../../src/reverse/ReverseTaskStore.js';
-import {diffEnvRequirements, exportRebuildBundle} from '../../../src/tools/rebuild.js';
+import {
+  diffEnvRequirements,
+  exportRebuildBundle,
+} from '../../../src/tools/rebuild.js';
 import {getJSHookRuntime} from '../../../src/tools/runtime.js';
 
 interface ResponseShape {
@@ -32,7 +35,10 @@ function makeResponse(): ResponseShape {
 function extractFirstJsonBlock(lines: string[]): Record<string, unknown> {
   const start = lines.indexOf('```json');
   const end = lines.indexOf('```', start + 1);
-  return JSON.parse(lines.slice(start + 1, end).join('\n')) as Record<string, unknown>;
+  return JSON.parse(lines.slice(start + 1, end).join('\n')) as Record<
+    string,
+    unknown
+  >;
 }
 
 describe('rebuild bridge tools', () => {
@@ -44,25 +50,32 @@ describe('rebuild bridge tools', () => {
 
     try {
       const exportResponse = makeResponse();
-      await exportRebuildBundle.handler({
-        params: {
-          taskId: 'task-001',
-          taskSlug: 'demo',
-          targetUrl: 'https://example.com',
-          goal: 'rebuild signature',
-          entryCode: 'import "./env.js";\nconsole.log(signToken("a", "b"));',
-          envCode: 'globalThis.window = globalThis;',
-          polyfillsCode: 'globalThis.atob = (v) => v;',
-          capture: {
-            cookies: [{name: 'sid', value: '1'}],
-            requests: [{url: 'https://example.com/api/sign', method: 'POST'}],
+      await exportRebuildBundle.handler(
+        {
+          params: {
+            taskId: 'task-001',
+            taskSlug: 'demo',
+            targetUrl: 'https://example.com',
+            goal: 'rebuild signature',
+            entryCode: 'import "./env.js";\nconsole.log(signToken("a", "b"));',
+            envCode: 'globalThis.window = globalThis;',
+            polyfillsCode: 'globalThis.atob = (v) => v;',
+            capture: {
+              cookies: [{name: 'sid', value: '1'}],
+              requests: [{url: 'https://example.com/api/sign', method: 'POST'}],
+            },
+            notes: [
+              'target request is /api/sign',
+              'cookie sid participates in request chain',
+            ],
           },
-          notes: [
-            'target request is /api/sign',
-            'cookie sid participates in request chain',
-          ],
-        },
-      } as Parameters<typeof exportRebuildBundle.handler>[0], exportResponse as unknown as Parameters<typeof exportRebuildBundle.handler>[1], {} as Parameters<typeof exportRebuildBundle.handler>[2]);
+        } as Parameters<typeof exportRebuildBundle.handler>[0],
+        exportResponse as unknown as Parameters<
+          typeof exportRebuildBundle.handler
+        >[1],
+        {} as Parameters<typeof exportRebuildBundle.handler>[2],
+        runtime,
+      );
 
       await stat(path.join(rootDir, 'task-001', 'env', 'entry.js'));
       await stat(path.join(rootDir, 'task-001', 'env', 'env.js'));
@@ -70,22 +83,42 @@ describe('rebuild bridge tools', () => {
       await stat(path.join(rootDir, 'task-001', 'env', 'capture.json'));
       await stat(path.join(rootDir, 'task-001', 'report.md'));
 
-      const report = await readFile(path.join(rootDir, 'task-001', 'report.md'), 'utf8');
+      const report = await readFile(
+        path.join(rootDir, 'task-001', 'report.md'),
+        'utf8',
+      );
       assert.ok(report.includes('/api/sign'));
       assert.ok(report.includes('cookie sid'));
 
       const diffResponse = makeResponse();
-      await diffEnvRequirements.handler({
-        params: {
-          runtimeError: "ReferenceError: window is not defined\nReferenceError: localStorage is not defined\nTypeError: Cannot read properties of undefined (reading 'subtle')",
-          observedCapabilities: ['window', 'document', 'navigator', 'localStorage', 'crypto'],
-        },
-      } as Parameters<typeof diffEnvRequirements.handler>[0], diffResponse as unknown as Parameters<typeof diffEnvRequirements.handler>[1], {} as Parameters<typeof diffEnvRequirements.handler>[2]);
+      await diffEnvRequirements.handler(
+        {
+          params: {
+            runtimeError:
+              "ReferenceError: window is not defined\nReferenceError: localStorage is not defined\nTypeError: Cannot read properties of undefined (reading 'subtle')",
+            observedCapabilities: [
+              'window',
+              'document',
+              'navigator',
+              'localStorage',
+              'crypto',
+            ],
+          },
+        } as Parameters<typeof diffEnvRequirements.handler>[0],
+        diffResponse as unknown as Parameters<
+          typeof diffEnvRequirements.handler
+        >[1],
+        {} as Parameters<typeof diffEnvRequirements.handler>[2],
+        runtime,
+      );
 
       const diffJson = extractFirstJsonBlock(diffResponse.lines);
       assert.ok(Array.isArray(diffJson.missingCapabilities));
       assert.ok(Array.isArray(diffJson.nextPatches));
-      assert.strictEqual((diffJson.nextPatches as Array<Record<string, unknown>>)[0].capability, 'window');
+      assert.strictEqual(
+        (diffJson.nextPatches as Array<Record<string, unknown>>)[0].capability,
+        'window',
+      );
     } finally {
       runtime.reverseTaskStore = originalStore;
       await rm(rootDir, {recursive: true, force: true});
@@ -93,7 +126,9 @@ describe('rebuild bridge tools', () => {
   });
 
   it('auto-generates a rebuild bundle from observed page evidence and task logs', async () => {
-    const rootDir = await mkdtemp(path.join(tmpdir(), 'js-reverse-rebuild-auto-'));
+    const rootDir = await mkdtemp(
+      path.join(tmpdir(), 'js-reverse-rebuild-auto-'),
+    );
     const runtime = getJSHookRuntime();
     const originalStore = runtime.reverseTaskStore;
     const originals = {
@@ -123,45 +158,79 @@ describe('rebuild bridge tools', () => {
       });
 
       runtime.collector.getTopPriorityFiles = () => ({
-        files: [{
-          url: 'https://example.com/static/sign.js',
-          content: 'function signPayload(token, nonce) { return token + nonce; }',
-          size: 58,
-          type: 'external',
-        }],
+        files: [
+          {
+            url: 'https://example.com/static/sign.js',
+            content:
+              'function signPayload(token, nonce) { return token + nonce; }',
+            size: 58,
+            type: 'external',
+          },
+        ],
         totalSize: 58,
         totalFiles: 1,
       });
-      runtime.pageController.getCookies = async () => [{name: 'sid', value: 'cookie-1'}];
+      runtime.pageController.getCookies = async () => [
+        {name: 'sid', value: 'cookie-1'},
+      ];
       runtime.pageController.getLocalStorage = async () => ({token: 'abc'});
       runtime.pageController.getSessionStorage = async () => ({nonce: 'n-1'});
-      runtime.pageController.getPage = async () => ({
-        url: () => 'https://example.com/product',
-        title: async () => 'Product',
-      } as Awaited<ReturnType<typeof runtime.pageController.getPage>>);
+      runtime.pageController.getPage = async () =>
+        ({
+          url: () => 'https://example.com/product',
+          title: async () => 'Product',
+        }) as Awaited<ReturnType<typeof runtime.pageController.getPage>>;
 
       const response = makeResponse();
-      await exportRebuildBundle.handler({
-        params: {
-          taskId: 'task-002',
-          taskSlug: 'auto-demo',
-          targetUrl: 'https://example.com/product',
-          goal: 'rebuild signature',
-          autoGenerate: true,
-        },
-      } as Parameters<typeof exportRebuildBundle.handler>[0], response as unknown as Parameters<typeof exportRebuildBundle.handler>[1], {} as Parameters<typeof exportRebuildBundle.handler>[2]);
+      await exportRebuildBundle.handler(
+        {
+          params: {
+            taskId: 'task-002',
+            taskSlug: 'auto-demo',
+            targetUrl: 'https://example.com/product',
+            goal: 'rebuild signature',
+            autoGenerate: true,
+          },
+        } as Parameters<typeof exportRebuildBundle.handler>[0],
+        response as unknown as Parameters<
+          typeof exportRebuildBundle.handler
+        >[1],
+        {} as Parameters<typeof exportRebuildBundle.handler>[2],
+        runtime,
+      );
 
-      const entryCode = await readFile(path.join(rootDir, 'task-002', 'env', 'entry.js'), 'utf8');
-      const envCode = await readFile(path.join(rootDir, 'task-002', 'env', 'env.js'), 'utf8');
-      const capture = JSON.parse(await readFile(path.join(rootDir, 'task-002', 'env', 'capture.json'), 'utf8')) as Record<string, unknown>;
+      const entryCode = await readFile(
+        path.join(rootDir, 'task-002', 'env', 'entry.js'),
+        'utf8',
+      );
+      const envCode = await readFile(
+        path.join(rootDir, 'task-002', 'env', 'env.js'),
+        'utf8',
+      );
+      const capture = JSON.parse(
+        await readFile(
+          path.join(rootDir, 'task-002', 'env', 'capture.json'),
+          'utf8',
+        ),
+      ) as Record<string, unknown>;
 
       assert.ok(entryCode.includes('signPayload'));
       assert.ok(entryCode.includes('capture.targetScript'));
       assert.ok(envCode.includes('globalThis.window = globalThis'));
       assert.ok(envCode.includes('globalThis.localStorage'));
-      assert.strictEqual((capture.page as Record<string, unknown>).url, 'https://example.com/product');
-      assert.strictEqual(((capture.cookies as Array<Record<string, unknown>>)[0]).name, 'sid');
-      assert.strictEqual(((capture.runtimeEvidence as Array<Record<string, unknown>>)[0]).functionName, 'signPayload');
+      assert.strictEqual(
+        (capture.page as Record<string, unknown>).url,
+        'https://example.com/product',
+      );
+      assert.strictEqual(
+        (capture.cookies as Array<Record<string, unknown>>)[0].name,
+        'sid',
+      );
+      assert.strictEqual(
+        (capture.runtimeEvidence as Array<Record<string, unknown>>)[0]
+          .functionName,
+        'signPayload',
+      );
     } finally {
       runtime.reverseTaskStore = originalStore;
       runtime.collector.getTopPriorityFiles = originals.getTopPriorityFiles;
@@ -174,7 +243,9 @@ describe('rebuild bridge tools', () => {
   });
 
   it('filters auto-generated evidence by target keywords instead of logging unrelated page noise', async () => {
-    const rootDir = await mkdtemp(path.join(tmpdir(), 'js-reverse-rebuild-filtered-'));
+    const rootDir = await mkdtemp(
+      path.join(tmpdir(), 'js-reverse-rebuild-filtered-'),
+    );
     const runtime = getJSHookRuntime();
     const originalStore = runtime.reverseTaskStore;
     const originals = {
@@ -195,7 +266,8 @@ describe('rebuild bridge tools', () => {
       });
       await task.appendLog('runtime-evidence', {
         source: 'hook',
-        requestUrl: 'https://api.m.jd.com/client.action?functionId=pc_search&h5st=abc123',
+        requestUrl:
+          'https://api.m.jd.com/client.action?functionId=pc_search&h5st=abc123',
         functionName: 'genH5st',
         bodyPreview: '{"h5st":"abc123"}',
       });
@@ -224,36 +296,64 @@ describe('rebuild bridge tools', () => {
         totalSize: 74,
         totalFiles: 2,
       });
-      runtime.pageController.getCookies = async () => [{name: 'pin', value: 'jd-user'}];
-      runtime.pageController.getLocalStorage = async () => ({h5st_seed: 'seed-1', ad_cache: 'skip'});
-      runtime.pageController.getSessionStorage = async () => ({h5st_nonce: 'n-1'});
-      runtime.pageController.getPage = async () => ({
-        url: () => 'https://item.jd.com/1001.html',
-        title: async () => 'JD Product',
-      } as Awaited<ReturnType<typeof runtime.pageController.getPage>>);
+      runtime.pageController.getCookies = async () => [
+        {name: 'pin', value: 'jd-user'},
+      ];
+      runtime.pageController.getLocalStorage = async () => ({
+        h5st_seed: 'seed-1',
+        ad_cache: 'skip',
+      });
+      runtime.pageController.getSessionStorage = async () => ({
+        h5st_nonce: 'n-1',
+      });
+      runtime.pageController.getPage = async () =>
+        ({
+          url: () => 'https://item.jd.com/1001.html',
+          title: async () => 'JD Product',
+        }) as Awaited<ReturnType<typeof runtime.pageController.getPage>>;
 
       const response = makeResponse();
-      await exportRebuildBundle.handler({
-        params: {
-          taskId: 'task-003',
-          taskSlug: 'jd-h5st',
-          targetUrl: 'https://item.jd.com/1001.html',
-          goal: 'find h5st',
-          autoGenerate: true,
-          targetKeywords: ['h5st'],
-          targetUrlPatterns: ['api.m.jd.com'],
-          maxEvidenceItems: 2,
-        },
-      } as unknown as Parameters<typeof exportRebuildBundle.handler>[0], response as unknown as Parameters<typeof exportRebuildBundle.handler>[1], {} as Parameters<typeof exportRebuildBundle.handler>[2]);
+      await exportRebuildBundle.handler(
+        {
+          params: {
+            taskId: 'task-003',
+            taskSlug: 'jd-h5st',
+            targetUrl: 'https://item.jd.com/1001.html',
+            goal: 'find h5st',
+            autoGenerate: true,
+            targetKeywords: ['h5st'],
+            targetUrlPatterns: ['api.m.jd.com'],
+            maxEvidenceItems: 2,
+          },
+        } as unknown as Parameters<typeof exportRebuildBundle.handler>[0],
+        response as unknown as Parameters<
+          typeof exportRebuildBundle.handler
+        >[1],
+        {} as Parameters<typeof exportRebuildBundle.handler>[2],
+        runtime,
+      );
 
-      const capture = JSON.parse(await readFile(path.join(rootDir, 'task-003', 'env', 'capture.json'), 'utf8')) as Record<string, unknown>;
-      const runtimeEvidence = capture.runtimeEvidence as Array<Record<string, unknown>>;
+      const capture = JSON.parse(
+        await readFile(
+          path.join(rootDir, 'task-003', 'env', 'capture.json'),
+          'utf8',
+        ),
+      ) as Record<string, unknown>;
+      const runtimeEvidence = capture.runtimeEvidence as Array<
+        Record<string, unknown>
+      >;
       const filteredScript = capture.targetScript as Record<string, unknown>;
-      const report = await readFile(path.join(rootDir, 'task-003', 'report.md'), 'utf8');
+      const report = await readFile(
+        path.join(rootDir, 'task-003', 'report.md'),
+        'utf8',
+      );
 
       assert.strictEqual(runtimeEvidence.length, 1);
       assert.strictEqual(runtimeEvidence[0].functionName, 'genH5st');
-      assert.strictEqual(filteredScript.url, 'https://storage.360buyimg.com/js/h5st.js');
+      assert.strictEqual(
+        filteredScript.url,
+        'https://storage.360buyimg.com/js/h5st.js',
+      );
       assert.ok(!JSON.stringify(capture).includes('trackAd'));
       assert.ok(!JSON.stringify(capture).includes('analytics'));
       assert.ok(report.includes('targetKeywords'));
@@ -270,7 +370,9 @@ describe('rebuild bridge tools', () => {
   });
 
   it('matches weird targets through function names and action descriptions without relying on obvious parameter names', async () => {
-    const rootDir = await mkdtemp(path.join(tmpdir(), 'js-reverse-rebuild-function-target-'));
+    const rootDir = await mkdtemp(
+      path.join(tmpdir(), 'js-reverse-rebuild-function-target-'),
+    );
     const runtime = getJSHookRuntime();
     const originalStore = runtime.reverseTaskStore;
     const originals = {
@@ -322,35 +424,62 @@ describe('rebuild bridge tools', () => {
         totalSize: 80,
         totalFiles: 2,
       });
-      runtime.pageController.getCookies = async () => [{name: 'sid', value: 'checkout-user'}];
-      runtime.pageController.getLocalStorage = async () => ({order_seed: 'seed-2'});
-      runtime.pageController.getSessionStorage = async () => ({order_nonce: 'nonce-2'});
-      runtime.pageController.getPage = async () => ({
-        url: () => 'https://example.com/order',
-        title: async () => 'Checkout',
-      } as Awaited<ReturnType<typeof runtime.pageController.getPage>>);
+      runtime.pageController.getCookies = async () => [
+        {name: 'sid', value: 'checkout-user'},
+      ];
+      runtime.pageController.getLocalStorage = async () => ({
+        order_seed: 'seed-2',
+      });
+      runtime.pageController.getSessionStorage = async () => ({
+        order_nonce: 'nonce-2',
+      });
+      runtime.pageController.getPage = async () =>
+        ({
+          url: () => 'https://example.com/order',
+          title: async () => 'Checkout',
+        }) as Awaited<ReturnType<typeof runtime.pageController.getPage>>;
 
       const response = makeResponse();
-      await exportRebuildBundle.handler({
-        params: {
-          taskId: 'task-004',
-          taskSlug: 'weird-param',
-          targetUrl: 'https://example.com/order',
-          goal: 'find weird param',
-          autoGenerate: true,
-          targetFunctionNames: ['computeQtk9'],
-          targetActionDescription: 'submit order button',
-        },
-      } as unknown as Parameters<typeof exportRebuildBundle.handler>[0], response as unknown as Parameters<typeof exportRebuildBundle.handler>[1], {} as Parameters<typeof exportRebuildBundle.handler>[2]);
+      await exportRebuildBundle.handler(
+        {
+          params: {
+            taskId: 'task-004',
+            taskSlug: 'weird-param',
+            targetUrl: 'https://example.com/order',
+            goal: 'find weird param',
+            autoGenerate: true,
+            targetFunctionNames: ['computeQtk9'],
+            targetActionDescription: 'submit order button',
+          },
+        } as unknown as Parameters<typeof exportRebuildBundle.handler>[0],
+        response as unknown as Parameters<
+          typeof exportRebuildBundle.handler
+        >[1],
+        {} as Parameters<typeof exportRebuildBundle.handler>[2],
+        runtime,
+      );
 
-      const capture = JSON.parse(await readFile(path.join(rootDir, 'task-004', 'env', 'capture.json'), 'utf8')) as Record<string, unknown>;
-      const runtimeEvidence = capture.runtimeEvidence as Array<Record<string, unknown>>;
+      const capture = JSON.parse(
+        await readFile(
+          path.join(rootDir, 'task-004', 'env', 'capture.json'),
+          'utf8',
+        ),
+      ) as Record<string, unknown>;
+      const runtimeEvidence = capture.runtimeEvidence as Array<
+        Record<string, unknown>
+      >;
       const filteredScript = capture.targetScript as Record<string, unknown>;
-      const report = await readFile(path.join(rootDir, 'task-004', 'report.md'), 'utf8');
+      const report = await readFile(
+        path.join(rootDir, 'task-004', 'report.md'),
+        'utf8',
+      );
 
       assert.strictEqual(runtimeEvidence.length, 1);
       assert.strictEqual(runtimeEvidence[0].functionName, 'computeQtk9');
-      assert.strictEqual(filteredScript.url, 'https://example.com/static/checkout.js');
+      assert.strictEqual(
+        filteredScript.url,
+        'https://example.com/static/checkout.js',
+      );
       assert.ok(!JSON.stringify(capture).includes('trackHeartbeat'));
       assert.ok(!JSON.stringify(capture).includes('telemetry'));
       assert.ok(report.includes('computeQtk9'));

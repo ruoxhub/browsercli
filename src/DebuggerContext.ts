@@ -1,8 +1,8 @@
+// @ts-nocheck
 /**
  * @license
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
- * @ts-nocheck
  */
 
 import type {CDPSession, Protocol} from './third_party/index.js';

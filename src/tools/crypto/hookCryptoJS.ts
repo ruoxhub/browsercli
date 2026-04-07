@@ -3,9 +3,9 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { zod } from '../../third_party/index.js';
-import { ToolCategory } from '../categories.js';
-import { defineTool, type Context, type Response } from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
+import {defineTool, type Context, type Response} from '../ToolDefinition.js';
 
 export const hookCryptoJS = defineTool({
   name: 'hook_cryptojs',
@@ -26,7 +26,17 @@ export const hookCryptoJS = defineTool({
       .default('compact')
       .describe('日志输出格式'),
   },
-  handler: async (request: { params: { algorithms?: Array<'AES' | 'DES' | 'MD5' | 'SHA' | 'HMAC' | 'all'>; logFormat?: 'full' | 'compact' | 'json' } }, response: Response, context: Context) => {
+  handler: async (
+    request: {
+      params: {
+        algorithms?: Array<'AES' | 'DES' | 'MD5' | 'SHA' | 'HMAC' | 'all'>;
+        logFormat?: 'full' | 'compact' | 'json';
+      };
+    },
+    response: Response,
+    context: Context,
+    runtime,
+  ) => {
     const algorithms = request.params.algorithms || ['all'];
     const logFormat = request.params.logFormat || 'compact';
 
@@ -136,7 +146,9 @@ export const hookCryptoJS = defineTool({
       response.appendResponseLine('  - MD5/SHA 哈希计算');
       response.appendResponseLine('  - HMAC 消息认证码');
       response.appendResponseLine('');
-      response.appendResponseLine('输出参数：key, iv, mode, padding, ciphertext');
+      response.appendResponseLine(
+        '输出参数：key, iv, mode, padding, ciphertext',
+      );
     } catch (error) {
       response.appendResponseLine(
         `❌ 错误：${error instanceof Error ? error.message : String(error)}`,

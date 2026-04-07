@@ -156,7 +156,6 @@ async function ensureBrowserConnection() {
     const browser = runtime.browserManager.getBrowser();
     if (browser) {
       // 类型转换：绕过 puppeteer 类型不匹配问题
-      // @ts-expect-error - Internal Puppeteer type mismatch
       _networkCollector = new NetworkCollector(browser, undefined, false);
       await _networkCollector.init();
       console.log('[DAEMON] NetworkCollector initialized');
@@ -310,12 +309,11 @@ async function handleRequest(msg: DaemonMessage) {
         getNetworkRequests: (includePreserved?: boolean) => {
           const page = runtime.browserManager.getCurrentPage();
           if (!page || !_networkCollector) return [];
-          // @ts-expect-error - Internal Puppeteer type mismatch
           return _networkCollector.getData(page, includePreserved);
         },
       };
 
-      await targetTool.handler(request, response, context);
+      await targetTool.handler(request, response, context, runtime);
 
       // 构建返回结果
       const resultData: any = {};

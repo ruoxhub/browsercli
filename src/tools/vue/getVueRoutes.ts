@@ -3,9 +3,9 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { zod } from '../../third_party/index.js';
-import { ToolCategory } from '../categories.js';
-import { defineTool, type Context, type Response } from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
+import {defineTool, type Context, type Response} from '../ToolDefinition.js';
 
 export const getVueRoutes = defineTool({
   name: 'get_vue_routes',
@@ -21,14 +21,14 @@ export const getVueRoutes = defineTool({
       .optional()
       .default(true)
       .describe('是否包含子路由'),
-    maxDepth: zod
-      .number()
-      .int()
-      .optional()
-      .default(3)
-      .describe('最大递归深度'),
+    maxDepth: zod.number().int().optional().default(3).describe('最大递归深度'),
   },
-  handler: async (request: { params: { includeChildren?: boolean; maxDepth?: number } }, response: Response, context: Context) => {
+  handler: async (
+    request: {params: {includeChildren?: boolean; maxDepth?: number}},
+    response: Response,
+    context: Context,
+    runtime,
+  ) => {
     const includeChildren = request.params.includeChildren ?? true;
     const maxDepth = request.params.maxDepth ?? 3;
 
@@ -101,23 +101,27 @@ export const getVueRoutes = defineTool({
 
     try {
       const frame = context.getSelectedFrame();
-      const result = await frame.evaluate(getCode) as {
+      const result = (await frame.evaluate(getCode)) as {
         found: boolean;
         vueVersion?: string;
         routes?: any[];
-        currentRoute?: { path: string; name: string };
+        currentRoute?: {path: string; name: string};
         error?: string;
       };
 
       if (!result.found) {
         response.appendResponseLine('❌ 未检测到 Vue Router');
-        response.appendResponseLine(result.error || '此页面可能未使用 Vue 或 Vue Router');
+        response.appendResponseLine(
+          result.error || '此页面可能未使用 Vue 或 Vue Router',
+        );
         return;
       }
 
       response.appendResponseLine('✅ Vue Router 已检测到');
       response.appendResponseLine(`- Vue 版本：${result.vueVersion}`);
-      response.appendResponseLine(`- 当前路由：${result.currentRoute?.path || 'N/A'} (${result.currentRoute?.name || 'N/A'})`);
+      response.appendResponseLine(
+        `- 当前路由：${result.currentRoute?.path || 'N/A'} (${result.currentRoute?.name || 'N/A'})`,
+      );
       response.appendResponseLine('');
       response.appendResponseLine(`路由表 (${result.routes?.length || 0}):`);
       response.appendResponseLine('```json');

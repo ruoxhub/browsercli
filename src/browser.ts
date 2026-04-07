@@ -23,6 +23,7 @@ import type {
   Browser,
   ChromeReleaseChannel,
   LaunchOptions,
+  Page,
   Target,
 } from './third_party/index.js';
 import {puppeteer} from './third_party/index.js';
@@ -404,6 +405,12 @@ export interface BrowserManagerConfig {
   };
   args?: string[];
   devtools?: boolean;
+  // 新增：自动启动浏览器能力（合并自 BrowserModeManager）
+  autoLaunch?: boolean;
+  browserPath?: string;
+  remoteDebuggingPort?: number;
+  waitForBrowserTimeoutMs?: number;
+  waitForBrowserPollMs?: number;
 }
 
 /**
@@ -412,6 +419,7 @@ export interface BrowserManagerConfig {
  */
 export class BrowserManager {
   private browser?: Browser;
+  private currentPage: Page | null = null;
   private config: BrowserManagerConfig;
   private stealthInjected = false;
   private crashCheckInterval?: NodeJS.Timeout;
@@ -485,10 +493,61 @@ export class BrowserManager {
   }
 
   /**
+   * Launch browser and return instance (alias for ensureBrowser, for BrowserModeManager compatibility)
+   */
+  async launch(): Promise<Browser> {
+    return this.ensureBrowser();
+  }
+
+  /**
    * Get the current browser instance
    */
-  async getBrowser(): Promise<Browser> {
-    return this.ensureBrowser();
+  getBrowser(): Browser | null {
+    return this.browser ?? null;
+  }
+
+  /**
+   * Create a new page in the browser
+   */
+  async newPage(): Promise<Page> {
+    const browser = await this.ensureBrowser();
+    const pages = await browser.pages();
+    const page = pages.length > 0 ? pages[0] : await browser.newPage();
+    this.trackCurrentPage(page);
+    return page;
+  }
+
+  private trackCurrentPage(page: Page): void {
+    this.currentPage = page;
+    page.once('close', () => {
+      if (this.currentPage === page) {
+        this.currentPage = null;
+      }
+    });
+  }
+
+  setCurrentPage(page: Page | null): void {
+    if (!page) {
+      this.currentPage = null;
+      return;
+    }
+    this.trackCurrentPage(page);
+  }
+
+  /**
+   * Get current page (stub for compatibility - returns first page)
+   */
+  getCurrentPage(): Page | null {
+    return this.currentPage && !this.currentPage.isClosed()
+      ? this.currentPage
+      : null;
+  }
+
+  /**
+   * Check if browser is connected
+   */
+  isConnected(): boolean {
+    return this.browser?.connected ?? false;
   }
 
   /**
@@ -570,11 +629,12 @@ export class BrowserManager {
         const pages = await this.browser.pages();
         if (pages.length > 0) {
           const page = pages[0];
-          const targetId = page.target()._targetId;
+          this.trackCurrentPage(page);
+          const targetId = (page.target() as Target & {_targetId?: string})
+            ._targetId;
 
           // 使用 CDP 命令获取浏览器窗口边界
           const client = await page.createCDPSession();
-          // @ts-expect-error - CDP send returns correct type
           const {windowId, bounds} = await client.send(
             'Browser.getWindowForTarget',
             {
@@ -588,7 +648,6 @@ export class BrowserManager {
 
           // 优先使用配置的 viewport，否则使用浏览器窗口边界
           if (this.config.viewport) {
-            // @ts-expect-error - setViewport exists on puppeteer Page
             await page.setViewport({
               width: this.config.viewport.width,
               height: this.config.viewport.height,
@@ -634,6 +693,20 @@ export class BrowserManager {
       return this.browser;
     } catch (error) {
       const errorMessage = (error as Error).message;
+
+      // 如果连接失败但配置了 autoLaunch，尝试自动启动浏览器
+      if (this.config.autoLaunch) {
+        logger('Remote browser connection failed, attempting auto-launch...');
+        try {
+          await this.launchBrowserProcess();
+          // 重新尝试连接
+          return this.connectToRemoteBrowser();
+        } catch (launchError) {
+          logger('Auto-launch failed:', launchError);
+          // 抛出原始连接错误，因为 autoLaunch 只是回退方案
+          throw error;
+        }
+      }
 
       // Provide specific guidance for common connection issues
       if (errorMessage.includes('Page.enable')) {
@@ -764,6 +837,7 @@ export class BrowserManager {
       if (this.config.viewport) {
         const [page] = await this.browser.pages();
         if (page) {
+          this.trackCurrentPage(page);
           // @ts-expect-error internal API for now.
           await page.resize({
             contentWidth: this.config.viewport.width,
@@ -945,10 +1019,156 @@ export class BrowserManager {
   }
 
   /**
-   * Check if browser is connected
+   * Launch browser process with remote debugging (auto-launch capability)
    */
-  isConnected(): boolean {
-    return this.browser?.connected ?? false;
+  private async launchBrowserProcess(): Promise<void> {
+    const port = this.config.remoteDebuggingPort ?? 9222;
+    const browsers = this.detectAllBrowsers();
+
+    if (browsers.length === 0) {
+      throw new Error(
+        'Cannot find browser executable. Please specify browserPath in config.\n' +
+          'Supported browsers: Chrome, Edge',
+      );
+    }
+
+    const selectedBrowser = browsers[0];
+    logger(`Launching browser: ${selectedBrowser.path}`);
+    logger(`Remote debugging port: ${port}`);
+
+    const {spawn} = await import('node:child_process');
+    const browserProcess = spawn(
+      selectedBrowser.path,
+      [
+        `--remote-debugging-port=${port}`,
+        '--no-first-run',
+        '--no-default-browser-check',
+      ],
+      {
+        detached: true,
+        stdio: 'ignore',
+      },
+    );
+
+    browserProcess.unref();
+
+    // Wait for browser to be ready
+    await this.waitForBrowser(port);
+    logger('Browser launched successfully');
+  }
+
+  /**
+   * Wait for browser to be ready
+   */
+  private async waitForBrowser(port: number, timeout?: number): Promise<void> {
+    const startTime = Date.now();
+    const maxTimeout = timeout ?? this.config.waitForBrowserTimeoutMs ?? 5000;
+    const pollInterval = this.config.waitForBrowserPollMs ?? 500;
+
+    while (Date.now() - startTime < maxTimeout) {
+      try {
+        const response = await fetch(`http://127.0.0.1:${port}/json/version`);
+        if (response.ok) {
+          return;
+        }
+      } catch {
+        // Browser not ready yet, retry
+      }
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+    }
+    throw new Error('Browser failed to start within timeout');
+  }
+
+  /**
+   * Detect all available browsers
+   */
+  private detectAllBrowsers(): Array<{name: string; path: string}> {
+    const foundBrowsers: Array<{name: string; path: string}> = [];
+
+    // Use configured browser path if specified
+    if (this.config.browserPath) {
+      try {
+        const {existsSync} = require('node:fs');
+        if (existsSync(this.config.browserPath)) {
+          foundBrowsers.push({
+            name: 'Custom Browser',
+            path: this.config.browserPath,
+          });
+          return foundBrowsers;
+        }
+      } catch {
+        // Ignore and continue with default detection
+      }
+    }
+
+    if (process.platform !== 'win32') {
+      // Unix-like platforms
+      const unixCandidates =
+        process.platform === 'darwin'
+          ? [
+              {
+                name: 'Chrome (macOS)',
+                path: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+              },
+              {
+                name: 'Edge (macOS)',
+                path: '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+              },
+            ]
+          : [
+              {name: 'Chrome (linux)', path: '/usr/bin/google-chrome'},
+              {name: 'Chrome (linux)', path: '/usr/bin/google-chrome-stable'},
+              {name: 'Chromium (linux)', path: '/usr/bin/chromium-browser'},
+              {name: 'Chromium (linux)', path: '/usr/bin/chromium'},
+              {name: 'Edge (linux)', path: '/usr/bin/microsoft-edge'},
+            ];
+
+      const {existsSync} = require('node:fs');
+      for (const candidate of unixCandidates) {
+        if (existsSync(candidate.path)) {
+          foundBrowsers.push({name: candidate.name, path: candidate.path});
+        }
+      }
+      return foundBrowsers;
+    }
+
+    // Windows: scan common drive letters
+    const {existsSync} = require('node:fs');
+    const browserTemplates = [
+      {
+        name: 'Chrome',
+        paths: [
+          'Google\\Chrome\\Application\\chrome.exe',
+          'Program Files\\Google\\Chrome\\Application\\chrome.exe',
+          'Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+        ],
+      },
+      {
+        name: 'Edge',
+        paths: [
+          'Microsoft\\Edge\\Application\\msedge.exe',
+          'Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+          'Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+        ],
+      },
+    ];
+
+    const driveLetters = 'CDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+    for (const drive of driveLetters) {
+      for (const template of browserTemplates) {
+        for (const browserPath of template.paths) {
+          const fullPath = `${drive}:\\${browserPath}`;
+          if (existsSync(fullPath)) {
+            foundBrowsers.push({
+              name: `${template.name} (${drive}:)`,
+              path: fullPath,
+            });
+          }
+        }
+      }
+    }
+
+    return foundBrowsers;
   }
 
   /**
@@ -982,5 +1202,6 @@ export class BrowserManager {
     }
 
     this.stealthInjected = false;
+    this.currentPage = null;
   }
 }

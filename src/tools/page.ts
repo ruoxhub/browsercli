@@ -1,10 +1,14 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import {createCipheriv, createDecipheriv, createHash, randomBytes} from 'node:crypto';
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  randomBytes,
+} from 'node:crypto';
 import {readFile, writeFile} from 'node:fs/promises';
 
 import {zod} from '../third_party/index.js';
@@ -12,7 +16,6 @@ import {zod} from '../third_party/index.js';
 import {ToolCategory} from './categories.js';
 import {getJSHookRuntime} from './runtime.js';
 import {defineTool} from './ToolDefinition.js';
-
 
 interface SessionSnapshot {
   id: string;
@@ -26,8 +29,14 @@ interface SessionSnapshot {
 }
 
 const sessionSnapshots = new Map<string, SessionSnapshot>();
-const sessionTtlMs = Math.max(60_000, Number(process.env.SESSION_STATE_TTL_MS ?? 30 * 60_000));
-const cleanupIntervalMs = Math.max(15_000, Number(process.env.SESSION_STATE_CLEANUP_INTERVAL_MS ?? 5 * 60_000));
+const sessionTtlMs = Math.max(
+  60_000,
+  Number(process.env.SESSION_STATE_TTL_MS ?? 30 * 60_000),
+);
+const cleanupIntervalMs = Math.max(
+  15_000,
+  Number(process.env.SESSION_STATE_CLEANUP_INTERVAL_MS ?? 5 * 60_000),
+);
 
 let cleanupInitialized = false;
 let cleanupTimer: ReturnType<typeof setInterval> | undefined;
@@ -75,7 +84,10 @@ function encryptText(plainText: string): {
   }
   const iv = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', key, iv);
-  const encrypted = Buffer.concat([cipher.update(plainText, 'utf8'), cipher.final()]);
+  const encrypted = Buffer.concat([
+    cipher.update(plainText, 'utf8'),
+    cipher.final(),
+  ]);
   const tag = cipher.getAuthTag();
   return {
     encrypted: true,
@@ -102,28 +114,44 @@ function decryptText(payload: {
   const encrypted = Buffer.from(payload.data, 'base64');
   const decipher = createDecipheriv('aes-256-gcm', key, iv);
   decipher.setAuthTag(tag);
-  return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString('utf8');
+  return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString(
+    'utf8',
+  );
 }
 
-function normalizeSnapshot(snapshot: unknown, fallbackId?: string): SessionSnapshot {
+function normalizeSnapshot(
+  snapshot: unknown,
+  fallbackId?: string,
+): SessionSnapshot {
   if (!snapshot || typeof snapshot !== 'object') {
     throw new Error('Invalid session snapshot payload: expected object.');
   }
   const raw = snapshot as Partial<SessionSnapshot>;
-  const id = typeof raw.id === 'string' && raw.id.length > 0
-    ? raw.id
-    : (fallbackId ?? `session_${Date.now()}`);
+  const id =
+    typeof raw.id === 'string' && raw.id.length > 0
+      ? raw.id
+      : (fallbackId ?? `session_${Date.now()}`);
   return {
     id,
-    savedAt: typeof raw.savedAt === 'string' && raw.savedAt.length > 0 ? raw.savedAt : new Date().toISOString(),
-    expiresAt: typeof raw.expiresAt === 'string' && raw.expiresAt.length > 0
-      ? raw.expiresAt
-      : new Date(Date.now() + sessionTtlMs).toISOString(),
+    savedAt:
+      typeof raw.savedAt === 'string' && raw.savedAt.length > 0
+        ? raw.savedAt
+        : new Date().toISOString(),
+    expiresAt:
+      typeof raw.expiresAt === 'string' && raw.expiresAt.length > 0
+        ? raw.expiresAt
+        : new Date(Date.now() + sessionTtlMs).toISOString(),
     url: typeof raw.url === 'string' ? raw.url : '',
     title: typeof raw.title === 'string' ? raw.title : '',
     cookies: Array.isArray(raw.cookies) ? raw.cookies : [],
-    localStorage: raw.localStorage && typeof raw.localStorage === 'object' ? raw.localStorage : {},
-    sessionStorage: raw.sessionStorage && typeof raw.sessionStorage === 'object' ? raw.sessionStorage : {},
+    localStorage:
+      raw.localStorage && typeof raw.localStorage === 'object'
+        ? raw.localStorage
+        : {},
+    sessionStorage:
+      raw.sessionStorage && typeof raw.sessionStorage === 'object'
+        ? raw.sessionStorage
+        : {},
   };
 }
 
@@ -132,10 +160,9 @@ export const clickElement = defineTool({
   description: 'Click an element by selector.',
   annotations: {category: ToolCategory.NAVIGATION, readOnlyHint: false},
   schema: {selector: zod.string()},
-  handler: async (request, response) => {
+  handler: async (request, response, context, runtime) => {
     ensureCleanupLoop();
     cleanupExpiredSessions();
-    const runtime = getJSHookRuntime();
     await runtime.pageController.click(request.params.selector);
     response.appendResponseLine('Element clicked.');
   },
@@ -150,13 +177,16 @@ export const typeText = defineTool({
     text: zod.string(),
     delay: zod.number().int().nonnegative().optional(),
   },
-  handler: async (request, response) => {
+  handler: async (request, response, context, runtime) => {
     ensureCleanupLoop();
     cleanupExpiredSessions();
-    const runtime = getJSHookRuntime();
-    await runtime.pageController.type(request.params.selector, request.params.text, {
-      delay: request.params.delay,
-    });
+    await runtime.pageController.type(
+      request.params.selector,
+      request.params.text,
+      {
+        delay: request.params.delay,
+      },
+    );
     response.appendResponseLine('Text typed.');
   },
 });
@@ -169,11 +199,13 @@ export const waitForElement = defineTool({
     selector: zod.string(),
     timeout: zod.number().int().positive().optional(),
   },
-  handler: async (request, response) => {
+  handler: async (request, response, context, runtime) => {
     ensureCleanupLoop();
     cleanupExpiredSessions();
-    const runtime = getJSHookRuntime();
-    const result = await runtime.pageController.waitForSelector(request.params.selector, request.params.timeout);
+    const result = await runtime.pageController.waitForSelector(
+      request.params.selector,
+      request.params.timeout,
+    );
     response.appendResponseLine('```json');
     response.appendResponseLine(JSON.stringify(result, null, 2));
     response.appendResponseLine('```');
@@ -185,19 +217,26 @@ export const waitForElement = defineTool({
  */
 export const scrollBy = defineTool({
   name: 'scroll_by',
-  description: 'Scroll page by direction (up/down/top/bottom). Automatically waits 800ms for lazy-loaded content to load.',
+  description:
+    'Scroll page by direction (up/down/top/bottom). Automatically waits 800ms for lazy-loaded content to load.',
   annotations: {category: ToolCategory.NAVIGATION, readOnlyHint: false},
   schema: {
-    direction: zod.enum(['up', 'down', 'top', 'bottom']).describe('Scroll direction'),
-    pixels: zod.number().int().positive().optional().describe('Pixels to scroll (only for up/down, default: 1000)'),
+    direction: zod
+      .enum(['up', 'down', 'top', 'bottom'])
+      .describe('Scroll direction'),
+    pixels: zod
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Pixels to scroll (only for up/down, default: 1000)'),
   },
-  handler: async (request, response) => {
+  handler: async (request, response, context, runtime) => {
     ensureCleanupLoop();
     cleanupExpiredSessions();
-    const runtime = getJSHookRuntime();
     const result = await runtime.pageController.scrollBy(
       request.params.direction,
-      request.params.pixels
+      request.params.pixels,
     );
     response.appendResponseLine(result);
   },
@@ -208,10 +247,9 @@ export const getPerformanceMetrics = defineTool({
   description: 'Get page performance metrics from Performance API.',
   annotations: {category: ToolCategory.NAVIGATION, readOnlyHint: true},
   schema: {},
-  handler: async (_request, response) => {
+  handler: async (_request, response, context, runtime) => {
     ensureCleanupLoop();
     cleanupExpiredSessions();
-    const runtime = getJSHookRuntime();
     const metrics = await runtime.pageController.getPerformanceMetrics();
     response.appendResponseLine('```json');
     response.appendResponseLine(JSON.stringify(metrics, null, 2));
@@ -221,7 +259,8 @@ export const getPerformanceMetrics = defineTool({
 
 export const saveSessionState = defineTool({
   name: 'save_session_state',
-  description: 'Save current page session state (cookies/localStorage/sessionStorage) into in-memory snapshot.',
+  description:
+    'Save current page session state (cookies/localStorage/sessionStorage) into in-memory snapshot.',
   annotations: {category: ToolCategory.NAVIGATION, readOnlyHint: true},
   schema: {
     sessionId: zod.string().optional(),
@@ -229,15 +268,15 @@ export const saveSessionState = defineTool({
     includeLocalStorage: zod.boolean().optional(),
     includeSessionStorage: zod.boolean().optional(),
   },
-  handler: async (request, response) => {
+  handler: async (request, response, context, runtime) => {
     ensureCleanupLoop();
     cleanupExpiredSessions();
-    const runtime = getJSHookRuntime();
     const page = await runtime.pageController.getPage();
     const sessionId = request.params.sessionId ?? `session_${Date.now()}`;
     const includeCookies = request.params.includeCookies !== false;
     const includeLocalStorage = request.params.includeLocalStorage !== false;
-    const includeSessionStorage = request.params.includeSessionStorage !== false;
+    const includeSessionStorage =
+      request.params.includeSessionStorage !== false;
 
     const snapshot: SessionSnapshot = {
       id: sessionId,
@@ -246,23 +285,33 @@ export const saveSessionState = defineTool({
       url: page.url(),
       title: await page.title(),
       cookies: includeCookies ? await runtime.pageController.getCookies() : [],
-      localStorage: includeLocalStorage ? await runtime.pageController.getLocalStorage() : {},
-      sessionStorage: includeSessionStorage ? await runtime.pageController.getSessionStorage() : {},
+      localStorage: includeLocalStorage
+        ? await runtime.pageController.getLocalStorage()
+        : {},
+      sessionStorage: includeSessionStorage
+        ? await runtime.pageController.getSessionStorage()
+        : {},
     };
     sessionSnapshots.set(sessionId, snapshot);
 
     response.appendResponseLine('```json');
-    response.appendResponseLine(JSON.stringify({
-      sessionId,
-      savedAt: snapshot.savedAt,
-      url: snapshot.url,
-      title: snapshot.title,
-      counts: {
-        cookies: snapshot.cookies.length,
-        localStorage: Object.keys(snapshot.localStorage).length,
-        sessionStorage: Object.keys(snapshot.sessionStorage).length,
-      },
-    }, null, 2));
+    response.appendResponseLine(
+      JSON.stringify(
+        {
+          sessionId,
+          savedAt: snapshot.savedAt,
+          url: snapshot.url,
+          title: snapshot.title,
+          counts: {
+            cookies: snapshot.cookies.length,
+            localStorage: Object.keys(snapshot.localStorage).length,
+            sessionStorage: Object.keys(snapshot.sessionStorage).length,
+          },
+        },
+        null,
+        2,
+      ),
+    );
     response.appendResponseLine('```');
   },
 });
@@ -276,13 +325,14 @@ export const restoreSessionState = defineTool({
     navigateToSavedUrl: zod.boolean().optional(),
     clearStorageBeforeRestore: zod.boolean().optional(),
   },
-  handler: async (request, response) => {
+  handler: async (request, response, context, runtime) => {
     ensureCleanupLoop();
     cleanupExpiredSessions();
-    const runtime = getJSHookRuntime();
     const snapshot = sessionSnapshots.get(request.params.sessionId);
     if (!snapshot) {
-      throw new Error(`Session snapshot not found: ${request.params.sessionId}`);
+      throw new Error(
+        `Session snapshot not found: ${request.params.sessionId}`,
+      );
     }
 
     if (request.params.navigateToSavedUrl !== false) {
@@ -306,16 +356,22 @@ export const restoreSessionState = defineTool({
     }
 
     response.appendResponseLine('```json');
-    response.appendResponseLine(JSON.stringify({
-      sessionId: snapshot.id,
-      restoredAt: new Date().toISOString(),
-      url: snapshot.url,
-      restored: {
-        cookies: snapshot.cookies.length,
-        localStorage: Object.keys(snapshot.localStorage).length,
-        sessionStorage: Object.keys(snapshot.sessionStorage).length,
-      },
-    }, null, 2));
+    response.appendResponseLine(
+      JSON.stringify(
+        {
+          sessionId: snapshot.id,
+          restoredAt: new Date().toISOString(),
+          url: snapshot.url,
+          restored: {
+            cookies: snapshot.cookies.length,
+            localStorage: Object.keys(snapshot.localStorage).length,
+            sessionStorage: Object.keys(snapshot.sessionStorage).length,
+          },
+        },
+        null,
+        2,
+      ),
+    );
     response.appendResponseLine('```');
   },
 });
@@ -325,10 +381,10 @@ export const listSessionStates = defineTool({
   description: 'List all saved session snapshots in memory.',
   annotations: {category: ToolCategory.NAVIGATION, readOnlyHint: true},
   schema: {},
-  handler: async (_request, response) => {
+  handler: async (_request, response, context, runtime) => {
     ensureCleanupLoop();
     const removed = cleanupExpiredSessions();
-    const sessions = Array.from(sessionSnapshots.values()).map((snapshot) => ({
+    const sessions = Array.from(sessionSnapshots.values()).map(snapshot => ({
       sessionId: snapshot.id,
       savedAt: snapshot.savedAt,
       url: snapshot.url,
@@ -342,7 +398,13 @@ export const listSessionStates = defineTool({
     }));
 
     response.appendResponseLine('```json');
-    response.appendResponseLine(JSON.stringify({total: sessions.length, cleanedExpired: removed, sessions}, null, 2));
+    response.appendResponseLine(
+      JSON.stringify(
+        {total: sessions.length, cleanedExpired: removed, sessions},
+        null,
+        2,
+      ),
+    );
     response.appendResponseLine('```');
   },
 });
@@ -354,23 +416,30 @@ export const deleteSessionState = defineTool({
   schema: {
     sessionId: zod.string(),
   },
-  handler: async (request, response) => {
+  handler: async (request, response, context, runtime) => {
     ensureCleanupLoop();
     cleanupExpiredSessions();
     const deleted = sessionSnapshots.delete(request.params.sessionId);
     response.appendResponseLine('```json');
-    response.appendResponseLine(JSON.stringify({
-      sessionId: request.params.sessionId,
-      deleted,
-      remaining: sessionSnapshots.size,
-    }, null, 2));
+    response.appendResponseLine(
+      JSON.stringify(
+        {
+          sessionId: request.params.sessionId,
+          deleted,
+          remaining: sessionSnapshots.size,
+        },
+        null,
+        2,
+      ),
+    );
     response.appendResponseLine('```');
   },
 });
 
 export const dumpSessionState = defineTool({
   name: 'dump_session_state',
-  description: 'Export a saved session snapshot as JSON, optionally writing to a file.',
+  description:
+    'Export a saved session snapshot as JSON, optionally writing to a file.',
   annotations: {category: ToolCategory.NAVIGATION, readOnlyHint: true},
   schema: {
     sessionId: zod.string(),
@@ -378,17 +447,20 @@ export const dumpSessionState = defineTool({
     pretty: zod.boolean().optional(),
     encrypt: zod.boolean().optional(),
   },
-  handler: async (request, response) => {
+  handler: async (request, response, context, runtime) => {
     ensureCleanupLoop();
     cleanupExpiredSessions();
     const snapshot = sessionSnapshots.get(request.params.sessionId);
     if (!snapshot) {
-      throw new Error(`Session snapshot not found: ${request.params.sessionId}`);
+      throw new Error(
+        `Session snapshot not found: ${request.params.sessionId}`,
+      );
     }
 
     const pretty = request.params.pretty !== false;
     const rawJson = JSON.stringify(snapshot, null, pretty ? 2 : 0);
-    const encryptedPayload = request.params.encrypt === true ? encryptText(rawJson) : null;
+    const encryptedPayload =
+      request.params.encrypt === true ? encryptText(rawJson) : null;
     const json = encryptedPayload
       ? JSON.stringify(encryptedPayload, null, pretty ? 2 : 0)
       : rawJson;
@@ -397,13 +469,19 @@ export const dumpSessionState = defineTool({
     }
 
     response.appendResponseLine('```json');
-    response.appendResponseLine(JSON.stringify({
-      sessionId: snapshot.id,
-      path: request.params.path ?? null,
-      bytes: Buffer.byteLength(json, 'utf8'),
-      encrypted: request.params.encrypt === true,
-      snapshot,
-    }, null, 2));
+    response.appendResponseLine(
+      JSON.stringify(
+        {
+          sessionId: snapshot.id,
+          path: request.params.path ?? null,
+          bytes: Buffer.byteLength(json, 'utf8'),
+          encrypted: request.params.encrypt === true,
+          snapshot,
+        },
+        null,
+        2,
+      ),
+    );
     response.appendResponseLine('```');
   },
 });
@@ -418,29 +496,42 @@ export const loadSessionState = defineTool({
     snapshotJson: zod.string().optional(),
     overwrite: zod.boolean().optional(),
   },
-  handler: async (request, response) => {
+  handler: async (request, response, context, runtime) => {
     ensureCleanupLoop();
     cleanupExpiredSessions();
 
     // If only sessionId is provided, try to load from memory
-    if (!request.params.path && !request.params.snapshotJson && request.params.sessionId) {
+    if (
+      !request.params.path &&
+      !request.params.snapshotJson &&
+      request.params.sessionId
+    ) {
       const existingSnapshot = sessionSnapshots.get(request.params.sessionId);
       if (existingSnapshot) {
         response.appendResponseLine('```json');
-        response.appendResponseLine(JSON.stringify({
-          sessionId: request.params.sessionId,
-          loaded: true,
-          source: 'memory',
-          counts: {
-            cookies: existingSnapshot.cookies.length,
-            localStorage: Object.keys(existingSnapshot.localStorage).length,
-            sessionStorage: Object.keys(existingSnapshot.sessionStorage).length,
-          },
-        }, null, 2));
+        response.appendResponseLine(
+          JSON.stringify(
+            {
+              sessionId: request.params.sessionId,
+              loaded: true,
+              source: 'memory',
+              counts: {
+                cookies: existingSnapshot.cookies.length,
+                localStorage: Object.keys(existingSnapshot.localStorage).length,
+                sessionStorage: Object.keys(existingSnapshot.sessionStorage)
+                  .length,
+              },
+            },
+            null,
+            2,
+          ),
+        );
         response.appendResponseLine('```');
         return;
       }
-      throw new Error(`Session snapshot not found in memory: ${request.params.sessionId}. Provide path or snapshotJson to load from file or JSON string.`);
+      throw new Error(
+        `Session snapshot not found in memory: ${request.params.sessionId}. Provide path or snapshotJson to load from file or JSON string.`,
+      );
     }
 
     const rawJson = request.params.path
@@ -456,49 +547,57 @@ export const loadSessionState = defineTool({
     } catch {
       throw new Error('Invalid snapshot JSON content.');
     }
-    const normalizedRaw = parsed
-      && typeof parsed === 'object'
-      && (parsed as any).encrypted === true
-      && (parsed as any).algorithm === 'aes-256-gcm'
-      ? JSON.parse(decryptText(parsed as any))
-      : parsed;
+    const normalizedRaw =
+      parsed &&
+      typeof parsed === 'object' &&
+      (parsed as any).encrypted === true &&
+      (parsed as any).algorithm === 'aes-256-gcm'
+        ? JSON.parse(decryptText(parsed as any))
+        : parsed;
     const snapshot = normalizeSnapshot(normalizedRaw, request.params.sessionId);
     const targetId = request.params.sessionId ?? snapshot.id;
     const existing = sessionSnapshots.has(targetId);
     if (existing && request.params.overwrite !== true) {
-      throw new Error(`Session snapshot already exists: ${targetId}. Set overwrite=true to replace.`);
+      throw new Error(
+        `Session snapshot already exists: ${targetId}. Set overwrite=true to replace.`,
+      );
     }
 
     const normalized = normalizeSnapshot({...snapshot, id: targetId}, targetId);
     sessionSnapshots.set(targetId, normalized);
 
     response.appendResponseLine('```json');
-    response.appendResponseLine(JSON.stringify({
-      sessionId: targetId,
-      loaded: true,
-      overwritten: existing,
-      counts: {
-        cookies: normalized.cookies.length,
-        localStorage: Object.keys(normalized.localStorage).length,
-        sessionStorage: Object.keys(normalized.sessionStorage).length,
-      },
-    }, null, 2));
+    response.appendResponseLine(
+      JSON.stringify(
+        {
+          sessionId: targetId,
+          loaded: true,
+          overwritten: existing,
+          counts: {
+            cookies: normalized.cookies.length,
+            localStorage: Object.keys(normalized.localStorage).length,
+            sessionStorage: Object.keys(normalized.sessionStorage).length,
+          },
+        },
+        null,
+        2,
+      ),
+    );
     response.appendResponseLine('```');
   },
 });
 
 export const checkBrowserHealth = defineTool({
   name: 'check_browser_health',
-  description: 'Check browser connectivity and active page readiness before running reverse workflows.',
+  description:
+    'Check browser connectivity and active page readiness before running reverse workflows.',
   annotations: {category: ToolCategory.NAVIGATION, readOnlyHint: true},
   schema: {},
-  handler: async (_request, response) => {
+  handler: async (_request, response, context, runtime) => {
     ensureCleanupLoop();
     cleanupExpiredSessions();
-    const runtime = getJSHookRuntime();
     const issues: Array<{code: string; message: string}> = [];
-    const browser = runtime.browserManager.getBrowser();
-    let connected = Boolean(browser && browser.isConnected());
+    let connected = runtime.browserManager.isConnected();
     try {
       const status = await runtime.collector.getStatus();
       connected = connected || status.running;
@@ -527,7 +626,8 @@ export const checkBrowserHealth = defineTool({
     if (!connected) {
       issues.push({
         code: 'BROWSER_DISCONNECTED',
-        message: 'Browser is not connected. Use browserUrl/wsEndpoint or start remote debugging.',
+        message:
+          'Browser is not connected. Use browserUrl/wsEndpoint or start remote debugging.',
       });
     }
 
@@ -537,8 +637,12 @@ export const checkBrowserHealth = defineTool({
       pageReady,
       currentPage: {url, title},
       recommendations: [
-        !connected ? 'Start Chrome with --remote-debugging-port and reconnect MCP.' : null,
-        connected && !pageReady ? 'Open/select a target page, then retry health check.' : null,
+        !connected
+          ? 'Start Chrome with --remote-debugging-port and reconnect MCP.'
+          : null,
+        connected && !pageReady
+          ? 'Open/select a target page, then retry health check.'
+          : null,
       ].filter((item): item is string => Boolean(item)),
       issues,
     };

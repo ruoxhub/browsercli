@@ -33,8 +33,7 @@ export const emulateNetwork = defineTool({
         `The network throttling option to emulate. Set to "No emulation" to disable. Set to "Offline" to simulate offline network conditions.`,
       ),
   },
-  handler: async (request, response) => {
-    const runtime = getJSHookRuntime();
+  handler: async (request, response, context, runtime) => {
     const page = await runtime.collector.getActivePage();
     const conditions = request.params.throttlingOption;
 
@@ -85,8 +84,7 @@ export const emulateCpu = defineTool({
         'The CPU throttling rate representing the slowdown factor 1-20x. Set the rate to 1 to disable throttling',
       ),
   },
-  handler: async (request, response) => {
-    const runtime = getJSHookRuntime();
+  handler: async (request, response, context, runtime) => {
     const page = await runtime.collector.getActivePage();
     const {throttlingRate} = request.params;
 
@@ -109,8 +107,7 @@ export const resizePage = defineTool({
     width: zod.number().describe('Page width in pixels'),
     height: zod.number().describe('Page height in pixels'),
   },
-  handler: async (request, response) => {
-    const runtime = getJSHookRuntime();
+  handler: async (request, response, context, runtime) => {
     const page = await runtime.collector.getActivePage();
 
     await page.setViewport({
@@ -143,8 +140,7 @@ export const emulateMobile = defineTool({
       .optional()
       .describe('Optional device type to emulate (default: iphone)'),
   },
-  handler: async (request, response) => {
-    const runtime = getJSHookRuntime();
+  handler: async (request, response, context, runtime) => {
     const page = await runtime.collector.getActivePage();
 
     if (request.params.enable) {
