@@ -8,7 +8,43 @@
 import * as readline from 'node:readline';
 
 import {sendCommand} from '../daemon/client.js';
+import {listTools} from '../tools/index.js';
+import {getBuiltInSkillDefinitions} from '../skills/index.js';
 import {logger} from '../logger.js';
+
+const REPL_COMMANDS = ['status', 'list-skills', 'list-tools', 'help', 'exit', 'quit'];
+const SKILL_NAMES = getBuiltInSkillDefinitions().map(s => s.name);
+let TOOL_NAMES: string[] | null = null;
+
+function getToolNames(): string[] {
+  if (TOOL_NAMES) return TOOL_NAMES;
+  TOOL_NAMES = listTools().map(t => t.name);
+  return TOOL_NAMES;
+}
+
+function complete(input: string): string[] {
+  const parts = input.split(/\s+/);
+  const isLastCharSpace = input.endsWith(' ') && input.length > 0;
+
+  if (parts.length <= 1 && !isLastCharSpace) {
+    // Completing first word: commands
+    const partial = parts[0].toLowerCase();
+    return REPL_COMMANDS.filter(cmd => cmd.startsWith(partial));
+  }
+
+  if (parts.length === 2 && !isLastCharSpace) {
+    const cmd = parts[0].toLowerCase();
+    const partial = parts[1].toLowerCase();
+    if (cmd === 'skill') {
+      return SKILL_NAMES.filter(s => s.startsWith(partial));
+    }
+    if (cmd === 'tool') {
+      return getToolNames().filter(t => t.startsWith(partial));
+    }
+  }
+
+  return [];
+}
 
 function printHelp(): void {
   logger('可用命令：');
@@ -41,6 +77,13 @@ export async function replCommand(): Promise<void> {
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
+    tabSize: 2,
+    completer: complete,
+  });
+
+  rl.on('SIGINT', () => {
+    logger('');
+    prompt();
   });
 
   const prompt = () => {
