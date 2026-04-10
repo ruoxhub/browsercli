@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -10,7 +9,7 @@
 
 import chalk from 'chalk';
 
-import { safeStringify } from './safeJson.js';
+import {safeStringify} from './safeJson.js';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
@@ -18,7 +17,12 @@ class Logger {
   private level: LogLevel;
 
   // ✅ 修复：性能优化 - 使用静态常量避免重复创建数组
-  private static readonly LEVELS: LogLevel[] = ['debug', 'info', 'warn', 'error'];
+  private static readonly LEVELS: LogLevel[] = [
+    'debug',
+    'info',
+    'warn',
+    'error',
+  ];
 
   constructor(level: LogLevel = 'info') {
     this.level = level;
@@ -28,7 +32,11 @@ class Logger {
     return Logger.LEVELS.indexOf(level) >= Logger.LEVELS.indexOf(this.level);
   }
 
-  private formatMessage(level: LogLevel, message: string, ...args: unknown[]): string {
+  private formatMessage(
+    level: LogLevel,
+    message: string,
+    ...args: unknown[]
+  ): string {
     const timestamp = new Date().toISOString();
     const prefix = `[${timestamp}] [${level.toUpperCase()}]`;
     // ✅ 修复：使用 safeStringify 处理循环引用和特殊对象
@@ -85,4 +93,3 @@ function parseLogLevel(value: string | undefined): LogLevel {
 
 // 导出单例
 export const logger = new Logger(parseLogLevel(process.env.LOG_LEVEL));
-

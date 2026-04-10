@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -6,7 +5,7 @@
  */
 /**
  * 页面控制器 - 薄封装Puppeteer API
- * 
+ *
  * 设计原则:
  * - 不重复实现Puppeteer已有的功能
  * - 直接调用page.click(), page.type()等API
@@ -17,9 +16,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { logger } from '../../utils/logger.js';
+import {logger} from '../../utils/logger.js';
 
-import type { CodeCollector } from './CodeCollector.js';
+import type {CodeCollector} from './CodeCollector.js';
 
 export interface NavigationOptions {
   waitUntil?: 'load' | 'domcontentloaded' | 'networkidle0' | 'networkidle2';
@@ -42,7 +41,14 @@ export interface ScrollOptions {
 }
 
 export interface ReplayAction {
-  action: 'navigate' | 'click' | 'type' | 'wait' | 'scroll' | 'pressKey' | 'evaluate';
+  action:
+    | 'navigate'
+    | 'click'
+    | 'type'
+    | 'wait'
+    | 'scroll'
+    | 'pressKey'
+    | 'evaluate';
   url?: string;
   selector?: string;
   text?: string;
@@ -67,7 +73,10 @@ export class PageController {
   /**
    * 导航到指定URL（薄封装page.goto）
    */
-  async navigate(url: string, options?: NavigationOptions): Promise<{
+  async navigate(
+    url: string,
+    options?: NavigationOptions,
+  ): Promise<{
     url: string;
     title: string;
     loadTime: number;
@@ -150,16 +159,16 @@ export class PageController {
     const client = await page.createCDPSession();
 
     // 获取元素坐标
-    const coords = await page.evaluate((sel) => {
+    const coords = await page.evaluate(sel => {
       const el = document.querySelector(sel);
       if (!el) throw new Error(`Element not found: ${sel}`);
-      el.scrollIntoView({ block: 'center' });
+      el.scrollIntoView({block: 'center'});
       const rect = el.getBoundingClientRect();
       return {
         x: rect.x + rect.width / 2,
         y: rect.y + rect.height / 2,
         tag: el.tagName,
-        text: (el.textContent || '').slice(0, 100)
+        text: (el.textContent || '').slice(0, 100),
       };
     }, selector);
 
@@ -169,7 +178,7 @@ export class PageController {
       x: coords.x,
       y: coords.y,
       button: 'left',
-      clickCount: 1
+      clickCount: 1,
     });
 
     // 发送真实鼠标释放事件
@@ -178,7 +187,7 @@ export class PageController {
       x: coords.x,
       y: coords.y,
       button: 'left',
-      clickCount: 1
+      clickCount: 1,
     });
 
     logger.info(`Real mouse click at: ${selector} (${coords.x}, ${coords.y})`);
@@ -189,7 +198,10 @@ export class PageController {
    * 🆕 文件上传绕过对话框 — CDP DOM.setFileInputFiles
    * 直接设置 file input 的本地文件路径，完全绕过文件对话框
    */
-  async setFiles(selector: string, filePaths: string[]): Promise<{
+  async setFiles(
+    selector: string,
+    filePaths: string[],
+  ): Promise<{
     success: boolean;
     files: number;
   }> {
@@ -205,7 +217,7 @@ export class PageController {
     // 查找目标元素
     const node = await client.send('DOM.querySelector', {
       nodeId: doc.root.nodeId,
-      selector
+      selector,
     });
 
     if (!node.nodeId) {
@@ -215,17 +227,21 @@ export class PageController {
     // 设置文件
     await client.send('DOM.setFileInputFiles', {
       nodeId: node.nodeId,
-      files: filePaths
+      files: filePaths,
     });
 
     logger.info(`Set ${filePaths.length} file(s) to ${selector}`);
-    return { success: true, files: filePaths.length };
+    return {success: true, files: filePaths.length};
   }
 
   /**
    * 输入文本（薄封装page.type）
    */
-  async type(selector: string, text: string, options?: TypeOptions): Promise<void> {
+  async type(
+    selector: string,
+    text: string,
+    options?: TypeOptions,
+  ): Promise<void> {
     const page = await this.collector.getActivePage();
     await page.type(selector, text, {
       delay: options?.delay,
@@ -256,7 +272,7 @@ export class PageController {
    */
   async scroll(options: ScrollOptions): Promise<void> {
     const page = await this.collector.getActivePage();
-    await page.evaluate((opts) => {
+    await page.evaluate(opts => {
       window.scrollTo(opts.x || 0, opts.y || 0);
     }, options);
     logger.info(`Scrolled to: x=${options.x || 0}, y=${options.y || 0}`);
@@ -267,24 +283,31 @@ export class PageController {
    * @param direction 'up' | 'down' | 'top' | 'bottom'
    * @param pixels 滚动像素（仅用于 up/down）
    */
-  async scrollBy(direction: 'up' | 'down' | 'top' | 'bottom', pixels = 1000): Promise<string> {
+  async scrollBy(
+    direction: 'up' | 'down' | 'top' | 'bottom',
+    pixels = 1000,
+  ): Promise<string> {
     const page = await this.collector.getActivePage();
-    const result = await page.evaluate((dir, px) => {
-      switch (dir) {
-        case 'top':
-          window.scrollTo(0, 0);
-          return 'scrolled to top';
-        case 'bottom':
-          window.scrollTo(0, document.body.scrollHeight);
-          return 'scrolled to bottom';
-        case 'up':
-          window.scrollBy(0, -Math.abs(px));
-          return `scrolled up ${Math.abs(px)}px`;
-        case 'down':
-          window.scrollBy(0, Math.abs(px));
-          return `scrolled down ${Math.abs(px)}px`;
-      }
-    }, direction, pixels);
+    const result = await page.evaluate(
+      (dir, px) => {
+        switch (dir) {
+          case 'top':
+            window.scrollTo(0, 0);
+            return 'scrolled to top';
+          case 'bottom':
+            window.scrollTo(0, document.body.scrollHeight);
+            return 'scrolled to bottom';
+          case 'up':
+            window.scrollBy(0, -Math.abs(px));
+            return `scrolled up ${Math.abs(px)}px`;
+          case 'down':
+            window.scrollBy(0, Math.abs(px));
+            return `scrolled down ${Math.abs(px)}px`;
+        }
+      },
+      direction,
+      pixels,
+    );
 
     // 等待懒加载触发（800ms 与 web-access 一致）
     await new Promise(resolve => setTimeout(resolve, 800));
@@ -296,7 +319,10 @@ export class PageController {
   /**
    * 等待选择器出现并返回元素信息（增强版）
    */
-  async waitForSelector(selector: string, timeout?: number): Promise<{
+  async waitForSelector(
+    selector: string,
+    timeout?: number,
+  ): Promise<{
     success: boolean;
     element?: any;
     message: string;
@@ -310,7 +336,7 @@ export class PageController {
       });
 
       // 获取元素信息
-      const element = await page.evaluate((sel) => {
+      const element = await page.evaluate(sel => {
         const el = document.querySelector(sel);
         if (!el) return null;
 
@@ -319,10 +345,13 @@ export class PageController {
           id: el.id || undefined,
           className: el.className || undefined,
           textContent: el.textContent?.trim().substring(0, 100) || undefined,
-          attributes: Array.from(el.attributes).reduce((acc, attr) => {
-            acc[attr.name] = attr.value;
-            return acc;
-          }, {} as Record<string, string>),
+          attributes: Array.from(el.attributes).reduce(
+            (acc, attr) => {
+              acc[attr.name] = attr.value;
+              return acc;
+            },
+            {} as Record<string, string>,
+          ),
         };
       }, selector);
 
@@ -398,7 +427,7 @@ export class PageController {
     if (options?.path) {
       const dir = path.dirname(options.path);
       if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
+        fs.mkdirSync(dir, {recursive: true});
         logger.debug(`Screenshot directory created: ${dir}`);
       }
     }
@@ -423,14 +452,14 @@ export class PageController {
     src: string;
   } | null> {
     const page = await this.collector.getActivePage();
-    return await page.evaluate((sel) => {
+    return await page.evaluate(sel => {
       const video = document.querySelector(sel) as HTMLVideoElement;
       if (!video) return null;
       return {
         duration: video.duration,
         currentTime: video.currentTime,
         paused: video.paused,
-        src: video.src
+        src: video.src,
       };
     }, selector);
   }
@@ -440,12 +469,16 @@ export class PageController {
    */
   async seekVideo(selector: string, time: number): Promise<void> {
     const page = await this.collector.getActivePage();
-    await page.evaluate((sel, t) => {
-      const video = document.querySelector(sel) as HTMLVideoElement;
-      if (video) {
-        video.currentTime = t;
-      }
-    }, selector, time);
+    await page.evaluate(
+      (sel, t) => {
+        const video = document.querySelector(sel) as HTMLVideoElement;
+        if (video) {
+          video.currentTime = t;
+        }
+      },
+      selector,
+      time,
+    );
     logger.info(`Video seeked to ${time}s: ${selector}`);
   }
 
@@ -459,7 +492,7 @@ export class PageController {
       outputPath?: string;
       format?: 'png' | 'jpeg';
       quality?: number;
-    }
+    },
   ): Promise<Buffer | string> {
     const page = await this.collector.getActivePage();
 
@@ -471,7 +504,7 @@ export class PageController {
     }
 
     // 获取视频帧的边界框
-    const videoBox = await page.evaluate((sel) => {
+    const videoBox = await page.evaluate(sel => {
       const video = document.querySelector(sel) as HTMLVideoElement;
       if (!video) return null;
       const rect = video.getBoundingClientRect();
@@ -480,7 +513,7 @@ export class PageController {
         y: rect.y,
         width: rect.width,
         height: rect.height,
-        tagName: video.tagName
+        tagName: video.tagName,
       };
     }, selector);
 
@@ -497,11 +530,13 @@ export class PageController {
         x: Math.round(videoBox.x),
         y: Math.round(videoBox.y),
         width: Math.round(videoBox.width),
-        height: Math.round(videoBox.height)
-      }
+        height: Math.round(videoBox.height),
+      },
     });
 
-    logger.info(`Video frame captured${options?.outputPath ? `: ${options.outputPath}` : ''}`);
+    logger.info(
+      `Video frame captured${options?.outputPath ? `: ${options.outputPath}` : ''}`,
+    );
     return options?.outputPath ? options.outputPath : (buffer as Buffer);
   }
 
@@ -512,11 +547,14 @@ export class PageController {
     const page = await this.collector.getActivePage();
 
     const metrics = await page.evaluate(() => {
-      const perf = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
+      const perf = performance.getEntriesByType(
+        'navigation',
+      )[0] as PerformanceNavigationTiming;
 
-      return {
+      const result: Record<string, unknown> = {
         // 页面加载时间
-        domContentLoaded: perf.domContentLoadedEventEnd - perf.domContentLoadedEventStart,
+        domContentLoaded:
+          perf.domContentLoadedEventEnd - perf.domContentLoadedEventStart,
         loadComplete: perf.loadEventEnd - perf.loadEventStart,
 
         // 网络时间
@@ -531,6 +569,38 @@ export class PageController {
         // 资源统计
         resources: performance.getEntriesByType('resource').length,
       };
+
+      // Paint Timing
+      const paintEntries = performance.getEntriesByType('paint');
+      const fcp = paintEntries.find(e => e.name === 'first-contentful-paint');
+      if (fcp) {
+        result.firstContentfulPaint = fcp.startTime;
+      }
+
+      // Largest Contentful Paint
+      const lcpEntries = performance.getEntriesByType(
+        'largest-contentful-paint',
+      );
+      if (lcpEntries.length > 0) {
+        result.largestContentfulPaint =
+          lcpEntries[lcpEntries.length - 1].startTime;
+      }
+
+      // Cumulative Layout Shift
+      const clsEntries = performance.getEntriesByType('layout-shift') as Array<
+        PerformanceEntry & {value: number; hadRecentInput: boolean}
+      >;
+      if (clsEntries.length > 0) {
+        let clsValue = 0;
+        for (const entry of clsEntries) {
+          if (!entry.hadRecentInput) {
+            clsValue += entry.value;
+          }
+        }
+        result.cumulativeLayoutShift = clsValue;
+      }
+
+      return result;
     });
 
     logger.info('Performance metrics retrieved');
@@ -543,7 +613,7 @@ export class PageController {
   async injectScript(scriptContent: string): Promise<void> {
     const page = await this.collector.getActivePage();
 
-    await page.evaluate((script) => {
+    await page.evaluate(script => {
       const scriptElement = document.createElement('script');
       scriptElement.textContent = script;
       document.head.appendChild(scriptElement);
@@ -558,11 +628,11 @@ export class PageController {
   async injectScriptOnNewDocument(scriptContent: string): Promise<void> {
     const page = await this.collector.getActivePage();
 
-    await page.evaluateOnNewDocument((script) => {
+    await page.evaluateOnNewDocument(script => {
       // Run script directly in the new document context.
       // This avoids relying on DOM readiness (head/body may not exist yet)
       // and is more reliable than appending an inline <script> element.
-       
+
       new Function(script)();
     }, scriptContent);
 
@@ -572,16 +642,18 @@ export class PageController {
   /**
    * 🆕 设置Cookie
    */
-  async setCookies(cookies: Array<{
-    name: string;
-    value: string;
-    domain?: string;
-    path?: string;
-    expires?: number;
-    httpOnly?: boolean;
-    secure?: boolean;
-    sameSite?: 'Strict' | 'Lax' | 'None';
-  }>): Promise<void> {
+  async setCookies(
+    cookies: Array<{
+      name: string;
+      value: string;
+      domain?: string;
+      path?: string;
+      expires?: number;
+      httpOnly?: boolean;
+      secure?: boolean;
+      sameSite?: 'Strict' | 'Lax' | 'None';
+    }>,
+  ): Promise<void> {
     const page = await this.collector.getActivePage();
     await page.setCookie(...cookies);
     logger.info(`Set ${cookies.length} cookies`);
@@ -612,28 +684,33 @@ export class PageController {
    */
   async setViewport(width: number, height: number): Promise<void> {
     const page = await this.collector.getActivePage();
-    await page.setViewport({ width, height });
+    await page.setViewport({width, height});
     logger.info(`Viewport set to ${width}x${height}`);
   }
 
   /**
    * 🆕 模拟设备
    */
-  async emulateDevice(deviceName: 'iPhone' | 'iPad' | 'Android'): Promise<void> {
+  async emulateDevice(
+    deviceName: 'iPhone' | 'iPad' | 'Android',
+  ): Promise<void> {
     const page = await this.collector.getActivePage();
 
     const devices = {
       iPhone: {
-        viewport: { width: 375, height: 812, isMobile: true },
-        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15',
+        viewport: {width: 375, height: 812, isMobile: true},
+        userAgent:
+          'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15',
       },
       iPad: {
-        viewport: { width: 768, height: 1024, isMobile: true },
-        userAgent: 'Mozilla/5.0 (iPad; CPU OS 14_0 like Mac OS X) AppleWebKit/605.1.15',
+        viewport: {width: 768, height: 1024, isMobile: true},
+        userAgent:
+          'Mozilla/5.0 (iPad; CPU OS 14_0 like Mac OS X) AppleWebKit/605.1.15',
       },
       Android: {
-        viewport: { width: 360, height: 640, isMobile: true },
-        userAgent: 'Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 Chrome/91.0.4472.120',
+        viewport: {width: 360, height: 640, isMobile: true},
+        userAgent:
+          'Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 Chrome/91.0.4472.120',
       },
     };
 
@@ -649,7 +726,7 @@ export class PageController {
    */
   async waitForNetworkIdle(timeout = 30000): Promise<void> {
     const page = await this.collector.getActivePage();
-    await page.waitForNetworkIdle({ timeout });
+    await page.waitForNetworkIdle({timeout});
     logger.info('Network is idle');
   }
 
@@ -680,9 +757,13 @@ export class PageController {
   async setLocalStorage(key: string, value: string): Promise<void> {
     const page = await this.collector.getActivePage();
 
-    await page.evaluate((k, v) => {
-      localStorage.setItem(k, v);
-    }, key, value);
+    await page.evaluate(
+      (k, v) => {
+        localStorage.setItem(k, v);
+      },
+      key,
+      value,
+    );
 
     logger.info(`Set localStorage: ${key}`);
   }
@@ -715,7 +796,9 @@ export class PageController {
       }
       return items;
     });
-    logger.info(`Retrieved ${Object.keys(storage).length} sessionStorage items`);
+    logger.info(
+      `Retrieved ${Object.keys(storage).length} sessionStorage items`,
+    );
     return storage;
   }
 
@@ -724,9 +807,13 @@ export class PageController {
    */
   async setSessionStorage(key: string, value: string): Promise<void> {
     const page = await this.collector.getActivePage();
-    await page.evaluate((k, v) => {
-      sessionStorage.setItem(k, v);
-    }, key, value);
+    await page.evaluate(
+      (k, v) => {
+        sessionStorage.setItem(k, v);
+      },
+      key,
+      value,
+    );
     logger.info(`Set sessionStorage: ${key}`);
   }
 
@@ -768,12 +855,12 @@ export class PageController {
   /**
    * 🆕 获取页面所有链接
    */
-  async getAllLinks(): Promise<Array<{ text: string; href: string }>> {
+  async getAllLinks(): Promise<Array<{text: string; href: string}>> {
     const page = await this.collector.getActivePage();
 
     const links = await page.evaluate(() => {
       const anchors = document.querySelectorAll('a[href]');
-      const result: Array<{ text: string; href: string }> = [];
+      const result: Array<{text: string; href: string}> = [];
 
       for (let i = 0; i < anchors.length; i++) {
         const anchor = anchors[i] as HTMLAnchorElement;
@@ -800,8 +887,17 @@ export class PageController {
   /**
    * 执行交互回放，用于在采样前自动触发关键动作。
    */
-  async replayActions(actions: ReplayAction[]): Promise<Array<{index: number; action: string; success: boolean; message: string}>> {
-    const results: Array<{index: number; action: string; success: boolean; message: string}> = [];
+  async replayActions(
+    actions: ReplayAction[],
+  ): Promise<
+    Array<{index: number; action: string; success: boolean; message: string}>
+  > {
+    const results: Array<{
+      index: number;
+      action: string;
+      success: boolean;
+      message: string;
+    }> = [];
     for (let index = 0; index < actions.length; index += 1) {
       const item = actions[index];
       try {
@@ -822,7 +918,9 @@ export class PageController {
             if (!item.selector) {
               throw new Error('type action requires selector');
             }
-            await this.type(item.selector, item.text ?? '', {delay: item.delay});
+            await this.type(item.selector, item.text ?? '', {
+              delay: item.delay,
+            });
             break;
           case 'wait':
             if (!item.selector) {
@@ -846,9 +944,16 @@ export class PageController {
             await this.evaluate(item.code);
             break;
           default:
-            throw new Error(`Unsupported action: ${(item as {action?: string}).action ?? 'unknown'}`);
+            throw new Error(
+              `Unsupported action: ${(item as {action?: string}).action ?? 'unknown'}`,
+            );
         }
-        results.push({index, action: item.action, success: true, message: 'ok'});
+        results.push({
+          index,
+          action: item.action,
+          success: true,
+          message: 'ok',
+        });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         results.push({index, action: item.action, success: false, message});

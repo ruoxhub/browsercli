@@ -49,6 +49,7 @@ export const listConsoleMessages = defineTool({
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
+    title: 'List console messages',
   },
   schema: {
     pageSize: zod
@@ -97,6 +98,7 @@ export const getConsoleMessage = defineTool({
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
+    title: 'Get console message by index',
   },
   schema: {
     msgid: zod

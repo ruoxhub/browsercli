@@ -1,10 +1,8 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import {execSync} from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -53,23 +51,4 @@ export function isDaemonRunning(pid?: number | null): boolean {
   }
 
   return false;
-}
-
-export function serializeArgs(
-  options: Record<string, any>,
-  argv: Record<string, any>,
-): string[] {
-  const args: string[] = [];
-  for (const [name, opt] of Object.entries(options)) {
-    const value = argv[name];
-    if (value === undefined) continue;
-    if (opt.type === 'boolean') {
-      if (value) args.push(`--${name}`);
-    } else if (Array.isArray(value)) {
-      for (const v of value) args.push(`--${name}=${v}`);
-    } else {
-      args.push(`--${name}=${value}`);
-    }
-  }
-  return args;
 }

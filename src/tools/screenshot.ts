@@ -17,6 +17,7 @@ export const screenshot = defineTool({
     category: ToolCategory.DEBUGGING,
     // Not read-only due to filePath param.
     readOnlyHint: false,
+    title: 'Take screenshot',
   },
   schema: {
     format: zod
@@ -90,16 +91,20 @@ export const screenshot = defineTool({
  */
 export const getVideoInfo = defineTool({
   name: 'get_video_info',
-  description: 'Get HTMLVideoElement info including duration, currentTime, paused state, and src.',
+  description:
+    'Get HTMLVideoElement info including duration, currentTime, paused state, and src.',
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
+    title: 'Get video info',
   },
   schema: {
     selector: zod.string().describe('CSS selector of the video element'),
   },
   handler: async (request, response, context, runtime) => {
-    const info = await runtime.pageController.getVideoInfo(request.params.selector);
+    const info = await runtime.pageController.getVideoInfo(
+      request.params.selector,
+    );
 
     response.appendResponseLine('```json');
     response.appendResponseLine(JSON.stringify(info, null, 2));
@@ -116,13 +121,17 @@ export const seekVideo = defineTool({
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: false,
+    title: 'Seek video',
   },
   schema: {
     selector: zod.string().describe('CSS selector of the video element'),
     time: zod.number().nonnegative().describe('Time in seconds to seek to'),
   },
   handler: async (request, response, context, runtime) => {
-    await runtime.pageController.seekVideo(request.params.selector, request.params.time);
+    await runtime.pageController.seekVideo(
+      request.params.selector,
+      request.params.time,
+    );
     response.appendResponseLine(`Video seeked to ${request.params.time}s`);
   },
 });
@@ -132,17 +141,31 @@ export const seekVideo = defineTool({
  */
 export const captureVideoFrame = defineTool({
   name: 'capture_video_frame',
-  description: 'Capture a specific frame from a video element. Can seek to a specific time before capturing.',
+  description:
+    'Capture a specific frame from a video element. Can seek to a specific time before capturing.',
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
+    title: 'Capture video frame',
   },
   schema: {
     selector: zod.string().describe('CSS selector of the video element'),
-    seekTime: zod.number().nonnegative().optional().describe('Time in seconds to seek before capturing'),
-    outputPath: zod.string().optional().describe('Output file path (optional, returns buffer if not specified)'),
+    seekTime: zod
+      .number()
+      .nonnegative()
+      .optional()
+      .describe('Time in seconds to seek before capturing'),
+    outputPath: zod
+      .string()
+      .optional()
+      .describe('Output file path (optional, returns buffer if not specified)'),
     format: zod.enum(['png', 'jpeg']).optional().default('png'),
-    quality: zod.number().min(0).max(100).optional().describe('Image quality for JPEG (0-100)'),
+    quality: zod
+      .number()
+      .min(0)
+      .max(100)
+      .optional()
+      .describe('Image quality for JPEG (0-100)'),
   },
   handler: async (request, response, context, runtime) => {
     const result = await runtime.pageController.captureVideoFrame(
@@ -152,7 +175,7 @@ export const captureVideoFrame = defineTool({
         outputPath: request.params.outputPath,
         format: request.params.format,
         quality: request.params.quality,
-      }
+      },
     );
 
     if (typeof result === 'string') {

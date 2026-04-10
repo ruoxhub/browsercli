@@ -56,7 +56,10 @@ export function parseCommand(input: string): {command: string; args: string[]} {
 /**
  * 解析技能参数
  */
-export function parseSkillArgs(args: string[]): {url?: string; options: Record<string, unknown>} {
+export function parseSkillArgs(args: string[]): {
+  url?: string;
+  options: Record<string, unknown>;
+} {
   const result: {url?: string; options: Record<string, unknown>} = {
     options: {},
   };
@@ -113,7 +116,11 @@ export async function executeCommand(input: string): Promise<string> {
       if (response.success && response.result) {
         try {
           const data = JSON.parse(response.result);
-          if (typeof data !== 'object' || data === null || typeof data.pid !== 'number') {
+          if (
+            typeof data !== 'object' ||
+            data === null ||
+            typeof data.pid !== 'number'
+          ) {
             return '❌ 响应格式异常';
           }
           return `✅ Daemon 运行中
@@ -135,7 +142,11 @@ export async function executeCommand(input: string): Promise<string> {
       if (response.success && response.result) {
         try {
           const parsed = JSON.parse(response.result);
-          if (typeof parsed !== 'object' || parsed === null || !Array.isArray(parsed.skills)) {
+          if (
+            typeof parsed !== 'object' ||
+            parsed === null ||
+            !Array.isArray(parsed.skills)
+          ) {
             return '❌ 响应格式异常';
           }
           const {skills} = parsed;
@@ -256,7 +267,8 @@ export async function startRepl(): Promise<void> {
         console.log(result);
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       console.error(`❌ 错误：${errorMessage}`);
     }
 

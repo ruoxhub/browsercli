@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -6,24 +5,24 @@
  */
 /**
  * DOM检查器 - 薄封装CDP DOM域
- * 
+ *
  * 功能:
  * - 查询DOM元素（querySelector, querySelectorAll）
  * - 获取元素属性和位置
  * - 获取页面DOM结构
  * - 查找可点击元素
- * 
+ *
  * 设计原则:
  * - 薄封装CDP DOM域API
  * - 依赖CodeCollector获取Page实例
  * - 解决"AI点击前需要先知道元素存在"的问题
  */
 
-import type { CDPSession } from 'puppeteer';
+import type {CDPSession} from 'puppeteer';
 
-import { logger } from '../../utils/logger.js';
+import {logger} from '../../utils/logger.js';
 
-import type { CodeCollector } from './CodeCollector.js';
+import type {CodeCollector} from './CodeCollector.js';
 
 export interface ElementInfo {
   found: boolean;
@@ -61,15 +60,18 @@ export class DOMInspector {
   /**
    * 查询单个元素（类似document.querySelector）
    */
-  async querySelector(selector: string, _getAttributes = true): Promise<ElementInfo> {
+  async querySelector(
+    selector: string,
+    _getAttributes = true,
+  ): Promise<ElementInfo> {
     try {
       const page = await this.collector.getActivePage();
 
       // 使用page.evaluate查询元素（更简单可靠）
-      const elementInfo = await page.evaluate((sel) => {
+      const elementInfo = await page.evaluate(sel => {
         const element = document.querySelector(sel);
         if (!element) {
-          return { found: false };
+          return {found: false};
         }
 
         // 获取元素属性
@@ -93,9 +95,10 @@ export class DOMInspector {
 
         // 检查可见性
         const style = window.getComputedStyle(element);
-        const visible = style.display !== 'none' && 
-                       style.visibility !== 'hidden' && 
-                       style.opacity !== '0';
+        const visible =
+          style.display !== 'none' &&
+          style.visibility !== 'hidden' &&
+          style.opacity !== '0';
 
         return {
           found: true,
@@ -107,11 +110,13 @@ export class DOMInspector {
         };
       }, selector);
 
-      logger.info(`querySelector: ${selector} - ${elementInfo.found ? 'found' : 'not found'}`);
+      logger.info(
+        `querySelector: ${selector} - ${elementInfo.found ? 'found' : 'not found'}`,
+      );
       return elementInfo;
     } catch (error) {
       logger.error(`querySelector failed for ${selector}:`, error);
-      return { found: false };
+      return {found: false};
     }
   }
 
@@ -127,59 +132,69 @@ export class DOMInspector {
     try {
       const page = await this.collector.getActivePage();
 
-      const elements = await page.evaluate((sel, maxLimit) => {
-        const nodeList = document.querySelectorAll(sel);
+      const elements = await page.evaluate(
+        (sel, maxLimit) => {
+          const nodeList = document.querySelectorAll(sel);
 
-        // 🔧 如果超过限制，输出警告
-        if (nodeList.length > maxLimit) {
-          console.warn(`[DOMInspector] Found ${nodeList.length} elements for "${sel}", limiting to ${maxLimit}`);
-        }
-
-        const results: any[] = [];
-
-        for (let i = 0; i < Math.min(nodeList.length, maxLimit); i++) {
-          const element = nodeList[i];
-          if (!element) continue;
-
-          const attributes: Record<string, string> = {};
-          const attrs = element.attributes;
-          for (let j = 0; j < attrs.length; j++) {
-            const attr = attrs[j];
-            if (attr) {
-              attributes[attr.name] = attr.value;
-            }
+          // 🔧 如果超过限制，输出警告
+          if (nodeList.length > maxLimit) {
+            console.warn(
+              `[DOMInspector] Found ${nodeList.length} elements for "${sel}", limiting to ${maxLimit}`,
+            );
           }
 
-          const rect = element.getBoundingClientRect();
-          const style = window.getComputedStyle(element);
+          const results: any[] = [];
 
-          // 🔧 限制 textContent 长度，防止单个元素文本过长
-          const textContent = element.textContent?.trim() || '';
-          const truncatedText = textContent.length > 500
-            ? textContent.substring(0, 500) + '...[truncated]'
-            : textContent;
+          for (let i = 0; i < Math.min(nodeList.length, maxLimit); i++) {
+            const element = nodeList[i];
+            if (!element) continue;
 
-          results.push({
-            found: true,
-            nodeName: element.nodeName,
-            attributes,
-            textContent: truncatedText,
-            boundingBox: {
-              x: rect.x,
-              y: rect.y,
-              width: rect.width,
-              height: rect.height,
-            },
-            visible: style.display !== 'none' &&
-                    style.visibility !== 'hidden' &&
-                    style.opacity !== '0',
-          });
-        }
+            const attributes: Record<string, string> = {};
+            const attrs = element.attributes;
+            for (let j = 0; j < attrs.length; j++) {
+              const attr = attrs[j];
+              if (attr) {
+                attributes[attr.name] = attr.value;
+              }
+            }
 
-        return results;
-      }, selector, limit);
+            const rect = element.getBoundingClientRect();
+            const style = window.getComputedStyle(element);
 
-      logger.info(`querySelectorAll: ${selector} - found ${elements.length} elements (limit: ${limit})`);
+            // 🔧 限制 textContent 长度，防止单个元素文本过长
+            const textContent = element.textContent?.trim() || '';
+            const truncatedText =
+              textContent.length > 500
+                ? textContent.substring(0, 500) + '...[truncated]'
+                : textContent;
+
+            results.push({
+              found: true,
+              nodeName: element.nodeName,
+              attributes,
+              textContent: truncatedText,
+              boundingBox: {
+                x: rect.x,
+                y: rect.y,
+                width: rect.width,
+                height: rect.height,
+              },
+              visible:
+                style.display !== 'none' &&
+                style.visibility !== 'hidden' &&
+                style.opacity !== '0',
+            });
+          }
+
+          return results;
+        },
+        selector,
+        limit,
+      );
+
+      logger.info(
+        `querySelectorAll: ${selector} - found ${elements.length} elements (limit: ${limit})`,
+      );
       return elements;
     } catch (error) {
       logger.error(`querySelectorAll failed for ${selector}:`, error);
@@ -194,46 +209,50 @@ export class DOMInspector {
     try {
       const page = await this.collector.getActivePage();
 
-      const structure = await page.evaluate((depth, withText) => {
-        function buildTree(node: Element, currentDepth: number): any {
-          if (currentDepth > depth) {
-            return null;
-          }
-
-          const result: any = {
-            tag: node.tagName,
-            id: node.id || undefined,
-            class: node.className || undefined,
-          };
-
-          if (withText && node.childNodes.length === 1) {
-            const firstChild = node.childNodes[0];
-            if (firstChild && firstChild.nodeType === 3) {
-              result.text = node.textContent?.trim();
+      const structure = await page.evaluate(
+        (depth, withText) => {
+          function buildTree(node: Element, currentDepth: number): any {
+            if (currentDepth > depth) {
+              return null;
             }
-          }
 
-          const children: any[] = [];
-          const childElements = node.children;
-          for (let i = 0; i < childElements.length; i++) {
-            const child = childElements[i];
-            if (child) {
-              const childTree = buildTree(child, currentDepth + 1);
-              if (childTree) {
-                children.push(childTree);
+            const result: any = {
+              tag: node.tagName,
+              id: node.id || undefined,
+              class: node.className || undefined,
+            };
+
+            if (withText && node.childNodes.length === 1) {
+              const firstChild = node.childNodes[0];
+              if (firstChild && firstChild.nodeType === 3) {
+                result.text = node.textContent?.trim();
               }
             }
+
+            const children: any[] = [];
+            const childElements = node.children;
+            for (let i = 0; i < childElements.length; i++) {
+              const child = childElements[i];
+              if (child) {
+                const childTree = buildTree(child, currentDepth + 1);
+                if (childTree) {
+                  children.push(childTree);
+                }
+              }
+            }
+
+            if (children.length > 0) {
+              result.children = children;
+            }
+
+            return result;
           }
 
-          if (children.length > 0) {
-            result.children = children;
-          }
-
-          return result;
-        }
-
-        return buildTree(document.body, 0);
-      }, maxDepth, includeText);
+          return buildTree(document.body, 0);
+        },
+        maxDepth,
+        includeText,
+      );
 
       logger.info('DOM structure retrieved');
       return structure;
@@ -250,23 +269,28 @@ export class DOMInspector {
     try {
       const page = await this.collector.getActivePage();
 
-      const clickableElements = await page.evaluate((filter) => {
+      const clickableElements = await page.evaluate(filter => {
         const results: any[] = [];
 
         // 查找按钮
-        const buttons = document.querySelectorAll('button, input[type="button"], input[type="submit"]');
-        buttons.forEach((btn) => {
-          const text = btn.textContent?.trim() || (btn as HTMLInputElement).value || '';
+        const buttons = document.querySelectorAll(
+          'button, input[type="button"], input[type="submit"]',
+        );
+        buttons.forEach(btn => {
+          const text =
+            btn.textContent?.trim() || (btn as HTMLInputElement).value || '';
           if (filter && !text.toLowerCase().includes(filter.toLowerCase())) {
             return;
           }
 
           const rect = btn.getBoundingClientRect();
           const style = window.getComputedStyle(btn);
-          const visible = style.display !== 'none' && 
-                         style.visibility !== 'hidden' && 
-                         style.opacity !== '0' &&
-                         rect.width > 0 && rect.height > 0;
+          const visible =
+            style.display !== 'none' &&
+            style.visibility !== 'hidden' &&
+            style.opacity !== '0' &&
+            rect.width > 0 &&
+            rect.height > 0;
 
           // 生成选择器
           let selector = btn.tagName.toLowerCase();
@@ -292,7 +316,7 @@ export class DOMInspector {
 
         // 查找链接
         const links = document.querySelectorAll('a[href]');
-        links.forEach((link) => {
+        links.forEach(link => {
           const text = link.textContent?.trim() || '';
           if (filter && !text.toLowerCase().includes(filter.toLowerCase())) {
             return;
@@ -300,10 +324,12 @@ export class DOMInspector {
 
           const rect = link.getBoundingClientRect();
           const style = window.getComputedStyle(link);
-          const visible = style.display !== 'none' && 
-                         style.visibility !== 'hidden' && 
-                         style.opacity !== '0' &&
-                         rect.width > 0 && rect.height > 0;
+          const visible =
+            style.display !== 'none' &&
+            style.visibility !== 'hidden' &&
+            style.opacity !== '0' &&
+            rect.width > 0 &&
+            rect.height > 0;
 
           let selector = 'a';
           if (link.id) {
@@ -329,7 +355,9 @@ export class DOMInspector {
         return results;
       }, filterText);
 
-      logger.info(`findClickable: found ${clickableElements.length} elements${filterText ? ` (filtered by: ${filterText})` : ''}`);
+      logger.info(
+        `findClickable: found ${clickableElements.length} elements${filterText ? ` (filtered by: ${filterText})` : ''}`,
+      );
       return clickableElements;
     } catch (error) {
       logger.error('findClickable failed:', error);
@@ -340,11 +368,13 @@ export class DOMInspector {
   /**
    * 🆕 获取元素的计算样式
    */
-  async getComputedStyle(selector: string): Promise<Record<string, string> | null> {
+  async getComputedStyle(
+    selector: string,
+  ): Promise<Record<string, string> | null> {
     try {
       const page = await this.collector.getActivePage();
 
-      const styles = await page.evaluate((sel) => {
+      const styles = await page.evaluate(sel => {
         const element = document.querySelector(sel);
         if (!element) {
           return null;
@@ -355,10 +385,25 @@ export class DOMInspector {
 
         // 获取常用样式属性
         const importantProps = [
-          'display', 'visibility', 'opacity', 'position', 'z-index',
-          'width', 'height', 'top', 'left', 'right', 'bottom',
-          'color', 'background-color', 'font-size', 'font-family',
-          'border', 'padding', 'margin', 'overflow',
+          'display',
+          'visibility',
+          'opacity',
+          'position',
+          'z-index',
+          'width',
+          'height',
+          'top',
+          'left',
+          'right',
+          'bottom',
+          'color',
+          'background-color',
+          'font-size',
+          'font-family',
+          'border',
+          'padding',
+          'margin',
+          'overflow',
         ];
 
         for (const prop of importantProps) {
@@ -368,7 +413,9 @@ export class DOMInspector {
         return result;
       }, selector);
 
-      logger.info(`getComputedStyle: ${selector} - ${styles ? 'found' : 'not found'}`);
+      logger.info(
+        `getComputedStyle: ${selector} - ${styles ? 'found' : 'not found'}`,
+      );
       return styles;
     } catch (error) {
       logger.error(`getComputedStyle failed for ${selector}:`, error);
@@ -379,12 +426,15 @@ export class DOMInspector {
   /**
    * 🆕 等待元素出现（动态DOM监控）
    */
-  async waitForElement(selector: string, timeout = 30000): Promise<ElementInfo | null> {
+  async waitForElement(
+    selector: string,
+    timeout = 30000,
+  ): Promise<ElementInfo | null> {
     try {
       const page = await this.collector.getActivePage();
 
       // 等待元素出现
-      await page.waitForSelector(selector, { timeout });
+      await page.waitForSelector(selector, {timeout});
 
       // 获取元素信息
       return await this.querySelector(selector);
@@ -397,16 +447,18 @@ export class DOMInspector {
   /**
    * 🆕 监听DOM变化（MutationObserver）
    */
-  async observeDOMChanges(options: {
-    selector?: string;
-    childList?: boolean;
-    attributes?: boolean;
-    characterData?: boolean;
-    subtree?: boolean;
-  } = {}): Promise<void> {
+  async observeDOMChanges(
+    options: {
+      selector?: string;
+      childList?: boolean;
+      attributes?: boolean;
+      characterData?: boolean;
+      subtree?: boolean;
+    } = {},
+  ): Promise<void> {
     const page = await this.collector.getActivePage();
 
-    await page.evaluate((opts) => {
+    await page.evaluate(opts => {
       const targetNode = opts.selector
         ? document.querySelector(opts.selector)
         : document.body;
@@ -416,8 +468,8 @@ export class DOMInspector {
         return;
       }
 
-      const observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
+      const observer = new MutationObserver(mutations => {
+        mutations.forEach(mutation => {
           console.log('[DOM Change]', {
             type: mutation.type,
             target: mutation.target,
@@ -466,65 +518,73 @@ export class DOMInspector {
     try {
       const page = await this.collector.getActivePage();
 
-      const elements = await page.evaluate((searchText, tagName) => {
-        // 转义 XPath 中的引号，防止注入
-        const escapeXPathString = (str: string): string => {
-          if (!str.includes('"')) return `"${str}"`;
-          if (!str.includes("'")) return `'${str}'`;
-          // 同时包含单双引号时，使用 concat 拼接
-          return `concat(${str.split('"').map((part, i) => i === 0 ? `"${part}"` : `'"',"${part}"`).join(',')})`;
-        };
-        const escaped = escapeXPathString(searchText);
-        const xpath = tagName
-          ? `//${tagName}[contains(text(), ${escaped})]`
-          : `//*[contains(text(), ${escaped})]`;
+      const elements = await page.evaluate(
+        (searchText, tagName) => {
+          // 转义 XPath 中的引号，防止注入
+          const escapeXPathString = (str: string): string => {
+            if (!str.includes('"')) return `"${str}"`;
+            if (!str.includes("'")) return `'${str}'`;
+            // 同时包含单双引号时，使用 concat 拼接
+            return `concat(${str
+              .split('"')
+              .map((part, i) => (i === 0 ? `"${part}"` : `'"',"${part}"`))
+              .join(',')})`;
+          };
+          const escaped = escapeXPathString(searchText);
+          const xpath = tagName
+            ? `//${tagName}[contains(text(), ${escaped})]`
+            : `//*[contains(text(), ${escaped})]`;
 
-        const result = document.evaluate(
-          xpath,
-          document,
-          null,
-          XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
-          null
-        );
+          const result = document.evaluate(
+            xpath,
+            document,
+            null,
+            XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
+            null,
+          );
 
-        const elements: any[] = [];
-        for (let i = 0; i < Math.min(result.snapshotLength, 100); i++) {
-          const element = result.snapshotItem(i) as Element;
-          if (!element) continue;
+          const elements: any[] = [];
+          for (let i = 0; i < Math.min(result.snapshotLength, 100); i++) {
+            const element = result.snapshotItem(i) as Element;
+            if (!element) continue;
 
-          const rect = element.getBoundingClientRect();
-          const style = window.getComputedStyle(element);
+            const rect = element.getBoundingClientRect();
+            const style = window.getComputedStyle(element);
 
-          // 生成选择器
-          let selector = element.tagName.toLowerCase();
-          if (element.id) {
-            selector = `#${element.id}`;
-          } else if (element.className) {
-            const classes = element.className.split(' ').filter(c => c);
-            if (classes.length > 0) {
-              selector = `${element.tagName.toLowerCase()}.${classes[0]}`;
+            // 生成选择器
+            let selector = element.tagName.toLowerCase();
+            if (element.id) {
+              selector = `#${element.id}`;
+            } else if (element.className) {
+              const classes = element.className.split(' ').filter(c => c);
+              if (classes.length > 0) {
+                selector = `${element.tagName.toLowerCase()}.${classes[0]}`;
+              }
             }
+
+            elements.push({
+              found: true,
+              nodeName: element.tagName,
+              textContent: element.textContent?.trim(),
+              selector,
+              boundingBox: {
+                x: rect.x,
+                y: rect.y,
+                width: rect.width,
+                height: rect.height,
+              },
+              visible:
+                style.display !== 'none' &&
+                style.visibility !== 'hidden' &&
+                style.opacity !== '0',
+            });
           }
 
-          elements.push({
-            found: true,
-            nodeName: element.tagName,
-            textContent: element.textContent?.trim(),
-            selector,
-            boundingBox: {
-              x: rect.x,
-              y: rect.y,
-              width: rect.width,
-              height: rect.height,
-            },
-            visible: style.display !== 'none' &&
-                    style.visibility !== 'hidden' &&
-                    style.opacity !== '0',
-          });
-        }
-
-        return elements;
-      }, text, tag);
+          return elements;
+        },
+        text,
+        tag,
+      );
 
       logger.info(`findByText: "${text}" - found ${elements.length} elements`);
       return elements;
@@ -541,7 +601,7 @@ export class DOMInspector {
     try {
       const page = await this.collector.getActivePage();
 
-      const xpath = await page.evaluate((sel) => {
+      const xpath = await page.evaluate(sel => {
         const element = document.querySelector(sel);
         if (!element) {
           return null;
@@ -596,7 +656,7 @@ export class DOMInspector {
     try {
       const page = await this.collector.getActivePage();
 
-      const inViewport = await page.evaluate((sel) => {
+      const inViewport = await page.evaluate(sel => {
         const element = document.querySelector(sel);
         if (!element) {
           return false;
@@ -606,8 +666,10 @@ export class DOMInspector {
         return (
           rect.top >= 0 &&
           rect.left >= 0 &&
-          rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
-          rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+          rect.bottom <=
+            (window.innerHeight || document.documentElement.clientHeight) &&
+          rect.right <=
+            (window.innerWidth || document.documentElement.clientWidth)
         );
       }, selector);
 
@@ -630,4 +692,3 @@ export class DOMInspector {
     }
   }
 }
-

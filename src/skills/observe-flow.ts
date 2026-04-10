@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { logger } from '../utils/logger.js';
+import {logger} from '../utils/logger.js';
 
-import type { SkillContext, SkillResult } from './SkillRunner.js';
-import { SkillRegistry } from './SkillRunner.js';
+import type {SkillContext, SkillResult} from './SkillRunner.js';
+import {SkillRegistry} from './SkillRunner.js';
 
 /**
  * 观察模式技能配置
@@ -74,9 +74,9 @@ export interface ScriptAnalysis {
  */
 export interface DependencyInfo {
   /** 节点列表 */
-  nodes: Array<{ id: string; url: string; type: string }>;
+  nodes: Array<{id: string; url: string; type: string}>;
   /** 边列表 */
-  edges: Array<{ from: string; to: string; type: string }>;
+  edges: Array<{from: string; to: string; type: string}>;
   /** 入口文件列表 */
   entryPoints: string[];
   /** 第三方库列表 */
@@ -162,15 +162,28 @@ async function observeFlowSkill(context: SkillContext): Promise<SkillResult> {
 
     // 4. 检测加密算法
     const cryptoDetection = detectCryptoPatterns(collectResult.files);
-    logger.info(`Crypto detection: ${cryptoDetection.algorithms.length} algorithms found`);
+    logger.info(
+      `Crypto detection: ${cryptoDetection.algorithms.length} algorithms found`,
+    );
 
     // 5. 检测混淆代码
-    const obfuscationDetection = detectObfuscationPatterns(collectResult.files, scriptAnalysis);
-    logger.info(`Obfuscation detection: ${obfuscationDetection.types.length} types found`);
+    const obfuscationDetection = detectObfuscationPatterns(
+      collectResult.files,
+      scriptAnalysis,
+    );
+    logger.info(
+      `Obfuscation detection: ${obfuscationDetection.types.length} types found`,
+    );
 
     // 6. 生成风险评估
-    const riskAssessment = assessOverallRisk(scriptAnalysis, cryptoDetection, obfuscationDetection);
-    logger.info(`Risk assessment: ${riskAssessment.level} (${riskAssessment.score}/100)`);
+    const riskAssessment = assessOverallRisk(
+      scriptAnalysis,
+      cryptoDetection,
+      obfuscationDetection,
+    );
+    logger.info(
+      `Risk assessment: ${riskAssessment.level} (${riskAssessment.score}/100)`,
+    );
 
     const duration = Date.now() - startTime;
 
@@ -207,12 +220,20 @@ async function observeFlowSkill(context: SkillContext): Promise<SkillResult> {
  */
 async function collectScripts(
   url: string,
-  options: ObserveFlowOptions
-): Promise<{ files: Array<{ url: string; content: string; size: number; type: string }>; totalSize: number }> {
+  options: ObserveFlowOptions,
+): Promise<{
+  files: Array<{url: string; content: string; size: number; type: string}>;
+  totalSize: number;
+}> {
   // 这里使用简化的收集逻辑，实际项目中可以集成 CodeCollector
   // 为了技能系统的独立性，我们提供一个基础实现
 
-  const files: Array<{ url: string; content: string; size: number; type: string }> = [];
+  const files: Array<{
+    url: string;
+    content: string;
+    size: number;
+    type: string;
+  }> = [];
 
   // 模拟收集结果（实际应该调用 CodeCollector）
   // 在实际使用时，这里会调用 CodeCollector.collect() 方法
@@ -226,18 +247,20 @@ async function collectScripts(
   const timeout = options.timeout ?? 30000;
   const dynamicWaitMs = options.dynamicWaitMs ?? 3000;
 
-  logger.info(`Collect options: ${JSON.stringify({
-    url,
-    includeDynamic,
-    includeExternal,
-    includeInline,
-    includeServiceWorker,
-    includeWebWorker,
-    maxFileSize,
-    maxTotalSize,
-    timeout,
-    dynamicWaitMs,
-  })}`);
+  logger.info(
+    `Collect options: ${JSON.stringify({
+      url,
+      includeDynamic,
+      includeExternal,
+      includeInline,
+      includeServiceWorker,
+      includeWebWorker,
+      maxFileSize,
+      maxTotalSize,
+      timeout,
+      dynamicWaitMs,
+    })}`,
+  );
 
   // TODO: 在实际技能系统中，这里应该：
   // 1. 使用 Puppeteer 导航到目标 URL
@@ -251,16 +274,16 @@ async function collectScripts(
 
   const totalSize = files.reduce((sum, file) => sum + file.size, 0);
 
-  return { files, totalSize };
+  return {files, totalSize};
 }
 
 /**
  * 分析脚本列表
  */
 function analyzeScripts(
-  files: Array<{ url: string; content: string; size: number; type: string }>
+  files: Array<{url: string; content: string; size: number; type: string}>,
 ): ScriptAnalysis[] {
-  return files.map((file) => analyzeSingleScript(file));
+  return files.map(file => analyzeSingleScript(file));
 }
 
 /**
@@ -272,7 +295,7 @@ function analyzeSingleScript(file: {
   size: number;
   type: string;
 }): ScriptAnalysis {
-  const { url, content, size, type } = file;
+  const {url, content, size, type} = file;
 
   // 检测加密
   const hasEncryption = detectEncryption(content);
@@ -320,7 +343,7 @@ function analyzeSingleScript(file: {
  * 分析依赖关系
  */
 function analyzeDependencies(
-  files: Array<{ url: string; content: string; size: number; type: string }>
+  files: Array<{url: string; content: string; size: number; type: string}>,
 ): DependencyInfo {
   const nodes: DependencyInfo['nodes'] = [];
   const edges: DependencyInfo['edges'] = [];
@@ -328,7 +351,7 @@ function analyzeDependencies(
   const thirdPartyLibs: string[] = [];
 
   // 构建节点
-  files.forEach((file) => {
+  files.forEach(file => {
     nodes.push({
       id: file.url,
       url: file.url,
@@ -342,7 +365,7 @@ function analyzeDependencies(
 
     // 检测第三方库
     const libs = detectThirdPartyLibs(file.content);
-    libs.forEach((lib) => {
+    libs.forEach(lib => {
       if (!thirdPartyLibs.includes(lib)) {
         thirdPartyLibs.push(lib);
       }
@@ -350,11 +373,13 @@ function analyzeDependencies(
   });
 
   // 构建边（依赖关系）
-  files.forEach((file) => {
+  files.forEach(file => {
     const imports = extractImports(file.content);
-    imports.forEach((imp) => {
+    imports.forEach(imp => {
       // 查找匹配的目标文件
-      const targetFile = files.find((f) => f.url.includes(imp) || f.url.endsWith(imp));
+      const targetFile = files.find(
+        f => f.url.includes(imp) || f.url.endsWith(imp),
+      );
       if (targetFile) {
         edges.push({
           from: file.url,
@@ -365,28 +390,28 @@ function analyzeDependencies(
     });
   });
 
-  return { nodes, edges, entryPoints, thirdPartyLibs };
+  return {nodes, edges, entryPoints, thirdPartyLibs};
 }
 
 /**
  * 检测加密模式
  */
 function detectCryptoPatterns(
-  files: Array<{ url: string; content: string; size: number; type: string }>
-): { algorithms: string[]; libraries: string[]; confidence: number } {
+  files: Array<{url: string; content: string; size: number; type: string}>,
+): {algorithms: string[]; libraries: string[]; confidence: number} {
   const allAlgorithms = new Set<string>();
   const allLibraries = new Set<string>();
   let totalConfidence = 0;
   let count = 0;
 
-  files.forEach((file) => {
+  files.forEach(file => {
     // 检测加密库
     const libs = detectCryptoLibraries(file.content);
-    libs.forEach((lib) => allLibraries.add(lib));
+    libs.forEach(lib => allLibraries.add(lib));
 
     // 检测算法
     const algos = extractCryptoAlgo(file.content);
-    algos.forEach((algo) => allAlgorithms.add(algo));
+    algos.forEach(algo => allAlgorithms.add(algo));
 
     // 计算置信度
     if (algos.length > 0 || libs.length > 0) {
@@ -406,19 +431,19 @@ function detectCryptoPatterns(
  * 检测混淆模式
  */
 function detectObfuscationPatterns(
-  files: Array<{ url: string; content: string; size: number; type: string }>,
-  scriptAnalysis: ScriptAnalysis[]
-): { hasObfuscation: boolean; types: string[]; affectedFiles: string[] } {
+  files: Array<{url: string; content: string; size: number; type: string}>,
+  scriptAnalysis: ScriptAnalysis[],
+): {hasObfuscation: boolean; types: string[]; affectedFiles: string[]} {
   const types = new Set<string>();
   const affectedFiles: string[] = [];
 
-  scriptAnalysis.forEach((analysis) => {
+  scriptAnalysis.forEach(analysis => {
     if (analysis.hasObfuscation) {
       affectedFiles.push(analysis.url);
 
       // 识别具体混淆类型
       const obfTypes = identifyObfuscationType(analysis);
-      obfTypes.forEach((t) => types.add(t));
+      obfTypes.forEach(t => types.add(t));
     }
   });
 
@@ -434,9 +459,18 @@ function detectObfuscationPatterns(
  */
 function assessOverallRisk(
   scriptAnalysis: ScriptAnalysis[],
-  cryptoDetection: { algorithms: string[]; libraries: string[]; confidence: number },
-  obfuscationDetection: { hasObfuscation: boolean; types: string[] }
-): { score: number; level: 'low' | 'medium' | 'high' | 'critical'; description: string; recommendations: string[] } {
+  cryptoDetection: {
+    algorithms: string[];
+    libraries: string[];
+    confidence: number;
+  },
+  obfuscationDetection: {hasObfuscation: boolean; types: string[]},
+): {
+  score: number;
+  level: 'low' | 'medium' | 'high' | 'critical';
+  description: string;
+  recommendations: string[];
+} {
   let score = 0;
   const recommendations: string[] = [];
 
@@ -447,7 +481,7 @@ function assessOverallRisk(
   }
 
   // 自定义加密库加分
-  if (cryptoDetection.libraries.some((lib) => !isStandardCryptoLib(lib))) {
+  if (cryptoDetection.libraries.some(lib => !isStandardCryptoLib(lib))) {
     score += 15;
     recommendations.push('检测到非标准加密库，建议审查其实现');
   }
@@ -458,13 +492,17 @@ function assessOverallRisk(
     recommendations.push('检测到代码混淆，可能需要反混淆分析');
 
     // 严重混淆类型额外加分
-    if (obfuscationDetection.types.some((t) => ['vm-protection', 'control-flow-flattening'].includes(t))) {
+    if (
+      obfuscationDetection.types.some(t =>
+        ['vm-protection', 'control-flow-flattening'].includes(t),
+      )
+    ) {
       score += 20;
     }
   }
 
   // 高风险脚本比例
-  const highRiskScripts = scriptAnalysis.filter((s) => s.riskScore > 70).length;
+  const highRiskScripts = scriptAnalysis.filter(s => s.riskScore > 70).length;
   if (highRiskScripts > scriptAnalysis.length * 0.3) {
     score += 15;
     recommendations.push('高比例脚本存在风险特征，建议重点分析');
@@ -476,7 +514,12 @@ function assessOverallRisk(
   else if (score >= 60) level = 'high';
   else if (score >= 30) level = 'medium';
 
-  const description = generateRiskDescription(level, cryptoDetection, obfuscationDetection, scriptAnalysis);
+  const description = generateRiskDescription(
+    level,
+    cryptoDetection,
+    obfuscationDetection,
+    scriptAnalysis,
+  );
 
   if (recommendations.length === 0) {
     recommendations.push('未发现明显风险特征');
@@ -502,15 +545,20 @@ function detectEncryption(content: string): boolean {
     /btoa|atob|Base64/i,
     /createHash|createCipher|createDecipher/i,
   ];
-  return patterns.some((pattern) => pattern.test(content));
+  return patterns.some(pattern => pattern.test(content));
 }
 
 /**
  * 检测是否包含 API 调用
  */
 function detectAPI(content: string): boolean {
-  const patterns = [/fetch\s*\(/, /XMLHttpRequest/, /axios|request|ajax/i, /\.get\(|\.post\(|\.put\(|\.delete\(/];
-  return patterns.some((pattern) => pattern.test(content));
+  const patterns = [
+    /fetch\s*\(/,
+    /XMLHttpRequest/,
+    /axios|request|ajax/i,
+    /\.get\(|\.post\(|\.put\(|\.delete\(/,
+  ];
+  return patterns.some(pattern => pattern.test(content));
 }
 
 /**
@@ -538,18 +586,18 @@ function detectObfuscation(content: string): boolean {
  */
 function extractCryptoAlgo(content: string): string[] {
   const algorithms: string[] = [];
-  const patterns: Array<{ pattern: RegExp; name: string }> = [
-    { pattern: /\bAES\b/i, name: 'AES' },
-    { pattern: /\bDES\b/i, name: 'DES' },
-    { pattern: /\bRSA\b/i, name: 'RSA' },
-    { pattern: /\bMD5\b/i, name: 'MD5' },
-    { pattern: /\bSHA(1|256|384|512)\b/i, name: 'SHA' },
-    { pattern: /\bHMAC\b/i, name: 'HMAC' },
-    { pattern: /\bECB|CBC|CFB|OFB|CTR|GCM\b/i, name: 'Mode' },
-    { pattern: /\bPKCS7|PKCS5|ZeroPadding\b/i, name: 'Padding' },
+  const patterns: Array<{pattern: RegExp; name: string}> = [
+    {pattern: /\bAES\b/i, name: 'AES'},
+    {pattern: /\bDES\b/i, name: 'DES'},
+    {pattern: /\bRSA\b/i, name: 'RSA'},
+    {pattern: /\bMD5\b/i, name: 'MD5'},
+    {pattern: /\bSHA(1|256|384|512)\b/i, name: 'SHA'},
+    {pattern: /\bHMAC\b/i, name: 'HMAC'},
+    {pattern: /\bECB|CBC|CFB|OFB|CTR|GCM\b/i, name: 'Mode'},
+    {pattern: /\bPKCS7|PKCS5|ZeroPadding\b/i, name: 'Padding'},
   ];
 
-  patterns.forEach(({ pattern, name }) => {
+  patterns.forEach(({pattern, name}) => {
     if (pattern.test(content) && !algorithms.includes(name)) {
       algorithms.push(name);
     }
@@ -570,18 +618,18 @@ function extractCryptoAlgorithms(content: string): string[] {
  */
 function detectCryptoLibraries(content: string): string[] {
   const libraries: string[] = [];
-  const patterns: Array<{ pattern: RegExp; name: string }> = [
-    { pattern: /CryptoJS/i, name: 'CryptoJS' },
-    { pattern: /JSEncrypt/i, name: 'JSEncrypt' },
-    { pattern: /forge\./i, name: 'node-forge' },
-    { pattern: /sjcl/i, name: 'SJCL' },
-    { pattern: /bcrypt/i, name: 'bcrypt' },
-    { pattern: /crypto-js/i, name: 'crypto-js' },
-    { pattern: /webcrypto|crypto\.subtle/i, name: 'WebCrypto' },
-    { pattern: /sm-crypto/i, name: 'SM-Crypto' },
+  const patterns: Array<{pattern: RegExp; name: string}> = [
+    {pattern: /CryptoJS/i, name: 'CryptoJS'},
+    {pattern: /JSEncrypt/i, name: 'JSEncrypt'},
+    {pattern: /forge\./i, name: 'node-forge'},
+    {pattern: /sjcl/i, name: 'SJCL'},
+    {pattern: /bcrypt/i, name: 'bcrypt'},
+    {pattern: /crypto-js/i, name: 'crypto-js'},
+    {pattern: /webcrypto|crypto\.subtle/i, name: 'WebCrypto'},
+    {pattern: /sm-crypto/i, name: 'SM-Crypto'},
   ];
 
-  patterns.forEach(({ pattern, name }) => {
+  patterns.forEach(({pattern, name}) => {
     if (pattern.test(content) && !libraries.includes(name)) {
       libraries.push(name);
     }
@@ -661,7 +709,15 @@ function detectThirdPartyLibs(content: string): string[] {
     /rxjs|RxJS|Observable/i,
   ];
 
-  const libNames = ['jQuery', 'React', 'Vue', 'Lodash', 'Axios', 'Moment', 'RxJS'];
+  const libNames = [
+    'jQuery',
+    'React',
+    'Vue',
+    'Lodash',
+    'Axios',
+    'Moment',
+    'RxJS',
+  ];
   patterns.forEach((pattern, idx) => {
     if (pattern.test(content) && !libs.includes(libNames[idx]!)) {
       libs.push(libNames[idx]!);
@@ -676,7 +732,10 @@ function detectThirdPartyLibs(content: string): string[] {
  */
 function isEntryPoint(url: string, content: string): boolean {
   const entryPatterns = [/main/i, /index/i, /app/i, /entry/i, /bootstrap/i];
-  return entryPatterns.some((pattern) => pattern.test(url)) || content.includes('webpackJsonp');
+  return (
+    entryPatterns.some(pattern => pattern.test(url)) ||
+    content.includes('webpackJsonp')
+  );
 }
 
 /**
@@ -686,12 +745,19 @@ function identifyObfuscationType(analysis: ScriptAnalysis): string[] {
   const types: string[] = [];
 
   // VM 保护检测
-  if (analysis.preview.includes('Function(') || analysis.preview.includes('new Function')) {
+  if (
+    analysis.preview.includes('Function(') ||
+    analysis.preview.includes('new Function')
+  ) {
     types.push('vm-protection');
   }
 
   // 控制流平坦化
-  if (analysis.preview.includes('case ') && analysis.preview.includes('break') && analysis.preview.includes('switch')) {
+  if (
+    analysis.preview.includes('case ') &&
+    analysis.preview.includes('break') &&
+    analysis.preview.includes('switch')
+  ) {
     const switchCount = (analysis.preview.match(/case\s/g) || []).length;
     if (switchCount > 10) {
       types.push('control-flow-flattening');
@@ -740,9 +806,9 @@ function calculateScriptRiskScore(analysis: {
  */
 function generateRiskDescription(
   level: string,
-  crypto: { algorithms: string[]; libraries: string[]; confidence: number },
-  obfuscation: { hasObfuscation: boolean; types: string[] },
-  scripts: ScriptAnalysis[]
+  crypto: {algorithms: string[]; libraries: string[]; confidence: number},
+  obfuscation: {hasObfuscation: boolean; types: string[]},
+  scripts: ScriptAnalysis[],
 ): string {
   const parts: string[] = [];
 
@@ -755,8 +821,8 @@ function generateRiskDescription(
   if (obfuscation.hasObfuscation) {
     parts.push(`发现 ${obfuscation.types.length} 种混淆类型`);
   }
-  if (scripts.some((s) => s.riskScore > 70)) {
-    parts.push(`${scripts.filter((s) => s.riskScore > 70).length} 个高风险脚本`);
+  if (scripts.some(s => s.riskScore > 70)) {
+    parts.push(`${scripts.filter(s => s.riskScore > 70).length} 个高风险脚本`);
   }
 
   const base = `总体风险等级：${level.toUpperCase()}`;
@@ -767,7 +833,13 @@ function generateRiskDescription(
  * 判断是否为标准加密库
  */
 function isStandardCryptoLib(lib: string): boolean {
-  const standardLibs = ['CryptoJS', 'WebCrypto', 'SJCL', 'node-forge', 'crypto-js'];
+  const standardLibs = [
+    'CryptoJS',
+    'WebCrypto',
+    'SJCL',
+    'node-forge',
+    'crypto-js',
+  ];
   return standardLibs.includes(lib);
 }
 
@@ -778,7 +850,8 @@ export function registerObserveFlowSkill(): void {
   const registry = SkillRegistry.getInstance();
   registry.register({
     name: 'observe-flow',
-    description: '观察模式：收集和分析页面脚本，识别加密和混淆代码，生成安全风险评估报告',
+    description:
+      '观察模式：收集和分析页面脚本，识别加密和混淆代码，生成安全风险评估报告',
     category: 'observe' as const,
     execute: observeFlowSkill,
   });

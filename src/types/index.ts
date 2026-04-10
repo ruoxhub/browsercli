@@ -1,16 +1,14 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
-
 /**
  * 核心类型定义
  */
 
-import type { Browser, Page } from 'puppeteer';
+import type {Browser, Page} from 'puppeteer';
 
 // ==================== 配置类型 ====================
 
@@ -40,13 +38,13 @@ export interface PuppeteerConfig {
   timeout: number;
   args?: string[];
   // 🆕 新增可配置项
-  viewport?: { width: number; height: number };
+  viewport?: {width: number; height: number};
   userAgent?: string;
   maxCollectedUrls?: number;
   // 🔧 新增：防止 MCP token 溢出的限制
-  maxFilesPerCollect?: number;      // 单次收集最大文件数（默认50）
-  maxTotalContentSize?: number;     // 单次返回最大总大小（默认512KB）
-  maxSingleFileSize?: number;       // 单个文件最大大小（默认100KB）
+  maxFilesPerCollect?: number; // 单次收集最大文件数（默认50）
+  maxTotalContentSize?: number; // 单次返回最大总大小（默认512KB）
+  maxSingleFileSize?: number; // 单个文件最大大小（默认100KB）
   useExternalBrowser?: boolean;
   remoteDebuggingUrl?: string;
   userDataDir?: string;
@@ -341,7 +339,14 @@ export interface DataSource {
 }
 
 export interface DataSink {
-  type: 'dom' | 'network' | 'storage' | 'eval' | 'xss' | 'sql-injection' | 'other';
+  type:
+    | 'dom'
+    | 'network'
+    | 'storage'
+    | 'eval'
+    | 'xss'
+    | 'sql-injection'
+    | 'other';
   location: CodeLocation;
 }
 
@@ -529,44 +534,44 @@ export interface SessionData {
  * 环境变量检测结果
  */
 export interface DetectedEnvironmentVariables {
-  window: string[];      // window对象的属性
-  document: string[];    // document对象的属性
-  navigator: string[];   // navigator对象的属性
-  location: string[];    // location对象的属性
-  screen: string[];      // screen对象的属性
-  other: string[];       // 其他全局对象
+  window: string[]; // window对象的属性
+  document: string[]; // document对象的属性
+  navigator: string[]; // navigator对象的属性
+  location: string[]; // location对象的属性
+  screen: string[]; // screen对象的属性
+  other: string[]; // 其他全局对象
 }
 
 /**
  * 缺失的API信息
  */
 export interface MissingAPI {
-  name: string;          // API名称
+  name: string; // API名称
   type: 'function' | 'object' | 'property';
-  path: string;          // 完整路径，如 'window.navigator.userAgent'
-  suggestion: string;    // 补充建议
+  path: string; // 完整路径，如 'window.navigator.userAgent'
+  suggestion: string; // 补充建议
 }
 
 /**
  * 环境补全代码
  */
 export interface EmulationCode {
-  nodejs: string;        // Node.js格式的补环境代码
-  python: string;        // Python + execjs格式的补环境代码
+  nodejs: string; // Node.js格式的补环境代码
+  python: string; // Python + execjs格式的补环境代码
 }
 
 /**
  * 环境补全分析选项
  */
 export interface EnvironmentEmulatorOptions {
-  code: string;                    // 要分析的代码
-  targetRuntime?: 'nodejs' | 'python' | 'both';  // 目标运行时
-  autoFetch?: boolean;             // 是否自动从浏览器提取真实值
-  browserUrl?: string;             // 浏览器访问的URL（用于提取环境变量）
-  browserType?: 'chrome' | 'firefox' | 'safari';  // 浏览器类型
-  includeComments?: boolean;       // 生成的代码是否包含注释
-  extractDepth?: number;           // 环境变量提取深度（默认3层）
-  useAI?: boolean;                 // 是否使用AI分析（默认true）
+  code: string; // 要分析的代码
+  targetRuntime?: 'nodejs' | 'python' | 'both'; // 目标运行时
+  autoFetch?: boolean; // 是否自动从浏览器提取真实值
+  browserUrl?: string; // 浏览器访问的URL（用于提取环境变量）
+  browserType?: 'chrome' | 'firefox' | 'safari'; // 浏览器类型
+  includeComments?: boolean; // 生成的代码是否包含注释
+  extractDepth?: number; // 环境变量提取深度（默认3层）
+  useAI?: boolean; // 是否使用AI分析（默认true）
 }
 
 /**
@@ -604,12 +609,23 @@ export interface EnvironmentEmulatorResult {
 /**
  * 虚拟机类型
  */
-export type VMType = 'custom' | 'obfuscator.io' | 'jsfuck' | 'jjencode' | 'unknown';
+export type VMType =
+  | 'custom'
+  | 'obfuscator.io'
+  | 'jsfuck'
+  | 'jjencode'
+  | 'unknown';
 
 /**
  * 指令类型
  */
-export type InstructionType = 'load' | 'store' | 'arithmetic' | 'control' | 'call' | 'unknown';
+export type InstructionType =
+  | 'load'
+  | 'store'
+  | 'arithmetic'
+  | 'control'
+  | 'call'
+  | 'unknown';
 
 /**
  * 复杂度级别
@@ -620,43 +636,43 @@ export type ComplexityLevel = 'low' | 'medium' | 'high';
  * VM指令信息
  */
 export interface VMInstruction {
-  opcode: number | string;       // 操作码
-  name: string;                  // 指令名称（推断）
+  opcode: number | string; // 操作码
+  name: string; // 指令名称（推断）
   type: InstructionType;
-  description: string;           // 指令描述
-  args?: number;                 // 参数数量
+  description: string; // 指令描述
+  args?: number; // 参数数量
 }
 
 /**
  * VM特征信息
  */
 export interface VMFeatures {
-  instructionCount: number;      // 指令数量
-  interpreterLocation: string;   // 解释器位置（行号）
-  complexity: ComplexityLevel;   // 复杂度
-  hasSwitch: boolean;            // 是否有大型switch
-  hasInstructionArray: boolean;  // 是否有指令数组
-  hasProgramCounter: boolean;    // 是否有程序计数器
+  instructionCount: number; // 指令数量
+  interpreterLocation: string; // 解释器位置（行号）
+  complexity: ComplexityLevel; // 复杂度
+  hasSwitch: boolean; // 是否有大型switch
+  hasInstructionArray: boolean; // 是否有指令数组
+  hasProgramCounter: boolean; // 是否有程序计数器
 }
 
 /**
  * 未还原部分信息
  */
 export interface UnresolvedPart {
-  location: string;              // 位置（行号或函数名）
-  reason: string;                // 未能还原的原因
-  suggestion?: string;           // 建议
+  location: string; // 位置（行号或函数名）
+  reason: string; // 未能还原的原因
+  suggestion?: string; // 建议
 }
 
 /**
  * JSVMP反混淆选项
  */
 export interface JSVMPDeobfuscatorOptions {
-  code: string;                  // 要反混淆的代码
-  aggressive?: boolean;          // 是否使用激进模式
+  code: string; // 要反混淆的代码
+  aggressive?: boolean; // 是否使用激进模式
   extractInstructions?: boolean; // 是否提取指令集
-  timeout?: number;              // 超时时间（毫秒）
-  maxIterations?: number;        // 最大迭代次数
+  timeout?: number; // 超时时间（毫秒）
+  maxIterations?: number; // 最大迭代次数
 }
 
 /**
@@ -705,7 +721,16 @@ export interface ScopeVariable {
   name: string;
   value: any;
   type: string;
-  scope: 'global' | 'local' | 'with' | 'closure' | 'catch' | 'block' | 'script' | 'eval' | 'module';
+  scope:
+    | 'global'
+    | 'local'
+    | 'with'
+    | 'closure'
+    | 'catch'
+    | 'block'
+    | 'script'
+    | 'eval'
+    | 'module';
   writable?: boolean;
   configurable?: boolean;
   enumerable?: boolean;
@@ -733,7 +758,9 @@ export interface BreakpointHitEvent {
 /**
  * 断点命中回调函数
  */
-export type BreakpointHitCallback = (event: BreakpointHitEvent) => void | Promise<void>;
+export type BreakpointHitCallback = (
+  event: BreakpointHitEvent,
+) => void | Promise<void>;
 
 /**
  * 调试会话数据（用于保存/恢复）
@@ -830,7 +857,10 @@ export interface ReverseTaskHandle {
 export interface ReverseTaskReadApi {
   getTaskDir(taskId: string): string;
   readSnapshot<T>(taskId: string, name: string): Promise<T | undefined>;
-  readLog(name: string, taskId: string): Promise<Array<Record<string, unknown>>>;
+  readLog(
+    name: string,
+    taskId: string,
+  ): Promise<Array<Record<string, unknown>>>;
 }
 
 // ==================== 全局类型扩展 ====================
@@ -838,10 +868,13 @@ export interface ReverseTaskReadApi {
 declare global {
   interface Window {
     __aiHooks?: Record<string, any[]>;
-    __aiHookMetadata?: Record<string, {
-      id: string;
-      createdAt: number;
-      enabled: boolean;
-    }>;
+    __aiHookMetadata?: Record<
+      string,
+      {
+        id: string;
+        createdAt: number;
+        enabled: boolean;
+      }
+    >;
   }
 }

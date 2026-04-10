@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -22,7 +21,11 @@
  * @param maxDepth 最大深度（默认10，防止深层嵌套）
  * @returns JSON 字符串，失败时返回错误描述
  */
-export function safeStringify(data: any, space?: number, maxDepth = 10): string {
+export function safeStringify(
+  data: any,
+  space?: number,
+  maxDepth = 10,
+): string {
   const seen = new WeakSet();
   let depth = 0;
 

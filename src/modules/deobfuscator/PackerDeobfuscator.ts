@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -7,26 +6,26 @@
 /**
  * Packer反混淆器
  * 专门用于处理Dean Edwards' Packer混淆的JavaScript代码
- * 
+ *
  * Packer特征：
  * 1. eval(function(p,a,c,k,e,d){...})(...) 模式
  * 2. 使用62进制或更高进制编码
  * 3. 字符串数组存储
  * 4. 自解压缩逻辑
- * 
+ *
  * 参考资料：
  * - Dean Edwards' Packer: http://dean.edwards.name/packer/
  * - 在线解包工具: https://matthewfl.com/unPacker.html
  */
 
-import { logger } from '../../utils/logger.js';
+import {logger} from '../../utils/logger.js';
 
 /**
  * Packer反混淆选项
  */
 export interface PackerDeobfuscatorOptions {
   code: string;
-  maxIterations?: number;  // 最大解包迭代次数
+  maxIterations?: number; // 最大解包迭代次数
 }
 
 /**
@@ -48,15 +47,18 @@ export class PackerDeobfuscator {
    */
   static detect(code: string): boolean {
     // 检测典型的Packer模式
-    const packerPattern = /eval\s*\(\s*function\s*\(\s*p\s*,\s*a\s*,\s*c\s*,\s*k\s*,\s*e\s*,\s*[dr]\s*\)/;
+    const packerPattern =
+      /eval\s*\(\s*function\s*\(\s*p\s*,\s*a\s*,\s*c\s*,\s*k\s*,\s*e\s*,\s*[dr]\s*\)/;
     return packerPattern.test(code);
   }
 
   /**
    * 反混淆Packer代码
    */
-  async deobfuscate(options: PackerDeobfuscatorOptions): Promise<PackerDeobfuscatorResult> {
-    const { code, maxIterations = 5 } = options;
+  async deobfuscate(
+    options: PackerDeobfuscatorOptions,
+  ): Promise<PackerDeobfuscatorResult> {
+    const {code, maxIterations = 5} = options;
 
     logger.info('📦 开始Packer反混淆...');
 
@@ -66,7 +68,10 @@ export class PackerDeobfuscator {
 
     try {
       // 循环解包，直到不再是Packer格式
-      while (PackerDeobfuscator.detect(currentCode) && iterations < maxIterations) {
+      while (
+        PackerDeobfuscator.detect(currentCode) &&
+        iterations < maxIterations
+      ) {
         const unpacked = this.unpack(currentCode);
 
         if (!unpacked || unpacked === currentCode) {
@@ -104,7 +109,7 @@ export class PackerDeobfuscator {
   private unpack(code: string): string {
     // 1. 提取Packer参数
     const match = code.match(
-      /eval\s*\(\s*function\s*\(\s*p\s*,\s*a\s*,\s*c\s*,\s*k\s*,\s*e\s*,\s*[dr]\s*\)\s*{([\s\S]*?)}\s*\((.*?)\)\s*\)/
+      /eval\s*\(\s*function\s*\(\s*p\s*,\s*a\s*,\s*c\s*,\s*k\s*,\s*e\s*,\s*[dr]\s*\)\s*{([\s\S]*?)}\s*\((.*?)\)\s*\)/,
     );
 
     if (!match || !match[2]) {
@@ -142,7 +147,7 @@ export class PackerDeobfuscator {
   } | null {
     try {
       // 使用Function构造器安全地解析参数
-       
+
       const parseFunc = new Function(`return [${argsString}];`);
       const params = parseFunc();
 
@@ -155,8 +160,16 @@ export class PackerDeobfuscator {
         a: params[1] || 0,
         c: params[2] || 0,
         k: (params[3] || '').split('|'),
-        e: params[4] || function (c: any) { return c; },
-        d: params[5] || function () { return ''; },
+        e:
+          params[4] ||
+          function (c: any) {
+            return c;
+          },
+        d:
+          params[5] ||
+          function () {
+            return '';
+          },
       };
     } catch {
       return null;
@@ -166,11 +179,16 @@ export class PackerDeobfuscator {
   /**
    * 执行解包器
    */
-  private executeUnpacker(
-    params: { p: string; a: number; c: number; k: string[]; e: Function; d: Function }
-  ): string {
-    const { p, a, k } = params;
-    let { c } = params;
+  private executeUnpacker(params: {
+    p: string;
+    a: number;
+    c: number;
+    k: string[];
+    e: Function;
+    d: Function;
+  }): string {
+    const {p, a, k} = params;
+    let {c} = params;
 
     // 标准Packer解包逻辑
     let result = p;
@@ -191,7 +209,8 @@ export class PackerDeobfuscator {
    * 进制转换（Packer使用的编码方式）
    */
   private base(num: number, radix: number): string {
-    const digits = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const digits =
+      '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
     if (num === 0) {
       return '0';
@@ -235,7 +254,9 @@ export class AAEncodeDeobfuscator {
    */
   static detect(code: string): boolean {
     // AAEncode使用颜文字字符
-    return code.includes('゜-゜') || code.includes('ω゜') || code.includes('o゜)');
+    return (
+      code.includes('゜-゜') || code.includes('ω゜') || code.includes('o゜)')
+    );
   }
 
   /**
@@ -247,7 +268,7 @@ export class AAEncodeDeobfuscator {
     try {
       // AAEncode本质上是可执行的JavaScript
       // 使用Function构造器执行并获取结果
-       
+
       const decoded = new Function(`return (${code})`)();
 
       logger.info('✅ AAEncode反混淆完成');
@@ -312,7 +333,7 @@ export class UniversalUnpacker {
     // 1. 检测Packer
     if (PackerDeobfuscator.detect(code)) {
       logger.info('检测到: Packer混淆');
-      const result = await this.packerDeobfuscator.deobfuscate({ code });
+      const result = await this.packerDeobfuscator.deobfuscate({code});
       return {
         code: result.code,
         type: 'Packer',
@@ -350,4 +371,3 @@ export class UniversalUnpacker {
     };
   }
 }
-

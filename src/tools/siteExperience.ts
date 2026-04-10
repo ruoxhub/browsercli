@@ -1,33 +1,34 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { z } from 'zod';
+import {z} from 'zod';
 
-import { siteExperienceService } from '../services/SiteExperienceService.js';
+import {siteExperienceService} from '../services/SiteExperienceService.js';
 
-import { ToolCategory } from './categories.js';
-import { defineTool } from './ToolDefinition.js';
-import type { Context } from './ToolDefinition.js';
+import {ToolCategory} from './categories.js';
+import {defineTool} from './ToolDefinition.js';
+import type {Context} from './ToolDefinition.js';
 
 /**
  * 搜索站点经验
  */
 export const searchSiteExperience = defineTool({
   name: 'search_site_experience',
-  description: '按 URL 或名称搜索站点经验。支持从完整 URL 自动提取域名进行匹配。',
+  description:
+    '按 URL 或名称搜索站点经验。支持从完整 URL 自动提取域名进行匹配。',
   annotations: {
     category: ToolCategory.DATA,
     readOnlyHint: true,
+    title: 'Search site experience',
   },
   schema: {
     url: z.string().optional().describe('要搜索的 URL 或域名'),
     name: z.string().optional().describe('要搜索的站点名称'),
   },
   async handler(request, response, context: Context) {
-    const { url, name } = request.params;
+    const {url, name} = request.params;
 
     if (!url && !name) {
       response.appendResponseLine('请提供 url 或 name 参数进行搜索');
@@ -35,7 +36,7 @@ export const searchSiteExperience = defineTool({
     }
 
     try {
-      const results = await siteExperienceService.search({ url, name });
+      const results = await siteExperienceService.search({url, name});
 
       if (results.length === 0) {
         response.appendResponseLine('未找到匹配的站点经验');
@@ -61,10 +62,13 @@ export const searchSiteExperience = defineTool({
         if (exp.knownPitfalls) {
           response.appendResponseLine(`**已知陷阱**:\n${exp.knownPitfalls}`);
         }
-        response.appendResponseLine(`**更新时间**: ${exp.updatedAt?.toISOString() || 'N/A'}`);
+        response.appendResponseLine(
+          `**更新时间**: ${exp.updatedAt?.toISOString() || 'N/A'}`,
+        );
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       response.appendResponseLine(`搜索失败：${errorMessage}`);
     }
   },
@@ -79,6 +83,7 @@ export const createSiteExperience = defineTool({
   annotations: {
     category: ToolCategory.DATA,
     readOnlyHint: false,
+    title: 'Create site experience',
   },
   schema: {
     domain: z.string().describe('站点域名（例如：example.com）'),
@@ -89,15 +94,21 @@ export const createSiteExperience = defineTool({
     knownPitfalls: z.string().optional().describe('已知陷阱描述'),
   },
   async handler(request, response, context: Context) {
-    const { domain, name, aliases, platformFeatures, validPatterns, knownPitfalls } =
-      request.params;
+    const {
+      domain,
+      name,
+      aliases,
+      platformFeatures,
+      validPatterns,
+      knownPitfalls,
+    } = request.params;
 
     try {
       // 检查是否已存在相同域名
       const existing = await siteExperienceService.getByDomain(domain);
       if (existing) {
         response.appendResponseLine(
-          `域名 ${domain} 已存在（ID: ${existing.id}），请使用 update_site_experience 更新`
+          `域名 ${domain} 已存在（ID: ${existing.id}），请使用 update_site_experience 更新`,
         );
         return;
       }
@@ -115,9 +126,12 @@ export const createSiteExperience = defineTool({
       response.appendResponseLine(`**ID**: ${result.id}`);
       response.appendResponseLine(`**域名**: ${result.domain}`);
       response.appendResponseLine(`**名称**: ${result.name}`);
-      response.appendResponseLine(`**创建时间**: ${result.createdAt?.toISOString() || 'N/A'}`);
+      response.appendResponseLine(
+        `**创建时间**: ${result.createdAt?.toISOString() || 'N/A'}`,
+      );
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       response.appendResponseLine(`创建失败：${errorMessage}`);
     }
   },
@@ -132,6 +146,7 @@ export const updateSiteExperience = defineTool({
   annotations: {
     category: ToolCategory.DATA,
     readOnlyHint: false,
+    title: 'Update site experience',
   },
   schema: {
     id: z.number().describe('要更新的站点经验 ID'),
@@ -142,7 +157,7 @@ export const updateSiteExperience = defineTool({
     knownPitfalls: z.string().optional().describe('新的已知陷阱描述'),
   },
   async handler(request, response, context: Context) {
-    const { id, name, aliases, platformFeatures, validPatterns, knownPitfalls } =
+    const {id, name, aliases, platformFeatures, validPatterns, knownPitfalls} =
       request.params;
 
     try {
@@ -165,9 +180,12 @@ export const updateSiteExperience = defineTool({
       response.appendResponseLine(`**ID**: ${result.id}`);
       response.appendResponseLine(`**域名**: ${result.domain}`);
       response.appendResponseLine(`**名称**: ${result.name}`);
-      response.appendResponseLine(`**更新时间**: ${result.updatedAt?.toISOString() || 'N/A'}`);
+      response.appendResponseLine(
+        `**更新时间**: ${result.updatedAt?.toISOString() || 'N/A'}`,
+      );
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       response.appendResponseLine(`更新失败：${errorMessage}`);
     }
   },
@@ -182,12 +200,13 @@ export const deleteSiteExperience = defineTool({
   annotations: {
     category: ToolCategory.DATA,
     readOnlyHint: false,
+    title: 'Delete site experience',
   },
   schema: {
     id: z.number().describe('要删除的站点经验 ID'),
   },
   async handler(request, response, context: Context) {
-    const { id } = request.params;
+    const {id} = request.params;
 
     try {
       const deleted = await siteExperienceService.delete(id);
@@ -199,7 +218,8 @@ export const deleteSiteExperience = defineTool({
 
       response.appendResponseLine(`成功删除站点经验 (ID: ${id})`);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       response.appendResponseLine(`删除失败：${errorMessage}`);
     }
   },
@@ -214,6 +234,7 @@ export const listSiteExperiences = defineTool({
   annotations: {
     category: ToolCategory.DATA,
     readOnlyHint: true,
+    title: 'List site experiences',
   },
   schema: {},
   async handler(request, response, context: Context) {
@@ -228,14 +249,17 @@ export const listSiteExperiences = defineTool({
       response.appendResponseLine(`共 ${results.length} 条站点经验:\n`);
 
       for (const exp of results) {
-        response.appendResponseLine(`- **${exp.name}** (${exp.domain}) [ID: ${exp.id}]`);
+        response.appendResponseLine(
+          `- **${exp.name}** (${exp.domain}) [ID: ${exp.id}]`,
+        );
       }
 
       response.appendResponseLine(
-        '\n使用 `search_site_experience` 查看详细信息，或使用 `id` 进行更新/删除操作'
+        '\n使用 `search_site_experience` 查看详细信息，或使用 `id` 进行更新/删除操作',
       );
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       response.appendResponseLine(`获取列表失败：${errorMessage}`);
     }
   },

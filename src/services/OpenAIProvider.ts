@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -6,15 +5,20 @@
  */
 /**
  * OpenAI Provider Implementation
- * 
+ *
  * Implements the AIProvider interface for OpenAI's API
  */
 
-import { readFileSync } from 'node:fs';
+import {readFileSync} from 'node:fs';
 
 import OpenAI from 'openai';
 
-import type { AIProvider, AIMessage, AIResponse, ChatOptions } from './AIService.js';
+import type {
+  AIProvider,
+  AIMessage,
+  AIResponse,
+  ChatOptions,
+} from './AIService.js';
 
 /**
  * OpenAI provider configuration
@@ -55,11 +59,14 @@ export class OpenAIProvider implements AIProvider {
    * @param options - Optional chat configuration
    * @returns AI response with content and usage information
    */
-  async chat(messages: AIMessage[], options?: ChatOptions): Promise<AIResponse> {
+  async chat(
+    messages: AIMessage[],
+    options?: ChatOptions,
+  ): Promise<AIResponse> {
     try {
       const response = await this.client.chat.completions.create({
         model: options?.model || this.defaultModel,
-        messages: messages.map((msg) => ({
+        messages: messages.map(msg => ({
           role: msg.role,
           content: msg.content,
         })),
@@ -94,7 +101,11 @@ export class OpenAIProvider implements AIProvider {
    * @param isFilePath - Whether imageInput is a file path (default: false)
    * @returns Analysis result as text
    */
-  async analyzeImage(imageInput: string, prompt: string, isFilePath = false): Promise<string> {
+  async analyzeImage(
+    imageInput: string,
+    prompt: string,
+    isFilePath = false,
+  ): Promise<string> {
     try {
       let imageUrl: string;
 
@@ -102,15 +113,18 @@ export class OpenAIProvider implements AIProvider {
         // Read file and convert to base64
         const imageBuffer = readFileSync(imageInput);
         const base64Image = imageBuffer.toString('base64');
-        
+
         // Detect image type from file extension
         const ext = imageInput.toLowerCase().split('.').pop();
         const mimeType = this.getMimeType(ext || '');
-        
+
         imageUrl = `data:${mimeType};base64,${base64Image}`;
       } else {
         // Assume it's already base64 or a URL
-        if (imageInput.startsWith('http://') || imageInput.startsWith('https://')) {
+        if (
+          imageInput.startsWith('http://') ||
+          imageInput.startsWith('https://')
+        ) {
           imageUrl = imageInput;
         } else if (imageInput.startsWith('data:')) {
           imageUrl = imageInput;
@@ -178,11 +192,11 @@ export class OpenAIProvider implements AIProvider {
     if (error instanceof OpenAI.APIError) {
       const message = `OpenAI API error (${error.status}): ${error.message}`;
       const formattedError = new Error(message);
-      
+
       // Preserve status code for retry logic
       (formattedError as any).status = error.status;
       (formattedError as any).code = error.code;
-      
+
       return formattedError;
     }
 

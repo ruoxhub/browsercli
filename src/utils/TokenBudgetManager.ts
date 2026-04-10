@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -6,14 +5,14 @@
  */
 /**
  * TokenBudgetManager - 全局 Token 预算管理器
- * 
+ *
  * 核心功能：
  * 1. 追踪每次工具调用的 Token 使用
  * 2. 维护会话级别的 Token 累计
  * 3. 提供三级预警机制（80%、90%、95%）
  * 4. 自动触发数据清理
  * 5. 提供智能优化建议
- * 
+ *
  * 设计原则：
  * - 单例模式 - 全局唯一实例
  * - 实时监控 - 每次工具调用后更新
@@ -21,9 +20,9 @@
  * - 自动清理 - 90% 时自动触发
  */
 
-import { DetailedDataManager } from './detailedDataManager.js';
-import { logger } from './logger.js';
-import { safeStringify } from './safeJson.js';
+import {DetailedDataManager} from './detailedDataManager.js';
+import {logger} from './logger.js';
+import {safeStringify} from './safeJson.js';
 
 /**
  * 工具调用记录
@@ -45,7 +44,7 @@ export interface TokenBudgetStats {
   maxTokens: number;
   usagePercentage: number;
   toolCallCount: number;
-  topTools: Array<{ tool: string; tokens: number; percentage: number }>;
+  topTools: Array<{tool: string; tokens: number; percentage: number}>;
   warnings: number[];
   recentCalls: ToolCallRecord[];
   suggestions: string[];
@@ -58,7 +57,7 @@ export class TokenBudgetManager {
   private static instance: TokenBudgetManager;
 
   // ==================== 配置 ====================
-  
+
   private readonly MAX_TOKENS = 200000; // Claude 上下文窗口
   private readonly WARNING_THRESHOLDS = [0.8, 0.9, 0.95]; // 预警阈值
   private readonly BYTES_PER_TOKEN = 4; // 1 token ≈ 4 bytes (经验值)
@@ -66,7 +65,7 @@ export class TokenBudgetManager {
   private readonly HISTORY_RETENTION = 5 * 60 * 1000; // 保留最近 5 分钟的历史
 
   // ==================== 状态 ====================
-  
+
   private currentUsage = 0; // 当前 Token 使用量
   private toolCallHistory: ToolCallRecord[] = []; // 工具调用历史
   private warnings = new Set<number>(); // 已触发的预警
@@ -89,7 +88,7 @@ export class TokenBudgetManager {
 
   /**
    * 记录工具调用
-   * 
+   *
    * @param toolName 工具名称
    * @param request 请求参数
    * @param response 响应数据
@@ -119,7 +118,7 @@ export class TokenBudgetManager {
       // 日志
       logger.debug(
         `Token usage: ${this.currentUsage}/${this.MAX_TOKENS} (${this.getUsagePercentage()}%) | ` +
-        `Tool: ${toolName} | Size: ${(totalSize / 1024).toFixed(1)}KB | Tokens: ${estimatedTokens}`
+          `Tool: ${toolName} | Size: ${(totalSize / 1024).toFixed(1)}KB | Tokens: ${estimatedTokens}`,
       );
 
       // 检查预警
@@ -148,7 +147,7 @@ export class TokenBudgetManager {
 
   /**
    * 估算 Token 数量
-   * 
+   *
    * 经验公式：1 token ≈ 4 bytes
    * 这是一个保守估计，实际可能更少
    */
@@ -186,16 +185,22 @@ export class TokenBudgetManager {
 
     logger.warn(
       `⚠️  Token Budget Warning: ${percentage}% used! ` +
-      `(${this.currentUsage}/${this.MAX_TOKENS}, ${remaining} tokens remaining)`
+        `(${this.currentUsage}/${this.MAX_TOKENS}, ${remaining} tokens remaining)`,
     );
 
     // 提供建议
     if (threshold >= 0.95) {
-      logger.warn('🚨 CRITICAL: Consider clearing caches or starting a new session!');
+      logger.warn(
+        '🚨 CRITICAL: Consider clearing caches or starting a new session!',
+      );
     } else if (threshold >= 0.9) {
-      logger.warn('⚠️  HIGH: Auto-cleanup will trigger soon. Consider using summary modes.');
+      logger.warn(
+        '⚠️  HIGH: Auto-cleanup will trigger soon. Consider using summary modes.',
+      );
     } else if (threshold >= 0.8) {
-      logger.warn('ℹ️  MODERATE: Monitor usage. Use get_token_budget_stats for details.');
+      logger.warn(
+        'ℹ️  MODERATE: Monitor usage. Use get_token_budget_stats for details.',
+      );
     }
   }
 
@@ -224,7 +229,7 @@ export class TokenBudgetManager {
     const cutoff = Date.now() - this.HISTORY_RETENTION;
     const beforeCount = this.toolCallHistory.length;
     this.toolCallHistory = this.toolCallHistory.filter(
-      call => call.timestamp > cutoff
+      call => call.timestamp > cutoff,
     );
     const removedCount = beforeCount - this.toolCallHistory.length;
     logger.info(`✅ Removed ${removedCount} old tool call records`);
@@ -238,13 +243,13 @@ export class TokenBudgetManager {
 
     logger.info(
       `✅ Cleanup complete! Freed ${freed} tokens (${freedPercentage}%). ` +
-      `Usage: ${afterUsage}/${this.MAX_TOKENS} (${this.getUsagePercentage()}%)`
+        `Usage: ${afterUsage}/${this.MAX_TOKENS} (${this.getUsagePercentage()}%)`,
     );
 
     // 重置预警（如果使用率降低）
     const newRatio = afterUsage / this.MAX_TOKENS;
     this.warnings = new Set(
-      Array.from(this.warnings).filter(threshold => newRatio >= threshold)
+      Array.from(this.warnings).filter(threshold => newRatio >= threshold),
     );
   }
 
@@ -254,14 +259,14 @@ export class TokenBudgetManager {
   private recalculateUsage(): void {
     this.currentUsage = this.toolCallHistory.reduce(
       (sum, call) => sum + call.estimatedTokens,
-      0
+      0,
     );
   }
 
   /**
    * 获取统计信息
    */
-  getStats(): TokenBudgetStats & { sessionStartTime: number } {
+  getStats(): TokenBudgetStats & {sessionStartTime: number} {
     // 计算每个工具的使用量
     const toolUsage = new Map<string, number>();
     for (const call of this.toolCallHistory) {
@@ -301,30 +306,46 @@ export class TokenBudgetManager {
   /**
    * 生成优化建议
    */
-  private generateSuggestions(topTools: Array<{ tool: string; tokens: number; percentage: number }>): string[] {
+  private generateSuggestions(
+    topTools: Array<{tool: string; tokens: number; percentage: number}>,
+  ): string[] {
     const suggestions: string[] = [];
     const ratio = this.currentUsage / this.MAX_TOKENS;
 
     // 基于使用率的建议
     if (ratio >= 0.95) {
-      suggestions.push('🚨 CRITICAL: Clear all caches immediately or start a new session');
+      suggestions.push(
+        '🚨 CRITICAL: Clear all caches immediately or start a new session',
+      );
     } else if (ratio >= 0.9) {
-      suggestions.push('⚠️  HIGH: Auto-cleanup triggered. Consider manual cleanup for better control');
+      suggestions.push(
+        '⚠️  HIGH: Auto-cleanup triggered. Consider manual cleanup for better control',
+      );
     } else if (ratio >= 0.8) {
-      suggestions.push('ℹ️  MODERATE: Monitor usage closely. Use summary modes for large data');
+      suggestions.push(
+        'ℹ️  MODERATE: Monitor usage closely. Use summary modes for large data',
+      );
     }
 
     // 基于工具使用的建议
-    for (const { tool, percentage } of topTools) {
+    for (const {tool, percentage} of topTools) {
       if (percentage > 30) {
         if (tool.includes('collect_code')) {
-          suggestions.push(`💡 ${tool} uses ${percentage}% tokens. Try smartMode="summary" or "priority"`);
+          suggestions.push(
+            `💡 ${tool} uses ${percentage}% tokens. Try smartMode="summary" or "priority"`,
+          );
         } else if (tool.includes('get_script_source')) {
-          suggestions.push(`💡 ${tool} uses ${percentage}% tokens. Try preview=true first`);
+          suggestions.push(
+            `💡 ${tool} uses ${percentage}% tokens. Try preview=true first`,
+          );
         } else if (tool.includes('network_get_requests')) {
-          suggestions.push(`💡 ${tool} uses ${percentage}% tokens. Reduce limit or use filters`);
+          suggestions.push(
+            `💡 ${tool} uses ${percentage}% tokens. Reduce limit or use filters`,
+          );
         } else if (tool.includes('page_evaluate')) {
-          suggestions.push(`💡 ${tool} uses ${percentage}% tokens. Query specific properties instead of full objects`);
+          suggestions.push(
+            `💡 ${tool} uses ${percentage}% tokens. Query specific properties instead of full objects`,
+          );
         }
       }
     }
@@ -357,4 +378,3 @@ export class TokenBudgetManager {
     logger.info('✅ Token budget reset complete');
   }
 }
-

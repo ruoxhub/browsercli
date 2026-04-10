@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -11,10 +10,14 @@ import {zod} from '../third_party/index.js';
 import type {CodeFile} from '../types/index.js';
 
 import {ToolCategory} from './categories.js';
-import {getJSHookRuntime} from './runtime.js';
+import type {getJSHookRuntime} from './runtime.js';
 import {defineTool} from './ToolDefinition.js';
 
-async function writeArtifactFile(taskDir: string, relativePath: string, content: string): Promise<void> {
+async function writeArtifactFile(
+  taskDir: string,
+  relativePath: string,
+  content: string,
+): Promise<void> {
   const filePath = path.join(taskDir, relativePath);
   await mkdir(path.dirname(filePath), {recursive: true});
   await writeFile(filePath, content, 'utf8');
@@ -34,7 +37,10 @@ function buildDefaultEnvCode(): string {
   ].join('\n');
 }
 
-function toStorageShimCode(name: 'localStorage' | 'sessionStorage', values: Record<string, unknown>): string {
+function toStorageShimCode(
+  name: 'localStorage' | 'sessionStorage',
+  values: Record<string, unknown>,
+): string {
   const entries = Object.entries(values);
   return [
     `const ${name}Seed = new Map(${JSON.stringify(entries)});`,
@@ -52,26 +58,32 @@ function toStorageShimCode(name: 'localStorage' | 'sessionStorage', values: Reco
 
 function buildAutoEnvCode(capture: Record<string, unknown>): string {
   const cookies = Array.isArray(capture.cookies) ? capture.cookies : [];
-  const localStorageValues = capture.localStorage && typeof capture.localStorage === 'object'
-    ? capture.localStorage as Record<string, unknown>
-    : {};
-  const sessionStorageValues = capture.sessionStorage && typeof capture.sessionStorage === 'object'
-    ? capture.sessionStorage as Record<string, unknown>
-    : {};
-  const page = capture.page && typeof capture.page === 'object'
-    ? capture.page as Record<string, unknown>
-    : {};
+  const localStorageValues =
+    capture.localStorage && typeof capture.localStorage === 'object'
+      ? (capture.localStorage as Record<string, unknown>)
+      : {};
+  const sessionStorageValues =
+    capture.sessionStorage && typeof capture.sessionStorage === 'object'
+      ? (capture.sessionStorage as Record<string, unknown>)
+      : {};
+  const page =
+    capture.page && typeof capture.page === 'object'
+      ? (capture.page as Record<string, unknown>)
+      : {};
 
   return [
     buildDefaultEnvCode(),
     `globalThis.location = {href: ${JSON.stringify(page.url ?? '')}};`,
-    `globalThis.document = {cookie: ${JSON.stringify(cookies.map((cookie) => `${String((cookie as Record<string, unknown>).name ?? '')}=${String((cookie as Record<string, unknown>).value ?? '')}`).join('; '))}, location: globalThis.location};`,
+    `globalThis.document = {cookie: ${JSON.stringify(cookies.map(cookie => `${String((cookie as Record<string, unknown>).name ?? '')}=${String((cookie as Record<string, unknown>).value ?? '')}`).join('; '))}, location: globalThis.location};`,
     toStorageShimCode('localStorage', localStorageValues),
     toStorageShimCode('sessionStorage', sessionStorageValues),
   ].join('\n\n');
 }
 
-function buildAutoEntryCode(targetScript: CodeFile | undefined, capture: Record<string, unknown>): string {
+function buildAutoEntryCode(
+  targetScript: CodeFile | undefined,
+  capture: Record<string, unknown>,
+): string {
   return [
     'import "./env.js";',
     'import "./polyfills.js";',
@@ -117,11 +129,19 @@ function matchesTargetText(
   targetFunctionNames: string[],
   targetActionDescription: string,
 ): boolean {
-  const text = typeof value === 'string' ? value.toLowerCase() : JSON.stringify(value ?? '').toLowerCase();
-  return targetKeywords.some((keyword) => text.includes(keyword.toLowerCase())) ||
-    targetUrlPatterns.some((pattern) => text.includes(pattern.toLowerCase())) ||
-    targetFunctionNames.some((functionName) => text.includes(functionName.toLowerCase())) ||
-    (targetActionDescription.length > 0 && text.includes(targetActionDescription.toLowerCase()));
+  const text =
+    typeof value === 'string'
+      ? value.toLowerCase()
+      : JSON.stringify(value ?? '').toLowerCase();
+  return (
+    targetKeywords.some(keyword => text.includes(keyword.toLowerCase())) ||
+    targetUrlPatterns.some(pattern => text.includes(pattern.toLowerCase())) ||
+    targetFunctionNames.some(functionName =>
+      text.includes(functionName.toLowerCase()),
+    ) ||
+    (targetActionDescription.length > 0 &&
+      text.includes(targetActionDescription.toLowerCase()))
+  );
 }
 
 function filterRuntimeEvidence(
@@ -132,20 +152,21 @@ function filterRuntimeEvidence(
   targetActionDescription: string,
   maxEvidenceItems: number,
 ): Array<Record<string, unknown>> {
-  const filtered = (
+  const filtered =
     targetKeywords.length === 0 &&
     targetUrlPatterns.length === 0 &&
     targetFunctionNames.length === 0 &&
     targetActionDescription.length === 0
-  )
-    ? records
-    : records.filter((record) => matchesTargetText(
-      record,
-      targetKeywords,
-      targetUrlPatterns,
-      targetFunctionNames,
-      targetActionDescription,
-    ));
+      ? records
+      : records.filter(record =>
+          matchesTargetText(
+            record,
+            targetKeywords,
+            targetUrlPatterns,
+            targetFunctionNames,
+            targetActionDescription,
+          ),
+        );
   return filtered.slice(0, maxEvidenceItems);
 }
 
@@ -164,13 +185,17 @@ function pickTargetScript(
   ) {
     return files[0];
   }
-  return files.find((file) => matchesTargetText(
-    file,
-    targetKeywords,
-    targetUrlPatterns,
-    targetFunctionNames,
-    targetActionDescription,
-  )) ?? files[0];
+  return (
+    files.find(file =>
+      matchesTargetText(
+        file,
+        targetKeywords,
+        targetUrlPatterns,
+        targetFunctionNames,
+        targetActionDescription,
+      ),
+    ) ?? files[0]
+  );
 }
 
 async function buildAutoBundle(
@@ -199,12 +224,13 @@ async function buildAutoBundle(
     options.targetActionDescription,
   );
   const page = await runtime.pageController.getPage();
-  const [cookies, localStorage, sessionStorage, runtimeEvidence] = await Promise.all([
-    runtime.pageController.getCookies(),
-    runtime.pageController.getLocalStorage(),
-    runtime.pageController.getSessionStorage(),
-    runtime.reverseTaskStore.readLog('runtime-evidence', taskId),
-  ]);
+  const [cookies, localStorage, sessionStorage, runtimeEvidence] =
+    await Promise.all([
+      runtime.pageController.getCookies(),
+      runtime.pageController.getLocalStorage(),
+      runtime.pageController.getSessionStorage(),
+      runtime.reverseTaskStore.readLog('runtime-evidence', taskId),
+    ]);
   const filteredRuntimeEvidence = filterRuntimeEvidence(
     runtimeEvidence,
     options.targetKeywords,
@@ -231,19 +257,31 @@ async function buildAutoBundle(
     envCode: buildAutoEnvCode(capture),
     polyfillsCode: '',
     capture,
-    notes: appendTargetContextNotes([
-      targetScript ? `auto-selected target script: ${targetScript.url}` : 'no target script selected from collector',
-      filteredRuntimeEvidence.length > 0 ? `filtered runtime evidence records: ${filteredRuntimeEvidence.length}` : 'no runtime evidence records found after target filtering',
-    ], options),
+    notes: appendTargetContextNotes(
+      [
+        targetScript
+          ? `auto-selected target script: ${targetScript.url}`
+          : 'no target script selected from collector',
+        filteredRuntimeEvidence.length > 0
+          ? `filtered runtime evidence records: ${filteredRuntimeEvidence.length}`
+          : 'no runtime evidence records found after target filtering',
+      ],
+      options,
+    ),
   };
 }
 
-function inferMissingCapabilities(runtimeError: string, observedCapabilities: string[]): Array<{
+function inferMissingCapabilities(
+  runtimeError: string,
+  observedCapabilities: string[],
+): Array<{
   capability: string;
   reason: string;
   priority: number;
 }> {
-  const available = new Set(observedCapabilities.map((item) => item.toLowerCase()));
+  const available = new Set(
+    observedCapabilities.map(item => item.toLowerCase()),
+  );
   const normalizedError = runtimeError.toLowerCase();
   const candidates = [
     {
@@ -279,19 +317,24 @@ function inferMissingCapabilities(runtimeError: string, observedCapabilities: st
   ];
 
   return candidates
-    .filter((candidate) =>
-      available.has(candidate.capability.toLowerCase()) &&
-      candidate.patterns.some((pattern) => normalizedError.includes(pattern)),
+    .filter(
+      candidate =>
+        available.has(candidate.capability.toLowerCase()) &&
+        candidate.patterns.some(pattern => normalizedError.includes(pattern)),
     )
     .sort((a, b) => b.priority - a.priority);
 }
 
 export const exportRebuildBundle = defineTool({
   name: 'export_rebuild_bundle',
-  description: 'Export a local Node rebuild bundle from observed reverse-engineering evidence.',
-  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: false},
+  description:
+    'Export a local Node rebuild bundle from observed reverse-engineering evidence.',
+  annotations: {
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: false,
+    title: 'Export rebuild bundle',
+  },
   schema: {
-    taskId: zod.string(),
     taskSlug: zod.string(),
     targetUrl: zod.string(),
     goal: zod.string(),
@@ -331,14 +374,33 @@ export const exportRebuildBundle = defineTool({
           notes: request.params.notes,
         };
 
-    if (!request.params.autoGenerate && (!request.params.entryCode || !request.params.envCode || !request.params.capture)) {
-      throw new Error('entryCode, envCode, and capture are required unless autoGenerate=true.');
+    if (
+      !request.params.autoGenerate &&
+      (!request.params.entryCode ||
+        !request.params.envCode ||
+        !request.params.capture)
+    ) {
+      throw new Error(
+        'entryCode, envCode, and capture are required unless autoGenerate=true.',
+      );
     }
 
-    await writeArtifactFile(task.taskDir, 'env/entry.js', `${bundle.entryCode}\n`);
+    await writeArtifactFile(
+      task.taskDir,
+      'env/entry.js',
+      `${bundle.entryCode}\n`,
+    );
     await writeArtifactFile(task.taskDir, 'env/env.js', `${bundle.envCode}\n`);
-    await writeArtifactFile(task.taskDir, 'env/polyfills.js', `${bundle.polyfillsCode}\n`);
-    await writeArtifactFile(task.taskDir, 'env/capture.json', `${JSON.stringify(bundle.capture, null, 2)}\n`);
+    await writeArtifactFile(
+      task.taskDir,
+      'env/polyfills.js',
+      `${bundle.polyfillsCode}\n`,
+    );
+    await writeArtifactFile(
+      task.taskDir,
+      'env/capture.json',
+      `${JSON.stringify(bundle.capture, null, 2)}\n`,
+    );
 
     const report = [
       '# Rebuild Bundle',
@@ -348,32 +410,43 @@ export const exportRebuildBundle = defineTool({
       `- Goal: ${request.params.goal}`,
       '',
       '## Notes',
-      ...bundle.notes.map((note) => `- ${note}`),
+      ...bundle.notes.map(note => `- ${note}`),
     ].join('\n');
     await writeArtifactFile(task.taskDir, 'report.md', `${report}\n`);
 
     response.appendResponseLine('```json');
-    response.appendResponseLine(JSON.stringify({
-      ok: true,
-      taskId: task.taskId,
-      taskDir: task.taskDir,
-      autoGenerated: Boolean(request.params.autoGenerate),
-      files: [
-        'env/entry.js',
-        'env/env.js',
-        'env/polyfills.js',
-        'env/capture.json',
-        'report.md',
-      ],
-    }, null, 2));
+    response.appendResponseLine(
+      JSON.stringify(
+        {
+          ok: true,
+          taskId: task.taskId,
+          taskDir: task.taskDir,
+          autoGenerated: Boolean(request.params.autoGenerate),
+          files: [
+            'env/entry.js',
+            'env/env.js',
+            'env/polyfills.js',
+            'env/capture.json',
+            'report.md',
+          ],
+        },
+        null,
+        2,
+      ),
+    );
     response.appendResponseLine('```');
   },
 });
 
 export const diffEnvRequirements = defineTool({
   name: 'diff_env_requirements',
-  description: 'Compare local runtime failures with observed browser capabilities and suggest the next environment patches.',
-  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+  description:
+    'Compare local runtime failures with observed browser capabilities and suggest the next environment patches.',
+  annotations: {
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: true,
+    title: 'Compare environment requirements',
+  },
   schema: {
     runtimeError: zod.string(),
     observedCapabilities: zod.array(zod.string()).default([]),
@@ -383,17 +456,23 @@ export const diffEnvRequirements = defineTool({
       request.params.runtimeError,
       request.params.observedCapabilities,
     );
-    const nextPatches = missingCapabilities.map((item) => ({
+    const nextPatches = missingCapabilities.map(item => ({
       capability: item.capability,
       reason: item.reason,
       suggestedPatch: `Add a minimal ${item.capability} shim based on browser evidence before retrying the entry script.`,
     }));
 
     response.appendResponseLine('```json');
-    response.appendResponseLine(JSON.stringify({
-      missingCapabilities: missingCapabilities.map((item) => item.capability),
-      nextPatches,
-    }, null, 2));
+    response.appendResponseLine(
+      JSON.stringify(
+        {
+          missingCapabilities: missingCapabilities.map(item => item.capability),
+          nextPatches,
+        },
+        null,
+        2,
+      ),
+    );
     response.appendResponseLine('```');
   },
 });

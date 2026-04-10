@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -63,7 +62,10 @@ export class ToolRegistry {
   }
 
   aliasEntries(): Array<{alias: string; canonical: string}> {
-    return Array.from(this.aliases.entries()).map(([alias, canonical]) => ({alias, canonical}));
+    return Array.from(this.aliases.entries()).map(([alias, canonical]) => ({
+      alias,
+      canonical,
+    }));
   }
 
   validateName(name: string): boolean {

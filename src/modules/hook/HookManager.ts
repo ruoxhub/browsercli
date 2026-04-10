@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -19,8 +18,8 @@
  * - 可扩展：运行时注册新的 hook 类型
  */
 
-import { HookCodeBuilder, type BuilderConfig } from './HookCodeBuilder.js';
-import { HookTypeRegistry, type HookTypePlugin } from './HookTypeRegistry.js';
+import {HookCodeBuilder, type BuilderConfig} from './HookCodeBuilder.js';
+import {HookTypeRegistry, type HookTypePlugin} from './HookTypeRegistry.js';
 
 // ==================== 公共类型 ====================
 
@@ -137,19 +136,24 @@ export class HookManager {
    * 通过声明式配置创建 hook
    * 这是最常用的方式，传入配置对象即可生成脚本
    */
-  create(options: HookCreateOptions): { hookId: string; script: string } {
-    const { type, params = {}, hookId: customId } = options;
+  create(options: HookCreateOptions): {hookId: string; script: string} {
+    const {type, params = {}, hookId: customId} = options;
 
     // 查找插件
     const plugin = this.registry.get(type);
     if (!plugin) {
       throw new Error(
-        `Unknown hook type: "${type}". Available types: ${this.registry.list().map(p => p.name).join(', ')}`
+        `Unknown hook type: "${type}". Available types: ${this.registry
+          .list()
+          .map(p => p.name)
+          .join(', ')}`,
       );
     }
 
     // 创建 builder 并应用基础配置
-    const hookId = customId || `${type}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const hookId =
+      customId ||
+      `${type}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const builder = new HookCodeBuilder(hookId);
 
     // 应用通用配置
@@ -181,7 +185,7 @@ export class HookManager {
     this.hooks.set(hookId, meta);
     this.hookData.set(hookId, []);
 
-    return { hookId, script };
+    return {hookId, script};
   }
 
   /**
@@ -190,8 +194,8 @@ export class HookManager {
    */
   createWithBuilder(
     builderFn: (builder: HookCodeBuilder) => HookCodeBuilder,
-    meta?: { type?: string; description?: string }
-  ): { hookId: string; script: string } {
+    meta?: {type?: string; description?: string},
+  ): {hookId: string; script: string} {
     const builder = new HookCodeBuilder();
     const configured = builderFn(builder);
     const config = configured.getConfig();
@@ -205,19 +209,19 @@ export class HookManager {
       createdAt: Date.now(),
       callCount: 0,
       script,
-      config: { type: meta?.type || 'custom' },
+      config: {type: meta?.type || 'custom'},
     };
 
     this.hooks.set(config.hookId, hookMeta);
     this.hookData.set(config.hookId, []);
 
-    return { hookId: config.hookId, script };
+    return {hookId: config.hookId, script};
   }
 
   /**
    * 从序列化的 BuilderConfig 恢复 hook
    */
-  createFromConfig(config: BuilderConfig): { hookId: string; script: string } {
+  createFromConfig(config: BuilderConfig): {hookId: string; script: string} {
     const builder = HookCodeBuilder.fromConfig(config);
     const script = builder.build();
 
@@ -229,13 +233,13 @@ export class HookManager {
       createdAt: Date.now(),
       callCount: 0,
       script,
-      config: { type: 'restored' },
+      config: {type: 'restored'},
     };
 
     this.hooks.set(config.hookId, hookMeta);
     this.hookData.set(config.hookId, []);
 
-    return { hookId: config.hookId, script };
+    return {hookId: config.hookId, script};
   }
 
   // ==================== Hook 管理 ====================
@@ -461,7 +465,10 @@ export class HookManager {
 
   // ==================== 内部方法 ====================
 
-  private applyCommonConfig(builder: HookCodeBuilder, options: HookCreateOptions): void {
+  private applyCommonConfig(
+    builder: HookCodeBuilder,
+    options: HookCreateOptions,
+  ): void {
     if (options.description) builder.describe(options.description);
     if (options.action) builder.action(options.action);
     if (options.asyncAware) builder.async(options.asyncAware);
@@ -471,7 +478,10 @@ export class HookManager {
     if (cap) {
       if (cap.args) builder.captureArgs();
       if (cap.returnValue) builder.captureReturn();
-      if (cap.stack) builder.captureStack(typeof cap.stack === 'number' ? cap.stack : undefined);
+      if (cap.stack)
+        builder.captureStack(
+          typeof cap.stack === 'number' ? cap.stack : undefined,
+        );
       if (cap.timing) builder.captureTiming();
       if (cap.thisContext) builder.captureThis();
     }
@@ -498,8 +508,10 @@ export class HookManager {
     // 存储
     const st = options.store;
     if (st) {
-      if (st.globalKey || st.maxRecords) builder.storeTo(st.globalKey || '__hookStore', st.maxRecords);
-      if (st.console !== undefined || st.consoleFormat) builder.console(st.console ?? true, st.consoleFormat);
+      if (st.globalKey || st.maxRecords)
+        builder.storeTo(st.globalKey || '__hookStore', st.maxRecords);
+      if (st.console !== undefined || st.consoleFormat)
+        builder.console(st.console ?? true, st.consoleFormat);
       if (st.serializer) builder.serializer(st.serializer);
     }
   }
@@ -508,12 +520,15 @@ export class HookManager {
     const lines: string[] = ['hookId,type,timestamp,target,data'];
 
     for (const [hookId, info] of Object.entries(allData)) {
-      const records = (info as Record<string, unknown>).records as HookDataRecord[];
+      const records = (info as Record<string, unknown>)
+        .records as HookDataRecord[];
       if (!records) continue;
       for (const rec of records) {
         const target = (rec.target as string) || '';
         const dataStr = JSON.stringify(rec).replace(/"/g, '""');
-        lines.push(`"${hookId}","${target}",${rec.timestamp},"${target}","${dataStr}"`);
+        lines.push(
+          `"${hookId}","${target}",${rec.timestamp},"${target}","${dataStr}"`,
+        );
       }
     }
 

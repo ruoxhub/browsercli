@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * @license
  * Copyright 2025 Google LLC
@@ -78,7 +77,7 @@ function normalizeUrl(url: string): string {
  * third-party Common.ObjectWrapper in ES module loading.
  */
 export class FakeIssuesManager {
-  #listeners: Map<string, Set<(...args: any[]) => void>> = new Map();
+  #listeners = new Map<string, Set<(...args: any[]) => void>>();
 
   addEventListener(event: string, listener: (...args: any[]) => void): void {
     if (!this.#listeners.has(event)) {
@@ -102,7 +101,10 @@ export class FakeIssuesManager {
 
 export function mapIssueToMessageObject(issue: AggregatedIssue) {
   const count = issue.getAggregatedIssuesCount();
-  const markdownDescription = issue.getDescription();
+  const markdownDescription = issue.getDescription() as unknown as {
+    file?: string;
+    substitutions?: Record<string, unknown>;
+  } | null;
   const filename = markdownDescription?.file;
   if (!markdownDescription) {
     logger(`no description found for issue:` + issue.code);

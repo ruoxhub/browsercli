@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -6,21 +5,21 @@
  */
 /**
  * EventBreakpointManager - 事件监听器断点管理
- * 
+ *
  * 功能：
  * 1. 设置事件监听器断点（按事件类型）
  * 2. 在事件触发时暂停执行
  * 3. 支持预定义的事件类别（鼠标、键盘、定时器等）
- * 
+ *
  * 设计原则：
  * - 使用 CDP DOMDebugger.setEventListenerBreakpoint
  * - 提供常用事件类别的快捷方法
  * - 支持自定义事件名称
  */
 
-import type { CDPSession } from 'puppeteer';
+import type {CDPSession} from 'puppeteer';
 
-import { logger } from '../../utils/logger.js';
+import {logger} from '../../utils/logger.js';
 
 /**
  * 事件断点信息
@@ -44,10 +43,22 @@ export class EventBreakpointManager {
   private breakpointCounter = 0;
 
   // 预定义的事件类别
-  static readonly MOUSE_EVENTS = ['click', 'dblclick', 'mousedown', 'mouseup', 'mousemove', 'mouseenter', 'mouseleave'];
+  static readonly MOUSE_EVENTS = [
+    'click',
+    'dblclick',
+    'mousedown',
+    'mouseup',
+    'mousemove',
+    'mouseenter',
+    'mouseleave',
+  ];
   static readonly KEYBOARD_EVENTS = ['keydown', 'keyup', 'keypress'];
   // Timer 使用 Instrumentation Breakpoint（非 DOM 事件）
-  static readonly TIMER_INSTRUMENTATION_EVENTS = ['TimerInstall', 'TimerFire', 'AnimationFrameFired'];
+  static readonly TIMER_INSTRUMENTATION_EVENTS = [
+    'TimerInstall',
+    'TimerFire',
+    'AnimationFrameFired',
+  ];
   static readonly WEBSOCKET_EVENTS = ['message', 'open', 'close', 'error'];
 
   /**
@@ -63,7 +74,10 @@ export class EventBreakpointManager {
    * @param eventName 事件名称（如 'click', 'setTimeout'）
    * @param targetName 可选的目标名称
    */
-  async setEventListenerBreakpoint(eventName: string, targetName?: string): Promise<string> {
+  async setEventListenerBreakpoint(
+    eventName: string,
+    targetName?: string,
+  ): Promise<string> {
     try {
       // 调用 CDP API 设置事件监听器断点
       await this.cdpSession.send('DOMDebugger.setEventListenerBreakpoint', {
@@ -82,7 +96,10 @@ export class EventBreakpointManager {
         createdAt: Date.now(),
       });
 
-      logger.info(`Event listener breakpoint set: ${eventName}`, { breakpointId, targetName });
+      logger.info(`Event listener breakpoint set: ${eventName}`, {
+        breakpointId,
+        targetName,
+      });
       return breakpointId;
     } catch (error) {
       logger.error('Failed to set event listener breakpoint:', error);
@@ -101,14 +118,20 @@ export class EventBreakpointManager {
 
     try {
       if (breakpoint.targetName === '__instrumentation__') {
-        await this.cdpSession.send('DOMDebugger.removeInstrumentationBreakpoint', {
-          eventName: breakpoint.eventName,
-        });
+        await this.cdpSession.send(
+          'DOMDebugger.removeInstrumentationBreakpoint',
+          {
+            eventName: breakpoint.eventName,
+          },
+        );
       } else {
-        await this.cdpSession.send('DOMDebugger.removeEventListenerBreakpoint', {
-          eventName: breakpoint.eventName,
-          targetName: breakpoint.targetName,
-        });
+        await this.cdpSession.send(
+          'DOMDebugger.removeEventListenerBreakpoint',
+          {
+            eventName: breakpoint.eventName,
+            targetName: breakpoint.targetName,
+          },
+        );
       }
 
       this.eventBreakpoints.delete(breakpointId);
@@ -168,7 +191,10 @@ export class EventBreakpointManager {
         });
         breakpointIds.push(breakpointId);
       } catch (error) {
-        logger.warn(`Failed to set timer instrumentation breakpoint: ${event}`, error);
+        logger.warn(
+          `Failed to set timer instrumentation breakpoint: ${event}`,
+          error,
+        );
       }
     }
     logger.info(`Set ${breakpointIds.length} timer event breakpoints`);
@@ -212,14 +238,20 @@ export class EventBreakpointManager {
       try {
         if (bp.targetName === '__instrumentation__') {
           // Instrumentation 断点用对应的 remove API
-          await this.cdpSession.send('DOMDebugger.removeInstrumentationBreakpoint', {
-            eventName: bp.eventName,
-          });
+          await this.cdpSession.send(
+            'DOMDebugger.removeInstrumentationBreakpoint',
+            {
+              eventName: bp.eventName,
+            },
+          );
         } else {
-          await this.cdpSession.send('DOMDebugger.removeEventListenerBreakpoint', {
-            eventName: bp.eventName,
-            targetName: bp.targetName,
-          });
+          await this.cdpSession.send(
+            'DOMDebugger.removeEventListenerBreakpoint',
+            {
+              eventName: bp.eventName,
+              targetName: bp.targetName,
+            },
+          );
         }
       } catch (error) {
         logger.warn(`Failed to remove event breakpoint ${bp.id}:`, error);
@@ -243,4 +275,3 @@ export class EventBreakpointManager {
     }
   }
 }
-

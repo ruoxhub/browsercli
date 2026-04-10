@@ -16,11 +16,11 @@
  * - 支持随时中断
  */
 
-import type { AIService } from '../../services/AIService.js';
-import { logger } from '../../utils/logger.js';
+import type {AIService} from '../../services/AIService.js';
+import {logger} from '../../utils/logger.js';
 
-import type { DebuggerManager, CallFrame } from './DebuggerManager.js';
-import type { XHRBreakpointManager } from './XHRBreakpointManager.js';
+import type {DebuggerManager, CallFrame} from './DebuggerManager.js';
+import type {XHRBreakpointManager} from './XHRBreakpointManager.js';
 
 // ==================== 类型定义 ====================
 
@@ -165,7 +165,7 @@ export class AIContinuousDebugger {
   constructor(
     private debuggerManager: DebuggerManager,
     private xhrManager: XHRBreakpointManager,
-    private aiService: AIService
+    private aiService: AIService,
   ) {}
 
   /**
@@ -179,7 +179,7 @@ export class AIContinuousDebugger {
    * 获取统计信息
    */
   getStats(): DebugSessionStats {
-    return { ...this.stats };
+    return {...this.stats};
   }
 
   /**
@@ -245,7 +245,9 @@ export class AIContinuousDebugger {
       this.status = 'completed';
     } catch (error) {
       this.status = 'error';
-      this.stats.errors.push(error instanceof Error ? error.message : String(error));
+      this.stats.errors.push(
+        error instanceof Error ? error.message : String(error),
+      );
       logger.error('AI continuous debugging error:', error);
       throw error;
     } finally {
@@ -260,7 +262,9 @@ export class AIContinuousDebugger {
   async xhrToJsBreakpoint(urlPattern: string): Promise<XhrToJsResult> {
     // 阶段 1: 设置 XHR 断点并等待触发
     const breakpointId = await this.xhrManager.setXHRBreakpoint(urlPattern);
-    logger.info(`XHR breakpoint set: ${breakpointId} for pattern: ${urlPattern}`);
+    logger.info(
+      `XHR breakpoint set: ${breakpointId} for pattern: ${urlPattern}`,
+    );
 
     try {
       // 等待 XHR 断点触发 (最多等待 30 秒)
@@ -336,8 +340,8 @@ export class AIContinuousDebugger {
       const functionName = frame.functionName || '';
 
       // 检查是否是 vendor 代码
-      const isVendor = vendorPatterns.some(pattern =>
-        url.includes(pattern) || functionName.includes(pattern)
+      const isVendor = vendorPatterns.some(
+        pattern => url.includes(pattern) || functionName.includes(pattern),
       );
 
       // 检查是否是匿名函数或内部函数（通常是业务代码）
@@ -357,7 +361,9 @@ export class AIContinuousDebugger {
   /**
    * 运行连续调试循环
    */
-  private async runContinuousLoop(config: ContinuousDebugConfig): Promise<void> {
+  private async runContinuousLoop(
+    config: ContinuousDebugConfig,
+  ): Promise<void> {
     const maxIterations = config.maxIterations ?? 50;
     const timeoutMs = config.timeoutMs ?? 300000;
     const startTime = Date.now();
@@ -393,12 +399,16 @@ export class AIContinuousDebugger {
         const aiLatency = Date.now() - aiStartTime;
         aiLatencies.push(aiLatency);
 
-        logger.info(`Iteration ${iteration + 1}: Decision - ${decision.action} (${decision.reason})`);
+        logger.info(
+          `Iteration ${iteration + 1}: Decision - ${decision.action} (${decision.reason})`,
+        );
 
         // 记录统计
         this.stats.iterations++;
-        this.stats.decisions[decision.action] = (this.stats.decisions[decision.action] ?? 0) + 1;
-        this.stats.avgAiLatencyMs = aiLatencies.reduce((a, b) => a + b, 0) / aiLatencies.length;
+        this.stats.decisions[decision.action] =
+          (this.stats.decisions[decision.action] ?? 0) + 1;
+        this.stats.avgAiLatencyMs =
+          aiLatencies.reduce((a, b) => a + b, 0) / aiLatencies.length;
 
         // 记录历史
         this.iterationHistory.push({
@@ -437,7 +447,7 @@ export class AIContinuousDebugger {
    */
   private async collectDebugInfo(
     pausedState: any,
-    iteration: number
+    iteration: number,
   ): Promise<DebugInfo> {
     const topFrame = pausedState.callFrames[0];
 
@@ -461,7 +471,7 @@ export class AIContinuousDebugger {
         type: v.type,
         scope: v.scope,
       })),
-      hitCount: 1, // TODO: 从断点信息获取
+      hitCount: this.stats.iterations + 1,
       iteration,
     };
   }
@@ -471,7 +481,7 @@ export class AIContinuousDebugger {
    */
   private async analyzeAndDecide(
     debugInfo: DebugInfo,
-    config: ContinuousDebugConfig
+    config: ContinuousDebugConfig,
   ): Promise<Decision> {
     const systemPrompt = config.systemPrompt ?? DEFAULT_SYSTEM_PROMPT;
 
@@ -481,13 +491,13 @@ export class AIContinuousDebugger {
     try {
       const response = await this.aiService.chat(
         [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
+          {role: 'system', content: systemPrompt},
+          {role: 'user', content: userPrompt},
         ],
         {
           temperature: 0.1,
           maxTokens: 500,
-        }
+        },
       );
 
       // 解析 JSON 响应
@@ -499,7 +509,11 @@ export class AIContinuousDebugger {
       const decision = JSON.parse(content) as Decision;
 
       // 验证决策有效性
-      if (!['step_into', 'step_over', 'step_out', 'resume', 'stop'].includes(decision.action)) {
+      if (
+        !['step_into', 'step_over', 'step_out', 'resume', 'stop'].includes(
+          decision.action,
+        )
+      ) {
         logger.warn('Invalid AI decision, defaulting to step_over:', decision);
         return {
           action: 'step_over',
@@ -515,19 +529,23 @@ export class AIContinuousDebugger {
       // 重试逻辑 (最多 2 次)
       for (let i = 0; i < 2; i++) {
         try {
-          await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, i)));
+          await new Promise(resolve =>
+            setTimeout(resolve, 1000 * Math.pow(2, i)),
+          );
           const response = await this.aiService.chat(
             [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: userPrompt },
+              {role: 'system', content: systemPrompt},
+              {role: 'user', content: userPrompt},
             ],
             {
               temperature: 0.1,
               maxTokens: 500,
-            }
+            },
           );
 
-          const decision = JSON.parse(response.content?.trim() ?? '{}') as Decision;
+          const decision = JSON.parse(
+            response.content?.trim() ?? '{}',
+          ) as Decision;
           if (decision.action) {
             return decision;
           }
@@ -549,20 +567,27 @@ export class AIContinuousDebugger {
    * 构建用户提示词
    */
   private buildUserPrompt(debugInfo: DebugInfo): string {
-    const callStackPreview = debugInfo.callStack.slice(0, 5).map((frame, i) => {
-      const functionName = frame.functionName || '(anonymous)';
-      const location = frame.url
-        ? `${frame.url}:${frame.location.lineNumber + 1}`
-        : `script:${frame.location.scriptId}`;
-      return `${i + 1}. ${functionName} @ ${location}`;
-    }).join('\n');
+    const callStackPreview = debugInfo.callStack
+      .slice(0, 5)
+      .map((frame, i) => {
+        const functionName = frame.functionName || '(anonymous)';
+        const location = frame.url
+          ? `${frame.url}:${frame.location.lineNumber + 1}`
+          : `script:${frame.location.scriptId}`;
+        return `${i + 1}. ${functionName} @ ${location}`;
+      })
+      .join('\n');
 
-    const scopeVarsPreview = debugInfo.scopeVariables.slice(0, 10).map(v => {
-      const valueStr = typeof v.value === 'object'
-        ? JSON.stringify(v.value).slice(0, 100)
-        : String(v.value);
-      return `  ${v.name} (${v.type}): ${valueStr}`;
-    }).join('\n');
+    const scopeVarsPreview = debugInfo.scopeVariables
+      .slice(0, 10)
+      .map(v => {
+        const valueStr =
+          typeof v.value === 'object'
+            ? JSON.stringify(v.value).slice(0, 100)
+            : String(v.value);
+        return `  ${v.name} (${v.type}): ${valueStr}`;
+      })
+      .join('\n');
 
     return `## 当前调试状态
 

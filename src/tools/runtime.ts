@@ -3,9 +3,9 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+import {BrowserManager, type BrowserManagerConfig} from '../browser.js';
 import {AISummarizer} from '../modules/analyzer/AISummarizer.js';
 import {CodeAnalyzer} from '../modules/analyzer/CodeAnalyzer.js';
-import {BrowserManager, type BrowserManagerConfig} from '../browser.js';
 import {CodeCollector} from '../modules/collector/CodeCollector.js';
 import {DOMInspector} from '../modules/collector/DOMInspector.js';
 import {PageController} from '../modules/collector/PageController.js';

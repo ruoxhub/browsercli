@@ -1,5 +1,3 @@
-
-// @ts-nocheck
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -9,21 +7,27 @@ import {zod} from '../third_party/index.js';
 import {TokenBudgetManager} from '../utils/TokenBudgetManager.js';
 
 import {ToolCategory} from './categories.js';
-import {getJSHookRuntime} from './runtime.js';
+import type {getJSHookRuntime} from './runtime.js';
 import {defineTool} from './ToolDefinition.js';
-
 
 export const deobfuscateCode = defineTool({
   name: 'deobfuscate_code',
   description: 'AI-assisted JavaScript deobfuscation.',
-  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+  annotations: {
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: true,
+    title: 'Deobfuscate JavaScript',
+  },
   schema: {
     code: zod.string(),
     aggressive: zod.boolean().optional(),
     renameVariables: zod.boolean().optional(),
   },
   handler: async (request, response, context, runtime) => {
-    const result = await runtime.deobfuscator.deobfuscate(request.params);
+    void context;
+    const result = await runtime.deobfuscator.deobfuscate(
+      request.params as any,
+    );
     response.appendResponseLine('```json');
     response.appendResponseLine(JSON.stringify(result, null, 2));
     response.appendResponseLine('```');
@@ -32,14 +36,20 @@ export const deobfuscateCode = defineTool({
 
 export const understandCode = defineTool({
   name: 'understand_code',
-  description: 'Analyze code structure/business/security with AI + static analysis.',
-  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+  description:
+    'Analyze code structure/business/security with AI + static analysis.',
+  annotations: {
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: true,
+    title: 'Analyze code structure and logic',
+  },
   schema: {
     code: zod.string(),
     focus: zod.enum(['all', 'structure', 'business', 'security']).optional(),
   },
   handler: async (request, response, context, runtime) => {
-    const result = await runtime.analyzer.understand(request.params);
+    void context;
+    const result = await runtime.analyzer.understand(request.params as any);
     response.appendResponseLine('```json');
     response.appendResponseLine(JSON.stringify(result, null, 2));
     response.appendResponseLine('```');
@@ -48,23 +58,40 @@ export const understandCode = defineTool({
 
 export const summarizeCode = defineTool({
   name: 'summarize_code',
-  description: 'Summarize one code file, multiple files, or project-level context.',
-  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+  description:
+    'Summarize one code file, multiple files, or project-level context.',
+  annotations: {
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: true,
+    title: 'Summarize code at scale',
+  },
   schema: {
     mode: zod.enum(['single', 'batch', 'project']).default('single'),
     code: zod.string().optional(),
     url: zod.string().optional(),
-    files: zod.array(zod.object({
-      url: zod.string(),
-      content: zod.string(),
-      size: zod.number().int().nonnegative(),
-      type: zod.enum(['inline', 'external', 'dynamic', 'service-worker', 'web-worker']),
-    })).optional(),
+    files: zod
+      .array(
+        zod.object({
+          url: zod.string(),
+          content: zod.string(),
+          size: zod.number().int().nonnegative(),
+          type: zod.enum([
+            'inline',
+            'external',
+            'dynamic',
+            'service-worker',
+            'web-worker',
+          ]),
+        }),
+      )
+      .optional(),
   },
   handler: async (request, response, context, runtime) => {
-
+    void context;
     if (request.params.mode === 'project') {
-      const result = await runtime.summarizer.summarizeProject(request.params.files ?? []);
+      const result = await runtime.summarizer.summarizeProject(
+        (request.params.files ?? []) as any,
+      );
       response.appendResponseLine('```json');
       response.appendResponseLine(JSON.stringify(result, null, 2));
       response.appendResponseLine('```');
@@ -72,7 +99,9 @@ export const summarizeCode = defineTool({
     }
 
     if (request.params.mode === 'batch') {
-      const result = await runtime.summarizer.summarizeBatch(request.params.files ?? []);
+      const result = await runtime.summarizer.summarizeBatch(
+        (request.params.files ?? []) as any,
+      );
       response.appendResponseLine('```json');
       response.appendResponseLine(JSON.stringify(result, null, 2));
       response.appendResponseLine('```');
@@ -94,21 +123,29 @@ export const summarizeCode = defineTool({
 
 export const detectCrypto = defineTool({
   name: 'detect_crypto',
-  description: 'Detect cryptographic algorithms/libraries from JavaScript source.',
-  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+  description:
+    'Detect cryptographic algorithms/libraries from JavaScript source.',
+  annotations: {
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: true,
+    title: 'Detect cryptographic patterns',
+  },
   schema: {
     code: zod.string(),
     useAI: zod.boolean().optional(),
   },
   handler: async (request, response, context, runtime) => {
-    const result = await runtime.cryptoDetector.detect(request.params);
+    void context;
+    const result = await runtime.cryptoDetector.detect(request.params as any);
     response.appendResponseLine('```json');
     response.appendResponseLine(JSON.stringify(result, null, 2));
     response.appendResponseLine('```');
   },
 });
 
-function normalizeCollectedFiles(result: unknown): Array<{url: string; content: string; size: number; type: string}> {
+function normalizeCollectedFiles(
+  result: unknown,
+): Array<{url: string; content: string; size: number; type: string}> {
   if (!result || typeof result !== 'object') {
     return [];
   }
@@ -117,11 +154,25 @@ function normalizeCollectedFiles(result: unknown): Array<{url: string; content: 
     return [];
   }
   return files
-    .filter((item): item is {url?: unknown; content?: unknown; size?: unknown; type?: unknown} => Boolean(item && typeof item === 'object'))
-    .map((file) => ({
+    .filter(
+      (
+        item,
+      ): item is {
+        url?: unknown;
+        content?: unknown;
+        size?: unknown;
+        type?: unknown;
+      } => Boolean(item && typeof item === 'object'),
+    )
+    .map(file => ({
       url: typeof file.url === 'string' ? file.url : 'unknown',
       content: typeof file.content === 'string' ? file.content : '',
-      size: typeof file.size === 'number' ? file.size : (typeof file.content === 'string' ? file.content.length : 0),
+      size:
+        typeof file.size === 'number'
+          ? file.size
+          : typeof file.content === 'string'
+            ? file.content.length
+            : 0,
       type: typeof file.type === 'string' ? file.type : 'external',
     }));
 }
@@ -133,7 +184,9 @@ function toRecord(value: unknown): Record<string, unknown> | undefined {
   return value as Record<string, unknown>;
 }
 
-function toMirroredNetworkEntry(entry: Record<string, unknown>): Record<string, unknown> | undefined {
+function toMirroredNetworkEntry(
+  entry: Record<string, unknown>,
+): Record<string, unknown> | undefined {
   const request = toRecord(entry.request);
   if (!request || typeof request.url !== 'string') {
     return undefined;
@@ -154,10 +207,15 @@ function toMirroredNetworkEntry(entry: Record<string, unknown>): Record<string, 
   return mirrored;
 }
 
-function toMirroredScriptEntry(entry: Record<string, unknown>): Record<string, unknown> | undefined {
-  const scriptUrl = typeof entry.scriptUrl === 'string'
-    ? entry.scriptUrl
-    : (typeof entry.url === 'string' ? entry.url : undefined);
+function toMirroredScriptEntry(
+  entry: Record<string, unknown>,
+): Record<string, unknown> | undefined {
+  const scriptUrl =
+    typeof entry.scriptUrl === 'string'
+      ? entry.scriptUrl
+      : typeof entry.url === 'string'
+        ? entry.url
+        : undefined;
   const hasLocator = Boolean(toRecord(entry.locator));
   const hasScriptId = typeof entry.scriptId === 'string';
   if (!scriptUrl || (!hasLocator && !hasScriptId)) {
@@ -181,7 +239,9 @@ function toMirroredScriptEntry(entry: Record<string, unknown>): Record<string, u
   return mirrored;
 }
 
-function buildHookTimeline(hookRecords: Array<{hookId: string; records: Array<Record<string, unknown>>}>): Array<{
+function buildHookTimeline(
+  hookRecords: Array<{hookId: string; records: Array<Record<string, unknown>>}>,
+): Array<{
   hookId: string;
   target: string;
   url?: string;
@@ -196,18 +256,28 @@ function buildHookTimeline(hookRecords: Array<{hookId: string; records: Array<Re
       return [];
     }
     const text = value.toLowerCase();
-    const indicators = ['sign', 'signature', 'token', 'auth', 'x-sign', 'hmac', 'nonce']
-      .filter((keyword) => text.includes(keyword));
+    const indicators = [
+      'sign',
+      'signature',
+      'token',
+      'auth',
+      'x-sign',
+      'hmac',
+      'nonce',
+    ].filter(keyword => text.includes(keyword));
     return [...new Set(indicators)];
   };
 
-  const timeline = hookRecords.flatMap((entry) =>
-    entry.records.map((record) => ({
+  const timeline = hookRecords.flatMap(entry =>
+    entry.records.map(record => ({
       hookId: entry.hookId,
       target: typeof record.target === 'string' ? record.target : 'unknown',
       url: typeof record.url === 'string' ? record.url : undefined,
       event: typeof record.event === 'string' ? record.event : undefined,
-      method: typeof record.method === 'string' ? record.method.toUpperCase() : undefined,
+      method:
+        typeof record.method === 'string'
+          ? record.method.toUpperCase()
+          : undefined,
       status: typeof record.status === 'number' ? record.status : undefined,
       signatureIndicators: [
         ...findSignatureIndicators(record.url),
@@ -216,7 +286,8 @@ function buildHookTimeline(hookRecords: Array<{hookId: string; records: Array<Re
         ...findSignatureIndicators(record.requestBody),
         ...findSignatureIndicators(record.data),
       ],
-      timestamp: typeof record.timestamp === 'number' ? record.timestamp : Date.now(),
+      timestamp:
+        typeof record.timestamp === 'number' ? record.timestamp : Date.now(),
     })),
   );
   timeline.sort((a, b) => a.timestamp - b.timestamp);
@@ -264,11 +335,14 @@ function correlateNetworkFlows(
     if (!item.url) {
       continue;
     }
-    const method = item.method ?? (item.target === 'websocket' ? 'WS' : 'UNKNOWN');
+    const method =
+      item.method ?? (item.target === 'websocket' ? 'WS' : 'UNKNOWN');
     const key = `${item.url}::${method}`;
     const eventName = item.event ?? item.target;
     const existing = buckets.find(
-      (bucket) => bucket.key === key && item.timestamp - bucket.lastTimestamp <= timeWindowMs,
+      bucket =>
+        bucket.key === key &&
+        item.timestamp - bucket.lastTimestamp <= timeWindowMs,
     );
 
     if (existing) {
@@ -294,15 +368,19 @@ function correlateNetworkFlows(
       eventCount: 1,
       hookIds: new Set([item.hookId]),
       events: new Set([eventName]),
-      statuses: typeof item.status === 'number' ? new Set([item.status]) : new Set(),
+      statuses:
+        typeof item.status === 'number' ? new Set([item.status]) : new Set(),
       signatureIndicators: new Set(item.signatureIndicators ?? []),
     });
   }
 
   return buckets
-    .sort((a, b) => b.eventCount - a.eventCount || b.lastTimestamp - a.lastTimestamp)
+    .sort(
+      (a, b) =>
+        b.eventCount - a.eventCount || b.lastTimestamp - a.lastTimestamp,
+    )
     .slice(0, maxFlows)
-    .map((bucket) => ({
+    .map(bucket => ({
       url: bucket.url,
       method: bucket.method,
       firstTimestamp: bucket.firstTimestamp,
@@ -352,15 +430,18 @@ function buildRequestFingerprints(
   suspiciousScore: number;
   sampleUrls: string[];
 }> {
-  const buckets = new Map<string, {
-    urlPattern: string;
-    methods: Set<string>;
-    flowCount: number;
-    totalEvents: number;
-    signatureIndicators: Set<string>;
-    suspiciousScore: number;
-    sampleUrls: Set<string>;
-  }>();
+  const buckets = new Map<
+    string,
+    {
+      urlPattern: string;
+      methods: Set<string>;
+      flowCount: number;
+      totalEvents: number;
+      signatureIndicators: Set<string>;
+      suspiciousScore: number;
+      sampleUrls: Set<string>;
+    }
+  >();
 
   for (const flow of flows) {
     const urlPattern = buildUrlPattern(flow.url);
@@ -369,7 +450,7 @@ function buildRequestFingerprints(
     const flowScore =
       Math.min(flow.eventCount, 10) +
       Math.min(flow.signatureIndicators.length, 5) * 3 +
-      (flow.statuses.some((status) => status >= 400) ? 2 : 0);
+      (flow.statuses.some(status => status >= 400) ? 2 : 0);
 
     if (existing) {
       existing.methods.add(flow.method);
@@ -395,9 +476,12 @@ function buildRequestFingerprints(
   }
 
   return Array.from(buckets.values())
-    .sort((a, b) => b.suspiciousScore - a.suspiciousScore || b.totalEvents - a.totalEvents)
+    .sort(
+      (a, b) =>
+        b.suspiciousScore - a.suspiciousScore || b.totalEvents - a.totalEvents,
+    )
     .slice(0, maxFingerprints)
-    .map((bucket) => {
+    .map(bucket => {
       const methods = Array.from(bucket.methods).sort();
       const signatureIndicators = Array.from(bucket.signatureIndicators).sort();
       const fingerprint = `${methods.join('+')} ${bucket.urlPattern}`.trim();
@@ -422,11 +506,22 @@ function buildPriorityTargets(input: {
     suspiciousScore: number;
     signatureIndicatorCount: number;
   }>;
-  signatureHints: {signatureParams: string[]; candidateFunctions: string[]; requestSinks: string[]};
+  signatureHints: {
+    signatureParams: string[];
+    candidateFunctions: string[];
+    requestSinks: string[];
+  };
   maxTargets: number;
-}): Array<{target: string; type: 'network' | 'function'; priorityScore: number; reasons: string[]}> {
-  const networkTargets = input.requestFingerprints.map((item) => {
-    const isWritePath = item.methods.some((method) => ['POST', 'PUT', 'PATCH', 'DELETE', 'WS'].includes(method));
+}): Array<{
+  target: string;
+  type: 'network' | 'function';
+  priorityScore: number;
+  reasons: string[];
+}> {
+  const networkTargets = input.requestFingerprints.map(item => {
+    const isWritePath = item.methods.some(method =>
+      ['POST', 'PUT', 'PATCH', 'DELETE', 'WS'].includes(method),
+    );
     const score =
       item.suspiciousScore +
       item.signatureIndicatorCount * 2 +
@@ -437,24 +532,34 @@ function buildPriorityTargets(input: {
       type: 'network' as const,
       priorityScore: score,
       reasons: [
-        item.signatureIndicatorCount > 0 ? `signature indicators: ${item.signatureIndicatorCount}` : null,
+        item.signatureIndicatorCount > 0
+          ? `signature indicators: ${item.signatureIndicatorCount}`
+          : null,
         isWritePath ? `write-like methods: ${item.methods.join(', ')}` : null,
       ].filter((value): value is string => Boolean(value)),
     };
   });
 
-  const functionTargets = input.signatureHints.candidateFunctions.slice(0, 5).map((name) => ({
-    target: name,
-    type: 'function' as const,
-    priorityScore: 6 + Math.min(input.signatureHints.signatureParams.length, 4),
-    reasons: [
-      'name matches signing/encryption keywords',
-      input.signatureHints.signatureParams.length > 0 ? `related params: ${input.signatureHints.signatureParams.slice(0, 4).join(', ')}` : null,
-    ].filter((value): value is string => Boolean(value)),
-  }));
+  const functionTargets = input.signatureHints.candidateFunctions
+    .slice(0, 5)
+    .map(name => ({
+      target: name,
+      type: 'function' as const,
+      priorityScore:
+        6 + Math.min(input.signatureHints.signatureParams.length, 4),
+      reasons: [
+        'name matches signing/encryption keywords',
+        input.signatureHints.signatureParams.length > 0
+          ? `related params: ${input.signatureHints.signatureParams.slice(0, 4).join(', ')}`
+          : null,
+      ].filter((value): value is string => Boolean(value)),
+    }));
 
   return [...networkTargets, ...functionTargets]
-    .sort((a, b) => b.priorityScore - a.priorityScore || a.target.localeCompare(b.target))
+    .sort(
+      (a, b) =>
+        b.priorityScore - a.priorityScore || a.target.localeCompare(b.target),
+    )
     .slice(0, input.maxTargets);
 }
 
@@ -463,9 +568,12 @@ function extractSignatureChainHints(code: string): {
   candidateFunctions: string[];
   requestSinks: string[];
 } {
-  const signatureParamRegex = /\b(sign(?:ature)?|token|auth|nonce|timestamp|x-sign)\b/gi;
-  const functionNameRegex = /(function\s+([A-Za-z_$][\w$]*)\s*\(|const\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\(|([A-Za-z_$][\w$]*)\s*:\s*(?:async\s*)?function)/g;
-  const requestSinkRegex = /\b(fetch|XMLHttpRequest|sendBeacon|axios\.(?:get|post|request)|\$.ajax)\b/g;
+  const signatureParamRegex =
+    /\b(sign(?:ature)?|token|auth|nonce|timestamp|x-sign)\b/gi;
+  const functionNameRegex =
+    /(function\s+([A-Za-z_$][\w$]*)\s*\(|const\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\(|([A-Za-z_$][\w$]*)\s*:\s*(?:async\s*)?function)/g;
+  const requestSinkRegex =
+    /\b(fetch|XMLHttpRequest|sendBeacon|axios\.(?:get|post|request)|\$.ajax)\b/g;
 
   const params = new Set<string>();
   for (const match of code.matchAll(signatureParamRegex)) {
@@ -477,7 +585,10 @@ function extractSignatureChainHints(code: string): {
   const functions = new Set<string>();
   for (const match of code.matchAll(functionNameRegex)) {
     const name = match[2] || match[3] || match[4];
-    if (name && /(sign|token|encrypt|hash|auth|nonce|hmac|md5|sha)/i.test(name)) {
+    if (
+      name &&
+      /(sign|token|encrypt|hash|auth|nonce|hmac|md5|sha)/i.test(name)
+    ) {
       functions.add(name);
     }
   }
@@ -499,27 +610,47 @@ function extractSignatureChainHints(code: string): {
 function buildActionPlan(result: {
   target: string;
   topHookIds: Array<{hookId: string; type: string}>;
-  suspiciousFlows: Array<{url: string; method: string; signatureIndicators: string[]}>;
-  priorityTargets: Array<{target: string; type: 'network' | 'function'; priorityScore: number}>;
-  signatureHints: {signatureParams: string[]; candidateFunctions: string[]; requestSinks: string[]};
+  suspiciousFlows: Array<{
+    url: string;
+    method: string;
+    signatureIndicators: string[];
+  }>;
+  priorityTargets: Array<{
+    target: string;
+    type: 'network' | 'function';
+    priorityScore: number;
+  }>;
+  signatureHints: {
+    signatureParams: string[];
+    candidateFunctions: string[];
+    requestSinks: string[];
+  };
 }): string[] {
   const steps: string[] = [];
   const addStep = (text: string) => {
     steps.push(`${steps.length + 1}) ${text}`);
   };
-  addStep(`调用 collect_code，参数: {"url":"${result.target}","returnMode":"top-priority","topN":10}`);
+  addStep(
+    `调用 collect_code，参数: {"url":"${result.target}","returnMode":"top-priority","topN":10}`,
+  );
 
   if (result.suspiciousFlows.length > 0) {
     const flow = result.suspiciousFlows[0];
-    addStep(`重点观察可疑请求: ${flow.method} ${flow.url}，命中指标: ${flow.signatureIndicators.join(', ')}`);
+    addStep(
+      `重点观察可疑请求: ${flow.method} ${flow.url}，命中指标: ${flow.signatureIndicators.join(', ')}`,
+    );
   } else {
-    addStep('先触发登录/下单/关键业务操作，再重新运行 analyze_target 捕获动态请求');
+    addStep(
+      '先触发登录/下单/关键业务操作，再重新运行 analyze_target 捕获动态请求',
+    );
   }
 
   if (result.priorityTargets.length > 0) {
     const top = result.priorityTargets[0];
     if (top.type === 'network') {
-      addStep(`优先复现网络链路: ${top.target}（priority=${top.priorityScore}）`);
+      addStep(
+        `优先复现网络链路: ${top.target}（priority=${top.priorityScore}）`,
+      );
     } else {
       addStep(`优先审计函数: ${top.target}（priority=${top.priorityScore}）`);
     }
@@ -527,18 +658,26 @@ function buildActionPlan(result: {
 
   if (result.signatureHints.candidateFunctions.length > 0) {
     const fnName = result.signatureHints.candidateFunctions[0];
-    addStep(`使用 search_in_scripts 搜索函数名 "${fnName}"，并用 understand_code 深挖调用链`);
+    addStep(
+      `使用 search_in_scripts 搜索函数名 "${fnName}"，并用 understand_code 深挖调用链`,
+    );
   } else {
-    addStep('使用 search_in_scripts 搜索关键词 sign/token/auth/nonce，定位签名生成点');
+    addStep(
+      '使用 search_in_scripts 搜索关键词 sign/token/auth/nonce，定位签名生成点',
+    );
   }
 
   if (result.topHookIds.length > 0) {
-    addStep(`调用 get_hook_data 查看首个 hook 数据: {"hookId":"${result.topHookIds[0].hookId}"}`);
+    addStep(
+      `调用 get_hook_data 查看首个 hook 数据: {"hookId":"${result.topHookIds[0].hookId}"}`,
+    );
   } else {
     addStep('用 create_hook + inject_hook 手工注入 fetch/xhr hook 后再采样');
   }
 
-  addStep('对疑似签名代码调用 deobfuscate_code（aggressive=true）并复测请求参数变化');
+  addStep(
+    '对疑似签名代码调用 deobfuscate_code（aggressive=true）并复测请求参数变化',
+  );
   return steps;
 }
 
@@ -549,14 +688,17 @@ function buildWhyTheseSteps(input: {
 }): string[] {
   return [
     input.requestFingerprints.length > 0
-      ? `Observed suspicious request fingerprints: ${input.requestFingerprints.slice(0, 2).map((item) => item.fingerprint).join('; ')}`
-      : 'No stable request fingerprint yet, so the next steps keep observation and capture lightweight.',
+      ? `观察到可疑的请求指纹：${input.requestFingerprints
+          .slice(0, 2)
+          .map(item => item.fingerprint)
+          .join('；')}`
+      : '尚未捕获稳定请求指纹，后续步骤将继续观察和轻量采集。',
     input.candidateFunctions.length > 0
-      ? `Candidate signing functions were found: ${input.candidateFunctions.slice(0, 3).join(', ')}`
-      : 'No obvious signing function names were found, so the workflow should rely on request and hook evidence first.',
+      ? `找到候选签名函数：${input.candidateFunctions.slice(0, 3).join('、')}`
+      : '未发现明显的签名函数名，工作流将优先依赖请求和 Hook 证据。',
     input.hookRecordCount > 0
-      ? `Hook capture already produced ${input.hookRecordCount} runtime records, enough to start correlation and local rebuild.`
-      : 'Hook capture has not produced data yet, so the workflow should avoid premature local rebuild guesses.',
+      ? `Hook 已采集到 ${input.hookRecordCount} 条记录，足以开始关联分析和本地重建。`
+      : 'Hook 尚未产出数据，应避免过早进行本地重建猜测。',
   ];
 }
 
@@ -566,48 +708,72 @@ function buildStopConditions(input: {
 }): string[] {
   return [
     input.suspiciousFlowCount > 0
-      ? 'Stop broadening capture once the target request path is confirmed and export a rebuild bundle.'
-      : 'Stop and trigger the target action if no suspicious request path has been confirmed yet.',
+      ? '目标请求路径确认后即可停止扩大采集范围，并导出重建 Bundle。'
+      : '若尚未确认可疑请求路径，应先触发目标操作后再停止分析。',
     input.hookRecordCount > 200
-      ? 'Stop expanding hooks until noisy capture is reduced with summary view or narrower targets.'
-      : 'Stop escalating to breakpoints unless hook evidence still cannot expose the required runtime context.',
+      ? 'Hook 数据超过 200 条时应先降噪（summary 视图或缩小目标），再决定是否注入新 Hook。'
+      : 'Hook 证据不足以定位问题时，再考虑升级到断点调试。',
   ];
 }
 
-type AnalyzeTargetParams = zod.infer<zod.ZodObject<{
-  url: zod.ZodString;
-  topN: zod.ZodOptional<zod.ZodNumber>;
-  useAI: zod.ZodOptional<zod.ZodBoolean>;
-  runDeobfuscation: zod.ZodOptional<zod.ZodBoolean>;
-  hookPreset: zod.ZodOptional<zod.ZodEnum<['none', 'api-signature', 'network-core']>>;
-  autoInjectHooks: zod.ZodOptional<zod.ZodBoolean>;
-  waitAfterHookMs: zod.ZodOptional<zod.ZodNumber>;
-  correlationWindowMs: zod.ZodOptional<zod.ZodNumber>;
-  maxCorrelatedFlows: zod.ZodOptional<zod.ZodNumber>;
-  maxFingerprints: zod.ZodOptional<zod.ZodNumber>;
-  autoReplayActions: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
-    action: zod.ZodEnum<['navigate', 'click', 'type', 'wait', 'scroll', 'pressKey', 'evaluate']>;
-    url: zod.ZodOptional<zod.ZodString>;
-    selector: zod.ZodOptional<zod.ZodString>;
-    text: zod.ZodOptional<zod.ZodString>;
-    delay: zod.ZodOptional<zod.ZodNumber>;
-    timeout: zod.ZodOptional<zod.ZodNumber>;
-    x: zod.ZodOptional<zod.ZodNumber>;
-    y: zod.ZodOptional<zod.ZodNumber>;
-    key: zod.ZodOptional<zod.ZodString>;
-    code: zod.ZodOptional<zod.ZodString>;
-  }>>>;
-  collect: zod.ZodOptional<zod.ZodObject<{
-    smartMode: zod.ZodOptional<zod.ZodEnum<['summary', 'priority', 'incremental', 'full']>>;
-    includeInline: zod.ZodOptional<zod.ZodBoolean>;
-    includeExternal: zod.ZodOptional<zod.ZodBoolean>;
-    includeDynamic: zod.ZodOptional<zod.ZodBoolean>;
-    maxTotalSize: zod.ZodOptional<zod.ZodNumber>;
-    maxFileSize: zod.ZodOptional<zod.ZodNumber>;
-  }>>;
-}>>;
+type AnalyzeTargetParams = zod.infer<
+  zod.ZodObject<{
+    url: zod.ZodString;
+    topN: zod.ZodOptional<zod.ZodNumber>;
+    useAI: zod.ZodOptional<zod.ZodBoolean>;
+    runDeobfuscation: zod.ZodOptional<zod.ZodBoolean>;
+    hookPreset: zod.ZodOptional<
+      zod.ZodEnum<['none', 'api-signature', 'network-core']>
+    >;
+    autoInjectHooks: zod.ZodOptional<zod.ZodBoolean>;
+    waitAfterHookMs: zod.ZodOptional<zod.ZodNumber>;
+    correlationWindowMs: zod.ZodOptional<zod.ZodNumber>;
+    maxCorrelatedFlows: zod.ZodOptional<zod.ZodNumber>;
+    maxFingerprints: zod.ZodOptional<zod.ZodNumber>;
+    autoReplayActions: zod.ZodOptional<
+      zod.ZodArray<
+        zod.ZodObject<{
+          action: zod.ZodEnum<
+            [
+              'navigate',
+              'click',
+              'type',
+              'wait',
+              'scroll',
+              'pressKey',
+              'evaluate',
+            ]
+          >;
+          url: zod.ZodOptional<zod.ZodString>;
+          selector: zod.ZodOptional<zod.ZodString>;
+          text: zod.ZodOptional<zod.ZodString>;
+          delay: zod.ZodOptional<zod.ZodNumber>;
+          timeout: zod.ZodOptional<zod.ZodNumber>;
+          x: zod.ZodOptional<zod.ZodNumber>;
+          y: zod.ZodOptional<zod.ZodNumber>;
+          key: zod.ZodOptional<zod.ZodString>;
+          code: zod.ZodOptional<zod.ZodString>;
+        }>
+      >
+    >;
+    collect: zod.ZodOptional<
+      zod.ZodObject<{
+        smartMode: zod.ZodOptional<
+          zod.ZodEnum<['summary', 'priority', 'incremental', 'full']>
+        >;
+        includeInline: zod.ZodOptional<zod.ZodBoolean>;
+        includeExternal: zod.ZodOptional<zod.ZodBoolean>;
+        includeDynamic: zod.ZodOptional<zod.ZodBoolean>;
+        maxTotalSize: zod.ZodOptional<zod.ZodNumber>;
+        maxFileSize: zod.ZodOptional<zod.ZodNumber>;
+      }>
+    >;
+  }>
+>;
 
-function pickHookTypes(hookPreset: 'none' | 'api-signature' | 'network-core'): string[] {
+function pickHookTypes(
+  hookPreset: 'none' | 'api-signature' | 'network-core',
+): string[] {
   if (hookPreset === 'none') {
     return [];
   }
@@ -622,8 +788,18 @@ async function collectAnalyzeTargetCode(
   params: AnalyzeTargetParams,
 ): Promise<{
   collectResult: unknown;
-  normalizedFiles: Array<{url: string; content: string; size: number; type: string}>;
-  candidateFiles: Array<{url: string; content: string; size: number; type: string}>;
+  normalizedFiles: Array<{
+    url: string;
+    content: string;
+    size: number;
+    type: string;
+  }>;
+  candidateFiles: Array<{
+    url: string;
+    content: string;
+    size: number;
+    type: string;
+  }>;
   analysisCode: string;
 }> {
   const topN = params.topN ?? 8;
@@ -639,9 +815,15 @@ async function collectAnalyzeTargetCode(
 
   const normalizedFiles = normalizeCollectedFiles(collectResult);
   const topPriority = runtime.collector.getTopPriorityFiles(topN);
-  const candidateFiles = topPriority.files.length > 0 ? topPriority.files : normalizedFiles.slice(0, topN);
-  const mergedCode = candidateFiles.map((file) => `// ${file.url}\n${file.content}`).join('\n\n');
-  const analysisCode = mergedCode.length > 300000 ? mergedCode.slice(0, 300000) : mergedCode;
+  const candidateFiles =
+    topPriority.files.length > 0
+      ? topPriority.files
+      : normalizedFiles.slice(0, topN);
+  const mergedCode = candidateFiles
+    .map(file => `// ${file.url}\n${file.content}`)
+    .join('\n\n');
+  const analysisCode =
+    mergedCode.length > 300000 ? mergedCode.slice(0, 300000) : mergedCode;
   return {collectResult, normalizedFiles, candidateFiles, analysisCode};
 }
 
@@ -649,23 +831,36 @@ async function installAnalyzeHooks(
   runtime: ReturnType<typeof getJSHookRuntime>,
   hookPreset: 'none' | 'api-signature' | 'network-core',
   autoInjectHooks: boolean,
-): Promise<Array<{hookId: string; type: string}>> {
-  const injectedHooks: Array<{hookId: string; type: string}> = [];
+): Promise<Array<{hookId: string; type: string; injected: boolean}>> {
+  const injectedHooks: Array<{
+    hookId: string;
+    type: string;
+    injected: boolean;
+  }> = [];
   for (const type of pickHookTypes(hookPreset)) {
     const created = runtime.hookManager.create({
       type,
       description: `[analyze_target] ${type} hook`,
       action: 'log',
     });
+    let injected = false;
     if (autoInjectHooks) {
-      await runtime.pageController.injectScript(created.script);
+      try {
+        await runtime.pageController.injectScript(created.script);
+        injected = true;
+      } catch {
+        // Hook 注入失败，记录但继续其他 Hook
+      }
     }
-    injectedHooks.push({hookId: created.hookId, type});
+    injectedHooks.push({hookId: created.hookId, type, injected});
   }
   return injectedHooks;
 }
 
-async function runAnalyzeTargetWorkflow(runtime: ReturnType<typeof getJSHookRuntime>, params: AnalyzeTargetParams) {
+async function runAnalyzeTargetWorkflow(
+  runtime: ReturnType<typeof getJSHookRuntime>,
+  params: AnalyzeTargetParams,
+) {
   const startedAt = Date.now();
   const hookPreset = params.hookPreset ?? 'api-signature';
   const autoInjectHooks = params.autoInjectHooks ?? true;
@@ -673,15 +868,22 @@ async function runAnalyzeTargetWorkflow(runtime: ReturnType<typeof getJSHookRunt
   const maxCorrelatedFlows = params.maxCorrelatedFlows ?? 20;
   const maxFingerprints = params.maxFingerprints ?? 12;
 
-  const {collectResult, normalizedFiles, candidateFiles, analysisCode} = await collectAnalyzeTargetCode(runtime, params);
-  const injectedHooks = await installAnalyzeHooks(runtime, hookPreset, autoInjectHooks);
+  const {collectResult, normalizedFiles, candidateFiles, analysisCode} =
+    await collectAnalyzeTargetCode(runtime, params);
+  const injectedHooks = await installAnalyzeHooks(
+    runtime,
+    hookPreset,
+    autoInjectHooks,
+  );
 
   const replayResults = params.autoReplayActions?.length
-    ? await runtime.pageController.replayActions(params.autoReplayActions)
+    ? await runtime.pageController.replayActions(
+        params.autoReplayActions as any,
+      )
     : [];
 
   if (params.waitAfterHookMs && params.waitAfterHookMs > 0) {
-    await new Promise((resolve) => setTimeout(resolve, params.waitAfterHookMs));
+    await new Promise(resolve => setTimeout(resolve, params.waitAfterHookMs));
   }
 
   const [understand, crypto] = await Promise.all([
@@ -697,24 +899,41 @@ async function runAnalyzeTargetWorkflow(runtime: ReturnType<typeof getJSHookRunt
       })
     : undefined;
 
-  const hookRecords = injectedHooks.map((hook) => ({
+  const hookRecords = injectedHooks.map(hook => ({
     hookId: hook.hookId,
     records: runtime.hookManager.getRecords(hook.hookId),
   }));
-  const hookTimeline = buildHookTimeline(hookRecords as Array<{hookId: string; records: Array<Record<string, unknown>>}>);
-  const urlActivity = hookTimeline.reduce<Record<string, number>>((acc, item) => {
-    if (item.url) {
-      acc[item.url] = (acc[item.url] ?? 0) + 1;
-    }
-    return acc;
-  }, {});
+  const hookTimeline = buildHookTimeline(
+    hookRecords as Array<{
+      hookId: string;
+      records: Array<Record<string, unknown>>;
+    }>,
+  );
+  const urlActivity = hookTimeline.reduce<Record<string, number>>(
+    (acc, item) => {
+      if (item.url) {
+        acc[item.url] = (acc[item.url] ?? 0) + 1;
+      }
+      return acc;
+    },
+    {},
+  );
   const activeUrls = Object.entries(urlActivity)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10)
     .map(([url, count]) => ({url, count}));
-  const correlatedFlows = correlateNetworkFlows(hookTimeline, correlationWindowMs, maxCorrelatedFlows);
-  const suspiciousFlows = correlatedFlows.filter((flow) => flow.signatureIndicators.length > 0);
-  const requestFingerprints = buildRequestFingerprints(correlatedFlows, maxFingerprints);
+  const correlatedFlows = correlateNetworkFlows(
+    hookTimeline,
+    correlationWindowMs,
+    maxCorrelatedFlows,
+  );
+  const suspiciousFlows = correlatedFlows.filter(
+    flow => flow.signatureIndicators.length > 0,
+  );
+  const requestFingerprints = buildRequestFingerprints(
+    correlatedFlows,
+    maxFingerprints,
+  );
   const signatureHints = extractSignatureChainHints(analysisCode);
   const priorityTargets = buildPriorityTargets({
     requestFingerprints,
@@ -744,7 +963,7 @@ async function runAnalyzeTargetWorkflow(runtime: ReturnType<typeof getJSHookRunt
     analysis: {
       qualityScore: understand.qualityScore,
       securityRiskCount: understand.securityRisks.length,
-      cryptoAlgorithms: crypto.algorithms.map((item) => item.name),
+      cryptoAlgorithms: crypto.algorithms.map(item => item.name),
     },
     deobfuscation: deobfuscation
       ? {
@@ -783,17 +1002,28 @@ async function runAnalyzeTargetWorkflow(runtime: ReturnType<typeof getJSHookRunt
       suspiciousFlowCount: suspiciousFlows.length,
     }),
     nextActions: [
-      crypto.algorithms.length > 0 ? 'Focus on crypto-related files from top-priority list.' : null,
-      hookTimeline.length === 0 ? 'Trigger page interactions and rerun get_hook_data / analyze_target.' : null,
-      understand.securityRisks.length > 0 ? 'Review high-severity security findings and verify call stacks.' : null,
+      crypto.algorithms.length > 0
+        ? 'Focus on crypto-related files from top-priority list.'
+        : null,
+      hookTimeline.length === 0
+        ? 'Trigger page interactions and rerun get_hook_data / analyze_target.'
+        : null,
+      understand.securityRisks.length > 0
+        ? 'Review high-severity security findings and verify call stacks.'
+        : null,
     ].filter((item): item is string => Boolean(item)),
   };
 }
 
 export const recordReverseEvidence = defineTool({
   name: 'record_reverse_evidence',
-  description: 'Append structured reverse-engineering evidence to a task artifact log.',
-  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: false},
+  description:
+    'Append structured reverse-engineering evidence to a task artifact log.',
+  annotations: {
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: false,
+    title: 'Record reverse engineering evidence',
+  },
   schema: {
     taskId: zod.string(),
     taskSlug: zod.string(),
@@ -807,6 +1037,7 @@ export const recordReverseEvidence = defineTool({
     entry: zod.record(zod.string(), zod.unknown()),
   },
   handler: async (request, response, context, runtime) => {
+    void context;
     const task = await runtime.reverseTaskStore.openTask({
       taskId: request.params.taskId,
       slug: request.params.taskSlug,
@@ -819,7 +1050,8 @@ export const recordReverseEvidence = defineTool({
       targetFunctionNames: request.params.targetFunctionNames ?? [],
       targetActionDescription: request.params.targetActionDescription ?? '',
     };
-    const hasTargetContext = targetContext.targetKeywords.length > 0 ||
+    const hasTargetContext =
+      targetContext.targetKeywords.length > 0 ||
       targetContext.targetUrlPatterns.length > 0 ||
       targetContext.targetFunctionNames.length > 0 ||
       targetContext.targetActionDescription.length > 0;
@@ -846,10 +1078,9 @@ export const recordReverseEvidence = defineTool({
     }
 
     if (hasTargetContext) {
-      const existingTargetContext = await runtime.reverseTaskStore.readSnapshot<Record<string, unknown>>(
-        request.params.taskId,
-        'target-context.json',
-      );
+      const existingTargetContext = await runtime.reverseTaskStore.readSnapshot<
+        Record<string, unknown>
+      >(request.params.taskId, 'target-context.json');
       await task.writeSnapshot('target-context.json', {
         ...existingTargetContext,
         ...targetContext,
@@ -857,22 +1088,33 @@ export const recordReverseEvidence = defineTool({
     }
 
     response.appendResponseLine('```json');
-    response.appendResponseLine(JSON.stringify({
-      ok: true,
-      taskId: task.taskId,
-      taskDir: task.taskDir,
-      channel: request.params.channel,
-      mirroredChannels,
-      targetContext: hasTargetContext ? targetContext : undefined,
-    }, null, 2));
+    response.appendResponseLine(
+      JSON.stringify(
+        {
+          ok: true,
+          taskId: task.taskId,
+          taskDir: task.taskDir,
+          channel: request.params.channel,
+          mirroredChannels,
+          targetContext: hasTargetContext ? targetContext : undefined,
+        },
+        null,
+        2,
+      ),
+    );
     response.appendResponseLine('```');
   },
 });
 
 export const analyzeTarget = defineTool({
   name: 'analyze_target',
-  description: 'One-shot reverse workflow: collect code, run security/crypto analysis, optional deobfuscation, and hook timeline correlation.',
-  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: false},
+  description:
+    'One-shot reverse workflow: collect code, run security/crypto analysis, optional deobfuscation, and hook timeline correlation.',
+  annotations: {
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: false,
+    title: 'Analyze reverse engineering target',
+  },
   schema: {
     url: zod.string().url(),
     topN: zod.number().int().positive().optional(),
@@ -884,28 +1126,45 @@ export const analyzeTarget = defineTool({
     correlationWindowMs: zod.number().int().positive().optional(),
     maxCorrelatedFlows: zod.number().int().positive().optional(),
     maxFingerprints: zod.number().int().positive().optional(),
-    autoReplayActions: zod.array(zod.object({
-      action: zod.enum(['navigate', 'click', 'type', 'wait', 'scroll', 'pressKey', 'evaluate']),
-      url: zod.string().url().optional(),
-      selector: zod.string().optional(),
-      text: zod.string().optional(),
-      delay: zod.number().int().nonnegative().optional(),
-      timeout: zod.number().int().positive().optional(),
-      x: zod.number().optional(),
-      y: zod.number().optional(),
-      key: zod.string().optional(),
-      code: zod.string().optional(),
-    })).optional(),
-    collect: zod.object({
-      smartMode: zod.enum(['summary', 'priority', 'incremental', 'full']).optional(),
-      includeInline: zod.boolean().optional(),
-      includeExternal: zod.boolean().optional(),
-      includeDynamic: zod.boolean().optional(),
-      maxTotalSize: zod.number().int().positive().optional(),
-      maxFileSize: zod.number().int().positive().optional(),
-    }).optional(),
+    autoReplayActions: zod
+      .array(
+        zod.object({
+          action: zod.enum([
+            'navigate',
+            'click',
+            'type',
+            'wait',
+            'scroll',
+            'pressKey',
+            'evaluate',
+          ]),
+          url: zod.string().url().optional(),
+          selector: zod.string().optional(),
+          text: zod.string().optional(),
+          delay: zod.number().int().nonnegative().optional(),
+          timeout: zod.number().int().positive().optional(),
+          x: zod.number().optional(),
+          y: zod.number().optional(),
+          key: zod.string().optional(),
+          code: zod.string().optional(),
+        }),
+      )
+      .optional(),
+    collect: zod
+      .object({
+        smartMode: zod
+          .enum(['summary', 'priority', 'incremental', 'full'])
+          .optional(),
+        includeInline: zod.boolean().optional(),
+        includeExternal: zod.boolean().optional(),
+        includeDynamic: zod.boolean().optional(),
+        maxTotalSize: zod.number().int().positive().optional(),
+        maxFileSize: zod.number().int().positive().optional(),
+      })
+      .optional(),
   },
   handler: async (request, response, context, runtime) => {
+    void context;
     const result = await runAnalyzeTargetWorkflow(runtime, request.params);
 
     response.appendResponseLine('```json');
@@ -953,8 +1212,13 @@ function toMarkdownReport(report: {
 
 export const riskPanel = defineTool({
   name: 'risk_panel',
-  description: 'Build a combined risk score from analyzer, crypto detector and hook signals.',
-  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+  description:
+    'Build a combined risk score from analyzer, crypto detector and hook signals.',
+  annotations: {
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: true,
+    title: 'Assess reverse engineering risk',
+  },
   schema: {
     code: zod.string().optional(),
     useAI: zod.boolean().optional(),
@@ -963,14 +1227,20 @@ export const riskPanel = defineTool({
     topN: zod.number().int().positive().optional(),
   },
   handler: async (request, response, context, runtime) => {
-
+    void context;
     let code = request.params.code;
     if (!code) {
-      const top = runtime.collector.getTopPriorityFiles(request.params.topN ?? 5);
+      const top = runtime.collector.getTopPriorityFiles(
+        request.params.topN ?? 5,
+      );
       if (top.files.length === 0) {
-        throw new Error('No code provided and no collected files found. Run collect_code first.');
+        throw new Error(
+          'No code provided and no collected files found. Run collect_code first.',
+        );
       }
-      code = top.files.map((file) => `// ${file.url}\n${file.content}`).join('\n\n');
+      code = top.files
+        .map(file => `// ${file.url}\n${file.content}`)
+        .join('\n\n');
     }
 
     const [understand, crypto] = await Promise.all([
@@ -978,26 +1248,42 @@ export const riskPanel = defineTool({
       runtime.cryptoDetector.detect({code}),
     ]);
 
-    const securityRisks = Array.isArray(understand.securityRisks) ? understand.securityRisks : [];
-    const highSeverityCount = securityRisks.filter((risk) => risk.severity === 'critical' || risk.severity === 'high').length;
+    const securityRisks = Array.isArray(understand.securityRisks)
+      ? understand.securityRisks
+      : [];
+    const highSeverityCount = securityRisks.filter(
+      risk => risk.severity === 'critical' || risk.severity === 'high',
+    ).length;
     const cryptoResult = crypto as {
       securityIssues?: unknown[];
       algorithms?: Array<{name?: string}>;
     };
-    const cryptoIssues = Array.isArray(cryptoResult.securityIssues) ? cryptoResult.securityIssues : [];
-    const algorithms = Array.isArray(cryptoResult.algorithms) ? cryptoResult.algorithms : [];
-    const dangerousAlgorithms = algorithms.filter((algo) =>
-      ['md5', 'sha1', 'rc4', 'des'].includes(String(algo.name ?? '').toLowerCase()),
+    const cryptoIssues = Array.isArray(cryptoResult.securityIssues)
+      ? cryptoResult.securityIssues
+      : [];
+    const algorithms = Array.isArray(cryptoResult.algorithms)
+      ? cryptoResult.algorithms
+      : [];
+    const dangerousAlgorithms = algorithms.filter(algo =>
+      ['md5', 'sha1', 'rc4', 'des'].includes(
+        String(algo.name ?? '').toLowerCase(),
+      ),
     );
 
     let hookSignalCount = 0;
     if (request.params.includeHookSignals !== false) {
       if (request.params.hookId) {
-        hookSignalCount = runtime.hookManager.getRecords(request.params.hookId).length;
+        hookSignalCount = runtime.hookManager.getRecords(
+          request.params.hookId,
+        ).length;
       } else {
         hookSignalCount = runtime.hookManager
           .getAllKnownHookIds()
-          .reduce((sum, hookId) => sum + runtime.hookManager.getRecords(hookId).length, 0);
+          .reduce(
+            (sum, hookId) =>
+              sum + runtime.hookManager.getRecords(hookId).length,
+            0,
+          );
       }
     }
 
@@ -1017,13 +1303,21 @@ export const riskPanel = defineTool({
         highSeverityRisks: highSeverityCount,
         cryptoAlgorithms: algorithms.length,
         cryptoIssues: cryptoIssues.length,
-        dangerousAlgorithms: dangerousAlgorithms.map((algo) => algo.name ?? 'unknown'),
+        dangerousAlgorithms: dangerousAlgorithms.map(
+          algo => algo.name ?? 'unknown',
+        ),
         hookSignals: hookSignalCount,
       },
       recommendations: [
-        highSeverityCount > 0 ? 'Prioritize high-severity security findings first.' : null,
-        dangerousAlgorithms.length > 0 ? 'Replace weak crypto algorithms (MD5/SHA1/RC4/DES).' : null,
-        hookSignalCount > 0 ? 'Review hook records to confirm if suspicious paths are expected.' : null,
+        highSeverityCount > 0
+          ? 'Prioritize high-severity security findings first.'
+          : null,
+        dangerousAlgorithms.length > 0
+          ? 'Replace weak crypto algorithms (MD5/SHA1/RC4/DES).'
+          : null,
+        hookSignalCount > 0
+          ? 'Review hook records to confirm if suspicious paths are expected.'
+          : null,
       ].filter((item): item is string => Boolean(item)),
     };
 
@@ -1035,20 +1329,28 @@ export const riskPanel = defineTool({
 
 export const exportSessionReport = defineTool({
   name: 'export_session_report',
-  description: 'Export current reverse-engineering session as JSON or Markdown.',
-  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+  description:
+    'Export current reverse-engineering session as JSON or Markdown.',
+  annotations: {
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: true,
+    title: 'Export session report',
+  },
   schema: {
     format: zod.enum(['json', 'markdown']).default('json'),
     includeHookData: zod.boolean().optional(),
   },
   handler: async (request, response, context, runtime) => {
+    void context;
     const summaries = runtime.collector.getCollectedFilesSummary();
     const collectorStats = await runtime.collector.getAllStats();
     const hookStats = runtime.hookManager.getStats();
-    const totalHookRecords = runtime.hookManager.getAllKnownHookIds().reduce(
-      (sum, hookId) => sum + runtime.hookManager.getRecords(hookId).length,
-      0,
-    );
+    const totalHookRecords = runtime.hookManager
+      .getAllKnownHookIds()
+      .reduce(
+        (sum, hookId) => sum + runtime.hookManager.getRecords(hookId).length,
+        0,
+      );
     const tokenStats = TokenBudgetManager.getInstance().getStats();
 
     const report = {
@@ -1067,7 +1369,9 @@ export const exportSessionReport = defineTool({
         maxTokens: tokenStats.maxTokens,
         usagePercent: tokenStats.usagePercentage,
       },
-      hookData: request.params.includeHookData ? runtime.hookManager.exportData('json') : undefined,
+      hookData: request.params.includeHookData
+        ? runtime.hookManager.exportData('json')
+        : undefined,
     };
 
     if (request.params.format === 'markdown') {

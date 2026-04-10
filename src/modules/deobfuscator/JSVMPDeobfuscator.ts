@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -11,12 +10,16 @@
 
 import * as parser from '@babel/parser';
 import traverseImport from '@babel/traverse';
-const traverse = (traverseImport as unknown as {default?: typeof traverseImport}).default ?? traverseImport;
+const traverse =
+  (traverseImport as unknown as {default?: typeof traverseImport}).default ??
+  traverseImport;
 import generateImport from '@babel/generator';
-const generate = (generateImport as unknown as {default?: typeof generateImport}).default ?? generateImport;
+const generate =
+  (generateImport as unknown as {default?: typeof generateImport}).default ??
+  generateImport;
 import * as t from '@babel/types';
 
-import type { LLMService } from '../../services/LLMService.js';
+import type {LLMService} from '../../services/LLMService.js';
 import type {
   JSVMPDeobfuscatorOptions,
   JSVMPDeobfuscatorResult,
@@ -26,7 +29,7 @@ import type {
   ComplexityLevel,
   UnresolvedPart,
 } from '../../types/index.js';
-import { logger } from '../../utils/logger.js';
+import {logger} from '../../utils/logger.js';
 
 /**
  * JSVMP反混淆器
@@ -41,7 +44,9 @@ export class JSVMPDeobfuscator {
   /**
    * 反混淆JSVMP代码
    */
-  async deobfuscate(options: JSVMPDeobfuscatorOptions): Promise<JSVMPDeobfuscatorResult> {
+  async deobfuscate(
+    options: JSVMPDeobfuscatorOptions,
+  ): Promise<JSVMPDeobfuscatorResult> {
     const startTime = Date.now();
     const {
       code,
@@ -89,7 +94,7 @@ export class JSVMPDeobfuscator {
         vmType,
         aggressive,
         timeout,
-        maxIterations
+        maxIterations,
       );
 
       const processingTime = Date.now() - startTime;
@@ -185,7 +190,7 @@ export class JSVMPDeobfuscator {
         // 4. 检测字节码解析模式：parseInt("" + b[O] + b[O + 1], 16)
         CallExpression(path) {
           if (
-            t.isIdentifier(path.node.callee, { name: 'parseInt' }) &&
+            t.isIdentifier(path.node.callee, {name: 'parseInt'}) &&
             path.node.arguments.length >= 2
           ) {
             const firstArg = path.node.arguments[0];
@@ -199,7 +204,7 @@ export class JSVMPDeobfuscator {
           // 检测apply调用模式：s.apply(b, u)
           if (
             t.isMemberExpression(path.node.callee) &&
-            t.isIdentifier(path.node.callee.property, { name: 'apply' })
+            t.isIdentifier(path.node.callee.property, {name: 'apply'})
           ) {
             hasApplyCall = true;
           }
@@ -209,8 +214,8 @@ export class JSVMPDeobfuscator {
         WhileStatement(path) {
           // 检测while(true)或while(1)模式
           if (
-            t.isBooleanLiteral(path.node.test, { value: true }) ||
-            t.isNumericLiteral(path.node.test, { value: 1 })
+            t.isBooleanLiteral(path.node.test, {value: true}) ||
+            t.isNumericLiteral(path.node.test, {value: 1})
           ) {
             hasWhileLoop = true;
           }
@@ -233,7 +238,11 @@ export class JSVMPDeobfuscator {
 
       if (isJSVMP) {
         const complexity: ComplexityLevel =
-          instructionCount > 100 ? 'high' : instructionCount > 50 ? 'medium' : 'low';
+          instructionCount > 100
+            ? 'high'
+            : instructionCount > 50
+              ? 'medium'
+              : 'low';
 
         logger.info('🔍 JSVMP特征检测结果:');
         logger.info(`  - Switch语句: ${hasSwitch} (${maxSwitchCases} cases)`);
@@ -320,7 +329,10 @@ export class JSVMPDeobfuscator {
   /**
    * 提取虚拟机指令集
    */
-  private extractInstructions(code: string, features: VMFeatures): VMInstruction[] {
+  private extractInstructions(
+    code: string,
+    features: VMFeatures,
+  ): VMInstruction[] {
     const instructions: VMInstruction[] = [];
 
     try {
@@ -339,8 +351,8 @@ export class JSVMPDeobfuscator {
                 ? t.isNumericLiteral(caseNode.test)
                   ? caseNode.test.value
                   : t.isStringLiteral(caseNode.test)
-                  ? caseNode.test.value
-                  : index
+                    ? caseNode.test.value
+                    : index
                 : index;
 
               // 推断指令类型
@@ -450,7 +462,11 @@ export class JSVMPDeobfuscator {
     }
 
     // 5. CALL指令：函数调用
-    if (hasFunctionCall || code.includes('.apply(') || code.includes('.call(')) {
+    if (
+      hasFunctionCall ||
+      code.includes('.apply(') ||
+      code.includes('.call(')
+    ) {
       return 'call';
     }
 
@@ -467,7 +483,7 @@ export class JSVMPDeobfuscator {
     vmType: VMType,
     aggressive: boolean,
     _timeout: number,
-    _maxIterations: number
+    _maxIterations: number,
   ): Promise<{
     code: string;
     confidence: number;
@@ -479,14 +495,24 @@ export class JSVMPDeobfuscator {
 
     // 根据VM类型选择还原策略
     if (vmType === 'obfuscator.io') {
-      return await this.restoreObfuscatorIO(code, aggressive, warnings, unresolvedParts);
+      return await this.restoreObfuscatorIO(
+        code,
+        aggressive,
+        warnings,
+        unresolvedParts,
+      );
     } else if (vmType === 'jsfuck') {
       return await this.restoreJSFuck(code, warnings);
     } else if (vmType === 'jjencode') {
       return await this.restoreJJEncode(code, warnings);
     } else {
       // 自定义VM，使用LLM辅助
-      return await this.restoreCustomVM(code, aggressive, warnings, unresolvedParts);
+      return await this.restoreCustomVM(
+        code,
+        aggressive,
+        warnings,
+        unresolvedParts,
+      );
     }
   }
 
@@ -498,7 +524,7 @@ export class JSVMPDeobfuscator {
     code: string,
     aggressive: boolean,
     warnings: string[],
-    unresolvedParts: UnresolvedPart[]
+    unresolvedParts: UnresolvedPart[],
   ): Promise<{
     code: string;
     confidence: number;
@@ -510,7 +536,9 @@ export class JSVMPDeobfuscator {
 
     try {
       // 1. 提取字符串数组
-      const stringArrayMatch = code.match(/var\s+(_0x[a-f0-9]+)\s*=\s*(\[.*?\]);/s);
+      const stringArrayMatch = code.match(
+        /var\s+(_0x[a-f0-9]+)\s*=\s*(\[.*?\]);/s,
+      );
       if (stringArrayMatch) {
         const arrayName = stringArrayMatch[1];
         const arrayContent = stringArrayMatch[2];
@@ -523,7 +551,9 @@ export class JSVMPDeobfuscator {
           const stringArray = arrayFunc();
 
           if (Array.isArray(stringArray)) {
-            logger.info(`✅ 成功解析字符串数组，包含 ${stringArray.length} 个字符串`);
+            logger.info(
+              `✅ 成功解析字符串数组，包含 ${stringArray.length} 个字符串`,
+            );
 
             // 替换所有对字符串数组的引用
             const refPattern = new RegExp(`${arrayName}\\[(\\d+)\\]`, 'g');
@@ -545,20 +575,34 @@ export class JSVMPDeobfuscator {
             try {
               logger.info('🤖 使用LLM辅助提取字符串数组...');
               const snippet = (arrayContent || '').substring(0, 3000);
-              const response = await this.llm.chat([
-                { role: 'system', content: 'You are a JavaScript reverse engineer. Extract and decode the string array from obfuscator.io protected code. Return ONLY a valid JSON array of decoded strings.' },
-                { role: 'user', content: `Extract the string array from this obfuscated code fragment:\n\`\`\`\n${snippet}\n\`\`\`\n\nReturn the decoded string array as a JSON array.` },
-              ], { temperature: 0.1, maxTokens: 4000 });
+              const response = await this.llm.chat(
+                [
+                  {
+                    role: 'system',
+                    content:
+                      'You are a JavaScript reverse engineer. Extract and decode the string array from obfuscator.io protected code. Return ONLY a valid JSON array of decoded strings.',
+                  },
+                  {
+                    role: 'user',
+                    content: `Extract the string array from this obfuscated code fragment:\n\`\`\`\n${snippet}\n\`\`\`\n\nReturn the decoded string array as a JSON array.`,
+                  },
+                ],
+                {temperature: 0.1, maxTokens: 4000},
+              );
 
               const jsonMatch = response.content.match(/\[[\s\S]*\]/);
               if (jsonMatch) {
                 const llmArray = JSON.parse(jsonMatch[0]);
                 if (Array.isArray(llmArray) && llmArray.length > 0) {
                   logger.info(`✅ LLM提取到 ${llmArray.length} 个字符串`);
-                  const refPattern = new RegExp(`${arrayName}\\[(\\d+)\\]`, 'g');
+                  const refPattern = new RegExp(
+                    `${arrayName}\\[(\\d+)\\]`,
+                    'g',
+                  );
                   restored = restored.replace(refPattern, (_match, index) => {
                     const idx = parseInt(index, 10);
-                    if (idx < llmArray.length) return JSON.stringify(llmArray[idx]);
+                    if (idx < llmArray.length)
+                      return JSON.stringify(llmArray[idx]);
                     return _match;
                   });
                   confidence += 0.15;
@@ -573,7 +617,9 @@ export class JSVMPDeobfuscator {
           unresolvedParts.push({
             location: 'String Array',
             reason: '无法解析字符串数组',
-            suggestion: this.llm ? 'AI已尝试辅助提取，结果可能不完整' : '配置LLM服务以启用AI辅助提取',
+            suggestion: this.llm
+              ? 'AI已尝试辅助提取，结果可能不完整'
+              : '配置LLM服务以启用AI辅助提取',
           });
         }
       }
@@ -581,13 +627,16 @@ export class JSVMPDeobfuscator {
       // 2. 移除字符串数组旋转函数
       restored = restored.replace(
         /\(function\s*\(_0x[a-f0-9]+,\s*_0x[a-f0-9]+\)\s*\{[\s\S]*?\}\(_0x[a-f0-9]+,\s*0x[a-f0-9]+\)\);?/g,
-        ''
+        '',
       );
 
       // 3. 简化函数包装器
       if (aggressive) {
         // 移除IIFE包装
-        restored = restored.replace(/\(function\s*\(\)\s*\{([\s\S]*)\}\(\)\);?/g, '$1');
+        restored = restored.replace(
+          /\(function\s*\(\)\s*\{([\s\S]*)\}\(\)\);?/g,
+          '$1',
+        );
         confidence += 0.1;
       }
 
@@ -606,7 +655,8 @@ export class JSVMPDeobfuscator {
         code: restored,
         confidence: Math.min(confidence, 1.0),
         warnings,
-        unresolvedParts: unresolvedParts.length > 0 ? unresolvedParts : undefined,
+        unresolvedParts:
+          unresolvedParts.length > 0 ? unresolvedParts : undefined,
       };
     } catch (error) {
       warnings.push(`obfuscator.io还原失败: ${error}`);
@@ -624,7 +674,10 @@ export class JSVMPDeobfuscator {
    * JSFuck原理：只使用6个字符 []()!+ 来编写JavaScript
    * 例如：false = ![] , true = !![] , undefined = [][[]] , NaN = +[![]]
    */
-  private async restoreJSFuck(code: string, warnings: string[]): Promise<{
+  private async restoreJSFuck(
+    code: string,
+    warnings: string[],
+  ): Promise<{
     code: string;
     confidence: number;
     warnings: string[];
@@ -675,7 +728,10 @@ export class JSVMPDeobfuscator {
    * JJEncode原理：使用日文字符和特殊符号编码JavaScript
    * 特征：$=~[]; $={___:++$,$$$$:(![]+"")[$]...
    */
-  private async restoreJJEncode(code: string, warnings: string[]): Promise<{
+  private async restoreJJEncode(
+    code: string,
+    warnings: string[],
+  ): Promise<{
     code: string;
     confidence: number;
     warnings: string[];
@@ -686,7 +742,7 @@ export class JSVMPDeobfuscator {
       // JJEncode的还原方法：直接执行代码
       try {
         // 提取JJEncode的核心代码（通常在最后一行）
-        const lines = code.split('\n').filter((line) => line.trim());
+        const lines = code.split('\n').filter(line => line.trim());
         const lastLine = lines.length > 0 ? lines[lines.length - 1] : '';
 
         // JJEncode通常以 $$$$ 结尾
@@ -732,28 +788,34 @@ export class JSVMPDeobfuscator {
   private async llmDecodeEncoding(
     code: string,
     encodingType: string,
-    warnings: string[]
+    warnings: string[],
   ): Promise<{
     code: string;
     confidence: number;
     warnings: string[];
   }> {
     if (!this.llm) {
-      warnings.push(`未配置LLM服务，${encodingType}本地还原失败后无法进行AI辅助分析`);
+      warnings.push(
+        `未配置LLM服务，${encodingType}本地还原失败后无法进行AI辅助分析`,
+      );
       warnings.push('建议：配置DeepSeek/OpenAI API以启用AI辅助反混淆');
-      return { code, confidence: 0.1, warnings };
+      return {code, confidence: 0.1, warnings};
     }
 
     try {
       logger.info(`🤖 使用LLM辅助分析${encodingType}混淆...`);
 
       // 截取代码片段，避免token超限
-      const snippet = code.length > 5000 ? code.substring(0, 5000) + '\n\n// ... (code truncated)' : code;
+      const snippet =
+        code.length > 5000
+          ? code.substring(0, 5000) + '\n\n// ... (code truncated)'
+          : code;
 
-      const response = await this.llm.chat([
-        {
-          role: 'system',
-          content: `# Role
+      const response = await this.llm.chat(
+        [
+          {
+            role: 'system',
+            content: `# Role
 You are an expert JavaScript reverse engineer specializing in encoding-based obfuscation.
 
 # Task
@@ -778,12 +840,14 @@ Return a JSON object:
   "keyFindings": ["finding1", "finding2"],
   "manualSteps": ["step1 if full decode failed"]
 }`,
-        },
-        {
-          role: 'user',
-          content: `Decode this ${encodingType} obfuscated code:\n\`\`\`javascript\n${snippet}\n\`\`\``,
-        },
-      ], { temperature: 0.1, maxTokens: 4000 });
+          },
+          {
+            role: 'user',
+            content: `Decode this ${encodingType} obfuscated code:\n\`\`\`javascript\n${snippet}\n\`\`\``,
+          },
+        ],
+        {temperature: 0.1, maxTokens: 4000},
+      );
 
       // 解析LLM返回
       const jsonMatch = response.content.match(/\{[\s\S]*\}/);
@@ -791,17 +855,29 @@ Return a JSON object:
         try {
           const result = JSON.parse(jsonMatch[0]);
 
-          if (result.decoded && result.decoded !== code && result.decoded.length > 0) {
+          if (
+            result.decoded &&
+            result.decoded !== code &&
+            result.decoded.length > 0
+          ) {
             logger.info(`✅ AI辅助${encodingType}解码完成`);
-            warnings.push(`${encodingType}由AI辅助解码，准确性: ${Math.round((result.confidence || 0.5) * 100)}%`);
+            warnings.push(
+              `${encodingType}由AI辅助解码，准确性: ${Math.round((result.confidence || 0.5) * 100)}%`,
+            );
 
             if (result.mechanism) {
               warnings.push(`编码机制: ${result.mechanism}`);
             }
             if (result.keyFindings && Array.isArray(result.keyFindings)) {
-              result.keyFindings.forEach((f: string) => warnings.push(`发现: ${f}`));
+              result.keyFindings.forEach((f: string) =>
+                warnings.push(`发现: ${f}`),
+              );
             }
-            if (result.manualSteps && Array.isArray(result.manualSteps) && result.manualSteps.length > 0) {
+            if (
+              result.manualSteps &&
+              Array.isArray(result.manualSteps) &&
+              result.manualSteps.length > 0
+            ) {
               warnings.push(`需手动完成: ${result.manualSteps.join('; ')}`);
             }
 
@@ -816,14 +892,24 @@ Return a JSON object:
           if (result.mechanism || result.keyFindings) {
             warnings.push(`AI分析了${encodingType}编码机制但未能完全解码`);
             if (result.mechanism) warnings.push(`机制: ${result.mechanism}`);
-            if (result.keyFindings) result.keyFindings.forEach((f: string) => warnings.push(`发现: ${f}`));
-            if (result.manualSteps) result.manualSteps.forEach((s: string) => warnings.push(`建议: ${s}`));
+            if (result.keyFindings)
+              result.keyFindings.forEach((f: string) =>
+                warnings.push(`发现: ${f}`),
+              );
+            if (result.manualSteps)
+              result.manualSteps.forEach((s: string) =>
+                warnings.push(`建议: ${s}`),
+              );
           }
         } catch {
           // JSON解析失败，尝试直接使用LLM文本输出
-          const codeBlockMatch = response.content.match(/```(?:javascript|js)?\s*([\s\S]*?)```/);
+          const codeBlockMatch = response.content.match(
+            /```(?:javascript|js)?\s*([\s\S]*?)```/,
+          );
           if (codeBlockMatch && codeBlockMatch[1].trim().length > 10) {
-            warnings.push(`${encodingType}由AI辅助解码（从文本响应提取），需验证准确性`);
+            warnings.push(
+              `${encodingType}由AI辅助解码（从文本响应提取），需验证准确性`,
+            );
             return {
               code: codeBlockMatch[1].trim(),
               confidence: 0.4,
@@ -834,11 +920,11 @@ Return a JSON object:
       }
 
       warnings.push(`AI未能成功解码${encodingType}，返回原始代码`);
-      return { code, confidence: 0.15, warnings };
+      return {code, confidence: 0.15, warnings};
     } catch (error) {
       logger.warn(`LLM辅助${encodingType}解码失败`, error);
       warnings.push(`AI辅助分析失败: ${error}`);
-      return { code, confidence: 0.1, warnings };
+      return {code, confidence: 0.1, warnings};
     }
   }
 
@@ -850,7 +936,7 @@ Return a JSON object:
     code: string,
     aggressive: boolean,
     warnings: string[],
-    unresolvedParts: UnresolvedPart[]
+    unresolvedParts: UnresolvedPart[],
   ): Promise<{
     code: string;
     confidence: number;
@@ -862,7 +948,12 @@ Return a JSON object:
       warnings.push('建议：配置DeepSeek/OpenAI API以启用AI辅助反混淆');
 
       // 尝试基础的模式匹配还原（含LLM结构分析降级）
-      return await this.restoreCustomVMBasic(code, aggressive, warnings, unresolvedParts);
+      return await this.restoreCustomVMBasic(
+        code,
+        aggressive,
+        warnings,
+        unresolvedParts,
+      );
     }
 
     try {
@@ -935,7 +1026,12 @@ ${codeSnippet}
         }
       } catch (e) {
         warnings.push('LLM返回结果解析失败，使用基础还原方法');
-        return await this.restoreCustomVMBasic(code, aggressive, warnings, unresolvedParts);
+        return await this.restoreCustomVMBasic(
+          code,
+          aggressive,
+          warnings,
+          unresolvedParts,
+        );
       }
 
       // 5. 基于LLM分析结果进行还原
@@ -946,7 +1042,10 @@ ${codeSnippet}
           warnings.push(...vmAnalysis.warnings);
         }
 
-        if (vmAnalysis.restorationSteps && Array.isArray(vmAnalysis.restorationSteps)) {
+        if (
+          vmAnalysis.restorationSteps &&
+          Array.isArray(vmAnalysis.restorationSteps)
+        ) {
           unresolvedParts.push({
             location: 'VM Restoration',
             reason: 'LLM建议的还原步骤',
@@ -958,15 +1057,26 @@ ${codeSnippet}
           code,
           confidence: 0.6,
           warnings,
-          unresolvedParts: unresolvedParts.length > 0 ? unresolvedParts : undefined,
+          unresolvedParts:
+            unresolvedParts.length > 0 ? unresolvedParts : undefined,
         };
       }
 
-      return await this.restoreCustomVMBasic(code, aggressive, warnings, unresolvedParts);
+      return await this.restoreCustomVMBasic(
+        code,
+        aggressive,
+        warnings,
+        unresolvedParts,
+      );
     } catch (error) {
       logger.error('LLM辅助还原失败', error);
       warnings.push(`LLM辅助还原失败: ${error}`);
-      return await this.restoreCustomVMBasic(code, aggressive, warnings, unresolvedParts);
+      return await this.restoreCustomVMBasic(
+        code,
+        aggressive,
+        warnings,
+        unresolvedParts,
+      );
     }
   }
 
@@ -978,7 +1088,7 @@ ${codeSnippet}
     code: string,
     aggressive: boolean,
     warnings: string[],
-    unresolvedParts: UnresolvedPart[]
+    unresolvedParts: UnresolvedPart[],
   ): Promise<{
     code: string;
     confidence: number;
@@ -1013,12 +1123,16 @@ ${codeSnippet}
       if (this.llm) {
         try {
           logger.info('🤖 使用LLM对自定义VM进行结构分析...');
-          const snippet = code.length > 4000 ? code.substring(0, 4000) + '\n// ... truncated' : code;
+          const snippet =
+            code.length > 4000
+              ? code.substring(0, 4000) + '\n// ... truncated'
+              : code;
 
-          const response = await this.llm.chat([
-            {
-              role: 'system',
-              content: `# Role
+          const response = await this.llm.chat(
+            [
+              {
+                role: 'system',
+                content: `# Role
 You are a JavaScript VM protection analyst. Analyze custom JavaScript VM (JSVMP) code and provide structural insights.
 
 # Task
@@ -1042,12 +1156,14 @@ Return a JSON object:
   "restorationApproach": "recommended approach for full restoration",
   "simplifiedLogic": "if possible, a simplified version of what this VM code does"
 }`,
-            },
-            {
-              role: 'user',
-              content: `Analyze this custom VM protected JavaScript:\n\`\`\`javascript\n${snippet}\n\`\`\``,
-            },
-          ], { temperature: 0.2, maxTokens: 3000 });
+              },
+              {
+                role: 'user',
+                content: `Analyze this custom VM protected JavaScript:\n\`\`\`javascript\n${snippet}\n\`\`\``,
+              },
+            ],
+            {temperature: 0.2, maxTokens: 3000},
+          );
 
           const jsonMatch = response.content.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
@@ -1056,13 +1172,18 @@ Return a JSON object:
 
             if (analysis.vmStructure) {
               const vs = analysis.vmStructure;
-              if (vs.interpreterLoop) warnings.push(`VM解释器位置: ${vs.interpreterLoop}`);
-              if (vs.bytecodeVar) warnings.push(`字节码变量: ${vs.bytecodeVar}`);
+              if (vs.interpreterLoop)
+                warnings.push(`VM解释器位置: ${vs.interpreterLoop}`);
+              if (vs.bytecodeVar)
+                warnings.push(`字节码变量: ${vs.bytecodeVar}`);
               if (vs.pcVar) warnings.push(`程序计数器: ${vs.pcVar}`);
               if (vs.stackVar) warnings.push(`栈变量: ${vs.stackVar}`);
             }
 
-            if (analysis.instructionMap && typeof analysis.instructionMap === 'object') {
+            if (
+              analysis.instructionMap &&
+              typeof analysis.instructionMap === 'object'
+            ) {
               const mapStr = Object.entries(analysis.instructionMap)
                 .map(([k, v]) => `${k}→${v}`)
                 .join(', ');
@@ -1077,8 +1198,13 @@ Return a JSON object:
               });
             }
 
-            if (analysis.simplifiedLogic && analysis.simplifiedLogic.length > 10) {
-              warnings.push(`AI推断的简化逻辑: ${analysis.simplifiedLogic.substring(0, 500)}`);
+            if (
+              analysis.simplifiedLogic &&
+              analysis.simplifiedLogic.length > 10
+            ) {
+              warnings.push(
+                `AI推断的简化逻辑: ${analysis.simplifiedLogic.substring(0, 500)}`,
+              );
             }
 
             confidence += 0.15;
@@ -1096,7 +1222,9 @@ Return a JSON object:
         unresolvedParts.push({
           location: 'Custom VM',
           reason: '自定义VM需要深度分析',
-          suggestion: this.llm ? '已通过AI获取结构信息，可结合动态调试进一步还原' : '配置LLM服务或使用插桩技术记录VM执行流程',
+          suggestion: this.llm
+            ? '已通过AI获取结构信息，可结合动态调试进一步还原'
+            : '配置LLM服务或使用插桩技术记录VM执行流程',
         });
       }
 
@@ -1104,7 +1232,8 @@ Return a JSON object:
         code: restored,
         confidence,
         warnings,
-        unresolvedParts: unresolvedParts.length > 0 ? unresolvedParts : undefined,
+        unresolvedParts:
+          unresolvedParts.length > 0 ? unresolvedParts : undefined,
       };
     } catch (error) {
       warnings.push(`基础还原失败: ${error}`);
@@ -1117,4 +1246,3 @@ Return a JSON object:
     }
   }
 }
-

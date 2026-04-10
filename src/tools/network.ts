@@ -38,6 +38,7 @@ export const listNetworkRequests = defineTool({
   annotations: {
     category: ToolCategory.NETWORK,
     readOnlyHint: true,
+    title: 'List network requests for selected page',
   },
   schema: {
     pageSize: zod
@@ -91,6 +92,7 @@ export const getNetworkRequest = defineTool({
   annotations: {
     category: ToolCategory.NETWORK,
     readOnlyHint: true,
+    title: 'Get a network request by ID',
   },
   schema: {
     reqid: zod

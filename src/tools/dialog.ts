@@ -19,6 +19,7 @@ export const handleDialog = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    title: 'Handle dialog (accept/dismiss)',
   },
   schema: {
     action: zod
@@ -27,7 +28,9 @@ export const handleDialog = defineTool({
     promptText: zod
       .string()
       .optional()
-      .describe('Optional prompt text to enter into the dialog (for prompt dialogs)'),
+      .describe(
+        'Optional prompt text to enter into the dialog (for prompt dialogs)',
+      ),
   },
   handler: async (request, response, context, runtime) => {
     const page = await runtime.collector.getActivePage();
@@ -35,7 +38,9 @@ export const handleDialog = defineTool({
     // 尝试从上下文获取 dialog，如果没有则使用最近打开的 dialog
     const dialog = context.getDialog();
     if (!dialog) {
-      throw new Error('No open dialog found. Use an action that triggers a dialog first, then call this tool.');
+      throw new Error(
+        'No open dialog found. Use an action that triggers a dialog first, then call this tool.',
+      );
     }
 
     switch (request.params.action) {
@@ -49,7 +54,9 @@ export const handleDialog = defineTool({
           response.appendResponseLine('Successfully accepted the dialog');
         } catch (err) {
           // 可能已经被外部处理
-          response.appendResponseLine('Dialog may have already been handled externally');
+          response.appendResponseLine(
+            'Dialog may have already been handled externally',
+          );
         }
         break;
       }
@@ -59,7 +66,9 @@ export const handleDialog = defineTool({
           response.appendResponseLine('Successfully dismissed the dialog');
         } catch (err) {
           // 可能已经被外部处理
-          response.appendResponseLine('Dialog may have already been handled externally');
+          response.appendResponseLine(
+            'Dialog may have already been handled externally',
+          );
         }
         break;
       }

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { logger } from '../utils/logger.js';
+import {logger} from '../utils/logger.js';
 
 import type {SkillContext, SkillResult} from './SkillRunner.js';
 import {SkillRegistry} from './SkillRunner.js';
@@ -91,7 +91,7 @@ export interface AutoHookSkillData {
  * 预设配置
  */
 const PRESET_CONFIGS: Record<string, Partial<AutoHookOptions>> = {
-  'none': {
+  none: {
     preset: 'none',
   },
   'api-signature': {
@@ -575,21 +575,44 @@ function detectCryptoLibraries(): CryptoDetectionResult[] {
   // 检测 CryptoJS
   results.push({
     name: 'CryptoJS',
-    detected: typeof (globalThis as typeof globalThis & { CryptoJS?: unknown }).CryptoJS !== 'undefined',
+    detected:
+      typeof (globalThis as typeof globalThis & {CryptoJS?: unknown})
+        .CryptoJS !== 'undefined',
   });
 
   // 检测 JSEncrypt
   results.push({
     name: 'JSEncrypt',
-    detected: typeof (globalThis as typeof globalThis & { JSEncrypt?: unknown }).JSEncrypt !== 'undefined',
+    detected:
+      typeof (globalThis as typeof globalThis & {JSEncrypt?: unknown})
+        .JSEncrypt !== 'undefined',
   });
 
   // 检测 SM-Crypto
   results.push({
     name: 'SM-Crypto',
-    detected: typeof (globalThis as typeof globalThis & { sm2?: unknown; sm3?: unknown; sm4?: unknown }).sm2 !== 'undefined' ||
-              typeof (globalThis as typeof globalThis & { sm2?: unknown; sm3?: unknown; sm4?: unknown }).sm3 !== 'undefined' ||
-              typeof (globalThis as typeof globalThis & { sm2?: unknown; sm3?: unknown; sm4?: unknown }).sm4 !== 'undefined',
+    detected:
+      typeof (
+        globalThis as typeof globalThis & {
+          sm2?: unknown;
+          sm3?: unknown;
+          sm4?: unknown;
+        }
+      ).sm2 !== 'undefined' ||
+      typeof (
+        globalThis as typeof globalThis & {
+          sm2?: unknown;
+          sm3?: unknown;
+          sm4?: unknown;
+        }
+      ).sm3 !== 'undefined' ||
+      typeof (
+        globalThis as typeof globalThis & {
+          sm2?: unknown;
+          sm3?: unknown;
+          sm4?: unknown;
+        }
+      ).sm4 !== 'undefined',
   });
 
   return results;

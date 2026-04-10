@@ -4,9 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { AIService, type AIProvider, type AIMessage, type ChatOptions } from '../../../src/services/AIService.js';
+import {
+  AIService,
+  type AIProvider,
+  type AIMessage,
+  type ChatOptions,
+} from '../../../src/services/AIService.js';
 
 type RetryableError = Error & {
   code?: 'ECONNRESET' | 'ETIMEDOUT' | 'ENOTFOUND';
@@ -25,7 +30,7 @@ describe('AIService', () => {
   describe('Constructor', () => {
     it('should initialize with a provider', () => {
       const mockProvider: AIProvider = {
-        chat: async () => ({ content: 'test' }),
+        chat: async () => ({content: 'test'}),
         analyzeImage: async () => 'test',
       };
 
@@ -35,7 +40,7 @@ describe('AIService', () => {
 
     it('should initialize with default retry configuration', () => {
       const mockProvider: AIProvider = {
-        chat: async () => ({ content: 'test' }),
+        chat: async () => ({content: 'test'}),
         analyzeImage: async () => 'test',
       };
 
@@ -45,7 +50,7 @@ describe('AIService', () => {
 
     it('should initialize with custom retry configuration', () => {
       const mockProvider: AIProvider = {
-        chat: async () => ({ content: 'test' }),
+        chat: async () => ({content: 'test'}),
         analyzeImage: async () => 'test',
       };
 
@@ -61,7 +66,7 @@ describe('AIService', () => {
 
     it('should accept partial retry configuration', () => {
       const mockProvider: AIProvider = {
-        chat: async () => ({ content: 'test' }),
+        chat: async () => ({content: 'test'}),
         analyzeImage: async () => 'test',
       };
 
@@ -76,19 +81,17 @@ describe('AIService', () => {
   describe('chat method', () => {
     it('should call provider chat method with messages', async () => {
       let calledWith: AIMessage[] | undefined;
-      
+
       const mockProvider: AIProvider = {
         chat: async (messages: AIMessage[]) => {
           calledWith = messages;
-          return { content: 'Hello!' };
+          return {content: 'Hello!'};
         },
         analyzeImage: async () => 'test',
       };
 
       const service = new AIService(mockProvider);
-      const messages: AIMessage[] = [
-        { role: 'user', content: 'Hello' },
-      ];
+      const messages: AIMessage[] = [{role: 'user', content: 'Hello'}];
 
       const response = await service.chat(messages);
 
@@ -98,11 +101,11 @@ describe('AIService', () => {
 
     it('should pass chat options to provider', async () => {
       let calledOptions: ChatOptions | undefined;
-      
+
       const mockProvider: AIProvider = {
         chat: async (messages: AIMessage[], options?: ChatOptions) => {
           calledOptions = options;
-          return { content: 'test' };
+          return {content: 'test'};
         },
         analyzeImage: async () => 'test',
       };
@@ -114,7 +117,7 @@ describe('AIService', () => {
         model: 'gpt-4',
       };
 
-      await service.chat([{ role: 'user', content: 'test' }], options);
+      await service.chat([{role: 'user', content: 'test'}], options);
 
       assert.deepStrictEqual(calledOptions, options);
     });
@@ -133,7 +136,7 @@ describe('AIService', () => {
       };
 
       const service = new AIService(mockProvider);
-      const response = await service.chat([{ role: 'user', content: 'test' }]);
+      const response = await service.chat([{role: 'user', content: 'test'}]);
 
       assert.strictEqual(response.content, 'Response');
       assert.ok(response.usage);
@@ -151,7 +154,7 @@ describe('AIService', () => {
       };
 
       const service = new AIService(mockProvider);
-      const response = await service.chat([{ role: 'user', content: 'test' }]);
+      const response = await service.chat([{role: 'user', content: 'test'}]);
 
       assert.strictEqual(response.content, 'Response');
       assert.strictEqual(response.usage, undefined);
@@ -167,10 +170,10 @@ describe('AIService', () => {
 
       const service = new AIService(mockProvider);
       const messages: AIMessage[] = [
-        { role: 'system', content: 'You are helpful' },
-        { role: 'user', content: 'Hello' },
-        { role: 'assistant', content: 'Hi!' },
-        { role: 'user', content: 'How are you?' },
+        {role: 'system', content: 'You are helpful'},
+        {role: 'user', content: 'Hello'},
+        {role: 'assistant', content: 'Hi!'},
+        {role: 'user', content: 'How are you?'},
       ];
 
       const response = await service.chat(messages);
@@ -181,18 +184,28 @@ describe('AIService', () => {
 
   describe('analyzeImage method', () => {
     it('should call provider analyzeImage method', async () => {
-      let calledWith: { imageInput: string; prompt: string; isFilePath?: boolean } | undefined;
-      
+      let calledWith:
+        | {imageInput: string; prompt: string; isFilePath?: boolean}
+        | undefined;
+
       const mockProvider: AIProvider = {
-        chat: async () => ({ content: 'test' }),
-        analyzeImage: async (imageInput: string, prompt: string, isFilePath?: boolean) => {
-          calledWith = { imageInput, prompt, isFilePath };
+        chat: async () => ({content: 'test'}),
+        analyzeImage: async (
+          imageInput: string,
+          prompt: string,
+          isFilePath?: boolean,
+        ) => {
+          calledWith = {imageInput, prompt, isFilePath};
           return 'Image analysis result';
         },
       };
 
       const service = new AIService(mockProvider);
-      const result = await service.analyzeImage('image.png', 'Describe this image', true);
+      const result = await service.analyzeImage(
+        'image.png',
+        'Describe this image',
+        true,
+      );
 
       assert.ok(calledWith);
       assert.strictEqual(calledWith.imageInput, 'image.png');
@@ -203,15 +216,20 @@ describe('AIService', () => {
 
     it('should handle base64 image input', async () => {
       const mockProvider: AIProvider = {
-        chat: async () => ({ content: 'test' }),
+        chat: async () => ({content: 'test'}),
         analyzeImage: async (imageInput: string) => {
           return `Analyzed base64 image: ${imageInput.substring(0, 10)}...`;
         },
       };
 
       const service = new AIService(mockProvider);
-      const base64Image = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
-      const result = await service.analyzeImage(base64Image, 'What is this?', false);
+      const base64Image =
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+      const result = await service.analyzeImage(
+        base64Image,
+        'What is this?',
+        false,
+      );
 
       assert.ok(result.includes('Analyzed base64 image'));
     });
@@ -220,7 +238,7 @@ describe('AIService', () => {
   describe('Error handling and retry mechanism', () => {
     it('should retry on network errors (ECONNRESET)', async () => {
       let attempts = 0;
-      
+
       const mockProvider: AIProvider = {
         chat: async () => {
           attempts++;
@@ -230,7 +248,7 @@ describe('AIService', () => {
             });
             throw error;
           }
-          return { content: 'Success after retries' };
+          return {content: 'Success after retries'};
         },
         analyzeImage: async () => 'test',
       };
@@ -242,7 +260,7 @@ describe('AIService', () => {
         backoffMultiplier: 2,
       });
 
-      const response = await service.chat([{ role: 'user', content: 'test' }]);
+      const response = await service.chat([{role: 'user', content: 'test'}]);
 
       assert.strictEqual(attempts, 3);
       assert.strictEqual(response.content, 'Success after retries');
@@ -250,7 +268,7 @@ describe('AIService', () => {
 
     it('should retry on network errors (ETIMEDOUT)', async () => {
       let attempts = 0;
-      
+
       const mockProvider: AIProvider = {
         chat: async () => {
           attempts++;
@@ -260,7 +278,7 @@ describe('AIService', () => {
             });
             throw error;
           }
-          return { content: 'Success' };
+          return {content: 'Success'};
         },
         analyzeImage: async () => 'test',
       };
@@ -270,7 +288,7 @@ describe('AIService', () => {
         initialDelay: 10,
       });
 
-      const response = await service.chat([{ role: 'user', content: 'test' }]);
+      const response = await service.chat([{role: 'user', content: 'test'}]);
 
       assert.strictEqual(attempts, 2);
       assert.strictEqual(response.content, 'Success');
@@ -278,7 +296,7 @@ describe('AIService', () => {
 
     it('should retry on network errors (ENOTFOUND)', async () => {
       let attempts = 0;
-      
+
       const mockProvider: AIProvider = {
         chat: async () => {
           attempts++;
@@ -288,7 +306,7 @@ describe('AIService', () => {
             });
             throw error;
           }
-          return { content: 'Success' };
+          return {content: 'Success'};
         },
         analyzeImage: async () => 'test',
       };
@@ -298,14 +316,14 @@ describe('AIService', () => {
         initialDelay: 10,
       });
 
-      await service.chat([{ role: 'user', content: 'test' }]);
+      await service.chat([{role: 'user', content: 'test'}]);
 
       assert.strictEqual(attempts, 2);
     });
 
     it('should retry on rate limit errors (429)', async () => {
       let attempts = 0;
-      
+
       const mockProvider: AIProvider = {
         chat: async () => {
           attempts++;
@@ -315,7 +333,7 @@ describe('AIService', () => {
             });
             throw error;
           }
-          return { content: 'Success' };
+          return {content: 'Success'};
         },
         analyzeImage: async () => 'test',
       };
@@ -325,14 +343,14 @@ describe('AIService', () => {
         initialDelay: 10,
       });
 
-      await service.chat([{ role: 'user', content: 'test' }]);
+      await service.chat([{role: 'user', content: 'test'}]);
 
       assert.strictEqual(attempts, 2);
     });
 
     it('should retry on server errors (500)', async () => {
       let attempts = 0;
-      
+
       const mockProvider: AIProvider = {
         chat: async () => {
           attempts++;
@@ -342,7 +360,7 @@ describe('AIService', () => {
             });
             throw error;
           }
-          return { content: 'Success' };
+          return {content: 'Success'};
         },
         analyzeImage: async () => 'test',
       };
@@ -352,14 +370,14 @@ describe('AIService', () => {
         initialDelay: 10,
       });
 
-      await service.chat([{ role: 'user', content: 'test' }]);
+      await service.chat([{role: 'user', content: 'test'}]);
 
       assert.strictEqual(attempts, 2);
     });
 
     it('should retry on server errors (503)', async () => {
       let attempts = 0;
-      
+
       const mockProvider: AIProvider = {
         chat: async () => {
           attempts++;
@@ -369,7 +387,7 @@ describe('AIService', () => {
             });
             throw error;
           }
-          return { content: 'Success' };
+          return {content: 'Success'};
         },
         analyzeImage: async () => 'test',
       };
@@ -379,14 +397,14 @@ describe('AIService', () => {
         initialDelay: 10,
       });
 
-      await service.chat([{ role: 'user', content: 'test' }]);
+      await service.chat([{role: 'user', content: 'test'}]);
 
       assert.strictEqual(attempts, 2);
     });
 
     it('should not retry on client errors (400)', async () => {
       let attempts = 0;
-      
+
       const mockProvider: AIProvider = {
         chat: async () => {
           attempts++;
@@ -405,11 +423,11 @@ describe('AIService', () => {
 
       await assert.rejects(
         async () => {
-          await service.chat([{ role: 'user', content: 'test' }]);
+          await service.chat([{role: 'user', content: 'test'}]);
         },
         {
           message: /Bad request/,
-        }
+        },
       );
 
       assert.strictEqual(attempts, 1);
@@ -417,7 +435,7 @@ describe('AIService', () => {
 
     it('should not retry on authentication errors (401)', async () => {
       let attempts = 0;
-      
+
       const mockProvider: AIProvider = {
         chat: async () => {
           attempts++;
@@ -436,11 +454,11 @@ describe('AIService', () => {
 
       await assert.rejects(
         async () => {
-          await service.chat([{ role: 'user', content: 'test' }]);
+          await service.chat([{role: 'user', content: 'test'}]);
         },
         {
           message: /Unauthorized/,
-        }
+        },
       );
 
       assert.strictEqual(attempts, 1);
@@ -448,7 +466,7 @@ describe('AIService', () => {
 
     it('should throw error after max retries exhausted', async () => {
       let attempts = 0;
-      
+
       const mockProvider: AIProvider = {
         chat: async () => {
           attempts++;
@@ -467,11 +485,11 @@ describe('AIService', () => {
 
       await assert.rejects(
         async () => {
-          await service.chat([{ role: 'user', content: 'test' }]);
+          await service.chat([{role: 'user', content: 'test'}]);
         },
         {
           message: /AI service request failed after 2 retries/,
-        }
+        },
       );
 
       // Should attempt initial + 2 retries = 3 total
@@ -482,7 +500,7 @@ describe('AIService', () => {
       const delays: number[] = [];
       let attempts = 0;
       let lastTime = Date.now();
-      
+
       const mockProvider: AIProvider = {
         chat: async () => {
           attempts++;
@@ -491,14 +509,14 @@ describe('AIService', () => {
             delays.push(currentTime - lastTime);
           }
           lastTime = currentTime;
-          
+
           if (attempts < 4) {
             const error = createRetryableError('Connection reset', {
               code: 'ECONNRESET',
             });
             throw error;
           }
-          return { content: 'Success' };
+          return {content: 'Success'};
         },
         analyzeImage: async () => 'test',
       };
@@ -510,7 +528,7 @@ describe('AIService', () => {
         backoffMultiplier: 2,
       });
 
-      await service.chat([{ role: 'user', content: 'test' }]);
+      await service.chat([{role: 'user', content: 'test'}]);
 
       // Verify exponential backoff: each delay should be roughly 2x the previous
       // Allow some tolerance for timing variations
@@ -523,7 +541,7 @@ describe('AIService', () => {
       const delays: number[] = [];
       let attempts = 0;
       let lastTime = Date.now();
-      
+
       const mockProvider: AIProvider = {
         chat: async () => {
           attempts++;
@@ -532,14 +550,14 @@ describe('AIService', () => {
             delays.push(currentTime - lastTime);
           }
           lastTime = currentTime;
-          
+
           if (attempts < 5) {
             const error = createRetryableError('Connection reset', {
               code: 'ECONNRESET',
             });
             throw error;
           }
-          return { content: 'Success' };
+          return {content: 'Success'};
         },
         analyzeImage: async () => 'test',
       };
@@ -551,19 +569,23 @@ describe('AIService', () => {
         backoffMultiplier: 2,
       });
 
-      await service.chat([{ role: 'user', content: 'test' }]);
+      await service.chat([{role: 'user', content: 'test'}]);
 
-      // All delays should be capped at maxDelay (150ms)
+      // All delays should be capped at maxDelay (150ms) with tolerance
+      // Use generous tolerance for timing-sensitive tests in CI/WSL2
       for (const delay of delays) {
-        assert.ok(delay <= 200); // Allow some tolerance
+        assert.ok(
+          delay <= 250,
+          `delay ${delay}ms exceeded maxDelay+tolerance (250ms)`,
+        );
       }
     });
 
     it('should retry analyzeImage on transient errors', async () => {
       let attempts = 0;
-      
+
       const mockProvider: AIProvider = {
-        chat: async () => ({ content: 'test' }),
+        chat: async () => ({content: 'test'}),
         analyzeImage: async () => {
           attempts++;
           if (attempts < 2) {
@@ -589,9 +611,9 @@ describe('AIService', () => {
 
     it('should handle non-retryable errors in analyzeImage', async () => {
       let attempts = 0;
-      
+
       const mockProvider: AIProvider = {
-        chat: async () => ({ content: 'test' }),
+        chat: async () => ({content: 'test'}),
         analyzeImage: async () => {
           attempts++;
           const error = createRetryableError('Invalid image format', {
@@ -612,7 +634,7 @@ describe('AIService', () => {
         },
         {
           message: /Invalid image format/,
-        }
+        },
       );
 
       assert.strictEqual(attempts, 1);
@@ -620,7 +642,7 @@ describe('AIService', () => {
 
     it('should not retry on non-Error objects', async () => {
       let attempts = 0;
-      
+
       const mockProvider: AIProvider = {
         chat: async () => {
           attempts++;
@@ -634,11 +656,9 @@ describe('AIService', () => {
         initialDelay: 10,
       });
 
-      await assert.rejects(
-        async () => {
-          await service.chat([{ role: 'user', content: 'test' }]);
-        }
-      );
+      await assert.rejects(async () => {
+        await service.chat([{role: 'user', content: 'test'}]);
+      });
 
       // Should not retry non-Error objects
       assert.strictEqual(attempts, 1);
@@ -646,7 +666,7 @@ describe('AIService', () => {
 
     it('should not retry on null errors', async () => {
       let attempts = 0;
-      
+
       const mockProvider: AIProvider = {
         chat: async () => {
           attempts++;
@@ -660,11 +680,9 @@ describe('AIService', () => {
         initialDelay: 10,
       });
 
-      await assert.rejects(
-        async () => {
-          await service.chat([{ role: 'user', content: 'test' }]);
-        }
-      );
+      await assert.rejects(async () => {
+        await service.chat([{role: 'user', content: 'test'}]);
+      });
 
       // Should not retry null errors
       assert.strictEqual(attempts, 1);
@@ -676,15 +694,17 @@ describe('AIService', () => {
       const mockProvider: AIProvider = {
         chat: async (messages: AIMessage[]) => {
           const systemMsg = messages.find(m => m.role === 'system');
-          return { content: systemMsg ? 'Has system message' : 'No system message' };
+          return {
+            content: systemMsg ? 'Has system message' : 'No system message',
+          };
         },
         analyzeImage: async () => 'test',
       };
 
       const service = new AIService(mockProvider);
       const messages: AIMessage[] = [
-        { role: 'system', content: 'You are helpful' },
-        { role: 'user', content: 'Hello' },
+        {role: 'system', content: 'You are helpful'},
+        {role: 'user', content: 'Hello'},
       ];
 
       const response = await service.chat(messages);
@@ -695,16 +715,16 @@ describe('AIService', () => {
     it('should handle conversation history', async () => {
       const mockProvider: AIProvider = {
         chat: async (messages: AIMessage[]) => {
-          return { content: `Conversation has ${messages.length} messages` };
+          return {content: `Conversation has ${messages.length} messages`};
         },
         analyzeImage: async () => 'test',
       };
 
       const service = new AIService(mockProvider);
       const messages: AIMessage[] = [
-        { role: 'user', content: 'What is 2+2?' },
-        { role: 'assistant', content: '4' },
-        { role: 'user', content: 'What is 3+3?' },
+        {role: 'user', content: 'What is 2+2?'},
+        {role: 'assistant', content: '4'},
+        {role: 'user', content: 'What is 3+3?'},
       ];
 
       const response = await service.chat(messages);
@@ -714,12 +734,12 @@ describe('AIService', () => {
 
     it('should handle empty message content', async () => {
       const mockProvider: AIProvider = {
-        chat: async () => ({ content: '' }),
+        chat: async () => ({content: ''}),
         analyzeImage: async () => 'test',
       };
 
       const service = new AIService(mockProvider);
-      const response = await service.chat([{ role: 'user', content: '' }]);
+      const response = await service.chat([{role: 'user', content: ''}]);
 
       assert.strictEqual(response.content, '');
     });

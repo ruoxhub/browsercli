@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -11,20 +10,22 @@
 
 import * as parser from '@babel/parser';
 import traverseImport from '@babel/traverse';
-const traverse = (traverseImport as unknown as {default?: typeof traverseImport}).default ?? traverseImport;
+const traverse =
+  (traverseImport as unknown as {default?: typeof traverseImport}).default ??
+  traverseImport;
 import * as t from '@babel/types';
 
-import type { CryptoAlgorithm } from '../../types/index.js';
-import { logger } from '../../utils/logger.js';
+import type {CryptoAlgorithm} from '../../types/index.js';
+import {logger} from '../../utils/logger.js';
 
-import type { CryptoRulesManager } from './CryptoRules.js';
+import type {CryptoRulesManager} from './CryptoRules.js';
 
 export interface SecurityIssue {
   severity: 'critical' | 'high' | 'medium' | 'low';
   algorithm?: string;
   issue: string;
   recommendation: string;
-  location?: { file: string; line: number };
+  location?: {file: string; line: number};
 }
 
 export interface CryptoStrength {
@@ -48,7 +49,7 @@ export interface ASTDetectionResult {
  */
 export function detectByAST(
   code: string,
-  rulesManager: CryptoRulesManager
+  rulesManager: CryptoRulesManager,
 ): ASTDetectionResult {
   const algorithms: CryptoAlgorithm[] = [];
   const parameters = new Map<string, Record<string, unknown>>();
@@ -70,9 +71,9 @@ export function detectByAST(
           node.init?.type === 'ArrayExpression' &&
           node.init.elements.length === 256 &&
           node.id.type === 'Identifier' &&
-          (node.id.name.toLowerCase().includes('sbox') || 
-           node.id.name.toLowerCase().includes('box') ||
-           node.id.name.toLowerCase().includes('table'))
+          (node.id.name.toLowerCase().includes('sbox') ||
+            node.id.name.toLowerCase().includes('box') ||
+            node.id.name.toLowerCase().includes('table'))
         ) {
           algorithms.push({
             name: 'Custom Symmetric Cipher',
@@ -90,15 +91,19 @@ export function detectByAST(
       // 检测大数运算 - 非对称加密的特征
       CallExpression(path) {
         const node = path.node;
-        
+
         // 检测大数运算方法
         if (
           node.callee.type === 'MemberExpression' &&
           node.callee.property.type === 'Identifier'
         ) {
           const methodName = node.callee.property.name;
-          
-          if (['modPow', 'modInverse', 'gcd', 'isProbablePrime'].includes(methodName)) {
+
+          if (
+            ['modPow', 'modInverse', 'gcd', 'isProbablePrime'].includes(
+              methodName,
+            )
+          ) {
             algorithms.push({
               name: 'Asymmetric Encryption',
               type: 'asymmetric',
@@ -121,11 +126,16 @@ export function detectByAST(
         const node = path.node;
         const funcName = node.id?.name.toLowerCase() || '';
 
-        if (funcName.includes('hash') || funcName.includes('digest') || funcName.includes('checksum')) {
+        if (
+          funcName.includes('hash') ||
+          funcName.includes('digest') ||
+          funcName.includes('checksum')
+        ) {
           const bodyCode = code.substring(node.start || 0, node.end || 0);
 
           // 检测循环和位运算 - 哈希函数的特征
-          const hasLoop = bodyCode.includes('for') || bodyCode.includes('while');
+          const hasLoop =
+            bodyCode.includes('for') || bodyCode.includes('while');
           const hasBitOps = />>>|<<|&|\||\^/.test(bodyCode);
 
           if (hasLoop && hasBitOps) {
@@ -150,20 +160,26 @@ export function detectByAST(
 
         // 提取数组中的数值
         const values: number[] = [];
-        elements.forEach((element) => {
+        elements.forEach(element => {
           if (t.isNumericLiteral(element)) {
             values.push(element.value);
           }
         });
 
         // 检查是否匹配已知的加密常量（支持任意位置匹配）
-        constantRules.forEach((rule) => {
+        constantRules.forEach(rule => {
           if (rule.values.length > values.length) return;
 
           let matched = false;
           // 滑动窗口：在 values 中查找连续子序列
-          for (let offset = 0; offset <= values.length - rule.values.length; offset++) {
-            const allMatch = rule.values.every((c, i) => values[offset + i] === c);
+          for (
+            let offset = 0;
+            offset <= values.length - rule.values.length;
+            offset++
+          ) {
+            const allMatch = rule.values.every(
+              (c, i) => values[offset + i] === c,
+            );
             if (allMatch) {
               matched = true;
               break;
@@ -192,7 +208,7 @@ export function detectByAST(
     logger.warn('AST detection failed', error);
   }
 
-  return { algorithms, parameters };
+  return {algorithms, parameters};
 }
 
 /**
@@ -200,7 +216,7 @@ export function detectByAST(
  */
 function extractCryptoParameters(
   node: t.CallExpression,
-  parameters: Map<string, Record<string, unknown>>
+  parameters: Map<string, Record<string, unknown>>,
 ): void {
   if (!t.isMemberExpression(node.callee)) return;
 
@@ -208,15 +224,20 @@ function extractCryptoParameters(
 
   // 检测CryptoJS模式
   if (calleeName.includes('CryptoJS')) {
-    const algoMatch = calleeName.match(/CryptoJS\.(AES|DES|TripleDES|RC4|Rabbit|RabbitLegacy)/);
+    const algoMatch = calleeName.match(
+      /CryptoJS\.(AES|DES|TripleDES|RC4|Rabbit|RabbitLegacy)/,
+    );
     if (algoMatch) {
       const algoName = algoMatch[1];
       const params: Record<string, unknown> = {};
 
       // 第三个参数通常是配置对象
-      if (node.arguments.length >= 3 && t.isObjectExpression(node.arguments[2])) {
+      if (
+        node.arguments.length >= 3 &&
+        t.isObjectExpression(node.arguments[2])
+      ) {
         const config = node.arguments[2];
-        config.properties.forEach((prop) => {
+        config.properties.forEach(prop => {
           if (t.isObjectProperty(prop) && t.isIdentifier(prop.key)) {
             const key = prop.key.name;
             if (t.isIdentifier(prop.value)) {
@@ -238,12 +259,14 @@ function extractCryptoParameters(
 
   // 检测Web Crypto API
   if (calleeName.includes('crypto.subtle')) {
-    const methodMatch = calleeName.match(/\.(encrypt|decrypt|sign|verify|digest|generateKey)/);
+    const methodMatch = calleeName.match(
+      /\.(encrypt|decrypt|sign|verify|digest|generateKey)/,
+    );
     if (methodMatch && node.arguments.length > 0) {
       const firstArg = node.arguments[0];
       if (t.isObjectExpression(firstArg)) {
         const params: Record<string, unknown> = {};
-        firstArg.properties.forEach((prop) => {
+        firstArg.properties.forEach(prop => {
           if (t.isObjectProperty(prop) && t.isIdentifier(prop.key)) {
             const key = prop.key.name;
             if (t.isStringLiteral(prop.value)) {
@@ -289,12 +312,12 @@ function getCalleeFullName(node: t.MemberExpression): string {
  */
 export function mergeParameters(
   algorithms: CryptoAlgorithm[],
-  parameters: Map<string, Record<string, unknown>>
+  parameters: Map<string, Record<string, unknown>>,
 ): void {
-  algorithms.forEach((algo) => {
+  algorithms.forEach(algo => {
     const params = parameters.get(algo.name);
     if (params) {
-      algo.parameters = { ...algo.parameters, ...params };
+      algo.parameters = {...algo.parameters, ...params};
     }
   });
 }
@@ -305,12 +328,12 @@ export function mergeParameters(
 export function evaluateSecurity(
   algorithms: CryptoAlgorithm[],
   _code: string, // 保留参数以便未来扩展
-  rulesManager: CryptoRulesManager
+  rulesManager: CryptoRulesManager,
 ): SecurityIssue[] {
   const issues: SecurityIssue[] = [];
   const securityRules = rulesManager.getSecurityRules();
 
-  algorithms.forEach((algo) => {
+  algorithms.forEach(algo => {
     const context = {
       algorithm: algo.name,
       mode: algo.parameters?.mode as string,
@@ -318,7 +341,7 @@ export function evaluateSecurity(
       keySize: (algo.parameters as any)?.keySize as number, // keySize 可能存在于参数中
     };
 
-    securityRules.forEach((rule) => {
+    securityRules.forEach(rule => {
       if (rule.check(context)) {
         issues.push({
           severity: rule.severity,
@@ -339,7 +362,7 @@ export function evaluateSecurity(
  */
 export function analyzeStrength(
   _algorithms: CryptoAlgorithm[], // 保留参数以便未来扩展
-  securityIssues: SecurityIssue[]
+  securityIssues: SecurityIssue[],
 ): CryptoStrength {
   let algorithmScore = 100;
   let keySizeScore = 100;
@@ -348,11 +371,20 @@ export function analyzeStrength(
 
   // 根据安全问题降低分数
   // 基于 issue 来源分类（而非匹配 message 文本，避免误分类）
-  const algorithmIssueKeywords = ['broken', 'deprecated', 'vulnerable', 'MD5', 'SHA-1', 'SHA1', 'DES', 'RC4'];
+  const algorithmIssueKeywords = [
+    'broken',
+    'deprecated',
+    'vulnerable',
+    'MD5',
+    'SHA-1',
+    'SHA1',
+    'DES',
+    'RC4',
+  ];
   const keySizeIssueKeywords = ['key size', 'key length', 'short', 'bits'];
   const modeIssueKeywords = ['ECB', 'mode', 'padding', 'NoPadding'];
 
-  securityIssues.forEach((issue) => {
+  securityIssues.forEach(issue => {
     const penalty = {
       critical: 40,
       high: 25,
@@ -366,7 +398,9 @@ export function analyzeStrength(
       modeScore -= penalty;
     } else if (keySizeIssueKeywords.some(k => text.includes(k.toLowerCase()))) {
       keySizeScore -= penalty;
-    } else if (algorithmIssueKeywords.some(k => text.includes(k.toLowerCase()))) {
+    } else if (
+      algorithmIssueKeywords.some(k => text.includes(k.toLowerCase()))
+    ) {
       algorithmScore -= penalty;
     } else {
       implementationScore -= penalty;
@@ -380,7 +414,8 @@ export function analyzeStrength(
   implementationScore = Math.max(0, implementationScore);
 
   // 计算总分
-  const totalScore = (algorithmScore + keySizeScore + modeScore + implementationScore) / 4;
+  const totalScore =
+    (algorithmScore + keySizeScore + modeScore + implementationScore) / 4;
 
   // 确定整体强度
   let overall: CryptoStrength['overall'];
@@ -405,4 +440,3 @@ export function analyzeStrength(
     },
   };
 }
-

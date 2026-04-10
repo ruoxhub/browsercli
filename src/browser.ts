@@ -462,11 +462,13 @@ export class BrowserManager {
   /**
    * Reset the singleton instance (useful for testing)
    */
-  static resetInstance(): void {
+  static async resetInstance(): Promise<void> {
     if (browserManager) {
-      browserManager.close().catch(err => {
+      try {
+        await browserManager.close();
+      } catch (err) {
         logger('Error closing browser during reset:', err);
-      });
+      }
       browserManager = undefined;
     }
   }
@@ -1088,8 +1090,7 @@ export class BrowserManager {
     // Use configured browser path if specified
     if (this.config.browserPath) {
       try {
-        const {existsSync} = require('node:fs');
-        if (existsSync(this.config.browserPath)) {
+        if (fs.existsSync(this.config.browserPath)) {
           foundBrowsers.push({
             name: 'Custom Browser',
             path: this.config.browserPath,
@@ -1123,7 +1124,7 @@ export class BrowserManager {
               {name: 'Edge (linux)', path: '/usr/bin/microsoft-edge'},
             ];
 
-      const {existsSync} = require('node:fs');
+      const {existsSync} = fs;
       for (const candidate of unixCandidates) {
         if (existsSync(candidate.path)) {
           foundBrowsers.push({name: candidate.name, path: candidate.path});
@@ -1133,7 +1134,6 @@ export class BrowserManager {
     }
 
     // Windows: scan common drive letters
-    const {existsSync} = require('node:fs');
     const browserTemplates = [
       {
         name: 'Chrome',
@@ -1158,7 +1158,7 @@ export class BrowserManager {
       for (const template of browserTemplates) {
         for (const browserPath of template.paths) {
           const fullPath = `${drive}:\\${browserPath}`;
-          if (existsSync(fullPath)) {
+          if (fs.existsSync(fullPath)) {
             foundBrowsers.push({
               name: `${template.name} (${drive}:)`,
               path: fullPath,

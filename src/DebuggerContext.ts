@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * @license
  * Copyright 2025 Google LLC
@@ -163,7 +162,7 @@ export class DebuggerContext {
     client.on('Debugger.scriptParsed', this.#onScriptParsed);
 
     // Listen for paused/resumed events
-    client.on('Debugger.paused', this.#onPaused);
+    client.on('Debugger.paused', this.#onPaused as any);
     client.on('Debugger.resumed', this.#onResumed);
 
     // Enable the debugger domain
@@ -188,7 +187,7 @@ export class DebuggerContext {
     }
 
     this.#client.off('Debugger.scriptParsed', this.#onScriptParsed);
-    this.#client.off('Debugger.paused', this.#onPaused);
+    this.#client.off('Debugger.paused', this.#onPaused as any);
     this.#client.off('Debugger.resumed', this.#onResumed);
 
     try {
@@ -651,11 +650,11 @@ export class DebuggerContext {
       throw new Error('Debugger not enabled');
     }
 
-    const params: SetBreakpointByUrlRequest = {
+    const params = {
       urlRegex,
       lineNumber,
       columnNumber,
-    };
+    } as unknown as SetBreakpointByUrlRequest;
 
     if (condition) {
       params.condition = condition;

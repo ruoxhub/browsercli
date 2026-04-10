@@ -12,6 +12,7 @@ import {
 import {readFile, writeFile} from 'node:fs/promises';
 
 import {zod} from '../third_party/index.js';
+import {validateOutputPath} from '../utils/fsSafe.js';
 
 import {ToolCategory} from './categories.js';
 import {getJSHookRuntime} from './runtime.js';
@@ -158,7 +159,11 @@ function normalizeSnapshot(
 export const clickElement = defineTool({
   name: 'click_element',
   description: 'Click an element by selector.',
-  annotations: {category: ToolCategory.NAVIGATION, readOnlyHint: false},
+  annotations: {
+    category: ToolCategory.NAVIGATION,
+    readOnlyHint: false,
+    title: 'Click element by selector',
+  },
   schema: {selector: zod.string()},
   handler: async (request, response, context, runtime) => {
     ensureCleanupLoop();
@@ -171,7 +176,11 @@ export const clickElement = defineTool({
 export const typeText = defineTool({
   name: 'type_text',
   description: 'Type text into an input element.',
-  annotations: {category: ToolCategory.NAVIGATION, readOnlyHint: false},
+  annotations: {
+    category: ToolCategory.NAVIGATION,
+    readOnlyHint: false,
+    title: 'Type text into input element',
+  },
   schema: {
     selector: zod.string(),
     text: zod.string(),
@@ -194,7 +203,11 @@ export const typeText = defineTool({
 export const waitForElement = defineTool({
   name: 'wait_for_element',
   description: 'Wait for selector to appear.',
-  annotations: {category: ToolCategory.NAVIGATION, readOnlyHint: true},
+  annotations: {
+    category: ToolCategory.NAVIGATION,
+    readOnlyHint: true,
+    title: 'Wait for element to appear',
+  },
   schema: {
     selector: zod.string(),
     timeout: zod.number().int().positive().optional(),
@@ -219,7 +232,11 @@ export const scrollBy = defineTool({
   name: 'scroll_by',
   description:
     'Scroll page by direction (up/down/top/bottom). Automatically waits 800ms for lazy-loaded content to load.',
-  annotations: {category: ToolCategory.NAVIGATION, readOnlyHint: false},
+  annotations: {
+    category: ToolCategory.NAVIGATION,
+    readOnlyHint: false,
+    title: 'Scroll page by direction',
+  },
   schema: {
     direction: zod
       .enum(['up', 'down', 'top', 'bottom'])
@@ -242,26 +259,15 @@ export const scrollBy = defineTool({
   },
 });
 
-export const getPerformanceMetrics = defineTool({
-  name: 'get_performance_metrics',
-  description: 'Get page performance metrics from Performance API.',
-  annotations: {category: ToolCategory.NAVIGATION, readOnlyHint: true},
-  schema: {},
-  handler: async (_request, response, context, runtime) => {
-    ensureCleanupLoop();
-    cleanupExpiredSessions();
-    const metrics = await runtime.pageController.getPerformanceMetrics();
-    response.appendResponseLine('```json');
-    response.appendResponseLine(JSON.stringify(metrics, null, 2));
-    response.appendResponseLine('```');
-  },
-});
-
 export const saveSessionState = defineTool({
   name: 'save_session_state',
   description:
     'Save current page session state (cookies/localStorage/sessionStorage) into in-memory snapshot.',
-  annotations: {category: ToolCategory.NAVIGATION, readOnlyHint: true},
+  annotations: {
+    category: ToolCategory.NAVIGATION,
+    readOnlyHint: true,
+    title: 'Save page session state',
+  },
   schema: {
     sessionId: zod.string().optional(),
     includeCookies: zod.boolean().optional(),
@@ -319,7 +325,11 @@ export const saveSessionState = defineTool({
 export const restoreSessionState = defineTool({
   name: 'restore_session_state',
   description: 'Restore a previously saved session snapshot to current page.',
-  annotations: {category: ToolCategory.NAVIGATION, readOnlyHint: false},
+  annotations: {
+    category: ToolCategory.NAVIGATION,
+    readOnlyHint: false,
+    title: 'Restore page session state',
+  },
   schema: {
     sessionId: zod.string(),
     navigateToSavedUrl: zod.boolean().optional(),
@@ -379,7 +389,11 @@ export const restoreSessionState = defineTool({
 export const listSessionStates = defineTool({
   name: 'list_session_states',
   description: 'List all saved session snapshots in memory.',
-  annotations: {category: ToolCategory.NAVIGATION, readOnlyHint: true},
+  annotations: {
+    category: ToolCategory.NAVIGATION,
+    readOnlyHint: true,
+    title: 'List saved session snapshots',
+  },
   schema: {},
   handler: async (_request, response, context, runtime) => {
     ensureCleanupLoop();
@@ -412,7 +426,11 @@ export const listSessionStates = defineTool({
 export const deleteSessionState = defineTool({
   name: 'delete_session_state',
   description: 'Delete one in-memory session snapshot by sessionId.',
-  annotations: {category: ToolCategory.NAVIGATION, readOnlyHint: false},
+  annotations: {
+    category: ToolCategory.NAVIGATION,
+    readOnlyHint: false,
+    title: 'Delete session snapshot',
+  },
   schema: {
     sessionId: zod.string(),
   },
@@ -440,7 +458,11 @@ export const dumpSessionState = defineTool({
   name: 'dump_session_state',
   description:
     'Export a saved session snapshot as JSON, optionally writing to a file.',
-  annotations: {category: ToolCategory.NAVIGATION, readOnlyHint: true},
+  annotations: {
+    category: ToolCategory.NAVIGATION,
+    readOnlyHint: true,
+    title: 'Export session snapshot',
+  },
   schema: {
     sessionId: zod.string(),
     path: zod.string().optional(),
@@ -465,7 +487,8 @@ export const dumpSessionState = defineTool({
       ? JSON.stringify(encryptedPayload, null, pretty ? 2 : 0)
       : rawJson;
     if (request.params.path) {
-      await writeFile(request.params.path, json, 'utf8');
+      const safePath = validateOutputPath(request.params.path);
+      await writeFile(safePath, json, 'utf8');
     }
 
     response.appendResponseLine('```json');
@@ -489,7 +512,11 @@ export const dumpSessionState = defineTool({
 export const loadSessionState = defineTool({
   name: 'load_session_state',
   description: 'Load a session snapshot from JSON string or file into memory.',
-  annotations: {category: ToolCategory.NAVIGATION, readOnlyHint: false},
+  annotations: {
+    category: ToolCategory.NAVIGATION,
+    readOnlyHint: false,
+    title: 'Load session snapshot from JSON',
+  },
   schema: {
     sessionId: zod.string().optional(),
     path: zod.string().optional(),
@@ -535,7 +562,7 @@ export const loadSessionState = defineTool({
     }
 
     const rawJson = request.params.path
-      ? await readFile(request.params.path, 'utf8')
+      ? await readFile(validateOutputPath(request.params.path), 'utf8')
       : request.params.snapshotJson;
     if (!rawJson) {
       throw new Error('Either path or snapshotJson must be provided.');
@@ -591,7 +618,11 @@ export const checkBrowserHealth = defineTool({
   name: 'check_browser_health',
   description:
     'Check browser connectivity and active page readiness before running reverse workflows.',
-  annotations: {category: ToolCategory.NAVIGATION, readOnlyHint: true},
+  annotations: {
+    category: ToolCategory.NAVIGATION,
+    readOnlyHint: true,
+    title: 'Check browser health',
+  },
   schema: {},
   handler: async (_request, response, context, runtime) => {
     ensureCleanupLoop();

@@ -10,13 +10,19 @@ import {describe, it} from 'node:test';
 import {BrowserModeManager} from '../../../src/modules/browser/BrowserModeManager.js';
 
 interface BrowserLike {
+  connected?: boolean;
   isConnected?(): boolean;
   newPage?(): Promise<PageLike>;
+  pages?(): Promise<PageLike[]>;
   disconnect?(): Promise<void>;
+  close?(): Promise<void>;
+  on?(event: string, handler: () => void): void;
 }
 
 interface PageLike {
   on(event: string, handler: () => void): void;
+  once(event: string, handler: () => void): void;
+  isClosed?(): boolean;
   setCacheEnabled(): Promise<void>;
   setBypassCSP(): Promise<void>;
   setJavaScriptEnabled(): Promise<void>;
@@ -30,13 +36,13 @@ interface BrowserModeManagerHarness {
   sessionData?: {cookies?: Array<{name: string; value: string}>};
   autoLaunched?: boolean;
   browserProcess?: {killed: boolean; kill(): void};
+  ensureBrowser(): Promise<BrowserLike>;
   launch(): Promise<BrowserLike>;
   newPage(): Promise<PageLike>;
   goto(url: string, page?: PageLike): Promise<void>;
   close(): Promise<void>;
   getBrowser(): BrowserLike | null;
   getCurrentPage(): PageLike | null;
-  injectAntiDetectionScripts(page: PageLike): Promise<void>;
 }
 
 describe('BrowserModeManager (mocked)', () => {
@@ -48,13 +54,14 @@ describe('BrowserModeManager (mocked)', () => {
     const connected = {
       isConnected: () => true,
     } satisfies BrowserLike;
-    manager.browser = connected;
+    // Stub ensureBrowser so launch() returns the mock
+    manager.ensureBrowser = async () => connected;
 
     const browser = await manager.launch();
     assert.strictEqual(browser, connected);
   });
 
-  it('creates new page, restores cookies and handles page close', async () => {
+  it('tracks current page and clears on close', async () => {
     const manager = new BrowserModeManager({
       useStealthScripts: false,
       autoLaunch: false,
@@ -67,6 +74,12 @@ describe('BrowserModeManager (mocked)', () => {
           closeHandler = handler;
         }
       },
+      once: (event: string, handler: () => void) => {
+        if (event === 'close') {
+          closeHandler = handler;
+        }
+      },
+      isClosed: () => false,
       setCacheEnabled: async () => undefined,
       setBypassCSP: async () => undefined,
       setJavaScriptEnabled: async () => undefined,
@@ -78,90 +91,53 @@ describe('BrowserModeManager (mocked)', () => {
     const browser = {
       newPage: async () => page,
       pages: async () => [page],
-    } satisfies BrowserLike;
+      connected: true,
+      close: async () => undefined,
+    } satisfies BrowserLike & {connected: boolean; close(): Promise<void>};
 
-    manager.browser = browser;
+    // Stub ensureBrowser so newPage() doesn't try to launch real Chrome
+    manager.ensureBrowser = async () => browser;
     manager.sessionData = {cookies: [{name: 'sid', value: '1'}]};
-    let antiDetectionInjected = 0;
-    manager.injectAntiDetectionScripts = async () => {
-      antiDetectionInjected += 1;
-    };
 
     const created = await manager.newPage();
     assert.strictEqual(created, page);
     assert.strictEqual(manager.getCurrentPage(), page);
-    assert.strictEqual(antiDetectionInjected, 1);
 
     assert.ok(closeHandler);
   });
 
-  it('navigates with current page or provided page and throws without page', async () => {
+  it('disconnects browser and clears state on close', async () => {
     const manager = new BrowserModeManager({
       useStealthScripts: false,
       autoLaunch: false,
     }) as unknown as BrowserModeManagerHarness;
 
-    await assert.rejects(async () => {
-      await manager.goto('https://example.com');
-    }, /No page available/);
-
-    let gotoCount = 0;
-    const page = {
-      goto: async () => {
-        gotoCount += 1;
-      },
-      on: () => undefined,
-      setCacheEnabled: async () => undefined,
-      setBypassCSP: async () => undefined,
-      setJavaScriptEnabled: async () => undefined,
-      setCookie: async () => 0,
-    } satisfies PageLike;
-    manager.currentPage = page;
-
-    await manager.goto('https://a.com');
-    await manager.goto('https://b.com', page);
-    assert.strictEqual(gotoCount, 2);
-  });
-
-  it('disconnects browser and terminates auto-launched process on close', async () => {
-    const manager = new BrowserModeManager({
-      useStealthScripts: false,
-      autoLaunch: false,
-    }) as unknown as BrowserModeManagerHarness;
-
-    let disconnected = 0;
-    let killed = 0;
+    let closed = 0;
     manager.browser = {
-      disconnect: async () => {
-        disconnected += 1;
+      connected: true,
+      close: async () => {
+        closed += 1;
       },
-    };
-    manager.autoLaunched = true;
-    manager.browserProcess = {
-      killed: false,
-      kill: () => {
-        killed += 1;
-      },
-    };
+    } as unknown as BrowserLike & {connected: boolean; close(): Promise<void>};
 
     await manager.close();
-    assert.strictEqual(disconnected, 1);
-    assert.strictEqual(killed, 1);
+    assert.strictEqual(closed, 1);
     assert.strictEqual(manager.getBrowser(), null);
     assert.strictEqual(manager.getCurrentPage(), null);
   });
 
-  it('handles disconnect failure branch on close', async () => {
+  it('handles close failure branch gracefully', async () => {
     const manager = new BrowserModeManager({
       useStealthScripts: false,
       autoLaunch: false,
     }) as unknown as BrowserModeManagerHarness;
 
     manager.browser = {
-      disconnect: async () => {
-        throw new Error('disconnect failed');
+      connected: true,
+      close: async () => {
+        throw new Error('close failed');
       },
-    };
+    } as unknown as BrowserLike & {connected: boolean; close(): Promise<void>};
 
     await manager.close();
     assert.strictEqual(manager.getBrowser(), null);

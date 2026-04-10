@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -12,9 +11,9 @@ import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import type { CodeFile, CollectCodeResult } from '../../types/index.js';
-import { logger } from '../../utils/logger.js';
-import { resolveDefaultCodeCacheDir } from '../../utils/projectPaths.js';
+import type {CodeFile, CollectCodeResult} from '../../types/index.js';
+import {logger} from '../../utils/logger.js';
+import {resolveDefaultCodeCacheDir} from '../../utils/projectPaths.js';
 
 export interface CacheEntry {
   url: string;
@@ -41,7 +40,8 @@ export class CodeCache {
   private readonly MAX_MEMORY_CACHE_SIZE = 100; // 最多 100 个条目
 
   constructor(options: CacheOptions = {}) {
-    this.cacheDir = options.cacheDir || resolveDefaultCodeCacheDir(import.meta.url);
+    this.cacheDir =
+      options.cacheDir || resolveDefaultCodeCacheDir(import.meta.url);
     this.maxAge = options.maxAge || 24 * 60 * 60 * 1000; // 默认24小时
     this.maxSize = options.maxSize || 100 * 1024 * 1024; // 默认100MB
   }
@@ -51,7 +51,7 @@ export class CodeCache {
    */
   async init(): Promise<void> {
     try {
-      await fs.mkdir(this.cacheDir, { recursive: true });
+      await fs.mkdir(this.cacheDir, {recursive: true});
       logger.debug(`Cache directory initialized: ${this.cacheDir}`);
     } catch (error) {
       logger.error('Failed to initialize cache directory:', error);
@@ -62,7 +62,7 @@ export class CodeCache {
    * 生成缓存键
    */
   private generateKey(url: string, options?: Record<string, unknown>): string {
-    const data = JSON.stringify({ url, options });
+    const data = JSON.stringify({url, options});
     return crypto.createHash('md5').update(data).digest('hex');
   }
 
@@ -83,7 +83,10 @@ export class CodeCache {
   /**
    * 从缓存获取
    */
-  async get(url: string, options?: Record<string, unknown>): Promise<CollectCodeResult | null> {
+  async get(
+    url: string,
+    options?: Record<string, unknown>,
+  ): Promise<CollectCodeResult | null> {
     const key = this.generateKey(url, options);
 
     // 先检查内存缓存
@@ -93,7 +96,7 @@ export class CodeCache {
         logger.debug(`Cache hit (memory): ${url}`);
         return {
           files: entry.files,
-          dependencies: { nodes: [], edges: [] },
+          dependencies: {nodes: [], edges: []},
           totalSize: entry.totalSize,
           collectTime: entry.collectTime,
         };
@@ -120,7 +123,7 @@ export class CodeCache {
       logger.debug(`Cache hit (disk): ${url}`);
       return {
         files: entry.files,
-        dependencies: { nodes: [], edges: [] },
+        dependencies: {nodes: [], edges: []},
         totalSize: entry.totalSize,
         collectTime: entry.collectTime,
       };
@@ -133,9 +136,16 @@ export class CodeCache {
   /**
    * 保存到缓存
    */
-  async set(url: string, result: CollectCodeResult, options?: Record<string, unknown>): Promise<void> {
+  async set(
+    url: string,
+    result: CollectCodeResult,
+    options?: Record<string, unknown>,
+  ): Promise<void> {
     const key = this.generateKey(url, options);
-    const hash = crypto.createHash('md5').update(JSON.stringify(result.files)).digest('hex');
+    const hash = crypto
+      .createHash('md5')
+      .update(JSON.stringify(result.files))
+      .digest('hex');
 
     const entry: CacheEntry = {
       url,
@@ -163,7 +173,9 @@ export class CodeCache {
     try {
       const cachePath = this.getCachePath(key);
       await fs.writeFile(cachePath, JSON.stringify(entry, null, 2), 'utf-8');
-      logger.debug(`Cache saved: ${url} (${(result.totalSize / 1024).toFixed(2)} KB)`);
+      logger.debug(
+        `Cache saved: ${url} (${(result.totalSize / 1024).toFixed(2)} KB)`,
+      );
     } catch (error) {
       logger.error('Failed to save cache:', error);
     }
@@ -179,7 +191,7 @@ export class CodeCache {
     try {
       const files = await fs.readdir(this.cacheDir);
       let totalSize = 0;
-      const entries: Array<{ file: string; mtime: Date; size: number }> = [];
+      const entries: Array<{file: string; mtime: Date; size: number}> = [];
 
       for (const file of files) {
         if (!file.endsWith('.json')) continue;

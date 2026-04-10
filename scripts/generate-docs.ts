@@ -53,12 +53,14 @@ function allTools(): ToolDef[] {
 function uniqueToolsByName(tools: ToolDef[]): ToolDef[] {
   const seen = new Set<string>();
   const deduped: ToolDef[] = [];
-  for (const tool of tools) {
-    if (seen.has(tool.name)) {
+  for (const item of tools) {
+    // Skip non-tool exports (functions, interfaces, constants, etc.)
+    if (!item.annotations || !item.name) continue;
+    if (seen.has(item.name)) {
       continue;
     }
-    seen.add(tool.name);
-    deduped.push(tool);
+    seen.add(item.name);
+    deduped.push(item);
   }
   return deduped;
 }
@@ -85,7 +87,11 @@ function generateConfigOptionsMarkdown(): string {
   return markdown.trim();
 }
 
-function updateReadmeBlock(beginMarker: string, endMarker: string, content: string): void {
+function updateReadmeBlock(
+  beginMarker: string,
+  endMarker: string,
+  content: string,
+): void {
   const readmeContent = fs.readFileSync(README_PATH, 'utf8');
   const beginIndex = readmeContent.indexOf(beginMarker);
   const endIndex = readmeContent.indexOf(endMarker);
@@ -101,7 +107,9 @@ function updateReadmeBlock(beginMarker: string, endMarker: string, content: stri
 }
 
 function generateDocs(): void {
-  const tools = uniqueToolsByName(allTools()).sort((a, b) => a.name.localeCompare(b.name));
+  const tools = uniqueToolsByName(allTools()).sort((a, b) =>
+    a.name.localeCompare(b.name),
+  );
   const categories = new Map<string, ToolDef[]>();
 
   for (const tool of tools) {
@@ -148,15 +156,23 @@ function generateDocs(): void {
 
   const toolsTOC = Array.from(categories.entries())
     .map(([category, categoryTools]) => {
-      const lines = [`- **${labels[category as ToolCategory]}** (${categoryTools.length} tools)`];
+      const lines = [
+        `- **${labels[category as ToolCategory]}** (${categoryTools.length} tools)`,
+      ];
       for (const tool of categoryTools) {
-        lines.push(`  - [\`${tool.name}\`](docs/tool-reference.md#${tool.name.toLowerCase()})`);
+        lines.push(
+          `  - [\`${tool.name}\`](docs/tool-reference.md#${tool.name.toLowerCase()})`,
+        );
       }
       return lines.join('\n');
     })
     .join('\n');
 
-  updateReadmeBlock('<!-- BEGIN AUTO GENERATED TOOLS -->', '<!-- END AUTO GENERATED TOOLS -->', toolsTOC);
+  updateReadmeBlock(
+    '<!-- BEGIN AUTO GENERATED TOOLS -->',
+    '<!-- END AUTO GENERATED TOOLS -->',
+    toolsTOC,
+  );
   updateReadmeBlock(
     '<!-- BEGIN AUTO GENERATED OPTIONS -->',
     '<!-- END AUTO GENERATED OPTIONS -->',

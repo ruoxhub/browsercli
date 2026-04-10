@@ -148,6 +148,7 @@ async function appendDebuggerEvidence(
  */
 export const listScripts = defineTool({
   name: 'list_scripts',
+  aliases: ['ls', 'scripts'],
   description:
     'Lists all JavaScript scripts loaded in the current page. Returns script ID, URL, and source map information. Use this to find scripts before setting breakpoints or searching.',
   annotations: {
@@ -650,6 +651,7 @@ export const searchInSources = defineTool({
  */
 export const setBreakpoint = defineTool({
   name: 'set_breakpoint',
+  aliases: ['bp'],
   description:
     'Sets a breakpoint in a JavaScript file at the specified line. The breakpoint will trigger when the code executes. NOTE: Prefer hook_function or create_hook for monitoring function calls — breakpoints require pause/resume coordination and are error-prone in automated workflows. Use breakpoints only when you need to inspect local variables inside a function.',
   annotations: {
@@ -744,6 +746,7 @@ export const setBreakpoint = defineTool({
  */
 export const removeBreakpoint = defineTool({
   name: 'remove_breakpoint',
+  aliases: ['rbp'],
   description:
     'Removes a breakpoint by its ID. Use list_breakpoints to see active breakpoints.',
   annotations: {
@@ -788,6 +791,7 @@ export const removeBreakpoint = defineTool({
  */
 export const listBreakpoints = defineTool({
   name: 'list_breakpoints',
+  aliases: ['bps'],
   description: 'Lists all active breakpoints in the current debugging session.',
   annotations: {
     title: 'List Breakpoints',

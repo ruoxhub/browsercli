@@ -34,6 +34,7 @@ so returned values have to JSON-serializable.`,
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
+    title: 'Evaluate JavaScript',
   },
   schema: {
     function: zod.string().describe(
@@ -87,12 +88,19 @@ export const injectPreloadScript = defineTool({
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
+    title: 'Inject preload script',
   },
   schema: {
-    script: zod.string().describe('JavaScript source to register for future document loads.'),
+    script: zod
+      .string()
+      .describe('JavaScript source to register for future document loads.'),
   },
   handler: async (request, response, context, runtime) => {
-    await runtime.pageController.injectScriptOnNewDocument(request.params.script);
-    response.appendResponseLine('Preload script registered for future documents.');
+    await runtime.pageController.injectScriptOnNewDocument(
+      request.params.script,
+    );
+    response.appendResponseLine(
+      'Preload script registered for future documents.',
+    );
   },
 });

@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -13,7 +12,11 @@ import {defineTool} from './ToolDefinition.js';
 export const queryDom = defineTool({
   name: 'query_dom',
   description: 'Query one or multiple elements by CSS selector.',
-  annotations: {category: ToolCategory.NAVIGATION, readOnlyHint: true},
+  annotations: {
+    category: ToolCategory.NAVIGATION,
+    readOnlyHint: true,
+    title: 'Query DOM elements by CSS selector',
+  },
   schema: {
     selector: zod.string(),
     all: zod.boolean().optional(),
@@ -21,7 +24,10 @@ export const queryDom = defineTool({
   },
   handler: async (request, response, context, runtime) => {
     const result = request.params.all
-      ? await runtime.domInspector.querySelectorAll(request.params.selector, request.params.limit)
+      ? await runtime.domInspector.querySelectorAll(
+          request.params.selector,
+          request.params.limit,
+        )
       : await runtime.domInspector.querySelector(request.params.selector);
 
     // 设置结构化返回数据
@@ -36,13 +42,20 @@ export const queryDom = defineTool({
 export const getDomStructure = defineTool({
   name: 'get_dom_structure',
   description: 'Get DOM tree structure for current page.',
-  annotations: {category: ToolCategory.NAVIGATION, readOnlyHint: true},
+  annotations: {
+    category: ToolCategory.NAVIGATION,
+    readOnlyHint: true,
+    title: 'Get DOM tree structure',
+  },
   schema: {
     maxDepth: zod.number().int().positive().optional(),
     includeText: zod.boolean().optional(),
   },
   handler: async (request, response, context, runtime) => {
-    const result = await runtime.domInspector.getStructure(request.params.maxDepth, request.params.includeText);
+    const result = await runtime.domInspector.getStructure(
+      request.params.maxDepth,
+      request.params.includeText,
+    );
 
     // 设置结构化返回数据
     response.setStructuredContent(result);
@@ -56,12 +69,18 @@ export const getDomStructure = defineTool({
 export const findClickableElements = defineTool({
   name: 'find_clickable_elements',
   description: 'Find clickable buttons/links, optionally filtered by text.',
-  annotations: {category: ToolCategory.NAVIGATION, readOnlyHint: true},
+  annotations: {
+    category: ToolCategory.NAVIGATION,
+    readOnlyHint: true,
+    title: 'Find clickable buttons and links',
+  },
   schema: {
     filterText: zod.string().optional(),
   },
   handler: async (request, response, context, runtime) => {
-    const result = await runtime.domInspector.findClickable(request.params.filterText);
+    const result = await runtime.domInspector.findClickable(
+      request.params.filterText,
+    );
 
     // 设置结构化返回数据
     response.setStructuredContent(result);

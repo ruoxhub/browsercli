@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -23,8 +22,8 @@
   //    Reference: https://github.com/nicehash/nicehashquickmine
   const screenX = Math.floor(Math.random() * 401) + 800; // 800-1200
   const screenY = Math.floor(Math.random() * 201) + 400; // 400-600
-  Object.defineProperty(MouseEvent.prototype, 'screenX', { value: screenX });
-  Object.defineProperty(MouseEvent.prototype, 'screenY', { value: screenY });
-  Object.defineProperty(PointerEvent.prototype, 'screenX', { value: screenX });
-  Object.defineProperty(PointerEvent.prototype, 'screenY', { value: screenY });
+  Object.defineProperty(MouseEvent.prototype, 'screenX', {value: screenX});
+  Object.defineProperty(MouseEvent.prototype, 'screenY', {value: screenY});
+  Object.defineProperty(PointerEvent.prototype, 'screenX', {value: screenX});
+  Object.defineProperty(PointerEvent.prototype, 'screenY', {value: screenY});
 })();

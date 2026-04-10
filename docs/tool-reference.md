@@ -4,14 +4,13 @@
 
 > 快速按逆向目标查工具，请先看：[`docs/reverse-task-index.md`](./reverse-task-index.md)
 
-- **[Navigation automation](#navigation-automation)** (20 tools)
+- **[Navigation automation](#navigation-automation)** (19 tools)
   - [`check_browser_health`](#check_browser_health)
   - [`click_element`](#click_element)
   - [`delete_session_state`](#delete_session_state)
   - [`dump_session_state`](#dump_session_state)
   - [`find_clickable_elements`](#find_clickable_elements)
   - [`get_dom_structure`](#get_dom_structure)
-  - [`get_performance_metrics`](#get_performance_metrics)
   - [`list_pages`](#list_pages)
   - [`list_session_states`](#list_session_states)
   - [`load_session_state`](#load_session_state)
@@ -40,7 +39,7 @@
   - [`inject_preload_script`](#inject_preload_script)
   - [`list_console_messages`](#list_console_messages)
   - [`take_screenshot`](#take_screenshot)
-- **[JS Reverse Engineering](#js-reverse-engineering)** (49 tools)
+- **[JS Reverse Engineering](#js-reverse-engineering)** (50 tools)
   - [`analyze_target`](#analyze_target)
   - [`break_on_xhr`](#break_on_xhr)
   - [`collect_code`](#collect_code)
@@ -62,6 +61,7 @@
   - [`inject_stealth`](#inject_stealth)
   - [`inspect_object`](#inspect_object)
   - [`list_breakpoints`](#list_breakpoints)
+  - [`list_created_hooks`](#list_created_hooks)
   - [`list_hooks`](#list_hooks)
   - [`list_scripts`](#list_scripts)
   - [`list_stealth_features`](#list_stealth_features)
@@ -140,10 +140,6 @@
 
 - `maxDepth`
 - `includeText`
-
-### `get_performance_metrics`
-
-**Description:** Get page performance metrics from Performance API.
 
 ### `list_pages`
 
@@ -607,6 +603,14 @@ so returned values have to JSON-serializable.
 ### `list_breakpoints`
 
 **Description:** Lists all active breakpoints in the current debugging session.
+
+### `list_created_hooks`
+
+**Description:** List all hooks created via create_hook with their status and record counts.
+
+**Parameters:**
+
+- `verbose`
 
 ### `list_hooks`
 

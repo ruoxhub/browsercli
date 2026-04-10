@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -6,21 +5,21 @@
  */
 /**
  * BlackboxManager - 黑盒化管理
- * 
+ *
  * 功能：
  * 1. 黑盒化脚本（按 URL 模式）
  * 2. 单步调试时自动跳过黑盒化的代码
  * 3. 调用栈中隐藏黑盒化的帧
- * 
+ *
  * 设计原则：
  * - 使用 CDP Debugger.setBlackboxPatterns
  * - 提供常用库的预定义黑盒化规则
  * - 支持自定义模式
  */
 
-import type { CDPSession } from 'puppeteer';
+import type {CDPSession} from 'puppeteer';
 
-import { logger } from '../../utils/logger.js';
+import {logger} from '../../utils/logger.js';
 
 /**
  * 黑盒化管理器
@@ -112,7 +111,9 @@ export class BlackboxManager {
         patterns: Array.from(this.blackboxedPatterns),
       });
 
-      logger.info(`Blackboxed ${BlackboxManager.COMMON_LIBRARY_PATTERNS.length} common library patterns`);
+      logger.info(
+        `Blackboxed ${BlackboxManager.COMMON_LIBRARY_PATTERNS.length} common library patterns`,
+      );
     } catch (error) {
       logger.error('Failed to blackbox common libraries:', error);
       throw error;
@@ -157,4 +158,3 @@ export class BlackboxManager {
     }
   }
 }
-

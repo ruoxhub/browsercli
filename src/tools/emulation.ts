@@ -25,6 +25,7 @@ export const emulateNetwork = defineTool({
   annotations: {
     category: ToolCategory.EMULATION,
     readOnlyHint: false,
+    title: 'Emulate network conditions',
   },
   schema: {
     throttlingOption: zod
@@ -74,6 +75,7 @@ export const emulateCpu = defineTool({
   annotations: {
     category: ToolCategory.EMULATION,
     readOnlyHint: false,
+    title: 'Emulate CPU throttling',
   },
   schema: {
     throttlingRate: zod
@@ -102,6 +104,7 @@ export const resizePage = defineTool({
   annotations: {
     category: ToolCategory.EMULATION,
     readOnlyHint: false,
+    title: 'Resize browser window dimensions',
   },
   schema: {
     width: zod.number().describe('Page width in pixels'),
@@ -130,6 +133,7 @@ export const emulateMobile = defineTool({
   annotations: {
     category: ToolCategory.EMULATION,
     readOnlyHint: false,
+    title: 'Emulate mobile device viewport',
   },
   schema: {
     enable: zod
@@ -145,22 +149,49 @@ export const emulateMobile = defineTool({
 
     if (request.params.enable) {
       const device = request.params.device || 'iphone';
-      let viewport: {width: number; height: number; deviceScaleFactor: number; isMobile: boolean; hasTouch: boolean};
+      let viewport: {
+        width: number;
+        height: number;
+        deviceScaleFactor: number;
+        isMobile: boolean;
+        hasTouch: boolean;
+      };
       let userAgent: string;
 
       switch (device) {
         case 'android':
-          viewport = {width: 412, height: 915, deviceScaleFactor: 2.625, isMobile: true, hasTouch: true};
-          userAgent = 'Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
+          viewport = {
+            width: 412,
+            height: 915,
+            deviceScaleFactor: 2.625,
+            isMobile: true,
+            hasTouch: true,
+          };
+          userAgent =
+            'Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
           break;
         case 'ipad':
-          viewport = {width: 1024, height: 768, deviceScaleFactor: 2, isMobile: true, hasTouch: true};
-          userAgent = 'Mozilla/5.0 (iPad; CPU OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1';
+          viewport = {
+            width: 1024,
+            height: 768,
+            deviceScaleFactor: 2,
+            isMobile: true,
+            hasTouch: true,
+          };
+          userAgent =
+            'Mozilla/5.0 (iPad; CPU OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1';
           break;
         case 'iphone':
         default:
-          viewport = {width: 390, height: 844, deviceScaleFactor: 3, isMobile: true, hasTouch: true};
-          userAgent = 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1';
+          viewport = {
+            width: 390,
+            height: 844,
+            deviceScaleFactor: 3,
+            isMobile: true,
+            hasTouch: true,
+          };
+          userAgent =
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1';
           break;
       }
 
@@ -169,10 +200,18 @@ export const emulateMobile = defineTool({
       await page.setJavaScriptEnabled(true);
 
       response.appendResponseLine(`Mobile emulation enabled (${device})`);
-      response.appendResponseLine(`Viewport: ${viewport.width}x${viewport.height}`);
+      response.appendResponseLine(
+        `Viewport: ${viewport.width}x${viewport.height}`,
+      );
       response.appendResponseLine(`User-Agent: ${userAgent.slice(0, 80)}...`);
     } else {
-      await page.setViewport({width: 1280, height: 720, deviceScaleFactor: 1, isMobile: false, hasTouch: false});
+      await page.setViewport({
+        width: 1280,
+        height: 720,
+        deviceScaleFactor: 1,
+        isMobile: false,
+        hasTouch: false,
+      });
       await page.setUserAgent('');
       response.appendResponseLine('Mobile emulation disabled');
     }

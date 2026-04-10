@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -6,21 +5,21 @@
  */
 /**
  * 脚本管理器 - 薄封装CDP Debugger域
- * 
+ *
  * 功能:
  * - 获取页面所有已加载的脚本列表
  * - 获取指定脚本的完整源码
  * - 监听脚本加载事件
- * 
+ *
  * 设计原则:
  * - 薄封装CDP Debugger.scriptParsed事件和Debugger.getScriptSource方法
  * - 依赖CodeCollector获取Page实例
  */
 
-import type { CDPSession } from 'puppeteer';
+import type {CDPSession} from 'puppeteer';
 
-import { logger } from '../../utils/logger.js';
-import type { CodeCollector } from '../collector/CodeCollector.js';
+import {logger} from '../../utils/logger.js';
+import type {CodeCollector} from '../collector/CodeCollector.js';
 
 export interface ScriptInfo {
   scriptId: string;
@@ -82,7 +81,7 @@ export class ScriptManager {
     // 🆕 移除冗余检查（initialized 为 true 时 cdpSession 一定不为 null）
     const page = await this.collector.getActivePage();
     this.cdpSession = await page.createCDPSession();
-    
+
     // 启用Debugger域
     await this.cdpSession.send('Debugger.enable');
 
@@ -109,7 +108,9 @@ export class ScriptManager {
         this.scriptsByUrl.get(params.url)!.push(scriptInfo);
       }
 
-      logger.debug(`Script parsed: ${params.url || 'inline'} (${params.scriptId})`);
+      logger.debug(
+        `Script parsed: ${params.url || 'inline'} (${params.scriptId})`,
+      );
     };
 
     // 监听脚本解析事件
@@ -138,7 +139,9 @@ export class ScriptManager {
     }
 
     this.initialized = true;
-    logger.info(`ScriptManager initialized, collected ${this.scripts.size} scripts`);
+    logger.info(
+      `ScriptManager initialized, collected ${this.scripts.size} scripts`,
+    );
   }
 
   /**
@@ -157,7 +160,10 @@ export class ScriptManager {
    * @param includeSource 是否包含源码（默认false，推荐false）
    * @param maxScripts 最大脚本数量限制（默认1000，防止内存溢出）
    */
-  async getAllScripts(includeSource = false, maxScripts = 1000): Promise<ScriptInfo[]> {
+  async getAllScripts(
+    includeSource = false,
+    maxScripts = 1000,
+  ): Promise<ScriptInfo[]> {
     if (!this.cdpSession) {
       await this.init();
     }
@@ -166,14 +172,18 @@ export class ScriptManager {
 
     // 🔧 修复：检查脚本数量，防止内存溢出
     if (scripts.length > maxScripts) {
-      logger.warn(`Found ${scripts.length} scripts, limiting to ${maxScripts}. Increase maxScripts parameter if needed.`);
+      logger.warn(
+        `Found ${scripts.length} scripts, limiting to ${maxScripts}. Increase maxScripts parameter if needed.`,
+      );
     }
 
     const limitedScripts = scripts.slice(0, maxScripts);
 
     // 如果需要包含源码，逐个获取
     if (includeSource) {
-      logger.warn(`Loading source code for ${limitedScripts.length} scripts. This may use significant memory.`);
+      logger.warn(
+        `Loading source code for ${limitedScripts.length} scripts. This may use significant memory.`,
+      );
 
       let loadedCount = 0;
       let failedCount = 0;
@@ -181,26 +191,38 @@ export class ScriptManager {
       for (const script of limitedScripts) {
         if (!script.source) {
           try {
-            const { scriptSource } = await this.cdpSession!.send('Debugger.getScriptSource', {
-              scriptId: script.scriptId,
-            });
+            const {scriptSource} = await this.cdpSession!.send(
+              'Debugger.getScriptSource',
+              {
+                scriptId: script.scriptId,
+              },
+            );
             script.source = scriptSource;
             loadedCount++;
 
             // 每加载 10 个脚本输出进度
             if (loadedCount % 10 === 0) {
-              logger.debug(`Loaded ${loadedCount}/${limitedScripts.length} scripts...`);
+              logger.debug(
+                `Loaded ${loadedCount}/${limitedScripts.length} scripts...`,
+              );
             }
           } catch (error) {
-            logger.warn(`Failed to get source for script ${script.scriptId}:`, error);
+            logger.warn(
+              `Failed to get source for script ${script.scriptId}:`,
+              error,
+            );
             failedCount++;
           }
         }
       }
 
-      logger.info(`getAllScripts: ${limitedScripts.length} scripts (loaded: ${loadedCount}, failed: ${failedCount})`);
+      logger.info(
+        `getAllScripts: ${limitedScripts.length} scripts (loaded: ${loadedCount}, failed: ${failedCount})`,
+      );
     } else {
-      logger.info(`getAllScripts: ${limitedScripts.length} scripts (source not included)`);
+      logger.info(
+        `getAllScripts: ${limitedScripts.length} scripts (source not included)`,
+      );
     }
 
     return limitedScripts;
@@ -209,7 +231,10 @@ export class ScriptManager {
   /**
    * 获取指定脚本的源码
    */
-  async getScriptSource(scriptId?: string, url?: string): Promise<ScriptInfo | null> {
+  async getScriptSource(
+    scriptId?: string,
+    url?: string,
+  ): Promise<ScriptInfo | null> {
     // ✅ 参数验证
     if (!scriptId && !url) {
       throw new Error('Either scriptId or url parameter must be provided');
@@ -254,22 +279,34 @@ export class ScriptManager {
     // 获取源码
     if (!targetScript.source) {
       try {
-        const { scriptSource } = await this.cdpSession!.send('Debugger.getScriptSource', {
-          scriptId: targetScript.scriptId,
-        });
+        const {scriptSource} = await this.cdpSession!.send(
+          'Debugger.getScriptSource',
+          {
+            scriptId: targetScript.scriptId,
+          },
+        );
         targetScript.source = scriptSource;
         targetScript.sourceLength = scriptSource.length;
 
         // 🆕 自动建立索引和分片
-        this.buildKeywordIndex(targetScript.scriptId, targetScript.url, scriptSource);
+        this.buildKeywordIndex(
+          targetScript.scriptId,
+          targetScript.url,
+          scriptSource,
+        );
         this.chunkScript(targetScript.scriptId, scriptSource);
       } catch (error) {
-        logger.error(`Failed to get script source for ${targetScript.scriptId}:`, error);
+        logger.error(
+          `Failed to get script source for ${targetScript.scriptId}:`,
+          error,
+        );
         return null;
       }
     }
 
-    logger.info(`getScriptSource: ${targetScript.url || 'inline'} (${targetScript.sourceLength} bytes)`);
+    logger.info(
+      `getScriptSource: ${targetScript.url || 'inline'} (${targetScript.sourceLength} bytes)`,
+    );
     return targetScript;
   }
 
@@ -300,7 +337,9 @@ export class ScriptManager {
       }
     }
 
-    logger.info(`findScriptsByUrl: ${urlPattern} - found ${results.length} scripts`);
+    logger.info(
+      `findScriptsByUrl: ${urlPattern} - found ${results.length} scripts`,
+    );
     return results;
   }
 
@@ -321,7 +360,7 @@ export class ScriptManager {
       caseSensitive?: boolean;
       contextLines?: number;
       maxMatches?: number;
-    } = {}
+    } = {},
   ): Promise<{
     keyword: string;
     totalMatches: number;
@@ -350,7 +389,10 @@ export class ScriptManager {
     try {
       searchRegex = isRegex
         ? new RegExp(keyword, caseSensitive ? 'g' : 'gi')
-        : new RegExp(keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), caseSensitive ? 'g' : 'gi');
+        : new RegExp(
+            keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+            caseSensitive ? 'g' : 'gi',
+          );
     } catch (error) {
       logger.error(`Invalid search pattern: ${keyword}`, error);
       return {
@@ -410,7 +452,9 @@ export class ScriptManager {
       }
     }
 
-    logger.info(`searchInScripts: "${keyword}" - found ${matches.length} matches`);
+    logger.info(
+      `searchInScripts: "${keyword}" - found ${matches.length} matches`,
+    );
 
     return {
       keyword,
@@ -431,7 +475,7 @@ export class ScriptManager {
       maxDepth?: number;
       maxSize?: number; // KB
       includeComments?: boolean;
-    } = {}
+    } = {},
   ): Promise<{
     mainFunction: string;
     code: string;
@@ -447,7 +491,7 @@ export class ScriptManager {
     totalSize: number;
     extractedCount: number;
   }> {
-    const { maxDepth = 3, maxSize = 500, includeComments = true } = options;
+    const {maxDepth = 3, maxSize = 500, includeComments = true} = options;
 
     // 获取脚本源码
     const script = await this.getScriptSource(scriptId);
@@ -465,7 +509,7 @@ export class ScriptManager {
       t = await import('@babel/types');
     } catch (error: any) {
       throw new Error(
-        `Failed to load Babel dependencies. Please install: npm install @babel/parser @babel/traverse @babel/generator @babel/types\nError: ${error.message}`
+        `Failed to load Babel dependencies. Please install: npm install @babel/parser @babel/traverse @babel/generator @babel/types\nError: ${error.message}`,
       );
     }
 
@@ -512,7 +556,7 @@ export class ScriptManager {
         const name = path.node.id?.name;
         if (!name) return;
 
-        const funcCode = generate(path.node, { comments: includeComments }).code;
+        const funcCode = generate(path.node, {comments: includeComments}).code;
         const deps = extractDependencies(path);
 
         allFunctions.set(name, {
@@ -530,10 +574,13 @@ export class ScriptManager {
       VariableDeclarator(path: any) {
         if (
           t.isIdentifier(path.node.id) &&
-          (t.isFunctionExpression(path.node.init) || t.isArrowFunctionExpression(path.node.init))
+          (t.isFunctionExpression(path.node.init) ||
+            t.isArrowFunctionExpression(path.node.init))
         ) {
           const name = path.node.id.name;
-          const funcCode = generate(path.node, { comments: includeComments }).code;
+          const funcCode = generate(path.node, {
+            comments: includeComments,
+          }).code;
           const deps = extractDependencies(path);
 
           allFunctions.set(name, {
@@ -588,10 +635,14 @@ export class ScriptManager {
 
     // 检查大小限制
     if (totalSize > maxSize * 1024) {
-      logger.warn(`Extracted code size (${(totalSize / 1024).toFixed(2)}KB) exceeds limit (${maxSize}KB)`);
+      logger.warn(
+        `Extracted code size (${(totalSize / 1024).toFixed(2)}KB) exceeds limit (${maxSize}KB)`,
+      );
     }
 
-    logger.info(`extractFunctionTree: ${functionName} - extracted ${functions.length} functions (${(totalSize / 1024).toFixed(2)}KB)`);
+    logger.info(
+      `extractFunctionTree: ${functionName} - extracted ${functions.length} functions (${(totalSize / 1024).toFixed(2)}KB)`,
+    );
 
     return {
       mainFunction: functionName,
@@ -674,7 +725,11 @@ export class ScriptManager {
   /**
    * 🆕 建立关键词索引（在获取脚本源码时自动调用）
    */
-  private buildKeywordIndex(scriptId: string, url: string, content: string): void {
+  private buildKeywordIndex(
+    scriptId: string,
+    url: string,
+    content: string,
+  ): void {
     const lines = content.split('\n');
     const keywordRegex = /\b[a-zA-Z_$][a-zA-Z0-9_$]{2,}\b/g;
 
@@ -756,7 +811,7 @@ export class ScriptManager {
       caseSensitive?: boolean;
       contextLines?: number;
       maxMatches?: number;
-    } = {}
+    } = {},
   ): Promise<{
     keyword: string;
     totalMatches: number;
@@ -770,7 +825,7 @@ export class ScriptManager {
     }>;
     searchMethod: 'indexed' | 'regex';
   }> {
-    const { isRegex = false, caseSensitive = false, maxMatches = 100 } = options;
+    const {isRegex = false, caseSensitive = false, maxMatches = 100} = options;
 
     const searchTerm = caseSensitive ? keyword : keyword.toLowerCase();
     const matches: Array<{
@@ -807,7 +862,9 @@ export class ScriptManager {
         }
       }
 
-      logger.info(`🔍 Enhanced search (indexed) found ${matches.length} matches for "${keyword}"`);
+      logger.info(
+        `🔍 Enhanced search (indexed) found ${matches.length} matches for "${keyword}"`,
+      );
 
       return {
         keyword,
@@ -825,4 +882,3 @@ export class ScriptManager {
     }
   }
 }
-

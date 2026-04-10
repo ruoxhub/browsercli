@@ -7,6 +7,7 @@
 import {CdpProxy} from '../cdp-proxy/index.js';
 import {zod} from '../third_party/index.js';
 import type {Page} from '../third_party/index.js';
+import {validateOutputPath} from '../utils/fsSafe.js';
 
 import {ToolCategory} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
@@ -18,10 +19,12 @@ let proxyInstance: CdpProxy | null = null;
  */
 export const cdp_start_proxy = defineTool({
   name: 'cdp_start_proxy',
-  description: '启动 CDP Proxy HTTP 服务器，允许通过 HTTP API 操控浏览器。代理运行在 localhost:3456。',
+  description:
+    '启动 CDP Proxy HTTP 服务器，允许通过 HTTP API 操控浏览器。代理运行在 localhost:3456。',
   annotations: {
     category: ToolCategory.PAGES,
     readOnlyHint: false,
+    title: 'Start CDP proxy',
   },
   schema: {
     port: zod.number().optional().describe('HTTP 端口，默认 3456'),
@@ -39,8 +42,12 @@ export const cdp_start_proxy = defineTool({
       // 注意：proxy 需要 browser 实例，这里先启动 HTTP 服务器
       // browser 实例会在后续通过 MCP context 注入
       await proxyInstance.start();
-      response.appendResponseLine(`CDP Proxy 已启动在 http://localhost:${port}`);
-      response.appendResponseLine('可用端点：/health, /targets, /new, /close, /navigate, /eval, /click, /screenshot 等');
+      response.appendResponseLine(
+        `CDP Proxy 已启动在 http://localhost:${port}`,
+      );
+      response.appendResponseLine(
+        '可用端点：/health, /targets, /new, /close, /navigate, /eval, /click, /screenshot 等',
+      );
     } catch (error) {
       response.appendResponseLine(`启动失败：${(error as Error).message}`);
     }
@@ -56,6 +63,7 @@ export const cdp_get_targets = defineTool({
   annotations: {
     category: ToolCategory.PAGES,
     readOnlyHint: true,
+    title: 'Get CDP targets',
   },
   schema: {},
   handler: async (_request, response, context, runtime) => {
@@ -80,6 +88,7 @@ export const cdp_new_page = defineTool({
   annotations: {
     category: ToolCategory.PAGES,
     readOnlyHint: false,
+    title: 'Create new CDP page',
   },
   schema: {
     url: zod.string().optional().describe('初始 URL，默认 about:blank'),
@@ -102,6 +111,7 @@ export const cdp_close_page = defineTool({
   annotations: {
     category: ToolCategory.PAGES,
     readOnlyHint: false,
+    title: 'Close CDP page',
   },
   schema: {
     pageIdx: zod.number().describe('页面索引（从 get_targets 获取）'),
@@ -121,6 +131,7 @@ export const cdp_navigate = defineTool({
   annotations: {
     category: ToolCategory.PAGES,
     readOnlyHint: false,
+    title: 'CDP navigate',
   },
   schema: {
     url: zod.string().describe('目标 URL'),
@@ -141,6 +152,7 @@ export const cdp_eval = defineTool({
   annotations: {
     category: ToolCategory.DOM,
     readOnlyHint: false,
+    title: 'CDP evaluate JavaScript',
   },
   schema: {
     expr: zod.string().describe('JavaScript 表达式'),
@@ -162,6 +174,7 @@ export const cdp_click = defineTool({
   annotations: {
     category: ToolCategory.DOM,
     readOnlyHint: false,
+    title: 'CDP click element',
   },
   schema: {
     selector: zod.string().describe('CSS 选择器'),
@@ -188,6 +201,7 @@ export const cdp_click_at = defineTool({
   annotations: {
     category: ToolCategory.DOM,
     readOnlyHint: false,
+    title: 'CDP click at coordinates',
   },
   schema: {
     selector: zod.string().describe('CSS 选择器'),
@@ -199,7 +213,11 @@ export const cdp_click_at = defineTool({
       if (!el) return {error: '未找到元素：' + sel};
       (el as HTMLElement).scrollIntoView({block: 'center'});
       const rect = (el as HTMLElement).getBoundingClientRect();
-      return {x: rect.x + rect.width / 2, y: rect.y + rect.height / 2, tag: (el as HTMLElement).tagName};
+      return {
+        x: rect.x + rect.width / 2,
+        y: rect.y + rect.height / 2,
+        tag: (el as HTMLElement).tagName,
+      };
     }, request.params.selector);
     if ((coord as {error?: string}).error) {
       response.appendResponseLine(JSON.stringify(coord));
@@ -220,10 +238,14 @@ export const cdp_screenshot = defineTool({
   annotations: {
     category: ToolCategory.SCREENSHOT,
     readOnlyHint: true,
+    title: 'CDP screenshot',
   },
   schema: {
     file: zod.string().optional().describe('保存文件路径，不指定则返回数据'),
-    type: zod.enum(['png', 'jpeg', 'webp']).optional().describe('图片类型，默认 png'),
+    type: zod
+      .enum(['png', 'jpeg', 'webp'])
+      .optional()
+      .describe('图片类型，默认 png'),
     fullPage: zod.boolean().optional().describe('是否截取整个页面，默认 false'),
   },
   handler: async (request, response, context, runtime) => {
@@ -239,10 +261,13 @@ export const cdp_screenshot = defineTool({
 
     if (request.params.file) {
       const fs = await import('node:fs');
-      fs.writeFileSync(request.params.file, screenshot);
-      response.appendResponseLine(`截图已保存到：${request.params.file}`);
+      const safePath = validateOutputPath(request.params.file);
+      fs.writeFileSync(safePath, screenshot);
+      response.appendResponseLine(`截图已保存到：${safePath}`);
     } else {
-      response.appendResponseLine(`截图数据 (${type}, ${screenshot.length} bytes)`);
+      response.appendResponseLine(
+        `截图数据 (${type}, ${screenshot.length} bytes)`,
+      );
     }
   },
 });
@@ -256,10 +281,14 @@ export const cdp_scroll = defineTool({
   annotations: {
     category: ToolCategory.DOM,
     readOnlyHint: false,
+    title: 'CDP scroll',
   },
   schema: {
     y: zod.number().optional().describe('滚动距离，默认 3000'),
-    direction: zod.enum(['down', 'up', 'top', 'bottom']).optional().describe('滚动方向，默认 down'),
+    direction: zod
+      .enum(['down', 'up', 'top', 'bottom'])
+      .optional()
+      .describe('滚动方向，默认 down'),
   },
   handler: async (request, response, context, runtime) => {
     const page = context.getSelectedPage();
@@ -292,6 +321,7 @@ export const cdp_upload_files = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    title: 'CDP upload files',
   },
   schema: {
     selector: zod.string().describe('文件输入框的 CSS 选择器'),
@@ -304,7 +334,9 @@ export const cdp_upload_files = defineTool({
       response.appendResponseLine(`未找到元素：${request.params.selector}`);
       return;
     }
-    await (input as unknown as {uploadFile: (...files: string[]) => Promise<void>}).uploadFile(...request.params.files);
+    await (
+      input as unknown as {uploadFile: (...files: string[]) => Promise<void>}
+    ).uploadFile(...request.params.files);
     response.appendResponseLine(`已上传 ${request.params.files.length} 个文件`);
   },
 });
@@ -318,6 +350,7 @@ export const cdp_page_info = defineTool({
   annotations: {
     category: ToolCategory.PAGES,
     readOnlyHint: true,
+    title: 'CDP page info',
   },
   schema: {},
   handler: async (_request, response, context, runtime) => {

@@ -19,11 +19,10 @@ export const click = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    title: 'Click element by CSS selector',
   },
   schema: {
-    selector: zod
-      .string()
-      .describe('CSS selector of the element to click'),
+    selector: zod.string().describe('CSS selector of the element to click'),
     dblClick: zod
       .boolean()
       .optional()
@@ -50,25 +49,35 @@ export const click = defineTool({
  */
 export const clickAt = defineTool({
   name: 'click_at',
-  description: 'Real mouse click using CDP Input.dispatchMouseEvent. Acts as user gesture, can trigger file dialogs and bypass some anti-automation detection.',
+  description:
+    'Real mouse click using CDP Input.dispatchMouseEvent. Acts as user gesture, can trigger file dialogs and bypass some anti-automation detection.',
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    title: 'Click at specific coordinates',
   },
   schema: {
     selector: zod.string().describe('CSS selector of the element to click'),
   },
   handler: async (request, response, context, runtime) => {
-    const result = await runtime.pageController.clickAt(request.params.selector);
+    const result = await runtime.pageController.clickAt(
+      request.params.selector,
+    );
 
     response.appendResponseLine('```json');
-    response.appendResponseLine(JSON.stringify({
-      clicked: true,
-      x: result.x,
-      y: result.y,
-      tag: result.tag,
-      text: result.text
-    }, null, 2));
+    response.appendResponseLine(
+      JSON.stringify(
+        {
+          clicked: true,
+          x: result.x,
+          y: result.y,
+          tag: result.tag,
+          text: result.text,
+        },
+        null,
+        2,
+      ),
+    );
     response.appendResponseLine('```');
   },
 });
@@ -79,19 +88,23 @@ export const clickAt = defineTool({
  */
 export const setFiles = defineTool({
   name: 'set_files',
-  description: 'Set files to a file input element using CDP DOM.setFileInputFiles. Bypasses file chooser dialog completely.',
+  description:
+    'Set files to a file input element using CDP DOM.setFileInputFiles. Bypasses file chooser dialog completely.',
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    title: 'Set files on a file input element',
   },
   schema: {
     selector: zod.string().describe('CSS selector of the file input element'),
-    filePaths: zod.array(zod.string()).describe('Array of absolute file paths to upload'),
+    filePaths: zod
+      .array(zod.string())
+      .describe('Array of absolute file paths to upload'),
   },
   handler: async (request, response, context, runtime) => {
     const result = await runtime.pageController.setFiles(
       request.params.selector,
-      request.params.filePaths
+      request.params.filePaths,
     );
 
     response.appendResponseLine('```json');
@@ -109,6 +122,7 @@ export const hover = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    title: 'Hover over element by CSS selector',
   },
   schema: {
     selector: zod
@@ -124,7 +138,9 @@ export const hover = defineTool({
     }
 
     await element.hover();
-    response.appendResponseLine(`Successfully hovered over element: ${request.params.selector}`);
+    response.appendResponseLine(
+      `Successfully hovered over element: ${request.params.selector}`,
+    );
   },
 });
 
@@ -133,10 +149,12 @@ export const hover = defineTool({
  */
 export const fill = defineTool({
   name: 'fill',
-  description: 'Type text into an input, text area or select an option from a <select> element',
+  description:
+    'Type text into an input, text area or select an option from a <select> element',
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    title: 'Fill text input or select option',
   },
   schema: {
     selector: zod
@@ -153,7 +171,7 @@ export const fill = defineTool({
     }
 
     // 检查是否是 select 元素
-    const isSelect = await page.evaluate((sel) => {
+    const isSelect = await page.evaluate(sel => {
       const el = document.querySelector(sel);
       return el?.tagName === 'SELECT';
     }, request.params.selector);
@@ -164,7 +182,9 @@ export const fill = defineTool({
       await element.type(request.params.value);
     }
 
-    response.appendResponseLine(`Successfully filled value into element: ${request.params.selector}`);
+    response.appendResponseLine(
+      `Successfully filled value into element: ${request.params.selector}`,
+    );
   },
 });
 
@@ -177,10 +197,13 @@ export const drag = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    title: 'Drag element onto another element',
   },
   schema: {
     fromSelector: zod.string().describe('CSS selector of the element to drag'),
-    toSelector: zod.string().describe('CSS selector of the element to drop into'),
+    toSelector: zod
+      .string()
+      .describe('CSS selector of the element to drop into'),
   },
   handler: async (request, response, context, runtime) => {
     const page = await runtime.collector.getActivePage();
@@ -189,7 +212,9 @@ export const drag = defineTool({
     const toElement = await page.$(request.params.toSelector);
 
     if (!fromElement) {
-      throw new Error(`Source element not found: ${request.params.fromSelector}`);
+      throw new Error(
+        `Source element not found: ${request.params.fromSelector}`,
+      );
     }
     if (!toElement) {
       throw new Error(`Target element not found: ${request.params.toSelector}`);
@@ -216,7 +241,9 @@ export const drag = defineTool({
     await page.mouse.move(toX, toY);
     await page.mouse.up();
 
-    response.appendResponseLine(`Successfully dragged element from ${request.params.fromSelector} to ${request.params.toSelector}`);
+    response.appendResponseLine(
+      `Successfully dragged element from ${request.params.fromSelector} to ${request.params.toSelector}`,
+    );
   },
 });
 
@@ -229,12 +256,15 @@ export const fillForm = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    title: 'Fill multiple form fields at once',
   },
   schema: {
     elements: zod
       .array(
         zod.object({
-          selector: zod.string().describe('CSS selector of the element to fill out'),
+          selector: zod
+            .string()
+            .describe('CSS selector of the element to fill out'),
           value: zod.string().describe('Value for the element'),
         }),
       )
@@ -247,7 +277,7 @@ export const fillForm = defineTool({
       const el = await page.$(element.selector);
       if (el) {
         // 检查是否是 select 元素
-        const isSelect = await page.evaluate((sel) => {
+        const isSelect = await page.evaluate(sel => {
           const ele = document.querySelector(sel);
           return ele?.tagName === 'SELECT';
         }, element.selector);
@@ -260,7 +290,9 @@ export const fillForm = defineTool({
       }
     }
 
-    response.appendResponseLine(`Successfully filled out ${request.params.elements.length} form elements`);
+    response.appendResponseLine(
+      `Successfully filled out ${request.params.elements.length} form elements`,
+    );
   },
 });
 
@@ -273,11 +305,10 @@ export const uploadFile = defineTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    title: 'Upload file through file input',
   },
   schema: {
-    selector: zod
-      .string()
-      .describe('CSS selector of the file input element'),
+    selector: zod.string().describe('CSS selector of the file input element'),
     filePath: zod.string().describe('The absolute path of the file to upload'),
   },
   handler: async (request, response, context, runtime) => {
@@ -291,7 +322,9 @@ export const uploadFile = defineTool({
     try {
       // 尝试直接使用 uploadFile 方法（需要类型断言）
       await (element as any).uploadFile(request.params.filePath);
-      response.appendResponseLine(`File uploaded from ${request.params.filePath}`);
+      response.appendResponseLine(
+        `File uploaded from ${request.params.filePath}`,
+      );
     } catch {
       // 如果不是 file input，尝试点击触发 file chooser
       try {
@@ -300,7 +333,9 @@ export const uploadFile = defineTool({
           element.click(),
         ]);
         await fileChooser.accept([request.params.filePath]);
-        response.appendResponseLine(`File uploaded from ${request.params.filePath}`);
+        response.appendResponseLine(
+          `File uploaded from ${request.params.filePath}`,
+        );
       } catch {
         throw new Error(
           `Failed to upload file. The element could not accept the file directly, and clicking it did not trigger a file chooser.`,
@@ -315,10 +350,12 @@ export const uploadFile = defineTool({
  */
 export const pressKey = defineTool({
   name: 'press_key',
-  description: 'Press a key or key combination. Use this when other input methods like fill() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations).',
+  description:
+    'Press a key or key combination. Use this when other input methods like fill() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations).',
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    title: 'Press a key or key combination',
   },
   schema: {
     key: zod

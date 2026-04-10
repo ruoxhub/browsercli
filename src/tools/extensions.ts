@@ -15,10 +15,12 @@ import {defineTool} from './ToolDefinition.js';
  */
 export const updateExtensions = defineTool({
   name: 'update_extensions',
-  description: 'Update Chrome extensions by navigating to chrome://extensions/ and clicking the "Update now" button.',
+  description:
+    'Update Chrome extensions by navigating to chrome://extensions/ and clicking the "Update now" button.',
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: false,
+    title: 'Update browser extensions',
   },
   schema: {},
   handler: async (_request, response, context, runtime) => {
@@ -42,7 +44,10 @@ export const updateExtensions = defineTool({
 
       const shadowRoot = (manager as any).shadowRoot;
       if (!shadowRoot) {
-        return {success: false, error: 'shadowRoot not found on extensions-manager'};
+        return {
+          success: false,
+          error: 'shadowRoot not found on extensions-manager',
+        };
       }
 
       const toolbar = shadowRoot.querySelector('extensions-toolbar#toolbar');
@@ -52,7 +57,10 @@ export const updateExtensions = defineTool({
 
       const toolbarShadowRoot = (toolbar as any).shadowRoot;
       if (!toolbarShadowRoot) {
-        return {success: false, error: 'shadowRoot not found on extensions-toolbar'};
+        return {
+          success: false,
+          error: 'shadowRoot not found on extensions-toolbar',
+        };
       }
 
       const updateButton = toolbarShadowRoot.querySelector('#updateNow');
@@ -70,9 +78,13 @@ export const updateExtensions = defineTool({
     });
 
     if (result.success) {
-      response.appendResponseLine('Chrome extensions update initiated successfully.');
+      response.appendResponseLine(
+        'Chrome extensions update initiated successfully.',
+      );
     } else {
-      response.appendResponseLine(`Failed to update extensions: ${result.error}`);
+      response.appendResponseLine(
+        `Failed to update extensions: ${result.error}`,
+      );
     }
   },
 });

@@ -24,6 +24,7 @@ export const listWebSocketConnections = defineTool({
   annotations: {
     category: ToolCategory.NETWORK,
     readOnlyHint: true,
+    title: 'List WebSocket connections for selected page',
   },
   schema: {
     pageSize: zod
@@ -72,6 +73,7 @@ export const getWebSocketMessages = defineTool({
   annotations: {
     category: ToolCategory.NETWORK,
     readOnlyHint: true,
+    title: 'Get WebSocket messages for a connection',
   },
   schema: {
     wsid: zod.number().describe('The wsid of the WebSocket connection.'),
@@ -186,6 +188,7 @@ export const getWebSocketMessage = defineTool({
   annotations: {
     category: ToolCategory.NETWORK,
     readOnlyHint: true,
+    title: 'Get a single WebSocket message by frame index',
   },
   schema: {
     wsid: zod.number().describe('The wsid of the WebSocket connection.'),
@@ -220,6 +223,7 @@ export const analyzeWebSocketMessages = defineTool({
   annotations: {
     category: ToolCategory.NETWORK,
     readOnlyHint: true,
+    title: 'Analyze and group WebSocket message patterns',
   },
   schema: {
     wsid: zod

@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -11,13 +10,24 @@ import {ToolCategory} from './categories.js';
 import {getJSHookRuntime} from './runtime.js';
 import {defineTool} from './ToolDefinition.js';
 
-
 export const injectStealth = defineTool({
   name: 'inject_stealth',
   description: 'Inject anti-detection stealth scripts to current page.',
-  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: false},
+  annotations: {
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: false,
+    title: 'Inject stealth scripts',
+  },
   schema: {
-    preset: zod.enum(['windows-chrome', 'mac-chrome', 'mac-safari', 'linux-chrome', 'windows-edge']).optional(),
+    preset: zod
+      .enum([
+        'windows-chrome',
+        'mac-chrome',
+        'mac-safari',
+        'linux-chrome',
+        'windows-edge',
+      ])
+      .optional(),
   },
   handler: async (request, response, context, runtime) => {
     const page = await runtime.collector.getActivePage();
@@ -29,11 +39,17 @@ export const injectStealth = defineTool({
 export const listStealthPresets = defineTool({
   name: 'list_stealth_presets',
   description: 'List available stealth presets.',
-  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+  annotations: {
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: true,
+    title: 'List stealth presets',
+  },
   schema: {},
   handler: async (_request, response, context, runtime) => {
     response.appendResponseLine('```json');
-    response.appendResponseLine(JSON.stringify(StealthScripts2025.getPresets(), null, 2));
+    response.appendResponseLine(
+      JSON.stringify(StealthScripts2025.getPresets(), null, 2),
+    );
     response.appendResponseLine('```');
   },
 });
@@ -41,16 +57,38 @@ export const listStealthPresets = defineTool({
 export const listStealthFeatures = defineTool({
   name: 'list_stealth_features',
   description: 'List available stealth feature toggles.',
-  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+  annotations: {
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: true,
+    title: 'List stealth feature toggles',
+  },
   schema: {},
   handler: async (_request, response, context, runtime) => {
     response.appendResponseLine('```json');
-    response.appendResponseLine(JSON.stringify([
-      'hideWebDriver', 'mockChrome', 'setUserAgent', 'fixPermissions', 'mockPlugins',
-      'canvasNoise', 'webglOverride', 'audioContextNoise', 'fixLanguages', 'mockBattery',
-      'mockMediaDevices', 'mockNotifications', 'mockConnection', 'focusOverride',
-      'performanceNoise', 'overrideScreen',
-    ], null, 2));
+    response.appendResponseLine(
+      JSON.stringify(
+        [
+          'hideWebDriver',
+          'mockChrome',
+          'setUserAgent',
+          'fixPermissions',
+          'mockPlugins',
+          'canvasNoise',
+          'webglOverride',
+          'audioContextNoise',
+          'fixLanguages',
+          'mockBattery',
+          'mockMediaDevices',
+          'mockNotifications',
+          'mockConnection',
+          'focusOverride',
+          'performanceNoise',
+          'overrideScreen',
+        ],
+        null,
+        2,
+      ),
+    );
     response.appendResponseLine('```');
   },
 });
@@ -58,7 +96,11 @@ export const listStealthFeatures = defineTool({
 export const setUserAgent = defineTool({
   name: 'set_user_agent',
   description: 'Set custom user-agent for active page.',
-  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: false},
+  annotations: {
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: false,
+    title: 'Set user agent',
+  },
   schema: {userAgent: zod.string().min(1)},
   handler: async (request, response, context, runtime) => {
     const page = await runtime.collector.getActivePage();

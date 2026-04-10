@@ -1,5 +1,3 @@
-
-// @ts-nocheck
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -8,17 +6,25 @@
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {getJSHookRuntime} from './runtime.js';
 import {defineTool} from './ToolDefinition.js';
 
 export const collectCode = defineTool({
   name: 'collect_code',
-  description: 'Collect JavaScript code from a page with smart modes (summary/priority/incremental/full).',
-  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+  description:
+    'Collect JavaScript code from a page with smart modes (summary/priority/incremental/full).',
+  annotations: {
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: true,
+    title: 'Collect JavaScript code from a page',
+  },
   schema: {
     url: zod.string().url(),
-    smartMode: zod.enum(['summary', 'priority', 'incremental', 'full']).optional(),
-    returnMode: zod.enum(['full', 'summary', 'pattern', 'top-priority']).optional(),
+    smartMode: zod
+      .enum(['summary', 'priority', 'incremental', 'full'])
+      .optional(),
+    returnMode: zod
+      .enum(['full', 'summary', 'pattern', 'top-priority'])
+      .optional(),
     includeInline: zod.boolean().optional(),
     includeExternal: zod.boolean().optional(),
     includeDynamic: zod.boolean().optional(),
@@ -29,12 +35,14 @@ export const collectCode = defineTool({
     topN: zod.number().int().positive().optional(),
   },
   handler: async (request, response, context, runtime) => {
+    void context;
     const returnMode = request.params.returnMode ?? 'full';
     const shouldCollect =
-      returnMode !== 'summary' || runtime.collector.getCollectedFilesSummary().length === 0;
+      returnMode !== 'summary' ||
+      runtime.collector.getCollectedFilesSummary().length === 0;
 
     if (shouldCollect) {
-      await runtime.collector.collect(request.params);
+      await runtime.collector.collect(request.params as any);
     }
 
     let result: unknown;
@@ -53,7 +61,7 @@ export const collectCode = defineTool({
         request.params.maxTotalSize,
       );
     } else {
-      result = await runtime.collector.collect(request.params);
+      result = await runtime.collector.collect(request.params as any);
     }
 
     response.appendResponseLine('```json');
@@ -78,8 +86,8 @@ function diffSummaries(
   }>;
   unchanged?: Array<{url: string; size: number; type: string}>;
 } {
-  const prevMap = new Map(previous.map((item) => [item.url, item]));
-  const currentMap = new Map(current.map((item) => [item.url, item]));
+  const prevMap = new Map(previous.map(item => [item.url, item]));
+  const currentMap = new Map(current.map(item => [item.url, item]));
 
   const added: Array<{url: string; size: number; type: string}> = [];
   const removed: Array<{url: string; size: number; type: string}> = [];
@@ -119,13 +127,19 @@ function diffSummaries(
     }
   }
 
-  return includeUnchanged ? {added, removed, changed, unchanged} : {added, removed, changed};
+  return includeUnchanged
+    ? {added, removed, changed, unchanged}
+    : {added, removed, changed};
 }
 
 export const collectionDiff = defineTool({
   name: 'collection_diff',
   description: 'Compare previous and current collected file summaries.',
-  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+  annotations: {
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: true,
+    title: 'Compare collected code snapshots',
+  },
   schema: {
     previous: zod.array(
       zod.object({
@@ -146,8 +160,22 @@ export const collectionDiff = defineTool({
     includeUnchanged: zod.boolean().optional(),
   },
   handler: async (request, response, context, runtime) => {
-    const current = request.params.current ?? runtime.collector.getCollectedFilesSummary();
-    const diff = diffSummaries(request.params.previous, current, request.params.includeUnchanged);
+    void context;
+    const current = (request.params.current ??
+      runtime.collector.getCollectedFilesSummary()) as Array<{
+      url: string;
+      size: number;
+      type: string;
+    }>;
+    const diff = diffSummaries(
+      (request.params.previous ?? []) as Array<{
+        url: string;
+        size: number;
+        type: string;
+      }>,
+      current,
+      request.params.includeUnchanged,
+    );
     const result = {
       previousCount: request.params.previous.length,
       currentCount: current.length,
@@ -165,13 +193,18 @@ export const collectionDiff = defineTool({
 export const searchInScripts = defineTool({
   name: 'search_in_scripts',
   description: 'Search in collected script cache with regex pattern.',
-  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+  annotations: {
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: true,
+    title: 'Search collected scripts with regex',
+  },
   schema: {
     pattern: zod.string(),
     limit: zod.number().int().positive().optional(),
     maxTotalSize: zod.number().int().positive().optional(),
   },
   handler: async (request, response, context, runtime) => {
+    void context;
     const result = runtime.collector.getFilesByPattern(
       request.params.pattern,
       request.params.limit,

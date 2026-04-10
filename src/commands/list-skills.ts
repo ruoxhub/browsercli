@@ -13,6 +13,18 @@ interface SkillInfo {
   category?: string;
 }
 
+export function formatSkills(skills: SkillInfo[]): string {
+  if (skills.length === 0) {
+    return '可用技能:\n  (无可用技能)\n提示：使用 "js-reverse start" 启动服务后加载技能';
+  }
+  const lines = ['可用技能:'];
+  for (const skill of skills) {
+    const category = skill.category ? ` [${skill.category}]` : '';
+    lines.push(`  - ${skill.name}:${category} ${skill.description}`);
+  }
+  return lines.join('\n');
+}
+
 export async function listSkillsCommand(options: {
   json?: boolean;
 }): Promise<void> {
@@ -29,10 +41,7 @@ export async function listSkillsCommand(options: {
     if (options.json) {
       console.log(JSON.stringify(skills, null, 2));
     } else {
-      console.log('可用技能:');
-      for (const skill of skills) {
-        console.log(`  - ${skill.name}: ${skill.description}`);
-      }
+      console.log(formatSkills(skills));
     }
   } catch (error) {
     console.error(

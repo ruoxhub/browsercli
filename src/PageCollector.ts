@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * @license
  * Copyright 2025 Google LLC
@@ -6,6 +5,8 @@
  */
 
 // 动态导入 chrome-devtools-frontend 以绕过类型检查
+
+import {createRequire} from 'node:module';
 
 import {FakeIssuesManager} from './DevtoolsUtils.js';
 import {features} from './features.js';
@@ -22,11 +23,9 @@ import type {
   Handler,
   HTTPRequest,
   Page,
-  PageEvents,
 } from './third_party/index.js';
 
 // 动态导入 chrome-devtools-frontend 以绕过类型检查
-import {createRequire} from 'node:module';
 const require = createRequire(import.meta.url);
 const CDTP_MODULE_PATH = '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
 const cdtp = require(CDTP_MODULE_PATH);
@@ -72,6 +71,14 @@ export interface RequestInitiator {
       }>;
     };
   };
+}
+
+interface PuppeteerPageEvents {
+  request: HTTPRequest;
+  response: HTTPRequest;
+  console: ConsoleMessage;
+  pageerror: Error;
+  framenavigated: Frame;
 }
 
 interface PageEvents extends PuppeteerPageEvents {
@@ -292,7 +299,7 @@ export class ConsoleCollector extends PageCollector<
 
 class PageIssueSubscriber {
   #issueManager: FakeIssuesManager | null = null;
-  #issueAggregator: IssueAggregator | null = null;
+  #issueAggregator: typeof IssueAggregator | null = null;
   #seenKeys = new Set<string>();
   #seenIssues = new Set<AggregatedIssue>();
   #page: Page;
@@ -372,12 +379,10 @@ class PageIssueSubscriber {
 
   #onIssueAdded = (data: Protocol.Audits.IssueAddedEvent) => {
     try {
-      const inspectorIssue = data.issue;
-      // @ts-expect-error Types of protocol from Puppeteer and CDP are
-      // incomparable for InspectorIssueCode, one is union, other is enum.
+      const inspectorIssue = data.issue as {code?: string};
       const issue = createIssuesFromProtocolIssue(null, inspectorIssue)[0];
       if (!issue) {
-        logger('No issue mapping for for the issue: ', inspectorIssue.code);
+        logger('No issue mapping for for the issue: ', inspectorIssue?.code);
         return;
       }
 
@@ -386,14 +391,14 @@ class PageIssueSubscriber {
         return;
       }
       this.#seenKeys.add(primaryKey);
-      this.#issueManager.dispatchEventToListeners(
-        IssuesManagerEvents.ISSUE_ADDED,
-        {
-          issue,
-          // @ts-expect-error We don't care that issues model is null
-          issuesModel: null,
-        },
-      );
+      (
+        this.#issueManager as unknown as {
+          dispatchEventToListeners: (event: string, data: unknown) => void;
+        }
+      ).dispatchEventToListeners(IssuesManagerEvents.ISSUE_ADDED, {
+        issue,
+        issuesModel: null,
+      });
     } catch (error) {
       logger('Error creating a new issue', error);
     }

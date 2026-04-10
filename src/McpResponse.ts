@@ -1,10 +1,10 @@
-// @ts-nocheck
 /**
  * @license
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {mapIssueToMessageObject} from './DevtoolsUtils.js';
 import {
   formatConsoleEventShort,
   formatConsoleEventVerbose,
@@ -28,12 +28,19 @@ import type {
   ResourceType,
   TextContent,
 } from './third_party/index.js';
+import type {AggregatedIssue} from './third_party/index.js';
 import type {ImageContentData, Response} from './tools/ToolDefinition.js';
+
+function isAggregatedIssue(value: unknown): value is AggregatedIssue {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'code' in value &&
+    typeof (value as Record<string, unknown>).code === 'function'
+  );
+}
 import {paginate} from './utils/pagination.js';
 import type {PaginationOptions} from './utils/types.js';
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AggregatedIssueType = any;
 
 export class McpResponse implements Response {
   #includePages = false;
@@ -269,13 +276,11 @@ export class McpResponse implements Response {
             }),
           ),
         };
-      } else if ('code' in message) {
-        // Treat as AggregatedIssue-like object
-        const issueMessage = message as AggregatedIssueType;
+      } else if (isAggregatedIssue(message)) {
         consoleData = {
           consoleMessageStableId,
           type: 'error',
-          message: (message as Error).message,
+          message: message.title?.() ?? message.code() ?? '<unknown error>',
           args: [],
         };
       }
@@ -293,7 +298,7 @@ export class McpResponse implements Response {
           if ('type' in message) {
             return normalizedTypes.has(message.type());
           }
-          if (message instanceof AggregatedIssue) {
+          if (isAggregatedIssue(message)) {
             return normalizedTypes.has('issue');
           }
           return normalizedTypes.has('error');
@@ -324,7 +329,7 @@ export class McpResponse implements Response {
                 ),
               };
             }
-            if (item instanceof AggregatedIssue) {
+            if (isAggregatedIssue(item)) {
               const mappedIssueMessage = mapIssueToMessageObject(item);
               if (!mappedIssueMessage) return null;
               return {
@@ -335,7 +340,10 @@ export class McpResponse implements Response {
             return {
               consoleMessageStableId,
               type: 'error',
-              message: (item as Error).message,
+              message: String(
+                (item as unknown as Record<string, unknown>).message ??
+                  '<unknown error>',
+              ),
               args: [],
             };
           }),

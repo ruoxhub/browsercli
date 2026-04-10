@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -6,7 +5,7 @@
  */
 /**
  * 智能代码收集器 - 解决token溢出问题
- * 
+ *
  * 核心策略：
  * 1. 分批收集 - 按优先级分批返回代码
  * 2. 智能过滤 - 只收集关键代码（加密、API调用等）
@@ -14,10 +13,10 @@
  * 4. 增量收集 - 支持按需获取特定文件
  */
 
-import type { Page } from 'puppeteer';
+import type {Page} from 'puppeteer';
 
-import type { CodeFile } from '../../types/index.js';
-import { logger } from '../../utils/logger.js';
+import type {CodeFile} from '../../types/index.js';
+import {logger} from '../../utils/logger.js';
 
 export interface SmartCollectOptions {
   mode: 'summary' | 'priority' | 'incremental' | 'full';
@@ -43,9 +42,9 @@ export interface CodeSummary {
 export class SmartCodeCollector {
   // 🔧 修复：降低默认限制，防止 MCP token 溢出
   // MCP 通常限制在 200K tokens ≈ 800KB-1MB 文本
-  private readonly DEFAULT_MAX_TOTAL_SIZE = 512 * 1024;  // 512KB (原2MB)
-  private readonly DEFAULT_MAX_FILE_SIZE = 100 * 1024;   // 100KB (原500KB)
-  private readonly PREVIEW_LINES = 50;  // 50行 (原100行)
+  private readonly DEFAULT_MAX_TOTAL_SIZE = 512 * 1024; // 512KB (原2MB)
+  private readonly DEFAULT_MAX_FILE_SIZE = 100 * 1024; // 100KB (原500KB)
+  private readonly PREVIEW_LINES = 50; // 50行 (原100行)
 
   /**
    * 智能收集代码
@@ -53,20 +52,20 @@ export class SmartCodeCollector {
   async smartCollect(
     _page: Page, // 预留，未来可用于动态分析
     files: CodeFile[],
-    options: SmartCollectOptions
+    options: SmartCollectOptions,
   ): Promise<CodeFile[] | CodeSummary[]> {
     logger.info(`Smart code collection mode: ${options.mode}`);
 
     switch (options.mode) {
       case 'summary':
         return this.collectSummaries(files);
-      
+
       case 'priority':
         return this.collectByPriority(files, options);
-      
+
       case 'incremental':
         return this.collectIncremental(files, options);
-      
+
       case 'full':
       default:
         return this.collectWithLimit(files, options);
@@ -102,7 +101,7 @@ export class SmartCodeCollector {
    */
   private collectByPriority(
     files: CodeFile[],
-    options: SmartCollectOptions
+    options: SmartCollectOptions,
   ): CodeFile[] {
     const maxTotalSize = options.maxTotalSize || this.DEFAULT_MAX_TOTAL_SIZE;
     const maxFileSize = options.maxFileSize || this.DEFAULT_MAX_FILE_SIZE;
@@ -120,7 +119,7 @@ export class SmartCodeCollector {
     const result: CodeFile[] = [];
     let currentSize = 0;
 
-    for (const { file } of scoredFiles) {
+    for (const {file} of scoredFiles) {
       let content = file.content;
       let truncated = false;
 
@@ -132,7 +131,9 @@ export class SmartCodeCollector {
 
       // 检查是否超过总大小限制
       if (currentSize + content.length > maxTotalSize) {
-        logger.warn(`Reached max total size limit (${maxTotalSize} bytes), stopping collection`);
+        logger.warn(
+          `Reached max total size limit (${maxTotalSize} bytes), stopping collection`,
+        );
         break;
       }
 
@@ -151,7 +152,9 @@ export class SmartCodeCollector {
       currentSize += content.length;
     }
 
-    logger.info(`Collected ${result.length}/${files.length} files by priority (${(currentSize / 1024).toFixed(2)} KB)`);
+    logger.info(
+      `Collected ${result.length}/${files.length} files by priority (${(currentSize / 1024).toFixed(2)} KB)`,
+    );
     return result;
   }
 
@@ -160,7 +163,7 @@ export class SmartCodeCollector {
    */
   private collectIncremental(
     files: CodeFile[],
-    options: SmartCollectOptions
+    options: SmartCollectOptions,
   ): CodeFile[] {
     const includePatterns = options.includePatterns || [];
     const excludePatterns = options.excludePatterns || [];
@@ -176,10 +179,14 @@ export class SmartCodeCollector {
         return true;
       }
 
-      return includePatterns.some(pattern => new RegExp(pattern).test(file.url));
+      return includePatterns.some(pattern =>
+        new RegExp(pattern).test(file.url),
+      );
     });
 
-    logger.info(`Incremental collection: ${filtered.length}/${files.length} files matched`);
+    logger.info(
+      `Incremental collection: ${filtered.length}/${files.length} files matched`,
+    );
     return this.collectWithLimit(filtered, options);
   }
 
@@ -188,7 +195,7 @@ export class SmartCodeCollector {
    */
   private collectWithLimit(
     files: CodeFile[],
-    options: SmartCollectOptions
+    options: SmartCollectOptions,
   ): CodeFile[] {
     const maxTotalSize = options.maxTotalSize || this.DEFAULT_MAX_TOTAL_SIZE;
     const maxFileSize = options.maxFileSize || this.DEFAULT_MAX_FILE_SIZE;
@@ -208,7 +215,9 @@ export class SmartCodeCollector {
 
       // 检查总大小限制
       if (currentSize + content.length > maxTotalSize) {
-        logger.warn(`Reached max total size limit, collected ${result.length}/${files.length} files`);
+        logger.warn(
+          `Reached max total size limit, collected ${result.length}/${files.length} files`,
+        );
         break;
       }
 
@@ -253,7 +262,8 @@ export class SmartCodeCollector {
     if (this.detectObfuscation(file.content)) score += 20;
 
     // 文件大小惩罚（小文件优先）
-    if (file.size < 10 * 1024) score += 10; // < 10KB
+    if (file.size < 10 * 1024)
+      score += 10; // < 10KB
     else if (file.size > 500 * 1024) score -= 20; // > 500KB
 
     return score;
@@ -350,4 +360,3 @@ export class SmartCodeCollector {
     return imports;
   }
 }
-

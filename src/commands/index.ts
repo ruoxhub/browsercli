@@ -61,22 +61,6 @@ export async function createCli(): Promise<Command> {
       await callSkillCommand(name, options);
     });
 
-  // 工具调用命令 - 懒加载 action (保留向后兼容)
-  program
-    .command('call-tool <name>')
-    .description('调用工具 (已废弃，请直接使用工具名作为子命令)')
-    .option(
-      '--param <key=value>',
-      '工具参数',
-      (val, previous: string[]) => (previous ? [...previous, val] : [val]),
-      [],
-    )
-    .option('--url <url>', '目标 URL')
-    .action(async (name, options) => {
-      const {callToolCommand} = await import('./call-tool.js');
-      await callToolCommand(name, options);
-    });
-
   // 列表命令 - 懒加载 action
   program
     .command('list-skills')
@@ -100,10 +84,9 @@ export async function createCli(): Promise<Command> {
   program
     .command('repl')
     .description('进入交互模式')
-    .option('--browserUrl <url>', '连接现有 Chrome 实例')
-    .action(async options => {
+    .action(async () => {
       const {replCommand} = await import('./repl.js');
-      await replCommand(options);
+      await replCommand();
     });
 
   // 脚手架命令 - 懒加载 action

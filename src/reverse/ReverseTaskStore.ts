@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -30,7 +29,9 @@ async function pathExists(targetPath: string): Promise<boolean> {
   }
 }
 
-async function readExistingDescriptor(taskFilePath: string): Promise<ReverseTaskDescriptor | undefined> {
+async function readExistingDescriptor(
+  taskFilePath: string,
+): Promise<ReverseTaskDescriptor | undefined> {
   if (!(await pathExists(taskFilePath))) {
     return undefined;
   }
@@ -38,7 +39,10 @@ async function readExistingDescriptor(taskFilePath: string): Promise<ReverseTask
   return JSON.parse(raw) as ReverseTaskDescriptor;
 }
 
-async function writeJsonFile(targetPath: string, value: unknown): Promise<void> {
+async function writeJsonFile(
+  targetPath: string,
+  value: unknown,
+): Promise<void> {
   await writeFile(targetPath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
 }
 
@@ -47,15 +51,17 @@ function containsPlaceholderToken(value: unknown): boolean {
     return /^<[^>]+>$/.test(value);
   }
   if (Array.isArray(value)) {
-    return value.some((item) => containsPlaceholderToken(item));
+    return value.some(item => containsPlaceholderToken(item));
   }
   if (value && typeof value === 'object') {
-    return Object.values(value).some((item) => containsPlaceholderToken(item));
+    return Object.values(value).some(item => containsPlaceholderToken(item));
   }
   return false;
 }
 
-async function shouldResetPlaceholderJsonl(targetPath: string): Promise<boolean> {
+async function shouldResetPlaceholderJsonl(
+  targetPath: string,
+): Promise<boolean> {
   if (!(await pathExists(targetPath))) {
     return false;
   }
@@ -63,12 +69,15 @@ async function shouldResetPlaceholderJsonl(targetPath: string): Promise<boolean>
   if (raw.length === 0) {
     return false;
   }
-  const lines = raw.split('\n').map((line) => line.trim()).filter((line) => line.length > 0);
+  const lines = raw
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line.length > 0);
   if (lines.length === 0) {
     return false;
   }
   try {
-    return lines.every((line) => containsPlaceholderToken(JSON.parse(line)));
+    return lines.every(line => containsPlaceholderToken(JSON.parse(line)));
   } catch {
     return false;
   }
@@ -147,7 +156,10 @@ export class ReverseTaskStore implements ReverseTaskReadApi {
     return JSON.parse(raw) as T;
   }
 
-  async readLog(name: string, taskId: string): Promise<Array<Record<string, unknown>>> {
+  async readLog(
+    name: string,
+    taskId: string,
+  ): Promise<Array<Record<string, unknown>>> {
     const filePath = path.join(this.getTaskDir(taskId), `${name}.jsonl`);
     if (!(await pathExists(filePath))) {
       return [];
@@ -155,12 +167,15 @@ export class ReverseTaskStore implements ReverseTaskReadApi {
     const raw = await readFile(filePath, 'utf8');
     return raw
       .split('\n')
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0)
-      .map((line) => JSON.parse(line) as Record<string, unknown>);
+      .map(line => line.trim())
+      .filter(line => line.length > 0)
+      .map(line => JSON.parse(line) as Record<string, unknown>);
   }
 
-  private async appendJsonLine(targetPath: string, value: Record<string, unknown>): Promise<void> {
+  private async appendJsonLine(
+    targetPath: string,
+    value: Record<string, unknown>,
+  ): Promise<void> {
     const line = `${JSON.stringify(value)}\n`;
     if (await shouldResetPlaceholderJsonl(targetPath)) {
       await writeFile(targetPath, line, 'utf8');

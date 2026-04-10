@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -6,21 +5,21 @@
  */
 /**
  * UnifiedCacheManager - 统一缓存管理器
- * 
+ *
  * 核心功能：
  * 1. 协调所有缓存（DetailedDataManager, CodeCache, CodeCompressor）
  * 2. 提供全局缓存统计
  * 3. 智能清理策略（过期数据 → 低命中率 → 大体积）
  * 4. 缓存预热机制
  * 5. 全局缓存大小限制
- * 
+ *
  * 设计原则：
  * - 单例模式 - 全局唯一实例
  * - 非侵入式 - 不修改现有缓存实现
  * - 协调者模式 - 只协调，不替代
  */
 
-import { logger } from './logger.js';
+import {logger} from './logger.js';
 
 /**
  * 缓存实例接口（适配器模式）
@@ -132,7 +131,7 @@ export class UnifiedCacheManager {
     for (const [name, cache] of this.caches) {
       try {
         const stats = await cache.getStats();
-        
+
         totalEntries += stats.entries;
         totalSize += stats.size;
         totalHits += stats.hits || 0;
@@ -152,12 +151,15 @@ export class UnifiedCacheManager {
     }
 
     // 计算全局命中率
-    const hitRate = totalHits + totalMisses > 0
-      ? totalHits / (totalHits + totalMisses)
-      : 0;
+    const hitRate =
+      totalHits + totalMisses > 0 ? totalHits / (totalHits + totalMisses) : 0;
 
     // 生成建议
-    const recommendations = this.generateRecommendations(totalSize, hitRate, cacheStats);
+    const recommendations = this.generateRecommendations(
+      totalSize,
+      hitRate,
+      cacheStats,
+    );
 
     return {
       totalEntries,
@@ -199,7 +201,7 @@ export class UnifiedCacheManager {
 
     logger.info(
       `Smart cleanup: current ${beforeStats.totalSizeMB}MB, ` +
-      `target ${(target / 1024 / 1024).toFixed(2)}MB`
+        `target ${(target / 1024 / 1024).toFixed(2)}MB`,
     );
 
     // 1. 清理过期数据
@@ -256,13 +258,17 @@ export class UnifiedCacheManager {
     const avgHitRate = stats.hitRate;
 
     for (const cacheStats of stats.caches) {
-      if (cacheStats.hitRate !== undefined &&
-          cacheStats.hitRate < avgHitRate * this.LOW_HIT_RATE_THRESHOLD) {
+      if (
+        cacheStats.hitRate !== undefined &&
+        cacheStats.hitRate < avgHitRate * this.LOW_HIT_RATE_THRESHOLD
+      ) {
         const cache = this.caches.get(cacheStats.name);
         if (cache && cache.clear) {
           try {
             await cache.clear();
-            logger.info(`Cleared low hit rate cache: ${cacheStats.name} (${(cacheStats.hitRate * 100).toFixed(1)}%)`);
+            logger.info(
+              `Cleared low hit rate cache: ${cacheStats.name} (${(cacheStats.hitRate * 100).toFixed(1)}%)`,
+            );
           } catch (error) {
             logger.error(`Failed to clear ${cacheStats.name}:`, error);
           }
@@ -288,7 +294,9 @@ export class UnifiedCacheManager {
       if (cache && cache.clear) {
         try {
           await cache.clear();
-          logger.info(`Cleared large cache: ${cacheStats.name} (${cacheStats.sizeMB}MB)`);
+          logger.info(
+            `Cleared large cache: ${cacheStats.name} (${cacheStats.sizeMB}MB)`,
+          );
         } catch (error) {
           logger.error(`Failed to clear ${cacheStats.name}:`, error);
         }
@@ -305,7 +313,7 @@ export class UnifiedCacheManager {
 
     logger.info(
       `Cleanup complete! Freed ${(freed / 1024 / 1024).toFixed(2)}MB (${freedPercentage}%). ` +
-      `Usage: ${(after / 1024 / 1024).toFixed(2)}MB/${(this.GLOBAL_MAX_SIZE / 1024 / 1024).toFixed(0)}MB`
+        `Usage: ${(after / 1024 / 1024).toFixed(2)}MB/${(this.GLOBAL_MAX_SIZE / 1024 / 1024).toFixed(0)}MB`,
     );
 
     return {
@@ -354,36 +362,48 @@ export class UnifiedCacheManager {
   private generateRecommendations(
     totalSize: number,
     hitRate: number,
-    cacheStats: Array<{ name: string; size: number; hitRate?: number }>
+    cacheStats: Array<{name: string; size: number; hitRate?: number}>,
   ): string[] {
     const recommendations: string[] = [];
 
     // 基于总大小的建议
     const sizeRatio = totalSize / this.GLOBAL_MAX_SIZE;
     if (sizeRatio >= 0.9) {
-      recommendations.push('🚨 CRITICAL: Cache size at 90%. Run smart_cache_cleanup immediately!');
+      recommendations.push(
+        '🚨 CRITICAL: Cache size at 90%. Run smart_cache_cleanup immediately!',
+      );
     } else if (sizeRatio >= 0.7) {
-      recommendations.push('⚠️  WARNING: Cache size at 70%. Consider cleanup soon.');
+      recommendations.push(
+        '⚠️  WARNING: Cache size at 70%. Consider cleanup soon.',
+      );
     } else if (sizeRatio >= 0.5) {
       recommendations.push('ℹ️  INFO: Cache size at 50%. Monitor usage.');
     }
 
     // 基于命中率的建议
     if (hitRate < 0.3) {
-      recommendations.push('💡 Low cache hit rate (<30%). Consider adjusting TTL or cache strategy.');
+      recommendations.push(
+        '💡 Low cache hit rate (<30%). Consider adjusting TTL or cache strategy.',
+      );
     } else if (hitRate > 0.7) {
-      recommendations.push('✅ Good cache hit rate (>70%). Cache is working well.');
+      recommendations.push(
+        '✅ Good cache hit rate (>70%). Cache is working well.',
+      );
     }
 
     // 基于单个缓存的建议
     for (const cache of cacheStats) {
       const cacheRatio = cache.size / totalSize;
       if (cacheRatio > 0.5) {
-        recommendations.push(`💡 ${cache.name} uses ${Math.round(cacheRatio * 100)}% of total cache. Consider cleanup.`);
+        recommendations.push(
+          `💡 ${cache.name} uses ${Math.round(cacheRatio * 100)}% of total cache. Consider cleanup.`,
+        );
       }
 
       if (cache.hitRate !== undefined && cache.hitRate < 0.2) {
-        recommendations.push(`💡 ${cache.name} has low hit rate (${(cache.hitRate * 100).toFixed(1)}%). Consider disabling or adjusting.`);
+        recommendations.push(
+          `💡 ${cache.name} has low hit rate (${(cache.hitRate * 100).toFixed(1)}%). Consider disabling or adjusting.`,
+        );
       }
     }
 
@@ -394,4 +414,3 @@ export class UnifiedCacheManager {
     return recommendations;
   }
 }
-

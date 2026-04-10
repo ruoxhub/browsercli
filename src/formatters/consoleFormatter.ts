@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * @license
  * Copyright 2025 Google LLC
@@ -162,7 +161,10 @@ export function formatIssue(
   }
   if (processedMarkdown) result.push(processedMarkdown);
 
-  const links = issue.getDescription()?.links;
+  const descriptionObj = issue.getDescription() as unknown as {
+    links?: Array<{linkTitle: string; link: string}>;
+  } | null;
+  const links = descriptionObj?.links;
   if (links && links.length > 0) {
     result.push('Learn more:');
     for (const link of links) {

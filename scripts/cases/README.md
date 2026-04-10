@@ -22,7 +22,6 @@
 - Runtime: pure-node
 - Notes: 新增站点 case 时先从这份高密度抽象骨架开始，补齐关键字段、hook 点、断点提示、pure extraction 关键点
 
-
 ### 某东 `h5st` 参数
 
 - Case: [scripts/cases/jd-h5st-pure-node.mjs](jd-h5st-pure-node.mjs)

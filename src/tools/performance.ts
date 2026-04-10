@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * @license
  * Copyright 2025 Google LLC
@@ -17,7 +16,6 @@ import {
 } from '../trace-processing/parse.js';
 
 import {ToolCategory} from './categories.js';
-import {getJSHookRuntime} from './runtime.js';
 import {defineTool} from './ToolDefinition.js';
 
 /**
@@ -32,6 +30,7 @@ export const startPerformanceTrace = defineTool({
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: true,
+    title: 'Start performance trace',
   },
   schema: {
     reload: zod
@@ -116,6 +115,7 @@ export const stopPerformanceTrace = defineTool({
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: true,
+    title: 'Stop performance trace',
   },
   schema: {},
   handler: async (_request, response, context, runtime) => {
@@ -138,6 +138,7 @@ export const performanceAnalyzeInsight = defineTool({
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: true,
+    title: 'Analyze performance insight',
   },
   schema: {
     insightName: zod
@@ -155,13 +156,17 @@ export const performanceAnalyzeInsight = defineTool({
       return;
     }
 
-    const insightOutput = getInsightOutput(
+    const insightOutput = await getInsightOutput(
       lastRecording,
       'default',
       request.params.insightName as InsightName,
     );
     if ('error' in insightOutput) {
-      response.appendResponseLine(insightOutput.error);
+      response.appendResponseLine(
+        typeof insightOutput.error === 'string'
+          ? insightOutput.error
+          : JSON.stringify(insightOutput.error),
+      );
       return;
     }
 
@@ -179,71 +184,11 @@ export const getPerformanceMetrics = defineTool({
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: true,
+    title: 'Get performance metrics',
   },
   schema: {},
   handler: async (_request, response, context, runtime) => {
-    const page = await runtime.collector.getActivePage();
-
-    const metrics = await page.evaluate(() => {
-      const performanceData: Record<string, unknown> = {};
-
-      // Navigation Timing
-      const navEntries = performance.getEntriesByType('navigation');
-      if (navEntries.length > 0) {
-        const nav = navEntries[0] as PerformanceNavigationTiming;
-        performanceData.navigation = {
-          domContentLoaded: nav.domContentLoadedEventEnd,
-          loadComplete: nav.loadEventEnd,
-          firstByte: nav.responseStart,
-          dns: nav.domainLookupEnd - nav.domainLookupStart,
-          tcp: nav.connectEnd - nav.connectStart,
-          ttfb: nav.responseStart - nav.requestStart,
-          download: nav.responseEnd - nav.responseStart,
-        };
-      }
-
-      // Paint Timing
-      const paintEntries = performance.getEntriesByType('paint');
-      const fcp = paintEntries.find(e => e.name === 'first-contentful-paint');
-      if (fcp) {
-        performanceData.firstContentfulPaint = fcp.startTime;
-      }
-
-      // Largest Contentful Paint (if available)
-      const lcpEntries = performance.getEntriesByType('largest-contentful-paint');
-      if (lcpEntries.length > 0) {
-        performanceData.largestContentfulPaint = lcpEntries[lcpEntries.length - 1].startTime;
-      }
-
-      // Cumulative Layout Shift (if available)
-      const clsEntries = performance.getEntriesByType('layout-shift') as Array<PerformanceEntry & {value: number; hadRecentInput: boolean}>;
-      if (clsEntries.length > 0) {
-        let clsValue = 0;
-        for (const entry of clsEntries) {
-          if (!entry.hadRecentInput) {
-            clsValue += entry.value;
-          }
-        }
-        performanceData.cumulativeLayoutShift = clsValue;
-      }
-
-      // Resource Timing Summary
-      const resources = performance.getEntriesByType('resource');
-      if (resources.length > 0) {
-        performanceData.resources = {
-          total: resources.length,
-          byType: {} as Record<string, number>,
-        };
-        const byType: Record<string, number> = {};
-        for (const resource of resources) {
-          const type = (resource as PerformanceResourceTiming).initiatorType;
-          byType[type] = (byType[type] || 0) + 1;
-        }
-        (performanceData.resources as {byType: Record<string, number>}).byType = byType;
-      }
-
-      return performanceData;
-    });
+    const metrics = await runtime.pageController.getPerformanceMetrics();
 
     response.appendResponseLine('## Performance Metrics');
     response.appendResponseLine('```json');
@@ -266,7 +211,7 @@ async function stopTracingAndAppendOutput(
     response.appendResponseLine('The performance trace has been stopped.');
     if (traceResultIsSuccess(result)) {
       context.storeTraceRecording(result);
-      const traceSummaryText = getTraceSummary(result);
+      const traceSummaryText = await getTraceSummary(result);
       response.appendResponseLine(traceSummaryText);
     } else {
       response.appendResponseLine(

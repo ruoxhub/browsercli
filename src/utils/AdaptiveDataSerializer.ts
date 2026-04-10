@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -6,21 +5,21 @@
  */
 /**
  * AdaptiveDataSerializer - 自适应数据序列化器
- * 
+ *
  * 核心功能：
  * 1. 自动检测数据类型（大数组、深层对象、代码字符串、网络请求等）
  * 2. 根据类型选择最优序列化策略
  * 3. 智能截断和采样
  * 4. 保留关键信息，减少 Token 浪费
- * 
+ *
  * 设计原则：
  * - 类型检测优先 - 先识别类型再处理
  * - 保留结构 - 保留数据的关键结构信息
  * - 渐进式加载 - 支持按需获取完整数据
  */
 
-import { DetailedDataManager } from './detailedDataManager.js';
-import { safeStringify } from './safeJson.js';
+import {DetailedDataManager} from './detailedDataManager.js';
+import {safeStringify} from './safeJson.js';
 
 /**
  * 序列化上下文
@@ -62,7 +61,7 @@ export class AdaptiveDataSerializer {
    * 序列化数据
    */
   serialize(data: any, context: SerializationContext = {}): string {
-    const ctx = { ...this.DEFAULT_CONTEXT, ...context };
+    const ctx = {...this.DEFAULT_CONTEXT, ...context};
 
     // 检测数据类型
     const type = this.detectType(data);
@@ -141,16 +140,16 @@ export class AdaptiveDataSerializer {
   /**
    * 序列化大数组
    */
-  private serializeLargeArray(arr: any[], ctx: Required<SerializationContext>): string {
+  private serializeLargeArray(
+    arr: any[],
+    ctx: Required<SerializationContext>,
+  ): string {
     if (arr.length <= ctx.maxArrayLength) {
       return safeStringify(arr);
     }
 
     // 采样：前5个 + 后5个
-    const sample = [
-      ...arr.slice(0, 5),
-      ...arr.slice(-5),
-    ];
+    const sample = [...arr.slice(0, 5), ...arr.slice(-5)];
 
     const detailId = DetailedDataManager.getInstance().store(arr);
 
@@ -166,7 +165,10 @@ export class AdaptiveDataSerializer {
   /**
    * 序列化深层对象
    */
-  private serializeDeepObject(obj: any, ctx: Required<SerializationContext>): string {
+  private serializeDeepObject(
+    obj: any,
+    ctx: Required<SerializationContext>,
+  ): string {
     const limited = this.limitDepth(obj, ctx.maxDepth);
     return safeStringify(limited);
   }
@@ -174,7 +176,10 @@ export class AdaptiveDataSerializer {
   /**
    * 序列化代码字符串
    */
-  private serializeCodeString(code: string, _ctx: Required<SerializationContext>): string {
+  private serializeCodeString(
+    code: string,
+    _ctx: Required<SerializationContext>,
+  ): string {
     const lines = code.split('\n');
 
     if (lines.length <= 100) {
@@ -197,7 +202,10 @@ export class AdaptiveDataSerializer {
   /**
    * 序列化网络请求
    */
-  private serializeNetworkRequests(requests: any[], ctx: Required<SerializationContext>): string {
+  private serializeNetworkRequests(
+    requests: any[],
+    ctx: Required<SerializationContext>,
+  ): string {
     if (requests.length <= ctx.maxArrayLength) {
       return safeStringify(requests);
     }
@@ -225,7 +233,10 @@ export class AdaptiveDataSerializer {
   /**
    * 序列化 DOM 结构
    */
-  private serializeDOMStructure(dom: any, ctx: Required<SerializationContext>): string {
+  private serializeDOMStructure(
+    dom: any,
+    ctx: Required<SerializationContext>,
+  ): string {
     // 限制深度
     const limited = this.limitDepth(dom, ctx.maxDepth);
     return safeStringify(limited);
@@ -234,7 +245,10 @@ export class AdaptiveDataSerializer {
   /**
    * 序列化函数树
    */
-  private serializeFunctionTree(tree: any, ctx: Required<SerializationContext>): string {
+  private serializeFunctionTree(
+    tree: any,
+    ctx: Required<SerializationContext>,
+  ): string {
     // 只保留函数名和调用关系
     const simplified = this.simplifyFunctionTree(tree, ctx.maxDepth);
     return safeStringify(simplified);
@@ -243,7 +257,10 @@ export class AdaptiveDataSerializer {
   /**
    * 默认序列化
    */
-  private serializeDefault(data: any, ctx: Required<SerializationContext>): string {
+  private serializeDefault(
+    data: any,
+    ctx: Required<SerializationContext>,
+  ): string {
     const jsonStr = safeStringify(data);
 
     if (jsonStr.length <= ctx.threshold) {
@@ -289,27 +306,36 @@ export class AdaptiveDataSerializer {
    * 检查是否是网络请求
    */
   private isNetworkRequest(obj: any): boolean {
-    return obj && typeof obj === 'object' &&
+    return (
+      obj &&
+      typeof obj === 'object' &&
       ('requestId' in obj || 'url' in obj) &&
-      ('method' in obj || 'type' in obj);
+      ('method' in obj || 'type' in obj)
+    );
   }
 
   /**
    * 检查是否是 DOM 结构
    */
   private isDOMStructure(obj: any): boolean {
-    return obj && typeof obj === 'object' &&
+    return (
+      obj &&
+      typeof obj === 'object' &&
       ('tag' in obj || 'tagName' in obj) &&
-      ('children' in obj || 'childNodes' in obj);
+      ('children' in obj || 'childNodes' in obj)
+    );
   }
 
   /**
    * 检查是否是函数树
    */
   private isFunctionTree(obj: any): boolean {
-    return obj && typeof obj === 'object' &&
+    return (
+      obj &&
+      typeof obj === 'object' &&
       ('functionName' in obj || 'name' in obj) &&
-      ('dependencies' in obj || 'calls' in obj || 'callGraph' in obj);
+      ('dependencies' in obj || 'calls' in obj || 'callGraph' in obj)
+    );
   }
 
   /**
@@ -325,7 +351,7 @@ export class AdaptiveDataSerializer {
     let maxDepth = currentDepth;
 
     for (const key in obj) {
-      if (obj.hasOwnProperty(key)) {
+      if (Object.hasOwn(obj, key)) {
         const depth = this.getDepth(obj[key], currentDepth + 1);
         maxDepth = Math.max(maxDepth, depth);
       }
@@ -352,7 +378,7 @@ export class AdaptiveDataSerializer {
 
     const result: any = {};
     for (const key in obj) {
-      if (obj.hasOwnProperty(key)) {
+      if (Object.hasOwn(obj, key)) {
         result[key] = this.limitDepth(obj[key], maxDepth, currentDepth + 1);
       }
     }
@@ -363,17 +389,20 @@ export class AdaptiveDataSerializer {
   /**
    * 简化函数树
    */
-  private simplifyFunctionTree(tree: any, maxDepth: number, currentDepth = 0): any {
+  private simplifyFunctionTree(
+    tree: any,
+    maxDepth: number,
+    currentDepth = 0,
+  ): any {
     if (currentDepth >= maxDepth) {
-      return { name: tree.functionName || tree.name, truncated: true };
+      return {name: tree.functionName || tree.name, truncated: true};
     }
 
     return {
       name: tree.functionName || tree.name,
       dependencies: (tree.dependencies || []).map((dep: any) =>
-        this.simplifyFunctionTree(dep, maxDepth, currentDepth + 1)
+        this.simplifyFunctionTree(dep, maxDepth, currentDepth + 1),
       ),
     };
   }
 }
-

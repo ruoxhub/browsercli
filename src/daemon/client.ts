@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -99,8 +98,17 @@ export async function sendCommand(request: {
   skill?: string;
   args?: Record<string, unknown>;
 }): Promise<{success: boolean; result?: string; error?: string}> {
+  const socketPath = getSocketPath();
+
+  // Pre-flight check: socket must exist before attempting connection
+  if (!fs.existsSync(socketPath)) {
+    throw new Error(
+      `后台服务未运行。请先执行：js-reverse start --browserUrl <chrome-debug-url>`,
+    );
+  }
+
   return new Promise((resolve, reject) => {
-    const socket = createConnection(getSocketPath());
+    const socket = createConnection(socketPath);
     let response = '';
 
     socket.on('data', chunk => {

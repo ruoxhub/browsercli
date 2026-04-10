@@ -205,14 +205,8 @@ export function parseArguments(version: string, argv = process.argv) {
       return true;
     })
     .example([
-      [
-        '$0 --http',
-        'Start HTTP server on default port 3000',
-      ],
-      [
-        '$0 --http --port 8080',
-        'Start HTTP server on custom port 8080',
-      ],
+      ['$0 --http', 'Start HTTP server on default port 3000'],
+      ['$0 --http --port 8080', 'Start HTTP server on custom port 8080'],
       [
         '$0 --http --host 0.0.0.0 --port 3000',
         'Start HTTP server accessible from external networks',

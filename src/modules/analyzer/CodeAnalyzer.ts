@@ -1,19 +1,20 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
- /**
+/**
  * 代码理解模块 - AI辅助代码语义理解
  */
 
 import * as parser from '@babel/parser';
 import traverseImport from '@babel/traverse';
-const traverse = (traverseImport as unknown as {default?: typeof traverseImport}).default ?? traverseImport;
+const traverse =
+  (traverseImport as unknown as {default?: typeof traverseImport}).default ??
+  traverseImport;
 import * as t from '@babel/types';
 
-import type { LLMService } from '../../services/LLMService.js';
+import type {LLMService} from '../../services/LLMService.js';
 import type {
   UnderstandCodeOptions,
   UnderstandCodeResult,
@@ -26,7 +27,7 @@ import type {
   ClassInfo,
   CallGraph,
 } from '../../types/index.js';
-import { logger } from '../../utils/logger.js';
+import {logger} from '../../utils/logger.js';
 
 export class CodeAnalyzer {
   private llm: LLMService;
@@ -38,12 +39,14 @@ export class CodeAnalyzer {
   /**
    * 理解代码
    */
-  async understand(options: UnderstandCodeOptions): Promise<UnderstandCodeResult> {
+  async understand(
+    options: UnderstandCodeOptions,
+  ): Promise<UnderstandCodeResult> {
     logger.info('Starting code understanding...');
     const startTime = Date.now();
 
     try {
-      const { code, context, focus = 'all' } = options;
+      const {code, context, focus = 'all'} = options;
 
       // 1. 静态分析 - 提取代码结构
       const structure = await this.analyzeStructure(code);
@@ -70,8 +73,10 @@ export class CodeAnalyzer {
       logger.debug('Security risks identified');
 
       // 7. 代码模式和反模式检测
-      const { patterns, antiPatterns } = this.detectCodePatterns(code);
-      logger.debug(`Detected ${patterns.length} patterns and ${antiPatterns.length} anti-patterns`);
+      const {patterns, antiPatterns} = this.detectCodePatterns(code);
+      logger.debug(
+        `Detected ${patterns.length} patterns and ${antiPatterns.length} anti-patterns`,
+      );
 
       // 8. 复杂度指标分析
       const complexityMetrics = this.analyzeComplexityMetrics(code);
@@ -83,7 +88,7 @@ export class CodeAnalyzer {
         securityRisks,
         aiAnalysis,
         complexityMetrics,
-        antiPatterns
+        antiPatterns,
       );
 
       const duration = Date.now() - startTime;
@@ -128,7 +133,9 @@ export class CodeAnalyzer {
           const node = path.node;
           functions.push({
             name: node.id?.name || 'anonymous',
-            params: node.params.map((p) => (p.type === 'Identifier' ? p.name : 'unknown')),
+            params: node.params.map(p =>
+              p.type === 'Identifier' ? p.name : 'unknown',
+            ),
             location: {
               file: 'current',
               line: node.loc?.start.line || 0,
@@ -143,15 +150,23 @@ export class CodeAnalyzer {
           const parent = path.parent;
           let name = 'anonymous';
 
-          if (parent.type === 'VariableDeclarator' && parent.id.type === 'Identifier') {
+          if (
+            parent.type === 'VariableDeclarator' &&
+            parent.id.type === 'Identifier'
+          ) {
             name = parent.id.name;
-          } else if (parent.type === 'AssignmentExpression' && parent.left.type === 'Identifier') {
+          } else if (
+            parent.type === 'AssignmentExpression' &&
+            parent.left.type === 'Identifier'
+          ) {
             name = parent.left.name;
           }
 
           functions.push({
             name,
-            params: node.params.map((p) => (p.type === 'Identifier' ? p.name : 'unknown')),
+            params: node.params.map(p =>
+              p.type === 'Identifier' ? p.name : 'unknown',
+            ),
             location: {
               file: 'current',
               line: node.loc?.start.line || 0,
@@ -166,13 +181,18 @@ export class CodeAnalyzer {
           const parent = path.parent;
           let name = 'arrow';
 
-          if (parent.type === 'VariableDeclarator' && parent.id.type === 'Identifier') {
+          if (
+            parent.type === 'VariableDeclarator' &&
+            parent.id.type === 'Identifier'
+          ) {
             name = parent.id.name;
           }
 
           functions.push({
             name,
-            params: node.params.map((p) => (p.type === 'Identifier' ? p.name : 'unknown')),
+            params: node.params.map(p =>
+              p.type === 'Identifier' ? p.name : 'unknown',
+            ),
             location: {
               file: 'current',
               line: node.loc?.start.line || 0,
@@ -191,8 +211,13 @@ export class CodeAnalyzer {
             ClassMethod(methodPath) {
               const method = methodPath.node;
               methods.push({
-                name: method.key.type === 'Identifier' ? method.key.name : 'unknown',
-                params: method.params.map((p) => (p.type === 'Identifier' ? p.name : 'unknown')),
+                name:
+                  method.key.type === 'Identifier'
+                    ? method.key.name
+                    : 'unknown',
+                params: method.params.map(p =>
+                  p.type === 'Identifier' ? p.name : 'unknown',
+                ),
                 location: {
                   file: 'current',
                   line: method.loc?.start.line || 0,
@@ -246,10 +271,16 @@ export class CodeAnalyzer {
   /**
    * AI深度分析
    */
-  private async aiAnalyze(code: string, focus: string): Promise<Record<string, unknown>> {
+  private async aiAnalyze(
+    code: string,
+    focus: string,
+  ): Promise<Record<string, unknown>> {
     try {
       const messages = this.llm.generateCodeAnalysisPrompt(code, focus);
-      const response = await this.llm.chat(messages, { temperature: 0.3, maxTokens: 2000 });
+      const response = await this.llm.chat(messages, {
+        temperature: 0.3,
+        maxTokens: 2000,
+      });
 
       // 尝试解析JSON响应
       const jsonMatch = response.content.match(/\{[\s\S]*\}/);
@@ -257,7 +288,7 @@ export class CodeAnalyzer {
         return JSON.parse(jsonMatch[0]) as Record<string, unknown>;
       }
 
-      return { rawAnalysis: response.content };
+      return {rawAnalysis: response.content};
     } catch (error) {
       logger.warn('AI analysis failed, using fallback', error);
       return {};
@@ -267,7 +298,10 @@ export class CodeAnalyzer {
   /**
    * 检测技术栈
    */
-  private detectTechStack(code: string, aiAnalysis: Record<string, unknown>): TechStack {
+  private detectTechStack(
+    code: string,
+    aiAnalysis: Record<string, unknown>,
+  ): TechStack {
     const techStack: TechStack = {
       other: [],
     };
@@ -283,7 +317,11 @@ export class CodeAnalyzer {
     }
 
     // 基于代码特征检测
-    if (code.includes('React.') || code.includes('useState') || code.includes('useEffect')) {
+    if (
+      code.includes('React.') ||
+      code.includes('useState') ||
+      code.includes('useEffect')
+    ) {
       techStack.framework = 'React';
     } else if (code.includes('Vue.') || code.includes('createApp')) {
       techStack.framework = 'Vue';
@@ -310,7 +348,10 @@ export class CodeAnalyzer {
   /**
    * 提取业务逻辑
    */
-  private extractBusinessLogic(aiAnalysis: Record<string, unknown>, context?: Record<string, unknown>): BusinessLogic {
+  private extractBusinessLogic(
+    aiAnalysis: Record<string, unknown>,
+    context?: Record<string, unknown>,
+  ): BusinessLogic {
     const businessLogic: BusinessLogic = {
       mainFeatures: [],
       entities: [],
@@ -318,7 +359,10 @@ export class CodeAnalyzer {
       dataModel: {},
     };
 
-    if (aiAnalysis.businessLogic && typeof aiAnalysis.businessLogic === 'object') {
+    if (
+      aiAnalysis.businessLogic &&
+      typeof aiAnalysis.businessLogic === 'object'
+    ) {
       const bl = aiAnalysis.businessLogic as Record<string, unknown>;
       if (Array.isArray(bl.mainFeatures)) {
         businessLogic.mainFeatures = bl.mainFeatures as string[];
@@ -330,7 +374,7 @@ export class CodeAnalyzer {
 
     // 合并上下文信息
     if (context) {
-      businessLogic.dataModel = { ...businessLogic.dataModel, ...context };
+      businessLogic.dataModel = {...businessLogic.dataModel, ...context};
     }
 
     return businessLogic;
@@ -383,7 +427,7 @@ export class CodeAnalyzer {
    * 构建调用图
    */
   private buildCallGraph(functions: FunctionInfo[], code: string): CallGraph {
-    const nodes: CallGraph['nodes'] = functions.map((fn) => ({
+    const nodes: CallGraph['nodes'] = functions.map(fn => ({
       id: fn.name,
       name: fn.name,
       type: 'function' as const,
@@ -405,7 +449,10 @@ export class CodeAnalyzer {
         },
         FunctionExpression(path) {
           const parent = path.parent;
-          if (parent.type === 'VariableDeclarator' && parent.id.type === 'Identifier') {
+          if (
+            parent.type === 'VariableDeclarator' &&
+            parent.id.type === 'Identifier'
+          ) {
             currentFunction = parent.id.name;
           }
         },
@@ -416,11 +463,17 @@ export class CodeAnalyzer {
 
             if (callee.type === 'Identifier') {
               calledFunction = callee.name;
-            } else if (callee.type === 'MemberExpression' && callee.property.type === 'Identifier') {
+            } else if (
+              callee.type === 'MemberExpression' &&
+              callee.property.type === 'Identifier'
+            ) {
               calledFunction = callee.property.name;
             }
 
-            if (calledFunction && functions.some((f) => f.name === calledFunction)) {
+            if (
+              calledFunction &&
+              functions.some(f => f.name === calledFunction)
+            ) {
               edges.push({
                 from: currentFunction,
                 to: calledFunction,
@@ -433,7 +486,7 @@ export class CodeAnalyzer {
       logger.warn('Call graph construction failed', error);
     }
 
-    return { nodes, edges };
+    return {nodes, edges};
   }
 
   /**
@@ -466,7 +519,10 @@ export class CodeAnalyzer {
           complexity++;
         },
         LogicalExpression(logicalPath: any) {
-          if (logicalPath.node.operator === '&&' || logicalPath.node.operator === '||') {
+          if (
+            logicalPath.node.operator === '&&' ||
+            logicalPath.node.operator === '||'
+          ) {
             complexity++;
           }
         },
@@ -489,44 +545,80 @@ export class CodeAnalyzer {
    * 4. 无害处理（Sanitizer）：加密、验证等安全处理
    */
   private async analyzeDataFlow(code: string): Promise<DataFlow> {
-    const graph: DataFlow['graph'] = { nodes: [], edges: [] };
+    const graph: DataFlow['graph'] = {nodes: [], edges: []};
     const sources: DataFlow['sources'] = [];
     const sinks: DataFlow['sinks'] = [];
     const taintPaths: DataFlow['taintPaths'] = [];
 
     // 污点标记映射：变量名 -> 污点源信息
-    const taintMap = new Map<string, { sourceType: string; sourceLine: number }>();
+    const taintMap = new Map<
+      string,
+      {sourceType: string; sourceLine: number}
+    >();
 
     // 无害处理函数（Sanitizers）- 检测安全的数据处理
     // 基于OWASP和业界最佳实践扩展
     const sanitizers = new Set([
       // URL编码
-      'encodeURIComponent', 'encodeURI', 'escape', 'decodeURIComponent', 'decodeURI',
+      'encodeURIComponent',
+      'encodeURI',
+      'escape',
+      'decodeURIComponent',
+      'decodeURI',
       // HTML转义
-      'htmlentities', 'htmlspecialchars', 'escapeHtml', 'escapeHTML',
-      'he.encode', 'he.escape',
+      'htmlentities',
+      'htmlspecialchars',
+      'escapeHtml',
+      'escapeHTML',
+      'he.encode',
+      'he.escape',
       // 验证器库
-      'validator.escape', 'validator.unescape', 'validator.stripLow',
-      'validator.blacklist', 'validator.whitelist', 'validator.trim',
-      'validator.isEmail', 'validator.isURL', 'validator.isInt',
+      'validator.escape',
+      'validator.unescape',
+      'validator.stripLow',
+      'validator.blacklist',
+      'validator.whitelist',
+      'validator.trim',
+      'validator.isEmail',
+      'validator.isURL',
+      'validator.isInt',
       // DOMPurify
-      'DOMPurify.sanitize', 'DOMPurify.addHook',
+      'DOMPurify.sanitize',
+      'DOMPurify.addHook',
       // 加密/哈希
-      'crypto.encrypt', 'crypto.hash', 'crypto.createHash', 'crypto.createHmac',
-      'CryptoJS.AES.encrypt', 'CryptoJS.SHA256', 'CryptoJS.MD5',
-      'bcrypt.hash', 'bcrypt.compare',
+      'crypto.encrypt',
+      'crypto.hash',
+      'crypto.createHash',
+      'crypto.createHmac',
+      'CryptoJS.AES.encrypt',
+      'CryptoJS.SHA256',
+      'CryptoJS.MD5',
+      'bcrypt.hash',
+      'bcrypt.compare',
       // Base64编码
-      'btoa', 'atob', 'Buffer.from',
+      'btoa',
+      'atob',
+      'Buffer.from',
       // SQL参数化
-      'db.prepare', 'db.query', 'mysql.escape', 'pg.query',
+      'db.prepare',
+      'db.query',
+      'mysql.escape',
+      'pg.query',
       // XSS防护
-      'xss', 'sanitizeHtml',
+      'xss',
+      'sanitizeHtml',
       // 输入验证
-      'parseInt', 'parseFloat', 'Number', 'String',
+      'parseInt',
+      'parseFloat',
+      'Number',
+      'String',
       // 其他
-      'JSON.stringify', 'JSON.parse',
-      'String.prototype.replace', 'String.prototype.trim',
-      'Array.prototype.filter', 'Array.prototype.map',
+      'JSON.stringify',
+      'JSON.parse',
+      'String.prototype.replace',
+      'String.prototype.trim',
+      'Array.prototype.filter',
+      'Array.prototype.map',
     ]);
 
     try {
@@ -549,32 +641,52 @@ export class CodeAnalyzer {
             const methodName = callee.property.name;
 
             // 网络请求
-            if (['fetch', 'ajax', 'get', 'post', 'request', 'axios'].includes(methodName)) {
+            if (
+              ['fetch', 'ajax', 'get', 'post', 'request', 'axios'].includes(
+                methodName,
+              )
+            ) {
               const sourceId = `source-network-${line}`;
-              sources.push({ type: 'network', location: { file: 'current', line } });
+              sources.push({
+                type: 'network',
+                location: {file: 'current', line},
+              });
               graph.nodes.push({
                 id: sourceId,
                 name: `${methodName}()`,
                 type: 'source',
-                location: { file: 'current', line },
+                location: {file: 'current', line},
               });
 
               // 标记返回值为污点
               const parent = path.parent;
               if (t.isVariableDeclarator(parent) && t.isIdentifier(parent.id)) {
-                taintMap.set(parent.id.name, { sourceType: 'network', sourceLine: line });
+                taintMap.set(parent.id.name, {
+                  sourceType: 'network',
+                  sourceLine: line,
+                });
               }
             }
 
             // DOM查询（用户输入）
-            else if (['querySelector', 'getElementById', 'getElementsByClassName', 'getElementsByTagName'].includes(methodName)) {
+            else if (
+              [
+                'querySelector',
+                'getElementById',
+                'getElementsByClassName',
+                'getElementsByTagName',
+              ].includes(methodName)
+            ) {
               const sourceId = `source-dom-${line}`;
-              sources.push({ type: 'user_input', location: { file: 'current', line } });
+              sources.push({
+                type: 'user_input',
+                location: {file: 'current', line},
+              });
               graph.nodes.push({
                 id: sourceId,
                 name: `${methodName}()`,
                 type: 'source',
-                location: { file: 'current', line },
+                location: {file: 'current', line},
               });
             }
           }
@@ -584,18 +696,28 @@ export class CodeAnalyzer {
             const funcName = callee.name;
 
             // eval系列 (代码注入)
-            if (['eval', 'Function', 'setTimeout', 'setInterval'].includes(funcName)) {
+            if (
+              ['eval', 'Function', 'setTimeout', 'setInterval'].includes(
+                funcName,
+              )
+            ) {
               const sinkId = `sink-eval-${line}`;
-              sinks.push({ type: 'eval', location: { file: 'current', line } });
+              sinks.push({type: 'eval', location: {file: 'current', line}});
               graph.nodes.push({
                 id: sinkId,
                 name: `${funcName}()`,
                 type: 'sink',
-                location: { file: 'current', line },
+                location: {file: 'current', line},
               });
 
               // 检查参数是否被污染
-              self.checkTaintedArguments(path.node.arguments, taintMap, taintPaths, funcName, line);
+              self.checkTaintedArguments(
+                path.node.arguments,
+                taintMap,
+                taintPaths,
+                funcName,
+                line,
+              );
             }
           }
 
@@ -604,56 +726,96 @@ export class CodeAnalyzer {
             const methodName = callee.property.name;
 
             // document.write/writeln (XSS)
-            if (['write', 'writeln'].includes(methodName) &&
-                t.isIdentifier(callee.object) && callee.object.name === 'document') {
+            if (
+              ['write', 'writeln'].includes(methodName) &&
+              t.isIdentifier(callee.object) &&
+              callee.object.name === 'document'
+            ) {
               const sinkId = `sink-document-write-${line}`;
-              sinks.push({ type: 'xss', location: { file: 'current', line } });
+              sinks.push({type: 'xss', location: {file: 'current', line}});
               graph.nodes.push({
                 id: sinkId,
                 name: `document.${methodName}()`,
                 type: 'sink',
-                location: { file: 'current', line },
+                location: {file: 'current', line},
               });
-              self.checkTaintedArguments(path.node.arguments, taintMap, taintPaths, methodName, line);
+              self.checkTaintedArguments(
+                path.node.arguments,
+                taintMap,
+                taintPaths,
+                methodName,
+                line,
+              );
             }
 
             // SQL查询方法 (SQL注入)
             if (['query', 'execute', 'exec', 'run'].includes(methodName)) {
               const sinkId = `sink-sql-${line}`;
-              sinks.push({ type: 'sql-injection', location: { file: 'current', line } });
+              sinks.push({
+                type: 'sql-injection',
+                location: {file: 'current', line},
+              });
               graph.nodes.push({
                 id: sinkId,
                 name: `${methodName}() (SQL)`,
                 type: 'sink',
-                location: { file: 'current', line },
+                location: {file: 'current', line},
               });
-              self.checkTaintedArguments(path.node.arguments, taintMap, taintPaths, methodName, line);
+              self.checkTaintedArguments(
+                path.node.arguments,
+                taintMap,
+                taintPaths,
+                methodName,
+                line,
+              );
             }
 
             // 命令执行 (Command Injection)
-            if (['exec', 'spawn', 'execSync', 'spawnSync'].includes(methodName)) {
+            if (
+              ['exec', 'spawn', 'execSync', 'spawnSync'].includes(methodName)
+            ) {
               const sinkId = `sink-command-${line}`;
-              sinks.push({ type: 'other', location: { file: 'current', line } });
+              sinks.push({type: 'other', location: {file: 'current', line}});
               graph.nodes.push({
                 id: sinkId,
                 name: `${methodName}() (Command)`,
                 type: 'sink',
-                location: { file: 'current', line },
+                location: {file: 'current', line},
               });
-              self.checkTaintedArguments(path.node.arguments, taintMap, taintPaths, methodName, line);
+              self.checkTaintedArguments(
+                path.node.arguments,
+                taintMap,
+                taintPaths,
+                methodName,
+                line,
+              );
             }
 
             // 路径遍历 (Path Traversal)
-            if (['readFile', 'writeFile', 'readFileSync', 'writeFileSync', 'open'].includes(methodName)) {
+            if (
+              [
+                'readFile',
+                'writeFile',
+                'readFileSync',
+                'writeFileSync',
+                'open',
+              ].includes(methodName)
+            ) {
               const sinkId = `sink-file-${line}`;
-              sinks.push({ type: 'other', location: { file: 'current', line } });
+              sinks.push({type: 'other', location: {file: 'current', line}});
               graph.nodes.push({
                 id: sinkId,
                 name: `${methodName}() (File)`,
                 type: 'sink',
-                location: { file: 'current', line },
+                location: {file: 'current', line},
               });
-              self.checkTaintedArguments(path.node.arguments, taintMap, taintPaths, methodName, line);
+              self.checkTaintedArguments(
+                path.node.arguments,
+                taintMap,
+                taintPaths,
+                methodName,
+                line,
+              );
             }
           }
         },
@@ -665,85 +827,118 @@ export class CodeAnalyzer {
           const line = path.node.loc?.start.line || 0;
 
           // location.* (URL参数)
-          if (t.isIdentifier(obj) && obj.name === 'location' && t.isIdentifier(prop)) {
+          if (
+            t.isIdentifier(obj) &&
+            obj.name === 'location' &&
+            t.isIdentifier(prop)
+          ) {
             if (['href', 'search', 'hash', 'pathname'].includes(prop.name)) {
               const sourceId = `source-url-${line}`;
-              sources.push({ type: 'user_input', location: { file: 'current', line } });
+              sources.push({
+                type: 'user_input',
+                location: {file: 'current', line},
+              });
               graph.nodes.push({
                 id: sourceId,
                 name: `location.${prop.name}`,
                 type: 'source',
-                location: { file: 'current', line },
+                location: {file: 'current', line},
               });
 
               // 标记为污点
               const parent = path.parent;
               if (t.isVariableDeclarator(parent) && t.isIdentifier(parent.id)) {
-                taintMap.set(parent.id.name, { sourceType: 'url', sourceLine: line });
+                taintMap.set(parent.id.name, {
+                  sourceType: 'url',
+                  sourceLine: line,
+                });
               }
             }
           }
 
           // document.cookie
-          if (t.isIdentifier(obj) && obj.name === 'document' && t.isIdentifier(prop) && prop.name === 'cookie') {
+          if (
+            t.isIdentifier(obj) &&
+            obj.name === 'document' &&
+            t.isIdentifier(prop) &&
+            prop.name === 'cookie'
+          ) {
             const sourceId = `source-cookie-${line}`;
-            sources.push({ type: 'storage', location: { file: 'current', line } });
+            sources.push({type: 'storage', location: {file: 'current', line}});
             graph.nodes.push({
               id: sourceId,
               name: 'document.cookie',
               type: 'source',
-              location: { file: 'current', line },
+              location: {file: 'current', line},
             });
           }
 
           // localStorage/sessionStorage
-          if (t.isIdentifier(obj) && ['localStorage', 'sessionStorage'].includes(obj.name)) {
+          if (
+            t.isIdentifier(obj) &&
+            ['localStorage', 'sessionStorage'].includes(obj.name)
+          ) {
             const sourceId = `source-storage-${line}`;
-            sources.push({ type: 'storage', location: { file: 'current', line } });
+            sources.push({type: 'storage', location: {file: 'current', line}});
             graph.nodes.push({
               id: sourceId,
               name: `${obj.name}.getItem()`,
               type: 'source',
-              location: { file: 'current', line },
+              location: {file: 'current', line},
             });
           }
 
           // window.name (可被跨窗口污染)
-          if (t.isIdentifier(obj) && obj.name === 'window' &&
-              t.isIdentifier(prop) && prop.name === 'name') {
+          if (
+            t.isIdentifier(obj) &&
+            obj.name === 'window' &&
+            t.isIdentifier(prop) &&
+            prop.name === 'name'
+          ) {
             const sourceId = `source-window-name-${line}`;
-            sources.push({ type: 'user_input', location: { file: 'current', line } });
+            sources.push({
+              type: 'user_input',
+              location: {file: 'current', line},
+            });
             graph.nodes.push({
               id: sourceId,
               name: 'window.name',
               type: 'source',
-              location: { file: 'current', line },
+              location: {file: 'current', line},
             });
           }
 
           // postMessage接收 (跨域消息)
-          if (t.isIdentifier(obj) && obj.name === 'event' &&
-              t.isIdentifier(prop) && prop.name === 'data') {
+          if (
+            t.isIdentifier(obj) &&
+            obj.name === 'event' &&
+            t.isIdentifier(prop) &&
+            prop.name === 'data'
+          ) {
             const sourceId = `source-postmessage-${line}`;
-            sources.push({ type: 'network', location: { file: 'current', line } });
+            sources.push({type: 'network', location: {file: 'current', line}});
             graph.nodes.push({
               id: sourceId,
               name: 'event.data (postMessage)',
               type: 'source',
-              location: { file: 'current', line },
+              location: {file: 'current', line},
             });
           }
 
           // WebSocket消息
-          if (t.isIdentifier(obj) && obj.name === 'message' &&
-              t.isIdentifier(prop) && prop.name === 'data') {
+          if (
+            t.isIdentifier(obj) &&
+            obj.name === 'message' &&
+            t.isIdentifier(prop) &&
+            prop.name === 'data'
+          ) {
             const sourceId = `source-websocket-${line}`;
-            sources.push({ type: 'network', location: { file: 'current', line } });
+            sources.push({type: 'network', location: {file: 'current', line}});
             graph.nodes.push({
               id: sourceId,
               name: 'WebSocket message.data',
               type: 'source',
-              location: { file: 'current', line },
+              location: {file: 'current', line},
             });
           }
         },
@@ -759,23 +954,26 @@ export class CodeAnalyzer {
             const propName = left.property.name;
             if (['innerHTML', 'outerHTML'].includes(propName)) {
               const sinkId = `sink-dom-${line}`;
-              sinks.push({ type: 'xss', location: { file: 'current', line } });
+              sinks.push({type: 'xss', location: {file: 'current', line}});
               graph.nodes.push({
                 id: sinkId,
                 name: propName,
                 type: 'sink',
-                location: { file: 'current', line },
+                location: {file: 'current', line},
               });
 
               // 检查右值是否被污染
               if (t.isIdentifier(right) && taintMap.has(right.name)) {
                 const taintInfo = taintMap.get(right.name)!;
                 taintPaths.push({
-                  source: { type: taintInfo.sourceType as DataFlow['sources'][0]['type'], location: { file: 'current', line: taintInfo.sourceLine } },
-                  sink: { type: 'xss', location: { file: 'current', line } },
+                  source: {
+                    type: taintInfo.sourceType as DataFlow['sources'][0]['type'],
+                    location: {file: 'current', line: taintInfo.sourceLine},
+                  },
+                  sink: {type: 'xss', location: {file: 'current', line}},
                   path: [
-                    { file: 'current', line: taintInfo.sourceLine },
-                    { file: 'current', line },
+                    {file: 'current', line: taintInfo.sourceLine},
+                    {file: 'current', line},
                   ],
                 });
               }
@@ -793,12 +991,17 @@ export class CodeAnalyzer {
 
           if (t.isIdentifier(id) && init) {
             // 检查是否经过Sanitizer处理
-            if (t.isCallExpression(init) && self.checkSanitizer(init, sanitizers)) {
+            if (
+              t.isCallExpression(init) &&
+              self.checkSanitizer(init, sanitizers)
+            ) {
               // 如果参数是污点变量，经过Sanitizer后清除污点
               const arg = init.arguments[0];
               if (t.isIdentifier(arg) && taintMap.has(arg.name)) {
                 // 不传播污点（已被清洗）
-                logger.debug(`Taint cleaned by sanitizer: ${arg.name} -> ${id.name}`);
+                logger.debug(
+                  `Taint cleaned by sanitizer: ${arg.name} -> ${id.name}`,
+                );
                 return;
               }
             }
@@ -810,11 +1013,15 @@ export class CodeAnalyzer {
             }
             // 二元表达式传播
             else if (t.isBinaryExpression(init)) {
-              const leftTainted = t.isIdentifier(init.left) && taintMap.has(init.left.name);
-              const rightTainted = t.isIdentifier(init.right) && taintMap.has(init.right.name);
+              const leftTainted =
+                t.isIdentifier(init.left) && taintMap.has(init.left.name);
+              const rightTainted =
+                t.isIdentifier(init.right) && taintMap.has(init.right.name);
 
               if (leftTainted || rightTainted) {
-                const taintInfo = leftTainted ? taintMap.get((init.left as t.Identifier).name)! : taintMap.get((init.right as t.Identifier).name)!;
+                const taintInfo = leftTainted
+                  ? taintMap.get((init.left as t.Identifier).name)!
+                  : taintMap.get((init.right as t.Identifier).name)!;
                 taintMap.set(id.name, taintInfo);
               }
             }
@@ -834,13 +1041,16 @@ export class CodeAnalyzer {
           const left = path.node.left;
           const right = path.node.right;
 
-          if (t.isIdentifier(left) && t.isIdentifier(right) && taintMap.has(right.name)) {
+          if (
+            t.isIdentifier(left) &&
+            t.isIdentifier(right) &&
+            taintMap.has(right.name)
+          ) {
             const taintInfo = taintMap.get(right.name)!;
             taintMap.set(left.name, taintInfo);
           }
         },
       });
-
     } catch (error) {
       logger.warn('Data flow analysis failed', error);
     }
@@ -848,7 +1058,12 @@ export class CodeAnalyzer {
     // 使用LLM辅助进行深度污点分析（如果有污点路径）
     if (taintPaths.length > 0 && this.llm) {
       try {
-        await this.enhanceTaintAnalysisWithLLM(code, sources, sinks, taintPaths);
+        await this.enhanceTaintAnalysisWithLLM(
+          code,
+          sources,
+          sinks,
+          taintPaths,
+        );
       } catch (error) {
         logger.warn('LLM-enhanced taint analysis failed', error);
       }
@@ -872,18 +1087,20 @@ export class CodeAnalyzer {
     code: string,
     sources: DataFlow['sources'],
     sinks: DataFlow['sinks'],
-    taintPaths: DataFlow['taintPaths']
+    taintPaths: DataFlow['taintPaths'],
   ): Promise<void> {
     if (!this.llm || taintPaths.length === 0) return;
 
     try {
-      const sourcesList = sources.map(s => `${s.type} at line ${s.location.line}`);
+      const sourcesList = sources.map(
+        s => `${s.type} at line ${s.location.line}`,
+      );
       const sinksList = sinks.map(s => `${s.type} at line ${s.location.line}`);
 
       const messages = this.llm.generateTaintAnalysisPrompt(
         code.length > 4000 ? code.substring(0, 4000) : code,
         sourcesList,
-        sinksList
+        sinksList,
       );
 
       const response = await this.llm.chat(messages, {
@@ -894,16 +1111,19 @@ export class CodeAnalyzer {
       // 尝试解析LLM返回的额外污点路径
       const jsonMatch = response.content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        const llmResult = JSON.parse(jsonMatch[0]) as { taintPaths?: any[] };
+        const llmResult = JSON.parse(jsonMatch[0]) as {taintPaths?: any[]};
 
         if (Array.isArray(llmResult.taintPaths)) {
-          logger.info(`LLM identified ${llmResult.taintPaths.length} additional taint paths`);
+          logger.info(
+            `LLM identified ${llmResult.taintPaths.length} additional taint paths`,
+          );
 
           // 将LLM发现的路径添加到结果中（去重）
           llmResult.taintPaths.forEach((path: any) => {
             const exists = taintPaths.some(
-              p => p.source.location.line === path.source?.location?.line &&
-                   p.sink.location.line === path.sink?.location?.line
+              p =>
+                p.source.location.line === path.source?.location?.line &&
+                p.sink.location.line === path.sink?.location?.line,
             );
 
             if (!exists && path.source && path.sink) {
@@ -926,26 +1146,26 @@ export class CodeAnalyzer {
    */
   private checkTaintedArguments(
     args: Array<t.Expression | t.SpreadElement | t.ArgumentPlaceholder>,
-    taintMap: Map<string, { sourceType: string; sourceLine: number }>,
+    taintMap: Map<string, {sourceType: string; sourceLine: number}>,
     taintPaths: DataFlow['taintPaths'],
     _funcName: string,
-    line: number
+    line: number,
   ): void {
-    args.forEach((arg) => {
+    args.forEach(arg => {
       if (t.isIdentifier(arg) && taintMap.has(arg.name)) {
         const taintInfo = taintMap.get(arg.name)!;
         taintPaths.push({
           source: {
             type: taintInfo.sourceType as DataFlow['sources'][0]['type'],
-            location: { file: 'current', line: taintInfo.sourceLine },
+            location: {file: 'current', line: taintInfo.sourceLine},
           },
           sink: {
             type: 'eval',
-            location: { file: 'current', line },
+            location: {file: 'current', line},
           },
           path: [
-            { file: 'current', line: taintInfo.sourceLine },
-            { file: 'current', line },
+            {file: 'current', line: taintInfo.sourceLine},
+            {file: 'current', line},
           ],
         });
       }
@@ -958,7 +1178,10 @@ export class CodeAnalyzer {
    * 基于OWASP Top 10和CWE标准进行全面的安全风险检测
    * 结合静态分析和AI分析结果
    */
-  private identifySecurityRisks(code: string, aiAnalysis: Record<string, unknown>): SecurityRisk[] {
+  private identifySecurityRisks(
+    code: string,
+    aiAnalysis: Record<string, unknown>,
+  ): SecurityRisk[] {
     const risks: SecurityRisk[] = [];
 
     // 从AI分析中提取风险
@@ -969,7 +1192,7 @@ export class CodeAnalyzer {
           risks.push({
             type: (r.type as SecurityRisk['type']) || 'other',
             severity: (r.severity as SecurityRisk['severity']) || 'low',
-            location: { file: 'current', line: (r.location as any)?.line || 0 },
+            location: {file: 'current', line: (r.location as any)?.line || 0},
             description: (r.description as string) || '',
             recommendation: (r.recommendation as string) || '',
           });
@@ -994,23 +1217,33 @@ export class CodeAnalyzer {
             const propName = left.property.name;
 
             // innerHTML/outerHTML赋值
-            if (['innerHTML', 'outerHTML', 'insertAdjacentHTML'].includes(propName)) {
+            if (
+              ['innerHTML', 'outerHTML', 'insertAdjacentHTML'].includes(
+                propName,
+              )
+            ) {
               risks.push({
                 type: 'xss',
                 severity: 'high',
-                location: { file: 'current', line },
+                location: {file: 'current', line},
                 description: `Potential XSS vulnerability: Direct assignment to ${propName} without sanitization`,
-                recommendation: 'Use textContent for plain text, or DOMPurify.sanitize() for HTML content',
+                recommendation:
+                  'Use textContent for plain text, or DOMPurify.sanitize() for HTML content',
               });
             }
 
             // document.write
-            if (propName === 'write' && t.isIdentifier(left.object) && left.object.name === 'document') {
+            if (
+              propName === 'write' &&
+              t.isIdentifier(left.object) &&
+              left.object.name === 'document'
+            ) {
               risks.push({
                 type: 'xss',
                 severity: 'high',
-                location: { file: 'current', line },
-                description: 'Dangerous use of document.write() which can lead to XSS',
+                location: {file: 'current', line},
+                description:
+                  'Dangerous use of document.write() which can lead to XSS',
                 recommendation: 'Use modern DOM manipulation methods instead',
               });
             }
@@ -1028,9 +1261,11 @@ export class CodeAnalyzer {
               risks.push({
                 type: 'other',
                 severity: 'critical',
-                location: { file: 'current', line },
-                description: 'Critical: Use of eval() allows arbitrary code execution',
-                recommendation: 'Refactor to avoid eval(). Use JSON.parse() for data, or proper function calls',
+                location: {file: 'current', line},
+                description:
+                  'Critical: Use of eval() allows arbitrary code execution',
+                recommendation:
+                  'Refactor to avoid eval(). Use JSON.parse() for data, or proper function calls',
               });
             }
 
@@ -1038,20 +1273,25 @@ export class CodeAnalyzer {
               risks.push({
                 type: 'other',
                 severity: 'critical',
-                location: { file: 'current', line },
-                description: 'Critical: Function constructor allows code injection',
-                recommendation: 'Use regular function declarations or arrow functions',
+                location: {file: 'current', line},
+                description:
+                  'Critical: Function constructor allows code injection',
+                recommendation:
+                  'Use regular function declarations or arrow functions',
               });
             }
 
             // setTimeout/setInterval with string argument
             if (['setTimeout', 'setInterval'].includes(callee.name)) {
               const firstArg = path.node.arguments[0];
-              if (t.isStringLiteral(firstArg) || (t.isIdentifier(firstArg) && firstArg.name !== 'function')) {
+              if (
+                t.isStringLiteral(firstArg) ||
+                (t.isIdentifier(firstArg) && firstArg.name !== 'function')
+              ) {
                 risks.push({
                   type: 'other',
                   severity: 'medium',
-                  location: { file: 'current', line },
+                  location: {file: 'current', line},
                   description: `${callee.name}() with string argument can lead to code injection`,
                   recommendation: `Use ${callee.name}() with function reference instead of string`,
                 });
@@ -1068,13 +1308,18 @@ export class CodeAnalyzer {
               const firstArg = path.node.arguments[0];
 
               // 检查是否使用字符串拼接
-              if (t.isBinaryExpression(firstArg) || t.isTemplateLiteral(firstArg)) {
+              if (
+                t.isBinaryExpression(firstArg) ||
+                t.isTemplateLiteral(firstArg)
+              ) {
                 risks.push({
                   type: 'sql-injection',
                   severity: 'critical',
-                  location: { file: 'current', line },
-                  description: 'Potential SQL injection: Query built with string concatenation',
-                  recommendation: 'Use parameterized queries or prepared statements',
+                  location: {file: 'current', line},
+                  description:
+                    'Potential SQL injection: Query built with string concatenation',
+                  recommendation:
+                    'Use parameterized queries or prepared statements',
                 });
               }
             }
@@ -1087,17 +1332,22 @@ export class CodeAnalyzer {
           const prop = path.node.property;
           const line = path.node.loc?.start.line || 0;
 
-          if (t.isIdentifier(obj) && obj.name === 'Math' &&
-              t.isIdentifier(prop) && prop.name === 'random') {
+          if (
+            t.isIdentifier(obj) &&
+            obj.name === 'Math' &&
+            t.isIdentifier(prop) &&
+            prop.name === 'random'
+          ) {
             // 检查是否用于安全相关场景（通过上下文判断）
             const parent = path.parent;
             if (t.isCallExpression(parent) || t.isBinaryExpression(parent)) {
               risks.push({
                 type: 'other',
                 severity: 'medium',
-                location: { file: 'current', line },
+                location: {file: 'current', line},
                 description: 'Math.random() is not cryptographically secure',
-                recommendation: 'Use crypto.getRandomValues() or crypto.randomBytes() for security-sensitive operations',
+                recommendation:
+                  'Use crypto.getRandomValues() or crypto.randomBytes() for security-sensitive operations',
               });
             }
           }
@@ -1115,18 +1365,18 @@ export class CodeAnalyzer {
 
             // 检测可能的密钥、密码、token
             const sensitivePatterns = [
-              { pattern: /(password|passwd|pwd)/i, type: 'password' },
-              { pattern: /(api[_-]?key|apikey)/i, type: 'API key' },
-              { pattern: /(secret|token|auth)/i, type: 'secret' },
-              { pattern: /(private[_-]?key|privatekey)/i, type: 'private key' },
+              {pattern: /(password|passwd|pwd)/i, type: 'password'},
+              {pattern: /(api[_-]?key|apikey)/i, type: 'API key'},
+              {pattern: /(secret|token|auth)/i, type: 'secret'},
+              {pattern: /(private[_-]?key|privatekey)/i, type: 'private key'},
             ];
 
-            for (const { pattern, type } of sensitivePatterns) {
+            for (const {pattern, type} of sensitivePatterns) {
               if (pattern.test(varName) && value.length > 8) {
                 risks.push({
                   type: 'other',
                   severity: 'critical',
-                  location: { file: 'current', line },
+                  location: {file: 'current', line},
                   description: `Hardcoded ${type} detected in source code`,
                   recommendation: `Store ${type} in environment variables or secure configuration`,
                 });
@@ -1141,8 +1391,12 @@ export class CodeAnalyzer {
     }
 
     // 去重（基于type和line）
-    const uniqueRisks = risks.filter((risk, index, self) =>
-      index === self.findIndex((r) => r.type === risk.type && r.location.line === risk.location.line)
+    const uniqueRisks = risks.filter(
+      (risk, index, self) =>
+        index ===
+        self.findIndex(
+          r => r.type === risk.type && r.location.line === risk.location.line,
+        ),
     );
 
     return uniqueRisks;
@@ -1167,13 +1421,13 @@ export class CodeAnalyzer {
       cognitiveComplexity: number;
       maintainabilityIndex: number;
     },
-    antiPatterns?: Array<{ severity: string }>
+    antiPatterns?: Array<{severity: string}>,
   ): number {
     let score = 100;
 
     // 1. 安全风险扣分 (权重: 40%)
     let securityScore = 100;
-    securityRisks.forEach((risk) => {
+    securityRisks.forEach(risk => {
       if (risk.severity === 'critical') securityScore -= 20;
       else if (risk.severity === 'high') securityScore -= 10;
       else if (risk.severity === 'medium') securityScore -= 5;
@@ -1186,16 +1440,19 @@ export class CodeAnalyzer {
     if (complexityMetrics) {
       // 圈复杂度评分
       if (complexityMetrics.cyclomaticComplexity > 20) complexityScore -= 30;
-      else if (complexityMetrics.cyclomaticComplexity > 10) complexityScore -= 15;
+      else if (complexityMetrics.cyclomaticComplexity > 10)
+        complexityScore -= 15;
       else if (complexityMetrics.cyclomaticComplexity > 5) complexityScore -= 5;
 
       // 认知复杂度评分
       if (complexityMetrics.cognitiveComplexity > 15) complexityScore -= 20;
-      else if (complexityMetrics.cognitiveComplexity > 10) complexityScore -= 10;
+      else if (complexityMetrics.cognitiveComplexity > 10)
+        complexityScore -= 10;
     } else {
       // 回退到简单的平均复杂度计算
       const avgComplexity =
-        structure.functions.reduce((sum, fn) => sum + fn.complexity, 0) / (structure.functions.length || 1);
+        structure.functions.reduce((sum, fn) => sum + fn.complexity, 0) /
+        (structure.functions.length || 1);
       if (avgComplexity > 10) complexityScore -= 20;
       else if (avgComplexity > 5) complexityScore -= 10;
     }
@@ -1207,7 +1464,7 @@ export class CodeAnalyzer {
     // 4. 代码异味扣分 (权重: 15%)
     let codeSmellScore = 100;
     if (antiPatterns) {
-      antiPatterns.forEach((pattern) => {
+      antiPatterns.forEach(pattern => {
         if (pattern.severity === 'high') codeSmellScore -= 10;
         else if (pattern.severity === 'medium') codeSmellScore -= 5;
         else codeSmellScore -= 2;
@@ -1223,9 +1480,9 @@ export class CodeAnalyzer {
 
     // 加权平均
     score =
-      securityScore * 0.40 +
+      securityScore * 0.4 +
       complexityScore * 0.25 +
-      maintainabilityScore * 0.20 +
+      maintainabilityScore * 0.2 +
       codeSmellScore * 0.15;
 
     // 与AI评分取平均（如果AI评分可用）
@@ -1244,9 +1501,9 @@ export class CodeAnalyzer {
    */
   private checkSanitizer(
     node: t.CallExpression,
-    sanitizers: Set<string>
+    sanitizers: Set<string>,
   ): boolean {
-    const { callee } = node;
+    const {callee} = node;
 
     // 简单函数调用: encodeURIComponent()
     if (t.isIdentifier(callee)) {
@@ -1292,11 +1549,25 @@ export class CodeAnalyzer {
    * 基于业界最佳实践和代码质量标准
    */
   private detectCodePatterns(code: string): {
-    patterns: Array<{ name: string; location: number; description: string }>;
-    antiPatterns: Array<{ name: string; location: number; severity: string; recommendation: string }>;
+    patterns: Array<{name: string; location: number; description: string}>;
+    antiPatterns: Array<{
+      name: string;
+      location: number;
+      severity: string;
+      recommendation: string;
+    }>;
   } {
-    const patterns: Array<{ name: string; location: number; description: string }> = [];
-    const antiPatterns: Array<{ name: string; location: number; severity: string; recommendation: string }> = [];
+    const patterns: Array<{
+      name: string;
+      location: number;
+      description: string;
+    }> = [];
+    const antiPatterns: Array<{
+      name: string;
+      location: number;
+      severity: string;
+      recommendation: string;
+    }> = [];
 
     try {
       const ast = parser.parse(code, {
@@ -1308,12 +1579,15 @@ export class CodeAnalyzer {
         // 检测单例模式
         VariableDeclarator(path) {
           const init = path.node.init;
-          if (t.isCallExpression(init) &&
-              t.isFunctionExpression(init.callee) &&
-              init.callee.body.body.some(stmt =>
+          if (
+            t.isCallExpression(init) &&
+            t.isFunctionExpression(init.callee) &&
+            init.callee.body.body.some(
+              stmt =>
                 t.isReturnStatement(stmt) &&
-                t.isObjectExpression(stmt.argument)
-              )) {
+                t.isObjectExpression(stmt.argument),
+            )
+          ) {
             patterns.push({
               name: 'Singleton Pattern',
               location: path.node.loc?.start.line || 0,
@@ -1326,12 +1600,14 @@ export class CodeAnalyzer {
         ClassDeclaration(path) {
           const methods = path.node.body.body.filter(m => t.isClassMethod(m));
           const methodNames = methods.map(m =>
-            t.isClassMethod(m) && t.isIdentifier(m.key) ? m.key.name : ''
+            t.isClassMethod(m) && t.isIdentifier(m.key) ? m.key.name : '',
           );
 
-          if (methodNames.includes('subscribe') &&
-              methodNames.includes('unsubscribe') &&
-              methodNames.includes('notify')) {
+          if (
+            methodNames.includes('subscribe') &&
+            methodNames.includes('unsubscribe') &&
+            methodNames.includes('notify')
+          ) {
             patterns.push({
               name: 'Observer Pattern',
               location: path.node.loc?.start.line || 0,
@@ -1362,9 +1638,11 @@ export class CodeAnalyzer {
           let current: typeof path.parentPath | null = path.parentPath;
 
           while (current) {
-            if (current.isIfStatement() ||
-                current.isForStatement() ||
-                current.isWhileStatement()) {
+            if (
+              current.isIfStatement() ||
+              current.isForStatement() ||
+              current.isWhileStatement()
+            ) {
               depth++;
             }
             current = current.parentPath;
@@ -1390,7 +1668,8 @@ export class CodeAnalyzer {
           if (commonNumbers.includes(value)) return;
 
           // 忽略数组索引
-          if (t.isMemberExpression(parent) && parent.property === path.node) return;
+          if (t.isMemberExpression(parent) && parent.property === path.node)
+            return;
 
           // 忽略函数参数默认值
           if (t.isAssignmentPattern(parent)) return;
@@ -1411,7 +1690,8 @@ export class CodeAnalyzer {
               name: 'Empty Catch Block',
               location: path.node.loc?.start.line || 0,
               severity: 'high',
-              recommendation: 'Empty catch block swallows errors. Add proper error handling or logging',
+              recommendation:
+                'Empty catch block swallows errors. Add proper error handling or logging',
             });
           }
         },
@@ -1423,7 +1703,8 @@ export class CodeAnalyzer {
               name: 'Use of var',
               location: path.node.loc?.start.line || 0,
               severity: 'low',
-              recommendation: 'Use let or const instead of var for better scoping',
+              recommendation:
+                'Use let or const instead of var for better scoping',
             });
           }
         },
@@ -1443,7 +1724,7 @@ export class CodeAnalyzer {
       logger.warn('Code pattern detection failed', error);
     }
 
-    return { patterns, antiPatterns };
+    return {patterns, antiPatterns};
   }
 
   /**
@@ -1482,18 +1763,32 @@ export class CodeAnalyzer {
 
       traverse(ast, {
         // 圈复杂度
-        IfStatement() { cyclomaticComplexity++; },
-        SwitchCase() { cyclomaticComplexity++; },
-        ForStatement() { cyclomaticComplexity++; },
-        WhileStatement() { cyclomaticComplexity++; },
-        DoWhileStatement() { cyclomaticComplexity++; },
-        ConditionalExpression() { cyclomaticComplexity++; },
+        IfStatement() {
+          cyclomaticComplexity++;
+        },
+        SwitchCase() {
+          cyclomaticComplexity++;
+        },
+        ForStatement() {
+          cyclomaticComplexity++;
+        },
+        WhileStatement() {
+          cyclomaticComplexity++;
+        },
+        DoWhileStatement() {
+          cyclomaticComplexity++;
+        },
+        ConditionalExpression() {
+          cyclomaticComplexity++;
+        },
         LogicalExpression(path) {
           if (path.node.operator === '&&' || path.node.operator === '||') {
             cyclomaticComplexity++;
           }
         },
-        CatchClause() { cyclomaticComplexity++; },
+        CatchClause() {
+          cyclomaticComplexity++;
+        },
 
         // 认知复杂度（考虑嵌套）
         'IfStatement|ForStatement|WhileStatement|DoWhileStatement': {
@@ -1534,9 +1829,9 @@ export class CodeAnalyzer {
 
     // Halstead指标计算
     const n1 = uniqueOperators.size; // 唯一操作符数
-    const n2 = uniqueOperands.size;  // 唯一操作数数
-    const N1 = operators;             // 总操作符数
-    const N2 = operands;              // 总操作数数
+    const n2 = uniqueOperands.size; // 唯一操作数数
+    const N1 = operators; // 总操作符数
+    const N2 = operands; // 总操作数数
 
     const vocabulary = n1 + n2;
     const length = N1 + N2;
@@ -1547,8 +1842,12 @@ export class CodeAnalyzer {
     // MI = 171 - 5.2 * ln(V) - 0.23 * G - 16.2 * ln(LOC)
     const volume = length * Math.log2(vocabulary || 1);
     const loc = code.split('\n').length;
-    const maintainabilityIndex = Math.max(0,
-      171 - 5.2 * Math.log(volume || 1) - 0.23 * cyclomaticComplexity - 16.2 * Math.log(loc)
+    const maintainabilityIndex = Math.max(
+      0,
+      171 -
+        5.2 * Math.log(volume || 1) -
+        0.23 * cyclomaticComplexity -
+        16.2 * Math.log(loc),
     );
 
     return {
@@ -1581,7 +1880,11 @@ export class CodeAnalyzer {
     duplicateLocation: number;
     similarity: number;
   }> {
-    const duplicates: Array<{ location: number; duplicateLocation: number; similarity: number }> = [];
+    const duplicates: Array<{
+      location: number;
+      duplicateLocation: number;
+      similarity: number;
+    }> = [];
     const codeBlocks: Array<{
       node: t.Node;
       hash: string;
@@ -1658,7 +1961,7 @@ export class CodeAnalyzer {
           // Type-2/Type-3 克隆: 计算相似度
           const similarity = this.calculateCodeSimilarity(
             block1.normalizedCode,
-            block2.normalizedCode
+            block2.normalizedCode,
           );
 
           // 相似度阈值: 0.85 (85%以上认为是重复代码)
@@ -1692,7 +1995,11 @@ export class CodeAnalyzer {
         return undefined;
       }
       // 忽略注释
-      if (key === 'comments' || key === 'leadingComments' || key === 'trailingComments') {
+      if (
+        key === 'comments' ||
+        key === 'leadingComments' ||
+        key === 'trailingComments'
+      ) {
         return undefined;
       }
       return value;
@@ -1702,7 +2009,7 @@ export class CodeAnalyzer {
     let hash = 0;
     for (let i = 0; i < normalized.length; i++) {
       const char = normalized.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
+      hash = (hash << 5) - hash + char;
       hash = hash & hash; // Convert to 32bit integer
     }
     return hash.toString(36);
@@ -1725,7 +2032,17 @@ export class CodeAnalyzer {
         const name = path.node.name;
 
         // 跳过保留字和内置对象
-        const reserved = ['console', 'window', 'document', 'Math', 'JSON', 'Array', 'Object', 'String', 'Number'];
+        const reserved = [
+          'console',
+          'window',
+          'document',
+          'Math',
+          'JSON',
+          'Array',
+          'Object',
+          'String',
+          'Number',
+        ];
         if (reserved.includes(name)) return;
 
         // 为每个唯一标识符分配一个规范化的名称
@@ -1766,8 +2083,8 @@ export class CodeAnalyzer {
     }
 
     // 动态规划矩阵 - 使用Array.from确保类型安全
-    const matrix: number[][] = Array.from({ length: len1 + 1 }, () =>
-      Array.from({ length: len2 + 1 }, () => 0)
+    const matrix: number[][] = Array.from({length: len1 + 1}, () =>
+      Array.from({length: len2 + 1}, () => 0),
     );
 
     // 初始化第一行和第一列
@@ -1783,9 +2100,9 @@ export class CodeAnalyzer {
       for (let j = 1; j <= len2; j++) {
         const cost = code1[i - 1] === code2[j - 1] ? 0 : 1;
         matrix[i]![j] = Math.min(
-          matrix[i - 1]![j]! + 1,      // 删除
-          matrix[i]![j - 1]! + 1,      // 插入
-          matrix[i - 1]![j - 1]! + cost // 替换
+          matrix[i - 1]![j]! + 1, // 删除
+          matrix[i]![j - 1]! + 1, // 插入
+          matrix[i - 1]![j - 1]! + cost, // 替换
         );
       }
     }
@@ -1794,7 +2111,6 @@ export class CodeAnalyzer {
     const maxLen = Math.max(len1, len2);
 
     // 相似度 = 1 - (编辑距离 / 最大长度)
-    return 1 - (distance / maxLen);
+    return 1 - distance / maxLen;
   }
 }
-

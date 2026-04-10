@@ -4,12 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {logger} from '../logger.js';
 import {createRequire} from 'node:module';
+
+import {logger} from '../logger.js';
 
 // 动态导入 chrome-devtools-frontend 运行时模块，避免将其源码类型拉入当前 TS program。
 const require = createRequire(import.meta.url);
-const CDTP_MODULE_PATH = '../../node_modules/chrome-devtools-frontend/mcp/mcp.js';
+const CDTP_MODULE_PATH =
+  '../../node_modules/chrome-devtools-frontend/mcp/mcp.js';
 let cdtp: any;
 let initialized = false;
 

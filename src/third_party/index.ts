@@ -279,7 +279,7 @@ export namespace Protocol {
 }
 
 // Puppeteer Page 事件类型 - 用于 PageCollector.ts
-export type PuppeteerPageEvents = {
+export interface PuppeteerPageEvents {
   console: unknown;
   dialog: unknown;
   request: unknown;
@@ -292,7 +292,7 @@ export type PuppeteerPageEvents = {
   pageerror: unknown;
   popup: unknown;
   close: unknown;
-};
+}
 
 export type Handler<T = unknown> = (event: T) => void;
 

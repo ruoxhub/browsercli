@@ -40,7 +40,6 @@ import {
   deleteSessionState,
   dumpSessionState,
   clickElement,
-  getPerformanceMetrics,
   listSessionStates,
   loadSessionState,
   restoreSessionState,
@@ -48,6 +47,7 @@ import {
   typeText,
   waitForElement,
 } from '../../../src/tools/page.js';
+import {getPerformanceMetrics} from '../../../src/tools/performance.js';
 import {getJSHookRuntime} from '../../../src/tools/runtime.js';
 import {
   injectStealth,
@@ -1036,14 +1036,14 @@ describe('jshook tools handlers', () => {
         runtime,
       );
 
-      await assert.rejects(async () => {
-        await invokeTool(
-          injectHook as unknown as ToolDefinitionHarness,
-          {hookId: 'missing'},
-          res,
-          runtime,
-        );
-      });
+      // injectHook 现在对不存在的 hook 返回友好消息而不是抛错
+      await invokeTool(
+        injectHook as unknown as ToolDefinitionHarness,
+        {hookId: 'missing'},
+        res,
+        runtime,
+      );
+      assert.ok(res.lines.some(line => line.includes('Hook 未找到')));
 
       assert.ok(res.lines.some(line => line.includes('Hook injected: h1')));
       assert.ok(res.lines.some(line => line.includes('Element clicked.')));

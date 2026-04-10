@@ -219,7 +219,8 @@ main().catch(console.error);
  * 创建任务脚手架
  */
 async function createScaffold(config: ScaffoldConfig): Promise<void> {
-  const outputDir = config.outputPath || path.join('artifacts/tasks', config.name);
+  const outputDir =
+    config.outputPath || path.join('artifacts/tasks', config.name);
 
   console.log(`📦 创建任务脚手架：${config.name}`);
   console.log(`   描述：${config.description}`);
@@ -245,19 +246,32 @@ async function createScaffold(config: ScaffoldConfig): Promise<void> {
 
   // 写入文件
   const files = [
-    {path: 'task.json', content: JSON.stringify({
-      name: config.name,
-      description: config.description,
-      targetUrl: config.targetUrl,
-      difficulty: 'medium',
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-    }, null, 2)},
+    {
+      path: 'task.json',
+      content: JSON.stringify(
+        {
+          name: config.name,
+          description: config.description,
+          targetUrl: config.targetUrl,
+          difficulty: 'medium',
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+        },
+        null,
+        2,
+      ),
+    },
     {path: 'env/env.js', content: replaceTemplate(TASK_TEMPLATE.envJs)},
-    {path: 'env/polyfills.js', content: replaceTemplate(TASK_TEMPLATE.polyfillsJs)},
+    {
+      path: 'env/polyfills.js',
+      content: replaceTemplate(TASK_TEMPLATE.polyfillsJs),
+    },
     {path: 'entry.js', content: replaceTemplate(TASK_TEMPLATE.entryJs)},
     {path: 'README.md', content: replaceTemplate(TASK_TEMPLATE.readmeMd)},
-    {path: 'run/run-local.mjs', content: replaceTemplate(TASK_TEMPLATE.runScript)},
+    {
+      path: 'run/run-local.mjs',
+      content: replaceTemplate(TASK_TEMPLATE.runScript),
+    },
   ];
 
   for (const file of files) {
@@ -282,7 +296,9 @@ build/
   console.log(`   1. cd ${outputDir}`);
   console.log(`   2. 编辑 env/env.js 配置目标环境`);
   console.log(`   3. 使用 js-reverse start 启动 daemon`);
-  console.log(`   4. 使用 js-reverse call-skill observe-flow --url ${config.targetUrl} 开始分析`);
+  console.log(
+    `   4. 使用 js-reverse call-skill observe-flow --url ${config.targetUrl} 开始分析`,
+  );
 }
 
 /**
@@ -295,7 +311,7 @@ async function interactiveCreate(): Promise<void> {
   });
 
   const question = (prompt: string): Promise<string> => {
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       rl.question(prompt, resolve);
     });
   };

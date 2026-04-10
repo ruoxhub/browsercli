@@ -18,6 +18,7 @@ export const listPages = defineTool({
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: true,
+    title: 'List pages',
   },
   schema: {},
   handler: async (_request, response, context, runtime) => {
@@ -31,6 +32,7 @@ export const selectPage = defineTool({
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: true,
+    title: 'Select page',
   },
   schema: {
     pageIdx: zod
@@ -54,6 +56,7 @@ export const newPage = defineTool({
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: false,
+    title: 'Create new page',
   },
   schema: {
     url: zod.string().describe('URL to load in a new page.'),
@@ -79,6 +82,7 @@ export const navigatePage = defineTool({
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: false,
+    title: 'Navigate page',
   },
   schema: {
     type: zod

@@ -2,16 +2,17 @@
  * @license
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
- * @ts-nocheck
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-
 import {DebuggerContext} from './DebuggerContext.js';
-import {extractUrlLikeFromDevToolsTitle, urlsEqual} from './DevtoolsUtils.js';
+import {extractUrlLikeFromDevToolsTitle} from './DevtoolsUtils.js';
 import type {TrafficSummary} from './formatters/websocketFormatter.js';
 import {NetworkCollector, ConsoleCollector} from './PageCollector.js';
 import type {ListenerMap, RequestInitiator} from './PageCollector.js';
@@ -498,11 +499,10 @@ export class McpContext implements Context {
           if (!urlLike) {
             continue;
           }
-          // TODO: lookup without a loop.
-          for (const page of this.#pages) {
-            if (urlsEqual(page.url(), urlLike)) {
-              this.#pageToDevToolsPage.set(page, devToolsPage);
-            }
+          const urlMap = new Map(this.#pages.map(p => [p.url(), p]));
+          const page = urlMap.get(urlLike);
+          if (page) {
+            this.#pageToDevToolsPage.set(page, devToolsPage);
           }
         } catch (error) {
           this.logger('Issue occurred while trying to find DevTools', error);

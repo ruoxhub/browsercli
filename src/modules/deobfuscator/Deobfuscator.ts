@@ -1,5 +1,3 @@
-
-// @ts-nocheck
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -25,22 +23,40 @@
 
 import * as parser from '@babel/parser';
 import traverseImport from '@babel/traverse';
-const traverse = (traverseImport as unknown as {default?: typeof traverseImport}).default ?? traverseImport;
+const traverse =
+  (traverseImport as unknown as {default?: typeof traverseImport}).default ??
+  traverseImport;
 import generateImport from '@babel/generator';
-const generate = (generateImport as unknown as {default?: typeof generateImport}).default ?? generateImport;
+const generate =
+  (generateImport as unknown as {default?: typeof generateImport}).default ??
+  generateImport;
 import * as t from '@babel/types';
 
 import crypto from 'node:crypto';
 
-import type { LLMService } from '../../services/LLMService.js';
-import type { DeobfuscateOptions, DeobfuscateResult, ObfuscationType, Transformation, UnresolvedPart } from '../../types/index.js';
-import { logger } from '../../utils/logger.js';
+import type {LLMService} from '../../services/LLMService.js';
+import type {
+  DeobfuscateOptions,
+  DeobfuscateResult,
+  ObfuscationType,
+  Transformation,
+  UnresolvedPart,
+} from '../../types/index.js';
+import {logger} from '../../utils/logger.js';
 
 // 子模块
-import { AdvancedDeobfuscator, type AdvancedDeobfuscateOptions } from './AdvancedDeobfuscator.js';
-import { ASTOptimizer } from './ASTOptimizer.js';
-import { JSVMPDeobfuscator } from './JSVMPDeobfuscator.js';
-import { PackerDeobfuscator, AAEncodeDeobfuscator, URLEncodeDeobfuscator, UniversalUnpacker } from './PackerDeobfuscator.js';
+import {
+  AdvancedDeobfuscator,
+  type AdvancedDeobfuscateOptions,
+} from './AdvancedDeobfuscator.js';
+import {ASTOptimizer} from './ASTOptimizer.js';
+import {JSVMPDeobfuscator} from './JSVMPDeobfuscator.js';
+import {
+  PackerDeobfuscator,
+  AAEncodeDeobfuscator,
+  URLEncodeDeobfuscator,
+  UniversalUnpacker,
+} from './PackerDeobfuscator.js';
 
 // ==================== 扩展选项 ====================
 
@@ -90,7 +106,9 @@ export class Deobfuscator {
   /**
    * 完整反混淆管线入口
    */
-  async deobfuscate(options: DeobfuscateFullOptions): Promise<DeobfuscateResult> {
+  async deobfuscate(
+    options: DeobfuscateFullOptions,
+  ): Promise<DeobfuscateResult> {
     // 缓存
     const cacheKey = this.generateCacheKey(options);
     const cached = this.resultCache.get(cacheKey);
@@ -118,21 +136,49 @@ export class Deobfuscator {
       pipelineWarnings.push(`检测到的混淆类型: ${obfuscationType.join(', ')}`);
 
       // ── Step 1: Packer / AAEncode / URLEncode 自动解包 ──
-      if (this.shouldRun(options.unpack, autoMode, obfuscationType, ['packer', 'aaencode', 'urlencoded', 'eval-obfuscation'])) {
+      if (
+        this.shouldRun(options.unpack, autoMode, obfuscationType, [
+          'packer',
+          'aaencode',
+          'urlencoded',
+          'eval-obfuscation',
+        ])
+      ) {
         code = await this.runUnpack(code, transformations);
       }
 
       // ── Step 2: JSVMP 虚拟机保护还原 ──
-      if (this.shouldRun(options.jsvmp, autoMode, obfuscationType, ['vm-protection'])) {
-        code = await this.runJSVMP(code, options, transformations, pipelineWarnings, pipelineUnresolved);
+      if (
+        this.shouldRun(options.jsvmp, autoMode, obfuscationType, [
+          'vm-protection',
+        ])
+      ) {
+        code = await this.runJSVMP(
+          code,
+          options,
+          transformations,
+          pipelineWarnings,
+          pipelineUnresolved,
+        );
       }
 
       // ── Step 3: 高级反混淆 ──
-      if (this.shouldRun(options.advanced, autoMode, obfuscationType, [
-        'invisible-unicode', 'control-flow-flattening', 'string-array-rotation',
-        'dead-code-injection', 'opaque-predicates', 'custom',
-      ])) {
-        code = await this.runAdvanced(code, options, transformations, pipelineWarnings);
+      if (
+        this.shouldRun(options.advanced, autoMode, obfuscationType, [
+          'invisible-unicode',
+          'control-flow-flattening',
+          'string-array-rotation',
+          'dead-code-injection',
+          'opaque-predicates',
+          'custom',
+        ])
+      ) {
+        code = await this.runAdvanced(
+          code,
+          options,
+          transformations,
+          pipelineWarnings,
+        );
       }
 
       // ── Step 4: 基础管线 ──
@@ -151,7 +197,13 @@ export class Deobfuscator {
       code = await this.simplifyExpressions(code, transformations);
 
       // ── Step 5: AST 优化器 ──
-      if (this.shouldRun(options.astOptimize, autoMode, obfuscationType, ['javascript-obfuscator', 'uglify', 'webpack'])) {
+      if (
+        this.shouldRun(options.astOptimize, autoMode, obfuscationType, [
+          'javascript-obfuscator',
+          'uglify',
+          'webpack',
+        ])
+      ) {
         code = await this.runASTOptimizer(code, transformations);
       }
 
@@ -166,19 +218,31 @@ export class Deobfuscator {
         const llmResult = await this.llmAnalysis(code);
         if (llmResult) {
           analysis = llmResult;
-          transformations.push({ type: 'llm-analysis', description: 'AI-assisted code analysis completed', success: true });
+          transformations.push({
+            type: 'llm-analysis',
+            description: 'AI-assisted code analysis completed',
+            success: true,
+          });
         }
       }
 
       // ── 结果 ──
       const deobfuscateTime = Date.now() - startTime;
       const readabilityScore = this.calculateReadabilityScore(code);
-      const confidence = this.calculateConfidence(transformations, readabilityScore);
+      const confidence = this.calculateConfidence(
+        transformations,
+        readabilityScore,
+      );
 
       // 重新检测，因为某些类型可能在子管线中被发现
-      const finalTypes = this.mergeObfuscationTypes(obfuscationType, transformations);
+      const finalTypes = this.mergeObfuscationTypes(
+        obfuscationType,
+        transformations,
+      );
 
-      logger.success(`Deobfuscation completed in ${deobfuscateTime}ms (confidence: ${(confidence * 100).toFixed(1)}%)`);
+      logger.success(
+        `Deobfuscation completed in ${deobfuscateTime}ms (confidence: ${(confidence * 100).toFixed(1)}%)`,
+      );
 
       const result: DeobfuscateResult = {
         code,
@@ -189,7 +253,8 @@ export class Deobfuscator {
         analysis,
         // 完整透传给外部 AI：所有子管线的分析信息
         warnings: pipelineWarnings.length > 0 ? pipelineWarnings : undefined,
-        unresolvedParts: pipelineUnresolved.length > 0 ? pipelineUnresolved : undefined,
+        unresolvedParts:
+          pipelineUnresolved.length > 0 ? pipelineUnresolved : undefined,
       };
 
       this.cacheResult(cacheKey, result);
@@ -225,7 +290,10 @@ export class Deobfuscator {
   /**
    * Packer / AAEncode / URLEncode 解包
    */
-  private async runUnpack(code: string, transformations: Transformation[]): Promise<string> {
+  private async runUnpack(
+    code: string,
+    transformations: Transformation[],
+  ): Promise<string> {
     try {
       logger.info('Running UniversalUnpacker...');
       const result = await this.universalUnpacker.deobfuscate(code);
@@ -239,7 +307,11 @@ export class Deobfuscator {
       }
     } catch (error) {
       logger.warn('UniversalUnpacker failed', error);
-      transformations.push({ type: 'unpack', description: 'UniversalUnpacker failed', success: false });
+      transformations.push({
+        type: 'unpack',
+        description: 'UniversalUnpacker failed',
+        success: false,
+      });
     }
     return code;
   }
@@ -295,10 +367,12 @@ export class Deobfuscator {
         }
 
         if (result.instructions && result.instructions.length > 0) {
-          detail.instructionSample = result.instructions.slice(0, 10).map(i => ({
-            type: i.type,
-            opcode: i.opcode,
-          }));
+          detail.instructionSample = result.instructions
+            .slice(0, 10)
+            .map(i => ({
+              type: i.type,
+              opcode: i.opcode,
+            }));
         }
 
         if (result.stats) {
@@ -315,7 +389,9 @@ export class Deobfuscator {
         return result.deobfuscatedCode;
       } else if (result.isJSVMP) {
         // 检测到了 JSVMP 但置信度太低，仍然把分析信息传出
-        pipelineWarnings.push(`[JSVMP] 检测到VM保护但还原置信度过低(${(result.confidence * 100).toFixed(1)}%)，代码未修改`);
+        pipelineWarnings.push(
+          `[JSVMP] 检测到VM保护但还原置信度过低(${(result.confidence * 100).toFixed(1)}%)，代码未修改`,
+        );
         transformations.push({
           type: 'jsvmp',
           description: `JSVMP detected but confidence too low (${(result.confidence * 100).toFixed(1)}%), code unchanged`,
@@ -330,7 +406,11 @@ export class Deobfuscator {
     } catch (error) {
       logger.warn('JSVMPDeobfuscator failed', error);
       pipelineWarnings.push(`[JSVMP] 反混淆失败: ${error}`);
-      transformations.push({ type: 'jsvmp', description: `JSVMP deobfuscation failed: ${error}`, success: false });
+      transformations.push({
+        type: 'jsvmp',
+        description: `JSVMP deobfuscation failed: ${error}`,
+        success: false,
+      });
     }
     return code;
   }
@@ -377,7 +457,11 @@ export class Deobfuscator {
     } catch (error) {
       logger.warn('AdvancedDeobfuscator failed', error);
       pipelineWarnings.push(`[Advanced] 高级反混淆失败: ${error}`);
-      transformations.push({ type: 'advanced', description: `Advanced deobfuscation failed: ${error}`, success: false });
+      transformations.push({
+        type: 'advanced',
+        description: `Advanced deobfuscation failed: ${error}`,
+        success: false,
+      });
     }
     return code;
   }
@@ -385,21 +469,29 @@ export class Deobfuscator {
   /**
    * AST 优化器
    */
-  private async runASTOptimizer(code: string, transformations: Transformation[]): Promise<string> {
+  private async runASTOptimizer(
+    code: string,
+    transformations: Transformation[],
+  ): Promise<string> {
     try {
       logger.info('Running ASTOptimizer...');
       const optimized = this.astOptimizer.optimize(code);
       if (optimized !== code) {
         transformations.push({
           type: 'ast-optimize',
-          description: 'AST optimizations applied (constant folding, propagation, variable inlining, property unfolding)',
+          description:
+            'AST optimizations applied (constant folding, propagation, variable inlining, property unfolding)',
           success: true,
         });
         return optimized;
       }
     } catch (error) {
       logger.warn('ASTOptimizer failed', error);
-      transformations.push({ type: 'ast-optimize', description: 'AST optimization failed', success: false });
+      transformations.push({
+        type: 'ast-optimize',
+        description: 'AST optimization failed',
+        success: false,
+      });
     }
     return code;
   }
@@ -453,14 +545,18 @@ export class Deobfuscator {
     }
 
     // 控制流平坦化 (while + switch 嵌套)
-    if (/while\s*\([^)]*\)\s*\{?\s*switch\s*\(/.test(code) ||
-        /while\s*\(\s*!!\s*\[\s*\]\s*\)\s*\{?\s*switch/.test(code)) {
+    if (
+      /while\s*\([^)]*\)\s*\{?\s*switch\s*\(/.test(code) ||
+      /while\s*\(\s*!!\s*\[\s*\]\s*\)\s*\{?\s*switch/.test(code)
+    ) {
       types.push('control-flow-flattening');
     }
 
     // 不透明谓词 (恒真/恒假条件)
-    if (/if\s*\(\s*typeof\s+\w+\s*[!=]==?\s*['"]undefined['"]\s*\)/.test(code) &&
-        code.includes('_0x')) {
+    if (
+      /if\s*\(\s*typeof\s+\w+\s*[!=]==?\s*['"]undefined['"]\s*\)/.test(code) &&
+      code.includes('_0x')
+    ) {
       types.push('opaque-predicates');
     }
 
@@ -470,7 +566,11 @@ export class Deobfuscator {
     }
 
     // 字符串数组旋转
-    if (/\(\s*function\s*\(\s*_0x[a-f0-9]+\s*,\s*_0x[a-f0-9]+\s*\).*?push\s*\(\s*.*?shift\s*\(\s*\)/.test(code)) {
+    if (
+      /\(\s*function\s*\(\s*_0x[a-f0-9]+\s*,\s*_0x[a-f0-9]+\s*\).*?push\s*\(\s*.*?shift\s*\(\s*\)/.test(
+        code,
+      )
+    ) {
       types.push('string-array-rotation');
     }
 
@@ -490,7 +590,10 @@ export class Deobfuscator {
     }
 
     // Base64 编码
-    if (/atob\s*\(|btoa\s*\(/.test(code) && /[A-Za-z0-9+/]{20,}={0,2}/.test(code)) {
+    if (
+      /atob\s*\(|btoa\s*\(/.test(code) &&
+      /[A-Za-z0-9+/]{20,}={0,2}/.test(code)
+    ) {
       types.push('base64-encoding');
     }
 
@@ -513,14 +616,33 @@ export class Deobfuscator {
     // 从 transformations 推断新发现的类型
     for (const t of transformations) {
       if (t.success) {
-        if (t.type === 'unpack' && t.description.includes('Packer')) types.add('packer');
-        if (t.type === 'unpack' && t.description.includes('AAEncode')) types.add('aaencode');
-        if (t.type === 'unpack' && t.description.includes('URLEncode')) types.add('urlencoded');
+        if (t.type === 'unpack' && t.description.includes('Packer'))
+          types.add('packer');
+        if (t.type === 'unpack' && t.description.includes('AAEncode'))
+          types.add('aaencode');
+        if (t.type === 'unpack' && t.description.includes('URLEncode'))
+          types.add('urlencoded');
         if (t.type === 'jsvmp') types.add('vm-protection');
-        if (t.type === 'advanced' && t.description.includes('invisible-unicode')) types.add('invisible-unicode');
-        if (t.type === 'advanced' && t.description.includes('control-flow-flattening')) types.add('control-flow-flattening');
-        if (t.type === 'advanced' && t.description.includes('opaque-predicates')) types.add('opaque-predicates');
-        if (t.type === 'advanced' && t.description.includes('dead-code-injection')) types.add('dead-code-injection');
+        if (
+          t.type === 'advanced' &&
+          t.description.includes('invisible-unicode')
+        )
+          types.add('invisible-unicode');
+        if (
+          t.type === 'advanced' &&
+          t.description.includes('control-flow-flattening')
+        )
+          types.add('control-flow-flattening');
+        if (
+          t.type === 'advanced' &&
+          t.description.includes('opaque-predicates')
+        )
+          types.add('opaque-predicates');
+        if (
+          t.type === 'advanced' &&
+          t.description.includes('dead-code-injection')
+        )
+          types.add('dead-code-injection');
       }
     }
 
@@ -537,38 +659,77 @@ export class Deobfuscator {
   /**
    * 基础 AST 转换 (常量折叠 + 死代码消除)
    */
-  private async basicTransform(code: string, transformations: Transformation[]): Promise<string> {
+  private async basicTransform(
+    code: string,
+    transformations: Transformation[],
+  ): Promise<string> {
     try {
-      const ast = parser.parse(code, { sourceType: 'module', plugins: ['jsx', 'typescript'] });
+      const ast = parser.parse(code, {
+        sourceType: 'module',
+        plugins: ['jsx', 'typescript'],
+      });
 
       traverse(ast, {
         // 常量折叠
         BinaryExpression(path) {
-          if (t.isNumericLiteral(path.node.left) && t.isNumericLiteral(path.node.right)) {
+          if (
+            t.isNumericLiteral(path.node.left) &&
+            t.isNumericLiteral(path.node.right)
+          ) {
             const l = path.node.left.value;
             const r = path.node.right.value;
             let result: number | undefined;
             switch (path.node.operator) {
-              case '+': result = l + r; break;
-              case '-': result = l - r; break;
-              case '*': result = l * r; break;
-              case '/': result = r !== 0 ? l / r : undefined; break;
-              case '%': result = r !== 0 ? l % r : undefined; break;
-              case '**': result = l ** r; break;
-              case '|': result = l | r; break;
-              case '&': result = l & r; break;
-              case '^': result = l ^ r; break;
-              case '<<': result = l << r; break;
-              case '>>': result = l >> r; break;
-              case '>>>': result = l >>> r; break;
+              case '+':
+                result = l + r;
+                break;
+              case '-':
+                result = l - r;
+                break;
+              case '*':
+                result = l * r;
+                break;
+              case '/':
+                result = r !== 0 ? l / r : undefined;
+                break;
+              case '%':
+                result = r !== 0 ? l % r : undefined;
+                break;
+              case '**':
+                result = l ** r;
+                break;
+              case '|':
+                result = l | r;
+                break;
+              case '&':
+                result = l & r;
+                break;
+              case '^':
+                result = l ^ r;
+                break;
+              case '<<':
+                result = l << r;
+                break;
+              case '>>':
+                result = l >> r;
+                break;
+              case '>>>':
+                result = l >>> r;
+                break;
             }
             if (result !== undefined && isFinite(result)) {
               path.replaceWith(t.numericLiteral(result));
             }
           }
           // 字符串拼接折叠
-          if (t.isStringLiteral(path.node.left) && t.isStringLiteral(path.node.right) && path.node.operator === '+') {
-            path.replaceWith(t.stringLiteral(path.node.left.value + path.node.right.value));
+          if (
+            t.isStringLiteral(path.node.left) &&
+            t.isStringLiteral(path.node.right) &&
+            path.node.operator === '+'
+          ) {
+            path.replaceWith(
+              t.stringLiteral(path.node.left.value + path.node.right.value),
+            );
           }
         },
 
@@ -588,17 +749,28 @@ export class Deobfuscator {
         // 条件表达式简化 true ? a : b → a
         ConditionalExpression(path) {
           if (t.isBooleanLiteral(path.node.test)) {
-            path.replaceWith(path.node.test.value ? path.node.consequent : path.node.alternate);
+            path.replaceWith(
+              path.node.test.value ? path.node.consequent : path.node.alternate,
+            );
           }
         },
       });
 
-      const output = generate(ast, { comments: true, compact: false });
-      transformations.push({ type: 'basic-ast-transform', description: 'Constant folding, dead code elimination, string concatenation', success: true });
+      const output = generate(ast, {comments: true, compact: false});
+      transformations.push({
+        type: 'basic-ast-transform',
+        description:
+          'Constant folding, dead code elimination, string concatenation',
+        success: true,
+      });
       return output.code;
     } catch (error) {
       logger.warn('Basic transform failed', error);
-      transformations.push({ type: 'basic-ast-transform', description: 'Failed', success: false });
+      transformations.push({
+        type: 'basic-ast-transform',
+        description: 'Failed',
+        success: false,
+      });
       return code;
     }
   }
@@ -606,9 +778,15 @@ export class Deobfuscator {
   /**
    * 字符串解码 (hex / unicode)
    */
-  private async decodeStrings(code: string, transformations: Transformation[]): Promise<string> {
+  private async decodeStrings(
+    code: string,
+    transformations: Transformation[],
+  ): Promise<string> {
     try {
-      const ast = parser.parse(code, { sourceType: 'module', plugins: ['jsx', 'typescript'] });
+      const ast = parser.parse(code, {
+        sourceType: 'module',
+        plugins: ['jsx', 'typescript'],
+      });
       let decoded = 0;
 
       traverse(ast, {
@@ -618,11 +796,15 @@ export class Deobfuscator {
 
           // 十六进制
           if (value.includes('\\x')) {
-            newValue = newValue.replace(/\\x([0-9A-Fa-f]{2})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+            newValue = newValue.replace(/\\x([0-9A-Fa-f]{2})/g, (_, hex) =>
+              String.fromCharCode(parseInt(hex, 16)),
+            );
           }
           // Unicode
           if (value.includes('\\u')) {
-            newValue = newValue.replace(/\\u([0-9A-Fa-f]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+            newValue = newValue.replace(/\\u([0-9A-Fa-f]{4})/g, (_, hex) =>
+              String.fromCharCode(parseInt(hex, 16)),
+            );
           }
 
           if (newValue !== value) {
@@ -633,14 +815,22 @@ export class Deobfuscator {
       });
 
       if (decoded > 0) {
-        const output = generate(ast, { comments: true, compact: false });
-        transformations.push({ type: 'string-decode', description: `Decoded ${decoded} strings (hex/unicode)`, success: true });
+        const output = generate(ast, {comments: true, compact: false});
+        transformations.push({
+          type: 'string-decode',
+          description: `Decoded ${decoded} strings (hex/unicode)`,
+          success: true,
+        });
         return output.code;
       }
       return code;
     } catch (error) {
       logger.warn('String decoding failed', error);
-      transformations.push({ type: 'string-decode', description: 'Failed', success: false });
+      transformations.push({
+        type: 'string-decode',
+        description: 'Failed',
+        success: false,
+      });
       return code;
     }
   }
@@ -648,13 +838,19 @@ export class Deobfuscator {
   /**
    * 提取字符串数组 (JavaScript Obfuscator 特有)
    */
-  private async extractStringArrays(code: string, transformations: Transformation[]): Promise<string> {
+  private async extractStringArrays(
+    code: string,
+    transformations: Transformation[],
+  ): Promise<string> {
     try {
-      const ast = parser.parse(code, { sourceType: 'module', plugins: ['jsx', 'typescript'] });
+      const ast = parser.parse(code, {
+        sourceType: 'module',
+        plugins: ['jsx', 'typescript'],
+      });
       let extracted = 0;
 
       traverse(ast, {
-        VariableDeclarator: (path) => {
+        VariableDeclarator: path => {
           if (
             t.isIdentifier(path.node.id) &&
             path.node.id.name.startsWith('_0x') &&
@@ -662,25 +858,35 @@ export class Deobfuscator {
           ) {
             const arrayName = path.node.id.name;
             const strings: string[] = [];
-            path.node.init.elements.forEach((el) => {
+            path.node.init.elements.forEach(el => {
               if (t.isStringLiteral(el)) strings.push(el.value);
             });
             if (strings.length > 0) {
               this.stringArrays.set(arrayName, strings);
               extracted++;
-              logger.debug(`Extracted string array: ${arrayName} (${strings.length} strings)`);
+              logger.debug(
+                `Extracted string array: ${arrayName} (${strings.length} strings)`,
+              );
             }
           }
         },
       });
 
       if (extracted > 0) {
-        transformations.push({ type: 'extract-string-arrays', description: `Extracted ${extracted} string arrays`, success: true });
+        transformations.push({
+          type: 'extract-string-arrays',
+          description: `Extracted ${extracted} string arrays`,
+          success: true,
+        });
       }
       return code;
     } catch (error) {
       logger.warn('String array extraction failed', error);
-      transformations.push({ type: 'extract-string-arrays', description: 'Failed', success: false });
+      transformations.push({
+        type: 'extract-string-arrays',
+        description: 'Failed',
+        success: false,
+      });
       return code;
     }
   }
@@ -688,11 +894,17 @@ export class Deobfuscator {
   /**
    * 数组解密 (替换字符串数组引用)
    */
-  private async decryptArrays(code: string, transformations: Transformation[]): Promise<string> {
+  private async decryptArrays(
+    code: string,
+    transformations: Transformation[],
+  ): Promise<string> {
     if (this.stringArrays.size === 0) return code;
 
     try {
-      const ast = parser.parse(code, { sourceType: 'module', plugins: ['jsx', 'typescript'] });
+      const ast = parser.parse(code, {
+        sourceType: 'module',
+        plugins: ['jsx', 'typescript'],
+      });
       let replaced = 0;
       const arrays = this.stringArrays;
 
@@ -717,14 +929,22 @@ export class Deobfuscator {
       });
 
       if (replaced > 0) {
-        const output = generate(ast, { comments: true, compact: false });
-        transformations.push({ type: 'decrypt-arrays', description: `Replaced ${replaced} array references`, success: true });
+        const output = generate(ast, {comments: true, compact: false});
+        transformations.push({
+          type: 'decrypt-arrays',
+          description: `Replaced ${replaced} array references`,
+          success: true,
+        });
         return output.code;
       }
       return code;
     } catch (error) {
       logger.warn('Array decryption failed', error);
-      transformations.push({ type: 'decrypt-arrays', description: 'Failed', success: false });
+      transformations.push({
+        type: 'decrypt-arrays',
+        description: 'Failed',
+        success: false,
+      });
       return code;
     }
   }
@@ -732,17 +952,24 @@ export class Deobfuscator {
   /**
    * 控制流平坦化还原 (基础版)
    */
-  private async unflattenControlFlow(code: string, transformations: Transformation[]): Promise<string> {
+  private async unflattenControlFlow(
+    code: string,
+    transformations: Transformation[],
+  ): Promise<string> {
     try {
-      const ast = parser.parse(code, { sourceType: 'module', plugins: ['jsx', 'typescript'] });
+      const ast = parser.parse(code, {
+        sourceType: 'module',
+        plugins: ['jsx', 'typescript'],
+      });
       let unflattened = 0;
 
       traverse(ast, {
         WhileStatement(path) {
           const body = path.node.body;
-          const switchNode = t.isBlockStatement(body) && body.body.length === 1
-            ? body.body[0]
-            : body;
+          const switchNode =
+            t.isBlockStatement(body) && body.body.length === 1
+              ? body.body[0]
+              : body;
 
           if (!t.isSwitchStatement(switchNode)) return;
 
@@ -766,9 +993,9 @@ export class Deobfuscator {
           if (
             t.isMemberExpression(callee) &&
             t.isStringLiteral(callee.object) &&
-            t.isIdentifier(callee.property, { name: 'split' }) &&
+            t.isIdentifier(callee.property, {name: 'split'}) &&
             init.arguments.length === 1 &&
-            t.isStringLiteral(init.arguments[0], { value: '|' })
+            t.isStringLiteral(init.arguments[0], {value: '|'})
           ) {
             const order = callee.object.value.split('|').map(Number);
             const cases = switchNode.cases;
@@ -776,10 +1003,17 @@ export class Deobfuscator {
             // 按执行顺序重组 case 的 consequent
             const orderedStatements: t.Statement[] = [];
             for (const idx of order) {
-              const matchedCase = cases.find(c => t.isStringLiteral(c.test, { value: String(idx) }) || t.isNumericLiteral(c.test, { value: idx }));
+              const matchedCase = cases.find(
+                c =>
+                  t.isStringLiteral(c.test, {value: String(idx)}) ||
+                  t.isNumericLiteral(c.test, {value: idx}),
+              );
               if (matchedCase) {
                 for (const stmt of matchedCase.consequent) {
-                  if (!t.isContinueStatement(stmt) && !t.isBreakStatement(stmt)) {
+                  if (
+                    !t.isContinueStatement(stmt) &&
+                    !t.isBreakStatement(stmt)
+                  ) {
                     orderedStatements.push(stmt);
                   }
                 }
@@ -795,14 +1029,22 @@ export class Deobfuscator {
       });
 
       if (unflattened > 0) {
-        const output = generate(ast, { comments: true, compact: false });
-        transformations.push({ type: 'unflatten-control-flow', description: `Unflattened ${unflattened} control flow patterns`, success: true });
+        const output = generate(ast, {comments: true, compact: false});
+        transformations.push({
+          type: 'unflatten-control-flow',
+          description: `Unflattened ${unflattened} control flow patterns`,
+          success: true,
+        });
         return output.code;
       }
       return code;
     } catch (error) {
       logger.warn('Control flow unflattening failed', error);
-      transformations.push({ type: 'unflatten-control-flow', description: 'Failed', success: false });
+      transformations.push({
+        type: 'unflatten-control-flow',
+        description: 'Failed',
+        success: false,
+      });
       return code;
     }
   }
@@ -810,9 +1052,15 @@ export class Deobfuscator {
   /**
    * 表达式简化
    */
-  private async simplifyExpressions(code: string, transformations: Transformation[]): Promise<string> {
+  private async simplifyExpressions(
+    code: string,
+    transformations: Transformation[],
+  ): Promise<string> {
     try {
-      const ast = parser.parse(code, { sourceType: 'module', plugins: ['jsx', 'typescript'] });
+      const ast = parser.parse(code, {
+        sourceType: 'module',
+        plugins: ['jsx', 'typescript'],
+      });
       let simplified = 0;
 
       traverse(ast, {
@@ -827,12 +1075,18 @@ export class Deobfuscator {
             simplified++;
           }
           // void 0 → undefined
-          else if (path.node.operator === 'void' && t.isNumericLiteral(path.node.argument, { value: 0 })) {
+          else if (
+            path.node.operator === 'void' &&
+            t.isNumericLiteral(path.node.argument, {value: 0})
+          ) {
             path.replaceWith(t.identifier('undefined'));
             simplified++;
           }
           // !0 → true, !1 → false
-          else if (path.node.operator === '!' && t.isNumericLiteral(path.node.argument)) {
+          else if (
+            path.node.operator === '!' &&
+            t.isNumericLiteral(path.node.argument)
+          ) {
             path.replaceWith(t.booleanLiteral(!path.node.argument.value));
             simplified++;
           }
@@ -848,14 +1102,22 @@ export class Deobfuscator {
       });
 
       if (simplified > 0) {
-        const output = generate(ast, { comments: true, compact: false });
-        transformations.push({ type: 'simplify-expressions', description: `Simplified ${simplified} expressions`, success: true });
+        const output = generate(ast, {comments: true, compact: false});
+        transformations.push({
+          type: 'simplify-expressions',
+          description: `Simplified ${simplified} expressions`,
+          success: true,
+        });
         return output.code;
       }
       return code;
     } catch (error) {
       logger.warn('Expression simplification failed', error);
-      transformations.push({ type: 'simplify-expressions', description: 'Failed', success: false });
+      transformations.push({
+        type: 'simplify-expressions',
+        description: 'Failed',
+        success: false,
+      });
       return code;
     }
   }
@@ -863,16 +1125,25 @@ export class Deobfuscator {
   /**
    * 变量重命名
    */
-  private async renameVariables(code: string, transformations: Transformation[]): Promise<string> {
+  private async renameVariables(
+    code: string,
+    transformations: Transformation[],
+  ): Promise<string> {
     try {
-      const ast = parser.parse(code, { sourceType: 'module', plugins: ['jsx', 'typescript'] });
+      const ast = parser.parse(code, {
+        sourceType: 'module',
+        plugins: ['jsx', 'typescript'],
+      });
       let renamed = 0;
       const renameMap = new Map<string, string>();
 
       // 第一遍：收集需要重命名的变量
       traverse(ast, {
         VariableDeclarator(path) {
-          if (t.isIdentifier(path.node.id) && path.node.id.name.startsWith('_0x')) {
+          if (
+            t.isIdentifier(path.node.id) &&
+            path.node.id.name.startsWith('_0x')
+          ) {
             const oldName = path.node.id.name;
             const newName = `var_${renamed}`;
             renameMap.set(oldName, newName);
@@ -892,14 +1163,22 @@ export class Deobfuscator {
           },
         });
 
-        const output = generate(ast, { comments: true, compact: false });
-        transformations.push({ type: 'rename-variables', description: `Renamed ${renamed} variables`, success: true });
+        const output = generate(ast, {comments: true, compact: false});
+        transformations.push({
+          type: 'rename-variables',
+          description: `Renamed ${renamed} variables`,
+          success: true,
+        });
         return output.code;
       }
       return code;
     } catch (error) {
       logger.warn('Variable renaming failed', error);
-      transformations.push({ type: 'rename-variables', description: 'Failed', success: false });
+      transformations.push({
+        type: 'rename-variables',
+        description: 'Failed',
+        success: false,
+      });
       return code;
     }
   }
@@ -910,7 +1189,10 @@ export class Deobfuscator {
     if (!this.llm) return null;
     try {
       const messages = this.llm.generateDeobfuscationPrompt(code);
-      const response = await this.llm.chat(messages, { temperature: 0.3, maxTokens: 2000 });
+      const response = await this.llm.chat(messages, {
+        temperature: 0.3,
+        maxTokens: 2000,
+      });
       return response.content;
     } catch (error) {
       logger.warn('LLM analysis failed', error);
@@ -920,20 +1202,29 @@ export class Deobfuscator {
 
   // ==================== 评分 ====================
 
-  private calculateConfidence(transformations: Transformation[], readabilityScore: number): number {
-    const successCount = transformations.filter((t) => t.success).length;
+  private calculateConfidence(
+    transformations: Transformation[],
+    readabilityScore: number,
+  ): number {
+    const successCount = transformations.filter(t => t.success).length;
     const totalCount = transformations.length || 1;
     const transformConfidence = successCount / totalCount;
     const readabilityConfidence = readabilityScore / 100;
-    return Math.min(Math.max(transformConfidence * 0.6 + readabilityConfidence * 0.4, 0), 1);
+    return Math.min(
+      Math.max(transformConfidence * 0.6 + readabilityConfidence * 0.4, 0),
+      1,
+    );
   }
 
   private calculateReadabilityScore(code: string): number {
     let score = 0;
     if (code.includes('\n')) score += 20;
     if (code.includes('//') || code.includes('/*')) score += 10;
-    const varNames = code.match(/\b[a-zA-Z_$][a-zA-Z0-9_$]*\b/g) || [];
-    const avgLength = varNames.reduce((sum, name) => sum + name.length, 0) / (varNames.length || 1);
+    const varNames: string[] =
+      code.match(/\b[a-zA-Z_$][a-zA-Z0-9_$]*\b/g) || [];
+    const avgLength =
+      varNames.reduce((sum, name) => sum + name.length, 0) /
+      (varNames.length || 1);
     if (avgLength > 3) score += 30;
     const density = code.replace(/\s/g, '').length / (code.length || 1);
     if (density < 0.8) score += 20;

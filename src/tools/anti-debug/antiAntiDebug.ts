@@ -12,14 +12,16 @@ export type AntiAntiDebugFeature =
   | 'fixedTime'
   | 'preventClose'
   | 'preventHistoryBack'
-  | 'preventConsoleClear';
+  | 'preventConsoleClear'
+  | 'hideWebdriver';
 
 const FEATURE_DESCRIPTIONS: Record<AntiAntiDebugFeature, string> = {
   fixedWindowSize: '固定浏览器窗口尺寸，绕过 DevTools 检测',
-  fixedTime: '固定 Date.now() 和 performance.now() 返回值',
+  fixedTime: '固定 Date.now() 和 performance.now() 返回值（保存原始引用）',
   preventClose: '阻止 window.close() 关闭页面',
   preventHistoryBack: '阻止 history.back/go() 返回上一页',
   preventConsoleClear: '阻止 console.clear() 清除控制台',
+  hideWebdriver: '隐藏 navigator.webdriver 标志，绕过自动化检测',
 };
 
 export const antiAntiDebug = defineTool({
@@ -39,6 +41,7 @@ export const antiAntiDebug = defineTool({
           'preventClose',
           'preventHistoryBack',
           'preventConsoleClear',
+          'hideWebdriver',
         ]),
       )
       .describe('要启用的功能'),
@@ -47,8 +50,9 @@ export const antiAntiDebug = defineTool({
     request: {params: {features: AntiAntiDebugFeature[]}},
     response: Response,
     context: Context,
-    runtime,
+    _runtime,
   ) => {
+    void _runtime;
     const features = request.params.features;
 
     const hookCodes: string[] = [];
@@ -131,6 +135,7 @@ export const antiAntiDebug = defineTool({
       hookCodes.push(`
 (function() {
   'use strict';
+  const origClear = console.clear;
   console.clear = function() {
     console.log('[anti_anti_debug] ⛔ Blocked: console.clear()');
   };
@@ -138,6 +143,23 @@ export const antiAntiDebug = defineTool({
 })();
 `);
       installedFeatures.push('preventConsoleClear');
+    }
+
+    // Hide Webdriver
+    if (features.includes('hideWebdriver')) {
+      hookCodes.push(`
+(function() {
+  'use strict';
+  if (navigator.webdriver !== undefined) {
+    Object.defineProperty(navigator, 'webdriver', {
+      get: function() { return false; },
+      configurable: true
+    });
+    console.log('[anti_anti_debug] ✅ Hidden navigator.webdriver');
+  }
+})();
+`);
+      installedFeatures.push('hideWebdriver');
     }
 
     // Combine all hooks

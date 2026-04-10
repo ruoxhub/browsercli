@@ -96,7 +96,6 @@ This is a pure CLI tool for JavaScript reverse engineering with Chrome DevTools 
   - `stop` - Stop daemon service
   - `status` - Check daemon status
   - `call-skill` - Execute a skill
-  - `call-tool` - Execute a tool
   - `list-skills` - List available skills
   - `list-tools` - List available tools
   - `repl` - Interactive REPL mode

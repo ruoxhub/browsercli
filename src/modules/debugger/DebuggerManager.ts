@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -6,12 +5,12 @@
  */
 /**
  * DebuggerManager - 调试器核心管理
- * 
+ *
  * 功能：
  * 1. 断点管理（设置、删除、列出、条件断点）
  * 2. 执行控制（暂停、继续、单步执行）
  * 3. 调试状态管理（暂停状态、调用帧）
- * 
+ *
  * 设计原则：
  * - 薄封装CDP Debugger域，直接调用CDP API
  * - 依赖CodeCollector获取CDP会话
@@ -21,7 +20,7 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 
-import type { CDPSession } from 'puppeteer';
+import type {CDPSession} from 'puppeteer';
 
 import type {
   ScopeVariable,
@@ -31,15 +30,14 @@ import type {
   GetScopeVariablesOptions,
   GetScopeVariablesResult,
 } from '../../types/index.js';
-import { logger } from '../../utils/logger.js';
-import { resolveDefaultDebuggerSessionsDir } from '../../utils/projectPaths.js';
-import type { CodeCollector } from '../collector/CodeCollector.js';
+import {logger} from '../../utils/logger.js';
+import {resolveDefaultDebuggerSessionsDir} from '../../utils/projectPaths.js';
+import type {CodeCollector} from '../collector/CodeCollector.js';
 
-import { BlackboxManager } from './BlackboxManager.js';
-import { EventBreakpointManager } from './EventBreakpointManager.js';
-import { WatchExpressionManager } from './WatchExpressionManager.js';
-import { XHRBreakpointManager } from './XHRBreakpointManager.js';
-
+import {BlackboxManager} from './BlackboxManager.js';
+import {EventBreakpointManager} from './EventBreakpointManager.js';
+import {WatchExpressionManager} from './WatchExpressionManager.js';
+import {XHRBreakpointManager} from './XHRBreakpointManager.js';
 
 /**
  * 断点信息
@@ -89,7 +87,16 @@ export interface CallFrame {
  * 作用域
  */
 export interface Scope {
-  type: 'global' | 'local' | 'with' | 'closure' | 'catch' | 'block' | 'script' | 'eval' | 'module';
+  type:
+    | 'global'
+    | 'local'
+    | 'with'
+    | 'closure'
+    | 'catch'
+    | 'block'
+    | 'script'
+    | 'eval'
+    | 'module';
   object: {
     type: string;
     objectId?: string;
@@ -97,8 +104,8 @@ export interface Scope {
     description?: string;
   };
   name?: string;
-  startLocation?: { scriptId: string; lineNumber: number; columnNumber: number };
-  endLocation?: { scriptId: string; lineNumber: number; columnNumber: number };
+  startLocation?: {scriptId: string; lineNumber: number; columnNumber: number};
+  endLocation?: {scriptId: string; lineNumber: number; columnNumber: number};
 }
 
 /**
@@ -145,7 +152,9 @@ export class DebuggerManager {
    */
   getCDPSession(): CDPSession {
     if (!this.cdpSession || !this.enabled) {
-      throw new Error('Debugger not enabled. Call init() or enable() first to get CDP session.');
+      throw new Error(
+        'Debugger not enabled. Call init() or enable() first to get CDP session.',
+      );
     }
     return this.cdpSession;
   }
@@ -155,7 +164,9 @@ export class DebuggerManager {
    */
   getWatchManager(): WatchExpressionManager {
     if (!this._watchManager) {
-      throw new Error('WatchExpressionManager not initialized. Call initAdvancedFeatures() first.');
+      throw new Error(
+        'WatchExpressionManager not initialized. Call initAdvancedFeatures() first.',
+      );
     }
     return this._watchManager;
   }
@@ -165,7 +176,9 @@ export class DebuggerManager {
    */
   getXHRManager(): XHRBreakpointManager {
     if (!this._xhrManager) {
-      throw new Error('XHRBreakpointManager not initialized. Call initAdvancedFeatures() first.');
+      throw new Error(
+        'XHRBreakpointManager not initialized. Call initAdvancedFeatures() first.',
+      );
     }
     return this._xhrManager;
   }
@@ -175,7 +188,9 @@ export class DebuggerManager {
    */
   getEventManager(): EventBreakpointManager {
     if (!this._eventManager) {
-      throw new Error('EventBreakpointManager not initialized. Call initAdvancedFeatures() first.');
+      throw new Error(
+        'EventBreakpointManager not initialized. Call initAdvancedFeatures() first.',
+      );
     }
     return this._eventManager;
   }
@@ -185,7 +200,9 @@ export class DebuggerManager {
    */
   getBlackboxManager(): BlackboxManager {
     if (!this._blackboxManager) {
-      throw new Error('BlackboxManager not initialized. Call initAdvancedFeatures() first.');
+      throw new Error(
+        'BlackboxManager not initialized. Call initAdvancedFeatures() first.',
+      );
     }
     return this._blackboxManager;
   }
@@ -211,7 +228,8 @@ export class DebuggerManager {
       // 🆕 创建事件监听器引用
       this.pausedListener = (params: any) => this.handlePaused(params);
       this.resumedListener = () => this.handleResumed();
-      this.breakpointResolvedListener = (params: any) => this.handleBreakpointResolved(params);
+      this.breakpointResolvedListener = (params: any) =>
+        this.handleBreakpointResolved(params);
 
       // 监听暂停事件
       this.cdpSession.on('Debugger.paused', this.pausedListener);
@@ -220,7 +238,10 @@ export class DebuggerManager {
       this.cdpSession.on('Debugger.resumed', this.resumedListener);
 
       // 监听断点解析事件
-      this.cdpSession.on('Debugger.breakpointResolved', this.breakpointResolvedListener);
+      this.cdpSession.on(
+        'Debugger.breakpointResolved',
+        this.breakpointResolvedListener,
+      );
 
       logger.info('Debugger enabled successfully');
     } catch (error) {
@@ -245,7 +266,9 @@ export class DebuggerManager {
    */
   async initAdvancedFeatures(runtimeInspector?: any): Promise<void> {
     if (!this.enabled || !this.cdpSession) {
-      throw new Error('Debugger must be enabled before initializing advanced features. Call init() first.');
+      throw new Error(
+        'Debugger must be enabled before initializing advanced features. Call init() first.',
+      );
     }
 
     try {
@@ -314,7 +337,10 @@ export class DebuggerManager {
         this.resumedListener = null;
       }
       if (this.breakpointResolvedListener) {
-        this.cdpSession.off('Debugger.breakpointResolved', this.breakpointResolvedListener);
+        this.cdpSession.off(
+          'Debugger.breakpointResolved',
+          this.breakpointResolvedListener,
+        );
         this.breakpointResolvedListener = null;
       }
 
@@ -356,7 +382,7 @@ export class DebuggerManager {
     if (!this.enabled || !this.cdpSession) {
       throw new Error('Debugger is not enabled. Call enable() first.');
     }
-    await this.cdpSession.send('Debugger.setAsyncCallStackDepth', { maxDepth });
+    await this.cdpSession.send('Debugger.setAsyncCallStackDepth', {maxDepth});
   }
 
   // ==================== 断点管理 ====================
@@ -371,7 +397,9 @@ export class DebuggerManager {
     condition?: string;
   }): Promise<BreakpointInfo> {
     if (!this.enabled || !this.cdpSession) {
-      throw new Error('Debugger is not enabled. Call init() or enable() first.');
+      throw new Error(
+        'Debugger is not enabled. Call init() or enable() first.',
+      );
     }
 
     // ✅ 参数验证
@@ -435,7 +463,9 @@ export class DebuggerManager {
     condition?: string;
   }): Promise<BreakpointInfo> {
     if (!this.enabled || !this.cdpSession) {
-      throw new Error('Debugger is not enabled. Call init() or enable() first.');
+      throw new Error(
+        'Debugger is not enabled. Call init() or enable() first.',
+      );
     }
 
     // ✅ 参数验证
@@ -476,9 +506,12 @@ export class DebuggerManager {
 
       this.breakpoints.set(result.breakpointId, breakpointInfo);
 
-      logger.info(`Breakpoint set: scriptId=${params.scriptId}:${params.lineNumber}`, {
-        breakpointId: result.breakpointId,
-      });
+      logger.info(
+        `Breakpoint set: scriptId=${params.scriptId}:${params.lineNumber}`,
+        {
+          breakpointId: result.breakpointId,
+        },
+      );
 
       return breakpointInfo;
     } catch (error) {
@@ -492,7 +525,9 @@ export class DebuggerManager {
    */
   async removeBreakpoint(breakpointId: string): Promise<void> {
     if (!this.enabled || !this.cdpSession) {
-      throw new Error('Debugger is not enabled. Call init() or enable() first.');
+      throw new Error(
+        'Debugger is not enabled. Call init() or enable() first.',
+      );
     }
 
     // ✅ 参数验证
@@ -501,11 +536,13 @@ export class DebuggerManager {
     }
 
     if (!this.breakpoints.has(breakpointId)) {
-      throw new Error(`Breakpoint not found: ${breakpointId}. Use listBreakpoints() to see active breakpoints.`);
+      throw new Error(
+        `Breakpoint not found: ${breakpointId}. Use listBreakpoints() to see active breakpoints.`,
+      );
     }
 
     try {
-      await this.cdpSession.send('Debugger.removeBreakpoint', { breakpointId });
+      await this.cdpSession.send('Debugger.removeBreakpoint', {breakpointId});
       this.breakpoints.delete(breakpointId);
 
       logger.info(`Breakpoint removed: ${breakpointId}`);
@@ -545,13 +582,15 @@ export class DebuggerManager {
   /**
    * 设置异常断点（在异常时暂停）
    */
-  async setPauseOnExceptions(state: 'none' | 'uncaught' | 'all'): Promise<void> {
+  async setPauseOnExceptions(
+    state: 'none' | 'uncaught' | 'all',
+  ): Promise<void> {
     if (!this.enabled || !this.cdpSession) {
       throw new Error('Debugger not enabled');
     }
 
     try {
-      await this.cdpSession.send('Debugger.setPauseOnExceptions', { state });
+      await this.cdpSession.send('Debugger.setPauseOnExceptions', {state});
       this.pauseOnExceptionsState = state; // ✨ 跟踪状态
       logger.info(`Pause on exceptions set to: ${state}`);
     } catch (error) {
@@ -687,7 +726,7 @@ export class DebuggerManager {
         reject(new Error('Timeout waiting for paused event'));
       }, timeout);
 
-      this.pausedResolvers.push((state) => {
+      this.pausedResolvers.push(state => {
         clearTimeout(timer);
         resolve(state);
       });
@@ -711,11 +750,14 @@ export class DebuggerManager {
     }
 
     try {
-      const result = await this.cdpSession.send('Debugger.evaluateOnCallFrame', {
-        callFrameId: params.callFrameId,
-        expression: params.expression,
-        returnByValue: params.returnByValue !== false,
-      });
+      const result = await this.cdpSession.send(
+        'Debugger.evaluateOnCallFrame',
+        {
+          callFrameId: params.callFrameId,
+          expression: params.expression,
+          returnByValue: params.returnByValue !== false,
+        },
+      );
 
       logger.info(`Evaluated on call frame: ${params.expression}`, {
         result: result.result.value,
@@ -736,13 +778,17 @@ export class DebuggerManager {
    * @param options 获取选项
    * @returns 作用域变量列表和错误信息
    */
-  async getScopeVariables(options: GetScopeVariablesOptions = {}): Promise<GetScopeVariablesResult> {
+  async getScopeVariables(
+    options: GetScopeVariablesOptions = {},
+  ): Promise<GetScopeVariablesResult> {
     if (!this.enabled || !this.cdpSession) {
       throw new Error('Debugger not enabled');
     }
 
     if (!this.pausedState) {
-      throw new Error('Not in paused state. Use pause() or set a breakpoint first.');
+      throw new Error(
+        'Not in paused state. Use pause() or set a breakpoint first.',
+      );
     }
 
     const {
@@ -763,7 +809,7 @@ export class DebuggerManager {
       }
 
       const variables: ScopeVariable[] = [];
-      const errors: Array<{ scope: string; error: string }> = [];
+      const errors: Array<{scope: string; error: string}> = [];
       let successfulScopes = 0;
 
       // 遍历作用域链
@@ -771,10 +817,13 @@ export class DebuggerManager {
         try {
           // 获取作用域对象的属性
           if (scope.object.objectId) {
-            const properties = await this.cdpSession.send('Runtime.getProperties', {
-              objectId: scope.object.objectId,
-              ownProperties: true,
-            });
+            const properties = await this.cdpSession.send(
+              'Runtime.getProperties',
+              {
+                objectId: scope.object.objectId,
+                ownProperties: true,
+              },
+            );
 
             // 处理每个属性
             for (const prop of properties.result) {
@@ -794,11 +843,15 @@ export class DebuggerManager {
               variables.push(variable);
 
               // 如果需要展开对象属性
-              if (includeObjectProperties && prop.value?.objectId && maxDepth > 0) {
+              if (
+                includeObjectProperties &&
+                prop.value?.objectId &&
+                maxDepth > 0
+              ) {
                 try {
                   const nestedProps = await this.getObjectProperties(
                     prop.value.objectId,
-                    maxDepth - 1
+                    maxDepth - 1,
                   );
                   // 将嵌套属性添加到变量中（可以用特殊格式表示层级）
                   for (const nested of nestedProps) {
@@ -810,7 +863,10 @@ export class DebuggerManager {
                   }
                 } catch (nestedError) {
                   // 忽略嵌套属性获取失败
-                  logger.debug(`Failed to get nested properties for ${prop.name}:`, nestedError);
+                  logger.debug(
+                    `Failed to get nested properties for ${prop.name}:`,
+                    nestedError,
+                  );
                 }
               }
             }
@@ -821,7 +877,10 @@ export class DebuggerManager {
           const errorMsg = error.message || String(error);
 
           // ✅ 增强错误处理：记录错误但不中断流程
-          logger.warn(`Failed to get properties for scope ${scope.type}:`, errorMsg);
+          logger.warn(
+            `Failed to get properties for scope ${scope.type}:`,
+            errorMsg,
+          );
 
           errors.push({
             scope: scope.type,
@@ -852,11 +911,14 @@ export class DebuggerManager {
         result.errors = errors;
       }
 
-      logger.info(`Got ${variables.length} variables from ${successfulScopes}/${targetFrame.scopeChain.length} scopes`, {
-        callFrameId: targetFrame.callFrameId,
-        functionName: targetFrame.functionName,
-        errors: errors.length,
-      });
+      logger.info(
+        `Got ${variables.length} variables from ${successfulScopes}/${targetFrame.scopeChain.length} scopes`,
+        {
+          callFrameId: targetFrame.callFrameId,
+          functionName: targetFrame.functionName,
+          errors: errors.length,
+        },
+      );
 
       return result;
     } catch (error) {
@@ -868,7 +930,10 @@ export class DebuggerManager {
   /**
    * 递归获取对象属性（用于展开嵌套对象）
    */
-  private async getObjectProperties(objectId: string, maxDepth: number): Promise<ScopeVariable[]> {
+  private async getObjectProperties(
+    objectId: string,
+    maxDepth: number,
+  ): Promise<ScopeVariable[]> {
     if (maxDepth <= 0 || !this.cdpSession) {
       return [];
     }
@@ -974,7 +1039,11 @@ export class DebuggerManager {
     this.pausedResolvers = [];
 
     // ✨ 异步触发断点命中回调（不阻塞 paused 事件处理）
-    if (params.hitBreakpoints && params.hitBreakpoints.length > 0 && this.breakpointHitCallbacks.size > 0) {
+    if (
+      params.hitBreakpoints &&
+      params.hitBreakpoints.length > 0 &&
+      this.breakpointHitCallbacks.size > 0
+    ) {
       // 使用 queueMicrotask 确保回调不阻塞事件循环
       const callbacks = Array.from(this.breakpointHitCallbacks);
       const hitBreakpoints = params.hitBreakpoints;
@@ -984,10 +1053,13 @@ export class DebuggerManager {
         // 尝试自动获取顶层作用域变量
         let variables: ScopeVariable[] | undefined;
         try {
-          const result = await this.getScopeVariables({ skipErrors: true });
+          const result = await this.getScopeVariables({skipErrors: true});
           variables = result.variables;
         } catch (error) {
-          logger.debug('Failed to auto-fetch variables for breakpoint hit callback:', error);
+          logger.debug(
+            'Failed to auto-fetch variables for breakpoint hit callback:',
+            error,
+          );
         }
 
         // 构建事件对象
@@ -1078,18 +1150,21 @@ export class DebuggerManager {
    * @param metadata 会话元数据
    * @returns 保存的文件路径
    */
-  async saveSession(filePath?: string, metadata?: DebuggerSession['metadata']): Promise<string> {
+  async saveSession(
+    filePath?: string,
+    metadata?: DebuggerSession['metadata'],
+  ): Promise<string> {
     const session = this.exportSession(metadata);
 
     // 如果未指定路径，使用默认路径
     if (!filePath) {
       const sessionsDir = this.getDefaultSessionsDir();
-      await fs.mkdir(sessionsDir, { recursive: true });
+      await fs.mkdir(sessionsDir, {recursive: true});
       filePath = path.join(sessionsDir, `session-${Date.now()}.json`);
     } else {
       // 确保目录存在
       const dir = path.dirname(filePath);
-      await fs.mkdir(dir, { recursive: true });
+      await fs.mkdir(dir, {recursive: true});
     }
 
     // 写入文件
@@ -1125,16 +1200,19 @@ export class DebuggerManager {
    */
   async importSession(sessionData: DebuggerSession | string): Promise<void> {
     if (!this.enabled) {
-      throw new Error('Debugger must be enabled before importing session. Call init() or enable() first.');
+      throw new Error(
+        'Debugger must be enabled before importing session. Call init() or enable() first.',
+      );
     }
 
-    const session: DebuggerSession = typeof sessionData === 'string'
-      ? JSON.parse(sessionData)
-      : sessionData;
+    const session: DebuggerSession =
+      typeof sessionData === 'string' ? JSON.parse(sessionData) : sessionData;
 
     // 验证会话版本
     if (session.version !== '1.0') {
-      logger.warn(`Session version mismatch: ${session.version} (expected 1.0)`);
+      logger.warn(
+        `Session version mismatch: ${session.version} (expected 1.0)`,
+      );
     }
 
     logger.info('Importing session...', {
@@ -1196,7 +1274,9 @@ export class DebuggerManager {
   /**
    * 列出所有已保存的会话文件
    */
-  async listSavedSessions(): Promise<Array<{ path: string; timestamp: number; metadata?: any }>> {
+  async listSavedSessions(): Promise<
+    Array<{path: string; timestamp: number; metadata?: any}>
+  > {
     const sessionsDir = this.getDefaultSessionsDir();
 
     try {
@@ -1207,7 +1287,8 @@ export class DebuggerManager {
     }
 
     const files = await fs.readdir(sessionsDir);
-    const sessions: Array<{ path: string; timestamp: number; metadata?: any }> = [];
+    const sessions: Array<{path: string; timestamp: number; metadata?: any}> =
+      [];
 
     for (const file of files) {
       if (file.endsWith('.json')) {

@@ -16,10 +16,12 @@ import {defineTool} from './ToolDefinition.js';
  */
 export const invokeSkill = defineTool({
   name: 'invoke-skill',
-  description: '调用已注册的逆向工程技能（observe-flow, auto-hook, rebuild-bundle）',
+  description:
+    '调用已注册的逆向工程技能（observe-flow, auto-hook, rebuild-bundle）',
   annotations: {
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: true,
+    title: 'Invoke skill',
   },
   schema: {
     skillName: zod
@@ -45,7 +47,7 @@ export const invokeSkill = defineTool({
         response.setStructuredContent({
           success: false,
           error: `技能不存在：${skillName}`,
-          availableSkills: availableSkills.map((s) => ({
+          availableSkills: availableSkills.map(s => ({
             name: s.name,
             description: s.description,
             category: s.category,
@@ -62,11 +64,14 @@ export const invokeSkill = defineTool({
         options,
       });
 
-      logger.info(`[invoke-skill] Skill completed: ${skillName}, success=${result.success}`);
+      logger.info(
+        `[invoke-skill] Skill completed: ${skillName}, success=${result.success}`,
+      );
 
       response.setStructuredContent(result);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       logger.error(`[invoke-skill] Skill failed: ${errorMessage}`);
       response.setStructuredContent({
         success: false,
@@ -85,6 +90,7 @@ export const listSkills = defineTool({
   annotations: {
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: true,
+    title: 'List skills',
   },
   schema: {},
   handler: async (request, response, context, runtime) => {
@@ -92,7 +98,7 @@ export const listSkills = defineTool({
     const skills = registry.list();
 
     response.setStructuredContent({
-      skills: skills.map((s) => ({
+      skills: skills.map(s => ({
         name: s.name,
         description: s.description,
         category: s.category,

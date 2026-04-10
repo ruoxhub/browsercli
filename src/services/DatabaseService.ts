@@ -1,14 +1,13 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { drizzle } from 'drizzle-orm/node-postgres';
-import { Pool, PoolConfig } from 'pg';
+import {drizzle} from 'drizzle-orm/node-postgres';
+import {Pool, PoolConfig} from 'pg';
 
 import * as schema from '../database/schema.js';
-import { logger } from '../utils/logger.js';
+import {logger} from '../utils/logger.js';
 
 /**
  * 数据库服务 - 管理 PostgreSQL 连接池
@@ -56,7 +55,7 @@ export class DatabaseService {
     if (!this.pool) {
       throw new Error('Database not connected');
     }
-    return drizzle(this.pool, { schema });
+    return drizzle(this.pool, {schema});
   }
 
   /**

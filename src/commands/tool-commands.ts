@@ -32,6 +32,25 @@ export function getParameterType(zodType: any): string {
 }
 
 /**
+ * 为懒加载工具生成简化 schema（无 zod 依赖）
+ */
+function registerLazyToolSchema(
+  cmd: Command,
+  schema: Record<string, string>,
+): void {
+  if (
+    !schema ||
+    typeof schema !== 'object' ||
+    Object.keys(schema).length === 0
+  ) {
+    return;
+  }
+  for (const [paramName, paramType] of Object.entries(schema)) {
+    cmd.option(`--${paramName} <value>`, `${paramName} (${paramType})`);
+  }
+}
+
+/**
  * 检查字段是否必填
  */
 export function isOptional(zodType: any): boolean {
@@ -466,7 +485,7 @@ const LAZY_TOOLS: LazyToolDefinition[] = [
   {
     name: 'list_scripts',
     description: '列出脚本',
-    schema: {},
+    schema: {filter: 'string'},
     modulePath: './debugger.js',
     handlerName: 'listScripts',
   },
@@ -599,14 +618,14 @@ const LAZY_TOOLS: LazyToolDefinition[] = [
   {
     name: 'evaluate_script',
     description: '执行脚本',
-    schema: {},
+    schema: {function: 'string'},
     modulePath: './script.js',
     handlerName: 'evaluateScript',
   },
   {
     name: 'inject_preload_script',
     description: '注入预加载脚本',
-    schema: {},
+    schema: {script: 'string'},
     modulePath: './script.js',
     handlerName: 'injectPreloadScript',
   },
@@ -858,28 +877,28 @@ const LAZY_TOOLS: LazyToolDefinition[] = [
   {
     name: 'cdp_navigate',
     description: 'CDP 导航',
-    schema: {},
+    schema: {url: 'string'},
     modulePath: './cdp-proxy.js',
     handlerName: 'cdp_navigate',
   },
   {
     name: 'cdp_eval',
     description: 'CDP 执行',
-    schema: {},
+    schema: {expr: 'string'},
     modulePath: './cdp-proxy.js',
     handlerName: 'cdp_eval',
   },
   {
     name: 'cdp_click',
     description: 'CDP 点击',
-    schema: {},
+    schema: {selector: 'string'},
     modulePath: './cdp-proxy.js',
     handlerName: 'cdp_click',
   },
   {
     name: 'cdp_click_at',
     description: 'CDP 点击坐标',
-    schema: {},
+    schema: {selector: 'string'},
     modulePath: './cdp-proxy.js',
     handlerName: 'cdp_click_at',
   },
@@ -930,7 +949,13 @@ function createLazyToolCommand(
     typeof tool.schema === 'object' &&
     Object.keys(tool.schema).length > 0
   ) {
-    registerToolSchema(cmd, tool.schema);
+    // 如果是字符串 schema（懒加载工具），使用 registerLazyToolSchema
+    const firstValue = Object.values(tool.schema)[0];
+    if (typeof firstValue === 'string') {
+      registerLazyToolSchema(cmd, tool.schema as Record<string, string>);
+    } else {
+      registerToolSchema(cmd, tool.schema);
+    }
   }
 
   // 执行动作 - 懒加载
@@ -973,7 +998,10 @@ function createLazyToolCommand(
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       console.error(`工具调用失败：${errorMessage}`);
-      process.exit(1);
+      console.error(`提示：使用 "js-reverse status" 检查 Daemon 状态`);
+      process.exitCode = 1;
+      // Don't call process.exit(1) here - let the CLI exit naturally with exitCode set
+      // This ensures proper cleanup and prevents abrupt termination
     }
   });
 }
@@ -988,7 +1016,6 @@ export async function generateToolCommands(program: Command): Promise<void> {
     'stop',
     'status',
     'call-skill',
-    'call-tool',
     'list-skills',
     'list-tools',
     'repl',

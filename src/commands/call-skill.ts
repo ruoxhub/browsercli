@@ -17,7 +17,14 @@ export async function callSkillCommand(
       args.url = options.url;
     }
     if (options.data) {
-      args.data = JSON.parse(options.data);
+      try {
+        args.data = JSON.parse(options.data);
+      } catch {
+        console.error(
+          `错误：--data 参数必须是有效的 JSON 格式，收到：${options.data}`,
+        );
+        process.exit(1);
+      }
     }
 
     const result = await sendCommand({

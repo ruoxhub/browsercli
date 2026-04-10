@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * @license
  * Copyright 2025 Google LLC
@@ -171,12 +170,15 @@ export class WebSocketCollector {
     const connectionMap = this.#connectionMap.get(page)!;
     const idGenerator = this.#idGenerators.get(page)!;
 
-    const onCreated = (event: Protocol.Network.WebSocketCreatedEvent): void => {
+    const onCreated = (event: unknown): void => {
+      const e = event as Protocol.Network.WebSocketCreatedEvent & {
+        initiator?: RequestInitiator;
+      };
       const wsData: WebSocketDataWithId = {
         connection: {
-          requestId: event.requestId,
-          url: event.url,
-          initiator: event.initiator as RequestInitiator | undefined,
+          requestId: e.requestId,
+          url: e.url,
+          initiator: e.initiator,
           status: 'connecting',
           createdAt: Date.now(),
         },
@@ -184,7 +186,7 @@ export class WebSocketCollector {
       };
       wsData[stableIdSymbol] = idGenerator();
 
-      connectionMap.set(event.requestId, wsData);
+      connectionMap.set(e.requestId, wsData);
 
       const navigations = this.#storage.get(page);
       if (navigations) {
@@ -195,37 +197,43 @@ export class WebSocketCollector {
       wsData.connection.status = 'open';
     };
 
-    const onFrameSent = (
-      event: Protocol.Network.WebSocketFrameSentEvent,
-    ): void => {
-      const wsData = connectionMap.get(event.requestId);
+    const onFrameSent = (event: unknown): void => {
+      const e = event as {
+        requestId: string;
+        timestamp: number;
+        response: {opcode: number; payloadData: string};
+      };
+      const wsData = connectionMap.get(e.requestId);
       if (!wsData) {
         return;
       }
 
       wsData.frames.push({
-        requestId: event.requestId,
+        requestId: e.requestId,
         direction: 'sent',
-        timestamp: event.timestamp * 1000, // Convert to ms
-        opcode: event.response.opcode,
-        payloadData: event.response.payloadData,
+        timestamp: e.timestamp * 1000,
+        opcode: e.response.opcode,
+        payloadData: e.response.payloadData,
       });
     };
 
-    const onFrameReceived = (
-      event: Protocol.Network.WebSocketFrameReceivedEvent,
-    ): void => {
-      const wsData = connectionMap.get(event.requestId);
+    const onFrameReceived = (event: unknown): void => {
+      const e = event as {
+        requestId: string;
+        timestamp: number;
+        response: {opcode: number; payloadData: string};
+      };
+      const wsData = connectionMap.get(e.requestId);
       if (!wsData) {
         return;
       }
 
       wsData.frames.push({
-        requestId: event.requestId,
+        requestId: e.requestId,
         direction: 'received',
-        timestamp: event.timestamp * 1000, // Convert to ms
-        opcode: event.response.opcode,
-        payloadData: event.response.payloadData,
+        timestamp: e.timestamp * 1000,
+        opcode: e.response.opcode,
+        payloadData: e.response.payloadData,
       });
     };
 
@@ -243,10 +251,10 @@ export class WebSocketCollector {
       this.#splitAfterNavigation(page);
     };
 
-    client.on('Network.webSocketCreated', onCreated);
-    client.on('Network.webSocketFrameSent', onFrameSent);
-    client.on('Network.webSocketFrameReceived', onFrameReceived);
-    client.on('Network.webSocketClosed', onClosed);
+    client.on('Network.webSocketCreated', onCreated as any);
+    client.on('Network.webSocketFrameSent', onFrameSent as any);
+    client.on('Network.webSocketFrameReceived', onFrameReceived as any);
+    client.on('Network.webSocketClosed', onClosed as any);
     page.on('framenavigated', frame => {
       if (frame === page.mainFrame()) {
         onFrameNavigated();
@@ -282,10 +290,13 @@ export class WebSocketCollector {
       try {
         // @ts-expect-error _client is internal Puppeteer API
         const client = page._client() as CDPSession;
-        client.off('Network.webSocketCreated', listeners.onCreated);
-        client.off('Network.webSocketFrameSent', listeners.onFrameSent);
-        client.off('Network.webSocketFrameReceived', listeners.onFrameReceived);
-        client.off('Network.webSocketClosed', listeners.onClosed);
+        client.off('Network.webSocketCreated', listeners.onCreated as any);
+        client.off('Network.webSocketFrameSent', listeners.onFrameSent as any);
+        client.off(
+          'Network.webSocketFrameReceived',
+          listeners.onFrameReceived as any,
+        );
+        client.off('Network.webSocketClosed', listeners.onClosed as any);
       } catch {
         // Page might already be closed
       }

@@ -43,7 +43,10 @@ export class SessionManager {
    */
   static getInstance(sessionId: string, browser: Browser): SessionManager {
     if (!SessionManager.instances.has(sessionId)) {
-      SessionManager.instances.set(sessionId, new SessionManager(sessionId, browser));
+      SessionManager.instances.set(
+        sessionId,
+        new SessionManager(sessionId, browser),
+      );
     }
     return SessionManager.instances.get(sessionId)!;
   }
@@ -73,12 +76,17 @@ export class SessionManager {
 
         // 同时使用 localStorage 持久化标签（跨页面刷新）
         const url = window.location.href;
-        const allSessionTags = JSON.parse(localStorage.getItem('mcp-session-tags') || '{}');
+        const allSessionTags = JSON.parse(
+          localStorage.getItem('mcp-session-tags') || '{}',
+        );
         if (!allSessionTags[url]) {
           allSessionTags[url] = new Set();
         }
         allSessionTags[url].add(sessionId);
-        localStorage.setItem('mcp-session-tags', JSON.stringify(allSessionTags));
+        localStorage.setItem(
+          'mcp-session-tags',
+          JSON.stringify(allSessionTags),
+        );
       }, this.sessionId);
 
       // 记录页面 URL
@@ -87,7 +95,9 @@ export class SessionManager {
         this.ownedPageUrls.add(url);
       }
 
-      logger(`[SessionManager] Tagged page for session ${this.sessionId}: ${url}`);
+      logger(
+        `[SessionManager] Tagged page for session ${this.sessionId}: ${url}`,
+      );
     } catch (error) {
       logger(`[SessionManager] Failed to tag page:`, error);
     }
@@ -106,20 +116,27 @@ export class SessionManager {
 
         // 从 localStorage 中移除
         const url = window.location.href;
-        const allSessionTags = JSON.parse(localStorage.getItem('mcp-session-tags') || '{}');
+        const allSessionTags = JSON.parse(
+          localStorage.getItem('mcp-session-tags') || '{}',
+        );
         if (allSessionTags[url]) {
           allSessionTags[url].delete(sessionId);
           if (allSessionTags[url].size === 0) {
             delete allSessionTags[url];
           }
-          localStorage.setItem('mcp-session-tags', JSON.stringify(allSessionTags));
+          localStorage.setItem(
+            'mcp-session-tags',
+            JSON.stringify(allSessionTags),
+          );
         }
       }, this.sessionId);
 
       const url = page.url();
       this.ownedPageUrls.delete(url);
 
-      logger(`[SessionManager] Untagged page for session ${this.sessionId}: ${url}`);
+      logger(
+        `[SessionManager] Untagged page for session ${this.sessionId}: ${url}`,
+      );
     } catch (error) {
       logger(`[SessionManager] Failed to untag page:`, error);
     }
@@ -178,7 +195,9 @@ export class SessionManager {
 
         // 检查 URL 是否在 localStorage 中有当前会话的标签
         const hasTag = await page.evaluate((sessionId: string) => {
-          const allSessionTags = JSON.parse(localStorage.getItem('mcp-session-tags') || '{}');
+          const allSessionTags = JSON.parse(
+            localStorage.getItem('mcp-session-tags') || '{}',
+          );
           return allSessionTags[window.location.href]?.includes(sessionId);
         }, this.sessionId);
 

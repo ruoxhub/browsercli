@@ -7,6 +7,16 @@
 
 import {sendCommand} from '../daemon/client.js';
 
+/** Format tools for display */
+export function formatTools(
+  tools: Array<{name: string; description?: string}>,
+  json: boolean,
+): string {
+  if (json) return JSON.stringify(tools, null, 2);
+  if (tools.length === 0) return '可用工具:\n  (无)';
+  return '可用工具:\n' + tools.map(t => `  - ${t.name}`).join('\n');
+}
+
 export async function listToolsCommand(options: {
   json?: boolean;
 }): Promise<void> {
@@ -20,14 +30,7 @@ export async function listToolsCommand(options: {
     const data = JSON.parse(result.result);
     const tools = data.tools || [];
 
-    if (options.json) {
-      console.log(JSON.stringify(tools, null, 2));
-    } else {
-      console.log('可用工具:');
-      for (const tool of tools) {
-        console.log(`  - ${tool.name}`);
-      }
-    }
+    console.log(formatTools(tools, !!options.json));
   } catch (error) {
     console.error(
       `获取工具列表失败：${error instanceof Error ? error.message : error}`,

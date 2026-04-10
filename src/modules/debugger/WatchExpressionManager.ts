@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -6,21 +5,21 @@
  */
 /**
  * WatchExpressionManager - 监视表达式管理
- * 
+ *
  * 功能：
  * 1. 添加/删除/启用/禁用监视表达式
  * 2. 在每次暂停时自动求值所有监视表达式
  * 3. 追踪表达式值的变化历史
- * 
+ *
  * 设计原则：
  * - 依赖 RuntimeInspector 进行表达式求值
  * - 自动在断点暂停时求值
  * - 提供值变化检测
  */
 
-import { logger } from '../../utils/logger.js';
+import {logger} from '../../utils/logger.js';
 
-import type { RuntimeInspector } from './RuntimeInspector.js';
+import type {RuntimeInspector} from './RuntimeInspector.js';
 
 /**
  * 监视表达式
@@ -32,7 +31,7 @@ export interface WatchExpression {
   enabled: boolean;
   lastValue: any;
   lastError: Error | null;
-  valueHistory: Array<{ value: any; timestamp: number }>;
+  valueHistory: Array<{value: any; timestamp: number}>;
   createdAt: number;
 }
 
@@ -63,7 +62,7 @@ export class WatchExpressionManager {
    */
   addWatch(expression: string, name?: string): string {
     const watchId = `watch_${++this.watchCounter}`;
-    
+
     this.watches.set(watchId, {
       id: watchId,
       expression,
@@ -75,7 +74,7 @@ export class WatchExpressionManager {
       createdAt: Date.now(),
     });
 
-    logger.info(`Watch expression added: ${watchId}`, { expression, name });
+    logger.info(`Watch expression added: ${watchId}`, {expression, name});
     return watchId;
   }
 
@@ -98,7 +97,9 @@ export class WatchExpressionManager {
     if (!watch) return false;
 
     watch.enabled = enabled;
-    logger.info(`Watch expression ${enabled ? 'enabled' : 'disabled'}: ${watchId}`);
+    logger.info(
+      `Watch expression ${enabled ? 'enabled' : 'disabled'}: ${watchId}`,
+    );
     return true;
   }
 
@@ -122,7 +123,10 @@ export class WatchExpressionManager {
    * @param callFrameId 可选的调用帧 ID（在断点暂停时使用）
    * @param timeout 单个表达式的超时时间（毫秒，默认5000ms）
    */
-  async evaluateAll(callFrameId?: string, timeout = 5000): Promise<WatchResult[]> {
+  async evaluateAll(
+    callFrameId?: string,
+    timeout = 5000,
+  ): Promise<WatchResult[]> {
     const results: WatchResult[] = [];
 
     for (const watch of this.watches.values()) {
@@ -134,7 +138,10 @@ export class WatchExpressionManager {
         const value = await Promise.race([
           this.runtimeInspector.evaluate(watch.expression, callFrameId),
           new Promise((_, reject) => {
-            timeoutId = setTimeout(() => reject(new Error(`Evaluation timeout after ${timeout}ms`)), timeout);
+            timeoutId = setTimeout(
+              () => reject(new Error(`Evaluation timeout after ${timeout}ms`)),
+              timeout,
+            );
           }),
         ]).finally(() => {
           // ✅ 清理定时器，防止内存泄漏
@@ -199,7 +206,9 @@ export class WatchExpressionManager {
   /**
    * 获取监视表达式的值变化历史
    */
-  getValueHistory(watchId: string): Array<{ value: any; timestamp: number }> | null {
+  getValueHistory(
+    watchId: string,
+  ): Array<{value: any; timestamp: number}> | null {
     const watch = this.watches.get(watchId);
     return watch ? watch.valueHistory : null;
   }
@@ -209,7 +218,13 @@ export class WatchExpressionManager {
    *
    * ✅ 修复：添加循环引用检测、深度限制、数组处理
    */
-  private deepEqual(a: any, b: any, depth = 0, maxDepth = 10, seen = new WeakSet()): boolean {
+  private deepEqual(
+    a: any,
+    b: any,
+    depth = 0,
+    maxDepth = 10,
+    seen = new WeakSet(),
+  ): boolean {
     // 基本类型和引用相等
     if (a === b) return true;
     if (a == null || b == null) return false;
@@ -231,7 +246,8 @@ export class WatchExpressionManager {
     if (Array.isArray(a) && Array.isArray(b)) {
       if (a.length !== b.length) return false;
       for (let i = 0; i < a.length; i++) {
-        if (!this.deepEqual(a[i], b[i], depth + 1, maxDepth, seen)) return false;
+        if (!this.deepEqual(a[i], b[i], depth + 1, maxDepth, seen))
+          return false;
       }
       return true;
     }
@@ -244,7 +260,8 @@ export class WatchExpressionManager {
 
     for (const key of keysA) {
       if (!keysB.includes(key)) return false;
-      if (!this.deepEqual(a[key], b[key], depth + 1, maxDepth, seen)) return false;
+      if (!this.deepEqual(a[key], b[key], depth + 1, maxDepth, seen))
+        return false;
     }
 
     return true;
@@ -253,7 +270,7 @@ export class WatchExpressionManager {
   /**
    * 导出监视表达式配置
    */
-  exportWatches(): Array<{ expression: string; name: string; enabled: boolean }> {
+  exportWatches(): Array<{expression: string; name: string; enabled: boolean}> {
     return Array.from(this.watches.values()).map(watch => ({
       expression: watch.expression,
       name: watch.name,
@@ -264,7 +281,9 @@ export class WatchExpressionManager {
   /**
    * 导入监视表达式配置
    */
-  importWatches(watches: Array<{ expression: string; name?: string; enabled?: boolean }>): void {
+  importWatches(
+    watches: Array<{expression: string; name?: string; enabled?: boolean}>,
+  ): void {
     for (const watch of watches) {
       const watchId = this.addWatch(watch.expression, watch.name);
       if (watch.enabled === false) {
@@ -274,4 +293,3 @@ export class WatchExpressionManager {
     logger.info(`Imported ${watches.length} watch expressions`);
   }
 }
-

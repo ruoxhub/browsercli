@@ -17,6 +17,7 @@
 
 import type {Browser, Page, CDPSession} from 'puppeteer';
 
+import type {BrowserManager} from '../../browser.js';
 import type {
   CollectCodeOptions,
   CollectCodeResult,
@@ -25,7 +26,6 @@ import type {
   DependencyGraph,
 } from '../../types/index.js';
 import {logger} from '../../utils/logger.js';
-import type {BrowserManager} from '../../browser.js';
 
 import {CodeCache} from './CodeCache.js';
 import {CodeCompressor} from './CodeCompressor.js';

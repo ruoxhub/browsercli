@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -6,14 +5,14 @@
  */
 /**
  * Manual test for BrowserManager
- * 
+ *
  * This test verifies:
  * 1. Singleton pattern works correctly
  * 2. Browser can be launched and connected
  * 3. Stealth injection works
  * 4. Browser can be restarted
  * 5. Remote debugging connection works (if configured)
- * 
+ *
  * Run with: npm run build && node build/tests/manual/test-browser-manager.js
  */
 
@@ -55,8 +54,10 @@ async function testBrowserManager() {
       await page.goto('about:blank');
       const webdriverValue = await page.evaluate(() => navigator.webdriver);
       console.log('✓ Webdriver hidden:', webdriverValue === false);
-      
-      const chromeExists = await page.evaluate(() => typeof (window as any).chrome !== 'undefined');
+
+      const chromeExists = await page.evaluate(
+        () => typeof (window as any).chrome !== 'undefined',
+      );
       console.log('✓ Chrome object exists:', chromeExists);
     }
 
@@ -72,7 +73,7 @@ async function testBrowserManager() {
 
     // Test 8: Reset instance
     console.log('\nTest 8: Reset instance');
-    BrowserManager.resetInstance();
+    await BrowserManager.resetInstance();
     console.log('✓ Instance reset');
 
     // Test 9: Launch with stealth enabled from start
@@ -90,12 +91,15 @@ async function testBrowserManager() {
       const page = pages3[0];
       await page.goto('about:blank');
       const webdriverValue = await page.evaluate(() => navigator.webdriver);
-      console.log('✓ Webdriver hidden (stealth mode):', webdriverValue === false);
+      console.log(
+        '✓ Webdriver hidden (stealth mode):',
+        webdriverValue === false,
+      );
     }
 
     // Cleanup
     await manager3.close();
-    BrowserManager.resetInstance();
+    await BrowserManager.resetInstance();
 
     console.log('\n=== All tests passed! ===');
   } catch (error) {

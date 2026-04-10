@@ -6,7 +6,12 @@
 
 // DevTools 类型定义 - 本地化避免路径问题
 export interface Connection {
-  connection: () => { send: (method: string, params?: Record<string, unknown>) => Promise<unknown> };
+  connection: () => {
+    send: (
+      method: string,
+      params?: Record<string, unknown>,
+    ) => Promise<unknown>;
+  };
 }
 
 export interface CDPSession {

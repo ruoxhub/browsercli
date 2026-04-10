@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -6,25 +5,25 @@
  */
 /**
  * RuntimeInspector - 运行时检查
- * 
+ *
  * 功能：
  * 1. 获取调用堆栈（Call Stack）
  * 2. 获取作用域变量（Scope Variables）
  * 3. 获取对象属性（Object Properties）
  * 4. 表达式求值（Expression Evaluation）
- * 
+ *
  * 设计原则：
  * - 薄封装CDP Runtime域，直接调用CDP API
  * - 依赖DebuggerManager获取暂停状态
  * - 提供友好的数据格式化
  */
 
-import type { CDPSession } from 'puppeteer';
+import type {CDPSession} from 'puppeteer';
 
-import { logger } from '../../utils/logger.js';
-import type { CodeCollector } from '../collector/CodeCollector.js';
+import {logger} from '../../utils/logger.js';
+import type {CodeCollector} from '../collector/CodeCollector.js';
 
-import type { DebuggerManager, CallFrame, Scope } from './DebuggerManager.js';
+import type {DebuggerManager, CallFrame, Scope} from './DebuggerManager.js';
 
 /**
  * 变量信息
@@ -78,7 +77,7 @@ export class RuntimeInspector {
 
   constructor(
     private collector: CodeCollector,
-    private debuggerManager: DebuggerManager
+    private debuggerManager: DebuggerManager,
   ) {}
 
   /**
@@ -127,7 +126,9 @@ export class RuntimeInspector {
    */
   async enableAsyncStackTraces(maxDepth = 32): Promise<void> {
     if (!this.debuggerManager.isEnabled()) {
-      throw new Error('Debugger is not enabled. Call debuggerManager.enable() first.');
+      throw new Error(
+        'Debugger is not enabled. Call debuggerManager.enable() first.',
+      );
     }
 
     try {
@@ -187,7 +188,7 @@ export class RuntimeInspector {
    */
   async getCallStack(): Promise<CallStackInfo | null> {
     const pausedState = this.debuggerManager.getPausedState();
-    
+
     if (!pausedState) {
       logger.warn('Not in paused state, cannot get call stack');
       return null;
@@ -232,7 +233,9 @@ export class RuntimeInspector {
    */
   async getScopeVariables(callFrameId: string): Promise<ScopeVariables[]> {
     if (!this.enabled || !this.cdpSession) {
-      throw new Error('Runtime inspector is not enabled. Call init() or enable() first.');
+      throw new Error(
+        'Runtime inspector is not enabled. Call init() or enable() first.',
+      );
     }
 
     if (!callFrameId) {
@@ -241,16 +244,20 @@ export class RuntimeInspector {
 
     const pausedState = this.debuggerManager.getPausedState();
     if (!pausedState) {
-      throw new Error('Not in paused state. Debugger must be paused to get scope variables.');
+      throw new Error(
+        'Not in paused state. Debugger must be paused to get scope variables.',
+      );
     }
 
     // 查找指定的调用帧
     const callFrame = pausedState.callFrames.find(
-      (frame: CallFrame) => frame.callFrameId === callFrameId
+      (frame: CallFrame) => frame.callFrameId === callFrameId,
     );
 
     if (!callFrame) {
-      throw new Error(`Call frame not found: ${callFrameId}. Use getCallStack() to see available frames.`);
+      throw new Error(
+        `Call frame not found: ${callFrameId}. Use getCallStack() to see available frames.`,
+      );
     }
 
     try {
@@ -263,7 +270,9 @@ export class RuntimeInspector {
         }
 
         // 获取作用域对象的属性
-        const properties = await this.getObjectProperties(scope.object.objectId);
+        const properties = await this.getObjectProperties(
+          scope.object.objectId,
+        );
 
         scopeVariablesList.push({
           scopeType: scope.type,
@@ -308,7 +317,9 @@ export class RuntimeInspector {
    */
   async getObjectProperties(objectId: string): Promise<VariableInfo[]> {
     if (!this.enabled || !this.cdpSession) {
-      throw new Error('Runtime inspector is not enabled. Call init() or enable() first.');
+      throw new Error(
+        'Runtime inspector is not enabled. Call init() or enable() first.',
+      );
     }
 
     if (!objectId) {
@@ -365,11 +376,14 @@ export class RuntimeInspector {
     const pausedState = this.debuggerManager.getPausedState();
 
     if (!pausedState) {
-      throw new Error('Not in paused state. Use evaluateGlobal() for global context evaluation.');
+      throw new Error(
+        'Not in paused state. Use evaluateGlobal() for global context evaluation.',
+      );
     }
 
     // 如果没有指定callFrameId，使用顶层调用帧
-    const targetCallFrameId = callFrameId || pausedState.callFrames[0]?.callFrameId;
+    const targetCallFrameId =
+      callFrameId || pausedState.callFrames[0]?.callFrameId;
 
     if (!targetCallFrameId) {
       throw new Error('No call frame available for evaluation');
@@ -398,7 +412,9 @@ export class RuntimeInspector {
    */
   async evaluateGlobal(expression: string): Promise<any> {
     if (!this.enabled || !this.cdpSession) {
-      throw new Error('Runtime inspector is not enabled. Call init() or enable() first.');
+      throw new Error(
+        'Runtime inspector is not enabled. Call init() or enable() first.',
+      );
     }
 
     // ✅ 参数验证
@@ -470,4 +486,3 @@ export class RuntimeInspector {
     logger.info('Runtime inspector closed');
   }
 }
-

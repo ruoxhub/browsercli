@@ -2,7 +2,6 @@
  * @license
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
- * @ts-nocheck
  */
 
 import {isUtf8} from 'node:buffer';
@@ -11,14 +10,19 @@ import type {HTTPRequest, HTTPResponse} from '../third_party/index.js';
 
 const BODY_CONTEXT_SIZE_LIMIT = 10000;
 const BODY_READ_TIMEOUT_MS = 3000;
+const URL_DISPLAY_MAX = 80;
+
+function truncateUrl(url: string): string {
+  if (url.length <= URL_DISPLAY_MAX) return url;
+  return url.substring(0, URL_DISPLAY_MAX) + '…';
+}
 
 export function getShortDescriptionForRequest(
   request: HTTPRequest,
   id: number,
   selectedInDevToolsUI = false,
 ): string {
-  // TODO truncate the URL
-  return `reqid=${id} ${request.method()} ${request.url()} ${getStatusFromRequest(request)}${selectedInDevToolsUI ? ` [selected in the DevTools Network panel]` : ''}`;
+  return `reqid=${id} ${request.method()} ${truncateUrl(request.url())} ${getStatusFromRequest(request)}${selectedInDevToolsUI ? ` [selected in the DevTools Network panel]` : ''}`;
 }
 
 export function getStatusFromRequest(request: HTTPRequest): string {

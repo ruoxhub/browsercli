@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -8,21 +7,21 @@
  * AI代码摘要生成器 - 使用LLM生成代码摘要
  */
 
-import type { LLMService } from '../../services/LLMService.js';
-import type { CodeFile } from '../../types/index.js';
-import { logger } from '../../utils/logger.js';
+import type {LLMService} from '../../services/LLMService.js';
+import type {CodeFile} from '../../types/index.js';
+import {logger} from '../../utils/logger.js';
 
 export interface CodeSummary {
   url: string;
   type: string;
   size: number;
-  
+
   // AI生成的摘要
   summary: string;
   purpose: string;
   keyFunctions: string[];
   dependencies: string[];
-  
+
   // 特征检测
   hasEncryption: boolean;
   encryptionMethods?: string[];
@@ -30,15 +29,15 @@ export interface CodeSummary {
   apiEndpoints?: string[];
   hasObfuscation: boolean;
   obfuscationType?: string;
-  
+
   // 安全评估
   securityIssues?: string[];
   suspiciousPatterns?: string[];
-  
+
   // 复杂度评估
   complexity: 'low' | 'medium' | 'high';
   linesOfCode: number;
-  
+
   // 建议
   recommendations?: string[];
 }
@@ -54,9 +53,10 @@ export class AISummarizer {
 
     // 截取代码片段（避免token溢出）
     const maxLength = 10000; // 约2000 tokens
-    const codeSnippet = file.content.length > maxLength
-      ? file.content.substring(0, maxLength) + '\n\n... (truncated)'
-      : file.content;
+    const codeSnippet =
+      file.content.length > maxLength
+        ? file.content.substring(0, maxLength) + '\n\n... (truncated)'
+        : file.content;
 
     const prompt = this.buildSummaryPrompt(file.url, codeSnippet);
 
@@ -64,7 +64,8 @@ export class AISummarizer {
       const response = await this.llmService.chat([
         {
           role: 'system',
-          content: 'You are an expert JavaScript reverse engineer. Analyze code and provide concise, accurate summaries.',
+          content:
+            'You are an expert JavaScript reverse engineer. Analyze code and provide concise, accurate summaries.',
         },
         {
           role: 'user',
@@ -72,7 +73,8 @@ export class AISummarizer {
         },
       ]);
 
-      const responseText = typeof response === 'string' ? response : response.content;
+      const responseText =
+        typeof response === 'string' ? response : response.content;
       const summary = this.parseSummaryResponse(responseText, file);
       logger.debug(`AI summary generated for: ${file.url}`);
 
@@ -88,20 +90,25 @@ export class AISummarizer {
   /**
    * 批量生成摘要
    */
-  async summarizeBatch(files: CodeFile[], maxConcurrent = 3): Promise<CodeSummary[]> {
+  async summarizeBatch(
+    files: CodeFile[],
+    maxConcurrent = 3,
+  ): Promise<CodeSummary[]> {
     logger.info(`Generating AI summaries for ${files.length} files...`);
 
     const results: CodeSummary[] = [];
-    
+
     // 分批处理，避免并发过多
     for (let i = 0; i < files.length; i += maxConcurrent) {
       const batch = files.slice(i, i + maxConcurrent);
       const batchResults = await Promise.all(
-        batch.map(file => this.summarizeFile(file))
+        batch.map(file => this.summarizeFile(file)),
       );
       results.push(...batchResults);
-      
-      logger.debug(`Processed batch ${Math.floor(i / maxConcurrent) + 1}/${Math.ceil(files.length / maxConcurrent)}`);
+
+      logger.debug(
+        `Processed batch ${Math.floor(i / maxConcurrent) + 1}/${Math.ceil(files.length / maxConcurrent)}`,
+      );
     }
 
     return results;
@@ -154,9 +161,10 @@ Format your response as JSON.`;
         },
       ]);
 
-      const responseText = typeof response === 'string' ? response : response.content;
+      const responseText =
+        typeof response === 'string' ? response : response.content;
       const parsed = JSON.parse(responseText);
-      
+
       return {
         totalFiles: files.length,
         totalSize: files.reduce((sum, f) => sum + f.size, 0),
@@ -168,7 +176,7 @@ Format your response as JSON.`;
       };
     } catch (error) {
       logger.error('Failed to generate project summary:', error);
-      
+
       return {
         totalFiles: files.length,
         totalSize: files.reduce((sum, f) => sum + f.size, 0),
@@ -219,7 +227,7 @@ Provide analysis in JSON format with the following structure:
   private parseSummaryResponse(response: string, file: CodeFile): CodeSummary {
     try {
       const parsed = JSON.parse(response);
-      
+
       return {
         url: file.url,
         type: file.type,
@@ -254,19 +262,26 @@ Provide analysis in JSON format with the following structure:
     const lines = content.split('\n');
 
     // 简单的模式匹配
-    const hasEncryption = /encrypt|decrypt|crypto|cipher|aes|rsa/i.test(content);
+    const hasEncryption = /encrypt|decrypt|crypto|cipher|aes|rsa/i.test(
+      content,
+    );
     const hasAPI = /fetch|xhr|ajax|axios|request/i.test(content);
-    const hasObfuscation = /eval\(|\\x[0-9a-f]{2}|\\u[0-9a-f]{4}/i.test(content);
+    const hasObfuscation = /eval\(|\\x[0-9a-f]{2}|\\u[0-9a-f]{4}/i.test(
+      content,
+    );
 
     // 提取函数名
-    const functionMatches = content.matchAll(/function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)/g);
-    const keyFunctions = Array.from(functionMatches, m => m[1]).filter((name): name is string => !!name).slice(0, 10);
+    const functionMatches = content.matchAll(
+      /function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)/g,
+    );
+    const keyFunctions = Array.from(functionMatches, m => m[1])
+      .filter((name): name is string => !!name)
+      .slice(0, 10);
 
     // 评估复杂度
     const avgLineLength = content.length / lines.length;
-    const complexity: 'low' | 'medium' | 'high' = 
-      avgLineLength > 100 ? 'high' :
-      avgLineLength > 50 ? 'medium' : 'low';
+    const complexity: 'low' | 'medium' | 'high' =
+      avgLineLength > 100 ? 'high' : avgLineLength > 50 ? 'medium' : 'low';
 
     return {
       url: file.url,
@@ -284,4 +299,3 @@ Provide analysis in JSON format with the following structure:
     };
   }
 }
-

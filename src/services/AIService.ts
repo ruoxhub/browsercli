@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -6,7 +5,7 @@
  */
 /**
  * AI Service Abstraction Layer
- * 
+ *
  * Provides a unified interface for interacting with different LLM providers
  * (OpenAI, Anthropic, Gemini) with support for chat and image analysis.
  */
@@ -69,7 +68,11 @@ export interface AIProvider {
    * @param isFilePath - Whether imageInput is a file path (default: false)
    * @returns Analysis result as text
    */
-  analyzeImage(imageInput: string, prompt: string, isFilePath?: boolean): Promise<string>;
+  analyzeImage(
+    imageInput: string,
+    prompt: string,
+    isFilePath?: boolean,
+  ): Promise<string>;
 }
 
 /**
@@ -128,7 +131,7 @@ export class AIService {
    */
   constructor(provider: AIProvider, retryConfig?: Partial<RetryConfig>) {
     this.provider = provider;
-    this.retryConfig = { ...DEFAULT_RETRY_CONFIG, ...retryConfig };
+    this.retryConfig = {...DEFAULT_RETRY_CONFIG, ...retryConfig};
   }
 
   /**
@@ -137,7 +140,10 @@ export class AIService {
    * @param options - Optional chat configuration
    * @returns AI response with content and usage information
    */
-  async chat(messages: AIMessage[], options?: ChatOptions): Promise<AIResponse> {
+  async chat(
+    messages: AIMessage[],
+    options?: ChatOptions,
+  ): Promise<AIResponse> {
     return this.withRetry(() => this.provider.chat(messages, options));
   }
 
@@ -148,8 +154,14 @@ export class AIService {
    * @param isFilePath - Whether imageInput is a file path (default: false)
    * @returns Analysis result as text
    */
-  async analyzeImage(imageInput: string, prompt: string, isFilePath?: boolean): Promise<string> {
-    return this.withRetry(() => this.provider.analyzeImage(imageInput, prompt, isFilePath));
+  async analyzeImage(
+    imageInput: string,
+    prompt: string,
+    isFilePath?: boolean,
+  ): Promise<string> {
+    return this.withRetry(() =>
+      this.provider.analyzeImage(imageInput, prompt, isFilePath),
+    );
   }
 
   /**
@@ -181,13 +193,16 @@ export class AIService {
         await this.sleep(delay);
 
         // Increase delay for next attempt (exponential backoff)
-        delay = Math.min(delay * this.retryConfig.backoffMultiplier, this.retryConfig.maxDelay);
+        delay = Math.min(
+          delay * this.retryConfig.backoffMultiplier,
+          this.retryConfig.maxDelay,
+        );
       }
     }
 
     // All retries exhausted
     throw new Error(
-      `AI service request failed after ${this.retryConfig.maxRetries} retries: ${lastError?.message}`
+      `AI service request failed after ${this.retryConfig.maxRetries} retries: ${lastError?.message}`,
     );
   }
 
@@ -204,7 +219,11 @@ export class AIService {
     const err = error as any;
 
     // Retry on network errors
-    if (err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT' || err.code === 'ENOTFOUND') {
+    if (
+      err.code === 'ECONNRESET' ||
+      err.code === 'ETIMEDOUT' ||
+      err.code === 'ENOTFOUND'
+    ) {
       return true;
     }
 
@@ -226,6 +245,6 @@ export class AIService {
    * @param ms - Duration in milliseconds
    */
   private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 }

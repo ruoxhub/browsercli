@@ -6,11 +6,27 @@
  */
 
 import {writeFileSync, mkdirSync, existsSync} from 'node:fs';
-import {join, dirname} from 'node:path';
-import {fileURLToPath} from 'node:url';
+import {join} from 'node:path';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const TASK_NAME_RE = /^[a-z][a-z0-9-]*$/;
+const TASK_NAME_EXAMPLES = 'jd-h5st、douyin-sign、taobao-mtop';
+
+export function validateTaskName(name: string): string | null {
+  if (!TASK_NAME_RE.test(name)) {
+    return `名称必须以小写字母开头，只能包含小写字母、数字和连字符。正确示例：${TASK_NAME_EXAMPLES}`;
+  }
+  return null;
+}
+
+export function validateUrl(url: string | undefined): string | null {
+  if (!url) return null;
+  try {
+    new URL(url);
+    return null;
+  } catch {
+    return `无效的 URL 格式：${url}`;
+  }
+}
 
 export async function scaffoldCommand(options: {
   name: string;
@@ -21,10 +37,16 @@ export async function scaffoldCommand(options: {
   const {name, desc = 'New task', url, output} = options;
 
   // 验证名称格式
-  if (!/^[a-z][a-z0-9-]*$/.test(name)) {
-    console.error(
-      '错误：名称必须以小写字母开头，只能包含小写字母、数字和连字符',
-    );
+  const nameError = validateTaskName(name);
+  if (nameError) {
+    console.error(`错误：${nameError}`);
+    process.exit(1);
+  }
+
+  // 验证 URL 格式
+  const urlError = validateUrl(url);
+  if (urlError) {
+    console.error(`错误：${urlError}`);
     process.exit(1);
   }
 
@@ -33,8 +55,11 @@ export async function scaffoldCommand(options: {
     : join(process.cwd(), 'tasks', name);
 
   try {
-    // 创建任务目录
-    if (!existsSync(taskDir)) {
+    // 检查任务目录是否已存在
+    if (existsSync(taskDir)) {
+      console.warn(`警告：任务目录已存在：${taskDir}`);
+      console.warn('将覆盖现有配置文件');
+    } else {
       mkdirSync(taskDir, {recursive: true});
     }
 

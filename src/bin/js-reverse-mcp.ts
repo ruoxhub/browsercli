@@ -22,9 +22,12 @@ import {
   isDaemonRunning,
 } from '../daemon/utils.js';
 import {logger} from '../logger.js';
-import {Client, PipeTransport, StdioClientTransport} from '../third_party/index.js';
+import {
+  Client,
+  PipeTransport,
+  StdioClientTransport,
+} from '../third_party/index.js';
 import {VERSION} from '../version.js';
-
 
 const pid = getDaemonPid();
 if (isDaemonRunning(pid)) {

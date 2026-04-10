@@ -12,17 +12,10 @@ import path from 'node:path';
 import process from 'node:process';
 
 import {logger} from '../logger.js';
-import {
-  SkillRegistry,
-  SkillRunner,
-  getBuiltInSkillDefinitions,
-} from '../skills/index.js';
+import {NetworkCollector} from '../PageCollector.js';
+import {SkillRunner, getBuiltInSkillDefinitions} from '../skills/index.js';
 import {PipeTransport} from '../third_party/index.js';
 import {getJSHookRuntime} from '../tools/runtime.js';
-import type {JSHookToolDefinition} from '../tools/ToolRegistry.js';
-import {logger as skillLogger} from '../utils/logger.js';
-
-import {NetworkCollector} from '../PageCollector.js';
 
 import type {DaemonMessage} from './types.js';
 import {
@@ -33,16 +26,16 @@ import {
   isDaemonRunning,
 } from './utils.js';
 
-console.log('[DAEMON] Module loading...');
+logger('[DAEMON] Module loading...');
 
 // 技能系统导入 - 懒加载
 
-console.log('[DAEMON] Modules loaded, checking existing daemon...');
+logger('[DAEMON] Modules loaded, checking existing daemon...');
 
 const pid = getDaemonPid();
 if (isDaemonRunning(pid)) {
-  console.error('Daemon 已经在运行中 (PID: ' + pid + ')');
-  console.error('如需重启，请先执行：js-reverse stop');
+  logger('Daemon already running (PID: ' + pid + ')');
+  logger('如需重启，请执行：js-reverse stop');
   process.exit(1);
 }
 
@@ -76,36 +69,25 @@ function parseDaemonArgs(args: string[]) {
   // 设置环境变量供 runtime 使用
   if (browserUrl) {
     process.env.REMOTE_DEBUGGING_URL = browserUrl;
-    console.log(`[DAEMON] Set REMOTE_DEBUGGING_URL=${browserUrl}`);
+    logger(`[DAEMON] Set REMOTE_DEBUGGING_URL=${browserUrl}`);
   }
   if (wsEndpoint) {
     process.env.WS_ENDPOINT = wsEndpoint;
-    console.log(`[DAEMON] Set WS_ENDPOINT=${wsEndpoint}`);
+    logger(`[DAEMON] Set WS_ENDPOINT=${wsEndpoint}`);
   }
 
   return {browserUrl, wsEndpoint};
 }
 
-const parsedArgs = parseDaemonArgs(mcpServerArgs);
+parseDaemonArgs(mcpServerArgs);
 
 // 懒加载状态
-let _skillRegistry: SkillRegistry | null = null;
 let _toolsLoaded = false;
 let _loadToolsPromise: Promise<void> | null = null;
 let _cachedToolsList: any[] | null = null;
 
 // 全局 NetworkCollector 实例（daemon 级别初始化）
 let _networkCollector: NetworkCollector | null = null;
-
-/**
- * 懒加载技能注册表
- */
-function getSkillRegistry(): SkillRegistry {
-  if (!_skillRegistry) {
-    _skillRegistry = SkillRegistry.getInstance();
-  }
-  return _skillRegistry;
-}
 
 /**
  * 懒加载工具注册
@@ -122,7 +104,7 @@ async function ensureToolsLoaded(): Promise<void> {
     registerBuiltInTools();
     _toolsLoaded = true;
     _cachedToolsList = listTools();
-    console.log(`[DAEMON] Registered ${_cachedToolsList.length} tools`);
+    logger(`[DAEMON] Registered ${_cachedToolsList.length} tools`);
   })();
   return _loadToolsPromise;
 }
@@ -138,8 +120,7 @@ async function getCachedTools(): Promise<any[]> {
   return _cachedToolsList || [];
 }
 
-// 懒加载技能注册（同步，不依赖重型模块）
-console.log('[DAEMON] Skill registry ready (lazy load)');
+logger('[DAEMON] Skill registry ready (lazy load)');
 
 let server: Server | null = null;
 
@@ -147,10 +128,10 @@ let server: Server | null = null;
 // 在 socket 服务器启动后异步执行，不阻塞主事件循环
 async function ensureBrowserConnection() {
   try {
-    console.log('[DAEMON] Establishing browser connection...');
+    logger('[DAEMON] Establishing browser connection...');
     const runtime = getJSHookRuntime();
     await runtime.browserManager.launch();
-    console.log('[DAEMON] Browser connected successfully');
+    logger('[DAEMON] Browser connected successfully');
 
     // 初始化 NetworkCollector（网络请求数据收集）
     const browser = runtime.browserManager.getBrowser();
@@ -158,10 +139,10 @@ async function ensureBrowserConnection() {
       // 类型转换：绕过 puppeteer 类型不匹配问题
       _networkCollector = new NetworkCollector(browser, undefined, false);
       await _networkCollector.init();
-      console.log('[DAEMON] NetworkCollector initialized');
+      logger('[DAEMON] NetworkCollector initialized');
     }
   } catch (error) {
-    console.error('[DAEMON] Failed to connect browser:', error);
+    logger('[DAEMON] Failed to connect browser:', error);
   }
 }
 
@@ -192,7 +173,7 @@ async function handleRequest(msg: DaemonMessage) {
         return {success: false, error: 'Missing tool name'};
       }
 
-      console.log(`[DAEMON] invoke_tool: ${tool}`, args);
+      logger(`[DAEMON] invoke_tool: ${tool}`, args);
       const tools = await getCachedTools();
       const targetTool = tools.find(t => t.name === tool);
       if (!targetTool) {
@@ -236,17 +217,17 @@ async function handleRequest(msg: DaemonMessage) {
         setIncludePages: (value: boolean) => {
           response._includePages = value;
         },
-        setIncludeNetworkRequests: (value: boolean, options?: any) => {
+        setIncludeNetworkRequests: (value: boolean, _options?: any) => {
           response._includeNetwork = value;
         },
-        setIncludeConsoleData: (value: boolean, options?: any) => {
+        setIncludeConsoleData: (value: boolean, _options?: any) => {
           response._includeConsole = value;
         },
         attachImage: (data: any) => {
           response._imageData = data;
         },
-        attachNetworkRequest: (id: number) => {},
-        attachConsoleMessage: (id: number) => {},
+        attachNetworkRequest: (_id: number) => {},
+        attachConsoleMessage: (_id: number) => {},
       };
 
       const context: any = {
@@ -389,10 +370,9 @@ async function handleRequest(msg: DaemonMessage) {
         }),
       };
     } else if (msg.method === 'list_tools') {
-      console.log('[DAEMON] list_tools called');
       const tools = await getCachedTools();
-      console.log(
-        `[DAEMON] Got ${tools.length} tools (cached: ${_cachedToolsList !== null})`,
+      logger(
+        `[DAEMON] list_tools: ${tools.length} tools (cached: ${_cachedToolsList !== null})`,
       );
       return {
         success: true,
@@ -437,19 +417,19 @@ async function handleRequest(msg: DaemonMessage) {
 }
 
 async function startSocketServer() {
-  console.log('[DAEMON] startSocketServer: starting...');
+  logger('[DAEMON] startSocketServer: starting...');
   // Remove existing socket file if it exists (only on non-Windows)
   if (!IS_WINDOWS) {
     try {
       fs.unlinkSync(socketPath);
-      console.log('[DAEMON] startSocketServer: cleaned up old socket file');
+      logger('[DAEMON] startSocketServer: cleaned up old socket file');
     } catch {
       // ignore errors.
     }
   }
 
   return await new Promise<void>((resolve, reject) => {
-    console.log('[DAEMON] startSocketServer: creating server...');
+    logger('[DAEMON] startSocketServer: creating server...');
     server = createServer(socket => {
       const transport = new PipeTransport(socket, socket);
       transport.onmessage = async (message: string) => {
@@ -463,7 +443,7 @@ async function startSocketServer() {
       });
     });
 
-    console.log('[DAEMON] startSocketServer: calling server.listen()...');
+    logger('[DAEMON] startSocketServer: calling server.listen()...');
     server.listen(
       {
         path: socketPath,
@@ -471,7 +451,7 @@ async function startSocketServer() {
         writableAll: false,
       },
       () => {
-        console.log(`Daemon server listening on ${socketPath}`);
+        logger(`Daemon server listening on ${socketPath}`);
         resolve();
       },
     );
@@ -484,7 +464,7 @@ async function startSocketServer() {
 }
 
 async function cleanup() {
-  console.log('Cleaning up daemon...');
+  logger('Cleaning up daemon...');
 
   if (server) {
     await new Promise<void>(resolve => {
@@ -526,15 +506,15 @@ process.on('unhandledRejection', error => {
 });
 
 // Start the server
-console.log('[DAEMON] About to call startSocketServer()');
+logger('[DAEMON] About to call startSocketServer()');
 startSocketServer()
   .then(() => {
-    console.log('[DAEMON] startSocketServer resolved successfully');
+    logger('[DAEMON] startSocketServer resolved successfully');
   })
   .catch(error => {
-    console.error('[DAEMON] startSocketServer failed:', error);
+    logger('[DAEMON] startSocketServer failed:', error);
     process.exit(1);
   });
-console.log('[DAEMON] startSocketServer called, process should stay alive');
+logger('[DAEMON] startSocketServer called, process should stay alive');
 
 // Keep the process running - the server will handle connections via event loop

@@ -53,7 +53,10 @@ function buildDefaultEnvCode(): string {
 /**
  * 构建 localStorage/sessionStorage shim 代码
  */
-function buildStorageShimCode(name: 'localStorage' | 'sessionStorage', values: Record<string, unknown>): string {
+function buildStorageShimCode(
+  name: 'localStorage' | 'sessionStorage',
+  values: Record<string, unknown>,
+): string {
   const entries = Object.entries(values);
   return [
     `const ${name}Seed = new Map(${JSON.stringify(entries)});`,
@@ -88,7 +91,7 @@ function buildAutoEnvCode(capture: Record<string, unknown>): string {
       : {};
 
   const cookieString = (cookies as Array<{name?: unknown; value?: unknown}>)
-    .map((cookie) => `${String(cookie.name ?? '')}=${String(cookie.value ?? '')}`)
+    .map(cookie => `${String(cookie.name ?? '')}=${String(cookie.value ?? '')}`)
     .join('; ');
 
   return [
@@ -103,7 +106,10 @@ function buildAutoEnvCode(capture: Record<string, unknown>): string {
 /**
  * 构建入口代码
  */
-function buildEntryCode(targetScript: {url: string; content: string} | null, capture: Record<string, unknown>): string {
+function buildEntryCode(
+  targetScript: {url: string; content: string} | null,
+  capture: Record<string, unknown>,
+): string {
   return [
     'import "./env.js";',
     'import "./polyfills.js";',
@@ -134,12 +140,18 @@ function matchesTargetText(
   targetFunctionNames: string[],
   targetActionDescription: string,
 ): boolean {
-  const text = typeof value === 'string' ? value.toLowerCase() : JSON.stringify(value ?? '').toLowerCase();
+  const text =
+    typeof value === 'string'
+      ? value.toLowerCase()
+      : JSON.stringify(value ?? '').toLowerCase();
   return (
-    targetKeywords.some((keyword) => text.includes(keyword.toLowerCase())) ||
-    targetUrlPatterns.some((pattern) => text.includes(pattern.toLowerCase())) ||
-    targetFunctionNames.some((functionName) => text.includes(functionName.toLowerCase())) ||
-    (targetActionDescription.length > 0 && text.includes(targetActionDescription.toLowerCase()))
+    targetKeywords.some(keyword => text.includes(keyword.toLowerCase())) ||
+    targetUrlPatterns.some(pattern => text.includes(pattern.toLowerCase())) ||
+    targetFunctionNames.some(functionName =>
+      text.includes(functionName.toLowerCase()),
+    ) ||
+    (targetActionDescription.length > 0 &&
+      text.includes(targetActionDescription.toLowerCase()))
   );
 }
 
@@ -161,9 +173,19 @@ function pickTargetScript(
   ) {
     return files[0] ?? null;
   }
-  return files.find((file) =>
-    matchesTargetText(file, targetKeywords, targetUrlPatterns, targetFunctionNames, targetActionDescription),
-  ) ?? files[0] ?? null;
+  return (
+    files.find(file =>
+      matchesTargetText(
+        file,
+        targetKeywords,
+        targetUrlPatterns,
+        targetFunctionNames,
+        targetActionDescription,
+      ),
+    ) ??
+    files[0] ??
+    null
+  );
 }
 
 /**
@@ -183,8 +205,14 @@ function filterRuntimeEvidence(
     targetFunctionNames.length === 0 &&
     targetActionDescription.length === 0
       ? records
-      : records.filter((record) =>
-          matchesTargetText(record, targetKeywords, targetUrlPatterns, targetFunctionNames, targetActionDescription),
+      : records.filter(record =>
+          matchesTargetText(
+            record,
+            targetKeywords,
+            targetUrlPatterns,
+            targetFunctionNames,
+            targetActionDescription,
+          ),
         );
   return filtered.slice(0, maxEvidenceItems);
 }
@@ -192,12 +220,17 @@ function filterRuntimeEvidence(
 /**
  * 推断缺失的能力
  */
-function inferMissingCapabilities(runtimeError: string, observedCapabilities: string[]): Array<{
+function inferMissingCapabilities(
+  runtimeError: string,
+  observedCapabilities: string[],
+): Array<{
   capability: string;
   reason: string;
   priority: number;
 }> {
-  const available = new Set(observedCapabilities.map((item) => item.toLowerCase()));
+  const available = new Set(
+    observedCapabilities.map(item => item.toLowerCase()),
+  );
   const normalizedError = runtimeError.toLowerCase();
   const candidates = [
     {
@@ -234,9 +267,9 @@ function inferMissingCapabilities(runtimeError: string, observedCapabilities: st
 
   return candidates
     .filter(
-      (candidate) =>
+      candidate =>
         available.has(candidate.capability.toLowerCase()) &&
-        candidate.patterns.some((pattern) => normalizedError.includes(pattern)),
+        candidate.patterns.some(pattern => normalizedError.includes(pattern)),
     )
     .sort((a, b) => b.priority - a.priority);
 }
@@ -253,7 +286,10 @@ async function rebuildBundleSkill(context: SkillContext): Promise<SkillResult> {
     // 1. 收集逆向工程证据
     const runtimeEvidence: Array<Record<string, unknown>> = [];
     if (options.taskId) {
-      logger.debug('[rebuild-bundle] Reading runtime evidence for task:', options.taskId);
+      logger.debug(
+        '[rebuild-bundle] Reading runtime evidence for task:',
+        options.taskId,
+      );
       // 在实际运行时会从 ReverseTaskStore 读取
       // 这里返回空数组，由实际运行时填充
     }

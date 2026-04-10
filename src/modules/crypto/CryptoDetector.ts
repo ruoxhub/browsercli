@@ -1,5 +1,3 @@
-
-// @ts-nocheck
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -22,20 +20,23 @@
  * - 性能优化 (单次AST解析、结果缓存)
  */
 
-import type { LLMService } from '../../services/LLMService.js';
-import type { DetectCryptoOptions, DetectCryptoResult, CryptoAlgorithm, CryptoLibrary } from '../../types/index.js';
-import { logger } from '../../utils/logger.js';
-
+import type {LLMService} from '../../services/LLMService.js';
 import type {
-  SecurityIssue,
-  CryptoStrength} from './CryptoDetectorEnhanced.js';
+  DetectCryptoOptions,
+  DetectCryptoResult,
+  CryptoAlgorithm,
+  CryptoLibrary,
+} from '../../types/index.js';
+import {logger} from '../../utils/logger.js';
+
+import type {SecurityIssue, CryptoStrength} from './CryptoDetectorEnhanced.js';
 import {
   detectByAST,
   mergeParameters,
   evaluateSecurity,
   analyzeStrength,
 } from './CryptoDetectorEnhanced.js';
-import { CryptoRulesManager } from './CryptoRules.js';
+import {CryptoRulesManager} from './CryptoRules.js';
 
 export class CryptoDetector {
   private llm: LLMService;
@@ -63,15 +64,17 @@ export class CryptoDetector {
   /**
    * 检测加密算法（优化版本 - 单次AST解析）
    */
-  async detect(options: DetectCryptoOptions): Promise<DetectCryptoResult & {
-    securityIssues?: SecurityIssue[];
-    strength?: CryptoStrength;
-  }> {
+  async detect(options: DetectCryptoOptions): Promise<
+    DetectCryptoResult & {
+      securityIssues?: SecurityIssue[];
+      strength?: CryptoStrength;
+    }
+  > {
     logger.info('Starting crypto detection...');
     const startTime = Date.now();
 
     try {
-      const { code } = options;
+      const {code} = options;
       const algorithms: CryptoAlgorithm[] = [];
       const libraries: CryptoLibrary[] = [];
       const securityIssues: SecurityIssue[] = [];
@@ -92,7 +95,9 @@ export class CryptoDetector {
       if (astResults.parameters) {
         mergeParameters(algorithms, astResults.parameters);
       }
-      logger.debug(`Found ${astResults.algorithms.length} algorithms by AST analysis`);
+      logger.debug(
+        `Found ${astResults.algorithms.length} algorithms by AST analysis`,
+      );
 
       // 4. AI深度分析（默认关闭，需显式启用，避免不必要的 LLM 调用）
       const useAI = (options as any).useAI === true;
@@ -106,7 +111,11 @@ export class CryptoDetector {
       const mergedAlgorithms = this.mergeResults(algorithms);
 
       // 6. 安全性评估
-      const securityResults = evaluateSecurity(mergedAlgorithms, code, this.rulesManager);
+      const securityResults = evaluateSecurity(
+        mergedAlgorithms,
+        code,
+        this.rulesManager,
+      );
       securityIssues.push(...securityResults);
       logger.debug(`Found ${securityIssues.length} security issues`);
 
@@ -116,11 +125,14 @@ export class CryptoDetector {
       // 8. 计算总体置信度
       const confidence =
         mergedAlgorithms.length > 0
-          ? mergedAlgorithms.reduce((sum, algo) => sum + algo.confidence, 0) / mergedAlgorithms.length
+          ? mergedAlgorithms.reduce((sum, algo) => sum + algo.confidence, 0) /
+            mergedAlgorithms.length
           : 0;
 
       const duration = Date.now() - startTime;
-      logger.success(`Crypto detection completed in ${duration}ms, found ${mergedAlgorithms.length} algorithms`);
+      logger.success(
+        `Crypto detection completed in ${duration}ms, found ${mergedAlgorithms.length} algorithms`,
+      );
 
       return {
         algorithms: mergedAlgorithms,
@@ -142,8 +154,8 @@ export class CryptoDetector {
     const algorithms: CryptoAlgorithm[] = [];
     const keywordRules = this.rulesManager.getKeywordRules();
 
-    keywordRules.forEach((rule) => {
-      rule.keywords.forEach((keyword) => {
+    keywordRules.forEach(rule => {
+      rule.keywords.forEach(keyword => {
         // 使用词边界匹配，避免误匹配
         const regex = new RegExp(`\\b${this.escapeRegex(keyword)}\\b`, 'gi');
         const matches = code.match(regex);
@@ -187,7 +199,10 @@ export class CryptoDetector {
   private async detectByAI(code: string): Promise<CryptoAlgorithm[]> {
     try {
       const messages = this.llm.generateCryptoDetectionPrompt(code);
-      const response = await this.llm.chat(messages, { temperature: 0.2, maxTokens: 2000 });
+      const response = await this.llm.chat(messages, {
+        temperature: 0.2,
+        maxTokens: 2000,
+      });
 
       // 解析JSON响应
       const jsonMatch = response.content.match(/\{[\s\S]*\}/);
@@ -195,7 +210,7 @@ export class CryptoDetector {
         return [];
       }
 
-      const result = JSON.parse(jsonMatch[0]) as { algorithms?: unknown[] };
+      const result = JSON.parse(jsonMatch[0]) as {algorithms?: unknown[]};
       if (!Array.isArray(result.algorithms)) {
         return [];
       }
@@ -204,7 +219,7 @@ export class CryptoDetector {
         const a = algo as Record<string, unknown>;
         return {
           name: (a.name as string) || 'Unknown',
-          type: (a.type as CryptoAlgorithm['type']) || 'other',
+          type: (a.type as CryptoAlgorithm['type']) || 'encoding',
           confidence: (a.confidence as number) || 0.5,
           location: {
             file: 'current',
@@ -227,8 +242,8 @@ export class CryptoDetector {
     const libraries: CryptoLibrary[] = [];
     const libraryRules = this.rulesManager.getLibraryRules();
 
-    libraryRules.forEach((rule) => {
-      const found = rule.patterns.some((pattern) => code.includes(pattern));
+    libraryRules.forEach(rule => {
+      const found = rule.patterns.some(pattern => code.includes(pattern));
 
       if (found) {
         // 尝试提取版本号
@@ -262,7 +277,7 @@ export class CryptoDetector {
   private mergeResults(algorithms: CryptoAlgorithm[]): CryptoAlgorithm[] {
     const merged = new Map<string, CryptoAlgorithm>();
 
-    algorithms.forEach((algo) => {
+    algorithms.forEach(algo => {
       const key = `${algo.name}-${algo.type}`;
       const existing = merged.get(key);
 
@@ -271,7 +286,9 @@ export class CryptoDetector {
       }
     });
 
-    return Array.from(merged.values()).sort((a, b) => b.confidence - a.confidence);
+    return Array.from(merged.values()).sort(
+      (a, b) => b.confidence - a.confidence,
+    );
   }
 
   /**
@@ -287,4 +304,3 @@ export class CryptoDetector {
     return 0;
   }
 }
-

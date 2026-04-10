@@ -121,3 +121,25 @@ describe('daemon/client', () => {
     assert.strictEqual(output, '# Title\n\nContent');
   });
 });
+
+describe('daemon/client - 错误处理', () => {
+  it('socket 不存在时应该返回友好的中文错误提示', async () => {
+    const nonExistentSocket = '/tmp/js-reverse-mcp-nonexistent-test.sock';
+    setTestSocketPath(nonExistentSocket);
+
+    try {
+      await sendCommand({method: 'status'});
+      assert.fail('Expected error to be thrown');
+    } catch (error) {
+      assert.ok(error instanceof Error);
+      assert.ok(
+        error.message.includes('后台服务未运行'),
+        `Expected Chinese error message, got: ${error.message}`,
+      );
+      assert.ok(
+        error.message.includes('js-reverse start'),
+        `Expected usage hint in error message, got: ${error.message}`,
+      );
+    }
+  });
+});

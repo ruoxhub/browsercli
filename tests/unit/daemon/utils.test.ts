@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -7,29 +6,14 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {isDaemonRunning, serializeArgs, socketPath} from '../../../src/daemon/utils.js';
+import {isDaemonRunning, socketPath} from '../../../src/daemon/utils.js';
 
 describe('daemon/utils', () => {
   it('socketPath 应该是有效路径', () => {
     assert.ok(socketPath.endsWith('js-reverse-mcp.sock'));
   });
 
-  it('serializeArgs 应该正确序列化布尔参数', () => {
-    const options = {
-      headless: {type: 'boolean'},
-      isolated: {type: 'boolean'},
-    };
-    const argv = {headless: true, isolated: false};
-    const result = serializeArgs(options, argv);
-    assert.deepStrictEqual(result, ['--headless']);
-  });
-
-  it('serializeArgs 应该正确序列化字符串参数', () => {
-    const options = {
-      browserUrl: {type: 'string'},
-    };
-    const argv = {browserUrl: 'http://127.0.0.1:9222'};
-    const result = serializeArgs(options, argv);
-    assert.deepStrictEqual(result, ['--browserUrl=http://127.0.0.1:9222']);
+  it('isDaemonRunning 应该在没有 PID 时返回 false', () => {
+    assert.strictEqual(isDaemonRunning(999999), false);
   });
 });

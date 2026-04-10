@@ -28,11 +28,14 @@ export class CdpProxy {
   private port: number;
   private readonly sessions = new Map<string, number>(); // targetId -> sessionId
   private cmdId = 0;
-  private readonly pending = new Map<number, {
-    resolve: (msg: unknown) => void;
-    reject: (err: Error) => void;
-    timer: NodeJS.Timeout;
-  }>();
+  private readonly pending = new Map<
+    number,
+    {
+      resolve: (msg: unknown) => void;
+      reject: (err: Error) => void;
+      timer: NodeJS.Timeout;
+    }
+  >();
 
   constructor(port: number = DEFAULT_PORT) {
     this.port = port;
@@ -86,7 +89,7 @@ export class CdpProxy {
         resolve();
       });
 
-      this.server.on('error', (err) => {
+      this.server.on('error', err => {
         logger(`[CdpProxy] 服务器错误:`, err);
         reject(err);
       });
@@ -104,11 +107,13 @@ export class CdpProxy {
   ): Promise<void> {
     // GET /health - 健康检查（不需要 browser）
     if (pathname === '/health') {
-      res.end(JSON.stringify({
-        status: 'ok',
-        port: this.port,
-        sessions: this.sessions.size,
-      }));
+      res.end(
+        JSON.stringify({
+          status: 'ok',
+          port: this.port,
+          sessions: this.sessions.size,
+        }),
+      );
       return;
     }
 
@@ -139,13 +144,21 @@ export class CdpProxy {
         await page.goto(targetUrl, {waitUntil: 'domcontentloaded'});
       }
       const target = page.target();
-      res.end(JSON.stringify({targetId: (target as unknown as {targetId: string}).targetId}));
+      res.end(
+        JSON.stringify({
+          targetId: (target as unknown as {targetId: string}).targetId,
+        }),
+      );
       return;
     }
 
     // GET /close?target=xxx - 关闭 tab
     if (pathname === '/close') {
-      const target = this.browser.targets().find(t => (t as unknown as {targetId: string}).targetId === query.target);
+      const target = this.browser
+        .targets()
+        .find(
+          t => (t as unknown as {targetId: string}).targetId === query.target,
+        );
       if (target) {
         const page = await target.page();
         await page?.close({runBeforeUnload: false});
@@ -207,7 +220,11 @@ export class CdpProxy {
         if (!el) return {error: '未找到元素：' + sel};
         (el as HTMLElement).scrollIntoView({block: 'center'});
         (el as HTMLElement).click();
-        return {clicked: true, tag: (el as HTMLElement).tagName, text: (el.textContent || '').slice(0, 100)};
+        return {
+          clicked: true,
+          tag: (el as HTMLElement).tagName,
+          text: (el.textContent || '').slice(0, 100),
+        };
       }, selector);
       res.end(JSON.stringify(result));
       return;
@@ -227,7 +244,11 @@ export class CdpProxy {
         if (!el) return {error: '未找到元素：' + sel};
         (el as HTMLElement).scrollIntoView({block: 'center'});
         const rect = (el as HTMLElement).getBoundingClientRect();
-        return {x: rect.x + rect.width / 2, y: rect.y + rect.height / 2, tag: (el as HTMLElement).tagName};
+        return {
+          x: rect.x + rect.width / 2,
+          y: rect.y + rect.height / 2,
+          tag: (el as HTMLElement).tagName,
+        };
       }, selector);
       if ((coord as {error?: string}).error) {
         res.statusCode = 400;
@@ -255,7 +276,9 @@ export class CdpProxy {
         res.end(JSON.stringify({error: '未找到元素：' + body.selector}));
         return;
       }
-      await (input as unknown as {uploadFile: (...files: string[]) => Promise<void>}).uploadFile(...body.files);
+      await (
+        input as unknown as {uploadFile: (...files: string[]) => Promise<void>}
+      ).uploadFile(...body.files);
       res.end(JSON.stringify({success: true, files: body.files.length}));
       return;
     }
@@ -269,7 +292,8 @@ export class CdpProxy {
       if (direction === 'top') {
         js = 'window.scrollTo(0, 0); "scrolled to top"';
       } else if (direction === 'bottom') {
-        js = 'window.scrollTo(0, document.body.scrollHeight); "scrolled to bottom"';
+        js =
+          'window.scrollTo(0, document.body.scrollHeight); "scrolled to bottom"';
       } else if (direction === 'up') {
         js = `window.scrollBy(0, -${Math.abs(y)}); "scrolled up ${Math.abs(y)}px"`;
       } else {
@@ -302,24 +326,26 @@ export class CdpProxy {
 
     // 404 - 未知端点
     res.statusCode = 404;
-    res.end(JSON.stringify({
-      error: '未知端点',
-      endpoints: {
-        '/health': 'GET - 健康检查',
-        '/targets': 'GET - 列出所有页面',
-        '/new?url=': 'GET - 创建后台 tab',
-        '/close?target=': 'GET - 关闭 tab',
-        '/navigate?target=&url=': 'GET - 导航',
-        '/back?target=': 'GET - 后退',
-        '/info?target=': 'GET - 页面信息',
-        '/eval?target=': 'POST body=JS - 执行 JS',
-        '/click?target=': 'POST body=CSS 选择器 - 点击',
-        '/clickAt?target=': 'POST body=CSS 选择器 - 鼠标点击',
-        '/setFiles?target=': 'POST body=JSON - 文件上传',
-        '/scroll?target=&y=&direction=': 'GET - 滚动',
-        '/screenshot?target=&file=': 'GET - 截图',
-      },
-    }));
+    res.end(
+      JSON.stringify({
+        error: '未知端点',
+        endpoints: {
+          '/health': 'GET - 健康检查',
+          '/targets': 'GET - 列出所有页面',
+          '/new?url=': 'GET - 创建后台 tab',
+          '/close?target=': 'GET - 关闭 tab',
+          '/navigate?target=&url=': 'GET - 导航',
+          '/back?target=': 'GET - 后退',
+          '/info?target=': 'GET - 页面信息',
+          '/eval?target=': 'POST body=JS - 执行 JS',
+          '/click?target=': 'POST body=CSS 选择器 - 点击',
+          '/clickAt?target=': 'POST body=CSS 选择器 - 鼠标点击',
+          '/setFiles?target=': 'POST body=JSON - 文件上传',
+          '/scroll?target=&y=&direction=': 'GET - 滚动',
+          '/screenshot?target=&file=': 'GET - 截图',
+        },
+      }),
+    );
   }
 
   /**
@@ -329,7 +355,9 @@ export class CdpProxy {
     if (!this.browser) {
       throw new Error('Browser 未初始化');
     }
-    const target = this.browser.targets().find(t => (t as unknown as {targetId: string}).targetId === targetId);
+    const target = this.browser
+      .targets()
+      .find(t => (t as unknown as {targetId: string}).targetId === targetId);
     if (!target) {
       throw new Error(`未找到 target: ${targetId}`);
     }
@@ -344,7 +372,7 @@ export class CdpProxy {
    * 读取 POST body
    */
   private async readBody(req: http.IncomingMessage): Promise<string> {
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       let body = '';
       req.on('data', chunk => {
         body += chunk.toString();
@@ -360,7 +388,7 @@ export class CdpProxy {
    */
   async stop(): Promise<void> {
     if (this.server) {
-      await new Promise<void>((resolve) => {
+      await new Promise<void>(resolve => {
         this.server!.close(() => resolve());
       });
       this.server = undefined;

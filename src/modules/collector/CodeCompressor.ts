@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -18,11 +17,11 @@
  * 8. 进度回调
  */
 
-import { createHash } from 'node:crypto';
-import { promisify } from 'node:util';
-import { gzip, gunzip } from 'node:zlib';
+import {createHash} from 'node:crypto';
+import {promisify} from 'node:util';
+import {gzip, gunzip} from 'node:zlib';
 
-import { logger } from '../../utils/logger.js';
+import {logger} from '../../utils/logger.js';
 
 const gzipAsync = promisify(gzip);
 const gunzipAsync = promisify(gunzip);
@@ -101,7 +100,10 @@ export class CodeCompressor {
   /**
    * 压缩代码（增强版）
    */
-  async compress(code: string, options: CompressOptions = {}): Promise<CompressedCode> {
+  async compress(
+    code: string,
+    options: CompressOptions = {},
+  ): Promise<CompressedCode> {
     const startTime = Date.now();
     const level = options.level ?? this.DEFAULT_LEVEL;
     const useCache = options.useCache ?? true;
@@ -135,7 +137,7 @@ export class CodeCompressor {
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
         const buffer = Buffer.from(code, 'utf-8');
-        const compressed = await gzipAsync(buffer, { level });
+        const compressed = await gzipAsync(buffer, {level});
         const base64 = compressed.toString('base64');
 
         const originalSize = buffer.length;
@@ -147,7 +149,9 @@ export class CodeCompressor {
         this.stats.totalCompressed++;
         this.stats.totalOriginalSize += originalSize;
         this.stats.totalCompressedSize += compressedSize;
-        this.stats.averageRatio = (1 - this.stats.totalCompressedSize / this.stats.totalOriginalSize) * 100;
+        this.stats.averageRatio =
+          (1 - this.stats.totalCompressedSize / this.stats.totalOriginalSize) *
+          100;
         this.stats.totalTime += compressionTime;
 
         const result: CompressedCode = {
@@ -174,16 +178,23 @@ export class CodeCompressor {
           });
         }
 
-        logger.debug(`Compressed code: ${originalSize} -> ${compressedSize} bytes (${compressionRatio.toFixed(1)}% reduction, level ${level}, ${compressionTime}ms)`);
+        logger.debug(
+          `Compressed code: ${originalSize} -> ${compressedSize} bytes (${compressionRatio.toFixed(1)}% reduction, level ${level}, ${compressionTime}ms)`,
+        );
 
         return result;
       } catch (error) {
         lastError = error as Error;
-        logger.warn(`Compression attempt ${attempt + 1}/${maxRetries} failed:`, error);
+        logger.warn(
+          `Compression attempt ${attempt + 1}/${maxRetries} failed:`,
+          error,
+        );
 
         if (attempt < maxRetries - 1) {
           // 等待后重试
-          await new Promise(resolve => setTimeout(resolve, 100 * (attempt + 1)));
+          await new Promise(resolve =>
+            setTimeout(resolve, 100 * (attempt + 1)),
+          );
         }
       }
     }
@@ -205,10 +216,15 @@ export class CodeCompressor {
         return decompressed.toString('utf-8');
       } catch (error) {
         lastError = error as Error;
-        logger.warn(`Decompression attempt ${attempt + 1}/${maxRetries} failed:`, error);
+        logger.warn(
+          `Decompression attempt ${attempt + 1}/${maxRetries} failed:`,
+          error,
+        );
 
         if (attempt < maxRetries - 1) {
-          await new Promise(resolve => setTimeout(resolve, 100 * (attempt + 1)));
+          await new Promise(resolve =>
+            setTimeout(resolve, 100 * (attempt + 1)),
+          );
         }
       }
     }
@@ -221,15 +237,17 @@ export class CodeCompressor {
    * 批量压缩文件（增强版 - 并发）
    */
   async compressBatch(
-    files: Array<{ url: string; content: string }>,
-    options: BatchCompressOptions = {}
-  ): Promise<Array<{
-    url: string;
-    compressed: string;
-    originalSize: number;
-    compressedSize: number;
-    compressionRatio: number;
-  }>> {
+    files: Array<{url: string; content: string}>,
+    options: BatchCompressOptions = {},
+  ): Promise<
+    Array<{
+      url: string;
+      compressed: string;
+      originalSize: number;
+      compressedSize: number;
+      compressionRatio: number;
+    }>
+  > {
     const concurrency = options.concurrency ?? this.DEFAULT_CONCURRENCY;
     const results: Array<{
       url: string;
@@ -244,7 +262,7 @@ export class CodeCompressor {
       const batch = files.slice(i, i + concurrency);
 
       const batchResults = await Promise.all(
-        batch.map(async (file) => {
+        batch.map(async file => {
           try {
             const result = await this.compress(file.content, options);
 
@@ -271,7 +289,7 @@ export class CodeCompressor {
               compressionRatio: 0,
             };
           }
-        })
+        }),
       );
 
       results.push(...batchResults);
@@ -283,10 +301,16 @@ export class CodeCompressor {
     }
 
     const totalOriginal = results.reduce((sum, r) => sum + r.originalSize, 0);
-    const totalCompressed = results.reduce((sum, r) => sum + r.compressedSize, 0);
-    const totalRatio = totalOriginal > 0 ? (1 - totalCompressed / totalOriginal) * 100 : 0;
+    const totalCompressed = results.reduce(
+      (sum, r) => sum + r.compressedSize,
+      0,
+    );
+    const totalRatio =
+      totalOriginal > 0 ? (1 - totalCompressed / totalOriginal) * 100 : 0;
 
-    logger.info(`Batch compression: ${results.length} files, ${(totalOriginal / 1024).toFixed(2)} KB -> ${(totalCompressed / 1024).toFixed(2)} KB (${totalRatio.toFixed(1)}% reduction)`);
+    logger.info(
+      `Batch compression: ${results.length} files, ${(totalOriginal / 1024).toFixed(2)} KB -> ${(totalCompressed / 1024).toFixed(2)} KB (${totalRatio.toFixed(1)}% reduction)`,
+    );
 
     return results;
   }
@@ -320,7 +344,10 @@ export class CodeCompressor {
    * 注意：输出格式与 decompress() 兼容（单个 gzip base64）。
    * 分块仅用于进度回调和内存控制，最终合并为整体压缩。
    */
-  async compressStream(code: string, options: CompressOptions = {}): Promise<CompressedCode> {
+  async compressStream(
+    code: string,
+    options: CompressOptions = {},
+  ): Promise<CompressedCode> {
     const chunkSize = options.chunkSize ?? this.DEFAULT_CHUNK_SIZE;
 
     // 如果文件小于分块大小，使用普通压缩
@@ -339,7 +366,7 @@ export class CodeCompressor {
     }
 
     // 整体压缩（保持与 decompress 兼容的格式）
-    const result = await this.compress(code, { ...options, useCache: false });
+    const result = await this.compress(code, {...options, useCache: false});
 
     if (options.onProgress) {
       options.onProgress(100);
@@ -347,7 +374,9 @@ export class CodeCompressor {
 
     const compressionTime = Date.now() - startTime;
 
-    logger.info(`Stream compression: ${totalChunks} chunks analyzed, ${(result.originalSize / 1024).toFixed(2)} KB -> ${(result.compressedSize / 1024).toFixed(2)} KB (${result.compressionRatio.toFixed(1)}% reduction, ${compressionTime}ms)`);
+    logger.info(
+      `Stream compression: ${totalChunks} chunks analyzed, ${(result.originalSize / 1024).toFixed(2)} KB -> ${(result.compressedSize / 1024).toFixed(2)} KB (${result.compressionRatio.toFixed(1)}% reduction, ${compressionTime}ms)`,
+    );
 
     return {
       ...result,
@@ -364,7 +393,7 @@ export class CodeCompressor {
    * 获取压缩统计
    */
   getStats(): CompressionStats {
-    return { ...this.stats };
+    return {...this.stats};
   }
 
   /**
@@ -422,4 +451,3 @@ export class CodeCompressor {
     this.cache.set(key, entry);
   }
 }
-

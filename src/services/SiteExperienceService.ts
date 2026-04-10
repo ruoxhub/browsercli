@@ -1,15 +1,18 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { eq, like, or } from 'drizzle-orm';
+import {eq, like, or} from 'drizzle-orm';
 
-import { siteExperiences, type SiteExperience, type NewSiteExperience } from '../database/schema.js';
-import { logger } from '../utils/logger.js';
+import {
+  siteExperiences,
+  type SiteExperience,
+  type NewSiteExperience,
+} from '../database/schema.js';
+import {logger} from '../utils/logger.js';
 
-import { dbService } from './DatabaseService.js';
+import {dbService} from './DatabaseService.js';
 
 /**
  * 站点经验服务 - CRUD 操作
@@ -18,9 +21,12 @@ export class SiteExperienceService {
   /**
    * 搜索站点经验（按 URL 或名称）
    */
-  async search(params: { url?: string; name?: string }): Promise<SiteExperience[]> {
+  async search(params: {
+    url?: string;
+    name?: string;
+  }): Promise<SiteExperience[]> {
     const db = dbService.getDb();
-    const { url, name } = params;
+    const {url, name} = params;
 
     try {
       const query = db.select().from(siteExperiences);
@@ -32,8 +38,8 @@ export class SiteExperienceService {
           return query.where(
             or(
               eq(siteExperiences.domain, domain),
-              like(siteExperiences.domain, `%${domain}%`)
-            )
+              like(siteExperiences.domain, `%${domain}%`),
+            ),
           );
         }
       }
@@ -42,8 +48,8 @@ export class SiteExperienceService {
         return query.where(
           or(
             eq(siteExperiences.name, name),
-            like(siteExperiences.name, `%${name}%`)
-          )
+            like(siteExperiences.name, `%${name}%`),
+          ),
         );
       }
 
@@ -110,7 +116,9 @@ export class SiteExperienceService {
         })
         .returning();
 
-      logger.info(`[SiteExperienceService] Created experience for domain: ${data.domain}`);
+      logger.info(
+        `[SiteExperienceService] Created experience for domain: ${data.domain}`,
+      );
       return results[0];
     } catch (error) {
       logger.error('[SiteExperienceService] Create failed', error);
@@ -123,7 +131,7 @@ export class SiteExperienceService {
    */
   async update(
     id: number,
-    data: Partial<NewSiteExperience>
+    data: Partial<NewSiteExperience>,
   ): Promise<SiteExperience | null> {
     const db = dbService.getDb();
 
@@ -159,7 +167,7 @@ export class SiteExperienceService {
       const results = await db
         .delete(siteExperiences)
         .where(eq(siteExperiences.id, id))
-        .returning({ id: siteExperiences.id });
+        .returning({id: siteExperiences.id});
 
       const deleted = results.length > 0;
       if (deleted) {

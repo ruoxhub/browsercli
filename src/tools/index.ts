@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-
 // 导入所有工具
 import {
   deobfuscateCode,
@@ -32,6 +31,7 @@ import {
   cdp_upload_files,
   cdp_page_info,
 } from './cdp-proxy.js';
+import {getCodeTemplate, listCodeTemplates} from './code-templates.js';
 import {collectCode, collectionDiff, searchInScripts} from './collector.js';
 import {listConsoleMessages, getConsoleMessage} from './console.js';
 import {hookCryptoJS} from './crypto/hookCryptoJS.js';
@@ -58,6 +58,16 @@ import {
   getAiDebugStatus,
   inspectObject,
   listHooks,
+  findInScript,
+  getRequestInitiator,
+  getPausedInfo,
+  evaluateOnCallframe,
+  setBreakpointOnText,
+  hookFunction,
+  unhookFunction,
+  xhrToJsBreakpoint,
+  startContinuousDebugging,
+  stopContinuousDebugging,
 } from './debugger.js';
 import {handleDialog} from './dialog.js';
 import {queryDom, getDomStructure, findClickableElements} from './dom.js';
@@ -67,7 +77,47 @@ import {
   emulateCpu,
   resizePage,
 } from './emulation.js';
-import {click, pressKey, fillForm, uploadFile, hover, drag} from './input.js';
+import {updateExtensions} from './extensions.js';
+import {listFrames, selectFrame} from './frames.js';
+import {antiAntiHook} from './hook/antiAntiHook.js';
+import {fixedWindowSize} from './hook/fixedWindowSize.js';
+import {hookConsoleLog} from './hook/hookConsoleLog.js';
+import {hookConsoleProtect} from './hook/hookConsoleProtect.js';
+import {hookConsoleTable} from './hook/hookConsoleTable.js';
+import {hookCookie} from './hook/hookCookie.js';
+import {hookDateNow} from './hook/hookDateNow.js';
+import {hookFetch} from './hook/hookFetch.js';
+import {hookHistory} from './hook/hookHistory.js';
+import {hookJsonParse} from './hook/hookJsonParse.js';
+import {hookJsonStringify} from './hook/hookJsonStringify.js';
+import {hookLocalStorage} from './hook/hookLocalStorage.js';
+import {hookLocationHref} from './hook/hookLocationHref.js';
+import {hookPerformanceNow} from './hook/hookPerformanceNow.js';
+import {hookPromise} from './hook/hookPromise.js';
+import {hookRandom} from './hook/hookRandom.js';
+import {hookSessionStorage} from './hook/hookSessionStorage.js';
+import {hookWebSocket} from './hook/hookWebSocket.js';
+import {hookXhrOpen} from './hook/hookXhrOpen.js';
+import {hookXhrSetRequestHeader} from './hook/hookXhrSetRequestHeader.js';
+import {
+  createHook,
+  injectHook,
+  listCreatedHooks,
+  getHookData,
+  removeHook,
+} from './hook.js';
+import {
+  click,
+  pressKey,
+  fillForm,
+  uploadFile,
+  hover,
+  drag,
+  clickAt,
+  setFiles,
+  fill,
+} from './input.js';
+import {listNetworkRequests, getNetworkRequest} from './network.js';
 import {
   waitForElement,
   scrollBy,
@@ -81,16 +131,20 @@ import {
   clickElement,
   typeText,
 } from './page.js';
-import {listPages, selectPage, newPage} from './pages.js';
-import {screenshot, captureVideoFrame} from './screenshot.js';
+import {listPages, selectPage, newPage, navigatePage} from './pages.js';
 import {
   startPerformanceTrace,
   stopPerformanceTrace,
   getPerformanceMetrics,
   performanceAnalyzeInsight,
 } from './performance.js';
-import {createHook, injectHook, getHookData, removeHook} from './hook.js';
-import {listFrames, selectFrame} from './frames.js';
+import {exportRebuildBundle, diffEnvRequirements} from './rebuild.js';
+import {
+  screenshot,
+  captureVideoFrame,
+  getVideoInfo,
+  seekVideo,
+} from './screenshot.js';
 import {evaluateScript, injectPreloadScript} from './script.js';
 import {
   searchSiteExperience,
@@ -99,7 +153,6 @@ import {
   updateSiteExperience,
   deleteSiteExperience,
 } from './siteExperience.js';
-import {updateExtensions} from './extensions.js';
 import {invokeSkill, listSkills} from './skill.js';
 import {
   injectStealth,
@@ -107,24 +160,33 @@ import {
   listStealthPresets,
   setUserAgent,
 } from './stealth.js';
-import {exportRebuildBundle, diffEnvRequirements} from './rebuild.js';
+
+// v_jstools 迁移工具
+import type {JSHookToolDefinition} from './ToolRegistry.js';
+import {ToolRegistry} from './ToolRegistry.js';
+import {
+  deobfuscateCodeVJ,
+  minifyCode,
+  transpileCode,
+  analyzeAst,
+  diffCode,
+} from './v-jstools.js';
 
 // 反调试工具
 
 // 加密库 Hook 工具
 
 // Vue 工具
-import type {JSHookToolDefinition} from './ToolRegistry.js';
-import {ToolRegistry} from './ToolRegistry.js';
+// Hook 工具 (AntiDebug_Breaker 迁移)
 import {activateVueDevtools} from './vue/activateVueDevtools.js';
 import {clearVueGuards} from './vue/clearVueGuards.js';
 import {getVueRoutes} from './vue/getVueRoutes.js';
 
 // CDP 代理
-import {listNetworkRequests, getNetworkRequest} from './network.js';
 import {
   listWebSocketConnections,
   getWebSocketMessages,
+  getWebSocketMessage,
   analyzeWebSocketMessages,
 } from './websocket.js';
 
@@ -134,6 +196,9 @@ const registry = new ToolRegistry();
  * 注册所有内置工具
  */
 export function registerBuiltInTools(): void {
+  // Idempotent: skip if already registered (e.g., auto-registered on module load)
+  if (registry.values().length > 0) return;
+
   registry.registerMany([
     // 技能工具
     invokeSkill,
@@ -155,15 +220,19 @@ export function registerBuiltInTools(): void {
     // WebSocket 工具
     listWebSocketConnections,
     getWebSocketMessages,
+    getWebSocketMessage,
     analyzeWebSocketMessages,
 
     // 输入工具
     click,
+    clickAt,
     pressKey,
     fillForm,
+    fill,
     uploadFile,
     hover,
     drag,
+    setFiles,
 
     // 导航工具
     clickElement,
@@ -175,10 +244,13 @@ export function registerBuiltInTools(): void {
     listPages,
     selectPage,
     newPage,
+    navigatePage,
 
     // 截图工具
     screenshot,
     captureVideoFrame,
+    getVideoInfo,
+    seekVideo,
 
     // 模拟工具
     emulateMobile,
@@ -213,10 +285,21 @@ export function registerBuiltInTools(): void {
     getAiDebugStatus,
     inspectObject,
     listHooks,
+    findInScript,
+    getRequestInitiator,
+    getPausedInfo,
+    evaluateOnCallframe,
+    setBreakpointOnText,
+    hookFunction,
+    unhookFunction,
+    xhrToJsBreakpoint,
+    startContinuousDebugging,
+    stopContinuousDebugging,
 
     // Hook 工具
     createHook,
     injectHook,
+    listCreatedHooks,
     getHookData,
     removeHook,
 
@@ -302,6 +385,41 @@ export function registerBuiltInTools(): void {
     dumpSessionState,
     loadSessionState,
     checkBrowserHealth,
+
+    // Hook 工具 (AntiDebug_Breaker 迁移)
+    hookConsoleLog,
+    hookConsoleTable,
+    hookLocationHref,
+    hookCookie,
+    hookXhrOpen,
+    hookXhrSetRequestHeader,
+    hookFetch,
+    hookJsonParse,
+    hookJsonStringify,
+    hookPromise,
+    hookRandom,
+    hookLocalStorage,
+    hookSessionStorage,
+    antiAntiHook,
+    hookWebSocket,
+    hookHistory,
+
+    // Hook 工具 (剩余 4 个 AntiDebug_Breaker 迁移)
+    hookPerformanceNow,
+    hookDateNow,
+    fixedWindowSize,
+    hookConsoleProtect,
+
+    // v_jstools 迁移工具
+    deobfuscateCodeVJ,
+    minifyCode,
+    transpileCode,
+    analyzeAst,
+    diffCode,
+
+    // v_jstools 代码模板
+    getCodeTemplate,
+    listCodeTemplates,
   ]);
 }
 
@@ -318,3 +436,6 @@ export function getToolRegistry(): ToolRegistry {
 export function listTools(): JSHookToolDefinition[] {
   return registry.values();
 }
+
+// Auto-register on module load so tools are always available
+registerBuiltInTools();

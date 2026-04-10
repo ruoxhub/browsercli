@@ -20,9 +20,13 @@ export async function statusCommand(): Promise<void> {
       console.log('Daemon 未运行');
     }
   } catch (error) {
-    console.error(
-      `Daemon 未运行：${error instanceof Error ? error.message : error}`,
-    );
+    const message = error instanceof Error ? error.message : String(error);
+    // 如果错误信息已经包含"未运行"等关键字，不再重复前缀
+    if (message.includes('未运行')) {
+      console.error(message);
+    } else {
+      console.error(`获取状态失败：${message}`);
+    }
     process.exit(1);
   }
 }

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * @license
  * Copyright 2025 Google LLC
@@ -101,10 +100,25 @@ export class WaitForHelper {
         resolve(true);
       };
 
-      this.#page._client().on('Page.frameStartedNavigating', listener);
+      (
+        this.#page as unknown as {
+          _client: () => {
+            on: (e: string, fn: (d: unknown) => void) => void;
+            off: (e: string, fn: (d: unknown) => void) => void;
+          };
+        }
+      )
+        ._client()
+        .on('Page.frameStartedNavigating', listener);
       this.#abortController.signal.addEventListener('abort', () => {
         resolve(false);
-        this.#page._client().off('Page.frameStartedNavigating', listener);
+        (
+          this.#page as unknown as {
+            _client: () => {off: (e: string, fn: (d: unknown) => void) => void};
+          }
+        )
+          ._client()
+          .off('Page.frameStartedNavigating', listener);
       });
     });
 
