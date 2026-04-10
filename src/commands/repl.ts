@@ -12,7 +12,14 @@ import {listTools} from '../tools/index.js';
 import {getBuiltInSkillDefinitions} from '../skills/index.js';
 import {logger} from '../logger.js';
 
-const REPL_COMMANDS = ['status', 'list-skills', 'list-tools', 'help', 'exit', 'quit'];
+const REPL_COMMANDS = [
+  'status',
+  'list-skills',
+  'list-tools',
+  'help',
+  'exit',
+  'quit',
+];
 const SKILL_NAMES = getBuiltInSkillDefinitions().map(s => s.name);
 let TOOL_NAMES: string[] | null = null;
 
@@ -126,10 +133,15 @@ export async function replCommand(): Promise<void> {
           } else {
             logger(`获取失败：${result.error}`);
           }
-        } catch (error) {
-          logger(
-            `获取技能列表失败：${error instanceof Error ? error.message : error}`,
-          );
+        } catch {
+          // Fallback to built-in skills
+          const skills = getBuiltInSkillDefinitions();
+          logger(`可用技能 (${skills.length}):`);
+          for (const s of skills) {
+            logger(`  - ${s.name}: ${s.description}`);
+          }
+          logger('');
+          logger('(离线模式：显示内置技能列表)');
         }
         prompt();
         return;
@@ -143,10 +155,15 @@ export async function replCommand(): Promise<void> {
           } else {
             logger(`获取失败：${result.error}`);
           }
-        } catch (error) {
-          logger(
-            `获取工具列表失败：${error instanceof Error ? error.message : error}`,
-          );
+        } catch {
+          // Fallback to built-in tools
+          const tools = listTools();
+          logger(`可用工具 (${tools.length}):`);
+          for (const t of tools) {
+            logger(`  - ${t.name}`);
+          }
+          logger('');
+          logger('(离线模式：显示内置工具列表)');
         }
         prompt();
         return;
