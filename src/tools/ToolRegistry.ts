@@ -34,6 +34,32 @@ export class ToolRegistry {
     }
   }
 
+  /**
+   * Auto-generate kebab-case aliases for all underscore tool names.
+   * Called after all tools are registered to avoid alias conflicts.
+   */
+  autoGenerateKebabAliases(): void {
+    const toAdd: Array<{tool: JSHookToolDefinition; kebabAlias: string}> = [];
+
+    for (const tool of this.tools.values()) {
+      if (!tool.name.includes('_')) continue;
+      const kebabName = tool.name.replace(/_/g, '-');
+      // Skip if tool already has this alias, or it conflicts with another tool/alias
+      if (tool.aliases?.includes(kebabName)) continue;
+      if (this.tools.has(kebabName)) continue;
+      if (this.aliases.has(kebabName)) continue;
+      // Check against other pending kebab aliases
+      if (toAdd.some(a => a.kebabAlias === kebabName)) continue;
+      toAdd.push({tool, kebabAlias: kebabName});
+    }
+
+    for (const {tool, kebabAlias} of toAdd) {
+      const aliases = [...(tool.aliases ?? []), kebabAlias];
+      this.tools.set(tool.name, {...tool, aliases});
+      this.aliases.set(kebabAlias, tool.name);
+    }
+  }
+
   registerMany(tools: JSHookToolDefinition[]): void {
     for (const tool of tools) {
       this.register(tool);

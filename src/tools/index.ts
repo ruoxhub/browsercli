@@ -81,6 +81,8 @@ import {updateExtensions} from './extensions.js';
 import {listFrames, selectFrame} from './frames.js';
 import {antiAntiHook} from './hook/antiAntiHook.js';
 import {fixedWindowSize} from './hook/fixedWindowSize.js';
+import {hookClose} from './hook/hookClose.js';
+import {hookConsoleClear} from './hook/hookConsoleClear.js';
 import {hookConsoleLog} from './hook/hookConsoleLog.js';
 import {hookConsoleProtect} from './hook/hookConsoleProtect.js';
 import {hookConsoleTable} from './hook/hookConsoleTable.js';
@@ -88,6 +90,7 @@ import {hookCookie} from './hook/hookCookie.js';
 import {hookDateNow} from './hook/hookDateNow.js';
 import {hookFetch} from './hook/hookFetch.js';
 import {hookHistory} from './hook/hookHistory.js';
+import {hookHistoryGo} from './hook/hookHistoryGo.js';
 import {hookJsonParse} from './hook/hookJsonParse.js';
 import {hookJsonStringify} from './hook/hookJsonStringify.js';
 import {hookLocalStorage} from './hook/hookLocalStorage.js';
@@ -160,7 +163,6 @@ import {
   listStealthPresets,
   setUserAgent,
 } from './stealth.js';
-
 // v_jstools 迁移工具
 import type {JSHookToolDefinition} from './ToolRegistry.js';
 import {ToolRegistry} from './ToolRegistry.js';
@@ -171,17 +173,13 @@ import {
   analyzeAst,
   diffCode,
 } from './v-jstools.js';
-
 // 反调试工具
-
 // 加密库 Hook 工具
-
 // Vue 工具
 // Hook 工具 (AntiDebug_Breaker 迁移)
 import {activateVueDevtools} from './vue/activateVueDevtools.js';
 import {clearVueGuards} from './vue/clearVueGuards.js';
 import {getVueRoutes} from './vue/getVueRoutes.js';
-
 // CDP 代理
 import {
   listWebSocketConnections,
@@ -410,6 +408,11 @@ export function registerBuiltInTools(): void {
     fixedWindowSize,
     hookConsoleProtect,
 
+    // Hook 工具 (新增 AntiDebug_Breaker 迁移)
+    hookClose,
+    hookConsoleClear,
+    hookHistoryGo,
+
     // v_jstools 迁移工具
     deobfuscateCodeVJ,
     minifyCode,
@@ -439,3 +442,4 @@ export function listTools(): JSHookToolDefinition[] {
 
 // Auto-register on module load so tools are always available
 registerBuiltInTools();
+registry.autoGenerateKebabAliases();
