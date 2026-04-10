@@ -4,6 +4,7 @@
  * Copyright 2026 JSReverser-MCP
  * SPDX-License-Identifier: Apache-2.0
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import type {Command} from 'commander';
 
@@ -1010,6 +1011,7 @@ function createLazyToolCommand(
  * 为所有已注册的工具生成 CLI 命令 - 懒加载版本
  * 关键：只注册命令结构，不加载工具模块
  */
+
 export async function generateToolCommands(program: Command): Promise<void> {
   const manualCommands = new Set([
     'start',

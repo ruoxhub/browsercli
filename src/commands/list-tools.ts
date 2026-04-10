@@ -49,6 +49,8 @@ export async function listToolsCommand(options: {
   console.log(formatTools(tools, !!options.json));
 
   if (isOffline && !options.json) {
-    console.log('\n(离线模式：显示内置工具定义，启动后台服务可获取完整工具列表)');
+    console.log(
+      '\n(离线模式：显示内置工具定义，启动后台服务可获取完整工具列表)',
+    );
   }
 }

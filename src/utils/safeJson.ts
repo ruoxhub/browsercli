@@ -3,6 +3,8 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 /**
  * 安全的 JSON 操作工具
  *
@@ -113,10 +115,12 @@ export function safeStringify(
  * @param text JSON 字符串
  * @returns 解析后的对象，失败时返回 null
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 export function safeParse(text: string): any {
   try {
     return JSON.parse(text);
-  } catch (error) {
+  } catch {
     return null;
   }
 }

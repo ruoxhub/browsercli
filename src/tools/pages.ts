@@ -21,7 +21,7 @@ export const listPages = defineTool({
     title: 'List pages',
   },
   schema: {},
-  handler: async (_request, response, context, runtime) => {
+  handler: async (_request, response, _context, _runtime) => {
     response.setIncludePages(true);
   },
 });
@@ -62,7 +62,7 @@ export const newPage = defineTool({
     url: zod.string().describe('URL to load in a new page.'),
     ...timeoutSchema,
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const page = await context.newPage();
 
     await context.waitForEventsAfterAction(async () => {
@@ -98,7 +98,7 @@ export const navigatePage = defineTool({
       .describe('Whether to ignore cache on reload.'),
     ...timeoutSchema,
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const page = context.getSelectedPage();
     const options = {
       timeout: request.params.timeout ?? DEFAULT_NAV_TIMEOUT,

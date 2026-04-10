@@ -188,6 +188,8 @@ export class OpenAIProvider implements AIProvider {
    * @param error - The error to handle
    * @returns Formatted error
    */
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+
   private handleError(error: unknown): Error {
     if (error instanceof OpenAI.APIError) {
       const message = `OpenAI API error (${error.status}): ${error.message}`;

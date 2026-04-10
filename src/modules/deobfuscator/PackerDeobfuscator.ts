@@ -142,7 +142,9 @@ export class PackerDeobfuscator {
     a: number;
     c: number;
     k: string[];
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
     e: Function;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
     d: Function;
   } | null {
     try {
@@ -162,8 +164,8 @@ export class PackerDeobfuscator {
         k: (params[3] || '').split('|'),
         e:
           params[4] ||
-          function (c: any) {
-            return c;
+          function (_c: number) {
+            return _c;
           },
         d:
           params[5] ||
@@ -184,7 +186,9 @@ export class PackerDeobfuscator {
     a: number;
     c: number;
     k: string[];
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
     e: Function;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
     d: Function;
   }): string {
     const {p, a, k} = params;
@@ -323,6 +327,7 @@ export class UniversalUnpacker {
   /**
    * 自动检测并反混淆
    */
+
   async deobfuscate(code: string): Promise<{
     code: string;
     type: string;

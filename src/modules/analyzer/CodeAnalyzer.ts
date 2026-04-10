@@ -3,6 +3,8 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 /**
  * 代码理解模块 - AI辅助代码语义理解
  */
@@ -126,6 +128,7 @@ export class CodeAnalyzer {
       });
 
       // 保存this引用以在traverse回调中使用
+      // eslint-disable-next-line @typescript-eslint/no-this-alias
       const self = this;
 
       traverse(ast, {
@@ -627,6 +630,7 @@ export class CodeAnalyzer {
         plugins: ['jsx', 'typescript'],
       });
 
+      // eslint-disable-next-line @typescript-eslint/no-this-alias
       const self = this;
 
       // 第一遍遍历：识别污点源和污点汇聚点
@@ -1893,6 +1897,7 @@ export class CodeAnalyzer {
     }> = [];
 
     try {
+      // eslint-disable-next-line @typescript-eslint/no-this-alias
       const self = this;
 
       // 收集所有代码块（函数、类方法、块语句）
@@ -2072,6 +2077,7 @@ export class CodeAnalyzer {
    * 使用Levenshtein距离算法计算字符串相似度
    * 返回值: 0.0 (完全不同) 到 1.0 (完全相同)
    */
+
   private calculateCodeSimilarity(code1: string, code2: string): number {
     // Levenshtein距离算法
     const len1 = code1.length;

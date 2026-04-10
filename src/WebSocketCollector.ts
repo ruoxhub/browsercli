@@ -251,9 +251,13 @@ export class WebSocketCollector {
       this.#splitAfterNavigation(page);
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     client.on('Network.webSocketCreated', onCreated as any);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     client.on('Network.webSocketFrameSent', onFrameSent as any);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     client.on('Network.webSocketFrameReceived', onFrameReceived as any);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     client.on('Network.webSocketClosed', onClosed as any);
     page.on('framenavigated', frame => {
       if (frame === page.mainFrame()) {
@@ -290,6 +294,7 @@ export class WebSocketCollector {
       try {
         // @ts-expect-error _client is internal Puppeteer API
         const client = page._client() as CDPSession;
+        /* eslint-disable @typescript-eslint/no-explicit-any */
         client.off('Network.webSocketCreated', listeners.onCreated as any);
         client.off('Network.webSocketFrameSent', listeners.onFrameSent as any);
         client.off(
@@ -297,6 +302,7 @@ export class WebSocketCollector {
           listeners.onFrameReceived as any,
         );
         client.off('Network.webSocketClosed', listeners.onClosed as any);
+        /* eslint-enable @typescript-eslint/no-explicit-any */
       } catch {
         // Page might already be closed
       }

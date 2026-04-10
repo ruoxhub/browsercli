@@ -31,7 +31,7 @@ export const bypassDebugger = defineTool({
     request: {params: {targets?: Array<'eval' | 'Function' | 'constructor'>}},
     response: Response,
     context: Context,
-    runtime,
+    _runtime,
   ) => {
     const targets = request.params.targets || [
       'eval',

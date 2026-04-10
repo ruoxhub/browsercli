@@ -147,7 +147,7 @@ export const performanceAnalyzeInsight = defineTool({
         'The name of the Insight you want more information on. For example: "DocumentLatency" or "LCPBreakdown"',
       ),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const lastRecording = context.recordedTraces().at(-1);
     if (!lastRecording) {
       response.appendResponseLine(

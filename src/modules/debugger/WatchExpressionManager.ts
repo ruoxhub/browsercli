@@ -3,6 +3,8 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 /**
  * WatchExpressionManager - 监视表达式管理
  *
@@ -281,6 +283,7 @@ export class WatchExpressionManager {
   /**
    * 导入监视表达式配置
    */
+
   importWatches(
     watches: Array<{expression: string; name?: string; enabled?: boolean}>,
   ): void {

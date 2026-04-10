@@ -291,7 +291,7 @@ export class HookCodeBuilder {
       description,
       action,
       capture,
-      condition,
+      condition: _condition,
       store,
       lifecycle,
       asyncAware,

@@ -205,6 +205,8 @@ export class AnthropicProvider implements AIProvider {
    * @param error - The error to handle
    * @returns Formatted error
    */
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+
   private handleError(error: unknown): Error {
     if (error instanceof Anthropic.APIError) {
       const message = `Anthropic API error (${error.status}): ${error.message}`;

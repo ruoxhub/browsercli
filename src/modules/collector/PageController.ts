@@ -3,6 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * 页面控制器 - 薄封装Puppeteer API
  *
@@ -862,8 +863,7 @@ export class PageController {
       const anchors = document.querySelectorAll('a[href]');
       const result: Array<{text: string; href: string}> = [];
 
-      for (let i = 0; i < anchors.length; i++) {
-        const anchor = anchors[i] as HTMLAnchorElement;
+      for (const anchor of Array.from(anchors) as HTMLAnchorElement[]) {
         result.push({
           text: anchor.textContent?.trim() || '',
           href: anchor.href,

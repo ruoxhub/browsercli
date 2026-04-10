@@ -248,7 +248,7 @@ Provide analysis in JSON format with the following structure:
         linesOfCode: file.content.split('\n').length,
         recommendations: parsed.recommendations,
       };
-    } catch (error) {
+    } catch {
       logger.warn('Failed to parse AI response, using basic analysis');
       return this.basicAnalysis(file);
     }

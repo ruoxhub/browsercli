@@ -3,6 +3,8 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 /**
  * 加密检测规则配置
  * 支持动态加载和扩展
@@ -486,6 +488,7 @@ export class CryptoRulesManager {
    * 导出规则为JSON
    * 注意：SecurityRule 的 check 函数和 PatternRule 的 custom matcher 无法序列化，仅导出元数据
    */
+
   exportToJSON(): string {
     return JSON.stringify(
       {

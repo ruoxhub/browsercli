@@ -113,7 +113,7 @@ const PRESET_CONFIGS: Record<string, Partial<AutoHookOptions>> = {
 /**
  * 生成 CryptoJS Hook 脚本
  */
-function generateCryptoJsHookScript(algorithms: string[] = ['all']): string {
+function _generateCryptoJsHookScript(algorithms: string[] = ['all']): string {
   return `
 (function() {
   'use strict';
@@ -184,7 +184,7 @@ function generateCryptoJsHookScript(algorithms: string[] = ['all']): string {
 /**
  * 生成 JSEncrypt Hook 脚本
  */
-function generateJsEncryptHookScript(): string {
+function _generateJsEncryptHookScript(): string {
   return `
 (function() {
   'use strict';
@@ -233,7 +233,7 @@ function generateJsEncryptHookScript(): string {
 /**
  * 生成 SM-Crypto Hook 脚本
  */
-function generateSmCryptoHookScript(): string {
+function _generateSmCryptoHookScript(): string {
   return `
 (function() {
   'use strict';
@@ -317,7 +317,7 @@ function generateSmCryptoHookScript(): string {
 /**
  * 生成 Fetch Hook 脚本
  */
-function generateFetchHookScript(): string {
+function _generateFetchHookScript(): string {
   return `
 (function() {
   'use strict';
@@ -366,7 +366,7 @@ function generateFetchHookScript(): string {
 /**
  * 生成 XHR Hook 脚本
  */
-function generateXhrHookScript(): string {
+function _generateXhrHookScript(): string {
   return `
 (function() {
   'use strict';
@@ -412,7 +412,7 @@ function generateXhrHookScript(): string {
 /**
  * 生成定时器 Hook 脚本
  */
-function generateTimerHookScript(): string {
+function _generateTimerHookScript(): string {
   return `
 (function() {
   'use strict';
@@ -470,7 +470,7 @@ function generateTimerHookScript(): string {
 /**
  * 生成 eval Hook 脚本
  */
-function generateEvalHookScript(): string {
+function _generateEvalHookScript(): string {
   return `
 (function() {
   'use strict';
@@ -524,7 +524,7 @@ function generateEvalHookScript(): string {
 /**
  * 生成 Cookie Hook 脚本
  */
-function generateCookieHookScript(): string {
+function _generateCookieHookScript(): string {
   return `
 (function() {
   'use strict';

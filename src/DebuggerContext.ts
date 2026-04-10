@@ -162,6 +162,7 @@ export class DebuggerContext {
     client.on('Debugger.scriptParsed', this.#onScriptParsed);
 
     // Listen for paused/resumed events
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     client.on('Debugger.paused', this.#onPaused as any);
     client.on('Debugger.resumed', this.#onResumed);
 
@@ -187,6 +188,7 @@ export class DebuggerContext {
     }
 
     this.#client.off('Debugger.scriptParsed', this.#onScriptParsed);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this.#client.off('Debugger.paused', this.#onPaused as any);
     this.#client.off('Debugger.resumed', this.#onResumed);
 

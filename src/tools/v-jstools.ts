@@ -7,7 +7,7 @@ import * as babelGenerator from '@babel/generator';
 import * as babelParser from '@babel/parser';
 import * as babelTemplate from '@babel/template';
 import * as babelTraverse from '@babel/traverse';
-import type {NodePath, Visitor, Scope} from '@babel/traverse';
+import type {NodePath, Visitor} from '@babel/traverse';
 import * as t from '@babel/types';
 import type {
   CallExpression,
@@ -18,33 +18,42 @@ import type {
 } from '@babel/types';
 import {minify} from 'terser';
 
-import {zod} from '../../third_party/index.js';
-import {ToolCategory} from '../categories.js';
-import {defineTool, type Context, type Response} from '../ToolDefinition.js';
+import {zod} from '../third_party/index.js';
+
+import {ToolCategory} from './categories.js';
+import {defineTool, type Context, type Response} from './ToolDefinition.js';
 
 // Re-export Babel packages
 const generator = babelGenerator.default;
 const parser = babelParser.default;
-const template = babelTemplate.default;
+const _template = babelTemplate.default;
 const traverse = babelTraverse.default;
 
 // ============== Babel visitors for deobfuscation ==============
 
 function delExtra(path: NodePath) {
   if ('extra' in path.node) {
-    delete (path.node as Record<string, unknown>)['extra'];
+    delete (path.node as unknown as Record<string, unknown>)['extra'];
   }
 }
 
-function transCondition(path: NodePath<ExpressionStatement>) {
+function transCondition(path: NodePath<t.IfStatement>) {
   const {test, consequent, alternate} = path.node;
   if (!test) return;
   const parentPath = path.parentPath;
   if (parentPath?.isAssignmentExpression()) {
     const {operator, left} = parentPath.node;
     if (operator === '=') {
-      const newConsequent = t.assignmentExpression('=', left, consequent);
-      const newAlternate = t.assignmentExpression('=', left, alternate);
+      const newConsequent = t.assignmentExpression(
+        '=',
+        left,
+        consequent as unknown as t.Expression,
+      );
+      const newAlternate = t.assignmentExpression(
+        '=',
+        left,
+        alternate as unknown as t.Expression,
+      );
       parentPath.replaceWith(
         t.conditionalExpression(test, newConsequent, newAlternate),
       );
@@ -191,7 +200,7 @@ function addCatchLog(path: NodePath) {
   );
 }
 
-function mergeObj(path: NodePath<VariableDeclarator>) {
+function _mergeObj(path: NodePath<VariableDeclarator>) {
   const {id, init} = path.node;
   if (!t.isObjectExpression(init)) return;
   if (!t.isIdentifier(id)) return;
@@ -232,7 +241,7 @@ function mergeObj(path: NodePath<VariableDeclarator>) {
   });
 }
 
-function callToStr(path: NodePath<VariableDeclarator>) {
+function _callToStr(path: NodePath<VariableDeclarator>) {
   const {id, init} = path.node;
   if (!t.isObjectExpression(init)) return;
   if (!t.isIdentifier(id)) return;
@@ -261,7 +270,12 @@ function callToStr(path: NodePath<VariableDeclarator>) {
           objKeys[key] = (_path, args) => {
             if (args?.length === 2) {
               _path.replaceWith(
-                t.binaryExpression(retStmt.argument.operator, args[0], args[1]),
+                t.binaryExpression(
+                  (retStmt.argument as unknown as {operator: string})
+                    .operator as t.BinaryExpression['operator'],
+                  args[0],
+                  args[1],
+                ),
               );
             }
           };
@@ -270,7 +284,8 @@ function callToStr(path: NodePath<VariableDeclarator>) {
             if (args?.length === 2) {
               _path.replaceWith(
                 t.logicalExpression(
-                  retStmt.argument.operator,
+                  (retStmt.argument as unknown as {operator: string})
+                    .operator as t.LogicalExpression['operator'],
                   args[0],
                   args[1],
                 ),
@@ -316,7 +331,7 @@ function callToStr(path: NodePath<VariableDeclarator>) {
           ? callee.property.name
           : null;
       if (!propName || !objKeys[propName]) return;
-      objKeys[propName](_path, _path.node.arguments);
+      objKeys[propName](_path, _path.node.arguments as t.Expression[]);
     },
     MemberExpression(_path) {
       if (
@@ -335,13 +350,13 @@ function callToStr(path: NodePath<VariableDeclarator>) {
   });
 }
 
-function replaceWhile(path: NodePath) {
+function _replaceWhile(path: NodePath) {
   if (!t.isWhileStatement(path.node)) return;
   const node = path.node;
   if (!t.isBooleanLiteral(node.test) && !t.isUnaryExpression(node.test)) return;
   if (
     !(
-      node.test.prefix ||
+      ('prefix' in node.test && node.test.prefix) ||
       ('value' in node.test && (node.test as {value: boolean}).value)
     )
   )
@@ -358,9 +373,11 @@ function replaceWhile(path: NodePath) {
     return;
 
   const switchStmt = body[0];
-  const arrName = t.isIdentifier(switchStmt.discriminant.object)
-    ? switchStmt.discriminant.object.name
-    : null;
+  const arrName =
+    t.isMemberExpression(switchStmt.discriminant) &&
+    t.isIdentifier(switchStmt.discriminant.object)
+      ? switchStmt.discriminant.object.name
+      : null;
   if (!arrName) return;
 
   let arr: string[] = [];
@@ -384,9 +401,12 @@ function replaceWhile(path: NodePath) {
     }
     // Also remove the index variable
     if (t.isIdentifier(id)) {
-      const argName = t.isIdentifier(switchStmt.discriminant.property.argument)
-        ? switchStmt.discriminant.property.argument.name
-        : null;
+      const argName =
+        (
+          switchStmt.discriminant as unknown as {
+            property?: {argument?: {name?: string}};
+          }
+        ).property?.argument?.name ?? null;
       if (id.name === argName) {
         prePath.remove();
       }
@@ -837,16 +857,20 @@ export const diffCode = defineTool({
     _context: Context,
     _runtime: unknown,
   ) => {
-    const {text1, text2, mode} = request.params;
+    const {text1, text2, mode: _mode} = request.params;
 
     try {
-      const {createTwoFilesPatch, diffChars, diffWords, diffLines} =
-        await import('diff');
+      const {
+        createTwoFilesPatch,
+        diffChars: _diffChars,
+        diffWords: _diffWords,
+        diffLines,
+      } = await import('diff');
       const lines1 = text1.split('\n');
       const lines2 = text2.split('\n');
-      const added =
+      const _added =
         lines2.length > lines1.length ? lines2.length - lines1.length : 0;
-      const removed =
+      const _removed =
         lines1.length > lines2.length ? lines1.length - lines2.length : 0;
 
       // Use diff library for detailed comparison
@@ -922,8 +946,10 @@ function runSojsonDeobfuscation(
   }
 
   // Sojson: extract decrypt code (first 3 statements)
-  ast = extractSojsonDecrypt(ast);
-  ast = evalSojsonDecrypt(ast);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ast = extractSojsonDecrypt(ast) as any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ast = evalSojsonDecrypt(ast) as any;
   applyGeneralPasses(ast);
 
   if (config.clearExtra) {
@@ -949,7 +975,7 @@ function runObDeobfuscation(
   let ast = parser.parse(jscode);
 
   // OB deobfuscation: attempt to find and eval the decoder
-  ast = evalObDecoder(ast);
+  ast = evalObDecoder(ast) as unknown as typeof ast;
   applyGeneralPasses(ast);
 
   if (config.clearExtra) {
@@ -1052,7 +1078,7 @@ function runAutoDeobfuscation(
   }
 
   // Detect JSFuck: mostly brackets, plus signs, exclamation marks
-  const bracketRatio = (code.match(/\[|\]|\+|\!/g) || []).length / code.length;
+  const bracketRatio = (code.match(/\[|\]|\+|!/g) || []).length / code.length;
   if (bracketRatio > 0.7 && code.length > 1000) {
     try {
       return runJSFuckDeobfuscation(jscode);
@@ -1090,7 +1116,8 @@ function extractSojsonDecrypt(ast: t.File): t.File {
 
   const {code} = generator(decryptAst, {compact: true});
   // Store globally for later eval
-  (globalThis as Record<string, string>).__sojson_decrypt_code = code;
+  (globalThis as unknown as Record<string, string>).__sojson_decrypt_code =
+    code;
   ast.program.body = restCode;
   return ast;
 }
@@ -1099,7 +1126,8 @@ function evalSojsonDecrypt(ast: t.File): t.File {
   // Run the decrypt code in a sandbox to get the decrypt function
   try {
     const code =
-      (globalThis as Record<string, string>).__sojson_decrypt_code || '';
+      (globalThis as unknown as Record<string, string>).__sojson_decrypt_code ||
+      '';
     if (!code) return ast;
 
     eval(code);
@@ -1172,7 +1200,7 @@ function removeSojsonExtra(ast: t.File) {
   // Clean marked nodes
   traverse(ast, {
     enter(path) {
-      if ((path as Record<string, unknown>)._remove) {
+      if ((path as unknown as {_remove?: boolean})._remove) {
         path.remove();
       }
     },
@@ -1216,12 +1244,12 @@ function markForRemoval(path: NodePath) {
       t.isFunctionDeclaration(target.node) ||
       t.isStatement(target.node)
     ) {
-      (target as Record<string, unknown>)._remove = true;
+      (target as unknown as {_remove?: boolean})._remove = true;
       return;
     }
     target = target.parentPath;
   }
-  (path as Record<string, unknown>)._remove = true;
+  (path as unknown as {_remove?: boolean})._remove = true;
 }
 
 // ============== Cleanup functions ==============

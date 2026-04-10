@@ -3,7 +3,9 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+import type {ReplayAction} from '../modules/collector/PageController.js';
 import {zod} from '../third_party/index.js';
+import type {CodeFile} from '../types/index.js';
 import {TokenBudgetManager} from '../utils/TokenBudgetManager.js';
 
 import {ToolCategory} from './categories.js';
@@ -25,9 +27,11 @@ export const deobfuscateCode = defineTool({
   },
   handler: async (request, response, context, runtime) => {
     void context;
-    const result = await runtime.deobfuscator.deobfuscate(
-      request.params as any,
-    );
+    const result = await runtime.deobfuscator.deobfuscate({
+      code: request.params.code,
+      aggressive: request.params.aggressive,
+      renameVariables: request.params.renameVariables,
+    });
     response.appendResponseLine('```json');
     response.appendResponseLine(JSON.stringify(result, null, 2));
     response.appendResponseLine('```');
@@ -49,7 +53,10 @@ export const understandCode = defineTool({
   },
   handler: async (request, response, context, runtime) => {
     void context;
-    const result = await runtime.analyzer.understand(request.params as any);
+    const result = await runtime.analyzer.understand({
+      code: request.params.code,
+      focus: request.params.focus,
+    });
     response.appendResponseLine('```json');
     response.appendResponseLine(JSON.stringify(result, null, 2));
     response.appendResponseLine('```');
@@ -90,7 +97,7 @@ export const summarizeCode = defineTool({
     void context;
     if (request.params.mode === 'project') {
       const result = await runtime.summarizer.summarizeProject(
-        (request.params.files ?? []) as any,
+        (request.params.files ?? []) as CodeFile[],
       );
       response.appendResponseLine('```json');
       response.appendResponseLine(JSON.stringify(result, null, 2));
@@ -100,7 +107,7 @@ export const summarizeCode = defineTool({
 
     if (request.params.mode === 'batch') {
       const result = await runtime.summarizer.summarizeBatch(
-        (request.params.files ?? []) as any,
+        (request.params.files ?? []) as CodeFile[],
       );
       response.appendResponseLine('```json');
       response.appendResponseLine(JSON.stringify(result, null, 2));
@@ -136,7 +143,9 @@ export const detectCrypto = defineTool({
   },
   handler: async (request, response, context, runtime) => {
     void context;
-    const result = await runtime.cryptoDetector.detect(request.params as any);
+    const result = await runtime.cryptoDetector.detect({
+      code: request.params.code,
+    });
     response.appendResponseLine('```json');
     response.appendResponseLine(JSON.stringify(result, null, 2));
     response.appendResponseLine('```');
@@ -878,7 +887,7 @@ async function runAnalyzeTargetWorkflow(
 
   const replayResults = params.autoReplayActions?.length
     ? await runtime.pageController.replayActions(
-        params.autoReplayActions as any,
+        params.autoReplayActions as ReplayAction[],
       )
     : [];
 

@@ -3,20 +3,21 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * JSVMP反混淆器
  * 识别和破解JavaScript虚拟机保护（JSVMP）混淆
  */
 
+import generateImport from '@babel/generator';
+const generate =
+  (generateImport as unknown as {default?: typeof generateImport}).default ??
+  generateImport;
 import * as parser from '@babel/parser';
 import traverseImport from '@babel/traverse';
 const traverse =
   (traverseImport as unknown as {default?: typeof traverseImport}).default ??
   traverseImport;
-import generateImport from '@babel/generator';
-const generate =
-  (generateImport as unknown as {default?: typeof generateImport}).default ??
-  generateImport;
 import * as t from '@babel/types';
 
 import type {LLMService} from '../../services/LLMService.js';
@@ -342,6 +343,7 @@ export class JSVMPDeobfuscator {
       });
 
       // 查找switch语句并提取case
+      // eslint-disable-next-line @typescript-eslint/no-this-alias
       const self = this;
       traverse(ast, {
         SwitchStatement(path) {
@@ -1024,7 +1026,7 @@ ${codeSnippet}
         if (jsonMatch) {
           vmAnalysis = JSON.parse(jsonMatch[0]);
         }
-      } catch (e) {
+      } catch {
         warnings.push('LLM返回结果解析失败，使用基础还原方法');
         return await this.restoreCustomVMBasic(
           code,

@@ -3,6 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * 高级反混淆模块 - 支持2024-2025最新混淆技术
  *
@@ -16,19 +17,19 @@
  * 7. Custom Obfuscators (魔改混淆器)
  */
 
-import {logger} from '../../utils/logger.js';
-import type {LLMService} from '../../services/LLMService.js';
-
+import generateImport from '@babel/generator';
+const generate =
+  (generateImport as unknown as {default?: typeof generateImport}).default ??
+  generateImport;
 import * as parser from '@babel/parser';
 import traverseImport from '@babel/traverse';
 const traverse =
   (traverseImport as unknown as {default?: typeof traverseImport}).default ??
   traverseImport;
-import generateImport from '@babel/generator';
-const generate =
-  (generateImport as unknown as {default?: typeof generateImport}).default ??
-  generateImport;
 import * as t from '@babel/types';
+
+import type {LLMService} from '../../services/LLMService.js';
+import {logger} from '../../utils/logger.js';
 
 export interface AdvancedDeobfuscateOptions {
   code: string;
@@ -219,6 +220,7 @@ export class AdvancedDeobfuscator {
     let decoded = code;
 
     // 查找所有不可见字符序列
+    // eslint-disable-next-line no-misleading-character-class
     const invisiblePattern = /[\u200B\u200C\u200D\u2060\uFEFF]+/g;
     const matches = code.match(invisiblePattern);
 

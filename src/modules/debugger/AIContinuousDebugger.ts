@@ -3,6 +3,8 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 /**
  * AIContinuousDebugger - AI 辅助连续调试
  *
@@ -310,7 +312,9 @@ export class AIContinuousDebugger {
       };
     } catch (error) {
       // 超时或其他错误，清理 XHR 断点
-      await this.xhrManager.removeXHRBreakpoint(breakpointId).catch(() => {});
+      await this.xhrManager.removeXHRBreakpoint(breakpointId).catch(() => {
+        /* no-op */
+      });
       throw error;
     }
   }
@@ -633,6 +637,7 @@ ${scopeVarsPreview || '(empty)'}
   /**
    * 关闭并清理资源
    */
+
   async close(): Promise<void> {
     await this.stop();
     this.iterationHistory = [];

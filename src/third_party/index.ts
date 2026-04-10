@@ -13,6 +13,7 @@ export {hideBin} from 'yargs/helpers';
 export {default as debug} from 'debug';
 export type {Debugger} from 'debug';
 export {z as zod} from 'zod';
+export type {Connection, CDPSession, Target} from 'puppeteer-core';
 
 // MCP SDK
 export {Client} from '@modelcontextprotocol/sdk/client/index.js';
@@ -41,8 +42,8 @@ export interface CDPError {
   code: number;
   message: string;
 }
-export type CommandParams<T extends CDPCommand> = Record<string, unknown>;
-export type CommandResult<T extends CDPCommand = CDPCommand> = Record<
+export type CommandParams<_T extends CDPCommand> = Record<string, unknown>;
+export type CommandResult<_T extends CDPCommand = CDPCommand> = Record<
   string,
   unknown
 >;
@@ -66,13 +67,11 @@ export interface CDPConnection {
   ) => Promise<{result: CommandResult<T>} | {error: CDPError}>;
 }
 
+/* eslint-disable @typescript-eslint/no-namespace */
 // 本地 DevTools 类型定义 - 避免 chrome-devtools-frontend 路径问题
-export type Connection = import('puppeteer-core').Connection;
-export type CDPSession = import('puppeteer-core').CDPSession;
 
 // Protocol 命名空间
 
-// eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Protocol {
   export interface Debugger {
     pause(): Promise<unknown>;
@@ -209,7 +208,6 @@ export namespace Protocol {
     requestServedFromCache: unknown;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-namespace
   export namespace Network {
     export interface WebSocketCreatedEvent {
       requestId: string;
@@ -261,7 +259,6 @@ export namespace Protocol {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-namespace
   export namespace Audits {
     export interface IssueAddedEvent {
       issue: unknown;
@@ -269,7 +266,7 @@ export namespace Protocol {
   }
 
   // Page 域 - 用于 WaitForHelper.ts 和 PageCollector.ts
-  // eslint-disable-next-line @typescript-eslint/no-namespace
+
   export namespace Page {
     export interface FrameStartedNavigatingEvent {
       navigationType: string;
@@ -310,22 +307,28 @@ export type IssuesManagerEventTypes = unknown;
 
 // Mock objects for chrome-devtools-frontend runtime values
 // These are stub implementations to satisfy type checking after removing the dependency
-// eslint-disable-next-line @typescript-eslint/no-namespace
+/* eslint-disable @typescript-eslint/no-namespace */
 export namespace Common {
   export class ObjectWrapper<T = unknown> {
-    emit(_event: string, _data?: T): void {}
+    emit(_event: string, _data?: T): void {
+      /* no-op */
+    }
     addEventListener(
       _event: string,
       _listener: (...args: unknown[]) => void,
-    ): void {}
+    ): void {
+      /* no-op */
+    }
     removeEventListener(
       _event: string,
       _listener: (...args: unknown[]) => void,
-    ): void {}
+    ): void {
+      /* no-op */
+    }
   }
 
   // EventTarget 类型 - 用于 PageCollector.ts
-  // eslint-disable-next-line @typescript-eslint/no-namespace
+
   export namespace EventTarget {
     export interface EventTargetEvent<T> {
       data: T;
@@ -348,7 +351,6 @@ export namespace MarkdownIssueDescription {
     null;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace I18n {
   export namespace DevToolsLocale {
     export const DevToolsLocale = {
@@ -356,19 +358,18 @@ export namespace I18n {
     };
   }
   export const i18n = {
-    registerLocaleDataForTest: (_locale: string, _data: unknown): void => {},
+    registerLocaleDataForTest: (_locale: string, _data: unknown): void => {
+      /* no-op */
+    },
   };
 }
 
 // PageCollector 需要的类型
-export type Target = import('puppeteer-core').Target;
-// eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace PageEvents {
   export type FrameNavigated = unknown;
 }
 
 // DevTools 命名空间 - 用于 DevToolsConnectionAdapter.ts
-// eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace devtools {
   // CDP 连接相关类型
   export interface CDPConnection {

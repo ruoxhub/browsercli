@@ -3,6 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * DOM检查器 - 薄封装CDP DOM域
  *
@@ -77,8 +78,7 @@ export class DOMInspector {
         // 获取元素属性
         const attributes: Record<string, string> = {};
         const attrs = element.attributes;
-        for (let i = 0; i < attrs.length; i++) {
-          const attr = attrs[i];
+        for (const attr of Array.from(attrs)) {
           if (attr) {
             attributes[attr.name] = attr.value;
           }
@@ -151,8 +151,7 @@ export class DOMInspector {
 
             const attributes: Record<string, string> = {};
             const attrs = element.attributes;
-            for (let j = 0; j < attrs.length; j++) {
-              const attr = attrs[j];
+            for (const attr of Array.from(attrs)) {
               if (attr) {
                 attributes[attr.name] = attr.value;
               }
@@ -231,8 +230,7 @@ export class DOMInspector {
 
             const children: any[] = [];
             const childElements = node.children;
-            for (let i = 0; i < childElements.length; i++) {
-              const child = childElements[i];
+            for (const child of Array.from(childElements)) {
               if (child) {
                 const childTree = buildTree(child, currentDepth + 1);
                 if (childTree) {
@@ -619,8 +617,7 @@ export class DOMInspector {
           let ix = 0;
           const siblings = el.parentNode?.children;
           if (siblings) {
-            for (let i = 0; i < siblings.length; i++) {
-              const sibling = siblings[i];
+            for (const sibling of Array.from(siblings)) {
               if (!sibling) continue;
 
               if (sibling === el) {

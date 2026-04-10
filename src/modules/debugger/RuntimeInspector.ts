@@ -3,6 +3,8 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 /**
  * RuntimeInspector - 运行时检查
  *
@@ -467,6 +469,7 @@ export class RuntimeInspector {
   /**
    * 关闭运行时检查器
    */
+
   async close(): Promise<void> {
     // disable() 内部已处理 detach 和状态清理
     if (this.enabled) {

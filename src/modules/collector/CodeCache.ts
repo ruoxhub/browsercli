@@ -127,7 +127,7 @@ export class CodeCache {
         totalSize: entry.totalSize,
         collectTime: entry.collectTime,
       };
-    } catch (error) {
+    } catch {
       // 缓存不存在或读取失败
       return null;
     }

@@ -35,7 +35,9 @@ export class CdpSessionProvider {
   invalidate(page: Page): void {
     const session = this.#pageSessions.get(page);
     if (session) {
-      void session.detach().catch(() => {});
+      void session.detach().catch((_error: unknown) => {
+        // Intentionally ignored — session detach errors are expected on cleanup
+      });
       this.#pageSessions.delete(page);
     }
   }

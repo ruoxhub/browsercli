@@ -7,7 +7,6 @@
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {getJSHookRuntime} from './runtime.js';
 import {defineTool} from './ToolDefinition.js';
 
 /**
@@ -33,7 +32,7 @@ export const handleDialog = defineTool({
       ),
   },
   handler: async (request, response, context, runtime) => {
-    const page = await runtime.collector.getActivePage();
+    const _page = await runtime.collector.getActivePage();
 
     // 尝试从上下文获取 dialog，如果没有则使用最近打开的 dialog
     const dialog = context.getDialog();
@@ -52,7 +51,7 @@ export const handleDialog = defineTool({
             await dialog.accept();
           }
           response.appendResponseLine('Successfully accepted the dialog');
-        } catch (err) {
+        } catch {
           // 可能已经被外部处理
           response.appendResponseLine(
             'Dialog may have already been handled externally',
@@ -64,7 +63,7 @@ export const handleDialog = defineTool({
         try {
           await dialog.dismiss();
           response.appendResponseLine('Successfully dismissed the dialog');
-        } catch (err) {
+        } catch {
           // 可能已经被外部处理
           response.appendResponseLine(
             'Dialog may have already been handled externally',

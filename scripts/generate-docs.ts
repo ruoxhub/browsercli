@@ -7,46 +7,128 @@
 import fs from 'node:fs';
 
 import {cliOptions} from '../build/src/cli.js';
-import * as jshookAnalyzerTools from '../build/src/tools/analyzer.js';
+import * as analyzerTools from '../build/src/tools/analyzer.js';
+import * as antiDebugTools from '../build/src/tools/anti-debug/antiAntiDebug.js';
+import * as bypassDebuggerTools from '../build/src/tools/anti-debug/bypassDebugger.js';
 import {ToolCategory, labels} from '../build/src/tools/categories.js';
-import * as jshookCollectorTools from '../build/src/tools/collector.js';
+import * as cdpProxyTools from '../build/src/tools/cdp-proxy.js';
+import * as codeTemplateTools from '../build/src/tools/code-templates.js';
+import * as collectorTools from '../build/src/tools/collector.js';
 import * as consoleTools from '../build/src/tools/console.js';
+import * as hookCryptoJS from '../build/src/tools/crypto/hookCryptoJS.js';
+import * as hookJSEncrypt from '../build/src/tools/crypto/hookJSEncrypt.js';
+import * as hookSMCrypto from '../build/src/tools/crypto/hookSMCrypto.js';
 import * as debuggerTools from '../build/src/tools/debugger.js';
-import * as jshookDomTools from '../build/src/tools/dom.js';
-import * as jshookHookTools from '../build/src/tools/hook.js';
+import * as dialogTools from '../build/src/tools/dialog.js';
+import * as domTools from '../build/src/tools/dom.js';
+import * as emulationTools from '../build/src/tools/emulation.js';
+import * as extensionsTools from '../build/src/tools/extensions.js';
+import * as framesTools from '../build/src/tools/frames.js';
+import * as hookAntiAntiHook from '../build/src/tools/hook/antiAntiHook.js';
+import * as hookFixedWindowSize from '../build/src/tools/hook/fixedWindowSize.js';
+import * as hookConsoleLog from '../build/src/tools/hook/hookConsoleLog.js';
+import * as hookConsoleProtect from '../build/src/tools/hook/hookConsoleProtect.js';
+import * as hookConsoleTable from '../build/src/tools/hook/hookConsoleTable.js';
+import * as hookCookie from '../build/src/tools/hook/hookCookie.js';
+import * as hookDateNow from '../build/src/tools/hook/hookDateNow.js';
+import * as hookFetch from '../build/src/tools/hook/hookFetch.js';
+import * as hookHistory from '../build/src/tools/hook/hookHistory.js';
+import * as hookJsonParse from '../build/src/tools/hook/hookJsonParse.js';
+import * as hookJsonStringify from '../build/src/tools/hook/hookJsonStringify.js';
+import * as hookLocalStorage from '../build/src/tools/hook/hookLocalStorage.js';
+import * as hookLocationHref from '../build/src/tools/hook/hookLocationHref.js';
+import * as hookPerformanceNow from '../build/src/tools/hook/hookPerformanceNow.js';
+import * as hookPromise from '../build/src/tools/hook/hookPromise.js';
+import * as hookRandom from '../build/src/tools/hook/hookRandom.js';
+import * as hookSessionStorage from '../build/src/tools/hook/hookSessionStorage.js';
+import * as hookWebSocket from '../build/src/tools/hook/hookWebSocket.js';
+import * as hookXhrOpen from '../build/src/tools/hook/hookXhrOpen.js';
+import * as hookXhrSetRequestHeader from '../build/src/tools/hook/hookXhrSetRequestHeader.js';
+import * as hookTools from '../build/src/tools/hook.js';
+import * as inputTools from '../build/src/tools/input.js';
 import * as networkTools from '../build/src/tools/network.js';
-import * as jshookPageTools from '../build/src/tools/page.js';
+import * as pageTools from '../build/src/tools/page.js';
 import * as pagesTools from '../build/src/tools/pages.js';
+import * as performanceTools from '../build/src/tools/performance.js';
+import * as rebuildTools from '../build/src/tools/rebuild.js';
 import * as screenshotTools from '../build/src/tools/screenshot.js';
+import * as scriptInjectorTools from '../build/src/tools/script-injector.js';
 import * as scriptTools from '../build/src/tools/script.js';
-import * as jshookStealthTools from '../build/src/tools/stealth.js';
+import * as siteExperienceTools from '../build/src/tools/siteExperience.js';
+import * as skillTools from '../build/src/tools/skill.js';
+import * as stealthTools from '../build/src/tools/stealth.js';
+import * as vJsTools from '../build/src/tools/v-jstools.js';
+import * as vueDevtoolsTools from '../build/src/tools/vue/activateVueDevtools.js';
+import * as vueClearGuardTools from '../build/src/tools/vue/clearVueGuards.js';
+import * as vueRouteTools from '../build/src/tools/vue/getVueRoutes.js';
 import * as websocketTools from '../build/src/tools/websocket.js';
 
-const OUTPUT_PATH = './docs/tool-reference.md';
+const OUTPUT_PATH = './docs/reference/tool-reference.md';
 const README_PATH = './README.md';
 
 interface ToolDef {
   name: string;
   description: string;
-  annotations: {category: ToolCategory};
+  annotations: {category: ToolCategory; title?: string};
   schema: Record<string, unknown>;
 }
 
 function allTools(): ToolDef[] {
   return [
+    ...Object.values(analyzerTools),
+    ...Object.values(antiDebugTools),
+    ...Object.values(bypassDebuggerTools),
+    ...Object.values(cdpProxyTools),
+    ...Object.values(codeTemplateTools),
+    ...Object.values(collectorTools),
     ...Object.values(consoleTools),
+    ...Object.values(hookCryptoJS),
+    ...Object.values(hookJSEncrypt),
+    ...Object.values(hookSMCrypto),
     ...Object.values(debuggerTools),
+    ...Object.values(dialogTools),
+    ...Object.values(domTools),
+    ...Object.values(emulationTools),
+    ...Object.values(extensionsTools),
+    ...Object.values(framesTools),
+    ...Object.values(hookTools),
+    ...Object.values(hookAntiAntiHook),
+    ...Object.values(hookFixedWindowSize),
+    ...Object.values(hookConsoleLog),
+    ...Object.values(hookConsoleProtect),
+    ...Object.values(hookConsoleTable),
+    ...Object.values(hookCookie),
+    ...Object.values(hookDateNow),
+    ...Object.values(hookFetch),
+    ...Object.values(hookHistory),
+    ...Object.values(hookJsonParse),
+    ...Object.values(hookJsonStringify),
+    ...Object.values(hookLocalStorage),
+    ...Object.values(hookLocationHref),
+    ...Object.values(hookPerformanceNow),
+    ...Object.values(hookPromise),
+    ...Object.values(hookRandom),
+    ...Object.values(hookSessionStorage),
+    ...Object.values(hookWebSocket),
+    ...Object.values(hookXhrOpen),
+    ...Object.values(hookXhrSetRequestHeader),
+    ...Object.values(inputTools),
     ...Object.values(networkTools),
+    ...Object.values(pageTools),
     ...Object.values(pagesTools),
+    ...Object.values(performanceTools),
+    ...Object.values(rebuildTools),
     ...Object.values(screenshotTools),
     ...Object.values(scriptTools),
+    ...Object.values(scriptInjectorTools),
+    ...Object.values(siteExperienceTools),
+    ...Object.values(skillTools),
+    ...Object.values(stealthTools),
+    ...Object.values(vJsTools),
+    ...Object.values(vueDevtoolsTools),
+    ...Object.values(vueClearGuardTools),
+    ...Object.values(vueRouteTools),
     ...Object.values(websocketTools),
-    ...Object.values(jshookCollectorTools),
-    ...Object.values(jshookAnalyzerTools),
-    ...Object.values(jshookHookTools),
-    ...Object.values(jshookStealthTools),
-    ...Object.values(jshookDomTools),
-    ...Object.values(jshookPageTools),
   ] as ToolDef[];
 }
 
@@ -119,7 +201,7 @@ function generateDocs(): void {
   }
 
   const categoryOrder = Object.values(ToolCategory);
-  let markdown = `<!-- AUTO GENERATED DO NOT EDIT - run 'npm run docs' to update-->\n\n# Chrome DevTools MCP Tool Reference\n\n> 快速按逆向目标查工具，请先看：[\`docs/reverse-task-index.md\`](./reverse-task-index.md)\n\n`;
+  let markdown = `<!-- AUTO GENERATED DO NOT EDIT - run 'npm run docs' to update-->\n\n# Chrome DevTools MCP Tool Reference\n\n> 快速按逆向目标查工具，请先看：[\`reverse-task-index.md\`](./reverse-task-index.md)\n\n`;
 
   for (const category of categoryOrder) {
     const toolsInCategory = categories.get(category) || [];
@@ -138,7 +220,8 @@ function generateDocs(): void {
 
     markdown += `## ${labels[category]}\n\n`;
     for (const tool of toolsInCategory) {
-      markdown += `### \`${tool.name}\`\n\n`;
+      const toolTitle = tool.annotations?.title || tool.name;
+      markdown += `### \`${tool.name}\` — ${toolTitle}\n\n`;
       markdown += `**Description:** ${tool.description}\n\n`;
 
       const params = Object.keys(tool.schema || {});
@@ -161,7 +244,7 @@ function generateDocs(): void {
       ];
       for (const tool of categoryTools) {
         lines.push(
-          `  - [\`${tool.name}\`](docs/tool-reference.md#${tool.name.toLowerCase()})`,
+          `  - [\`${tool.name}\`](docs/reference/tool-reference.md#${tool.name.toLowerCase()})`,
         );
       }
       return lines.join('\n');

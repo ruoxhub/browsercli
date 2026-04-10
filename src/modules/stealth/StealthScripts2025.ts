@@ -10,6 +10,8 @@
  * 覆盖所有主流浏览器指纹检测维度
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import type {Page} from 'puppeteer';
 
 import {logger} from '../../logger.js';
@@ -537,11 +539,19 @@ export class StealthScripts2025 {
         w.chrome = {};
       }
       w.chrome.runtime = {
-        connect: () => {},
-        sendMessage: () => {},
+        connect: () => {
+          /* no-op */
+        },
+        sendMessage: () => {
+          /* no-op */
+        },
         onMessage: {
-          addListener: () => {},
-          removeListener: () => {},
+          addListener: () => {
+            /* no-op */
+          },
+          removeListener: () => {
+            /* no-op */
+          },
           hasListener: () => false,
           hasListeners: () => false,
         },
@@ -654,8 +664,12 @@ export class StealthScripts2025 {
           return Promise.resolve({
             state: Notification.permission,
             onchange: null,
-            addEventListener: () => {},
-            removeEventListener: () => {},
+            addEventListener: () => {
+              /* no-op */
+            },
+            removeEventListener: () => {
+              /* no-op */
+            },
             dispatchEvent: () => true,
           } as unknown as PermissionStatus);
         }
@@ -703,7 +717,9 @@ export class StealthScripts2025 {
           (list as any).item = (idx: number) => list[idx] ?? null;
           (list as any).namedItem = (name: string) =>
             list.find(p => p.name === name) ?? null;
-          (list as any).refresh = () => {};
+          (list as any).refresh = () => {
+            /* no-op */
+          };
           return list;
         },
       });
@@ -889,8 +905,12 @@ export class StealthScripts2025 {
             onchargingtimechange: null,
             ondischargingtimechange: null,
             onlevelchange: null,
-            addEventListener: () => {},
-            removeEventListener: () => {},
+            addEventListener: () => {
+              /* no-op */
+            },
+            removeEventListener: () => {
+              /* no-op */
+            },
             dispatchEvent: () => true,
           });
         /* eslint-enable */
@@ -986,8 +1006,12 @@ export class StealthScripts2025 {
             rtt: c.rtt,
             saveData: c.saveData,
             onchange: null,
-            addEventListener: () => {},
-            removeEventListener: () => {},
+            addEventListener: () => {
+              /* no-op */
+            },
+            removeEventListener: () => {
+              /* no-op */
+            },
             dispatchEvent: () => true,
           }),
           configurable: true,

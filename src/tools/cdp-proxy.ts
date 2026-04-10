@@ -29,7 +29,7 @@ export const cdp_start_proxy = defineTool({
   schema: {
     port: zod.number().optional().describe('HTTP 端口，默认 3456'),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, _context, _runtime) => {
     if (proxyInstance) {
       response.appendResponseLine('CDP Proxy 已经在运行中');
       return;
@@ -66,7 +66,7 @@ export const cdp_get_targets = defineTool({
     title: 'Get CDP targets',
   },
   schema: {},
-  handler: async (_request, response, context, runtime) => {
+  handler: async (_request, response, context, _runtime) => {
     const pages = context.getPages();
     const targets = pages.map((page: Page, idx: number) => ({
       index: idx,
@@ -93,7 +93,7 @@ export const cdp_new_page = defineTool({
   schema: {
     url: zod.string().optional().describe('初始 URL，默认 about:blank'),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const page = await context.newPage();
     if (request.params.url && request.params.url !== 'about:blank') {
       await page.goto(request.params.url, {waitUntil: 'domcontentloaded'});
@@ -116,7 +116,7 @@ export const cdp_close_page = defineTool({
   schema: {
     pageIdx: zod.number().describe('页面索引（从 get_targets 获取）'),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     await context.closePage(request.params.pageIdx);
     response.appendResponseLine(`页面 ${request.params.pageIdx} 已关闭`);
   },
@@ -136,7 +136,7 @@ export const cdp_navigate = defineTool({
   schema: {
     url: zod.string().describe('目标 URL'),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const page = context.getSelectedPage();
     await page.goto(request.params.url, {waitUntil: 'domcontentloaded'});
     response.appendResponseLine(`已导航到：${page.url()}`);
@@ -157,7 +157,7 @@ export const cdp_eval = defineTool({
   schema: {
     expr: zod.string().describe('JavaScript 表达式'),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const page = context.getSelectedPage();
     const result = await page.evaluate(request.params.expr);
     response.appendResponseLine('## 执行结果');
@@ -179,7 +179,7 @@ export const cdp_click = defineTool({
   schema: {
     selector: zod.string().describe('CSS 选择器'),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const page = context.getSelectedPage();
     const result = await page.evaluate((sel: string) => {
       const el = document.querySelector(sel);
@@ -206,7 +206,7 @@ export const cdp_click_at = defineTool({
   schema: {
     selector: zod.string().describe('CSS 选择器'),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const page = context.getSelectedPage();
     const coord = await page.evaluate((sel: string) => {
       const el = document.querySelector(sel);
@@ -248,7 +248,7 @@ export const cdp_screenshot = defineTool({
       .describe('图片类型，默认 png'),
     fullPage: zod.boolean().optional().describe('是否截取整个页面，默认 false'),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const page = context.getSelectedPage();
     const type = request.params.type || 'png';
     const fullPage = request.params.fullPage || false;
@@ -290,7 +290,7 @@ export const cdp_scroll = defineTool({
       .optional()
       .describe('滚动方向，默认 down'),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const page = context.getSelectedPage();
     const y = request.params.y || 3000;
     const direction = request.params.direction || 'down';
@@ -327,7 +327,7 @@ export const cdp_upload_files = defineTool({
     selector: zod.string().describe('文件输入框的 CSS 选择器'),
     files: zod.array(zod.string()).describe('本地文件路径列表'),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const page = context.getSelectedPage();
     const input = await page.$(request.params.selector);
     if (!input) {
@@ -353,7 +353,7 @@ export const cdp_page_info = defineTool({
     title: 'CDP page info',
   },
   schema: {},
-  handler: async (_request, response, context, runtime) => {
+  handler: async (_request, response, context, _runtime) => {
     const page = context.getSelectedPage();
     const info = await page.evaluate(() => ({
       title: document.title,

@@ -166,20 +166,6 @@ function checkPort(port: number): Promise<boolean> {
   });
 }
 
-/**
- * 使用 WebSocket 连接测试端口是否可用
- */
-async function testWebSocketPort(port: number): Promise<boolean> {
-  try {
-    const response = await fetch(`http://127.0.0.1:${port}/json/version`, {
-      signal: AbortSignal.timeout(2000),
-    });
-    return response.ok;
-  } catch {
-    return false;
-  }
-}
-
 export async function resolveAutoConnectTarget(options?: {
   candidates?: string[];
   fetchImpl?: typeof fetch;
@@ -637,7 +623,7 @@ export class BrowserManager {
 
           // 使用 CDP 命令获取浏览器窗口边界
           const client = await page.createCDPSession();
-          const {windowId, bounds} = await client.send(
+          const {windowId: _windowId, bounds} = await client.send(
             'Browser.getWindowForTarget',
             {
               targetId,

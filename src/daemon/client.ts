@@ -150,7 +150,8 @@ export function handleResponse(
   }
   const texts =
     result.content
-      ?.filter((c: any) => c.type === 'text')
-      .map((c: any) => c.text) || [];
+      ?.filter((c: {type: string}) => c.type === 'text')
+      .map(c => (c as {type: string; text?: string}).text)
+      .filter((t): t is string => typeof t === 'string') || [];
   return texts.join('\n');
 }

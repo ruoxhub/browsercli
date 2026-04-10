@@ -3,9 +3,10 @@
  * Copyright 2026 JSReverser-MCP
  * SPDX-License-Identifier: Apache-2.0
  */
-import {zod} from '../../third_party/index.js';
-import {ToolCategory} from '../categories.js';
-import {defineTool, type Context, type Response} from '../ToolDefinition.js';
+import {zod} from '../third_party/index.js';
+
+import {ToolCategory} from './categories.js';
+import {defineTool, type Context, type Response} from './ToolDefinition.js';
 
 // Code templates migrated from v_jstools html_codes
 const TEMPLATES: Record<
@@ -115,12 +116,7 @@ export const getCodeTemplate = defineTool({
       ])
       .describe('模板名称'),
   },
-  handler: async (
-    request: {params: {name: string}},
-    response: Response,
-    _context: Context,
-    _runtime: unknown,
-  ) => {
+  handler: async (request, response, _context, _runtime) => {
     const templateName = request.params.name;
     const templateInfo = TEMPLATES[templateName];
 

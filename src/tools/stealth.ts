@@ -7,7 +7,6 @@ import {StealthScripts2025} from '../modules/stealth/StealthScripts2025.js';
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {getJSHookRuntime} from './runtime.js';
 import {defineTool} from './ToolDefinition.js';
 
 export const injectStealth = defineTool({
@@ -45,7 +44,7 @@ export const listStealthPresets = defineTool({
     title: 'List stealth presets',
   },
   schema: {},
-  handler: async (_request, response, context, runtime) => {
+  handler: async (_request, response, _context, _runtime) => {
     response.appendResponseLine('```json');
     response.appendResponseLine(
       JSON.stringify(StealthScripts2025.getPresets(), null, 2),
@@ -63,7 +62,7 @@ export const listStealthFeatures = defineTool({
     title: 'List stealth feature toggles',
   },
   schema: {},
-  handler: async (_request, response, context, runtime) => {
+  handler: async (_request, response, _context, _runtime) => {
     response.appendResponseLine('```json');
     response.appendResponseLine(
       JSON.stringify(

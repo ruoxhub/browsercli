@@ -3,6 +3,8 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 /**
  * 代码收集模块 - 完整实现
  *
@@ -1449,6 +1451,7 @@ export class CodeCollector {
   /**
    * 清除文件缓存
    */
+
   clearCollectedFilesCache(): void {
     const count = this.collectedFilesCache.size;
     this.collectedFilesCache.clear();

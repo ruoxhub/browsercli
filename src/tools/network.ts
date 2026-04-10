@@ -71,7 +71,7 @@ export const listNetworkRequests = defineTool({
         'Set to true to return the preserved requests over the last 3 navigations.',
       ),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const data = await context.getDevToolsData();
     const reqid = data?.cdpRequestId
       ? context.resolveCdpRequestId(data.cdpRequestId)
@@ -102,7 +102,7 @@ export const getNetworkRequest = defineTool({
         'The reqid of the network request. If omitted returns the currently selected request in the DevTools Network panel.',
       ),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     if (request.params.reqid) {
       response.attachNetworkRequest(request.params.reqid);
     } else {

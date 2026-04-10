@@ -3,6 +3,8 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 /**
  * 脚本管理器 - 薄封装CDP Debugger域
  *
@@ -804,6 +806,7 @@ export class ScriptManager {
   /**
    * 🆕 增强的搜索（使用内存索引，避免重复加载脚本源码）
    */
+
   async searchInScriptsEnhanced(
     keyword: string,
     options: {

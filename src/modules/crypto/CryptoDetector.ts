@@ -3,6 +3,8 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 /**
  * 加密检测模块 - 优化版本
  *
@@ -294,6 +296,7 @@ export class CryptoDetector {
   /**
    * 查找关键字所在行号
    */
+
   private findLineNumber(code: string, keyword: string): number {
     const lines = code.split('\n');
     for (let i = 0; i < lines.length; i++) {

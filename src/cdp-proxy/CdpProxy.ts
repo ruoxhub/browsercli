@@ -6,7 +6,6 @@
 
 import fs from 'node:fs';
 import http from 'node:http';
-import net from 'node:net';
 import {URL} from 'node:url';
 
 import {logger} from '../logger.js';

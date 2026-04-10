@@ -14,7 +14,7 @@
  */
 
 import type {HookCodeBuilder} from './HookCodeBuilder.js';
-import {type BuilderConfig} from './HookCodeBuilder.js';
+import {type BuilderConfig as _BuilderConfig} from './HookCodeBuilder.js';
 
 // ==================== 插件接口 ====================
 
@@ -278,7 +278,7 @@ function createXHRPlugin(): HookTypePlugin {
   return {
     name: 'xhr',
     description: 'Hook XMLHttpRequest with URL filtering',
-    apply(builder, params) {
+    apply(builder, _params) {
       return builder.intercept('XMLHttpRequest.prototype.open', 'XHR.open');
     },
     customBuild(builder, params) {

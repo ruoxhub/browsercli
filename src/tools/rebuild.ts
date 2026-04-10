@@ -336,6 +336,7 @@ export const exportRebuildBundle = defineTool({
   },
   schema: {
     taskSlug: zod.string(),
+    taskId: zod.string().optional(),
     targetUrl: zod.string(),
     goal: zod.string(),
     autoGenerate: zod.boolean().optional(),
@@ -451,7 +452,7 @@ export const diffEnvRequirements = defineTool({
     runtimeError: zod.string(),
     observedCapabilities: zod.array(zod.string()).default([]),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, _context, _runtime) => {
     const missingCapabilities = inferMissingCapabilities(
       request.params.runtimeError,
       request.params.observedCapabilities,

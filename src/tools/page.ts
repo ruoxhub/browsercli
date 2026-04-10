@@ -3,6 +3,8 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import {
   createCipheriv,
   createDecipheriv,
@@ -15,7 +17,6 @@ import {zod} from '../third_party/index.js';
 import {validateOutputPath} from '../utils/fsSafe.js';
 
 import {ToolCategory} from './categories.js';
-import {getJSHookRuntime} from './runtime.js';
 import {defineTool} from './ToolDefinition.js';
 
 interface SessionSnapshot {
@@ -395,7 +396,7 @@ export const listSessionStates = defineTool({
     title: 'List saved session snapshots',
   },
   schema: {},
-  handler: async (_request, response, context, runtime) => {
+  handler: async (_request, response, _context, _runtime) => {
     ensureCleanupLoop();
     const removed = cleanupExpiredSessions();
     const sessions = Array.from(sessionSnapshots.values()).map(snapshot => ({
@@ -434,7 +435,7 @@ export const deleteSessionState = defineTool({
   schema: {
     sessionId: zod.string(),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, _context, _runtime) => {
     ensureCleanupLoop();
     cleanupExpiredSessions();
     const deleted = sessionSnapshots.delete(request.params.sessionId);
@@ -469,7 +470,7 @@ export const dumpSessionState = defineTool({
     pretty: zod.boolean().optional(),
     encrypt: zod.boolean().optional(),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, _context, _runtime) => {
     ensureCleanupLoop();
     cleanupExpiredSessions();
     const snapshot = sessionSnapshots.get(request.params.sessionId);
@@ -523,7 +524,7 @@ export const loadSessionState = defineTool({
     snapshotJson: zod.string().optional(),
     overwrite: zod.boolean().optional(),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, _context, _runtime) => {
     ensureCleanupLoop();
     cleanupExpiredSessions();
 

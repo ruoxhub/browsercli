@@ -30,6 +30,8 @@ import type {
 } from './third_party/index.js';
 import type {AggregatedIssue} from './third_party/index.js';
 import type {ImageContentData, Response} from './tools/ToolDefinition.js';
+import {paginate} from './utils/pagination.js';
+import type {PaginationOptions} from './utils/types.js';
 
 function isAggregatedIssue(value: unknown): value is AggregatedIssue {
   return (
@@ -39,8 +41,6 @@ function isAggregatedIssue(value: unknown): value is AggregatedIssue {
     typeof (value as Record<string, unknown>).code === 'function'
   );
 }
-import {paginate} from './utils/pagination.js';
-import type {PaginationOptions} from './utils/types.js';
 
 export class McpResponse implements Response {
   #includePages = false;

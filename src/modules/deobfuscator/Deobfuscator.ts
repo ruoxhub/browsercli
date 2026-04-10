@@ -21,18 +21,18 @@
  *   - 结果缓存 + LRU 淘汰
  */
 
+import crypto from 'node:crypto';
+
+import generateImport from '@babel/generator';
+const generate =
+  (generateImport as unknown as {default?: typeof generateImport}).default ??
+  generateImport;
 import * as parser from '@babel/parser';
 import traverseImport from '@babel/traverse';
 const traverse =
   (traverseImport as unknown as {default?: typeof traverseImport}).default ??
   traverseImport;
-import generateImport from '@babel/generator';
-const generate =
-  (generateImport as unknown as {default?: typeof generateImport}).default ??
-  generateImport;
 import * as t from '@babel/types';
-
-import crypto from 'node:crypto';
 
 import type {LLMService} from '../../services/LLMService.js';
 import type {
@@ -575,7 +575,7 @@ export class Deobfuscator {
     }
 
     // JSFuck
-    if (/^\s*[\[\]()!+]+\s*$/.test(code.substring(0, 200))) {
+    if (/^\s*[\]()!+]+\s*$/.test(code.substring(0, 200))) {
       types.push('jsfuck');
     }
 

@@ -3,6 +3,8 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 /**
  * AdaptiveDataSerializer - 自适应数据序列化器
  *
@@ -389,6 +391,8 @@ export class AdaptiveDataSerializer {
   /**
    * 简化函数树
    */
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+
   private simplifyFunctionTree(
     tree: any,
     maxDepth: number,

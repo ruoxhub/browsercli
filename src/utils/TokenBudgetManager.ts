@@ -3,6 +3,8 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 /**
  * TokenBudgetManager - 全局 Token 预算管理器
  *
@@ -369,6 +371,7 @@ export class TokenBudgetManager {
   /**
    * 重置会话
    */
+
   reset(): void {
     logger.info('🔄 Resetting token budget...');
     this.currentUsage = 0;

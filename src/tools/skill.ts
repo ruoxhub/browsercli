@@ -33,7 +33,7 @@ export const invokeSkill = defineTool({
       .describe('技能配置选项'),
     url: zod.string().optional().describe('目标 URL（可选）'),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, _context, _runtime) => {
     const {skillName, options = {}, url} = request.params;
 
     logger.debug(`[invoke-skill] Received request: skill=${skillName}`);
@@ -93,7 +93,7 @@ export const listSkills = defineTool({
     title: 'List skills',
   },
   schema: {},
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, _context, _runtime) => {
     const registry = SkillRegistry.getInstance();
     const skills = registry.list();
 

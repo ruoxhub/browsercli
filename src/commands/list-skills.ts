@@ -16,7 +16,7 @@ interface SkillInfo {
 
 export function formatSkills(skills: SkillInfo[]): string {
   if (skills.length === 0) {
-    return '可用技能:\n  (无可用技能)';
+    return '可用技能:\n  (无可用技能)\n提示：使用 "js-reverse start" 启动服务后加载技能';
   }
   const lines = [`可用技能 (${skills.length}):`];
   for (const skill of skills) {
@@ -60,7 +60,9 @@ export async function listSkillsCommand(options: {
   } else {
     console.log(formatSkills(skills));
     if (source === 'built-in') {
-      console.log('\n提示：后台服务未运行，显示内置技能列表。启动服务后显示完整列表。');
+      console.log(
+        '\n提示：后台服务未运行，显示内置技能列表。启动服务后显示完整列表。',
+      );
     }
   }
 }

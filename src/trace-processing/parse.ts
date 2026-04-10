@@ -3,6 +3,7 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import {createRequire} from 'node:module';
 
@@ -119,7 +120,7 @@ const extraFormatDescriptions = `Information on performance traces may contain m
 
 export async function getTraceSummary(result: TraceResult): Promise<string> {
   const {AgentFocus, PerformanceTraceFormatter} = await getHelpers();
-  const focus =
+  const _focus =
     AgentFocus.Session.fromParsedTrace?.(result.parsedTrace) ??
     result.parsedTrace;
   const formatter = new PerformanceTraceFormatter();

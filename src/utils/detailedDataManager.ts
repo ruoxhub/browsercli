@@ -3,6 +3,8 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 /**
  * 详细数据管理器 - 解决上下文溢出问题
  *
@@ -386,6 +388,7 @@ export class DetailedDataManager {
   /**
    * 清空所有缓存
    */
+
   clear(): void {
     this.cache.clear();
     logger.info('Cleared all detailed data cache');

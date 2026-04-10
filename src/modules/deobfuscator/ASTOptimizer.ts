@@ -3,6 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * AST优化器 - 基于Babel的高级反混淆转换
  *
@@ -17,15 +18,15 @@
  * 8. 序列表达式展开 (Sequence Expression Expansion)
  */
 
+import generateImport from '@babel/generator';
+const generate =
+  (generateImport as unknown as {default?: typeof generateImport}).default ??
+  generateImport;
 import * as parser from '@babel/parser';
 import traverseImport from '@babel/traverse';
 const traverse =
   (traverseImport as unknown as {default?: typeof traverseImport}).default ??
   traverseImport;
-import generateImport from '@babel/generator';
-const generate =
-  (generateImport as unknown as {default?: typeof generateImport}).default ??
-  generateImport;
 import * as t from '@babel/types';
 
 import {logger} from '../../utils/logger.js';

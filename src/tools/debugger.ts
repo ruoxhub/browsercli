@@ -3,6 +3,7 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 /**
  * JS Reverse Engineering Tools
@@ -17,12 +18,10 @@
 import type {ContinuousDebugConfig} from '../modules/debugger/AIContinuousDebugger.js';
 import {AIContinuousDebugger} from '../modules/debugger/AIContinuousDebugger.js';
 import type {DebuggerManager} from '../modules/debugger/DebuggerManager.js';
-import {AIService} from '../services/AIService.js';
 import {zod} from '../third_party/index.js';
 import {createAIService, getAIConfig} from '../utils/config.js';
 
 import {ToolCategory} from './categories.js';
-import {getJSHookRuntime} from './runtime.js';
 import {defineTool} from './ToolDefinition.js';
 
 const BREAKPOINT_STALL_HINT =
@@ -164,7 +163,7 @@ export const listScripts = defineTool({
         'Optional filter string to match against script URLs (case-insensitive partial match).',
       ),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -248,7 +247,7 @@ export const getScriptSource = defineTool({
         'Number of characters to return when using offset (default: 1000).',
       ),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -365,7 +364,7 @@ export const findInScript = defineTool({
       .default(true)
       .describe('Whether the search is case-sensitive (default: true).'),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -517,7 +516,7 @@ export const searchInSources = defineTool({
         'Only search scripts whose URL contains this string (case-insensitive).',
       ),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -687,7 +686,7 @@ export const setBreakpoint = defineTool({
       .default(false)
       .describe('Whether to treat the URL as a regex pattern.'),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -761,7 +760,7 @@ export const removeBreakpoint = defineTool({
         'The breakpoint ID to remove (from list_breakpoints or set_breakpoint).',
       ),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -799,7 +798,7 @@ export const listBreakpoints = defineTool({
     readOnlyHint: true,
   },
   schema: {},
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -988,7 +987,7 @@ export const getPausedInfo = defineTool({
       .default(2)
       .describe('Maximum scope depth to traverse (default: 2).'),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -1130,7 +1129,7 @@ export const resume = defineTool({
     readOnlyHint: false,
   },
   schema: {},
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -1169,7 +1168,7 @@ export const pause = defineTool({
     readOnlyHint: false,
   },
   schema: {},
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -1210,7 +1209,7 @@ export const stepOver = defineTool({
     readOnlyHint: false,
   },
   schema: {},
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -1251,7 +1250,7 @@ export const stepInto = defineTool({
     readOnlyHint: false,
   },
   schema: {},
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -1292,7 +1291,7 @@ export const stepOut = defineTool({
     readOnlyHint: false,
   },
   schema: {},
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -1343,7 +1342,7 @@ export const evaluateOnCallframe = defineTool({
         'The call frame index to evaluate in (0 = top frame, default: 0).',
       ),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -1450,7 +1449,7 @@ export const setBreakpointOnText = defineTool({
         'Optional condition expression. Breakpoint only triggers when this evaluates to true.',
       ),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -1609,7 +1608,7 @@ export const hookFunction = defineTool({
         'Custom identifier for this hook. Used to unhook later. Defaults to target name.',
       ),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const {target, logArgs, logResult, logStack, hookId} = request.params;
     const id = hookId || target.replace(/[^a-zA-Z0-9]/g, '_');
 
@@ -1819,7 +1818,7 @@ export const unhookFunction = defineTool({
       .string()
       .describe('The hook ID to remove (from hook_function).'),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const {hookId} = request.params;
 
     const unhookCode = `
@@ -1872,7 +1871,7 @@ export const listHooks = defineTool({
     readOnlyHint: true,
   },
   schema: {},
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const listCode = `
 (function() {
   if (!window.__mcp_hooks__) return [];
@@ -1942,7 +1941,7 @@ export const inspectObject = defineTool({
       .default(true)
       .describe('Whether to show prototype chain (default: true).'),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const {expression, depth, showMethods, showPrototype} = request.params;
 
     const inspectCode = `
@@ -2073,7 +2072,7 @@ export const getStorage = defineTool({
       .optional()
       .describe('Optional filter string to match against keys/names.'),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const {type, filter} = request.params;
 
     const storageCode = `
@@ -2175,7 +2174,7 @@ export const breakOnXhr = defineTool({
   schema: {
     url: zod.string().describe('URL pattern to break on (partial match).'),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -2223,7 +2222,7 @@ export const removeXhrBreakpoint = defineTool({
   schema: {
     url: zod.string().describe('The URL pattern to remove breakpoint for.'),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -2409,7 +2408,7 @@ export const stopMonitor = defineTool({
   schema: {
     monitorId: zod.string().describe('The monitor ID to stop.'),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const {monitorId} = request.params;
 
     const stopCode = `
@@ -2700,7 +2699,7 @@ export const xhrToJsBreakpoint = defineTool({
       .default(30000)
       .describe('等待 XHR 断点触发的最大时间 (毫秒)'),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const {urlPattern, maxWaitMs} = request.params;
     const debugger_ = context.debuggerContext;
 
@@ -2798,7 +2797,9 @@ export const xhrToJsBreakpoint = defineTool({
             url: urlPattern,
           });
         }
-      } catch {}
+      } catch {
+        // Ignore cleanup errors
+      }
 
       response.appendResponseLine(
         `错误：${error instanceof Error ? error.message : String(error)}`,
@@ -2847,7 +2848,7 @@ export const startContinuousDebugging = defineTool({
     model: zod.string().optional().describe('模型名称'),
     systemPrompt: zod.string().optional().describe('系统提示词覆盖'),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const debugger_ = context.debuggerContext;
 
     if (!debugger_.isEnabled()) {
@@ -2958,7 +2959,7 @@ export const stopContinuousDebugging = defineTool({
     readOnlyHint: false,
   },
   schema: {},
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const continuousDebugger = (context as any).__continuousDebugger as
       | AIContinuousDebugger
       | undefined;
@@ -3010,7 +3011,7 @@ export const getAiDebugStatus = defineTool({
     readOnlyHint: true,
   },
   schema: {},
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const continuousDebugger = (context as any).__continuousDebugger as
       | AIContinuousDebugger
       | undefined;

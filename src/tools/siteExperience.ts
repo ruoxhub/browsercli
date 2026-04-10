@@ -27,7 +27,7 @@ export const searchSiteExperience = defineTool({
     url: z.string().optional().describe('要搜索的 URL 或域名'),
     name: z.string().optional().describe('要搜索的站点名称'),
   },
-  async handler(request, response, context: Context) {
+  async handler(request, response, _context: Context) {
     const {url, name} = request.params;
 
     if (!url && !name) {
@@ -93,7 +93,7 @@ export const createSiteExperience = defineTool({
     validPatterns: z.string().optional().describe('有效模式描述'),
     knownPitfalls: z.string().optional().describe('已知陷阱描述'),
   },
-  async handler(request, response, context: Context) {
+  async handler(request, response, _context: Context) {
     const {
       domain,
       name,
@@ -156,7 +156,7 @@ export const updateSiteExperience = defineTool({
     validPatterns: z.string().optional().describe('新的有效模式描述'),
     knownPitfalls: z.string().optional().describe('新的已知陷阱描述'),
   },
-  async handler(request, response, context: Context) {
+  async handler(request, response, _context: Context) {
     const {id, name, aliases, platformFeatures, validPatterns, knownPitfalls} =
       request.params;
 
@@ -205,7 +205,7 @@ export const deleteSiteExperience = defineTool({
   schema: {
     id: z.number().describe('要删除的站点经验 ID'),
   },
-  async handler(request, response, context: Context) {
+  async handler(request, response, _context: Context) {
     const {id} = request.params;
 
     try {
@@ -237,7 +237,7 @@ export const listSiteExperiences = defineTool({
     title: 'List site experiences',
   },
   schema: {},
-  async handler(request, response, context: Context) {
+  async handler(request, response, _context: Context) {
     try {
       const results = await siteExperienceService.listAll();
 

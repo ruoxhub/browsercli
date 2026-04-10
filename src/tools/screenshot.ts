@@ -7,7 +7,6 @@
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {getJSHookRuntime} from './runtime.js';
 import {defineTool} from './ToolDefinition.js';
 
 export const screenshot = defineTool({
@@ -45,7 +44,7 @@ export const screenshot = defineTool({
         'The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.',
       ),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const page = context.getSelectedPage();
 
     const format = request.params.format;

@@ -8,7 +8,6 @@ import {zod} from '../third_party/index.js';
 import type {JSHandle} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {getJSHookRuntime} from './runtime.js';
 import {defineTool} from './ToolDefinition.js';
 
 // Default script evaluation timeout in milliseconds (30 seconds)
@@ -50,7 +49,7 @@ Example with arguments: \`(el) => {
 `,
     ),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     let fn: JSHandle<unknown> | undefined;
     try {
       const frame = context.getSelectedFrame();

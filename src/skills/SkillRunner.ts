@@ -51,7 +51,9 @@ export class SkillRegistry {
   private static instance: SkillRegistry;
   private skills = new Map<string, SkillDefinition>();
 
-  private constructor() {}
+  private constructor() {
+    // Intentional: singleton initialization
+  }
 
   static getInstance(): SkillRegistry {
     if (!SkillRegistry.instance) {

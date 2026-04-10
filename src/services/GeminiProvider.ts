@@ -103,8 +103,8 @@ export class GeminiProvider implements AIProvider {
    * @returns AI response
    */
   private async chatAPI(
-    messages: AIMessage[],
-    options?: ChatOptions,
+    _messages: AIMessage[],
+    _options?: ChatOptions,
   ): Promise<AIResponse> {
     throw new Error(
       'Gemini API mode not yet implemented. Please use CLI mode or install gemini-cli.',
@@ -155,9 +155,9 @@ export class GeminiProvider implements AIProvider {
    * @returns Analysis result
    */
   private async analyzeImageAPI(
-    imageInput: string,
-    prompt: string,
-    isFilePath: boolean,
+    _imageInput: string,
+    _prompt: string,
+    _isFilePath: boolean,
   ): Promise<string> {
     throw new Error(
       'Gemini API mode not yet implemented. Please use CLI mode or install gemini-cli.',
@@ -250,8 +250,11 @@ export class GeminiProvider implements AIProvider {
   ): Promise<string> {
     return new Promise((resolve, reject) => {
       let settled = false;
-      let timeout: NodeJS.Timeout | undefined;
-      const settle = (handler: (value: any) => void, value: any): void => {
+      let timeout: NodeJS.Timeout | undefined = undefined;
+      const settle = (
+        handler: (value: unknown) => void,
+        value: unknown,
+      ): void => {
         if (settled) {
           return;
         }
@@ -377,7 +380,7 @@ export class GeminiProvider implements AIProvider {
       this.cliAvailable = result.status === 0;
       GeminiProvider.cliAvailabilityCache.set(this.cliPath, this.cliAvailable);
       return this.cliAvailable;
-    } catch (error) {
+    } catch {
       this.cliAvailable = false;
       GeminiProvider.cliAvailabilityCache.set(this.cliPath, false);
       return false;
@@ -389,6 +392,7 @@ export class GeminiProvider implements AIProvider {
    * @param error - The error to handle
    * @returns Formatted error
    */
+
   private handleError(error: unknown): Error {
     if (error instanceof Error) {
       return error;

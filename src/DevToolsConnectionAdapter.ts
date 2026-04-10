@@ -5,7 +5,6 @@
  */
 
 import type {
-  CDPSession,
   CDPConnection,
   CDPConnectionObserver,
   CDPCommand,

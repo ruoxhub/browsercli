@@ -191,7 +191,7 @@ function pickTargetScript(
 /**
  * 过滤运行时证据
  */
-function filterRuntimeEvidence(
+function _filterRuntimeEvidence(
   records: Array<Record<string, unknown>>,
   targetKeywords: string[],
   targetUrlPatterns: string[],
@@ -220,7 +220,7 @@ function filterRuntimeEvidence(
 /**
  * 推断缺失的能力
  */
-function inferMissingCapabilities(
+function _inferMissingCapabilities(
   runtimeError: string,
   observedCapabilities: string[],
 ): Array<{

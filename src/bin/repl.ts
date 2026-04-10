@@ -6,7 +6,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as readline from 'node:readline';
 import {createInterface} from 'node:readline';
 
 import {sendCommand} from '../daemon/client.js';
@@ -151,7 +150,10 @@ export async function executeCommand(input: string): Promise<string> {
           }
           const {skills} = parsed;
           return skills
-            .map((s: any) => `  ${s.name} - ${s.description} [${s.category}]`)
+            .map(
+              (s: {name: string; description: string; category: string}) =>
+                `  ${s.name} - ${s.description} [${s.category}]`,
+            )
             .join('\n');
         } catch (parseError) {
           return `❌ 响应解析失败：${parseError instanceof Error ? parseError.message : parseError}`;

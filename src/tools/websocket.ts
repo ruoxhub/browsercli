@@ -57,7 +57,7 @@ export const listWebSocketConnections = defineTool({
         'Set to true to return the preserved connections over the last 3 navigations.',
       ),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, _context, _runtime) => {
     response.setIncludeWebSocketConnections(true, {
       pageSize: request.params.pageSize,
       pageIdx: request.params.pageIdx,
@@ -108,7 +108,7 @@ export const getWebSocketMessages = defineTool({
         'Set to true to show full message payload. Default false (summary only) to avoid large binary output.',
       ),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const ws = context.getWebSocketById(request.params.wsid);
     let frames = ws.frames;
 
@@ -198,7 +198,7 @@ export const getWebSocketMessage = defineTool({
       .min(0)
       .describe('The frame index (0-based) to retrieve.'),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const ws = context.getWebSocketById(request.params.wsid);
     const frameIndex = request.params.frameIndex;
 
@@ -234,7 +234,7 @@ export const analyzeWebSocketMessages = defineTool({
       .optional()
       .describe('Only analyze messages in this direction.'),
   },
-  handler: async (request, response, context, runtime) => {
+  handler: async (request, response, context, _runtime) => {
     const ws = context.getWebSocketById(request.params.wsid);
     let frames = ws.frames;
 

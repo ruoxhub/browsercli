@@ -3,9 +3,10 @@
  * Copyright 2026 JSReverser-MCP
  * SPDX-License-Identifier: Apache-2.0
  */
-import {zod} from '../../third_party/index.js';
-import {ToolCategory} from '../categories.js';
-import {defineTool, type Context, type Response} from '../ToolDefinition.js';
+import {zod} from '../third_party/index.js';
+
+import {ToolCategory} from './categories.js';
+import {defineTool, type Context, type Response} from './ToolDefinition.js';
 
 /**
  * Script injection configuration entry

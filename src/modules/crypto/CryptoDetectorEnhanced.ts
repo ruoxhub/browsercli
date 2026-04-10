@@ -3,6 +3,8 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 /**
  * CryptoDetector 增强方法
  * 包含统一AST解析、安全评估、强度分析等新功能
@@ -360,6 +362,7 @@ export function evaluateSecurity(
 /**
  * 加密强度分析
  */
+
 export function analyzeStrength(
   _algorithms: CryptoAlgorithm[], // 保留参数以便未来扩展
   securityIssues: SecurityIssue[],
