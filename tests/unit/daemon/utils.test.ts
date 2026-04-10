@@ -5,8 +5,12 @@
  */
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
+import {rmSync, existsSync} from 'node:fs';
 
 import {isDaemonRunning, socketPath} from '../../../src/daemon/utils.js';
+
+// Clean up socket before running tests to avoid false positives
+if (existsSync(socketPath)) rmSync(socketPath);
 
 describe('daemon/utils', () => {
   it('socketPath 应该是有效路径', () => {
