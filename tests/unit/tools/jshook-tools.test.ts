@@ -41,6 +41,9 @@ import {hookPerformanceNow} from '../../../src/tools/hook/hookPerformanceNow.js'
 import {hookDateNow} from '../../../src/tools/hook/hookDateNow.js';
 import {fixedWindowSize} from '../../../src/tools/hook/fixedWindowSize.js';
 import {hookConsoleProtect} from '../../../src/tools/hook/hookConsoleProtect.js';
+import {clearVueGuards} from '../../../src/tools/vue/clearVueGuards.js';
+import {getVueRoutes} from '../../../src/tools/vue/getVueRoutes.js';
+import {activateVueDevtools} from '../../../src/tools/vue/activateVueDevtools.js';
 import {
   clickElement,
   checkBrowserHealth,
@@ -397,5 +400,38 @@ describe('jshook tools schema', () => {
       protectedMethods: ['log', 'warn'],
     });
     assert.deepStrictEqual(protectCustom.protectedMethods, ['log', 'warn']);
+  });
+
+  it('validates Vue tools schemas', () => {
+    // clear_vue_guards
+    const clearGuardsSchema = zod.object(clearVueGuards.schema);
+    const clearGuardsDefault = clearGuardsSchema.parse({});
+    assert.deepStrictEqual(clearGuardsDefault.guards, undefined);
+    const clearGuardsSpecific = clearGuardsSchema.parse({
+      guards: ['beforeEach', 'afterEach'],
+    });
+    assert.deepStrictEqual(clearGuardsSpecific.guards, [
+      'beforeEach',
+      'afterEach',
+    ]);
+    const clearGuardsAll = clearGuardsSchema.parse({guards: ['all']});
+    assert.deepStrictEqual(clearGuardsAll.guards, ['all']);
+
+    // get_vue_routes
+    const routesSchema = zod.object(getVueRoutes.schema);
+    const routesDefault = routesSchema.parse({});
+    assert.strictEqual(routesDefault.includeChildren, true);
+    assert.strictEqual(routesDefault.maxDepth, 3);
+    const routesCustom = routesSchema.parse({
+      includeChildren: false,
+      maxDepth: 5,
+    });
+    assert.strictEqual(routesCustom.includeChildren, false);
+    assert.strictEqual(routesCustom.maxDepth, 5);
+
+    // activate_vue_devtools
+    const vueDevtoolsSchema = zod.object(activateVueDevtools.schema);
+    const vueDevtoolsDefault = vueDevtoolsSchema.parse({});
+    assert.deepStrictEqual(vueDevtoolsDefault, {});
   });
 });
