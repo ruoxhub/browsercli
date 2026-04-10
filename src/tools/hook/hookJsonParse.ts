@@ -12,7 +12,7 @@ export const hookJsonParse = defineTool({
   description: 'Hook JSON.parse：监控 JSON 解析操作，支持过滤特定字符串',
   annotations: {
     title: 'Hook JSON Parse',
-    category: ToolCategory.REVERSE_ENGINEERING,
+    category: ToolCategory.HOOK,
     readOnlyHint: false,
   },
   schema: {

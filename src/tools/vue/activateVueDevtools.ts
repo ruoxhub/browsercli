@@ -3,7 +3,6 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Context, type Response} from '../ToolDefinition.js';
 
@@ -12,7 +11,7 @@ export const activateVueDevtools = defineTool({
   description: '激活 Vue Devtools：强制启用 Vue.js 开发者工具',
   annotations: {
     title: 'Activate Vue Devtools',
-    category: ToolCategory.REVERSE_ENGINEERING,
+    category: ToolCategory.HOOK,
     readOnlyHint: false,
   },
   schema: {},
@@ -20,7 +19,7 @@ export const activateVueDevtools = defineTool({
     _request: {params: Record<string, never>},
     response: Response,
     context: Context,
-    runtime,
+    _runtime,
   ) => {
     const hookCode = `
 (function() {

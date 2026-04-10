@@ -13,7 +13,7 @@ export const fixedWindowSize = defineTool({
     '固定窗口尺寸：拦截 window.innerHeight/innerWidth/outerHeight/outerWidth 的读取和设置',
   annotations: {
     title: 'Fixed Window Size',
-    category: ToolCategory.REVERSE_ENGINEERING,
+    category: ToolCategory.HOOK,
     readOnlyHint: false,
   },
   schema: {

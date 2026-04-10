@@ -13,7 +13,7 @@ export const hookHistory = defineTool({
     'Hook History API：监控 history.pushState/replaceState 操作，支持 URL 过滤',
   annotations: {
     title: 'Hook History API',
-    category: ToolCategory.REVERSE_ENGINEERING,
+    category: ToolCategory.HOOK,
     readOnlyHint: false,
   },
   schema: {

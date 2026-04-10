@@ -13,7 +13,7 @@ export const hookPerformanceNow = defineTool({
     'Hook performance.now()：固定返回值，支持调用栈打印和 debugger 触发',
   annotations: {
     title: 'Hook Performance Now',
-    category: ToolCategory.REVERSE_ENGINEERING,
+    category: ToolCategory.HOOK,
     readOnlyHint: false,
   },
   schema: {

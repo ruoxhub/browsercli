@@ -12,7 +12,7 @@ export const hookJsonStringify = defineTool({
   description: 'Hook JSON.stringify：监控 JSON 序列化操作',
   annotations: {
     title: 'Hook JSON Stringify',
-    category: ToolCategory.REVERSE_ENGINEERING,
+    category: ToolCategory.HOOK,
     readOnlyHint: false,
   },
   schema: {

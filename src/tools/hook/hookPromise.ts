@@ -13,7 +13,7 @@ export const hookPromise = defineTool({
     'Hook Promise：监控 Promise resolve，打印 resolve 参数和调用栈，快速定位异步回调位置',
   annotations: {
     title: 'Hook Promise',
-    category: ToolCategory.REVERSE_ENGINEERING,
+    category: ToolCategory.HOOK,
     readOnlyHint: false,
   },
   schema: {

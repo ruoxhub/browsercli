@@ -12,7 +12,7 @@ export const hookCryptoJS = defineTool({
   description: 'Hook CryptoJS 加密库：AES、DES、MD5、SHA 等对称/哈希/HMAC 算法',
   annotations: {
     title: 'Hook CryptoJS',
-    category: ToolCategory.REVERSE_ENGINEERING,
+    category: ToolCategory.HOOK,
     readOnlyHint: false,
   },
   schema: {
@@ -35,7 +35,7 @@ export const hookCryptoJS = defineTool({
     },
     response: Response,
     context: Context,
-    runtime,
+    _runtime,
   ) => {
     const algorithms = request.params.algorithms || ['all'];
     const logFormat = request.params.logFormat || 'compact';

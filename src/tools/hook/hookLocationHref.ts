@@ -13,7 +13,7 @@ export const hookLocationHref = defineTool({
     'Hook location.href：阻断页面跳转，触发 debugger 以定位跳转代码位置',
   annotations: {
     title: 'Hook Location Href',
-    category: ToolCategory.REVERSE_ENGINEERING,
+    category: ToolCategory.HOOK,
     readOnlyHint: false,
   },
   schema: {

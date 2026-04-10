@@ -13,7 +13,7 @@ export const hookXhrSetRequestHeader = defineTool({
     'Hook XMLHttpRequest.setRequestHeader：监控请求头设置，支持过滤特定 Header 名',
   annotations: {
     title: 'Hook XHR Set Request Header',
-    category: ToolCategory.REVERSE_ENGINEERING,
+    category: ToolCategory.HOOK,
     readOnlyHint: false,
   },
   schema: {

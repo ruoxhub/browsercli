@@ -13,7 +13,7 @@ export const hookConsoleLog = defineTool({
     'Hook console.log：防止网站重写 console.log 方法，保持日志输出能力',
   annotations: {
     title: 'Hook Console Log',
-    category: ToolCategory.REVERSE_ENGINEERING,
+    category: ToolCategory.HOOK,
     readOnlyHint: false,
   },
   schema: {

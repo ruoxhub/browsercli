@@ -13,7 +13,7 @@ export const hookConsoleProtect = defineTool({
     '保护 console：防止代码重写 console.log/trace/groupCollapsed/groupEnd 等方法',
   annotations: {
     title: 'Hook Console Protect',
-    category: ToolCategory.REVERSE_ENGINEERING,
+    category: ToolCategory.HOOK,
     readOnlyHint: false,
   },
   schema: {

@@ -13,7 +13,7 @@ export const hookLocalStorage = defineTool({
     'Hook localStorage：监控 setItem/getItem/removeItem/clear 操作，支持过滤特定键',
   annotations: {
     title: 'Hook Local Storage',
-    category: ToolCategory.REVERSE_ENGINEERING,
+    category: ToolCategory.HOOK,
     readOnlyHint: false,
   },
   schema: {

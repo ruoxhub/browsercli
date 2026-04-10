@@ -13,7 +13,7 @@ export const hookDateNow = defineTool({
     'Hook Date.now()：固定 Date.now() 的返回值，支持调用栈打印和 debugger 触发',
   annotations: {
     title: 'Hook Date Now',
-    category: ToolCategory.REVERSE_ENGINEERING,
+    category: ToolCategory.HOOK,
     readOnlyHint: false,
   },
   schema: {

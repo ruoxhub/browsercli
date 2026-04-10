@@ -12,7 +12,7 @@ export const hookRandom = defineTool({
   description: 'Hook Math.random：固定 Math.random 的返回值',
   annotations: {
     title: 'Hook Random',
-    category: ToolCategory.REVERSE_ENGINEERING,
+    category: ToolCategory.HOOK,
     readOnlyHint: false,
   },
   schema: {

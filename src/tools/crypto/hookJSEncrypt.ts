@@ -12,7 +12,7 @@ export const hookJSEncrypt = defineTool({
   description: 'Hook JSEncrypt RSA 加密库：公钥/私钥、原始数据、密文',
   annotations: {
     title: 'Hook JSEncrypt',
-    category: ToolCategory.REVERSE_ENGINEERING,
+    category: ToolCategory.HOOK,
     readOnlyHint: false,
   },
   schema: {
@@ -26,7 +26,7 @@ export const hookJSEncrypt = defineTool({
     request: {params: {logFormat?: 'full' | 'compact' | 'json'}},
     response: Response,
     context: Context,
-    runtime,
+    _runtime,
   ) => {
     const logFormat = request.params.logFormat || 'compact';
 

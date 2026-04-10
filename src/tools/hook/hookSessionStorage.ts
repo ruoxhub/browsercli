@@ -13,7 +13,7 @@ export const hookSessionStorage = defineTool({
     'Hook sessionStorage：监控 setItem/getItem/removeItem/clear 操作',
   annotations: {
     title: 'Hook Session Storage',
-    category: ToolCategory.REVERSE_ENGINEERING,
+    category: ToolCategory.HOOK,
     readOnlyHint: false,
   },
   schema: {

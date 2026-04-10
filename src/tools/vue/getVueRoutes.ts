@@ -3,6 +3,8 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Context, type Response} from '../ToolDefinition.js';
@@ -12,7 +14,7 @@ export const getVueRoutes = defineTool({
   description: '获取 Vue Router 路由表：已加载的路由配置信息',
   annotations: {
     title: 'Get Vue Routes',
-    category: ToolCategory.REVERSE_ENGINEERING,
+    category: ToolCategory.HOOK,
     readOnlyHint: true,
   },
   schema: {
@@ -27,7 +29,7 @@ export const getVueRoutes = defineTool({
     request: {params: {includeChildren?: boolean; maxDepth?: number}},
     response: Response,
     context: Context,
-    runtime,
+    _runtime,
   ) => {
     const includeChildren = request.params.includeChildren ?? true;
     const maxDepth = request.params.maxDepth ?? 3;

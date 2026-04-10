@@ -13,7 +13,7 @@ export const hookConsoleTable = defineTool({
     'Hook console.table：绕过通过 console.table 检测运行时间差的反调试',
   annotations: {
     title: 'Hook Console Table',
-    category: ToolCategory.REVERSE_ENGINEERING,
+    category: ToolCategory.HOOK,
     readOnlyHint: false,
   },
   schema: {

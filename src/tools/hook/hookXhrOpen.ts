@@ -13,7 +13,7 @@ export const hookXhrOpen = defineTool({
     'Hook XMLHttpRequest.open：监控 XHR 请求初始化，支持过滤特定 URL',
   annotations: {
     title: 'Hook XHR Open',
-    category: ToolCategory.REVERSE_ENGINEERING,
+    category: ToolCategory.HOOK,
     readOnlyHint: false,
   },
   schema: {

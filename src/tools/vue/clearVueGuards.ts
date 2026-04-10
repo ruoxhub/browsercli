@@ -12,7 +12,7 @@ export const clearVueGuards = defineTool({
   description: '清除 Vue Router 全局守卫：beforeEach、beforeResolve',
   annotations: {
     title: 'Clear Vue Guards',
-    category: ToolCategory.REVERSE_ENGINEERING,
+    category: ToolCategory.HOOK,
     readOnlyHint: false,
   },
   schema: {
@@ -29,8 +29,9 @@ export const clearVueGuards = defineTool({
     },
     response: Response,
     context: Context,
-    runtime,
+    _runtime,
   ) => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const guards = request.params.guards || ['all'];
 
     const hookCode = `

@@ -13,7 +13,7 @@ export const hookCookie = defineTool({
     'Hook document.cookie：监控 Cookie 的读写操作，支持过滤特定 Cookie 名',
   annotations: {
     title: 'Hook Cookie',
-    category: ToolCategory.REVERSE_ENGINEERING,
+    category: ToolCategory.HOOK,
     readOnlyHint: false,
   },
   schema: {

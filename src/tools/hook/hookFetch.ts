@@ -12,7 +12,7 @@ export const hookFetch = defineTool({
   description: 'Hook window.fetch：监控 fetch API 调用，打印请求参数和堆栈',
   annotations: {
     title: 'Hook Fetch',
-    category: ToolCategory.REVERSE_ENGINEERING,
+    category: ToolCategory.HOOK,
     readOnlyHint: false,
   },
   schema: {

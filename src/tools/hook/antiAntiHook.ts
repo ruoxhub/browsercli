@@ -158,7 +158,7 @@ export const antiAntiHook = defineTool({
     '反 Hook 检测：保护 Function.prototype.toString，使被 Hook 的方法看起来像原生代码',
   annotations: {
     title: 'Anti-Anti-Hook',
-    category: ToolCategory.REVERSE_ENGINEERING,
+    category: ToolCategory.HOOK,
     readOnlyHint: false,
   },
   schema: {

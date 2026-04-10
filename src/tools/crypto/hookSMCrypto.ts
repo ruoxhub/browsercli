@@ -12,7 +12,7 @@ export const hookSMCrypto = defineTool({
   description: 'Hook SM-crypto 国密库：SM2、SM3、SM4 算法',
   annotations: {
     title: 'Hook SM-Crypto',
-    category: ToolCategory.REVERSE_ENGINEERING,
+    category: ToolCategory.HOOK,
     readOnlyHint: false,
   },
   schema: {
@@ -35,7 +35,7 @@ export const hookSMCrypto = defineTool({
     },
     response: Response,
     context: Context,
-    runtime,
+    _runtime,
   ) => {
     const algorithms = request.params.algorithms || ['all'];
     const logFormat = request.params.logFormat || 'compact';

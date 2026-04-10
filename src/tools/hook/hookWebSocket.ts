@@ -13,7 +13,7 @@ export const hookWebSocket = defineTool({
     'Hook WebSocket：监控 WebSocket 连接、消息收发操作，支持按 URL 过滤',
   annotations: {
     title: 'Hook WebSocket',
-    category: ToolCategory.REVERSE_ENGINEERING,
+    category: ToolCategory.HOOK,
     readOnlyHint: false,
   },
   schema: {
