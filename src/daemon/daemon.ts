@@ -5,6 +5,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+// eslint-disable @typescript-eslint/no-explicit-any
 
 import fs from 'node:fs';
 import {createServer, type Server} from 'node:net';
@@ -16,6 +17,7 @@ import {NetworkCollector} from '../PageCollector.js';
 import {SkillRunner, getBuiltInSkillDefinitions} from '../skills/index.js';
 import {PipeTransport} from '../third_party/index.js';
 import {getJSHookRuntime} from '../tools/runtime.js';
+import type {JSHookToolDefinition} from '../tools/ToolRegistry.js';
 
 import type {DaemonMessage} from './types.js';
 import {
@@ -84,7 +86,7 @@ parseDaemonArgs(mcpServerArgs);
 // 懒加载状态
 let _toolsLoaded = false;
 let _loadToolsPromise: Promise<void> | null = null;
-let _cachedToolsList: any[] | null = null;
+let _cachedToolsList: JSHookToolDefinition[] | null = null;
 
 // 全局 NetworkCollector 实例（daemon 级别初始化）
 let _networkCollector: NetworkCollector | null = null;
@@ -112,6 +114,8 @@ async function ensureToolsLoaded(): Promise<void> {
 /**
  * 获取工具列表（懒加载 + 缓存）
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 async function getCachedTools(): Promise<any[]> {
   if (_cachedToolsList) {
     return _cachedToolsList;
@@ -194,7 +198,7 @@ async function handleRequest(msg: DaemonMessage) {
         if (browser) {
           cachedPages = await browser.pages();
         }
-      } catch (e) {
+      } catch {
         // Ignore errors
       }
 
@@ -226,8 +230,12 @@ async function handleRequest(msg: DaemonMessage) {
         attachImage: (data: any) => {
           response._imageData = data;
         },
-        attachNetworkRequest: (_id: number) => {},
-        attachConsoleMessage: (_id: number) => {},
+        attachNetworkRequest: (_id: number) => {
+          /* no-op */
+        },
+        attachConsoleMessage: (_id: number) => {
+          /* no-op */
+        },
       };
 
       const context: any = {
@@ -247,22 +255,38 @@ async function handleRequest(msg: DaemonMessage) {
         },
         // 其他需要的存根方法
         getSelectedFrame: () => undefined,
-        selectFrame: () => {},
-        resetSelectedFrame: () => {},
+        selectFrame: () => {
+          /* no-op */
+        },
+        resetSelectedFrame: () => {
+          /* no-op */
+        },
         isPageSelected: (page: any) =>
           runtime.browserManager.getCurrentPage() === page,
-        setNetworkConditions: () => {},
-        setCpuThrottlingRate: () => {},
+        setNetworkConditions: () => {
+          /* no-op */
+        },
+        setCpuThrottlingRate: () => {
+          /* no-op */
+        },
         saveTemporaryFile: async () => ({filename: ''}),
         saveFile: async () => ({filename: ''}),
-        waitForEventsAfterAction: async () => {},
+        waitForEventsAfterAction: async () => {
+          /* no-op */
+        },
         waitForTextOnPage: async () => false,
         isRunningPerformanceTrace: () => false,
-        setIsRunningPerformanceTrace: () => {},
+        setIsRunningPerformanceTrace: () => {
+          /* no-op */
+        },
         recordedTraces: () => [],
-        storeTraceRecording: () => {},
+        storeTraceRecording: () => {
+          /* no-op */
+        },
         getDialog: () => undefined,
-        clearDialog: () => {},
+        clearDialog: () => {
+          /* no-op */
+        },
         getDebugger: () => null,
         getCachedTrafficSummary: () => null,
         getWebSocketById: () => null,
@@ -275,13 +299,25 @@ async function handleRequest(msg: DaemonMessage) {
         getDevToolsData: async () => ({}),
         resolveCdpRequestId: () => undefined,
         debuggerContext: {
-          pause: async () => {},
-          resume: async () => {},
-          stepInto: async () => {},
-          stepOver: async () => {},
-          stepOut: async () => {},
+          pause: async () => {
+            /* no-op */
+          },
+          resume: async () => {
+            /* no-op */
+          },
+          stepInto: async () => {
+            /* no-op */
+          },
+          stepOver: async () => {
+            /* no-op */
+          },
+          stepOut: async () => {
+            /* no-op */
+          },
           setBreakpoint: async () => ({breakpointId: ''}),
-          removeBreakpoint: async () => {},
+          removeBreakpoint: async () => {
+            /* no-op */
+          },
           getScriptSource: async () => '',
         },
         getRequestInitiator: () => undefined,
@@ -308,7 +344,7 @@ async function handleRequest(msg: DaemonMessage) {
         try {
           const res = await fetch(jsonUrl);
           chromePages = await res.json();
-        } catch (e) {
+        } catch {
           // Ignore fetch errors silently
         }
 
