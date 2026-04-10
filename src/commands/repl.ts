@@ -10,7 +10,11 @@ import * as readline from 'node:readline';
 import {sendCommand} from '../daemon/client.js';
 import {listTools} from '../tools/index.js';
 import {getBuiltInSkillDefinitions} from '../skills/index.js';
-import {logger} from '../logger.js';
+
+/** REPL 专用 replLog，始终输出到 stderr（避免与 stdout 管道混用） */
+function replLog(msg: string): void {
+  process.stderr.write(msg + '\n');
+}
 
 const REPL_COMMANDS = [
   'status',
@@ -29,7 +33,7 @@ function getToolNames(): string[] {
   return TOOL_NAMES;
 }
 
-function complete(input: string): string[] {
+export function complete(input: string): string[] {
   const parts = input.split(/\s+/);
   const isLastCharSpace = input.endsWith(' ') && input.length > 0;
 
@@ -54,15 +58,15 @@ function complete(input: string): string[] {
 }
 
 function printHelp(): void {
-  logger('可用命令：');
-  logger('  skill <name> [args...]  - 调用指定技能');
-  logger('  tool <name> [args...]   - 调用指定工具');
-  logger('  status                  - 查看 daemon 状态');
-  logger('  list-skills             - 列出可用技能');
-  logger('  list-tools              - 列出可用工具');
-  logger('  help                    - 显示此帮助信息');
-  logger('  exit / quit             - 退出 REPL');
-  logger('');
+  replLog('可用命令：');
+  replLog('  skill <name> [args...]  - 调用指定技能');
+  replLog('  tool <name> [args...]   - 调用指定工具');
+  replLog('  status                  - 查看 daemon 状态');
+  replLog('  list-skills             - 列出可用技能');
+  replLog('  list-tools              - 列出可用工具');
+  replLog('  help                    - 显示此帮助信息');
+  replLog('  exit / quit             - 退出 REPL');
+  replLog('');
 }
 
 export async function replCommand(): Promise<void> {
@@ -71,149 +75,157 @@ export async function replCommand(): Promise<void> {
     const statusResult = await sendCommand({method: 'status'});
     if (statusResult.success) {
       const info = JSON.parse(statusResult.result);
-      logger(`Daemon 已连接 (PID: ${info.pid})`);
+      replLog(`Daemon 已连接 (PID: ${info.pid})`);
     }
   } catch {
-    logger('⚠ 后台服务未运行，请先执行：js-reverse start --browserUrl <url>');
-    logger('');
+    replLog('⚠ 后台服务未运行，请先执行：js-reverse start --browserUrl <url>');
+    replLog('');
   }
 
-  logger('进入交互模式 (REPL)');
+  replLog('进入交互模式 (REPL)');
   printHelp();
 
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
     tabSize: 2,
-    completer: complete,
+    completer: process.stdin.isTTY ? complete : undefined,
+    terminal: false,
   });
 
   rl.on('SIGINT', () => {
-    logger('');
-    prompt();
+    replLog('');
+    if (process.stdin.isTTY) prompt();
   });
 
-  const prompt = () => {
-    rl.question('js-reverse> ', async input => {
-      const trimmed = input.trim();
+  rl.on('close', () => {
+    process.exit(0);
+  });
 
-      if (trimmed === 'exit' || trimmed === 'quit') {
-        rl.close();
-        return;
-      }
+  const processLine = async (line: string) => {
+    const trimmed = line.trim();
 
-      if (trimmed === 'help') {
-        printHelp();
-        prompt();
-        return;
-      }
+    if (trimmed === 'exit' || trimmed === 'quit') {
+      rl.close();
+      return;
+    }
 
-      if (trimmed === 'status') {
-        try {
-          const result = await sendCommand({method: 'status'});
-          if (result.success) {
-            logger(`状态：${result.result}`);
-          } else {
-            logger(`未运行：${result.error}`);
-          }
-        } catch (error) {
-          logger(
-            `获取状态失败：${error instanceof Error ? error.message : error}`,
-          );
-        }
-        prompt();
-        return;
-      }
+    if (trimmed === 'help') {
+      printHelp();
+      return;
+    }
 
-      if (trimmed === 'list-skills') {
-        try {
-          const result = await sendCommand({method: 'list_skills'});
-          if (result.success) {
-            logger(result.result || '');
-          } else {
-            logger(`获取失败：${result.error}`);
-          }
-        } catch {
-          // Fallback to built-in skills
-          const skills = getBuiltInSkillDefinitions();
-          logger(`可用技能 (${skills.length}):`);
-          for (const s of skills) {
-            logger(`  - ${s.name}: ${s.description}`);
-          }
-          logger('');
-          logger('(离线模式：显示内置技能列表)');
-        }
-        prompt();
-        return;
-      }
-
-      if (trimmed === 'list-tools') {
-        try {
-          const result = await sendCommand({method: 'list_tools'});
-          if (result.success) {
-            logger(result.result || '');
-          } else {
-            logger(`获取失败：${result.error}`);
-          }
-        } catch {
-          // Fallback to built-in tools
-          const tools = listTools();
-          logger(`可用工具 (${tools.length}):`);
-          for (const t of tools) {
-            logger(`  - ${t.name}`);
-          }
-          logger('');
-          logger('(离线模式：显示内置工具列表)');
-        }
-        prompt();
-        return;
-      }
-
-      if (!trimmed) {
-        prompt();
-        return;
-      }
-
-      const parts = trimmed.split(/\s+/);
-      const [type, name, ...args] = parts;
-
-      if (!type || !name) {
-        logger('用法：skill <name> [args...] 或 tool <name> [args...]');
-        logger('输入 "help" 查看完整帮助');
-        prompt();
-        return;
-      }
-
+    if (trimmed === 'status') {
       try {
-        if (type === 'skill') {
-          const result = await sendCommand({
-            method: 'invoke_skill',
-            skill: name,
-            args: {args},
-          });
-          logger(
-            result.success ? result.result || '成功' : `失败：${result.error}`,
-          );
-        } else if (type === 'tool') {
-          const result = await sendCommand({
-            method: 'invoke_tool',
-            tool: name,
-            args: {args},
-          });
-          logger(
-            result.success ? result.result || '成功' : `失败：${result.error}`,
-          );
+        const result = await sendCommand({method: 'status'});
+        if (result.success) {
+          replLog(`状态：${result.result}`);
         } else {
-          logger('未知命令类型，使用 "skill" 或 "tool"');
-          logger('输入 "help" 查看完整帮助');
+          replLog(`未运行：${result.error}`);
         }
       } catch (error) {
-        logger(`执行失败：${error instanceof Error ? error.message : error}`);
+        replLog(
+          `获取状态失败：${error instanceof Error ? error.message : error}`,
+        );
       }
+      return;
+    }
 
+    if (trimmed === 'list-skills') {
+      try {
+        const result = await sendCommand({method: 'list_skills'});
+        if (result.success) {
+          replLog(result.result || '');
+        } else {
+          replLog(`获取失败：${result.error}`);
+        }
+      } catch {
+        const skills = getBuiltInSkillDefinitions();
+        replLog(`可用技能 (${skills.length}):`);
+        for (const s of skills) {
+          replLog(`  - ${s.name}: ${s.description}`);
+        }
+        replLog('');
+        replLog('(离线模式：显示内置技能列表)');
+      }
+      return;
+    }
+
+    if (trimmed === 'list-tools') {
+      try {
+        const result = await sendCommand({method: 'list_tools'});
+        if (result.success) {
+          replLog(result.result || '');
+        } else {
+          replLog(`获取失败：${result.error}`);
+        }
+      } catch {
+        const tools = listTools();
+        replLog(`可用工具 (${tools.length}):`);
+        for (const t of tools) {
+          replLog(`  - ${t.name}`);
+        }
+        replLog('');
+        replLog('(离线模式：显示内置工具列表)');
+      }
+      return;
+    }
+
+    if (!trimmed) {
+      return;
+    }
+
+    const parts = trimmed.split(/\s+/);
+    const [type, name, ...args] = parts;
+
+    if (!type || !name) {
+      replLog('用法：skill <name> [args...] 或 tool <name> [args...]');
+      replLog('输入 "help" 查看完整帮助');
+      return;
+    }
+
+    try {
+      if (type === 'skill') {
+        const result = await sendCommand({
+          method: 'invoke_skill',
+          skill: name,
+          args: {args},
+        });
+        replLog(
+          result.success ? result.result || '成功' : `失败：${result.error}`,
+        );
+      } else if (type === 'tool') {
+        const result = await sendCommand({
+          method: 'invoke_tool',
+          tool: name,
+          args: {args},
+        });
+        replLog(
+          result.success ? result.result || '成功' : `失败：${result.error}`,
+        );
+      } else {
+        replLog('未知命令类型，使用 "skill" 或 "tool"');
+        replLog('输入 "help" 查看完整帮助');
+      }
+    } catch (error) {
+      replLog(`执行失败：${error instanceof Error ? error.message : error}`);
+    }
+  };
+
+  // TTY 模式：使用 question() 循环（带 prompt）
+  const prompt = () => {
+    rl.question('js-reverse> ', async input => {
+      await processLine(input);
       prompt();
     });
   };
 
-  prompt();
+  // 非 TTY 模式（管道/重定向）：逐行处理
+  if (!process.stdin.isTTY) {
+    rl.on('line', async line => {
+      await processLine(line);
+    });
+  } else {
+    prompt();
+  }
 }
