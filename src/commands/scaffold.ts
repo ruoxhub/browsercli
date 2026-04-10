@@ -95,10 +95,67 @@ js-reverse call-skill <skill-name> --url ${url || 'https://example.com'}
 
     writeFileSync(join(taskDir, 'README.md'), readmeContent);
 
+    // 创建 Hook 脚本模板
+    const hookTemplate = `/**
+ * @license
+ * Copyright 2026 JSReverser-MCP
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+// ${name} - Hook 脚本
+// 目标: ${url || desc}
+
+(function () {
+  'use strict';
+
+  // TODO: 在此添加 Hook 逻辑
+  console.log('[${name}] Hook loaded');
+
+  // 示例：Hook JSON.stringify
+  const originalStringify = JSON.stringify;
+  JSON.stringify = function (...args) {
+    const result = originalStringify.apply(this, args);
+    // TODO: 添加自定义逻辑
+    return result;
+  };
+})();
+`;
+
+    writeFileSync(join(taskDir, 'hook.js'), hookTemplate);
+
+    // 创建 Bundle 复现模板
+    const bundleTemplate = `/**
+ * @license
+ * Copyright 2026 JSReverser-MCP
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+// ${name} - Node.js 环境复现脚本
+// 目标: ${url || desc}
+
+// TODO: 在此添加签名/加密算法实现
+
+function ${name.replace(/-/g, '_')}(params) {
+  // TODO: 实现逻辑
+  return params;
+}
+
+// 测试
+if (require.main === module) {
+  console.log(${name.replace(/-/g, '_')}({test: 'value'}));
+}
+
+module.exports = { ${name.replace(/-/g, '_')} };
+`;
+
+    writeFileSync(join(taskDir, 'bundle.js'), bundleTemplate);
+
     console.log(`任务脚手架创建成功：${taskDir}`);
     console.log('文件:');
     console.log(`  - config.json`);
     console.log(`  - README.md`);
+    console.log(`  - hook.js`);
+    console.log(`  - bundle.js`);
   } catch (error) {
     console.error(
       `创建失败：${error instanceof Error ? error.message : error}`,
