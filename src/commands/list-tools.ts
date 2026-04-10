@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {listTools} from '../tools/index.js';
 import {sendCommand} from '../daemon/client.js';
 
 /** Format tools for display */
@@ -20,21 +21,34 @@ export function formatTools(
 export async function listToolsCommand(options: {
   json?: boolean;
 }): Promise<void> {
+  let tools: Array<{name: string; description?: string}> = [];
+  let isOffline = false;
+
+  // Try daemon first
   try {
     const result = await sendCommand({method: 'list_tools'});
-    if (!result.success || !result.result) {
-      console.error('获取工具列表失败');
-      process.exit(1);
+    if (result.success && result.result) {
+      const data = JSON.parse(result.result);
+      tools = data.tools || [];
     }
+  } catch {
+    // Daemon not running, fall back to built-in tools
+    isOffline = true;
+  }
 
-    const data = JSON.parse(result.result);
-    const tools = data.tools || [];
+  // Fallback to built-in tools
+  if (tools.length === 0) {
+    isOffline = true;
+    const builtInTools = listTools();
+    tools = builtInTools.map(t => ({
+      name: t.name,
+      description: t.description,
+    }));
+  }
 
-    console.log(formatTools(tools, !!options.json));
-  } catch (error) {
-    console.error(
-      `获取工具列表失败：${error instanceof Error ? error.message : error}`,
-    );
-    process.exit(1);
+  console.log(formatTools(tools, !!options.json));
+
+  if (isOffline && !options.json) {
+    console.log('\n(离线模式：显示内置工具定义，启动后台服务可获取完整工具列表)');
   }
 }
