@@ -1,101 +1,141 @@
-<!-- gitnexus:start -->
-# GitNexus — Code Intelligence
+# PROJECT KNOWLEDGE BASE — JSReverser-MCP
 
-This project is indexed by GitNexus as **JSReverser-MCP** (2716 symbols, 7839 relationships, 223 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+**Generated:** 2026-04-11
+**Commit:** 7b57023 — test: 跳过需要 Chrome 的 daemon 集成测试并修复 utils 测试
+**Branch:** axi-mode
 
-> If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
+## OVERVIEW
 
-## Always Do
+JS逆向工程MCP服务 — 标准化前端JavaScript逆向流程。通过Puppeteer接管Chrome，提供页面观察、Hook采样、断点调试、网络分析、补环境复现等能力。CLI + Daemon双进程架构，通过Unix Socket通信。
 
-- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `gitnexus_impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
-- **MUST run `gitnexus_detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows.
-- **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
-- When exploring unfamiliar code, use `gitnexus_query({query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
-- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `gitnexus_context({name: "symbolName"})`.
+## STRUCTURE
 
-## When Debugging
-
-1. `gitnexus_query({query: "<error or symptom>"})` — find execution flows related to the issue
-2. `gitnexus_context({name: "<suspect function>"})` — see all callers, callees, and process participation
-3. `READ gitnexus://repo/JSReverser-MCP/process/{processName}` — trace the full execution flow step by step
-4. For regressions: `gitnexus_detect_changes({scope: "compare", base_ref: "main"})` — see what your branch changed
-
-## When Refactoring
-
-- **Renaming**: MUST use `gitnexus_rename({symbol_name: "old", new_name: "new", dry_run: true})` first. Review the preview — graph edits are safe, text_search edits need manual review. Then run with `dry_run: false`.
-- **Extracting/Splitting**: MUST run `gitnexus_context({name: "target"})` to see all incoming/outgoing refs, then `gitnexus_impact({target: "target", direction: "upstream"})` to find all external callers before moving code.
-- After any refactor: run `gitnexus_detect_changes({scope: "all"})` to verify only expected files changed.
-
-## Never Do
-
-- NEVER edit a function, class, or method without first running `gitnexus_impact` on it.
-- NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
-- NEVER rename symbols with find-and-replace — use `gitnexus_rename` which understands the call graph.
-- NEVER commit changes without running `gitnexus_detect_changes()` to check affected scope.
-
-## Tools Quick Reference
-
-| Tool | When to use | Command |
-|------|-------------|---------|
-| `query` | Find code by concept | `gitnexus_query({query: "auth validation"})` |
-| `context` | 360-degree view of one symbol | `gitnexus_context({name: "validateUser"})` |
-| `impact` | Blast radius before editing | `gitnexus_impact({target: "X", direction: "upstream"})` |
-| `detect_changes` | Pre-commit scope check | `gitnexus_detect_changes({scope: "staged"})` |
-| `rename` | Safe multi-file rename | `gitnexus_rename({symbol_name: "old", new_name: "new", dry_run: true})` |
-| `cypher` | Custom graph queries | `gitnexus_cypher({query: "MATCH ..."})` |
-
-## Impact Risk Levels
-
-| Depth | Meaning | Action |
-|-------|---------|--------|
-| d=1 | WILL BREAK — direct callers/importers | MUST update these |
-| d=2 | LIKELY AFFECTED — indirect deps | Should test |
-| d=3 | MAY NEED TESTING — transitive | Test if critical path |
-
-## Resources
-
-| Resource | Use for |
-|----------|---------|
-| `gitnexus://repo/JSReverser-MCP/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/JSReverser-MCP/clusters` | All functional areas |
-| `gitnexus://repo/JSReverser-MCP/processes` | All execution flows |
-| `gitnexus://repo/JSReverser-MCP/process/{name}` | Step-by-step execution trace |
-
-## Self-Check Before Finishing
-
-Before completing any code modification task, verify:
-1. `gitnexus_impact` was run for all modified symbols
-2. No HIGH/CRITICAL risk warnings were ignored
-3. `gitnexus_detect_changes()` confirms changes match expected scope
-4. All d=1 (WILL BREAK) dependents were updated
-
-## Keeping the Index Fresh
-
-After committing code changes, the GitNexus index becomes stale. Re-run analyze to update it:
-
-```bash
-npx gitnexus analyze
+```
+JSReverser-MCP/
+├── src/              # 核心源码 (SWC编译 → build/)
+│   ├── bin/          # CLI可执行入口 (js-reverse, js-reverse-mcp)
+│   ├── commands/     # Commander.js命令定义
+│   ├── daemon/       # 后台守护进程 (Unix Socket服务端)
+│   ├── tools/        # MCP工具实现 (60+工具)
+│   │   └── hook/     # Hook系统 (注入、采样、追踪)
+│   ├── skills/       # 逆向工程技能 (observe-flow, auto-hook, rebuild-bundle)
+│   ├── services/     # 业务服务层
+│   ├── modules/      # 功能模块 (debugger, collector)
+│   ├── cdp-proxy/    # CDP HTTP代理 (端口3456)
+│   ├── database/     # 数据持久化层
+│   ├── types/        # TypeScript类型定义
+│   └── utils/        # 跨层工具函数
+├── tests/            # 测试 (Node.js原生test runner)
+├── scripts/          # 构建/CI/自动化脚本
+├── docs/             # 文档 (reference, guides)
+├── artifacts/        # 任务产物 (默认.gitignore, 仅_TEMPLATE提交)
+└── build/            # 编译输出 (SWC, 勿手动编辑)
 ```
 
-If the index previously included embeddings, preserve them by adding `--embeddings`:
+## WHERE TO LOOK
+
+| Task        | Location                                  | Notes                                   |
+| ----------- | ----------------------------------------- | --------------------------------------- |
+| 启动MCP服务 | `src/index.ts` → `src/daemon/daemon.ts`   | `npm start` 直连daemon                  |
+| CLI命令     | `src/bin/js-reverse.ts` → `src/commands/` | Commander.js定义                        |
+| 添加工具    | `src/tools/` + 注册到index                | 改工具后跑 `npm run docs`               |
+| Hook逻辑    | `src/tools/hook/`                         | 注入、采样、函数追踪                    |
+| 技能系统    | `src/skills/`                             | observe-flow, auto-hook, rebuild-bundle |
+| CDP代理     | `src/cdp-proxy/CdpProxy.ts`               | HTTP API on :3456                       |
+| 补环境      | `artifacts/tasks/<id>/env/`               | env.js → polyfills.js → entry.js        |
+| 案例沉淀    | `scripts/cases/`                          | 抽象方法论，非敏感参数                  |
+| 文档生成    | `scripts/generate-docs.ts`                | `npm run docs` 触发                     |
+| 构建后处理  | `scripts/post-build.ts`                   | 生成mock、修补第三方                    |
+
+## CODE MAP
+
+| Symbol                    | Type     | Location                    | Role                                |
+| ------------------------- | -------- | --------------------------- | ----------------------------------- |
+| `handleRequest`           | Function | `src/daemon/daemon.ts:156`  | MCP请求路由分发，60+工具调度中枢    |
+| `startSocketServer`       | Function | `src/daemon/daemon.ts:455`  | Unix Socket服务端启动               |
+| `ensureBrowserConnection` | Function | `src/daemon/daemon.ts:133`  | 浏览器连接懒初始化                  |
+| `ensureToolsLoaded`       | Function | `src/daemon/daemon.ts:97`   | 工具注册懒加载                      |
+| `parseDaemonArgs`         | Function | `src/daemon/daemon.ts:57`   | CLI参数解析 (browserUrl/wsEndpoint) |
+| `createCli`               | Function | `src/commands/index.ts`     | Commander.js CLI定义                |
+| `CdpProxy`                | Class    | `src/cdp-proxy/CdpProxy.ts` | CDP HTTP代理服务器                  |
+
+## CONVENTIONS
+
+- **Compiler**: SWC (非tsc产出)，`npm run build`
+- **Module**: ESM (`"type": "module"`)，import用 `.js` 后缀
+- **Types**: `interface` 非 `type` (eslint: consistent-type-definitions)
+- **Arrays**: 简单用 `T[]`，复杂泛型用 `Array<T>`
+- **Imports**: 组间空行分隔，组内升序，禁止循环依赖，Node内置必须 `node:` 协议
+- **Quotes**: 单引号，`bracketSpacing: false`，尾随逗号all，arrowParens avoid
+- **License**: 每个源文件需含年度license header (自定义ESLint规则检查)
+- **Commits**: Conventional Commits格式
+- **Barrel exports**: 大量使用 `index.ts` 聚合模块导出
+
+## ANTI-PATTERNS (THIS PROJECT)
+
+- **NEVER** 改函数/类/方法前不跑 `gitnexus_impact` 分析影响面
+- **NEVER** 忽略HIGH/CRITICAL风险警告
+- **NEVER** 用find-and-replace重命名符号 — 用 `gitnexus_rename`
+- **NEVER** 不跑 `gitnexus_detect_changes()` 就提交
+- **DON'T** 跳过页面证据直接猜环境 (逆向方法论)
+- **DON'T** 一次性全量模拟浏览器 (逆向方法论)
+- **DON'T** 提交真实任务目录到Git (仅 `_TEMPLATE/`)
+- **DON'T** 手动编辑 `build/` 目录 (SWC编译产物)
+- **DON'T** 手动编辑 `docs/reference/tool-reference.md` (自动生成，跑 `npm run docs`)
+- **DON'T** 编辑 `src/bin/cliDefinitions.ts` (自动生成，跑 `npm run cli:generate`)
+
+## UNIQUE STYLES
+
+- **懒加载贯穿全局**: 所有command handler用 `async () => { const {x} = await import('./x.js'); }` 模式
+- **双重MCP架构**: `js-reverse-mcp` fork `src/index.ts` 作为子进程，形成三层: CLI → MCP-Daemon → MCP-Server
+- **Daemon与CLI解耦**: 两个独立进程通过Unix Socket通信 (Windows用named pipe)
+- **逆向方法论沉淀**: Observe-first → Hook-preferred → Breakpoint-last → Rebuild-oriented → Evidence-first → Pure-extraction-after-pass
+- **任务脚手架**: `artifacts/tasks/<task-id>/` 标准结构 (task.json, runtime-evidence.jsonl, env/, entry.js, run/, report.md)
+
+## COMMANDS
 
 ```bash
-npx gitnexus analyze --embeddings
+# 安装 & 构建
+npm install
+npm run build              # SWC编译 + post-build处理
+
+# 测试
+npm test                   # 全量测试
+npm run test:unit          # 单元测试
+npm run test:property      # 属性测试
+npm run test:only          # 仅运行 marked { only: true } 的测试
+npm run test:update-snapshots
+npm run coverage:full
+npm run coverage:core      # 核心7文件覆盖率
+
+# 类型 & 质量
+npm run typecheck          # tsc --noEmit (不参与build)
+npm run format             # Prettier格式化
+npm run lint               # ESLint检查
+
+# 文档
+npm run docs               # 从源码生成工具文档
+
+# CLI
+js-reverse start --browserUrl http://127.0.0.1:9222
+js-reverse stop
+js-reverse status
+js-reverse list-skills
+js-reverse call-skill observe-flow --url https://example.com
+js-reverse repl
+js-reverse scaffold --name my-task --desc "Task" --url https://example.com
 ```
 
-To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.embeddings` field shows the count (0 means no embeddings). **Running analyze without `--embeddings` will delete any previously generated embeddings.**
+## NOTES
 
-> Claude Code users: A PostToolUse hook handles this automatically after `git commit` and `git merge`.
-
-## CLI
-
-| Task | Read this skill file |
-|------|---------------------|
-| Understand architecture / "How does X work?" | `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md` |
-| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |
-| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus/gitnexus-debugging/SKILL.md` |
-| Rename / extract / split / refactor | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md` |
-| Tools, resources, schema reference | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md` |
-| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
-
-<!-- gitnexus:end -->
+- **Node版本**: v22 (见.nvmrc)，引擎要求 `^20.19.0 || ^22.12.0 || >=23`
+- **运行时flag**: `--experimental-strip-types` 用于直接跑TS脚本
+- **tsconfig双配置**: 主配置宽松(strict:false)，scripts/子配置严格(strict:true)
+- **类型错误不阻止构建**: typecheck是独立script，未集成到build流程
+- **Rollup配置缺失**: `npm run bundle` 引用 `rollup.config.mjs` 但该文件不存在
+- **无CI/CD配置**: 文档提到CI流水线，但实际无 `.github/workflows/`
+- **许可证头争议**: 源文件标注 "Copyright 2025 Google LLC"，但项目实际作者zhizhuodemao，License Apache-2.0
+- **FIXME**: `src/browser.ts:321` 日志订阅时机可能过晚 (浏览器启动后才订阅)
+- **TODO**: `src/skills/observe-flow.ts:265` 技能系统需浏览器上下文功能未完全实现
+- **CDP Proxy**: 固定端口3456，提供HTTP API操控Chrome DevTools Protocol
+- **外部AI**: 支持OpenAI/Anthropic/Gemini作为分析增强层，通过环境变量配置
