@@ -42,7 +42,8 @@ export function renderError(
 export function successOutput(
   data: Record<string, unknown>,
 ): AxiStructuredOutput {
-  return {status: 'success', ...data};
+  const {status: _ignored, ...rest} = data;
+  return {status: 'success', ...rest};
 }
 
 export function tableOutput(
