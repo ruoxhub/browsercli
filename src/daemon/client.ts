@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import {createConnection} from 'node:net';
 import {fileURLToPath} from 'node:url';
 
-import type {CallToolResult} from '../third_party/index.js';
+import type {CallToolResult} from '@modelcontextprotocol/sdk/types.js';
 
 import {socketPath, IS_WINDOWS} from './utils.js';
 
