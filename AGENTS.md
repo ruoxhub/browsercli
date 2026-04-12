@@ -14,7 +14,7 @@ JS逆向工程MCP服务 — 标准化前端JavaScript逆向流程。通过Puppet
 JSReverser-MCP/
 ├── src/              # 核心源码 (SWC编译 → build/)
 │   ├── bin/          # CLI可执行入口 (js-reverse, js-reverse-mcp)
-│   ├── commands/     # Commander.js命令定义
+│   ├── cli/          # CLI层 (axi-sdk-js, 9命令 + 80+工具调度)
 │   ├── daemon/       # 后台守护进程 (Unix Socket服务端)
 │   ├── tools/        # MCP工具实现 (60+工具)
 │   │   └── hook/     # Hook系统 (注入、采样、追踪)
@@ -34,18 +34,18 @@ JSReverser-MCP/
 
 ## WHERE TO LOOK
 
-| Task        | Location                                  | Notes                                   |
-| ----------- | ----------------------------------------- | --------------------------------------- |
-| 启动MCP服务 | `src/index.ts` → `src/daemon/daemon.ts`   | `npm start` 直连daemon                  |
-| CLI命令     | `src/bin/js-reverse.ts` → `src/commands/` | Commander.js定义                        |
-| 添加工具    | `src/tools/` + 注册到index                | 改工具后跑 `npm run docs`               |
-| Hook逻辑    | `src/tools/hook/`                         | 注入、采样、函数追踪                    |
-| 技能系统    | `src/skills/`                             | observe-flow, auto-hook, rebuild-bundle |
-| CDP代理     | `src/cdp-proxy/CdpProxy.ts`               | HTTP API on :3456                       |
-| 补环境      | `artifacts/tasks/<id>/env/`               | env.js → polyfills.js → entry.js        |
-| 案例沉淀    | `scripts/cases/`                          | 抽象方法论，非敏感参数                  |
-| 文档生成    | `scripts/generate-docs.ts`                | `npm run docs` 触发                     |
-| 构建后处理  | `scripts/post-build.ts`                   | 生成mock、修补第三方                    |
+| Task        | Location                                      | Notes                                   |
+| ----------- | --------------------------------------------- | --------------------------------------- |
+| 启动MCP服务 | `src/index.ts` → `src/daemon/daemon.ts`       | `npm start` 直连daemon                  |
+| CLI命令     | `src/bin/js-reverse.ts` → `src/cli/commands/` | axi-sdk-js定义                          |
+| 添加工具    | `src/tools/` + 注册到index                    | 改工具后跑 `npm run docs`               |
+| Hook逻辑    | `src/tools/hook/`                             | 注入、采样、函数追踪                    |
+| 技能系统    | `src/skills/`                                 | observe-flow, auto-hook, rebuild-bundle |
+| CDP代理     | `src/cdp-proxy/CdpProxy.ts`                   | HTTP API on :3456                       |
+| 补环境      | `artifacts/tasks/<id>/env/`                   | env.js → polyfills.js → entry.js        |
+| 案例沉淀    | `scripts/cases/`                              | 抽象方法论，非敏感参数                  |
+| 文档生成    | `scripts/generate-docs.ts`                    | `npm run docs` 触发                     |
+| 构建后处理  | `scripts/post-build.ts`                       | 生成mock、修补第三方                    |
 
 ## CODE MAP
 
@@ -56,7 +56,7 @@ JSReverser-MCP/
 | `ensureBrowserConnection` | Function | `src/daemon/daemon.ts:133`  | 浏览器连接懒初始化                  |
 | `ensureToolsLoaded`       | Function | `src/daemon/daemon.ts:97`   | 工具注册懒加载                      |
 | `parseDaemonArgs`         | Function | `src/daemon/daemon.ts:57`   | CLI参数解析 (browserUrl/wsEndpoint) |
-| `createCli`               | Function | `src/commands/index.ts`     | Commander.js CLI定义                |
+| `runAxiCli`               | Function | `src/bin/js-reverse.ts`     | axi-sdk-js CLI入口                  |
 | `CdpProxy`                | Class    | `src/cdp-proxy/CdpProxy.ts` | CDP HTTP代理服务器                  |
 
 ## CONVENTIONS
@@ -82,10 +82,10 @@ JSReverser-MCP/
 - **DON'T** 提交真实任务目录到Git (仅 `_TEMPLATE/`)
 - **DON'T** 手动编辑 `build/` 目录 (SWC编译产物)
 - **DON'T** 手动编辑 `docs/reference/tool-reference.md` (自动生成，跑 `npm run docs`)
-- **DON'T** 编辑 `src/bin/cliDefinitions.ts` (自动生成，跑 `npm run cli:generate`)
 
 ## UNIQUE STYLES
 
+- **axi-sdk-js CLI**: 入口使用 `runAxiCli()`，命令遵循 `AxiCliCommand<DaemonContext>` 签名，TOON格式输出
 - **懒加载贯穿全局**: 所有command handler用 `async () => { const {x} = await import('./x.js'); }` 模式
 - **双重MCP架构**: `js-reverse-mcp` fork `src/index.ts` 作为子进程，形成三层: CLI → MCP-Daemon → MCP-Server
 - **Daemon与CLI解耦**: 两个独立进程通过Unix Socket通信 (Windows用named pipe)
@@ -121,6 +121,8 @@ js-reverse start --browserUrl http://127.0.0.1:9222
 js-reverse stop
 js-reverse status
 js-reverse list-skills
+js-reverse list-tools
+js-reverse call list_scripts
 js-reverse call-skill observe-flow --url https://example.com
 js-reverse repl
 js-reverse scaffold --name my-task --desc "Task" --url https://example.com
