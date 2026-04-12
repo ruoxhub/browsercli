@@ -177,3 +177,10 @@ project/
 *.png
 .omc/
 .omx/
+
+# GSD planning artifacts
+.sisyphus/
+
+# Graphify analysis output
+graphify-out/
+src/graphify-out/
