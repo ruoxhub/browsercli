@@ -5,15 +5,45 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// CLI 入口 - 懒加载模式
-// 只有当用户实际执行命令时，才加载对应的命令模块
-async function main() {
-  const {createCli} = await import('../commands/index.js');
-  const program = await createCli();
-  program.parse(process.argv);
-}
+import {runAxiCli, type AxiCliCommand} from 'axi-sdk-js';
+import {createRequire} from 'node:module';
+import type {DaemonContext} from '../cli/types.js';
+import {
+  startCommand,
+  stopCommand,
+  statusCommand,
+  toolDispatcherCommand,
+  callSkillCommand,
+  listSkillsCommand,
+  listToolsCommand,
+  replCommand,
+  scaffoldCommand,
+  generateTopLevelHelp,
+  generateCommandHelp,
+} from '../cli/index.js';
 
-main().catch(error => {
-  console.error('CLI 启动失败:', error);
-  process.exit(1);
+const require = createRequire(import.meta.url);
+const pkg = require('../../../package.json');
+
+const homeHandler: AxiCliCommand<DaemonContext> = async () =>
+  generateTopLevelHelp();
+
+await runAxiCli<DaemonContext>({
+  description: 'JS逆向工程MCP服务 — 标准化前端JavaScript逆向流程',
+  version: pkg.version,
+  topLevelHelp: generateTopLevelHelp(),
+  home: homeHandler,
+  hooks: false,
+  getCommandHelp: cmd => generateCommandHelp(cmd),
+  commands: {
+    start: startCommand,
+    stop: stopCommand,
+    status: statusCommand,
+    call: toolDispatcherCommand,
+    'call-skill': callSkillCommand,
+    'list-skills': listSkillsCommand,
+    'list-tools': listToolsCommand,
+    repl: replCommand,
+    scaffold: scaffoldCommand,
+  },
 });
