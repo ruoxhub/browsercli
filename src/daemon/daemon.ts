@@ -215,6 +215,7 @@ async function handleRequest(msg: DaemonMessage) {
         _includeNetwork: false,
         _includeConsole: false,
         _imageData: null,
+        _structuredContent: null as unknown,
         appendResponseLine: (line: string) => {
           response._lines.push(line);
         },
@@ -227,6 +228,12 @@ async function handleRequest(msg: DaemonMessage) {
         setIncludeConsoleData: (value: boolean, _options?: any) => {
           response._includeConsole = value;
         },
+        setStructuredContent: (value: unknown) => {
+          response._structuredContent = value;
+        },
+        setIncludeWebSocketConnections: (_value: boolean, _options?: any) => {
+          /* no-op: WebSocket tracking not implemented in daemon mode */
+        },
         attachImage: (data: any) => {
           response._imageData = data;
         },
@@ -235,6 +242,9 @@ async function handleRequest(msg: DaemonMessage) {
         },
         attachConsoleMessage: (_id: number) => {
           /* no-op */
+        },
+        attachWebSocket: (_wsid: number) => {
+          /* no-op: WebSocket tracking not implemented in daemon mode */
         },
       };
 
@@ -387,6 +397,9 @@ async function handleRequest(msg: DaemonMessage) {
       }
       if (response._lines.length > 0) {
         resultData.text = response._lines.join('\n');
+      }
+      if (response._structuredContent !== null && response._structuredContent !== undefined) {
+        Object.assign(resultData, response._structuredContent);
       }
 
       return {
