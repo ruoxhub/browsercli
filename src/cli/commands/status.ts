@@ -32,7 +32,8 @@ export const statusCommand: AxiCliCommand<DaemonContext> = async (
       status: 'info',
       command: 'status',
       running: false,
-      message: '后台服务未运行。请先执行：js-reverse start --browserUrl <chrome-debug-url>',
+      message:
+        '后台服务未运行。请先执行：js-reverse start --browserUrl <chrome-debug-url>',
     };
   }
 

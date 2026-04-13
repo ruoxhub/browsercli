@@ -27,11 +27,9 @@ export const stopCommand: AxiCliCommand<DaemonContext> = async (
   }
 
   if (reachability === 'stopped') {
-    throw new AxiError(
-      '停止失败：后台服务未运行',
-      'DAEMON_NOT_RUNNING',
-      ['请先执行：js-reverse start --browserUrl <chrome-debug-url>'],
-    );
+    throw new AxiError('停止失败：后台服务未运行', 'DAEMON_NOT_RUNNING', [
+      '请先执行：js-reverse start --browserUrl <chrome-debug-url>',
+    ]);
   }
 
   // reachability === 'running'
