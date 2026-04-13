@@ -31,24 +31,48 @@ export function getDaemonPid(): number | null {
   return parseInt(pid, 10) || null;
 }
 
+/**
+ * 检查 daemon 是否正在运行且可达。
+ *
+ * 优先级：
+ * 1. socket 文件存在 → daemon 可达，运行中
+ * 2. socket 不存在但 PID 文件存在 → daemon 不可达（可能是孤儿进程或 socket 已清理）
+ * 3. socket 和 PID 文件都不存在 → 未运行
+ *
+ * 注意：仅凭 PID + kill(pid,0) 无法可靠判断，因为任何进程存在都会返回 true。
+ * 必须以 socket 文件存在性为主要依据。
+ */
 export function isDaemonRunning(pid?: number | null): boolean {
-  if (pid === null || pid === undefined) pid = getDaemonPid() ?? undefined;
-
-  // 先检查 socket 文件（最可靠的指标）
+  // 首要检查：socket 文件是否存在（daemon 可达的必要条件）
   if (fs.existsSync(socketPath)) {
     return true;
   }
 
-  // socket 不存在时，检查 PID
-  if (pid !== undefined && pid !== null) {
+  // socket 不存在时，说明 daemon 不可达，不再检查 PID
+  //（可能是孤儿进程或上次异常退出残留的 PID 文件）
+  return false;
+}
+
+/**
+ * 获取 daemon 的可达性状态。
+ * - 'running': socket 存在，daemon 可达
+ * - 'orphaned': socket 不存在但 PID 进程仍存在（孤儿进程）
+ * - 'stopped': 完全未运行
+ */
+export function getDaemonReachability(): 'running' | 'orphaned' | 'stopped' {
+  if (fs.existsSync(socketPath)) {
+    return 'running';
+  }
+
+  const pid = getDaemonPid();
+  if (pid !== null) {
     try {
-      // 使用 kill 0 检查进程是否存在（不发送信号）
       process.kill(pid, 0);
-      return true;
+      return 'orphaned';
     } catch {
-      return false;
+      // PID 进程不存在，返回 stopped
     }
   }
 
-  return false;
+  return 'stopped';
 }
