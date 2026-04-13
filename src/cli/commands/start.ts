@@ -82,7 +82,7 @@ export const startCommand: AxiCliCommand<DaemonContext> = async (
     }
     if (attempts === maxAttempts) {
       throw new AxiError(
-        `等待浏览器连接超时 (${maxAttempts * intervalMs / 1000}s)`,
+        `等待浏览器连接超时 (${(maxAttempts * intervalMs) / 1000}s)`,
         'BROWSER_TIMEOUT',
         [
           `确认 Chrome 已启动并监听：${browserUrl}`,
