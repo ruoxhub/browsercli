@@ -10,6 +10,7 @@ import {fileURLToPath} from 'node:url';
 
 import type {CallToolResult} from '@modelcontextprotocol/sdk/types.js';
 
+import {logger} from '../logger.js';
 import {socketPath, IS_WINDOWS} from './utils.js';
 
 // 允许测试覆盖 socket 路径
@@ -40,8 +41,19 @@ export async function startDaemon(args: string[]): Promise<void> {
         detached: true,
         stdio: 'ignore',
       });
+
+  // Handle spawn failure (e.g., node binary not found)
+  child.on('error', err => {
+    logger(`[CLIENT] Failed to spawn daemon: ${err.message}`);
+  });
   child.unref();
 
+  if (child.pid === undefined) {
+    throw new Error(
+      `Failed to spawn daemon process: node not found or daemon path invalid`,
+    );
+  }
+  console.log(`Daemon PID: ${child.pid}`);
   console.log(`Daemon PID: ${child.pid}`);
 
   // 等待 socket 文件创建（最多 25 秒）

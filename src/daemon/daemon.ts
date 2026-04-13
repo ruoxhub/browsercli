@@ -470,7 +470,16 @@ async function startSocketServer() {
       const transport = new PipeTransport(socket, socket);
       transport.onmessage = async (message: string) => {
         logger('onmessage', message);
-        const response = await handleRequest(JSON.parse(message));
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(message);
+        } catch (err) {
+          logger('IPC: failed to parse message as JSON:', message.slice(0, 200));
+          transport.send(JSON.stringify({success: false, error: 'Invalid JSON'}));
+          socket.end();
+          return;
+        }
+        const response = await handleRequest(parsed as DaemonMessage);
         transport.send(JSON.stringify(response));
         socket.end();
       };
