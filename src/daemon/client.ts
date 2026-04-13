@@ -110,12 +110,17 @@ export async function sendCommand(request: {
   return new Promise((resolve, reject) => {
     const socket = createConnection(socketPath);
     let response = '';
+    let settled = false;  // Guard against double-settlement
 
     socket.on('data', chunk => {
       response += chunk.toString();
     });
 
     socket.on('end', () => {
+      // Guard: if already rejected (e.g., by timeout), don't resolve
+      if (settled) return;
+      settled = true;
+
       try {
         // Ensure we have complete data before parsing
         // On some systems (especially Windows named pipes), 'end' may fire
@@ -144,8 +149,14 @@ export async function sendCommand(request: {
       }
     });
 
-    socket.on('error', reject);
+    socket.on('error', err => {
+      if (settled) return;
+      settled = true;
+      reject(err);
+    });
     socket.setTimeout(30000, () => {
+      if (settled) return;
+      settled = true;
       socket.destroy();
       reject(new Error('IPC 请求超时'));
     });
