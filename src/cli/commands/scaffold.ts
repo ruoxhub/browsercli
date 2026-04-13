@@ -9,7 +9,8 @@ import type {DaemonContext} from '../types.js';
 import {AxiError} from '../errors.js';
 import {parseArgs, getFlag} from '../args-parser.js';
 import {writeFileSync, mkdirSync, existsSync} from 'node:fs';
-import {join} from 'node:path';
+import {join, resolve, isAbsolute} from 'node:path';
+import os from 'node:os';
 
 const TASK_NAME_RE = /^[a-z][a-z0-9-]*$/;
 
@@ -99,9 +100,38 @@ export const scaffoldCommand: AxiCliCommand<DaemonContext> = async (
     }
   }
 
+  // Defend against path traversal via --output.
+  // Allow:
+  //   - Relative paths (no leading /) — always within cwd
+  //   - Absolute paths inside os.tmpdir() or cwd
+  // Block absolute paths that escape to arbitrary filesystem locations.
   const taskDir = output
     ? join(output, name)
     : join(process.cwd(), 'tasks', name);
+
+  if (isAbsolute(output ?? '')) {
+    const normalized = resolve(output!);
+    const allowedRoots = [resolve(os.tmpdir()), resolve(process.cwd())];
+    const isAllowed = allowedRoots.some(root => normalized.startsWith(root + '/'));
+    if (!isAllowed) {
+      throw new AxiError(
+        '无效的 --output 绝对路径，仅允许 tmpdir 或 cwd 下的路径',
+        'VALIDATION_ERROR',
+        ['请使用当前目录下的相对路径'],
+      );
+    }
+  }
+
+  // Ensure the final task dir stays within allowed boundaries
+  const resolvedTaskDir = resolve(taskDir);
+  const cwdResolved = resolve(process.cwd());
+  if (!resolvedTaskDir.startsWith(cwdResolved + '/') && !resolvedTaskDir.startsWith(resolve(os.tmpdir()) + '/')) {
+    throw new AxiError(
+      '无效的 --output 路径，禁止目录穿越',
+      'VALIDATION_ERROR',
+      ['请使用当前目录或 tmpdir 下的相对路径'],
+    );
+  }
 
   try {
     if (existsSync(taskDir)) {
