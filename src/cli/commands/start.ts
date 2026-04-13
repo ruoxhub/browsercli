@@ -23,6 +23,7 @@ export const startCommand: AxiCliCommand<DaemonContext> = async (
   const executablePath = getFlag(parsed, 'executablePath');
   const http = getBoolFlag(parsed, 'http');
   const port = getFlag(parsed, 'port', '3000');
+  const waitForBrowser = getBoolFlag(parsed, 'wait-for-browser');
 
   const reachability = getDaemonReachability();
 
@@ -58,6 +59,40 @@ export const startCommand: AxiCliCommand<DaemonContext> = async (
 
   await startDaemon(daemonArgs);
 
+  // Optionally wait for browser to become reachable
+  if (waitForBrowser && browserUrl) {
+    const maxAttempts = 60;
+    const intervalMs = 500;
+    let attempts = 0;
+    while (attempts < maxAttempts) {
+      attempts++;
+      try {
+        const resp = await fetch(`${browserUrl}/json/version`, {
+          signal: AbortSignal.timeout(3000),
+        });
+        if (resp.ok) {
+          break;
+        }
+      } catch {
+        // not ready yet
+      }
+      if (attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, intervalMs));
+      }
+    }
+    if (attempts === maxAttempts) {
+      throw new AxiError(
+        `等待浏览器连接超时 (${maxAttempts * intervalMs / 1000}s)`,
+        'BROWSER_TIMEOUT',
+        [
+          `确认 Chrome 已启动并监听：${browserUrl}`,
+          '需要启动标志：--remote-debugging-port=9222',
+          '示例：chrome --remote-debugging-port=9222',
+        ],
+      );
+    }
+  }
+
   const result: Record<string, unknown> = {
     command: 'start',
     message: 'Daemon 启动成功',
@@ -66,6 +101,11 @@ export const startCommand: AxiCliCommand<DaemonContext> = async (
   if (http) {
     result.httpMode = true;
     result.httpPort = port;
+  }
+
+  if (waitForBrowser && browserUrl) {
+    result.browserUrl = browserUrl;
+    result.waitedForBrowser = true;
   }
 
   return successOutput(result);
