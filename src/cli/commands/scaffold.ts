@@ -13,6 +13,17 @@ import {join} from 'node:path';
 
 const TASK_NAME_RE = /^[a-z][a-z0-9-]*$/;
 
+// JavaScript reserved words that cannot be used as function names
+const RESERVED_WORDS = new Set([
+  'break', 'case', 'catch', 'continue', 'debugger', 'default', 'delete',
+  'do', 'else', 'export', 'extends', 'finally', 'for', 'function',
+  'if', 'import', 'in', 'instanceof', 'new', 'return', 'super',
+  'switch', 'this', 'throw', 'try', 'typeof', 'var', 'void',
+  'while', 'with', 'yield', 'class', 'const', 'enum', 'let',
+  'static', 'implements', 'interface', 'package', 'private',
+  'protected', 'public',
+]);
+
 export const scaffoldCommand: AxiCliCommand<DaemonContext> = async (
   args,
   _ctx,
@@ -34,6 +45,14 @@ export const scaffoldCommand: AxiCliCommand<DaemonContext> = async (
       '名称必须以小写字母开头，只能包含小写字母、数字和连字符',
       'VALIDATION_ERROR',
       ['示例：jd-h5st、douyin-sign、taobao-mtop'],
+    );
+  }
+
+  if (RESERVED_WORDS.has(name)) {
+    throw new AxiError(
+      `名称 "${name}" 是 JavaScript 保留字，不能使用`,
+      'VALIDATION_ERROR',
+      ['请选择其他名称：jd-h5st、douyin-sign、taobao-mtop'],
     );
   }
 
