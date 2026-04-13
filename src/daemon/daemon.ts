@@ -474,8 +474,13 @@ async function startSocketServer() {
         try {
           parsed = JSON.parse(message);
         } catch (err) {
-          logger('IPC: failed to parse message as JSON:', message.slice(0, 200));
-          transport.send(JSON.stringify({success: false, error: 'Invalid JSON'}));
+          logger(
+            'IPC: failed to parse message as JSON:',
+            message.slice(0, 200),
+          );
+          transport.send(
+            JSON.stringify({success: false, error: 'Invalid JSON'}),
+          );
           socket.end();
           return;
         }
