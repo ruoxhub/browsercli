@@ -110,7 +110,7 @@ export async function sendCommand(request: {
   return new Promise((resolve, reject) => {
     const socket = createConnection(socketPath);
     let response = '';
-    let settled = false;  // Guard against double-settlement
+    let settled = false; // Guard against double-settlement
 
     socket.on('data', chunk => {
       response += chunk.toString();
