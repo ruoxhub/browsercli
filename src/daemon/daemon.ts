@@ -398,7 +398,10 @@ async function handleRequest(msg: DaemonMessage) {
       if (response._lines.length > 0) {
         resultData.text = response._lines.join('\n');
       }
-      if (response._structuredContent !== null && response._structuredContent !== undefined) {
+      if (
+        response._structuredContent !== null &&
+        response._structuredContent !== undefined
+      ) {
         Object.assign(resultData, response._structuredContent);
       }
 

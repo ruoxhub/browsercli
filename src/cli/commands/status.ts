@@ -38,18 +38,61 @@ export const statusCommand: AxiCliCommand<DaemonContext> = async (
   }
 
   // reachability === 'running'
+  let browserConnected = false;
+  let browserUrl: string | undefined;
+  let wsEndpoint: string | undefined;
+
   try {
     const result = await sendCommand({method: 'status'});
     if (result.success && result.result) {
       const info = JSON.parse(result.result as string);
-      return successOutput({
+
+      // Extract browser connection params from daemon args
+      const args: string[] = info.args || [];
+      for (let i = 0; i < args.length; i++) {
+        if (args[i] === '--browserUrl' && args[i + 1]) {
+          browserUrl = args[i + 1];
+          i++;
+        } else if (args[i] === '--wsEndpoint' && args[i + 1]) {
+          wsEndpoint = args[i + 1];
+          i++;
+        }
+      }
+
+      // Actively check browser connectivity via Chrome DevTools endpoint
+      if (browserUrl) {
+        try {
+          const response = await fetch(`${browserUrl}/json/version`, {
+            signal: AbortSignal.timeout(3000),
+          });
+          browserConnected = response.ok;
+        } catch {
+          browserConnected = false;
+        }
+      } else if (wsEndpoint) {
+        // WebSocket endpoint — assume connected if daemon is reachable
+        // (WebSocket health check is more complex; rely on daemon reachability)
+        browserConnected = true;
+      }
+
+      const output: Record<string, unknown> = {
         command: 'status',
         running: true,
         pid: info.pid,
         socketPath: info.socketPath,
         startDate: info.startDate,
-        args: info.args,
-      });
+        browserConnected,
+      };
+
+      if (!browserConnected && (browserUrl || wsEndpoint)) {
+        output.warnings = [
+          'Browser 连接失败，请确认 Chrome 已启动并启用 --remote-debugging-port=9222',
+          '工具调用将会失败，请先确保浏览器可达',
+        ];
+        output.status = 'warn';
+      }
+
+      return output;
     }
   } catch {
     // sendCommand 失败但 reachability 是 running，说明 socket 存在但连接异常
