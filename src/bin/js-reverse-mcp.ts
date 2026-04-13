@@ -251,12 +251,14 @@ process.on('SIGHUP', () => {
   void cleanup();
 });
 
-// Handle uncaught errors
+// Handle uncaught errors - MUST exit to prevent undefined state
 process.on('uncaughtException', error => {
   logger('Uncaught exception:', error);
+  process.exit(1);
 });
-process.on('unhandledRejection', error => {
-  logger('Unhandled rejection:', error);
+process.on('unhandledRejection', reason => {
+  logger('Unhandled rejection:', reason);
+  process.exit(1);
 });
 
 // Start the server

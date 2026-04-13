@@ -6,6 +6,7 @@
 
 import type {AxiCliCommand} from 'axi-sdk-js';
 import type {DaemonContext} from '../types.js';
+import {AxiError} from '../errors.js';
 import {successOutput} from '../output.js';
 import {parseArgs, getFlag} from '../args-parser.js';
 import {sendCommand} from '../../daemon/client.js';
@@ -18,13 +19,9 @@ export const callSkillCommand: AxiCliCommand<DaemonContext> = async (
   const skillName = parsed.positionals[0];
 
   if (!skillName) {
-    return {
-      status: 'error',
-      command: 'call-skill',
-      message: '缺少技能名称参数',
-      suggestion:
-        '用法：js-reverse call-skill <skill-name> [--url <url>] [--data <json>]',
-    };
+    throw new AxiError('缺少技能名称参数', 'VALIDATION_ERROR', [
+      '用法：js-reverse call-skill <skill-name> [--url <url>] [--data <json>]',
+    ]);
   }
 
   const url = getFlag(parsed, 'url');
@@ -38,11 +35,10 @@ export const callSkillCommand: AxiCliCommand<DaemonContext> = async (
     try {
       skillArgs.data = JSON.parse(dataStr);
     } catch {
-      return {
-        status: 'error',
-        command: 'call-skill',
-        message: `--data 参数必须是有效的 JSON 格式，收到：${dataStr}`,
-      };
+      throw new AxiError(
+        `--data 参数必须是有效的 JSON 格式，收到：${dataStr}`,
+        'VALIDATION_ERROR',
+      );
     }
   }
 
@@ -60,18 +56,13 @@ export const callSkillCommand: AxiCliCommand<DaemonContext> = async (
         result: result.result || '技能执行成功',
       });
     }
-    return {
-      status: 'error',
-      command: 'call-skill',
-      skill: skillName,
-      message: `技能执行失败：${result.error}`,
-    };
+    throw new AxiError(`技能执行失败：${result.error}`, 'SKILL_ERROR');
   } catch (error) {
-    return {
-      status: 'error',
-      command: 'call-skill',
-      skill: skillName,
-      message: `技能调用失败：${error instanceof Error ? error.message : error}`,
-    };
+    if (error instanceof AxiError) throw error;
+    throw new AxiError(
+      `技能调用失败：${error instanceof Error ? error.message : error}`,
+      'DAEMON_ERROR',
+      ['确保后台服务正在运行：js-reverse start --browserUrl <url>'],
+    );
   }
 };

@@ -78,7 +78,7 @@ export function generateCommandHelp(command: string): string | null {
     scaffold: {
       description: '创建新的逆向任务脚手架',
       usage:
-        'js-reverse scaffold --name <name> --desc <description> --url <url>',
+        'js-reverse scaffold --name <name> [--desc <description>] [--url <url>] [--output <directory>]',
     },
   };
 

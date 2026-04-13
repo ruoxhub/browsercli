@@ -15,7 +15,7 @@ export const statusCommand: AxiCliCommand<DaemonContext> = async (
 ) => {
   try {
     const result = await sendCommand({method: 'status'});
-    if (result.success) {
+    if (result.success && result.result) {
       const info = JSON.parse(result.result as string);
       return successOutput({
         command: 'status',

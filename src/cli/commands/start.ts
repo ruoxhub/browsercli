@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {AxiCliCommand} from 'axi-sdk-js';
+import {AxiCliCommand} from 'axi-sdk-js';
 import type {DaemonContext} from '../types.js';
+import {AxiError} from '../errors.js';
 import {parseArgs, getFlag, getBoolFlag} from '../args-parser.js';
 import {successOutput} from '../output.js';
 import {startDaemon} from '../../daemon/client.js';
@@ -24,11 +25,9 @@ export const startCommand: AxiCliCommand<DaemonContext> = async (
   const port = getFlag(parsed, 'port', '3000');
 
   if (isDaemonRunning()) {
-    return {
-      status: 'error',
-      message: 'Daemon 已经在运行中',
-      suggestion: '如需重启，请先执行：js-reverse stop',
-    };
+    throw new AxiError('Daemon 已经在运行中', 'DAEMON_ALREADY_RUNNING', [
+      '如需重启，请先执行：js-reverse stop',
+    ]);
   }
 
   const daemonArgs: string[] = [];

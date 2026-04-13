@@ -117,11 +117,24 @@ export async function sendCommand(request: {
 
     socket.on('end', () => {
       try {
-        // PipeTransport uses \0 as delimiter, response may have trailing \0
-        const trimmed = response.trim();
-        const nullIndex = trimmed.indexOf('\0');
-        const jsonStr = nullIndex > 0 ? trimmed.slice(0, nullIndex) : trimmed;
-        resolve(JSON.parse(jsonStr));
+        // Ensure we have complete data before parsing
+        // On some systems (especially Windows named pipes), 'end' may fire
+        // before all buffered data is flushed, so we wait one tick
+        setImmediate(() => {
+          try {
+            const trimmed = response.trim();
+            const nullIndex = trimmed.indexOf('\0');
+            const jsonStr =
+              nullIndex > 0 ? trimmed.slice(0, nullIndex) : trimmed;
+            resolve(JSON.parse(jsonStr));
+          } catch (err) {
+            reject(
+              new Error(
+                `响应解析失败：${err}. Response: ${response.slice(0, 200)}`,
+              ),
+            );
+          }
+        });
       } catch (err) {
         reject(
           new Error(

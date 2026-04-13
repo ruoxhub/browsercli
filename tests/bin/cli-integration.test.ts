@@ -97,8 +97,8 @@ describe('CLI Integration', () => {
       );
       assert.fail('Should reject invalid task name');
     } catch (e: any) {
-      // Command exits with code 1, which throws - that's expected behavior
-      assert.ok(e.status === 1, 'Should exit with code 1');
+      // Command exits with code 2 for VALIDATION_ERROR - that's expected behavior
+      assert.ok(e.status === 2, `Should exit with code 2, got ${e.status}`);
     }
   });
 

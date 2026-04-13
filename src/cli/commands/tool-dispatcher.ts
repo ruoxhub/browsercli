@@ -6,6 +6,7 @@
 
 import type {AxiCliCommand} from 'axi-sdk-js';
 import type {DaemonContext} from '../types.js';
+import {AxiError} from '../errors.js';
 import {successOutput} from '../output.js';
 import {parseArgs} from '../args-parser.js';
 import {sendCommand} from '../../daemon/client.js';
@@ -75,18 +76,11 @@ export const toolDispatcherCommand: AxiCliCommand<DaemonContext> = async (
         result: result.result || '执行成功',
       });
     }
-    return {
-      status: 'error',
-      command: 'call',
-      tool: toolName,
-      message: `工具执行失败：${result.error}`,
-    };
+    throw new AxiError(`工具执行失败：${result.error}`, 'TOOL_EXECUTION_ERROR');
   } catch (error) {
-    return {
-      status: 'error',
-      command: 'call',
-      tool: toolName,
-      message: `工具调用失败：${error instanceof Error ? error.message : error}`,
-    };
+    throw new AxiError(
+      `工具调用失败：${error instanceof Error ? error.message : error}`,
+      'TOOL_INVOCATION_ERROR',
+    );
   }
 };

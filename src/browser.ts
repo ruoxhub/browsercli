@@ -890,7 +890,7 @@ export class BrowserManager {
    * Handle browser crash by attempting to restart
    */
   private async handleBrowserCrash(): Promise<void> {
-    if (this.isRestarting) return;
+    if (this.isRestarting || !this.browser) return;
 
     this.isRestarting = true;
     logger('Attempting to restart browser after crash');

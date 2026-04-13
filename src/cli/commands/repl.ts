@@ -175,7 +175,7 @@ export const replCommand: AxiCliCommand<DaemonContext> = async (
         const tools = await getToolNamesList();
         replLog(`可用工具 (${tools.length}):`);
         for (const t of tools) {
-          replLog(`  - ${t.name}`);
+          replLog(`  - ${t}`);
         }
         replLog('');
         replLog('(离线模式：显示内置工具列表)');

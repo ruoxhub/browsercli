@@ -6,7 +6,7 @@
 
 import type {AxiCliCommand} from 'axi-sdk-js';
 import type {DaemonContext} from '../types.js';
-import {successOutput} from '../output.js';
+import {AxiError} from '../errors.js';
 import {parseArgs, getFlag} from '../args-parser.js';
 import {writeFileSync, mkdirSync, existsSync} from 'node:fs';
 import {join} from 'node:path';
@@ -24,33 +24,24 @@ export const scaffoldCommand: AxiCliCommand<DaemonContext> = async (
   const output = getFlag(parsed, 'output');
 
   if (!name) {
-    return {
-      status: 'error',
-      command: 'scaffold',
-      message: '缺少 --name 参数',
-      suggestion:
-        '用法：js-reverse scaffold --name <task-name> [--desc <desc>] [--url <url>]',
-    };
+    throw new AxiError('缺少 --name 参数', 'VALIDATION_ERROR', [
+      '用法：js-reverse scaffold --name <task-name> [--desc <desc>] [--url <url>]',
+    ]);
   }
 
   if (!TASK_NAME_RE.test(name)) {
-    return {
-      status: 'error',
-      command: 'scaffold',
-      message: '名称必须以小写字母开头，只能包含小写字母、数字和连字符',
-      examples: ['jd-h5st', 'douyin-sign', 'taobao-mtop'],
-    };
+    throw new AxiError(
+      '名称必须以小写字母开头，只能包含小写字母、数字和连字符',
+      'VALIDATION_ERROR',
+      ['示例：jd-h5st、douyin-sign、taobao-mtop'],
+    );
   }
 
   if (url) {
     try {
       new URL(url);
     } catch {
-      return {
-        status: 'error',
-        command: 'scaffold',
-        message: `无效的 URL 格式：${url}`,
-      };
+      throw new AxiError(`无效的 URL 格式：${url}`, 'VALIDATION_ERROR');
     }
   }
 
@@ -140,17 +131,22 @@ module.exports = { ${name.replace(/-/g, '_')} };
 
     writeFileSync(join(taskDir, 'bundle.js'), bundleTemplate);
 
-    return successOutput({
-      command: 'scaffold',
-      taskName: name,
-      taskDir,
-      files: ['config.json', 'README.md', 'hook.js', 'bundle.js'],
-    });
+    // Return user-friendly success message (not JSON) for CLI output
+    return `任务脚手架创建成功！
+
+📁 目录: ${taskDir}
+📄 文件: config.json, README.md, hook.js, bundle.js
+
+⚡ 下一步:
+   cd ${taskDir}
+   # 编辑 hook.js 实现 Hook 逻辑
+   # 编辑 bundle.js 实现签名算法
+`;
   } catch (error) {
-    return {
-      status: 'error',
-      command: 'scaffold',
-      message: `创建失败：${error instanceof Error ? error.message : error}`,
-    };
+    if (error instanceof AxiError) throw error;
+    throw new AxiError(
+      `创建失败：${error instanceof Error ? error.message : error}`,
+      'SCAFFOLD_ERROR',
+    );
   }
 };

@@ -11,6 +11,7 @@ import {URL} from 'node:url';
 import {logger} from '../logger.js';
 import {puppeteer} from '../third_party/index.js';
 import type {Browser, Page} from '../third_party/index.js';
+import {validateOutputPath} from '../utils/fsSafe.js';
 
 const DEFAULT_PORT = parseInt(process.env.CDP_PROXY_PORT || '3456');
 
@@ -314,8 +315,9 @@ export class CdpProxy {
         fullPage: query.fullPage === 'true',
       });
       if (query.file) {
-        fs.writeFileSync(query.file, screenshot);
-        res.end(JSON.stringify({saved: query.file}));
+        const safePath = validateOutputPath(query.file);
+        fs.writeFileSync(safePath, screenshot);
+        res.end(JSON.stringify({saved: safePath}));
       } else {
         res.setHeader('Content-Type', `image/${format}`);
         res.end(screenshot);
@@ -368,17 +370,25 @@ export class CdpProxy {
   }
 
   /**
-   * 读取 POST body
+   * 读取 POST body（带大小限制防止 DoS）
    */
-  private async readBody(req: http.IncomingMessage): Promise<string> {
-    return new Promise(resolve => {
+  private async readBody(
+    req: http.IncomingMessage,
+    maxSize = 10 * 1024 * 1024,
+  ): Promise<string> {
+    return new Promise((resolve, reject) => {
       let body = '';
+      let size = 0;
       req.on('data', chunk => {
+        size += chunk.length;
+        if (size > maxSize) {
+          reject(new Error('Request body too large (max 10MB)'));
+          return;
+        }
         body += chunk.toString();
       });
-      req.on('end', () => {
-        resolve(body);
-      });
+      req.on('end', () => resolve(body));
+      req.on('error', reject);
     });
   }
 

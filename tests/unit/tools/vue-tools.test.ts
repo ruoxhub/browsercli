@@ -74,15 +74,9 @@ describe('Vue tools metadata', () => {
 });
 
 describe('Vue tools hook code 结构', () => {
-  it('activateVueDevtools hookCode 包含关键函数', () => {
-    // Read the source and check the hook code string contains expected functions
-    const source = await import(
-      '../../../src/tools/vue/activateVueDevtools.js',
-      {with: {type: 'json'}}
-    );
-
-    // The handler is defined in the module; we can verify the module loads correctly
-    assert.ok(source.activateVueDevtools);
+  it('activateVueDevtools hookCode 包含关键函数', async () => {
+    // Verify the module structure
+    assert.ok(activateVueDevtools.handler);
   });
 
   it('clearVueGuards hookCode 包含 findRouter 函数', () => {
