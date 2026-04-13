@@ -20,14 +20,11 @@ export const toolDispatcherCommand: AxiCliCommand<DaemonContext> = async (
   const toolName = parsed.positionals[0];
 
   if (!toolName) {
-    return {
-      status: 'error',
-      command: 'call',
-      message: '缺少工具名称',
-      suggestion: `用法：js-reverse call <tool-name> [--param value]`,
-      availableTools: getAllToolNames().slice(0, 20),
-      totalTools: getAllToolNames().length,
-    };
+    throw new AxiError(
+      '缺少工具名称',
+      'VALIDATION_ERROR',
+      [`用法：js-reverse call <tool-name> [--param value]`],
+    );
   }
 
   const meta = getToolMeta(toolName);
@@ -35,13 +32,7 @@ export const toolDispatcherCommand: AxiCliCommand<DaemonContext> = async (
     const suggestions = searchTools(toolName)
       .map(t => t.name)
       .slice(0, 5);
-    return {
-      status: 'error',
-      command: 'call',
-      tool: toolName,
-      message: `未知工具：${toolName}`,
-      suggestions,
-    };
+    throw new AxiError(`未知工具：${toolName}`, 'UNKNOWN_TOOL', suggestions);
   }
 
   const toolArgs: Record<string, unknown> = {};
