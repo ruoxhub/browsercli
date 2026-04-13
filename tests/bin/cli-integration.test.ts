@@ -112,4 +112,74 @@ describe('CLI Integration', () => {
       'Should create scaffold successfully',
     );
   });
+
+  it('call without tool name exits with code 2', () => {
+    try {
+      runCli('call 2>&1');
+      assert.fail('Should reject missing tool name');
+    } catch (e: any) {
+      assert.ok(e.status === 2, `Should exit with code 2, got ${e.status}`);
+      assert.ok(e.stdout.includes('VALIDATION_ERROR'), 'Should include VALIDATION_ERROR');
+    }
+  });
+
+  it('call-skill without skill name exits with code 2', () => {
+    try {
+      runCli('call-skill 2>&1');
+      assert.fail('Should reject missing skill name');
+    } catch (e: any) {
+      assert.ok(e.status === 2, `Should exit with code 2, got ${e.status}`);
+      assert.ok(e.stdout.includes('VALIDATION_ERROR'), 'Should include VALIDATION_ERROR');
+    }
+  });
+
+  it('scaffold without name exits with code 2', () => {
+    try {
+      runCli('scaffold 2>&1');
+      assert.fail('Should reject missing name');
+    } catch (e: any) {
+      assert.ok(e.status === 2, `Should exit with code 2, got ${e.status}`);
+      assert.ok(e.stdout.includes('VALIDATION_ERROR'), 'Should include VALIDATION_ERROR');
+    }
+  });
+
+  it('call with unknown tool exits with code 1', () => {
+    try {
+      runCli('call nonexistent-tool-xyz 2>&1');
+      assert.fail('Should reject unknown tool');
+    } catch (e: any) {
+      assert.ok(e.status === 1, `Should exit with code 1, got ${e.status}`);
+      assert.ok(e.stdout.includes('UNKNOWN_TOOL'), 'Should include UNKNOWN_TOOL');
+    }
+  });
+
+  it('call with daemon not running exits with code 1', () => {
+    try {
+      runCli('call query_dom 2>&1');
+      assert.fail('Should fail when daemon not running');
+    } catch (e: any) {
+      assert.ok(e.status === 1, `Should exit with code 1, got ${e.status}`);
+      assert.ok(e.stdout.includes('TOOL_INVOCATION_ERROR') || e.stdout.includes('DAEMON_ERROR'), 'Should include daemon error');
+    }
+  });
+
+  it('call-skill with daemon not running exits with code 1', () => {
+    try {
+      runCli('call-skill observe-flow 2>&1');
+      assert.fail('Should fail when daemon not running');
+    } catch (e: any) {
+      assert.ok(e.status === 1, `Should exit with code 1, got ${e.status}`);
+      assert.ok(e.stdout.includes('DAEMON_ERROR'), 'Should include DAEMON_ERROR');
+    }
+  });
+
+  it('stop without daemon exits with code 1', () => {
+    try {
+      runCli('stop 2>&1');
+      assert.fail('Should fail when daemon not running');
+    } catch (e: any) {
+      assert.ok(e.status === 1, `Should exit with code 1, got ${e.status}`);
+      assert.ok(e.stdout.includes('DAEMON_NOT_RUNNING'), 'Should include DAEMON_NOT_RUNNING');
+    }
+  });
 });
