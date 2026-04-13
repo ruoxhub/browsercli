@@ -45,7 +45,7 @@ export function generateCommandHelp(command: string): string | null {
     start: {
       description: '启动后台 daemon 服务',
       usage:
-        'js-reverse start [--browserUrl <url>] [--wsEndpoint <endpoint>] [--headless] [--http] [--port <port>]',
+        'js-reverse start [--browserUrl <url>] [--wsEndpoint <endpoint>] [--wait-for-browser] [--headless] [--http] [--port <port>]',
     },
     stop: {
       description: '停止后台 daemon 服务',

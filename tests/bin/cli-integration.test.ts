@@ -204,4 +204,33 @@ describe('CLI Integration', () => {
       );
     }
   });
+
+  it('start --help shows --wait-for-browser flag', () => {
+    const output = runCli('start --help');
+    assert.ok(
+      output.includes('--wait-for-browser'),
+      'Should include --wait-for-browser in start help',
+    );
+  });
+
+  it('start --wait-for-browser with no browserUrl does not error', () => {
+    // When --wait-for-browser is set but --browserUrl is not, the flag is
+    // ignored and start proceeds normally. Since daemon may already be running
+    // in the test environment, we just verify the flag is accepted without
+    // a VALIDATION_ERROR exit code.
+    try {
+      runCli('start --wait-for-browser 2>&1');
+      // If daemon is already running, exit code 1 is acceptable
+    } catch (e: any) {
+      // Accept DAEMON_ALREADY_RUNNING (code 1) or DAEMON_ORPHANED (code 1)
+      assert.ok(
+        e.status === 1,
+        `Expected exit 1, got ${e.status}. Flag should be accepted.`,
+      );
+      assert.ok(
+        e.stdout.includes('DAEMON') || e.stdout.includes('already'),
+        'Should fail with daemon-related error, not VALIDATION_ERROR',
+      );
+    }
+  });
 });
