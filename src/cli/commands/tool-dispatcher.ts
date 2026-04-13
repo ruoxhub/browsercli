@@ -59,10 +59,16 @@ export const toolDispatcherCommand: AxiCliCommand<DaemonContext> = async (
     });
 
     if (result.success) {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(result.result as string);
+      } catch {
+        parsed = result.result || '执行成功';
+      }
       return successOutput({
         command: 'call',
         tool: toolName,
-        result: result.result || '执行成功',
+        result: parsed,
       });
     }
     throw new AxiError(`工具执行失败：${result.error}`, 'TOOL_EXECUTION_ERROR');

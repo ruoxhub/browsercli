@@ -50,10 +50,16 @@ export const callSkillCommand: AxiCliCommand<DaemonContext> = async (
     });
 
     if (result.success) {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(result.result as string);
+      } catch {
+        parsed = result.result || '技能执行成功';
+      }
       return successOutput({
         command: 'call-skill',
         skill: skillName,
-        result: result.result || '技能执行成功',
+        result: parsed,
       });
     }
     throw new AxiError(`技能执行失败：${result.error}`, 'SKILL_ERROR');
