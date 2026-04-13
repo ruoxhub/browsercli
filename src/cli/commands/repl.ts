@@ -131,7 +131,10 @@ export const replCommand: AxiCliCommand<DaemonContext> = async (
       try {
         const result = await sendCommand({method: 'status'});
         if (result.success) {
-          replLog(`状态：${result.result}`);
+          const info = JSON.parse(result.result as string);
+          replLog(
+            `状态：PID=${info.pid} | Socket=${info.socketPath} | Started=${info.startDate}`,
+          );
         } else {
           replLog(`未运行：${result.error}`);
         }
@@ -147,7 +150,12 @@ export const replCommand: AxiCliCommand<DaemonContext> = async (
       try {
         const result = await sendCommand({method: 'list_skills'});
         if (result.success) {
-          replLog(result.result || '');
+          const parsed = JSON.parse(result.result as string);
+          const skills = parsed.skills || [];
+          replLog(`可用技能 (${skills.length}):`);
+          for (const s of skills) {
+            replLog(`  - ${s.name} (${s.category}): ${s.description}`);
+          }
         } else {
           replLog(`获取失败：${result.error}`);
         }
@@ -167,7 +175,12 @@ export const replCommand: AxiCliCommand<DaemonContext> = async (
       try {
         const result = await sendCommand({method: 'list_tools'});
         if (result.success) {
-          replLog(result.result || '');
+          const parsed = JSON.parse(result.result as string);
+          const tools = parsed.tools || [];
+          replLog(`可用工具 (${tools.length}):`);
+          for (const t of tools) {
+            replLog(`  - ${t.name} (${t.category}): ${t.description}`);
+          }
         } else {
           replLog(`获取失败：${result.error}`);
         }
