@@ -4,12 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import fs from 'node:fs';
 import type {AxiCliCommand} from 'axi-sdk-js';
 import type {DaemonContext} from '../types.js';
 import {AxiError} from '../errors.js';
 import {successOutput} from '../output.js';
 import {sendCommand} from '../../daemon/client.js';
-import {getDaemonReachability, getDaemonPid} from '../../daemon/utils.js';
+import {
+  getDaemonReachability,
+  getDaemonPid,
+  getPidFilePath,
+} from '../../daemon/utils.js';
 
 export const stopCommand: AxiCliCommand<DaemonContext> = async (
   _args,
@@ -46,10 +51,29 @@ export const stopCommand: AxiCliCommand<DaemonContext> = async (
     ]);
   } catch (error) {
     if (error instanceof AxiError) throw error;
-    throw new AxiError(
-      `停止失败：${error instanceof Error ? error.message : error}`,
-      'DAEMON_ERROR',
-      ['确保后台服务正在运行：js-reverse start --browserUrl <url>'],
-    );
+    // Handle IPC timeout (daemon socket exists but daemon is unresponsive).
+    // Clean up the PID file so that getDaemonReachability() returns 'stopped'
+    // on the next call, making 'stop' idempotent regardless of daemon state.
+    const errMsg = error instanceof Error ? error.message : String(error);
+    if (
+      errMsg.includes('IPC 请求超时') ||
+      errMsg.includes('ETIMEDOUT') ||
+      errMsg.includes('ECONNREFUSED')
+    ) {
+      const pidFile = getPidFilePath();
+      try {
+        fs.unlinkSync(pidFile);
+      } catch {
+        /* ignore */
+      }
+      throw new AxiError(
+        '停止失败：daemon 响应超时，已清理残留状态',
+        'DAEMON_NOT_RUNNING',
+        ['请先执行：js-reverse start --browserUrl <chrome-debug-url>'],
+      );
+    }
+    throw new AxiError(`停止失败：${errMsg}`, 'DAEMON_ERROR', [
+      '确保后台服务正在运行：js-reverse start --browserUrl <url>',
+    ]);
   }
 };

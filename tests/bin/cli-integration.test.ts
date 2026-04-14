@@ -192,14 +192,29 @@ describe('CLI Integration', () => {
     }
   });
 
-  // Idempotent: first try to stop any running daemon, then verify that
-  // a subsequent stop fails with DAEMON_NOT_RUNNING. This makes the test
-  // reliable regardless of whether a daemon is already running in the env.
-  // Skipped: requires a healthy daemon socket that responds to IPC within the
-  // execSync timeout window; in environments where the daemon was started by
-  // this test run the socket transitions through a closing state that can
-  // cause sendCommand to hang.
-  it.skip('stop without daemon exits with code 1', () => {
+  // Idempotency: 'stop' when daemon is not running should fail fast with
+  // DAEMON_NOT_RUNNING regardless of prior daemon state. In WSL environments
+  // the socket may linger after daemon exit — the stop command now handles
+  // IPC timeout by cleaning the PID file and returning DAEMON_NOT_RUNNING.
+  // We test the fast path: a second stop when daemon is not reachable.
+  it('stop when daemon not running exits with code 1 and DAEMON_NOT_RUNNING', () => {
+    try {
+      runCli('stop 2>&1');
+    } catch {
+      // ignore first attempt — daemon may or may not be running
+    }
+    // A second stop should be fast even when socket cleanup is pending
+    try {
+      runCli('stop 2>&1');
+      assert.fail('Should fail when daemon is not running');
+    } catch (e: any) {
+      assert.ok(e.status === 1, `Should exit with code 1, got ${e.status}`);
+      assert.ok(
+        e.stdout.includes('DAEMON_NOT_RUNNING'),
+        `Should include DAEMON_NOT_RUNNING, got: ${e.stdout.slice(0, 200)}`,
+      );
+    }
+  });
     // Idempotent: first try to stop any running daemon, then verify that
     // a subsequent stop fails with DAEMON_NOT_RUNNING. This makes the test
     // reliable regardless of whether a daemon is already running in the env.

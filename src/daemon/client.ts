@@ -166,7 +166,7 @@ export async function sendCommand(request: {
       settled = true;
       reject(err);
     });
-    socket.setTimeout(30000, () => {
+    socket.setTimeout(5000, () => {
       if (settled) return;
       settled = true;
       socket.destroy();
