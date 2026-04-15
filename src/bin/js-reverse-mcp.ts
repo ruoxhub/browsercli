@@ -90,48 +90,35 @@ interface McpResult {
 
 async function handleRequest(msg: DaemonMessage) {
   try {
-    if (msg.method === 'invoke_tool') {
-      if (!mcpClient) {
-        throw new Error('MCP client not initialized');
-      }
-      const {tool, args} = msg;
+    if (!mcpClient) {
+      throw new Error('MCP client not initialized');
+    }
 
+    if (msg.method === 'invoke_tool') {
+      const {tool, args} = msg;
       const result = (await mcpClient.callTool({
         name: tool!,
         arguments: args || {},
       })) as McpResult | McpContent[];
+      return {success: true, result: JSON.stringify(result)};
+    }
 
-      return {
-        success: true,
-        result: JSON.stringify(result),
-      };
-    } else if (msg.method === 'invoke_skill') {
-      if (!mcpClient) {
-        throw new Error('MCP client not initialized');
-      }
+    if (msg.method === 'invoke_skill') {
       const {skill, args} = msg;
-
       const result = (await mcpClient.callTool({
         name: skill!,
         arguments: args || {},
       })) as McpResult | McpContent[];
+      return {success: true, result: JSON.stringify(result)};
+    }
 
-      return {
-        success: true,
-        result: JSON.stringify(result),
-      };
-    } else if (msg.method === 'stop') {
-      // Ensure we are not interrupting in-progress starting.
+    if (msg.method === 'stop') {
       await started;
-      // Trigger cleanup asynchronously.
-      setImmediate(() => {
-        void cleanup();
-      });
-      return {
-        success: true,
-        message: 'stopping',
-      };
-    } else if (msg.method === 'status') {
+      setImmediate(() => void cleanup());
+      return {success: true, message: 'stopping'};
+    }
+
+    if (msg.method === 'status') {
       return {
         success: true,
         result: JSON.stringify({
@@ -143,18 +130,14 @@ async function handleRequest(msg: DaemonMessage) {
         }),
       };
     }
-    {
-      return {
-        success: false,
-        error: `Unknown method: ${JSON.stringify(msg, null, 2)}`,
-      };
-    }
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+
     return {
       success: false,
-      error: errorMessage,
+      error: `Unknown method: ${JSON.stringify(msg, null, 2)}`,
     };
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return {success: false, error: errorMessage};
   }
 }
 
@@ -241,15 +224,9 @@ async function cleanup() {
 }
 
 // Handle shutdown signals
-process.on('SIGTERM', () => {
-  void cleanup();
-});
-process.on('SIGINT', () => {
-  void cleanup();
-});
-process.on('SIGHUP', () => {
-  void cleanup();
-});
+for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP']) {
+  process.on(sig, () => void cleanup());
+}
 
 // Handle uncaught errors - MUST exit to prevent undefined state
 process.on('uncaughtException', error => {

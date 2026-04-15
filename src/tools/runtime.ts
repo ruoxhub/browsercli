@@ -39,8 +39,11 @@ export interface JSHookRuntime {
   deobfuscator: Deobfuscator;
   cryptoDetector: CryptoDetector;
   reverseTaskStore: ReverseTaskStore;
+  /** @deprecated Use setPageContext instead */
   bindPageContext: (resolver: () => Page) => void;
+  /** @deprecated Use setPageContext instead */
   syncPageContext: (page: Page) => void;
+  setPageContext: (page: Page | (() => Page)) => void;
   clearPageContext: () => void;
 }
 
@@ -109,6 +112,9 @@ export function getJSHookRuntime(): JSHookRuntime {
     },
     syncPageContext: page => {
       collector.setPageResolver(() => page);
+    },
+    setPageContext: page => {
+      collector.setPageResolver(typeof page === 'function' ? page : () => page);
     },
     clearPageContext: () => {
       collector.setPageResolver(undefined);

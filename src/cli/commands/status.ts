@@ -50,13 +50,8 @@ export const statusCommand: AxiCliCommand<DaemonContext> = async (
       // Extract browser connection params from daemon args
       const args: string[] = info.args || [];
       for (let i = 0; i < args.length; i++) {
-        if (args[i] === '--browserUrl' && args[i + 1]) {
-          browserUrl = args[i + 1];
-          i++;
-        } else if (args[i] === '--wsEndpoint' && args[i + 1]) {
-          wsEndpoint = args[i + 1];
-          i++;
-        }
+        if (args[i] === '--browserUrl') browserUrl = args[++i];
+        else if (args[i] === '--wsEndpoint') wsEndpoint = args[++i];
       }
 
       // Actively check browser connectivity via Chrome DevTools endpoint
@@ -69,10 +64,8 @@ export const statusCommand: AxiCliCommand<DaemonContext> = async (
         } catch {
           browserConnected = false;
         }
-      } else if (wsEndpoint) {
-        // WebSocket endpoint — assume connected if daemon is reachable
-        // (WebSocket health check is more complex; rely on daemon reachability)
-        browserConnected = true;
+      } else {
+        browserConnected = !!wsEndpoint;
       }
 
       const output: Record<string, unknown> = {

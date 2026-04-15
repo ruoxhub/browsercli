@@ -67,9 +67,9 @@ export const searchSiteExperience = defineTool({
         );
       }
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      response.appendResponseLine(`搜索失败：${errorMessage}`);
+      response.appendResponseLine(
+        `搜索失败：${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   },
 });
@@ -130,9 +130,9 @@ export const createSiteExperience = defineTool({
         `**创建时间**: ${result.createdAt?.toISOString() || 'N/A'}`,
       );
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      response.appendResponseLine(`创建失败：${errorMessage}`);
+      response.appendResponseLine(
+        `创建失败：${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   },
 });
@@ -161,13 +161,13 @@ export const updateSiteExperience = defineTool({
       request.params;
 
     try {
-      const updateData: Record<string, unknown> = {};
-      if (name !== undefined) updateData.name = name;
-      if (aliases !== undefined) updateData.aliases = aliases;
-      if (platformFeatures !== undefined)
-        updateData.platformFeatures = platformFeatures;
-      if (validPatterns !== undefined) updateData.validPatterns = validPatterns;
-      if (knownPitfalls !== undefined) updateData.knownPitfalls = knownPitfalls;
+      const updateData: Record<string, unknown> = {
+        ...(name !== undefined && {name}),
+        ...(aliases !== undefined && {aliases}),
+        ...(platformFeatures !== undefined && {platformFeatures}),
+        ...(validPatterns !== undefined && {validPatterns}),
+        ...(knownPitfalls !== undefined && {knownPitfalls}),
+      };
 
       const result = await siteExperienceService.update(id, updateData);
 
@@ -184,9 +184,9 @@ export const updateSiteExperience = defineTool({
         `**更新时间**: ${result.updatedAt?.toISOString() || 'N/A'}`,
       );
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      response.appendResponseLine(`更新失败：${errorMessage}`);
+      response.appendResponseLine(
+        `更新失败：${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   },
 });
@@ -218,9 +218,9 @@ export const deleteSiteExperience = defineTool({
 
       response.appendResponseLine(`成功删除站点经验 (ID: ${id})`);
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      response.appendResponseLine(`删除失败：${errorMessage}`);
+      response.appendResponseLine(
+        `删除失败：${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   },
 });
@@ -258,9 +258,9 @@ export const listSiteExperiences = defineTool({
         '\n使用 `search_site_experience` 查看详细信息，或使用 `id` 进行更新/删除操作',
       );
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      response.appendResponseLine(`获取列表失败：${errorMessage}`);
+      response.appendResponseLine(
+        `获取列表失败：${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   },
 });

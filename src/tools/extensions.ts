@@ -25,49 +25,40 @@ export const updateExtensions = defineTool({
   handler: async (_request, response, context, runtime) => {
     const page = await runtime.collector.getActivePage();
 
-    // 导航到 extensions 页面
     await page.goto('chrome://extensions/', {
       waitUntil: 'networkidle2',
       timeout: 10000,
     });
 
-    // 等待页面加载完成
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    // 执行 JavaScript 点击更新按钮
     const result = await page.evaluate(() => {
+      const traverseShadowRoot = (
+        selector: string,
+        el: Element | ShadowRoot,
+      ): Element | null => {
+        const found = el.querySelector(selector);
+        if (found) return found;
+        for (const child of el.children) {
+          const sr = (child as any).shadowRoot;
+          if (sr) {
+            const deep = traverseShadowRoot(selector, sr);
+            if (deep) return deep;
+          }
+        }
+        return null;
+      };
+
       const manager = document.querySelector('extensions-manager');
       if (!manager) {
         return {success: false, error: 'extensions-manager not found'};
       }
 
-      const shadowRoot = (manager as any).shadowRoot;
-      if (!shadowRoot) {
-        return {
-          success: false,
-          error: 'shadowRoot not found on extensions-manager',
-        };
-      }
-
-      const toolbar = shadowRoot.querySelector('extensions-toolbar#toolbar');
-      if (!toolbar) {
-        return {success: false, error: 'extensions-toolbar#toolbar not found'};
-      }
-
-      const toolbarShadowRoot = (toolbar as any).shadowRoot;
-      if (!toolbarShadowRoot) {
-        return {
-          success: false,
-          error: 'shadowRoot not found on extensions-toolbar',
-        };
-      }
-
-      const updateButton = toolbarShadowRoot.querySelector('#updateNow');
+      const updateButton = traverseShadowRoot('#updateNow', manager);
       if (!updateButton) {
         return {success: false, error: '#updateNow button not found'};
       }
 
-      // 检查按钮是否被禁用
       if ((updateButton as any).disabled) {
         return {success: false, error: 'Update button is disabled'};
       }

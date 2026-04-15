@@ -32,27 +32,22 @@ export function safeStringify(
   let depth = 0;
 
   const replacer = (key: string, value: any): any => {
-    // 处理 undefined
     if (value === undefined) {
       return '[undefined]';
     }
 
-    // 处理 BigInt
     if (typeof value === 'bigint') {
       return `[BigInt: ${value.toString()}]`;
     }
 
-    // 处理函数
     if (typeof value === 'function') {
       return `[Function: ${value.name || 'anonymous'}]`;
     }
 
-    // 处理 Symbol
     if (typeof value === 'symbol') {
       return `[Symbol: ${value.toString()}]`;
     }
 
-    // 处理特殊对象
     if (value instanceof Error) {
       return {
         __type: 'Error',
@@ -77,22 +72,18 @@ export function safeStringify(
       };
     }
 
-    // 处理对象和数组
     if (value !== null && typeof value === 'object') {
-      // 深度限制
       depth++;
       if (depth > maxDepth) {
         depth--;
         return '[Max depth exceeded]';
       }
 
-      // 循环引用检测
       if (seen.has(value)) {
         return '[Circular Reference]';
       }
       seen.add(value);
 
-      // 正常返回
       const result = value;
       depth--;
       return result;
@@ -104,7 +95,6 @@ export function safeStringify(
   try {
     return JSON.stringify(data, replacer, space);
   } catch (error) {
-    // 如果还是失败，返回错误描述
     return `[Serialization Error: ${error instanceof Error ? error.message : String(error)}]`;
   }
 }
@@ -115,8 +105,6 @@ export function safeStringify(
  * @param text JSON 字符串
  * @returns 解析后的对象，失败时返回 null
  */
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 export function safeParse(text: string): any {
   try {
     return JSON.parse(text);

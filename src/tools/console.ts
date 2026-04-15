@@ -15,32 +15,50 @@ type ConsoleResponseType = ConsoleMessageType | 'issue';
 const FILTERABLE_MESSAGE_TYPES: [
   ConsoleResponseType,
   ...ConsoleResponseType[],
-] = [
-  'log',
-  'debug',
-  'info',
-  'error',
-  'warn',
-  'dir',
-  'dirxml',
-  'table',
-  'trace',
-  'clear',
-  'startGroup',
-  'startGroupCollapsed',
-  'endGroup',
-  'assert',
-  'profile',
-  'profileEnd',
-  'count',
-  'timeEnd',
-  'verbose',
-  'issue',
-];
-
-if (features.issues) {
-  FILTERABLE_MESSAGE_TYPES.push('issue');
-}
+] = features.issues
+  ? [
+      'log',
+      'debug',
+      'info',
+      'error',
+      'warn',
+      'dir',
+      'dirxml',
+      'table',
+      'trace',
+      'clear',
+      'startGroup',
+      'startGroupCollapsed',
+      'endGroup',
+      'assert',
+      'profile',
+      'profileEnd',
+      'count',
+      'timeEnd',
+      'verbose',
+      'issue',
+    ]
+  : [
+      'log',
+      'debug',
+      'info',
+      'error',
+      'warn',
+      'dir',
+      'dirxml',
+      'table',
+      'trace',
+      'clear',
+      'startGroup',
+      'startGroupCollapsed',
+      'endGroup',
+      'assert',
+      'profile',
+      'profileEnd',
+      'count',
+      'timeEnd',
+      'verbose',
+    ];
 
 export const listConsoleMessages = defineTool({
   name: 'list_console_messages',

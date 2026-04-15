@@ -31,22 +31,15 @@ import {puppeteer} from './third_party/index.js';
 let browserManager: BrowserManager | undefined;
 
 function makeTargetFilter() {
-  const ignoredPrefixes = new Set([
+  const ignoredPrefixes = [
     'chrome://',
     'chrome-extension://',
     'chrome-untrusted://',
-  ]);
+  ];
 
   return function targetFilter(target: Target): boolean {
-    if (target.url() === 'chrome://newtab/') {
-      return true;
-    }
-    for (const prefix of ignoredPrefixes) {
-      if (target.url().startsWith(prefix)) {
-        return false;
-      }
-    }
-    return true;
+    if (target.url() === 'chrome://newtab/') return true;
+    return !ignoredPrefixes.some(prefix => target.url().startsWith(prefix));
   };
 }
 

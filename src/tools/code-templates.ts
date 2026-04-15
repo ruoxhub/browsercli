@@ -131,7 +131,6 @@ export const getCodeTemplate = defineTool({
     }
 
     try {
-      // Load the template file from the v_jstools model_codes directory
       const templatePath = `/mnt/d/browserplugs/v_jstools/tools/model_codes/${templateInfo.file}.js`;
       const fs = await import('node:fs/promises');
       const code = await fs.readFile(templatePath, 'utf-8');

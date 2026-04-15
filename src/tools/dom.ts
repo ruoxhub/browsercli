@@ -8,6 +8,13 @@ import {zod} from '../third_party/index.js';
 import {ToolCategory} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
 
+function respondWithJson(result: unknown, response: any): void {
+  response.setStructuredContent(result);
+  response.appendResponseLine('```json');
+  response.appendResponseLine(JSON.stringify(result, null, 2));
+  response.appendResponseLine('```');
+}
+
 export const queryDom = defineTool({
   name: 'query_dom',
   description: 'Query one or multiple elements by CSS selector.',
@@ -29,12 +36,7 @@ export const queryDom = defineTool({
         )
       : await runtime.domInspector.querySelector(request.params.selector);
 
-    // 设置结构化返回数据
-    response.setStructuredContent(result);
-
-    response.appendResponseLine('```json');
-    response.appendResponseLine(JSON.stringify(result, null, 2));
-    response.appendResponseLine('```');
+    respondWithJson(result, response);
   },
 });
 
@@ -56,12 +58,7 @@ export const getDomStructure = defineTool({
       request.params.includeText,
     );
 
-    // 设置结构化返回数据
-    response.setStructuredContent(result);
-
-    response.appendResponseLine('```json');
-    response.appendResponseLine(JSON.stringify(result, null, 2));
-    response.appendResponseLine('```');
+    respondWithJson(result, response);
   },
 });
 
@@ -81,11 +78,6 @@ export const findClickableElements = defineTool({
       request.params.filterText,
     );
 
-    // 设置结构化返回数据
-    response.setStructuredContent(result);
-
-    response.appendResponseLine('```json');
-    response.appendResponseLine(JSON.stringify(result, null, 2));
-    response.appendResponseLine('```');
+    respondWithJson(result, response);
   },
 });

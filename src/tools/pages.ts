@@ -12,6 +12,21 @@ import {defineTool, timeoutSchema} from './ToolDefinition.js';
 // Default navigation timeout in milliseconds (10 seconds)
 const DEFAULT_NAV_TIMEOUT = 10000;
 
+async function tryNavigate(
+  action: () => Promise<void>,
+  successMsg: string,
+  response: any,
+): Promise<void> {
+  try {
+    await action();
+    response.appendResponseLine(successMsg);
+  } catch (error) {
+    response.appendResponseLine(
+      `Unable to ${successMsg.toLowerCase().split(' ')[1]}: ${error.message}.`,
+    );
+  }
+}
+
 export const listPages = defineTool({
   name: 'list_pages',
   description: `Get a list of pages open in the browser.`,
@@ -103,78 +118,58 @@ export const navigatePage = defineTool({
     const options = {
       timeout: request.params.timeout ?? DEFAULT_NAV_TIMEOUT,
     };
+    const navType = request.params.type || 'url';
 
-    if (!request.params.type && !request.params.url) {
-      throw new Error('Either URL or a type is required.');
-    }
-
-    if (!request.params.type) {
-      request.params.type = 'url';
+    if (navType === 'url' && !request.params.url) {
+      throw new Error('A URL is required for navigation of type=url.');
     }
 
     await context.waitForEventsAfterAction(async () => {
-      switch (request.params.type) {
+      switch (navType) {
         case 'url':
-          if (!request.params.url) {
-            throw new Error('A URL is required for navigation of type=url.');
-          }
-          try {
-            await page.goto(request.params.url, {
-              ...options,
-              waitUntil: 'domcontentloaded',
-            });
-            response.appendResponseLine(
-              `Successfully navigated to ${request.params.url}.`,
-            );
-          } catch (error) {
-            response.appendResponseLine(
-              `Unable to navigate in the  selected page: ${error.message}.`,
-            );
-          }
+          await tryNavigate(
+            () =>
+              page.goto(request.params.url!, {
+                ...options,
+                waitUntil: 'domcontentloaded',
+              }),
+            `Successfully navigated to ${request.params.url}.`,
+            response,
+          );
           break;
         case 'back':
-          try {
-            await page.goBack({
-              ...options,
-              waitUntil: 'domcontentloaded',
-            });
-            response.appendResponseLine(
-              `Successfully navigated back to ${page.url()}.`,
-            );
-          } catch (error) {
-            response.appendResponseLine(
-              `Unable to navigate back in the selected page: ${error.message}.`,
-            );
-          }
+          await tryNavigate(
+            () =>
+              page.goBack({
+                ...options,
+                waitUntil: 'domcontentloaded',
+              }),
+            `Successfully navigated back to ${page.url()}.`,
+            response,
+          );
           break;
         case 'forward':
-          try {
-            await page.goForward({
-              ...options,
-              waitUntil: 'domcontentloaded',
-            });
-            response.appendResponseLine(
-              `Successfully navigated forward to ${page.url()}.`,
-            );
-          } catch (error) {
-            response.appendResponseLine(
-              `Unable to navigate forward in the selected page: ${error.message}.`,
-            );
-          }
+          await tryNavigate(
+            () =>
+              page.goForward({
+                ...options,
+                waitUntil: 'domcontentloaded',
+              }),
+            `Successfully navigated forward to ${page.url()}.`,
+            response,
+          );
           break;
         case 'reload':
-          try {
-            await page.reload({
-              ...options,
-              waitUntil: 'domcontentloaded',
-              ignoreCache: request.params.ignoreCache,
-            });
-            response.appendResponseLine(`Successfully reloaded the page.`);
-          } catch (error) {
-            response.appendResponseLine(
-              `Unable to reload the selected page: ${error.message}.`,
-            );
-          }
+          await tryNavigate(
+            () =>
+              page.reload({
+                ...options,
+                waitUntil: 'domcontentloaded',
+                ignoreCache: request.params.ignoreCache,
+              }),
+            'Successfully reloaded the page.',
+            response,
+          );
           break;
       }
     });

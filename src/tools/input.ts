@@ -36,9 +36,7 @@ export const click = defineTool({
     });
 
     response.appendResponseLine(
-      request.params.dblClick
-        ? `Successfully double clicked on element: ${request.params.selector}`
-        : `Successfully clicked on element: ${request.params.selector}`,
+      `Successfully ${request.params.dblClick ? 'double ' : ''}clicked on element: ${request.params.selector}`,
     );
   },
 });
@@ -131,11 +129,9 @@ export const hover = defineTool({
   },
   handler: async (request, response, context, runtime) => {
     const page = await runtime.collector.getActivePage();
-
     const element = await page.$(request.params.selector);
-    if (!element) {
+    if (!element)
       throw new Error(`Element not found: ${request.params.selector}`);
-    }
 
     await element.hover();
     response.appendResponseLine(
@@ -164,13 +160,10 @@ export const fill = defineTool({
   },
   handler: async (request, response, context, runtime) => {
     const page = await runtime.collector.getActivePage();
-
     const element = await page.$(request.params.selector);
-    if (!element) {
+    if (!element)
       throw new Error(`Element not found: ${request.params.selector}`);
-    }
 
-    // 检查是否是 select 元素
     const isSelect = await page.evaluate(sel => {
       const el = document.querySelector(sel);
       return el?.tagName === 'SELECT';
@@ -207,18 +200,15 @@ export const drag = defineTool({
   },
   handler: async (request, response, context, runtime) => {
     const page = await runtime.collector.getActivePage();
-
     const fromElement = await page.$(request.params.fromSelector);
     const toElement = await page.$(request.params.toSelector);
 
-    if (!fromElement) {
+    if (!fromElement)
       throw new Error(
         `Source element not found: ${request.params.fromSelector}`,
       );
-    }
-    if (!toElement) {
+    if (!toElement)
       throw new Error(`Target element not found: ${request.params.toSelector}`);
-    }
 
     // 获取源元素中心点
     const fromBox = await fromElement.boundingBox();
@@ -313,34 +303,35 @@ export const uploadFile = defineTool({
   },
   handler: async (request, response, context, runtime) => {
     const page = await runtime.collector.getActivePage();
-
     const element = await page.$(request.params.selector);
-    if (!element) {
+    if (!element)
       throw new Error(`Element not found: ${request.params.selector}`);
+
+    const uploaded = await (element as any)
+      .uploadFile(request.params.filePath)
+      .then(() => true)
+      .catch(() => false);
+
+    if (uploaded) {
+      response.appendResponseLine(
+        `File uploaded from ${request.params.filePath}`,
+      );
+      return;
     }
 
     try {
-      // 尝试直接使用 uploadFile 方法（需要类型断言）
-      await (element as any).uploadFile(request.params.filePath);
+      const [fileChooser] = await Promise.all([
+        page.waitForFileChooser({timeout: 3000}),
+        element.click(),
+      ]);
+      await fileChooser.accept([request.params.filePath]);
       response.appendResponseLine(
         `File uploaded from ${request.params.filePath}`,
       );
     } catch {
-      // 如果不是 file input，尝试点击触发 file chooser
-      try {
-        const [fileChooser] = await Promise.all([
-          page.waitForFileChooser({timeout: 3000}),
-          element.click(),
-        ]);
-        await fileChooser.accept([request.params.filePath]);
-        response.appendResponseLine(
-          `File uploaded from ${request.params.filePath}`,
-        );
-      } catch {
-        throw new Error(
-          `Failed to upload file. The element could not accept the file directly, and clicking it did not trigger a file chooser.`,
-        );
-      }
+      throw new Error(
+        `Failed to upload file. The element could not accept the file directly, and clicking it did not trigger a file chooser.`,
+      );
     }
   },
 });

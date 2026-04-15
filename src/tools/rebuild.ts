@@ -136,9 +136,7 @@ function matchesTargetText(
   return (
     targetKeywords.some(keyword => text.includes(keyword.toLowerCase())) ||
     targetUrlPatterns.some(pattern => text.includes(pattern.toLowerCase())) ||
-    targetFunctionNames.some(functionName =>
-      text.includes(functionName.toLowerCase()),
-    ) ||
+    targetFunctionNames.some(fn => text.includes(fn.toLowerCase())) ||
     (targetActionDescription.length > 0 &&
       text.includes(targetActionDescription.toLowerCase()))
   );
@@ -152,21 +150,22 @@ function filterRuntimeEvidence(
   targetActionDescription: string,
   maxEvidenceItems: number,
 ): Array<Record<string, unknown>> {
-  const filtered =
-    targetKeywords.length === 0 &&
-    targetUrlPatterns.length === 0 &&
-    targetFunctionNames.length === 0 &&
-    targetActionDescription.length === 0
-      ? records
-      : records.filter(record =>
-          matchesTargetText(
-            record,
-            targetKeywords,
-            targetUrlPatterns,
-            targetFunctionNames,
-            targetActionDescription,
-          ),
-        );
+  const hasTargets =
+    targetKeywords.length > 0 ||
+    targetUrlPatterns.length > 0 ||
+    targetFunctionNames.length > 0 ||
+    targetActionDescription.length > 0;
+  const filtered = hasTargets
+    ? records.filter(record =>
+        matchesTargetText(
+          record,
+          targetKeywords,
+          targetUrlPatterns,
+          targetFunctionNames,
+          targetActionDescription,
+        ),
+      )
+    : records;
   return filtered.slice(0, maxEvidenceItems);
 }
 
@@ -177,14 +176,12 @@ function pickTargetScript(
   targetFunctionNames: string[],
   targetActionDescription: string,
 ): CodeFile | undefined {
-  if (
-    targetKeywords.length === 0 &&
-    targetUrlPatterns.length === 0 &&
-    targetFunctionNames.length === 0 &&
-    targetActionDescription.length === 0
-  ) {
-    return files[0];
-  }
+  const hasTargets =
+    targetKeywords.length > 0 ||
+    targetUrlPatterns.length > 0 ||
+    targetFunctionNames.length > 0 ||
+    targetActionDescription.length > 0;
+  if (!hasTargets) return files[0];
   return (
     files.find(file =>
       matchesTargetText(

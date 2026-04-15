@@ -34,6 +34,17 @@ logger('[DAEMON] Module loading...');
 
 logger('[DAEMON] Modules loaded, checking existing daemon...');
 
+const pidFilePath = getPidFilePath();
+const existingPid = getDaemonPid();
+if (existingPid !== null && !fs.existsSync(getSocketPath())) {
+  try {
+    process.kill(existingPid, 0);
+  } catch {
+    logger(`[DAEMON] Cleaning up stale PID file (PID: ${existingPid})`);
+    fs.unlinkSync(pidFilePath);
+  }
+}
+
 const pid = getDaemonPid();
 if (isDaemonRunning(pid)) {
   logger('Daemon already running (PID: ' + pid + ')');
@@ -41,7 +52,6 @@ if (isDaemonRunning(pid)) {
   process.exit(1);
 }
 
-const pidFilePath = getPidFilePath();
 fs.mkdirSync(path.dirname(pidFilePath), {
   recursive: true,
 });
@@ -59,16 +69,10 @@ function parseDaemonArgs(args: string[]) {
   let wsEndpoint: string | undefined;
 
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--browserUrl' && args[i + 1]) {
-      browserUrl = args[i + 1];
-      i++;
-    } else if (args[i] === '--wsEndpoint' && args[i + 1]) {
-      wsEndpoint = args[i + 1];
-      i++;
-    }
+    if (args[i] === '--browserUrl') browserUrl = args[++i];
+    else if (args[i] === '--wsEndpoint') wsEndpoint = args[++i];
   }
 
-  // 设置环境变量供 runtime 使用
   if (browserUrl) {
     process.env.REMOTE_DEBUGGING_URL = browserUrl;
     logger(`[DAEMON] Set REMOTE_DEBUGGING_URL=${browserUrl}`);
@@ -171,7 +175,9 @@ async function handleRequest(msg: DaemonMessage) {
         success: result.success,
         result: JSON.stringify(result),
       };
-    } else if (msg.method === 'invoke_tool') {
+    }
+
+    if (msg.method === 'invoke_tool') {
       const {tool, args = {}} = msg;
       if (!tool) {
         return {success: false, error: 'Missing tool name'};
@@ -187,11 +193,9 @@ async function handleRequest(msg: DaemonMessage) {
         };
       }
 
-      // 构建工具调用的参数
       const {getJSHookRuntime} = await import('../tools/runtime.js');
       const runtime = getJSHookRuntime();
 
-      // 预获取页面列表（支持同步调用）
       let cachedPages: any[] = [];
       try {
         const browser = runtime.browserManager.getBrowser();
@@ -202,7 +206,6 @@ async function handleRequest(msg: DaemonMessage) {
         // Ignore errors
       }
 
-      // 如果当前没有选中页面，自动选择第一个可用页面
       if (!runtime.browserManager.getCurrentPage() && cachedPages.length > 0) {
         runtime.browserManager.setCurrentPage(cachedPages[0]);
         logger('[DAEMON] Auto-selected first page:', cachedPages[0].url());
@@ -249,12 +252,10 @@ async function handleRequest(msg: DaemonMessage) {
       };
 
       const context: any = {
-        // 实现 Context 接口所需的方法
         getPageByIdx: async (idx: number) => {
           if (!cachedPages[idx]) throw new Error(`Page ${idx} not found`);
           return cachedPages[idx];
         },
-        // 使用预缓存的页面列表（同步返回，避免 Promise 问题）
         getPages: () => cachedPages,
         getSelectedPage: () => runtime.browserManager.getCurrentPage(),
         selectPage: (page: any) => runtime.browserManager.setCurrentPage(page),
@@ -263,7 +264,6 @@ async function handleRequest(msg: DaemonMessage) {
           const pages = await context.getPages();
           if (pages[idx]) await pages[idx].close();
         },
-        // 其他需要的存根方法
         getSelectedFrame: () => undefined,
         selectFrame: () => {
           /* no-op */
@@ -305,10 +305,10 @@ async function handleRequest(msg: DaemonMessage) {
         getFrameByIdx: () => null,
         getDevToolsBackendNodeId: () => null,
         getDevToolsFrameId: () => null,
-        // 网络工具所需方法 - 返回空对象表示 DevTools 未激活
         getDevToolsData: async () => ({}),
         resolveCdpRequestId: () => undefined,
         debuggerContext: {
+          isEnabled: () => false,
           pause: async () => {
             /* no-op */
           },
@@ -329,10 +329,12 @@ async function handleRequest(msg: DaemonMessage) {
             /* no-op */
           },
           getScriptSource: async () => '',
+          getScripts: () => [],
+          getScriptsByUrlPattern: () => [],
+          getScriptById: () => undefined,
         },
         getRequestInitiator: () => undefined,
         getRequestInitiatorById: () => undefined,
-        // 网络请求数据获取 - 从 NetworkCollector 获取实际数据
         getNetworkRequests: (includePreserved?: boolean) => {
           const page = runtime.browserManager.getCurrentPage();
           if (!page || !_networkCollector) return [];
@@ -342,11 +344,9 @@ async function handleRequest(msg: DaemonMessage) {
 
       await targetTool.handler(request, response, context, runtime);
 
-      // 构建返回结果
       const resultData: any = {};
       if (response._includePages) {
         const pages = await context.getPages();
-        // 直接从 Chrome DevTools 端点获取页面信息
         const remoteDebuggingUrl =
           process.env.REMOTE_DEBUGGING_URL || 'http://127.0.0.1:9222';
         const jsonUrl = `${remoteDebuggingUrl}/json`;
@@ -359,7 +359,6 @@ async function handleRequest(msg: DaemonMessage) {
         }
 
         resultData.pages = pages.map((p: any, i: number) => {
-          // 尝试匹配 Puppeteer page 和 Chrome /json 返回的页面
           let matchedPage: any | undefined;
           const pageUrl = p.url?.() || p.url || '';
           if (pageUrl) {
@@ -374,11 +373,9 @@ async function handleRequest(msg: DaemonMessage) {
           };
         });
       }
-      // 处理网络请求数据
       if (response._includeNetwork) {
         const page = runtime.browserManager.getCurrentPage();
         if (page && _networkCollector) {
-          // 使用 NetworkCollector 收集的实际数据
           const requests = _networkCollector.getData(page, false);
           resultData.networkRequests = requests.map(
             (req: any, idx: number) => ({
@@ -409,7 +406,9 @@ async function handleRequest(msg: DaemonMessage) {
         success: true,
         result: JSON.stringify(resultData),
       };
-    } else if (msg.method === 'list_skills') {
+    }
+
+    if (msg.method === 'list_skills') {
       const skills = getBuiltInSkillDefinitions();
       return {
         success: true,
@@ -421,7 +420,9 @@ async function handleRequest(msg: DaemonMessage) {
           })),
         }),
       };
-    } else if (msg.method === 'list_tools') {
+    }
+
+    if (msg.method === 'list_tools') {
       const tools = await getCachedTools();
       logger(
         `[DAEMON] list_tools: ${tools.length} tools (cached: ${_cachedToolsList !== null})`,
@@ -436,7 +437,9 @@ async function handleRequest(msg: DaemonMessage) {
           })),
         }),
       };
-    } else if (msg.method === 'stop') {
+    }
+
+    if (msg.method === 'stop') {
       setImmediate(() => {
         void cleanup();
       });
@@ -444,7 +447,9 @@ async function handleRequest(msg: DaemonMessage) {
         success: true,
         message: 'stopping',
       };
-    } else if (msg.method === 'status') {
+    }
+
+    if (msg.method === 'status') {
       return {
         success: true,
         result: JSON.stringify({
@@ -455,6 +460,7 @@ async function handleRequest(msg: DaemonMessage) {
         }),
       };
     }
+
     return {
       success: false,
       error: `Unknown method: ${msg.method}`,
@@ -552,12 +558,11 @@ async function cleanup() {
 }
 
 // Handle shutdown signals
-process.on('SIGTERM', () => {
-  void cleanup();
-});
-process.on('SIGINT', () => {
-  void cleanup();
-});
+for (const sig of ['SIGTERM', 'SIGINT'] as const) {
+  process.on(sig, () => {
+    void cleanup();
+  });
+}
 // 忽略 SIGHUP 信号，防止父进程退出时意外触发 cleanup
 process.on('SIGHUP', () => {
   logger('Received SIGHUP, ignoring');

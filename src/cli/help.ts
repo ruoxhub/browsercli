@@ -13,7 +13,7 @@ export function generateTopLevelHelp(options?: {
   version?: string;
   commands?: string[];
 }): string {
-  const opts = {
+  const output: AxiStructuredOutput = {
     bin: options?.bin ?? 'js-reverse',
     description:
       options?.description ??
@@ -30,12 +30,6 @@ export function generateTopLevelHelp(options?: {
       'repl',
       'scaffold',
     ],
-  };
-  const output: AxiStructuredOutput = {
-    bin: opts.bin,
-    description: opts.description,
-    version: opts.version,
-    commands: opts.commands,
   };
   return renderOutput(output);
 }

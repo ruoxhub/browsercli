@@ -77,6 +77,48 @@ function printHelp(): void {
   replLog('');
 }
 
+async function listSkillsRepl(): Promise<void> {
+  try {
+    const result = await sendCommand({method: 'list_skills'});
+    if (result.success) {
+      const parsed = JSON.parse(result.result as string);
+      const skills = parsed.skills || [];
+      replLog(`可用技能 (${skills.length}):`);
+      for (const s of skills) {
+        replLog(`  - ${s.name} (${s.category}): ${s.description}`);
+      }
+      return;
+    }
+    replLog(`获取失败：${result.error}`);
+  } catch {
+    const skills = await getSkillNames();
+    replLog(`可用技能 (${skills.length}):`);
+    for (const s of skills) replLog(`  - ${s}`);
+    replLog('\n(离线模式：显示内置技能列表)');
+  }
+}
+
+async function listToolsRepl(): Promise<void> {
+  try {
+    const result = await sendCommand({method: 'list_tools'});
+    if (result.success) {
+      const parsed = JSON.parse(result.result as string);
+      const tools = parsed.tools || [];
+      replLog(`可用工具 (${tools.length}):`);
+      for (const t of tools) {
+        replLog(`  - ${t.name} (${t.category}): ${t.description}`);
+      }
+      return;
+    }
+    replLog(`获取失败：${result.error}`);
+  } catch {
+    const tools = await getToolNamesList();
+    replLog(`可用工具 (${tools.length}):`);
+    for (const t of tools) replLog(`  - ${t}`);
+    replLog('\n(离线模式：显示内置工具列表)');
+  }
+}
+
 export const replCommand: AxiCliCommand<DaemonContext> = async (
   _args,
   _ctx,
@@ -147,52 +189,12 @@ export const replCommand: AxiCliCommand<DaemonContext> = async (
     }
 
     if (trimmed === 'list-skills') {
-      try {
-        const result = await sendCommand({method: 'list_skills'});
-        if (result.success) {
-          const parsed = JSON.parse(result.result as string);
-          const skills = parsed.skills || [];
-          replLog(`可用技能 (${skills.length}):`);
-          for (const s of skills) {
-            replLog(`  - ${s.name} (${s.category}): ${s.description}`);
-          }
-        } else {
-          replLog(`获取失败：${result.error}`);
-        }
-      } catch {
-        const skills = await getSkillNames();
-        replLog(`可用技能 (${skills.length}):`);
-        for (const s of skills) {
-          replLog(`  - ${s}`);
-        }
-        replLog('');
-        replLog('(离线模式：显示内置技能列表)');
-      }
+      await listSkillsRepl();
       return;
     }
 
     if (trimmed === 'list-tools') {
-      try {
-        const result = await sendCommand({method: 'list_tools'});
-        if (result.success) {
-          const parsed = JSON.parse(result.result as string);
-          const tools = parsed.tools || [];
-          replLog(`可用工具 (${tools.length}):`);
-          for (const t of tools) {
-            replLog(`  - ${t.name} (${t.category}): ${t.description}`);
-          }
-        } else {
-          replLog(`获取失败：${result.error}`);
-        }
-      } catch {
-        const tools = await getToolNamesList();
-        replLog(`可用工具 (${tools.length}):`);
-        for (const t of tools) {
-          replLog(`  - ${t}`);
-        }
-        replLog('');
-        replLog('(离线模式：显示内置工具列表)');
-      }
+      await listToolsRepl();
       return;
     }
 

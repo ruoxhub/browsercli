@@ -70,12 +70,12 @@ export const invokeSkill = defineTool({
 
       response.setStructuredContent(result);
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      logger.error(`[invoke-skill] Skill failed: ${errorMessage}`);
+      logger.error(
+        `[invoke-skill] Skill failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
       response.setStructuredContent({
         success: false,
-        error: errorMessage,
+        error: error instanceof Error ? error.message : String(error),
       });
     }
   },

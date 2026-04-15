@@ -281,7 +281,6 @@ export function parseKey(keyInput: string): [KeyInput, ...KeyInput[]] {
   let key = '';
   const result: KeyInput[] = [];
   for (const ch of keyInput) {
-    // Handle cases like Shift++.
     if (ch === '+' && key) {
       result.push(throwIfInvalidKey(key));
       key = '';

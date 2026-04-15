@@ -90,10 +90,8 @@ export function getDefaultLLMProvider(): LLMProvider {
     provider === 'openai' ||
     provider === 'anthropic' ||
     provider === 'gemini'
-  ) {
+  )
     return provider;
-  }
-  // Default to gemini if no provider specified
   return 'gemini';
 }
 
@@ -107,7 +105,6 @@ export function getAIConfig(): AIConfig | undefined {
     provider,
   };
 
-  // OpenAI configuration
   if (process.env.OPENAI_API_KEY) {
     config.openai = {
       apiKey: process.env.OPENAI_API_KEY,
@@ -116,7 +113,6 @@ export function getAIConfig(): AIConfig | undefined {
     };
   }
 
-  // Anthropic configuration
   if (process.env.ANTHROPIC_API_KEY) {
     config.anthropic = {
       apiKey: process.env.ANTHROPIC_API_KEY,
@@ -125,18 +121,13 @@ export function getAIConfig(): AIConfig | undefined {
     };
   }
 
-  // Gemini configuration
-  const geminiApiKey = process.env.GEMINI_API_KEY;
-  const geminiCliPath = process.env.GEMINI_CLI_PATH || 'gemini-cli';
-
   config.gemini = {
-    apiKey: geminiApiKey,
-    cliPath: geminiCliPath,
-    useAPI: !!geminiApiKey,
+    apiKey: process.env.GEMINI_API_KEY,
+    cliPath: process.env.GEMINI_CLI_PATH || 'gemini-cli',
+    useAPI: !!process.env.GEMINI_API_KEY,
     model: process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp',
   };
 
-  // Check if any provider is configured
   const hasAnyProvider = config.openai || config.anthropic || config.gemini;
 
   return hasAnyProvider ? config : undefined;
@@ -194,7 +185,6 @@ export function validateConfig(config: SystemConfig): {
 } {
   const errors: string[] = [];
 
-  // Validate browser config
   if (config.browser.remoteDebuggingPort !== undefined) {
     const port = config.browser.remoteDebuggingPort;
     if (port < 1 || port > 65535) {
@@ -204,7 +194,6 @@ export function validateConfig(config: SystemConfig): {
     }
   }
 
-  // Validate AI config if present
   if (config.ai) {
     const {provider} = config.ai;
 
@@ -245,11 +234,6 @@ export function isDebugEnabled(): boolean {
   );
 }
 
-/**
- * Create an AI service instance based on configuration
- * @param config - Optional AI configuration (uses environment if not provided)
- * @returns AIService instance or undefined if no provider is configured
- */
 export function createAIService(config?: AIConfig): AIService | undefined {
   const aiConfig = config || getAIConfig();
 
@@ -259,53 +243,49 @@ export function createAIService(config?: AIConfig): AIService | undefined {
 
   const {provider} = aiConfig;
 
-  try {
-    switch (provider) {
-      case 'openai': {
-        if (!aiConfig.openai) {
-          throw new Error('OpenAI configuration not found');
-        }
-        const openaiProvider = new OpenAIProvider({
+  switch (provider) {
+    case 'openai': {
+      if (!aiConfig.openai) {
+        throw new Error('OpenAI configuration not found');
+      }
+      return new AIService(
+        new OpenAIProvider({
           apiKey: aiConfig.openai.apiKey,
           baseURL: aiConfig.openai.baseURL,
           model: aiConfig.openai.model,
-        });
-        return new AIService(openaiProvider);
-      }
+        }),
+      );
+    }
 
-      case 'anthropic': {
-        if (!aiConfig.anthropic) {
-          throw new Error('Anthropic configuration not found');
-        }
-        const anthropicProvider = new AnthropicProvider({
+    case 'anthropic': {
+      if (!aiConfig.anthropic) {
+        throw new Error('Anthropic configuration not found');
+      }
+      return new AIService(
+        new AnthropicProvider({
           apiKey: aiConfig.anthropic.apiKey,
           baseURL: aiConfig.anthropic.baseURL,
           model: aiConfig.anthropic.model,
-        });
-        return new AIService(anthropicProvider);
-      }
+        }),
+      );
+    }
 
-      case 'gemini': {
-        if (!aiConfig.gemini) {
-          throw new Error('Gemini configuration not found');
-        }
-        const geminiProvider = new GeminiProvider({
+    case 'gemini': {
+      if (!aiConfig.gemini) {
+        throw new Error('Gemini configuration not found');
+      }
+      return new AIService(
+        new GeminiProvider({
           apiKey: aiConfig.gemini.apiKey,
           cliPath: aiConfig.gemini.cliPath,
           useAPI: aiConfig.gemini.useAPI,
           model: aiConfig.gemini.model,
-        });
-        return new AIService(geminiProvider);
-      }
+        }),
+      );
+    }
 
-      default: {
-        throw new Error(`Unknown provider: ${provider}`);
-      }
+    default: {
+      throw new Error(`Unknown provider: ${provider}`);
     }
-  } catch (error) {
-    if (error instanceof Error) {
-      throw new Error(`Failed to create AI service: ${error.message}`);
-    }
-    throw error;
   }
 }

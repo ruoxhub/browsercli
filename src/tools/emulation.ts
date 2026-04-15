@@ -15,6 +15,61 @@ const throttlingOptions: [string, ...string[]] = [
   ...Object.keys(PredefinedNetworkConditions),
 ];
 
+interface DeviceProfile {
+  viewport: {
+    width: number;
+    height: number;
+    deviceScaleFactor: number;
+    isMobile: boolean;
+    hasTouch: boolean;
+  };
+  userAgent: string;
+}
+
+const DEVICE_PROFILES: Record<string, DeviceProfile> = {
+  android: {
+    viewport: {
+      width: 412,
+      height: 915,
+      deviceScaleFactor: 2.625,
+      isMobile: true,
+      hasTouch: true,
+    },
+    userAgent:
+      'Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+  },
+  ipad: {
+    viewport: {
+      width: 1024,
+      height: 768,
+      deviceScaleFactor: 2,
+      isMobile: true,
+      hasTouch: true,
+    },
+    userAgent:
+      'Mozilla/5.0 (iPad; CPU OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1',
+  },
+  iphone: {
+    viewport: {
+      width: 390,
+      height: 844,
+      deviceScaleFactor: 3,
+      isMobile: true,
+      hasTouch: true,
+    },
+    userAgent:
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1',
+  },
+};
+
+const DESKTOP_VIEWPORT = {
+  width: 1280,
+  height: 720,
+  deviceScaleFactor: 1,
+  isMobile: false,
+  hasTouch: false,
+};
+
 /**
  * 模拟网络条件（节流/离线模式）
  */
@@ -55,11 +110,11 @@ export const emulateNetwork = defineTool({
     }
 
     if (conditions in PredefinedNetworkConditions) {
-      const networkCondition =
+      await page.emulateNetworkConditions(
         PredefinedNetworkConditions[
           conditions as keyof typeof PredefinedNetworkConditions
-        ];
-      await page.emulateNetworkConditions(networkCondition);
+        ],
+      );
       response.appendResponseLine(`Network emulation set to: ${conditions}`);
     }
   },
@@ -147,70 +202,21 @@ export const emulateMobile = defineTool({
     const page = await runtime.collector.getActivePage();
 
     if (request.params.enable) {
-      const device = request.params.device || 'iphone';
-      let viewport: {
-        width: number;
-        height: number;
-        deviceScaleFactor: number;
-        isMobile: boolean;
-        hasTouch: boolean;
-      };
-      let userAgent: string;
-
-      switch (device) {
-        case 'android':
-          viewport = {
-            width: 412,
-            height: 915,
-            deviceScaleFactor: 2.625,
-            isMobile: true,
-            hasTouch: true,
-          };
-          userAgent =
-            'Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
-          break;
-        case 'ipad':
-          viewport = {
-            width: 1024,
-            height: 768,
-            deviceScaleFactor: 2,
-            isMobile: true,
-            hasTouch: true,
-          };
-          userAgent =
-            'Mozilla/5.0 (iPad; CPU OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1';
-          break;
-        case 'iphone':
-        default:
-          viewport = {
-            width: 390,
-            height: 844,
-            deviceScaleFactor: 3,
-            isMobile: true,
-            hasTouch: true,
-          };
-          userAgent =
-            'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1';
-          break;
-      }
-
-      await page.setViewport(viewport);
-      await page.setUserAgent(userAgent);
+      const profile = DEVICE_PROFILES[request.params.device || 'iphone'];
+      await page.setViewport(profile.viewport);
+      await page.setUserAgent(profile.userAgent);
       await page.setJavaScriptEnabled(true);
-
-      response.appendResponseLine(`Mobile emulation enabled (${device})`);
       response.appendResponseLine(
-        `Viewport: ${viewport.width}x${viewport.height}`,
+        `Mobile emulation enabled (${request.params.device || 'iphone'})`,
       );
-      response.appendResponseLine(`User-Agent: ${userAgent.slice(0, 80)}...`);
+      response.appendResponseLine(
+        `Viewport: ${profile.viewport.width}x${profile.viewport.height}`,
+      );
+      response.appendResponseLine(
+        `User-Agent: ${profile.userAgent.slice(0, 80)}...`,
+      );
     } else {
-      await page.setViewport({
-        width: 1280,
-        height: 720,
-        deviceScaleFactor: 1,
-        isMobile: false,
-        hasTouch: false,
-      });
+      await page.setViewport(DESKTOP_VIEWPORT);
       await page.setUserAgent('');
       response.appendResponseLine('Mobile emulation disabled');
     }

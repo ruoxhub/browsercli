@@ -161,9 +161,7 @@ export const getWebSocketMessages = defineTool({
         pageSize,
         pageIdx,
       });
-      for (const line of lines) {
-        response.appendResponseLine(line);
-      }
+      lines.forEach(line => response.appendResponseLine(line));
       return;
     }
 
@@ -176,9 +174,7 @@ export const getWebSocketMessages = defineTool({
       pageSize,
       pageIdx,
     });
-    for (const line of lines) {
-      response.appendResponseLine(line);
-    }
+    lines.forEach(line => response.appendResponseLine(line));
   },
 });
 
@@ -210,10 +206,7 @@ export const getWebSocketMessage = defineTool({
 
     const frame = ws.frames[frameIndex];
     const lines = formatWebSocketFrameDetail(frame, frameIndex);
-
-    for (const line of lines) {
-      response.appendResponseLine(line);
-    }
+    lines.forEach(line => response.appendResponseLine(line));
   },
 });
 
@@ -253,9 +246,7 @@ export const analyzeWebSocketMessages = defineTool({
 
     // Format and output the summary
     const lines = formatTrafficSummary(summary);
-    for (const line of lines) {
-      response.appendResponseLine(line);
-    }
+    lines.forEach(line => response.appendResponseLine(line));
 
     // Add usage hints
     response.appendResponseLine(``);

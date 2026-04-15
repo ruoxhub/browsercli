@@ -229,20 +229,17 @@ async function createScaffold(config: ScaffoldConfig): Promise<void> {
   console.log('');
 
   // 创建目录结构
-  const dirs = ['', 'run', 'env', 'network', 'replay', 'scripts'];
-  for (const dir of dirs) {
-    const fullPath = path.join(outputDir, dir);
-    fs.mkdirSync(fullPath, {recursive: true});
+  for (const dir of ['', 'run', 'env', 'network', 'replay', 'scripts']) {
+    fs.mkdirSync(path.join(outputDir, dir), {recursive: true});
   }
 
   // 替换模板变量
-  const replaceTemplate = (content: string): string => {
-    return content
+  const replaceTemplate = (content: string): string =>
+    content
       .replace(/\{\{NAME\}\}/g, config.name)
       .replace(/\{\{DESC\}\}/g, config.description)
       .replace(/\{\{URL\}\}/g, config.targetUrl)
       .replace(/\{\{DATE\}\}/g, new Date().toISOString().split('T')[0]);
-  };
 
   // 写入文件
   const files = [
@@ -275,19 +272,19 @@ async function createScaffold(config: ScaffoldConfig): Promise<void> {
   ];
 
   for (const file of files) {
-    const filePath = path.join(outputDir, file.path);
-    fs.writeFileSync(filePath, file.content);
+    fs.writeFileSync(path.join(outputDir, file.path), file.content);
     console.log(`   ✅ ${file.path}`);
   }
 
-  // 创建 .gitignore
-  const gitignore = `node_modules/
+  fs.writeFileSync(
+    path.join(outputDir, '.gitignore'),
+    `node_modules/
 *.log
 .DS_Store
 dist/
 build/
-`;
-  fs.writeFileSync(path.join(outputDir, '.gitignore'), gitignore);
+`,
+  );
   console.log('   ✅ .gitignore');
 
   console.log('');

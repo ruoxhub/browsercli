@@ -54,7 +54,6 @@ export async function startDaemon(args: string[]): Promise<void> {
     );
   }
   console.log(`Daemon PID: ${child.pid}`);
-  console.log(`Daemon PID: ${child.pid}`);
 
   // 等待 socket 文件创建（最多 25 秒）
   await new Promise<void>((resolve, reject) => {

@@ -57,9 +57,5 @@ export function listOutput(
   items: string[],
   title?: string,
 ): AxiStructuredOutput {
-  const output: AxiStructuredOutput = {items};
-  if (title) {
-    output.title = title;
-  }
-  return output;
+  return title ? {items, title} : {items};
 }

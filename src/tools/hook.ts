@@ -163,9 +163,7 @@ async function syncHookRecordsFromPage(
     return;
   }
 
-  if (!page || typeof page.evaluate !== 'function') {
-    return;
-  }
+  if (!page?.evaluate) return;
 
   const storeSnapshot = await page.evaluate((id?: string) => {
     const rawStore = (window as typeof window & {__hookStore?: unknown})

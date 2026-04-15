@@ -193,9 +193,7 @@ export const typeText = defineTool({
     await runtime.pageController.type(
       request.params.selector,
       request.params.text,
-      {
-        delay: request.params.delay,
-      },
+      {delay: request.params.delay},
     );
     response.appendResponseLine('Text typed.');
   },
@@ -227,7 +225,7 @@ export const waitForElement = defineTool({
 });
 
 /**
- * 🆕 方向滚动（支持懒加载触发）
+ * 方向滚动（支持懒加载触发）
  */
 export const scrollBy = defineTool({
   name: 'scroll_by',
@@ -280,10 +278,9 @@ export const saveSessionState = defineTool({
     cleanupExpiredSessions();
     const page = await runtime.pageController.getPage();
     const sessionId = request.params.sessionId ?? `session_${Date.now()}`;
-    const includeCookies = request.params.includeCookies !== false;
-    const includeLocalStorage = request.params.includeLocalStorage !== false;
-    const includeSessionStorage =
-      request.params.includeSessionStorage !== false;
+    const includeCookies = !!request.params.includeCookies;
+    const includeLocalStorage = !!request.params.includeLocalStorage;
+    const includeSessionStorage = !!request.params.includeSessionStorage;
 
     const snapshot: SessionSnapshot = {
       id: sessionId,

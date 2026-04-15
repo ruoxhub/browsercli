@@ -37,18 +37,14 @@ export const toolDispatcherCommand: AxiCliCommand<DaemonContext> = async (
   for (const [key, value] of Object.entries(parsed.flags)) {
     if (typeof value === 'boolean') {
       toolArgs[key] = value;
-    } else {
-      const schemaType = meta.schema[key];
-      if (schemaType === 'number') {
-        toolArgs[key] = Number(value);
-      } else if (schemaType === 'boolean') {
-        toolArgs[key] = value === 'true';
-      } else if (typeof value === 'string' && value.includes(',')) {
-        toolArgs[key] = value.split(',').map(s => s.trim());
-      } else {
-        toolArgs[key] = value;
-      }
+      continue;
     }
+    const schemaType = meta.schema[key];
+    if (schemaType === 'number') toolArgs[key] = Number(value);
+    else if (schemaType === 'boolean') toolArgs[key] = value === 'true';
+    else if (typeof value === 'string' && value.includes(','))
+      toolArgs[key] = value.split(',').map(s => s.trim());
+    else toolArgs[key] = value;
   }
 
   try {

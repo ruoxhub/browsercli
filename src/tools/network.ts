@@ -32,6 +32,17 @@ const FILTERABLE_RESOURCE_TYPES: readonly [ResourceType, ...ResourceType[]] = [
   'other',
 ];
 
+async function resolveReqid(
+  context: any,
+  explicitReqid?: number,
+): Promise<number | undefined> {
+  if (explicitReqid) return explicitReqid;
+  const data = await context.getDevToolsData();
+  return data?.cdpRequestId
+    ? context.resolveCdpRequestId(data.cdpRequestId)
+    : undefined;
+}
+
 export const listNetworkRequests = defineTool({
   name: 'list_network_requests',
   description: `List all requests for the currently selected page since the last navigation.`,
@@ -72,10 +83,7 @@ export const listNetworkRequests = defineTool({
       ),
   },
   handler: async (request, response, context, _runtime) => {
-    const data = await context.getDevToolsData();
-    const reqid = data?.cdpRequestId
-      ? context.resolveCdpRequestId(data.cdpRequestId)
-      : undefined;
+    const reqid = await resolveReqid(context);
     response.setIncludeNetworkRequests(true, {
       pageSize: request.params.pageSize,
       pageIdx: request.params.pageIdx,
@@ -103,20 +111,13 @@ export const getNetworkRequest = defineTool({
       ),
   },
   handler: async (request, response, context, _runtime) => {
-    if (request.params.reqid) {
-      response.attachNetworkRequest(request.params.reqid);
+    const reqid = await resolveReqid(context, request.params.reqid);
+    if (reqid) {
+      response.attachNetworkRequest(reqid);
     } else {
-      const data = await context.getDevToolsData();
-      const reqid = data?.cdpRequestId
-        ? context.resolveCdpRequestId(data.cdpRequestId)
-        : undefined;
-      if (reqid) {
-        response.attachNetworkRequest(reqid);
-      } else {
-        response.appendResponseLine(
-          `Nothing is currently selected in the DevTools Network panel.`,
-        );
-      }
+      response.appendResponseLine(
+        `Nothing is currently selected in the DevTools Network panel.`,
+      );
     }
   },
 });

@@ -40,13 +40,13 @@ export const listSkillsCommand: AxiCliCommand<DaemonContext> = async (
 
   if (skills.length === 0) {
     const builtIns = getBuiltInSkillDefinitions();
-    for (const skill of builtIns) {
-      skills.push({
+    skills.push(
+      ...builtIns.map(skill => ({
         name: skill.name,
         description: skill.description,
         category: (skill as {category?: string}).category,
-      });
-    }
+      })),
+    );
   }
 
   if (json) {

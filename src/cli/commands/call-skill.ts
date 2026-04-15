@@ -28,9 +28,7 @@ export const callSkillCommand: AxiCliCommand<DaemonContext> = async (
   const dataStr = getFlag(parsed, 'data');
 
   const skillArgs: Record<string, unknown> = {};
-  if (url) {
-    skillArgs.url = url;
-  }
+  if (url) skillArgs.url = url;
   if (dataStr) {
     try {
       skillArgs.data = JSON.parse(dataStr);

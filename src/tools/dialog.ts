@@ -32,9 +32,6 @@ export const handleDialog = defineTool({
       ),
   },
   handler: async (request, response, context, runtime) => {
-    const _page = await runtime.collector.getActivePage();
-
-    // 尝试从上下文获取 dialog，如果没有则使用最近打开的 dialog
     const dialog = context.getDialog();
     if (!dialog) {
       throw new Error(
@@ -42,35 +39,18 @@ export const handleDialog = defineTool({
       );
     }
 
-    switch (request.params.action) {
-      case 'accept': {
-        try {
-          if (request.params.promptText !== undefined) {
-            await dialog.accept(request.params.promptText);
-          } else {
-            await dialog.accept();
-          }
-          response.appendResponseLine('Successfully accepted the dialog');
-        } catch {
-          // 可能已经被外部处理
-          response.appendResponseLine(
-            'Dialog may have already been handled externally',
-          );
-        }
-        break;
+    try {
+      if (request.params.action === 'accept') {
+        await dialog.accept(request.params.promptText);
+        response.appendResponseLine('Successfully accepted the dialog');
+      } else {
+        await dialog.dismiss();
+        response.appendResponseLine('Successfully dismissed the dialog');
       }
-      case 'dismiss': {
-        try {
-          await dialog.dismiss();
-          response.appendResponseLine('Successfully dismissed the dialog');
-        } catch {
-          // 可能已经被外部处理
-          response.appendResponseLine(
-            'Dialog may have already been handled externally',
-          );
-        }
-        break;
-      }
+    } catch {
+      response.appendResponseLine(
+        'Dialog may have already been handled externally',
+      );
     }
 
     context.clearDialog();

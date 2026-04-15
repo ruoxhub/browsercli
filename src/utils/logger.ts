@@ -16,7 +16,6 @@ export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 class Logger {
   private level: LogLevel;
 
-  // ✅ 修复：性能优化 - 使用静态常量避免重复创建数组
   private static readonly LEVELS: LogLevel[] = [
     'debug',
     'info',
@@ -39,21 +38,18 @@ class Logger {
   ): string {
     const timestamp = new Date().toISOString();
     const prefix = `[${timestamp}] [${level.toUpperCase()}]`;
-    // ✅ 修复：使用 safeStringify 处理循环引用和特殊对象
     const formattedArgs = args.length > 0 ? ' ' + safeStringify(args) : '';
     return `${prefix} ${message}${formattedArgs}`;
   }
 
   debug(message: string, ...args: unknown[]): void {
     if (this.shouldLog('debug')) {
-      // 使用 stderr 避免干扰 MCP 的 stdout 通信
       console.error(chalk.gray(this.formatMessage('debug', message, ...args)));
     }
   }
 
   info(message: string, ...args: unknown[]): void {
     if (this.shouldLog('info')) {
-      // 使用 stderr 避免干扰 MCP 的 stdout 通信
       console.error(chalk.blue(this.formatMessage('info', message, ...args)));
     }
   }
@@ -72,7 +68,6 @@ class Logger {
 
   success(message: string, ...args: unknown[]): void {
     if (this.shouldLog('info')) {
-      // 使用 stderr 避免干扰 MCP 的 stdout 通信
       console.error(chalk.green(this.formatMessage('info', message, ...args)));
     }
   }
@@ -82,7 +77,6 @@ class Logger {
   }
 }
 
-// ✅ 修复：安全的环境变量解析
 function parseLogLevel(value: string | undefined): LogLevel {
   const validLevels: LogLevel[] = ['debug', 'info', 'warn', 'error'];
   if (value && validLevels.includes(value as LogLevel)) {
@@ -91,5 +85,4 @@ function parseLogLevel(value: string | undefined): LogLevel {
   return 'info';
 }
 
-// 导出单例
 export const logger = new Logger(parseLogLevel(process.env.LOG_LEVEL));

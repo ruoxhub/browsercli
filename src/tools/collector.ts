@@ -10,6 +10,12 @@ import {zod} from '../third_party/index.js';
 import {ToolCategory} from './categories.js';
 import {defineTool} from './ToolDefinition.js';
 
+function respondJson(result: unknown, response: any): void {
+  response.appendResponseLine('```json');
+  response.appendResponseLine(JSON.stringify(result, null, 2));
+  response.appendResponseLine('```');
+}
+
 export const collectCode = defineTool({
   name: 'collect_code',
   description:
@@ -66,9 +72,7 @@ export const collectCode = defineTool({
       result = await runtime.collector.collect(request.params as any);
     }
 
-    response.appendResponseLine('```json');
-    response.appendResponseLine(JSON.stringify(result, null, 2));
-    response.appendResponseLine('```');
+    respondJson(result, response);
   },
 });
 
@@ -186,9 +190,7 @@ export const collectionDiff = defineTool({
       changedCount: diff.changed.length,
       ...diff,
     };
-    response.appendResponseLine('```json');
-    response.appendResponseLine(JSON.stringify(result, null, 2));
-    response.appendResponseLine('```');
+    respondJson(result, response);
   },
 });
 
@@ -212,8 +214,6 @@ export const searchInScripts = defineTool({
       request.params.limit,
       request.params.maxTotalSize,
     );
-    response.appendResponseLine('```json');
-    response.appendResponseLine(JSON.stringify(result, null, 2));
-    response.appendResponseLine('```');
+    respondJson(result, response);
   },
 });

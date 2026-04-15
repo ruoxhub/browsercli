@@ -92,11 +92,9 @@ export const createInjectScript = defineTool({
       enabled: enabled ?? true,
     });
 
-    response.appendResponseLine('✅ 注入脚本已创建');
-    response.appendResponseLine(`- ID: ${id}`);
-    response.appendResponseLine(`- 名称: ${name}`);
-    response.appendResponseLine(`- URL 匹配: ${urlPattern}`);
-    response.appendResponseLine(`- 状态: ${enabled ? '已启用' : '已禁用'}`);
+    response.appendResponseLine(
+      `✅ 注入脚本已创建\n- ID: ${id}\n- 名称: ${name}\n- URL 匹配: ${urlPattern}\n- 状态: ${enabled ? '已启用' : '已禁用'}`,
+    );
   },
 });
 
@@ -121,8 +119,9 @@ export const listInjectScripts = defineTool({
       return;
     }
 
-    response.appendResponseLine(`📋 共 ${injectConfigs.size} 个注入脚本配置：`);
-    response.appendResponseLine('');
+    response.appendResponseLine(
+      `📋 共 ${injectConfigs.size} 个注入脚本配置：\n`,
+    );
     for (const [, config] of injectConfigs) {
       const status = config.enabled ? '✅' : '❌';
       response.appendResponseLine(
@@ -179,10 +178,8 @@ export const updateInjectScript = defineTool({
     if (code !== undefined) config.code = code;
     if (enabled !== undefined) config.enabled = enabled;
 
-    response.appendResponseLine(`✅ 注入脚本 "${config.name}" 已更新`);
-    response.appendResponseLine(`- ID: ${id}`);
     response.appendResponseLine(
-      `- 状态: ${config.enabled ? '已启用' : '已禁用'}`,
+      `✅ 注入脚本 "${config.name}" 已更新\n- ID: ${id}\n- 状态: ${config.enabled ? '已启用' : '已禁用'}`,
     );
   },
 });
@@ -245,9 +242,8 @@ export const checkUrlMatches = defineTool({
     }
 
     response.appendResponseLine(
-      `🔍 URL "${url}" 匹配到 ${matches.length} 个注入脚本：`,
+      `🔍 URL "${url}" 匹配到 ${matches.length} 个注入脚本：\n`,
     );
-    response.appendResponseLine('');
     for (const config of matches) {
       response.appendResponseLine(`- ✅ **${config.name}** (ID: ${config.id})`);
     }
