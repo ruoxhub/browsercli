@@ -12,6 +12,37 @@ import {successOutput} from '../output.js';
 import {startDaemon} from '../../daemon/client.js';
 import {getDaemonReachability, getDaemonPid} from '../../daemon/utils.js';
 
+const BROWSER_POLL_ATTEMPTS = 60;
+const BROWSER_POLL_INTERVAL_MS = 500;
+const BROWSER_FETCH_TIMEOUT_MS = 3000;
+
+async function waitForBrowserReachable(browserUrl: string): Promise<void> {
+  for (let attempt = 1; attempt <= BROWSER_POLL_ATTEMPTS; attempt++) {
+    try {
+      const resp = await fetch(`${browserUrl}/json/version`, {
+        signal: AbortSignal.timeout(BROWSER_FETCH_TIMEOUT_MS),
+      });
+      if (resp.ok) return;
+    } catch {
+      // not ready yet
+    }
+    if (attempt < BROWSER_POLL_ATTEMPTS) {
+      await new Promise(resolve =>
+        setTimeout(resolve, BROWSER_POLL_INTERVAL_MS),
+      );
+    }
+  }
+  throw new AxiError(
+    `等待浏览器连接超时 (${(BROWSER_POLL_ATTEMPTS * BROWSER_POLL_INTERVAL_MS) / 1000}s)`,
+    'BROWSER_TIMEOUT',
+    [
+      `确认 Chrome 已启动并监听：${browserUrl}`,
+      '需要启动标志：--remote-debugging-port=9222',
+      '示例：chrome --remote-debugging-port=9222',
+    ],
+  );
+}
+
 export const startCommand: AxiCliCommand<DaemonContext> = async (
   args,
   _ctx,
@@ -43,70 +74,21 @@ export const startCommand: AxiCliCommand<DaemonContext> = async (
   }
 
   const daemonArgs: string[] = [];
-
-  if (browserUrl) {
-    daemonArgs.push('--browserUrl', browserUrl);
-  }
-  if (wsEndpoint) {
-    daemonArgs.push('--wsEndpoint', wsEndpoint);
-  }
-  if (headless) {
-    daemonArgs.push('--headless');
-  }
-  if (executablePath) {
-    daemonArgs.push('--executablePath', executablePath);
-  }
+  if (browserUrl) daemonArgs.push('--browserUrl', browserUrl);
+  if (wsEndpoint) daemonArgs.push('--wsEndpoint', wsEndpoint);
+  if (headless) daemonArgs.push('--headless');
+  if (executablePath) daemonArgs.push('--executablePath', executablePath);
 
   await startDaemon(daemonArgs);
 
-  // Optionally wait for browser to become reachable
   if (waitForBrowser && browserUrl) {
-    const maxAttempts = 60;
-    const intervalMs = 500;
-    let attempts = 0;
-    while (attempts < maxAttempts) {
-      attempts++;
-      try {
-        const resp = await fetch(`${browserUrl}/json/version`, {
-          signal: AbortSignal.timeout(3000),
-        });
-        if (resp.ok) {
-          break;
-        }
-      } catch {
-        // not ready yet
-      }
-      if (attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, intervalMs));
-      }
-    }
-    if (attempts === maxAttempts) {
-      throw new AxiError(
-        `等待浏览器连接超时 (${(maxAttempts * intervalMs) / 1000}s)`,
-        'BROWSER_TIMEOUT',
-        [
-          `确认 Chrome 已启动并监听：${browserUrl}`,
-          '需要启动标志：--remote-debugging-port=9222',
-          '示例：chrome --remote-debugging-port=9222',
-        ],
-      );
-    }
+    await waitForBrowserReachable(browserUrl);
   }
 
-  const result: Record<string, unknown> = {
+  return successOutput({
     command: 'start',
     message: 'Daemon 启动成功',
-  };
-
-  if (http) {
-    result.httpMode = true;
-    result.httpPort = port;
-  }
-
-  if (waitForBrowser && browserUrl) {
-    result.browserUrl = browserUrl;
-    result.waitedForBrowser = true;
-  }
-
-  return successOutput(result);
+    ...(http && {httpMode: true, httpPort: port}),
+    ...(waitForBrowser && browserUrl && {browserUrl, waitedForBrowser: true}),
+  });
 };

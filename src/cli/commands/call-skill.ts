@@ -47,20 +47,30 @@ export const callSkillCommand: AxiCliCommand<DaemonContext> = async (
       args: skillArgs,
     });
 
-    if (result.success) {
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(result.result as string);
-      } catch {
-        parsed = result.result || '技能执行成功';
-      }
+    // daemon wraps skill result in result.result as JSON string
+    let skillResult: {
+      success: boolean;
+      error?: string;
+      message?: string;
+      data?: unknown;
+    };
+    try {
+      skillResult = JSON.parse(result.result as string);
+    } catch {
+      skillResult = {success: false, error: result.result as string};
+    }
+
+    if (skillResult.success) {
       return successOutput({
         command: 'call-skill',
         skill: skillName,
-        result: parsed,
+        result: skillResult.data ?? skillResult.message ?? '技能执行成功',
       });
     }
-    throw new AxiError(`技能执行失败：${result.error}`, 'SKILL_ERROR');
+    throw new AxiError(
+      `技能执行失败：${skillResult.error || skillResult.message || '未知错误'}`,
+      'SKILL_ERROR',
+    );
   } catch (error) {
     if (error instanceof AxiError) throw error;
     throw new AxiError(

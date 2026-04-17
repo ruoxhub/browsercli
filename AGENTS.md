@@ -21,7 +21,6 @@ JSReverser-MCP/
 │   ├── skills/       # 逆向工程技能 (observe-flow, auto-hook, rebuild-bundle)
 │   ├── services/     # 业务服务层
 │   ├── modules/      # 功能模块 (debugger, collector)
-│   ├── cdp-proxy/    # CDP HTTP代理 (端口3456)
 │   ├── database/     # 数据持久化层
 │   ├── types/        # TypeScript类型定义
 │   └── utils/        # 跨层工具函数
@@ -41,7 +40,6 @@ JSReverser-MCP/
 | 添加工具    | `src/tools/` + 注册到index                    | 改工具后跑 `npm run docs`               |
 | Hook逻辑    | `src/tools/hook/`                             | 注入、采样、函数追踪                    |
 | 技能系统    | `src/skills/`                                 | observe-flow, auto-hook, rebuild-bundle |
-| CDP代理     | `src/cdp-proxy/CdpProxy.ts`                   | HTTP API on :3456                       |
 | 补环境      | `artifacts/tasks/<id>/env/`                   | env.js → polyfills.js → entry.js        |
 | 案例沉淀    | `scripts/cases/`                              | 抽象方法论，非敏感参数                  |
 | 文档生成    | `scripts/generate-docs.ts`                    | `npm run docs` 触发                     |
@@ -57,7 +55,6 @@ JSReverser-MCP/
 | `ensureToolsLoaded`       | Function | `src/daemon/daemon.ts:97`   | 工具注册懒加载                      |
 | `parseDaemonArgs`         | Function | `src/daemon/daemon.ts:57`   | CLI参数解析 (browserUrl/wsEndpoint) |
 | `runAxiCli`               | Function | `src/bin/js-reverse.ts`     | axi-sdk-js CLI入口                  |
-| `CdpProxy`                | Class    | `src/cdp-proxy/CdpProxy.ts` | CDP HTTP代理服务器                  |
 
 ## CONVENTIONS
 

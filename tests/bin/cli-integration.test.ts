@@ -215,8 +215,10 @@ describe('CLI Integration', () => {
       );
     }
   });
+
+  it('stop when daemon not running exits with code 1 and DAEMON_NOT_RUNNING (idempotent)', () => {
     // Idempotent: first try to stop any running daemon, then verify that
-    // a subsequent stop fails with DAEMON_NOT_RUNNING. This makes the test
+    // a subsequent stop failed with DAEMON_NOT_RUNNING. This makes the test
     // reliable regardless of whether a daemon is already running in the env.
     try {
       runCli('stop 2>&1');

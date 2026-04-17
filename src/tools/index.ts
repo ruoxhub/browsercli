@@ -17,20 +17,6 @@ import {
 } from './analyzer.js';
 import {antiAntiDebug} from './anti-debug/antiAntiDebug.js';
 import {bypassDebugger} from './anti-debug/bypassDebugger.js';
-import {
-  cdp_start_proxy as startCdpProxy,
-  cdp_get_targets,
-  cdp_new_page,
-  cdp_close_page,
-  cdp_navigate,
-  cdp_eval,
-  cdp_click,
-  cdp_click_at,
-  cdp_screenshot,
-  cdp_scroll,
-  cdp_upload_files,
-  cdp_page_info,
-} from './cdp-proxy.js';
 import {getCodeTemplate, listCodeTemplates} from './code-templates.js';
 import {collectCode, collectionDiff, searchInScripts} from './collector.js';
 import {listConsoleMessages, getConsoleMessage} from './console.js';
@@ -180,7 +166,6 @@ import {
 import {activateVueDevtools} from './vue/activateVueDevtools.js';
 import {clearVueGuards} from './vue/clearVueGuards.js';
 import {getVueRoutes} from './vue/getVueRoutes.js';
-// CDP 代理
 import {
   listWebSocketConnections,
   getWebSocketMessages,
@@ -360,20 +345,6 @@ export function registerBuiltInTools(): void {
     activateVueDevtools,
     clearVueGuards,
     getVueRoutes,
-
-    // CDP 代理工具
-    startCdpProxy,
-    cdp_get_targets,
-    cdp_new_page,
-    cdp_close_page,
-    cdp_navigate,
-    cdp_eval,
-    cdp_click,
-    cdp_click_at,
-    cdp_screenshot,
-    cdp_scroll,
-    cdp_upload_files,
-    cdp_page_info,
 
     // Session 工具
     saveSessionState,

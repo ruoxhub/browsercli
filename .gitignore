@@ -184,3 +184,7 @@ project/
 # Graphify analysis output
 graphify-out/
 src/graphify-out/
+.graphify_analysis.json
+.graphify_ast.json
+.graphify_detect.json
+.graphify_labels.json

@@ -27,7 +27,6 @@ src/tools/
 ├── network.ts / websocket.ts# 网络请求与 WS 消息分析
 ├── input.ts / dom.ts        # 输入操作与 DOM 查询
 ├── emulation.ts / stealth.ts# 设备模拟与反检测
-├── cdp-proxy.ts             # CDP HTTP API 代理 (:3456)
 ├── performance.ts           # 性能追踪 (Core Web Vitals)
 ├── rebuild.ts               # 本地复现 bundle 导出
 ├── skill.ts                 # 技能系统调用

@@ -167,7 +167,6 @@ interface JSHookRuntime {
 | Hook | 4 | `createHook`, `injectHook` |
 | 代码分析 | 8 | `deobfuscateCode`, `understandCode` |
 | 页面控制 | 12 | `click`, `type_text`, `screenshot` |
-| CDP Proxy | 11 | `cdp_eval`, `cdp_click` |
 
 **注册机制**:
 ```typescript
@@ -1247,7 +1246,6 @@ JSReverser-MCP/
 │   │   ├── js-reverse.ts
 │   │   ├── repl.ts
 │   │   └── scaffold.ts
-│   ├── cdp-proxy/                # CDP 代理服务
 │   ├── commands/                 # CLI 命令
 │   │   ├── index.ts
 │   │   ├── start.ts
@@ -1343,7 +1341,6 @@ JSReverser-MCP/
 │   │   │   ├── clearVueGuards.ts
 │   │   │   └── getVueRoutes.ts
 │   │   ├── analyzer.ts           # 分析工具
-│   │   ├── cdp-proxy.ts          # CDP 代理工具
 │   │   ├── categories.ts         # 工具分类
 │   │   ├── collector.ts          # 收集工具
 │   │   ├── console.ts            # 控制台工具

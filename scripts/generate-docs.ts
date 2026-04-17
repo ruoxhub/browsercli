@@ -11,7 +11,6 @@ import * as analyzerTools from '../build/src/tools/analyzer.js';
 import * as antiDebugTools from '../build/src/tools/anti-debug/antiAntiDebug.js';
 import * as bypassDebuggerTools from '../build/src/tools/anti-debug/bypassDebugger.js';
 import {ToolCategory, labels} from '../build/src/tools/categories.js';
-import * as cdpProxyTools from '../build/src/tools/cdp-proxy.js';
 import * as codeTemplateTools from '../build/src/tools/code-templates.js';
 import * as collectorTools from '../build/src/tools/collector.js';
 import * as consoleTools from '../build/src/tools/console.js';
@@ -78,7 +77,6 @@ function allTools(): ToolDef[] {
     ...Object.values(analyzerTools),
     ...Object.values(antiDebugTools),
     ...Object.values(bypassDebuggerTools),
-    ...Object.values(cdpProxyTools),
     ...Object.values(codeTemplateTools),
     ...Object.values(collectorTools),
     ...Object.values(consoleTools),

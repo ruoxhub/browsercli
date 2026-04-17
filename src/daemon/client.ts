@@ -10,8 +10,17 @@ import {fileURLToPath} from 'node:url';
 
 import type {CallToolResult} from '@modelcontextprotocol/sdk/types.js';
 
-import {logger} from '../logger.js';
 import {socketPath, IS_WINDOWS} from './utils.js';
+
+// Lazy logger to avoid loading debug + third_party at startup
+let _logger: ((msg: string, ...args: unknown[]) => void) | undefined;
+function getLogger() {
+  if (!_logger) {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    _logger = require('../logger.js').logger;
+  }
+  return _logger;
+}
 
 // 允许测试覆盖 socket 路径
 let _testSocketPath: string | undefined;
@@ -44,7 +53,7 @@ export async function startDaemon(args: string[]): Promise<void> {
 
   // Handle spawn failure (e.g., node binary not found)
   child.on('error', err => {
-    logger(`[CLIENT] Failed to spawn daemon: ${err.message}`);
+    getLogger()(`[CLIENT] Failed to spawn daemon: ${err.message}`);
   });
   child.unref();
 

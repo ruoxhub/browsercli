@@ -14,7 +14,11 @@ import process from 'node:process';
 
 import {logger} from '../logger.js';
 import {NetworkCollector} from '../PageCollector.js';
-import {SkillRunner, getBuiltInSkillDefinitions} from '../skills/index.js';
+import {
+  SkillRunner,
+  getBuiltInSkillDefinitions,
+  registerBuiltInSkills,
+} from '../skills/index.js';
 import {PipeTransport} from '../third_party/index.js';
 import {getJSHookRuntime} from '../tools/runtime.js';
 import type {JSHookToolDefinition} from '../tools/ToolRegistry.js';
@@ -30,7 +34,9 @@ import {
 
 logger('[DAEMON] Module loading...');
 
-// 技能系统导入 - 懒加载
+// 注册内置技能到 SkillRegistry
+registerBuiltInSkills();
+logger('[DAEMON] Built-in skills registered');
 
 logger('[DAEMON] Modules loaded, checking existing daemon...');
 
@@ -281,8 +287,8 @@ async function handleRequest(msg: DaemonMessage) {
         },
         saveTemporaryFile: async () => ({filename: ''}),
         saveFile: async () => ({filename: ''}),
-        waitForEventsAfterAction: async () => {
-          /* no-op */
+        waitForEventsAfterAction: async (action: () => Promise<unknown>) => {
+          await action();
         },
         waitForTextOnPage: async () => false,
         isRunningPerformanceTrace: () => false,

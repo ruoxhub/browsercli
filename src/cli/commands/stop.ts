@@ -51,21 +51,13 @@ export const stopCommand: AxiCliCommand<DaemonContext> = async (
     ]);
   } catch (error) {
     if (error instanceof AxiError) throw error;
-    // Handle IPC timeout (daemon socket exists but daemon is unresponsive).
+
+    // Handle IPC errors (daemon socket exists but daemon is unresponsive).
     // Clean up the PID file so that getDaemonReachability() returns 'stopped'
     // on the next call, making 'stop' idempotent regardless of daemon state.
     const errMsg = error instanceof Error ? error.message : String(error);
-    if (
-      errMsg.includes('IPC 请求超时') ||
-      errMsg.includes('ETIMEDOUT') ||
-      errMsg.includes('ECONNREFUSED')
-    ) {
-      const pidFile = getPidFilePath();
-      try {
-        fs.unlinkSync(pidFile);
-      } catch {
-        /* ignore */
-      }
+    if (isIpcError(errMsg)) {
+      cleanupPidFile();
       throw new AxiError(
         '停止失败：daemon 响应超时，已清理残留状态',
         'DAEMON_NOT_RUNNING',
@@ -77,3 +69,21 @@ export const stopCommand: AxiCliCommand<DaemonContext> = async (
     ]);
   }
 };
+
+const IPC_ERROR_PATTERNS = [
+  'IPC 请求超时',
+  'ETIMEDOUT',
+  'ECONNREFUSED',
+] as const;
+
+function isIpcError(message: string): boolean {
+  return IPC_ERROR_PATTERNS.some(pattern => message.includes(pattern));
+}
+
+function cleanupPidFile(): void {
+  try {
+    fs.unlinkSync(getPidFilePath());
+  } catch {
+    // ignore
+  }
+}
