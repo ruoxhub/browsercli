@@ -138,3 +138,12 @@ js-reverse scaffold --name my-task --desc "Task" --url https://example.com
 - **TODO**: `src/skills/observe-flow.ts:265` 技能系统需浏览器上下文功能未完全实现
 - **CDP Proxy**: 固定端口3456，提供HTTP API操控Chrome DevTools Protocol
 - **外部AI**: 支持OpenAI/Anthropic/Gemini作为分析增强层，通过环境变量配置
+
+## graphify
+
+This project has a graphify knowledge graph at graphify-out/.
+
+Rules:
+- Before answering architecture or codebase questions, read graphify-out/GRAPH_REPORT.md for god nodes and community structure
+- If graphify-out/wiki/index.md exists, navigate it instead of reading raw files
+- After modifying code files in this session, run `graphify update .` to keep the graph current (AST-only, no API cost)

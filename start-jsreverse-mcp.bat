@@ -1,1 +1,0 @@
-node build/src/index.js --http --port 13000 --host 0.0.0.0 --databaseUrl postgresql://ruoxing:mrx123456@127.0.0.1:5432/js_reverse_mcp --browserUrl http://127.0.0.1:9222

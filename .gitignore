@@ -188,3 +188,6 @@ src/graphify-out/
 .graphify_ast.json
 .graphify_detect.json
 .graphify_labels.json
+.graphify_incremental.json
+.graphify_semantic_new.json
+.graphify_uncached.txt

@@ -16,12 +16,51 @@ export const DAEMON_CLIENT_NAME = 'js-reverse-daemon';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const INDEX_SCRIPT_PATH = path.resolve(__dirname, '../index.js');
 
+/**
+ * Windows Named Pipe 不会在文件系统上创建 socket 文件，
+ * 因此需要使用 ready 标记文件来表示 daemon 已就绪。
+ * Unix 系统可直接检测 .sock 文件，无需 ready 文件。
+ */
+const readyFilePath = path.join(os.tmpdir(), 'js-reverse-mcp.ready');
+
 export function getPidFilePath(): string {
   return path.join(os.tmpdir(), 'js-reverse-mcp.pid');
 }
 
 export function getSocketPath(): string {
   return socketPath;
+}
+
+export function getReadyFilePath(): string {
+  return readyFilePath;
+}
+
+/** 写入 ready 标记文件（daemon socket 服务器成功 listen 后调用） */
+export function writeReadyFile(): void {
+  fs.writeFileSync(readyFilePath, Date.now().toString());
+}
+
+/** 删除 ready 标记文件（daemon 退出时调用） */
+export function removeReadyFile(): void {
+  try {
+    fs.unlinkSync(readyFilePath);
+  } catch {
+    // ignore
+  }
+}
+
+/** 检查 daemon 是否就绪（socket 可达） */
+export function isDaemonReady(): boolean {
+  if (IS_WINDOWS) {
+    // Windows: Named Pipe 不产生文件系统 socket 文件，用 ready 标记判断
+    return fs.existsSync(readyFilePath);
+  }
+  // Unix: 直接检查 socket 文件
+  try {
+    return fs.statSync(socketPath).isSocket();
+  } catch {
+    return false;
+  }
 }
 
 export function getDaemonPid(): number | null {
@@ -43,8 +82,8 @@ export function getDaemonPid(): number | null {
  * 必须以 socket 文件存在性为主要依据。
  */
 export function isDaemonRunning(pid?: number | null): boolean {
-  // 首要检查：socket 文件是否存在（daemon 可达的必要条件）
-  if (fs.existsSync(socketPath)) {
+  // 首要检查：daemon 是否就绪（socket 文件/Named Pipe 可达）
+  if (isDaemonReady()) {
     return true;
   }
 
@@ -60,7 +99,7 @@ export function isDaemonRunning(pid?: number | null): boolean {
  * - 'stopped': 完全未运行
  */
 export function getDaemonReachability(): 'running' | 'orphaned' | 'stopped' {
-  if (fs.existsSync(socketPath)) {
+  if (isDaemonReady()) {
     return 'running';
   }
 

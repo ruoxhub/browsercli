@@ -10,7 +10,12 @@ import {fileURLToPath} from 'node:url';
 
 import type {CallToolResult} from '@modelcontextprotocol/sdk/types.js';
 
-import {socketPath, IS_WINDOWS} from './utils.js';
+import {
+  socketPath,
+  IS_WINDOWS,
+  isDaemonReady,
+  getReadyFilePath,
+} from './utils.js';
 
 // Lazy logger to avoid loading debug + third_party at startup
 let _logger: ((msg: string, ...args: unknown[]) => void) | undefined;
@@ -31,6 +36,23 @@ export function setTestSocketPath(path: string): void {
 
 function getSocketPath(): string {
   return _testSocketPath || socketPath;
+}
+
+/**
+ * 检查 daemon 是否就绪（可接受连接）。
+ * 测试模式下（_testSocketPath 覆盖）直接检查 socket 文件是否存在；
+ * 生产模式下使用全局 isDaemonReady()（Windows 检查 ready 文件，Unix 检查 socket 文件）。
+ */
+function checkDaemonReady(): boolean {
+  // 测试模式：直接用 statSync 检查 socket 文件
+  if (_testSocketPath) {
+    try {
+      return fs.statSync(_testSocketPath).isSocket();
+    } catch {
+      return false;
+    }
+  }
+  return isDaemonReady();
 }
 
 export async function startDaemon(args: string[]): Promise<void> {
@@ -64,47 +86,42 @@ export async function startDaemon(args: string[]): Promise<void> {
   }
   console.log(`Daemon PID: ${child.pid}`);
 
-  // 等待 socket 文件创建（最多 25 秒）
+  // 等待 daemon 就绪（最多 25 秒）
   await new Promise<void>((resolve, reject) => {
     let attempts = 0;
     const maxAttempts = 250; // 250 * 100ms = 25 秒
-    const targetSocketPath = getSocketPath();
 
-    const checkSocket = () => {
+    const checkReady = () => {
       attempts++;
       try {
-        // 使用 statSync 而不仅仅是 accessSync，确保 socket 完全就绪
-        const stats = fs.statSync(targetSocketPath);
-        // 确认是 socket 文件
-        if (stats.isSocket()) {
-          // socket 创建后，再短暂等待确保 daemon 准备好接受连接
-          setTimeout(resolve, 500);
+        if (checkDaemonReady()) {
+          // daemon 就绪后短暂等待确保完全可接受连接
+          setTimeout(resolve, 300);
           return;
         }
       } catch {
-        // 文件不存在或不是 socket，继续等待
+        // 检测失败，继续等待
       }
       if (attempts >= maxAttempts) {
-        // 最后尝试一次访问检查
+        // 最后尝试一次
         try {
-          fs.accessSync(targetSocketPath, fs.constants.F_OK);
-          const stats = fs.statSync(targetSocketPath);
-          if (stats.isSocket()) {
-            setTimeout(resolve, 500);
+          if (checkDaemonReady()) {
+            setTimeout(resolve, 300);
             return;
           }
         } catch {
           // 真正的失败
         }
-        reject(
-          new Error(`Daemon 启动超时，socket 文件未创建：${targetSocketPath}`),
-        );
+        const detail = IS_WINDOWS
+          ? `ready 文件未创建：${getReadyFilePath()}`
+          : `socket 文件未创建：${getSocketPath()}`;
+        reject(new Error(`Daemon 启动超时，${detail}`));
       } else {
-        setTimeout(checkSocket, 100);
+        setTimeout(checkReady, 100);
       }
     };
 
-    checkSocket();
+    checkReady();
   });
 }
 
@@ -120,8 +137,8 @@ export async function sendCommand(request: {
 }): Promise<{success: boolean; result?: string; error?: string}> {
   const socketPath = getSocketPath();
 
-  // Pre-flight check: socket must exist before attempting connection
-  if (!fs.existsSync(socketPath)) {
+  // Pre-flight check: daemon 必须就绪才能连接
+  if (!checkDaemonReady()) {
     throw new Error(
       `后台服务未运行。请先执行：js-reverse start --browserUrl <chrome-debug-url>`,
     );

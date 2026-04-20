@@ -29,7 +29,10 @@ import {
   getPidFilePath,
   getSocketPath,
   IS_WINDOWS,
+  isDaemonReady,
   isDaemonRunning,
+  removeReadyFile,
+  writeReadyFile,
 } from './utils.js';
 
 logger('[DAEMON] Module loading...');
@@ -42,7 +45,7 @@ logger('[DAEMON] Modules loaded, checking existing daemon...');
 
 const pidFilePath = getPidFilePath();
 const existingPid = getDaemonPid();
-if (existingPid !== null && !fs.existsSync(getSocketPath())) {
+if (existingPid !== null && !isDaemonReady()) {
   try {
     process.kill(existingPid, 0);
   } catch {
@@ -530,6 +533,10 @@ async function startSocketServer() {
       },
       () => {
         logger(`Daemon server listening on ${socketPath}`);
+        // Windows Named Pipe 不产生文件系统 socket 文件，
+        // 需要写入 ready 标记让客户端知道 daemon 已就绪
+        writeReadyFile();
+        logger('[DAEMON] Ready file written');
         resolve();
       },
     );
@@ -556,6 +563,8 @@ async function cleanup() {
       // ignore errors
     }
   }
+  // 清理 ready 标记文件
+  removeReadyFile();
   logger(`unlinking ${pidFilePath}`);
   if (fs.existsSync(pidFilePath)) {
     fs.unlinkSync(pidFilePath);

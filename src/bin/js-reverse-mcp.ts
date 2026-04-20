@@ -20,6 +20,8 @@ import {
   INDEX_SCRIPT_PATH,
   IS_WINDOWS,
   isDaemonRunning,
+  removeReadyFile,
+  writeReadyFile,
 } from '../daemon/utils.js';
 import {logger} from '../logger.js';
 import {
@@ -173,6 +175,9 @@ async function startSocketServer() {
       },
       async () => {
         console.log(`Daemon server listening on ${socketPath}`);
+        // Windows Named Pipe 不产生文件系统 socket 文件，
+        // 需要写入 ready 标记让客户端知道 daemon 已就绪
+        writeReadyFile();
 
         try {
           // Setup MCP client
@@ -216,6 +221,8 @@ async function cleanup() {
       // ignore errors
     }
   }
+  // 清理 ready 标记文件
+  removeReadyFile();
   logger(`unlinking ${pidFilePath}`);
   if (fs.existsSync(pidFilePath)) {
     fs.unlinkSync(pidFilePath);
