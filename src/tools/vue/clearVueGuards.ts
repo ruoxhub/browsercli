@@ -3,38 +3,24 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import {zod} from '../../third_party/index.js';
-import {ToolCategory} from '../categories.js';
-import {defineTool, type Context, type Response} from '../ToolDefinition.js';
 
-export const clearVueGuards = defineTool({
-  name: 'clear_vue_guards',
-  description: '清除 Vue Router 全局守卫：beforeEach、beforeResolve',
-  annotations: {
-    title: 'Clear Vue Guards',
-    category: ToolCategory.HOOK,
-    readOnlyHint: false,
-  },
-  schema: {
-    guards: zod
-      .array(zod.enum(['beforeEach', 'beforeResolve', 'afterEach', 'all']))
-      .optional()
-      .describe('要清除的守卫，默认全部'),
-  },
-  handler: async (
-    request: {
-      params: {
-        guards?: Array<'beforeEach' | 'beforeResolve' | 'afterEach' | 'all'>;
-      };
-    },
-    response: Response,
-    context: Context,
-    _runtime,
-  ) => {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const guards = request.params.guards || ['all'];
+import type {Frame} from '../../third_party/index.js';
+import type {HookResult, VueGuard} from './types.js';
 
-    const hookCode = `
+/**
+ * 清除 Vue Router 全局守卫：beforeEach、beforeResolve。
+ *
+ * @param frame - Puppeteer Frame 对象，用于注入 Hook 代码
+ * @param guards - 要清除的守卫，默认全部
+ * @returns 结构化结果对象
+ */
+export async function clearVueGuards(
+  frame: Frame,
+  guards?: VueGuard[],
+): Promise<HookResult> {
+  const guardList = guards || ['all'];
+
+  const hookCode = `
 (function() {
   'use strict';
 
@@ -94,31 +80,31 @@ export const clearVueGuards = defineTool({
 })();
 `;
 
-    try {
-      const frame = context.getSelectedFrame();
-      const result = (await frame.evaluate(hookCode)) as {
-        success: boolean;
-        clearedGuards?: string[];
-        error?: string;
+  try {
+    const result = (await frame.evaluate(hookCode)) as {
+      success: boolean;
+      clearedGuards?: string[];
+      error?: string;
+    };
+
+    if (!result.success) {
+      return {
+        success: false,
+        message: result.error || '未知错误',
+        tooltype: 'clear_vue_guards',
       };
-
-      if (!result.success) {
-        response.appendResponseLine('❌ 清除失败');
-        response.appendResponseLine(result.error || '未知错误');
-        return;
-      }
-
-      response.appendResponseLine('✅ Vue Router 守卫已清除');
-      response.appendResponseLine(
-        `- 已清除的守卫：${result.clearedGuards?.join(', ') || 'none'}`,
-      );
-      response.appendResponseLine('');
-      response.appendResponseLine('现在路由跳转将不会被拦截。');
-      response.appendResponseLine('如需恢复，请刷新页面。');
-    } catch (error) {
-      response.appendResponseLine(
-        `❌ 错误：${error instanceof Error ? error.message : String(error)}`,
-      );
     }
-  },
-});
+
+    return {
+      success: true,
+      message: `Vue Router 守卫已清除：${result.clearedGuards?.join(', ') || 'none'}`,
+      tooltype: 'clear_vue_guards',
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `错误：${error instanceof Error ? error.message : String(error)}`,
+      tooltype: 'clear_vue_guards',
+    };
+  }
+}

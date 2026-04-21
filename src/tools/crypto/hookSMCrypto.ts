@@ -3,50 +3,33 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import {zod} from '../../third_party/index.js';
-import {ToolCategory} from '../categories.js';
-import {defineTool, type Context, type Response} from '../ToolDefinition.js';
 
-export const hookSMCrypto = defineTool({
-  name: 'hook_smcrypto',
-  description: 'Hook SM-crypto 国密库：SM2、SM3、SM4 算法',
-  annotations: {
-    title: 'Hook SM-Crypto',
-    category: ToolCategory.HOOK,
-    readOnlyHint: false,
-  },
-  schema: {
-    algorithms: zod
-      .array(zod.enum(['SM2', 'SM3', 'SM4', 'all']))
-      .optional()
-      .describe('要 Hook 的算法，默认全部'),
-    logFormat: zod
-      .enum(['full', 'compact', 'json'])
-      .optional()
-      .default('compact')
-      .describe('日志输出格式'),
-  },
-  handler: async (
-    request: {
-      params: {
-        algorithms?: Array<'SM2' | 'SM3' | 'SM4' | 'all'>;
-        logFormat?: 'full' | 'compact' | 'json';
-      };
-    },
-    response: Response,
-    context: Context,
-    _runtime,
-  ) => {
-    const algorithms = request.params.algorithms || ['all'];
-    const logFormat = request.params.logFormat || 'compact';
+import type {Frame} from '../../third_party/index.js';
+import type {HookResult, LogFormat, SMAlgorithm} from './types.js';
 
-    const hookCode = `
+/**
+ * Hook SM-crypto 国密库：SM2、SM3、SM4 算法。
+ *
+ * @param frame - Puppeteer Frame 对象，用于注入 Hook 代码
+ * @param algorithms - 要 Hook 的算法，默认 ['all']
+ * @param logFormat - 日志输出格式，默认 'compact'
+ * @returns 结构化结果对象
+ */
+export async function hookSMCrypto(
+  frame: Frame,
+  algorithms?: SMAlgorithm[],
+  logFormat?: LogFormat,
+): Promise<HookResult> {
+  const algos = algorithms || ['all'];
+  const format = logFormat || 'compact';
+
+  const hookCode = `
 (function() {
   'use strict';
 
   const hookId = 'hook_smcrypto';
-  const algorithms = ${JSON.stringify(algorithms)};
-  const logFormat = '${logFormat}';
+  const algorithms = ${JSON.stringify(algos)};
+  const logFormat = '${format}';
 
   function log(data) {
     if (logFormat === 'json') {
@@ -136,28 +119,20 @@ export const hookSMCrypto = defineTool({
 })();
 `;
 
-    try {
-      const frame = context.getSelectedFrame();
-      await frame.evaluate(hookCode);
-
-      response.appendResponseLine('✅ SM-Crypto Hook 已安装');
-      response.appendResponseLine(`- 算法：${algorithms.join(', ')}`);
-      response.appendResponseLine(`- 日志格式：${logFormat}`);
-      response.appendResponseLine('');
-      response.appendResponseLine('将捕获以下国密操作:');
-      if (algorithms.includes('SM2') || algorithms.includes('all')) {
-        response.appendResponseLine('  - SM2: 椭圆曲线公钥加密/解密');
-      }
-      if (algorithms.includes('SM3') || algorithms.includes('all')) {
-        response.appendResponseLine('  - SM3: 密码杂凑算法');
-      }
-      if (algorithms.includes('SM4') || algorithms.includes('all')) {
-        response.appendResponseLine('  - SM4: 分组密码算法');
-      }
-    } catch (error) {
-      response.appendResponseLine(
-        `❌ 错误：${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-  },
-});
+  try {
+    await frame.evaluate(hookCode);
+    return {
+      success: true,
+      message: 'SM-Crypto Hook 已安装',
+      tooltype: 'hook_smcrypto',
+      algorithms: algos,
+      logFormat: format,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `错误：${error instanceof Error ? error.message : String(error)}`,
+      tooltype: 'hook_smcrypto',
+    };
+  }
+}

@@ -3,26 +3,18 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import {ToolCategory} from '../categories.js';
-import {defineTool, type Context, type Response} from '../ToolDefinition.js';
 
-export const activateVueDevtools = defineTool({
-  name: 'activate_vue_devtools',
-  description:
-    '激活 Vue Devtools：强制启用 Vue.js 和 Pinia 开发者工具（支持 Vue 2/3 + Pinia，带重试机制）',
-  annotations: {
-    title: 'Activate Vue Devtools',
-    category: ToolCategory.HOOK,
-    readOnlyHint: false,
-  },
-  schema: {},
-  handler: async (
-    _request: {params: Record<string, never>},
-    response: Response,
-    context: Context,
-    _runtime,
-  ) => {
-    const hookCode = `
+import type {Frame} from '../../third_party/index.js';
+import type {HookResult} from './types.js';
+
+/**
+ * 激活 Vue Devtools：强制启用 Vue.js 和 Pinia 开发者工具（支持 Vue 2/3 + Pinia，带重试机制）。
+ *
+ * @param frame - Puppeteer Frame 对象，用于注入 Hook 代码
+ * @returns 结构化结果对象
+ */
+export async function activateVueDevtools(frame: Frame): Promise<HookResult> {
+  const hookCode = `
 (function() {
   'use strict';
 
@@ -207,45 +199,33 @@ export const activateVueDevtools = defineTool({
 })();
 `;
 
-    try {
-      const frame = context.getSelectedFrame();
-      const result = (await frame.evaluate(hookCode)) as {
-        success: boolean;
-        version?: string;
-        piniaEnabled?: boolean;
-        error?: string;
-        message?: string;
+  try {
+    const result = (await frame.evaluate(hookCode)) as {
+      success: boolean;
+      version?: string;
+      piniaEnabled?: boolean;
+      error?: string;
+      message?: string;
+    };
+
+    if (!result.success) {
+      return {
+        success: false,
+        message: result.error || result.message || '激活失败',
+        tooltype: 'activate_vue_devtools',
       };
-
-      if (!result.success) {
-        response.appendResponseLine('❌ 激活失败');
-        response.appendResponseLine(
-          result.error || result.message || '未知错误',
-        );
-        response.appendResponseLine('');
-        response.appendResponseLine(
-          '提示：请确保页面已加载 Vue 框架，且已安装 Vue Devtools 扩展。',
-        );
-        return;
-      }
-
-      response.appendResponseLine('✅ Vue Devtools 已激活');
-      response.appendResponseLine(`- Vue 版本：${result.version}`);
-      if (result.piniaEnabled) {
-        response.appendResponseLine('- Pinia Devtools：已启用');
-      }
-      response.appendResponseLine('');
-      response.appendResponseLine(
-        '现在可以在 Chrome DevTools 中使用 Vue.js devtools 插件：',
-      );
-      response.appendResponseLine('  - Vue 2.x: 安装 "Vue.js devtools" (v5)');
-      response.appendResponseLine('  - Vue 3.x: 安装 "Vue.js devtools"');
-      response.appendResponseLine('');
-      response.appendResponseLine('注意：两个版本的插件不能同时启用。');
-    } catch (error) {
-      response.appendResponseLine(
-        `❌ 错误：${error instanceof Error ? error.message : String(error)}`,
-      );
     }
-  },
-});
+
+    return {
+      success: true,
+      message: `Vue Devtools 已激活，版本：${result.version}${result.piniaEnabled ? ' (Pinia 已启用)' : ''}`,
+      tooltype: 'activate_vue_devtools',
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `错误：${error instanceof Error ? error.message : String(error)}`,
+      tooltype: 'activate_vue_devtools',
+    };
+  }
+}

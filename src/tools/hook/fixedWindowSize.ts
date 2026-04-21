@@ -3,64 +3,39 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import {zod} from '../../third_party/index.js';
-import {ToolCategory} from '../categories.js';
-import {defineTool, type Context, type Response} from '../ToolDefinition.js';
 
-export const fixedWindowSize = defineTool({
-  name: 'fixed_window_size',
-  description:
-    '固定窗口尺寸：拦截 window.innerHeight/innerWidth/outerHeight/outerWidth 的读取和设置',
-  annotations: {
-    title: 'Fixed Window Size',
-    category: ToolCategory.HOOK,
-    readOnlyHint: false,
-  },
-  schema: {
-    innerHeight: zod
-      .number()
-      .optional()
-      .default(660)
-      .describe('固定的 innerHeight 值'),
-    innerWidth: zod
-      .number()
-      .optional()
-      .default(1366)
-      .describe('固定的 innerWidth 值'),
-    outerHeight: zod
-      .number()
-      .optional()
-      .default(760)
-      .describe('固定的 outerHeight 值'),
-    outerWidth: zod
-      .number()
-      .optional()
-      .default(1400)
-      .describe('固定的 outerWidth 值'),
-  },
-  handler: async (
-    request: {
-      params: {
-        innerHeight?: number;
-        innerWidth?: number;
-        outerHeight?: number;
-        outerWidth?: number;
-      };
-    },
-    response: Response,
-    context: Context,
-    _runtime,
-  ) => {
-    void _runtime;
-    const {innerHeight, innerWidth, outerHeight, outerWidth} = request.params;
+import type {Frame} from '../../third_party/index.js';
+import type {HookResult} from './types.js';
 
-    const hookCode = `
+/**
+ * 固定窗口尺寸：拦截 window.innerHeight/innerWidth/outerHeight/outerWidth 的读取和设置。
+ *
+ * @param frame - Puppeteer Frame 对象，用于注入 Hook 代码
+ * @param innerHeight - 固定的 innerHeight 值，默认 660
+ * @param innerWidth - 固定的 innerWidth 值，默认 1366
+ * @param outerHeight - 固定的 outerHeight 值，默认 760
+ * @param outerWidth - 固定的 outerWidth 值，默认 1400
+ * @returns 结构化结果对象
+ */
+export async function fixedWindowSize(
+  frame: Frame,
+  innerHeight?: number,
+  innerWidth?: number,
+  outerHeight?: number,
+  outerWidth?: number,
+): Promise<HookResult> {
+  const fixedInnerH = innerHeight ?? 660;
+  const fixedInnerW = innerWidth ?? 1366;
+  const fixedOuterH = outerHeight ?? 760;
+  const fixedOuterW = outerWidth ?? 1400;
+
+  const hookCode = `
 (function() {
   'use strict';
-  const fixedInnerH = ${innerHeight};
-  const fixedInnerW = ${innerWidth};
-  const fixedOuterH = ${outerHeight};
-  const fixedOuterW = ${outerWidth};
+  const fixedInnerH = ${fixedInnerH};
+  const fixedInnerW = ${fixedInnerW};
+  const fixedOuterH = ${fixedOuterH};
+  const fixedOuterW = ${fixedOuterW};
 
   // innerHeight
   const innerHeightDesc = Object.getOwnPropertyDescriptor(window, 'innerHeight');
@@ -110,20 +85,18 @@ export const fixedWindowSize = defineTool({
 })();
 `;
 
-    try {
-      const frame = context.getSelectedFrame();
-      await frame.evaluate(hookCode);
-      response.appendResponseLine('✅ 窗口尺寸 Hook 已安装');
-      response.appendResponseLine(
-        `- innerHeight=${innerHeight}, innerWidth=${innerWidth}`,
-      );
-      response.appendResponseLine(
-        `- outerHeight=${outerHeight}, outerWidth=${outerWidth}`,
-      );
-    } catch (error) {
-      response.appendResponseLine(
-        `❌ 错误：${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-  },
-});
+  try {
+    await frame.evaluate(hookCode);
+    return {
+      success: true,
+      message: `窗口尺寸 Hook 已安装，innerHeight=${fixedInnerH}, innerWidth=${fixedInnerW}, outerHeight=${fixedOuterH}, outerWidth=${fixedOuterW}`,
+      tooltype: 'fixed_window_size',
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `错误：${error instanceof Error ? error.message : String(error)}`,
+      tooltype: 'fixed_window_size',
+    };
+  }
+}

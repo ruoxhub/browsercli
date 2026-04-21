@@ -3,64 +3,27 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import {zod} from '../../third_party/index.js';
-import {ToolCategory} from '../categories.js';
-import {defineTool, type Context, type Response} from '../ToolDefinition.js';
 
-export type AntiAntiDebugFeature =
-  | 'fixedWindowSize'
-  | 'fixedTime'
-  | 'preventClose'
-  | 'preventHistoryBack'
-  | 'preventConsoleClear'
-  | 'hideWebdriver';
+import type {Frame} from '../../third_party/index.js';
+import type {HookResult, AntiAntiDebugFeature} from './types.js';
 
-const FEATURE_DESCRIPTIONS: Record<AntiAntiDebugFeature, string> = {
-  fixedWindowSize: '固定浏览器窗口尺寸，绕过 DevTools 检测',
-  fixedTime: '固定 Date.now() 和 performance.now() 返回值（保存原始引用）',
-  preventClose: '阻止 window.close() 关闭页面',
-  preventHistoryBack: '阻止 history.back/go() 返回上一页',
-  preventConsoleClear: '阻止 console.clear() 清除控制台',
-  hideWebdriver: '隐藏 navigator.webdriver 标志，绕过自动化检测',
-};
+/**
+ * 反反调试工具集：窗口尺寸/时间函数/页面关闭/历史跳转/控制台清除。
+ *
+ * @param frame - Puppeteer Frame 对象，用于注入 Hook 代码
+ * @param features - 要启用的功能列表
+ * @returns 结构化结果对象
+ */
+export async function antiAntiDebug(
+  frame: Frame,
+  features: AntiAntiDebugFeature[],
+): Promise<HookResult> {
+  const hookCodes: string[] = [];
+  const installedFeatures: string[] = [];
 
-export const antiAntiDebug = defineTool({
-  name: 'anti_anti_debug',
-  description: '反反调试工具集：窗口尺寸/时间函数/页面关闭/历史跳转/控制台清除',
-  annotations: {
-    title: 'Anti-Anti-Debug',
-    category: ToolCategory.REVERSE_ENGINEERING,
-    readOnlyHint: false,
-  },
-  schema: {
-    features: zod
-      .array(
-        zod.enum([
-          'fixedWindowSize',
-          'fixedTime',
-          'preventClose',
-          'preventHistoryBack',
-          'preventConsoleClear',
-          'hideWebdriver',
-        ]),
-      )
-      .describe('要启用的功能'),
-  },
-  handler: async (
-    request: {params: {features: AntiAntiDebugFeature[]}},
-    response: Response,
-    context: Context,
-    _runtime,
-  ) => {
-    void _runtime;
-    const features = request.params.features;
-
-    const hookCodes: string[] = [];
-    const installedFeatures: string[] = [];
-
-    // Fixed Window Size
-    if (features.includes('fixedWindowSize')) {
-      hookCodes.push(`
+  // Fixed Window Size
+  if (features.includes('fixedWindowSize')) {
+    hookCodes.push(`
 (function() {
   'use strict';
   Object.defineProperties(window, {
@@ -72,12 +35,12 @@ export const antiAntiDebug = defineTool({
   console.log('[anti_anti_debug] ✅ Fixed window size');
 })();
 `);
-      installedFeatures.push('fixedWindowSize');
-    }
+    installedFeatures.push('fixedWindowSize');
+  }
 
-    // Fixed Time
-    if (features.includes('fixedTime')) {
-      hookCodes.push(`
+  // Fixed Time
+  if (features.includes('fixedTime')) {
+    hookCodes.push(`
 (function() {
   'use strict';
   const originalDateNow = Date.now;
@@ -92,12 +55,12 @@ export const antiAntiDebug = defineTool({
   }
 })();
 `);
-      installedFeatures.push('fixedTime');
-    }
+    installedFeatures.push('fixedTime');
+  }
 
-    // Prevent Close
-    if (features.includes('preventClose')) {
-      hookCodes.push(`
+  // Prevent Close
+  if (features.includes('preventClose')) {
+    hookCodes.push(`
 (function() {
   'use strict';
   window.close = function() {
@@ -106,12 +69,12 @@ export const antiAntiDebug = defineTool({
   console.log('[anti_anti_debug] ✅ Blocked window.close');
 })();
 `);
-      installedFeatures.push('preventClose');
-    }
+    installedFeatures.push('preventClose');
+  }
 
-    // Prevent History Back
-    if (features.includes('preventHistoryBack')) {
-      hookCodes.push(`
+  // Prevent History Back
+  if (features.includes('preventHistoryBack')) {
+    hookCodes.push(`
 (function() {
   'use strict';
   const originalHistory = window.history;
@@ -127,12 +90,12 @@ export const antiAntiDebug = defineTool({
   console.log('[anti_anti_debug] ✅ Blocked history navigation');
 })();
 `);
-      installedFeatures.push('preventHistoryBack');
-    }
+    installedFeatures.push('preventHistoryBack');
+  }
 
-    // Prevent Console Clear
-    if (features.includes('preventConsoleClear')) {
-      hookCodes.push(`
+  // Prevent Console Clear
+  if (features.includes('preventConsoleClear')) {
+    hookCodes.push(`
 (function() {
   'use strict';
   const origClear = console.clear;
@@ -142,12 +105,12 @@ export const antiAntiDebug = defineTool({
   console.log('[anti_anti_debug] ✅ Blocked console.clear');
 })();
 `);
-      installedFeatures.push('preventConsoleClear');
-    }
+    installedFeatures.push('preventConsoleClear');
+  }
 
-    // Hide Webdriver
-    if (features.includes('hideWebdriver')) {
-      hookCodes.push(`
+  // Hide Webdriver
+  if (features.includes('hideWebdriver')) {
+    hookCodes.push(`
 (function() {
   'use strict';
   if (navigator.webdriver !== undefined) {
@@ -159,27 +122,24 @@ export const antiAntiDebug = defineTool({
   }
 })();
 `);
-      installedFeatures.push('hideWebdriver');
-    }
+    installedFeatures.push('hideWebdriver');
+  }
 
-    // Combine all hooks
-    const combinedCode = hookCodes.join('\n');
+  // Combine all hooks
+  const combinedCode = hookCodes.join('\n');
 
-    try {
-      const frame = context.getSelectedFrame();
-      await frame.evaluate(combinedCode);
-
-      response.appendResponseLine('✅ Anti-Anti-Debug 已安装');
-      response.appendResponseLine(`- 启用功能：${installedFeatures.length}`);
-      response.appendResponseLine('');
-
-      for (const feature of installedFeatures as AntiAntiDebugFeature[]) {
-        response.appendResponseLine(`- ${FEATURE_DESCRIPTIONS[feature]}`);
-      }
-    } catch (error) {
-      response.appendResponseLine(
-        `❌ 错误：${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-  },
-});
+  try {
+    await frame.evaluate(combinedCode);
+    return {
+      success: true,
+      message: `Anti-Anti-Debug 已安装，启用功能：${installedFeatures.length}`,
+      tooltype: 'anti_anti_debug',
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `错误：${error instanceof Error ? error.message : String(error)}`,
+      tooltype: 'anti_anti_debug',
+    };
+  }
+}

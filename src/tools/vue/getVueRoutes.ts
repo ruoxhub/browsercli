@@ -3,38 +3,29 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import {zod} from '../../third_party/index.js';
-import {ToolCategory} from '../categories.js';
-import {defineTool, type Context, type Response} from '../ToolDefinition.js';
+import type {Frame} from '../../third_party/index.js';
+import type {HookResult} from './types.js';
 
-export const getVueRoutes = defineTool({
-  name: 'get_vue_routes',
-  description: '获取 Vue Router 路由表：已加载的路由配置信息',
-  annotations: {
-    title: 'Get Vue Routes',
-    category: ToolCategory.HOOK,
-    readOnlyHint: true,
-  },
-  schema: {
-    includeChildren: zod
-      .boolean()
-      .optional()
-      .default(true)
-      .describe('是否包含子路由'),
-    maxDepth: zod.number().int().optional().default(3).describe('最大递归深度'),
-  },
-  handler: async (
-    request: {params: {includeChildren?: boolean; maxDepth?: number}},
-    response: Response,
-    context: Context,
-    _runtime,
-  ) => {
-    const includeChildren = request.params.includeChildren ?? true;
-    const maxDepth = request.params.maxDepth ?? 3;
+/**
+ * 获取 Vue Router 路由表：已加载的路由配置信息。
+ *
+ * @param frame - Puppeteer Frame 对象，用于注入 Hook 代码
+ * @param includeChildren - 是否包含子路由，默认 true
+ * @param maxDepth - 最大递归深度，默认 3
+ * @returns 结构化结果对象
+ */
+export async function getVueRoutes(
+  frame: Frame,
+  includeChildren?: boolean,
+  maxDepth?: number,
+): Promise<HookResult> {
+  const withChildren = includeChildren ?? true;
+  const depth = maxDepth ?? 3;
 
-    const getCode = `
+  const getCode = `
 (function() {
   function findVueInstance() {
     // Vue 3
@@ -56,8 +47,8 @@ export const getVueRoutes = defineTool({
     return null;
   }
 
-  function extractRoutes(router, depth = 0) {
-    if (!router || depth > ${maxDepth}) return [];
+  function extractRoutes(router, d) {
+    if (!router || d > ${depth}) return [];
 
     const routes = router.options?.routes || router.options || [];
 
@@ -68,8 +59,8 @@ export const getVueRoutes = defineTool({
         component: route.component?.__name || route.component?.name || 'Anonymous',
       };
 
-      if (${includeChildren} && route.children && route.children.length > 0) {
-        extracted.children = extractRoutes({ options: route.children }, depth + 1);
+      if (${withChildren} && route.children && route.children.length > 0) {
+        extracted.children = extractRoutes({ options: route.children }, d + 1);
       }
 
       return extracted;
@@ -86,7 +77,7 @@ export const getVueRoutes = defineTool({
     };
   }
 
-  const routes = extractRoutes(router);
+  const routes = extractRoutes(router, 0);
   const currentRoute = router.currentRoute?.value || router.currentRoute;
 
   return {
@@ -101,38 +92,33 @@ export const getVueRoutes = defineTool({
 })();
 `;
 
-    try {
-      const frame = context.getSelectedFrame();
-      const result = (await frame.evaluate(getCode)) as {
-        found: boolean;
-        vueVersion?: string;
-        routes?: any[];
-        currentRoute?: {path: string; name: string};
-        error?: string;
+  try {
+    const result = (await frame.evaluate(getCode)) as {
+      found: boolean;
+      vueVersion?: string;
+      routes?: any[];
+      currentRoute?: {path: string; name: string};
+      error?: string;
+    };
+
+    if (!result.found) {
+      return {
+        success: false,
+        message: result.error || '未检测到 Vue Router',
+        tooltype: 'get_vue_routes',
       };
-
-      if (!result.found) {
-        response.appendResponseLine('❌ 未检测到 Vue Router');
-        response.appendResponseLine(
-          result.error || '此页面可能未使用 Vue 或 Vue Router',
-        );
-        return;
-      }
-
-      response.appendResponseLine('✅ Vue Router 已检测到');
-      response.appendResponseLine(`- Vue 版本：${result.vueVersion}`);
-      response.appendResponseLine(
-        `- 当前路由：${result.currentRoute?.path || 'N/A'} (${result.currentRoute?.name || 'N/A'})`,
-      );
-      response.appendResponseLine('');
-      response.appendResponseLine(`路由表 (${result.routes?.length || 0}):`);
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result.routes, null, 2));
-      response.appendResponseLine('```');
-    } catch (error) {
-      response.appendResponseLine(
-        `❌ 错误：${error instanceof Error ? error.message : String(error)}`,
-      );
     }
-  },
-});
+
+    return {
+      success: true,
+      message: `Vue Router 已检测到，版本：${result.vueVersion}，路由数：${result.routes?.length || 0}，当前路由：${result.currentRoute?.path || 'N/A'}`,
+      tooltype: 'get_vue_routes',
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `错误：${error instanceof Error ? error.message : String(error)}`,
+      tooltype: 'get_vue_routes',
+    };
+  }
+}

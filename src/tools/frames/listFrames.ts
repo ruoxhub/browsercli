@@ -1,0 +1,72 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import type {Frame} from '../../third_party/index.js';
+import type {Page} from './types.js';
+import type {FrameInfo, ListFramesResult} from './types.js';
+
+/**
+ * 计算 Frame 的嵌套深度。
+ */
+function getFrameDepth(frame: Frame): number {
+  let depth = 0;
+  let parent = frame.parentFrame();
+  while (parent) {
+    depth += 1;
+    parent = parent.parentFrame();
+  }
+  return depth;
+}
+
+/**
+ * 列出页面中所有 Frame（包括 iframe）。
+ *
+ * 遍历 Page 上的所有 Frame，返回每个 Frame 的索引、URL、名称和嵌套深度。
+ *
+ * @param page - Puppeteer Page 对象
+ * @returns 结构化结果对象，data 包含 Frame 信息列表
+ */
+export async function listFrames(page: Page): Promise<ListFramesResult> {
+  const tooltype = 'list_frames';
+
+  try {
+    const frames = page.frames();
+
+    if (frames.length === 0) {
+      return {
+        success: true,
+        message: 'No frames found.',
+        tooltype,
+        data: [],
+      };
+    }
+
+    const frameInfos: FrameInfo[] = frames.map((frame, index) => {
+      const depth = getFrameDepth(frame);
+      const name = frame.name() || undefined;
+      return {
+        index,
+        url: frame.url() || '(empty)',
+        ...(name ? {name} : {}),
+        depth,
+      };
+    });
+
+    return {
+      success: true,
+      message: `找到 ${frameInfos.length} 个 Frame`,
+      tooltype,
+      logFormat: 'full',
+      data: frameInfos,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `列出 Frame 失败：${error instanceof Error ? error.message : String(error)}`,
+      tooltype,
+    };
+  }
+}

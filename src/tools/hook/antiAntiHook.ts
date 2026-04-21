@@ -3,17 +3,27 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import {zod} from '../../third_party/index.js';
-import {ToolCategory} from '../categories.js';
-import type {getJSHookRuntime} from '../runtime.js';
-import {defineTool, type Context, type Response} from '../ToolDefinition.js';
 
-function buildAntiAntiHookCode(hookedMethods: string[]): string {
-  const methodList = JSON.stringify(hookedMethods);
-  return `
+import type {Frame} from '../../third_party/index.js';
+import type {HookResult} from './types.js';
+
+/**
+ * 反 Hook 检测：保护 Function.prototype.toString，使被 Hook 的方法看起来像原生代码。
+ *
+ * @param frame - Puppeteer Frame 对象，用于注入 Hook 代码
+ * @param hookedMethods - 已被 Hook 的方法路径列表，如 ["console.table", "localStorage.setItem"]
+ * @returns 结构化结果对象
+ */
+export async function antiAntiHook(
+  frame: Frame,
+  hookedMethods?: string[],
+): Promise<HookResult> {
+  const methods = hookedMethods || [];
+
+  const hookCode = `
 (function() {
   'use strict';
-  const hookedMethods = ${methodList};
+  const hookedMethods = ${JSON.stringify(methods)};
   const hookedFunctions = new Map();
 
   // Resolve hooked methods from global object
@@ -150,54 +160,21 @@ function buildAntiAntiHookCode(hookedMethods: string[]): string {
   }
 })();
 `;
+
+  try {
+    await frame.evaluate(hookCode);
+    return {
+      success: true,
+      message: methods.length > 0
+        ? `Anti-Anti-Hook 已安装，保护方法数：${methods.length}`
+        : 'Anti-Anti-Hook 已安装，基础 Function.prototype.toString 保护已启用',
+      tooltype: 'anti_anti_hook',
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `错误：${error instanceof Error ? error.message : String(error)}`,
+      tooltype: 'anti_anti_hook',
+    };
+  }
 }
-
-export const antiAntiHook = defineTool({
-  name: 'anti_anti_hook',
-  description:
-    '反 Hook 检测：保护 Function.prototype.toString，使被 Hook 的方法看起来像原生代码',
-  annotations: {
-    title: 'Anti-Anti-Hook',
-    category: ToolCategory.HOOK,
-    readOnlyHint: false,
-  },
-  schema: {
-    hookedMethods: zod
-      .array(zod.string())
-      .optional()
-      .describe(
-        '已被 Hook 的方法路径列表，如 ["console.table", "localStorage.setItem"]。省略时自动保护所有已知 hook。',
-      ),
-  },
-  handler: async (
-    request: {params: {hookedMethods?: string[]}},
-    response: Response,
-    context: Context,
-    runtime: ReturnType<typeof getJSHookRuntime>,
-  ) => {
-    let hookedMethods = request.params.hookedMethods;
-
-    // Auto-populate from HookManager when not explicitly provided
-    if (!hookedMethods) {
-      const knownIds = runtime.hookManager.getAllKnownHookIds();
-      hookedMethods = knownIds.length > 0 ? knownIds : [];
-    }
-
-    const hookCode = buildAntiAntiHookCode(hookedMethods);
-
-    try {
-      const frame = context.getSelectedFrame();
-      await frame.evaluate(hookCode);
-      response.appendResponseLine('✅ Anti-Anti-Hook 已安装');
-      response.appendResponseLine(
-        hookedMethods.length > 0
-          ? `- 保护方法数：${hookedMethods.length}`
-          : '- 基础 Function.prototype.toString 保护已启用',
-      );
-    } catch (error) {
-      response.appendResponseLine(
-        `❌ 错误：${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-  },
-});

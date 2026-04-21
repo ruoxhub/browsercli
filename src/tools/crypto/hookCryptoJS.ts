@@ -3,50 +3,37 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import {zod} from '../../third_party/index.js';
-import {ToolCategory} from '../categories.js';
-import {defineTool, type Context, type Response} from '../ToolDefinition.js';
 
-export const hookCryptoJS = defineTool({
-  name: 'hook_cryptojs',
-  description: 'Hook CryptoJS 加密库：AES、DES、MD5、SHA 等对称/哈希/HMAC 算法',
-  annotations: {
-    title: 'Hook CryptoJS',
-    category: ToolCategory.HOOK,
-    readOnlyHint: false,
-  },
-  schema: {
-    algorithms: zod
-      .array(zod.enum(['AES', 'DES', 'MD5', 'SHA', 'HMAC', 'all']))
-      .optional()
-      .describe('要 Hook 的算法，默认全部'),
-    logFormat: zod
-      .enum(['full', 'compact', 'json'])
-      .optional()
-      .default('compact')
-      .describe('日志输出格式'),
-  },
-  handler: async (
-    request: {
-      params: {
-        algorithms?: Array<'AES' | 'DES' | 'MD5' | 'SHA' | 'HMAC' | 'all'>;
-        logFormat?: 'full' | 'compact' | 'json';
-      };
-    },
-    response: Response,
-    context: Context,
-    _runtime,
-  ) => {
-    const algorithms = request.params.algorithms || ['all'];
-    const logFormat = request.params.logFormat || 'compact';
+import type {Frame} from '../../third_party/index.js';
+import type {
+  HookResult,
+  LogFormat,
+  CryptoJSAlgorithm,
+} from './types.js';
 
-    const hookCode = `
+/**
+ * Hook CryptoJS 加密库：AES、DES、MD5、SHA、HMAC 等对称/哈希算法。
+ *
+ * @param frame - Puppeteer Frame 对象，用于注入 Hook 代码
+ * @param algorithms - 要 Hook 的算法，默认 ['all']
+ * @param logFormat - 日志输出格式，默认 'compact'
+ * @returns 结构化结果对象
+ */
+export async function hookCryptoJS(
+  frame: Frame,
+  algorithms?: CryptoJSAlgorithm[],
+  logFormat?: LogFormat,
+): Promise<HookResult> {
+  const algos = algorithms || ['all'];
+  const format = logFormat || 'compact';
+
+  const hookCode = `
 (function() {
   'use strict';
 
   const hookId = 'hook_cryptojs';
-  const algorithms = ${JSON.stringify(algorithms)};
-  const logFormat = '${logFormat}';
+  const algorithms = ${JSON.stringify(algos)};
+  const logFormat = '${format}';
 
   function hasEncryptProp(obj) {
     const requiredProps = ['ciphertext', 'key', 'iv', 'algorithm', 'mode', 'padding', 'blockSize', 'formatter'];
@@ -133,26 +120,20 @@ export const hookCryptoJS = defineTool({
 })();
 `;
 
-    try {
-      const frame = context.getSelectedFrame();
-      await frame.evaluate(hookCode);
-
-      response.appendResponseLine('✅ CryptoJS Hook 已安装');
-      response.appendResponseLine(`- 算法：${algorithms.join(', ')}`);
-      response.appendResponseLine(`- 日志格式：${logFormat}`);
-      response.appendResponseLine('');
-      response.appendResponseLine('将捕获以下加密操作:');
-      response.appendResponseLine('  - AES/DES 对称加密/解密');
-      response.appendResponseLine('  - MD5/SHA 哈希计算');
-      response.appendResponseLine('  - HMAC 消息认证码');
-      response.appendResponseLine('');
-      response.appendResponseLine(
-        '输出参数：key, iv, mode, padding, ciphertext',
-      );
-    } catch (error) {
-      response.appendResponseLine(
-        `❌ 错误：${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-  },
-});
+  try {
+    await frame.evaluate(hookCode);
+    return {
+      success: true,
+      message: 'CryptoJS Hook 已安装',
+      tooltype: 'hook_cryptojs',
+      algorithms: algos,
+      logFormat: format,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `错误：${error instanceof Error ? error.message : String(error)}`,
+      tooltype: 'hook_cryptojs',
+    };
+  }
+}

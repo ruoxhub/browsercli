@@ -3,47 +3,28 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import {zod} from '../../third_party/index.js';
-import {ToolCategory} from '../categories.js';
-import {defineTool, type Context, type Response} from '../ToolDefinition.js';
+
+import type {Frame} from '../../third_party/index.js';
+import type {HookResult, BypassTarget} from './types.js';
 
 /**
- * Bypass Debugger - 绕过无限 debugger
+ * 绕过无限 debugger：自动移除 eval/Function/constructor 中的 debugger 关键字。
  *
- * Hook eval、Function、Function.prototype.constructor，移除代码中的 debugger 关键字
+ * @param frame - Puppeteer Frame 对象，用于注入 Hook 代码
+ * @param targets - 要 Hook 的目标，默认全部
+ * @returns 结构化结果对象
  */
-export const bypassDebugger = defineTool({
-  name: 'bypass_debugger',
-  description:
-    '绕过无限 debugger：自动移除 eval/Function/constructor 中的 debugger 关键字',
-  annotations: {
-    title: 'Bypass Debugger',
-    category: ToolCategory.REVERSE_ENGINEERING,
-    readOnlyHint: false,
-  },
-  schema: {
-    targets: zod
-      .array(zod.enum(['eval', 'Function', 'constructor']))
-      .optional()
-      .describe('要 Hook 的目标，默认全部'),
-  },
-  handler: async (
-    request: {params: {targets?: Array<'eval' | 'Function' | 'constructor'>}},
-    response: Response,
-    context: Context,
-    _runtime,
-  ) => {
-    const targets = request.params.targets || [
-      'eval',
-      'Function',
-      'constructor',
-    ];
+export async function bypassDebugger(
+  frame: Frame,
+  targets?: BypassTarget[],
+): Promise<HookResult> {
+  const hookTargets = targets || ['eval', 'Function', 'constructor'];
 
-    const hookCode = `
+  const hookCode = `
 (function() {
   'use strict';
 
-  const targets = ${JSON.stringify(targets)};
+  const targets = ${JSON.stringify(hookTargets)};
   const hookId = 'bypass_debugger';
 
   // Hook window.eval
@@ -92,29 +73,18 @@ export const bypassDebugger = defineTool({
 })();
 `;
 
-    try {
-      const frame = context.getSelectedFrame();
-      await frame.evaluate(hookCode);
-
-      response.appendResponseLine('✅ Bypass Debugger 已安装');
-      response.appendResponseLine(`- Hook 目标：${targets.join(', ')}`);
-      response.appendResponseLine('');
-      response.appendResponseLine('已绕过以下无限 debugger 方式:');
-      if (targets.includes('eval')) {
-        response.appendResponseLine('  - eval() 中的 debugger 关键字');
-      }
-      if (targets.includes('Function')) {
-        response.appendResponseLine('  - Function 构造器中的 debugger 关键字');
-      }
-      if (targets.includes('constructor')) {
-        response.appendResponseLine(
-          '  - Function.prototype.constructor 中的 debugger 关键字',
-        );
-      }
-    } catch (error) {
-      response.appendResponseLine(
-        `❌ 错误：${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-  },
-});
+  try {
+    await frame.evaluate(hookCode);
+    return {
+      success: true,
+      message: `Bypass Debugger 已安装，Hook 目标：${hookTargets.join(', ')}`,
+      tooltype: 'bypass_debugger',
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `错误：${error instanceof Error ? error.message : String(error)}`,
+      tooltype: 'bypass_debugger',
+    };
+  }
+}

@@ -3,39 +3,29 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import {zod} from '../../third_party/index.js';
-import {ToolCategory} from '../categories.js';
-import {defineTool, type Context, type Response} from '../ToolDefinition.js';
 
-export const hookJSEncrypt = defineTool({
-  name: 'hook_jsencrypt',
-  description: 'Hook JSEncrypt RSA 加密库：公钥/私钥、原始数据、密文',
-  annotations: {
-    title: 'Hook JSEncrypt',
-    category: ToolCategory.HOOK,
-    readOnlyHint: false,
-  },
-  schema: {
-    logFormat: zod
-      .enum(['full', 'compact', 'json'])
-      .optional()
-      .default('compact')
-      .describe('日志输出格式'),
-  },
-  handler: async (
-    request: {params: {logFormat?: 'full' | 'compact' | 'json'}},
-    response: Response,
-    context: Context,
-    _runtime,
-  ) => {
-    const logFormat = request.params.logFormat || 'compact';
+import type {Frame} from '../../third_party/index.js';
+import type {HookResult, LogFormat} from './types.js';
 
-    const hookCode = `
+/**
+ * Hook JSEncrypt RSA 加密库：公钥/私钥、原始数据、密文。
+ *
+ * @param frame - Puppeteer Frame 对象，用于注入 Hook 代码
+ * @param logFormat - 日志输出格式，默认 'compact'
+ * @returns 结构化结果对象
+ */
+export async function hookJSEncrypt(
+  frame: Frame,
+  logFormat?: LogFormat,
+): Promise<HookResult> {
+  const format = logFormat || 'compact';
+
+  const hookCode = `
 (function() {
   'use strict';
 
   const hookId = 'hook_jsencrypt';
-  const logFormat = '${logFormat}';
+  const logFormat = '${format}';
 
   function log(data) {
     if (logFormat === 'json') {
@@ -87,24 +77,19 @@ export const hookJSEncrypt = defineTool({
 })();
 `;
 
-    try {
-      const frame = context.getSelectedFrame();
-      await frame.evaluate(hookCode);
-
-      response.appendResponseLine('✅ JSEncrypt Hook 已安装');
-      response.appendResponseLine(`- 日志格式：${logFormat}`);
-      response.appendResponseLine('');
-      response.appendResponseLine('将捕获以下 RSA 操作:');
-      response.appendResponseLine('  - encrypt(): 公钥加密');
-      response.appendResponseLine('  - decrypt(): 私钥解密');
-      response.appendResponseLine('');
-      response.appendResponseLine(
-        '输出参数：publicKey, privateKey, plaintext, ciphertext',
-      );
-    } catch (error) {
-      response.appendResponseLine(
-        `❌ 错误：${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-  },
-});
+  try {
+    await frame.evaluate(hookCode);
+    return {
+      success: true,
+      message: 'JSEncrypt Hook 已安装',
+      tooltype: 'hook_jsencrypt',
+      logFormat: format,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `错误：${error instanceof Error ? error.message : String(error)}`,
+      tooltype: 'hook_jsencrypt',
+    };
+  }
+}
