@@ -3,7 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import {Mutex} from '../Mutex.js';
+import {Mutex} from './Mutex.js';
 
 export class ToolExecutionScheduler {
   private readonly writeMutex = new Mutex();

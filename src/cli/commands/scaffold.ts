@@ -205,17 +205,15 @@ js-reverse call-skill <skill-name> --url ${url || 'https://example.com'}
 
 // TODO: 在此添加签名/加密算法实现
 
-function ${name.replace(/-/g, '_')}(params) {
+export function ${name.replace(/-/g, '_')}(params) {
   // TODO: 实现逻辑
   return params;
 }
 
 // 测试
-if (require.main === module) {
+if (process.argv[1] && import.meta.url.endsWith(process.argv[1])) {
   console.log(${name.replace(/-/g, '_')}({test: 'value'}));
 }
-
-module.exports = { ${name.replace(/-/g, '_')} };
 `;
 
     writeFileSync(join(taskDir, 'bundle.js'), bundleTemplate);

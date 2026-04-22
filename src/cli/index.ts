@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export {type DaemonContext} from './types.js';
+export {type DaemonContext, type WorkerContext} from './types.js';
 export {
   renderOutput,
   renderError,
@@ -29,6 +29,28 @@ export {
   searchTools,
   type ToolMeta,
 } from './tools-meta.js';
+export {
+  DEFAULT_SEKIRO_HOST,
+  DEFAULT_GROUP,
+  RUNTIME_DIR_NAME,
+  type GlobalConfig,
+  type ConfigSource,
+  type ResolvedConfig,
+  getUserConfigPath,
+  getProjectConfigPath,
+  loadUserConfig,
+  loadProjectConfig,
+  loadFullConfig,
+  mergeConfigs,
+  resolveConfig,
+  initUserConfig,
+  writeConfigFile,
+  setUserConfigValue,
+  deleteUserConfigValue,
+  showConfigInfo,
+} from '../config.js';
+export {SekiroInvoker} from './sekiro-invoker.js';
+export {WorkerManager} from './worker-manager.js';
 export {startCommand} from './commands/start.js';
 export {stopCommand} from './commands/stop.js';
 export {statusCommand} from './commands/status.js';
@@ -38,3 +60,4 @@ export {callSkillCommand} from './commands/call-skill.js';
 export {scaffoldCommand} from './commands/scaffold.js';
 export {replCommand} from './commands/repl.js';
 export {toolDispatcherCommand} from './commands/tool-dispatcher.js';
+export {configCommand} from './commands/config.js';

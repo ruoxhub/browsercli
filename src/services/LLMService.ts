@@ -3,7 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import {createAIService} from '../utils/config.js';
+import {createAIService} from '../config.js';
 
 import type {AIMessage, AIResponse, ChatOptions} from './AIService.js';
 

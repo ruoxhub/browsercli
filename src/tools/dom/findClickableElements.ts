@@ -14,10 +14,10 @@ import type {
 /**
  * 查找页面中可点击的按钮和链接。
  *
- * 在 Puppeteer Frame 中注入查询代码，返回所有可点击元素的结构化信息。
+ * 在 Playwright Frame 中注入查询代码，返回所有可点击元素的结构化信息。
  * 支持按文本内容过滤。
  *
- * @param frame - Puppeteer Frame 对象，用于注入查询代码
+ * @param frame - Playwright Frame 对象，用于注入查询代码
  * @param params - 查询参数
  * @returns 结构化结果对象
  */

@@ -11,7 +11,7 @@ import path from 'node:path';
 
 import {chromium, type Browser, type BrowserContext, type Page, type CDPSession} from 'playwright-core';
 
-import {logger} from '../logger.js';
+import {logger} from '../utils/logger.js';
 import {
   StealthScripts2025,
   type StealthPreset,
@@ -91,7 +91,7 @@ async function discoverChromeDebugPort(): Promise<{
         const ok = await checkPort(port);
         if (ok) {
           const wsPath = lines[1] || null;
-          logger(
+          logger.debug(
             `[discoverChromeDebugPort] 从 DevToolsActivePort 发现端口：${port}${wsPath ? ' (带 wsPath)' : ''}`,
           );
           return {port, wsPath: wsPath || undefined};
@@ -107,7 +107,7 @@ async function discoverChromeDebugPort(): Promise<{
   for (const port of commonPorts) {
     const ok = await checkPort(port);
     if (ok) {
-      logger(`[discoverChromeDebugPort] 扫描发现 Chrome 调试端口：${port}`);
+      logger.debug(`[discoverChromeDebugPort] 扫描发现 Chrome 调试端口：${port}`);
       return {port, wsPath: undefined};
     }
   }
@@ -419,7 +419,7 @@ export class BrowserManager {
       try {
         await browserManager.close();
       } catch (err) {
-        logger('Error closing browser during reset:', err);
+        logger.debug('Error closing browser during reset:', err);
       }
       browserManager = undefined;
     }
@@ -522,7 +522,7 @@ export class BrowserManager {
         this.config.browserURL ??
         this.config.remoteDebuggingUrl;
 
-      logger('Connecting to remote browser at:', debugUrl);
+      logger.debug('Connecting to remote browser at:', debugUrl);
 
       // First, verify the endpoint is accessible and get version info
       let browserURL: string | undefined;
@@ -537,19 +537,19 @@ export class BrowserManager {
               'Protocol-Version'?: string;
               webSocketDebuggerUrl?: string;
             };
-            logger('Browser version info:', {
+            logger.debug('Browser version info:', {
               browser: versionInfo.Browser,
               protocolVersion: versionInfo['Protocol-Version'],
             });
             webSocketDebuggerUrl = versionInfo.webSocketDebuggerUrl;
           } else {
-            logger(
+            logger.debug(
               'Warning: /json/version returned non-OK status:',
               response.status,
             );
           }
         } catch (err) {
-          logger('Warning: Could not fetch browser version:', err);
+          logger.debug('Warning: Could not fetch browser version:', err);
         }
       }
 
@@ -570,7 +570,7 @@ export class BrowserManager {
         connectEndpoint!,
         connectOptions,
       );
-      logger('Connected to remote browser via Playwright');
+      logger.debug('Connected to remote browser via Playwright');
 
       // Get the default context
       this.context = this.browser.contexts()[0];
@@ -590,7 +590,7 @@ export class BrowserManager {
               {},
             );
 
-            logger(
+            logger.debug(
               `Browser window bounds: ${bounds.width}x${bounds.height} at (${bounds.left}, ${bounds.top})`,
             );
 
@@ -600,7 +600,7 @@ export class BrowserManager {
                 width: this.config.viewport.width,
                 height: this.config.viewport.height,
               });
-              logger(
+              logger.debug(
                 `Viewport set to ${this.config.viewport.width}x${this.config.viewport.height} (configured)`,
               );
             } else {
@@ -609,7 +609,7 @@ export class BrowserManager {
                 width: bounds.width,
                 height: bounds.height,
               });
-              logger(
+              logger.debug(
                 `Viewport auto-adapted to ${bounds.width}x${bounds.height} (from browser window)`,
               );
             }
@@ -618,15 +618,15 @@ export class BrowserManager {
           }
         }
       } catch (err) {
-        logger('Warning: Could not set viewport from browser bounds:', err);
+        logger.debug('Warning: Could not set viewport from browser bounds:', err);
       }
 
       // Verify connection by checking browser version
       try {
         const browserVersion = this.browser.version();
-        logger('Browser version:', browserVersion);
+        logger.debug('Browser version:', browserVersion);
       } catch (versionErr) {
-        logger('Warning: Could not get browser version:', versionErr);
+        logger.debug('Warning: Could not get browser version:', versionErr);
       }
 
       // Set up crash detection
@@ -643,13 +643,13 @@ export class BrowserManager {
 
       // 如果连接失败但配置了 autoLaunch，尝试自动启动浏览器
       if (this.config.autoLaunch) {
-        logger('Remote browser connection failed, attempting auto-launch...');
+        logger.debug('Remote browser connection failed, attempting auto-launch...');
         try {
           await this.launchBrowserProcess();
           // 重新尝试连接
           return this.connectToRemoteBrowser();
         } catch (launchError) {
-          logger('Auto-launch failed:', launchError);
+          logger.debug('Auto-launch failed:', launchError);
           // 抛出原始连接错误，因为 autoLaunch 只是回退方案
           throw error;
         }
@@ -746,7 +746,7 @@ export class BrowserManager {
     }
 
     try {
-      logger('Launching browser with config:', {
+      logger.debug('Launching browser with config:', {
         channel: launchChannel,
         executablePath,
         headless,
@@ -762,7 +762,7 @@ export class BrowserManager {
         ignoreDefaultArgs: HARMFUL_ARGS,
       });
 
-      logger('Browser launched successfully');
+      logger.debug('Browser launched successfully');
 
       // Set up crash detection
       this.setupCrashDetection();
@@ -817,7 +817,7 @@ export class BrowserManager {
 
     // Listen for disconnect events (Playwright's equivalent of Puppeteer 'disconnected')
     this.browser.on('disconnected', () => {
-      logger('Browser closed');
+      logger.debug('Browser closed');
       if (!this.isRestarting) {
         void this.handleBrowserCrash();
       }
@@ -826,7 +826,7 @@ export class BrowserManager {
     // Periodically check if browser is still connected
     this.crashCheckInterval = setInterval(() => {
       if (this.browser && !this.browser.isConnected() && !this.isRestarting) {
-        logger('Browser connection lost, attempting restart');
+        logger.debug('Browser connection lost, attempting restart');
         void this.handleBrowserCrash();
       }
     }, 5000); // Check every 5 seconds
@@ -839,7 +839,7 @@ export class BrowserManager {
     if (this.isRestarting || !this.browser) return;
 
     this.isRestarting = true;
-    logger('Attempting to restart browser after crash');
+    logger.debug('Attempting to restart browser after crash');
 
     try {
       // Clean up old browser instance
@@ -848,7 +848,7 @@ export class BrowserManager {
           await this.browser.close();
         } catch (err) {
           // Ignore errors when closing crashed browser
-          logger('Error closing crashed browser:', err);
+          logger.debug('Error closing crashed browser:', err);
         }
         this.browser = undefined;
         this.context = undefined;
@@ -859,9 +859,9 @@ export class BrowserManager {
 
       // Restart browser
       await this.ensureBrowser();
-      logger('Browser restarted successfully');
+      logger.debug('Browser restarted successfully');
     } catch (error) {
-      logger('Failed to restart browser:', error);
+      logger.debug('Failed to restart browser:', error);
     } finally {
       this.isRestarting = false;
     }
@@ -881,7 +881,7 @@ export class BrowserManager {
     }
 
     if (this.stealthInjected) {
-      logger('Stealth scripts already injected');
+      logger.debug('Stealth scripts already injected');
       return;
     }
 
@@ -904,7 +904,7 @@ export class BrowserManager {
       }
 
       this.stealthInjected = true;
-      logger('Advanced stealth scripts injected successfully');
+      logger.debug('Advanced stealth scripts injected successfully');
     } catch (error) {
       throw new Error(
         `Failed to inject stealth scripts: ${(error as Error).message}`,
@@ -965,8 +965,8 @@ export class BrowserManager {
     }
 
     const selectedBrowser = browsers[0];
-    logger(`Launching browser: ${selectedBrowser.path}`);
-    logger(`Remote debugging port: ${port}`);
+    logger.debug(`Launching browser: ${selectedBrowser.path}`);
+    logger.debug(`Remote debugging port: ${port}`);
 
     const {spawn} = await import('node:child_process');
     const browserProcess = spawn(
@@ -986,7 +986,7 @@ export class BrowserManager {
 
     // Wait for browser to be ready
     await this.waitForBrowser(port);
-    logger('Browser launched successfully');
+    logger.debug('Browser launched successfully');
   }
 
   /**
@@ -1105,7 +1105,7 @@ export class BrowserManager {
    * Restart the browser
    */
   async restart(): Promise<void> {
-    logger('Manually restarting browser');
+    logger.debug('Manually restarting browser');
     await this.close();
     await this.ensureBrowser();
   }
@@ -1124,9 +1124,9 @@ export class BrowserManager {
     if (this.browser) {
       try {
         await this.browser.close();
-        logger('Browser closed successfully');
+        logger.debug('Browser closed successfully');
       } catch (error) {
-        logger('Error closing browser:', error);
+        logger.debug('Error closing browser:', error);
       }
       this.browser = undefined;
       this.context = undefined;

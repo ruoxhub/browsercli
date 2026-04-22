@@ -8,8 +8,9 @@ import type {AxiCliCommand} from 'axi-sdk-js';
 import type {DaemonContext} from '../types.js';
 import {tableOutput, successOutput} from '../output.js';
 import {getBoolFlag, parseArgs} from '../args-parser.js';
-import {sendCommand} from '../../daemon/client.js';
+import {SekiroInvoker} from '../sekiro-invoker.js';
 import {getBuiltInSkillDefinitions} from '../../skills/index.js';
+import {resolveConfig} from '../config.js';
 
 interface SkillInfo {
   name: string;
@@ -19,7 +20,7 @@ interface SkillInfo {
 
 export const listSkillsCommand: AxiCliCommand<DaemonContext> = async (
   args,
-  _ctx,
+  ctx,
 ) => {
   const parsed = parseArgs(args);
   const json = getBoolFlag(parsed, 'json');
@@ -28,14 +29,17 @@ export const listSkillsCommand: AxiCliCommand<DaemonContext> = async (
   let source = 'built-in';
 
   try {
-    const result = await sendCommand({method: 'list_skills'});
-    if (result.success && result.result) {
-      const data = JSON.parse(result.result as string);
-      skills.push(...(data.skills || []));
-      source = 'daemon';
+    const cfg = ctx?.resolvedConfig ?? resolveConfig();
+    const invoker = ctx?.invoker ?? new SekiroInvoker({sekiroHost: cfg.sekiroHost});
+    const result = await invoker.invoke(cfg.group, '_list_skills') as {
+      skills?: SkillInfo[];
+    };
+    if (result.skills && result.skills.length > 0) {
+      skills.push(...result.skills);
+      source = 'worker';
     }
   } catch {
-    // Daemon not running, use built-in definitions
+    // Worker not running, use built-in definitions
   }
 
   if (skills.length === 0) {
@@ -63,7 +67,7 @@ export const listSkillsCommand: AxiCliCommand<DaemonContext> = async (
   };
 
   if (source === 'built-in') {
-    output.note = '后台服务未运行，显示内置技能列表';
+    output.note = 'Worker 未运行，显示内置技能列表';
   }
 
   return {

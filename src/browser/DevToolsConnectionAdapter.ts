@@ -14,7 +14,7 @@ import type {
   CommandParams,
   CommandResult,
 } from '../third_party/index.js';
-import {logger} from '../logger.js';
+import {logger} from '../utils/logger.js';
 
 /**
  * This class makes a Playwright CDP connection look like DevTools CDPConnection.

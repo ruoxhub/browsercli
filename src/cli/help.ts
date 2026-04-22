@@ -27,6 +27,7 @@ export function generateTopLevelHelp(options?: {
       'call-skill',
       'list-skills',
       'list-tools',
+      'config',
       'repl',
       'scaffold',
     ],
@@ -37,16 +38,16 @@ export function generateTopLevelHelp(options?: {
 export function generateCommandHelp(command: string): string | null {
   const helpMap: Record<string, {description: string; usage: string}> = {
     start: {
-      description: '启动后台 daemon 服务',
+      description: '启动 Worker 并连接到 Sekiro Server',
       usage:
-        'js-reverse start [--browserUrl <url>] [--wsEndpoint <endpoint>] [--wait-for-browser] [--headless] [--http] [--port <port>]',
+        'js-reverse start [--browserUrl <url>] [--wsEndpoint <endpoint>] [--sekiroHost <host>] [--group <name>] [--wait-for-browser] [--headless]',
     },
     stop: {
-      description: '停止后台 daemon 服务',
+      description: '停止 Worker 进程',
       usage: 'js-reverse stop',
     },
     status: {
-      description: '查看 daemon 状态',
+      description: '查看 Worker 和 Sekiro 连接状态',
       usage: 'js-reverse status',
     },
     call: {
@@ -56,6 +57,11 @@ export function generateCommandHelp(command: string): string | null {
     'call-skill': {
       description: '调用逆向工程技能',
       usage: 'js-reverse call-skill <skill-name> [--url <url>] [--data <json>]',
+    },
+    config: {
+      description: '查看/设置/初始化全局配置',
+      usage:
+        'js-reverse config [--init] [--set key=value] [--get key] [--unset key] [--list]',
     },
     'list-skills': {
       description: '列出所有可用的逆向工程技能',

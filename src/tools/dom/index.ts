@@ -7,6 +7,7 @@
 export {queryDom} from './queryDom.js';
 export {getDomStructure} from './getDomStructure.js';
 export {findClickableElements} from './findClickableElements.js';
+export {WaitForHelper} from './WaitForHelper.js';
 export type {
   DomResult,
   ElementInfo,

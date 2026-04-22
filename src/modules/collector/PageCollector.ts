@@ -8,9 +8,9 @@
 
 import {createRequire} from 'node:module';
 
-import {FakeIssuesManager} from './DevtoolsUtils.js';
-import {features} from './features.js';
-import {logger} from './logger.js';
+import {FakeIssuesManager} from '../../utils/DevtoolsUtils.js';
+import {features} from '../../utils/features.js';
+import {logger} from '../../utils/logger.js';
 import type {
   AggregatedIssue,
   Common,
@@ -23,11 +23,11 @@ import type {
   Handler,
   HTTPRequest,
   Page,
-} from './third_party/index.js';
+} from '../../third_party/index.js';
 
 // 动态导入 chrome-devtools-frontend 以绕过类型检查
 const require = createRequire(import.meta.url);
-const CDTP_MODULE_PATH = '../node_modules/chrome-devtools-frontend/mcp/mcp.js';
+const CDTP_MODULE_PATH = '../../../node_modules/chrome-devtools-frontend/mcp/mcp.js';
 const cdtp = require(CDTP_MODULE_PATH);
 
 // 从动态导入中获取运行时对象
@@ -336,7 +336,7 @@ class PageIssueSubscriber {
     try {
       await this.#session.send('Audits.enable');
     } catch (error) {
-      logger('Error subscribing to issues', error);
+      logger.debug('Error subscribing to issues', error);
     }
   }
 
@@ -382,7 +382,7 @@ class PageIssueSubscriber {
       const inspectorIssue = data.issue as {code?: string};
       const issue = createIssuesFromProtocolIssue(null, inspectorIssue)[0];
       if (!issue) {
-        logger('No issue mapping for for the issue: ', inspectorIssue?.code);
+        logger.debug('No issue mapping for for the issue: ', inspectorIssue?.code);
         return;
       }
 
@@ -400,7 +400,7 @@ class PageIssueSubscriber {
         issuesModel: null,
       });
     } catch (error) {
-      logger('Error creating a new issue', error);
+      logger.debug('Error creating a new issue', error);
     }
   };
 }

@@ -9,7 +9,7 @@ import {
   formatGroupMessages,
   formatRecentMessages,
 } from '../../formatters/websocketFormatter.js';
-import type {WebSocketData} from '../../WebSocketCollector.js';
+import type {WebSocketData} from '../network/WebSocketCollector.js';
 import type {GetMessagesResult, GetWebSocketMessagesParams} from './types.js';
 
 /**

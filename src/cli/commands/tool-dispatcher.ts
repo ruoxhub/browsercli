@@ -9,12 +9,13 @@ import type {DaemonContext} from '../types.js';
 import {AxiError} from '../errors.js';
 import {successOutput} from '../output.js';
 import {parseArgs} from '../args-parser.js';
-import {sendCommand} from '../../daemon/client.js';
 import {getToolMeta, getAllToolNames, searchTools} from '../tools-meta.js';
+import {SekiroInvoker} from '../sekiro-invoker.js';
+import {resolveConfig} from '../config.js';
 
 export const toolDispatcherCommand: AxiCliCommand<DaemonContext> = async (
   args,
-  _ctx,
+  ctx,
 ) => {
   const parsed = parseArgs(args);
   const toolName = parsed.positionals[0];
@@ -48,26 +49,15 @@ export const toolDispatcherCommand: AxiCliCommand<DaemonContext> = async (
   }
 
   try {
-    const result = await sendCommand({
-      method: 'invoke_tool',
-      tool: toolName,
-      args: toolArgs,
-    });
+    const cfg = ctx?.resolvedConfig ?? resolveConfig();
+    const invoker = ctx?.invoker ?? new SekiroInvoker({sekiroHost: cfg.sekiroHost});
+    const result = await invoker.invoke(cfg.group, toolName, toolArgs);
 
-    if (result.success) {
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(result.result as string);
-      } catch {
-        parsed = result.result || '执行成功';
-      }
-      return successOutput({
-        command: 'call',
-        tool: toolName,
-        result: parsed,
-      });
-    }
-    throw new AxiError(`工具执行失败：${result.error}`, 'TOOL_EXECUTION_ERROR');
+    return successOutput({
+      command: 'call',
+      tool: toolName,
+      result,
+    });
   } catch (error) {
     throw new AxiError(
       `工具调用失败：${error instanceof Error ? error.message : error}`,

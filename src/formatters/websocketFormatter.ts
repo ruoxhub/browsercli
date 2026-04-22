@@ -8,7 +8,7 @@ import type {
   WebSocketConnection,
   WebSocketData,
   WebSocketFrame,
-} from '../WebSocketCollector.js';
+} from '../tools/network/WebSocketCollector.js';
 
 const PAYLOAD_SIZE_LIMIT = 5000;
 

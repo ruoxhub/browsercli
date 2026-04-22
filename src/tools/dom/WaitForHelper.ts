@@ -4,12 +4,25 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {logger} from './logger.js';
-import type {Page, Protocol, CdpPage} from './third_party/index.js';
+import type {Page, CDPSession} from '../../third_party/index.js';
+import {logger} from '../../utils/logger.js';
 
+/**
+ * WaitForHelper — Playwright 适配版
+ *
+ * 页面操作后的等待协调器，解决「执行操作 → 等待导航 → 等待DOM稳定」的异步时序问题。
+ *
+ * 核心流程 (waitForEventsAfterAction):
+ * 1. 注册导航监听
+ * 2. 执行用户操作（如点击按钮）
+ * 3. 如果触发了跨文档导航，等 waitForNavigation 完成
+ * 4. 最后等 DOM 稳定
+ * 5. 整体 15s 超时防死等
+ */
 export class WaitForHelper {
   #abortController = new AbortController();
-  #page: CdpPage;
+  #page: Page;
+  #cdpSession?: CDPSession;
   #stableDomTimeout: number;
   #stableDomFor: number;
   #expectNavigationIn: number;
@@ -24,13 +37,24 @@ export class WaitForHelper {
     this.#stableDomFor = 100 * cpuTimeoutMultiplier;
     this.#expectNavigationIn = 100 * cpuTimeoutMultiplier;
     this.#navigationTimeout = 3000 * networkTimeoutMultiplier;
-    this.#page = page as unknown as CdpPage;
+    this.#page = page;
   }
 
   /**
-   * A wrapper that executes a action and waits for
-   * a potential navigation, after which it waits
-   * for the DOM to be stable before returning.
+   * 获取或创建 CDP Session（Playwright 通过 context.newCDPSession 访问 CDP）
+   */
+  async #ensureCdpSession(): Promise<CDPSession> {
+    if (!this.#cdpSession || this.#cdpSession.isClosed()) {
+      this.#cdpSession = await this.#page.context().newCDPSession(this.#page);
+    }
+    return this.#cdpSession;
+  }
+
+  /**
+   * 等待 DOM 稳定。
+   *
+   * 通过 MutationObserver 监听 DOM 变化，当 DOM 在指定时间内无变化时才 resolve。
+   * 超时兜底防止无限等待。
    */
   async waitForStableDom(): Promise<void> {
     const stableDomObserver = await this.#page.evaluateHandle(timeout => {
@@ -81,11 +105,20 @@ export class WaitForHelper {
     ]);
   }
 
-  async waitForNavigationStarted() {
-    // Currently Puppeteer does not have API
-    // For when a navigation is about to start
+  /**
+   * 等待导航开始。
+   *
+   * 通过 CDP 的 Page.frameStartedNavigating 事件检测导航，
+   * 区分同文档导航（historySameDocument/historyDifferentDocument/sameDocument）
+   * 与跨文档导航。
+   *
+   * @returns true 表示发生了跨文档导航，false 表示同文档导航或超时
+   */
+  async waitForNavigationStarted(): Promise<boolean> {
+    const cdp = await this.#ensureCdpSession();
+
     const navigationStartedPromise = new Promise<boolean>(resolve => {
-      const listener = (event: Protocol.Page.FrameStartedNavigatingEvent) => {
+      const listener = (event: {navigationType: string; frameId: string}) => {
         if (
           [
             'historySameDocument',
@@ -100,27 +133,19 @@ export class WaitForHelper {
         resolve(true);
       };
 
-      (
-        this.#page as unknown as {
-          _client: () => {
-            on: (e: string, fn: (d: unknown) => void) => void;
-            off: (e: string, fn: (d: unknown) => void) => void;
-          };
-        }
-      )
-        ._client()
-        .on('Page.frameStartedNavigating', listener);
+      cdp.on('Page.frameStartedNavigating', listener);
       this.#abortController.signal.addEventListener('abort', () => {
         resolve(false);
-        (
-          this.#page as unknown as {
-            _client: () => {off: (e: string, fn: (d: unknown) => void) => void};
-          }
-        )
-          ._client()
-          .off('Page.frameStartedNavigating', listener);
+        cdp.off('Page.frameStartedNavigating', listener);
       });
     });
+
+    // 启用 Page 域以接收导航事件
+    try {
+      await cdp.send('Page.enable');
+    } catch {
+      // 可能已启用，忽略
+    }
 
     return await Promise.race([
       navigationStartedPromise,
@@ -138,6 +163,16 @@ export class WaitForHelper {
     });
   }
 
+  /**
+   * 主入口：执行操作并等待后续事件。
+   *
+   * 组合 waitForNavigationStarted + waitForNavigation + waitForStableDom：
+   * 1. 注册导航监听
+   * 2. 执行用户操作
+   * 3. 如果触发了跨文档导航，等待导航完成
+   * 4. 等待 DOM 稳定
+   * 5. 整体 15s 超时
+   */
   async waitForEventsAfterAction(
     action: () => Promise<unknown>,
   ): Promise<void> {
@@ -153,17 +188,17 @@ export class WaitForHelper {
 
     const doAction = async () => {
       const navigationFinished = this.waitForNavigationStarted()
-        .then(navigationStated => {
-          if (navigationStated) {
-            return this.#page.waitForNavigation({
+        .then(async navigationStarted => {
+          if (navigationStarted) {
+            // Playwright: waitForNavigation 在 action 前调用也能正常工作
+            await this.#page.waitForURL('**', {
               timeout: this.#navigationTimeout,
-              waitUntil: 'domcontentloaded',
-              signal: this.#abortController.signal,
+            }).catch(() => {
+              // 导航等待失败不中断流程
             });
           }
-          return;
         })
-        .catch(error => logger(error));
+        .catch(error => logger.debug('Wait error', error));
 
       try {
         await action();
@@ -180,16 +215,24 @@ export class WaitForHelper {
         // the correct context
         await this.waitForStableDom();
       } catch (error) {
-        logger(error);
+        logger.debug('Wait error', error);
       } finally {
         this.#abortController.abort();
+        // 清理 CDP Session
+        try {
+          if (this.#cdpSession && !this.#cdpSession.isClosed()) {
+            await this.#cdpSession.detach();
+          }
+        } catch {
+          // Ignored
+        }
       }
     };
 
     try {
       await Promise.race([doAction(), overallTimeout]);
     } catch (error) {
-      logger(error);
+      logger.debug('Wait error', error);
       this.#abortController.abort();
     }
   }

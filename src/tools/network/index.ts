@@ -9,6 +9,17 @@
 export {listNetworkRequests} from './listNetworkRequests.js';
 export {getNetworkRequest} from './getNetworkRequest.js';
 
+// ─── WebSocket Collector ─────────────────────────────
+
+export {WebSocketCollector} from './WebSocketCollector.js';
+export type {
+  WebSocketStatus,
+  WebSocketDirection,
+  WebSocketConnection,
+  WebSocketFrame,
+  WebSocketData,
+} from './WebSocketCollector.js';
+
 // ─── 类型导出 ─────────────────────────────────────────
 
 export type {

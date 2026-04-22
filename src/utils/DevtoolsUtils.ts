@@ -12,7 +12,7 @@ import {
   Marked,
   MarkdownIssueDescription,
   I18n,
-} from './third_party/index.js';
+} from '../third_party/index.js';
 
 export function extractUrlLikeFromDevToolsTitle(
   title: string,
@@ -107,14 +107,14 @@ export function mapIssueToMessageObject(issue: AggregatedIssue) {
   } | null;
   const filename = markdownDescription?.file;
   if (!markdownDescription) {
-    logger(`no description found for issue:` + issue.code);
+    logger.debug(`no description found for issue:` + issue.code);
     return null;
   }
   const rawMarkdown = filename
     ? ISSUE_UTILS.getIssueDescription(filename)
     : null;
   if (!rawMarkdown) {
-    logger(`no markdown ${filename} found for issue:` + issue.code);
+    logger.debug(`no markdown ${filename} found for issue:` + issue.code);
     return null;
   }
   let processedMarkdown: string;
@@ -128,11 +128,11 @@ export function mapIssueToMessageObject(issue: AggregatedIssue) {
     const markdownAst = Marked.Marked.lexer(processedMarkdown);
     title = MarkdownIssueDescription.findTitleFromMarkdownAst(markdownAst);
   } catch {
-    logger('error parsing markdown for issue ' + issue.code());
+    logger.debug('error parsing markdown for issue ' + issue.code());
     return null;
   }
   if (!title) {
-    logger('cannot read issue title from ' + filename);
+    logger.debug('cannot read issue title from ' + filename);
     return null;
   }
   return {

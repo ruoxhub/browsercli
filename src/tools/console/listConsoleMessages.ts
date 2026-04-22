@@ -6,7 +6,7 @@
 
 import {
   mapIssueToMessageObject,
-} from '../../DevtoolsUtils.js';
+} from '../../utils/DevtoolsUtils.js';
 import type {
   ConsoleMessageData,
   ConsoleMessageEntry,

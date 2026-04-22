@@ -8,7 +8,7 @@ import {
   analyzeWebSocketFramesV2,
   formatTrafficSummary,
 } from '../../formatters/websocketFormatter.js';
-import type {WebSocketData} from '../../WebSocketCollector.js';
+import type {WebSocketData} from '../network/WebSocketCollector.js';
 import type {AnalyzeMessagesResult, AnalyzeWebSocketMessagesParams} from './types.js';
 
 /**

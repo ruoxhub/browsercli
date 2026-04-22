@@ -7,7 +7,7 @@
 
 import {createRequire} from 'node:module';
 
-import {logger} from '../logger.js';
+import {logger} from '../utils/logger.js';
 
 // 动态导入 chrome-devtools-frontend 运行时模块，避免将其源码类型拉入当前 TS program。
 const require = createRequire(import.meta.url);
@@ -95,7 +95,7 @@ export async function parseRawTraceBuffer(
     };
   } catch (e) {
     const errorText = e instanceof Error ? e.message : JSON.stringify(e);
-    logger(`Unexpected error parsing trace: ${errorText}`);
+    logger.debug(`Unexpected error parsing trace: ${errorText}`);
     return {
       error: errorText,
     };

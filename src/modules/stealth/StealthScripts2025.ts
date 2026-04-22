@@ -14,7 +14,7 @@
 
 import type {Page} from '../../third_party/index.js';
 
-import {logger} from '../../logger.js';
+import {logger} from '../../utils/logger.js';
 
 // ==================== 类型定义 ====================
 
@@ -373,7 +373,7 @@ export class StealthScripts2025 {
     const resolved = this.resolveOptions(options);
     this.currentOptions = resolved;
 
-    logger(
+    logger.debug(
       `🛡️ Injecting stealth scripts (preset: ${options.preset ?? 'windows-chrome'})`,
     );
 
@@ -474,7 +474,7 @@ export class StealthScripts2025 {
           await feature.inject();
           injected.push(feature.name);
         } catch (error) {
-          logger(`⚠️ Stealth feature ${feature.name} failed:`, error);
+          logger.debug(`⚠️ Stealth feature ${feature.name} failed:`, error);
           skipped.push(`${feature.name} (error)`);
         }
       } else {
@@ -484,7 +484,7 @@ export class StealthScripts2025 {
 
     await Promise.all(tasks);
 
-    logger(
+    logger.debug(
       `✅ Stealth injected: ${injected.length} features, ${skipped.length} skipped`,
     );
 
@@ -1102,6 +1102,6 @@ export class StealthScripts2025 {
     };
     const resolved = this.resolveOptions({preset: presetMap[platform]});
     await this.setUserAgentConsistent(page, resolved);
-    logger(`🧬 User-Agent overridden for ${platform}`);
+    logger.debug(`🧬 User-Agent overridden for ${platform}`);
   }
 }

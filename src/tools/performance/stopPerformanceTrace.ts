@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {logger} from '../../logger.js';
+import {logger} from '../../utils/logger.js';
 import {
   parseRawTraceBuffer,
   traceResultIsSuccess,
@@ -92,7 +92,7 @@ export async function stopPerformanceTrace(
     };
   } catch (e) {
     const errorText = e instanceof Error ? e.message : JSON.stringify(e);
-    logger(`Error stopping performance trace: ${errorText}`);
+    logger.debug(`Error stopping performance trace: ${errorText}`);
     return {
       success: false,
       message: `停止性能追踪时出错：${errorText}`,

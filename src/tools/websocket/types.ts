@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {WebSocketData, WebSocketFrame} from '../../WebSocketCollector.js';
+import type {WebSocketData, WebSocketFrame} from '../network/WebSocketCollector.js';
 import type {TrafficSummary} from '../../formatters/websocketFormatter.js';
 
 /** WebSocket 连接列表参数 */

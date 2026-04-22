@@ -4,13 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {AxiCliCommand} from 'axi-sdk-js';
+import type {AxiCliCommand} from 'axi-sdk-js';
 import type {DaemonContext} from '../types.js';
 import {AxiError} from '../errors.js';
 import {parseArgs, getFlag, getBoolFlag} from '../args-parser.js';
 import {successOutput} from '../output.js';
-import {startDaemon} from '../../daemon/client.js';
-import {getDaemonReachability, getDaemonPid} from '../../daemon/utils.js';
+import {SekiroInvoker} from '../sekiro-invoker.js';
+import {WorkerManager} from '../worker-manager.js';
+import {resolveConfig} from '../config.js';
 
 const BROWSER_POLL_ATTEMPTS = 60;
 const BROWSER_POLL_INTERVAL_MS = 500;
@@ -45,50 +46,96 @@ async function waitForBrowserReachable(browserUrl: string): Promise<void> {
 
 export const startCommand: AxiCliCommand<DaemonContext> = async (
   args,
-  _ctx,
+  ctx,
 ) => {
   const parsed = parseArgs(args);
   const browserUrl = getFlag(parsed, 'browserUrl');
   const wsEndpoint = getFlag(parsed, 'wsEndpoint');
   const headless = getBoolFlag(parsed, 'headless');
   const executablePath = getFlag(parsed, 'executablePath');
-  const http = getBoolFlag(parsed, 'http');
-  const port = getFlag(parsed, 'port', '3000');
   const waitForBrowser = getBoolFlag(parsed, 'wait-for-browser');
 
-  const reachability = getDaemonReachability();
+  // 合并配置：CLI 参数 > 环境变量 > 配置文件 > 默认值
+  const cfg = resolveConfig({
+    sekiroHost: getFlag(parsed, 'sekiroHost') || ctx?.resolvedConfig.sekiroHost,
+    group: getFlag(parsed, 'group') || ctx?.resolvedConfig.group,
+    browserUrl: browserUrl || ctx?.resolvedConfig.browserUrl,
+    wsEndpoint: wsEndpoint || ctx?.resolvedConfig.wsEndpoint,
+    headless: headless || undefined,
+    executablePath: executablePath || ctx?.resolvedConfig.executablePath,
+  });
 
-  if (reachability === 'running') {
-    throw new AxiError('Daemon 已经在运行中', 'DAEMON_ALREADY_RUNNING', [
+  // 1. 检查 Sekiro Server 是否可用
+  const invoker = ctx?.invoker ?? new SekiroInvoker({sekiroHost: cfg.sekiroHost});
+  const serverAvailable = await invoker.isServerAvailable();
+  if (!serverAvailable) {
+    throw new AxiError(
+      `Sekiro Server 不可用: ${cfg.sekiroHost}`,
+      'SEKIRO_UNAVAILABLE',
+      [
+        '请先启动 sekiro-go Server',
+        '下载地址: https://github.com/yint-tech/sekiro-go',
+        '默认启动: ./sekiro-go --port 5612',
+      ],
+    );
+  }
+
+  // 2. 检查 Worker 是否已在运行
+  const workerManager = ctx?.workerManager ?? new WorkerManager();
+  if (workerManager.isRunning()) {
+    throw new AxiError('Worker 已经在运行中', 'WORKER_ALREADY_RUNNING', [
       '如需重启，请先执行：js-reverse stop',
     ]);
   }
 
-  if (reachability === 'orphaned') {
-    const stalePid = getDaemonPid();
-    throw new AxiError(
-      `发现孤儿 daemon 进程 (PID:${stalePid})，socket 已丢失`,
-      'DAEMON_ORPHANED',
-      [`请手动 kill 该进程：kill ${stalePid}`, '然后重新执行 js-reverse start'],
-    );
+  // 3. spawn Worker 进程
+  await workerManager.start({
+    sekiroHost: cfg.sekiroHost,
+    group: cfg.group,
+    browserUrl: cfg.browserUrl,
+    wsEndpoint: cfg.wsEndpoint,
+    headless: cfg.headless,
+    executablePath: cfg.executablePath,
+  });
+
+  // 4. 等待浏览器连接（如果指定）
+  if (waitForBrowser && cfg.browserUrl) {
+    await waitForBrowserReachable(cfg.browserUrl);
   }
 
-  const daemonArgs: string[] = [];
-  if (browserUrl) daemonArgs.push('--browserUrl', browserUrl);
-  if (wsEndpoint) daemonArgs.push('--wsEndpoint', wsEndpoint);
-  if (headless) daemonArgs.push('--headless');
-  if (executablePath) daemonArgs.push('--executablePath', executablePath);
-
-  await startDaemon(daemonArgs);
-
-  if (waitForBrowser && browserUrl) {
-    await waitForBrowserReachable(browserUrl);
+  // 5. 轮询等待 Worker 注册到 Sekiro Server
+  const workerReady = await waitForWorkerRegistered(invoker, cfg.group);
+  if (!workerReady) {
+    throw new AxiError('Worker 启动后未能注册到 Sekiro Server', 'WORKER_REGISTER_TIMEOUT');
   }
 
   return successOutput({
     command: 'start',
-    message: 'Daemon 启动成功',
-    ...(http && {httpMode: true, httpPort: port}),
-    ...(waitForBrowser && browserUrl && {browserUrl, waitedForBrowser: true}),
+    message: 'Worker 启动成功，已连接到 Sekiro Server',
+    sekiroHost: cfg.sekiroHost,
+    group: cfg.group,
+    ...(waitForBrowser && cfg.browserUrl && {browserUrl: cfg.browserUrl, waitedForBrowser: true}),
   });
 };
+
+/**
+ * 等待 Worker 注册到 Sekiro Server
+ */
+async function waitForWorkerRegistered(
+  invoker: SekiroInvoker,
+  group: string,
+  maxAttempts = 20,
+): Promise<boolean> {
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      const clients = await invoker.listClients(group) as {clients?: unknown[]};
+      if (clients.clients && clients.clients.length > 0) {
+        return true;
+      }
+    } catch {
+      // ignore
+    }
+    await new Promise(r => setTimeout(r, 500));
+  }
+  return false;
+}

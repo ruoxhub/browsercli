@@ -15,7 +15,7 @@ export function toAxiError(
   if (error instanceof AxiError) return error;
   if (error instanceof Error) {
     return new AxiError(error.message, fallbackCode, [
-      'Check daemon status with "js-reverse status"',
+      'Check Worker status with "js-reverse status"',
       'Ensure browser is running with --remote-debugging-port=9222',
     ]);
   }
@@ -24,20 +24,20 @@ export function toAxiError(
 
 export function daemonError(action: string, details?: string): AxiError {
   const suggestions = [
-    'Run "js-reverse start" to launch the daemon',
-    'Check daemon logs for more details',
+    'Run "js-reverse start" to launch the Worker',
+    'Check Worker logs for more details',
   ];
   if (details) suggestions.unshift(details);
   return new AxiError(
-    `Failed to ${action}: daemon unavailable`,
-    'DAEMON_ERROR',
+    `Failed to ${action}: Worker unavailable`,
+    'WORKER_ERROR',
     suggestions,
   );
 }
 
 export function toolError(tool: string, reason: string): AxiError {
   return new AxiError(`Tool "${tool}" failed: ${reason}`, 'TOOL_ERROR', [
-    'Verify the daemon is running',
+    'Verify the Worker is running',
     'Check tool parameters are valid',
   ]);
 }

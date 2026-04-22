@@ -6,7 +6,7 @@
 
 import type {Browser, BrowserContext, Page} from 'playwright-core';
 
-import {logger} from '../logger.js';
+import {logger} from '../utils/logger.js';
 
 /**
  * SessionManager 管理多个独立的会话，每个会话有自己独占的页面集合。
@@ -98,11 +98,11 @@ export class SessionManager {
         this.ownedPageUrls.add(url);
       }
 
-      logger(
+      logger.debug(
         `[SessionManager] Tagged page for session ${this.sessionId}: ${url}`,
       );
     } catch (error) {
-      logger(`[SessionManager] Failed to tag page:`, error);
+      logger.debug(`[SessionManager] Failed to tag page:`, error);
     }
   }
 
@@ -137,11 +137,11 @@ export class SessionManager {
       const url = page.url();
       this.ownedPageUrls.delete(url);
 
-      logger(
+      logger.debug(
         `[SessionManager] Untagged page for session ${this.sessionId}: ${url}`,
       );
     } catch (error) {
-      logger(`[SessionManager] Failed to untag page:`, error);
+      logger.debug(`[SessionManager] Failed to untag page:`, error);
     }
   }
 
@@ -155,7 +155,7 @@ export class SessionManager {
       });
       return sessionId === this.sessionId;
     } catch (error) {
-      logger(`[SessionManager] Failed to check page ownership:`, error);
+      logger.debug(`[SessionManager] Failed to check page ownership:`, error);
       return false;
     }
   }
@@ -210,11 +210,11 @@ export class SessionManager {
             sessionStorage.setItem('mcp-session-id', sessionId);
           }, this.sessionId);
           this.ownedPageUrls.add(url);
-          logger(`[SessionManager] Restored tag for page: ${url}`);
+          logger.debug(`[SessionManager] Restored tag for page: ${url}`);
         }
       }
     } catch (error) {
-      logger(`[SessionManager] Failed to restore session tags:`, error);
+      logger.debug(`[SessionManager] Failed to restore session tags:`, error);
     }
   }
 

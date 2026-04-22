@@ -10,10 +10,10 @@ import type {ElementInfo, QueryDomParams, QueryDomResult} from './types.js';
 /**
  * 通过 CSS 选择器查询 DOM 元素。
  *
- * 在 Puppeteer Frame 中注入查询代码，返回匹配元素的结构化信息。
+ * 在 Playwright Frame 中注入查询代码，返回匹配元素的结构化信息。
  * 默认查询第一个匹配元素（querySelector），设置 all=true 时查询所有匹配元素。
  *
- * @param frame - Puppeteer Frame 对象，用于注入查询代码
+ * @param frame - Playwright Frame 对象，用于注入查询代码
  * @param params - 查询参数
  * @returns 结构化结果对象
  */
@@ -26,7 +26,7 @@ export async function queryDom(
 
   try {
     if (all) {
-      const elements = await frame.evaluate(queryAllCode, selector, limit);
+      const elements = await frame.evaluate(queryAllCode, {selector, limit});
       return {
         success: true,
         message: `查询到 ${elements.length} 个匹配元素：${selector}`,
@@ -100,7 +100,7 @@ function queryOneCode(selector: string): ElementInfo {
 }
 
 /** 注入代码：查询多个元素 */
-function queryAllCode(selector: string, maxLimit: number): ElementInfo[] {
+function queryAllCode({selector, limit: maxLimit}: {selector: string; limit: number}): ElementInfo[] {
   const nodeList = document.querySelectorAll(selector);
   const results: ElementInfo[] = [];
 

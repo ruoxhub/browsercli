@@ -4,14 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {RequestInitiator} from './PageCollector.js';
+import type {RequestInitiator} from './types.js';
 import type {
   Browser,
   CDPSession,
   Page,
   Protocol,
   Target,
-} from './third_party/index.js';
+} from '../../third_party/index.js';
 
 /**
  * WebSocket connection status.

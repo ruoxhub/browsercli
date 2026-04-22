@@ -10,10 +10,10 @@ import type {GetDomStructureParams, GetDomStructureResult} from './types.js';
 /**
  * 获取页面 DOM 树结构。
  *
- * 在 Puppeteer Frame 中注入遍历代码，返回指定深度的 DOM 树结构。
+ * 在 Playwright Frame 中注入遍历代码，返回指定深度的 DOM 树结构。
  * 可选包含文本内容，便于 AI 理解页面布局。
  *
- * @param frame - Puppeteer Frame 对象，用于注入遍历代码
+ * @param frame - Playwright Frame 对象，用于注入遍历代码
  * @param params - 结构参数
  * @returns 结构化结果对象
  */
@@ -26,7 +26,7 @@ export async function getDomStructure(
 
   try {
     const structure = await frame.evaluate(
-      (depth, withText) => {
+      ({depth, withText}) => {
         function buildTree(node: Element, currentDepth: number): Record<
           string,
           unknown
@@ -68,8 +68,7 @@ export async function getDomStructure(
 
         return buildTree(document.body, 0);
       },
-      maxDepth,
-      includeText,
+      {depth: maxDepth, withText: includeText},
     );
 
     return {

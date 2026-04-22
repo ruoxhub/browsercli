@@ -370,7 +370,7 @@ export namespace Protocol {
     }
   }
 
-  // Page 域 - 用于 WaitForHelper.ts 和 PageCollector.ts
+  // Page 域 - 用于 WaitForHelper.ts 和 modules/collector/PageCollector.ts
 
   export namespace Page {
     export interface FrameStartedNavigatingEvent {
@@ -380,7 +380,7 @@ export namespace Protocol {
   }
 }
 
-// Puppeteer Page 事件类型 - 用于 PageCollector.ts
+// Puppeteer Page 事件类型 - 用于 modules/collector/PageCollector.ts
 export interface PuppeteerPageEvents {
   console: unknown;
   dialog: unknown;
@@ -432,7 +432,7 @@ export namespace Common {
     }
   }
 
-  // EventTarget 类型 - 用于 PageCollector.ts
+  // EventTarget 类型 - 用于 modules/collector/PageCollector.ts
 
   export namespace EventTarget {
     export interface EventTargetEvent<T> {
@@ -469,7 +469,7 @@ export namespace I18n {
   };
 }
 
-// PageCollector 需要的类型
+// modules/collector/PageCollector 需要的类型
 export namespace PageEvents {
   export type FrameNavigated = unknown;
 }

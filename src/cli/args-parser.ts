@@ -10,6 +10,14 @@ export interface ParsedArgs {
   unknown: string[];
 }
 
+/**
+ * 判断字符串是否看起来像一个负数（而非短选项）
+ * 规则：以单个 - 开头，后面紧跟数字或 . 数字
+ */
+function isNegativeNumber(arg: string): boolean {
+  return /^-\d/.test(arg) || /^-\.\d/.test(arg);
+}
+
 export function parseArgs(rawArgs: string[]): ParsedArgs {
   const result: ParsedArgs = {
     flags: {},
@@ -22,6 +30,7 @@ export function parseArgs(rawArgs: string[]): ParsedArgs {
     const arg = rawArgs[i];
 
     if (arg.startsWith('--')) {
+      // 长选项
       const eqIndex = arg.indexOf('=');
       if (eqIndex !== -1) {
         const key = arg.slice(2, eqIndex);
@@ -37,7 +46,8 @@ export function parseArgs(rawArgs: string[]): ParsedArgs {
           result.flags[key] = true;
         }
       }
-    } else if (arg.startsWith('-') && arg.length === 2) {
+    } else if (arg.startsWith('-') && arg.length === 2 && !isNegativeNumber(arg)) {
+      // 短选项 -x
       const key = arg.slice(1);
       const next = rawArgs[i + 1];
       if (next !== undefined && !next.startsWith('-')) {
@@ -45,6 +55,12 @@ export function parseArgs(rawArgs: string[]): ParsedArgs {
         i++;
       } else {
         result.flags[key] = true;
+      }
+    } else if (arg.startsWith('-') && arg.length > 2 && !isNegativeNumber(arg)) {
+      // 组合短选项 -abc → -a -b -c
+      const letters = arg.slice(1).split('');
+      for (const letter of letters) {
+        result.flags[letter] = true;
       }
     } else {
       result.positionals.push(arg);

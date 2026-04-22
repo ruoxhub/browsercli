@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { setIssuesEnabled } from '../../../src/features.js';
+import { setIssuesEnabled } from '../../../src/utils/features.js';
 import { zod } from '../../../src/third_party/index.js';
 import { getConsoleMessage, listConsoleMessages } from '../../../src/tools/console.js';
 

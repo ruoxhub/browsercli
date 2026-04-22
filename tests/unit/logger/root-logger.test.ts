@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 
-import { logger, saveLogsToFile } from '../../../src/logger.js';
+import { logger, saveLogsToFile } from '../../../src/utils/logger.js';
 
 interface FakeWriteStream {
   write(chunk: string): boolean;
@@ -35,7 +35,7 @@ describe('root logger', () => {
     const file = path.join(dir, `log-${Date.now()}.txt`);
     const stream = saveLogsToFile(file);
 
-    logger('hello from logger test');
+    logger.debug('hello from logger test');
 
     await new Promise<void>((resolve) => {
       stream.end(() => resolve());

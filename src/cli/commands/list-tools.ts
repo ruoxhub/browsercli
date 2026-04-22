@@ -8,11 +8,12 @@ import type {AxiCliCommand} from 'axi-sdk-js';
 import type {DaemonContext} from '../types.js';
 import {tableOutput, successOutput} from '../output.js';
 import {getBoolFlag, parseArgs} from '../args-parser.js';
-import {sendCommand} from '../../daemon/client.js';
+import {SekiroInvoker} from '../sekiro-invoker.js';
+import {resolveConfig} from '../config.js';
 
 export const listToolsCommand: AxiCliCommand<DaemonContext> = async (
   args,
-  _ctx,
+  ctx,
 ) => {
   const parsed = parseArgs(args);
   const json = getBoolFlag(parsed, 'json');
@@ -21,11 +22,12 @@ export const listToolsCommand: AxiCliCommand<DaemonContext> = async (
   let isOffline = false;
 
   try {
-    const result = await sendCommand({method: 'list_tools'});
-    if (result.success && result.result) {
-      const data = JSON.parse(result.result as string);
-      tools = data.tools || [];
-    }
+    const cfg = ctx?.resolvedConfig ?? resolveConfig();
+    const invoker = ctx?.invoker ?? new SekiroInvoker({sekiroHost: cfg.sekiroHost});
+    const result = await invoker.invoke(cfg.group, '_list_tools') as {
+      tools?: Array<{name: string; description?: string}>;
+    };
+    tools = result.tools || [];
   } catch {
     isOffline = true;
   }

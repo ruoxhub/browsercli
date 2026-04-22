@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {CDPSession, Protocol} from './third_party/index.js';
+import type {CDPSession, Protocol} from '../third_party/index.js';
 
 // 类型别名，用于兼容原来的 Protocol.Debugger.XxxEvent 用法
 type ScriptParsedEvent = Protocol.ScriptParsedEvent;

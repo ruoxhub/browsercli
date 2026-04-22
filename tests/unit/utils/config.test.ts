@@ -25,7 +25,7 @@ import {
   createAIService,
   type SystemConfig,
   type AIConfig,
-} from '../../../src/utils/config.js';
+} from '../../../src/config.js';
 
 describe('Configuration Management', () => {
   // Store original environment variables
