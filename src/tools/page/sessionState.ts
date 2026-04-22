@@ -186,7 +186,7 @@ export async function saveSessionState(
     const includeLocalStorage = !!params?.includeLocalStorage;
     const includeSessionStorage = !!params?.includeSessionStorage;
 
-    const cookies = includeCookies ? await page.cookies() : [];
+    const cookies = includeCookies ? await page.context().cookies() : [];
     const localStorageData: Record<string, string> = includeLocalStorage
       ? await page.evaluate(() => {
           const items: Record<string, string> = {};
@@ -279,7 +279,7 @@ export async function restoreSessionState(
     const page = await runtime.getActivePage();
 
     if (params.navigateToSavedUrl !== false) {
-      await page.goto(snapshot.url, {waitUntil: 'networkidle2'});
+      await page.goto(snapshot.url, {waitUntil: 'networkidle'});
     }
 
     if (params.clearStorageBeforeRestore === true) {
@@ -287,33 +287,35 @@ export async function restoreSessionState(
         window.localStorage.clear();
         window.sessionStorage.clear();
       });
-      const existingCookies = await page.cookies();
-      await page.deleteCookie(...existingCookies);
+      const existingCookies = await page.context().cookies();
+      // Playwright: clearCookies with name/domain filter, or clear all
+      await page.context().clearCookies();
     }
 
     if (snapshot.cookies.length > 0) {
-      await page.setCookie(
-        ...(snapshot.cookies as unknown as Array<
-          Parameters<typeof page.setCookie>[0]
-        >),
-      );
+      // Playwright: addCookies expects array of {name, value, domain?, path?, ...}
+      const cookiesToAdd = snapshot.cookies.map((c: Record<string, unknown>) => ({
+        name: c.name as string,
+        value: c.value as string,
+        domain: c.domain as string | undefined,
+        path: c.path as string | undefined,
+      }));
+      await page.context().addCookies(cookiesToAdd);
     }
     for (const [key, value] of Object.entries(snapshot.localStorage)) {
       await page.evaluate(
-        (k, v) => {
+        ({k, v}: {k: string; v: string}) => {
           window.localStorage.setItem(k, v);
         },
-        key,
-        value,
+        {k: key, v: value},
       );
     }
     for (const [key, value] of Object.entries(snapshot.sessionStorage)) {
       await page.evaluate(
-        (k, v) => {
+        ({k, v}: {k: string; v: string}) => {
           window.sessionStorage.setItem(k, v);
         },
-        key,
-        value,
+        {k: key, v: value},
       );
     }
 

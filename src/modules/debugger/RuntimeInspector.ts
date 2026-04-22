@@ -20,7 +20,7 @@
  * - 提供友好的数据格式化
  */
 
-import type {CDPSession} from 'puppeteer';
+import type {CDPSession} from '../../third_party/index.js';
 
 import {logger} from '../../utils/logger.js';
 import type {CodeCollector} from '../collector/CodeCollector.js';
@@ -93,8 +93,8 @@ export class RuntimeInspector {
 
     try {
       const page = await this.collector.getActivePage();
-      // ✅ 修复：使用新的API，避免弃用警告
-      this.cdpSession = await page.createCDPSession();
+      // Playwright: createCDPSession is on BrowserContext, not Page
+      this.cdpSession = await page.context().newCDPSession(page);
 
       // 启用Runtime域
       await this.cdpSession.send('Runtime.enable');

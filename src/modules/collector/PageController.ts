@@ -5,10 +5,10 @@
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /**
- * 页面控制器 - 薄封装Puppeteer API
+ * 页面控制器 - 薄封装Playwright API
  *
  * 设计原则:
- * - 不重复实现Puppeteer已有的功能
+ * - 不重复实现Playwright已有的功能
  * - 直接调用page.click(), page.type()等API
  * - 依赖CodeCollector获取Page实例
  * - 所有方法都是薄封装，不超过5行代码
@@ -22,7 +22,7 @@ import {logger} from '../../utils/logger.js';
 import type {CodeCollector} from './CodeCollector.js';
 
 export interface NavigationOptions {
-  waitUntil?: 'load' | 'domcontentloaded' | 'networkidle0' | 'networkidle2';
+  waitUntil?: 'load' | 'domcontentloaded' | 'networkidle' | 'commit';
   timeout?: number;
 }
 
@@ -86,7 +86,7 @@ export class PageController {
     const startTime = Date.now();
 
     await page.goto(url, {
-      waitUntil: options?.waitUntil || 'networkidle2',
+      waitUntil: options?.waitUntil || 'networkidle',
       timeout: options?.timeout || 30000,
     });
 
@@ -109,7 +109,7 @@ export class PageController {
   async reload(options?: NavigationOptions): Promise<void> {
     const page = await this.collector.getActivePage();
     await page.reload({
-      waitUntil: options?.waitUntil || 'networkidle2',
+      waitUntil: options?.waitUntil || 'networkidle',
       timeout: options?.timeout || 30000,
     });
     logger.info('Page reloaded');
@@ -157,7 +157,7 @@ export class PageController {
     text: string;
   }> {
     const page = await this.collector.getActivePage();
-    const client = await page.createCDPSession();
+    const client = await page.context().newCDPSession(page);
 
     // 获取元素坐标
     const coords = await page.evaluate(sel => {
@@ -207,7 +207,7 @@ export class PageController {
     files: number;
   }> {
     const page = await this.collector.getActivePage();
-    const client = await page.createCDPSession();
+    const client = await page.context().newCDPSession(page);
 
     // 启用 DOM 域
     await client.send('DOM.enable', {});
@@ -251,11 +251,12 @@ export class PageController {
   }
 
   /**
-   * 选择下拉框选项（薄封装page.select）
+   * 选择下拉框选项（薄封装page.selectOption）
+   * Playwright: page.select() → page.selectOption()
    */
   async select(selector: string, ...values: string[]): Promise<void> {
     const page = await this.collector.getActivePage();
-    await page.select(selector, ...values);
+    await page.selectOption(selector, values);
     logger.info(`Selected in ${selector}: ${values.join(', ')}`);
   }
 
@@ -290,7 +291,7 @@ export class PageController {
   ): Promise<string> {
     const page = await this.collector.getActivePage();
     const result = await page.evaluate(
-      (dir, px) => {
+      ({dir, px}: {dir: string; px: number}) => {
         switch (dir) {
           case 'top':
             window.scrollTo(0, 0);
@@ -306,8 +307,7 @@ export class PageController {
             return `scrolled down ${Math.abs(px)}px`;
         }
       },
-      direction,
-      pixels,
+      {dir: direction, px: pixels},
     );
 
     // 等待懒加载触发（800ms 与 web-access 一致）
@@ -378,7 +378,7 @@ export class PageController {
   async waitForNavigation(timeout?: number): Promise<void> {
     const page = await this.collector.getActivePage();
     await page.waitForNavigation({
-      waitUntil: 'networkidle2',
+      waitUntil: 'networkidle',
       timeout: timeout || 30000,
     });
     logger.info('Navigation completed');
@@ -471,14 +471,13 @@ export class PageController {
   async seekVideo(selector: string, time: number): Promise<void> {
     const page = await this.collector.getActivePage();
     await page.evaluate(
-      (sel, t) => {
+      ({sel, t}: {sel: string; t: number}) => {
         const video = document.querySelector(sel) as HTMLVideoElement;
         if (video) {
           video.currentTime = t;
         }
       },
-      selector,
-      time,
+      {sel: selector, t: time},
     );
     logger.info(`Video seeked to ${time}s: ${selector}`);
   }
@@ -629,7 +628,8 @@ export class PageController {
   async injectScriptOnNewDocument(scriptContent: string): Promise<void> {
     const page = await this.collector.getActivePage();
 
-    await page.evaluateOnNewDocument(script => {
+    // Playwright: addInitScript replaces evaluateOnNewDocument
+    await page.addInitScript(script => {
       // Run script directly in the new document context.
       // This avoids relying on DOM readiness (head/body may not exist yet)
       // and is more reliable than appending an inline <script> element.
@@ -642,6 +642,7 @@ export class PageController {
 
   /**
    * 🆕 设置Cookie
+   * Playwright: page.setCookie → page.context().addCookies()
    */
   async setCookies(
     cookies: Array<{
@@ -656,41 +657,44 @@ export class PageController {
     }>,
   ): Promise<void> {
     const page = await this.collector.getActivePage();
-    await page.setCookie(...cookies);
+    await page.context().addCookies(cookies);
     logger.info(`Set ${cookies.length} cookies`);
   }
 
   /**
    * 🆕 获取Cookie
+   * Playwright: page.cookies() → page.context().cookies()
    */
   async getCookies(): Promise<any[]> {
     const page = await this.collector.getActivePage();
-    const cookies = await page.cookies();
+    const cookies = await page.context().cookies();
     logger.info(`Retrieved ${cookies.length} cookies`);
     return cookies;
   }
 
   /**
    * 🆕 清除Cookie
+   * Playwright: page.deleteCookie → page.context().clearCookies()
    */
   async clearCookies(): Promise<void> {
     const page = await this.collector.getActivePage();
-    const cookies = await page.cookies();
-    await page.deleteCookie(...cookies);
+    await page.context().clearCookies();
     logger.info('All cookies cleared');
   }
 
   /**
    * 🆕 设置视口大小
+   * Playwright: page.setViewport() → page.setViewportSize()
    */
   async setViewport(width: number, height: number): Promise<void> {
     const page = await this.collector.getActivePage();
-    await page.setViewport({width, height});
+    await page.setViewportSize({width, height});
     logger.info(`Viewport set to ${width}x${height}`);
   }
 
   /**
    * 🆕 模拟设备
+   * Playwright: setUserAgent via CDP, setViewport via setViewportSize
    */
   async emulateDevice(
     deviceName: 'iPhone' | 'iPad' | 'Android',
@@ -699,25 +703,30 @@ export class PageController {
 
     const devices = {
       iPhone: {
-        viewport: {width: 375, height: 812, isMobile: true},
+        viewport: {width: 375, height: 812},
         userAgent:
           'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15',
       },
       iPad: {
-        viewport: {width: 768, height: 1024, isMobile: true},
+        viewport: {width: 768, height: 1024},
         userAgent:
           'Mozilla/5.0 (iPad; CPU OS 14_0 like Mac OS X) AppleWebKit/605.1.15',
       },
       Android: {
-        viewport: {width: 360, height: 640, isMobile: true},
+        viewport: {width: 360, height: 640},
         userAgent:
           'Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 Chrome/91.0.4472.120',
       },
     };
 
     const device = devices[deviceName];
-    await page.setViewport(device.viewport);
-    await page.setUserAgent(device.userAgent);
+    await page.setViewportSize(device.viewport);
+
+    // Playwright: setUserAgent via CDP
+    const client = await page.context().newCDPSession(page);
+    await client.send('Network.setUserAgentOverride', {
+      userAgent: device.userAgent,
+    });
 
     logger.info(`Emulating ${deviceName}`);
   }
@@ -727,7 +736,8 @@ export class PageController {
    */
   async waitForNetworkIdle(timeout = 30000): Promise<void> {
     const page = await this.collector.getActivePage();
-    await page.waitForNetworkIdle({timeout});
+    // Playwright: use waitForURL with networkidle instead of waitForNetworkIdle
+    await page.waitForURL('**', {waitUntil: 'networkidle', timeout});
     logger.info('Network is idle');
   }
 
@@ -759,11 +769,10 @@ export class PageController {
     const page = await this.collector.getActivePage();
 
     await page.evaluate(
-      (k, v) => {
+      ({k, v}: {k: string; v: string}) => {
         localStorage.setItem(k, v);
       },
-      key,
-      value,
+      {k: key, v: value},
     );
 
     logger.info(`Set localStorage: ${key}`);
@@ -809,11 +818,10 @@ export class PageController {
   async setSessionStorage(key: string, value: string): Promise<void> {
     const page = await this.collector.getActivePage();
     await page.evaluate(
-      (k, v) => {
+      ({k, v}: {k: string; v: string}) => {
         sessionStorage.setItem(k, v);
       },
-      key,
-      value,
+      {k: key, v: value},
     );
     logger.info(`Set sessionStorage: ${key}`);
   }
@@ -840,6 +848,7 @@ export class PageController {
 
   /**
    * 🆕 上传文件
+   * Playwright: element.uploadFile() → element.setInputFiles()
    */
   async uploadFile(selector: string, filePath: string): Promise<void> {
     const page = await this.collector.getActivePage();
@@ -849,7 +858,7 @@ export class PageController {
       throw new Error(`File input not found: ${selector}`);
     }
 
-    await (input as any).uploadFile(filePath);
+    await input.setInputFiles(filePath);
     logger.info(`File uploaded: ${filePath}`);
   }
 

@@ -17,7 +17,7 @@
  * - 支持自定义模式
  */
 
-import type {CDPSession} from 'puppeteer';
+import type {CDPSession} from '../../third_party/index.js';
 
 import {logger} from '../../utils/logger.js';
 

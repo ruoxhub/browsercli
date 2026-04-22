@@ -17,7 +17,7 @@
  * - 提供断点命中统计
  */
 
-import type {CDPSession} from 'puppeteer';
+import type {CDPSession} from '../../third_party/index.js';
 
 import {logger} from '../../utils/logger.js';
 

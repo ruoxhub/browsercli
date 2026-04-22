@@ -22,7 +22,7 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 
-import type {CDPSession} from 'puppeteer';
+import type {CDPSession} from '../../third_party/index.js';
 
 import type {
   ScopeVariable,
@@ -220,8 +220,8 @@ export class DebuggerManager {
 
     try {
       const page = await this.collector.getActivePage();
-      // ✅ 修复：使用新的API，避免弃用警告
-      this.cdpSession = await page.createCDPSession();
+      // Playwright: createCDPSession is on BrowserContext, not Page
+      this.cdpSession = await page.context().newCDPSession(page);
 
       // 启用Debugger域
       await this.cdpSession.send('Debugger.enable');

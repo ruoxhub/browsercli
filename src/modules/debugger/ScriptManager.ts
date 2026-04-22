@@ -18,7 +18,7 @@
  * - 依赖CodeCollector获取Page实例
  */
 
-import type {CDPSession} from 'puppeteer';
+import type {CDPSession} from '../../third_party/index.js';
 
 import {logger} from '../../utils/logger.js';
 import type {CodeCollector} from '../collector/CodeCollector.js';
@@ -82,7 +82,7 @@ export class ScriptManager {
 
     // 🆕 移除冗余检查（initialized 为 true 时 cdpSession 一定不为 null）
     const page = await this.collector.getActivePage();
-    this.cdpSession = await page.createCDPSession();
+    this.cdpSession = await page.context().newCDPSession(page);
 
     // 启用Debugger域
     await this.cdpSession.send('Debugger.enable');

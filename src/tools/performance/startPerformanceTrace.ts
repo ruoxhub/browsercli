@@ -9,7 +9,7 @@ import type {PerformanceRuntimeServices, StartPerformanceTraceResult} from './ty
 /**
  * 在指定页面上启动性能追踪录制（纯函数版本）。
  *
- * 启动 Chrome Tracing，可配置是否自动重新加载页面和自动停止。
+ * 通过 CDP Tracing.start 启动 Chrome Tracing，可配置是否自动重新加载页面和自动停止。
  * 追踪数据用于分析页面性能问题和 Core Web Vitals。
  *
  * @param runtime - Performance 运行时服务
@@ -37,7 +37,7 @@ export async function startPerformanceTrace(
     const pageUrlForTracing = page.url();
 
     if (params.reload) {
-      await page.goto('about:blank', {waitUntil: ['networkidle0']});
+      await page.goto('about:blank', {waitUntil: 'networkidle'});
     }
 
     // 与 DevTools / Lighthouse 保持同步的 trace categories
@@ -59,17 +59,33 @@ export async function startPerformanceTrace(
       'v8.execute',
       'v8',
     ];
-    await page.tracing.start({categories});
+
+    // Playwright: use CDP Tracing.start instead of page.tracing.start
+    const client = await page.context().newCDPSession(page);
+    await client.send('Tracing.start', {
+      traceConfig: {
+        includedCategories: categories.filter(c => !c.startsWith('-')),
+        excludedCategories: categories.filter(c => c.startsWith('-')).map(c => c.slice(1)),
+      },
+    });
 
     if (params.reload) {
-      await page.goto(pageUrlForTracing, {waitUntil: ['load']});
+      await page.goto(pageUrlForTracing, {waitUntil: 'load'});
     }
 
     if (params.autoStop) {
       await new Promise(resolve => setTimeout(resolve, 5_000));
       // 动态导入避免循环依赖
       const {stopPerformanceTrace} = await import('./stopPerformanceTrace.js');
-      return stopPerformanceTrace(runtime);
+      const stopResult = await stopPerformanceTrace(runtime);
+      // Map stop result to start result format
+      return {
+        success: stopResult.success,
+        message: stopResult.message,
+        tooltype: 'start_performance_trace',
+        logFormat: stopResult.logFormat,
+        data: stopResult.data as any,
+      };
     }
 
     return {

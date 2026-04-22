@@ -25,6 +25,8 @@ export async function typeText(
 ): Promise<TypeTextResult> {
   try {
     const page = await runtime.getActivePage();
+    // Playwright: page.type(selector, text, options) - compatible
+    // But prefer page.fill() for direct input, page.type() for char-by-char
     await page.type(params.selector, params.text, {
       delay: params.delay,
     });

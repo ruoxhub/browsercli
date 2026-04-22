@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @license
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
@@ -12,7 +12,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import type {Page} from 'puppeteer';
+import type {Page} from '../../third_party/index.js';
 
 import {logger} from '../../logger.js';
 
@@ -501,7 +501,7 @@ export class StealthScripts2025 {
 
   /** 1. 隐藏 webdriver 属性 */
   static async hideWebDriver(page: Page): Promise<void> {
-    await page.evaluateOnNewDocument(() => {
+    await page.addInitScript(() => {
       // 删除 webdriver 属性
       Object.defineProperty(navigator, 'webdriver', {
         get: () => undefined,
@@ -532,7 +532,7 @@ export class StealthScripts2025 {
 
   /** 2. 模拟 chrome 对象 */
   static async mockChrome(page: Page): Promise<void> {
-    await page.evaluateOnNewDocument(() => {
+    await page.addInitScript(() => {
       /* eslint-disable @typescript-eslint/no-explicit-any */
       const w = window as any;
       if (!w.chrome) {
@@ -615,16 +615,22 @@ export class StealthScripts2025 {
     const memory = options.deviceMemory;
     const touchPoints = options.maxTouchPoints ?? 0;
 
-    await page.setUserAgent(ua);
+    // Playwright: setUserAgent not available on Page, use CDP
+    const client = await page.context().newCDPSession(page);
+    await client.send('Network.setUserAgentOverride', {
+      userAgent: ua,
+    });
 
-    await page.evaluateOnNewDocument(
+    await page.addInitScript(
       (
-        uaStr: string,
-        plat: string,
-        vend: string,
-        cores: number,
-        mem: number | null,
-        touch: number,
+        {uaStr, plat, vend, cores, mem, touch}: {
+          uaStr: string;
+          plat: string;
+          vend: string;
+          cores: number;
+          mem: number | null;
+          touch: number;
+        },
       ) => {
         Object.defineProperty(navigator, 'userAgent', {get: () => uaStr});
         Object.defineProperty(navigator, 'platform', {get: () => plat});
@@ -644,18 +650,13 @@ export class StealthScripts2025 {
           Object.defineProperty(navigator, 'deviceMemory', {get: () => mem});
         }
       },
-      ua,
-      platform,
-      vendor,
-      concurrency,
-      memory ?? null,
-      touchPoints,
+      {uaStr: ua, plat: platform, vend: vendor, cores: concurrency, mem: memory ?? null, touch: touchPoints},
     );
   }
 
   /** 4. 修复 Permissions API */
   static async fixPermissions(page: Page): Promise<void> {
-    await page.evaluateOnNewDocument(() => {
+    await page.addInitScript(() => {
       const originalQuery = window.navigator.permissions.query;
       window.navigator.permissions.query = function (
         parameters: PermissionDescriptor,
@@ -688,7 +689,7 @@ export class StealthScripts2025 {
         ? options.plugins
         : DEFAULT_PLUGINS;
 
-    await page.evaluateOnNewDocument((pluginPayload: PluginConfig[]) => {
+    await page.addInitScript((pluginPayload: PluginConfig[]) => {
       /* eslint-disable @typescript-eslint/no-explicit-any */
       Object.defineProperty(navigator, 'plugins', {
         get: () => {
@@ -729,7 +730,7 @@ export class StealthScripts2025 {
 
   /** 6. Canvas 指纹噪声（每个会话随机种子） */
   static async mockCanvas(page: Page): Promise<void> {
-    await page.evaluateOnNewDocument(() => {
+    await page.addInitScript(() => {
       // 生成会话级随机种子
       const seed = Math.floor(Math.random() * 256);
 
@@ -806,8 +807,8 @@ export class StealthScripts2025 {
     const vendor = options.webglVendor ?? 'Intel Inc.';
     const renderer = options.webglRenderer ?? 'Intel(R) UHD Graphics 770';
 
-    await page.evaluateOnNewDocument(
-      (v: string, r: string) => {
+    await page.addInitScript(
+      ({v, r}: {v: string; r: string}) => {
         const VENDOR_PARAM = 0x9245; // UNMASKED_VENDOR_WEBGL
         const RENDERER_PARAM = 0x9246; // UNMASKED_RENDERER_WEBGL
 
@@ -829,14 +830,13 @@ export class StealthScripts2025 {
           };
         }
       },
-      vendor,
-      renderer,
+      {v: vendor, r: renderer},
     );
   }
 
   /** 8. AudioContext 指纹噪声 */
   static async mockAudioContext(page: Page): Promise<void> {
-    await page.evaluateOnNewDocument(() => {
+    await page.addInitScript(() => {
       const noiseSeed = Math.random() * 0.0001;
 
       if (typeof OfflineAudioContext !== 'undefined') {
@@ -874,7 +874,7 @@ export class StealthScripts2025 {
         ? options.languages
         : ['en-US', 'en'];
 
-    await page.evaluateOnNewDocument((langs: string[]) => {
+    await page.addInitScript((langs: string[]) => {
       Object.defineProperty(navigator, 'languages', {
         get: () => Object.freeze([...langs]),
       });
@@ -892,8 +892,8 @@ export class StealthScripts2025 {
       level: 0.87 + Math.random() * 0.12,
     };
 
-    await page.evaluateOnNewDocument(
-      (charging: boolean, level: number) => {
+    await page.addInitScript(
+      ({charging, level}: {charging: boolean; level: number}) => {
         /* eslint-disable @typescript-eslint/no-explicit-any */
         (navigator as any).getBattery = () =>
           Promise.resolve({
@@ -915,8 +915,7 @@ export class StealthScripts2025 {
           });
         /* eslint-enable */
       },
-      battery.charging,
-      battery.level,
+      {charging: battery.charging, level: battery.level},
     );
   }
 
@@ -931,7 +930,7 @@ export class StealthScripts2025 {
       speakers: options.mediaDevices?.speakers ?? 1,
     };
 
-    await page.evaluateOnNewDocument(
+    await page.addInitScript(
       (c: {audioInputs: number; videoInputs: number; speakers: number}) => {
         if (
           navigator.mediaDevices &&
@@ -974,7 +973,7 @@ export class StealthScripts2025 {
 
   /** 12. Notification API */
   static async mockNotifications(page: Page): Promise<void> {
-    await page.evaluateOnNewDocument(() => {
+    await page.addInitScript(() => {
       Object.defineProperty(Notification, 'permission', {get: () => 'default'});
       Notification.requestPermission = (...args: unknown[]) => {
         if (typeof args[0] === 'function') {
@@ -997,7 +996,7 @@ export class StealthScripts2025 {
       saveData: false,
     };
 
-    await page.evaluateOnNewDocument((c: ConnectionConfig) => {
+    await page.addInitScript((c: ConnectionConfig) => {
       if (!('connection' in navigator)) {
         Object.defineProperty(navigator, 'connection', {
           get: () => ({
@@ -1022,7 +1021,7 @@ export class StealthScripts2025 {
 
   /** 14. document.hasFocus() 覆盖 */
   static async mockFocus(page: Page): Promise<void> {
-    await page.evaluateOnNewDocument(() => {
+    await page.addInitScript(() => {
       Document.prototype.hasFocus = function () {
         return true;
       };
@@ -1035,7 +1034,7 @@ export class StealthScripts2025 {
 
   /** 15. performance.now() 微量噪声（默认关闭，开启可能影响调试精度） */
   static async mockPerformanceNow(page: Page): Promise<void> {
-    await page.evaluateOnNewDocument(() => {
+    await page.addInitScript(() => {
       const _now = performance.now.bind(performance);
       performance.now = function () {
         return _now() + Math.random() * 0.05;
@@ -1060,7 +1059,7 @@ export class StealthScripts2025 {
       pixelDepth: s.pixelDepth ?? s.colorDepth ?? 24,
     };
 
-    await page.evaluateOnNewDocument(
+    await page.addInitScript(
       (sc: {
         width: number;
         height: number;

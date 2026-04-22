@@ -16,7 +16,7 @@ export async function setFiles(
   const page = frame.page();
 
   try {
-    const client = await page.createCDPSession();
+    const client = await page.context().newCDPSession(page);
 
     await client.send('DOM.enable', {});
 

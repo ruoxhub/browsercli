@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Page} from 'puppeteer';
+import type {Page} from '../../third_party/index.js';
 
 import type {StealthInjectionOptions, StealthPreset, StealthReport} from '../../modules/stealth/StealthScripts2025.js';
 import {StealthScripts2025} from '../../modules/stealth/StealthScripts2025.js';
@@ -43,7 +43,7 @@ export interface SetUserAgentResult extends StealthResult {
 /**
  * 注入反检测隐身脚本。
  *
- * @param page - Puppeteer Page 对象
+ * @param page - Playwright Page 对象
  * @param preset - 平台预设名称
  * @returns 结构化结果对象
  */
@@ -116,7 +116,7 @@ export function listStealthFeatures(): ListFeaturesResult {
 /**
  * 设置自定义 User-Agent。
  *
- * @param page - Puppeteer Page 对象
+ * @param page - Playwright Page 对象
  * @param userAgent - 自定义 UA 字符串
  * @returns 结构化结果对象
  */
@@ -125,7 +125,11 @@ export async function setUserAgent(
   userAgent: string,
 ): Promise<SetUserAgentResult> {
   try {
-    await page.setUserAgent(userAgent);
+    // Playwright: setUserAgent is not available on Page, use CDP
+    const client = await page.context().newCDPSession(page);
+    await client.send('Network.setUserAgentOverride', {
+      userAgent,
+    });
     return {
       success: true,
       message: 'User-Agent updated.',

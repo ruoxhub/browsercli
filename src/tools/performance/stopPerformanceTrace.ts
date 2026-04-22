@@ -19,7 +19,7 @@ import type {
 /**
  * 停止当前页面的性能追踪录制并分析结果（纯函数版本）。
  *
- * 停止 Chrome Tracing，解析追踪数据并生成摘要。
+ * 通过 CDP Tracing.end 停止 Chrome Tracing，收集追踪数据并解析生成摘要。
  * 如果追踪数据解析成功，会自动存储结果供后续 Insight 分析。
  *
  * @param runtime - Performance 运行时服务
@@ -41,7 +41,31 @@ export async function stopPerformanceTrace(
 
   try {
     const page = await runtime.getActivePage();
-    const traceEventsBuffer = await page.tracing.stop();
+
+    // Playwright: use CDP to stop tracing and collect data
+    const client = await page.context().newCDPSession(page);
+
+    // Collect trace data via CDP events
+    const traceChunks: string[] = [];
+    const dataHandler = (event: {value: string}) => {
+      traceChunks.push(event.value);
+    };
+    client.on('Tracing.tracingComplete', () => {});
+    client.on('Tracing.dataCollected', dataHandler as any);
+
+    await client.send('Tracing.end');
+
+    // Wait for tracingComplete event
+    await new Promise<void>(resolve => {
+      client.on('Tracing.tracingComplete', () => resolve());
+      // Timeout fallback
+      setTimeout(resolve, 5000);
+    });
+
+    client.off('Tracing.dataCollected', dataHandler as any);
+
+    const traceEventsBuffer = Buffer.from(traceChunks.join(''));
+
     const result = await parseRawTraceBuffer(traceEventsBuffer);
 
     if (traceResultIsSuccess(result)) {

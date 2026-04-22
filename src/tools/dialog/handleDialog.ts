@@ -10,11 +10,11 @@ import type {DialogAction, DialogResult, HandleDialogParams} from './types.js';
 /**
  * 处理浏览器弹窗（alert/confirm/prompt）。
  *
- * 在 Puppeteer Page 上监听 dialog 事件，自动捕获弹窗对象后执行 accept 或 dismiss。
+ * 在 Playwright Page 上监听 dialog 事件，自动捕获弹窗对象后执行 accept 或 dismiss。
  * 调用方需要在触发弹窗的页面操作之前注册此函数，
  * 或在弹窗已存在时直接传入已捕获的 Dialog 对象。
  *
- * @param page - Puppeteer Page 对象
+ * @param page - Playwright Page 对象
  * @param params - 处理参数 { action, promptText? }
  * @returns 结构化结果对象
  */
@@ -69,11 +69,11 @@ export async function handleDialog(
  * 此函数设置一次性监听器，等待最多 5 秒获取 dialog；
  * 如果页面已有 dialog 上下文则立即返回。
  */
-async function waitForDialog(page: Page, timeoutMs = 5000): Promise<import('puppeteer-core').Dialog | null> {
+async function waitForDialog(page: Page, timeoutMs = 5000): Promise<import('playwright-core').Dialog | null> {
   return new Promise((resolve) => {
     let settled = false;
 
-    const handler = (dialog: import('puppeteer-core').Dialog) => {
+    const handler = (dialog: import('playwright-core').Dialog) => {
       if (!settled) {
         settled = true;
         page.off('dialog', handler);

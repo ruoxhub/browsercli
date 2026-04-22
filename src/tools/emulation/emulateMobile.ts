@@ -59,10 +59,12 @@ const DESKTOP_VIEWPORT = {
 /**
  * 一键切换移动设备模式（viewport + user-agent + touch）。
  *
- * 在 Puppeteer Frame 对应的 Page 上模拟移动设备视口、
+ * 在 Playwright Frame 对应的 Page 上模拟移动设备视口、
  * User-Agent 和触摸事件，或恢复桌面模式。
+ * Playwright 不支持 page 级别的 setUserAgent/setViewport 完整参数，
+ * 因此使用 CDP 设置 UA，setViewportSize 设置视口尺寸。
  *
- * @param frame - Puppeteer Frame 对象，用于获取 Page 并设置设备模拟
+ * @param frame - Playwright Frame 对象，用于获取 Page 并设置设备模拟
  * @param params - 移动设备模拟参数
  * @returns 结构化结果对象
  */
@@ -85,9 +87,17 @@ export async function emulateMobile(
         };
       }
 
-      await page.setViewport(profile.viewport);
-      await page.setUserAgent(profile.userAgent);
-      await page.setJavaScriptEnabled(true);
+      // Playwright: setViewportSize only supports width/height
+      await page.setViewportSize({
+        width: profile.viewport.width,
+        height: profile.viewport.height,
+      });
+
+      // Playwright: setUserAgent is not available on Page, use CDP
+      const client = await page.context().newCDPSession(page);
+      await client.send('Network.setUserAgentOverride', {
+        userAgent: profile.userAgent,
+      });
 
       return {
         success: true,
@@ -106,8 +116,16 @@ export async function emulateMobile(
     }
 
     // 关闭移动模拟，恢复桌面模式
-    await page.setViewport(DESKTOP_VIEWPORT);
-    await page.setUserAgent('');
+    await page.setViewportSize({
+      width: DESKTOP_VIEWPORT.width,
+      height: DESKTOP_VIEWPORT.height,
+    });
+
+    // Reset UA via CDP (empty string resets to default)
+    const client = await page.context().newCDPSession(page);
+    await client.send('Network.setUserAgentOverride', {
+      userAgent: '',
+    });
 
     return {
       success: true,

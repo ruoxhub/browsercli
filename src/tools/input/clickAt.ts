@@ -16,7 +16,7 @@ export async function clickAt(
   const page = frame.page();
 
   try {
-    const client = await page.createCDPSession();
+    const client = await page.context().newCDPSession(page);
 
     const coords = await page.evaluate(sel => {
       const el = document.querySelector(sel);

@@ -13,30 +13,135 @@ export {hideBin} from 'yargs/helpers';
 export {default as debug} from 'debug';
 export type {Debugger} from 'debug';
 export {z as zod} from 'zod';
-export type {Connection, CDPSession, Target} from 'puppeteer-core';
 
-// MCP SDK
-export {Client} from '@modelcontextprotocol/sdk/client/index.js';
-export {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
+// ─── Playwright exports (replaces Puppeteer) ───
+// Re-export commonly used Playwright types for the rest of the codebase.
+// All downstream code should import from this barrel file, not from 'playwright-core' directly.
+
+// Import types that are also used locally in this file
+import type {
+  CDPSession as PlaywrightCDPSession,
+} from 'playwright-core';
+
+// Re-export all Playwright types for downstream consumers
 export type {
-  CallToolResult,
-  ImageContent,
-  TextContent,
-} from '@modelcontextprotocol/sdk/types.js';
-export type ResourceType = string;
+  Browser,
+  BrowserContext,
+  Page,
+  Frame,
+  CDPSession,
+  JSHandle,
+  ElementHandle,
+  ConsoleMessage,
+  Dialog,
+  Download,
+  FileChooser,
+  Keyboard,
+  Mouse,
+  Touchscreen,
+  Request,
+  Response,
+  Route,
+  WebSocket as PlaywrightWebSocket,
+  Worker,
+  BrowserType,
+  Selectors,
+} from 'playwright-core';
 
-// Puppeteer exports - 使用真实类型，不手写接口
-export {
-  Locator,
-  PredefinedNetworkConditions,
-  CDPSessionEvent,
-} from 'puppeteer-core';
-export {default as puppeteer} from 'puppeteer-core';
-export type * from 'puppeteer-core';
-export type {Page as CdpPage} from 'puppeteer-core';
-export {PipeTransport} from 'puppeteer-core/internal/node/PipeTransport.js';
+// Re-export the chromium instance creator
+export {chromium, firefox, webkit} from 'playwright-core';
 
-// DevTools CDP 连接类型
+// CDP-specific types - Playwright uses CDPSession differently from Puppeteer
+// We map Puppeteer concepts to Playwright equivalents where possible.
+
+// ─── Type aliases for backward compatibility ───
+// Puppeteer used 'Target' which doesn't exist in Playwright.
+// In Playwright, browser targets are accessed via BrowserContext.
+// We provide a minimal Target-like interface for compatibility.
+
+export interface Target {
+  url(): string;
+  type(): string;
+}
+
+// Puppeteer's Connection type - not directly available in Playwright.
+// We provide a minimal interface for the DevToolsConnectionAdapter.
+export interface Connection {
+  session(sessionId: string): PlaywrightCDPSession | null;
+}
+
+// Puppeteer's ChromeReleaseChannel - Playwright uses string channel names directly
+export type ChromeReleaseChannel =
+  | 'chrome'
+  | 'chrome-beta'
+  | 'chrome-dev'
+  | 'chrome-canary'
+  | 'msedge'
+  | 'msedge-beta'
+  | 'msedge-dev'
+  | 'msedge-canary';
+
+// Puppeteer's LaunchOptions - map to Playwright's launch options
+export interface LaunchOptions {
+  channel?: ChromeReleaseChannel;
+  executablePath?: string;
+  headless?: boolean;
+  args?: string[];
+  userDataDir?: string;
+  ignoreDefaultArgs?: string[] | boolean;
+  acceptInsecureCerts?: boolean;
+  defaultViewport?: null;
+  pipe?: boolean;
+  handleDevToolsAsPage?: boolean;
+  targetFilter?: (target: Target) => boolean;
+  ignoreHTTPSErrors?: boolean;
+}
+
+// Puppeteer's CDPSessionEvent - Playwright doesn't have this enum.
+// We provide the event names as constants.
+export const CDPSessionEvent = {
+  SessionAttached: 'sessionattached',
+  SessionDetached: 'sessiondetached',
+  Disconnected: 'disconnected',
+} as const;
+
+export type CDPSessionEventType = (typeof CDPSessionEvent)[keyof typeof CDPSessionEvent];
+
+// Puppeteer's PredefinedNetworkConditions - not in Playwright.
+// We provide the common presets.
+export const PredefinedNetworkConditions = {
+  'Slow 3G': {
+    offline: false,
+    downloadThroughput: 50 * 1024 / 8,
+    uploadThroughput: 50 * 1024 / 8,
+    latency: 2000,
+  },
+  'Fast 3G': {
+    offline: false,
+    downloadThroughput: 1.6 * 1024 * 1024 / 8,
+    uploadThroughput: 750 * 1024 / 8,
+    latency: 562.5,
+  },
+} as const;
+
+// Puppeteer's Locator - Playwright has its own Locator type
+export type {Locator} from 'playwright-core';
+
+// Puppeteer's HTTPRequest/HTTPResponse - map to Playwright's Request/Response
+export type {Request as HTTPRequest, Response as HTTPResponse} from 'playwright-core';
+
+// ResourceType - Playwright uses string union type
+export type ResourceType = 'document' | 'stylesheet' | 'image' | 'media' | 'font' | 'script' | 'texttrack' | 'xhr' | 'fetch' | 'eventsource' | 'websocket' | 'manifest' | 'signedexchange' | 'ping' | 'cspviolationreport' | 'preflight' | 'other';
+
+// PipeTransport - not available in Playwright, provide stub
+export const PipeTransport = class PipeTransport {
+  // Stub - Playwright uses different transport mechanisms
+};
+
+// CdpPage type alias for backward compatibility
+export type {Page as CdpPage} from 'playwright-core';
+
+// ─── DevTools CDP 连接类型 ───
 export type CDPCommand = string;
 export interface CDPError {
   code: number;

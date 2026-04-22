@@ -4,11 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Browser, Page} from 'puppeteer';
+import type {Browser, BrowserContext, Page} from 'playwright-core';
 
-import {debug} from './third_party/index.js';
-
-const logger = debug('mcp:session');
+import {logger} from '../logger.js';
 
 /**
  * SessionManager 管理多个独立的会话，每个会话有自己独占的页面集合。
@@ -24,28 +22,33 @@ const logger = debug('mcp:session');
  * CDP Session 缓存：
  * - 避免重复调用 attachToTarget
  * - 提高并发操作稳定性
+ *
+ * Playwright 适配说明：
+ * - Browser.pages() 不存在，需通过 BrowserContext.pages() 获取
+ * - Browser.newPage() 在 Playwright 中不存在，需通过 BrowserContext.newPage()
+ * - 因此构造函数需要 BrowserContext 而非 Browser
  */
 export class SessionManager {
   private static instances = new Map<string, SessionManager>();
 
   private readonly sessionId: string;
-  private readonly browser: Browser;
+  private readonly context: BrowserContext;
   private readonly ownedPageUrls = new Set<string>();
   private readonly cdpSessions = new WeakMap<Page, number>(); // Page -> sessionId 缓存
 
-  private constructor(sessionId: string, browser: Browser) {
+  private constructor(sessionId: string, context: BrowserContext) {
     this.sessionId = sessionId;
-    this.browser = browser;
+    this.context = context;
   }
 
   /**
    * 获取或创建会话管理器实例
    */
-  static getInstance(sessionId: string, browser: Browser): SessionManager {
+  static getInstance(sessionId: string, context: BrowserContext): SessionManager {
     if (!SessionManager.instances.has(sessionId)) {
       SessionManager.instances.set(
         sessionId,
-        new SessionManager(sessionId, browser),
+        new SessionManager(sessionId, context),
       );
     }
     return SessionManager.instances.get(sessionId)!;
@@ -161,7 +164,7 @@ export class SessionManager {
    * 获取当前会话拥有的所有页面
    */
   async getOwnedPages(): Promise<Page[]> {
-    const allPages = await this.browser.pages();
+    const allPages = this.context.pages();
     const ownedPages: Page[] = [];
 
     for (const page of allPages) {
@@ -177,7 +180,7 @@ export class SessionManager {
    * 创建带有会话标签的新页面
    */
   async newPage(): Promise<Page> {
-    const page = await this.browser.newPage();
+    const page = await this.context.newPage();
     await this.tagPage(page);
     return page;
   }
@@ -188,7 +191,7 @@ export class SessionManager {
    */
   async restoreSessionTags(): Promise<void> {
     try {
-      const allPages = await this.browser.pages();
+      const allPages = this.context.pages();
 
       for (const page of allPages) {
         const url = page.url();

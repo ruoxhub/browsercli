@@ -58,10 +58,13 @@ export async function navigatePage(
         await page.goForward(options);
         break;
       case 'reload':
-        await page.reload({
-          ...options,
-          ignoreCache: params.ignoreCache,
-        });
+        if (params.ignoreCache) {
+          // Playwright: reload() does not support ignoreCache, use CDP
+          const client = await page.context().newCDPSession(page);
+          await client.send('Page.reload', {ignoreCache: true});
+        } else {
+          await page.reload(options);
+        }
         break;
     }
 

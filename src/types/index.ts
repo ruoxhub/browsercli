@@ -9,7 +9,7 @@
  * 核心类型定义
  */
 
-import type {Browser, Page} from 'puppeteer';
+import type {Browser, Page} from '../third_party/index.js';
 
 // ==================== 配置类型 ====================
 

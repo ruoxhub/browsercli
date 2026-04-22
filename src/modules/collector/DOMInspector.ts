@@ -19,7 +19,7 @@
  * - 解决"AI点击前需要先知道元素存在"的问题
  */
 
-import type {CDPSession} from 'puppeteer';
+import type {CDPSession} from '../../third_party/index.js';
 
 import {logger} from '../../utils/logger.js';
 

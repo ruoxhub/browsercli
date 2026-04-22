@@ -17,9 +17,9 @@
  * - 反检测和资源拦截
  */
 
-import type {Browser, Page, CDPSession} from 'puppeteer';
+import type {Browser, Page, CDPSession} from '../../third_party/index.js';
 
-import type {BrowserManager} from '../../browser.js';
+import type {BrowserManager} from '../../browser/index.js';
 import type {
   CollectCodeOptions,
   CollectCodeResult,
@@ -331,7 +331,8 @@ export class CodeCollector {
     }
 
     if (this.browser) {
-      const pages = await this.browser.pages();
+      const context = this.browser.contexts()[0];
+      const pages = context ? await context.pages() : [];
       const usablePages = pages.filter(page => !page.isClosed());
       if (usablePages.length > 0) {
         const fallbackPage = usablePages[usablePages.length - 1];
@@ -354,14 +355,16 @@ export class CodeCollector {
 
     const page = await this.browserManager.newPage();
 
-    // 🆕 设置User-Agent（使用配置）
-    await page.setUserAgent(this.userAgent);
+    // 🆕 设置User-Agent（使用配置）- Playwright: set via CDP
+    const cdpForUA = await page.context().newCDPSession(page);
+    await cdpForUA.send('Network.setUserAgentOverride', {userAgent: this.userAgent});
+    await cdpForUA.detach();
 
     // BrowserModeManager已在newPage()时自动注入反检测脚本，无需重复注入
 
     if (url) {
       await page.goto(url, {
-        waitUntil: 'networkidle2',
+        waitUntil: 'networkidle',
         timeout: this.config.timeout,
       });
     }
@@ -403,8 +406,9 @@ export class CodeCollector {
 
     try {
       // 尝试获取 pages，如果浏览器已关闭会抛出异常
-      const pages = await this.browser.pages();
-      const version = await this.browser.version();
+      const context = this.browser.contexts()[0];
+      const pages = context ? await context.pages() : [];
+      const version = this.browser.version();
 
       return {
         running: true,
@@ -455,19 +459,23 @@ export class CodeCollector {
     // this.collectedUrls.clear(); // 移除
 
     try {
-      // 设置超时
-      page.setDefaultTimeout(options.timeout || this.config.timeout);
+      // Playwright: setDefaultTimeout is not on Page, set defaultNavigationTimeout instead
+      const timeoutValue = options.timeout || this.config.timeout;
+      page.setDefaultTimeout(timeoutValue);
+      page.setDefaultNavigationTimeout(timeoutValue);
 
-      // ✅ 修复：使用配置的 User-Agent，而非硬编码
-      await page.setUserAgent(this.userAgent);
+      // ✅ 修复：使用配置的 User-Agent - Playwright: set via CDP
+      const cdpForUA = await page.context().newCDPSession(page);
+      await cdpForUA.send('Network.setUserAgentOverride', {userAgent: this.userAgent});
+      await cdpForUA.detach();
 
       // BrowserModeManager已在newPage()时自动注入反检测脚本，无需重复注入
 
       // 收集的代码文件（完整收集，不限制总大小）
       const files: CodeFile[] = [];
 
-      // ✅ 修复：使用新的 API，避免弃用警告
-      this.cdpSession = await page.createCDPSession();
+      // ✅ 修复：Playwright - create CDP session via context
+      this.cdpSession = await page.context().newCDPSession(page);
       await this.cdpSession.send('Network.enable');
       await this.cdpSession.send('Runtime.enable');
 
@@ -582,7 +590,7 @@ export class CodeCollector {
       // 访问页面
       logger.info(`Navigating to: ${options.url}`);
       await page.goto(options.url, {
-        waitUntil: 'networkidle2',
+        waitUntil: 'networkidle',
         timeout: options.timeout || this.config.timeout,
       });
 

@@ -16,17 +16,28 @@ export async function uploadFile(
   const page = frame.page();
 
   try {
+    // Playwright: use setInputFiles on ElementHandle
     const element = await page.$(selector);
     if (!element) {
       throw new Error(`Element not found: ${selector}`);
     }
 
-    const uploaded = await (element as any)
-      .uploadFile(filePath)
-      .then(() => true)
-      .catch(() => false);
+    try {
+      await element.setInputFiles(filePath);
+      return {
+        success: true,
+        message: `File uploaded from ${filePath}`,
+        tooltype,
+        logFormat: 'simple',
+      };
+    } catch {
+      // Fallback: try filechooser event pattern
+      const [fileChooser] = await Promise.all([
+        page.waitForEvent('filechooser', {timeout: 3000}),
+        element.click(),
+      ]);
+      await fileChooser.setFiles(filePath);
 
-    if (uploaded) {
       return {
         success: true,
         message: `File uploaded from ${filePath}`,
@@ -34,19 +45,6 @@ export async function uploadFile(
         logFormat: 'simple',
       };
     }
-
-    const [fileChooser] = await Promise.all([
-      page.waitForFileChooser({timeout: 3000}),
-      element.click(),
-    ]);
-    await fileChooser.accept([filePath]);
-
-    return {
-      success: true,
-      message: `File uploaded from ${filePath}`,
-      tooltype,
-      logFormat: 'simple',
-    };
   } catch (error) {
     return {
       success: false,

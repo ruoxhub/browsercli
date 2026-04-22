@@ -27,9 +27,9 @@ export async function fill(
     }, selector);
 
     if (isSelect) {
-      await element.select(value);
+      await element.selectOption(value);
     } else {
-      await element.type(value);
+      await element.fill(value);
     }
 
     return {

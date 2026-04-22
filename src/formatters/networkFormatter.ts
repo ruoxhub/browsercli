@@ -26,21 +26,31 @@ export function getShortDescriptionForRequest(
 }
 
 export function getStatusFromRequest(request: HTTPRequest): string {
-  const httpResponse = request.response();
+  // Playwright: request.response() is async, but we use it synchronously here
+  // for the short description. We check failure first.
   const failure = request.failure();
-  let status: string;
+  if (failure) {
+    return `[failed - ${failure.errorText}]`;
+  }
+  return '[pending]';
+}
+
+/**
+ * Async version of getStatusFromRequest that can check response status.
+ * Use this when you need the actual HTTP status code.
+ */
+export async function getStatusFromRequestAsync(request: HTTPRequest): Promise<string> {
+  const httpResponse = await request.response();
+  const failure = request.failure();
   if (httpResponse) {
     const responseStatus = httpResponse.status();
-    status =
-      responseStatus >= 200 && responseStatus <= 299
-        ? `[success - ${responseStatus}]`
-        : `[failed - ${responseStatus}]`;
+    return responseStatus >= 200 && responseStatus <= 299
+      ? `[success - ${responseStatus}]`
+      : `[failed - ${responseStatus}]`;
   } else if (failure) {
-    status = `[failed - ${failure.errorText}]`;
-  } else {
-    status = '[pending]';
+    return `[failed - ${failure.errorText}]`;
   }
-  return status;
+  return '[pending]';
 }
 
 export function getFormattedHeaderValue(
@@ -60,7 +70,7 @@ export async function getFormattedResponseBody(
 ): Promise<string | undefined> {
   try {
     const responseBuffer = await Promise.race([
-      httpResponse.buffer(),
+      httpResponse.body(),
       new Promise<Buffer>((_, reject) => {
         setTimeout(() => reject(new Error('timeout')), timeoutMs);
       }),
@@ -89,22 +99,11 @@ export async function getFormattedRequestBody(
   httpRequest: HTTPRequest,
   sizeLimit: number = BODY_CONTEXT_SIZE_LIMIT,
 ): Promise<string | undefined> {
-  if (httpRequest.hasPostData()) {
-    const data = httpRequest.postData();
+  // Playwright: no hasPostData()/fetchPostData(), use postData() directly
+  const data = httpRequest.postData();
 
-    if (data) {
-      return `${getSizeLimitedString(data, sizeLimit)}`;
-    }
-
-    try {
-      const fetchData = await httpRequest.fetchPostData();
-
-      if (fetchData) {
-        return `${getSizeLimitedString(fetchData, sizeLimit)}`;
-      }
-    } catch {
-      return `<not available anymore>`;
-    }
+  if (data) {
+    return `${getSizeLimitedString(data, sizeLimit)}`;
   }
 
   return;

@@ -9,39 +9,17 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 
-import puppeteerExtra from 'puppeteer-extra';
-import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+import {chromium, type Browser, type BrowserContext, type Page, type CDPSession} from 'playwright-core';
 
-import {logger} from './logger.js';
+import {logger} from '../logger.js';
 import {
   StealthScripts2025,
   type StealthPreset,
   type StealthInjectionOptions,
-} from './modules/stealth/index.js';
+} from '../modules/stealth/index.js';
 import {HARMFUL_ARGS, DEFAULT_ARGS, STEALTH_ARGS} from './stealth-args.js';
-import type {
-  Browser,
-  ChromeReleaseChannel,
-  LaunchOptions,
-  Page,
-  Target,
-} from './third_party/index.js';
-import {puppeteer} from './third_party/index.js';
 
 let browserManager: BrowserManager | undefined;
-
-function makeTargetFilter() {
-  const ignoredPrefixes = [
-    'chrome://',
-    'chrome-extension://',
-    'chrome-untrusted://',
-  ];
-
-  return function targetFilter(target: Target): boolean {
-    if (target.url() === 'chrome://newtab/') return true;
-    return !ignoredPrefixes.some(prefix => target.url().startsWith(prefix));
-  };
-}
 
 export async function ensureBrowserConnected(options: {
   browserURL?: string;
@@ -279,50 +257,43 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     });
   }
 
-  const args: LaunchOptions['args'] = [
+  const args = [
     ...(options.args ?? []),
     '--hide-crash-restore-bubble',
   ];
   if (headless) {
     args.push('--screen-info={3840x2160}');
   }
-  let puppeteerChannel: ChromeReleaseChannel | undefined;
+
+  let launchChannel: string | undefined;
   if (options.devtools) {
     args.push('--auto-open-devtools-for-tabs');
   }
   if (!executablePath) {
-    puppeteerChannel =
+    launchChannel =
       channel && channel !== 'stable'
-        ? (`chrome-${channel}` as ChromeReleaseChannel)
+        ? `chrome-${channel}`
         : 'chrome';
   }
 
   try {
-    const browser = await puppeteer.launch({
-      channel: puppeteerChannel,
-      targetFilter: makeTargetFilter(),
+    const browser = await chromium.launch({
+      channel: launchChannel,
       executablePath,
-      defaultViewport: null,
-      userDataDir,
-      pipe: true,
       headless,
       args,
-      acceptInsecureCerts: options.acceptInsecureCerts,
-      handleDevToolsAsPage: true,
+      ignoreDefaultArgs: HARMFUL_ARGS,
     });
-    if (options.logFile) {
-      // FIXME: we are probably subscribing too late to catch startup logs. We
-      // should expose the process earlier or expose the getRecentLogs() getter.
-      browser.process()?.stderr?.pipe(options.logFile);
-      browser.process()?.stdout?.pipe(options.logFile);
-    }
+
     if (options.viewport) {
-      const [page] = await browser.pages();
-      // @ts-expect-error internal API for now.
-      await page?.resize({
-        contentWidth: options.viewport.width,
-        contentHeight: options.viewport.height,
-      });
+      const context = browser.contexts()[0];
+      const page = context?.pages()[0];
+      if (page) {
+        await page.setViewportSize({
+          width: options.viewport.width,
+          height: options.viewport.height,
+        });
+      }
     }
     return browser;
   } catch (error) {
@@ -395,9 +366,11 @@ export interface BrowserManagerConfig {
 /**
  * Singleton BrowserManager class that manages a single browser instance
  * with support for stealth injection, crash detection, and auto-restart.
+ * Built on Playwright (replaces Puppeteer).
  */
 export class BrowserManager {
   private browser?: Browser;
+  private context?: BrowserContext;
   private currentPage: Page | null = null;
   private config: BrowserManagerConfig;
   private stealthInjected = false;
@@ -456,7 +429,7 @@ export class BrowserManager {
    * Ensure browser is connected and running
    */
   async ensureBrowser(): Promise<Browser> {
-    if (this.browser?.connected) {
+    if (this.browser?.isConnected()) {
       return this.browser;
     }
 
@@ -488,12 +461,20 @@ export class BrowserManager {
   }
 
   /**
+   * Get the current browser context
+   */
+  getContext(): BrowserContext | null {
+    return this.context ?? null;
+  }
+
+  /**
    * Create a new page in the browser
    */
   async newPage(): Promise<Page> {
     const browser = await this.ensureBrowser();
-    const pages = await browser.pages();
-    const page = pages.length > 0 ? pages[0] : await browser.newPage();
+    const ctx = this.context ?? browser.contexts()[0];
+    const pages = ctx.pages();
+    const page = pages.length > 0 ? pages[0] : await ctx.newPage();
     this.trackCurrentPage(page);
     return page;
   }
@@ -516,7 +497,7 @@ export class BrowserManager {
   }
 
   /**
-   * Get current page (stub for compatibility - returns first page)
+   * Get current page
    */
   getCurrentPage(): Page | null {
     return this.currentPage && !this.currentPage.isClosed()
@@ -528,11 +509,11 @@ export class BrowserManager {
    * Check if browser is connected
    */
   isConnected(): boolean {
-    return this.browser?.connected ?? false;
+    return this.browser?.isConnected() ?? false;
   }
 
   /**
-   * Connect to a remote browser instance via debugging port
+   * Connect to a remote browser instance via CDP
    */
   private async connectToRemoteBrowser(): Promise<Browser> {
     try {
@@ -572,84 +553,69 @@ export class BrowserManager {
         }
       }
 
-      // If we got a WebSocket URL from /json/version, use it directly
-      // This avoids issues with browserURL connection mode
-      const connectOptions: Parameters<typeof puppeteer.connect>[0] = {
-        targetFilter: makeTargetFilter(),
-        defaultViewport: null,
-        protocolTimeout: 30000, // 30 second timeout for CDP commands
+      // Use Playwright connectOverCDP
+      // Prefer explicit WebSocket endpoint over browserURL
+      const connectEndpoint =
+        this.config.wsEndpoint ??
+        webSocketDebuggerUrl ??
+        this.config.browserURL ??
+        this.config.remoteDebuggingUrl;
+
+      const connectOptions = {
+        timeout: 30000,
+        ...(this.config.wsHeaders ? {headers: this.config.wsHeaders} : {}),
       };
 
-      // Prefer explicit WebSocket endpoint over browserURL
-      // This is more reliable and avoids CDP protocol issues
-      if (this.config.wsEndpoint) {
-        connectOptions.browserWSEndpoint = this.config.wsEndpoint;
-      } else if (webSocketDebuggerUrl) {
-        // Use the WebSocket URL from /json/version
-        connectOptions.browserWSEndpoint = webSocketDebuggerUrl;
-        logger(
-          'Using WebSocket endpoint from /json/version:',
-          webSocketDebuggerUrl,
-        );
-      } else if (this.config.browserURL || this.config.remoteDebuggingUrl) {
-        // Fallback to browserURL mode
-        connectOptions.browserURL =
-          this.config.browserURL ?? this.config.remoteDebuggingUrl;
-      }
+      this.browser = await chromium.connectOverCDP(
+        connectEndpoint!,
+        connectOptions,
+      );
+      logger('Connected to remote browser via Playwright');
 
-      // Add headers if provided
-      if (this.config.wsHeaders) {
-        connectOptions.headers = this.config.wsHeaders;
-      }
-
-      this.browser = await puppeteer.connect(connectOptions);
-      logger('Connected to remote browser');
+      // Get the default context
+      this.context = this.browser.contexts()[0];
 
       // 连接成功后，获取浏览器窗口边界并应用到页面（自动适配）
       try {
-        const pages = await this.browser.pages();
-        if (pages.length > 0) {
-          const page = pages[0];
-          this.trackCurrentPage(page);
-          const targetId = (page.target() as Target & {_targetId?: string})
-            ._targetId;
+        if (this.context) {
+          const pages = this.context.pages();
+          if (pages.length > 0) {
+            const page = pages[0];
+            this.trackCurrentPage(page);
 
-          // 使用 CDP 命令获取浏览器窗口边界
-          const client = await page.createCDPSession();
-          const {windowId: _windowId, bounds} = await client.send(
-            'Browser.getWindowForTarget',
-            {
-              targetId,
-            },
-          );
-
-          logger(
-            `Browser window bounds: ${bounds.width}x${bounds.height} at (${bounds.left}, ${bounds.top})`,
-          );
-
-          // 优先使用配置的 viewport，否则使用浏览器窗口边界
-          if (this.config.viewport) {
-            await page.setViewport({
-              width: this.config.viewport.width,
-              height: this.config.viewport.height,
-              deviceScaleFactor: 1,
-            });
-            logger(
-              `Viewport set to ${this.config.viewport.width}x${this.config.viewport.height} (configured)`,
+            // 使用 CDP 命令获取浏览器窗口边界
+            const client = await this.context.newCDPSession(page);
+            const {windowId: _windowId, bounds} = await client.send(
+              'Browser.getWindowForTarget',
+              {},
             );
-          } else {
-            // 自动适配：使用浏览器窗口边界作为 viewport
-            await page.setViewport({
-              width: bounds.width,
-              height: bounds.height,
-              deviceScaleFactor: 1,
-            });
+
             logger(
-              `Viewport auto-adapted to ${bounds.width}x${bounds.height} (from browser window)`,
+              `Browser window bounds: ${bounds.width}x${bounds.height} at (${bounds.left}, ${bounds.top})`,
             );
+
+            // 优先使用配置的 viewport，否则使用浏览器窗口边界
+            if (this.config.viewport) {
+              await page.setViewportSize({
+                width: this.config.viewport.width,
+                height: this.config.viewport.height,
+              });
+              logger(
+                `Viewport set to ${this.config.viewport.width}x${this.config.viewport.height} (configured)`,
+              );
+            } else {
+              // 自动适配：使用浏览器窗口边界作为 viewport
+              await page.setViewportSize({
+                width: bounds.width,
+                height: bounds.height,
+              });
+              logger(
+                `Viewport auto-adapted to ${bounds.width}x${bounds.height} (from browser window)`,
+              );
+            }
+
+            await client.detach();
           }
-
-          await client.detach();
         }
       } catch (err) {
         logger('Warning: Could not set viewport from browser bounds:', err);
@@ -657,7 +623,7 @@ export class BrowserManager {
 
       // Verify connection by checking browser version
       try {
-        const browserVersion = await this.browser.version();
+        const browserVersion = this.browser.version();
         logger('Browser version:', browserVersion);
       } catch (versionErr) {
         logger('Warning: Could not get browser version:', versionErr);
@@ -693,7 +659,7 @@ export class BrowserManager {
       if (errorMessage.includes('Page.enable')) {
         throw new Error(
           `CDP 协议错误：'Page.enable' 命令未找到。
-原因：Chrome 版本与 Puppeteer 24.x 不兼容，或连接到了错误的端点。
+原因：Chrome 版本与 Playwright 不兼容，或连接到了错误的端点。
 
 解决方法：
 1. 更新 Chrome 到最新版本
@@ -701,7 +667,6 @@ export class BrowserManager {
 3. 检查是否连接到了正确的 WebSocket 端点
 4. 尝试重启 Chrome 后重新连接
 
-当前 Puppeteer 版本：24.31.0
 原始错误：${errorMessage}`,
           {cause: error},
         );
@@ -728,16 +693,11 @@ export class BrowserManager {
   }
 
   /**
-   * Launch a new browser instance
+   * Launch a new browser instance using Playwright
    */
   private async launchBrowser(): Promise<Browser> {
     const {channel, executablePath, headless, isolated, useStealthScripts} =
       this.config;
-
-    // Use puppeteer-extra with stealth plugin if stealth is enabled
-    const puppeteerInstance = useStealthScripts
-      ? puppeteerExtra.use(StealthPlugin())
-      : puppeteer;
 
     const profileDirName =
       channel && channel !== 'stable'
@@ -758,7 +718,7 @@ export class BrowserManager {
     }
 
     // Build args: start with DEFAULT_ARGS, add user args, then STEALTH_ARGS if enabled
-    const args: LaunchOptions['args'] = [
+    const args = [
       ...DEFAULT_ARGS,
       ...(this.config.args ?? []),
       '--hide-crash-restore-bubble',
@@ -773,40 +733,33 @@ export class BrowserManager {
       args.push('--screen-info={3840x2160}');
     }
 
-    let puppeteerChannel: ChromeReleaseChannel | undefined;
+    let launchChannel: string | undefined;
     if (this.config.devtools) {
       args.push('--auto-open-devtools-for-tabs');
     }
 
     if (!executablePath) {
-      puppeteerChannel =
+      launchChannel =
         channel && channel !== 'stable'
-          ? (`chrome-${channel}` as ChromeReleaseChannel)
+          ? `chrome-${channel}`
           : 'chrome';
     }
 
     try {
       logger('Launching browser with config:', {
-        channel: puppeteerChannel,
+        channel: launchChannel,
         executablePath,
         headless,
         isolated,
         useStealthScripts,
       });
 
-      this.browser = await puppeteerInstance.launch({
-        channel: puppeteerChannel,
-        targetFilter: makeTargetFilter(),
+      this.browser = await chromium.launch({
+        channel: launchChannel,
         executablePath,
-        defaultViewport: null,
-        userDataDir,
-        pipe: true,
         headless,
         args,
-        // Remove harmful default args
         ignoreDefaultArgs: HARMFUL_ARGS,
-        acceptInsecureCerts: this.config.acceptInsecureCerts,
-        handleDevToolsAsPage: true,
       });
 
       logger('Browser launched successfully');
@@ -816,18 +769,18 @@ export class BrowserManager {
 
       // Set viewport if configured
       if (this.config.viewport) {
-        const [page] = await this.browser.pages();
+        const ctx = this.browser.contexts()[0];
+        const page = ctx?.pages()[0];
         if (page) {
           this.trackCurrentPage(page);
-          // @ts-expect-error internal API for now.
-          await page.resize({
-            contentWidth: this.config.viewport.width,
-            contentHeight: this.config.viewport.height,
+          await page.setViewportSize({
+            width: this.config.viewport.width,
+            height: this.config.viewport.height,
           });
         }
       }
 
-      // Mark stealth as injected if using puppeteer-extra
+      // Mark stealth as injected if enabled
       if (useStealthScripts) {
         this.stealthInjected = true;
       }
@@ -862,9 +815,9 @@ export class BrowserManager {
       clearInterval(this.crashCheckInterval);
     }
 
-    // Listen for disconnect events
+    // Listen for disconnect events (Playwright's equivalent of Puppeteer 'disconnected')
     this.browser.on('disconnected', () => {
-      logger('Browser disconnected');
+      logger('Browser closed');
       if (!this.isRestarting) {
         void this.handleBrowserCrash();
       }
@@ -872,7 +825,7 @@ export class BrowserManager {
 
     // Periodically check if browser is still connected
     this.crashCheckInterval = setInterval(() => {
-      if (this.browser && !this.browser.connected && !this.isRestarting) {
+      if (this.browser && !this.browser.isConnected() && !this.isRestarting) {
         logger('Browser connection lost, attempting restart');
         void this.handleBrowserCrash();
       }
@@ -898,6 +851,7 @@ export class BrowserManager {
           logger('Error closing crashed browser:', err);
         }
         this.browser = undefined;
+        this.context = undefined;
       }
 
       // Wait a bit before restarting
@@ -937,20 +891,17 @@ export class BrowserManager {
         ...options,
       };
 
-      const pages = await this.browser.pages();
-      for (const page of pages) {
-        await StealthScripts2025.injectAll(page, stealthOptions);
-      }
-
-      // Listen for new pages and inject stealth
-      this.browser.on('targetcreated', async target => {
-        if (target.type() === 'page') {
-          const page = await target.page();
-          if (page) {
-            await StealthScripts2025.injectAll(page, stealthOptions);
-          }
+      // Inject stealth into all pages across all contexts
+      for (const ctx of this.browser.contexts()) {
+        for (const page of ctx.pages()) {
+          await StealthScripts2025.injectAll(page, stealthOptions);
         }
-      });
+
+        // Listen for new pages and inject stealth
+        ctx.on('page', async page => {
+          await StealthScripts2025.injectAll(page, stealthOptions);
+        });
+      }
 
       this.stealthInjected = true;
       logger('Advanced stealth scripts injected successfully');
@@ -1178,6 +1129,7 @@ export class BrowserManager {
         logger('Error closing browser:', error);
       }
       this.browser = undefined;
+      this.context = undefined;
     }
 
     this.stealthInjected = false;
