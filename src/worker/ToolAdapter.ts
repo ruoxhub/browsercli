@@ -79,11 +79,15 @@ export class ToolAdapter {
           // 新模式：handler(runtimeServices, params)
           result = await handler(this.contextProvider, params);
         } else if (callMode === 'frame') {
-          // 旧模式：handler(frame/page, params)
-          if (page) {
-            result = await handler(page, params);
+          // 旧模式：handler(frame, params) — 优先使用选中的 Frame，回退到 Page 的 mainFrame
+          const frame = this.contextProvider.getSelectedFrame()
+            ?? page?.mainFrame()
+            ?? null;
+          if (frame) {
+            result = await handler(frame, params);
           } else {
-            result = await handler(params);
+            reject(`Tool "${toolName}" 需要页面上下文，但当前没有可用页面`);
+            return;
           }
         } else {
           // params-only 或未指定：handler(params)

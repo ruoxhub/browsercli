@@ -5,8 +5,8 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
-import type {Page} from './types.js';
 import type {FrameInfo, SelectFrameParams, SelectFrameResult} from './types.js';
+import type {ToolContextProvider} from '../../worker/ToolContextProvider.js';
 
 /**
  * 计算 Frame 的嵌套深度。
@@ -24,22 +24,30 @@ function getFrameDepth(frame: Frame): number {
 /**
  * 按索引选择页面中的 Frame，返回该 Frame 的信息。
  *
- * 验证索引有效性后，返回对应 Frame 的结构化信息。
- * 注意：此函数仅返回 Frame 信息，不修改任何上下文状态。
- * 如需切换执行上下文，仍需使用 select_frame 工具。
+ * 验证索引有效性后，将选中的 Frame 同步到 ToolContextProvider，
+ * 后续 frame callMode 的工具将在该 Frame 上执行。
  *
- * @param page - Puppeteer Page 对象
+ * @param runtime - ToolContextProvider 运行时上下文
  * @param params - 选择参数 { frameIdx }
  * @returns 结构化结果对象，data 包含选中的 Frame 信息
  */
 export async function selectFrame(
-  page: Page,
+  runtime: ToolContextProvider,
   params: SelectFrameParams,
 ): Promise<SelectFrameResult> {
   const {frameIdx} = params;
   const tooltype = 'select_frame';
 
   try {
+    const page = runtime.getSelectedPage();
+    if (!page) {
+      return {
+        success: false,
+        message: '没有可用的页面，请先导航到目标页面',
+        tooltype,
+      };
+    }
+
     const frames = page.frames();
 
     if (frameIdx < 0 || frameIdx >= frames.length) {
@@ -50,7 +58,7 @@ export async function selectFrame(
       };
     }
 
-    const frame = frames[frameIdx];
+    const frame = frames[frameIdx]!;
     const depth = getFrameDepth(frame);
     const name = frame.name() || undefined;
     const info: FrameInfo = {
@@ -59,6 +67,9 @@ export async function selectFrame(
       ...(name ? {name} : {}),
       depth,
     };
+
+    // 同步选中的 Frame 到上下文
+    runtime.setSelectedFrame(frame);
 
     const label =
       frameIdx === 0

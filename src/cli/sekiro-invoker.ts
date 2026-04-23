@@ -49,8 +49,10 @@ export class SekiroInvoker {
 
   constructor(config: SekiroInvokerConfig) {
     // sekiroHost 是 WebSocket 地址如 ws://127.0.0.1:5612，需转为 HTTP
+    // ws:// → http://, wss:// → https://
     this.baseUrl = config.sekiroHost
-      .replace(/^ws/, 'http')
+      .replace(/^wss:\/\//, 'https://')
+      .replace(/^ws:\/\//, 'http://')
       .replace(/\/$/, '');
     this.invokeTimeout = config.invokeTimeout ?? 30000;
     this.queryTimeout = config.queryTimeout ?? 5000;
@@ -149,16 +151,45 @@ export class SekiroInvoker {
 
   /**
    * 检查 Sekiro Server 是否可用
+   *
+   * 优先使用根路径做轻量级连通性检查，失败后回退到 groupQueue。
+   * 包含短暂重试以容忍服务初始化延迟。
    */
-  async isServerAvailable(): Promise<boolean> {
-    try {
-      const url = `${this.baseUrl}/business/groupQueue`;
-      const response = await fetch(url, {
-        signal: AbortSignal.timeout(this.healthTimeout),
-      });
-      return response.ok;
-    } catch {
-      return false;
+  async isServerAvailable(maxAttempts = 2): Promise<boolean> {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      // 1. 先尝试根路径（最轻量）
+      try {
+        const response = await fetch(this.baseUrl, {
+          signal: AbortSignal.timeout(this.healthTimeout),
+        });
+        if (response.ok || response.status === 302) return true;
+      } catch {
+        // 根路径不可达，尝试业务端点
+      }
+
+      // 2. 回退到 groupQueue 端点
+      try {
+        const url = `${this.baseUrl}/business/groupQueue`;
+        const response = await fetch(url, {
+          signal: AbortSignal.timeout(this.healthTimeout),
+        });
+        if (response.ok) return true;
+      } catch {
+        // 两个端点均不可达
+      }
+
+      // 还有重试机会则等待
+      if (attempt < maxAttempts - 1) {
+        await new Promise(r => setTimeout(r, 500));
+      }
     }
+    return false;
+  }
+
+  /**
+   * 获取实际请求的 HTTP baseUrl（用于错误信息展示）
+   */
+  getHttpUrl(): string {
+    return this.baseUrl;
   }
 }

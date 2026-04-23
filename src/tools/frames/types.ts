@@ -31,6 +31,8 @@ export interface FrameInfo {
   name?: string;
   /** 嵌套深度（0 = 主 frame） */
   depth: number;
+  /** 是否为当前选中的 Frame */
+  selected?: boolean;
 }
 
 /** listFrames 结果 */

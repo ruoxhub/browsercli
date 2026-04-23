@@ -10,19 +10,24 @@ import type {
   GetPerformanceMetricsData,
 } from './types.js';
 
+interface RuntimeWithPage {
+  getActivePage(): Promise<Page>;
+}
+
 /**
  * 获取当前页面的性能指标（纯函数版本）。
  *
  * 通过浏览器 Performance API 采集导航时间、资源统计、
  * Paint 事件 (FCP/LCP) 和 CLS 等指标。
  *
- * @param page - Puppeteer Page 对象
+ * @param runtime - 运行时服务（需提供 getActivePage）
  * @returns 结构化结果 { success, message, tooltype, logFormat, data }
  */
 export async function getPerformanceMetrics(
-  page: Page,
+  runtime: RuntimeWithPage,
 ): Promise<GetPerformanceMetricsResult> {
   try {
+    const page = await runtime.getActivePage();
     const metrics = await page.evaluate(() => {
       const perf = performance.getEntriesByType(
         'navigation',

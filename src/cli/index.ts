@@ -50,6 +50,7 @@ export {
   showConfigInfo,
 } from '../config.js';
 export {SekiroInvoker} from './sekiro-invoker.js';
+export {WorkerManager} from './worker-manager.js';
 export {startCommand} from './commands/start.js';
 export {stopCommand} from './commands/stop.js';
 export {statusCommand} from './commands/status.js';

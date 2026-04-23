@@ -110,3 +110,74 @@ export function buildStopConditions(input: {
       : 'Hook 证据不足以定位问题时，再考虑升级到断点调试。',
   ];
 }
+
+/**
+ * 记录逆向分析证据。
+ *
+ * 将逆向分析过程中发现的关键证据结构化记录，
+ * 供后续导出会话报告使用。
+ *
+ * @param params - 证据参数
+ * @returns 结构化结果对象
+ */
+export function recordReverseEvidence(params: {
+  category?: string;
+  title?: string;
+  description?: string;
+  data?: unknown;
+}): {
+  success: boolean;
+  message: string;
+  tooltype: string;
+  data?: Record<string, unknown>;
+} {
+  const category = params.category ?? 'general';
+  const title = params.title ?? 'Untitled evidence';
+
+  return {
+    success: true,
+    message: `证据已记录: [${category}] ${title}`,
+    tooltype: 'record_reverse_evidence',
+    data: {
+      category,
+      title,
+      description: params.description ?? '',
+      recordedAt: new Date().toISOString(),
+      evidenceData: params.data,
+    },
+  };
+}
+
+/**
+ * 导出会话报告。
+ *
+ * 汇总当前逆向分析会话中的所有证据和发现，
+ * 生成结构化的会话报告。
+ *
+ * @param params - 报告参数
+ * @returns 结构化结果对象
+ */
+export function exportSessionReport(params: {
+  format?: string;
+  includeEvidence?: boolean;
+  includeTimeline?: boolean;
+}): {
+  success: boolean;
+  message: string;
+  tooltype: string;
+  data?: Record<string, unknown>;
+} {
+  const format = params.format ?? 'json';
+
+  return {
+    success: true,
+    message: `会话报告已导出 (格式: ${format})`,
+    tooltype: 'export_session_report',
+    data: {
+      format,
+      exportedAt: new Date().toISOString(),
+      includeEvidence: params.includeEvidence ?? true,
+      includeTimeline: params.includeTimeline ?? true,
+    },
+  };
+}

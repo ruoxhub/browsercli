@@ -11,7 +11,6 @@ import {parseArgs, getFlag, getBoolFlag} from '../args-parser.js';
 import {successOutput} from '../output.js';
 import {SekiroInvoker} from '../sekiro-invoker.js';
 import {resolveConfig} from '../../config.js';
-import {main as workerMain} from '../../index.js';
 
 const BROWSER_POLL_ATTEMPTS = 60;
 const BROWSER_POLL_INTERVAL_MS = 500;
@@ -70,33 +69,36 @@ export const startCommand: AxiCliCommand<WorkerContext> = async (
   const serverAvailable = await invoker.isServerAvailable();
   if (!serverAvailable) {
     throw new AxiError(
-      `Sekiro Server 不可用: ${cfg.sekiroHost}`,
+      `Sekiro Server 不可用: ${cfg.sekiroHost} (HTTP: ${invoker.getHttpUrl()})`,
       'SEKIRO_UNAVAILABLE',
       [
         '请先启动 sekiro-go Server',
         '下载地址: https://github.com/yint-tech/sekiro-go',
         '默认启动: ./sekiro-go --port 5612',
+        `确认端口监听: netstat -ano | findstr "${cfg.sekiroHost.split(':').pop()}"`,
       ],
     );
   }
 
   // 2. 检查 Worker 是否已在运行
-  const workerState = ctx?.workerState;
-  if (workerState?.running) {
+  const workerManager = ctx?.workerManager;
+  if (workerManager?.isRunning()) {
     throw new AxiError('Worker 已经在运行中', 'WORKER_ALREADY_RUNNING', [
       '如需重启，请先执行：js-reverse stop',
     ]);
   }
 
-  // 3. 直接在当前进程中启动 Worker
-  await workerMain({
-    sekiroHost: cfg.sekiroHost,
-    group: cfg.group,
-    browserUrl: cfg.browserUrl,
-    wsEndpoint: cfg.wsEndpoint,
-    headless: cfg.headless,
-    executablePath: cfg.executablePath,
-  });
+  // 3. spawn Worker 进程
+  if (workerManager) {
+    await workerManager.start({
+      sekiroHost: cfg.sekiroHost,
+      group: cfg.group,
+      browserUrl: cfg.browserUrl,
+      wsEndpoint: cfg.wsEndpoint,
+      headless: cfg.headless,
+      executablePath: cfg.executablePath,
+    });
+  }
 
   // 4. 等待浏览器连接（如果指定）
   if (waitForBrowser && cfg.browserUrl) {
@@ -128,8 +130,14 @@ async function waitForWorkerRegistered(
 ): Promise<boolean> {
   for (let i = 0; i < maxAttempts; i++) {
     try {
-      const clients = await invoker.listClients(group) as {clients?: unknown[]};
-      if (clients.clients && clients.clients.length > 0) {
+      const result = await invoker.listClients(group) as {
+        data?: unknown[];
+        clients?: unknown[];
+        status?: number;
+      };
+      // Sekiro clientQueue 返回格式: {data: [...], status: 0}
+      const clientList = result.data ?? result.clients;
+      if (Array.isArray(clientList) && clientList.length > 0) {
         return true;
       }
     } catch {

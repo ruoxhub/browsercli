@@ -8,22 +8,21 @@ import type {AxiCliCommand} from 'axi-sdk-js';
 import type {WorkerContext} from '../types.js';
 import {AxiError} from 'axi-sdk-js';
 import {successOutput} from '../output.js';
-import {stopWorker} from '../../index.js';
 
 export const stopCommand: AxiCliCommand<WorkerContext> = async (
   _args,
   ctx,
 ) => {
-  const workerState = ctx?.workerState;
+  const workerManager = ctx?.workerManager;
 
-  if (!workerState?.running) {
+  if (!workerManager?.isRunning()) {
     throw new AxiError('停止失败：Worker 未运行', 'WORKER_NOT_RUNNING', [
       '请先执行：js-reverse start --browserUrl <chrome-debug-url>',
     ]);
   }
 
   try {
-    await stopWorker();
+    await workerManager.stop();
     return successOutput({
       command: 'stop',
       message: 'Worker 已停止',

@@ -39,11 +39,24 @@ export const toolDispatcherCommand: AxiCliCommand<WorkerContext> = async (
       continue;
     }
     const schemaType = meta.schema[key];
-    if (schemaType === 'number') toolArgs[key] = Number(value);
-    else if (schemaType === 'boolean') toolArgs[key] = value === 'true';
-    else if (typeof value === 'string' && value.includes(','))
+    if (schemaType === 'number') {
+      toolArgs[key] = Number(value);
+    } else if (schemaType === 'boolean') {
+      toolArgs[key] = value === 'true' || value === '1';
+    } else if (schemaType === 'string') {
+      toolArgs[key] = value;
+    } else if (typeof value === 'string' && value.includes(',')) {
       toolArgs[key] = value.split(',').map(s => s.trim());
-    else toolArgs[key] = value;
+    } else {
+      // 无 schema 时，尝试智能推断：纯数字字符串转 number，"true"/"false" 转 boolean
+      if (value === 'true' || value === 'false') {
+        toolArgs[key] = value === 'true';
+      } else if (/^-?\d+(\.\d+)?$/.test(value)) {
+        toolArgs[key] = Number(value);
+      } else {
+        toolArgs[key] = value;
+      }
+    }
   }
 
   try {

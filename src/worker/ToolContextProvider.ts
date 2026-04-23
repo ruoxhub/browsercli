@@ -11,13 +11,18 @@
  * 作为 ToolAdapter 与纯函数工具之间的桥梁。
  */
 
-import type {Browser, BrowserContext, Page} from 'playwright-core';
+import type {Browser, BrowserContext, Frame, Page} from 'playwright-core';
+
+type TraceResult = unknown;
 
 export class ToolContextProvider {
   private selectedPage: Page | null = null;
+  private selectedFrame: Frame | null = null;
   private pagesList: Page[] = [];
   private _browser: Browser | null = null;
   private _context: BrowserContext | null = null;
+  private _isRunningPerformanceTrace = false;
+  private _traceRecordings: TraceResult[] = [];
 
   constructor() {}
 
@@ -47,6 +52,28 @@ export class ToolContextProvider {
 
   setSelectedPage(page: Page | null): void {
     this.selectedPage = page;
+    // 页面切换时重置 frame 选择，回退到主 frame
+    this.selectedFrame = page?.mainFrame() ?? null;
+  }
+
+  // ─── Frame 管理 ───────────────────────────────────────
+
+  getSelectedFrame(): Frame | null {
+    return this.selectedFrame;
+  }
+
+  setSelectedFrame(frame: Frame | null): void {
+    this.selectedFrame = frame;
+  }
+
+  /** 按索引选择 Frame（0 = 主 frame），返回选中的 Frame */
+  selectFrameByIdx(frameIdx: number): Frame | null {
+    const page = this.selectedPage;
+    if (!page) return null;
+    const frames = page.frames();
+    if (frameIdx < 0 || frameIdx >= frames.length) return null;
+    this.selectedFrame = frames[frameIdx]!;
+    return this.selectedFrame;
   }
 
   getPages(): Page[] {
@@ -151,5 +178,33 @@ export class ToolContextProvider {
 
   getConsoleMessageStableId(_message: unknown): number {
     return -1;
+  }
+
+  // ─── WebSocketRuntimeServices (stub) ──────────────────
+
+  getWebSocketConnections(): unknown[] {
+    return [];
+  }
+
+  getWebSocketConnectionById(_wsid: number): unknown {
+    return undefined;
+  }
+
+  // ─── PerformanceRuntimeServices ────────────────────────
+
+  isRunningPerformanceTrace(): boolean {
+    return this._isRunningPerformanceTrace;
+  }
+
+  setIsRunningPerformanceTrace(running: boolean): void {
+    this._isRunningPerformanceTrace = running;
+  }
+
+  storeTraceRecording(result: TraceResult): void {
+    this._traceRecordings.push(result);
+  }
+
+  recordedTraces(): TraceResult[] {
+    return this._traceRecordings;
   }
 }

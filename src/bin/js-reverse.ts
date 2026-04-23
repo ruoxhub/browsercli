@@ -27,7 +27,7 @@
 import {runAxiCli, type AxiCliCommand} from 'axi-sdk-js';
 import {resolveConfig} from '../config.js';
 import {SekiroInvoker} from '../cli/sekiro-invoker.js';
-import {getWorkerState} from '../index.js';
+import {WorkerManager} from '../cli/worker-manager.js';
 import {generateTopLevelHelp, generateCommandHelp} from '../cli/help.js';
 import {startCommand} from '../cli/commands/start.js';
 import {stopCommand} from '../cli/commands/stop.js';
@@ -70,13 +70,13 @@ runAxiCli<WorkerContext>({
   resolveContext: () => {
     const resolvedConfig = resolveConfig();
     const invoker = new SekiroInvoker({sekiroHost: resolvedConfig.sekiroHost});
-    const workerState = getWorkerState();
+    const workerManager = new WorkerManager();
 
     const ctx: WorkerContext = {
       sekiroHost: resolvedConfig.sekiroHost,
       group: resolvedConfig.group,
       invoker,
-      workerState,
+      workerManager,
       resolvedConfig,
       config: {
         browserUrl: resolvedConfig.browserUrl,

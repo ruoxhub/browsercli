@@ -5,8 +5,8 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
-import type {Page} from './types.js';
 import type {FrameInfo, ListFramesResult} from './types.js';
+import type {ToolContextProvider} from '../../worker/ToolContextProvider.js';
 
 /**
  * 计算 Frame 的嵌套深度。
@@ -26,13 +26,25 @@ function getFrameDepth(frame: Frame): number {
  *
  * 遍历 Page 上的所有 Frame，返回每个 Frame 的索引、URL、名称和嵌套深度。
  *
- * @param page - Puppeteer Page 对象
+ * @param runtime - ToolContextProvider 运行时上下文
  * @returns 结构化结果对象，data 包含 Frame 信息列表
  */
-export async function listFrames(page: Page): Promise<ListFramesResult> {
+export async function listFrames(
+  runtime: ToolContextProvider,
+): Promise<ListFramesResult> {
   const tooltype = 'list_frames';
 
   try {
+    const page = runtime.getSelectedPage();
+    if (!page) {
+      return {
+        success: false,
+        message: '没有可用的页面，请先导航到目标页面',
+        tooltype,
+        data: [],
+      };
+    }
+
     const frames = page.frames();
 
     if (frames.length === 0) {
@@ -44,14 +56,17 @@ export async function listFrames(page: Page): Promise<ListFramesResult> {
       };
     }
 
+    const selectedFrame = runtime.getSelectedFrame();
     const frameInfos: FrameInfo[] = frames.map((frame, index) => {
       const depth = getFrameDepth(frame);
       const name = frame.name() || undefined;
+      const isSelected = frame === selectedFrame;
       return {
         index,
         url: frame.url() || '(empty)',
         ...(name ? {name} : {}),
         depth,
+        ...(isSelected ? {selected: true} : {}),
       };
     });
 

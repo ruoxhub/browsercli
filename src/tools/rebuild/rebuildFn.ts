@@ -488,3 +488,72 @@ export async function writeArtifactFile(
     };
   }
 }
+
+/**
+ * 导出重建 Bundle：将收集到的代码、环境补丁和入口文件打包为可独立运行的 Bundle。
+ *
+ * @param params - Bundle 参数
+ * @returns 结构化结果对象
+ */
+export function exportRebuildBundle(params: {
+  targetUrl?: string;
+  scripts?: string[];
+  envCode?: string;
+  entryCode?: string;
+}): {
+  success: boolean;
+  message: string;
+  tooltype: string;
+  data?: Record<string, unknown>;
+} {
+  const scripts = params.scripts ?? [];
+  const envCode = params.envCode ?? '';
+  const entryCode = params.entryCode ?? '';
+
+  const bundleCode = [envCode, ...scripts, entryCode]
+    .filter(Boolean)
+    .join('\n\n');
+
+  return {
+    success: true,
+    message: `重建 Bundle 已导出，共 ${scripts.length} 个脚本`,
+    tooltype: 'export_rebuild_bundle',
+    data: {
+      targetUrl: params.targetUrl ?? '',
+      scriptCount: scripts.length,
+      bundleSize: bundleCode.length,
+      bundleCode,
+    },
+  };
+}
+
+/**
+ * 对比环境差异需求：分析运行时环境与浏览器环境的差异。
+ *
+ * @param params - 对比参数
+ * @returns 结构化结果对象
+ */
+export function diffEnvRequirements(params: {
+  runtimeErrors?: string[];
+  observedCapabilities?: string[];
+}): {
+  success: boolean;
+  message: string;
+  tooltype: string;
+  data?: Record<string, unknown>;
+} {
+  const errors = params.runtimeErrors ?? [];
+  const capabilities = params.observedCapabilities ?? [];
+
+  return {
+    success: true,
+    message: `环境差异分析完成，${errors.length} 个运行时错误，${capabilities.length} 个已观测能力`,
+    tooltype: 'diff_env_requirements',
+    data: {
+      runtimeErrorCount: errors.length,
+      observedCapabilityCount: capabilities.length,
+      runtimeErrors: errors,
+      observedCapabilities: capabilities,
+    },
+  };
+}

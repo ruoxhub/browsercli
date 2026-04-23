@@ -9,7 +9,7 @@ export {buildHookTimeline} from './timeline.js';
 export {correlateNetworkFlows} from './flows.js';
 export {buildUrlPattern, buildRequestFingerprints, buildPriorityTargets} from './fingerprints.js';
 export {extractSignatureChainHints} from './signature.js';
-export {buildActionPlan, buildWhyTheseSteps, buildStopConditions} from './reports.js';
+export {buildActionPlan, buildWhyTheseSteps, buildStopConditions, recordReverseEvidence, exportSessionReport} from './reports.js';
 export {pickHookTypes} from './hooks.js';
 export {analyzeTarget} from './analyzeTarget.js';
 export {deobfuscateCode} from './deobfuscate.js';

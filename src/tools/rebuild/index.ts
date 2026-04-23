@@ -15,6 +15,8 @@ export {
   pickTargetScript,
   inferMissingCapabilities,
   writeArtifactFile,
+  exportRebuildBundle,
+  diffEnvRequirements,
 } from './rebuildFn.js';
 
 export type {

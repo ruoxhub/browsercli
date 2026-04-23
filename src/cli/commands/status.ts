@@ -11,8 +11,9 @@ export const statusCommand: AxiCliCommand<WorkerContext> = async (
   _args,
   ctx,
 ) => {
-  const workerState = ctx?.workerState;
-  const isRunning = workerState?.running ?? false;
+  const workerManager = ctx?.workerManager;
+  const isRunning = workerManager?.isRunning() ?? false;
+  const pid = workerManager?.getPid() ?? null;
 
   if (!isRunning) {
     return {
@@ -32,8 +33,10 @@ export const statusCommand: AxiCliCommand<WorkerContext> = async (
 
   if (cfg && invoker) {
     try {
-      const clients = await invoker.listClients(cfg.group) as {clients?: unknown[]};
-      onlineClients = clients.clients?.length ?? 0;
+      const clients = await invoker.listClients(cfg.group) as {data?: unknown[]; clients?: unknown[]};
+      // Sekiro clientQueue 返回格式: {data: [...], status: 0}
+      const clientList = clients.data ?? clients.clients;
+      onlineClients = Array.isArray(clientList) ? clientList.length : 0;
       sekiroConnected = onlineClients > 0;
     } catch {
       sekiroConnected = false;
@@ -43,6 +46,7 @@ export const statusCommand: AxiCliCommand<WorkerContext> = async (
   const output: Record<string, unknown> = {
     command: 'status',
     running: true,
+    pid,
     sekiroConnected,
     onlineClients,
   };
