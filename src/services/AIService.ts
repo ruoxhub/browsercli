@@ -40,20 +40,10 @@ export interface AIProvider {
 }
 
 export interface AIConfig {
-  provider: 'openai' | 'anthropic' | 'gemini';
+  provider: 'openai';
   openai?: {
     apiKey: string;
     baseURL?: string;
-    model?: string;
-  };
-  anthropic?: {
-    apiKey: string;
-    model?: string;
-  };
-  gemini?: {
-    apiKey?: string;
-    cliPath?: string;
-    useAPI?: boolean;
     model?: string;
   };
 }
