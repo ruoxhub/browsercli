@@ -52,6 +52,30 @@ export interface AnalyzeTargetParams {
 export async function analyzeTarget(
   params: AnalyzeTargetParams,
 ): Promise<AnalyzeTargetResult> {
+  if (!params?.url) {
+    return {
+      success: false,
+      message: 'analyze_target requires a "url" parameter',
+      tooltype: 'analyze_target',
+      data: {
+        target: '',
+        durationMs: 0,
+        collection: {totalCollected: 0, selectedForAnalysis: 0, dependencies: {nodes: [], edges: []}},
+        analysis: {qualityScore: 0, securityRiskCount: 0, cryptoAlgorithms: []},
+        deobfuscation: null,
+        hooks: {preset: 'none', autoInjected: false, hookIds: [], totalRecords: 0, activeUrls: [], correlatedFlows: [], suspiciousFlows: [], timelineSample: []},
+        requestFingerprints: [],
+        priorityTargets: [],
+        signatureChain: {signatureParams: [], candidateFunctions: [], requestSinks: []},
+        actionPlan: [],
+        recommendedNextSteps: [],
+        whyTheseSteps: [],
+        stopIf: [],
+        nextActions: [],
+      },
+    };
+  }
+
   const startedAt = Date.now();
   const hookPreset = params.hookPreset ?? 'api-signature';
   const autoInjectHooks = params.autoInjectHooks ?? true;
@@ -59,7 +83,15 @@ export async function analyzeTarget(
   const maxCorrelatedFlows = params.maxCorrelatedFlows ?? 20;
   const maxFingerprints = params.maxFingerprints ?? 12;
 
-  const hookTimeline = buildHookTimeline(params.hookRecords);
+  const hookRecords = params.hookRecords ?? [];
+  const injectedHooks = params.injectedHooks ?? [];
+  const normalizedFiles = params.normalizedFiles ?? [];
+  const candidateFiles = params.candidateFiles ?? [];
+  const analysisCode = params.analysisCode ?? '';
+  const understandResult = params.understandResult ?? {qualityScore: 0, securityRisks: []};
+  const cryptoResult = params.cryptoResult ?? {algorithms: []};
+
+  const hookTimeline = buildHookTimeline(hookRecords);
   const urlActivity = hookTimeline.reduce<Record<string, number>>(
     (acc, item) => {
       if (item.url) {
@@ -85,7 +117,7 @@ export async function analyzeTarget(
     correlatedFlows,
     maxFingerprints,
   );
-  const signatureHints = extractSignatureChainHints(params.analysisCode);
+  const signatureHints = extractSignatureChainHints(analysisCode);
   const priorityTargets = buildPriorityTargets({
     requestFingerprints,
     signatureHints,
@@ -93,7 +125,7 @@ export async function analyzeTarget(
   });
   const actionPlan = buildActionPlan({
     target: params.url,
-    topHookIds: params.injectedHooks,
+    topHookIds: injectedHooks,
     suspiciousFlows,
     priorityTargets,
     signatureHints,
@@ -107,14 +139,14 @@ export async function analyzeTarget(
     target: params.url,
     durationMs: Date.now() - startedAt,
     collection: {
-      totalCollected: params.normalizedFiles.length,
-      selectedForAnalysis: params.candidateFiles.length,
+      totalCollected: normalizedFiles.length,
+      selectedForAnalysis: candidateFiles.length,
       dependencies: collectionDependencies,
     },
     analysis: {
-      qualityScore: params.understandResult.qualityScore,
-      securityRiskCount: params.understandResult.securityRisks.length,
-      cryptoAlgorithms: params.cryptoResult.algorithms.map(item => item.name),
+      qualityScore: understandResult.qualityScore,
+      securityRiskCount: understandResult.securityRisks.length,
+      cryptoAlgorithms: cryptoResult.algorithms.map(item => item.name),
     },
     deobfuscation: params.deobfuscationResult
       ? {
@@ -126,7 +158,7 @@ export async function analyzeTarget(
     hooks: {
       preset: hookPreset,
       autoInjected: autoInjectHooks,
-      hookIds: params.injectedHooks,
+      hookIds: injectedHooks,
       totalRecords: hookTimeline.length,
       activeUrls,
       correlatedFlows,
@@ -148,13 +180,13 @@ export async function analyzeTarget(
       suspiciousFlowCount: suspiciousFlows.length,
     }),
     nextActions: [
-      params.cryptoResult.algorithms.length > 0
+      cryptoResult.algorithms.length > 0
         ? 'Focus on crypto-related files from top-priority list.'
         : null,
       hookTimeline.length === 0
         ? 'Trigger page interactions and rerun get_hook_data / analyze_target.'
         : null,
-      params.understandResult.securityRisks.length > 0
+      understandResult.securityRisks.length > 0
         ? 'Review high-severity security findings and verify call stacks.'
         : null,
     ].filter((item): item is string => Boolean(item)),

@@ -15,13 +15,15 @@ import type {
 
 /**
  * 将 HTTPRequest 序列化为结构化数据。
+ *
+ * Playwright 的 request.response() 是异步的，需要 await。
  */
-function serializeRequest(
+async function serializeRequest(
   request: HTTPRequest,
   reqid: number,
   runtime: NetworkRuntimeServices,
-): NetworkRequestData {
-  const httpResponse = request.response();
+): Promise<NetworkRequestData> {
+  const httpResponse = await request.response();
   return {
     reqid,
     url: request.url(),
@@ -60,11 +62,13 @@ export async function listNetworkRequests(
       });
     }
 
-    // 序列化
-    const allData: NetworkRequestData[] = requests.map(request => {
-      const reqid = runtime.getNetworkRequestStableId(request);
-      return serializeRequest(request, reqid, runtime);
-    });
+    // 序列化（Playwright request.response() 是异步的）
+    const allData: NetworkRequestData[] = await Promise.all(
+      requests.map(async request => {
+        const reqid = runtime.getNetworkRequestStableId(request);
+        return serializeRequest(request, reqid, runtime);
+      }),
+    );
 
     // 分页
     const total = allData.length;

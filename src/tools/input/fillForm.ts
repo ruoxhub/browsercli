@@ -11,8 +11,18 @@ export async function fillForm(
   frame: Frame,
   params: FillFormParams,
 ): Promise<FillFormResult> {
-  const {elements} = params;
+  const elements = params?.elements;
   const tooltype = 'fill_form';
+
+  if (!Array.isArray(elements) || elements.length === 0) {
+    return {
+      success: false,
+      message: 'fill_form requires a non-empty "elements" array',
+      tooltype,
+      data: {filled: 0, total: 0},
+    };
+  }
+
   const page = frame.page();
   const total = elements.length;
   let filled = 0;

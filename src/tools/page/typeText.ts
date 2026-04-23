@@ -24,6 +24,20 @@ export async function typeText(
   params: TypeTextParams,
 ): Promise<TypeTextResult> {
   try {
+    if (!params?.selector || !params?.text) {
+      return {
+        success: false,
+        message: 'type_text requires "selector" and "text" parameters',
+        tooltype: 'type_text',
+        logFormat: 'json',
+        data: {
+          selector: params?.selector ?? '',
+          textLength: 0,
+          typed: false,
+        },
+      };
+    }
+
     const page = await runtime.getActivePage();
     // Playwright: page.type(selector, text, options) - compatible
     // But prefer page.fill() for direct input, page.type() for char-by-char

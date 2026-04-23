@@ -887,7 +887,22 @@ function formatBytes(bytes: number): string {
  * 纯函数：对 JS 代码执行 AST 转换，不依赖 MCP Tool 框架。
  */
 export function deobfuscateCode(params: DeobfuscateParams): DeobfuscateResult {
-  const {code, mode, clearExtra, clearUnused} = params;
+  const {mode, clearExtra, clearUnused} = params ?? {};
+
+  if (!params?.code || typeof params.code !== 'string') {
+    return {
+      success: false,
+      message: 'deobfuscate_code_vj requires a "code" string parameter',
+      tooltype: 'deobfuscate_code_vj',
+      result: '',
+      origLines: 0,
+      resultLines: 0,
+      origBytes: 0,
+      resultBytes: 0,
+    };
+  }
+
+  const {code} = params;
 
   try {
     let result: string;

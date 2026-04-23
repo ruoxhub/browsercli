@@ -18,11 +18,21 @@ export async function antiAntiDebug(
   frame: Frame,
   features: AntiAntiDebugFeature[],
 ): Promise<HookResult> {
+  const safeFeatures = Array.isArray(features) ? features : [];
+
+  if (safeFeatures.length === 0) {
+    return {
+      success: false,
+      message: 'anti_anti_debug requires a non-empty "features" array (e.g. ["fixedWindowSize", "hideWebdriver"])',
+      tooltype: 'anti_anti_debug',
+    };
+  }
+
   const hookCodes: string[] = [];
   const installedFeatures: string[] = [];
 
   // Fixed Window Size
-  if (features.includes('fixedWindowSize')) {
+  if (safeFeatures.includes('fixedWindowSize')) {
     hookCodes.push(`
 (function() {
   'use strict';
@@ -39,7 +49,7 @@ export async function antiAntiDebug(
   }
 
   // Fixed Time
-  if (features.includes('fixedTime')) {
+  if (safeFeatures.includes('fixedTime')) {
     hookCodes.push(`
 (function() {
   'use strict';
@@ -59,7 +69,7 @@ export async function antiAntiDebug(
   }
 
   // Prevent Close
-  if (features.includes('preventClose')) {
+  if (safeFeatures.includes('preventClose')) {
     hookCodes.push(`
 (function() {
   'use strict';
@@ -73,7 +83,7 @@ export async function antiAntiDebug(
   }
 
   // Prevent History Back
-  if (features.includes('preventHistoryBack')) {
+  if (safeFeatures.includes('preventHistoryBack')) {
     hookCodes.push(`
 (function() {
   'use strict';
@@ -94,7 +104,7 @@ export async function antiAntiDebug(
   }
 
   // Prevent Console Clear
-  if (features.includes('preventConsoleClear')) {
+  if (safeFeatures.includes('preventConsoleClear')) {
     hookCodes.push(`
 (function() {
   'use strict';
@@ -109,7 +119,7 @@ export async function antiAntiDebug(
   }
 
   // Hide Webdriver
-  if (features.includes('hideWebdriver')) {
+  if (safeFeatures.includes('hideWebdriver')) {
     hookCodes.push(`
 (function() {
   'use strict';

@@ -19,7 +19,16 @@ export async function hookFunction(
   params: HookFunctionParams,
 ): Promise<HookFunctionResult> {
   const {target, logArgs = true, logResult = true, logStack = false, hookId} =
-    params;
+    params ?? {};
+
+  if (!target || typeof target !== 'string') {
+    return {
+      success: false,
+      message: 'hook_function requires a "target" string parameter (e.g. "XMLHttpRequest.prototype.open")',
+      tooltype: 'hook_function',
+    };
+  }
+
   const id = hookId || target.replace(/[^a-zA-Z0-9]/g, '_');
 
   // Split target into object path and method

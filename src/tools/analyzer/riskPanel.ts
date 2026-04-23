@@ -14,6 +14,27 @@ export async function riskPanel(
     topN?: number;
   },
 ): Promise<RiskPanelResult> {
+  if (!runtime?.analyzer?.understand || !runtime?.cryptoDetector?.detect) {
+    return {
+      success: false,
+      message: 'risk_panel requires analyzer.understand and cryptoDetector.detect runtime services',
+      tooltype: 'riskPanel',
+      data: {
+        score: 0,
+        level: 'low',
+        factors: {
+          securityRisks: 0,
+          highSeverityRisks: 0,
+          cryptoAlgorithms: 0,
+          cryptoIssues: 0,
+          dangerousAlgorithms: [],
+          hookSignals: 0,
+        },
+        recommendations: [],
+      },
+    };
+  }
+
   const [understand, crypto] = await Promise.all([
     runtime.analyzer.understand({
       code: params.code ?? '',

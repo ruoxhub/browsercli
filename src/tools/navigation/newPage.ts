@@ -33,6 +33,10 @@ export async function newPage(
   try {
     const page = await runtime.newPage();
 
+    // 自动选中新创建的页面
+    runtime.selectPage(page);
+    runtime.syncPageContext?.(page);
+
     await page.goto(url, {
       timeout: timeout ?? DEFAULT_NAV_TIMEOUT,
       waitUntil: 'domcontentloaded',

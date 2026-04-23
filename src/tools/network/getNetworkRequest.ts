@@ -53,7 +53,7 @@ export async function getNetworkRequest(
     }
 
     const request = runtime.getNetworkRequestById(reqid);
-    const httpResponse = request.response();
+    const httpResponse = await request.response();
     const data: GetNetworkRequestData = {
       reqid,
       url: request.url(),

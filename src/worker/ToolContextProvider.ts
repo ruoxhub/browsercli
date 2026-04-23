@@ -11,9 +11,26 @@
  * 作为 ToolAdapter 与纯函数工具之间的桥梁。
  */
 
-import type {Browser, BrowserContext, Frame, Page} from 'playwright-core';
+import type {Browser, BrowserContext, Frame, Page, Request} from 'playwright-core';
+import type {HTTPRequest} from '../third_party/index.js';
+import type {RequestInitiator} from '../tools/network/types.js';
 
 type TraceResult = unknown;
+
+/**
+ * 带稳定 ID 的请求记录
+ */
+interface TrackedRequest {
+  stableId: number;
+  request: Request;
+  initiator?: RequestInitiator;
+}
+
+/**
+ * 单个 Page 的导航分组存储
+ * navigations[0] 为当前导航，后续为保留的历史导航
+ */
+type PageRequestStorage = Array<TrackedRequest[]>;
 
 export class ToolContextProvider {
   private selectedPage: Page | null = null;
@@ -23,6 +40,18 @@ export class ToolContextProvider {
   private _context: BrowserContext | null = null;
   private _isRunningPerformanceTrace = false;
   private _traceRecordings: TraceResult[] = [];
+
+  // ─── 网络请求收集 ────────────────────────────────────
+  private _networkStorage = new WeakMap<Page, PageRequestStorage>();
+  private _idGenerators = new WeakMap<Page, () => number>();
+  private _maxNavigationSaved = 3;
+  private _pageListeners = new WeakMap<
+    Page,
+    {onRequest: (req: Request) => void; onFrameNavigated: () => void}
+  >();
+  private _contextListener:
+    | {onPage: (page: Page) => void}
+    | null = null;
 
   constructor() {}
 
@@ -38,6 +67,7 @@ export class ToolContextProvider {
 
   setContext(context: BrowserContext): void {
     this._context = context;
+    this._startNetworkCollection(context);
   }
 
   getContext(): BrowserContext | null {
@@ -135,26 +165,198 @@ export class ToolContextProvider {
   }
 
   async isCollectorRunning(): Promise<boolean> {
-    // TODO: 集成 Collector 状态
-    return false;
+    return !!this._context;
   }
 
-  // ─── NetworkRuntimeServices (stub) ────────────────────
+  // ─── 网络请求收集（Playwright 原生实现） ──────────────
 
-  getNetworkRequests(_includePreservedRequests?: boolean): unknown[] {
-    // TODO: 集成网络请求收集器
-    return [];
+  /**
+   * 启动网络请求收集：监听 BrowserContext 的 page 和 request 事件
+   */
+  private _startNetworkCollection(context: BrowserContext): void {
+    // 为 context 中已有页面注册收集
+    for (const page of context.pages()) {
+      this._attachPageListeners(page);
+    }
+
+    // 监听新页面创建
+    const onPage = (page: Page) => {
+      this._attachPageListeners(page);
+    };
+    this._contextListener = {onPage};
+    context.on('page', onPage);
   }
 
-  getNetworkRequestById(_reqid: number): unknown {
-    throw new Error('网络请求收集器未集成');
+  /**
+   * 为单个 Page 注册 request 和 framenavigated 监听
+   */
+  private _attachPageListeners(page: Page): void {
+    if (this._networkStorage.has(page)) {
+      return;
+    }
+
+    // 初始化存储和 ID 生成器
+    const idGenerator = this._createIdGenerator();
+    this._idGenerators.set(page, idGenerator);
+    const storage: PageRequestStorage = [[]];
+    this._networkStorage.set(page, storage);
+
+    // 监听请求
+    const onRequest = (req: Request): void => {
+      const navigations = this._networkStorage.get(page);
+      if (!navigations) return;
+      const tracked: TrackedRequest = {
+        stableId: idGenerator(),
+        request: req,
+      };
+      navigations[0]!.push(tracked);
+    };
+    page.on('request', onRequest);
+
+    // 主 frame 导航时分割存储
+    const onFrameNavigated = (): void => {
+      this._splitAfterNavigation(page);
+    };
+    page.on('framenavigated', (frame: Frame) => {
+      if (frame === page.mainFrame()) {
+        onFrameNavigated();
+      }
+    });
+
+    this._pageListeners.set(page, {onRequest, onFrameNavigated});
+
+    // 页面关闭时清理
+    page.once('close', () => {
+      this._detachPageListeners(page);
+    });
   }
 
-  getNetworkRequestStableId(_request: unknown): number {
+  /**
+   * 清理 Page 的监听和存储
+   */
+  private _detachPageListeners(page: Page): void {
+    const listeners = this._pageListeners.get(page);
+    if (listeners) {
+      try {
+        page.off('request', listeners.onRequest);
+      } catch {
+        // Page might already be closed
+      }
+    }
+    this._pageListeners.delete(page);
+    this._networkStorage.delete(page);
+    this._idGenerators.delete(page);
+  }
+
+  /**
+   * 主 frame 导航后分割请求存储
+   *
+   * 找到最后一个导航请求（主 frame 的 document 类型请求），
+   * 将该请求及其之后的所有请求移到新导航组，
+   * 确保导航请求不会丢失在历史导航中。
+   */
+  private _splitAfterNavigation(page: Page): void {
+    const navigations = this._networkStorage.get(page);
+    if (!navigations) return;
+
+    const requests = navigations[0]!;
+
+    // 找到最后一个属于主 frame 的导航请求（resourceType === 'document'）
+    const lastNavIdx = requests.findLastIndex(tracked => {
+      const req = tracked.request;
+      return req.frame() === page.mainFrame()
+        && req.resourceType() === 'document';
+    });
+
+    if (lastNavIdx !== -1) {
+      // 保留导航请求及其之后的所有请求到新导航组
+      const fromCurrentNavigation = requests.splice(lastNavIdx);
+      navigations.unshift(fromCurrentNavigation);
+    } else {
+      navigations.unshift([]);
+    }
+
+    navigations.splice(this._maxNavigationSaved);
+  }
+
+  private _createIdGenerator(): () => number {
+    let i = 1;
+    return () => {
+      if (i === Number.MAX_SAFE_INTEGER) {
+        i = 0;
+      }
+      return i++;
+    };
+  }
+
+  // ─── NetworkRuntimeServices ───────────────────────────
+
+  getNetworkRequests(includePreservedRequests?: boolean): HTTPRequest[] {
+    const page = this.selectedPage;
+    if (!page) return [];
+
+    const navigations = this._networkStorage.get(page);
+    if (!navigations) return [];
+
+    if (!includePreservedRequests) {
+      return navigations[0]!.map(t => t.request as unknown as HTTPRequest);
+    }
+
+    const requests: HTTPRequest[] = [];
+    for (let index = this._maxNavigationSaved; index >= 0; index--) {
+      if (navigations[index]) {
+        requests.push(
+          ...navigations[index]!.map(t => t.request as unknown as HTTPRequest),
+        );
+      }
+    }
+    return requests;
+  }
+
+  getNetworkRequestById(reqid: number): HTTPRequest {
+    const page = this.selectedPage;
+    if (!page) {
+      throw new Error('未选中页面');
+    }
+
+    const navigations = this._networkStorage.get(page);
+    if (!navigations) {
+      throw new Error('当前页面没有请求记录');
+    }
+
+    for (const navigation of navigations) {
+      const found = navigation.find(t => t.stableId === reqid);
+      if (found) {
+        return found.request as unknown as HTTPRequest;
+      }
+    }
+
+    throw new Error(`请求 ID ${reqid} 未找到`);
+  }
+
+  getNetworkRequestStableId(request: unknown): number {
+    if (!this.selectedPage) return -1;
+
+    const navigations = this._networkStorage.get(this.selectedPage);
+    if (!navigations) return -1;
+
+    for (const navigation of navigations) {
+      const found = navigation.find(
+        t => t.request === (request as Request),
+      );
+      if (found) return found.stableId;
+    }
     return -1;
   }
 
-  getRequestInitiator(_request: unknown): undefined {
+  getRequestInitiator(request: unknown): RequestInitiator | undefined {
+    // Playwright 的 Request 对象有 initiator() 方法
+    const req = request as Request;
+    // @ts-expect-error initiator() may not be on the public Playwright type
+    if (typeof req.initiator === 'function') {
+      // @ts-expect-error Playwright internal
+      return req.initiator() as RequestInitiator;
+    }
     return undefined;
   }
 
