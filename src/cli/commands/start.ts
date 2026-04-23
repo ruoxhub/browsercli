@@ -5,13 +5,13 @@
  */
 
 import type {AxiCliCommand} from 'axi-sdk-js';
-import type {DaemonContext} from '../types.js';
-import {AxiError} from '../errors.js';
+import type {WorkerContext} from '../types.js';
+import {AxiError} from 'axi-sdk-js';
 import {parseArgs, getFlag, getBoolFlag} from '../args-parser.js';
 import {successOutput} from '../output.js';
 import {SekiroInvoker} from '../sekiro-invoker.js';
-import {WorkerManager} from '../worker-manager.js';
-import {resolveConfig} from '../config.js';
+import {resolveConfig} from '../../config.js';
+import {main as workerMain} from '../../index.js';
 
 const BROWSER_POLL_ATTEMPTS = 60;
 const BROWSER_POLL_INTERVAL_MS = 500;
@@ -44,7 +44,7 @@ async function waitForBrowserReachable(browserUrl: string): Promise<void> {
   );
 }
 
-export const startCommand: AxiCliCommand<DaemonContext> = async (
+export const startCommand: AxiCliCommand<WorkerContext> = async (
   args,
   ctx,
 ) => {
@@ -81,15 +81,15 @@ export const startCommand: AxiCliCommand<DaemonContext> = async (
   }
 
   // 2. 检查 Worker 是否已在运行
-  const workerManager = ctx?.workerManager ?? new WorkerManager();
-  if (workerManager.isRunning()) {
+  const workerState = ctx?.workerState;
+  if (workerState?.running) {
     throw new AxiError('Worker 已经在运行中', 'WORKER_ALREADY_RUNNING', [
       '如需重启，请先执行：js-reverse stop',
     ]);
   }
 
-  // 3. spawn Worker 进程
-  await workerManager.start({
+  // 3. 直接在当前进程中启动 Worker
+  await workerMain({
     sekiroHost: cfg.sekiroHost,
     group: cfg.group,
     browserUrl: cfg.browserUrl,

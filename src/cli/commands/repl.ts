@@ -7,10 +7,11 @@
 import * as readline from 'node:readline';
 
 import type {AxiCliCommand} from 'axi-sdk-js';
-import type {DaemonContext} from '../types.js';
+import type {WorkerContext} from '../types.js';
 import {SekiroInvoker} from '../sekiro-invoker.js';
-import {WorkerManager} from '../worker-manager.js';
-import {resolveConfig} from '../config.js';
+import type {WorkerState} from '../../index.js';
+import {getWorkerState} from '../../index.js';
+import {resolveConfig} from '../../config.js';
 
 const REPL_COMMANDS = [
   'status',
@@ -28,12 +29,12 @@ class ReplSession {
   private skillNames: string[] | null = null;
   private toolNames: string[] | null = null;
   private readonly invoker: SekiroInvoker;
-  private readonly workerManager: WorkerManager;
+  private readonly workerState: WorkerState;
   private readonly group: string;
 
-  constructor(invoker: SekiroInvoker, workerManager: WorkerManager, group: string) {
+  constructor(invoker: SekiroInvoker, workerState: WorkerState, group: string) {
     this.invoker = invoker;
-    this.workerManager = workerManager;
+    this.workerState = workerState;
     this.group = group;
   }
 
@@ -128,10 +129,9 @@ class ReplSession {
     }
 
     if (trimmed === 'status') {
-      const running = this.workerManager.isRunning();
-      const pid = this.workerManager.getPid();
+      const running = this.workerState.running;
       if (running) {
-        replLog(`状态：PID=${pid} | Worker 运行中`);
+        replLog('状态：Worker 运行中');
       } else {
         replLog('状态：Worker 未运行');
       }
@@ -224,19 +224,18 @@ export async function complete(input: string): Promise<string[]> {
   return [];
 }
 
-export const replCommand: AxiCliCommand<DaemonContext> = async (
+export const replCommand: AxiCliCommand<WorkerContext> = async (
   _args,
   ctx,
 ) => {
   const cfg = ctx?.resolvedConfig ?? resolveConfig();
   const invoker = ctx?.invoker ?? new SekiroInvoker({sekiroHost: cfg.sekiroHost});
-  const workerManager = ctx?.workerManager ?? new WorkerManager();
+  const workerState = ctx?.workerState ?? getWorkerState();
 
-  const session = new ReplSession(invoker, workerManager, cfg.group);
+  const session = new ReplSession(invoker, workerState, cfg.group);
 
-  if (workerManager.isRunning()) {
-    const pid = workerManager.getPid();
-    replLog(`Worker 运行中 (PID: ${pid})`);
+  if (workerState.running) {
+    replLog('Worker 运行中');
   } else {
     replLog('Worker 未运行，请先执行：js-reverse start --browserUrl <url>');
     replLog('');

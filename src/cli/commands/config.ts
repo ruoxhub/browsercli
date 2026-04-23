@@ -17,8 +17,8 @@
  */
 
 import type {AxiCliCommand} from 'axi-sdk-js';
-import type {DaemonContext} from '../types.js';
-import {AxiError} from '../errors.js';
+import type {WorkerContext} from '../types.js';
+import {AxiError} from 'axi-sdk-js';
 import {successOutput} from '../output.js';
 import {parseArgs, getFlag, hasFlag} from '../args-parser.js';
 import {
@@ -31,8 +31,9 @@ import {
   getProjectConfigPath,
   loadUserConfig,
   loadProjectConfig,
+  writeConfigFile,
   type GlobalConfig,
-} from '../config.js';
+} from '../../config.js';
 
 /** 配置键 → 描述 */
 const CONFIG_KEY_DESCRIPTIONS: Record<string, string> = {
@@ -108,7 +109,7 @@ function coerceValue(key: string, value: string): unknown {
   return value;
 }
 
-export const configCommand: AxiCliCommand<DaemonContext> = async (
+export const configCommand: AxiCliCommand<WorkerContext> = async (
   args,
   _ctx,
 ) => {
@@ -146,7 +147,6 @@ export const configCommand: AxiCliCommand<DaemonContext> = async (
       const parent = (existing as Record<string, unknown>)[parentKey] as Record<string, unknown> | undefined ?? {};
       parent[subKey] = coerced;
       (existing as Record<string, unknown>)[parentKey] = parent;
-      const {writeConfigFile} = await import('../config.js');
       writeConfigFile(getUserConfigPath(), existing);
     } else {
       setUserConfigValue(key as keyof GlobalConfig, coerced);
@@ -189,7 +189,6 @@ export const configCommand: AxiCliCommand<DaemonContext> = async (
         const parent = (existing as Record<string, unknown>)[parentKey] as Record<string, unknown> | undefined;
         if (parent && subKey in parent) {
           delete parent[subKey];
-          const {writeConfigFile} = await import('../config.js');
           writeConfigFile(getUserConfigPath(), existing);
           return successOutput({
             command: 'config',

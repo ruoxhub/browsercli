@@ -1,11 +1,11 @@
 {
   "name": "js-reverse-mcp",
   "version": "2.0.3",
-  "description": "MCP server for JavaScript reverse engineering and debugging",
+  "description": "JavaScript reverse engineering and debugging",
   "type": "module",
   "bin": {
     "js-reverse": "./build/src/bin/js-reverse.js",
-    "js-reverse-worker": "./build/src/worker/index.js"
+    "js-reverse-worker": "./build/src/index.js"
   },
   "main": "index.js",
   "scripts": {
@@ -19,6 +19,7 @@
     "docs": "npm run build && npm run docs:generate && npm run format",
     "docs:generate": "node --experimental-strip-types scripts/generate-docs.ts",
     "start": "npm run build && node build/src/index.js",
+    "run": "node build/src/index.js",
     "start-debug": "DEBUG=mcp:* DEBUG_COLORS=false npm run build && node build/src/index.js",
     "test:node20": "node --require ./build/tests/setup.js --test-reporter spec --test-force-exit --test build/tests",
     "test": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test-reporter spec --test-force-exit --test \"build/tests/**/*.test.js\"",
@@ -73,9 +74,6 @@
     "openai": "^4.73.0",
     "pg": "^8.20.0",
     "playwright-core": "^1.59.1",
-    "puppeteer": "^24.42.0",
-    "puppeteer-extra": "^3.3.6",
-    "puppeteer-extra-plugin-stealth": "^2.11.2",
     "sm-crypto": "^0.4.0",
     "terser": "^5.46.1",
     "ws": "^8.20.0",

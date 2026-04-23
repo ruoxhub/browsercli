@@ -5,13 +5,11 @@
  */
 
 import type {AxiCliCommand} from 'axi-sdk-js';
-import type {DaemonContext} from '../types.js';
+import type {WorkerContext} from '../types.js';
 import {tableOutput, successOutput} from '../output.js';
 import {getBoolFlag, parseArgs} from '../args-parser.js';
-import {SekiroInvoker} from '../sekiro-invoker.js';
-import {resolveConfig} from '../config.js';
 
-export const listToolsCommand: AxiCliCommand<DaemonContext> = async (
+export const listToolsCommand: AxiCliCommand<WorkerContext> = async (
   args,
   ctx,
 ) => {
@@ -22,12 +20,14 @@ export const listToolsCommand: AxiCliCommand<DaemonContext> = async (
   let isOffline = false;
 
   try {
-    const cfg = ctx?.resolvedConfig ?? resolveConfig();
-    const invoker = ctx?.invoker ?? new SekiroInvoker({sekiroHost: cfg.sekiroHost});
-    const result = await invoker.invoke(cfg.group, '_list_tools') as {
-      tools?: Array<{name: string; description?: string}>;
-    };
-    tools = result.tools || [];
+    const invoker = ctx?.invoker;
+    const group = ctx?.group;
+    if (invoker && group) {
+      const result = await invoker.invoke(group, '_list_tools') as {
+        tools?: Array<{name: string; description?: string}>;
+      };
+      tools = result.tools || [];
+    }
   } catch {
     isOffline = true;
   }

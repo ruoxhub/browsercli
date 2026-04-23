@@ -5,25 +5,25 @@
  */
 
 import type {AxiCliCommand} from 'axi-sdk-js';
-import type {DaemonContext} from '../types.js';
-import {AxiError} from '../errors.js';
+import type {WorkerContext} from '../types.js';
+import {AxiError} from 'axi-sdk-js';
 import {successOutput} from '../output.js';
-import {WorkerManager} from '../worker-manager.js';
+import {stopWorker} from '../../index.js';
 
-export const stopCommand: AxiCliCommand<DaemonContext> = async (
+export const stopCommand: AxiCliCommand<WorkerContext> = async (
   _args,
   ctx,
 ) => {
-  const workerManager = ctx?.workerManager ?? new WorkerManager();
+  const workerState = ctx?.workerState;
 
-  if (!workerManager.isRunning()) {
+  if (!workerState?.running) {
     throw new AxiError('停止失败：Worker 未运行', 'WORKER_NOT_RUNNING', [
       '请先执行：js-reverse start --browserUrl <chrome-debug-url>',
     ]);
   }
 
   try {
-    await workerManager.stop();
+    await stopWorker();
     return successOutput({
       command: 'stop',
       message: 'Worker 已停止',

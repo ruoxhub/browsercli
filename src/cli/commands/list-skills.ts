@@ -5,12 +5,10 @@
  */
 
 import type {AxiCliCommand} from 'axi-sdk-js';
-import type {DaemonContext} from '../types.js';
+import type {WorkerContext} from '../types.js';
 import {tableOutput, successOutput} from '../output.js';
 import {getBoolFlag, parseArgs} from '../args-parser.js';
-import {SekiroInvoker} from '../sekiro-invoker.js';
 import {getBuiltInSkillDefinitions} from '../../skills/index.js';
-import {resolveConfig} from '../config.js';
 
 interface SkillInfo {
   name: string;
@@ -18,7 +16,7 @@ interface SkillInfo {
   category?: string;
 }
 
-export const listSkillsCommand: AxiCliCommand<DaemonContext> = async (
+export const listSkillsCommand: AxiCliCommand<WorkerContext> = async (
   args,
   ctx,
 ) => {
@@ -29,14 +27,16 @@ export const listSkillsCommand: AxiCliCommand<DaemonContext> = async (
   let source = 'built-in';
 
   try {
-    const cfg = ctx?.resolvedConfig ?? resolveConfig();
-    const invoker = ctx?.invoker ?? new SekiroInvoker({sekiroHost: cfg.sekiroHost});
-    const result = await invoker.invoke(cfg.group, '_list_skills') as {
-      skills?: SkillInfo[];
-    };
-    if (result.skills && result.skills.length > 0) {
-      skills.push(...result.skills);
-      source = 'worker';
+    const invoker = ctx?.invoker;
+    const group = ctx?.group;
+    if (invoker && group) {
+      const result = await invoker.invoke(group, '_list_skills') as {
+        skills?: SkillInfo[];
+      };
+      if (result.skills && result.skills.length > 0) {
+        skills.push(...result.skills);
+        source = 'worker';
+      }
     }
   } catch {
     // Worker not running, use built-in definitions

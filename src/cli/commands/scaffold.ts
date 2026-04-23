@@ -5,8 +5,8 @@
  */
 
 import type {AxiCliCommand} from 'axi-sdk-js';
-import type {DaemonContext} from '../types.js';
-import {AxiError} from '../errors.js';
+import type {WorkerContext} from '../types.js';
+import {AxiError} from 'axi-sdk-js';
 import {parseArgs, getFlag} from '../args-parser.js';
 import {writeFileSync, mkdirSync, existsSync} from 'node:fs';
 import {join, resolve, isAbsolute} from 'node:path';
@@ -60,7 +60,7 @@ const RESERVED_WORDS = new Set([
   'public',
 ]);
 
-export const scaffoldCommand: AxiCliCommand<DaemonContext> = async (
+export const scaffoldCommand: AxiCliCommand<WorkerContext> = async (
   args,
   _ctx,
 ) => {

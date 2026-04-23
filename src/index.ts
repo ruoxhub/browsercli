@@ -22,27 +22,64 @@ import type {ActionHandler} from './types/sekiro.js';
 import type {WorkerStartOptions} from './types/platform.js';
 import {ToolAdapter} from './worker/ToolAdapter.js';
 import {ToolContextProvider} from './worker/ToolContextProvider.js';
+import {BrowserManager} from './browser/index.js';
+import type {BrowserManagerConfig} from './browser/index.js';
+
+// Worker 运行状态
+export interface WorkerState {
+  running: boolean;
+  client: NodeClient | null;
+  browserManager: BrowserManager | null;
+}
+
+const workerState: WorkerState = {
+  running: false,
+  client: null,
+  browserManager: null,
+};
+
+export function getWorkerState(): WorkerState {
+  return workerState;
+}
 
 // 优雅关闭
 let isShuttingDown = false;
 
-async function gracefulShutdown(client: NodeClient, signal: string): Promise<void> {
+async function gracefulShutdown(signal: string): Promise<void> {
   if (isShuttingDown) return;
   isShuttingDown = true;
 
+  const {client, browserManager} = workerState;
   console.log(`[Worker] 收到 ${signal}，开始优雅关闭...`);
 
   // 1. 断开 Sekiro 连接（Server 自动路由到其他 Worker）
-  client.disconnect();
+  if (client) client.disconnect();
 
   // 2. 等待当前 Action 完成（最多 10s）
   // Sekiro 断开后不会再有新请求进来，当前执行的 handler 自然完成
 
   // 3. 关闭浏览器连接
-  // TODO: 集成 BrowserManager 的关闭
+  if (browserManager) {
+    try {
+      await browserManager.close();
+      console.log('[Worker] 浏览器已关闭');
+    } catch (err) {
+      console.error('[Worker] 关闭浏览器失败:', err);
+    }
+  }
+
+  workerState.running = false;
+  workerState.client = null;
+  workerState.browserManager = null;
 
   console.log('[Worker] 已关闭');
-  process.exit(0);
+}
+
+/**
+ * 停止 Worker（供 CLI 调用）
+ */
+export async function stopWorker(): Promise<void> {
+  await gracefulShutdown('stop');
 }
 
 /**
@@ -151,27 +188,47 @@ async function registerSkills(client: NodeClient): Promise<void> {
 }
 
 /**
- * Worker 主函数
+ * Worker 主函数 — 可由 CLI 或独立运行调用
  */
-async function main(): Promise<void> {
-  const options = parseWorkerArgs(process.argv.slice(2));
+export async function main(options?: WorkerStartOptions): Promise<void> {
+  if (workerState.running) {
+    throw new Error('Worker 已在运行中');
+  }
+
+  const opts = options ?? parseWorkerArgs(process.argv.slice(2));
 
   console.log('[Worker] 启动中...');
-  console.log(`[Worker] Sekiro Host: ${options.sekiroHost}`);
-  console.log(`[Worker] Group: ${options.group}`);
+  console.log(`[Worker] Sekiro Host: ${opts.sekiroHost}`);
+  console.log(`[Worker] Group: ${opts.group}`);
 
   // 1. 初始化 ToolContextProvider
   const contextProvider = new ToolContextProvider();
 
-  // TODO: 2. 初始化 BrowserManager，将 Page 注入 contextProvider
-  // const browserManager = await BrowserManager.create({...});
-  // contextProvider.setPages(browserManager.getPages());
-  // contextProvider.setSelectedPage(browserManager.getActivePage());
+  // 2. 初始化 BrowserManager，将 Page 注入 contextProvider
+  const browserConfig: BrowserManagerConfig = {
+    browserURL: opts.browserUrl,
+    wsEndpoint: opts.wsEndpoint,
+    headless: opts.headless,
+    executablePath: opts.executablePath,
+    useStealthScripts: true,
+  };
+
+  const browserManager = BrowserManager.getInstance(browserConfig);
+  const browser = await browserManager.ensureBrowser();
+  console.log(`[Worker] 浏览器已${opts.browserUrl || opts.wsEndpoint ? '连接' : '启动'}: v${browser.version()}`);
+
+  // 获取当前页面并注入 contextProvider
+  const page = await browserManager.newPage();
+  const context = browser.contexts()[0] ?? page.context();
+  contextProvider.setSelectedPage(page);
+  contextProvider.setPages(context.pages());
+  contextProvider.setBrowser(browser);
+  contextProvider.setContext(context);
 
   // 3. 创建 NodeClient
   const client = new NodeClient({
-    group: options.group,
-    sekiroHost: options.sekiroHost,
+    group: opts.group,
+    sekiroHost: opts.sekiroHost,
   });
 
   // 4. 注册内置 Actions
@@ -189,14 +246,22 @@ async function main(): Promise<void> {
   // 7. 连接到 Sekiro Server
   await client.start();
 
+  // 8. 更新运行状态
+  workerState.running = true;
+  workerState.client = client;
+  workerState.browserManager = browserManager;
+
   console.log('[Worker] 已启动并连接到 Sekiro Server');
 
-  // 8. 注册信号处理
-  process.on('SIGTERM', () => gracefulShutdown(client, 'SIGTERM'));
-  process.on('SIGINT', () => gracefulShutdown(client, 'SIGINT'));
+  // 9. 注册信号处理
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 }
 
-main().catch(err => {
-  console.error('[Worker] 启动失败:', err);
-  process.exit(1);
-});
+// 独立运行入口（通过 node 直接执行时）
+if (process.argv[1] && (process.argv[1].endsWith('index.js') || process.argv[1].endsWith('index.ts'))) {
+  main().catch(err => {
+    console.error('[Worker] 启动失败:', err);
+    process.exit(1);
+  });
+}

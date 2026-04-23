@@ -71,13 +71,22 @@ export class ToolAdapter {
 
         const params = sekiroRequest.params || {};
         const page = this.contextProvider.getSelectedPage();
+        const callMode = meta.callMode;
 
-        // 调用 handler — 大部分 tool handler 接受 (frame/page, params) 或 (runtimeServices, params)
-        // 这里提供一个统一的调用方式
+        // 根据 callMode 决定调用方式
         let result: unknown;
-        if (page) {
-          result = await handler(page, params);
+        if (callMode === 'runtime') {
+          // 新模式：handler(runtimeServices, params)
+          result = await handler(this.contextProvider, params);
+        } else if (callMode === 'frame') {
+          // 旧模式：handler(frame/page, params)
+          if (page) {
+            result = await handler(page, params);
+          } else {
+            result = await handler(params);
+          }
         } else {
+          // params-only 或未指定：handler(params)
           result = await handler(params);
         }
 

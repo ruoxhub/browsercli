@@ -10,9 +10,10 @@
  * 配置优先级（高 → 低）：
  * 1. CLI 参数（--sekiroHost 等）
  * 2. 环境变量（SEKIRO_HOST, OPENAI_API_KEY 等）
- * 3. 项目级配置文件（<cwd>/js-reverse.config.json）
- * 4. 用户级配置文件（~/.jsreverserrc.json）
- * 5. 内置默认值
+ * 3. 项目根目录配置文件（<cwd>/config.json）
+ * 4. 项目级配置文件（<cwd>/js-reverse.config.json）
+ * 5. 用户级配置文件（~/.jsreverserrc.json）
+ * 6. 内置默认值
  *
  * 本文件合并了原先分散在以下三处的配置逻辑：
  * - src/cli/global-config.ts（全局配置文件加载/解析）
@@ -57,6 +58,9 @@ const USER_CONFIG_FILENAME = '.jsreverserrc.json';
 
 /** 项目级配置文件名 */
 const PROJECT_CONFIG_FILENAME = 'js-reverse.config.json';
+
+/** 项目根目录 config.json 文件名 */
+const ROOT_CONFIG_FILENAME = 'config.json';
 
 // ==========================================================================
 // 第二部分：类型定义
@@ -204,6 +208,11 @@ export function getProjectConfigPath(cwd?: string): string {
   return path.join(cwd ?? process.cwd(), PROJECT_CONFIG_FILENAME);
 }
 
+/** 获取项目根目录 config.json 路径 (<cwd>/config.json) */
+export function getRootConfigPath(cwd?: string): string {
+  return path.join(cwd ?? process.cwd(), ROOT_CONFIG_FILENAME);
+}
+
 /** 安全读取 JSON 配置文件 */
 function readConfigFile(filePath: string): GlobalConfig | null {
   try {
@@ -250,6 +259,17 @@ export function loadProjectConfig(cwd?: string): ConfigSource {
   };
 }
 
+/** 加载项目根目录 config.json */
+export function loadRootConfig(cwd?: string): ConfigSource {
+  const filePath = getRootConfigPath(cwd);
+  const config = readConfigFile(filePath);
+  return {
+    filePath,
+    exists: config !== null,
+    config: config ?? undefined,
+  };
+}
+
 /** 合并多个 GlobalConfig（后者覆盖前者） */
 export function mergeConfigs(...configs: Array<GlobalConfig | undefined>): GlobalConfig {
   const result: GlobalConfig = {};
@@ -265,19 +285,21 @@ export function mergeConfigs(...configs: Array<GlobalConfig | undefined>): Globa
 }
 
 /**
- * 加载完整配置链 — 项目级覆盖用户级
+ * 加载完整配置链 — config.json 覆盖项目级，项目级覆盖用户级
  *
  * 返回合并后的 GlobalConfig（不含默认值，仅包含用户/项目显式配置）
  */
 export function loadFullConfig(): {merged: GlobalConfig; sources: ConfigSource[]} {
   const userSource = loadUserConfig();
   const projectSource = loadProjectConfig();
+  const rootSource = loadRootConfig();
 
-  const merged = mergeConfigs(userSource.config, projectSource.config);
+  // 合并优先级（低→高）：用户级 < 项目级 < 根目录 config.json
+  const merged = mergeConfigs(userSource.config, projectSource.config, rootSource.config);
 
   return {
     merged,
-    sources: [userSource, projectSource],
+    sources: [userSource, projectSource, rootSource],
   };
 }
 
@@ -406,50 +428,90 @@ export function showConfigInfo(): {
 
 /**
  * 获取默认 LLM 提供商
+ *
+ * 优先级：环境变量 > config.json > 默认值
  */
 export function getDefaultLLMProvider(): LLMProvider {
-  const provider = process.env.DEFAULT_LLM_PROVIDER?.toLowerCase();
+  const envProvider = process.env.DEFAULT_LLM_PROVIDER?.toLowerCase();
   if (
-    provider === 'openai' ||
-    provider === 'anthropic' ||
-    provider === 'gemini'
+    envProvider === 'openai' ||
+    envProvider === 'anthropic' ||
+    envProvider === 'gemini'
   )
-    return provider;
+    return envProvider;
+
+  const {merged: fileConfig} = loadFullConfig();
+  if (fileConfig.llmProvider) return fileConfig.llmProvider;
+
   return 'gemini';
 }
 
 /**
- * 从环境变量获取 AI 配置
+ * 从环境变量 + config.json 获取 AI 配置
+ *
+ * 优先级：环境变量 > config.json 中的对应字段
  */
 export function getAIConfig(): AIConfig | undefined {
   const provider = getDefaultLLMProvider();
+  const {merged: fileConfig} = loadFullConfig();
 
   const config: AIConfig = {
     provider,
   };
 
+  // OpenAI：环境变量 > config.json
   if (process.env.OPENAI_API_KEY) {
     config.openai = {
       apiKey: process.env.OPENAI_API_KEY,
       baseURL: process.env.OPENAI_BASE_URL,
       model: process.env.OPENAI_MODEL || 'gpt-4o',
     };
+  } else if (fileConfig.openai) {
+    config.openai = {
+      apiKey: fileConfig.openai.apiKey || '',
+      baseURL: fileConfig.openai.baseURL,
+      model: fileConfig.openai.model || 'gpt-4o',
+    };
   }
 
+  // Anthropic：环境变量 > config.json
   if (process.env.ANTHROPIC_API_KEY) {
     config.anthropic = {
       apiKey: process.env.ANTHROPIC_API_KEY,
       baseURL: process.env.ANTHROPIC_BASE_URL,
       model: process.env.ANTHROPIC_MODEL || 'claude-3-5-sonnet-20241022',
     };
+  } else if (fileConfig.anthropic) {
+    config.anthropic = {
+      apiKey: fileConfig.anthropic.apiKey || '',
+      baseURL: fileConfig.anthropic.baseURL,
+      model: fileConfig.anthropic.model || 'claude-3-5-sonnet-20241022',
+    };
   }
 
-  config.gemini = {
-    apiKey: process.env.GEMINI_API_KEY,
-    cliPath: process.env.GEMINI_CLI_PATH || 'gemini-cli',
-    useAPI: !!process.env.GEMINI_API_KEY,
-    model: process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp',
-  };
+  // Gemini：环境变量 > config.json
+  if (process.env.GEMINI_API_KEY) {
+    config.gemini = {
+      apiKey: process.env.GEMINI_API_KEY,
+      cliPath: process.env.GEMINI_CLI_PATH || 'gemini-cli',
+      useAPI: true,
+      model: process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp',
+    };
+  } else if (fileConfig.gemini) {
+    config.gemini = {
+      apiKey: fileConfig.gemini.apiKey,
+      cliPath: fileConfig.gemini.cliPath || 'gemini-cli',
+      useAPI: !!fileConfig.gemini.apiKey,
+      model: fileConfig.gemini.model || 'gemini-2.0-flash-exp',
+    };
+  } else {
+    config.gemini = {
+      apiKey: process.env.GEMINI_API_KEY,
+      cliPath: process.env.GEMINI_CLI_PATH || 'gemini-cli',
+      useAPI: !!process.env.GEMINI_API_KEY,
+      model: process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp',
+    };
+  }
 
   const hasAnyProvider = config.openai || config.anthropic || config.gemini;
 
@@ -457,21 +519,36 @@ export function getAIConfig(): AIConfig | undefined {
 }
 
 /**
- * 从环境变量获取浏览器配置
+ * 从环境变量 + config.json 获取浏览器配置
+ *
+ * 优先级：环境变量 > config.json 中的 browser 字段
  */
 export function getBrowserConfig(): BrowserConfig {
+  const {merged: fileConfig} = loadFullConfig();
+  const fileBrowser = fileConfig.browser;
+
   const config: BrowserConfig = {
-    headless: process.env.BROWSER_HEADLESS !== 'false',
-    isolated: process.env.BROWSER_ISOLATED !== 'false',
-    useStealthScripts: process.env.USE_STEALTH_SCRIPTS === 'true',
+    headless: process.env.BROWSER_HEADLESS
+      ? process.env.BROWSER_HEADLESS !== 'false'
+      : fileBrowser?.headless ?? true,
+    isolated: process.env.BROWSER_ISOLATED
+      ? process.env.BROWSER_ISOLATED !== 'false'
+      : fileBrowser?.isolated ?? true,
+    useStealthScripts: process.env.USE_STEALTH_SCRIPTS
+      ? process.env.USE_STEALTH_SCRIPTS === 'true'
+      : fileBrowser?.useStealthScripts ?? false,
   };
 
   if (process.env.BROWSER_EXECUTABLE_PATH) {
     config.executablePath = process.env.BROWSER_EXECUTABLE_PATH;
+  } else if (fileBrowser?.executablePath) {
+    config.executablePath = fileBrowser.executablePath;
   }
 
   if (process.env.BROWSER_CHANNEL) {
     config.channel = process.env.BROWSER_CHANNEL as BrowserConfig['channel'];
+  } else if (fileBrowser?.channel) {
+    config.channel = fileBrowser.channel;
   }
 
   if (process.env.REMOTE_DEBUGGING_URL) {
@@ -483,6 +560,10 @@ export function getBrowserConfig(): BrowserConfig {
       process.env.REMOTE_DEBUGGING_PORT,
       10,
     );
+  }
+
+  if (fileBrowser?.viewport) {
+    config.viewport = fileBrowser.viewport;
   }
 
   return config;

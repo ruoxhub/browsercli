@@ -4,10 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export {type DaemonContext, type WorkerContext} from './types.js';
+export {type WorkerContext} from './types.js';
 export {
-  renderOutput,
-  renderError,
   successOutput,
   tableOutput,
   listOutput,
@@ -38,8 +36,10 @@ export {
   type ResolvedConfig,
   getUserConfigPath,
   getProjectConfigPath,
+  getRootConfigPath,
   loadUserConfig,
   loadProjectConfig,
+  loadRootConfig,
   loadFullConfig,
   mergeConfigs,
   resolveConfig,
@@ -50,7 +50,6 @@ export {
   showConfigInfo,
 } from '../config.js';
 export {SekiroInvoker} from './sekiro-invoker.js';
-export {WorkerManager} from './worker-manager.js';
 export {startCommand} from './commands/start.js';
 export {stopCommand} from './commands/stop.js';
 export {statusCommand} from './commands/status.js';

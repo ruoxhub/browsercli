@@ -4,6 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/**
+ * CLI 错误工具 — 项目特有的错误构造函数
+ *
+ * AxiError 本身从 axi-sdk-js 直接导入，此文件仅提供领域特定的便捷构造
+ */
+
 import {AxiError} from 'axi-sdk-js';
 
 export {AxiError};

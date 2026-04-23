@@ -472,7 +472,11 @@ export class BrowserManager {
    */
   async newPage(): Promise<Page> {
     const browser = await this.ensureBrowser();
-    const ctx = this.context ?? browser.contexts()[0];
+    let ctx = this.context ?? browser.contexts()[0];
+    if (!ctx) {
+      ctx = await browser.newContext();
+      this.context = ctx;
+    }
     const pages = ctx.pages();
     const page = pages.length > 0 ? pages[0] : await ctx.newPage();
     this.trackCurrentPage(page);

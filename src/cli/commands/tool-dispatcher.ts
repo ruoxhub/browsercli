@@ -5,15 +5,13 @@
  */
 
 import type {AxiCliCommand} from 'axi-sdk-js';
-import type {DaemonContext} from '../types.js';
-import {AxiError} from '../errors.js';
+import type {WorkerContext} from '../types.js';
+import {AxiError} from 'axi-sdk-js';
 import {successOutput} from '../output.js';
 import {parseArgs} from '../args-parser.js';
-import {getToolMeta, getAllToolNames, searchTools} from '../tools-meta.js';
-import {SekiroInvoker} from '../sekiro-invoker.js';
-import {resolveConfig} from '../config.js';
+import {getToolMeta, searchTools} from '../tools-meta.js';
 
-export const toolDispatcherCommand: AxiCliCommand<DaemonContext> = async (
+export const toolDispatcherCommand: AxiCliCommand<WorkerContext> = async (
   args,
   ctx,
 ) => {
@@ -49,9 +47,12 @@ export const toolDispatcherCommand: AxiCliCommand<DaemonContext> = async (
   }
 
   try {
-    const cfg = ctx?.resolvedConfig ?? resolveConfig();
-    const invoker = ctx?.invoker ?? new SekiroInvoker({sekiroHost: cfg.sekiroHost});
-    const result = await invoker.invoke(cfg.group, toolName, toolArgs);
+    const invoker = ctx?.invoker;
+    const group = ctx?.group;
+    if (!invoker || !group) {
+      throw new AxiError('Worker 未运行', 'WORKER_NOT_RUNNING');
+    }
+    const result = await invoker.invoke(group, toolName, toolArgs);
 
     return successOutput({
       command: 'call',
@@ -59,6 +60,7 @@ export const toolDispatcherCommand: AxiCliCommand<DaemonContext> = async (
       result,
     });
   } catch (error) {
+    if (error instanceof AxiError) throw error;
     throw new AxiError(
       `工具调用失败：${error instanceof Error ? error.message : error}`,
       'TOOL_INVOCATION_ERROR',

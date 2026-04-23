@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {AxiStructuredOutput} from './output.js';
-import {renderOutput} from './output.js';
+/**
+ * CLI 帮助文本生成 — 供 runAxiCli 的 topLevelHelp 和 getCommandHelp 使用
+ */
 
 export function generateTopLevelHelp(options?: {
   bin?: string;
@@ -13,26 +14,38 @@ export function generateTopLevelHelp(options?: {
   version?: string;
   commands?: string[];
 }): string {
-  const output: AxiStructuredOutput = {
-    bin: options?.bin ?? 'js-reverse',
-    description:
-      options?.description ??
-      'JS逆向工程MCP服务 — 标准化前端JavaScript逆向流程',
-    version: options?.version ?? '2.0.3',
-    commands: options?.commands ?? [
-      'start',
-      'stop',
-      'status',
-      'call',
-      'call-skill',
-      'list-skills',
-      'list-tools',
-      'config',
-      'repl',
-      'scaffold',
-    ],
-  };
-  return renderOutput(output);
+  const bin = options?.bin ?? 'js-reverse';
+  const description = options?.description ?? 'JS逆向工程MCP服务 — 标准化前端JavaScript逆向流程';
+  const version = options?.version ?? '2.0.3';
+  const commands = options?.commands ?? [
+    'start',
+    'stop',
+    'status',
+    'call',
+    'call-skill',
+    'list-skills',
+    'list-tools',
+    'config',
+    'repl',
+    'scaffold',
+  ];
+
+  const lines = [
+    `\n  ${bin} v${version}`,
+    `  ${description}`,
+    '',
+    '  Commands:',
+  ];
+
+  for (const cmd of commands) {
+    lines.push(`    ${cmd}`);
+  }
+
+  lines.push('');
+  lines.push('  Run js-reverse <command> --help for more information on a command.');
+  lines.push('');
+
+  return lines.join('\n');
 }
 
 export function generateCommandHelp(command: string): string | null {
@@ -85,10 +98,11 @@ export function generateCommandHelp(command: string): string | null {
   const help = helpMap[command];
   if (!help) return null;
 
-  const output: AxiStructuredOutput = {
-    command,
-    description: help.description,
-    usage: help.usage,
-  };
-  return renderOutput(output);
+  return [
+    '',
+    `  ${command} — ${help.description}`,
+    '',
+    `  用法: ${help.usage}`,
+    '',
+  ].join('\n');
 }

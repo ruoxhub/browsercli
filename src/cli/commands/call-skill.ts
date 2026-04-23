@@ -5,14 +5,12 @@
  */
 
 import type {AxiCliCommand} from 'axi-sdk-js';
-import type {DaemonContext} from '../types.js';
-import {AxiError} from '../errors.js';
+import type {WorkerContext} from '../types.js';
+import {AxiError} from 'axi-sdk-js';
 import {successOutput} from '../output.js';
 import {parseArgs, getFlag} from '../args-parser.js';
-import {SekiroInvoker} from '../sekiro-invoker.js';
-import {resolveConfig} from '../config.js';
 
-export const callSkillCommand: AxiCliCommand<DaemonContext> = async (
+export const callSkillCommand: AxiCliCommand<WorkerContext> = async (
   args,
   ctx,
 ) => {
@@ -42,10 +40,13 @@ export const callSkillCommand: AxiCliCommand<DaemonContext> = async (
   }
 
   try {
-    const cfg = ctx?.resolvedConfig ?? resolveConfig();
-    const invoker = ctx?.invoker ?? new SekiroInvoker({sekiroHost: cfg.sekiroHost});
+    const invoker = ctx?.invoker;
+    const group = ctx?.group;
+    if (!invoker || !group) {
+      throw new AxiError('Worker 未运行', 'WORKER_NOT_RUNNING');
+    }
     const actionName = `skill_${skillName}`;
-    const result = await invoker.invoke(cfg.group, actionName, skillArgs) as {
+    const result = await invoker.invoke(group, actionName, skillArgs) as {
       success?: boolean;
       error?: string;
       message?: string;
