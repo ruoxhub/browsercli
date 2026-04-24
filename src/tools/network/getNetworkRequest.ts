@@ -54,15 +54,37 @@ export async function getNetworkRequest(
 
     const request = runtime.getNetworkRequestById(reqid);
     const httpResponse = await request.response();
+
+    // 尝试读取响应体（文本），可通过 params.maxBodyLength 设置，默认 300 字符
+    const maxBodyLength = params?.maxBodyLength ?? 300;
+    let responseBody: string | undefined;
+    if (httpResponse) {
+      try {
+        const contentType = httpResponse.headers()['content-type'] ?? '';
+        // 只读取文本类型的响应体
+        if (contentType.includes('json') || contentType.includes('text') || contentType.includes('javascript')) {
+          const fullBody = await httpResponse.text();
+          responseBody = fullBody.length > maxBodyLength
+            ? fullBody.slice(0, maxBodyLength) + '\n... [truncated]'
+            : fullBody;
+        }
+      } catch {
+        // 忽略读取失败
+      }
+    }
+
     const data: GetNetworkRequestData = {
       reqid,
       url: request.url(),
       method: request.method(),
       resourceType: request.resourceType(),
+      postData: request.postData() ?? undefined,
       statusCode: httpResponse?.status() ?? 0,
+      statusText: httpResponse?.statusText?.(),
       requestHeaders: request.headers(),
       responseHeaders: httpResponse?.headers() ?? {},
       initiator: runtime.getRequestInitiator(request),
+      responseBody,
     };
 
     return {

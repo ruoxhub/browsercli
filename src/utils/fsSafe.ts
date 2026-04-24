@@ -5,6 +5,8 @@
  */
 import path from 'node:path';
 
+import {getEnvValue} from '../config.js';
+
 /**
  * Validate a user-provided file path to prevent directory traversal attacks.
  *
@@ -25,7 +27,7 @@ export function validateOutputPath(userPath: string): string {
   }
 
   // Relative paths: check for traversal outside allowed directory
-  const allowedBase = process.env.JSREVERSER_OUTPUT_DIR ?? process.cwd();
+  const allowedBase = getEnvValue('JSREVERSER_OUTPUT_DIR') ?? process.cwd();
   const normalizedBase = path.resolve(allowedBase) + path.sep;
   const resolvedWithTrailingSep = resolved + path.sep;
 

@@ -22,7 +22,7 @@ export class LLMService {
     const service = this.serviceFactory();
     if (!service) {
       throw new Error(
-        'No AI provider configured. Set DEFAULT_LLM_PROVIDER and provider API key or Gemini CLI.',
+        'No AI provider configured. Set OPENAI_API_KEY environment variable.',
       );
     }
 

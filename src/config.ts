@@ -29,8 +29,6 @@ import {config as dotenvConfig} from 'dotenv';
 
 import {resolveDefaultEnvPath} from './utils/projectPaths.js';
 import {AIService} from './services/AIService.js';
-import {AnthropicProvider} from './services/AnthropicProvider.js';
-import {GeminiProvider} from './services/GeminiProvider.js';
 import {OpenAIProvider} from './services/OpenAIProvider.js';
 
 // ==================== .env 加载 ====================
@@ -67,7 +65,7 @@ const ROOT_CONFIG_FILENAME = 'config.json';
 // ==========================================================================
 
 /** LLM 提供商类型 */
-export type LLMProvider = 'openai' | 'anthropic' | 'gemini';
+export type LLMProvider = 'openai';
 
 /** 用户级全局配置结构（配置文件可写的所有字段） */
 export interface GlobalConfig {
@@ -93,18 +91,6 @@ export interface GlobalConfig {
     baseURL?: string;
     model?: string;
   };
-  /** Anthropic 配置 */
-  anthropic?: {
-    apiKey?: string;
-    baseURL?: string;
-    model?: string;
-  };
-  /** Gemini 配置 */
-  gemini?: {
-    apiKey?: string;
-    cliPath?: string;
-    model?: string;
-  };
   /** 浏览器配置 */
   browser?: {
     headless?: boolean;
@@ -116,6 +102,16 @@ export interface GlobalConfig {
   };
   /** 调试模式 */
   debug?: boolean;
+  /** 日志级别 */
+  logLevel?: string;
+  /** 输出目录 */
+  outputDir?: string;
+  /** 会话状态 TTL（毫秒） */
+  sessionStateTtlMs?: number;
+  /** 会话状态清理间隔（毫秒） */
+  sessionStateCleanupIntervalMs?: number;
+  /** 会话状态加密密钥 */
+  sessionStateEncryptionKey?: string;
 }
 
 /** AI Service 配置（运行时解析后的完整结构） */
@@ -124,17 +120,6 @@ export interface AIConfig {
   openai?: {
     apiKey: string;
     baseURL?: string;
-    model?: string;
-  };
-  anthropic?: {
-    apiKey: string;
-    baseURL?: string;
-    model?: string;
-  };
-  gemini?: {
-    apiKey?: string;
-    cliPath?: string;
-    useAPI?: boolean;
     model?: string;
   };
 }
@@ -304,10 +289,10 @@ export function loadFullConfig(): {merged: GlobalConfig; sources: ConfigSource[]
 }
 
 // ==========================================================================
-// 第四部分：环境变量映射 + 配置解析
+// 第四部分：统一环境变量读取 + 配置解析
 // ==========================================================================
 
-/** 环境变量 → GlobalConfig 键映射 */
+/** 所有已知环境变量 → GlobalConfig 键映射 */
 const ENV_MAP: Readonly<Record<string, keyof GlobalConfig>> = {
   SEKIRO_HOST: 'sekiroHost',
   SEKIRO_GROUP: 'group',
@@ -318,7 +303,68 @@ const ENV_MAP: Readonly<Record<string, keyof GlobalConfig>> = {
   JSREVERSER_RUNTIME_DIR: 'runtimeDirName',
   DEFAULT_LLM_PROVIDER: 'llmProvider',
   JSREVERSER_DEBUG: 'debug',
+  // OpenAI
+  OPENAI_API_KEY: 'openai',
+  OPENAI_BASE_URL: 'openai',
+  OPENAI_MODEL: 'openai',
+  // Browser 扩展
+  BROWSER_ISOLATED: 'browser',
+  USE_STEALTH_SCRIPTS: 'browser',
+  BROWSER_CHANNEL: 'browser',
+  REMOTE_DEBUGGING_URL: 'browser',
+  REMOTE_DEBUGGING_PORT: 'browser',
+  // 日志与会话
+  LOG_LEVEL: 'logLevel',
+  JSREVERSER_OUTPUT_DIR: 'outputDir',
+  SESSION_STATE_TTL_MS: 'sessionStateTtlMs',
+  SESSION_STATE_CLEANUP_INTERVAL_MS: 'sessionStateCleanupIntervalMs',
+  SESSION_STATE_ENCRYPTION_KEY: 'sessionStateEncryptionKey',
 };
+
+/**
+ * 统一读取环境变量（字符串）
+ *
+ * @param key 环境变量名
+ * @param defaultValue 默认值
+ * @returns 环境变量值或默认值
+ */
+export function getEnvValue(key: string, defaultValue?: string): string | undefined {
+  const value = process.env[key];
+  if (value === undefined || value === '') return defaultValue;
+  return value;
+}
+
+/**
+ * 统一读取环境变量（数字）
+ *
+ * @param key 环境变量名
+ * @param defaultValue 默认值
+ * @returns 解析后的数字或默认值
+ */
+export function getEnvNumber(key: string, defaultValue?: number): number | undefined {
+  const value = process.env[key];
+  if (value === undefined || value === '') return defaultValue;
+  const parsed = Number(value);
+  if (Number.isNaN(parsed)) return defaultValue;
+  return parsed;
+}
+
+/**
+ * 统一读取环境变量（布尔）
+ *
+ * 支持 'true' / '1' / 'yes' / 'on' 为 true，'false' / '0' / 'no' / 'off' 为 false
+ *
+ * @param key 环境变量名
+ * @param defaultValue 默认值
+ * @returns 解析后的布尔值或默认值
+ */
+export function getEnvBoolean(key: string, defaultValue?: boolean): boolean | undefined {
+  const value = process.env[key]?.toLowerCase().trim();
+  if (value === undefined || value === '') return defaultValue;
+  if (['true', '1', 'yes', 'on'].includes(value)) return true;
+  if (['false', '0', 'no', 'off'].includes(value)) return false;
+  return defaultValue;
+}
 
 /** 从环境变量提取配置 */
 function configFromEnv(): GlobalConfig {
@@ -355,8 +401,8 @@ export function resolveConfig(envArgs?: Partial<GlobalConfig>): ResolvedConfig {
   return {
     sekiroHost: merged.sekiroHost ?? DEFAULTS.sekiroHost,
     group: merged.group ?? DEFAULTS.group,
-    browserUrl: merged.browserUrl,
-    wsEndpoint: merged.wsEndpoint,
+    browserUrl: merged.browserUrl || undefined,
+    wsEndpoint: merged.wsEndpoint || undefined,
     headless: merged.headless ?? DEFAULTS.headless,
     executablePath: merged.executablePath,
     runtimeDirName: merged.runtimeDirName ?? DEFAULTS.runtimeDirName,
@@ -415,7 +461,7 @@ export function showConfigInfo(): {
   envOverrides: string[];
 } {
   const {sources} = loadFullConfig();
-  const envOverrides = Object.keys(ENV_MAP).filter(k => process.env[k]);
+  const envOverrides = Object.keys(ENV_MAP).filter(k => getEnvValue(k) !== undefined);
 
   const resolved = resolveConfig();
 
@@ -432,18 +478,13 @@ export function showConfigInfo(): {
  * 优先级：环境变量 > config.json > 默认值
  */
 export function getDefaultLLMProvider(): LLMProvider {
-  const envProvider = process.env.DEFAULT_LLM_PROVIDER?.toLowerCase();
-  if (
-    envProvider === 'openai' ||
-    envProvider === 'anthropic' ||
-    envProvider === 'gemini'
-  )
-    return envProvider;
+  const envProvider = getEnvValue('DEFAULT_LLM_PROVIDER')?.toLowerCase();
+  if (envProvider === 'openai') return envProvider;
 
   const {merged: fileConfig} = loadFullConfig();
   if (fileConfig.llmProvider) return fileConfig.llmProvider;
 
-  return 'gemini';
+  return 'openai';
 }
 
 /**
@@ -460,11 +501,12 @@ export function getAIConfig(): AIConfig | undefined {
   };
 
   // OpenAI：环境变量 > config.json
-  if (process.env.OPENAI_API_KEY) {
+  const openaiApiKey = getEnvValue('OPENAI_API_KEY');
+  if (openaiApiKey) {
     config.openai = {
-      apiKey: process.env.OPENAI_API_KEY,
-      baseURL: process.env.OPENAI_BASE_URL,
-      model: process.env.OPENAI_MODEL || 'gpt-4o',
+      apiKey: openaiApiKey,
+      baseURL: getEnvValue('OPENAI_BASE_URL'),
+      model: getEnvValue('OPENAI_MODEL') || 'gpt-4o',
     };
   } else if (fileConfig.openai) {
     config.openai = {
@@ -474,46 +516,7 @@ export function getAIConfig(): AIConfig | undefined {
     };
   }
 
-  // Anthropic：环境变量 > config.json
-  if (process.env.ANTHROPIC_API_KEY) {
-    config.anthropic = {
-      apiKey: process.env.ANTHROPIC_API_KEY,
-      baseURL: process.env.ANTHROPIC_BASE_URL,
-      model: process.env.ANTHROPIC_MODEL || 'claude-3-5-sonnet-20241022',
-    };
-  } else if (fileConfig.anthropic) {
-    config.anthropic = {
-      apiKey: fileConfig.anthropic.apiKey || '',
-      baseURL: fileConfig.anthropic.baseURL,
-      model: fileConfig.anthropic.model || 'claude-3-5-sonnet-20241022',
-    };
-  }
-
-  // Gemini：环境变量 > config.json
-  if (process.env.GEMINI_API_KEY) {
-    config.gemini = {
-      apiKey: process.env.GEMINI_API_KEY,
-      cliPath: process.env.GEMINI_CLI_PATH || 'gemini-cli',
-      useAPI: true,
-      model: process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp',
-    };
-  } else if (fileConfig.gemini) {
-    config.gemini = {
-      apiKey: fileConfig.gemini.apiKey,
-      cliPath: fileConfig.gemini.cliPath || 'gemini-cli',
-      useAPI: !!fileConfig.gemini.apiKey,
-      model: fileConfig.gemini.model || 'gemini-2.0-flash-exp',
-    };
-  } else {
-    config.gemini = {
-      apiKey: process.env.GEMINI_API_KEY,
-      cliPath: process.env.GEMINI_CLI_PATH || 'gemini-cli',
-      useAPI: !!process.env.GEMINI_API_KEY,
-      model: process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp',
-    };
-  }
-
-  const hasAnyProvider = config.openai || config.anthropic || config.gemini;
+  const hasAnyProvider = config.openai;
 
   return hasAnyProvider ? config : undefined;
 }
@@ -528,38 +531,34 @@ export function getBrowserConfig(): BrowserConfig {
   const fileBrowser = fileConfig.browser;
 
   const config: BrowserConfig = {
-    headless: process.env.BROWSER_HEADLESS
-      ? process.env.BROWSER_HEADLESS !== 'false'
-      : fileBrowser?.headless ?? true,
-    isolated: process.env.BROWSER_ISOLATED
-      ? process.env.BROWSER_ISOLATED !== 'false'
-      : fileBrowser?.isolated ?? true,
-    useStealthScripts: process.env.USE_STEALTH_SCRIPTS
-      ? process.env.USE_STEALTH_SCRIPTS === 'true'
-      : fileBrowser?.useStealthScripts ?? false,
+    headless: getEnvBoolean('BROWSER_HEADLESS') ?? fileBrowser?.headless ?? true,
+    isolated: getEnvBoolean('BROWSER_ISOLATED') ?? fileBrowser?.isolated ?? true,
+    useStealthScripts:
+      getEnvBoolean('USE_STEALTH_SCRIPTS') ?? fileBrowser?.useStealthScripts ?? false,
   };
 
-  if (process.env.BROWSER_EXECUTABLE_PATH) {
-    config.executablePath = process.env.BROWSER_EXECUTABLE_PATH;
+  const envExecutablePath = getEnvValue('BROWSER_EXECUTABLE_PATH');
+  if (envExecutablePath) {
+    config.executablePath = envExecutablePath;
   } else if (fileBrowser?.executablePath) {
     config.executablePath = fileBrowser.executablePath;
   }
 
-  if (process.env.BROWSER_CHANNEL) {
-    config.channel = process.env.BROWSER_CHANNEL as BrowserConfig['channel'];
+  const envChannel = getEnvValue('BROWSER_CHANNEL');
+  if (envChannel) {
+    config.channel = envChannel as BrowserConfig['channel'];
   } else if (fileBrowser?.channel) {
     config.channel = fileBrowser.channel;
   }
 
-  if (process.env.REMOTE_DEBUGGING_URL) {
-    config.remoteDebuggingUrl = process.env.REMOTE_DEBUGGING_URL;
+  const envRemoteDebuggingUrl = getEnvValue('REMOTE_DEBUGGING_URL');
+  if (envRemoteDebuggingUrl) {
+    config.remoteDebuggingUrl = envRemoteDebuggingUrl;
   }
 
-  if (process.env.REMOTE_DEBUGGING_PORT) {
-    config.remoteDebuggingPort = parseInt(
-      process.env.REMOTE_DEBUGGING_PORT,
-      10,
-    );
+  const envRemoteDebuggingPort = getEnvNumber('REMOTE_DEBUGGING_PORT');
+  if (envRemoteDebuggingPort !== undefined) {
+    config.remoteDebuggingPort = envRemoteDebuggingPort;
   }
 
   if (fileBrowser?.viewport) {
@@ -604,16 +603,6 @@ export function validateConfig(config: SystemConfig): {
     if (provider === 'openai' && !config.ai.openai) {
       errors.push('OpenAI provider selected but OPENAI_API_KEY not configured');
     }
-
-    if (provider === 'anthropic' && !config.ai.anthropic) {
-      errors.push(
-        'Anthropic provider selected but ANTHROPIC_API_KEY not configured',
-      );
-    }
-
-    if (provider === 'gemini' && !config.ai.gemini) {
-      errors.push('Gemini provider selected but no configuration found');
-    }
   }
 
   return {
@@ -624,18 +613,18 @@ export function validateConfig(config: SystemConfig): {
 
 /**
  * 获取环境变量（带默认值）
+ * @deprecated 请使用 getEnvValue
  */
 export function getEnv(key: string, defaultValue?: string): string | undefined {
-  return process.env[key] || defaultValue;
+  return getEnvValue(key, defaultValue);
 }
 
 /**
  * 检查调试模式是否启用
  */
 export function isDebugEnabled(): boolean {
-  return (
-    process.env.DEBUG === 'true' || process.env.DEBUG?.includes('mcp') || false
-  );
+  const debug = getEnvValue('DEBUG');
+  return debug === 'true' || debug?.includes('mcp') || false;
 }
 
 /**
@@ -660,33 +649,6 @@ export function createAIService(config?: AIConfig): AIService | undefined {
           apiKey: aiConfig.openai.apiKey,
           baseURL: aiConfig.openai.baseURL,
           model: aiConfig.openai.model,
-        }),
-      );
-    }
-
-    case 'anthropic': {
-      if (!aiConfig.anthropic) {
-        throw new Error('Anthropic configuration not found');
-      }
-      return new AIService(
-        new AnthropicProvider({
-          apiKey: aiConfig.anthropic.apiKey,
-          baseURL: aiConfig.anthropic.baseURL,
-          model: aiConfig.anthropic.model,
-        }),
-      );
-    }
-
-    case 'gemini': {
-      if (!aiConfig.gemini) {
-        throw new Error('Gemini configuration not found');
-      }
-      return new AIService(
-        new GeminiProvider({
-          apiKey: aiConfig.gemini.apiKey,
-          cliPath: aiConfig.gemini.cliPath,
-          useAPI: aiConfig.gemini.useAPI,
-          model: aiConfig.gemini.model,
         }),
       );
     }

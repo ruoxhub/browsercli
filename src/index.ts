@@ -24,6 +24,8 @@ import {ToolAdapter} from './worker/ToolAdapter.js';
 import {ToolContextProvider} from './worker/ToolContextProvider.js';
 import {BrowserManager} from './browser/index.js';
 import type {BrowserManagerConfig} from './browser/index.js';
+import {resolveConfig, getEnvBoolean} from './config.js';
+import type {GlobalConfig} from './config.js';
 
 // 优雅关闭
 let isShuttingDown = false;
@@ -53,38 +55,49 @@ async function gracefulShutdown(client: NodeClient, browserManager: BrowserManag
 }
 
 /**
- * 解析 Worker 命令行参数
+ * 解析 Worker 命令行参数为 GlobalConfig 格式
  */
-function parseWorkerArgs(args: string[]): WorkerStartOptions {
-  const options: WorkerStartOptions = {
-    sekiroHost: 'ws://127.0.0.1:5612',
-    group: 'js-reverse',
-  };
+function parseWorkerArgs(args: string[]): GlobalConfig {
+  const cliConfig: GlobalConfig = {};
 
   for (let i = 0; i < args.length; i++) {
     switch (args[i]) {
       case '--sekiroHost':
-        options.sekiroHost = args[++i];
+        cliConfig.sekiroHost = args[++i];
         break;
       case '--group':
-        options.group = args[++i];
+        cliConfig.group = args[++i];
         break;
       case '--browserUrl':
-        options.browserUrl = args[++i];
+        cliConfig.browserUrl = args[++i];
         break;
       case '--wsEndpoint':
-        options.wsEndpoint = args[++i];
+        cliConfig.wsEndpoint = args[++i];
         break;
       case '--headless':
-        options.headless = true;
+        cliConfig.headless = true;
         break;
       case '--executablePath':
-        options.executablePath = args[++i];
+        cliConfig.executablePath = args[++i];
         break;
     }
   }
 
-  return options;
+  return cliConfig;
+}
+
+/**
+ * 将 ResolvedConfig 转换为 WorkerStartOptions
+ */
+function toWorkerOptions(resolved: ReturnType<typeof resolveConfig>): WorkerStartOptions {
+  return {
+    sekiroHost: resolved.sekiroHost,
+    group: resolved.group,
+    browserUrl: resolved.browserUrl,
+    wsEndpoint: resolved.wsEndpoint,
+    headless: resolved.headless,
+    executablePath: resolved.executablePath,
+  };
 }
 
 /**
@@ -161,22 +174,26 @@ async function registerSkills(client: NodeClient): Promise<void> {
  * Worker 主函数
  */
 async function main(): Promise<void> {
-  const options = parseWorkerArgs(process.argv.slice(2));
+  // 1. 解析 CLI 参数并通过 config.ts 合并配置（CLI > 环境变量 > 配置文件 > 默认值）
+  const cliConfig = parseWorkerArgs(process.argv.slice(2));
+  const resolved = resolveConfig(cliConfig);
+  const options = toWorkerOptions(resolved);
 
   console.log('[Worker] 启动中...');
   console.log(`[Worker] Sekiro Host: ${options.sekiroHost}`);
   console.log(`[Worker] Group: ${options.group}`);
 
-  // 1. 初始化 ToolContextProvider
+  // 2. 初始化 ToolContextProvider
   const contextProvider = new ToolContextProvider();
 
-  // 2. 初始化 BrowserManager，将 Page 注入 contextProvider
+  // 3. 初始化 BrowserManager，将 Page 注入 contextProvider
+  // 浏览器配置也从 config.ts 获取（支持 config.json / .env 等）
   const browserConfig: BrowserManagerConfig = {
     browserURL: options.browserUrl,
     wsEndpoint: options.wsEndpoint,
     headless: options.headless,
     executablePath: options.executablePath,
-    useStealthScripts: true,
+    useStealthScripts: getEnvBoolean('USE_STEALTH_SCRIPTS') ?? true,
   };
 
   const browserManager = BrowserManager.getInstance(browserConfig);

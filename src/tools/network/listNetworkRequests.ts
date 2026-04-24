@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {HTTPRequest} from '../../third_party/index.js';
+import type {HTTPRequest, ResourceType} from '../../third_party/index.js';
 import type {
   ListNetworkRequestsData,
   ListNetworkRequestsParams,
@@ -14,25 +14,19 @@ import type {
 } from './types.js';
 
 /**
- * 将 HTTPRequest 序列化为结构化数据。
+ * 将 HTTPRequest 序列化为精简结构化数据。
  *
- * Playwright 的 request.response() 是异步的，需要 await。
+ * 仅包含基本信息，详情使用 getNetworkRequest 获取。
  */
-async function serializeRequest(
+function serializeRequest(
   request: HTTPRequest,
   reqid: number,
-  runtime: NetworkRuntimeServices,
-): Promise<NetworkRequestData> {
-  const httpResponse = await request.response();
+): NetworkRequestData {
   return {
     reqid,
     url: request.url(),
     method: request.method(),
-    resourceType: request.resourceType(),
-    statusCode: httpResponse?.status() ?? 0,
-    requestHeaders: request.headers(),
-    responseHeaders: httpResponse?.headers() ?? {},
-    initiator: runtime.getRequestInitiator(request),
+    postData: request.postData() ?? undefined,
   };
 }
 
@@ -58,17 +52,15 @@ export async function listNetworkRequests(
     if (params?.resourceTypes?.length) {
       const normalizedTypes = new Set(params.resourceTypes);
       requests = requests.filter(request => {
-        return normalizedTypes.has(request.resourceType());
+        return normalizedTypes.has(request.resourceType() as ResourceType);
       });
     }
 
-    // 序列化（Playwright request.response() 是异步的）
-    const allData: NetworkRequestData[] = await Promise.all(
-      requests.map(async request => {
-        const reqid = runtime.getNetworkRequestStableId(request);
-        return serializeRequest(request, reqid, runtime);
-      }),
-    );
+    // 序列化（精简版，仅包含基本信息）
+    const allData: NetworkRequestData[] = requests.map(request => {
+      const reqid = runtime.getNetworkRequestStableId(request);
+      return serializeRequest(request, reqid);
+    });
 
     // 分页
     const total = allData.length;

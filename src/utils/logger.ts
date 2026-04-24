@@ -16,6 +16,7 @@ import fs from 'node:fs';
 import chalk from 'chalk';
 
 import {safeStringify} from './safeJson.js';
+import {getEnvValue} from '../config.js';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
@@ -124,7 +125,7 @@ function parseLogLevel(value: string | undefined): LogLevel {
   return 'info';
 }
 
-export const logger = new Logger(parseLogLevel(process.env.LOG_LEVEL));
+export const logger = new Logger(parseLogLevel(getEnvValue('LOG_LEVEL')));
 
 /**
  * 将日志保存到文件的便捷函数。

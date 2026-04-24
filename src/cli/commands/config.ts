@@ -44,7 +44,7 @@ const CONFIG_KEY_DESCRIPTIONS: Record<string, string> = {
   headless: '无头模式 (true/false)',
   executablePath: '浏览器可执行路径',
   runtimeDirName: '运行时目录名',
-  llmProvider: 'AI 提供商 (openai/anthropic/gemini)',
+  llmProvider: 'AI 提供商 (openai)',
   debug: '调试模式 (true/false)',
 };
 
@@ -56,12 +56,6 @@ const NESTED_KEYS: Record<string, string> = {
   'openai.apiKey': 'openai',
   'openai.baseURL': 'openai',
   'openai.model': 'openai',
-  'anthropic.apiKey': 'anthropic',
-  'anthropic.baseURL': 'anthropic',
-  'anthropic.model': 'anthropic',
-  'gemini.apiKey': 'gemini',
-  'gemini.cliPath': 'gemini',
-  'gemini.model': 'gemini',
   'browser.headless': 'browser',
   'browser.isolated': 'browser',
   'browser.executablePath': 'browser',

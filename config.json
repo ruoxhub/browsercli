@@ -1,0 +1,24 @@
+{
+  "sekiroHost": "ws://127.0.0.1:5612",
+  "group": "js-reverse",
+  "browserUrl": "http://127.0.0.1:9222",
+  "wsEndpoint": "",
+  "headless": false,
+  "llmProvider": "openai",
+  "openai": {
+    "baseURL": "http://127.0.0.1:1234/v1",
+    "model": "minimax-m2.5"
+  },
+  "browser": {
+    "headless": false,
+    "isolated": true,
+    "executablePath": "",
+    "channel": "chrome",
+    "useStealthScripts": true,
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    }
+  },
+  "debug": false
+}

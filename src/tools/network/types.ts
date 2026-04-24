@@ -115,11 +115,13 @@ export interface ListNetworkRequestsParams {
 export interface GetNetworkRequestParams {
   /** 网络请求稳定 ID，省略则使用 DevTools 中当前选中的请求 */
   reqid?: number;
+  /** 响应体最大长度限制，默认 300 字符，超出部分截断 */
+  maxBodyLength?: number;
 }
 
 // ─── 数据类型 ──────────────────────────────────────────
 
-/** 单条网络请求的摘要数据 */
+/** 单条网络请求的摘要数据（精简版） */
 export interface NetworkRequestData {
   /** 稳定 ID */
   reqid: number;
@@ -127,16 +129,8 @@ export interface NetworkRequestData {
   url: string;
   /** HTTP 方法 */
   method: string;
-  /** 资源类型 */
-  resourceType: string;
-  /** HTTP 状态码 */
-  statusCode: number;
-  /** 请求头 */
-  requestHeaders: Record<string, string>;
-  /** 响应头 */
-  responseHeaders: Record<string, string>;
-  /** 请求发起者 */
-  initiator?: RequestInitiator;
+  /** POST 数据 */
+  postData?: string;
 }
 
 /** listNetworkRequests 返回数据 */
@@ -147,8 +141,33 @@ export interface ListNetworkRequestsData {
   pageSize: number | undefined;
 }
 
-/** getNetworkRequest 返回数据 */
-export interface GetNetworkRequestData extends NetworkRequestData {}
+/** getNetworkRequest 返回数据（完整详情） */
+export interface GetNetworkRequestData {
+  /** 稳定 ID */
+  reqid: number;
+  /** 请求 URL */
+  url: string;
+  /** HTTP 方法 */
+  method: string;
+  /** 资源类型 */
+  resourceType: string;
+  /** POST 数据 */
+  postData?: string;
+  /** HTTP 状态码 */
+  statusCode: number;
+  /** 状态文本 */
+  statusText?: string;
+  /** 请求头 */
+  requestHeaders: Record<string, string>;
+  /** 响应头 */
+  responseHeaders: Record<string, string>;
+  /** 请求发起者 */
+  initiator?: RequestInitiator;
+  /** 请求时间戳 */
+  timestamp?: number;
+  /** 响应体（文本，如果可读取） */
+  responseBody?: string;
+}
 
 // ─── 结果类型 ──────────────────────────────────────────
 

@@ -40,7 +40,7 @@ export interface ContinuousDebugConfig {
   timeoutMs?: number;
 
   /** AI 提供商 (默认使用 AIService 配置) */
-  aiProvider?: 'openai' | 'anthropic' | 'gemini';
+  aiProvider?: 'openai';
 
   /** 模型名称 (可选) */
   model?: string;

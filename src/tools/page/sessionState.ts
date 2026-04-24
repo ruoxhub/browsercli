@@ -13,6 +13,7 @@ import {
 import {readFile, writeFile} from 'node:fs/promises';
 
 import {validateOutputPath} from '../../utils/fsSafe.js';
+import {getEnvValue, getEnvNumber} from '../../config.js';
 
 import type {
   DeleteSessionStateParams,
@@ -37,11 +38,11 @@ import type {
 const sessionSnapshots = new Map<string, SessionSnapshot>();
 const sessionTtlMs = Math.max(
   60_000,
-  Number(process.env.SESSION_STATE_TTL_MS ?? 30 * 60_000),
+  getEnvNumber('SESSION_STATE_TTL_MS') ?? 30 * 60_000,
 );
 const cleanupIntervalMs = Math.max(
   15_000,
-  Number(process.env.SESSION_STATE_CLEANUP_INTERVAL_MS ?? 5 * 60_000),
+  getEnvNumber('SESSION_STATE_CLEANUP_INTERVAL_MS') ?? 5 * 60_000,
 );
 
 let cleanupInitialized = false;
@@ -72,7 +73,7 @@ function ensureCleanupLoop(): void {
 // ─── 加密辅助 ──────────────────────────────────────────
 
 function getEncryptionKey(): Buffer | undefined {
-  const configured = process.env.SESSION_STATE_ENCRYPTION_KEY;
+  const configured = getEnvValue('SESSION_STATE_ENCRYPTION_KEY');
   if (!configured || configured.length === 0) {
     return undefined;
   }

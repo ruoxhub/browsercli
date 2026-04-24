@@ -522,8 +522,8 @@ export class BrowserManager {
   private async connectToRemoteBrowser(): Promise<Browser> {
     try {
       const debugUrl =
-        this.config.wsEndpoint ??
-        this.config.browserURL ??
+        this.config.wsEndpoint ||
+        this.config.browserURL ||
         this.config.remoteDebuggingUrl;
 
       logger.debug('Connecting to remote browser at:', debugUrl);
@@ -532,7 +532,7 @@ export class BrowserManager {
       let browserURL: string | undefined;
       let webSocketDebuggerUrl: string | undefined;
       if (this.config.browserURL || this.config.remoteDebuggingUrl) {
-        browserURL = this.config.browserURL ?? this.config.remoteDebuggingUrl;
+        browserURL = this.config.browserURL || this.config.remoteDebuggingUrl;
         try {
           const response = await fetch(`${browserURL}/json/version`);
           if (response.ok) {
@@ -560,9 +560,9 @@ export class BrowserManager {
       // Use Playwright connectOverCDP
       // Prefer explicit WebSocket endpoint over browserURL
       const connectEndpoint =
-        this.config.wsEndpoint ??
-        webSocketDebuggerUrl ??
-        this.config.browserURL ??
+        this.config.wsEndpoint ||
+        webSocketDebuggerUrl ||
+        this.config.browserURL ||
         this.config.remoteDebuggingUrl;
 
       const connectOptions = {

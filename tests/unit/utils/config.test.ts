@@ -95,17 +95,6 @@ describe('Configuration Management', () => {
   });
 
   describe('getAIConfig', () => {
-    it('should return Gemini CLI config when no API keys are configured', () => {
-      const config = getAIConfig();
-      
-      // Gemini CLI is always available as a fallback
-      assert.ok(config);
-      assert.strictEqual(config.provider, 'gemini');
-      assert.ok(config.gemini);
-      assert.strictEqual(config.gemini.useAPI, false);
-      assert.strictEqual(config.gemini.cliPath, 'gemini-cli');
-    });
-
     it('should configure OpenAI when OPENAI_API_KEY is set', () => {
       process.env.OPENAI_API_KEY = 'sk-test-key';
       const config = getAIConfig();
@@ -134,65 +123,6 @@ describe('Configuration Management', () => {
       assert.strictEqual(config.openai.model, 'gpt-3.5-turbo');
     });
 
-    it('should configure Anthropic when ANTHROPIC_API_KEY is set', () => {
-      process.env.ANTHROPIC_API_KEY = 'sk-ant-test-key';
-      const config = getAIConfig();
-      
-      assert.ok(config);
-      assert.ok(config.anthropic);
-      assert.strictEqual(config.anthropic.apiKey, 'sk-ant-test-key');
-      assert.strictEqual(config.anthropic.model, 'claude-3-5-sonnet-20241022');
-    });
-
-    it('should use custom Anthropic model when set', () => {
-      process.env.ANTHROPIC_API_KEY = 'sk-ant-test-key';
-      process.env.ANTHROPIC_MODEL = 'claude-3-opus-20240229';
-      const config = getAIConfig();
-      
-      assert.ok(config?.anthropic);
-      assert.strictEqual(config.anthropic.model, 'claude-3-opus-20240229');
-    });
-
-    it('should configure Gemini with API key when set', () => {
-      process.env.GEMINI_API_KEY = 'gemini-test-key';
-      const config = getAIConfig();
-      
-      assert.ok(config);
-      assert.ok(config.gemini);
-      assert.strictEqual(config.gemini.apiKey, 'gemini-test-key');
-      assert.strictEqual(config.gemini.useAPI, true);
-      assert.strictEqual(config.gemini.model, 'gemini-2.0-flash-exp');
-    });
-
-    it('should configure Gemini in CLI mode when no API key', () => {
-      // Gemini is always configured with CLI fallback
-      process.env.OPENAI_API_KEY = 'sk-test-key'; // Need at least one provider
-      const config = getAIConfig();
-      
-      assert.ok(config);
-      assert.ok(config.gemini);
-      assert.strictEqual(config.gemini.useAPI, false);
-      assert.strictEqual(config.gemini.cliPath, 'gemini-cli');
-    });
-
-    it('should use custom Gemini CLI path when set', () => {
-      process.env.GEMINI_CLI_PATH = '/custom/path/gemini-cli';
-      process.env.OPENAI_API_KEY = 'sk-test-key'; // Need at least one provider
-      const config = getAIConfig();
-      
-      assert.ok(config?.gemini);
-      assert.strictEqual(config.gemini.cliPath, '/custom/path/gemini-cli');
-    });
-
-    it('should use custom Gemini model when set', () => {
-      process.env.GEMINI_API_KEY = 'gemini-test-key';
-      process.env.GEMINI_MODEL = 'gemini-pro';
-      const config = getAIConfig();
-      
-      assert.ok(config?.gemini);
-      assert.strictEqual(config.gemini.model, 'gemini-pro');
-    });
-
     it('should set correct provider based on DEFAULT_LLM_PROVIDER', () => {
       process.env.OPENAI_API_KEY = 'sk-test-key';
       process.env.DEFAULT_LLM_PROVIDER = 'openai';
@@ -202,17 +132,6 @@ describe('Configuration Management', () => {
       assert.strictEqual(config.provider, 'openai');
     });
 
-    it('should configure multiple providers simultaneously', () => {
-      process.env.OPENAI_API_KEY = 'sk-test-key';
-      process.env.ANTHROPIC_API_KEY = 'sk-ant-test-key';
-      process.env.GEMINI_API_KEY = 'gemini-test-key';
-      const config = getAIConfig();
-      
-      assert.ok(config);
-      assert.ok(config.openai);
-      assert.ok(config.anthropic);
-      assert.ok(config.gemini);
-    });
   });
 
   describe('getBrowserConfig', () => {
@@ -401,34 +320,6 @@ describe('Configuration Management', () => {
       
       assert.strictEqual(result.valid, false);
       assert.ok(result.errors.some(e => e.includes('OpenAI')));
-    });
-
-    it('should reject Anthropic provider without configuration', () => {
-      const config: SystemConfig = {
-        ai: {
-          provider: 'anthropic',
-        },
-        browser: {},
-      };
-      
-      const result = validateConfig(config);
-      
-      assert.strictEqual(result.valid, false);
-      assert.ok(result.errors.some(e => e.includes('Anthropic')));
-    });
-
-    it('should reject Gemini provider without configuration', () => {
-      const config: SystemConfig = {
-        ai: {
-          provider: 'gemini',
-        },
-        browser: {},
-      };
-      
-      const result = validateConfig(config);
-      
-      assert.strictEqual(result.valid, false);
-      assert.ok(result.errors.some(e => e.includes('Gemini')));
     });
 
     it('should accept valid OpenAI configuration', () => {

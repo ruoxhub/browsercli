@@ -22,15 +22,11 @@ export interface Config {
 }
 
 export interface LLMConfig {
-  provider: 'openai' | 'anthropic';
+  provider: 'openai';
   openai?: {
     apiKey: string;
     model: string;
     baseURL?: string;
-  };
-  anthropic?: {
-    apiKey: string;
-    model: string;
   };
 }
 
