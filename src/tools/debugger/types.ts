@@ -19,6 +19,8 @@ export interface DebuggerResult {
   tooltype: string;
   /** 使用的日志格式 */
   logFormat?: string;
+  /** 可选的结构化结果 */
+  data?: unknown;
 }
 
 /** Hook 函数参数 */

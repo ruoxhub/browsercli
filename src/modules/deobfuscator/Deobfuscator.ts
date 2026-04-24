@@ -22,6 +22,7 @@
  */
 
 import crypto from 'node:crypto';
+import vm from 'node:vm';
 
 import generateImport from '@babel/generator';
 const generate =
@@ -68,6 +69,25 @@ function getStaticNumber(node: t.Node | null | undefined): number | null {
     return -node.argument.value;
   }
   return null;
+}
+
+function isObfuscatorIdentifier(name: string): boolean {
+  return /^_0x[a-z0-9]+$/i.test(name);
+}
+
+function isStaticVmArg(node: t.Node): node is t.Expression {
+  if (
+    t.isNumericLiteral(node) ||
+    t.isStringLiteral(node) ||
+    t.isBooleanLiteral(node)
+  ) {
+    return true;
+  }
+
+  return (
+    t.isUnaryExpression(node, {operator: '-'}) &&
+    (t.isNumericLiteral(node.argument) || t.isUnaryExpression(node.argument))
+  );
 }
 
 // ==================== 扩展选项 ====================
@@ -200,6 +220,8 @@ export class Deobfuscator {
       code = await this.decodeStrings(code, transformations);
       code = await this.decryptArrays(code, transformations);
       code = await this.inlineStringDecoderCalls(code, transformations);
+      code = await this.evaluateStringDecoderCalls(code, transformations);
+      code = await this.basicTransform(code, transformations);
 
       // 控制流平坦化还原（基础版，仅 aggressive 时）
       if (options.aggressive) {
@@ -1047,6 +1069,163 @@ export class Deobfuscator {
       });
       return code;
     }
+  }
+
+  /**
+   * 通过受限 vm 静态求值更复杂的 javascript-obfuscator 解码器调用
+   */
+  private async evaluateStringDecoderCalls(
+    code: string,
+    transformations: Transformation[],
+  ): Promise<string> {
+    try {
+      const ast = parser.parse(code, {
+        sourceType: 'module',
+        plugins: ['jsx', 'typescript'],
+      });
+      const helperCode = this.buildDecoderHelperPrelude(ast.program.body);
+      if (!helperCode) {
+        return code;
+      }
+
+      const context = vm.createContext({
+        parseInt,
+        decodeURIComponent,
+        String,
+        Array,
+        Number,
+        Boolean,
+        Math,
+        Buffer,
+        atob: (value: string) => Buffer.from(value, 'base64').toString('binary'),
+        btoa: (value: string) => Buffer.from(value, 'binary').toString('base64'),
+      });
+
+      new vm.Script(helperCode).runInContext(context, {timeout: 100});
+
+      let replaced = 0;
+      traverse(ast, {
+        CallExpression: path => {
+          if (!t.isIdentifier(path.node.callee)) return;
+          if (!isObfuscatorIdentifier(path.node.callee.name)) return;
+          if (!path.node.arguments.every(isStaticVmArg)) return;
+
+          const expression = generate(path.node, {compact: true}).code;
+          let evaluated: unknown;
+          try {
+            evaluated = new vm.Script(expression).runInContext(context, {
+              timeout: 50,
+            });
+          } catch {
+            return;
+          }
+
+          if (typeof evaluated === 'string') {
+            path.replaceWith(t.stringLiteral(evaluated));
+            replaced++;
+            return;
+          }
+
+          if (typeof evaluated === 'number') {
+            path.replaceWith(t.numericLiteral(evaluated));
+            replaced++;
+          }
+        },
+
+        MemberExpression(path) {
+          if (
+            path.node.computed &&
+            t.isStringLiteral(path.node.property) &&
+            t.isValidIdentifier(path.node.property.value)
+          ) {
+            path.node.computed = false;
+            path.node.property = t.identifier(path.node.property.value);
+          }
+        },
+      });
+
+      if (replaced > 0) {
+        const output = generate(ast, {comments: true, compact: false});
+        transformations.push({
+          type: 'evaluate-string-decoders',
+          description: `Evaluated ${replaced} decoder calls in sandbox`,
+          success: true,
+        });
+        return output.code;
+      }
+
+      return code;
+    } catch (error) {
+      logger.warn('Decoder sandbox evaluation failed', error);
+      transformations.push({
+        type: 'evaluate-string-decoders',
+        description: 'Failed',
+        success: false,
+      });
+      return code;
+    }
+  }
+
+  private buildDecoderHelperPrelude(body: t.Statement[]): string | null {
+    const helperStatements: string[] = [];
+
+    for (const statement of body) {
+      if (
+        t.isFunctionDeclaration(statement) &&
+        statement.id &&
+        isObfuscatorIdentifier(statement.id.name)
+      ) {
+        helperStatements.push(generate(statement, {compact: true}).code);
+        continue;
+      }
+
+      if (t.isVariableDeclaration(statement)) {
+        const hasHelperDeclarator = statement.declarations.some(declaration => {
+          if (!t.isIdentifier(declaration.id)) return false;
+          if (isObfuscatorIdentifier(declaration.id.name)) return true;
+
+          return (
+            t.isIdentifier(declaration.init) &&
+            isObfuscatorIdentifier(declaration.init.name)
+          );
+        });
+
+        if (hasHelperDeclarator) {
+          helperStatements.push(generate(statement, {compact: true}).code);
+        }
+        continue;
+      }
+
+      if (
+        t.isExpressionStatement(statement) &&
+        t.isCallExpression(statement.expression) &&
+        this.statementContainsObfuscatorHelper(statement)
+      ) {
+        helperStatements.push(generate(statement, {compact: true}).code);
+      }
+    }
+
+    return helperStatements.length > 0 ? helperStatements.join('\n') : null;
+  }
+
+  private statementContainsObfuscatorHelper(statement: t.Statement): boolean {
+    let found = false;
+
+    traverse(
+      t.file(t.program([statement])),
+      {
+        Identifier(path) {
+          if (isObfuscatorIdentifier(path.node.name)) {
+            found = true;
+            path.stop();
+          }
+        },
+      },
+      undefined,
+      {},
+    );
+
+    return found;
   }
 
   private extractArrayProviderStrings(

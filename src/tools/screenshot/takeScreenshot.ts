@@ -12,6 +12,11 @@ import type {
   TakeScreenshotParams,
   TakeScreenshotResult,
 } from './types.js';
+import {
+  getActivePageWithGuard,
+  normalizeBrowserRuntimeError,
+  withOperationTimeout,
+} from '../shared/browserRuntime.js';
 
 /**
  * 截图页面（纯函数版本）。
@@ -27,40 +32,49 @@ export async function takeScreenshot(
   params: TakeScreenshotParams = {},
 ): Promise<TakeScreenshotResult> {
   try {
-    const page = await runtime.getActivePage();
+    const page = await getActivePageWithGuard(runtime);
     const format = params.format || 'png';
     const quality = format === 'png' ? undefined : params.quality;
-
-    // 自动创建截图目录
-    if (params.filePath) {
-      const dir = path.dirname(params.filePath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, {recursive: true});
-      }
+    if (quality !== undefined && (quality < 0 || quality > 100)) {
+      throw new Error(`quality 必须在 0-100 之间，收到: ${quality}`);
     }
 
-    const buffer = await page.screenshot({
-      type: format,
-      fullPage: params.fullPage,
-      quality,
-      optimizeForSpeed: true,
-      path: params.filePath,
-    });
+    // 自动创建截图目录
+    const resolvedFilePath = params.filePath
+      ? path.resolve(params.filePath)
+      : undefined;
+    if (resolvedFilePath) {
+      const dir = path.dirname(resolvedFilePath);
+      fs.mkdirSync(dir, {recursive: true});
+    }
 
-    const screenshotBuffer = Buffer.from(buffer);
+    const buffer = await withOperationTimeout(
+      page.screenshot({
+        type: format as 'png' | 'jpeg',
+        fullPage: params.fullPage,
+        quality,
+        optimizeForSpeed: true,
+        path: resolvedFilePath,
+      }),
+      '执行截图',
+    );
 
-    if (params.filePath) {
+    const screenshotBuffer = Buffer.isBuffer(buffer)
+      ? buffer
+      : Buffer.from(buffer);
+
+    if (resolvedFilePath) {
       return {
         success: true,
         message: params.fullPage
-          ? `全页截图已保存: ${params.filePath}`
-          : `视口截图已保存: ${params.filePath}`,
+          ? `全页截图已保存: ${resolvedFilePath}`
+          : `视口截图已保存: ${resolvedFilePath}`,
         tooltype: 'take_screenshot',
         logFormat: 'json',
         data: {
           format,
           fullPage: params.fullPage || false,
-          filePath: params.filePath,
+          filePath: resolvedFilePath,
           size: screenshotBuffer.length,
         },
       };
@@ -84,7 +98,7 @@ export async function takeScreenshot(
   } catch (error) {
     return {
       success: false,
-      message: `截图失败: ${error instanceof Error ? error.message : String(error)}`,
+      message: `截图失败: ${normalizeBrowserRuntimeError(error)}`,
       tooltype: 'take_screenshot',
       logFormat: 'json',
     };

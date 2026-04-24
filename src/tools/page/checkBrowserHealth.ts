@@ -10,6 +10,11 @@ import type {
   HealthIssue,
   PageRuntimeServices,
 } from './types.js';
+import {
+  getActivePageWithGuard,
+  normalizeBrowserRuntimeError,
+  withOperationTimeout,
+} from '../shared/browserRuntime.js';
 
 /**
  * 检查浏览器连接健康状态和页面可用性（纯函数版本）。
@@ -37,18 +42,24 @@ export async function checkBrowserHealth(
   let url: string | null = null;
   let title: string | null = null;
   try {
-    const page = await runtime.getActivePage();
+    const page = await getActivePageWithGuard(runtime);
     pageReady = true;
     connected = true;
     url = page.url();
-    title = await page.title();
-    await page.evaluate('1+1');
+    title = await withOperationTimeout(page.title(), '读取页面标题');
+    await withOperationTimeout(page.evaluate('1+1'), '执行页面健康探针');
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = normalizeBrowserRuntimeError(error);
     issues.push({
       code: 'NO_ACTIVE_PAGE',
       message: `No controllable active page: ${message}`,
     });
+    if (/浏览器连接失败|已关闭|超时/.test(message)) {
+      issues.push({
+        code: 'PAGE_UNRESPONSIVE',
+        message: `Active page is present but not responsive: ${message}`,
+      });
+    }
   }
 
   if (!connected) {

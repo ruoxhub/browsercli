@@ -11,7 +11,14 @@
  * 作为 ToolAdapter 与纯函数工具之间的桥梁。
  */
 
-import type {Browser, BrowserContext, Frame, Page, Request} from 'patchright';
+import type {
+  Browser,
+  BrowserContext,
+  CDPSession,
+  Frame,
+  Page,
+  Request,
+} from 'patchright';
 
 import {AISummarizer} from '../modules/analyzer/AISummarizer.js';
 import {CodeAnalyzer} from '../modules/analyzer/CodeAnalyzer.js';
@@ -20,6 +27,7 @@ import {Deobfuscator} from '../modules/deobfuscator/Deobfuscator.js';
 import {LLMService} from '../services/LLMService.js';
 import type {HTTPRequest} from '../third_party/index.js';
 import type {RequestInitiator} from '../tools/network/types.js';
+import {DebuggerContext} from '../utils/DebuggerContext.js';
 
 type TraceResult = unknown;
 
@@ -51,6 +59,8 @@ export class ToolContextProvider {
   private _analyzer: CodeAnalyzer | null = null;
   private _summarizer: AISummarizer | null = null;
   private _cryptoDetector: CryptoDetector | null = null;
+  private _debuggerContexts = new WeakMap<Page, DebuggerContext>();
+  private _debuggerSessions = new WeakMap<Page, CDPSession>();
 
   // ─── 网络请求收集 ────────────────────────────────────
   private _networkStorage = new WeakMap<Page, PageRequestStorage>();
@@ -142,6 +152,52 @@ export class ToolContextProvider {
 
   selectPage(page: Page): void {
     this.selectedPage = page;
+  }
+
+  async getDebuggerContext(page?: Page): Promise<DebuggerContext> {
+    const activePage = page ?? (await this.getActivePage());
+    const existing = this._debuggerContexts.get(activePage);
+    if (existing?.isEnabled()) {
+      return existing;
+    }
+
+    const client = await activePage.context().newCDPSession(activePage);
+    const debuggerContext = new DebuggerContext();
+    await debuggerContext.enable(client);
+
+    this._debuggerContexts.set(activePage, debuggerContext);
+    this._debuggerSessions.set(activePage, client);
+
+    activePage.once('close', () => {
+      void this.disposeDebuggerContext(activePage);
+    });
+
+    return debuggerContext;
+  }
+
+  async disposeDebuggerContext(page?: Page): Promise<void> {
+    const activePage = page ?? this.selectedPage;
+    if (!activePage) {
+      return;
+    }
+
+    const debuggerContext = this._debuggerContexts.get(activePage);
+    if (debuggerContext) {
+      try {
+        await debuggerContext.disable();
+      } catch {
+        // Ignore cleanup errors when the page/session is already gone.
+      }
+    }
+
+    const client = this._debuggerSessions.get(activePage);
+    if (client) {
+      try {
+        await client.detach();
+      } catch {
+        // Ignore cleanup errors when the page/session is already gone.
+      }
+    }
   }
 
   async bringPageToFront(page: Page): Promise<void> {

@@ -16,7 +16,7 @@ describe('ToolContextProvider', () => {
 
     const result = await deobfuscateCode(runtime, {
       code: [
-        'function _0x5c1a(){const _0x2f8b=[\'log\',\'Hello, JSReverser-MCP!\'];',
+        "function _0x5c1a(){const _0x2f8b=['log','Hello, JSReverser-MCP!'];",
         '_0x5c1a=function(){return _0x2f8b;};return _0x5c1a();}',
         'function _0x1f4d(_0x31f4f6,_0x4df9ff){const _0x5c1af4=_0x5c1a();',
         'return _0x1f4d=function(_0x1f4d7d,_0x2dcf8d){_0x1f4d7d=_0x1f4d7d-0x0;',
@@ -32,5 +32,30 @@ describe('ToolContextProvider', () => {
     assert.match(result.message, /completed/i);
     assert.ok(typeof result.data.code === 'string');
     assert.ok(result.data.code.includes('console'));
+  });
+
+  it('reuses debugger context for the same page', async () => {
+    const runtime = new ToolContextProvider();
+    const client = {
+      on: () => undefined,
+      off: () => undefined,
+      send: async () => undefined,
+      detach: async () => undefined,
+    };
+    const page = {
+      isClosed: () => false,
+      mainFrame: () => null,
+      context: () => ({
+        newCDPSession: async () => client,
+      }),
+      once: () => undefined,
+    };
+
+    runtime.setSelectedPage(page as never);
+
+    const first = await runtime.getDebuggerContext();
+    const second = await runtime.getDebuggerContext();
+
+    assert.equal(first, second);
   });
 });

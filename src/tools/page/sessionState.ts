@@ -14,6 +14,11 @@ import {readFile, writeFile} from 'node:fs/promises';
 
 import {validateOutputPath} from '../../utils/fsSafe.js';
 import {getEnvValue, getEnvNumber} from '../../config.js';
+import {
+  getActivePageWithGuard,
+  normalizeBrowserRuntimeError,
+  withOperationTimeout,
+} from '../shared/browserRuntime.js';
 
 import type {
   DeleteSessionStateParams,
@@ -181,36 +186,47 @@ export async function saveSessionState(
     ensureCleanupLoop();
     cleanupExpiredSessions();
 
-    const page = await runtime.getActivePage();
+    const page = await getActivePageWithGuard(runtime);
     const sessionId = params?.sessionId ?? `session_${Date.now()}`;
     const includeCookies = !!params?.includeCookies;
     const includeLocalStorage = !!params?.includeLocalStorage;
     const includeSessionStorage = !!params?.includeSessionStorage;
 
-    const cookies = includeCookies ? await page.context().cookies() : [];
+    const cookies = includeCookies
+      ? await withOperationTimeout(
+          page.context().cookies(),
+          '读取 cookies',
+        )
+      : [];
     const localStorageData: Record<string, string> = includeLocalStorage
-      ? await page.evaluate(() => {
-          const items: Record<string, string> = {};
-          for (let i = 0; i < window.localStorage.length; i++) {
-            const key = window.localStorage.key(i);
-            if (key) {
-              items[key] = window.localStorage.getItem(key) || '';
+      ? await withOperationTimeout(
+          page.evaluate(() => {
+            const items: Record<string, string> = {};
+            for (let i = 0; i < window.localStorage.length; i++) {
+              const key = window.localStorage.key(i);
+              if (key) {
+                items[key] = window.localStorage.getItem(key) || '';
+              }
             }
-          }
-          return items;
-        })
+            return items;
+          }),
+          '读取 localStorage',
+        )
       : {};
     const sessionStorageData: Record<string, string> = includeSessionStorage
-      ? await page.evaluate(() => {
-          const items: Record<string, string> = {};
-          for (let i = 0; i < window.sessionStorage.length; i++) {
-            const key = window.sessionStorage.key(i);
-            if (key) {
-              items[key] = window.sessionStorage.getItem(key) || '';
+      ? await withOperationTimeout(
+          page.evaluate(() => {
+            const items: Record<string, string> = {};
+            for (let i = 0; i < window.sessionStorage.length; i++) {
+              const key = window.sessionStorage.key(i);
+              if (key) {
+                items[key] = window.sessionStorage.getItem(key) || '';
+              }
             }
-          }
-          return items;
-        })
+            return items;
+          }),
+          '读取 sessionStorage',
+        )
       : {};
 
     const snapshot: SessionSnapshot = {
@@ -218,7 +234,7 @@ export async function saveSessionState(
       savedAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + sessionTtlMs).toISOString(),
       url: page.url(),
-      title: await page.title(),
+      title: await withOperationTimeout(page.title(), '读取页面标题'),
       cookies: cookies as unknown as Array<Record<string, unknown>>,
       localStorage: localStorageData,
       sessionStorage: sessionStorageData,
@@ -245,7 +261,7 @@ export async function saveSessionState(
   } catch (error) {
     return {
       success: false,
-      message: `保存会话失败: ${error instanceof Error ? error.message : String(error)}`,
+      message: `保存会话失败: ${normalizeBrowserRuntimeError(error)}`,
       tooltype: 'save_session_state',
       logFormat: 'json',
     };

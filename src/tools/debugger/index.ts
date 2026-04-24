@@ -4,6 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {Page} from 'patchright';
+
+import type {ToolContextProvider} from '../../worker/ToolContextProvider.js';
+import type {
+  BreakpointInfo,
+  PausedState,
+  ScriptInfo,
+} from '../../utils/DebuggerContext.js';
+import {hookFunction as hookFunctionImpl} from './hookFunction.js';
 import type {DebuggerResult} from './types.js';
 
 export {hookFunction} from './hookFunction.js';
@@ -32,196 +41,417 @@ export type {
   Frame,
 } from './types.js';
 
-// ─── CDP Debugger 工具 (stub 实现) ────────────────────
-// 以下工具需要 CDP Debugger 协议支持，提供基础 stub 实现
+type DebuggerRuntime = Pick<
+  ToolContextProvider,
+  | 'getDebuggerContext'
+  | 'getSelectedPage'
+  | 'getSelectedFrame'
+  | 'getNetworkRequestById'
+  | 'getRequestInitiator'
+>;
+
+interface TraceFunctionParams {
+  target?: string;
+  logArgs?: boolean;
+  logResult?: boolean;
+  logStack?: boolean;
+  hookId?: string;
+}
+
+function success(
+  tooltype: string,
+  message: string,
+  data?: unknown,
+): DebuggerResult {
+  return {success: true, message, tooltype, data};
+}
+
+function failure(tooltype: string, message: string): DebuggerResult {
+  return {success: false, message, tooltype};
+}
+
+function getRuntime(runtime: unknown): DebuggerRuntime {
+  if (
+    runtime &&
+    typeof runtime === 'object' &&
+    'getDebuggerContext' in runtime &&
+    typeof runtime.getDebuggerContext === 'function'
+  ) {
+    return runtime as DebuggerRuntime;
+  }
+  throw new Error('缺少调试运行时上下文');
+}
+
+function ensureString(
+  value: unknown,
+  name: string,
+  tooltype: string,
+): string | DebuggerResult {
+  if (typeof value !== 'string' || value.trim() === '') {
+    return failure(tooltype, `${name} 参数不能为空`);
+  }
+  return value;
+}
+
+function ensureLineNumber(
+  value: unknown,
+  tooltype: string,
+): number | DebuggerResult {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+    return failure(tooltype, 'lineNumber 必须是非负整数');
+  }
+  return value;
+}
+
+function summarizeBreakpoints(breakpoints: BreakpointInfo[]): string {
+  if (breakpoints.length === 0) {
+    return '当前无活跃断点';
+  }
+  return `当前共有 ${breakpoints.length} 个活跃断点`;
+}
+
+function summarizeScripts(scripts: ScriptInfo[], filter?: string): string {
+  if (scripts.length === 0) {
+    return filter ? `未找到匹配过滤词 "${filter}" 的脚本` : '当前无已记录脚本';
+  }
+  return filter
+    ? `找到 ${scripts.length} 个匹配过滤词 "${filter}" 的脚本`
+    : `已记录 ${scripts.length} 个脚本`;
+}
+
+function findMatches(
+  source: string,
+  query: string,
+  caseSensitive = false,
+): Array<{index: number; lineNumber: number; columnNumber: number}> {
+  const haystack = caseSensitive ? source : source.toLowerCase();
+  const needle = caseSensitive ? query : query.toLowerCase();
+  const matches: Array<{
+    index: number;
+    lineNumber: number;
+    columnNumber: number;
+  }> = [];
+
+  if (!needle) {
+    return matches;
+  }
+
+  let fromIndex = 0;
+  while (fromIndex < haystack.length) {
+    const index = haystack.indexOf(needle, fromIndex);
+    if (index === -1) {
+      break;
+    }
+    const prefix = source.slice(0, index);
+    const lines = prefix.split('\n');
+    matches.push({
+      index,
+      lineNumber: lines.length - 1,
+      columnNumber: lines.at(-1)?.length ?? 0,
+    });
+    fromIndex = index + Math.max(needle.length, 1);
+  }
+
+  return matches;
+}
+
+async function getDebugger(runtime: DebuggerRuntime) {
+  return await runtime.getDebuggerContext();
+}
+
+function getTraceFrame(runtime: DebuggerRuntime) {
+  const frame = runtime.getSelectedFrame();
+  if (frame) {
+    return frame;
+  }
+
+  const page = runtime.getSelectedPage() as Page | null;
+  return page?.mainFrame() ?? null;
+}
 
 /**
  * 设置断点。
  */
 export async function setBreakpoint(
-  _runtime: unknown,
-  params: {url?: string; lineNumber?: number; condition?: string} = {},
+  runtime: DebuggerRuntime,
+  params: {
+    url?: string;
+    lineNumber?: number;
+    columnNumber?: number;
+    condition?: string;
+    isRegex?: boolean;
+  } = {},
 ): Promise<DebuggerResult> {
-  return {
-    success: true,
-    message: `断点已设置: ${params.url ?? 'unknown'}:${params.lineNumber ?? 0}`,
-    tooltype: 'set_breakpoint',
-  };
+  const url = ensureString(params.url, 'url', 'set_breakpoint');
+  if (typeof url !== 'string') {
+    return url;
+  }
+  const lineNumber = ensureLineNumber(params.lineNumber, 'set_breakpoint');
+  if (typeof lineNumber !== 'number') {
+    return lineNumber;
+  }
+
+  const debuggerContext = await getDebugger(runtime);
+  const breakpoint = params.isRegex
+    ? await debuggerContext.setBreakpointByUrlRegex(
+        url,
+        lineNumber,
+        params.columnNumber ?? 0,
+        params.condition,
+      )
+    : await debuggerContext.setBreakpoint(
+        url,
+        lineNumber,
+        params.columnNumber ?? 0,
+        params.condition,
+      );
+
+  return success(
+    'set_breakpoint',
+    `断点已设置: ${url}:${lineNumber}`,
+    breakpoint,
+  );
 }
 
 /**
  * 移除断点。
  */
 export async function removeBreakpoint(
-  _runtime: unknown,
+  runtime: DebuggerRuntime,
   params: {breakpointId?: string} = {},
 ): Promise<DebuggerResult> {
-  return {
-    success: true,
-    message: `断点已移除: ${params.breakpointId ?? 'unknown'}`,
-    tooltype: 'remove_breakpoint',
-  };
+  const breakpointId = ensureString(
+    params.breakpointId,
+    'breakpointId',
+    'remove_breakpoint',
+  );
+  if (typeof breakpointId !== 'string') {
+    return breakpointId;
+  }
+
+  const debuggerContext = await getDebugger(runtime);
+  await debuggerContext.removeBreakpoint(breakpointId);
+
+  return success('remove_breakpoint', `断点已移除: ${breakpointId}`, {
+    breakpointId,
+  });
 }
 
 /**
  * 列出所有断点。
  */
 export async function listBreakpoints(
-  _runtime: unknown,
+  runtime: DebuggerRuntime,
 ): Promise<DebuggerResult> {
-  return {
-    success: true,
-    message: '当前无活跃断点',
-    tooltype: 'list_breakpoints',
-  };
+  const debuggerContext = await getDebugger(runtime);
+  const breakpoints = debuggerContext.getBreakpoints();
+  return success(
+    'list_breakpoints',
+    summarizeBreakpoints(breakpoints),
+    breakpoints,
+  );
 }
 
 /**
  * 单步进入。
  */
 export async function stepInto(
-  _runtime: unknown,
+  runtime: DebuggerRuntime,
 ): Promise<DebuggerResult> {
-  return {
-    success: true,
-    message: 'Step into 执行完成',
-    tooltype: 'step_into',
-  };
+  const debuggerContext = await getDebugger(runtime);
+  await debuggerContext.stepInto();
+  return success('step_into', '单步进入执行完成');
 }
 
 /**
  * 单步跳过。
  */
 export async function stepOver(
-  _runtime: unknown,
+  runtime: DebuggerRuntime,
 ): Promise<DebuggerResult> {
-  return {
-    success: true,
-    message: 'Step over 执行完成',
-    tooltype: 'step_over',
-  };
+  const debuggerContext = await getDebugger(runtime);
+  await debuggerContext.stepOver();
+  return success('step_over', '单步跳过执行完成');
 }
 
 /**
  * 单步跳出。
  */
 export async function stepOut(
-  _runtime: unknown,
+  runtime: DebuggerRuntime,
 ): Promise<DebuggerResult> {
-  return {
-    success: true,
-    message: 'Step out 执行完成',
-    tooltype: 'step_out',
-  };
+  const debuggerContext = await getDebugger(runtime);
+  await debuggerContext.stepOut();
+  return success('step_out', '单步跳出执行完成');
 }
 
 /**
  * 继续执行。
  */
 export async function resume(
-  _runtime: unknown,
+  runtime: DebuggerRuntime,
 ): Promise<DebuggerResult> {
-  return {
-    success: true,
-    message: '执行已恢复',
-    tooltype: 'resume',
-  };
+  const debuggerContext = await getDebugger(runtime);
+  await debuggerContext.resume();
+  return success('resume', '执行已恢复');
 }
 
 /**
  * 暂停执行。
  */
-export async function pause(
-  _runtime: unknown,
-): Promise<DebuggerResult> {
-  return {
-    success: true,
-    message: '执行已暂停',
-    tooltype: 'pause',
-  };
+export async function pause(runtime: DebuggerRuntime): Promise<DebuggerResult> {
+  const debuggerContext = await getDebugger(runtime);
+  await debuggerContext.pause();
+  return success('pause', '已请求暂停执行');
 }
 
 /**
  * 列出页面加载的脚本。
  */
 export async function listScripts(
-  _runtime: unknown,
+  runtime: DebuggerRuntime,
   params: {filter?: string} = {},
 ): Promise<DebuggerResult> {
-  return {
-    success: true,
-    message: `脚本列表${params.filter ? ` (过滤: ${params.filter})` : ''}，当前无脚本`,
-    tooltype: 'list_scripts',
-  };
+  const debuggerContext = await getDebugger(runtime);
+  const scripts = params.filter
+    ? debuggerContext.getScriptsByUrlPattern(params.filter)
+    : debuggerContext.getScripts();
+
+  return success(
+    'list_scripts',
+    summarizeScripts(scripts, params.filter),
+    scripts,
+  );
 }
 
 /**
  * 获取脚本源码。
  */
 export async function getScriptSource(
-  _runtime: unknown,
+  runtime: DebuggerRuntime,
   params: {scriptId?: string} = {},
 ): Promise<DebuggerResult> {
-  return {
-    success: true,
-    message: `脚本源码: ${params.scriptId ?? 'unknown'}`,
-    tooltype: 'get_script_source',
-  };
+  const scriptId = ensureString(
+    params.scriptId,
+    'scriptId',
+    'get_script_source',
+  );
+  if (typeof scriptId !== 'string') {
+    return scriptId;
+  }
+
+  const debuggerContext = await getDebugger(runtime);
+  const source = await debuggerContext.getScriptSource(scriptId);
+  const script = debuggerContext.getScriptById(scriptId);
+
+  return success('get_script_source', `已获取脚本源码: ${scriptId}`, {
+    script,
+    source,
+  });
 }
 
 /**
  * 在源码中搜索。
  */
 export async function searchInSources(
-  _runtime: unknown,
-  params: {query?: string} = {},
+  runtime: DebuggerRuntime,
+  params: {
+    query?: string;
+    caseSensitive?: boolean;
+    isRegex?: boolean;
+    maxResults?: number;
+  } = {},
 ): Promise<DebuggerResult> {
-  return {
-    success: true,
-    message: `源码搜索: ${params.query ?? ''}`,
-    tooltype: 'search_in_sources',
-  };
+  const query = ensureString(params.query, 'query', 'search_in_sources');
+  if (typeof query !== 'string') {
+    return query;
+  }
+
+  const debuggerContext = await getDebugger(runtime);
+  const result = await debuggerContext.searchInScripts(query, {
+    caseSensitive: params.caseSensitive,
+    isRegex: params.isRegex,
+  });
+  const matches = params.maxResults
+    ? result.matches.slice(0, params.maxResults)
+    : result.matches;
+
+  return success(
+    'search_in_sources',
+    `源码搜索完成，命中 ${matches.length} 条`,
+    {...result, matches},
+  );
 }
 
 /**
  * 设置 XHR 断点。
  */
 export async function breakOnXhr(
-  _runtime: unknown,
+  runtime: DebuggerRuntime,
   params: {url?: string} = {},
 ): Promise<DebuggerResult> {
-  return {
-    success: true,
-    message: `XHR 断点已设置: ${params.url ?? '*'}`,
-    tooltype: 'break_on_xhr',
-  };
+  const debuggerContext = await getDebugger(runtime);
+  const client = debuggerContext.getClient();
+  if (!client) {
+    return failure('break_on_xhr', 'Debugger 尚未启用');
+  }
+
+  const url = typeof params.url === 'string' ? params.url : '';
+  await client.send('DOMDebugger.setXHRBreakpoint', {url});
+  return success('break_on_xhr', `XHR 断点已设置: ${url || '*'}`, {
+    url: url || '*',
+  });
 }
 
 /**
  * 移除 XHR 断点。
  */
 export async function removeXhrBreakpoint(
-  _runtime: unknown,
+  runtime: DebuggerRuntime,
   params: {url?: string} = {},
 ): Promise<DebuggerResult> {
-  return {
-    success: true,
-    message: `XHR 断点已移除: ${params.url ?? '*'}`,
-    tooltype: 'remove_xhr_breakpoint',
-  };
+  const debuggerContext = await getDebugger(runtime);
+  const client = debuggerContext.getClient();
+  if (!client) {
+    return failure('remove_xhr_breakpoint', 'Debugger 尚未启用');
+  }
+
+  const url = typeof params.url === 'string' ? params.url : '';
+  await client.send('DOMDebugger.removeXHRBreakpoint', {url});
+  return success('remove_xhr_breakpoint', `XHR 断点已移除: ${url || '*'}`, {
+    url: url || '*',
+  });
 }
 
 /**
  * 追踪函数调用。
  */
 export async function traceFunction(
-  _runtime: unknown,
-  params: {target?: string} = {},
+  runtime: DebuggerRuntime,
+  params: TraceFunctionParams = {},
 ): Promise<DebuggerResult> {
+  const target = ensureString(params.target, 'target', 'trace_function');
+  if (typeof target !== 'string') {
+    return target;
+  }
+
+  const frame = getTraceFrame(runtime);
+  if (!frame) {
+    return failure('trace_function', '当前没有可用的页面或 Frame');
+  }
+
+  const result = await hookFunctionImpl(frame, {
+    target,
+    logArgs: params.logArgs,
+    logResult: params.logResult,
+    logStack: params.logStack,
+    hookId: params.hookId,
+  });
+
   return {
-    success: true,
-    message: `函数追踪已启动: ${params.target ?? 'unknown'}`,
+    ...result,
     tooltype: 'trace_function',
+    message: result.success ? `函数追踪已启动: ${target}` : result.message,
   };
 }
 
@@ -229,121 +459,211 @@ export async function traceFunction(
  * 获取 AI 调试状态。
  */
 export async function getAiDebugStatus(
-  _runtime: unknown,
+  runtime: DebuggerRuntime,
 ): Promise<DebuggerResult> {
-  return {
-    success: true,
-    message: 'AI 调试状态：未激活',
-    tooltype: 'get_ai_debug_status',
-  };
+  const debuggerContext = await getDebugger(runtime);
+  const pausedState = debuggerContext.getPausedState();
+  const breakpoints = debuggerContext.getBreakpoints();
+  const scripts = debuggerContext.getScripts();
+
+  return success('get_ai_debug_status', '已获取调试状态', {
+    isPaused: pausedState.isPaused,
+    breakpointCount: breakpoints.length,
+    scriptCount: scripts.length,
+    lastAutoRecoveryEvent: debuggerContext.getLastAutoRecoveryEvent(),
+  });
 }
 
 /**
  * 在脚本中查找文本。
  */
 export async function findInScript(
-  _runtime: unknown,
-  params: {scriptId?: string; query?: string} = {},
+  runtime: DebuggerRuntime,
+  params: {scriptId?: string; query?: string; caseSensitive?: boolean} = {},
 ): Promise<DebuggerResult> {
-  return {
-    success: true,
-    message: `在脚本 ${params.scriptId ?? 'unknown'} 中查找: ${params.query ?? ''}`,
-    tooltype: 'find_in_script',
-  };
+  const scriptId = ensureString(params.scriptId, 'scriptId', 'find_in_script');
+  if (typeof scriptId !== 'string') {
+    return scriptId;
+  }
+  const query = ensureString(params.query, 'query', 'find_in_script');
+  if (typeof query !== 'string') {
+    return query;
+  }
+
+  const debuggerContext = await getDebugger(runtime);
+  const source = await debuggerContext.getScriptSource(scriptId);
+  const matches = findMatches(source, query, params.caseSensitive);
+
+  return success(
+    'find_in_script',
+    `在脚本 ${scriptId} 中找到 ${matches.length} 处匹配`,
+    {scriptId, query, matches},
+  );
 }
 
 /**
  * 获取请求发起者信息。
  */
 export async function getRequestInitiator(
-  _runtime: unknown,
-  params: {requestId?: string} = {},
+  runtime: DebuggerRuntime,
+  params: {requestId?: number} = {},
 ): Promise<DebuggerResult> {
-  return {
-    success: true,
-    message: `请求发起者: ${params.requestId ?? 'unknown'}`,
-    tooltype: 'get_request_initiator',
-  };
+  if (typeof params.requestId !== 'number') {
+    return failure('get_request_initiator', 'requestId 必须是数字');
+  }
+
+  const request = runtime.getNetworkRequestById(params.requestId);
+  const initiator = runtime.getRequestInitiator(request);
+
+  if (!initiator) {
+    return failure(
+      'get_request_initiator',
+      `请求 ${params.requestId} 没有 initiator 信息`,
+    );
+  }
+
+  return success(
+    'get_request_initiator',
+    `已获取请求 ${params.requestId} 的发起者信息`,
+    initiator,
+  );
 }
 
 /**
  * 获取当前暂停信息。
  */
 export async function getPausedInfo(
-  _runtime: unknown,
+  runtime: DebuggerRuntime,
 ): Promise<DebuggerResult> {
-  return {
-    success: true,
-    message: '当前未暂停',
-    tooltype: 'get_paused_info',
-  };
+  const debuggerContext = await getDebugger(runtime);
+  const pausedState = debuggerContext.getPausedState();
+
+  if (!pausedState.isPaused) {
+    return success('get_paused_info', '当前未暂停', pausedState);
+  }
+
+  return success(
+    'get_paused_info',
+    `当前已暂停，调用帧数量 ${pausedState.callFrames.length}`,
+    pausedState,
+  );
 }
 
 /**
  * 在调用帧上执行表达式。
  */
 export async function evaluateOnCallframe(
-  _runtime: unknown,
+  runtime: DebuggerRuntime,
   params: {callFrameId?: string; expression?: string} = {},
 ): Promise<DebuggerResult> {
-  return {
-    success: true,
-    message: `在调用帧 ${params.callFrameId ?? 'unknown'} 上执行: ${params.expression ?? ''}`,
-    tooltype: 'evaluate_on_callframe',
-  };
+  const expression = ensureString(
+    params.expression,
+    'expression',
+    'evaluate_on_callframe',
+  );
+  if (typeof expression !== 'string') {
+    return expression;
+  }
+
+  const debuggerContext = await getDebugger(runtime);
+  const pausedState = debuggerContext.getPausedState();
+  const callFrameId =
+    params.callFrameId ?? pausedState.callFrames[0]?.callFrameId;
+  if (!callFrameId) {
+    return failure('evaluate_on_callframe', '当前没有可用的调用帧');
+  }
+
+  const result = await debuggerContext.evaluateOnCallFrame(
+    callFrameId,
+    expression,
+    {returnByValue: true},
+  );
+  return success(
+    'evaluate_on_callframe',
+    `表达式已在调用帧 ${callFrameId} 上执行`,
+    result,
+  );
 }
 
 /**
  * 在文本上设置断点。
  */
 export async function setBreakpointOnText(
-  _runtime: unknown,
-  params: {text?: string; url?: string} = {},
+  runtime: DebuggerRuntime,
+  params: {
+    text?: string;
+    occurrence?: number;
+    condition?: string;
+    caseSensitive?: boolean;
+  } = {},
 ): Promise<DebuggerResult> {
-  return {
-    success: true,
-    message: `文本断点已设置: "${params.text ?? ''}"`,
-    tooltype: 'set_breakpoint_on_text',
-  };
+  const text = ensureString(params.text, 'text', 'set_breakpoint_on_text');
+  if (typeof text !== 'string') {
+    return text;
+  }
+
+  const debuggerContext = await getDebugger(runtime);
+  const result = await debuggerContext.searchInScripts(text, {
+    caseSensitive: params.caseSensitive,
+  });
+  const occurrence = Math.max(1, params.occurrence ?? 1);
+  const match = result.matches[occurrence - 1];
+
+  if (!match?.url) {
+    return failure(
+      'set_breakpoint_on_text',
+      `未找到文本 "${text}" 对应的可断点脚本位置`,
+    );
+  }
+
+  const breakpoint = await debuggerContext.setBreakpoint(
+    match.url,
+    match.lineNumber,
+    0,
+    params.condition,
+  );
+  return success('set_breakpoint_on_text', `文本断点已设置: "${text}"`, {
+    match,
+    breakpoint,
+  });
 }
 
 /**
  * XHR 到 JS 断点转换。
  */
 export async function xhrToJsBreakpoint(
-  _runtime: unknown,
+  runtime: DebuggerRuntime,
   params: {url?: string} = {},
 ): Promise<DebuggerResult> {
-  return {
-    success: true,
-    message: `XHR 到 JS 断点转换: ${params.url ?? 'unknown'}`,
-    tooltype: 'xhr_to_js_breakpoint',
-  };
+  const xhrResult = await breakOnXhr(runtime, params);
+  if (!xhrResult.success) {
+    return xhrResult;
+  }
+
+  return success(
+    'xhr_to_js_breakpoint',
+    '已设置 XHR 断点；命中后可结合 get_paused_info / set_breakpoint 完成 JS 断点定位',
+    xhrResult.data,
+  );
 }
 
 /**
  * 开始连续调试。
  */
 export async function startContinuousDebugging(
-  _runtime: unknown,
-  params: {target?: string} = {},
+  _runtime: DebuggerRuntime,
 ): Promise<DebuggerResult> {
-  return {
-    success: true,
-    message: `连续调试已启动: ${params.target ?? 'unknown'}`,
-    tooltype: 'start_continuous_debugging',
-  };
+  return failure(
+    'start_continuous_debugging',
+    '当前工具层尚未接入 AIContinuousDebugger 运行时，请改用 pause/set_breakpoint/get_paused_info 组合',
+  );
 }
 
 /**
  * 停止连续调试。
  */
 export async function stopContinuousDebugging(
-  _runtime: unknown,
+  _runtime: DebuggerRuntime,
 ): Promise<DebuggerResult> {
-  return {
-    success: true,
-    message: '连续调试已停止',
-    tooltype: 'stop_continuous_debugging',
-  };
+  return failure('stop_continuous_debugging', '当前没有可停止的连续调试会话');
 }

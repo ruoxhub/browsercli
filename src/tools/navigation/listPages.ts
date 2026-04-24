@@ -11,6 +11,10 @@ import type {
   NavigationRuntimeServices,
   PageInfo,
 } from './types.js';
+import {
+  normalizeBrowserRuntimeError,
+  withOperationTimeout,
+} from '../shared/browserRuntime.js';
 
 /**
  * 列出浏览器中所有已打开的页面（纯函数版本）。
@@ -31,14 +35,22 @@ export async function listPages(
   try {
     const pages = runtime.getPages();
     const selectedPage = runtime.getSelectedPage();
-
-    const pageInfos: PageInfo[] = await Promise.all(
-      pages.map(async (page, index) => ({
+    let unavailableTitleCount = 0;
+    const pageInfos: PageInfo[] = [];
+    for (const [index, page] of pages.entries()) {
+      let title: string;
+      try {
+        title = await withOperationTimeout(page.title(), `读取页面 ${index} 标题`);
+      } catch (error) {
+        unavailableTitleCount += 1;
+        title = `[unavailable] ${normalizeBrowserRuntimeError(error)}`;
+      }
+      pageInfos.push({
         index,
         url: page.url(),
-        title: await page.title(),
-      })),
-    );
+        title,
+      });
+    }
 
     const selectedIndex = pages.indexOf(selectedPage);
 
@@ -49,7 +61,10 @@ export async function listPages(
 
     return {
       success: true,
-      message: `找到 ${pageInfos.length} 个页面`,
+      message:
+        unavailableTitleCount > 0
+          ? `找到 ${pageInfos.length} 个页面，其中 ${unavailableTitleCount} 个页面标题不可用`
+          : `找到 ${pageInfos.length} 个页面`,
       tooltype,
       logFormat: 'full',
       data,

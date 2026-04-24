@@ -6,6 +6,8 @@
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
 
+import JavaScriptObfuscator from 'javascript-obfuscator';
+
 import { Deobfuscator } from '../../../src/modules/deobfuscator/Deobfuscator.js';
 import type { Transformation, UnresolvedPart } from '../../../src/types/index.js';
 
@@ -18,6 +20,7 @@ interface DeobfuscatorHarness {
   simplifyExpressions(code: string, transformations: Transformation[]): Promise<string>;
   renameVariables(code: string, transformations: Transformation[]): Promise<string>;
   inlineStringDecoderCalls(code: string, transformations: Transformation[]): Promise<string>;
+  evaluateStringDecoderCalls(code: string, transformations: Transformation[]): Promise<string>;
   unflattenControlFlow(code: string, transformations: Transformation[]): Promise<string>;
   shouldRun(
     explicitFlag: boolean | undefined,
@@ -144,6 +147,82 @@ describe('Deobfuscator extended', () => {
     assert.ok(result.code.includes('console.log'));
     assert.ok(result.code.includes('Hello, JSReverser-MCP!'));
     assert.ok(!result.code.includes('_0x1f4d(0x0)'));
+  });
+
+  it('evaluates rotated javascript-obfuscator decoder calls from sandbox', async () => {
+    const d = new Deobfuscator() as unknown as DeobfuscatorHarness;
+    const source = `
+      const CONFIG = {
+        version: '1.2.3',
+        salt: 'mcp-demo-salt',
+        api: '/api/demo',
+      };
+
+      function buildHeaders(token) {
+        return {
+          'x-token': token,
+          'x-version': CONFIG.version,
+        };
+      }
+
+      function sign(payload, ts) {
+        const base = Object.keys(payload)
+          .sort()
+          .map(key => key + '=' + String(payload[key]))
+          .join('&');
+        const raw = base + '|' + ts + '|' + CONFIG.salt;
+        return Buffer.from(raw).toString('base64');
+      }
+
+      async function submit(payload, token) {
+        const ts = 1710000000;
+        return {
+          url: CONFIG.api,
+          headers: buildHeaders(token),
+          body: {
+            payload,
+            ts,
+            sign: sign(payload, ts),
+          },
+        };
+      }
+
+      submit({a: 1, b: 'ok'}, 'demo-token').then(console.log);
+    `;
+    const obfuscated = JavaScriptObfuscator.obfuscate(source, {
+      compact: true,
+      controlFlowFlattening: true,
+      controlFlowFlatteningThreshold: 1,
+      deadCodeInjection: true,
+      deadCodeInjectionThreshold: 1,
+      stringArray: true,
+      stringArrayThreshold: 1,
+      stringArrayEncoding: ['base64'],
+      stringArrayWrappersCount: 2,
+      stringArrayRotate: true,
+      stringArrayShuffle: true,
+      splitStrings: true,
+      splitStringsChunkLength: 4,
+      simplify: true,
+      transformObjectKeys: true,
+      renameGlobals: false,
+    }).getObfuscatedCode();
+
+    const result = await d.deobfuscate({
+      code: obfuscated,
+      aggressive: true,
+      renameVariables: true,
+    });
+
+    assert.ok(result.code.includes('demo-token'));
+    assert.ok(result.code.includes('x-token'));
+    assert.ok(result.code.includes('/api/demo'));
+    assert.ok(result.code.includes('base64'));
+    assert.ok(
+      result.transformations.some(
+        transformation => transformation.type === 'evaluate-string-decoders',
+      ),
+    );
   });
 
   it('unflattens simple switch/while control flow', async () => {
