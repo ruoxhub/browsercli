@@ -4,13 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {AxiCliCommand} from 'axi-sdk-js';
-import type {WorkerContext} from '../types.js';
-import {AxiError} from 'axi-sdk-js';
-import {parseArgs, getFlag} from '../args-parser.js';
-import {writeFileSync, mkdirSync, existsSync} from 'node:fs';
-import {join, resolve, isAbsolute} from 'node:path';
+import {existsSync, mkdirSync, writeFileSync} from 'node:fs';
 import os from 'node:os';
+import {isAbsolute, join, resolve} from 'node:path';
+
+import {AxiError} from 'axi-sdk-js';
+import type {AxiCliCommand} from 'axi-sdk-js';
+
+import {getFlag, parseArgs} from '../args-parser.js';
+import type {WorkerContext} from '../types.js';
 
 const TASK_NAME_RE = /^[a-z][a-z0-9-]*$/;
 
@@ -169,7 +171,7 @@ ${desc}
 ## 使用说明
 
 \`\`\`bash
-js-reverse call-skill <skill-name> --url ${url || 'https://example.com'}
+js-reverse call <tool-or-skill-name> --url ${url || 'https://example.com'}
 \`\`\`
 `;
 

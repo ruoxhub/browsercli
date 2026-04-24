@@ -5,10 +5,12 @@
  */
 
 import type {AxiCliCommand} from 'axi-sdk-js';
-import type {WorkerContext} from '../types.js';
 import {AxiError} from 'axi-sdk-js';
-import {successOutput} from '../output.js';
+
 import {parseArgs, getFlag} from '../args-parser.js';
+import {getConvertedSkillToolName} from '../converted-skill-tools.js';
+import {successOutput} from '../output.js';
+import type {WorkerContext} from '../types.js';
 
 export const callSkillCommand: AxiCliCommand<WorkerContext> = async (
   args,
@@ -30,7 +32,16 @@ export const callSkillCommand: AxiCliCommand<WorkerContext> = async (
   if (url) skillArgs.url = url;
   if (dataStr) {
     try {
-      skillArgs.data = JSON.parse(dataStr);
+      const parsedData = JSON.parse(dataStr) as unknown;
+      if (
+        parsedData &&
+        typeof parsedData === 'object' &&
+        !Array.isArray(parsedData)
+      ) {
+        Object.assign(skillArgs, parsedData);
+      } else {
+        skillArgs.data = parsedData;
+      }
     } catch {
       throw new AxiError(
         `--data 参数必须是有效的 JSON 格式，收到：${dataStr}`,
@@ -45,8 +56,9 @@ export const callSkillCommand: AxiCliCommand<WorkerContext> = async (
     if (!invoker || !group) {
       throw new AxiError('Worker 未运行', 'WORKER_NOT_RUNNING');
     }
-    const actionName = `skill_${skillName}`;
-    const result = await invoker.invoke(group, actionName, skillArgs) as {
+    const toolName =
+      getConvertedSkillToolName(skillName) ?? skillName.replaceAll('-', '_');
+    const result = (await invoker.invoke(group, toolName, skillArgs)) as {
       success?: boolean;
       error?: string;
       message?: string;
@@ -57,17 +69,20 @@ export const callSkillCommand: AxiCliCommand<WorkerContext> = async (
       return successOutput({
         command: 'call-skill',
         skill: skillName,
-        result: result.data ?? result.message ?? '技能执行成功',
+        tool:
+          getConvertedSkillToolName(skillName) ??
+          skillName.replaceAll('-', '_'),
+        result: result.data ?? result.message ?? '工具执行成功',
       });
     }
     throw new AxiError(
-      `技能执行失败：${result.error || result.message || '未知错误'}`,
+      `工具执行失败：${result.error || result.message || '未知错误'}`,
       'SKILL_ERROR',
     );
   } catch (error) {
     if (error instanceof AxiError) throw error;
     throw new AxiError(
-      `技能调用失败：${error instanceof Error ? error.message : error}`,
+      `兼容技能调用失败：${error instanceof Error ? error.message : error}`,
       'SEKIRO_ERROR',
       ['确保 Worker 正在运行：js-reverse start --browserUrl <url>'],
     );

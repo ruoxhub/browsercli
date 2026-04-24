@@ -7,7 +7,8 @@
   "llmProvider": "openai",
   "openai": {
     "baseURL": "http://127.0.0.1:1234/v1",
-    "model": "minimax-m2.5"
+    "model": "minimax-m2.5",
+    "apiKey": ""
   },
   "browser": {
     "headless": false,

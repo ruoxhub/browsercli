@@ -5,9 +5,16 @@
  */
 
 import type {AxiCliCommand} from 'axi-sdk-js';
-import type {WorkerContext} from '../types.js';
-import {tableOutput, successOutput} from '../output.js';
+
 import {getBoolFlag, parseArgs} from '../args-parser.js';
+import {getConvertedSkillToolDefinitions} from '../converted-skill-tools.js';
+import {tableOutput, successOutput} from '../output.js';
+import type {WorkerContext} from '../types.js';
+
+interface ListedTool {
+  name: string;
+  description?: string;
+}
 
 export const listToolsCommand: AxiCliCommand<WorkerContext> = async (
   args,
@@ -16,14 +23,15 @@ export const listToolsCommand: AxiCliCommand<WorkerContext> = async (
   const parsed = parseArgs(args);
   const json = getBoolFlag(parsed, 'json');
 
-  let tools: Array<{name: string; description?: string}> = [];
+  let tools: ListedTool[] = [];
   let isOffline = false;
+  const legacySkills = getConvertedSkillToolDefinitions();
 
   try {
     const invoker = ctx?.invoker;
     const group = ctx?.group;
     if (invoker && group) {
-      const result = await invoker.invoke(group, '_list_tools') as {
+      const result = (await invoker.invoke(group, '_list_tools')) as {
         tools?: Array<{name: string; description?: string}>;
       };
       tools = result.tools || [];
@@ -42,15 +50,34 @@ export const listToolsCommand: AxiCliCommand<WorkerContext> = async (
   }
 
   if (json) {
-    return successOutput({command: 'list-tools', tools, offline: isOffline});
+    return successOutput({
+      command: 'list-tools',
+      tools,
+      legacySkills,
+      offline: isOffline,
+    });
   }
 
-  const headers = ['Name'];
-  const rows = tools.map(t => [t.name]);
+  const headers = ['Type', 'Name', 'Tool', 'Category', 'Description'];
+  const toolRows = tools.map(t => [
+    'tool',
+    t.name,
+    t.name,
+    '',
+    t.description || '',
+  ]);
+  const skillRows = legacySkills.map(skill => [
+    'legacy-skill',
+    skill.name,
+    skill.toolName,
+    skill.category,
+    skill.description,
+  ]);
 
   const output: Record<string, unknown> = {
     command: 'list-tools',
     total: tools.length,
+    legacySkillTotal: legacySkills.length,
   };
 
   if (isOffline) {
@@ -59,6 +86,6 @@ export const listToolsCommand: AxiCliCommand<WorkerContext> = async (
 
   return {
     ...output,
-    ...tableOutput(headers, rows),
+    ...tableOutput(headers, [...toolRows, ...skillRows]),
   };
 };

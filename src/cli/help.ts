@@ -15,15 +15,14 @@ export function generateTopLevelHelp(options?: {
   commands?: string[];
 }): string {
   const bin = options?.bin ?? 'js-reverse';
-  const description = options?.description ?? 'JS逆向工程MCP服务 — 标准化前端JavaScript逆向流程';
+  const description =
+    options?.description ?? 'JS逆向工程MCP服务 — 标准化前端JavaScript逆向流程';
   const version = options?.version ?? '2.0.3';
   const commands = options?.commands ?? [
     'start',
     'stop',
     'status',
     'call',
-    'call-skill',
-    'list-skills',
     'list-tools',
     'config',
     'repl',
@@ -42,7 +41,9 @@ export function generateTopLevelHelp(options?: {
   }
 
   lines.push('');
-  lines.push('  Run js-reverse <command> --help for more information on a command.');
+  lines.push(
+    '  Run js-reverse <command> --help for more information on a command.',
+  );
   lines.push('');
 
   return lines.join('\n');
@@ -64,24 +65,17 @@ export function generateCommandHelp(command: string): string | null {
       usage: 'js-reverse status',
     },
     call: {
-      description: '调用 MCP 工具',
-      usage: 'js-reverse call <tool-name> [--param value]',
-    },
-    'call-skill': {
-      description: '调用逆向工程技能',
-      usage: 'js-reverse call-skill <skill-name> [--url <url>] [--data <json>]',
+      description: '调用 MCP 工具，或兼容调用已迁移为 Tool 的旧技能',
+      usage:
+        'js-reverse call <tool-or-skill-name> [--param value] [--url <url>] [--data <json>]',
     },
     config: {
       description: '查看/设置/初始化全局配置',
       usage:
         'js-reverse config [--init] [--set key=value] [--get key] [--unset key] [--list]',
     },
-    'list-skills': {
-      description: '列出所有可用的逆向工程技能',
-      usage: 'js-reverse list-skills [--json]',
-    },
     'list-tools': {
-      description: '列出所有可用的 MCP 工具',
+      description: '列出所有可用的 MCP 工具及旧技能兼容映射',
       usage: 'js-reverse list-tools [--json]',
     },
     repl: {

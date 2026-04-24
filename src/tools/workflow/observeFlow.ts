@@ -4,13 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {logger} from '../utils/logger.js';
-
-import type {SkillContext, SkillResult} from './SkillRunner.js';
-import {SkillRegistry} from './SkillRunner.js';
+import {logger} from '../../utils/logger.js';
 
 /**
- * 观察模式技能配置
+ * 观察模式工具配置
  */
 export interface ObserveFlowOptions {
   /** 是否包含动态脚本 */
@@ -130,26 +127,38 @@ export interface ObserveFlowReport {
   };
 }
 
+/** 观察模式工具统一返回结构 */
+export interface ObserveFlowToolResult {
+  success: boolean;
+  message?: string;
+  error?: string;
+  tooltype: 'observe_flow';
+  data?: ObserveFlowReport;
+}
+
 /**
- * 观察模式技能 - 收集和分析页面脚本
+ * 观察模式工具 - 收集和分析页面脚本
  */
-async function observeFlowSkill(context: SkillContext): Promise<SkillResult> {
-  const options = (context.options || {}) as ObserveFlowOptions;
+export async function observeFlow(
+  params: ObserveFlowOptions & {url?: string} = {},
+): Promise<ObserveFlowToolResult> {
+  const {url, ...options} = params;
 
   try {
-    logger.info('Starting observe-flow skill...');
+    logger.info('Starting observe_flow tool...');
     const startTime = Date.now();
 
     // 验证必要的上下文
-    if (!context.url) {
+    if (!url) {
       return {
         success: false,
-        error: 'Missing required context: url',
+        error: 'Missing required parameter: url',
+        tooltype: 'observe_flow',
       };
     }
 
     // 1. 收集页面脚本
-    const collectResult = await collectScripts(context.url, options);
+    const collectResult = await collectScripts(url, options);
     logger.info(`Collected ${collectResult.files.length} scripts`);
 
     // 2. 分析每个脚本
@@ -188,7 +197,7 @@ async function observeFlowSkill(context: SkillContext): Promise<SkillResult> {
     const duration = Date.now() - startTime;
 
     const report: ObserveFlowReport = {
-      url: context.url,
+      url,
       scriptCount: collectResult.files.length,
       totalSize: collectResult.totalSize,
       collectTime: duration,
@@ -199,18 +208,20 @@ async function observeFlowSkill(context: SkillContext): Promise<SkillResult> {
       overallRiskAssessment: riskAssessment,
     };
 
-    logger.info(`Observe-flow completed in ${duration}ms`);
+    logger.info(`observe_flow completed in ${duration}ms`);
 
     return {
       success: true,
       message: `观察模式完成：收集 ${report.scriptCount} 个脚本，发现 ${cryptoDetection.algorithms.length} 种加密算法，${obfuscationDetection.types.length} 种混淆类型`,
+      tooltype: 'observe_flow',
       data: report,
     };
   } catch (error) {
-    logger.error('Observe-flow skill failed', error);
+    logger.error('observe_flow tool failed', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),
+      tooltype: 'observe_flow',
     };
   }
 }
@@ -841,18 +852,4 @@ function isStandardCryptoLib(lib: string): boolean {
     'crypto-js',
   ];
   return standardLibs.includes(lib);
-}
-
-/**
- * 获取技能定义并注册
- */
-export function registerObserveFlowSkill(): void {
-  const registry = SkillRegistry.getInstance();
-  registry.register({
-    name: 'observe-flow',
-    description:
-      '观察模式：收集和分析页面脚本，识别加密和混淆代码，生成安全风险评估报告',
-    category: 'observe' as const,
-    execute: observeFlowSkill,
-  });
 }

@@ -4,13 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {logger} from '../utils/logger.js';
-
-import type {SkillContext, SkillResult} from './SkillRunner.js';
-import {SkillRegistry} from './SkillRunner.js';
+import {logger} from '../../utils/logger.js';
 
 /**
- * 本地复现技能配置
+ * 本地复现工具配置
  */
 export interface RebuildBundleOptions {
   /** 目标 URL */
@@ -274,11 +271,38 @@ function _inferMissingCapabilities(
     .sort((a, b) => b.priority - a.priority);
 }
 
+/** 本地复现工具统一返回结构 */
+export interface RebuildBundleToolResult {
+  success: boolean;
+  message?: string;
+  error?: string;
+  tooltype: 'rebuild_bundle';
+  data?: {
+    url?: string;
+    bundlePath: string;
+    evidenceCount: number;
+    files: {
+      entryCode: string;
+      envCode: string;
+      polyfillsCode: string;
+      capture: Record<string, unknown>;
+    };
+    targetContext: {
+      targetKeywords: string[];
+      targetUrlPatterns: string[];
+      targetFunctionNames: string[];
+      targetActionDescription: string;
+    };
+  };
+}
+
 /**
- * 本地复现技能 - 构建本地 Node.js 复现环境
+ * 本地复现工具 - 构建本地 Node.js 复现环境
  */
-async function rebuildBundleSkill(context: SkillContext): Promise<SkillResult> {
-  const options = (context.options || {}) as RebuildBundleOptions;
+export async function rebuildBundle(
+  params: RebuildBundleOptions & {url?: string} = {},
+): Promise<RebuildBundleToolResult> {
+  const {url, ...options} = params;
 
   logger.debug('[rebuild-bundle] Starting skill with options:', options);
 
@@ -308,7 +332,7 @@ async function rebuildBundleSkill(context: SkillContext): Promise<SkillResult> {
 
     // 3. 模拟收集页面数据（实际运行时会通过 runtime 收集）
     const pageData = {
-      url: context.url ?? options.targetUrl ?? '',
+      url: url ?? options.targetUrl ?? '',
       cookies: [] as Array<{name: string; value: string}>,
       localStorage: {} as Record<string, unknown>,
       sessionStorage: {} as Record<string, unknown>,
@@ -342,7 +366,7 @@ async function rebuildBundleSkill(context: SkillContext): Promise<SkillResult> {
 
     // 6. 返回结果
     const result = {
-      url: context.url ?? options.targetUrl,
+      url: url ?? options.targetUrl,
       bundlePath: '',
       evidenceCount: runtimeEvidence.length,
       files: {
@@ -359,32 +383,20 @@ async function rebuildBundleSkill(context: SkillContext): Promise<SkillResult> {
       },
     };
 
-    logger.info('[rebuild-bundle] Skill completed successfully');
+    logger.info('[rebuild_bundle] Tool completed successfully');
 
     return {
       success: true,
       message: '本地复现完成',
+      tooltype: 'rebuild_bundle',
       data: result,
     };
   } catch (error) {
-    logger.error('[rebuild-bundle] Skill failed:', error);
+    logger.error('[rebuild_bundle] Tool failed:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),
+      tooltype: 'rebuild_bundle',
     };
   }
-}
-
-/**
- * 获取技能定义并注册
- */
-export function registerRebuildBundleSkill(): void {
-  const registry = SkillRegistry.getInstance();
-  registry.register({
-    name: 'rebuild-bundle',
-    description: '本地复现：构建 Node.js 环境复现目标代码，支持参数提取',
-    category: 'rebuild' as const,
-    execute: rebuildBundleSkill,
-  });
-  logger.debug('[rebuild-bundle] Skill registered');
 }

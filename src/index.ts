@@ -13,24 +13,26 @@
  * 3. 初始化 ToolContextProvider
  * 4. 创建 NodeClient，连接到 Sekiro Server
  * 5. 通过 ToolAdapter 注册所有 Tools 为 Sekiro Actions
- * 6. 注册 Skills 为 Sekiro Actions
- * 7. 进入运行状态，等待 Server 转发请求
+ * 6. 进入运行状态，等待 Server 转发请求
  */
 
-import {NodeClient} from './protocol/Client.js';
-import type {ActionHandler} from './types/sekiro.js';
-import type {WorkerStartOptions} from './types/platform.js';
-import {ToolAdapter} from './worker/ToolAdapter.js';
-import {ToolContextProvider} from './worker/ToolContextProvider.js';
 import {BrowserManager} from './browser/index.js';
 import type {BrowserManagerConfig} from './browser/index.js';
 import {resolveConfig, getEnvBoolean} from './config.js';
 import type {GlobalConfig} from './config.js';
+import {NodeClient} from './protocol/Client.js';
+import type {WorkerStartOptions} from './types/platform.js';
+import {ToolAdapter} from './worker/ToolAdapter.js';
+import {ToolContextProvider} from './worker/ToolContextProvider.js';
 
 // 优雅关闭
 let isShuttingDown = false;
 
-async function gracefulShutdown(client: NodeClient, browserManager: BrowserManager, signal: string): Promise<void> {
+async function gracefulShutdown(
+  client: NodeClient,
+  browserManager: BrowserManager,
+  signal: string,
+): Promise<void> {
   if (isShuttingDown) return;
   isShuttingDown = true;
 
@@ -89,7 +91,9 @@ function parseWorkerArgs(args: string[]): GlobalConfig {
 /**
  * 将 ResolvedConfig 转换为 WorkerStartOptions
  */
-function toWorkerOptions(resolved: ReturnType<typeof resolveConfig>): WorkerStartOptions {
+function toWorkerOptions(
+  resolved: ReturnType<typeof resolveConfig>,
+): WorkerStartOptions {
   return {
     sekiroHost: resolved.sekiroHost,
     group: resolved.group,
@@ -114,11 +118,11 @@ function registerBuiltinActions(client: NodeClient): void {
     resolve({tools});
   });
 
-  // _list_skills — 返回所有已注册的 Skill
+  // _list_skills — 兼容旧客户端：技能已迁移为 Tool，返回对应 Tool 列表
   client.registerAction('_list_skills', async (_request, resolve, _reject) => {
-    const {getBuiltInSkillDefinitions} = await import('./skills/index.js');
-    const skills = getBuiltInSkillDefinitions();
-    resolve({skills});
+    const {getConvertedSkillToolDefinitions} =
+      await import('./cli/converted-skill-tools.js');
+    resolve({skills: getConvertedSkillToolDefinitions()});
   });
 
   // _status — 返回 Worker 状态
@@ -129,45 +133,6 @@ function registerBuiltinActions(client: NodeClient): void {
       uptime: process.uptime(),
     });
   });
-}
-
-/**
- * 注册 Skills 为 Sekiro Actions
- */
-async function registerSkills(client: NodeClient): Promise<void> {
-  const {SkillRegistry} = await import('./skills/SkillRunner.js');
-  const {registerBuiltInSkills} = await import('./skills/index.js');
-
-  // 先注册所有内置技能
-  registerBuiltInSkills();
-
-  const registry = SkillRegistry.getInstance();
-  const skills = registry.list();
-
-  for (const skill of skills) {
-    const actionName = `skill_${skill.name}`;
-    const handler: ActionHandler = async (request, resolve, reject) => {
-      const startTime = Date.now();
-      try {
-        const context = {
-          url: (request.params?.url as string) || '',
-          options: request.params,
-        };
-        const result = await skill.execute(context);
-        const duration = Date.now() - startTime;
-        console.log(`[Worker][Skill] action=${actionName} duration=${duration}ms status=${result.success ? 'ok' : 'err'}`);
-        resolve(result);
-      } catch (err) {
-        const duration = Date.now() - startTime;
-        const errMsg = err instanceof Error ? err.message : String(err);
-        console.log(`[Worker][Skill] action=${actionName} duration=${duration}ms status=err msg=${errMsg}`);
-        reject(errMsg);
-      }
-    };
-    client.registerAction(actionName, handler);
-  }
-
-  console.log(`[Worker] 注册了 ${skills.length} 个 Skill`);
 }
 
 /**
@@ -198,7 +163,9 @@ async function main(): Promise<void> {
 
   const browserManager = BrowserManager.getInstance(browserConfig);
   const browser = await browserManager.ensureBrowser();
-  console.log(`[Worker] 浏览器已${options.browserUrl || options.wsEndpoint ? '连接' : '启动'}: v${browser.version()}`);
+  console.log(
+    `[Worker] 浏览器已${options.browserUrl || options.wsEndpoint ? '连接' : '启动'}: v${browser.version()}`,
+  );
 
   // 获取当前页面并注入 contextProvider
   const page = await browserManager.newPage();
@@ -223,17 +190,18 @@ async function main(): Promise<void> {
     client.registerAction(name, handler);
   });
 
-  // 6. 注册 Skills
-  await registerSkills(client);
-
-  // 7. 连接到 Sekiro Server
+  // 6. 连接到 Sekiro Server
   await client.start();
 
   console.log('[Worker] 已启动并连接到 Sekiro Server');
 
-  // 8. 注册信号处理
-  process.on('SIGTERM', () => gracefulShutdown(client, browserManager, 'SIGTERM'));
-  process.on('SIGINT', () => gracefulShutdown(client, browserManager, 'SIGINT'));
+  // 7. 注册信号处理
+  process.on('SIGTERM', () =>
+    gracefulShutdown(client, browserManager, 'SIGTERM'),
+  );
+  process.on('SIGINT', () =>
+    gracefulShutdown(client, browserManager, 'SIGINT'),
+  );
 }
 
 main().catch(err => {

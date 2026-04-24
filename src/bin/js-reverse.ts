@@ -15,40 +15,35 @@
  *   start         启动 Worker 并连接到 Sekiro Server
  *   stop          停止 Worker 进程
  *   status        查看 Worker 和 Sekiro 连接状态
- *   call          调用 MCP 工具
- *   call-skill    调用逆向工程技能
- *   list-tools    列出所有可用的 MCP 工具
- *   list-skills   列出所有可用的逆向工程技能
+ *   call          调用 MCP 工具或兼容技能
+ *   list-tools    列出所有可用的 MCP 工具及兼容技能映射
  *   config        查看/设置/初始化全局配置
  *   repl          启动交互式 REPL 模式
  *   scaffold      创建新的逆向任务脚手架
  */
 
 import {runAxiCli, type AxiCliCommand} from 'axi-sdk-js';
-import {resolveConfig} from '../config.js';
-import {SekiroInvoker} from '../cli/sekiro-invoker.js';
-import {WorkerManager} from '../cli/worker-manager.js';
-import {generateTopLevelHelp, generateCommandHelp} from '../cli/help.js';
-import {startCommand} from '../cli/commands/start.js';
-import {stopCommand} from '../cli/commands/stop.js';
-import {statusCommand} from '../cli/commands/status.js';
-import {listSkillsCommand} from '../cli/commands/list-skills.js';
-import {listToolsCommand} from '../cli/commands/list-tools.js';
-import {callSkillCommand} from '../cli/commands/call-skill.js';
-import {scaffoldCommand} from '../cli/commands/scaffold.js';
-import {replCommand} from '../cli/commands/repl.js';
-import {toolDispatcherCommand} from '../cli/commands/tool-dispatcher.js';
+
 import {configCommand} from '../cli/commands/config.js';
+import {listToolsCommand} from '../cli/commands/list-tools.js';
+import {replCommand} from '../cli/commands/repl.js';
+import {scaffoldCommand} from '../cli/commands/scaffold.js';
+import {startCommand} from '../cli/commands/start.js';
+import {statusCommand} from '../cli/commands/status.js';
+import {stopCommand} from '../cli/commands/stop.js';
+import {toolDispatcherCommand} from '../cli/commands/tool-dispatcher.js';
+import {generateCommandHelp, generateTopLevelHelp} from '../cli/help.js';
+import {SekiroInvoker} from '../cli/sekiro-invoker.js';
 import type {WorkerContext} from '../cli/types.js';
+import {WorkerManager} from '../cli/worker-manager.js';
+import {resolveConfig} from '../config.js';
 
 const commands: Record<string, AxiCliCommand<WorkerContext>> = {
   start: startCommand,
   stop: stopCommand,
   status: statusCommand,
   call: toolDispatcherCommand,
-  'call-skill': callSkillCommand,
   'list-tools': listToolsCommand,
-  'list-skills': listSkillsCommand,
   config: configCommand,
   repl: replCommand,
   scaffold: scaffoldCommand,
@@ -59,7 +54,7 @@ const homeCommand: AxiCliCommand<WorkerContext> = async () => {
   return generateTopLevelHelp();
 };
 
-runAxiCli<WorkerContext>({
+void runAxiCli<WorkerContext>({
   description: 'JS逆向工程MCP服务 — 标准化前端JavaScript逆向流程',
   version: '2.0.3',
   topLevelHelp: generateTopLevelHelp(),

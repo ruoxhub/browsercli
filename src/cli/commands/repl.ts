@@ -7,19 +7,13 @@
 import * as readline from 'node:readline';
 
 import type {AxiCliCommand} from 'axi-sdk-js';
-import type {WorkerContext} from '../types.js';
-import {SekiroInvoker} from '../sekiro-invoker.js';
-import {WorkerManager} from '../worker-manager.js';
-import {resolveConfig} from '../../config.js';
 
-const REPL_COMMANDS = [
-  'status',
-  'list-skills',
-  'list-tools',
-  'help',
-  'exit',
-  'quit',
-];
+import {resolveConfig} from '../../config.js';
+import {SekiroInvoker} from '../sekiro-invoker.js';
+import type {WorkerContext} from '../types.js';
+import {WorkerManager} from '../worker-manager.js';
+
+const REPL_COMMANDS = ['status', 'list-tools', 'help', 'exit', 'quit'];
 
 /**
  * REPL 会话 — 封装所有可变状态，避免模块级变量泄漏
@@ -31,7 +25,11 @@ class ReplSession {
   private readonly workerManager: WorkerManager;
   private readonly group: string;
 
-  constructor(invoker: SekiroInvoker, workerManager: WorkerManager, group: string) {
+  constructor(
+    invoker: SekiroInvoker,
+    workerManager: WorkerManager,
+    group: string,
+  ) {
     this.invoker = invoker;
     this.workerManager = workerManager;
     this.group = group;
@@ -39,8 +37,9 @@ class ReplSession {
 
   async getSkillNames(): Promise<string[]> {
     if (this.skillNames) return this.skillNames;
-    const {getBuiltInSkillDefinitions} = await import('../../skills/index.js');
-    this.skillNames = getBuiltInSkillDefinitions().map(s => s.name);
+    const {getConvertedSkillToolDefinitions} =
+      await import('../converted-skill-tools.js');
+    this.skillNames = getConvertedSkillToolDefinitions().map(s => s.name);
     return this.skillNames;
   }
 
@@ -76,28 +75,9 @@ class ReplSession {
     return [];
   }
 
-  async listSkillsRepl(): Promise<void> {
-    try {
-      const result = await this.invoker.invoke(this.group, '_list_skills') as {
-        skills?: Array<{name: string; category?: string; description: string}>;
-      };
-      const skills = result.skills || [];
-      replLog(`可用技能 (${skills.length}):`);
-      for (const s of skills) {
-        replLog(`  - ${s.name} (${s.category}): ${s.description}`);
-      }
-      return;
-    } catch {
-      const skills = await this.getSkillNames();
-      replLog(`可用技能 (${skills.length}):`);
-      for (const s of skills) replLog(`  - ${s}`);
-      replLog('\n(离线模式：显示内置技能列表)');
-    }
-  }
-
   async listToolsRepl(): Promise<void> {
     try {
-      const result = await this.invoker.invoke(this.group, '_list_tools') as {
+      const result = (await this.invoker.invoke(this.group, '_list_tools')) as {
         tools?: Array<{name: string; description?: string}>;
       };
       const tools = result.tools || [];
@@ -105,12 +85,20 @@ class ReplSession {
       for (const t of tools) {
         replLog(`  - ${t.name}: ${t.description || ''}`);
       }
+      const skills = await this.getSkillNames();
+      replLog(`兼容技能 (${skills.length}):`);
+      for (const skill of skills) {
+        replLog(`  - ${skill}`);
+      }
       return;
     } catch {
       const tools = await this.getToolNamesList();
       replLog(`可用工具 (${tools.length}):`);
       for (const t of tools) replLog(`  - ${t}`);
-      replLog('\n(离线模式：显示内置工具列表)');
+      const skills = await this.getSkillNames();
+      replLog(`兼容技能 (${skills.length}):`);
+      for (const skill of skills) replLog(`  - ${skill}`);
+      replLog('\n(离线模式：显示内置工具与兼容技能列表)');
     }
   }
 
@@ -138,11 +126,6 @@ class ReplSession {
       return true;
     }
 
-    if (trimmed === 'list-skills') {
-      await this.listSkillsRepl();
-      return true;
-    }
-
     if (trimmed === 'list-tools') {
       await this.listToolsRepl();
       return true;
@@ -163,11 +146,18 @@ class ReplSession {
 
     try {
       if (type === 'skill') {
-        const actionName = `skill_${name}`;
-        const result = await this.invoker.invoke(this.group, actionName, {args: restArgs});
+        const {getConvertedSkillToolName} =
+          await import('../converted-skill-tools.js');
+        const actionName =
+          getConvertedSkillToolName(name) ?? name.replaceAll('-', '_');
+        const result = await this.invoker.invoke(this.group, actionName, {
+          args: restArgs,
+        });
         replLog(JSON.stringify(result, null, 2));
       } else if (type === 'tool') {
-        const result = await this.invoker.invoke(this.group, name, {args: restArgs});
+        const result = await this.invoker.invoke(this.group, name, {
+          args: restArgs,
+        });
         replLog(JSON.stringify(result, null, 2));
       } else {
         replLog('未知命令类型，使用 "skill" 或 "tool"');
@@ -187,11 +177,10 @@ function replLog(msg: string): void {
 
 function printHelp(): void {
   replLog('可用命令：');
-  replLog('  skill <name> [args...]  - 调用指定技能');
+  replLog('  skill <name> [args...]  - 兼容调用已迁移为 Tool 的旧技能');
   replLog('  tool <name> [args...]   - 调用指定工具');
   replLog('  status                  - 查看 Worker 状态');
-  replLog('  list-skills             - 列出可用技能');
-  replLog('  list-tools              - 列出可用工具');
+  replLog('  list-tools              - 列出可用工具和兼容技能');
   replLog('  help                    - 显示此帮助信息');
   replLog('  exit / quit             - 退出 REPL');
   replLog('');
@@ -200,7 +189,8 @@ function printHelp(): void {
 /** 导出 complete 供外部使用（保持向后兼容） */
 export async function complete(input: string): Promise<string[]> {
   // 临时创建无状态 session 来补全，不缓存
-  const {getBuiltInSkillDefinitions} = await import('../../skills/index.js');
+  const {getConvertedSkillToolDefinitions} =
+    await import('../converted-skill-tools.js');
   const {getAllToolNames} = await import('../tools-meta.js');
   const parts = input.split(/\s+/);
   const isLastCharSpace = input.endsWith(' ') && input.length > 0;
@@ -214,7 +204,9 @@ export async function complete(input: string): Promise<string[]> {
     const cmd = parts[0].toLowerCase();
     const partial = parts[1].toLowerCase();
     if (cmd === 'skill') {
-      return getBuiltInSkillDefinitions().map(s => s.name).filter(s => s.startsWith(partial));
+      return getConvertedSkillToolDefinitions()
+        .map(s => s.name)
+        .filter(s => s.startsWith(partial));
     }
     if (cmd === 'tool') {
       return getAllToolNames().filter(t => t.startsWith(partial));
@@ -224,12 +216,10 @@ export async function complete(input: string): Promise<string[]> {
   return [];
 }
 
-export const replCommand: AxiCliCommand<WorkerContext> = async (
-  _args,
-  ctx,
-) => {
+export const replCommand: AxiCliCommand<WorkerContext> = async (_args, ctx) => {
   const cfg = ctx?.resolvedConfig ?? resolveConfig();
-  const invoker = ctx?.invoker ?? new SekiroInvoker({sekiroHost: cfg.sekiroHost});
+  const invoker =
+    ctx?.invoker ?? new SekiroInvoker({sekiroHost: cfg.sekiroHost});
   const workerManager = ctx?.workerManager ?? new WorkerManager();
 
   const session = new ReplSession(invoker, workerManager, cfg.group);
@@ -265,7 +255,9 @@ export const replCommand: AxiCliCommand<WorkerContext> = async (
   // 注意：不在 close 事件中调用 process.exit()，
   // 让 readline 自然结束，调用者决定如何退出
   let resolveRepl: () => void;
-  const replDone = new Promise<void>(r => { resolveRepl = r; });
+  const replDone = new Promise<void>(r => {
+    resolveRepl = r;
+  });
 
   rl.on('close', () => {
     resolveRepl();

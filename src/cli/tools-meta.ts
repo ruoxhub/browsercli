@@ -18,20 +18,29 @@ export interface ToolMeta {
 
 export const TOOLS_META: ToolMeta[] = [
   {
-    name: 'invoke-skill',
-    description: '调用技能',
+    name: 'observe_flow',
+    description:
+      '观察模式：收集和分析页面脚本，识别加密和混淆代码，生成风险评估报告',
     schema: {},
-    modulePath: './skill/skill.js',
-    handlerName: 'invokeSkill',
-    callMode: 'runtime',
+    modulePath: './workflow/observeFlow.js',
+    handlerName: 'observeFlow',
+    callMode: 'params-only',
   },
   {
-    name: 'list-skills',
-    description: '列出所有技能',
+    name: 'auto_hook',
+    description: '自动 Hook：按预设生成调试 Hook 和加密库 Hook 注入计划',
     schema: {},
-    modulePath: './skill/skill.js',
-    handlerName: 'listSkills',
-    callMode: 'runtime',
+    modulePath: './workflow/autoHook.js',
+    handlerName: 'autoHook',
+    callMode: 'params-only',
+  },
+  {
+    name: 'rebuild_bundle',
+    description: '本地复现：构建 Node.js 环境复现目标代码，支持参数提取上下文',
+    schema: {},
+    modulePath: './workflow/rebuildBundle.js',
+    handlerName: 'rebuildBundle',
+    callMode: 'params-only',
   },
   {
     name: 'query_dom',

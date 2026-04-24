@@ -4,13 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {logger} from '../utils/logger.js';
-
-import type {SkillContext, SkillResult} from './SkillRunner.js';
-import {SkillRegistry} from './SkillRunner.js';
+import {logger} from '../../utils/logger.js';
 
 /**
- * 自动 Hook 技能配置
+ * 自动 Hook 工具配置
  */
 export interface AutoHookOptions {
   /** Hook 预设 */
@@ -68,9 +65,9 @@ export interface CryptoDetectionResult {
 }
 
 /**
- * 自动 Hook 技能执行结果数据
+ * 自动 Hook 工具执行结果数据
  */
-export interface AutoHookSkillData {
+export interface AutoHookToolData {
   /** 页面 URL */
   url: string;
   /** 注入的 Hook 列表 */
@@ -85,6 +82,15 @@ export interface AutoHookSkillData {
     cryptoLibraries: number;
     timestamp: number;
   };
+}
+
+/** 自动 Hook 工具统一返回结构 */
+export interface AutoHookToolResult {
+  success: boolean;
+  message?: string;
+  error?: string;
+  tooltype: 'auto_hook';
+  data?: AutoHookToolData;
 }
 
 /**
@@ -632,10 +638,12 @@ function mergePresetConfig(options: AutoHookOptions): AutoHookOptions {
 }
 
 /**
- * 自动 Hook 技能 - 注入调试 Hook 和加密库 Hook
+ * 自动 Hook 工具 - 注入调试 Hook 和加密库 Hook
  */
-async function autoHookSkill(context: SkillContext): Promise<SkillResult> {
-  const rawOptions = (context.options || {}) as AutoHookOptions;
+export async function autoHook(
+  params: AutoHookOptions & {url?: string} = {},
+): Promise<AutoHookToolResult> {
+  const {url, ...rawOptions} = params;
   const options = mergePresetConfig(rawOptions);
 
   logger.info('[AutoHook] Starting with options: ' + JSON.stringify(options));
@@ -739,8 +747,8 @@ async function autoHookSkill(context: SkillContext): Promise<SkillResult> {
     const failedInjections = hooksInjected.filter(h => !h.success).length;
     const detectedCryptoCount = cryptoDetected.filter(c => c.detected).length;
 
-    const data: AutoHookSkillData = {
-      url: context.url || 'unknown',
+    const data: AutoHookToolData = {
+      url: url || 'unknown',
       hooksInjected,
       cryptoDetected,
       report: {
@@ -757,6 +765,7 @@ async function autoHookSkill(context: SkillContext): Promise<SkillResult> {
     return {
       success: true,
       message: `自动 Hook 完成：注入 ${successfulInjections} 个 Hook, 检测到 ${detectedCryptoCount} 个加密库`,
+      tooltype: 'auto_hook',
       data,
     };
   } catch (error) {
@@ -767,24 +776,12 @@ async function autoHookSkill(context: SkillContext): Promise<SkillResult> {
     return {
       success: false,
       error: errorMessage,
+      tooltype: 'auto_hook',
       data: {
-        url: context.url || 'unknown',
+        url: url || 'unknown',
         hooksInjected,
         cryptoDetected,
-      } as AutoHookSkillData,
+      } as AutoHookToolData,
     };
   }
-}
-
-/**
- * 获取技能定义并注册
- */
-export function registerAutoHookSkill(): void {
-  const registry = SkillRegistry.getInstance();
-  registry.register({
-    name: 'auto-hook',
-    description: '自动 Hook：注入调试 Hook 和加密库 Hook，辅助逆向分析',
-    category: 'hook' as const,
-    execute: autoHookSkill,
-  });
 }

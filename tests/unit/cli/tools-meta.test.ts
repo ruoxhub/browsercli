@@ -69,20 +69,30 @@ describe('tools-meta', () => {
       }
     });
 
-    it('no duplicate modulePath + handlerName combinations', () => {
-      const combos = TOOLS_META.map(t => `${t.modulePath}:${t.handlerName}`);
-      const uniqueCombos = new Set(combos);
-      assert.strictEqual(
-        combos.length,
-        uniqueCombos.size,
-        'Duplicate modulePath:handlerName found',
-      );
+    it('no duplicate modulePath + handlerName combinations except documented aliases', () => {
+      const allowedAliases = new Set([
+        './hook/InjectHook.js:injectHook',
+        './script/script.js:evaluateScriptFn',
+      ]);
+      const seen = new Map<string, string>();
+
+      for (const tool of TOOLS_META) {
+        const combo = `${tool.modulePath}:${tool.handlerName}`;
+        const previous = seen.get(combo);
+        if (previous && !allowedAliases.has(combo)) {
+          assert.fail(
+            `Duplicate modulePath:handlerName found: ${combo} (${previous}, ${tool.name})`,
+          );
+        }
+        seen.set(combo, tool.name);
+      }
     });
 
     it('contains known core tools', () => {
       const names = TOOLS_META.map(t => t.name);
-      assert.ok(names.includes('invoke_skill'));
-      assert.ok(names.includes('list_skills'));
+      assert.ok(names.includes('observe_flow'));
+      assert.ok(names.includes('auto_hook'));
+      assert.ok(names.includes('rebuild_bundle'));
       assert.ok(names.includes('query_dom'));
       assert.ok(names.includes('hook_function'));
       assert.ok(names.includes('list_network_requests'));
@@ -94,7 +104,7 @@ describe('tools-meta', () => {
       const meta = getToolMeta('query_dom');
       assert.ok(meta);
       assert.strictEqual(meta!.name, 'query_dom');
-      assert.strictEqual(meta!.modulePath, './dom.js');
+      assert.strictEqual(meta!.modulePath, './dom/queryDom.js');
     });
 
     it('returns undefined for non-existing tool', () => {
@@ -103,9 +113,9 @@ describe('tools-meta', () => {
     });
 
     it('returns correct handlerName', () => {
-      const meta = getToolMeta('list_skills');
+      const meta = getToolMeta('auto_hook');
       assert.ok(meta);
-      assert.strictEqual(meta!.handlerName, 'listSkills');
+      assert.strictEqual(meta!.handlerName, 'autoHook');
     });
   });
 

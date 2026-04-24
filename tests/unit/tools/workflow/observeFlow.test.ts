@@ -5,7 +5,9 @@
  */
 
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
+
+import {observeFlow} from '../../../../src/tools/workflow/observeFlow.js';
 
 // 测试辅助函数（直接复制被测试函数的逻辑以便单元测试）
 function detectEncryption(content: string): boolean {
@@ -15,12 +17,17 @@ function detectEncryption(content: string): boolean {
     /btoa|atob|Base64/i,
     /createHash|createCipher|createDecipher/i,
   ];
-  return patterns.some((pattern) => pattern.test(content));
+  return patterns.some(pattern => pattern.test(content));
 }
 
 function detectAPI(content: string): boolean {
-  const patterns = [/fetch\s*\(/, /XMLHttpRequest/, /axios|request|ajax/i, /\.get\(|\.post\(|\.put\(|\.delete\(/];
-  return patterns.some((pattern) => pattern.test(content));
+  const patterns = [
+    /fetch\s*\(/,
+    /XMLHttpRequest/,
+    /axios|request|ajax/i,
+    /\.get\(|\.post\(|\.put\(|\.delete\(/,
+  ];
+  return patterns.some(pattern => pattern.test(content));
 }
 
 function detectObfuscation(content: string): boolean {
@@ -38,18 +45,18 @@ function detectObfuscation(content: string): boolean {
 
 function extractCryptoAlgo(content: string): string[] {
   const algorithms: string[] = [];
-  const patterns: Array<{ pattern: RegExp; name: string }> = [
-    { pattern: /\bAES\b/i, name: 'AES' },
-    { pattern: /\bDES\b/i, name: 'DES' },
-    { pattern: /\bRSA\b/i, name: 'RSA' },
-    { pattern: /\bMD5\b/i, name: 'MD5' },
-    { pattern: /\bSHA(1|256|384|512)\b/i, name: 'SHA' },
-    { pattern: /\bHMAC\b/i, name: 'HMAC' },
-    { pattern: /\bECB|CBC|CFB|OFB|CTR|GCM\b/i, name: 'Mode' },
-    { pattern: /\bPKCS7|PKCS5|ZeroPadding\b/i, name: 'Padding' },
+  const patterns: Array<{pattern: RegExp; name: string}> = [
+    {pattern: /\bAES\b/i, name: 'AES'},
+    {pattern: /\bDES\b/i, name: 'DES'},
+    {pattern: /\bRSA\b/i, name: 'RSA'},
+    {pattern: /\bMD5\b/i, name: 'MD5'},
+    {pattern: /\bSHA(1|256|384|512)\b/i, name: 'SHA'},
+    {pattern: /\bHMAC\b/i, name: 'HMAC'},
+    {pattern: /\bECB|CBC|CFB|OFB|CTR|GCM\b/i, name: 'Mode'},
+    {pattern: /\bPKCS7|PKCS5|ZeroPadding\b/i, name: 'Padding'},
   ];
 
-  patterns.forEach(({ pattern, name }) => {
+  patterns.forEach(({pattern, name}) => {
     if (pattern.test(content) && !algorithms.includes(name)) {
       algorithms.push(name);
     }
@@ -60,18 +67,18 @@ function extractCryptoAlgo(content: string): string[] {
 
 function detectCryptoLibraries(content: string): string[] {
   const libraries: string[] = [];
-  const patterns: Array<{ pattern: RegExp; name: string }> = [
-    { pattern: /CryptoJS/i, name: 'CryptoJS' },
-    { pattern: /JSEncrypt/i, name: 'JSEncrypt' },
-    { pattern: /forge\./i, name: 'node-forge' },
-    { pattern: /sjcl/i, name: 'SJCL' },
-    { pattern: /bcrypt/i, name: 'bcrypt' },
-    { pattern: /crypto-js/i, name: 'crypto-js' },
-    { pattern: /webcrypto|crypto\.subtle/i, name: 'WebCrypto' },
-    { pattern: /sm-crypto/i, name: 'SM-Crypto' },
+  const patterns: Array<{pattern: RegExp; name: string}> = [
+    {pattern: /CryptoJS/i, name: 'CryptoJS'},
+    {pattern: /JSEncrypt/i, name: 'JSEncrypt'},
+    {pattern: /forge\./i, name: 'node-forge'},
+    {pattern: /sjcl/i, name: 'SJCL'},
+    {pattern: /bcrypt/i, name: 'bcrypt'},
+    {pattern: /crypto-js/i, name: 'crypto-js'},
+    {pattern: /webcrypto|crypto\.subtle/i, name: 'WebCrypto'},
+    {pattern: /sm-crypto/i, name: 'SM-Crypto'},
   ];
 
-  patterns.forEach(({ pattern, name }) => {
+  patterns.forEach(({pattern, name}) => {
     if (pattern.test(content) && !libraries.includes(name)) {
       libraries.push(name);
     }
@@ -139,7 +146,15 @@ function detectThirdPartyLibs(content: string): string[] {
     /rxjs|RxJS|Observable/i,
   ];
 
-  const libNames = ['jQuery', 'React', 'Vue', 'Lodash', 'Axios', 'Moment', 'RxJS'];
+  const libNames = [
+    'jQuery',
+    'React',
+    'Vue',
+    'Lodash',
+    'Axios',
+    'Moment',
+    'RxJS',
+  ];
   patterns.forEach((pattern, idx) => {
     if (pattern.test(content) && !libs.includes(libNames[idx]!)) {
       libs.push(libNames[idx]!);
@@ -151,7 +166,10 @@ function detectThirdPartyLibs(content: string): string[] {
 
 function isEntryPoint(url: string, content: string): boolean {
   const entryPatterns = [/main/i, /index/i, /app/i, /entry/i, /bootstrap/i];
-  return entryPatterns.some((pattern) => pattern.test(url)) || content.includes('webpackJsonp');
+  return (
+    entryPatterns.some(pattern => pattern.test(url)) ||
+    content.includes('webpackJsonp')
+  );
 }
 
 function identifyObfuscationType(preview: string): string[] {
@@ -161,7 +179,11 @@ function identifyObfuscationType(preview: string): string[] {
     types.push('vm-protection');
   }
 
-  if (preview.includes('case ') && preview.includes('break') && preview.includes('switch')) {
+  if (
+    preview.includes('case ') &&
+    preview.includes('break') &&
+    preview.includes('switch')
+  ) {
     const switchCount = (preview.match(/case\s/g) || []).length;
     if (switchCount > 10) {
       types.push('control-flow-flattening');
@@ -217,7 +239,7 @@ function analyzeSingleScript(file: {
   preview: string;
   riskScore: number;
 } {
-  const { url, content, size, type } = file;
+  const {url, content, size, type} = file;
 
   const hasEncryption = detectEncryption(content);
   const cryptoAlgorithms = extractCryptoAlgo(content);
@@ -248,7 +270,7 @@ function analyzeSingleScript(file: {
   };
 }
 
-describe('observe-flow skill', () => {
+describe('observeFlow tool', () => {
   describe('detectEncryption', () => {
     it('detects AES encryption', () => {
       assert.strictEqual(detectEncryption('CryptoJS.AES.encrypt()'), true);
@@ -316,7 +338,10 @@ describe('observe-flow skill', () => {
     });
 
     it('detects Function constructor', () => {
-      assert.strictEqual(detectObfuscation('new Function("return this")'), true);
+      assert.strictEqual(
+        detectObfuscation('new Function("return this")'),
+        true,
+      );
     });
 
     it('detects long single lines', () => {
@@ -325,7 +350,10 @@ describe('observe-flow skill', () => {
     });
 
     it('returns false for normal code', () => {
-      assert.strictEqual(detectObfuscation('function test() { return 1; }'), false);
+      assert.strictEqual(
+        detectObfuscation('function test() { return 1; }'),
+        false,
+      );
     });
   });
 
@@ -381,7 +409,9 @@ describe('observe-flow skill', () => {
 
   describe('extractFunctions', () => {
     it('extracts function declarations', () => {
-      const result = extractFunctions('function myFunc() {} function another() {}');
+      const result = extractFunctions(
+        'function myFunc() {} function another() {}',
+      );
       assert.ok(result.includes('myFunc'));
       assert.ok(result.includes('another'));
     });
@@ -419,7 +449,9 @@ describe('observe-flow skill', () => {
 
   describe('extractImports', () => {
     it('extracts ES6 imports', () => {
-      const result = extractImports('import x from "module1"; import y from "module2";');
+      const result = extractImports(
+        'import x from "module1"; import y from "module2";',
+      );
       assert.ok(result.includes('module1'));
       assert.ok(result.includes('module2'));
     });
@@ -435,7 +467,9 @@ describe('observe-flow skill', () => {
     });
 
     it('deduplicates imports', () => {
-      const result = extractImports('import x from "mod"; import y from "mod";');
+      const result = extractImports(
+        'import x from "mod"; import y from "mod";',
+      );
       assert.strictEqual(result.length, 1);
     });
 
@@ -516,7 +550,10 @@ describe('observe-flow skill', () => {
     });
 
     it('detects webpack entry by content', () => {
-      assert.strictEqual(isEntryPoint('https://site.com/bundle.js', 'webpackJsonp([1])'), true);
+      assert.strictEqual(
+        isEntryPoint('https://site.com/bundle.js', 'webpackJsonp([1])'),
+        true,
+      );
     });
 
     it('returns false for regular files', () => {
@@ -532,10 +569,13 @@ describe('observe-flow skill', () => {
 
     it('detects control flow flattening', () => {
       // 需要包含 switch, case, break 关键字，且 case 数量>10
-      const code = 'switch(x) {' + Array(15)
-        .fill(0)
-        .map((_, i) => `case ${i}: break;`)
-        .join(' ') + '}';
+      const code =
+        'switch(x) {' +
+        Array(15)
+          .fill(0)
+          .map((_, i) => `case ${i}: break;`)
+          .join(' ') +
+        '}';
       const result = identifyObfuscationType(code);
       assert.ok(result.includes('control-flow-flattening'));
     });
@@ -612,7 +652,8 @@ describe('observe-flow skill', () => {
     it('analyzes a complete script', () => {
       const file = {
         url: 'https://site.com/crypto.js',
-        content: 'import x from "crypto-js"; function encrypt() { return CryptoJS.AES.encrypt(data, key); }',
+        content:
+          'import x from "crypto-js"; function encrypt() { return CryptoJS.AES.encrypt(data, key); }',
         size: 150,
         type: 'external',
       };
@@ -647,7 +688,8 @@ describe('observe-flow skill', () => {
     it('analyzes clean script', () => {
       const file = {
         url: 'https://site.com/utils.js',
-        content: 'function add(a, b) { return a + b; } function multiply(a, b) { return a * b; }',
+        content:
+          'function add(a, b) { return a + b; } function multiply(a, b) { return a * b; }',
         size: 80,
         type: 'external',
       };
@@ -660,20 +702,46 @@ describe('observe-flow skill', () => {
     });
   });
 
-  describe('SkillResult interface', () => {
+  describe('observeFlow tool result', () => {
+    it('runs the observeFlow tool with required url', async () => {
+      const result = await observeFlow({url: 'https://example.com'});
+
+      assert.strictEqual(result.success, true);
+      assert.strictEqual(result.tooltype, 'observe_flow');
+      assert.ok(result.data);
+      assert.strictEqual(result.data.url, 'https://example.com');
+    });
+
+    it('returns error when url is missing', async () => {
+      const result = await observeFlow();
+
+      assert.strictEqual(result.success, false);
+      assert.strictEqual(result.tooltype, 'observe_flow');
+      assert.ok(result.error);
+    });
     it('returns success result with report data', () => {
       const mockResult = {
         success: true as const,
         message: '测试成功',
+        tooltype: 'observe_flow' as const,
         data: {
           url: 'https://example.com',
           scriptCount: 5,
           totalSize: 1024,
           collectTime: 100,
           scriptAnalysis: [],
-          dependencies: { nodes: [], edges: [], entryPoints: [], thirdPartyLibs: [] },
-          cryptoDetection: { algorithms: [], libraries: [], confidence: 0 },
-          obfuscationDetection: { hasObfuscation: false, types: [], affectedFiles: [] },
+          dependencies: {
+            nodes: [],
+            edges: [],
+            entryPoints: [],
+            thirdPartyLibs: [],
+          },
+          cryptoDetection: {algorithms: [], libraries: [], confidence: 0},
+          obfuscationDetection: {
+            hasObfuscation: false,
+            types: [],
+            affectedFiles: [],
+          },
           overallRiskAssessment: {
             score: 20,
             level: 'low' as const,
@@ -692,6 +760,7 @@ describe('observe-flow skill', () => {
       const mockResult = {
         success: false as const,
         error: '测试错误信息',
+        tooltype: 'observe_flow' as const,
       };
 
       assert.strictEqual(mockResult.success, false);

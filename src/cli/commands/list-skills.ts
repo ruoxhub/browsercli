@@ -5,15 +5,17 @@
  */
 
 import type {AxiCliCommand} from 'axi-sdk-js';
-import type {WorkerContext} from '../types.js';
-import {tableOutput, successOutput} from '../output.js';
+
 import {getBoolFlag, parseArgs} from '../args-parser.js';
-import {getBuiltInSkillDefinitions} from '../../skills/index.js';
+import {getConvertedSkillToolDefinitions} from '../converted-skill-tools.js';
+import {tableOutput, successOutput} from '../output.js';
+import type {WorkerContext} from '../types.js';
 
 interface SkillInfo {
   name: string;
   description: string;
   category?: string;
+  toolName?: string;
 }
 
 export const listSkillsCommand: AxiCliCommand<WorkerContext> = async (
@@ -30,7 +32,7 @@ export const listSkillsCommand: AxiCliCommand<WorkerContext> = async (
     const invoker = ctx?.invoker;
     const group = ctx?.group;
     if (invoker && group) {
-      const result = await invoker.invoke(group, '_list_skills') as {
+      const result = (await invoker.invoke(group, '_list_skills')) as {
         skills?: SkillInfo[];
       };
       if (result.skills && result.skills.length > 0) {
@@ -39,26 +41,24 @@ export const listSkillsCommand: AxiCliCommand<WorkerContext> = async (
       }
     }
   } catch {
-    // Worker not running, use built-in definitions
+    // Worker not running, use converted built-in tool definitions
   }
 
   if (skills.length === 0) {
-    const builtIns = getBuiltInSkillDefinitions();
-    skills.push(
-      ...builtIns.map(skill => ({
-        name: skill.name,
-        description: skill.description,
-        category: (skill as {category?: string}).category,
-      })),
-    );
+    skills.push(...getConvertedSkillToolDefinitions());
   }
 
   if (json) {
     return successOutput({command: 'list-skills', skills, source});
   }
 
-  const headers = ['Name', 'Category', 'Description'];
-  const rows = skills.map(s => [s.name, s.category || '', s.description]);
+  const headers = ['Legacy Skill', 'Tool', 'Category', 'Description'];
+  const rows = skills.map(s => [
+    s.name,
+    s.toolName || '',
+    s.category || '',
+    s.description,
+  ]);
 
   const output: Record<string, unknown> = {
     command: 'list-skills',
@@ -67,7 +67,7 @@ export const listSkillsCommand: AxiCliCommand<WorkerContext> = async (
   };
 
   if (source === 'built-in') {
-    output.note = 'Worker 未运行，显示内置技能列表';
+    output.note = 'Skill 模块已迁移为 Tool；Worker 未运行，显示内置兼容映射';
   }
 
   return {

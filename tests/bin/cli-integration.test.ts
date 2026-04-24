@@ -10,11 +10,20 @@ import {describe, it} from 'node:test';
 
 const CLI_PATH = 'node build/src/bin/js-reverse.js';
 
+interface CliExecError {
+  status?: number;
+  stdout: string;
+}
+
 /**
  * 执行 CLI 命令并返回输出
  */
 function runCli(args: string): string {
   return execSync(`${CLI_PATH} ${args}`, {encoding: 'utf8'});
+}
+
+function asCliExecError(error: unknown): CliExecError {
+  return error as CliExecError;
 }
 
 describe('CLI Integration', () => {
@@ -25,13 +34,18 @@ describe('CLI Integration', () => {
     assert.ok(output.includes('status'), 'Should include status command');
     assert.ok(output.includes('repl'), 'Should include repl command');
     assert.ok(output.includes('scaffold'), 'Should include scaffold command');
+    assert.ok(output.includes('call'), 'Should include call command');
     assert.ok(
-      output.includes('call-skill'),
-      'Should include call-skill command',
+      output.includes('list-tools'),
+      'Should include list-tools command',
     );
     assert.ok(
-      output.includes('list-skills'),
-      'Should include list-skills command',
+      !output.includes('call-skill'),
+      'Should not include call-skill command',
+    );
+    assert.ok(
+      !output.includes('list-skills'),
+      'Should not include list-skills command',
     );
   });
 
@@ -44,8 +58,8 @@ describe('CLI Integration', () => {
     assert.ok(typeof data.startDate === 'string', 'Should have startDate');
   });
 
-  it.skip('list-skills returns three skills', () => {
-    const output = runCli('list-skills');
+  it.skip('list-tools includes three legacy skills', () => {
+    const output = runCli('list-tools');
     assert.ok(
       output.includes('observe-flow'),
       'Should have observe-flow skill',
@@ -57,23 +71,21 @@ describe('CLI Integration', () => {
     );
   });
 
-  it.skip('call-skill observe-flow executes successfully', () => {
-    const output = runCli('call-skill observe-flow --url https://example.com');
-    assert.ok(output.includes('技能执行成功'), 'Should execute successfully');
+  it.skip('call observe-flow executes successfully', () => {
+    const output = runCli('call observe-flow --url https://example.com');
+    assert.ok(output.includes('observe_flow'), 'Should execute successfully');
     assert.ok(output.includes('observe-flow'), 'Should mention skill name');
   });
 
-  it.skip('call-skill auto-hook executes successfully', () => {
-    const output = runCli('call-skill auto-hook --url https://example.com');
-    assert.ok(output.includes('技能执行成功'), 'Should execute successfully');
+  it.skip('call auto-hook executes successfully', () => {
+    const output = runCli('call auto-hook --url https://example.com');
+    assert.ok(output.includes('auto_hook'), 'Should execute successfully');
     assert.ok(output.includes('auto-hook'), 'Should mention skill name');
   });
 
-  it.skip('call-skill rebuild-bundle executes successfully', () => {
-    const output = runCli(
-      'call-skill rebuild-bundle --url https://example.com',
-    );
-    assert.ok(output.includes('技能执行成功'), 'Should execute successfully');
+  it.skip('call rebuild-bundle executes successfully', () => {
+    const output = runCli('call rebuild-bundle --url https://example.com');
+    assert.ok(output.includes('rebuild_bundle'), 'Should execute successfully');
     assert.ok(output.includes('rebuild-bundle'), 'Should mention skill name');
     assert.ok(
       output.includes('bundlePath'),
@@ -96,7 +108,8 @@ describe('CLI Integration', () => {
         'scaffold --name 123invalid --desc test --url https://example.com 2>&1',
       );
       assert.fail('Should reject invalid task name');
-    } catch (e: any) {
+    } catch (error) {
+      const e = asCliExecError(error);
       // Command exits with code 2 for VALIDATION_ERROR - that's expected behavior
       assert.ok(e.status === 2, `Should exit with code 2, got ${e.status}`);
     }
@@ -117,20 +130,8 @@ describe('CLI Integration', () => {
     try {
       runCli('call 2>&1');
       assert.fail('Should reject missing tool name');
-    } catch (e: any) {
-      assert.ok(e.status === 2, `Should exit with code 2, got ${e.status}`);
-      assert.ok(
-        e.stdout.includes('VALIDATION_ERROR'),
-        'Should include VALIDATION_ERROR',
-      );
-    }
-  });
-
-  it('call-skill without skill name exits with code 2', () => {
-    try {
-      runCli('call-skill 2>&1');
-      assert.fail('Should reject missing skill name');
-    } catch (e: any) {
+    } catch (error) {
+      const e = asCliExecError(error);
       assert.ok(e.status === 2, `Should exit with code 2, got ${e.status}`);
       assert.ok(
         e.stdout.includes('VALIDATION_ERROR'),
@@ -143,7 +144,8 @@ describe('CLI Integration', () => {
     try {
       runCli('scaffold 2>&1');
       assert.fail('Should reject missing name');
-    } catch (e: any) {
+    } catch (error) {
+      const e = asCliExecError(error);
       assert.ok(e.status === 2, `Should exit with code 2, got ${e.status}`);
       assert.ok(
         e.stdout.includes('VALIDATION_ERROR'),
@@ -156,7 +158,8 @@ describe('CLI Integration', () => {
     try {
       runCli('call nonexistent-tool-xyz 2>&1');
       assert.fail('Should reject unknown tool');
-    } catch (e: any) {
+    } catch (error) {
+      const e = asCliExecError(error);
       assert.ok(e.status === 1, `Should exit with code 1, got ${e.status}`);
       assert.ok(
         e.stdout.includes('UNKNOWN_TOOL'),
@@ -169,7 +172,8 @@ describe('CLI Integration', () => {
     try {
       runCli('call query_dom 2>&1');
       assert.fail('Should fail when daemon not running');
-    } catch (e: any) {
+    } catch (error) {
+      const e = asCliExecError(error);
       assert.ok(e.status === 1, `Should exit with code 1, got ${e.status}`);
       assert.ok(
         e.stdout.includes('TOOL_INVOCATION_ERROR') ||
@@ -179,11 +183,12 @@ describe('CLI Integration', () => {
     }
   });
 
-  it('call-skill with daemon not running exits with code 1', () => {
+  it('call legacy skill with daemon not running exits with code 1', () => {
     try {
-      runCli('call-skill observe-flow 2>&1');
+      runCli('call observe-flow 2>&1');
       assert.fail('Should fail when daemon not running');
-    } catch (e: any) {
+    } catch (error) {
+      const e = asCliExecError(error);
       assert.ok(e.status === 1, `Should exit with code 1, got ${e.status}`);
       assert.ok(
         e.stdout.includes('DAEMON_ERROR'),
@@ -207,7 +212,8 @@ describe('CLI Integration', () => {
     try {
       runCli('stop 2>&1');
       assert.fail('Should fail when daemon is not running');
-    } catch (e: any) {
+    } catch (error) {
+      const e = asCliExecError(error);
       assert.ok(e.status === 1, `Should exit with code 1, got ${e.status}`);
       assert.ok(
         e.stdout.includes('DAEMON_NOT_RUNNING'),
@@ -231,7 +237,8 @@ describe('CLI Integration', () => {
     try {
       runCli('stop 2>&1');
       assert.fail('Should fail when daemon not running');
-    } catch (e: any) {
+    } catch (error) {
+      const e = asCliExecError(error);
       assert.ok(e.status === 1, `Should exit with code 1, got ${e.status}`);
       assert.ok(
         e.stdout.includes('DAEMON_NOT_RUNNING'),
@@ -256,7 +263,8 @@ describe('CLI Integration', () => {
     try {
       runCli('start --wait-for-browser 2>&1');
       // If daemon is already running, exit code 1 is acceptable
-    } catch (e: any) {
+    } catch (error) {
+      const e = asCliExecError(error);
       // Accept DAEMON_ALREADY_RUNNING (code 1) or DAEMON_ORPHANED (code 1)
       assert.ok(
         e.status === 1,

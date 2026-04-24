@@ -30,15 +30,37 @@ js-reverse start --browserUrl http://127.0.0.1:9222
 # 查看守护进程状态
 js-reverse status
 
-# 列出可用技能
-js-reverse list-skills
-
-# 列出可用工具
+# 列出可用工具和兼容技能映射
 js-reverse list-tools
+
+# 新工作流工具（推荐）
+js-reverse call observe_flow --url https://example.com
+
+# 兼容旧技能名（已并入 call）
+js-reverse call observe-flow --url https://example.com
+
+# 通用兼容包装工具（仍保留）
+js-reverse call invoke_skill --skillName observe-flow --url https://example.com
 
 # 停止守护进程
 js-reverse stop
 ```
+
+### 技能迁移与兼容入口
+
+内置技能已经迁移为工作流 Tool，推荐优先使用新的 Tool 名称；旧技能名现在通过 `call` 命令兼容，适合已有脚本、Sekiro 调用方或自动化任务继续使用。
+
+| 能力           | 推荐入口                         | CLI 兼容入口                     | Tool 兼容入口                                             | Sekiro 兼容 Action            |
+| -------------- | -------------------------------- | -------------------------------- | --------------------------------------------------------- | ----------------------------- |
+| Observe Flow   | `js-reverse call observe_flow`   | `js-reverse call observe-flow`   | `js-reverse call invoke_skill --skillName observe-flow`   | `action=skill_observe_flow`   |
+| Auto Hook      | `js-reverse call auto_hook`      | `js-reverse call auto-hook`      | `js-reverse call invoke_skill --skillName auto-hook`      | `action=skill_auto_hook`      |
+| Rebuild Bundle | `js-reverse call rebuild_bundle` | `js-reverse call rebuild-bundle` | `js-reverse call invoke_skill --skillName rebuild-bundle` | `action=skill_rebuild_bundle` |
+
+兼容查询入口：
+
+- `js-reverse list-tools`
+- `js-reverse call list_skills`
+- Sekiro `action=_list_skills`
 
 ---
 
@@ -52,15 +74,15 @@ js-reverse stop
 js-reverse start --browserUrl http://127.0.0.1:9222
 ```
 
-|| 参数                      | 说明                       | 默认值              |
-| ------------------------- | -------------------------- | ------------------- |
-| `--browserUrl <url>`      | 连接到已有的 Chrome 实例   | -                   |
-| `--wsEndpoint <endpoint>` | 通过 WebSocket 端点连接    | -                   |
-| `--headless`              | 无头模式运行               | false               |
-| `--executablePath <path>` | 自定义 Chrome/Edge 路径    | -                   |
+|                           | 参数                         | 说明                | 默认值 |
+| ------------------------- | ---------------------------- | ------------------- | ------ |
+| `--browserUrl <url>`      | 连接到已有的 Chrome 实例     | -                   |
+| `--wsEndpoint <endpoint>` | 通过 WebSocket 端点连接      | -                   |
+| `--headless`              | 无头模式运行                 | false               |
+| `--executablePath <path>` | 自定义 Chrome/Edge 路径      | -                   |
 | `--sekiroHost <host>`     | Sekiro Server WebSocket 地址 | ws://127.0.0.1:5612 |
-| `--group <name>`          | Sekiro 分组名              | default             |
-| `--wait-for-browser`      | 等待浏览器可达后再返回     | false               |
+| `--group <name>`          | Sekiro 分组名                | default             |
+| `--wait-for-browser`      | 等待浏览器可达后再返回       | false               |
 
 **示例：**
 
@@ -110,17 +132,17 @@ js-reverse config --list                 # 列出配置文件路径和来源
 
 **配置键说明：**
 
-|| 键                      | 说明                           |
-| ----------------------- | ------------------------------ |
-| `sekiroHost`            | Sekiro Server WebSocket 地址   |
-| `group`                 | Sekiro 分组名                  |
-| `browserUrl`            | 浏览器调试 URL                 |
-| `wsEndpoint`            | WebSocket 端点                 |
-| `headless`              | 无头模式 (true/false)          |
-| `executablePath`        | 浏览器可执行路径               |
-| `runtimeDirName`        | 运行时目录名                   |
-| `llmProvider`           | AI 提供商 (openai/anthropic/gemini) |
-| `debug`                 | 调试模式 (true/false)          |
+|                  | 键                                  | 说明 |
+| ---------------- | ----------------------------------- | ---- |
+| `sekiroHost`     | Sekiro Server WebSocket 地址        |
+| `group`          | Sekiro 分组名                       |
+| `browserUrl`     | 浏览器调试 URL                      |
+| `wsEndpoint`     | WebSocket 端点                      |
+| `headless`       | 无头模式 (true/false)               |
+| `executablePath` | 浏览器可执行路径                    |
+| `runtimeDirName` | 运行时目录名                        |
+| `llmProvider`    | AI 提供商 (openai/anthropic/gemini) |
+| `debug`          | 调试模式 (true/false)               |
 
 **嵌套键（用点号分隔）：**
 
@@ -151,36 +173,39 @@ js-reverse config --unset browserUrl
 js-reverse config --list
 ```
 
-### call-skill - 执行技能
+### call - 调用工具或兼容技能
 
 ```bash
-js-reverse call-skill <skill-name> [options]
+js-reverse call <tool-or-skill-name> [options]
 ```
 
-|| 参数            | 说明                                               |
-| --------------- | -------------------------------------------------- |
-| `<skill-name>`  | 技能名称：`observe-flow`、`auto-hook`、`rebuild-bundle` |
-| `--url <url>`   | 目标网页 URL                                       |
-| `--data <json>` | 额外的 JSON 数据                                   |
+`call` 同时支持两类目标：
+
+- MCP Tool，例如 `take_screenshot`、`query_dom`
+- 旧技能名兼容入口，例如 `observe-flow`、`auto-hook`、`rebuild-bundle`
+
+|                        | 参数               | 说明 |
+| ---------------------- | ------------------ | ---- |
+| `<tool-or-skill-name>` | 工具名或兼容技能名 |
+| `--url <url>`          | 目标网页 URL       |
+| `--data <json>`        | 额外的 JSON 数据   |
 
 **示例：**
 
 ```bash
-# 执行观察流技能
-js-reverse call-skill observe-flow --url https://example.com
+# 调用普通工具
+js-reverse call take_screenshot
+js-reverse call query_dom --selector "#app"
 
-# 执行自动 Hook 技能
-js-reverse call-skill auto-hook --url https://example.com
+# 使用新 Tool 名称调用工作流
+js-reverse call observe_flow --url https://example.com
+js-reverse call auto_hook --url https://example.com
+js-reverse call rebuild_bundle --url https://example.com
 
-# 执行重建包技能
-js-reverse call-skill rebuild-bundle --url https://example.com
-```
-
-### list-skills - 列出可用技能
-
-```bash
-js-reverse list-skills        # 表格输出
-js-reverse list-skills --json # JSON 输出
+# 使用旧技能名兼容调用
+js-reverse call observe-flow --url https://example.com
+js-reverse call auto-hook --url https://example.com
+js-reverse call rebuild-bundle --url https://example.com
 ```
 
 ### list-tools - 列出可用工具
@@ -190,23 +215,19 @@ js-reverse list-tools        # 表格输出
 js-reverse list-tools --json # JSON 输出
 ```
 
-### call - 调用特定工具
+该命令同时返回：
 
-```bash
-js-reverse call <tool-name> [--param value]
-```
+- 当前可用的 MCP 工具列表
+- legacy skill 到新 Tool 的兼容映射
 
 **示例：**
 
 ```bash
-# 截图
-js-reverse call take_screenshot
+# 表格查看工具和兼容技能
+js-reverse list-tools
 
-# 列出网络请求
-js-reverse call list_network_requests
-
-# 查询 DOM
-js-reverse call query_dom --selector "div.container"
+# JSON 输出，适合脚本消费
+js-reverse list-tools --json
 ```
 
 ### repl - 交互式 REPL 模式
@@ -217,15 +238,14 @@ js-reverse repl
 
 进入 REPL 后可使用以下子命令：
 
-|| 子命令                   | 说明             |
-| ------------------------ | ---------------- |
-| `skill <name> [args...]` | 调用技能         |
-| `tool <name> [args...]`  | 调用工具         |
-| `status`                 | 检查守护进程状态 |
-| `list-skills`            | 列出技能         |
-| `list-tools`             | 列出工具         |
-| `help`                   | 显示帮助         |
-| `exit` / `quit`          | 退出 REPL        |
+|                          | 子命令             | 说明 |
+| ------------------------ | ------------------ | ---- |
+| `skill <name> [args...]` | 调用技能           |
+| `tool <name> [args...]`  | 调用工具           |
+| `status`                 | 检查守护进程状态   |
+| `list-tools`             | 列出工具和兼容技能 |
+| `help`                   | 显示帮助           |
+| `exit` / `quit`          | 退出 REPL          |
 
 ### scaffold - 创建新任务脚手架
 
@@ -233,12 +253,12 @@ js-reverse repl
 js-reverse scaffold --name <task-name> [--desc <desc>] [--url <url>] [--output <directory>]
 ```
 
-|| 参数               | 说明                   | 默认值             |
-| ------------------ | ---------------------- | ------------------ |
-| `--name <name>`    | 任务名称（必需）       | -                  |
-| `--desc <desc>`    | 任务描述               | "New task"         |
-| `--url <url>`      | 目标 URL               | -                  |
-| `--output <dir>`   | 输出目录               | `./tasks/<name>`   |
+|                  | 参数             | 说明             | 默认值 |
+| ---------------- | ---------------- | ---------------- | ------ |
+| `--name <name>`  | 任务名称（必需） | -                |
+| `--desc <desc>`  | 任务描述         | "New task"       |
+| `--url <url>`    | 目标 URL         | -                |
+| `--output <dir>` | 输出目录         | `./tasks/<name>` |
 
 **示例：**
 
@@ -254,11 +274,11 @@ js-reverse scaffold --name jd-h5st --desc "JD H5ST 签名" --url https://m.jd.co
 
 ### DOM 操作
 
-|| 工具名                    | 说明           | 示例                                                                  |
-| ------------------------- | -------------- | --------------------------------------------------------------------- |
-| `query_dom`               | 查询 DOM 元素  | `js-reverse call query_dom --selector "#container"`                   |
-| `get_dom_structure`       | 获取 DOM 结构  | `js-reverse call get_dom_structure --maxDepth 3 --includeText true`   |
-| `find_clickable_elements` | 查找可点击元素 | `js-reverse call find_clickable_elements --filterText "提交"`         |
+|                           | 工具名         | 说明                                                                | 示例 |
+| ------------------------- | -------------- | ------------------------------------------------------------------- | ---- |
+| `query_dom`               | 查询 DOM 元素  | `js-reverse call query_dom --selector "#container"`                 |
+| `get_dom_structure`       | 获取 DOM 结构  | `js-reverse call get_dom_structure --maxDepth 3 --includeText true` |
+| `find_clickable_elements` | 查找可点击元素 | `js-reverse call find_clickable_elements --filterText "提交"`       |
 
 **示例：**
 
@@ -278,10 +298,10 @@ js-reverse call find_clickable_elements --filterText "登录"
 
 ### 网络请求
 
-|| 工具名                  | 说明                 | 示例                                                |
-| ----------------------- | -------------------- | --------------------------------------------------- |
-| `list_network_requests` | 列出所有网络请求     | `js-reverse call list_network_requests`             |
-| `get_network_request`   | 获取指定网络请求详情 | `js-reverse call get_network_request --reqid 123`   |
+|                         | 工具名               | 说明                                              | 示例 |
+| ----------------------- | -------------------- | ------------------------------------------------- | ---- |
+| `list_network_requests` | 列出所有网络请求     | `js-reverse call list_network_requests`           |
+| `get_network_request`   | 获取指定网络请求详情 | `js-reverse call get_network_request --reqid 123` |
 
 **示例：**
 
@@ -304,10 +324,10 @@ js-reverse call get_network_request --reqid 456
 
 ### 控制台消息
 
-|| 工具名                  | 说明               | 示例                                              |
-| ----------------------- | ------------------ | ------------------------------------------------- |
-| `list_console_messages` | 列出控制台消息     | `js-reverse call list_console_messages`           |
-| `get_console_message`   | 获取指定控制台消息 | `js-reverse call get_console_message --msgid 1`   |
+|                         | 工具名             | 说明                                            | 示例 |
+| ----------------------- | ------------------ | ----------------------------------------------- | ---- |
+| `list_console_messages` | 列出控制台消息     | `js-reverse call list_console_messages`         |
+| `get_console_message`   | 获取指定控制台消息 | `js-reverse call get_console_message --msgid 1` |
 
 **示例：**
 
@@ -324,12 +344,12 @@ js-reverse call get_console_message --msgid 5
 
 ### WebSocket
 
-|| 工具名                        | 说明                    | 示例                                                              |
-| ----------------------------- | ----------------------- | ----------------------------------------------------------------- |
-| `list_websocket_connections`  | 列出 WebSocket 连接     | `js-reverse call list_websocket_connections`                      |
-| `get_websocket_messages`      | 获取 WebSocket 消息列表 | `js-reverse call get_websocket_messages --wsid 1`                 |
-| `get_websocket_message`       | 获取单条 WebSocket 消息 | `js-reverse call get_websocket_message --wsid 1 --frameIndex 0`   |
-| `analyze_websocket_messages`  | 分析 WebSocket 消息     | `js-reverse call analyze_websocket_messages --wsid 1`             |
+|                              | 工具名                  | 说明                                                            | 示例 |
+| ---------------------------- | ----------------------- | --------------------------------------------------------------- | ---- |
+| `list_websocket_connections` | 列出 WebSocket 连接     | `js-reverse call list_websocket_connections`                    |
+| `get_websocket_messages`     | 获取 WebSocket 消息列表 | `js-reverse call get_websocket_messages --wsid 1`               |
+| `get_websocket_message`      | 获取单条 WebSocket 消息 | `js-reverse call get_websocket_message --wsid 1 --frameIndex 0` |
+| `analyze_websocket_messages` | 分析 WebSocket 消息     | `js-reverse call analyze_websocket_messages --wsid 1`           |
 
 **示例：**
 
@@ -349,8 +369,8 @@ js-reverse call get_websocket_message --wsid 1 --frameIndex 10
 
 ### 输入自动化
 
-|| 工具名        | 说明                   | 示例                                                                             |
-| ------------- | ---------------------- | -------------------------------------------------------------------------------- |
+|               | 工具名                 | 说明                                                                             | 示例 |
+| ------------- | ---------------------- | -------------------------------------------------------------------------------- | ---- |
 | `click`       | 点击元素               | `js-reverse call click --selector "#btn"`                                        |
 | `click_at`    | 按坐标点击（真实鼠标） | `js-reverse call click_at --selector "#file-input"`                              |
 | `press_key`   | 按键操作               | `js-reverse call press_key --key "Enter"`                                        |
@@ -398,12 +418,12 @@ js-reverse call drag --fromSelector "#draggable" --toSelector "#dropzone"
 
 ### 页面操作
 
-|| 工具名              | 说明               | 示例                                                                      |
-| ------------------- | ------------------ | ------------------------------------------------------------------------- |
-| `click_element`     | 点击页面元素       | `js-reverse call click_element --selector "button.submit"`                |
-| `type_text`         | 输入文本（带延迟） | `js-reverse call type_text --selector "#input" --text "Hello" --delay 50` |
-| `wait_for_element`  | 等待元素出现       | `js-reverse call wait_for_element --selector ".loaded" --timeout 5000`    |
-| `scroll_by`         | 滚动页面           | `js-reverse call scroll_by --direction "down"`                            |
+|                    | 工具名             | 说明                                                                      | 示例 |
+| ------------------ | ------------------ | ------------------------------------------------------------------------- | ---- |
+| `click_element`    | 点击页面元素       | `js-reverse call click_element --selector "button.submit"`                |
+| `type_text`        | 输入文本（带延迟） | `js-reverse call type_text --selector "#input" --text "Hello" --delay 50` |
+| `wait_for_element` | 等待元素出现       | `js-reverse call wait_for_element --selector ".loaded" --timeout 5000`    |
+| `scroll_by`        | 滚动页面           | `js-reverse call scroll_by --direction "down"`                            |
 
 **示例：**
 
@@ -425,12 +445,12 @@ js-reverse call scroll_by --direction "top"
 
 ### 页面管理
 
-|| 工具名           | 说明         | 示例                                                                          |
-| ---------------- | ------------ | ----------------------------------------------------------------------------- |
-| `list_pages`     | 列出所有页面 | `js-reverse call list_pages`                                                  |
-| `select_page`    | 选择页面     | `js-reverse call select_page --pageIdx 1`                                     |
-| `new_page`       | 新建页面     | `js-reverse call new_page --url "https://example.com"`                        |
-| `navigate_page`  | 导航页面     | `js-reverse call navigate_page --type "navigate" --url "https://example.com"` |
+|                 | 工具名       | 说明                                                                          | 示例 |
+| --------------- | ------------ | ----------------------------------------------------------------------------- | ---- |
+| `list_pages`    | 列出所有页面 | `js-reverse call list_pages`                                                  |
+| `select_page`   | 选择页面     | `js-reverse call select_page --pageIdx 1`                                     |
+| `new_page`      | 新建页面     | `js-reverse call new_page --url "https://example.com"`                        |
+| `navigate_page` | 导航页面     | `js-reverse call navigate_page --type "navigate" --url "https://example.com"` |
 
 **示例：**
 
@@ -453,8 +473,8 @@ js-reverse call navigate_page --type "reload"
 
 ### 截图与视频
 
-|| 工具名                | 说明         | 示例                                                      |
-| --------------------- | ------------ | --------------------------------------------------------- |
+|                       | 工具名       | 说明                                                      | 示例 |
+| --------------------- | ------------ | --------------------------------------------------------- | ---- |
 | `take_screenshot`     | 页面截图     | `js-reverse call take_screenshot`                         |
 | `capture_video_frame` | 捕获视频帧   | `js-reverse call capture_video_frame --selector "video"`  |
 | `get_video_info`      | 获取视频信息 | `js-reverse call get_video_info --selector "video"`       |
@@ -488,8 +508,8 @@ js-reverse call capture_video_frame --selector "video" --seekTime 30 --outputPat
 
 ### 模拟
 
-|| 工具名            | 说明          | 示例                                                     |
-| ----------------- | ------------- | -------------------------------------------------------- |
+|                   | 工具名        | 说明                                                     | 示例 |
+| ----------------- | ------------- | -------------------------------------------------------- | ---- |
 | `emulate_mobile`  | 模拟移动设备  | `js-reverse call emulate_mobile --device "iPhone 14"`    |
 | `emulate_network` | 模拟网络条件  | `js-reverse call emulate_network --preset "Slow 3G"`     |
 | `emulate_cpu`     | 模拟 CPU 节流 | `js-reverse call emulate_cpu --rate 4`                   |
@@ -516,8 +536,8 @@ js-reverse call resize_page --width 375 --height 812
 
 ### 隐身
 
-|| 工具名                  | 说明            | 示例                                                          |
-| ----------------------- | --------------- | ------------------------------------------------------------- |
+|                         | 工具名          | 说明                                                          | 示例 |
+| ----------------------- | --------------- | ------------------------------------------------------------- | ---- |
 | `inject_stealth`        | 注入隐身脚本    | `js-reverse call inject_stealth`                              |
 | `list_stealth_features` | 列出隐身功能    | `js-reverse call list_stealth_features`                       |
 | `list_stealth_presets`  | 列出隐身预设    | `js-reverse call list_stealth_presets`                        |
@@ -541,8 +561,8 @@ js-reverse call set_user_agent --userAgent "Mozilla/5.0 (Windows NT 10.0; Win64;
 
 ### 性能分析
 
-|| 工具名                        | 说明         | 示例                                                       |
-| ----------------------------- | ------------ | ---------------------------------------------------------- |
+|                               | 工具名       | 说明                                                       | 示例 |
+| ----------------------------- | ------------ | ---------------------------------------------------------- | ---- |
 | `start_performance_trace`     | 开始性能追踪 | `js-reverse call start_performance_trace`                  |
 | `stop_performance_trace`      | 停止性能追踪 | `js-reverse call stop_performance_trace`                   |
 | `get_performance_metrics`     | 获取性能指标 | `js-reverse call get_performance_metrics`                  |
@@ -567,38 +587,38 @@ js-reverse call performance_analyze_insight --type "LCP"
 
 ### 调试器
 
-|| 工具名                        | 说明               | 示例                                                            |
-| ----------------------------- | ------------------ | --------------------------------------------------------------- |
-| `set_breakpoint`              | 设置断点           | `js-reverse call set_breakpoint --url "app.js" --lineNumber 10` |
-| `set_breakpoint_on_text`      | 在文本上设置断点   | `js-reverse call set_breakpoint_on_text --text "encrypt("`      |
-| `remove_breakpoint`           | 移除断点           | `js-reverse call remove_breakpoint --breakpointId "bp1"`        |
-| `list_breakpoints`            | 列出断点           | `js-reverse call list_breakpoints`                              |
-| `step_into`                   | 单步进入           | `js-reverse call step_into`                                     |
-| `step_over`                   | 单步跳过           | `js-reverse call step_over`                                     |
-| `step_out`                    | 单步跳出           | `js-reverse call step_out`                                      |
-| `resume`                      | 继续执行           | `js-reverse call resume`                                        |
-| `pause`                       | 暂停执行           | `js-reverse call pause`                                         |
-| `list_scripts`                | 列出脚本           | `js-reverse call list_scripts`                                  |
-| `get_script_source`           | 获取脚本源码       | `js-reverse call get_script_source --scriptId "3"`              |
-| `search_in_sources`           | 搜索源码           | `js-reverse call search_in_sources --query "encrypt"`           |
-| `get_storage`                 | 获取存储数据       | `js-reverse call get_storage`                                   |
-| `break_on_xhr`                | XHR 断点           | `js-reverse call break_on_xhr --url "/api"`                     |
-| `remove_xhr_breakpoint`       | 移除 XHR 断点      | `js-reverse call remove_xhr_breakpoint --url "/api"`            |
-| `xhr_to_js_breakpoint`        | XHR 转 JS 断点     | `js-reverse call xhr_to_js_breakpoint`                          |
-| `monitor_events`              | 监控事件           | `js-reverse call monitor_events --events '["click","input"]'`   |
-| `stop_monitor`                | 停止监控           | `js-reverse call stop_monitor --monitorId "m1"`                 |
-| `trace_function`              | 追踪函数           | `js-reverse call trace_function --functionName "encrypt"`       |
-| `hook_function`               | Hook 函数          | `js-reverse call hook_function --target "window.encrypt"`       |
-| `unhook_function`             | 取消 Hook          | `js-reverse call unhook_function --hookId "hk1"`                |
-| `inspect_object`              | 检查对象           | `js-reverse call inspect_object --expression "window.crypto"`   |
-| `find_in_script`              | 在脚本中搜索       | `js-reverse call find_in_script --query "encrypt"`              |
-| `get_request_initiator`       | 获取请求发起者     | `js-reverse call get_request_initiator --reqid 123`             |
-| `get_paused_info`             | 获取暂停信息       | `js-reverse call get_paused_info`                               |
-| `evaluate_on_callframe`       | 在调用帧上执行     | `js-reverse call evaluate_on_callframe --expression "x"`        |
-| `get_ai_debug_status`         | 获取 AI 调试状态   | `js-reverse call get_ai_debug_status`                           |
-| `start_continuous_debugging`  | 开始连续调试       | `js-reverse call start_continuous_debugging`                    |
-| `stop_continuous_debugging`   | 停止连续调试       | `js-reverse call stop_continuous_debugging`                     |
-| `list_hooks`                  | 列出所有 Hook      | `js-reverse call list_hooks`                                    |
+|                              | 工具名           | 说明                                                            | 示例 |
+| ---------------------------- | ---------------- | --------------------------------------------------------------- | ---- |
+| `set_breakpoint`             | 设置断点         | `js-reverse call set_breakpoint --url "app.js" --lineNumber 10` |
+| `set_breakpoint_on_text`     | 在文本上设置断点 | `js-reverse call set_breakpoint_on_text --text "encrypt("`      |
+| `remove_breakpoint`          | 移除断点         | `js-reverse call remove_breakpoint --breakpointId "bp1"`        |
+| `list_breakpoints`           | 列出断点         | `js-reverse call list_breakpoints`                              |
+| `step_into`                  | 单步进入         | `js-reverse call step_into`                                     |
+| `step_over`                  | 单步跳过         | `js-reverse call step_over`                                     |
+| `step_out`                   | 单步跳出         | `js-reverse call step_out`                                      |
+| `resume`                     | 继续执行         | `js-reverse call resume`                                        |
+| `pause`                      | 暂停执行         | `js-reverse call pause`                                         |
+| `list_scripts`               | 列出脚本         | `js-reverse call list_scripts`                                  |
+| `get_script_source`          | 获取脚本源码     | `js-reverse call get_script_source --scriptId "3"`              |
+| `search_in_sources`          | 搜索源码         | `js-reverse call search_in_sources --query "encrypt"`           |
+| `get_storage`                | 获取存储数据     | `js-reverse call get_storage`                                   |
+| `break_on_xhr`               | XHR 断点         | `js-reverse call break_on_xhr --url "/api"`                     |
+| `remove_xhr_breakpoint`      | 移除 XHR 断点    | `js-reverse call remove_xhr_breakpoint --url "/api"`            |
+| `xhr_to_js_breakpoint`       | XHR 转 JS 断点   | `js-reverse call xhr_to_js_breakpoint`                          |
+| `monitor_events`             | 监控事件         | `js-reverse call monitor_events --events '["click","input"]'`   |
+| `stop_monitor`               | 停止监控         | `js-reverse call stop_monitor --monitorId "m1"`                 |
+| `trace_function`             | 追踪函数         | `js-reverse call trace_function --functionName "encrypt"`       |
+| `hook_function`              | Hook 函数        | `js-reverse call hook_function --target "window.encrypt"`       |
+| `unhook_function`            | 取消 Hook        | `js-reverse call unhook_function --hookId "hk1"`                |
+| `inspect_object`             | 检查对象         | `js-reverse call inspect_object --expression "window.crypto"`   |
+| `find_in_script`             | 在脚本中搜索     | `js-reverse call find_in_script --query "encrypt"`              |
+| `get_request_initiator`      | 获取请求发起者   | `js-reverse call get_request_initiator --reqid 123`             |
+| `get_paused_info`            | 获取暂停信息     | `js-reverse call get_paused_info`                               |
+| `evaluate_on_callframe`      | 在调用帧上执行   | `js-reverse call evaluate_on_callframe --expression "x"`        |
+| `get_ai_debug_status`        | 获取 AI 调试状态 | `js-reverse call get_ai_debug_status`                           |
+| `start_continuous_debugging` | 开始连续调试     | `js-reverse call start_continuous_debugging`                    |
+| `stop_continuous_debugging`  | 停止连续调试     | `js-reverse call stop_continuous_debugging`                     |
+| `list_hooks`                 | 列出所有 Hook    | `js-reverse call list_hooks`                                    |
 
 **示例：**
 
@@ -695,13 +715,13 @@ js-reverse call list_hooks
 
 #### 通用 Hook
 
-|| 工具名              | 说明            | 示例                                           |
-| ------------------- | --------------- | ---------------------------------------------- |
-| `create_hook`       | 创建 Hook       | `js-reverse call create_hook --type fetch`     |
-| `inject_hook`       | 注入 Hook       | `js-reverse call inject_hook --hookId "hk1"`   |
-| `list_created_hooks`| 列出已创建 Hook | `js-reverse call list_created_hooks`           |
-| `get_hook_data`     | 获取 Hook 数据  | `js-reverse call get_hook_data --hookId "hk1"` |
-| `remove_hook`       | 移除 Hook       | `js-reverse call remove_hook --hookId "hk1"`   |
+|                      | 工具名          | 说明                                           | 示例 |
+| -------------------- | --------------- | ---------------------------------------------- | ---- |
+| `create_hook`        | 创建 Hook       | `js-reverse call create_hook --type fetch`     |
+| `inject_hook`        | 注入 Hook       | `js-reverse call inject_hook --hookId "hk1"`   |
+| `list_created_hooks` | 列出已创建 Hook | `js-reverse call list_created_hooks`           |
+| `get_hook_data`      | 获取 Hook 数据  | `js-reverse call get_hook_data --hookId "hk1"` |
+| `remove_hook`        | 移除 Hook       | `js-reverse call remove_hook --hookId "hk1"`   |
 
 **示例：**
 
@@ -729,8 +749,8 @@ js-reverse call remove_hook --hookId "hk123"
 
 #### 专用 Hook
 
-|| 工具名                        | 说明                      | 示例                                                                    |
-| ----------------------------- | ------------------------- | ----------------------------------------------------------------------- |
+|                               | 工具名                    | 说明                                                                    | 示例 |
+| ----------------------------- | ------------------------- | ----------------------------------------------------------------------- | ---- |
 | `hook_console_log`            | Hook console.log          | `js-reverse call hook_console_log`                                      |
 | `hook_console_table`          | Hook console.table        | `js-reverse call hook_console_table`                                    |
 | `hook_console_protect`        | Hook console 保护         | `js-reverse call hook_console_protect`                                  |
@@ -806,8 +826,8 @@ js-reverse call hook_close
 
 ### 对话框
 
-|| 工具名          | 说明       | 示例                                                                    |
-| --------------- | ---------- | ----------------------------------------------------------------------- |
+|                 | 工具名     | 说明                                                                    | 示例 |
+| --------------- | ---------- | ----------------------------------------------------------------------- | ---- |
 | `handle_dialog` | 处理对话框 | `js-reverse call handle_dialog --action accept --promptText "输入内容"` |
 
 **示例：**
@@ -825,8 +845,8 @@ js-reverse call handle_dialog --action accept --promptText "用户名"
 
 ### 框架
 
-|| 工具名         | 说明        | 示例                                        |
-| -------------- | ----------- | ------------------------------------------- |
+|                | 工具名      | 说明                                        | 示例 |
+| -------------- | ----------- | ------------------------------------------- | ---- |
 | `list_frames`  | 列出 iframe | `js-reverse call list_frames`               |
 | `select_frame` | 选择 iframe | `js-reverse call select_frame --frameIdx 1` |
 
@@ -842,8 +862,8 @@ js-reverse call select_frame --frameIdx 1
 
 ### 脚本执行
 
-|| 工具名                  | 说明           | 示例                                                                      |
-| ----------------------- | -------------- | ------------------------------------------------------------------------- |
+|                         | 工具名         | 说明                                                                      | 示例 |
+| ----------------------- | -------------- | ------------------------------------------------------------------------- | ---- |
 | `evaluate_script`       | 执行脚本       | `js-reverse call evaluate_script --function "() => document.title"`       |
 | `inject_preload_script` | 注入预加载脚本 | `js-reverse call inject_preload_script --script "console.log('preload')"` |
 
@@ -860,8 +880,8 @@ js-reverse call inject_preload_script --script "(() => { window.preloadData = 't
 
 ### 站点经验
 
-|| 工具名                   | 说明         | 示例                                                                               |
-| ------------------------ | ------------ | ---------------------------------------------------------------------------------- |
+|                          | 工具名       | 说明                                                                               | 示例 |
+| ------------------------ | ------------ | ---------------------------------------------------------------------------------- | ---- |
 | `search_site_experience` | 搜索站点经验 | `js-reverse call search_site_experience --url "https://example.com"`               |
 | `list_site_experiences`  | 列出站点经验 | `js-reverse call list_site_experiences`                                            |
 | `create_site_experience` | 创建站点经验 | `js-reverse call create_site_experience --name "my-site"`                          |
@@ -870,14 +890,14 @@ js-reverse call inject_preload_script --script "(() => { window.preloadData = 't
 
 ### 扩展
 
-|| 工具名              | 说明     | 示例                                |
-| ------------------- | -------- | ----------------------------------- |
+|                     | 工具名   | 说明                                | 示例 |
+| ------------------- | -------- | ----------------------------------- | ---- |
 | `update_extensions` | 更新扩展 | `js-reverse call update_extensions` |
 
 ### 分析器
 
-|| 工具名                    | 说明         | 示例                                                                      |
-| ------------------------- | ------------ | ------------------------------------------------------------------------- |
+|                           | 工具名       | 说明                                                                      | 示例 |
+| ------------------------- | ------------ | ------------------------------------------------------------------------- | ---- |
 | `deobfuscate_code`        | 去混淆代码   | `js-reverse call deobfuscate_code --code "obfuscated..."`                 |
 | `understand_code`         | 理解代码     | `js-reverse call understand_code --code "function(){}"`                   |
 | `summarize_code`          | 总结代码     | `js-reverse call summarize_code --mode single --code "..."`               |
@@ -923,8 +943,8 @@ js-reverse call export_session_report --format json --includeHookData true
 
 ### 代码收集器
 
-|| 工具名              | 说明             | 示例                                                                   |
-| ------------------- | ---------------- | ---------------------------------------------------------------------- |
+|                     | 工具名           | 说明                                                                   | 示例 |
+| ------------------- | ---------------- | ---------------------------------------------------------------------- | ---- |
 | `collect_code`      | 收集代码         | `js-reverse call collect_code`                                         |
 | `collection_diff`   | 收集差异对比     | `js-reverse call collection_diff --previous "snap1" --current "snap2"` |
 | `search_in_scripts` | 搜索脚本中的内容 | `js-reverse call search_in_scripts --pattern "encrypt"`                |
@@ -951,8 +971,8 @@ js-reverse call search_in_scripts --pattern "token" --caseSensitive false
 
 ### 重建包
 
-|| 工具名                  | 说明         | 示例                                                                                           |
-| ----------------------- | ------------ | ---------------------------------------------------------------------------------------------- |
+|                         | 工具名       | 说明                                                                                           | 示例 |
+| ----------------------- | ------------ | ---------------------------------------------------------------------------------------------- | ---- |
 | `export_rebuild_bundle` | 导出重建包   | `js-reverse call export_rebuild_bundle --taskSlug "task1"`                                     |
 | `diff_env_requirements` | 对比环境需求 | `js-reverse call diff_env_requirements --runtimeError "ReferenceError: window is not defined"` |
 
@@ -971,8 +991,8 @@ js-reverse call diff_env_requirements --runtimeError "ReferenceError: fetch is n
 
 ### 反反调试
 
-|| 工具名            | 说明           | 示例                                                              |
-| ----------------- | -------------- | ----------------------------------------------------------------- |
+|                   | 工具名         | 说明                                                              | 示例 |
+| ----------------- | -------------- | ----------------------------------------------------------------- | ---- |
 | `anti_anti_debug` | 反反调试       | `js-reverse call anti_anti_debug`                                 |
 | `bypass_debugger` | 绕过调试器检测 | `js-reverse call bypass_debugger --targets '["eval","Function"]'` |
 
@@ -988,11 +1008,11 @@ js-reverse call bypass_debugger --targets '["eval","Function","constructor"]'
 
 ### 加密 Hook
 
-|| 工具名            | 说明              | 示例                              |
-| ----------------- | ----------------- | --------------------------------- |
-| `hook_cryptojs`   | Hook CryptoJS 库  | `js-reverse call hook_cryptojs`   |
-| `hook_jsencrypt`  | Hook JSEncrypt 库 | `js-reverse call hook_jsencrypt`  |
-| `hook_smcrypto`   | Hook SM-Crypto 库 | `js-reverse call hook_smcrypto`   |
+|                  | 工具名            | 说明                             | 示例 |
+| ---------------- | ----------------- | -------------------------------- | ---- |
+| `hook_cryptojs`  | Hook CryptoJS 库  | `js-reverse call hook_cryptojs`  |
+| `hook_jsencrypt` | Hook JSEncrypt 库 | `js-reverse call hook_jsencrypt` |
+| `hook_smcrypto`  | Hook SM-Crypto 库 | `js-reverse call hook_smcrypto`  |
 
 **示例：**
 
@@ -1018,8 +1038,8 @@ js-reverse call hook_smcrypto --algorithms '["SM2","SM4"]'
 
 ### Vue DevTools
 
-|| 工具名                  | 说明              | 示例                                    |
-| ----------------------- | ----------------- | --------------------------------------- |
+|                         | 工具名            | 说明                                    | 示例 |
+| ----------------------- | ----------------- | --------------------------------------- | ---- |
 | `activate_vue_devtools` | 激活 Vue DevTools | `js-reverse call activate_vue_devtools` |
 | `clear_vue_guards`      | 清除 Vue 路由守卫 | `js-reverse call clear_vue_guards`      |
 | `get_vue_routes`        | 获取 Vue 路由信息 | `js-reverse call get_vue_routes`        |
@@ -1039,8 +1059,8 @@ js-reverse call get_vue_routes
 
 ### 会话状态
 
-|| 工具名                  | 说明               | 示例                                                                             |
-| ----------------------- | ------------------ | -------------------------------------------------------------------------------- |
+|                         | 工具名             | 说明                                                                             | 示例 |
+| ----------------------- | ------------------ | -------------------------------------------------------------------------------- | ---- |
 | `save_session_state`    | 保存会话状态       | `js-reverse call save_session_state --sessionId "s1"`                            |
 | `restore_session_state` | 恢复会话状态       | `js-reverse call restore_session_state --sessionId "s1"`                         |
 | `list_session_states`   | 列出会话状态       | `js-reverse call list_session_states`                                            |
@@ -1079,8 +1099,8 @@ js-reverse call delete_session_state --sessionId "s1"
 
 ### v_jstools 工具集
 
-|| 工具名                | 说明                   | 示例                                                    |
-| --------------------- | ---------------------- | ------------------------------------------------------- |
+|                       | 工具名                 | 说明                                                    | 示例 |
+| --------------------- | ---------------------- | ------------------------------------------------------- | ---- |
 | `deobfuscate_code_vj` | 去混淆代码 (v_jstools) | `js-reverse call deobfuscate_code_vj --code "..."`      |
 | `minify_code`         | 压缩/格式化代码        | `js-reverse call minify_code --code "..."`              |
 | `transpile_code`      | 转译代码               | `js-reverse call transpile_code --code "..."`           |
@@ -1118,8 +1138,8 @@ js-reverse call diff_code --text1 "..." --text2 "..." --mode context
 
 ### 代码模板
 
-|| 工具名                | 说明         | 示例                                                    |
-| --------------------- | ------------ | ------------------------------------------------------- |
+|                       | 工具名       | 说明                                                    | 示例 |
+| --------------------- | ------------ | ------------------------------------------------------- | ---- |
 | `get_code_template`   | 获取代码模板 | `js-reverse call get_code_template --name "fetch-hook"` |
 | `list_code_templates` | 列出代码模板 | `js-reverse call list_code_templates`                   |
 
@@ -1136,8 +1156,10 @@ js-reverse call get_code_template --name "xhr-intercept"
 
 ### 技能系统
 
-|| 工具名         | 说明           | 示例                                                      |
-| -------------- | -------------- | --------------------------------------------------------- |
+以下两个 Tool 是通用兼容包装层，主要用于统一调用旧技能名；推荐新代码直接调用对应工作流 Tool，CLI 层则优先使用 `js-reverse call <tool-or-skill-name>`。
+
+|                | 工具名         | 说明                                                      | 示例 |
+| -------------- | -------------- | --------------------------------------------------------- | ---- |
 | `invoke_skill` | 调用已注册技能 | `js-reverse call invoke_skill --skillName "observe-flow"` |
 | `list_skills`  | 列出可用技能   | `js-reverse call list_skills`                             |
 
@@ -1150,6 +1172,39 @@ js-reverse call list_skills
 # 调用技能
 js-reverse call invoke_skill --skillName "observe-flow" --url "https://example.com"
 js-reverse call invoke_skill --skillName "auto-hook" --url "https://example.com"
+
+# 推荐：直接调用工作流 Tool
+js-reverse call observe_flow --url "https://example.com"
+js-reverse call auto_hook --url "https://example.com"
+```
+
+### Sekiro 兼容调用
+
+如果你是直接通过 Sekiro HTTP / Worker action 调用，而不是通过 CLI，可以继续使用以下兼容入口：
+
+| 用途             | Action         | 说明                                         |
+| ---------------- | -------------- | -------------------------------------------- |
+| 列出工具         | `_list_tools`  | 返回已注册 Tool 列表                         |
+| 列出技能兼容映射 | `_list_skills` | 返回旧技能名与新 Tool 映射                   |
+| 查看状态         | `_status`      | 返回 Worker 进程状态                         |
+| 调用旧技能别名   | `skill_<name>` | 例如 `skill_observe_flow`、`skill_auto_hook` |
+| 调用新工具       | `<tool_name>`  | 例如 `observe_flow`、`auto_hook`             |
+
+**示例：**
+
+```bash
+# 列出技能兼容映射
+curl "http://127.0.0.1:5612/business/invoke?group=default&action=_list_skills"
+
+# 调用旧技能别名
+curl -X POST "http://127.0.0.1:5612/business/invoke" ^
+  -H "Content-Type: application/json" ^
+  -d "{\"group\":\"default\",\"action\":\"skill_observe_flow\",\"params\":{\"url\":\"https://example.com\"}}"
+
+# 调用新工具
+curl -X POST "http://127.0.0.1:5612/business/invoke" ^
+  -H "Content-Type: application/json" ^
+  -d "{\"group\":\"default\",\"action\":\"observe_flow\",\"params\":{\"url\":\"https://example.com\"}}"
 ```
 
 ---
@@ -1165,13 +1220,15 @@ js-reverse call invoke_skill --skillName "auto-hook" --url "https://example.com"
 **使用方法：**
 
 ```bash
-js-reverse call-skill observe-flow --url https://example.com
+js-reverse call observe-flow --url https://example.com
+# 或
+js-reverse call observe_flow --url https://example.com
 ```
 
 **选项：**
 
-|| 选项                   | 类型    | 说明                                                  |
-| ---------------------- | ------- | ----------------------------------------------------- |
+|                        | 选项    | 类型                                                  | 说明 |
+| ---------------------- | ------- | ----------------------------------------------------- | ---- |
 | `includeDynamic`       | boolean | 包含动态脚本                                          |
 | `includeExternal`      | boolean | 包含外部脚本                                          |
 | `includeInline`        | boolean | 包含内联脚本                                          |
@@ -1203,21 +1260,23 @@ js-reverse call-skill observe-flow --url https://example.com
 **使用方法：**
 
 ```bash
-js-reverse call-skill auto-hook --url https://example.com
+js-reverse call auto-hook --url https://example.com
+# 或
+js-reverse call auto_hook --url https://example.com
 ```
 
 **预设模式：**
 
-|| 预设名          | 包含的 Hook                                          | 适用场景     |
-| --------------- | ---------------------------------------------------- | ------------ |
+|                 | 预设名                                               | 包含的 Hook  | 适用场景 |
+| --------------- | ---------------------------------------------------- | ------------ | -------- |
 | `none`          | 最小化 Hook                                          | 轻量调试     |
 | `api-signature` | hookFetch, hookXhr, hookCookie                       | API 签名分析 |
 | `network-core`  | hookFetch, hookXhr, hookTimers, hookEval, hookCookie | 网络核心分析 |
 
 **选项：**
 
-|| 选项              | 类型    | 默认值 | 说明            |
-| ----------------- | ------- | ------ | --------------- |
+|                   | 选项    | 类型   | 默认值          | 说明 |
+| ----------------- | ------- | ------ | --------------- | ---- |
 | `preset`          | string  | `none` | 预设模式        |
 | `autoInject`      | boolean | true   | 自动注入        |
 | `waitAfterHookMs` | number  | -      | Hook 后等待时间 |
@@ -1247,13 +1306,15 @@ js-reverse call-skill auto-hook --url https://example.com
 **使用方法：**
 
 ```bash
-js-reverse call-skill rebuild-bundle --url https://example.com
+js-reverse call rebuild-bundle --url https://example.com
+# 或
+js-reverse call rebuild_bundle --url https://example.com
 ```
 
 **选项：**
 
-|| 选项                  | 类型     | 说明             |
-| --------------------- | -------- | ---------------- |
+|                       | 选项     | 类型             | 说明 |
+| --------------------- | -------- | ---------------- | ---- |
 | `targetUrl`           | string   | 目标 URL         |
 | `targetFunctionNames` | string[] | 目标函数名列表   |
 | `targetKeywords`      | string[] | 目标关键词       |
@@ -1281,7 +1342,7 @@ js-reverse call-skill rebuild-bundle --url https://example.com
 
 ## REPL 模式
 
-REPL 提供了一个交互式命令行界面，可以直接调用工具和技能。
+REPL 提供了一个交互式命令行界面，可以直接调用工具和兼容技能。
 
 ### 启动
 
@@ -1295,8 +1356,7 @@ js-reverse repl
 js-reverse> skill observe-flow --url https://example.com    # 调用技能
 js-reverse> tool take_screenshot                            # 调用工具
 js-reverse> status                                         # 检查守护进程状态
-js-reverse> list-skills                                    # 列出技能
-js-reverse> list-tools                                     # 列出工具
+js-reverse> list-tools                                     # 列出工具和兼容技能
 js-reverse> help                                           # 显示帮助
 js-reverse> exit                                           # 退出
 ```
@@ -1331,17 +1391,10 @@ chrome.exe --remote-debugging-port=9222
 js-reverse list-tools
 ```
 
-### 如何查看所有可用技能？
-
-```bash
-js-reverse list-skills
-```
-
 ### 如何使用 JSON 格式输出？
 
 ```bash
 js-reverse list-tools --json
-js-reverse list-skills --json
 ```
 
 ### 如何管理配置？
