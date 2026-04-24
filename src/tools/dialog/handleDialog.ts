@@ -4,8 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {Dialog} from 'patchright';
+
 import type {Page} from '../../third_party/index.js';
-import type {DialogAction, DialogResult, HandleDialogParams} from './types.js';
+
+import type {DialogResult, HandleDialogParams} from './types.js';
 
 interface RuntimeWithPage {
   getActivePage(): Promise<Page>;
@@ -74,11 +77,14 @@ export async function handleDialog(
  * 此函数设置一次性监听器，等待最多 5 秒获取 dialog；
  * 如果页面已有 dialog 上下文则立即返回。
  */
-async function waitForDialog(page: Page, timeoutMs = 5000): Promise<import('playwright-core').Dialog | null> {
-  return new Promise((resolve) => {
+async function waitForDialog(
+  page: Page,
+  timeoutMs = 5000,
+): Promise<Dialog | null> {
+  return new Promise(resolve => {
     let settled = false;
 
-    const handler = (dialog: import('playwright-core').Dialog) => {
+    const handler = (dialog: Dialog) => {
       if (!settled) {
         settled = true;
         page.off('dialog', handler);

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {CDPSession} from 'playwright-core';
+import type {CDPSession} from 'patchright';
 
 import type {
   CDPConnection,
@@ -14,7 +14,6 @@ import type {
   CommandParams,
   CommandResult,
 } from '../third_party/index.js';
-import {logger} from '../utils/logger.js';
 
 /**
  * This class makes a Playwright CDP connection look like DevTools CDPConnection.
@@ -75,10 +74,12 @@ export class PlaywrightDevToolsConnection implements CDPConnection {
     const session = this.#childSessions.get(sessionId) ?? this.#rootSession;
     // Playwright's CDPSession.send is strictly typed with Protocol.CommandParameters.
     // We use type assertion since our CDPCommand is just string.
-    return (session.send as (method: string, params?: Record<string, unknown>) => Promise<Record<string, unknown>>)(
-      method,
-      params as Record<string, unknown>,
-    )
+    return (
+      session.send as (
+        method: string,
+        params?: Record<string, unknown>,
+      ) => Promise<Record<string, unknown>>
+    )(method, params as Record<string, unknown>)
       .then(result => ({result: result as CommandResult<T>}))
       .catch(error => ({
         error: {
@@ -96,10 +97,7 @@ export class PlaywrightDevToolsConnection implements CDPConnection {
     this.#observers.delete(observer);
   }
 
-  #startForwardingCdpEvents(
-    sessionId: string,
-    session: CDPSession,
-  ): void {
+  #startForwardingCdpEvents(sessionId: string, session: CDPSession): void {
     // Playwright CDPSession supports broad event listening via:
     //   session.on('event', ({method, params}) => { ... })
     // This is equivalent to Puppeteer's session.on('*', handler)

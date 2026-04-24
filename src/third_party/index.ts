@@ -16,12 +16,10 @@ export {z as zod} from 'zod';
 
 // ─── Playwright exports (replaces Puppeteer) ───
 // Re-export commonly used Playwright types for the rest of the codebase.
-// All downstream code should import from this barrel file, not from 'playwright-core' directly.
+// All downstream code should import from this barrel file, not from 'patchright' directly.
 
 // Import types that are also used locally in this file
-import type {
-  CDPSession as PlaywrightCDPSession,
-} from 'playwright-core';
+import type {CDPSession as PlaywrightCDPSession} from 'patchright';
 
 // Re-export all Playwright types for downstream consumers
 export type {
@@ -46,10 +44,10 @@ export type {
   Worker,
   BrowserType,
   Selectors,
-} from 'playwright-core';
+} from 'patchright';
 
 // Re-export the chromium instance creator
-export {chromium, firefox, webkit} from 'playwright-core';
+export {chromium, firefox, webkit} from 'patchright';
 
 // CDP-specific types - Playwright uses CDPSession differently from Puppeteer
 // We map Puppeteer concepts to Playwright equivalents where possible.
@@ -105,33 +103,54 @@ export const CDPSessionEvent = {
   Disconnected: 'disconnected',
 } as const;
 
-export type CDPSessionEventType = (typeof CDPSessionEvent)[keyof typeof CDPSessionEvent];
+export type CDPSessionEventType =
+  (typeof CDPSessionEvent)[keyof typeof CDPSessionEvent];
 
 // Puppeteer's PredefinedNetworkConditions - not in Playwright.
 // We provide the common presets.
 export const PredefinedNetworkConditions = {
   'Slow 3G': {
     offline: false,
-    downloadThroughput: 50 * 1024 / 8,
-    uploadThroughput: 50 * 1024 / 8,
+    downloadThroughput: (50 * 1024) / 8,
+    uploadThroughput: (50 * 1024) / 8,
     latency: 2000,
   },
   'Fast 3G': {
     offline: false,
-    downloadThroughput: 1.6 * 1024 * 1024 / 8,
-    uploadThroughput: 750 * 1024 / 8,
+    downloadThroughput: (1.6 * 1024 * 1024) / 8,
+    uploadThroughput: (750 * 1024) / 8,
     latency: 562.5,
   },
 } as const;
 
 // Puppeteer's Locator - Playwright has its own Locator type
-export type {Locator} from 'playwright-core';
+export type {Locator} from 'patchright';
 
 // Puppeteer's HTTPRequest/HTTPResponse - map to Playwright's Request/Response
-export type {Request as HTTPRequest, Response as HTTPResponse} from 'playwright-core';
+export type {
+  Request as HTTPRequest,
+  Response as HTTPResponse,
+} from 'patchright';
 
 // ResourceType - Playwright uses string union type
-export type ResourceType = 'document' | 'stylesheet' | 'image' | 'media' | 'font' | 'script' | 'texttrack' | 'xhr' | 'fetch' | 'eventsource' | 'websocket' | 'manifest' | 'signedexchange' | 'ping' | 'cspviolationreport' | 'preflight' | 'other';
+export type ResourceType =
+  | 'document'
+  | 'stylesheet'
+  | 'image'
+  | 'media'
+  | 'font'
+  | 'script'
+  | 'texttrack'
+  | 'xhr'
+  | 'fetch'
+  | 'eventsource'
+  | 'websocket'
+  | 'manifest'
+  | 'signedexchange'
+  | 'ping'
+  | 'cspviolationreport'
+  | 'preflight'
+  | 'other';
 
 // PipeTransport - not available in Playwright, provide stub
 export const PipeTransport = class PipeTransport {
@@ -139,7 +158,7 @@ export const PipeTransport = class PipeTransport {
 };
 
 // CdpPage type alias for backward compatibility
-export type {Page as CdpPage} from 'playwright-core';
+export type {Page as CdpPage} from 'patchright';
 
 // ─── DevTools CDP 连接类型 ───
 export type CDPCommand = string;

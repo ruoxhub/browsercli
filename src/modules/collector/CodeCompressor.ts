@@ -73,6 +73,13 @@ interface CacheEntry {
   timestamp: number;
 }
 
+interface CompressionMetrics {
+  originalSize: number;
+  compressedSize: number;
+  compressionRatio: number;
+  compressionTime: number;
+}
+
 // ==================== 类实现 ====================
 
 export class CodeCompressor {
@@ -113,21 +120,16 @@ export class CodeCompressor {
     const cacheKey = this.generateCacheKey(code, level);
 
     // 检查缓存
-    if (useCache && this.cache.has(cacheKey)) {
-      const cached = this.cache.get(cacheKey)!;
-      if (Date.now() - cached.timestamp < this.CACHE_TTL) {
-        this.stats.cacheHits++;
-        logger.debug(`Cache hit for compression (${code.length} bytes)`);
-        return {
-          compressed: cached.compressed,
-          originalSize: cached.originalSize,
-          compressedSize: cached.compressedSize,
-          compressionRatio: cached.compressionRatio,
-          level,
-        };
-      } else {
-        this.cache.delete(cacheKey);
-      }
+    const cached = useCache ? this.getCached(cacheKey) : null;
+    if (cached) {
+      logger.debug(`Cache hit for compression (${code.length} bytes)`);
+      return {
+        compressed: cached.compressed,
+        originalSize: cached.originalSize,
+        compressedSize: cached.compressedSize,
+        compressionRatio: cached.compressionRatio,
+        level,
+      };
     }
 
     this.stats.cacheMisses++;
@@ -140,46 +142,28 @@ export class CodeCompressor {
         const compressed = await gzipAsync(buffer, {level});
         const base64 = compressed.toString('base64');
 
-        const originalSize = buffer.length;
-        const compressedSize = compressed.length;
-        const compressionRatio = (1 - compressedSize / originalSize) * 100;
-        const compressionTime = Date.now() - startTime;
-
-        // 更新统计
-        this.stats.totalCompressed++;
-        this.stats.totalOriginalSize += originalSize;
-        this.stats.totalCompressedSize += compressedSize;
-        this.stats.averageRatio =
-          (1 - this.stats.totalCompressedSize / this.stats.totalOriginalSize) *
-          100;
-        this.stats.totalTime += compressionTime;
-
-        const result: CompressedCode = {
-          compressed: base64,
-          originalSize,
-          compressedSize,
-          compressionRatio,
-          level,
-          metadata: {
-            hash: cacheKey,
-            timestamp: Date.now(),
-            compressionTime,
-          },
+        const metrics: CompressionMetrics = {
+          originalSize: buffer.length,
+          compressedSize: compressed.length,
+          compressionRatio: (1 - compressed.length / buffer.length) * 100,
+          compressionTime: Date.now() - startTime,
         };
+        this.recordCompression(metrics);
+
+        const result = this.buildCompressedResult(
+          base64,
+          level,
+          cacheKey,
+          metrics,
+        );
 
         // 保存到缓存
         if (useCache) {
-          this.addToCache(cacheKey, {
-            compressed: base64,
-            originalSize,
-            compressedSize,
-            compressionRatio,
-            timestamp: Date.now(),
-          });
+          this.addToCache(cacheKey, this.toCacheEntry(result));
         }
 
         logger.debug(
-          `Compressed code: ${originalSize} -> ${compressedSize} bytes (${compressionRatio.toFixed(1)}% reduction, level ${level}, ${compressionTime}ms)`,
+          `Compressed code: ${metrics.originalSize} -> ${metrics.compressedSize} bytes (${metrics.compressionRatio.toFixed(1)}% reduction, level ${level}, ${metrics.compressionTime}ms)`,
         );
 
         return result;
@@ -191,10 +175,7 @@ export class CodeCompressor {
         );
 
         if (attempt < maxRetries - 1) {
-          // 等待后重试
-          await new Promise(resolve =>
-            setTimeout(resolve, 100 * (attempt + 1)),
-          );
+          await this.waitBeforeRetry(attempt);
         }
       }
     }
@@ -222,9 +203,7 @@ export class CodeCompressor {
         );
 
         if (attempt < maxRetries - 1) {
-          await new Promise(resolve =>
-            setTimeout(resolve, 100 * (attempt + 1)),
-          );
+          await this.waitBeforeRetry(attempt);
         }
       }
     }
@@ -440,6 +419,11 @@ export class CodeCompressor {
    * 添加到缓存（LRU）
    */
   private addToCache(key: string, entry: CacheEntry): void {
+    if (this.cache.delete(key)) {
+      this.cache.set(key, entry);
+      return;
+    }
+
     // 如果缓存已满，删除最旧的
     if (this.cache.size >= this.CACHE_MAX_SIZE) {
       const firstKey = this.cache.keys().next().value;
@@ -449,5 +433,79 @@ export class CodeCompressor {
     }
 
     this.cache.set(key, entry);
+  }
+
+  /**
+   * 获取有效缓存项，并刷新其 LRU 顺序
+   */
+  private getCached(key: string): CacheEntry | null {
+    const cached = this.cache.get(key);
+    if (!cached) {
+      return null;
+    }
+
+    if (Date.now() - cached.timestamp >= this.CACHE_TTL) {
+      this.cache.delete(key);
+      return null;
+    }
+
+    this.stats.cacheHits++;
+    this.addToCache(key, cached);
+    return cached;
+  }
+
+  /**
+   * 更新压缩统计
+   */
+  private recordCompression(metrics: CompressionMetrics): void {
+    this.stats.totalCompressed++;
+    this.stats.totalOriginalSize += metrics.originalSize;
+    this.stats.totalCompressedSize += metrics.compressedSize;
+    this.stats.averageRatio =
+      (1 - this.stats.totalCompressedSize / this.stats.totalOriginalSize) * 100;
+    this.stats.totalTime += metrics.compressionTime;
+  }
+
+  /**
+   * 构造公开压缩结果
+   */
+  private buildCompressedResult(
+    compressed: string,
+    level: number,
+    hash: string,
+    metrics: CompressionMetrics,
+  ): CompressedCode {
+    return {
+      compressed,
+      originalSize: metrics.originalSize,
+      compressedSize: metrics.compressedSize,
+      compressionRatio: metrics.compressionRatio,
+      level,
+      metadata: {
+        hash,
+        timestamp: Date.now(),
+        compressionTime: metrics.compressionTime,
+      },
+    };
+  }
+
+  /**
+   * 从公开压缩结果构造缓存项
+   */
+  private toCacheEntry(result: CompressedCode): CacheEntry {
+    return {
+      compressed: result.compressed,
+      originalSize: result.originalSize,
+      compressedSize: result.compressedSize,
+      compressionRatio: result.compressionRatio,
+      timestamp: Date.now(),
+    };
+  }
+
+  /**
+   * 重试前线性退避
+   */
+  private async waitBeforeRetry(attempt: number): Promise<void> {
+    await new Promise(resolve => setTimeout(resolve, 100 * (attempt + 1)));
   }
 }

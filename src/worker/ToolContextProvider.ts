@@ -11,7 +11,8 @@
  * 作为 ToolAdapter 与纯函数工具之间的桥梁。
  */
 
-import type {Browser, BrowserContext, Frame, Page, Request} from 'playwright-core';
+import type {Browser, BrowserContext, Frame, Page, Request} from 'patchright';
+
 import type {HTTPRequest} from '../third_party/index.js';
 import type {RequestInitiator} from '../tools/network/types.js';
 
@@ -30,7 +31,7 @@ interface TrackedRequest {
  * 单个 Page 的导航分组存储
  * navigations[0] 为当前导航，后续为保留的历史导航
  */
-type PageRequestStorage = Array<TrackedRequest[]>;
+type PageRequestStorage = TrackedRequest[][];
 
 export class ToolContextProvider {
   private selectedPage: Page | null = null;
@@ -49,11 +50,7 @@ export class ToolContextProvider {
     Page,
     {onRequest: (req: Request) => void; onFrameNavigated: () => void}
   >();
-  private _contextListener:
-    | {onPage: (page: Page) => void}
-    | null = null;
-
-  constructor() {}
+  private _contextListener: {onPage: (page: Page) => void} | null = null;
 
   // ─── Browser / Context 管理 ──────────────────────────
 
@@ -121,7 +118,8 @@ export class ToolContextProvider {
   getPageByIdx(idx: number): Page {
     const pages = this.getPages();
     const page = pages[idx];
-    if (!page) throw new Error(`页面索引 ${idx} 超出范围 (共 ${pages.length} 个页面)`);
+    if (!page)
+      throw new Error(`页面索引 ${idx} 超出范围 (共 ${pages.length} 个页面)`);
     return page;
   }
 
@@ -264,8 +262,9 @@ export class ToolContextProvider {
     // 找到最后一个属于主 frame 的导航请求（resourceType === 'document'）
     const lastNavIdx = requests.findLastIndex(tracked => {
       const req = tracked.request;
-      return req.frame() === page.mainFrame()
-        && req.resourceType() === 'document';
+      return (
+        req.frame() === page.mainFrame() && req.resourceType() === 'document'
+      );
     });
 
     if (lastNavIdx !== -1) {
@@ -341,9 +340,7 @@ export class ToolContextProvider {
     if (!navigations) return -1;
 
     for (const navigation of navigations) {
-      const found = navigation.find(
-        t => t.request === (request as Request),
-      );
+      const found = navigation.find(t => t.request === (request as Request));
       if (found) return found.stableId;
     }
     return -1;

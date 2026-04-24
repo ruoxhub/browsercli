@@ -9,14 +9,20 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 
-import {chromium, type Browser, type BrowserContext, type Page, type CDPSession} from 'playwright-core';
+import {
+  chromium,
+  type Browser,
+  type BrowserContext,
+  type Page,
+} from 'patchright';
 
-import {logger} from '../utils/logger.js';
 import {
   StealthScripts2025,
   type StealthPreset,
   type StealthInjectionOptions,
 } from '../modules/stealth/index.js';
+import {logger} from '../utils/logger.js';
+
 import {HARMFUL_ARGS, DEFAULT_ARGS, STEALTH_ARGS} from './stealth-args.js';
 
 let browserManager: BrowserManager | undefined;
@@ -107,7 +113,9 @@ async function discoverChromeDebugPort(): Promise<{
   for (const port of commonPorts) {
     const ok = await checkPort(port);
     if (ok) {
-      logger.debug(`[discoverChromeDebugPort] 扫描发现 Chrome 调试端口：${port}`);
+      logger.debug(
+        `[discoverChromeDebugPort] 扫描发现 Chrome 调试端口：${port}`,
+      );
       return {port, wsPath: undefined};
     }
   }
@@ -257,10 +265,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     });
   }
 
-  const args = [
-    ...(options.args ?? []),
-    '--hide-crash-restore-bubble',
-  ];
+  const args = [...(options.args ?? []), '--hide-crash-restore-bubble'];
   if (headless) {
     args.push('--screen-info={3840x2160}');
   }
@@ -271,9 +276,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   }
   if (!executablePath) {
     launchChannel =
-      channel && channel !== 'stable'
-        ? `chrome-${channel}`
-        : 'chrome';
+      channel && channel !== 'stable' ? `chrome-${channel}` : 'chrome';
   }
 
   try {
@@ -622,7 +625,10 @@ export class BrowserManager {
           }
         }
       } catch (err) {
-        logger.debug('Warning: Could not set viewport from browser bounds:', err);
+        logger.debug(
+          'Warning: Could not set viewport from browser bounds:',
+          err,
+        );
       }
 
       // Verify connection by checking browser version
@@ -647,7 +653,9 @@ export class BrowserManager {
 
       // 如果连接失败但配置了 autoLaunch，尝试自动启动浏览器
       if (this.config.autoLaunch) {
-        logger.debug('Remote browser connection failed, attempting auto-launch...');
+        logger.debug(
+          'Remote browser connection failed, attempting auto-launch...',
+        );
         try {
           await this.launchBrowserProcess();
           // 重新尝试连接
@@ -744,9 +752,7 @@ export class BrowserManager {
 
     if (!executablePath) {
       launchChannel =
-        channel && channel !== 'stable'
-          ? `chrome-${channel}`
-          : 'chrome';
+        channel && channel !== 'stable' ? `chrome-${channel}` : 'chrome';
     }
 
     try {

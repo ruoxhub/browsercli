@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Browser, BrowserContext, Page} from 'playwright-core';
+import type {BrowserContext, Page} from 'patchright';
 
 import {logger} from '../utils/logger.js';
 
@@ -44,7 +44,10 @@ export class SessionManager {
   /**
    * 获取或创建会话管理器实例
    */
-  static getInstance(sessionId: string, context: BrowserContext): SessionManager {
+  static getInstance(
+    sessionId: string,
+    context: BrowserContext,
+  ): SessionManager {
     if (!SessionManager.instances.has(sessionId)) {
       SessionManager.instances.set(
         sessionId,

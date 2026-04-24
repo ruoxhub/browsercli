@@ -4,17 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { CodeCompressor } from '../../../src/modules/collector/CodeCompressor.js';
+import {CodeCompressor} from '../../../src/modules/collector/CodeCompressor.js';
 
 interface CodeCompressorHarness {
   CACHE_TTL: number;
-  cache: Map<string, { timestamp: number }>;
+  cache: Map<string, {timestamp: number}>;
   compress(
     source: string,
-    options: { level: number; maxRetries?: number; useCache?: boolean },
-  ): Promise<{ compressed: string; originalSize: number }>;
+    options: {level: number; maxRetries?: number; useCache?: boolean},
+  ): Promise<{compressed: string; originalSize: number}>;
   generateCacheKey(source: string, level: number): string;
   getCacheSize(): number;
   clearCache(): void;
@@ -22,11 +22,11 @@ interface CodeCompressorHarness {
   selectCompressionLevel(size: number): number;
   compressStream(
     source: string,
-    options: { chunkSize: number; onProgress?: (progress: number) => void },
+    options: {chunkSize: number; onProgress?: (progress: number) => void},
   ): Promise<{
     compressed: string;
     chunks?: number;
-    metadata?: { compressionTime?: number };
+    metadata?: {compressionTime?: number};
   }>;
 }
 
@@ -35,8 +35,8 @@ describe('CodeCompressor extended', () => {
     const c = new CodeCompressor();
     const src = 'function x(){return "hello".repeat(120);}';
 
-    const first = await c.compress(src, { level: 6 });
-    const second = await c.compress(src, { level: 6 });
+    const first = await c.compress(src, {level: 6});
+    const second = await c.compress(src, {level: 6});
     const restored = await c.decompress(first.compressed);
 
     assert.strictEqual(restored, src);
@@ -56,13 +56,13 @@ describe('CodeCompressor extended', () => {
     const c = new CodeCompressor() as unknown as CodeCompressorHarness;
     const src = 'const longText = "' + 'a'.repeat(3000) + '";';
 
-    await c.compress(src, { level: 6 });
+    await c.compress(src, {level: 6});
     const key = c.generateCacheKey(src, 6);
     const entry = c.cache.get(key);
     assert.ok(entry);
 
     entry.timestamp = Date.now() - c.CACHE_TTL - 1;
-    await c.compress(src, { level: 6 });
+    await c.compress(src, {level: 6});
 
     assert.ok(c.getCacheSize() >= 1);
     c.clearCache();
@@ -74,7 +74,7 @@ describe('CodeCompressor extended', () => {
     const src = 'const a = 1;';
 
     await assert.rejects(async () => {
-      await c.compress(src, { level: 99, maxRetries: 1, useCache: false });
+      await c.compress(src, {level: 99, maxRetries: 1, useCache: false});
     });
 
     await assert.rejects(async () => {
@@ -85,9 +85,9 @@ describe('CodeCompressor extended', () => {
   it('covers batch compression success and fallback', async () => {
     const c = new CodeCompressor();
     const files = [
-      { url: 'a.js', content: 'let a = 1;' },
-      { url: 'b.js', content: 'let b = 2;' },
-      { url: 'c.js', content: 'let c = 3;' },
+      {url: 'a.js', content: 'let a = 1;'},
+      {url: 'b.js', content: 'let b = 2;'},
+      {url: 'c.js', content: 'let c = 3;'},
     ];
 
     let overallProgress = 0;
@@ -95,7 +95,7 @@ describe('CodeCompressor extended', () => {
 
     const ok = await c.compressBatch(files, {
       concurrency: 2,
-      onProgress: (p) => {
+      onProgress: p => {
         overallProgress = p;
       },
       onFileProgress: (f, p) => {
@@ -113,7 +113,7 @@ describe('CodeCompressor extended', () => {
     });
 
     assert.strictEqual(fallback.length, 3);
-    fallback.forEach((item) => {
+    fallback.forEach(item => {
       assert.strictEqual(item.compressionRatio, 0);
       assert.strictEqual(item.compressedSize, item.originalSize);
     });
@@ -130,7 +130,7 @@ describe('CodeCompressor extended', () => {
     assert.strictEqual(c.selectCompressionLevel(200 * 1024), 9);
     assert.strictEqual(c.selectCompressionLevel(2 * 1024 * 1024), 6);
 
-    const small = await c.compressStream('short', { chunkSize: 100 });
+    const small = await c.compressStream('short', {chunkSize: 100});
     assert.ok(typeof small.compressed === 'string');
 
     const bigSource = 'x'.repeat(4096);
@@ -144,8 +144,26 @@ describe('CodeCompressor extended', () => {
     assert.ok((streamed.metadata?.compressionTime ?? 0) >= 0);
 
     for (let i = 0; i < 130; i++) {
-      await c.compress(`let x${i} = ${i};`, { level: 1 });
+      await c.compress(`let x${i} = ${i};`, {level: 1});
     }
     assert.ok(c.getCacheSize() <= 100);
+  });
+
+  it('refreshes cached entries before LRU eviction', async () => {
+    const c = new CodeCompressor() as unknown as CodeCompressorHarness;
+
+    for (let i = 0; i < 100; i++) {
+      await c.compress(`let cached${i} = ${i};`, {level: 1});
+    }
+
+    const refreshedKey = c.generateCacheKey('let cached0 = 0;', 1);
+    const staleKey = c.generateCacheKey('let cached1 = 1;', 1);
+
+    await c.compress('let cached0 = 0;', {level: 1});
+    await c.compress('let cached100 = 100;', {level: 1});
+
+    assert.ok(c.cache.has(refreshedKey));
+    assert.strictEqual(c.cache.has(staleKey), false);
+    assert.strictEqual(c.getCacheSize(), 100);
   });
 });
