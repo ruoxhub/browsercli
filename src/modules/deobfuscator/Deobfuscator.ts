@@ -58,6 +58,18 @@ import {
   UniversalUnpacker,
 } from './PackerDeobfuscator.js';
 
+function getStaticNumber(node: t.Node | null | undefined): number | null {
+  if (!node) return null;
+  if (t.isNumericLiteral(node)) return node.value;
+  if (
+    t.isUnaryExpression(node, {operator: '-'}) &&
+    t.isNumericLiteral(node.argument)
+  ) {
+    return -node.argument.value;
+  }
+  return null;
+}
+
 // ==================== 扩展选项 ====================
 
 export interface DeobfuscateFullOptions extends DeobfuscateOptions {
@@ -187,6 +199,7 @@ export class Deobfuscator {
       code = await this.basicTransform(code, transformations);
       code = await this.decodeStrings(code, transformations);
       code = await this.decryptArrays(code, transformations);
+      code = await this.inlineStringDecoderCalls(code, transformations);
 
       // 控制流平坦化还原（基础版，仅 aggressive 时）
       if (options.aggressive) {
@@ -947,6 +960,262 @@ export class Deobfuscator {
       });
       return code;
     }
+  }
+
+  /**
+   * 内联 javascript-obfuscator 常见的字符串解码包装函数
+   */
+  private async inlineStringDecoderCalls(
+    code: string,
+    transformations: Transformation[],
+  ): Promise<string> {
+    try {
+      const ast = parser.parse(code, {
+        sourceType: 'module',
+        plugins: ['jsx', 'typescript'],
+      });
+      const providers = new Map<string, string[]>();
+      const decoders = new Map<string, {strings: string[]; offset: number}>();
+      let replaced = 0;
+
+      traverse(ast, {
+        FunctionDeclaration: path => {
+          const name = path.node.id?.name;
+          if (!name) return;
+
+          const providerStrings = this.extractArrayProviderStrings(path.node);
+          if (providerStrings) {
+            providers.set(name, providerStrings);
+            return;
+          }
+
+          const decoder = this.extractStringDecoder(path.node, providers);
+          if (decoder) {
+            decoders.set(name, decoder);
+          }
+        },
+      });
+
+      traverse(ast, {
+        CallExpression(path) {
+          if (!t.isIdentifier(path.node.callee)) return;
+
+          const decoder = decoders.get(path.node.callee.name);
+          if (!decoder) return;
+          if (path.node.arguments.length === 0) return;
+
+          const firstArg = path.node.arguments[0];
+          const index = getStaticNumber(firstArg);
+          if (index === null) return;
+
+          const resolved = decoder.strings[index - decoder.offset];
+          if (resolved === undefined) return;
+
+          path.replaceWith(t.stringLiteral(resolved));
+          replaced++;
+        },
+
+        MemberExpression(path) {
+          if (
+            path.node.computed &&
+            t.isStringLiteral(path.node.property) &&
+            t.isValidIdentifier(path.node.property.value)
+          ) {
+            path.node.computed = false;
+            path.node.property = t.identifier(path.node.property.value);
+          }
+        },
+      });
+
+      if (replaced > 0) {
+        const output = generate(ast, {comments: true, compact: false});
+        transformations.push({
+          type: 'inline-string-decoders',
+          description: `Inlined ${replaced} string decoder calls`,
+          success: true,
+        });
+        return output.code;
+      }
+
+      return code;
+    } catch (error) {
+      logger.warn('String decoder inlining failed', error);
+      transformations.push({
+        type: 'inline-string-decoders',
+        description: 'Failed',
+        success: false,
+      });
+      return code;
+    }
+  }
+
+  private extractArrayProviderStrings(
+    fn: t.FunctionDeclaration,
+  ): string[] | null {
+    const fnName = fn.id?.name;
+    if (!fnName) return null;
+
+    let arrayName: string | null = null;
+    let strings: string[] | null = null;
+    let rebindReturnsArray = false;
+    let returnsSelfCall = false;
+
+    for (const statement of fn.body.body) {
+      if (t.isVariableDeclaration(statement)) {
+        for (const declaration of statement.declarations) {
+          if (
+            t.isIdentifier(declaration.id) &&
+            t.isArrayExpression(declaration.init)
+          ) {
+            const values = declaration.init.elements.map(element =>
+              t.isStringLiteral(element) ? element.value : null,
+            );
+            if (values.every(value => typeof value === 'string')) {
+              arrayName = declaration.id.name;
+              strings = values as string[];
+            }
+          }
+        }
+        continue;
+      }
+
+      if (
+        t.isExpressionStatement(statement) &&
+        t.isAssignmentExpression(statement.expression, {operator: '='}) &&
+        t.isIdentifier(statement.expression.left, {name: fnName}) &&
+        t.isFunctionExpression(statement.expression.right)
+      ) {
+        const innerStatements = statement.expression.right.body.body;
+        if (
+          innerStatements.length === 1 &&
+          t.isReturnStatement(innerStatements[0]) &&
+          t.isIdentifier(innerStatements[0].argument) &&
+          innerStatements[0].argument.name === arrayName
+        ) {
+          rebindReturnsArray = true;
+        }
+        continue;
+      }
+
+      if (
+        t.isReturnStatement(statement) &&
+        t.isCallExpression(statement.argument) &&
+        t.isIdentifier(statement.argument.callee, {name: fnName})
+      ) {
+        returnsSelfCall = true;
+      }
+    }
+
+    if (strings && arrayName && rebindReturnsArray && returnsSelfCall) {
+      return strings;
+    }
+
+    return null;
+  }
+
+  private extractStringDecoder(
+    fn: t.FunctionDeclaration,
+    providers: Map<string, string[]>,
+  ): {strings: string[]; offset: number} | null {
+    const fnName = fn.id?.name;
+    if (!fnName) return null;
+
+    let backingStrings: string[] | null = null;
+    let backingArrayAlias: string | null = null;
+
+    for (const statement of fn.body.body) {
+      if (!t.isVariableDeclaration(statement)) continue;
+      for (const declaration of statement.declarations) {
+        if (
+          !t.isIdentifier(declaration.id) ||
+          !t.isCallExpression(declaration.init) ||
+          !t.isIdentifier(declaration.init.callee)
+        ) {
+          continue;
+        }
+
+        const strings = providers.get(declaration.init.callee.name);
+        if (strings) {
+          backingStrings = strings;
+          backingArrayAlias = declaration.id.name;
+        }
+      }
+    }
+
+    if (!backingStrings || !backingArrayAlias) return null;
+
+    for (const statement of fn.body.body) {
+      if (
+        !t.isReturnStatement(statement) ||
+        !t.isSequenceExpression(statement.argument)
+      ) {
+        continue;
+      }
+
+      const [assignmentExpr] = statement.argument.expressions;
+      if (
+        !t.isAssignmentExpression(assignmentExpr, {operator: '='}) ||
+        !t.isIdentifier(assignmentExpr.left, {name: fnName}) ||
+        !t.isFunctionExpression(assignmentExpr.right)
+      ) {
+        continue;
+      }
+
+      const innerFn = assignmentExpr.right;
+      const indexParam = innerFn.params[0];
+      if (!t.isIdentifier(indexParam)) return null;
+
+      let offset = 0;
+      let hasOffsetAssign = false;
+      let returnsBackingLookup = false;
+
+      for (const innerStatement of innerFn.body.body) {
+        if (
+          t.isExpressionStatement(innerStatement) &&
+          t.isAssignmentExpression(innerStatement.expression, {operator: '='}) &&
+          t.isIdentifier(innerStatement.expression.left, {
+            name: indexParam.name,
+          }) &&
+          t.isBinaryExpression(innerStatement.expression.right, {
+            operator: '-',
+          }) &&
+          t.isIdentifier(innerStatement.expression.right.left, {
+            name: indexParam.name,
+          })
+        ) {
+          const numericOffset = getStaticNumber(
+            innerStatement.expression.right.right,
+          );
+          if (numericOffset !== null) {
+            offset = numericOffset;
+            hasOffsetAssign = true;
+          }
+          continue;
+        }
+
+        if (
+          t.isReturnStatement(innerStatement) &&
+          t.isMemberExpression(innerStatement.argument, {computed: true}) &&
+          t.isIdentifier(innerStatement.argument.object, {
+            name: backingArrayAlias,
+          }) &&
+          t.isIdentifier(innerStatement.argument.property, {
+            name: indexParam.name,
+          })
+        ) {
+          returnsBackingLookup = true;
+        }
+      }
+
+      if (returnsBackingLookup) {
+        return {
+          strings: backingStrings,
+          offset: hasOffsetAssign ? offset : 0,
+        };
+      }
+    }
+
+    return null;
   }
 
   /**

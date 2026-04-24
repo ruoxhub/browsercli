@@ -13,6 +13,11 @@
 
 import type {Browser, BrowserContext, Frame, Page, Request} from 'patchright';
 
+import {AISummarizer} from '../modules/analyzer/AISummarizer.js';
+import {CodeAnalyzer} from '../modules/analyzer/CodeAnalyzer.js';
+import {CryptoDetector} from '../modules/crypto/CryptoDetector.js';
+import {Deobfuscator} from '../modules/deobfuscator/Deobfuscator.js';
+import {LLMService} from '../services/LLMService.js';
 import type {HTTPRequest} from '../third_party/index.js';
 import type {RequestInitiator} from '../tools/network/types.js';
 
@@ -41,6 +46,11 @@ export class ToolContextProvider {
   private _context: BrowserContext | null = null;
   private _isRunningPerformanceTrace = false;
   private _traceRecordings: TraceResult[] = [];
+  private _llmService: LLMService | null = null;
+  private _deobfuscator: Deobfuscator | null = null;
+  private _analyzer: CodeAnalyzer | null = null;
+  private _summarizer: AISummarizer | null = null;
+  private _cryptoDetector: CryptoDetector | null = null;
 
   // ─── 网络请求收集 ────────────────────────────────────
   private _networkStorage = new WeakMap<Page, PageRequestStorage>();
@@ -156,6 +166,36 @@ export class ToolContextProvider {
       return activePage;
     }
     throw new Error('没有可用的页面');
+  }
+
+  // ─── AnalyzerRuntimeServices ───────────────────────────
+
+  get deobfuscator(): Deobfuscator {
+    if (!this._deobfuscator) {
+      this._deobfuscator = new Deobfuscator(this._getLlmService());
+    }
+    return this._deobfuscator;
+  }
+
+  get analyzer(): CodeAnalyzer {
+    if (!this._analyzer) {
+      this._analyzer = new CodeAnalyzer(this._getLlmService());
+    }
+    return this._analyzer;
+  }
+
+  get summarizer(): AISummarizer {
+    if (!this._summarizer) {
+      this._summarizer = new AISummarizer(this._getLlmService());
+    }
+    return this._summarizer;
+  }
+
+  get cryptoDetector(): CryptoDetector {
+    if (!this._cryptoDetector) {
+      this._cryptoDetector = new CryptoDetector(this._getLlmService());
+    }
+    return this._cryptoDetector;
   }
 
   isBrowserConnected(): boolean {
@@ -405,5 +445,12 @@ export class ToolContextProvider {
 
   recordedTraces(): TraceResult[] {
     return this._traceRecordings;
+  }
+
+  private _getLlmService(): LLMService {
+    if (!this._llmService) {
+      this._llmService = new LLMService();
+    }
+    return this._llmService;
   }
 }

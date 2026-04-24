@@ -17,6 +17,7 @@ interface DeobfuscatorHarness {
   decryptArrays(code: string, transformations: Transformation[]): Promise<string>;
   simplifyExpressions(code: string, transformations: Transformation[]): Promise<string>;
   renameVariables(code: string, transformations: Transformation[]): Promise<string>;
+  inlineStringDecoderCalls(code: string, transformations: Transformation[]): Promise<string>;
   unflattenControlFlow(code: string, transformations: Transformation[]): Promise<string>;
   shouldRun(
     explicitFlag: boolean | undefined,
@@ -130,6 +131,19 @@ describe('Deobfuscator extended', () => {
 
     const renamed = await d.renameVariables('var _0xabc=1;console.log(_0xabc);', ts);
     assert.ok(renamed.includes('var_0'));
+  });
+
+  it('inlines javascript-obfuscator string decoder wrapper calls', async () => {
+    const d = new Deobfuscator() as unknown as DeobfuscatorHarness;
+    const result = await d.deobfuscate({
+      code: "function _0x5c1a(){const _0x2f8b=['log','Hello, JSReverser-MCP!'];_0x5c1a=function(){return _0x2f8b;};return _0x5c1a();}function _0x1f4d(_0x31f4f6,_0x4df9ff){const _0x5c1af4=_0x5c1a();return _0x1f4d=function(_0x1f4d7d,_0x2dcf8d){_0x1f4d7d=_0x1f4d7d-0x0;return _0x5c1af4[_0x1f4d7d];},_0x1f4d(_0x31f4f6,_0x4df9ff);}console[_0x1f4d(0x0)](_0x1f4d(0x1));",
+      aggressive: true,
+      renameVariables: true,
+    });
+
+    assert.ok(result.code.includes('console.log'));
+    assert.ok(result.code.includes('Hello, JSReverser-MCP!'));
+    assert.ok(!result.code.includes('_0x1f4d(0x0)'));
   });
 
   it('unflattens simple switch/while control flow', async () => {
