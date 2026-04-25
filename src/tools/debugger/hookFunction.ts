@@ -5,6 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+import {evaluateInPageRuntime} from './evaluateInPageRuntime.js';
 import type {HookFunctionParams, HookFunctionResult} from './types.js';
 
 /**
@@ -30,26 +31,31 @@ export async function hookFunction(
   }
 
   const id = hookId || target.replace(/[^a-zA-Z0-9]/g, '_');
-
   // Split target into object path and method
   const parts = target.split('.');
   const methodName = parts.pop()!;
   const objectPath = parts.length > 0 ? parts.join('.') : 'window';
 
-  const hookCode = `
+  try {
+    const result = await evaluateInPageRuntime<{
+      success: boolean;
+      hookId?: string;
+      message?: string;
+    }>(
+      frame,
+      `
 (function() {
   const hookId = ${JSON.stringify(id)};
   const objectPath = ${JSON.stringify(objectPath)};
   const methodName = ${JSON.stringify(methodName)};
-  const logArgs = ${logArgs};
-  const logResult = ${logResult};
-  const logStack = ${logStack};
+  const logArgs = ${JSON.stringify(logArgs)};
+  const logResult = ${JSON.stringify(logResult)};
+  const logStack = ${JSON.stringify(logStack)};
 
-  // Get the object
   let obj;
   try {
-    obj = objectPath === 'window' ? window : eval(objectPath);
-  } catch(e) {
+    obj = objectPath === 'window' ? window : (0, eval)(objectPath);
+  } catch (e) {
     throw new Error('Cannot find object: ' + objectPath);
   }
 
@@ -57,7 +63,6 @@ export async function hookFunction(
     throw new Error('Cannot find function: ' + methodName + ' on ' + objectPath);
   }
 
-  // Store original and hooks registry
   window.__mcp_hooks__ = window.__mcp_hooks__ || {};
   window.__hookStore = window.__hookStore || {};
   if (window.__mcp_hooks__[hookId]) {
@@ -70,7 +75,7 @@ export async function hookFunction(
   const original = obj[methodName];
   window.__mcp_hooks__[hookId] = { obj, methodName, original };
 
-  const safeClone = (value) => {
+  const safeClone = value => {
     try {
       if (typeof value === 'function') return '[Function]';
       if (typeof Element !== 'undefined' && value instanceof Element) {
@@ -86,14 +91,13 @@ export async function hookFunction(
     }
   };
 
-  const pushHookData = (record) => {
+  const pushHookData = record => {
     const store = window.__hookStore[hookId];
     if (!Array.isArray(store)) return;
     store.push(record);
     if (store.length > 1000) store.shift();
   };
 
-  // Create hooked function
   obj[methodName] = function(...args) {
     const callInfo = {
       hook: hookId,
@@ -117,7 +121,6 @@ export async function hookFunction(
     try {
       const result = original.apply(this, args);
 
-      // Handle promises
       if (result && typeof result.then === 'function') {
         return result.then(res => {
           if (logResult) {
@@ -144,7 +147,7 @@ export async function hookFunction(
             error: err && err.message ? err.message : String(err),
           };
           pushHookData(errorInfo);
-          console.log('[MCP Hook Error]', { hook: hookId, error: err.message });
+          console.log('[MCP Hook Error]', { hook: hookId, error: err && err.message ? err.message : String(err) });
           throw err;
         });
       }
@@ -174,22 +177,19 @@ export async function hookFunction(
         error: err && err.message ? err.message : String(err),
       };
       pushHookData(errorInfo);
-      console.log('[MCP Hook Error]', { hook: hookId, error: err.message });
+      console.log('[MCP Hook Error]', { hook: hookId, error: err && err.message ? err.message : String(err) });
       throw err;
     }
   };
 
-  // Preserve function properties
   Object.keys(original).forEach(key => {
     try { obj[methodName][key] = original[key]; } catch(e) {}
   });
 
   return { success: true, hookId: hookId };
-})();
-`;
-
-  try {
-    const result = await frame.evaluate(hookCode);
+})()
+`,
+    );
 
     if (result && typeof result === 'object') {
       const r = result as {success: boolean; hookId?: string; message?: string};

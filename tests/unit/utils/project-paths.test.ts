@@ -17,13 +17,19 @@ import {
 describe('project path resolution', () => {
   it('resolves runtime default paths from the package root instead of process cwd', () => {
     const originalCwd = process.cwd;
-    const fakeCwd = path.join(path.parse(process.cwd()).root, 'Windows', 'system32');
+    const fakeCwd = path.join(
+      path.parse(process.cwd()).root,
+      'Windows',
+      'system32',
+    );
 
     process.cwd = () => fakeCwd;
 
     try {
       const codeCacheDir = resolveDefaultCodeCacheDir(import.meta.url);
-      const debuggerSessionsDir = resolveDefaultDebuggerSessionsDir(import.meta.url);
+      const debuggerSessionsDir = resolveDefaultDebuggerSessionsDir(
+        import.meta.url,
+      );
       const envPath = resolveDefaultEnvPath(import.meta.url);
 
       assert.ok(codeCacheDir.endsWith(path.join('.cache', 'code')));

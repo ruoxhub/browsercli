@@ -128,8 +128,9 @@ describe('debugger tools error paths', () => {
       },
       getSelectedPage: () => ({evaluate: async () => ({})}),
       getSelectedFrame: () => ({
-        evaluate: async (script: string) => {
-          capturedScript = script;
+        evaluate: async (script: unknown) => {
+          capturedScript =
+            typeof script === 'function' ? script.toString() : String(script);
           return {success: true, hookId: 'h_store'};
         },
       }),

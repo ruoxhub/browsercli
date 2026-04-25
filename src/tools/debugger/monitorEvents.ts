@@ -37,61 +37,89 @@ export async function monitorEvents(
   const id = monitorId || selector.replace(/[^a-zA-Z0-9]/g, '_') || 'window';
   const eventList = events || DEFAULT_EVENTS;
 
-  const monitorCode = `
-(function() {
-  const selector = ${JSON.stringify(selector)};
-  const events = ${JSON.stringify(eventList)};
-  const monitorId = ${JSON.stringify(id)};
-
-  window.__mcp_monitors__ = window.__mcp_monitors__ || {};
-  if (window.__mcp_monitors__[monitorId]) {
-    return { success: false, message: 'Monitor already exists: ' + monitorId };
-  }
-
-  let target;
-  if (selector === 'window') {
-    target = window;
-  } else if (selector === 'document') {
-    target = document;
-  } else {
-    target = document.querySelector(selector);
-    if (!target) {
-      return { success: false, message: 'Element not found: ' + selector };
-    }
-  }
-
-  const listeners = {};
-
-  events.forEach(eventType => {
-    const handler = (e) => {
-      const info = {
-        monitor: monitorId,
-        event: eventType,
-        timestamp: new Date().toISOString(),
-        target: e.target?.tagName || 'unknown',
-      };
-
-      if (e.target?.id) info.targetId = e.target.id;
-      if (e.target?.className) info.targetClass = e.target.className;
-      if (e.key) info.key = e.key;
-      if (e.code) info.code = e.code;
-      if (e.clientX !== undefined) info.position = { x: e.clientX, y: e.clientY };
-
-      console.log('[MCP Event]', info);
-    };
-
-    target.addEventListener(eventType, handler, true);
-    listeners[eventType] = handler;
-  });
-
-  window.__mcp_monitors__[monitorId] = { target, listeners };
-
-  return { success: true, monitorId, eventCount: events.length };
-})();
-`;
-
   try {
-    const result = await frame.evaluate(monitorCode);
+    const result = await frame.evaluate(
+      ({
+        selector,
+        events,
+        monitorId,
+      }: {
+        selector: string;
+        events: string[];
+        monitorId: string;
+      }) => {
+        const browserWindow = window as typeof window & {
+          __mcp_monitors__?: Record<
+            string,
+            {
+              target: EventTarget;
+              listeners: Record<string, EventListener>;
+            }
+          >;
+        };
+
+        browserWindow.__mcp_monitors__ = browserWindow.__mcp_monitors__ || {};
+        if (browserWindow.__mcp_monitors__[monitorId]) {
+          return {success: false, message: `Monitor already exists: ${monitorId}`};
+        }
+
+        let target: EventTarget | null;
+        if (selector === 'window') {
+          target = window;
+        } else if (selector === 'document') {
+          target = document;
+        } else {
+          target = document.querySelector(selector);
+          if (!target) {
+            return {success: false, message: `Element not found: ${selector}`};
+          }
+        }
+
+        const listeners: Record<string, EventListener> = {};
+
+        events.forEach(eventType => {
+          const handler: EventListener = event => {
+            const typedEvent = event as Event & {
+              target?: EventTarget & {
+                tagName?: string;
+                id?: string;
+                className?: string;
+              };
+              key?: string;
+              code?: string;
+              clientX?: number;
+              clientY?: number;
+            };
+            const info: Record<string, unknown> = {
+              monitor: monitorId,
+              event: eventType,
+              timestamp: new Date().toISOString(),
+              target: typedEvent.target?.tagName || 'unknown',
+            };
+
+            if (typedEvent.target?.id) info.targetId = typedEvent.target.id;
+            if (typedEvent.target?.className) {
+              info.targetClass = typedEvent.target.className;
+            }
+            if (typedEvent.key) info.key = typedEvent.key;
+            if (typedEvent.code) info.code = typedEvent.code;
+            if (typedEvent.clientX !== undefined) {
+              info.position = {x: typedEvent.clientX, y: typedEvent.clientY};
+            }
+
+            console.log('[MCP Event]', info);
+          };
+
+          target.addEventListener(eventType, handler, true);
+          listeners[eventType] = handler;
+        });
+
+        browserWindow.__mcp_monitors__[monitorId] = {target, listeners};
+
+        return {success: true, monitorId, eventCount: events.length};
+      },
+      {selector, events: eventList, monitorId: id},
+    );
 
     if (result && typeof result === 'object') {
       const r = result as {

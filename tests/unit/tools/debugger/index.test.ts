@@ -166,6 +166,18 @@ describe('src/tools/debugger/index.ts', () => {
     assert.equal(Array.isArray(breakpoints.data), true);
   });
 
+  it('accepts legacy scriptId argument spellings for get_script_source', async () => {
+    const {runtime} = createRuntime();
+
+    const snakeCase = await getScriptSource(runtime, {script_id: '1'});
+    const flatCase = await getScriptSource(runtime, {scriptid: '1'});
+
+    assert.equal(snakeCase.success, true);
+    assert.equal(flatCase.success, true);
+    assert.equal((snakeCase.data as {script?: {scriptId?: string}}).script?.scriptId, '1');
+    assert.equal((flatCase.data as {script?: {scriptId?: string}}).script?.scriptId, '1');
+  });
+
   it('supports searching, finding, and setting breakpoints', async () => {
     const {runtime} = createRuntime();
 

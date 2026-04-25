@@ -7,6 +7,7 @@
 ## 目录
 
 - [快速开始](#快速开始)
+- [调试器静态验证站](#调试器静态验证站)
 - [CLI 命令](#cli-命令)
 - [MCP 工具](#mcp-工具)
 - [内置技能](#内置技能)
@@ -45,6 +46,134 @@ js-reverse call invoke_skill --skillName observe-flow --url https://example.com
 # 停止守护进程
 js-reverse stop
 ```
+
+## 调试器静态验证站
+
+仓库内置了一个本地调试测试站，用于集中验证调试器、网络、WebSocket 等工具是否工作正常：
+
+- 页面入口：`scripts/debugger-lab/index.html`
+- 主脚本：`scripts/debugger-lab/app.js`
+- 静态资源目录：`scripts/debugger-lab/`
+- 推荐启动命令：`npm run debugger-lab`
+- 完整验证规划：[`docs/js-reverse-tool-validation-plan.md`](./js-reverse-tool-validation-plan.md)
+
+这个页面专门覆盖以下场景：
+
+- 稳定脚本 URL，便于 `list_scripts`、`get_script_source`、`search_in_sources`
+- 命名函数入口，便于 `hook_function`、`unhook_function`、`list_hooks`
+- 表单、点击、输入、submit，便于 `monitor_events`、`stop_monitor`
+- `localStorage`、`sessionStorage`、`cookie` 写入，便于 `get_storage`
+- Fetch / XHR 请求，便于 `break_on_xhr`、`xhr_to_js_breakpoint`、`get_request_initiator`
+- WebSocket 连接与消息，便于 `list_websocket_connections`、`get_websocket_messages`、`analyze_websocket_messages`
+- 显式 `debugger;` 语句，便于 `pause`、`get_paused_info`、`evaluate_on_callframe`、单步工具
+
+### 启动方式
+
+不要直接双击 `index.html`。请用本地服务打开，否则 `fetch` / `XMLHttpRequest` / `WebSocket` 场景通常会受到 `file://` 限制。
+
+示例：
+
+```bash
+# 方式 1：npm script（推荐）
+npm run debugger-lab
+
+# 方式 2：直接运行脚本
+node scripts/debugger-lab/server.mjs
+
+# 然后打开
+http://127.0.0.1:8936
+```
+
+如果你只需要静态页面，也可以使用其他静态服务器把根目录指向 `scripts/debugger-lab`；
+但这样不会包含内置的 `/api/ping`、`/api/echo`、`/ws` 测试接口。
+
+### 推荐验证顺序
+
+```bash
+# 1. 打开测试页
+js-reverse call navigate_page --url "http://127.0.0.1:8936"
+
+# 2. 确认脚本已加载
+js-reverse call list_scripts --filter "/app.js"
+
+# 3. 搜索关键入口
+js-reverse call search_in_sources --query "encryptPayload"
+js-reverse call search_in_sources --query "triggerManualPause"
+js-reverse call search_in_sources --query "debugger;"
+
+# 4. 给稳定文本打断点
+js-reverse call set_breakpoint_on_text --text "debugger;" --urlFilter "debugger-lab/app.js"
+```
+
+### 页面内可直接触发的场景
+
+| 页面动作                           | 对应函数 / 行为                                   | 适合验证的工具                                                                                |
+| ---------------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| 点击“执行 encryptPayload”          | `window.debugLab.signature.encryptPayload()`      | `hook_function` `list_hooks` `unhook_function`                                                |
+| 点击“执行 signPayload”             | `window.debugLab.signature.signPayload()`         | `hook_function` `inspect_object`                                                              |
+| 点击“执行 calculateRiskScore”      | `window.debugLab.scoring.calculateRiskScore()`    | `hook_function` `search_in_sources`                                                           |
+| 点击“发起 Fetch”                   | `window.debugLab.network.fetchEcho()`             | `get_request_initiator`                                                                       |
+| 点击“发起 XHR”                     | `window.debugLab.network.xhrEcho()`               | `break_on_xhr` `xhr_to_js_breakpoint`                                                         |
+| 点击“连接 WS” / “发送 WS 消息”     | `window.debugLab.connectWebSocket()`              | `list_websocket_connections` `get_websocket_messages` `analyze_websocket_messages`            |
+| 点击“写入 Storage” / “刷新 Cookie” | `localStorage` `sessionStorage` `document.cookie` | `get_storage`                                                                                 |
+| 在表单中输入、切换、提交           | DOM 事件流                                        | `monitor_events` `stop_monitor`                                                               |
+| 点击“触发 debugger”                | `window.debugLab.triggerManualPause()`            | `pause` `resume` `step_into` `step_over` `step_out` `get_paused_info` `evaluate_on_callframe` |
+| 点击“更新复杂对象”                 | 更新 `window.debugLab.runtimeSnapshot`            | `inspect_object`                                                                              |
+
+### 推荐命令样例
+
+```bash
+# 观察脚本
+js-reverse call list_scripts --filter "/app.js"
+js-reverse call get_script_source --scriptId "<scriptId>"
+js-reverse call search_in_sources --query "token-watch"
+
+# Hook 命名函数
+js-reverse call hook_function --target "window.debugLab.signature.encryptPayload" --logArgs true --logResult true
+js-reverse call list_hooks
+js-reverse call unhook_function --hookId "window_debugLab_signature_encryptPayload"
+
+# 监控表单事件
+js-reverse call monitor_events --selector "#lab-form" --events '["click","input","change","submit"]'
+js-reverse call stop_monitor --monitorId "_lab_form"
+
+# 读取存储
+js-reverse call get_storage --type "all"
+js-reverse call get_storage --type "localStorage" --filter "debugger-lab"
+js-reverse call get_storage --type "cookies" --filter "dbg_token"
+
+# XHR 断点
+js-reverse call break_on_xhr --url "ping.json"
+
+# 点击页面按钮触发 XHR 后，可继续转 JS 断点
+js-reverse call xhr_to_js_breakpoint
+
+# WebSocket
+js-reverse call list_websocket_connections
+js-reverse call analyze_websocket_messages --wsid 1
+js-reverse call get_websocket_messages --wsid 1
+
+# 检查对象
+js-reverse call inspect_object --expression "window.debugLab.runtimeSnapshot" --depth 3
+js-reverse call inspect_object --expression "window.debugLab.lastResponse" --depth 3
+
+# 触发 debugger 后查看暂停态
+js-reverse call get_paused_info
+js-reverse call evaluate_on_callframe --expression "localSecret"
+js-reverse call evaluate_on_callframe --expression "computedToken"
+js-reverse call step_over
+js-reverse call resume
+```
+
+### 调试器验证建议
+
+- `list_scripts` 建议直接用 `--filter "/app.js"`，本地测试站真实脚本 URL 是 `http://127.0.0.1:8936/app.js`
+- 优先用 `set_breakpoint_on_text`，比直接写行号更稳
+- Hook 目标优先选 `window.debugLab.signature.encryptPayload`，返回值明确、重复触发方便
+- `inspect_object` 推荐检查 `window.debugLab.runtimeSnapshot`，结构足够复杂，能覆盖嵌套对象展示
+- `get_storage` 推荐先点击页面内的 Storage/Cookie 按钮，再执行读取命令
+- WebSocket 工具建议先点“连接 WS”，再点“发送 WS 消息”
+- `evaluate_on_callframe` 只有在页面真正暂停后才有意义，推荐先点“触发 debugger”
 
 ### 技能迁移与兼容入口
 

@@ -5,6 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+import {evaluateInPageRuntime} from './evaluateInPageRuntime.js';
 import type {HookEntry, ListHooksResult} from './types.js';
 
 /**
@@ -14,21 +15,21 @@ import type {HookEntry, ListHooksResult} from './types.js';
  * @returns 结构化结果对象，data 包含 Hook 列表
  */
 export async function listHooks(frame: Frame): Promise<ListHooksResult> {
-  const listCode = `
+  try {
+    const hooks = (await evaluateInPageRuntime<
+      Array<{id: string; target: string}>
+    >(
+      frame,
+      `
 (function() {
   if (!window.__mcp_hooks__) return [];
   return Object.keys(window.__mcp_hooks__).map(id => {
     const hook = window.__mcp_hooks__[id];
     return { id, target: hook.obj.constructor.name + '.' + hook.methodName };
   });
-})();
-`;
-
-  try {
-    const hooks = (await frame.evaluate(listCode)) as Array<{
-      id: string;
-      target: string;
-    }>;
+})()
+`,
+    )) as Array<{id: string; target: string}>;
 
     if (!hooks || hooks.length === 0) {
       return {

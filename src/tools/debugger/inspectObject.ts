@@ -5,6 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+import {evaluateInPageRuntime} from './evaluateInPageRuntime.js';
 import type {InspectObjectParams, InspectObjectResult} from './types.js';
 
 /**
@@ -21,7 +22,10 @@ export async function inspectObject(
   const {expression, depth = 2, showMethods = true, showPrototype = true} =
     params;
 
-  const inspectCode = `
+  try {
+    const result = await evaluateInPageRuntime<Record<string, unknown>>(
+      frame,
+      `
 (function() {
   const maxDepth = ${depth};
   const showMethods = ${showMethods};
@@ -29,7 +33,7 @@ export async function inspectObject(
 
   let target;
   try {
-    target = eval(${JSON.stringify(expression)});
+    target = (0, eval)(${JSON.stringify(expression)});
   } catch(e) {
     return { error: 'Cannot evaluate: ' + e.message };
   }
@@ -60,7 +64,6 @@ export async function inspectObject(
 
     for (const prop of props.slice(0, 50)) {
       try {
-        const descriptor = Object.getOwnPropertyDescriptor(obj, prop);
         const value = obj[prop];
         const valueType = typeof value;
 
@@ -91,7 +94,7 @@ export async function inspectObject(
     value: inspect(target, 0),
   };
 
-  if (showPrototype && typeof target === 'object') {
+  if (showPrototype && (typeof target === 'object' || typeof target === 'function') && target !== null) {
     const protoChain = [];
     let proto = Object.getPrototypeOf(target);
     while (proto && protoChain.length < 5) {
@@ -102,11 +105,9 @@ export async function inspectObject(
   }
 
   return result;
-})();
-`;
-
-  try {
-    const result = await frame.evaluate(inspectCode);
+})()
+`,
+    );
 
     if (result && typeof result === 'object' && 'error' in result) {
       return {

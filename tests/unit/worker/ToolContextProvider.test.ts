@@ -58,4 +58,21 @@ describe('ToolContextProvider', () => {
 
     assert.equal(first, second);
   });
+
+  it('resets the selected frame to the new page main frame when switching pages', () => {
+    const runtime = new ToolContextProvider();
+    const oldFrame = {name: 'old-frame'};
+    const newFrame = {name: 'new-main-frame'};
+    const newPage = {
+      mainFrame: () => newFrame,
+    };
+
+    runtime.setSelectedFrame(oldFrame as never);
+    runtime.selectPage(newPage as never);
+    assert.equal(runtime.getSelectedFrame(), newFrame);
+
+    runtime.setSelectedFrame(oldFrame as never);
+    runtime.syncPageContext(newPage as never);
+    assert.equal(runtime.getSelectedFrame(), newFrame);
+  });
 });

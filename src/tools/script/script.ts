@@ -35,6 +35,16 @@ export interface InjectPreloadScriptResult extends ScriptResult {
   tooltype: 'inject_preload_script';
 }
 
+interface ScriptRuntime {
+  getSelectedPage(): {
+    addInitScript?(script: string | ((...args: unknown[]) => unknown), arg?: unknown): Promise<void>;
+  } | null;
+  getSelectedFrame(): Frame | null;
+  getContext?(): {
+    addInitScript?(script: string | ((...args: unknown[]) => unknown), arg?: unknown): Promise<void>;
+  } | null;
+}
+
 // Default script evaluation timeout in milliseconds (30 seconds)
 const DEFAULT_SCRIPT_TIMEOUT = 30000;
 
@@ -99,6 +109,36 @@ export async function evaluateScriptFn(
 }
 
 /**
+ * 运行时包装：在当前选中的 Frame / Page 上执行脚本。
+ */
+export async function evaluateScript(
+  runtime: ScriptRuntime,
+  params: {function?: string} = {},
+): Promise<EvaluateScriptResult> {
+  const functionCode = params.function;
+  if (!functionCode || functionCode.trim().length === 0) {
+    return {
+      success: false,
+      message: 'function 参数不能为空',
+      tooltype: 'evaluate_script',
+      result: '',
+    };
+  }
+
+  const frame = runtime.getSelectedFrame();
+  if (!frame) {
+    return {
+      success: false,
+      message: '当前没有可用的 Frame',
+      tooltype: 'evaluate_script',
+      result: '',
+    };
+  }
+
+  return evaluateScriptFn(frame, functionCode);
+}
+
+/**
  * 注册预加载脚本。
  *
  * 注意：此函数需要 runtime.pageController 来注入脚本，
@@ -121,6 +161,37 @@ export function injectPreloadScriptFn(
   return {
     success: true,
     message: 'Preload script prepared for registration.',
+    tooltype: 'inject_preload_script',
+  };
+}
+
+/**
+ * 运行时包装：向当前页面或上下文注册预加载脚本。
+ */
+export async function injectPreloadScript(
+  runtime: ScriptRuntime,
+  params: {script?: string} = {},
+): Promise<InjectPreloadScriptResult> {
+  const script = params.script ?? '';
+  const prepared = injectPreloadScriptFn(script);
+  if (!prepared.success) {
+    return prepared;
+  }
+
+  const target =
+    runtime.getContext?.() ?? runtime.getSelectedPage?.() ?? null;
+  if (!target?.addInitScript) {
+    return {
+      success: false,
+      message: '当前运行时不支持注入预加载脚本',
+      tooltype: 'inject_preload_script',
+    };
+  }
+
+  await target.addInitScript(script);
+  return {
+    success: true,
+    message: 'Preload script registered for future documents',
     tooltype: 'inject_preload_script',
   };
 }

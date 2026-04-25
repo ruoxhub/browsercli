@@ -11,6 +11,10 @@ import {
   evaluateScript,
   injectPreloadScript,
 } from '../../../src/tools/script.js';
+import {
+  evaluateScript as evaluateScriptTool,
+  injectPreloadScript as injectPreloadScriptTool,
+} from '../../../src/tools/script/script.js';
 
 interface HandleLike {
   dispose(): Promise<void>;
@@ -230,5 +234,55 @@ describe('evaluate_script callback path', () => {
     assert.strictEqual(pageUsed, false);
     assert.strictEqual(frameUsed, true);
     assert.ok(lines.some(line => line.includes('{"ok":true}')));
+  });
+
+  it('runs runtime evaluate_script against the selected frame', async () => {
+    let frameUsed = false;
+
+    const frame: FrameLike = {
+      evaluateHandle: async () => {
+        frameUsed = true;
+        return {dispose: async () => undefined};
+      },
+      evaluate: async callback => {
+        frameUsed = true;
+        if (typeof callback !== 'function') {
+          throw new Error('expected callback evaluate path');
+        }
+        return callback(async () => ({ok: true}));
+      },
+    };
+
+    const result = await evaluateScriptTool(
+      {
+        getSelectedFrame: () => frame,
+        getSelectedPage: () => null,
+      },
+      {function: '() => ({ ok: true })'},
+    );
+
+    assert.equal(result.success, true);
+    assert.equal(frameUsed, true);
+    assert.equal(result.result, '{"ok":true}');
+  });
+
+  it('registers runtime preload script on the page context', async () => {
+    let injected: string | undefined;
+
+    const result = await injectPreloadScriptTool(
+      {
+        getSelectedFrame: () => null,
+        getSelectedPage: () => ({
+          addInitScript: async (script: string) => {
+            injected = script;
+          },
+        }),
+        getContext: () => null,
+      },
+      {script: 'window.__preload = 1;'},
+    );
+
+    assert.equal(result.success, true);
+    assert.equal(injected, 'window.__preload = 1;');
   });
 });

@@ -117,6 +117,12 @@ export interface MonitorEventsResult extends DebuggerResult {
   data?: {monitorId: string; eventCount: number};
 }
 
+/** Stop Monitor 参数 */
+export interface StopMonitorParams {
+  /** 要停止的监控 ID */
+  monitorId?: string;
+}
+
 /** Stop Monitor 结果 */
 export interface StopMonitorResult extends DebuggerResult {
   tooltype: 'stop_monitor';

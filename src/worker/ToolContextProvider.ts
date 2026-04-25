@@ -151,7 +151,7 @@ export class ToolContextProvider {
   }
 
   selectPage(page: Page): void {
-    this.selectedPage = page;
+    this.setSelectedPage(page);
   }
 
   async getDebuggerContext(page?: Page): Promise<DebuggerContext> {
@@ -205,7 +205,7 @@ export class ToolContextProvider {
   }
 
   syncPageContext(page: Page): void {
-    this.selectedPage = page;
+    this.setSelectedPage(page);
   }
 
   // ─── PageRuntimeServices / ScreenshotRuntimeServices ──

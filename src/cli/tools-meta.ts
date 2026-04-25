@@ -474,7 +474,9 @@ export const TOOLS_META: ToolMeta[] = [
   {
     name: 'get_script_source',
     description: '获取脚本源码',
-    schema: {},
+    schema: {
+      scriptId: 'string',
+    },
     modulePath: './debugger/index.js',
     handlerName: 'getScriptSource',
     callMode: 'runtime',
@@ -514,7 +516,10 @@ export const TOOLS_META: ToolMeta[] = [
   {
     name: 'monitor_events',
     description: '监控事件',
-    schema: {},
+    schema: {
+      selector: 'string',
+      monitorId: 'string',
+    },
     modulePath: './debugger/monitorEvents.js',
     handlerName: 'monitorEvents',
     callMode: 'frame',
@@ -522,7 +527,9 @@ export const TOOLS_META: ToolMeta[] = [
   {
     name: 'stop_monitor',
     description: '停止监控',
-    schema: {},
+    schema: {
+      monitorId: 'string',
+    },
     modulePath: './debugger/stopMonitor.js',
     handlerName: 'stopMonitor',
     callMode: 'frame',
@@ -708,7 +715,7 @@ export const TOOLS_META: ToolMeta[] = [
     description: '执行脚本',
     schema: {function: 'string'},
     modulePath: './script/script.js',
-    handlerName: 'evaluateScriptFn',
+    handlerName: 'evaluateScript',
     callMode: 'runtime',
   },
   {
@@ -716,7 +723,7 @@ export const TOOLS_META: ToolMeta[] = [
     description: '注入预加载脚本',
     schema: {script: 'string'},
     modulePath: './script/script.js',
-    handlerName: 'evaluateScriptFn',
+    handlerName: 'injectPreloadScript',
     callMode: 'runtime',
   },
   {

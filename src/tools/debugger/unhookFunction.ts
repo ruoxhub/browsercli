@@ -5,7 +5,8 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
-import type {UnhookFunctionResult} from './types.js';
+import {evaluateInPageRuntime} from './evaluateInPageRuntime.js';
+import type {HookFunctionParams, UnhookFunctionResult} from './types.js';
 
 /**
  * 移除已安装的函数 Hook，恢复原始函数。
@@ -16,9 +17,24 @@ import type {UnhookFunctionResult} from './types.js';
  */
 export async function unhookFunction(
   frame: Frame,
-  hookId: string,
+  params: Pick<HookFunctionParams, 'hookId'>,
 ): Promise<UnhookFunctionResult> {
-  const unhookCode = `
+  const hookId = params?.hookId;
+  if (!hookId) {
+    return {
+      success: false,
+      message: 'hookId 参数不能为空',
+      tooltype: 'unhook_function',
+    };
+  }
+
+  try {
+    const result = await evaluateInPageRuntime<{
+      success: boolean;
+      message?: string;
+    }>(
+      frame,
+      `
 (function() {
   const hookId = ${JSON.stringify(hookId)};
   if (!window.__mcp_hooks__ || !window.__mcp_hooks__[hookId]) {
@@ -30,11 +46,9 @@ export async function unhookFunction(
   delete window.__mcp_hooks__[hookId];
 
   return { success: true };
-})();
-`;
-
-  try {
-    const result = await frame.evaluate(unhookCode);
+})()
+`,
+    );
 
     if (result && typeof result === 'object') {
       const r = result as {success: boolean; message?: string};

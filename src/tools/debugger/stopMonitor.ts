@@ -5,7 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
-import type {StopMonitorResult} from './types.js';
+import type {StopMonitorParams, StopMonitorResult} from './types.js';
 
 /**
  * 停止指定的事件监控。
@@ -16,27 +16,41 @@ import type {StopMonitorResult} from './types.js';
  */
 export async function stopMonitor(
   frame: Frame,
-  monitorId: string,
+  params: StopMonitorParams = {},
 ): Promise<StopMonitorResult> {
-  const stopCode = `
-(function() {
-  const monitorId = ${JSON.stringify(monitorId)};
-  if (!window.__mcp_monitors__ || !window.__mcp_monitors__[monitorId]) {
-    return { success: false, message: 'Monitor not found: ' + monitorId };
+  const monitorId = params.monitorId;
+  if (!monitorId) {
+    return {
+      success: false,
+      message: 'monitorId 参数不能为空',
+      tooltype: 'stop_monitor',
+    };
   }
 
-  const { target, listeners } = window.__mcp_monitors__[monitorId];
-  Object.entries(listeners).forEach(([eventType, handler]) => {
-    target.removeEventListener(eventType, handler, true);
-  });
-
-  delete window.__mcp_monitors__[monitorId];
-  return { success: true };
-})();
-`;
-
   try {
-    const result = await frame.evaluate(stopCode);
+    const result = await frame.evaluate((id: string) => {
+      const browserWindow = window as typeof window & {
+        __mcp_monitors__?: Record<
+          string,
+          {
+            target: EventTarget;
+            listeners: Record<string, EventListener>;
+          }
+        >;
+      };
+
+      if (!browserWindow.__mcp_monitors__ || !browserWindow.__mcp_monitors__[id]) {
+        return {success: false, message: `Monitor not found: ${id}`};
+      }
+
+      const {target, listeners} = browserWindow.__mcp_monitors__[id];
+      Object.entries(listeners).forEach(([eventType, handler]) => {
+        target.removeEventListener(eventType, handler, true);
+      });
+
+      delete browserWindow.__mcp_monitors__[id];
+      return {success: true};
+    }, monitorId);
 
     if (result && typeof result === 'object') {
       const r = result as {success: boolean; message?: string};

@@ -117,6 +117,12 @@ describe('tools-meta', () => {
       assert.ok(meta);
       assert.strictEqual(meta!.handlerName, 'autoHook');
     });
+
+    it('includes required debugger params for get_script_source', () => {
+      const meta = getToolMeta('get_script_source');
+      assert.ok(meta);
+      assert.deepStrictEqual(meta!.schema, {scriptId: 'string'});
+    });
   });
 
   describe('getAllToolNames', () => {

@@ -329,10 +329,10 @@ export async function listScripts(
  */
 export async function getScriptSource(
   runtime: DebuggerRuntime,
-  params: {scriptId?: string} = {},
+  params: {scriptId?: string; script_id?: string; scriptid?: string} = {},
 ): Promise<DebuggerResult> {
   const scriptId = ensureString(
-    params.scriptId,
+    params.scriptId ?? params.script_id ?? params.scriptid,
     'scriptId',
     'get_script_source',
   );
