@@ -5,6 +5,11 @@
  */
 
 import type {CDPSession, Protocol} from '../third_party/index.js';
+import {
+  createExecutionContextInfo,
+  type ExecutionContextInfo,
+  type RawExecutionContextDescription,
+} from '../tools/debugger/executionContexts.js';
 
 // 类型别名，用于兼容原来的 Protocol.Debugger.XxxEvent 用法
 type ScriptParsedEvent = Protocol.ScriptParsedEvent;
@@ -127,6 +132,14 @@ export interface AutoRecoveryEvent {
   error?: string;
 }
 
+interface ExecutionContextCreatedEvent {
+  context: RawExecutionContextDescription;
+}
+
+interface ExecutionContextDestroyedEvent {
+  executionContextId: number;
+}
+
 /**
  * DebuggerContext manages the Chrome DevTools Protocol Debugger domain.
  * It tracks loaded scripts, manages breakpoints, and provides search functionality.
@@ -136,6 +149,7 @@ export class DebuggerContext {
   #scripts = new Map<string, ScriptInfo>(); // scriptId -> info
   #urlToScripts = new Map<string, string[]>(); // url -> scriptId[]
   #breakpoints = new Map<string, BreakpointInfo>(); // breakpointId -> info
+  #executionContexts = new Map<number, ExecutionContextInfo>(); // contextId -> info
   #enabled = false;
   #pausedState: PausedState = {isPaused: false, callFrames: []};
   #breakpointHitWindowMs = 2000;
@@ -157,6 +171,7 @@ export class DebuggerContext {
     this.#client = client;
     this.#scripts.clear();
     this.#urlToScripts.clear();
+    this.#executionContexts.clear();
 
     // Listen for script parsed events
     client.on('Debugger.scriptParsed', this.#onScriptParsed);
@@ -165,9 +180,22 @@ export class DebuggerContext {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     client.on('Debugger.paused', this.#onPaused as any);
     client.on('Debugger.resumed', this.#onResumed);
+    client.on(
+      'Runtime.executionContextCreated',
+      this.#onExecutionContextCreated,
+    );
+    client.on(
+      'Runtime.executionContextDestroyed',
+      this.#onExecutionContextDestroyed,
+    );
+    client.on(
+      'Runtime.executionContextsCleared',
+      this.#onExecutionContextsCleared,
+    );
 
     // Enable the debugger domain
     await client.send('Debugger.enable');
+    await client.send('Runtime.enable');
 
     // Set async call stack depth for better stack traces
     try {
@@ -191,6 +219,24 @@ export class DebuggerContext {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this.#client.off('Debugger.paused', this.#onPaused as any);
     this.#client.off('Debugger.resumed', this.#onResumed);
+    this.#client.off(
+      'Runtime.executionContextCreated',
+      this.#onExecutionContextCreated,
+    );
+    this.#client.off(
+      'Runtime.executionContextDestroyed',
+      this.#onExecutionContextDestroyed,
+    );
+    this.#client.off(
+      'Runtime.executionContextsCleared',
+      this.#onExecutionContextsCleared,
+    );
+
+    try {
+      await this.#client.send('Runtime.disable');
+    } catch {
+      // Ignore errors during cleanup
+    }
 
     try {
       await this.#client.send('Debugger.disable');
@@ -200,6 +246,7 @@ export class DebuggerContext {
 
     this.#scripts.clear();
     this.#urlToScripts.clear();
+    this.#executionContexts.clear();
     this.#breakpoints.clear();
     this.#pausedState = {isPaused: false, callFrames: []};
     this.#breakpointLoopTracker.clear();
@@ -307,6 +354,23 @@ export class DebuggerContext {
 
   #onResumed = (): void => {
     this.#pausedState = {isPaused: false, callFrames: []};
+  };
+
+  #onExecutionContextCreated = (event: ExecutionContextCreatedEvent): void => {
+    this.#executionContexts.set(
+      event.context.id,
+      createExecutionContextInfo(event.context),
+    );
+  };
+
+  #onExecutionContextDestroyed = (
+    event: ExecutionContextDestroyedEvent,
+  ): void => {
+    this.#executionContexts.delete(event.executionContextId);
+  };
+
+  #onExecutionContextsCleared = (): void => {
+    this.#executionContexts.clear();
   };
 
   // ==================== Paused State Management ====================
@@ -492,6 +556,20 @@ export class DebuggerContext {
    */
   getScripts(): ScriptInfo[] {
     return Array.from(this.#scripts.values());
+  }
+
+  /**
+   * Get recorded execution contexts.
+   */
+  getExecutionContexts(): ExecutionContextInfo[] {
+    return Array.from(this.#executionContexts.values());
+  }
+
+  /**
+   * Get execution context by ID.
+   */
+  getExecutionContextById(contextId: number): ExecutionContextInfo | undefined {
+    return this.#executionContexts.get(contextId);
   }
 
   /**

@@ -10,6 +10,8 @@ import type {
   NavigatePageData,
   NavigationRuntimeServices,
 } from './types.js';
+import {resolveActivePage} from '../shared/activePageResolver.js';
+import {explainPageError} from '../shared/pageDiagnostics.js';
 
 // Default navigation timeout in milliseconds (10 seconds)
 const DEFAULT_NAV_TIMEOUT = 10_000;
@@ -36,8 +38,6 @@ export async function navigatePage(
   const options = {timeout, waitUntil: 'domcontentloaded' as const};
 
   try {
-    const page = runtime.getSelectedPage();
-
     if (navType === 'url' && !params.url) {
       return {
         success: false,
@@ -46,6 +46,23 @@ export async function navigatePage(
         logFormat: 'simple',
       };
     }
+
+    const resolvedPage = resolveActivePage(runtime);
+    if ('message' in resolvedPage) {
+      return {
+        success: false,
+        message: resolvedPage.message,
+        tooltype,
+        logFormat: 'simple',
+        data: {
+          type: navType,
+          url: '',
+          navigated: false,
+        },
+      };
+    }
+
+    const page = resolvedPage.page;
 
     switch (navType) {
       case 'url':
@@ -91,7 +108,7 @@ export async function navigatePage(
   } catch (error) {
     return {
       success: false,
-      message: `导航失败：${error instanceof Error ? error.message : String(error)}`,
+      message: explainPageError(error, '导航'),
       tooltype,
       logFormat: 'simple',
       data: {

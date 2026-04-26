@@ -12,6 +12,57 @@ import type {
   NetworkRequestData,
   NetworkRuntimeServices,
 } from './types.js';
+import {resolveActivePageIndex} from '../shared/activePageResolver.js';
+
+const DEFAULT_WAIT_TIMEOUT_MS = 5000;
+const WAIT_POLL_INTERVAL_MS = 50;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function getRequestHeaders(request: HTTPRequest): Record<string, string> {
+  try {
+    return request.headers();
+  } catch {
+    return {};
+  }
+}
+
+async function waitForMatchingRequest(
+  runtime: NetworkRuntimeServices,
+  options: {
+    includePreservedRequests: boolean;
+    targetPageIdx: number;
+    waitForRequest: string;
+    waitTimeoutMs?: number;
+  },
+): Promise<boolean> {
+  const timeoutMs = options.waitTimeoutMs ?? DEFAULT_WAIT_TIMEOUT_MS;
+  const deadline = Date.now() + timeoutMs;
+
+  while (true) {
+    const requests = runtime.getNetworkRequests(
+      options.includePreservedRequests,
+      options.targetPageIdx,
+    );
+    const hasMatch = requests.some(request =>
+      request.url().includes(options.waitForRequest),
+    );
+    if (hasMatch) {
+      return true;
+    }
+
+    const remainingMs = deadline - Date.now();
+    if (remainingMs <= 0) {
+      return false;
+    }
+
+    await sleep(Math.min(WAIT_POLL_INTERVAL_MS, remainingMs));
+  }
+}
 
 /**
  * 将 HTTPRequest 序列化为精简结构化数据。
@@ -27,6 +78,7 @@ function serializeRequest(
     url: request.url(),
     method: request.method(),
     postData: request.postData() ?? undefined,
+    requestHeaders: getRequestHeaders(request),
   };
 }
 
@@ -44,15 +96,76 @@ export async function listNetworkRequests(
   runtime: NetworkRuntimeServices,
   params?: ListNetworkRequestsParams,
 ): Promise<ListNetworkRequestsResult> {
+  const resultPageIdx = params?.pageIdx ?? 0;
+  const pageSize = params?.pageSize;
+  let targetPageIdx = params?.targetPageIdx ?? 0;
+
   try {
     const includePreserved = params?.includePreservedRequests ?? false;
-    let requests = runtime.getNetworkRequests(includePreserved);
+    if (params?.targetPageIdx === undefined) {
+      const resolvedPage = resolveActivePageIndex(runtime);
+      if ('message' in resolvedPage) {
+        return {
+          success: false,
+          message: resolvedPage.message,
+          tooltype: 'list_network_requests',
+          logFormat: 'json',
+          data: {
+            requests: [],
+            total: 0,
+            pageIdx: resultPageIdx,
+            pageSize,
+            targetPageIdx: 0,
+            timedOut: false,
+          },
+        };
+      }
+      targetPageIdx = resolvedPage.pageIdx;
+    }
+
+    if (params?.waitForRequest) {
+      const matched = await waitForMatchingRequest(runtime, {
+        includePreservedRequests: includePreserved,
+        targetPageIdx,
+        waitForRequest: params.waitForRequest,
+        waitTimeoutMs: params.waitTimeoutMs,
+      });
+      if (!matched) {
+        const timeoutMs = params.waitTimeoutMs ?? DEFAULT_WAIT_TIMEOUT_MS;
+        return {
+          success: false,
+          message: `等待请求超时：${timeoutMs}ms 内未发现匹配 ${params.waitForRequest} 的请求`,
+          tooltype: 'list_network_requests',
+          logFormat: 'json',
+          data: {
+            requests: [],
+            total: 0,
+            pageIdx: resultPageIdx,
+            pageSize,
+            targetPageIdx,
+            timedOut: true,
+          },
+        };
+      }
+    }
+
+    let requests = runtime.getNetworkRequests(includePreserved, targetPageIdx);
 
     // 按资源类型过滤
     if (params?.resourceTypes?.length) {
       const normalizedTypes = new Set(params.resourceTypes);
       requests = requests.filter(request => {
         return normalizedTypes.has(request.resourceType() as ResourceType);
+      });
+    }
+
+    if (params?.headerFilter) {
+      const keyword = params.headerFilter.toLowerCase();
+      requests = requests.filter(request => {
+        const headers = getRequestHeaders(request);
+        return Object.entries(headers).some(([key, value]) => {
+          return `${key}: ${value}`.toLowerCase().includes(keyword);
+        });
       });
     }
 
@@ -64,12 +177,10 @@ export async function listNetworkRequests(
 
     // 分页
     const total = allData.length;
-    const pageSize = params?.pageSize;
-    const pageIdx = params?.pageIdx ?? 0;
 
     let pagedData: NetworkRequestData[];
     if (pageSize) {
-      const start = pageIdx * pageSize;
+      const start = resultPageIdx * pageSize;
       pagedData = allData.slice(start, start + pageSize);
     } else {
       pagedData = allData;
@@ -78,8 +189,10 @@ export async function listNetworkRequests(
     const data: ListNetworkRequestsData = {
       requests: pagedData,
       total,
-      pageIdx,
+      pageIdx: resultPageIdx,
+      targetPageIdx,
       pageSize,
+      timedOut: false,
     };
 
     return {
@@ -98,8 +211,10 @@ export async function listNetworkRequests(
       data: {
         requests: [],
         total: 0,
-        pageIdx: 0,
-        pageSize: undefined,
+        pageIdx: resultPageIdx,
+        pageSize,
+        targetPageIdx,
+        timedOut: false,
       },
     };
   }

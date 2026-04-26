@@ -81,6 +81,8 @@ export interface GlobalConfig {
   headless?: boolean;
   /** 浏览器可执行路径 */
   executablePath?: string;
+  /** PostgreSQL 连接字符串 */
+  databaseUrl?: string;
   /** Worker 运行时目录名 */
   runtimeDirName?: string;
   /** AI 提供商 */
@@ -166,6 +168,7 @@ export interface ResolvedConfig {
   wsEndpoint?: string;
   headless: boolean;
   executablePath?: string;
+  databaseUrl?: string;
   runtimeDirName: string;
   debug: boolean;
 }
@@ -300,6 +303,7 @@ const ENV_MAP: Readonly<Record<string, keyof GlobalConfig>> = {
   BROWSER_WS_ENDPOINT: 'wsEndpoint',
   BROWSER_HEADLESS: 'headless',
   BROWSER_EXECUTABLE_PATH: 'executablePath',
+  DATABASE_URL: 'databaseUrl',
   JSREVERSER_RUNTIME_DIR: 'runtimeDirName',
   DEFAULT_LLM_PROVIDER: 'llmProvider',
   JSREVERSER_DEBUG: 'debug',
@@ -405,6 +409,7 @@ export function resolveConfig(envArgs?: Partial<GlobalConfig>): ResolvedConfig {
     wsEndpoint: merged.wsEndpoint || undefined,
     headless: merged.headless ?? DEFAULTS.headless,
     executablePath: merged.executablePath,
+    databaseUrl: merged.databaseUrl || undefined,
     runtimeDirName: merged.runtimeDirName ?? DEFAULTS.runtimeDirName,
     debug: merged.debug ?? DEFAULTS.debug,
   };

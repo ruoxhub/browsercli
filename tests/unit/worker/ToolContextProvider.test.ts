@@ -75,4 +75,35 @@ describe('ToolContextProvider', () => {
     runtime.syncPageContext(newPage as never);
     assert.equal(runtime.getSelectedFrame(), newFrame);
   });
+
+  it('reads network requests from the requested page index', () => {
+    const runtime = new ToolContextProvider();
+    const selectedPage = {id: 'selected', mainFrame: () => null};
+    const targetPage = {id: 'target', mainFrame: () => null};
+    const selectedRequest = {url: () => 'https://example.test/selected'};
+    const targetRequest = {url: () => 'https://example.test/target'};
+
+    runtime.setPages([selectedPage as never, targetPage as never]);
+    runtime.setSelectedPage(selectedPage as never);
+
+    const internals = runtime as unknown as {
+      _networkStorage: WeakMap<
+        object,
+        Array<Array<{stableId: number; request: object}>>
+      >;
+    };
+
+    internals._networkStorage.set(selectedPage, [
+      [{stableId: 1, request: selectedRequest}],
+    ]);
+    internals._networkStorage.set(targetPage, [
+      [{stableId: 2, request: targetRequest}],
+    ]);
+
+    const requests = runtime.getNetworkRequests(false, 1);
+
+    assert.deepStrictEqual(requests, [targetRequest]);
+    assert.equal(runtime.getNetworkRequestStableId(targetRequest), 2);
+    assert.equal(runtime.getNetworkRequestById(2), targetRequest);
+  });
 });

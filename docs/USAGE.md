@@ -432,6 +432,13 @@ js-reverse call find_clickable_elements --filterText "登录"
 | `list_network_requests` | 列出所有网络请求     | `js-reverse call list_network_requests`           |
 | `get_network_request`   | 获取指定网络请求详情 | `js-reverse call get_network_request --reqid 123` |
 
+`list_network_requests` 中有两个容易混淆的分页/定位参数：
+
+- `pageIdx`：结果分页页码，只影响返回列表的第几页
+- `targetPageIdx`：浏览器页面索引，用来指定要查看哪个标签页的网络请求
+
+当前实现里，`list_network_requests --targetPageIdx <n>` 返回的 `reqid` 只适合在同一个当前选中页上下文里继续使用。跨页场景下如果不同页面出现重复 `reqid`，后续 `get_network_request` / `get_request_initiator` 可能命中错误页面的请求。要稳定追查非当前页请求，先切换当前页面，再执行详情类工具。
+
 **示例：**
 
 ```bash
@@ -440,6 +447,9 @@ js-reverse call list_network_requests
 
 # 分页获取（每页20条）
 js-reverse call list_network_requests --pageSize 20 --pageIdx 0
+
+# 查看第 2 个浏览器页签的请求列表
+js-reverse call list_network_requests --targetPageIdx 1
 
 # 只获取 XHR 和 Fetch 类型
 js-reverse call list_network_requests --resourceTypes '["xhr","fetch"]'
@@ -741,7 +751,7 @@ js-reverse call performance_analyze_insight --type "LCP"
 | `unhook_function`            | 取消 Hook        | `js-reverse call unhook_function --hookId "hk1"`                |
 | `inspect_object`             | 检查对象         | `js-reverse call inspect_object --expression "window.crypto"`   |
 | `find_in_script`             | 在脚本中搜索     | `js-reverse call find_in_script --query "encrypt"`              |
-| `get_request_initiator`      | 获取请求发起者   | `js-reverse call get_request_initiator --reqid 123`             |
+| `get_request_initiator`      | 获取请求发起者   | `js-reverse call get_request_initiator --requestId 123`         |
 | `get_paused_info`            | 获取暂停信息     | `js-reverse call get_paused_info`                               |
 | `evaluate_on_callframe`      | 在调用帧上执行   | `js-reverse call evaluate_on_callframe --expression "x"`        |
 | `get_ai_debug_status`        | 获取 AI 调试状态 | `js-reverse call get_ai_debug_status`                           |
@@ -821,7 +831,7 @@ js-reverse call search_in_sources --query "\\d{32}" --isRegex true
 js-reverse call find_in_script --query "encrypt"
 
 # 获取请求发起者
-js-reverse call get_request_initiator --reqid 123
+js-reverse call get_request_initiator --requestId 123
 
 # 获取暂停信息（断点命中时）
 js-reverse call get_paused_info
@@ -1005,12 +1015,20 @@ js-reverse call select_frame --frameIdx 1
 | `evaluate_script`       | 执行脚本       | `js-reverse call evaluate_script --function "() => document.title"`       |
 | `inject_preload_script` | 注入预加载脚本 | `js-reverse call inject_preload_script --script "console.log('preload')"` |
 
+`evaluate_script` 当前支持 `--context page` 和 `--context content-script`。CLI 也接受 `--verbose`，但当前实现还没有根据该参数返回额外堆栈或底层错误细节；开启后仍主要返回归一化错误消息，因此不要把它当成已生效的诊断开关。
+
 **示例：**
 
 ```bash
 # 执行脚本
 js-reverse call evaluate_script --function "() => document.title"
 js-reverse call evaluate_script --function "() => window.innerWidth"
+
+# 在 content-script 上下文执行
+js-reverse call evaluate_script --function "() => location.href" --context content-script
+
+# 当前版本可传入 verbose，但不会额外展开底层堆栈
+js-reverse call evaluate_script --function "() => { throw new Error('boom') }" --verbose
 
 # 注入预加载脚本（每次页面加载前执行）
 js-reverse call inject_preload_script --script "(() => { window.preloadData = 'test'; })()"

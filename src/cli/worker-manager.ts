@@ -51,6 +51,7 @@ export class WorkerManager {
     if (options.wsEndpoint) workerArgs.push('--wsEndpoint', options.wsEndpoint);
     if (options.headless) workerArgs.push('--headless');
     if (options.executablePath) workerArgs.push('--executablePath', options.executablePath);
+    if (options.databaseUrl) workerArgs.push('--databaseUrl', options.databaseUrl);
 
     // 确定可执行路径
     const execPath = process.execPath;

@@ -4,15 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {HTTPRequest, ResourceType} from '../../third_party/index.js';
+import type {HTTPRequest, Page, ResourceType} from '../../third_party/index.js';
 
 // ─── 可过滤的资源类型 ──────────────────────────────────
 
 /** 可过滤的网络请求资源类型列表 */
-export const FILTERABLE_RESOURCE_TYPES: readonly [
-  ResourceType,
-  ...ResourceType[],
-] = [
+export const FILTERABLE_RESOURCE_TYPES = [
   'document',
   'stylesheet',
   'image',
@@ -32,7 +29,7 @@ export const FILTERABLE_RESOURCE_TYPES: readonly [
   'preflight',
   'fedcm',
   'other',
-];
+] as const;
 
 // ─── 运行时服务接口 ──────────────────────────────────
 
@@ -43,8 +40,17 @@ export const FILTERABLE_RESOURCE_TYPES: readonly [
  * 调用方负责提供具体实现（如直接传入 McpContext 的方法绑定）。
  */
 export interface NetworkRuntimeServices {
+  /** 获取所有已打开的页面（可选，用于推导当前活跃页索引） */
+  getPages?: () => Page[];
+  /** 获取当前选中的页面（可选，用于推导当前活跃页索引） */
+  getSelectedPage?: () => Page | null;
+  /** 获取当前选中的页面索引（可选） */
+  getSelectedPageIndex?: () => number | null;
   /** 获取当前选中页面的所有网络请求 */
-  getNetworkRequests: (includePreservedRequests?: boolean) => HTTPRequest[];
+  getNetworkRequests: (
+    includePreservedRequests?: boolean,
+    pageIdx?: number,
+  ) => HTTPRequest[];
   /** 通过稳定 ID 获取单条网络请求 */
   getNetworkRequestById: (reqid: number) => HTTPRequest;
   /** 获取请求的稳定 ID */
@@ -103,12 +109,20 @@ export interface RequestInitiator {
 export interface ListNetworkRequestsParams {
   /** 每页最大条数，省略返回全部 */
   pageSize?: number;
-  /** 页码（0-based），省略返回第一页 */
+  /** 结果分页页码，从 0 开始 */
   pageIdx?: number;
+  /** 浏览器页面索引，省略时使用当前活跃页 */
+  targetPageIdx?: number;
   /** 按资源类型过滤 */
   resourceTypes?: ResourceType[];
   /** 是否包含最近 3 次导航的保留请求 */
   includePreservedRequests?: boolean;
+  /** 等待匹配 URL 片段的请求出现 */
+  waitForRequest?: string;
+  /** 等待请求超时时间（毫秒） */
+  waitTimeoutMs?: number;
+  /** 按请求头关键词过滤 */
+  headerFilter?: string;
 }
 
 /** getNetworkRequest 参数 */
@@ -131,14 +145,21 @@ export interface NetworkRequestData {
   method: string;
   /** POST 数据 */
   postData?: string;
+  /** 请求头 */
+  requestHeaders?: Record<string, string>;
 }
 
 /** listNetworkRequests 返回数据 */
 export interface ListNetworkRequestsData {
   requests: NetworkRequestData[];
   total: number;
+  /** 结果分页页码 */
   pageIdx: number;
+  /** 实际使用的浏览器页面索引 */
+  targetPageIdx: number;
   pageSize: number | undefined;
+  /** 是否因等待请求超时而提前返回 */
+  timedOut?: boolean;
 }
 
 /** getNetworkRequest 返回数据（完整详情） */

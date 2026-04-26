@@ -68,8 +68,18 @@ export const TOOLS_META: ToolMeta[] = [
   },
   {
     name: 'list_network_requests',
-    description: '列出网络请求',
-    schema: {},
+    description:
+      '列出网络请求；pageIdx 为结果分页页码，targetPageIdx 为浏览器页索引，支持按资源类型、请求头关键词过滤，并可等待匹配请求出现',
+    schema: {
+      pageSize: 'number',
+      pageIdx: 'number',
+      targetPageIdx: 'number',
+      resourceTypes: 'string[]',
+      includePreservedRequests: 'boolean',
+      waitForRequest: 'string',
+      waitTimeoutMs: 'number',
+      headerFilter: 'string',
+    },
     modulePath: './network/listNetworkRequests.js',
     handlerName: 'listNetworkRequests',
     callMode: 'runtime',
@@ -196,8 +206,8 @@ export const TOOLS_META: ToolMeta[] = [
   },
   {
     name: 'scroll_by',
-    description: '滚动页面',
-    schema: {},
+    description: '滚动页面；direction 支持 up/down/top/bottom',
+    schema: {direction: 'string', pixels: 'number'},
     modulePath: './page/scrollBy.js',
     handlerName: 'scrollBy',
     callMode: 'runtime',
@@ -725,8 +735,8 @@ export const TOOLS_META: ToolMeta[] = [
   },
   {
     name: 'evaluate_script',
-    description: '执行脚本',
-    schema: {function: 'string'},
+    description: '执行脚本；支持 page / content-script 上下文，并透传 verbose 参数',
+    schema: {function: 'string', context: 'string', verbose: 'boolean'},
     modulePath: './script/script.js',
     handlerName: 'evaluateScript',
     callMode: 'runtime',
@@ -745,7 +755,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './site-experience/siteExperience.js',
     handlerName: 'searchSiteExperience',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'list_site_experiences',
@@ -753,7 +763,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './site-experience/siteExperience.js',
     handlerName: 'listSiteExperiences',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'create_site_experience',
@@ -761,7 +771,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './site-experience/siteExperience.js',
     handlerName: 'createSiteExperience',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'update_site_experience',
@@ -769,7 +779,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './site-experience/siteExperience.js',
     handlerName: 'updateSiteExperience',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'delete_site_experience',
@@ -777,7 +787,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './site-experience/siteExperience.js',
     handlerName: 'deleteSiteExperience',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'update_extensions',

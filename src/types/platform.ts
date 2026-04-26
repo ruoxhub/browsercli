@@ -55,6 +55,8 @@ interface WorkerStartOptions {
   headless?: boolean;
   /** 浏览器可执行路径 */
   executablePath?: string;
+  /** PostgreSQL 连接字符串 */
+  databaseUrl?: string;
 }
 
 // ==================== Action 配置（兼容旧 BaseClient） ====================

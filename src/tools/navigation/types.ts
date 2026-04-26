@@ -19,8 +19,10 @@ export interface NavigationRuntimeServices {
   getPages: () => Page[];
   /** 按索引获取页面 */
   getPageByIdx: (idx: number) => Page;
+  /** 获取当前选中页面索引（可选） */
+  getSelectedPageIndex?: () => number | null;
   /** 获取当前选中的页面 */
-  getSelectedPage: () => Page;
+  getSelectedPage: () => Page | null;
   /** 创建新页面 */
   newPage: () => Promise<Page>;
   /** 选择页面（切换上下文） */

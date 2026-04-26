@@ -52,6 +52,7 @@ export const startCommand: AxiCliCommand<WorkerContext> = async (
   const wsEndpoint = getFlag(parsed, 'wsEndpoint');
   const headless = getBoolFlag(parsed, 'headless');
   const executablePath = getFlag(parsed, 'executablePath');
+  const databaseUrl = getFlag(parsed, 'databaseUrl');
   const waitForBrowser = getBoolFlag(parsed, 'wait-for-browser');
 
   // 合并配置：CLI 参数 > 环境变量 > 配置文件 > 默认值
@@ -62,6 +63,7 @@ export const startCommand: AxiCliCommand<WorkerContext> = async (
     wsEndpoint: wsEndpoint || ctx?.resolvedConfig.wsEndpoint,
     headless: headless || undefined,
     executablePath: executablePath || ctx?.resolvedConfig.executablePath,
+    databaseUrl: databaseUrl || ctx?.resolvedConfig.databaseUrl,
   });
 
   // 1. 检查 Sekiro Server 是否可用
@@ -97,6 +99,7 @@ export const startCommand: AxiCliCommand<WorkerContext> = async (
       wsEndpoint: cfg.wsEndpoint,
       headless: cfg.headless,
       executablePath: cfg.executablePath,
+      databaseUrl: cfg.databaseUrl,
     });
   }
 

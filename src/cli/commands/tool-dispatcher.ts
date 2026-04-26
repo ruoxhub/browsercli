@@ -13,6 +13,7 @@ import {
   getConvertedSkillToolName,
 } from '../converted-skill-tools.js';
 import {successOutput} from '../output.js';
+import {validateToolArgs} from '../tool-arg-validator.js';
 import {getToolMeta, searchTools} from '../tools-meta.js';
 import type {WorkerContext} from '../types.js';
 
@@ -126,7 +127,12 @@ export const toolDispatcherCommand: AxiCliCommand<WorkerContext> = async (
     if (!invoker || !group) {
       throw new AxiError('Worker 未运行', 'WORKER_NOT_RUNNING');
     }
-    const result = await invoker.invoke(group, toolName, toolArgs);
+    const validatedArgs = validateToolArgs(toolName, toolArgs);
+    if (validatedArgs.ok === false) {
+      throw new AxiError(validatedArgs.error, 'VALIDATION_ERROR');
+    }
+
+    const result = await invoker.invoke(group, toolName, validatedArgs.value);
 
     return successOutput({
       command: 'call',

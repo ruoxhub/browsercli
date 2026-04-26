@@ -386,8 +386,27 @@ export class ToolContextProvider {
 
   // ─── NetworkRuntimeServices ───────────────────────────
 
-  getNetworkRequests(includePreservedRequests?: boolean): HTTPRequest[] {
-    const page = this.selectedPage;
+  private _resolveNetworkPage(pageIdx?: number): Page | null {
+    if (typeof pageIdx === 'number') {
+      return this.getPageByIdx(pageIdx);
+    }
+    return this.selectedPage;
+  }
+
+  private _getNetworkCandidatePages(): Page[] {
+    return this.selectedPage
+      ? [
+          this.selectedPage,
+          ...this.getPages().filter(page => page !== this.selectedPage),
+        ]
+      : this.getPages();
+  }
+
+  getNetworkRequests(
+    includePreservedRequests?: boolean,
+    pageIdx?: number,
+  ): HTTPRequest[] {
+    const page = this._resolveNetworkPage(pageIdx);
     if (!page) return [];
 
     const navigations = this._networkStorage.get(page);
@@ -409,20 +428,22 @@ export class ToolContextProvider {
   }
 
   getNetworkRequestById(reqid: number): HTTPRequest {
-    const page = this.selectedPage;
-    if (!page) {
+    const candidatePages = this._getNetworkCandidatePages();
+    if (candidatePages.length === 0) {
       throw new Error('未选中页面');
     }
 
-    const navigations = this._networkStorage.get(page);
-    if (!navigations) {
-      throw new Error('当前页面没有请求记录');
-    }
+    for (const page of candidatePages) {
+      const navigations = this._networkStorage.get(page);
+      if (!navigations) {
+        continue;
+      }
 
-    for (const navigation of navigations) {
-      const found = navigation.find(t => t.stableId === reqid);
-      if (found) {
-        return found.request as unknown as HTTPRequest;
+      for (const navigation of navigations) {
+        const found = navigation.find(t => t.stableId === reqid);
+        if (found) {
+          return found.request as unknown as HTTPRequest;
+        }
       }
     }
 
@@ -430,15 +451,20 @@ export class ToolContextProvider {
   }
 
   getNetworkRequestStableId(request: unknown): number {
-    if (!this.selectedPage) return -1;
+    const candidatePages = this._getNetworkCandidatePages();
 
-    const navigations = this._networkStorage.get(this.selectedPage);
-    if (!navigations) return -1;
+    for (const page of candidatePages) {
+      const navigations = this._networkStorage.get(page);
+      if (!navigations) {
+        continue;
+      }
 
-    for (const navigation of navigations) {
-      const found = navigation.find(t => t.request === (request as Request));
-      if (found) return found.stableId;
+      for (const navigation of navigations) {
+        const found = navigation.find(t => t.request === (request as Request));
+        if (found) return found.stableId;
+      }
     }
+
     return -1;
   }
 

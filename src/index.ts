@@ -21,6 +21,7 @@ import type {BrowserManagerConfig} from './browser/index.js';
 import {resolveConfig, getEnvBoolean} from './config.js';
 import type {GlobalConfig} from './config.js';
 import {NodeClient} from './protocol/Client.js';
+import {dbService} from './services/DatabaseService.js';
 import type {WorkerStartOptions} from './types/platform.js';
 import {ToolAdapter} from './worker/ToolAdapter.js';
 import {ToolContextProvider} from './worker/ToolContextProvider.js';
@@ -50,6 +51,14 @@ async function gracefulShutdown(
     console.log('[Worker] 浏览器已关闭');
   } catch (err) {
     console.error('[Worker] 关闭浏览器失败:', err);
+  }
+
+  // 4. 关闭数据库连接
+  try {
+    await dbService.disconnect();
+    console.log('[Worker] 数据库连接已关闭');
+  } catch (err) {
+    console.error('[Worker] 关闭数据库连接失败:', err);
   }
 
   console.log('[Worker] 已关闭');
@@ -82,6 +91,9 @@ function parseWorkerArgs(args: string[]): GlobalConfig {
       case '--executablePath':
         cliConfig.executablePath = args[++i];
         break;
+      case '--databaseUrl':
+        cliConfig.databaseUrl = args[++i];
+        break;
     }
   }
 
@@ -101,6 +113,7 @@ function toWorkerOptions(
     wsEndpoint: resolved.wsEndpoint,
     headless: resolved.headless,
     executablePath: resolved.executablePath,
+    databaseUrl: resolved.databaseUrl,
   };
 }
 
@@ -118,12 +131,12 @@ function registerBuiltinActions(client: NodeClient): void {
     resolve({tools});
   });
 
-  // _list_skills — 兼容旧客户端：技能已迁移为 Tool，返回对应 Tool 列表
-  client.registerAction('_list_skills', async (_request, resolve, _reject) => {
-    const {getConvertedSkillToolDefinitions} =
-      await import('./cli/converted-skill-tools.js');
-    resolve({skills: getConvertedSkillToolDefinitions()});
-  });
+  // // _list_skills — 兼容旧客户端：技能已迁移为 Tool，返回对应 Tool 列表
+  // client.registerAction('_list_skills', async (_request, resolve, _reject) => {
+  //   const {getConvertedSkillToolDefinitions} =
+  //     await import('./cli/converted-skill-tools.js');
+  //   resolve({skills: getConvertedSkillToolDefinitions()});
+  // });
 
   // _status — 返回 Worker 状态
   client.registerAction('_status', (_request, resolve, _reject) => {
@@ -147,6 +160,12 @@ async function main(): Promise<void> {
   console.log('[Worker] 启动中...');
   console.log(`[Worker] Sekiro Host: ${options.sekiroHost}`);
   console.log(`[Worker] Group: ${options.group}`);
+
+  if (options.databaseUrl) {
+    await dbService.connect(options.databaseUrl);
+    await dbService.migrate();
+    console.log('[Worker] 数据库已连接并完成迁移');
+  }
 
   // 2. 初始化 ToolContextProvider
   const contextProvider = new ToolContextProvider();

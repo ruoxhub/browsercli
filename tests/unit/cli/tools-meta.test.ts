@@ -123,6 +123,43 @@ describe('tools-meta', () => {
       assert.ok(meta);
       assert.deepStrictEqual(meta!.schema, {scriptId: 'string'});
     });
+
+    it('describes evaluate_script passthrough schema', () => {
+      const meta = getToolMeta('evaluate_script');
+      assert.ok(meta);
+      assert.match(meta!.description, /context/);
+      assert.match(meta!.description, /verbose/);
+      assert.deepStrictEqual(meta!.schema, {
+        function: 'string',
+        context: 'string',
+        verbose: 'boolean',
+      });
+    });
+
+    it('describes scroll_by supported params', () => {
+      const meta = getToolMeta('scroll_by');
+      assert.ok(meta);
+      assert.deepStrictEqual(meta!.schema, {
+        direction: 'string',
+        pixels: 'number',
+      });
+    });
+
+    it('describes list_network_requests pagination and target page params', () => {
+      const meta = getToolMeta('list_network_requests');
+      assert.ok(meta);
+      assert.match(meta!.description, /targetPageIdx/);
+      assert.deepStrictEqual(meta!.schema, {
+        pageSize: 'number',
+        pageIdx: 'number',
+        targetPageIdx: 'number',
+        resourceTypes: 'string[]',
+        includePreservedRequests: 'boolean',
+        waitForRequest: 'string',
+        waitTimeoutMs: 'number',
+        headerFilter: 'string',
+      });
+    });
   });
 
   describe('getAllToolNames', () => {

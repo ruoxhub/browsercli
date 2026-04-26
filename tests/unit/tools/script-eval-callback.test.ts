@@ -6,15 +6,17 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {getJSHookRuntime} from '../../../src/tools/runtime.js';
 import {
   evaluateScript,
+  evaluateScriptFn,
   injectPreloadScript,
-} from '../../../src/tools/script.js';
-import {
-  evaluateScript as evaluateScriptTool,
-  injectPreloadScript as injectPreloadScriptTool,
 } from '../../../src/tools/script/script.js';
+
+type EvaluateScriptRuntime = Parameters<typeof evaluateScript>[0];
+type InjectPreloadRuntime = Parameters<typeof injectPreloadScript>[0];
+type EvaluateScriptDebuggerContext = Awaited<
+  ReturnType<NonNullable<EvaluateScriptRuntime['getDebuggerContext']>>
+>;
 
 interface HandleLike {
   dispose(): Promise<void>;
@@ -23,35 +25,24 @@ interface HandleLike {
 interface PageLike {
   evaluateHandle(): Promise<HandleLike>;
   evaluate(
-    callback: (fn: () => Promise<{ok: boolean}>) => Promise<string>,
-    passedFn?: () => Promise<{ok: boolean}>,
-  ): Promise<string>;
+    callback: (fn: () => Promise<unknown>) => Promise<string | undefined>,
+    passedFn?: unknown,
+  ): Promise<string | undefined>;
 }
 
 interface FrameLike extends PageLike {}
 
-interface ContextLike {
-  getSelectedPage(): PageLike;
-  getSelectedFrame(): FrameLike;
-  waitForEventsAfterAction(action: () => Promise<void>): Promise<void>;
-}
-
-interface ResponseLike {
-  appendResponseLine(value: string): void;
-  setIncludePages(): void;
-  setIncludeNetworkRequests(): void;
-  setIncludeConsoleData(): void;
-  attachImage(): void;
-  attachNetworkRequest(): void;
-  attachConsoleMessage(): void;
-  setIncludeWebSocketConnections(): void;
-  attachWebSocket(): void;
-  setStructuredContent(): void;
+interface ExecutionContextLike {
+  id: number;
+  origin: string;
+  name: string;
+  world: 'page' | 'content-script' | 'unknown';
+  frameId?: string;
+  extensionId?: string;
 }
 
 describe('evaluate_script callback path', () => {
   it('executes page.evaluate callback body and disposes handle', async () => {
-    const lines: string[] = [];
     let disposed = 0;
 
     const fn = async () => ({ok: true});
@@ -64,112 +55,42 @@ describe('evaluate_script callback path', () => {
 
     const page: PageLike = {
       evaluateHandle: async () => handle,
-      evaluate: async (callback, passedFn) => callback(passedFn ?? fn),
+      evaluate: async callback => callback(fn),
     };
 
-    const context: ContextLike = {
-      getSelectedPage: () => page,
-      getSelectedFrame: () => page,
-      waitForEventsAfterAction: async (action: () => Promise<void>) => {
-        await action();
-      },
-    };
-
-    const response: ResponseLike = {
-      appendResponseLine: (v: string) => lines.push(v),
-      setIncludePages: () => undefined,
-      setIncludeNetworkRequests: () => undefined,
-      setIncludeConsoleData: () => undefined,
-      attachImage: () => undefined,
-      attachNetworkRequest: () => undefined,
-      attachConsoleMessage: () => undefined,
-      setIncludeWebSocketConnections: () => undefined,
-      attachWebSocket: () => undefined,
-      setStructuredContent: () => undefined,
-    };
-
-    const runtime = getJSHookRuntime();
-    await evaluateScript.handler(
-      {params: {function: '() => ({ ok: true })'}} as Parameters<
-        typeof evaluateScript.handler
-      >[0],
-      response as Parameters<typeof evaluateScript.handler>[1],
-      {
-        ...context,
-        getSelectedPage: () => ({
-          ...page,
-          evaluate: async (callback: unknown) => {
-            if (typeof callback !== 'function') {
-              throw new Error('expected callback evaluate path');
-            }
-            return callback(fn);
-          },
-        }),
-        getSelectedFrame: () => ({
-          ...page,
-          evaluate: async (callback: unknown) => {
-            if (typeof callback !== 'function') {
-              throw new Error('expected callback evaluate path');
-            }
-            return callback(fn);
-          },
-        }),
-      } as unknown as Parameters<typeof evaluateScript.handler>[2],
-      runtime,
+    const result = await evaluateScriptFn(
+      page as unknown as Parameters<typeof evaluateScriptFn>[0],
+      '() => ({ ok: true })',
     );
 
+    assert.equal(result.success, true);
+    assert.equal(result.result, '{"ok":true}');
     assert.strictEqual(disposed, 1);
-    assert.ok(lines.some(l => l.includes('Script ran on page and returned')));
-    assert.ok(lines.some(l => l.includes('{"ok":true}')));
+    assert.match(result.message, /returned/);
   });
 
   it('registers a preload script on future documents', async () => {
-    const lines: string[] = [];
     let injected: string | undefined;
 
-    const response: ResponseLike = {
-      appendResponseLine: (v: string) => lines.push(v),
-      setIncludePages: () => undefined,
-      setIncludeNetworkRequests: () => undefined,
-      setIncludeConsoleData: () => undefined,
-      attachImage: () => undefined,
-      attachNetworkRequest: () => undefined,
-      attachConsoleMessage: () => undefined,
-      setIncludeWebSocketConnections: () => undefined,
-      attachWebSocket: () => undefined,
-      setStructuredContent: () => undefined,
-    };
+    const result = await injectPreloadScript(
+      {
+        getSelectedFrame: () => null,
+        getSelectedPage: () => ({
+          addInitScript: async (script: string) => {
+            injected = script;
+          },
+        }),
+        getContext: () => null,
+      } as InjectPreloadRuntime,
+      {script: 'window.__preload = 1;'},
+    );
 
-    const runtime = getJSHookRuntime();
-    const originalInject =
-      runtime.pageController.injectScriptOnNewDocument.bind(
-        runtime.pageController,
-      );
-    runtime.pageController.injectScriptOnNewDocument = async (
-      scriptContent: string,
-    ) => {
-      injected = scriptContent;
-    };
-
-    try {
-      await injectPreloadScript.handler(
-        {params: {script: 'window.__preload = 1;'}} as Parameters<
-          typeof injectPreloadScript.handler
-        >[0],
-        response as Parameters<typeof injectPreloadScript.handler>[1],
-        {} as Parameters<typeof injectPreloadScript.handler>[2],
-        runtime,
-      );
-    } finally {
-      runtime.pageController.injectScriptOnNewDocument = originalInject;
-    }
-
+    assert.equal(result.success, true);
     assert.strictEqual(injected, 'window.__preload = 1;');
-    assert.ok(lines.some(line => line.includes('Preload script registered')));
+    assert.match(result.message, /registered/);
   });
 
   it('runs evaluate_script in the selected frame execution context', async () => {
-    const lines: string[] = [];
     let pageUsed = false;
     let frameUsed = false;
 
@@ -202,38 +123,18 @@ describe('evaluate_script callback path', () => {
       },
     };
 
-    const runtime = getJSHookRuntime();
-    const response: ResponseLike = {
-      appendResponseLine: (v: string) => lines.push(v),
-      setIncludePages: () => undefined,
-      setIncludeNetworkRequests: () => undefined,
-      setIncludeConsoleData: () => undefined,
-      attachImage: () => undefined,
-      attachNetworkRequest: () => undefined,
-      attachConsoleMessage: () => undefined,
-      setIncludeWebSocketConnections: () => undefined,
-      attachWebSocket: () => undefined,
-      setStructuredContent: () => undefined,
-    };
-
-    await evaluateScript.handler(
-      {params: {function: '() => ({ ok: true })'}} as Parameters<
-        typeof evaluateScript.handler
-      >[0],
-      response as Parameters<typeof evaluateScript.handler>[1],
+    const result = await evaluateScript(
       {
         getSelectedPage: () => page,
         getSelectedFrame: () => frame,
-        waitForEventsAfterAction: async (action: () => Promise<void>) => {
-          await action();
-        },
-      } as unknown as Parameters<typeof evaluateScript.handler>[2],
-      runtime,
+      } as unknown as EvaluateScriptRuntime,
+      {function: '() => ({ ok: true })'},
     );
 
+    assert.equal(result.success, true);
     assert.strictEqual(pageUsed, false);
     assert.strictEqual(frameUsed, true);
-    assert.ok(lines.some(line => line.includes('{"ok":true}')));
+    assert.equal(result.result, '{"ok":true}');
   });
 
   it('runs runtime evaluate_script against the selected frame', async () => {
@@ -253,11 +154,11 @@ describe('evaluate_script callback path', () => {
       },
     };
 
-    const result = await evaluateScriptTool(
+    const result = await evaluateScript(
       {
         getSelectedFrame: () => frame,
         getSelectedPage: () => null,
-      },
+      } as unknown as EvaluateScriptRuntime,
       {function: '() => ({ ok: true })'},
     );
 
@@ -266,10 +167,242 @@ describe('evaluate_script callback path', () => {
     assert.equal(result.result, '{"ok":true}');
   });
 
+  it('runs runtime evaluate_script in content-script context when requested', async () => {
+    const calls: Array<{method: string; params?: Record<string, unknown>}> = [];
+    const debuggerContext = {
+      getExecutionContexts: () => [
+        {
+          id: 1,
+          origin: 'https://example.com',
+          name: '',
+          world: 'page',
+          frameId: 'frame-1',
+        },
+        {
+          id: 2,
+          origin: 'chrome-extension://abcdef/content.js',
+          name: 'content-script',
+          world: 'content-script',
+          frameId: 'frame-1',
+          extensionId: 'abcdef',
+        },
+      ],
+      getClient: () => ({
+        send: async (method: string, params?: Record<string, unknown>) => {
+          calls.push({method, params});
+          return {
+            result: {
+              value: '{"ok":true,"world":"content-script"}',
+            },
+          };
+        },
+      }),
+    } as unknown as EvaluateScriptDebuggerContext;
+
+    const result = await evaluateScript(
+      {
+        getSelectedFrame: () => null,
+        getSelectedPage: () => null,
+        getDebuggerContext: async () => debuggerContext,
+      } as EvaluateScriptRuntime,
+      {
+        function: '() => ({ ok: true, world: "content-script" })',
+        context: 'content-script',
+      },
+    );
+
+    assert.equal(result.success, true);
+    assert.equal(result.result, '{"ok":true,"world":"content-script"}');
+    assert.deepEqual(calls, [
+      {
+        method: 'Runtime.evaluate',
+        params: {
+          expression:
+            '(async () => JSON.stringify(await (() => ({ ok: true, world: "content-script" }))()))()',
+          contextId: 2,
+          returnByValue: true,
+          awaitPromise: true,
+        },
+      },
+    ]);
+  });
+
+  it('selects the execution context bound to the current frame', async () => {
+    const calls: Array<{method: string; params?: Record<string, unknown>}> = [];
+    const selectedFrame = {
+      _id: 'frame-2',
+      evaluateHandle: async () => {
+        throw new Error('frame fallback should not be used');
+      },
+      evaluate: async () => {
+        throw new Error('frame fallback should not be used');
+      },
+    } as unknown as FrameLike;
+
+    const debuggerContext = {
+      getExecutionContexts: () => [
+        {
+          id: 11,
+          origin: 'https://example.com',
+          name: '',
+          world: 'page',
+          frameId: 'frame-1',
+        },
+        {
+          id: 22,
+          origin: 'https://example.com',
+          name: '',
+          world: 'page',
+          frameId: 'frame-2',
+        },
+      ],
+      getClient: () => ({
+        send: async (method: string, params?: Record<string, unknown>) => {
+          calls.push({method, params});
+          return {
+            result: {
+              value: '{"frame":"two"}',
+            },
+          };
+        },
+      }),
+    } as unknown as EvaluateScriptDebuggerContext;
+
+    const result = await evaluateScript(
+      {
+        getSelectedFrame: () => selectedFrame,
+        getSelectedPage: () => null,
+        getDebuggerContext: async () => debuggerContext,
+      } as EvaluateScriptRuntime,
+      {function: '() => ({ frame: "two" })'},
+    );
+
+    assert.equal(result.success, true);
+    assert.equal(result.result, '{"frame":"two"}');
+    assert.equal(calls[0]?.params?.contextId, 22);
+  });
+
+  it('fails instead of falling back when debugger context lookup throws', async () => {
+    let frameUsed = false;
+    const frame: FrameLike = {
+      evaluateHandle: async () => {
+        frameUsed = true;
+        return {dispose: async () => undefined};
+      },
+      evaluate: async callback => {
+        frameUsed = true;
+        return callback(async () => ({ok: true}));
+      },
+    };
+
+    const result = await evaluateScript(
+      {
+        getSelectedFrame: () => frame,
+        getSelectedPage: () => null,
+        getDebuggerContext: async () => {
+          throw new Error('cdp unavailable');
+        },
+      } as EvaluateScriptRuntime,
+      {function: '() => ({ ok: true })'},
+    );
+
+    assert.equal(result.success, false);
+    assert.match(result.message, /cdp unavailable/);
+    assert.equal(frameUsed, false);
+  });
+
+  it('keeps undefined results consistent across frame and CDP paths', async () => {
+    const frame: FrameLike = {
+      evaluateHandle: async () => ({dispose: async () => undefined}),
+      evaluate: async callback => callback(async () => undefined),
+    };
+    const frameResult = await evaluateScript(
+      {
+        getSelectedFrame: () => frame,
+        getSelectedPage: () => null,
+      } as unknown as EvaluateScriptRuntime,
+      {function: '() => undefined'},
+    );
+
+    const debuggerContext = {
+      getExecutionContexts: () => [
+        {
+          id: 1,
+          origin: 'https://example.com',
+          name: '',
+          world: 'page',
+          frameId: 'frame-1',
+        },
+      ],
+      getClient: () => ({
+        send: async () => ({
+          result: {
+            value: undefined,
+          },
+        }),
+      }),
+    } as unknown as EvaluateScriptDebuggerContext;
+    const cdpResult = await evaluateScript(
+      {
+        getSelectedFrame: () =>
+          ({_id: 'frame-1'} as unknown as FrameLike),
+        getSelectedPage: () => null,
+        getDebuggerContext: async () => debuggerContext,
+      } as EvaluateScriptRuntime,
+      {function: '() => undefined'},
+    );
+
+    assert.equal(frameResult.success, true);
+    assert.equal(cdpResult.success, true);
+    assert.equal(frameResult.result, undefined);
+    assert.equal(cdpResult.result, undefined);
+  });
+
+  it('returns isolation hint when page context accesses extension object', async () => {
+    const debuggerContext = {
+      getExecutionContexts: () => [
+        {
+          id: 1,
+          origin: 'https://example.com',
+          name: '',
+          world: 'page',
+          frameId: 'frame-1',
+        },
+      ],
+      getClient: () => ({
+        send: async () => ({
+          result: {},
+          exceptionDetails: {
+            text: 'TypeError: Cannot read properties of undefined',
+            exception: {
+              description:
+                "TypeError: Cannot read properties of undefined (reading 'get_zse_96')",
+            },
+          },
+        }),
+      }),
+    } as unknown as EvaluateScriptDebuggerContext;
+
+    const result = await evaluateScript(
+      {
+        getSelectedFrame: () => null,
+        getSelectedPage: () => null,
+        getDebuggerContext: async () => debuggerContext,
+      } as EvaluateScriptRuntime,
+      {
+        function: '() => window.__zhihu.get_zse_96()',
+        context: 'page',
+      },
+    );
+
+    assert.equal(result.success, false);
+    assert.match(result.message, /content script/i);
+  });
+
   it('registers runtime preload script on the page context', async () => {
     let injected: string | undefined;
 
-    const result = await injectPreloadScriptTool(
+    const result = await injectPreloadScript(
       {
         getSelectedFrame: () => null,
         getSelectedPage: () => ({
@@ -278,7 +411,7 @@ describe('evaluate_script callback path', () => {
           },
         }),
         getContext: () => null,
-      },
+      } as InjectPreloadRuntime,
       {script: 'window.__preload = 1;'},
     );
 

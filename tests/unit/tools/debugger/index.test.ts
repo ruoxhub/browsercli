@@ -7,6 +7,8 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
+import {selectExecutionContext} from '../../../../src/tools/debugger/contextSelector.js';
+import {createExecutionContextInfo} from '../../../../src/tools/debugger/executionContexts.js';
 import {
   breakOnXhr,
   evaluateOnCallframe,
@@ -140,13 +142,78 @@ function createRuntime() {
       getNetworkRequestById: (id: number) => ({id}),
       getRequestInitiator: (request: {id: number}) => ({
         requestId: request.id,
-        type: 'script',
+        type: 'script' as const,
       }),
     },
   };
 }
 
 describe('src/tools/debugger/index.ts', () => {
+  it('classifies and selects execution contexts by world', () => {
+    const pageContext = createExecutionContextInfo({
+      id: 1,
+      origin: 'https://example.com',
+      name: '',
+      auxData: {
+        frameId: 'frame-1',
+        type: 'default',
+        isDefault: true,
+      },
+    });
+    const contentScriptContext = createExecutionContextInfo({
+      id: 2,
+      origin: 'chrome-extension://abcdef/content.js',
+      name: 'content-script',
+      auxData: {
+        frameId: 'frame-1',
+        type: 'isolated',
+      },
+    });
+    const isolatedUnnamedContext = createExecutionContextInfo({
+      id: 3,
+      origin: 'https://example.com',
+      name: '',
+      auxData: {
+        frameId: 'frame-2',
+        type: 'isolated',
+      },
+    });
+
+    assert.equal(pageContext.world, 'page');
+    assert.equal(contentScriptContext.world, 'content-script');
+    assert.equal(isolatedUnnamedContext.world, 'content-script');
+    assert.equal(contentScriptContext.extensionId, 'abcdef');
+    assert.deepEqual(
+      selectExecutionContext([pageContext, contentScriptContext], {
+        context: 'page',
+      }),
+      pageContext,
+    );
+    assert.deepEqual(
+      selectExecutionContext([pageContext, contentScriptContext], {
+        context: 'content-script',
+      }),
+      contentScriptContext,
+    );
+    assert.equal(
+      selectExecutionContext(
+        [pageContext, contentScriptContext, isolatedUnnamedContext],
+        {
+          context: 'content-script',
+          frameId: 'frame-2',
+        },
+      )?.id,
+      3,
+    );
+    assert.equal(
+      selectExecutionContext([pageContext, contentScriptContext], {
+        context: 'content-script',
+        frameId: 'frame-missing',
+      }),
+      null,
+    );
+  });
+
   it('returns real script and breakpoint data', async () => {
     const {runtime} = createRuntime();
 
@@ -199,7 +266,7 @@ describe('src/tools/debugger/index.ts', () => {
     const removed = await removeBreakpoint(runtime, {breakpointId: 'bp-1'});
 
     assert.equal((search.data as {matches: Array<unknown>}).matches.length, 1);
-    assert.equal((find.data as {matches: Array<unknown>}).matches.length, 3);
+    assert.equal((find.data as {matches: Array<unknown>}).matches.length, 4);
     assert.equal(
       (breakpoint.data as {breakpointId: string}).breakpointId,
       'bp-1',

@@ -8,6 +8,7 @@ import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {getToolMeta} from '../../../src/cli/tools-meta.js';
+import {siteExperienceService} from '../../../src/services/SiteExperienceService.js';
 import {ToolAdapter} from '../../../src/worker/ToolAdapter.js';
 import {ToolContextProvider} from '../../../src/worker/ToolContextProvider.js';
 
@@ -22,6 +23,43 @@ interface ResolvePayload {
 }
 
 describe('ToolAdapter', () => {
+  it('passes params objects through params-only site experience tools', async () => {
+    const runtime = new ToolContextProvider();
+    const adapter = new ToolAdapter(runtime);
+    const meta = getToolMeta('search_site_experience');
+    assert.ok(meta, 'missing meta for search_site_experience');
+
+    const originalSearch = siteExperienceService.search;
+    let capturedParams: {url?: string; name?: string} | undefined;
+
+    siteExperienceService.search = async params => {
+      capturedParams = params;
+      return [];
+    };
+
+    try {
+      const result = await new Promise<ResolvePayload>((resolve, reject) => {
+        void adapter.wrapTool(meta!)(
+          {params: {url: 'https://www.douyin.com'}},
+          value => resolve(value as ResolvePayload),
+          reject,
+        );
+      });
+
+      assert.deepStrictEqual(capturedParams, {
+        url: 'https://www.douyin.com',
+      });
+      assert.deepStrictEqual(result.structuredContent, {
+        success: true,
+        message: '找到 0 条站点经验',
+        tooltype: 'search_site_experience',
+        results: [],
+      });
+    } finally {
+      siteExperienceService.search = originalSearch;
+    }
+  });
+
   it('passes params objects through frame callMode hook management tools', async () => {
     const runtime = new ToolContextProvider();
     const evaluateCalls: Array<{
