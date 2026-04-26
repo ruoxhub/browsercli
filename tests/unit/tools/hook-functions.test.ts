@@ -68,6 +68,32 @@ describe('hook.ts pure functions', () => {
 
       assert.strictEqual(result.bodySnippet, 'payload data');
     });
+
+    it('应该为 autoHook 的加密/执行类记录推断类型并提取片段', () => {
+      const cryptoResult = normalizeHookRecord({
+        target: 'Function.prototype.apply',
+        event: 'encrypt',
+        algorithm: 'AES',
+        ciphertext: 'cipher-xxx',
+      });
+      const evalResult = normalizeHookRecord({
+        target: 'window.eval',
+        event: 'eval',
+        code: 'return token + Date.now()',
+      });
+      const timerResult = normalizeHookRecord({
+        target: 'window.setTimeout',
+        event: 'setTimeout',
+        fnSnippet: '() => fetch("/api")',
+      });
+
+      assert.strictEqual(cryptoResult.type, 'cryptojs');
+      assert.strictEqual(cryptoResult.bodySnippet, 'cipher-xxx');
+      assert.strictEqual(evalResult.type, 'eval');
+      assert.strictEqual(evalResult.bodySnippet, 'return token + Date.now()');
+      assert.strictEqual(timerResult.type, 'timer');
+      assert.strictEqual(timerResult.bodySnippet, '() => fetch("/api")');
+    });
   });
 
   describe('summarizeHookRecords', () => {
@@ -249,6 +275,74 @@ describe('hook.ts pure functions', () => {
       assert.strictEqual(result[0].status, 200);
       assert.strictEqual(result[1].url, 'https://api.example.com/2');
       assert.strictEqual(result[1].status, 404);
+    });
+
+    it('应该对同一请求的 request/response 记录去重并继承响应状态', () => {
+      const records: NormalizedHookRecord[] = [
+        {
+          hookId: 'hook_fetch_auto',
+          type: 'fetch',
+          target: 'window.fetch',
+          event: 'request',
+          method: 'POST',
+          url: 'https://api.example.com/login',
+          status: undefined,
+          bodySnippet: '{"u":"a"}',
+          timestamp: 1,
+        },
+        {
+          hookId: 'hook_fetch_auto',
+          type: 'fetch',
+          target: 'window.fetch',
+          event: 'response',
+          method: 'POST',
+          url: 'https://api.example.com/login',
+          status: 200,
+          bodySnippet: '',
+          timestamp: 2,
+        },
+      ];
+
+      const result = buildRequestBindings(records);
+
+      assert.deepStrictEqual(result, [
+        {
+          hookId: 'hook_fetch_auto',
+          type: 'fetch',
+          event: 'request',
+          method: 'POST',
+          url: 'https://api.example.com/login',
+          status: 200,
+        },
+      ]);
+    });
+
+    it('没有 request/open 事件时应回退到带 URL 的记录', () => {
+      const records: NormalizedHookRecord[] = [
+        {
+          hookId: 'hook_fetch_auto',
+          type: 'fetch',
+          target: 'window.fetch',
+          event: 'response',
+          method: 'GET',
+          url: 'https://api.example.com/fallback',
+          status: 204,
+          bodySnippet: '',
+        },
+      ];
+
+      const result = buildRequestBindings(records);
+
+      assert.deepStrictEqual(result, [
+        {
+          hookId: 'hook_fetch_auto',
+          type: 'fetch',
+          event: 'response',
+          method: 'GET',
+          url: 'https://api.example.com/fallback',
+          status: 204,
+        },
+      ]);
     });
 
     it('空方法应该 fallback 到 UNKNOWN', () => {

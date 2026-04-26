@@ -36,6 +36,13 @@ export {injectHook} from './InjectHook.js';
 export {syncHookRecords} from './SyncHookRecords.js';
 export {getHookData} from './GetHookData.js';
 export {removeHookBrowser} from './RemoveHookBrowser.js';
+export {
+  buildRequestBindings,
+  inferCandidateEnvNeeds,
+  normalizeHookRecord,
+  summarizeHookRecords,
+  toHookRecordArray,
+} from './record-utils.js';
 
 // ─── 类型导出 ─────────────────────────────────────────
 
@@ -52,3 +59,9 @@ export type {
   BypassTarget,
   Frame,
 } from './types.js';
+export type {
+  HookRecordSummaryEntry,
+  HookRecordSummaryResult,
+  NormalizedHookRecord,
+  RequestBinding,
+} from './record-utils.js';

@@ -60,9 +60,10 @@ export interface InjectHookResult extends HookManagementResult {
 
 /** 同步 Hook 数据结果 */
 export interface SyncHookRecordsResult extends HookManagementResult {
-  tooltype: 'sync_hook_records';
+  tooltype: 'list_created_hooks';
   syncedHookIds: string[];
   totalRecords: number;
+  hooks: unknown[];
 }
 
 /** 获取 Hook 数据结果 */
@@ -73,7 +74,7 @@ export interface GetHookDataResult extends HookManagementResult {
 
 /** 移除 Hook 结果（浏览器端清理） */
 export interface RemoveHookBrowserResult extends HookManagementResult {
-  tooltype: 'remove_hook_browser';
+  tooltype: 'remove_hook';
   hookId: string;
 }
 

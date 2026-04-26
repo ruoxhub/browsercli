@@ -867,10 +867,13 @@ js-reverse call inject_hook --hookId "hk123"
 # 获取 Hook 数据
 js-reverse call get_hook_data --hookId "hk123"
 js-reverse call get_hook_data --hookId "hk123" --view summary --maxRecords 50
+js-reverse call get_hook_data --hookId "hk123" --view detail --maxRecords 20
+js-reverse call get_hook_data --view summary --type fetch --event response --phase success
 
 # 列出所有 Hook
 js-reverse call list_created_hooks
 js-reverse call list_created_hooks --verbose true
+js-reverse call list_created_hooks --type xhr --phase before
 
 # 移除 Hook
 js-reverse call remove_hook --hookId "hk123"

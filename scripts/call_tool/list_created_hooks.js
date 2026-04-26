@@ -6,6 +6,12 @@ await runToolCase({
   toolName: 'list_created_hooks',
   description: '列出已创建 Hook',
   callMode: 'frame',
-  schema: {},
-  defaultParams: {},
+  schema: {
+    hookId: 'string?',
+    verbose: 'boolean?',
+    type: 'string?',
+    event: 'string?',
+    phase: 'string?',
+  },
+  defaultParams: {verbose: true},
 });

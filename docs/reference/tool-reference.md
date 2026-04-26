@@ -730,13 +730,16 @@ so returned values have to JSON-serializable.
 
 ### `get_hook_data` — Get hook captured data
 
-**Description:** Get captured data for one hook or all hooks. Supports raw view and summary view for noise reduction.
+**Description:** Get captured data for one hook or all hooks. Supports raw view, summary view, and detail view for normalized analysis.
 
 **Parameters:**
 
 - `hookId`
 - `view`
 - `maxRecords`
+- `type`
+- `event`
+- `phase`
 
 ### `get_paused_info` — Get Paused Info
 
@@ -839,11 +842,15 @@ so returned values have to JSON-serializable.
 
 ### `list_created_hooks` — List created hooks
 
-**Description:** List all hooks created via create_hook with their status and record counts.
+**Description:** List hookStore records grouped by hookId, with optional verbose summaries and filters.
 
 **Parameters:**
 
+- `hookId`
 - `verbose`
+- `type`
+- `event`
+- `phase`
 
 ### `list_hooks` — List Hooks
 
@@ -1661,4 +1668,3 @@ so returned values have to JSON-serializable.
 - `platformFeatures`
 - `validPatterns`
 - `knownPitfalls`
-

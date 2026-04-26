@@ -48,6 +48,8 @@ export interface HookInjectionRecord {
   description: string;
   /** 是否成功注入 */
   success: boolean;
+  /** 是否实际执行过页面注入 */
+  injected?: boolean;
   /** 错误信息 */
   error?: string;
 }
@@ -84,6 +86,15 @@ export interface AutoHookToolData {
   };
 }
 
+interface FrameLike {
+  evaluate(script: string): Promise<unknown>;
+}
+
+interface AutoHookRuntimeServices {
+  getSelectedFrame?(): FrameLike | null;
+  getSelectedPage?(): {mainFrame?: () => FrameLike; url?: () => string} | null;
+}
+
 /** 自动 Hook 工具统一返回结构 */
 export interface AutoHookToolResult {
   success: boolean;
@@ -116,6 +127,40 @@ const PRESET_CONFIGS: Record<string, Partial<AutoHookOptions>> = {
   },
 };
 
+function _generateHookStoreHelpers(hookId: string): string {
+  return `
+  window.__hookStore = window.__hookStore || {};
+  if (!Array.isArray(window.__hookStore[hookId])) {
+    window.__hookStore[hookId] = [];
+  }
+
+  function safeClone(value) {
+    try {
+      if (typeof value === 'function') return '[Function]';
+      if (typeof Element !== 'undefined' && value instanceof Element) {
+        return '[Element: ' + value.tagName + ']';
+      }
+      return JSON.parse(JSON.stringify(value));
+    } catch (e) {
+      try {
+        return String(value);
+      } catch {
+        return '[Unserializable]';
+      }
+    }
+  }
+
+  function pushHookRecord(record) {
+    const store = window.__hookStore[hookId];
+    if (!Array.isArray(store)) return;
+    store.push(record);
+    if (store.length > 1000) {
+      store.shift();
+    }
+  }
+`;
+}
+
 /**
  * 生成 CryptoJS Hook 脚本
  */
@@ -125,6 +170,7 @@ function _generateCryptoJsHookScript(algorithms: string[] = ['all']): string {
   'use strict';
   const hookId = 'hook_cryptojs_auto';
   const algorithms = ${JSON.stringify(algorithms)};
+  ${_generateHookStoreHelpers('hook_cryptojs_auto')}
 
   function hasEncryptProp(obj) {
     const requiredProps = ['ciphertext', 'key', 'iv', 'algorithm', 'mode', 'padding', 'blockSize', 'formatter'];
@@ -146,7 +192,12 @@ function _generateCryptoJsHookScript(algorithms: string[] = ['all']): string {
 
       if (Object.hasOwn(arguments[0], "$super") && Object.hasOwn(arguments[1], "callee")) {
         const data = {
-          type: 'encrypt',
+          hookId,
+          type: 'cryptojs',
+          target: 'Function.prototype.apply',
+          event: 'encrypt',
+          phase: 'before',
+          operation: 'encrypt',
           timestamp: Date.now(),
           algorithm: arguments[1][0].algorithm?.toString() || 'Unknown',
           mode: arguments[1][0].mode?.toString() || 'Unknown',
@@ -160,6 +211,7 @@ function _generateCryptoJsHookScript(algorithms: string[] = ['all']): string {
           data.ciphertext = encryptText;
         }
 
+        pushHookRecord(data);
         console.log('[CryptoJS]', data);
       }
 
@@ -169,12 +221,18 @@ function _generateCryptoJsHookScript(algorithms: string[] = ['all']): string {
 
       if (Object.hasOwn(arguments[0], "$super") && Object.hasOwn(arguments[1], "callee")) {
         const data = {
-          type: 'decrypt',
+          hookId,
+          type: 'cryptojs',
+          target: 'Function.prototype.apply',
+          event: 'decrypt',
+          phase: 'before',
+          operation: 'decrypt',
           timestamp: Date.now(),
           key: arguments[1][1].toString() || 'N/A',
           iv: arguments[1][2]?.iv?.toString() || 'N/A',
         };
 
+        pushHookRecord(data);
         console.log('[CryptoJS]', data);
       }
     }
@@ -182,6 +240,15 @@ function _generateCryptoJsHookScript(algorithms: string[] = ['all']): string {
     return temp_apply.apply(this, arguments);
   };
 
+  pushHookRecord({
+    hookId,
+    type: 'cryptojs',
+    target: 'Function.prototype.apply',
+    event: 'installed',
+    phase: 'install',
+    timestamp: Date.now(),
+    algorithms,
+  });
   console.log('[hook_cryptojs_auto] ✅ CryptoJS hook installed');
 })();
 `;
@@ -195,8 +262,17 @@ function _generateJsEncryptHookScript(): string {
 (function() {
   'use strict';
   const hookId = 'hook_jsencrypt_auto';
+  ${_generateHookStoreHelpers('hook_jsencrypt_auto')}
 
   if (typeof window.JSEncrypt === 'undefined') {
+    pushHookRecord({
+      hookId,
+      type: 'jsencrypt',
+      target: 'window.JSEncrypt',
+      event: 'missing',
+      phase: 'install',
+      timestamp: Date.now(),
+    });
     console.log('[hook_jsencrypt_auto] ⚠️ JSEncrypt not found on this page');
     return;
   }
@@ -205,13 +281,21 @@ function _generateJsEncryptHookScript(): string {
   window.JSEncrypt.prototype.encrypt = function(plaintext) {
     const result = originalEncrypt.call(this, plaintext);
 
-    console.log('[JSEncrypt]', {
-      type: 'encrypt',
+    const record = {
+      hookId,
+      type: 'jsencrypt',
+      target: 'JSEncrypt.prototype.encrypt',
+      event: 'encrypt',
+      phase: 'after',
       timestamp: Date.now(),
-      publicKey: this.pubKey?.n?.toString(16)?.slice(0, 64) + '...' || 'N/A',
+      publicKey: this.pubKey?.n?.toString(16)?.slice(0, 64)
+        ? this.pubKey.n.toString(16).slice(0, 64) + '...'
+        : 'N/A',
       plaintext: plaintext?.slice(0, 100),
       ciphertext: result?.slice(0, 200),
-    });
+    };
+    pushHookRecord(record);
+    console.log('[JSEncrypt]', record);
 
     return result;
   };
@@ -220,17 +304,33 @@ function _generateJsEncryptHookScript(): string {
   window.JSEncrypt.prototype.decrypt = function(ciphertext) {
     const result = originalDecrypt.call(this, ciphertext);
 
-    console.log('[JSEncrypt]', {
-      type: 'decrypt',
+    const record = {
+      hookId,
+      type: 'jsencrypt',
+      target: 'JSEncrypt.prototype.decrypt',
+      event: 'decrypt',
+      phase: 'after',
       timestamp: Date.now(),
-      privateKey: this.privKey?.n?.toString(16)?.slice(0, 64) + '...' || 'N/A',
+      privateKey: this.privKey?.n?.toString(16)
+        ? this.privKey.n.toString(16).slice(0, 64) + '...'
+        : 'N/A',
       ciphertext: ciphertext?.slice(0, 100),
       plaintext: result?.slice(0, 100),
-    });
+    };
+    pushHookRecord(record);
+    console.log('[JSEncrypt]', record);
 
     return result;
   };
 
+  pushHookRecord({
+    hookId,
+    type: 'jsencrypt',
+    target: 'window.JSEncrypt',
+    event: 'installed',
+    phase: 'install',
+    timestamp: Date.now(),
+  });
   console.log('[hook_jsencrypt_auto] ✅ JSEncrypt hook installed');
 })();
 `;
@@ -244,8 +344,13 @@ function _generateSmCryptoHookScript(): string {
 (function() {
   'use strict';
   const hookId = 'hook_smcrypto_auto';
+  ${_generateHookStoreHelpers('hook_smcrypto_auto')}
 
   const sm = window.sm2 || window.sm3 || window.sm4 || window;
+  const detectedModules = [];
+  if (sm.sm2) detectedModules.push('sm2');
+  if (sm.sm3) detectedModules.push('sm3');
+  if (sm.sm4) detectedModules.push('sm4');
 
   // SM2 Hook
   if (sm.sm2) {
@@ -253,13 +358,19 @@ function _generateSmCryptoHookScript(): string {
     if (originalSm2Encrypt) {
       sm.sm2.encrypt = function(data, ...args) {
         const result = originalSm2Encrypt.call(this, data, ...args);
-        console.log('[SM-Crypto]', {
+        const record = {
+          hookId,
+          type: 'smcrypto',
+          target: 'sm2.encrypt',
+          event: 'encrypt',
+          phase: 'after',
           algorithm: 'SM2',
-          type: 'encrypt',
           timestamp: Date.now(),
           plaintext: data?.slice(0, 50),
           ciphertext: typeof result === 'string' ? result.slice(0, 100) : '[object]',
-        });
+        };
+        pushHookRecord(record);
+        console.log('[SM-Crypto]', record);
         return result;
       };
     }
@@ -268,13 +379,19 @@ function _generateSmCryptoHookScript(): string {
     if (originalSm2Decrypt) {
       sm.sm2.decrypt = function(cipher, ...args) {
         const result = originalSm2Decrypt.call(this, cipher, ...args);
-        console.log('[SM-Crypto]', {
+        const record = {
+          hookId,
+          type: 'smcrypto',
+          target: 'sm2.decrypt',
+          event: 'decrypt',
+          phase: 'after',
           algorithm: 'SM2',
-          type: 'decrypt',
           timestamp: Date.now(),
           ciphertext: typeof cipher === 'string' ? cipher.slice(0, 50) : '[object]',
           plaintext: typeof result === 'string' ? result.slice(0, 50) : '[object]',
-        });
+        };
+        pushHookRecord(record);
+        console.log('[SM-Crypto]', record);
         return result;
       };
     }
@@ -285,13 +402,19 @@ function _generateSmCryptoHookScript(): string {
     const originalSm3 = sm.sm3;
     sm.sm3 = function(data, ...args) {
       const result = originalSm3.call(this, data, ...args);
-      console.log('[SM-Crypto]', {
+      const record = {
+        hookId,
+        type: 'smcrypto',
+        target: 'sm3',
+        event: 'hash',
+        phase: 'after',
         algorithm: 'SM3',
-        type: 'hash',
         timestamp: Date.now(),
         input: typeof data === 'string' ? data.slice(0, 50) : '[object]',
         hash: typeof result === 'string' ? result : '[object]',
-      });
+      };
+      pushHookRecord(record);
+      console.log('[SM-Crypto]', record);
       return result;
     };
   }
@@ -302,19 +425,34 @@ function _generateSmCryptoHookScript(): string {
     if (originalSm4Encrypt) {
       sm.sm4.encrypt = function(data, key, ...args) {
         const result = originalSm4Encrypt.call(this, data, key, ...args);
-        console.log('[SM-Crypto]', {
+        const record = {
+          hookId,
+          type: 'smcrypto',
+          target: 'sm4.encrypt',
+          event: 'encrypt',
+          phase: 'after',
           algorithm: 'SM4',
-          type: 'encrypt',
           timestamp: Date.now(),
           key: typeof key === 'string' ? key.slice(0, 32) : '[object]',
           plaintext: typeof data === 'string' ? data.slice(0, 50) : '[object]',
           ciphertext: typeof result === 'string' ? result.slice(0, 100) : '[object]',
-        });
+        };
+        pushHookRecord(record);
+        console.log('[SM-Crypto]', record);
         return result;
       };
     }
   }
 
+  pushHookRecord({
+    hookId,
+    type: 'smcrypto',
+    target: 'window.sm*',
+    event: 'installed',
+    phase: 'install',
+    timestamp: Date.now(),
+    modules: detectedModules,
+  });
   console.log('[hook_smcrypto_auto] ✅ SM-Crypto hook installed');
 })();
 `;
@@ -328,41 +466,71 @@ function _generateFetchHookScript(): string {
 (function() {
   'use strict';
   const hookId = 'hook_fetch_auto';
+  ${_generateHookStoreHelpers('hook_fetch_auto')}
 
   const originalFetch = window.fetch;
   window.fetch = async function(input, init) {
     const url = typeof input === 'string' ? input : input?.url || '[unknown]';
     const method = init?.method || 'GET';
 
-    console.log('[Fetch Hook]', {
-      type: 'request',
+    const requestRecord = {
+      hookId,
+      type: 'fetch',
+      target: 'window.fetch',
+      event: 'request',
+      phase: 'before',
       timestamp: Date.now(),
       url,
       method,
-      headers: init?.headers || {},
+      headers: safeClone(init?.headers || {}),
       body: init?.body ? String(init.body).slice(0, 200) : undefined,
-    });
+    };
+    pushHookRecord(requestRecord);
+    console.log('[Fetch Hook]', requestRecord);
 
     try {
       const response = await originalFetch.call(this, input, init);
-      console.log('[Fetch Hook]', {
-        type: 'response',
+      const responseRecord = {
+        hookId,
+        type: 'fetch',
+        target: 'window.fetch',
+        event: 'response',
+        phase: 'success',
         timestamp: Date.now(),
         url,
+        method,
         status: response.status,
         statusText: response.statusText,
-      });
+      };
+      pushHookRecord(responseRecord);
+      console.log('[Fetch Hook]', responseRecord);
       return response;
     } catch (error) {
-      console.log('[Fetch Hook]', {
-        type: 'error',
+      const errorRecord = {
+        hookId,
+        type: 'fetch',
+        target: 'window.fetch',
+        event: 'error',
+        phase: 'error',
         timestamp: Date.now(),
         url,
+        method,
         error: error instanceof Error ? error.message : String(error),
-      });
+      };
+      pushHookRecord(errorRecord);
+      console.log('[Fetch Hook]', errorRecord);
       throw error;
     }
   };
+
+  pushHookRecord({
+    hookId,
+    type: 'fetch',
+    target: 'window.fetch',
+    event: 'installed',
+    phase: 'install',
+    timestamp: Date.now(),
+  });
 
   console.log('[hook_fetch_auto] ✅ Fetch hook installed');
 })();
@@ -377,6 +545,7 @@ function _generateXhrHookScript(): string {
 (function() {
   'use strict';
   const hookId = 'hook_xhr_auto';
+  ${_generateHookStoreHelpers('hook_xhr_auto')}
 
   const originalOpen = XMLHttpRequest.prototype.open;
   const originalSend = XMLHttpRequest.prototype.send;
@@ -384,31 +553,82 @@ function _generateXhrHookScript(): string {
   XMLHttpRequest.prototype.open = function(method, url, ...rest) {
     this._hookUrl = typeof url === 'string' ? url : String(url);
     this._hookMethod = method;
+    this._hookCorrelationId = 'xhr_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    pushHookRecord({
+      hookId,
+      type: 'xhr',
+      target: 'XMLHttpRequest.open',
+      event: 'open',
+      phase: 'before',
+      timestamp: Date.now(),
+      url: this._hookUrl || 'UNKNOWN',
+      method: this._hookMethod || 'UNKNOWN',
+      correlationId: this._hookCorrelationId,
+    });
     return originalOpen.call(this, method, url, ...rest);
   };
 
   XMLHttpRequest.prototype.send = function(body) {
-    console.log('[XHR Hook]', {
-      type: 'request',
+    const requestRecord = {
+      hookId,
+      type: 'xhr',
+      target: 'XMLHttpRequest.send',
+      event: 'request',
+      phase: 'before',
       timestamp: Date.now(),
       method: this._hookMethod || 'UNKNOWN',
       url: this._hookUrl || 'UNKNOWN',
       body: body ? String(body).slice(0, 200) : undefined,
-    });
+      correlationId: this._hookCorrelationId,
+    };
+    pushHookRecord(requestRecord);
+    console.log('[XHR Hook]', requestRecord);
 
     this.addEventListener('load', function() {
-      console.log('[XHR Hook]', {
-        type: 'response',
+      const responseRecord = {
+        hookId,
+        type: 'xhr',
+        target: 'XMLHttpRequest.send',
+        event: 'response',
+        phase: 'success',
         timestamp: Date.now(),
         method: this._hookMethod || 'UNKNOWN',
         url: this._hookUrl || 'UNKNOWN',
         status: this.status,
         response: this.responseText ? String(this.responseText).slice(0, 200) : undefined,
-      });
+        correlationId: this._hookCorrelationId,
+      };
+      pushHookRecord(responseRecord);
+      console.log('[XHR Hook]', responseRecord);
+    });
+
+    this.addEventListener('error', function() {
+      const errorRecord = {
+        hookId,
+        type: 'xhr',
+        target: 'XMLHttpRequest.send',
+        event: 'error',
+        phase: 'error',
+        timestamp: Date.now(),
+        method: this._hookMethod || 'UNKNOWN',
+        url: this._hookUrl || 'UNKNOWN',
+        correlationId: this._hookCorrelationId,
+      };
+      pushHookRecord(errorRecord);
+      console.log('[XHR Hook]', errorRecord);
     });
 
     return originalSend.call(this, body);
   };
+
+  pushHookRecord({
+    hookId,
+    type: 'xhr',
+    target: 'XMLHttpRequest',
+    event: 'installed',
+    phase: 'install',
+    timestamp: Date.now(),
+  });
 
   console.log('[hook_xhr_auto] ✅ XHR hook installed');
 })();
@@ -423,23 +643,36 @@ function _generateTimerHookScript(): string {
 (function() {
   'use strict';
   const hookId = 'hook_timers_auto';
+  ${_generateHookStoreHelpers('hook_timers_auto')}
 
   const originalSetTimeout = window.setTimeout;
   window.setTimeout = function(fn, delay, ...args) {
     const fnStr = typeof fn === 'function' ? fn.toString() : String(fn);
-    console.log('[Timer Hook]', {
-      type: 'setTimeout',
+    const scheduleRecord = {
+      hookId,
+      type: 'timer',
+      target: 'window.setTimeout',
+      event: 'setTimeout',
+      phase: 'before',
       timestamp: Date.now(),
       delay,
       fnType: typeof fn,
       fnSnippet: fnStr.slice(0, 100),
-    });
+    };
+    pushHookRecord(scheduleRecord);
+    console.log('[Timer Hook]', scheduleRecord);
 
     const wrappedFn = function() {
-      console.log('[Timer Hook]', {
-        type: 'setTimeout:exec',
+      const execRecord = {
+        hookId,
+        type: 'timer',
+        target: 'window.setTimeout',
+        event: 'setTimeout:exec',
+        phase: 'success',
         timestamp: Date.now(),
-      });
+      };
+      pushHookRecord(execRecord);
+      console.log('[Timer Hook]', execRecord);
       return fn.apply(this, arguments);
     };
 
@@ -449,24 +682,45 @@ function _generateTimerHookScript(): string {
   const originalSetInterval = window.setInterval;
   window.setInterval = function(fn, delay, ...args) {
     const fnStr = typeof fn === 'function' ? fn.toString() : String(fn);
-    console.log('[Timer Hook]', {
-      type: 'setInterval',
+    const scheduleRecord = {
+      hookId,
+      type: 'timer',
+      target: 'window.setInterval',
+      event: 'setInterval',
+      phase: 'before',
       timestamp: Date.now(),
       delay,
       fnType: typeof fn,
       fnSnippet: fnStr.slice(0, 100),
-    });
+    };
+    pushHookRecord(scheduleRecord);
+    console.log('[Timer Hook]', scheduleRecord);
 
     const wrappedFn = function() {
-      console.log('[Timer Hook]', {
-        type: 'setInterval:exec',
+      const execRecord = {
+        hookId,
+        type: 'timer',
+        target: 'window.setInterval',
+        event: 'setInterval:exec',
+        phase: 'success',
         timestamp: Date.now(),
-      });
+      };
+      pushHookRecord(execRecord);
+      console.log('[Timer Hook]', execRecord);
       return fn.apply(this, arguments);
     };
 
     return originalSetInterval.call(this, wrappedFn, delay, ...args);
   };
+
+  pushHookRecord({
+    hookId,
+    type: 'timer',
+    target: 'window.setTimeout',
+    event: 'installed',
+    phase: 'install',
+    timestamp: Date.now(),
+  });
 
   console.log('[hook_timers_auto] ✅ Timer hooks installed');
 })();
@@ -481,29 +735,48 @@ function _generateEvalHookScript(): string {
 (function() {
   'use strict';
   const hookId = 'hook_eval_auto';
+  ${_generateHookStoreHelpers('hook_eval_auto')}
 
   const originalEval = window.eval;
   window.eval = function(code) {
-    console.log('[Eval Hook]', {
+    const evalRecord = {
+      hookId,
       type: 'eval',
+      target: 'window.eval',
+      event: 'eval',
+      phase: 'before',
       timestamp: Date.now(),
       code: typeof code === 'string' ? code.slice(0, 200) : '[non-string]',
-    });
+    };
+    pushHookRecord(evalRecord);
+    console.log('[Eval Hook]', evalRecord);
 
     try {
       const result = originalEval.call(this, code);
-      console.log('[Eval Hook]', {
-        type: 'eval:result',
+      const resultRecord = {
+        hookId,
+        type: 'eval',
+        target: 'window.eval',
+        event: 'eval:result',
+        phase: 'success',
         timestamp: Date.now(),
         resultType: typeof result,
-      });
+      };
+      pushHookRecord(resultRecord);
+      console.log('[Eval Hook]', resultRecord);
       return result;
     } catch (error) {
-      console.log('[Eval Hook]', {
-        type: 'eval:error',
+      const errorRecord = {
+        hookId,
+        type: 'eval',
+        target: 'window.eval',
+        event: 'eval:error',
+        phase: 'error',
         timestamp: Date.now(),
         error: error instanceof Error ? error.message : String(error),
-      });
+      };
+      pushHookRecord(errorRecord);
+      console.log('[Eval Hook]', errorRecord);
       throw error;
     }
   };
@@ -513,14 +786,29 @@ function _generateEvalHookScript(): string {
   window.Function = function(...args) {
     if (args.length > 0) {
       const lastArg = args[args.length - 1];
-      console.log('[Function Hook]', {
-        type: 'Function',
+      const functionRecord = {
+        hookId,
+        type: 'eval',
+        target: 'window.Function',
+        event: 'Function',
+        phase: 'before',
         timestamp: Date.now(),
         code: String(lastArg).slice(0, 200),
-      });
+      };
+      pushHookRecord(functionRecord);
+      console.log('[Function Hook]', functionRecord);
     }
     return originalFunction.apply(this, args);
   };
+
+  pushHookRecord({
+    hookId,
+    type: 'eval',
+    target: 'window.eval',
+    event: 'installed',
+    phase: 'install',
+    timestamp: Date.now(),
+  });
 
   console.log('[hook_eval_auto] ✅ Eval/Function hooks installed');
 })();
@@ -532,15 +820,24 @@ function _generateEvalHookScript(): string {
  */
 function _generateCookieHookScript(): string {
   return `
-(function() {
-  'use strict';
-  const hookId = 'hook_cookie_auto';
-
-  const cookieDescriptor = Object.getOwnPropertyDescriptor(Document.prototype, 'cookie');
-  if (!cookieDescriptor) {
-    console.log('[hook_cookie_auto] ⚠️ Cannot hook cookie - descriptor not found');
-    return;
-  }
+  (function() {
+    'use strict';
+    const hookId = 'hook_cookie_auto';
+    ${_generateHookStoreHelpers('hook_cookie_auto')}
+  
+    const cookieDescriptor = Object.getOwnPropertyDescriptor(Document.prototype, 'cookie');
+    if (!cookieDescriptor) {
+      pushHookRecord({
+        hookId,
+        type: 'cookie',
+        target: 'Document.cookie',
+        event: 'missing',
+        phase: 'install',
+        timestamp: Date.now(),
+      });
+      console.log('[hook_cookie_auto] ⚠️ Cannot hook cookie - descriptor not found');
+      return;
+    }
 
   const originalGet = cookieDescriptor.get;
   const originalSet = cookieDescriptor.set;
@@ -548,23 +845,44 @@ function _generateCookieHookScript(): string {
   Object.defineProperty(Document.prototype, 'cookie', {
     get: function() {
       const value = originalGet.call(this);
-      console.log('[Cookie Hook]', {
-        type: 'get',
+      const record = {
+        hookId,
+        type: 'cookie',
+        target: 'Document.cookie',
+        event: 'get',
+        phase: 'after',
         timestamp: Date.now(),
         cookieLength: value?.length || 0,
-      });
+      };
+      pushHookRecord(record);
+      console.log('[Cookie Hook]', record);
       return value;
     },
     set: function(value) {
-      console.log('[Cookie Hook]', {
-        type: 'set',
+      const record = {
+        hookId,
+        type: 'cookie',
+        target: 'Document.cookie',
+        event: 'set',
+        phase: 'after',
         timestamp: Date.now(),
         cookie: value?.slice(0, 200) || '',
-      });
+      };
+      pushHookRecord(record);
+      console.log('[Cookie Hook]', record);
       return originalSet.call(this, value);
     },
     configurable: true,
     enumerable: true,
+  });
+
+  pushHookRecord({
+    hookId,
+    type: 'cookie',
+    target: 'Document.cookie',
+    event: 'installed',
+    phase: 'install',
+    timestamp: Date.now(),
   });
 
   console.log('[hook_cookie_auto] ✅ Cookie hook installed');
@@ -637,118 +955,190 @@ function mergePresetConfig(options: AutoHookOptions): AutoHookOptions {
   };
 }
 
+function isRuntimeServices(value: unknown): value is AutoHookRuntimeServices {
+  return !!value && typeof value === 'object';
+}
+
+function resolveAutoHookInvocation(
+  runtimeOrParams?:
+    | AutoHookRuntimeServices
+    | (AutoHookOptions & {url?: string}),
+  maybeParams?: AutoHookOptions & {url?: string},
+): {
+  runtime?: AutoHookRuntimeServices;
+  params: AutoHookOptions & {url?: string};
+} {
+  if (maybeParams !== undefined && isRuntimeServices(runtimeOrParams)) {
+    return {runtime: runtimeOrParams, params: maybeParams};
+  }
+
+  return {params: (runtimeOrParams as AutoHookOptions & {url?: string}) || {}};
+}
+
+function buildHookPlans(
+  options: AutoHookOptions,
+): Array<HookInjectionRecord & {script: string}> {
+  const plans: Array<HookInjectionRecord & {script: string}> = [];
+
+  if (options.hookFetch) {
+    plans.push({
+      hookId: 'hook_fetch_auto',
+      type: 'fetch',
+      description: 'Hook fetch API - capture requests and responses',
+      success: true,
+      injected: false,
+      script: _generateFetchHookScript(),
+    });
+  }
+
+  if (options.hookXhr) {
+    plans.push({
+      hookId: 'hook_xhr_auto',
+      type: 'xhr',
+      description: 'Hook XMLHttpRequest - capture XHR requests',
+      success: true,
+      injected: false,
+      script: _generateXhrHookScript(),
+    });
+  }
+
+  if (options.hookTimers) {
+    plans.push({
+      hookId: 'hook_timers_auto',
+      type: 'timer',
+      description: 'Hook setTimeout/setInterval',
+      success: true,
+      injected: false,
+      script: _generateTimerHookScript(),
+    });
+  }
+
+  if (options.hookEval) {
+    plans.push({
+      hookId: 'hook_eval_auto',
+      type: 'eval',
+      description: 'Hook eval and Function constructor',
+      success: true,
+      injected: false,
+      script: _generateEvalHookScript(),
+    });
+  }
+
+  if (options.hookCookie) {
+    plans.push({
+      hookId: 'hook_cookie_auto',
+      type: 'cookie',
+      description: 'Hook document.cookie getter/setter',
+      success: true,
+      injected: false,
+      script: _generateCookieHookScript(),
+    });
+  }
+
+  if (options.hookCrypto) {
+    plans.push({
+      hookId: 'hook_cryptojs_auto',
+      type: 'cryptojs',
+      description: 'Hook CryptoJS - AES, DES, MD5, SHA, HMAC',
+      success: true,
+      injected: false,
+      script: _generateCryptoJsHookScript(),
+    });
+  }
+
+  if (options.hookRsa) {
+    plans.push({
+      hookId: 'hook_jsencrypt_auto',
+      type: 'jsencrypt',
+      description: 'Hook JSEncrypt - RSA encryption/decryption',
+      success: true,
+      injected: false,
+      script: _generateJsEncryptHookScript(),
+    });
+  }
+
+  if (options.hookSmCrypto) {
+    plans.push({
+      hookId: 'hook_smcrypto_auto',
+      type: 'smcrypto',
+      description: 'Hook SM-Crypto - SM2, SM3, SM4',
+      success: true,
+      injected: false,
+      script: _generateSmCryptoHookScript(),
+    });
+  }
+
+  return plans;
+}
+
+async function injectHookPlans(
+  runtime: AutoHookRuntimeServices,
+  plans: Array<HookInjectionRecord & {script: string}>,
+): Promise<HookInjectionRecord[]> {
+  const selectedPage = runtime.getSelectedPage?.() ?? null;
+  const frame =
+    runtime.getSelectedFrame?.() ?? selectedPage?.mainFrame?.() ?? null;
+
+  if (!frame) {
+    throw new Error('auto_hook 需要可用的页面/Frame 才能执行 autoInject');
+  }
+
+  const injected: HookInjectionRecord[] = [];
+  for (const plan of plans) {
+    try {
+      await frame.evaluate(plan.script);
+      injected.push({...plan, success: true, injected: true});
+    } catch (error) {
+      injected.push({
+        ...plan,
+        success: false,
+        injected: true,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  return injected;
+}
+
 /**
  * 自动 Hook 工具 - 注入调试 Hook 和加密库 Hook
  */
 export async function autoHook(
-  params: AutoHookOptions & {url?: string} = {},
+  runtimeOrParams:
+    | AutoHookRuntimeServices
+    | (AutoHookOptions & {url?: string}) = {},
+  maybeParams?: AutoHookOptions & {url?: string},
 ): Promise<AutoHookToolResult> {
+  const {runtime, params} = resolveAutoHookInvocation(
+    runtimeOrParams,
+    maybeParams,
+  );
   const {url, ...rawOptions} = params;
   const options = mergePresetConfig(rawOptions);
 
   logger.info('[AutoHook] Starting with options: ' + JSON.stringify(options));
 
-  const hooksInjected: HookInjectionRecord[] = [];
+  let hooksInjected: HookInjectionRecord[] = [];
   const cryptoDetected: CryptoDetectionResult[] = detectCryptoLibraries();
 
   try {
-    // 1. 根据预设注入基础 Hook
-    if (options.hookFetch) {
-      const record: HookInjectionRecord = {
-        hookId: 'hook_fetch_auto',
-        type: 'fetch',
-        description: 'Hook fetch API - capture requests and responses',
-        success: true,
-      };
-      hooksInjected.push(record);
-      logger.info('[AutoHook] Injected fetch hook');
-    }
-
-    if (options.hookXhr) {
-      const record: HookInjectionRecord = {
-        hookId: 'hook_xhr_auto',
-        type: 'xhr',
-        description: 'Hook XMLHttpRequest - capture XHR requests',
-        success: true,
-      };
-      hooksInjected.push(record);
-      logger.info('[AutoHook] Injected XHR hook');
-    }
-
-    if (options.hookTimers) {
-      const record: HookInjectionRecord = {
-        hookId: 'hook_timers_auto',
-        type: 'timer',
-        description: 'Hook setTimeout/setInterval',
-        success: true,
-      };
-      hooksInjected.push(record);
-      logger.info('[AutoHook] Injected timer hooks');
-    }
-
-    if (options.hookEval) {
-      const record: HookInjectionRecord = {
-        hookId: 'hook_eval_auto',
-        type: 'eval',
-        description: 'Hook eval and Function constructor',
-        success: true,
-      };
-      hooksInjected.push(record);
-      logger.info('[AutoHook] Injected eval hooks');
-    }
-
-    if (options.hookCookie) {
-      const record: HookInjectionRecord = {
-        hookId: 'hook_cookie_auto',
-        type: 'cookie',
-        description: 'Hook document.cookie getter/setter',
-        success: true,
-      };
-      hooksInjected.push(record);
-      logger.info('[AutoHook] Injected cookie hook');
-    }
-
-    // 2. Hook 加密库
-    if (options.hookCrypto) {
-      const record: HookInjectionRecord = {
-        hookId: 'hook_cryptojs_auto',
-        type: 'cryptojs',
-        description: 'Hook CryptoJS - AES, DES, MD5, SHA, HMAC',
-        success: true,
-      };
-      hooksInjected.push(record);
-      logger.info('[AutoHook] Injected CryptoJS hook');
-    }
-
-    if (options.hookRsa) {
-      const record: HookInjectionRecord = {
-        hookId: 'hook_jsencrypt_auto',
-        type: 'jsencrypt',
-        description: 'Hook JSEncrypt - RSA encryption/decryption',
-        success: true,
-      };
-      hooksInjected.push(record);
-      logger.info('[AutoHook] Injected JSEncrypt hook');
-    }
-
-    if (options.hookSmCrypto) {
-      const record: HookInjectionRecord = {
-        hookId: 'hook_smcrypto_auto',
-        type: 'smcrypto',
-        description: 'Hook SM-Crypto - SM2, SM3, SM4',
-        success: true,
-      };
-      hooksInjected.push(record);
-      logger.info('[AutoHook] Injected SM-Crypto hook');
-    }
+    const hookPlans = buildHookPlans(options);
+    hooksInjected =
+      options.autoInject && runtime
+        ? await injectHookPlans(runtime, hookPlans)
+        : hookPlans.map(({script: _script, ...plan}) => plan);
 
     // 3. 生成 Hook 报告
-    const successfulInjections = hooksInjected.filter(h => h.success).length;
+    const successfulInjections = hooksInjected.filter(
+      h => h.success && h.injected,
+    ).length;
     const failedInjections = hooksInjected.filter(h => !h.success).length;
     const detectedCryptoCount = cryptoDetected.filter(c => c.detected).length;
+    const pageUrl = runtime?.getSelectedPage?.()?.url?.();
 
     const data: AutoHookToolData = {
-      url: url || 'unknown',
+      url: url || pageUrl || 'unknown',
       hooksInjected,
       cryptoDetected,
       report: {
@@ -764,7 +1154,9 @@ export async function autoHook(
 
     return {
       success: true,
-      message: `自动 Hook 完成：注入 ${successfulInjections} 个 Hook, 检测到 ${detectedCryptoCount} 个加密库`,
+      message: options.autoInject
+        ? `自动 Hook 完成：实际注入 ${successfulInjections} 个 Hook, 检测到 ${detectedCryptoCount} 个加密库`
+        : `自动 Hook 计划已生成：共 ${hooksInjected.length} 个 Hook（未注入页面）`,
       tooltype: 'auto_hook',
       data,
     };
@@ -778,7 +1170,7 @@ export async function autoHook(
       error: errorMessage,
       tooltype: 'auto_hook',
       data: {
-        url: url || 'unknown',
+        url: url || runtime?.getSelectedPage?.()?.url?.() || 'unknown',
         hooksInjected,
         cryptoDetected,
       } as AutoHookToolData,

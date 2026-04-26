@@ -6,6 +6,38 @@
 
 import type {Frame} from '../../third_party/index.js';
 import type {SyncHookRecordsResult} from './types.js';
+import {summarizeHookStore, readHookStore} from './store-utils.js';
+
+interface SyncHookRecordsParams {
+  hookId?: string;
+  verbose?: boolean;
+  type?: string;
+  event?: string;
+  phase?: string;
+}
+
+function normalizeParams(
+  params?: string | SyncHookRecordsParams,
+): Pick<
+  SyncHookRecordsParams,
+  'hookId' | 'verbose' | 'type' | 'event' | 'phase'
+> {
+  if (typeof params === 'string') {
+    return {hookId: params};
+  }
+
+  if (params && typeof params === 'object') {
+    return {
+      hookId: typeof params.hookId === 'string' ? params.hookId : undefined,
+      verbose: params.verbose === true,
+      type: typeof params.type === 'string' ? params.type : undefined,
+      event: typeof params.event === 'string' ? params.event : undefined,
+      phase: typeof params.phase === 'string' ? params.phase : undefined,
+    };
+  }
+
+  return {};
+}
 
 /**
  * 将 Hook 记录从浏览器端同步到 Node.js 端。
@@ -19,68 +51,49 @@ import type {SyncHookRecordsResult} from './types.js';
  */
 export async function syncHookRecords(
   frame: Frame,
-  hookId?: string,
+  params?: string | SyncHookRecordsParams,
 ): Promise<SyncHookRecordsResult> {
+  const {hookId, verbose, type, event, phase} = normalizeParams(params);
+
   try {
-    const storeSnapshot = await frame.evaluate((id?: string) => {
-      const rawStore = (window as typeof window & {__hookStore?: unknown})
-        .__hookStore;
-      const store =
-        rawStore && typeof rawStore === 'object'
-          ? (rawStore as Record<string, unknown>)
-          : {};
-
-      const normalize = (value: unknown) => (Array.isArray(value) ? value : []);
-
-      if (typeof id === 'string' && id.length > 0) {
-        return {[id]: normalize(store[id])};
-      }
-
-      const all: Record<string, unknown[]> = {};
-      for (const [key, value] of Object.entries(store)) {
-        if (Array.isArray(value)) {
-          all[key] = value;
-        }
-      }
-      return all;
-    }, hookId);
+    const storeSnapshot = await readHookStore(frame, hookId);
 
     if (!storeSnapshot || typeof storeSnapshot !== 'object') {
       return {
         success: true,
         message: '浏览器端无 Hook 数据',
-        tooltype: 'sync_hook_records',
+        tooltype: 'list_created_hooks',
         syncedHookIds: [],
         totalRecords: 0,
+        hooks: [],
       };
     }
 
-    const syncedHookIds: string[] = [];
-    let totalRecords = 0;
-
-    for (const [id, records] of Object.entries(
-      storeSnapshot as Record<string, unknown>,
-    )) {
-      if (Array.isArray(records)) {
-        syncedHookIds.push(id);
-        totalRecords += records.length;
-      }
-    }
+    const summary = summarizeHookStore(storeSnapshot, {type, event, phase});
+    const hooks = verbose
+      ? summary.hooks
+      : summary.hooks.map(({hookId: id, total, type}) => ({
+          hookId: id,
+          total,
+          type,
+        }));
 
     return {
       success: true,
-      message: `同步完成，${syncedHookIds.length} 个 Hook，共 ${totalRecords} 条记录`,
-      tooltype: 'sync_hook_records',
-      syncedHookIds,
-      totalRecords,
+      message: `同步完成，${summary.totalHooks} 个 Hook，共 ${summary.totalRecords} 条记录`,
+      tooltype: 'list_created_hooks',
+      syncedHookIds: summary.hooks.map(item => item.hookId),
+      totalRecords: summary.totalRecords,
+      hooks,
     };
   } catch (error) {
     return {
       success: false,
       message: `同步失败：${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'sync_hook_records',
+      tooltype: 'list_created_hooks',
       syncedHookIds: [],
       totalRecords: 0,
+      hooks: [],
     };
   }
 }

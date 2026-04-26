@@ -7,6 +7,26 @@
 import type {Frame} from '../../third_party/index.js';
 import type {RemoveHookBrowserResult} from './types.js';
 
+interface RemoveHookBrowserParams {
+  hookId?: string;
+}
+
+function normalizeHookId(
+  params?: string | RemoveHookBrowserParams,
+): string | undefined {
+  if (typeof params === 'string') {
+    return params;
+  }
+  if (
+    params &&
+    typeof params === 'object' &&
+    typeof params.hookId === 'string'
+  ) {
+    return params.hookId;
+  }
+  return undefined;
+}
+
 /**
  * 清理浏览器端的 Hook 数据。
  *
@@ -20,12 +40,25 @@ import type {RemoveHookBrowserResult} from './types.js';
  */
 export async function removeHookBrowser(
   frame: Frame,
-  hookId: string,
+  params?: string | RemoveHookBrowserParams,
 ): Promise<RemoveHookBrowserResult> {
+  const hookId = normalizeHookId(params);
+
+  if (!hookId) {
+    return {
+      success: false,
+      message: 'hookId 参数不能为空',
+      tooltype: 'remove_hook',
+      hookId: '',
+    };
+  }
+
+  const serializedHookId = JSON.stringify(hookId);
   const cleanupScript = `(function(){
   var s = window.__hookStore;
-  if (s && s['${hookId}']) {
-    delete s['${hookId}'];
+  var hookId = ${serializedHookId};
+  if (s && s[hookId]) {
+    delete s[hookId];
   }
 })()`;
 
@@ -34,14 +67,14 @@ export async function removeHookBrowser(
     return {
       success: true,
       message: `浏览器端 Hook 数据已清理：${hookId}`,
-      tooltype: 'remove_hook_browser',
+      tooltype: 'remove_hook',
       hookId,
     };
   } catch (error) {
     return {
       success: false,
       message: `清理失败（页面可能已关闭）：${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'remove_hook_browser',
+      tooltype: 'remove_hook',
       hookId,
     };
   }

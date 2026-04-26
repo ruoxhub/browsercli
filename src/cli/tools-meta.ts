@@ -32,7 +32,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './workflow/autoHook.js',
     handlerName: 'autoHook',
-    callMode: 'params-only',
+    callMode: 'runtime',
   },
   {
     name: 'rebuild_bundle',
@@ -665,7 +665,14 @@ export const TOOLS_META: ToolMeta[] = [
   {
     name: 'get_hook_data',
     description: '获取 Hook 数据',
-    schema: {},
+    schema: {
+      hookId: 'string?',
+      view: 'string?',
+      maxRecords: 'number?',
+      type: 'string?',
+      event: 'string?',
+      phase: 'string?',
+    },
     modulePath: './hook/GetHookData.js',
     handlerName: 'getHookData',
     callMode: 'frame',
@@ -673,7 +680,7 @@ export const TOOLS_META: ToolMeta[] = [
   {
     name: 'remove_hook',
     description: '移除 Hook',
-    schema: {},
+    schema: {hookId: 'string'},
     modulePath: './hook/RemoveHookBrowser.js',
     handlerName: 'removeHookBrowser',
     callMode: 'frame',
@@ -681,7 +688,13 @@ export const TOOLS_META: ToolMeta[] = [
   {
     name: 'list_created_hooks',
     description: '列出已创建 Hook',
-    schema: {},
+    schema: {
+      hookId: 'string?',
+      verbose: 'boolean?',
+      type: 'string?',
+      event: 'string?',
+      phase: 'string?',
+    },
     modulePath: './hook/SyncHookRecords.js',
     handlerName: 'syncHookRecords',
     callMode: 'frame',

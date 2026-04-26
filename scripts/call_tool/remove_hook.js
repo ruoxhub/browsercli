@@ -6,6 +6,6 @@ await runToolCase({
   toolName: 'remove_hook',
   description: '移除 Hook',
   callMode: 'frame',
-  schema: {},
-  defaultParams: {},
+  schema: {hookId: 'string'},
+  defaultParams: {hookId: 'hook_id_here'},
 });

@@ -57,6 +57,174 @@ describe('autoHook tool', () => {
       // 应该优雅地处理无效预设
       assert.ok(result.success || result.error);
     });
+
+    it('autoInject=false 时应仅生成计划而不执行页面注入', async () => {
+      let evaluateCalls = 0;
+      const runtime = {
+        getSelectedFrame: () => ({
+          evaluate: async () => {
+            evaluateCalls += 1;
+          },
+        }),
+        getSelectedPage: () => ({
+          url: () => 'https://example.com/runtime',
+        }),
+      };
+
+      const result = await autoHook(runtime, {
+        hookFetch: true,
+        autoInject: false,
+      });
+
+      assert.strictEqual(result.success, true);
+      assert.strictEqual(evaluateCalls, 0);
+      assert.ok(result.message?.includes('未注入页面'));
+      assert.strictEqual(result.data?.hooksInjected[0]?.injected, false);
+    });
+
+    it('autoInject=true 时应对选中 frame 执行真实注入', async () => {
+      const injectedScripts: string[] = [];
+      const runtime = {
+        getSelectedFrame: () => ({
+          evaluate: async (script: string) => {
+            injectedScripts.push(script);
+          },
+        }),
+        getSelectedPage: () => ({
+          url: () => 'https://example.com/runtime',
+        }),
+      };
+
+      const result = await autoHook(runtime, {
+        hookFetch: true,
+        hookCookie: true,
+        autoInject: true,
+      });
+
+      assert.strictEqual(result.success, true);
+      assert.strictEqual(injectedScripts.length, 2);
+      assert.ok(
+        injectedScripts.some(script => script.includes('hook_fetch_auto')),
+      );
+      assert.ok(
+        injectedScripts.some(script => script.includes('hook_cookie_auto')),
+      );
+      assert.ok(
+        injectedScripts.some(
+          script =>
+            script.includes('window.__hookStore') &&
+            script.includes("event: 'installed'"),
+        ),
+      );
+      assert.ok(
+        injectedScripts.some(
+          script =>
+            script.includes("type: 'fetch'") &&
+            script.includes("target: 'window.fetch'"),
+        ),
+      );
+      assert.ok(
+        injectedScripts.some(
+          script =>
+            script.includes('hook_cookie_auto') &&
+            script.includes("event: 'missing'") &&
+            script.includes("target: 'Document.cookie'"),
+        ),
+      );
+      assert.ok(result.message?.includes('实际注入 2 个 Hook'));
+      assert.strictEqual(
+        result.data?.hooksInjected.every(item => item.injected === true),
+        true,
+      );
+    });
+
+    it('timer/eval 自动注入脚本也应写入 __hookStore', async () => {
+      const injectedScripts: string[] = [];
+      const runtime = {
+        getSelectedFrame: () => ({
+          evaluate: async (script: string) => {
+            injectedScripts.push(script);
+          },
+        }),
+        getSelectedPage: () => ({
+          url: () => 'https://example.com/runtime',
+        }),
+      };
+
+      const result = await autoHook(runtime, {
+        hookTimers: true,
+        hookEval: true,
+        autoInject: true,
+      });
+
+      assert.strictEqual(result.success, true);
+      assert.ok(
+        injectedScripts.some(
+          script =>
+            script.includes('hook_timers_auto') &&
+            script.includes('window.__hookStore') &&
+            script.includes("type: 'timer'"),
+        ),
+      );
+      assert.ok(
+        injectedScripts.some(
+          script =>
+            script.includes('hook_eval_auto') &&
+            script.includes('window.__hookStore') &&
+            script.includes("target: 'window.eval'"),
+        ),
+      );
+    });
+
+    it('crypto/rsa/smcrypto 自动注入脚本也应写入 __hookStore', async () => {
+      const injectedScripts: string[] = [];
+      const runtime = {
+        getSelectedFrame: () => ({
+          evaluate: async (script: string) => {
+            injectedScripts.push(script);
+          },
+        }),
+        getSelectedPage: () => ({
+          url: () => 'https://example.com/runtime',
+        }),
+      };
+
+      const result = await autoHook(runtime, {
+        hookCrypto: true,
+        hookRsa: true,
+        hookSmCrypto: true,
+        autoInject: true,
+      });
+
+      assert.strictEqual(result.success, true);
+      assert.ok(
+        injectedScripts.some(
+          script =>
+            script.includes('hook_cryptojs_auto') &&
+            script.includes('window.__hookStore') &&
+            script.includes("type: 'cryptojs'") &&
+            script.includes("event: 'installed'"),
+        ),
+      );
+      assert.ok(
+        injectedScripts.some(
+          script =>
+            script.includes('hook_jsencrypt_auto') &&
+            script.includes('window.__hookStore') &&
+            script.includes("type: 'jsencrypt'") &&
+            script.includes("target: 'window.JSEncrypt'"),
+        ),
+      );
+      assert.ok(
+        injectedScripts.some(
+          script =>
+            script.includes('hook_smcrypto_auto') &&
+            script.includes('window.__hookStore') &&
+            script.includes("type: 'smcrypto'") &&
+            script.includes("target: 'window.sm*'"),
+        ),
+      );
+    });
   });
 
   describe('预设配置', () => {
