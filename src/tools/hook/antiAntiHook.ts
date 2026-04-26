@@ -5,6 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+import {buildHookStoreRuntime} from './store-utils.js';
 import type {HookResult} from './types.js';
 
 /**
@@ -25,6 +26,11 @@ export async function antiAntiHook(
   'use strict';
   const hookedMethods = ${JSON.stringify(methods)};
   const hookedFunctions = new Map();
+${buildHookStoreRuntime({
+  hookId: 'anti_anti_hook',
+  type: 'function',
+  target: 'Function.prototype.toString',
+})}
 
   // Resolve hooked methods from global object
   for (let methodPath of hookedMethods) {
@@ -51,6 +57,10 @@ export async function antiAntiHook(
       return 'function toString() { [native code] }';
     } else if (hookedFunctions.has(this)) {
       const funcName = hookedFunctions.get(this);
+      __pushHookRecord({
+        event: 'toString_masked',
+        functionName: funcName,
+      });
       return 'function ' + funcName + '() { [native code] }';
     }
     return temp_toString.apply(this, arguments);
@@ -65,6 +75,10 @@ export async function antiAntiHook(
   Object.getOwnPropertyDescriptor = function(obj, prop) {
     var result = tempGetOwnPropertyDescriptor.call(this, obj, prop);
     if (result && typeof result.value === 'function' && hookedFunctions.has(result.value)) {
+      __pushHookRecord({
+        event: 'descriptor_masked',
+        property: String(prop),
+      });
       result.value = function() { return 'native'; };
     }
     return result;
@@ -165,9 +179,10 @@ export async function antiAntiHook(
     await frame.evaluate(hookCode);
     return {
       success: true,
-      message: methods.length > 0
-        ? `Anti-Anti-Hook 已安装，保护方法数：${methods.length}`
-        : 'Anti-Anti-Hook 已安装，基础 Function.prototype.toString 保护已启用',
+      message:
+        methods.length > 0
+          ? `Anti-Anti-Hook 已安装，保护方法数：${methods.length}`
+          : 'Anti-Anti-Hook 已安装，基础 Function.prototype.toString 保护已启用',
       tooltype: 'anti_anti_hook',
     };
   } catch (error) {

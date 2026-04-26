@@ -5,6 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+import {buildHookStoreRuntime} from './store-utils.js';
 import type {HookResult} from './types.js';
 
 /**
@@ -16,8 +17,22 @@ import type {HookResult} from './types.js';
 export async function hookHistoryGo(frame: Frame): Promise<HookResult> {
   const hookCode = `(function() {
   'use strict';
-  window.history.go = function() {};
-  window.history.back = function() {};
+${buildHookStoreRuntime({
+  hookId: 'hook_history_go',
+  type: 'history',
+  target: 'window.history.go',
+})}
+  window.history.go = function(delta) {
+    __pushHookRecord({
+      event: 'go_blocked',
+      delta: typeof delta === 'number' ? delta : undefined,
+    });
+  };
+  window.history.back = function() {
+    __pushHookRecord({
+      event: 'back_blocked',
+    });
+  };
 })();`;
 
   try {

@@ -13,13 +13,6 @@ import type {Browser, Page} from '../third_party/index.js';
 
 // ==================== 配置类型 ====================
 
-export interface Config {
-  llm: LLMConfig;
-  puppeteer: PuppeteerConfig;
-  mcp: MCPConfig;
-  cache: CacheConfig;
-  performance: PerformanceConfig;
-}
 
 export interface LLMConfig {
   provider: 'openai';
@@ -30,27 +23,7 @@ export interface LLMConfig {
   };
 }
 
-export interface PuppeteerConfig {
-  headless: boolean;
-  timeout: number;
-  args?: string[];
-  // 🆕 新增可配置项
-  viewport?: {width: number; height: number};
-  userAgent?: string;
-  maxCollectedUrls?: number;
-  // 🔧 新增：防止 MCP token 溢出的限制
-  maxFilesPerCollect?: number; // 单次收集最大文件数（默认50）
-  maxTotalContentSize?: number; // 单次返回最大总大小（默认512KB）
-  maxSingleFileSize?: number; // 单个文件最大大小（默认100KB）
-  useExternalBrowser?: boolean;
-  remoteDebuggingUrl?: string;
-  userDataDir?: string;
-  useStealthScripts?: boolean;
-  reuseEnvironmentPerSession?: boolean;
-  autoLaunchExternalBrowser?: boolean;
-  externalBrowserPath?: string;
-  externalBrowserArgs?: string[];
-}
+
 
 export interface MCPConfig {
   name: string;

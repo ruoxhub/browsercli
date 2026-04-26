@@ -5,6 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+import {buildHookStoreRuntime} from './store-utils.js';
 import type {HookResult, LogFormat} from './types.js';
 
 /**
@@ -31,11 +32,16 @@ export async function hookXhrOpen(
   const showStack = ${JSON.stringify(!!showStack)};
   const triggerDebugger = ${JSON.stringify(!!triggerDebugger)};
   const hasFilter = filterUrls.length > 0;
+${buildHookStoreRuntime({
+  hookId: 'hook_xhr_open',
+  type: 'xhr',
+  target: 'XMLHttpRequest.open',
+  showStack,
+  triggerDebugger,
+})}
 
   function logAndPause(msg) {
     console.log(msg);
-    if (triggerDebugger) debugger;
-    if (showStack) console.log(new Error().stack);
   }
 
   const origOpen = XMLHttpRequest.prototype.open;
@@ -43,8 +49,19 @@ export async function hookXhrOpen(
     const method = arguments[0];
     const url = arguments[1];
     if (!hasFilter) {
+      __pushHookRecord({
+        event: 'open',
+        method: typeof method === 'string' ? method.toUpperCase() : '',
+        url: typeof url === 'string' ? url : String(url || ''),
+      });
       logAndPause('初始化xhr请求：method ---> ' + method + ', url ---> ' + url);
     } else if (url && filterUrls.some(item => url.includes(item))) {
+      __pushHookRecord({
+        event: 'open',
+        method: typeof method === 'string' ? method.toUpperCase() : '',
+        url,
+        matchedFilters: filterUrls.filter(item => url.includes(item)),
+      });
       logAndPause('捕获到xhr请求 ---> url: ' + url + ' method: ' + method);
     }
     return origOpen.apply(this, arguments);

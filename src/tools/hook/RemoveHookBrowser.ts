@@ -5,6 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+import {HOOK_STORE_KEY} from './store-utils.js';
 import type {RemoveHookBrowserResult} from './types.js';
 
 interface RemoveHookBrowserParams {
@@ -55,7 +56,7 @@ export async function removeHookBrowser(
 
   const serializedHookId = JSON.stringify(hookId);
   const cleanupScript = `(function(){
-  var s = window.__hookStore;
+  var s = window[${JSON.stringify(HOOK_STORE_KEY)}];
   var hookId = ${serializedHookId};
   if (s && s[hookId]) {
     delete s[hookId];

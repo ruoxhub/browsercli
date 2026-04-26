@@ -34,7 +34,10 @@ import {
   fixedWindowSize,
   antiAntiHook,
 } from '../../../src/tools/hook/index.js';
-import type {StorageAction, ConsoleProtectMode} from '../../../src/tools/hook/types.js';
+import type {
+  StorageAction,
+  ConsoleProtectMode,
+} from '../../../src/tools/hook/types.js';
 
 function createErrorFrame(errorMsg: string): Frame {
   return {
@@ -58,13 +61,18 @@ describe('hook functions', () => {
     });
 
     it('应该支持 filterUrls 参数', async () => {
-      const evaluate = mock.fn(async () => undefined);
+      let injectedScript = '';
+      const evaluate = mock.fn(async (script: unknown) => {
+        injectedScript = String(script);
+      });
       const frame = {evaluate} as unknown as Frame;
 
       const result = await hookXhrOpen(frame, ['api.example.com']);
 
       assert.strictEqual(result.success, true);
       assert.ok(result.message.includes('api.example.com'));
+      assert.match(injectedScript, /__hookStore/);
+      assert.match(injectedScript, /hook_xhr_open/);
     });
 
     it('应该在 evaluate 抛出错误时返回失败结果', async () => {
@@ -80,7 +88,10 @@ describe('hook functions', () => {
 
   describe('hookFetch', () => {
     it('应该调用 frame.evaluate 并返回成功结果', async () => {
-      const evaluate = mock.fn(async () => undefined);
+      let injectedScript = '';
+      const evaluate = mock.fn(async (script: unknown) => {
+        injectedScript = String(script);
+      });
       const frame = {evaluate} as unknown as Frame;
 
       const result = await hookFetch(frame);
@@ -88,6 +99,8 @@ describe('hook functions', () => {
       assert.strictEqual(evaluate.mock.callCount(), 1);
       assert.strictEqual(result.success, true);
       assert.strictEqual(result.tooltype, 'hook_fetch');
+      assert.match(injectedScript, /__hookStore/);
+      assert.match(injectedScript, /__pushHookRecord/);
     });
 
     it('应该在 evaluate 抛出错误时返回失败结果', async () => {
@@ -102,7 +115,10 @@ describe('hook functions', () => {
 
   describe('hookCookie', () => {
     it('应该调用 frame.evaluate 并返回成功结果', async () => {
-      const evaluate = mock.fn(async () => undefined);
+      let injectedScript = '';
+      const evaluate = mock.fn(async (script: unknown) => {
+        injectedScript = String(script);
+      });
       const frame = {evaluate} as unknown as Frame;
 
       const result = await hookCookie(frame);
@@ -265,19 +281,27 @@ describe('hook functions', () => {
 
   describe('hookHistoryGo', () => {
     it('应该调用 frame.evaluate 并返回成功结果', async () => {
-      const evaluate = mock.fn(async () => undefined);
+      let injectedScript = '';
+      const evaluate = mock.fn(async (script: unknown) => {
+        injectedScript = String(script);
+      });
       const frame = {evaluate} as unknown as Frame;
 
       const result = await hookHistoryGo(frame);
 
       assert.strictEqual(result.success, true);
       assert.strictEqual(result.tooltype, 'hook_history_go');
+      assert.match(injectedScript, /go_blocked/);
+      assert.match(injectedScript, /__hookStore/);
     });
   });
 
   describe('hookLocationHref', () => {
     it('应该调用 frame.evaluate 并返回成功结果', async () => {
-      const evaluate = mock.fn(async () => undefined);
+      let injectedScript = '';
+      const evaluate = mock.fn(async (script: unknown) => {
+        injectedScript = String(script);
+      });
       const frame = {evaluate} as unknown as Frame;
 
       const result = await hookLocationHref(frame);
@@ -337,19 +361,26 @@ describe('hook functions', () => {
 
   describe('hookConsoleProtect', () => {
     it('应该调用 frame.evaluate 并返回成功结果', async () => {
-      const evaluate = mock.fn(async () => undefined);
+      let injectedScript = '';
+      const evaluate = mock.fn(async (script: unknown) => {
+        injectedScript = String(script);
+      });
       const frame = {evaluate} as unknown as Frame;
 
       const result = await hookConsoleProtect(frame);
 
       assert.strictEqual(result.success, true);
       assert.strictEqual(result.tooltype, 'hook_console_protect');
+      assert.match(injectedScript, /overwrite_blocked/);
     });
   });
 
   describe('hookConsoleTable', () => {
     it('应该调用 frame.evaluate 并返回成功结果', async () => {
-      const evaluate = mock.fn(async () => undefined);
+      let injectedScript = '';
+      const evaluate = mock.fn(async (script: unknown) => {
+        injectedScript = String(script);
+      });
       const frame = {evaluate} as unknown as Frame;
 
       const result = await hookConsoleTable(frame);
@@ -371,13 +402,18 @@ describe('hook functions', () => {
 
   describe('fixedWindowSize', () => {
     it('应该调用 frame.evaluate 并返回成功结果', async () => {
-      const evaluate = mock.fn(async () => undefined);
+      let injectedScript = '';
+      const evaluate = mock.fn(async (script: unknown) => {
+        injectedScript = String(script);
+      });
       const frame = {evaluate} as unknown as Frame;
 
       const result = await fixedWindowSize(frame);
 
       assert.strictEqual(result.success, true);
       assert.strictEqual(result.tooltype, 'fixed_window_size');
+      assert.match(injectedScript, /__hookStore/);
+      assert.match(injectedScript, /innerHeight/);
     });
 
     it('应该支持自定义尺寸参数', async () => {

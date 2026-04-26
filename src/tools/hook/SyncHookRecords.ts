@@ -69,7 +69,12 @@ export async function syncHookRecords(
       };
     }
 
-    const summary = summarizeHookStore(storeSnapshot, {type, event, phase});
+    const summary = summarizeHookStore(storeSnapshot, {
+      type,
+      event,
+      phase,
+      preserveEmpty: true,
+    });
     const hooks = verbose
       ? summary.hooks
       : summary.hooks.map(({hookId: id, total, type}) => ({

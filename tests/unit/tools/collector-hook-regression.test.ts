@@ -217,6 +217,35 @@ describe('collector/hook regressions', () => {
     });
   });
 
+  it('get_hook_data should keep explicitly installed hooks even when no records were captured yet', async () => {
+    const frame = {
+      evaluate: async (_fn: unknown, hookId?: string) => ({
+        [hookId || 'hook_fetch']: [],
+      }),
+    };
+
+    const result = await getHookData(frame as never, {
+      hookId: 'hook_fetch',
+      view: 'detail',
+    });
+
+    assert.strictEqual(result.success, true);
+    assert.deepStrictEqual(result.data, {
+      view: 'detail',
+      totalHooks: 1,
+      totalRecords: 0,
+      normalizedRecords: [],
+      summary: {
+        total: 0,
+        unique: 0,
+        dropped: 0,
+        records: [],
+      },
+      candidateEnvNeeds: [],
+      requestBindings: [],
+    });
+  });
+
   it('get_hook_data detail should normalize records and derive helper views', async () => {
     const frame = {
       evaluate: async () => ({
@@ -394,6 +423,24 @@ describe('collector/hook regressions', () => {
           {target: 'window.fetch', event: 'response', timestamp: 2},
         ],
       },
+    ]);
+  });
+
+  it('list_created_hooks should include initialized hooks with zero records', async () => {
+    const frame = {
+      evaluate: async () => ({
+        hook_fetch: [],
+      }),
+    };
+
+    const result = await syncHookRecords(frame as never);
+
+    assert.strictEqual(result.success, true);
+    assert.strictEqual(result.message, '同步完成，1 个 Hook，共 0 条记录');
+    assert.deepStrictEqual(result.syncedHookIds, ['hook_fetch']);
+    assert.strictEqual(result.totalRecords, 0);
+    assert.deepStrictEqual(result.hooks, [
+      {hookId: 'hook_fetch', total: 0, type: 'fetch'},
     ]);
   });
 

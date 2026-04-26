@@ -5,6 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+import {buildHookStoreRuntime} from './store-utils.js';
 import type {HookResult} from './types.js';
 
 /**
@@ -31,6 +32,13 @@ export async function hookHistory(
   const showStack = ${JSON.stringify(!!showStack)};
   const triggerDebugger = ${JSON.stringify(!!triggerDebugger)};
   const hasFilter = filterUrls.length > 0;
+${buildHookStoreRuntime({
+  hookId: 'hook_history',
+  type: 'history',
+  target: 'window.history',
+  showStack,
+  triggerDebugger,
+})}
 
   function matchesFilter(url) {
     if (!hasFilter) return true;
@@ -41,13 +49,16 @@ export async function hookHistory(
 
   function logAndPause(msg) {
     console.log(msg);
-    if (triggerDebugger) debugger;
-    if (showStack) console.log(new Error().stack);
   }
 
   const origPushState = history.pushState;
   history.pushState = function(state, title, url) {
     if (!hasFilter || matchesFilter(url)) {
+      __pushHookRecord({
+        event: 'pushState',
+        url: url ? String(url) : '',
+        state: __cloneHookValue(state),
+      });
       logAndPause('调用pushState ---> ' + (url || 'null') + ' | state: ' + JSON.stringify(state));
     }
     return origPushState.apply(this, arguments);
@@ -56,6 +67,11 @@ export async function hookHistory(
   const origReplaceState = history.replaceState;
   history.replaceState = function(state, title, url) {
     if (!hasFilter || matchesFilter(url)) {
+      __pushHookRecord({
+        event: 'replaceState',
+        url: url ? String(url) : '',
+        state: __cloneHookValue(state),
+      });
       logAndPause('调用replaceState ---> ' + (url || 'null') + ' | state: ' + JSON.stringify(state));
     }
     return origReplaceState.apply(this, arguments);

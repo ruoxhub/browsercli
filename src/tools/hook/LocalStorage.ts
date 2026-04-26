@@ -5,6 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+import {buildHookStoreRuntime} from './store-utils.js';
 import type {HookResult, StorageAction} from './types.js';
 
 /**
@@ -24,7 +25,12 @@ export async function hookLocalStorage(
   showStack?: boolean,
   triggerDebugger?: boolean,
 ): Promise<HookResult> {
-  const enabledActions = actions || ['setItem', 'getItem', 'removeItem', 'clear'];
+  const enabledActions = actions || [
+    'setItem',
+    'getItem',
+    'removeItem',
+    'clear',
+  ];
   const hasFilter = filterKeys && filterKeys.length > 0;
 
   const hookCode = `
@@ -35,11 +41,16 @@ export async function hookLocalStorage(
   const showStack = ${JSON.stringify(!!showStack)};
   const triggerDebugger = ${JSON.stringify(!!triggerDebugger)};
   const hasFilter = filterKeys.length > 0;
+${buildHookStoreRuntime({
+  hookId: 'hook_local_storage',
+  type: 'storage',
+  target: 'window.localStorage',
+  showStack,
+  triggerDebugger,
+})}
 
   function logAndPause(msg) {
     console.log(msg);
-    if (triggerDebugger) debugger;
-    if (showStack) console.log(new Error().stack);
   }
 
   function matchesFilter(key) {
@@ -51,6 +62,11 @@ export async function hookLocalStorage(
     const orig = localStorage.setItem;
     localStorage.setItem = function(key, value) {
       if (!hasFilter || matchesFilter(key)) {
+        __pushHookRecord({
+          event: 'setItem',
+          key,
+          value,
+        });
         logAndPause('设置localStorage，键 ---> ' + key + ' 值 ---> ' + value);
       }
       return orig.call(this, key, value);
@@ -61,6 +77,10 @@ export async function hookLocalStorage(
     const orig = localStorage.getItem;
     localStorage.getItem = function(key) {
       if (!hasFilter || matchesFilter(key)) {
+        __pushHookRecord({
+          event: 'getItem',
+          key,
+        });
         logAndPause('读取localStorage，键 ---> ' + key);
       }
       return orig.call(this, key);
@@ -71,6 +91,10 @@ export async function hookLocalStorage(
     const orig = localStorage.removeItem;
     localStorage.removeItem = function(key) {
       if (!hasFilter || matchesFilter(key)) {
+        __pushHookRecord({
+          event: 'removeItem',
+          key,
+        });
         logAndPause('移除localStorage，键 ---> ' + key);
       }
       return orig.call(this, key);
@@ -80,6 +104,9 @@ export async function hookLocalStorage(
   if (actions.includes('clear')) {
     const orig = localStorage.clear;
     localStorage.clear = function() {
+      __pushHookRecord({
+        event: 'clear',
+      });
       logAndPause('清空localStorage');
       return orig.call(this);
     };

@@ -99,22 +99,19 @@ export async function getHookData(
 
   try {
     const storeSnapshot = await readHookStore(frame, hookId);
+    const filters = {type, event, phase, preserveEmpty: true};
     const data =
       view === 'summary'
         ? {
             view: 'summary' as const,
-            ...summarizeHookStore(
-              storeSnapshot,
-              {type, event, phase},
-              maxRecords,
-            ),
+            ...summarizeHookStore(storeSnapshot, filters, maxRecords),
           }
         : view === 'detail'
           ? buildDetailedView(
-              filterHookStore(storeSnapshot, {type, event, phase}, maxRecords),
+              filterHookStore(storeSnapshot, filters, maxRecords),
               maxRecords,
             )
-          : filterHookStore(storeSnapshot, {type, event, phase}, maxRecords);
+          : filterHookStore(storeSnapshot, filters, maxRecords);
 
     return {
       success: true,

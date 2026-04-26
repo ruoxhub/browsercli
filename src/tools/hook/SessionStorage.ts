@@ -5,6 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+import {buildHookStoreRuntime} from './store-utils.js';
 import type {HookResult, StorageAction} from './types.js';
 
 /**
@@ -24,7 +25,12 @@ export async function hookSessionStorage(
   showStack?: boolean,
   triggerDebugger?: boolean,
 ): Promise<HookResult> {
-  const enabledActions = actions || ['setItem', 'getItem', 'removeItem', 'clear'];
+  const enabledActions = actions || [
+    'setItem',
+    'getItem',
+    'removeItem',
+    'clear',
+  ];
   const hasFilter = filterKeys && filterKeys.length > 0;
 
   const hookCode = `
@@ -35,11 +41,16 @@ export async function hookSessionStorage(
   const showStack = ${JSON.stringify(!!showStack)};
   const triggerDebugger = ${JSON.stringify(!!triggerDebugger)};
   const hasFilter = filterKeys.length > 0;
+${buildHookStoreRuntime({
+  hookId: 'hook_session_storage',
+  type: 'storage',
+  target: 'window.sessionStorage',
+  showStack,
+  triggerDebugger,
+})}
 
   function logAndPause(msg) {
     console.log(msg);
-    if (triggerDebugger) debugger;
-    if (showStack) console.log(new Error().stack);
   }
 
   function matchesFilter(key) {
@@ -51,6 +62,11 @@ export async function hookSessionStorage(
     const orig = sessionStorage.setItem;
     sessionStorage.setItem = function(key, value) {
       if (!hasFilter || matchesFilter(key)) {
+        __pushHookRecord({
+          event: 'setItem',
+          key,
+          value,
+        });
         logAndPause('设置sessionStorage，键 ---> ' + key + ' 值 ---> ' + value);
       }
       return orig.call(this, key, value);
@@ -61,6 +77,10 @@ export async function hookSessionStorage(
     const orig = sessionStorage.getItem;
     sessionStorage.getItem = function(key) {
       if (!hasFilter || matchesFilter(key)) {
+        __pushHookRecord({
+          event: 'getItem',
+          key,
+        });
         logAndPause('读取sessionStorage，键 ---> ' + key);
       }
       return orig.call(this, key);
@@ -71,6 +91,10 @@ export async function hookSessionStorage(
     const orig = sessionStorage.removeItem;
     sessionStorage.removeItem = function(key) {
       if (!hasFilter || matchesFilter(key)) {
+        __pushHookRecord({
+          event: 'removeItem',
+          key,
+        });
         logAndPause('移除sessionStorage，键 ---> ' + key);
       }
       return orig.call(this, key);
@@ -80,6 +104,9 @@ export async function hookSessionStorage(
   if (actions.includes('clear')) {
     const orig = sessionStorage.clear;
     sessionStorage.clear = function() {
+      __pushHookRecord({
+        event: 'clear',
+      });
       logAndPause('清空sessionStorage');
       return orig.call(this);
     };

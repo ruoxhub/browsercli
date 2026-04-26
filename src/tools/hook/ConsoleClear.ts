@@ -5,6 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+import {buildHookStoreRuntime} from './store-utils.js';
 import type {HookResult} from './types.js';
 
 /**
@@ -16,7 +17,17 @@ import type {HookResult} from './types.js';
 export async function hookConsoleClear(frame: Frame): Promise<HookResult> {
   const hookCode = `(function() {
   'use strict';
-  console.clear = function() {};
+${buildHookStoreRuntime({
+  hookId: 'hook_console_clear',
+  type: 'console',
+  target: 'console.clear',
+})}
+  console.clear = function() {
+    __pushHookRecord({
+      event: 'clear_blocked',
+      blocked: true,
+    });
+  };
 })();`;
 
   try {

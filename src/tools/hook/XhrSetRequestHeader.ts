@@ -5,6 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+import {buildHookStoreRuntime} from './store-utils.js';
 import type {HookResult} from './types.js';
 
 /**
@@ -31,11 +32,16 @@ export async function hookXhrSetRequestHeader(
   const showStack = ${JSON.stringify(!!showStack)};
   const triggerDebugger = ${JSON.stringify(!!triggerDebugger)};
   const hasFilter = filterKeys.length > 0;
+${buildHookStoreRuntime({
+  hookId: 'hook_xhr_set_request_header',
+  type: 'xhr',
+  target: 'XMLHttpRequest.setRequestHeader',
+  showStack,
+  triggerDebugger,
+})}
 
   function logAndPause(msg) {
     console.log(msg);
-    if (triggerDebugger) debugger;
-    if (showStack) console.log(new Error().stack);
   }
 
   const origSetHeader = XMLHttpRequest.prototype.setRequestHeader;
@@ -43,8 +49,19 @@ export async function hookXhrSetRequestHeader(
     const header = arguments[0];
     const value = arguments[1];
     if (!hasFilter) {
+      __pushHookRecord({
+        event: 'set_request_header',
+        header: typeof header === 'string' ? header : String(header || ''),
+        value: __cloneHookValue(value),
+      });
       logAndPause('请求头设置：' + header + ': ' + value);
     } else if (header && filterKeys.some(item => header.includes(item))) {
+      __pushHookRecord({
+        event: 'set_request_header',
+        header,
+        value: __cloneHookValue(value),
+        matchedFilters: filterKeys.filter(item => header.includes(item)),
+      });
       logAndPause('捕获到设置请求头 ---> ' + header + '\\n' + header + ': ' + value);
     }
     return origSetHeader.apply(this, arguments);

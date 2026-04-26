@@ -5,6 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+import {buildHookStoreRuntime} from './store-utils.js';
 import type {HookResult} from './types.js';
 
 /**
@@ -31,6 +32,13 @@ export async function hookCookie(
   const showStack = ${JSON.stringify(!!showStack)};
   const triggerDebugger = ${JSON.stringify(!!triggerDebugger)};
   const hasFilter = filterKeys.length > 0;
+${buildHookStoreRuntime({
+  hookId: 'hook_cookie',
+  type: 'cookie',
+  target: 'document.cookie',
+  showStack,
+  triggerDebugger,
+})}
 
   function parseCookieNames(cookieStr) {
     if (!cookieStr || typeof cookieStr !== 'string') return [];
@@ -43,8 +51,6 @@ export async function hookCookie(
 
   function logAndPause(msg) {
     console.log(msg);
-    if (triggerDebugger) debugger;
-    if (showStack) console.log(new Error().stack);
   }
 
   const descriptor = Object.getOwnPropertyDescriptor(Document.prototype, 'cookie');
@@ -53,14 +59,30 @@ export async function hookCookie(
 
   Object.defineProperty(document, 'cookie', {
     get: function() {
-      return originalGet.call(document);
+      const currentValue = originalGet.call(document);
+      __pushHookRecord({
+        event: 'get',
+        cookie: currentValue,
+      });
+      return currentValue;
     },
     set: function(cookie) {
       if (!hasFilter) {
+        __pushHookRecord({
+          event: 'set',
+          cookie,
+          keys: parseCookieNames(cookie),
+        });
         logAndPause('设置cookie：\\n' + cookie);
       } else {
         const keys = parseCookieNames(cookie);
         if (keys.length > 0 && filterKeys.some(k => keys[0].includes(k))) {
+          __pushHookRecord({
+            event: 'set',
+            cookie,
+            keys,
+            matchedFilters: filterKeys.filter(k => keys[0].includes(k)),
+          });
           logAndPause('捕获到设置cookie ---> ' + keys[0] + '\\n值：' + cookie);
         }
       }

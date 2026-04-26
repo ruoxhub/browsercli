@@ -5,6 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+import {buildHookStoreRuntime} from './store-utils.js';
 import type {HookResult} from './types.js';
 
 /**
@@ -30,10 +31,19 @@ export async function hookDateNow(
   const fixedValue = ${value};
   const showStack = ${JSON.stringify(!!showStack)};
   const triggerDebugger = ${JSON.stringify(!!triggerDebugger)};
+${buildHookStoreRuntime({
+  hookId: 'hook_date_now',
+  type: 'timer',
+  target: 'Date.now',
+  showStack,
+  triggerDebugger,
+})}
 
   Date.now = function() {
-    if (triggerDebugger) debugger;
-    if (showStack) console.log(new Error().stack);
+    __pushHookRecord({
+      event: 'call',
+      returnValue: fixedValue,
+    });
     return fixedValue;
   };
   console.log('[hook_date_now] ✅ Date.now() fixed to ' + fixedValue);

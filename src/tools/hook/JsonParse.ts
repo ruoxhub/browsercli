@@ -5,6 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+import {buildHookStoreRuntime} from './store-utils.js';
 import type {HookResult} from './types.js';
 
 /**
@@ -32,17 +33,32 @@ export async function hookJsonParse(
   const triggerDebugger = ${JSON.stringify(!!triggerDebugger)};
   const hasFilter = filterKeys.length > 0;
   const origParse = JSON.parse;
+${buildHookStoreRuntime({
+  hookId: 'hook_json_parse',
+  type: 'json',
+  target: 'JSON.parse',
+  showStack,
+  triggerDebugger,
+})}
 
   JSON.parse = function() {
+    const source = arguments[0];
     if (!hasFilter) {
-      console.log('调用JSON.parse ---> ', arguments[0]);
-    } else if (arguments[0] && typeof arguments[0] === 'string' && filterKeys.some(item => arguments[0].includes(item))) {
-      console.log('捕获到JSON.parse指定字符串 ---> ', arguments[0]);
+      __pushHookRecord({
+        event: 'parse',
+        input: typeof source === 'string' ? source : __cloneHookValue(source),
+      });
+      console.log('调用JSON.parse ---> ', source);
+    } else if (source && typeof source === 'string' && filterKeys.some(item => source.includes(item))) {
+      __pushHookRecord({
+        event: 'parse',
+        input: source,
+        matchedFilters: filterKeys.filter(item => source.includes(item)),
+      });
+      console.log('捕获到JSON.parse指定字符串 ---> ', source);
     } else {
       return origParse.apply(this, arguments);
     }
-    if (triggerDebugger) debugger;
-    if (showStack) console.log(new Error().stack);
     return origParse.apply(this, arguments);
   };
   console.log('[hook_json_parse] ✅ JSON.parse hook installed');

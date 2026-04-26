@@ -5,6 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+import {buildHookStoreRuntime} from './store-utils.js';
 import type {HookResult} from './types.js';
 
 /**
@@ -26,15 +27,57 @@ export async function hookFetch(
   const showStack = ${JSON.stringify(!!showStack)};
   const triggerDebugger = ${JSON.stringify(!!triggerDebugger)};
   const origFetch = window.fetch;
+${buildHookStoreRuntime({
+  hookId: 'hook_fetch',
+  type: 'fetch',
+  target: 'window.fetch',
+  showStack,
+  triggerDebugger,
+})}
 
   window.fetch = function() {
-    console.log('捕获到fetch请求：');
-    for (let i = 0; i < arguments.length; i++) {
-      console.log(arguments[i]);
-    }
-    if (triggerDebugger) debugger;
-    if (showStack) console.log(new Error().stack);
-    return origFetch.apply(this, arguments);
+    const args = Array.from(arguments);
+    const input = args[0];
+    const init = args[1] || {};
+    const url = typeof input === 'string'
+      ? input
+      : input && typeof input.url === 'string'
+        ? input.url
+        : '';
+    const method = typeof init.method === 'string'
+      ? init.method
+      : input && typeof input.method === 'string'
+        ? input.method
+        : 'GET';
+    const body = init && Object.prototype.hasOwnProperty.call(init, 'body')
+      ? __cloneHookValue(init.body)
+      : undefined;
+    const requestRecord = __pushHookRecord({
+      event: 'request',
+      method: String(method).toUpperCase(),
+      url,
+      body,
+      args: args.map(__cloneHookValue),
+    });
+    console.log('捕获到fetch请求：', requestRecord);
+    return origFetch.apply(this, arguments).then(function(response) {
+      __pushHookRecord({
+        event: 'response',
+        method: String(method).toUpperCase(),
+        url,
+        status: response.status,
+        statusText: response.statusText,
+      });
+      return response;
+    }, function(error) {
+      __pushHookRecord({
+        event: 'error',
+        method: String(method).toUpperCase(),
+        url,
+        error: error && error.message ? error.message : String(error),
+      });
+      throw error;
+    });
   };
   window.fetch.__proto__ = origFetch.__proto__;
   console.log('[hook_fetch] ✅ Fetch hook installed');

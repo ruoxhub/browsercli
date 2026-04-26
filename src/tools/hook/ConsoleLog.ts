@@ -5,6 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+import {buildHookStoreRuntime} from './store-utils.js';
 import type {HookResult, ConsoleProtectMode} from './types.js';
 
 /**
@@ -25,10 +26,21 @@ export async function hookConsoleLog(
       ? `
 (function() {
   'use strict';
+${buildHookStoreRuntime({
+  hookId: 'hook_console_log',
+  type: 'console',
+  target: 'window.console',
+})}
   const readonlyProps = ['log', 'trace', 'groupCollapsed', 'groupEnd'];
   const readonlyConsole = new Proxy(console, {
     set(t, k, v, r) {
       if (readonlyProps.includes(k)) {
+        __pushHookRecord({
+          event: 'overwrite_blocked',
+          mode: 'proxy',
+          method: String(k),
+          value: __cloneHookValue(v),
+        });
         console.groupCollapsed('%c有代码试图重写console.' + k + '方法，已阻止', 'color: #ff6348;', v);
         console.trace();
         console.groupEnd();
@@ -42,6 +54,11 @@ export async function hookConsoleLog(
     enumerable: false,
     get: function() { return readonlyConsole; },
     set: function(v) {
+      __pushHookRecord({
+        event: 'console_overwrite_blocked',
+        mode: 'proxy',
+        value: __cloneHookValue(v),
+      });
       console.groupCollapsed('%c有代码试图重写console，已阻止', 'color: #ff6348;', v);
       console.trace();
       console.groupEnd();
@@ -54,9 +71,18 @@ export async function hookConsoleLog(
         ? `
 (function() {
   'use strict';
+${buildHookStoreRuntime({
+  hookId: 'hook_console_log',
+  type: 'console',
+  target: 'console.log',
+})}
   const tempLog = console.log;
   function judgeOverwrite() {
     if (console.log.toString() !== 'function log() { [native code] }') {
+      __pushHookRecord({
+        event: 'overwrite_restored',
+        mode: 'toString',
+      });
       console.log = tempLog;
       console.log('[hook_console_log] ⚠️ console.log was overwritten, restored');
     }
@@ -69,7 +95,16 @@ export async function hookConsoleLog(
         : `
 (function() {
   'use strict';
+${buildHookStoreRuntime({
+  hookId: 'hook_console_log',
+  type: 'console',
+  target: 'console.log',
+})}
   Object.freeze(console);
+  __pushHookRecord({
+    event: 'freeze_enabled',
+    mode: 'freeze',
+  });
   console.log('[hook_console_log] ✅ Console log protection installed (freeze mode)');
 })();
 `;

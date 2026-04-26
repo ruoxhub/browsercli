@@ -6,6 +6,9 @@
 
 import type {Frame} from '../../third_party/index.js';
 
+export const HOOK_STORE_KEY = '__hookStore';
+export const DEFAULT_HOOK_STORE_MAX_RECORDS = 500;
+
 export interface HookStoreSummaryItem {
   hookId: string;
   type: string;
@@ -26,6 +29,75 @@ export interface HookStoreFilterParams {
   type?: string;
   event?: string;
   phase?: string;
+  preserveEmpty?: boolean;
+}
+
+interface BrowserHookStoreRuntimeOptions {
+  hookId: string;
+  type: string;
+  target: string;
+  maxRecords?: number;
+  showStack?: boolean;
+  triggerDebugger?: boolean;
+}
+
+export function buildHookStoreRuntime(
+  options: BrowserHookStoreRuntimeOptions,
+): string {
+  const runtime = {
+    ...options,
+    maxRecords:
+      typeof options.maxRecords === 'number' && options.maxRecords > 0
+        ? Math.floor(options.maxRecords)
+        : DEFAULT_HOOK_STORE_MAX_RECORDS,
+    showStack: options.showStack === true,
+    triggerDebugger: options.triggerDebugger === true,
+  };
+
+  return [
+    `  const __hookRuntime = ${JSON.stringify(runtime)};`,
+    `  const __hookStoreKey = ${JSON.stringify(HOOK_STORE_KEY)};`,
+    `  if (!window[__hookStoreKey] || typeof window[__hookStoreKey] !== 'object') {`,
+    `    window[__hookStoreKey] = {};`,
+    `  }`,
+    `  const __hookStore = window[__hookStoreKey];`,
+    `  if (!Array.isArray(__hookStore[__hookRuntime.hookId])) {`,
+    `    __hookStore[__hookRuntime.hookId] = [];`,
+    `  }`,
+    `  function __captureHookStack() {`,
+    `    const stack = new Error().stack;`,
+    `    return typeof stack === 'string' ? stack.split('\\n').slice(2, 12).join('\\n') : undefined;`,
+    `  }`,
+    `  function __cloneHookValue(value) {`,
+    `    if (value === null || value === undefined) return value;`,
+    `    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;`,
+    `    if (Array.isArray(value)) {`,
+    `      return value.map(__cloneHookValue);`,
+    `    }`,
+    `    try {`,
+    `      return JSON.parse(JSON.stringify(value));`,
+    `    } catch (_error) {`,
+    `      return String(value);`,
+    `    }`,
+    `  }`,
+    `  function __pushHookRecord(record) {`,
+    `    const entry = Object.assign({`,
+    `      hookId: __hookRuntime.hookId,`,
+    `      type: __hookRuntime.type,`,
+    `      target: __hookRuntime.target,`,
+    `      timestamp: Date.now(),`,
+    `    }, record || {});`,
+    `    if (__hookRuntime.showStack && entry.stack === undefined) {`,
+    `      entry.stack = __captureHookStack();`,
+    `    }`,
+    `    const __records = __hookStore[__hookRuntime.hookId];`,
+    `    if (__records.length >= __hookRuntime.maxRecords) __records.shift();`,
+    `    __records.push(entry);`,
+    `    if (__hookRuntime.triggerDebugger) debugger;`,
+    `    return entry;`,
+    `  }`,
+    ``,
+  ].join('\n');
 }
 
 export async function readHookStore(
@@ -33,8 +105,10 @@ export async function readHookStore(
   hookId?: string,
 ): Promise<Record<string, unknown[]>> {
   return await frame.evaluate((id?: string) => {
-    const rawStore = (window as typeof window & {__hookStore?: unknown})
-      .__hookStore;
+    const hookStoreKey = '__hookStore';
+    const rawStore = (window as typeof window & Record<string, unknown>)[
+      hookStoreKey
+    ];
     const store =
       rawStore && typeof rawStore === 'object'
         ? (rawStore as Record<string, unknown>)
@@ -76,10 +150,10 @@ export function summarizeHookStore(
   filters?: HookStoreFilterParams,
   maxRecords?: number,
 ): HookStoreSummary {
-  const hooks = Object.entries(storeSnapshot)
+  const hooks: HookStoreSummaryItem[] = Object.entries(storeSnapshot)
     .map(([hookId, records]) => {
       const filteredRecords = filterHookRecords(records, filters);
-      if (filteredRecords.length === 0) {
+      if (filteredRecords.length === 0 && filters?.preserveEmpty !== true) {
         return null;
       }
 
@@ -94,7 +168,7 @@ export function summarizeHookStore(
           ? (lastRecord as Record<string, unknown>)
           : undefined;
 
-      return {
+      const summaryItem: HookStoreSummaryItem = {
         hookId,
         type: inferHookType(hookId, filteredRecords),
         total: filteredRecords.length,
@@ -112,6 +186,7 @@ export function summarizeHookStore(
             : undefined,
         recentRecords: trimmedRecords,
       };
+      return summaryItem;
     })
     .filter((item): item is HookStoreSummaryItem => item !== null);
 
@@ -135,7 +210,9 @@ export function filterHookStore(
         hookId,
         limitRecords(filterHookRecords(records, filters), maxRecords),
       ])
-      .filter(([, records]) => records.length > 0),
+      .filter(
+        ([, records]) => records.length > 0 || filters?.preserveEmpty === true,
+      ),
   );
 }
 

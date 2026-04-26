@@ -1,7 +1,7 @@
 {
   "sekiroHost": "ws://127.0.0.1:5612",
   "group": "js-reverse",
-  "browserUrl": "http://127.0.0.1:9222",
+  "browserUrl": "http://127.0.0.1:19222",
   "wsEndpoint": "",
   "headless": false,
   "llmProvider": "openai",

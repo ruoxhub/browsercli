@@ -5,6 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+import {buildHookStoreRuntime} from './store-utils.js';
 import type {HookResult} from './types.js';
 
 /**
@@ -23,11 +24,25 @@ export async function hookConsoleTable(
   const hookCode = `
 (function() {
   'use strict';
+${buildHookStoreRuntime({
+  hookId: 'hook_console_table',
+  type: 'console',
+  target: 'console.table',
+})}
 ${
   isEnabled
-    ? `  console.table = function() {};
+    ? `  console.table = function() {
+    __pushHookRecord({
+      event: 'table_blocked',
+      blocked: true,
+      args: Array.from(arguments).map(__cloneHookValue),
+    });
+  };
   console.log('[hook_console_table] ✅ console.table neutralized (anti-time-difference-debug)');`
-    : `  console.log('[hook_console_table] ⚠️ hook disabled');`
+    : `  __pushHookRecord({
+    event: 'disabled',
+  });
+  console.log('[hook_console_table] ⚠️ hook disabled');`
 }
 })();
 `;

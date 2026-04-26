@@ -5,6 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+import {buildHookStoreRuntime} from './store-utils.js';
 import type {HookResult} from './types.js';
 
 /**
@@ -26,6 +27,13 @@ export async function hookPromise(
   const showStack = ${JSON.stringify(!!showStack)};
   const triggerDebugger = ${JSON.stringify(!!triggerDebugger)};
   const __Promise = Promise;
+${buildHookStoreRuntime({
+  hookId: 'hook_promise',
+  type: 'promise',
+  target: 'Promise',
+  showStack,
+  triggerDebugger,
+})}
 
   Promise = function Promise(callback) {
     if (!callback) {
@@ -36,11 +44,13 @@ export async function hookPromise(
       const originResolve = resolve;
       resolve = function(result) {
         if (result && !(result instanceof Promise)) {
+          __pushHookRecord({
+            event: 'resolve',
+            result: __cloneHookValue(result),
+          });
           console.groupCollapsed(result);
           console.trace();
           console.groupEnd();
-          if (triggerDebugger) debugger;
-          if (showStack) console.log(new Error().stack);
         }
         return originResolve.apply(this, arguments);
       };

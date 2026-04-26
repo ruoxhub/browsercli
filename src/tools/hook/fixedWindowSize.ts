@@ -5,6 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+import {buildHookStoreRuntime} from './store-utils.js';
 import type {HookResult} from './types.js';
 
 /**
@@ -36,13 +37,22 @@ export async function fixedWindowSize(
   const fixedInnerW = ${fixedInnerW};
   const fixedOuterH = ${fixedOuterH};
   const fixedOuterW = ${fixedOuterW};
+${buildHookStoreRuntime({
+  hookId: 'fixed_window_size',
+  type: 'window',
+  target: 'window.size',
+})}
 
   // innerHeight
   const innerHeightDesc = Object.getOwnPropertyDescriptor(window, 'innerHeight');
   const innerHeightSet = innerHeightDesc ? innerHeightDesc.set : undefined;
   Object.defineProperty(window, 'innerHeight', {
-    get: function() { return fixedInnerH; },
+    get: function() {
+      __pushHookRecord({event: 'get', property: 'innerHeight', value: fixedInnerH});
+      return fixedInnerH;
+    },
     set: function(v) {
+      __pushHookRecord({event: 'set', property: 'innerHeight', value: __cloneHookValue(v), appliedValue: fixedInnerH});
       if (innerHeightSet) innerHeightSet.call(window, fixedInnerH);
     },
     configurable: true
@@ -52,8 +62,12 @@ export async function fixedWindowSize(
   const innerWidthDesc = Object.getOwnPropertyDescriptor(window, 'innerWidth');
   const innerWidthSet = innerWidthDesc ? innerWidthDesc.set : undefined;
   Object.defineProperty(window, 'innerWidth', {
-    get: function() { return fixedInnerW; },
+    get: function() {
+      __pushHookRecord({event: 'get', property: 'innerWidth', value: fixedInnerW});
+      return fixedInnerW;
+    },
     set: function(v) {
+      __pushHookRecord({event: 'set', property: 'innerWidth', value: __cloneHookValue(v), appliedValue: fixedInnerW});
       if (innerWidthSet) innerWidthSet.call(window, fixedInnerW);
     },
     configurable: true
@@ -63,8 +77,12 @@ export async function fixedWindowSize(
   const outerHeightDesc = Object.getOwnPropertyDescriptor(window, 'outerHeight');
   const outerHeightSet = outerHeightDesc ? outerHeightDesc.set : undefined;
   Object.defineProperty(window, 'outerHeight', {
-    get: function() { return fixedOuterH; },
+    get: function() {
+      __pushHookRecord({event: 'get', property: 'outerHeight', value: fixedOuterH});
+      return fixedOuterH;
+    },
     set: function(v) {
+      __pushHookRecord({event: 'set', property: 'outerHeight', value: __cloneHookValue(v), appliedValue: fixedOuterH});
       if (outerHeightSet) outerHeightSet.call(window, fixedOuterH);
     },
     configurable: true
@@ -74,8 +92,12 @@ export async function fixedWindowSize(
   const outerWidthDesc = Object.getOwnPropertyDescriptor(window, 'outerWidth');
   const outerWidthSet = outerWidthDesc ? outerWidthDesc.set : undefined;
   Object.defineProperty(window, 'outerWidth', {
-    get: function() { return fixedOuterW; },
+    get: function() {
+      __pushHookRecord({event: 'get', property: 'outerWidth', value: fixedOuterW});
+      return fixedOuterW;
+    },
     set: function(v) {
+      __pushHookRecord({event: 'set', property: 'outerWidth', value: __cloneHookValue(v), appliedValue: fixedOuterW});
       if (outerWidthSet) outerWidthSet.call(window, fixedOuterW);
     },
     configurable: true

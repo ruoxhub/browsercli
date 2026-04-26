@@ -32,6 +32,9 @@ export type {
   HookManagerStats,
 } from './HookManager.js';
 
+export {HookStore, DEFAULT_HOOK_STORE_KEY} from './HookStore.js';
+export type {HookStoreSnapshot} from './HookStore.js';
+
 // AI Hook 生成器
 export {AIHookGenerator} from './AIHookGenerator.js';
 export type {

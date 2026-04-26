@@ -5,6 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+import {buildHookStoreRuntime} from './store-utils.js';
 import type {HookResult} from './types.js';
 
 /**
@@ -18,12 +19,22 @@ export async function hookConsoleProtect(
   frame: Frame,
   protectedMethods?: string[],
 ): Promise<HookResult> {
-  const methods = protectedMethods || ['log', 'trace', 'groupCollapsed', 'groupEnd'];
+  const methods = protectedMethods || [
+    'log',
+    'trace',
+    'groupCollapsed',
+    'groupEnd',
+  ];
 
   const hookCode = `
 (function() {
   'use strict';
   const protectedMethods = ${JSON.stringify(methods)};
+${buildHookStoreRuntime({
+  hookId: 'hook_console_protect',
+  type: 'console',
+  target: 'window.console',
+})}
 
   // Save original references BEFORE proxying to avoid recursion in the trap
   const origConsole = console;
@@ -34,6 +45,11 @@ export async function hookConsoleProtect(
   const readonlyConsole = new Proxy(origConsole, {
     set(t, k, v, r) {
       if (protectedMethods.includes(k)) {
+        __pushHookRecord({
+          event: 'overwrite_blocked',
+          method: String(k),
+          value: __cloneHookValue(v),
+        });
         origGroupCollapsed.call(origConsole, '%c有代码试图重写 console.' + k + ' 方法，已阻止', 'color: #ff6348;', v);
         origTrace.call(origConsole);
         origGroupEnd.call(origConsole);
@@ -50,6 +66,10 @@ export async function hookConsoleProtect(
       return readonlyConsole;
     },
     set: function(v) {
+      __pushHookRecord({
+        event: 'console_overwrite_blocked',
+        value: __cloneHookValue(v),
+      });
       origGroupCollapsed.call(origConsole, '%c有代码试图重写 console，已阻止', 'color: #ff6348;', v);
       origTrace.call(origConsole);
       origGroupEnd.call(origConsole);

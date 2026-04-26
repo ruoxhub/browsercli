@@ -5,6 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+import {buildHookStoreRuntime} from './store-utils.js';
 import type {HookResult} from './types.js';
 
 /**
@@ -30,11 +31,19 @@ export async function hookPerformanceNow(
   const fixedValue = ${value};
   const showStack = ${JSON.stringify(!!showStack)};
   const triggerDebugger = ${JSON.stringify(!!triggerDebugger)};
+${buildHookStoreRuntime({
+  hookId: 'hook_performance_now',
+  type: 'timer',
+  target: 'performance.now',
+  showStack,
+  triggerDebugger,
+})}
 
-  const origNow = performance.now;
   performance.now = function() {
-    if (triggerDebugger) debugger;
-    if (showStack) console.log(new Error().stack);
+    __pushHookRecord({
+      event: 'call',
+      returnValue: fixedValue,
+    });
     return fixedValue;
   };
   console.log('[hook_performance_now] ✅ performance.now() fixed to ' + fixedValue);

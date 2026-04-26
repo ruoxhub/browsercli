@@ -922,6 +922,12 @@ js-reverse call hook_fetch --showStack true
 js-reverse call hook_xhr_open --filterUrls '["/api/","/sign/"]' --showStack true
 js-reverse call hook_xhr_set_request_header --filterKeys '["Authorization","X-Token"]'
 
+# 直接执行 Hook 工具后的验证
+js-reverse call hook_fetch
+js-reverse call get_hook_data --hookId "hook_fetch" --view detail
+# 若 totalRecords=0，表示 Hook 已安装但页面尚未产生新的 fetch 调用
+# 可继续触发页面操作后再次读取
+
 # 数据解析 Hook
 js-reverse call hook_json_parse
 js-reverse call hook_json_parse --filterKeys '["token","sign"]'

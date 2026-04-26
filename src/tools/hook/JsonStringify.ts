@@ -5,6 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+import {buildHookStoreRuntime} from './store-utils.js';
 import type {HookResult} from './types.js';
 
 /**
@@ -26,11 +27,20 @@ export async function hookJsonStringify(
   const showStack = ${JSON.stringify(!!showStack)};
   const triggerDebugger = ${JSON.stringify(!!triggerDebugger)};
   const origStringify = JSON.stringify;
+${buildHookStoreRuntime({
+  hookId: 'hook_json_stringify',
+  type: 'json',
+  target: 'JSON.stringify',
+  showStack,
+  triggerDebugger,
+})}
 
   JSON.stringify = function() {
+    __pushHookRecord({
+      event: 'stringify',
+      args: Array.from(arguments).map(__cloneHookValue),
+    });
     console.log('调用JSON.stringify，参数：\\n', ...arguments);
-    if (triggerDebugger) debugger;
-    if (showStack) console.log(new Error().stack);
     return origStringify.apply(this, arguments);
   };
   console.log('[hook_json_stringify] ✅ JSON.stringify hook installed');

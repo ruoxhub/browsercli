@@ -19,6 +19,7 @@
  */
 
 import {HookCodeBuilder, type BuilderConfig} from './HookCodeBuilder.js';
+import {DEFAULT_HOOK_STORE_KEY, HookStore} from './HookStore.js';
 import {HookTypeRegistry, type HookTypePlugin} from './HookTypeRegistry.js';
 
 // ==================== 公共类型 ====================
@@ -105,12 +106,13 @@ export interface HookManagerStats {
 export class HookManager {
   private registry: HookTypeRegistry;
   private hooks = new Map<string, HookMeta>();
-  private hookData = new Map<string, HookDataRecord[]>();
+  private hookStore: HookStore<HookDataRecord>;
   private maxRecordsPerHook: number;
 
   constructor(maxRecordsPerHook = 1000) {
     this.registry = new HookTypeRegistry();
     this.maxRecordsPerHook = maxRecordsPerHook;
+    this.hookStore = new HookStore<HookDataRecord>(maxRecordsPerHook);
   }
 
   // ==================== Registry 代理 ====================
@@ -183,7 +185,7 @@ export class HookManager {
       config: options,
     };
     this.hooks.set(hookId, meta);
-    this.hookData.set(hookId, []);
+    this.hookStore.ensure(hookId);
 
     return {hookId, script};
   }
@@ -213,7 +215,7 @@ export class HookManager {
     };
 
     this.hooks.set(config.hookId, hookMeta);
-    this.hookData.set(config.hookId, []);
+    this.hookStore.ensure(config.hookId);
 
     return {hookId: config.hookId, script};
   }
@@ -237,7 +239,7 @@ export class HookManager {
     };
 
     this.hooks.set(config.hookId, hookMeta);
-    this.hookData.set(config.hookId, []);
+    this.hookStore.ensure(config.hookId);
 
     return {hookId: config.hookId, script};
   }
@@ -256,14 +258,14 @@ export class HookManager {
 
   /** 获取已有采集记录的 hookId 列表（含无元数据的 hook） */
   getRecordedHookIds(): string[] {
-    return Array.from(this.hookData.keys());
+    return this.hookStore.getHookIds();
   }
 
   /** 获取所有已知 hookId（元数据 + 记录） */
   getAllKnownHookIds(): string[] {
     const ids = new Set<string>([
       ...this.hooks.keys(),
-      ...this.hookData.keys(),
+      ...this.hookStore.getHookIds(),
     ]);
     return Array.from(ids);
   }
@@ -286,14 +288,14 @@ export class HookManager {
 
   /** 删除 hook */
   remove(hookId: string): boolean {
-    this.hookData.delete(hookId);
+    this.hookStore.remove(hookId);
     return this.hooks.delete(hookId);
   }
 
   /** 清除所有 hook */
   clearAll(): void {
     this.hooks.clear();
-    this.hookData.clear();
+    this.hookStore.clear();
   }
 
   // ==================== 数据管理 ====================
@@ -302,27 +304,17 @@ export class HookManager {
   addRecord(hookId: string, record: HookDataRecord): void {
     const meta = this.hooks.get(hookId);
     if (meta) meta.callCount++;
-
-    let records = this.hookData.get(hookId);
-    if (!records) {
-      records = [];
-      this.hookData.set(hookId, records);
-    }
-
-    if (records.length >= this.maxRecordsPerHook) {
-      records.shift();
-    }
-    records.push(record);
+    this.hookStore.add(hookId, record);
   }
 
   /** 获取 hook 的所有记录 */
   getRecords(hookId: string): HookDataRecord[] {
-    return this.hookData.get(hookId) || [];
+    return this.hookStore.get(hookId);
   }
 
   /** 清除 hook 的记录 */
   clearRecords(hookId: string): void {
-    this.hookData.set(hookId, []);
+    this.hookStore.clear(hookId);
     const meta = this.hooks.get(hookId);
     if (meta) meta.callCount = 0;
   }
@@ -331,7 +323,7 @@ export class HookManager {
   exportData(format: 'json' | 'csv' = 'json'): string {
     const allData: Record<string, unknown> = {};
 
-    for (const [hookId, records] of this.hookData.entries()) {
+    for (const [hookId, records] of Object.entries(this.hookStore.snapshot())) {
       const meta = this.hooks.get(hookId);
       allData[hookId] = {
         meta: meta
@@ -435,7 +427,7 @@ export class HookManager {
    * 生成浏览器端数据收集辅助脚本
    * 用于在浏览器中提取 hook 数据
    */
-  generateDataCollectorScript(storeKey = '__hookStore'): string {
+  generateDataCollectorScript(storeKey = DEFAULT_HOOK_STORE_KEY): string {
     return [
       `// Hook data collector`,
       `(function() {`,
@@ -509,7 +501,7 @@ export class HookManager {
     const st = options.store;
     if (st) {
       if (st.globalKey || st.maxRecords)
-        builder.storeTo(st.globalKey || '__hookStore', st.maxRecords);
+        builder.storeTo(st.globalKey || DEFAULT_HOOK_STORE_KEY, st.maxRecords);
       if (st.console !== undefined || st.consoleFormat)
         builder.console(st.console ?? true, st.consoleFormat);
       if (st.serializer) builder.serializer(st.serializer);

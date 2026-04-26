@@ -5,6 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+import {buildHookStoreRuntime} from './store-utils.js';
 import type {HookResult} from './types.js';
 
 /**
@@ -23,8 +24,18 @@ export async function hookLocationHref(
   const hookCode = `
 (function() {
   'use strict';
+${buildHookStoreRuntime({
+  hookId: 'hook_location_href',
+  type: 'location',
+  target: 'window.onbeforeunload',
+  triggerDebugger: shouldDebug,
+})}
   window.onbeforeunload = function() {
-    ${shouldDebug ? 'debugger;' : ''}
+    __pushHookRecord({
+      event: 'beforeunload',
+      blocked: true,
+      url: window.location.href,
+    });
     console.log('[hook_location_href] ⛔ Page navigation blocked');
     return false;
   };

@@ -5,6 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+import {buildHookStoreRuntime} from './store-utils.js';
 import type {HookResult} from './types.js';
 
 /**
@@ -16,7 +17,17 @@ import type {HookResult} from './types.js';
 export async function hookClose(frame: Frame): Promise<HookResult> {
   const hookCode = `(function() {
   'use strict';
-  window.close = function() {};
+${buildHookStoreRuntime({
+  hookId: 'hook_close',
+  type: 'window',
+  target: 'window.close',
+})}
+  window.close = function() {
+    __pushHookRecord({
+      event: 'close_blocked',
+      blocked: true,
+    });
+  };
 })();`;
 
   try {
