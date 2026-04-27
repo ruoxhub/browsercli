@@ -33,9 +33,50 @@ import {logger} from '../../utils/logger.js';
 
 export class CodeAnalyzer {
   private llm: LLMService;
+  private lastParseResult:
+    | {
+        code: string;
+        ast: t.File | null;
+        error: unknown;
+        warningLogged: boolean;
+      }
+    | undefined;
 
   constructor(llm: LLMService) {
     this.llm = llm;
+  }
+
+  private parseCodeAst(code: string, warningMessage: string): t.File | null {
+    if (this.lastParseResult?.code === code) {
+      if (!this.lastParseResult.ast && !this.lastParseResult.warningLogged) {
+        logger.warn(warningMessage, this.lastParseResult.error);
+        this.lastParseResult.warningLogged = true;
+      }
+      return this.lastParseResult.ast;
+    }
+
+    try {
+      const ast = parser.parse(code, {
+        sourceType: 'module',
+        plugins: ['jsx', 'typescript'],
+      });
+      this.lastParseResult = {
+        code,
+        ast,
+        error: null,
+        warningLogged: false,
+      };
+      return ast;
+    } catch (error) {
+      this.lastParseResult = {
+        code,
+        ast: null,
+        error,
+        warningLogged: true,
+      };
+      logger.warn(warningMessage, error);
+      return null;
+    }
   }
 
   /**
@@ -49,9 +90,10 @@ export class CodeAnalyzer {
 
     try {
       const {code, context, focus = 'all'} = options;
+      const ast = this.parseCodeAst(code, 'Failed to parse code structure');
 
       // 1. 静态分析 - 提取代码结构
-      const structure = await this.analyzeStructure(code);
+      const structure = await this.analyzeStructure(code, ast);
       logger.debug('Code structure analyzed');
 
       // 2. AI分析 - 深度理解
@@ -67,21 +109,21 @@ export class CodeAnalyzer {
       logger.debug('Business logic extracted');
 
       // 5. 数据流分析
-      const dataFlow = await this.analyzeDataFlow(code);
+      const dataFlow = await this.analyzeDataFlow(code, ast);
       logger.debug('Data flow analyzed');
 
       // 6. 安全风险识别
-      const securityRisks = this.identifySecurityRisks(code, aiAnalysis);
+      const securityRisks = this.identifySecurityRisks(code, aiAnalysis, ast);
       logger.debug('Security risks identified');
 
       // 7. 代码模式和反模式检测
-      const {patterns, antiPatterns} = this.detectCodePatterns(code);
+      const {patterns, antiPatterns} = this.detectCodePatterns(code, ast);
       logger.debug(
         `Detected ${patterns.length} patterns and ${antiPatterns.length} anti-patterns`,
       );
 
       // 8. 复杂度指标分析
-      const complexityMetrics = this.analyzeComplexityMetrics(code);
+      const complexityMetrics = this.analyzeComplexityMetrics(code, ast);
       logger.debug('Complexity metrics calculated');
 
       // 9. 代码质量评分（整合新指标）
@@ -117,16 +159,17 @@ export class CodeAnalyzer {
   /**
    * 分析代码结构
    */
-  private async analyzeStructure(code: string): Promise<CodeStructure> {
+  private async analyzeStructure(
+    code: string,
+    ast: t.File | null = this.parseCodeAst(
+      code,
+      'Failed to parse code structure',
+    ),
+  ): Promise<CodeStructure> {
     const functions: FunctionInfo[] = [];
     const classes: ClassInfo[] = [];
 
-    try {
-      const ast = parser.parse(code, {
-        sourceType: 'module',
-        plugins: ['jsx', 'typescript'],
-      });
-
+    if (ast) {
       // 保存this引用以在traverse回调中使用
       // eslint-disable-next-line @typescript-eslint/no-this-alias
       const self = this;
@@ -253,15 +296,13 @@ export class CodeAnalyzer {
           });
         },
       });
-    } catch (error) {
-      logger.warn('Failed to parse code structure', error);
     }
 
     // 分析模块导入导出
-    const modules = this.analyzeModules(code);
+    const modules = this.analyzeModules(code, ast);
 
     // 构建调用图
-    const callGraph = this.buildCallGraph(functions, code);
+    const callGraph = this.buildCallGraph(functions, code, ast);
 
     return {
       functions,
@@ -386,15 +427,13 @@ export class CodeAnalyzer {
   /**
    * 分析模块导入导出
    */
-  private analyzeModules(code: string): CodeStructure['modules'] {
+  private analyzeModules(
+    code: string,
+    ast: t.File | null = this.parseCodeAst(code, 'Module analysis failed'),
+  ): CodeStructure['modules'] {
     const modules: CodeStructure['modules'] = [];
 
-    try {
-      const ast = parser.parse(code, {
-        sourceType: 'module',
-        plugins: ['jsx', 'typescript'],
-      });
-
+    if (ast) {
       const imports: string[] = [];
       const exports: string[] = [];
 
@@ -419,8 +458,6 @@ export class CodeAnalyzer {
           exports,
         });
       }
-    } catch (error) {
-      logger.warn('Module analysis failed', error);
     }
 
     return modules;
@@ -429,7 +466,14 @@ export class CodeAnalyzer {
   /**
    * 构建调用图
    */
-  private buildCallGraph(functions: FunctionInfo[], code: string): CallGraph {
+  private buildCallGraph(
+    functions: FunctionInfo[],
+    code: string,
+    ast: t.File | null = this.parseCodeAst(
+      code,
+      'Call graph construction failed',
+    ),
+  ): CallGraph {
     const nodes: CallGraph['nodes'] = functions.map(fn => ({
       id: fn.name,
       name: fn.name,
@@ -438,12 +482,7 @@ export class CodeAnalyzer {
 
     const edges: CallGraph['edges'] = [];
 
-    try {
-      const ast = parser.parse(code, {
-        sourceType: 'module',
-        plugins: ['jsx', 'typescript'],
-      });
-
+    if (ast) {
       let currentFunction = '';
 
       traverse(ast, {
@@ -485,8 +524,6 @@ export class CodeAnalyzer {
           }
         },
       });
-    } catch (error) {
-      logger.warn('Call graph construction failed', error);
     }
 
     return {nodes, edges};
@@ -547,7 +584,10 @@ export class CodeAnalyzer {
    * 3. 污点传播分析：追踪数据从源到汇的流动路径
    * 4. 无害处理（Sanitizer）：加密、验证等安全处理
    */
-  private async analyzeDataFlow(code: string): Promise<DataFlow> {
+  private async analyzeDataFlow(
+    code: string,
+    ast: t.File | null = this.parseCodeAst(code, 'Data flow analysis failed'),
+  ): Promise<DataFlow> {
     const graph: DataFlow['graph'] = {nodes: [], edges: []};
     const sources: DataFlow['sources'] = [];
     const sinks: DataFlow['sinks'] = [];
@@ -625,10 +665,9 @@ export class CodeAnalyzer {
     ]);
 
     try {
-      const ast = parser.parse(code, {
-        sourceType: 'module',
-        plugins: ['jsx', 'typescript'],
-      });
+      if (!ast) {
+        return {sources, sinks, graph, taintPaths};
+      }
 
       // eslint-disable-next-line @typescript-eslint/no-this-alias
       const self = this;
@@ -1185,6 +1224,10 @@ export class CodeAnalyzer {
   private identifySecurityRisks(
     code: string,
     aiAnalysis: Record<string, unknown>,
+    ast: t.File | null = this.parseCodeAst(
+      code,
+      'Static security analysis failed',
+    ),
   ): SecurityRisk[] {
     const risks: SecurityRisk[] = [];
 
@@ -1206,10 +1249,9 @@ export class CodeAnalyzer {
 
     // 基于规则的静态检测 - 增强版
     try {
-      const ast = parser.parse(code, {
-        sourceType: 'module',
-        plugins: ['jsx', 'typescript'],
-      });
+      if (!ast) {
+        return risks;
+      }
 
       traverse(ast, {
         // 1. XSS风险检测
@@ -1552,7 +1594,13 @@ export class CodeAnalyzer {
    * 识别常见的设计模式和代码异味
    * 基于业界最佳实践和代码质量标准
    */
-  private detectCodePatterns(code: string): {
+  private detectCodePatterns(
+    code: string,
+    ast: t.File | null = this.parseCodeAst(
+      code,
+      'Code pattern detection failed',
+    ),
+  ): {
     patterns: Array<{name: string; location: number; description: string}>;
     antiPatterns: Array<{
       name: string;
@@ -1574,10 +1622,9 @@ export class CodeAnalyzer {
     }> = [];
 
     try {
-      const ast = parser.parse(code, {
-        sourceType: 'module',
-        plugins: ['jsx', 'typescript'],
-      });
+      if (!ast) {
+        return {patterns, antiPatterns};
+      }
 
       traverse(ast, {
         // 检测单例模式
@@ -1739,7 +1786,13 @@ export class CodeAnalyzer {
    * - 认知复杂度 (Cognitive Complexity)
    * - 维护性指数 (Maintainability Index)
    */
-  private analyzeComplexityMetrics(code: string): {
+  private analyzeComplexityMetrics(
+    code: string,
+    ast: t.File | null = this.parseCodeAst(
+      code,
+      'Complexity metrics calculation failed',
+    ),
+  ): {
     cyclomaticComplexity: number;
     cognitiveComplexity: number;
     maintainabilityIndex: number;
@@ -1758,10 +1811,21 @@ export class CodeAnalyzer {
     const uniqueOperands = new Set<string>();
 
     try {
-      const ast = parser.parse(code, {
-        sourceType: 'module',
-        plugins: ['jsx', 'typescript'],
-      });
+      if (!ast) {
+        return {
+          cyclomaticComplexity,
+          cognitiveComplexity,
+          maintainabilityIndex: Math.round(
+            Math.max(0, 171 - 16.2 * Math.log(code.split('\n').length)),
+          ),
+          halsteadMetrics: {
+            vocabulary: 0,
+            length: 0,
+            difficulty: 0,
+            effort: 0,
+          },
+        };
+      }
 
       let nestingLevel = 0;
 

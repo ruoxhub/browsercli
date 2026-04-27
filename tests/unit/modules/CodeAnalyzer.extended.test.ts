@@ -4,18 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
 import type * as t from '@babel/types';
 
-import { CodeAnalyzer } from '../../../src/modules/analyzer/CodeAnalyzer.js';
+import {CodeAnalyzer} from '../../../src/modules/analyzer/CodeAnalyzer.js';
+import {logger} from '../../../src/utils/logger.js';
 
 interface LLMServiceLike {
   generateCodeAnalysisPrompt(code: string, focus: string): unknown[];
   chat(
     messages: unknown[],
-    options?: { temperature?: number; maxTokens?: number },
-  ): Promise<{ content: string }>;
+    options?: {temperature?: number; maxTokens?: number},
+  ): Promise<{content: string}>;
   generateTaintAnalysisPrompt?(
     code: string,
     sources: unknown[],
@@ -31,38 +32,50 @@ interface CodeAnalyzerTestHarness {
     focus?: string;
     context?: Record<string, unknown>;
   }): Promise<{
-    structure: { functions: Array<{ name: string }> };
-    techStack: { framework?: string };
+    structure: {functions: Array<{name: string}>};
+    techStack: {framework?: string};
     securityRisks: unknown[];
     qualityScore: number;
-    complexityMetrics: { cyclomaticComplexity: number };
+    complexityMetrics: {cyclomaticComplexity: number};
   }>;
-  analyzeModules(code: string): Array<{ name: string }>;
-  analyzeStructure(code: string): Promise<{ functions: Array<{ name: string }> }>;
+  analyzeModules(code: string): Array<{name: string}>;
+  analyzeStructure(code: string): Promise<{functions: Array<{name: string}>}>;
   buildCallGraph(
-    functions: Array<{ name: string }>,
+    functions: Array<{name: string}>,
     code: string,
-  ): { nodes: unknown[]; edges: unknown[] };
+  ): {nodes: unknown[]; edges: unknown[]};
   aiAnalyze(code: string, focus: string): Promise<Record<string, unknown>>;
   detectTechStack(
     code: string,
     aiAnalysis: Record<string, unknown>,
-  ): { framework?: string; bundler?: string; other?: string[]; cryptoLibrary?: string[] };
+  ): {
+    framework?: string;
+    bundler?: string;
+    other?: string[];
+    cryptoLibrary?: string[];
+  };
   extractBusinessLogic(
     aiAnalysis: Record<string, unknown>,
     context?: Record<string, unknown>,
-  ): { dataModel: Record<string, unknown>; rules: string[] };
+  ): {dataModel: Record<string, unknown>; rules: string[]};
   analyzeDataFlow(code: string): Promise<{
     sources: unknown[];
     sinks: unknown[];
-    graph: { nodes: unknown[] };
+    graph: {nodes: unknown[]};
     taintPaths: unknown[];
   }>;
-  identifySecurityRisks(code: string, aiAnalysis: Record<string, unknown>): unknown[];
-  detectCodePatterns(code: string): { patterns: unknown[]; antiPatterns: unknown[] };
-  analyzeComplexityMetrics(
+  identifySecurityRisks(
     code: string,
-  ): { cyclomaticComplexity: number; maintainabilityIndex: number };
+    aiAnalysis: Record<string, unknown>,
+  ): unknown[];
+  detectCodePatterns(code: string): {
+    patterns: unknown[];
+    antiPatterns: unknown[];
+  };
+  analyzeComplexityMetrics(code: string): {
+    cyclomaticComplexity: number;
+    maintainabilityIndex: number;
+  };
   calculateQualityScore(
     structure: unknown,
     risks: unknown[],
@@ -89,7 +102,7 @@ interface CodeAnalyzerTestHarness {
     sinkLine: number,
   ): void;
   detectDuplicateCode(ast: t.File): unknown[];
-  constructor: { prototype: object };
+  constructor: {prototype: object};
 }
 
 const richCode = `
@@ -117,12 +130,26 @@ function a2(){ return helper(1); }
 describe('CodeAnalyzer extended', () => {
   function makeAnalyzer(): CodeAnalyzerTestHarness {
     const llm = {
-      generateCodeAnalysisPrompt: () => [{ role: 'user', content: 'x' }],
+      generateCodeAnalysisPrompt: () => [{role: 'user', content: 'x'}],
       chat: async () => ({
         content: JSON.stringify({
-          techStack: { framework: 'React', bundler: 'Webpack', libraries: ['lodash'] },
-          businessLogic: { mainFeatures: ['login'], dataFlow: 'request -> render' },
-          securityRisks: [{ type: 'xss', severity: 'high', description: 'risk', location: { line: 1 } }],
+          techStack: {
+            framework: 'React',
+            bundler: 'Webpack',
+            libraries: ['lodash'],
+          },
+          businessLogic: {
+            mainFeatures: ['login'],
+            dataFlow: 'request -> render',
+          },
+          securityRisks: [
+            {
+              type: 'xss',
+              severity: 'high',
+              description: 'risk',
+              location: {line: 1},
+            },
+          ],
           qualityScore: 77,
         }),
       }),
@@ -137,7 +164,7 @@ describe('CodeAnalyzer extended', () => {
     const result = await analyzer.understand({
       code: richCode,
       focus: 'all',
-      context: { app: 'demo' },
+      context: {app: 'demo'},
     });
 
     assert.ok(result.structure.functions.length > 0);
@@ -161,7 +188,7 @@ describe('CodeAnalyzer extended', () => {
     const tech = analyzer.detectTechStack(richCode, ai);
     assert.ok(tech.framework || tech.bundler || tech.other);
 
-    const logic = analyzer.extractBusinessLogic(ai, { env: 'test' });
+    const logic = analyzer.extractBusinessLogic(ai, {env: 'test'});
     assert.ok(logic.dataModel.env === 'test');
 
     const dataFlow = await analyzer.analyzeDataFlow(richCode);
@@ -172,7 +199,7 @@ describe('CodeAnalyzer extended', () => {
     const risks = analyzer.identifySecurityRisks(richCode, ai);
     assert.ok(risks.length >= 1);
 
-    const { patterns, antiPatterns } = analyzer.detectCodePatterns(richCode);
+    const {patterns, antiPatterns} = analyzer.detectCodePatterns(richCode);
     assert.ok(Array.isArray(patterns));
     assert.ok(Array.isArray(antiPatterns));
 
@@ -180,7 +207,13 @@ describe('CodeAnalyzer extended', () => {
     assert.ok(metrics.cyclomaticComplexity >= 1);
     assert.ok(metrics.maintainabilityIndex >= 0);
 
-    const score = analyzer.calculateQualityScore(structure, risks, ai, metrics, antiPatterns);
+    const score = analyzer.calculateQualityScore(
+      structure,
+      risks,
+      ai,
+      metrics,
+      antiPatterns,
+    );
     assert.ok(score >= 0 && score <= 100);
   });
 
@@ -190,8 +223,8 @@ describe('CodeAnalyzer extended', () => {
 
     const memberName = analyzer.getMemberExpressionName({
       type: 'MemberExpression',
-      object: { type: 'Identifier', name: 'DOMPurify' },
-      property: { type: 'Identifier', name: 'sanitize' },
+      object: {type: 'Identifier', name: 'DOMPurify'},
+      property: {type: 'Identifier', name: 'sanitize'},
       computed: false,
     });
     assert.strictEqual(memberName, 'DOMPurify.sanitize');
@@ -201,8 +234,8 @@ describe('CodeAnalyzer extended', () => {
         type: 'CallExpression',
         callee: {
           type: 'MemberExpression',
-          object: { type: 'Identifier', name: 'DOMPurify' },
-          property: { type: 'Identifier', name: 'sanitize' },
+          object: {type: 'Identifier', name: 'DOMPurify'},
+          property: {type: 'Identifier', name: 'sanitize'},
           computed: false,
         },
         arguments: [],
@@ -215,16 +248,16 @@ describe('CodeAnalyzer extended', () => {
     const fakeNode = {
       type: 'Identifier',
       name: 'x',
-      loc: { start: { line: 1 }, end: { line: 1 } },
+      loc: {start: {line: 1}, end: {line: 1}},
     } as unknown as t.Identifier;
     const h = analyzer.computeASTHash(fakeNode);
     assert.ok(typeof h === 'string');
 
     const n = analyzer.normalizeCode({
       type: 'FunctionDeclaration',
-      id: { type: 'Identifier', name: 'foo' },
+      id: {type: 'Identifier', name: 'foo'},
       params: [],
-      body: { type: 'BlockStatement', body: [], directives: [] },
+      body: {type: 'BlockStatement', body: [], directives: []},
       generator: false,
       async: false,
     });
@@ -238,7 +271,7 @@ describe('CodeAnalyzer extended', () => {
   it('covers fallback/error branches across analyzer methods', async () => {
     const llm = {
       generateCodeAnalysisPrompt: () => [],
-      chat: async () => ({ content: 'plain text response' }),
+      chat: async () => ({content: 'plain text response'}),
       generateTaintAnalysisPrompt: () => [],
     } satisfies LLMServiceLike;
     const analyzer = new CodeAnalyzer(
@@ -261,12 +294,9 @@ describe('CodeAnalyzer extended', () => {
     analyzer.analyzeStructure = async () => {
       throw new Error('boom');
     };
-    await assert.rejects(
-      async () => {
-        await analyzer.understand({ code: 'const x=1' });
-      },
-      /boom/,
-    );
+    await assert.rejects(async () => {
+      await analyzer.understand({code: 'const x=1'});
+    }, /boom/);
     analyzer.analyzeStructure = originalAnalyzeStructure;
 
     // parse failure branches
@@ -280,6 +310,28 @@ describe('CodeAnalyzer extended', () => {
     assert.deepStrictEqual(Array.isArray(badFlow.sources), true);
   });
 
+  it('logs one parse warning for invalid code during understand', async () => {
+    const analyzer = makeAnalyzer();
+    const warnings: string[] = [];
+    const originalWarn = logger.warn;
+
+    logger.warn = ((message: string, ..._args: unknown[]) => {
+      warnings.push(message);
+    }) as typeof logger.warn;
+
+    try {
+      const result = await analyzer.understand({
+        code: '123abc',
+        focus: 'all',
+      });
+      assert.ok(result);
+    } finally {
+      logger.warn = originalWarn;
+    }
+
+    assert.strictEqual(warnings.length, 1);
+  });
+
   it('covers tech stack/business logic/security/pattern complexity branches', async () => {
     const analyzer = makeAnalyzer();
 
@@ -287,12 +339,15 @@ describe('CodeAnalyzer extended', () => {
     assert.strictEqual(vue.framework, 'Vue');
     const ng = analyzer.detectTechStack('@angular/core', {});
     assert.strictEqual(ng.framework, 'Angular');
-    const crypto = analyzer.detectTechStack('JSEncrypt;crypto-js;__webpack_require__', {});
+    const crypto = analyzer.detectTechStack(
+      'JSEncrypt;crypto-js;__webpack_require__',
+      {},
+    );
     assert.strictEqual(crypto.bundler, 'Webpack');
     assert.ok(Array.isArray(crypto.cryptoLibrary));
 
     const logic = analyzer.extractBusinessLogic(
-      { businessLogic: { mainFeatures: ['f1'], dataFlow: 'a->b' } },
+      {businessLogic: {mainFeatures: ['f1'], dataFlow: 'a->b'}},
       undefined,
     );
     assert.strictEqual(logic.rules.length, 1);
@@ -309,7 +364,14 @@ describe('CodeAnalyzer extended', () => {
       const n = Math.random() + 1;
     `;
     const risks = analyzer.identifySecurityRisks(secCode, {
-      securityRisks: [{ type: 'xss', severity: 'high', location: { line: 4 }, description: 'ai-risk' }],
+      securityRisks: [
+        {
+          type: 'xss',
+          severity: 'high',
+          location: {line: 4},
+          description: 'ai-risk',
+        },
+      ],
     });
     assert.ok(risks.length >= 4);
 
@@ -326,7 +388,9 @@ ${'        doWork(12345);\n'.repeat(55)}
     assert.ok(pat.patterns.length >= 1);
     assert.ok(pat.antiPatterns.length >= 1);
 
-    const metrics = analyzer.analyzeComplexityMetrics('if(a&&b){for(;;){break;}}');
+    const metrics = analyzer.analyzeComplexityMetrics(
+      'if(a&&b){for(;;){break;}}',
+    );
     assert.ok(metrics.cyclomaticComplexity >= 2);
     const metricsFail = analyzer.analyzeComplexityMetrics('function(');
     assert.ok(metricsFail.cyclomaticComplexity >= 1);
@@ -335,14 +399,17 @@ ${'        doWork(12345);\n'.repeat(55)}
   it('covers taint-flow enhancement and duplicate code helper branches', async () => {
     const llm = {
       generateCodeAnalysisPrompt: () => [],
-      generateTaintAnalysisPrompt: () => [{ role: 'user', content: 'taint' }],
+      generateTaintAnalysisPrompt: () => [{role: 'user', content: 'taint'}],
       chat: async () => ({
         content: JSON.stringify({
           taintPaths: [
             {
-              source: { type: 'network', location: { file: 'current', line: 1 } },
-              sink: { type: 'eval', location: { file: 'current', line: 9 } },
-              path: [{ file: 'current', line: 1 }, { file: 'current', line: 9 }],
+              source: {type: 'network', location: {file: 'current', line: 1}},
+              sink: {type: 'eval', location: {file: 'current', line: 9}},
+              path: [
+                {file: 'current', line: 1},
+                {file: 'current', line: 9},
+              ],
             },
           ],
         }),
@@ -384,12 +451,23 @@ ${'        doWork(12345);\n'.repeat(55)}
     analyzer.llm.chat = async () => {
       throw new Error('llm-fail');
     };
-    await analyzer.enhanceTaintAnalysisWithLLM(code, flow.sources, flow.sinks, flow.taintPaths);
+    await analyzer.enhanceTaintAnalysisWithLLM(
+      code,
+      flow.sources,
+      flow.sinks,
+      flow.taintPaths,
+    );
 
     // checkTaintedArguments no-op branch
     const taintMap = new Map<string, unknown>();
     const taintPaths: unknown[] = [];
-    analyzer.checkTaintedArguments([{ type: 'StringLiteral', value: 'x' }], taintMap, taintPaths, 'eval', 1);
+    analyzer.checkTaintedArguments(
+      [{type: 'StringLiteral', value: 'x'}],
+      taintMap,
+      taintPaths,
+      'eval',
+      1,
+    );
     assert.strictEqual(taintPaths.length, 0);
 
     // detectDuplicateCode catch branch

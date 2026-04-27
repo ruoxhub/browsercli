@@ -51,9 +51,11 @@ export {
 } from '../config.js';
 export {SekiroInvoker} from './sekiro-invoker.js';
 export {WorkerManager} from './worker-manager.js';
+export {callSkillCommand} from './commands/call-skill.js';
 export {startCommand} from './commands/start.js';
 export {stopCommand} from './commands/stop.js';
 export {statusCommand} from './commands/status.js';
+export {listSkillsCommand} from './commands/list-skills.js';
 export {listToolsCommand} from './commands/list-tools.js';
 export {scaffoldCommand} from './commands/scaffold.js';
 export {replCommand} from './commands/repl.js';

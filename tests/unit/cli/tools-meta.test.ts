@@ -96,6 +96,12 @@ describe('tools-meta', () => {
       assert.ok(names.includes('query_dom'));
       assert.ok(names.includes('hook_function'));
       assert.ok(names.includes('list_network_requests'));
+      assert.ok(!names.includes('list_console_messages'));
+      assert.ok(!names.includes('get_console_message'));
+      assert.ok(!names.includes('list_websocket_connections'));
+      assert.ok(!names.includes('get_websocket_messages'));
+      assert.ok(!names.includes('get_websocket_message'));
+      assert.ok(!names.includes('analyze_websocket_messages'));
     });
   });
 
@@ -118,6 +124,12 @@ describe('tools-meta', () => {
       assert.strictEqual(meta!.handlerName, 'autoHook');
     });
 
+    it('uses the corrected vjstools module path', () => {
+      const meta = getToolMeta('deobfuscate_code_vj');
+      assert.ok(meta);
+      assert.strictEqual(meta!.modulePath, './vjstools/deobfuscate.js');
+    });
+
     it('includes required debugger params for get_script_source', () => {
       const meta = getToolMeta('get_script_source');
       assert.ok(meta);
@@ -127,7 +139,7 @@ describe('tools-meta', () => {
     it('describes evaluate_script passthrough schema', () => {
       const meta = getToolMeta('evaluate_script');
       assert.ok(meta);
-      assert.match(meta!.description, /context/);
+      assert.match(meta!.description, /上下文/);
       assert.match(meta!.description, /verbose/);
       assert.deepStrictEqual(meta!.schema, {
         function: 'string',

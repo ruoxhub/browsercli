@@ -1,0 +1,21 @@
+=== 企知道签名逆向分析报告 ===
+
+目标网站: https://qiye.qizhidao.com/
+API端点: https://app.qizhidao.com/qzd-bff-pcweb/qzd/v1/search/enterprise/suggestPredict
+
+捕获的签名: 6da78837620a37d4b218d3b860983250.o06D0Q
+签名格式: 32位十六进制MD5哈希 + '.' + 6位随机字符串
+
+请求头关键信息:
+  - device-id: BmgHKs2zzucLjHYF5PgY1poEvEiWw6WEenUdGnqNd6nZlPIM+i6/scTw0qWzHsZ6RH4QKR34lcR3tpS3a3qFZOw==
+  - user-agent-web: X/310eaa0102fab82453d645e416aa7918
+  - h5version: v1.0.0
+
+请求体: {\
+category_new\:[],\prefix\:\腾讯\,\size\:5,\status\:\\,\type\:0}
+
+分析结论:
+1. 签名由前端JS动态生成，格式为 MD5哈希(32位) + '.' + 随机后缀(6位)
+2. 签名算法可能基于请求参数、时间戳、device-id等生成
+3. 已成功捕获有效签名，可用于模拟请求
+4. JS代码经过webpack混淆，静态分析困难

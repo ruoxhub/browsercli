@@ -24,7 +24,9 @@
 
 import {runAxiCli, type AxiCliCommand} from 'axi-sdk-js';
 
+import {callSkillCommand} from '../cli/commands/call-skill.js';
 import {configCommand} from '../cli/commands/config.js';
+import {listSkillsCommand} from '../cli/commands/list-skills.js';
 import {listToolsCommand} from '../cli/commands/list-tools.js';
 import {replCommand} from '../cli/commands/repl.js';
 import {scaffoldCommand} from '../cli/commands/scaffold.js';
@@ -43,7 +45,9 @@ const commands: Record<string, AxiCliCommand<WorkerContext>> = {
   stop: stopCommand,
   status: statusCommand,
   call: toolDispatcherCommand,
+  'call-skill': callSkillCommand,
   'list-tools': listToolsCommand,
+  'list-skills': listSkillsCommand,
   config: configCommand,
   repl: replCommand,
   scaffold: scaffoldCommand,

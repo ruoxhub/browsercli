@@ -131,12 +131,12 @@ function registerBuiltinActions(client: NodeClient): void {
     resolve({tools});
   });
 
-  // // _list_skills — 兼容旧客户端：技能已迁移为 Tool，返回对应 Tool 列表
-  // client.registerAction('_list_skills', async (_request, resolve, _reject) => {
-  //   const {getConvertedSkillToolDefinitions} =
-  //     await import('./cli/converted-skill-tools.js');
-  //   resolve({skills: getConvertedSkillToolDefinitions()});
-  // });
+  // _list_skills — 兼容旧客户端：技能已迁移为 Tool，返回对应 Tool 列表
+  client.registerAction('_list_skills', async (_request, resolve, _reject) => {
+    const {getConvertedSkillToolDefinitions} =
+      await import('./cli/converted-skill-tools.js');
+    resolve({skills: getConvertedSkillToolDefinitions()});
+  });
 
   // _status — 返回 Worker 状态
   client.registerAction('_status', (_request, resolve, _reject) => {

@@ -8,6 +8,9 @@ import type {BrowserContext, Page} from 'patchright';
 
 import {logger} from '../utils/logger.js';
 
+const SESSION_ID_STORAGE_KEY = 'mcp-session-id';
+const SESSION_TAGS_STORAGE_KEY = 'mcp-session-tags';
+
 /**
  * SessionManager 管理多个独立的会话，每个会话有自己独占的页面集合。
  *
@@ -76,24 +79,38 @@ export class SessionManager {
    */
   async tagPage(page: Page): Promise<void> {
     try {
-      await page.evaluate((sessionId: string) => {
-        // 使用 sessionStorage 存储会话标签，页面关闭时自动清除
-        sessionStorage.setItem('mcp-session-id', sessionId);
+      await page.evaluate(
+        ({
+          sessionId,
+          sessionIdStorageKey,
+          sessionTagsStorageKey,
+        }: {
+          sessionId: string;
+          sessionIdStorageKey: string;
+          sessionTagsStorageKey: string;
+        }) => {
+          // 使用 sessionStorage 存储会话标签，页面关闭时自动清除
+          sessionStorage.setItem(sessionIdStorageKey, sessionId);
 
-        // 同时使用 localStorage 持久化标签（跨页面刷新）
-        const url = window.location.href;
-        const allSessionTags = JSON.parse(
-          localStorage.getItem('mcp-session-tags') || '{}',
-        );
-        if (!allSessionTags[url]) {
-          allSessionTags[url] = new Set();
-        }
-        allSessionTags[url].add(sessionId);
-        localStorage.setItem(
-          'mcp-session-tags',
-          JSON.stringify(allSessionTags),
-        );
-      }, this.sessionId);
+          // 同时使用 localStorage 持久化标签（跨页面刷新）
+          const url = window.location.href;
+          const allSessionTags = JSON.parse(
+            localStorage.getItem(sessionTagsStorageKey) || '{}',
+          ) as Record<string, string[]>;
+          const sessionTags = new Set(allSessionTags[url] ?? []);
+          sessionTags.add(sessionId);
+          allSessionTags[url] = [...sessionTags];
+          localStorage.setItem(
+            sessionTagsStorageKey,
+            JSON.stringify(allSessionTags),
+          );
+        },
+        {
+          sessionId: this.sessionId,
+          sessionIdStorageKey: SESSION_ID_STORAGE_KEY,
+          sessionTagsStorageKey: SESSION_TAGS_STORAGE_KEY,
+        },
+      );
 
       // 记录页面 URL
       const url = page.url();
@@ -114,28 +131,47 @@ export class SessionManager {
    */
   async untagPage(page: Page): Promise<void> {
     try {
-      await page.evaluate((sessionId: string) => {
-        const storedSessionId = sessionStorage.getItem('mcp-session-id');
-        if (storedSessionId === sessionId) {
-          sessionStorage.removeItem('mcp-session-id');
-        }
+      await page.evaluate(
+        ({
+          sessionId,
+          sessionIdStorageKey,
+          sessionTagsStorageKey,
+        }: {
+          sessionId: string;
+          sessionIdStorageKey: string;
+          sessionTagsStorageKey: string;
+        }) => {
+          const storedSessionId = sessionStorage.getItem(sessionIdStorageKey);
+          if (storedSessionId === sessionId) {
+            sessionStorage.removeItem(sessionIdStorageKey);
+          }
 
-        // 从 localStorage 中移除
-        const url = window.location.href;
-        const allSessionTags = JSON.parse(
-          localStorage.getItem('mcp-session-tags') || '{}',
-        );
-        if (allSessionTags[url]) {
-          allSessionTags[url].delete(sessionId);
-          if (allSessionTags[url].size === 0) {
-            delete allSessionTags[url];
+          // 从 localStorage 中移除
+          const url = window.location.href;
+          const allSessionTags = JSON.parse(
+            localStorage.getItem(sessionTagsStorageKey) || '{}',
+          ) as Record<string, string[]>;
+          if (allSessionTags[url]) {
+            const remainingTags = allSessionTags[url].filter(
+              currentSessionId => currentSessionId !== sessionId,
+            );
+            if (remainingTags.length === 0) {
+              delete allSessionTags[url];
+            } else {
+              allSessionTags[url] = remainingTags;
+            }
           }
           localStorage.setItem(
-            'mcp-session-tags',
+            sessionTagsStorageKey,
             JSON.stringify(allSessionTags),
           );
-        }
-      }, this.sessionId);
+        },
+        {
+          sessionId: this.sessionId,
+          sessionIdStorageKey: SESSION_ID_STORAGE_KEY,
+          sessionTagsStorageKey: SESSION_TAGS_STORAGE_KEY,
+        },
+      );
 
       const url = page.url();
       this.ownedPageUrls.delete(url);
@@ -153,9 +189,9 @@ export class SessionManager {
    */
   async ownsPage(page: Page): Promise<boolean> {
     try {
-      const sessionId = await page.evaluate(() => {
-        return sessionStorage.getItem('mcp-session-id');
-      });
+      const sessionId = await page.evaluate((sessionIdStorageKey: string) => {
+        return sessionStorage.getItem(sessionIdStorageKey);
+      }, SESSION_ID_STORAGE_KEY);
       return sessionId === this.sessionId;
     } catch (error) {
       logger.debug(`[SessionManager] Failed to check page ownership:`, error);
@@ -200,18 +236,44 @@ export class SessionManager {
         const url = page.url();
 
         // 检查 URL 是否在 localStorage 中有当前会话的标签
-        const hasTag = await page.evaluate((sessionId: string) => {
-          const allSessionTags = JSON.parse(
-            localStorage.getItem('mcp-session-tags') || '{}',
-          );
-          return allSessionTags[window.location.href]?.includes(sessionId);
-        }, this.sessionId);
+        const hasTag = await page.evaluate(
+          ({
+            sessionId,
+            sessionTagsStorageKey,
+          }: {
+            sessionId: string;
+            sessionTagsStorageKey: string;
+          }) => {
+            const allSessionTags = JSON.parse(
+              localStorage.getItem(sessionTagsStorageKey) || '{}',
+            ) as Record<string, string[]>;
+            return (allSessionTags[window.location.href] ?? []).includes(
+              sessionId,
+            );
+          },
+          {
+            sessionId: this.sessionId,
+            sessionTagsStorageKey: SESSION_TAGS_STORAGE_KEY,
+          },
+        );
 
         if (hasTag) {
           // 重新添加 sessionStorage 标签
-          await page.evaluate((sessionId: string) => {
-            sessionStorage.setItem('mcp-session-id', sessionId);
-          }, this.sessionId);
+          await page.evaluate(
+            ({
+              sessionId,
+              sessionIdStorageKey,
+            }: {
+              sessionId: string;
+              sessionIdStorageKey: string;
+            }) => {
+              sessionStorage.setItem(sessionIdStorageKey, sessionId);
+            },
+            {
+              sessionId: this.sessionId,
+              sessionIdStorageKey: SESSION_ID_STORAGE_KEY,
+            },
+          );
           this.ownedPageUrls.add(url);
           logger.debug(`[SessionManager] Restored tag for page: ${url}`);
         }
