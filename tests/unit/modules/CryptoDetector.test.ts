@@ -30,4 +30,17 @@ describe('CryptoDetector', () => {
 
     assert.ok(result.algorithms.length >= 1);
   });
+
+  it('handles missing code without throwing', async () => {
+    const detector = new CryptoDetector(
+      llmStub as unknown as ConstructorParameters<typeof CryptoDetector>[0],
+    );
+    const result = await detector.detect({
+      useAI: false,
+    } as unknown as Parameters<typeof detector.detect>[0]);
+
+    assert.deepStrictEqual(result.algorithms, []);
+    assert.deepStrictEqual(result.libraries, []);
+    assert.strictEqual(result.confidence, 0);
+  });
 });

@@ -76,7 +76,7 @@ export class CryptoDetector {
     const startTime = Date.now();
 
     try {
-      const {code} = options;
+      const code = typeof options?.code === 'string' ? options.code : '';
       const algorithms: CryptoAlgorithm[] = [];
       const libraries: CryptoLibrary[] = [];
       const securityIssues: SecurityIssue[] = [];
