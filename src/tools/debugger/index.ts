@@ -329,24 +329,54 @@ export async function listScripts(
  */
 export async function getScriptSource(
   runtime: DebuggerRuntime,
-  params: {scriptId?: string; script_id?: string; scriptid?: string} = {},
+  params: {
+    scriptId?: string;
+    script_id?: string;
+    scriptid?: string;
+    urlPattern?: string;
+    urlFilter?: string;
+  } = {},
 ): Promise<DebuggerResult> {
-  const scriptId = ensureString(
-    params.scriptId ?? params.script_id ?? params.scriptid,
-    'scriptId',
-    'get_script_source',
-  );
-  if (typeof scriptId !== 'string') {
-    return scriptId;
+  const debuggerContext = await getDebugger(runtime);
+  const requestedScriptId =
+    params.scriptId ?? params.script_id ?? params.scriptid;
+  const urlPattern = params.urlPattern ?? params.urlFilter;
+  let scriptId = requestedScriptId;
+  let resolution:
+    | {mode: 'scriptId'; pattern?: undefined}
+    | {mode: 'urlPattern'; pattern: string}
+    | undefined;
+
+  if (!scriptId && typeof urlPattern === 'string' && urlPattern.trim()) {
+    const matches = debuggerContext.getScriptsByUrlPattern(urlPattern);
+    scriptId = matches[0]?.scriptId;
+    resolution = {mode: 'urlPattern', pattern: urlPattern};
+    if (!scriptId) {
+      return failure(
+        'get_script_source',
+        `未找到匹配 URL 模式 "${urlPattern}" 的脚本`,
+      );
+    }
+  } else {
+    const validatedScriptId = ensureString(
+      scriptId,
+      'scriptId',
+      'get_script_source',
+    );
+    if (typeof validatedScriptId !== 'string') {
+      return validatedScriptId;
+    }
+    scriptId = validatedScriptId;
+    resolution = {mode: 'scriptId'};
   }
 
-  const debuggerContext = await getDebugger(runtime);
   const source = await debuggerContext.getScriptSource(scriptId);
   const script = debuggerContext.getScriptById(scriptId);
 
   return success('get_script_source', `已获取脚本源码: ${scriptId}`, {
     script,
     source,
+    resolution,
   });
 }
 
@@ -360,6 +390,9 @@ export async function searchInSources(
     caseSensitive?: boolean;
     isRegex?: boolean;
     maxResults?: number;
+    contextLines?: number;
+    maxLineLength?: number;
+    urlFilter?: string;
   } = {},
 ): Promise<DebuggerResult> {
   const query = ensureString(params.query, 'query', 'search_in_sources');
@@ -372,15 +405,78 @@ export async function searchInSources(
     caseSensitive: params.caseSensitive,
     isRegex: params.isRegex,
   });
-  const matches = params.maxResults
-    ? result.matches.slice(0, params.maxResults)
-    : result.matches;
+  const filteredMatches =
+    typeof params.urlFilter === 'string' && params.urlFilter.length > 0
+      ? result.matches.filter(match => match.url?.includes(params.urlFilter!))
+      : result.matches;
+  const limitedMatches = params.maxResults
+    ? filteredMatches.slice(0, params.maxResults)
+    : filteredMatches;
+  const matches =
+    typeof params.contextLines === 'number' && params.contextLines > 0
+      ? await Promise.all(
+          limitedMatches.map(async match => ({
+            ...match,
+            context: await buildSearchContext(debuggerContext, match, {
+              contextLines: params.contextLines!,
+              maxLineLength: params.maxLineLength,
+            }),
+          })),
+        )
+      : limitedMatches;
 
   return success(
     'search_in_sources',
     `源码搜索完成，命中 ${matches.length} 条`,
-    {...result, matches},
+    {...result, matches, totalMatches: filteredMatches.length},
   );
+}
+
+async function buildSearchContext(
+  debuggerContext: Awaited<ReturnType<typeof getDebugger>>,
+  match: {scriptId: string; lineNumber: number; lineContent: string},
+  options: {contextLines: number; maxLineLength?: number},
+) {
+  const source = await debuggerContext.getScriptSource(match.scriptId);
+  const lines = source.split('\n');
+  const startLine = Math.max(0, match.lineNumber - options.contextLines);
+  const endLine = Math.min(
+    lines.length - 1,
+    match.lineNumber + options.contextLines,
+  );
+  const formatLine = (line: string) =>
+    truncateSourceLine(line, options.maxLineLength);
+  const before = lines.slice(startLine, match.lineNumber).map(formatLine);
+  const line = formatLine(lines[match.lineNumber] ?? match.lineContent);
+  const after = lines.slice(match.lineNumber + 1, endLine + 1).map(formatLine);
+
+  return {
+    before,
+    line,
+    after,
+    truncated:
+      before.some(item => item.endsWith('...')) ||
+      line.endsWith('...') ||
+      after.some(item => item.endsWith('...')),
+  };
+}
+
+function truncateSourceLine(line: string, maxLineLength?: number): string {
+  if (
+    typeof maxLineLength !== 'number' ||
+    maxLineLength <= 0 ||
+    line.length <= maxLineLength
+  ) {
+    return line;
+  }
+
+  const prefix = line.slice(0, maxLineLength);
+  const lastSpace = prefix.lastIndexOf(' ');
+  const safePrefix =
+    lastSpace > Math.floor(maxLineLength / 2)
+      ? prefix.slice(0, lastSpace)
+      : prefix;
+  return `${safePrefix.trimEnd()}...`;
 }
 
 /**

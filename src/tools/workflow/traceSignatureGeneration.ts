@@ -1,0 +1,184 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import {zod} from '../../third_party/index.js';
+import type {
+  NetworkRuntimeServices,
+  RequestInitiator,
+} from '../network/types.js';
+
+interface DebuggerRuntime {
+  getDebuggerContext?: () => Promise<{
+    getPausedState: () => {
+      isPaused: boolean;
+      reason?: string;
+      callFrames: Array<{
+        callFrameId: string;
+        functionName?: string;
+        url?: string;
+        location?: {
+          scriptId: string;
+          lineNumber: number;
+          columnNumber: number;
+        };
+      }>;
+    };
+  }>;
+}
+
+export interface TraceSignatureGenerationParams {
+  requestUrlPattern?: string;
+  headerKeyword?: string;
+  maxResults?: number;
+  includeSensitiveValues?: boolean;
+  taskId?: string;
+}
+
+interface TraceSignatureGenerationRuntime
+  extends NetworkRuntimeServices, DebuggerRuntime {}
+
+const SIGNATURE_HEADER_PATTERN =
+  /(^|[-_])(sign|signature|token|auth|nonce|timestamp)([-_]|$)|x-sign/i;
+
+export const traceSignatureGeneration = Object.assign(
+  async function traceSignatureGeneration(
+    runtime: TraceSignatureGenerationRuntime,
+    params: TraceSignatureGenerationParams = {},
+  ) {
+    const requestUrlPattern = params.requestUrlPattern ?? '';
+    const headerKeyword = (params.headerKeyword ?? '').toLowerCase();
+    const maxResults = Math.max(1, Math.floor(params.maxResults ?? 10));
+    const includeSensitiveValues = params.includeSensitiveValues === true;
+    const requests = runtime
+      .getNetworkRequests(false, runtime.getSelectedPageIndex?.() ?? 0)
+      .filter(request => {
+        if (requestUrlPattern && !request.url().includes(requestUrlPattern)) {
+          return false;
+        }
+        if (!headerKeyword) {
+          return true;
+        }
+        return Object.entries(request.headers()).some(([key, value]) =>
+          `${key}: ${value}`.toLowerCase().includes(headerKeyword),
+        );
+      })
+      .slice(0, maxResults);
+
+    const requestFingerprints = requests.map(request => {
+      const headers = request.headers();
+      return {
+        reqid: runtime.getNetworkRequestStableId(request),
+        method: request.method(),
+        url: request.url(),
+        signatureIndicators: findSignatureIndicators(headers),
+      };
+    });
+
+    const evidence = {
+      requestHeaders: requests.map(request =>
+        redactHeaders(request.headers(), includeSensitiveValues),
+      ),
+      initiators: requests
+        .map(request => runtime.getRequestInitiator(request))
+        .filter((item): item is RequestInitiator => Boolean(item)),
+    };
+    const pausedFrames = await readPausedFrames(runtime);
+    const nextActions = buildNextActions({
+      requestUrlPattern,
+      headerKeyword,
+      hasRequests: requests.length > 0,
+      hasPausedFrames: pausedFrames.length > 0,
+    });
+
+    return {
+      success: true,
+      message:
+        requests.length > 0
+          ? `签名追踪完成，匹配 ${requests.length} 个请求`
+          : '签名追踪完成，尚未匹配请求；请先触发目标业务动作',
+      tooltype: 'trace_signature_generation',
+      data: {
+        requestFingerprints,
+        pausedFrames,
+        evidence,
+        nextActions,
+        gaps:
+          requests.length === 0 ? ['未发现匹配请求，无法关联签名生成链路'] : [],
+        taskId: params.taskId,
+      },
+    };
+  },
+  {
+    schema: {
+      requestUrlPattern: zod.string().optional(),
+      headerKeyword: zod.string().optional(),
+      maxResults: zod.number().optional(),
+      includeSensitiveValues: zod.boolean().optional(),
+      taskId: zod.string().optional(),
+    },
+  },
+);
+
+function findSignatureIndicators(headers: Record<string, string>): string[] {
+  return Object.keys(headers).filter(key => SIGNATURE_HEADER_PATTERN.test(key));
+}
+
+function redactHeaders(
+  headers: Record<string, string>,
+  includeSensitiveValues: boolean,
+): Record<string, string> {
+  if (includeSensitiveValues) {
+    return headers;
+  }
+
+  return Object.fromEntries(
+    Object.entries(headers).map(([key, value]) => [
+      key,
+      SIGNATURE_HEADER_PATTERN.test(key) ? '[redacted]' : value,
+    ]),
+  );
+}
+
+async function readPausedFrames(runtime: DebuggerRuntime) {
+  if (!runtime.getDebuggerContext) {
+    return [];
+  }
+
+  const debuggerContext = await runtime.getDebuggerContext();
+  const pausedState = debuggerContext.getPausedState();
+  if (!pausedState.isPaused) {
+    return [];
+  }
+
+  return pausedState.callFrames.map(frame => ({
+    callFrameId: frame.callFrameId,
+    functionName: frame.functionName ?? '',
+    url: frame.url ?? '',
+    lineNumber: frame.location?.lineNumber ?? 0,
+    columnNumber: frame.location?.columnNumber ?? 0,
+  }));
+}
+
+function buildNextActions(input: {
+  requestUrlPattern: string;
+  headerKeyword: string;
+  hasRequests: boolean;
+  hasPausedFrames: boolean;
+}): string[] {
+  const urlHint = input.requestUrlPattern || '*';
+  const headerHint = input.headerKeyword || 'sign/token/auth/nonce';
+
+  return [
+    input.hasRequests
+      ? `调用 list_network_requests 并设置 headerFilter="${headerHint}" 复核签名请求`
+      : '先触发登录、下单、分页等目标业务动作，再重新运行 trace_signature_generation',
+    `调用 xhr_to_js_breakpoint，参数包含 urlPattern="${urlHint}"，在请求发送前暂停`,
+    input.hasPausedFrames
+      ? '调用 evaluate_on_callframe 检查局部变量、this、headers、body、sign/token/nonce'
+      : '命中断点后调用 get_paused_info，再调用 evaluate_on_callframe 查看局部变量',
+    '调用 export_session_report 输出请求指纹、调试步骤、证据和剩余缺口',
+  ];
+}

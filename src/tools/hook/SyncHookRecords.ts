@@ -73,7 +73,7 @@ export async function syncHookRecords(
       type,
       event,
       phase,
-      preserveEmpty: true,
+      preserveEmpty: Boolean(hookId) || (!type && !event && !phase),
     });
     const hooks = verbose
       ? summary.hooks

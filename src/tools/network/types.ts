@@ -56,9 +56,7 @@ export interface NetworkRuntimeServices {
   /** 获取请求的稳定 ID */
   getNetworkRequestStableId: (request: HTTPRequest) => number;
   /** 获取请求发起者信息 */
-  getRequestInitiator: (
-    request: HTTPRequest,
-  ) => RequestInitiator | undefined;
+  getRequestInitiator: (request: HTTPRequest) => RequestInitiator | undefined;
   /** 获取 DevTools UI 中当前选中的请求数据 */
   getDevToolsData: () => Promise<DevToolsData | undefined>;
   /** 将 CDP request ID 解析为稳定 ID */
@@ -123,6 +121,8 @@ export interface ListNetworkRequestsParams {
   waitTimeoutMs?: number;
   /** 按请求头关键词过滤 */
   headerFilter?: string;
+  /** 是否返回签名相关证据关联 */
+  includeSignatureEvidence?: boolean;
 }
 
 /** getNetworkRequest 参数 */
@@ -160,6 +160,15 @@ export interface ListNetworkRequestsData {
   pageSize: number | undefined;
   /** 是否因等待请求超时而提前返回 */
   timedOut?: boolean;
+  /** 签名相关请求证据关联，仅 includeSignatureEvidence=true 时返回 */
+  evidenceCorrelations?: NetworkEvidenceCorrelation[];
+}
+
+export interface NetworkEvidenceCorrelation {
+  reqid: number;
+  signatureIndicators: string[];
+  initiator?: RequestInitiator;
+  nextSteps: string[];
 }
 
 /** getNetworkRequest 返回数据（完整详情） */

@@ -28,6 +28,14 @@ interface HookDataParams {
   phase?: string;
 }
 
+interface HookDiagnostic {
+  hookId: string;
+  type: string;
+  issue: 'hook_installed_no_records';
+  likelyCauses: string[];
+  nextSteps: string[];
+}
+
 function normalizeParams(params?: string | HookDataParams): (Required<
   Pick<HookDataParams, 'view'>
 > &
@@ -99,7 +107,7 @@ export async function getHookData(
 
   try {
     const storeSnapshot = await readHookStore(frame, hookId);
-    const filters = {type, event, phase, preserveEmpty: true};
+    const filters = {type, event, phase, preserveEmpty: Boolean(hookId)};
     const data =
       view === 'summary'
         ? {
@@ -154,6 +162,8 @@ function buildDetailedView(
       ),
   );
 
+  const diagnostics = buildHookDiagnostics(storeSnapshot);
+
   return {
     view: 'detail' as const,
     totalHooks: Object.keys(storeSnapshot).length,
@@ -162,8 +172,42 @@ function buildDetailedView(
       typeof maxRecords === 'number' && maxRecords > 0
         ? normalizedRecords.slice(-Math.floor(maxRecords))
         : normalizedRecords,
+    ...(diagnostics.length > 0 ? {diagnostics} : {}),
     summary: summarizeHookRecords(normalizedRecords, maxRecords ?? 20),
     candidateEnvNeeds: inferCandidateEnvNeeds(normalizedRecords),
     requestBindings: buildRequestBindings(normalizedRecords),
   };
+}
+
+function buildHookDiagnostics(
+  storeSnapshot: Record<string, unknown[]>,
+): HookDiagnostic[] {
+  return Object.entries(storeSnapshot)
+    .filter(([, records]) => records.length === 0)
+    .map(([hookId]) => ({
+      hookId,
+      type: inferDiagnosticHookType(hookId),
+      issue: 'hook_installed_no_records' as const,
+      likelyCauses: [
+        '目标业务动作尚未触发',
+        'Hook 注入晚于页面签名逻辑初始化',
+        '当前选中的 Frame 与请求所在 Frame 不一致',
+        '目标请求未经过该 Hook 类型',
+      ],
+      nextSteps: [
+        '触发登录、下单、分页等目标业务动作后重新读取 get_hook_data',
+        '使用 inject_preload_script 或在页面加载前安装 Hook',
+        '用 list_frames / select_frame 确认 Hook 注入到正确 Frame',
+        '升级到 xhr_to_js_breakpoint、get_paused_info、evaluate_on_callframe 调试链路',
+      ],
+    }));
+}
+
+function inferDiagnosticHookType(hookId: string): string {
+  if (hookId.includes('fetch')) return 'fetch';
+  if (hookId.includes('xhr')) return 'xhr';
+  if (hookId.includes('crypto')) return 'crypto';
+  if (hookId.includes('storage')) return 'storage';
+  if (hookId.includes('cookie')) return 'cookie';
+  return 'unknown';
 }

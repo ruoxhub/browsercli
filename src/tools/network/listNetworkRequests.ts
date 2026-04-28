@@ -10,6 +10,7 @@ import type {
   ListNetworkRequestsParams,
   ListNetworkRequestsResult,
   NetworkRequestData,
+  NetworkEvidenceCorrelation,
   NetworkRuntimeServices,
 } from './types.js';
 import {resolveActivePageIndex} from '../shared/activePageResolver.js';
@@ -30,6 +31,9 @@ function getRequestHeaders(request: HTTPRequest): Record<string, string> {
     return {};
   }
 }
+
+const SIGNATURE_HEADER_PATTERN =
+  /(^|[-_])(sign|signature|token|auth|nonce|timestamp)([-_]|$)|x-sign/i;
 
 async function waitForMatchingRequest(
   runtime: NetworkRuntimeServices,
@@ -193,6 +197,11 @@ export async function listNetworkRequests(
       targetPageIdx,
       pageSize,
       timedOut: false,
+      ...(params?.includeSignatureEvidence
+        ? {
+            evidenceCorrelations: buildEvidenceCorrelations(runtime, requests),
+          }
+        : {}),
     };
 
     return {
@@ -218,4 +227,33 @@ export async function listNetworkRequests(
       },
     };
   }
+}
+
+function buildEvidenceCorrelations(
+  runtime: NetworkRuntimeServices,
+  requests: HTTPRequest[],
+): NetworkEvidenceCorrelation[] {
+  return requests
+    .map((request): NetworkEvidenceCorrelation | null => {
+      const reqid = runtime.getNetworkRequestStableId(request);
+      const headers = getRequestHeaders(request);
+      const signatureIndicators = Object.keys(headers).filter(key =>
+        SIGNATURE_HEADER_PATTERN.test(key),
+      );
+      if (signatureIndicators.length === 0) {
+        return null;
+      }
+
+      return {
+        reqid,
+        signatureIndicators,
+        initiator: runtime.getRequestInitiator(request),
+        nextSteps: [
+          '调用 get_request_initiator 查看完整调用栈',
+          '调用 xhr_to_js_breakpoint 在请求发送前暂停',
+          '暂停后调用 get_paused_info 和 evaluate_on_callframe 查看局部变量',
+        ],
+      };
+    })
+    .filter((item): item is NetworkEvidenceCorrelation => item !== null);
 }

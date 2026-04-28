@@ -235,6 +235,25 @@ describe('collector/hook regressions', () => {
       totalHooks: 1,
       totalRecords: 0,
       normalizedRecords: [],
+      diagnostics: [
+        {
+          hookId: 'hook_fetch',
+          type: 'fetch',
+          issue: 'hook_installed_no_records',
+          likelyCauses: [
+            '目标业务动作尚未触发',
+            'Hook 注入晚于页面签名逻辑初始化',
+            '当前选中的 Frame 与请求所在 Frame 不一致',
+            '目标请求未经过该 Hook 类型',
+          ],
+          nextSteps: [
+            '触发登录、下单、分页等目标业务动作后重新读取 get_hook_data',
+            '使用 inject_preload_script 或在页面加载前安装 Hook',
+            '用 list_frames / select_frame 确认 Hook 注入到正确 Frame',
+            '升级到 xhr_to_js_breakpoint、get_paused_info、evaluate_on_callframe 调试链路',
+          ],
+        },
+      ],
       summary: {
         total: 0,
         unique: 0,
@@ -393,7 +412,7 @@ describe('collector/hook regressions', () => {
     ]);
 
     const cleanupCall = evaluateCalls.find(call => call.kind === 'cleanup');
-    assert.ok(cleanupCall?.script?.includes('window.__hookStore'));
+    assert.ok(cleanupCall?.script?.includes('__hookStore'));
     assert.ok(cleanupCall?.script?.includes('"hook_from_params"'));
   });
 

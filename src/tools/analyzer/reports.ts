@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {CorrelatedFlow, PriorityTarget, SignatureChainHints} from './types.js';
+import type {
+  CorrelatedFlow,
+  PriorityTarget,
+  SignatureChainHints,
+} from './types.js';
 
 export function buildActionPlan(result: {
   target: string;
@@ -161,6 +165,10 @@ export function exportSessionReport(params: {
   format?: string;
   includeEvidence?: boolean;
   includeTimeline?: boolean;
+  workflowSteps?: string[];
+  requestFingerprints?: unknown[];
+  evidence?: Record<string, unknown>;
+  gaps?: string[];
 }): {
   success: boolean;
   message: string;
@@ -178,6 +186,10 @@ export function exportSessionReport(params: {
       exportedAt: new Date().toISOString(),
       includeEvidence: params.includeEvidence ?? true,
       includeTimeline: params.includeTimeline ?? true,
+      workflowSteps: params.workflowSteps ?? [],
+      requestFingerprints: params.requestFingerprints ?? [],
+      evidence: params.evidence ?? {},
+      gaps: params.gaps ?? [],
     },
   };
 }

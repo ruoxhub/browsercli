@@ -30,6 +30,7 @@ export type {
   GetNetworkRequestParams,
   NetworkRequestData,
   ListNetworkRequestsData,
+  NetworkEvidenceCorrelation,
   GetNetworkRequestData,
   ListNetworkRequestsResult,
   GetNetworkRequestResult,

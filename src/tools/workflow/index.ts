@@ -7,6 +7,7 @@
 export {autoHook} from './autoHook.js';
 export {observeFlow} from './observeFlow.js';
 export {rebuildBundle} from './rebuildBundle.js';
+export {traceSignatureGeneration} from './traceSignatureGeneration.js';
 export type {
   AutoHookOptions,
   AutoHookToolData,
@@ -25,3 +26,4 @@ export type {
   RebuildBundleOptions,
   RebuildBundleToolResult,
 } from './rebuildBundle.js';
+export type {TraceSignatureGenerationParams} from './traceSignatureGeneration.js';

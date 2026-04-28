@@ -126,7 +126,9 @@ js-reverse call set_breakpoint_on_text --text "debugger;" --urlFilter "debugger-
 # 观察脚本
 js-reverse call list_scripts --filter "/app.js"
 js-reverse call get_script_source --scriptId "<scriptId>"
+js-reverse call get_script_source --urlPattern "app.js"
 js-reverse call search_in_sources --query "token-watch"
+js-reverse call search_in_sources --query "token-watch" --contextLines 2 --maxLineLength 120 --urlFilter "app.js"
 
 # Hook 命名函数
 js-reverse call hook_function --target "window.debugLab.signature.encryptPayload" --logArgs true --logResult true
@@ -164,6 +166,32 @@ js-reverse call evaluate_on_callframe --expression "computedToken"
 js-reverse call step_over
 js-reverse call resume
 ```
+
+### 签名追踪工作流
+
+当 Hook 显示“注入成功”但 `get_hook_data` 仍然是 0 条记录时，不要直接进入本地重建。先确认目标请求、早期注入时机和暂停现场。
+
+```powershell
+# 1. 先找带签名特征的请求头，并返回证据关联
+js-reverse call list_network_requests --headerFilter "sign" --includeSignatureEvidence true
+
+# 2. 生成签名追踪路径和下一步命令
+js-reverse call trace_signature_generation --requestUrlPattern "/api/" --headerKeyword "sign" --maxResults 5
+
+# 3. 查看 Hook 详情；若 totalRecords 为 0，结果会给出可能原因和升级路径
+js-reverse call get_hook_data --hookId "hook_fetch" --view detail --maxRecords 20
+
+# 4. 在请求发送前暂停，查看调用栈和局部变量
+js-reverse call xhr_to_js_breakpoint --url "/api/"
+js-reverse call get_paused_info
+js-reverse call evaluate_on_callframe --expression "headers"
+js-reverse call evaluate_on_callframe --expression "body"
+
+# 5. 导出本次证据和剩余缺口
+js-reverse call export_session_report --format "json"
+```
+
+`trace_signature_generation` 不会重放真实请求；它只根据当前网络记录、请求头、initiator 和暂停态生成证据路径。需要复测参数变化时，先在隔离环境确认目标接口没有副作用。
 
 ### 调试器验证建议
 

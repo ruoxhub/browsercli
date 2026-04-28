@@ -43,6 +43,21 @@ export const TOOLS_META: ToolMeta[] = [
     callMode: 'params-only',
   },
   {
+    name: 'trace_signature_generation',
+    description:
+      '签名追踪工作流：从请求头/URL 线索关联网络请求、Hook 诊断、XHR 断点和调用帧检查',
+    schema: {
+      requestUrlPattern: 'string',
+      headerKeyword: 'string',
+      maxResults: 'number',
+      includeSensitiveValues: 'boolean',
+      taskId: 'string',
+    },
+    modulePath: './workflow/traceSignatureGeneration.js',
+    handlerName: 'traceSignatureGeneration',
+    callMode: 'runtime',
+  },
+  {
     name: 'query_dom',
     description: '查询 DOM',
     schema: {selector: 'string', all: 'boolean', limit: 'number'},
@@ -695,7 +710,8 @@ export const TOOLS_META: ToolMeta[] = [
   },
   {
     name: 'evaluate_script',
-    description: '执行脚本；支持 page / content-script 上下文，并透传 verbose 参数',
+    description:
+      '执行脚本；支持 page / content-script 上下文，并透传 verbose 参数',
     schema: {function: 'string', context: 'string', verbose: 'boolean'},
     modulePath: './script/script.js',
     handlerName: 'evaluateScript',

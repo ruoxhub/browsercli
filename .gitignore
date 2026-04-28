@@ -191,3 +191,4 @@ src/graphify-out/
 .graphify_incremental.json
 .graphify_semantic_new.json
 .graphify_uncached.txt
+.planning

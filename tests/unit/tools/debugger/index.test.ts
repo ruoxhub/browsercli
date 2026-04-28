@@ -133,18 +133,20 @@ function createRuntime() {
     getLastAutoRecoveryEvent: () => ({breakpointId: 'bp-1', hitCount: 3}),
   };
 
+  const runtime = {
+    getDebuggerContext: async () => debuggerContext,
+    getSelectedPage: () => ({mainFrame: () => frame}),
+    getSelectedFrame: () => frame,
+    getNetworkRequestById: (id: number) => ({id}),
+    getRequestInitiator: (request: {id: number}) => ({
+      requestId: request.id,
+      type: 'script' as const,
+    }),
+  } as unknown as Parameters<typeof listScripts>[0];
+
   return {
     clientCalls,
-    runtime: {
-      getDebuggerContext: async () => debuggerContext,
-      getSelectedPage: () => ({mainFrame: () => frame}),
-      getSelectedFrame: () => frame,
-      getNetworkRequestById: (id: number) => ({id}),
-      getRequestInitiator: (request: {id: number}) => ({
-        requestId: request.id,
-        type: 'script' as const,
-      }),
-    },
+    runtime,
   };
 }
 
@@ -224,7 +226,7 @@ describe('src/tools/debugger/index.ts', () => {
 
     assert.equal(scripts.success, true);
     assert.equal(Array.isArray(scripts.data), true);
-    assert.equal((scripts.data as Array<unknown>).length, 2);
+    assert.equal((scripts.data as unknown[]).length, 2);
     assert.match(filtered.message, /app\.js/);
     assert.equal(
       (source.data as {source: string}).source.includes('function test'),
@@ -241,8 +243,35 @@ describe('src/tools/debugger/index.ts', () => {
 
     assert.equal(snakeCase.success, true);
     assert.equal(flatCase.success, true);
-    assert.equal((snakeCase.data as {script?: {scriptId?: string}}).script?.scriptId, '1');
-    assert.equal((flatCase.data as {script?: {scriptId?: string}}).script?.scriptId, '1');
+    assert.equal(
+      (snakeCase.data as {script?: {scriptId?: string}}).script?.scriptId,
+      '1',
+    );
+    assert.equal(
+      (flatCase.data as {script?: {scriptId?: string}}).script?.scriptId,
+      '1',
+    );
+  });
+
+  it('resolves get_script_source by URL pattern when scriptId is omitted', async () => {
+    const {runtime} = createRuntime();
+
+    const source = await getScriptSource(runtime, {urlPattern: 'app.js'});
+
+    assert.equal(source.success, true);
+    assert.equal(
+      (source.data as {script?: {scriptId?: string}}).script?.scriptId,
+      '1',
+    );
+    assert.equal(
+      (source.data as {resolution?: {mode?: string; pattern?: string}})
+        .resolution?.mode,
+      'urlPattern',
+    );
+    assert.equal(
+      (source.data as {resolution?: {pattern?: string}}).resolution?.pattern,
+      'app.js',
+    );
   });
 
   it('supports searching, finding, and setting breakpoints', async () => {
@@ -265,8 +294,8 @@ describe('src/tools/debugger/index.ts', () => {
     const textBreakpoint = await setBreakpointOnText(runtime, {text: 'needle'});
     const removed = await removeBreakpoint(runtime, {breakpointId: 'bp-1'});
 
-    assert.equal((search.data as {matches: Array<unknown>}).matches.length, 1);
-    assert.equal((find.data as {matches: Array<unknown>}).matches.length, 4);
+    assert.equal((search.data as {matches: unknown[]}).matches.length, 1);
+    assert.equal((find.data as {matches: unknown[]}).matches.length, 4);
     assert.equal(
       (breakpoint.data as {breakpointId: string}).breakpointId,
       'bp-1',
@@ -325,6 +354,37 @@ describe('src/tools/debugger/index.ts', () => {
       {method: 'DOMDebugger.removeXHRBreakpoint', params: {url: '/api'}},
       {method: 'DOMDebugger.setXHRBreakpoint', params: {url: '/api'}},
     ]);
+  });
+
+  it('returns bounded context snippets for source search matches', async () => {
+    const {runtime} = createRuntime();
+
+    const search = await searchInSources(runtime, {
+      query: 'token',
+      maxResults: 1,
+      contextLines: 1,
+      maxLineLength: 24,
+      urlFilter: 'app.js',
+    });
+
+    const match = (
+      search.data as {
+        matches: Array<{
+          context?: {
+            before: string[];
+            line: string;
+            after: string[];
+            truncated: boolean;
+          };
+        }>;
+      }
+    ).matches[0];
+
+    assert.equal(search.success, true);
+    assert.deepEqual(match.context?.before, []);
+    assert.equal(match.context?.line, 'const token = 1;');
+    assert.deepEqual(match.context?.after, ['function test(){ return...']);
+    assert.equal(match.context?.truncated, true);
   });
 
   it('fails explicitly for unsupported continuous debugging entrypoints', async () => {

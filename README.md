@@ -85,6 +85,21 @@
 - `get_network_request`：查看单个请求的详细内容，包括请求头、响应和载荷。
 - `get_request_initiator`：追溯某个请求是谁触发的，帮助定位调用链。
 - `break_on_xhr`：在目标请求发出时中断，适合抓参数生成前的现场。
+- `trace_signature_generation`：从请求 URL/签名请求头出发，串联网络证据、Hook 诊断、XHR 断点和调用帧检查。
+
+推荐签名追踪顺序：
+
+```powershell
+js-reverse call list_network_requests --headerFilter "sign" --includeSignatureEvidence true
+js-reverse call trace_signature_generation --requestUrlPattern "/api/" --headerKeyword "sign"
+js-reverse call get_hook_data --hookId "hook_fetch" --view detail --maxRecords 20
+js-reverse call xhr_to_js_breakpoint --url "/api/"
+js-reverse call get_paused_info
+js-reverse call evaluate_on_callframe --expression "headers"
+js-reverse call export_session_report --format "json"
+```
+
+当 `get_hook_data` 显示 Hook 已安装但记录数为 0 时，先检查是否触发了目标业务动作、是否选中了正确 frame、Hook 是否晚于页面初始化注入；仍无法定位时，用 `xhr_to_js_breakpoint` 在请求发送前暂停，再通过 `get_paused_info` 和 `evaluate_on_callframe` 看局部变量。
 
 ### 页面状态与运行前检查
 
@@ -317,12 +332,15 @@ GEMINI_CLI_PATH=gemini-cli
 参数链路沉淀遵循以下规则：
 
 1. 先读本地 task artifact
+
 - `artifacts/tasks/<task-id>/`
 
 2. 本地没有时再读抽象 case
+
 - `scripts/cases/*`
 
 3. 仍不足时按模板新建
+
 - `docs/reference/parameter-methodology-template.md`
 - `docs/reference/parameter-site-mapping-template.md`
 
@@ -379,25 +397,31 @@ Commands:
 三个核心逆向技能：
 
 **1. observe-flow (观察模式)**
+
 ```bash
 js-reverse call-skill observe-flow --url https://m.jd.com
 ```
+
 - 收集和分析页面脚本
 - 识别加密算法和混淆代码
 - 生成安全风险评估报告
 
 **2. auto-hook (自动 Hook)**
+
 ```bash
 js-reverse call-skill auto-hook --url https://m.jd.com
 ```
+
 - 注入调试 Hook 和加密库 Hook
 - 辅助逆向分析
 - 记录运行时调用链
 
 **3. rebuild-bundle (本地复现)**
+
 ```bash
 js-reverse call-skill rebuild-bundle --url https://m.jd.com
 ```
+
 - 构建 Node.js 环境复现目标代码
 - 支持参数提取
 - 生成可运行的本地 bundle
@@ -405,11 +429,13 @@ js-reverse call-skill rebuild-bundle --url https://m.jd.com
 ### REPL 交互模式
 
 启动交互式命令行：
+
 ```bash
 js-reverse repl
 ```
 
 **REPL 命令：**
+
 ```
 help                    显示帮助信息
 skills                  列出所有可用技能
@@ -420,6 +446,7 @@ exit, quit, q           退出
 ```
 
 **技能调用示例：**
+
 ```
 skill rebuild-bundle --url https://example.com/app.js
 skill observe-flow --url https://example.com
@@ -439,6 +466,7 @@ js-reverse scaffold
 ```
 
 **生成的目录结构：**
+
 ```
 artifacts/tasks/<task-name>/
 ├── task.json           # 任务配置
@@ -453,6 +481,7 @@ artifacts/tasks/<task-name>/
 ```
 
 **安全验证：**
+
 - 任务名称必须以小写字母开头
 - 只能包含小写字母、数字和连字符
 - 示例：`jd-h5st` ✅，`123invalid` ❌
@@ -460,6 +489,7 @@ artifacts/tasks/<task-name>/
 ### 端到端示例
 
 **完整流程：**
+
 ```bash
 # 1. 启动 daemon
 js-reverse start --browserUrl http://127.0.0.1:9222
@@ -485,6 +515,7 @@ js-reverse repl
 在 Windows 上，如果 `js-reverse` 命令未被识别（PowerShell 报错"无法将'js-reverse'项识别为 cmdlet"），有三种解决方案：
 
 **方案 1：使用 npm 脚本（推荐）**
+
 ```powershell
 # 从项目目录运行
 npm run cli:daemon:start -- --browserUrl http://127.0.0.1:9222
@@ -493,6 +524,7 @@ npm run cli:daemon:stop
 ```
 
 **方案 2：全局安装 CLI**
+
 ```powershell
 # 在项目目录执行全局安装
 npm install -g .
@@ -507,6 +539,7 @@ npm uninstall -g js-reverse-mcp
 ```
 
 **方案 3：使用完整路径**
+
 ```powershell
 # 使用 node 直接运行编译后的文件
 node build/src/bin/js-reverse.js start --browserUrl http://127.0.0.1:9222
@@ -515,6 +548,7 @@ node build/src/bin/js-reverse.js stop
 ```
 
 **npx 临时运行（无需安装）：**
+
 ```powershell
 # 在项目目录使用
 npx js-reverse start --browserUrl http://127.0.0.1:9222

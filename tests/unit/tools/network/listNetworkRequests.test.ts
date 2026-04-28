@@ -99,8 +99,7 @@ describe('listNetworkRequests', () => {
         getPages: () => pages as never[],
         getSelectedPage: () => selectedPage as never,
         getSelectedPageIndex: () => 0,
-        getNetworkRequests: () =>
-          [firstRequest, secondRequest] as never[],
+        getNetworkRequests: () => [firstRequest, secondRequest] as never[],
         getNetworkRequestById: () => {
           throw new Error('unused');
         },
@@ -157,7 +156,9 @@ describe('listNetworkRequests', () => {
         getSelectedPage: () => selectedPage as never,
         getSelectedPageIndex: () => null,
         getNetworkRequests: () => {
-          throw new Error('should not fetch requests without a resolved page index');
+          throw new Error(
+            'should not fetch requests without a resolved page index',
+          );
         },
         getNetworkRequestById: () => {
           throw new Error('unused');
@@ -235,7 +236,10 @@ describe('listNetworkRequests', () => {
     assert.equal(result.success, false);
     assert.match(result.message, /等待请求超时/);
     assert.equal(result.data.timedOut, true);
-    assert.ok(durationMs < 40, `expected immediate timeout, got ${durationMs}ms`);
+    assert.ok(
+      durationMs < 40,
+      `expected immediate timeout, got ${durationMs}ms`,
+    );
   });
 
   it('returns explicit timeout failure when no matching request arrives', async () => {
@@ -282,8 +286,7 @@ describe('listNetworkRequests', () => {
         getPages: () => pages as never[],
         getSelectedPage: () => selectedPage as never,
         getSelectedPageIndex: () => 0,
-        getNetworkRequests: () =>
-          [zhihuRequest, otherRequest] as never[],
+        getNetworkRequests: () => [zhihuRequest, otherRequest] as never[],
         getNetworkRequestById: () => {
           throw new Error('unused');
         },
@@ -302,5 +305,60 @@ describe('listNetworkRequests', () => {
       result.data.requests[0]?.url,
       'https://www.zhihu.com/api/v4/feed',
     );
+  });
+
+  it('can include signature evidence correlation for filtered requests', async () => {
+    const pages = [{id: 0}];
+    const selectedPage = pages[0];
+    const signedRequest = createRequest('https://example.test/api/order', {
+      'x-sign': 'abc123',
+      'x-nonce': 'n-1',
+      accept: 'application/json',
+    });
+
+    const result = await listNetworkRequests(
+      {
+        getPages: () => pages as never[],
+        getSelectedPage: () => selectedPage as never,
+        getSelectedPageIndex: () => 0,
+        getNetworkRequests: () => [signedRequest] as never[],
+        getNetworkRequestById: () => {
+          throw new Error('unused');
+        },
+        getNetworkRequestStableId: () => 501,
+        getRequestInitiator: () => ({
+          type: 'script',
+          url: 'https://example.test/app.js',
+          lineNumber: 12,
+          columnNumber: 3,
+        }),
+        getDevToolsData: async () => undefined,
+        resolveCdpRequestId: () => undefined,
+      },
+      {
+        headerFilter: 'sign',
+        includeSignatureEvidence: true,
+      },
+    );
+
+    assert.equal(result.success, true);
+    assert.equal(result.data.requests.length, 1);
+    assert.deepEqual(result.data.evidenceCorrelations, [
+      {
+        reqid: 501,
+        signatureIndicators: ['x-sign', 'x-nonce'],
+        initiator: {
+          type: 'script',
+          url: 'https://example.test/app.js',
+          lineNumber: 12,
+          columnNumber: 3,
+        },
+        nextSteps: [
+          '调用 get_request_initiator 查看完整调用栈',
+          '调用 xhr_to_js_breakpoint 在请求发送前暂停',
+          '暂停后调用 get_paused_info 和 evaluate_on_callframe 查看局部变量',
+        ],
+      },
+    ]);
   });
 });
