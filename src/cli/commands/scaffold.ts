@@ -114,9 +114,10 @@ export const scaffoldCommand: AxiCliCommand<WorkerContext> = async (
   if (isAbsolute(output ?? '')) {
     const normalized = resolve(output!);
     const allowedRoots = [resolve(os.tmpdir()), resolve(process.cwd())];
-    const isAllowed = allowedRoots.some(root =>
-      normalized.startsWith(root + '/'),
-    );
+    const isAllowed = allowedRoots.some(root => {
+      const rootWithSep = root.endsWith(path.sep) ? root : root + path.sep;
+      return normalized.startsWith(rootWithSep) || normalized === root;
+    });
     if (!isAllowed) {
       throw new AxiError(
         '无效的 --output 绝对路径，仅允许 tmpdir 或 cwd 下的路径',
@@ -129,10 +130,18 @@ export const scaffoldCommand: AxiCliCommand<WorkerContext> = async (
   // Ensure the final task dir stays within allowed boundaries
   const resolvedTaskDir = resolve(taskDir);
   const cwdResolved = resolve(process.cwd());
-  if (
-    !resolvedTaskDir.startsWith(cwdResolved + '/') &&
-    !resolvedTaskDir.startsWith(resolve(os.tmpdir()) + '/')
-  ) {
+  const tmpResolved = resolve(os.tmpdir());
+  const isUnderCwd =
+    resolvedTaskDir === cwdResolved ||
+    resolvedTaskDir.startsWith(
+      cwdResolved.endsWith(path.sep) ? cwdResolved : cwdResolved + path.sep,
+    );
+  const isUnderTmp =
+    resolvedTaskDir === tmpResolved ||
+    resolvedTaskDir.startsWith(
+      tmpResolved.endsWith(path.sep) ? tmpResolved : tmpResolved + path.sep,
+    );
+  if (!isUnderCwd && !isUnderTmp) {
     throw new AxiError(
       '无效的 --output 路径，禁止目录穿越',
       'VALIDATION_ERROR',

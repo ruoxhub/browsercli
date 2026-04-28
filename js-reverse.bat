@@ -4,6 +4,9 @@ setlocal enabledelayedexpansion
 REM JS Reverse MCP - Windows 启动脚本
 REM 用法：js-reverse.bat <command> [options]
 
+REM 设置 UTF-8 编码，避免中文乱码
+chcp 65001 >nul 2>&1
+
 set "SCRIPT_DIR=%~dp0"
 set "CLI_PATH=%SCRIPT_DIR%build\src\bin\js-reverse.js"
 

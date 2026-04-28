@@ -86,16 +86,45 @@ ${buildHookStoreRuntime({
 
   try {
     await frame.evaluate(hookCode);
+
+    // 注入后尝试读取当前状态（验证 Hook 是否激活）
+    let recordCount = 0;
+    try {
+      recordCount = (await frame.evaluate(() => {
+        const store = (window as any).__hookStore;
+        if (!store) return 0;
+        const records = store['hook_fetch'];
+        return Array.isArray(records) ? records.length : 0;
+      })) as number;
+    } catch {
+      // 状态读取失败不影响主流程
+    }
+
     return {
       success: true,
-      message: 'Fetch Hook 已安装，所有 fetch 调用将被打印',
+      message:
+        `Fetch Hook 已注入页面。当前已捕获 ${recordCount} 条记录。` +
+        (recordCount === 0
+          ? ' 注意：页面加载前的请求无法回溯捕获，请刷新页面或触发新的 fetch 请求。'
+          : ''),
       tooltype: 'hook_fetch',
+      data: {
+        hookId: 'hook_fetch',
+        status: 'active',
+        recordCount,
+        note: '后续 fetch 调用将被自动捕获并存储在 window.__hookStore.hook_fetch',
+      },
     };
   } catch (error) {
     return {
       success: false,
-      message: `错误：${error instanceof Error ? error.message : String(error)}`,
+      message: `Fetch Hook 注入失败：${error instanceof Error ? error.message : String(error)}`,
       tooltype: 'hook_fetch',
+      data: {
+        hookId: 'hook_fetch',
+        status: 'failed',
+        error: error instanceof Error ? error.message : String(error),
+      },
     };
   }
 }

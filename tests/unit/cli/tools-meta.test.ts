@@ -103,6 +103,19 @@ describe('tools-meta', () => {
       assert.ok(!names.includes('get_websocket_message'));
       assert.ok(!names.includes('analyze_websocket_messages'));
     });
+
+    it('contains migrated wasm tools', () => {
+      const names = TOOLS_META.map(t => t.name);
+      assert.ok(names.includes('wasm_capabilities'));
+      assert.ok(names.includes('wasm_dump'));
+      assert.ok(names.includes('wasm_disassemble'));
+      assert.ok(names.includes('wasm_decompile'));
+      assert.ok(names.includes('wasm_inspect_sections'));
+      assert.ok(names.includes('wasm_offline_run'));
+      assert.ok(names.includes('wasm_optimize'));
+      assert.ok(names.includes('wasm_vmp_trace'));
+      assert.ok(names.includes('wasm_memory_inspect'));
+    });
   });
 
   describe('getToolMeta', () => {
@@ -170,6 +183,21 @@ describe('tools-meta', () => {
         waitForRequest: 'string',
         waitTimeoutMs: 'number',
         headerFilter: 'string',
+      });
+    });
+
+    it('describes wasm_offline_run params', () => {
+      const meta = getToolMeta('wasm_offline_run');
+      assert.ok(meta);
+      assert.strictEqual(meta!.modulePath, './wasm/index.js');
+      assert.strictEqual(meta!.handlerName, 'wasmOfflineRun');
+      assert.strictEqual(meta!.callMode, 'runtime');
+      assert.deepStrictEqual(meta!.schema, {
+        inputPath: 'string',
+        functionName: 'string',
+        args: 'string[]',
+        runtime: 'string',
+        timeoutMs: 'number',
       });
     });
   });

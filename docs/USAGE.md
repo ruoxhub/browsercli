@@ -374,13 +374,15 @@ js-reverse list-tools --json # JSON 输出
 
 该命令同时返回：
 
-- 当前可用的 MCP 工具列表
+- 当前可用的 MCP 工具列表（含参数签名）
 - legacy skill 到新 Tool 的兼容映射
+
+表格输出现在包含 `Signature` 列，显示每个工具所需/可选的参数格式，例如 `--scriptId <str>`、`--offset <num>`、`--caseSensitive <bool>`。
 
 **示例：**
 
 ```bash
-# 表格查看工具和兼容技能
+# 表格查看工具和兼容技能（含参数签名）
 js-reverse list-tools
 
 # JSON 输出，适合脚本消费
@@ -754,8 +756,8 @@ js-reverse call performance_analyze_insight --type "LCP"
 
 ### 调试器
 
-|                              | 工具名           | 说明                                                            | 示例 |
-| ---------------------------- | ---------------- | --------------------------------------------------------------- | ---- |
+|                              | 工具名           | 说明                                                            | 示例                             |
+| ---------------------------- | ---------------- | --------------------------------------------------------------- | -------------------------------- |
 | `set_breakpoint`             | 设置断点         | `js-reverse call set_breakpoint --url "app.js" --lineNumber 10` |
 | `set_breakpoint_on_text`     | 在文本上设置断点 | `js-reverse call set_breakpoint_on_text --text "encrypt("`      |
 | `remove_breakpoint`          | 移除断点         | `js-reverse call remove_breakpoint --breakpointId "bp1"`        |
@@ -782,6 +784,7 @@ js-reverse call performance_analyze_insight --type "LCP"
 | `get_request_initiator`      | 获取请求发起者   | `js-reverse call get_request_initiator --requestId 123`         |
 | `get_paused_info`            | 获取暂停信息     | `js-reverse call get_paused_info`                               |
 | `evaluate_on_callframe`      | 在调用帧上执行   | `js-reverse call evaluate_on_callframe --expression "x"`        |
+|                              | `inspect_locals` | 检查局部变量                                                    | `js-reverse call inspect_locals` |
 | `get_ai_debug_status`        | 获取 AI 调试状态 | `js-reverse call get_ai_debug_status`                           |
 | `start_continuous_debugging` | 开始连续调试     | `js-reverse call start_continuous_debugging`                    |
 | `stop_continuous_debugging`  | 停止连续调试     | `js-reverse call stop_continuous_debugging`                     |
@@ -798,7 +801,10 @@ js-reverse call list_scripts --filter "main.js"
 
 # 获取脚本源码
 js-reverse call get_script_source --scriptId "3"
-js-reverse call get_script_source --scriptId "3" --startLine 1 --endLine 50
+js-reverse call get_script_source --scriptId "3" --offset 0 --limit 5000
+
+# 大文件分片读取（从第 5000 个字符开始读取 5000 个字符）
+js-reverse call get_script_source --scriptId "3" --offset 5000 --limit 5000
 
 # 设置断点
 js-reverse call set_breakpoint --url "app.js" --lineNumber 10
@@ -855,6 +861,15 @@ js-reverse call search_in_sources --query "encrypt"
 js-reverse call search_in_sources --query "token" --caseSensitive false
 js-reverse call search_in_sources --query "\\d{32}" --isRegex true
 
+# 限定单个脚本搜索
+js-reverse call search_in_sources --query "sign" --scriptId "3"
+
+# 字符级上下文（适合单行压缩 JS）
+js-reverse call search_in_sources --query "encrypt" --contextChars 120
+
+# 行级上下文 + URL 过滤
+js-reverse call search_in_sources --query "token-watch" --contextLines 2 --maxLineLength 120 --urlFilter "app.js"
+
 # 在脚本中搜索
 js-reverse call find_in_script --query "encrypt"
 
@@ -864,8 +879,12 @@ js-reverse call get_request_initiator --requestId 123
 # 获取暂停信息（断点命中时）
 js-reverse call get_paused_info
 
-# 在调用帧上执行表达式
+# 在调用帧上执行表达式（需先命中断点）
 js-reverse call evaluate_on_callframe --expression "localVar"
+js-reverse call evaluate_on_callframe --expression "headers" --callFrameId "c1"
+
+# 查看当前暂停栈的局部变量摘要
+js-reverse call inspect_locals
 
 # AI 调试状态
 js-reverse call get_ai_debug_status
@@ -962,9 +981,10 @@ js-reverse call hook_xhr_set_request_header --filterKeys '["Authorization","X-To
 
 # 直接执行 Hook 工具后的验证
 js-reverse call hook_fetch
+# 返回结果会显示 recordCount（已捕获记录数）和状态提示；
+# 若 recordCount=0，表示 Hook 已安装但页面尚未产生新的 fetch 调用，
+# 可刷新页面或触发新的 fetch 请求后再读取。
 js-reverse call get_hook_data --hookId "hook_fetch" --view detail
-# 若 totalRecords=0，表示 Hook 已安装但页面尚未产生新的 fetch 调用
-# 可继续触发页面操作后再次读取
 
 # 数据解析 Hook
 js-reverse call hook_json_parse
@@ -1136,14 +1156,14 @@ js-reverse call export_session_report --format json --includeHookData true
 **示例：**
 
 ```bash
-# 收集页面代码
-js-reverse call collect_code
+# 收集页面代码（需要指定 URL）
+js-reverse call collect_code --url "https://example.com"
 
 # 智能模式收集
-js-reverse call collect_code --smartMode priority --maxTotalSize 1048576
+js-reverse call collect_code --url "https://example.com" --returnMode priority --maxTotalSize 1048576
 
-# 指定模式
-js-reverse call collect_code --smartMode incremental --pattern "*.js"
+# 仅收集内联脚本并限定大小
+js-reverse call collect_code --url "https://example.com" --includeInline true --includeExternal false --maxTotalSize 512000
 
 # 代码差异对比
 js-reverse call collection_diff --previous "before" --current "after"
@@ -1404,9 +1424,13 @@ curl -X POST "http://127.0.0.1:5612/business/invoke" ^
 **使用方法：**
 
 ```bash
-js-reverse call observe-flow --url https://example.com
-# 或
+# 导航到目标页面后执行（自动使用当前页面 URL）
+js-reverse call observe_flow
+
+# 或显式指定 URL
 js-reverse call observe_flow --url https://example.com
+# 旧兼容名
+js-reverse call observe-flow --url https://example.com
 ```
 
 **选项：**
@@ -1439,14 +1463,18 @@ js-reverse call observe_flow --url https://example.com
 
 **类别：** hook
 
-**描述：** 自动注入调试 Hook 和加密库 Hook，辅助逆向分析。
+**描述：** 自动注入调试 Hook 和加密库 Hook，并在页面上下文中检测已知加密库（CryptoJS、JSEncrypt、SM-Crypto、forge、WebCrypto）。
 
 **使用方法：**
 
 ```bash
-js-reverse call auto-hook --url https://example.com
-# 或
+# 导航到目标页面后执行（自动使用当前页面）
+js-reverse call auto_hook
+
+# 或显式指定 URL
 js-reverse call auto_hook --url https://example.com
+# 旧兼容名
+js-reverse call auto-hook --url https://example.com
 ```
 
 **预设模式：**
@@ -1568,6 +1596,8 @@ google-chrome --remote-debugging-port=9222
 ```cmd
 chrome.exe --remote-debugging-port=9222
 ```
+
+> Windows 下使用 `js-reverse.bat` 启动 CLI 时，脚本已自动设置 `chcp 65001`（UTF-8 编码），可避免中文输出乱码。如使用 PowerShell 直接运行 `node build/src/bin/js-reverse.js`，建议先执行 `chcp 65001`。
 
 ### 如何查看所有可用工具？
 

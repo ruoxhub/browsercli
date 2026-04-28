@@ -14,6 +14,16 @@ import type {Browser, Page} from '../third_party/index.js';
 // ==================== 配置类型 ====================
 
 
+export interface PuppeteerConfig {
+  timeout?: number;
+  maxCollectedUrls?: number;
+  maxFilesPerCollect?: number;
+  maxTotalContentSize?: number;
+  maxSingleFileSize?: number;
+  userAgent?: string;
+  headless?: boolean;
+}
+
 export interface LLMConfig {
   provider: 'openai';
   openai?: {

@@ -88,7 +88,10 @@ function ensureString(
   tooltype: string,
 ): string | DebuggerResult {
   if (typeof value !== 'string' || value.trim() === '') {
-    return failure(tooltype, `${name} 参数不能为空`);
+    return failure(
+      tooltype,
+      `${name} 参数不能为空。需要提供一个字符串值，例如: --${name} "value"`,
+    );
   }
   return value;
 }
@@ -335,6 +338,8 @@ export async function getScriptSource(
     scriptid?: string;
     urlPattern?: string;
     urlFilter?: string;
+    offset?: number;
+    limit?: number;
   } = {},
 ): Promise<DebuggerResult> {
   const debuggerContext = await getDebugger(runtime);
@@ -370,14 +375,33 @@ export async function getScriptSource(
     resolution = {mode: 'scriptId'};
   }
 
-  const source = await debuggerContext.getScriptSource(scriptId);
+  const fullSource = await debuggerContext.getScriptSource(scriptId);
   const script = debuggerContext.getScriptById(scriptId);
 
-  return success('get_script_source', `已获取脚本源码: ${scriptId}`, {
-    script,
-    source,
-    resolution,
-  });
+  const offset =
+    typeof params.offset === 'number' && params.offset >= 0
+      ? params.offset
+      : 0;
+  const limit =
+    typeof params.limit === 'number' && params.limit > 0
+      ? params.limit
+      : fullSource.length;
+  const source = fullSource.substring(offset, offset + limit);
+  const isPartial = offset > 0 || source.length < fullSource.length;
+
+  return success(
+    'get_script_source',
+    `已获取脚本源码: ${scriptId}${isPartial ? ` (偏移 ${offset}, 长度 ${source.length} / ${fullSource.length})` : ''}`,
+    {
+      script,
+      source,
+      fullLength: fullSource.length,
+      resolution,
+      partial: isPartial,
+      offset,
+      limit: source.length,
+    },
+  );
 }
 
 /**
@@ -391,8 +415,10 @@ export async function searchInSources(
     isRegex?: boolean;
     maxResults?: number;
     contextLines?: number;
+    contextChars?: number;
     maxLineLength?: number;
     urlFilter?: string;
+    scriptId?: string;
   } = {},
 ): Promise<DebuggerResult> {
   const query = ensureString(params.query, 'query', 'search_in_sources');
@@ -405,23 +431,39 @@ export async function searchInSources(
     caseSensitive: params.caseSensitive,
     isRegex: params.isRegex,
   });
-  const filteredMatches =
+  let filteredMatches =
     typeof params.urlFilter === 'string' && params.urlFilter.length > 0
       ? result.matches.filter(match => match.url?.includes(params.urlFilter!))
       : result.matches;
+  if (typeof params.scriptId === 'string' && params.scriptId.length > 0) {
+    filteredMatches = filteredMatches.filter(
+      match => match.scriptId === params.scriptId,
+    );
+  }
   const limitedMatches = params.maxResults
     ? filteredMatches.slice(0, params.maxResults)
     : filteredMatches;
+
+  const hasLineContext =
+    typeof params.contextLines === 'number' && params.contextLines > 0;
+  const hasCharContext =
+    typeof params.contextChars === 'number' && params.contextChars > 0;
+
   const matches =
-    typeof params.contextLines === 'number' && params.contextLines > 0
+    hasLineContext || hasCharContext
       ? await Promise.all(
-          limitedMatches.map(async match => ({
-            ...match,
-            context: await buildSearchContext(debuggerContext, match, {
-              contextLines: params.contextLines!,
-              maxLineLength: params.maxLineLength,
-            }),
-          })),
+          limitedMatches.map(async match => {
+            const context = hasCharContext
+              ? await buildCharSearchContext(debuggerContext, match, {
+                  contextChars: params.contextChars!,
+                  maxLineLength: params.maxLineLength,
+                })
+              : await buildSearchContext(debuggerContext, match, {
+                  contextLines: params.contextLines!,
+                  maxLineLength: params.maxLineLength,
+                });
+            return {...match, context};
+          }),
         )
       : limitedMatches;
 
@@ -458,6 +500,36 @@ async function buildSearchContext(
       before.some(item => item.endsWith('...')) ||
       line.endsWith('...') ||
       after.some(item => item.endsWith('...')),
+  };
+}
+
+async function buildCharSearchContext(
+  debuggerContext: Awaited<ReturnType<typeof getDebugger>>,
+  match: {scriptId: string; lineNumber: number; lineContent: string},
+  options: {contextChars: number; maxLineLength?: number},
+) {
+  const source = await debuggerContext.getScriptSource(match.scriptId);
+  const lines = source.split('\n');
+  let lineStartOffset = 0;
+  for (let i = 0; i < match.lineNumber && i < lines.length; i++) {
+    lineStartOffset += lines[i].length + 1; // +1 for newline
+  }
+  const lineEndOffset = lineStartOffset + match.lineContent.length;
+  const start = Math.max(0, lineStartOffset - options.contextChars);
+  const end = Math.min(source.length, lineEndOffset + options.contextChars);
+
+  const before = source.substring(start, lineStartOffset);
+  const line = truncateSourceLine(
+    source.substring(lineStartOffset, lineEndOffset),
+    options.maxLineLength,
+  );
+  const after = source.substring(lineEndOffset, end);
+
+  return {
+    before,
+    line,
+    after,
+    truncated: start > 0 || end < source.length,
   };
 }
 
@@ -663,21 +735,94 @@ export async function evaluateOnCallframe(
 
   const debuggerContext = await getDebugger(runtime);
   const pausedState = debuggerContext.getPausedState();
-  const callFrameId =
-    params.callFrameId ?? pausedState.callFrames[0]?.callFrameId;
-  if (!callFrameId) {
-    return failure('evaluate_on_callframe', '当前没有可用的调用帧');
+
+  if (!pausedState.isPaused) {
+    return failure(
+      'evaluate_on_callframe',
+      '当前未处于暂停状态，无法执行表达式。请先命中断点或调用 pause。',
+    );
   }
 
-  const result = await debuggerContext.evaluateOnCallFrame(
-    callFrameId,
-    expression,
-    {returnByValue: true},
+  const callFrameId =
+    params.callFrameId ?? pausedState.callFrames[0]?.callFrameId;
+  if (!callFrameId || typeof callFrameId !== 'string') {
+    return failure(
+      'evaluate_on_callframe',
+      '当前没有可用的调用帧。请确认已命中断点，或显式提供 --callFrameId 参数（可从 get_paused_info 获取）。',
+    );
+  }
+
+  try {
+    const result = await debuggerContext.evaluateOnCallFrame(
+      callFrameId,
+      expression,
+      {returnByValue: true},
+    );
+    return success(
+      'evaluate_on_callframe',
+      `表达式已在调用帧 ${callFrameId} 上执行`,
+      result,
+    );
+  } catch (error) {
+    const detail =
+      error instanceof Error ? error.message : String(error);
+    return failure(
+      'evaluate_on_callframe',
+      `表达式执行失败: ${detail}。请确认 callFrameId "${callFrameId}" 有效且调试器仍处于暂停状态。`,
+    );
+  }
+}
+
+/**
+ * 检查当前暂停栈的局部变量摘要。
+ */
+export async function inspectLocals(
+  runtime: DebuggerRuntime,
+): Promise<DebuggerResult> {
+  const debuggerContext = await getDebugger(runtime);
+  const pausedState = debuggerContext.getPausedState();
+
+  if (!pausedState.isPaused) {
+    return failure('inspect_locals', '当前未处于暂停状态');
+  }
+
+  const frames = await Promise.all(
+    pausedState.callFrames.map(async (frame, idx) => {
+      const locals: Array<{name: string; type: string; value: unknown}> = [];
+      const localScope = frame.scopeChain.find(s => s.type === 'local');
+      if (localScope?.object?.objectId) {
+        try {
+          const vars = await debuggerContext.getScopeVariables(
+            localScope.object.objectId,
+          );
+          locals.push(
+            ...vars.map(v => ({
+              name: v.name,
+              type: v.type,
+              value: v.value,
+            })),
+          );
+        } catch {
+          // 忽略单个作用域读取失败
+        }
+      }
+      return {
+        index: idx,
+        callFrameId: frame.callFrameId,
+        functionName: frame.functionName,
+        scriptId: frame.location.scriptId,
+        url: frame.url,
+        lineNumber: frame.location.lineNumber,
+        locals,
+        localCount: locals.length,
+      };
+    }),
   );
+
   return success(
-    'evaluate_on_callframe',
-    `表达式已在调用帧 ${callFrameId} 上执行`,
-    result,
+    'inspect_locals',
+    `当前暂停栈共 ${frames.length} 帧，已读取局部变量摘要`,
+    {frames, totalFrames: frames.length},
   );
 }
 

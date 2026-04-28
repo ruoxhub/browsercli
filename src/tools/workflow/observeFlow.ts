@@ -136,29 +136,51 @@ export interface ObserveFlowToolResult {
   data?: ObserveFlowReport;
 }
 
+interface ObserveFlowRuntimeServices {
+  collector?: {
+    collect(
+      options: {url: string} & Record<string, unknown>,
+    ): Promise<{
+      files: Array<{
+        url: string;
+        content: string;
+        size: number;
+        type: string;
+      }>;
+      totalSize: number;
+    }>;
+  };
+  getSelectedPage?(): {url(): string} | null;
+}
+
 /**
  * 观察模式工具 - 收集和分析页面脚本
  */
 export async function observeFlow(
+  runtime: ObserveFlowRuntimeServices,
   params: ObserveFlowOptions & {url?: string} = {},
 ): Promise<ObserveFlowToolResult> {
-  const {url, ...options} = params;
+  const {url: paramUrl, ...options} = params;
 
   try {
     logger.info('Starting observe_flow tool...');
     const startTime = Date.now();
 
+    const url =
+      paramUrl ?? runtime.getSelectedPage?.()?.url?.() ?? undefined;
+
     // 验证必要的上下文
     if (!url) {
       return {
         success: false,
-        error: 'Missing required parameter: url',
+        error:
+          '缺少 url 参数，且当前没有选中的页面。请提供 --url 参数或先导航到目标页面。',
         tooltype: 'observe_flow',
       };
     }
 
     // 1. 收集页面脚本
-    const collectResult = await collectScripts(url, options);
+    const collectResult = await collectScripts(runtime, url, options);
     logger.info(`Collected ${collectResult.files.length} scripts`);
 
     // 2. 分析每个脚本
@@ -230,62 +252,54 @@ export async function observeFlow(
  * 收集页面脚本
  */
 async function collectScripts(
+  runtime: ObserveFlowRuntimeServices,
   url: string,
   options: ObserveFlowOptions,
 ): Promise<{
   files: Array<{url: string; content: string; size: number; type: string}>;
   totalSize: number;
 }> {
-  // 这里使用简化的收集逻辑，实际项目中可以集成 CodeCollector
-  // 为了技能系统的独立性，我们提供一个基础实现
+  // 优先使用 CodeCollector 进行真实收集
+  if (runtime.collector) {
+    try {
+      const result = await runtime.collector.collect({
+        url,
+        includeInline: options.includeInline ?? true,
+        includeExternal: options.includeExternal ?? true,
+        includeDynamic: options.includeDynamic ?? false,
+        includeServiceWorker: options.includeServiceWorker ?? false,
+        includeWebWorker: options.includeWebWorker ?? false,
+        maxFileSize: options.maxFileSize ?? 100 * 1024,
+        maxTotalSize: options.maxTotalSize ?? 512 * 1024,
+        timeout: options.timeout ?? 30000,
+        dynamicWaitMs: options.dynamicWaitMs ?? 3000,
+        smartMode: options.mode ?? 'full',
+        compress: options.compress ?? false,
+      });
+      return {
+        files: result.files.map(f => ({
+          url: f.url,
+          content: f.content,
+          size: f.size,
+          type: f.type,
+        })),
+        totalSize: result.totalSize,
+      };
+    } catch (collectorError) {
+      logger.warn(
+        'CodeCollector 收集失败，降级为仅返回空结果: ' +
+          (collectorError instanceof Error
+            ? collectorError.message
+            : String(collectorError)),
+      );
+    }
+  }
 
-  const files: Array<{
-    url: string;
-    content: string;
-    size: number;
-    type: string;
-  }> = [];
-
-  // 模拟收集结果（实际应该调用 CodeCollector）
-  // 在实际使用时，这里会调用 CodeCollector.collect() 方法
-  const includeDynamic = options.includeDynamic ?? false;
-  const includeExternal = options.includeExternal ?? true;
-  const includeInline = options.includeInline ?? true;
-  const includeServiceWorker = options.includeServiceWorker ?? false;
-  const includeWebWorker = options.includeWebWorker ?? false;
-  const maxFileSize = options.maxFileSize ?? 100 * 1024; // 100KB
-  const maxTotalSize = options.maxTotalSize ?? 512 * 1024; // 512KB
-  const timeout = options.timeout ?? 30000;
-  const dynamicWaitMs = options.dynamicWaitMs ?? 3000;
-
-  logger.info(
-    `Collect options: ${JSON.stringify({
-      url,
-      includeDynamic,
-      includeExternal,
-      includeInline,
-      includeServiceWorker,
-      includeWebWorker,
-      maxFileSize,
-      maxTotalSize,
-      timeout,
-      dynamicWaitMs,
-    })}`,
+  // 降级：如果 collector 不可用，返回空结果并附带原因
+  logger.warn(
+    'observe_flow: CodeCollector 未初始化（runtime.collector 不存在），返回空脚本列表。',
   );
-
-  // TODO: 在实际技能系统中，这里应该：
-  // 1. 使用 Puppeteer 导航到目标 URL
-  // 2. 收集所有<script>标签
-  // 3. 拦截网络请求收集外部脚本
-  // 4. 等待动态脚本加载（如果 includeDynamic）
-  // 5. 收集 Service Worker 和 Web Worker
-
-  // 由于技能系统需要浏览器上下文，实际实现需要通过 MCP 工具调用
-  // 这里提供一个框架，具体实现在工具层
-
-  const totalSize = files.reduce((sum, file) => sum + file.size, 0);
-
-  return {files, totalSize};
+  return {files: [], totalSize: 0};
 }
 
 /**

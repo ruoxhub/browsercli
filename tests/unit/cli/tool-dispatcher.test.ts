@@ -82,6 +82,33 @@ describe('tool-arg-validator', () => {
     });
   });
 
+  it('injects wasm_disassemble defaults', () => {
+    const result = validateToolArgs('wasm_disassemble', {
+      inputPath: 'artifacts/wasm/sample.wasm',
+    });
+
+    assert.deepStrictEqual(result, {
+      ok: true,
+      value: {
+        inputPath: 'artifacts/wasm/sample.wasm',
+        foldExprs: true,
+      },
+    });
+  });
+
+  it('rejects invalid wasm runtime enum', () => {
+    const result = validateToolArgs('wasm_offline_run', {
+      inputPath: 'artifacts/wasm/sample.wasm',
+      functionName: '_sign',
+      runtime: 'node',
+    });
+
+    assert.deepStrictEqual(result, {
+      ok: false,
+      error: 'wasm_offline_run 的参数 runtime 仅支持：wasmtime, wasmer, auto',
+    });
+  });
+
   it('rejects non-finite numbers', () => {
     const result = validateToolArgs('scroll_by', {
       direction: 'down',
@@ -173,11 +200,7 @@ describe('tool-dispatcher', () => {
     const {calls, ctx} = createWorkerContext();
 
     await toolDispatcherCommand(
-      [
-        'search_site_experience',
-        '--url',
-        'https://www.douyin.com',
-      ],
+      ['search_site_experience', '--url', 'https://www.douyin.com'],
       ctx,
     );
 

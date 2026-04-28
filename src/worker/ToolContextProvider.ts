@@ -27,6 +27,8 @@ import {Deobfuscator} from '../modules/deobfuscator/Deobfuscator.js';
 import {LLMService} from '../services/LLMService.js';
 import type {HTTPRequest} from '../third_party/index.js';
 import type {RequestInitiator} from '../tools/network/types.js';
+import {BrowserManager} from '../browser/index.js';
+import {CodeCollector} from '../modules/collector/CodeCollector.js';
 import {DebuggerContext} from '../utils/DebuggerContext.js';
 
 type TraceResult = unknown;
@@ -61,6 +63,8 @@ export class ToolContextProvider {
   private _cryptoDetector: CryptoDetector | null = null;
   private _debuggerContexts = new WeakMap<Page, DebuggerContext>();
   private _debuggerSessions = new WeakMap<Page, CDPSession>();
+  private _browserManager: BrowserManager | null = null;
+  private _collector: CodeCollector | null = null;
 
   // ─── 网络请求收集 ────────────────────────────────────
   private _networkStorage = new WeakMap<Page, PageRequestStorage>();
@@ -80,6 +84,29 @@ export class ToolContextProvider {
 
   getBrowser(): Browser | null {
     return this._browser;
+  }
+
+  setBrowserManager(browserManager: BrowserManager): void {
+    this._browserManager = browserManager;
+  }
+
+  get collector(): CodeCollector {
+    if (!this._collector) {
+      if (!this._browserManager) {
+        throw new Error(
+          'BrowserManager 未初始化，无法创建 CodeCollector。请先调用 setBrowserManager()。',
+        );
+      }
+      const config = {
+        timeout: 30000,
+        maxCollectedUrls: 10000,
+        maxFilesPerCollect: 200,
+        maxTotalContentSize: 512 * 1024,
+        maxSingleFileSize: 200 * 1024,
+      };
+      this._collector = new CodeCollector(config, this._browserManager);
+    }
+    return this._collector;
   }
 
   setContext(context: BrowserContext): void {

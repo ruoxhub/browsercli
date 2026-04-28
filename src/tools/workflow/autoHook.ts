@@ -891,53 +891,38 @@ function _generateCookieHookScript(): string {
 }
 
 /**
- * 检测页面中的加密库
+ * 检测页面中的加密库（在页面上下文中执行）
  */
-function detectCryptoLibraries(): CryptoDetectionResult[] {
-  const results: CryptoDetectionResult[] = [];
-
-  // 检测 CryptoJS
-  results.push({
-    name: 'CryptoJS',
-    detected:
-      typeof (globalThis as typeof globalThis & {CryptoJS?: unknown})
-        .CryptoJS !== 'undefined',
-  });
-
-  // 检测 JSEncrypt
-  results.push({
-    name: 'JSEncrypt',
-    detected:
-      typeof (globalThis as typeof globalThis & {JSEncrypt?: unknown})
-        .JSEncrypt !== 'undefined',
-  });
-
-  // 检测 SM-Crypto
-  results.push({
-    name: 'SM-Crypto',
-    detected:
-      typeof (
-        globalThis as typeof globalThis & {
-          sm2?: unknown;
-          sm3?: unknown;
-          sm4?: unknown;
-        }
-      ).sm2 !== 'undefined' ||
-      typeof (
-        globalThis as typeof globalThis & {
-          sm2?: unknown;
-          sm3?: unknown;
-          sm4?: unknown;
-        }
-      ).sm3 !== 'undefined' ||
-      typeof (
-        globalThis as typeof globalThis & {
-          sm2?: unknown;
-          sm3?: unknown;
-          sm4?: unknown;
-        }
-      ).sm4 !== 'undefined',
-  });
+async function detectCryptoLibraries(
+  frame: FrameLike,
+): Promise<CryptoDetectionResult[]> {
+  const results = (await frame.evaluate(() => {
+    return [
+      {
+        name: 'CryptoJS',
+        detected: typeof (window as any).CryptoJS !== 'undefined',
+      },
+      {
+        name: 'JSEncrypt',
+        detected: typeof (window as any).JSEncrypt !== 'undefined',
+      },
+      {
+        name: 'SM-Crypto',
+        detected:
+          typeof (window as any).sm2 !== 'undefined' ||
+          typeof (window as any).sm3 !== 'undefined' ||
+          typeof (window as any).sm4 !== 'undefined',
+      },
+      {
+        name: 'forge',
+        detected: typeof (window as any).forge !== 'undefined',
+      },
+      {
+        name: 'WebCrypto',
+        detected: typeof (window as any).crypto?.subtle !== 'undefined',
+      },
+    ];
+  })) as CryptoDetectionResult[];
 
   return results;
 }
@@ -1120,7 +1105,7 @@ export async function autoHook(
   logger.info('[AutoHook] Starting with options: ' + JSON.stringify(options));
 
   let hooksInjected: HookInjectionRecord[] = [];
-  const cryptoDetected: CryptoDetectionResult[] = detectCryptoLibraries();
+  let cryptoDetected: CryptoDetectionResult[] = [];
 
   try {
     const hookPlans = buildHookPlans(options);
@@ -1129,7 +1114,30 @@ export async function autoHook(
         ? await injectHookPlans(runtime, hookPlans)
         : hookPlans.map(({script: _script, ...plan}) => plan);
 
-    // 3. 生成 Hook 报告
+    // 在页面上下文中检测加密库（如果存在 frame）
+    const frame =
+      runtime?.getSelectedFrame?.() ??
+      runtime?.getSelectedPage?.()?.mainFrame?.() ??
+      null;
+    if (frame) {
+      try {
+        cryptoDetected = await detectCryptoLibraries(frame);
+      } catch (detectError) {
+        logger.warn(
+          '[AutoHook] 页面加密库检测失败: ' +
+            (detectError instanceof Error
+              ? detectError.message
+              : String(detectError)),
+        );
+        cryptoDetected = [];
+      }
+    } else {
+      logger.warn(
+        '[AutoHook] 没有可用的页面 Frame，跳过页面加密库检测',
+      );
+    }
+
+    // 生成 Hook 报告
     const successfulInjections = hooksInjected.filter(
       h => h.success && h.injected,
     ).length;
@@ -1152,11 +1160,23 @@ export async function autoHook(
 
     logger.info('[AutoHook] Completed successfully');
 
+    const statusParts: string[] = [];
+    if (options.autoInject) {
+      statusParts.push(`已注入 ${successfulInjections}/${hooksInjected.length} 个 Hook`);
+      if (failedInjections > 0) {
+        statusParts.push(`${failedInjections} 个注入失败`);
+      }
+    } else {
+      statusParts.push(`已生成 ${hooksInjected.length} 个 Hook 计划（未注入）`);
+    }
+    statusParts.push(`检测到 ${detectedCryptoCount} 个加密库`);
+    if (!frame) {
+      statusParts.push('注意：未找到可用 Frame，加密库检测未执行');
+    }
+
     return {
       success: true,
-      message: options.autoInject
-        ? `自动 Hook 完成：实际注入 ${successfulInjections} 个 Hook, 检测到 ${detectedCryptoCount} 个加密库`
-        : `自动 Hook 计划已生成：共 ${hooksInjected.length} 个 Hook（未注入页面）`,
+      message: `自动 Hook 完成：${statusParts.join('，')}`,
       tooltype: 'auto_hook',
       data,
     };

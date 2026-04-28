@@ -193,6 +193,7 @@ async function main(): Promise<void> {
   contextProvider.setPages(context.pages());
   contextProvider.setBrowser(browser);
   contextProvider.setContext(context);
+  contextProvider.setBrowserManager(browserManager);
 
   // 3. 创建 NodeClient
   const client = new NodeClient({
