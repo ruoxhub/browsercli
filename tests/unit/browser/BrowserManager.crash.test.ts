@@ -10,6 +10,7 @@ import {BrowserManager} from '../../../src/browser.js';
 
 interface BrowserLike {
   connected: boolean;
+  isConnected(): boolean;
   on(event: string, handler: () => void): void;
   close(): Promise<void>;
 }
@@ -58,6 +59,9 @@ describe('BrowserManager crash handling', () => {
     let disconnectedHandler: (() => void) | undefined;
     manager.browser = {
       connected: true,
+      isConnected() {
+        return this.connected;
+      },
       on: (event: string, handler: () => void) => {
         if (event === 'disconnected') {
           disconnectedHandler = handler;
@@ -107,6 +111,9 @@ describe('BrowserManager crash handling', () => {
 
     manager.browser = {
       connected: true,
+      isConnected() {
+        return this.connected;
+      },
       on: () => undefined,
       close: async () => undefined,
     };
@@ -126,6 +133,9 @@ describe('BrowserManager crash handling', () => {
     let closed = 0;
     manager.browser = {
       connected: false,
+      isConnected() {
+        return this.connected;
+      },
       on: () => undefined,
       close: async () => {
         closed += 1;
@@ -143,6 +153,9 @@ describe('BrowserManager crash handling', () => {
       ensured += 1;
       return {
         connected: true,
+        isConnected() {
+          return this.connected;
+        },
         on: () => undefined,
         close: async () => undefined,
       };
@@ -165,6 +178,9 @@ describe('BrowserManager crash handling', () => {
       ensured += 1;
       return {
         connected: true,
+        isConnected() {
+          return this.connected;
+        },
         on: () => undefined,
         close: async () => undefined,
       };

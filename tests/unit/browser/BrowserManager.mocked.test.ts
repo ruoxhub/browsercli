@@ -6,7 +6,10 @@
 import assert from 'node:assert';
 import {beforeEach, afterEach, describe, it} from 'node:test';
 
-import {BrowserManager} from '../../../src/browser.js';
+import {
+  BrowserManager,
+  isPatchrightDetachedFrameError,
+} from '../../../src/browser.js';
 import {StealthScripts2025} from '../../../src/modules/stealth/StealthScripts2025.js';
 
 interface ResettableStealthScripts {
@@ -15,14 +18,20 @@ interface ResettableStealthScripts {
 
 interface BrowserLike {
   connected: boolean;
+  isConnected?(): boolean;
   close(): Promise<void>;
+  contexts?(): Array<{
+    on(event: string, handler: unknown): void;
+    pages(): unknown[];
+  }>;
   on(event: string, handler: unknown): void;
-  pages?(): Promise<unknown[]>;
 }
 
 interface BrowserManagerLike {
   browser?: BrowserLike;
   connectToRemoteBrowser(): Promise<BrowserLike>;
+  detachedFrameGuard?: (error: Error) => void;
+  installDetachedFrameGuard(): void;
   launchBrowser(): Promise<BrowserLike>;
   close(): Promise<void>;
   ensureBrowser(): Promise<BrowserLike>;
@@ -56,7 +65,12 @@ describe('BrowserManager mocked', () => {
       headless: true,
       isolated: true,
     });
-    const existing = {connected: true};
+    const existing = {
+      connected: true,
+      isConnected() {
+        return this.connected;
+      },
+    };
     (manager as unknown as BrowserManagerLike).browser =
       existing as BrowserLike;
 
@@ -113,17 +127,22 @@ describe('BrowserManager mocked', () => {
 
     const pageA = {id: 'a'};
     const pageB = {id: 'b'};
-    type TargetCreatedHandler = (target: {
-      type(): string;
-      page(): Promise<{id: string}>;
-    }) => Promise<void>;
-    let onTargetCreated: TargetCreatedHandler | null = null;
+    type PageHandler = (page: {id: string}) => Promise<void>;
+    let onPage: PageHandler | null = null;
     const browser: BrowserLike = {
-      pages: async () => [pageA, pageB],
+      contexts: () => [
+        {
+          pages: () => [pageA, pageB],
+          on: (event: string, handler: unknown) => {
+            if (event === 'page') {
+              onPage = handler as PageHandler;
+            }
+          },
+        },
+      ],
       on: (event: string, handler: unknown) => {
-        if (event === 'targetcreated') {
-          onTargetCreated = handler as TargetCreatedHandler;
-        }
+        void event;
+        void handler;
       },
       close: async () => undefined,
       connected: true,
@@ -149,14 +168,11 @@ describe('BrowserManager mocked', () => {
     await manager.injectStealth();
     assert.strictEqual(injectedCount, 2);
 
-    if (!onTargetCreated) {
-      throw new Error('expected targetcreated handler');
+    if (!onPage) {
+      throw new Error('expected page handler');
     }
-    const targetCreatedHandler: TargetCreatedHandler = onTargetCreated;
-    await targetCreatedHandler({
-      type: () => 'page',
-      page: async () => ({id: 'c'}),
-    });
+    const pageHandler: PageHandler = onPage;
+    await pageHandler({id: 'c'});
     assert.strictEqual(injectedCount, 3);
   });
 
@@ -171,10 +187,18 @@ describe('BrowserManager mocked', () => {
     }, /Browser not initialized/);
 
     (manager as unknown as BrowserManagerLike).browser = {
-      pages: async () => [{}],
+      contexts: () => [
+        {
+          pages: () => [{}],
+          on: () => undefined,
+        },
+      ],
       on: () => undefined,
       close: async () => undefined,
       connected: true,
+      isConnected() {
+        return this.connected;
+      },
     };
 
     (StealthScripts2025 as unknown as ResettableStealthScripts).injectAll =
@@ -203,6 +227,9 @@ describe('BrowserManager mocked', () => {
     let closeCalled = 0;
     (manager as unknown as BrowserManagerLike).browser = {
       connected: true,
+      isConnected() {
+        return this.connected;
+      },
       close: async () => {
         closeCalled += 1;
         throw new Error('close fail');
@@ -222,11 +249,53 @@ describe('BrowserManager mocked', () => {
       restarted += 1;
       return {
         connected: true,
+        isConnected() {
+          return this.connected;
+        },
         close: async () => undefined,
         on: () => undefined,
       };
     };
     await manager.restart();
     assert.strictEqual(restarted, 2);
+  });
+
+  it('classifies only Patchright detached frame errors', () => {
+    const patchrightError = new Error('Frame was detached');
+    patchrightError.stack =
+      'Error: Frame was detached\n    at patchright-core/lib/server/chromium/crPage.js';
+
+    const sameMessageFromApp = new Error('Frame was detached');
+    sameMessageFromApp.stack = 'Error: Frame was detached\n    at src/app.ts';
+
+    assert.strictEqual(isPatchrightDetachedFrameError(patchrightError), true);
+    assert.strictEqual(
+      isPatchrightDetachedFrameError(sameMessageFromApp),
+      false,
+    );
+    assert.strictEqual(
+      isPatchrightDetachedFrameError('Frame was detached'),
+      false,
+    );
+  });
+
+  it('installs and removes the detached frame guard with browser cleanup', async () => {
+    const manager = BrowserManager.getInstance({
+      headless: true,
+      isolated: true,
+    }) as unknown as BrowserManagerLike;
+
+    const before = process.listenerCount('uncaughtException');
+    manager.installDetachedFrameGuard();
+    assert.strictEqual(process.listenerCount('uncaughtException'), before + 1);
+
+    const patchrightError = new Error('Frame was detached');
+    patchrightError.stack =
+      'Error: Frame was detached\n    at patchright-core/lib/server/chromium/crPage.js';
+    manager.detachedFrameGuard?.(patchrightError);
+    assert.strictEqual(process.listenerCount('uncaughtException'), before + 1);
+
+    await manager.close();
+    assert.strictEqual(process.listenerCount('uncaughtException'), before);
   });
 });

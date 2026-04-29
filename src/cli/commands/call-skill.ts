@@ -7,10 +7,15 @@
 import type {AxiCliCommand} from 'axi-sdk-js';
 import {AxiError} from 'axi-sdk-js';
 
-import {parseArgs, getFlag} from '../args-parser.js';
-import {getConvertedSkillToolName} from '../converted-skill-tools.js';
+import {parseArgs} from '../args-parser.js';
 import {successOutput} from '../output.js';
 import type {WorkerContext} from '../types.js';
+
+import {
+  parseSkillInvocationArgs,
+  resolveLegacySkillToolName,
+} from './shared/skill-args.js';
+import {requireWorkerRuntime} from './shared/worker-runtime.js';
 
 export const callSkillCommand: AxiCliCommand<WorkerContext> = async (
   args,
@@ -25,39 +30,11 @@ export const callSkillCommand: AxiCliCommand<WorkerContext> = async (
     ]);
   }
 
-  const url = getFlag(parsed, 'url');
-  const dataStr = getFlag(parsed, 'data');
-
-  const skillArgs: Record<string, unknown> = {};
-  if (url) skillArgs.url = url;
-  if (dataStr) {
-    try {
-      const parsedData = JSON.parse(dataStr) as unknown;
-      if (
-        parsedData &&
-        typeof parsedData === 'object' &&
-        !Array.isArray(parsedData)
-      ) {
-        Object.assign(skillArgs, parsedData);
-      } else {
-        skillArgs.data = parsedData;
-      }
-    } catch {
-      throw new AxiError(
-        `--data 参数必须是有效的 JSON 格式，收到：${dataStr}`,
-        'VALIDATION_ERROR',
-      );
-    }
-  }
+  const skillArgs = parseSkillInvocationArgs(parsed);
 
   try {
-    const invoker = ctx?.invoker;
-    const group = ctx?.group;
-    if (!invoker || !group) {
-      throw new AxiError('Worker 未运行', 'WORKER_NOT_RUNNING');
-    }
-    const toolName =
-      getConvertedSkillToolName(skillName) ?? skillName.replaceAll('-', '_');
+    const {group, invoker} = requireWorkerRuntime(ctx);
+    const toolName = resolveLegacySkillToolName(skillName);
     const result = (await invoker.invoke(group, toolName, skillArgs)) as {
       success?: boolean;
       error?: string;
@@ -69,9 +46,7 @@ export const callSkillCommand: AxiCliCommand<WorkerContext> = async (
       return successOutput({
         command: 'call-skill',
         skill: skillName,
-        tool:
-          getConvertedSkillToolName(skillName) ??
-          skillName.replaceAll('-', '_'),
+        tool: toolName,
         result: result.data ?? result.message ?? '工具执行成功',
       });
     }

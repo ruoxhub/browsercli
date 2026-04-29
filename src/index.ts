@@ -19,134 +19,13 @@
 import {BrowserManager} from './browser/index.js';
 import type {BrowserManagerConfig} from './browser/index.js';
 import {resolveConfig, getEnvBoolean} from './config.js';
-import type {GlobalConfig} from './config.js';
 import {NodeClient} from './protocol/Client.js';
 import {dbService} from './services/DatabaseService.js';
-import type {WorkerStartOptions} from './types/platform.js';
+import {registerBuiltinActions} from './worker/BuiltinActions.js';
 import {ToolAdapter} from './worker/ToolAdapter.js';
 import {ToolContextProvider} from './worker/ToolContextProvider.js';
-
-// 优雅关闭
-let isShuttingDown = false;
-
-async function gracefulShutdown(
-  client: NodeClient,
-  browserManager: BrowserManager,
-  signal: string,
-): Promise<void> {
-  if (isShuttingDown) return;
-  isShuttingDown = true;
-
-  console.log(`[Worker] 收到 ${signal}，开始优雅关闭...`);
-
-  // 1. 断开 Sekiro 连接（Server 自动路由到其他 Worker）
-  client.disconnect();
-
-  // 2. 等待当前 Action 完成（最多 10s）
-  // Sekiro 断开后不会再有新请求进来，当前执行的 handler 自然完成
-
-  // 3. 关闭浏览器连接
-  try {
-    await browserManager.close();
-    console.log('[Worker] 浏览器已关闭');
-  } catch (err) {
-    console.error('[Worker] 关闭浏览器失败:', err);
-  }
-
-  // 4. 关闭数据库连接
-  try {
-    await dbService.disconnect();
-    console.log('[Worker] 数据库连接已关闭');
-  } catch (err) {
-    console.error('[Worker] 关闭数据库连接失败:', err);
-  }
-
-  console.log('[Worker] 已关闭');
-  process.exit(0);
-}
-
-/**
- * 解析 Worker 命令行参数为 GlobalConfig 格式
- */
-function parseWorkerArgs(args: string[]): GlobalConfig {
-  const cliConfig: GlobalConfig = {};
-
-  for (let i = 0; i < args.length; i++) {
-    switch (args[i]) {
-      case '--sekiroHost':
-        cliConfig.sekiroHost = args[++i];
-        break;
-      case '--group':
-        cliConfig.group = args[++i];
-        break;
-      case '--browserUrl':
-        cliConfig.browserUrl = args[++i];
-        break;
-      case '--wsEndpoint':
-        cliConfig.wsEndpoint = args[++i];
-        break;
-      case '--headless':
-        cliConfig.headless = true;
-        break;
-      case '--executablePath':
-        cliConfig.executablePath = args[++i];
-        break;
-      case '--databaseUrl':
-        cliConfig.databaseUrl = args[++i];
-        break;
-    }
-  }
-
-  return cliConfig;
-}
-
-/**
- * 将 ResolvedConfig 转换为 WorkerStartOptions
- */
-function toWorkerOptions(
-  resolved: ReturnType<typeof resolveConfig>,
-): WorkerStartOptions {
-  return {
-    sekiroHost: resolved.sekiroHost,
-    group: resolved.group,
-    browserUrl: resolved.browserUrl,
-    wsEndpoint: resolved.wsEndpoint,
-    headless: resolved.headless,
-    executablePath: resolved.executablePath,
-    databaseUrl: resolved.databaseUrl,
-  };
-}
-
-/**
- * 注册内置 Action（_list_tools, _list_skills, _status）
- */
-function registerBuiltinActions(client: NodeClient): void {
-  // _list_tools — 返回所有已注册的 Tool 名称
-  client.registerAction('_list_tools', async (_request, resolve, _reject) => {
-    const {getAllToolNames, getToolMeta} = await import('./cli/tools-meta.js');
-    const tools = getAllToolNames().map(name => {
-      const meta = getToolMeta(name);
-      return {name, description: meta?.description || ''};
-    });
-    resolve({tools});
-  });
-
-  // _list_skills — 兼容旧客户端：技能已迁移为 Tool，返回对应 Tool 列表
-  client.registerAction('_list_skills', async (_request, resolve, _reject) => {
-    const {getConvertedSkillToolDefinitions} =
-      await import('./cli/converted-skill-tools.js');
-    resolve({skills: getConvertedSkillToolDefinitions()});
-  });
-
-  // _status — 返回 Worker 状态
-  client.registerAction('_status', (_request, resolve, _reject) => {
-    resolve({
-      pid: process.pid,
-      status: client.getStatus(),
-      uptime: process.uptime(),
-    });
-  });
-}
+import {parseWorkerArgs, toWorkerOptions} from './worker/WorkerArgs.js';
+import {createGracefulShutdown} from './worker/WorkerLifecycle.js';
 
 /**
  * Worker 主函数
@@ -216,12 +95,9 @@ async function main(): Promise<void> {
   console.log('[Worker] 已启动并连接到 Sekiro Server');
 
   // 7. 注册信号处理
-  process.on('SIGTERM', () =>
-    gracefulShutdown(client, browserManager, 'SIGTERM'),
-  );
-  process.on('SIGINT', () =>
-    gracefulShutdown(client, browserManager, 'SIGINT'),
-  );
+  const gracefulShutdown = createGracefulShutdown({browserManager, client});
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 }
 
 main().catch(err => {

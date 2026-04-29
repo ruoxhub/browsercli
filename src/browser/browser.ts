@@ -27,6 +27,17 @@ import {HARMFUL_ARGS, DEFAULT_ARGS, STEALTH_ARGS} from './stealth-args.js';
 
 let browserManager: BrowserManager | undefined;
 
+export function isPatchrightDetachedFrameError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return (
+    error.message === 'Frame was detached' &&
+    (error.stack?.includes('patchright-core') ?? false)
+  );
+}
+
 export async function ensureBrowserConnected(options: {
   browserURL?: string;
   wsEndpoint?: string;
@@ -379,6 +390,7 @@ export class BrowserManager {
   private stealthInjected = false;
   private crashCheckInterval?: NodeJS.Timeout;
   private isRestarting = false;
+  private detachedFrameGuard?: (error: Error) => void;
 
   private constructor(config: BrowserManagerConfig) {
     const remoteDebuggingUrl = config.remoteDebuggingUrl;
@@ -573,6 +585,7 @@ export class BrowserManager {
         ...(this.config.wsHeaders ? {headers: this.config.wsHeaders} : {}),
       };
 
+      this.installDetachedFrameGuard();
       this.browser = await chromium.connectOverCDP(
         connectEndpoint!,
         connectOptions,
@@ -702,6 +715,34 @@ export class BrowserManager {
         cause: error,
       });
     }
+  }
+
+  private installDetachedFrameGuard(): void {
+    if (this.detachedFrameGuard) {
+      return;
+    }
+
+    this.detachedFrameGuard = error => {
+      if (isPatchrightDetachedFrameError(error)) {
+        logger.debug('Ignoring transient Patchright detached frame event');
+        return;
+      }
+
+      process.removeListener('uncaughtException', this.detachedFrameGuard!);
+      this.detachedFrameGuard = undefined;
+      throw error;
+    };
+
+    process.on('uncaughtException', this.detachedFrameGuard);
+  }
+
+  private removeDetachedFrameGuard(): void {
+    if (!this.detachedFrameGuard) {
+      return;
+    }
+
+    process.removeListener('uncaughtException', this.detachedFrameGuard);
+    this.detachedFrameGuard = undefined;
   }
 
   /**
@@ -1124,6 +1165,8 @@ export class BrowserManager {
    * Close the browser and clean up resources
    */
   async close(): Promise<void> {
+    this.removeDetachedFrameGuard();
+
     // Clear crash detection interval
     if (this.crashCheckInterval) {
       clearInterval(this.crashCheckInterval);

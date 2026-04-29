@@ -10,11 +10,9 @@ export {
   launch,
   ensureBrowserLaunched,
   BrowserManager,
+  isPatchrightDetachedFrameError,
 } from './browser.js';
-export type {
-  BrowserManagerConfig,
-  Channel
-} from './browser.js';
+export type {BrowserManagerConfig, Channel} from './browser.js';
 
 export {PlaywrightDevToolsConnection as PuppeteerDevToolsConnection} from './DevToolsConnectionAdapter.js';
 

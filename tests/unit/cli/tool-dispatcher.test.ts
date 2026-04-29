@@ -146,6 +146,23 @@ describe('tool-dispatcher', () => {
     );
   });
 
+  it('preserves valueless numeric flags as invalid booleans', async () => {
+    const {calls, ctx} = createWorkerContext();
+
+    await assert.rejects(
+      Promise.resolve(
+        toolDispatcherCommand(['scroll_by', '--direction', 'down', '--pixels'], ctx),
+      ),
+      (error: unknown) => {
+        assert.ok(error instanceof AxiError);
+        assert.strictEqual(error.code, 'VALIDATION_ERROR');
+        assert.strictEqual(error.message, 'scroll_by 的参数 pixels 必须是数字');
+        assert.deepStrictEqual(calls, []);
+        return true;
+      },
+    );
+  });
+
   it('injects evaluate_script defaults before invoking worker', async () => {
     const {calls, ctx} = createWorkerContext();
 

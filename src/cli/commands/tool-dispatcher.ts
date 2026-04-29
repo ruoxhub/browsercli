@@ -17,39 +17,9 @@ import {validateToolArgs} from '../tool-arg-validator.js';
 import {getToolMeta, searchTools} from '../tools-meta.js';
 import type {WorkerContext} from '../types.js';
 
-function parseSkillArgs(
-  parsed: ReturnType<typeof parseArgs>,
-): Record<string, unknown> {
-  const url = parsed.flags.url;
-  const dataStr = parsed.flags.data;
-  const skillArgs: Record<string, unknown> = {};
-
-  if (typeof url === 'string') {
-    skillArgs.url = url;
-  }
-
-  if (typeof dataStr === 'string') {
-    try {
-      const parsedData = JSON.parse(dataStr) as unknown;
-      if (
-        parsedData &&
-        typeof parsedData === 'object' &&
-        !Array.isArray(parsedData)
-      ) {
-        Object.assign(skillArgs, parsedData);
-      } else {
-        skillArgs.data = parsedData;
-      }
-    } catch {
-      throw new AxiError(
-        `--data 参数必须是有效的 JSON 格式，收到：${dataStr}`,
-        'VALIDATION_ERROR',
-      );
-    }
-  }
-
-  return skillArgs;
-}
+import {parseSkillInvocationArgs} from './shared/skill-args.js';
+import {buildToolArgs} from './shared/tool-args.js';
+import {requireWorkerRuntime} from './shared/worker-runtime.js';
 
 export const toolDispatcherCommand: AxiCliCommand<WorkerContext> = async (
   args,
@@ -89,44 +59,12 @@ export const toolDispatcherCommand: AxiCliCommand<WorkerContext> = async (
   }
 
   const toolName = meta?.name ?? convertedToolName!;
-  const toolArgs: Record<string, unknown> = isLegacySkill
-    ? parseSkillArgs(parsed)
-    : {};
-
-  if (meta) {
-    for (const [key, value] of Object.entries(parsed.flags)) {
-      if (typeof value === 'boolean') {
-        toolArgs[key] = value;
-        continue;
-      }
-      const schemaType = meta.schema[key];
-      if (schemaType === 'number') {
-        toolArgs[key] = Number(value);
-      } else if (schemaType === 'boolean') {
-        toolArgs[key] = value === 'true' || value === '1';
-      } else if (schemaType === 'string') {
-        toolArgs[key] = value;
-      } else if (typeof value === 'string' && value.includes(',')) {
-        toolArgs[key] = value.split(',').map(s => s.trim());
-      } else {
-        // 无 schema 时，尝试智能推断：纯数字字符串转 number，"true"/"false" 转 boolean
-        if (value === 'true' || value === 'false') {
-          toolArgs[key] = value === 'true';
-        } else if (/^-?\d+(\.\d+)?$/.test(value)) {
-          toolArgs[key] = Number(value);
-        } else {
-          toolArgs[key] = value;
-        }
-      }
-    }
-  }
+  const toolArgs = meta
+    ? buildToolArgs(parsed, meta)
+    : parseSkillInvocationArgs(parsed);
 
   try {
-    const invoker = ctx?.invoker;
-    const group = ctx?.group;
-    if (!invoker || !group) {
-      throw new AxiError('Worker 未运行', 'WORKER_NOT_RUNNING');
-    }
+    const {group, invoker} = requireWorkerRuntime(ctx);
     const validatedArgs = validateToolArgs(toolName, toolArgs);
     if (validatedArgs.ok === false) {
       throw new AxiError(validatedArgs.error, 'VALIDATION_ERROR');
