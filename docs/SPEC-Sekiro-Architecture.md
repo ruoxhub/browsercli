@@ -119,22 +119,22 @@ type ActionHandler = (
 ) => void;
 ```
 
-### 重写 `src/protocol/Client.ts`（BaseClient → NodeClient）
+### 重写 `src/protocol/Client.ts`（BaseClient → RpcClient）
 
 删除浏览器绑定（window、Chrome Storage），保留 Action 管理核心：
 
 ```typescript
-interface NodeClientConfig {
+interface RpcClientConfig {
   group: string;
   sekiroHost: string;  // e.g. ws://127.0.0.1:5620
   clientId?: string;
 }
 
-class NodeClient {
+class RpcClient {
   private sekiro: SekiroClient;
   private actions: Map<string, ActionHandler>;
 
-  constructor(config: NodeClientConfig) {
+  constructor(config: RpcClientConfig) {
     this.sekiro = new SekiroClient(wsURL);
     this.actions = new Map();
   }
@@ -149,10 +149,10 @@ class NodeClient {
 ### 文件变更
 
 - 改造：`src/protocol/sekiro.ts`（浏览器 → Node.js）
-- 重写：`src/protocol/Client.ts`（BaseClient → NodeClient）
+- 重写：`src/protocol/Client.ts`（BaseClient → RpcClient）
 - 删除：`src/protocol/baseClient.ts`（已被 Client.ts 替代）
 - 新建：`src/types/sekiro.ts`
-- 新建：`src/types/platform.ts`（NodeClientConfig 等类型）
+- 新建：`src/types/platform.ts`（RpcClientConfig 等类型）
 
 ## 5. Worker Layer — ToolAdapter 与 Action 注册
 
@@ -162,7 +162,7 @@ class NodeClient {
 1. 解析 CLI 参数 (--sekiroHost, --group, --browserUrl 等)
 2. 初始化 BrowserManager (连接/启动浏览器)
 3. 初始化 JSHookRuntime (全局服务集合)
-4. 创建 NodeClient，连接到 sekiro-go Server
+4. 创建 RpcClient，连接到 sekiro-go Server
 5. 通过 ToolAdapter 注册所有 Tools 为 Sekiro Actions
 6. 注册 Skills 为 Sekiro Actions
 7. 进入运行状态，等待 Server 转发请求
@@ -201,7 +201,7 @@ class ToolAdapter {
   }
 
   /** 批量注册所有 Tools */
-  registerAll(client: NodeClient): void {
+  registerAll(client: RpcClient): void {
     for (const tool of this.tools) {
       client.registerAction(tool.name, this.wrapTool(tool));
       for (const alias of tool.aliases ?? []) {
@@ -388,7 +388,7 @@ Worker 收到 SIGTERM:
 | 阶段 | 内容 | 依赖 |
 |------|------|------|
 | Phase 1 | 新建 `src/types/sekiro.ts` + `src/types/platform.ts`，改造 `src/protocol/sekiro.ts` 为 Node.js 版 | 无 |
-| Phase 2 | 重写 `src/protocol/Client.ts`（BaseClient → NodeClient） | Phase 1 |
+| Phase 2 | 重写 `src/protocol/Client.ts`（BaseClient → RpcClient） | Phase 1 |
 | Phase 3 | 新建 Worker 层（`src/worker/`：index、ToolAdapter、ToolResponseAccumulator、ToolContextProvider） | Phase 2 |
 | Phase 4 | 新建 CLI 层（`src/cli/sekiro-invoker.ts`、`src/cli/worker-manager.ts`），改造 CLI 命令 | Phase 3 |
 | Phase 5 | 删除 Daemon 层（`src/daemon/`）、MCP 入口（`src/bin/js-reverse-mcp`），清理 IPC 相关代码 | Phase 4 |
@@ -398,9 +398,9 @@ Worker 收到 SIGTERM:
 | 操作 | 文件 | 说明 |
 |------|------|------|
 | 新建 | `src/types/sekiro.ts` | Sekiro 协议类型定义 |
-| 新建 | `src/types/platform.ts` | NodeClientConfig 等平台类型 |
+| 新建 | `src/types/platform.ts` | RpcClientConfig 等平台类型 |
 | 改造 | `src/protocol/sekiro.ts` | 浏览器端 → Node.js（ws 包、删 window、加重连/心跳） |
-| 重写 | `src/protocol/Client.ts` | BaseClient → NodeClient |
+| 重写 | `src/protocol/Client.ts` | BaseClient → RpcClient |
 | 新建 | `src/worker/index.ts` | Worker 进程入口 |
 | 新建 | `src/worker/ToolAdapter.ts` | Tool handler → Sekiro Action 适配器 |
 | 新建 | `src/worker/ToolResponseAccumulator.ts` | Response accumulator |

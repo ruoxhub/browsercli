@@ -5,12 +5,12 @@
  */
 
 import type {BrowserManager} from '../browser/index.js';
-import type {NodeClient} from '../protocol/Client.js';
+import type {RpcClient} from '../protocol/Client.js';
 import {dbService} from '../services/DatabaseService.js';
 
 interface ShutdownDependencies {
   browserManager: BrowserManager;
-  client: NodeClient;
+  client: RpcClient;
   database?: Pick<typeof dbService, 'disconnect'>;
   exit?: (code: number) => never;
   timeoutMs?: number;

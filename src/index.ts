@@ -11,7 +11,7 @@
  * 1. 解析 CLI 参数
  * 2. 初始化 BrowserManager (连接/启动浏览器)
  * 3. 初始化 ToolContextProvider
- * 4. 创建 NodeClient，连接到 Sekiro Server
+ * 4. 创建 RpcClient，连接到 Sekiro Server
  * 5. 通过 ToolAdapter 注册所有 Tools 为 Sekiro Actions
  * 6. 进入运行状态，等待 Server 转发请求
  */
@@ -19,7 +19,7 @@
 import {BrowserManager} from './browser/index.js';
 import type {BrowserManagerConfig} from './browser/index.js';
 import {resolveConfig, getEnvBoolean} from './config.js';
-import {NodeClient} from './protocol/Client.js';
+import {RpcClient} from './protocol/Client.js';
 import {dbService} from './services/DatabaseService.js';
 import {registerBuiltinActions} from './worker/BuiltinActions.js';
 import {ToolAdapter} from './worker/ToolAdapter.js';
@@ -74,8 +74,8 @@ async function main(): Promise<void> {
   contextProvider.setContext(context);
   contextProvider.setBrowserManager(browserManager);
 
-  // 3. 创建 NodeClient
-  const client = new NodeClient({
+  // 3. 创建 RpcClient
+  const client = new RpcClient({
     group: options.group,
     sekiroHost: options.sekiroHost,
   });

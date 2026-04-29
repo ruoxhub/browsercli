@@ -5,15 +5,15 @@
  */
 
 /**
- * 平台层类型定义 — NodeClient、Worker、CLI 共用
+ * 平台层类型定义 — RpcClient、Worker、CLI 共用
  */
 
 import type {ActionHandler} from './sekiro.js';
 
-// ==================== NodeClient 配置 ====================
+// ==================== RpcClient 配置 ====================
 
-/** NodeClient 构造配置 */
-interface NodeClientConfig {
+/** RpcClient 构造配置 */
+interface RpcClientConfig {
   /** 分组名 */
   group: string;
   /** Sekiro Server 地址，如 ws://127.0.0.1:5612 */
@@ -28,7 +28,7 @@ interface NodeClientConfig {
   heartbeatInterval?: number;
 }
 
-/** NodeClient 状态快照 */
+/** RpcClient 状态快照 */
 interface ClientStatus {
   isInitialized: boolean;
   isConnected: boolean;
@@ -73,7 +73,7 @@ interface ActionConfig {
 }
 
 export {
-  type NodeClientConfig,
+  type RpcClientConfig,
   type ClientStatus,
   type WorkerStartOptions,
   type SimpleActionHandler,
