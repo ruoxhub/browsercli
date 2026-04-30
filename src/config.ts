@@ -8,8 +8,8 @@
  * 全局统一配置 — 整合 CLI 配置、全局配置文件、AI/Browser 系统配置
  *
  * 配置优先级（高 → 低）：
- * 1. CLI 参数（--sekiroHost 等）
- * 2. 环境变量（SEKIRO_HOST, OPENAI_API_KEY 等）
+ * 1. CLI 参数（--rpcHost 等）
+ * 2. 环境变量（RPC_HOST, OPENAI_API_KEY 等）
  * 3. 项目根目录配置文件（<cwd>/config.json）
  * 4. 项目级配置文件（<cwd>/js-reverse.config.json）
  * 5. 用户级配置文件（~/.jsreverserrc.json）
@@ -30,6 +30,7 @@ import {config as dotenvConfig} from 'dotenv';
 import {AIService} from './services/AIService.js';
 import {OpenAIProvider} from './services/OpenAIProvider.js';
 import {resolveDefaultEnvPath} from './utils/projectPaths.js';
+import { BrowserManagerConfig } from './browser/browser.js';
 
 // ==================== .env 加载 ====================
 
@@ -43,7 +44,7 @@ if (existsSync(envPath)) {
 // ==========================================================================
 
 /** Sekiro Server 默认 WebSocket 地址 */
-export const DEFAULT_SEKIRO_HOST = 'ws://127.0.0.1:5612';
+export const DEFAULT_RPC_HOST = 'ws://127.0.0.1:5612';
 
 /** Sekiro 默认分组名 */
 export const DEFAULT_GROUP = 'js-reverse';
@@ -101,6 +102,25 @@ export interface GlobalConfig {
     channel?: 'chrome' | 'chrome-beta' | 'chrome-dev' | 'chrome-canary' | 'msedge';
     useStealthScripts?: boolean;
     viewport?: {width: number; height: number};
+    browserURL?: string;
+    wsEndpoint?: string;
+    remoteDebuggingUrl?: string;
+    remoteDebuggingPort?: number;
+    wsHeaders?: Record<string, string>;
+    acceptInsecureCerts?: boolean;
+    userDataDir?: string;
+    args?: string[];
+    devtools?: boolean;
+    autoLaunch?: boolean;
+    browserPath?: string;
+    waitForBrowserTimeoutMs?: number;
+    waitForBrowserPollMs?: number;
+    timeout?: number;
+    maxCollectedUrls?: number;
+    maxFilesPerCollect?: number;
+    maxTotalContentSize?: number;
+    maxSingleFileSize?: number;
+    userAgent?: string;
   };
   /** 调试模式 */
   debug?: boolean;
@@ -126,27 +146,12 @@ export interface AIConfig {
   };
 }
 
-/** 浏览器配置（运行时解析后的完整结构） */
-export interface BrowserConfig {
-  headless?: boolean;
-  executablePath?: string;
-  channel?:
-    | 'chrome'
-    | 'chrome-beta'
-    | 'chrome-dev'
-    | 'chrome-canary'
-    | 'msedge';
-  isolated?: boolean;
-  remoteDebuggingUrl?: string;
-  remoteDebuggingPort?: number;
-  useStealthScripts?: boolean;
-  viewport?: {width: number; height: number};
-}
+
 
 /** 系统配置（AI + Browser + Debug） */
 export interface SystemConfig {
   ai?: AIConfig;
-  browser: BrowserConfig;
+  browser: BrowserManagerConfig;
   debug?: boolean;
 }
 
@@ -162,7 +167,7 @@ export interface ConfigSource {
 
 /** CLI 层解析后的完整配置 */
 export interface ResolvedConfig {
-  sekiroHost: string;
+  rpcHost: string;
   group: string;
   browserUrl?: string;
   wsEndpoint?: string;
@@ -175,7 +180,7 @@ export interface ResolvedConfig {
 
 /** 内置默认值 */
 const DEFAULTS: Readonly<ResolvedConfig> = {
-  sekiroHost: DEFAULT_SEKIRO_HOST,
+  rpcHost: DEFAULT_RPC_HOST,
   group: DEFAULT_GROUP,
   headless: false,
   runtimeDirName: RUNTIME_DIR_NAME,
@@ -297,8 +302,8 @@ export function loadFullConfig(): {merged: GlobalConfig; sources: ConfigSource[]
 
 /** 所有已知环境变量 → GlobalConfig 键映射 */
 const ENV_MAP: Readonly<Record<string, keyof GlobalConfig>> = {
-  SEKIRO_HOST: 'sekiroHost',
-  SEKIRO_GROUP: 'group',
+  RPC_HOST: 'rpcHost',
+  RPC_GROUP: 'group',
   BROWSER_URL: 'browserUrl',
   BROWSER_WS_ENDPOINT: 'wsEndpoint',
   BROWSER_HEADLESS: 'headless',
@@ -403,7 +408,7 @@ export function resolveConfig(envArgs?: Partial<GlobalConfig>): ResolvedConfig {
   const merged = mergeConfigs(fileConfig, envConfig, envArgs);
 
   return {
-    sekiroHost: merged.sekiroHost ?? DEFAULTS.sekiroHost,
+    rpcHost: merged.rpcHost ?? DEFAULTS.rpcHost,
     group: merged.group ?? DEFAULTS.group,
     browserUrl: merged.browserUrl || undefined,
     wsEndpoint: merged.wsEndpoint || undefined,
@@ -425,7 +430,7 @@ export function initUserConfig(): {path: string; created: boolean} {
   }
 
   const defaultConfig: GlobalConfig = {
-    sekiroHost: DEFAULT_SEKIRO_HOST,
+    rpcHost: DEFAULT_RPC_HOST,
     group: DEFAULT_GROUP,
     headless: false,
     debug: false,
@@ -531,11 +536,11 @@ export function getAIConfig(): AIConfig | undefined {
  *
  * 优先级：环境变量 > config.json 中的 browser 字段
  */
-export function getBrowserConfig(): BrowserConfig {
+export function getBrowserManagerConfig(): BrowserManagerConfig {
   const {merged: fileConfig} = loadFullConfig();
   const fileBrowser = fileConfig.browser;
 
-  const config: BrowserConfig = {
+  const config: BrowserManagerConfig = {
     headless: getEnvBoolean('BROWSER_HEADLESS') ?? fileBrowser?.headless ?? true,
     isolated: getEnvBoolean('BROWSER_ISOLATED') ?? fileBrowser?.isolated ?? true,
     useStealthScripts:
@@ -551,19 +556,150 @@ export function getBrowserConfig(): BrowserConfig {
 
   const envChannel = getEnvValue('BROWSER_CHANNEL');
   if (envChannel) {
-    config.channel = envChannel as BrowserConfig['channel'];
+    config.channel = envChannel as BrowserManagerConfig['channel'];
   } else if (fileBrowser?.channel) {
-    config.channel = fileBrowser.channel;
+    config.channel = fileBrowser.channel as BrowserManagerConfig['channel'];
+  }
+
+  const envBrowserURL = getEnvValue('BROWSER_URL');
+  if (envBrowserURL) {
+    config.browserURL = envBrowserURL;
+  } else if (fileBrowser?.browserURL) {
+    config.browserURL = fileBrowser.browserURL;
+  } else if (fileConfig.browserUrl) {
+    config.browserURL = fileConfig.browserUrl;
+  }
+
+  const envWsEndpoint = getEnvValue('BROWSER_WS_ENDPOINT');
+  if (envWsEndpoint) {
+    config.wsEndpoint = envWsEndpoint;
+  } else if (fileBrowser?.wsEndpoint) {
+    config.wsEndpoint = fileBrowser.wsEndpoint;
+  } else if (fileConfig.wsEndpoint) {
+    config.wsEndpoint = fileConfig.wsEndpoint;
   }
 
   const envRemoteDebuggingUrl = getEnvValue('REMOTE_DEBUGGING_URL');
   if (envRemoteDebuggingUrl) {
     config.remoteDebuggingUrl = envRemoteDebuggingUrl;
+  } else if (fileBrowser?.remoteDebuggingUrl) {
+    config.remoteDebuggingUrl = fileBrowser.remoteDebuggingUrl;
   }
 
   const envRemoteDebuggingPort = getEnvNumber('REMOTE_DEBUGGING_PORT');
   if (envRemoteDebuggingPort !== undefined) {
     config.remoteDebuggingPort = envRemoteDebuggingPort;
+  } else if (fileBrowser?.remoteDebuggingPort !== undefined) {
+    config.remoteDebuggingPort = fileBrowser.remoteDebuggingPort;
+  }
+
+  const envUserDataDir = getEnvValue('BROWSER_USER_DATA_DIR');
+  if (envUserDataDir) {
+    config.userDataDir = envUserDataDir;
+  } else if (fileBrowser?.userDataDir) {
+    config.userDataDir = fileBrowser.userDataDir;
+  }
+
+  const envBrowserPath = getEnvValue('BROWSER_PATH');
+  if (envBrowserPath) {
+    config.browserPath = envBrowserPath;
+  } else if (fileBrowser?.browserPath) {
+    config.browserPath = fileBrowser.browserPath;
+  }
+
+  const envUserAgent = getEnvValue('BROWSER_USER_AGENT');
+  if (envUserAgent) {
+    config.userAgent = envUserAgent;
+  } else if (fileBrowser?.userAgent) {
+    config.userAgent = fileBrowser.userAgent;
+  }
+
+  const envAcceptInsecureCerts = getEnvBoolean('BROWSER_ACCEPT_INSECURE_CERTS');
+  if (envAcceptInsecureCerts !== undefined) {
+    config.acceptInsecureCerts = envAcceptInsecureCerts;
+  } else if (fileBrowser?.acceptInsecureCerts !== undefined) {
+    config.acceptInsecureCerts = fileBrowser.acceptInsecureCerts;
+  }
+
+  const envDevtools = getEnvBoolean('BROWSER_DEVTOOLS');
+  if (envDevtools !== undefined) {
+    config.devtools = envDevtools;
+  } else if (fileBrowser?.devtools !== undefined) {
+    config.devtools = fileBrowser.devtools;
+  }
+
+  const envAutoLaunch = getEnvBoolean('BROWSER_AUTO_LAUNCH');
+  if (envAutoLaunch !== undefined) {
+    config.autoLaunch = envAutoLaunch;
+  } else if (fileBrowser?.autoLaunch !== undefined) {
+    config.autoLaunch = fileBrowser.autoLaunch;
+  }
+
+  const envWaitTimeout = getEnvNumber('BROWSER_WAIT_TIMEOUT_MS');
+  if (envWaitTimeout !== undefined) {
+    config.waitForBrowserTimeoutMs = envWaitTimeout;
+  } else if (fileBrowser?.waitForBrowserTimeoutMs !== undefined) {
+    config.waitForBrowserTimeoutMs = fileBrowser.waitForBrowserTimeoutMs;
+  }
+
+  const envWaitPoll = getEnvNumber('BROWSER_WAIT_POLL_MS');
+  if (envWaitPoll !== undefined) {
+    config.waitForBrowserPollMs = envWaitPoll;
+  } else if (fileBrowser?.waitForBrowserPollMs !== undefined) {
+    config.waitForBrowserPollMs = fileBrowser.waitForBrowserPollMs;
+  }
+
+  const envTimeout = getEnvNumber('BROWSER_TIMEOUT');
+  if (envTimeout !== undefined) {
+    config.timeout = envTimeout;
+  } else if (fileBrowser?.timeout !== undefined) {
+    config.timeout = fileBrowser.timeout;
+  }
+
+  const envMaxUrls = getEnvNumber('BROWSER_MAX_COLLECTED_URLS');
+  if (envMaxUrls !== undefined) {
+    config.maxCollectedUrls = envMaxUrls;
+  } else if (fileBrowser?.maxCollectedUrls !== undefined) {
+    config.maxCollectedUrls = fileBrowser.maxCollectedUrls;
+  }
+
+  const envMaxFiles = getEnvNumber('BROWSER_MAX_FILES_PER_COLLECT');
+  if (envMaxFiles !== undefined) {
+    config.maxFilesPerCollect = envMaxFiles;
+  } else if (fileBrowser?.maxFilesPerCollect !== undefined) {
+    config.maxFilesPerCollect = fileBrowser.maxFilesPerCollect;
+  }
+
+  const envMaxTotalSize = getEnvNumber('BROWSER_MAX_TOTAL_CONTENT_SIZE');
+  if (envMaxTotalSize !== undefined) {
+    config.maxTotalContentSize = envMaxTotalSize;
+  } else if (fileBrowser?.maxTotalContentSize !== undefined) {
+    config.maxTotalContentSize = fileBrowser.maxTotalContentSize;
+  }
+
+  const envMaxSingleSize = getEnvNumber('BROWSER_MAX_SINGLE_FILE_SIZE');
+  if (envMaxSingleSize !== undefined) {
+    config.maxSingleFileSize = envMaxSingleSize;
+  } else if (fileBrowser?.maxSingleFileSize !== undefined) {
+    config.maxSingleFileSize = fileBrowser.maxSingleFileSize;
+  }
+
+  const envWsHeaders = getEnvValue('BROWSER_WS_HEADERS');
+  if (envWsHeaders) {
+    try {
+      config.wsHeaders = JSON.parse(envWsHeaders) as Record<string, string>;
+    } catch {
+      // 忽略非法 JSON
+    }
+  } else if (fileBrowser?.wsHeaders) {
+    config.wsHeaders = fileBrowser.wsHeaders;
+  }
+
+  const envArgs = getEnvValue('BROWSER_ARGS');
+  if (envArgs) {
+    config.args = envArgs.split(',').map(s => s.trim()).filter(Boolean);
+  } else if (fileBrowser?.args) {
+    config.args = fileBrowser.args;
   }
 
   if (fileBrowser?.viewport) {
@@ -579,7 +715,7 @@ export function getBrowserConfig(): BrowserConfig {
 export function getSystemConfig(): SystemConfig {
   return {
     ai: getAIConfig(),
-    browser: getBrowserConfig(),
+    browser: getBrowserManagerConfig(),
     debug: isDebugEnabled(),
   };
 }

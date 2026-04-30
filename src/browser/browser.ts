@@ -359,6 +359,7 @@ export interface BrowserManagerConfig {
   browserURL?: string;
   wsEndpoint?: string;
   remoteDebuggingUrl?: string;
+  remoteDebuggingPort?: number;
   wsHeaders?: Record<string, string>;
   useStealthScripts?: boolean;
   acceptInsecureCerts?: boolean;
@@ -372,7 +373,6 @@ export interface BrowserManagerConfig {
   // 新增：自动启动浏览器能力（合并自 BrowserModeManager）
   autoLaunch?: boolean;
   browserPath?: string;
-  remoteDebuggingPort?: number;
   waitForBrowserTimeoutMs?: number;
   waitForBrowserPollMs?: number;
   timeout?: number;

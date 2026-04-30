@@ -29,7 +29,7 @@ import {
 } from './utils/CacheAdapters.js';
 import {DetailedDataManager} from './utils/detailedDataManager.js';
 import {UnifiedCacheManager} from './utils/UnifiedCacheManager.js';
-
+import {getBrowserConfig} from './config.js';
 let runtime: Runtime | undefined;
 
 export interface Runtime {
@@ -54,19 +54,13 @@ export interface Runtime {
 }
 
 
-export function getRuntime(options: WorkerStartOptions): Runtime {
+export function getRuntime(): Runtime {
   if (runtime) {
     return runtime;
   }
   // 初始化 BrowserManager，将 Page 注入 contextProvider
   // 浏览器配置也从 config.ts 获取（支持 config.json / .env 等）
-  const browserConfig: BrowserManagerConfig = {
-    browserURL: options.browserUrl,
-    wsEndpoint: options.wsEndpoint,
-    headless: options.headless,
-    executablePath: options.executablePath,
-    useStealthScripts: getEnvBoolean('USE_STEALTH_SCRIPTS') ?? true,
-  };
+  const browserConfig: BrowserManagerConfig = getBrowserConfig();
   const browserManager = BrowserManager.getInstance(browserConfig);
 
   const collector = new CodeCollector(browserConfig, browserManager);
