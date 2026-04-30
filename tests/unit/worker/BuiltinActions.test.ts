@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import type {ActionHandler} from '../../../src/types/sekiro.js';
+import type {ActionHandler} from '../../../src/types/rpc.js';
 import {registerBuiltinActions} from '../../../src/worker/BuiltinActions.js';
 
 describe('BuiltinActions', () => {

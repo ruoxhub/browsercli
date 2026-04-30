@@ -32,7 +32,7 @@ interface SekiroInvokerConfig {
 }
 
 /** Sekiro 标准响应结构 */
-interface SekiroResponse {
+interface RpcResponse {
   code?: number;
   status?: number;
   message?: string;
@@ -91,7 +91,7 @@ export class SekiroInvoker {
           throw new Error(`Sekiro HTTP ${response.status}: ${await response.text()}`);
         }
 
-        const result = await response.json() as SekiroResponse;
+        const result = await response.json() as RpcResponse;
 
         // Sekiro 返回 status=-1 或 code=-1 表示失败
         if (result.status === -1 || result.code === -1) {

@@ -98,13 +98,13 @@
 ### 新建类型文件 `src/types/sekiro.ts`
 
 ```typescript
-interface SekiroRequest {
+interface RpcRequest {
   __sekiro_seq__: string;
   action: string;
   params?: Record<string, unknown>;
 }
 
-interface SekiroResponse {
+interface RpcResponse {
   code?: number;
   status?: number;
   message?: string;
@@ -113,7 +113,7 @@ interface SekiroResponse {
 }
 
 type ActionHandler = (
-  request: SekiroRequest,
+  request: RpcRequest,
   resolve: (response: unknown) => void,
   reject: (errorMessage: string) => void,
 ) => void;

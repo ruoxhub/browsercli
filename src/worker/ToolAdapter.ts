@@ -13,7 +13,7 @@
  * 通过 tools-meta.ts 中的 ToolMeta 动态加载 handler，适配为 Action
  */
 
-import type {ActionHandler} from '../types/sekiro.js';
+import type {ActionHandler} from '../types/rpc.js';
 import type {ToolMeta} from '../cli/tools-meta.js';
 import {getAllToolNames, getToolMeta} from '../cli/tools-meta.js';
 import {ToolResponseAccumulator} from './ToolResponseAccumulator.js';

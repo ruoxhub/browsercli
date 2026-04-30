@@ -5,7 +5,7 @@
  */
 
 import type * as ToolsMeta from '../cli/tools-meta.js';
-import type {ActionHandler} from '../types/sekiro.js';
+import type {ActionHandler} from '../types/rpc.js';
 
 interface BuiltinActionClient {
   getStatus(): unknown;

@@ -17,11 +17,11 @@
 
 import WebSocket from 'ws';
 import type {
-  SekiroRequest,
-  SekiroResponse,
+  RpcRequest,
+  RpcResponse,
   ActionHandler,
-  SekiroConnectionState,
-} from '../types/sekiro.js';
+  RpcConnectionState,
+} from '../types/rpc.js';
 import type {RpcClientConfig, ClientStatus} from '../types/platform.js';
 
 /** 默认配置 */
@@ -49,7 +49,7 @@ export class RpcClient {
   private readonly heartbeatInterval: number;
 
   // 连接状态
-  private _connectionState: SekiroConnectionState = 'disconnected';
+  private _connectionState: RpcConnectionState = 'disconnected';
 
   constructor(config: RpcClientConfig) {
     this.config = config;
@@ -171,7 +171,7 @@ export class RpcClient {
    * 默认 _execjs handler — 执行 JavaScript 代码
    */
   private _execjsHandler(
-    request: SekiroRequest,
+    request: RpcRequest,
     resolve: (response: unknown) => void,
     reject: (error: string) => void,
   ): void {
@@ -208,7 +208,7 @@ export class RpcClient {
   /**
    * 更新连接状态
    */
-  private setConnectionState(state: SekiroConnectionState): void {
+  private setConnectionState(state: RpcConnectionState): void {
     this._connectionState = state;
     this.log(`连接状态变更: ${state}`);
   }
@@ -237,7 +237,7 @@ export class RpcClient {
             typeof event.data === 'string'
               ? event.data
               : Buffer.from(event.data as ArrayBuffer).toString('utf-8');
-          this.handleSekiroRequest(data);
+          this.handleRpcRequest(data);
         } catch (ex) {
           this.log(`处理消息异常：${ex}`);
         }
@@ -351,8 +351,8 @@ export class RpcClient {
   /**
    * 处理 Sekiro 请求
    */
-  private handleSekiroRequest(requestJson: string): void {
-    let request: SekiroRequest;
+  private handleRpcRequest(requestJson: string): void {
+    let request: RpcRequest;
     try {
       request = JSON.parse(requestJson);
     } catch (e) {
@@ -430,7 +430,7 @@ export class RpcClient {
    * 发送失败响应
    */
   private sendFailed(seq: string, errorMessage: string): void {
-    const responseJson: SekiroResponse = {
+    const responseJson: RpcResponse = {
       message: errorMessage,
       status: -1,
       __sekiro_seq__: seq,

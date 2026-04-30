@@ -9,14 +9,14 @@
  */
 
 /** Sekiro 请求（Server → Client） */
-interface SekiroRequest {
+interface RpcRequest {
   __sekiro_seq__: string;
   action: string;
   params?: Record<string, unknown>;
 }
 
 /** Sekiro 响应（Client → Server） */
-interface SekiroResponse {
+interface RpcResponse {
   code?: number;
   status?: number;
   message?: string;
@@ -26,20 +26,20 @@ interface SekiroResponse {
 
 /** Action 处理函数签名 */
 type ActionHandler = (
-  request: SekiroRequest,
+  request: RpcRequest,
   resolve: (response: unknown) => void,
   reject: (errorMessage: string) => void,
 ) => void;
 
 /** SekiroClient 连接状态 */
-type SekiroConnectionState =
+type RpcConnectionState =
   | 'disconnected'
   | 'connecting'
   | 'connected'
   | 'reconnecting';
 
 /** SekiroClient 配置选项 */
-interface SekiroClientOptions {
+interface RpcClientOptions {
   /** WebSocket URL 前缀，如 ws://127.0.0.1:5612 */
   sekiroHost: string;
   /** 分组名 */
@@ -55,9 +55,9 @@ interface SekiroClientOptions {
 }
 
 export {
-  type SekiroRequest,
-  type SekiroResponse,
+  type RpcRequest,
+  type RpcResponse,
   type ActionHandler,
-  type SekiroConnectionState,
-  type SekiroClientOptions,
+  type RpcConnectionState,
+  type RpcClientOptions,
 };

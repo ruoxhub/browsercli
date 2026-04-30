@@ -8,7 +8,7 @@
  * 平台层类型定义 — RpcClient、Worker、CLI 共用
  */
 
-import type {ActionHandler} from './sekiro.js';
+import type {ActionHandler} from './rpc.js';
 
 // ==================== RpcClient 配置 ====================
 
@@ -32,7 +32,7 @@ interface RpcClientConfig {
 interface ClientStatus {
   isInitialized: boolean;
   isConnected: boolean;
-  connectionState: import('./sekiro').SekiroConnectionState;
+  connectionState: import('./rpc.js').RpcConnectionState;
   group: string;
   clientId: string;
   actionCount: number;
