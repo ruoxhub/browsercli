@@ -4,14 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {resolveActivePage} from '../shared/activePageResolver.js';
+import {explainPageError} from '../shared/pageDiagnostics.js';
+
 import type {
   NavigatePageParams,
   NavigatePageResult,
   NavigatePageData,
   NavigationRuntimeServices,
 } from './types.js';
-import {resolveActivePage} from '../shared/activePageResolver.js';
-import {explainPageError} from '../shared/pageDiagnostics.js';
 
 // Default navigation timeout in milliseconds (10 seconds)
 const DEFAULT_NAV_TIMEOUT = 10_000;

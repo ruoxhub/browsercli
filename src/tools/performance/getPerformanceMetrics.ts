@@ -5,6 +5,7 @@
  */
 
 import type {Page} from '../../third_party/index.js';
+
 import type {
   GetPerformanceMetricsResult,
   GetPerformanceMetricsData,

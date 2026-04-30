@@ -4,6 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+
+import {mkdir, writeFile} from 'node:fs/promises';
+import path from 'node:path';
+
+import type {CodeFile} from '../../types/index.js';
+
 import type {
   BuildDefaultEnvCodeResult,
   ToStorageShimCodeParams,
@@ -26,11 +32,6 @@ import type {
   WriteArtifactFileParams,
   WriteArtifactFileResult,
 } from './types.js';
-
-import {mkdir, writeFile} from 'node:fs/promises';
-import path from 'node:path';
-
-import type {CodeFile} from '../../types/index.js';
 
 // ─── 纯函数（无 Puppeteer 依赖） ────────────────────────
 

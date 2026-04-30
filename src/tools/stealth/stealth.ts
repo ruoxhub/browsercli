@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Page} from '../../third_party/index.js';
 
 import type {StealthInjectionOptions, StealthPreset, StealthReport} from '../../modules/stealth/StealthScripts2025.js';
 import {StealthScripts2025} from '../../modules/stealth/StealthScripts2025.js';
+import type {Page} from '../../third_party/index.js';
 
 /** Stealth 操作统一返回结构 */
 export interface StealthResult {

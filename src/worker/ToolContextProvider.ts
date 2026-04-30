@@ -19,22 +19,28 @@ import type {
   Browser,
   BrowserContext,
   CDPSession,
+  ConsoleMessage,
+  Dialog,
   Frame,
   Page,
   Request,
+  WebSocket as PlaywrightWebSocket,
 } from 'patchright';
 
-import type {Runtime} from '../runtime.js';
-import type {HTTPRequest} from '../third_party/index.js';
-import type {RequestInitiator} from '../tools/network/types.js';
-import {BrowserManager} from '../browser/index.js';
-import {CodeCollector} from '../modules/collector/CodeCollector.js';
-import {DebuggerContext} from '../utils/DebuggerContext.js';
+import type {BrowserManager} from '../browser/index.js';
 import {AISummarizer} from '../modules/analyzer/AISummarizer.js';
 import {CodeAnalyzer} from '../modules/analyzer/CodeAnalyzer.js';
+import {CodeCollector} from '../modules/collector/CodeCollector.js';
+import {PageController} from '../modules/collector/PageController.js';
 import {CryptoDetector} from '../modules/crypto/CryptoDetector.js';
 import {Deobfuscator} from '../modules/deobfuscator/Deobfuscator.js';
+import {HookManager} from '../modules/hook/HookManager.js';
+import type {Runtime} from '../runtime.js';
 import {LLMService} from '../services/LLMService.js';
+import type {HTTPRequest} from '../third_party/index.js';
+import type {RequestInitiator} from '../tools/network/types.js';
+import type {WebSocketData} from '../tools/network/WebSocketCollector.js';
+import {DebuggerContext} from '../utils/DebuggerContext.js';
 
 type TraceResult = unknown;
 
@@ -52,6 +58,41 @@ interface TrackedRequest {
  * navigations[0] 为当前导航，后续为保留的历史导航
  */
 type PageRequestStorage = TrackedRequest[][];
+
+/**
+ * 带稳定 ID 的 Console 记录
+ */
+interface TrackedConsoleMessage {
+  stableId: number;
+  message: ConsoleMessage | Error;
+}
+
+type PageConsoleStorage = TrackedConsoleMessage[][];
+
+/**
+ * WebSocket 内部存储，扩展 WebSocketData 以携带 stableId
+ */
+type TrackedWebSocketData = WebSocketData & {stableId: number};
+
+type PageWebSocketStorage = TrackedWebSocketData[][];
+
+const DEFAULT_TIMEOUT = 5_000;
+const NAVIGATION_TIMEOUT = 10_000;
+
+function getNetworkMultiplierFromString(condition: string | null): number {
+  switch (condition) {
+    case 'Fast 4G':
+      return 1;
+    case 'Slow 4G':
+      return 2.5;
+    case 'Fast 3G':
+      return 5;
+    case 'Slow 3G':
+      return 10;
+    default:
+      return 1;
+  }
+}
 
 export class ToolContextProvider {
   private selectedPage: Page | null = null;
@@ -72,6 +113,8 @@ export class ToolContextProvider {
    */
   private _runtime: Runtime | null = null;
 
+  private _isDisposed = false;
+
   // ─── 网络请求收集 ────────────────────────────────────
   private _networkStorage = new WeakMap<Page, PageRequestStorage>();
   private _idGenerators = new WeakMap<Page, () => number>();
@@ -82,12 +125,105 @@ export class ToolContextProvider {
   >();
   private _contextListener: {onPage: (page: Page) => void} | null = null;
 
+  // ─── Console 收集 ────────────────────────────────────
+  private _consoleStorage = new WeakMap<Page, PageConsoleStorage>();
+  private _consoleIdGenerators = new WeakMap<Page, () => number>();
+  private _consoleListeners = new WeakMap<
+    Page,
+    {
+      onConsole: (msg: ConsoleMessage) => void;
+      onPageError: (err: Error) => void;
+    }
+  >();
+
+  // ─── WebSocket 收集 ─────────────────────────────────
+  private _webSocketStorage = new WeakMap<Page, PageWebSocketStorage>();
+  private _webSocketIdGenerators = new WeakMap<Page, () => number>();
+  private _webSocketConnectionMaps = new WeakMap<
+    Page,
+    Map<string, TrackedWebSocketData>
+  >();
+  private _webSocketListeners = new WeakMap<
+    Page,
+    {
+      onWebSocket: (ws: PlaywrightWebSocket) => void;
+      onFrameNavigated: (frame: Frame) => void;
+    }
+  >();
+  private _webSocketRequestIdCounters = new WeakMap<Page, number>();
+
+  // ─── Dialog / 超时 / 条件 ────────────────────────────
+  private _dialog?: Dialog;
+  private _networkConditionsMap = new WeakMap<Page, string>();
+  private _cpuThrottlingRateMap = new WeakMap<Page, number>();
+
   constructor(runtime?: Runtime) {
     if (runtime) {
       this._runtime = runtime;
       this._browserManager = runtime.browserManager;
       this._collector = runtime.collector;
     }
+  }
+
+  // ─── 生命周期 ────────────────────────────────────────
+
+  /**
+   * 初始化收集器并同步当前页面列表。
+   * 应在 BrowserContext 就绪后调用一次。
+   */
+  async init(): Promise<void> {
+    if (this._isDisposed) {
+      throw new Error('ToolContextProvider 已销毁，无法重新初始化');
+    }
+    await this.syncPages();
+    for (const page of this.pagesList) {
+      if (!this._networkStorage.has(page)) {
+        this._attachPageListeners(page);
+      }
+      this._attachConsoleListeners(page);
+      this._attachWebSocketListeners(page);
+    }
+  }
+
+  /**
+   * 释放所有资源、监听器和会话。
+   */
+  dispose(): void {
+    if (this._isDisposed) return;
+    this._isDisposed = true;
+
+    // 清理 debugger
+    for (const page of this.pagesList) {
+      void this.disposeDebuggerContext(page);
+    }
+
+    // 清理 context 级别监听
+    if (this._contextListener && this._context) {
+      this._context.off('page', this._contextListener.onPage);
+    }
+    this._contextListener = null;
+
+    // 清理页面级别监听
+    for (const page of this.pagesList) {
+      this._detachPageListeners(page);
+      this._detachConsoleListeners(page);
+      this._detachWebSocketListeners(page);
+    }
+
+    // 清理 dialog
+    if (this.selectedPage) {
+      try {
+        this.selectedPage.off('dialog', this._dialogHandler);
+      } catch {
+        // ignore
+      }
+    }
+
+    this._networkStorage = new WeakMap();
+    this._consoleStorage = new WeakMap();
+    this._webSocketStorage = new WeakMap();
+    this._networkConditionsMap = new WeakMap();
+    this._cpuThrottlingRateMap = new WeakMap();
   }
 
   // ─── Browser / Context 管理 ──────────────────────────
@@ -161,6 +297,8 @@ export class ToolContextProvider {
     const frames = page.frames();
     if (frameIdx < 0 || frameIdx >= frames.length) return null;
     this.selectedFrame = frames[frameIdx]!;
+    // 参考 McpContext：切换 frame 后重新初始化 debugger
+    void this.getDebuggerContext(page).catch(() => {});
     return this.selectedFrame;
   }
 
@@ -169,6 +307,37 @@ export class ToolContextProvider {
     if (this._context) {
       this.pagesList = this._context.pages();
     }
+    return this.pagesList;
+  }
+
+  /**
+   * 从 BrowserContext 同步页面列表，并自动选择第一个可用页面。
+   * 参考 McpContext.createPagesSnapshot。
+   */
+  async syncPages(): Promise<Page[]> {
+    const context = this._context;
+    if (context) {
+      this.pagesList = context.pages();
+    } else {
+      const browser = this.getBrowser();
+      if (browser) {
+        this.pagesList = browser.contexts().flatMap(ctx => ctx.pages());
+      }
+    }
+
+    if (
+      !this.selectedPage ||
+      this.selectedPage.isClosed() ||
+      this.pagesList.indexOf(this.selectedPage) === -1
+    ) {
+      const firstAvailable = this.pagesList.find(p => !p.isClosed());
+      if (firstAvailable) {
+        this.selectPage(firstAvailable);
+      } else {
+        this.setSelectedPage(null);
+      }
+    }
+
     return this.pagesList;
   }
 
@@ -188,12 +357,58 @@ export class ToolContextProvider {
     if (!this._context) throw new Error('BrowserContext 未初始化');
     const page = await this._context.newPage();
     this.pagesList = this._context.pages();
+    this.selectPage(page);
+    // 自动注册收集器（网络收集已在 selectPage → setContext 路径中处理，
+    // 但 newPage 可能发生在 setContext 之后，因此显式补充）
+    if (!this._networkStorage.has(page)) {
+      this._attachPageListeners(page);
+    }
+    this._attachConsoleListeners(page);
+    this._attachWebSocketListeners(page);
     return page;
   }
 
   selectPage(page: Page): void {
+    const oldPage = this.selectedPage;
+    if (oldPage && oldPage !== page) {
+      try {
+        oldPage.off('dialog', this._dialogHandler);
+      } catch {
+        // ignore
+      }
+    }
+    this.setSelectedPage(page);
+    page.on('dialog', this._dialogHandler);
+    this._updateSelectedPageTimeouts();
+    // 参考 McpContext：页面切换后重新初始化 debugger
+    void this.getDebuggerContext(page).catch(() => {});
+  }
+
+  async bringPageToFront(page: Page): Promise<void> {
+    await page.bringToFront();
+  }
+
+  syncPageContext(page: Page): void {
     this.setSelectedPage(page);
   }
+
+  // ─── PageRuntimeServices / ScreenshotRuntimeServices ──
+
+  async getActivePage(): Promise<Page> {
+    if (this.selectedPage && !this.selectedPage.isClosed()) {
+      return this.selectedPage;
+    }
+    // 尝试获取第一个可用页面
+    const pages = this.getPages();
+    const activePage = pages.find(p => !p.isClosed()) ?? null;
+    if (activePage) {
+      this.selectedPage = activePage;
+      return activePage;
+    }
+    throw new Error('没有可用的页面');
+  }
+
+  // ─── Debugger 管理 ───────────────────────────────────
 
   async getDebuggerContext(page?: Page): Promise<DebuggerContext> {
     const activePage = page ?? (await this.getActivePage());
@@ -239,30 +454,9 @@ export class ToolContextProvider {
         // Ignore cleanup errors when the page/session is already gone.
       }
     }
-  }
 
-  async bringPageToFront(page: Page): Promise<void> {
-    await page.bringToFront();
-  }
-
-  syncPageContext(page: Page): void {
-    this.setSelectedPage(page);
-  }
-
-  // ─── PageRuntimeServices / ScreenshotRuntimeServices ──
-
-  async getActivePage(): Promise<Page> {
-    if (this.selectedPage && !this.selectedPage.isClosed()) {
-      return this.selectedPage;
-    }
-    // 尝试获取第一个可用页面
-    const pages = this.getPages();
-    const activePage = pages.find(p => !p.isClosed()) ?? null;
-    if (activePage) {
-      this.selectedPage = activePage;
-      return activePage;
-    }
-    throw new Error('没有可用的页面');
+    this._debuggerContexts.delete(activePage);
+    this._debuggerSessions.delete(activePage);
   }
 
   // ─── AnalyzerRuntimeServices ───────────────────────────
@@ -299,6 +493,22 @@ export class ToolContextProvider {
     return new CryptoDetector(this._getLlmService());
   }
 
+  get hookManager() {
+    return this._runtime?.hookManager ?? this._fallbackHookManager();
+  }
+
+  private _fallbackHookManager() {
+    return new HookManager();
+  }
+
+  get pageController() {
+    return this._runtime?.pageController ?? this._fallbackPageController();
+  }
+
+  private _fallbackPageController() {
+    return new PageController(this.collector);
+  }
+
   isBrowserConnected(): boolean {
     return this._browser?.isConnected() ?? false;
   }
@@ -321,6 +531,10 @@ export class ToolContextProvider {
     // 监听新页面创建
     const onPage = (page: Page) => {
       this._attachPageListeners(page);
+      this._attachConsoleListeners(page);
+      this._attachWebSocketListeners(page);
+      // 同步页面列表
+      this.pagesList = context.pages();
     };
     this._contextListener = {onPage};
     context.on('page', onPage);
@@ -371,7 +585,7 @@ export class ToolContextProvider {
   }
 
   /**
-   * 清理 Page 的监听和存储
+   * 清理 Page 的网络监听和存储
    */
   private _detachPageListeners(page: Page): void {
     const listeners = this._pageListeners.get(page);
@@ -389,10 +603,6 @@ export class ToolContextProvider {
 
   /**
    * 主 frame 导航后分割请求存储
-   *
-   * 找到最后一个导航请求（主 frame 的 document 类型请求），
-   * 将该请求及其之后的所有请求移到新导航组，
-   * 确保导航请求不会丢失在历史导航中。
    */
   private _splitAfterNavigation(page: Page): void {
     const navigations = this._networkStorage.get(page);
@@ -427,6 +637,235 @@ export class ToolContextProvider {
       }
       return i++;
     };
+  }
+
+  // ─── Console 收集 ────────────────────────────────────
+
+  private _attachConsoleListeners(page: Page): void {
+    if (this._consoleStorage.has(page)) {
+      return;
+    }
+
+    const idGenerator = this._createIdGenerator();
+    this._consoleIdGenerators.set(page, idGenerator);
+    const storage: PageConsoleStorage = [[]];
+    this._consoleStorage.set(page, storage);
+
+    const onConsole = (msg: ConsoleMessage): void => {
+      const navigations = this._consoleStorage.get(page);
+      if (!navigations) return;
+      navigations[0]!.push({stableId: idGenerator(), message: msg});
+    };
+
+    const onPageError = (err: Error): void => {
+      const navigations = this._consoleStorage.get(page);
+      if (!navigations) return;
+      navigations[0]!.push({stableId: idGenerator(), message: err});
+    };
+
+    page.on('console', onConsole);
+    page.on('pageerror', onPageError);
+
+    const onFrameNavigated = (frame: Frame): void => {
+      if (frame !== page.mainFrame()) return;
+      const navigations = this._consoleStorage.get(page);
+      if (!navigations) return;
+      navigations.unshift([]);
+      navigations.splice(this._maxNavigationSaved);
+    };
+    page.on('framenavigated', onFrameNavigated);
+
+    this._consoleListeners.set(page, {onConsole, onPageError});
+
+    page.once('close', () => {
+      this._detachConsoleListeners(page);
+    });
+  }
+
+  private _detachConsoleListeners(page: Page): void {
+    const listeners = this._consoleListeners.get(page);
+    if (listeners) {
+      try {
+        page.off('console', listeners.onConsole);
+        page.off('pageerror', listeners.onPageError);
+      } catch {
+        // Page might already be closed
+      }
+    }
+    this._consoleListeners.delete(page);
+    this._consoleStorage.delete(page);
+    this._consoleIdGenerators.delete(page);
+  }
+
+  // ─── WebSocket 收集 ─────────────────────────────────
+
+  private _attachWebSocketListeners(page: Page): void {
+    if (this._webSocketStorage.has(page)) {
+      return;
+    }
+
+    const idGenerator = this._createIdGenerator();
+    this._webSocketIdGenerators.set(page, idGenerator);
+    const storage: PageWebSocketStorage = [[]];
+    this._webSocketStorage.set(page, storage);
+    this._webSocketConnectionMaps.set(page, new Map());
+    this._webSocketRequestIdCounters.set(page, 0);
+
+    const onWebSocket = (ws: PlaywrightWebSocket): void => {
+      const connectionMap = this._webSocketConnectionMaps.get(page);
+      if (!connectionMap) return;
+
+      let counter = this._webSocketRequestIdCounters.get(page) ?? 0;
+      counter++;
+      this._webSocketRequestIdCounters.set(page, counter);
+      const requestId = `ws-${counter}-${Date.now()}`;
+
+      const tracked: TrackedWebSocketData = {
+        connection: {
+          requestId,
+          url: ws.url(),
+          status: 'open',
+          createdAt: Date.now(),
+        },
+        frames: [],
+        stableId: idGenerator(),
+      };
+
+      connectionMap.set(requestId, tracked);
+      const navigations = this._webSocketStorage.get(page);
+      if (navigations) {
+        navigations[0]!.push(tracked);
+      }
+
+      ws.on('framereceived', data => {
+        const payload =
+          typeof data.payload === 'string'
+            ? data.payload
+            : data.payload.toString('base64');
+        const opcode = typeof data.payload === 'string' ? 1 : 2;
+        tracked.frames.push({
+          requestId,
+          direction: 'received',
+          timestamp: Date.now(),
+          opcode,
+          payloadData: payload,
+        });
+      });
+
+      ws.on('framesent', data => {
+        const payload =
+          typeof data.payload === 'string'
+            ? data.payload
+            : data.payload.toString('base64');
+        const opcode = typeof data.payload === 'string' ? 1 : 2;
+        tracked.frames.push({
+          requestId,
+          direction: 'sent',
+          timestamp: Date.now(),
+          opcode,
+          payloadData: payload,
+        });
+      });
+
+      ws.on('close', () => {
+        tracked.connection.status = 'closed';
+        tracked.connection.closedAt = Date.now();
+      });
+    };
+
+    const onFrameNavigated = (frame: Frame): void => {
+      if (frame !== page.mainFrame()) return;
+      const navigations = this._webSocketStorage.get(page);
+      if (!navigations) return;
+      navigations.unshift([]);
+      navigations.splice(this._maxNavigationSaved);
+      this._webSocketConnectionMaps.set(page, new Map());
+      this._webSocketRequestIdCounters.set(page, 0);
+    };
+
+    page.on('websocket', onWebSocket);
+    page.on('framenavigated', onFrameNavigated);
+
+    this._webSocketListeners.set(page, {onWebSocket, onFrameNavigated});
+
+    page.once('close', () => {
+      this._detachWebSocketListeners(page);
+    });
+  }
+
+  private _detachWebSocketListeners(page: Page): void {
+    const listeners = this._webSocketListeners.get(page);
+    if (listeners) {
+      try {
+        page.off('websocket', listeners.onWebSocket);
+        page.off('framenavigated', listeners.onFrameNavigated);
+      } catch {
+        // Page might already be closed
+      }
+    }
+    this._webSocketListeners.delete(page);
+    this._webSocketStorage.delete(page);
+    this._webSocketIdGenerators.delete(page);
+    this._webSocketConnectionMaps.delete(page);
+    this._webSocketRequestIdCounters.delete(page);
+  }
+
+  // ─── Dialog 管理 ─────────────────────────────────────
+
+  private _dialogHandler = (dialog: Dialog): void => {
+    this._dialog = dialog;
+  };
+
+  getDialog(): Dialog | undefined {
+    return this._dialog;
+  }
+
+  clearDialog(): void {
+    this._dialog = undefined;
+  }
+
+  // ─── 超时与网络/CPU 条件联动 ─────────────────────────
+
+  setNetworkConditions(conditions: string | null): void {
+    const page = this.selectedPage;
+    if (!page) return;
+    if (conditions === null) {
+      this._networkConditionsMap.delete(page);
+    } else {
+      this._networkConditionsMap.set(page, conditions);
+    }
+    this._updateSelectedPageTimeouts();
+  }
+
+  getNetworkConditions(): string | null {
+    const page = this.selectedPage;
+    if (!page) return null;
+    return this._networkConditionsMap.get(page) ?? null;
+  }
+
+  setCpuThrottlingRate(rate: number): void {
+    const page = this.selectedPage;
+    if (!page) return;
+    this._cpuThrottlingRateMap.set(page, rate);
+    this._updateSelectedPageTimeouts();
+  }
+
+  getCpuThrottlingRate(): number {
+    const page = this.selectedPage;
+    if (!page) return 1;
+    return this._cpuThrottlingRateMap.get(page) ?? 1;
+  }
+
+  private _updateSelectedPageTimeouts(): void {
+    const page = this.selectedPage;
+    if (!page) return;
+    const cpuMultiplier = this.getCpuThrottlingRate();
+    page.setDefaultTimeout(DEFAULT_TIMEOUT * cpuMultiplier);
+
+    const networkMultiplier = getNetworkMultiplierFromString(
+      this.getNetworkConditions(),
+    );
+    page.setDefaultNavigationTimeout(NAVIGATION_TIMEOUT * networkMultiplier);
   }
 
   // ─── NetworkRuntimeServices ───────────────────────────
@@ -532,28 +971,108 @@ export class ToolContextProvider {
     return undefined;
   }
 
-  // ─── ConsoleRuntimeServices (stub) ────────────────────
+  // ─── ConsoleRuntimeServices ──────────────────────────
 
-  getConsoleData(_includePreservedMessages?: boolean): unknown[] {
-    return [];
+  getConsoleData(
+    includePreservedMessages?: boolean,
+  ): Array<ConsoleMessage | Error> {
+    const page = this.selectedPage;
+    if (!page) return [];
+
+    const navigations = this._consoleStorage.get(page);
+    if (!navigations) return [];
+
+    if (!includePreservedMessages) {
+      return navigations[0]!.map(t => t.message);
+    }
+
+    const data: Array<ConsoleMessage | Error> = [];
+    for (let index = this._maxNavigationSaved; index >= 0; index--) {
+      if (navigations[index]) {
+        data.push(...navigations[index]!.map(t => t.message));
+      }
+    }
+    return data;
   }
 
-  getConsoleMessageById(_id: number): unknown {
-    throw new Error('Console 收集器未集成');
+  getConsoleMessageById(id: number): ConsoleMessage | Error {
+    const page = this.selectedPage;
+    if (!page) {
+      throw new Error('未选中页面');
+    }
+    const navigations = this._consoleStorage.get(page);
+    if (!navigations) {
+      throw new Error('Console 收集器未初始化');
+    }
+    for (const navigation of navigations) {
+      const found = navigation.find(t => t.stableId === id);
+      if (found) return found.message;
+    }
+    throw new Error(`Console 消息 ID ${id} 未找到`);
   }
 
-  getConsoleMessageStableId(_message: unknown): number {
+  getConsoleMessageStableId(message: unknown): number {
+    const candidatePages = this._getNetworkCandidatePages();
+    for (const page of candidatePages) {
+      const navigations = this._consoleStorage.get(page);
+      if (!navigations) continue;
+      for (const navigation of navigations) {
+        const found = navigation.find(t => t.message === message);
+        if (found) return found.stableId;
+      }
+    }
     return -1;
   }
 
-  // ─── WebSocketRuntimeServices (stub) ──────────────────
+  // ─── WebSocketRuntimeServices ────────────────────────
 
-  getWebSocketConnections(): unknown[] {
-    return [];
+  getWebSocketConnections(includePreservedData?: boolean): WebSocketData[] {
+    const page = this.selectedPage;
+    if (!page) return [];
+
+    const navigations = this._webSocketStorage.get(page);
+    if (!navigations) return [];
+
+    if (!includePreservedData) {
+      return navigations[0] ?? [];
+    }
+
+    const data: WebSocketData[] = [];
+    for (let index = this._maxNavigationSaved; index >= 0; index--) {
+      if (navigations[index]) {
+        data.push(...navigations[index]);
+      }
+    }
+    return data;
   }
 
-  getWebSocketConnectionById(_wsid: number): unknown {
-    return undefined;
+  getWebSocketConnectionById(wsid: number): WebSocketData {
+    const page = this.selectedPage;
+    if (!page) {
+      throw new Error('未选中页面');
+    }
+    const navigations = this._webSocketStorage.get(page);
+    if (!navigations) {
+      throw new Error('WebSocket 收集器未初始化');
+    }
+    for (const navigation of navigations) {
+      const found = navigation.find(t => t.stableId === wsid);
+      if (found) return found;
+    }
+    throw new Error(`WebSocket ID ${wsid} 未找到`);
+  }
+
+  getWebSocketStableId(ws: unknown): number {
+    const candidatePages = this._getNetworkCandidatePages();
+    for (const page of candidatePages) {
+      const navigations = this._webSocketStorage.get(page);
+      if (!navigations) continue;
+      for (const navigation of navigations) {
+        const found = navigation.find(t => t === ws);
+        if (found) return found.stableId;
+      }
+    }
+    return -1;
   }
 
   // ─── PerformanceRuntimeServices ────────────────────────

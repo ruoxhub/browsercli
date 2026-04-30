@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {AnalyzerRuntimeServices, UnderstandCodeFnResult} from './types.js';
 import type {UnderstandCodeOptions} from '../../types/index.js';
+
+import type {AnalyzerRuntimeServices, UnderstandCodeFnResult} from './types.js';
 
 export async function understandCode(
   runtime: AnalyzerRuntimeServices,

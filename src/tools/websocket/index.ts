@@ -30,17 +30,19 @@ export type {
 // 以下包装函数从 runtime 获取 WebSocket 数据后调用纯函数。
 
 import type {ToolContextProvider} from '../../worker/ToolContextProvider.js';
-import {listWebSocketConnections as _listConnections} from './listConnections.js';
-import {getWebSocketMessages as _getMessages} from './getMessages.js';
-import {getWebSocketMessage as _getMessage} from './getMessage.js';
+import type {WebSocketData} from '../network/WebSocketCollector.js';
+
 import {analyzeWebSocketMessages as _analyzeMessages} from './analyzeMessages.js';
+import {getWebSocketMessage as _getMessage} from './getMessage.js';
+import {getWebSocketMessages as _getMessages} from './getMessages.js';
+import {listWebSocketConnections as _listConnections} from './listConnections.js';
 import type {
   ListWebSocketConnectionsParams,
   GetWebSocketMessagesParams,
   GetWebSocketMessageParams,
   AnalyzeWebSocketMessagesParams,
 } from './types.js';
-import type {WebSocketData} from '../network/WebSocketCollector.js';
+
 
 /**
  * 列出 WebSocket 连接 — runtime 适配版

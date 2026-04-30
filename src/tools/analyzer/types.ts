@@ -4,17 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Frame} from '../../third_party/index.js';
-import type {Deobfuscator} from '../../modules/deobfuscator/Deobfuscator.js';
-import type {CodeAnalyzer} from '../../modules/analyzer/CodeAnalyzer.js';
 import type {AISummarizer, CodeSummary} from '../../modules/analyzer/AISummarizer.js';
+import type {CodeAnalyzer} from '../../modules/analyzer/CodeAnalyzer.js';
+import type {CodeCollector} from '../../modules/collector/CodeCollector.js';
+import type {PageController} from '../../modules/collector/PageController.js';
 import type {CryptoDetector} from '../../modules/crypto/CryptoDetector.js';
 import type {SecurityIssue, CryptoStrength} from '../../modules/crypto/CryptoDetectorEnhanced.js';
+import type {Deobfuscator} from '../../modules/deobfuscator/Deobfuscator.js';
+import type {HookManager} from '../../modules/hook/HookManager.js';
+import type {Frame} from '../../third_party/index.js';
 import type {
   DeobfuscateResult,
   UnderstandCodeResult as UnderstandCodeResultType,
-  CodeFile,
-  DetectCryptoResult as DetectCryptoResultType,
   CryptoAlgorithm,
   CryptoLibrary,
 } from '../../types/index.js';
@@ -120,6 +121,7 @@ export interface AnalyzeTargetResult extends AnalyzerResult {
     whyTheseSteps: string[];
     stopIf: string[];
     nextActions: string[];
+    replay?: Array<{index: number; action: string; success: boolean; message: string}>;
   };
 }
 
@@ -128,6 +130,9 @@ export interface AnalyzerRuntimeServices {
   analyzer: CodeAnalyzer;
   summarizer: AISummarizer;
   cryptoDetector: CryptoDetector;
+  collector: CodeCollector;
+  hookManager: HookManager;
+  pageController: PageController;
 }
 
 export interface DeobfuscateCodeResult extends AnalyzerResult {

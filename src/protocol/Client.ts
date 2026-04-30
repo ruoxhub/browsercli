@@ -16,13 +16,14 @@
  */
 
 import WebSocket from 'ws';
+
+import type {RpcClientConfig, ClientStatus} from '../types/platform.js';
 import type {
   RpcRequest,
   RpcResponse,
   ActionHandler,
   RpcConnectionState,
 } from '../types/rpc.js';
-import type {RpcClientConfig, ClientStatus} from '../types/platform.js';
 
 /** 默认配置 */
 const DEFAULT_RECONNECT_BASE_DELAY = 2000;
@@ -37,7 +38,7 @@ export class RpcClient {
   // WebSocket & 重连
   private wsURL = '';
   private socket: WebSocket | null = null;
-  private handlers: Map<string, ActionHandler> = new Map();
+  private handlers = new Map<string, ActionHandler>();
   private isManualDisconnect = false;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;

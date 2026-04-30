@@ -5,8 +5,9 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
-import type {SyncHookRecordsResult} from './types.js';
+
 import {summarizeHookStore, readHookStore} from './store-utils.js';
+import type {SyncHookRecordsResult} from './types.js';
 
 interface SyncHookRecordsParams {
   hookId?: string;

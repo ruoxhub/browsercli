@@ -6,6 +6,7 @@
 
 import {formatWebSocketFrameDetail} from '../../formatters/websocketFormatter.js';
 import type {WebSocketData} from '../network/WebSocketCollector.js';
+
 import type {GetMessageResult, GetWebSocketMessageParams} from './types.js';
 
 /**

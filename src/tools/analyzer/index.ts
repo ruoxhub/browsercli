@@ -14,7 +14,7 @@ export {pickHookTypes} from './hooks.js';
 export {analyzeTarget} from './analyzeTarget.js';
 export {deobfuscateCode} from './deobfuscate.js';
 export {understandCode} from './understand.js';
-export {summarizeFile, summarizeBatch, summarizeProject} from './summarize.js';
+export {summarizeFile, summarizeBatch, summarizeProject, summarizeCode} from './summarize.js';
 export {detectCrypto} from './detectCrypto.js';
 export {riskPanel} from './riskPanel.js';
 export type {AnalyzeTargetParams} from './analyzeTarget.js';

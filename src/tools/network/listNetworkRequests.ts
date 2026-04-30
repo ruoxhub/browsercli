@@ -5,6 +5,8 @@
  */
 
 import type {HTTPRequest, ResourceType} from '../../third_party/index.js';
+import {resolveActivePageIndex} from '../shared/activePageResolver.js';
+
 import type {
   ListNetworkRequestsData,
   ListNetworkRequestsParams,
@@ -13,7 +15,6 @@ import type {
   NetworkEvidenceCorrelation,
   NetworkRuntimeServices,
 } from './types.js';
-import {resolveActivePageIndex} from '../shared/activePageResolver.js';
 
 const DEFAULT_WAIT_TIMEOUT_MS = 5000;
 const WAIT_POLL_INTERVAL_MS = 50;

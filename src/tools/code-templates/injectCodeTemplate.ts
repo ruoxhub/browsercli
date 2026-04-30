@@ -5,6 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+
 import {CODE_TEMPLATES, TEMPLATES_DIR} from './templates.js';
 import type {CodeTemplateName, InjectCodeTemplateResult} from './types.js';
 

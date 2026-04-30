@@ -4,9 +4,10 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+import {BrowserManager, type BrowserManagerConfig} from './browser/index.js';
+import {getEnvBoolean} from './config.js';
 import {AISummarizer} from './modules/analyzer/AISummarizer.js';
 import {CodeAnalyzer} from './modules/analyzer/CodeAnalyzer.js';
-import {BrowserManager, type BrowserManagerConfig} from './browser/index.js';
 import {CodeCollector} from './modules/collector/CodeCollector.js';
 import {DOMInspector} from './modules/collector/DOMInspector.js';
 import {PageController} from './modules/collector/PageController.js';
@@ -19,6 +20,8 @@ import {WasmDecompiler} from './modules/wasm/WasmDecompiler.js';
 import {WasmRuntimeInspector} from './modules/wasm/WasmRuntimeInspector.js';
 import {ReverseTaskStore} from './reverse/ReverseTaskStore.js';
 import {LLMService} from './services/LLMService.js';
+import type {Page} from './third_party/index.js';
+import type {WorkerStartOptions} from './types/platform.js';
 import {
   CodeCacheAdapter,
   CodeCompressorAdapter,
@@ -26,9 +29,6 @@ import {
 } from './utils/CacheAdapters.js';
 import {DetailedDataManager} from './utils/detailedDataManager.js';
 import {UnifiedCacheManager} from './utils/UnifiedCacheManager.js';
-import type {Page} from './third_party/index.js';
-import type {WorkerStartOptions} from './types/platform.js';
-import {getEnvBoolean} from './config.js';
 
 let runtime: Runtime | undefined;
 

@@ -19,7 +19,6 @@
  */
 
 import type {CDPSession} from '../../third_party/index.js';
-
 import {logger} from '../../utils/logger.js';
 import type {CodeCollector} from '../collector/CodeCollector.js';
 

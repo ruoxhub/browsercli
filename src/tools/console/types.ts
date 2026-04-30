@@ -82,7 +82,7 @@ export interface ConsoleRuntimeServices {
   /** 获取 console 数据列表 */
   getConsoleData: (
     includePreservedMessages?: boolean,
-  ) => Array<ConsoleMessageEntry>;
+  ) => ConsoleMessageEntry[];
   /** 通过 ID 获取单条 console 消息 */
   getConsoleMessageById: (
     id: number,

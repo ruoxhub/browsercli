@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {AnalyzerRuntimeServices, DetectCryptoFnResult} from './types.js';
 import type {DetectCryptoOptions} from '../../types/index.js';
+
+import type {AnalyzerRuntimeServices, DetectCryptoFnResult} from './types.js';
 
 export async function detectCrypto(
   runtime: AnalyzerRuntimeServices,

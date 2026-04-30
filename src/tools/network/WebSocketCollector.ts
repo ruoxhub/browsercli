@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {RequestInitiator} from './types.js';
 import type {
   Browser,
   CDPSession,
@@ -12,6 +11,8 @@ import type {
   Protocol,
   Target,
 } from '../../third_party/index.js';
+
+import type {RequestInitiator} from './types.js';
 
 /**
  * WebSocket connection status.

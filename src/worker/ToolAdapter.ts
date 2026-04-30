@@ -13,15 +13,16 @@
  * 通过 tools-meta.ts 中的 ToolMeta 动态加载 handler，适配为 Action
  */
 
-import type {ActionHandler} from '../types/rpc.js';
 import type {ToolMeta} from '../cli/tools-meta.js';
 import {getAllToolNames, getToolMeta} from '../cli/tools-meta.js';
+import type {ActionHandler} from '../types/rpc.js';
+
+import type {ToolContextProvider} from './ToolContextProvider.js';
 import {ToolResponseAccumulator} from './ToolResponseAccumulator.js';
-import {ToolContextProvider} from './ToolContextProvider.js';
 
 export class ToolAdapter {
   private contextProvider: ToolContextProvider;
-  private loadedHandlers: Map<string, (...args: unknown[]) => Promise<unknown>> = new Map();
+  private loadedHandlers = new Map<string, (...args: unknown[]) => Promise<unknown>>();
 
   constructor(contextProvider: ToolContextProvider) {
     this.contextProvider = contextProvider;

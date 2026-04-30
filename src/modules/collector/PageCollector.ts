@@ -8,9 +8,6 @@
 
 import {createRequire} from 'node:module';
 
-import {FakeIssuesManager} from '../../utils/DevtoolsUtils.js';
-import {features} from '../../utils/features.js';
-import {logger} from '../../utils/logger.js';
 import type {
   AggregatedIssue,
   Common,
@@ -24,6 +21,9 @@ import type {
   HTTPRequest,
   Page,
 } from '../../third_party/index.js';
+import {FakeIssuesManager} from '../../utils/DevtoolsUtils.js';
+import {features} from '../../utils/features.js';
+import {logger} from '../../utils/logger.js';
 
 // 动态导入 chrome-devtools-frontend 以绕过类型检查
 const require = createRequire(import.meta.url);

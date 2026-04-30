@@ -5,6 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+
 import type {HookResult} from './types.js';
 
 /**

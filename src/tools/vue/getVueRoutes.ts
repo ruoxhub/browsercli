@@ -7,6 +7,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import type {Frame} from '../../third_party/index.js';
+
 import type {HookResult} from './types.js';
 
 /**

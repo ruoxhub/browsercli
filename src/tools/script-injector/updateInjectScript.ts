@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {UpdateInjectScriptResult} from './types.js';
 import {getInjectConfigStore} from './createInjectScript.js';
+import type {UpdateInjectScriptResult} from './types.js';
 
 /**
  * 更新注入脚本配置（纯函数版本）。

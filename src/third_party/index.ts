@@ -20,9 +20,9 @@ export {z as zod} from 'zod';
 // Playwright types and browser instances
 export * from './playwright.js';
 // Puppeteer-compatible types (Target, Connection, Handler, etc.)
-export * from './puppeteer-compat.js';
+export type * from './puppeteer-compat.js';
 // CDP Protocol types (Protocol namespace, CDPConnection, etc.)
-export * from './cdp.js';
+export type * from './cdp.js';
 // Stub implementations (Common, Marked, MarkdownIssueDescription, I18n)
 export * from './stubs.js';
 

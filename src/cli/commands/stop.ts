@@ -5,9 +5,10 @@
  */
 
 import type {AxiCliCommand} from 'axi-sdk-js';
-import type {WorkerContext} from '../types.js';
 import {AxiError} from 'axi-sdk-js';
+
 import {successOutput} from '../output.js';
+import type {WorkerContext} from '../types.js';
 
 export const stopCommand: AxiCliCommand<WorkerContext> = async (
   _args,

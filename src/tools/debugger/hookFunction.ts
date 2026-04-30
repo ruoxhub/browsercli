@@ -5,6 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+
 import {evaluateInPageRuntime} from './evaluateInPageRuntime.js';
 import type {HookFunctionParams, HookFunctionResult} from './types.js';
 

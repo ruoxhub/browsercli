@@ -22,14 +22,14 @@
  */
 
 import {existsSync, readFileSync, writeFileSync, mkdirSync} from 'node:fs';
-import path from 'node:path';
 import os from 'node:os';
+import path from 'node:path';
 
 import {config as dotenvConfig} from 'dotenv';
 
-import {resolveDefaultEnvPath} from './utils/projectPaths.js';
 import {AIService} from './services/AIService.js';
 import {OpenAIProvider} from './services/OpenAIProvider.js';
+import {resolveDefaultEnvPath} from './utils/projectPaths.js';
 
 // ==================== .env 加载 ====================
 
@@ -70,7 +70,7 @@ export type LLMProvider = 'openai';
 /** 用户级全局配置结构（配置文件可写的所有字段） */
 export interface GlobalConfig {
   /** Sekiro Server WebSocket 地址 */
-  sekiroHost?: string;
+  rpcHost?: string;
   /** Sekiro 分组名 */
   group?: string;
   /** 浏览器调试 URL */

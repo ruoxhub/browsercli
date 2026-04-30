@@ -5,6 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+
 import type {GetDomStructureParams, GetDomStructureResult} from './types.js';
 
 /**
@@ -48,7 +49,7 @@ export async function getDomStructure(
             }
           }
 
-          const children: Record<string, unknown>[] = [];
+          const children: Array<Record<string, unknown>> = [];
           const childElements = node.children;
           for (const child of Array.from(childElements)) {
             if (child) {

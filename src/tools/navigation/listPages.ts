@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {
+  normalizeBrowserRuntimeError,
+  withOperationTimeout,
+} from '../shared/browserRuntime.js';
+
 import type {
   ListPagesParams,
   ListPagesResult,
@@ -11,10 +16,6 @@ import type {
   NavigationRuntimeServices,
   PageInfo,
 } from './types.js';
-import {
-  normalizeBrowserRuntimeError,
-  withOperationTimeout,
-} from '../shared/browserRuntime.js';
 
 /**
  * 列出浏览器中所有已打开的页面（纯函数版本）。

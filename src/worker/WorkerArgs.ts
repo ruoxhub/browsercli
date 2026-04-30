@@ -8,7 +8,7 @@ import type {GlobalConfig} from '../config.js';
 import type {WorkerStartOptions} from '../types/platform.js';
 
 type ResolvedWorkerConfig = Required<
-  Pick<WorkerStartOptions, 'sekiroHost' | 'group' | 'headless'>
+  Pick<WorkerStartOptions, 'rpcHost' | 'group' | 'headless'>
 > &
   Pick<
     WorkerStartOptions,
@@ -20,7 +20,7 @@ const VALUE_FLAGS: Record<string, keyof GlobalConfig> = {
   '--databaseUrl': 'databaseUrl',
   '--executablePath': 'executablePath',
   '--group': 'group',
-  '--sekiroHost': 'sekiroHost',
+  '--rpcHost': 'rpcHost',
   '--wsEndpoint': 'wsEndpoint',
 };
 
@@ -66,7 +66,7 @@ export function toWorkerOptions(
     executablePath: resolved.executablePath,
     group: resolved.group,
     headless: resolved.headless,
-    sekiroHost: resolved.sekiroHost,
+    rpcHost: resolved.rpcHost,
     wsEndpoint: resolved.wsEndpoint,
   };
 }

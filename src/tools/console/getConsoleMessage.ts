@@ -5,6 +5,7 @@
  */
 
 import type {AggregatedIssue} from '../../third_party/index.js';
+
 import type {
   ConsoleMessageEntry,
   ConsoleRuntimeServices,

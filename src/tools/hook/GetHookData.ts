@@ -5,12 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
-import type {GetHookDataResult} from './types.js';
-import {
-  filterHookStore,
-  readHookStore,
-  summarizeHookStore,
-} from './store-utils.js';
+
 import {
   buildRequestBindings,
   inferCandidateEnvNeeds,
@@ -18,6 +13,12 @@ import {
   summarizeHookRecords,
   toHookRecordArray,
 } from './record-utils.js';
+import {
+  filterHookStore,
+  readHookStore,
+  summarizeHookStore,
+} from './store-utils.js';
+import type {GetHookDataResult} from './types.js';
 
 interface HookDataParams {
   hookId?: string;

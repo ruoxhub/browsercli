@@ -17,10 +17,8 @@
  */
 
 import type {AxiCliCommand} from 'axi-sdk-js';
-import type {WorkerContext} from '../types.js';
 import {AxiError} from 'axi-sdk-js';
-import {successOutput} from '../output.js';
-import {parseArgs, getFlag, hasFlag} from '../args-parser.js';
+
 import {
   resolveConfig,
   showConfigInfo,
@@ -34,6 +32,9 @@ import {
   writeConfigFile,
   type GlobalConfig,
 } from '../../config.js';
+import {parseArgs, getFlag, hasFlag} from '../args-parser.js';
+import {successOutput} from '../output.js';
+import type {WorkerContext} from '../types.js';
 
 /** 配置键 → 描述 */
 const CONFIG_KEY_DESCRIPTIONS: Record<string, string> = {

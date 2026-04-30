@@ -4,52 +4,119 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {buildHookTimeline} from './timeline.js';
-import {correlateNetworkFlows} from './flows.js';
 import {
-  buildUrlPattern,
   buildRequestFingerprints,
   buildPriorityTargets,
 } from './fingerprints.js';
-import {extractSignatureChainHints} from './signature.js';
-import {buildActionPlan, buildWhyTheseSteps, buildStopConditions} from './reports.js';
+import {correlateNetworkFlows} from './flows.js';
 import {pickHookTypes} from './hooks.js';
+import {normalizeCollectedFiles} from './normalize.js';
+import {
+  buildActionPlan,
+  buildWhyTheseSteps,
+  buildStopConditions,
+} from './reports.js';
+import {extractSignatureChainHints} from './signature.js';
+import {buildHookTimeline} from './timeline.js';
 import type {
   AnalyzeTargetResult,
+  AnalyzerRuntimeServices,
   HookPreset,
-  HookTimelineEntry,
-  CorrelatedFlow,
-  RequestFingerprint,
-  PriorityTarget,
-  SignatureChainHints,
   CollectedFileEntry,
 } from './types.js';
 
 export interface AnalyzeTargetParams {
   url: string;
   topN?: number;
+  useAI?: boolean;
+  runDeobfuscation?: boolean;
   hookPreset?: HookPreset;
   autoInjectHooks?: boolean;
   waitAfterHookMs?: number;
   correlationWindowMs?: number;
   maxCorrelatedFlows?: number;
   maxFingerprints?: number;
-  analysisCode: string;
+  autoReplayActions?: Array<{
+    action: 'navigate' | 'click' | 'type' | 'wait' | 'scroll' | 'pressKey' | 'evaluate';
+    url?: string;
+    selector?: string;
+    text?: string;
+    delay?: number;
+    timeout?: number;
+    x?: number;
+    y?: number;
+    key?: string;
+    code?: string;
+  }>;
+  collect?: {
+    smartMode?: 'summary' | 'priority' | 'incremental' | 'full';
+    includeInline?: boolean;
+    includeExternal?: boolean;
+    includeDynamic?: boolean;
+    maxTotalSize?: number;
+    maxFileSize?: number;
+  };
+}
+
+async function collectAnalyzeTargetCode(
+  runtime: AnalyzerRuntimeServices,
+  params: AnalyzeTargetParams,
+): Promise<{
+  collectResult: unknown;
   normalizedFiles: CollectedFileEntry[];
   candidateFiles: CollectedFileEntry[];
-  hookRecords: Array<{hookId: string; records: Array<Record<string, unknown>>}>;
-  injectedHooks: Array<{hookId: string; type: string; injected: boolean}>;
-  understandResult: {qualityScore: number; securityRisks: Array<{severity: string}>};
-  cryptoResult: {algorithms: Array<{name: string}>};
-  deobfuscationResult?: {
-    confidence: number;
-    readabilityScore: number;
-    transformations: number;
-  };
-  collectionResult?: {dependencies?: {nodes: unknown[]; edges: unknown[]}};
+  analysisCode: string;
+}> {
+  const topN = params.topN ?? 8;
+  const collectResult = await runtime.collector.collect({
+    url: params.url,
+    smartMode: params.collect?.smartMode ?? 'priority',
+    includeInline: params.collect?.includeInline,
+    includeExternal: params.collect?.includeExternal,
+    includeDynamic: params.collect?.includeDynamic ?? true,
+    maxTotalSize: params.collect?.maxTotalSize,
+    maxFileSize: params.collect?.maxFileSize,
+  });
+
+  const normalizedFiles = normalizeCollectedFiles(collectResult);
+  const topPriority = runtime.collector.getTopPriorityFiles(topN);
+  const candidateFiles =
+    topPriority.files.length > 0 ? topPriority.files : normalizedFiles.slice(0, topN);
+  const mergedCode = candidateFiles
+    .map(file => `// ${file.url}\n${file.content}`)
+    .join('\n\n');
+  const analysisCode = mergedCode.length > 300000 ? mergedCode.slice(0, 300000) : mergedCode;
+  return {collectResult, normalizedFiles, candidateFiles, analysisCode};
+}
+
+async function installAnalyzeHooks(
+  runtime: AnalyzerRuntimeServices,
+  hookPreset: HookPreset,
+  autoInjectHooks: boolean,
+): Promise<Array<{hookId: string; type: string; injected: boolean}>> {
+  const injectedHooks: Array<{hookId: string; type: string; injected: boolean}> = [];
+  for (const type of pickHookTypes(hookPreset)) {
+    const created = runtime.hookManager.create({
+      type,
+      description: `[analyze_target] ${type} hook`,
+      action: 'log',
+    });
+    let injected = false;
+    if (autoInjectHooks) {
+      try {
+        await runtime.pageController.injectScript(created.script);
+        injected = true;
+      } catch {
+        injected = false;
+      }
+    }
+    injectedHooks.push({hookId: created.hookId, type, injected});
+  }
+  return injectedHooks;
 }
 
 export async function analyzeTarget(
+  runtime: AnalyzerRuntimeServices,
   params: AnalyzeTargetParams,
 ): Promise<AnalyzeTargetResult> {
   if (!params?.url) {
@@ -60,10 +127,23 @@ export async function analyzeTarget(
       data: {
         target: '',
         durationMs: 0,
-        collection: {totalCollected: 0, selectedForAnalysis: 0, dependencies: {nodes: [], edges: []}},
+        collection: {
+          totalCollected: 0,
+          selectedForAnalysis: 0,
+          dependencies: {nodes: [], edges: []},
+        },
         analysis: {qualityScore: 0, securityRiskCount: 0, cryptoAlgorithms: []},
         deobfuscation: null,
-        hooks: {preset: 'none', autoInjected: false, hookIds: [], totalRecords: 0, activeUrls: [], correlatedFlows: [], suspiciousFlows: [], timelineSample: []},
+        hooks: {
+          preset: 'none',
+          autoInjected: false,
+          hookIds: [],
+          totalRecords: 0,
+          activeUrls: [],
+          correlatedFlows: [],
+          suspiciousFlows: [],
+          timelineSample: [],
+        },
         requestFingerprints: [],
         priorityTargets: [],
         signatureChain: {signatureParams: [], candidateFunctions: [], requestSinks: []},
@@ -83,40 +163,51 @@ export async function analyzeTarget(
   const maxCorrelatedFlows = params.maxCorrelatedFlows ?? 20;
   const maxFingerprints = params.maxFingerprints ?? 12;
 
-  const hookRecords = params.hookRecords ?? [];
-  const injectedHooks = params.injectedHooks ?? [];
-  const normalizedFiles = params.normalizedFiles ?? [];
-  const candidateFiles = params.candidateFiles ?? [];
-  const analysisCode = params.analysisCode ?? '';
-  const understandResult = params.understandResult ?? {qualityScore: 0, securityRisks: []};
-  const cryptoResult = params.cryptoResult ?? {algorithms: []};
+  const {collectResult, normalizedFiles, candidateFiles, analysisCode} =
+    await collectAnalyzeTargetCode(runtime, params);
+  const injectedHooks = await installAnalyzeHooks(runtime, hookPreset, autoInjectHooks);
+
+  const replayResults = params.autoReplayActions?.length
+    ? await runtime.pageController.replayActions(params.autoReplayActions)
+    : [];
+
+  if (params.waitAfterHookMs && params.waitAfterHookMs > 0) {
+    await new Promise(resolve => setTimeout(resolve, params.waitAfterHookMs));
+  }
+
+  const [understand, crypto] = await Promise.all([
+    runtime.analyzer.understand({code: analysisCode, focus: 'security'}),
+    runtime.cryptoDetector.detect({code: analysisCode}),
+  ]);
+
+  const deobfuscation = params.runDeobfuscation
+    ? await runtime.deobfuscator.deobfuscate({
+        code: analysisCode.slice(0, 120000),
+        aggressive: true,
+        renameVariables: true,
+      })
+    : undefined;
+
+  const hookRecords = injectedHooks.map(hook => ({
+    hookId: hook.hookId,
+    records: runtime.hookManager.getRecords(hook.hookId) as Array<Record<string, unknown>>,
+  }));
 
   const hookTimeline = buildHookTimeline(hookRecords);
-  const urlActivity = hookTimeline.reduce<Record<string, number>>(
-    (acc, item) => {
-      if (item.url) {
-        acc[item.url] = (acc[item.url] ?? 0) + 1;
-      }
-      return acc;
-    },
-    {},
-  );
+  const urlActivity = hookTimeline.reduce<Record<string, number>>((acc, item) => {
+    if (item.url) {
+      acc[item.url] = (acc[item.url] ?? 0) + 1;
+    }
+    return acc;
+  }, {});
   const activeUrls = Object.entries(urlActivity)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10)
     .map(([url, count]) => ({url, count}));
-  const correlatedFlows = correlateNetworkFlows(
-    hookTimeline,
-    correlationWindowMs,
-    maxCorrelatedFlows,
-  );
-  const suspiciousFlows = correlatedFlows.filter(
-    flow => flow.signatureIndicators.length > 0,
-  );
-  const requestFingerprints = buildRequestFingerprints(
-    correlatedFlows,
-    maxFingerprints,
-  );
+
+  const correlatedFlows = correlateNetworkFlows(hookTimeline, correlationWindowMs, maxCorrelatedFlows);
+  const suspiciousFlows = correlatedFlows.filter(flow => flow.signatureIndicators.length > 0);
+  const requestFingerprints = buildRequestFingerprints(correlatedFlows, maxFingerprints);
   const signatureHints = extractSignatureChainHints(analysisCode);
   const priorityTargets = buildPriorityTargets({
     requestFingerprints,
@@ -130,10 +221,13 @@ export async function analyzeTarget(
     priorityTargets,
     signatureHints,
   });
-  const collectionDependencies: {nodes: unknown[]; edges: unknown[]} =
-    params.collectionResult && typeof params.collectionResult === 'object'
-      ? ((params.collectionResult as {dependencies?: {nodes: unknown[]; edges: unknown[]}}).dependencies ?? {nodes: [], edges: []})
-      : {nodes: [], edges: []};
+
+  const collectionDependencies:
+    | {nodes: unknown[]; edges: unknown[]}
+    | undefined =
+    collectResult && typeof collectResult === 'object'
+      ? (collectResult as {dependencies?: {nodes: unknown[]; edges: unknown[]}}).dependencies
+      : undefined;
 
   const result = {
     target: params.url,
@@ -141,18 +235,18 @@ export async function analyzeTarget(
     collection: {
       totalCollected: normalizedFiles.length,
       selectedForAnalysis: candidateFiles.length,
-      dependencies: collectionDependencies,
+      dependencies: collectionDependencies ?? {nodes: [], edges: []},
     },
     analysis: {
-      qualityScore: understandResult.qualityScore,
-      securityRiskCount: understandResult.securityRisks.length,
-      cryptoAlgorithms: cryptoResult.algorithms.map(item => item.name),
+      qualityScore: understand.qualityScore ?? 0,
+      securityRiskCount: understand.securityRisks?.length ?? 0,
+      cryptoAlgorithms: crypto.algorithms.map((item: {name: string}) => item.name),
     },
-    deobfuscation: params.deobfuscationResult
+    deobfuscation: deobfuscation
       ? {
-          confidence: params.deobfuscationResult.confidence,
-          readabilityScore: params.deobfuscationResult.readabilityScore,
-          transformations: params.deobfuscationResult.transformations,
+          confidence: deobfuscation.confidence,
+          readabilityScore: deobfuscation.readabilityScore,
+          transformations: deobfuscation.transformations.length,
         }
       : null,
     hooks: {
@@ -180,16 +274,17 @@ export async function analyzeTarget(
       suspiciousFlowCount: suspiciousFlows.length,
     }),
     nextActions: [
-      cryptoResult.algorithms.length > 0
+      crypto.algorithms.length > 0
         ? 'Focus on crypto-related files from top-priority list.'
         : null,
       hookTimeline.length === 0
         ? 'Trigger page interactions and rerun get_hook_data / analyze_target.'
         : null,
-      understandResult.securityRisks.length > 0
+      understand.securityRisks?.length > 0
         ? 'Review high-severity security findings and verify call stacks.'
         : null,
     ].filter((item): item is string => Boolean(item)),
+    replay: replayResults,
   };
 
   return {

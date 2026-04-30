@@ -65,7 +65,7 @@ export interface SetFilesParams {
   /** CSS 选择器（file input 元素） */
   selector: string;
   /** 文件绝对路径列表 */
-  filePaths: Array<string>;
+  filePaths: string[];
 }
 
 /** setFiles 结果 */
@@ -117,7 +117,7 @@ export interface FormElement {
 /** fillForm 参数 */
 export interface FillFormParams {
   /** 要填充的元素列表 */
-  elements: Array<FormElement>;
+  elements: FormElement[];
 }
 
 /** fillForm 结果 */

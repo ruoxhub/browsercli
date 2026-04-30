@@ -7,16 +7,17 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import type {
-  ScreenshotRuntimeServices,
-  TakeScreenshotParams,
-  TakeScreenshotResult,
-} from './types.js';
 import {
   getActivePageWithGuard,
   normalizeBrowserRuntimeError,
   withOperationTimeout,
 } from '../shared/browserRuntime.js';
+
+import type {
+  ScreenshotRuntimeServices,
+  TakeScreenshotParams,
+  TakeScreenshotResult,
+} from './types.js';
 
 /**
  * 截图页面（纯函数版本）。

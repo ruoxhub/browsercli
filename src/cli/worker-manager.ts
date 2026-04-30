@@ -13,11 +13,12 @@
 
 import {spawn, execSync, type ChildProcess} from 'node:child_process';
 import fs from 'node:fs';
-import path from 'node:path';
 import os from 'node:os';
+import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import type {WorkerStartOptions} from '../types/platform.js';
+
 import {RUNTIME_DIR_NAME} from '../config.js';
+import type {WorkerStartOptions} from '../types/platform.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

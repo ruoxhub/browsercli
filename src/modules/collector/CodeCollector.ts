@@ -17,9 +17,8 @@
  * - 反检测和资源拦截
  */
 
-import type {Browser, Page, CDPSession} from '../../third_party/index.js';
-
 import type {BrowserManager, BrowserManagerConfig} from '../../browser/index.js';
+import type {Browser, Page, CDPSession} from '../../third_party/index.js';
 import type {
   CollectCodeOptions,
   CollectCodeResult,

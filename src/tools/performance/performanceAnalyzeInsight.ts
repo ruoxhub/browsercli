@@ -6,6 +6,7 @@
 
 import {getInsightOutput} from '../../trace-processing/parse.js';
 import type {InsightName} from '../../trace-processing/parse.js';
+
 import type {
   PerformanceRuntimeServices,
   PerformanceAnalyzeInsightResult,

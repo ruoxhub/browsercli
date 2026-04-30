@@ -8,9 +8,10 @@
  * WorkerContext — CLI 层上下文，持有 SekiroInvoker、WorkerManager 和解析后的配置
  */
 
+import type {ResolvedConfig} from '../config.js';
+
 import type {SekiroInvoker} from './sekiro-invoker.js';
 import type {WorkerManager} from './worker-manager.js';
-import type {ResolvedConfig} from '../config.js';
 
 export interface WorkerContext {
   sekiroHost: string;

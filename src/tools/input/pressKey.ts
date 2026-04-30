@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {parseKey} from '../../utils/keyboard.js';
+
 import type {Frame} from './types.js';
 import type {PressKeyParams, PressKeyResult} from './types.js';
-import {parseKey} from '../../utils/keyboard.js';
 
 export async function pressKey(
   frame: Frame,

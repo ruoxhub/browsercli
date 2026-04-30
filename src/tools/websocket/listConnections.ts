@@ -5,6 +5,7 @@
  */
 
 import type {WebSocketData} from '../network/WebSocketCollector.js';
+
 import type {ListConnectionsResult, ListWebSocketConnectionsParams} from './types.js';
 
 /**

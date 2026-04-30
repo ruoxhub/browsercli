@@ -5,6 +5,7 @@
  */
 
 import type {AxiCliCommand} from 'axi-sdk-js';
+
 import type {WorkerContext} from '../types.js';
 
 export const statusCommand: AxiCliCommand<WorkerContext> = async (

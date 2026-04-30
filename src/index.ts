@@ -17,8 +17,8 @@
  */
 
 import {resolveConfig} from './config.js';
-import {getRuntime} from './runtime.js';
 import {RpcClient} from './protocol/Client.js';
+import {getRuntime} from './runtime.js';
 import {dbService} from './services/DatabaseService.js';
 import {registerBuiltinActions} from './worker/BuiltinActions.js';
 import {ToolAdapter} from './worker/ToolAdapter.js';
@@ -50,6 +50,7 @@ async function main(): Promise<void> {
 
   // 4. 将 Runtime 注入 ToolContextProvider，复用同一套服务实例
   const contextProvider = new ToolContextProvider(runtime);
+  await contextProvider.init();
 
   // 5. 创建 RpcClient
   const client = new RpcClient({
@@ -75,6 +76,7 @@ async function main(): Promise<void> {
   const gracefulShutdown = createGracefulShutdown({
     browserManager: runtime.browserManager,
     client,
+    contextProvider,
   });
   process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
   process.on('SIGINT', () => gracefulShutdown('SIGINT'));

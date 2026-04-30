@@ -5,8 +5,9 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
-import type {FrameInfo, ListFramesResult} from './types.js';
 import type {ToolContextProvider} from '../../worker/ToolContextProvider.js';
+
+import type {FrameInfo, ListFramesResult} from './types.js';
 
 /**
  * 计算 Frame 的嵌套深度。

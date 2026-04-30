@@ -5,6 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+
 import {HOOK_STORE_KEY} from './store-utils.js';
 import type {RemoveHookBrowserResult} from './types.js';
 

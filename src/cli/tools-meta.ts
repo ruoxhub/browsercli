@@ -826,7 +826,7 @@ export const TOOLS_META: ToolMeta[] = [
     description: '总结代码',
     schema: {},
     modulePath: './analyzer/summarize.js',
-    handlerName: 'summarizeFile',
+    handlerName: 'summarizeCode',
     callMode: 'runtime',
   },
   {

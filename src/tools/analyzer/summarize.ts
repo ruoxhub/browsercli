@@ -4,13 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {CodeFile} from '../../types/index.js';
+
 import type {
   AnalyzerRuntimeServices,
   SummarizeFileResult,
   SummarizeBatchResult,
   SummarizeProjectResult,
 } from './types.js';
-import type {CodeFile} from '../../types/index.js';
 
 export async function summarizeFile(
   runtime: AnalyzerRuntimeServices,
@@ -77,4 +78,32 @@ export async function summarizeProject(
       data: {} as SummarizeProjectResult['data'],
     };
   }
+}
+
+export async function summarizeCode(
+  runtime: AnalyzerRuntimeServices,
+  params: {
+    mode?: 'single' | 'batch' | 'project';
+    code?: string;
+    url?: string;
+    files?: CodeFile[];
+  },
+): Promise<SummarizeFileResult | SummarizeBatchResult | SummarizeProjectResult> {
+  const mode = params.mode ?? 'single';
+
+  if (mode === 'project') {
+    return summarizeProject(runtime, params.files ?? []);
+  }
+
+  if (mode === 'batch') {
+    return summarizeBatch(runtime, params.files ?? []);
+  }
+
+  const file: CodeFile = {
+    url: params.url ?? 'inline-input.js',
+    content: params.code ?? '',
+    size: (params.code ?? '').length,
+    type: 'inline',
+  };
+  return summarizeFile(runtime, file);
 }

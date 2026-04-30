@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {ISSUE_UTILS} from './issue-descriptions.js';
-import {logger} from './logger.js';
 import {
   type Issue,
   type AggregatedIssue,
@@ -13,6 +11,9 @@ import {
   MarkdownIssueDescription,
   I18n,
 } from '../third_party/index.js';
+
+import {ISSUE_UTILS} from './issue-descriptions.js';
+import {logger} from './logger.js';
 
 export function extractUrlLikeFromDevToolsTitle(
   title: string,

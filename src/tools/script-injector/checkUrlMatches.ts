@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {CheckUrlMatchesResult} from './types.js';
 import {getInjectConfigStore} from './createInjectScript.js';
+import type {CheckUrlMatchesResult} from './types.js';
 
 function matchesUrlPattern(pattern: string, url: string): boolean {
   try {

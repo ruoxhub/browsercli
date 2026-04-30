@@ -23,7 +23,6 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 
 import type {CDPSession} from '../../third_party/index.js';
-
 import type {
   ScopeVariable,
   BreakpointHitCallback,

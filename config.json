@@ -1,5 +1,5 @@
 {
-  "sekiroHost": "ws://127.0.0.1:5612",
+  "rpcHost": "ws://127.0.0.1:5612",
   "group": "js-reverse",
   "browserUrl": "http://127.0.0.1:19222",
   "wsEndpoint": "",

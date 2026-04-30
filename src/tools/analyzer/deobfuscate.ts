@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {AnalyzerRuntimeServices, DeobfuscateCodeResult} from './types.js';
 import type {DeobfuscateFullOptions} from '../../modules/deobfuscator/Deobfuscator.js';
+
+import type {AnalyzerRuntimeServices, DeobfuscateCodeResult} from './types.js';
 
 export async function deobfuscateCode(
   runtime: AnalyzerRuntimeServices,

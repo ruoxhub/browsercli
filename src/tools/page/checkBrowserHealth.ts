@@ -4,17 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {
+  getActivePageWithGuard,
+  normalizeBrowserRuntimeError,
+  withOperationTimeout,
+} from '../shared/browserRuntime.js';
+
 import type {
   CheckBrowserHealthParams,
   CheckBrowserHealthResult,
   HealthIssue,
   PageRuntimeServices,
 } from './types.js';
-import {
-  getActivePageWithGuard,
-  normalizeBrowserRuntimeError,
-  withOperationTimeout,
-} from '../shared/browserRuntime.js';
 
 /**
  * 检查浏览器连接健康状态和页面可用性（纯函数版本）。

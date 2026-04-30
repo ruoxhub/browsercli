@@ -11,6 +11,7 @@ import {dbService} from '../services/DatabaseService.js';
 interface ShutdownDependencies {
   browserManager: BrowserManager;
   client: RpcClient;
+  contextProvider?: {dispose(): void};
   database?: Pick<typeof dbService, 'disconnect'>;
   exit?: (code: number) => never;
   timeoutMs?: number;
@@ -35,6 +36,7 @@ async function withTimeout<T>(
 export function createGracefulShutdown({
   browserManager,
   client,
+  contextProvider,
   database = dbService,
   exit = process.exit,
   timeoutMs = 10000,
@@ -47,6 +49,15 @@ export function createGracefulShutdown({
 
     console.log(`[Worker] 收到 ${signal}，开始优雅关闭...`);
     client.disconnect();
+
+    if (contextProvider) {
+      try {
+        contextProvider.dispose();
+        console.log('[Worker] ContextProvider 已释放');
+      } catch (err) {
+        console.error('[Worker] 释放 ContextProvider 失败:', err);
+      }
+    }
 
     try {
       await withTimeout(browserManager.close(), timeoutMs, '关闭浏览器超时');

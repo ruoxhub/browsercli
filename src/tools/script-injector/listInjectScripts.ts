@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {ListInjectScriptsResult} from './types.js';
 import {getInjectConfigStore} from './createInjectScript.js';
+import type {ListInjectScriptsResult} from './types.js';
 
 /**
  * 列出所有已配置的注入脚本（纯函数版本）。

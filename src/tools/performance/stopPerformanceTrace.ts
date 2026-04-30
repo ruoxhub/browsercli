@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {logger} from '../../utils/logger.js';
 import {
   parseRawTraceBuffer,
   traceResultIsSuccess,
   getTraceSummary,
 } from '../../trace-processing/parse.js';
+import {logger} from '../../utils/logger.js';
+
 import type {
   PerformanceRuntimeServices,
   StopPerformanceTraceResult,

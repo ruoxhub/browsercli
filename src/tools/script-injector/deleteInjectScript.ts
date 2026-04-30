@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {DeleteInjectScriptResult} from './types.js';
 import {getInjectConfigStore} from './createInjectScript.js';
+import type {DeleteInjectScriptResult} from './types.js';
 
 /**
  * 删除注入脚本配置（纯函数版本）。

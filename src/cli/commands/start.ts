@@ -5,12 +5,13 @@
  */
 
 import type {AxiCliCommand} from 'axi-sdk-js';
-import type {WorkerContext} from '../types.js';
 import {AxiError} from 'axi-sdk-js';
+
+import {resolveConfig} from '../../config.js';
 import {parseArgs, getFlag, getBoolFlag} from '../args-parser.js';
 import {successOutput} from '../output.js';
 import {SekiroInvoker} from '../sekiro-invoker.js';
-import {resolveConfig} from '../../config.js';
+import type {WorkerContext} from '../types.js';
 
 const BROWSER_POLL_ATTEMPTS = 60;
 const BROWSER_POLL_INTERVAL_MS = 500;

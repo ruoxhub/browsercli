@@ -5,6 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+
 import {buildHookStoreRuntime} from './store-utils.js';
 import type {HookResult, ConsoleProtectMode} from './types.js';
 

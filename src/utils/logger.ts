@@ -15,8 +15,9 @@ import fs from 'node:fs';
 
 import chalk from 'chalk';
 
-import {safeStringify} from './safeJson.js';
 import {getEnvValue} from '../config.js';
+
+import {safeStringify} from './safeJson.js';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 

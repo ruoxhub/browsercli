@@ -5,13 +5,14 @@
  */
 
 import type {AnalyzerRuntimeServices, RiskPanelResult} from './types.js';
-import type {UnderstandCodeOptions} from '../../types/index.js';
 
 export async function riskPanel(
   runtime: AnalyzerRuntimeServices,
   params: {
     code?: string;
     topN?: number;
+    includeHookSignals?: boolean;
+    hookId?: string;
   },
 ): Promise<RiskPanelResult> {
   if (!runtime?.analyzer?.understand || !runtime?.cryptoDetector?.detect) {
@@ -35,12 +36,38 @@ export async function riskPanel(
     };
   }
 
+  let code = params.code;
+  if (!code) {
+    const top = runtime.collector.getTopPriorityFiles(params.topN ?? 5);
+    if (top.files.length === 0) {
+      return {
+        success: false,
+        message: 'No code provided and no collected files found. Run collect_code first.',
+        tooltype: 'riskPanel',
+        data: {
+          score: 0,
+          level: 'low',
+          factors: {
+            securityRisks: 0,
+            highSeverityRisks: 0,
+            cryptoAlgorithms: 0,
+            cryptoIssues: 0,
+            dangerousAlgorithms: [],
+            hookSignals: 0,
+          },
+          recommendations: [],
+        },
+      };
+    }
+    code = top.files.map(file => `// ${file.url}\n${file.content}`).join('\n\n');
+  }
+
   const [understand, crypto] = await Promise.all([
     runtime.analyzer.understand({
-      code: params.code ?? '',
+      code: code ?? '',
       focus: 'security',
     }),
-    runtime.cryptoDetector.detect({code: params.code ?? ''}),
+    runtime.cryptoDetector.detect({code: code ?? ''}),
   ]);
 
   const securityRisks = Array.isArray(understand.securityRisks)
@@ -66,10 +93,22 @@ export async function riskPanel(
     ),
   );
 
+  let hookSignalCount = 0;
+  if (params.includeHookSignals !== false) {
+    if (params.hookId) {
+      hookSignalCount = runtime.hookManager.getRecords(params.hookId).length;
+    } else {
+      hookSignalCount = runtime.hookManager
+        .getAllKnownHookIds()
+        .reduce((sum, hookId) => sum + runtime.hookManager.getRecords(hookId).length, 0);
+    }
+  }
+
   const rawScore =
     highSeverityCount * 20 +
     cryptoIssues.length * 15 +
-    dangerousAlgorithms.length * 10;
+    dangerousAlgorithms.length * 10 +
+    Math.min(hookSignalCount, 10) * 2;
 
   const score = Math.max(0, Math.min(100, rawScore));
   const level = score >= 70 ? 'high' : score >= 40 ? 'medium' : 'low';
@@ -80,6 +119,9 @@ export async function riskPanel(
       : null,
     dangerousAlgorithms.length > 0
       ? 'Replace weak crypto algorithms (MD5/SHA1/RC4/DES).'
+      : null,
+    hookSignalCount > 0
+      ? 'Review hook records to confirm if suspicious paths are expected.'
       : null,
   ].filter((item): item is string => Boolean(item));
 
@@ -98,7 +140,7 @@ export async function riskPanel(
         dangerousAlgorithms: dangerousAlgorithms.map(
           algo => algo.name ?? 'unknown',
         ),
-        hookSignals: 0,
+        hookSignals: hookSignalCount,
       },
       recommendations,
     },

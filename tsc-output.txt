@@ -1,0 +1,234 @@
+src/cli/commands/scaffold.ts(118,41): error TS2304: Cannot find name 'path'.
+src/cli/commands/scaffold.ts(118,67): error TS2304: Cannot find name 'path'.
+src/cli/commands/scaffold.ts(137,28): error TS2304: Cannot find name 'path'.
+src/cli/commands/scaffold.ts(137,68): error TS2304: Cannot find name 'path'.
+src/cli/commands/scaffold.ts(142,28): error TS2304: Cannot find name 'path'.
+src/cli/commands/scaffold.ts(142,68): error TS2304: Cannot find name 'path'.
+src/cli/commands/start.ts(96,7): error TS2353: Object literal may only specify known properties, and 'sekiroHost' does not exist in type 'WorkerStartOptions'.
+src/cli/worker-manager.ts(47,31): error TS2339: Property 'sekiroHost' does not exist on type 'WorkerStartOptions'.
+src/modules/collector/DOMInspector.ts(136,9): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(pageFunction: PageFunction<string, unknown>, arg: string, isolatedContext?: boolean): Promise<unknown>', gave the following error.
+    Argument of type '(sel: any, maxLimit: any) => any[]' is not assignable to parameter of type 'PageFunction<string, unknown>'.
+      Type '(sel: any, maxLimit: any) => any[]' is not assignable to type '(arg: string) => unknown'.
+        Target signature provides too few arguments. Expected 2 or more, but got 1.
+  Overload 2 of 2, '(pageFunction: PageFunction<void, unknown>, arg?: any, isolatedContext?: boolean): Promise<unknown>', gave the following error.
+    Argument of type '(sel: any, maxLimit: any) => any[]' is not assignable to parameter of type 'PageFunction<void, unknown>'.
+      Type '(sel: any, maxLimit: any) => any[]' is not assignable to type '(arg: void) => unknown'.
+        Target signature provides too few arguments. Expected 2 or more, but got 1.
+src/modules/collector/DOMInspector.ts(156,33): error TS2339: Property 'name' does not exist on type 'unknown'.
+src/modules/collector/DOMInspector.ts(156,46): error TS2339: Property 'value' does not exist on type 'unknown'.
+src/modules/collector/DOMInspector.ts(195,59): error TS2339: Property 'length' does not exist on type 'unknown'.
+src/modules/collector/DOMInspector.ts(197,7): error TS2740: Type '{}' is missing the following properties from type 'ElementInfo[]': length, pop, push, concat, and 35 more.
+src/modules/collector/DOMInspector.ts(212,9): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(pageFunction: PageFunction<any, any>, arg: any, isolatedContext?: boolean): Promise<any>', gave the following error.
+    Argument of type '(depth: any, withText: any) => any' is not assignable to parameter of type 'PageFunction<any, any>'.
+      Type '(depth: any, withText: any) => any' is not assignable to type '(arg: any) => any'.
+        Target signature provides too few arguments. Expected 2 or more, but got 1.
+  Overload 2 of 2, '(pageFunction: PageFunction<void, any>, arg?: any, isolatedContext?: boolean): Promise<any>', gave the following error.
+    Argument of type '(depth: any, withText: any) => any' is not assignable to parameter of type 'PageFunction<void, any>'.
+      Type '(depth: any, withText: any) => any' is not assignable to type '(arg: void) => any'.
+        Target signature provides too few arguments. Expected 2 or more, but got 1.
+src/modules/collector/DOMInspector.ts(520,9): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(pageFunction: PageFunction<string, unknown>, arg: string, isolatedContext?: boolean): Promise<unknown>', gave the following error.
+    Argument of type '(searchText: any, tagName: any) => any[]' is not assignable to parameter of type 'PageFunction<string, unknown>'.
+      Type '(searchText: any, tagName: any) => any[]' is not assignable to type '(arg: string) => unknown'.
+        Target signature provides too few arguments. Expected 2 or more, but got 1.
+  Overload 2 of 2, '(pageFunction: PageFunction<void, unknown>, arg?: any, isolatedContext?: boolean): Promise<unknown>', gave the following error.
+    Argument of type '(searchText: any, tagName: any) => any[]' is not assignable to parameter of type 'PageFunction<void, unknown>'.
+      Type '(searchText: any, tagName: any) => any[]' is not assignable to type '(arg: void) => unknown'.
+        Target signature provides too few arguments. Expected 2 or more, but got 1.
+src/modules/collector/DOMInspector.ts(587,61): error TS2339: Property 'length' does not exist on type 'unknown'.
+src/modules/collector/DOMInspector.ts(588,7): error TS2740: Type '{}' is missing the following properties from type 'ElementInfo[]': length, pop, push, concat, and 35 more.
+src/modules/collector/PageCollector.ts(134,39): error TS2339: Property 'pages' does not exist on type 'Browser'.
+src/modules/collector/PageCollector.ts(139,22): error TS2345: Argument of type '"targetcreated"' is not assignable to parameter of type '"disconnected"'.
+src/modules/collector/PageCollector.ts(140,22): error TS2345: Argument of type '"targetdestroyed"' is not assignable to parameter of type '"disconnected"'.
+src/modules/collector/PageCollector.ts(144,23): error TS2345: Argument of type '"targetcreated"' is not assignable to parameter of type '"disconnected"'.
+src/modules/collector/PageCollector.ts(145,23): error TS2345: Argument of type '"targetdestroyed"' is not assignable to parameter of type '"disconnected"'.
+src/modules/collector/PageCollector.ts(149,31): error TS2339: Property 'page' does not exist on type 'Target'.
+src/modules/collector/PageCollector.ts(157,31): error TS2339: Property 'page' does not exist on type 'Target'.
+src/modules/collector/PageCollector.ts(193,15): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Argument of type 'string' is not assignable to parameter of type '"worker"'.
+src/modules/collector/PageCollector.ts(213,18): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Argument of type 'string' is not assignable to parameter of type '"worker"'.
+src/modules/collector/PageCollector.ts(366,16): error TS2339: Property 'emit' does not exist on type 'Page'.
+src/modules/wasm/WasmCollector.ts(5,39): error TS2307: Cannot find module 'puppeteer' or its corresponding type declarations.
+src/modules/wasm/WasmCollector.ts(163,9): error TS2820: Type '"networkidle2"' is not assignable to type '"networkidle" | "load" | "domcontentloaded" | "commit"'. Did you mean '"networkidle"'?
+src/modules/wasm/WasmDecompiler.ts(1,25): error TS2307: Cannot find module 'wabt' or its corresponding type declarations.
+src/protocol/Client.ts(79,30): error TS2339: Property 'sekiroHost' does not exist on type 'RpcClientConfig'.
+src/protocol/Client.ts(126,17): error TS2339: Property 'sekiroHost' does not exist on type 'RpcClientConfig'.
+src/protocol/Client.ts(157,7): error TS2353: Object literal may only specify known properties, and 'sekiroHost' does not exist in type 'ClientStatus'.
+src/protocol/Client.ts(157,31): error TS2339: Property 'sekiroHost' does not exist on type 'RpcClientConfig'.
+src/tools/console/types.ts(8,14): error TS2724: '"../../third_party/index.js"' has no exported member named 'ConsoleMessageType'. Did you mean 'ConsoleMessage'?
+src/tools/debugger/evaluateInPageRuntime.ts(29,25): error TS2339: Property 'evaluate' does not exist on type 'never'.
+src/tools/dom/WaitForHelper.ts(47,47): error TS2339: Property 'isClosed' does not exist on type 'CDPSession'.
+src/tools/dom/WaitForHelper.ts(223,53): error TS2339: Property 'isClosed' does not exist on type 'CDPSession'.
+src/tools/hook/Fetch.ts(111,7): error TS2353: Object literal may only specify known properties, and 'data' does not exist in type 'HookResult'.
+src/tools/hook/Fetch.ts(123,7): error TS2353: Object literal may only specify known properties, and 'data' does not exist in type 'HookResult'.
+src/tools/network/WebSocketCollector.ts(121,39): error TS2339: Property 'pages' does not exist on type 'Browser'.
+src/tools/network/WebSocketCollector.ts(126,22): error TS2345: Argument of type '"targetcreated"' is not assignable to parameter of type '"disconnected"'.
+src/tools/network/WebSocketCollector.ts(127,22): error TS2345: Argument of type '"targetdestroyed"' is not assignable to parameter of type '"disconnected"'.
+src/tools/network/WebSocketCollector.ts(131,23): error TS2345: Argument of type '"targetcreated"' is not assignable to parameter of type '"disconnected"'.
+src/tools/network/WebSocketCollector.ts(132,23): error TS2345: Argument of type '"targetdestroyed"' is not assignable to parameter of type '"disconnected"'.
+src/tools/network/WebSocketCollector.ts(136,31): error TS2339: Property 'page' does not exist on type 'Target'.
+src/tools/network/WebSocketCollector.ts(144,31): error TS2339: Property 'page' does not exist on type 'Target'.
+src/tools/page/scrollBy.ts(31,7): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(pageFunction: PageFunction<"up" | "down" | "top" | "bottom", unknown>, arg: "up" | "down" | "top" | "bottom", isolatedContext?: boolean): Promise<unknown>', gave the following error.
+    Argument of type '(dir: any, px: any) => string' is not assignable to parameter of type 'PageFunction<"up" | "down" | "top" | "bottom", unknown>'.
+      Type '(dir: any, px: any) => string' is not assignable to type '(arg: "up" | "down" | "top" | "bottom") => unknown'.
+        Target signature provides too few arguments. Expected 2 or more, but got 1.
+  Overload 2 of 2, '(pageFunction: PageFunction<void, unknown>, arg?: any, isolatedContext?: boolean): Promise<unknown>', gave the following error.
+    Argument of type '(dir: any, px: any) => string' is not assignable to parameter of type 'PageFunction<void, unknown>'.
+      Type '(dir: any, px: any) => string' is not assignable to type '(arg: void) => unknown'.
+        Target signature provides too few arguments. Expected 2 or more, but got 1.
+src/tools/page/scrollBy.ts(62,9): error TS2322: Type 'unknown' is not assignable to type 'string'.
+src/tools/screenshot/captureVideoFrame.ts(35,9): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(pageFunction: PageFunction<string, unknown>, arg: string, isolatedContext?: boolean): Promise<unknown>', gave the following error.
+    Argument of type '(sel: any, t: any) => void' is not assignable to parameter of type 'PageFunction<string, unknown>'.
+      Type '(sel: any, t: any) => void' is not assignable to type '(arg: string) => unknown'.
+        Target signature provides too few arguments. Expected 2 or more, but got 1.
+  Overload 2 of 2, '(pageFunction: PageFunction<void, unknown>, arg?: any, isolatedContext?: boolean): Promise<unknown>', gave the following error.
+    Argument of type '(sel: any, t: any) => void' is not assignable to parameter of type 'PageFunction<void, unknown>'.
+      Type '(sel: any, t: any) => void' is not assignable to type '(arg: void) => unknown'.
+        Target signature provides too few arguments. Expected 2 or more, but got 1.
+src/tools/screenshot/seekVideo.ts(29,7): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(pageFunction: PageFunction<string, unknown>, arg: string, isolatedContext?: boolean): Promise<unknown>', gave the following error.
+    Argument of type '(sel: any, t: any) => void' is not assignable to parameter of type 'PageFunction<string, unknown>'.
+      Type '(sel: any, t: any) => void' is not assignable to type '(arg: string) => unknown'.
+        Target signature provides too few arguments. Expected 2 or more, but got 1.
+  Overload 2 of 2, '(pageFunction: PageFunction<void, unknown>, arg?: any, isolatedContext?: boolean): Promise<unknown>', gave the following error.
+    Argument of type '(sel: any, t: any) => void' is not assignable to parameter of type 'PageFunction<void, unknown>'.
+      Type '(sel: any, t: any) => void' is not assignable to type '(arg: void) => unknown'.
+        Target signature provides too few arguments. Expected 2 or more, but got 1.
+src/tools/screenshot/takeScreenshot.ts(56,9): error TS2353: Object literal may only specify known properties, and 'optimizeForSpeed' does not exist in type 'PageScreenshotOptions'.
+src/tools/workflow/autoHook.ts(899,41): error TS2345: Argument of type '() => { name: string; detected: boolean; }[]' is not assignable to parameter of type 'string'.
+src/utils/keyboard.ts(7,14): error TS2305: Module '"../third_party/index.js"' has no exported member 'KeyInput'.
+src/worker/WorkerArgs.ts(11,28): error TS2344: Type '"headless" | "sekiroHost" | "group"' does not satisfy the constraint 'keyof WorkerStartOptions'.
+  Type '"sekiroHost"' is not assignable to type 'keyof WorkerStartOptions'.
+src/worker/WorkerArgs.ts(69,5): error TS2353: Object literal may only specify known properties, and 'sekiroHost' does not exist in type 'WorkerStartOptions'.
+tests/bin/repl.test.ts(10,60): error TS2307: Cannot find module '../../src/bin/repl.js' or its corresponding type declarations.
+tests/bin/scaffold.test.ts(12,25): error TS2307: Cannot find module '../../src/bin/scaffold.js' or its corresponding type declarations.
+tests/integration/gemini-cli.integration.test.ts(20,32): error TS2307: Cannot find module '../../src/services/GeminiProvider.js' or its corresponding type declarations.
+tests/integration/jshook-e2e.integration.test.ts(12,30): error TS2307: Cannot find module '../../src/services/GeminiProvider.js' or its corresponding type declarations.
+tests/manual/test-browser-manager.ts(19,30): error TS2307: Cannot find module '../../src/browser.js' or its corresponding type declarations.
+tests/manual/test-gemini-provider.ts(14,32): error TS2307: Cannot find module '../../src/services/GeminiProvider.js' or its corresponding type declarations.
+tests/property/AIService.property.test.ts(23,35): error TS2307: Cannot find module '../../src/services/AnthropicProvider.js' or its corresponding type declarations.
+tests/property/AIService.property.test.ts(24,32): error TS2307: Cannot find module '../../src/services/GeminiProvider.js' or its corresponding type declarations.
+tests/property/backward-compatibility.property.test.ts(13,30): error TS2307: Cannot find module '../../src/tools/script.js' or its corresponding type declarations.
+tests/property/jshook-tools.property.test.ts(14,29): error TS2307: Cannot find module '../../src/tools/analyzer.js' or its corresponding type declarations.
+tests/property/jshook-tools.property.test.ts(15,27): error TS2307: Cannot find module '../../src/tools/collector.js' or its corresponding type declarations.
+tests/property/jshook-tools.property.test.ts(16,24): error TS2307: Cannot find module '../../src/tools/dom.js' or its corresponding type declarations.
+tests/property/jshook-tools.property.test.ts(17,26): error TS2307: Cannot find module '../../src/tools/hook.js' or its corresponding type declarations.
+tests/property/jshook-tools.property.test.ts(18,28): error TS2307: Cannot find module '../../src/tools/page.js' or its corresponding type declarations.
+tests/property/jshook-tools.property.test.ts(19,29): error TS2307: Cannot find module '../../src/tools/stealth.js' or its corresponding type declarations.
+tests/property/ToolRegistry.property.test.ts(12,28): error TS2307: Cannot find module '../../src/tools/categories.js' or its corresponding type declarations.
+tests/property/ToolRegistry.property.test.ts(13,28): error TS2307: Cannot find module '../../src/tools/ToolRegistry.js' or its corresponding type declarations.
+tests/unit/browser/browser.mocked.test.ts(14,8): error TS2307: Cannot find module '../../../src/browser.js' or its corresponding type declarations.
+tests/unit/browser/browser.mocked.test.ts(19,9): error TS2305: Module '"../../../src/third_party/index.js"' has no exported member 'puppeteer'.
+tests/unit/browser/BrowserManager.crash.test.ts(9,30): error TS2307: Cannot find module '../../../src/browser.js' or its corresponding type declarations.
+tests/unit/browser/BrowserManager.mocked.test.ts(12,8): error TS2307: Cannot find module '../../../src/browser.js' or its corresponding type declarations.
+tests/unit/browser/BrowserManager.test.ts(16,30): error TS2307: Cannot find module '../../../src/browser.js' or its corresponding type declarations.
+tests/unit/cli/output.test.ts(11,3): error TS2305: Module '"../../../src/cli/output.js"' has no exported member 'renderError'.
+tests/unit/cli/output.test.ts(12,3): error TS2305: Module '"../../../src/cli/output.js"' has no exported member 'renderOutput'.
+tests/unit/cli/start.test.ts(62,35): error TS2339: Property 'sekiroHost' does not exist on type 'WorkerStartOptions'.
+tests/unit/compat/backward-compatibility.test.ts(11,31): error TS2307: Cannot find module '../../../src/tools/console.js' or its corresponding type declarations.
+tests/unit/compat/backward-compatibility.test.ts(12,32): error TS2307: Cannot find module '../../../src/tools/debugger.js' or its corresponding type declarations.
+tests/unit/compat/backward-compatibility.test.ts(13,31): error TS2307: Cannot find module '../../../src/tools/network.js' or its corresponding type declarations.
+tests/unit/compat/backward-compatibility.test.ts(14,29): error TS2307: Cannot find module '../../../src/tools/pages.js' or its corresponding type declarations.
+tests/unit/compat/backward-compatibility.test.ts(15,34): error TS2307: Cannot find module '../../../src/tools/screenshot.js' or its corresponding type declarations.
+tests/unit/compat/backward-compatibility.test.ts(16,30): error TS2307: Cannot find module '../../../src/tools/script.js' or its corresponding type declarations.
+tests/unit/daemon/client.test.ts(19,8): error TS2307: Cannot find module '../../../src/daemon/client.js' or its corresponding type declarations.
+tests/unit/daemon/client.test.ts(20,14): error TS2305: Module '"../../../src/third_party/index.js"' has no exported member 'CallToolResult'.
+tests/unit/daemon/utils.test.ts(10,43): error TS2307: Cannot find module '../../../src/daemon/utils.js' or its corresponding type declarations.
+tests/unit/formatters/console-network-formatters.test.ts(51,17): error TS2352: Conversion of type '{ buffer: () => Promise<Buffer<ArrayBufferLike>>; }' to type 'Response' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ buffer: () => Promise<Buffer<ArrayBufferLike>>; }' is missing the following properties from type 'Response': allHeaders, body, finished, frame, and 15 more.
+tests/unit/McpResponse.network.test.ts(9,27): error TS2307: Cannot find module '../../src/McpResponse.js' or its corresponding type declarations.
+tests/unit/services/AnthropicProvider.mocked.test.ts(14,35): error TS2307: Cannot find module '../../../src/services/AnthropicProvider.js' or its corresponding type declarations.
+tests/unit/services/AnthropicProvider.test.ts(9,35): error TS2307: Cannot find module '../../../src/services/AnthropicProvider.js' or its corresponding type declarations.
+tests/unit/services/GeminiProvider.extended.test.ts(12,32): error TS2307: Cannot find module '../../../src/services/GeminiProvider.js' or its corresponding type declarations.
+tests/unit/services/GeminiProvider.test.ts(9,32): error TS2307: Cannot find module '../../../src/services/GeminiProvider.js' or its corresponding type declarations.
+tests/unit/tools/debugger-tools.extended.test.ts(40,8): error TS2307: Cannot find module '../../../src/tools/debugger.js' or its corresponding type declarations.
+tests/unit/tools/debugger-tools.extended.test.ts(41,39): error TS2307: Cannot find module '../../../src/tools/frames.js' or its corresponding type declarations.
+tests/unit/tools/debugger-tools.extended.test.ts(42,32): error TS2307: Cannot find module '../../../src/tools/runtime.js' or its corresponding type declarations.
+tests/unit/tools/debugger-tools.extended.test.ts(944,46): error TS2307: Cannot find module '../../../src/tools/debugger.js' or its corresponding type declarations.
+tests/unit/tools/hook-functions.test.ts(17,8): error TS2307: Cannot find module '../../../src/tools/hook.js' or its corresponding type declarations.
+tests/unit/tools/jshook-tools.handlers.test.ts(21,8): error TS2307: Cannot find module '../../../src/tools/analyzer.js' or its corresponding type declarations.
+tests/unit/tools/jshook-tools.handlers.test.ts(26,8): error TS2307: Cannot find module '../../../src/tools/collector.js' or its corresponding type declarations.
+tests/unit/tools/jshook-tools.handlers.test.ts(31,8): error TS2307: Cannot find module '../../../src/tools/dom.js' or its corresponding type declarations.
+tests/unit/tools/jshook-tools.handlers.test.ts(37,8): error TS2307: Cannot find module '../../../src/tools/hook.js' or its corresponding type declarations.
+tests/unit/tools/jshook-tools.handlers.test.ts(49,8): error TS2307: Cannot find module '../../../src/tools/page.js' or its corresponding type declarations.
+tests/unit/tools/jshook-tools.handlers.test.ts(50,37): error TS2307: Cannot find module '../../../src/tools/performance.js' or its corresponding type declarations.
+tests/unit/tools/jshook-tools.handlers.test.ts(51,32): error TS2307: Cannot find module '../../../src/tools/runtime.js' or its corresponding type declarations.
+tests/unit/tools/jshook-tools.handlers.test.ts(57,8): error TS2307: Cannot find module '../../../src/tools/stealth.js' or its corresponding type declarations.
+tests/unit/tools/jshook-tools.test.ts(15,8): error TS2307: Cannot find module '../../../src/tools/analyzer.js' or its corresponding type declarations.
+tests/unit/tools/jshook-tools.test.ts(16,43): error TS2307: Cannot find module '../../../src/tools/collector.js' or its corresponding type declarations.
+tests/unit/tools/jshook-tools.test.ts(17,24): error TS2307: Cannot find module '../../../src/tools/dom.js' or its corresponding type declarations.
+tests/unit/tools/jshook-tools.test.ts(23,8): error TS2307: Cannot find module '../../../src/tools/hook.js' or its corresponding type declarations.
+tests/unit/tools/jshook-tools.test.ts(24,30): error TS2307: Cannot find module '../../../src/tools/hook/hookConsoleLog.js' or its corresponding type declarations.
+tests/unit/tools/jshook-tools.test.ts(25,32): error TS2307: Cannot find module '../../../src/tools/hook/hookConsoleTable.js' or its corresponding type declarations.
+tests/unit/tools/jshook-tools.test.ts(26,32): error TS2307: Cannot find module '../../../src/tools/hook/hookLocationHref.js' or its corresponding type declarations.
+tests/unit/tools/jshook-tools.test.ts(27,26): error TS2307: Cannot find module '../../../src/tools/hook/hookCookie.js' or its corresponding type declarations.
+tests/unit/tools/jshook-tools.test.ts(28,27): error TS2307: Cannot find module '../../../src/tools/hook/hookXhrOpen.js' or its corresponding type declarations.
+tests/unit/tools/jshook-tools.test.ts(29,39): error TS2307: Cannot find module '../../../src/tools/hook/hookXhrSetRequestHeader.js' or its corresponding type declarations.
+tests/unit/tools/jshook-tools.test.ts(30,25): error TS2307: Cannot find module '../../../src/tools/hook/hookFetch.js' or its corresponding type declarations.
+tests/unit/tools/jshook-tools.test.ts(31,29): error TS2307: Cannot find module '../../../src/tools/hook/hookJsonParse.js' or its corresponding type declarations.
+tests/unit/tools/jshook-tools.test.ts(32,33): error TS2307: Cannot find module '../../../src/tools/hook/hookJsonStringify.js' or its corresponding type declarations.
+tests/unit/tools/jshook-tools.test.ts(33,27): error TS2307: Cannot find module '../../../src/tools/hook/hookPromise.js' or its corresponding type declarations.
+tests/unit/tools/jshook-tools.test.ts(34,26): error TS2307: Cannot find module '../../../src/tools/hook/hookRandom.js' or its corresponding type declarations.
+tests/unit/tools/jshook-tools.test.ts(35,32): error TS2307: Cannot find module '../../../src/tools/hook/hookLocalStorage.js' or its corresponding type declarations.
+tests/unit/tools/jshook-tools.test.ts(36,34): error TS2307: Cannot find module '../../../src/tools/hook/hookSessionStorage.js' or its corresponding type declarations.
+tests/unit/tools/jshook-tools.test.ts(38,29): error TS2307: Cannot find module '../../../src/tools/hook/hookWebSocket.js' or its corresponding type declarations.
+tests/unit/tools/jshook-tools.test.ts(39,27): error TS2307: Cannot find module '../../../src/tools/hook/hookHistory.js' or its corresponding type declarations.
+tests/unit/tools/jshook-tools.test.ts(40,34): error TS2307: Cannot find module '../../../src/tools/hook/hookPerformanceNow.js' or its corresponding type declarations.
+tests/unit/tools/jshook-tools.test.ts(41,27): error TS2307: Cannot find module '../../../src/tools/hook/hookDateNow.js' or its corresponding type declarations.
+tests/unit/tools/jshook-tools.test.ts(43,34): error TS2307: Cannot find module '../../../src/tools/hook/hookConsoleProtect.js' or its corresponding type declarations.
+tests/unit/tools/jshook-tools.test.ts(56,8): error TS2307: Cannot find module '../../../src/tools/page.js' or its corresponding type declarations.
+tests/unit/tools/jshook-tools.test.ts(57,29): error TS2307: Cannot find module '../../../src/tools/stealth.js' or its corresponding type declarations.
+tests/unit/tools/jshook-tools.test.ts(314,52): error TS2339: Property 'schema' does not exist on type '(frame: Frame, hookedMethods?: string[]) => Promise<HookResult>'.
+tests/unit/tools/jshook-tools.test.ts(377,50): error TS2339: Property 'schema' does not exist on type '(frame: Frame, innerHeight?: number, innerWidth?: number, outerHeight?: number, outerWidth?: number) => Promise<HookResult>'.
+tests/unit/tools/jshook-tools.test.ts(407,57): error TS2339: Property 'schema' does not exist on type '(frame: Frame, guards?: VueGuard[]) => Promise<HookResult>'.
+tests/unit/tools/jshook-tools.test.ts(421,50): error TS2339: Property 'schema' does not exist on type '(frame: Frame, includeChildren?: boolean, maxDepth?: number) => Promise<HookResult>'.
+tests/unit/tools/jshook-tools.test.ts(433,62): error TS2339: Property 'schema' does not exist on type '(frame: Frame) => Promise<HookResult>'.
+tests/unit/tools/rebuild.test.ts(17,8): error TS2307: Cannot find module '../../../src/tools/rebuild.js' or its corresponding type declarations.
+tests/unit/tools/rebuild.test.ts(18,32): error TS2307: Cannot find module '../../../src/tools/runtime.js' or its corresponding type declarations.
+tests/unit/tools/reverse-task-tools.test.ts(17,8): error TS2307: Cannot find module '../../../src/tools/analyzer.js' or its corresponding type declarations.
+tests/unit/tools/reverse-task-tools.test.ts(18,27): error TS2307: Cannot find module '../../../src/tools/hook.js' or its corresponding type declarations.
+tests/unit/tools/reverse-task-tools.test.ts(19,32): error TS2307: Cannot find module '../../../src/tools/runtime.js' or its corresponding type declarations.
+tests/unit/tools/script-eval-callback.test.ts(272,7): error TS2352: Conversion of type '{ getSelectedFrame: () => FrameLike; getSelectedPage: () => any; getDebuggerContext: () => Promise<{ getExecutionContexts(): ExecutionContextInfo[]; getClient(): CDPSession | null; }>; }' to type 'ScriptRuntime' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  The types returned by 'getSelectedFrame()' are incompatible between these types.
+    Type 'FrameLike' is missing the following properties from type 'Frame': $, $$, $eval, $$eval, and 54 more.
+tests/unit/tools/script-eval-callback.test.ts(299,7): error TS2352: Conversion of type '{ getSelectedFrame: () => FrameLike; getSelectedPage: () => any; getDebuggerContext: () => Promise<never>; }' to type 'ScriptRuntime' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  The types returned by 'getSelectedFrame()' are incompatible between these types.
+    Type 'FrameLike' is missing the following properties from type 'Frame': $, $$, $eval, $$eval, and 54 more.
+tests/unit/tools/script-eval-callback.test.ts(346,7): error TS2352: Conversion of type '{ getSelectedFrame: () => FrameLike; getSelectedPage: () => any; getDebuggerContext: () => Promise<{ getExecutionContexts(): ExecutionContextInfo[]; getClient(): CDPSession | null; }>; }' to type 'ScriptRuntime' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  The types returned by 'getSelectedFrame()' are incompatible between these types.
+    Type 'FrameLike' is missing the following properties from type 'Frame': $, $$, $eval, $$eval, and 54 more.
+tests/unit/tools/ToolDefinition.extended.test.ts(10,30): error TS2307: Cannot find module '../../../src/tools/categories.js' or its corresponding type declarations.
+tests/unit/tools/ToolDefinition.extended.test.ts(11,61): error TS2307: Cannot find module '../../../src/tools/ToolDefinition.js' or its corresponding type declarations.
+tests/unit/tools/ToolRegistry.test.ts(10,28): error TS2307: Cannot find module '../../../src/tools/categories.js' or its corresponding type declarations.
+tests/unit/tools/ToolRegistry.test.ts(11,28): error TS2307: Cannot find module '../../../src/tools/ToolRegistry.js' or its corresponding type declarations.
+tests/unit/tools/vue-tools.test.ts(18,37): error TS2339: Property 'description' does not exist on type '(frame: Frame) => Promise<HookResult>'.
+tests/unit/tools/vue-tools.test.ts(19,46): error TS2339: Property 'annotations' does not exist on type '(frame: Frame) => Promise<HookResult>'.
+tests/unit/tools/vue-tools.test.ts(20,50): error TS2339: Property 'schema' does not exist on type '(frame: Frame) => Promise<HookResult>'.
+tests/unit/tools/vue-tools.test.ts(24,53): error TS2339: Property 'handler' does not exist on type '(frame: Frame) => Promise<HookResult>'.
+tests/unit/tools/vue-tools.test.ts(26,29): error TS2339: Property 'handler' does not exist on type '(frame: Frame) => Promise<HookResult>'.
+tests/unit/tools/vue-tools.test.ts(35,32): error TS2339: Property 'description' does not exist on type '(frame: Frame, guards?: VueGuard[]) => Promise<HookResult>'.
+tests/unit/tools/vue-tools.test.ts(36,41): error TS2339: Property 'annotations' does not exist on type '(frame: Frame, guards?: VueGuard[]) => Promise<HookResult>'.
+tests/unit/tools/vue-tools.test.ts(40,37): error TS2339: Property 'schema' does not exist on type '(frame: Frame, guards?: VueGuard[]) => Promise<HookResult>'.
+tests/unit/tools/vue-tools.test.ts(45,48): error TS2339: Property 'handler' does not exist on type '(frame: Frame, guards?: VueGuard[]) => Promise<HookResult>'.
+tests/unit/tools/vue-tools.test.ts(47,24): error TS2339: Property 'handler' does not exist on type '(frame: Frame, guards?: VueGuard[]) => Promise<HookResult>'.
+tests/unit/tools/vue-tools.test.ts(56,30): error TS2339: Property 'description' does not exist on type '(frame: Frame, includeChildren?: boolean, maxDepth?: number) => Promise<HookResult>'.
+tests/unit/tools/vue-tools.test.ts(57,39): error TS2339: Property 'annotations' does not exist on type '(frame: Frame, includeChildren?: boolean, maxDepth?: number) => Promise<HookResult>'.
+tests/unit/tools/vue-tools.test.ts(61,35): error TS2339: Property 'schema' does not exist on type '(frame: Frame, includeChildren?: boolean, maxDepth?: number) => Promise<HookResult>'.
+tests/unit/tools/vue-tools.test.ts(67,46): error TS2339: Property 'handler' does not exist on type '(frame: Frame, includeChildren?: boolean, maxDepth?: number) => Promise<HookResult>'.
+tests/unit/tools/vue-tools.test.ts(69,22): error TS2339: Property 'handler' does not exist on type '(frame: Frame, includeChildren?: boolean, maxDepth?: number) => Promise<HookResult>'.
+tests/unit/tools/vue-tools.test.ts(79,35): error TS2339: Property 'handler' does not exist on type '(frame: Frame) => Promise<HookResult>'.
+tests/unit/tools/vue-tools.test.ts(84,30): error TS2339: Property 'handler' does not exist on type '(frame: Frame, guards?: VueGuard[]) => Promise<HookResult>'.
+tests/unit/tools/vue-tools.test.ts(89,28): error TS2339: Property 'handler' does not exist on type '(frame: Frame, includeChildren?: boolean, maxDepth?: number) => Promise<HookResult>'.
+tests/unit/tools/workflow/observeFlow.test.ts(707,41): error TS2353: Object literal may only specify known properties, and 'url' does not exist in type 'ObserveFlowRuntimeServices'.
+tests/unit/tools/workflow/observeFlow.test.ts(716,28): error TS2554: Expected 1-2 arguments, but got 0.
+tests/unit/worker/ToolAdapter.test.ts(43,11): error TS2345: Argument of type '{ params: { url: string; }; }' is not assignable to parameter of type 'RpcRequest'.
+  Type '{ params: { url: string; }; }' is missing the following properties from type 'RpcRequest': __sekiro_seq__, action
+tests/unit/worker/ToolAdapter.test.ts(98,11): error TS2345: Argument of type '{ params: { hookId: string; }; }' is not assignable to parameter of type 'RpcRequest'.
+  Type '{ params: { hookId: string; }; }' is missing the following properties from type 'RpcRequest': __sekiro_seq__, action

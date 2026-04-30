@@ -12,8 +12,8 @@ import {
 } from 'node:crypto';
 import {readFile, writeFile} from 'node:fs/promises';
 
-import {validateOutputPath} from '../../utils/fsSafe.js';
 import {getEnvValue, getEnvNumber} from '../../config.js';
+import {validateOutputPath} from '../../utils/fsSafe.js';
 import {
   getActivePageWithGuard,
   normalizeBrowserRuntimeError,

@@ -6,12 +6,13 @@
 
 import type {Page} from 'patchright';
 
-import type {ToolContextProvider} from '../../worker/ToolContextProvider.js';
 import type {
   BreakpointInfo,
   PausedState,
   ScriptInfo,
 } from '../../utils/DebuggerContext.js';
+import type {ToolContextProvider} from '../../worker/ToolContextProvider.js';
+
 import {hookFunction as hookFunctionImpl} from './hookFunction.js';
 import type {DebuggerResult} from './types.js';
 

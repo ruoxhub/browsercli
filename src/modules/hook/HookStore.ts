@@ -6,9 +6,7 @@
 
 export const DEFAULT_HOOK_STORE_KEY = '__hookStore';
 
-export interface HookStoreSnapshot<RecordType> {
-  [hookId: string]: RecordType[];
-}
+export type HookStoreSnapshot<RecordType> = Record<string, RecordType[]>;
 
 export class HookStore<RecordType> {
   private readonly recordsByHook = new Map<string, RecordType[]>();
