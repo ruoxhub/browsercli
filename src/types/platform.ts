@@ -16,8 +16,8 @@ import type {ActionHandler} from './rpc.js';
 interface RpcClientConfig {
   /** 分组名 */
   group: string;
-  /** Sekiro Server 地址，如 ws://127.0.0.1:5612 */
-  sekiroHost: string;
+  /** rpc Server 地址，如 ws://127.0.0.1:5612 */
+  rpcHost: string;
   /** 客户端 ID（默认自动生成） */
   clientId?: string;
   /** 重连基础间隔 ms */
@@ -36,15 +36,15 @@ interface ClientStatus {
   group: string;
   clientId: string;
   actionCount: number;
-  sekiroHost: string;
+  rpcHost: string;
 }
 
 // ==================== Worker 配置 ====================
 
 /** Worker 启动选项 */
 interface WorkerStartOptions {
-  /** Sekiro Server 地址 */
-  sekiroHost: string;
+  /** rpc Server 地址 */
+  rpcHost: string;
   /** 分组名 */
   group: string;
   /** 浏览器调试 URL */

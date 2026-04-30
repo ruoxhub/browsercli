@@ -9,6 +9,10 @@
  *
  * 实现各工具模块的 XxxRuntimeServices 接口，
  * 作为 ToolAdapter 与纯函数工具之间的桥梁。
+ *
+ * 设计参考 McpContext：所有上下文状态（Browser、Page、Network、Debugger
+ * 以及各分析/Hook/Wasm 模块）统一聚合到本类，避免在 runtime.ts
+ * 与 Worker 入口之间重复创建服务实例。
  */
 
 import type {
@@ -20,16 +24,17 @@ import type {
   Request,
 } from 'patchright';
 
-import {AISummarizer} from '../modules/analyzer/AISummarizer.js';
-import {CodeAnalyzer} from '../modules/analyzer/CodeAnalyzer.js';
-import {CryptoDetector} from '../modules/crypto/CryptoDetector.js';
-import {Deobfuscator} from '../modules/deobfuscator/Deobfuscator.js';
-import {LLMService} from '../services/LLMService.js';
+import type {Runtime} from '../runtime.js';
 import type {HTTPRequest} from '../third_party/index.js';
 import type {RequestInitiator} from '../tools/network/types.js';
 import {BrowserManager} from '../browser/index.js';
 import {CodeCollector} from '../modules/collector/CodeCollector.js';
 import {DebuggerContext} from '../utils/DebuggerContext.js';
+import {AISummarizer} from '../modules/analyzer/AISummarizer.js';
+import {CodeAnalyzer} from '../modules/analyzer/CodeAnalyzer.js';
+import {CryptoDetector} from '../modules/crypto/CryptoDetector.js';
+import {Deobfuscator} from '../modules/deobfuscator/Deobfuscator.js';
+import {LLMService} from '../services/LLMService.js';
 
 type TraceResult = unknown;
 
@@ -56,15 +61,16 @@ export class ToolContextProvider {
   private _context: BrowserContext | null = null;
   private _isRunningPerformanceTrace = false;
   private _traceRecordings: TraceResult[] = [];
-  private _llmService: LLMService | null = null;
-  private _deobfuscator: Deobfuscator | null = null;
-  private _analyzer: CodeAnalyzer | null = null;
-  private _summarizer: AISummarizer | null = null;
-  private _cryptoDetector: CryptoDetector | null = null;
   private _debuggerContexts = new WeakMap<Page, DebuggerContext>();
   private _debuggerSessions = new WeakMap<Page, CDPSession>();
   private _browserManager: BrowserManager | null = null;
   private _collector: CodeCollector | null = null;
+
+  /**
+   * 聚合的 Runtime 实例。若传入，则所有分析/Hook/Wasm 服务均从 Runtime
+   * 复用，避免重复创建。
+   */
+  private _runtime: Runtime | null = null;
 
   // ─── 网络请求收集 ────────────────────────────────────
   private _networkStorage = new WeakMap<Page, PageRequestStorage>();
@@ -76,6 +82,14 @@ export class ToolContextProvider {
   >();
   private _contextListener: {onPage: (page: Page) => void} | null = null;
 
+  constructor(runtime?: Runtime) {
+    if (runtime) {
+      this._runtime = runtime;
+      this._browserManager = runtime.browserManager;
+      this._collector = runtime.collector;
+    }
+  }
+
   // ─── Browser / Context 管理 ──────────────────────────
 
   setBrowser(browser: Browser): void {
@@ -83,7 +97,7 @@ export class ToolContextProvider {
   }
 
   getBrowser(): Browser | null {
-    return this._browser;
+    return this._browser ?? this._browserManager?.getBrowser() ?? null;
   }
 
   setBrowserManager(browserManager: BrowserManager): void {
@@ -253,32 +267,36 @@ export class ToolContextProvider {
 
   // ─── AnalyzerRuntimeServices ───────────────────────────
 
-  get deobfuscator(): Deobfuscator {
-    if (!this._deobfuscator) {
-      this._deobfuscator = new Deobfuscator(this._getLlmService());
-    }
-    return this._deobfuscator;
+  get deobfuscator() {
+    return this._runtime?.deobfuscator ?? this._fallbackDeobfuscator();
   }
 
-  get analyzer(): CodeAnalyzer {
-    if (!this._analyzer) {
-      this._analyzer = new CodeAnalyzer(this._getLlmService());
-    }
-    return this._analyzer;
+  private _fallbackDeobfuscator() {
+    return new Deobfuscator(this._getLlmService());
   }
 
-  get summarizer(): AISummarizer {
-    if (!this._summarizer) {
-      this._summarizer = new AISummarizer(this._getLlmService());
-    }
-    return this._summarizer;
+  get analyzer() {
+    return this._runtime?.analyzer ?? this._fallbackAnalyzer();
   }
 
-  get cryptoDetector(): CryptoDetector {
-    if (!this._cryptoDetector) {
-      this._cryptoDetector = new CryptoDetector(this._getLlmService());
-    }
-    return this._cryptoDetector;
+  private _fallbackAnalyzer() {
+    return new CodeAnalyzer(this._getLlmService());
+  }
+
+  get summarizer() {
+    return this._runtime?.summarizer ?? this._fallbackSummarizer();
+  }
+
+  private _fallbackSummarizer() {
+    return new AISummarizer(this._getLlmService());
+  }
+
+  get cryptoDetector() {
+    return this._runtime?.cryptoDetector ?? this._fallbackCryptoDetector();
+  }
+
+  private _fallbackCryptoDetector() {
+    return new CryptoDetector(this._getLlmService());
   }
 
   isBrowserConnected(): boolean {
@@ -556,7 +574,12 @@ export class ToolContextProvider {
     return this._traceRecordings;
   }
 
+  private _llmService: LLMService | null = null;
+
   private _getLlmService(): LLMService {
+    if (this._runtime?.llmService) {
+      return this._runtime.llmService;
+    }
     if (!this._llmService) {
       this._llmService = new LLMService();
     }

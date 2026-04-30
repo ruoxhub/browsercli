@@ -5,20 +5,19 @@
  */
 
 /**
- * Worker — Sekiro Worker 进程入口
+ * Worker — Rpc Worker 进程入口
  *
  * 职责：
  * 1. 解析 CLI 参数
  * 2. 初始化 BrowserManager (连接/启动浏览器)
  * 3. 初始化 ToolContextProvider
- * 4. 创建 RpcClient，连接到 Sekiro Server
- * 5. 通过 ToolAdapter 注册所有 Tools 为 Sekiro Actions
+ * 4. 创建 RpcClient，连接到 Rpc Server
+ * 5. 通过 ToolAdapter 注册所有 Tools 为 Rpc Actions
  * 6. 进入运行状态，等待 Server 转发请求
  */
 
-import {BrowserManager} from './browser/index.js';
-import type {BrowserManagerConfig} from './browser/index.js';
-import {resolveConfig, getEnvBoolean} from './config.js';
+import {resolveConfig} from './config.js';
+import {getRuntime} from './runtime.js';
 import {RpcClient} from './protocol/Client.js';
 import {dbService} from './services/DatabaseService.js';
 import {registerBuiltinActions} from './worker/BuiltinActions.js';
@@ -37,7 +36,7 @@ async function main(): Promise<void> {
   const options = toWorkerOptions(resolved);
 
   console.log('[Worker] 启动中...');
-  console.log(`[Worker] Sekiro Host: ${options.sekiroHost}`);
+  console.log(`[Worker] Rpc Host: ${options.rpcHost}`);
   console.log(`[Worker] Group: ${options.group}`);
 
   if (options.databaseUrl) {
@@ -46,56 +45,37 @@ async function main(): Promise<void> {
     console.log('[Worker] 数据库已连接并完成迁移');
   }
 
-  // 2. 初始化 ToolContextProvider
-  const contextProvider = new ToolContextProvider();
+  // 2. 初始化聚合 Runtime（统一创建 BrowserManager、Collector、LLM 等）
+  const runtime = getRuntime(options);
 
-  // 3. 初始化 BrowserManager，将 Page 注入 contextProvider
-  // 浏览器配置也从 config.ts 获取（支持 config.json / .env 等）
-  const browserConfig: BrowserManagerConfig = {
-    browserURL: options.browserUrl,
-    wsEndpoint: options.wsEndpoint,
-    headless: options.headless,
-    executablePath: options.executablePath,
-    useStealthScripts: getEnvBoolean('USE_STEALTH_SCRIPTS') ?? true,
-  };
+  // 4. 将 Runtime 注入 ToolContextProvider，复用同一套服务实例
+  const contextProvider = new ToolContextProvider(runtime);
 
-  const browserManager = BrowserManager.getInstance(browserConfig);
-  const browser = await browserManager.ensureBrowser();
-  console.log(
-    `[Worker] 浏览器已${options.browserUrl || options.wsEndpoint ? '连接' : '启动'}: v${browser.version()}`,
-  );
-
-  // 获取当前页面并注入 contextProvider
-  const page = await browserManager.newPage();
-  const context = browser.contexts()[0] ?? page.context();
-  contextProvider.setSelectedPage(page);
-  contextProvider.setPages(context.pages());
-  contextProvider.setBrowser(browser);
-  contextProvider.setContext(context);
-  contextProvider.setBrowserManager(browserManager);
-
-  // 3. 创建 RpcClient
+  // 5. 创建 RpcClient
   const client = new RpcClient({
     group: options.group,
-    sekiroHost: options.sekiroHost,
+    rpcHost: options.rpcHost,
   });
 
-  // 4. 注册内置 Actions
+  // 6. 注册内置 Actions
   registerBuiltinActions(client);
 
-  // 5. 通过 ToolAdapter 注册所有 Tools
+  // 7. 通过 ToolAdapter 注册所有 Tools
   const toolAdapter = new ToolAdapter(contextProvider);
   await toolAdapter.registerAll((name, handler) => {
     client.registerAction(name, handler);
   });
 
-  // 6. 连接到 Sekiro Server
+  // 8. 连接到 Rpc Server
   await client.start();
 
-  console.log('[Worker] 已启动并连接到 Sekiro Server');
+  console.log('[Worker] 已启动并连接到 Rpc Server');
 
-  // 7. 注册信号处理
-  const gracefulShutdown = createGracefulShutdown({browserManager, client});
+  // 9. 注册信号处理
+  const gracefulShutdown = createGracefulShutdown({
+    browserManager: runtime.browserManager,
+    client,
+  });
   process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
   process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 }

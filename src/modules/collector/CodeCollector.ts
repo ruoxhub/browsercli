@@ -19,12 +19,11 @@
 
 import type {Browser, Page, CDPSession} from '../../third_party/index.js';
 
-import type {BrowserManager} from '../../browser/index.js';
+import type {BrowserManager, BrowserManagerConfig} from '../../browser/index.js';
 import type {
   CollectCodeOptions,
   CollectCodeResult,
   CodeFile,
-  PuppeteerConfig,
   DependencyGraph,
 } from '../../types/index.js';
 import {logger} from '../../utils/logger.js';
@@ -38,7 +37,7 @@ import {
 // import { StreamingCollector } from './StreamingCollector.js'; // 暂不使用
 
 export class CodeCollector {
-  private config: PuppeteerConfig;
+  private config: BrowserManagerConfig;
   private readonly browserManager: BrowserManager;
   private browser: Browser | null = null;
   private browserListenerAttached = false;
@@ -72,7 +71,7 @@ export class CodeCollector {
   } = {};
   private pageResolver?: () => Page | null | undefined;
 
-  constructor(config: PuppeteerConfig, browserManager: BrowserManager) {
+  constructor(config: BrowserManagerConfig, browserManager: BrowserManager) {
     this.config = config;
     this.browserManager = browserManager;
 

@@ -375,6 +375,12 @@ export interface BrowserManagerConfig {
   remoteDebuggingPort?: number;
   waitForBrowserTimeoutMs?: number;
   waitForBrowserPollMs?: number;
+  timeout?: number;
+  maxCollectedUrls?: number;
+  maxFilesPerCollect?: number;
+  maxTotalContentSize?: number;
+  maxSingleFileSize?: number;
+  userAgent?: string;
 }
 
 /**

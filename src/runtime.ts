@@ -19,20 +19,20 @@ import {WasmDecompiler} from './modules/wasm/WasmDecompiler.js';
 import {WasmRuntimeInspector} from './modules/wasm/WasmRuntimeInspector.js';
 import {ReverseTaskStore} from './reverse/ReverseTaskStore.js';
 import {LLMService} from './services/LLMService.js';
-import type {PuppeteerConfig} from './types/index.js';
 import {
   CodeCacheAdapter,
   CodeCompressorAdapter,
   DetailedDataManagerAdapter,
 } from './utils/CacheAdapters.js';
-import {getBrowserConfig} from './utils/config.js';
 import {DetailedDataManager} from './utils/detailedDataManager.js';
 import {UnifiedCacheManager} from './utils/UnifiedCacheManager.js';
 import type {Page} from './third_party/index.js';
+import type {WorkerStartOptions} from './types/platform.js';
+import {getEnvBoolean} from './config.js';
 
-let runtime: JSHookRuntime | undefined;
+let runtime: Runtime | undefined;
 
-export interface JSHookRuntime {
+export interface Runtime {
   browserManager: BrowserManager;
   collector: CodeCollector;
   domInspector: DOMInspector;
@@ -41,7 +41,7 @@ export interface JSHookRuntime {
   llmService: LLMService;
   analyzer: CodeAnalyzer;
   summarizer: AISummarizer;
-  deobfuscator: Deobfuscator;Z
+  deobfuscator: Deobfuscator;
   cryptoDetector: CryptoDetector;
   wasmCollector: WasmCollector;
   wasmAnalyzer: WasmAnalyzer;
@@ -53,31 +53,23 @@ export interface JSHookRuntime {
   clearPageContext: () => void;
 }
 
-function toCollectorConfig(): PuppeteerConfig {
-  const browser = getBrowserConfig();
-  return {
-    headless: browser.headless!,
-    timeout: 30000,
-    remoteDebuggingUrl: browser.remoteDebuggingUrl,
-    useStealthScripts: browser.useStealthScripts,
-  };
-}
 
-export function getJSHookRuntime(): JSHookRuntime {
+export function getRuntime(options: WorkerStartOptions): Runtime {
   if (runtime) {
     return runtime;
   }
+  // 初始化 BrowserManager，将 Page 注入 contextProvider
+  // 浏览器配置也从 config.ts 获取（支持 config.json / .env 等）
+  const browserConfig: BrowserManagerConfig = {
+    browserURL: options.browserUrl,
+    wsEndpoint: options.wsEndpoint,
+    headless: options.headless,
+    executablePath: options.executablePath,
+    useStealthScripts: getEnvBoolean('USE_STEALTH_SCRIPTS') ?? true,
+  };
+  const browserManager = BrowserManager.getInstance(browserConfig);
 
-  const browserManager = BrowserManager.getInstance({
-    remoteDebuggingUrl: process.env.REMOTE_DEBUGGING_URL,
-    remoteDebuggingPort: process.env.REMOTE_DEBUGGING_PORT
-      ? Number(process.env.REMOTE_DEBUGGING_PORT)
-      : 9222,
-    useStealthScripts: process.env.USE_STEALTH_SCRIPTS !== 'false',
-    autoLaunch: true,
-  } as BrowserManagerConfig);
-
-  const collector = new CodeCollector(toCollectorConfig(), browserManager);
+  const collector = new CodeCollector(browserConfig, browserManager);
   const domInspector = new DOMInspector(collector);
   const pageController = new PageController(collector);
   const hookManager = new HookManager();
