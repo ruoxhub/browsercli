@@ -8,10 +8,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import type {
-  ScreenshotRuntimeServices,
   CaptureVideoFrameParams,
   CaptureVideoFrameResult,
 } from './types.js';
+
+import {getRuntime} from '../../runtime.js';
 
 /**
  * 捕获视频当前帧（纯函数版本）。
@@ -23,11 +24,10 @@ import type {
  * @returns 结构化结果 { success, message, tooltype, logFormat, data }
  */
 export async function captureVideoFrame(
-  runtime: ScreenshotRuntimeServices,
   params: CaptureVideoFrameParams,
 ): Promise<CaptureVideoFrameResult> {
   try {
-    const page = await runtime.getActivePage();
+    const page = await getRuntime().contextProvider!.getActivePage();
 
     // 先定位到指定时间点
     if (params.seekTime !== undefined) {

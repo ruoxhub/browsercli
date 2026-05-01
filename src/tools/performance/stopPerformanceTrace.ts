@@ -12,10 +12,10 @@ import {
 import {logger} from '../../utils/logger.js';
 
 import type {
-  PerformanceRuntimeServices,
   StopPerformanceTraceResult,
   StopPerformanceTraceData,
 } from './types.js';
+import {getRuntime} from '../../runtime.js';
 
 /**
  * 停止当前页面的性能追踪录制并分析结果（纯函数版本）。
@@ -23,13 +23,10 @@ import type {
  * 通过 CDP Tracing.end 停止 Chrome Tracing，收集追踪数据并解析生成摘要。
  * 如果追踪数据解析成功，会自动存储结果供后续 Insight 分析。
  *
- * @param runtime - Performance 运行时服务
  * @returns 结构化结果 { success, message, tooltype, logFormat, data }
  */
-export async function stopPerformanceTrace(
-  runtime: PerformanceRuntimeServices,
-): Promise<StopPerformanceTraceResult> {
-  if (!runtime.isRunningPerformanceTrace()) {
+export async function stopPerformanceTrace(): Promise<StopPerformanceTraceResult> {
+  if (!getRuntime().contextProvider!.isRunningPerformanceTrace()) {
     return {
       success: false,
       message: '当前没有正在运行的性能追踪。',
@@ -41,7 +38,7 @@ export async function stopPerformanceTrace(
   const data: StopPerformanceTraceData = {};
 
   try {
-    const page = await runtime.getActivePage();
+    const page = await getRuntime().contextProvider!.getActivePage();
 
     // Playwright: use CDP to stop tracing and collect data
     const client = await page.context().newCDPSession(page);
@@ -70,7 +67,7 @@ export async function stopPerformanceTrace(
     const result = await parseRawTraceBuffer(traceEventsBuffer);
 
     if (traceResultIsSuccess(result)) {
-      runtime.storeTraceRecording(result);
+      getRuntime().contextProvider!.storeTraceRecording(result);
       const traceSummaryText = await getTraceSummary(result);
       data.traceSummary = traceSummaryText;
 
@@ -102,6 +99,6 @@ export async function stopPerformanceTrace(
       data,
     };
   } finally {
-    runtime.setIsRunningPerformanceTrace(false);
+    getRuntime().contextProvider!.setIsRunningPerformanceTrace(false);
   }
 }

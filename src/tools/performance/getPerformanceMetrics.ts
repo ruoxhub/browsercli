@@ -4,16 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Page} from '../../third_party/index.js';
-
 import type {
   GetPerformanceMetricsResult,
   GetPerformanceMetricsData,
 } from './types.js';
-
-interface RuntimeWithPage {
-  getActivePage(): Promise<Page>;
-}
+import {getRuntime} from '../../runtime.js';
 
 /**
  * 获取当前页面的性能指标（纯函数版本）。
@@ -21,14 +16,11 @@ interface RuntimeWithPage {
  * 通过浏览器 Performance API 采集导航时间、资源统计、
  * Paint 事件 (FCP/LCP) 和 CLS 等指标。
  *
- * @param runtime - 运行时服务（需提供 getActivePage）
  * @returns 结构化结果 { success, message, tooltype, logFormat, data }
  */
-export async function getPerformanceMetrics(
-  runtime: RuntimeWithPage,
-): Promise<GetPerformanceMetricsResult> {
+export async function getPerformanceMetrics(): Promise<GetPerformanceMetricsResult> {
   try {
-    const page = await runtime.getActivePage();
+    const page = await getRuntime().contextProvider!.getActivePage();
     const metrics = await page.evaluate(() => {
       const perf = performance.getEntriesByType(
         'navigation',

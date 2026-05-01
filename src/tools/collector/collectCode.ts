@@ -7,8 +7,8 @@
 import type {
   CollectCodeParams,
   CollectCodeResult,
-  CollectorRuntimeServices,
 } from './types.js';
+import {getRuntime} from '../../runtime.js';
 
 /**
  * 从页面收集 JavaScript 代码（纯函数版本）。
@@ -16,41 +16,39 @@ import type {
  * 不依赖 MCP Tool 框架，接收 runtime 服务注入，
  * 内部调用 collector 做收集，返回结构化对象。
  *
- * @param runtime - Collector 运行时服务
  * @param params - 收集参数
  * @returns 结构化结果 { success, message, tooltype, data }
  */
 export async function collectCode(
-  runtime: CollectorRuntimeServices,
   params: CollectCodeParams,
 ): Promise<CollectCodeResult> {
   const returnMode = params.returnMode ?? 'full';
   const shouldCollect =
     returnMode !== 'summary' ||
-    runtime.collector.getCollectedFilesSummary().length === 0;
+    getRuntime().collector.getCollectedFilesSummary().length === 0;
 
   try {
     if (shouldCollect) {
-      await runtime.collector.collect(params as Parameters<typeof runtime.collector.collect>[0]);
+      await getRuntime().collector.collect(params as Parameters<typeof getRuntime().collector.collect>[0]);
     }
 
     let data: unknown;
 
     if (returnMode === 'summary') {
-      data = runtime.collector.getCollectedFilesSummary();
+      data = getRuntime().collector.getCollectedFilesSummary();
     } else if (returnMode === 'pattern') {
-      data = runtime.collector.getFilesByPattern(
+      data = getRuntime().collector.getFilesByPattern(
         params.pattern ?? '.*',
         params.limit,
         params.maxTotalSize,
       );
     } else if (returnMode === 'top-priority') {
-      data = runtime.collector.getTopPriorityFiles(
+      data = getRuntime().collector.getTopPriorityFiles(
         params.topN,
         params.maxTotalSize,
       );
     } else {
-      data = await runtime.collector.collect(params as Parameters<typeof runtime.collector.collect>[0]);
+      data = await getRuntime().collector.collect(params as Parameters<typeof getRuntime().collector.collect>[0]);
     }
 
     return {

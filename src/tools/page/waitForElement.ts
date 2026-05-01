@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {getRuntime} from '../../runtime.js';
+
 import type {
   ElementInfo,
-  PageRuntimeServices,
   WaitForElementParams,
   WaitForElementResult,
 } from './types.js';
@@ -16,16 +17,14 @@ import type {
  *
  * 等待元素出现后返回元素的结构化信息。
  *
- * @param runtime - Page 运行时服务
  * @param params - 等待参数（selector, timeout）
  * @returns 结构化结果 { success, message, tooltype, logFormat, data }
  */
 export async function waitForElement(
-  runtime: PageRuntimeServices,
   params: WaitForElementParams,
 ): Promise<WaitForElementResult> {
   try {
-    const page = await runtime.getActivePage();
+    const page = await getRuntime().contextProvider!.getActivePage();
 
     await page.waitForSelector(params.selector, {
       timeout: params.timeout ?? 30000,

@@ -4,21 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {getRuntime} from '../../runtime.js';
 import type {CodeFile} from '../../types/index.js';
 
 import type {
-  AnalyzerRuntimeServices,
   SummarizeFileResult,
   SummarizeBatchResult,
   SummarizeProjectResult,
 } from './types.js';
 
 export async function summarizeFile(
-  runtime: AnalyzerRuntimeServices,
   file: CodeFile,
 ): Promise<SummarizeFileResult> {
   try {
-    const data = await runtime.summarizer.summarizeFile(file);
+    const data = await getRuntime().summarizer.summarizeFile(file);
     return {
       success: true,
       message: 'File summarization completed',
@@ -36,12 +35,11 @@ export async function summarizeFile(
 }
 
 export async function summarizeBatch(
-  runtime: AnalyzerRuntimeServices,
   files: CodeFile[],
   maxConcurrent?: number,
 ): Promise<SummarizeBatchResult> {
   try {
-    const data = await runtime.summarizer.summarizeBatch(files, maxConcurrent);
+    const data = await getRuntime().summarizer.summarizeBatch(files, maxConcurrent);
     return {
       success: true,
       message: 'Batch summarization completed',
@@ -59,11 +57,10 @@ export async function summarizeBatch(
 }
 
 export async function summarizeProject(
-  runtime: AnalyzerRuntimeServices,
   files: CodeFile[],
 ): Promise<SummarizeProjectResult> {
   try {
-    const data = await runtime.summarizer.summarizeProject(files);
+    const data = await getRuntime().summarizer.summarizeProject(files);
     return {
       success: true,
       message: 'Project summarization completed',
@@ -81,7 +78,6 @@ export async function summarizeProject(
 }
 
 export async function summarizeCode(
-  runtime: AnalyzerRuntimeServices,
   params: {
     mode?: 'single' | 'batch' | 'project';
     code?: string;
@@ -92,11 +88,11 @@ export async function summarizeCode(
   const mode = params.mode ?? 'single';
 
   if (mode === 'project') {
-    return summarizeProject(runtime, params.files ?? []);
+    return summarizeProject(params.files ?? []);
   }
 
   if (mode === 'batch') {
-    return summarizeBatch(runtime, params.files ?? []);
+    return summarizeBatch(params.files ?? []);
   }
 
   const file: CodeFile = {
@@ -105,5 +101,5 @@ export async function summarizeCode(
     size: (params.code ?? '').length,
     type: 'inline',
   };
-  return summarizeFile(runtime, file);
+  return summarizeFile(file);
 }

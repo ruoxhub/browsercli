@@ -4,16 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {getRuntime} from '../../runtime.js';
 import type {UnderstandCodeOptions} from '../../types/index.js';
 
-import type {AnalyzerRuntimeServices, UnderstandCodeFnResult} from './types.js';
+import type {UnderstandCodeFnResult} from './types.js';
 
 export async function understandCode(
-  runtime: AnalyzerRuntimeServices,
   options: UnderstandCodeOptions,
 ): Promise<UnderstandCodeFnResult> {
   try {
-    const data = await runtime.analyzer.understand(options);
+    const data = await getRuntime().analyzer.understand(options);
     return {
       success: true,
       message: 'Code analysis completed',

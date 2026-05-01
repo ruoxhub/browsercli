@@ -7,12 +7,9 @@
 import type {Dialog} from 'patchright';
 
 import type {Page} from '../../third_party/index.js';
+import {getRuntime} from '../../runtime.js';
 
 import type {DialogResult, HandleDialogParams} from './types.js';
-
-interface RuntimeWithPage {
-  getActivePage(): Promise<Page>;
-}
 
 /**
  * 处理浏览器弹窗（alert/confirm/prompt）。
@@ -21,18 +18,16 @@ interface RuntimeWithPage {
  * 调用方需要在触发弹窗的页面操作之前注册此函数，
  * 或在弹窗已存在时直接传入已捕获的 Dialog 对象。
  *
- * @param runtime - 运行时服务（需提供 getActivePage）
  * @param params - 处理参数 { action, promptText? }
  * @returns 结构化结果对象
  */
 export async function handleDialog(
-  runtime: RuntimeWithPage,
   params: HandleDialogParams,
 ): Promise<DialogResult> {
   const {action, promptText} = params;
   const tooltype = 'handle_dialog';
 
-  const page = await runtime.getActivePage();
+  const page = await getRuntime().contextProvider!.getActivePage();
   const dialog = await waitForDialog(page);
   if (!dialog) {
     return {

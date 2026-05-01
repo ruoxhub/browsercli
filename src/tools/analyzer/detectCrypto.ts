@@ -4,16 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {getRuntime} from '../../runtime.js';
 import type {DetectCryptoOptions} from '../../types/index.js';
 
-import type {AnalyzerRuntimeServices, DetectCryptoFnResult} from './types.js';
+import type {DetectCryptoFnResult} from './types.js';
 
 export async function detectCrypto(
-  runtime: AnalyzerRuntimeServices,
   options: DetectCryptoOptions,
 ): Promise<DetectCryptoFnResult> {
   try {
-    const raw = await runtime.cryptoDetector.detect(options);
+    const raw = await getRuntime().cryptoDetector.detect(options);
     return {
       success: true,
       message: 'Crypto detection completed',

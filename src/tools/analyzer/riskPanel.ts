@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {AnalyzerRuntimeServices, RiskPanelResult} from './types.js';
+import {getRuntime} from '../../runtime.js';
+import type {RiskPanelResult} from './types.js';
 
 export async function riskPanel(
-  runtime: AnalyzerRuntimeServices,
   params: {
     code?: string;
     topN?: number;
@@ -15,6 +15,7 @@ export async function riskPanel(
     hookId?: string;
   },
 ): Promise<RiskPanelResult> {
+  const runtime = getRuntime();
   if (!runtime?.analyzer?.understand || !runtime?.cryptoDetector?.detect) {
     return {
       success: false,

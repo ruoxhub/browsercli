@@ -76,10 +76,7 @@ export class ToolAdapter {
 
         // 根据 callMode 决定调用方式
         let result: unknown;
-        if (callMode === 'runtime') {
-          // 新模式：handler(runtimeServices, params)
-          result = await handler(this.contextProvider, params);
-        } else if (callMode === 'frame') {
+        if (callMode === 'frame') {
           // 旧模式：handler(frame, params) — 优先使用选中的 Frame，回退到 Page 的 mainFrame
           const frame = this.contextProvider.getSelectedFrame()
             ?? page?.mainFrame()

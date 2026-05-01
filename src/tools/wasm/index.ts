@@ -12,7 +12,7 @@ import {isAbsolute, normalize, relative, resolve} from 'node:path';
 
 import type {Page} from 'patchright';
 
-import type {ToolContextProvider} from '../../worker/ToolContextProvider.js';
+import {getRuntime} from '../../runtime.js';
 
 type WasmToolName =
   | 'wabt.wasm2wat'
@@ -22,7 +22,6 @@ type WasmToolName =
   | 'runtime.wasmtime'
   | 'runtime.wasmer';
 
-type WasmRuntimeServices = Pick<ToolContextProvider, 'getActivePage'>;
 type Args = Record<string, unknown>;
 
 interface ToolSpec {
@@ -321,16 +320,16 @@ function textPreview(text: string, maxLines: number) {
   };
 }
 
-async function getActivePage(runtime: WasmRuntimeServices): Promise<Page> {
-  return runtime.getActivePage();
+async function getActivePage(): Promise<Page> {
+  return getRuntime().contextProvider!.getActivePage();
 }
 
-export async function wasmCapabilities(runtime: WasmRuntimeServices) {
+export async function wasmCapabilities() {
   const probes = await probeAllTools();
   let pageCapability;
 
   try {
-    const page = await getActivePage(runtime);
+    const page = await getActivePage();
     const probe = await page.evaluate(() => {
       const win = window as unknown as {
         __aiHooks?: Record<string, unknown>;
@@ -476,10 +475,10 @@ function toolCapability(
   };
 }
 
-export async function wasmDump(runtime: WasmRuntimeServices, args: Args = {}) {
+export async function wasmDump(args: Args = {}) {
   const moduleIndex = argNumber(args, 'moduleIndex', 0);
   const outputPath = argString(args, 'outputPath');
-  const page = await getActivePage(runtime);
+  const page = await getActivePage();
 
   const result: WasmDumpEvalResult = await page.evaluate((idx: number) => {
     const win = window as unknown as {__aiHooks?: Record<string, unknown>};
@@ -571,7 +570,6 @@ export async function wasmDump(runtime: WasmRuntimeServices, args: Args = {}) {
 }
 
 export async function wasmDisassemble(
-  _runtime: WasmRuntimeServices,
   args: Args = {},
 ) {
   const inputPath = argRequiredString(args, 'inputPath');
@@ -608,7 +606,6 @@ export async function wasmDisassemble(
 }
 
 export async function wasmDecompile(
-  _runtime: WasmRuntimeServices,
   args: Args = {},
 ) {
   const inputPath = argRequiredString(args, 'inputPath');
@@ -638,7 +635,6 @@ export async function wasmDecompile(
 }
 
 export async function wasmInspectSections(
-  _runtime: WasmRuntimeServices,
   args: Args = {},
 ) {
   const inputPath = argRequiredString(args, 'inputPath');
@@ -670,7 +666,6 @@ export async function wasmInspectSections(
 }
 
 export async function wasmOfflineRun(
-  _runtime: WasmRuntimeServices,
   args: Args = {},
 ) {
   const inputPath = argRequiredString(args, 'inputPath');
@@ -718,7 +713,6 @@ export async function wasmOfflineRun(
 }
 
 export async function wasmOptimize(
-  _runtime: WasmRuntimeServices,
   args: Args = {},
 ) {
   const inputPath = argRequiredString(args, 'inputPath');
@@ -766,12 +760,11 @@ export async function wasmOptimize(
 }
 
 export async function wasmVmpTrace(
-  runtime: WasmRuntimeServices,
   args: Args = {},
 ) {
   const maxEvents = argNumber(args, 'maxEvents', 5000);
   const filterModule = argString(args, 'filterModule');
-  const page = await getActivePage(runtime);
+  const page = await getActivePage();
 
   const traceData: WasmVmpTraceEvalResult = await page.evaluate(
     (opts: {maxEvents: number; filterModule?: string}) => {
@@ -834,14 +827,13 @@ export async function wasmVmpTrace(
 }
 
 export async function wasmMemoryInspect(
-  runtime: WasmRuntimeServices,
   args: Args = {},
 ) {
   const offset = argNumber(args, 'offset', 0);
   const length = Math.min(argNumber(args, 'length', 256), 65_536);
   const format = argString(args, 'format', 'both');
   const searchPattern = argString(args, 'searchPattern');
-  const page = await getActivePage(runtime);
+  const page = await getActivePage();
 
   const memData: WasmMemoryInspectEvalResult = await page.evaluate(
     (opts: {offset: number; length: number; searchPattern?: string}) => {

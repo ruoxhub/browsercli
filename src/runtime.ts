@@ -29,7 +29,8 @@ import {
 } from './utils/CacheAdapters.js';
 import {DetailedDataManager} from './utils/detailedDataManager.js';
 import {UnifiedCacheManager} from './utils/UnifiedCacheManager.js';
-import {getBrowserConfig} from './config.js';
+import {getBrowserManagerConfig} from './config.js';
+import type {ToolContextProvider} from './worker/ToolContextProvider.js';
 let runtime: Runtime | undefined;
 
 export interface Runtime {
@@ -48,6 +49,7 @@ export interface Runtime {
   wasmDecompiler: WasmDecompiler;
   wasmRuntimeInspector: WasmRuntimeInspector;
   reverseTaskStore: ReverseTaskStore;
+  contextProvider?: ToolContextProvider;
   bindPageContext: (resolver: () => Page) => void;
   syncPageContext: (page: Page) => void;
   clearPageContext: () => void;
@@ -60,7 +62,7 @@ export function getRuntime(): Runtime {
   }
   // 初始化 BrowserManager，将 Page 注入 contextProvider
   // 浏览器配置也从 config.ts 获取（支持 config.json / .env 等）
-  const browserConfig: BrowserManagerConfig = getBrowserConfig();
+  const browserConfig: BrowserManagerConfig = getBrowserManagerConfig();
   const browserManager = BrowserManager.getInstance(browserConfig);
 
   const collector = new CodeCollector(browserConfig, browserManager);

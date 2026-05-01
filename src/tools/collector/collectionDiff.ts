@@ -8,25 +8,23 @@ import type {
   CollectionDiffData,
   CollectionDiffParams,
   CollectionDiffResult,
-  CollectorRuntimeServices,
   DiffChangedEntry,
   FileSummaryEntry,
 } from './types.js';
+import {getRuntime} from '../../runtime.js';
 
 /**
  * 对比两次收集的文件摘要差异（纯函数版本）。
  *
- * @param runtime - Collector 运行时服务（用于获取当前摘要）
  * @param params - Diff 参数
  * @returns 结构化结果 { success, message, tooltype, data }
  */
 export function collectionDiff(
-  runtime: CollectorRuntimeServices,
   params: CollectionDiffParams,
 ): CollectionDiffResult {
   try {
     const current: FileSummaryEntry[] =
-      (params.current ?? runtime.collector.getCollectedFilesSummary()) as FileSummaryEntry[];
+      (params.current ?? getRuntime().collector.getCollectedFilesSummary()) as FileSummaryEntry[];
     const previous: FileSummaryEntry[] = (params.previous ?? []) as FileSummaryEntry[];
 
     const diff = diffSummaries(previous, current, params.includeUnchanged);

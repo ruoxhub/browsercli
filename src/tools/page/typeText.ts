@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {getRuntime} from '../../runtime.js';
+
 import type {
-  PageRuntimeServices,
   TypeTextParams,
   TypeTextResult,
 } from './types.js';
@@ -15,12 +16,10 @@ import type {
  *
  * 通过 CSS 选择器定位输入框并逐字输入。
  *
- * @param runtime - Page 运行时服务
  * @param params - 输入参数（selector, text, delay）
  * @returns 结构化结果 { success, message, tooltype, logFormat, data }
  */
 export async function typeText(
-  runtime: PageRuntimeServices,
   params: TypeTextParams,
 ): Promise<TypeTextResult> {
   try {
@@ -38,7 +37,7 @@ export async function typeText(
       };
     }
 
-    const page = await runtime.getActivePage();
+    const page = await getRuntime().contextProvider!.getActivePage();
     // Playwright: page.type(selector, text, options) - compatible
     // But prefer page.fill() for direct input, page.type() for char-by-char
     await page.type(params.selector, params.text, {

@@ -5,7 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
-import type {ToolContextProvider} from '../../worker/ToolContextProvider.js';
+import {getRuntime} from '../../runtime.js';
 
 import type {FrameInfo, ListFramesResult} from './types.js';
 
@@ -27,16 +27,13 @@ function getFrameDepth(frame: Frame): number {
  *
  * 遍历 Page 上的所有 Frame，返回每个 Frame 的索引、URL、名称和嵌套深度。
  *
- * @param runtime - ToolContextProvider 运行时上下文
  * @returns 结构化结果对象，data 包含 Frame 信息列表
  */
-export async function listFrames(
-  runtime: ToolContextProvider,
-): Promise<ListFramesResult> {
+export async function listFrames(): Promise<ListFramesResult> {
   const tooltype = 'list_frames';
 
   try {
-    const page = runtime.getSelectedPage();
+    const page = getRuntime().contextProvider!.getSelectedPage();
     if (!page) {
       return {
         success: false,
@@ -57,7 +54,7 @@ export async function listFrames(
       };
     }
 
-    const selectedFrame = runtime.getSelectedFrame();
+    const selectedFrame = getRuntime().contextProvider!.getSelectedFrame();
     const frameInfos: FrameInfo[] = frames.map((frame, index) => {
       const depth = getFrameDepth(frame);
       const name = frame.name() || undefined;

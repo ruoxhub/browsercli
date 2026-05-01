@@ -8,10 +8,10 @@ import {getInsightOutput} from '../../trace-processing/parse.js';
 import type {InsightName} from '../../trace-processing/parse.js';
 
 import type {
-  PerformanceRuntimeServices,
   PerformanceAnalyzeInsightResult,
   PerformanceAnalyzeInsightData,
 } from './types.js';
+import {getRuntime} from '../../runtime.js';
 
 /**
  * 获取性能追踪录制中某个 Insight 的详细信息（纯函数版本）。
@@ -19,15 +19,13 @@ import type {
  * 在追踪录制完成后，可使用此函数获取特定 Insight 的分析详情，
  * 如 "DocumentLatency"、"LCPBreakdown" 等。
  *
- * @param runtime - Performance 运行时服务
  * @param insightName - Insight 名称
  * @returns 结构化结果 { success, message, tooltype, logFormat, data }
  */
 export async function performanceAnalyzeInsight(
-  runtime: PerformanceRuntimeServices,
   insightName: InsightName,
 ): Promise<PerformanceAnalyzeInsightResult> {
-  const lastRecording = runtime.recordedTraces().at(-1);
+  const lastRecording = getRuntime().contextProvider!.recordedTraces().at(-1);
 
   if (!lastRecording) {
     return {

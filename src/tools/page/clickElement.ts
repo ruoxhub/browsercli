@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {getRuntime} from '../../runtime.js';
+
 import type {
   ClickElementParams,
   ClickElementResult,
-  PageRuntimeServices,
 } from './types.js';
 
 /**
@@ -15,16 +16,14 @@ import type {
  *
  * 通过 CSS 选择器定位元素并点击。
  *
- * @param runtime - Page 运行时服务
  * @param params - 点击参数（selector）
  * @returns 结构化结果 { success, message, tooltype, logFormat, data }
  */
 export async function clickElement(
-  runtime: PageRuntimeServices,
   params: ClickElementParams,
 ): Promise<ClickElementResult> {
   try {
-    const page = await runtime.getActivePage();
+    const page = await getRuntime().contextProvider!.getActivePage();
     await page.click(params.selector);
 
     return {

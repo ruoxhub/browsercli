@@ -14,10 +14,11 @@ import {
 } from '../shared/browserRuntime.js';
 
 import type {
-  ScreenshotRuntimeServices,
   TakeScreenshotParams,
   TakeScreenshotResult,
 } from './types.js';
+
+import {getRuntime} from '../../runtime.js';
 
 /**
  * 截图页面（纯函数版本）。
@@ -29,11 +30,10 @@ import type {
  * @returns 结构化结果 { success, message, tooltype, logFormat, data }
  */
 export async function takeScreenshot(
-  runtime: ScreenshotRuntimeServices,
   params: TakeScreenshotParams = {},
 ): Promise<TakeScreenshotResult> {
   try {
-    const page = await getActivePageWithGuard(runtime);
+    const page = await getActivePageWithGuard(getRuntime().contextProvider!);
     const format = params.format || 'png';
     const quality = format === 'png' ? undefined : params.quality;
     if (quality !== undefined && (quality < 0 || quality > 100)) {

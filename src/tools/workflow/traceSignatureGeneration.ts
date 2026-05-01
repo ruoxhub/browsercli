@@ -5,29 +5,8 @@
  */
 
 import {zod} from '../../third_party/index.js';
-import type {
-  NetworkRuntimeServices,
-  RequestInitiator,
-} from '../network/types.js';
-
-interface DebuggerRuntime {
-  getDebuggerContext?: () => Promise<{
-    getPausedState: () => {
-      isPaused: boolean;
-      reason?: string;
-      callFrames: Array<{
-        callFrameId: string;
-        functionName?: string;
-        url?: string;
-        location?: {
-          scriptId: string;
-          lineNumber: number;
-          columnNumber: number;
-        };
-      }>;
-    };
-  }>;
-}
+import {getRuntime} from '../../runtime.js';
+import type {RequestInitiator} from '../network/types.js';
 
 export interface TraceSignatureGenerationParams {
   requestUrlPattern?: string;
@@ -37,23 +16,20 @@ export interface TraceSignatureGenerationParams {
   taskId?: string;
 }
 
-interface TraceSignatureGenerationRuntime
-  extends NetworkRuntimeServices, DebuggerRuntime {}
-
 const SIGNATURE_HEADER_PATTERN =
   /(^|[-_])(sign|signature|token|auth|nonce|timestamp)([-_]|$)|x-sign/i;
 
 export const traceSignatureGeneration = Object.assign(
   async function traceSignatureGeneration(
-    runtime: TraceSignatureGenerationRuntime,
     params: TraceSignatureGenerationParams = {},
   ) {
+    const contextProvider = getRuntime().contextProvider!;
     const requestUrlPattern = params.requestUrlPattern ?? '';
     const headerKeyword = (params.headerKeyword ?? '').toLowerCase();
     const maxResults = Math.max(1, Math.floor(params.maxResults ?? 10));
     const includeSensitiveValues = params.includeSensitiveValues === true;
-    const requests = runtime
-      .getNetworkRequests(false, runtime.getSelectedPageIndex?.() ?? 0)
+    const requests = contextProvider
+      .getNetworkRequests(false, contextProvider.getSelectedPageIndex?.() ?? 0)
       .filter(request => {
         if (requestUrlPattern && !request.url().includes(requestUrlPattern)) {
           return false;
@@ -70,7 +46,7 @@ export const traceSignatureGeneration = Object.assign(
     const requestFingerprints = requests.map(request => {
       const headers = request.headers();
       return {
-        reqid: runtime.getNetworkRequestStableId(request),
+        reqid: contextProvider.getNetworkRequestStableId(request),
         method: request.method(),
         url: request.url(),
         signatureIndicators: findSignatureIndicators(headers),
@@ -82,10 +58,10 @@ export const traceSignatureGeneration = Object.assign(
         redactHeaders(request.headers(), includeSensitiveValues),
       ),
       initiators: requests
-        .map(request => runtime.getRequestInitiator(request))
+        .map(request => contextProvider.getRequestInitiator(request))
         .filter((item): item is RequestInitiator => Boolean(item)),
     };
-    const pausedFrames = await readPausedFrames(runtime);
+    const pausedFrames = await readPausedFrames();
     const nextActions = buildNextActions({
       requestUrlPattern,
       headerKeyword,
@@ -142,12 +118,9 @@ function redactHeaders(
   );
 }
 
-async function readPausedFrames(runtime: DebuggerRuntime) {
-  if (!runtime.getDebuggerContext) {
-    return [];
-  }
-
-  const debuggerContext = await runtime.getDebuggerContext();
+async function readPausedFrames() {
+  const contextProvider = getRuntime().contextProvider!;
+  const debuggerContext = await contextProvider.getDebuggerContext();
   const pausedState = debuggerContext.getPausedState();
   if (!pausedState.isPaused) {
     return [];

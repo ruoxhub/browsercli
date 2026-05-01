@@ -5,25 +5,23 @@
  */
 
 import type {
-  CollectorRuntimeServices,
   SearchInScriptsData,
   SearchInScriptsParams,
   SearchInScriptsResult,
 } from './types.js';
+import {getRuntime} from '../../runtime.js';
 
 /**
  * 在已收集的脚本缓存中搜索匹配正则的代码（纯函数版本）。
  *
- * @param runtime - Collector 运行时服务
  * @param params - 搜索参数
  * @returns 结构化结果 { success, message, tooltype, data }
  */
 export function searchInScripts(
-  runtime: CollectorRuntimeServices,
   params: SearchInScriptsParams,
 ): SearchInScriptsResult {
   try {
-    const result = runtime.collector.getFilesByPattern(
+    const result = getRuntime().collector.getFilesByPattern(
       params.pattern,
       params.limit,
       params.maxTotalSize,

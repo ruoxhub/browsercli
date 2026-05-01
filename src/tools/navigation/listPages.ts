@@ -9,11 +9,12 @@ import {
   withOperationTimeout,
 } from '../shared/browserRuntime.js';
 
+import {getRuntime} from '../../runtime.js';
+
 import type {
   ListPagesParams,
   ListPagesResult,
   ListPagesData,
-  NavigationRuntimeServices,
   PageInfo,
 } from './types.js';
 
@@ -23,19 +24,17 @@ import type {
  * 遍历所有页面，返回每个页面的索引、URL 和标题，
  * 以及当前选中页面的索引。
  *
- * @param runtime - Navigation 运行时服务
  * @param _params - 无参数
  * @returns 结构化结果 { success, message, tooltype, logFormat, data }
  */
 export async function listPages(
-  runtime: NavigationRuntimeServices,
   _params?: ListPagesParams,
 ): Promise<ListPagesResult> {
   const tooltype = 'list_pages';
 
   try {
-    const pages = runtime.getPages();
-    const selectedPage = runtime.getSelectedPage();
+    const pages = getRuntime().contextProvider!.getPages();
+    const selectedPage = getRuntime().contextProvider!.getSelectedPage();
     let unavailableTitleCount = 0;
     const pageInfos: PageInfo[] = [];
     for (const [index, page] of pages.entries()) {

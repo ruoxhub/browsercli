@@ -24,7 +24,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './workflow/observeFlow.js',
     handlerName: 'observeFlow',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'auto_hook',
@@ -32,7 +32,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './workflow/autoHook.js',
     handlerName: 'autoHook',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'rebuild_bundle',
@@ -55,7 +55,7 @@ export const TOOLS_META: ToolMeta[] = [
     },
     modulePath: './workflow/traceSignatureGeneration.js',
     handlerName: 'traceSignatureGeneration',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'query_dom',
@@ -97,7 +97,7 @@ export const TOOLS_META: ToolMeta[] = [
     },
     modulePath: './network/listNetworkRequests.js',
     handlerName: 'listNetworkRequests',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'get_network_request',
@@ -105,7 +105,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './network/getNetworkRequest.js',
     handlerName: 'getNetworkRequest',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'click',
@@ -161,7 +161,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './page/clickElement.js',
     handlerName: 'clickElement',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'type_text',
@@ -169,7 +169,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './page/typeText.js',
     handlerName: 'typeText',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'wait_for_element',
@@ -177,7 +177,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './page/waitForElement.js',
     handlerName: 'waitForElement',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'scroll_by',
@@ -185,7 +185,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {direction: 'string', pixels: 'number'},
     modulePath: './page/scrollBy.js',
     handlerName: 'scrollBy',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'save_session_state',
@@ -193,7 +193,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './page/sessionState.js',
     handlerName: 'saveSessionState',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'restore_session_state',
@@ -201,7 +201,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './page/sessionState.js',
     handlerName: 'restoreSessionState',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'list_session_states',
@@ -209,7 +209,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './page/sessionState.js',
     handlerName: 'listSessionStates',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'delete_session_state',
@@ -217,7 +217,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './page/sessionState.js',
     handlerName: 'deleteSessionState',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'dump_session_state',
@@ -225,7 +225,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './page/sessionState.js',
     handlerName: 'dumpSessionState',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'load_session_state',
@@ -233,7 +233,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './page/sessionState.js',
     handlerName: 'loadSessionState',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'check_browser_health',
@@ -241,7 +241,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './page/checkBrowserHealth.js',
     handlerName: 'checkBrowserHealth',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'list_pages',
@@ -249,7 +249,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './navigation/listPages.js',
     handlerName: 'listPages',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'select_page',
@@ -257,7 +257,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './navigation/selectPage.js',
     handlerName: 'selectPage',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'new_page',
@@ -265,7 +265,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {url: 'string', timeout: 'number'},
     modulePath: './navigation/newPage.js',
     handlerName: 'newPage',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'navigate_page',
@@ -278,7 +278,7 @@ export const TOOLS_META: ToolMeta[] = [
     },
     modulePath: './navigation/navigatePage.js',
     handlerName: 'navigatePage',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'take_screenshot',
@@ -286,7 +286,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './screenshot/takeScreenshot.js',
     handlerName: 'takeScreenshot',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'capture_video_frame',
@@ -294,7 +294,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './screenshot/captureVideoFrame.js',
     handlerName: 'captureVideoFrame',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'get_video_info',
@@ -302,7 +302,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './screenshot/getVideoInfo.js',
     handlerName: 'getVideoInfo',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'seek_video',
@@ -310,7 +310,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './screenshot/seekVideo.js',
     handlerName: 'seekVideo',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'emulate_mobile',
@@ -350,7 +350,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './stealth/stealth.js',
     handlerName: 'setUserAgent',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'start_performance_trace',
@@ -358,7 +358,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './performance/startPerformanceTrace.js',
     handlerName: 'startPerformanceTrace',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'stop_performance_trace',
@@ -366,7 +366,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './performance/stopPerformanceTrace.js',
     handlerName: 'stopPerformanceTrace',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'get_performance_metrics',
@@ -374,7 +374,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './performance/getPerformanceMetrics.js',
     handlerName: 'getPerformanceMetrics',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'performance_analyze_insight',
@@ -382,7 +382,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './performance/performanceAnalyzeInsight.js',
     handlerName: 'performanceAnalyzeInsight',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'set_breakpoint',
@@ -390,7 +390,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'setBreakpoint',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'remove_breakpoint',
@@ -398,7 +398,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'removeBreakpoint',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'list_breakpoints',
@@ -406,7 +406,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'listBreakpoints',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'step_into',
@@ -414,7 +414,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'stepInto',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'step_over',
@@ -422,7 +422,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'stepOver',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'step_out',
@@ -430,7 +430,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'stepOut',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'resume',
@@ -438,7 +438,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'resume',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'pause',
@@ -446,7 +446,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'pause',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'list_scripts',
@@ -454,7 +454,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {filter: 'string'},
     modulePath: './debugger/index.js',
     handlerName: 'listScripts',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'get_script_source',
@@ -464,7 +464,7 @@ export const TOOLS_META: ToolMeta[] = [
     },
     modulePath: './debugger/index.js',
     handlerName: 'getScriptSource',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'search_in_sources',
@@ -472,7 +472,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'searchInSources',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'get_storage',
@@ -488,7 +488,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'breakOnXhr',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'remove_xhr_breakpoint',
@@ -496,7 +496,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'removeXhrBreakpoint',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'monitor_events',
@@ -525,7 +525,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'traceFunction',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'get_ai_debug_status',
@@ -533,7 +533,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'getAiDebugStatus',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'inspect_object',
@@ -557,7 +557,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'findInScript',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'get_request_initiator',
@@ -565,7 +565,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'getRequestInitiator',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'get_paused_info',
@@ -573,7 +573,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'getPausedInfo',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'evaluate_on_callframe',
@@ -581,7 +581,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'evaluateOnCallframe',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'inspect_locals',
@@ -589,7 +589,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'inspectLocals',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'set_breakpoint_on_text',
@@ -597,7 +597,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'setBreakpointOnText',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'hook_function',
@@ -621,7 +621,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'xhrToJsBreakpoint',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'start_continuous_debugging',
@@ -629,7 +629,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'startContinuousDebugging',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'stop_continuous_debugging',
@@ -637,7 +637,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'stopContinuousDebugging',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'create_hook',
@@ -698,7 +698,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './dialog/handleDialog.js',
     handlerName: 'handleDialog',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'list_frames',
@@ -706,7 +706,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './frames/listFrames.js',
     handlerName: 'listFrames',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'select_frame',
@@ -714,7 +714,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {frameIdx: 'number'},
     modulePath: './frames/selectFrame.js',
     handlerName: 'selectFrame',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'evaluate_script',
@@ -723,7 +723,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {function: 'string', context: 'string', verbose: 'boolean'},
     modulePath: './script/script.js',
     handlerName: 'evaluateScript',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'inject_preload_script',
@@ -731,7 +731,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {script: 'string'},
     modulePath: './script/script.js',
     handlerName: 'injectPreloadScript',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'search_site_experience',
@@ -779,7 +779,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './extensions/updateExtensions.js',
     handlerName: 'updateExtensions',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'inject_stealth',
@@ -787,7 +787,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './stealth/stealth.js',
     handlerName: 'injectStealth',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'list_stealth_features',
@@ -795,7 +795,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './stealth/stealth.js',
     handlerName: 'listStealthFeatures',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'list_stealth_presets',
@@ -803,7 +803,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './stealth/stealth.js',
     handlerName: 'listStealthPresets',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'deobfuscate_code',
@@ -811,7 +811,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './analyzer/deobfuscate.js',
     handlerName: 'deobfuscateCode',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'understand_code',
@@ -819,7 +819,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './analyzer/understand.js',
     handlerName: 'understandCode',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'summarize_code',
@@ -827,7 +827,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './analyzer/summarize.js',
     handlerName: 'summarizeCode',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'detect_crypto',
@@ -835,7 +835,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './analyzer/detectCrypto.js',
     handlerName: 'detectCrypto',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'record_reverse_evidence',
@@ -851,7 +851,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './analyzer/analyzeTarget.js',
     handlerName: 'analyzeTarget',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'risk_panel',
@@ -859,7 +859,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './analyzer/riskPanel.js',
     handlerName: 'riskPanel',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'export_session_report',
@@ -875,7 +875,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './collector/collectCode.js',
     handlerName: 'collectCode',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'collection_diff',
@@ -883,7 +883,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './collector/collectionDiff.js',
     handlerName: 'collectionDiff',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'search_in_scripts',
@@ -891,7 +891,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './collector/searchInScripts.js',
     handlerName: 'searchInScripts',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'export_rebuild_bundle',
@@ -956,7 +956,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './wasm/index.js',
     handlerName: 'wasmCapabilities',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'wasm_dump',
@@ -967,7 +967,7 @@ export const TOOLS_META: ToolMeta[] = [
     },
     modulePath: './wasm/index.js',
     handlerName: 'wasmDump',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'wasm_disassemble',
@@ -979,7 +979,7 @@ export const TOOLS_META: ToolMeta[] = [
     },
     modulePath: './wasm/index.js',
     handlerName: 'wasmDisassemble',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'wasm_decompile',
@@ -990,7 +990,7 @@ export const TOOLS_META: ToolMeta[] = [
     },
     modulePath: './wasm/index.js',
     handlerName: 'wasmDecompile',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'wasm_inspect_sections',
@@ -1001,7 +1001,7 @@ export const TOOLS_META: ToolMeta[] = [
     },
     modulePath: './wasm/index.js',
     handlerName: 'wasmInspectSections',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'wasm_offline_run',
@@ -1015,7 +1015,7 @@ export const TOOLS_META: ToolMeta[] = [
     },
     modulePath: './wasm/index.js',
     handlerName: 'wasmOfflineRun',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'wasm_optimize',
@@ -1027,7 +1027,7 @@ export const TOOLS_META: ToolMeta[] = [
     },
     modulePath: './wasm/index.js',
     handlerName: 'wasmOptimize',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'wasm_vmp_trace',
@@ -1038,7 +1038,7 @@ export const TOOLS_META: ToolMeta[] = [
     },
     modulePath: './wasm/index.js',
     handlerName: 'wasmVmpTrace',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'wasm_memory_inspect',
@@ -1051,7 +1051,7 @@ export const TOOLS_META: ToolMeta[] = [
     },
     modulePath: './wasm/index.js',
     handlerName: 'wasmMemoryInspect',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'activate_vue_devtools',
@@ -1275,7 +1275,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './vjstools/deobfuscate.js',
     handlerName: 'minifyCodeFn',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'transpile_code',
@@ -1283,7 +1283,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './vjstools/deobfuscate.js',
     handlerName: 'transpileCode',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'analyze_ast',
@@ -1291,7 +1291,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './vjstools/deobfuscate.js',
     handlerName: 'analyzeAst',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'diff_code',
@@ -1299,7 +1299,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './vjstools/deobfuscate.js',
     handlerName: 'diffCodeFn',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'get_code_template',
@@ -1307,7 +1307,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './code-templates/getCodeTemplate.js',
     handlerName: 'getCodeTemplate',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'list_code_templates',
@@ -1315,7 +1315,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './code-templates/listCodeTemplates.js',
     handlerName: 'listCodeTemplates',
-    callMode: 'runtime',
+    callMode: 'params-only',
   },
   {
     name: 'click_at',

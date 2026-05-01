@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {getRuntime} from '../../runtime.js';
 import {
   buildRequestFingerprints,
   buildPriorityTargets,
@@ -116,9 +117,9 @@ async function installAnalyzeHooks(
 }
 
 export async function analyzeTarget(
-  runtime: AnalyzerRuntimeServices,
   params: AnalyzeTargetParams,
 ): Promise<AnalyzeTargetResult> {
+  const runtime = getRuntime();
   if (!params?.url) {
     return {
       success: false,

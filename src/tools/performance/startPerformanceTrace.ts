@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {PerformanceRuntimeServices, StartPerformanceTraceResult} from './types.js';
+import type {StartPerformanceTraceResult} from './types.js';
+import {getRuntime} from '../../runtime.js';
 
 /**
  * 在指定页面上启动性能追踪录制（纯函数版本）。
@@ -12,15 +13,13 @@ import type {PerformanceRuntimeServices, StartPerformanceTraceResult} from './ty
  * 通过 CDP Tracing.start 启动 Chrome Tracing，可配置是否自动重新加载页面和自动停止。
  * 追踪数据用于分析页面性能问题和 Core Web Vitals。
  *
- * @param runtime - Performance 运行时服务
  * @param params - 追踪参数（reload / autoStop）
  * @returns 结构化结果 { success, message, tooltype, logFormat, data }
  */
 export async function startPerformanceTrace(
-  runtime: PerformanceRuntimeServices,
   params: {reload: boolean; autoStop: boolean},
 ): Promise<StartPerformanceTraceResult> {
-  if (runtime.isRunningPerformanceTrace()) {
+  if (getRuntime().contextProvider!.isRunningPerformanceTrace()) {
     return {
       success: false,
       message:
@@ -30,10 +29,10 @@ export async function startPerformanceTrace(
     };
   }
 
-  runtime.setIsRunningPerformanceTrace(true);
+  getRuntime().contextProvider!.setIsRunningPerformanceTrace(true);
 
   try {
-    const page = await runtime.getActivePage();
+    const page = await getRuntime().contextProvider!.getActivePage();
     const pageUrlForTracing = page.url();
 
     if (params.reload) {
@@ -77,7 +76,7 @@ export async function startPerformanceTrace(
       await new Promise(resolve => setTimeout(resolve, 5_000));
       // 动态导入避免循环依赖
       const {stopPerformanceTrace} = await import('./stopPerformanceTrace.js');
-      const stopResult = await stopPerformanceTrace(runtime);
+      const stopResult = await stopPerformanceTrace();
       // Map stop result to start result format
       return {
         success: stopResult.success,
@@ -96,7 +95,7 @@ export async function startPerformanceTrace(
       data: {autoStop: params.autoStop},
     };
   } catch (error) {
-    runtime.setIsRunningPerformanceTrace(false);
+    getRuntime().contextProvider!.setIsRunningPerformanceTrace(false);
     return {
       success: false,
       message: `启动性能追踪失败：${error instanceof Error ? error.message : String(error)}`,

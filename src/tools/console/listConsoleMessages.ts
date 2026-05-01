@@ -7,12 +7,12 @@
 import {
   mapIssueToMessageObject,
 } from '../../utils/DevtoolsUtils.js';
+import {getRuntime} from '../../runtime.js';
 
 import type {
   ConsoleMessageData,
   ConsoleMessageEntry,
   ConsoleResponseType,
-  ConsoleRuntimeServices,
   ListConsoleMessagesData,
   ListConsoleMessagesParams,
   ListConsoleMessagesResult,
@@ -27,12 +27,11 @@ import {isAggregatedIssue} from './types.js';
  * @returns 结构化结果 { success, message, tooltype, logFormat, data }
  */
 export async function listConsoleMessages(
-  runtime: ConsoleRuntimeServices,
   params?: ListConsoleMessagesParams,
 ): Promise<ListConsoleMessagesResult> {
   try {
     const includePreserved = params?.includePreservedMessages ?? false;
-    let messages = runtime.getConsoleData(includePreserved);
+    let messages = getRuntime().contextProvider!.getConsoleData(includePreserved);
 
     // 按类型过滤
     if (params?.types?.length) {
@@ -54,8 +53,8 @@ export async function listConsoleMessages(
       await Promise.all(
         messages.map(async (item): Promise<ConsoleMessageData | null> => {
           const consoleMessageStableId =
-            runtime.getConsoleMessageStableId(item);
-          const sourceMapHints = runtime.getConsoleSourceMapHints?.(item);
+            getRuntime().contextProvider!.getConsoleMessageStableId(item);
+          const sourceMapHints = getRuntime().contextProvider!.getConsoleSourceMapHints?.(item);
 
           if ('args' in item) {
             const consoleMessage = item as ConsoleMessageEntry;

@@ -5,6 +5,7 @@
  */
 
 import type {CDPSession, Frame, JSHandle} from '../../third_party/index.js';
+import {getRuntime} from '../../runtime.js';
 import {selectExecutionContext} from '../debugger/contextSelector.js';
 import type {ExecutionContextInfo} from '../debugger/executionContexts.js';
 
@@ -84,15 +85,9 @@ function buildContextEvaluationExpression(functionCode: string): string {
   return `(async () => JSON.stringify(await (${functionCode})()))()`;
 }
 
-function hasDebuggerContextCapability(
-  runtime: ScriptRuntime,
-): runtime is ScriptRuntime & {
-  getDebuggerContext(): Promise<{
-    getExecutionContexts(): ExecutionContextInfo[];
-    getClient(): CDPSession | null;
-  }>;
-} {
-  return typeof runtime.getDebuggerContext === 'function';
+function hasDebuggerContextCapability(): boolean {
+  const ctx = getRuntime().contextProvider;
+  return typeof ctx?.getDebuggerContext === 'function';
 }
 
 function getUnknownErrorMessage(error: unknown): string {
@@ -258,7 +253,6 @@ export async function evaluateScriptFn(
  * 运行时包装：在当前选中的 Frame / Page 上执行脚本。
  */
 export async function evaluateScript(
-  runtime: ScriptRuntime,
   params: {
     function?: string;
     context?: 'page' | 'content-script';
@@ -276,11 +270,12 @@ export async function evaluateScript(
     };
   }
 
-  const frame = runtime.getSelectedFrame();
+  const ctx = getRuntime().contextProvider!;
+  const frame = ctx.getSelectedFrame();
 
-  if (hasDebuggerContextCapability(runtime)) {
+  if (hasDebuggerContextCapability()) {
     try {
-      const debuggerContext = await runtime.getDebuggerContext();
+      const debuggerContext = await ctx.getDebuggerContext!();
       const executionContexts = debuggerContext.getExecutionContexts();
       const selectedFrameId = getFrameId(frame);
       const executionContext = selectExecutionContext(
@@ -412,7 +407,6 @@ export function injectPreloadScriptFn(
  * 运行时包装：向当前页面或上下文注册预加载脚本。
  */
 export async function injectPreloadScript(
-  runtime: ScriptRuntime,
   params: {script?: string} = {},
 ): Promise<InjectPreloadScriptResult> {
   const script = params.script ?? '';
@@ -421,8 +415,9 @@ export async function injectPreloadScript(
     return prepared;
   }
 
+  const ctx = getRuntime().contextProvider!;
   const target =
-    runtime.getContext?.() ?? runtime.getSelectedPage?.() ?? null;
+    ctx.getContext?.() ?? ctx.getSelectedPage?.() ?? null;
   if (!target?.addInitScript) {
     return {
       success: false,

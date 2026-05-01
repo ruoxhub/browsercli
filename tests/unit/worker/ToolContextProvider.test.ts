@@ -12,9 +12,7 @@ import {ToolContextProvider} from '../../../src/worker/ToolContextProvider.js';
 
 describe('ToolContextProvider', () => {
   it('provides analyzer runtime services for deobfuscate_code', async () => {
-    const runtime = new ToolContextProvider();
-
-    const result = await deobfuscateCode(runtime, {
+    const result = await deobfuscateCode({
       code: [
         "function _0x5c1a(){const _0x2f8b=['log','Hello, JSReverser-MCP!'];",
         '_0x5c1a=function(){return _0x2f8b;};return _0x5c1a();}',

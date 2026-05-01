@@ -13,6 +13,7 @@ import {
 import {readFile, writeFile} from 'node:fs/promises';
 
 import {getEnvValue, getEnvNumber} from '../../config.js';
+import {getRuntime} from '../../runtime.js';
 import {validateOutputPath} from '../../utils/fsSafe.js';
 import {
   getActivePageWithGuard,
@@ -30,7 +31,6 @@ import type {
   ListSessionStatesResult,
   LoadSessionStateParams,
   LoadSessionStateResult,
-  PageRuntimeServices,
   RestoreSessionStateParams,
   RestoreSessionStateResult,
   SaveSessionStateParams,
@@ -174,19 +174,17 @@ function normalizeSnapshot(
 /**
  * 保存当前页面会话状态到内存快照（纯函数版本）。
  *
- * @param runtime - Page 运行时服务
  * @param params - 保存参数
  * @returns 结构化结果 { success, message, tooltype, logFormat, data }
  */
 export async function saveSessionState(
-  runtime: PageRuntimeServices,
   params?: SaveSessionStateParams,
 ): Promise<SaveSessionStateResult> {
   try {
     ensureCleanupLoop();
     cleanupExpiredSessions();
 
-    const page = await getActivePageWithGuard(runtime);
+    const page = await getActivePageWithGuard(getRuntime().contextProvider!);
     const sessionId = params?.sessionId ?? `session_${Date.now()}`;
     const includeCookies = !!params?.includeCookies;
     const includeLocalStorage = !!params?.includeLocalStorage;
@@ -271,12 +269,10 @@ export async function saveSessionState(
 /**
  * 从内存快照恢复会话状态到当前页面（纯函数版本）。
  *
- * @param runtime - Page 运行时服务
  * @param params - 恢复参数
  * @returns 结构化结果 { success, message, tooltype, logFormat, data }
  */
 export async function restoreSessionState(
-  runtime: PageRuntimeServices,
   params: RestoreSessionStateParams,
 ): Promise<RestoreSessionStateResult> {
   try {
@@ -293,7 +289,7 @@ export async function restoreSessionState(
       };
     }
 
-    const page = await runtime.getActivePage();
+    const page = await getRuntime().contextProvider!.getActivePage();
 
     if (params.navigateToSavedUrl !== false) {
       await page.goto(snapshot.url, {waitUntil: 'networkidle'});
@@ -365,12 +361,10 @@ export async function restoreSessionState(
 /**
  * 列出所有内存中的会话快照（纯函数版本）。
  *
- * @param _runtime - Page 运行时服务（未使用）
  * @param _params - 参数（无参数）
  * @returns 结构化结果 { success, message, tooltype, logFormat, data }
  */
 export async function listSessionStates(
-  _runtime?: PageRuntimeServices,
   _params?: ListSessionStatesParams,
 ): Promise<ListSessionStatesResult> {
   ensureCleanupLoop();
@@ -407,12 +401,10 @@ export async function listSessionStates(
 /**
  * 删除一个内存中的会话快照（纯函数版本）。
  *
- * @param _runtime - Page 运行时服务（未使用）
  * @param params - 删除参数
  * @returns 结构化结果 { success, message, tooltype, logFormat, data }
  */
 export async function deleteSessionState(
-  _runtime: PageRuntimeServices,
   params: DeleteSessionStateParams,
 ): Promise<DeleteSessionStateResult> {
   ensureCleanupLoop();
@@ -438,12 +430,10 @@ export async function deleteSessionState(
 /**
  * 导出会话快照为 JSON，可选写入文件（纯函数版本）。
  *
- * @param _runtime - Page 运行时服务（未使用）
  * @param params - 导出参数
  * @returns 结构化结果 { success, message, tooltype, logFormat, data }
  */
 export async function dumpSessionState(
-  _runtime: PageRuntimeServices,
   params: DumpSessionStateParams,
 ): Promise<DumpSessionStateResult> {
   try {
@@ -510,12 +500,10 @@ export async function dumpSessionState(
 /**
  * 从 JSON 字符串或文件加载会话快照到内存（纯函数版本）。
  *
- * @param _runtime - Page 运行时服务（未使用）
  * @param params - 加载参数
  * @returns 结构化结果 { success, message, tooltype, logFormat, data }
  */
 export async function loadSessionState(
-  _runtime: PageRuntimeServices,
   params: LoadSessionStateParams,
 ): Promise<LoadSessionStateResult> {
   try {

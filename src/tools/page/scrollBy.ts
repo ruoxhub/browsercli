@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {getRuntime} from '../../runtime.js';
+
 import type {
-  PageRuntimeServices,
   ScrollByParams,
   ScrollByResult,
 } from './types.js';
@@ -15,16 +16,14 @@ import type {
  *
  * 支持 up/down/top/bottom 方向滚动，自动等待 800ms 触发懒加载内容。
  *
- * @param runtime - Page 运行时服务
  * @param params - 滚动参数（direction, pixels）
  * @returns 结构化结果 { success, message, tooltype, logFormat, data }
  */
 export async function scrollBy(
-  runtime: PageRuntimeServices,
   params: ScrollByParams,
 ): Promise<ScrollByResult> {
   try {
-    const page = await runtime.getActivePage();
+    const page = await getRuntime().contextProvider!.getActivePage();
     const pixels = params.pixels ?? 1000;
 
     const result = await page.evaluate(

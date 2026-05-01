@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {getRuntime} from '../../runtime.js';
+
 import type {
-  NavigationRuntimeServices,
   SelectPageParams,
   SelectPageResult,
   SelectPageData,
@@ -16,22 +17,20 @@ import type {
  *
  * 将指定索引的页面带到前台并切换上下文。
  *
- * @param runtime - Navigation 运行时服务
  * @param params - 选择参数 { pageIdx }
  * @returns 结构化结果 { success, message, tooltype, logFormat, data }
  */
 export async function selectPage(
-  runtime: NavigationRuntimeServices,
   params: SelectPageParams,
 ): Promise<SelectPageResult> {
   const {pageIdx} = params;
   const tooltype = 'select_page';
 
   try {
-    const page = runtime.getPageByIdx(pageIdx);
-    await runtime.bringPageToFront(page);
-    runtime.selectPage(page);
-    runtime.syncPageContext?.(page);
+    const page = getRuntime().contextProvider!.getPageByIdx(pageIdx);
+    await getRuntime().contextProvider!.bringPageToFront(page);
+    getRuntime().contextProvider!.selectPage(page);
+    getRuntime().contextProvider!.syncPageContext?.(page);
 
     const data: SelectPageData = {
       selectedIndex: pageIdx,

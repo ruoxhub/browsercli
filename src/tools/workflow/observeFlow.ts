@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {getRuntime} from '../../runtime.js';
 import {logger} from '../../utils/logger.js';
 
 /**
@@ -136,28 +137,10 @@ export interface ObserveFlowToolResult {
   data?: ObserveFlowReport;
 }
 
-interface ObserveFlowRuntimeServices {
-  collector?: {
-    collect(
-      options: {url: string} & Record<string, unknown>,
-    ): Promise<{
-      files: Array<{
-        url: string;
-        content: string;
-        size: number;
-        type: string;
-      }>;
-      totalSize: number;
-    }>;
-  };
-  getSelectedPage?(): {url(): string} | null;
-}
-
 /**
  * 观察模式工具 - 收集和分析页面脚本
  */
 export async function observeFlow(
-  runtime: ObserveFlowRuntimeServices,
   params: ObserveFlowOptions & {url?: string} = {},
 ): Promise<ObserveFlowToolResult> {
   const {url: paramUrl, ...options} = params;
@@ -167,7 +150,7 @@ export async function observeFlow(
     const startTime = Date.now();
 
     const url =
-      paramUrl ?? runtime.getSelectedPage?.()?.url?.() ?? undefined;
+      paramUrl ?? getRuntime().contextProvider!.getSelectedPage?.()?.url?.() ?? undefined;
 
     // 验证必要的上下文
     if (!url) {
@@ -180,7 +163,7 @@ export async function observeFlow(
     }
 
     // 1. 收集页面脚本
-    const collectResult = await collectScripts(runtime, url, options);
+    const collectResult = await collectScripts(url, options);
     logger.info(`Collected ${collectResult.files.length} scripts`);
 
     // 2. 分析每个脚本
@@ -252,7 +235,6 @@ export async function observeFlow(
  * 收集页面脚本
  */
 async function collectScripts(
-  runtime: ObserveFlowRuntimeServices,
   url: string,
   options: ObserveFlowOptions,
 ): Promise<{
@@ -260,9 +242,10 @@ async function collectScripts(
   totalSize: number;
 }> {
   // 优先使用 CodeCollector 进行真实收集
-  if (runtime.collector) {
+  const collector = getRuntime().contextProvider!.collector;
+  if (collector) {
     try {
-      const result = await runtime.collector.collect({
+      const result = await collector.collect({
         url,
         includeInline: options.includeInline ?? true,
         includeExternal: options.includeExternal ?? true,

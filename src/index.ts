@@ -46,10 +46,11 @@ async function main(): Promise<void> {
   }
 
   // 2. 初始化聚合 Runtime（统一创建 BrowserManager、Collector、LLM 等）
-  const runtime = getRuntime(options);
+  const runtime = getRuntime();
 
   // 4. 将 Runtime 注入 ToolContextProvider，复用同一套服务实例
   const contextProvider = new ToolContextProvider(runtime);
+  runtime.contextProvider = contextProvider;
   await contextProvider.init();
 
   // 5. 创建 RpcClient

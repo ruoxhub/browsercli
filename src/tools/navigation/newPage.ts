@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {getRuntime} from '../../runtime.js';
+
 import type {
-  NavigationRuntimeServices,
   NewPageParams,
   NewPageResult,
   NewPageData,
@@ -19,30 +20,28 @@ const DEFAULT_NAV_TIMEOUT = 10_000;
  *
  * 等待 DOMContentLoaded 事件（非完整页面加载）。
  *
- * @param runtime - Navigation 运行时服务
  * @param params - 创建参数 { url, timeout? }
  * @returns 结构化结果 { success, message, tooltype, logFormat, data }
  */
 export async function newPage(
-  runtime: NavigationRuntimeServices,
   params: NewPageParams,
 ): Promise<NewPageResult> {
   const {url, timeout} = params;
   const tooltype = 'new_page';
 
   try {
-    const page = await runtime.newPage();
+    const page = await getRuntime().contextProvider!.newPage();
 
     // 自动选中新创建的页面
-    runtime.selectPage(page);
-    runtime.syncPageContext?.(page);
+    getRuntime().contextProvider!.selectPage(page);
+    getRuntime().contextProvider!.syncPageContext?.(page);
 
     await page.goto(url, {
       timeout: timeout ?? DEFAULT_NAV_TIMEOUT,
       waitUntil: 'domcontentloaded',
     });
 
-    const pages = runtime.getPages();
+    const pages = getRuntime().contextProvider!.getPages();
     const index = pages.indexOf(page);
 
     const data: NewPageData = {

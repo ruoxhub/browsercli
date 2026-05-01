@@ -5,10 +5,11 @@
  */
 
 import type {
-  ScreenshotRuntimeServices,
   SeekVideoParams,
   SeekVideoResult,
 } from './types.js';
+
+import {getRuntime} from '../../runtime.js';
 
 /**
  * 定位视频到指定时间点（纯函数版本）。
@@ -20,11 +21,10 @@ import type {
  * @returns 结构化结果 { success, message, tooltype, logFormat, data }
  */
 export async function seekVideo(
-  runtime: ScreenshotRuntimeServices,
   params: SeekVideoParams,
 ): Promise<SeekVideoResult> {
   try {
-    const page = await runtime.getActivePage();
+    const page = await getRuntime().contextProvider!.getActivePage();
     await page.evaluate(
       (sel, t) => {
         const video = document.querySelector(sel) as HTMLVideoElement;

@@ -4,11 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {getRuntime} from '../../runtime.js';
+
 import type {
   GetNetworkRequestData,
   GetNetworkRequestParams,
   GetNetworkRequestResult,
-  NetworkRuntimeServices,
 } from './types.js';
 
 /**
@@ -16,21 +17,19 @@ import type {
  *
  * 如果省略 reqid，则尝试从 DevTools UI 当前选中请求获取。
  *
- * @param runtime - Network 运行时服务
  * @param params - 查询参数（可选 reqid）
  * @returns 结构化结果 { success, message, tooltype, logFormat, data }
  */
 export async function getNetworkRequest(
-  runtime: NetworkRuntimeServices,
   params?: GetNetworkRequestParams,
 ): Promise<GetNetworkRequestResult> {
   try {
     // 解析 reqid：显式传入 > DevTools UI 选中
     let reqid = params?.reqid;
     if (!reqid) {
-      const devToolsData = await runtime.getDevToolsData();
+      const devToolsData = await getRuntime().contextProvider!.getDevToolsData();
       if (devToolsData?.cdpRequestId) {
-        reqid = runtime.resolveCdpRequestId(devToolsData.cdpRequestId);
+        reqid = getRuntime().contextProvider!.resolveCdpRequestId(devToolsData.cdpRequestId);
       }
     }
 
@@ -52,7 +51,7 @@ export async function getNetworkRequest(
       };
     }
 
-    const request = runtime.getNetworkRequestById(reqid);
+    const request = getRuntime().contextProvider!.getNetworkRequestById(reqid);
     const httpResponse = await request.response();
 
     // 尝试读取响应体（文本），可通过 params.maxBodyLength 设置，默认 300 字符
@@ -83,7 +82,7 @@ export async function getNetworkRequest(
       statusText: httpResponse?.statusText?.(),
       requestHeaders: request.headers(),
       responseHeaders: httpResponse?.headers() ?? {},
-      initiator: runtime.getRequestInitiator(request),
+      initiator: getRuntime().contextProvider!.getRequestInitiator(request),
       responseBody,
     };
 

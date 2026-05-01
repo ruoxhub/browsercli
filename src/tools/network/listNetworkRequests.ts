@@ -5,6 +5,7 @@
  */
 
 import type {HTTPRequest, ResourceType} from '../../third_party/index.js';
+import {getRuntime} from '../../runtime.js';
 import {resolveActivePageIndex} from '../shared/activePageResolver.js';
 
 import type {
@@ -13,7 +14,6 @@ import type {
   ListNetworkRequestsResult,
   NetworkRequestData,
   NetworkEvidenceCorrelation,
-  NetworkRuntimeServices,
 } from './types.js';
 
 const DEFAULT_WAIT_TIMEOUT_MS = 5000;
@@ -37,7 +37,6 @@ const SIGNATURE_HEADER_PATTERN =
   /(^|[-_])(sign|signature|token|auth|nonce|timestamp)([-_]|$)|x-sign/i;
 
 async function waitForMatchingRequest(
-  runtime: NetworkRuntimeServices,
   options: {
     includePreservedRequests: boolean;
     targetPageIdx: number;
@@ -49,7 +48,7 @@ async function waitForMatchingRequest(
   const deadline = Date.now() + timeoutMs;
 
   while (true) {
-    const requests = runtime.getNetworkRequests(
+    const requests = getRuntime().contextProvider!.getNetworkRequests(
       options.includePreservedRequests,
       options.targetPageIdx,
     );
@@ -90,15 +89,13 @@ function serializeRequest(
 /**
  * 列出当前页面的所有网络请求（纯函数版本）。
  *
- * 从 NetworkRuntimeServices 获取请求数据，
+ * 通过 getRuntime() 获取请求数据，
  * 支持按资源类型过滤和分页。
  *
- * @param runtime - Network 运行时服务
  * @param params - 查询参数（分页、类型过滤等）
  * @returns 结构化结果 { success, message, tooltype, logFormat, data }
  */
 export async function listNetworkRequests(
-  runtime: NetworkRuntimeServices,
   params?: ListNetworkRequestsParams,
 ): Promise<ListNetworkRequestsResult> {
   const resultPageIdx = params?.pageIdx ?? 0;
@@ -108,7 +105,7 @@ export async function listNetworkRequests(
   try {
     const includePreserved = params?.includePreservedRequests ?? false;
     if (params?.targetPageIdx === undefined) {
-      const resolvedPage = resolveActivePageIndex(runtime);
+      const resolvedPage = resolveActivePageIndex(getRuntime().contextProvider!);
       if ('message' in resolvedPage) {
         return {
           success: false,
@@ -129,7 +126,7 @@ export async function listNetworkRequests(
     }
 
     if (params?.waitForRequest) {
-      const matched = await waitForMatchingRequest(runtime, {
+      const matched = await waitForMatchingRequest({
         includePreservedRequests: includePreserved,
         targetPageIdx,
         waitForRequest: params.waitForRequest,
@@ -154,7 +151,7 @@ export async function listNetworkRequests(
       }
     }
 
-    let requests = runtime.getNetworkRequests(includePreserved, targetPageIdx);
+    let requests = getRuntime().contextProvider!.getNetworkRequests(includePreserved, targetPageIdx);
 
     // 按资源类型过滤
     if (params?.resourceTypes?.length) {
@@ -176,7 +173,7 @@ export async function listNetworkRequests(
 
     // 序列化（精简版，仅包含基本信息）
     const allData: NetworkRequestData[] = requests.map(request => {
-      const reqid = runtime.getNetworkRequestStableId(request);
+      const reqid = getRuntime().contextProvider!.getNetworkRequestStableId(request);
       return serializeRequest(request, reqid);
     });
 
@@ -200,7 +197,7 @@ export async function listNetworkRequests(
       timedOut: false,
       ...(params?.includeSignatureEvidence
         ? {
-            evidenceCorrelations: buildEvidenceCorrelations(runtime, requests),
+            evidenceCorrelations: buildEvidenceCorrelations(requests),
           }
         : {}),
     };
@@ -231,12 +228,11 @@ export async function listNetworkRequests(
 }
 
 function buildEvidenceCorrelations(
-  runtime: NetworkRuntimeServices,
   requests: HTTPRequest[],
 ): NetworkEvidenceCorrelation[] {
   return requests
     .map((request): NetworkEvidenceCorrelation | null => {
-      const reqid = runtime.getNetworkRequestStableId(request);
+      const reqid = getRuntime().contextProvider!.getNetworkRequestStableId(request);
       const headers = getRequestHeaders(request);
       const signatureIndicators = Object.keys(headers).filter(key =>
         SIGNATURE_HEADER_PATTERN.test(key),
@@ -248,7 +244,7 @@ function buildEvidenceCorrelations(
       return {
         reqid,
         signatureIndicators,
-        initiator: runtime.getRequestInitiator(request),
+        initiator: getRuntime().contextProvider!.getRequestInitiator(request),
         nextSteps: [
           '调用 get_request_initiator 查看完整调用栈',
           '调用 xhr_to_js_breakpoint 在请求发送前暂停',

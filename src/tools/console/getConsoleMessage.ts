@@ -5,10 +5,10 @@
  */
 
 import type {AggregatedIssue} from '../../third_party/index.js';
+import {getRuntime} from '../../runtime.js';
 
 import type {
   ConsoleMessageEntry,
-  ConsoleRuntimeServices,
   GetConsoleMessageData,
   GetConsoleMessageParams,
   GetConsoleMessageResult,
@@ -23,13 +23,12 @@ import {isAggregatedIssue} from './types.js';
  * @returns 结构化结果 { success, message, tooltype, logFormat, data }
  */
 export async function getConsoleMessage(
-  runtime: ConsoleRuntimeServices,
   params: GetConsoleMessageParams,
 ): Promise<GetConsoleMessageResult> {
   try {
-    const message = runtime.getConsoleMessageById(params.msgid);
+    const message = getRuntime().contextProvider!.getConsoleMessageById(params.msgid);
     const consoleMessageStableId = params.msgid;
-    const sourceMapHints = runtime.getConsoleSourceMapHints?.(message);
+    const sourceMapHints = getRuntime().contextProvider!.getConsoleSourceMapHints?.(message);
 
     let data: GetConsoleMessageData;
 

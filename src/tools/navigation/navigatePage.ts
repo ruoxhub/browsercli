@@ -7,11 +7,12 @@
 import {resolveActivePage} from '../shared/activePageResolver.js';
 import {explainPageError} from '../shared/pageDiagnostics.js';
 
+import {getRuntime} from '../../runtime.js';
+
 import type {
   NavigatePageParams,
   NavigatePageResult,
   NavigatePageData,
-  NavigationRuntimeServices,
 } from './types.js';
 
 // Default navigation timeout in milliseconds (10 seconds)
@@ -25,12 +26,10 @@ type NavType = 'url' | 'back' | 'forward' | 'reload';
  * 支持 URL 导航、前进、后退、刷新操作。
  * 等待 DOMContentLoaded 事件（非完整页面加载）。
  *
- * @param runtime - Navigation 运行时服务
  * @param params - 导航参数 { type?, url?, ignoreCache?, timeout? }
  * @returns 结构化结果 { success, message, tooltype, logFormat, data }
  */
 export async function navigatePage(
-  runtime: NavigationRuntimeServices,
   params: NavigatePageParams,
 ): Promise<NavigatePageResult> {
   const tooltype = 'navigate_page';
@@ -48,7 +47,7 @@ export async function navigatePage(
       };
     }
 
-    const resolvedPage = resolveActivePage(runtime);
+    const resolvedPage = resolveActivePage(getRuntime().contextProvider!);
     if ('message' in resolvedPage) {
       return {
         success: false,

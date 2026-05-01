@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {getRuntime} from '../../runtime.js';
 import {logger} from '../../utils/logger.js';
 
 /**
@@ -84,15 +85,6 @@ export interface AutoHookToolData {
     cryptoLibraries: number;
     timestamp: number;
   };
-}
-
-interface FrameLike {
-  evaluate(script: string): Promise<unknown>;
-}
-
-interface AutoHookRuntimeServices {
-  getSelectedFrame?(): FrameLike | null;
-  getSelectedPage?(): {mainFrame?: () => FrameLike; url?: () => string} | null;
 }
 
 /** 自动 Hook 工具统一返回结构 */
@@ -824,7 +816,7 @@ function _generateCookieHookScript(): string {
     'use strict';
     const hookId = 'hook_cookie_auto';
     ${_generateHookStoreHelpers('hook_cookie_auto')}
-  
+
     const cookieDescriptor = Object.getOwnPropertyDescriptor(Document.prototype, 'cookie');
     if (!cookieDescriptor) {
       pushHookRecord({
@@ -893,9 +885,16 @@ function _generateCookieHookScript(): string {
 /**
  * 检测页面中的加密库（在页面上下文中执行）
  */
-async function detectCryptoLibraries(
-  frame: FrameLike,
-): Promise<CryptoDetectionResult[]> {
+async function detectCryptoLibraries(): Promise<CryptoDetectionResult[]> {
+  const contextProvider = getRuntime().contextProvider!;
+  const selectedPage = contextProvider.getSelectedPage?.() ?? null;
+  const frame =
+    contextProvider.getSelectedFrame?.() ?? selectedPage?.mainFrame?.() ?? null;
+
+  if (!frame) {
+    return [];
+  }
+
   const results = (await frame.evaluate(() => {
     return [
       {
@@ -938,26 +937,6 @@ function mergePresetConfig(options: AutoHookOptions): AutoHookOptions {
     ...presetConfig,
     ...options,
   };
-}
-
-function isRuntimeServices(value: unknown): value is AutoHookRuntimeServices {
-  return !!value && typeof value === 'object';
-}
-
-function resolveAutoHookInvocation(
-  runtimeOrParams?:
-    | AutoHookRuntimeServices
-    | (AutoHookOptions & {url?: string}),
-  maybeParams?: AutoHookOptions & {url?: string},
-): {
-  runtime?: AutoHookRuntimeServices;
-  params: AutoHookOptions & {url?: string};
-} {
-  if (maybeParams !== undefined && isRuntimeServices(runtimeOrParams)) {
-    return {runtime: runtimeOrParams, params: maybeParams};
-  }
-
-  return {params: (runtimeOrParams as AutoHookOptions & {url?: string}) || {}};
 }
 
 function buildHookPlans(
@@ -1057,12 +1036,12 @@ function buildHookPlans(
 }
 
 async function injectHookPlans(
-  runtime: AutoHookRuntimeServices,
   plans: Array<HookInjectionRecord & {script: string}>,
 ): Promise<HookInjectionRecord[]> {
-  const selectedPage = runtime.getSelectedPage?.() ?? null;
+  const contextProvider = getRuntime().contextProvider!;
+  const selectedPage = contextProvider.getSelectedPage?.() ?? null;
   const frame =
-    runtime.getSelectedFrame?.() ?? selectedPage?.mainFrame?.() ?? null;
+    contextProvider.getSelectedFrame?.() ?? selectedPage?.mainFrame?.() ?? null;
 
   if (!frame) {
     throw new Error('auto_hook 需要可用的页面/Frame 才能执行 autoInject');
@@ -1090,15 +1069,8 @@ async function injectHookPlans(
  * 自动 Hook 工具 - 注入调试 Hook 和加密库 Hook
  */
 export async function autoHook(
-  runtimeOrParams:
-    | AutoHookRuntimeServices
-    | (AutoHookOptions & {url?: string}) = {},
-  maybeParams?: AutoHookOptions & {url?: string},
+  params: AutoHookOptions & {url?: string} = {},
 ): Promise<AutoHookToolResult> {
-  const {runtime, params} = resolveAutoHookInvocation(
-    runtimeOrParams,
-    maybeParams,
-  );
   const {url, ...rawOptions} = params;
   const options = mergePresetConfig(rawOptions);
 
@@ -1110,18 +1082,18 @@ export async function autoHook(
   try {
     const hookPlans = buildHookPlans(options);
     hooksInjected =
-      options.autoInject && runtime
-        ? await injectHookPlans(runtime, hookPlans)
+      options.autoInject
+        ? await injectHookPlans(hookPlans)
         : hookPlans.map(({script: _script, ...plan}) => plan);
 
     // 在页面上下文中检测加密库（如果存在 frame）
+    const contextProvider = getRuntime().contextProvider!;
+    const selectedPage = contextProvider.getSelectedPage?.() ?? null;
     const frame =
-      runtime?.getSelectedFrame?.() ??
-      runtime?.getSelectedPage?.()?.mainFrame?.() ??
-      null;
+      contextProvider.getSelectedFrame?.() ?? selectedPage?.mainFrame?.() ?? null;
     if (frame) {
       try {
-        cryptoDetected = await detectCryptoLibraries(frame);
+        cryptoDetected = await detectCryptoLibraries();
       } catch (detectError) {
         logger.warn(
           '[AutoHook] 页面加密库检测失败: ' +
@@ -1143,7 +1115,7 @@ export async function autoHook(
     ).length;
     const failedInjections = hooksInjected.filter(h => !h.success).length;
     const detectedCryptoCount = cryptoDetected.filter(c => c.detected).length;
-    const pageUrl = runtime?.getSelectedPage?.()?.url?.();
+    const pageUrl = getRuntime().contextProvider!.getSelectedPage?.()?.url?.();
 
     const data: AutoHookToolData = {
       url: url || pageUrl || 'unknown',
@@ -1190,7 +1162,7 @@ export async function autoHook(
       error: errorMessage,
       tooltype: 'auto_hook',
       data: {
-        url: url || runtime?.getSelectedPage?.()?.url?.() || 'unknown',
+        url: url || getRuntime().contextProvider!.getSelectedPage?.()?.url?.() || 'unknown',
         hooksInjected,
         cryptoDetected,
       } as AutoHookToolData,

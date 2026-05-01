@@ -5,10 +5,11 @@
  */
 
 import type {
-  ScreenshotRuntimeServices,
   GetVideoInfoParams,
   GetVideoInfoResult,
 } from './types.js';
+
+import {getRuntime} from '../../runtime.js';
 
 /**
  * 获取视频元素信息（纯函数版本）。
@@ -20,11 +21,10 @@ import type {
  * @returns 结构化结果 { success, message, tooltype, logFormat, data }
  */
 export async function getVideoInfo(
-  runtime: ScreenshotRuntimeServices,
   params: GetVideoInfoParams,
 ): Promise<GetVideoInfoResult> {
   try {
-    const page = await runtime.getActivePage();
+    const page = await getRuntime().contextProvider!.getActivePage();
     const info = await page.evaluate(sel => {
       const video = document.querySelector(sel) as HTMLVideoElement;
       if (!video) return null;

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {getRuntime} from '../../runtime.js';
 import {
   getActivePageWithGuard,
   normalizeBrowserRuntimeError,
@@ -14,7 +15,6 @@ import type {
   CheckBrowserHealthParams,
   CheckBrowserHealthResult,
   HealthIssue,
-  PageRuntimeServices,
 } from './types.js';
 
 /**
@@ -22,18 +22,16 @@ import type {
  *
  * 检测浏览器连接、页面就绪状态，并返回问题列表和建议。
  *
- * @param runtime - Page 运行时服务
  * @param _params - 参数（无参数）
  * @returns 结构化结果 { success, message, tooltype, logFormat, data }
  */
 export async function checkBrowserHealth(
-  runtime: PageRuntimeServices,
   _params?: CheckBrowserHealthParams,
 ): Promise<CheckBrowserHealthResult> {
   const issues: HealthIssue[] = [];
-  let connected = runtime.isBrowserConnected();
+  let connected = getRuntime().contextProvider!.isBrowserConnected();
   try {
-    const running = await runtime.isCollectorRunning();
+    const running = await getRuntime().contextProvider!.isCollectorRunning();
     connected = connected || running;
   } catch {
     // Fall through to page-level probes below.
@@ -43,7 +41,7 @@ export async function checkBrowserHealth(
   let url: string | null = null;
   let title: string | null = null;
   try {
-    const page = await getActivePageWithGuard(runtime);
+    const page = await getActivePageWithGuard(getRuntime().contextProvider!);
     pageReady = true;
     connected = true;
     url = page.url();
