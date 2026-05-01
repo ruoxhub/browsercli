@@ -9,7 +9,7 @@ import * as readline from 'node:readline';
 import type {AxiCliCommand} from 'axi-sdk-js';
 
 import {resolveConfig} from '../../config.js';
-import {SekiroInvoker} from '../rpc-invoker.js';
+import {SekiroInvoker} from '../sekiro-invoker.js';
 import type {WorkerContext} from '../types.js';
 import {WorkerManager} from '../worker-manager.js';
 

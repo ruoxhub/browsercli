@@ -19,8 +19,6 @@ describe('help', () => {
       assert.ok(result.includes('JS逆向工程MCP服务'));
       assert.ok(result.includes('call'));
       assert.ok(result.includes('list-tools'));
-      assert.ok(result.includes('call-skill'));
-      assert.ok(result.includes('list-skills'));
     });
 
     it('accepts custom bin name', () => {
@@ -85,19 +83,6 @@ describe('help', () => {
       assert.ok(result!.includes('兼容映射'));
     });
 
-    it('returns help for call-skill command', () => {
-      const result = generateCommandHelp('call-skill');
-      assert.ok(result);
-      assert.ok(result!.includes('<skill-name>'));
-      assert.ok(result!.includes('--data'));
-    });
-
-    it('returns help for list-skills command', () => {
-      const result = generateCommandHelp('list-skills');
-      assert.ok(result);
-      assert.ok(result!.includes('--json'));
-    });
-
     it('returns help for repl command', () => {
       const result = generateCommandHelp('repl');
       assert.ok(result);
@@ -121,9 +106,7 @@ describe('help', () => {
         'stop',
         'status',
         'call',
-        'call-skill',
         'list-tools',
-        'list-skills',
         'repl',
         'scaffold',
       ];
@@ -143,9 +126,7 @@ describe('help', () => {
         'stop',
         'status',
         'call',
-        'call-skill',
         'list-tools',
-        'list-skills',
         'repl',
         'scaffold',
       ];

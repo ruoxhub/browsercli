@@ -23,9 +23,7 @@ export function generateTopLevelHelp(options?: {
     'stop',
     'status',
     'call',
-    'call-skill',
     'list-tools',
-    'list-skills',
     'config',
     'repl',
     'scaffold',
@@ -71,11 +69,6 @@ export function generateCommandHelp(command: string): string | null {
       usage:
         'js-reverse call <tool-or-skill-name> [--param value] [--url <url>] [--data <json>]',
     },
-    'call-skill': {
-      description: '兼容调用旧技能名称，自动转发到对应 Tool',
-      usage:
-        'js-reverse call-skill <skill-name> [--url <url>] [--data <json>]',
-    },
     config: {
       description: '查看/设置/初始化全局配置',
       usage:
@@ -84,10 +77,6 @@ export function generateCommandHelp(command: string): string | null {
     'list-tools': {
       description: '列出所有可用的 MCP 工具及旧技能兼容映射',
       usage: 'js-reverse list-tools [--json]',
-    },
-    'list-skills': {
-      description: '列出旧技能兼容映射，Worker 在线时优先返回运行时列表',
-      usage: 'js-reverse list-skills [--json]',
     },
     repl: {
       description: '启动交互式 REPL 模式',

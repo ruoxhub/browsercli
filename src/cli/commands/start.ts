@@ -10,7 +10,7 @@ import {AxiError} from 'axi-sdk-js';
 import {resolveConfig} from '../../config.js';
 import {parseArgs, getFlag, getBoolFlag} from '../args-parser.js';
 import {successOutput} from '../output.js';
-import {SekiroInvoker} from '../rpc-invoker.js';
+import {SekiroInvoker} from '../sekiro-invoker.js';
 import type {WorkerContext} from '../types.js';
 
 const BROWSER_POLL_ATTEMPTS = 60;

@@ -8,9 +8,7 @@ import type {AxiCliCommand} from 'axi-sdk-js';
 
 import {resolveConfig} from '../config.js';
 
-import {callSkillCommand} from './commands/call-skill.js';
 import {configCommand} from './commands/config.js';
-import {listSkillsCommand} from './commands/list-skills.js';
 import {listToolsCommand} from './commands/list-tools.js';
 import {replCommand} from './commands/repl.js';
 import {scaffoldCommand} from './commands/scaffold.js';
@@ -19,7 +17,7 @@ import {statusCommand} from './commands/status.js';
 import {stopCommand} from './commands/stop.js';
 import {toolDispatcherCommand} from './commands/tool-dispatcher.js';
 import {generateTopLevelHelp} from './help.js';
-import {SekiroInvoker} from './rpc-invoker.js';
+import {SekiroInvoker} from './sekiro-invoker.js';
 import type {WorkerContext} from './types.js';
 import {WorkerManager} from './worker-manager.js';
 
@@ -28,9 +26,7 @@ export const cliVersion = '2.0.3';
 
 export const cliCommands: Record<string, AxiCliCommand<WorkerContext>> = {
   call: toolDispatcherCommand,
-  'call-skill': callSkillCommand,
   config: configCommand,
-  'list-skills': listSkillsCommand,
   'list-tools': listToolsCommand,
   repl: replCommand,
   scaffold: scaffoldCommand,
