@@ -77,7 +77,7 @@ export class RpcClient {
    * 构建 WebSocket 注册 URL
    */
   private buildWebSocketURL(): string {
-    const host = this.config.sekiroHost || 'ws://127.0.0.1:5612';
+    const host = this.config.rpcHost || 'ws://127.0.0.1:5612';
     return `${host}/business/register?group=${this.config.group}&clientId=${this.clientId}`;
   }
 
@@ -124,7 +124,7 @@ export class RpcClient {
    */
   reconnect(newSekiroHost: string): void {
     this.log('正在重新连接...');
-    this.config.sekiroHost = newSekiroHost;
+    this.config.rpcHost = newSekiroHost;
     const wsURL = this.buildWebSocketURL();
     this.log(`切换地址重连：${wsURL}`);
     this._internalDisconnect();
@@ -155,7 +155,7 @@ export class RpcClient {
       group: this.config.group,
       clientId: this.clientId,
       actionCount: this.getActionNames().length,
-      sekiroHost: this.config.sekiroHost,
+      rpcHost: this.config.rpcHost,
     };
   }
 

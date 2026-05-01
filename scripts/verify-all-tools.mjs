@@ -4,7 +4,7 @@
  * verify-all-tools.mjs — 批量调用所有 MCP 工具并生成验证报告
  *
  * 用法：
- *   node scripts/verify-all-tools.mjs [--sekiroHost ws://127.0.0.1:5612] [--group js-reverse] [--timeout 30000] [--concurrency 5] [--output report.json]
+ *   node scripts/verify-all-tools.mjs [--rpcHost ws://127.0.0.1:5612] [--group js-reverse] [--timeout 30000] [--concurrency 5] [--output report.json]
  *
  * 前提：Sekiro Server 和 Worker 均已运行（js-reverse start）
  */
@@ -19,10 +19,10 @@ const ROOT = resolve(__dirname, '..');
 // ─── 参数解析 ───────────────────────────────────────────
 
 function parseArgs(argv) {
-  const args = { sekiroHost: 'ws://127.0.0.1:5612', group: 'js-reverse', timeout: 30000, concurrency: 5, output: '' };
+  const args = { rpcHost: 'ws://127.0.0.1:5612', group: 'js-reverse', timeout: 30000, concurrency: 5, output: '' };
   for (let i = 2; i < argv.length; i++) {
     switch (argv[i]) {
-      case '--sekiroHost': args.sekiroHost = argv[++i]; break;
+      case '--rpcHost': args.rpcHost = argv[++i]; break;
       case '--group': args.group = argv[++i]; break;
       case '--timeout': args.timeout = Number(argv[++i]); break;
       case '--concurrency': args.concurrency = Number(argv[++i]); break;
@@ -75,7 +75,7 @@ async function invokeTool(httpUrl, group, toolName, params, timeout) {
     const result = await response.json();
 
     if (result.status === -1 || result.code === -1) {
-      return { ok: false, status: 'sekiro_error', error: result.message || 'Sekiro action 执行失败', data: null };
+      return { ok: false, status: 'rpc_error', error: result.message || 'Sekiro action 执行失败', data: null };
     }
 
     return { ok: true, status: 'ok', data: result.data ?? result };
@@ -248,7 +248,7 @@ function formatConsoleReport(report) {
 
 async function main() {
   const args = parseArgs(process.argv);
-  const httpUrl = toHttpUrl(args.sekiroHost);
+  const httpUrl = toHttpUrl(args.rpcHost);
   const toolNames = extractToolsFromMeta();
 
   console.log(`\n🔍 JSReverser-MCP 工具验证`);
@@ -262,7 +262,7 @@ async function main() {
     if (!resp.ok && resp.status !== 302) throw new Error(`HTTP ${resp.status}`);
   } catch {
     console.error(`❌ Sekiro Server 不可用: ${httpUrl}`);
-    console.error('   请确保 sekiro-go 已启动且 Worker 已注册');
+    console.error('   请确保 rpc-go 已启动且 Worker 已注册');
     process.exit(1);
   }
   console.log('✓ Sekiro Server 可用\n');

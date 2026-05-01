@@ -15,7 +15,7 @@ import {
 describe('WorkerArgs', () => {
   it('parses supported worker flags into GlobalConfig', () => {
     const config = parseWorkerArgs([
-      '--sekiroHost',
+      '--rpcHost',
       'ws://127.0.0.1:5612',
       '--group',
       'reverse',
@@ -36,7 +36,7 @@ describe('WorkerArgs', () => {
       executablePath: 'C:/Chrome/chrome.exe',
       group: 'reverse',
       headless: true,
-      sekiroHost: 'ws://127.0.0.1:5612',
+      rpcHost: 'ws://127.0.0.1:5612',
       wsEndpoint: 'ws://browser',
     });
   });
@@ -64,7 +64,7 @@ describe('WorkerArgs', () => {
       executablePath: undefined,
       group: 'reverse',
       headless: false,
-      sekiroHost: 'ws://127.0.0.1:5612',
+      rpcHost: 'ws://127.0.0.1:5612',
       wsEndpoint: undefined,
     });
 
@@ -74,7 +74,7 @@ describe('WorkerArgs', () => {
       executablePath: undefined,
       group: 'reverse',
       headless: false,
-      sekiroHost: 'ws://127.0.0.1:5612',
+      rpcHost: 'ws://127.0.0.1:5612',
       wsEndpoint: undefined,
     });
   });

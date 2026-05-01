@@ -14,7 +14,7 @@ function createWorkerContext() {
   const starts: WorkerStartOptions[] = [];
 
   const ctx = {
-    sekiroHost: 'ws://127.0.0.1:5612',
+    rpcHost: 'ws://127.0.0.1:5612',
     group: 'test-group',
     invoker: {
       async isServerAvailable() {
@@ -36,7 +36,7 @@ function createWorkerContext() {
       },
     },
     resolvedConfig: {
-      sekiroHost: 'ws://127.0.0.1:5612',
+      rpcHost: 'ws://127.0.0.1:5612',
       group: 'test-group',
       headless: false,
       runtimeDirName: 'js-reverse',
@@ -59,7 +59,7 @@ describe('start command', () => {
     );
 
     assert.strictEqual(starts.length, 1);
-    assert.strictEqual(starts[0]?.sekiroHost, 'ws://127.0.0.1:5612');
+    assert.strictEqual(starts[0]?.rpcHost, 'ws://127.0.0.1:5612');
     assert.strictEqual(starts[0]?.group, 'test-group');
     assert.strictEqual(starts[0]?.headless, false);
     assert.strictEqual(starts[0]?.databaseUrl, 'postgresql://from-cli/db');

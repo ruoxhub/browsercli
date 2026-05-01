@@ -14,8 +14,8 @@
 # 调用某个工具案例
 node scripts/call_tool/query_dom.js
 
-# 覆盖默认 group / sekiroHost / timeout
-node scripts/call_tool/query_dom.js --group default --sekiroHost ws://127.0.0.1:5612 --timeout 30000
+# 覆盖默认 group / rpcHost / timeout
+node scripts/call_tool/query_dom.js --group default --rpcHost ws://127.0.0.1:5612 --timeout 30000
 
 # 覆盖脚本内示例参数
 node scripts/call_tool/query_dom.js --params '{"selector":"#app","all":true}'

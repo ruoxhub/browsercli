@@ -237,7 +237,7 @@ js-reverse start --browserUrl http://127.0.0.1:9222
 | `--wsEndpoint <endpoint>` | 通过 WebSocket 端点连接      | -                   |
 | `--headless`              | 无头模式运行                 | false               |
 | `--executablePath <path>` | 自定义 Chrome/Edge 路径      | -                   |
-| `--sekiroHost <host>`     | Sekiro Server WebSocket 地址 | ws://127.0.0.1:5612 |
+| `--rpcHost <host>`     | Sekiro Server WebSocket 地址 | ws://127.0.0.1:5612 |
 | `--group <name>`          | Sekiro 分组名                | default             |
 | `--wait-for-browser`      | 等待浏览器可达后再返回       | false               |
 
@@ -248,7 +248,7 @@ js-reverse start --browserUrl http://127.0.0.1:9222
 js-reverse start --browserUrl http://127.0.0.1:9222
 
 # 指定 Sekiro Server 和分组
-js-reverse start --browserUrl http://127.0.0.1:9222 --sekiroHost ws://127.0.0.1:5612 --group my-project
+js-reverse start --browserUrl http://127.0.0.1:9222 --rpcHost ws://127.0.0.1:5612 --group my-project
 
 # 无头模式
 js-reverse start --headless
@@ -291,7 +291,7 @@ js-reverse config --list                 # 列出配置文件路径和来源
 
 |                  | 键                                  | 说明 |
 | ---------------- | ----------------------------------- | ---- |
-| `sekiroHost`     | Sekiro Server WebSocket 地址        |
+| `rpcHost`     | Sekiro Server WebSocket 地址        |
 | `group`          | Sekiro 分组名                       |
 | `browserUrl`     | 浏览器调试 URL                      |
 | `wsEndpoint`     | WebSocket 端点                      |
@@ -315,13 +315,13 @@ js-reverse config --list                 # 列出配置文件路径和来源
 js-reverse config --init
 
 # 设置 Sekiro Server 地址
-js-reverse config --set sekiroHost=ws://127.0.0.1:5612
+js-reverse config --set rpcHost=ws://127.0.0.1:5612
 
 # 设置 OpenAI API Key
 js-reverse config --set openai.apiKey=sk-xxx
 
 # 获取配置项
-js-reverse config --get sekiroHost
+js-reverse config --get rpcHost
 
 # 删除配置项
 js-reverse config --unset browserUrl
@@ -1615,8 +1615,8 @@ js-reverse list-tools --json
 
 ```bash
 js-reverse config --init                      # 初始化配置
-js-reverse config --set sekiroHost=ws://127.0.0.1:5612  # 设置配置
-js-reverse config --get sekiroHost            # 获取配置
+js-reverse config --set rpcHost=ws://127.0.0.1:5612  # 设置配置
+js-reverse config --get rpcHost            # 获取配置
 js-reverse config --list                      # 列出配置来源
 ```
 

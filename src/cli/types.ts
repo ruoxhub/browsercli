@@ -10,11 +10,11 @@
 
 import type {ResolvedConfig} from '../config.js';
 
-import type {SekiroInvoker} from './sekiro-invoker.js';
+import type {SekiroInvoker} from './rpc-invoker.js';
 import type {WorkerManager} from './worker-manager.js';
 
 export interface WorkerContext {
-  sekiroHost: string;
+  rpcHost: string;
   group: string;
   invoker: SekiroInvoker;
   workerManager: WorkerManager;

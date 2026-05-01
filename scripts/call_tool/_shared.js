@@ -8,7 +8,7 @@
 
 function parseArgs(argv) {
   const args = {
-    sekiroHost: 'ws://127.0.0.1:5612',
+    rpcHost: 'ws://127.0.0.1:5612',
     group: 'js-reverse',
     timeout: 30000,
     params: undefined,
@@ -16,8 +16,8 @@ function parseArgs(argv) {
 
   for (let i = 2; i < argv.length; i++) {
     switch (argv[i]) {
-      case '--sekiroHost':
-        args.sekiroHost = argv[++i];
+      case '--rpcHost':
+        args.rpcHost = argv[++i];
         break;
       case '--group':
         args.group = argv[++i];
@@ -72,7 +72,7 @@ async function invokeTool(httpUrl, group, toolName, params, timeout) {
     if (result.status === -1 || result.code === -1) {
       return {
         ok: false,
-        status: 'sekiro_error',
+        status: 'rpc_error',
         error: result.message || 'Sekiro action 执行失败',
         data: result,
       };
@@ -114,7 +114,7 @@ export async function runToolCase({
   callMode,
 }) {
   const args = parseArgs(process.argv);
-  const httpUrl = toHttpUrl(args.sekiroHost);
+  const httpUrl = toHttpUrl(args.rpcHost);
   const finalParams = mergeParams(defaultParams, args.params);
 
   console.log(`\n=== Tool Case ===`);

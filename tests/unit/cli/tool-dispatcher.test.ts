@@ -21,7 +21,7 @@ interface InvokeCall {
 function createWorkerContext() {
   const calls: InvokeCall[] = [];
   const ctx = {
-    sekiroHost: 'http://localhost:5612',
+    rpcHost: 'http://localhost:5612',
     group: 'test-group',
     invoker: {
       async invoke(

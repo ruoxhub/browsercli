@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {CollectCodeOptions} from '../../types/index.js';
 import type {
   CollectCodeParams,
   CollectCodeResult,
@@ -29,7 +30,7 @@ export async function collectCode(
 
   try {
     if (shouldCollect) {
-      await getRuntime().collector.collect(params as Parameters<typeof getRuntime().collector.collect>[0]);
+      await getRuntime().collector.collect(params as CollectCodeOptions);
     }
 
     let data: unknown;
@@ -48,7 +49,7 @@ export async function collectCode(
         params.maxTotalSize,
       );
     } else {
-      data = await getRuntime().collector.collect(params as Parameters<typeof getRuntime().collector.collect>[0]);
+      data = await getRuntime().collector.collect(params as CollectCodeOptions);
     }
 
     return {

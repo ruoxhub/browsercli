@@ -19,7 +19,7 @@ import {statusCommand} from './commands/status.js';
 import {stopCommand} from './commands/stop.js';
 import {toolDispatcherCommand} from './commands/tool-dispatcher.js';
 import {generateTopLevelHelp} from './help.js';
-import {SekiroInvoker} from './sekiro-invoker.js';
+import {SekiroInvoker} from './rpc-invoker.js';
 import type {WorkerContext} from './types.js';
 import {WorkerManager} from './worker-manager.js';
 
@@ -44,11 +44,11 @@ export const homeCommand: AxiCliCommand<WorkerContext> = async () =>
 
 export function createWorkerContext(): WorkerContext {
   const resolvedConfig = resolveConfig();
-  const invoker = new SekiroInvoker({sekiroHost: resolvedConfig.sekiroHost});
+  const invoker = new SekiroInvoker({rpcHost: resolvedConfig.rpcHost});
   const workerManager = new WorkerManager();
 
   return {
-    sekiroHost: resolvedConfig.sekiroHost,
+    rpcHost: resolvedConfig.rpcHost,
     group: resolvedConfig.group,
     invoker,
     workerManager,

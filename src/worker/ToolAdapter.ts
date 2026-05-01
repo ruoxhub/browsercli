@@ -59,7 +59,7 @@ export class ToolAdapter {
    * 将 Tool handler 包装为 Sekiro ActionHandler
    */
   wrapTool(meta: ToolMeta): ActionHandler {
-    return async (sekiroRequest, resolve, reject) => {
+    return async (rpcRequest, resolve, reject) => {
       const startTime = Date.now();
       const toolName = meta.name;
 
@@ -70,7 +70,7 @@ export class ToolAdapter {
           return;
         }
 
-        const params = sekiroRequest.params || {};
+        const params = rpcRequest.params || {};
         const page = this.contextProvider.getSelectedPage();
         const callMode = meta.callMode;
 

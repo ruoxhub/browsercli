@@ -4,8 +4,8 @@ src/cli/commands/scaffold.ts(137,28): error TS2304: Cannot find name 'path'.
 src/cli/commands/scaffold.ts(137,68): error TS2304: Cannot find name 'path'.
 src/cli/commands/scaffold.ts(142,28): error TS2304: Cannot find name 'path'.
 src/cli/commands/scaffold.ts(142,68): error TS2304: Cannot find name 'path'.
-src/cli/commands/start.ts(96,7): error TS2353: Object literal may only specify known properties, and 'sekiroHost' does not exist in type 'WorkerStartOptions'.
-src/cli/worker-manager.ts(47,31): error TS2339: Property 'sekiroHost' does not exist on type 'WorkerStartOptions'.
+src/cli/commands/start.ts(96,7): error TS2353: Object literal may only specify known properties, and 'rpcHost' does not exist in type 'WorkerStartOptions'.
+src/cli/worker-manager.ts(47,31): error TS2339: Property 'rpcHost' does not exist on type 'WorkerStartOptions'.
 src/modules/collector/DOMInspector.ts(136,9): error TS2769: No overload matches this call.
   Overload 1 of 2, '(pageFunction: PageFunction<string, unknown>, arg: string, isolatedContext?: boolean): Promise<unknown>', gave the following error.
     Argument of type '(sel: any, maxLimit: any) => any[]' is not assignable to parameter of type 'PageFunction<string, unknown>'.
@@ -56,10 +56,10 @@ src/modules/collector/PageCollector.ts(366,16): error TS2339: Property 'emit' do
 src/modules/wasm/WasmCollector.ts(5,39): error TS2307: Cannot find module 'puppeteer' or its corresponding type declarations.
 src/modules/wasm/WasmCollector.ts(163,9): error TS2820: Type '"networkidle2"' is not assignable to type '"networkidle" | "load" | "domcontentloaded" | "commit"'. Did you mean '"networkidle"'?
 src/modules/wasm/WasmDecompiler.ts(1,25): error TS2307: Cannot find module 'wabt' or its corresponding type declarations.
-src/protocol/Client.ts(79,30): error TS2339: Property 'sekiroHost' does not exist on type 'RpcClientConfig'.
-src/protocol/Client.ts(126,17): error TS2339: Property 'sekiroHost' does not exist on type 'RpcClientConfig'.
-src/protocol/Client.ts(157,7): error TS2353: Object literal may only specify known properties, and 'sekiroHost' does not exist in type 'ClientStatus'.
-src/protocol/Client.ts(157,31): error TS2339: Property 'sekiroHost' does not exist on type 'RpcClientConfig'.
+src/protocol/Client.ts(79,30): error TS2339: Property 'rpcHost' does not exist on type 'RpcClientConfig'.
+src/protocol/Client.ts(126,17): error TS2339: Property 'rpcHost' does not exist on type 'RpcClientConfig'.
+src/protocol/Client.ts(157,7): error TS2353: Object literal may only specify known properties, and 'rpcHost' does not exist in type 'ClientStatus'.
+src/protocol/Client.ts(157,31): error TS2339: Property 'rpcHost' does not exist on type 'RpcClientConfig'.
 src/tools/console/types.ts(8,14): error TS2724: '"../../third_party/index.js"' has no exported member named 'ConsoleMessageType'. Did you mean 'ConsoleMessage'?
 src/tools/debugger/evaluateInPageRuntime.ts(29,25): error TS2339: Property 'evaluate' does not exist on type 'never'.
 src/tools/dom/WaitForHelper.ts(47,47): error TS2339: Property 'isClosed' does not exist on type 'CDPSession'.
@@ -104,9 +104,9 @@ src/tools/screenshot/seekVideo.ts(29,7): error TS2769: No overload matches this 
 src/tools/screenshot/takeScreenshot.ts(56,9): error TS2353: Object literal may only specify known properties, and 'optimizeForSpeed' does not exist in type 'PageScreenshotOptions'.
 src/tools/workflow/autoHook.ts(899,41): error TS2345: Argument of type '() => { name: string; detected: boolean; }[]' is not assignable to parameter of type 'string'.
 src/utils/keyboard.ts(7,14): error TS2305: Module '"../third_party/index.js"' has no exported member 'KeyInput'.
-src/worker/WorkerArgs.ts(11,28): error TS2344: Type '"headless" | "sekiroHost" | "group"' does not satisfy the constraint 'keyof WorkerStartOptions'.
-  Type '"sekiroHost"' is not assignable to type 'keyof WorkerStartOptions'.
-src/worker/WorkerArgs.ts(69,5): error TS2353: Object literal may only specify known properties, and 'sekiroHost' does not exist in type 'WorkerStartOptions'.
+src/worker/WorkerArgs.ts(11,28): error TS2344: Type '"headless" | "rpcHost" | "group"' does not satisfy the constraint 'keyof WorkerStartOptions'.
+  Type '"rpcHost"' is not assignable to type 'keyof WorkerStartOptions'.
+src/worker/WorkerArgs.ts(69,5): error TS2353: Object literal may only specify known properties, and 'rpcHost' does not exist in type 'WorkerStartOptions'.
 tests/bin/repl.test.ts(10,60): error TS2307: Cannot find module '../../src/bin/repl.js' or its corresponding type declarations.
 tests/bin/scaffold.test.ts(12,25): error TS2307: Cannot find module '../../src/bin/scaffold.js' or its corresponding type declarations.
 tests/integration/gemini-cli.integration.test.ts(20,32): error TS2307: Cannot find module '../../src/services/GeminiProvider.js' or its corresponding type declarations.
@@ -131,7 +131,7 @@ tests/unit/browser/BrowserManager.mocked.test.ts(12,8): error TS2307: Cannot fin
 tests/unit/browser/BrowserManager.test.ts(16,30): error TS2307: Cannot find module '../../../src/browser.js' or its corresponding type declarations.
 tests/unit/cli/output.test.ts(11,3): error TS2305: Module '"../../../src/cli/output.js"' has no exported member 'renderError'.
 tests/unit/cli/output.test.ts(12,3): error TS2305: Module '"../../../src/cli/output.js"' has no exported member 'renderOutput'.
-tests/unit/cli/start.test.ts(62,35): error TS2339: Property 'sekiroHost' does not exist on type 'WorkerStartOptions'.
+tests/unit/cli/start.test.ts(62,35): error TS2339: Property 'rpcHost' does not exist on type 'WorkerStartOptions'.
 tests/unit/compat/backward-compatibility.test.ts(11,31): error TS2307: Cannot find module '../../../src/tools/console.js' or its corresponding type declarations.
 tests/unit/compat/backward-compatibility.test.ts(12,32): error TS2307: Cannot find module '../../../src/tools/debugger.js' or its corresponding type declarations.
 tests/unit/compat/backward-compatibility.test.ts(13,31): error TS2307: Cannot find module '../../../src/tools/network.js' or its corresponding type declarations.

@@ -45,7 +45,7 @@ export class WorkerManager {
 
     // 构造 Worker 启动参数
     const workerArgs: string[] = [
-      '--sekiroHost', options.sekiroHost,
+      '--rpcHost', options.rpcHost,
       '--group', options.group,
     ];
     if (options.browserUrl) workerArgs.push('--browserUrl', options.browserUrl);

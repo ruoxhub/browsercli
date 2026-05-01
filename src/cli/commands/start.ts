@@ -10,7 +10,7 @@ import {AxiError} from 'axi-sdk-js';
 import {resolveConfig} from '../../config.js';
 import {parseArgs, getFlag, getBoolFlag} from '../args-parser.js';
 import {successOutput} from '../output.js';
-import {SekiroInvoker} from '../sekiro-invoker.js';
+import {SekiroInvoker} from '../rpc-invoker.js';
 import type {WorkerContext} from '../types.js';
 
 const BROWSER_POLL_ATTEMPTS = 60;
@@ -58,7 +58,7 @@ export const startCommand: AxiCliCommand<WorkerContext> = async (
 
   // 合并配置：CLI 参数 > 环境变量 > 配置文件 > 默认值
   const cfg = resolveConfig({
-    sekiroHost: getFlag(parsed, 'sekiroHost') || ctx?.resolvedConfig.sekiroHost,
+    rpcHost: getFlag(parsed, 'rpcHost') || ctx?.resolvedConfig.rpcHost,
     group: getFlag(parsed, 'group') || ctx?.resolvedConfig.group,
     browserUrl: browserUrl || ctx?.resolvedConfig.browserUrl,
     wsEndpoint: wsEndpoint || ctx?.resolvedConfig.wsEndpoint,
@@ -68,17 +68,17 @@ export const startCommand: AxiCliCommand<WorkerContext> = async (
   });
 
   // 1. 检查 Sekiro Server 是否可用
-  const invoker = ctx?.invoker ?? new SekiroInvoker({sekiroHost: cfg.sekiroHost});
+  const invoker = ctx?.invoker ?? new SekiroInvoker({rpcHost: cfg.rpcHost});
   const serverAvailable = await invoker.isServerAvailable();
   if (!serverAvailable) {
     throw new AxiError(
-      `Sekiro Server 不可用: ${cfg.sekiroHost} (HTTP: ${invoker.getHttpUrl()})`,
+      `Sekiro Server 不可用: ${cfg.rpcHost} (HTTP: ${invoker.getHttpUrl()})`,
       'SEKIRO_UNAVAILABLE',
       [
-        '请先启动 sekiro-go Server',
-        '下载地址: https://github.com/yint-tech/sekiro-go',
-        '默认启动: ./sekiro-go --port 5612',
-        `确认端口监听: netstat -ano | findstr "${cfg.sekiroHost.split(':').pop()}"`,
+        '请先启动 rpc-go Server',
+        '下载地址: https://github.com/yint-tech/rpc-go',
+        '默认启动: ./rpc-go --port 5612',
+        `确认端口监听: netstat -ano | findstr "${cfg.rpcHost.split(':').pop()}"`,
       ],
     );
   }
@@ -94,7 +94,7 @@ export const startCommand: AxiCliCommand<WorkerContext> = async (
   // 3. spawn Worker 进程
   if (workerManager) {
     await workerManager.start({
-      sekiroHost: cfg.sekiroHost,
+      rpcHost: cfg.rpcHost,
       group: cfg.group,
       browserUrl: cfg.browserUrl,
       wsEndpoint: cfg.wsEndpoint,
@@ -118,7 +118,7 @@ export const startCommand: AxiCliCommand<WorkerContext> = async (
   return successOutput({
     command: 'start',
     message: 'Worker 启动成功，已连接到 Sekiro Server',
-    sekiroHost: cfg.sekiroHost,
+    rpcHost: cfg.rpcHost,
     group: cfg.group,
     ...(waitForBrowser && cfg.browserUrl && {browserUrl: cfg.browserUrl, waitedForBrowser: true}),
   });

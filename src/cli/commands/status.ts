@@ -27,7 +27,7 @@ export const statusCommand: AxiCliCommand<WorkerContext> = async (
   }
 
   // 检查 Sekiro Server 连接状态
-  let sekiroConnected = false;
+  let rpcConnected = false;
   let onlineClients = 0;
   const cfg = ctx?.resolvedConfig;
   const invoker = ctx?.invoker;
@@ -38,9 +38,9 @@ export const statusCommand: AxiCliCommand<WorkerContext> = async (
       // Sekiro clientQueue 返回格式: {data: [...], status: 0}
       const clientList = clients.data ?? clients.clients;
       onlineClients = Array.isArray(clientList) ? clientList.length : 0;
-      sekiroConnected = onlineClients > 0;
+      rpcConnected = onlineClients > 0;
     } catch {
-      sekiroConnected = false;
+      rpcConnected = false;
     }
   }
 
@@ -48,14 +48,14 @@ export const statusCommand: AxiCliCommand<WorkerContext> = async (
     command: 'status',
     running: true,
     pid,
-    sekiroConnected,
+    rpcConnected,
     onlineClients,
   };
 
-  if (!sekiroConnected) {
+  if (!rpcConnected) {
     output.warnings = [
       'Worker 运行中但未连接到 Sekiro Server',
-      '工具调用将会失败，请检查 sekiro-go Server 状态',
+      '工具调用将会失败，请检查 rpc-go Server 状态',
     ];
     output.status = 'warn';
   }

@@ -9,7 +9,7 @@ import * as readline from 'node:readline';
 import type {AxiCliCommand} from 'axi-sdk-js';
 
 import {resolveConfig} from '../../config.js';
-import {SekiroInvoker} from '../sekiro-invoker.js';
+import {SekiroInvoker} from '../rpc-invoker.js';
 import type {WorkerContext} from '../types.js';
 import {WorkerManager} from '../worker-manager.js';
 
@@ -219,7 +219,7 @@ export async function complete(input: string): Promise<string[]> {
 export const replCommand: AxiCliCommand<WorkerContext> = async (_args, ctx) => {
   const cfg = ctx?.resolvedConfig ?? resolveConfig();
   const invoker =
-    ctx?.invoker ?? new SekiroInvoker({sekiroHost: cfg.sekiroHost});
+    ctx?.invoker ?? new SekiroInvoker({rpcHost: cfg.rpcHost});
   const workerManager = ctx?.workerManager ?? new WorkerManager();
 
   const session = new ReplSession(invoker, workerManager, cfg.group);

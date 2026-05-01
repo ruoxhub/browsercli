@@ -49,7 +49,7 @@ export {
   deleteUserConfigValue,
   showConfigInfo,
 } from '../config.js';
-export {SekiroInvoker} from './sekiro-invoker.js';
+export {SekiroInvoker} from './rpc-invoker.js';
 export {WorkerManager} from './worker-manager.js';
 export {callSkillCommand} from './commands/call-skill.js';
 export {startCommand} from './commands/start.js';

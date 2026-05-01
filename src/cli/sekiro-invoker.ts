@@ -18,7 +18,7 @@
 
 /** SekiroInvoker 配置 */
 interface SekiroInvokerConfig {
-  sekiroHost: string;
+  rpcHost: string;
   /** invoke 超时 ms（默认 30000） */
   invokeTimeout?: number;
   /** 查询类操作超时 ms（默认 5000） */
@@ -48,9 +48,9 @@ export class SekiroInvoker {
   private readonly retryDelay: number;
 
   constructor(config: SekiroInvokerConfig) {
-    // sekiroHost 是 WebSocket 地址如 ws://127.0.0.1:5612，需转为 HTTP
+    // rpcHost 是 WebSocket 地址如 ws://127.0.0.1:5612，需转为 HTTP
     // ws:// → http://, wss:// → https://
-    this.baseUrl = config.sekiroHost
+    this.baseUrl = config.rpcHost
       .replace(/^wss:\/\//, 'https://')
       .replace(/^ws:\/\//, 'http://')
       .replace(/\/$/, '');

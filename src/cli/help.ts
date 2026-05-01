@@ -56,7 +56,7 @@ export function generateCommandHelp(command: string): string | null {
     start: {
       description: '启动 Worker 并连接到 Sekiro Server',
       usage:
-        'js-reverse start [--browserUrl <url>] [--wsEndpoint <endpoint>] [--sekiroHost <host>] [--group <name>] [--wait-for-browser] [--headless]',
+        'js-reverse start [--browserUrl <url>] [--wsEndpoint <endpoint>] [--rpcHost <host>] [--group <name>] [--wait-for-browser] [--headless]',
     },
     stop: {
       description: '停止 Worker 进程',

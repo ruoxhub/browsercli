@@ -38,7 +38,7 @@ import type {WorkerContext} from '../types.js';
 
 /** 配置键 → 描述 */
 const CONFIG_KEY_DESCRIPTIONS: Record<string, string> = {
-  sekiroHost: 'Sekiro Server WebSocket 地址',
+  rpcHost: 'Sekiro Server WebSocket 地址',
   group: 'Sekiro 分组名',
   browserUrl: '浏览器调试 URL',
   wsEndpoint: 'WebSocket 端点',
@@ -70,7 +70,7 @@ function parseSetValue(raw: string): {key: string; value: string} {
     throw new AxiError(
       `--set 格式错误：${raw}`,
       'VALIDATION_ERROR',
-      ['正确格式：--set key=value', '示例：--set sekiroHost=ws://127.0.0.1:5612'],
+      ['正确格式：--set key=value', '示例：--set rpcHost=ws://127.0.0.1:5612'],
     );
   }
   return {key: raw.slice(0, eqIdx), value: raw.slice(eqIdx + 1)};

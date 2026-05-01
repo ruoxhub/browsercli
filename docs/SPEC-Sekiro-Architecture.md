@@ -18,7 +18,7 @@
 | D2 | Sekiro Server 部署方式 | 独立进程（Go 进程） | 多客户端可连接，职责分离 |
 | D3 | Tools 执行位置 | 独立 Worker（Sekiro Client） | Server 只路由，Worker 持有浏览器状态，可独立扩缩 |
 | D4 | MCP stdio 接口 | 删除，仅保留 CLI 交互 | 架构大幅简化 |
-| D5 | Sekiro Client SDK | 直接改造现有 `sekiro.ts` 为 Node.js 版 | 核心逻辑平台无关，只需替换 WebSocket 实现 |
+| D5 | Sekiro Client SDK | 直接改造现有 `rpc.ts` 为 Node.js 版 | 核心逻辑平台无关，只需替换 WebSocket 实现 |
 | D6 | Tool 桥接方式 | 适配器层（ToolAdapter） | 保护 90+ 现有 Tools 不需改动 |
 | D7 | Skills 定位 | 与 Tools 同级，注册为 Sekiro Action | 统一注册和调用模型 |
 | D8 | 实施策略 | Big Bang 重构 | 目标就是去 Daemon 化，双轨和内嵌方案都保留 Daemon |
@@ -69,8 +69,8 @@
 
 ### 核心流程
 
-1. `js-reverse start` → CLI spawn Worker 进程 + 确认 sekiro-go Server 可用
-2. Worker 启动 → 连接 sekiro-go Server → 注册 group + Actions
+1. `js-reverse start` → CLI spawn Worker 进程 + 确认 rpc-go Server 可用
+2. Worker 启动 → 连接 rpc-go Server → 注册 group + Actions
 3. CLI 调用 → HTTP POST `/business/invoke` → Server 路由到 Worker → Worker 执行 → 结果原路返回
 4. Skills 和 Tools 同级注册为 Action，由同一个 Worker 处理
 
@@ -82,7 +82,7 @@
 
 ## 4. Protocol Layer — SekiroClient Node.js 改造
 
-### 改造 `src/protocol/sekiro.ts`
+### 改造 `src/protocol/rpc.ts`
 
 | 改动点 | 当前（浏览器端） | 改造后（Node.js） |
 |--------|----------------|------------------|
@@ -90,12 +90,12 @@
 | 定时器 | `window.setTimeout` | `setTimeout`（全局） |
 | `isConnected()` | `socket.readyState === WebSocket.OPEN` | `socket.readyState === WebSocket.OPEN`（ws 包兼容） |
 | window 导出 | `typeof window !== 'undefined'` 守卫 | 删除，改为标准 ES 导出 |
-| 类型依赖 | `import from '../types/sekiro'`（不存在） | 新建 `src/types/sekiro.ts` |
+| 类型依赖 | `import from '../types/rpc'`（不存在） | 新建 `src/types/rpc.ts` |
 | 重连机制 | 固定 2s | 可配置重连间隔 + 指数退避 |
 | 心跳 | 无 | 新增 ping/pong 心跳，防止连接空闲断开 |
-| 注册协议 | WebSocket URL 拼接 `group` + `clientId` | 对齐 sekiro-go 的 `C_REGISTER` 协议 |
+| 注册协议 | WebSocket URL 拼接 `group` + `clientId` | 对齐 rpc-go 的 `C_REGISTER` 协议 |
 
-### 新建类型文件 `src/types/sekiro.ts`
+### 新建类型文件 `src/types/rpc.ts`
 
 ```typescript
 interface RpcRequest {
@@ -126,16 +126,16 @@ type ActionHandler = (
 ```typescript
 interface RpcClientConfig {
   group: string;
-  sekiroHost: string;  // e.g. ws://127.0.0.1:5620
+  rpcHost: string;  // e.g. ws://127.0.0.1:5620
   clientId?: string;
 }
 
 class RpcClient {
-  private sekiro: SekiroClient;
+  private rpc: SekiroClient;
   private actions: Map<string, ActionHandler>;
 
   constructor(config: RpcClientConfig) {
-    this.sekiro = new SekiroClient(wsURL);
+    this.rpc = new SekiroClient(wsURL);
     this.actions = new Map();
   }
 
@@ -148,10 +148,10 @@ class RpcClient {
 
 ### 文件变更
 
-- 改造：`src/protocol/sekiro.ts`（浏览器 → Node.js）
+- 改造：`src/protocol/rpc.ts`（浏览器 → Node.js）
 - 重写：`src/protocol/Client.ts`（BaseClient → RpcClient）
 - 删除：`src/protocol/baseClient.ts`（已被 Client.ts 替代）
-- 新建：`src/types/sekiro.ts`
+- 新建：`src/types/rpc.ts`
 - 新建：`src/types/platform.ts`（RpcClientConfig 等类型）
 
 ## 5. Worker Layer — ToolAdapter 与 Action 注册
@@ -159,10 +159,10 @@ class RpcClient {
 ### Worker 启动流程
 
 ```
-1. 解析 CLI 参数 (--sekiroHost, --group, --browserUrl 等)
+1. 解析 CLI 参数 (--rpcHost, --group, --browserUrl 等)
 2. 初始化 BrowserManager (连接/启动浏览器)
 3. 初始化 JSHookRuntime (全局服务集合)
-4. 创建 RpcClient，连接到 sekiro-go Server
+4. 创建 RpcClient，连接到 rpc-go Server
 5. 通过 ToolAdapter 注册所有 Tools 为 Sekiro Actions
 6. 注册 Skills 为 Sekiro Actions
 7. 进入运行状态，等待 Server 转发请求
@@ -184,8 +184,8 @@ class ToolAdapter {
    * Action: handler(request, resolve, reject) => void
    */
   wrapTool(tool: ToolDefinition): ActionHandler {
-    return (sekiroRequest, resolve, reject) => {
-      const toolRequest = { params: sekiroRequest.params || {} };
+    return (rpcRequest, resolve, reject) => {
+      const toolRequest = { params: rpcRequest.params || {} };
       const toolResponse = new ToolResponseAccumulator();
       const toolContext = new ToolContextProvider(this.runtime);
 
@@ -279,7 +279,7 @@ client.registerAction(`skill_${skill.name}`, (request, resolve, reject) => {
 
 | 命令 | 当前实现 | 新实现 |
 |------|---------|--------|
-| `js-reverse start` | spawn Daemon 进程 | spawn Worker 进程 + 检查 sekiro-go 可用性 |
+| `js-reverse start` | spawn Daemon 进程 | spawn Worker 进程 + 检查 rpc-go 可用性 |
 | `js-reverse stop` | IPC `{method:'stop'}` | 发送 SIGTERM 给 Worker 进程 |
 | `js-reverse status` | IPC `{method:'status'}` | HTTP GET `/business/clientQueue?group=...` + Worker 进程状态 |
 | `js-reverse list-tools` | IPC `{method:'list_tools'}` | HTTP GET `/business/invoke?group=...&action=_list_tools` |
@@ -296,8 +296,8 @@ client.registerAction(`skill_${skill.name}`, (request, resolve, reject) => {
 class SekiroInvoker {
   private baseUrl: string;
 
-  constructor(config: { sekiroHost: string }) {
-    this.baseUrl = config.sekiroHost;
+  constructor(config: { rpcHost: string }) {
+    this.baseUrl = config.rpcHost;
   }
 
   async invoke(group: string, action: string, params?: Record<string, unknown>): Promise<unknown>;
@@ -321,18 +321,18 @@ class WorkerManager {
 ### `js-reverse start` 新流程
 
 ```
-1. 解析参数 (--sekiroHost, --group, --browserUrl 等)
-2. 检查 sekiro-go Server 是否可用
-   ├─ 不可用 → 提示用户先启动 sekiro-go Server，退出
+1. 解析参数 (--rpcHost, --group, --browserUrl 等)
+2. 检查 rpc-go Server 是否可用
+   ├─ 不可用 → 提示用户先启动 rpc-go Server，退出
    └─ 可用 → 继续
 3. spawn Worker 进程
 4. 轮询等待 Worker 注册到 Server
-5. 输出 "Worker 已启动，连接到 sekiro-go Server"
+5. 输出 "Worker 已启动，连接到 rpc-go Server"
 ```
 
 ### 文件变更
 
-- 新建：`src/cli/sekiro-invoker.ts`
+- 新建：`src/cli/rpc-invoker.ts`
 - 新建：`src/cli/worker-manager.ts`
 - 改造：`src/cli/commands/start.ts`
 - 改造：`src/cli/commands/tool-dispatcher.ts`
@@ -362,10 +362,10 @@ STOPPED ──start()──► STARTING ──► CONNECTING
 |------|---------|
 | Worker → Server WebSocket 断开 | 指数退避重连（2s → 4s → 8s → 30s 封顶），重连成功后重新注册所有 Actions |
 | Worker 浏览器连接断开 | 标记当前 Action 返回错误，不自动重连浏览器 |
-| Tool 执行超时 | 由 sekiro-go 的 TimeoutManager 统一控制（默认 30s） |
+| Tool 执行超时 | 由 rpc-go 的 TimeoutManager 统一控制（默认 30s） |
 | Tool 执行异常 | ToolAdapter 的 catch 捕获，调用 `reject(errorMessage)` |
 | Worker 进程崩溃 | CLI 的 WorkerManager 监听 exit 事件，输出错误信息，不自动重启 |
-| sekiro-go Server 不可用 | CLI start 命令前置检查，拒绝启动 |
+| rpc-go Server 不可用 | CLI start 命令前置检查，拒绝启动 |
 
 ### 日志
 
@@ -387,25 +387,25 @@ Worker 收到 SIGTERM:
 
 | 阶段 | 内容 | 依赖 |
 |------|------|------|
-| Phase 1 | 新建 `src/types/sekiro.ts` + `src/types/platform.ts`，改造 `src/protocol/sekiro.ts` 为 Node.js 版 | 无 |
+| Phase 1 | 新建 `src/types/rpc.ts` + `src/types/platform.ts`，改造 `src/protocol/rpc.ts` 为 Node.js 版 | 无 |
 | Phase 2 | 重写 `src/protocol/Client.ts`（BaseClient → RpcClient） | Phase 1 |
 | Phase 3 | 新建 Worker 层（`src/worker/`：index、ToolAdapter、ToolResponseAccumulator、ToolContextProvider） | Phase 2 |
-| Phase 4 | 新建 CLI 层（`src/cli/sekiro-invoker.ts`、`src/cli/worker-manager.ts`），改造 CLI 命令 | Phase 3 |
+| Phase 4 | 新建 CLI 层（`src/cli/rpc-invoker.ts`、`src/cli/worker-manager.ts`），改造 CLI 命令 | Phase 3 |
 | Phase 5 | 删除 Daemon 层（`src/daemon/`）、MCP 入口（`src/bin/js-reverse-mcp`），清理 IPC 相关代码 | Phase 4 |
 
 ## 9. 完整文件变更清单
 
 | 操作 | 文件 | 说明 |
 |------|------|------|
-| 新建 | `src/types/sekiro.ts` | Sekiro 协议类型定义 |
+| 新建 | `src/types/rpc.ts` | Sekiro 协议类型定义 |
 | 新建 | `src/types/platform.ts` | RpcClientConfig 等平台类型 |
-| 改造 | `src/protocol/sekiro.ts` | 浏览器端 → Node.js（ws 包、删 window、加重连/心跳） |
+| 改造 | `src/protocol/rpc.ts` | 浏览器端 → Node.js（ws 包、删 window、加重连/心跳） |
 | 重写 | `src/protocol/Client.ts` | BaseClient → RpcClient |
 | 新建 | `src/worker/index.ts` | Worker 进程入口 |
 | 新建 | `src/worker/ToolAdapter.ts` | Tool handler → Sekiro Action 适配器 |
 | 新建 | `src/worker/ToolResponseAccumulator.ts` | Response accumulator |
 | 新建 | `src/worker/ToolContextProvider.ts` | Context 提供者 |
-| 新建 | `src/cli/sekiro-invoker.ts` | Sekiro HTTP API 调用方 |
+| 新建 | `src/cli/rpc-invoker.ts` | Sekiro HTTP API 调用方 |
 | 新建 | `src/cli/worker-manager.ts` | Worker 进程生命周期管理 |
 | 改造 | `src/cli/commands/start.ts` | spawn Worker 替代 spawn Daemon |
 | 改造 | `src/cli/commands/tool-dispatcher.ts` | SekiroInvoker 替代 IPC |
@@ -429,7 +429,7 @@ Worker 收到 SIGTERM:
 
 | 风险 | 缓解措施 |
 |------|---------|
-| sekiro-go Server 需要额外部署 | CLI start 前置检查 + 清晰的错误提示 |
+| rpc-go Server 需要额外部署 | CLI start 前置检查 + 清晰的错误提示 |
 | Worker 崩溃后需手动重启 | 未来可加自动重启策略，当前保持简单 |
 | ToolAdapter 适配器可能遗漏 response/context 方法 | 逐步迁移 + 测试覆盖 |
 | 现有测试基于 Daemon 架构 | Phase 5 同步改造测试 |

@@ -3,7 +3,7 @@
  * verify-network-requests.mjs — 验证 list_network_requests 工具
  *
  * 用法：
- *   node scripts/verify-network-requests.mjs [--sekiroHost ws://127.0.0.1:5612] [--group js-reverse]
+ *   node scripts/verify-network-requests.mjs [--rpcHost ws://127.0.0.1:5612] [--group js-reverse]
  *
  * 前提：Sekiro Server 和 Worker 均已运行（js-reverse start）
  */
@@ -13,10 +13,10 @@ import { readFileSync } from 'node:fs';
 // ─── 参数解析 ───────────────────────────────────────────
 
 function parseArgs(argv) {
-  const args = { sekiroHost: 'ws://127.0.0.1:5612', group: 'js-reverse', timeout: 30000 };
+  const args = { rpcHost: 'ws://127.0.0.1:5612', group: 'js-reverse', timeout: 30000 };
   for (let i = 2; i < argv.length; i++) {
     switch (argv[i]) {
-      case '--sekiroHost': args.sekiroHost = argv[++i]; break;
+      case '--rpcHost': args.rpcHost = argv[++i]; break;
       case '--group': args.group = argv[++i]; break;
       case '--timeout': args.timeout = Number(argv[++i]); break;
     }
@@ -50,7 +50,7 @@ async function invokeTool(httpUrl, group, toolName, params, timeout) {
     const result = await response.json();
 
     if (result.status === -1 || result.code === -1) {
-      return { ok: false, status: 'sekiro_error', error: result.message || 'Sekiro action 执行失败', data: null };
+      return { ok: false, status: 'rpc_error', error: result.message || 'Sekiro action 执行失败', data: null };
     }
 
     return { ok: true, status: 'success', data: result };
@@ -76,7 +76,7 @@ function printResult(label, result) {
 
 async function main() {
   const args = parseArgs(process.argv);
-  const httpUrl = toHttpUrl(args.sekiroHost);
+  const httpUrl = toHttpUrl(args.rpcHost);
 
   console.log(`🚀 验证网络请求工具`);
   console.log(`   Sekiro HTTP: ${httpUrl}`);

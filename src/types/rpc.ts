@@ -41,7 +41,7 @@ type RpcConnectionState =
 /** SekiroClient 配置选项 */
 interface RpcClientOptions {
   /** WebSocket URL 前缀，如 ws://127.0.0.1:5612 */
-  sekiroHost: string;
+  rpcHost: string;
   /** 分组名 */
   group: string;
   /** 客户端 ID（默认自动生成） */
