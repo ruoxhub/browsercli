@@ -5,6 +5,7 @@
  */
 
 import {getRuntime} from '../../runtime.js';
+import {withOperationTimeout} from '../shared/browserRuntime.js';
 import {
   buildRequestFingerprints,
   buildPriorityTargets,
@@ -165,7 +166,11 @@ export async function analyzeTarget(
   const maxFingerprints = params.maxFingerprints ?? 12;
 
   const {collectResult, normalizedFiles, candidateFiles, analysisCode} =
-    await collectAnalyzeTargetCode(runtime, params);
+    await withOperationTimeout(
+      collectAnalyzeTargetCode(runtime, params),
+      'analyze_target 代码收集',
+      10000,
+    );
   const injectedHooks = await installAnalyzeHooks(runtime, hookPreset, autoInjectHooks);
 
   const replayResults = params.autoReplayActions?.length
@@ -176,10 +181,14 @@ export async function analyzeTarget(
     await new Promise(resolve => setTimeout(resolve, params.waitAfterHookMs));
   }
 
-  const [understand, crypto] = await Promise.all([
-    runtime.analyzer.understand({code: analysisCode, focus: 'security'}),
-    runtime.cryptoDetector.detect({code: analysisCode}),
-  ]);
+  const [understand, crypto] = await withOperationTimeout(
+    Promise.all([
+      runtime.analyzer.understand({code: analysisCode, focus: 'security'}),
+      runtime.cryptoDetector.detect({code: analysisCode}),
+    ]),
+    'analyze_target 安全分析',
+    10000,
+  );
 
   const deobfuscation = params.runDeobfuscation
     ? await runtime.deobfuscator.deobfuscate({

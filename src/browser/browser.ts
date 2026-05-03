@@ -489,17 +489,23 @@ export class BrowserManager {
   }
 
   /**
-   * Create a new page in the browser
+   * Create a new page in the browser with full initialization.
+   *
+   * Initialization chain (参考 old-source BrowserModeManager):
+   * 1. 确保 BrowserContext 存在
+   * 2. 创建新页面（不复用已有页面）
+   * 3. 启用缓存、绕过 CSP
+   * 4. 追踪当前页面
    */
   async newPage(): Promise<Page> {
     const browser = await this.ensureBrowser();
     let ctx = this.context ?? browser.contexts()[0];
     if (!ctx) {
-      ctx = await browser.newContext();
+      // bypassCSP 为 context 级选项，在创建 context 时设置
+      ctx = await browser.newContext({bypassCSP: true});
       this.context = ctx;
     }
-    const pages = ctx.pages();
-    const page = pages.length > 0 ? pages[0] : await ctx.newPage();
+    const page = await ctx.newPage();
     this.trackCurrentPage(page);
     return page;
   }
@@ -820,6 +826,9 @@ export class BrowserManager {
       });
 
       logger.debug('Browser launched successfully');
+
+      // 获取默认 BrowserContext
+      this.context = this.browser.contexts()[0] ?? undefined;
 
       // Set up crash detection
       this.setupCrashDetection();

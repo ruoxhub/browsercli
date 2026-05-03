@@ -87,6 +87,9 @@ export class ToolAdapter {
             reject(`Tool "${toolName}" 需要页面上下文，但当前没有可用页面`);
             return;
           }
+        } else if (callMode === 'context') {
+          // context 模式：handler(contextProvider, params) — 传递 ToolContextProvider 作为第一个参数
+          result = await handler(this.contextProvider, params);
         } else {
           // params-only 或未指定：handler(params)
           result = await handler(params);

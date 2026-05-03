@@ -95,10 +95,19 @@ export async function summarizeCode(
     return summarizeBatch(params.files ?? []);
   }
 
+  if (!params.code || params.code.trim() === '') {
+    return {
+      success: false,
+      message: 'summarize_code requires a non-empty "code" parameter in single mode',
+      tooltype: 'summarize',
+      data: {} as SummarizeFileResult['data'],
+    };
+  }
+
   const file: CodeFile = {
     url: params.url ?? 'inline-input.js',
-    content: params.code ?? '',
-    size: (params.code ?? '').length,
+    content: params.code,
+    size: params.code.length,
     type: 'inline',
   };
   return summarizeFile(file);

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type ToolCallMode = 'runtime' | 'frame' | 'params-only';
+export type ToolCallMode = 'runtime' | 'frame' | 'params-only' | 'context';
 
 export interface ToolMeta {
   name: string;
@@ -390,7 +390,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'setBreakpoint',
-    callMode: 'params-only',
+    callMode: 'context',
   },
   {
     name: 'remove_breakpoint',
@@ -398,7 +398,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'removeBreakpoint',
-    callMode: 'params-only',
+    callMode: 'context',
   },
   {
     name: 'list_breakpoints',
@@ -406,7 +406,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'listBreakpoints',
-    callMode: 'params-only',
+    callMode: 'context',
   },
   {
     name: 'step_into',
@@ -414,7 +414,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'stepInto',
-    callMode: 'params-only',
+    callMode: 'context',
   },
   {
     name: 'step_over',
@@ -422,7 +422,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'stepOver',
-    callMode: 'params-only',
+    callMode: 'context',
   },
   {
     name: 'step_out',
@@ -430,7 +430,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'stepOut',
-    callMode: 'params-only',
+    callMode: 'context',
   },
   {
     name: 'resume',
@@ -438,7 +438,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'resume',
-    callMode: 'params-only',
+    callMode: 'context',
   },
   {
     name: 'pause',
@@ -446,7 +446,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'pause',
-    callMode: 'params-only',
+    callMode: 'context',
   },
   {
     name: 'list_scripts',
@@ -454,7 +454,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {filter: 'string'},
     modulePath: './debugger/index.js',
     handlerName: 'listScripts',
-    callMode: 'params-only',
+    callMode: 'context',
   },
   {
     name: 'get_script_source',
@@ -464,7 +464,7 @@ export const TOOLS_META: ToolMeta[] = [
     },
     modulePath: './debugger/index.js',
     handlerName: 'getScriptSource',
-    callMode: 'params-only',
+    callMode: 'context',
   },
   {
     name: 'search_in_sources',
@@ -472,7 +472,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'searchInSources',
-    callMode: 'params-only',
+    callMode: 'context',
   },
   {
     name: 'get_storage',
@@ -488,7 +488,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'breakOnXhr',
-    callMode: 'params-only',
+    callMode: 'context',
   },
   {
     name: 'remove_xhr_breakpoint',
@@ -496,7 +496,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'removeXhrBreakpoint',
-    callMode: 'params-only',
+    callMode: 'context',
   },
   {
     name: 'monitor_events',
@@ -525,7 +525,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'traceFunction',
-    callMode: 'params-only',
+    callMode: 'context',
   },
   {
     name: 'get_ai_debug_status',
@@ -533,7 +533,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'getAiDebugStatus',
-    callMode: 'params-only',
+    callMode: 'context',
   },
   {
     name: 'inspect_object',
@@ -557,7 +557,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'findInScript',
-    callMode: 'params-only',
+    callMode: 'context',
   },
   {
     name: 'get_request_initiator',
@@ -565,7 +565,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'getRequestInitiator',
-    callMode: 'params-only',
+    callMode: 'context',
   },
   {
     name: 'get_paused_info',
@@ -573,7 +573,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'getPausedInfo',
-    callMode: 'params-only',
+    callMode: 'context',
   },
   {
     name: 'evaluate_on_callframe',
@@ -581,7 +581,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'evaluateOnCallframe',
-    callMode: 'params-only',
+    callMode: 'context',
   },
   {
     name: 'inspect_locals',
@@ -589,7 +589,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'inspectLocals',
-    callMode: 'params-only',
+    callMode: 'context',
   },
   {
     name: 'set_breakpoint_on_text',
@@ -597,7 +597,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'setBreakpointOnText',
-    callMode: 'params-only',
+    callMode: 'context',
   },
   {
     name: 'hook_function',
@@ -621,7 +621,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'xhrToJsBreakpoint',
-    callMode: 'params-only',
+    callMode: 'context',
   },
   {
     name: 'start_continuous_debugging',
@@ -629,7 +629,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'startContinuousDebugging',
-    callMode: 'params-only',
+    callMode: 'context',
   },
   {
     name: 'stop_continuous_debugging',
@@ -637,7 +637,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'stopContinuousDebugging',
-    callMode: 'params-only',
+    callMode: 'context',
   },
   {
     name: 'create_hook',

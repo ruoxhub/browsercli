@@ -33,7 +33,16 @@ export async function takeScreenshot(
   params: TakeScreenshotParams = {},
 ): Promise<TakeScreenshotResult> {
   try {
-    const page = await getActivePageWithGuard(getRuntime().contextProvider!);
+    const contextProvider = getRuntime().contextProvider;
+    if (!contextProvider) {
+      return {
+        success: false,
+        message: '截图失败: 浏览器上下文尚未初始化',
+        tooltype: 'take_screenshot',
+        logFormat: 'json',
+      };
+    }
+    const page = await getActivePageWithGuard(contextProvider);
     const format = params.format || 'png';
     const quality = format === 'png' ? undefined : params.quality;
     if (quality !== undefined && (quality < 0 || quality > 100)) {

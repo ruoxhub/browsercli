@@ -5,6 +5,7 @@
  */
 
 import {getRuntime} from '../../runtime.js';
+import {withOperationTimeout} from '../shared/browserRuntime.js';
 import type {RiskPanelResult} from './types.js';
 
 export async function riskPanel(
@@ -63,13 +64,17 @@ export async function riskPanel(
     code = top.files.map(file => `// ${file.url}\n${file.content}`).join('\n\n');
   }
 
-  const [understand, crypto] = await Promise.all([
-    runtime.analyzer.understand({
-      code: code ?? '',
-      focus: 'security',
-    }),
-    runtime.cryptoDetector.detect({code: code ?? ''}),
-  ]);
+  const [understand, crypto] = await withOperationTimeout(
+    Promise.all([
+      runtime.analyzer.understand({
+        code: code ?? '',
+        focus: 'security',
+      }),
+      runtime.cryptoDetector.detect({code: code ?? ''}),
+    ]),
+    'risk_panel 分析',
+    10000,
+  );
 
   const securityRisks = Array.isArray(understand.securityRisks)
     ? understand.securityRisks

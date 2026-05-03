@@ -48,9 +48,16 @@ async function main(): Promise<void> {
   // 2. 初始化聚合 Runtime（统一创建 BrowserManager、Collector、LLM 等）
   const runtime = getRuntime();
 
+  // 3. 确保浏览器已连接并获取 BrowserContext
+  const browser = await runtime.browserManager.ensureBrowser();
+  const browserContext = runtime.browserManager.getContext() ?? browser.contexts()[0] ?? null;
+
   // 4. 将 Runtime 注入 ToolContextProvider，复用同一套服务实例
   const contextProvider = new ToolContextProvider(runtime);
   runtime.contextProvider = contextProvider;
+  if (browserContext) {
+    contextProvider.setContext(browserContext);
+  }
   await contextProvider.init();
 
   // 5. 创建 RpcClient

@@ -24,7 +24,16 @@ export async function getVideoInfo(
   params: GetVideoInfoParams,
 ): Promise<GetVideoInfoResult> {
   try {
-    const page = await getRuntime().contextProvider!.getActivePage();
+    const contextProvider = getRuntime().contextProvider;
+    if (!contextProvider) {
+      return {
+        success: false,
+        message: '获取视频信息失败: 浏览器上下文尚未初始化',
+        tooltype: 'get_video_info',
+        logFormat: 'json',
+      };
+    }
+    const page = await contextProvider.getActivePage();
     const info = await page.evaluate(sel => {
       const video = document.querySelector(sel) as HTMLVideoElement;
       if (!video) return null;

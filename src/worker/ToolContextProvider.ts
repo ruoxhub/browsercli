@@ -41,39 +41,23 @@ import type {HTTPRequest} from '../third_party/index.js';
 import type {RequestInitiator} from '../tools/network/types.js';
 import type {WebSocketData} from '../tools/network/WebSocketCollector.js';
 import {DebuggerContext} from '../utils/DebuggerContext.js';
+import {
+  NetworkRequestCollector,
+  ConsoleMessageCollector,
+  WsCollector,
+  type TrackedRequest,
+  type TrackedConsoleMessage,
+  type TrackedWebSocketData,
+} from './collectors.js';
 
 type TraceResult = unknown;
-
-/**
- * 带稳定 ID 的请求记录
- */
-interface TrackedRequest {
-  stableId: number;
-  request: Request;
-  initiator?: RequestInitiator;
-}
 
 /**
  * 单个 Page 的导航分组存储
  * navigations[0] 为当前导航，后续为保留的历史导航
  */
 type PageRequestStorage = TrackedRequest[][];
-
-/**
- * 带稳定 ID 的 Console 记录
- */
-interface TrackedConsoleMessage {
-  stableId: number;
-  message: ConsoleMessage | Error;
-}
-
 type PageConsoleStorage = TrackedConsoleMessage[][];
-
-/**
- * WebSocket 内部存储，扩展 WebSocketData 以携带 stableId
- */
-type TrackedWebSocketData = WebSocketData & {stableId: number};
-
 type PageWebSocketStorage = TrackedWebSocketData[][];
 
 const DEFAULT_TIMEOUT = 5_000;
@@ -152,6 +136,11 @@ export class ToolContextProvider {
   >();
   private _webSocketRequestIdCounters = new WeakMap<Page, number>();
 
+  // ─── PageCollector 实例（新架构，逐步替代上面的内联收集） ──
+  private _networkCollector: NetworkRequestCollector | null = null;
+  private _consoleCollector: ConsoleMessageCollector | null = null;
+  private _wsCollector: WsCollector | null = null;
+
   // ─── Dialog / 超时 / 条件 ────────────────────────────
   private _dialog?: Dialog;
   private _networkConditionsMap = new WeakMap<Page, string>();
@@ -176,6 +165,19 @@ export class ToolContextProvider {
       throw new Error('ToolContextProvider 已销毁，无法重新初始化');
     }
     await this.syncPages();
+
+    // 创建 PageCollector 实例并启动上下文收集
+    this._networkCollector = new NetworkRequestCollector();
+    this._consoleCollector = new ConsoleMessageCollector();
+    this._wsCollector = new WsCollector();
+
+    if (this._context) {
+      this._networkCollector.startContextCollection(this._context);
+      this._consoleCollector.startContextCollection(this._context);
+      this._wsCollector.startContextCollection(this._context);
+    }
+
+    // 兼容：保留内联收集逻辑（后续逐步移除）
     for (const page of this.pagesList) {
       if (!this._networkStorage.has(page)) {
         this._attachPageListeners(page);
@@ -224,6 +226,14 @@ export class ToolContextProvider {
     this._webSocketStorage = new WeakMap();
     this._networkConditionsMap = new WeakMap();
     this._cpuThrottlingRateMap = new WeakMap();
+
+    // 清理 PageCollector 实例
+    this._networkCollector?.dispose();
+    this._consoleCollector?.dispose();
+    this._wsCollector?.dispose();
+    this._networkCollector = null;
+    this._consoleCollector = null;
+    this._wsCollector = null;
   }
 
   // ─── Browser / Context 管理 ──────────────────────────
@@ -266,6 +276,20 @@ export class ToolContextProvider {
 
   getContext(): BrowserContext | null {
     return this._context;
+  }
+
+  // ─── PageCollector 访问 ───────────────────────────────
+
+  get networkCollector(): NetworkRequestCollector | null {
+    return this._networkCollector;
+  }
+
+  get consoleCollector(): ConsoleMessageCollector | null {
+    return this._consoleCollector;
+  }
+
+  get wsCollector(): WsCollector | null {
+    return this._wsCollector;
   }
 
   // ─── NavigationRuntimeServices ──────────────────────

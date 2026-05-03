@@ -71,18 +71,6 @@ function failure(tooltype: string, message: string): DebuggerResult {
   return {success: false, message, tooltype};
 }
 
-function getRuntime(runtime: unknown): DebuggerRuntime {
-  if (
-    runtime &&
-    typeof runtime === 'object' &&
-    'getDebuggerContext' in runtime &&
-    typeof runtime.getDebuggerContext === 'function'
-  ) {
-    return runtime as DebuggerRuntime;
-  }
-  throw new Error('缺少调试运行时上下文');
-}
-
 function ensureString(
   value: unknown,
   name: string,
@@ -160,7 +148,17 @@ function findMatches(
 }
 
 async function getDebugger(runtime: DebuggerRuntime) {
-  return await runtime.getDebuggerContext();
+  if (!runtime || typeof runtime.getDebuggerContext !== 'function') {
+    throw new Error(
+      '缺少调试运行时上下文。请确保已选择页面且调试器可用。',
+    );
+  }
+  try {
+    return await runtime.getDebuggerContext();
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    throw new Error(`获取调试上下文失败: ${detail}`);
+  }
 }
 
 function getTraceFrame(runtime: DebuggerRuntime) {
