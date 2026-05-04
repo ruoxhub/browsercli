@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export {hookCryptoJS} from './hookCryptoJS.js';
-export {hookJSEncrypt} from './hookJSEncrypt.js';
-export {hookSMCrypto} from './hookSMCrypto.js';
+export {hookCryptoJS} from './CryptoJS.js';
+export {hookJSEncrypt} from './JSEncrypt.js';
+export {hookSMCrypto} from './SMCrypto.js';
 export type {
   HookResult,
   LogFormat,

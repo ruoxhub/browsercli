@@ -6,7 +6,7 @@
 
 import type {ConsoleMessage, Frame, Page, Request, WebSocket as PlaywrightWebSocket} from 'patchright';
 
-import {PageCollector} from '../utils/PageCollector.js';
+import {PageCollector} from '../PageCollector.js';
 import type {RequestInitiator} from '../tools/network/types.js';
 import type {WebSocketData} from '../tools/network/WebSocketCollector.js';
 
