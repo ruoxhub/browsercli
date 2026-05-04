@@ -4,118 +4,103 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {defineTool} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
+
 import {resolveActivePage} from '../shared/activePageResolver.js';
 import {explainPageError} from '../shared/pageDiagnostics.js';
 
-import {getRuntime} from '../../runtime.js';
-
-import type {
-  NavigatePageParams,
-  NavigatePageResult,
-  NavigatePageData,
-} from './types.js';
+import type {ToolContextProvider} from '../../worker/ToolContextProvider.js';
 
 // Default navigation timeout in milliseconds (10 seconds)
 const DEFAULT_NAV_TIMEOUT = 10_000;
 
 type NavType = 'url' | 'back' | 'forward' | 'reload';
 
-/**
- * 导航当前页面（纯函数版本）。
- *
- * 支持 URL 导航、前进、后退、刷新操作。
- * 等待 DOMContentLoaded 事件（非完整页面加载）。
- *
- * @param params - 导航参数 { type?, url?, ignoreCache?, timeout? }
- * @returns 结构化结果 { success, message, tooltype, logFormat, data }
- */
-export async function navigatePage(
-  params: NavigatePageParams,
-): Promise<NavigatePageResult> {
-  const tooltype = 'navigate_page';
-  const navType: NavType = params.type ?? 'url';
-  const timeout = params.timeout ?? DEFAULT_NAV_TIMEOUT;
-  const options = {timeout, waitUntil: 'domcontentloaded' as const};
+const actionLabel: Record<NavType, string> = {
+  url: '导航到',
+  back: '后退导航',
+  forward: '前进导航',
+  reload: '刷新页面',
+};
 
-  try {
-    if (navType === 'url' && !params.url) {
-      return {
-        success: false,
-        message: '导航类型为 url 时必须提供 url 参数',
-        tooltype,
-        logFormat: 'simple',
-      };
+/**
+ * 导航当前页面，支持 URL 导航、前进、后退、刷新操作。
+ */
+export const navigatePage = defineTool({
+  name: 'navigate_page',
+  description:
+    'Navigate the current page. Supports URL navigation, back, forward, and reload. Waits for DOMContentLoaded event.',
+  annotations: {
+    title: '导航页面',
+    category: ToolCategory.NAVIGATION,
+    readOnlyHint: false,
+  },
+  schema: {
+    type: zod
+      .enum(['url', 'back', 'forward', 'reload'])
+      .optional()
+      .describe('导航类型（默认 url）。'),
+    url: zod
+      .string()
+      .optional()
+      .describe('目标 URL（仅 type=url 时使用）。'),
+    ignoreCache: zod
+      .boolean()
+      .optional()
+      .describe('是否忽略缓存（仅 reload 时使用）。'),
+    timeout: zod
+      .number()
+      .int()
+      .optional()
+      .describe('导航超时（毫秒），默认 10000。'),
+  },
+  handler: async (request, response, context) => {
+    const runtime = context as unknown as ToolContextProvider;
+    const navType: NavType = request.params.type ?? 'url';
+    const timeout = request.params.timeout ?? DEFAULT_NAV_TIMEOUT;
+    const options = {timeout, waitUntil: 'domcontentloaded' as const};
+
+    if (navType === 'url' && !request.params.url) {
+      response.appendResponseLine('导航类型为 url 时必须提供 url 参数。');
+      return;
     }
 
-    const resolvedPage = resolveActivePage(getRuntime().contextProvider!);
-    if ('message' in resolvedPage) {
-      return {
-        success: false,
-        message: resolvedPage.message,
-        tooltype,
-        logFormat: 'simple',
-        data: {
-          type: navType,
-          url: '',
-          navigated: false,
-        },
-      };
+    const resolvedPage = resolveActivePage(runtime);
+    if (!resolvedPage.ok) {
+      response.appendResponseLine(resolvedPage.message);
+      return;
     }
 
     const page = resolvedPage.page;
 
-    switch (navType) {
-      case 'url':
-        await page.goto(params.url!, options);
-        break;
-      case 'back':
-        await page.goBack(options);
-        break;
-      case 'forward':
-        await page.goForward(options);
-        break;
-      case 'reload':
-        if (params.ignoreCache) {
-          // Playwright: reload() does not support ignoreCache, use CDP
-          const client = await page.context().newCDPSession(page);
-          await client.send('Page.reload', {ignoreCache: true});
-        } else {
-          await page.reload(options);
-        }
-        break;
+    try {
+      switch (navType) {
+        case 'url':
+          await page.goto(request.params.url!, options);
+          break;
+        case 'back':
+          await page.goBack(options);
+          break;
+        case 'forward':
+          await page.goForward(options);
+          break;
+        case 'reload':
+          if (request.params.ignoreCache) {
+            const client = await page.context().newCDPSession(page);
+            await client.send('Page.reload', {ignoreCache: true});
+          } else {
+            await page.reload(options);
+          }
+          break;
+      }
+
+      response.appendResponseLine(
+        `已${actionLabel[navType]}${navType === 'url' ? ` ${request.params.url}` : ''}，当前 URL: ${page.url()}`,
+      );
+    } catch (error) {
+      response.appendResponseLine(explainPageError(error, '导航'));
     }
-
-    const data: NavigatePageData = {
-      type: navType,
-      url: page.url(),
-      navigated: true,
-    };
-
-    const actionLabel: Record<NavType, string> = {
-      url: `导航到 ${params.url}`,
-      back: '后退导航',
-      forward: '前进导航',
-      reload: '刷新页面',
-    };
-
-    return {
-      success: true,
-      message: `已${actionLabel[navType]}，当前 URL: ${page.url()}`,
-      tooltype,
-      logFormat: 'simple',
-      data,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: explainPageError(error, '导航'),
-      tooltype,
-      logFormat: 'simple',
-      data: {
-        type: navType,
-        url: '',
-        navigated: false,
-      },
-    };
-  }
-}
+  },
+});

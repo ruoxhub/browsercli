@@ -4,53 +4,46 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {getRuntime} from '../../runtime.js';
+import {defineTool} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
 
-import type {
-  SelectPageParams,
-  SelectPageResult,
-  SelectPageData,
-} from './types.js';
+import type {ToolContextProvider} from '../../worker/ToolContextProvider.js';
 
 /**
- * 按索引选择页面（纯函数版本）。
- *
- * 将指定索引的页面带到前台并切换上下文。
- *
- * @param params - 选择参数 { pageIdx }
- * @returns 结构化结果 { success, message, tooltype, logFormat, data }
+ * 按索引选择页面，将指定页面带到前台并切换上下文。
  */
-export async function selectPage(
-  params: SelectPageParams,
-): Promise<SelectPageResult> {
-  const {pageIdx} = params;
-  const tooltype = 'select_page';
+export const selectPage = defineTool({
+  name: 'select_page',
+  description:
+    'Select a page by index to bring it to the foreground and switch context. Use list_pages first to find the page index.',
+  annotations: {
+    title: '选择页面',
+    category: ToolCategory.NAVIGATION,
+    readOnlyHint: false,
+  },
+  schema: {
+    pageIdx: zod
+      .number()
+      .int()
+      .describe('页面索引（从 list_pages 获取）.'),
+  },
+  handler: async (request, response, context) => {
+    const runtime = context as unknown as ToolContextProvider;
+    const {pageIdx} = request.params;
 
-  try {
-    const page = getRuntime().contextProvider!.getPageByIdx(pageIdx);
-    await getRuntime().contextProvider!.bringPageToFront(page);
-    getRuntime().contextProvider!.selectPage(page);
-    getRuntime().contextProvider!.syncPageContext?.(page);
+    try {
+      const page = runtime.getPageByIdx(pageIdx);
+      await runtime.bringPageToFront(page);
+      runtime.selectPage(page);
+      runtime.syncPageContext(page);
 
-    const data: SelectPageData = {
-      selectedIndex: pageIdx,
-      url: page.url(),
-      title: await page.title(),
-    };
-
-    return {
-      success: true,
-      message: `已选择页面 ${pageIdx}: ${page.url()}`,
-      tooltype,
-      logFormat: 'simple',
-      data,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `选择页面失败：${error instanceof Error ? error.message : String(error)}`,
-      tooltype,
-      logFormat: 'simple',
-    };
-  }
-}
+      response.appendResponseLine(`已选择页面 ${pageIdx}: ${page.url()}`);
+      response.appendResponseLine(`标题: ${await page.title()}`);
+    } catch (error) {
+      response.appendResponseLine(
+        `选择页面失败：${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  },
+});

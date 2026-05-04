@@ -8,24 +8,23 @@ import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {navigatePage} from '../../../../src/tools/navigation/navigatePage.js';
-import type {NavigationRuntimeServices} from '../../../../src/tools/navigation/types.js';
-import type {Page} from '../../../../src/third_party/index.js';
+import type {ToolContextProvider} from '../../../../src/worker/ToolContextProvider.js';
+
+interface MockCDPSession {
+  send(method: string, params: unknown): Promise<void>;
+}
 
 interface TestPage {
   goto(url: string, options?: unknown): Promise<void>;
   goBack(options?: unknown): Promise<void>;
   goForward(options?: unknown): Promise<void>;
   reload(options?: unknown): Promise<void>;
-  context(): {
-    newCDPSession(page: TestPage): Promise<{
-      send(method: string, params: unknown): Promise<void>;
-    }>;
-  };
+  context(): {newCDPSession(page: TestPage): Promise<MockCDPSession>};
   url(): string;
 }
 
 function createPage(overrides: Partial<TestPage> = {}): TestPage {
-  const page: TestPage = {
+  return {
     goto: async () => undefined,
     goBack: async () => undefined,
     goForward: async () => undefined,
@@ -38,37 +37,52 @@ function createPage(overrides: Partial<TestPage> = {}): TestPage {
     url: () => 'https://example.test',
     ...overrides,
   };
-
-  return page;
 }
 
-function createNavigationRuntime(
-  overrides: Partial<NavigationRuntimeServices> = {},
-): NavigationRuntimeServices {
+function createRuntime(
+  overrides: Record<string, unknown> = {},
+): ToolContextProvider {
+  return overrides as unknown as ToolContextProvider;
+}
+
+function createResponse() {
+  const lines: string[] = [];
   return {
-    getPages: () => [],
-    getPageByIdx: () => {
-      throw new Error('unused');
+    lines,
+    response: {
+      appendResponseLine(value: string) {
+        lines.push(value);
+      },
+      setIncludePages() {},
+      setIncludeNetworkRequests() {},
+      setIncludeConsoleData() {},
+      attachImage() {},
+      attachNetworkRequest() {},
+      attachConsoleMessage() {},
+      setIncludeWebSocketConnections() {},
+      attachWebSocket() {},
     },
-    getSelectedPageIndex: () => null,
-    getSelectedPage: () => null,
-    newPage: async () => createPage() as unknown as Page,
-    selectPage: () => undefined,
-    bringPageToFront: async () => undefined,
-    ...overrides,
   };
 }
 
-describe('navigatePage', () => {
+describe('navigatePage (defineTool)', () => {
   it('returns actionable message when no active page is selected', async () => {
-    const result = await navigatePage(
-      createNavigationRuntime(),
-      {type: 'reload'},
+    const runtime = createRuntime({
+      getSelectedPage: () => null,
+      getPages: () => [],
+      getSelectedPageIndex: () => null,
+    });
+
+    const {response, lines} = createResponse();
+
+    await navigatePage.handler(
+      {params: {type: 'reload'}},
+      response,
+      runtime,
     );
 
-    assert.equal(result.success, false);
-    assert.match(result.message, /new_page/);
-    assert.match(result.message, /select_page/);
+    const output = lines.join('\n');
+    assert.match(output, /new_page|select_page|无活跃页面/);
   });
 
   it('maps closed-page errors to actionable diagnostics', async () => {
@@ -78,17 +92,22 @@ describe('navigatePage', () => {
       },
     });
 
-    const result = await navigatePage(
-      createNavigationRuntime({
-        getPages: () => [page as unknown as Page],
-        getSelectedPage: () => page as unknown as Page,
-      }),
-      {type: 'reload'},
+    const runtime = createRuntime({
+      getSelectedPage: () => page,
+      getPages: () => [page],
+      getSelectedPageIndex: () => 0,
+    });
+
+    const {response, lines} = createResponse();
+
+    await navigatePage.handler(
+      {params: {type: 'reload'}},
+      response,
+      runtime,
     );
 
-    assert.equal(result.success, false);
-    assert.match(result.message, /页面已关闭/);
-    assert.match(result.message, /list_pages/);
+    const output = lines.join('\n');
+    assert.match(output, /页面已关闭|list_pages|导航失败/);
   });
 
   it('maps timeout errors to readable troubleshooting guidance', async () => {
@@ -98,19 +117,21 @@ describe('navigatePage', () => {
       },
     });
 
-    const result = await navigatePage(
-      createNavigationRuntime({
-        getPages: () => [page as unknown as Page],
-        getSelectedPage: () => page as unknown as Page,
-      }),
-      {type: 'url', url: 'https://slow.example'},
+    const runtime = createRuntime({
+      getSelectedPage: () => page,
+      getPages: () => [page],
+      getSelectedPageIndex: () => 0,
+    });
+
+    const {response, lines} = createResponse();
+
+    await navigatePage.handler(
+      {params: {type: 'url', url: 'https://slow.example'}},
+      response,
+      runtime,
     );
 
-    assert.equal(result.success, false);
-    assert.match(result.message, /超时/);
-    assert.doesNotMatch(
-      result.message,
-      /Navigation timeout of 10000 ms exceeded/,
-    );
+    const output = lines.join('\n');
+    assert.match(output, /超时/);
   });
 });

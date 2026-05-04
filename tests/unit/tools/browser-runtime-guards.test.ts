@@ -12,6 +12,26 @@ import {checkBrowserHealth} from '../../../src/tools/page/checkBrowserHealth.js'
 import {saveSessionState} from '../../../src/tools/page/sessionState.js';
 import {takeScreenshot} from '../../../src/tools/screenshot/takeScreenshot.js';
 
+function createResponse() {
+  const lines: string[] = [];
+  return {
+    lines,
+    response: {
+      appendResponseLine(value: string) {
+        lines.push(value);
+      },
+      setIncludePages() {},
+      setIncludeNetworkRequests() {},
+      setIncludeConsoleData() {},
+      attachImage() {},
+      attachNetworkRequest() {},
+      attachConsoleMessage() {},
+      setIncludeWebSocketConnections() {},
+      attachWebSocket() {},
+    },
+  };
+}
+
 describe('browser runtime guards', () => {
   it('maps fetch failed into a diagnosable browser-health issue', async () => {
     const result = await checkBrowserHealth(
@@ -36,41 +56,43 @@ describe('browser runtime guards', () => {
   });
 
   it('degrades list_pages when one title probe is unavailable', async () => {
-    const result = await listPages(
-      {
-        getPages: () => [
-          {
-            url: () => 'https://bad.example',
-            title: async () => {
-              throw new Error('fetch failed');
-            },
+    const runtime = {
+      getPages: () => [
+        {
+          url: () => 'https://bad.example',
+          title: async () => {
+            throw new Error('fetch failed');
           },
-          {
-            url: () => 'https://ok.example',
-            title: async () => 'OK',
-          },
-        ],
-        getPageByIdx: (idx: number) => {
-          throw new Error(`unused: ${idx}`);
         },
-        getSelectedPage: () =>
-          ({
-            url: () => 'https://ok.example',
-            title: async () => 'OK',
-          }) as never,
-        newPage: async () => {
-          throw new Error('unused');
+        {
+          url: () => 'https://ok.example',
+          title: async () => 'OK',
         },
-        selectPage: () => undefined,
-        bringPageToFront: async () => undefined,
-      } as never,
-      {},
-    );
+      ],
+      getPageByIdx: (idx: number) => {
+        throw new Error(`unused: ${idx}`);
+      },
+      getSelectedPage: () =>
+        ({
+          url: () => 'https://ok.example',
+          title: async () => 'OK',
+        }) as never,
+      newPage: async () => {
+        throw new Error('unused');
+      },
+      selectPage: () => undefined,
+      bringPageToFront: async () => undefined,
+      syncPageContext: () => undefined,
+    } as never;
 
-    assert.equal(result.success, true);
-    assert.match(result.message, /1 个页面标题不可用/);
-    assert.match(result.data?.pages[0]?.title ?? '', /\[unavailable\]/);
-    assert.equal(result.data?.pages[1]?.title, 'OK');
+    const {response, lines} = createResponse();
+
+    await listPages.handler({params: {}}, response, runtime);
+
+    const output = lines.join('\n');
+    assert.match(output, /1 个页面标题不可用|unavailable/);
+    assert.match(output, /\[unavailable\]/);
+    assert.match(output, /OK/);
   });
 
   it('normalizes fetch-failed errors for save_session_state and take_screenshot', async () => {

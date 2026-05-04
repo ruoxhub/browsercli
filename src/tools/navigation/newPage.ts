@@ -4,65 +4,61 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {getRuntime} from '../../runtime.js';
+import {defineTool} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
 
-import type {
-  NewPageParams,
-  NewPageResult,
-  NewPageData,
-} from './types.js';
+import type {ToolContextProvider} from '../../worker/ToolContextProvider.js';
 
 // Default navigation timeout in milliseconds (10 seconds)
 const DEFAULT_NAV_TIMEOUT = 10_000;
 
 /**
- * 创建新页面并导航到指定 URL（纯函数版本）。
- *
- * 等待 DOMContentLoaded 事件（非完整页面加载）。
- *
- * @param params - 创建参数 { url, timeout? }
- * @returns 结构化结果 { success, message, tooltype, logFormat, data }
+ * 创建新页面并导航到指定 URL。
  */
-export async function newPage(
-  params: NewPageParams,
-): Promise<NewPageResult> {
-  const {url, timeout} = params;
-  const tooltype = 'new_page';
+export const newPage = defineTool({
+  name: 'new_page',
+  description:
+    'Create a new browser page and navigate to the specified URL. The new page will be automatically selected.',
+  annotations: {
+    title: '新建页面',
+    category: ToolCategory.NAVIGATION,
+    readOnlyHint: false,
+  },
+  schema: {
+    url: zod.string().describe('要加载的 URL。'),
+    timeout: zod
+      .number()
+      .int()
+      .optional()
+      .describe('导航超时（毫秒），默认 10000。'),
+  },
+  handler: async (request, response, context) => {
+    const runtime = context as unknown as ToolContextProvider;
+    const {url, timeout} = request.params;
 
-  try {
-    const page = await getRuntime().contextProvider!.newPage();
+    try {
+      const page = await runtime.newPage();
+      runtime.selectPage(page);
+      runtime.syncPageContext(page);
 
-    // 自动选中新创建的页面
-    getRuntime().contextProvider!.selectPage(page);
-    getRuntime().contextProvider!.syncPageContext?.(page);
+      await page.goto(url, {
+        timeout: timeout ?? DEFAULT_NAV_TIMEOUT,
+        waitUntil: 'domcontentloaded',
+      });
 
-    await page.goto(url, {
-      timeout: timeout ?? DEFAULT_NAV_TIMEOUT,
-      waitUntil: 'domcontentloaded',
-    });
+      const pages = runtime.getPages();
+      const index = pages.indexOf(page);
 
-    const pages = getRuntime().contextProvider!.getPages();
-    const index = pages.indexOf(page);
-
-    const data: NewPageData = {
-      index: index >= 0 ? index : pages.length - 1,
-      url: page.url(),
-      title: await page.title(),
-    };
-
-    return {
-      success: true,
-      message: `已创建新页面并导航到 ${url}`,
-      tooltype,
-      logFormat: 'simple',
-      data,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `创建新页面失败：${error instanceof Error ? error.message : String(error)}`,
-      tooltype,
-      logFormat: 'simple',
-    };
-  }
-}
+      response.appendResponseLine(`已创建新页面并导航到 ${url}`);
+      response.appendResponseLine(
+        `页面索引: ${index >= 0 ? index : pages.length - 1}`,
+      );
+      response.appendResponseLine(`标题: ${await page.title()}`);
+    } catch (error) {
+      response.appendResponseLine(
+        `创建新页面失败：${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  },
+});
