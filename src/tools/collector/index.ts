@@ -4,6 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/**
+ * Collector 工具集（标准 MCP 工具版本）。
+ *
+ * 所有工具均使用 defineTool 包裹，符合项目工具定义规范，
+ * 通过 MCP 框架调用，handler 通过 response 对象返回结果。
+ */
+
 export {collectCode} from './collectCode.js';
 export {collectionDiff} from './collectionDiff.js';
 export {searchInScripts} from './searchInScripts.js';

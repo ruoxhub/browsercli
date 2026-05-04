@@ -4,66 +4,104 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {defineTool} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
 import type {
-  CollectionDiffData,
   CollectionDiffParams,
-  CollectionDiffResult,
+  CollectionDiffData,
   DiffChangedEntry,
   FileSummaryEntry,
 } from './types.js';
 import {getRuntime} from '../../runtime.js';
 
 /**
- * 对比两次收集的文件摘要差异（纯函数版本）。
+ * 对比两次收集的文件摘要差异（标准 MCP 工具版本）。
  *
- * @param params - Diff 参数
- * @returns 结构化结果 { success, message, tooltype, data }
+ * 使用 defineTool 包裹，符合项目工具定义规范，
+ * 通过 response 对象返回结构化结果。
  */
-export function collectionDiff(
-  params: CollectionDiffParams,
-): CollectionDiffResult {
-  try {
-    const current: FileSummaryEntry[] =
-      (params.current ?? getRuntime().collector.getCollectedFilesSummary()) as FileSummaryEntry[];
-    const previous: FileSummaryEntry[] = (params.previous ?? []) as FileSummaryEntry[];
+export const collectionDiff = defineTool({
+  name: 'collection_diff',
+  description: 'Compare previous and current collected file summaries.',
+  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+  schema: {
+    previous: zod.array(
+      zod.object({
+        url: zod.string(),
+        size: zod.number().int().nonnegative(),
+        type: zod.string(),
+      }),
+    ),
+    current: zod
+      .array(
+        zod.object({
+          url: zod.string(),
+          size: zod.number().int().nonnegative(),
+          type: zod.string(),
+        }),
+      )
+      .optional(),
+    includeUnchanged: zod.boolean().optional(),
+  },
+  handler: async (request, response) => {
+    const params = request.params as CollectionDiffParams;
+    const runtime = getRuntime();
 
-    const diff = diffSummaries(previous, current, params.includeUnchanged);
+    try {
+      const current: FileSummaryEntry[] =
+        (params.current ?? runtime.collector.getCollectedFilesSummary()) as FileSummaryEntry[];
+      const previous: FileSummaryEntry[] = (params.previous ?? []) as FileSummaryEntry[];
 
-    const data: CollectionDiffData = {
-      previousCount: previous.length,
-      currentCount: current.length,
-      addedCount: diff.added.length,
-      removedCount: diff.removed.length,
-      changedCount: diff.changed.length,
-      ...diff,
-    };
+      const diff = diffSummaries(previous, current, params.includeUnchanged);
 
-    return {
-      success: true,
-      message: `对比完成：${data.addedCount} 新增, ${data.removedCount} 移除, ${data.changedCount} 变更`,
-      tooltype: 'collection_diff',
-      logFormat: 'json',
-      data,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `对比失败：${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'collection_diff',
-      logFormat: 'json',
-      data: {
-        previousCount: 0,
-        currentCount: 0,
-        addedCount: 0,
-        removedCount: 0,
-        changedCount: 0,
-        added: [],
-        removed: [],
-        changed: [],
-      },
-    };
-  }
-}
+      const data: CollectionDiffData = {
+        previousCount: previous.length,
+        currentCount: current.length,
+        addedCount: diff.added.length,
+        removedCount: diff.removed.length,
+        changedCount: diff.changed.length,
+        ...diff,
+      };
+
+      const result = {
+        success: true,
+        message: `对比完成：${data.addedCount} 新增, ${data.removedCount} 移除, ${data.changedCount} 变更`,
+        tooltype: 'collection_diff',
+        logFormat: 'json',
+        data,
+      };
+
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error('[collectionDiff] 对比失败:', errorMsg);
+
+      const errorResult = {
+        success: false,
+        message: `对比失败：${errorMsg}`,
+        tooltype: 'collection_diff',
+        logFormat: 'json',
+        data: {
+          previousCount: 0,
+          currentCount: 0,
+          addedCount: 0,
+          removedCount: 0,
+          changedCount: 0,
+          added: [],
+          removed: [],
+          changed: [],
+        },
+      };
+
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(errorResult, null, 2));
+      response.appendResponseLine('```');
+    }
+  },
+});
 
 function diffSummaries(
   previous: FileSummaryEntry[],
