@@ -4,25 +4,38 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Frame} from '../../third_party/index.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
 
 import {buildHookStoreRuntime} from './store-utils.js';
-import type {HookResult} from './types.js';
 
 /**
  * 反 Hook 检测：保护 Function.prototype.toString，使被 Hook 的方法看起来像原生代码。
- *
- * @param frame - Puppeteer Frame 对象，用于注入 Hook 代码
- * @param hookedMethods - 已被 Hook 的方法路径列表，如 ["console.table", "localStorage.setItem"]
- * @returns 结构化结果对象
  */
-export async function antiAntiHook(
-  frame: Frame,
-  hookedMethods?: string[],
-): Promise<HookResult> {
-  const methods = hookedMethods || [];
+export const antiAntiHook = defineTool({
+  name: 'anti_anti_hook',
+  description:
+    'Anti-anti-hook: protect Function.prototype.toString to make hooked methods look native. Also protects Object.getOwnPropertyDescriptor and iframe contentWindow/contentDocument.',
+  annotations: {
+    title: 'Anti Anti-Hook',
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: false,
+  },
+  schema: {
+    hookedMethods: zod
+      .array(zod.string())
+      .optional()
+      .describe(
+        'Method paths that have been hooked, e.g. ["console.table", "localStorage.setItem"]',
+      ),
+  },
+  handler: async (request, response, context) => {
+    const {hookedMethods} = request.params;
+    const methods = hookedMethods || [];
+    const frame = (context as Context).getSelectedFrame();
 
-  const hookCode = `
+    const hookCode = `
 (function() {
   'use strict';
   const hookedMethods = ${JSON.stringify(methods)};
@@ -176,21 +189,28 @@ ${buildHookStoreRuntime({
 })();
 `;
 
-  try {
-    await frame.evaluate(hookCode);
-    return {
-      success: true,
-      message:
-        methods.length > 0
-          ? `Anti-Anti-Hook 已安装，保护方法数：${methods.length}`
-          : 'Anti-Anti-Hook 已安装，基础 Function.prototype.toString 保护已启用',
-      tooltype: 'anti_anti_hook',
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `错误：${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'anti_anti_hook',
-    };
-  }
-}
+    try {
+      await frame.evaluate(hookCode);
+      const result = {
+        success: true,
+        message:
+          methods.length > 0
+            ? `Anti-Anti-Hook 已安装，保护方法数：${methods.length}`
+            : 'Anti-Anti-Hook 已安装，基础 Function.prototype.toString 保护已启用',
+        tooltype: 'anti_anti_hook',
+      };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    } catch (error) {
+      const result = {
+        success: false,
+        message: `错误：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'anti_anti_hook',
+      };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    }
+  },
+});

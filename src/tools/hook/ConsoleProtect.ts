@@ -4,30 +4,43 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Frame} from '../../third_party/index.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
 
 import {buildHookStoreRuntime} from './store-utils.js';
-import type {HookResult} from './types.js';
 
 /**
  * 保护 console：防止代码重写 console.log/trace/groupCollapsed/groupEnd 等方法。
- *
- * @param frame - Puppeteer Frame 对象，用于注入 Hook 代码
- * @param protectedMethods - 要保护的方法名列表
- * @returns 结构化结果对象
  */
-export async function hookConsoleProtect(
-  frame: Frame,
-  protectedMethods?: string[],
-): Promise<HookResult> {
-  const methods = protectedMethods || [
-    'log',
-    'trace',
-    'groupCollapsed',
-    'groupEnd',
-  ];
+export const hookConsoleProtect = defineTool({
+  name: 'hook_console_protect',
+  description:
+    'Protect console methods (log/trace/groupCollapsed/groupEnd) from being overwritten by website code.',
+  annotations: {
+    title: 'Hook Console Protect',
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: false,
+  },
+  schema: {
+    protectedMethods: zod
+      .array(zod.string())
+      .optional()
+      .describe(
+        'Method names to protect, default: log, trace, groupCollapsed, groupEnd',
+      ),
+  },
+  handler: async (request, response, context) => {
+    const {protectedMethods} = request.params;
+    const methods = protectedMethods || [
+      'log',
+      'trace',
+      'groupCollapsed',
+      'groupEnd',
+    ];
+    const frame = (context as Context).getSelectedFrame();
 
-  const hookCode = `
+    const hookCode = `
 (function() {
   'use strict';
   const protectedMethods = ${JSON.stringify(methods)};
@@ -81,18 +94,25 @@ ${buildHookStoreRuntime({
 })();
 `;
 
-  try {
-    await frame.evaluate(hookCode);
-    return {
-      success: true,
-      message: `Console 保护 Hook 已安装，保护方法：${methods.join(', ')}`,
-      tooltype: 'hook_console_protect',
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `错误：${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'hook_console_protect',
-    };
-  }
-}
+    try {
+      await frame.evaluate(hookCode);
+      const result = {
+        success: true,
+        message: `Console 保护 Hook 已安装，保护方法：${methods.join(', ')}`,
+        tooltype: 'hook_console_protect',
+      };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    } catch (error) {
+      const result = {
+        success: false,
+        message: `错误：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'hook_console_protect',
+      };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    }
+  },
+});

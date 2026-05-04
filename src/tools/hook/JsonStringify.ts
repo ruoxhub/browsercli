@@ -4,25 +4,35 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Frame} from '../../third_party/index.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
 
 import {buildHookStoreRuntime} from './store-utils.js';
-import type {HookResult} from './types.js';
 
 /**
  * Hook JSON.stringify：监控 JSON 序列化操作。
- *
- * @param frame - Puppeteer Frame 对象，用于注入 Hook 代码
- * @param showStack - 是否打印调用栈
- * @param triggerDebugger - 触发时是否暂停
- * @returns 结构化结果对象
  */
-export async function hookJsonStringify(
-  frame: Frame,
-  showStack?: boolean,
-  triggerDebugger?: boolean,
-): Promise<HookResult> {
-  const hookCode = `
+export const hookJsonStringify = defineTool({
+  name: 'hook_json_stringify',
+  description: 'Hook JSON.stringify to monitor JSON serialization operations.',
+  annotations: {
+    title: 'Hook JSON.stringify',
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: false,
+  },
+  schema: {
+    showStack: zod.boolean().optional().describe('Whether to print call stack'),
+    triggerDebugger: zod
+      .boolean()
+      .optional()
+      .describe('Whether to trigger debugger on hit'),
+  },
+  handler: async (request, response, context) => {
+    const {showStack, triggerDebugger} = request.params;
+    const frame = (context as Context).getSelectedFrame();
+
+    const hookCode = `
 (function() {
   'use strict';
   const showStack = ${JSON.stringify(!!showStack)};
@@ -48,18 +58,25 @@ ${buildHookStoreRuntime({
 })();
 `;
 
-  try {
-    await frame.evaluate(hookCode);
-    return {
-      success: true,
-      message: 'JSON Stringify Hook 已安装，所有 JSON.stringify 调用将被打印',
-      tooltype: 'hook_json_stringify',
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `错误：${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'hook_json_stringify',
-    };
-  }
-}
+    try {
+      await frame.evaluate(hookCode);
+      const result = {
+        success: true,
+        message: 'JSON Stringify Hook 已安装，所有 JSON.stringify 调用将被打印',
+        tooltype: 'hook_json_stringify',
+      };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    } catch (error) {
+      const result = {
+        success: false,
+        message: `错误：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'hook_json_stringify',
+      };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    }
+  },
+});

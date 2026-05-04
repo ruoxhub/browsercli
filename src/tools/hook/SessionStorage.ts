@@ -4,37 +4,51 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Frame} from '../../third_party/index.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
 
 import {buildHookStoreRuntime} from './store-utils.js';
-import type {HookResult, StorageAction} from './types.js';
 
 /**
  * Hook sessionStorage：监控 setItem/getItem/removeItem/clear 操作。
- *
- * @param frame - Puppeteer Frame 对象，用于注入 Hook 代码
- * @param actions - 要监控的操作类型，默认全部
- * @param filterKeys - 要过滤的特定键名
- * @param showStack - 是否打印调用栈
- * @param triggerDebugger - 触发时是否暂停
- * @returns 结构化结果对象
  */
-export async function hookSessionStorage(
-  frame: Frame,
-  actions?: StorageAction[],
-  filterKeys?: string[],
-  showStack?: boolean,
-  triggerDebugger?: boolean,
-): Promise<HookResult> {
-  const enabledActions = actions || [
-    'setItem',
-    'getItem',
-    'removeItem',
-    'clear',
-  ];
-  const hasFilter = filterKeys && filterKeys.length > 0;
+export const hookSessionStorage = defineTool({
+  name: 'hook_session_storage',
+  description:
+    'Hook sessionStorage to monitor setItem/getItem/removeItem/clear operations. Supports key filtering.',
+  annotations: {
+    title: 'Hook SessionStorage',
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: false,
+  },
+  schema: {
+    actions: zod
+      .array(zod.enum(['setItem', 'getItem', 'removeItem', 'clear']))
+      .optional()
+      .describe('Actions to monitor, default all'),
+    filterKeys: zod
+      .array(zod.string())
+      .optional()
+      .describe('Key name keywords to filter'),
+    showStack: zod.boolean().optional().describe('Whether to print call stack'),
+    triggerDebugger: zod
+      .boolean()
+      .optional()
+      .describe('Whether to trigger debugger on hit'),
+  },
+  handler: async (request, response, context) => {
+    const {actions, filterKeys, showStack, triggerDebugger} = request.params;
+    const enabledActions = actions || [
+      'setItem',
+      'getItem',
+      'removeItem',
+      'clear',
+    ];
+    const hasFilter = filterKeys && filterKeys.length > 0;
+    const frame = (context as Context).getSelectedFrame();
 
-  const hookCode = `
+    const hookCode = `
 (function() {
   'use strict';
   const actions = ${JSON.stringify(enabledActions)};
@@ -117,18 +131,25 @@ ${buildHookStoreRuntime({
 })();
 `;
 
-  try {
-    await frame.evaluate(hookCode);
-    return {
-      success: true,
-      message: `SessionStorage Hook 已安装，监控操作：${enabledActions.join(', ')}`,
-      tooltype: 'hook_session_storage',
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `错误：${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'hook_session_storage',
-    };
-  }
-}
+    try {
+      await frame.evaluate(hookCode);
+      const result = {
+        success: true,
+        message: `SessionStorage Hook 已安装，监控操作：${enabledActions.join(', ')}`,
+        tooltype: 'hook_session_storage',
+      };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    } catch (error) {
+      const result = {
+        success: false,
+        message: `错误：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'hook_session_storage',
+      };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    }
+  },
+});

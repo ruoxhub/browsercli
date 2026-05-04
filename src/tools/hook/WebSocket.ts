@@ -4,29 +4,41 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Frame} from '../../third_party/index.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
 
 import {buildHookStoreRuntime} from './store-utils.js';
-import type {HookResult} from './types.js';
 
 /**
  * Hook WebSocket：监控 WebSocket 连接、消息收发操作，支持按 URL 过滤。
- *
- * @param frame - Puppeteer Frame 对象，用于注入 Hook 代码
- * @param filterUrls - 要过滤的 WebSocket URL 关键字
- * @param showStack - 是否打印调用栈
- * @param triggerDebugger - 触发时是否暂停
- * @returns 结构化结果对象
  */
-export async function hookWebSocket(
-  frame: Frame,
-  filterUrls?: string[],
-  showStack?: boolean,
-  triggerDebugger?: boolean,
-): Promise<HookResult> {
-  const hasFilter = filterUrls && filterUrls.length > 0;
+export const hookWebSocket = defineTool({
+  name: 'hook_websocket',
+  description:
+    'Hook WebSocket to monitor connections, message send/receive. Supports URL filtering.',
+  annotations: {
+    title: 'Hook WebSocket',
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: false,
+  },
+  schema: {
+    filterUrls: zod
+      .array(zod.string())
+      .optional()
+      .describe('URL keywords to filter, empty means monitor all'),
+    showStack: zod.boolean().optional().describe('Whether to print call stack'),
+    triggerDebugger: zod
+      .boolean()
+      .optional()
+      .describe('Whether to trigger debugger on hit'),
+  },
+  handler: async (request, response, context) => {
+    const {filterUrls, showStack, triggerDebugger} = request.params;
+    const hasFilter = filterUrls && filterUrls.length > 0;
+    const frame = (context as Context).getSelectedFrame();
 
-  const hookCode = `
+    const hookCode = `
 (function() {
   'use strict';
   const filterUrls = ${JSON.stringify(filterUrls || [])};
@@ -103,20 +115,27 @@ ${buildHookStoreRuntime({
 })();
 `;
 
-  try {
-    await frame.evaluate(hookCode);
-    return {
-      success: true,
-      message: hasFilter
-        ? `WebSocket Hook 已安装，过滤 URL：${filterUrls!.join(', ')}`
-        : 'WebSocket Hook 已安装，监控所有 WebSocket 操作',
-      tooltype: 'hook_websocket',
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `错误：${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'hook_websocket',
-    };
-  }
-}
+    try {
+      await frame.evaluate(hookCode);
+      const result = {
+        success: true,
+        message: hasFilter
+          ? `WebSocket Hook 已安装，过滤 URL：${filterUrls!.join(', ')}`
+          : 'WebSocket Hook 已安装，监控所有 WebSocket 操作',
+        tooltype: 'hook_websocket',
+      };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    } catch (error) {
+      const result = {
+        success: false,
+        message: `错误：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'hook_websocket',
+      };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    }
+  },
+});

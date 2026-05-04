@@ -4,27 +4,40 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Frame} from '../../third_party/index.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
 
 import {buildHookStoreRuntime} from './store-utils.js';
-import type {HookResult, ConsoleProtectMode} from './types.js';
 
 /**
  * Hook console.log：防止网站重写 console.log 方法，保持日志输出能力。
- *
- * @param frame - Puppeteer Frame 对象，用于注入 Hook 代码
- * @param mode - 防护模式：proxy/toString/freeze，默认 proxy
- * @returns 结构化结果对象
  */
-export async function hookConsoleLog(
-  frame: Frame,
-  mode?: ConsoleProtectMode,
-): Promise<HookResult> {
-  const protectMode = mode || 'proxy';
+export const hookConsoleLog = defineTool({
+  name: 'hook_console_log',
+  description:
+    'Protect console.log from being overwritten by websites. Supports proxy/toString/freeze modes.',
+  annotations: {
+    title: 'Hook Console Log',
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: false,
+  },
+  schema: {
+    mode: zod
+      .enum(['proxy', 'toString', 'freeze'])
+      .optional()
+      .describe(
+        'Protection mode: proxy (realtime intercept), toString (periodic check), freeze (Object.freeze), default proxy',
+      ),
+  },
+  handler: async (request, response, context) => {
+    const {mode} = request.params;
+    const protectMode = mode || 'proxy';
+    const frame = (context as Context).getSelectedFrame();
 
-  const hookCode =
-    protectMode === 'proxy'
-      ? `
+    const hookCode =
+      protectMode === 'proxy'
+        ? `
 (function() {
   'use strict';
 ${buildHookStoreRuntime({
@@ -68,8 +81,8 @@ ${buildHookStoreRuntime({
   console.log('[hook_console_log] ✅ Console log protection installed (proxy mode)');
 })();
 `
-      : protectMode === 'toString'
-        ? `
+        : protectMode === 'toString'
+          ? `
 (function() {
   'use strict';
 ${buildHookStoreRuntime({
@@ -93,7 +106,7 @@ ${buildHookStoreRuntime({
   console.log('[hook_console_log] ✅ Console log protection installed (toString mode)');
 })();
 `
-        : `
+          : `
 (function() {
   'use strict';
 ${buildHookStoreRuntime({
@@ -110,25 +123,32 @@ ${buildHookStoreRuntime({
 })();
 `;
 
-  const modeLabel =
-    protectMode === 'proxy'
-      ? 'Proxy 实时拦截'
-      : protectMode === 'freeze'
-        ? '冻结 console 对象'
-        : '定期检查恢复';
+    const modeLabel =
+      protectMode === 'proxy'
+        ? 'Proxy 实时拦截'
+        : protectMode === 'freeze'
+          ? '冻结 console 对象'
+          : '定期检查恢复';
 
-  try {
-    await frame.evaluate(hookCode);
-    return {
-      success: true,
-      message: `Console Log 保护已安装，模式：${modeLabel}`,
-      tooltype: 'hook_console_log',
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `错误：${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'hook_console_log',
-    };
-  }
-}
+    try {
+      await frame.evaluate(hookCode);
+      const result = {
+        success: true,
+        message: `Console Log 保护已安装，模式：${modeLabel}`,
+        tooltype: 'hook_console_log',
+      };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    } catch (error) {
+      const result = {
+        success: false,
+        message: `错误：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'hook_console_log',
+      };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    }
+  },
+});

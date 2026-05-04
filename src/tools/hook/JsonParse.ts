@@ -4,29 +4,41 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Frame} from '../../third_party/index.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
 
 import {buildHookStoreRuntime} from './store-utils.js';
-import type {HookResult} from './types.js';
 
 /**
  * Hook JSON.parse：监控 JSON 解析操作，支持过滤特定字符串。
- *
- * @param frame - Puppeteer Frame 对象，用于注入 Hook 代码
- * @param filterKeys - 要过滤的特定 JSON 字符串内容
- * @param showStack - 是否打印调用栈
- * @param triggerDebugger - 触发时是否暂停
- * @returns 结构化结果对象
  */
-export async function hookJsonParse(
-  frame: Frame,
-  filterKeys?: string[],
-  showStack?: boolean,
-  triggerDebugger?: boolean,
-): Promise<HookResult> {
-  const hasFilter = filterKeys && filterKeys.length > 0;
+export const hookJsonParse = defineTool({
+  name: 'hook_json_parse',
+  description:
+    'Hook JSON.parse to monitor JSON parsing operations. Supports content filtering.',
+  annotations: {
+    title: 'Hook JSON.parse',
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: false,
+  },
+  schema: {
+    filterKeys: zod
+      .array(zod.string())
+      .optional()
+      .describe('Content keywords to filter, empty means monitor all'),
+    showStack: zod.boolean().optional().describe('Whether to print call stack'),
+    triggerDebugger: zod
+      .boolean()
+      .optional()
+      .describe('Whether to trigger debugger on hit'),
+  },
+  handler: async (request, response, context) => {
+    const {filterKeys, showStack, triggerDebugger} = request.params;
+    const hasFilter = filterKeys && filterKeys.length > 0;
+    const frame = (context as Context).getSelectedFrame();
 
-  const hookCode = `
+    const hookCode = `
 (function() {
   'use strict';
   const filterKeys = ${JSON.stringify(filterKeys || [])};
@@ -66,20 +78,27 @@ ${buildHookStoreRuntime({
 })();
 `;
 
-  try {
-    await frame.evaluate(hookCode);
-    return {
-      success: true,
-      message: hasFilter
-        ? `JSON Parse Hook 已安装，过滤字符串：${filterKeys!.join(', ')}`
-        : 'JSON Parse Hook 已安装，监控所有 JSON.parse 调用',
-      tooltype: 'hook_json_parse',
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `错误：${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'hook_json_parse',
-    };
-  }
-}
+    try {
+      await frame.evaluate(hookCode);
+      const result = {
+        success: true,
+        message: hasFilter
+          ? `JSON Parse Hook 已安装，过滤字符串：${filterKeys!.join(', ')}`
+          : 'JSON Parse Hook 已安装，监控所有 JSON.parse 调用',
+        tooltype: 'hook_json_parse',
+      };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    } catch (error) {
+      const result = {
+        success: false,
+        message: `错误：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'hook_json_parse',
+      };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    }
+  },
+});

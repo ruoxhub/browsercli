@@ -4,25 +4,36 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Frame} from '../../third_party/index.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
 
 import {buildHookStoreRuntime} from './store-utils.js';
-import type {HookResult} from './types.js';
 
 /**
  * Hook location.href：阻断页面跳转，触发 debugger 以定位跳转代码位置。
- *
- * @param frame - Puppeteer Frame 对象，用于注入 Hook 代码
- * @param triggerDebugger - 跳转时是否触发 debugger 断点，默认 true
- * @returns 结构化结果对象
  */
-export async function hookLocationHref(
-  frame: Frame,
-  triggerDebugger?: boolean,
-): Promise<HookResult> {
-  const shouldDebug = triggerDebugger !== false;
+export const hookLocationHref = defineTool({
+  name: 'hook_location_href',
+  description:
+    'Block page navigation by hooking onbeforeunload. Useful for preventing anti-debugging redirects.',
+  annotations: {
+    title: 'Hook Location Href',
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: false,
+  },
+  schema: {
+    triggerDebugger: zod
+      .boolean()
+      .optional()
+      .describe('Whether to trigger debugger on navigation, default true'),
+  },
+  handler: async (request, response, context) => {
+    const {triggerDebugger} = request.params;
+    const shouldDebug = triggerDebugger !== false;
+    const frame = (context as Context).getSelectedFrame();
 
-  const hookCode = `
+    const hookCode = `
 (function() {
   'use strict';
 ${buildHookStoreRuntime({
@@ -44,18 +55,25 @@ ${buildHookStoreRuntime({
 })();
 `;
 
-  try {
-    await frame.evaluate(hookCode);
-    return {
-      success: true,
-      message: `Location Href Hook 已安装，页面跳转将被阻断${shouldDebug ? '，并触发 debugger 断点' : ''}`,
-      tooltype: 'hook_location_href',
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `错误：${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'hook_location_href',
-    };
-  }
-}
+    try {
+      await frame.evaluate(hookCode);
+      const result = {
+        success: true,
+        message: `Location Href Hook 已安装，页面跳转将被阻断${shouldDebug ? '，并触发 debugger 断点' : ''}`,
+        tooltype: 'hook_location_href',
+      };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    } catch (error) {
+      const result = {
+        success: false,
+        message: `错误：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'hook_location_href',
+      };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    }
+  },
+});

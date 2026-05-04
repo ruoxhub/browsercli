@@ -4,19 +4,29 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Frame} from '../../third_party/index.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
 
 import {buildHookStoreRuntime} from './store-utils.js';
-import type {HookResult} from './types.js';
 
 /**
  * 禁止历史导航：重写 window.history.go 和 window.history.back 方法以防止网站反调试返回上一页。
- *
- * @param frame - Puppeteer Frame 对象，用于注入 Hook 代码
- * @returns 结构化结果对象
  */
-export async function hookHistoryGo(frame: Frame): Promise<HookResult> {
-  const hookCode = `(function() {
+export const hookHistoryGo = defineTool({
+  name: 'hook_history_go',
+  description:
+    'Block history.go and history.back to prevent anti-debugging page navigation.',
+  annotations: {
+    title: 'Hook History Go',
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: false,
+  },
+  schema: {},
+  handler: async (_request, response, context) => {
+    const frame = (context as Context).getSelectedFrame();
+
+    const hookCode = `(function() {
   'use strict';
 ${buildHookStoreRuntime({
   hookId: 'hook_history_go',
@@ -36,18 +46,25 @@ ${buildHookStoreRuntime({
   };
 })();`;
 
-  try {
-    await frame.evaluate(hookCode);
-    return {
-      success: true,
-      message: 'history.go 和 history.back 已拦截',
-      tooltype: 'hook_history_go',
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `错误：${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'hook_history_go',
-    };
-  }
-}
+    try {
+      await frame.evaluate(hookCode);
+      const result = {
+        success: true,
+        message: 'history.go 和 history.back 已拦截',
+        tooltype: 'hook_history_go',
+      };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    } catch (error) {
+      const result = {
+        success: false,
+        message: `错误：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'hook_history_go',
+      };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    }
+  },
+});

@@ -4,29 +4,41 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Frame} from '../../third_party/index.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
 
 import {buildHookStoreRuntime} from './store-utils.js';
-import type {HookResult} from './types.js';
 
 /**
  * Hook XMLHttpRequest.setRequestHeader：监控请求头设置，支持过滤特定 Header 名。
- *
- * @param frame - Puppeteer Frame 对象，用于注入 Hook 代码
- * @param filterKeys - 要监控的特定 Header 名称
- * @param showStack - 是否打印调用栈
- * @param triggerDebugger - 触发时是否暂停
- * @returns 结构化结果对象
  */
-export async function hookXhrSetRequestHeader(
-  frame: Frame,
-  filterKeys?: string[],
-  showStack?: boolean,
-  triggerDebugger?: boolean,
-): Promise<HookResult> {
-  const hasFilter = filterKeys && filterKeys.length > 0;
+export const hookXhrSetRequestHeader = defineTool({
+  name: 'hook_xhr_set_request_header',
+  description:
+    'Hook XMLHttpRequest.setRequestHeader to monitor request header setting. Supports header name filtering.',
+  annotations: {
+    title: 'Hook XHR SetRequestHeader',
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: false,
+  },
+  schema: {
+    filterKeys: zod
+      .array(zod.string())
+      .optional()
+      .describe('Header name keywords to filter, empty means monitor all'),
+    showStack: zod.boolean().optional().describe('Whether to print call stack'),
+    triggerDebugger: zod
+      .boolean()
+      .optional()
+      .describe('Whether to trigger debugger on hit'),
+  },
+  handler: async (request, response, context) => {
+    const {filterKeys, showStack, triggerDebugger} = request.params;
+    const hasFilter = filterKeys && filterKeys.length > 0;
+    const frame = (context as Context).getSelectedFrame();
 
-  const hookCode = `
+    const hookCode = `
 (function() {
   'use strict';
   const filterKeys = ${JSON.stringify(filterKeys || [])};
@@ -71,20 +83,27 @@ ${buildHookStoreRuntime({
 })();
 `;
 
-  try {
-    await frame.evaluate(hookCode);
-    return {
-      success: true,
-      message: hasFilter
-        ? `XHR SetRequestHeader Hook 已安装，过滤 Header：${filterKeys!.join(', ')}`
-        : 'XHR SetRequestHeader Hook 已安装，监控所有请求头设置',
-      tooltype: 'hook_xhr_set_request_header',
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `错误：${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'hook_xhr_set_request_header',
-    };
-  }
-}
+    try {
+      await frame.evaluate(hookCode);
+      const result = {
+        success: true,
+        message: hasFilter
+          ? `XHR SetRequestHeader Hook 已安装，过滤 Header：${filterKeys!.join(', ')}`
+          : 'XHR SetRequestHeader Hook 已安装，监控所有请求头设置',
+        tooltype: 'hook_xhr_set_request_header',
+      };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    } catch (error) {
+      const result = {
+        success: false,
+        message: `错误：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'hook_xhr_set_request_header',
+      };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    }
+  },
+});

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// ─── Hook 安装函数 ────────────────────────────────────
+// ─── Hook 安装工具（defineTool 格式）───────────────────
 
 export {hookXhrOpen} from './XhrOpen.js';
 export {hookXhrSetRequestHeader} from './XhrSetRequestHeader.js';
@@ -30,12 +30,15 @@ export {hookConsoleTable} from './ConsoleTable.js';
 export {fixedWindowSize} from './fixedWindowSize.js';
 export {antiAntiHook} from './antiAntiHook.js';
 
-// ─── Hook 管理函数 ────────────────────────────────────
+// ─── Hook 管理工具（defineTool 格式）───────────────────
 
 export {injectHook} from './InjectHook.js';
 export {syncHookRecords} from './SyncHookRecords.js';
 export {getHookData} from './GetHookData.js';
 export {removeHookBrowser} from './RemoveHookBrowser.js';
+
+// ─── 工具函数导出 ──────────────────────────────────────
+
 export {
   buildRequestBindings,
   inferCandidateEnvNeeds,

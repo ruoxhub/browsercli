@@ -4,29 +4,41 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Frame} from '../../third_party/index.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
 
 import {buildHookStoreRuntime} from './store-utils.js';
-import type {HookResult} from './types.js';
 
 /**
  * Hook Math.random：固定 Math.random 的返回值。
- *
- * @param frame - Puppeteer Frame 对象，用于注入 Hook 代码
- * @param fixedValue - 固定的返回值，默认 0
- * @param showStack - 是否打印调用栈
- * @param triggerDebugger - 触发时是否暂停
- * @returns 结构化结果对象
  */
-export async function hookRandom(
-  frame: Frame,
-  fixedValue?: number,
-  showStack?: boolean,
-  triggerDebugger?: boolean,
-): Promise<HookResult> {
-  const value = fixedValue ?? 0;
+export const hookRandom = defineTool({
+  name: 'hook_random',
+  description:
+    'Hook Math.random to fix its return value. Useful for bypassing random-based anti-debugging.',
+  annotations: {
+    title: 'Hook Math.random',
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: false,
+  },
+  schema: {
+    fixedValue: zod
+      .number()
+      .optional()
+      .describe('Fixed return value, default 0'),
+    showStack: zod.boolean().optional().describe('Whether to print call stack'),
+    triggerDebugger: zod
+      .boolean()
+      .optional()
+      .describe('Whether to trigger debugger on hit'),
+  },
+  handler: async (request, response, context) => {
+    const {fixedValue, showStack, triggerDebugger} = request.params;
+    const value = fixedValue ?? 0;
+    const frame = (context as Context).getSelectedFrame();
 
-  const hookCode = `
+    const hookCode = `
 (function() {
   'use strict';
   const fixedValue = ${value};
@@ -51,18 +63,25 @@ ${buildHookStoreRuntime({
 })();
 `;
 
-  try {
-    await frame.evaluate(hookCode);
-    return {
-      success: true,
-      message: `Math.random Hook 已安装，固定返回值：${value}`,
-      tooltype: 'hook_random',
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `错误：${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'hook_random',
-    };
-  }
-}
+    try {
+      await frame.evaluate(hookCode);
+      const result = {
+        success: true,
+        message: `Math.random Hook 已安装，固定返回值：${value}`,
+        tooltype: 'hook_random',
+      };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    } catch (error) {
+      const result = {
+        success: false,
+        message: `错误：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'hook_random',
+      };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    }
+  },
+});

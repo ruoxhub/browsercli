@@ -4,25 +4,36 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Frame} from '../../third_party/index.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
 
 import {buildHookStoreRuntime} from './store-utils.js';
-import type {HookResult} from './types.js';
 
 /**
  * Hook window.fetch：监控 fetch API 调用，打印请求参数和堆栈。
- *
- * @param frame - Puppeteer Frame 对象，用于注入 Hook 代码
- * @param showStack - 是否打印调用栈
- * @param triggerDebugger - 触发时是否暂停
- * @returns 结构化结果对象
  */
-export async function hookFetch(
-  frame: Frame,
-  showStack?: boolean,
-  triggerDebugger?: boolean,
-): Promise<HookResult> {
-  const hookCode = `
+export const hookFetch = defineTool({
+  name: 'hook_fetch',
+  description:
+    'Hook window.fetch to monitor fetch API calls, logging request parameters and stack traces.',
+  annotations: {
+    title: 'Hook Fetch',
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: false,
+  },
+  schema: {
+    showStack: zod.boolean().optional().describe('Whether to print call stack'),
+    triggerDebugger: zod
+      .boolean()
+      .optional()
+      .describe('Whether to trigger debugger on hit'),
+  },
+  handler: async (request, response, context) => {
+    const {showStack, triggerDebugger} = request.params;
+    const frame = (context as Context).getSelectedFrame();
+
+    const hookCode = `
 (function() {
   'use strict';
   const showStack = ${JSON.stringify(!!showStack)};
@@ -85,47 +96,53 @@ ${buildHookStoreRuntime({
 })();
 `;
 
-  try {
-    await frame.evaluate(hookCode);
-
-    // 注入后尝试读取当前状态（验证 Hook 是否激活）
-    let recordCount = 0;
     try {
-      recordCount = (await frame.evaluate(() => {
-        const store = (window as any).__hookStore;
-        if (!store) return 0;
-        const records = store['hook_fetch'];
-        return Array.isArray(records) ? records.length : 0;
-      })) as number;
-    } catch {
-      // 状态读取失败不影响主流程
-    }
+      await frame.evaluate(hookCode);
 
-    return {
-      success: true,
-      message:
-        `Fetch Hook 已注入页面。当前已捕获 ${recordCount} 条记录。` +
-        (recordCount === 0
-          ? ' 注意：页面加载前的请求无法回溯捕获，请刷新页面或触发新的 fetch 请求。'
-          : ''),
-      tooltype: 'hook_fetch',
-      data: {
-        hookId: 'hook_fetch',
-        status: 'active',
-        recordCount,
-        note: '后续 fetch 调用将被自动捕获并存储在 window.__hookStore.hook_fetch',
-      },
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `Fetch Hook 注入失败：${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'hook_fetch',
-      data: {
-        hookId: 'hook_fetch',
-        status: 'failed',
-        error: error instanceof Error ? error.message : String(error),
-      },
-    };
-  }
-}
+      let recordCount = 0;
+      try {
+        recordCount = (await frame.evaluate(() => {
+          const store = (window as any).__hookStore;
+          if (!store) return 0;
+          const records = store['hook_fetch'];
+          return Array.isArray(records) ? records.length : 0;
+        })) as number;
+      } catch {
+        // 状态读取失败不影响主流程
+      }
+
+      const result = {
+        success: true,
+        message:
+          `Fetch Hook 已注入页面。当前已捕获 ${recordCount} 条记录。` +
+          (recordCount === 0
+            ? ' 注意：页面加载前的请求无法回溯捕获，请刷新页面或触发新的 fetch 请求。'
+            : ''),
+        tooltype: 'hook_fetch',
+        data: {
+          hookId: 'hook_fetch',
+          status: 'active',
+          recordCount,
+          note: '后续 fetch 调用将被自动捕获并存储在 window.__hookStore.hook_fetch',
+        },
+      };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    } catch (error) {
+      const result = {
+        success: false,
+        message: `Fetch Hook 注入失败：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'hook_fetch',
+        data: {
+          hookId: 'hook_fetch',
+          status: 'failed',
+          error: error instanceof Error ? error.message : String(error),
+        },
+      };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    }
+  },
+});

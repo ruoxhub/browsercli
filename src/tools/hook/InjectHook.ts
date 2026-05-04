@@ -4,40 +4,54 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Frame} from '../../third_party/index.js';
-
-import type {InjectHookResult} from './types.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
 
 /**
  * 向页面注入 Hook 脚本。
  *
- * 将预生成的 Hook 脚本注入到指定 Frame 中执行，
+ * 将预生成的 Hook 脚本注入到当前 Frame 中执行，
  * Hook 将立即开始监控/拦截目标 API。
- *
- * @param frame - Puppeteer Frame 对象，用于注入脚本
- * @param hookId - Hook 标识符（用于日志和追踪）
- * @param script - 要注入的 Hook 脚本代码
- * @returns 结构化结果对象
  */
-export async function injectHook(
-  frame: Frame,
-  hookId: string,
-  script: string,
-): Promise<InjectHookResult> {
-  try {
-    await frame.evaluate(script);
-    return {
-      success: true,
-      message: `Hook injected: ${hookId}`,
-      tooltype: 'inject_hook',
-      hookId,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `注入失败：${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'inject_hook',
-      hookId,
-    };
-  }
-}
+export const injectHook = defineTool({
+  name: 'inject_hook',
+  description:
+    'Inject an existing hook script into the current page. The hook will start monitoring/intercepting immediately.',
+  annotations: {
+    title: 'Inject Hook',
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: false,
+  },
+  schema: {
+    hookId: zod.string().describe('Hook identifier for logging and tracking'),
+    script: zod.string().describe('Hook script code to inject'),
+  },
+  handler: async (request, response, context) => {
+    const {hookId, script} = request.params;
+    const frame = (context as Context).getSelectedFrame();
+
+    try {
+      await frame.evaluate(script);
+      const result = {
+        success: true,
+        message: `Hook injected: ${hookId}`,
+        tooltype: 'inject_hook',
+        hookId,
+      };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    } catch (error) {
+      const result = {
+        success: false,
+        message: `注入失败：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'inject_hook',
+        hookId,
+      };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    }
+  },
+});
