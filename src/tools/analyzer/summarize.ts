@@ -4,7 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {zod} from '../../third_party/index.js';
 import {getRuntime} from '../../runtime.js';
+import {defineTool} from '../ToolDefinition.js';
+import {ToolCategory} from '../categories.js';
 import type {CodeFile} from '../../types/index.js';
 
 import type {
@@ -77,38 +80,64 @@ export async function summarizeProject(
   }
 }
 
-export async function summarizeCode(
-  params: {
-    mode?: 'single' | 'batch' | 'project';
-    code?: string;
-    url?: string;
-    files?: CodeFile[];
+export const summarizeCode = defineTool({
+  name: 'summarize_code',
+  description: 'Summarize one code file, multiple files, or project-level context.',
+  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+  schema: {
+    mode: zod.enum(['single', 'batch', 'project']).default('single'),
+    code: zod.string().optional(),
+    url: zod.string().optional(),
+    files: zod.array(zod.object({
+      url: zod.string(),
+      content: zod.string(),
+      size: zod.number().int().nonnegative(),
+      type: zod.enum(['inline', 'external', 'dynamic', 'service-worker', 'web-worker']),
+    })).optional(),
   },
-): Promise<SummarizeFileResult | SummarizeBatchResult | SummarizeProjectResult> {
-  const mode = params.mode ?? 'single';
+  handler: async (request, response) => {
+    const runtime = getRuntime();
 
-  if (mode === 'project') {
-    return summarizeProject(params.files ?? []);
-  }
+    if (request.params.mode === 'project') {
+      const result = await runtime.summarizer.summarizeProject(request.params.files ?? []);
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify({
+        success: true,
+        message: 'Project summarization completed',
+        tooltype: 'summarize',
+        data: result,
+      }, null, 2));
+      response.appendResponseLine('```');
+      return;
+    }
 
-  if (mode === 'batch') {
-    return summarizeBatch(params.files ?? []);
-  }
+    if (request.params.mode === 'batch') {
+      const result = await runtime.summarizer.summarizeBatch(request.params.files ?? []);
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify({
+        success: true,
+        message: 'Batch summarization completed',
+        tooltype: 'summarize',
+        data: result,
+      }, null, 2));
+      response.appendResponseLine('```');
+      return;
+    }
 
-  if (!params.code || params.code.trim() === '') {
-    return {
-      success: false,
-      message: 'summarize_code requires a non-empty "code" parameter in single mode',
-      tooltype: 'summarize',
-      data: {} as SummarizeFileResult['data'],
+    const file = {
+      url: request.params.url ?? 'inline-input.js',
+      content: request.params.code ?? '',
+      size: (request.params.code ?? '').length,
+      type: 'inline' as const,
     };
-  }
-
-  const file: CodeFile = {
-    url: params.url ?? 'inline-input.js',
-    content: params.code,
-    size: params.code.length,
-    type: 'inline',
-  };
-  return summarizeFile(file);
-}
+    const result = await runtime.summarizer.summarizeFile(file);
+    response.appendResponseLine('```json');
+    response.appendResponseLine(JSON.stringify({
+      success: true,
+      message: 'File summarization completed',
+      tooltype: 'summarize',
+      data: result,
+    }, null, 2));
+    response.appendResponseLine('```');
+  },
+});

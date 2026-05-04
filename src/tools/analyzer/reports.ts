@@ -4,11 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {zod} from '../../third_party/index.js';
+import {getRuntime} from '../../runtime.js';
+import {TokenBudgetManager} from '../../utils/TokenBudgetManager.js';
+import {defineTool} from '../ToolDefinition.js';
+import {ToolCategory} from '../categories.js';
+
 import type {
   CorrelatedFlow,
   PriorityTarget,
   SignatureChainHints,
 } from './types.js';
+import {toMirroredNetworkEntry, toMirroredScriptEntry} from './normalize.js';
 
 export function buildActionPlan(result: {
   target: string;
@@ -124,33 +131,85 @@ export function buildStopConditions(input: {
  * @param params - 证据参数
  * @returns 结构化结果对象
  */
-export function recordReverseEvidence(params: {
-  category?: string;
-  title?: string;
-  description?: string;
-  data?: unknown;
-}): {
-  success: boolean;
-  message: string;
-  tooltype: string;
-  data?: Record<string, unknown>;
-} {
-  const category = params.category ?? 'general';
-  const title = params.title ?? 'Untitled evidence';
+export const record_reverse_evidence = defineTool({
+  name: 'record_reverse_evidence',
+  description: 'Append structured reverse-engineering evidence to a task artifact log.',
+  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: false},
+  schema: {
+    taskId: zod.string(),
+    taskSlug: zod.string(),
+    targetUrl: zod.string(),
+    goal: zod.string(),
+    channel: zod.string().default('runtime-evidence'),
+    targetKeywords: zod.array(zod.string()).optional(),
+    targetUrlPatterns: zod.array(zod.string()).optional(),
+    targetFunctionNames: zod.array(zod.string()).optional(),
+    targetActionDescription: zod.string().optional(),
+    entry: zod.record(zod.string(), zod.unknown()),
+  },
+  handler: async (request, response) => {
+    const runtime = getRuntime();
+    const task = await runtime.reverseTaskStore.openTask({
+      taskId: request.params.taskId,
+      slug: request.params.taskSlug,
+      targetUrl: request.params.targetUrl,
+      goal: request.params.goal,
+    });
+    const targetContext = {
+      targetKeywords: request.params.targetKeywords ?? [],
+      targetUrlPatterns: request.params.targetUrlPatterns ?? [],
+      targetFunctionNames: request.params.targetFunctionNames ?? [],
+      targetActionDescription: request.params.targetActionDescription ?? '',
+    };
+    const hasTargetContext = targetContext.targetKeywords.length > 0 ||
+      targetContext.targetUrlPatterns.length > 0 ||
+      targetContext.targetFunctionNames.length > 0 ||
+      targetContext.targetActionDescription.length > 0;
 
-  return {
-    success: true,
-    message: `证据已记录: [${category}] ${title}`,
-    tooltype: 'record_reverse_evidence',
-    data: {
-      category,
-      title,
-      description: params.description ?? '',
-      recordedAt: new Date().toISOString(),
-      evidenceData: params.data,
-    },
-  };
-}
+    const artifactEntry = {
+      ...request.params.entry,
+      ...(hasTargetContext ? {targetContext} : {}),
+    };
+
+    await task.appendLog(request.params.channel, artifactEntry);
+
+    const mirroredChannels: string[] = [];
+    if (request.params.channel === 'runtime-evidence') {
+      const mirroredNetworkEntry = toMirroredNetworkEntry(request.params.entry);
+      if (mirroredNetworkEntry) {
+        await task.appendLog('network', mirroredNetworkEntry);
+        mirroredChannels.push('network');
+      }
+      const mirroredScriptEntry = toMirroredScriptEntry(request.params.entry);
+      if (mirroredScriptEntry) {
+        await task.appendLog('scripts', mirroredScriptEntry);
+        mirroredChannels.push('scripts');
+      }
+    }
+
+    if (hasTargetContext) {
+      const existingTargetContext = await runtime.reverseTaskStore.readSnapshot<Record<string, unknown>>(
+        request.params.taskId,
+        'target-context.json',
+      );
+      await task.writeSnapshot('target-context.json', {
+        ...existingTargetContext,
+        ...targetContext,
+      });
+    }
+
+    response.appendResponseLine('```json');
+    response.appendResponseLine(JSON.stringify({
+      ok: true,
+      taskId: task.taskId,
+      taskDir: task.taskDir,
+      channel: request.params.channel,
+      mirroredChannels,
+      targetContext: hasTargetContext ? targetContext : undefined,
+    }, null, 2));
+    response.appendResponseLine('```');
+  },
+});
 
 /**
  * 导出会话报告。
@@ -161,35 +220,95 @@ export function recordReverseEvidence(params: {
  * @param params - 报告参数
  * @returns 结构化结果对象
  */
-export function exportSessionReport(params: {
-  format?: string;
-  includeEvidence?: boolean;
-  includeTimeline?: boolean;
-  workflowSteps?: string[];
-  requestFingerprints?: unknown[];
-  evidence?: Record<string, unknown>;
-  gaps?: string[];
-}): {
-  success: boolean;
-  message: string;
-  tooltype: string;
-  data?: Record<string, unknown>;
-} {
-  const format = params.format ?? 'json';
+export const export_session_report = defineTool({
+  name: 'export_session_report',
+  description: 'Export current reverse-engineering session as JSON or Markdown.',
+  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+  schema: {
+    format: zod.enum(['json', 'markdown']).default('json'),
+    includeHookData: zod.boolean().optional(),
+  },
+  handler: async (request, response) => {
+    const runtime = getRuntime();
+    const summaries = runtime.collector.getCollectedFilesSummary();
+    const collectorStats = await runtime.collector.getAllStats();
+    const hookStats = runtime.hookManager.getStats();
+    const totalHookRecords = runtime.hookManager.getAllKnownHookIds().reduce(
+      (sum, hookId) => sum + runtime.hookManager.getRecords(hookId).length,
+      0,
+    );
+    const tokenStats = TokenBudgetManager.getInstance().getStats();
 
-  return {
-    success: true,
-    message: `会话报告已导出 (格式: ${format})`,
-    tooltype: 'export_session_report',
-    data: {
-      format,
-      exportedAt: new Date().toISOString(),
-      includeEvidence: params.includeEvidence ?? true,
-      includeTimeline: params.includeTimeline ?? true,
-      workflowSteps: params.workflowSteps ?? [],
-      requestFingerprints: params.requestFingerprints ?? [],
-      evidence: params.evidence ?? {},
-      gaps: params.gaps ?? [],
-    },
+    const report = {
+      generatedAt: new Date().toISOString(),
+      collector: {
+        totalFiles: summaries.length,
+        totalBytes: summaries.reduce((sum, file) => sum + file.size, 0),
+        cacheStats: collectorStats,
+      },
+      hooks: {
+        ...hookStats,
+        totalRecords: totalHookRecords,
+      },
+      tokenBudget: {
+        usedTokens: tokenStats.currentUsage,
+        maxTokens: tokenStats.maxTokens,
+        usagePercent: tokenStats.usagePercentage,
+      },
+      hookData: request.params.includeHookData ? runtime.hookManager.exportData('json') : undefined,
+    };
+
+    if (request.params.format === 'markdown') {
+      const markdown = toMarkdownReport(report);
+      response.appendResponseLine(markdown);
+      return;
+    }
+
+    response.appendResponseLine('```json');
+    response.appendResponseLine(JSON.stringify({
+      success: true,
+      message: `会话报告已导出 (格式: ${request.params.format})`,
+      tooltype: 'export_session_report',
+      data: report,
+    }, null, 2));
+    response.appendResponseLine('```');
+  },
+});
+
+// Helper function for markdown report
+function toMarkdownReport(report: {
+  generatedAt: string;
+  collector: {
+    totalFiles: number;
+    totalBytes: number;
   };
+  hooks: {
+    totalHooks: number;
+    enabledHooks: number;
+    totalRecords: number;
+  };
+  tokenBudget: {
+    usedTokens: number;
+    maxTokens: number;
+    usagePercent: number;
+  };
+}): string {
+  return [
+    '# Session Report',
+    '',
+    `Generated At: ${report.generatedAt}`,
+    '',
+    '## Collector',
+    `- Files: ${report.collector.totalFiles}`,
+    `- Total Bytes: ${report.collector.totalBytes}`,
+    '',
+    '## Hooks',
+    `- Total Hooks: ${report.hooks.totalHooks}`,
+    `- Enabled Hooks: ${report.hooks.enabledHooks}`,
+    `- Total Records: ${report.hooks.totalRecords}`,
+    '',
+    '## Token Budget',
+    `- Used: ${report.tokenBudget.usedTokens}/${report.tokenBudget.maxTokens}`,
+    `- Usage: ${report.tokenBudget.usagePercent.toFixed(2)}%`,
+  ].join('\n');
 }

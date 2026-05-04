@@ -4,19 +4,25 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+// Helper functions (used internally)
 export {normalizeCollectedFiles, toRecord, toMirroredNetworkEntry, toMirroredScriptEntry} from './normalize.js';
 export {buildHookTimeline} from './timeline.js';
 export {correlateNetworkFlows} from './flows.js';
 export {buildUrlPattern, buildRequestFingerprints, buildPriorityTargets} from './fingerprints.js';
 export {extractSignatureChainHints} from './signature.js';
-export {buildActionPlan, buildWhyTheseSteps, buildStopConditions, recordReverseEvidence, exportSessionReport} from './reports.js';
+export {buildActionPlan, buildWhyTheseSteps, buildStopConditions} from './reports.js';
 export {pickHookTypes} from './hooks.js';
-export {analyzeTarget} from './analyzeTarget.js';
+
+// MCP Tools (defined with defineTool)
 export {deobfuscateCode} from './deobfuscate.js';
 export {understandCode} from './understand.js';
-export {summarizeFile, summarizeBatch, summarizeProject, summarizeCode} from './summarize.js';
+export {summarizeCode} from './summarize.js';
 export {detectCrypto} from './detectCrypto.js';
 export {riskPanel} from './riskPanel.js';
+export {record_reverse_evidence, export_session_report} from './reports.js';
+export {analyze_target} from './analyzeTarget.js';
+
+// Type exports
 export type {AnalyzeTargetParams} from './analyzeTarget.js';
 export type {
   AnalyzerResult,

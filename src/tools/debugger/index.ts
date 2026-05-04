@@ -148,9 +148,17 @@ function findMatches(
 }
 
 async function getDebugger(runtime: DebuggerRuntime) {
-  if (!runtime || typeof runtime.getDebuggerContext !== 'function') {
+  if (!runtime) {
     throw new Error(
-      '缺少调试运行时上下文。请确保已选择页面且调试器可用。',
+      '缺少调试运行时上下文：runtime 为空。请确保已选择页面且调试器可用。',
+    );
+  }
+  if (typeof runtime.getDebuggerContext !== 'function') {
+    const available = Object.keys(runtime).slice(0, 10).join(', ');
+    throw new Error(
+      `缺少调试运行时上下文：runtime.getDebuggerContext 不是函数` +
+        `(typeof=${typeof runtime.getDebuggerContext}, keys=[${available}])。` +
+        '请确保已选择页面且调试器可用。',
     );
   }
   try {
@@ -261,6 +269,13 @@ export async function stepInto(
   runtime: DebuggerRuntime,
 ): Promise<DebuggerResult> {
   const debuggerContext = await getDebugger(runtime);
+  const pausedState = debuggerContext.getPausedState();
+  if (!pausedState.isPaused) {
+    return failure(
+      'step_into',
+      '当前未处于暂停状态，无法单步进入。请先命中断点或调用 pause。',
+    );
+  }
   await debuggerContext.stepInto();
   return success('step_into', '单步进入执行完成');
 }
@@ -272,6 +287,13 @@ export async function stepOver(
   runtime: DebuggerRuntime,
 ): Promise<DebuggerResult> {
   const debuggerContext = await getDebugger(runtime);
+  const pausedState = debuggerContext.getPausedState();
+  if (!pausedState.isPaused) {
+    return failure(
+      'step_over',
+      '当前未处于暂停状态，无法单步跳过。请先命中断点或调用 pause。',
+    );
+  }
   await debuggerContext.stepOver();
   return success('step_over', '单步跳过执行完成');
 }
@@ -283,6 +305,13 @@ export async function stepOut(
   runtime: DebuggerRuntime,
 ): Promise<DebuggerResult> {
   const debuggerContext = await getDebugger(runtime);
+  const pausedState = debuggerContext.getPausedState();
+  if (!pausedState.isPaused) {
+    return failure(
+      'step_out',
+      '当前未处于暂停状态，无法单步跳出。请先命中断点或调用 pause。',
+    );
+  }
   await debuggerContext.stepOut();
   return success('step_out', '单步跳出执行完成');
 }
@@ -303,8 +332,17 @@ export async function resume(
  */
 export async function pause(runtime: DebuggerRuntime): Promise<DebuggerResult> {
   const debuggerContext = await getDebugger(runtime);
-  await debuggerContext.pause();
-  return success('pause', '已请求暂停执行');
+  const client = debuggerContext.getClient();
+  if (!client) {
+    return failure('pause', 'Debugger 尚未启用，无法暂停执行');
+  }
+  try {
+    await debuggerContext.pause();
+    return success('pause', '已请求暂停执行');
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    return failure('pause', `暂停执行失败: ${detail}`);
+  }
 }
 
 /**
@@ -341,7 +379,15 @@ export async function getScriptSource(
     limit?: number;
   } = {},
 ): Promise<DebuggerResult> {
-  const debuggerContext = await getDebugger(runtime);
+  let debuggerContext;
+  try {
+    debuggerContext = await getDebugger(runtime);
+  } catch {
+    return failure(
+      'get_script_source',
+      'Debugger 尚未启用，无法获取脚本源码。请先打开页面并确保调试器可用。',
+    );
+  }
   const requestedScriptId =
     params.scriptId ?? params.script_id ?? params.scriptid;
   const urlPattern = params.urlPattern ?? params.urlFilter;
@@ -577,14 +623,30 @@ export async function removeXhrBreakpoint(
   runtime: DebuggerRuntime,
   params: {url?: string} = {},
 ): Promise<DebuggerResult> {
-  const debuggerContext = await getDebugger(runtime);
+  let debuggerContext;
+  try {
+    debuggerContext = await getDebugger(runtime);
+  } catch {
+    return failure(
+      'remove_xhr_breakpoint',
+      'Debugger 尚未启用，无法移除 XHR 断点。请先设置 XHR 断点。',
+    );
+  }
   const client = debuggerContext.getClient();
   if (!client) {
     return failure('remove_xhr_breakpoint', 'Debugger 尚未启用');
   }
 
   const url = typeof params.url === 'string' ? params.url : '';
-  await client.send('DOMDebugger.removeXHRBreakpoint', {url});
+  try {
+    await client.send('DOMDebugger.removeXHRBreakpoint', {url});
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    return failure(
+      'remove_xhr_breakpoint',
+      `移除 XHR 断点失败: ${detail}`,
+    );
+  }
   return success('remove_xhr_breakpoint', `XHR 断点已移除: ${url || '*'}`, {
     url: url || '*',
   });
@@ -628,7 +690,18 @@ export async function traceFunction(
 export async function getAiDebugStatus(
   runtime: DebuggerRuntime,
 ): Promise<DebuggerResult> {
-  const debuggerContext = await getDebugger(runtime);
+  let debuggerContext;
+  try {
+    debuggerContext = await getDebugger(runtime);
+  } catch {
+    return success('get_ai_debug_status', '调试器尚未初始化', {
+      isPaused: false,
+      breakpointCount: 0,
+      scriptCount: 0,
+      lastAutoRecoveryEvent: null,
+      debuggerEnabled: false,
+    });
+  }
   const pausedState = debuggerContext.getPausedState();
   const breakpoints = debuggerContext.getBreakpoints();
   const scripts = debuggerContext.getScripts();
@@ -638,6 +711,7 @@ export async function getAiDebugStatus(
     breakpointCount: breakpoints.length,
     scriptCount: scripts.length,
     lastAutoRecoveryEvent: debuggerContext.getLastAutoRecoveryEvent(),
+    debuggerEnabled: true,
   });
 }
 

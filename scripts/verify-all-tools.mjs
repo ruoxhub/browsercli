@@ -532,7 +532,7 @@ async function main() {
   const SKIP_TOOLS = new Set(['new_page']);
 
   // 需要调试器处于暂停状态的工具
-  const NEEDS_PAUSED_STATE = new Set(['step_over', 'resume']);
+  const NEEDS_PAUSED_STATE = new Set(['step_into', 'step_over', 'step_out', 'resume']);
 
   const standaloneTools = filteredTools.filter(t => t.callMode === 'params-only' && !BROWSER_TOOLS.has(t.name) && !SKIP_TOOLS.has(t.name));
   const browserTools = filteredTools.filter(t => t.callMode === 'params-only' && BROWSER_TOOLS.has(t.name));

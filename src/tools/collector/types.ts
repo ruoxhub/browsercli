@@ -99,10 +99,26 @@ export interface SearchInScriptsData {
   truncated: boolean;
 }
 
+/** collectCode 返回数据结构 */
+export interface CollectCodeData {
+  /** 收集的文件列表或摘要 */
+  files?: Array<{url: string; content?: string; size: number; type: string}>;
+  /** 文件摘要信息 (summary 模式) */
+  summary?: FileSummaryEntry[];
+  /** 总大小 (字节) */
+  totalSize?: number;
+  /** 收集的文件数量 */
+  count?: number;
+  /** 是否被截断 */
+  truncated?: boolean;
+  /** 返回模式 */
+  returnMode?: ReturnMode;
+}
+
 /** collectCode 返回结果 */
 export interface CollectCodeResult extends CollectorResult {
   tooltype: 'collect_code';
-  data: unknown;
+  data: CollectCodeData | null;
 }
 
 /** collectionDiff 返回结果 */

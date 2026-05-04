@@ -89,6 +89,10 @@ export class ToolAdapter {
           }
         } else if (callMode === 'context') {
           // context 模式：handler(contextProvider, params) — 传递 ToolContextProvider 作为第一个参数
+          if (!this.contextProvider) {
+            reject(`Tool "${toolName}" 需要上下文，但 contextProvider 不可用`);
+            return;
+          }
           result = await handler(this.contextProvider, params);
         } else {
           // params-only 或未指定：handler(params)

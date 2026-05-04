@@ -1,9 +1,6 @@
 {
   "rpcHost": "ws://127.0.0.1:5612",
   "group": "js-reverse",
-  "browserUrl": "http://127.0.0.1:19222",
-  "wsEndpoint": "",
-  "headless": false,
   "databaseUrl": "postgresql://ruoxing:mrx123456@127.0.0.1:5432/js_reverse_mcp",
   "llmProvider": "openai",
   "openai": {
@@ -17,10 +14,8 @@
     "executablePath": "",
     "channel": "chrome",
     "useStealthScripts": true,
-    "viewport": {
-      "width": 1280,
-      "height": 720
-    }
+    "browserURL": "http://127.0.0.1:19222",
+    "wsEndpoint": ""
   },
   "debug": false
 }

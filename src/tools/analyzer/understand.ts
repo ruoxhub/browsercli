@@ -4,28 +4,39 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {zod} from '../../third_party/index.js';
 import {getRuntime} from '../../runtime.js';
-import type {UnderstandCodeOptions} from '../../types/index.js';
+import {defineTool} from '../ToolDefinition.js';
+import {ToolCategory} from '../categories.js';
 
-import type {UnderstandCodeFnResult} from './types.js';
-
-export async function understandCode(
-  options: UnderstandCodeOptions,
-): Promise<UnderstandCodeFnResult> {
-  try {
-    const data = await getRuntime().analyzer.understand(options);
-    return {
-      success: true,
-      message: 'Code analysis completed',
-      tooltype: 'understand',
-      data,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `Code analysis failed: ${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'understand',
-      data: {} as UnderstandCodeFnResult['data'],
-    };
-  }
-}
+export const understandCode = defineTool({
+  name: 'understand_code',
+  description: 'Analyze code structure/business/security with AI + static analysis.',
+  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+  schema: {
+    code: zod.string(),
+    focus: zod.enum(['all', 'structure', 'business', 'security']).optional(),
+  },
+  handler: async (request, response) => {
+    try {
+      const result = await getRuntime().analyzer.understand(request.params);
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify({
+        success: true,
+        message: 'Code analysis completed',
+        tooltype: 'understand',
+        data: result,
+      }, null, 2));
+      response.appendResponseLine('```');
+    } catch (error) {
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify({
+        success: false,
+        message: `Code analysis failed: ${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'understand',
+        data: {},
+      }, null, 2));
+      response.appendResponseLine('```');
+    }
+  },
+});
