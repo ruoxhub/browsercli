@@ -10,7 +10,7 @@ import type {
   BreakpointInfo,
   PausedState,
   ScriptInfo,
-} from '../../utils/DebuggerContext.js';
+} from '../../DebuggerContext.js';
 import type {ToolContextProvider} from '../../worker/ToolContextProvider.js';
 
 import {hookFunction as hookFunctionImpl} from './hookFunction.js';

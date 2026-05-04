@@ -6,7 +6,7 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {DebuggerContext} from '../../src/utils/DebuggerContext.js';
+import {DebuggerContext} from '../../src/DebuggerContext.js';
 
 type Handler = (payload: any) => void;
 

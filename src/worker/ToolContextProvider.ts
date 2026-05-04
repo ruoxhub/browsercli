@@ -40,7 +40,7 @@ import {LLMService} from '../services/LLMService.js';
 import type {HTTPRequest} from '../third_party/index.js';
 import type {RequestInitiator} from '../tools/network/types.js';
 import type {WebSocketData} from '../tools/network/WebSocketCollector.js';
-import {DebuggerContext} from '../utils/DebuggerContext.js';
+import {DebuggerContext} from '../DebuggerContext.js';
 import {
   NetworkRequestCollector,
   ConsoleMessageCollector,

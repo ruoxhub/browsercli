@@ -11,7 +11,7 @@ import type {HookResult, BypassTarget} from './types.js';
 /**
  * 绕过无限 debugger：自动移除 eval/Function/constructor 中的 debugger 关键字。
  *
- * @param frame - Puppeteer Frame 对象，用于注入 Hook 代码
+ * @param frame - Playwright Frame 对象，用于注入 Hook 代码
  * @param targets - 要 Hook 的目标，默认全部
  * @returns 结构化结果对象
  */

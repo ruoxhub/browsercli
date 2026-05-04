@@ -6,12 +6,12 @@
 
 import type {DebuggerContext} from '../DebuggerContext.js';
 import type {TrafficSummary} from '../formatters/websocketFormatter.js';
-import type {RequestInitiator} from '../PageCollector.js';
+import type {RequestInitiator} from './network/types.js';
 import {zod} from '../third_party/index.js';
 import type {Dialog, Frame, HTTPRequest, Page} from '../third_party/index.js';
 import type {TraceResult} from '../trace-processing/parse.js';
 import type {PaginationOptions} from '../utils/types.js';
-import type {WebSocketData} from '../WebSocketCollector.js';
+import type {WebSocketData} from './network/WebSocketCollector.js';
 
 import type {ToolCategory} from './categories.js';
 
