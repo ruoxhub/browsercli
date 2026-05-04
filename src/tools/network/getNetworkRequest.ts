@@ -4,43 +4,129 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {defineTool} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
 import {getRuntime} from '../../runtime.js';
 
-import type {
-  GetNetworkRequestData,
-  GetNetworkRequestParams,
-  GetNetworkRequestResult,
-} from './types.js';
-
-/**
- * 通过 ID 获取单条网络请求详情（纯函数版本）。
- *
- * 如果省略 reqid，则尝试从 DevTools UI 当前选中请求获取。
- *
- * @param params - 查询参数（可选 reqid）
- * @returns 结构化结果 { success, message, tooltype, logFormat, data }
- */
-export async function getNetworkRequest(
-  params?: GetNetworkRequestParams,
-): Promise<GetNetworkRequestResult> {
-  try {
-    // 解析 reqid：显式传入 > DevTools UI 选中
-    let reqid = params?.reqid;
-    if (!reqid) {
-      const devToolsData = await getRuntime().contextProvider!.getDevToolsData();
-      if (devToolsData?.cdpRequestId) {
-        reqid = getRuntime().contextProvider!.resolveCdpRequestId(devToolsData.cdpRequestId);
+export const getNetworkRequest = defineTool({
+  name: 'get_network_request',
+  description:
+    'Gets a network request by an optional reqid, if omitted returns the currently selected request in the DevTools Network panel.',
+  annotations: {
+    category: ToolCategory.NETWORK,
+    readOnlyHint: true,
+  },
+  schema: {
+    reqid: zod
+      .number()
+      .optional()
+      .describe(
+        'The reqid of the network request. If omitted returns the currently selected request in the DevTools Network panel.',
+      ),
+    maxBodyLength: zod
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        'Maximum length of the response body to return. Defaults to 300 characters.',
+      ),
+  },
+  handler: async (request, response) => {
+    try {
+      let reqid = request.params.reqid;
+      if (!reqid) {
+        const devToolsData =
+          await getRuntime().contextProvider!.getDevToolsData();
+        if (devToolsData?.cdpRequestId) {
+          reqid = getRuntime().contextProvider!.resolveCdpRequestId(
+            devToolsData.cdpRequestId,
+          );
+        }
       }
-    }
 
-    if (!reqid) {
-      return {
+      if (!reqid) {
+        const result = {
+          success: false,
+          message: '未指定 reqid，且 DevTools Network 面板未选中任何请求',
+          tooltype: 'get_network_request',
+          logFormat: 'json',
+          data: {
+            reqid: 0,
+            url: '',
+            method: '',
+            resourceType: '',
+            statusCode: 0,
+            requestHeaders: {},
+            responseHeaders: {},
+          },
+        };
+        response.appendResponseLine('```json');
+        response.appendResponseLine(JSON.stringify(result, null, 2));
+        response.appendResponseLine('```');
+        return;
+      }
+
+      const networkRequest =
+        getRuntime().contextProvider!.getNetworkRequestById(reqid);
+      const httpResponse = await networkRequest.response();
+
+      const maxBodyLength = request.params.maxBodyLength ?? 300;
+      let responseBody: string | undefined;
+      if (httpResponse) {
+        try {
+          const contentType = httpResponse.headers()['content-type'] ?? '';
+          if (
+            contentType.includes('json') ||
+            contentType.includes('text') ||
+            contentType.includes('javascript')
+          ) {
+            const fullBody = await httpResponse.text();
+            responseBody =
+              fullBody.length > maxBodyLength
+                ? fullBody.slice(0, maxBodyLength) + '\n... [truncated]'
+                : fullBody;
+          }
+        } catch {
+          // 忽略读取失败
+        }
+      }
+
+      const data = {
+        reqid,
+        url: networkRequest.url(),
+        method: networkRequest.method(),
+        resourceType: networkRequest.resourceType(),
+        postData: networkRequest.postData() ?? undefined,
+        statusCode: httpResponse?.status() ?? 0,
+        statusText: httpResponse?.statusText?.(),
+        requestHeaders: networkRequest.headers(),
+        responseHeaders: httpResponse?.headers() ?? {},
+        initiator:
+          getRuntime().contextProvider!.getRequestInitiator(networkRequest),
+        responseBody,
+      };
+
+      const result = {
+        success: true,
+        message: `请求 ID=${reqid} 获取成功`,
+        tooltype: 'get_network_request',
+        logFormat: 'json',
+        data,
+      };
+
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    } catch (error) {
+      const result = {
         success: false,
-        message: '未指定 reqid，且 DevTools Network 面板未选中任何请求',
+        message: `获取请求失败：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'get_network_request',
         logFormat: 'json',
         data: {
-          reqid: 0,
+          reqid: request.params.reqid ?? 0,
           url: '',
           method: '',
           resourceType: '',
@@ -49,65 +135,9 @@ export async function getNetworkRequest(
           responseHeaders: {},
         },
       };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
     }
-
-    const request = getRuntime().contextProvider!.getNetworkRequestById(reqid);
-    const httpResponse = await request.response();
-
-    // 尝试读取响应体（文本），可通过 params.maxBodyLength 设置，默认 300 字符
-    const maxBodyLength = params?.maxBodyLength ?? 300;
-    let responseBody: string | undefined;
-    if (httpResponse) {
-      try {
-        const contentType = httpResponse.headers()['content-type'] ?? '';
-        // 只读取文本类型的响应体
-        if (contentType.includes('json') || contentType.includes('text') || contentType.includes('javascript')) {
-          const fullBody = await httpResponse.text();
-          responseBody = fullBody.length > maxBodyLength
-            ? fullBody.slice(0, maxBodyLength) + '\n... [truncated]'
-            : fullBody;
-        }
-      } catch {
-        // 忽略读取失败
-      }
-    }
-
-    const data: GetNetworkRequestData = {
-      reqid,
-      url: request.url(),
-      method: request.method(),
-      resourceType: request.resourceType(),
-      postData: request.postData() ?? undefined,
-      statusCode: httpResponse?.status() ?? 0,
-      statusText: httpResponse?.statusText?.(),
-      requestHeaders: request.headers(),
-      responseHeaders: httpResponse?.headers() ?? {},
-      initiator: getRuntime().contextProvider!.getRequestInitiator(request),
-      responseBody,
-    };
-
-    return {
-      success: true,
-      message: `请求 ID=${reqid} 获取成功`,
-      tooltype: 'get_network_request',
-      logFormat: 'json',
-      data,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `获取请求失败：${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'get_network_request',
-      logFormat: 'json',
-      data: {
-        reqid: params?.reqid ?? 0,
-        url: '',
-        method: '',
-        resourceType: '',
-        statusCode: 0,
-        requestHeaders: {},
-        responseHeaders: {},
-      },
-    };
-  }
-}
+  },
+});

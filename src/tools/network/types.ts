@@ -9,7 +9,7 @@ import type {HTTPRequest, Page, ResourceType} from '../../third_party/index.js';
 // ─── 可过滤的资源类型 ──────────────────────────────────
 
 /** 可过滤的网络请求资源类型列表 */
-export const FILTERABLE_RESOURCE_TYPES = [
+export const FILTERABLE_RESOURCE_TYPES: [ResourceType, ...ResourceType[]] = [
   'document',
   'stylesheet',
   'image',
@@ -29,7 +29,7 @@ export const FILTERABLE_RESOURCE_TYPES = [
   'preflight',
   'fedcm',
   'other',
-] as const;
+];
 
 // ─── 运行时服务接口 ──────────────────────────────────
 

@@ -4,17 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {HTTPRequest, ResourceType} from '../../third_party/index.js';
+import {defineTool} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
 import {getRuntime} from '../../runtime.js';
 import {resolveActivePageIndex} from '../shared/activePageResolver.js';
-
+import type {HTTPRequest, ResourceType} from '../../third_party/index.js';
 import type {
   ListNetworkRequestsData,
   ListNetworkRequestsParams,
-  ListNetworkRequestsResult,
-  NetworkRequestData,
   NetworkEvidenceCorrelation,
+  NetworkRequestData,
 } from './types.js';
+import {FILTERABLE_RESOURCE_TYPES} from './types.js';
 
 const DEFAULT_WAIT_TIMEOUT_MS = 5000;
 const WAIT_POLL_INTERVAL_MS = 50;
@@ -36,14 +38,12 @@ function getRequestHeaders(request: HTTPRequest): Record<string, string> {
 const SIGNATURE_HEADER_PATTERN =
   /(^|[-_])(sign|signature|token|auth|nonce|timestamp)([-_]|$)|x-sign/i;
 
-async function waitForMatchingRequest(
-  options: {
-    includePreservedRequests: boolean;
-    targetPageIdx: number;
-    waitForRequest: string;
-    waitTimeoutMs?: number;
-  },
-): Promise<boolean> {
+async function waitForMatchingRequest(options: {
+  includePreservedRequests: boolean;
+  targetPageIdx: number;
+  waitForRequest: string;
+  waitTimeoutMs?: number;
+}): Promise<boolean> {
   const timeoutMs = options.waitTimeoutMs ?? DEFAULT_WAIT_TIMEOUT_MS;
   const deadline = Date.now() + timeoutMs;
 
@@ -68,11 +68,6 @@ async function waitForMatchingRequest(
   }
 }
 
-/**
- * 将 HTTPRequest 序列化为精简结构化数据。
- *
- * 仅包含基本信息，详情使用 getNetworkRequest 获取。
- */
 function serializeRequest(
   request: HTTPRequest,
   reqid: number,
@@ -86,153 +81,13 @@ function serializeRequest(
   };
 }
 
-/**
- * 列出当前页面的所有网络请求（纯函数版本）。
- *
- * 通过 getRuntime() 获取请求数据，
- * 支持按资源类型过滤和分页。
- *
- * @param params - 查询参数（分页、类型过滤等）
- * @returns 结构化结果 { success, message, tooltype, logFormat, data }
- */
-export async function listNetworkRequests(
-  params?: ListNetworkRequestsParams,
-): Promise<ListNetworkRequestsResult> {
-  const resultPageIdx = params?.pageIdx ?? 0;
-  const pageSize = params?.pageSize;
-  let targetPageIdx = params?.targetPageIdx ?? 0;
-
-  try {
-    const includePreserved = params?.includePreservedRequests ?? false;
-    if (params?.targetPageIdx === undefined) {
-      const resolvedPage = resolveActivePageIndex(getRuntime().contextProvider!);
-      if ('message' in resolvedPage) {
-        return {
-          success: false,
-          message: resolvedPage.message,
-          tooltype: 'list_network_requests',
-          logFormat: 'json',
-          data: {
-            requests: [],
-            total: 0,
-            pageIdx: resultPageIdx,
-            pageSize,
-            targetPageIdx: 0,
-            timedOut: false,
-          },
-        };
-      }
-      targetPageIdx = resolvedPage.pageIdx;
-    }
-
-    if (params?.waitForRequest) {
-      const matched = await waitForMatchingRequest({
-        includePreservedRequests: includePreserved,
-        targetPageIdx,
-        waitForRequest: params.waitForRequest,
-        waitTimeoutMs: params.waitTimeoutMs,
-      });
-      if (!matched) {
-        const timeoutMs = params.waitTimeoutMs ?? DEFAULT_WAIT_TIMEOUT_MS;
-        return {
-          success: false,
-          message: `等待请求超时：${timeoutMs}ms 内未发现匹配 ${params.waitForRequest} 的请求`,
-          tooltype: 'list_network_requests',
-          logFormat: 'json',
-          data: {
-            requests: [],
-            total: 0,
-            pageIdx: resultPageIdx,
-            pageSize,
-            targetPageIdx,
-            timedOut: true,
-          },
-        };
-      }
-    }
-
-    let requests = getRuntime().contextProvider!.getNetworkRequests(includePreserved, targetPageIdx);
-
-    // 按资源类型过滤
-    if (params?.resourceTypes?.length) {
-      const normalizedTypes = new Set(params.resourceTypes);
-      requests = requests.filter(request => {
-        return normalizedTypes.has(request.resourceType() as ResourceType);
-      });
-    }
-
-    if (params?.headerFilter) {
-      const keyword = params.headerFilter.toLowerCase();
-      requests = requests.filter(request => {
-        const headers = getRequestHeaders(request);
-        return Object.entries(headers).some(([key, value]) => {
-          return `${key}: ${value}`.toLowerCase().includes(keyword);
-        });
-      });
-    }
-
-    // 序列化（精简版，仅包含基本信息）
-    const allData: NetworkRequestData[] = requests.map(request => {
-      const reqid = getRuntime().contextProvider!.getNetworkRequestStableId(request);
-      return serializeRequest(request, reqid);
-    });
-
-    // 分页
-    const total = allData.length;
-
-    let pagedData: NetworkRequestData[];
-    if (pageSize) {
-      const start = resultPageIdx * pageSize;
-      pagedData = allData.slice(start, start + pageSize);
-    } else {
-      pagedData = allData;
-    }
-
-    const data: ListNetworkRequestsData = {
-      requests: pagedData,
-      total,
-      pageIdx: resultPageIdx,
-      targetPageIdx,
-      pageSize,
-      timedOut: false,
-      ...(params?.includeSignatureEvidence
-        ? {
-            evidenceCorrelations: buildEvidenceCorrelations(requests),
-          }
-        : {}),
-    };
-
-    return {
-      success: true,
-      message: `共 ${total} 个请求，返回 ${pagedData.length} 个`,
-      tooltype: 'list_network_requests',
-      logFormat: 'json',
-      data,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `列出请求失败：${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'list_network_requests',
-      logFormat: 'json',
-      data: {
-        requests: [],
-        total: 0,
-        pageIdx: resultPageIdx,
-        pageSize,
-        targetPageIdx,
-        timedOut: false,
-      },
-    };
-  }
-}
-
 function buildEvidenceCorrelations(
   requests: HTTPRequest[],
 ): NetworkEvidenceCorrelation[] {
   return requests
     .map((request): NetworkEvidenceCorrelation | null => {
-      const reqid = getRuntime().contextProvider!.getNetworkRequestStableId(request);
+      const reqid =
+        getRuntime().contextProvider!.getNetworkRequestStableId(request);
       const headers = getRequestHeaders(request);
       const signatureIndicators = Object.keys(headers).filter(key =>
         SIGNATURE_HEADER_PATTERN.test(key),
@@ -254,3 +109,226 @@ function buildEvidenceCorrelations(
     })
     .filter((item): item is NetworkEvidenceCorrelation => item !== null);
 }
+
+export const listNetworkRequests = defineTool({
+  name: 'list_network_requests',
+  description:
+    'List all requests for the currently selected page since the last navigation. Supports filtering by resource type, header keyword, pagination, and waiting for matching requests.',
+  annotations: {
+    category: ToolCategory.NETWORK,
+    readOnlyHint: true,
+  },
+  schema: {
+    pageSize: zod
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        'Maximum number of requests to return. When omitted, returns all requests.',
+      ),
+    pageIdx: zod
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe(
+        'Page number to return (0-based). When omitted, returns the first page.',
+      ),
+    resourceTypes: zod
+      .array(zod.enum(FILTERABLE_RESOURCE_TYPES))
+      .optional()
+      .describe(
+        'Filter requests to only return requests of the specified resource types. When omitted or empty, returns all requests.',
+      ),
+    includePreservedRequests: zod
+      .boolean()
+      .default(false)
+      .optional()
+      .describe(
+        'Set to true to return the preserved requests over the last 3 navigations.',
+      ),
+    targetPageIdx: zod
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe(
+        'Browser page index. When omitted, uses the currently active page.',
+      ),
+    waitForRequest: zod
+      .string()
+      .optional()
+      .describe(
+        'Wait for a request whose URL contains this fragment before returning.',
+      ),
+    waitTimeoutMs: zod
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        'Maximum time in milliseconds to wait for a matching request when waitForRequest is set.',
+      ),
+    headerFilter: zod
+      .string()
+      .optional()
+      .describe(
+        'Filter requests by a keyword present in their headers (case-insensitive).',
+      ),
+    includeSignatureEvidence: zod
+      .boolean()
+      .optional()
+      .describe(
+        'Include signature-related evidence correlations in the response.',
+      ),
+  },
+  handler: async (request, response) => {
+    try {
+      const params = request.params as ListNetworkRequestsParams;
+      const resultPageIdx = params.pageIdx ?? 0;
+      const pageSize = params.pageSize;
+      let targetPageIdx = params.targetPageIdx ?? 0;
+
+      const includePreserved = params.includePreservedRequests ?? false;
+      if (params.targetPageIdx === undefined) {
+        const resolvedPage = resolveActivePageIndex(
+          getRuntime().contextProvider!,
+        );
+        if ('message' in resolvedPage) {
+          const errorResult = {
+            success: false,
+            message: resolvedPage.message,
+            tooltype: 'list_network_requests',
+            logFormat: 'json',
+            data: {
+              requests: [],
+              total: 0,
+              pageIdx: resultPageIdx,
+              pageSize,
+              targetPageIdx: 0,
+              timedOut: false,
+            },
+          };
+          response.appendResponseLine('```json');
+          response.appendResponseLine(JSON.stringify(errorResult, null, 2));
+          response.appendResponseLine('```');
+          return;
+        }
+        targetPageIdx = resolvedPage.pageIdx;
+      }
+
+      if (params.waitForRequest) {
+        const matched = await waitForMatchingRequest({
+          includePreservedRequests: includePreserved,
+          targetPageIdx,
+          waitForRequest: params.waitForRequest,
+          waitTimeoutMs: params.waitTimeoutMs,
+        });
+        if (!matched) {
+          const timeoutMs = params.waitTimeoutMs ?? DEFAULT_WAIT_TIMEOUT_MS;
+          const timeoutResult = {
+            success: false,
+            message: `等待请求超时：${timeoutMs}ms 内未发现匹配 ${params.waitForRequest} 的请求`,
+            tooltype: 'list_network_requests',
+            logFormat: 'json',
+            data: {
+              requests: [],
+              total: 0,
+              pageIdx: resultPageIdx,
+              pageSize,
+              targetPageIdx,
+              timedOut: true,
+            },
+          };
+          response.appendResponseLine('```json');
+          response.appendResponseLine(JSON.stringify(timeoutResult, null, 2));
+          response.appendResponseLine('```');
+          return;
+        }
+      }
+
+      let requests = getRuntime().contextProvider!.getNetworkRequests(
+        includePreserved,
+        targetPageIdx,
+      );
+
+      if (params.resourceTypes?.length) {
+        const normalizedTypes = new Set(params.resourceTypes);
+        requests = requests.filter(request => {
+          return normalizedTypes.has(request.resourceType() as ResourceType);
+        });
+      }
+
+      if (params.headerFilter) {
+        const keyword = params.headerFilter.toLowerCase();
+        requests = requests.filter(request => {
+          const headers = getRequestHeaders(request);
+          return Object.entries(headers).some(([key, value]) => {
+            return `${key}: ${value}`.toLowerCase().includes(keyword);
+          });
+        });
+      }
+
+      const allData: NetworkRequestData[] = requests.map(request => {
+        const reqid =
+          getRuntime().contextProvider!.getNetworkRequestStableId(request);
+        return serializeRequest(request, reqid);
+      });
+
+      const total = allData.length;
+
+      let pagedData: NetworkRequestData[];
+      if (pageSize) {
+        const start = resultPageIdx * pageSize;
+        pagedData = allData.slice(start, start + pageSize);
+      } else {
+        pagedData = allData;
+      }
+
+      const data: ListNetworkRequestsData = {
+        requests: pagedData,
+        total,
+        pageIdx: resultPageIdx,
+        targetPageIdx,
+        pageSize,
+        timedOut: false,
+        ...(params.includeSignatureEvidence
+          ? {
+              evidenceCorrelations: buildEvidenceCorrelations(requests),
+            }
+          : {}),
+      };
+
+      const result = {
+        success: true,
+        message: `共 ${total} 个请求，返回 ${pagedData.length} 个`,
+        tooltype: 'list_network_requests',
+        logFormat: 'json',
+        data,
+      };
+
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    } catch (error) {
+      const errorResult = {
+        success: false,
+        message: `列出请求失败：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'list_network_requests',
+        logFormat: 'json',
+        data: {
+          requests: [],
+          total: 0,
+          pageIdx: request.params.pageIdx ?? 0,
+          pageSize: request.params.pageSize,
+          targetPageIdx: 0,
+          timedOut: false,
+        },
+      };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(errorResult, null, 2));
+      response.appendResponseLine('```');
+    }
+  },
+});

@@ -7,6 +7,7 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
+import {getRuntime} from '../../../../src/runtime.js';
 import {listNetworkRequests} from '../../../../src/tools/network/listNetworkRequests.js';
 import {NO_ACTIVE_PAGE_MESSAGE} from '../../../../src/tools/shared/activePageResolver.js';
 
@@ -31,61 +32,122 @@ function createRequest(
   };
 }
 
+function createMockResponse() {
+  const lines: string[] = [];
+  return {
+    lines,
+    appendResponseLine: (value: string) => lines.push(value),
+    setIncludePages: () => undefined,
+    setIncludeNetworkRequests: () => undefined,
+    setIncludeConsoleData: () => undefined,
+    attachImage: () => undefined,
+    attachNetworkRequest: () => undefined,
+    attachConsoleMessage: () => undefined,
+    setIncludeWebSocketConnections: () => undefined,
+    attachWebSocket: () => undefined,
+  };
+}
+
+function parseResult(
+  response: ReturnType<typeof createMockResponse>,
+): Record<string, unknown> {
+  const jsonLine = response.lines.find(line => line.trim().startsWith('{'));
+  if (!jsonLine) {
+    throw new Error(
+      'No JSON line found in response: ' + response.lines.join('\n'),
+    );
+  }
+  return JSON.parse(jsonLine);
+}
+
+function setupContextProvider(services: {
+  getPages?: () => unknown[];
+  getSelectedPage?: () => unknown | null;
+  getSelectedPageIndex?: () => number | null;
+  getNetworkRequests?: (
+    includePreserved?: boolean,
+    pageIdx?: number,
+  ) => unknown[];
+  getNetworkRequestById?: (reqid: number) => unknown;
+  getNetworkRequestStableId?: (request: unknown) => number;
+  getRequestInitiator?: (request: unknown) => unknown;
+  getDevToolsData?: () => Promise<unknown>;
+  resolveCdpRequestId?: (cdpRequestId: string) => number | undefined;
+}) {
+  const runtime = getRuntime();
+  runtime.contextProvider = services as never;
+}
+
 describe('listNetworkRequests', () => {
   it('uses selected page index when targetPageIdx is omitted', async () => {
     const pages = [{id: 0}, {id: 1}, {id: 2}, {id: 3}, {id: 4}];
     const selectedPage = pages[4];
     const request = createRequest('https://example.test/api');
 
-    const result = await listNetworkRequests(
-      {
-        getPages: () => pages as never[],
-        getSelectedPage: () => selectedPage as never,
-        getSelectedPageIndex: () => 4,
-        getNetworkRequests: () => [request as never],
-        getNetworkRequestById: () => {
-          throw new Error('unused');
-        },
-        getNetworkRequestStableId: () => 101,
-        getRequestInitiator: () => undefined,
-        getDevToolsData: async () => undefined,
-        resolveCdpRequestId: () => undefined,
+    const response = createMockResponse();
+    setupContextProvider({
+      getPages: () => pages as never[],
+      getSelectedPage: () => selectedPage as never,
+      getSelectedPageIndex: () => 4,
+      getNetworkRequests: () => [request as never],
+      getNetworkRequestById: () => {
+        throw new Error('unused');
       },
-      {},
+      getNetworkRequestStableId: () => 101,
+      getRequestInitiator: () => undefined,
+      getDevToolsData: async () => undefined,
+      resolveCdpRequestId: () => undefined,
+    });
+
+    await listNetworkRequests.handler(
+      {params: {}} as never,
+      response as never,
+      undefined,
     );
 
+    const result = parseResult(response);
     assert.equal(result.success, true);
-    assert.equal(result.data.pageIdx, 0);
-    assert.equal(result.data.targetPageIdx, 4);
-    assert.equal(result.data.requests[0]?.reqid, 101);
+    const data = result.data as Record<string, unknown>;
+    assert.equal(data.pageIdx, 0);
+    assert.equal(data.targetPageIdx, 4);
+    assert.equal(
+      (data.requests as Array<Record<string, unknown>>)[0]?.reqid,
+      101,
+    );
   });
 
   it('uses targetPageIdx for browser page selection', async () => {
     const requestedPageIndexes: Array<number | undefined> = [];
 
-    const result = await listNetworkRequests(
-      {
-        getPages: () => [],
-        getSelectedPage: () => null,
-        getSelectedPageIndex: () => null,
-        getNetworkRequests: (_includePreserved, pageIdx) => {
-          requestedPageIndexes.push(pageIdx);
-          return [createRequest('https://example.test/target-page') as never];
-        },
-        getNetworkRequestById: () => {
-          throw new Error('unused');
-        },
-        getNetworkRequestStableId: () => 111,
-        getRequestInitiator: () => undefined,
-        getDevToolsData: async () => undefined,
-        resolveCdpRequestId: () => undefined,
+    const response = createMockResponse();
+    setupContextProvider({
+      getPages: () => [],
+      getSelectedPage: () => null,
+      getSelectedPageIndex: () => null,
+      getNetworkRequests: (_includePreserved, pageIdx) => {
+        requestedPageIndexes.push(pageIdx);
+        return [createRequest('https://example.test/target-page') as never];
       },
-      {targetPageIdx: 3},
+      getNetworkRequestById: () => {
+        throw new Error('unused');
+      },
+      getNetworkRequestStableId: () => 111,
+      getRequestInitiator: () => undefined,
+      getDevToolsData: async () => undefined,
+      resolveCdpRequestId: () => undefined,
+    });
+
+    await listNetworkRequests.handler(
+      {params: {targetPageIdx: 3}} as never,
+      response as never,
+      undefined,
     );
 
+    const result = parseResult(response);
     assert.equal(result.success, true);
     assert.deepStrictEqual(requestedPageIndexes, [3]);
-    assert.equal(result.data.targetPageIdx, 3);
+    const data = result.data as Record<string, unknown>;
+    assert.equal(data.targetPageIdx, 3);
   });
 
   it('paginates requests using pageIdx as result page number', async () => {
@@ -94,83 +156,99 @@ describe('listNetworkRequests', () => {
     const firstRequest = createRequest('https://example.test/request-1');
     const secondRequest = createRequest('https://example.test/request-2');
 
-    const result = await listNetworkRequests(
-      {
-        getPages: () => pages as never[],
-        getSelectedPage: () => selectedPage as never,
-        getSelectedPageIndex: () => 0,
-        getNetworkRequests: () => [firstRequest, secondRequest] as never[],
-        getNetworkRequestById: () => {
-          throw new Error('unused');
-        },
-        getNetworkRequestStableId: request =>
-          request === (firstRequest as never) ? 201 : 202,
-        getRequestInitiator: () => undefined,
-        getDevToolsData: async () => undefined,
-        resolveCdpRequestId: () => undefined,
+    const response = createMockResponse();
+    setupContextProvider({
+      getPages: () => pages as never[],
+      getSelectedPage: () => selectedPage as never,
+      getSelectedPageIndex: () => 0,
+      getNetworkRequests: () => [firstRequest, secondRequest] as never[],
+      getNetworkRequestById: () => {
+        throw new Error('unused');
       },
-      {pageSize: 1, pageIdx: 1},
+      getNetworkRequestStableId: request =>
+        request === (firstRequest as never) ? 201 : 202,
+      getRequestInitiator: () => undefined,
+      getDevToolsData: async () => undefined,
+      resolveCdpRequestId: () => undefined,
+    });
+
+    await listNetworkRequests.handler(
+      {params: {pageSize: 1, pageIdx: 1}} as never,
+      response as never,
+      undefined,
     );
 
+    const result = parseResult(response);
     assert.equal(result.success, true);
-    assert.equal(result.data.pageIdx, 1);
-    assert.equal(result.data.targetPageIdx, 0);
-    assert.equal(result.data.requests.length, 1);
+    const data = result.data as Record<string, unknown>;
+    assert.equal(data.pageIdx, 1);
+    assert.equal(data.targetPageIdx, 0);
+    assert.equal((data.requests as unknown[]).length, 1);
     assert.equal(
-      result.data.requests[0]?.url,
+      (data.requests as Array<Record<string, unknown>>)[0]?.url,
       'https://example.test/request-2',
     );
   });
 
   it('returns actionable message when no active page is available', async () => {
-    const result = await listNetworkRequests(
-      {
-        getPages: () => [],
-        getSelectedPage: () => null,
-        getSelectedPageIndex: () => null,
-        getNetworkRequests: () => {
-          throw new Error('should not fetch requests without active page');
-        },
-        getNetworkRequestById: () => {
-          throw new Error('unused');
-        },
-        getNetworkRequestStableId: () => -1,
-        getRequestInitiator: () => undefined,
-        getDevToolsData: async () => undefined,
-        resolveCdpRequestId: () => undefined,
+    const response = createMockResponse();
+    setupContextProvider({
+      getPages: () => [],
+      getSelectedPage: () => null,
+      getSelectedPageIndex: () => null,
+      getNetworkRequests: () => {
+        throw new Error('should not fetch requests without active page');
       },
-      {},
+      getNetworkRequestById: () => {
+        throw new Error('unused');
+      },
+      getNetworkRequestStableId: () => -1,
+      getRequestInitiator: () => undefined,
+      getDevToolsData: async () => undefined,
+      resolveCdpRequestId: () => undefined,
+    });
+
+    await listNetworkRequests.handler(
+      {params: {}} as never,
+      response as never,
+      undefined,
     );
 
+    const result = parseResult(response);
     assert.equal(result.success, false);
-    assert.match(result.message, /new_page/);
-    assert.match(result.message, /select_page/);
+    assert.match((result.message as string) || '', /new_page/);
+    assert.match((result.message as string) || '', /select_page/);
   });
 
   it('fails when selected page exists but active page index cannot be resolved', async () => {
     const selectedPage = {id: 99};
 
-    const result = await listNetworkRequests(
-      {
-        getPages: () => [],
-        getSelectedPage: () => selectedPage as never,
-        getSelectedPageIndex: () => null,
-        getNetworkRequests: () => {
-          throw new Error(
-            'should not fetch requests without a resolved page index',
-          );
-        },
-        getNetworkRequestById: () => {
-          throw new Error('unused');
-        },
-        getNetworkRequestStableId: () => -1,
-        getRequestInitiator: () => undefined,
-        getDevToolsData: async () => undefined,
-        resolveCdpRequestId: () => undefined,
+    const response = createMockResponse();
+    setupContextProvider({
+      getPages: () => [],
+      getSelectedPage: () => selectedPage as never,
+      getSelectedPageIndex: () => null,
+      getNetworkRequests: () => {
+        throw new Error(
+          'should not fetch requests without a resolved page index',
+        );
       },
-      {},
+      getNetworkRequestById: () => {
+        throw new Error('unused');
+      },
+      getNetworkRequestStableId: () => -1,
+      getRequestInitiator: () => undefined,
+      getDevToolsData: async () => undefined,
+      resolveCdpRequestId: () => undefined,
+    });
+
+    await listNetworkRequests.handler(
+      {params: {}} as never,
+      response as never,
+      undefined,
     );
 
+    const result = parseResult(response);
     assert.equal(result.success, false);
     assert.equal(result.message, NO_ACTIVE_PAGE_MESSAGE);
   });
@@ -185,27 +263,33 @@ describe('listNetworkRequests', () => {
       currentRequests = [delayedRequest];
     }, 20);
 
-    const result = await listNetworkRequests(
-      {
-        getPages: () => pages as never[],
-        getSelectedPage: () => selectedPage as never,
-        getSelectedPageIndex: () => 0,
-        getNetworkRequests: () => currentRequests as never[],
-        getNetworkRequestById: () => {
-          throw new Error('unused');
-        },
-        getNetworkRequestStableId: () => 202,
-        getRequestInitiator: () => undefined,
-        getDevToolsData: async () => undefined,
-        resolveCdpRequestId: () => undefined,
+    const response = createMockResponse();
+    setupContextProvider({
+      getPages: () => pages as never[],
+      getSelectedPage: () => selectedPage as never,
+      getSelectedPageIndex: () => 0,
+      getNetworkRequests: () => currentRequests as never[],
+      getNetworkRequestById: () => {
+        throw new Error('unused');
       },
-      {waitForRequest: '/api/v4', waitTimeoutMs: 150},
+      getNetworkRequestStableId: () => 202,
+      getRequestInitiator: () => undefined,
+      getDevToolsData: async () => undefined,
+      resolveCdpRequestId: () => undefined,
+    });
+
+    await listNetworkRequests.handler(
+      {params: {waitForRequest: '/api/v4', waitTimeoutMs: 150}} as never,
+      response as never,
+      undefined,
     );
 
+    const result = parseResult(response);
     assert.equal(result.success, true);
-    assert.equal(result.data.requests.length, 1);
+    const data = result.data as Record<string, unknown>;
+    assert.equal((data.requests as unknown[]).length, 1);
     assert.equal(
-      result.data.requests[0]?.url,
+      (data.requests as Array<Record<string, unknown>>)[0]?.url,
       'https://example.test/api/v4/feed',
     );
   });
@@ -215,27 +299,33 @@ describe('listNetworkRequests', () => {
     const selectedPage = pages[0];
     const start = Date.now();
 
-    const result = await listNetworkRequests(
-      {
-        getPages: () => pages as never[],
-        getSelectedPage: () => selectedPage as never,
-        getSelectedPageIndex: () => 0,
-        getNetworkRequests: () => [] as never[],
-        getNetworkRequestById: () => {
-          throw new Error('unused');
-        },
-        getNetworkRequestStableId: () => 0,
-        getRequestInitiator: () => undefined,
-        getDevToolsData: async () => undefined,
-        resolveCdpRequestId: () => undefined,
+    const response = createMockResponse();
+    setupContextProvider({
+      getPages: () => pages as never[],
+      getSelectedPage: () => selectedPage as never,
+      getSelectedPageIndex: () => 0,
+      getNetworkRequests: () => [] as never[],
+      getNetworkRequestById: () => {
+        throw new Error('unused');
       },
-      {waitForRequest: '/never', waitTimeoutMs: 0},
+      getNetworkRequestStableId: () => 0,
+      getRequestInitiator: () => undefined,
+      getDevToolsData: async () => undefined,
+      resolveCdpRequestId: () => undefined,
+    });
+
+    await listNetworkRequests.handler(
+      {params: {waitForRequest: '/never', waitTimeoutMs: 0}} as never,
+      response as never,
+      undefined,
     );
 
     const durationMs = Date.now() - start;
+    const result = parseResult(response);
     assert.equal(result.success, false);
-    assert.match(result.message, /等待请求超时/);
-    assert.equal(result.data.timedOut, true);
+    assert.match((result.message as string) || '', /等待请求超时/);
+    const data = result.data as Record<string, unknown>;
+    assert.equal(data.timedOut, true);
     assert.ok(
       durationMs < 40,
       `expected immediate timeout, got ${durationMs}ms`,
@@ -246,28 +336,34 @@ describe('listNetworkRequests', () => {
     const pages = [{id: 0}];
     const selectedPage = pages[0];
 
-    const result = await listNetworkRequests(
-      {
-        getPages: () => pages as never[],
-        getSelectedPage: () => selectedPage as never,
-        getSelectedPageIndex: () => 0,
-        getNetworkRequests: () =>
-          [createRequest('https://example.test/other')] as never[],
-        getNetworkRequestById: () => {
-          throw new Error('unused');
-        },
-        getNetworkRequestStableId: () => 401,
-        getRequestInitiator: () => undefined,
-        getDevToolsData: async () => undefined,
-        resolveCdpRequestId: () => undefined,
+    const response = createMockResponse();
+    setupContextProvider({
+      getPages: () => pages as never[],
+      getSelectedPage: () => selectedPage as never,
+      getSelectedPageIndex: () => 0,
+      getNetworkRequests: () =>
+        [createRequest('https://example.test/other')] as never[],
+      getNetworkRequestById: () => {
+        throw new Error('unused');
       },
-      {waitForRequest: '/missing', waitTimeoutMs: 30},
+      getNetworkRequestStableId: () => 401,
+      getRequestInitiator: () => undefined,
+      getDevToolsData: async () => undefined,
+      resolveCdpRequestId: () => undefined,
+    });
+
+    await listNetworkRequests.handler(
+      {params: {waitForRequest: '/missing', waitTimeoutMs: 30}} as never,
+      response as never,
+      undefined,
     );
 
+    const result = parseResult(response);
     assert.equal(result.success, false);
-    assert.match(result.message, /等待请求超时/);
-    assert.equal(result.data.timedOut, true);
-    assert.equal(result.data.requests.length, 0);
+    assert.match((result.message as string) || '', /等待请求超时/);
+    const data = result.data as Record<string, unknown>;
+    assert.equal(data.timedOut, true);
+    assert.equal((data.requests as unknown[]).length, 0);
   });
 
   it('filters requests by header keyword', async () => {
@@ -281,28 +377,34 @@ describe('listNetworkRequests', () => {
       accept: 'application/json',
     });
 
-    const result = await listNetworkRequests(
-      {
-        getPages: () => pages as never[],
-        getSelectedPage: () => selectedPage as never,
-        getSelectedPageIndex: () => 0,
-        getNetworkRequests: () => [zhihuRequest, otherRequest] as never[],
-        getNetworkRequestById: () => {
-          throw new Error('unused');
-        },
-        getNetworkRequestStableId: request =>
-          request === (zhihuRequest as never) ? 301 : 302,
-        getRequestInitiator: () => undefined,
-        getDevToolsData: async () => undefined,
-        resolveCdpRequestId: () => undefined,
+    const response = createMockResponse();
+    setupContextProvider({
+      getPages: () => pages as never[],
+      getSelectedPage: () => selectedPage as never,
+      getSelectedPageIndex: () => 0,
+      getNetworkRequests: () => [zhihuRequest, otherRequest] as never[],
+      getNetworkRequestById: () => {
+        throw new Error('unused');
       },
-      {headerFilter: 'x-zse-96'},
+      getNetworkRequestStableId: request =>
+        request === (zhihuRequest as never) ? 301 : 302,
+      getRequestInitiator: () => undefined,
+      getDevToolsData: async () => undefined,
+      resolveCdpRequestId: () => undefined,
+    });
+
+    await listNetworkRequests.handler(
+      {params: {headerFilter: 'x-zse-96'}} as never,
+      response as never,
+      undefined,
     );
 
+    const result = parseResult(response);
     assert.equal(result.success, true);
-    assert.equal(result.data.requests.length, 1);
+    const data = result.data as Record<string, unknown>;
+    assert.equal((data.requests as unknown[]).length, 1);
     assert.equal(
-      result.data.requests[0]?.url,
+      (data.requests as Array<Record<string, unknown>>)[0]?.url,
       'https://www.zhihu.com/api/v4/feed',
     );
   });
@@ -316,34 +418,37 @@ describe('listNetworkRequests', () => {
       accept: 'application/json',
     });
 
-    const result = await listNetworkRequests(
-      {
-        getPages: () => pages as never[],
-        getSelectedPage: () => selectedPage as never,
-        getSelectedPageIndex: () => 0,
-        getNetworkRequests: () => [signedRequest] as never[],
-        getNetworkRequestById: () => {
-          throw new Error('unused');
-        },
-        getNetworkRequestStableId: () => 501,
-        getRequestInitiator: () => ({
-          type: 'script',
-          url: 'https://example.test/app.js',
-          lineNumber: 12,
-          columnNumber: 3,
-        }),
-        getDevToolsData: async () => undefined,
-        resolveCdpRequestId: () => undefined,
+    const response = createMockResponse();
+    setupContextProvider({
+      getPages: () => pages as never[],
+      getSelectedPage: () => selectedPage as never,
+      getSelectedPageIndex: () => 0,
+      getNetworkRequests: () => [signedRequest] as never[],
+      getNetworkRequestById: () => {
+        throw new Error('unused');
       },
-      {
-        headerFilter: 'sign',
-        includeSignatureEvidence: true,
-      },
+      getNetworkRequestStableId: () => 501,
+      getRequestInitiator: () => ({
+        type: 'script',
+        url: 'https://example.test/app.js',
+        lineNumber: 12,
+        columnNumber: 3,
+      }),
+      getDevToolsData: async () => undefined,
+      resolveCdpRequestId: () => undefined,
+    });
+
+    await listNetworkRequests.handler(
+      {params: {headerFilter: 'sign', includeSignatureEvidence: true}} as never,
+      response as never,
+      undefined,
     );
 
+    const result = parseResult(response);
     assert.equal(result.success, true);
-    assert.equal(result.data.requests.length, 1);
-    assert.deepEqual(result.data.evidenceCorrelations, [
+    const data = result.data as Record<string, unknown>;
+    assert.equal((data.requests as unknown[]).length, 1);
+    assert.deepEqual(data.evidenceCorrelations, [
       {
         reqid: 501,
         signatureIndicators: ['x-sign', 'x-nonce'],

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// ─── Network 纯函数 ──────────────────────────────────
+// ─── Network 工具（defineTool 模式）───────────────────
 
 export {listNetworkRequests} from './listNetworkRequests.js';
 export {getNetworkRequest} from './getNetworkRequest.js';
