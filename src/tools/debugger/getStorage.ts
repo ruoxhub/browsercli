@@ -4,24 +4,37 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Frame} from '../../third_party/index.js';
-
-import type {GetStorageParams, GetStorageResult} from './types.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
 
 /**
  * 获取浏览器存储数据（cookies、localStorage、sessionStorage）。
- *
- * @param frame - Puppeteer Frame 对象
- * @param params - 存储参数
- * @returns 结构化结果对象，data 包含存储数据
  */
-export async function getStorage(
-  frame: Frame,
-  params: GetStorageParams = {},
-): Promise<GetStorageResult> {
-  const {type = 'all', filter} = params;
+export const getStorage = defineTool({
+  name: 'get_storage',
+  description:
+    'Gets browser storage data including cookies, localStorage, and sessionStorage.',
+  annotations: {
+    title: '获取存储',
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: true,
+  },
+  schema: {
+    type: zod
+      .enum(['all', 'cookies', 'localStorage', 'sessionStorage'])
+      .optional()
+      .default('all')
+      .describe('要获取的存储类型（默认: all）。'),
+    filter: zod
+      .string()
+      .optional()
+      .describe('按键名过滤（不区分大小写）。'),
+  },
+  handler: async (request, response, context) => {
+    const {type, filter} = request.params;
 
-  const storageCode = `
+    const storageCode = `
 (function() {
   const type = ${JSON.stringify(type)};
   const filter = ${JSON.stringify(filter)};
@@ -87,21 +100,20 @@ export async function getStorage(
 })();
 `;
 
-  try {
-    const result = await frame.evaluate(storageCode);
+    try {
+      const frame = (context as Context).getSelectedFrame();
+      const result = await frame.evaluate(storageCode);
 
-    return {
-      success: true,
-      message: `存储数据获取完成${filter ? ` (过滤: "${filter}")` : ''}`,
-      tooltype: 'get_storage',
-      logFormat: 'json',
-      data: result as Record<string, unknown>,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `错误：${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'get_storage',
-    };
-  }
-}
+      response.appendResponseLine(
+        `存储数据${filter ? ` (过滤: "${filter}")` : ''}:\n`,
+      );
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    } catch (error) {
+      response.appendResponseLine(
+        `错误：${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  },
+});

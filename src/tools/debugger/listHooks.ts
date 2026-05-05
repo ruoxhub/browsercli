@@ -4,24 +4,32 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Frame} from '../../third_party/index.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
 
 import {evaluateInPageRuntime} from './evaluateInPageRuntime.js';
-import type {HookEntry, ListHooksResult} from './types.js';
 
 /**
  * 列出当前页面所有已安装的 Hook。
- *
- * @param frame - Puppeteer Frame 对象
- * @returns 结构化结果对象，data 包含 Hook 列表
  */
-export async function listHooks(frame: Frame): Promise<ListHooksResult> {
-  try {
-    const hooks = (await evaluateInPageRuntime<
-      Array<{id: string; target: string}>
-    >(
-      frame,
-      `
+export const listHooks = defineTool({
+  name: 'list_hooks',
+  description: 'Lists all active function hooks.',
+  annotations: {
+    title: '列出 Hook',
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: true,
+  },
+  schema: {},
+  handler: async (request, response, context) => {
+    try {
+      const frame = (context as Context).getSelectedFrame();
+      const hooks = (await evaluateInPageRuntime<
+        Array<{id: string; target: string}>
+      >(
+        frame,
+        `
 (function() {
   if (!window.__mcp_hooks__) return [];
   return Object.keys(window.__mcp_hooks__).map(id => {
@@ -30,34 +38,21 @@ export async function listHooks(frame: Frame): Promise<ListHooksResult> {
   });
 })()
 `,
-    )) as Array<{id: string; target: string}>;
+      )) as Array<{id: string; target: string}>;
 
-    if (!hooks || hooks.length === 0) {
-      return {
-        success: true,
-        message: '当前没有已安装的 Hook',
-        tooltype: 'list_hooks',
-        data: [],
-      };
+      if (!hooks || hooks.length === 0) {
+        response.appendResponseLine('当前没有已安装的 Hook');
+        return;
+      }
+
+      response.appendResponseLine(`活跃 Hook（${hooks.length} 个）:\n`);
+      for (const hook of hooks) {
+        response.appendResponseLine(`- ${hook.id}: ${hook.target}`);
+      }
+    } catch (error) {
+      response.appendResponseLine(
+        `错误：${error instanceof Error ? error.message : String(error)}`,
+      );
     }
-
-    const entries: HookEntry[] = hooks.map(h => ({
-      id: h.id,
-      target: h.target,
-    }));
-
-    return {
-      success: true,
-      message: `找到 ${entries.length} 个活跃 Hook`,
-      tooltype: 'list_hooks',
-      logFormat: 'json',
-      data: entries,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `错误：${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'list_hooks',
-    };
-  }
-}
+  },
+});

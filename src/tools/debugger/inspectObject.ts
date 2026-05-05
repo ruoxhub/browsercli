@@ -4,29 +4,55 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Frame} from '../../third_party/index.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
 
 import {evaluateInPageRuntime} from './evaluateInPageRuntime.js';
-import type {InspectObjectParams, InspectObjectResult} from './types.js';
 
 /**
  * 深度检查一个 JavaScript 对象，展示其属性、原型链和方法。
- *
- * @param frame - Puppeteer Frame 对象，用于注入检查代码
- * @param params - 检查参数
- * @returns 结构化结果对象，data 包含检查结果
  */
-export async function inspectObject(
-  frame: Frame,
-  params: InspectObjectParams,
-): Promise<InspectObjectResult> {
-  const {expression, depth = 2, showMethods = true, showPrototype = true} =
-    params;
+export const inspectObject = defineTool({
+  name: 'inspect_object',
+  description:
+    'Deeply inspects a JavaScript object, showing its properties, prototype chain, and methods. Useful for understanding object structure.',
+  annotations: {
+    title: '检查对象',
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: true,
+  },
+  schema: {
+    expression: zod
+      .string()
+      .describe(
+        'JavaScript 表达式（如 "window.app", "document.body", "myObject"）.',
+      ),
+    depth: zod
+      .number()
+      .int()
+      .optional()
+      .default(2)
+      .describe('嵌套检查深度（默认: 2）。'),
+    showMethods: zod
+      .boolean()
+      .optional()
+      .default(true)
+      .describe('是否展示方法（默认: true）。'),
+    showPrototype: zod
+      .boolean()
+      .optional()
+      .default(true)
+      .describe('是否展示原型链（默认: true）。'),
+  },
+  handler: async (request, response, context) => {
+    const {expression, depth, showMethods, showPrototype} = request.params;
 
-  try {
-    const result = await evaluateInPageRuntime<Record<string, unknown>>(
-      frame,
-      `
+    try {
+      const frame = (context as Context).getSelectedFrame();
+      const result = await evaluateInPageRuntime<Record<string, unknown>>(
+        frame,
+        `
 (function() {
   const maxDepth = ${depth};
   const showMethods = ${showMethods};
@@ -108,28 +134,21 @@ export async function inspectObject(
   return result;
 })()
 `,
-    );
+      );
 
-    if (result && typeof result === 'object' && 'error' in result) {
-      return {
-        success: false,
-        message: (result as {error: string}).error,
-        tooltype: 'inspect_object',
-      };
+      if (result && typeof result === 'object' && 'error' in result) {
+        response.appendResponseLine(`❌ ${(result as {error: string}).error}`);
+        return;
+      }
+
+      response.appendResponseLine(`对象检查：${expression}\n`);
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    } catch (error) {
+      response.appendResponseLine(
+        `错误：${error instanceof Error ? error.message : String(error)}`,
+      );
     }
-
-    return {
-      success: true,
-      message: `对象检查完成：${expression}`,
-      tooltype: 'inspect_object',
-      logFormat: 'json',
-      data: result as Record<string, unknown>,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `错误：${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'inspect_object',
-    };
-  }
-}
+  },
+});

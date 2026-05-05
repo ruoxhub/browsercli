@@ -37,7 +37,7 @@ import {
   monitorEvents,
   stopMonitor,
   traceFunction,
-} from '../../../src/tools/debugger.js';
+} from '../../../src/tools/debugger/index.js';
 import {listFrames, selectFrame} from '../../../src/tools/frames.js';
 import {getJSHookRuntime} from '../../../src/tools/runtime.js';
 
@@ -941,7 +941,7 @@ describe('debugger tools extended', () => {
   });
 
   it('covers xhr_to_js_breakpoint two-phase workflow', async () => {
-    const {xhrToJsBreakpoint} = await import('../../../src/tools/debugger.js');
+    const {xhrToJsBreakpoint} = await import('../../../src/tools/debugger/index.js');
     const response = makeResponse();
     const runtime = getJSHookRuntime();
 

@@ -480,7 +480,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/getStorage.js',
     handlerName: 'getStorage',
-    callMode: 'frame',
+    callMode: 'context',
   },
   {
     name: 'break_on_xhr',
@@ -507,7 +507,7 @@ export const TOOLS_META: ToolMeta[] = [
     },
     modulePath: './debugger/monitorEvents.js',
     handlerName: 'monitorEvents',
-    callMode: 'frame',
+    callMode: 'context',
   },
   {
     name: 'stop_monitor',
@@ -517,7 +517,7 @@ export const TOOLS_META: ToolMeta[] = [
     },
     modulePath: './debugger/stopMonitor.js',
     handlerName: 'stopMonitor',
-    callMode: 'frame',
+    callMode: 'context',
   },
   {
     name: 'trace_function',
@@ -541,7 +541,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/inspectObject.js',
     handlerName: 'inspectObject',
-    callMode: 'frame',
+    callMode: 'context',
   },
   {
     name: 'list_hooks',
@@ -549,7 +549,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/listHooks.js',
     handlerName: 'listHooks',
-    callMode: 'frame',
+    callMode: 'context',
   },
   {
     name: 'find_in_script',
@@ -605,7 +605,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/hookFunction.js',
     handlerName: 'hookFunction',
-    callMode: 'frame',
+    callMode: 'context',
   },
   {
     name: 'unhook_function',
@@ -613,7 +613,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/unhookFunction.js',
     handlerName: 'unhookFunction',
-    callMode: 'frame',
+    callMode: 'context',
   },
   {
     name: 'xhr_to_js_breakpoint',

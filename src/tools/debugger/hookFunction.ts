@@ -1,57 +1,89 @@
 /**
- * @license
+ * @license`
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Frame} from '../../third_party/index.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
 
 import {evaluateInPageRuntime} from './evaluateInPageRuntime.js';
-import type {HookFunctionParams, HookFunctionResult} from './types.js';
 
 /**
  * Hook 一个 JavaScript 函数，监控其调用、参数和返回值，不暂停执行。
- *
- * @param frame - Puppeteer Frame 对象，用于注入 Hook 代码
- * @param params - Hook 参数
- * @returns 结构化结果对象
  */
-export async function hookFunction(
-  frame: Frame,
-  params: HookFunctionParams,
-): Promise<HookFunctionResult> {
-  const {target, logArgs = true, logResult = true, logStack = false, hookId} =
-    params ?? {};
+export const hookFunction = defineTool({
+  name: 'hook_function',
+  description:
+    'RECOMMENDED for reverse engineering: Hooks a JavaScript function to log its calls, arguments, and return values without pausing execution. More reliable than breakpoints for automated workflows. Use this as the default approach for monitoring functions.',
+  annotations: {
+    title: 'Hook Function',
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: false,
+  },
+  schema: {
+    target: zod
+      .string()
+      .describe(
+        'The function to hook. Can be: global function name ("fetch"), object method ("XMLHttpRequest.prototype.open"), or path ("window.app.api.request").',
+      ),
+    logArgs: zod
+      .boolean()
+      .optional()
+      .default(true)
+      .describe('Whether to log function arguments (default: true).'),
+    logResult: zod
+      .boolean()
+      .optional()
+      .default(true)
+      .describe('Whether to log return value (default: true).'),
+    logStack: zod
+      .boolean()
+      .optional()
+      .default(false)
+      .describe('Whether to log call stack (default: false).'),
+    hookId: zod
+      .string()
+      .optional()
+      .describe(
+        'Custom identifier for this hook. Used to unhook later. Defaults to target name.',
+      ),
+  },
+  handler: async (request, response, context) => {
+    const {target, logArgs = true, logResult = true, logStack = false, hookId} =
+      request.params;
 
-  if (!target || typeof target !== 'string') {
-    return {
-      success: false,
-      message: 'hook_function requires a "target" string parameter (e.g. "XMLHttpRequest.prototype.open")',
-      tooltype: 'hook_function',
-    };
-  }
+    if (!target || typeof target !== 'string') {
+      response.appendResponseLine(
+        'hook_function requires a "target" string parameter (e.g. "XMLHttpRequest.prototype.open")',
+      );
+      return;
+    }
 
-  const id = hookId || target.replace(/[^a-zA-Z0-9]/g, '_');
-  // Split target into object path and method
-  const parts = target.split('.');
-  const methodName = parts.pop()!;
-  const objectPath = parts.length > 0 ? parts.join('.') : 'window';
+    const id = hookId || target.replace(/[^a-zA-Z0-9]/g, '_');
+    // Split target into object path and method
+    const parts = target.split('.');
+    const methodName = parts.pop()!;
+    const objectPath = parts.length > 0 ? parts.join('.') : 'window';
 
-  try {
-    const result = await evaluateInPageRuntime<{
-      success: boolean;
-      hookId?: string;
-      message?: string;
-    }>(
-      frame,
-      `
+    try {
+      const frame = (context as Context).getSelectedFrame();
+      if (!frame) {
+        response.appendResponseLine('当前没有可用的页面或 Frame');
+        return;
+      }
+
+      const result = await evaluateInPageRuntime(
+        frame,
+        `
 (function() {
   const hookId = ${JSON.stringify(id)};
   const objectPath = ${JSON.stringify(objectPath)};
   const methodName = ${JSON.stringify(methodName)};
-  const logArgs = ${JSON.stringify(logArgs)};
-  const logResult = ${JSON.stringify(logResult)};
-  const logStack = ${JSON.stringify(logStack)};
+  const logArgs = ${logArgs};
+  const logResult = ${logResult};
+  const logStack = ${logStack};
 
   let obj;
   try {
@@ -76,7 +108,7 @@ export async function hookFunction(
   const original = obj[methodName];
   window.__mcp_hooks__[hookId] = { obj, methodName, original };
 
-  const safeClone = value => {
+  const safeClone = (value) => {
     try {
       if (typeof value === 'function') return '[Function]';
       if (typeof Element !== 'undefined' && value instanceof Element) {
@@ -92,7 +124,7 @@ export async function hookFunction(
     }
   };
 
-  const pushHookData = record => {
+  const pushHookData = (record) => {
     const store = window.__hookStore[hookId];
     if (!Array.isArray(store)) return;
     store.push(record);
@@ -148,7 +180,7 @@ export async function hookFunction(
             error: err && err.message ? err.message : String(err),
           };
           pushHookData(errorInfo);
-          console.log('[MCP Hook Error]', { hook: hookId, error: err && err.message ? err.message : String(err) });
+          console.log('[MCP Hook Error]', { hook: hookId, error: err.message });
           throw err;
         });
       }
@@ -178,7 +210,7 @@ export async function hookFunction(
         error: err && err.message ? err.message : String(err),
       };
       pushHookData(errorInfo);
-      console.log('[MCP Hook Error]', { hook: hookId, error: err && err.message ? err.message : String(err) });
+      console.log('[MCP Hook Error]', { hook: hookId, error: err.message });
       throw err;
     }
   };
@@ -188,37 +220,32 @@ export async function hookFunction(
   });
 
   return { success: true, hookId: hookId };
-})()
+})();
 `,
-    );
+      );
 
-    if (result && typeof result === 'object') {
-      const r = result as {success: boolean; hookId?: string; message?: string};
-      if (r.success) {
-        return {
-          success: true,
-          message: `Hook 已安装：${target} (id: ${r.hookId ?? id})`,
-          tooltype: 'hook_function',
-          logFormat: 'full',
-          data: {hookId: r.hookId ?? id, target},
-        };
+      if (result && typeof result === 'object') {
+        const r = result as {success: boolean; hookId?: string; message?: string};
+        if (r.success) {
+          response.appendResponseLine(`✅ Hook 已安装：${target} (id: ${r.hookId ?? id})`);
+          response.appendResponseLine(`- Hook ID: ${r.hookId ?? id}`);
+          response.appendResponseLine(`- 目标: ${target}`);
+          response.appendResponseLine(`- 记录参数: ${logArgs}`);
+          response.appendResponseLine(`- 记录返回值: ${logResult}`);
+          response.appendResponseLine(`- 记录调用栈: ${logStack}`);
+          response.appendResponseLine('');
+          response.appendResponseLine('函数调用将被记录到控制台。使用 list_console_messages 查看。');
+          response.appendResponseLine(
+            `使用 unhook_function(hookId: "${r.hookId ?? id}") 移除。`,
+          );
+        } else {
+          response.appendResponseLine(`❌ ${r.message}`);
+        }
       }
-      return {
-        success: false,
-        message: r.message || `Hook 安装失败：${target}`,
-        tooltype: 'hook_function',
-      };
+    } catch (error) {
+      response.appendResponseLine(
+        `错误：${error instanceof Error ? error.message : String(error)}`,
+      );
     }
-    return {
-      success: false,
-      message: `Hook 安装返回异常：${target}`,
-      tooltype: 'hook_function',
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `错误：${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'hook_function',
-    };
-  }
-}
+  },
+});

@@ -9,7 +9,7 @@ import {describe, it} from 'node:test';
 
 import {parseArguments} from '../../../src/cli.js';
 import * as consoleTools from '../../../src/tools/console.js';
-import * as debuggerTools from '../../../src/tools/debugger.js';
+import * as debuggerTools from '../../../src/tools/debugger/index.js';
 import * as networkTools from '../../../src/tools/network.js';
 import * as pagesTools from '../../../src/tools/pages.js';
 import * as screenshotTools from '../../../src/tools/screenshot.js';

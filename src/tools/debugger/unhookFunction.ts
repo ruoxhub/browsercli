@@ -1,41 +1,49 @@
 /**
- * @license
+ * @license`
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Frame} from '../../third_party/index.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
 
 import {evaluateInPageRuntime} from './evaluateInPageRuntime.js';
-import type {HookFunctionParams, UnhookFunctionResult} from './types.js';
 
 /**
  * 移除已安装的函数 Hook，恢复原始函数。
- *
- * @param frame - Puppeteer Frame 对象
- * @param hookId - 要移除的 Hook ID
- * @returns 结构化结果对象
  */
-export async function unhookFunction(
-  frame: Frame,
-  params: Pick<HookFunctionParams, 'hookId'>,
-): Promise<UnhookFunctionResult> {
-  const hookId = params?.hookId;
-  if (!hookId) {
-    return {
-      success: false,
-      message: 'hookId 参数不能为空',
-      tooltype: 'unhook_function',
-    };
-  }
+export const unhookFunction = defineTool({
+  name: 'unhook_function',
+  description: 'Removes a previously installed function hook.',
+  annotations: {
+    title: 'Unhook Function',
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: false,
+  },
+  schema: {
+    hookId: zod
+      .string()
+      .describe('The hook ID to remove (from hook_function).'),
+  },
+  handler: async (request, response, context) => {
+    const hookId = request.params.hookId;
 
-  try {
-    const result = await evaluateInPageRuntime<{
-      success: boolean;
-      message?: string;
-    }>(
-      frame,
-      `
+    if (!hookId) {
+      response.appendResponseLine('hookId 参数不能为空');
+      return;
+    }
+
+    try {
+      const frame = (context as Context).getSelectedFrame();
+      if (!frame) {
+        response.appendResponseLine('当前没有可用的页面或 Frame');
+        return;
+      }
+
+      const result = await evaluateInPageRuntime(
+        frame,
+        `
 (function() {
   const hookId = ${JSON.stringify(hookId)};
   if (!window.__mcp_hooks__ || !window.__mcp_hooks__[hookId]) {
@@ -49,33 +57,20 @@ export async function unhookFunction(
   return { success: true };
 })()
 `,
-    );
+      );
 
-    if (result && typeof result === 'object') {
-      const r = result as {success: boolean; message?: string};
-      if (r.success) {
-        return {
-          success: true,
-          message: `Hook "${hookId}" 已移除`,
-          tooltype: 'unhook_function',
-        };
+      if (result && typeof result === 'object') {
+        const r = result as {success: boolean; message?: string};
+        if (r.success) {
+          response.appendResponseLine(`✅ Hook "${hookId}" 已移除`);
+        } else {
+          response.appendResponseLine(`❌ ${r.message}`);
+        }
       }
-      return {
-        success: false,
-        message: r.message || `Hook 未找到：${hookId}`,
-        tooltype: 'unhook_function',
-      };
+    } catch (error) {
+      response.appendResponseLine(
+        `错误：${error instanceof Error ? error.message : String(error)}`,
+      );
     }
-    return {
-      success: false,
-      message: `移除 Hook 返回异常：${hookId}`,
-      tooltype: 'unhook_function',
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `错误：${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'unhook_function',
-    };
-  }
-}
+  },
+});

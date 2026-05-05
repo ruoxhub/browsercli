@@ -34,7 +34,7 @@ import {
   traceFunction,
   unhookFunction,
   getStorage,
-} from '../../../src/tools/debugger.js';
+} from '../../../src/tools/debugger/index.js';
 
 interface DebuggerResponseHarness {
   lines: string[];
