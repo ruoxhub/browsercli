@@ -4,34 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-
 import {mkdir, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 
+import type {Runtime} from '../../runtime.js';
 import type {CodeFile} from '../../types/index.js';
 
-import type {
-  BuildDefaultEnvCodeResult,
-  ToStorageShimCodeParams,
-  ToStorageShimCodeResult,
-  BuildAutoEnvCodeParams,
-  BuildAutoEnvCodeResult,
-  BuildAutoEntryCodeParams,
-  BuildAutoEntryCodeResult,
-  AppendTargetContextNotesParams,
-  AppendTargetContextNotesResult,
-  MatchesTargetTextParams,
-  MatchesTargetTextResult,
-  FilterRuntimeEvidenceParams,
-  FilterRuntimeEvidenceResult,
-  PickTargetScriptParams,
-  PickTargetScriptResult,
-  InferMissingCapabilitiesParams,
-  InferMissingCapabilitiesResult,
-  MissingCapability,
-  WriteArtifactFileParams,
-  WriteArtifactFileResult,
-} from './types.js';
+import type {AutoBundleOptions, AutoBundleResult, MissingCapability} from './types.js';
 
 // ─── 纯函数（无 Puppeteer 依赖） ────────────────────────
 
@@ -39,11 +18,9 @@ import type {
  * 生成默认浏览器环境补丁代码。
  *
  * 包含 window/self/global/document/navigator/location/atob/btoa/crypto 等基础 shim。
- *
- * @returns 结构化结果对象，data.code 为生成的代码字符串
  */
-export function buildDefaultEnvCode(): BuildDefaultEnvCodeResult {
-  const code = [
+export function buildDefaultEnvCode(): string {
+  return [
     'globalThis.window = globalThis;',
     'globalThis.self = globalThis;',
     'globalThis.global = globalThis;',
@@ -54,28 +31,17 @@ export function buildDefaultEnvCode(): BuildDefaultEnvCodeResult {
     'globalThis.btoa ??= (value) => Buffer.from(value, "utf8").toString("base64");',
     'globalThis.crypto ??= {subtle: {}};',
   ].join('\n');
-
-  return {
-    success: true,
-    message: '默认环境代码生成成功',
-    tooltype: 'build_default_env',
-    logFormat: 'simple',
-    data: {code},
-  };
 }
 
 /**
  * 生成 localStorage/sessionStorage 的 shim 代码。
- *
- * @param params - 包含 name（存储类型）和 values（初始值）
- * @returns 结构化结果对象，data.code 为生成的代码字符串
  */
 export function toStorageShimCode(
-  params: ToStorageShimCodeParams,
-): ToStorageShimCodeResult {
-  const {name, values} = params;
+  name: 'localStorage' | 'sessionStorage',
+  values: Record<string, unknown>,
+): string {
   const entries = Object.entries(values);
-  const code = [
+  return [
     `const ${name}Seed = new Map(${JSON.stringify(entries)});`,
     `globalThis.${name} = {`,
     '  getItem(key) { return this._store.has(key) ? this._store.get(key) : null; },',
@@ -87,28 +53,14 @@ export function toStorageShimCode(
     `  _store: ${name}Seed,`,
     '};',
   ].join('\n');
-
-  return {
-    success: true,
-    message: `${name} shim 代码生成成功`,
-    tooltype: 'to_storage_shim',
-    logFormat: 'simple',
-    data: {code, name},
-  };
 }
 
 /**
  * 从浏览器捕获数据生成完整环境代码。
  *
  * 整合默认环境、Cookie、localStorage、sessionStorage 等。
- *
- * @param params - 包含 capture（浏览器捕获数据）
- * @returns 结构化结果对象，data.code 为生成的代码字符串
  */
-export function buildAutoEnvCode(
-  params: BuildAutoEnvCodeParams,
-): BuildAutoEnvCodeResult {
-  const {capture} = params;
+export function buildAutoEnvCode(capture: Record<string, unknown>): string {
   const cookies = Array.isArray(capture.cookies) ? capture.cookies : [];
   const localStorageValues =
     capture.localStorage && typeof capture.localStorage === 'object'
@@ -123,46 +75,25 @@ export function buildAutoEnvCode(
       ? (capture.page as Record<string, unknown>)
       : {};
 
-  const defaultEnv = buildDefaultEnvCode();
-  const localShim = toStorageShimCode({
-    name: 'localStorage',
-    values: localStorageValues,
-  });
-  const sessionShim = toStorageShimCode({
-    name: 'sessionStorage',
-    values: sessionStorageValues,
-  });
-
-  const code = [
-    defaultEnv.data.code,
+  return [
+    buildDefaultEnvCode(),
     `globalThis.location = {href: ${JSON.stringify(page.url ?? '')}};`,
     `globalThis.document = {cookie: ${JSON.stringify(cookies.map(cookie => `${String((cookie as Record<string, unknown>).name ?? '')}=${String((cookie as Record<string, unknown>).value ?? '')}`).join('; '))}, location: globalThis.location};`,
-    localShim.data.code,
-    sessionShim.data.code,
+    toStorageShimCode('localStorage', localStorageValues),
+    toStorageShimCode('sessionStorage', sessionStorageValues),
   ].join('\n\n');
-
-  return {
-    success: true,
-    message: '自动环境代码生成成功',
-    tooltype: 'build_auto_env',
-    logFormat: 'simple',
-    data: {code},
-  };
 }
 
 /**
  * 生成入口脚本代码。
  *
  * 入口脚本导入 env.js、polyfills.js，注入捕获数据，并尝试执行目标函数。
- *
- * @param params - 包含 targetScript 和 capture
- * @returns 结构化结果对象，data.code 为生成的代码字符串
  */
 export function buildAutoEntryCode(
-  params: BuildAutoEntryCodeParams,
-): BuildAutoEntryCodeResult {
-  const {targetScript, capture} = params;
-  const code = [
+  targetScript: CodeFile | undefined,
+  capture: Record<string, unknown>,
+): string {
+  return [
     'import "./env.js";',
     'import "./polyfills.js";',
     '',
@@ -180,107 +111,63 @@ export function buildAutoEntryCode(
     '  console.log({message: "target function not callable yet", targetFunction});',
     '}',
   ].join('\n');
-
-  return {
-    success: true,
-    message: targetScript
-      ? `入口代码生成成功，目标脚本: ${targetScript.url}`
-      : '入口代码生成成功，无目标脚本',
-    tooltype: 'build_auto_entry',
-    logFormat: 'simple',
-    data: {code},
-  };
 }
 
 /**
  * 向 notes 列表追加目标上下文信息。
- *
- * @param params - 包含 notes 和各项目标上下文参数
- * @returns 结构化结果对象，data.notes 为追加后的列表
  */
 export function appendTargetContextNotes(
-  params: AppendTargetContextNotesParams,
-): AppendTargetContextNotesResult {
-  const {
-    notes,
-    targetKeywords,
-    targetUrlPatterns,
-    targetFunctionNames,
-    targetActionDescription,
-  } = params;
-  const result = [
+  notes: string[],
+  options: {
+    targetKeywords: string[];
+    targetUrlPatterns: string[];
+    targetFunctionNames: string[];
+    targetActionDescription: string;
+  },
+): string[] {
+  return [
     ...notes,
-    `targetKeywords: ${targetKeywords.length > 0 ? targetKeywords.join(', ') : '(none)'}`,
-    `targetUrlPatterns: ${targetUrlPatterns.length > 0 ? targetUrlPatterns.join(', ') : '(none)'}`,
-    `targetFunctionNames: ${targetFunctionNames.length > 0 ? targetFunctionNames.join(', ') : '(none)'}`,
-    `targetActionDescription: ${targetActionDescription.length > 0 ? targetActionDescription : '(none)'}`,
+    `targetKeywords: ${options.targetKeywords.length > 0 ? options.targetKeywords.join(', ') : '(none)'}`,
+    `targetUrlPatterns: ${options.targetUrlPatterns.length > 0 ? options.targetUrlPatterns.join(', ') : '(none)'}`,
+    `targetFunctionNames: ${options.targetFunctionNames.length > 0 ? options.targetFunctionNames.join(', ') : '(none)'}`,
+    `targetActionDescription: ${options.targetActionDescription.length > 0 ? options.targetActionDescription : '(none)'}`,
   ];
-
-  return {
-    success: true,
-    message: '目标上下文 notes 追加成功',
-    tooltype: 'append_target_context_notes',
-    logFormat: 'simple',
-    data: {notes: result},
-  };
 }
 
 /**
  * 检测值是否匹配目标文本。
- *
- * 将值转为小写文本后，与关键词/URL模式/函数名/操作描述进行匹配。
- *
- * @param params - 包含 value 和各项目标匹配参数
- * @returns 结构化结果对象，data.matched 为是否匹配
  */
 export function matchesTargetText(
-  params: MatchesTargetTextParams,
-): MatchesTargetTextResult {
-  const {
-    value,
-    targetKeywords,
-    targetUrlPatterns,
-    targetFunctionNames,
-    targetActionDescription,
-  } = params;
+  value: unknown,
+  targetKeywords: string[],
+  targetUrlPatterns: string[],
+  targetFunctionNames: string[],
+  targetActionDescription: string,
+): boolean {
   const text =
     typeof value === 'string'
       ? value.toLowerCase()
       : JSON.stringify(value ?? '').toLowerCase();
-  const matched =
+  return (
     targetKeywords.some(keyword => text.includes(keyword.toLowerCase())) ||
     targetUrlPatterns.some(pattern => text.includes(pattern.toLowerCase())) ||
     targetFunctionNames.some(fn => text.includes(fn.toLowerCase())) ||
     (targetActionDescription.length > 0 &&
-      text.includes(targetActionDescription.toLowerCase()));
-
-  return {
-    success: true,
-    message: matched ? '匹配到目标文本' : '未匹配到目标文本',
-    tooltype: 'matches_target_text',
-    logFormat: 'simple',
-    data: {matched},
-  };
+      text.includes(targetActionDescription.toLowerCase()))
+  );
 }
 
 /**
  * 按目标条件过滤运行时证据记录。
- *
- * @param params - 包含 records 和各项过滤条件
- * @returns 结构化结果对象，data.filtered 为过滤后的记录
  */
 export function filterRuntimeEvidence(
-  params: FilterRuntimeEvidenceParams,
-): FilterRuntimeEvidenceResult {
-  const {
-    records,
-    targetKeywords,
-    targetUrlPatterns,
-    targetFunctionNames,
-    targetActionDescription,
-    maxEvidenceItems,
-  } = params;
-
+  records: Record<string, unknown>[],
+  targetKeywords: string[],
+  targetUrlPatterns: string[],
+  targetFunctionNames: string[],
+  targetActionDescription: string,
+  maxEvidenceItems: number,
+): Record<string, unknown>[] {
   const hasTargets =
     targetKeywords.length > 0 ||
     targetUrlPatterns.length > 0 ||
@@ -288,67 +175,33 @@ export function filterRuntimeEvidence(
     targetActionDescription.length > 0;
 
   const filtered = hasTargets
-    ? records.filter(record => {
-        const text = JSON.stringify(record).toLowerCase();
-        return (
-          targetKeywords.some(keyword =>
-            text.includes(keyword.toLowerCase()),
-          ) ||
-          targetUrlPatterns.some(pattern =>
-            text.includes(pattern.toLowerCase()),
-          ) ||
-          targetFunctionNames.some(fn =>
-            text.includes(fn.toLowerCase()),
-          ) ||
-          (targetActionDescription.length > 0 &&
-            text.includes(targetActionDescription.toLowerCase()))
-        );
-      })
+    ? records.filter(record =>
+        matchesTargetText(
+          record,
+          targetKeywords,
+          targetUrlPatterns,
+          targetFunctionNames,
+          targetActionDescription,
+        ),
+      )
     : records;
 
-  const sliced = filtered.slice(0, maxEvidenceItems);
-
-  return {
-    success: true,
-    message: `证据过滤完成，${records.length} → ${sliced.length} 条`,
-    tooltype: 'filter_runtime_evidence',
-    logFormat: 'simple',
-    data: {
-      filtered: sliced,
-      totalBefore: records.length,
-      totalAfter: sliced.length,
-    },
-  };
+  return filtered.slice(0, maxEvidenceItems);
 }
 
 /**
  * 从代码文件列表中选取目标脚本。
  *
  * 按目标条件匹配，无匹配则返回第一个文件。
- *
- * @param params - 包含 files 和各项目标匹配参数
- * @returns 结构化结果对象，data.script 为选中的脚本（可能为 null）
  */
 export function pickTargetScript(
-  params: PickTargetScriptParams,
-): PickTargetScriptResult {
-  const {
-    files,
-    targetKeywords,
-    targetUrlPatterns,
-    targetFunctionNames,
-    targetActionDescription,
-  } = params;
-
-  if (files.length === 0) {
-    return {
-      success: true,
-      message: '无代码文件可选',
-      tooltype: 'pick_target_script',
-      logFormat: 'simple',
-      data: {script: null, index: -1},
-    };
-  }
+  files: CodeFile[],
+  targetKeywords: string[],
+  targetUrlPatterns: string[],
+  targetFunctionNames: string[],
+  targetActionDescription: string,
+): CodeFile | undefined {
+  if (files.length === 0) return undefined;
 
   const hasTargets =
     targetKeywords.length > 0 ||
@@ -356,52 +209,28 @@ export function pickTargetScript(
     targetFunctionNames.length > 0 ||
     targetActionDescription.length > 0;
 
-  if (!hasTargets) {
-    return {
-      success: true,
-      message: `默认选择第一个脚本: ${files[0].url}`,
-      tooltype: 'pick_target_script',
-      logFormat: 'simple',
-      data: {script: files[0], index: 0},
-    };
-  }
+  if (!hasTargets) return files[0];
 
-  const matchIndex = files.findIndex(file => {
-    const text = JSON.stringify(file).toLowerCase();
-    return (
-      targetKeywords.some(keyword => text.includes(keyword.toLowerCase())) ||
-      targetUrlPatterns.some(pattern => text.includes(pattern.toLowerCase())) ||
-      targetFunctionNames.some(fn => text.includes(fn.toLowerCase())) ||
-      (targetActionDescription.length > 0 &&
-        text.includes(targetActionDescription.toLowerCase()))
-    );
-  });
-
-  const resolvedIndex = matchIndex >= 0 ? matchIndex : 0;
-  const script = files[resolvedIndex];
-
-  return {
-    success: true,
-    message:
-      matchIndex >= 0
-        ? `匹配到目标脚本: ${script.url}`
-        : `未匹配到目标脚本，回退到第一个: ${script.url}`,
-    tooltype: 'pick_target_script',
-    logFormat: 'simple',
-    data: {script, index: resolvedIndex},
-  };
+  return (
+    files.find(file =>
+      matchesTargetText(
+        file,
+        targetKeywords,
+        targetUrlPatterns,
+        targetFunctionNames,
+        targetActionDescription,
+      ),
+    ) ?? files[0]
+  );
 }
 
 /**
  * 从运行时错误推断缺失的浏览器能力。
- *
- * @param params - 包含 runtimeError 和 observedCapabilities
- * @returns 结构化结果对象，data.missing 为缺失能力列表（按优先级排序）
  */
 export function inferMissingCapabilities(
-  params: InferMissingCapabilitiesParams,
-): InferMissingCapabilitiesResult {
-  const {runtimeError, observedCapabilities} = params;
+  runtimeError: string,
+  observedCapabilities: string[],
+): MissingCapability[] {
   const available = new Set(
     observedCapabilities.map(item => item.toLowerCase()),
   );
@@ -440,121 +269,90 @@ export function inferMissingCapabilities(
     },
   ];
 
-  const missing = candidates
+  return candidates
     .filter(
       candidate =>
         available.has(candidate.capability.toLowerCase()) &&
         candidate.patterns.some(pattern => normalizedError.includes(pattern)),
     )
     .sort((a, b) => b.priority - a.priority);
-
-  return {
-    success: true,
-    message: `推断完成，发现 ${missing.length} 个缺失能力`,
-    tooltype: 'infer_missing_capabilities',
-    logFormat: 'simple',
-    data: {missing},
-  };
 }
 
 /**
  * 将内容写入任务产物文件。
  *
  * 自动创建所需目录结构。
- *
- * @param params - 包含 taskDir、relativePath 和 content
- * @returns 结构化结果对象，data.filePath 为写入的绝对路径
  */
 export async function writeArtifactFile(
-  params: WriteArtifactFileParams,
-): Promise<WriteArtifactFileResult> {
-  const {taskDir, relativePath, content} = params;
+  taskDir: string,
+  relativePath: string,
+  content: string,
+): Promise<void> {
   const filePath = path.join(taskDir, relativePath);
-
-  try {
-    await mkdir(path.dirname(filePath), {recursive: true});
-    await writeFile(filePath, content, 'utf8');
-    return {
-      success: true,
-      message: `文件写入成功: ${relativePath}`,
-      tooltype: 'write_artifact_file',
-      logFormat: 'simple',
-      data: {filePath},
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `文件写入失败: ${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'write_artifact_file',
-    };
-  }
+  await mkdir(path.dirname(filePath), {recursive: true});
+  await writeFile(filePath, content, 'utf8');
 }
 
 /**
- * 导出重建 Bundle：将收集到的代码、环境补丁和入口文件打包为可独立运行的 Bundle。
- *
- * @param params - Bundle 参数
- * @returns 结构化结果对象
+ * 自动构建 Bundle：从浏览器收集数据和运行时证据，生成完整重建包。
  */
-export function exportRebuildBundle(params: {
-  targetUrl?: string;
-  scripts?: string[];
-  envCode?: string;
-  entryCode?: string;
-}): {
-  success: boolean;
-  message: string;
-  tooltype: string;
-  data?: Record<string, unknown>;
-} {
-  const scripts = params.scripts ?? [];
-  const envCode = params.envCode ?? '';
-  const entryCode = params.entryCode ?? '';
+export async function buildAutoBundle(
+  taskId: string,
+  options: AutoBundleOptions,
+  runtime: Runtime,
+): Promise<AutoBundleResult> {
+  const topPriority = runtime.collector.getTopPriorityFiles(1);
+  const targetScript = pickTargetScript(
+    topPriority.files,
+    options.targetKeywords,
+    options.targetUrlPatterns,
+    options.targetFunctionNames,
+    options.targetActionDescription,
+  );
+  const page = await runtime.pageController.getPage();
+  const [cookies, localStorage, sessionStorage, runtimeEvidence] =
+    await Promise.all([
+      runtime.pageController.getCookies(),
+      runtime.pageController.getLocalStorage(),
+      runtime.pageController.getSessionStorage(),
+      runtime.reverseTaskStore.readLog('runtime-evidence', taskId),
+    ]);
+  const filteredRuntimeEvidence = filterRuntimeEvidence(
+    runtimeEvidence,
+    options.targetKeywords,
+    options.targetUrlPatterns,
+    options.targetFunctionNames,
+    options.targetActionDescription,
+    options.maxEvidenceItems,
+  );
 
-  const bundleCode = [envCode, ...scripts, entryCode]
-    .filter(Boolean)
-    .join('\n\n');
-
-  return {
-    success: true,
-    message: `重建 Bundle 已导出，共 ${scripts.length} 个脚本`,
-    tooltype: 'export_rebuild_bundle',
-    data: {
-      targetUrl: params.targetUrl ?? '',
-      scriptCount: scripts.length,
-      bundleSize: bundleCode.length,
-      bundleCode,
+  const capture = {
+    page: {
+      url: page.url(),
+      title: await page.title(),
     },
+    cookies,
+    localStorage,
+    sessionStorage,
+    runtimeEvidence: filteredRuntimeEvidence,
+    targetScript: targetScript ?? null,
   };
-}
-
-/**
- * 对比环境差异需求：分析运行时环境与浏览器环境的差异。
- *
- * @param params - 对比参数
- * @returns 结构化结果对象
- */
-export function diffEnvRequirements(params: {
-  runtimeErrors?: string[];
-  observedCapabilities?: string[];
-}): {
-  success: boolean;
-  message: string;
-  tooltype: string;
-  data?: Record<string, unknown>;
-} {
-  const errors = params.runtimeErrors ?? [];
-  const capabilities = params.observedCapabilities ?? [];
 
   return {
-    success: true,
-    message: `环境差异分析完成，${errors.length} 个运行时错误，${capabilities.length} 个已观测能力`,
-    tooltype: 'diff_env_requirements',
-    data: {
-      runtimeErrorCount: errors.length,
-      observedCapabilityCount: capabilities.length,
-      runtimeErrors: errors,
-      observedCapabilities: capabilities,
-    },
+    entryCode: buildAutoEntryCode(targetScript, capture),
+    envCode: buildAutoEnvCode(capture),
+    polyfillsCode: '',
+    capture,
+    notes: appendTargetContextNotes(
+      [
+        targetScript
+          ? `auto-selected target script: ${targetScript.url}`
+          : 'no target script selected from collector',
+        filteredRuntimeEvidence.length > 0
+          ? `filtered runtime evidence records: ${filteredRuntimeEvidence.length}`
+          : 'no runtime evidence records found after target filtering',
+      ],
+      options,
+    ),
   };
 }

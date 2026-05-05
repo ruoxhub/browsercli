@@ -4,6 +4,25 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {zod} from '../../third_party/index.js';
+import {getRuntime} from '../../runtime.js';
+import {defineTool} from '../ToolDefinition.js';
+import {ToolCategory} from '../categories.js';
+
+import {
+  buildAutoBundle,
+  buildAutoEnvCode,
+  buildAutoEntryCode,
+  writeArtifactFile,
+  inferMissingCapabilities,
+  appendTargetContextNotes,
+  buildDefaultEnvCode,
+  filterRuntimeEvidence,
+  matchesTargetText,
+  pickTargetScript,
+  toStorageShimCode,
+} from './rebuildFn.js';
+
 export {
   buildDefaultEnvCode,
   toStorageShimCode,
@@ -15,33 +34,174 @@ export {
   pickTargetScript,
   inferMissingCapabilities,
   writeArtifactFile,
-  exportRebuildBundle,
-  diffEnvRequirements,
+  buildAutoBundle,
 } from './rebuildFn.js';
 
 export type {
-  RebuildResult,
-  BuildDefaultEnvCodeResult,
-  ToStorageShimCodeParams,
-  ToStorageShimCodeResult,
-  BuildAutoEnvCodeParams,
-  BuildAutoEnvCodeResult,
-  BuildAutoEntryCodeParams,
-  BuildAutoEntryCodeResult,
-  AppendTargetContextNotesParams,
-  AppendTargetContextNotesResult,
-  MatchesTargetTextParams,
-  MatchesTargetTextResult,
-  FilterRuntimeEvidenceParams,
-  FilterRuntimeEvidenceResult,
-  PickTargetScriptParams,
-  PickTargetScriptResult,
-  InferMissingCapabilitiesParams,
-  InferMissingCapabilitiesResult,
   MissingCapability,
-  BuildAutoBundleParams,
-  BuildAutoBundleResult,
-  BuildAutoBundleData,
-  WriteArtifactFileParams,
-  WriteArtifactFileResult,
+  AutoBundleOptions,
+  AutoBundleResult,
 } from './types.js';
+
+/**
+ * 导出重建 Bundle：将收集到的代码、环境补丁和入口文件打包为可独立运行的 Bundle。
+ *
+ * 支持 autoGenerate 模式自动从浏览器收集数据和运行时证据生成完整重建包，
+ * 也可手动提供 entryCode/envCode/polyfillsCode/capture。
+ */
+export const exportRebuildBundle = defineTool({
+  name: 'export_rebuild_bundle',
+  description:
+    'Export a local Node rebuild bundle from observed reverse-engineering evidence.',
+  annotations: {
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: false,
+  },
+  schema: {
+    taskId: zod.string(),
+    taskSlug: zod.string(),
+    targetUrl: zod.string(),
+    goal: zod.string(),
+    autoGenerate: zod.boolean().optional(),
+    targetKeywords: zod.array(zod.string()).optional(),
+    targetUrlPatterns: zod.array(zod.string()).optional(),
+    targetFunctionNames: zod.array(zod.string()).optional(),
+    targetActionDescription: zod.string().optional(),
+    maxEvidenceItems: zod.number().int().positive().optional(),
+    entryCode: zod.string().optional(),
+    envCode: zod.string().optional(),
+    polyfillsCode: zod.string().optional(),
+    capture: zod.record(zod.string(), zod.unknown()).optional(),
+    notes: zod.array(zod.string()).default([]),
+  },
+  handler: async (request, response) => {
+    const runtime = getRuntime();
+    const task = await runtime.reverseTaskStore.openTask({
+      taskId: request.params.taskId,
+      slug: request.params.taskSlug,
+      targetUrl: request.params.targetUrl,
+      goal: request.params.goal,
+    });
+
+    const bundle = request.params.autoGenerate
+      ? await buildAutoBundle(request.params.taskId, {
+          targetKeywords: request.params.targetKeywords ?? [],
+          targetUrlPatterns: request.params.targetUrlPatterns ?? [],
+          targetFunctionNames: request.params.targetFunctionNames ?? [],
+          targetActionDescription: request.params.targetActionDescription ?? '',
+          maxEvidenceItems: request.params.maxEvidenceItems ?? 20,
+        }, runtime)
+      : {
+          entryCode: request.params.entryCode ?? '',
+          envCode: request.params.envCode ?? '',
+          polyfillsCode: request.params.polyfillsCode ?? '',
+          capture: request.params.capture ?? {},
+          notes: request.params.notes,
+        };
+
+    if (
+      !request.params.autoGenerate &&
+      (!request.params.entryCode ||
+        !request.params.envCode ||
+        !request.params.capture)
+    ) {
+      throw new Error(
+        'entryCode, envCode, and capture are required unless autoGenerate=true.',
+      );
+    }
+
+    await writeArtifactFile(
+      task.taskDir,
+      'env/entry.js',
+      `${bundle.entryCode}\n`,
+    );
+    await writeArtifactFile(task.taskDir, 'env/env.js', `${bundle.envCode}\n`);
+    await writeArtifactFile(
+      task.taskDir,
+      'env/polyfills.js',
+      `${bundle.polyfillsCode}\n`,
+    );
+    await writeArtifactFile(
+      task.taskDir,
+      'env/capture.json',
+      `${JSON.stringify(bundle.capture, null, 2)}\n`,
+    );
+
+    const report = [
+      '# Rebuild Bundle',
+      '',
+      `- Task: ${request.params.taskId}`,
+      `- Target URL: ${request.params.targetUrl}`,
+      `- Goal: ${request.params.goal}`,
+      '',
+      '## Notes',
+      ...bundle.notes.map(note => `- ${note}`),
+    ].join('\n');
+    await writeArtifactFile(task.taskDir, 'report.md', `${report}\n`);
+
+    response.appendResponseLine('```json');
+    response.appendResponseLine(
+      JSON.stringify(
+        {
+          ok: true,
+          taskId: task.taskId,
+          taskDir: task.taskDir,
+          autoGenerated: Boolean(request.params.autoGenerate),
+          files: [
+            'env/entry.js',
+            'env/env.js',
+            'env/polyfills.js',
+            'env/capture.json',
+            'report.md',
+          ],
+        },
+        null,
+        2,
+      ),
+    );
+    response.appendResponseLine('```');
+  },
+});
+
+/**
+ * 对比环境差异需求：分析运行时错误与浏览器能力的差异，建议下一步环境补丁。
+ */
+export const diffEnvRequirements = defineTool({
+  name: 'diff_env_requirements',
+  description:
+    'Compare local runtime failures with observed browser capabilities and suggest the next environment patches.',
+  annotations: {
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: true,
+  },
+  schema: {
+    runtimeError: zod.string(),
+    observedCapabilities: zod.array(zod.string()).default([]),
+  },
+  handler: async (request, response) => {
+    const missingCapabilities = inferMissingCapabilities(
+      request.params.runtimeError,
+      request.params.observedCapabilities,
+    );
+    const nextPatches = missingCapabilities.map(item => ({
+      capability: item.capability,
+      reason: item.reason,
+      suggestedPatch: `Add a minimal ${item.capability} shim based on browser evidence before retrying the entry script.`,
+    }));
+
+    response.appendResponseLine('```json');
+    response.appendResponseLine(
+      JSON.stringify(
+        {
+          missingCapabilities: missingCapabilities.map(
+            item => item.capability,
+          ),
+          nextPatches,
+        },
+        null,
+        2,
+      ),
+    );
+    response.appendResponseLine('```');
+  },
+});

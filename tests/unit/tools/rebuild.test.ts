@@ -11,11 +11,11 @@ import path from 'node:path';
 import {describe, it} from 'node:test';
 
 import {ReverseTaskStore} from '../../../src/reverse/ReverseTaskStore.js';
+import * as runtimeModule from '../../../src/runtime.js';
 import {
   diffEnvRequirements,
   exportRebuildBundle,
-} from '../../../src/tools/rebuild.js';
-import {getJSHookRuntime} from '../../../src/tools/runtime.js';
+} from '../../../src/tools/rebuild/index.js';
 
 interface ResponseShape {
   lines: string[];
@@ -44,7 +44,7 @@ function extractFirstJsonBlock(lines: string[]): Record<string, unknown> {
 describe('rebuild bridge tools', () => {
   it('exports a local rebuild bundle and prioritizes env patches from runtime errors', async () => {
     const rootDir = await mkdtemp(path.join(tmpdir(), 'js-reverse-rebuild-'));
-    const runtime = getJSHookRuntime();
+    const runtime = runtimeModule.getRuntime();
     const originalStore = runtime.reverseTaskStore;
     runtime.reverseTaskStore = new ReverseTaskStore({rootDir});
 
@@ -74,7 +74,6 @@ describe('rebuild bridge tools', () => {
           typeof exportRebuildBundle.handler
         >[1],
         {} as Parameters<typeof exportRebuildBundle.handler>[2],
-        runtime,
       );
 
       await stat(path.join(rootDir, 'task-001', 'env', 'entry.js'));
@@ -109,7 +108,6 @@ describe('rebuild bridge tools', () => {
           typeof diffEnvRequirements.handler
         >[1],
         {} as Parameters<typeof diffEnvRequirements.handler>[2],
-        runtime,
       );
 
       const diffJson = extractFirstJsonBlock(diffResponse.lines);
@@ -129,7 +127,7 @@ describe('rebuild bridge tools', () => {
     const rootDir = await mkdtemp(
       path.join(tmpdir(), 'js-reverse-rebuild-auto-'),
     );
-    const runtime = getJSHookRuntime();
+    const runtime = runtimeModule.getRuntime();
     const originalStore = runtime.reverseTaskStore;
     const originals = {
       getTopPriorityFiles: runtime.collector.getTopPriorityFiles,
@@ -196,7 +194,6 @@ describe('rebuild bridge tools', () => {
           typeof exportRebuildBundle.handler
         >[1],
         {} as Parameters<typeof exportRebuildBundle.handler>[2],
-        runtime,
       );
 
       const entryCode = await readFile(
@@ -246,7 +243,7 @@ describe('rebuild bridge tools', () => {
     const rootDir = await mkdtemp(
       path.join(tmpdir(), 'js-reverse-rebuild-filtered-'),
     );
-    const runtime = getJSHookRuntime();
+    const runtime = runtimeModule.getRuntime();
     const originalStore = runtime.reverseTaskStore;
     const originals = {
       getTopPriorityFiles: runtime.collector.getTopPriorityFiles,
@@ -330,7 +327,6 @@ describe('rebuild bridge tools', () => {
           typeof exportRebuildBundle.handler
         >[1],
         {} as Parameters<typeof exportRebuildBundle.handler>[2],
-        runtime,
       );
 
       const capture = JSON.parse(
@@ -373,7 +369,7 @@ describe('rebuild bridge tools', () => {
     const rootDir = await mkdtemp(
       path.join(tmpdir(), 'js-reverse-rebuild-function-target-'),
     );
-    const runtime = getJSHookRuntime();
+    const runtime = runtimeModule.getRuntime();
     const originalStore = runtime.reverseTaskStore;
     const originals = {
       getTopPriorityFiles: runtime.collector.getTopPriorityFiles,
@@ -456,7 +452,6 @@ describe('rebuild bridge tools', () => {
           typeof exportRebuildBundle.handler
         >[1],
         {} as Parameters<typeof exportRebuildBundle.handler>[2],
-        runtime,
       );
 
       const capture = JSON.parse(
