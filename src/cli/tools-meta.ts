@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type ToolCallMode = 'runtime' | 'frame' | 'params-only' | 'context';
+export type ToolCallMode = 'runtime' | 'frame' | 'params-only' | 'context' | 'defineTool';
 
 export interface ToolMeta {
   name: string;
@@ -12,7 +12,7 @@ export interface ToolMeta {
   schema: Record<string, string>;
   modulePath: string;
   handlerName: string;
-  /** 调用模式：runtime=传入 RuntimeServices, frame=传入 Frame/Page, params-only=仅传 params */
+  /** 调用模式：runtime=传入 RuntimeServices, frame=传入 Frame/Page, params-only=仅传 params, defineTool=defineTool 定义结构 */
   callMode?: ToolCallMode;
 }
 
@@ -963,26 +963,26 @@ export const TOOLS_META: ToolMeta[] = [
   {
     name: 'wasm_capabilities',
     description:
-      '检查 WASM 捕获能力和本机 wabt/binaryen/wasmtime/wasmer 可用性',
+      'Detect available native Wasm toolchain (wabt, binaryen, wasmtime, wasmer) and session state',
     schema: {},
     modulePath: './wasm/index.js',
     handlerName: 'wasmCapabilities',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'wasm_dump',
-    description: '导出当前页面已捕获的 WebAssembly 模块二进制',
+    description: 'Dump a captured Wasm module to a .wasm file on disk',
     schema: {
       moduleIndex: 'number',
       outputPath: 'string',
     },
     modulePath: './wasm/index.js',
     handlerName: 'wasmDump',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'wasm_disassemble',
-    description: '使用 wasm2wat 将 .wasm 反汇编为 WAT',
+    description: 'Disassemble a .wasm file to WAT (WebAssembly Text Format)',
     schema: {
       inputPath: 'string',
       outputPath: 'string',
@@ -990,33 +990,41 @@ export const TOOLS_META: ToolMeta[] = [
     },
     modulePath: './wasm/index.js',
     handlerName: 'wasmDisassemble',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'wasm_decompile',
-    description: '使用 wasm-decompile 将 .wasm 反编译为类 C 伪代码',
+    description: 'Decompile a .wasm file with function-level summaries and suspicious-pattern detection',
     schema: {
       inputPath: 'string',
       outputPath: 'string',
+      foldExprs: 'boolean',
+      inlineExport: 'boolean',
+      maxWatChars: 'number',
     },
     modulePath: './wasm/index.js',
     handlerName: 'wasmDecompile',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'wasm_inspect_sections',
-    description: '使用 wasm-objdump 查看 WASM sections、元数据或字节码',
+    description: 'Inspect Wasm binary sections: section map, function signatures, string scan',
     schema: {
       inputPath: 'string',
       sections: 'string',
+      includeFunctionSignatures: 'boolean',
+      includeStringScan: 'boolean',
+      maskSensitiveStrings: 'boolean',
+      maxStringSlots: 'number',
+      maxSummaryLines: 'number',
     },
     modulePath: './wasm/index.js',
     handlerName: 'wasmInspectSections',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'wasm_offline_run',
-    description: '使用 wasmtime 或 wasmer 离线调用 WASM 导出函数',
+    description: 'Execute a Wasm function offline using wasmtime or wasmer CLI runtime',
     schema: {
       inputPath: 'string',
       functionName: 'string',
@@ -1026,11 +1034,11 @@ export const TOOLS_META: ToolMeta[] = [
     },
     modulePath: './wasm/index.js',
     handlerName: 'wasmOfflineRun',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'wasm_optimize',
-    description: '使用 binaryen wasm-opt 优化 .wasm 文件',
+    description: 'Optimize a .wasm file using binaryen wasm-opt with selectable optimization level',
     schema: {
       inputPath: 'string',
       outputPath: 'string',
@@ -1038,22 +1046,22 @@ export const TOOLS_META: ToolMeta[] = [
     },
     modulePath: './wasm/index.js',
     handlerName: 'wasmOptimize',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'wasm_vmp_trace',
-    description: '读取当前页面捕获到的 WASM VMP import-call trace',
+    description: 'Trace Wasm runtime events captured by JS-Wasm boundary hooks',
     schema: {
       maxEvents: 'number',
       filterModule: 'string',
     },
     modulePath: './wasm/index.js',
     handlerName: 'wasmVmpTrace',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'wasm_memory_inspect',
-    description: '检查当前页面导出的 WebAssembly.Memory 内容',
+    description: 'Inspect WebAssembly.Memory exports — hex/ascii dump, pattern search',
     schema: {
       offset: 'number',
       length: 'number',
@@ -1062,7 +1070,7 @@ export const TOOLS_META: ToolMeta[] = [
     },
     modulePath: './wasm/index.js',
     handlerName: 'wasmMemoryInspect',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'activate_vue_devtools',

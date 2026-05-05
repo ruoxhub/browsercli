@@ -6,44 +6,75 @@
 
 import {readFile, writeFile} from 'node:fs/promises';
 
+import {zod} from '../../third_party/index.js';
 import {getRuntime} from '../../runtime.js';
+import {defineTool} from '../ToolDefinition.js';
+import {ToolCategory} from '../categories.js';
 
-import type {
-  WasmDecompileParams,
-  WasmDecompileResult_,
-} from './types.js';
-
-export async function wasmDecompile(
-  params: WasmDecompileParams,
-): Promise<WasmDecompileResult_> {
-  const tooltype = 'wasm_decompile';
-
-  try {
-    const bytes = Uint8Array.from(await readFile(params.inputPath));
-    const runtime = getRuntime();
-
-    const decompiled = await runtime.wasmDecompiler.decompile(bytes);
-
-    if (params.outputPath) {
-      await writeFile(params.outputPath, decompiled.wat, 'utf-8');
-    }
-
-    return {
-      success: true,
-      message: `反编译完成：${decompiled.functionCount} 个函数，${decompiled.exportCount} 个导出`,
-      tooltype,
-      logFormat: 'json',
-      data: {
-        inputPath: params.inputPath,
-        outputPath: params.outputPath,
-        decompiled,
-      },
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `WASM 反编译失败：${error instanceof Error ? error.message : String(error)}`,
-      tooltype,
-    };
-  }
+function appendJson(
+  response: {appendResponseLine(value: string): void},
+  value: unknown,
+): void {
+  response.appendResponseLine('```json');
+  response.appendResponseLine(JSON.stringify(value, null, 2));
+  response.appendResponseLine('```');
 }
+
+export const wasmDecompile = defineTool({
+  name: 'wasm_decompile',
+  description: 'Decompile a .wasm file with function-level summaries and suspicious-pattern detection.',
+  annotations: {
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: true,
+  },
+  schema: {
+    inputPath: zod.string().describe('Path to the .wasm file to decompile'),
+    outputPath: zod.string().optional().describe('Optional output path for the .wat file'),
+    foldExprs: zod.boolean().optional().describe('Fold expression blocks for readability'),
+    inlineExport: zod.boolean().optional().describe('Inline export names into function bodies'),
+    maxWatChars: zod.number().int().positive().optional().describe('Truncate WAT output beyond this many characters'),
+  },
+  handler: async (request, response) => {
+    const {inputPath, outputPath, foldExprs, inlineExport, maxWatChars} = request.params;
+
+    try {
+      const bytes = Uint8Array.from(await readFile(inputPath));
+      const runtime = getRuntime();
+
+      const decompiled = await runtime.wasmDecompiler.decompile(bytes, {
+        foldExprs,
+        inlineExport,
+      });
+
+      if (outputPath) {
+        await writeFile(outputPath, decompiled.wat, 'utf-8');
+      }
+
+      // Optionally truncate WAT for large outputs
+      const wat = typeof maxWatChars === 'number' && maxWatChars > 0 && decompiled.wat.length > maxWatChars
+        ? `${decompiled.wat.slice(0, maxWatChars)}\n;; ... truncated ...`
+        : decompiled.wat;
+
+      appendJson(response, {
+        success: true,
+        message: `反编译完成：${decompiled.functionCount} 个函数，${decompiled.exportCount} 个导出`,
+        tooltype: 'wasm_decompile',
+        logFormat: 'json',
+        data: {
+          inputPath,
+          outputPath,
+          decompiled: {
+            ...decompiled,
+            wat,
+          },
+        },
+      });
+    } catch (error) {
+      appendJson(response, {
+        success: false,
+        message: `WASM 反编译失败：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'wasm_decompile',
+      });
+    }
+  },
+});

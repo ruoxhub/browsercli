@@ -6,10 +6,9 @@
 
 import {execFile} from 'node:child_process';
 
-import type {
-  WasmOfflineRunParams,
-  WasmOfflineRunResult,
-} from './types.js';
+import {zod} from '../../third_party/index.js';
+import {defineTool} from '../ToolDefinition.js';
+import {ToolCategory} from '../categories.js';
 
 function runCommand(
   cmd: string,
@@ -30,79 +29,105 @@ function runCommand(
   });
 }
 
-export async function wasmOfflineRun(
-  params: WasmOfflineRunParams,
-): Promise<WasmOfflineRunResult> {
-  const tooltype = 'wasm_offline_run';
-  const start = Date.now();
+function appendJson(
+  response: {appendResponseLine(value: string): void},
+  value: unknown,
+): void {
+  response.appendResponseLine('```json');
+  response.appendResponseLine(JSON.stringify(value, null, 2));
+  response.appendResponseLine('```');
+}
 
-  try {
-    const runtimeChoice = params.runtime ?? 'auto';
-    const timeoutMs = params.timeoutMs ?? 10000;
-    const args = params.args ?? [];
+export const wasmOfflineRun = defineTool({
+  name: 'wasm_offline_run',
+  description: 'Execute a Wasm function offline using wasmtime or wasmer CLI runtime.',
+  annotations: {
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: false,
+  },
+  schema: {
+    inputPath: zod.string().describe('Path to the .wasm file'),
+    functionName: zod.string().describe('Name of the exported Wasm function to invoke'),
+    args: zod.array(zod.string()).optional().describe('Arguments to pass to the function'),
+    runtime: zod.enum(['wasmtime', 'wasmer', 'auto']).optional().describe('Runtime to use (default "auto")'),
+    timeoutMs: zod.number().int().positive().optional().describe('Execution timeout in ms (default 10000)'),
+  },
+  handler: async (request, response) => {
+    const {
+      inputPath,
+      functionName,
+      args = [],
+      runtime: runtimeChoice = 'auto',
+      timeoutMs = 10000,
+    } = request.params;
 
-    let cmd: string;
-    let cmdArgs: string[];
+    const start = Date.now();
 
-    if (runtimeChoice === 'wasmer') {
-      cmd = 'wasmer';
-      cmdArgs = [params.inputPath, '--invoke', params.functionName, ...args];
-    } else if (runtimeChoice === 'wasmtime') {
-      cmd = 'wasmtime';
-      cmdArgs = [params.inputPath, '--invoke', params.functionName, ...args];
-    } else {
-      // auto: prefer wasmtime, fallback to wasmer
-      cmd = 'wasmtime';
-      cmdArgs = [params.inputPath, '--invoke', params.functionName, ...args];
-    }
+    try {
+      let cmd: string;
+      let cmdArgs: string[];
 
-    const result = await runCommand(cmd, cmdArgs, timeoutMs);
-    const durationMs = Date.now() - start;
+      if (runtimeChoice === 'wasmer') {
+        cmd = 'wasmer';
+        cmdArgs = [inputPath, '--invoke', functionName, ...args];
+      } else if (runtimeChoice === 'wasmtime') {
+        cmd = 'wasmtime';
+        cmdArgs = [inputPath, '--invoke', functionName, ...args];
+      } else {
+        // auto: prefer wasmtime, fallback to wasmer
+        cmd = 'wasmtime';
+        cmdArgs = [inputPath, '--invoke', functionName, ...args];
+      }
 
-    // auto fallback
-    if (result.exitCode !== 0 && runtimeChoice === 'auto' && result.stderr.includes('未找到')) {
-      const wasmerResult = await runCommand(
-        'wasmer',
-        [params.inputPath, '--invoke', params.functionName, ...args],
-        timeoutMs,
-      );
-      return {
-        success: wasmerResult.exitCode === 0,
-        message: wasmerResult.exitCode === 0
-          ? `wasmer 执行成功（${durationMs}ms）`
-          : `wasmer 执行失败：${wasmerResult.stderr}`,
-        tooltype,
+      const result = await runCommand(cmd, cmdArgs, timeoutMs);
+      const durationMs = Date.now() - start;
+
+      // auto fallback
+      if (result.exitCode !== 0 && runtimeChoice === 'auto' && result.stderr.includes('未找到')) {
+        const wasmerResult = await runCommand(
+          'wasmer',
+          [inputPath, '--invoke', functionName, ...args],
+          timeoutMs,
+        );
+        appendJson(response, {
+          success: wasmerResult.exitCode === 0,
+          message: wasmerResult.exitCode === 0
+            ? `wasmer 执行成功（${durationMs}ms）`
+            : `wasmer 执行失败：${wasmerResult.stderr}`,
+          tooltype: 'wasm_offline_run',
+          logFormat: 'json',
+          data: {
+            inputPath,
+            functionName,
+            runtime: 'wasmer',
+            ...wasmerResult,
+            durationMs: Date.now() - start,
+          },
+        });
+        return;
+      }
+
+      appendJson(response, {
+        success: result.exitCode === 0,
+        message: result.exitCode === 0
+          ? `${cmd} 执行成功（${durationMs}ms）`
+          : `${cmd} 执行失败（exit ${result.exitCode}）：${result.stderr.slice(0, 500)}`,
+        tooltype: 'wasm_offline_run',
         logFormat: 'json',
         data: {
-          inputPath: params.inputPath,
-          functionName: params.functionName,
-          runtime: 'wasmer',
-          ...wasmerResult,
-          durationMs: Date.now() - start,
+          inputPath,
+          functionName,
+          runtime: cmd,
+          ...result,
+          durationMs,
         },
-      };
+      });
+    } catch (error) {
+      appendJson(response, {
+        success: false,
+        message: `离线执行 WASM 失败：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'wasm_offline_run',
+      });
     }
-
-    return {
-      success: result.exitCode === 0,
-      message: result.exitCode === 0
-        ? `${cmd} 执行成功（${durationMs}ms）`
-        : `${cmd} 执行失败（exit ${result.exitCode}）：${result.stderr.slice(0, 500)}`,
-      tooltype,
-      logFormat: 'json',
-      data: {
-        inputPath: params.inputPath,
-        functionName: params.functionName,
-        runtime: cmd,
-        ...result,
-        durationMs,
-      },
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `离线执行 WASM 失败：${error instanceof Error ? error.message : String(error)}`,
-      tooltype,
-    };
-  }
-}
+  },
+});

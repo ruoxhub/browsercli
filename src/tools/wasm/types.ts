@@ -23,57 +23,6 @@ export interface WasmToolResult<T = unknown> {
   data?: T;
 }
 
-// ─── 参数类型 ──────────────────────────────────────────
-
-export interface WasmCapabilitiesParams {}
-
-export interface WasmDumpParams {
-  moduleIndex?: number;
-  outputPath?: string;
-}
-
-export interface WasmDisassembleParams {
-  inputPath: string;
-  outputPath?: string;
-  foldExprs?: boolean;
-}
-
-export interface WasmDecompileParams {
-  inputPath: string;
-  outputPath?: string;
-}
-
-export interface WasmInspectSectionsParams {
-  inputPath: string;
-  sections?: 'headers' | 'details' | 'disassemble' | 'all';
-}
-
-export interface WasmOfflineRunParams {
-  inputPath: string;
-  functionName: string;
-  args?: string[];
-  runtime?: 'wasmtime' | 'wasmer' | 'auto';
-  timeoutMs?: number;
-}
-
-export interface WasmOptimizeParams {
-  inputPath: string;
-  outputPath?: string;
-  level?: 'O1' | 'O2' | 'O3' | 'O4' | 'Os' | 'Oz';
-}
-
-export interface WasmVmpTraceParams {
-  maxEvents?: number;
-  filterModule?: string;
-}
-
-export interface WasmMemoryInspectParams {
-  offset?: number;
-  length?: number;
-  format?: 'hex' | 'ascii' | 'both';
-  searchPattern?: string;
-}
-
 // ─── 数据类型 ──────────────────────────────────────────
 
 export interface NativeToolInfo {
