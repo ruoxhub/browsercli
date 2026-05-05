@@ -37,38 +37,5 @@ export interface AnalyzeWebSocketMessagesParams {
   direction?: 'sent' | 'received';
 }
 
-/** WebSocket 操作统一返回结构 */
-export interface WebSocketResult {
-  success: boolean;
-  message: string;
-  tooltype: string;
-  logFormat?: string;
-}
-
-/** 连接列表结果 */
-export interface ListConnectionsResult extends WebSocketResult {
-  tooltype: 'list_websocket_connections';
-  connections: WebSocketData[];
-}
-
-/** 消息列表结果 */
-export interface GetMessagesResult extends WebSocketResult {
-  tooltype: 'get_websocket_messages';
-  lines: string[];
-}
-
-/** 单帧结果 */
-export interface GetMessageResult extends WebSocketResult {
-  tooltype: 'get_websocket_message';
-  lines: string[];
-}
-
-/** 分析结果 */
-export interface AnalyzeMessagesResult extends WebSocketResult {
-  tooltype: 'analyze_websocket_messages';
-  summary: TrafficSummary;
-  lines: string[];
-}
-
 /** 重新导出 */
 export type {WebSocketData, WebSocketFrame, TrafficSummary};

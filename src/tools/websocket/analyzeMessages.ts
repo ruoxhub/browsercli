@@ -8,74 +8,69 @@ import {
   analyzeWebSocketFramesV2,
   formatTrafficSummary,
 } from '../../formatters/websocketFormatter.js';
-import type {WebSocketData} from '../network/WebSocketCollector.js';
+import {zod} from '../../third_party/index.js';
 
-import type {AnalyzeMessagesResult, AnalyzeWebSocketMessagesParams} from './types.js';
+import {ToolCategory} from '../categories.js';
+import {defineTool} from '../ToolDefinition.js';
 
-/**
- * 分析 WebSocket 消息模式并分组。
- *
- * 纯函数：分析帧数据，生成分组统计和采样索引，不依赖 MCP Tool 框架。
- *
- * @param ws - WebSocket 连接数据
- * @param params - 分析参数
- * @returns 结构化结果对象（包含 summary 和格式化 lines）
- */
-export function analyzeWebSocketMessages(
-  ws: WebSocketData,
-  params: AnalyzeWebSocketMessagesParams,
-): AnalyzeMessagesResult {
-  try {
-    let frames = ws.frames;
+/** 本地缓存 TrafficSummary，与 getMessages 共享 */
+export const trafficSummaryCache = new Map<number, ReturnType<typeof analyzeWebSocketFramesV2>>();
 
-    // 方向过滤
-    if (params.direction) {
-      frames = frames.filter(f => f.direction === params.direction);
+const DIRECTION_OPTIONS: readonly ['sent', 'received'] = ['sent', 'received'];
+
+export const analyzeWebSocketMessages = defineTool({
+  name: 'analyze_websocket_messages',
+  description: `Analyzes WebSocket messages and groups them by pattern/fingerprint. Essential for understanding binary/protobuf message types in live streaming scenarios. Returns statistics and sample indices for each message type.`,
+  annotations: {
+    category: ToolCategory.NETWORK,
+    readOnlyHint: true,
+  },
+  schema: {
+    wsid: zod
+      .number()
+      .describe('The wsid of the WebSocket connection to analyze.'),
+    direction: zod
+      .enum(DIRECTION_OPTIONS)
+      .optional()
+      .describe('Only analyze messages in this direction.'),
+  },
+  handler: async (request, response, context) => {
+    try {
+      const ws = context.getWebSocketById(request.params.wsid);
+      let frames = ws.frames;
+
+      // 方向过滤
+      if (request.params.direction) {
+        frames = frames.filter(f => f.direction === request.params.direction);
+      }
+
+      // 分析并缓存结果
+      const summary = analyzeWebSocketFramesV2(
+        frames,
+        request.params.wsid,
+        ws.connection.url,
+      );
+      trafficSummaryCache.set(request.params.wsid, summary);
+
+      // 格式化输出摘要
+      const lines = formatTrafficSummary(summary);
+      for (const line of lines) {
+        response.appendResponseLine(line);
+      }
+
+      // 添加使用提示
+      response.appendResponseLine(``);
+      response.appendResponseLine(`### Usage`);
+      response.appendResponseLine(
+        `- View group: \`get_websocket_messages(wsid=${request.params.wsid}, groupId="A")\``,
+      );
+      response.appendResponseLine(
+        `- View single: \`get_websocket_message(wsid=${request.params.wsid}, frameIndex=0)\``,
+      );
+    } catch (error) {
+      response.appendResponseLine(
+        `Error: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
-
-    // 分析并生成摘要
-    const summary = analyzeWebSocketFramesV2(
-      frames,
-      params.wsid,
-      ws.connection.url,
-    );
-
-    // 格式化输出
-    const lines = formatTrafficSummary(summary);
-
-    // 添加使用提示
-    lines.push(``);
-    lines.push(`### Usage`);
-    lines.push(
-      `- View group: \`get_websocket_messages(wsid=${params.wsid}, groupId="A")\``,
-    );
-    lines.push(
-      `- View single: \`get_websocket_message(wsid=${params.wsid}, frameIndex=0)\``,
-    );
-
-    return {
-      success: true,
-      message: `WebSocket 消息分析完成，共 ${summary.groups.length} 个分组`,
-      tooltype: 'analyze_websocket_messages',
-      summary,
-      lines,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `错误：${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'analyze_websocket_messages',
-      summary: {
-        wsid: params.wsid,
-        url: ws.connection.url,
-        durationMs: 0,
-        totalFrames: 0,
-        sentCount: 0,
-        receivedCount: 0,
-        groups: [],
-        groupToIndices: new Map(),
-      },
-      lines: [],
-    };
-  }
-}
+  },
+});
