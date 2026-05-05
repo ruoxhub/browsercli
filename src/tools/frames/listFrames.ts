@@ -5,9 +5,10 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
-import {getRuntime} from '../../runtime.js';
+import {defineTool} from '../ToolDefinition.js';
+import {ToolCategory} from '../categories.js';
 
-import type {FrameInfo, ListFramesResult} from './types.js';
+import type {ToolContextProvider} from '../../worker/ToolContextProvider.js';
 
 /**
  * 计算 Frame 的嵌套深度。
@@ -24,62 +25,50 @@ function getFrameDepth(frame: Frame): number {
 
 /**
  * 列出页面中所有 Frame（包括 iframe）。
- *
- * 遍历 Page 上的所有 Frame，返回每个 Frame 的索引、URL、名称和嵌套深度。
- *
- * @returns 结构化结果对象，data 包含 Frame 信息列表
  */
-export async function listFrames(): Promise<ListFramesResult> {
-  const tooltype = 'list_frames';
+export const listFrames = defineTool({
+  name: 'list_frames',
+  description:
+    'Lists all frames (including iframes) in the current page as a tree. Shows frame index, name, and URL. Use select_frame to switch execution context to a specific frame.',
+  annotations: {
+    title: '列出 Frame',
+    category: ToolCategory.DEBUGGING,
+    readOnlyHint: true,
+  },
+  schema: {},
+  handler: async (_request, response, context) => {
+    const runtime = context as unknown as ToolContextProvider;
 
-  try {
-    const page = getRuntime().contextProvider!.getSelectedPage();
-    if (!page) {
-      return {
-        success: false,
-        message: '没有可用的页面，请先导航到目标页面',
-        tooltype,
-        data: [],
-      };
+    try {
+      const page = runtime.getSelectedPage();
+      if (!page) {
+        response.appendResponseLine('没有可用的页面，请先导航到目标页面');
+        return;
+      }
+
+      const frames = page.frames();
+      const currentFrame = runtime.getSelectedFrame();
+
+      if (frames.length === 0) {
+        response.appendResponseLine('No frames found.');
+        return;
+      }
+
+      response.appendResponseLine(`Frames (${frames.length} total):\n`);
+
+      for (let i = 0; i < frames.length; i += 1) {
+        const frame = frames[i];
+        const indent = '  '.repeat(getFrameDepth(frame));
+        const marker = frame === currentFrame ? ' [selected]' : '';
+        const name = frame.name() ? ` name="${frame.name()}"` : '';
+        response.appendResponseLine(
+          `${indent}${i}: ${frame.url() || '(empty)'}${name}${marker}`,
+        );
+      }
+    } catch (error) {
+      response.appendResponseLine(
+        `列出 Frame 失败：${error instanceof Error ? error.message : String(error)}`,
+      );
     }
-
-    const frames = page.frames();
-
-    if (frames.length === 0) {
-      return {
-        success: true,
-        message: 'No frames found.',
-        tooltype,
-        data: [],
-      };
-    }
-
-    const selectedFrame = getRuntime().contextProvider!.getSelectedFrame();
-    const frameInfos: FrameInfo[] = frames.map((frame, index) => {
-      const depth = getFrameDepth(frame);
-      const name = frame.name() || undefined;
-      const isSelected = frame === selectedFrame;
-      return {
-        index,
-        url: frame.url() || '(empty)',
-        ...(name ? {name} : {}),
-        depth,
-        ...(isSelected ? {selected: true} : {}),
-      };
-    });
-
-    return {
-      success: true,
-      message: `找到 ${frameInfos.length} 个 Frame`,
-      tooltype,
-      logFormat: 'full',
-      data: frameInfos,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `列出 Frame 失败：${error instanceof Error ? error.message : String(error)}`,
-      tooltype,
-    };
-  }
-}
+  },
+});
