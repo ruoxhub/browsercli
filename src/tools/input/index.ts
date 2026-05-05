@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+// ─── Input 工具（defineTool 格式）───────────────────────
+
 export {click} from './click.js';
 export {clickAt} from './clickAt.js';
 export {setFiles} from './setFiles.js';
@@ -13,27 +15,7 @@ export {fillForm} from './fillForm.js';
 export {drag} from './drag.js';
 export {uploadFile} from './uploadFile.js';
 export {pressKey} from './pressKey.js';
-export type {
-  InputResult,
-  ClickParams,
-  ClickResult,
-  ClickAtParams,
-  ClickAtResult,
-  ClickAtData,
-  SetFilesParams,
-  SetFilesResult,
-  HoverParams,
-  HoverResult,
-  FillParams,
-  FillResult,
-  FillFormParams,
-  FillFormResult,
-  FormElement,
-  DragParams,
-  DragResult,
-  UploadFileParams,
-  UploadFileResult,
-  PressKeyParams,
-  PressKeyResult,
-  Frame,
-} from './types.js';
+
+// ─── 类型导出 ─────────────────────────────────────────
+
+export type {Frame} from './types.js';

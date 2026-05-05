@@ -4,45 +4,56 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Frame} from './types.js';
-import type {FillParams, FillResult} from './types.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
 
-export async function fill(
-  frame: Frame,
-  params: FillParams,
-): Promise<FillResult> {
-  const {selector, value} = params;
-  const tooltype = 'fill';
-  const page = frame.page();
+/**
+ * 在 input/textarea/select 元素中填入值。
+ */
+export const fill = defineTool({
+  name: 'fill',
+  description:
+    'Fill a value into an input, textarea, or select element matched by CSS selector. Automatically handles <select> via selectOption.',
+  annotations: {
+    title: '填充输入',
+    category: ToolCategory.NAVIGATION,
+    readOnlyHint: false,
+  },
+  schema: {
+    selector: zod.string().describe('CSS 选择器（input / textarea / select）。'),
+    value: zod.string().describe('填充值。'),
+  },
+  handler: async (request, response, context) => {
+    const {selector, value} = request.params;
+    const frame = (context as Context).getSelectedFrame();
+    const page = frame.page();
 
-  try {
-    const element = await page.$(selector);
-    if (!element) {
-      throw new Error(`Element not found: ${selector}`);
+    try {
+      const element = await page.$(selector);
+      if (!element) {
+        response.appendResponseLine(`Element not found: ${selector}`);
+        return;
+      }
+
+      const isSelect = await page.evaluate(sel => {
+        const el = document.querySelector(sel);
+        return el?.tagName === 'SELECT';
+      }, selector);
+
+      if (isSelect) {
+        await element.selectOption(value);
+      } else {
+        await element.fill(value);
+      }
+
+      response.appendResponseLine(
+        `Successfully filled value into element: ${selector}`,
+      );
+    } catch (error) {
+      response.appendResponseLine(
+        `Fill failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
-
-    const isSelect = await page.evaluate(sel => {
-      const el = document.querySelector(sel);
-      return el?.tagName === 'SELECT';
-    }, selector);
-
-    if (isSelect) {
-      await element.selectOption(value);
-    } else {
-      await element.fill(value);
-    }
-
-    return {
-      success: true,
-      message: `Successfully filled value into element: ${selector}`,
-      tooltype,
-      logFormat: 'simple',
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `Fill failed: ${error instanceof Error ? error.message : String(error)}`,
-      tooltype,
-    };
-  }
-}
+  },
+});

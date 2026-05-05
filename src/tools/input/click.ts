@@ -4,30 +4,43 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Frame} from './types.js';
-import type {ClickParams, ClickResult} from './types.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
 
-export async function click(
-  frame: Frame,
-  params: ClickParams,
-): Promise<ClickResult> {
-  const {selector, dblClick = false} = params;
-  const tooltype = 'click';
-  const page = frame.page();
+/**
+ * 点击页面元素，支持单击和双击。
+ */
+export const click = defineTool({
+  name: 'click',
+  description:
+    'Click on an element matched by CSS selector. Supports single and double click.',
+  annotations: {
+    title: '点击元素',
+    category: ToolCategory.NAVIGATION,
+    readOnlyHint: false,
+  },
+  schema: {
+    selector: zod.string().describe('CSS 选择器。'),
+    dblClick: zod
+      .boolean()
+      .optional()
+      .describe('是否双击，默认 false。'),
+  },
+  handler: async (request, response, context) => {
+    const {selector, dblClick = false} = request.params;
+    const frame = (context as Context).getSelectedFrame();
+    const page = frame.page();
 
-  try {
-    await page.click(selector, {clickCount: dblClick ? 2 : 1});
-    return {
-      success: true,
-      message: `Successfully ${dblClick ? 'double ' : ''}clicked on element: ${selector}`,
-      tooltype,
-      logFormat: 'simple',
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `Click failed: ${error instanceof Error ? error.message : String(error)}`,
-      tooltype,
-    };
-  }
-}
+    try {
+      await page.click(selector, {clickCount: dblClick ? 2 : 1});
+      response.appendResponseLine(
+        `Successfully ${dblClick ? 'double ' : ''}clicked on element: ${selector}`,
+      );
+    } catch (error) {
+      response.appendResponseLine(
+        `Click failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  },
+});
