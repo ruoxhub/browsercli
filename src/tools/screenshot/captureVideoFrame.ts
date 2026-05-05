@@ -7,125 +7,151 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import type {
-  CaptureVideoFrameParams,
-  CaptureVideoFrameResult,
-} from './types.js';
+import {defineTool} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
 
-import {getRuntime} from '../../runtime.js';
+import type {ToolContextProvider} from '../../worker/ToolContextProvider.js';
 
 /**
- * 捕获视频当前帧（纯函数版本）。
+ * 捕获视频当前帧（defineTool 版本）。
  *
  * 先 seek 到指定时间（可选），然后截取视频元素当前帧。
- *
- * @param runtime - Screenshot 运行时服务
- * @param params - 视频帧捕获参数
- * @returns 结构化结果 { success, message, tooltype, logFormat, data }
+ * 参考 old-source 中 screenshot 的响应模式：
+ *   - 小于 2MB 直接附加图片到响应
+ *   - 指定 outputPath 时保存到指定路径
  */
-export async function captureVideoFrame(
-  params: CaptureVideoFrameParams,
-): Promise<CaptureVideoFrameResult> {
-  try {
-    const page = await getRuntime().contextProvider!.getActivePage();
+export const captureVideoFrame = defineTool({
+  name: 'capture_video_frame',
+  description: `Capture the current frame of a video element. Optionally seek to a specific time first. Returns the frame as an image.`,
+  annotations: {
+    title: '捕获视频帧',
+    category: ToolCategory.DEBUGGING,
+    readOnlyHint: false,
+  },
+  schema: {
+    selector: zod
+      .string()
+      .describe('CSS selector for the video element.'),
+    seekTime: zod
+      .number()
+      .optional()
+      .describe('Time position in seconds to seek to before capturing (optional).'),
+    outputPath: zod
+      .string()
+      .optional()
+      .describe('File path to save the captured frame (optional).'),
+    format: zod
+      .enum(['png', 'jpeg'])
+      .default('png')
+      .describe('Image format for the captured frame. Default is "png".'),
+    quality: zod
+      .number()
+      .min(0)
+      .max(100)
+      .optional()
+      .describe(
+        'Compression quality for JPEG format (0-100). Ignored for PNG format.',
+      ),
+  },
+  handler: async (request, response, context) => {
+    const runtime = context as unknown as ToolContextProvider;
 
-    // 先定位到指定时间点
-    if (params.seekTime !== undefined) {
-      await page.evaluate(
-        (sel, t) => {
-          const video = document.querySelector(sel) as HTMLVideoElement;
-          if (video) {
-            video.currentTime = t;
-          }
-        },
-        params.selector,
-        params.seekTime,
-      );
-      // 等待 seek 完成
-      await new Promise(resolve => setTimeout(resolve, 300));
-    }
+    try {
+      const page = await runtime.getActivePage();
 
-    // 获取视频帧的边界框
-    const videoBox = await page.evaluate(sel => {
-      const video = document.querySelector(sel) as HTMLVideoElement;
-      if (!video) return null;
-      const rect = video.getBoundingClientRect();
-      return {
-        x: rect.x,
-        y: rect.y,
-        width: rect.width,
-        height: rect.height,
-      };
-    }, params.selector);
-
-    if (!videoBox) {
-      return {
-        success: false,
-        message: `视频元素未找到: ${params.selector}`,
-        tooltype: 'capture_video_frame',
-        logFormat: 'json',
-      };
-    }
-
-    const format = params.format || 'png';
-
-    // 自动创建输出目录
-    if (params.outputPath) {
-      const dir = path.dirname(params.outputPath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, {recursive: true});
+      // 先定位到指定时间点
+      if (request.params.seekTime !== undefined) {
+        await page.evaluate(
+          (sel, t) => {
+            const video = document.querySelector(sel) as HTMLVideoElement;
+            if (video) {
+              video.currentTime = t;
+            }
+          },
+          request.params.selector,
+          request.params.seekTime,
+        );
+        // 等待 seek 完成
+        await new Promise(resolve => setTimeout(resolve, 300));
       }
-    }
 
-    // 截图
-    const buffer = await page.screenshot({
-      path: params.outputPath,
-      type: format,
-      quality: params.quality,
-      clip: {
-        x: Math.round(videoBox.x),
-        y: Math.round(videoBox.y),
-        width: Math.round(videoBox.width),
-        height: Math.round(videoBox.height),
-      },
-    });
+      // 获取视频帧的边界框
+      const videoBox = await page.evaluate(sel => {
+        const video = document.querySelector(sel) as HTMLVideoElement;
+        if (!video) return null;
+        const rect = video.getBoundingClientRect();
+        return {
+          x: rect.x,
+          y: rect.y,
+          width: rect.width,
+          height: rect.height,
+        };
+      }, request.params.selector);
 
-    const frameBuffer = Buffer.from(buffer);
+      if (!videoBox) {
+        response.appendResponseLine(
+          `视频元素未找到: ${request.params.selector}`,
+        );
+        return;
+      }
 
-    if (params.outputPath) {
-      return {
-        success: true,
-        message: `视频帧已捕获并保存: ${params.outputPath}`,
-        tooltype: 'capture_video_frame',
-        logFormat: 'json',
-        data: {
-          selector: params.selector,
-          outputPath: params.outputPath,
-          size: frameBuffer.length,
-          seekTime: params.seekTime,
+      const format = request.params.format;
+
+      // 自动创建输出目录
+      if (request.params.outputPath) {
+        const dir = path.dirname(request.params.outputPath);
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, {recursive: true});
+        }
+      }
+
+      // 截图
+      const buffer = await page.screenshot({
+        path: request.params.outputPath,
+        type: format,
+        quality: request.params.quality,
+        clip: {
+          x: Math.round(videoBox.x),
+          y: Math.round(videoBox.y),
+          width: Math.round(videoBox.width),
+          height: Math.round(videoBox.height),
         },
-      };
-    }
+      });
 
-    return {
-      success: true,
-      message: '视频帧已捕获',
-      tooltype: 'capture_video_frame',
-      logFormat: 'json',
-      data: {
-        selector: params.selector,
-        base64: frameBuffer.toString('base64'),
-        mimeType: `image/${format}`,
-        size: frameBuffer.length,
-        seekTime: params.seekTime,
-      },
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `捕获视频帧失败: ${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'capture_video_frame',
-      logFormat: 'json',
-    };
-  }
-}
+      const frameBuffer = Buffer.from(buffer);
+
+      if (request.params.seekTime !== undefined) {
+        response.appendResponseLine(
+          `Captured video frame at ${request.params.seekTime}s from ${request.params.selector}.`,
+        );
+      } else {
+        response.appendResponseLine(
+          `Captured video frame from ${request.params.selector}.`,
+        );
+      }
+
+      if (request.params.outputPath) {
+        response.appendResponseLine(
+          `Saved frame to ${request.params.outputPath}.`,
+        );
+      } else if (frameBuffer.length >= 2_000_000) {
+        // 大文件保存临时文件
+        const {filename} = await context.saveTemporaryFile(
+          frameBuffer as unknown as Uint8Array<ArrayBufferLike>,
+          `image/${format}` as 'image/png' | 'image/jpeg',
+        );
+        response.appendResponseLine(`Saved frame to ${filename}.`);
+      } else {
+        // 小文件直接附加图片到响应
+        response.attachImage({
+          mimeType: `image/${format}`,
+          data: frameBuffer.toString('base64'),
+        });
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      response.appendResponseLine(`捕获视频帧失败: ${errorMsg}`);
+    }
+  },
+});
