@@ -16,6 +16,7 @@
 import type {ToolMeta} from '../cli/tools-meta.js';
 import {getAllToolNames, getToolMeta} from '../cli/tools-meta.js';
 import type {Context, Response, ToolDefinition} from '../tools/ToolDefinition.js';
+import type {TrafficSummary} from '../formatters/websocketFormatter.js';
 import type {TraceResult} from '../trace-processing/parse.js';
 import type {ActionHandler} from '../types/rpc.js';
 
@@ -27,6 +28,7 @@ type LoadedHandler = ((...args: unknown[]) => Promise<unknown>) | ToolDefinition
 export class ToolAdapter {
   private contextProvider: ToolContextProvider;
   private loadedHandlers = new Map<string, LoadedHandler>();
+  private trafficSummaryCache = new Map<number, TrafficSummary>();
 
   constructor(contextProvider: ToolContextProvider) {
     this.contextProvider = contextProvider;
@@ -91,8 +93,8 @@ export class ToolAdapter {
       getWebSocketConnections: (includePreservedData) => provider.getWebSocketConnections(includePreservedData),
       getWebSocketById: (wsid) => provider.getWebSocketConnectionById(wsid),
       getWebSocketStableId: (ws) => provider.getWebSocketStableId(ws),
-      cacheTrafficSummary: (_wsid, _summary) => {},
-      getCachedTrafficSummary: (_wsid) => undefined,
+      cacheTrafficSummary: (wsid, summary) => { this.trafficSummaryCache.set(wsid, summary); },
+      getCachedTrafficSummary: (wsid) => this.trafficSummaryCache.get(wsid),
     };
   }
 

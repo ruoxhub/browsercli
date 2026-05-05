@@ -51,7 +51,6 @@ import * as pagesTools from '../build/src/tools/pages.js';
 import * as performanceTools from '../build/src/tools/performance.js';
 import * as rebuildTools from '../build/src/tools/rebuild.js';
 import * as screenshotTools from '../build/src/tools/screenshot.js';
-import * as scriptInjectorTools from '../build/src/tools/script-injector.js';
 import * as scriptTools from '../build/src/tools/script.js';
 import * as siteExperienceTools from '../build/src/tools/siteExperience.js';
 import * as skillTools from '../build/src/tools/skill.js';
@@ -60,7 +59,7 @@ import * as vJsTools from '../build/src/tools/v-jstools.js';
 import * as vueDevtoolsTools from '../build/src/tools/vue/activateVueDevtools.js';
 import * as vueClearGuardTools from '../build/src/tools/vue/clearVueGuards.js';
 import * as vueRouteTools from '../build/src/tools/vue/getVueRoutes.js';
-import * as websocketTools from '../build/src/tools/websocket.js';
+import * as websocketTools from '../build/src/tools/websocket/index.js';
 
 const OUTPUT_PATH = './docs/reference/tool-reference.md';
 const README_PATH = './README.md';
@@ -118,7 +117,6 @@ function allTools(): ToolDef[] {
     ...Object.values(rebuildTools),
     ...Object.values(screenshotTools),
     ...Object.values(scriptTools),
-    ...Object.values(scriptInjectorTools),
     ...Object.values(siteExperienceTools),
     ...Object.values(skillTools),
     ...Object.values(stealthTools),
