@@ -4,49 +4,69 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Frame} from '../../third_party/index.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
 
-import type {
-  ClickableElement,
-  FindClickableElementsParams,
-  FindClickableElementsResult,
-} from './types.js';
+import {NO_ACTIVE_PAGE_MESSAGE} from '../shared/activePageResolver.js';
+
+import type {ClickableElement} from './types.js';
 
 /**
  * 查找页面中可点击的按钮和链接。
  *
- * 在 Playwright Frame 中注入查询代码，返回所有可点击元素的结构化信息。
+ * 在当前 Frame 中注入查询代码，返回所有可点击元素的结构化信息。
  * 支持按文本内容过滤。
- *
- * @param frame - Playwright Frame 对象，用于注入查询代码
- * @param params - 查询参数
- * @returns 结构化结果对象
  */
-export async function findClickableElements(
-  frame: Frame,
-  params: FindClickableElementsParams = {},
-): Promise<FindClickableElementsResult> {
-  const {filterText} = params;
-  const tooltype = 'find_clickable_elements';
+export const findClickableElements = defineTool({
+  name: 'find_clickable_elements',
+  description:
+    'Find clickable buttons and links on the current page. Optionally filter by text content. Returns selector, text, type, visibility, and bounding box.',
+  annotations: {
+    title: '查找可点击元素',
+    category: ToolCategory.NAVIGATION,
+    readOnlyHint: true,
+  },
+  schema: {
+    filterText: zod
+      .string()
+      .optional()
+      .describe('按文本内容过滤（可选，不区分大小写）'),
+  },
+  handler: async (request, response, context) => {
+    const {filterText} = request.params;
+    const frame = (context as Context).getSelectedFrame();
 
-  try {
-    const elements = await frame.evaluate(findClickableCode, filterText);
+    if (!frame) {
+      response.appendResponseLine(NO_ACTIVE_PAGE_MESSAGE);
+      return;
+    }
 
-    return {
-      success: true,
-      message: `找到 ${elements.length} 个可点击元素${filterText ? `（过滤：${filterText}）` : ''}`,
-      tooltype,
-      logFormat: 'full',
-      data: elements,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `查找可点击元素失败：${error instanceof Error ? error.message : String(error)}`,
-      tooltype,
-    };
-  }
-}
+    try {
+      const elements = await frame.evaluate(findClickableCode, filterText);
+
+      const result = {
+        success: true,
+        message: `找到 ${elements.length} 个可点击元素${filterText ? `（过滤：${filterText}）` : ''}`,
+        tooltype: 'find_clickable_elements',
+        logFormat: 'full',
+        data: elements,
+      };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    } catch (error) {
+      const result = {
+        success: false,
+        message: `查找可点击元素失败：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'find_clickable_elements',
+      };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    }
+  },
+});
 
 /** 注入代码：查找可点击元素 */
 function findClickableCode(filter?: string): ClickableElement[] {

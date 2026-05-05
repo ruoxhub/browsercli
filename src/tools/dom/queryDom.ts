@@ -4,64 +4,100 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Frame} from '../../third_party/index.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
 
-import type {ElementInfo, QueryDomParams, QueryDomResult} from './types.js';
+import {NO_ACTIVE_PAGE_MESSAGE} from '../shared/activePageResolver.js';
+
+import type {ElementInfo} from './types.js';
 
 /**
  * 通过 CSS 选择器查询 DOM 元素。
  *
- * 在 Playwright Frame 中注入查询代码，返回匹配元素的结构化信息。
+ * 在当前 Frame 中注入查询代码，返回匹配元素的结构化信息。
  * 默认查询第一个匹配元素（querySelector），设置 all=true 时查询所有匹配元素。
- *
- * @param frame - Playwright Frame 对象，用于注入查询代码
- * @param params - 查询参数
- * @returns 结构化结果对象
  */
-export async function queryDom(
-  frame: Frame,
-  params: QueryDomParams,
-): Promise<QueryDomResult> {
-  const {selector, all = false, limit = 50} = params;
-  const tooltype = 'query_dom';
+export const queryDom = defineTool({
+  name: 'query_dom',
+  description:
+    'Query one or multiple DOM elements by CSS selector. Returns structured element info including tag, attributes, bounding box, and visibility.',
+  annotations: {
+    title: '查询DOM元素',
+    category: ToolCategory.NAVIGATION,
+    readOnlyHint: true,
+  },
+  schema: {
+    selector: zod
+      .string()
+      .describe('CSS 选择器，如 "#app"、".btn-primary"、"div[data-role=main]"'),
+    all: zod
+      .boolean()
+      .optional()
+      .describe('是否查询所有匹配元素（默认 false，仅查询第一个）'),
+    limit: zod
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('查询所有时的最大返回数量（默认 50）'),
+  },
+  handler: async (request, response, context) => {
+    const {selector, all = false, limit = 50} = request.params;
+    const frame = (context as Context).getSelectedFrame();
 
-  try {
-    if (all) {
-      const elements = await frame.evaluate(queryAllCode, {selector, limit});
-      return {
-        success: true,
-        message: `查询到 ${elements.length} 个匹配元素：${selector}`,
-        tooltype,
-        logFormat: 'full',
-        data: elements,
-      };
+    if (!frame) {
+      response.appendResponseLine(NO_ACTIVE_PAGE_MESSAGE);
+      return;
     }
 
-    const element = await frame.evaluate(queryOneCode, selector);
-    if (!element.found) {
-      return {
-        success: true,
-        message: `未找到匹配元素：${selector}`,
-        tooltype,
-        logFormat: 'compact',
-        data: element,
+    try {
+      if (all) {
+        const elements = await frame.evaluate(queryAllCode, {selector, limit});
+        const result = {
+          success: true,
+          message: `查询到 ${elements.length} 个匹配元素：${selector}`,
+          tooltype: 'query_dom',
+          logFormat: 'full',
+          data: elements,
+        };
+        response.appendResponseLine('```json');
+        response.appendResponseLine(JSON.stringify(result, null, 2));
+        response.appendResponseLine('```');
+        return;
+      }
+
+      const element = await frame.evaluate(queryOneCode, selector);
+      const result = element.found
+        ? {
+            success: true,
+            message: `查询到匹配元素：${selector}`,
+            tooltype: 'query_dom',
+            logFormat: 'full',
+            data: element,
+          }
+        : {
+            success: true,
+            message: `未找到匹配元素：${selector}`,
+            tooltype: 'query_dom',
+            logFormat: 'compact',
+            data: element,
+          };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    } catch (error) {
+      const result = {
+        success: false,
+        message: `查询失败：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'query_dom',
       };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
     }
-    return {
-      success: true,
-      message: `查询到匹配元素：${selector}`,
-      tooltype,
-      logFormat: 'full',
-      data: element,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `查询失败：${error instanceof Error ? error.message : String(error)}`,
-      tooltype,
-    };
-  }
-}
+  },
+});
 
 /** 注入代码：查询单个元素 */
 function queryOneCode(selector: string): ElementInfo {
@@ -101,7 +137,13 @@ function queryOneCode(selector: string): ElementInfo {
 }
 
 /** 注入代码：查询多个元素 */
-function queryAllCode({selector, limit: maxLimit}: {selector: string; limit: number}): ElementInfo[] {
+function queryAllCode({
+  selector,
+  limit: maxLimit,
+}: {
+  selector: string;
+  limit: number;
+}): ElementInfo[] {
   const nodeList = document.querySelectorAll(selector);
   const results: ElementInfo[] = [];
 
