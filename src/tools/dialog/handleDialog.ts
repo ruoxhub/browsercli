@@ -27,7 +27,18 @@ export async function handleDialog(
   const {action, promptText} = params;
   const tooltype = 'handle_dialog';
 
-  const page = await getRuntime().contextProvider!.getActivePage();
+  let page: Page;
+  try {
+    page = await getRuntime().contextProvider!.getActivePage();
+  } catch {
+    return {
+      success: false,
+      message:
+        'No active page available. Open a page first before handling dialogs.',
+      tooltype,
+    };
+  }
+
   const dialog = await waitForDialog(page);
   if (!dialog) {
     return {

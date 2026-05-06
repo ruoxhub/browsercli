@@ -7,11 +7,9 @@
 import {getInsightOutput} from '../../trace-processing/parse.js';
 import type {InsightName} from '../../trace-processing/parse.js';
 
-import type {
-  PerformanceAnalyzeInsightResult,
-  PerformanceAnalyzeInsightData,
-} from './types.js';
-import {getRuntime} from '../../runtime.js';
+import {defineTool} from '../ToolDefinition.js';
+import {ToolCategory} from '../categories.js';
+import {zod} from '../../third_party/index.js';
 
 /**
  * 获取性能追踪录制中某个 Insight 的详细信息（纯函数版本）。
@@ -22,57 +20,40 @@ import {getRuntime} from '../../runtime.js';
  * @param insightName - Insight 名称
  * @returns 结构化结果 { success, message, tooltype, logFormat, data }
  */
-export async function performanceAnalyzeInsight(
-  insightName: InsightName,
-): Promise<PerformanceAnalyzeInsightResult> {
-  const lastRecording = getRuntime().contextProvider!.recordedTraces().at(-1);
+export const performanceAnalyzeInsight = defineTool({
+  name: 'performance_analyze_insight',
+  description:
+    'Provides more detailed information on a specific Performance Insight that was highlighted in the results of a trace recording.',
+  annotations: {
+    category: ToolCategory.PERFORMANCE,
+    readOnlyHint: true,
+  },
+  schema: {
+    insightName: zod
+      .string()
+      .describe(
+        'The name of the Insight you want more information on. For example: "DocumentLatency" or "LCPBreakdown"',
+      ),
+  },
+  handler: async (request, response, context) => {
+    const lastRecording = context.recordedTraces().at(-1);
+    if (!lastRecording) {
+      response.appendResponseLine(
+        'No recorded traces found. Record a performance trace so you have Insights to analyze.',
+      );
+      return;
+    }
 
-  if (!lastRecording) {
-    return {
-      success: false,
-      message: '未找到已录制的追踪数据。请先录制性能追踪以获取 Insights。',
-      tooltype: 'performance_analyze_insight',
-      logFormat: 'text',
-    };
-  }
-
-  const data: PerformanceAnalyzeInsightData = {};
-
-  try {
     const insightOutput = await getInsightOutput(
       lastRecording,
       'default',
-      insightName,
+      request.params.insightName as InsightName,
     );
-
     if ('error' in insightOutput) {
-      data.error =
-        typeof insightOutput.error === 'string'
-          ? insightOutput.error
-          : JSON.stringify(insightOutput.error);
-      return {
-        success: false,
-        message: `Insight "${insightName}" 分析失败。`,
-        tooltype: 'performance_analyze_insight',
-        logFormat: 'text',
-        data,
-      };
+      response.appendResponseLine(insightOutput.error);
+      return;
     }
 
-    data.insightOutput = insightOutput.output;
-    return {
-      success: true,
-      message: `Insight "${insightName}" 分析完成。`,
-      tooltype: 'performance_analyze_insight',
-      logFormat: 'text',
-      data,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `分析 Insight 时出错：${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'performance_analyze_insight',
-      logFormat: 'text',
-    };
-  }
-}
+    response.appendResponseLine(insightOutput.output);
+  },
+});

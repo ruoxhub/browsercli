@@ -12,14 +12,14 @@ import type {HookResult, LogFormat} from './types.js';
  * Hook JSEncrypt RSA 加密库：公钥/私钥、原始数据、密文。
  *
  * @param frame - Puppeteer Frame 对象，用于注入 Hook 代码
- * @param logFormat - 日志输出格式，默认 'compact'
+ * @param params - 参数对象 { logFormat? }
  * @returns 结构化结果对象
  */
 export async function hookJSEncrypt(
   frame: Frame,
-  logFormat?: LogFormat,
+  params?: { logFormat?: LogFormat },
 ): Promise<HookResult> {
-  const format = logFormat || 'compact';
+  const format = params?.logFormat || 'compact';
 
   const hookCode = `
 (function() {

@@ -416,8 +416,10 @@ export async function injectPreloadScript(
   }
 
   const ctx = getRuntime().contextProvider!;
-  const target =
-    ctx.getContext?.() ?? ctx.getSelectedPage?.() ?? null;
+  const context = ctx.getContext?.() ?? null;
+  const selectedPage = ctx.getSelectedPage?.() ?? null;
+  const target = context ?? selectedPage ?? null;
+
   if (!target?.addInitScript) {
     return {
       success: false,
@@ -426,7 +428,29 @@ export async function injectPreloadScript(
     };
   }
 
-  await target.addInitScript(script);
+  // Check if the target (page or context) has been closed
+  const isClosed =
+    ('isClosed' in target && typeof target.isClosed === 'function' && target.isClosed()) ||
+    (selectedPage && selectedPage.isClosed());
+
+  if (isClosed) {
+    return {
+      success: false,
+      message: '当前页面或浏览器上下文已关闭，无法注入预加载脚本',
+      tooltype: 'inject_preload_script',
+    };
+  }
+
+  try {
+    await target.addInitScript(script);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    return {
+      success: false,
+      message: `注入预加载脚本失败：${msg}`,
+      tooltype: 'inject_preload_script',
+    };
+  }
   return {
     success: true,
     message: 'Preload script registered for future documents',

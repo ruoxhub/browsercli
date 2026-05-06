@@ -9,12 +9,13 @@ import type {Frame} from '../../third_party/index.js';
 import type {HookResult} from './types.js';
 
 /**
- * 激活 Vue Devtools：强制启用 Vue.js 和 Pinia 开发者工具（支持 Vue 2/3 + Pinia，带重试机制）。
+ * 激活 Vue Devtools：强制启用 Vue.js 和 Pinia 开发者工具（支持 Vue 2/3 + Pinia）。
  *
  * @param frame - Puppeteer Frame 对象，用于注入 Hook 代码
+ * @param _params - 未使用参数（适配 ToolAdapter frame 模式签名）
  * @returns 结构化结果对象
  */
-export async function activateVueDevtools(frame: Frame): Promise<HookResult> {
+export async function activateVueDevtools(frame: Frame, _params?: Record<string, unknown>): Promise<HookResult> {
   const hookCode = `
 (function() {
   'use strict';
@@ -137,47 +138,13 @@ export async function activateVueDevtools(frame: Frame): Promise<HookResult> {
     return {success: false, reason: 'Vue instance not found'};
   }
 
-  // Retry with exponential backoff
-  function executeWithRetry(maxTries, baseDelay) {
-    let tries = 0;
-    let delay = baseDelay;
-
-    function attempt() {
-      tries++;
-      const result = crack();
-      if (result.success) return result;
-      if (tries < maxTries) {
-        // Sync sleep not available in page context, use timing approach
-        return null; // signal to retry
-      }
-      return result; // final failure
-    }
-
-    // First attempt
-    const firstResult = attempt();
-    if (firstResult) return firstResult;
-
-    // Retry loop
-    while (tries < maxTries) {
-      // Simple busy-wait approximation
-      const start = Date.now();
-      while (Date.now() - start < delay) { /* wait */ }
-      delay *= 2;
-
-      const retryResult = attempt();
-      if (retryResult) return retryResult;
-    }
-
-    return {success: false, reason: 'Vue instance not found after ' + maxTries + ' retries'};
-  }
-
-  // Main execution
+  // Main execution — single attempt, no busy-wait retry
   try {
     if (!window.__VUE_DEVTOOLS_GLOBAL_HOOK__) {
       return {success: false, error: 'Vue Devtools hook not found. Please install Vue Devtools extension.'};
     }
 
-    const result = executeWithRetry(5, 200);
+    const result = crack();
 
     if (result.success) {
       return {

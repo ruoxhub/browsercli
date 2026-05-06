@@ -115,24 +115,45 @@ export async function searchSiteExperience(
 export async function createSiteExperience(
   params: CreateParams,
 ): Promise<CreateResult> {
+  // 校验必填字段
+  if (!params.domain || typeof params.domain !== 'string' || !params.domain.trim()) {
+    return {
+      success: false,
+      message: '创建失败：domain 为必填字段，且不能为空字符串',
+      tooltype: 'create_site_experience',
+      result: null as unknown as Awaited<ReturnType<typeof siteExperienceService.create>>,
+    };
+  }
+  if (!params.name || typeof params.name !== 'string' || !params.name.trim()) {
+    return {
+      success: false,
+      message: '创建失败：name 为必填字段，且不能为空字符串',
+      tooltype: 'create_site_experience',
+      result: null as unknown as Awaited<ReturnType<typeof siteExperienceService.create>>,
+    };
+  }
+
   try {
-    const existing = await siteExperienceService.getByDomain(params.domain);
+    const existing = await siteExperienceService.getByDomain(params.domain.trim());
     if (existing) {
       return {
         success: false,
-        message: `域名 ${params.domain} 已存在（ID: ${existing.id}），请使用 update 更新`,
+        message: `域名 ${params.domain.trim()} 已存在（ID: ${existing.id}），请使用 update 更新`,
         tooltype: 'create_site_experience',
         result: existing,
       };
     }
 
+    // 确保 aliases 为数组
+    const aliases = Array.isArray(params.aliases) ? params.aliases : [];
+
     const result = await siteExperienceService.create({
-      domain: params.domain,
-      name: params.name,
-      aliases: params.aliases || [],
-      platformFeatures: params.platformFeatures || null,
-      validPatterns: params.validPatterns || null,
-      knownPitfalls: params.knownPitfalls || null,
+      domain: params.domain.trim(),
+      name: params.name.trim(),
+      aliases,
+      platformFeatures: params.platformFeatures ?? null,
+      validPatterns: params.validPatterns ?? null,
+      knownPitfalls: params.knownPitfalls ?? null,
     });
 
     return {

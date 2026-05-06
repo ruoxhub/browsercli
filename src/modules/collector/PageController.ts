@@ -747,19 +747,28 @@ export class PageController {
   async getLocalStorage(): Promise<Record<string, string>> {
     const page = await this.collector.getActivePage();
 
-    const storage = await page.evaluate(() => {
-      const items: Record<string, string> = {};
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key) {
-          items[key] = localStorage.getItem(key) || '';
+    try {
+      const storage = await page.evaluate(() => {
+        const items: Record<string, string> = {};
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key) {
+            items[key] = localStorage.getItem(key) || '';
+          }
         }
-      }
-      return items;
-    });
+        return items;
+      });
 
-    logger.info(`Retrieved ${Object.keys(storage).length} localStorage items`);
-    return storage;
+      logger.info(`Retrieved ${Object.keys(storage).length} localStorage items`);
+      return storage;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes('SecurityError') || msg.includes('Access is denied')) {
+        logger.warn(`localStorage access denied on current page: ${msg}`);
+        return {};
+      }
+      throw error;
+    }
   }
 
   /**
@@ -796,20 +805,29 @@ export class PageController {
    */
   async getSessionStorage(): Promise<Record<string, string>> {
     const page = await this.collector.getActivePage();
-    const storage = await page.evaluate(() => {
-      const items: Record<string, string> = {};
-      for (let i = 0; i < sessionStorage.length; i++) {
-        const key = sessionStorage.key(i);
-        if (key) {
-          items[key] = sessionStorage.getItem(key) || '';
+    try {
+      const storage = await page.evaluate(() => {
+        const items: Record<string, string> = {};
+        for (let i = 0; i < sessionStorage.length; i++) {
+          const key = sessionStorage.key(i);
+          if (key) {
+            items[key] = sessionStorage.getItem(key) || '';
+          }
         }
+        return items;
+      });
+      logger.info(
+        `Retrieved ${Object.keys(storage).length} sessionStorage items`,
+      );
+      return storage;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes('SecurityError') || msg.includes('Access is denied')) {
+        logger.warn(`sessionStorage access denied on current page: ${msg}`);
+        return {};
       }
-      return items;
-    });
-    logger.info(
-      `Retrieved ${Object.keys(storage).length} sessionStorage items`,
-    );
-    return storage;
+      throw error;
+    }
   }
 
   /**

@@ -12,18 +12,20 @@ import type {HookResult, VueGuard} from './types.js';
  * 清除 Vue Router 全局守卫：beforeEach、beforeResolve。
  *
  * @param frame - Puppeteer Frame 对象，用于注入 Hook 代码
- * @param guards - 要清除的守卫，默认全部
+ * @param params - 参数对象 { guards? }
  * @returns 结构化结果对象
  */
 export async function clearVueGuards(
   frame: Frame,
-  guards?: VueGuard[],
+  params?: { guards?: VueGuard[] },
 ): Promise<HookResult> {
-  const guardList = guards || ['all'];
+  const guardList = params?.guards || ['all'];
 
   const hookCode = `
 (function() {
   'use strict';
+
+  const guards = ${JSON.stringify(guardList)};
 
   function findRouter() {
     const rootElement = document.querySelector('[id="app"], [data-v-app]');

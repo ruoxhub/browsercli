@@ -147,6 +147,28 @@ const TOOL_PARAMS = {
     length: 256,
     format: 'hex',
   },
+
+  // ── 逆向工程/报告 ────────────────────────────────────
+  record_reverse_evidence: {
+    taskId: 'verify-test-task',
+    taskSlug: 'verify-test-slug',
+    targetUrl: 'https://example.com',
+    goal: 'verify tool works',
+    entry: { type: 'test-evidence', description: 'automated verification' },
+  },
+
+  export_rebuild_bundle: {
+    taskId: 'verify-test-task',
+    taskSlug: 'verify-test-slug',
+    targetUrl: 'https://example.com',
+    goal: 'verify tool works',
+    autoGenerate: true,
+  },
+
+  diff_env_requirements: {
+    runtimeError: 'ReferenceError: window is not defined',
+    observedCapabilities: ['window', 'document', 'localStorage'],
+  },
 };
 
 // ─── 参数解析 ───────────────────────────────────────────

@@ -369,7 +369,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './performance/startPerformanceTrace.js',
     handlerName: 'startPerformanceTrace',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'stop_performance_trace',
@@ -385,7 +385,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './performance/getPerformanceMetrics.js',
     handlerName: 'getPerformanceMetrics',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'performance_analyze_insight',
@@ -393,7 +393,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './performance/performanceAnalyzeInsight.js',
     handlerName: 'performanceAnalyzeInsight',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'set_breakpoint',
@@ -491,7 +491,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/getStorage.js',
     handlerName: 'getStorage',
-    callMode: 'context',
+    callMode: 'defineTool',
   },
   {
     name: 'break_on_xhr',
@@ -518,7 +518,7 @@ export const TOOLS_META: ToolMeta[] = [
     },
     modulePath: './debugger/monitorEvents.js',
     handlerName: 'monitorEvents',
-    callMode: 'context',
+    callMode: 'defineTool',
   },
   {
     name: 'stop_monitor',
@@ -528,7 +528,7 @@ export const TOOLS_META: ToolMeta[] = [
     },
     modulePath: './debugger/stopMonitor.js',
     handlerName: 'stopMonitor',
-    callMode: 'context',
+    callMode: 'defineTool',
   },
   {
     name: 'trace_function',
@@ -552,7 +552,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/inspectObject.js',
     handlerName: 'inspectObject',
-    callMode: 'context',
+    callMode: 'defineTool',
   },
   {
     name: 'list_hooks',
@@ -560,7 +560,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/listHooks.js',
     handlerName: 'listHooks',
-    callMode: 'context',
+    callMode: 'defineTool',
   },
   {
     name: 'find_in_script',
@@ -652,11 +652,17 @@ export const TOOLS_META: ToolMeta[] = [
   },
   {
     name: 'create_hook',
-    description: '创建 Hook',
-    schema: {},
-    modulePath: './hook/InjectHook.js',
-    handlerName: 'injectHook',
-    callMode: 'frame',
+    description: '创建 Hook 定义（不注入浏览器）',
+    schema: {
+      type: 'string',
+      params: 'object?',
+      description: 'string?',
+      action: 'string?',
+      hookId: 'string?',
+    },
+    modulePath: './hook/CreateHook.js',
+    handlerName: 'createHook',
+    callMode: 'defineTool',
   },
   {
     name: 'inject_hook',
@@ -664,7 +670,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './hook/InjectHook.js',
     handlerName: 'injectHook',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'get_hook_data',
@@ -679,15 +685,15 @@ export const TOOLS_META: ToolMeta[] = [
     },
     modulePath: './hook/GetHookData.js',
     handlerName: 'getHookData',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'remove_hook',
     description: '移除 Hook',
-    schema: {hookId: 'string'},
-    modulePath: './hook/RemoveHookBrowser.js',
-    handlerName: 'removeHookBrowser',
-    callMode: 'frame',
+    schema: {hookId: 'string', cleanBrowser: 'boolean?'},
+    modulePath: './hook/RemoveHook.js',
+    handlerName: 'removeHook',
+    callMode: 'defineTool',
   },
   {
     name: 'list_created_hooks',
@@ -695,13 +701,11 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {
       hookId: 'string?',
       verbose: 'boolean?',
-      type: 'string?',
-      event: 'string?',
-      phase: 'string?',
+      syncFromBrowser: 'boolean?',
     },
-    modulePath: './hook/SyncHookRecords.js',
-    handlerName: 'syncHookRecords',
-    callMode: 'frame',
+    modulePath: './hook/ListCreatedHooks.js',
+    handlerName: 'listCreatedHooks',
+    callMode: 'defineTool',
   },
   {
     name: 'handle_dialog',
@@ -853,16 +857,16 @@ export const TOOLS_META: ToolMeta[] = [
     description: '记录逆向证据',
     schema: {},
     modulePath: './analyzer/reports.js',
-    handlerName: 'recordReverseEvidence',
-    callMode: 'params-only',
+    handlerName: 'record_reverse_evidence',
+    callMode: 'defineTool',
   },
   {
     name: 'analyze_target',
     description: '分析目标',
     schema: {},
     modulePath: './analyzer/analyzeTarget.js',
-    handlerName: 'analyzeTarget',
-    callMode: 'params-only',
+    handlerName: 'analyze_target',
+    callMode: 'defineTool',
   },
   {
     name: 'risk_panel',
@@ -877,8 +881,8 @@ export const TOOLS_META: ToolMeta[] = [
     description: '导出会话报告',
     schema: {},
     modulePath: './analyzer/reports.js',
-    handlerName: 'exportSessionReport',
-    callMode: 'params-only',
+    handlerName: 'export_session_report',
+    callMode: 'defineTool',
   },
   {
     name: 'collect_code',
@@ -908,17 +912,17 @@ export const TOOLS_META: ToolMeta[] = [
     name: 'export_rebuild_bundle',
     description: '导出重建包',
     schema: {},
-    modulePath: './rebuild/rebuildFn.js',
+    modulePath: './rebuild/index.js',
     handlerName: 'exportRebuildBundle',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'diff_env_requirements',
     description: '差异环境需求',
     schema: {},
-    modulePath: './rebuild/rebuildFn.js',
+    modulePath: './rebuild/index.js',
     handlerName: 'diffEnvRequirements',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'anti_anti_debug',
@@ -1102,7 +1106,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './hook/ConsoleLog.js',
     handlerName: 'hookConsoleLog',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'hook_console_table',
@@ -1110,7 +1114,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './hook/ConsoleTable.js',
     handlerName: 'hookConsoleTable',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'hook_location_href',
@@ -1118,7 +1122,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './hook/LocationHref.js',
     handlerName: 'hookLocationHref',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'hook_cookie',
@@ -1126,7 +1130,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './hook/Cookie.js',
     handlerName: 'hookCookie',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'hook_xhr_open',
@@ -1134,7 +1138,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './hook/XhrOpen.js',
     handlerName: 'hookXhrOpen',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'hook_xhr_set_request_header',
@@ -1142,7 +1146,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './hook/XhrSetRequestHeader.js',
     handlerName: 'hookXhrSetRequestHeader',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'hook_fetch',
@@ -1150,7 +1154,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './hook/Fetch.js',
     handlerName: 'hookFetch',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'hook_json_parse',
@@ -1158,7 +1162,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './hook/JsonParse.js',
     handlerName: 'hookJsonParse',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'hook_json_stringify',
@@ -1166,7 +1170,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './hook/JsonStringify.js',
     handlerName: 'hookJsonStringify',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'hook_promise',
@@ -1174,7 +1178,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './hook/Promise.js',
     handlerName: 'hookPromise',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'hook_random',
@@ -1182,7 +1186,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './hook/Random.js',
     handlerName: 'hookRandom',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'hook_local_storage',
@@ -1190,7 +1194,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './hook/LocalStorage.js',
     handlerName: 'hookLocalStorage',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'hook_session_storage',
@@ -1198,7 +1202,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './hook/SessionStorage.js',
     handlerName: 'hookSessionStorage',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'anti_anti_hook',
@@ -1206,7 +1210,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './hook/antiAntiHook.js',
     handlerName: 'antiAntiHook',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'hook_websocket',
@@ -1214,7 +1218,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './hook/WebSocket.js',
     handlerName: 'hookWebSocket',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'hook_history',
@@ -1222,7 +1226,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './hook/History.js',
     handlerName: 'hookHistory',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'hook_performance_now',
@@ -1230,7 +1234,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './hook/PerformanceNow.js',
     handlerName: 'hookPerformanceNow',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'hook_date_now',
@@ -1238,7 +1242,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './hook/DateNow.js',
     handlerName: 'hookDateNow',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'fixed_window_size',
@@ -1246,7 +1250,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './hook/fixedWindowSize.js',
     handlerName: 'fixedWindowSize',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'hook_console_protect',
@@ -1254,7 +1258,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './hook/ConsoleProtect.js',
     handlerName: 'hookConsoleProtect',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'hook_close',
@@ -1262,7 +1266,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './hook/Close.js',
     handlerName: 'hookClose',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'hook_console_clear',
@@ -1270,7 +1274,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './hook/ConsoleClear.js',
     handlerName: 'hookConsoleClear',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'hook_history_go',
@@ -1278,7 +1282,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './hook/HistoryGo.js',
     handlerName: 'hookHistoryGo',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'deobfuscate_code_vj',
@@ -1359,6 +1363,58 @@ export const TOOLS_META: ToolMeta[] = [
     modulePath: './input/fill.js',
     handlerName: 'fill',
     callMode: 'frame',
+  },
+  {
+    name: 'list_websocket_connections',
+    description: '列出 WebSocket 连接；获取 wsid 后先用 analyze_websocket_messages 分析消息模式',
+    schema: {
+      pageSize: 'number',
+      pageIdx: 'number',
+      urlFilter: 'string',
+      includePreservedConnections: 'boolean',
+    },
+    modulePath: './websocket/listConnections.js',
+    handlerName: 'listWebSocketConnections',
+    callMode: 'defineTool',
+  },
+  {
+    name: 'get_websocket_messages',
+    description:
+      '获取 WebSocket 消息列表；对二进制/protobuf 消息先调用 analyze_websocket_messages，再用 groupId 过滤',
+    schema: {
+      wsid: 'number',
+      direction: 'string',
+      groupId: 'string',
+      pageSize: 'number',
+      pageIdx: 'number',
+      show_content: 'boolean',
+    },
+    modulePath: './websocket/getMessages.js',
+    handlerName: 'getWebSocketMessages',
+    callMode: 'defineTool',
+  },
+  {
+    name: 'get_websocket_message',
+    description: '获取 WebSocket 单帧详情',
+    schema: {
+      wsid: 'number',
+      frameIndex: 'number',
+    },
+    modulePath: './websocket/getMessage.js',
+    handlerName: 'getWebSocketMessage',
+    callMode: 'defineTool',
+  },
+  {
+    name: 'analyze_websocket_messages',
+    description:
+      '分析 WebSocket 消息模式并分组；对二进制/protobuf 消息（如直播流）特别有用，返回每种消息类型的统计和采样索引',
+    schema: {
+      wsid: 'number',
+      direction: 'string',
+    },
+    modulePath: './websocket/analyzeMessages.js',
+    handlerName: 'analyzeWebSocketMessages',
+    callMode: 'defineTool',
   },
 ];
 

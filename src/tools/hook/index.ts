@@ -32,9 +32,12 @@ export {antiAntiHook} from './antiAntiHook.js';
 
 // ─── Hook 管理工具（defineTool 格式）───────────────────
 
+export {createHook} from './CreateHook.js';
 export {injectHook} from './InjectHook.js';
 export {syncHookRecords} from './SyncHookRecords.js';
 export {getHookData} from './GetHookData.js';
+export {removeHook} from './RemoveHook.js';
+export {listCreatedHooks} from './ListCreatedHooks.js';
 export {removeHookBrowser} from './RemoveHookBrowser.js';
 
 // ─── 工具函数导出 ──────────────────────────────────────

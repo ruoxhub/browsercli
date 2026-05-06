@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {defineTool, type Context} from '../ToolDefinition.js';
 import {zod} from '../../third_party/index.js';
+import {getRuntime} from '../../runtime.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
 import {ToolCategory} from '../categories.js';
 
 import {
@@ -30,12 +31,14 @@ interface HookDiagnostic {
 }
 
 /**
- * 从浏览器端获取 Hook 采集的数据。
+ * 从浏览器端获取 Hook 采集的数据，先同步到 HookManager 再读取。
+ *
+ * 参考 old-source/src/tools/hook.ts 的 getHookData。
  */
 export const getHookData = defineTool({
   name: 'get_hook_data',
   description:
-    'Get captured hook data from the browser. Supports raw, summary, and detail views with filtering.',
+    'Get captured hook data. Syncs from browser to HookManager first, then returns data. Supports raw, summary, and detail views with filtering.',
   annotations: {
     title: 'Get Hook Data',
     category: ToolCategory.REVERSE_ENGINEERING,
@@ -64,10 +67,35 @@ export const getHookData = defineTool({
   },
   handler: async (request, response, context) => {
     const {hookId, view, maxRecords, type, event, phase} = request.params;
-    const frame = (context as Context).getSelectedFrame();
+    const runtime = getRuntime();
 
     try {
-      const storeSnapshot = await readHookStore(frame, hookId);
+      // 1. 先从浏览器同步数据到 HookManager（参考 old-source 的 syncHookRecordsFromPage）
+      let storeSnapshot: Record<string, unknown[]> = {};
+      try {
+        const frame = (context as Context).getSelectedFrame();
+        const browserData = await readHookStore(frame, hookId);
+
+        // 同步到 HookManager
+        for (const [id, records] of Object.entries(browserData)) {
+          runtime.hookManager.clearRecords(id);
+          for (const record of toHookRecordArray(records)) {
+            runtime.hookManager.addRecord(id, {
+              hookId: id,
+              timestamp: typeof record.timestamp === 'number' ? record.timestamp : Date.now(),
+              ...record,
+            });
+          }
+        }
+        storeSnapshot = browserData;
+      } catch {
+        // 浏览器不可用，从 HookManager 读取已有数据
+        const allIds = hookId ? [hookId] : runtime.hookManager.getAllKnownHookIds();
+        for (const id of allIds) {
+          storeSnapshot[id] = runtime.hookManager.getRecords(id);
+        }
+      }
+
       const filters = {type, event, phase, preserveEmpty: Boolean(hookId)};
       const data =
         view === 'summary'

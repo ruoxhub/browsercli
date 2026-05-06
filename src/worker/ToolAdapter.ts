@@ -13,6 +13,8 @@
  * 通过 tools-meta.ts 中的 ToolMeta 动态加载 handler，适配为 Action
  */
 
+import type {Frame} from 'patchright';
+
 import type {ToolMeta} from '../cli/tools-meta.js';
 import {getAllToolNames, getToolMeta} from '../cli/tools-meta.js';
 import type {Context, Response, ToolDefinition} from '../tools/ToolDefinition.js';
@@ -24,6 +26,41 @@ import type {ToolContextProvider} from './ToolContextProvider.js';
 import {ToolResponseAccumulator} from './ToolResponseAccumulator.js';
 
 type LoadedHandler = ((...args: unknown[]) => Promise<unknown>) | ToolDefinition;
+
+/**
+ * frame.evaluate() 的默认超时时间（毫秒）。
+ * 当调试器暂停时，evaluate 会无限等待，因此必须手动超时。
+ */
+const FRAME_EVALUATE_TIMEOUT = 10_000;
+
+/**
+ * 为 Frame 对象创建代理，给 evaluate() 方法添加超时保护。
+ * 当调试器暂停时，frame.evaluate() 会无限等待导致 Sekiro 超时。
+ * 通过 Promise.race 限制单次 evaluate 的最长等待时间。
+ */
+function wrapFrameWithTimeout(frame: Frame, timeoutMs: number = FRAME_EVALUATE_TIMEOUT): Frame {
+  return new Proxy(frame, {
+    get(target, prop, receiver) {
+      const value = Reflect.get(target, prop, receiver);
+      if (prop === 'evaluate') {
+        return function evaluateWithTimeout(this: unknown, ...args: unknown[]) {
+          const evalPromise = (value as Function).apply(target, args);
+          const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error(`frame.evaluate() 超时 (${timeoutMs}ms)，可能调试器已暂停`)),
+              timeoutMs,
+            ),
+          );
+          return Promise.race([evalPromise, timeoutPromise]);
+        };
+      }
+      if (typeof value === 'function') {
+        return value.bind(target);
+      }
+      return value;
+    },
+  });
+}
 
 export class ToolAdapter {
   private contextProvider: ToolContextProvider;
@@ -61,12 +98,12 @@ export class ToolAdapter {
       },
       selectPage: (page) => provider.selectPage(page),
       getSelectedFrame: () => {
-        const frame = provider.getSelectedFrame();
+        const frame = provider.getSelectedFrame()
+          ?? provider.getSelectedPage()?.mainFrame();
         if (!frame) {
-          const page = provider.getSelectedPage();
-          return page?.mainFrame()!;
+          throw new Error('没有可用的 Frame，可能页面未选中或已关闭');
         }
-        return frame;
+        return wrapFrameWithTimeout(frame);
       },
       selectFrame: (frame) => provider.setSelectedFrame(frame),
       resetSelectedFrame: () => provider.setSelectedFrame(null),
@@ -138,6 +175,17 @@ export class ToolAdapter {
   }
 
   /**
+   * 为 frame 模式的调用获取带超时保护的 Frame
+   */
+  private getFrameForTool(toolName: string): Frame | null {
+    const frame = this.contextProvider.getSelectedFrame()
+      ?? this.contextProvider.getSelectedPage()?.mainFrame()
+      ?? null;
+    if (!frame) return null;
+    return wrapFrameWithTimeout(frame);
+  }
+
+  /**
    * 将 Tool handler 包装为 Sekiro ActionHandler
    */
   wrapTool(meta: ToolMeta): ActionHandler {
@@ -176,14 +224,11 @@ export class ToolAdapter {
         }
 
         // ── 传统函数模式 ────────────────────────────────────
-        const page = this.contextProvider.getSelectedPage();
         const callMode = meta.callMode;
 
         let result: unknown;
         if (callMode === 'frame') {
-          const frame = this.contextProvider.getSelectedFrame()
-            ?? page?.mainFrame()
-            ?? null;
+          const frame = this.getFrameForTool(toolName);
           if (frame) {
             result = await handler(frame, params);
           } else {

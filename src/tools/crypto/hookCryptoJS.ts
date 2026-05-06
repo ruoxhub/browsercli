@@ -16,17 +16,15 @@ import type {
  * Hook CryptoJS 加密库：AES、DES、MD5、SHA、HMAC 等对称/哈希算法。
  *
  * @param frame - Puppeteer Frame 对象，用于注入 Hook 代码
- * @param algorithms - 要 Hook 的算法，默认 ['all']
- * @param logFormat - 日志输出格式，默认 'compact'
+ * @param params - 参数对象 { algorithms?, logFormat? }
  * @returns 结构化结果对象
  */
 export async function hookCryptoJS(
   frame: Frame,
-  algorithms?: CryptoJSAlgorithm[],
-  logFormat?: LogFormat,
+  params?: { algorithms?: CryptoJSAlgorithm[]; logFormat?: LogFormat },
 ): Promise<HookResult> {
-  const algos = algorithms || ['all'];
-  const format = logFormat || 'compact';
+  const algos = params?.algorithms || ['all'];
+  const format = params?.logFormat || 'compact';
 
   const hookCode = `
 (function() {

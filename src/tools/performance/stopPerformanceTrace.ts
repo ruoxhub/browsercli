@@ -26,7 +26,17 @@ import {getRuntime} from '../../runtime.js';
  * @returns 结构化结果 { success, message, tooltype, logFormat, data }
  */
 export async function stopPerformanceTrace(): Promise<StopPerformanceTraceResult> {
-  if (!getRuntime().contextProvider!.isRunningPerformanceTrace()) {
+  const contextProvider = getRuntime().contextProvider;
+  if (!contextProvider) {
+    return {
+      success: false,
+      message: '上下文提供器未初始化。',
+      tooltype: 'stop_performance_trace',
+      logFormat: 'text',
+    };
+  }
+
+  if (!contextProvider.isRunningPerformanceTrace()) {
     return {
       success: false,
       message: '当前没有正在运行的性能追踪。',
@@ -38,36 +48,45 @@ export async function stopPerformanceTrace(): Promise<StopPerformanceTraceResult
   const data: StopPerformanceTraceData = {};
 
   try {
-    const page = await getRuntime().contextProvider!.getActivePage();
-
-    // Playwright: use CDP to stop tracing and collect data
+    const page = await contextProvider.getActivePage();
     const client = await page.context().newCDPSession(page);
 
-    // Collect trace data via CDP events
     const traceChunks: string[] = [];
-    const dataHandler = (event: {value: string}) => {
-      traceChunks.push(event.value);
+    const eventHandler = (data: {method: string; params?: Record<string, unknown>}) => {
+      if (data.method === 'Tracing.dataCollected' && data.params) {
+        traceChunks.push((data.params as {value: string}).value);
+      }
     };
-    client.on('Tracing.tracingComplete', () => {});
-    client.on('Tracing.dataCollected', dataHandler as any);
+    client.on('event', eventHandler);
 
     await client.send('Tracing.end');
 
-    // Wait for tracingComplete event
+    // Wait for tracingComplete with timeout
     await new Promise<void>(resolve => {
-      client.on('Tracing.tracingComplete', () => resolve());
-      // Timeout fallback
-      setTimeout(resolve, 5000);
+      const timeout = setTimeout(resolve, 10_000);
+      const completeHandler = (data: {method: string}) => {
+        if (data.method === 'Tracing.tracingComplete') {
+          clearTimeout(timeout);
+          client.off('event', completeHandler);
+          resolve();
+        }
+      };
+      client.on('event', completeHandler);
     });
 
-    client.off('Tracing.dataCollected', dataHandler as any);
+    client.off('event', eventHandler);
+
+    try {
+      await client.detach();
+    } catch {
+      // Ignore cleanup errors when the session is already gone
+    }
 
     const traceEventsBuffer = Buffer.from(traceChunks.join(''));
-
     const result = await parseRawTraceBuffer(traceEventsBuffer);
 
     if (traceResultIsSuccess(result)) {
-      getRuntime().contextProvider!.storeTraceRecording(result);
+      contextProvider.storeTraceRecording(result);
       const traceSummaryText = await getTraceSummary(result);
       data.traceSummary = traceSummaryText;
 
@@ -99,6 +118,6 @@ export async function stopPerformanceTrace(): Promise<StopPerformanceTraceResult
       data,
     };
   } finally {
-    getRuntime().contextProvider!.setIsRunningPerformanceTrace(false);
+    contextProvider.setIsRunningPerformanceTrace(false);
   }
 }

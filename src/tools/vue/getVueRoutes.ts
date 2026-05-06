@@ -14,17 +14,15 @@ import type {HookResult} from './types.js';
  * 获取 Vue Router 路由表：已加载的路由配置信息。
  *
  * @param frame - Puppeteer Frame 对象，用于注入 Hook 代码
- * @param includeChildren - 是否包含子路由，默认 true
- * @param maxDepth - 最大递归深度，默认 3
+ * @param params - 参数对象 { includeChildren?, maxDepth? }
  * @returns 结构化结果对象
  */
 export async function getVueRoutes(
   frame: Frame,
-  includeChildren?: boolean,
-  maxDepth?: number,
+  params?: { includeChildren?: boolean; maxDepth?: number },
 ): Promise<HookResult> {
-  const withChildren = includeChildren ?? true;
-  const depth = maxDepth ?? 3;
+  const withChildren = params?.includeChildren ?? true;
+  const depth = params?.maxDepth ?? 3;
 
   const getCode = `
 (function() {
