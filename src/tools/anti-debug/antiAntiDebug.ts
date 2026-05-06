@@ -4,37 +4,67 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Frame} from '../../third_party/index.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
 
-import type {HookResult, AntiAntiDebugFeature} from './types.js';
+import type {AntiAntiDebugFeature} from './types.js';
+
+const antiAntiDebugFeatureSchema = zod.enum([
+  'fixedWindowSize',
+  'fixedTime',
+  'preventClose',
+  'preventHistoryBack',
+  'preventConsoleClear',
+  'hideWebdriver',
+]);
 
 /**
  * 反反调试工具集：窗口尺寸/时间函数/页面关闭/历史跳转/控制台清除。
- *
- * @param frame - Puppeteer Frame 对象，用于注入 Hook 代码
- * @param features - 要启用的功能列表
- * @returns 结构化结果对象
  */
-export async function antiAntiDebug(
-  frame: Frame,
-  features: AntiAntiDebugFeature[],
-): Promise<HookResult> {
-  const safeFeatures = Array.isArray(features) ? features : [];
+export const antiAntiDebug = defineTool({
+  name: 'anti_anti_debug',
+  description:
+    'Anti-anti-debug toolkit: fix window size, freeze time, block page close, block history navigation, block console clear, hide webdriver flag.',
+  annotations: {
+    title: 'Anti Anti-Debug',
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: false,
+  },
+  schema: {
+    features: zod
+      .array(antiAntiDebugFeatureSchema)
+      .min(1)
+      .describe(
+        'Features to enable. Options: fixedWindowSize, fixedTime, preventClose, preventHistoryBack, preventConsoleClear, hideWebdriver',
+      ),
+  },
+  handler: async (request, response, context) => {
+    const {features} = request.params;
+    const safeFeatures: AntiAntiDebugFeature[] = Array.isArray(features)
+      ? features
+      : [];
 
-  if (safeFeatures.length === 0) {
-    return {
-      success: false,
-      message: 'anti_anti_debug requires a non-empty "features" array (e.g. ["fixedWindowSize", "hideWebdriver"])',
-      tooltype: 'anti_anti_debug',
-    };
-  }
+    if (safeFeatures.length === 0) {
+      const result = {
+        success: false,
+        message:
+          'anti_anti_debug requires a non-empty "features" array (e.g. ["fixedWindowSize", "hideWebdriver"])',
+        tooltype: 'anti_anti_debug',
+      };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+      return;
+    }
 
-  const hookCodes: string[] = [];
-  const installedFeatures: string[] = [];
+    const frame = (context as Context).getSelectedFrame();
+    const hookCodes: string[] = [];
+    const installedFeatures: string[] = [];
 
-  // Fixed Window Size
-  if (safeFeatures.includes('fixedWindowSize')) {
-    hookCodes.push(`
+    // Fixed Window Size
+    if (safeFeatures.includes('fixedWindowSize')) {
+      hookCodes.push(`
 (function() {
   'use strict';
   Object.defineProperties(window, {
@@ -46,12 +76,12 @@ export async function antiAntiDebug(
   console.log('[anti_anti_debug] ✅ Fixed window size');
 })();
 `);
-    installedFeatures.push('fixedWindowSize');
-  }
+      installedFeatures.push('fixedWindowSize');
+    }
 
-  // Fixed Time
-  if (safeFeatures.includes('fixedTime')) {
-    hookCodes.push(`
+    // Fixed Time
+    if (safeFeatures.includes('fixedTime')) {
+      hookCodes.push(`
 (function() {
   'use strict';
   const originalDateNow = Date.now;
@@ -66,12 +96,12 @@ export async function antiAntiDebug(
   }
 })();
 `);
-    installedFeatures.push('fixedTime');
-  }
+      installedFeatures.push('fixedTime');
+    }
 
-  // Prevent Close
-  if (safeFeatures.includes('preventClose')) {
-    hookCodes.push(`
+    // Prevent Close
+    if (safeFeatures.includes('preventClose')) {
+      hookCodes.push(`
 (function() {
   'use strict';
   window.close = function() {
@@ -80,12 +110,12 @@ export async function antiAntiDebug(
   console.log('[anti_anti_debug] ✅ Blocked window.close');
 })();
 `);
-    installedFeatures.push('preventClose');
-  }
+      installedFeatures.push('preventClose');
+    }
 
-  // Prevent History Back
-  if (safeFeatures.includes('preventHistoryBack')) {
-    hookCodes.push(`
+    // Prevent History Back
+    if (safeFeatures.includes('preventHistoryBack')) {
+      hookCodes.push(`
 (function() {
   'use strict';
   const originalHistory = window.history;
@@ -101,12 +131,12 @@ export async function antiAntiDebug(
   console.log('[anti_anti_debug] ✅ Blocked history navigation');
 })();
 `);
-    installedFeatures.push('preventHistoryBack');
-  }
+      installedFeatures.push('preventHistoryBack');
+    }
 
-  // Prevent Console Clear
-  if (safeFeatures.includes('preventConsoleClear')) {
-    hookCodes.push(`
+    // Prevent Console Clear
+    if (safeFeatures.includes('preventConsoleClear')) {
+      hookCodes.push(`
 (function() {
   'use strict';
   const origClear = console.clear;
@@ -116,12 +146,12 @@ export async function antiAntiDebug(
   console.log('[anti_anti_debug] ✅ Blocked console.clear');
 })();
 `);
-    installedFeatures.push('preventConsoleClear');
-  }
+      installedFeatures.push('preventConsoleClear');
+    }
 
-  // Hide Webdriver
-  if (safeFeatures.includes('hideWebdriver')) {
-    hookCodes.push(`
+    // Hide Webdriver
+    if (safeFeatures.includes('hideWebdriver')) {
+      hookCodes.push(`
 (function() {
   'use strict';
   if (navigator.webdriver !== undefined) {
@@ -133,24 +163,31 @@ export async function antiAntiDebug(
   }
 })();
 `);
-    installedFeatures.push('hideWebdriver');
-  }
+      installedFeatures.push('hideWebdriver');
+    }
 
-  // Combine all hooks
-  const combinedCode = hookCodes.join('\n');
+    // Combine all hooks
+    const combinedCode = hookCodes.join('\n');
 
-  try {
-    await frame.evaluate(combinedCode);
-    return {
-      success: true,
-      message: `Anti-Anti-Debug 已安装，启用功能：${installedFeatures.length}`,
-      tooltype: 'anti_anti_debug',
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `错误：${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'anti_anti_debug',
-    };
-  }
-}
+    try {
+      await frame.evaluate(combinedCode);
+      const result = {
+        success: true,
+        message: `Anti-Anti-Debug 已安装，启用功能：${installedFeatures.join(', ')}（共 ${installedFeatures.length} 项）`,
+        tooltype: 'anti_anti_debug',
+      };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    } catch (error) {
+      const result = {
+        success: false,
+        message: `错误：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'anti_anti_debug',
+      };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    }
+  },
+});
