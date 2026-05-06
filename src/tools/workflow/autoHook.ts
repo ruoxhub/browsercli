@@ -4,8 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {zod} from '../../third_party/index.js';
 import {getRuntime} from '../../runtime.js';
 import {logger} from '../../utils/logger.js';
+import {ToolCategory} from '../categories.js';
+import {defineTool, type Context, type Response} from '../ToolDefinition.js';
 
 /**
  * 自动 Hook 工具配置
