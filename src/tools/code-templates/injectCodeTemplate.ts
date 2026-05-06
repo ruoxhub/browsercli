@@ -4,54 +4,80 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Frame} from '../../third_party/index.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
 
 import {CODE_TEMPLATES, TEMPLATES_DIR} from './templates.js';
-import type {CodeTemplateName, InjectCodeTemplateResult} from './types.js';
+import type {CodeTemplateName} from './types.js';
+
+const codeTemplateNameSchema = zod
+  .enum(
+    Object.keys(CODE_TEMPLATES) as [CodeTemplateName, ...CodeTemplateName[]],
+  )
+  .describe(
+    `Template name to inject. Available: ${Object.keys(CODE_TEMPLATES).join(', ')}`,
+  );
 
 /**
- * 将代码模板注入到浏览器页面中执行（依赖 Puppeteer Frame）。
- *
- * 先读取模板文件，再通过 frame.evaluate 注入执行。
- *
- * @param frame - Puppeteer Frame 对象
- * @param templateName - 模板名称 key
- * @returns 结构化结果对象
+ * 将代码模板注入到浏览器页面中执行。
  */
-export async function injectCodeTemplate(
-  frame: Frame,
-  templateName: CodeTemplateName,
-): Promise<InjectCodeTemplateResult> {
-  const templateInfo = CODE_TEMPLATES[templateName];
+export const injectCodeTemplate = defineTool({
+  name: 'inject_code_template',
+  description:
+    'Inject a code template into the browser page for execution via frame.evaluate.',
+  annotations: {
+    title: 'Inject Code Template',
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: false,
+  },
+  schema: {
+    templateName: codeTemplateNameSchema,
+  },
+  handler: async (request, response, context) => {
+    const {templateName} = request.params;
+    const templateInfo = CODE_TEMPLATES[templateName];
+    const frame = (context as Context).getSelectedFrame();
 
-  if (!templateInfo) {
-    return {
-      success: false,
-      message: `未找到模板 "${templateName}"`,
-      tooltype: 'inject_code_template',
-      name: templateName,
-    };
-  }
+    if (!templateInfo) {
+      const result = {
+        success: false,
+        message: `未找到模板 "${templateName}"`,
+        tooltype: 'inject_code_template',
+        name: templateName,
+      };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+      return;
+    }
 
-  try {
-    const fs = await import('node:fs/promises');
-    const templatePath = `${TEMPLATES_DIR}/${templateInfo.file}.js`;
-    const code = await fs.readFile(templatePath, 'utf-8');
+    try {
+      const fs = await import('node:fs/promises');
+      const templatePath = `${TEMPLATES_DIR}/${templateInfo.file}.js`;
+      const code = await fs.readFile(templatePath, 'utf-8');
 
-    await frame.evaluate(code);
+      await frame.evaluate(code);
 
-    return {
-      success: true,
-      message: `已注入模板：${templateInfo.name}`,
-      tooltype: 'inject_code_template',
-      name: templateName,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `注入模板失败：${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'inject_code_template',
-      name: templateName,
-    };
-  }
-}
+      const result = {
+        success: true,
+        message: `已注入模板：${templateInfo.name}`,
+        tooltype: 'inject_code_template',
+        name: templateName,
+      };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    } catch (error) {
+      const result = {
+        success: false,
+        message: `注入模板失败：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'inject_code_template',
+        name: templateName,
+      };
+      response.appendResponseLine('```json');
+      response.appendResponseLine(JSON.stringify(result, null, 2));
+      response.appendResponseLine('```');
+    }
+  },
+});

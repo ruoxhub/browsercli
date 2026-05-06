@@ -4,54 +4,66 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Frame} from './types.js';
-import type {EmulateCpuParams, EmulateCpuResult} from './types.js';
+import {zod} from '../../third_party/index.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
+import {ToolCategory} from '../categories.js';
 
 /**
  * 模拟 CPU 节流（降频）。
- *
- * 通过 CDP Performance.setCPUThrottlingRate 在 Playwright Frame 对应的 Page 上设置 CPU 降频倍率，
- * 用于检测竞态条件和时序相关问题。
- *
- * @param frame - Playwright Frame 对象，用于获取 Page 并设置 CPU 节流
- * @param params - CPU 节流参数
- * @returns 结构化结果对象
  */
-export async function emulateCpu(
-  frame: Frame,
-  params: EmulateCpuParams,
-): Promise<EmulateCpuResult> {
-  const {throttlingRate} = params;
-  const tooltype = 'emulate_cpu';
-  const page = frame.page();
+export const emulateCpu = defineTool({
+  name: 'emulate_cpu',
+  description: 'Emulate CPU throttling via CDP Performance.setCPUThrottlingRate',
+  annotations: {category: ToolCategory.EMULATION, readOnlyHint: false},
+  schema: {
+    throttlingRate: zod
+      .number()
+      .min(1)
+      .max(20)
+      .describe('CPU throttling rate (1-20x)'),
+  },
+  handler: async (request, response, context) => {
+    const {throttlingRate} = request.params;
+    const tooltype = 'emulate_cpu';
+    const frame = context.getSelectedFrame();
+    const page = frame.page();
 
-  if (throttlingRate < 1 || throttlingRate > 20) {
-    return {
-      success: false,
-      message: 'CPU 降频倍率必须在 1-20 之间',
-      tooltype,
-    };
-  }
-
-  try {
-    const client = await page.context().newCDPSession(page);
-    await client.send('Performance.enable');
-    // Type assertion: Performance.setCPUThrottlingRate is a valid CDP command
-    await (client.send as (method: string, params?: Record<string, unknown>) => Promise<Record<string, unknown>>)(
-      'Performance.setCPUThrottlingRate',
-      {rate: throttlingRate},
-    );
-    return {
-      success: true,
-      message: `CPU 降频已设置为 ${throttlingRate}x`,
-      tooltype,
-      logFormat: 'simple',
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `CPU 降频设置失败：${error instanceof Error ? error.message : String(error)}`,
-      tooltype,
-    };
-  }
-}
+    try {
+      const client = await page.context().newCDPSession(page);
+      await client.send('Performance.enable');
+      await (client.send as (
+        method: string,
+        params?: Record<string, unknown>,
+      ) => Promise<Record<string, unknown>>)('Performance.setCPUThrottlingRate', {
+        rate: throttlingRate,
+      });
+      response.appendResponseLine('```json');
+      response.appendResponseLine(
+        JSON.stringify(
+          {
+            success: true,
+            message: `CPU 降频已设置为 ${throttlingRate}x`,
+            tooltype,
+          },
+          null,
+          2,
+        ),
+      );
+      response.appendResponseLine('```');
+    } catch (error) {
+      response.appendResponseLine('```json');
+      response.appendResponseLine(
+        JSON.stringify(
+          {
+            success: false,
+            message: `CPU 降频设置失败：${error instanceof Error ? error.message : String(error)}`,
+            tooltype,
+          },
+          null,
+          2,
+        ),
+      );
+      response.appendResponseLine('```');
+    }
+  },
+});

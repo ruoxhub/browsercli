@@ -4,48 +4,55 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {getRuntime} from '../../runtime.js';
-
-import type {
-  ClickElementParams,
-  ClickElementResult,
-} from './types.js';
+import {zod} from '../../third_party/index.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
+import {ToolCategory} from '../categories.js';
 
 /**
- * 点击页面元素（纯函数版本）。
- *
- * 通过 CSS 选择器定位元素并点击。
- *
- * @param params - 点击参数（selector）
- * @returns 结构化结果 { success, message, tooltype, logFormat, data }
+ * 点击页面元素。
  */
-export async function clickElement(
-  params: ClickElementParams,
-): Promise<ClickElementResult> {
-  try {
-    const page = await getRuntime().contextProvider!.getActivePage();
-    await page.click(params.selector);
+export const clickElement = defineTool({
+  name: 'click_element',
+  description: 'Click on an element by CSS selector',
+  annotations: {category: ToolCategory.INPUT, readOnlyHint: false},
+  schema: {
+    selector: zod.string().describe('CSS selector of the element to click'),
+  },
+  handler: async (request, response, context) => {
+    const {selector} = request.params;
+    try {
+      const page = context.getSelectedPage();
+      await page.click(selector);
 
-    return {
-      success: true,
-      message: `元素已点击: ${params.selector}`,
-      tooltype: 'click_element',
-      logFormat: 'json',
-      data: {
-        selector: params.selector,
-        clicked: true,
-      },
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `点击元素失败: ${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'click_element',
-      logFormat: 'json',
-      data: {
-        selector: params.selector,
-        clicked: false,
-      },
-    };
-  }
-}
+      response.appendResponseLine('```json');
+      response.appendResponseLine(
+        JSON.stringify(
+          {
+            success: true,
+            message: `元素已点击: ${selector}`,
+            tooltype: 'click_element',
+            data: {selector, clicked: true},
+          },
+          null,
+          2,
+        ),
+      );
+      response.appendResponseLine('```');
+    } catch (error) {
+      response.appendResponseLine('```json');
+      response.appendResponseLine(
+        JSON.stringify(
+          {
+            success: false,
+            message: `点击元素失败: ${error instanceof Error ? error.message : String(error)}`,
+            tooltype: 'click_element',
+            data: {selector, clicked: false},
+          },
+          null,
+          2,
+        ),
+      );
+      response.appendResponseLine('```');
+    }
+  },
+});

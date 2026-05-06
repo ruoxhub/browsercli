@@ -4,24 +4,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Frame} from '../../third_party/index.js';
-
-import type {HookResult, LogFormat} from './types.js';
+import {zod} from '../../third_party/index.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
+import {ToolCategory} from '../categories.js';
 
 /**
  * Hook JSEncrypt RSA 加密库：公钥/私钥、原始数据、密文。
- *
- * @param frame - Puppeteer Frame 对象，用于注入 Hook 代码
- * @param params - 参数对象 { logFormat? }
- * @returns 结构化结果对象
  */
-export async function hookJSEncrypt(
-  frame: Frame,
-  params?: { logFormat?: LogFormat },
-): Promise<HookResult> {
-  const format = params?.logFormat || 'compact';
+export const hookJSEncrypt = defineTool({
+  name: 'hook_jsencrypt',
+  description: 'Hook JSEncrypt RSA library: intercept public/private key, plaintext, ciphertext',
+  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: false},
+  schema: {
+    logFormat: zod
+      .enum(['compact', 'json'])
+      .optional()
+      .describe('Log output format (default: "compact")'),
+  },
+  handler: async (request, response, context) => {
+    const format = request.params.logFormat || 'compact';
+    const frame = context.getSelectedFrame();
 
-  const hookCode = `
+    const hookCode = `
 (function() {
   'use strict';
 
@@ -36,13 +40,11 @@ export async function hookJSEncrypt(
     }
   }
 
-  // Check if JSEncrypt exists
   if (typeof window.JSEncrypt === 'undefined') {
     console.log('[' + hookId + '] ⚠️ JSEncrypt not found on this page');
     return;
   }
 
-  // Hook JSEncrypt.prototype.encrypt
   const originalEncrypt = window.JSEncrypt.prototype.encrypt;
   window.JSEncrypt.prototype.encrypt = function(plaintext) {
     const result = originalEncrypt.call(this, plaintext);
@@ -58,7 +60,6 @@ export async function hookJSEncrypt(
     return result;
   };
 
-  // Hook JSEncrypt.prototype.decrypt
   const originalDecrypt = window.JSEncrypt.prototype.decrypt;
   window.JSEncrypt.prototype.decrypt = function(ciphertext) {
     const result = originalDecrypt.call(this, ciphertext);
@@ -78,19 +79,36 @@ export async function hookJSEncrypt(
 })();
 `;
 
-  try {
-    await frame.evaluate(hookCode);
-    return {
-      success: true,
-      message: 'JSEncrypt Hook 已安装',
-      tooltype: 'hook_jsencrypt',
-      logFormat: format,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `错误：${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'hook_jsencrypt',
-    };
-  }
-}
+    try {
+      await frame.evaluate(hookCode);
+      response.appendResponseLine('```json');
+      response.appendResponseLine(
+        JSON.stringify(
+          {
+            success: true,
+            message: 'JSEncrypt Hook 已安装',
+            tooltype: 'hook_jsencrypt',
+            logFormat: format,
+          },
+          null,
+          2,
+        ),
+      );
+      response.appendResponseLine('```');
+    } catch (error) {
+      response.appendResponseLine('```json');
+      response.appendResponseLine(
+        JSON.stringify(
+          {
+            success: false,
+            message: `错误：${error instanceof Error ? error.message : String(error)}`,
+            tooltype: 'hook_jsencrypt',
+          },
+          null,
+          2,
+        ),
+      );
+      response.appendResponseLine('```');
+    }
+  },
+});

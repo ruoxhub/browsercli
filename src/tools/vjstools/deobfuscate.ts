@@ -18,6 +18,10 @@ import type {
 } from '@babel/types';
 import {minify} from 'terser';
 
+import {defineTool} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
+
 import type {
   DeobfuscateParams,
   DeobfuscateResult,
@@ -1167,10 +1171,7 @@ export async function diffCodeFn(params: DiffParams): Promise<DiffResult> {
   const {text1, text2} = params;
 
   try {
-    const {
-      createTwoFilesPatch,
-      diffLines,
-    } = await import('diff');
+    const {createTwoFilesPatch, diffLines} = await import('diff');
 
     const lineDiff = diffLines(text1, text2);
     let addedLines = 0;
@@ -1206,6 +1207,116 @@ export async function diffCodeFn(params: DiffParams): Promise<DiffResult> {
     };
   }
 }
+
+// ============== defineTool wrappers ==============
+
+/**
+ * 代码解混淆 (v_jstools 风格) - defineTool 版本。
+ */
+export const deobfuscateCodeVj = defineTool({
+  name: 'deobfuscate_code_vj',
+  description:
+    'Deobfuscate JavaScript code using v_jstools-style AST transforms (sojson, ob, jsfuck, general)',
+  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+  schema: {
+    code: zod.string().describe('要解混淆的 JS 代码'),
+    mode: zod
+      .enum(['auto', 'sojson', 'ob', 'general', 'jsfuck'])
+      .optional()
+      .describe('解混淆模式（默认 auto）'),
+    clearExtra: zod.boolean().optional().describe('是否清除冗余代码'),
+    clearUnused: zod.boolean().optional().describe('是否清除未使用的代码'),
+  },
+  handler: async (request, response) => {
+    const result = deobfuscateCode(request.params as DeobfuscateParams);
+    response.appendResponseLine('```json');
+    response.appendResponseLine(JSON.stringify(result, null, 2));
+    response.appendResponseLine('```');
+  },
+});
+
+/**
+ * 代码压缩/格式化 - defineTool 版本。
+ */
+export const minifyCode = defineTool({
+  name: 'minify_code',
+  description: 'Minify or format JavaScript code using Terser',
+  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+  schema: {
+    code: zod.string().describe('要处理的 JS 代码'),
+    action: zod
+      .enum(['minify', 'format'])
+      .optional()
+      .describe('操作类型：minify 压缩，format 格式化（默认 minify）'),
+  },
+  handler: async (request, response) => {
+    const result = await minifyCodeFn(request.params as MinifyParams);
+    response.appendResponseLine('```json');
+    response.appendResponseLine(JSON.stringify(result, null, 2));
+    response.appendResponseLine('```');
+  },
+});
+
+/**
+ * 代码转译 - defineTool 版本。
+ */
+export const transpileCodeTool = defineTool({
+  name: 'transpile_code',
+  description: 'Transpile JavaScript/TypeScript/JSX code using Babel',
+  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+  schema: {
+    code: zod.string().describe('要转译的代码'),
+  },
+  handler: async (request, response) => {
+    const result = transpileCode(request.params as TranspileParams);
+    response.appendResponseLine('```json');
+    response.appendResponseLine(JSON.stringify(result, null, 2));
+    response.appendResponseLine('```');
+  },
+});
+
+/**
+ * AST 分析 - defineTool 版本。
+ */
+export const analyzeAstTool = defineTool({
+  name: 'analyze_ast',
+  description:
+    'Analyze JavaScript AST structure: summary stats, full AST dump, or filter by node type',
+  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+  schema: {
+    code: zod.string().describe('要分析的 JS 代码'),
+    detail: zod
+      .enum(['summary', 'full'])
+      .optional()
+      .describe('分析详细程度（默认 summary）'),
+    filterType: zod.string().optional().describe('按 AST 节点类型过滤'),
+  },
+  handler: async (request, response) => {
+    const result = analyzeAst(request.params as AnalyzeAstParams);
+    response.appendResponseLine('```json');
+    response.appendResponseLine(JSON.stringify(result, null, 2));
+    response.appendResponseLine('```');
+  },
+});
+
+/**
+ * 代码对比 - defineTool 版本。
+ */
+export const diffCodeTool = defineTool({
+  name: 'diff_code',
+  description: 'Compare two pieces of code/text and produce a unified diff',
+  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+  schema: {
+    text1: zod.string().describe('原始文本'),
+    text2: zod.string().describe('修改后文本'),
+  },
+  handler: async (request, response) => {
+    const result = await diffCodeFn(request.params as DiffParams);
+    response.appendResponseLine('```json');
+    response.appendResponseLine(JSON.stringify(result, null, 2));
+    response.appendResponseLine('```');
+  },
+});
 
 /** 格式化字节数（工具函数导出） */
 export {formatBytes};

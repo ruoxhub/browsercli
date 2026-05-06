@@ -4,74 +4,87 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {getRuntime} from '../../runtime.js';
-
-import type {
-  ScrollByParams,
-  ScrollByResult,
-} from './types.js';
+import {zod} from '../../third_party/index.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
+import {ToolCategory} from '../categories.js';
 
 /**
- * 按方向滚动页面（纯函数版本）。
- *
- * 支持 up/down/top/bottom 方向滚动，自动等待 800ms 触发懒加载内容。
- *
- * @param params - 滚动参数（direction, pixels）
- * @returns 结构化结果 { success, message, tooltype, logFormat, data }
+ * 按方向滚动页面。
  */
-export async function scrollBy(
-  params: ScrollByParams,
-): Promise<ScrollByResult> {
-  try {
-    const page = await getRuntime().contextProvider!.getActivePage();
-    const pixels = params.pixels ?? 1000;
+export const scrollBy = defineTool({
+  name: 'scroll_by',
+  description: 'Scroll page by direction (up/down/top/bottom), automatically waits 800ms for lazy-loaded content',
+  annotations: {category: ToolCategory.INPUT, readOnlyHint: true},
+  schema: {
+    direction: zod
+      .enum(['up', 'down', 'top', 'bottom'])
+      .describe('Scroll direction'),
+    pixels: zod
+      .number()
+      .optional()
+      .describe('Pixels to scroll (only for up/down, default 1000)'),
+  },
+  handler: async (request, response, context) => {
+    const {direction, pixels = 1000} = request.params;
 
-    const result = await page.evaluate(
-      (dir, px) => {
-        switch (dir) {
-          case 'top':
-            window.scrollTo(0, 0);
-            return 'scrolled to top';
-          case 'bottom':
-            window.scrollTo(0, document.body.scrollHeight);
-            return 'scrolled to bottom';
-          case 'up':
-            window.scrollBy(0, -Math.abs(px));
-            return `scrolled up ${Math.abs(px)}px`;
-          case 'down':
-            window.scrollBy(0, Math.abs(px));
-            return `scrolled down ${Math.abs(px)}px`;
-        }
-      },
-      params.direction,
-      pixels,
-    );
+    try {
+      const page = context.getSelectedPage();
 
-    // 等待懒加载触发（800ms 与原工具一致）
-    await new Promise(resolve => setTimeout(resolve, 800));
-
-    return {
-      success: true,
-      message: `页面已滚动: ${params.direction}`,
-      tooltype: 'scroll_by',
-      logFormat: 'json',
-      data: {
-        direction: params.direction,
+      const result = await page.evaluate(
+        (dir: string, px: number) => {
+          switch (dir) {
+            case 'top':
+              window.scrollTo(0, 0);
+              return 'scrolled to top';
+            case 'bottom':
+              window.scrollTo(0, document.body.scrollHeight);
+              return 'scrolled to bottom';
+            case 'up':
+              window.scrollBy(0, -Math.abs(px));
+              return `scrolled up ${Math.abs(px)}px`;
+            case 'down':
+              window.scrollBy(0, Math.abs(px));
+              return `scrolled down ${Math.abs(px)}px`;
+            default:
+              return 'unknown direction';
+          }
+        },
+        direction,
         pixels,
-        result,
-      },
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `滚动页面失败: ${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'scroll_by',
-      logFormat: 'json',
-      data: {
-        direction: params.direction,
-        pixels: params.pixels ?? 1000,
-        result: '',
-      },
-    };
-  }
-}
+      );
+
+      // 等待懒加载触发
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      response.appendResponseLine('```json');
+      response.appendResponseLine(
+        JSON.stringify(
+          {
+            success: true,
+            message: `页面已滚动: ${direction}`,
+            tooltype: 'scroll_by',
+            data: {direction, pixels, result},
+          },
+          null,
+          2,
+        ),
+      );
+      response.appendResponseLine('```');
+    } catch (error) {
+      response.appendResponseLine('```json');
+      response.appendResponseLine(
+        JSON.stringify(
+          {
+            success: false,
+            message: `滚动页面失败: ${error instanceof Error ? error.message : String(error)}`,
+            tooltype: 'scroll_by',
+            data: {direction, pixels, result: ''},
+          },
+          null,
+          2,
+        ),
+      );
+      response.appendResponseLine('```');
+    }
+  },
+});

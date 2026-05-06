@@ -8,51 +8,12 @@ import type {CDPSession, Frame, JSHandle} from '../../third_party/index.js';
 import {getRuntime} from '../../runtime.js';
 import {selectExecutionContext} from '../debugger/contextSelector.js';
 import type {ExecutionContextInfo} from '../debugger/executionContexts.js';
+import {zod} from '../../third_party/index.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
+import {ToolCategory} from '../categories.js';
 
-/** Script 操作统一返回结构 */
-export interface ScriptResult {
-  success: boolean;
-  message: string;
-  tooltype: string;
-  logFormat?: string;
-}
-
-/** 执行脚本参数 */
-export interface EvaluateScriptParams {
-  functionCode: string;
-  context?: 'page' | 'content-script';
-  verbose?: boolean;
-}
-
-/** 执行脚本结果 */
-export interface EvaluateScriptResult extends ScriptResult {
-  tooltype: 'evaluate_script';
-  result: string | undefined;
-}
-
-/** 注入预加载脚本参数 */
-export interface InjectPreloadScriptParams {
-  script: string;
-}
-
-/** 注入预加载脚本结果 */
-export interface InjectPreloadScriptResult extends ScriptResult {
-  tooltype: 'inject_preload_script';
-}
-
-interface ScriptRuntime {
-  getSelectedPage(): {
-    addInitScript?(script: string | ((...args: unknown[]) => unknown), arg?: unknown): Promise<void>;
-  } | null;
-  getSelectedFrame(): Frame | null;
-  getDebuggerContext?(): Promise<{
-    getExecutionContexts(): ExecutionContextInfo[];
-    getClient(): CDPSession | null;
-  }>;
-  getContext?(): {
-    addInitScript?(script: string | ((...args: unknown[]) => unknown), arg?: unknown): Promise<void>;
-  } | null;
-}
+// Default script evaluation timeout in milliseconds (30 seconds)
+const DEFAULT_SCRIPT_TIMEOUT = 30000;
 
 interface RuntimeEvaluateResult {
   exceptionDetails?: {
@@ -64,9 +25,6 @@ interface RuntimeEvaluateResult {
     description?: string;
   };
 }
-
-// Default script evaluation timeout in milliseconds (30 seconds)
-const DEFAULT_SCRIPT_TIMEOUT = 30000;
 
 function withTimeout<T>(
   promise: Promise<T>,
@@ -178,7 +136,7 @@ async function evaluateScriptInExecutionContext(
   client: CDPSession,
   executionContext: ExecutionContextInfo,
   functionCode: string,
-): Promise<EvaluateScriptResult> {
+): Promise<{success: boolean; message: string; tooltype: string; result?: string}> {
   const runtimeResult = (await withTimeout(
     client.send('Runtime.evaluate', {
       expression: buildContextEvaluationExpression(functionCode),
@@ -203,16 +161,12 @@ async function evaluateScriptInExecutionContext(
 }
 
 /**
- * 在页面中执行 JavaScript 函数。
- *
- * @param frame - Puppeteer Frame 对象
- * @param functionCode - 要执行的 JS 函数代码
- * @returns 结构化结果对象
+ * 在 Frame 上执行脚本（辅助函数）。
  */
-export async function evaluateScriptFn(
+async function evaluateScriptFn(
   frame: Frame,
   functionCode: string,
-): Promise<EvaluateScriptResult> {
+): Promise<{success: boolean; message: string; tooltype: string; result?: string}> {
   let fn: JSHandle<unknown> | undefined;
   try {
     fn = await withTimeout(
@@ -250,210 +204,308 @@ export async function evaluateScriptFn(
 }
 
 /**
- * 运行时包装：在当前选中的 Frame / Page 上执行脚本。
+ * 执行脚本；支持 page / content-script 上下文，并透传 verbose 参数
  */
-export async function evaluateScript(
-  params: {
-    function?: string;
-    context?: 'page' | 'content-script';
-    verbose?: boolean;
-  } = {},
-): Promise<EvaluateScriptResult> {
-  const functionCode = params.function;
-  const desiredContext = params.context ?? 'page';
-  if (!functionCode || functionCode.trim().length === 0) {
-    return {
-      success: false,
-      message: 'function 参数不能为空',
-      tooltype: 'evaluate_script',
-      result: '',
-    };
-  }
+export const evaluateScript = defineTool({
+  name: 'evaluate_script',
+  description: 'Execute JavaScript on the page; supports page / content-script context, with verbose parameter passthrough',
+  annotations: {category: ToolCategory.DEBUGGING, readOnlyHint: false},
+  schema: {
+    function: zod.string().describe('JavaScript function code to execute'),
+    context: zod
+      .enum(['page', 'content-script'])
+      .optional()
+      .describe('Execution context (default: "page")'),
+    verbose: zod
+      .boolean()
+      .optional()
+      .describe('Enable verbose output'),
+  },
+  handler: async (request, response, _context) => {
+    const functionCode = request.params.function;
+    const desiredContext = request.params.context ?? 'page';
 
-  const ctx = getRuntime().contextProvider!;
-  const frame = ctx.getSelectedFrame();
-
-  if (hasDebuggerContextCapability()) {
-    try {
-      const debuggerContext = await ctx.getDebuggerContext!();
-      const executionContexts = debuggerContext.getExecutionContexts();
-      const selectedFrameId = getFrameId(frame);
-      const executionContext = selectExecutionContext(
-        executionContexts,
-        {
-          context: desiredContext,
-          frameId: selectedFrameId,
-        },
+    if (!functionCode || functionCode.trim().length === 0) {
+      response.appendResponseLine('```json');
+      response.appendResponseLine(
+        JSON.stringify(
+          {
+            success: false,
+            message: 'function 参数不能为空',
+            tooltype: 'evaluate_script',
+            result: '',
+          },
+          null,
+          2,
+        ),
       );
+      response.appendResponseLine('```');
+      return;
+    }
 
-      if (!executionContext) {
-        return {
-          success: false,
-          message: describeContextSelectionFailure(
-            executionContexts,
-            desiredContext,
-            selectedFrameId,
-          ),
-          tooltype: 'evaluate_script',
-          result: undefined,
-        };
-      }
+    const ctx = getRuntime().contextProvider!;
+    const frame = ctx.getSelectedFrame();
 
-      const client = debuggerContext.getClient();
-      if (!client) {
-        return {
-          success: false,
-          message: '脚本执行失败：Debugger CDP 会话不可用',
-          tooltype: 'evaluate_script',
-          result: undefined,
-        };
-      }
-
+    if (hasDebuggerContextCapability()) {
       try {
-        return await evaluateScriptInExecutionContext(
-          client,
-          executionContext,
-          functionCode,
+        const debuggerContext = await ctx.getDebuggerContext!();
+        const executionContexts = debuggerContext.getExecutionContexts();
+        const selectedFrameId = getFrameId(frame);
+        const executionContext = selectExecutionContext(
+          executionContexts,
+          {
+            context: desiredContext,
+            frameId: selectedFrameId,
+          },
         );
+
+        if (!executionContext) {
+          response.appendResponseLine('```json');
+          response.appendResponseLine(
+            JSON.stringify(
+              {
+                success: false,
+                message: describeContextSelectionFailure(
+                  executionContexts,
+                  desiredContext,
+                  selectedFrameId,
+                ),
+                tooltype: 'evaluate_script',
+              },
+              null,
+              2,
+            ),
+          );
+          response.appendResponseLine('```');
+          return;
+        }
+
+        const client = debuggerContext.getClient();
+        if (!client) {
+          response.appendResponseLine('```json');
+          response.appendResponseLine(
+            JSON.stringify(
+              {
+                success: false,
+                message: '脚本执行失败：Debugger CDP 会话不可用',
+                tooltype: 'evaluate_script',
+              },
+              null,
+              2,
+            ),
+          );
+          response.appendResponseLine('```');
+          return;
+        }
+
+        try {
+          const evalResult = await evaluateScriptInExecutionContext(
+            client,
+            executionContext,
+            functionCode,
+          );
+          response.appendResponseLine('```json');
+          response.appendResponseLine(JSON.stringify(evalResult, null, 2));
+          response.appendResponseLine('```');
+          return;
+        } catch (error) {
+          const raw = getUnknownErrorMessage(error);
+          const isolationHint = getIsolationHint(
+            functionCode,
+            desiredContext,
+            raw,
+          );
+
+          response.appendResponseLine('```json');
+          response.appendResponseLine(
+            JSON.stringify(
+              {
+                success: false,
+                message: isolationHint ?? `脚本执行失败：${raw}`,
+                tooltype: 'evaluate_script',
+              },
+              null,
+              2,
+            ),
+          );
+          response.appendResponseLine('```');
+          return;
+        }
       } catch (error) {
-        const raw = getUnknownErrorMessage(error);
-        const isolationHint = getIsolationHint(
-          functionCode,
-          desiredContext,
-          raw,
+        response.appendResponseLine('```json');
+        response.appendResponseLine(
+          JSON.stringify(
+            {
+              success: false,
+              message: `脚本执行失败：${getUnknownErrorMessage(error)}`,
+              tooltype: 'evaluate_script',
+            },
+            null,
+            2,
+          ),
         );
-
-        return {
-          success: false,
-          message: isolationHint ?? `脚本执行失败：${raw}`,
-          tooltype: 'evaluate_script',
-          result: undefined,
-        };
+        response.appendResponseLine('```');
+        return;
       }
+    }
+
+    if (desiredContext === 'content-script') {
+      response.appendResponseLine('```json');
+      response.appendResponseLine(
+        JSON.stringify(
+          {
+            success: false,
+            message: '当前页面没有可用的 content-script 执行上下文',
+            tooltype: 'evaluate_script',
+          },
+          null,
+          2,
+        ),
+      );
+      response.appendResponseLine('```');
+      return;
+    }
+
+    if (!frame) {
+      response.appendResponseLine('```json');
+      response.appendResponseLine(
+        JSON.stringify(
+          {
+            success: false,
+            message: '当前没有可用的 Frame',
+            tooltype: 'evaluate_script',
+          },
+          null,
+          2,
+        ),
+      );
+      response.appendResponseLine('```');
+      return;
+    }
+
+    const result = await evaluateScriptFn(frame, functionCode);
+    if (!result.success) {
+      const isolationHint = getIsolationHint(
+        functionCode,
+        desiredContext,
+        result.message,
+      );
+      if (isolationHint) {
+        result.message = isolationHint;
+      }
+    }
+
+    response.appendResponseLine('```json');
+    response.appendResponseLine(JSON.stringify(result, null, 2));
+    response.appendResponseLine('```');
+  },
+});
+
+/**
+ * 注入预加载脚本
+ */
+export const injectPreloadScript = defineTool({
+  name: 'inject_preload_script',
+  description: 'Register a preload script for future documents on the current page/context',
+  annotations: {category: ToolCategory.DEBUGGING, readOnlyHint: false},
+  schema: {
+    script: zod.string().describe('JavaScript code to inject as preload script'),
+  },
+  handler: async (request, response, _context) => {
+    const script = request.params.script ?? '';
+
+    if (!script || script.trim().length === 0) {
+      response.appendResponseLine('```json');
+      response.appendResponseLine(
+        JSON.stringify(
+          {
+            success: false,
+            message: '脚本内容不能为空',
+            tooltype: 'inject_preload_script',
+          },
+          null,
+          2,
+        ),
+      );
+      response.appendResponseLine('```');
+      return;
+    }
+
+    const ctx = getRuntime().contextProvider!;
+    const context = ctx.getContext?.() ?? null;
+    const selectedPage = ctx.getSelectedPage?.() ?? null;
+    const target = context ?? selectedPage ?? null;
+
+    if (!target?.addInitScript) {
+      response.appendResponseLine('```json');
+      response.appendResponseLine(
+        JSON.stringify(
+          {
+            success: false,
+            message: '当前运行时不支持注入预加载脚本',
+            tooltype: 'inject_preload_script',
+          },
+          null,
+          2,
+        ),
+      );
+      response.appendResponseLine('```');
+      return;
+    }
+
+    const isClosed =
+      ('isClosed' in target && typeof target.isClosed === 'function' && target.isClosed()) ||
+      (selectedPage && selectedPage.isClosed());
+
+    if (isClosed) {
+      response.appendResponseLine('```json');
+      response.appendResponseLine(
+        JSON.stringify(
+          {
+            success: false,
+            message: '当前页面或浏览器上下文已关闭，无法注入预加载脚本',
+            tooltype: 'inject_preload_script',
+          },
+          null,
+          2,
+        ),
+      );
+      response.appendResponseLine('```');
+      return;
+    }
+
+    try {
+      await target.addInitScript(script);
     } catch (error) {
-      return {
-        success: false,
-        message: `脚本执行失败：${getUnknownErrorMessage(error)}`,
-        tooltype: 'evaluate_script',
-        result: undefined,
-      };
+      const msg = error instanceof Error ? error.message : String(error);
+      response.appendResponseLine('```json');
+      response.appendResponseLine(
+        JSON.stringify(
+          {
+            success: false,
+            message: `注入预加载脚本失败：${msg}`,
+            tooltype: 'inject_preload_script',
+          },
+          null,
+          2,
+        ),
+      );
+      response.appendResponseLine('```');
+      return;
     }
-  }
 
-  if (desiredContext === 'content-script') {
-    return {
-      success: false,
-      message: '当前页面没有可用的 content-script 执行上下文',
-      tooltype: 'evaluate_script',
-      result: undefined,
-    };
-  }
-
-  if (!frame) {
-    return {
-      success: false,
-      message: '当前没有可用的 Frame',
-      tooltype: 'evaluate_script',
-      result: undefined,
-    };
-  }
-
-  const result = await evaluateScriptFn(frame, functionCode);
-  if (!result.success) {
-    const isolationHint = getIsolationHint(
-      functionCode,
-      desiredContext,
-      result.message,
+    response.appendResponseLine('```json');
+    response.appendResponseLine(
+      JSON.stringify(
+        {
+          success: true,
+          message: 'Preload script registered for future documents',
+          tooltype: 'inject_preload_script',
+        },
+        null,
+        2,
+      ),
     );
-    if (isolationHint) {
-      return {
-        ...result,
-        message: isolationHint,
-      };
-    }
-  }
-
-  return result;
-}
-
-/**
- * 注册预加载脚本。
- *
- * 注意：此函数需要 runtime.pageController 来注入脚本，
- * 纯函数层仅定义签名，实际注入由 tool 层完成。
- *
- * @param script - JS 代码
- * @returns 结构化结果对象（仅声明成功，实际注入在 tool 层完成）
- */
-export function injectPreloadScriptFn(
-  script: string,
-): InjectPreloadScriptResult {
-  if (!script || script.trim().length === 0) {
-    return {
-      success: false,
-      message: '脚本内容不能为空',
-      tooltype: 'inject_preload_script',
-    };
-  }
-
-  return {
-    success: true,
-    message: 'Preload script prepared for registration.',
-    tooltype: 'inject_preload_script',
-  };
-}
-
-/**
- * 运行时包装：向当前页面或上下文注册预加载脚本。
- */
-export async function injectPreloadScript(
-  params: {script?: string} = {},
-): Promise<InjectPreloadScriptResult> {
-  const script = params.script ?? '';
-  const prepared = injectPreloadScriptFn(script);
-  if (!prepared.success) {
-    return prepared;
-  }
-
-  const ctx = getRuntime().contextProvider!;
-  const context = ctx.getContext?.() ?? null;
-  const selectedPage = ctx.getSelectedPage?.() ?? null;
-  const target = context ?? selectedPage ?? null;
-
-  if (!target?.addInitScript) {
-    return {
-      success: false,
-      message: '当前运行时不支持注入预加载脚本',
-      tooltype: 'inject_preload_script',
-    };
-  }
-
-  // Check if the target (page or context) has been closed
-  const isClosed =
-    ('isClosed' in target && typeof target.isClosed === 'function' && target.isClosed()) ||
-    (selectedPage && selectedPage.isClosed());
-
-  if (isClosed) {
-    return {
-      success: false,
-      message: '当前页面或浏览器上下文已关闭，无法注入预加载脚本',
-      tooltype: 'inject_preload_script',
-    };
-  }
-
-  try {
-    await target.addInitScript(script);
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    return {
-      success: false,
-      message: `注入预加载脚本失败：${msg}`,
-      tooltype: 'inject_preload_script',
-    };
-  }
-  return {
-    success: true,
-    message: 'Preload script registered for future documents',
-    tooltype: 'inject_preload_script',
-  };
-}
+    response.appendResponseLine('```');
+  },
+});

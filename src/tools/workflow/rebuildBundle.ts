@@ -5,6 +5,9 @@
  */
 
 import {logger} from '../../utils/logger.js';
+import {zod} from '../../third_party/index.js';
+import {defineTool} from '../ToolDefinition.js';
+import {ToolCategory} from '../categories.js';
 
 /**
  * 本地复现工具配置
@@ -299,104 +302,108 @@ export interface RebuildBundleToolResult {
 /**
  * 本地复现工具 - 构建本地 Node.js 复现环境
  */
-export async function rebuildBundle(
-  params: RebuildBundleOptions & {url?: string} = {},
-): Promise<RebuildBundleToolResult> {
-  const {url, ...options} = params;
+export const rebuildBundle = defineTool({
+  name: 'rebuild_bundle',
+  description: 'Build local Node.js reproduction environment from captured evidence and target script',
+  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+  schema: {
+    url: zod.string().optional().describe('Target URL'),
+    targetUrl: zod.string().optional().describe('Target URL (alternative)'),
+    targetFunctionNames: zod.array(zod.string()).optional().describe('Target function names'),
+    targetKeywords: zod.array(zod.string()).optional().describe('Target keywords'),
+    targetUrlPatterns: zod.array(zod.string()).optional().describe('Target URL patterns'),
+    goal: zod.string().optional().describe('Reverse engineering goal description'),
+    autoGenerate: zod.boolean().optional().describe('Auto generate reproduction bundle'),
+    maxEvidenceItems: zod.number().optional().describe('Maximum evidence items'),
+    taskId: zod.string().optional().describe('Task ID'),
+    taskSlug: zod.string().optional().describe('Task slug'),
+  },
+  handler: async (request, response, _context) => {
+    const params = request.params;
+    const url = params.url;
+    const options = {
+      targetUrl: params.targetUrl,
+      targetFunctionNames: params.targetFunctionNames,
+      targetKeywords: params.targetKeywords,
+      targetUrlPatterns: params.targetUrlPatterns,
+      goal: params.goal,
+      autoGenerate: params.autoGenerate,
+      maxEvidenceItems: params.maxEvidenceItems,
+      taskId: params.taskId,
+      taskSlug: params.taskSlug,
+    };
 
-  logger.debug('[rebuild-bundle] Starting skill with options:', options);
+    logger.debug('[rebuild-bundle] Starting skill with options:', options);
 
-  try {
-    // 1. 收集逆向工程证据
-    const runtimeEvidence: Array<Record<string, unknown>> = [];
-    if (options.taskId) {
-      logger.debug(
-        '[rebuild-bundle] Reading runtime evidence for task:',
-        options.taskId,
+    try {
+      // 1. 收集逆向工程证据
+      const runtimeEvidence: Array<Record<string, unknown>> = [];
+      if (options.taskId) {
+        logger.debug('[rebuild-bundle] Reading runtime evidence for task:', options.taskId);
+      }
+
+      // 2. 分析目标函数和关键字
+      const targetKeywords = options.targetKeywords ?? [];
+      const targetUrlPatterns = options.targetUrlPatterns ?? [];
+      const targetFunctionNames = options.targetFunctionNames ?? [];
+      const targetActionDescription = options.goal ?? '';
+
+      // 3. 模拟收集页面数据
+      const pageData = {
+        url: url ?? options.targetUrl ?? '',
+        cookies: [] as Array<{name: string; value: string}>,
+        localStorage: {} as Record<string, unknown>,
+        sessionStorage: {} as Record<string, unknown>,
+      };
+
+      // 4. 构建环境代码
+      const capture: Record<string, unknown> = {
+        page: {url: pageData.url, title: ''},
+        cookies: pageData.cookies,
+        localStorage: pageData.localStorage,
+        sessionStorage: pageData.sessionStorage,
+        runtimeEvidence,
+        targetScript: null,
+      };
+
+      const envCode = buildAutoEnvCode(capture);
+      const polyfillsCode = '';
+
+      // 5. 构建入口代码
+      const targetScript = pickTargetScript([], targetKeywords, targetUrlPatterns, targetFunctionNames, targetActionDescription);
+      const entryCode = buildEntryCode(targetScript, capture);
+
+      // 6. 返回结果
+      const result = {
+        url: url ?? options.targetUrl,
+        bundlePath: '',
+        evidenceCount: runtimeEvidence.length,
+        files: {entryCode, envCode, polyfillsCode, capture},
+        targetContext: {targetKeywords, targetUrlPatterns, targetFunctionNames, targetActionDescription},
+      };
+
+      logger.info('[rebuild_bundle] Tool completed successfully');
+
+      response.appendResponseLine('```json');
+      response.appendResponseLine(
+        JSON.stringify(
+          {success: true, message: '本地复现完成', tooltype: 'rebuild_bundle', data: result},
+          null,
+          2,
+        ),
       );
-      // 在实际运行时会从 ReverseTaskStore 读取
-      // 这里返回空数组，由实际运行时填充
+      response.appendResponseLine('```');
+    } catch (error) {
+      logger.error('[rebuild_bundle] Tool failed:', error);
+      response.appendResponseLine('```json');
+      response.appendResponseLine(
+        JSON.stringify(
+          {success: false, error: error instanceof Error ? error.message : String(error), tooltype: 'rebuild_bundle'},
+          null,
+          2,
+        ),
+      );
+      response.appendResponseLine('```');
     }
-
-    // 2. 分析目标函数和关键字
-    const targetKeywords = options.targetKeywords ?? [];
-    const targetUrlPatterns = options.targetUrlPatterns ?? [];
-    const targetFunctionNames = options.targetFunctionNames ?? [];
-    const targetActionDescription = options.goal ?? '';
-
-    logger.debug('[rebuild-bundle] Target filtering:', {
-      targetKeywords,
-      targetUrlPatterns,
-      targetFunctionNames,
-    });
-
-    // 3. 模拟收集页面数据（实际运行时会通过 runtime 收集）
-    const pageData = {
-      url: url ?? options.targetUrl ?? '',
-      cookies: [] as Array<{name: string; value: string}>,
-      localStorage: {} as Record<string, unknown>,
-      sessionStorage: {} as Record<string, unknown>,
-    };
-
-    // 4. 构建环境代码
-    const capture: Record<string, unknown> = {
-      page: {
-        url: pageData.url,
-        title: '',
-      },
-      cookies: pageData.cookies,
-      localStorage: pageData.localStorage,
-      sessionStorage: pageData.sessionStorage,
-      runtimeEvidence,
-      targetScript: null,
-    };
-
-    const envCode = buildAutoEnvCode(capture);
-    const polyfillsCode = '';
-
-    // 5. 构建入口代码
-    const targetScript = pickTargetScript(
-      [],
-      targetKeywords,
-      targetUrlPatterns,
-      targetFunctionNames,
-      targetActionDescription,
-    );
-    const entryCode = buildEntryCode(targetScript, capture);
-
-    // 6. 返回结果
-    const result = {
-      url: url ?? options.targetUrl,
-      bundlePath: '',
-      evidenceCount: runtimeEvidence.length,
-      files: {
-        entryCode,
-        envCode,
-        polyfillsCode,
-        capture,
-      },
-      targetContext: {
-        targetKeywords,
-        targetUrlPatterns,
-        targetFunctionNames,
-        targetActionDescription,
-      },
-    };
-
-    logger.info('[rebuild_bundle] Tool completed successfully');
-
-    return {
-      success: true,
-      message: '本地复现完成',
-      tooltype: 'rebuild_bundle',
-      data: result,
-    };
-  } catch (error) {
-    logger.error('[rebuild_bundle] Tool failed:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : String(error),
-      tooltype: 'rebuild_bundle',
-    };
-  }
-}
+  },
+});

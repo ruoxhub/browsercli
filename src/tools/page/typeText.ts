@@ -4,68 +4,76 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {getRuntime} from '../../runtime.js';
-
-import type {
-  TypeTextParams,
-  TypeTextResult,
-} from './types.js';
+import {zod} from '../../third_party/index.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
+import {ToolCategory} from '../categories.js';
 
 /**
- * 在输入元素中键入文本（纯函数版本）。
- *
- * 通过 CSS 选择器定位输入框并逐字输入。
- *
- * @param params - 输入参数（selector, text, delay）
- * @returns 结构化结果 { success, message, tooltype, logFormat, data }
+ * 在输入元素中键入文本。
  */
-export async function typeText(
-  params: TypeTextParams,
-): Promise<TypeTextResult> {
-  try {
-    if (!params?.selector || !params?.text) {
-      return {
-        success: false,
-        message: 'type_text requires "selector" and "text" parameters',
-        tooltype: 'type_text',
-        logFormat: 'json',
-        data: {
-          selector: params?.selector ?? '',
-          textLength: 0,
-          typed: false,
-        },
-      };
+export const typeText = defineTool({
+  name: 'type_text',
+  description: 'Type text into an input element by CSS selector',
+  annotations: {category: ToolCategory.INPUT, readOnlyHint: false},
+  schema: {
+    selector: zod.string().describe('CSS selector of the input element'),
+    text: zod.string().describe('Text to type'),
+    delay: zod.number().optional().describe('Delay between keystrokes in ms'),
+  },
+  handler: async (request, response, context) => {
+    const {selector, text, delay} = request.params;
+
+    if (!selector || !text) {
+      response.appendResponseLine('```json');
+      response.appendResponseLine(
+        JSON.stringify(
+          {
+            success: false,
+            message: 'type_text requires "selector" and "text" parameters',
+            tooltype: 'type_text',
+            data: {selector: selector ?? '', textLength: 0, typed: false},
+          },
+          null,
+          2,
+        ),
+      );
+      response.appendResponseLine('```');
+      return;
     }
 
-    const page = await getRuntime().contextProvider!.getActivePage();
-    // Playwright: page.type(selector, text, options) - compatible
-    // But prefer page.fill() for direct input, page.type() for char-by-char
-    await page.type(params.selector, params.text, {
-      delay: params.delay,
-    });
+    try {
+      const page = context.getSelectedPage();
+      await page.type(selector, text, {delay});
 
-    return {
-      success: true,
-      message: `文本已输入: ${params.selector}`,
-      tooltype: 'type_text',
-      logFormat: 'json',
-      data: {
-        selector: params.selector,
-        textLength: params.text.length,
-        typed: true,
-      },
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `输入文本失败: ${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'type_text',
-      logFormat: 'json',
-      data: {
-        selector: params.selector,
-        textLength: params.text.length,
-        typed: false,
-      },
-    };
-  }
-}
+      response.appendResponseLine('```json');
+      response.appendResponseLine(
+        JSON.stringify(
+          {
+            success: true,
+            message: `文本已输入: ${selector}`,
+            tooltype: 'type_text',
+            data: {selector, textLength: text.length, typed: true},
+          },
+          null,
+          2,
+        ),
+      );
+      response.appendResponseLine('```');
+    } catch (error) {
+      response.appendResponseLine('```json');
+      response.appendResponseLine(
+        JSON.stringify(
+          {
+            success: false,
+            message: `输入文本失败: ${error instanceof Error ? error.message : String(error)}`,
+            tooltype: 'type_text',
+            data: {selector, textLength: text.length, typed: false},
+          },
+          null,
+          2,
+        ),
+      );
+      response.appendResponseLine('```');
+    }
+  },
+});

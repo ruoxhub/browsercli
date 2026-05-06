@@ -6,85 +6,15 @@
 
 import type {Dialog} from 'patchright';
 
-import type {Page} from '../../third_party/index.js';
-import {getRuntime} from '../../runtime.js';
-
-import type {DialogResult, HandleDialogParams} from './types.js';
-
-/**
- * 处理浏览器弹窗（alert/confirm/prompt）。
- *
- * 在 Playwright Page 上监听 dialog 事件，自动捕获弹窗对象后执行 accept 或 dismiss。
- * 调用方需要在触发弹窗的页面操作之前注册此函数，
- * 或在弹窗已存在时直接传入已捕获的 Dialog 对象。
- *
- * @param params - 处理参数 { action, promptText? }
- * @returns 结构化结果对象
- */
-export async function handleDialog(
-  params: HandleDialogParams,
-): Promise<DialogResult> {
-  const {action, promptText} = params;
-  const tooltype = 'handle_dialog';
-
-  let page: Page;
-  try {
-    page = await getRuntime().contextProvider!.getActivePage();
-  } catch {
-    return {
-      success: false,
-      message:
-        'No active page available. Open a page first before handling dialogs.',
-      tooltype,
-    };
-  }
-
-  const dialog = await waitForDialog(page);
-  if (!dialog) {
-    return {
-      success: false,
-      message:
-        'No open dialog found. Use an action that triggers a dialog first, then call this function.',
-      tooltype,
-    };
-  }
-
-  try {
-    if (action === 'accept') {
-      await dialog.accept(promptText);
-      return {
-        success: true,
-        message: promptText
-          ? `Successfully accepted the dialog with text: ${promptText}`
-          : 'Successfully accepted the dialog',
-        tooltype,
-      };
-    }
-    await dialog.dismiss();
-    return {
-      success: true,
-      message: 'Successfully dismissed the dialog',
-      tooltype,
-    };
-  } catch {
-    return {
-      success: false,
-      message: 'Dialog may have already been handled externally',
-      tooltype,
-    };
-  }
-}
+import {zod} from '../../third_party/index.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
+import {ToolCategory} from '../categories.js';
 
 /**
  * 等待并获取页面上当前打开的 dialog。
- * Dialog 事件在 JS 执行 alert/confirm/prompt 时同步触发，
- * Puppeteer 会在 page.on('dialog') 回调中捕获 Dialog 对象。
- *
- * 此函数设置一次性监听器，等待最多 5 秒获取 dialog；
- * 如果页面已有 dialog 上下文则立即返回。
  */
 async function waitForDialog(
-  page: Page,
+  page: Context['getSelectedPage'] extends () => infer R ? R : never,
   timeoutMs = 5000,
 ): Promise<Dialog | null> {
   return new Promise(resolve => {
@@ -109,5 +39,117 @@ async function waitForDialog(
     }, timeoutMs);
   });
 }
+
+/**
+ * 处理浏览器弹窗（alert/confirm/prompt）。
+ */
+export const handleDialog = defineTool({
+  name: 'handle_dialog',
+  description: 'Handle browser dialogs (alert/confirm/prompt) - accept or dismiss',
+  annotations: {category: ToolCategory.PAGES, readOnlyHint: false},
+  schema: {
+    action: zod
+      .enum(['accept', 'dismiss'])
+      .describe('Action to take on the dialog'),
+    promptText: zod
+      .string()
+      .optional()
+      .describe('Text to enter for prompt dialogs (only with accept)'),
+  },
+  handler: async (request, response, context) => {
+    const {action, promptText} = request.params;
+    const tooltype = 'handle_dialog';
+
+    let page;
+    try {
+      page = context.getSelectedPage();
+    } catch {
+      response.appendResponseLine('```json');
+      response.appendResponseLine(
+        JSON.stringify(
+          {
+            success: false,
+            message:
+              'No active page available. Open a page first before handling dialogs.',
+            tooltype,
+          },
+          null,
+          2,
+        ),
+      );
+      response.appendResponseLine('```');
+      return;
+    }
+
+    const dialog = await waitForDialog(page);
+    if (!dialog) {
+      response.appendResponseLine('```json');
+      response.appendResponseLine(
+        JSON.stringify(
+          {
+            success: false,
+            message:
+              'No open dialog found. Use an action that triggers a dialog first, then call this function.',
+            tooltype,
+          },
+          null,
+          2,
+        ),
+      );
+      response.appendResponseLine('```');
+      return;
+    }
+
+    try {
+      if (action === 'accept') {
+        await dialog.accept(promptText);
+        response.appendResponseLine('```json');
+        response.appendResponseLine(
+          JSON.stringify(
+            {
+              success: true,
+              message: promptText
+                ? `Successfully accepted the dialog with text: ${promptText}`
+                : 'Successfully accepted the dialog',
+              tooltype,
+            },
+            null,
+            2,
+          ),
+        );
+        response.appendResponseLine('```');
+        return;
+      }
+      await dialog.dismiss();
+      response.appendResponseLine('```json');
+      response.appendResponseLine(
+        JSON.stringify(
+          {
+            success: true,
+            message: 'Successfully dismissed the dialog',
+            tooltype,
+          },
+          null,
+          2,
+        ),
+      );
+      response.appendResponseLine('```');
+    } catch {
+      response.appendResponseLine('```json');
+      response.appendResponseLine(
+        JSON.stringify(
+          {
+            success: false,
+            message: 'Dialog may have already been handled externally',
+            tooltype,
+          },
+          null,
+          2,
+        ),
+      );
+      response.appendResponseLine('```');
+    }
+  },
+});
 
 export type {DialogAction, DialogResult, HandleDialogParams} from './types.js';

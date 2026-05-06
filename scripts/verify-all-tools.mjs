@@ -26,6 +26,12 @@ const TOOL_PARAMS = {
     maxResults: 3,
   },
 
+  // ── 输入 ────────────────────────────────────────────
+  click: {
+    selector: 'body',
+    dblClick: false,
+  },
+
   // ── DOM ─────────────────────────────────────────────
   query_dom: {
     selector: 'body',

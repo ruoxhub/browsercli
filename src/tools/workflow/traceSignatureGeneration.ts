@@ -6,122 +6,12 @@
 
 import {zod} from '../../third_party/index.js';
 import {getRuntime} from '../../runtime.js';
+import {defineTool} from '../ToolDefinition.js';
+import {ToolCategory} from '../categories.js';
 import type {RequestInitiator} from '../network/types.js';
-
-export interface TraceSignatureGenerationParams {
-  requestUrlPattern?: string;
-  headerKeyword?: string;
-  maxResults?: number;
-  includeSensitiveValues?: boolean;
-  taskId?: string;
-}
 
 const SIGNATURE_HEADER_PATTERN =
   /(^|[-_])(sign|signature|token|auth|nonce|timestamp)([-_]|$)|x-sign/i;
-
-export const traceSignatureGeneration = Object.assign(
-  async function traceSignatureGeneration(
-    params: TraceSignatureGenerationParams = {},
-  ) {
-    const contextProvider = getRuntime().contextProvider!;
-    const requestUrlPattern = params.requestUrlPattern ?? '';
-    const headerKeyword = (params.headerKeyword ?? '').toLowerCase();
-    const maxResults = Math.max(1, Math.floor(params.maxResults ?? 10));
-    const includeSensitiveValues = params.includeSensitiveValues === true;
-    const selectedPage = contextProvider.getSelectedPage();
-    const pages = contextProvider.getPages();
-    const pageIndex =
-      selectedPage && !selectedPage.isClosed()
-        ? pages.indexOf(selectedPage)
-        : -1;
-    if (pageIndex < 0) {
-      return {
-        success: true,
-        message: '签名追踪完成，当前无活跃页面，请先打开或选择页面',
-        tooltype: 'trace_signature_generation',
-        data: {
-          requestFingerprints: [],
-          pausedFrames: [],
-          evidence: {requestHeaders: [], initiators: []},
-          nextActions: [
-            '先通过 new_page 或 navigate_page 打开目标页面',
-            '触发登录、下单、分页等目标业务动作',
-            '重新运行 trace_signature_generation',
-          ],
-          gaps: ['无活跃页面，无法获取网络请求'],
-          taskId: params.taskId,
-        },
-      };
-    }
-    const requests = contextProvider
-      .getNetworkRequests(false, pageIndex)
-      .filter(request => {
-        if (requestUrlPattern && !request.url().includes(requestUrlPattern)) {
-          return false;
-        }
-        if (!headerKeyword) {
-          return true;
-        }
-        return Object.entries(request.headers()).some(([key, value]) =>
-          `${key}: ${value}`.toLowerCase().includes(headerKeyword),
-        );
-      })
-      .slice(0, maxResults);
-
-    const requestFingerprints = requests.map(request => {
-      const headers = request.headers();
-      return {
-        reqid: contextProvider.getNetworkRequestStableId(request),
-        method: request.method(),
-        url: request.url(),
-        signatureIndicators: findSignatureIndicators(headers),
-      };
-    });
-
-    const evidence = {
-      requestHeaders: requests.map(request =>
-        redactHeaders(request.headers(), includeSensitiveValues),
-      ),
-      initiators: requests
-        .map(request => contextProvider.getRequestInitiator(request))
-        .filter((item): item is RequestInitiator => Boolean(item)),
-    };
-    const pausedFrames = await readPausedFrames();
-    const nextActions = buildNextActions({
-      requestUrlPattern,
-      headerKeyword,
-      hasRequests: requests.length > 0,
-      hasPausedFrames: pausedFrames.length > 0,
-    });
-
-    return {
-      success: true,
-      message:
-        requests.length > 0
-          ? `签名追踪完成，匹配 ${requests.length} 个请求`
-          : '签名追踪完成，尚未匹配请求；请先触发目标业务动作',
-      tooltype: 'trace_signature_generation',
-      data: {
-        requestFingerprints,
-        pausedFrames,
-        evidence,
-        nextActions,
-        gaps:
-          requests.length === 0 ? ['未发现匹配请求，无法关联签名生成链路'] : [],
-        taskId: params.taskId,
-      },
-    };
-  },
-  {
-    schema: {
-      requestUrlPattern: zod.string().optional(),
-      headerKeyword: zod.string().optional(),
-      maxResults: zod.number().optional(),
-      includeSensitiveValues: zod.boolean().optional(),
-      taskId: zod.string().optional(),
-    },
-  },
-);
 
 function findSignatureIndicators(headers: Record<string, string>): string[] {
   return Object.keys(headers).filter(key => SIGNATURE_HEADER_PATTERN.test(key));
@@ -143,9 +33,8 @@ function redactHeaders(
   );
 }
 
-async function readPausedFrames() {
-  const contextProvider = getRuntime().contextProvider!;
-  const debuggerContext = await contextProvider.getDebuggerContext();
+async function readPausedFrames(context: import('../ToolDefinition.js').Context) {
+  const debuggerContext = context.debuggerContext;
   const pausedState = debuggerContext.getPausedState();
   if (!pausedState.isPaused) {
     return [];
@@ -180,3 +69,134 @@ function buildNextActions(input: {
     '调用 export_session_report 输出请求指纹、调试步骤、证据和剩余缺口',
   ];
 }
+
+/**
+ * 签名追踪工作流
+ */
+export const traceSignatureGeneration = defineTool({
+  name: 'trace_signature_generation',
+  description: 'Signature tracing workflow: correlate network requests, hook diagnostics, XHR breakpoints and call frame inspection from header/URL clues',
+  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+  schema: {
+    requestUrlPattern: zod.string().optional().describe('URL pattern to filter requests'),
+    headerKeyword: zod.string().optional().describe('Header keyword to filter signature-related headers'),
+    maxResults: zod.number().optional().describe('Maximum number of results (default: 10)'),
+    includeSensitiveValues: zod.boolean().optional().describe('Include sensitive header values'),
+    taskId: zod.string().optional().describe('Task ID for evidence tracking'),
+  },
+  handler: async (request, response, context) => {
+    const params = request.params;
+    const requestUrlPattern = params.requestUrlPattern ?? '';
+    const headerKeyword = (params.headerKeyword ?? '').toLowerCase();
+    const maxResults = Math.max(1, Math.floor(params.maxResults ?? 10));
+    const includeSensitiveValues = params.includeSensitiveValues === true;
+
+    const contextProvider = getRuntime().contextProvider!;
+    const selectedPage = contextProvider.getSelectedPage();
+    const pages = contextProvider.getPages();
+    const pageIndex =
+      selectedPage && !selectedPage.isClosed()
+        ? pages.indexOf(selectedPage)
+        : -1;
+
+    if (pageIndex < 0) {
+      response.appendResponseLine('```json');
+      response.appendResponseLine(
+        JSON.stringify(
+          {
+            success: true,
+            message: '签名追踪完成，当前无活跃页面，请先打开或选择页面',
+            tooltype: 'trace_signature_generation',
+            data: {
+              requestFingerprints: [],
+              pausedFrames: [],
+              evidence: {requestHeaders: [], initiators: []},
+              nextActions: [
+                '先通过 new_page 或 navigate_page 打开目标页面',
+                '触发登录、下单、分页等目标业务动作',
+                '重新运行 trace_signature_generation',
+              ],
+              gaps: ['无活跃页面，无法获取网络请求'],
+              taskId: params.taskId,
+            },
+          },
+          null,
+          2,
+        ),
+      );
+      response.appendResponseLine('```');
+      return;
+    }
+
+    let requests;
+    try {
+      requests = contextProvider.getNetworkRequests(false, pageIndex);
+    } catch {
+      requests = [];
+    }
+    requests = requests.filter(request => {
+        if (requestUrlPattern && !request.url().includes(requestUrlPattern)) {
+          return false;
+        }
+        if (!headerKeyword) {
+          return true;
+        }
+        return Object.entries(request.headers()).some(([key, value]) =>
+          `${key}: ${value}`.toLowerCase().includes(headerKeyword),
+        );
+      })
+      .slice(0, maxResults);
+
+    const requestFingerprints = requests.map(request => {
+      const headers = request.headers();
+      return {
+        reqid: contextProvider.getNetworkRequestStableId(request),
+        method: request.method(),
+        url: request.url(),
+        signatureIndicators: findSignatureIndicators(headers),
+      };
+    });
+
+    const evidence = {
+      requestHeaders: requests.map(request =>
+        redactHeaders(request.headers(), includeSensitiveValues),
+      ),
+      initiators: requests
+        .map(request => contextProvider.getRequestInitiator(request))
+        .filter((item): item is RequestInitiator => Boolean(item)),
+    };
+
+    const pausedFrames = await readPausedFrames(context);
+    const nextActions = buildNextActions({
+      requestUrlPattern,
+      headerKeyword,
+      hasRequests: requests.length > 0,
+      hasPausedFrames: pausedFrames.length > 0,
+    });
+
+    response.appendResponseLine('```json');
+    response.appendResponseLine(
+      JSON.stringify(
+        {
+          success: true,
+          message:
+            requests.length > 0
+              ? `签名追踪完成，匹配 ${requests.length} 个请求`
+              : '签名追踪完成，尚未匹配请求；请先触发目标业务动作',
+          tooltype: 'trace_signature_generation',
+          data: {
+            requestFingerprints,
+            pausedFrames,
+            evidence,
+            nextActions,
+            gaps: requests.length === 0 ? ['未发现匹配请求，无法关联签名生成链路'] : [],
+            taskId: params.taskId,
+          },
+        },
+        null,
+        2,
+      ),
+    );
+    response.appendResponseLine('```');
+  },
+});

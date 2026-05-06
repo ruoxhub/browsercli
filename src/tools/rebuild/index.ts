@@ -96,7 +96,7 @@ export const exportRebuildBundle = defineTool({
           envCode: request.params.envCode ?? '',
           polyfillsCode: request.params.polyfillsCode ?? '',
           capture: request.params.capture ?? {},
-          notes: request.params.notes,
+          notes: request.params.notes ?? [],
         };
 
     if (

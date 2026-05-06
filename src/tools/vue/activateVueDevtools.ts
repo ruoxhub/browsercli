@@ -4,19 +4,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Frame} from '../../third_party/index.js';
-
-import type {HookResult} from './types.js';
+import {zod} from '../../third_party/index.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
+import {ToolCategory} from '../categories.js';
 
 /**
  * 激活 Vue Devtools：强制启用 Vue.js 和 Pinia 开发者工具（支持 Vue 2/3 + Pinia）。
- *
- * @param frame - Puppeteer Frame 对象，用于注入 Hook 代码
- * @param _params - 未使用参数（适配 ToolAdapter frame 模式签名）
- * @returns 结构化结果对象
  */
-export async function activateVueDevtools(frame: Frame, _params?: Record<string, unknown>): Promise<HookResult> {
-  const hookCode = `
+export const activateVueDevtools = defineTool({
+  name: 'activate_vue_devtools',
+  description: 'Force-enable Vue.js and Pinia DevTools (supports Vue 2/3 + Pinia)',
+  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: false},
+  schema: {},
+  handler: async (_request, response, context) => {
+    const frame = context.getSelectedFrame();
+
+    const hookCode = `
 (function() {
   'use strict';
 
@@ -49,19 +52,17 @@ export async function activateVueDevtools(frame: Frame, _params?: Record<string,
 
   function enablePiniaDevtools(vueRootInstance, vueVersion) {
     if (vueVersion === 2) {
-      return; // Pinia Vue2 support not available
+      return;
     }
     const pinia = vueRootInstance.config.globalProperties.$pinia;
     if (!pinia) return;
 
-    // Register Pinia devtools
     if (window.__VUE_DEVTOOLS_GLOBAL_HOOK__) {
       pinia.use(function(devtoolsPlugin) {
         const store = devtoolsPlugin.store;
         const app = devtoolsPlugin.app;
         const api = window.__VUE_DEVTOOLS_GLOBAL_HOOK__;
 
-        // Add to component state types
         if (!api.componentStateTypes) {
           api.componentStateTypes = [];
         }
@@ -71,7 +72,6 @@ export async function activateVueDevtools(frame: Frame, _params?: Record<string,
         }
       });
 
-      // Emit app init for Pinia
       window.__VUE_DEVTOOLS_GLOBAL_HOOK__.emit('app:init',
         vueRootInstance,
         vueRootInstance.version || '3.x',
@@ -113,7 +113,6 @@ export async function activateVueDevtools(frame: Frame, _params?: Record<string,
       Static: Symbol.for('v-stc'),
     });
 
-    // Enable Pinia devtools if available
     try {
       enablePiniaDevtools(app, 3);
     } catch (e) {
@@ -124,11 +123,9 @@ export async function activateVueDevtools(frame: Frame, _params?: Record<string,
   }
 
   function crack() {
-    // Vue 3 check
     if (window.__VUE__) {
       return crackVue3();
     }
-    // Vue 2 check
     const all = document.querySelectorAll('*');
     for (let i = 0; i < all.length; i++) {
       if (all[i].__vue__) {
@@ -138,7 +135,6 @@ export async function activateVueDevtools(frame: Frame, _params?: Record<string,
     return {success: false, reason: 'Vue instance not found'};
   }
 
-  // Main execution — single attempt, no busy-wait retry
   try {
     if (!window.__VUE_DEVTOOLS_GLOBAL_HOOK__) {
       return {success: false, error: 'Vue Devtools hook not found. Please install Vue Devtools extension.'};
@@ -167,33 +163,59 @@ export async function activateVueDevtools(frame: Frame, _params?: Record<string,
 })();
 `;
 
-  try {
-    const result = (await frame.evaluate(hookCode)) as {
-      success: boolean;
-      version?: string;
-      piniaEnabled?: boolean;
-      error?: string;
-      message?: string;
-    };
-
-    if (!result.success) {
-      return {
-        success: false,
-        message: result.error || result.message || '激活失败',
-        tooltype: 'activate_vue_devtools',
+    try {
+      const result = (await frame.evaluate(hookCode)) as {
+        success: boolean;
+        version?: string;
+        piniaEnabled?: boolean;
+        error?: string;
+        message?: string;
       };
-    }
 
-    return {
-      success: true,
-      message: `Vue Devtools 已激活，版本：${result.version}${result.piniaEnabled ? ' (Pinia 已启用)' : ''}`,
-      tooltype: 'activate_vue_devtools',
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `错误：${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'activate_vue_devtools',
-    };
-  }
-}
+      if (!result.success) {
+        response.appendResponseLine('```json');
+        response.appendResponseLine(
+          JSON.stringify(
+            {
+              success: false,
+              message: result.error || result.message || '激活失败',
+              tooltype: 'activate_vue_devtools',
+            },
+            null,
+            2,
+          ),
+        );
+        response.appendResponseLine('```');
+        return;
+      }
+
+      response.appendResponseLine('```json');
+      response.appendResponseLine(
+        JSON.stringify(
+          {
+            success: true,
+            message: `Vue Devtools 已激活，版本：${result.version}${result.piniaEnabled ? ' (Pinia 已启用)' : ''}`,
+            tooltype: 'activate_vue_devtools',
+          },
+          null,
+          2,
+        ),
+      );
+      response.appendResponseLine('```');
+    } catch (error) {
+      response.appendResponseLine('```json');
+      response.appendResponseLine(
+        JSON.stringify(
+          {
+            success: false,
+            message: `错误：${error instanceof Error ? error.message : String(error)}`,
+            tooltype: 'activate_vue_devtools',
+          },
+          null,
+          2,
+        ),
+      );
+      response.appendResponseLine('```');
+    }
+  },
+});

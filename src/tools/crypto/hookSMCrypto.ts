@@ -4,25 +4,33 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Frame} from '../../third_party/index.js';
-
-import type {HookResult, LogFormat, SMAlgorithm} from './types.js';
+import {zod} from '../../third_party/index.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
+import {ToolCategory} from '../categories.js';
 
 /**
  * Hook SM-crypto 国密库：SM2、SM3、SM4 算法。
- *
- * @param frame - Puppeteer Frame 对象，用于注入 Hook 代码
- * @param params - 参数对象 { algorithms?, logFormat? }
- * @returns 结构化结果对象
  */
-export async function hookSMCrypto(
-  frame: Frame,
-  params?: { algorithms?: SMAlgorithm[]; logFormat?: LogFormat },
-): Promise<HookResult> {
-  const algos = params?.algorithms || ['all'];
-  const format = params?.logFormat || 'compact';
+export const hookSMCrypto = defineTool({
+  name: 'hook_smcrypto',
+  description: 'Hook SM-crypto library: intercept SM2, SM3, SM4 algorithms',
+  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: false},
+  schema: {
+    algorithms: zod
+      .array(zod.string())
+      .optional()
+      .describe('Algorithms to hook (default: ["all"])'),
+    logFormat: zod
+      .enum(['compact', 'json'])
+      .optional()
+      .describe('Log output format (default: "compact")'),
+  },
+  handler: async (request, response, context) => {
+    const algos = request.params.algorithms || ['all'];
+    const format = request.params.logFormat || 'compact';
+    const frame = context.getSelectedFrame();
 
-  const hookCode = `
+    const hookCode = `
 (function() {
   'use strict';
 
@@ -40,7 +48,6 @@ export async function hookSMCrypto(
 
   const sm = window.sm2 || window.sm3 || window.sm4 || window;
 
-  // SM2 Hook
   if (algorithms.includes('SM2') || algorithms.includes('all')) {
     if (sm.sm2) {
       const originalSm2Encrypt = sm.sm2.encrypt;
@@ -75,7 +82,6 @@ export async function hookSMCrypto(
     }
   }
 
-  // SM3 Hook
   if (algorithms.includes('SM3') || algorithms.includes('all')) {
     if (sm.sm3) {
       const originalSm3 = sm.sm3;
@@ -93,7 +99,6 @@ export async function hookSMCrypto(
     }
   }
 
-  // SM4 Hook
   if (algorithms.includes('SM4') || algorithms.includes('all')) {
     if (sm.sm4) {
       const originalSm4Encrypt = sm.sm4.encrypt;
@@ -118,20 +123,37 @@ export async function hookSMCrypto(
 })();
 `;
 
-  try {
-    await frame.evaluate(hookCode);
-    return {
-      success: true,
-      message: 'SM-Crypto Hook 已安装',
-      tooltype: 'hook_smcrypto',
-      algorithms: algos,
-      logFormat: format,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `错误：${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'hook_smcrypto',
-    };
-  }
-}
+    try {
+      await frame.evaluate(hookCode);
+      response.appendResponseLine('```json');
+      response.appendResponseLine(
+        JSON.stringify(
+          {
+            success: true,
+            message: 'SM-Crypto Hook 已安装',
+            tooltype: 'hook_smcrypto',
+            algorithms: algos,
+            logFormat: format,
+          },
+          null,
+          2,
+        ),
+      );
+      response.appendResponseLine('```');
+    } catch (error) {
+      response.appendResponseLine('```json');
+      response.appendResponseLine(
+        JSON.stringify(
+          {
+            success: false,
+            message: `错误：${error instanceof Error ? error.message : String(error)}`,
+            tooltype: 'hook_smcrypto',
+          },
+          null,
+          2,
+        ),
+      );
+      response.appendResponseLine('```');
+    }
+  },
+});

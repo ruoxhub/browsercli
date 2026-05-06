@@ -4,29 +4,33 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Frame} from '../../third_party/index.js';
-
-import type {
-  HookResult,
-  LogFormat,
-  CryptoJSAlgorithm,
-} from './types.js';
+import {zod} from '../../third_party/index.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
+import {ToolCategory} from '../categories.js';
 
 /**
  * Hook CryptoJS 加密库：AES、DES、MD5、SHA、HMAC 等对称/哈希算法。
- *
- * @param frame - Puppeteer Frame 对象，用于注入 Hook 代码
- * @param params - 参数对象 { algorithms?, logFormat? }
- * @returns 结构化结果对象
  */
-export async function hookCryptoJS(
-  frame: Frame,
-  params?: { algorithms?: CryptoJSAlgorithm[]; logFormat?: LogFormat },
-): Promise<HookResult> {
-  const algos = params?.algorithms || ['all'];
-  const format = params?.logFormat || 'compact';
+export const hookCryptoJS = defineTool({
+  name: 'hook_cryptojs',
+  description: 'Hook CryptoJS library: intercept AES, DES, MD5, SHA, HMAC and other symmetric/hash algorithms',
+  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: false},
+  schema: {
+    algorithms: zod
+      .array(zod.string())
+      .optional()
+      .describe('Algorithms to hook (default: ["all"])'),
+    logFormat: zod
+      .enum(['compact', 'json', 'full'])
+      .optional()
+      .describe('Log output format (default: "compact")'),
+  },
+  handler: async (request, response, context) => {
+    const algos = request.params.algorithms || ['all'];
+    const format = request.params.logFormat || 'compact';
+    const frame = context.getSelectedFrame();
 
-  const hookCode = `
+    const hookCode = `
 (function() {
   'use strict';
 
@@ -68,10 +72,8 @@ export async function hookCryptoJS(
     }
   }
 
-  // Hook Function.prototype.apply
   const temp_apply = Function.prototype.apply;
   Function.prototype.apply = function() {
-    // Symmetric encryption
     if (arguments.length === 2 && arguments[0] && arguments[1] &&
         typeof arguments[1] === 'object' && arguments[1].length === 1 &&
         hasEncryptProp(arguments[1][0])) {
@@ -95,7 +97,6 @@ export async function hookCryptoJS(
         log(data);
       }
 
-    // Symmetric decryption
     } else if (arguments.length === 2 && arguments[0] && arguments[1] &&
                typeof arguments[1] === 'object' && arguments[1].length === 3 &&
                hasDecryptProp(arguments[1][1])) {
@@ -119,20 +120,37 @@ export async function hookCryptoJS(
 })();
 `;
 
-  try {
-    await frame.evaluate(hookCode);
-    return {
-      success: true,
-      message: 'CryptoJS Hook 已安装',
-      tooltype: 'hook_cryptojs',
-      algorithms: algos,
-      logFormat: format,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `错误：${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'hook_cryptojs',
-    };
-  }
-}
+    try {
+      await frame.evaluate(hookCode);
+      response.appendResponseLine('```json');
+      response.appendResponseLine(
+        JSON.stringify(
+          {
+            success: true,
+            message: 'CryptoJS Hook 已安装',
+            tooltype: 'hook_cryptojs',
+            algorithms: algos,
+            logFormat: format,
+          },
+          null,
+          2,
+        ),
+      );
+      response.appendResponseLine('```');
+    } catch (error) {
+      response.appendResponseLine('```json');
+      response.appendResponseLine(
+        JSON.stringify(
+          {
+            success: false,
+            message: `错误：${error instanceof Error ? error.message : String(error)}`,
+            tooltype: 'hook_cryptojs',
+          },
+          null,
+          2,
+        ),
+      );
+      response.appendResponseLine('```');
+    }
+  },
+});

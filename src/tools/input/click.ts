@@ -29,6 +29,12 @@ export const click = defineTool({
   },
   handler: async (request, response, context) => {
     const {selector, dblClick = false} = request.params;
+
+    if (!selector) {
+      response.appendResponseLine('Click failed: selector 参数不能为空');
+      return;
+    }
+
     const frame = (context as Context).getSelectedFrame();
     const page = frame.page();
 

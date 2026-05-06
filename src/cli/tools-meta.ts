@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type ToolCallMode = 'runtime' | 'frame' | 'params-only' | 'context' | 'defineTool';
+export type ToolCallMode = 'defineTool';
 
 export interface ToolMeta {
   name: string;
@@ -12,7 +12,7 @@ export interface ToolMeta {
   schema: Record<string, string>;
   modulePath: string;
   handlerName: string;
-  /** 调用模式：runtime=传入 RuntimeServices, frame=传入 Frame/Page, params-only=仅传 params, defineTool=defineTool 定义结构 */
+  /** 调用模式：所有工具统一使用 defineTool 定义结构 */
   callMode?: ToolCallMode;
 }
 
@@ -24,7 +24,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './workflow/observeFlow.js',
     handlerName: 'observeFlow',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'auto_hook',
@@ -32,7 +32,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './workflow/autoHook.js',
     handlerName: 'autoHook',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'rebuild_bundle',
@@ -40,7 +40,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './workflow/rebuildBundle.js',
     handlerName: 'rebuildBundle',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'trace_signature_generation',
@@ -55,7 +55,7 @@ export const TOOLS_META: ToolMeta[] = [
     },
     modulePath: './workflow/traceSignatureGeneration.js',
     handlerName: 'traceSignatureGeneration',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'query_dom',
@@ -63,7 +63,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {selector: 'string', all: 'boolean', limit: 'number'},
     modulePath: './dom/queryDom.js',
     handlerName: 'queryDom',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'get_dom_structure',
@@ -71,7 +71,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './dom/getDomStructure.js',
     handlerName: 'getDomStructure',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'find_clickable_elements',
@@ -79,7 +79,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './dom/findClickableElements.js',
     handlerName: 'findClickableElements',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'list_network_requests',
@@ -97,7 +97,7 @@ export const TOOLS_META: ToolMeta[] = [
     },
     modulePath: './network/listNetworkRequests.js',
     handlerName: 'listNetworkRequests',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'get_network_request',
@@ -105,7 +105,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './network/getNetworkRequest.js',
     handlerName: 'getNetworkRequest',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'click',
@@ -113,7 +113,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './input/click.js',
     handlerName: 'click',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'press_key',
@@ -121,7 +121,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './input/pressKey.js',
     handlerName: 'pressKey',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'fill_form',
@@ -129,7 +129,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './input/fillForm.js',
     handlerName: 'fillForm',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'upload_file',
@@ -137,7 +137,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './input/uploadFile.js',
     handlerName: 'uploadFile',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'hover',
@@ -145,7 +145,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './input/hover.js',
     handlerName: 'hover',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'drag',
@@ -153,7 +153,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './input/drag.js',
     handlerName: 'drag',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'click_element',
@@ -161,7 +161,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './page/clickElement.js',
     handlerName: 'clickElement',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'type_text',
@@ -169,7 +169,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './page/typeText.js',
     handlerName: 'typeText',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'wait_for_element',
@@ -177,7 +177,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './page/waitForElement.js',
     handlerName: 'waitForElement',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'scroll_by',
@@ -185,7 +185,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {direction: 'string', pixels: 'number'},
     modulePath: './page/scrollBy.js',
     handlerName: 'scrollBy',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'save_session_state',
@@ -193,7 +193,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './page/sessionState.js',
     handlerName: 'saveSessionState',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'restore_session_state',
@@ -201,7 +201,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './page/sessionState.js',
     handlerName: 'restoreSessionState',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'list_session_states',
@@ -209,7 +209,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './page/sessionState.js',
     handlerName: 'listSessionStates',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'delete_session_state',
@@ -217,7 +217,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './page/sessionState.js',
     handlerName: 'deleteSessionState',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'dump_session_state',
@@ -225,7 +225,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './page/sessionState.js',
     handlerName: 'dumpSessionState',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'load_session_state',
@@ -233,7 +233,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './page/sessionState.js',
     handlerName: 'loadSessionState',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'check_browser_health',
@@ -241,7 +241,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './page/checkBrowserHealth.js',
     handlerName: 'checkBrowserHealth',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'list_pages',
@@ -249,7 +249,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './navigation/listPages.js',
     handlerName: 'listPages',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'select_page',
@@ -257,7 +257,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './navigation/selectPage.js',
     handlerName: 'selectPage',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'new_page',
@@ -265,7 +265,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {url: 'string', timeout: 'number'},
     modulePath: './navigation/newPage.js',
     handlerName: 'newPage',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'navigate_page',
@@ -278,7 +278,7 @@ export const TOOLS_META: ToolMeta[] = [
     },
     modulePath: './navigation/navigatePage.js',
     handlerName: 'navigatePage',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'take_screenshot',
@@ -291,7 +291,7 @@ export const TOOLS_META: ToolMeta[] = [
     },
     modulePath: './screenshot/takeScreenshot.js',
     handlerName: 'takeScreenshot',
-    callMode: 'context',
+    callMode: 'defineTool',
   },
   {
     name: 'capture_video_frame',
@@ -305,7 +305,7 @@ export const TOOLS_META: ToolMeta[] = [
     },
     modulePath: './screenshot/captureVideoFrame.js',
     handlerName: 'captureVideoFrame',
-    callMode: 'context',
+    callMode: 'defineTool',
   },
   {
     name: 'get_video_info',
@@ -313,7 +313,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {selector: 'string'},
     modulePath: './screenshot/getVideoInfo.js',
     handlerName: 'getVideoInfo',
-    callMode: 'context',
+    callMode: 'defineTool',
   },
   {
     name: 'seek_video',
@@ -321,7 +321,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {selector: 'string', time: 'number'},
     modulePath: './screenshot/seekVideo.js',
     handlerName: 'seekVideo',
-    callMode: 'context',
+    callMode: 'defineTool',
   },
   {
     name: 'emulate_mobile',
@@ -329,7 +329,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './emulation/emulateMobile.js',
     handlerName: 'emulateMobile',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'emulate_network',
@@ -337,7 +337,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './emulation/emulateNetwork.js',
     handlerName: 'emulateNetwork',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'emulate_cpu',
@@ -345,7 +345,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './emulation/emulateCpu.js',
     handlerName: 'emulateCpu',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'resize_page',
@@ -353,7 +353,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './emulation/resizePage.js',
     handlerName: 'resizePage',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'set_user_agent',
@@ -361,7 +361,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './stealth/stealth.js',
     handlerName: 'setUserAgent',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'start_performance_trace',
@@ -377,7 +377,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './performance/stopPerformanceTrace.js',
     handlerName: 'stopPerformanceTrace',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'get_performance_metrics',
@@ -401,7 +401,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'setBreakpoint',
-    callMode: 'context',
+    callMode: 'defineTool',
   },
   {
     name: 'remove_breakpoint',
@@ -409,7 +409,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'removeBreakpoint',
-    callMode: 'context',
+    callMode: 'defineTool',
   },
   {
     name: 'list_breakpoints',
@@ -417,7 +417,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'listBreakpoints',
-    callMode: 'context',
+    callMode: 'defineTool',
   },
   {
     name: 'step_into',
@@ -425,7 +425,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'stepInto',
-    callMode: 'context',
+    callMode: 'defineTool',
   },
   {
     name: 'step_over',
@@ -433,7 +433,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'stepOver',
-    callMode: 'context',
+    callMode: 'defineTool',
   },
   {
     name: 'step_out',
@@ -441,7 +441,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'stepOut',
-    callMode: 'context',
+    callMode: 'defineTool',
   },
   {
     name: 'resume',
@@ -449,7 +449,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'resume',
-    callMode: 'context',
+    callMode: 'defineTool',
   },
   {
     name: 'pause',
@@ -457,7 +457,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'pause',
-    callMode: 'context',
+    callMode: 'defineTool',
   },
   {
     name: 'list_scripts',
@@ -465,7 +465,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {filter: 'string'},
     modulePath: './debugger/index.js',
     handlerName: 'listScripts',
-    callMode: 'context',
+    callMode: 'defineTool',
   },
   {
     name: 'get_script_source',
@@ -475,7 +475,7 @@ export const TOOLS_META: ToolMeta[] = [
     },
     modulePath: './debugger/index.js',
     handlerName: 'getScriptSource',
-    callMode: 'context',
+    callMode: 'defineTool',
   },
   {
     name: 'search_in_sources',
@@ -483,7 +483,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'searchInSources',
-    callMode: 'context',
+    callMode: 'defineTool',
   },
   {
     name: 'get_storage',
@@ -499,7 +499,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'breakOnXhr',
-    callMode: 'context',
+    callMode: 'defineTool',
   },
   {
     name: 'remove_xhr_breakpoint',
@@ -507,7 +507,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'removeXhrBreakpoint',
-    callMode: 'context',
+    callMode: 'defineTool',
   },
   {
     name: 'monitor_events',
@@ -536,7 +536,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'traceFunction',
-    callMode: 'context',
+    callMode: 'defineTool',
   },
   {
     name: 'get_ai_debug_status',
@@ -544,7 +544,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'getAiDebugStatus',
-    callMode: 'context',
+    callMode: 'defineTool',
   },
   {
     name: 'inspect_object',
@@ -568,7 +568,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'findInScript',
-    callMode: 'context',
+    callMode: 'defineTool',
   },
   {
     name: 'get_request_initiator',
@@ -576,7 +576,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'getRequestInitiator',
-    callMode: 'context',
+    callMode: 'defineTool',
   },
   {
     name: 'get_paused_info',
@@ -584,7 +584,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'getPausedInfo',
-    callMode: 'context',
+    callMode: 'defineTool',
   },
   {
     name: 'evaluate_on_callframe',
@@ -592,7 +592,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'evaluateOnCallframe',
-    callMode: 'context',
+    callMode: 'defineTool',
   },
   {
     name: 'inspect_locals',
@@ -600,7 +600,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'inspectLocals',
-    callMode: 'context',
+    callMode: 'defineTool',
   },
   {
     name: 'set_breakpoint_on_text',
@@ -608,7 +608,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'setBreakpointOnText',
-    callMode: 'context',
+    callMode: 'defineTool',
   },
   {
     name: 'hook_function',
@@ -616,7 +616,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/hookFunction.js',
     handlerName: 'hookFunction',
-    callMode: 'context',
+    callMode: 'defineTool',
   },
   {
     name: 'unhook_function',
@@ -624,7 +624,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/unhookFunction.js',
     handlerName: 'unhookFunction',
-    callMode: 'context',
+    callMode: 'defineTool',
   },
   {
     name: 'xhr_to_js_breakpoint',
@@ -632,7 +632,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'xhrToJsBreakpoint',
-    callMode: 'context',
+    callMode: 'defineTool',
   },
   {
     name: 'start_continuous_debugging',
@@ -640,7 +640,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'startContinuousDebugging',
-    callMode: 'context',
+    callMode: 'defineTool',
   },
   {
     name: 'stop_continuous_debugging',
@@ -648,7 +648,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'stopContinuousDebugging',
-    callMode: 'context',
+    callMode: 'defineTool',
   },
   {
     name: 'create_hook',
@@ -713,7 +713,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './dialog/handleDialog.js',
     handlerName: 'handleDialog',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'list_frames',
@@ -721,7 +721,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './frames/listFrames.js',
     handlerName: 'listFrames',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'select_frame',
@@ -729,7 +729,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {frameIdx: 'number'},
     modulePath: './frames/selectFrame.js',
     handlerName: 'selectFrame',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'evaluate_script',
@@ -738,7 +738,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {function: 'string', context: 'string', verbose: 'boolean'},
     modulePath: './script/script.js',
     handlerName: 'evaluateScript',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'inject_preload_script',
@@ -746,7 +746,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {script: 'string'},
     modulePath: './script/script.js',
     handlerName: 'injectPreloadScript',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'search_site_experience',
@@ -754,7 +754,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './site-experience/siteExperience.js',
     handlerName: 'searchSiteExperience',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'list_site_experiences',
@@ -762,7 +762,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './site-experience/siteExperience.js',
     handlerName: 'listSiteExperiences',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'create_site_experience',
@@ -770,7 +770,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './site-experience/siteExperience.js',
     handlerName: 'createSiteExperience',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'update_site_experience',
@@ -778,7 +778,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './site-experience/siteExperience.js',
     handlerName: 'updateSiteExperience',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'delete_site_experience',
@@ -786,7 +786,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './site-experience/siteExperience.js',
     handlerName: 'deleteSiteExperience',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'update_extensions',
@@ -794,7 +794,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './extensions/updateExtensions.js',
     handlerName: 'updateExtensions',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'inject_stealth',
@@ -802,7 +802,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './stealth/stealth.js',
     handlerName: 'injectStealth',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'list_stealth_features',
@@ -810,7 +810,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './stealth/stealth.js',
     handlerName: 'listStealthFeatures',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'list_stealth_presets',
@@ -818,7 +818,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './stealth/stealth.js',
     handlerName: 'listStealthPresets',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'deobfuscate_code',
@@ -826,7 +826,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './analyzer/deobfuscate.js',
     handlerName: 'deobfuscateCode',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'understand_code',
@@ -834,7 +834,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './analyzer/understand.js',
     handlerName: 'understandCode',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'summarize_code',
@@ -842,7 +842,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './analyzer/summarize.js',
     handlerName: 'summarizeCode',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'detect_crypto',
@@ -850,7 +850,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './analyzer/detectCrypto.js',
     handlerName: 'detectCrypto',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'record_reverse_evidence',
@@ -874,7 +874,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './analyzer/riskPanel.js',
     handlerName: 'riskPanel',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'export_session_report',
@@ -890,7 +890,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './collector/collectCode.js',
     handlerName: 'collectCode',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'collection_diff',
@@ -898,7 +898,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './collector/collectionDiff.js',
     handlerName: 'collectionDiff',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'search_in_scripts',
@@ -906,7 +906,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './collector/searchInScripts.js',
     handlerName: 'searchInScripts',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'export_rebuild_bundle',
@@ -930,7 +930,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './anti-debug/antiAntiDebug.js',
     handlerName: 'antiAntiDebug',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'bypass_debugger',
@@ -938,7 +938,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './anti-debug/bypassDebugger.js',
     handlerName: 'bypassDebugger',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'hook_cryptojs',
@@ -946,7 +946,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './crypto/hookCryptoJS.js',
     handlerName: 'hookCryptoJS',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'hook_jsencrypt',
@@ -954,7 +954,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './crypto/hookJSEncrypt.js',
     handlerName: 'hookJSEncrypt',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'hook_smcrypto',
@@ -962,7 +962,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './crypto/hookSMCrypto.js',
     handlerName: 'hookSMCrypto',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'wasm_capabilities',
@@ -998,7 +998,8 @@ export const TOOLS_META: ToolMeta[] = [
   },
   {
     name: 'wasm_decompile',
-    description: 'Decompile a .wasm file with function-level summaries and suspicious-pattern detection',
+    description:
+      'Decompile a .wasm file with function-level summaries and suspicious-pattern detection',
     schema: {
       inputPath: 'string',
       outputPath: 'string',
@@ -1012,7 +1013,8 @@ export const TOOLS_META: ToolMeta[] = [
   },
   {
     name: 'wasm_inspect_sections',
-    description: 'Inspect Wasm binary sections: section map, function signatures, string scan',
+    description:
+      'Inspect Wasm binary sections: section map, function signatures, string scan',
     schema: {
       inputPath: 'string',
       sections: 'string',
@@ -1028,7 +1030,8 @@ export const TOOLS_META: ToolMeta[] = [
   },
   {
     name: 'wasm_offline_run',
-    description: 'Execute a Wasm function offline using wasmtime or wasmer CLI runtime',
+    description:
+      'Execute a Wasm function offline using wasmtime or wasmer CLI runtime',
     schema: {
       inputPath: 'string',
       functionName: 'string',
@@ -1042,7 +1045,8 @@ export const TOOLS_META: ToolMeta[] = [
   },
   {
     name: 'wasm_optimize',
-    description: 'Optimize a .wasm file using binaryen wasm-opt with selectable optimization level',
+    description:
+      'Optimize a .wasm file using binaryen wasm-opt with selectable optimization level',
     schema: {
       inputPath: 'string',
       outputPath: 'string',
@@ -1065,7 +1069,8 @@ export const TOOLS_META: ToolMeta[] = [
   },
   {
     name: 'wasm_memory_inspect',
-    description: 'Inspect WebAssembly.Memory exports — hex/ascii dump, pattern search',
+    description:
+      'Inspect WebAssembly.Memory exports — hex/ascii dump, pattern search',
     schema: {
       offset: 'number',
       length: 'number',
@@ -1082,7 +1087,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './vue/activateVueDevtools.js',
     handlerName: 'activateVueDevtools',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'clear_vue_guards',
@@ -1090,7 +1095,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './vue/clearVueGuards.js',
     handlerName: 'clearVueGuards',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'get_vue_routes',
@@ -1098,7 +1103,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './vue/getVueRoutes.js',
     handlerName: 'getVueRoutes',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'hook_console_log',
@@ -1289,40 +1294,40 @@ export const TOOLS_META: ToolMeta[] = [
     description: '去混淆代码 (v_jstools)',
     schema: {},
     modulePath: './vjstools/deobfuscate.js',
-    handlerName: 'deobfuscateCode',
-    callMode: 'params-only',
+    handlerName: 'deobfuscateCodeVj',
+    callMode: 'defineTool',
   },
   {
     name: 'minify_code',
     description: '压缩代码',
     schema: {},
     modulePath: './vjstools/deobfuscate.js',
-    handlerName: 'minifyCodeFn',
-    callMode: 'params-only',
+    handlerName: 'minifyCode',
+    callMode: 'defineTool',
   },
   {
     name: 'transpile_code',
     description: '转译代码',
     schema: {},
     modulePath: './vjstools/deobfuscate.js',
-    handlerName: 'transpileCode',
-    callMode: 'params-only',
+    handlerName: 'transpileCodeTool',
+    callMode: 'defineTool',
   },
   {
     name: 'analyze_ast',
     description: '分析 AST',
     schema: {},
     modulePath: './vjstools/deobfuscate.js',
-    handlerName: 'analyzeAst',
-    callMode: 'params-only',
+    handlerName: 'analyzeAstTool',
+    callMode: 'defineTool',
   },
   {
     name: 'diff_code',
     description: '差异代码',
     schema: {},
     modulePath: './vjstools/deobfuscate.js',
-    handlerName: 'diffCodeFn',
-    callMode: 'params-only',
+    handlerName: 'diffCodeTool',
+    callMode: 'defineTool',
   },
   {
     name: 'get_code_template',
@@ -1330,7 +1335,15 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './code-templates/getCodeTemplate.js',
     handlerName: 'getCodeTemplate',
-    callMode: 'params-only',
+    callMode: 'defineTool',
+  },
+  {
+    name: 'inject_code_template',
+    description: '注入代码模板到页面执行',
+    schema: {},
+    modulePath: './code-templates/injectCodeTemplate.js',
+    handlerName: 'injectCodeTemplate',
+    callMode: 'defineTool',
   },
   {
     name: 'list_code_templates',
@@ -1338,7 +1351,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './code-templates/listCodeTemplates.js',
     handlerName: 'listCodeTemplates',
-    callMode: 'params-only',
+    callMode: 'defineTool',
   },
   {
     name: 'click_at',
@@ -1346,7 +1359,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './input/clickAt.js',
     handlerName: 'clickAt',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'set_files',
@@ -1354,7 +1367,7 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './input/setFiles.js',
     handlerName: 'setFiles',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'fill',
@@ -1362,11 +1375,12 @@ export const TOOLS_META: ToolMeta[] = [
     schema: {},
     modulePath: './input/fill.js',
     handlerName: 'fill',
-    callMode: 'frame',
+    callMode: 'defineTool',
   },
   {
     name: 'list_websocket_connections',
-    description: '列出 WebSocket 连接；获取 wsid 后先用 analyze_websocket_messages 分析消息模式',
+    description:
+      '列出 WebSocket 连接；获取 wsid 后先用 analyze_websocket_messages 分析消息模式',
     schema: {
       pageSize: 'number',
       pageIdx: 'number',

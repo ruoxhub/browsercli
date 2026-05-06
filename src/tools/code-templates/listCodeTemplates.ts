@@ -4,22 +4,39 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {defineTool} from '../ToolDefinition.js';
+import {ToolCategory} from '../categories.js';
+
 import {CODE_TEMPLATES, listTemplateInfos} from './templates.js';
-import type {CodeTemplateInfo, CodeTemplateName} from './types.js';
+import type {CodeTemplateName} from './types.js';
 
 /**
- * 列出所有可用的代码模板（纯 Node.js 函数，不依赖 Puppeteer）。
+ * 列出所有可用的代码模板。
  */
-export function listCodeTemplates(): {
-  templates: CodeTemplateInfo[];
-  count: number;
-} {
-  const templates = listTemplateInfos();
-  return {
-    templates,
-    count: templates.length,
-  };
-}
+export const listCodeTemplates = defineTool({
+  name: 'list_code_templates',
+  description:
+    'List all available code templates with their names, descriptions and file info.',
+  annotations: {
+    title: 'List Code Templates',
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: true,
+  },
+  schema: {},
+  handler: async (_request, response) => {
+    const templates = listTemplateInfos();
+    const result = {
+      success: true,
+      message: `共有 ${templates.length} 个可用模板`,
+      tooltype: 'list_code_templates',
+      templates,
+      count: templates.length,
+    };
+    response.appendResponseLine('```json');
+    response.appendResponseLine(JSON.stringify(result, null, 2));
+    response.appendResponseLine('```');
+  },
+});
 
 /** 获取模板中文描述映射 */
 export function getTemplateDescriptions(): Record<

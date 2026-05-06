@@ -8,7 +8,7 @@ import {zod} from '../../third_party/index.js';
 import {getRuntime} from '../../runtime.js';
 import {logger} from '../../utils/logger.js';
 import {ToolCategory} from '../categories.js';
-import {defineTool, type Context, type Response} from '../ToolDefinition.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
 
 /**
  * 自动 Hook 工具配置
@@ -1071,104 +1071,125 @@ async function injectHookPlans(
 /**
  * 自动 Hook 工具 - 注入调试 Hook 和加密库 Hook
  */
-export async function autoHook(
-  params: AutoHookOptions & {url?: string} = {},
-): Promise<AutoHookToolResult> {
-  const {url, ...rawOptions} = params;
-  const options = mergePresetConfig(rawOptions);
+export const autoHook = defineTool({
+  name: 'auto_hook',
+  description: 'Auto-hook: generate and inject debug hooks and crypto library hooks based on preset or custom options',
+  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: false},
+  schema: {
+    url: zod.string().optional().describe('Target URL'),
+    preset: zod.enum(['none', 'api-signature', 'network-core']).optional().describe('Hook preset'),
+    autoInject: zod.boolean().optional().describe('Auto inject hooks into page'),
+    waitAfterHookMs: zod.number().optional().describe('Wait time after hook injection in ms'),
+    useAI: zod.boolean().optional().describe('Use AI analysis'),
+    hookCrypto: zod.boolean().optional().describe('Hook CryptoJS library'),
+    hookRsa: zod.boolean().optional().describe('Hook JSEncrypt/RSA library'),
+    hookSmCrypto: zod.boolean().optional().describe('Hook SM-Crypto library'),
+    hookTimers: zod.boolean().optional().describe('Hook setTimeout/setInterval'),
+    hookEval: zod.boolean().optional().describe('Hook eval/Function constructor'),
+    hookCookie: zod.boolean().optional().describe('Hook document.cookie'),
+    hookXhr: zod.boolean().optional().describe('Hook XMLHttpRequest'),
+    hookFetch: zod.boolean().optional().describe('Hook fetch API'),
+  },
+  handler: async (request, response, context) => {
+    const {url, ...rawOptions} = request.params;
+    const options = mergePresetConfig(rawOptions as AutoHookOptions);
 
-  logger.info('[AutoHook] Starting with options: ' + JSON.stringify(options));
+    logger.info('[AutoHook] Starting with options: ' + JSON.stringify(options));
 
-  let hooksInjected: HookInjectionRecord[] = [];
-  let cryptoDetected: CryptoDetectionResult[] = [];
+    let hooksInjected: HookInjectionRecord[] = [];
+    let cryptoDetected: CryptoDetectionResult[] = [];
 
-  try {
-    const hookPlans = buildHookPlans(options);
-    hooksInjected =
-      options.autoInject
-        ? await injectHookPlans(hookPlans)
-        : hookPlans.map(({script: _script, ...plan}) => plan);
+    try {
+      const hookPlans = buildHookPlans(options);
+      hooksInjected =
+        options.autoInject
+          ? await injectHookPlans(hookPlans)
+          : hookPlans.map(({script: _script, ...plan}) => plan);
 
-    // 在页面上下文中检测加密库（如果存在 frame）
-    const contextProvider = getRuntime().contextProvider!;
-    const selectedPage = contextProvider.getSelectedPage?.() ?? null;
-    const frame =
-      contextProvider.getSelectedFrame?.() ?? selectedPage?.mainFrame?.() ?? null;
-    if (frame) {
-      try {
-        cryptoDetected = await detectCryptoLibraries();
-      } catch (detectError) {
-        logger.warn(
-          '[AutoHook] 页面加密库检测失败: ' +
-            (detectError instanceof Error
-              ? detectError.message
-              : String(detectError)),
-        );
-        cryptoDetected = [];
+      // 在页面上下文中检测加密库（如果存在 frame）
+      const frame = context.getSelectedFrame();
+      if (frame) {
+        try {
+          cryptoDetected = await detectCryptoLibraries();
+        } catch (detectError) {
+          logger.warn(
+            '[AutoHook] 页面加密库检测失败: ' +
+              (detectError instanceof Error
+                ? detectError.message
+                : String(detectError)),
+          );
+          cryptoDetected = [];
+        }
+      } else {
+        logger.warn('[AutoHook] 没有可用的页面 Frame，跳过页面加密库检测');
       }
-    } else {
-      logger.warn(
-        '[AutoHook] 没有可用的页面 Frame，跳过页面加密库检测',
-      );
-    }
 
-    // 生成 Hook 报告
-    const successfulInjections = hooksInjected.filter(
-      h => h.success && h.injected,
-    ).length;
-    const failedInjections = hooksInjected.filter(h => !h.success).length;
-    const detectedCryptoCount = cryptoDetected.filter(c => c.detected).length;
-    const pageUrl = getRuntime().contextProvider!.getSelectedPage?.()?.url?.();
+      const successfulInjections = hooksInjected.filter(h => h.success && h.injected).length;
+      const failedInjections = hooksInjected.filter(h => !h.success).length;
+      const detectedCryptoCount = cryptoDetected.filter(c => c.detected).length;
+      const pageUrl = context.getSelectedPage()?.url?.();
 
-    const data: AutoHookToolData = {
-      url: url || pageUrl || 'unknown',
-      hooksInjected,
-      cryptoDetected,
-      report: {
-        totalHooks: hooksInjected.length,
-        successfulInjections,
-        failedInjections,
-        cryptoLibraries: detectedCryptoCount,
-        timestamp: Date.now(),
-      },
-    };
-
-    logger.info('[AutoHook] Completed successfully');
-
-    const statusParts: string[] = [];
-    if (options.autoInject) {
-      statusParts.push(`已注入 ${successfulInjections}/${hooksInjected.length} 个 Hook`);
-      if (failedInjections > 0) {
-        statusParts.push(`${failedInjections} 个注入失败`);
-      }
-    } else {
-      statusParts.push(`已生成 ${hooksInjected.length} 个 Hook 计划（未注入）`);
-    }
-    statusParts.push(`检测到 ${detectedCryptoCount} 个加密库`);
-    if (!frame) {
-      statusParts.push('注意：未找到可用 Frame，加密库检测未执行');
-    }
-
-    return {
-      success: true,
-      message: `自动 Hook 完成：${statusParts.join('，')}`,
-      tooltype: 'auto_hook',
-      data,
-    };
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logger.info('[AutoHook] Failed: ' + errorMessage);
-
-    // 即使出错也返回已注入的 Hook 信息
-    return {
-      success: false,
-      error: errorMessage,
-      tooltype: 'auto_hook',
-      data: {
-        url: url || getRuntime().contextProvider!.getSelectedPage?.()?.url?.() || 'unknown',
+      const data: AutoHookToolData = {
+        url: url || pageUrl || 'unknown',
         hooksInjected,
         cryptoDetected,
-      } as AutoHookToolData,
-    };
-  }
-}
+        report: {
+          totalHooks: hooksInjected.length,
+          successfulInjections,
+          failedInjections,
+          cryptoLibraries: detectedCryptoCount,
+          timestamp: Date.now(),
+        },
+      };
+
+      logger.info('[AutoHook] Completed successfully');
+
+      const statusParts: string[] = [];
+      if (options.autoInject) {
+        statusParts.push(`已注入 ${successfulInjections}/${hooksInjected.length} 个 Hook`);
+        if (failedInjections > 0) statusParts.push(`${failedInjections} 个注入失败`);
+      } else {
+        statusParts.push(`已生成 ${hooksInjected.length} 个 Hook 计划（未注入）`);
+      }
+      statusParts.push(`检测到 ${detectedCryptoCount} 个加密库`);
+      if (!frame) statusParts.push('注意：未找到可用 Frame，加密库检测未执行');
+
+      response.appendResponseLine('```json');
+      response.appendResponseLine(
+        JSON.stringify(
+          {
+            success: true,
+            message: `自动 Hook 完成：${statusParts.join('，')}`,
+            tooltype: 'auto_hook',
+            data,
+          },
+          null,
+          2,
+        ),
+      );
+      response.appendResponseLine('```');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.info('[AutoHook] Failed: ' + errorMessage);
+
+      response.appendResponseLine('```json');
+      response.appendResponseLine(
+        JSON.stringify(
+          {
+            success: false,
+            error: errorMessage,
+            tooltype: 'auto_hook',
+            data: {
+              url: url || context.getSelectedPage()?.url?.() || 'unknown',
+              hooksInjected,
+              cryptoDetected,
+            } as AutoHookToolData,
+          },
+          null,
+          2,
+        ),
+      );
+      response.appendResponseLine('```');
+    }
+  },
+});

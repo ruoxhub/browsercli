@@ -4,24 +4,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Frame} from '../../third_party/index.js';
-
-import type {HookResult, VueGuard} from './types.js';
+import {zod} from '../../third_party/index.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
+import {ToolCategory} from '../categories.js';
 
 /**
  * 清除 Vue Router 全局守卫：beforeEach、beforeResolve。
- *
- * @param frame - Puppeteer Frame 对象，用于注入 Hook 代码
- * @param params - 参数对象 { guards? }
- * @returns 结构化结果对象
  */
-export async function clearVueGuards(
-  frame: Frame,
-  params?: { guards?: VueGuard[] },
-): Promise<HookResult> {
-  const guardList = params?.guards || ['all'];
+export const clearVueGuards = defineTool({
+  name: 'clear_vue_guards',
+  description: 'Clear Vue Router global guards (beforeEach, beforeResolve, afterEach)',
+  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: false},
+  schema: {
+    guards: zod
+      .array(zod.enum(['beforeEach', 'beforeResolve', 'afterEach', 'all']))
+      .optional()
+      .describe('Guards to clear (default: ["all"])'),
+  },
+  handler: async (request, response, context) => {
+    const guardList = request.params.guards || ['all'];
+    const frame = context.getSelectedFrame();
 
-  const hookCode = `
+    const hookCode = `
 (function() {
   'use strict';
 
@@ -53,7 +57,6 @@ export async function clearVueGuards(
 
   const clearedGuards = [];
 
-  // Clear beforeEach
   if (guards.includes('beforeEach') || guards.includes('all')) {
     if (router.beforeEach) {
       router.beforeEach((to, from, next) => next());
@@ -61,7 +64,6 @@ export async function clearVueGuards(
     }
   }
 
-  // Clear beforeResolve
   if (guards.includes('beforeResolve') || guards.includes('all')) {
     if (router.beforeResolve) {
       router.beforeResolve((to, from, next) => next());
@@ -69,7 +71,6 @@ export async function clearVueGuards(
     }
   }
 
-  // Clear afterEach
   if (guards.includes('afterEach') || guards.includes('all')) {
     if (router.afterEach) {
       router.afterEach(() => {});
@@ -83,31 +84,57 @@ export async function clearVueGuards(
 })();
 `;
 
-  try {
-    const result = (await frame.evaluate(hookCode)) as {
-      success: boolean;
-      clearedGuards?: string[];
-      error?: string;
-    };
-
-    if (!result.success) {
-      return {
-        success: false,
-        message: result.error || '未知错误',
-        tooltype: 'clear_vue_guards',
+    try {
+      const result = (await frame.evaluate(hookCode)) as {
+        success: boolean;
+        clearedGuards?: string[];
+        error?: string;
       };
-    }
 
-    return {
-      success: true,
-      message: `Vue Router 守卫已清除：${result.clearedGuards?.join(', ') || 'none'}`,
-      tooltype: 'clear_vue_guards',
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `错误：${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'clear_vue_guards',
-    };
-  }
-}
+      if (!result.success) {
+        response.appendResponseLine('```json');
+        response.appendResponseLine(
+          JSON.stringify(
+            {
+              success: false,
+              message: result.error || '未知错误',
+              tooltype: 'clear_vue_guards',
+            },
+            null,
+            2,
+          ),
+        );
+        response.appendResponseLine('```');
+        return;
+      }
+
+      response.appendResponseLine('```json');
+      response.appendResponseLine(
+        JSON.stringify(
+          {
+            success: true,
+            message: `Vue Router 守卫已清除：${result.clearedGuards?.join(', ') || 'none'}`,
+            tooltype: 'clear_vue_guards',
+          },
+          null,
+          2,
+        ),
+      );
+      response.appendResponseLine('```');
+    } catch (error) {
+      response.appendResponseLine('```json');
+      response.appendResponseLine(
+        JSON.stringify(
+          {
+            success: false,
+            message: `错误：${error instanceof Error ? error.message : String(error)}`,
+            tooltype: 'clear_vue_guards',
+          },
+          null,
+          2,
+        ),
+      );
+      response.appendResponseLine('```');
+    }
+  },
+});
