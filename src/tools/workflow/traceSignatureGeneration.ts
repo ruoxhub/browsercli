@@ -33,20 +33,24 @@ function redactHeaders(
   );
 }
 
-async function readPausedFrames(context: import('../ToolDefinition.js').Context) {
-  const debuggerContext = context.debuggerContext;
-  const pausedState = debuggerContext.getPausedState();
-  if (!pausedState.isPaused) {
+async function readPausedFrames(contextProvider: import('../../worker/ToolContextProvider.js').ToolContextProvider) {
+  try {
+    const debuggerContext = await contextProvider.getDebuggerContext();
+    const pausedState = debuggerContext.getPausedState();
+    if (!pausedState.isPaused) {
+      return [];
+    }
+
+    return pausedState.callFrames.map(frame => ({
+      callFrameId: frame.callFrameId,
+      functionName: frame.functionName ?? '',
+      url: frame.url ?? '',
+      lineNumber: frame.location?.lineNumber ?? 0,
+      columnNumber: frame.location?.columnNumber ?? 0,
+    }));
+  } catch {
     return [];
   }
-
-  return pausedState.callFrames.map(frame => ({
-    callFrameId: frame.callFrameId,
-    functionName: frame.functionName ?? '',
-    url: frame.url ?? '',
-    lineNumber: frame.location?.lineNumber ?? 0,
-    columnNumber: frame.location?.columnNumber ?? 0,
-  }));
 }
 
 function buildNextActions(input: {
@@ -166,7 +170,7 @@ export const traceSignatureGeneration = defineTool({
         .filter((item): item is RequestInitiator => Boolean(item)),
     };
 
-    const pausedFrames = await readPausedFrames(context);
+    const pausedFrames = await readPausedFrames(contextProvider);
     const nextActions = buildNextActions({
       requestUrlPattern,
       headerKeyword,
