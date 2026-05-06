@@ -63,8 +63,7 @@ export const navigatePage = defineTool({
     const options = {timeout, waitUntil: 'domcontentloaded' as const};
 
     if (navType === 'url' && !request.params.url) {
-      response.appendResponseLine('导航类型为 url 时必须提供 url 参数。');
-      return;
+      throw new Error('导航类型为 url 时必须提供 url 参数。');
     }
 
     const resolvedPage = resolveActivePage(runtime);

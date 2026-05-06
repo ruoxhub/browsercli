@@ -97,6 +97,9 @@ export class ToolAdapter {
         await provider.syncPages();
       },
       selectPage: (page) => provider.selectPage(page),
+      bringPageToFront: (page) => provider.bringPageToFront(page),
+      syncPageContext: (page) => provider.syncPageContext(page),
+      getPages: () => provider.getPages(),
       getSelectedFrame: () => {
         const frame = provider.getSelectedFrame()
           ?? provider.getSelectedPage()?.mainFrame();

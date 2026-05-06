@@ -53,6 +53,7 @@ export interface DevToolsData {
 
 export interface Response {
   appendResponseLine(value: string): void;
+  setStructuredContent(content: unknown): void;
   setIncludePages(value: boolean): void;
   setIncludeNetworkRequests(
     value: boolean,
@@ -99,6 +100,9 @@ export type Context = Readonly<{
   newPage(): Promise<Page>;
   closePage(pageIdx: number): Promise<void>;
   selectPage(page: Page): void;
+  bringPageToFront(page: Page): Promise<void>;
+  syncPageContext(page: Page): void;
+  getPages(): Page[];
   getSelectedFrame(): Frame;
   selectFrame(frame: Frame): void;
   resetSelectedFrame(): void;

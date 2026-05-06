@@ -8,8 +8,6 @@ import {defineTool} from '../ToolDefinition.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 
-import type {ToolContextProvider} from '../../worker/ToolContextProvider.js';
-
 /**
  * 按索引选择页面，将指定页面带到前台并切换上下文。
  */
@@ -29,21 +27,14 @@ export const selectPage = defineTool({
       .describe('页面索引（从 list_pages 获取）.'),
   },
   handler: async (request, response, context) => {
-    const runtime = context as unknown as ToolContextProvider;
     const {pageIdx} = request.params;
 
-    try {
-      const page = runtime.getPageByIdx(pageIdx);
-      await runtime.bringPageToFront(page);
-      runtime.selectPage(page);
-      runtime.syncPageContext(page);
+    const page = context.getPageByIdx(pageIdx);
+    await context.bringPageToFront(page);
+    context.selectPage(page);
+    context.syncPageContext(page);
 
-      response.appendResponseLine(`已选择页面 ${pageIdx}: ${page.url()}`);
-      response.appendResponseLine(`标题: ${await page.title()}`);
-    } catch (error) {
-      response.appendResponseLine(
-        `选择页面失败：${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
+    response.appendResponseLine(`已选择页面 ${pageIdx}: ${page.url()}`);
+    response.appendResponseLine(`标题: ${await page.title()}`);
   },
 });

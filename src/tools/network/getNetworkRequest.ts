@@ -62,9 +62,10 @@ export const getNetworkRequest = defineTool({
             responseHeaders: {},
           },
         };
-        response.appendResponseLine('```json');
-        response.appendResponseLine(JSON.stringify(result, null, 2));
-        response.appendResponseLine('```');
+        // response.appendResponseLine('```json');
+        // response.appendResponseLine(JSON.stringify(result, null, 2));
+        // response.appendResponseLine('```');
+        response.setStructuredContent(result);
         return;
       }
 
@@ -116,9 +117,10 @@ export const getNetworkRequest = defineTool({
         data,
       };
 
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+      // response.appendResponseLine('```json');
+      // response.appendResponseLine(JSON.stringify(result, null, 2));
+      // response.appendResponseLine('```');
+      response.setStructuredContent(result);
     } catch (error) {
       const result = {
         success: false,
@@ -135,9 +137,10 @@ export const getNetworkRequest = defineTool({
           responseHeaders: {},
         },
       };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+      response.setStructuredContent(result);
+      // response.appendResponseLine('```json');
+      // response.appendResponseLine(JSON.stringify(result, null, 2));
+      // response.appendResponseLine('```');
     }
   },
 });

@@ -8,8 +8,6 @@ import {defineTool} from '../ToolDefinition.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 
-import type {ToolContextProvider} from '../../worker/ToolContextProvider.js';
-
 // Default navigation timeout in milliseconds (10 seconds)
 const DEFAULT_NAV_TIMEOUT = 10_000;
 
@@ -34,20 +32,19 @@ export const newPage = defineTool({
       .describe('导航超时（毫秒），默认 10000。'),
   },
   handler: async (request, response, context) => {
-    const runtime = context as unknown as ToolContextProvider;
     const {url, timeout} = request.params;
 
     try {
-      const page = await runtime.newPage();
-      runtime.selectPage(page);
-      runtime.syncPageContext(page);
+      const page = await context.newPage();
+      context.selectPage(page);
+      context.syncPageContext(page);
 
       await page.goto(url, {
         timeout: timeout ?? DEFAULT_NAV_TIMEOUT,
         waitUntil: 'domcontentloaded',
       });
 
-      const pages = runtime.getPages();
+      const pages = context.getPages();
       const index = pages.indexOf(page);
 
       response.appendResponseLine(`已创建新页面并导航到 ${url}`);

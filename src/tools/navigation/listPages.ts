@@ -12,8 +12,6 @@ import {
   withOperationTimeout,
 } from '../shared/browserRuntime.js';
 
-import type {ToolContextProvider} from '../../worker/ToolContextProvider.js';
-
 /**
  * 列出浏览器中所有已打开的页面。
  */
@@ -28,11 +26,9 @@ export const listPages = defineTool({
   },
   schema: {},
   handler: async (request, response, context) => {
-    const runtime = context as unknown as ToolContextProvider;
-
     try {
-      const pages = runtime.getPages();
-      const selectedPage = runtime.getSelectedPage();
+      const pages = context.getPages();
+      const selectedPage = context.getSelectedPage();
       let unavailableTitleCount = 0;
       const pageInfos: Array<{index: number; url: string; title: string}> = [];
 

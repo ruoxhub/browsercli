@@ -196,7 +196,7 @@ export const listNetworkRequests = defineTool({
           getRuntime().contextProvider!,
         );
         if ('message' in resolvedPage) {
-          const errorResult = {
+          response.setStructuredContent({
             success: false,
             message: resolvedPage.message,
             tooltype: 'list_network_requests',
@@ -209,10 +209,7 @@ export const listNetworkRequests = defineTool({
               targetPageIdx: 0,
               timedOut: false,
             },
-          };
-          response.appendResponseLine('```json');
-          response.appendResponseLine(JSON.stringify(errorResult, null, 2));
-          response.appendResponseLine('```');
+          });
           return;
         }
         targetPageIdx = resolvedPage.pageIdx;
@@ -227,7 +224,7 @@ export const listNetworkRequests = defineTool({
         });
         if (!matched) {
           const timeoutMs = params.waitTimeoutMs ?? DEFAULT_WAIT_TIMEOUT_MS;
-          const timeoutResult = {
+          response.setStructuredContent({
             success: false,
             message: `等待请求超时：${timeoutMs}ms 内未发现匹配 ${params.waitForRequest} 的请求`,
             tooltype: 'list_network_requests',
@@ -240,10 +237,7 @@ export const listNetworkRequests = defineTool({
               targetPageIdx,
               timedOut: true,
             },
-          };
-          response.appendResponseLine('```json');
-          response.appendResponseLine(JSON.stringify(timeoutResult, null, 2));
-          response.appendResponseLine('```');
+          });
           return;
         }
       }
@@ -300,19 +294,15 @@ export const listNetworkRequests = defineTool({
           : {}),
       };
 
-      const result = {
+      response.setStructuredContent({
         success: true,
         message: `共 ${total} 个请求，返回 ${pagedData.length} 个`,
         tooltype: 'list_network_requests',
         logFormat: 'json',
         data,
-      };
-
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+      });
     } catch (error) {
-      const errorResult = {
+      response.setStructuredContent({
         success: false,
         message: `列出请求失败：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'list_network_requests',
@@ -325,10 +315,7 @@ export const listNetworkRequests = defineTool({
           targetPageIdx: 0,
           timedOut: false,
         },
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(errorResult, null, 2));
-      response.appendResponseLine('```');
+      });
     }
   },
 });
