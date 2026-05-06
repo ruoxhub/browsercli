@@ -162,7 +162,10 @@ const TOOL_PARAMS = {
     taskSlug: 'verify-test-slug',
     targetUrl: 'https://example.com',
     goal: 'verify tool works',
-    autoGenerate: true,
+    autoGenerate: false,
+    entryCode: 'console.log("test")',
+    envCode: 'globalThis.window = globalThis;',
+    capture: { test: true },
   },
 
   diff_env_requirements: {

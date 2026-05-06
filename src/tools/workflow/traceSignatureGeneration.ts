@@ -28,8 +28,33 @@ export const traceSignatureGeneration = Object.assign(
     const headerKeyword = (params.headerKeyword ?? '').toLowerCase();
     const maxResults = Math.max(1, Math.floor(params.maxResults ?? 10));
     const includeSensitiveValues = params.includeSensitiveValues === true;
+    const selectedPage = contextProvider.getSelectedPage();
+    const pages = contextProvider.getPages();
+    const pageIndex =
+      selectedPage && !selectedPage.isClosed()
+        ? pages.indexOf(selectedPage)
+        : -1;
+    if (pageIndex < 0) {
+      return {
+        success: true,
+        message: '签名追踪完成，当前无活跃页面，请先打开或选择页面',
+        tooltype: 'trace_signature_generation',
+        data: {
+          requestFingerprints: [],
+          pausedFrames: [],
+          evidence: {requestHeaders: [], initiators: []},
+          nextActions: [
+            '先通过 new_page 或 navigate_page 打开目标页面',
+            '触发登录、下单、分页等目标业务动作',
+            '重新运行 trace_signature_generation',
+          ],
+          gaps: ['无活跃页面，无法获取网络请求'],
+          taskId: params.taskId,
+        },
+      };
+    }
     const requests = contextProvider
-      .getNetworkRequests(false, contextProvider.getSelectedPageIndex?.() ?? 0)
+      .getNetworkRequests(false, pageIndex)
       .filter(request => {
         if (requestUrlPattern && !request.url().includes(requestUrlPattern)) {
           return false;

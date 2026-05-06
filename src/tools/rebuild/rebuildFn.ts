@@ -309,9 +309,9 @@ export async function buildAutoBundle(
     options.targetFunctionNames,
     options.targetActionDescription,
   );
-  const page = await runtime.pageController.getPage();
-  const [cookies, localStorage, sessionStorage, runtimeEvidence] =
+  const [page, cookies, localStorage, sessionStorage, runtimeEvidence] =
     await Promise.all([
+      runtime.pageController.getPage(),
       runtime.pageController.getCookies(),
       runtime.pageController.getLocalStorage(),
       runtime.pageController.getSessionStorage(),
