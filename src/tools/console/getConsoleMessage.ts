@@ -34,11 +34,10 @@ export const getConsoleMessage = defineTool({
       .describe('The msgid of a console message on the page from the listed console messages'),
   },
   handler: async (request, response) => {
+    let data: ConsoleMessageData;
     try {
       const message = getRuntime().contextProvider!.getConsoleMessageById(request.params.msgid);
       const consoleMessageStableId = request.params.msgid;
-
-      let data: ConsoleMessageData;
 
       if ('args' in message) {
         const consoleMessage = message as unknown as ConsoleMessageEntry;
@@ -80,11 +79,19 @@ export const getConsoleMessage = defineTool({
         };
       }
 
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(data, null, 2));
-      response.appendResponseLine('```');
+      // response.appendResponseLine('```json');
+      // response.appendResponseLine(JSON.stringify(data, null, 2));
+      // response.appendResponseLine('```');
+      response.setStructuredContent(data);
     } catch (error) {
-      response.appendResponseLine(`Error: ${error instanceof Error ? error.message : String(error)}`);
+      // response.appendResponseLine(`Error: ${error instanceof Error ? error.message : String(error)}`);
+      data = {
+        consoleMessageStableId: request.params.msgid,
+        type: 'error',
+        message: `Error: ${error instanceof Error ? error.message : String(error)}`,
+        args: [],
+      }
+      response.setStructuredContent(data)
     }
   },
 });

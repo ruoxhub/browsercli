@@ -52,9 +52,10 @@ export const antiAntiDebug = defineTool({
           'anti_anti_debug requires a non-empty "features" array (e.g. ["fixedWindowSize", "hideWebdriver"])',
         tooltype: 'anti_anti_debug',
       };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+      // response.appendResponseLine('```json');
+      // response.appendResponseLine(JSON.stringify(result, null, 2));
+      // response.appendResponseLine('```');
+      response.setStructuredContent(result);
       return;
     }
 
@@ -176,18 +177,20 @@ export const antiAntiDebug = defineTool({
         message: `Anti-Anti-Debug 已安装，启用功能：${installedFeatures.join(', ')}（共 ${installedFeatures.length} 项）`,
         tooltype: 'anti_anti_debug',
       };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+      // response.appendResponseLine('```json');
+      // response.appendResponseLine(JSON.stringify(result, null, 2));
+      // response.appendResponseLine('```');
+      response.setStructuredContent(result);
     } catch (error) {
       const result = {
         success: false,
         message: `错误：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'anti_anti_debug',
       };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+      // response.appendResponseLine('```json');
+      // response.appendResponseLine(JSON.stringify(result, null, 2));
+      // response.appendResponseLine('```');
+      response.setStructuredContent(result);
     }
   },
 });

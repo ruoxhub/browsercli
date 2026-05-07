@@ -32,9 +32,10 @@ export const listCodeTemplates = defineTool({
       templates,
       count: templates.length,
     };
-    response.appendResponseLine('```json');
-    response.appendResponseLine(JSON.stringify(result, null, 2));
-    response.appendResponseLine('```');
+    // response.appendResponseLine('```json');
+    // response.appendResponseLine(JSON.stringify(result, null, 2));
+    // response.appendResponseLine('```');
+    response.setStructuredContent(result);
   },
 });
 

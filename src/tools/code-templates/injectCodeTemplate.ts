@@ -46,9 +46,10 @@ export const injectCodeTemplate = defineTool({
         tooltype: 'inject_code_template',
         name: templateName,
       };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+      // response.appendResponseLine('```json');
+      // response.appendResponseLine(JSON.stringify(result, null, 2));
+      // response.appendResponseLine('```');
+      response.setStructuredContent(result);
       return;
     }
 
@@ -65,9 +66,10 @@ export const injectCodeTemplate = defineTool({
         tooltype: 'inject_code_template',
         name: templateName,
       };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+      // response.appendResponseLine('```json');
+      // response.appendResponseLine(JSON.stringify(result, null, 2));
+      // response.appendResponseLine('```');
+      response.setStructuredContent(result);
     } catch (error) {
       const result = {
         success: false,
@@ -75,9 +77,10 @@ export const injectCodeTemplate = defineTool({
         tooltype: 'inject_code_template',
         name: templateName,
       };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+      // response.appendResponseLine('```json');
+      // response.appendResponseLine(JSON.stringify(result, null, 2));
+      // response.appendResponseLine('```');
+      response.setStructuredContent(result);
     }
   },
 });

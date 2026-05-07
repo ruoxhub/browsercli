@@ -125,35 +125,19 @@ export const hookSMCrypto = defineTool({
 
     try {
       await frame.evaluate(hookCode);
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: true,
-            message: 'SM-Crypto Hook 已安装',
-            tooltype: 'hook_smcrypto',
-            algorithms: algos,
-            logFormat: format,
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: true,
+        message: 'SM-Crypto Hook 已安装',
+        tooltype: 'hook_smcrypto',
+        algorithms: algos,
+        logFormat: format,
+      });
     } catch (error) {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: false,
-            message: `错误：${error instanceof Error ? error.message : String(error)}`,
-            tooltype: 'hook_smcrypto',
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: false,
+        message: `错误：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'hook_smcrypto',
+      });
     }
   },
 });

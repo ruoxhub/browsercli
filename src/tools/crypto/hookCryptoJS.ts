@@ -122,35 +122,19 @@ export const hookCryptoJS = defineTool({
 
     try {
       await frame.evaluate(hookCode);
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: true,
-            message: 'CryptoJS Hook 已安装',
-            tooltype: 'hook_cryptojs',
-            algorithms: algos,
-            logFormat: format,
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: true,
+        message: 'CryptoJS Hook 已安装',
+        tooltype: 'hook_cryptojs',
+        algorithms: algos,
+        logFormat: format,
+      });
     } catch (error) {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: false,
-            message: `错误：${error instanceof Error ? error.message : String(error)}`,
-            tooltype: 'hook_cryptojs',
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: false,
+        message: `错误：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'hook_cryptojs',
+      });
     }
   },
 });

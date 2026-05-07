@@ -60,9 +60,10 @@ export const searchInScripts = defineTool({
         data,
       };
 
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(responseData, null, 2));
-      response.appendResponseLine('```');
+      // response.appendResponseLine('```json');
+      // response.appendResponseLine(JSON.stringify(responseData, null, 2));
+      // response.appendResponseLine('```');
+      response.setStructuredContent(responseData);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.error('[searchInScripts] 搜索失败:', errorMsg);
@@ -81,9 +82,10 @@ export const searchInScripts = defineTool({
         },
       };
 
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(errorData, null, 2));
-      response.appendResponseLine('```');
+      // response.appendResponseLine('```json');
+      // response.appendResponseLine(JSON.stringify(errorData, null, 2));
+      // response.appendResponseLine('```');
+      response.setStructuredContent(errorData);
     }
   },
 });

@@ -198,16 +198,15 @@ export const record_reverse_evidence = defineTool({
       });
     }
 
-    response.appendResponseLine('```json');
-    response.appendResponseLine(JSON.stringify({
-      ok: true,
-      taskId: task.taskId,
-      taskDir: task.taskDir,
-      channel: request.params.channel,
-      mirroredChannels,
-      targetContext: hasTargetContext ? targetContext : undefined,
-    }, null, 2));
-    response.appendResponseLine('```');
+    response.setStructuredContent({
+        ok: true,
+        taskId: task.taskId,
+        taskDir: task.taskDir,
+        channel: request.params.channel,
+        logFormat: 'json',
+        mirroredChannels,
+        targetContext: hasTargetContext ? targetContext : undefined,
+      });
   },
 });
 
@@ -264,14 +263,13 @@ export const export_session_report = defineTool({
       return;
     }
 
-    response.appendResponseLine('```json');
-    response.appendResponseLine(JSON.stringify({
-      success: true,
-      message: `会话报告已导出 (格式: ${request.params.format})`,
-      tooltype: 'export_session_report',
-      data: report,
-    }, null, 2));
-    response.appendResponseLine('```');
+    response.setStructuredContent({
+        success: true,
+        message: `会话报告已导出 (格式: ${request.params.format})`,
+        tooltype: 'export_session_report',
+        logFormat: 'json',
+        data: report,
+      });
   },
 });
 

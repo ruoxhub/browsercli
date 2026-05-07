@@ -24,11 +24,11 @@ export const riskPanel = defineTool({
   handler: async (request, response) => {
     const runtime = getRuntime();
     if (!runtime?.analyzer?.understand || !runtime?.cryptoDetector?.detect) {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify({
+      response.setStructuredContent({
         success: false,
         message: 'risk_panel requires analyzer.understand and cryptoDetector.detect runtime services',
         tooltype: 'riskPanel',
+        logFormat: 'json',
         data: {
           score: 0,
           level: 'low',
@@ -42,8 +42,7 @@ export const riskPanel = defineTool({
           },
           recommendations: [],
         },
-      }, null, 2));
-      response.appendResponseLine('```');
+      });
       return;
     }
 
@@ -51,11 +50,11 @@ export const riskPanel = defineTool({
     if (!code) {
       const top = runtime.collector.getTopPriorityFiles(request.params.topN ?? 5);
       if (top.files.length === 0) {
-        response.appendResponseLine('```json');
-        response.appendResponseLine(JSON.stringify({
+        response.setStructuredContent({
           success: false,
           message: 'No code provided and no collected files found. Run collect_code first.',
           tooltype: 'riskPanel',
+          logFormat: 'json',
           data: {
             score: 0,
             level: 'low',
@@ -69,8 +68,7 @@ export const riskPanel = defineTool({
             },
             recommendations: [],
           },
-        }, null, 2));
-        response.appendResponseLine('```');
+        });
         return;
       }
       code = top.files.map(file => `// ${file.url}\n${file.content}`).join('\n\n');
@@ -143,11 +141,11 @@ export const riskPanel = defineTool({
         : null,
     ].filter((item): item is string => Boolean(item));
 
-    response.appendResponseLine('```json');
-    response.appendResponseLine(JSON.stringify({
+    response.setStructuredContent({
       success: true,
       message: 'Risk panel analysis completed',
       tooltype: 'riskPanel',
+      logFormat: 'json',
       data: {
         score,
         level,
@@ -163,7 +161,6 @@ export const riskPanel = defineTool({
         },
         recommendations,
       },
-    }, null, 2));
-    response.appendResponseLine('```');
+    });
   },
 });

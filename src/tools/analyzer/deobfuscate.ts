@@ -21,23 +21,21 @@ export const deobfuscateCode = defineTool({
   handler: async (request, response) => {
     try {
       const result = await getRuntime().deobfuscator.deobfuscate(request.params);
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify({
+      response.setStructuredContent({
         success: true,
         message: 'Deobfuscation completed',
         tooltype: 'deobfuscate',
+        logFormat: 'json',
         data: result,
-      }, null, 2));
-      response.appendResponseLine('```');
+      });
     } catch (error) {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify({
+      response.setStructuredContent({
         success: false,
         message: `Deobfuscation failed: ${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'deobfuscate',
+        logFormat: 'json',
         data: {},
-      }, null, 2));
-      response.appendResponseLine('```');
+      });
     }
   },
 });

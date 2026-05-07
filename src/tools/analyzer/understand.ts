@@ -20,23 +20,29 @@ export const understandCode = defineTool({
   handler: async (request, response) => {
     try {
       const result = await getRuntime().analyzer.understand(request.params);
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify({
+      // response.appendResponseLine('```json');
+      // response.appendResponseLine(JSON.stringify({
+      //   success: true,
+      //   message: 'Code analysis completed',
+      //   tooltype: 'understand',
+      //   data: result,
+      // }, null, 2));
+      // response.appendResponseLine('```');
+      response.setStructuredContent({
         success: true,
         message: 'Code analysis completed',
         tooltype: 'understand',
+        logFormat: 'json',
         data: result,
-      }, null, 2));
-      response.appendResponseLine('```');
+      });
     } catch (error) {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify({
+      response.setStructuredContent({
         success: false,
         message: `Code analysis failed: ${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'understand',
+        logFormat: 'json',
         data: {},
-      }, null, 2));
-      response.appendResponseLine('```');
+      });
     }
   },
 });

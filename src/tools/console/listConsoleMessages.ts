@@ -17,14 +17,13 @@ import type {
   ConsoleMessageEntry,
   ConsoleResponseType,
   ListConsoleMessagesData,
+  ListConsoleMessagesResult,
 } from './types.js';
 import {FILTERABLE_MESSAGE_TYPES} from './types.js';
 import {isAggregatedIssue} from './types.js';
 
 /**
  * 列出当前页面的所有 Console 消息（defineTool 模式）。
- *
- * 使用 defineTool 包装，与 old-source 结构保持一致。
  */
 export const listConsoleMessages = defineTool({
   name: 'list_console_messages',
@@ -65,6 +64,7 @@ export const listConsoleMessages = defineTool({
       ),
   },
   handler: async (request, response) => {
+    let result: ListConsoleMessagesResult;
     try {
       const includePreserved = request.params.includePreservedMessages ?? false;
       let messages = getRuntime().contextProvider!.getConsoleData(includePreserved);
@@ -156,12 +156,26 @@ export const listConsoleMessages = defineTool({
         pageIdx,
         pageSize,
       };
-
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(data, null, 2));
-      response.appendResponseLine('```');
+      result = {
+        success: true,
+        message: `Listed ${data.messages.length} console messages`,
+        tooltype: 'list_console_messages',
+        logFormat: 'json',
+        data,
+      }
+      // response.appendResponseLine('```json');
+      // response.appendResponseLine(JSON.stringify(data, null, 2));
+      // response.appendResponseLine('```');
+      response.setStructuredContent(result);
     } catch (error) {
-      response.appendResponseLine(`Error: ${error instanceof Error ? error.message : String(error)}`);
+      result = {
+        success: false,
+        message: `List console messages failed: ${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'list_console_messages',
+        logFormat: 'json',
+        data: null
+      }
+      // response.appendResponseLine(`Error: ${error instanceof Error ? error.message : String(error)}`);
     }
   },
 });

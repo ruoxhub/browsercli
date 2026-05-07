@@ -81,34 +81,18 @@ export const hookJSEncrypt = defineTool({
 
     try {
       await frame.evaluate(hookCode);
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: true,
-            message: 'JSEncrypt Hook 已安装',
-            tooltype: 'hook_jsencrypt',
-            logFormat: format,
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: true,
+        message: 'JSEncrypt Hook 已安装',
+        tooltype: 'hook_jsencrypt',
+        logFormat: format,
+      });
     } catch (error) {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: false,
-            message: `错误：${error instanceof Error ? error.message : String(error)}`,
-            tooltype: 'hook_jsencrypt',
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: false,
+        message: `错误：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'hook_jsencrypt',
+      });
     }
   },
 });

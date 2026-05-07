@@ -226,20 +226,12 @@ export const evaluateScript = defineTool({
     const desiredContext = request.params.context ?? 'page';
 
     if (!functionCode || functionCode.trim().length === 0) {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: false,
-            message: 'function 参数不能为空',
-            tooltype: 'evaluate_script',
-            result: '',
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: false,
+        message: 'function 参数不能为空',
+        tooltype: 'evaluate_script',
+        result: '',
+      });
       return;
     }
 
@@ -260,41 +252,25 @@ export const evaluateScript = defineTool({
         );
 
         if (!executionContext) {
-          response.appendResponseLine('```json');
-          response.appendResponseLine(
-            JSON.stringify(
-              {
-                success: false,
-                message: describeContextSelectionFailure(
-                  executionContexts,
-                  desiredContext,
-                  selectedFrameId,
-                ),
-                tooltype: 'evaluate_script',
-              },
-              null,
-              2,
+          response.setStructuredContent({
+            success: false,
+            message: describeContextSelectionFailure(
+              executionContexts,
+              desiredContext,
+              selectedFrameId,
             ),
-          );
-          response.appendResponseLine('```');
+            tooltype: 'evaluate_script',
+          });
           return;
         }
 
         const client = debuggerContext.getClient();
         if (!client) {
-          response.appendResponseLine('```json');
-          response.appendResponseLine(
-            JSON.stringify(
-              {
-                success: false,
-                message: '脚本执行失败：Debugger CDP 会话不可用',
-                tooltype: 'evaluate_script',
-              },
-              null,
-              2,
-            ),
-          );
-          response.appendResponseLine('```');
+          response.setStructuredContent({
+            success: false,
+            message: '脚本执行失败：Debugger CDP 会话不可用',
+            tooltype: 'evaluate_script',
+          });
           return;
         }
 

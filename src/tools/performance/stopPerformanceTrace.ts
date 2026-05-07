@@ -26,19 +26,12 @@ export const stopPerformanceTrace = defineTool({
     const tooltype = 'stop_performance_trace';
 
     if (!context.isRunningPerformanceTrace()) {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: false,
-            message: '当前没有正在运行的性能追踪。',
-            tooltype,
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: false,
+        message: '当前没有正在运行的性能追踪。',
+        tooltype,
+        logFormat: 'json',
+      });
       return;
     }
 
@@ -87,28 +80,24 @@ export const stopPerformanceTrace = defineTool({
         const traceSummaryText = await getTraceSummary(result);
         data.traceSummary = traceSummaryText;
 
-        response.appendResponseLine('```json');
-        response.appendResponseLine(
-          JSON.stringify(
-            {success: true, message: '性能追踪已停止。', tooltype, data},
-            null,
-            2,
-          ),
-        );
-        response.appendResponseLine('```');
+        response.setStructuredContent({
+          success: true,
+          message: '性能追踪已停止。',
+          tooltype,
+          logFormat: 'json',
+          data,
+        });
         return;
       }
 
       data.parseError = result.error;
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {success: false, message: '追踪数据解析出错。', tooltype, data},
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: false,
+        message: '追踪数据解析出错。',
+        tooltype,
+        logFormat: 'json',
+        data,
+      });
     } catch (e) {
       const errorText = e instanceof Error ? e.message : JSON.stringify(e);
       logger.debug(`Error stopping performance trace: ${errorText}`);

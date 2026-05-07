@@ -137,9 +137,10 @@ export const collectCode = defineTool({
         data,
       };
 
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+      // response.appendResponseLine('```json');
+      // response.appendResponseLine(JSON.stringify(result, null, 2));
+      // response.appendResponseLine('```');
+      response.setStructuredContent(result);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.error('[collectCode] 收集失败:', errorMsg);
@@ -152,9 +153,10 @@ export const collectCode = defineTool({
         data: null,
       };
 
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(errorResult, null, 2));
-      response.appendResponseLine('```');
+      // response.appendResponseLine('```json');
+      // response.appendResponseLine(JSON.stringify(errorResult, null, 2));
+      // response.appendResponseLine('```');
+      response.setStructuredContent(errorResult);
     }
   },
 });

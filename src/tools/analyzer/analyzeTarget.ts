@@ -161,11 +161,11 @@ export const analyze_target = defineTool({
     const params = request.params;
     
     if (!params?.url) {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify({
+      response.setStructuredContent({
         success: false,
         message: 'analyze_target requires a "url" parameter',
         tooltype: 'analyze_target',
+        logFormat: 'json',
         data: {
           target: '',
           durationMs: 0,
@@ -195,8 +195,7 @@ export const analyze_target = defineTool({
           stopIf: [],
           nextActions: [],
         },
-      }, null, 2));
-      response.appendResponseLine('```');
+      });
       return;
     }
 
@@ -339,13 +338,12 @@ export const analyze_target = defineTool({
       replay: replayResults,
     };
 
-    response.appendResponseLine('```json');
-    response.appendResponseLine(JSON.stringify({
+    response.setStructuredContent({
       success: true,
       message: `分析完成，目标: ${params.url}`,
       tooltype: 'analyze_target',
+      logFormat: 'json',
       data: result,
-    }, null, 2));
-    response.appendResponseLine('```');
+    });
   },
 });

@@ -72,9 +72,10 @@ export const collectionDiff = defineTool({
         data,
       };
 
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+      // response.appendResponseLine('```json');
+      // response.appendResponseLine(JSON.stringify(result, null, 2));
+      // response.appendResponseLine('```');
+      response.setStructuredContent(result);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.error('[collectionDiff] 对比失败:', errorMsg);
@@ -96,9 +97,10 @@ export const collectionDiff = defineTool({
         },
       };
 
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(errorResult, null, 2));
-      response.appendResponseLine('```');
+      // response.appendResponseLine('```json');
+      // response.appendResponseLine(JSON.stringify(errorResult, null, 2));
+      // response.appendResponseLine('```');
+      response.setStructuredContent(errorResult);
     }
   },
 });

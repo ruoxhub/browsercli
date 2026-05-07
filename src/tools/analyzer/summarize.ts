@@ -137,14 +137,13 @@ export const summarizeCode = defineTool({
           runtime.summarizer.summarizeProject(request.params.files ?? []),
           SUMMARIZE_TIMEOUT_MS,
         );
-        response.appendResponseLine('```json');
-        response.appendResponseLine(JSON.stringify({
-          success: true,
-          message: 'Project summarization completed',
-          tooltype: 'summarize',
-          data: result,
-        }, null, 2));
-        response.appendResponseLine('```');
+        response.setStructuredContent({
+        success: true,
+        message: 'Project summarization completed',
+        tooltype: 'summarize',
+        logFormat: 'json',
+        data: result,
+      });
         return;
       }
 
@@ -153,14 +152,13 @@ export const summarizeCode = defineTool({
           runtime.summarizer.summarizeBatch(request.params.files ?? []),
           SUMMARIZE_TIMEOUT_MS,
         );
-        response.appendResponseLine('```json');
-        response.appendResponseLine(JSON.stringify({
-          success: true,
-          message: 'Batch summarization completed',
-          tooltype: 'summarize',
-          data: result,
-        }, null, 2));
-        response.appendResponseLine('```');
+        response.setStructuredContent({
+        success: true,
+        message: 'Batch summarization completed',
+        tooltype: 'summarize',
+        logFormat: 'json',
+        data: result,
+      });
         return;
       }
 
@@ -174,14 +172,13 @@ export const summarizeCode = defineTool({
         runtime.summarizer.summarizeFile(file),
         SUMMARIZE_TIMEOUT_MS,
       );
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify({
+      response.setStructuredContent({
         success: true,
         message: 'File summarization completed',
         tooltype: 'summarize',
+        logFormat: 'json',
         data: result,
-      }, null, 2));
-      response.appendResponseLine('```');
+      });
     } catch (error) {
       // Fallback to basic analysis on timeout or LLM failure
       const code = request.params.code ?? '';
@@ -200,14 +197,13 @@ export const summarizeCode = defineTool({
           ? (request.params.files ?? []).map(f => basicFileSummary(f.content, f.url))
           : basicFileSummary(code, url);
 
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify({
+      response.setStructuredContent({
         success: true,
         message: 'Summarization completed (fallback: AI unavailable or timed out)',
         tooltype: 'summarize',
+        logFormat: 'json',
         data: fallback,
-      }, null, 2));
-      response.appendResponseLine('```');
+      });
     }
   },
 });

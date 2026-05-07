@@ -96,18 +96,20 @@ export const bypassDebugger = defineTool({
         message: `Bypass Debugger 已安装，Hook 目标：${hookTargets.join(', ')}`,
         tooltype: 'bypass_debugger',
       };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+      // response.appendResponseLine('```json');
+      // response.appendResponseLine(JSON.stringify(result, null, 2));
+      // response.appendResponseLine('```');
+      response.setStructuredContent(result);
     } catch (error) {
       const result = {
         success: false,
         message: `错误：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'bypass_debugger',
       };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+      // response.appendResponseLine('```json');
+      // response.appendResponseLine(JSON.stringify(result, null, 2));
+      // response.appendResponseLine('```');
+      response.setStructuredContent(result);
     }
   },
 });

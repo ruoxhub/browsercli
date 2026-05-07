@@ -48,9 +48,10 @@ export const getCodeTemplate = defineTool({
         code: '',
         sizeBytes: 0,
       };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+      // response.appendResponseLine('```json');
+      // response.appendResponseLine(JSON.stringify(result, null, 2));
+      // response.appendResponseLine('```');
+      response.setStructuredContent(result);
       return;
     }
 
@@ -69,9 +70,10 @@ export const getCodeTemplate = defineTool({
         code,
         sizeBytes,
       };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+      // response.appendResponseLine('```json');
+      // response.appendResponseLine(JSON.stringify(result, null, 2));
+      // response.appendResponseLine('```');
+      response.setStructuredContent(result);
     } catch (error) {
       const result = {
         success: false,
@@ -82,9 +84,10 @@ export const getCodeTemplate = defineTool({
         code: '',
         sizeBytes: 0,
       };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+      // response.appendResponseLine('```json');
+      // response.appendResponseLine(JSON.stringify(result, null, 2));
+      // response.appendResponseLine('```');
+      response.setStructuredContent(result);
     }
   },
 });

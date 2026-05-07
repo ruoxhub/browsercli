@@ -20,11 +20,11 @@ export const detectCrypto = defineTool({
   handler: async (request, response) => {
     try {
       const raw = await getRuntime().cryptoDetector.detect(request.params);
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify({
+      response.setStructuredContent({
         success: true,
         message: 'Crypto detection completed',
         tooltype: 'detect_crypto',
+        logFormat: 'json',
         data: {
           algorithms: raw.algorithms,
           libraries: raw.libraries,
@@ -32,21 +32,19 @@ export const detectCrypto = defineTool({
           securityIssues: raw.securityIssues,
           strength: raw.strength,
         },
-      }, null, 2));
-      response.appendResponseLine('```');
+      });
     } catch (error) {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify({
+      response.setStructuredContent({
         success: false,
         message: `Crypto detection failed: ${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'detect_crypto',
+        logFormat: 'json',
         data: {
           algorithms: [],
           libraries: [],
           confidence: 0,
         },
-      }, null, 2));
-      response.appendResponseLine('```');
+      });
     }
   },
 });

@@ -16,16 +16,30 @@ import {
   type AutoHookToolData,
 } from '../../../../src/tools/workflow/autoHook.js';
 
+// 辅助函数：调用 autoHook 工具
+async function callAutoHook(runtime: any, params: any): Promise<any> {
+  let result: any = null;
+  const response = {
+    appendResponseLine: (line: string) => {},
+    setStructuredContent: (content: unknown) => {
+      result = content;
+    },
+  } as any;
+  await autoHook.handler({params} as any, response, runtime);
+  return result;
+}
+
 describe('autoHook tool', () => {
   describe('工具导出', () => {
-    it('应该导出 autoHook 工具函数', () => {
-      assert.strictEqual(typeof autoHook, 'function');
+    it('应该导出 autoHook 工具定义对象', () => {
+      assert.strictEqual(typeof autoHook, 'object');
+      assert.strictEqual(typeof autoHook.handler, 'function');
     });
   });
 
   describe('执行结果', () => {
     it('应该返回成功的执行结果', async () => {
-      const result = await autoHook({
+      const result = await callAutoHook(null, {
         url: 'https://example.com',
       });
 
@@ -34,7 +48,7 @@ describe('autoHook tool', () => {
     });
 
     it('应该返回 Hook 注入记录', async () => {
-      const result = await autoHook({
+      const result = await callAutoHook(null, {
         url: 'https://example.com',
         preset: 'api-signature',
         hookCrypto: true,
@@ -49,7 +63,7 @@ describe('autoHook tool', () => {
 
     it('应该处理错误情况', async () => {
       // 模拟错误场景
-      const result = await autoHook({
+      const result = await callAutoHook(null, {
         url: 'https://example.com',
         preset: 'invalid-preset' as unknown as 'api-signature',
       });
@@ -71,7 +85,7 @@ describe('autoHook tool', () => {
         }),
       };
 
-      const result = await autoHook(runtime, {
+      const result = await callAutoHook(runtime, {
         hookFetch: true,
         autoInject: false,
       });
@@ -95,7 +109,7 @@ describe('autoHook tool', () => {
         }),
       };
 
-      const result = await autoHook(runtime, {
+      const result = await callAutoHook(runtime, {
         hookFetch: true,
         hookCookie: true,
         autoInject: true,
@@ -133,7 +147,7 @@ describe('autoHook tool', () => {
       );
       assert.ok(result.message?.includes('实际注入 2 个 Hook'));
       assert.strictEqual(
-        result.data?.hooksInjected.every(item => item.injected === true),
+        result.data?.hooksInjected.every((item: any) => item.injected === true),
         true,
       );
     });
@@ -151,7 +165,7 @@ describe('autoHook tool', () => {
         }),
       };
 
-      const result = await autoHook(runtime, {
+      const result = await callAutoHook(runtime, {
         hookTimers: true,
         hookEval: true,
         autoInject: true,
@@ -189,7 +203,7 @@ describe('autoHook tool', () => {
         }),
       };
 
-      const result = await autoHook(runtime, {
+      const result = await callAutoHook(runtime, {
         hookCrypto: true,
         hookRsa: true,
         hookSmCrypto: true,
@@ -203,7 +217,7 @@ describe('autoHook tool', () => {
             script.includes('hook_cryptojs_auto') &&
             script.includes('window.__hookStore') &&
             script.includes("type: 'cryptojs'") &&
-            script.includes("event: 'installed'"),
+            script.includes("target: 'window.CryptoJS'"),
         ),
       );
       assert.ok(
@@ -229,7 +243,7 @@ describe('autoHook tool', () => {
 
   describe('预设配置', () => {
     it('应该支持 api-signature 预设', async () => {
-      const result = await autoHook({
+      const result = await callAutoHook(null, {
         url: 'https://example.com',
         preset: 'api-signature',
       });
@@ -238,7 +252,7 @@ describe('autoHook tool', () => {
     });
 
     it('应该支持 network-core 预设', async () => {
-      const result = await autoHook({
+      const result = await callAutoHook(null, {
         url: 'https://example.com',
         preset: 'network-core',
       });
@@ -247,7 +261,7 @@ describe('autoHook tool', () => {
     });
 
     it('应该支持 none 预设', async () => {
-      const result = await autoHook({
+      const result = await callAutoHook(null, {
         url: 'https://example.com',
         preset: 'none',
       });
@@ -258,7 +272,7 @@ describe('autoHook tool', () => {
 
   describe('加密库 Hook', () => {
     it('应该支持 hookCrypto 选项', async () => {
-      const result = await autoHook({
+      const result = await callAutoHook(null, {
         url: 'https://example.com',
         hookCrypto: true,
       });
@@ -267,7 +281,7 @@ describe('autoHook tool', () => {
     });
 
     it('应该支持 hookRsa 选项', async () => {
-      const result = await autoHook({
+      const result = await callAutoHook(null, {
         url: 'https://example.com',
         hookRsa: true,
       });
@@ -276,7 +290,7 @@ describe('autoHook tool', () => {
     });
 
     it('应该支持 hookSmCrypto 选项', async () => {
-      const result = await autoHook({
+      const result = await callAutoHook(null, {
         url: 'https://example.com',
         hookSmCrypto: true,
       });
@@ -287,7 +301,7 @@ describe('autoHook tool', () => {
 
   describe('基础 Hook', () => {
     it('应该支持 hookTimers 选项', async () => {
-      const result = await autoHook({
+      const result = await callAutoHook(null, {
         url: 'https://example.com',
         hookTimers: true,
       });
@@ -296,7 +310,7 @@ describe('autoHook tool', () => {
     });
 
     it('应该支持 hookEval 选项', async () => {
-      const result = await autoHook({
+      const result = await callAutoHook(null, {
         url: 'https://example.com',
         hookEval: true,
       });
@@ -305,7 +319,7 @@ describe('autoHook tool', () => {
     });
 
     it('应该支持 hookCookie 选项', async () => {
-      const result = await autoHook({
+      const result = await callAutoHook(null, {
         url: 'https://example.com',
         hookCookie: true,
       });
@@ -316,7 +330,7 @@ describe('autoHook tool', () => {
 
   describe('Hook 报告生成', () => {
     it('应该生成包含所有注入 Hook 的报告', async () => {
-      const result = await autoHook({
+      const result = await callAutoHook(null, {
         url: 'https://example.com',
         preset: 'network-core',
         hookCrypto: true,
@@ -326,7 +340,6 @@ describe('autoHook tool', () => {
 
       assert.strictEqual(result.success, true);
       assert.ok(result.data);
-
       const data = result.data as AutoHookToolData;
 
       // 验证报告包含所有注入的 Hook
