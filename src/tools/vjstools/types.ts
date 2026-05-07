@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/** v-jstools 操作统一返回结构 */
-export interface VJstoolsResult {
-  success: boolean;
-  message: string;
-  tooltype: string;
+import type {MessagesResult} from '../shared/types.js';
+
+/** v-jstools 操作统一返回结构（兼容旧字段 logFormat） */
+export interface VJstoolsResult<T = unknown> extends MessagesResult<T> {
+  /** 使用的日志格式 */
   logFormat?: string;
 }
 
@@ -20,14 +20,18 @@ export interface DeobfuscateParams {
   clearUnused?: boolean;
 }
 
-/** 解混淆结果 */
-export interface DeobfuscateResult extends VJstoolsResult {
-  tooltype: 'deobfuscate_code_vj';
+/** 解混淆返回数据 */
+export interface DeobfuscateData {
   result: string;
   origLines: number;
   resultLines: number;
   origBytes: number;
   resultBytes: number;
+}
+
+/** 解混淆结果 */
+export interface DeobfuscateResult extends VJstoolsResult<DeobfuscateData> {
+  tooltype: 'deobfuscate_code_vj';
 }
 
 /** 压缩/格式化参数 */
@@ -36,13 +40,17 @@ export interface MinifyParams {
   action?: 'minify' | 'format';
 }
 
-/** 压缩/格式化结果 */
-export interface MinifyResult extends VJstoolsResult {
-  tooltype: 'minify_code';
+/** 压缩/格式化返回数据 */
+export interface MinifyData {
   result: string;
   origBytes: number;
   resultBytes: number;
   reduction: string;
+}
+
+/** 压缩/格式化结果 */
+export interface MinifyResult extends VJstoolsResult<MinifyData> {
+  tooltype: 'minify_code';
 }
 
 /** 转译参数 */
@@ -51,10 +59,14 @@ export interface TranspileParams {
   presets?: string[];
 }
 
-/** 转译结果 */
-export interface TranspileResult extends VJstoolsResult {
-  tooltype: 'transpile_code';
+/** 转译返回数据 */
+export interface TranspileData {
   result: string;
+}
+
+/** 转译结果 */
+export interface TranspileResult extends VJstoolsResult<TranspileData> {
+  tooltype: 'transpile_code';
 }
 
 /** AST 分析参数 */
@@ -64,9 +76,8 @@ export interface AnalyzeAstParams {
   filterType?: string;
 }
 
-/** AST 分析结果 */
-export interface AnalyzeAstResult extends VJstoolsResult {
-  tooltype: 'analyze_ast';
+/** AST 分析返回数据 */
+export interface AnalyzeAstData {
   /** summary 模式下的统计数据 */
   stats?: Record<string, number>;
   /** 唯一标识符 */
@@ -79,6 +90,11 @@ export interface AnalyzeAstResult extends VJstoolsResult {
   filteredNodes?: Array<{type: string; line: number; name?: string}>;
 }
 
+/** AST 分析结果 */
+export interface AnalyzeAstResult extends VJstoolsResult<AnalyzeAstData> {
+  tooltype: 'analyze_ast';
+}
+
 /** 代码对比参数 */
 export interface DiffParams {
   text1: string;
@@ -86,10 +102,14 @@ export interface DiffParams {
   mode?: 'unified' | 'context';
 }
 
-/** 代码对比结果 */
-export interface DiffResult extends VJstoolsResult {
-  tooltype: 'diff_code';
+/** 代码对比返回数据 */
+export interface DiffData {
   diff: string;
   addedLines: number;
   removedLines: number;
+}
+
+/** 代码对比结果 */
+export interface DiffResult extends VJstoolsResult<DiffData> {
+  tooltype: 'diff_code';
 }

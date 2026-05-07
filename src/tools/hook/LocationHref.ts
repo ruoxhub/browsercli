@@ -57,23 +57,19 @@ ${buildHookStoreRuntime({
 
     try {
       await frame.evaluate(hookCode);
-      const result = {
+      response.setStructuredContent({
         success: true,
         message: `Location Href Hook 已安装，页面跳转将被阻断${shouldDebug ? '，并触发 debugger 断点' : ''}`,
         tooltype: 'hook_location_href',
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+        data: { hookId: 'hook_location_href' },
+      });
     } catch (error) {
-      const result = {
+      response.setStructuredContent({
         success: false,
         message: `错误：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'hook_location_href',
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+        data: { hookId: 'hook_location_href' },
+      });
     }
   },
 });

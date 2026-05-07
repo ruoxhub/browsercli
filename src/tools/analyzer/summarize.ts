@@ -14,6 +14,7 @@ import type {
   SummarizeFileResult,
   SummarizeBatchResult,
   SummarizeProjectResult,
+  SummarizeProjectData,
 } from './types.js';
 
 export async function summarizeFile(
@@ -141,7 +142,7 @@ export const summarizeCode = defineTool({
         success: true,
         message: 'Project summarization completed',
         tooltype: 'summarize',
-        logFormat: 'json',
+        // logFormat: 'json',
         data: result,
       });
         return;
@@ -172,7 +173,7 @@ export const summarizeCode = defineTool({
         runtime.summarizer.summarizeFile(file),
         SUMMARIZE_TIMEOUT_MS,
       );
-      response.setStructuredContent({
+      response.setStructuredContent<SummarizeFileResult>({
         success: true,
         message: 'File summarization completed',
         tooltype: 'summarize',

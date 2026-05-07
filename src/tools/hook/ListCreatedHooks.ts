@@ -89,28 +89,26 @@ export const listCreatedHooks = defineTool({
         }
       }
 
-      const result = {
+      response.setStructuredContent({
         success: true,
         message: `共 ${hooks.length} 个 Hook`,
         tooltype: 'list_created_hooks',
-        totalHooks: hooks.length,
-        totalEnabled: allHooks.filter(h => h.enabled).length,
-        totalDisabled: allHooks.filter(h => !h.enabled).length,
-        hooks,
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+        data: {
+          totalHooks: hooks.length,
+          totalEnabled: allHooks.filter(h => h.enabled).length,
+          totalDisabled: allHooks.filter(h => !h.enabled).length,
+          hooks,
+        },
+      });
     } catch (error) {
-      const result = {
+      response.setStructuredContent({
         success: false,
         message: `列出 Hook 失败：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'list_created_hooks',
-        hooks: [],
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+        data: {
+          hooks: [] as unknown[],
+        },
+      });
     }
   },
 });

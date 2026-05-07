@@ -80,23 +80,16 @@ export interface GetPerformanceMetricsData {
   metrics: Record<string, unknown>;
 }
 
+import type {MessagesResult} from '../shared/types.js';
+
 // ─── 结果类型 ────────────────────────────────────────────
 
 /**
- * Performance 函数统一返回结构。
- *
- * 成功时 success=true，message 包含操作描述；
- * 失败时 success=false，message 包含错误描述。
+ * Performance 函数统一返回结构（兼容旧字段 logFormat）。
  */
-export interface PerformanceResult<T = unknown> {
-  success: boolean;
-  message: string;
-  /** 工具类型标识 */
-  tooltype: string;
+export interface PerformanceResult<T = unknown> extends MessagesResult<T> {
   /** 使用的日志格式 */
   logFormat: string;
-  /** 结果数据 */
-  data?: T;
 }
 
 /** startPerformanceTrace 结果 */

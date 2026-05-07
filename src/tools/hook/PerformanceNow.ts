@@ -65,23 +65,19 @@ ${buildHookStoreRuntime({
 
     try {
       await frame.evaluate(hookCode);
-      const result = {
+      response.setStructuredContent({
         success: true,
         message: `performance.now() Hook 已安装，固定返回值：${value}`,
         tooltype: 'hook_performance_now',
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+        data: { hookId: 'hook_performance_now', fixedValue: value },
+      });
     } catch (error) {
-      const result = {
+      response.setStructuredContent({
         success: false,
         message: `错误：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'hook_performance_now',
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+        data: { hookId: 'hook_performance_now' },
+      });
     }
   },
 });

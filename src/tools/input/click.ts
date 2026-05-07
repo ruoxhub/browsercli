@@ -31,7 +31,11 @@ export const click = defineTool({
     const {selector, dblClick = false} = request.params;
 
     if (!selector) {
-      response.appendResponseLine('Click failed: selector 参数不能为空');
+      response.setStructuredContent({
+        success: false,
+        message: 'selector 参数不能为空',
+        tooltype: 'click',
+      });
       return;
     }
 
@@ -40,13 +44,19 @@ export const click = defineTool({
 
     try {
       await page.click(selector, {clickCount: dblClick ? 2 : 1});
-      response.appendResponseLine(
-        `Successfully ${dblClick ? 'double ' : ''}clicked on element: ${selector}`,
-      );
+      response.setStructuredContent({
+        success: true,
+        message: `Successfully ${dblClick ? 'double ' : ''}clicked on element: ${selector}`,
+        tooltype: 'click',
+        data: {selector, dblClick},
+      });
     } catch (error) {
-      response.appendResponseLine(
-        `Click failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: error instanceof Error ? error.message : String(error),
+        tooltype: 'click',
+        data: {selector, dblClick},
+      });
     }
   },
 });

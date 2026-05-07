@@ -29,12 +29,11 @@ export const listCodeTemplates = defineTool({
       success: true,
       message: `共有 ${templates.length} 个可用模板`,
       tooltype: 'list_code_templates',
-      templates,
-      count: templates.length,
+      data: {
+        templates,
+        count: templates.length,
+      }
     };
-    // response.appendResponseLine('```json');
-    // response.appendResponseLine(JSON.stringify(result, null, 2));
-    // response.appendResponseLine('```');
     response.setStructuredContent(result);
   },
 });

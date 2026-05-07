@@ -8,6 +8,8 @@ import {defineTool, type Context} from '../ToolDefinition.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 
+import {evaluateInPageRuntime} from './evaluateInPageRuntime.js';
+
 const DEFAULT_EVENTS = [
   'click',
   'dblclick',
@@ -138,7 +140,6 @@ export const monitorEvents = defineTool({
           });
 
           browserWindow.__mcp_monitors__[monitorId] = {target, listeners};
-
           return {success: true, monitorId, eventCount: events.length};
         },
         {selector, events: eventList, monitorId: id},
@@ -152,23 +153,34 @@ export const monitorEvents = defineTool({
           message?: string;
         };
         if (r.success) {
-          response.appendResponseLine(`✅ 事件监控已启动：${selector}`);
-          response.appendResponseLine(`- Monitor ID: ${r.monitorId ?? id}`);
-          response.appendResponseLine(`- 目标: ${selector}`);
-          response.appendResponseLine(`- 事件类型: ${r.eventCount ?? 0} 个`);
-          response.appendResponseLine('');
-          response.appendResponseLine('事件将被记录到控制台。使用 list_console_messages 查看。');
-          response.appendResponseLine(
-            `使用 stop_monitor(monitorId: "${r.monitorId ?? id}") 停止监控。`,
-          );
+          response.setStructuredContent({
+            success: true,
+            message: `事件监控已启动：${selector}`,
+            tooltype: 'monitor_events',
+            data: {
+              monitorId: r.monitorId ?? id,
+              selector,
+              eventCount: r.eventCount ?? 0,
+              hint: '事件将被记录到控制台。使用 list_console_messages 查看。',
+              stopCommand: `stop_monitor(monitorId: "${r.monitorId ?? id}")`
+            }
+          });
         } else {
-          response.appendResponseLine(`❌ ${r.message || '事件监控启动失败'}`);
+          response.setStructuredContent({
+            success: false,
+            message: r.message || '事件监控启动失败',
+            tooltype: 'monitor_events',
+            data: { selector }
+          });
         }
       }
     } catch (error) {
-      response.appendResponseLine(
-        `错误：${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: `错误：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'monitor_events',
+        data: { selector: request.params.selector }
+      });
     }
   },
 });

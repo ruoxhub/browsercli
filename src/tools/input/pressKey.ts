@@ -41,11 +41,19 @@ export const pressKey = defineTool({
         await page.keyboard.up(modifier);
       }
 
-      response.appendResponseLine(`Successfully pressed key: ${key}`);
+      response.setStructuredContent({
+        success: true,
+        message: `Successfully pressed key: ${key}`,
+        tooltype: 'press_key',
+        data: {key, mainKey, modifiers},
+      });
     } catch (error) {
-      response.appendResponseLine(
-        `PressKey failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: error instanceof Error ? error.message : String(error),
+        tooltype: 'press_key',
+        data: {key},
+      });
     }
   },
 });

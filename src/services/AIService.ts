@@ -127,18 +127,31 @@ export class AIService {
 
     const err = error as any;
 
+    // 网络相关错误码
     if (
       err.code === 'ECONNRESET' ||
       err.code === 'ETIMEDOUT' ||
-      err.code === 'ENOTFOUND'
+      err.code === 'ENOTFOUND' ||
+      err.code === 'ECONNREFUSED'
     ) {
       return true;
     }
 
+    // 错误消息包含连接错误特征
+    if (
+      err.message?.includes('Connection error') ||
+      err.message?.includes('connect') ||
+      err.message?.includes('ECONNREFUSED')
+    ) {
+      return true;
+    }
+
+    // HTTP 429 请求过多
     if (err.status === 429 || err.statusCode === 429) {
       return true;
     }
 
+    // 5xx 服务器错误
     if (err.status >= 500 || err.statusCode >= 500) {
       return true;
     }

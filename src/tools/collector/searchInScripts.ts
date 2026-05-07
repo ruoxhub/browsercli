@@ -56,13 +56,9 @@ export const searchInScripts = defineTool({
         success: true,
         message: `搜索完成：匹配 ${data.matched} 个文件，返回 ${data.returned} 个`,
         tooltype: 'search_in_scripts',
-        logFormat: 'json',
-        data,
+        data: data
       };
 
-      // response.appendResponseLine('```json');
-      // response.appendResponseLine(JSON.stringify(responseData, null, 2));
-      // response.appendResponseLine('```');
       response.setStructuredContent(responseData);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
@@ -72,7 +68,6 @@ export const searchInScripts = defineTool({
         success: false,
         message: `搜索失败：${errorMsg}`,
         tooltype: 'search_in_scripts',
-        logFormat: 'json',
         data: {
           files: [],
           totalSize: 0,
@@ -81,10 +76,6 @@ export const searchInScripts = defineTool({
           truncated: false,
         },
       };
-
-      // response.appendResponseLine('```json');
-      // response.appendResponseLine(JSON.stringify(errorData, null, 2));
-      // response.appendResponseLine('```');
       response.setStructuredContent(errorData);
     }
   },

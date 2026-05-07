@@ -104,16 +104,26 @@ export const getStorage = defineTool({
       const frame = (context as Context).getSelectedFrame();
       const result = await frame.evaluate(storageCode);
 
-      response.appendResponseLine(
-        `存储数据${filter ? ` (过滤: "${filter}")` : ''}:\n`,
-      );
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: true,
+        message: `存储数据${filter ? ` (过滤: "${filter}")` : ''}`,
+        tooltype: 'get_storage',
+        data: {
+          type: type || 'all',
+          filter: filter || null,
+          storage: result
+        }
+      });
     } catch (error) {
-      response.appendResponseLine(
-        `错误：${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: `错误：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'get_storage',
+        data: {
+          type: request.params.type || 'all',
+          filter: request.params.filter || null
+        }
+      });
     }
   },
 });

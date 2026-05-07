@@ -34,17 +34,16 @@ export const getConsoleMessage = defineTool({
       .describe('The msgid of a console message on the page from the listed console messages'),
   },
   handler: async (request, response) => {
-    let data: ConsoleMessageData;
+    let data;
+    let message;
     try {
-      const message = getRuntime().contextProvider!.getConsoleMessageById(request.params.msgid);
+      const consoleMessage = getRuntime().contextProvider!.getConsoleMessageById(request.params.msgid);
       const consoleMessageStableId = request.params.msgid;
 
       if ('args' in message) {
-        const consoleMessage = message as unknown as ConsoleMessageEntry;
+        message = consoleMessage.text()
         data = {
           consoleMessageStableId,
-          type: consoleMessage.type(),
-          message: consoleMessage.text(),
           args: await Promise.all(
             consoleMessage.args().map(async arg => {
               const remoteObj = arg.remoteObject();
@@ -61,10 +60,9 @@ export const getConsoleMessage = defineTool({
         };
       } else if (isAggregatedIssue(message)) {
         const issue = message as unknown as AggregatedIssue;
+        message: issue.title?.() ?? issue.code() ?? '<unknown error>',
         data = {
           consoleMessageStableId,
-          type: 'error',
-          message: issue.title?.() ?? issue.code() ?? '<unknown error>',
           args: [],
         };
       } else {
@@ -78,11 +76,13 @@ export const getConsoleMessage = defineTool({
           args: [],
         };
       }
-
-      // response.appendResponseLine('```json');
-      // response.appendResponseLine(JSON.stringify(data, null, 2));
-      // response.appendResponseLine('```');
-      response.setStructuredContent(data);
+      const responseData = {
+          success: true,
+          message: message,
+          tooltype: 'get_console_message',
+          data: data
+      };
+      response.setStructuredContent(responseData);
     } catch (error) {
       // response.appendResponseLine(`Error: ${error instanceof Error ? error.message : String(error)}`);
       data = {
@@ -91,7 +91,13 @@ export const getConsoleMessage = defineTool({
         message: `Error: ${error instanceof Error ? error.message : String(error)}`,
         args: [],
       }
-      response.setStructuredContent(data)
+      const responseData = {
+          success: true,
+          message: `Console message retrieved error`,
+          tooltype: 'get_console_message',
+          data: data
+      };
+      response.setStructuredContent(responseData)
     }
   },
 });

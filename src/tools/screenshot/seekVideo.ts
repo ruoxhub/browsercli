@@ -47,12 +47,23 @@ export const seekVideo = defineTool({
         request.params.time,
       );
 
-      response.appendResponseLine(
-        `视频已定位到 ${request.params.time}s: ${request.params.selector}`,
-      );
+      response.setStructuredContent({
+        success: true,
+        message: `视频已定位到 ${request.params.time}s: ${request.params.selector}`,
+        tooltype: 'seek_video',
+        data: {
+          selector: request.params.selector,
+          time: request.params.time,
+        },
+      });
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      response.appendResponseLine(`视频定位失败: ${errorMsg}`);
+      response.setStructuredContent({
+        success: false,
+        message: `视频定位失败: ${errorMsg}`,
+        tooltype: 'seek_video',
+        data: {},
+      });
     }
   },
 });

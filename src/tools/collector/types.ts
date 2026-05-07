@@ -5,18 +5,12 @@
  */
 
 import type {CodeCollector} from '../../modules/collector/CodeCollector.js';
+import type {MessagesResult} from '../shared/types.js';
 
 /**
- * Collector 函数统一返回结构。
- *
- * 成功时 success=true，message 包含操作描述；
- * 失败时 success=false，message 包含错误描述。
+ * Collector 函数统一返回结构（兼容旧字段 logFormat）。
  */
-export interface CollectorResult {
-  success: boolean;
-  message: string;
-  /** 工具类型标识 */
-  tooltype: string;
+export interface CollectorResult extends MessagesResult {
   /** 使用的日志格式 */
   logFormat?: string;
 }

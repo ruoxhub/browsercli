@@ -26,6 +26,7 @@ export const listPages = defineTool({
   },
   schema: {},
   handler: async (request, response, context) => {
+    let data;
     try {
       const pages = context.getPages();
       const selectedPage = context.getSelectedPage();
@@ -57,26 +58,24 @@ export const listPages = defineTool({
         return;
       }
 
-      response.appendResponseLine(
-        `共 ${pageInfos.length} 个页面${
-          unavailableTitleCount > 0
-            ? `，其中 ${unavailableTitleCount} 个标题不可用`
-            : ''
-        }：`,
-      );
-      response.appendResponseLine('');
+       data = {
+         pageInfos,
+         selectedIndex
+       }
 
-      for (const info of pageInfos) {
-        const marker = info.index === selectedIndex ? ' ← 选中' : '';
-        response.appendResponseLine(
-          `[${info.index}] ${info.url}${marker}`,
-        );
-        response.appendResponseLine(`    标题: ${info.title}`);
-      }
-    } catch (error) {
-      response.appendResponseLine(
-        `列出页面失败：${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
+       response.setStructuredContent({
+         success: true,
+         message: "",
+         tooltype: 'list_pages',
+         data: data
+       });
+     } catch (error) {
+       response.setStructuredContent({
+         success: false,
+         message: `列出页面失败：${error instanceof Error ? error.message : String(error)}`,
+         tooltype: 'list_pages',
+         data: {}
+       });
+     }
   },
 });

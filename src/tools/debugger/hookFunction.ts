@@ -55,9 +55,12 @@ export const hookFunction = defineTool({
       request.params;
 
     if (!target || typeof target !== 'string') {
-      response.appendResponseLine(
-        'hook_function requires a "target" string parameter (e.g. "XMLHttpRequest.prototype.open")',
-      );
+      response.setStructuredContent({
+        success: false,
+        message: 'hook_function requires a "target" string parameter (e.g. "XMLHttpRequest.prototype.open")',
+        tooltype: 'hook_function',
+        data: {}
+      });
       return;
     }
 
@@ -70,7 +73,12 @@ export const hookFunction = defineTool({
     try {
       const frame = (context as Context).getSelectedFrame();
       if (!frame) {
-        response.appendResponseLine('当前没有可用的页面或 Frame');
+        response.setStructuredContent({
+          success: false,
+          message: '当前没有可用的页面或 Frame',
+          tooltype: 'hook_function',
+          data: {}
+        });
         return;
       }
 
@@ -227,25 +235,36 @@ export const hookFunction = defineTool({
       if (result && typeof result === 'object') {
         const r = result as {success: boolean; hookId?: string; message?: string};
         if (r.success) {
-          response.appendResponseLine(`✅ Hook 已安装：${target} (id: ${r.hookId ?? id})`);
-          response.appendResponseLine(`- Hook ID: ${r.hookId ?? id}`);
-          response.appendResponseLine(`- 目标: ${target}`);
-          response.appendResponseLine(`- 记录参数: ${logArgs}`);
-          response.appendResponseLine(`- 记录返回值: ${logResult}`);
-          response.appendResponseLine(`- 记录调用栈: ${logStack}`);
-          response.appendResponseLine('');
-          response.appendResponseLine('函数调用将被记录到控制台。使用 list_console_messages 查看。');
-          response.appendResponseLine(
-            `使用 unhook_function(hookId: "${r.hookId ?? id}") 移除。`,
-          );
+          response.setStructuredContent({
+            success: true,
+            message: `Hook 已安装：${target}`,
+            tooltype: 'hook_function',
+            data: {
+              hookId: r.hookId ?? id,
+              target,
+              logArgs,
+              logResult,
+              logStack,
+              hint: '函数调用将被记录到控制台。使用 list_console_messages 查看。',
+              unhookCommand: `unhook_function(hookId: "${r.hookId ?? id}")`
+            }
+          });
         } else {
-          response.appendResponseLine(`❌ ${r.message}`);
+          response.setStructuredContent({
+            success: false,
+            message: r.message || 'Hook 安装失败',
+            tooltype: 'hook_function',
+            data: { target }
+          });
         }
       }
     } catch (error) {
-      response.appendResponseLine(
-        `错误：${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: `错误：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'hook_function',
+        data: { target }
+      });
     }
   },
 });

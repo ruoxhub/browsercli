@@ -53,7 +53,7 @@ export interface DevToolsData {
 
 export interface Response {
   appendResponseLine(value: string): void;
-  setStructuredContent(content: unknown): void;
+  setStructuredContent<T = unknown>(content: T): void;
   setIncludePages(value: boolean): void;
   setIncludeNetworkRequests(
     value: boolean,

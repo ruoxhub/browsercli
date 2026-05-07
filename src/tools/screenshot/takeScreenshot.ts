@@ -84,7 +84,6 @@ export const takeScreenshot = defineTool({
           type: format as 'png' | 'jpeg',
           fullPage: request.params.fullPage,
           quality,
-          optimizeForSpeed: true,
           path: resolvedFilePath,
         }),
         '执行截图',
@@ -94,36 +93,50 @@ export const takeScreenshot = defineTool({
         ? screenshot
         : Buffer.from(screenshot);
 
-      if (request.params.fullPage) {
-        response.appendResponseLine(
-          'Took a screenshot of the full current page.',
-        );
-      } else {
-        response.appendResponseLine(
-          "Took a screenshot of the current page's viewport.",
-        );
-      }
+      let savedPath: string | null = null;
+      let base64Image: string | null = null;
 
       if (resolvedFilePath) {
-        response.appendResponseLine(`Saved screenshot to ${resolvedFilePath}.`);
+        savedPath = resolvedFilePath;
       } else if (screenshotBuffer.length >= 2_000_000) {
         // 大文件保存临时文件
         const {filename} = await context.saveTemporaryFile(
           screenshotBuffer as unknown as Uint8Array<ArrayBufferLike>,
           `image/${format}` as 'image/png' | 'image/jpeg' | 'image/webp',
         );
-        response.appendResponseLine(`Saved screenshot to ${filename}.`);
+        savedPath = filename;
       } else {
         // 小文件直接附加图片到响应
+        base64Image = screenshotBuffer.toString('base64');
+      }
+
+      response.setStructuredContent({
+        success: true,
+        message: request.params.fullPage
+          ? 'Took a screenshot of the full current page.'
+          : "Took a screenshot of the current page's viewport.",
+        tooltype: 'screenshot',
+        data: {
+          format,
+          fileSize: screenshotBuffer.length,
+          savedPath,
+          base64: base64Image,
+        },
+      });
+
+      if (base64Image) {
         response.attachImage({
           mimeType: `image/${format}`,
-          data: screenshotBuffer.toString('base64'),
+          data: base64Image,
         });
       }
     } catch (error) {
-      response.appendResponseLine(
-        `截图失败: ${normalizeBrowserRuntimeError(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: `截图失败: ${normalizeBrowserRuntimeError(error)}`,
+        tooltype: 'screenshot',
+        data: {},
+      });
     }
   },
 });

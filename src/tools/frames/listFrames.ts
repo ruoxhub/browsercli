@@ -42,7 +42,12 @@ export const listFrames = defineTool({
     try {
       const page = runtime.getSelectedPage();
       if (!page) {
-        response.appendResponseLine('没有可用的页面，请先导航到目标页面');
+        response.setStructuredContent({
+          success: false,
+          message: '没有可用的页面，请先导航到目标页面',
+          toolType: 'list_frames',
+          data: {},
+        });
         return;
       }
 
@@ -50,25 +55,40 @@ export const listFrames = defineTool({
       const currentFrame = runtime.getSelectedFrame();
 
       if (frames.length === 0) {
-        response.appendResponseLine('No frames found.');
+        response.setStructuredContent({
+          success: true,
+          message: 'No frames found.',
+          toolType: 'list_frames',
+          data: {frameInfos: [], selectedIndex: -1},
+        });
         return;
       }
 
-      response.appendResponseLine(`Frames (${frames.length} total):\n`);
+      const selectedIndex = currentFrame
+        ? frames.indexOf(currentFrame)
+        : -1;
 
-      for (let i = 0; i < frames.length; i += 1) {
-        const frame = frames[i];
-        const indent = '  '.repeat(getFrameDepth(frame));
-        const marker = frame === currentFrame ? ' [selected]' : '';
-        const name = frame.name() ? ` name="${frame.name()}"` : '';
-        response.appendResponseLine(
-          `${indent}${i}: ${frame.url() || '(empty)'}${name}${marker}`,
-        );
-      }
+      const frameInfos = frames.map((frame, i) => ({
+        index: i,
+        url: frame.url() || '',
+        name: frame.name() || undefined,
+        depth: getFrameDepth(frame),
+        selected: i === selectedIndex,
+      }));
+
+      response.setStructuredContent({
+        success: true,
+        message: `Frames (${frames.length} total)`,
+        toolType: 'list_frames',
+        data: {frameInfos, selectedIndex},
+      });
     } catch (error) {
-      response.appendResponseLine(
-        `列出 Frame 失败：${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: `列出 Frame 失败：${error instanceof Error ? error.message : String(error)}`,
+        toolType: 'list_frames',
+        data: {},
+      });
     }
   },
 });

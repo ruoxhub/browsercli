@@ -54,15 +54,28 @@ export const stopMonitor = defineTool({
       if (result && typeof result === 'object') {
         const r = result as {success: boolean; message?: string};
         if (r.success) {
-          response.appendResponseLine(`✅ 监控 "${monitorId}" 已停止`);
+          response.setStructuredContent({
+            success: true,
+            message: `监控 "${monitorId}" 已停止`,
+            tooltype: 'stop_monitor',
+            data: { monitorId }
+          });
         } else {
-          response.appendResponseLine(`❌ ${r.message || `监控未找到：${monitorId}`}`);
+          response.setStructuredContent({
+            success: false,
+            message: r.message || `监控未找到：${monitorId}`,
+            tooltype: 'stop_monitor',
+            data: { monitorId }
+          });
         }
       }
     } catch (error) {
-      response.appendResponseLine(
-        `错误：${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: `错误：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'stop_monitor',
+        data: { monitorId: request.params.monitorId }
+      });
     }
   },
 });

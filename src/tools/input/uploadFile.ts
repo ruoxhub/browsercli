@@ -32,13 +32,22 @@ export const uploadFile = defineTool({
     try {
       const element = await page.$(selector);
       if (!element) {
-        response.appendResponseLine(`Element not found: ${selector}`);
+        response.setStructuredContent({
+          success: false,
+          message: `Element not found: ${selector}`,
+          tooltype: 'upload_file',
+        });
         return;
       }
 
       try {
         await element.setInputFiles(filePath);
-        response.appendResponseLine(`File uploaded from ${filePath}`);
+        response.setStructuredContent({
+          success: true,
+          message: `File uploaded from ${filePath}`,
+          tooltype: 'upload_file',
+          data: {selector, filePath},
+        });
       } catch {
         // Fallback: try filechooser event pattern
         const [fileChooser] = await Promise.all([
@@ -46,12 +55,20 @@ export const uploadFile = defineTool({
           element.click(),
         ]);
         await fileChooser.setFiles(filePath);
-        response.appendResponseLine(`File uploaded from ${filePath}`);
+        response.setStructuredContent({
+          success: true,
+          message: `File uploaded from ${filePath}`,
+          tooltype: 'upload_file',
+          data: {selector, filePath, fallback: true},
+        });
       }
     } catch (error) {
-      response.appendResponseLine(
-        `Upload failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: error instanceof Error ? error.message : String(error),
+        tooltype: 'upload_file',
+        data: {selector, filePath},
+      });
     }
   },
 });

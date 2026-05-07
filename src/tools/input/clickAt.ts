@@ -60,26 +60,19 @@ export const clickAt = defineTool({
         clickCount: 1,
       });
 
-      const result = {
+      response.setStructuredContent({
         success: true,
         message: `Real mouse click at ${selector} (${coords.x}, ${coords.y})`,
         tooltype: 'click_at',
-        logFormat: 'json',
         data: coords,
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+      });
     } catch (error) {
-      const result = {
+      response.setStructuredContent({
         success: false,
-        message: `ClickAt failed: ${error instanceof Error ? error.message : String(error)}`,
+        message: error instanceof Error ? error.message : String(error),
         tooltype: 'click_at',
         data: {x: 0, y: 0, tag: '', text: ''},
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+      });
     }
   },
 });

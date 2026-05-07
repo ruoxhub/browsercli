@@ -85,25 +85,21 @@ ${buildHookStoreRuntime({
 
     try {
       await frame.evaluate(hookCode);
-      const result = {
+      response.setStructuredContent({
         success: true,
         message: hasFilter
           ? `XHR Open Hook 已安装，过滤 URL：${filterUrls!.join(', ')}`
           : 'XHR Open Hook 已安装，监控所有 XHR 请求初始化',
         tooltype: 'hook_xhr_open',
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+        data: { hookId: 'hook_xhr_open' },
+      });
     } catch (error) {
-      const result = {
+      response.setStructuredContent({
         success: false,
         message: `错误：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'hook_xhr_open',
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+        data: { hookId: 'hook_xhr_open' },
+      });
     }
   },
 });

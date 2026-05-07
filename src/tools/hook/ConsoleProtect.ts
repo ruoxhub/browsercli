@@ -96,23 +96,19 @@ ${buildHookStoreRuntime({
 
     try {
       await frame.evaluate(hookCode);
-      const result = {
+      response.setStructuredContent({
         success: true,
         message: `Console 保护 Hook 已安装，保护方法：${methods.join(', ')}`,
         tooltype: 'hook_console_protect',
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+        data: { hookId: 'hook_console_protect', methods },
+      });
     } catch (error) {
-      const result = {
+      response.setStructuredContent({
         success: false,
         message: `错误：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'hook_console_protect',
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+        data: { hookId: 'hook_console_protect' },
+      });
     }
   },
 });

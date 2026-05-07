@@ -9,6 +9,7 @@ import {getRuntime} from '../../runtime.js';
 import {withOperationTimeout} from '../shared/browserRuntime.js';
 import {defineTool} from '../ToolDefinition.js';
 import {ToolCategory} from '../categories.js';
+import type {RiskPanelResult, RiskPanelData} from './types.js';
 
 export const riskPanel = defineTool({
   name: 'risk_panel',
@@ -28,7 +29,7 @@ export const riskPanel = defineTool({
         success: false,
         message: 'risk_panel requires analyzer.understand and cryptoDetector.detect runtime services',
         tooltype: 'riskPanel',
-        logFormat: 'json',
+        // logFormat: 'json',
         data: {
           score: 0,
           level: 'low',
@@ -41,7 +42,7 @@ export const riskPanel = defineTool({
             hookSignals: 0,
           },
           recommendations: [],
-        },
+        } as RiskPanelData,
       });
       return;
     }
@@ -67,7 +68,7 @@ export const riskPanel = defineTool({
               hookSignals: 0,
             },
             recommendations: [],
-          },
+          } as RiskPanelData,
         });
         return;
       }
@@ -141,11 +142,10 @@ export const riskPanel = defineTool({
         : null,
     ].filter((item): item is string => Boolean(item));
 
-    response.setStructuredContent({
+    response.setStructuredContent<RiskPanelResult>({
       success: true,
       message: 'Risk panel analysis completed',
       tooltype: 'riskPanel',
-      logFormat: 'json',
       data: {
         score,
         level,

@@ -34,15 +34,19 @@ export const drag = defineTool({
       const toElement = await page.$(toSelector);
 
       if (!fromElement) {
-        response.appendResponseLine(
-          `Source element not found: ${fromSelector}`,
-        );
+        response.setStructuredContent({
+          success: false,
+          message: `Source element not found: ${fromSelector}`,
+          tooltype: 'drag',
+        });
         return;
       }
       if (!toElement) {
-        response.appendResponseLine(
-          `Target element not found: ${toSelector}`,
-        );
+        response.setStructuredContent({
+          success: false,
+          message: `Target element not found: ${toSelector}`,
+          tooltype: 'drag',
+        });
         return;
       }
 
@@ -50,7 +54,12 @@ export const drag = defineTool({
       const toBox = await toElement.boundingBox();
 
       if (!fromBox || !toBox) {
-        response.appendResponseLine('Element bounding box not available');
+        response.setStructuredContent({
+          success: false,
+          message: 'Element bounding box not available',
+          tooltype: 'drag',
+          data: {fromSelector, toSelector},
+        });
         return;
       }
 
@@ -64,13 +73,19 @@ export const drag = defineTool({
       await page.mouse.move(toX, toY);
       await page.mouse.up();
 
-      response.appendResponseLine(
-        `Successfully dragged element from ${fromSelector} to ${toSelector}`,
-      );
+      response.setStructuredContent({
+        success: true,
+        message: `Successfully dragged element from ${fromSelector} to ${toSelector}`,
+        tooltype: 'drag',
+        data: {fromSelector, toSelector, from: {x: fromX, y: fromY}, to: {x: toX, y: toY}},
+      });
     } catch (error) {
-      response.appendResponseLine(
-        `Drag failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: error instanceof Error ? error.message : String(error),
+        tooltype: 'drag',
+        data: {fromSelector, toSelector},
+      });
     }
   },
 });

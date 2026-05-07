@@ -42,7 +42,12 @@ export const getDomStructure = defineTool({
     const frame = (context as Context).getSelectedFrame();
 
     if (!frame) {
-      response.appendResponseLine(NO_ACTIVE_PAGE_MESSAGE);
+      response.setStructuredContent({
+        success: false,
+        message: NO_ACTIVE_PAGE_MESSAGE,
+        tooltype: 'get_dom_structure',
+        data: null,
+      });
       return;
     }
 
@@ -93,25 +98,19 @@ export const getDomStructure = defineTool({
         {depth: maxDepth, withText: includeText},
       );
 
-      const result = {
+      response.setStructuredContent({
         success: true,
-        message: `DOM 结构已获取（深度：${maxDepth}，文本：${includeText ? '是' : '否'}）`,
+        message: `DOM structure retrieved (depth: ${maxDepth}, include text: ${includeText})`,
         tooltype: 'get_dom_structure',
-        logFormat: 'full',
-        data: structure ?? undefined,
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+        data: structure ?? null,
+      });
     } catch (error) {
-      const result = {
+      response.setStructuredContent({
         success: false,
-        message: `获取 DOM 结构失败：${error instanceof Error ? error.message : String(error)}`,
+        message: `Failed to get DOM structure: ${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'get_dom_structure',
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+        data: null,
+      });
     }
   },
 });

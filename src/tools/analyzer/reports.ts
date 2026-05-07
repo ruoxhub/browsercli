@@ -14,6 +14,8 @@ import type {
   CorrelatedFlow,
   PriorityTarget,
   SignatureChainHints,
+  RecordEvidenceResult,
+  ExportSessionReportResult,
 } from './types.js';
 import {toMirroredNetworkEntry, toMirroredScriptEntry} from './normalize.js';
 
@@ -199,13 +201,18 @@ export const record_reverse_evidence = defineTool({
     }
 
     response.setStructuredContent({
-        ok: true,
-        taskId: task.taskId,
-        taskDir: task.taskDir,
-        channel: request.params.channel,
-        logFormat: 'json',
-        mirroredChannels,
-        targetContext: hasTargetContext ? targetContext : undefined,
+        success: true,
+        message: 'Evidence recorded',
+        tooltype: 'record_reverse_evidence',
+        // logFormat: 'json',
+        data: {
+          ok: true,
+          taskId: task.taskId,
+          taskDir: task.taskDir,
+          channel: request.params.channel,
+          mirroredChannels,
+          targetContext: hasTargetContext ? targetContext : undefined,
+        },
       });
   },
 });
@@ -267,7 +274,7 @@ export const export_session_report = defineTool({
         success: true,
         message: `会话报告已导出 (格式: ${request.params.format})`,
         tooltype: 'export_session_report',
-        logFormat: 'json',
+        // logFormat: 'json',
         data: report,
       });
   },

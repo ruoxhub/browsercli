@@ -5,19 +5,12 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+import type {MessagesResult} from '../shared/types.js';
 
 /**
  * Extensions 函数统一返回结构。
- *
- * 成功时 success=true，message 包含操作描述；
- * 失败时 success=false，message 包含错误描述。
  */
-export interface ExtensionsResult {
-  success: boolean;
-  message: string;
-  /** 工具类型标识 */
-  tooltype: string;
-}
+export interface ExtensionsResult<T = unknown> extends MessagesResult<T> {}
 
 /** 重新导出 Frame 类型，方便调用方导入 */
 export type {Frame};

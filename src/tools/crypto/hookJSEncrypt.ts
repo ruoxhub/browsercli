@@ -85,13 +85,14 @@ export const hookJSEncrypt = defineTool({
         success: true,
         message: 'JSEncrypt Hook 已安装',
         tooltype: 'hook_jsencrypt',
-        logFormat: format,
+        data: {}
       });
     } catch (error) {
       response.setStructuredContent({
         success: false,
         message: `错误：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'hook_jsencrypt',
+        data: {}
       });
     }
   },

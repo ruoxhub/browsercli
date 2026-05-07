@@ -108,23 +108,16 @@ export interface NavigatePageData {
   navigated: boolean;
 }
 
+import type {MessagesResult} from '../shared/types.js';
+
 // ─── 结果类型 ──────────────────────────────────────────
 
 /**
- * Navigation 函数统一返回结构。
- *
- * 成功时 success=true，message 包含操作描述；
- * 失败时 success=false，message 包含错误描述。
+ * Navigation 函数统一返回结构（兼容旧字段 logFormat）。
  */
-export interface NavigationResult<T = unknown> {
-  success: boolean;
-  message: string;
-  /** 工具类型标识 */
-  tooltype: string;
+export interface NavigationResult<T = unknown> extends MessagesResult<T> {
   /** 使用的日志格式 */
   logFormat: string;
-  /** 结果数据 */
-  data?: T;
 }
 
 /** listPages 结果 */

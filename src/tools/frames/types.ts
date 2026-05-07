@@ -17,3 +17,15 @@ export interface FrameInfo {
   /** 是否为当前选中的 Frame */
   selected?: boolean;
 }
+
+/** list_frames 返回的 data 结构 */
+export interface ListFramesData {
+  frameInfos: FrameInfo[];
+  selectedIndex: number;
+}
+
+/** select_frame 返回的 data 结构 */
+export interface SelectFrameData {
+  selectedIndex: number;
+  selectedName?: string;
+}

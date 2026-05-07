@@ -34,28 +34,37 @@ export const newPage = defineTool({
   handler: async (request, response, context) => {
     const {url, timeout} = request.params;
 
-    try {
-      const page = await context.newPage();
-      context.selectPage(page);
-      context.syncPageContext(page);
+     try {
+       const page = await context.newPage();
+       context.selectPage(page);
+       context.syncPageContext(page);
 
-      await page.goto(url, {
-        timeout: timeout ?? DEFAULT_NAV_TIMEOUT,
-        waitUntil: 'domcontentloaded',
-      });
+       await page.goto(url, {
+         timeout: timeout ?? DEFAULT_NAV_TIMEOUT,
+         waitUntil: 'domcontentloaded',
+       });
 
-      const pages = context.getPages();
-      const index = pages.indexOf(page);
+       const pages = context.getPages();
+       const index = pages.indexOf(page);
+       const pageIndex = index >= 0 ? index : pages.length - 1;
 
-      response.appendResponseLine(`已创建新页面并导航到 ${url}`);
-      response.appendResponseLine(
-        `页面索引: ${index >= 0 ? index : pages.length - 1}`,
-      );
-      response.appendResponseLine(`标题: ${await page.title()}`);
-    } catch (error) {
-      response.appendResponseLine(
-        `创建新页面失败：${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
+       response.setStructuredContent({
+         success: true,
+         message: `已创建新页面并导航到 ${url}`,
+         tooltype: 'new_page',
+         data: {
+           index: pageIndex,
+           url: page.url(),
+           title: await page.title(),
+         }
+       });
+     } catch (error) {
+       response.setStructuredContent({
+         success: false,
+         message: `创建新页面失败：${error instanceof Error ? error.message : String(error)}`,
+         tooltype: 'new_page',
+         data: {}
+       });
+     }
   },
 });

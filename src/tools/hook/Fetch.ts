@@ -111,7 +111,7 @@ ${buildHookStoreRuntime({
         // 状态读取失败不影响主流程
       }
 
-      const result = {
+      response.setStructuredContent({
         success: true,
         message:
           `Fetch Hook 已注入页面。当前已捕获 ${recordCount} 条记录。` +
@@ -125,12 +125,9 @@ ${buildHookStoreRuntime({
           recordCount,
           note: '后续 fetch 调用将被自动捕获并存储在 window.__hookStore.hook_fetch',
         },
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+      });
     } catch (error) {
-      const result = {
+      response.setStructuredContent({
         success: false,
         message: `Fetch Hook 注入失败：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'hook_fetch',
@@ -139,10 +136,7 @@ ${buildHookStoreRuntime({
           status: 'failed',
           error: error instanceof Error ? error.message : String(error),
         },
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+      });
     }
   },
 });

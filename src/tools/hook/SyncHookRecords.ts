@@ -43,17 +43,16 @@ export const syncHookRecords = defineTool({
       const storeSnapshot = await readHookStore(frame, hookId);
 
       if (!storeSnapshot || typeof storeSnapshot !== 'object') {
-        const result = {
+        response.setStructuredContent({
           success: true,
           message: '浏览器端无 Hook 数据',
           tooltype: 'list_created_hooks',
-          syncedHookIds: [],
-          totalRecords: 0,
-          hooks: [],
-        };
-        response.appendResponseLine('```json');
-        response.appendResponseLine(JSON.stringify(result, null, 2));
-        response.appendResponseLine('```');
+          data: {
+            syncedHookIds: [] as string[],
+            totalRecords: 0,
+            hooks: [] as unknown[],
+          },
+        });
         return;
       }
 
@@ -71,29 +70,27 @@ export const syncHookRecords = defineTool({
             type,
           }));
 
-      const result = {
+      response.setStructuredContent({
         success: true,
         message: `同步完成，${summary.totalHooks} 个 Hook，共 ${summary.totalRecords} 条记录`,
         tooltype: 'list_created_hooks',
-        syncedHookIds: summary.hooks.map(item => item.hookId),
-        totalRecords: summary.totalRecords,
-        hooks,
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+        data: {
+          syncedHookIds: summary.hooks.map(item => item.hookId),
+          totalRecords: summary.totalRecords,
+          hooks,
+        },
+      });
     } catch (error) {
-      const result = {
+      response.setStructuredContent({
         success: false,
         message: `同步失败：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'list_created_hooks',
-        syncedHookIds: [],
-        totalRecords: 0,
-        hooks: [],
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+        data: {
+          syncedHookIds: [] as string[],
+          totalRecords: 0,
+          hooks: [] as unknown[],
+        },
+      });
     }
   },
 });

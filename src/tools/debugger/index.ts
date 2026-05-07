@@ -89,7 +89,12 @@ export const setBreakpoint = defineTool({
     const isRegex = request.params.isRegex;
 
     if (!url || typeof url !== 'string' || url.trim() === '') {
-      response.appendResponseLine('url 参数不能为空。');
+      response.setStructuredContent({
+        success: false,
+        message: "url 参数不能为空。",
+        tooltype: 'set_breakpoint',
+        data: {}
+      });
       return;
     }
 
@@ -111,25 +116,27 @@ export const setBreakpoint = defineTool({
             condition,
           );
 
-      response.appendResponseLine(`✅ 断点已设置！`);
-      response.appendResponseLine(`- ID: ${breakpoint.breakpointId}`);
-      response.appendResponseLine(`- URL: ${url}`);
-      response.appendResponseLine(`- 行号: ${lineNum}`);
-      if (condition) {
-        response.appendResponseLine(`- 条件: ${condition}`);
-      }
-      if (breakpoint.locations.length > 0) {
-        response.appendResponseLine(
-          `- 已解析到 ${breakpoint.locations.length} 个位置`,
-        );
-      }
-      response.appendResponseLine(
-        '- 提示: 如果执行卡住，先运行 resume。如果总是在同一位置暂停，移除断点后改用 trace_function(pause=false) 或 hook_function。',
-      );
+      response.setStructuredContent({
+        success: true,
+        message: "断点已设置",
+        tooltype: 'set_breakpoint',
+        data: {
+          breakpointId: breakpoint.breakpointId,
+          url: url,
+          lineNumber: lineNum,
+          columnNumber: columnNumber ?? 0,
+          condition: condition,
+          locationsCount: breakpoint.locations.length,
+          hint: "如果执行卡住，先运行 resume。如果总是在同一位置暂停，移除断点后改用 trace_function(pause=false) 或 hook_function。"
+        }
+      });
     } catch (error) {
-      response.appendResponseLine(
-        `设置断点失败: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: `设置断点失败: ${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'set_breakpoint',
+        data: {}
+      });
     }
   },
 });
@@ -153,18 +160,31 @@ export const removeBreakpoint = defineTool({
     const breakpointId = request.params.breakpointId;
 
     if (!breakpointId || typeof breakpointId !== 'string' || breakpointId.trim() === '') {
-      response.appendResponseLine('breakpointId 参数不能为空。');
+      response.setStructuredContent({
+        success: false,
+        message: "breakpointId 参数不能为空。",
+        tooltype: 'remove_breakpoint',
+        data: {}
+      });
       return;
     }
 
     try {
       const debuggerContext = await getDebugger(runtime);
       await debuggerContext.removeBreakpoint(breakpointId);
-      response.appendResponseLine(`✅ 断点 ${breakpointId} 已移除`);
+      response.setStructuredContent({
+        success: true,
+        message: "断点已移除",
+        tooltype: 'remove_breakpoint',
+        data: { breakpointId }
+      });
     } catch (error) {
-      response.appendResponseLine(
-        `移除断点失败: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: `移除断点失败: ${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'remove_breakpoint',
+        data: {}
+      });
     }
   },
 });
@@ -189,29 +209,37 @@ export const listBreakpoints = defineTool({
       const breakpoints = debuggerContext.getBreakpoints();
 
       if (breakpoints.length === 0) {
-        response.appendResponseLine('当前无活跃断点。');
+        response.setStructuredContent({
+          success: true,
+          message: "当前无活跃断点。",
+          tooltype: 'list_breakpoints',
+          data: { breakpoints: [] }
+        });
         return;
       }
 
-      response.appendResponseLine(`活跃断点（${breakpoints.length} 个）:\n`);
-      for (const bp of breakpoints) {
-        response.appendResponseLine(`- ID: ${bp.breakpointId}`);
-        response.appendResponseLine(`  URL: ${bp.url}`);
-        response.appendResponseLine(
-          `  行号: ${bp.lineNumber + 1}, 列号: ${bp.columnNumber}`,
-        );
-        if (bp.condition) {
-          response.appendResponseLine(`  条件: ${bp.condition}`);
-        }
-        if (bp.locations.length > 0) {
-          response.appendResponseLine(`  位置数量: ${bp.locations.length}`);
-        }
-        response.appendResponseLine('');
-      }
+      const breakpointData = breakpoints.map(bp => ({
+        breakpointId: bp.breakpointId,
+        url: bp.url,
+        lineNumber: bp.lineNumber + 1,
+        columnNumber: bp.columnNumber,
+        condition: bp.condition || null,
+        locationsCount: bp.locations.length
+      }));
+
+      response.setStructuredContent({
+        success: true,
+        message: `找到 ${breakpoints.length} 个活跃断点`,
+        tooltype: 'list_breakpoints',
+        data: { breakpoints: breakpointData }
+      });
     } catch (error) {
-      response.appendResponseLine(
-        `列出断点失败: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: `列出断点失败: ${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'list_breakpoints',
+        data: {}
+      });
     }
   },
 });
@@ -236,18 +264,28 @@ export const stepInto = defineTool({
       const debuggerContext = await getDebugger(runtime);
       const pausedState = debuggerContext.getPausedState();
       if (!pausedState.isPaused) {
-        response.appendResponseLine(
-          '当前未处于暂停状态，无法单步进入。请先命中断点或调用 pause。',
-        );
+        response.setStructuredContent({
+          success: false,
+          message: '当前未处于暂停状态，无法单步进入。请先命中断点或调用 pause。',
+          tooltype: 'step_into',
+          data: { isPaused: false }
+        });
         return;
       }
       await debuggerContext.stepInto();
-      response.appendResponseLine('⏭️ 单步进入执行完成');
-      response.appendResponseLine('使用 get_paused_info 查看当前状态。');
+      response.setStructuredContent({
+        success: true,
+        message: '单步进入执行完成',
+        tooltype: 'step_into',
+        data: { action: 'stepInto', isPaused: debuggerContext.getPausedState().isPaused }
+      });
     } catch (error) {
-      response.appendResponseLine(
-        `单步进入失败: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: `单步进入失败: ${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'step_into',
+        data: {}
+      });
     }
   },
 });
@@ -272,18 +310,28 @@ export const stepOver = defineTool({
       const debuggerContext = await getDebugger(runtime);
       const pausedState = debuggerContext.getPausedState();
       if (!pausedState.isPaused) {
-        response.appendResponseLine(
-          '当前未处于暂停状态，无法单步跳过。请先命中断点或调用 pause。',
-        );
+        response.setStructuredContent({
+          success: false,
+          message: '当前未处于暂停状态，无法单步跳过。请先命中断点或调用 pause。',
+          tooltype: 'step_over',
+          data: { isPaused: false }
+        });
         return;
       }
       await debuggerContext.stepOver();
-      response.appendResponseLine('⏭️ 单步跳过执行完成');
-      response.appendResponseLine('使用 get_paused_info 查看当前状态。');
+      response.setStructuredContent({
+        success: true,
+        message: '单步跳过执行完成',
+        tooltype: 'step_over',
+        data: { action: 'stepOver', isPaused: debuggerContext.getPausedState().isPaused }
+      });
     } catch (error) {
-      response.appendResponseLine(
-        `单步跳过失败: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: `单步跳过失败: ${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'step_over',
+        data: {}
+      });
     }
   },
 });
@@ -308,18 +356,28 @@ export const stepOut = defineTool({
       const debuggerContext = await getDebugger(runtime);
       const pausedState = debuggerContext.getPausedState();
       if (!pausedState.isPaused) {
-        response.appendResponseLine(
-          '当前未处于暂停状态，无法单步跳出。请先命中断点或调用 pause。',
-        );
+        response.setStructuredContent({
+          success: false,
+          message: '当前未处于暂停状态，无法单步跳出。请先命中断点或调用 pause。',
+          tooltype: 'step_out',
+          data: { isPaused: false }
+        });
         return;
       }
       await debuggerContext.stepOut();
-      response.appendResponseLine('⏆️ 单步跳出执行完成');
-      response.appendResponseLine('使用 get_paused_info 查看当前状态。');
+      response.setStructuredContent({
+        success: true,
+        message: '单步跳出执行完成',
+        tooltype: 'step_out',
+        data: { action: 'stepOut', isPaused: debuggerContext.getPausedState().isPaused }
+      });
     } catch (error) {
-      response.appendResponseLine(
-        `单步跳出失败: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: `单步跳出失败: ${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'step_out',
+        data: {}
+      });
     }
   },
 });
@@ -342,11 +400,19 @@ export const resume = defineTool({
     try {
       const debuggerContext = await getDebugger(runtime);
       await debuggerContext.resume();
-      response.appendResponseLine('▶️ 执行已恢复');
+      response.setStructuredContent({
+        success: true,
+        message: '执行已恢复',
+        tooltype: 'resume',
+        data: { action: 'resume' }
+      });
     } catch (error) {
-      response.appendResponseLine(
-        `恢复执行失败: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: `恢复执行失败: ${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'resume',
+        data: {}
+      });
     }
   },
 });
@@ -370,15 +436,28 @@ export const pause = defineTool({
       const debuggerContext = await getDebugger(runtime);
       const client = debuggerContext.getClient();
       if (!client) {
-        response.appendResponseLine('Debugger 尚未启用，无法暂停执行');
+        response.setStructuredContent({
+          success: false,
+          message: 'Debugger 尚未启用，无法暂停执行',
+          tooltype: 'pause',
+          data: {}
+        });
         return;
       }
       await debuggerContext.pause();
-      response.appendResponseLine('⏸️ 已请求暂停执行，等待暂停...');
+      response.setStructuredContent({
+        success: true,
+        message: '已请求暂停执行，等待暂停...',
+        tooltype: 'pause',
+        data: { action: 'pause' }
+      });
     } catch (error) {
-      response.appendResponseLine(
-        `暂停执行失败: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: `暂停执行失败: ${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'pause',
+        data: {}
+      });
     }
   },
 });
@@ -419,23 +498,34 @@ export const listScripts = defineTool({
         scriptsWithUrls.length > 0 ? scriptsWithUrls : scripts;
 
       if (displayScripts.length === 0) {
-        response.appendResponseLine('未找到脚本。');
+        response.setStructuredContent({
+          success: true,
+          message: '未找到脚本。',
+          tooltype: 'list_scripts',
+          data: { scripts: [], filter: request.params.filter || null }
+        });
         return;
       }
 
-      response.appendResponseLine(`找到 ${displayScripts.length} 个脚本:\n`);
-      for (const script of displayScripts) {
-        response.appendResponseLine(`- ID: ${script.scriptId}`);
-        response.appendResponseLine(`  URL: ${script.url || '(内联/eval)'}`);
-        if (script.sourceMapURL) {
-          response.appendResponseLine(`  SourceMap: ${script.sourceMapURL}`);
-        }
-        response.appendResponseLine('');
-      }
+      const scriptData = displayScripts.map(script => ({
+        scriptId: script.scriptId,
+        url: script.url || null,
+        sourceMapURL: script.sourceMapURL || null,
+      }));
+
+      response.setStructuredContent({
+        success: true,
+        message: `找到 ${displayScripts.length} 个脚本`,
+        tooltype: 'list_scripts',
+        data: { scripts: scriptData, filter: request.params.filter || null }
+      });
     } catch (error) {
-      response.appendResponseLine(
-        `列出脚本失败: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: `列出脚本失败: ${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'list_scripts',
+        data: {}
+      });
     }
   },
 });
@@ -487,25 +577,41 @@ export const getScriptSource = defineTool({
       const source = await debuggerContext.getScriptSource(scriptId);
 
       if (!source) {
-        response.appendResponseLine(`未找到脚本 ${scriptId} 的源码。`);
+        response.setStructuredContent({
+          success: false,
+          message: `未找到脚本 ${scriptId} 的源码。`,
+          tooltype: 'get_script_source',
+          data: { scriptId }
+        });
         return;
       }
+
+      const script = debuggerContext.getScriptById(scriptId);
+      const url = script?.url || null;
 
       // 字符偏移模式（用于压缩文件）
       if (offset !== undefined) {
         const start = Math.max(0, offset);
         const end = Math.min(source.length, start + (length || 1000));
         const extract = source.substring(start, end);
-
         const prefix = start > 0 ? '...' : '';
         const suffix = end < source.length ? '...' : '';
 
-        response.appendResponseLine(
-          `脚本 ${scriptId} 的源码（字符 ${start}-${end} / ${source.length}）:\n`,
-        );
-        response.appendResponseLine('```javascript');
-        response.appendResponseLine(`${prefix}${extract}${suffix}`);
-        response.appendResponseLine('```');
+        response.setStructuredContent({
+          success: true,
+          message: `脚本 ${scriptId} 的源码（字符 ${start}-${end} / ${source.length}）`,
+          tooltype: 'get_script_source',
+          data: {
+            scriptId,
+            url,
+            mode: 'offset',
+            sourceLength: source.length,
+            sourceStart: start,
+            sourceEnd: end,
+            sourcePreview: `${prefix}${extract}${suffix}`,
+            isComplete: end >= source.length && start === 0
+          }
+        });
         return;
       }
 
@@ -516,36 +622,64 @@ export const getScriptSource = defineTool({
         const end = endLine ?? lines.length;
         const selectedLines = lines.slice(start, end);
 
-        response.appendResponseLine(
-          `脚本 ${scriptId} 的源码（行 ${start + 1}-${Math.min(end, lines.length)}）:\n`,
-        );
-        response.appendResponseLine('```javascript');
-        for (let i = 0; i < selectedLines.length; i++) {
-          response.appendResponseLine(`${start + i + 1}: ${selectedLines[i]}`);
-        }
-        response.appendResponseLine('```');
+        response.setStructuredContent({
+          success: true,
+          message: `脚本 ${scriptId} 的源码（行 ${start + 1}-${Math.min(end, lines.length)}）`,
+          tooltype: 'get_script_source',
+          data: {
+            scriptId,
+            url,
+            mode: 'lineRange',
+            totalLines: lines.length,
+            startLine: start + 1,
+            endLine: Math.min(end, lines.length),
+            lines: selectedLines.map((line, i) => ({
+              lineNumber: start + i + 1,
+              content: line
+            })),
+            isComplete: start === 0 && end >= lines.length
+          }
+        });
         return;
       }
 
       // 完整源码 - 但警告如果太大
       if (source.length > 50000) {
-        response.appendResponseLine(
-          `脚本 ${scriptId} 很大（${source.length} 字符）。请使用 offset/length 或 startLine/endLine 读取部分。`,
-        );
-        response.appendResponseLine(`前 1000 个字符:\n`);
-        response.appendResponseLine('```javascript');
-        response.appendResponseLine(source.substring(0, 1000) + '...');
-        response.appendResponseLine('```');
+        response.setStructuredContent({
+          success: true,
+          message: `脚本 ${scriptId} 很大（${source.length} 字符）。请使用 offset/length 或 startLine/endLine 读取部分。`,
+          tooltype: 'get_script_source',
+          data: {
+            scriptId,
+            url,
+            mode: 'full',
+            sourceLength: source.length,
+            sourcePreview: source.substring(0, 1000) + '...',
+            warning: 'Source too large, use offset/length or startLine/endLine for partial view'
+          }
+        });
       } else {
-        response.appendResponseLine(`脚本 ${scriptId} 的源码:\n`);
-        response.appendResponseLine('```javascript');
-        response.appendResponseLine(source);
-        response.appendResponseLine('```');
+        response.setStructuredContent({
+          success: true,
+          message: `脚本 ${scriptId} 的源码`,
+          tooltype: 'get_script_source',
+          data: {
+            scriptId,
+            url,
+            mode: 'full',
+            sourceLength: source.length,
+            source: source,
+            isComplete: true
+          }
+        });
       }
     } catch (error) {
-      response.appendResponseLine(
-        `获取脚本源码失败: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: `获取脚本源码失败: ${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'get_script_source',
+        data: { scriptId: request.params.scriptId }
+      });
     }
   },
 });
@@ -616,7 +750,12 @@ export const searchInSources = defineTool({
       });
 
       if (result.matches.length === 0) {
-        response.appendResponseLine(`未找到匹配 "${query}"。`);
+        response.setStructuredContent({
+          success: true,
+          message: `未找到匹配 "${query}"。`,
+          tooltype: 'search_in_sources',
+          data: { query, matches: [], totalMatches: 0, filtered: false }
+        });
         return;
       }
 
@@ -646,29 +785,25 @@ export const searchInSources = defineTool({
       }
 
       if (filteredMatches.length === 0) {
-        response.appendResponseLine(`未找到匹配 "${query}"。`);
-        if (skippedMinified > 0) {
-          response.appendResponseLine(
-            `（跳过了 ${skippedMinified} 个压缩文件中的匹配。设置 excludeMinified=false 以包含它们。）`,
-          );
-        }
+        response.setStructuredContent({
+          success: true,
+          message: `未找到匹配 "${query}"。`,
+          tooltype: 'search_in_sources',
+          data: {
+            query,
+            matches: [],
+            totalMatches: 0,
+            skippedMinified,
+            hint: skippedMinified > 0 ? '设置 excludeMinified=false 以包含压缩文件中的匹配' : null
+          }
+        });
         return;
       }
 
       const displayMatches = filteredMatches.slice(0, maxResults);
       const totalMatches = filteredMatches.length;
 
-      response.appendResponseLine(
-        `找到 ${totalMatches} 个匹配 "${query}"${totalMatches > maxResults ? ` (显示前 ${maxResults})` : ''}:`,
-      );
-      if (skippedMinified > 0) {
-        response.appendResponseLine(
-          `（跳过了 ${skippedMinified} 个压缩文件中的匹配）`,
-        );
-      }
-      response.appendResponseLine('');
-
-      for (const match of displayMatches) {
+      const matchData = displayMatches.map(match => {
         const lineNum = match.lineNumber + 1;
         const scriptId = match.scriptId;
         const url = match.url || '(内联)';
@@ -701,19 +836,36 @@ export const searchInSources = defineTool({
           }
         }
 
-        response.appendResponseLine(`[${scriptId}] ${url}:${lineNum}`);
-        response.appendResponseLine(`  ${preview}`);
-        response.appendResponseLine('');
-      }
+        return {
+          scriptId,
+          url,
+          lineNumber: lineNum,
+          preview,
+          lineContentLength: match.lineContent.length
+        };
+      });
 
-      response.appendResponseLine('---');
-      response.appendResponseLine(
-        '提示: 使用 get_script_source(scriptId, startLine, endLine) 查看匹配周围的完整上下文。',
-      );
+      response.setStructuredContent({
+        success: true,
+        message: `找到 ${totalMatches} 个匹配 "${query}"${totalMatches > maxResults ? ` (显示前 ${maxResults})` : ''}`,
+        tooltype: 'search_in_sources',
+        data: {
+          query,
+          matches: matchData,
+          totalMatches,
+          displayedMatches: displayMatches.length,
+          skippedMinified,
+          maxResults,
+          hint: '使用 get_script_source(scriptId, startLine, endLine) 查看匹配周围的完整上下文。'
+        }
+      });
     } catch (error) {
-      response.appendResponseLine(
-        `搜索失败: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: `搜索失败: ${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'search_in_sources',
+        data: { query: request.params.query }
+      });
     }
   },
 });
@@ -742,17 +894,29 @@ export const breakOnXhr = defineTool({
       const client = debuggerContext.getClient();
 
       if (!client) {
-        response.appendResponseLine('Debugger 客户端不可用。');
+        response.setStructuredContent({
+          success: false,
+          message: 'Debugger 客户端不可用。',
+          tooltype: 'break_on_xhr',
+          data: {}
+        });
         return;
       }
 
       await client.send('DOMDebugger.setXHRBreakpoint', {url});
-      response.appendResponseLine(`✅ XHR 断点已设置，URL 模式: "${url}"`);
-      response.appendResponseLine('匹配的 XHR/Fetch 请求发出时将暂停执行。');
+      response.setStructuredContent({
+        success: true,
+        message: `XHR 断点已设置，URL 模式: "${url}"`,
+        tooltype: 'break_on_xhr',
+        data: { url, hint: '匹配的 XHR/Fetch 请求发出时将暂停执行。' }
+      });
     } catch (error) {
-      response.appendResponseLine(
-        `设置 XHR 断点失败: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: `设置 XHR 断点失败: ${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'break_on_xhr',
+        data: { url: request.params.url }
+      });
     }
   },
 });
@@ -780,16 +944,29 @@ export const removeXhrBreakpoint = defineTool({
       const client = debuggerContext.getClient();
 
       if (!client) {
-        response.appendResponseLine('Debugger 客户端不可用。');
+        response.setStructuredContent({
+          success: false,
+          message: 'Debugger 客户端不可用。',
+          tooltype: 'remove_xhr_breakpoint',
+          data: {}
+        });
         return;
       }
 
       await client.send('DOMDebugger.removeXHRBreakpoint', {url});
-      response.appendResponseLine(`✅ XHR 断点已移除: "${url}"`);
+      response.setStructuredContent({
+        success: true,
+        message: `XHR 断点已移除: "${url}"`,
+        tooltype: 'remove_xhr_breakpoint',
+        data: { url }
+      });
     } catch (error) {
-      response.appendResponseLine(
-        `移除 XHR 断点失败: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: `移除 XHR 断点失败: ${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'remove_xhr_breakpoint',
+        data: { url: request.params.url }
+      });
     }
   },
 });
@@ -893,14 +1070,16 @@ export const traceFunction = defineTool({
       }
 
       if (!foundMatch) {
-        response.appendResponseLine(`❌ 未找到函数 "${target}"。`);
-        response.appendResponseLine('');
-        response.appendResponseLine('搜索过的模式：');
-        for (const p of patterns.slice(0, 4)) {
-          response.appendResponseLine(`  - "${p}"`);
-        }
-        response.appendResponseLine('');
-        response.appendResponseLine('提示: 使用 search_in_sources 查找确切的函数签名，然后使用 set_breakpoint。');
+        response.setStructuredContent({
+          success: false,
+          message: `未找到函数 "${target}"。`,
+          tooltype: 'trace_function',
+          data: {
+            target,
+            searchedPatterns: patterns.slice(0, 4),
+            hint: '使用 search_in_sources 查找确切的函数签名，然后使用 set_breakpoint。'
+          }
+        });
         return;
       }
 
@@ -909,7 +1088,12 @@ export const traceFunction = defineTool({
       const url = script?.url || match.url;
 
       if (!url) {
-        response.appendResponseLine('无法追踪：脚本没有 URL（内联脚本）。');
+        response.setStructuredContent({
+          success: false,
+          message: '无法追踪：脚本没有 URL（内联脚本）。',
+          tooltype: 'trace_function',
+          data: { target }
+        });
         return;
       }
 
@@ -958,27 +1142,29 @@ export const traceFunction = defineTool({
         condition,
       );
 
-      response.appendResponseLine(`✅ 函数追踪已安装！`);
-      response.appendResponseLine(`- Trace ID: ${hookId || target}`);
-      response.appendResponseLine(`- 函数: ${target}`);
-      response.appendResponseLine(
-        `- 断点 ID: ${breakpointInfo.breakpointId}`,
-      );
-      response.appendResponseLine(
-        `- 位置: ${url}:${match.lineNumber + 1}:${columnNumber}`,
-      );
-      response.appendResponseLine(
-        `- 模式: ${logStack ? '暂停 on call' : 'Log only (no pause)'}`,
-      );
-      response.appendResponseLine('');
-      response.appendResponseLine('调用将被记录到控制台。使用 list_console_messages 查看。');
-      response.appendResponseLine(
-        `使用 remove_breakpoint(breakpointId: "${breakpointInfo.breakpointId}") 停止追踪。`,
-      );
+      response.setStructuredContent({
+        success: true,
+        message: '函数追踪已安装！',
+        tooltype: 'trace_function',
+        data: {
+          traceId: hookId || target,
+          target,
+          breakpointId: breakpointInfo.breakpointId,
+          url,
+          lineNumber: match.lineNumber + 1,
+          columnNumber,
+          mode: logStack ? 'pause on call' : 'Log only (no pause)',
+          hint: '调用将被记录到控制台。使用 list_console_messages 查看。',
+          stopCommand: `remove_breakpoint(breakpointId: "${breakpointInfo.breakpointId}")`
+        }
+      });
     } catch (error) {
-      response.appendResponseLine(
-        `错误: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: `错误: ${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'trace_function',
+        data: { target: request.params.target }
+      });
     }
   },
 });
@@ -1004,20 +1190,31 @@ export const getAiDebugStatus = defineTool({
       const breakpoints = debuggerContext.getBreakpoints();
       const scripts = debuggerContext.getScripts();
 
-      response.appendResponseLine('已获取调试状态:');
-      response.appendResponseLine(`- 暂停状态: ${pausedState.isPaused ? '已暂停' : '未暂停'}`);
-      response.appendResponseLine(`- 断点数量: ${breakpoints.length}`);
-      response.appendResponseLine(`- 脚本数量: ${scripts.length}`);
-      response.appendResponseLine('');
-      response.appendResponseLine(`- 最后自动恢复事件: ${debuggerContext.getLastAutoRecoveryEvent() ?? '无'}`);
-      response.appendResponseLine('- 调试器状态: 已启用');
+      response.setStructuredContent({
+        success: true,
+        message: '已获取调试状态',
+        tooltype: 'get_ai_debug_status',
+        data: {
+          isPaused: pausedState.isPaused,
+          breakpointsCount: breakpoints.length,
+          scriptsCount: scripts.length,
+          lastAutoRecoveryEvent: debuggerContext.getLastAutoRecoveryEvent() ?? null,
+          debuggerStatus: '已启用'
+        }
+      });
     } catch {
-      response.appendResponseLine('调试器尚未初始化');
-      response.appendResponseLine('- 暂停状态: false');
-      response.appendResponseLine('- 断点数量: 0');
-      response.appendResponseLine('- 脚本数量: 0');
-      response.appendResponseLine('- 最后自动恢复事件: null');
-      response.appendResponseLine('- 调试器状态: 未启用');
+      response.setStructuredContent({
+        success: false,
+        message: '调试器尚未初始化',
+        tooltype: 'get_ai_debug_status',
+        data: {
+          isPaused: false,
+          breakpointsCount: 0,
+          scriptsCount: 0,
+          lastAutoRecoveryEvent: null,
+          debuggerStatus: '未启用'
+        }
+      });
     }
   },
 });
@@ -1067,7 +1264,12 @@ export const findInScript = defineTool({
       const source = await debuggerContext.getScriptSource(scriptId);
 
       if (!source) {
-        response.appendResponseLine(`未找到脚本 ${scriptId} 的源码。`);
+        response.setStructuredContent({
+          success: false,
+          message: `未找到脚本 ${scriptId} 的源码。`,
+          tooltype: 'find_in_script',
+          data: { scriptId }
+        });
         return;
       }
 
@@ -1089,9 +1291,12 @@ export const findInScript = defineTool({
       }
 
       if (position === -1) {
-        response.appendResponseLine(
-          `"${query}" 未在脚本 ${scriptId} 中找到${occurrence > 1 ? ` (第 ${occurrence} 个匹配)` : ''}。`,
-        );
+        response.setStructuredContent({
+          success: false,
+          message: `"${query}" 未在脚本 ${scriptId} 中找到${occurrence > 1 ? ` (第 ${occurrence} 个匹配)` : ''}。`,
+          tooltype: 'find_in_script',
+          data: { scriptId, query, occurrence }
+        });
         return;
       }
 
@@ -1125,27 +1330,34 @@ export const findInScript = defineTool({
       const script = debuggerContext.getScriptById(scriptId);
       const url = script?.url || '(内联)';
 
-      response.appendResponseLine(`在脚本 ${scriptId} 中找到 "${query}":`);
-      response.appendResponseLine(`URL: ${url}`);
-      response.appendResponseLine(
-        `位置: 行 ${lineNumber + 1}, 列 ${columnNumber}`,
-      );
-      response.appendResponseLine(`字符偏移: ${position}`);
-      response.appendResponseLine('');
-      response.appendResponseLine('上下文:');
-      response.appendResponseLine('```javascript');
-      response.appendResponseLine(
-        `${prefix}${beforeContext}【${matchText}】${afterContext}${suffix}`,
-      );
-      response.appendResponseLine('```');
-      response.appendResponseLine('');
-      response.appendResponseLine(
-        `要在此处设置断点: set_breakpoint(url: "${url}", lineNumber: ${lineNumber + 1}, columnNumber: ${columnNumber})`,
-      );
+      response.setStructuredContent({
+        success: true,
+        message: `在脚本 ${scriptId} 中找到 "${query}"`,
+        tooltype: 'find_in_script',
+        data: {
+          scriptId,
+          url,
+          query,
+          occurrence,
+          lineNumber: lineNumber + 1,
+          columnNumber,
+          charOffset: position,
+          context: {
+            prefix,
+            match: matchText,
+            suffix,
+            fullContext: `${prefix}${beforeContext}【${matchText}】${afterContext}${suffix}`
+          },
+          setBreakpointCommand: `set_breakpoint(url: "${url}", lineNumber: ${lineNumber + 1}, columnNumber: ${columnNumber})`
+        }
+      });
     } catch (error) {
-      response.appendResponseLine(
-        `错误: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: `错误: ${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'find_in_script',
+        data: { scriptId: request.params.scriptId }
+      });
     }
   },
 });
@@ -1177,46 +1389,48 @@ export const getRequestInitiator = defineTool({
       const initiator = runtime.getRequestInitiator(httpRequest);
 
       if (!initiator) {
-        response.appendResponseLine(
-          `未找到请求 ${requestId} 的发起者信息。`,
-        );
-        response.appendResponseLine(
-          '这可能是导航请求或发起者未被捕获。',
-        );
+        response.setStructuredContent({
+          success: false,
+          message: `未找到请求 ${requestId} 的发起者信息。`,
+          tooltype: 'get_request_initiator',
+          data: {
+            requestId,
+            hint: '这可能是导航请求或发起者未被捕获。'
+          }
+        });
         return;
       }
 
-      response.appendResponseLine(
-        `请求 ${httpRequest.url()} 的发起者:\n`,
-      );
-      response.appendResponseLine(`类型: ${initiator.type}`);
+      const stackFrames = initiator.stack?.callFrames?.map((frame, i) => ({
+        index: i + 1,
+        functionName: frame.functionName || '(匿名)',
+        url: frame.url,
+        lineNumber: frame.lineNumber + 1,
+        columnNumber: frame.columnNumber
+      })) || [];
 
-      if (initiator.url) {
-        response.appendResponseLine(`URL: ${initiator.url}`);
-      }
-      if (initiator.lineNumber !== undefined) {
-        response.appendResponseLine(`行号: ${initiator.lineNumber + 1}`);
-      }
-      if (initiator.columnNumber !== undefined) {
-        response.appendResponseLine(`列号: ${initiator.columnNumber}`);
-      }
-
-      if (initiator.stack && initiator.stack.callFrames.length > 0) {
-        response.appendResponseLine('\n调用栈:');
-        for (let i = 0; i < initiator.stack.callFrames.length; i++) {
-          const frame = initiator.stack.callFrames[i];
-          const functionName = frame.functionName || '(匿名)';
-          response.appendResponseLine(
-            `  ${i + 1}. ${functionName} @ ${frame.url}:${frame.lineNumber + 1}:${frame.columnNumber}`,
-          );
+      response.setStructuredContent({
+        success: true,
+        message: `请求 ${httpRequest.url()} 的发起者信息获取完成`,
+        tooltype: 'get_request_initiator',
+        data: {
+          requestId,
+          requestUrl: httpRequest.url(),
+          type: initiator.type,
+          url: initiator.url || null,
+          lineNumber: initiator.lineNumber !== undefined ? initiator.lineNumber + 1 : null,
+          columnNumber: initiator.columnNumber !== undefined ? initiator.columnNumber : null,
+          stackFrames,
+          hasStack: stackFrames.length > 0
         }
-      }
-
-      response.appendResponseLine('\n✅ 请求发起者信息获取完成');
+      });
     } catch (error) {
-      response.appendResponseLine(
-        `获取发起者失败: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: `获取发起者失败: ${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'get_request_initiator',
+        data: { requestId: request.params.requestId }
+      });
     }
   },
 });
@@ -1254,41 +1468,53 @@ export const getPausedInfo = defineTool({
       const pausedState = debuggerContext.getPausedState();
 
       if (!pausedState.isPaused) {
-        response.appendResponseLine('执行未暂停。');
-        response.appendResponseLine('请先设置断点并触发它来暂停执行。');
+        response.setStructuredContent({
+          success: false,
+          message: '执行未暂停。',
+          tooltype: 'get_paused_info',
+          data: {
+            isPaused: false,
+            hint: '请先设置断点并触发它来暂停执行。'
+          }
+        });
         return;
       }
 
-      response.appendResponseLine('🔴 执行已暂停\n');
-
-      if (pausedState.reason) {
-        response.appendResponseLine(`原因: ${pausedState.reason}`);
-      }
-
-      if (pausedState.hitBreakpoints && pausedState.hitBreakpoints.length > 0) {
-        response.appendResponseLine(
-          `命中断点: ${pausedState.hitBreakpoints.join(', ')}`,
-        );
-      }
-
-      response.appendResponseLine('\n📍 调用栈:');
-
-      for (let i = 0; i < pausedState.callFrames.length; i++) {
-        const frame = pausedState.callFrames[i];
+      const callFrames = pausedState.callFrames.map((frame, i) => {
         const script = debuggerContext.getScriptById(frame.location.scriptId);
         const url =
           script?.url || frame.url || `script:${frame.location.scriptId}`;
-        response.appendResponseLine(
-          `  ${i + 1}. ${frame.functionName} @ ${url}:${frame.location.lineNumber + 1}:${frame.location.columnNumber}`,
-        );
-        response.appendResponseLine(`     CallFrameId: ${frame.callFrameId}`);
-      }
+        return {
+          index: i + 1,
+          functionName: frame.functionName,
+          url,
+          lineNumber: frame.location.lineNumber + 1,
+          columnNumber: frame.location.columnNumber,
+          callFrameId: frame.callFrameId
+        };
+      });
+
+      const result: {
+        isPaused: true;
+        reason?: string;
+        hitBreakpoints?: string[];
+        callFrames: typeof callFrames;
+        scopes?: Array<{
+          scopeName: string;
+          scopeType: string;
+          variables?: Array<{name: string; value: unknown}>;
+        }>;
+      } = {
+        isPaused: true,
+        reason: pausedState.reason || undefined,
+        hitBreakpoints: pausedState.hitBreakpoints?.length > 0 ? pausedState.hitBreakpoints : undefined,
+        callFrames
+      };
 
       // 包含作用域变量
       if (request.params.includeScopes && pausedState.callFrames.length > 0) {
-        response.appendResponseLine('\n🔍 作用域变量（顶层帧）:');
-
         const topFrame = pausedState.callFrames[0];
+        const scopes = [];
 
         for (const scope of topFrame.scopeChain) {
           // 只显示 local 和 closure 作用域，跳过 global
@@ -1297,7 +1523,14 @@ export const getPausedInfo = defineTool({
           }
 
           const scopeName = scope.name || scope.type;
-          response.appendResponseLine(`\n  [${scopeName}]:`);
+          const scopeData: {
+            scopeName: string;
+            scopeType: string;
+            variables?: Array<{name: string; value: unknown}>;
+          } = {
+            scopeName,
+            scopeType: scope.type
+          };
 
           if (scope.object.objectId) {
             try {
@@ -1305,38 +1538,46 @@ export const getPausedInfo = defineTool({
                 scope.object.objectId,
               );
 
-              if (variables.length === 0) {
-                response.appendResponseLine('    (空)');
-              } else {
-                for (const variable of variables.slice(0, 20)) {
-                  const valueStr =
-                    typeof variable.value === 'string'
-                      ? `"${variable.value}"`
-                      : JSON.stringify(variable.value);
-                  response.appendResponseLine(
-                    `    ${variable.name}: ${valueStr}`,
-                  );
-                }
+              if (variables.length > 0) {
+                scopeData.variables = variables.slice(0, 20).map(v => ({
+                  name: v.name,
+                  value: v.value
+                }));
                 if (variables.length > 20) {
-                  response.appendResponseLine(
-                    `    ... 还有 ${variables.length - 20} 个`,
-                  );
+                  scopeData.variables.push({
+                    name: `... 还有 ${variables.length - 20} 个`,
+                    value: null
+                  });
                 }
               }
             } catch {
-              response.appendResponseLine('    (无法获取变量)');
+              // 忽略单个作用域读取失败
             }
           }
+
+          scopes.push(scopeData);
         }
+
+        result.scopes = scopes;
       }
+
+      response.setStructuredContent({
+        success: true,
+        message: '执行已暂停',
+        tooltype: 'get_paused_info',
+        data: result
+      });
 
       response.appendResponseLine(
         '\n💡 使用 resume、step_over、step_into 或 step_out 继续。',
       );
     } catch (error) {
-      response.appendResponseLine(
-        `获取暂停信息失败: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: `获取暂停信息失败: ${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'get_paused_info',
+        data: { isPaused: false }
+      });
     }
   },
 });
@@ -1371,14 +1612,25 @@ export const evaluateOnCallframe = defineTool({
       const pausedState = debuggerContext.getPausedState();
 
       if (!pausedState.isPaused) {
-        response.appendResponseLine('执行未暂停，无法执行表达式。');
+        response.setStructuredContent({
+          success: false,
+          message: '执行未暂停，无法执行表达式。',
+          tooltype: 'evaluate_on_callframe',
+          data: { isPaused: false }
+        });
         return;
       }
 
       if (frameIndex >= pausedState.callFrames.length) {
-        response.appendResponseLine(
-          `无效的帧索引 ${frameIndex}。可用帧: 0-${pausedState.callFrames.length - 1}`,
-        );
+        response.setStructuredContent({
+          success: false,
+          message: `无效的帧索引 ${frameIndex}。可用帧: 0-${pausedState.callFrames.length - 1}`,
+          tooltype: 'evaluate_on_callframe',
+          data: {
+            frameIndex,
+            availableFrames: pausedState.callFrames.length
+          }
+        });
         return;
       }
 
@@ -1391,30 +1643,37 @@ export const evaluateOnCallframe = defineTool({
       );
 
       if (result.exceptionDetails) {
-        response.appendResponseLine(`❌ 错误: ${result.exceptionDetails.text}`);
-        if (result.exceptionDetails.exception) {
-          response.appendResponseLine(
-            `   ${result.exceptionDetails.exception.description || ''}`,
-          );
-        }
+        response.setStructuredContent({
+          success: false,
+          message: `错误: ${result.exceptionDetails.text}`,
+          tooltype: 'evaluate_on_callframe',
+          data: {
+            expression,
+            frameIndex,
+            exception: result.exceptionDetails.exception?.description || null
+          }
+        });
       } else {
-        response.appendResponseLine('📝 结果:');
-        if (result.result.value !== undefined) {
-          const valueStr =
-            typeof result.result.value === 'string'
-              ? `"${result.result.value}"`
-              : JSON.stringify(result.result.value, null, 2);
-          response.appendResponseLine(valueStr);
-        } else {
-          response.appendResponseLine(
-            result.result.description || `[${result.result.type}]`,
-          );
-        }
+        response.setStructuredContent({
+          success: true,
+          message: '执行成功',
+          tooltype: 'evaluate_on_callframe',
+          data: {
+            expression,
+            frameIndex,
+            result: result.result.value !== undefined
+              ? result.result.value
+              : result.result.description || `[${result.result.type}]`
+          }
+        });
       }
     } catch (error) {
-      response.appendResponseLine(
-        `执行失败: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: `执行失败: ${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'evaluate_on_callframe',
+        data: { expression: request.params.expression }
+      });
     }
   },
 });
@@ -1439,7 +1698,12 @@ export const inspectLocals = defineTool({
       const pausedState = debuggerContext.getPausedState();
 
       if (!pausedState.isPaused) {
-        response.appendResponseLine('当前未处于暂停状态');
+        response.setStructuredContent({
+          success: false,
+          message: '当前未处于暂停状态',
+          tooltype: 'inspect_locals',
+          data: { isPaused: false }
+        });
         return;
       }
 
@@ -1469,45 +1733,39 @@ export const inspectLocals = defineTool({
             functionName: frame.functionName,
             scriptId: frame.location.scriptId,
             url: frame.url,
-            lineNumber: frame.location.lineNumber,
-            locals,
+            lineNumber: frame.location.lineNumber + 1,
+            locals: locals.slice(0, 10),
             localCount: locals.length,
           };
         }),
       );
 
-      response.appendResponseLine(
-        `当前暂停栈共 ${frames.length} 帧，已读取局部变量摘要`,
-      );
-      response.appendResponseLine(
-        `总局部变量数: ${frames.reduce((sum, f) => sum + f.localCount, 0)}\n`,
-      );
-
-      for (const frame of frames) {
-        response.appendResponseLine(
-          `[${frame.index}] ${frame.functionName} @ ${frame.url}:${frame.lineNumber + 1}`,
-        );
-        response.appendResponseLine(`  CallFrameId: ${frame.callFrameId}`);
-        response.appendResponseLine(`  局部变量数: ${frame.localCount}`);
-        if (frame.localCount > 0) {
-          response.appendResponseLine('  变量:');
-          for (const local of frame.locals.slice(0, 10)) {
-            const valueStr =
-              typeof local.value === 'string'
-                ? `"${local.value}"`
-                : JSON.stringify(local.value);
-            response.appendResponseLine(`    ${local.name}: ${valueStr}`);
-          }
-          if (frame.localCount > 10) {
-            response.appendResponseLine(`    ... 还有 ${frame.localCount - 10} 个`);
-          }
+      response.setStructuredContent({
+        success: true,
+        message: `当前暂停栈共 ${frames.length} 帧，已读取局部变量摘要`,
+        tooltype: 'inspect_locals',
+        data: {
+          isPaused: true,
+          totalFrames: frames.length,
+          totalLocals: frames.reduce((sum, f) => sum + f.localCount, 0),
+          frames: frames.map(f => ({
+            index: f.index,
+            callFrameId: f.callFrameId,
+            functionName: f.functionName,
+            url: f.url,
+            lineNumber: f.lineNumber,
+            localCount: f.localCount,
+            locals: f.locals
+          }))
         }
-        response.appendResponseLine('');
-      }
+      });
     } catch (error) {
-      response.appendResponseLine(
-        `检查局部变量失败: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: `检查局部变量失败: ${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'inspect_locals',
+        data: { isPaused: false }
+      });
     }
   },
 });
@@ -1561,7 +1819,12 @@ export const setBreakpointOnText = defineTool({
       });
 
       if (searchResult.matches.length === 0) {
-        response.appendResponseLine(`"${text}" 未在任何已加载脚本中找到。`);
+        response.setStructuredContent({
+          success: false,
+          message: `"${text}" 未在任何已加载脚本中找到。`,
+          tooltype: 'set_breakpoint_on_text',
+          data: { text }
+        });
         return;
       }
 
@@ -1573,18 +1836,24 @@ export const setBreakpointOnText = defineTool({
           m => m.url && m.url.toLowerCase().includes(lowerFilter),
         );
         if (matches.length === 0) {
-          response.appendResponseLine(
-            `"${text}" 在未匹配 "${urlFilter}" 的脚本中找到。`,
-          );
+          response.setStructuredContent({
+            success: false,
+            message: `"${text}" 在未匹配 "${urlFilter}" 的脚本中找到。`,
+            tooltype: 'set_breakpoint_on_text',
+            data: { text, urlFilter }
+          });
           return;
         }
       }
 
       // 获取指定的匹配项
       if (occurrence > matches.length) {
-        response.appendResponseLine(
-          `只有 ${matches.length} 个匹配项，但请求了第 ${occurrence} 个。`,
-        );
+        response.setStructuredContent({
+          success: false,
+          message: `只有 ${matches.length} 个匹配项，但请求了第 ${occurrence} 个。`,
+          tooltype: 'set_breakpoint_on_text',
+          data: { text, matchesCount: matches.length, requestedOccurrence: occurrence }
+        });
         return;
       }
 
@@ -1593,7 +1862,12 @@ export const setBreakpointOnText = defineTool({
       const url = script?.url || match.url;
 
       if (!url) {
-        response.appendResponseLine('无法设置断点：脚本没有 URL（内联脚本）。');
+        response.setStructuredContent({
+          success: false,
+          message: '无法设置断点：脚本没有 URL（内联脚本）。',
+          tooltype: 'set_breakpoint_on_text',
+          data: { text }
+        });
         return;
       }
 
@@ -1619,18 +1893,8 @@ export const setBreakpointOnText = defineTool({
         condition,
       );
 
-      response.appendResponseLine(`✅ 断点设置成功！`);
-      response.appendResponseLine(`- ID: ${breakpointInfo.breakpointId}`);
-      response.appendResponseLine(`- URL: ${url}`);
-      response.appendResponseLine(
-        `- 行号: ${match.lineNumber + 1}, 列号: ${columnNumber}`,
-      );
-      if (condition) {
-        response.appendResponseLine(`- 条件: ${condition}`);
-      }
-      response.appendResponseLine(`- 提示: 如果执行卡住，先运行 resume。如果总是在同一位置暂停，移除断点后改用 trace_function(pause=false) 或 hook_function。`);
-
-      // 显示上下文
+      // 获取上下文预览
+      let contextPreview = null;
       if (match.lineNumber < lines.length) {
         const lineContent = lines[match.lineNumber];
         const contextStart = Math.max(0, columnNumber - 50);
@@ -1641,17 +1905,30 @@ export const setBreakpointOnText = defineTool({
         const preview = lineContent.substring(contextStart, contextEnd);
         const prefix = contextStart > 0 ? '...' : '';
         const suffix = contextEnd < lineContent.length ? '...' : '';
-
-        response.appendResponseLine('');
-        response.appendResponseLine('上下文:');
-        response.appendResponseLine('```javascript');
-        response.appendResponseLine(`${prefix}${preview}${suffix}`);
-        response.appendResponseLine('```');
+        contextPreview = `${prefix}${preview}${suffix}`;
       }
+
+      response.setStructuredContent({
+        success: true,
+        message: '断点设置成功！',
+        tooltype: 'set_breakpoint_on_text',
+        data: {
+          breakpointId: breakpointInfo.breakpointId,
+          url,
+          lineNumber: match.lineNumber + 1,
+          columnNumber,
+          condition: condition || null,
+          contextPreview,
+          hint: '如果执行卡住，先运行 resume。如果总是在同一位置暂停，移除断点后改用 trace_function(pause=false) 或 hook_function。'
+        }
+      });
     } catch (error) {
-      response.appendResponseLine(
-        `错误: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: `错误: ${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'set_breakpoint_on_text',
+        data: { text: request.params.text }
+      });
     }
   },
 });
@@ -1683,21 +1960,32 @@ export const xhrToJsBreakpoint = defineTool({
       const client = debuggerContext.getClient();
 
       if (!client) {
-        response.appendResponseLine('Debugger 客户端不可用。');
+        response.setStructuredContent({
+          success: false,
+          message: 'Debugger 客户端不可用。',
+          tooltype: 'xhr_to_js_breakpoint',
+          data: {}
+        });
         return;
       }
 
       await client.send('DOMDebugger.setXHRBreakpoint', {url});
-      response.appendResponseLine(
-        `✅ XHR 断点已设置: ${url || '*'}`,
-      );
-      response.appendResponseLine(
-        '命中后可结合 get_paused_info / set_breakpoint 完成 JS 断点定位',
-      );
+      response.setStructuredContent({
+        success: true,
+        message: `XHR 断点已设置: ${url || '*'}`,
+        tooltype: 'xhr_to_js_breakpoint',
+        data: {
+          url: url || '*',
+          hint: '命中后可结合 get_paused_info / set_breakpoint 完成 JS 断点定位'
+        }
+      });
     } catch (error) {
-      response.appendResponseLine(
-        `错误: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: `错误: ${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'xhr_to_js_breakpoint',
+        data: { url: request.params.url }
+      });
     }
   },
 });
@@ -1716,9 +2004,14 @@ export const startContinuousDebugging = defineTool({
   },
   schema: {},
   handler: async (request, response, context) => {
-    response.appendResponseLine(
-      '当前工具层尚未接入 AIContinuousDebugger 运行时，请改用 pause/set_breakpoint/get_paused_info 组合',
-    );
+    response.setStructuredContent({
+      success: false,
+      message: '当前工具层尚未接入 AIContinuousDebugger 运行时，请改用 pause/set_breakpoint/get_paused_info 组合',
+      tooltype: 'start_continuous_debugging',
+      data: {
+        hint: 'Use pause, set_breakpoint, and get_paused_info instead'
+      }
+    });
   },
 });
 
@@ -1735,6 +2028,11 @@ export const stopContinuousDebugging = defineTool({
   },
   schema: {},
   handler: async (request, response, context) => {
-    response.appendResponseLine('当前没有可停止的连续调试会话');
+    response.setStructuredContent({
+      success: false,
+      message: '当前没有可停止的连续调试会话',
+      tooltype: 'stop_continuous_debugging',
+      data: {}
+    });
   },
 });

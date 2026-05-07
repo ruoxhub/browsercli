@@ -44,11 +44,10 @@ export const injectCodeTemplate = defineTool({
         success: false,
         message: `未找到模板 "${templateName}"`,
         tooltype: 'inject_code_template',
-        name: templateName,
+        data: {
+          name: templateName
+        }
       };
-      // response.appendResponseLine('```json');
-      // response.appendResponseLine(JSON.stringify(result, null, 2));
-      // response.appendResponseLine('```');
       response.setStructuredContent(result);
       return;
     }
@@ -64,22 +63,16 @@ export const injectCodeTemplate = defineTool({
         success: true,
         message: `已注入模板：${templateInfo.name}`,
         tooltype: 'inject_code_template',
-        name: templateName,
+        data: {name: templateName}
       };
-      // response.appendResponseLine('```json');
-      // response.appendResponseLine(JSON.stringify(result, null, 2));
-      // response.appendResponseLine('```');
       response.setStructuredContent(result);
     } catch (error) {
       const result = {
         success: false,
         message: `注入模板失败：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'inject_code_template',
-        name: templateName,
+        data: {name: templateName}
       };
-      // response.appendResponseLine('```json');
-      // response.appendResponseLine(JSON.stringify(result, null, 2));
-      // response.appendResponseLine('```');
       response.setStructuredContent(result);
     }
   },

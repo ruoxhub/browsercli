@@ -5,26 +5,18 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+import type {MessagesResult} from '../shared/types.js';
 
 /**
- * 代码模板纯函数统一返回结构。
- *
- * 成功时 success=true，message 包含操作确认；
- * 失败时 success=false，message 包含错误描述。
+ * 代码模板纯函数统一返回结构（兼容旧字段 logFormat）。
  */
-export interface CodeTemplateResult {
-  success: boolean;
-  message: string;
-  /** 工具类型标识 */
-  tooltype: string;
+export interface CodeTemplateResult<T = unknown> extends MessagesResult<T> {
   /** 使用的日志格式 */
   logFormat?: string;
 }
 
-/**
- * 获取模板结果 — 纯 Node.js 函数返回，不依赖 Puppeteer。
- */
-export interface GetCodeTemplateResult extends CodeTemplateResult {
+/** getCodeTemplate 返回数据 */
+export interface GetCodeTemplateData {
   /** 模板名称（英文 key） */
   name: string;
   /** 模板中文描述 */
@@ -33,6 +25,19 @@ export interface GetCodeTemplateResult extends CodeTemplateResult {
   code: string;
   /** 模板文件大小（字节） */
   sizeBytes: number;
+}
+
+/**
+ * 获取模板结果 — 纯 Node.js 函数返回，不依赖 Puppeteer。
+ */
+export interface GetCodeTemplateResult extends CodeTemplateResult<GetCodeTemplateData> {
+  tooltype: 'get_code_template';
+}
+
+/** injectCodeTemplate 返回数据 */
+export interface InjectCodeTemplateData {
+  /** 模板名称（英文 key） */
+  name: string;
 }
 
 /**
@@ -50,9 +55,8 @@ export interface CodeTemplateInfo {
 /**
  * 注入模板结果 — 依赖 Puppeteer Frame。
  */
-export interface InjectCodeTemplateResult extends CodeTemplateResult {
-  /** 模板名称（英文 key） */
-  name: string;
+export interface InjectCodeTemplateResult extends CodeTemplateResult<InjectCodeTemplateData> {
+  tooltype: 'inject_code_template';
 }
 
 /** 代码模板名称枚举 */

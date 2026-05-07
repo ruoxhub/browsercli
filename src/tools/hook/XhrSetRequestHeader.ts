@@ -85,25 +85,21 @@ ${buildHookStoreRuntime({
 
     try {
       await frame.evaluate(hookCode);
-      const result = {
+      response.setStructuredContent({
         success: true,
         message: hasFilter
           ? `XHR SetRequestHeader Hook 已安装，过滤 Header：${filterKeys!.join(', ')}`
           : 'XHR SetRequestHeader Hook 已安装，监控所有请求头设置',
         tooltype: 'hook_xhr_set_request_header',
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+        data: { hookId: 'hook_xhr_set_request_header' },
+      });
     } catch (error) {
-      const result = {
+      response.setStructuredContent({
         success: false,
         message: `错误：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'hook_xhr_set_request_header',
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+        data: { hookId: 'hook_xhr_set_request_header' },
+      });
     }
   },
 });

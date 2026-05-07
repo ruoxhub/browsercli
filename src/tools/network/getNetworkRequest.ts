@@ -51,7 +51,6 @@ export const getNetworkRequest = defineTool({
           success: false,
           message: '未指定 reqid，且 DevTools Network 面板未选中任何请求',
           tooltype: 'get_network_request',
-          logFormat: 'json',
           data: {
             reqid: 0,
             url: '',
@@ -62,9 +61,6 @@ export const getNetworkRequest = defineTool({
             responseHeaders: {},
           },
         };
-        // response.appendResponseLine('```json');
-        // response.appendResponseLine(JSON.stringify(result, null, 2));
-        // response.appendResponseLine('```');
         response.setStructuredContent(result);
         return;
       }
@@ -113,13 +109,9 @@ export const getNetworkRequest = defineTool({
         success: true,
         message: `请求 ID=${reqid} 获取成功`,
         tooltype: 'get_network_request',
-        logFormat: 'json',
         data,
       };
 
-      // response.appendResponseLine('```json');
-      // response.appendResponseLine(JSON.stringify(result, null, 2));
-      // response.appendResponseLine('```');
       response.setStructuredContent(result);
     } catch (error) {
       const result = {
@@ -138,9 +130,6 @@ export const getNetworkRequest = defineTool({
         },
       };
       response.setStructuredContent(result);
-      // response.appendResponseLine('```json');
-      // response.appendResponseLine(JSON.stringify(result, null, 2));
-      // response.appendResponseLine('```');
     }
   },
 });

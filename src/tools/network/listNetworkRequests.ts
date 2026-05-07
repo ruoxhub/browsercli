@@ -298,7 +298,6 @@ export const listNetworkRequests = defineTool({
         success: true,
         message: `共 ${total} 个请求，返回 ${pagedData.length} 个`,
         tooltype: 'list_network_requests',
-        logFormat: 'json',
         data,
       });
     } catch (error) {
@@ -306,7 +305,6 @@ export const listNetworkRequests = defineTool({
         success: false,
         message: `列出请求失败：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'list_network_requests',
-        logFormat: 'json',
         data: {
           requests: [],
           total: 0,

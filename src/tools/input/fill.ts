@@ -32,7 +32,11 @@ export const fill = defineTool({
     try {
       const element = await page.$(selector);
       if (!element) {
-        response.appendResponseLine(`Element not found: ${selector}`);
+        response.setStructuredContent({
+          success: false,
+          message: `Element not found: ${selector}`,
+          tooltype: 'fill',
+        });
         return;
       }
 
@@ -47,13 +51,19 @@ export const fill = defineTool({
         await element.fill(value);
       }
 
-      response.appendResponseLine(
-        `Successfully filled value into element: ${selector}`,
-      );
+      response.setStructuredContent({
+        success: true,
+        message: `Successfully filled value into element: ${selector}`,
+        tooltype: 'fill',
+        data: {selector, value, isSelect},
+      });
     } catch (error) {
-      response.appendResponseLine(
-        `Fill failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: error instanceof Error ? error.message : String(error),
+        tooltype: 'fill',
+        data: {selector, value},
+      });
     }
   },
 });

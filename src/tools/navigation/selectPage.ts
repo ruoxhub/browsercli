@@ -34,7 +34,15 @@ export const selectPage = defineTool({
     context.selectPage(page);
     context.syncPageContext(page);
 
-    response.appendResponseLine(`已选择页面 ${pageIdx}: ${page.url()}`);
-    response.appendResponseLine(`标题: ${await page.title()}`);
+    response.setStructuredContent({
+      success: true,
+      message: `已选择页面 ${pageIdx}`,
+      tooltype: 'select_page',
+      data: {
+        selectedIndex: pageIdx,
+        url: page.url(),
+        title: await page.title(),
+      }
+    });
   },
 });

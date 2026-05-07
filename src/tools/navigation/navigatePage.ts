@@ -74,32 +74,48 @@ export const navigatePage = defineTool({
 
     const page = resolvedPage.page;
 
-    try {
-      switch (navType) {
-        case 'url':
-          await page.goto(request.params.url!, options);
-          break;
-        case 'back':
-          await page.goBack(options);
-          break;
-        case 'forward':
-          await page.goForward(options);
-          break;
-        case 'reload':
-          if (request.params.ignoreCache) {
-            const client = await page.context().newCDPSession(page);
-            await client.send('Page.reload', {ignoreCache: true});
-          } else {
-            await page.reload(options);
-          }
-          break;
-      }
+     try {
+       switch (navType) {
+         case 'url':
+           await page.goto(request.params.url!, options);
+           break;
+         case 'back':
+           await page.goBack(options);
+           break;
+         case 'forward':
+           await page.goForward(options);
+           break;
+         case 'reload':
+           if (request.params.ignoreCache) {
+             const client = await page.context().newCDPSession(page);
+             await client.send('Page.reload', {ignoreCache: true});
+           } else {
+             await page.reload(options);
+           }
+           break;
+       }
 
-      response.appendResponseLine(
-        `已${actionLabel[navType]}${navType === 'url' ? ` ${request.params.url}` : ''}，当前 URL: ${page.url()}`,
-      );
-    } catch (error) {
-      response.appendResponseLine(explainPageError(error, '导航'));
-    }
+       response.setStructuredContent({
+         success: true,
+         message: `已${actionLabel[navType]}${navType === 'url' ? ` ${request.params.url}` : ''}`,
+         tooltype: 'navigate_page',
+         data: {
+           type: navType,
+           url: page.url(),
+           navigated: true,
+         }
+       });
+     } catch (error) {
+       response.setStructuredContent({
+         success: false,
+         message: explainPageError(error, '导航'),
+         tooltype: 'navigate_page',
+         data: {
+           type: navType,
+           url: page.url(),
+           navigated: false,
+         }
+       });
+     }
   },
 });

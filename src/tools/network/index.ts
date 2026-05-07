@@ -4,12 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// ─── Network 工具（defineTool 模式）───────────────────
+// ─── Network 工具（defineTool 模式）──────────────────
 
 export {listNetworkRequests} from './listNetworkRequests.js';
 export {getNetworkRequest} from './getNetworkRequest.js';
 
-// ─── WebSocket Collector ─────────────────────────────
+// ─── WebSocket 工具（defineTool 模式）──────────────────
+
+export {listWebSocketConnections} from './listConnections.js';
+export {getWebSocketMessages} from './getMessages.js';
+export {getWebSocketMessage} from './getMessage.js';
+export {analyzeWebSocketMessages} from './analyzeMessages.js';
+
+// ─── WebSocket Collector ──────────────────────────
 
 export {WebSocketCollector} from './WebSocketCollector.js';
 export type {
@@ -20,7 +27,7 @@ export type {
   WebSocketData,
 } from './WebSocketCollector.js';
 
-// ─── 类型导出 ─────────────────────────────────────────
+// ─── 类型导出 ─────────────────────────────────
 
 export type {
   NetworkRuntimeServices,
@@ -34,6 +41,10 @@ export type {
   GetNetworkRequestData,
   ListNetworkRequestsResult,
   GetNetworkRequestResult,
+  // WebSocket 参数类型
+  ListWebSocketConnectionsParams,
+  GetWebSocketMessagesParams,
+  GetWebSocketMessageParams,
+  AnalyzeWebSocketMessagesParams,
 } from './types.js';
-
 export {FILTERABLE_RESOURCE_TYPES} from './types.js';

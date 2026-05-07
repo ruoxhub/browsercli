@@ -36,9 +36,11 @@ export const fillForm = defineTool({
     const page = frame.page();
 
     if (!Array.isArray(elements) || elements.length === 0) {
-      response.appendResponseLine(
-        'fill_form requires a non-empty "elements" array',
-      );
+      response.setStructuredContent({
+        success: false,
+        message: 'fill_form requires a non-empty "elements" array',
+        tooltype: 'fill_form',
+      });
       return;
     }
 
@@ -63,26 +65,19 @@ export const fillForm = defineTool({
         }
       }
 
-      const result = {
+      response.setStructuredContent({
         success: true,
         message: `Successfully filled out ${filled}/${total} form elements`,
         tooltype: 'fill_form',
-        logFormat: 'simple',
-        data: {filled, total},
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+        data: {filled, total, elements},
+      });
     } catch (error) {
-      const result = {
+      response.setStructuredContent({
         success: false,
-        message: `FillForm failed: ${error instanceof Error ? error.message : String(error)}`,
+        message: error instanceof Error ? error.message : String(error),
         tooltype: 'fill_form',
         data: {filled, total},
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+      });
     }
   },
 });

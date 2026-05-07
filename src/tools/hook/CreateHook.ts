@@ -46,17 +46,23 @@ export const createHook = defineTool({
     const runtime = getRuntime();
     try {
       const result = runtime.hookManager.create(request.params);
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: true,
+        message: result.hookId ? `Hook created: ${result.hookId}` : 'Hook created',
+        tooltype: 'create_hook',
+        data: result,
+      });
     } catch (error) {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify({
-        hookId: null,
-        script: null,
-        error: error instanceof Error ? error.message : String(error),
-      }, null, 2));
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: false,
+        message: error instanceof Error ? error.message : String(error),
+        tooltype: 'create_hook',
+        data: {
+          hookId: null,
+          script: null,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
     }
   },
 });

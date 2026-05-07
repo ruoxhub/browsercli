@@ -898,11 +898,13 @@ export function deobfuscateCode(params: DeobfuscateParams): DeobfuscateResult {
       success: false,
       message: 'deobfuscate_code_vj requires a "code" string parameter',
       tooltype: 'deobfuscate_code_vj',
-      result: '',
-      origLines: 0,
-      resultLines: 0,
-      origBytes: 0,
-      resultBytes: 0,
+      data: {
+        result: '',
+        origLines: 0,
+        resultLines: 0,
+        origBytes: 0,
+        resultBytes: 0,
+      },
     };
   }
 
@@ -936,22 +938,26 @@ export function deobfuscateCode(params: DeobfuscateParams): DeobfuscateResult {
       success: true,
       message: '代码解混淆完成',
       tooltype: 'deobfuscate_code_vj',
-      result,
-      origLines,
-      resultLines,
-      origBytes,
-      resultBytes,
+      data: {
+        result,
+        origLines,
+        resultLines,
+        origBytes,
+        resultBytes,
+      },
     };
   } catch (error) {
     return {
       success: false,
       message: `解混淆失败：${error instanceof Error ? error.message : String(error)}`,
       tooltype: 'deobfuscate_code_vj',
-      result: code,
-      origLines: code.split('\n').length,
-      resultLines: code.split('\n').length,
-      origBytes: new TextEncoder().encode(code).length,
-      resultBytes: new TextEncoder().encode(code).length,
+      data: {
+        result: code,
+        origLines: code.split('\n').length,
+        resultLines: code.split('\n').length,
+        origBytes: new TextEncoder().encode(code).length,
+        resultBytes: new TextEncoder().encode(code).length,
+      },
     };
   }
 }
@@ -994,20 +1000,24 @@ export async function minifyCodeFn(
       success: true,
       message: `代码${action === 'format' ? '格式化' : '压缩'}完成`,
       tooltype: 'minify_code',
-      result,
-      origBytes,
-      resultBytes,
-      reduction,
+      data: {
+        result,
+        origBytes,
+        resultBytes,
+        reduction,
+      },
     };
   } catch (error) {
     return {
       success: false,
       message: `处理失败：${error instanceof Error ? error.message : String(error)}`,
       tooltype: 'minify_code',
-      result: code,
-      origBytes: new TextEncoder().encode(code).length,
-      resultBytes: new TextEncoder().encode(code).length,
-      reduction: '0',
+      data: {
+        result: code,
+        origBytes: new TextEncoder().encode(code).length,
+        resultBytes: new TextEncoder().encode(code).length,
+        reduction: '0',
+      },
     };
   }
 }
@@ -1040,14 +1050,18 @@ export function transpileCode(params: TranspileParams): TranspileResult {
       success: true,
       message: '代码转译完成',
       tooltype: 'transpile_code',
-      result,
+      data: {
+        result,
+      },
     };
   } catch (error) {
     return {
       success: false,
       message: `转译失败：${error instanceof Error ? error.message : String(error)}`,
       tooltype: 'transpile_code',
-      result: code,
+      data: {
+        result: code,
+      },
     };
   }
 }
@@ -1081,7 +1095,9 @@ export function analyzeAst(params: AnalyzeAstParams): AnalyzeAstResult {
         success: true,
         message: 'AST 完整分析完成',
         tooltype: 'analyze_ast',
-        fullAst,
+        data: {
+          fullAst,
+        },
       };
     }
 
@@ -1110,7 +1126,9 @@ export function analyzeAst(params: AnalyzeAstParams): AnalyzeAstResult {
         success: true,
         message: `找到 ${nodes.length} 个 "${filterType}" 节点`,
         tooltype: 'analyze_ast',
-        filteredNodes: nodes,
+        data: {
+          filteredNodes: nodes,
+        },
       };
     }
 
@@ -1149,15 +1167,18 @@ export function analyzeAst(params: AnalyzeAstParams): AnalyzeAstResult {
       success: true,
       message: 'AST 概要分析完成',
       tooltype: 'analyze_ast',
-      stats,
-      identifiers,
-      functions,
+      data: {
+        stats,
+        identifiers,
+        functions,
+      },
     };
   } catch (error) {
     return {
       success: false,
       message: `AST 分析失败：${error instanceof Error ? error.message : String(error)}`,
       tooltype: 'analyze_ast',
+      data: {},
     };
   }
 }
@@ -1192,18 +1213,22 @@ export async function diffCodeFn(params: DiffParams): Promise<DiffResult> {
       success: true,
       message: '代码对比完成',
       tooltype: 'diff_code',
-      diff: unifiedDiff,
-      addedLines,
-      removedLines,
+      data: {
+        diff: unifiedDiff,
+        addedLines,
+        removedLines,
+      },
     };
   } catch (error) {
     return {
       success: false,
       message: `对比失败：${error instanceof Error ? error.message : String(error)}`,
       tooltype: 'diff_code',
-      diff: '',
-      addedLines: 0,
-      removedLines: 0,
+      data: {
+        diff: '',
+        addedLines: 0,
+        removedLines: 0,
+      },
     };
   }
 }

@@ -5,18 +5,12 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+import type {MessagesResult} from '../shared/types.js';
 
 /**
- * Hook 函数统一返回结构。
- *
- * 成功时 success=true，message 包含安装确认；
- * 失败时 success=false，message 包含错误描述。
+ * Vue Hook 函数统一返回结构（兼容旧字段 logFormat）。
  */
-export interface HookResult {
-  success: boolean;
-  message: string;
-  /** 工具类型标识 */
-  tooltype: string;
+export interface HookResult<T = unknown> extends MessagesResult<T> {
   /** 使用的日志格式 */
   logFormat?: string;
 }

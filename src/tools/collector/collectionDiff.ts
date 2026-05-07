@@ -68,13 +68,8 @@ export const collectionDiff = defineTool({
         success: true,
         message: `对比完成：${data.addedCount} 新增, ${data.removedCount} 移除, ${data.changedCount} 变更`,
         tooltype: 'collection_diff',
-        logFormat: 'json',
-        data,
+        data: data
       };
-
-      // response.appendResponseLine('```json');
-      // response.appendResponseLine(JSON.stringify(result, null, 2));
-      // response.appendResponseLine('```');
       response.setStructuredContent(result);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
@@ -96,10 +91,6 @@ export const collectionDiff = defineTool({
           changed: [],
         },
       };
-
-      // response.appendResponseLine('```json');
-      // response.appendResponseLine(JSON.stringify(errorResult, null, 2));
-      // response.appendResponseLine('```');
       response.setStructuredContent(errorResult);
     }
   },

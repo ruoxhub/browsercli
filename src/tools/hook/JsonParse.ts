@@ -80,25 +80,21 @@ ${buildHookStoreRuntime({
 
     try {
       await frame.evaluate(hookCode);
-      const result = {
+      response.setStructuredContent({
         success: true,
         message: hasFilter
           ? `JSON Parse Hook 已安装，过滤字符串：${filterKeys!.join(', ')}`
           : 'JSON Parse Hook 已安装，监控所有 JSON.parse 调用',
         tooltype: 'hook_json_parse',
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+        data: { hookId: 'hook_json_parse' },
+      });
     } catch (error) {
-      const result = {
+      response.setStructuredContent({
         success: false,
         message: `错误：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'hook_json_parse',
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+        data: { hookId: 'hook_json_parse' },
+      });
     }
   },
 });

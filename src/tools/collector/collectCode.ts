@@ -133,29 +133,18 @@ export const collectCode = defineTool({
         success: true,
         message,
         tooltype: 'collect_code',
-        logFormat: 'json',
-        data,
+        data: data ,
       };
-
-      // response.appendResponseLine('```json');
-      // response.appendResponseLine(JSON.stringify(result, null, 2));
-      // response.appendResponseLine('```');
       response.setStructuredContent(result);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.error('[collectCode] 收集失败:', errorMsg);
-
       const errorResult = {
         success: false,
         message: `代码收集失败：${errorMsg}`,
         tooltype: 'collect_code',
-        logFormat: 'json',
-        data: null,
+        data: {},
       };
-
-      // response.appendResponseLine('```json');
-      // response.appendResponseLine(JSON.stringify(errorResult, null, 2));
-      // response.appendResponseLine('```');
       response.setStructuredContent(errorResult);
     }
   },

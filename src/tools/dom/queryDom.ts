@@ -47,54 +47,43 @@ export const queryDom = defineTool({
     const frame = (context as Context).getSelectedFrame();
 
     if (!frame) {
-      response.appendResponseLine(NO_ACTIVE_PAGE_MESSAGE);
+      response.setStructuredContent({
+        success: false,
+        message: NO_ACTIVE_PAGE_MESSAGE,
+        tooltype: 'query_dom',
+        data: null,
+      });
       return;
     }
 
     try {
       if (all) {
         const elements = await frame.evaluate(queryAllCode, {selector, limit});
-        const result = {
+        response.setStructuredContent({
           success: true,
-          message: `查询到 ${elements.length} 个匹配元素：${selector}`,
+          message: `Query returned ${elements.length} matching elements`,
           tooltype: 'query_dom',
-          logFormat: 'full',
-          data: elements,
-        };
-        response.appendResponseLine('```json');
-        response.appendResponseLine(JSON.stringify(result, null, 2));
-        response.appendResponseLine('```');
+          data: {elements, selector, count: elements.length},
+        });
         return;
       }
 
       const element = await frame.evaluate(queryOneCode, selector);
-      const result = element.found
-        ? {
-            success: true,
-            message: `查询到匹配元素：${selector}`,
-            tooltype: 'query_dom',
-            logFormat: 'full',
-            data: element,
-          }
-        : {
-            success: true,
-            message: `未找到匹配元素：${selector}`,
-            tooltype: 'query_dom',
-            logFormat: 'compact',
-            data: element,
-          };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
-    } catch (error) {
-      const result = {
-        success: false,
-        message: `查询失败：${error instanceof Error ? error.message : String(error)}`,
+      response.setStructuredContent({
+        success: element.found,
+        message: element.found
+          ? `Found matching element: ${selector}`
+          : `No matching element found: ${selector}`,
         tooltype: 'query_dom',
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+        data: element.found ? element : null,
+      });
+    } catch (error) {
+      response.setStructuredContent({
+        success: false,
+        message: `Query failed: ${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'query_dom',
+        data: null,
+      });
     }
   },
 });

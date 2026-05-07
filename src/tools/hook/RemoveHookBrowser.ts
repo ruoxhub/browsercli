@@ -34,15 +34,12 @@ export const removeHookBrowser = defineTool({
     const frame = (context as Context).getSelectedFrame();
 
     if (!hookId) {
-      const result = {
+      response.setStructuredContent({
         success: false,
         message: 'hookId 参数不能为空',
         tooltype: 'remove_hook',
-        hookId: '',
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+        data: {hookId: ''},
+      });
       return;
     }
 
@@ -57,25 +54,19 @@ export const removeHookBrowser = defineTool({
 
     try {
       await frame.evaluate(cleanupScript);
-      const result = {
+      response.setStructuredContent({
         success: true,
         message: `浏览器端 Hook 数据已清理：${hookId}`,
         tooltype: 'remove_hook',
-        hookId,
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+        data: {hookId},
+      });
     } catch (error) {
-      const result = {
+      response.setStructuredContent({
         success: false,
         message: `清理失败（页面可能已关闭）：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'remove_hook',
-        hookId,
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+        data: {hookId},
+      });
     }
   },
 });

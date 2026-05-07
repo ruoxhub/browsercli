@@ -6,21 +6,6 @@
 
 import type {Frame} from '../../third_party/index.js';
 
-/**
- * DOM 函数统一返回结构。
- *
- * 成功时 success=true，message 包含操作描述；
- * 失败时 success=false，message 包含错误描述。
- */
-export interface DomResult {
-  success: boolean;
-  message: string;
-  /** 工具类型标识 */
-  tooltype: string;
-  /** 使用的日志格式 */
-  logFormat?: string;
-}
-
 /** 元素信息（对应 DOMInspector.ElementInfo） */
 export interface ElementInfo {
   found: boolean;
@@ -62,9 +47,11 @@ export interface QueryDomParams {
 }
 
 /** queryDom 结果 */
-export interface QueryDomResult extends DomResult {
+export interface QueryDomResult {
   tooltype: 'query_dom';
-  data?: ElementInfo | ElementInfo[];
+  success: boolean;
+  message: string;
+  data?: ElementInfo | ElementInfo[] | null;
 }
 
 /** getDomStructure 参数 */
@@ -76,9 +63,11 @@ export interface GetDomStructureParams {
 }
 
 /** getDomStructure 结果 */
-export interface GetDomStructureResult extends DomResult {
+export interface GetDomStructureResult {
   tooltype: 'get_dom_structure';
-  data?: Record<string, unknown>;
+  success: boolean;
+  message: string;
+  data?: Record<string, unknown> | null;
 }
 
 /** findClickableElements 参数 */
@@ -88,8 +77,10 @@ export interface FindClickableElementsParams {
 }
 
 /** findClickableElements 结果 */
-export interface FindClickableElementsResult extends DomResult {
+export interface FindClickableElementsResult {
   tooltype: 'find_clickable_elements';
+  success: boolean;
+  message: string;
   data?: ClickableElement[];
 }
 

@@ -48,6 +48,7 @@ export class OpenAIProvider implements AIProvider {
     this.client = new OpenAI({
       apiKey: config.apiKey,
       baseURL: config.baseURL,
+      timeout: 30000, // 30秒超时配置，避免连接长时间挂起
     });
 
     this.defaultModel = config.model || 'gpt-4o';
@@ -191,18 +192,34 @@ export class OpenAIProvider implements AIProvider {
   /* eslint-disable @typescript-eslint/no-explicit-any */
 
   private handleError(error: unknown): Error {
+    // 处理OpenAI API错误（包括网络错误，可能无status）
     if (error instanceof OpenAI.APIError) {
-      const message = `OpenAI API error (${error.status}): ${error.message}`;
+      const status = error.status ?? 'NETWORK';
+      const message = `OpenAI API error (${status}): ${error.message}`;
       const formattedError = new Error(message);
 
-      // Preserve status code for retry logic
-      (formattedError as any).status = error.status;
+      // 保留状态码和错误码供重试逻辑使用
+      (formattedError as any).status = status;
       (formattedError as any).code = error.code;
 
       return formattedError;
     }
 
+    // 处理普通网络错误（非APIError实例）
     if (error instanceof Error) {
+      const err = error as any;
+      // 识别常见网络错误，给出友好提示
+      if (
+        err.code === 'ECONNREFUSED' ||
+        err.code === 'ENOTFOUND' ||
+        err.code === 'ETIMEDOUT'
+      ) {
+        const baseURL = this.client?.baseURL || 'https://api.openai.com/v1';
+        return new Error(
+          `OpenAI connection failed (${err.code}): ${error.message}. ` +
+          `Troubleshooting: 1. Check network; 2. Verify base URL (${baseURL}); 3. Configure proxy if needed.`
+        );
+      }
       return error;
     }
 

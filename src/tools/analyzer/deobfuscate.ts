@@ -8,6 +8,7 @@ import {zod} from '../../third_party/index.js';
 import {getRuntime} from '../../runtime.js';
 import {defineTool} from '../ToolDefinition.js';
 import {ToolCategory} from '../categories.js';
+import type {DeobfuscateCodeResult} from './types.js';
 
 export const deobfuscateCode = defineTool({
   name: 'deobfuscate_code',
@@ -21,20 +22,20 @@ export const deobfuscateCode = defineTool({
   handler: async (request, response) => {
     try {
       const result = await getRuntime().deobfuscator.deobfuscate(request.params);
-      response.setStructuredContent({
+      response.setStructuredContent<DeobfuscateCodeResult>({
         success: true,
         message: 'Deobfuscation completed',
         tooltype: 'deobfuscate',
-        logFormat: 'json',
+        // logFormat: 'json',
         data: result,
       });
     } catch (error) {
-      response.setStructuredContent({
+      response.setStructuredContent<DeobfuscateCodeResult>({
         success: false,
         message: `Deobfuscation failed: ${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'deobfuscate',
-        logFormat: 'json',
-        data: {},
+        // logFormat: 'json',
+        data: {} as DeobfuscateCodeResult['data'],
       });
     }
   },

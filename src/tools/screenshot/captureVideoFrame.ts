@@ -121,37 +121,59 @@ export const captureVideoFrame = defineTool({
 
       const frameBuffer = Buffer.from(buffer);
 
-      if (request.params.seekTime !== undefined) {
-        response.appendResponseLine(
-          `Captured video frame at ${request.params.seekTime}s from ${request.params.selector}.`,
-        );
-      } else {
-        response.appendResponseLine(
-          `Captured video frame from ${request.params.selector}.`,
-        );
-      }
+      let savedPath: string | null = null;
+      let base64Image: string | null = null;
 
       if (request.params.outputPath) {
-        response.appendResponseLine(
-          `Saved frame to ${request.params.outputPath}.`,
-        );
+        savedPath = request.params.outputPath;
       } else if (frameBuffer.length >= 2_000_000) {
         // 大文件保存临时文件
         const {filename} = await context.saveTemporaryFile(
           frameBuffer as unknown as Uint8Array<ArrayBufferLike>,
           `image/${format}` as 'image/png' | 'image/jpeg',
         );
-        response.appendResponseLine(`Saved frame to ${filename}.`);
+        savedPath = filename;
       } else {
         // 小文件直接附加图片到响应
+        base64Image = frameBuffer.toString('base64');
+      }
+
+      response.setStructuredContent({
+        success: true,
+        message: request.params.seekTime !== undefined
+          ? `Captured video frame at ${request.params.seekTime}s from ${request.params.selector}.`
+          : `Captured video frame from ${request.params.selector}.`,
+        tooltype: 'capture_video_frame',
+        data: {
+          selector: request.params.selector,
+          seekTime: request.params.seekTime,
+          format,
+          clip: {
+            x: Math.round(videoBox.x),
+            y: Math.round(videoBox.y),
+            width: Math.round(videoBox.width),
+            height: Math.round(videoBox.height),
+          },
+          fileSize: frameBuffer.length,
+          savedPath,
+          base64: base64Image,
+        },
+      });
+
+      if (base64Image) {
         response.attachImage({
           mimeType: `image/${format}`,
-          data: frameBuffer.toString('base64'),
+          data: base64Image,
         });
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      response.appendResponseLine(`捕获视频帧失败: ${errorMsg}`);
+      response.setStructuredContent({
+        success: false,
+        message: `捕获视频帧失败: ${errorMsg}`,
+        tooltype: 'capture_video_frame',
+        data: {},
+      });
     }
   },
 });

@@ -29,15 +29,25 @@ export const unhookFunction = defineTool({
   handler: async (request, response, context) => {
     const hookId = request.params.hookId;
 
-    if (!hookId) {
-      response.appendResponseLine('hookId 参数不能为空');
+    if (!hookId || typeof hookId !== 'string' || hookId.trim() === '') {
+      response.setStructuredContent({
+        success: false,
+        message: "hookId 参数不能为空。",
+        tooltype: 'unhook_function',
+        data: {}
+      });
       return;
     }
 
     try {
       const frame = (context as Context).getSelectedFrame();
       if (!frame) {
-        response.appendResponseLine('当前没有可用的页面或 Frame');
+        response.setStructuredContent({
+          success: false,
+          message: '当前没有可用的页面或 Frame',
+          tooltype: 'unhook_function',
+          data: {}
+        });
         return;
       }
 
@@ -62,15 +72,28 @@ export const unhookFunction = defineTool({
       if (result && typeof result === 'object') {
         const r = result as {success: boolean; message?: string};
         if (r.success) {
-          response.appendResponseLine(`✅ Hook "${hookId}" 已移除`);
+          response.setStructuredContent({
+            success: true,
+            message: `Hook "${hookId}" 已移除`,
+            tooltype: 'unhook_function',
+            data: { hookId }
+          });
         } else {
-          response.appendResponseLine(`❌ ${r.message}`);
+          response.setStructuredContent({
+            success: false,
+            message: r.message || 'Hook 移除失败',
+            tooltype: 'unhook_function',
+            data: { hookId }
+          });
         }
       }
     } catch (error) {
-      response.appendResponseLine(
-        `错误：${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: `错误：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'unhook_function',
+        data: { hookId: request.params.hookId }
+      });
     }
   },
 });

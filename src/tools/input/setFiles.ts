@@ -44,7 +44,12 @@ export const setFiles = defineTool({
       });
 
       if (!node.nodeId) {
-        response.appendResponseLine(`Element not found: ${selector}`);
+        response.setStructuredContent({
+          success: false,
+          message: `Element not found: ${selector}`,
+          tooltype: 'set_files',
+          data: {files: 0},
+        });
         return;
       }
 
@@ -53,26 +58,19 @@ export const setFiles = defineTool({
         files: filePaths,
       });
 
-      const result = {
+      response.setStructuredContent({
         success: true,
         message: `Set ${filePaths.length} file(s) to ${selector}`,
         tooltype: 'set_files',
-        logFormat: 'json',
-        data: {files: filePaths.length},
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+        data: {files: filePaths.length, filePaths},
+      });
     } catch (error) {
-      const result = {
+      response.setStructuredContent({
         success: false,
-        message: `SetFiles failed: ${error instanceof Error ? error.message : String(error)}`,
+        message: error instanceof Error ? error.message : String(error),
         tooltype: 'set_files',
         data: {files: 0},
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+      });
     }
   },
 });

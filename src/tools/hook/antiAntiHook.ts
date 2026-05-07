@@ -191,26 +191,22 @@ ${buildHookStoreRuntime({
 
     try {
       await frame.evaluate(hookCode);
-      const result = {
+      response.setStructuredContent({
         success: true,
         message:
           methods.length > 0
             ? `Anti-Anti-Hook 已安装，保护方法数：${methods.length}`
             : 'Anti-Anti-Hook 已安装，基础 Function.prototype.toString 保护已启用',
         tooltype: 'anti_anti_hook',
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+        data: { hookId: 'anti_anti_hook', methodCount: methods.length },
+      });
     } catch (error) {
-      const result = {
+      response.setStructuredContent({
         success: false,
         message: `错误：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'anti_anti_hook',
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+        data: { hookId: 'anti_anti_hook' },
+      });
     }
   },
 });

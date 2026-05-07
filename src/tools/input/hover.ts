@@ -31,18 +31,28 @@ export const hover = defineTool({
     try {
       const element = await page.$(selector);
       if (!element) {
-        response.appendResponseLine(`Element not found: ${selector}`);
+        response.setStructuredContent({
+          success: false,
+          message: `Element not found: ${selector}`,
+          tooltype: 'hover',
+        });
         return;
       }
 
       await element.hover();
-      response.appendResponseLine(
-        `Successfully hovered over element: ${selector}`,
-      );
+      response.setStructuredContent({
+        success: true,
+        message: `Successfully hovered over element: ${selector}`,
+        tooltype: 'hover',
+        data: {selector},
+      });
     } catch (error) {
-      response.appendResponseLine(
-        `Hover failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: error instanceof Error ? error.message : String(error),
+        tooltype: 'hover',
+        data: {selector},
+      });
     }
   },
 });

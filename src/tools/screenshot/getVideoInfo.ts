@@ -45,36 +45,34 @@ export const getVideoInfo = defineTool({
       }, request.params.selector);
 
       if (!info) {
-        response.appendResponseLine(
-          `视频元素未找到: ${request.params.selector}`,
-        );
+        response.setStructuredContent({
+          success: false,
+          message: `视频元素未找到: ${request.params.selector}`,
+          tooltype: 'get_video_info',
+          data: {
+            selector: request.params.selector,
+          },
+        });
         return;
       }
 
-      response.appendResponseLine(
-        `视频信息获取成功: ${request.params.selector}`,
-      );
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: true,
-            message: `视频信息获取成功: ${request.params.selector}`,
-            tooltype: 'get_video_info',
-            logFormat: 'json',
-            data: {
-              selector: request.params.selector,
-              ...info,
-            },
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: true,
+        message: `视频信息获取成功: ${request.params.selector}`,
+        tooltype: 'get_video_info',
+        data: {
+          selector: request.params.selector,
+          ...info,
+        },
+      });
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      response.appendResponseLine(`获取视频信息失败: ${errorMsg}`);
+      response.setStructuredContent({
+        success: false,
+        message: `获取视频信息失败: ${errorMsg}`,
+        tooltype: 'get_video_info',
+        data: {},
+      });
     }
   },
 });

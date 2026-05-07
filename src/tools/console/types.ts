@@ -125,22 +125,18 @@ export interface ListConsoleMessagesData {
 /** getConsoleMessage 返回数据 */
 export interface GetConsoleMessageData extends ConsoleMessageData {}
 
+import type {MessagesResult} from '../shared/types.js';
+
 /** listConsoleMessages 结果 */
-export interface ListConsoleMessagesResult {
-  success: boolean;
-  message: string;
+export interface ListConsoleMessagesResult extends MessagesResult<ListConsoleMessagesData> {
   tooltype: string;
   logFormat: string;
-  data: ListConsoleMessagesData;
 }
 
 /** getConsoleMessage 结果 */
-export interface GetConsoleMessageResult {
-  success: boolean;
-  message: string;
+export interface GetConsoleMessageResult extends MessagesResult<GetConsoleMessageData> {
   tooltype: string;
   logFormat: string;
-  data: GetConsoleMessageData;
 }
 
 /** 判断是否为 AggregatedIssue */

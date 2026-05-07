@@ -126,14 +126,17 @@ export const hookCryptoJS = defineTool({
         success: true,
         message: 'CryptoJS Hook 已安装',
         tooltype: 'hook_cryptojs',
-        algorithms: algos,
-        logFormat: format,
+        data: {
+          algorithms: algos,
+        }
+        
       });
     } catch (error) {
       response.setStructuredContent({
         success: false,
         message: `错误：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'hook_cryptojs',
+        data: {}
       });
     }
   },

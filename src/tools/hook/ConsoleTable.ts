@@ -61,25 +61,21 @@ ${
 
     try {
       await frame.evaluate(hookCode);
-      const result = {
+      response.setStructuredContent({
         success: true,
         message: isEnabled
           ? 'Console Table Hook 已安装，console.table 已被置空，时间差检测将失效'
           : 'Console Table Hook 已禁用（enabled=false）',
         tooltype: 'hook_console_table',
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+        data: { hookId: 'hook_console_table', enabled: isEnabled },
+      });
     } catch (error) {
-      const result = {
+      response.setStructuredContent({
         success: false,
         message: `错误：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'hook_console_table',
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+        data: { hookId: 'hook_console_table' },
+      });
     }
   },
 });

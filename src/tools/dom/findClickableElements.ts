@@ -38,32 +38,30 @@ export const findClickableElements = defineTool({
     const frame = (context as Context).getSelectedFrame();
 
     if (!frame) {
-      response.appendResponseLine(NO_ACTIVE_PAGE_MESSAGE);
+      response.setStructuredContent({
+        success: false,
+        message: NO_ACTIVE_PAGE_MESSAGE,
+        tooltype: 'find_clickable_elements',
+        data: null,
+      });
       return;
     }
 
     try {
       const elements = await frame.evaluate(findClickableCode, filterText);
-
-      const result = {
+      response.setStructuredContent({
         success: true,
-        message: `找到 ${elements.length} 个可点击元素${filterText ? `（过滤：${filterText}）` : ''}`,
+        message: `Found ${elements.length} clickable elements${filterText ? ` (filtered: "${filterText}")` : ''}`,
         tooltype: 'find_clickable_elements',
-        logFormat: 'full',
         data: elements,
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+      });
     } catch (error) {
-      const result = {
+      response.setStructuredContent({
         success: false,
-        message: `查找可点击元素失败：${error instanceof Error ? error.message : String(error)}`,
+        message: `Failed to find clickable elements: ${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'find_clickable_elements',
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+        data: null,
+      });
     }
   },
 });

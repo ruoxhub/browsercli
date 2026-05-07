@@ -129,14 +129,14 @@ export const hookSMCrypto = defineTool({
         success: true,
         message: 'SM-Crypto Hook 已安装',
         tooltype: 'hook_smcrypto',
-        algorithms: algos,
-        logFormat: format,
+        data: {algorithms: algos},
       });
     } catch (error) {
       response.setStructuredContent({
         success: false,
         message: `错误：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'hook_smcrypto',
+        data: {}
       });
     }
   },

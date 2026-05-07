@@ -64,90 +64,61 @@ export const handleDialog = defineTool({
     try {
       page = context.getSelectedPage();
     } catch {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: false,
-            message:
-              'No active page available. Open a page first before handling dialogs.',
-            tooltype,
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: false,
+        message: 'No active page available. Open a page first before handling dialogs.',
+        tooltype,
+        data: {},
+      });
       return;
     }
 
     const dialog = await waitForDialog(page);
     if (!dialog) {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: false,
-            message:
-              'No open dialog found. Use an action that triggers a dialog first, then call this function.',
-            tooltype,
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: false,
+        message:
+          'No open dialog found. Use an action that triggers a dialog first, then call this function.',
+        tooltype,
+        data: {},
+      });
       return;
     }
 
     try {
       if (action === 'accept') {
         await dialog.accept(promptText);
-        response.appendResponseLine('```json');
-        response.appendResponseLine(
-          JSON.stringify(
-            {
-              success: true,
-              message: promptText
-                ? `Successfully accepted the dialog with text: ${promptText}`
-                : 'Successfully accepted the dialog',
-              tooltype,
-            },
-            null,
-            2,
-          ),
-        );
-        response.appendResponseLine('```');
+        response.setStructuredContent({
+          success: true,
+          message: promptText
+            ? `Successfully accepted the dialog with text: ${promptText}`
+            : 'Successfully accepted the dialog',
+          tooltype,
+          data: {
+            action: 'accept',
+            dialogType: dialog.type(),
+            promptText: promptText ?? null,
+          },
+        });
         return;
       }
       await dialog.dismiss();
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: true,
-            message: 'Successfully dismissed the dialog',
-            tooltype,
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: true,
+        message: 'Successfully dismissed the dialog',
+        tooltype,
+        data: {
+          action: 'dismiss',
+          dialogType: dialog.type(),
+        },
+      });
     } catch {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: false,
-            message: 'Dialog may have already been handled externally',
-            tooltype,
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: false,
+        message: 'Dialog may have already been handled externally',
+        tooltype,
+        data: {},
+      });
     }
   },
 });

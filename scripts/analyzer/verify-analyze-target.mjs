@@ -75,7 +75,7 @@ async function main() {
   // 阶段 1: 打开测试页面
   console.log('⏳ 阶段 1: 打开测试页面...');
   const newPageResult = await invokeTool(httpUrl, args.group, 'new_page', {
-    url: 'https://example.com',
+    url: 'https://qiye.qizhidao.com/',
     timeout: 10000,
   }, args.timeout);
 
@@ -85,7 +85,7 @@ async function main() {
     console.log(`⚠ 测试页面打开失败: ${newPageResult.error?.slice(0, 60) || newPageResult.status}`);
     console.log('  尝试使用 navigate_page...\n');
     const navResult = await invokeTool(httpUrl, args.group, 'navigate_page', {
-      type: 'goto', url: 'https://example.com', timeout: 10000,
+      type: 'goto', url: 'https://qiye.qizhidao.com/', timeout: 10000,
     }, args.timeout);
     if (!navResult.ok) {
       console.log(`⚠ navigate_page 也失败，analyze_target 可能失败\n`);
@@ -96,14 +96,14 @@ async function main() {
   await new Promise(r => setTimeout(r, 1500));
 
   // 测试 1: 轻量模式（无 AI、无去混淆、无 hook 注入）
-  console.log('⏳ 测试 1: 轻量模式 (useAI=false, runDeobfuscation=false, hookPreset=none)...');
+  console.log('⏳ 测试 1: 轻量模式 (useAI=true, runDeobfuscation=true, hookPreset=none)...');
   const params1 = {
-    url: 'https://example.com',
+    url: 'https://qiye.qizhidao.com/',
     topN: 3,
-    useAI: false,
-    runDeobfuscation: false,
+    useAI: true,
+    runDeobfuscation: true,
     hookPreset: 'none',
-    autoInjectHooks: false,
+    autoInjectHooks: true,
   };
   const start1 = Date.now();
   const result1 = await invokeTool(httpUrl, args.group, 'analyze_target', params1, args.timeout);
@@ -140,10 +140,10 @@ async function main() {
   // 测试 2: API 签名 hook 预设
   console.log('\n⏳ 测试 2: API 签名 hook 预设 (hookPreset=api-signature)...');
   const params2 = {
-    url: 'https://example.com',
+    url: 'https://qiye.qizhidao.com/',
     topN: 3,
-    useAI: false,
-    runDeobfuscation: false,
+    useAI: true,
+    runDeobfuscation: true,
     hookPreset: 'api-signature',
     autoInjectHooks: true,
     waitAfterHookMs: 500,

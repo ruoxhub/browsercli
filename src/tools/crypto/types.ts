@@ -5,20 +5,18 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+import type {MessagesResult} from '../shared/types.js';
+
+/** hookCryptoJS / hookSMCrypto 返回数据 */
+export interface CryptoHookData {
+  /** 已 Hook 的算法列表 */
+  algorithms?: string[];
+}
 
 /**
- * Hook 函数统一返回结构。
- *
- * 成功时 success=true，message 包含安装确认；
- * 失败时 success=false，message 包含错误描述。
+ * Crypto Hook 函数统一返回结构（兼容旧字段 logFormat）。
  */
-export interface HookResult {
-  success: boolean;
-  message: string;
-  /** 工具类型标识 */
-  tooltype: string;
-  /** 已 Hook 的算法列表（hookCryptoJS / hookSMCrypto 返回） */
-  algorithms?: string[];
+export interface HookResult<T = unknown> extends MessagesResult<T> {
   /** 使用的日志格式 */
   logFormat?: string;
 }

@@ -5,18 +5,12 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+import type {MessagesResult} from '../shared/types.js';
 
 /**
- * Emulation 函数统一返回结构。
- *
- * 成功时 success=true，message 包含操作描述；
- * 失败时 success=false，message 包含错误描述。
+ * Emulation 函数统一返回结构（兼容旧字段 logFormat）。
  */
-export interface EmulationResult {
-  success: boolean;
-  message: string;
-  /** 工具类型标识 */
-  tooltype: string;
+export interface EmulationResult<T = unknown> extends MessagesResult<T> {
   /** 使用的日志格式 */
   logFormat?: string;
 }
@@ -37,7 +31,7 @@ export interface EmulateNetworkParams {
 }
 
 /** emulateNetwork 结果 */
-export interface EmulateNetworkResult extends EmulationResult {
+export interface EmulateNetworkResult extends EmulationResult<null> {
   tooltype: 'emulate_network';
 }
 
@@ -48,7 +42,7 @@ export interface EmulateCpuParams {
 }
 
 /** emulateCpu 结果 */
-export interface EmulateCpuResult extends EmulationResult {
+export interface EmulateCpuResult extends EmulationResult<null> {
   tooltype: 'emulate_cpu';
 }
 
@@ -61,7 +55,7 @@ export interface ResizePageParams {
 }
 
 /** resizePage 结果 */
-export interface ResizePageResult extends EmulationResult {
+export interface ResizePageResult extends EmulationResult<null> {
   tooltype: 'resize_page';
 }
 
@@ -88,14 +82,16 @@ export interface DeviceProfileData {
   userAgent: string;
 }
 
+/** emulateMobile 返回数据 */
+export interface EmulateMobileData {
+  device?: DeviceType;
+  viewport?: {width: number; height: number};
+  userAgent?: string;
+}
+
 /** emulateMobile 结果 */
-export interface EmulateMobileResult extends EmulationResult {
+export interface EmulateMobileResult extends EmulationResult<EmulateMobileData> {
   tooltype: 'emulate_mobile';
-  data?: {
-    device?: DeviceType;
-    viewport?: {width: number; height: number};
-    userAgent?: string;
-  };
 }
 
 /** 重新导出 Frame 类型 */

@@ -5,20 +5,14 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+import type {MessagesResult} from '../shared/types.js';
 
 // ─── Hook 安装函数返回类型 ─────────────────────────────
 
 /**
- * Hook 函数统一返回结构。
- *
- * 成功时 success=true，message 包含安装确认；
- * 失败时 success=false，message 包含错误描述。
+ * Hook 函数统一返回结构（兼容旧字段 logFormat）。
  */
-export interface HookResult {
-  success: boolean;
-  message: string;
-  /** 工具类型标识 */
-  tooltype: string;
+export interface HookResult<T = unknown> extends MessagesResult<T> {
   /** 使用的日志格式 */
   logFormat?: string;
 }
@@ -38,47 +32,49 @@ export type BypassTarget = 'eval' | 'Function' | 'constructor';
 // ─── Hook 管理函数返回类型 ─────────────────────────────
 
 /**
- * Hook 管理操作统一返回结构。
- *
- * 成功时 success=true，message 包含操作确认；
- * 失败时 success=false，message 包含错误描述。
+ * Hook 管理操作统一返回结构（兼容旧字段 logFormat）。
  */
-export interface HookManagementResult {
-  success: boolean;
-  message: string;
-  /** 工具类型标识 */
-  tooltype: string;
+export interface HookManagementResult<T = unknown> extends MessagesResult<T> {
   /** 使用的日志格式 */
   logFormat?: string;
 }
 
-/** 注入 Hook 结果 */
-export interface InjectHookResult extends HookManagementResult {
-  tooltype: 'inject_hook';
+/** 注入 Hook 返回数据 */
+export interface InjectHookData {
   hookId: string;
 }
 
-/** 同步 Hook 数据结果 */
-export interface SyncHookRecordsResult extends HookManagementResult {
-  tooltype: 'list_created_hooks';
+/** 注入 Hook 结果 */
+export interface InjectHookResult extends HookManagementResult<InjectHookData> {
+  tooltype: 'inject_hook';
+}
+
+/** 同步 Hook 数据返回数据 */
+export interface SyncHookRecordsData {
   syncedHookIds: string[];
   totalRecords: number;
   hooks: unknown[];
 }
 
-/** 获取 Hook 数据结果 */
-export interface GetHookDataResult extends HookManagementResult {
-  tooltype: 'get_hook_data';
-  data: unknown;
+/** 同步 Hook 数据结果 */
+export interface SyncHookRecordsResult extends HookManagementResult<SyncHookRecordsData> {
+  tooltype: 'list_created_hooks';
 }
 
-/** 移除 Hook 结果（浏览器端清理） */
-export interface RemoveHookBrowserResult extends HookManagementResult {
-  tooltype: 'remove_hook';
+/** 获取 Hook 数据结果 */
+export interface GetHookDataResult extends HookManagementResult<unknown> {
+  tooltype: 'get_hook_data';
+}
+
+/** 移除 Hook 返回数据（浏览器端清理） */
+export interface RemoveHookBrowserData {
   hookId: string;
 }
 
-// ─── 重新导出 ──────────────────────────────────────────
+/** 移除 Hook 结果（浏览器端清理） */
+export interface RemoveHookBrowserResult extends HookManagementResult<RemoveHookBrowserData> {
+  tooltype: 'remove_hook';
+}
 
 /** 重新导出 Frame 类型，方便调用方导入 */
 export type {Frame};

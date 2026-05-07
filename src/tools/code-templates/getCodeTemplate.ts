@@ -43,10 +43,12 @@ export const getCodeTemplate = defineTool({
         success: false,
         message: `未找到模板 "${templateName}"`,
         tooltype: 'get_code_template',
-        name: templateName,
-        description: '',
-        code: '',
-        sizeBytes: 0,
+        data: {
+          name: templateName,
+          description: '',
+          code: '',
+          sizeBytes: 0,
+        }
       };
       // response.appendResponseLine('```json');
       // response.appendResponseLine(JSON.stringify(result, null, 2));
@@ -65,28 +67,28 @@ export const getCodeTemplate = defineTool({
         success: true,
         message: `已获取模板：${templateInfo.name}（${formatBytes(sizeBytes)}）`,
         tooltype: 'get_code_template',
-        name: templateName,
-        description: templateInfo.description,
-        code,
-        sizeBytes,
+        data:{
+          name: templateName,
+          description: templateInfo.description,
+          code,
+          sizeBytes
+        },
       };
-      // response.appendResponseLine('```json');
-      // response.appendResponseLine(JSON.stringify(result, null, 2));
-      // response.appendResponseLine('```');
+
       response.setStructuredContent(result);
     } catch (error) {
       const result = {
         success: false,
         message: `读取模板失败：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'get_code_template',
-        name: templateName,
-        description: templateInfo.description,
-        code: '',
-        sizeBytes: 0,
+        data:{
+          name: templateName,
+          description: templateInfo.description,
+          code: '',
+          sizeBytes: 0,
+        }
       };
-      // response.appendResponseLine('```json');
-      // response.appendResponseLine(JSON.stringify(result, null, 2));
-      // response.appendResponseLine('```');
+
       response.setStructuredContent(result);
     }
   },

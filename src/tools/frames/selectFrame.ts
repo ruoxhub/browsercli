@@ -36,35 +36,54 @@ export const selectFrame = defineTool({
     try {
       const page = runtime.getSelectedPage();
       if (!page) {
-        response.appendResponseLine('没有可用的页面，请先导航到目标页面');
+        response.setStructuredContent({
+          success: false,
+          message: '没有可用的页面，请先导航到目标页面',
+          toolType: 'select_frame',
+          data: {},
+        });
         return;
       }
 
       const frames = page.frames();
 
       if (frameIdx >= frames.length) {
-        response.appendResponseLine(
-          `Invalid frame index ${frameIdx}. Use list_frames to see available frames (0-${frames.length - 1}).`,
-        );
+        response.setStructuredContent({
+          success: false,
+          message: `Invalid frame index ${frameIdx}. Use list_frames to see available frames (0-${frames.length - 1}).`,
+          toolType: 'select_frame',
+          data: {},
+        });
         return;
       }
 
       const frame = frames[frameIdx];
       if (frameIdx === 0) {
         runtime.setSelectedFrame(null);
-        response.appendResponseLine('Switched to main frame.');
+        response.setStructuredContent({
+          success: true,
+          message: 'Switched to main frame.',
+          toolType: 'select_frame',
+          data: {selectedIndex: 0, selectedName: undefined},
+        });
         return;
       }
 
       runtime.setSelectedFrame(frame);
-      const name = frame.name() ? ` (name: "${frame.name()}")` : '';
-      response.appendResponseLine(
-        `Switched to frame ${frameIdx}: ${frame.url()}${name}`,
-      );
+      const name = frame.name() || undefined;
+      response.setStructuredContent({
+        success: true,
+        message: `Switched to frame ${frameIdx}: ${frame.url()}${name ? ` (name: "${name}")` : ''}`,
+        toolType: 'select_frame',
+        data: {selectedIndex: frameIdx, selectedName: name},
+      });
     } catch (error) {
-      response.appendResponseLine(
-        `选择 Frame 失败：${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: `选择 Frame 失败：${error instanceof Error ? error.message : String(error)}`,
+        toolType: 'select_frame',
+        data: {},
+      });
     }
   },
 });

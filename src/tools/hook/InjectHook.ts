@@ -33,25 +33,19 @@ export const injectHook = defineTool({
 
     try {
       await frame.evaluate(script);
-      const result = {
+      response.setStructuredContent({
         success: true,
         message: `Hook injected: ${hookId}`,
         tooltype: 'inject_hook',
-        hookId,
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+        data: {hookId},
+      });
     } catch (error) {
-      const result = {
+      response.setStructuredContent({
         success: false,
         message: `注入失败：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'inject_hook',
-        hookId,
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+        data: {hookId},
+      });
     }
   },
 });

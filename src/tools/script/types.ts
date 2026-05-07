@@ -5,6 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+import type {MessagesResult} from '../shared/types.js';
 
 // ─── 数据类型 ──────────────────────────────────────────
 
@@ -74,16 +75,11 @@ export interface CheckUrlMatchesData {
  *
  * 成功时 success=true，message 包含操作描述；
  * 失败时 success=false，message 包含错误描述。
+ * 所有业务数据统一放在 data 字段中。
  */
-export interface ScriptInjectorResult<T = unknown> {
-  success: boolean;
-  message: string;
-  /** 工具类型标识 */
-  tooltype: string;
+export interface ScriptInjectorResult<T = unknown> extends MessagesResult<T> {
   /** 使用的日志格式 */
   logFormat: string;
-  /** 结果数据 */
-  data?: T;
 }
 
 /** 创建注入脚本结果 */

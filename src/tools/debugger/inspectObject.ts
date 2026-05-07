@@ -137,18 +137,31 @@ export const inspectObject = defineTool({
       );
 
       if (result && typeof result === 'object' && 'error' in result) {
-        response.appendResponseLine(`❌ ${(result as {error: string}).error}`);
+        response.setStructuredContent({
+          success: false,
+          message: (result as {error: string}).error,
+          tooltype: 'inspect_object',
+          data: { expression }
+        });
         return;
       }
 
-      response.appendResponseLine(`对象检查：${expression}\n`);
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: true,
+        message: `对象检查：${expression}`,
+        tooltype: 'inspect_object',
+        data: {
+          expression,
+          result: result
+        }
+      });
     } catch (error) {
-      response.appendResponseLine(
-        `错误：${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: `错误：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'inspect_object',
+        data: { expression: request.params.expression }
+      });
     }
   },
 });

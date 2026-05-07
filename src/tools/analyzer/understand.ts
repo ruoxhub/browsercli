@@ -8,6 +8,7 @@ import {zod} from '../../third_party/index.js';
 import {getRuntime} from '../../runtime.js';
 import {defineTool} from '../ToolDefinition.js';
 import {ToolCategory} from '../categories.js';
+import type {UnderstandCodeFnResult} from './types.js';
 
 export const understandCode = defineTool({
   name: 'understand_code',
@@ -32,7 +33,7 @@ export const understandCode = defineTool({
         success: true,
         message: 'Code analysis completed',
         tooltype: 'understand',
-        logFormat: 'json',
+        // logFormat: 'json',
         data: result,
       });
     } catch (error) {
@@ -40,8 +41,8 @@ export const understandCode = defineTool({
         success: false,
         message: `Code analysis failed: ${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'understand',
-        logFormat: 'json',
-        data: {},
+        // logFormat: 'json',
+        data: {} as UnderstandCodeFnResult['data'],
       });
     }
   },

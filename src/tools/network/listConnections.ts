@@ -73,9 +73,9 @@ export const listWebSocketConnections = defineTool({
         tooltype: 'list_websocket_connections',
         data: {
           connections: paged.map(ws => ({
-            wsid: ws.stableId,
+            wsid: context.getWebSocketStableId(ws),
             url: ws.connection.url,
-            state: ws.connection.state,
+            state: ws.connection.status,
             frameCount: ws.frames.length,
           })),
           total: connections.length,
@@ -84,9 +84,7 @@ export const listWebSocketConnections = defineTool({
         },
       };
 
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+      response.setStructuredContent(result);
     } catch (error) {
       const errorResult = {
         success: false,
@@ -94,9 +92,7 @@ export const listWebSocketConnections = defineTool({
         tooltype: 'list_websocket_connections',
         data: {connections: [], total: 0, pageIdx: 0, pageSize: 0},
       };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(errorResult, null, 2));
-      response.appendResponseLine('```');
+      response.setStructuredContent(errorResult);
     }
   },
 });

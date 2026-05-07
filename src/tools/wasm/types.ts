@@ -13,14 +13,13 @@ import type {
   WasmSignatureDiffResult,
 } from '../../modules/wasm/WasmTypes.js';
 
+import type {MessagesResult} from '../shared/types.js';
+
 // ─── 基础结果类型 ────────────────────────────────────
 
-export interface WasmToolResult<T = unknown> {
-  success: boolean;
-  message: string;
-  tooltype: string;
+export interface WasmToolResult<T = unknown> extends MessagesResult<T> {
+  /** 使用的日志格式 */
   logFormat?: string;
-  data?: T;
 }
 
 // ─── 数据类型 ──────────────────────────────────────────

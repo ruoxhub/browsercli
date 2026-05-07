@@ -161,7 +161,7 @@ export const analyze_target = defineTool({
     const params = request.params;
     
     if (!params?.url) {
-      response.setStructuredContent({
+      response.setStructuredContent<AnalyzeTargetResult>({
         success: false,
         message: 'analyze_target requires a "url" parameter',
         tooltype: 'analyze_target',
@@ -342,7 +342,7 @@ export const analyze_target = defineTool({
       success: true,
       message: `分析完成，目标: ${params.url}`,
       tooltype: 'analyze_target',
-      logFormat: 'json',
+      // logFormat: 'json',
       data: result,
     });
   },

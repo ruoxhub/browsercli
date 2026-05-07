@@ -5,18 +5,12 @@
  */
 
 import type {Page} from '../../third_party/index.js';
+import type {MessagesResult} from '../shared/types.js';
 
 /**
- * Dialog 处理函数统一返回结构。
- *
- * 成功时 success=true，message 包含处理结果；
- * 失败时 success=false，message 包含错误描述。
+ * Dialog 处理函数统一返回结构（兼容旧字段 logFormat）。
  */
-export interface DialogResult {
-  success: boolean;
-  message: string;
-  /** 工具类型标识 */
-  tooltype: string;
+export interface DialogResult<T = unknown> extends MessagesResult<T> {
   /** 使用的日志格式 */
   logFormat?: string;
 }

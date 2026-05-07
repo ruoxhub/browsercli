@@ -127,19 +127,14 @@ export const getHookData = defineTool({
         tooltype: 'get_hook_data',
         data,
       };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+      response.setStructuredContent(result);
     } catch (error) {
-      const result = {
+      response.setStructuredContent({
         success: false,
         message: `获取失败：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'get_hook_data',
         data: null,
-      };
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify(result, null, 2));
-      response.appendResponseLine('```');
+      });
     }
   },
 });

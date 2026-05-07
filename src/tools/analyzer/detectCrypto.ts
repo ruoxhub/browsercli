@@ -8,6 +8,7 @@ import {zod} from '../../third_party/index.js';
 import {getRuntime} from '../../runtime.js';
 import {defineTool} from '../ToolDefinition.js';
 import {ToolCategory} from '../categories.js';
+import type {DetectCryptoFnResult} from './types.js';
 
 export const detectCrypto = defineTool({
   name: 'detect_crypto',
@@ -20,29 +21,29 @@ export const detectCrypto = defineTool({
   handler: async (request, response) => {
     try {
       const raw = await getRuntime().cryptoDetector.detect(request.params);
-      response.setStructuredContent({
+      response.setStructuredContent<DetectCryptoFnResult>({
         success: true,
         message: 'Crypto detection completed',
-        tooltype: 'detect_crypto',
-        logFormat: 'json',
+        tooltype: 'detectCrypto',
         data: {
-          algorithms: raw.algorithms,
-          libraries: raw.libraries,
-          confidence: raw.confidence,
-          securityIssues: raw.securityIssues,
+          algorithms: raw.algorithms ?? [],
+          libraries: raw.libraries ?? [],
+          confidence: raw.confidence ?? 0,
+          securityIssues: raw.securityIssues ?? [],
           strength: raw.strength,
         },
       });
     } catch (error) {
-      response.setStructuredContent({
+      response.setStructuredContent<DetectCryptoFnResult>({
         success: false,
         message: `Crypto detection failed: ${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'detect_crypto',
-        logFormat: 'json',
+        tooltype: 'detectCrypto',
         data: {
           algorithms: [],
           libraries: [],
           confidence: 0,
+          securityIssues: [],
+          strength: undefined,
         },
       });
     }

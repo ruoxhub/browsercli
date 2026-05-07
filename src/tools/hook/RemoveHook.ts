@@ -29,14 +29,12 @@ export const removeHook = defineTool({
     const runtime = getRuntime();
 
     if (!hookId) {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(JSON.stringify({
+      response.setStructuredContent({
         success: false,
         message: 'hookId 参数不能为空',
         tooltype: 'remove_hook',
-        hookId: '',
-      }, null, 2));
-      response.appendResponseLine('```');
+        data: {hookId: ''},
+      });
       return;
     }
 
@@ -69,17 +67,16 @@ export const removeHook = defineTool({
       }
     }
 
-    const result = {
+    response.setStructuredContent({
       success: removed,
       message: removed
         ? `Hook 已移除：${hookId}${browserCleaned ? '（含浏览器端数据）' : ''}`
         : `Hook 未找到：${hookId}`,
       tooltype: 'remove_hook',
-      hookId,
-      browserCleaned,
-    };
-    response.appendResponseLine('```json');
-    response.appendResponseLine(JSON.stringify(result, null, 2));
-    response.appendResponseLine('```');
+      data: {
+        hookId,
+        browserCleaned,
+      },
+    });
   },
 });

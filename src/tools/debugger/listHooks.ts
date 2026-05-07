@@ -25,7 +25,7 @@ export const listHooks = defineTool({
   handler: async (request, response, context) => {
     try {
       const frame = (context as Context).getSelectedFrame();
-      const hooks = (await evaluateInPageRuntime<
+      const hooks = await evaluateInPageRuntime<
         Array<{id: string; target: string}>
       >(
         frame,
@@ -38,21 +38,31 @@ export const listHooks = defineTool({
   });
 })()
 `,
-      )) as Array<{id: string; target: string}>;
+      );
 
       if (!hooks || hooks.length === 0) {
-        response.appendResponseLine('当前没有已安装的 Hook');
+        response.setStructuredContent({
+          success: true,
+          message: '当前没有已安装的 Hook',
+          tooltype: 'list_hooks',
+          data: { hooks: [] }
+        });
         return;
       }
 
-      response.appendResponseLine(`活跃 Hook（${hooks.length} 个）:\n`);
-      for (const hook of hooks) {
-        response.appendResponseLine(`- ${hook.id}: ${hook.target}`);
-      }
+      response.setStructuredContent({
+        success: true,
+        message: `活跃 Hook（${hooks.length} 个）`,
+        tooltype: 'list_hooks',
+        data: { hooks }
+      });
     } catch (error) {
-      response.appendResponseLine(
-        `错误：${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: `错误：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'list_hooks',
+        data: {}
+      });
     }
   },
 });
