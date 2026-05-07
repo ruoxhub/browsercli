@@ -210,7 +210,7 @@ export const analyze_target = defineTool({
       await withOperationTimeout(
         collectAnalyzeTargetCode(runtime, params),
         'analyze_target 代码收集',
-        10000,
+        30000,
       );
     const injectedHooks = await installAnalyzeHooks(runtime, hookPreset, autoInjectHooks);
 
@@ -222,13 +222,14 @@ export const analyze_target = defineTool({
       await new Promise(resolve => setTimeout(resolve, params.waitAfterHookMs));
     }
 
-    const [understand, crypto] = await withOperationTimeout(
-      Promise.all([
-        runtime.analyzer.understand({code: analysisCode, focus: 'security'}),
-        runtime.cryptoDetector.detect({code: analysisCode}),
-      ]),
+    // crypto detection is fast and local-only; run it separately so it
+    // never gets killed by the understand timeout.
+    const crypto = await runtime.cryptoDetector.detect({code: analysisCode});
+
+    const understand = await withOperationTimeout(
+      runtime.analyzer.understand({code: analysisCode, focus: 'security'}),
       'analyze_target 安全分析',
-      10000,
+      180000,
     );
 
     const deobfuscation = params.runDeobfuscation

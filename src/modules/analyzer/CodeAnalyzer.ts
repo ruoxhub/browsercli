@@ -46,6 +46,29 @@ export class CodeAnalyzer {
     this.llm = llm;
   }
 
+  private stripHtmlWrappers(code: string): string {
+    const htmlMarkers = ['<!DOCTYPE', '<html', '<head', '<body', '<script'];
+    const isLikelyHtml = htmlMarkers.some(marker => {
+      const idx = code.indexOf(marker);
+      return idx >= 0 && idx < 200;
+    });
+    if (!isLikelyHtml) return code;
+
+    const scriptBlocks: string[] = [];
+    const scriptRegex = /<script[^>]*>([\s\S]*?)<\/script>/gi;
+    let match: RegExpExecArray | null;
+    while ((match = scriptRegex.exec(code)) !== null) {
+      const content = match[1].trim();
+      if (content.length > 0) scriptBlocks.push(content);
+    }
+
+    if (scriptBlocks.length > 0) {
+      logger.info(`Stripped HTML wrapper, extracted ${scriptBlocks.length} <script> blocks`);
+      return scriptBlocks.join('\n\n');
+    }
+    return code;
+  }
+
   private parseCodeAst(code: string, warningMessage: string): t.File | null {
     if (this.lastParseResult?.code === code) {
       if (!this.lastParseResult.ast && !this.lastParseResult.warningLogged) {
@@ -55,8 +78,10 @@ export class CodeAnalyzer {
       return this.lastParseResult.ast;
     }
 
+    const parseableCode = this.stripHtmlWrappers(code);
+
     try {
-      const ast = parser.parse(code, {
+      const ast = parser.parse(parseableCode, {
         sourceType: 'module',
         plugins: ['jsx', 'typescript'],
       });
