@@ -13,7 +13,6 @@ import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
-/** 本地缓存 TrafficSummary，与 getMessages 共享 */
 export const trafficSummaryCache = new Map<number, ReturnType<typeof analyzeWebSocketFramesV2>>();
 
 const DIRECTION_OPTIONS: readonly ['sent', 'received'] = ['sent', 'received'];
@@ -39,12 +38,10 @@ export const analyzeWebSocketMessages = defineTool({
       const ws = context.getWebSocketById(request.params.wsid);
       let frames = ws.frames;
 
-      // 方向过滤
       if (request.params.direction) {
         frames = frames.filter(f => f.direction === request.params.direction);
       }
 
-      // 分析并缓存结果
       const summary = analyzeWebSocketFramesV2(
         frames,
         request.params.wsid,
@@ -52,25 +49,47 @@ export const analyzeWebSocketMessages = defineTool({
       );
       trafficSummaryCache.set(request.params.wsid, summary);
 
-      // 格式化输出摘要
       const lines = formatTrafficSummary(summary);
-      for (const line of lines) {
-        response.appendResponseLine(line);
-      }
 
-      // 添加使用提示
-      response.appendResponseLine(``);
-      response.appendResponseLine(`### Usage`);
-      response.appendResponseLine(
-        `- View group: \`get_websocket_messages(wsid=${request.params.wsid}, groupId="A")\``,
-      );
-      response.appendResponseLine(
-        `- View single: \`get_websocket_message(wsid=${request.params.wsid}, frameIndex=0)\``,
-      );
+      const groups = summary.groups.map(g => ({
+        id: g.id,
+        direction: g.direction,
+        head4B: g.head4B,
+        hint: g.hint,
+        count: g.count,
+        sizeRange: {
+          min: g.minSize,
+          max: g.maxSize,
+          minFormatted: g.minSize < 1024 ? `${g.minSize}B` : `${(g.minSize / 1024).toFixed(1)}KB`,
+          maxFormatted: g.maxSize < 1024 ? `${g.maxSize}B` : `${(g.maxSize / 1024).toFixed(1)}KB`,
+        },
+        sampleIndices: g.sampleIndices,
+      }));
+
+      response.setStructuredContent({
+        success: true,
+        message: lines.join('\n'),
+        tooltype: 'analyze_websocket_messages',
+        data: {
+          wsid: request.params.wsid,
+          url: summary.url,
+          durationMs: summary.durationMs,
+          totalFrames: summary.totalFrames,
+          sentCount: summary.sentCount,
+          receivedCount: summary.receivedCount,
+          groups,
+          pagination: {
+            groupCount: summary.groups.length,
+          },
+        },
+      });
     } catch (error) {
-      response.appendResponseLine(
-        `Error: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: `Error: ${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'analyze_websocket_messages',
+        data: null,
+      });
     }
   },
 });

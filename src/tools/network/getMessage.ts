@@ -31,21 +31,46 @@ export const getWebSocketMessage = defineTool({
       const frameIndex = request.params.frameIndex;
 
       if (frameIndex >= ws.frames.length) {
-        throw new Error(
-          `Frame index ${frameIndex} out of range. Total frames: ${ws.frames.length}`,
-        );
+        response.setStructuredContent({
+          success: false,
+          message: `Frame index ${frameIndex} out of range. Total frames: ${ws.frames.length}`,
+          tooltype: 'get_websocket_message',
+          data: {
+            wsid: request.params.wsid,
+            frameIndex,
+            totalFrames: ws.frames.length,
+          },
+        });
+        return;
       }
 
       const frame = ws.frames[frameIndex];
       const lines = formatWebSocketFrameDetail(frame, frameIndex);
 
-      for (const line of lines) {
-        response.appendResponseLine(line);
-      }
+      response.setStructuredContent({
+        success: true,
+        message: lines.join('\n'),
+        tooltype: 'get_websocket_message',
+        data: {
+          wsid: request.params.wsid,
+          frameIndex,
+          frame: {
+            direction: frame.direction,
+            timestamp: frame.timestamp,
+            timestampISO: new Date(frame.timestamp).toISOString(),
+            opcode: frame.opcode,
+            payloadSize: frame.payloadData.length,
+            payloadPreview: frame.payloadData.slice(0, 500),
+          },
+        },
+      });
     } catch (error) {
-      response.appendResponseLine(
-        `Error: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: `Error: ${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'get_websocket_message',
+        data: null,
+      });
     }
   },
 });

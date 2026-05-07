@@ -14,7 +14,6 @@ import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
-/** 本地缓存 TrafficSummary，避免重复分析 */
 const trafficSummaryCache = new Map<number, ReturnType<typeof analyzeWebSocketFramesV2>>();
 
 const DIRECTION_OPTIONS: readonly ['sent', 'received'] = ['sent', 'received'];
@@ -64,7 +63,6 @@ export const getWebSocketMessages = defineTool({
       const ws = context.getWebSocketById(request.params.wsid);
       let frames = ws.frames;
 
-      // 方向过滤
       if (request.params.direction) {
         frames = frames.filter(f => f.direction === request.params.direction);
       }
@@ -72,16 +70,13 @@ export const getWebSocketMessages = defineTool({
       const pageSize = request.params.pageSize ?? 10;
       const pageIdx = request.params.pageIdx ?? 0;
 
-      // Mode A: 有 groupId - 显示分组消息
       if (request.params.groupId) {
         const groupId = request.params.groupId.toUpperCase();
 
-        // 尝试从缓存获取摘要
         let summary =
           context.getCachedTrafficSummary(request.params.wsid) ??
           trafficSummaryCache.get(request.params.wsid);
 
-        // 未缓存则分析并缓存
         if (!summary) {
           summary = analyzeWebSocketFramesV2(
             ws.frames,
@@ -93,16 +88,19 @@ export const getWebSocketMessages = defineTool({
 
         const indices = summary.groupToIndices.get(groupId);
         if (!indices || indices.length === 0) {
-          response.appendResponseLine(`## Group ${groupId} Messages`);
-          response.appendResponseLine(`<group not found or empty>`);
-          response.appendResponseLine(``);
-          response.appendResponseLine(
-            `Available groups: ${summary.groups.map(g => g.id).join(', ')}`,
-          );
+          response.setStructuredContent({
+            success: false,
+            message: `Group ${groupId} not found or empty. Available groups: ${summary.groups.map(g => g.id).join(', ')}`,
+            tooltype: 'get_websocket_messages',
+            data: {
+              wsid: request.params.wsid,
+              groupId,
+              availableGroups: summary.groups.map(g => g.id),
+            },
+          });
           return;
         }
 
-        // 应用方向过滤到索引
         let filteredIndices = indices;
         if (request.params.direction) {
           filteredIndices = indices.filter(idx => {
@@ -115,28 +113,84 @@ export const getWebSocketMessages = defineTool({
           pageSize,
           pageIdx,
         });
-        for (const line of lines) {
-          response.appendResponseLine(line);
-        }
+
+        const offset = pageIdx * pageSize;
+        const paginatedIndices = filteredIndices.slice(offset, offset + pageSize);
+        const frameData = request.params.show_content
+          ? paginatedIndices.map(idx => {
+              const frame = ws.frames[idx];
+              return {
+                index: idx,
+                direction: frame.direction,
+                timestamp: frame.timestamp,
+                opcode: frame.opcode,
+                payloadSize: frame.payloadData.length,
+                payloadPreview: frame.payloadData.slice(0, 200),
+              };
+            })
+          : paginatedIndices.map(idx => ({index: idx}));
+
+        response.setStructuredContent({
+          success: true,
+          message: lines.join('\n'),
+          tooltype: 'get_websocket_messages',
+          data: {
+            wsid: request.params.wsid,
+            mode: 'group',
+            groupId,
+            frames: frameData,
+            pagination: {
+              pageIdx,
+              pageSize,
+              total: filteredIndices.length,
+              totalPages: Math.ceil(filteredIndices.length / pageSize),
+            },
+          },
+        });
         return;
       }
-
-      // Mode B: 无 groupId - 显示最近消息
-      response.appendResponseLine(
-        `## Recent Messages (wsid=${request.params.wsid})`,
-      );
 
       const lines = formatRecentMessages(frames, {
         pageSize,
         pageIdx,
       });
-      for (const line of lines) {
-        response.appendResponseLine(line);
-      }
+
+      const offset = pageIdx * pageSize;
+      const paginatedFrames = frames.slice(offset, offset + pageSize);
+      const frameData = request.params.show_content
+        ? paginatedFrames.map((frame, i) => ({
+            index: offset + i,
+            direction: frame.direction,
+            timestamp: frame.timestamp,
+            opcode: frame.opcode,
+            payloadSize: frame.payloadData.length,
+            payloadPreview: frame.payloadData.slice(0, 200),
+          }))
+        : paginatedFrames.map((_, i) => ({index: offset + i}));
+
+      response.setStructuredContent({
+        success: true,
+        message: lines.join('\n'),
+        tooltype: 'get_websocket_messages',
+        data: {
+          wsid: request.params.wsid,
+          mode: 'recent',
+          frames: frameData,
+          pagination: {
+            pageIdx,
+            pageSize,
+            total: frames.length,
+            totalPages: Math.ceil(frames.length / pageSize),
+          },
+        },
+      });
     } catch (error) {
-      response.appendResponseLine(
-        `Error: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      response.setStructuredContent({
+        success: false,
+        message: `Error: ${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'get_websocket_messages',
+        data: null,
+      });
     }
   },
 });
