@@ -7,6 +7,7 @@
 import {defineTool, type Context} from '../ToolDefinition.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
+import {getRuntime} from '../../runtime.js';
 
 import {buildHookStoreRuntime} from './store-utils.js';
 
@@ -61,6 +62,12 @@ ${
 
     try {
       await frame.evaluate(hookCode);
+      getRuntime().hookManager.registerHook({
+        hookId: 'hook_console_table',
+        type: 'console',
+        description: `Console Table Hook (enabled: ${isEnabled})`,
+        script: hookCode,
+      });
       response.setStructuredContent({
         success: true,
         message: isEnabled

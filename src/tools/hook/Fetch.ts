@@ -7,6 +7,7 @@
 import {defineTool, type Context} from '../ToolDefinition.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
+import {getRuntime} from '../../runtime.js';
 
 import {buildHookStoreRuntime} from './store-utils.js';
 
@@ -110,6 +111,13 @@ ${buildHookStoreRuntime({
       } catch {
         // 状态读取失败不影响主流程
       }
+
+      getRuntime().hookManager.registerHook({
+        hookId: 'hook_fetch',
+        type: 'fetch',
+        description: 'Fetch Hook',
+        script: hookCode,
+      });
 
       response.setStructuredContent({
         success: true,

@@ -7,6 +7,7 @@
 import {defineTool, type Context} from '../ToolDefinition.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
+import {getRuntime} from '../../runtime.js';
 
 import {buildHookStoreRuntime} from './store-utils.js';
 
@@ -48,6 +49,12 @@ ${buildHookStoreRuntime({
 
     try {
       await frame.evaluate(hookCode);
+      getRuntime().hookManager.registerHook({
+        hookId: 'hook_history_go',
+        type: 'history',
+        description: 'History Go Blocker',
+        script: hookCode,
+      });
       response.setStructuredContent({
         success: true,
         message: 'history.go 和 history.back 已拦截',

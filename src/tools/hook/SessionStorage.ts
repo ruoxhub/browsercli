@@ -7,6 +7,7 @@
 import {defineTool, type Context} from '../ToolDefinition.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
+import {getRuntime} from '../../runtime.js';
 
 import {buildHookStoreRuntime} from './store-utils.js';
 
@@ -133,6 +134,12 @@ ${buildHookStoreRuntime({
 
     try {
       await frame.evaluate(hookCode);
+      getRuntime().hookManager.registerHook({
+        hookId: 'hook_session_storage',
+        type: 'storage',
+        description: `SessionStorage Hook (actions: ${enabledActions.join(', ')})`,
+        script: hookCode,
+      });
       response.setStructuredContent({
         success: true,
         message: `SessionStorage Hook 已安装，监控操作：${enabledActions.join(', ')}`,

@@ -7,6 +7,7 @@
 import {defineTool, type Context} from '../ToolDefinition.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
+import {getRuntime} from '../../runtime.js';
 
 import {buildHookStoreRuntime} from './store-utils.js';
 
@@ -57,6 +58,12 @@ ${buildHookStoreRuntime({
 
     try {
       await frame.evaluate(hookCode);
+      getRuntime().hookManager.registerHook({
+        hookId: 'hook_location_href',
+        type: 'location',
+        description: `Location Href Hook (debugger: ${shouldDebug})`,
+        script: hookCode,
+      });
       response.setStructuredContent({
         success: true,
         message: `Location Href Hook 已安装，页面跳转将被阻断${shouldDebug ? '，并触发 debugger 断点' : ''}`,

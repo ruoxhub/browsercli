@@ -5,6 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+import {evaluateInPageRuntime} from '../debugger/evaluateInPageRuntime.js';
 
 export const HOOK_STORE_KEY = '__hookStore';
 export const DEFAULT_HOOK_STORE_MAX_RECORDS = 500;
@@ -104,30 +105,62 @@ export async function readHookStore(
   frame: Frame,
   hookId?: string,
 ): Promise<Record<string, unknown[]>> {
-  return await frame.evaluate((id?: string) => {
-    const hookStoreKey = '__hookStore';
-    const rawStore = (window as typeof window & Record<string, unknown>)[
-      hookStoreKey
-    ];
-    const store =
-      rawStore && typeof rawStore === 'object'
-        ? (rawStore as Record<string, unknown>)
-        : {};
-
-    const normalize = (value: unknown) => (Array.isArray(value) ? value : []);
-
-    if (typeof id === 'string' && id.length > 0) {
-      return {[id]: normalize(store[id])};
+  // 使用 CDP Runtime.evaluate（不带 contextId）从页面默认上下文读取
+  // frame.evaluate() 在 Playwright 的隔离 utility world 中执行，
+  // 无法读取页面主 world 的 window.__hookStore
+  const hookIdJson = JSON.stringify(hookId ?? '');
+  const expression = `(function() {
+  var hookStoreKey = '__hookStore';
+  var rawStore = window[hookStoreKey];
+  var store = rawStore && typeof rawStore === 'object' ? rawStore : {};
+  var normalize = function(value) { return Array.isArray(value) ? value : []; };
+  var id = ${hookIdJson};
+  if (typeof id === 'string' && id.length > 0) {
+    var result = {};
+    result[id] = normalize(store[id]);
+    return result;
+  }
+  var all = {};
+  var keys = Object.keys(store);
+  for (var i = 0; i < keys.length; i++) {
+    var key = keys[i];
+    var value = store[key];
+    if (Array.isArray(value)) {
+      all[key] = value;
     }
+  }
+  return all;
+})()`;
 
-    const all: Record<string, unknown[]> = {};
-    for (const [key, value] of Object.entries(store)) {
-      if (Array.isArray(value)) {
-        all[key] = value;
+  try {
+    return await evaluateInPageRuntime<Record<string, unknown[]>>(frame, expression);
+  } catch {
+    // CDP Runtime.evaluate 不可用时，回退到 frame.evaluate
+    return await frame.evaluate((id?: string) => {
+      const hookStoreKey = '__hookStore';
+      const rawStore = (window as typeof window & Record<string, unknown>)[
+        hookStoreKey
+      ];
+      const store =
+        rawStore && typeof rawStore === 'object'
+          ? (rawStore as Record<string, unknown>)
+          : {};
+
+      const normalize = (value: unknown) => (Array.isArray(value) ? value : []);
+
+      if (typeof id === 'string' && id.length > 0) {
+        return {[id]: normalize(store[id])};
       }
-    }
-    return all;
-  }, hookId);
+
+      const all: Record<string, unknown[]> = {};
+      for (const [key, value] of Object.entries(store)) {
+        if (Array.isArray(value)) {
+          all[key] = value;
+        }
+      }
+      return all;
+    }, hookId);
+  }
 }
 
 export function limitRecords(

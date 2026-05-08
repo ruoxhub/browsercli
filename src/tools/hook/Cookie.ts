@@ -7,6 +7,7 @@
 import {defineTool, type Context} from '../ToolDefinition.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
+import {getRuntime} from '../../runtime.js';
 
 import {buildHookStoreRuntime} from './store-utils.js';
 
@@ -107,7 +108,23 @@ ${buildHookStoreRuntime({
 `;
 
     try {
-      await frame.evaluate(hookCode);
+      // 使用 <script> 元素注入，确保 hook 代码在页面主 world 执行
+      // frame.evaluate() 在 Playwright 的隔离 utility world 中执行，
+      // 导致 window.__hookStore 和 document.cookie 的属性覆盖对页面不可见
+      await frame.evaluate((code: string) => {
+        const scriptEl = document.createElement('script');
+        scriptEl.textContent = code;
+        (document.head || document.documentElement).appendChild(scriptEl);
+        scriptEl.remove();
+      }, hookCode);
+      getRuntime().hookManager.registerHook({
+        hookId: 'hook_cookie',
+        type: 'cookie',
+        description: hasFilter
+          ? `Cookie Hook (filter: ${filterKeys!.join(', ')})`
+          : 'Cookie Hook (all)',
+        script: hookCode,
+      });
       response.setStructuredContent({
         success: true,
         message: hasFilter

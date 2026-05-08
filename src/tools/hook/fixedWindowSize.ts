@@ -7,6 +7,7 @@
 import {defineTool, type Context} from '../ToolDefinition.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
+import {getRuntime} from '../../runtime.js';
 
 import {buildHookStoreRuntime} from './store-utils.js';
 
@@ -127,6 +128,12 @@ ${buildHookStoreRuntime({
 
     try {
       await frame.evaluate(hookCode);
+      getRuntime().hookManager.registerHook({
+        hookId: 'fixed_window_size',
+        type: 'window',
+        description: `Fixed Window Size (${fixedInnerW}x${fixedInnerH})`,
+        script: hookCode,
+      });
       response.setStructuredContent({
         success: true,
         message: `窗口尺寸 Hook 已安装，innerHeight=${fixedInnerH}, innerWidth=${fixedInnerW}, outerHeight=${fixedOuterH}, outerWidth=${fixedOuterW}`,

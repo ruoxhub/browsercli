@@ -7,6 +7,7 @@
 import {defineTool, type Context} from '../ToolDefinition.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
+import {getRuntime} from '../../runtime.js';
 
 import {buildHookStoreRuntime} from './store-utils.js';
 
@@ -191,6 +192,14 @@ ${buildHookStoreRuntime({
 
     try {
       await frame.evaluate(hookCode);
+      getRuntime().hookManager.registerHook({
+        hookId: 'anti_anti_hook',
+        type: 'function',
+        description: methods.length > 0
+          ? `Anti-Anti-Hook (methods: ${methods.length})`
+          : 'Anti-Anti-Hook (base)',
+        script: hookCode,
+      });
       response.setStructuredContent({
         success: true,
         message:

@@ -246,6 +246,32 @@ export class HookManager {
 
   // ==================== Hook 管理 ====================
 
+  /**
+   * 注册外部创建的 Hook（如快捷 Hook 工具注入的 Hook）
+   * 与 create() 不同，此方法接受已生成的脚本和元数据，不经过 Builder/Registry
+   */
+  registerHook(meta: {
+    hookId: string;
+    type: string;
+    description: string;
+    script: string;
+    enabled?: boolean;
+  }): void {
+    const {hookId, type, description, script, enabled = true} = meta;
+    const existing = this.hooks.get(hookId);
+    this.hooks.set(hookId, {
+      hookId,
+      type,
+      description,
+      enabled,
+      createdAt: existing?.createdAt ?? Date.now(),
+      callCount: existing?.callCount ?? 0,
+      script,
+      config: existing?.config ?? {type},
+    });
+    this.hookStore.ensure(hookId);
+  }
+
   /** 获取 hook 元数据 */
   getHook(hookId: string): HookMeta | undefined {
     return this.hooks.get(hookId);

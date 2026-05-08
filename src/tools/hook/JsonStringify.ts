@@ -7,6 +7,7 @@
 import {defineTool, type Context} from '../ToolDefinition.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
+import {getRuntime} from '../../runtime.js';
 
 import {buildHookStoreRuntime} from './store-utils.js';
 
@@ -60,6 +61,12 @@ ${buildHookStoreRuntime({
 
     try {
       await frame.evaluate(hookCode);
+      getRuntime().hookManager.registerHook({
+        hookId: 'hook_json_stringify',
+        type: 'json',
+        description: 'JSON.stringify Hook',
+        script: hookCode,
+      });
       response.setStructuredContent({
         success: true,
         message: 'JSON Stringify Hook 已安装，所有 JSON.stringify 调用将被打印',

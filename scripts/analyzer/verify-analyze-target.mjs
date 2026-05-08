@@ -95,7 +95,7 @@ async function main() {
   // 等待页面稳定
   await new Promise(r => setTimeout(r, 1500));
 
-  // 测试 1: 轻量模式（无 AI、无去混淆、无 hook 注入）
+  // 测试 1: 轻量模式（有 AI、有去混淆、有 hook 注入）
   console.log('⏳ 测试 1: 轻量模式 (useAI=true, runDeobfuscation=true, hookPreset=none)...');
   const params1 = {
     url: 'https://qiye.qizhidao.com/',

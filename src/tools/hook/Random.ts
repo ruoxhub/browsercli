@@ -7,6 +7,7 @@
 import {defineTool, type Context} from '../ToolDefinition.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
+import {getRuntime} from '../../runtime.js';
 
 import {buildHookStoreRuntime} from './store-utils.js';
 
@@ -65,6 +66,12 @@ ${buildHookStoreRuntime({
 
     try {
       await frame.evaluate(hookCode);
+      getRuntime().hookManager.registerHook({
+        hookId: 'hook_random',
+        type: 'timer',
+        description: `Math.random Hook (fixed: ${value})`,
+        script: hookCode,
+      });
       response.setStructuredContent({
         success: true,
         message: `Math.random Hook 已安装，固定返回值：${value}`,
