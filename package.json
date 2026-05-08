@@ -90,7 +90,7 @@
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@stylistic/eslint-plugin": "^5.4.0",
     "@swc/cli": "^0.8.1",
-    "@swc/core": "^1.15.21",
+    "@swc/core": "^1.15.33",
     "@swc/core-win32-x64-msvc": "^1.15.30",
     "@types/babel__generator": "^7.6.8",
     "@types/babel__traverse": "^7.20.6",

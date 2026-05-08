@@ -76,8 +76,8 @@ function serializeRequest(
     reqid,
     url: request.url(),
     method: request.method(),
-    postData: request.postData() ?? undefined,
-    requestHeaders: getRequestHeaders(request),
+    // postData: request.postData() ?? undefined,
+    // requestHeaders: getRequestHeaders(request),
   };
 }
 

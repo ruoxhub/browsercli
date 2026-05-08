@@ -144,9 +144,9 @@ export interface NetworkRequestData {
   /** HTTP 方法 */
   method: string;
   /** POST 数据 */
-  postData?: string;
+  // postData?: string;
   /** 请求头 */
-  requestHeaders?: Record<string, string>;
+  // requestHeaders?: Record<string, string>;
 }
 
 /** listNetworkRequests 返回数据 */

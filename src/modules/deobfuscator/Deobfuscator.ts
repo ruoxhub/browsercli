@@ -138,9 +138,14 @@ export class Deobfuscator {
   /**
    * 完整反混淆管线入口
    */
-  async deobfuscate(
+   async deobfuscate(
     options: DeobfuscateFullOptions,
   ): Promise<DeobfuscateResult> {
+    if (!options.code || options.code.trim() === '') {
+      logger.warn('Deobfuscation called with empty code');
+      throw new Error('No code provided for deobfuscation');
+    }
+
     // 缓存
     const cacheKey = this.generateCacheKey(options);
     const cached = this.resultCache.get(cacheKey);

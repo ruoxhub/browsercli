@@ -26,7 +26,6 @@ export const deobfuscateCode = defineTool({
         success: true,
         message: 'Deobfuscation completed',
         tooltype: 'deobfuscate',
-        // logFormat: 'json',
         data: result,
       });
     } catch (error) {
@@ -34,7 +33,6 @@ export const deobfuscateCode = defineTool({
         success: false,
         message: `Deobfuscation failed: ${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'deobfuscate',
-        // logFormat: 'json',
         data: {} as DeobfuscateCodeResult['data'],
       });
     }

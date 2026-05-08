@@ -69,7 +69,7 @@ async function main() {
   console.log('✓ Sekiro Server 可用\n');
 
   console.log('⏳ 创建初始页面...');
-  const newPageResult = await invokeTool(httpUrl, args.group, 'new_page', { url: 'https://example.com', timeout: 10000 }, args.timeout);
+  const newPageResult = await invokeTool(httpUrl, args.group, 'new_page', { url: 'https://qiye.qizhidao.com/', timeout: 10000 }, args.timeout);
   if (!newPageResult.ok) {
     console.log(`✗ 初始页面创建失败: ${newPageResult.error?.slice(0, 80) || newPageResult.status}`);
     process.exit(1);
