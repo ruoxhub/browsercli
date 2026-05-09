@@ -1111,12 +1111,48 @@ js-reverse call inject_preload_script --script "(() => { window.preloadData = 't
 | `risk_panel`              | 风险面板     | `js-reverse call risk_panel --code "..."`                                 |
 | `export_session_report`   | 导出会话报告 | `js-reverse call export_session_report --format "markdown"`               |
 
+#### `deobfuscate_code` 参数详解
+
+| 参数               | 类型     | 必需 | 说明                                                                                         |
+| ------------------ | -------- | ---- | -------------------------------------------------------------------------------------------- |
+| `code`             | string   | 是   | 待去混淆的 JavaScript 代码。空字符串或纯空白会返回错误                                       |
+| `aggressive`       | boolean  | 否   | 启用激进模式：控制流平坦化还原、更深度表达式简化等                                           |
+| `renameVariables`  | boolean  | 否   | 将 `_0x` 风格变量重命名为 `var_N` 形式，提高可读性                                          |
+
+**反混淆管线流程**（默认自动模式，根据检测结果自动选择对应子管线）：
+
+1. **检测** — 自动识别混淆类型（`javascript-obfuscator`、`packer`、`aaencode`、`vm-protection`、`control-flow-flattening` 等 20+ 种）
+2. **解包** — Packer / AAEncode / URLEncode / eval 混淆自动解包
+3. **JSVMP 还原** — 虚拟机保护检测与还原，输出 VM 结构信息
+4. **高级反混淆** — 不可见 Unicode、控制流平坦化、不透明谓词、死代码注入等
+5. **基础管线** — 字符串数组提取/替换、字符串解码 (hex/unicode)、常量折叠、死代码消除、表达式简化
+6. **AST 优化** — 常量传播、变量内联、属性展开
+7. **变量重命名** — 仅在 `renameVariables=true` 时执行
+8. **LLM 辅助** — 可选，AI 语义分析
+
+**返回结果字段**：
+
+| 字段              | 类型     | 说明                                                         |
+| ----------------- | -------- | ------------------------------------------------------------ |
+| `code`            | string   | 去混淆后的代码                                               |
+| `readabilityScore` | number  | 可读性评分 (0-100)                                           |
+| `confidence`      | number   | 去混淆置信度 (0-1)                                           |
+| `obfuscationType` | string[] | 检测到的混淆类型列表                                         |
+| `transformations` | array    | 每个管线步骤的执行记录（`type`、`description`、`success`、可选 `detail`） |
+| `analysis`        | string   | 管线完成描述或 LLM 分析结果                                  |
+| `warnings`        | string[] | 子管线产生的警告/分析信息（可选，供外部 AI 进一步推理）      |
+| `unresolvedParts` | array    | 未能完全还原的部分（可选，含位置、原因、建议）               |
+
 **示例：**
 
 ```bash
 # 代码去混淆
 js-reverse call deobfuscate_code --code "(function(){...})()"
 js-reverse call deobfuscate_code --code "..." --aggressive true --renameVariables true
+
+# 空代码会返回错误
+# 返回: { success: false, message: "Deobfuscation failed: No code provided for deobfuscation" }
+js-reverse call deobfuscate_code --code ""
 
 # 理解代码结构
 js-reverse call understand_code --code "function encrypt(data) {...}"
@@ -1144,6 +1180,13 @@ js-reverse call risk_panel --code "..." --useAI true --includeHookSignals true
 js-reverse call export_session_report --format markdown
 js-reverse call export_session_report --format json --includeHookData true
 ```
+
+#### `understand_code` 参数详解
+
+| 参数   | 类型   | 必需 | 说明                                                              |
+| ------ | ------ | ---- | ----------------------------------------------------------------- |
+| `code` | string | 是   | 待分析的 JavaScript 代码                                          |
+| `focus` | enum  | 否   | 分析侧重方向：`all`（默认）、`structure`（结构）、`business`（业务逻辑）、`security`（安全） |
 
 ### 代码收集器
 

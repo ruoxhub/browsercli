@@ -25,7 +25,8 @@ export function registerBuiltinActions(client: BuiltinActionClient): void {
       if (!toolsMetaCache) {
         toolsMetaCache = await import('../cli/tools-meta.js');
       }
-      const {getAllToolNames, getToolMeta} = toolsMetaCache;
+      const {ensureToolsMeta, getAllToolNames, getToolMeta} = toolsMetaCache;
+      await ensureToolsMeta();
       const tools = getAllToolNames().map(name => {
         const meta = getToolMeta(name);
         return {name, description: meta?.description || ''};

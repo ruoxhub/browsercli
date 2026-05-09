@@ -7,9 +7,13 @@
 import type {AxiCliCommand} from 'axi-sdk-js';
 
 import {getBoolFlag, parseArgs} from '../args-parser.js';
-import {getConvertedSkillToolDefinitions} from '../converted-skill-tools.js';
 import {tableOutput, successOutput} from '../output.js';
-import {TOOL_ARG_SPECS} from '../tool-arg-specs.js';
+import {
+  ensureToolsMeta,
+  getAllToolsMeta,
+  getToolMeta,
+} from '../tools-meta.js';
+import type {ToolArgSpecMap} from '../zod-introspect.js';
 import type {WorkerContext} from '../types.js';
 
 interface ListedTool {
@@ -17,11 +21,10 @@ interface ListedTool {
   description?: string;
 }
 
-function formatArgSignature(toolName: string): string {
-  const specs = TOOL_ARG_SPECS[toolName];
-  if (!specs) return '';
+function formatArgSignature(argSpecs?: ToolArgSpecMap): string {
+  if (!argSpecs || Object.keys(argSpecs).length === 0) return '';
   const parts: string[] = [];
-  for (const [key, spec] of Object.entries(specs)) {
+  for (const [key, spec] of Object.entries(argSpecs)) {
     const typeLabel =
       spec.type === 'string'
         ? '<str>'
@@ -45,7 +48,6 @@ export const listToolsCommand: AxiCliCommand<WorkerContext> = async (
 
   let tools: ListedTool[] = [];
   let isOffline = false;
-  const legacySkills = getConvertedSkillToolDefinitions();
 
   try {
     const invoker = ctx?.invoker;
@@ -62,44 +64,49 @@ export const listToolsCommand: AxiCliCommand<WorkerContext> = async (
 
   if (tools.length === 0) {
     isOffline = true;
-    const {getAllToolNames, getToolMeta} = await import('../tools-meta.js');
-    tools = getAllToolNames().map(name => {
-      const meta = getToolMeta(name);
-      return {name, description: meta?.description};
-    });
+  }
+
+  // 始终加载本地工具元信息，以便获取参数签名
+  await ensureToolsMeta();
+
+  if (isOffline) {
+    const allMeta = getAllToolsMeta();
+    tools = allMeta.map(m => ({
+      name: m.name,
+      description: m.description,
+    }));
   }
 
   if (json) {
-    const enrichedTools = tools.map(t => ({
-      ...t,
-      signature: formatArgSignature(t.name),
-    }));
+    const enrichedTools = tools.map(t => {
+      const meta = getToolMeta(t.name);
+      return {
+        ...t,
+        signature: formatArgSignature(meta?.argSpecs),
+      };
+    });
     return successOutput({
       command: 'list-tools',
       tools: enrichedTools,
-      legacySkills,
       offline: isOffline,
     });
   }
 
-  const headers = ['Type', 'Name', 'Signature', 'Description'];
-  const toolRows = tools.map(t => [
-    'tool',
-    t.name,
-    formatArgSignature(t.name) || '-',
-    t.description || '',
-  ]);
-  const skillRows = legacySkills.map(skill => [
-    'legacy-skill',
-    skill.name,
-    '-',
-    skill.description,
-  ]);
+  const headers = ['Name', 'Signature', 'Description'];
+  const toolRows = tools.map(t => {
+    const meta = getToolMeta(t.name);
+    return [
+      t.name,
+      formatArgSignature(meta?.argSpecs) || '-',
+      t.description || '',
+    ];
+  });
+
+  const total = toolRows.length;
 
   const output: Record<string, unknown> = {
     command: 'list-tools',
-    total: tools.length,
-    legacySkillTotal: legacySkills.length,
+    total,
   };
 
   if (isOffline) {
@@ -108,6 +115,6 @@ export const listToolsCommand: AxiCliCommand<WorkerContext> = async (
 
   return {
     ...output,
-    ...tableOutput(headers, [...toolRows, ...skillRows]),
+    ...tableOutput(headers, toolRows),
   };
 };

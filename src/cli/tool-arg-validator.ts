@@ -5,10 +5,10 @@
  */
 
 import {
-  TOOL_ARG_SPECS,
   type ToolArgSpec,
   type ToolArgSpecMap,
-} from './tool-arg-specs.js';
+} from './zod-introspect.js';
+import {getToolMeta} from './tools-meta.js';
 
 interface ValidationSuccess {
   ok: true;
@@ -20,16 +20,9 @@ interface ValidationFailure {
   error: string;
 }
 
-function buildAliasMap(specs: ToolArgSpecMap): Map<string, string> {
-  const aliases = new Map<string, string>();
-
-  for (const [key, spec] of Object.entries(specs)) {
-    for (const alias of spec.aliases ?? []) {
-      aliases.set(alias, key);
-    }
-  }
-
-  return aliases;
+function buildAliasMap(_specs: ToolArgSpecMap): Map<string, string> {
+  // aliases 目前未从 zod schema 中提取，预留扩展
+  return new Map();
 }
 
 function normalizeRawArgs(
@@ -110,8 +103,9 @@ export function validateToolArgs(
   toolName: string,
   rawArgs: Record<string, unknown>,
 ): ValidationSuccess | ValidationFailure {
-  const specs = TOOL_ARG_SPECS[toolName];
-  if (!specs) {
+  const meta = getToolMeta(toolName);
+  const specs = meta?.argSpecs;
+  if (!specs || Object.keys(specs).length === 0) {
     return {ok: true, value: rawArgs};
   }
 

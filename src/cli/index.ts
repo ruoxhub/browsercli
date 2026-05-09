@@ -22,6 +22,7 @@ export {
 } from './args-parser.js';
 export {generateTopLevelHelp, generateCommandHelp} from './help.js';
 export {
+  ensureToolsMeta,
   getToolMeta,
   getAllToolNames,
   searchTools,

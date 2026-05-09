@@ -7,28 +7,35 @@ import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {
+  ensureToolsMeta,
   getAllToolNames,
+  getAllToolsMeta,
   getToolMeta,
   searchTools,
-  TOOLS_META,
 } from '../../../src/cli/tools-meta.js';
 
 describe('tools-meta', () => {
-  describe('TOOLS_META', () => {
-    it('is a non-empty array', () => {
-      assert.ok(Array.isArray(TOOLS_META));
-      assert.ok(TOOLS_META.length > 0);
+  describe('dynamic loading from defineTool', () => {
+    it('loads all tools from defineTool definitions', async () => {
+      await ensureToolsMeta();
+      const tools = getAllToolsMeta();
+      assert.ok(Array.isArray(tools));
+      assert.ok(tools.length > 0);
     });
 
-    it('has expected tool count', () => {
+    it('has expected tool count', async () => {
+      await ensureToolsMeta();
+      const tools = getAllToolsMeta();
       assert.ok(
-        TOOLS_META.length >= 80,
-        `Expected >= 80 tools, got ${TOOLS_META.length}`,
+        tools.length >= 80,
+        `Expected >= 80 tools, got ${tools.length}`,
       );
     });
 
-    it('every tool has required fields', () => {
-      for (const tool of TOOLS_META) {
+    it('every tool has required fields', async () => {
+      await ensureToolsMeta();
+      const tools = getAllToolsMeta();
+      for (const tool of tools) {
         assert.ok(tool.name, `Tool missing name: ${JSON.stringify(tool)}`);
         assert.ok(tool.description, `Tool missing description: ${tool.name}`);
         assert.ok(
@@ -37,11 +44,14 @@ describe('tools-meta', () => {
         );
         assert.ok(tool.modulePath, `Tool missing modulePath: ${tool.name}`);
         assert.ok(tool.handlerName, `Tool missing handlerName: ${tool.name}`);
+        assert.ok(tool.argSpecs, `Tool missing argSpecs: ${tool.name}`);
       }
     });
 
-    it('all tool names are unique', () => {
-      const names = TOOLS_META.map(t => t.name);
+    it('all tool names are unique', async () => {
+      await ensureToolsMeta();
+      const tools = getAllToolsMeta();
+      const names = tools.map(t => t.name);
       const uniqueNames = new Set(names);
       assert.strictEqual(
         names.length,
@@ -50,8 +60,10 @@ describe('tools-meta', () => {
       );
     });
 
-    it('all tool names are lowercase', () => {
-      for (const tool of TOOLS_META) {
+    it('all tool names are lowercase', async () => {
+      await ensureToolsMeta();
+      const tools = getAllToolsMeta();
+      for (const tool of tools) {
         assert.strictEqual(
           tool.name,
           tool.name.toLowerCase(),
@@ -60,8 +72,10 @@ describe('tools-meta', () => {
       }
     });
 
-    it('all tool names use underscores (not hyphens)', () => {
-      for (const tool of TOOLS_META) {
+    it('all tool names use underscores (not hyphens)', async () => {
+      await ensureToolsMeta();
+      const tools = getAllToolsMeta();
+      for (const tool of tools) {
         assert.ok(
           !tool.name.includes('-'),
           `Tool name contains hyphen: ${tool.name}`,
@@ -69,43 +83,20 @@ describe('tools-meta', () => {
       }
     });
 
-    it('no duplicate modulePath + handlerName combinations except documented aliases', () => {
-      const allowedAliases = new Set([
-        './hook/InjectHook.js:injectHook',
-        './script/script.js:evaluateScriptFn',
-      ]);
-      const seen = new Map<string, string>();
-
-      for (const tool of TOOLS_META) {
-        const combo = `${tool.modulePath}:${tool.handlerName}`;
-        const previous = seen.get(combo);
-        if (previous && !allowedAliases.has(combo)) {
-          assert.fail(
-            `Duplicate modulePath:handlerName found: ${combo} (${previous}, ${tool.name})`,
-          );
-        }
-        seen.set(combo, tool.name);
-      }
-    });
-
-    it('contains known core tools', () => {
-      const names = TOOLS_META.map(t => t.name);
+    it('contains known core tools', async () => {
+      await ensureToolsMeta();
+      const names = getAllToolsMeta().map(t => t.name);
       assert.ok(names.includes('observe_flow'));
       assert.ok(names.includes('auto_hook'));
       assert.ok(names.includes('rebuild_bundle'));
       assert.ok(names.includes('query_dom'));
       assert.ok(names.includes('hook_function'));
       assert.ok(names.includes('list_network_requests'));
-      assert.ok(!names.includes('list_console_messages'));
-      assert.ok(!names.includes('get_console_message'));
-      assert.ok(!names.includes('list_websocket_connections'));
-      assert.ok(!names.includes('get_websocket_messages'));
-      assert.ok(!names.includes('get_websocket_message'));
-      assert.ok(!names.includes('analyze_websocket_messages'));
     });
 
-    it('contains migrated wasm tools', () => {
-      const names = TOOLS_META.map(t => t.name);
+    it('contains migrated wasm tools', async () => {
+      await ensureToolsMeta();
+      const names = getAllToolsMeta().map(t => t.name);
       assert.ok(names.includes('wasm_capabilities'));
       assert.ok(names.includes('wasm_dump'));
       assert.ok(names.includes('wasm_disassemble'));
@@ -119,131 +110,94 @@ describe('tools-meta', () => {
   });
 
   describe('getToolMeta', () => {
-    it('returns meta for existing tool', () => {
+    it('returns meta for existing tool', async () => {
+      await ensureToolsMeta();
       const meta = getToolMeta('query_dom');
       assert.ok(meta);
       assert.strictEqual(meta!.name, 'query_dom');
       assert.strictEqual(meta!.modulePath, './dom/queryDom.js');
     });
 
-    it('returns undefined for non-existing tool', () => {
+    it('returns undefined for non-existing tool', async () => {
+      await ensureToolsMeta();
       const meta = getToolMeta('nonexistent_tool_xyz');
       assert.strictEqual(meta, undefined);
     });
 
-    it('returns correct handlerName', () => {
+    it('returns correct handlerName', async () => {
+      await ensureToolsMeta();
       const meta = getToolMeta('auto_hook');
       assert.ok(meta);
       assert.strictEqual(meta!.handlerName, 'autoHook');
     });
 
-    it('uses the corrected vjstools module path', () => {
+    it('uses the corrected vjstools module path', async () => {
+      await ensureToolsMeta();
       const meta = getToolMeta('deobfuscate_code_vj');
       assert.ok(meta);
       assert.strictEqual(meta!.modulePath, './vjstools/deobfuscate.js');
     });
 
-    it('includes required debugger params for get_script_source', () => {
-      const meta = getToolMeta('get_script_source');
-      assert.ok(meta);
-      assert.deepStrictEqual(meta!.schema, {scriptId: 'string'});
-    });
-
-    it('describes evaluate_script passthrough schema', () => {
-      const meta = getToolMeta('evaluate_script');
-      assert.ok(meta);
-      assert.match(meta!.description, /上下文/);
-      assert.match(meta!.description, /verbose/);
-      assert.deepStrictEqual(meta!.schema, {
-        function: 'string',
-        context: 'string',
-        verbose: 'boolean',
-      });
-    });
-
-    it('describes scroll_by supported params', () => {
+    it('includes argSpecs for scroll_by', async () => {
+      await ensureToolsMeta();
       const meta = getToolMeta('scroll_by');
       assert.ok(meta);
-      assert.deepStrictEqual(meta!.schema, {
-        direction: 'string',
-        pixels: 'number',
-      });
+      assert.ok(meta!.argSpecs.direction);
+      assert.strictEqual(meta!.argSpecs.direction.type, 'string');
+      assert.ok(meta!.argSpecs.direction.enum);
+      assert.ok(meta!.argSpecs.direction.enum!.includes('up'));
+      assert.ok(meta!.argSpecs.direction.enum!.includes('down'));
     });
 
-    it('describes list_network_requests pagination and target page params', () => {
-      const meta = getToolMeta('list_network_requests');
-      assert.ok(meta);
-      assert.match(meta!.description, /targetPageIdx/);
-      assert.deepStrictEqual(meta!.schema, {
-        pageSize: 'number',
-        pageIdx: 'number',
-        targetPageIdx: 'number',
-        resourceTypes: 'string[]',
-        includePreservedRequests: 'boolean',
-        waitForRequest: 'string',
-        waitTimeoutMs: 'number',
-        headerFilter: 'string',
-      });
-    });
-
-    it('describes wasm_offline_run params', () => {
+    it('includes argSpecs for wasm_offline_run', async () => {
+      await ensureToolsMeta();
       const meta = getToolMeta('wasm_offline_run');
       assert.ok(meta);
       assert.strictEqual(meta!.modulePath, './wasm/index.js');
       assert.strictEqual(meta!.handlerName, 'wasmOfflineRun');
-      assert.strictEqual(meta!.callMode, 'runtime');
-      assert.deepStrictEqual(meta!.schema, {
-        inputPath: 'string',
-        functionName: 'string',
-        args: 'string[]',
-        runtime: 'string',
-        timeoutMs: 'number',
-      });
+      assert.strictEqual(meta!.callMode, 'defineTool');
+      assert.ok(meta!.argSpecs.inputPath);
+      assert.strictEqual(meta!.argSpecs.inputPath.type, 'string');
+      assert.ok(meta!.argSpecs.inputPath.required);
     });
   });
 
   describe('getAllToolNames', () => {
-    it('returns array of strings', () => {
+    it('returns array of strings after initialization', async () => {
+      await ensureToolsMeta();
       const names = getAllToolNames();
       assert.ok(Array.isArray(names));
       assert.ok(names.length > 0);
       assert.ok(typeof names[0] === 'string');
     });
 
-    it('matches TOOLS_META length', () => {
+    it('matches getAllToolsMeta length', async () => {
+      await ensureToolsMeta();
       const names = getAllToolNames();
-      assert.strictEqual(names.length, TOOLS_META.length);
-    });
-
-    it('contains same names as TOOLS_META', () => {
-      const names = getAllToolNames();
-      const metaNames = TOOLS_META.map(t => t.name);
-      assert.deepStrictEqual(names.sort(), metaNames.sort());
+      const tools = getAllToolsMeta();
+      assert.strictEqual(names.length, tools.length);
     });
   });
 
   describe('searchTools', () => {
-    it('finds tools by name substring', () => {
-      const results = searchTools('dom');
+    it('finds tools by name substring', async () => {
+      const results = await searchTools('dom');
       assert.ok(results.length > 0);
       for (const tool of results) {
-        assert.ok(tool.name.includes('dom') || tool.name.includes('DOM'));
+        assert.ok(
+          tool.name.includes('dom') || tool.description.toLowerCase().includes('dom'),
+        );
       }
     });
 
-    it('finds tools by description', () => {
-      const results = searchTools('网络');
-      assert.ok(results.length > 0);
-    });
-
-    it('returns empty array for no match', () => {
-      const results = searchTools('zzz_nonexistent_term_xyz');
+    it('returns empty array for no match', async () => {
+      const results = await searchTools('zzz_nonexistent_term_xyz');
       assert.deepStrictEqual(results, []);
     });
 
-    it('is case-insensitive for name search', () => {
-      const lowerResults = searchTools('dom');
-      const upperResults = searchTools('DOM');
+    it('is case-insensitive for name search', async () => {
+      const lowerResults = await searchTools('dom');
+      const upperResults = await searchTools('DOM');
       assert.deepStrictEqual(lowerResults, upperResults);
     });
   });

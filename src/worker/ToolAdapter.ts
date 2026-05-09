@@ -16,7 +16,7 @@
 import type {Frame} from 'patchright';
 
 import type {ToolMeta} from '../cli/tools-meta.js';
-import {getAllToolNames, getToolMeta} from '../cli/tools-meta.js';
+import {ensureToolsMeta, getAllToolNames, getToolMeta} from '../cli/tools-meta.js';
 import type {Context, Response, ToolDefinition} from '../tools/ToolDefinition.js';
 import type {TrafficSummary} from '../formatters/websocketFormatter.js';
 import type {TraceResult} from '../trace-processing/parse.js';
@@ -276,6 +276,7 @@ export class ToolAdapter {
   async registerAll(
     registerFn: (name: string, handler: ActionHandler) => void,
   ): Promise<void> {
+    await ensureToolsMeta();
     const toolNames = getAllToolNames();
     let registered = 0;
 

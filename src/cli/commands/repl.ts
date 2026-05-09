@@ -19,7 +19,6 @@ const REPL_COMMANDS = ['status', 'list-tools', 'help', 'exit', 'quit'];
  * REPL 会话 — 封装所有可变状态，避免模块级变量泄漏
  */
 class ReplSession {
-  private skillNames: string[] | null = null;
   private toolNames: string[] | null = null;
   private readonly invoker: SekiroInvoker;
   private readonly workerManager: WorkerManager;
@@ -35,17 +34,10 @@ class ReplSession {
     this.group = group;
   }
 
-  async getSkillNames(): Promise<string[]> {
-    if (this.skillNames) return this.skillNames;
-    const {getConvertedSkillToolDefinitions} =
-      await import('../converted-skill-tools.js');
-    this.skillNames = getConvertedSkillToolDefinitions().map(s => s.name);
-    return this.skillNames;
-  }
-
   async getToolNamesList(): Promise<string[]> {
     if (this.toolNames) return this.toolNames;
-    const {getAllToolNames} = await import('../tools-meta.js');
+    const {ensureToolsMeta, getAllToolNames} = await import('../tools-meta.js');
+    await ensureToolsMeta();
     this.toolNames = getAllToolNames();
     return this.toolNames;
   }
@@ -62,10 +54,6 @@ class ReplSession {
     if (parts.length === 2 && !isLastCharSpace) {
       const cmd = parts[0].toLowerCase();
       const partial = parts[1].toLowerCase();
-      if (cmd === 'skill') {
-        const skills = await this.getSkillNames();
-        return skills.filter(s => s.startsWith(partial));
-      }
       if (cmd === 'tool') {
         const tools = await this.getToolNamesList();
         return tools.filter(t => t.startsWith(partial));
@@ -85,20 +73,12 @@ class ReplSession {
       for (const t of tools) {
         replLog(`  - ${t.name}: ${t.description || ''}`);
       }
-      const skills = await this.getSkillNames();
-      replLog(`兼容技能 (${skills.length}):`);
-      for (const skill of skills) {
-        replLog(`  - ${skill}`);
-      }
       return;
     } catch {
       const tools = await this.getToolNamesList();
       replLog(`可用工具 (${tools.length}):`);
       for (const t of tools) replLog(`  - ${t}`);
-      const skills = await this.getSkillNames();
-      replLog(`兼容技能 (${skills.length}):`);
-      for (const skill of skills) replLog(`  - ${skill}`);
-      replLog('\n(离线模式：显示内置工具与兼容技能列表)');
+      replLog('\n(离线模式：显示内置工具列表)');
     }
   }
 
@@ -139,28 +119,19 @@ class ReplSession {
     const [type, name, ...restArgs] = parts;
 
     if (!type || !name) {
-      replLog('用法：skill <name> [args...] 或 tool <name> [args...]');
+      replLog('用法：tool <name> [args...]');
       replLog('输入 "help" 查看完整帮助');
       return true;
     }
 
     try {
-      if (type === 'skill') {
-        const {getConvertedSkillToolName} =
-          await import('../converted-skill-tools.js');
-        const actionName =
-          getConvertedSkillToolName(name) ?? name.replaceAll('-', '_');
-        const result = await this.invoker.invoke(this.group, actionName, {
-          args: restArgs,
-        });
-        replLog(JSON.stringify(result, null, 2));
-      } else if (type === 'tool') {
+      if (type === 'tool') {
         const result = await this.invoker.invoke(this.group, name, {
           args: restArgs,
         });
         replLog(JSON.stringify(result, null, 2));
       } else {
-        replLog('未知命令类型，使用 "skill" 或 "tool"');
+        replLog('未知命令类型，使用 "tool"');
         replLog('输入 "help" 查看完整帮助');
       }
     } catch (error) {
@@ -177,10 +148,9 @@ function replLog(msg: string): void {
 
 function printHelp(): void {
   replLog('可用命令：');
-  replLog('  skill <name> [args...]  - 兼容调用已迁移为 Tool 的旧技能');
   replLog('  tool <name> [args...]   - 调用指定工具');
   replLog('  status                  - 查看 Worker 状态');
-  replLog('  list-tools              - 列出可用工具和兼容技能');
+  replLog('  list-tools              - 列出可用工具');
   replLog('  help                    - 显示此帮助信息');
   replLog('  exit / quit             - 退出 REPL');
   replLog('');
@@ -188,9 +158,6 @@ function printHelp(): void {
 
 /** 导出 complete 供外部使用（保持向后兼容） */
 export async function complete(input: string): Promise<string[]> {
-  // 临时创建无状态 session 来补全，不缓存
-  const {getConvertedSkillToolDefinitions} =
-    await import('../converted-skill-tools.js');
   const {getAllToolNames} = await import('../tools-meta.js');
   const parts = input.split(/\s+/);
   const isLastCharSpace = input.endsWith(' ') && input.length > 0;
@@ -203,11 +170,6 @@ export async function complete(input: string): Promise<string[]> {
   if (parts.length === 2 && !isLastCharSpace) {
     const cmd = parts[0].toLowerCase();
     const partial = parts[1].toLowerCase();
-    if (cmd === 'skill') {
-      return getConvertedSkillToolDefinitions()
-        .map(s => s.name)
-        .filter(s => s.startsWith(partial));
-    }
     if (cmd === 'tool') {
       return getAllToolNames().filter(t => t.startsWith(partial));
     }

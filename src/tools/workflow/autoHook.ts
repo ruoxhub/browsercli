@@ -1154,42 +1154,31 @@ export const autoHook = defineTool({
       statusParts.push(`检测到 ${detectedCryptoCount} 个加密库`);
       if (!frame) statusParts.push('注意：未找到可用 Frame，加密库检测未执行');
 
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: true,
-            message: `自动 Hook 完成：${statusParts.join('，')}`,
-            tooltype: 'auto_hook',
-            data,
-          },
-          null,
-          2,
-        ),
+
+      response.setStructuredContent(
+        {
+          success: true,
+          message: `自动 Hook 完成：${statusParts.join('，')}`,
+          tooltype: 'auto_hook',
+          data,
+        }
       );
-      response.appendResponseLine('```');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.info('[AutoHook] Failed: ' + errorMessage);
 
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: false,
-            error: errorMessage,
-            tooltype: 'auto_hook',
-            data: {
-              url: url || context.getSelectedPage()?.url?.() || 'unknown',
-              hooksInjected,
-              cryptoDetected,
-            } as AutoHookToolData,
-          },
-          null,
-          2,
-        ),
+      response.setStructuredContent(
+        {
+          success: false,
+          error: errorMessage,
+          tooltype: 'auto_hook',
+          data: {
+            url: url || context.getSelectedPage()?.url?.() || 'unknown',
+            hooksInjected,
+            cryptoDetected,
+          } as AutoHookToolData,
+        }
       );
-      response.appendResponseLine('```');
     }
   },
 });

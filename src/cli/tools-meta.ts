@@ -4,1449 +4,530 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/**
+ * ToolMeta 注册表 — 从 defineTool 定义动态加载 name / description / schema
+ *
+ * 不再手动维护 TOOLS_META 数组。每个工具只需在此声明 modulePath + handlerName，
+ * name / description / schema 从对应 defineTool 的导出自动提取。
+ */
+
+import type {ToolDefinition} from '../tools/ToolDefinition.js';
+import {
+  extractArgSpecsFromSchema,
+  extractSchemaTypeMap,
+  type ToolArgSpec,
+  type ToolArgSpecMap,
+} from './zod-introspect.js';
+
 export type ToolCallMode = 'defineTool';
 
+/**
+ * 工具注册条目 — 仅声明模块路径与导出名，其余从 defineTool 自动提取
+ */
+export interface ToolRegistryEntry {
+  modulePath: string;
+  handlerName: string;
+}
+
+/**
+ * 完整工具元信息 — CLI 使用
+ */
 export interface ToolMeta {
   name: string;
   description: string;
+  /** 简化类型映射 (key → 'string'|'number'|'boolean'|'string[]') */
   schema: Record<string, string>;
+  /** 丰富的参数规格（含 required / enum / defaultValue / description） */
+  argSpecs: ToolArgSpecMap;
   modulePath: string;
   handlerName: string;
-  /** 调用模式：所有工具统一使用 defineTool 定义结构 */
-  callMode?: ToolCallMode;
+  callMode: ToolCallMode;
 }
 
-export const TOOLS_META: ToolMeta[] = [
+/**
+ * 工具注册表 — 只需声明 modulePath 和 handlerName
+ * name / description / schema 从 defineTool 自动提取
+ */
+const TOOL_REGISTRY: ToolRegistryEntry[] = [
+  // ── workflow ──────────────────────────────────
+  {modulePath: './workflow/observeFlow.js', handlerName: 'observeFlow'},
+  {modulePath: './workflow/autoHook.js', handlerName: 'autoHook'},
+  {modulePath: './workflow/rebuildBundle.js', handlerName: 'rebuildBundle'},
   {
-    name: 'observe_flow',
-    description:
-      '观察模式：收集和分析页面脚本，识别加密和混淆代码，生成风险评估报告',
-    schema: {},
-    modulePath: './workflow/observeFlow.js',
-    handlerName: 'observeFlow',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'auto_hook',
-    description: '自动 Hook：按预设生成调试 Hook 和加密库 Hook 注入计划',
-    schema: {},
-    modulePath: './workflow/autoHook.js',
-    handlerName: 'autoHook',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'rebuild_bundle',
-    description: '本地复现：构建 Node.js 环境复现目标代码，支持参数提取上下文',
-    schema: {},
-    modulePath: './workflow/rebuildBundle.js',
-    handlerName: 'rebuildBundle',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'trace_signature_generation',
-    description:
-      '签名追踪工作流：从请求头/URL 线索关联网络请求、Hook 诊断、XHR 断点和调用帧检查',
-    schema: {
-      requestUrlPattern: 'string',
-      headerKeyword: 'string',
-      maxResults: 'number',
-      includeSensitiveValues: 'boolean',
-      taskId: 'string',
-    },
     modulePath: './workflow/traceSignatureGeneration.js',
     handlerName: 'traceSignatureGeneration',
-    callMode: 'defineTool',
   },
+  // ── dom ───────────────────────────────────────
+  {modulePath: './dom/queryDom.js', handlerName: 'queryDom'},
+  {modulePath: './dom/getDomStructure.js', handlerName: 'getDomStructure'},
   {
-    name: 'query_dom',
-    description: '查询 DOM',
-    schema: {selector: 'string', all: 'boolean', limit: 'number'},
-    modulePath: './dom/queryDom.js',
-    handlerName: 'queryDom',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'get_dom_structure',
-    description: '获取 DOM 结构',
-    schema: {},
-    modulePath: './dom/getDomStructure.js',
-    handlerName: 'getDomStructure',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'find_clickable_elements',
-    description: '查找可点击元素',
-    schema: {},
     modulePath: './dom/findClickableElements.js',
     handlerName: 'findClickableElements',
-    callMode: 'defineTool',
   },
+  // ── network ───────────────────────────────────
   {
-    name: 'list_network_requests',
-    description:
-      '列出网络请求；pageIdx 为结果分页页码，targetPageIdx 为浏览器页索引，支持按资源类型、请求头关键词过滤，并可等待匹配请求出现',
-    schema: {
-      pageSize: 'number',
-      pageIdx: 'number',
-      targetPageIdx: 'number',
-      resourceTypes: 'string[]',
-      includePreservedRequests: 'boolean',
-      waitForRequest: 'string',
-      waitTimeoutMs: 'number',
-      headerFilter: 'string',
-    },
     modulePath: './network/listNetworkRequests.js',
     handlerName: 'listNetworkRequests',
-    callMode: 'defineTool',
   },
   {
-    name: 'get_network_request',
-    description: '获取网络请求',
-    schema: {},
     modulePath: './network/getNetworkRequest.js',
     handlerName: 'getNetworkRequest',
-    callMode: 'defineTool',
   },
+  // ── input ──────────────────────────────────────
+  {modulePath: './input/click.js', handlerName: 'click'},
+  {modulePath: './input/pressKey.js', handlerName: 'pressKey'},
+  {modulePath: './input/fillForm.js', handlerName: 'fillForm'},
+  {modulePath: './input/uploadFile.js', handlerName: 'uploadFile'},
+  {modulePath: './input/hover.js', handlerName: 'hover'},
+  {modulePath: './input/drag.js', handlerName: 'drag'},
+  {modulePath: './input/clickAt.js', handlerName: 'clickAt'},
+  {modulePath: './input/setFiles.js', handlerName: 'setFiles'},
+  {modulePath: './input/fill.js', handlerName: 'fill'},
+  // ── page ───────────────────────────────────────
+  {modulePath: './page/clickElement.js', handlerName: 'clickElement'},
+  {modulePath: './page/typeText.js', handlerName: 'typeText'},
+  {modulePath: './page/waitForElement.js', handlerName: 'waitForElement'},
+  {modulePath: './page/scrollBy.js', handlerName: 'scrollBy'},
+  {modulePath: './page/sessionState.js', handlerName: 'saveSessionState'},
+  {modulePath: './page/sessionState.js', handlerName: 'restoreSessionState'},
+  {modulePath: './page/sessionState.js', handlerName: 'listSessionStates'},
+  {modulePath: './page/sessionState.js', handlerName: 'deleteSessionState'},
+  {modulePath: './page/sessionState.js', handlerName: 'dumpSessionState'},
+  {modulePath: './page/sessionState.js', handlerName: 'loadSessionState'},
   {
-    name: 'click',
-    description: '点击元素',
-    schema: {},
-    modulePath: './input/click.js',
-    handlerName: 'click',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'press_key',
-    description: '按键',
-    schema: {},
-    modulePath: './input/pressKey.js',
-    handlerName: 'pressKey',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'fill_form',
-    description: '填写表单',
-    schema: {},
-    modulePath: './input/fillForm.js',
-    handlerName: 'fillForm',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'upload_file',
-    description: '上传文件',
-    schema: {},
-    modulePath: './input/uploadFile.js',
-    handlerName: 'uploadFile',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'hover',
-    description: '悬停',
-    schema: {},
-    modulePath: './input/hover.js',
-    handlerName: 'hover',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'drag',
-    description: '拖拽',
-    schema: {},
-    modulePath: './input/drag.js',
-    handlerName: 'drag',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'click_element',
-    description: '点击元素',
-    schema: {},
-    modulePath: './page/clickElement.js',
-    handlerName: 'clickElement',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'type_text',
-    description: '输入文本',
-    schema: {},
-    modulePath: './page/typeText.js',
-    handlerName: 'typeText',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'wait_for_element',
-    description: '等待元素',
-    schema: {},
-    modulePath: './page/waitForElement.js',
-    handlerName: 'waitForElement',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'scroll_by',
-    description: '滚动页面；direction 支持 up/down/top/bottom',
-    schema: {direction: 'string', pixels: 'number'},
-    modulePath: './page/scrollBy.js',
-    handlerName: 'scrollBy',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'save_session_state',
-    description: '保存会话状态',
-    schema: {},
-    modulePath: './page/sessionState.js',
-    handlerName: 'saveSessionState',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'restore_session_state',
-    description: '恢复会话状态',
-    schema: {},
-    modulePath: './page/sessionState.js',
-    handlerName: 'restoreSessionState',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'list_session_states',
-    description: '列出会话状态',
-    schema: {},
-    modulePath: './page/sessionState.js',
-    handlerName: 'listSessionStates',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'delete_session_state',
-    description: '删除会话状态',
-    schema: {},
-    modulePath: './page/sessionState.js',
-    handlerName: 'deleteSessionState',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'dump_session_state',
-    description: '导出会话状态',
-    schema: {},
-    modulePath: './page/sessionState.js',
-    handlerName: 'dumpSessionState',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'load_session_state',
-    description: '加载会话状态',
-    schema: {},
-    modulePath: './page/sessionState.js',
-    handlerName: 'loadSessionState',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'check_browser_health',
-    description: '检查浏览器健康状态',
-    schema: {},
     modulePath: './page/checkBrowserHealth.js',
     handlerName: 'checkBrowserHealth',
-    callMode: 'defineTool',
   },
+  // ── navigation ─────────────────────────────────
+  {modulePath: './navigation/listPages.js', handlerName: 'listPages'},
+  {modulePath: './navigation/selectPage.js', handlerName: 'selectPage'},
+  {modulePath: './navigation/newPage.js', handlerName: 'newPage'},
+  {modulePath: './navigation/navigatePage.js', handlerName: 'navigatePage'},
+  // ── screenshot ─────────────────────────────────
+  {modulePath: './screenshot/takeScreenshot.js', handlerName: 'takeScreenshot'},
   {
-    name: 'list_pages',
-    description: '列出页面',
-    schema: {},
-    modulePath: './navigation/listPages.js',
-    handlerName: 'listPages',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'select_page',
-    description: '选择页面',
-    schema: {},
-    modulePath: './navigation/selectPage.js',
-    handlerName: 'selectPage',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'new_page',
-    description: '新建页面并导航到指定URL',
-    schema: {url: 'string', timeout: 'number'},
-    modulePath: './navigation/newPage.js',
-    handlerName: 'newPage',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'navigate_page',
-    description: '导航当前页面到URL，或执行前进/后退/刷新',
-    schema: {
-      type: 'string',
-      url: 'string',
-      ignoreCache: 'boolean',
-      timeout: 'number',
-    },
-    modulePath: './navigation/navigatePage.js',
-    handlerName: 'navigatePage',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'take_screenshot',
-    description: '截图',
-    schema: {
-      format: 'string',
-      quality: 'number',
-      fullPage: 'boolean',
-      filePath: 'string',
-    },
-    modulePath: './screenshot/takeScreenshot.js',
-    handlerName: 'takeScreenshot',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'capture_video_frame',
-    description: '捕获视频帧',
-    schema: {
-      selector: 'string',
-      seekTime: 'number',
-      outputPath: 'string',
-      format: 'string',
-      quality: 'number',
-    },
     modulePath: './screenshot/captureVideoFrame.js',
     handlerName: 'captureVideoFrame',
-    callMode: 'defineTool',
   },
+  {modulePath: './screenshot/getVideoInfo.js', handlerName: 'getVideoInfo'},
+  {modulePath: './screenshot/seekVideo.js', handlerName: 'seekVideo'},
+  // ── emulation ──────────────────────────────────
+  {modulePath: './emulation/emulateMobile.js', handlerName: 'emulateMobile'},
+  {modulePath: './emulation/emulateNetwork.js', handlerName: 'emulateNetwork'},
+  {modulePath: './emulation/emulateCpu.js', handlerName: 'emulateCpu'},
+  {modulePath: './emulation/resizePage.js', handlerName: 'resizePage'},
+  // ── stealth ────────────────────────────────────
+  {modulePath: './stealth/stealth.js', handlerName: 'setUserAgent'},
+  {modulePath: './stealth/stealth.js', handlerName: 'injectStealth'},
+  {modulePath: './stealth/stealth.js', handlerName: 'listStealthFeatures'},
+  {modulePath: './stealth/stealth.js', handlerName: 'listStealthPresets'},
+  // ── performance ─────────────────────────────────
   {
-    name: 'get_video_info',
-    description: '获取视频信息',
-    schema: {selector: 'string'},
-    modulePath: './screenshot/getVideoInfo.js',
-    handlerName: 'getVideoInfo',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'seek_video',
-    description: '跳转视频',
-    schema: {selector: 'string', time: 'number'},
-    modulePath: './screenshot/seekVideo.js',
-    handlerName: 'seekVideo',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'emulate_mobile',
-    description: '模拟移动设备',
-    schema: {},
-    modulePath: './emulation/emulateMobile.js',
-    handlerName: 'emulateMobile',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'emulate_network',
-    description: '模拟网络',
-    schema: {},
-    modulePath: './emulation/emulateNetwork.js',
-    handlerName: 'emulateNetwork',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'emulate_cpu',
-    description: '模拟 CPU',
-    schema: {},
-    modulePath: './emulation/emulateCpu.js',
-    handlerName: 'emulateCpu',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'resize_page',
-    description: '调整页面大小',
-    schema: {},
-    modulePath: './emulation/resizePage.js',
-    handlerName: 'resizePage',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'set_user_agent',
-    description: '设置 User-Agent',
-    schema: {},
-    modulePath: './stealth/stealth.js',
-    handlerName: 'setUserAgent',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'start_performance_trace',
-    description: '开始性能追踪',
-    schema: {},
     modulePath: './performance/startPerformanceTrace.js',
     handlerName: 'startPerformanceTrace',
-    callMode: 'defineTool',
   },
   {
-    name: 'stop_performance_trace',
-    description: '停止性能追踪',
-    schema: {},
     modulePath: './performance/stopPerformanceTrace.js',
     handlerName: 'stopPerformanceTrace',
-    callMode: 'defineTool',
   },
   {
-    name: 'get_performance_metrics',
-    description: '获取性能指标',
-    schema: {},
     modulePath: './performance/getPerformanceMetrics.js',
     handlerName: 'getPerformanceMetrics',
-    callMode: 'defineTool',
   },
   {
-    name: 'performance_analyze_insight',
-    description: '分析性能洞察',
-    schema: {},
     modulePath: './performance/performanceAnalyzeInsight.js',
     handlerName: 'performanceAnalyzeInsight',
-    callMode: 'defineTool',
   },
+  // ── debugger ───────────────────────────────────
+  {modulePath: './debugger/index.js', handlerName: 'setBreakpoint'},
+  {modulePath: './debugger/index.js', handlerName: 'removeBreakpoint'},
+  {modulePath: './debugger/index.js', handlerName: 'listBreakpoints'},
+  {modulePath: './debugger/index.js', handlerName: 'stepInto'},
+  {modulePath: './debugger/index.js', handlerName: 'stepOver'},
+  {modulePath: './debugger/index.js', handlerName: 'stepOut'},
+  {modulePath: './debugger/index.js', handlerName: 'resume'},
+  {modulePath: './debugger/index.js', handlerName: 'pause'},
+  {modulePath: './debugger/index.js', handlerName: 'listScripts'},
+  {modulePath: './debugger/index.js', handlerName: 'getScriptSource'},
+  {modulePath: './debugger/index.js', handlerName: 'searchInSources'},
+  {modulePath: './debugger/getStorage.js', handlerName: 'getStorage'},
+  {modulePath: './debugger/index.js', handlerName: 'breakOnXhr'},
+  {modulePath: './debugger/index.js', handlerName: 'removeXhrBreakpoint'},
+  {modulePath: './debugger/monitorEvents.js', handlerName: 'monitorEvents'},
+  {modulePath: './debugger/stopMonitor.js', handlerName: 'stopMonitor'},
+  {modulePath: './debugger/index.js', handlerName: 'traceFunction'},
+  {modulePath: './debugger/index.js', handlerName: 'getAiDebugStatus'},
+  {modulePath: './debugger/inspectObject.js', handlerName: 'inspectObject'},
+  {modulePath: './debugger/listHooks.js', handlerName: 'listHooks'},
+  {modulePath: './debugger/index.js', handlerName: 'findInScript'},
+  {modulePath: './debugger/index.js', handlerName: 'getRequestInitiator'},
+  {modulePath: './debugger/index.js', handlerName: 'getPausedInfo'},
   {
-    name: 'set_breakpoint',
-    description: '设置断点',
-    schema: {},
-    modulePath: './debugger/index.js',
-    handlerName: 'setBreakpoint',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'remove_breakpoint',
-    description: '移除断点',
-    schema: {},
-    modulePath: './debugger/index.js',
-    handlerName: 'removeBreakpoint',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'list_breakpoints',
-    description: '列出断点',
-    schema: {},
-    modulePath: './debugger/index.js',
-    handlerName: 'listBreakpoints',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'step_into',
-    description: '单步进入',
-    schema: {},
-    modulePath: './debugger/index.js',
-    handlerName: 'stepInto',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'step_over',
-    description: '单步跳过',
-    schema: {},
-    modulePath: './debugger/index.js',
-    handlerName: 'stepOver',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'step_out',
-    description: '单步跳出',
-    schema: {},
-    modulePath: './debugger/index.js',
-    handlerName: 'stepOut',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'resume',
-    description: '继续执行',
-    schema: {},
-    modulePath: './debugger/index.js',
-    handlerName: 'resume',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'pause',
-    description: '暂停执行',
-    schema: {},
-    modulePath: './debugger/index.js',
-    handlerName: 'pause',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'list_scripts',
-    description: '列出脚本',
-    schema: {filter: 'string'},
-    modulePath: './debugger/index.js',
-    handlerName: 'listScripts',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'get_script_source',
-    description: '获取脚本源码',
-    schema: {
-      scriptId: 'string',
-    },
-    modulePath: './debugger/index.js',
-    handlerName: 'getScriptSource',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'search_in_sources',
-    description: '搜索源码',
-    schema: {},
-    modulePath: './debugger/index.js',
-    handlerName: 'searchInSources',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'get_storage',
-    description: '获取存储',
-    schema: {},
-    modulePath: './debugger/getStorage.js',
-    handlerName: 'getStorage',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'break_on_xhr',
-    description: 'XHR 断点',
-    schema: {},
-    modulePath: './debugger/index.js',
-    handlerName: 'breakOnXhr',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'remove_xhr_breakpoint',
-    description: '移除 XHR 断点',
-    schema: {},
-    modulePath: './debugger/index.js',
-    handlerName: 'removeXhrBreakpoint',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'monitor_events',
-    description: '监控事件',
-    schema: {
-      selector: 'string',
-      monitorId: 'string',
-    },
-    modulePath: './debugger/monitorEvents.js',
-    handlerName: 'monitorEvents',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'stop_monitor',
-    description: '停止监控',
-    schema: {
-      monitorId: 'string',
-    },
-    modulePath: './debugger/stopMonitor.js',
-    handlerName: 'stopMonitor',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'trace_function',
-    description: '追踪函数',
-    schema: {},
-    modulePath: './debugger/index.js',
-    handlerName: 'traceFunction',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'get_ai_debug_status',
-    description: '获取 AI 调试状态',
-    schema: {},
-    modulePath: './debugger/index.js',
-    handlerName: 'getAiDebugStatus',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'inspect_object',
-    description: '检查对象',
-    schema: {},
-    modulePath: './debugger/inspectObject.js',
-    handlerName: 'inspectObject',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'list_hooks',
-    description: '列出 Hook',
-    schema: {},
-    modulePath: './debugger/listHooks.js',
-    handlerName: 'listHooks',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'find_in_script',
-    description: '在脚本中搜索',
-    schema: {},
-    modulePath: './debugger/index.js',
-    handlerName: 'findInScript',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'get_request_initiator',
-    description: '获取请求发起者',
-    schema: {},
-    modulePath: './debugger/index.js',
-    handlerName: 'getRequestInitiator',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'get_paused_info',
-    description: '获取暂停信息',
-    schema: {},
-    modulePath: './debugger/index.js',
-    handlerName: 'getPausedInfo',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'evaluate_on_callframe',
-    description: '在调用帧上执行',
-    schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'evaluateOnCallframe',
-    callMode: 'defineTool',
   },
+  {modulePath: './debugger/index.js', handlerName: 'inspectLocals'},
   {
-    name: 'inspect_locals',
-    description: '检查当前暂停栈的局部变量摘要',
-    schema: {},
-    modulePath: './debugger/index.js',
-    handlerName: 'inspectLocals',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'set_breakpoint_on_text',
-    description: '在文本上设置断点',
-    schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'setBreakpointOnText',
-    callMode: 'defineTool',
   },
+  {modulePath: './debugger/hookFunction.js', handlerName: 'hookFunction'},
   {
-    name: 'hook_function',
-    description: 'Hook 函数',
-    schema: {},
-    modulePath: './debugger/hookFunction.js',
-    handlerName: 'hookFunction',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'unhook_function',
-    description: '取消 Hook 函数',
-    schema: {},
     modulePath: './debugger/unhookFunction.js',
     handlerName: 'unhookFunction',
-    callMode: 'defineTool',
   },
   {
-    name: 'xhr_to_js_breakpoint',
-    description: 'XHR 到 JS 断点',
-    schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'xhrToJsBreakpoint',
-    callMode: 'defineTool',
   },
   {
-    name: 'start_continuous_debugging',
-    description: '开始连续调试',
-    schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'startContinuousDebugging',
-    callMode: 'defineTool',
   },
   {
-    name: 'stop_continuous_debugging',
-    description: '停止连续调试',
-    schema: {},
     modulePath: './debugger/index.js',
     handlerName: 'stopContinuousDebugging',
-    callMode: 'defineTool',
   },
+  // ── hook ────────────────────────────────────────
+  {modulePath: './hook/CreateHook.js', handlerName: 'createHook'},
+  {modulePath: './hook/InjectHook.js', handlerName: 'injectHook'},
+  {modulePath: './hook/GetHookData.js', handlerName: 'getHookData'},
+  {modulePath: './hook/RemoveHook.js', handlerName: 'removeHook'},
+  {modulePath: './hook/ListCreatedHooks.js', handlerName: 'listCreatedHooks'},
+  {modulePath: './hook/XhrOpen.js', handlerName: 'hookXhrOpen'},
   {
-    name: 'create_hook',
-    description: '创建 Hook 定义（不注入浏览器）',
-    schema: {
-      type: 'string',
-      params: 'object?',
-      description: 'string?',
-      action: 'string?',
-      hookId: 'string?',
-    },
-    modulePath: './hook/CreateHook.js',
-    handlerName: 'createHook',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'inject_hook',
-    description: '注入 Hook',
-    schema: {},
-    modulePath: './hook/InjectHook.js',
-    handlerName: 'injectHook',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'get_hook_data',
-    description: '获取 Hook 数据',
-    schema: {
-      hookId: 'string?',
-      view: 'string?',
-      maxRecords: 'number?',
-      type: 'string?',
-      event: 'string?',
-      phase: 'string?',
-    },
-    modulePath: './hook/GetHookData.js',
-    handlerName: 'getHookData',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'remove_hook',
-    description: '移除 Hook',
-    schema: {hookId: 'string', cleanBrowser: 'boolean?'},
-    modulePath: './hook/RemoveHook.js',
-    handlerName: 'removeHook',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'list_created_hooks',
-    description: '列出已创建 Hook',
-    schema: {
-      hookId: 'string?',
-      verbose: 'boolean?',
-      syncFromBrowser: 'boolean?',
-    },
-    modulePath: './hook/ListCreatedHooks.js',
-    handlerName: 'listCreatedHooks',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'handle_dialog',
-    description: '处理对话框',
-    schema: {},
-    modulePath: './dialog/handleDialog.js',
-    handlerName: 'handleDialog',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'list_frames',
-    description: '列出框架',
-    schema: {},
-    modulePath: './frames/listFrames.js',
-    handlerName: 'listFrames',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'select_frame',
-    description: '选择框架',
-    schema: {frameIdx: 'number'},
-    modulePath: './frames/selectFrame.js',
-    handlerName: 'selectFrame',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'evaluate_script',
-    description:
-      '执行脚本；支持 page / content-script 上下文，并透传 verbose 参数',
-    schema: {function: 'string', context: 'string', verbose: 'boolean'},
-    modulePath: './script/script.js',
-    handlerName: 'evaluateScript',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'inject_preload_script',
-    description: '注入预加载脚本',
-    schema: {script: 'string'},
-    modulePath: './script/script.js',
-    handlerName: 'injectPreloadScript',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'search_site_experience',
-    description: '搜索站点经验',
-    schema: {},
-    modulePath: './site-experience/siteExperience.js',
-    handlerName: 'searchSiteExperience',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'list_site_experiences',
-    description: '列出站点经验',
-    schema: {},
-    modulePath: './site-experience/siteExperience.js',
-    handlerName: 'listSiteExperiences',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'create_site_experience',
-    description: '创建站点经验',
-    schema: {},
-    modulePath: './site-experience/siteExperience.js',
-    handlerName: 'createSiteExperience',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'update_site_experience',
-    description: '更新站点经验',
-    schema: {},
-    modulePath: './site-experience/siteExperience.js',
-    handlerName: 'updateSiteExperience',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'delete_site_experience',
-    description: '删除站点经验',
-    schema: {},
-    modulePath: './site-experience/siteExperience.js',
-    handlerName: 'deleteSiteExperience',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'update_extensions',
-    description: '更新扩展',
-    schema: {},
-    modulePath: './extensions/updateExtensions.js',
-    handlerName: 'updateExtensions',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'inject_stealth',
-    description: '注入隐身',
-    schema: {},
-    modulePath: './stealth/stealth.js',
-    handlerName: 'injectStealth',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'list_stealth_features',
-    description: '列出隐身功能',
-    schema: {},
-    modulePath: './stealth/stealth.js',
-    handlerName: 'listStealthFeatures',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'list_stealth_presets',
-    description: '列出隐身预设',
-    schema: {},
-    modulePath: './stealth/stealth.js',
-    handlerName: 'listStealthPresets',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'deobfuscate_code',
-    description: '去混淆代码',
-    schema: {},
-    modulePath: './analyzer/deobfuscate.js',
-    handlerName: 'deobfuscateCode',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'understand_code',
-    description: '理解代码',
-    schema: {},
-    modulePath: './analyzer/understand.js',
-    handlerName: 'understandCode',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'summarize_code',
-    description: '总结代码',
-    schema: {},
-    modulePath: './analyzer/summarize.js',
-    handlerName: 'summarizeCode',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'detect_crypto',
-    description: '检测加密',
-    schema: {},
-    modulePath: './analyzer/detectCrypto.js',
-    handlerName: 'detectCrypto',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'record_reverse_evidence',
-    description: '记录逆向证据',
-    schema: {},
-    modulePath: './analyzer/reports.js',
-    handlerName: 'record_reverse_evidence',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'analyze_target',
-    description: '分析目标',
-    schema: {},
-    modulePath: './analyzer/analyzeTarget.js',
-    handlerName: 'analyze_target',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'risk_panel',
-    description: '风险面板',
-    schema: {},
-    modulePath: './analyzer/riskPanel.js',
-    handlerName: 'riskPanel',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'export_session_report',
-    description: '导出会话报告',
-    schema: {},
-    modulePath: './analyzer/reports.js',
-    handlerName: 'export_session_report',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'collect_code',
-    description: '收集代码',
-    schema: {},
-    modulePath: './collector/collectCode.js',
-    handlerName: 'collectCode',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'collection_diff',
-    description: '收集差异',
-    schema: {},
-    modulePath: './collector/collectionDiff.js',
-    handlerName: 'collectionDiff',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'search_in_scripts',
-    description: '搜索脚本',
-    schema: {},
-    modulePath: './collector/searchInScripts.js',
-    handlerName: 'searchInScripts',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'export_rebuild_bundle',
-    description: '导出重建包',
-    schema: {},
-    modulePath: './rebuild/index.js',
-    handlerName: 'exportRebuildBundle',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'diff_env_requirements',
-    description: '差异环境需求',
-    schema: {},
-    modulePath: './rebuild/index.js',
-    handlerName: 'diffEnvRequirements',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'anti_anti_debug',
-    description: '反反调试',
-    schema: {},
-    modulePath: './anti-debug/antiAntiDebug.js',
-    handlerName: 'antiAntiDebug',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'bypass_debugger',
-    description: '绕过调试',
-    schema: {},
-    modulePath: './anti-debug/bypassDebugger.js',
-    handlerName: 'bypassDebugger',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'hook_cryptojs',
-    description: 'Hook CryptoJS',
-    schema: {},
-    modulePath: './crypto/hookCryptoJS.js',
-    handlerName: 'hookCryptoJS',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'hook_jsencrypt',
-    description: 'Hook JSEncrypt',
-    schema: {},
-    modulePath: './crypto/hookJSEncrypt.js',
-    handlerName: 'hookJSEncrypt',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'hook_smcrypto',
-    description: 'Hook SMCrypto',
-    schema: {},
-    modulePath: './crypto/hookSMCrypto.js',
-    handlerName: 'hookSMCrypto',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'wasm_capabilities',
-    description:
-      'Detect available native Wasm toolchain (wabt, binaryen, wasmtime, wasmer) and session state',
-    schema: {},
-    modulePath: './wasm/index.js',
-    handlerName: 'wasmCapabilities',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'wasm_dump',
-    description: 'Dump a captured Wasm module to a .wasm file on disk',
-    schema: {
-      moduleIndex: 'number',
-      outputPath: 'string',
-    },
-    modulePath: './wasm/index.js',
-    handlerName: 'wasmDump',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'wasm_disassemble',
-    description: 'Disassemble a .wasm file to WAT (WebAssembly Text Format)',
-    schema: {
-      inputPath: 'string',
-      outputPath: 'string',
-      foldExprs: 'boolean',
-    },
-    modulePath: './wasm/index.js',
-    handlerName: 'wasmDisassemble',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'wasm_decompile',
-    description:
-      'Decompile a .wasm file with function-level summaries and suspicious-pattern detection',
-    schema: {
-      inputPath: 'string',
-      outputPath: 'string',
-      foldExprs: 'boolean',
-      inlineExport: 'boolean',
-      maxWatChars: 'number',
-    },
-    modulePath: './wasm/index.js',
-    handlerName: 'wasmDecompile',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'wasm_inspect_sections',
-    description:
-      'Inspect Wasm binary sections: section map, function signatures, string scan',
-    schema: {
-      inputPath: 'string',
-      sections: 'string',
-      includeFunctionSignatures: 'boolean',
-      includeStringScan: 'boolean',
-      maskSensitiveStrings: 'boolean',
-      maxStringSlots: 'number',
-      maxSummaryLines: 'number',
-    },
-    modulePath: './wasm/index.js',
-    handlerName: 'wasmInspectSections',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'wasm_offline_run',
-    description:
-      'Execute a Wasm function offline using wasmtime or wasmer CLI runtime',
-    schema: {
-      inputPath: 'string',
-      functionName: 'string',
-      args: 'string[]',
-      runtime: 'string',
-      timeoutMs: 'number',
-    },
-    modulePath: './wasm/index.js',
-    handlerName: 'wasmOfflineRun',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'wasm_optimize',
-    description:
-      'Optimize a .wasm file using binaryen wasm-opt with selectable optimization level',
-    schema: {
-      inputPath: 'string',
-      outputPath: 'string',
-      level: 'string',
-    },
-    modulePath: './wasm/index.js',
-    handlerName: 'wasmOptimize',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'wasm_vmp_trace',
-    description: 'Trace Wasm runtime events captured by JS-Wasm boundary hooks',
-    schema: {
-      maxEvents: 'number',
-      filterModule: 'string',
-    },
-    modulePath: './wasm/index.js',
-    handlerName: 'wasmVmpTrace',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'wasm_memory_inspect',
-    description:
-      'Inspect WebAssembly.Memory exports — hex/ascii dump, pattern search',
-    schema: {
-      offset: 'number',
-      length: 'number',
-      format: 'string',
-      searchPattern: 'string',
-    },
-    modulePath: './wasm/index.js',
-    handlerName: 'wasmMemoryInspect',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'activate_vue_devtools',
-    description: '激活 Vue Devtools',
-    schema: {},
-    modulePath: './vue/activateVueDevtools.js',
-    handlerName: 'activateVueDevtools',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'clear_vue_guards',
-    description: '清除 Vue 守卫',
-    schema: {},
-    modulePath: './vue/clearVueGuards.js',
-    handlerName: 'clearVueGuards',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'get_vue_routes',
-    description: '获取 Vue 路由',
-    schema: {},
-    modulePath: './vue/getVueRoutes.js',
-    handlerName: 'getVueRoutes',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'hook_console_log',
-    description: 'Hook Console Log',
-    schema: {},
-    modulePath: './hook/ConsoleLog.js',
-    handlerName: 'hookConsoleLog',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'hook_console_table',
-    description: 'Hook Console Table',
-    schema: {},
-    modulePath: './hook/ConsoleTable.js',
-    handlerName: 'hookConsoleTable',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'hook_location_href',
-    description: 'Hook Location Href',
-    schema: {},
-    modulePath: './hook/LocationHref.js',
-    handlerName: 'hookLocationHref',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'hook_cookie',
-    description: 'Hook Cookie',
-    schema: {},
-    modulePath: './hook/Cookie.js',
-    handlerName: 'hookCookie',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'hook_xhr_open',
-    description: 'Hook XHR Open',
-    schema: {},
-    modulePath: './hook/XhrOpen.js',
-    handlerName: 'hookXhrOpen',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'hook_xhr_set_request_header',
-    description: 'Hook XHR Set Request Header',
-    schema: {},
     modulePath: './hook/XhrSetRequestHeader.js',
     handlerName: 'hookXhrSetRequestHeader',
-    callMode: 'defineTool',
   },
+  {modulePath: './hook/Fetch.js', handlerName: 'hookFetch'},
+  {modulePath: './hook/Cookie.js', handlerName: 'hookCookie'},
+  {modulePath: './hook/WebSocket.js', handlerName: 'hookWebSocket'},
+  {modulePath: './hook/JsonParse.js', handlerName: 'hookJsonParse'},
+  {modulePath: './hook/JsonStringify.js', handlerName: 'hookJsonStringify'},
+  {modulePath: './hook/LocalStorage.js', handlerName: 'hookLocalStorage'},
   {
-    name: 'hook_fetch',
-    description: 'Hook Fetch',
-    schema: {},
-    modulePath: './hook/Fetch.js',
-    handlerName: 'hookFetch',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'hook_json_parse',
-    description: 'Hook JSON Parse',
-    schema: {},
-    modulePath: './hook/JsonParse.js',
-    handlerName: 'hookJsonParse',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'hook_json_stringify',
-    description: 'Hook JSON Stringify',
-    schema: {},
-    modulePath: './hook/JsonStringify.js',
-    handlerName: 'hookJsonStringify',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'hook_promise',
-    description: 'Hook Promise',
-    schema: {},
-    modulePath: './hook/Promise.js',
-    handlerName: 'hookPromise',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'hook_random',
-    description: 'Hook Random',
-    schema: {},
-    modulePath: './hook/Random.js',
-    handlerName: 'hookRandom',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'hook_local_storage',
-    description: 'Hook Local Storage',
-    schema: {},
-    modulePath: './hook/LocalStorage.js',
-    handlerName: 'hookLocalStorage',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'hook_session_storage',
-    description: 'Hook Session Storage',
-    schema: {},
     modulePath: './hook/SessionStorage.js',
     handlerName: 'hookSessionStorage',
-    callMode: 'defineTool',
   },
+  {modulePath: './hook/DateNow.js', handlerName: 'hookDateNow'},
   {
-    name: 'anti_anti_hook',
-    description: '反反 Hook',
-    schema: {},
-    modulePath: './hook/antiAntiHook.js',
-    handlerName: 'antiAntiHook',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'hook_websocket',
-    description: 'Hook WebSocket',
-    schema: {},
-    modulePath: './hook/WebSocket.js',
-    handlerName: 'hookWebSocket',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'hook_history',
-    description: 'Hook History',
-    schema: {},
-    modulePath: './hook/History.js',
-    handlerName: 'hookHistory',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'hook_performance_now',
-    description: 'Hook Performance Now',
-    schema: {},
     modulePath: './hook/PerformanceNow.js',
     handlerName: 'hookPerformanceNow',
-    callMode: 'defineTool',
   },
+  {modulePath: './hook/Random.js', handlerName: 'hookRandom'},
+  {modulePath: './hook/Promise.js', handlerName: 'hookPromise'},
+  {modulePath: './hook/History.js', handlerName: 'hookHistory'},
+  {modulePath: './hook/HistoryGo.js', handlerName: 'hookHistoryGo'},
+  {modulePath: './hook/LocationHref.js', handlerName: 'hookLocationHref'},
+  {modulePath: './hook/Close.js', handlerName: 'hookClose'},
+  {modulePath: './hook/ConsoleLog.js', handlerName: 'hookConsoleLog'},
+  {modulePath: './hook/ConsoleClear.js', handlerName: 'hookConsoleClear'},
   {
-    name: 'hook_date_now',
-    description: 'Hook Date Now',
-    schema: {},
-    modulePath: './hook/DateNow.js',
-    handlerName: 'hookDateNow',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'fixed_window_size',
-    description: '固定窗口大小',
-    schema: {},
-    modulePath: './hook/fixedWindowSize.js',
-    handlerName: 'fixedWindowSize',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'hook_console_protect',
-    description: 'Hook Console Protect',
-    schema: {},
     modulePath: './hook/ConsoleProtect.js',
     handlerName: 'hookConsoleProtect',
-    callMode: 'defineTool',
+  },
+  {modulePath: './hook/ConsoleTable.js', handlerName: 'hookConsoleTable'},
+  {
+    modulePath: './hook/fixedWindowSize.js',
+    handlerName: 'fixedWindowSize',
+  },
+  {modulePath: './hook/antiAntiHook.js', handlerName: 'antiAntiHook'},
+  // ── dialog ──────────────────────────────────────
+  {modulePath: './dialog/handleDialog.js', handlerName: 'handleDialog'},
+  // ── frames ──────────────────────────────────────
+  {modulePath: './frames/listFrames.js', handlerName: 'listFrames'},
+  {modulePath: './frames/selectFrame.js', handlerName: 'selectFrame'},
+  // ── script ──────────────────────────────────────
+  {modulePath: './script/script.js', handlerName: 'evaluateScript'},
+  {
+    modulePath: './script/script.js',
+    handlerName: 'injectPreloadScript',
+  },
+  // ── site-experience ──────────────────────────────
+  {
+    modulePath: './site-experience/siteExperience.js',
+    handlerName: 'searchSiteExperience',
   },
   {
-    name: 'hook_close',
-    description: 'Hook Close',
-    schema: {},
-    modulePath: './hook/Close.js',
-    handlerName: 'hookClose',
-    callMode: 'defineTool',
+    modulePath: './site-experience/siteExperience.js',
+    handlerName: 'listSiteExperiences',
   },
   {
-    name: 'hook_console_clear',
-    description: 'Hook Console Clear',
-    schema: {},
-    modulePath: './hook/ConsoleClear.js',
-    handlerName: 'hookConsoleClear',
-    callMode: 'defineTool',
+    modulePath: './site-experience/siteExperience.js',
+    handlerName: 'createSiteExperience',
   },
   {
-    name: 'hook_history_go',
-    description: 'Hook History Go',
-    schema: {},
-    modulePath: './hook/HistoryGo.js',
-    handlerName: 'hookHistoryGo',
-    callMode: 'defineTool',
+    modulePath: './site-experience/siteExperience.js',
+    handlerName: 'updateSiteExperience',
   },
   {
-    name: 'deobfuscate_code_vj',
-    description: '去混淆代码 (v_jstools)',
-    schema: {},
+    modulePath: './site-experience/siteExperience.js',
+    handlerName: 'deleteSiteExperience',
+  },
+  // ── extensions ──────────────────────────────────
+  {
+    modulePath: './extensions/updateExtensions.js',
+    handlerName: 'updateExtensions',
+  },
+  // ── analyzer ────────────────────────────────────
+  {modulePath: './analyzer/deobfuscate.js', handlerName: 'deobfuscateCode'},
+  {modulePath: './analyzer/understand.js', handlerName: 'understandCode'},
+  {modulePath: './analyzer/summarize.js', handlerName: 'summarizeCode'},
+  {modulePath: './analyzer/detectCrypto.js', handlerName: 'detectCrypto'},
+  {
+    modulePath: './analyzer/reports.js',
+    handlerName: 'record_reverse_evidence',
+  },
+  {modulePath: './analyzer/analyzeTarget.js', handlerName: 'analyze_target'},
+  {modulePath: './analyzer/riskPanel.js', handlerName: 'riskPanel'},
+  {
+    modulePath: './analyzer/reports.js',
+    handlerName: 'export_session_report',
+  },
+  // ── collector ───────────────────────────────────
+  {modulePath: './collector/collectCode.js', handlerName: 'collectCode'},
+  {
+    modulePath: './collector/collectionDiff.js',
+    handlerName: 'collectionDiff',
+  },
+  {
+    modulePath: './collector/searchInScripts.js',
+    handlerName: 'searchInScripts',
+  },
+  // ── rebuild ─────────────────────────────────────
+  {
+    modulePath: './rebuild/index.js',
+    handlerName: 'exportRebuildBundle',
+  },
+  {
+    modulePath: './rebuild/index.js',
+    handlerName: 'diffEnvRequirements',
+  },
+  // ── anti-debug ──────────────────────────────────
+  {
+    modulePath: './anti-debug/antiAntiDebug.js',
+    handlerName: 'antiAntiDebug',
+  },
+  {
+    modulePath: './anti-debug/bypassDebugger.js',
+    handlerName: 'bypassDebugger',
+  },
+  // ── crypto ──────────────────────────────────────
+  {modulePath: './crypto/hookCryptoJS.js', handlerName: 'hookCryptoJS'},
+  {modulePath: './crypto/hookJSEncrypt.js', handlerName: 'hookJSEncrypt'},
+  {modulePath: './crypto/hookSMCrypto.js', handlerName: 'hookSMCrypto'},
+  // ── wasm ────────────────────────────────────────
+  {modulePath: './wasm/index.js', handlerName: 'wasmCapabilities'},
+  {modulePath: './wasm/index.js', handlerName: 'wasmDump'},
+  {modulePath: './wasm/index.js', handlerName: 'wasmDisassemble'},
+  {modulePath: './wasm/index.js', handlerName: 'wasmDecompile'},
+  {modulePath: './wasm/index.js', handlerName: 'wasmInspectSections'},
+  {modulePath: './wasm/index.js', handlerName: 'wasmOfflineRun'},
+  {modulePath: './wasm/index.js', handlerName: 'wasmOptimize'},
+  {modulePath: './wasm/index.js', handlerName: 'wasmVmpTrace'},
+  {modulePath: './wasm/index.js', handlerName: 'wasmMemoryInspect'},
+  // ── vue ──────────────────────────────────────────
+  {
+    modulePath: './vue/activateVueDevtools.js',
+    handlerName: 'activateVueDevtools',
+  },
+  {modulePath: './vue/clearVueGuards.js', handlerName: 'clearVueGuards'},
+  {modulePath: './vue/getVueRoutes.js', handlerName: 'getVueRoutes'},
+  // ── vjstools ────────────────────────────────────
+  {
     modulePath: './vjstools/deobfuscate.js',
     handlerName: 'deobfuscateCodeVj',
-    callMode: 'defineTool',
   },
+  {modulePath: './vjstools/deobfuscate.js', handlerName: 'minifyCode'},
   {
-    name: 'minify_code',
-    description: '压缩代码',
-    schema: {},
-    modulePath: './vjstools/deobfuscate.js',
-    handlerName: 'minifyCode',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'transpile_code',
-    description: '转译代码',
-    schema: {},
     modulePath: './vjstools/deobfuscate.js',
     handlerName: 'transpileCodeTool',
-    callMode: 'defineTool',
   },
+  {modulePath: './vjstools/deobfuscate.js', handlerName: 'analyzeAstTool'},
+  {modulePath: './vjstools/deobfuscate.js', handlerName: 'diffCodeTool'},
+  // ── code-templates ──────────────────────────────
   {
-    name: 'analyze_ast',
-    description: '分析 AST',
-    schema: {},
-    modulePath: './vjstools/deobfuscate.js',
-    handlerName: 'analyzeAstTool',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'diff_code',
-    description: '差异代码',
-    schema: {},
-    modulePath: './vjstools/deobfuscate.js',
-    handlerName: 'diffCodeTool',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'get_code_template',
-    description: '获取代码模板',
-    schema: {},
     modulePath: './code-templates/getCodeTemplate.js',
     handlerName: 'getCodeTemplate',
-    callMode: 'defineTool',
   },
   {
-    name: 'inject_code_template',
-    description: '注入代码模板到页面执行',
-    schema: {},
     modulePath: './code-templates/injectCodeTemplate.js',
     handlerName: 'injectCodeTemplate',
-    callMode: 'defineTool',
   },
   {
-    name: 'list_code_templates',
-    description: '列出代码模板',
-    schema: {},
     modulePath: './code-templates/listCodeTemplates.js',
     handlerName: 'listCodeTemplates',
-    callMode: 'defineTool',
   },
+  // ── websocket ───────────────────────────────────
   {
-    name: 'click_at',
-    description: '在坐标点击',
-    schema: {},
-    modulePath: './input/clickAt.js',
-    handlerName: 'clickAt',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'set_files',
-    description: '设置文件',
-    schema: {},
-    modulePath: './input/setFiles.js',
-    handlerName: 'setFiles',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'fill',
-    description: '填充',
-    schema: {},
-    modulePath: './input/fill.js',
-    handlerName: 'fill',
-    callMode: 'defineTool',
-  },
-  {
-    name: 'list_websocket_connections',
-    description:
-      '列出 WebSocket 连接；获取 wsid 后先用 analyze_websocket_messages 分析消息模式',
-    schema: {
-      pageSize: 'number',
-      pageIdx: 'number',
-      urlFilter: 'string',
-      includePreservedConnections: 'boolean',
-    },
     modulePath: './websocket/listConnections.js',
     handlerName: 'listWebSocketConnections',
-    callMode: 'defineTool',
   },
   {
-    name: 'get_websocket_messages',
-    description:
-      '获取 WebSocket 消息列表；对二进制/protobuf 消息先调用 analyze_websocket_messages，再用 groupId 过滤',
-    schema: {
-      wsid: 'number',
-      direction: 'string',
-      groupId: 'string',
-      pageSize: 'number',
-      pageIdx: 'number',
-      show_content: 'boolean',
-    },
     modulePath: './websocket/getMessages.js',
     handlerName: 'getWebSocketMessages',
-    callMode: 'defineTool',
   },
   {
-    name: 'get_websocket_message',
-    description: '获取 WebSocket 单帧详情',
-    schema: {
-      wsid: 'number',
-      frameIndex: 'number',
-    },
     modulePath: './websocket/getMessage.js',
     handlerName: 'getWebSocketMessage',
-    callMode: 'defineTool',
   },
   {
-    name: 'analyze_websocket_messages',
-    description:
-      '分析 WebSocket 消息模式并分组；对二进制/protobuf 消息（如直播流）特别有用，返回每种消息类型的统计和采样索引',
-    schema: {
-      wsid: 'number',
-      direction: 'string',
-    },
     modulePath: './websocket/analyzeMessages.js',
     handlerName: 'analyzeWebSocketMessages',
-    callMode: 'defineTool',
   },
 ];
 
-const TOOLS_BY_NAME = new Map<string, ToolMeta>(
-  TOOLS_META.map(t => [t.name, t]),
-);
+// ─── 动态加载缓存 ──────────────────────────────────────
 
-export function getToolMeta(name: string): ToolMeta | undefined {
-  return TOOLS_BY_NAME.get(name);
+let toolsMetaCache: ToolMeta[] | null = null;
+let toolsByNameCache: Map<string, ToolMeta> | null = null;
+
+/**
+ * 从 defineTool 模块中提取 ToolMeta
+ */
+async function loadToolMeta(
+  entry: ToolRegistryEntry,
+): Promise<ToolMeta | null> {
+  try {
+    const modulePath = `../tools${entry.modulePath.replace(/^\./, '')}`;
+    const module = await import(modulePath);
+    const handler = module[entry.handlerName];
+
+    if (!handler) {
+      console.warn(
+        `[tools-meta] ${entry.modulePath} 中未找到导出 ${entry.handlerName}`,
+      );
+      return null;
+    }
+
+    // defineTool 返回 ToolDefinition 对象
+    if (typeof handler === 'object' && handler !== null && typeof handler.handler === 'function') {
+      const def = handler as ToolDefinition;
+      const argSpecs = extractArgSpecsFromSchema(def.schema);
+      const schemaTypeMap = extractSchemaTypeMap(def.schema);
+
+      return {
+        name: def.name,
+        description: def.description,
+        schema: schemaTypeMap,
+        argSpecs,
+        modulePath: entry.modulePath,
+        handlerName: entry.handlerName,
+        callMode: 'defineTool',
+      };
+    }
+
+    console.warn(
+      `[tools-meta] ${entry.modulePath}:${entry.handlerName} 不是 defineTool 定义`,
+    );
+    return null;
+  } catch (err) {
+    console.warn(
+      `[tools-meta] 加载 ${entry.modulePath}:${entry.handlerName} 失败: ${err instanceof Error ? err.message : err}`,
+    );
+    return null;
+  }
 }
 
-export function getAllToolNames(): string[] {
-  return TOOLS_META.map(t => t.name);
-}
+/**
+ * 初始化/获取 ToolMeta 列表（懒加载 + 缓存）
+ */
+async function getToolsMeta(): Promise<ToolMeta[]> {
+  if (toolsMetaCache) return toolsMetaCache;
 
-export function searchTools(query: string): ToolMeta[] {
-  const lower = query.toLowerCase();
-  return TOOLS_META.filter(
-    t => t.name.toLowerCase().includes(lower) || t.description.includes(query),
+  const results = await Promise.all(TOOL_REGISTRY.map(loadToolMeta));
+  toolsMetaCache = results.filter((m): m is ToolMeta => m !== null);
+
+  toolsByNameCache = new Map(
+    toolsMetaCache.map(t => [t.name, t]),
   );
+
+  return toolsMetaCache;
+}
+
+/**
+ * 同步获取已缓存的 ToolMeta 列表（未初始化时返回空数组）
+ */
+function getCachedToolsMeta(): ToolMeta[] {
+  return toolsMetaCache ?? [];
+}
+
+/**
+ * 同步获取已缓存的 ToolMeta name → meta 映射
+ */
+function getCachedToolsByName(): Map<string, ToolMeta> {
+  return toolsByNameCache ?? new Map();
+}
+
+// ─── 公共 API ────────────────────────────────────────────
+
+/**
+ * 获取工具的完整元信息（异步，从 defineTool 提取）
+ */
+export async function getToolMetaAsync(
+  name: string,
+): Promise<ToolMeta | undefined> {
+  const meta = await getToolsMeta();
+  return meta.find(t => t.name === name);
+}
+
+/**
+ * 获取工具的完整元信息（同步，依赖已初始化的缓存）
+ *
+ * 如果缓存未初始化，回退到从 TOOL_REGISTRY 中查找条目并
+ * 返回仅包含 modulePath/handlerName 的最小 meta。
+ * 在 CLI 调用场景中，通常先调用 ensureToolsMeta() 初始化缓存。
+ */
+export function getToolMeta(name: string): ToolMeta | undefined {
+  return getCachedToolsByName().get(name);
+}
+
+/**
+ * 确保工具元信息已从 defineTool 加载（应在使用 getToolMeta 前调用）
+ */
+export async function ensureToolsMeta(): Promise<void> {
+  await getToolsMeta();
+}
+
+/**
+ * 获取所有工具名称
+ */
+export function getAllToolNames(): string[] {
+  const cached = getCachedToolsMeta();
+  if (cached.length > 0) {
+    return cached.map(t => t.name);
+  }
+  // 回退：从注册表推导名称（需要 name，但还没加载）
+  // 此处返回空数组，应先调用 ensureToolsMeta()
+  return [];
+}
+
+/**
+ * 搜索工具
+ */
+export async function searchTools(query: string): Promise<ToolMeta[]> {
+  const meta = await getToolsMeta();
+  const lower = query.toLowerCase();
+  return meta.filter(
+    t =>
+      t.name.toLowerCase().includes(lower) ||
+      t.description.toLowerCase().includes(lower),
+  );
+}
+
+/**
+ * 获取工具的参数规格（含 required / enum / defaultValue / description）
+ */
+export async function getToolArgSpecs(
+  name: string,
+): Promise<ToolArgSpecMap | undefined> {
+  const meta = await getToolMetaAsync(name);
+  return meta?.argSpecs;
+}
+
+/**
+ * 获取所有已加载的 ToolMeta（同步，需先调用 ensureToolsMeta）
+ */
+export function getAllToolsMeta(): ToolMeta[] {
+  return getCachedToolsMeta();
 }

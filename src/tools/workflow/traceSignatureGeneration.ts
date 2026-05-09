@@ -104,31 +104,25 @@ export const traceSignatureGeneration = defineTool({
         : -1;
 
     if (pageIndex < 0) {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: true,
-            message: '签名追踪完成，当前无活跃页面，请先打开或选择页面',
-            tooltype: 'trace_signature_generation',
-            data: {
-              requestFingerprints: [],
-              pausedFrames: [],
-              evidence: {requestHeaders: [], initiators: []},
-              nextActions: [
-                '先通过 new_page 或 navigate_page 打开目标页面',
-                '触发登录、下单、分页等目标业务动作',
-                '重新运行 trace_signature_generation',
-              ],
-              gaps: ['无活跃页面，无法获取网络请求'],
-              taskId: params.taskId,
-            },
+      response.setStructuredContent(
+        {
+          success: true,
+          message: '签名追踪完成，当前无活跃页面，请先打开或选择页面',
+          tooltype: 'trace_signature_generation',
+          data: {
+            requestFingerprints: [],
+            pausedFrames: [],
+            evidence: {requestHeaders: [], initiators: []},
+            nextActions: [
+              '先通过 new_page 或 navigate_page 打开目标页面',
+              '触发登录、下单、分页等目标业务动作',
+              '重新运行 trace_signature_generation',
+            ],
+            gaps: ['无活跃页面，无法获取网络请求'],
+            taskId: params.taskId,
           },
-          null,
-          2,
-        ),
+        }
       );
-      response.appendResponseLine('```');
       return;
     }
 
@@ -178,29 +172,23 @@ export const traceSignatureGeneration = defineTool({
       hasPausedFrames: pausedFrames.length > 0,
     });
 
-    response.appendResponseLine('```json');
-    response.appendResponseLine(
-      JSON.stringify(
-        {
-          success: true,
-          message:
-            requests.length > 0
-              ? `签名追踪完成，匹配 ${requests.length} 个请求`
-              : '签名追踪完成，尚未匹配请求；请先触发目标业务动作',
-          tooltype: 'trace_signature_generation',
-          data: {
-            requestFingerprints,
-            pausedFrames,
-            evidence,
-            nextActions,
-            gaps: requests.length === 0 ? ['未发现匹配请求，无法关联签名生成链路'] : [],
-            taskId: params.taskId,
-          },
+    response.setStructuredContent(
+      {
+        success: true,
+        message:
+          requests.length > 0
+            ? `签名追踪完成，匹配 ${requests.length} 个请求`
+            : '签名追踪完成，尚未匹配请求；请先触发目标业务动作',
+        tooltype: 'trace_signature_generation',
+        data: {
+          requestFingerprints,
+          pausedFrames,
+          evidence,
+          nextActions,
+          gaps: requests.length === 0 ? ['未发现匹配请求，无法关联签名生成链路'] : [],
+          taskId: params.taskId,
         },
-        null,
-        2,
-      ),
+      }
     );
-    response.appendResponseLine('```');
   },
 });

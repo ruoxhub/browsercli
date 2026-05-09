@@ -101,35 +101,19 @@ export const observeFlow = defineTool({
 
       logger.info(`observe_flow completed in ${duration}ms`);
 
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: true,
-            message: `观察模式完成：收集 ${report.scriptCount} 个脚本，发现 ${cryptoDetection.algorithms.length} 种加密算法，${obfuscationDetection.types.length} 种混淆类型`,
-            tooltype: 'observe_flow',
-            data: report,
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+          success: true,
+          message: `观察模式完成：收集 ${report.scriptCount} 个脚本，发现 ${cryptoDetection.algorithms.length} 种加密算法，${obfuscationDetection.types.length} 种混淆类型`,
+          tooltype: 'observe_flow',
+          data: report
+      });
     } catch (error) {
       logger.error('observe_flow tool failed', error);
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: false,
-            error: error instanceof Error ? error.message : String(error),
-            tooltype: 'observe_flow',
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: false,
+        message: error instanceof Error ? error.message : String(error),
+        tooltype: 'observe_flow',
+      })
     }
   },
 });
