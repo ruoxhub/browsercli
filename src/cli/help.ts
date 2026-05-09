@@ -8,6 +8,17 @@
  * CLI 帮助文本生成 — 供 runAxiCli 的 topLevelHelp 和 getCommandHelp 使用
  */
 
+const commandDescriptions: Record<string, string> = {
+  start: '启动 Worker 并连接到 Sekiro Server',
+  stop: '停止 Worker 进程',
+  status: '查看 Worker 和 Sekiro 连接状态',
+  call: '调用 MCP 工具，或兼容调用已迁移为 Tool 的旧技能',
+  config: '查看/设置/初始化全局配置',
+  'list-tools': '列出所有可用的 MCP 工具及旧技能兼容映射',
+  repl: '启动交互式 REPL 模式',
+  scaffold: '创建新的逆向任务脚手架',
+};
+
 export function generateTopLevelHelp(options?: {
   bin?: string;
   description?: string;
@@ -37,7 +48,10 @@ export function generateTopLevelHelp(options?: {
   ];
 
   for (const cmd of commands) {
-    lines.push(`    ${cmd}`);
+    const desc = commandDescriptions[cmd];
+    lines.push(
+      desc ? `    ${cmd.padEnd(14)}${desc}` : `    ${cmd}`,
+    );
   }
 
   lines.push('');

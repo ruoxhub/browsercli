@@ -358,21 +358,30 @@ const TOOL_REGISTRY: ToolRegistryEntry[] = [
     modulePath: './code-templates/listCodeTemplates.js',
     handlerName: 'listCodeTemplates',
   },
-  // ── websocket ───────────────────────────────────
+  // ── console ──────────────────────────────────────
   {
-    modulePath: './websocket/listConnections.js',
+    modulePath: './console/listConsoleMessages.js',
+    handlerName: 'listConsoleMessages',
+  },
+  {
+    modulePath: './console/getConsoleMessage.js',
+    handlerName: 'getConsoleMessage',
+  },
+  // ── websocket (in network/) ─────────────────────
+  {
+    modulePath: './network/listConnections.js',
     handlerName: 'listWebSocketConnections',
   },
   {
-    modulePath: './websocket/getMessages.js',
+    modulePath: './network/getMessages.js',
     handlerName: 'getWebSocketMessages',
   },
   {
-    modulePath: './websocket/getMessage.js',
+    modulePath: './network/getMessage.js',
     handlerName: 'getWebSocketMessage',
   },
   {
-    modulePath: './websocket/analyzeMessages.js',
+    modulePath: './network/analyzeMessages.js',
     handlerName: 'analyzeWebSocketMessages',
   },
 ];
