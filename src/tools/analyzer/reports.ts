@@ -150,6 +150,29 @@ export const record_reverse_evidence = defineTool({
     entry: zod.record(zod.string(), zod.unknown()),
   },
   handler: async (request, response) => {
+    // 防御性参数归一化：entry 可能因未经严格校验而为 undefined/非对象
+    const rawEntry = request.params.entry;
+    const safeEntry: Record<string, unknown> =
+      rawEntry && typeof rawEntry === 'object' && !Array.isArray(rawEntry)
+        ? (rawEntry as Record<string, unknown>)
+        : {};
+
+    // 必填字段校验兜底（zod.record 类型 introspect 不能识别，在此补一层）
+    const missing: string[] = [];
+    if (!request.params.taskId) missing.push('taskId');
+    if (!request.params.taskSlug) missing.push('taskSlug');
+    if (!request.params.targetUrl) missing.push('targetUrl');
+    if (!request.params.goal) missing.push('goal');
+    if (missing.length > 0) {
+      response.setStructuredContent({
+        success: false,
+        message: `缺少必填参数：${missing.join(', ')}`,
+        tooltype: 'record_reverse_evidence',
+        data: {ok: false, missing},
+      });
+      return;
+    }
+
     const runtime = getRuntime();
     const task = await runtime.reverseTaskStore.openTask({
       taskId: request.params.taskId,
@@ -169,20 +192,21 @@ export const record_reverse_evidence = defineTool({
       targetContext.targetActionDescription.length > 0;
 
     const artifactEntry = {
-      ...request.params.entry,
+      ...safeEntry,
       ...(hasTargetContext ? {targetContext} : {}),
     };
 
-    await task.appendLog(request.params.channel, artifactEntry);
+    const channel = request.params.channel ?? 'runtime-evidence';
+    await task.appendLog(channel, artifactEntry);
 
     const mirroredChannels: string[] = [];
-    if (request.params.channel === 'runtime-evidence') {
-      const mirroredNetworkEntry = toMirroredNetworkEntry(request.params.entry);
+    if (channel === 'runtime-evidence') {
+      const mirroredNetworkEntry = toMirroredNetworkEntry(safeEntry);
       if (mirroredNetworkEntry) {
         await task.appendLog('network', mirroredNetworkEntry);
         mirroredChannels.push('network');
       }
-      const mirroredScriptEntry = toMirroredScriptEntry(request.params.entry);
+      const mirroredScriptEntry = toMirroredScriptEntry(safeEntry);
       if (mirroredScriptEntry) {
         await task.appendLog('scripts', mirroredScriptEntry);
         mirroredChannels.push('scripts');
@@ -209,8 +233,9 @@ export const record_reverse_evidence = defineTool({
           ok: true,
           taskId: task.taskId,
           taskDir: task.taskDir,
-          channel: request.params.channel,
+          channel,
           mirroredChannels,
+          entryProvided: rawEntry !== undefined,
           targetContext: hasTargetContext ? targetContext : undefined,
         },
       });

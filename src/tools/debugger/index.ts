@@ -37,18 +37,18 @@ type DebuggerRuntime = Pick<
 
 // ─── 辅助函数 ───────────────────────────────────────────────
 
+/**
+ * 从工具 Context 获取 DebuggerContext。
+ *
+ * 注：Context 既可能是 ToolAdapter 构建的 defineTool Context（拥有
+ * `getDebuggerContext(): Promise<DebuggerContext>`），也可能直接是
+ * ToolContextProvider 本身（旧路径，历史兼容）。两者都暴露同名方法，
+ * 所以这里用鸭子类型。
+ */
 async function getDebugger(runtime: DebuggerRuntime) {
-  if (!runtime) {
+  if (!runtime || typeof runtime.getDebuggerContext !== 'function') {
     throw new Error(
-      '缺少调试运行时上下文：runtime 为空。请确保已选择页面且调试器可用。',
-    );
-  }
-  if (typeof runtime.getDebuggerContext !== 'function') {
-    const available = Object.keys(runtime).slice(0, 10).join(', ');
-    throw new Error(
-      `缺少调试运行时上下文：runtime.getDebuggerContext 不是函数` +
-        `(typeof=${typeof runtime.getDebuggerContext}, keys=[${available}])。` +
-        '请确保已选择页面且调试器可用。',
+      '缺少调试运行时上下文。请确保：1) 已选中页面；2) 工具通过 defineTool 上下文调用（ToolAdapter）。',
     );
   }
   try {

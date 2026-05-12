@@ -126,7 +126,7 @@ export class ToolAdapter {
       },
       getDevToolsData: () => provider.getDevToolsData(),
       resolveCdpRequestId: (cdpRequestId) => provider.resolveCdpRequestId(cdpRequestId),
-      debuggerContext: provider.getDebuggerContext.bind(provider) as unknown as Context['debuggerContext'],
+      getDebuggerContext: () => provider.getDebuggerContext(),
       getRequestInitiator: (request) => provider.getRequestInitiator(request),
       getRequestInitiatorById: (_requestId) => undefined,
       getNetworkRequestById: (reqid) => provider.getNetworkRequestById(reqid),

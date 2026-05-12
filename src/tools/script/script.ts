@@ -80,6 +80,7 @@ function describeContextSelectionFailure(
   executionContexts: ExecutionContextInfo[],
   desiredContext: 'page' | 'content-script',
   selectedFrameId?: string,
+  explicitFrameId?: string,
 ): string {
   const worldMatches = executionContexts.filter(
     context => context.world === desiredContext,
@@ -89,12 +90,36 @@ function describeContextSelectionFailure(
     return `脚本执行失败：当前页面没有可用的 ${desiredContext} 执行上下文`;
   }
 
+  // 列出所有候选 context，便于用户下次用 --frameId 精确定位
+  const candidateLines = worldMatches
+    .slice(0, 8)
+    .map(
+      ctx =>
+        `  - frameId=${ctx.frameId ?? '(null)'} origin=${ctx.origin || '(empty)'} name=${ctx.name || '(empty)'}`,
+    )
+    .join('\n');
+
+  if (explicitFrameId) {
+    return (
+      `脚本执行失败：显式指定的 frameId=${explicitFrameId} 未在 ${desiredContext} 上下文中命中。\n` +
+      `可选 ${desiredContext} 上下文：\n${candidateLines}`
+    );
+  }
+
   if (selectedFrameId) {
-    return `脚本执行失败：未找到与当前选中 Frame(${selectedFrameId}) 匹配的 ${desiredContext} 执行上下文`;
+    return (
+      `脚本执行失败：未找到与当前选中 Frame(${selectedFrameId}) 匹配的 ${desiredContext} 执行上下文。\n` +
+      `可选 ${desiredContext} 上下文：\n${candidateLines}\n` +
+      `提示：改用 --frameId <id> 显式指定，或 --allowAnyFrame true 回退到第一个可用上下文。`
+    );
   }
 
   if (worldMatches.length > 1) {
-    return `脚本执行失败：存在多个 ${desiredContext} 执行上下文，但无法将当前选中 Frame 映射到唯一上下文`;
+    return (
+      `脚本执行失败：存在 ${worldMatches.length} 个 ${desiredContext} 执行上下文，无法自动映射到唯一目标。\n` +
+      `可选 ${desiredContext} 上下文：\n${candidateLines}\n` +
+      `提示：改用 --frameId <id> 显式指定，或 --allowAnyFrame true 回退到第一个可用上下文。`
+    );
   }
 
   return `脚本执行失败：无法选择 ${desiredContext} 执行上下文`;
@@ -216,6 +241,18 @@ export const evaluateScript = defineTool({
       .enum(['page', 'content-script'])
       .optional()
       .describe('Execution context (default: "page")'),
+    frameId: zod
+      .string()
+      .optional()
+      .describe(
+        '显式指定要执行的 frame 的 frameId。多 iframe（如跨域登录、Cookie 检测）场景必填，否则可能因上下文歧义失败。优先级高于 selectedFrame。',
+      ),
+    allowAnyFrame: zod
+      .boolean()
+      .optional()
+      .describe(
+        '当存在多个匹配的执行上下文且无法精确定位时，是否回退到第一个可用上下文。默认 false。',
+      ),
     verbose: zod
       .boolean()
       .optional()
@@ -224,6 +261,8 @@ export const evaluateScript = defineTool({
   handler: async (request, response, _context) => {
     const functionCode = request.params.function;
     const desiredContext = request.params.context ?? 'page';
+    const explicitFrameId = request.params.frameId;
+    const allowAnyFrame = request.params.allowAnyFrame ?? false;
 
     if (!functionCode || functionCode.trim().length === 0) {
       response.setStructuredContent({
@@ -243,11 +282,14 @@ export const evaluateScript = defineTool({
         const debuggerContext = await ctx.getDebuggerContext!();
         const executionContexts = debuggerContext.getExecutionContexts();
         const selectedFrameId = getFrameId(frame);
+        // frameId 优先级：explicitFrameId > selectedFrameId
+        const effectiveFrameId = explicitFrameId ?? selectedFrameId;
         const executionContext = selectExecutionContext(
           executionContexts,
           {
             context: desiredContext,
-            frameId: selectedFrameId,
+            frameId: effectiveFrameId,
+            fallbackToFirst: allowAnyFrame,
           },
         );
 
@@ -258,6 +300,7 @@ export const evaluateScript = defineTool({
               executionContexts,
               desiredContext,
               selectedFrameId,
+              explicitFrameId,
             ),
             tooltype: 'evaluate_script',
           });

@@ -224,18 +224,36 @@ export const listNetworkRequests = defineTool({
         });
         if (!matched) {
           const timeoutMs = params.waitTimeoutMs ?? DEFAULT_WAIT_TIMEOUT_MS;
+          // 轮询超时：返回已有的请求而非空列表，方便用户排查
+          let existingRequests = getRuntime().contextProvider!.getNetworkRequests(
+            includePreserved,
+            targetPageIdx,
+          );
+          // 对已有请求也应用 URL 过滤
+          existingRequests = existingRequests.filter(request =>
+            request.url().includes(params.waitForRequest!),
+          );
+          const existingData: NetworkRequestData[] = existingRequests.map(request => {
+            const reqid =
+              getRuntime().contextProvider!.getNetworkRequestStableId(request);
+            return serializeRequest(request, reqid);
+          });
+
           response.setStructuredContent({
-            success: false,
-            message: `等待请求超时：${timeoutMs}ms 内未发现匹配 ${params.waitForRequest} 的请求`,
+            success: existingData.length > 0,
+            message: existingData.length > 0
+              ? `等待请求超时（${timeoutMs}ms），但发现 ${existingData.length} 个历史匹配 ${params.waitForRequest} 的请求`
+              : `等待请求超时：${timeoutMs}ms 内未发现匹配 ${params.waitForRequest} 的请求`,
             tooltype: 'list_network_requests',
             logFormat: 'json',
             data: {
-              requests: [],
-              total: 0,
+              requests: existingData,
+              total: existingData.length,
               pageIdx: resultPageIdx,
               pageSize,
               targetPageIdx,
               timedOut: true,
+              waitedFor: params.waitForRequest,
             },
           });
           return;

@@ -160,6 +160,8 @@ export interface ListNetworkRequestsData {
   pageSize: number | undefined;
   /** 是否因等待请求超时而提前返回 */
   timedOut?: boolean;
+  /** 超时时等待的 URL 片段 */
+  waitedFor?: string;
   /** 签名相关请求证据关联，仅 includeSignatureEvidence=true 时返回 */
   evidenceCorrelations?: NetworkEvidenceCorrelation[];
 }

@@ -49,6 +49,8 @@ export interface ToolMeta {
  * name / description / schema 从 defineTool 自动提取
  */
 const TOOL_REGISTRY: ToolRegistryEntry[] = [
+  // ── pipeline ──────────────────────────────────
+  {modulePath: './pipeline/examples.js', handlerName: 'analyzePipeline'},
   // ── workflow ──────────────────────────────────
   {modulePath: './workflow/observeFlow.js', handlerName: 'observeFlow'},
   {modulePath: './workflow/autoHook.js', handlerName: 'autoHook'},
@@ -191,6 +193,7 @@ const TOOL_REGISTRY: ToolRegistryEntry[] = [
   // ── hook ────────────────────────────────────────
   {modulePath: './hook/CreateHook.js', handlerName: 'createHook'},
   {modulePath: './hook/InjectHook.js', handlerName: 'injectHook'},
+  {modulePath: './hook/InjectHook.js', handlerName: 'listPersistentHooks'},
   {modulePath: './hook/GetHookData.js', handlerName: 'getHookData'},
   {modulePath: './hook/RemoveHook.js', handlerName: 'removeHook'},
   {modulePath: './hook/ListCreatedHooks.js', handlerName: 'listCreatedHooks'},

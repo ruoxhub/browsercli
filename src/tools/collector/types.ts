@@ -86,7 +86,16 @@ export interface SearchInScriptsParams {
 
 /** searchInScripts 结果数据 */
 export interface SearchInScriptsData {
-  files: Array<{url: string; content: string; size: number; type: string}>;
+  files: Array<{
+    url: string;
+    content: string;
+    size: number;
+    type: string;
+    /** 若为 combo URL，列出其内含的子文件路径 */
+    subFiles?: string[];
+    /** 若为 combo URL 且 pattern 命中某些子文件名，列出命中的子文件 */
+    matchedSubFiles?: string[];
+  }>;
   totalSize: number;
   matched: number;
   returned: number;

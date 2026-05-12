@@ -84,18 +84,13 @@ describe('ToolContextProvider', () => {
     runtime.setPages([selectedPage as never, targetPage as never]);
     runtime.setSelectedPage(selectedPage as never);
 
-    const internals = runtime as unknown as {
-      _networkStorage: WeakMap<
-        object,
-        Array<Array<{stableId: number; request: object}>>
-      >;
-    };
-
-    internals._networkStorage.set(selectedPage, [
-      [{stableId: 1, request: selectedRequest}],
+    // 通过 NetworkRequestCollector 的测试 seed 接口写入数据，
+    // 避免依赖 ToolContextProvider 的内部 WeakMap 字段。
+    runtime.networkCollector.seedPageData(selectedPage as never, [
+      [{stableId: 1, request: selectedRequest as never}],
     ]);
-    internals._networkStorage.set(targetPage, [
-      [{stableId: 2, request: targetRequest}],
+    runtime.networkCollector.seedPageData(targetPage as never, [
+      [{stableId: 2, request: targetRequest as never}],
     ]);
 
     const requests = runtime.getNetworkRequests(false, 1);

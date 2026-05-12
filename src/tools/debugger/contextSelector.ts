@@ -15,6 +15,12 @@ export interface SelectExecutionContextParams {
   context?: SelectableExecutionContextWorld;
   frameId?: string;
   extensionId?: string;
+  /**
+   * 当 frameId 缺失且 world 内有多个候选时，是否回退到"第一个匹配"。
+   * 默认 false（严格行为，原有逻辑）。调用方明确开启后可用于消除
+   * 多 iframe 场景下的歧义报错。
+   */
+  fallbackToFirst?: boolean;
 }
 
 export function selectExecutionContext(
@@ -43,8 +49,17 @@ export function selectExecutionContext(
     const frameMatches = candidates.filter(
       context => context.frameId === params.frameId,
     );
-    return frameMatches.length === 1 ? frameMatches[0] ?? null : null;
+    if (frameMatches.length === 1) {
+      return frameMatches[0] ?? null;
+    }
+    if (frameMatches.length > 1 && params.fallbackToFirst) {
+      return frameMatches[0] ?? null;
+    }
+    return null;
   }
 
-  return candidates.length === 1 ? candidates[0] ?? null : null;
+  if (candidates.length === 1) {
+    return candidates[0] ?? null;
+  }
+  return params.fallbackToFirst ? (candidates[0] ?? null) : null;
 }

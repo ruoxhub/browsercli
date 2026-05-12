@@ -128,8 +128,10 @@ export type Context = Readonly<{
   resolveCdpRequestId(cdpRequestId: string): number | undefined;
   /**
    * Get the debugger context for script/breakpoint management.
+   * Returns a promise because the underlying CDP session must be attached
+   * lazily on first use.
    */
-  debuggerContext: DebuggerContext;
+  getDebuggerContext(): Promise<DebuggerContext>;
   /**
    * Get the initiator (call stack) for a network request.
    */

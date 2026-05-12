@@ -50,8 +50,11 @@ export function toRecord(
 }
 
 export function toMirroredNetworkEntry(
-  entry: Record<string, unknown>,
+  entry: Record<string, unknown> | null | undefined,
 ): Record<string, unknown> | undefined {
+  if (!entry || typeof entry !== 'object') {
+    return undefined;
+  }
   const request = toRecord(entry.request);
   if (!request || typeof request.url !== 'string') {
     return undefined;
@@ -73,8 +76,11 @@ export function toMirroredNetworkEntry(
 }
 
 export function toMirroredScriptEntry(
-  entry: Record<string, unknown>,
+  entry: Record<string, unknown> | null | undefined,
 ): Record<string, unknown> | undefined {
+  if (!entry || typeof entry !== 'object') {
+    return undefined;
+  }
   const scriptUrl =
     typeof entry.scriptUrl === 'string'
       ? entry.scriptUrl

@@ -12,7 +12,7 @@
 import {zod} from '../third_party/index.js';
 import type {ToolDefinition} from '../tools/ToolDefinition.js';
 
-export type ToolArgType = 'string' | 'number' | 'boolean' | 'string[]';
+export type ToolArgType = 'string' | 'number' | 'boolean' | 'string[]' | 'object';
 
 export interface ToolArgSpec {
   type: ToolArgType;
@@ -100,6 +100,8 @@ function extractArgSpec(
     } else {
       return null;
     }
+  } else if (inner instanceof zod.ZodRecord || inner instanceof zod.ZodObject) {
+    type = 'object';
   } else {
     // 不支持的类型，跳过
     return null;
@@ -179,6 +181,8 @@ export function extractSchemaTypeMap(
       } else {
         result[key] = 'unknown';
       }
+    } else if (inner instanceof zod.ZodRecord || inner instanceof zod.ZodObject) {
+      result[key] = 'object';
     } else {
       result[key] = 'unknown';
     }

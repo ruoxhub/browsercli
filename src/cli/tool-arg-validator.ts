@@ -9,6 +9,7 @@ import {
   type ToolArgSpecMap,
 } from './zod-introspect.js';
 import {getToolMeta} from './tools-meta.js';
+import {getAliasesForTool, suggestSimilarKeys} from './tool-aliases.js';
 
 interface ValidationSuccess {
   ok: true;
@@ -20,9 +21,31 @@ interface ValidationFailure {
   error: string;
 }
 
-function buildAliasMap(_specs: ToolArgSpecMap): Map<string, string> {
-  // aliases 目前未从 zod schema 中提取，预留扩展
-  return new Map();
+/**
+ * 构造给定工具的别名映射。
+ * 只保留 "别名目标存在于 schema、别名本身不在 schema" 的条目，
+ * 避免遮蔽真正支持的同名参数。
+ */
+function buildAliasMap(
+  toolName: string,
+  specs: ToolArgSpecMap,
+): Map<string, string> {
+  const map = new Map<string, string>();
+  const supportedKeys = new Set(Object.keys(specs));
+  const aliases = getAliasesForTool(toolName);
+
+  for (const [alias, canonical] of Object.entries(aliases)) {
+    if (supportedKeys.has(alias)) {
+      // 别名本身就是合法参数 → 不做映射
+      continue;
+    }
+    if (!supportedKeys.has(canonical)) {
+      // 映射目标在当前工具上并不存在 → 跳过
+      continue;
+    }
+    map.set(alias, canonical);
+  }
+  return map;
 }
 
 function normalizeRawArgs(
@@ -30,18 +53,23 @@ function normalizeRawArgs(
   rawArgs: Record<string, unknown>,
   specs: ToolArgSpecMap,
 ): ValidationSuccess | ValidationFailure {
-  const aliases = buildAliasMap(specs);
+  const aliases = buildAliasMap(toolName, specs);
   const normalized: Record<string, unknown> = {};
-  const supportedKeys = new Set(Object.keys(specs));
+  const supportedKeys = Object.keys(specs);
+  const supportedSet = new Set(supportedKeys);
 
   for (const [rawKey, value] of Object.entries(rawArgs)) {
     const key = aliases.get(rawKey) ?? rawKey;
-    if (!supportedKeys.has(key)) {
+    if (!supportedSet.has(key)) {
+      const suggestions = suggestSimilarKeys(rawKey, supportedKeys);
+      const suggestionText = suggestions.length
+        ? `（是否想用 ${suggestions.map(s => `--${s}`).join(' / ')}？）`
+        : '';
       return {
         ok: false,
-        error: `不支持参数 --${rawKey}；${toolName} 支持参数：${Array.from(
-          supportedKeys,
-        ).join(', ')}`,
+        error:
+          `不支持参数 --${rawKey}${suggestionText}；` +
+          `${toolName} 支持参数：${supportedKeys.join(', ')}`,
       };
     }
     if (!(key in normalized)) {
@@ -91,6 +119,18 @@ function validateType(
         return {
           ok: false,
           error: `${toolName} 的参数 ${key} 必须是字符串数组`,
+        };
+      }
+      return null;
+    case 'object':
+      if (
+        value === null ||
+        typeof value !== 'object' ||
+        Array.isArray(value)
+      ) {
+        return {
+          ok: false,
+          error: `${toolName} 的参数 ${key} 必须是 JSON 对象（提示：用 --data '{...}' 或 --file params.json 传递）`,
         };
       }
       return null;

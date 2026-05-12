@@ -29,6 +29,7 @@ import {logger} from '../../utils/logger.js';
 
 import {CodeCache} from './CodeCache.js';
 import {CodeCompressor} from './CodeCompressor.js';
+import {parseComboUrl} from './comboUrlParser.js';
 import {
   SmartCodeCollector,
   type SmartCollectOptions,
@@ -539,18 +540,38 @@ export class CodeCollector {
             // 防止重复收集
             if (!this.collectedUrls.has(url)) {
               this.collectedUrls.add(url);
+
+              // 识别 combo URL，附加 subFiles 元数据便于后续检索溯源
+              const comboInfo = parseComboUrl(url);
+
+              const metadata: Record<string, unknown> | undefined =
+                truncated || comboInfo
+                  ? {
+                      ...(truncated
+                        ? {
+                            truncated: true,
+                            originalSize: contentSize,
+                            truncatedSize: finalContent.length,
+                          }
+                        : {}),
+                      ...(comboInfo
+                        ? {
+                            combo: true,
+                            comboHost: comboInfo.host,
+                            comboPrefix: comboInfo.prefix,
+                            subFiles: comboInfo.subPaths,
+                            subUrls: comboInfo.subUrls,
+                          }
+                        : {}),
+                    }
+                  : undefined;
+
               const file: CodeFile = {
                 url,
                 content: finalContent,
                 size: finalContent.length,
                 type: 'external',
-                metadata: truncated
-                  ? {
-                      truncated: true,
-                      originalSize: contentSize,
-                      truncatedSize: finalContent.length,
-                    }
-                  : undefined,
+                metadata,
               };
               files.push(file);
 

@@ -24,7 +24,7 @@ export const toolDispatcherCommand: AxiCliCommand<WorkerContext> = async (
 
   if (!requestedName) {
     throw new AxiError('缺少工具名称', 'VALIDATION_ERROR', [
-      `用法：js-reverse call <tool-name> [--param value] [--url <url>] [--data <json>]`,
+      `用法：js-reverse call <tool-name> [--param value] [--url <url>] [--data <json>] [--file <path>]`,
     ]);
   }
 

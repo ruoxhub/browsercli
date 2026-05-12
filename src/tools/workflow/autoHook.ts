@@ -4,9 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {mkdir, writeFile} from 'node:fs/promises';
+import path from 'node:path';
+
 import {zod} from '../../third_party/index.js';
 import {getRuntime} from '../../runtime.js';
+import {resolveDefaultArtifactsTasksDir} from '../../utils/projectPaths.js';
 import {logger} from '../../utils/logger.js';
+import {readHookStore} from '../hook/store-utils.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 
@@ -38,6 +43,10 @@ export interface AutoHookOptions {
   hookXhr?: boolean;
   /** Hook Fetch */
   hookFetch?: boolean;
+  /** 注入后是否自动将 Hook 数据导出到 artifacts 目录 */
+  exportResults?: boolean;
+  /** 导出时等待页面产生数据的时间（毫秒），默认 3000 */
+  exportWaitMs?: number;
 }
 
 /**
@@ -1089,6 +1098,8 @@ export const autoHook = defineTool({
     hookCookie: zod.boolean().optional().describe('Hook document.cookie'),
     hookXhr: zod.boolean().optional().describe('Hook XMLHttpRequest'),
     hookFetch: zod.boolean().optional().describe('Hook fetch API'),
+    exportResults: zod.boolean().optional().describe('Export hook data to artifacts/ after injection'),
+    exportWaitMs: zod.number().int().positive().optional().describe('Wait time in ms before exporting hook data (default 3000)'),
   },
   handler: async (request, response, context) => {
     const {url, ...rawOptions} = request.params;
@@ -1142,6 +1153,43 @@ export const autoHook = defineTool({
         },
       };
 
+      // --export-results: 等待后自动导出 Hook 数据到 artifacts/
+      let exportPath: string | undefined;
+      if (options.exportResults && options.autoInject) {
+        const waitMs = options.exportWaitMs ?? 3000;
+        logger.info(`[AutoHook] exportResults=true, 等待 ${waitMs}ms 后导出 Hook 数据`);
+        await new Promise(resolve => setTimeout(resolve, waitMs));
+
+        try {
+          const hookStore = await readHookStore(frame!, undefined);
+          const exportDir = resolveDefaultArtifactsTasksDir(import.meta.url);
+          const sessionId = `auto-hook-${Date.now()}`;
+          const sessionDir = path.join(exportDir, sessionId);
+          await mkdir(sessionDir, {recursive: true});
+
+          exportPath = path.join(sessionDir, 'hook-data.json');
+          await writeFile(
+            exportPath,
+            JSON.stringify({
+              url: url || pageUrl || 'unknown',
+              exportedAt: new Date().toISOString(),
+              hooksInjected,
+              hookStore,
+              cryptoDetected,
+            }, null, 2),
+            'utf8',
+          );
+          logger.info(`[AutoHook] Hook 数据已导出到 ${exportPath}`);
+        } catch (exportError) {
+          logger.warn(
+            '[AutoHook] Hook 数据导出失败: ' +
+              (exportError instanceof Error ? exportError.message : String(exportError)),
+          );
+        }
+      } else if (options.exportResults && !options.autoInject) {
+        logger.warn('[AutoHook] exportResults=true 但 autoInject=false，跳过导出');
+      }
+
       logger.info('[AutoHook] Completed successfully');
 
       const statusParts: string[] = [];
@@ -1153,6 +1201,7 @@ export const autoHook = defineTool({
       }
       statusParts.push(`检测到 ${detectedCryptoCount} 个加密库`);
       if (!frame) statusParts.push('注意：未找到可用 Frame，加密库检测未执行');
+      if (exportPath) statusParts.push(`Hook 数据已导出到 ${exportPath}`);
 
 
       response.setStructuredContent(
@@ -1161,6 +1210,7 @@ export const autoHook = defineTool({
           message: `自动 Hook 完成：${statusParts.join('，')}`,
           tooltype: 'auto_hook',
           data,
+          ...(exportPath ? {exportPath} : {}),
         }
       );
     } catch (error) {

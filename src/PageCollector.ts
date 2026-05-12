@@ -155,6 +155,14 @@ export abstract class PageCollector<T extends {stableId: number}> {
   }
 
   /**
+   * 返回给定页面的导航分组存储（只读访问）。
+   * 主要供 DataCollectorManager 委托查询使用，避免暴露内部 WeakMap。
+   */
+  getNavigations(page: Page): T[][] | undefined {
+    return this.storage.get(page);
+  }
+
+  /**
    * 按 stableId 查找数据项（跨所有页面和导航段）
    */
   getById(id: number, pages: Page[]): T | undefined {
@@ -170,10 +178,39 @@ export abstract class PageCollector<T extends {stableId: number}> {
   }
 
   /**
+   * 在给定页面集合中按自定义谓词查找首个匹配项。
+   * 用于 getNetworkRequestStableId / getConsoleMessageStableId 等场景，
+   * 统一收敛跨页面跨导航段遍历逻辑。
+   */
+  findBy(
+    pages: Page[],
+    predicate: (item: T) => boolean,
+  ): T | undefined {
+    for (const page of pages) {
+      const navigations = this.storage.get(page);
+      if (!navigations) continue;
+      for (const navigation of navigations) {
+        const found = navigation.find(predicate);
+        if (found) return found;
+      }
+    }
+    return undefined;
+  }
+
+  /**
    * 获取数据项的 stableId
    */
   getStableId(item: T): number {
     return item.stableId;
+  }
+
+  /**
+   * 测试/注入用：直接写入某页面的导航分组存储。
+   * 单元测试中在无法真实触发 Playwright 事件的场景下使用。
+   * 生产代码应走 attachToPage / startContextCollection 路径。
+   */
+  seedPageData(page: Page, navigations: T[][]): void {
+    this.storage.set(page, navigations);
   }
 
   /**

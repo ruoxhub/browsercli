@@ -38,10 +38,25 @@ export function registerBuiltinActions(client: BuiltinActionClient): void {
   });
 
   client.registerAction('_status', (_request, resolve, _reject) => {
+    const mem = process.memoryUsage();
+    const clientStatus = client.getStatus() as Record<string, unknown> | null;
+    const isConnected =
+      clientStatus && typeof clientStatus === 'object'
+        ? Boolean((clientStatus as {isConnected?: boolean}).isConnected)
+        : false;
+
     resolve({
       pid: process.pid,
-      status: client.getStatus(),
+      status: clientStatus,
       uptime: process.uptime(),
+      memory: {
+        rss: mem.rss,
+        heapTotal: mem.heapTotal,
+        heapUsed: mem.heapUsed,
+        external: mem.external,
+      },
+      nodeVersion: process.version,
+      health: isConnected ? 'healthy' : 'degraded',
     });
   });
 }

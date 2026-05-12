@@ -39,6 +39,16 @@ describe('BuiltinActions', () => {
       isConnected: true,
     });
     assert.strictEqual(typeof (status as {uptime: unknown}).uptime, 'number');
+    assert.strictEqual(typeof (status as {memory: unknown}).memory, 'object');
+    assert.strictEqual(
+      typeof (status as {memory: {rss: number}}).memory.rss,
+      'number',
+    );
+    assert.strictEqual(typeof (status as {nodeVersion: unknown}).nodeVersion, 'string');
+    assert.strictEqual(
+      (status as {health: string}).health,
+      'healthy',
+    );
 
     const listTools = await new Promise<{tools: Array<{name: string}>}>(
       (resolve, reject) => {
