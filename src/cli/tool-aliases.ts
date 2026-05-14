@@ -68,6 +68,7 @@ export const TOOL_ALIASES: Readonly<Record<string, Readonly<Record<string, strin
     filter: 'filterText',
   },
   evaluate_script: {
+    script: 'function',
     frame: 'frameId',
     anyFrame: 'allowAnyFrame',
     fallback: 'allowAnyFrame',

@@ -17,6 +17,7 @@ import type {Frame} from 'patchright';
 
 import type {ToolMeta} from '../cli/tools-meta.js';
 import {ensureToolsMeta, getAllToolNames, getToolMeta} from '../cli/tools-meta.js';
+import {validateToolArgs} from '../cli/tool-arg-validator.js';
 import type {Context, Response, ToolDefinition} from '../tools/ToolDefinition.js';
 import type {TrafficSummary} from '../formatters/websocketFormatter.js';
 import type {TraceResult} from '../trace-processing/parse.js';
@@ -205,6 +206,14 @@ export class ToolAdapter {
 
         const params = rpcRequest.params || {};
 
+        // 前置参数校验 — 在到达 handler 前拦截类型错误
+        const validated = validateToolArgs(toolName, params as Record<string, unknown>);
+        if (!validated.ok) {
+          reject((validated as {ok: false; error: string}).error);
+          return;
+        }
+        const safeParams = (validated as {ok: true; value: Record<string, unknown>}).value;
+
         // ── defineTool 模式 ──────────────────────────────────
         if (this.isToolDefinition(handler) || meta.callMode === 'defineTool') {
           if (!this.isToolDefinition(handler)) {
@@ -215,7 +224,7 @@ export class ToolAdapter {
           const context = this.buildDefineToolContext();
 
           await handler.handler(
-            {params},
+            {params: safeParams},
             accumulator as Response,
             context,
           );
@@ -233,7 +242,7 @@ export class ToolAdapter {
         if (callMode === 'frame') {
           const frame = this.getFrameForTool(toolName);
           if (frame) {
-            result = await handler(frame, params);
+            result = await handler(frame, safeParams);
           } else {
             reject(`Tool "${toolName}" 需要页面上下文，但当前没有可用页面`);
             return;
@@ -243,9 +252,9 @@ export class ToolAdapter {
             reject(`Tool "${toolName}" 需要上下文，但 contextProvider 不可用`);
             return;
           }
-          result = await handler(this.contextProvider, params);
+          result = await handler(this.contextProvider, safeParams);
         } else {
-          result = await handler(params);
+          result = await handler(safeParams);
         }
 
         const duration = Date.now() - startTime;

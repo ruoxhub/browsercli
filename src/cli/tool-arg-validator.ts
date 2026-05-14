@@ -11,12 +11,12 @@ import {
 import {getToolMeta} from './tools-meta.js';
 import {getAliasesForTool, suggestSimilarKeys} from './tool-aliases.js';
 
-interface ValidationSuccess {
+export interface ValidationSuccess {
   ok: true;
   value: Record<string, unknown>;
 }
 
-interface ValidationFailure {
+export interface ValidationFailure {
   ok: false;
   error: string;
 }

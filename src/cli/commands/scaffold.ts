@@ -6,7 +6,7 @@
 
 import {existsSync, mkdirSync, writeFileSync} from 'node:fs';
 import os from 'node:os';
-import {isAbsolute, join, resolve} from 'node:path';
+import {isAbsolute, join, resolve, sep} from 'node:path';
 
 import {AxiError} from 'axi-sdk-js';
 import type {AxiCliCommand} from 'axi-sdk-js';
@@ -115,7 +115,7 @@ export const scaffoldCommand: AxiCliCommand<WorkerContext> = async (
     const normalized = resolve(output!);
     const allowedRoots = [resolve(os.tmpdir()), resolve(process.cwd())];
     const isAllowed = allowedRoots.some(root => {
-      const rootWithSep = root.endsWith(path.sep) ? root : root + path.sep;
+      const rootWithSep = root.endsWith(sep) ? root : root + sep;
       return normalized.startsWith(rootWithSep) || normalized === root;
     });
     if (!isAllowed) {
@@ -134,12 +134,12 @@ export const scaffoldCommand: AxiCliCommand<WorkerContext> = async (
   const isUnderCwd =
     resolvedTaskDir === cwdResolved ||
     resolvedTaskDir.startsWith(
-      cwdResolved.endsWith(path.sep) ? cwdResolved : cwdResolved + path.sep,
+      cwdResolved.endsWith(sep) ? cwdResolved : cwdResolved + sep,
     );
   const isUnderTmp =
     resolvedTaskDir === tmpResolved ||
     resolvedTaskDir.startsWith(
-      tmpResolved.endsWith(path.sep) ? tmpResolved : tmpResolved + path.sep,
+      tmpResolved.endsWith(sep) ? tmpResolved : tmpResolved + sep,
     );
   if (!isUnderCwd && !isUnderTmp) {
     throw new AxiError(

@@ -1,9 +1,9 @@
 ---
-name: jsreverser-toolkit
+name: jsreverser-playbook
 description: JSReverser CLI 工具导航与选择指南。在需要查询 js-reverse 可用的 161 个 MCP 工具、选择合适的工具组合完成逆向任务、理解工具分类与参数时使用。涵盖观察取证、Hook 注入、调试器、代码分析、反调试、加密库拦截、Wasm 逆向、本地复现等全部功能域。当用户提到 js-reverse 工具、需要知道某个逆向操作该用哪个工具、或在 JSReverser-CLI 上下文中需要工具选型指导时触发。
 ---
 
-# JSReverser Toolkit — 工具导航
+# JSReverser playbook — 工具导航
 
 ## 工具总览
 
@@ -32,33 +32,12 @@ js-reverse 提供 161 个 MCP 工具，按 26 个功能域组织：
 | WebSocket | 4 | WS 连接监控与消息分析 |
 
 完整工具清单与参数：`references/tool-catalog.md`
+> 提示：`js-reverse list-tools --json` 输出每个工具的完整 schema（含类型、枚举值、默认值），是比手写文档更权威的参数来源。如果 tool-catalog.md 与 list-tools 输出不一致，以 list-tools 为准。
 
 ## CLI 命令
 
 `js-reverse` 提供以下 CLI 命令，覆盖从启动服务到工具调用的完整流程：
 
-### start — 启动 Worker
-
-```bash
-js-reverse start [--browserUrl <url>] [--wsEndpoint <endpoint>] \
-  [--rpcHost <host>] [--group <name>] \
-  [--headless] [--wait-for-browser] [--executablePath <path>] [--databaseUrl <url>]
-```
-
-- 启动 Worker 进程并注册到 Sekiro Server
-- `--browserUrl`：Chrome DevTools Protocol 地址（如 `http://127.0.0.1:9222`）
-- `--wsEndpoint`：WebSocket 端点（CDP 直连模式）
-- `--headless`：无头模式启动浏览器
-- `--wait-for-browser`：阻塞等待浏览器可达后再继续
-- 首次使用流程：启动 Chrome（`--remote-debugging-port=9222`）→ 启动 rpc-go Server → `js-reverse start --browserUrl http://127.0.0.1:9222`
-
-### stop — 停止 Worker
-
-```bash
-js-reverse stop
-```
-
-停止当前运行的 Worker 进程。
 
 ### status — 查看状态
 
@@ -71,13 +50,18 @@ js-reverse status
 ### call — 调用 MCP 工具
 
 ```bash
-js-reverse call <tool-name> [--param value] [--url <url>] [--data <json>]
+js-reverse call <tool-name> [--param value] [--url <url>] [--data <json>] [--file <path>]
 ```
 
 - 直接从命令行调用任意 MCP 工具
 - 工具名支持连字符自动转下划线（`observe-flow` → `observe_flow`）
 - 输入错误工具名时会返回模糊匹配建议
-- 示例：`js-reverse call hook_fetch --url https://example.com`
+- 参数名别名：一些工具有别名提高易用性（如 `evaluate_script` 接受 `--script` 等价于 `--function`），见 `references/tool-catalog.md` 标注
+- `--file <path>`：从 JSON 文件读取复杂参数，避免 PowerShell/bash 转义问题；文件参数优先级低于命令行参数
+- 示例：
+  - `js-reverse call hook_fetch --url https://example.com`
+  - `js-reverse call auto_hook --data '{"preset":"network-core","autoInject":true,"exportResults":true}'`
+  - `js-reverse call evaluate_script --file ./params.json`
 
 ### list-tools — 列出工具
 
@@ -257,6 +241,7 @@ js-reverse scaffold --name <name> [--desc <desc>] [--url <url>] [--output <dir>]
 ## 必读引用
 
 - 自动化入口：`references/automation-entry.md`
+- 工具目录（含参数）：`references/tool-catalog.md`
 - 参数默认值：`references/tool-defaults.md`
 - 任务输入模板：`references/task-input-template.md`
 - CLI专用任务编排：`references/cli-task-template.md`

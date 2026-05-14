@@ -193,3 +193,4 @@ src/graphify-out/
 .graphify_uncached.txt
 .planning
 old-source
+artifacts/

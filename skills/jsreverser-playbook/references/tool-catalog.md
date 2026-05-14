@@ -160,7 +160,7 @@
 |------|------|
 | `hook_xhr_open` | Hook XMLHttpRequest.open |
 | `hook_xhr_set_request_header` | Hook XMLHttpRequest.setRequestHeader |
-| `hook_fetch` | Hook window.fetch |
+| `hook_fetch` | Hook window.fetch（可选 --url 过滤） |
 | `hook_cookie` | Hook document.cookie |
 | `hook_websocket` | Hook WebSocket |
 | `hook_json_parse` | Hook JSON.parse |
@@ -194,7 +194,7 @@
 
 | 工具 | 必填参数 | 用途 |
 |------|----------|------|
-| `evaluate_script` | `--function*` | 在页面执行 JavaScript |
+| `evaluate_script` | `--function*`（也接受 `--script`） | 在页面执行 JavaScript |
 | `inject_preload_script` | `--script*` | 注入预加载脚本（未来文档生效） |
 
 ## 15. 站点经验 (Site Experience)

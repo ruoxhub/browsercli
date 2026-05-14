@@ -21,4 +21,6 @@ export {
 } from './AIService.js';
 
 export {OpenAIProvider, type OpenAIConfig} from './OpenAIProvider.js';
+export { AnthropicProvider, type AnthropicConfig } from './AnthropicProvider.js';
+export { GeminiProvider, type GeminiConfig } from './GeminiProvider.js';
 export {LLMService, type LLMMessage, type LLMResponse} from './LLMService.js';

@@ -17,13 +17,17 @@ import {buildHookStoreRuntime} from './store-utils.js';
 export const hookFetch = defineTool({
   name: 'hook_fetch',
   description:
-    'Hook window.fetch to monitor fetch API calls, logging request parameters and stack traces.',
+    'Hook window.fetch to monitor fetch API calls, logging request parameters and stack traces. Supports optional --url filter.',
   annotations: {
     title: 'Hook Fetch',
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: false,
   },
   schema: {
+    url: zod
+      .string()
+      .optional()
+      .describe('URL pattern filter — only hook fetch requests whose URL includes this string'),
     showStack: zod.boolean().optional().describe('Whether to print call stack'),
     triggerDebugger: zod
       .boolean()
@@ -31,7 +35,7 @@ export const hookFetch = defineTool({
       .describe('Whether to trigger debugger on hit'),
   },
   handler: async (request, response, context) => {
-    const {showStack, triggerDebugger} = request.params;
+    const {url: urlFilter, showStack, triggerDebugger} = request.params;
     const frame = (context as Context).getSelectedFrame();
 
     const hookCode = `
@@ -39,6 +43,7 @@ export const hookFetch = defineTool({
   'use strict';
   const showStack = ${JSON.stringify(!!showStack)};
   const triggerDebugger = ${JSON.stringify(!!triggerDebugger)};
+  const urlFilter = ${JSON.stringify(urlFilter ?? '')};
   const origFetch = window.fetch;
 ${buildHookStoreRuntime({
   hookId: 'hook_fetch',
@@ -57,6 +62,9 @@ ${buildHookStoreRuntime({
       : input && typeof input.url === 'string'
         ? input.url
         : '';
+    if (urlFilter && !url.includes(urlFilter)) {
+      return origFetch.apply(this, arguments);
+    }
     const method = typeof init.method === 'string'
       ? init.method
       : input && typeof input.method === 'string'
