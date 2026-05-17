@@ -29,6 +29,7 @@ import type {
 const DEFAULT_RECONNECT_BASE_DELAY = 2000;
 const DEFAULT_RECONNECT_MAX_DELAY = 30000;
 const DEFAULT_HEARTBEAT_INTERVAL = 30000;
+const DEFAULT_PONG_TIMEOUT = 10000;
 
 export class RpcClient {
   private readonly config: RpcClientConfig;
@@ -42,12 +43,14 @@ export class RpcClient {
   private isManualDisconnect = false;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  private pongTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectAttempts = 0;
 
   // 可配置参数
   private readonly reconnectBaseDelay: number;
   private readonly reconnectMaxDelay: number;
   private readonly heartbeatInterval: number;
+  private readonly pongTimeout: number;
 
   // 连接状态
   private _connectionState: RpcConnectionState = 'disconnected';
@@ -58,6 +61,7 @@ export class RpcClient {
     this.reconnectBaseDelay = config.reconnectBaseDelay ?? DEFAULT_RECONNECT_BASE_DELAY;
     this.reconnectMaxDelay = config.reconnectMaxDelay ?? DEFAULT_RECONNECT_MAX_DELAY;
     this.heartbeatInterval = config.heartbeatInterval ?? DEFAULT_HEARTBEAT_INTERVAL;
+    this.pongTimeout = config.pongTimeout ?? DEFAULT_PONG_TIMEOUT;
 
     // 注册默认的 _execjs handler
     this.handlers.set('_execjs', this._execjsHandler.bind(this));
@@ -100,23 +104,42 @@ export class RpcClient {
   }
 
   /**
-   * 启动客户端 — 连接到 Sekiro Server
+   * 启动客户端 — 等待首次连接建立后返回
    */
   async start(): Promise<void> {
-    try {
-      const wsURL = this.buildWebSocketURL();
-      this.log(`连接 Sekiro: ${wsURL}`);
-      this.wsURL = wsURL;
+    const wsURL = this.buildWebSocketURL();
+    this.log(`连接 Sekiro: ${wsURL}`);
+    this.wsURL = wsURL;
+
+    await new Promise<void>((resolve, reject) => {
+      const onOpen = () => {
+        cleanup();
+        resolve();
+      };
+      const onError = (event: WebSocket.ErrorEvent) => {
+        cleanup();
+        reject(new Error(event.message || 'WebSocket 连接失败'));
+      };
+
+      const cleanup = () => {
+        if (this.socket) {
+          this.socket.removeEventListener('open', onOpen);
+          this.socket.removeEventListener('error', onError);
+        }
+      };
+
       this.connect();
-      this.isInitialized = true;
-      this.log('Sekiro 客户端初始化成功');
-    } catch (error) {
-      this.log(
-        `Sekiro 客户端初始化失败：${error instanceof Error ? error.message : error}`,
-        'error',
-      );
-      throw error;
-    }
+
+      if (this.socket) {
+        this.socket.addEventListener('open', onOpen);
+        this.socket.addEventListener('error', onError);
+      } else {
+        reject(new Error('创建 WebSocket 失败'));
+      }
+    });
+
+    this.isInitialized = true;
+    this.log('Sekiro 客户端初始化成功');
   }
 
   /**
@@ -127,9 +150,10 @@ export class RpcClient {
     this.config.rpcHost = newSekiroHost;
     const wsURL = this.buildWebSocketURL();
     this.log(`切换地址重连：${wsURL}`);
+    // 先断开，保持 isManualDisconnect=true 直到新连接发起，防止旧 onclose 触发重连
     this._internalDisconnect();
     this.wsURL = wsURL;
-    this.isManualDisconnect = false;
+    // 在 connect() 内部会将 isManualDisconnect 重置为 false
     this.connect();
     this.log(`连接新地址：${wsURL}`);
   }
@@ -260,9 +284,12 @@ export class RpcClient {
         this.log(`WebSocket 错误：${event.message || '未知错误'}`);
       };
 
-      // ws 包支持 pong 事件
+      // ws 包支持 pong 事件，收到后清除超时计时器
       this.socket.on('pong', () => {
-        // 心跳 pong 收到，连接正常
+        if (this.pongTimeoutTimer) {
+          clearTimeout(this.pongTimeoutTimer);
+          this.pongTimeoutTimer = null;
+        }
       });
     } catch (e) {
       this.log(`创建连接失败，将自动重连：${e}`);
@@ -271,7 +298,7 @@ export class RpcClient {
   }
 
   /**
-   * 启动心跳
+   * 启动心跳，每次 ping 后设置 pong 超时，超时则主动断开重连
    */
   private startHeartbeat(): void {
     this.stopHeartbeat();
@@ -281,6 +308,13 @@ export class RpcClient {
       if (this.socket && this.socket.readyState === WebSocket.OPEN) {
         try {
           this.socket.ping();
+          // pong 超时检测：若在 pongTimeout 内未收到 pong，主动断开触发重连
+          this.pongTimeoutTimer = setTimeout(() => {
+            this.log('心跳 pong 超时，主动断开重连', 'warn');
+            this._internalDisconnect();
+            this.isManualDisconnect = false;
+            this.scheduleReconnect();
+          }, this.pongTimeout);
         } catch {
           this.log('心跳 ping 发送失败');
         }
@@ -289,12 +323,16 @@ export class RpcClient {
   }
 
   /**
-   * 停止心跳
+   * 停止心跳并清除 pong 超时计时器
    */
   private stopHeartbeat(): void {
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
+    }
+    if (this.pongTimeoutTimer) {
+      clearTimeout(this.pongTimeoutTimer);
+      this.pongTimeoutTimer = null;
     }
   }
 
@@ -404,19 +442,23 @@ export class RpcClient {
 
     if (typeof response === 'string') {
       try {
-        responseJson = JSON.parse(response) as Record<string, unknown>;
+        const parsed = JSON.parse(response);
+        if (Array.isArray(parsed)) {
+          responseJson = {data: parsed};
+        } else if (typeof parsed === 'object' && parsed !== null) {
+          responseJson = parsed as Record<string, unknown>;
+        } else {
+          responseJson = {data: parsed};
+        }
       } catch {
         responseJson = {data: response};
       }
+    } else if (Array.isArray(response)) {
+      responseJson = {data: response};
     } else if (typeof response === 'object' && response !== null) {
       responseJson = response as Record<string, unknown>;
     } else {
       responseJson = {data: response};
-    }
-
-    // 确保是数组或字符串时包装为对象
-    if (Array.isArray(responseJson) || typeof responseJson === 'string') {
-      responseJson = {data: responseJson, code: 0};
     }
 
     responseJson.code = 0;

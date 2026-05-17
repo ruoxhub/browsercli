@@ -26,6 +26,8 @@ interface RpcClientConfig {
   reconnectMaxDelay?: number;
   /** 心跳间隔 ms */
   heartbeatInterval?: number;
+  /** pong 超时 ms，超时后主动断开重连 */
+  pongTimeout?: number;
 }
 
 /** RpcClient 状态快照 */

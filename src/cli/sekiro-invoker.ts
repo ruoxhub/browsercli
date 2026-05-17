@@ -167,9 +167,9 @@ export class SekiroInvoker {
         // 根路径不可达，尝试业务端点
       }
 
-      // 2. 回退到 groupQueue 端点
+      // 2. 回退到 clientQueue 端点（某些 rpc-go 版本没有 groupQueue）
       try {
-        const url = `${this.baseUrl}/business/groupQueue`;
+        const url = `${this.baseUrl}/business/clientQueue?group=healthcheck`;
         const response = await fetch(url, {
           signal: AbortSignal.timeout(this.healthTimeout),
         });
