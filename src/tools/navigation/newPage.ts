@@ -7,6 +7,7 @@
 import {defineTool} from '../ToolDefinition.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
+import {type PreloadPreset, getPreloadPreset} from '../script/preload-presets.js';
 
 // Default navigation timeout in milliseconds (10 seconds)
 const DEFAULT_NAV_TIMEOUT = 10_000;
@@ -30,14 +31,24 @@ export const newPage = defineTool({
       .int()
       .optional()
       .describe('导航超时（毫秒），默认 10000。'),
+    preloadHook: zod.string().optional().describe('在页面加载前注入的 hook 脚本'),
+    preloadPreset: zod.enum(['capture-all-fetch', 'capture-all-xhr', 'capture-all-requests', 'log-cookies']).optional().describe('预设 hook 模板'),
   },
   handler: async (request, response, context) => {
-    const {url, timeout} = request.params;
+    const {url, timeout, preloadHook, preloadPreset} = request.params;
 
      try {
        const page = await context.newPage();
        context.selectPage(page);
        context.syncPageContext(page);
+
+       // 注入预加载 hook（在 goto 之前）
+       const hookCode = preloadPreset
+         ? getPreloadPreset(preloadPreset as PreloadPreset)
+         : preloadHook;
+       if (hookCode) {
+         await page.addInitScript(hookCode);
+       }
 
        await page.goto(url, {
          timeout: timeout ?? DEFAULT_NAV_TIMEOUT,

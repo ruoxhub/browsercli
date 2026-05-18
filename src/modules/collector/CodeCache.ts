@@ -295,4 +295,79 @@ export class CodeCache {
 
     logger.info('Cache warmup completed');
   }
+
+  /**
+   * 在缓存的代码文件中搜索
+   */
+  async searchInCache(
+    query: string,
+    options?: {
+      caseSensitive?: boolean;
+      isRegex?: boolean;
+      urlFilter?: string;
+    },
+  ): Promise<Array<{scriptId: string; url?: string; lineNumber: number; lineContent: string}>> {
+    const {caseSensitive = false, isRegex = false, urlFilter} = options ?? {};
+    const results: Array<{scriptId: string; url?: string; lineNumber: number; lineContent: string}> = [];
+
+    let pattern: RegExp;
+    try {
+      if (isRegex) {
+        pattern = new RegExp(query, caseSensitive ? '' : 'i');
+      } else {
+        const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        pattern = new RegExp(escaped, caseSensitive ? '' : 'i');
+      }
+    } catch {
+      return results;
+    }
+
+    const searchEntry = (files: CodeFile[], entryUrl?: string) => {
+      for (const file of files) {
+        const fileUrl = file.url ?? entryUrl ?? '';
+        if (urlFilter && !fileUrl.toLowerCase().includes(urlFilter.toLowerCase())) {
+          continue;
+        }
+        const content = (file as any).content ?? (file as any).source ?? '';
+        if (!content) continue;
+
+        const lines = (content as string).split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (pattern.test(lines[i])) {
+            results.push({
+              scriptId: fileUrl || `cache:line:${i}`,
+              url: fileUrl || undefined,
+              lineNumber: i,
+              lineContent: lines[i],
+            });
+          }
+        }
+      }
+    };
+
+    // 搜索内存缓存
+    for (const entry of this.memoryCache.values()) {
+      searchEntry(entry.files, entry.url);
+    }
+
+    // 搜索磁盘缓存（跳过已在内存中的条目）
+    try {
+      const files = await fs.readdir(this.cacheDir);
+      for (const file of files) {
+        if (!file.endsWith('.json')) continue;
+        try {
+          const data = await fs.readFile(path.join(this.cacheDir, file), 'utf-8');
+          const entry: CacheEntry = JSON.parse(data);
+          if (this.isExpired(entry)) continue;
+          searchEntry(entry.files, entry.url);
+        } catch {
+          // 跳过无法读取的缓存文件
+        }
+      }
+    } catch {
+      // 磁盘搜索失败时返回内存搜索结果
+    }
+
+    return results;
+  }
 }

@@ -27,7 +27,7 @@ export const hookFetch = defineTool({
     url: zod
       .string()
       .optional()
-      .describe('URL pattern filter — only hook fetch requests whose URL includes this string'),
+      .describe('URL 子串过滤 — 只 hook URL 包含此字符串的 fetch 请求（子串匹配，非精确匹配）'),
     showStack: zod.boolean().optional().describe('Whether to print call stack'),
     triggerDebugger: zod
       .boolean()

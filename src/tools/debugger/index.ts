@@ -9,6 +9,7 @@ import type {ToolContextProvider} from '../../worker/ToolContextProvider.js';
 import {defineTool} from '../ToolDefinition.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
+import {PackerDeobfuscator} from '../../modules/deobfuscator/PackerDeobfuscator.js';
 
 // ─── 子模块工具导出（defineTool 格式）─────────────────────
 
@@ -567,14 +568,18 @@ export const getScriptSource = defineTool({
       .optional()
       .default(1000)
       .describe('使用 offset 时返回的字符数（默认: 1000）。'),
+    prettyPrint: zod
+      .boolean()
+      .optional()
+      .describe('是否对返回的源码进行格式化（适用于压缩文件）'),
   },
   handler: async (request, response, context) => {
     const runtime = context as unknown as DebuggerRuntime;
-    const {scriptId, startLine, endLine, offset, length} = request.params;
+    const {scriptId, startLine, endLine, offset, length, prettyPrint} = request.params;
 
     try {
       const debuggerContext = await getDebugger(runtime);
-      const source = await debuggerContext.getScriptSource(scriptId);
+      let source = await debuggerContext.getScriptSource(scriptId);
 
       if (!source) {
         response.setStructuredContent({
@@ -584,6 +589,15 @@ export const getScriptSource = defineTool({
           data: { scriptId }
         });
         return;
+      }
+
+      // 格式化源码（可选）
+      if (prettyPrint) {
+        try {
+          source = new PackerDeobfuscator().beautify(source);
+        } catch {
+          // 格式化失败时 fallback 返回原始源码
+        }
       }
 
       const script = debuggerContext.getScriptById(scriptId);
@@ -729,6 +743,11 @@ export const searchInSources = defineTool({
       .string()
       .optional()
       .describe('只搜索 URL 包含此字符串的脚本（不区分大小写）。'),
+    source: zod
+      .enum(['live', 'cache', 'auto'])
+      .optional()
+      .default('auto')
+      .describe("搜索来源：'live' 只走 CDP，'cache' 只走本地缓存，'auto' 先尝试 CDP 失败时 fallback 到缓存"),
   },
   handler: async (request, response, context) => {
     const runtime = context as unknown as DebuggerRuntime;
@@ -740,27 +759,57 @@ export const searchInSources = defineTool({
       maxLineLength,
       excludeMinified,
       urlFilter,
+      source,
     } = request.params;
 
-    try {
+    const searchWithCdp = async () => {
       const debuggerContext = await getDebugger(runtime);
-      const result = await debuggerContext.searchInScripts(query, {
-        caseSensitive,
-        isRegex,
-      });
+      return debuggerContext.searchInScripts(query, { caseSensitive, isRegex });
+    };
 
-      if (result.matches.length === 0) {
+    const searchWithCache = async () => {
+      const {CodeCache} = await import('../../modules/collector/CodeCache.js');
+      const cache = new CodeCache();
+      return cache.searchInCache(query, { caseSensitive, isRegex, urlFilter });
+    };
+
+    try {
+      let matches: Array<{scriptId: string; url?: string; lineNumber: number; lineContent: string}>;
+      let searchSource: string;
+
+      if (source === 'cache') {
+        const cacheMatches = await searchWithCache();
+        matches = cacheMatches;
+        searchSource = 'cache';
+      } else if (source === 'live') {
+        const result = await searchWithCdp();
+        matches = result.matches;
+        searchSource = 'live';
+      } else {
+        // auto: 先尝试 CDP，失败时 fallback 到 cache
+        try {
+          const result = await searchWithCdp();
+          matches = result.matches;
+          searchSource = 'live';
+        } catch {
+          const cacheMatches = await searchWithCache();
+          matches = cacheMatches;
+          searchSource = 'cache (fallback)';
+        }
+      }
+
+      if (matches.length === 0) {
         response.setStructuredContent({
           success: true,
           message: `未找到匹配 "${query}"。`,
           tooltype: 'search_in_sources',
-          data: { query, matches: [], totalMatches: 0, filtered: false }
+          data: { query, matches: [], totalMatches: 0, filtered: false, searchSource }
         });
         return;
       }
 
       // 过滤匹配
-      let filteredMatches = result.matches;
+      let filteredMatches = matches;
 
       // 应用 URL 过滤
       if (urlFilter) {

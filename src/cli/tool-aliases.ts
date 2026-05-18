@@ -73,6 +73,11 @@ export const TOOL_ALIASES: Readonly<Record<string, Readonly<Record<string, strin
     anyFrame: 'allowAnyFrame',
     fallback: 'allowAnyFrame',
   },
+  hook_fetch: {
+    urlPattern: 'url',
+    pattern: 'url',
+    filter: 'url',
+  },
 });
 
 /**

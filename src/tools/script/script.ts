@@ -11,6 +11,7 @@ import type {ExecutionContextInfo} from '../debugger/executionContexts.js';
 import {zod} from '../../third_party/index.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 import {ToolCategory} from '../categories.js';
+import {type PreloadPreset, getPreloadPreset} from './preload-presets.js';
 
 // Default script evaluation timeout in milliseconds (30 seconds)
 const DEFAULT_SCRIPT_TIMEOUT = 30000;
@@ -428,10 +429,12 @@ export const injectPreloadScript = defineTool({
   description: 'Register a preload script for future documents on the current page/context',
   annotations: {category: ToolCategory.DEBUGGING, readOnlyHint: false},
   schema: {
-    script: zod.string().describe('JavaScript code to inject as preload script'),
+    script: zod.string().optional().describe('JavaScript code to inject as preload script'),
+    preset: zod.enum(['capture-all-fetch', 'capture-all-xhr', 'capture-all-requests', 'log-cookies']).optional().describe('预设 hook 模板，与 script 参数互斥'),
   },
   handler: async (request, response, _context) => {
-    const script = request.params.script ?? '';
+    const {preset} = request.params;
+    const script = preset ? getPreloadPreset(preset as PreloadPreset) : (request.params.script ?? '');
 
     if (!script || script.trim().length === 0) {
       response.appendResponseLine('```json');

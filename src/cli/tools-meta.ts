@@ -203,6 +203,7 @@ const TOOL_REGISTRY: ToolRegistryEntry[] = [
     handlerName: 'hookXhrSetRequestHeader',
   },
   {modulePath: './hook/Fetch.js', handlerName: 'hookFetch'},
+  {modulePath: './hook/AnalyzeUrlParams.js', handlerName: 'analyzeUrlParams'},
   {modulePath: './hook/Cookie.js', handlerName: 'hookCookie'},
   {modulePath: './hook/WebSocket.js', handlerName: 'hookWebSocket'},
   {modulePath: './hook/JsonParse.js', handlerName: 'hookJsonParse'},

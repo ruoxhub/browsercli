@@ -47,11 +47,19 @@ function tryParseJsonObject(raw: string): Record<string, unknown> | undefined {
 }
 
 /**
- * 读取 --file 参数指定的文件内容并解析为 JSON。
+ * 读取 --file 参数指定的文件内容并解析。
+ * - .json → JSON.parse
+ * - .js/.mjs/.ts → 读取文件内容作为 { function: fileContent }（适用于 evaluate_script）
  */
 function readArgsFromFile(filePath: string): Record<string, unknown> {
   const resolved = path.resolve(filePath);
+  const ext = path.extname(resolved).toLowerCase();
   const raw = readFileSync(resolved, 'utf8');
+
+  if (ext === '.js' || ext === '.mjs' || ext === '.ts') {
+    return {function: raw};
+  }
+
   try {
     return JSON.parse(raw) as Record<string, unknown>;
   } catch {
@@ -99,11 +107,12 @@ function coerceFlagValue(
 /**
  * 构建最终调用工具用的参数对象。
  *
- * 优先级（高 → 低）：命令行 flags > --data > --file
+ * 优先级（高 → 低）：命令行 flags > --data > --file > --stdin
  *
  * 特殊 flag：
- *   --file path/to/params.json  从 JSON 文件加载基础参数
+ *   --file path/to/params.json  从 JSON 文件加载基础参数（.js/.mjs/.ts 文件作为 { function: content }）
  *   --data '{"k":"v"}'          行内 JSON 参数包
+ *   --stdin                     从 stdin 读取 JSON 参数（最低优先级）
  *
  * 对于 schema 类型为 object 的字段，单独传 --key '{"..."}'
  * 时会被自动解析为对象。
@@ -114,7 +123,20 @@ export function buildToolArgs(
 ): Record<string, unknown> {
   const toolArgs: Record<string, unknown> = {};
 
-  // 1. 最低优先级：--file
+  // 0. 最低优先级：--stdin（从 stdin 读取 JSON）
+  if (parsed.flags['stdin'] === true && !process.stdin.isTTY) {
+    try {
+      const stdinData = readFileSync('/dev/stdin', 'utf8');
+      const stdinArgs = tryParseJsonObject(stdinData);
+      if (stdinArgs) {
+        Object.assign(toolArgs, stdinArgs);
+      }
+    } catch {
+      // stdin 读取失败时静默忽略
+    }
+  }
+
+  // 1. 次低优先级：--file
   const filePath = parsed.flags['file'];
   if (typeof filePath === 'string' && filePath.length > 0) {
     const fileArgs = readArgsFromFile(filePath);
@@ -129,7 +151,7 @@ export function buildToolArgs(
 
   // 3. 最高优先级：单个命令行 flag
   for (const [key, value] of Object.entries(parsed.flags)) {
-    if (key === 'file' || key === 'data') continue;
+    if (key === 'file' || key === 'data' || key === 'stdin') continue;
 
     if (typeof value === 'boolean') {
       toolArgs[key] = value;
