@@ -19,3 +19,5 @@ export {PlaywrightDevToolsConnection as PuppeteerDevToolsConnection} from './Dev
 export {SessionManager} from './SessionManager.js';
 
 export {HARMFUL_ARGS, DEFAULT_ARGS, STEALTH_ARGS} from './stealth-args.js';
+
+export {mapCDPError, isCDPSessionGone, wrapCDPCall} from './CDPErrorMapper.js';
