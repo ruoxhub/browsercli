@@ -397,6 +397,7 @@ export class BrowserManager {
   private crashCheckInterval?: NodeJS.Timeout;
   private isRestarting = false;
   private detachedFrameGuard?: (error: Error) => void;
+  private launchPromise: Promise<Browser> | null = null;
 
   private constructor(config: BrowserManagerConfig) {
     const remoteDebuggingUrl = config.remoteDebuggingUrl;
@@ -454,17 +455,27 @@ export class BrowserManager {
       return this.browser;
     }
 
-    // If we have a remote debugging URL, connect to existing browser
-    if (
-      this.config.browserURL ||
-      this.config.wsEndpoint ||
-      this.config.remoteDebuggingUrl
-    ) {
-      return this.connectToRemoteBrowser();
+    // Reuse in-flight launch to prevent concurrent launches
+    if (this.launchPromise) {
+      return this.launchPromise;
     }
 
-    // Otherwise launch a new browser
-    return this.launchBrowser();
+    const doLaunch = async (): Promise<Browser> => {
+      if (
+        this.config.browserURL ||
+        this.config.wsEndpoint ||
+        this.config.remoteDebuggingUrl
+      ) {
+        return this.connectToRemoteBrowser();
+      }
+      return this.launchBrowser();
+    };
+
+    this.launchPromise = doLaunch().finally(() => {
+      this.launchPromise = null;
+    });
+
+    return this.launchPromise;
   }
 
   /**
@@ -1180,27 +1191,39 @@ export class BrowserManager {
    * Close the browser and clean up resources
    */
   async close(): Promise<void> {
-    this.removeDetachedFrameGuard();
+    if (!this.browser) return;
 
-    // Clear crash detection interval
     if (this.crashCheckInterval) {
       clearInterval(this.crashCheckInterval);
       this.crashCheckInterval = undefined;
     }
 
-    // Close browser
-    if (this.browser) {
-      try {
-        await this.browser.close();
-        logger.debug('Browser closed successfully');
-      } catch (error) {
-        logger.debug('Error closing browser:', error);
-      }
-      this.browser = undefined;
-      this.context = undefined;
-    }
+    this.removeDetachedFrameGuard();
 
-    this.stealthInjected = false;
+    const browser = this.browser;
+    this.browser = undefined;
+    this.context = undefined;
     this.currentPage = null;
+    this.stealthInjected = false;
+
+    try {
+      await Promise.race([
+        browser.close(),
+        new Promise<void>((_, reject) =>
+          setTimeout(() => reject(new Error('Browser close timeout')), 5_000),
+        ),
+      ]);
+      logger.debug('Browser closed successfully');
+    } catch (error) {
+      const pid = (browser as unknown as {process(): {pid?: number} | null}).process()?.pid;
+      if (pid) {
+        try {
+          process.kill(pid, 'SIGKILL');
+        } catch {
+          // Process may already be dead
+        }
+      }
+      logger.debug('Browser close forced:', error);
+    }
   }
 }
