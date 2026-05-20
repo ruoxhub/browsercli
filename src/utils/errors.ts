@@ -8,21 +8,75 @@ export interface ErrorResponse {
   type: string;
   message: string;
   context?: Record<string, unknown>;
+  recoverable?: boolean;
 }
 
 export const ErrorCodes = {
-  TOOL_EXECUTION_ERROR: 'TOOL_EXECUTION_ERROR',
-  VALIDATION_ERROR: 'VALIDATION_ERROR',
-  AI_PROVIDER_ERROR: 'AI_PROVIDER_ERROR',
-  BROWSER_ERROR: 'BROWSER_ERROR',
-  INTERNAL_ERROR: 'INTERNAL_ERROR',
+  PREREQUISITE: 'PREREQUISITE',
+  VALIDATION: 'VALIDATION',
+  NOT_FOUND: 'NOT_FOUND',
+  TIMEOUT: 'TIMEOUT',
+  CONNECTION: 'CONNECTION',
+  RUNTIME: 'RUNTIME',
+  PERMISSION: 'PERMISSION',
+
+  TOOL_EXECUTION_ERROR: 'RUNTIME',
+  VALIDATION_ERROR: 'VALIDATION',
+  AI_PROVIDER_ERROR: 'RUNTIME',
+  BROWSER_ERROR: 'CONNECTION',
+  INTERNAL_ERROR: 'RUNTIME',
 } as const;
+
+export const LegacyErrorCodeMap = {
+  TOOL_EXECUTION_ERROR: ErrorCodes.RUNTIME,
+  VALIDATION_ERROR: ErrorCodes.VALIDATION,
+  AI_PROVIDER_ERROR: ErrorCodes.RUNTIME,
+  BROWSER_ERROR: ErrorCodes.CONNECTION,
+  INTERNAL_ERROR: ErrorCodes.RUNTIME,
+} as const;
+
+export type ToolErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];
+
+const NON_RECOVERABLE_CODES = new Set<ToolErrorCode>([
+  ErrorCodes.PERMISSION,
+  ErrorCodes.NOT_FOUND,
+]);
+
+export class ToolError extends Error {
+  constructor(
+    public readonly code: ToolErrorCode,
+    message: string,
+    public readonly context?: Record<string, unknown>,
+    public readonly recoverable: boolean = !NON_RECOVERABLE_CODES.has(code),
+  ) {
+    super(message);
+    this.name = 'ToolError';
+  }
+}
+
+export function createToolError(
+  code: ToolErrorCode,
+  message: string,
+  context?: Record<string, unknown>,
+): ToolError {
+  return new ToolError(code, message, context);
+}
 
 export function formatError(
   error: unknown,
-  code: string = ErrorCodes.INTERNAL_ERROR,
+  code: string = ErrorCodes.RUNTIME,
   context?: Record<string, unknown>,
 ): ErrorResponse {
+  if (error instanceof ToolError) {
+    return {
+      code: error.code,
+      type: error.name,
+      message: error.message,
+      context: context ?? error.context,
+      recoverable: error.recoverable,
+    };
+  }
+
   if (error instanceof Error) {
     return {
       code,

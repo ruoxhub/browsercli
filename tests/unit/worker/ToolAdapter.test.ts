@@ -7,10 +7,13 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {getToolMeta} from '../../../src/cli/tools-meta.js';
+import {ensureToolsMeta, getToolMeta} from '../../../src/cli/tools-meta.js';
 import {siteExperienceService} from '../../../src/services/SiteExperienceService.js';
 import {ToolAdapter} from '../../../src/worker/ToolAdapter.js';
 import {ToolContextProvider} from '../../../src/worker/ToolContextProvider.js';
+import {ErrorCodes, ToolError} from '../../../src/utils/errors.js';
+import type {ToolMeta} from '../../../src/cli/tools-meta.js';
+import type {RpcRequest} from '../../../src/types/rpc.js';
 
 interface ResolvePayload {
   structuredContent?: {
@@ -22,7 +25,190 @@ interface ResolvePayload {
   };
 }
 
+const fixtureModulePath = './test-fixtures/toolAdapterFixtures.js';
+
+function fixtureMeta(
+  overrides: Partial<ToolMeta> & Pick<ToolMeta, 'name' | 'handlerName'>,
+): ToolMeta {
+  return {
+    description: '',
+    schema: {},
+    argSpecs: {},
+    modulePath: fixtureModulePath,
+    callMode: 'defineTool',
+    ...overrides,
+  } as ToolMeta;
+}
+
+function legacyFixtureMeta(
+  overrides: Partial<ToolMeta> & Pick<ToolMeta, 'name' | 'handlerName'>,
+): ToolMeta {
+  return fixtureMeta(overrides);
+}
+
+async function invokeTool(
+  adapter: ToolAdapter,
+  meta: ToolMeta,
+  params: Record<string, unknown> = {},
+): Promise<unknown> {
+  return await new Promise((resolve, reject) => {
+    void adapter.wrapTool(meta)(
+      {
+        __sekiro_seq__: 'test',
+        action: meta.name,
+        params,
+      } satisfies RpcRequest,
+      resolve,
+      reject,
+    );
+  });
+}
+
 describe('ToolAdapter', () => {
+  it('wrapTool executes default function handlers with validated params', async () => {
+    const provider = new ToolContextProvider();
+    const adapter = new ToolAdapter(provider);
+    const meta = legacyFixtureMeta({
+      name: 'default_function_fixture',
+      handlerName: 'defaultFunctionFixture',
+      callMode: undefined,
+      argSpecs: {
+        value: {type: 'string', required: true, description: ''},
+      },
+    });
+
+    const result = await invokeTool(adapter, meta, {value: 'ok'});
+
+    assert.deepStrictEqual(result, {
+      structuredContent: {
+        received: {value: 'ok'},
+        tooltype: 'default_function_fixture',
+      },
+    });
+  });
+
+  it('wrapTool executes context handlers with ToolContextProvider', async () => {
+    const provider = new ToolContextProvider();
+    const adapter = new ToolAdapter(provider);
+    const meta = legacyFixtureMeta({
+      name: 'context_function_fixture',
+      handlerName: 'contextFunctionFixture',
+      callMode: 'context' as ToolMeta['callMode'],
+    });
+
+    const result = await invokeTool(adapter, meta, {value: 'ok'});
+
+    assert.deepStrictEqual(result, {
+      structuredContent: {
+        sameProvider: true,
+        received: {value: 'ok'},
+        tooltype: 'context_function_fixture',
+      },
+    });
+  });
+
+  it('wrapTool executes frame handlers with selected frame', async () => {
+    const provider = new ToolContextProvider();
+    const frame = {
+      evaluate: async (script: string) => `evaluated:${script}`,
+    };
+    provider.setSelectedFrame(frame as never);
+    const adapter = new ToolAdapter(provider);
+    const meta = legacyFixtureMeta({
+      name: 'frame_function_fixture',
+      handlerName: 'frameFunctionFixture',
+      callMode: 'frame' as ToolMeta['callMode'],
+    });
+
+    const result = await invokeTool(adapter, meta, {value: 'ok'});
+
+    assert.deepStrictEqual(result, {
+      structuredContent: {
+        evaluated: 'evaluated:window.__fixtureValue',
+        received: {value: 'ok'},
+        tooltype: 'frame_function_fixture',
+      },
+    });
+  });
+
+  it('wrapTool executes defineTool handlers with accumulated response', async () => {
+    const provider = new ToolContextProvider();
+    provider.setSelectedPage({mainFrame: () => ({})} as never);
+    const adapter = new ToolAdapter(provider);
+    const meta = fixtureMeta({
+      name: 'define_tool_fixture',
+      handlerName: 'defineToolFixture',
+      callMode: 'defineTool',
+    });
+
+    const result = await invokeTool(adapter, meta, {value: 'ok'});
+
+    assert.deepStrictEqual(result, {
+      structuredContent: {
+        selectedPageAvailable: true,
+        received: {value: 'ok'},
+        tooltype: 'define_tool_fixture',
+      },
+    });
+  });
+
+  it('wrapTool rejects validation errors as ToolError VALIDATION', async () => {
+    await ensureToolsMeta();
+    const provider = new ToolContextProvider();
+    const adapter = new ToolAdapter(provider);
+    const meta = getToolMeta('create_site_experience');
+    assert.ok(meta, 'missing meta for create_site_experience');
+
+    await assert.rejects(
+      invokeTool(adapter, meta, {domain: 42, name: 'fixture'}),
+      (error: unknown) =>
+        error instanceof ToolError && error.code === ErrorCodes.VALIDATION,
+    );
+  });
+
+  it('wrapTool rejects missing handlers as ToolError NOT_FOUND', async () => {
+    const provider = new ToolContextProvider();
+    const adapter = new ToolAdapter(provider);
+    const meta = fixtureMeta({
+      name: 'missing_handler_fixture',
+      handlerName: 'missingHandlerFixture',
+    });
+
+    await assert.rejects(
+      invokeTool(adapter, meta),
+      (error: unknown) =>
+        error instanceof ToolError && error.code === ErrorCodes.NOT_FOUND,
+    );
+  });
+
+  it('wrapTool emits tool:error for thrown errors', async () => {
+    const provider = new ToolContextProvider();
+    const events: unknown[] = [];
+    provider.eventBus.on('tool:error', payload => {
+      events.push(payload);
+    });
+    const adapter = new ToolAdapter(provider);
+    const meta = fixtureMeta({
+      name: 'throwing_fixture',
+      handlerName: 'throwingFixture',
+      callMode: undefined,
+    });
+
+    await assert.rejects(
+      invokeTool(adapter, meta),
+      (error: unknown) =>
+        error instanceof ToolError && error.code === ErrorCodes.RUNTIME,
+    );
+
+    assert.deepStrictEqual(events, [
+      {
+        name: 'throwing_fixture',
+        code: ErrorCodes.RUNTIME,
+        message: 'fixture failure',
+      },
+    ]);
+  });
+
   it('passes params objects through params-only site experience tools', async () => {
     const runtime = new ToolContextProvider();
     const adapter = new ToolAdapter(runtime);
@@ -40,7 +226,11 @@ describe('ToolAdapter', () => {
     try {
       const result = await new Promise<ResolvePayload>((resolve, reject) => {
         void adapter.wrapTool(meta!)(
-          {params: {url: 'https://www.douyin.com'}},
+          {
+            __sekiro_seq__: 'test',
+            action: meta!.name,
+            params: {url: 'https://www.douyin.com'},
+          },
           value => resolve(value as ResolvePayload),
           reject,
         );
@@ -95,7 +285,11 @@ describe('ToolAdapter', () => {
 
       return await new Promise<ResolvePayload>((resolve, reject) => {
         void adapter.wrapTool(meta!)(
-          {params: {hookId: 'hook_from_params'}},
+          {
+            __sekiro_seq__: 'test',
+            action: meta!.name,
+            params: {hookId: 'hook_from_params'},
+          },
           value => resolve(value as ResolvePayload),
           reject,
         );

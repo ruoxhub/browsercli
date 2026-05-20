@@ -27,12 +27,14 @@ import type {
   Page,
 } from 'patchright';
 
-import type {DebuggerContext} from '../DebuggerContext.js';
 import type {BrowserManager} from '../browser/index.js';
+import type {DebuggerContext} from '../DebuggerContext.js';
 import type {Runtime} from '../runtime.js';
 import type {HTTPRequest} from '../third_party/index.js';
 import type {RequestInitiator} from '../tools/network/types.js';
 import type {WebSocketData} from '../tools/network/WebSocketCollector.js';
+import {createAppEventBusOptions, type AppEventMap} from '../types/events.js';
+import {EventBus} from '../utils/EventBus.js';
 
 import type {
   ConsoleMessageCollector,
@@ -46,6 +48,11 @@ import {ServiceLocator} from './context/ServiceLocator.js';
 
 type TraceResult = unknown;
 
+function ignoreDebuggerWarmupError(): void {
+  // DebuggerContext warmup is opportunistic; callers still resolve frames/pages
+  // through the selected Page if a CDP session cannot be established yet.
+}
+
 export class ToolContextProvider {
   private readonly _pageManager = new PageManager();
   private readonly _debuggerManager = new DebuggerSessionManager();
@@ -55,9 +62,13 @@ export class ToolContextProvider {
   private _isRunningPerformanceTrace = false;
   private _traceRecordings: TraceResult[] = [];
   private _isDisposed = false;
+  public readonly eventBus: EventBus<AppEventMap>;
 
   constructor(runtime?: Runtime) {
     this._serviceLocator = new ServiceLocator(runtime);
+    this.eventBus =
+      runtime?.eventBus ??
+      new EventBus<AppEventMap>(createAppEventBusOptions());
   }
 
   // ─── 生命周期 ────────────────────────────────────────
@@ -169,7 +180,9 @@ export class ToolContextProvider {
     if (frame) {
       const page = this._pageManager.getSelectedPage();
       if (page) {
-        void this._debuggerManager.ensureForPage(page).catch(() => {});
+        void this._debuggerManager
+          .ensureForPage(page)
+          .catch(ignoreDebuggerWarmupError);
       }
     }
     return frame;
@@ -204,7 +217,9 @@ export class ToolContextProvider {
   selectPage(page: Page): void {
     this._pageManager.selectPage(page);
     // 页面切换后重新初始化 debugger，与旧实现一致
-    void this._debuggerManager.ensureForPage(page).catch(() => {});
+    void this._debuggerManager
+      .ensureForPage(page)
+      .catch(ignoreDebuggerWarmupError);
   }
 
   async bringPageToFront(page: Page): Promise<void> {

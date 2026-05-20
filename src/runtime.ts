@@ -1,11 +1,10 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 import {BrowserManager, type BrowserManagerConfig} from './browser/index.js';
-import {getEnvBoolean} from './config.js';
+import {getBrowserManagerConfig} from './config.js';
 import {AISummarizer} from './modules/analyzer/AISummarizer.js';
 import {CodeAnalyzer} from './modules/analyzer/CodeAnalyzer.js';
 import {CodeCollector} from './modules/collector/CodeCollector.js';
@@ -19,17 +18,18 @@ import {WasmCollector} from './modules/wasm/WasmCollector.js';
 import {WasmDecompiler} from './modules/wasm/WasmDecompiler.js';
 import {WasmRuntimeInspector} from './modules/wasm/WasmRuntimeInspector.js';
 import {ReverseTaskStore} from './reverse/ReverseTaskStore.js';
+import {RuntimeServices} from './runtime/RuntimeServices.js';
 import {LLMService} from './services/LLMService.js';
 import type {Page} from './third_party/index.js';
-import type {WorkerStartOptions} from './types/platform.js';
+import {createAppEventBusOptions, type AppEventMap} from './types/events.js';
 import {
   CodeCacheAdapter,
   CodeCompressorAdapter,
   DetailedDataManagerAdapter,
 } from './utils/CacheAdapters.js';
 import {DetailedDataManager} from './utils/detailedDataManager.js';
+import {EventBus} from './utils/EventBus.js';
 import {UnifiedCacheManager} from './utils/UnifiedCacheManager.js';
-import {getBrowserManagerConfig} from './config.js';
 import type {ToolContextProvider} from './worker/ToolContextProvider.js';
 let runtime: Runtime | undefined;
 
@@ -49,12 +49,12 @@ export interface Runtime {
   wasmDecompiler: WasmDecompiler;
   wasmRuntimeInspector: WasmRuntimeInspector;
   reverseTaskStore: ReverseTaskStore;
+  eventBus: EventBus<AppEventMap>;
   contextProvider?: ToolContextProvider;
   bindPageContext: (resolver: () => Page) => void;
   syncPageContext: (page: Page) => void;
   clearPageContext: () => void;
 }
-
 
 export function getRuntime(): Runtime {
   if (runtime) {
@@ -69,17 +69,19 @@ export function getRuntime(): Runtime {
   const domInspector = new DOMInspector(collector);
   const pageController = new PageController(collector);
   const hookManager = new HookManager();
-  const llmService = new LLMService();
-  const wasmAnalyzer = new WasmAnalyzer();
-  const wasmDecompiler = new WasmDecompiler();
-  const wasmRuntimeInspector = new WasmRuntimeInspector();
+  const services = new RuntimeServices(pageController);
   const detailedDataManager = DetailedDataManager.getInstance();
   const unifiedCacheManager = UnifiedCacheManager.getInstance();
   const reverseTaskStore = new ReverseTaskStore();
+  const eventBus = new EventBus<AppEventMap>(createAppEventBusOptions());
 
-  unifiedCacheManager.registerCache(new DetailedDataManagerAdapter(detailedDataManager));
+  unifiedCacheManager.registerCache(
+    new DetailedDataManagerAdapter(detailedDataManager),
+  );
   unifiedCacheManager.registerCache(new CodeCacheAdapter(collector.getCache()));
-  unifiedCacheManager.registerCache(new CodeCompressorAdapter(collector.getCompressor()));
+  unifiedCacheManager.registerCache(
+    new CodeCompressorAdapter(collector.getCompressor()),
+  );
 
   runtime = {
     browserManager,
@@ -87,20 +89,39 @@ export function getRuntime(): Runtime {
     domInspector,
     pageController,
     hookManager,
-    llmService,
-    analyzer: new CodeAnalyzer(llmService),
-    summarizer: new AISummarizer(llmService),
-    deobfuscator: new Deobfuscator(llmService),
-    cryptoDetector: new CryptoDetector(llmService),
-    wasmCollector: new WasmCollector(pageController, wasmAnalyzer, wasmRuntimeInspector),
-    wasmAnalyzer,
-    wasmDecompiler,
-    wasmRuntimeInspector,
+    get llmService() {
+      return services.getLLMService();
+    },
+    get analyzer() {
+      return services.getAnalyzer();
+    },
+    get summarizer() {
+      return services.getSummarizer();
+    },
+    get deobfuscator() {
+      return services.getDeobfuscator();
+    },
+    get cryptoDetector() {
+      return services.getCryptoDetector();
+    },
+    get wasmCollector() {
+      return services.getWasmCollector();
+    },
+    get wasmAnalyzer() {
+      return services.getWasmAnalyzer();
+    },
+    get wasmDecompiler() {
+      return services.getWasmDecompiler();
+    },
+    get wasmRuntimeInspector() {
+      return services.getWasmRuntimeInspector();
+    },
     reverseTaskStore,
-    bindPageContext: (resolver) => {
+    eventBus,
+    bindPageContext: resolver => {
       collector.setPageResolver(() => resolver());
     },
-    syncPageContext: (page) => {
+    syncPageContext: page => {
       collector.setPageResolver(() => page);
       browserManager.setCurrentPage(page);
     },

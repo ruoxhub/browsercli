@@ -18,11 +18,19 @@ import {HOOK_STORE_KEY} from './store-utils.js';
  */
 export const removeHook = defineTool({
   name: 'remove_hook',
-  description: 'Remove a hook by id. Removes from in-process HookManager and optionally cleans browser-side data.',
-  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: false},
+  description:
+    'Remove a hook by id. Removes from in-process HookManager and optionally cleans browser-side data.',
+  annotations: {
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: false,
+  },
   schema: {
     hookId: zod.string().describe('Hook ID to remove'),
-    cleanBrowser: zod.boolean().optional().default(true).describe('Also clean browser-side hook data (default: true)'),
+    cleanBrowser: zod
+      .boolean()
+      .optional()
+      .default(true)
+      .describe('Also clean browser-side hook data (default: true)'),
   },
   handler: async (request, response, context) => {
     const {hookId, cleanBrowser = true} = request.params;
@@ -50,7 +58,7 @@ export const removeHook = defineTool({
         // 使用 Promise.race 添加超时保护，防止调试器暂停时 evaluate 无限挂起
         const cleanupPromise = frame.evaluate(`
           (function(){
-            var s = window[${JSON.stringify(HOOK_STORE_KEY)}];
+            var s = window.${HOOK_STORE_KEY};
             var hookId = ${serializedHookId};
             if (s && s[hookId]) { delete s[hookId]; }
           })()
@@ -67,11 +75,19 @@ export const removeHook = defineTool({
       }
     }
 
+    if (browserCleaned) {
+      response.setStructuredContent({
+        success: true,
+        message: `浏览器端 Hook 数据已清理：${hookId}`,
+        tooltype: 'remove_hook',
+        hookId,
+      });
+      return;
+    }
+
     response.setStructuredContent({
       success: removed,
-      message: removed
-        ? `Hook 已移除：${hookId}${browserCleaned ? '（含浏览器端数据）' : ''}`
-        : `Hook 未找到：${hookId}`,
+      message: removed ? `Hook 已移除：${hookId}` : `Hook 未找到：${hookId}`,
       tooltype: 'remove_hook',
       data: {
         hookId,

@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -7,9 +6,9 @@
 import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { logger, saveLogsToFile } from '../../../src/utils/logger.js';
+import {logger, saveLogsToFile} from '../../../src/utils/logger.js';
 
 interface FakeWriteStream {
   write(chunk: string): boolean;
@@ -30,14 +29,14 @@ type ConsoleErrorFn = typeof console.error;
 describe('root logger', () => {
   it('saves debug logs to a file', async () => {
     const dir = path.resolve('js-reverse-mcp-main/tests/.tmp/root-logger');
-    fs.mkdirSync(dir, { recursive: true });
+    fs.mkdirSync(dir, {recursive: true});
 
     const file = path.join(dir, `log-${Date.now()}.txt`);
     const stream = saveLogsToFile(file);
 
-    logger.debug('hello from logger test');
+    logger.info('hello from logger test');
 
-    await new Promise<void>((resolve) => {
+    await new Promise<void>(resolve => {
       stream.end(() => resolve());
     });
 
@@ -65,7 +64,8 @@ describe('root logger', () => {
       },
     };
 
-    (fs as unknown as MutableFsModule).createWriteStream = () => fakeStream as unknown as ReturnType<typeof fs.createWriteStream>;
+    (fs as unknown as MutableFsModule).createWriteStream = () =>
+      fakeStream as unknown as ReturnType<typeof fs.createWriteStream>;
     let exitCode: number | null = null;
     (process as unknown as MutableProcess).exit = (code: number) => {
       exitCode = code;
@@ -79,14 +79,35 @@ describe('root logger', () => {
     try {
       saveLogsToFile('/tmp/fake-log.txt');
       assert.ok(errorHandler);
-      assert.throws(() => errorHandler!(new Error('disk full')), /__exit_called__/);
+      assert.throws(
+        () => errorHandler!(new Error('disk full')),
+        /__exit_called__/,
+      );
       assert.strictEqual(endCalled, 1);
       assert.strictEqual(exitCode, 1);
       assert.ok(errorLogged.includes('Error when opening/writing to log file'));
     } finally {
       (fs as unknown as MutableFsModule).createWriteStream = originalCreate;
-      (process as unknown as MutableProcess).exit = originalExit as unknown as MutableProcess['exit'];
+      (process as unknown as MutableProcess).exit =
+        originalExit as unknown as MutableProcess['exit'];
       console.error = originalConsoleError;
     }
+  });
+
+  it('serializes structured fields in log output', () => {
+    const originalConsoleError = console.error;
+    let output = '';
+    console.error = ((msg?: unknown) => {
+      output = String(msg ?? '');
+    }) as ConsoleErrorFn;
+
+    try {
+      logger.info('tool.completed', {toolName: 'x'});
+    } finally {
+      console.error = originalConsoleError;
+    }
+
+    assert.ok(output.includes('tool.completed'));
+    assert.ok(output.includes('"toolName":"x"'));
   });
 });

@@ -42,7 +42,10 @@ export const searchSiteExperience = defineTool({
     }
 
     try {
-      const results = await siteExperienceService.search({url, name});
+      const searchParams: {url?: string; name?: string} = {};
+      if (url !== undefined) searchParams.url = url;
+      if (name !== undefined) searchParams.name = name;
+      const results = await siteExperienceService.search(searchParams);
       response.appendResponseLine('```json');
       response.appendResponseLine(
         JSON.stringify(
@@ -87,14 +90,27 @@ export const createSiteExperience = defineTool({
     domain: zod.string().describe('Site domain (required)'),
     name: zod.string().describe('Site name (required)'),
     aliases: zod.array(zod.string()).optional().describe('Domain aliases'),
-    platformFeatures: zod.string().optional().describe('Platform features description'),
-    validPatterns: zod.string().optional().describe('Valid patterns description'),
-    knownPitfalls: zod.string().optional().describe('Known pitfalls description'),
+    platformFeatures: zod
+      .string()
+      .optional()
+      .describe('Platform features description'),
+    validPatterns: zod
+      .string()
+      .optional()
+      .describe('Valid patterns description'),
+    knownPitfalls: zod
+      .string()
+      .optional()
+      .describe('Known pitfalls description'),
   },
   handler: async (request, response) => {
     const params = request.params;
 
-    if (!params.domain || typeof params.domain !== 'string' || !params.domain.trim()) {
+    if (
+      !params.domain ||
+      typeof params.domain !== 'string' ||
+      !params.domain.trim()
+    ) {
       response.appendResponseLine('```json');
       response.appendResponseLine(
         JSON.stringify(
@@ -110,7 +126,11 @@ export const createSiteExperience = defineTool({
       response.appendResponseLine('```');
       return;
     }
-    if (!params.name || typeof params.name !== 'string' || !params.name.trim()) {
+    if (
+      !params.name ||
+      typeof params.name !== 'string' ||
+      !params.name.trim()
+    ) {
       response.appendResponseLine('```json');
       response.appendResponseLine(
         JSON.stringify(
@@ -128,7 +148,9 @@ export const createSiteExperience = defineTool({
     }
 
     try {
-      const existing = await siteExperienceService.getByDomain(params.domain.trim());
+      const existing = await siteExperienceService.getByDomain(
+        params.domain.trim(),
+      );
       if (existing) {
         response.appendResponseLine('```json');
         response.appendResponseLine(
@@ -200,8 +222,14 @@ export const updateSiteExperience = defineTool({
   schema: {
     id: zod.number().describe('Site experience ID to update'),
     name: zod.string().optional().describe('Updated site name'),
-    aliases: zod.array(zod.string()).optional().describe('Updated domain aliases'),
-    platformFeatures: zod.string().optional().describe('Updated platform features'),
+    aliases: zod
+      .array(zod.string())
+      .optional()
+      .describe('Updated domain aliases'),
+    platformFeatures: zod
+      .string()
+      .optional()
+      .describe('Updated platform features'),
     validPatterns: zod.string().optional().describe('Updated valid patterns'),
     knownPitfalls: zod.string().optional().describe('Updated known pitfalls'),
   },
@@ -212,9 +240,15 @@ export const updateSiteExperience = defineTool({
       const updateData: Record<string, unknown> = {
         ...(params.name !== undefined && {name: params.name}),
         ...(params.aliases !== undefined && {aliases: params.aliases}),
-        ...(params.platformFeatures !== undefined && {platformFeatures: params.platformFeatures}),
-        ...(params.validPatterns !== undefined && {validPatterns: params.validPatterns}),
-        ...(params.knownPitfalls !== undefined && {knownPitfalls: params.knownPitfalls}),
+        ...(params.platformFeatures !== undefined && {
+          platformFeatures: params.platformFeatures,
+        }),
+        ...(params.validPatterns !== undefined && {
+          validPatterns: params.validPatterns,
+        }),
+        ...(params.knownPitfalls !== undefined && {
+          knownPitfalls: params.knownPitfalls,
+        }),
       };
 
       const result = await siteExperienceService.update(params.id, updateData);

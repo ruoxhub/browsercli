@@ -82,7 +82,14 @@ export class ToolResponseAccumulator implements Response {
   toJSON(): Record<string, unknown> {
     const result: Record<string, unknown> = {};
     if (this.lines.length > 0) {
-      result.text = this.lines.join('\n');
+      const text = this.lines.join('\n');
+      result.text = text;
+      if (this.structuredContent === null) {
+        const parsed = parseFencedJson(text);
+        if (parsed !== undefined) {
+          result.structuredContent = parsed;
+        }
+      }
     }
     if (this.structuredContent !== null) {
       result.structuredContent = this.structuredContent;
@@ -94,5 +101,16 @@ export class ToolResponseAccumulator implements Response {
       result.network = [];
     }
     return result;
+  }
+}
+
+function parseFencedJson(text: string): unknown {
+  const match = text.match(/^```json\s*\n([\s\S]*?)\n```$/);
+  if (!match) return undefined;
+
+  try {
+    return JSON.parse(match[1]);
+  } catch {
+    return undefined;
   }
 }

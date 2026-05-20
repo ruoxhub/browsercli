@@ -26,12 +26,24 @@ export const listCreatedHooks = defineTool({
     readOnlyHint: true,
   },
   schema: {
-    hookId: zod.string().optional().describe('Specific hook ID to inspect, omit for all'),
-    verbose: zod.boolean().optional().default(false).describe('Include detailed records per hook'),
-    syncFromBrowser: zod.boolean().optional().default(false).describe('Sync data from browser before listing'),
+    hookId: zod
+      .string()
+      .optional()
+      .describe('Specific hook ID to inspect, omit for all'),
+    verbose: zod
+      .boolean()
+      .optional()
+      .default(false)
+      .describe('Include detailed records per hook'),
+    syncFromBrowser: zod
+      .boolean()
+      .optional()
+      .default(false)
+      .describe('Sync data from browser before listing'),
   },
   handler: async (request, response, context) => {
-    const {hookId, verbose = false, syncFromBrowser = false} = request.params;
+    const {hookId, verbose = false} = request.params;
+    const syncFromBrowser = request.params.syncFromBrowser ?? Boolean(hookId);
     const runtime = getRuntime();
 
     try {
@@ -77,28 +89,51 @@ export const listCreatedHooks = defineTool({
       });
 
       // 3. 如果有浏览器同步数据，合并记录数
+      const legacySummary =
+        browserData && typeof browserData === 'object'
+          ? summarizeHookStore(browserData, {
+              preserveEmpty: true,
+            })
+          : null;
       if (browserData && typeof browserData === 'object') {
-        const summary = summarizeHookStore(browserData, {
-          preserveEmpty: true,
-        });
         for (const hook of hooks) {
-          const browserHook = summary.hooks.find(h => h.hookId === (hook as {hookId: string}).hookId);
+          const browserHook = legacySummary?.hooks.find(
+            h => h.hookId === (hook as {hookId: string}).hookId,
+          );
           if (browserHook) {
-            (hook as Record<string, unknown>).browserRecordCount = browserHook.total;
+            (hook as Record<string, unknown>).browserRecordCount =
+              browserHook.total;
           }
         }
       }
 
       response.setStructuredContent({
         success: true,
-        message: `共 ${hooks.length} 个 Hook`,
+        message: legacySummary
+          ? `同步完成，${legacySummary.totalHooks} 个 Hook，共 ${legacySummary.totalRecords} 条记录`
+          : `共 ${hooks.length} 个 Hook`,
         tooltype: 'list_created_hooks',
-        data: {
-          totalHooks: hooks.length,
-          totalEnabled: allHooks.filter(h => h.enabled).length,
-          totalDisabled: allHooks.filter(h => !h.enabled).length,
-          hooks,
-        },
+        ...(legacySummary
+          ? {
+              syncedHookIds: legacySummary.hooks.map(h => h.hookId),
+              totalRecords: legacySummary.totalRecords,
+              hooks: legacySummary.hooks.map(h => ({
+                hookId: h.hookId,
+                total: h.total,
+                type: h.type,
+              })),
+            }
+          : {}),
+        ...(legacySummary
+          ? {}
+          : {
+              data: {
+                totalHooks: hooks.length,
+                totalEnabled: allHooks.filter(h => h.enabled).length,
+                totalDisabled: allHooks.filter(h => !h.enabled).length,
+                hooks,
+              },
+            }),
       });
     } catch (error) {
       response.setStructuredContent({

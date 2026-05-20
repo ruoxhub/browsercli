@@ -7,24 +7,38 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
+import {ToolResponseAccumulator} from '../../../src/worker/ToolResponseAccumulator.js';
 import {deobfuscateCode} from '../../../src/tools/analyzer/deobfuscate.js';
 import {ToolContextProvider} from '../../../src/worker/ToolContextProvider.js';
 
 describe('ToolContextProvider', () => {
   it('provides analyzer runtime services for deobfuscate_code', async () => {
-    const result = await deobfuscateCode({
-      code: [
-        "function _0x5c1a(){const _0x2f8b=['log','Hello, JSReverser-MCP!'];",
-        '_0x5c1a=function(){return _0x2f8b;};return _0x5c1a();}',
-        'function _0x1f4d(_0x31f4f6,_0x4df9ff){const _0x5c1af4=_0x5c1a();',
-        'return _0x1f4d=function(_0x1f4d7d,_0x2dcf8d){_0x1f4d7d=_0x1f4d7d-0x0;',
-        'return _0x5c1af4[_0x1f4d7d];},_0x1f4d(_0x31f4f6,_0x4df9ff);}',
-        'console[_0x1f4d(0x0)](_0x1f4d(0x1));',
-      ].join(''),
-      aggressive: true,
-      renameVariables: true,
-    });
+    const response = new ToolResponseAccumulator();
+    await deobfuscateCode.handler(
+      {
+        params: {
+          code: [
+            "function _0x5c1a(){const _0x2f8b=['log','Hello, JSReverser-MCP!'];",
+            '_0x5c1a=function(){return _0x2f8b;};return _0x5c1a();}',
+            'function _0x1f4d(_0x31f4f6,_0x4df9ff){const _0x5c1af4=_0x5c1a();',
+            'return _0x1f4d=function(_0x1f4d7d,_0x2dcf8d){_0x1f4d7d=_0x1f4d7d-0x0;',
+            'return _0x5c1af4[_0x1f4d7d];},_0x1f4d(_0x31f4f6,_0x4df9ff);}',
+            'console[_0x1f4d(0x0)](_0x1f4d(0x1));',
+          ].join(''),
+          aggressive: true,
+          renameVariables: true,
+        },
+      },
+      response,
+      {} as never,
+    );
 
+    const result = response.toJSON().structuredContent as {
+      success: boolean;
+      tooltype: string;
+      message: string;
+      data: {code: string};
+    };
     assert.equal(result.success, true);
     assert.equal(result.tooltype, 'deobfuscate');
     assert.match(result.message, /completed/i);
@@ -63,6 +77,10 @@ describe('ToolContextProvider', () => {
     const newFrame = {name: 'new-main-frame'};
     const newPage = {
       mainFrame: () => newFrame,
+      on: () => undefined,
+      once: () => undefined,
+      setDefaultTimeout: () => undefined,
+      setDefaultNavigationTimeout: () => undefined,
     };
 
     runtime.setSelectedFrame(oldFrame as never);

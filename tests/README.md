@@ -22,19 +22,28 @@ tests/
 ### Unit Tests
 
 Run all unit tests:
+
 ```bash
 npm test
 ```
 
 Run tests without rebuilding:
+
 ```bash
 npm run test:only:no-build
 ```
 
 Run only specific tests (marked with `.only`):
+
 ```bash
 npm run test:only
 ```
+
+### Focused Refactor Suites
+
+- `npm run test:worker` verifies the worker adapter, execution pipeline, context provider, and lifecycle units.
+- `npm run test:registry` verifies generated tool metadata and profile-aware registry behavior.
+- Run `npm run typecheck`, `npm run check-format`, and `npm run test:unit` before merging execution-pipeline or registry changes.
 
 ### Integration Tests
 
@@ -49,6 +58,7 @@ npm test -- tests/integration/
 ```
 
 **Note:** Integration tests for Gemini CLI require `gemini-cli` to be installed:
+
 ```bash
 npm install -g @google/generative-ai-cli
 ```
@@ -71,7 +81,7 @@ node --experimental-strip-types tests/manual/test-gemini-provider.ts
 Unit tests use Node.js built-in test runner. Example:
 
 ```typescript
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 import assert from 'node:assert';
 
 describe('MyModule', () => {
@@ -93,12 +103,14 @@ describe('MyModule', () => {
 ### Unit vs Integration Tests
 
 **Unit Tests:**
+
 - Test individual components in isolation
 - Use mocks and stubs for dependencies
 - Fast execution
 - No external dependencies required
 
 **Integration Tests:**
+
 - Test components with real dependencies
 - Verify actual behavior with external systems
 - May require setup (e.g., installing CLI tools)
