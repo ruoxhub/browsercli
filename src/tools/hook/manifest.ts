@@ -9,6 +9,27 @@ import type {DomainManifest} from '../manifest.js';
 export const manifest = {
   name: 'hook',
   description: 'JavaScript runtime hook creation and management tools.',
+  prerequisites: {
+    injectHook: [
+      {condition: 'requiresPage', fix: 'Start or attach a browser page first.'},
+    ],
+    hookCookie: [
+      {condition: 'requiresPage', fix: 'Start or attach a browser page first.'},
+    ],
+    hookFetch: [
+      {condition: 'requiresPage', fix: 'Start or attach a browser page first.'},
+    ],
+  },
+  toolDependencies: [
+    {from: 'injectHook', to: 'createHook', relation: 'requires', weight: 1},
+    {from: 'hookCookie', to: 'injectHook', relation: 'uses', weight: 0.8},
+    {from: 'hookFetch', to: 'injectHook', relation: 'uses', weight: 0.8},
+  ],
+  sceneKeywords: {
+    hookCookie: ['cookie', 'document.cookie', 'runtime hook'],
+    hookFetch: ['fetch', 'request', 'network hook'],
+    injectHook: ['inject', 'runtime', 'instrumentation'],
+  },
   tools: [
     {modulePath: './hook/CreateHook.js', handlerName: 'createHook'},
     {modulePath: './hook/InjectHook.js', handlerName: 'injectHook'},
@@ -17,7 +38,10 @@ export const manifest = {
     {modulePath: './hook/RemoveHook.js', handlerName: 'removeHook'},
     {modulePath: './hook/ListCreatedHooks.js', handlerName: 'listCreatedHooks'},
     {modulePath: './hook/XhrOpen.js', handlerName: 'hookXhrOpen'},
-    {modulePath: './hook/XhrSetRequestHeader.js', handlerName: 'hookXhrSetRequestHeader'},
+    {
+      modulePath: './hook/XhrSetRequestHeader.js',
+      handlerName: 'hookXhrSetRequestHeader',
+    },
     {modulePath: './hook/Fetch.js', handlerName: 'hookFetch'},
     {modulePath: './hook/AnalyzeUrlParams.js', handlerName: 'analyzeUrlParams'},
     {modulePath: './hook/Cookie.js', handlerName: 'hookCookie'},

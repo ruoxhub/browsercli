@@ -5,6 +5,9 @@
  */
 
 import assert from 'node:assert';
+import {mkdtempSync, readFileSync, rmSync} from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import {describe, it} from 'node:test';
 
 import {
@@ -17,7 +20,13 @@ import {ToolExecutionPipeline} from '../../../src/worker/ToolExecutionPipeline.j
 import type {ToolExecutionRouter} from '../../../src/worker/ToolExecutionRouter.js';
 import type {ToolHandlerLoader} from '../../../src/worker/ToolHandlerLoader.js';
 import type {ToolResponseOffloader} from '../../../src/worker/ToolResponseOffloader.js';
+import {ToolResultRecorder} from '../../../src/worker/ToolResultRecorder.js';
 import type {ToolTelemetry} from '../../../src/worker/ToolTelemetry.js';
+
+interface TestResultRecorder {
+  records: unknown[];
+  record(record: unknown): void;
+}
 
 function meta(overrides: Partial<ToolMeta> = {}): ToolMeta {
   return {
@@ -42,6 +51,7 @@ function createPipeline(
       successes: unknown[];
       failures: unknown[];
     };
+    recorder?: TestResultRecorder;
   } = {},
 ) {
   const handler = options.handler ?? (async () => undefined);
@@ -67,15 +77,30 @@ function createPipeline(
   } as unknown as ToolTelemetry;
 
   return {
-    pipeline: new ToolExecutionPipeline(loader, router, offloader, telemetry),
+    pipeline: new ToolExecutionPipeline(
+      loader,
+      router,
+      offloader,
+      telemetry,
+      undefined,
+      undefined,
+      options.recorder as never,
+    ),
     telemetryState,
   };
 }
 
 describe('ToolExecutionPipeline', () => {
   it('execute returns normalized response for successful function tool', async () => {
+    const recorder: TestResultRecorder = {
+      records: [],
+      record(record: unknown) {
+        this.records.push(record);
+      },
+    };
     const {pipeline, telemetryState} = createPipeline({
       result: {value: 'ok'},
+      recorder,
     });
 
     const result = await pipeline.execute(meta(), {value: 'ok'});
@@ -85,6 +110,13 @@ describe('ToolExecutionPipeline', () => {
     });
     assert.strictEqual(telemetryState.successes.length, 1);
     assert.strictEqual(telemetryState.failures.length, 0);
+    assert.strictEqual(recorder.records.length, 1);
+    assert.deepStrictEqual(
+      (recorder.records[0] as Record<string, unknown>).response,
+      {
+        structuredContent: {value: 'ok'},
+      },
+    );
   });
 
   it('execute throws VALIDATION when args are invalid', async () => {
@@ -133,18 +165,36 @@ describe('ToolExecutionPipeline', () => {
   });
 
   it('execute normalizes unknown thrown errors into RUNTIME ToolError', async () => {
+    const recorder: TestResultRecorder = {
+      records: [],
+      record(record: unknown) {
+        this.records.push(record);
+      },
+    };
     const {pipeline, telemetryState} = createPipeline({
       thrown: new Error('boom'),
+      recorder,
     });
 
     await assert.rejects(
-      pipeline.execute(meta(), {}),
+      pipeline.execute(meta(), {value: 'ok'}),
       (error: unknown) =>
         error instanceof ToolError &&
         error.code === ErrorCodes.RUNTIME &&
         error.message === 'boom',
     );
     assert.strictEqual(telemetryState.failures.length, 1);
+    assert.deepStrictEqual(
+      (recorder.records[0] as Record<string, unknown>).request,
+      {value: 'ok'},
+    );
+    assert.deepStrictEqual(
+      (recorder.records[0] as Record<string, unknown>).error,
+      {
+        code: ErrorCodes.RUNTIME,
+        message: 'boom',
+      },
+    );
   });
 
   it('execute passes large normalized responses through ToolResponseOffloader', async () => {
@@ -158,5 +208,121 @@ describe('ToolExecutionPipeline', () => {
     assert.deepStrictEqual(result, {
       offloaded: {text: 'large text'},
     });
+  });
+
+  it('checks prerequisites before loading handlers', async () => {
+    let loaded = false;
+    const loader = {
+      load: async () => {
+        loaded = true;
+        return async () => ({ok: true});
+      },
+    } as unknown as ToolHandlerLoader;
+    const router = {
+      execute: async () => ({ok: true}),
+    } as unknown as ToolExecutionRouter;
+    const offloader = {
+      handle: (response: unknown) => response,
+    } as unknown as ToolResponseOffloader;
+    const failures: unknown[] = [];
+    const telemetry = {
+      success: () => undefined,
+      failure: (...args: unknown[]) => failures.push(args),
+    } as unknown as ToolTelemetry;
+    const pipeline = new ToolExecutionPipeline(
+      loader,
+      router,
+      offloader,
+      telemetry,
+      undefined,
+      {
+        check: () => {
+          throw new ToolError(ErrorCodes.PREREQUISITE, 'missing page');
+        },
+      } as never,
+    );
+
+    await assert.rejects(
+      pipeline.execute(
+        meta({
+          prerequisites: [
+            {
+              condition: 'requiresPage',
+              fix: 'Start or attach a browser page first.',
+            },
+          ],
+        }),
+        {},
+      ),
+      (error: unknown) =>
+        error instanceof ToolError && error.code === ErrorCodes.PREREQUISITE,
+    );
+    assert.strictEqual(loaded, false);
+    assert.strictEqual(failures.length, 1);
+  });
+
+  it('enriches normalized responses before offloading', async () => {
+    const {pipeline} = createPipeline({
+      result: {ok: true},
+      offload: response => response,
+    });
+    const contextGuard = {
+      recordCall: () => 1,
+      enrichResponse: (_toolName: string, response: unknown) => ({
+        ...(response as Record<string, unknown>),
+        guarded: true,
+      }),
+    };
+    const patched = pipeline as unknown as {
+      contextGuard: typeof contextGuard;
+    };
+    patched.contextGuard = contextGuard;
+
+    const result = await pipeline.execute(meta(), {});
+
+    assert.deepStrictEqual(result, {
+      structuredContent: {ok: true},
+      guarded: true,
+    });
+  });
+
+  it('records tool results to JSONL when enabled', async () => {
+    const outputDir = mkdtempSync(path.join(os.tmpdir(), 'tool-results-'));
+    try {
+      const recorder = new ToolResultRecorder(
+        () => ({
+          enabled: true,
+          outputDir,
+        }),
+        () => new Date('2026-05-21T00:00:00.000Z'),
+      );
+
+      recorder.record({
+        toolName: 'pipeline_fixture',
+        success: true,
+        startedAt: '2026-05-21T00:00:00.000Z',
+        durationMs: 5,
+        request: {value: 'ok'},
+        response: {structuredContent: {value: 'ok'}},
+      });
+
+      const content = readFileSync(
+        path.join(outputDir, '2026-05-21.jsonl'),
+        'utf-8',
+      )
+        .trim()
+        .split('\n');
+      assert.strictEqual(content.length, 1);
+      assert.deepStrictEqual(JSON.parse(content[0]!), {
+        toolName: 'pipeline_fixture',
+        success: true,
+        startedAt: '2026-05-21T00:00:00.000Z',
+        durationMs: 5,
+        request: {value: 'ok'},
+        response: {structuredContent: {value: 'ok'}},
+      });
+    } finally {
+      rmSync(outputDir, {force: true, recursive: true});
+    }
   });
 });

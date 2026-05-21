@@ -4,14 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {ToolMeta} from '../cli/tools-meta.js';
 import {validateToolArgs} from '../cli/tool-arg-validator.js';
+import type {ToolMeta} from '../cli/tools-meta.js';
+import type {ToolPrerequisiteChecker} from '../tools/prerequisites/ToolPrerequisiteChecker.js';
 import {createToolError, ErrorCodes, ToolError} from '../utils/errors.js';
 
+import type {ToolCallContextGuard} from './ToolCallContextGuard.js';
 import type {ToolExecutionRouter} from './ToolExecutionRouter.js';
 import type {ToolHandlerLoader} from './ToolHandlerLoader.js';
 import {ToolResponseAccumulator} from './ToolResponseAccumulator.js';
 import type {ToolResponseOffloader} from './ToolResponseOffloader.js';
+import {ToolResultRecorder} from './ToolResultRecorder.js';
 import type {ToolTelemetry} from './ToolTelemetry.js';
 
 export class ToolExecutionPipeline {
@@ -20,11 +23,15 @@ export class ToolExecutionPipeline {
     private readonly router: ToolExecutionRouter,
     private readonly offloader: ToolResponseOffloader,
     private readonly telemetry: ToolTelemetry,
+    private readonly contextGuard?: ToolCallContextGuard,
+    private readonly prerequisiteChecker?: ToolPrerequisiteChecker,
+    private readonly resultRecorder = new ToolResultRecorder(),
   ) {}
 
   async execute(meta: ToolMeta, rawParams: unknown): Promise<unknown> {
     const startedAt = Date.now();
     const toolName = meta.name;
+    let params: Record<string, unknown> | undefined;
 
     try {
       const validated = validateToolArgs(
@@ -39,8 +46,8 @@ export class ToolExecutionPipeline {
         );
       }
 
-      const params = (validated as {ok: true; value: Record<string, unknown>})
-        .value;
+      params = (validated as {ok: true; value: Record<string, unknown>}).value;
+      this.prerequisiteChecker?.check(toolName, meta.prerequisites);
       const handler = await this.loader.load(meta);
       if (!handler) {
         throw createToolError(
@@ -51,13 +58,25 @@ export class ToolExecutionPipeline {
       }
 
       const rawResult = await this.router.execute(meta, handler, params);
-      const response = this.offloader.handle(this.normalizeResponse(rawResult));
+      const normalized = this.normalizeResponse(rawResult);
+      this.contextGuard?.recordCall(toolName);
+      const enriched =
+        this.contextGuard?.enrichResponse(toolName, normalized) ?? normalized;
+      const response = this.offloader.handle(enriched);
       this.telemetry.success(
         toolName,
         params,
         response,
         Date.now() - startedAt,
       );
+      this.resultRecorder.record({
+        toolName,
+        success: true,
+        startedAt: new Date(startedAt).toISOString(),
+        durationMs: Date.now() - startedAt,
+        request: params,
+        response,
+      });
       return response;
     } catch (error) {
       const toolError =
@@ -69,6 +88,17 @@ export class ToolExecutionPipeline {
               {toolName},
             );
       this.telemetry.failure(toolName, toolError, Date.now() - startedAt);
+      this.resultRecorder.record({
+        toolName,
+        success: false,
+        startedAt: new Date(startedAt).toISOString(),
+        durationMs: Date.now() - startedAt,
+        request: params,
+        error: {
+          code: toolError.code,
+          message: toolError.message,
+        },
+      });
       throw toolError;
     }
   }

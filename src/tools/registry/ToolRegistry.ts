@@ -18,6 +18,10 @@ export interface RegisteredToolEntry {
   handlerName: string;
   profile: ToolProfile;
   dependencies?: string[];
+  prerequisites?: DomainManifest['prerequisites'][string];
+  toolDependencies?: DomainManifest['toolDependencies'];
+  sceneKeywords?: string[];
+  workflowRule?: DomainManifest['workflowRule'];
 }
 
 export class ToolRegistry {
@@ -38,6 +42,18 @@ export class ToolRegistry {
           handlerName: tool.handlerName,
           profile: this.getEffectiveProfile(manifest, tool),
           dependencies: manifest.dependencies,
+          ...(manifest.prerequisites?.[tool.handlerName]
+            ? {prerequisites: manifest.prerequisites[tool.handlerName]}
+            : {}),
+          ...(manifest.toolDependencies
+            ? {toolDependencies: manifest.toolDependencies}
+            : {}),
+          ...(manifest.sceneKeywords?.[tool.handlerName]
+            ? {sceneKeywords: manifest.sceneKeywords[tool.handlerName]}
+            : {}),
+          ...(manifest.workflowRule
+            ? {workflowRule: manifest.workflowRule}
+            : {}),
         })),
     );
   }

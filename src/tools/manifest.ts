@@ -18,10 +18,34 @@ export interface ToolEntry {
 
 export type ToolProfile = 'search' | 'workflow' | 'full';
 
+export interface ToolPrerequisite {
+  condition: 'requiresPage' | 'requiresDebugger' | 'requiresHookStore' | string;
+  fix: string;
+}
+
+export interface ToolDependency {
+  from: string;
+  to: string;
+  relation: 'requires' | 'precedes' | 'suggests' | 'uses' | 'extends';
+  weight?: number;
+}
+
+export interface WorkflowRule {
+  patterns: readonly RegExp[];
+  priority: number;
+  tools: readonly string[];
+  hint: string;
+}
+
 export interface DomainManifest {
   name: string;
   description: string;
+  version?: 1;
   profile?: ToolProfile;
   dependencies?: string[];
+  prerequisites?: Record<string, ToolPrerequisite[]>;
+  toolDependencies?: ToolDependency[];
+  sceneKeywords?: Record<string, string[]>;
+  workflowRule?: WorkflowRule;
   tools: ToolEntry[];
 }

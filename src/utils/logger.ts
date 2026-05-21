@@ -12,6 +12,8 @@
  */
 
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 import chalk from 'chalk';
 
@@ -20,6 +22,115 @@ import {getEnvValue} from '../config.js';
 import {safeStringify} from './safeJson.js';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+
+type ConsoleMethod = 'debug' | 'error' | 'info' | 'log' | 'warn';
+
+interface LoggerConsoleState {
+  defaultLogFileName: string | null;
+  defaultLogHome: string | null;
+  defaultLoggingEnabled: boolean;
+  fileStream: fs.WriteStream | null;
+  installed: boolean;
+  original: Record<ConsoleMethod, (...args: unknown[]) => void>;
+  writingFromLogger: boolean;
+}
+
+const LOGGER_CONSOLE_STATE = Symbol.for('jsreverser.logger.consoleState');
+
+function getConsoleState(): LoggerConsoleState {
+  const globalWithState = globalThis as typeof globalThis & {
+    [LOGGER_CONSOLE_STATE]?: LoggerConsoleState;
+  };
+  if (!globalWithState[LOGGER_CONSOLE_STATE]) {
+    globalWithState[LOGGER_CONSOLE_STATE] = {
+      defaultLogFileName: null,
+      defaultLogHome: null,
+      defaultLoggingEnabled: false,
+      fileStream: null,
+      installed: false,
+      original: {
+        debug: console.debug.bind(console),
+        error: console.error.bind(console),
+        info: console.info.bind(console),
+        log: console.log.bind(console),
+        warn: console.warn.bind(console),
+      },
+      writingFromLogger: false,
+    };
+  }
+  return globalWithState[LOGGER_CONSOLE_STATE];
+}
+
+function createDefaultLogFileName(now = new Date()): string {
+  const state = getConsoleState();
+  const home = os.homedir();
+  if (!state.defaultLogFileName || state.defaultLogHome !== home) {
+    const datetime = now.toISOString().replace(/[:.]/g, '-');
+    state.defaultLogHome = home;
+    state.defaultLogFileName = path.join(
+      home,
+      '.jsreverse',
+      'log',
+      `${datetime}.log`,
+    );
+  }
+  return state.defaultLogFileName;
+}
+
+function formatConsoleArg(arg: unknown): string {
+  return typeof arg === 'string' ? arg : safeStringify(arg);
+}
+
+function formatConsoleMessage(method: ConsoleMethod, args: unknown[]): string {
+  const timestamp = new Date().toISOString();
+  const level = method === 'log' ? 'INFO' : method.toUpperCase();
+  return `[${timestamp}] [${level}] ${args.map(formatConsoleArg).join(' ')}`;
+}
+
+function openLogFile(fileName: string): fs.WriteStream {
+  fs.mkdirSync(path.dirname(fileName), {recursive: true});
+  const stream = fs.createWriteStream(fileName, {flags: 'a+'});
+  stream.on('error', (error: Error) => {
+    console.error(`Error when opening/writing to log file: ${error.message}`);
+    stream.end();
+    process.exit(1);
+  });
+  return stream;
+}
+
+function ensureDefaultFileStream(): fs.WriteStream | null {
+  const state = getConsoleState();
+  if (state.fileStream) {
+    return state.fileStream;
+  }
+  if (!state.defaultLoggingEnabled) {
+    return null;
+  }
+  state.fileStream = openLogFile(createDefaultLogFileName());
+  return state.fileStream;
+}
+
+function writeConsoleLog(method: ConsoleMethod, args: unknown[]): void {
+  ensureDefaultFileStream()?.write(`${formatConsoleMessage(method, args)}\n`);
+}
+
+function installConsoleFileBridge(): void {
+  const state = getConsoleState();
+  if (state.installed) {
+    return;
+  }
+
+  const methods: ConsoleMethod[] = ['debug', 'error', 'info', 'log', 'warn'];
+  for (const method of methods) {
+    console[method] = ((...args: unknown[]) => {
+      if (!state.writingFromLogger) {
+        writeConsoleLog(method, args);
+      }
+      state.original[method](...args);
+    }) as (typeof console)[typeof method];
+  }
+  state.installed = true;
+}
 
 class Logger {
   private level: LogLevel;
@@ -60,7 +171,11 @@ class Logger {
     const formatted = this.formatMessage(level, message, ...args);
 
     // 写入文件流（无颜色）
-    this.fileStream?.write(`${formatted}\n`);
+    const stream = this.fileStream ?? ensureDefaultFileStream();
+    stream?.write(`${formatted}\n`);
+    if (!this.fileStream && stream) {
+      this.fileStream = stream;
+    }
 
     // 控制台输出（带颜色）
     const colorFn: Record<LogLevel, (text: string) => string> = {
@@ -69,7 +184,13 @@ class Logger {
       warn: chalk.yellow,
       error: chalk.red,
     };
-    console.error(colorFn[level](formatted));
+    const state = getConsoleState();
+    state.writingFromLogger = true;
+    try {
+      console.error(colorFn[level](formatted));
+    } finally {
+      state.writingFromLogger = false;
+    }
   }
 
   debug(message: string, ...args: unknown[]): void {
@@ -91,8 +212,18 @@ class Logger {
   success(message: string, ...args: unknown[]): void {
     if (this.shouldLog('info')) {
       const formatted = this.formatMessage('info', message, ...args);
-      this.fileStream?.write(`${formatted}\n`);
-      console.error(chalk.green(formatted));
+      const stream = this.fileStream ?? ensureDefaultFileStream();
+      stream?.write(`${formatted}\n`);
+      if (!this.fileStream && stream) {
+        this.fileStream = stream;
+      }
+      const state = getConsoleState();
+      state.writingFromLogger = true;
+      try {
+        console.error(chalk.green(formatted));
+      } finally {
+        state.writingFromLogger = false;
+      }
     }
   }
 
@@ -100,21 +231,50 @@ class Logger {
     this.level = level;
   }
 
+  useFileStream(stream: fs.WriteStream): void {
+    this.fileStream = stream;
+  }
+
   /**
    * 将日志写入指定文件，同时保留控制台输出。
    * 替代原 src/logger.ts 中基于 debug 库的 saveLogsToFile。
    */
   saveLogsToFile(fileName: string): fs.WriteStream {
-    const stream = fs.createWriteStream(fileName, {flags: 'a+'});
-    stream.on('error', (error: Error) => {
-      console.error(
-        `Error when opening/writing to log file: ${error.message}`,
-      );
-      stream.end();
-      process.exit(1);
-    });
+    this.fileStream?.end();
+    const stream = openLogFile(fileName);
     this.fileStream = stream;
+    getConsoleState().fileStream = stream;
     return stream;
+  }
+
+  close(): Promise<void> {
+    const stream = this.fileStream;
+    if (!stream) {
+      return Promise.resolve();
+    }
+    this.fileStream = null;
+    const state = getConsoleState();
+    if (state.fileStream === stream) {
+      state.fileStream = null;
+    }
+    return new Promise(resolve => {
+      stream.end(() => resolve());
+    });
+  }
+
+  flush(): Promise<void> {
+    if (!this.fileStream) {
+      return Promise.resolve();
+    }
+    return new Promise((resolve, reject) => {
+      this.fileStream?.write('', error => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve();
+      });
+    });
   }
 }
 
@@ -128,10 +288,28 @@ function parseLogLevel(value: string | undefined): LogLevel {
 
 export const logger = new Logger(parseLogLevel(getEnvValue('LOG_LEVEL')));
 
+if (process.env.NODE_ENV !== 'test') {
+  installConsoleFileBridge();
+  const state = getConsoleState();
+  state.defaultLoggingEnabled = true;
+  if (state.fileStream) {
+    logger.useFileStream(state.fileStream);
+  }
+}
+
 /**
  * 将日志保存到文件的便捷函数。
  * 兼容原 src/logger.ts 的 saveLogsToFile 接口。
  */
 export function saveLogsToFile(fileName: string): fs.WriteStream {
+  installConsoleFileBridge();
   return logger.saveLogsToFile(fileName);
+}
+
+export function flushLogs(): Promise<void> {
+  return logger.flush();
+}
+
+export function closeLogs(): Promise<void> {
+  return logger.close();
 }

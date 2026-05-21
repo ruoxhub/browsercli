@@ -235,14 +235,14 @@ export class RpcClient {
    */
   private setConnectionState(state: RpcConnectionState): void {
     this._connectionState = state;
-    this.log(`连接状态变更: ${state}`);
+    // this.log(`连接状态变更: ${state}`);
   }
 
   /**
    * 连接 WebSocket
    */
   private connect(): void {
-    this.log(`正在连接 wsURL: ${this.wsURL}`);
+    // this.log(`正在连接 wsURL: ${this.wsURL}`);
     this.isManualDisconnect = false;
     this.setConnectionState('connecting');
 
@@ -250,7 +250,7 @@ export class RpcClient {
       this.socket = new WebSocket(this.wsURL);
 
       this.socket.onopen = () => {
-        this.log('成功建立连接');
+        // this.log('成功建立连接');
         this.setConnectionState('connected');
         this.reconnectAttempts = 0;
         this.startHeartbeat();
@@ -272,11 +272,11 @@ export class RpcClient {
         this.stopHeartbeat();
 
         if (this.isManualDisconnect) {
-          this.log('连接已手动断开');
+          // this.log('连接已手动断开');
           this.setConnectionState('disconnected');
           return;
         }
-        this.log(`连接断开 (code=${event.code})，将自动重连`);
+        // this.log(`连接断开 (code=${event.code})，将自动重连`);
         this.scheduleReconnect();
       };
 
@@ -355,7 +355,7 @@ export class RpcClient {
     );
     this.reconnectAttempts++;
 
-    this.log(`${delay}ms 后重连 (attempt=${this.reconnectAttempts})`);
+    // this.log(`${delay}ms 后重连 (attempt=${this.reconnectAttempts})`);
     this.reconnectTimer = setTimeout(() => {
       if (!this.isManualDisconnect) {
         this.connect();

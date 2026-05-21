@@ -13,8 +13,11 @@ export const DEFAULT_GROUP = 'js-reverse';
 /** Worker 进程运行时目录 */
 export const RUNTIME_DIR_NAME = 'js-reverse';
 
+/** 用户级配置目录名 */
+export const USER_CONFIG_DIR_NAME = '.jsreverse';
+
 /** 用户级配置文件名 */
-export const USER_CONFIG_FILENAME = '.jsreverserrc.json';
+export const USER_CONFIG_FILENAME = 'config.json';
 
 /** 项目级配置文件名 */
 export const PROJECT_CONFIG_FILENAME = 'js-reverse.config.json';

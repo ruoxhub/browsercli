@@ -45,6 +45,7 @@ import {DataCollectorManager} from './context/DataCollectorManager.js';
 import {DebuggerSessionManager} from './context/DebuggerSessionManager.js';
 import {PageManager} from './context/PageManager.js';
 import {ServiceLocator} from './context/ServiceLocator.js';
+import type {ToolTabContext} from './ToolCallContextGuard.js';
 
 type TraceResult = unknown;
 
@@ -190,6 +191,18 @@ export class ToolContextProvider {
 
   getPages(): Page[] {
     return this._pageManager.getPages();
+  }
+
+  getContextMeta(): ToolTabContext {
+    const page = this.getSelectedPage();
+    const pages = this.getPages();
+    const tabIndex = page ? pages.indexOf(page) : null;
+    return {
+      url: page?.url() ?? null,
+      title: null,
+      tabIndex,
+      pageId: tabIndex === null || tabIndex < 0 ? null : String(tabIndex),
+    };
   }
 
   async syncPages(): Promise<Page[]> {

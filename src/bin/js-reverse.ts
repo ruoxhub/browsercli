@@ -24,6 +24,8 @@
 
 import {runAxiCli} from 'axi-sdk-js';
 
+import '../utils/logger.js';
+
 import {
   cliCommands,
   cliDescription,

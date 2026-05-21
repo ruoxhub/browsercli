@@ -19,13 +19,15 @@ import {
   getAllToolNames,
   getToolMeta,
 } from '../cli/tools-meta.js';
+import {ToolPrerequisiteChecker} from '../tools/prerequisites/ToolPrerequisiteChecker.js';
 import type {ActionHandler} from '../types/rpc.js';
 
 import {DefineToolContextFactory} from './DefineToolContextFactory.js';
+import {ToolCallContextGuard} from './ToolCallContextGuard.js';
+import type {ToolContextProvider} from './ToolContextProvider.js';
 import {ToolExecutionPipeline} from './ToolExecutionPipeline.js';
 import {ToolExecutionRouter} from './ToolExecutionRouter.js';
 import {ToolHandlerLoader} from './ToolHandlerLoader.js';
-import type {ToolContextProvider} from './ToolContextProvider.js';
 import {ToolResponseOffloader} from './ToolResponseOffloader.js';
 import {ToolTelemetry} from './ToolTelemetry.js';
 
@@ -49,6 +51,8 @@ export class ToolAdapter {
       this.router,
       new ToolResponseOffloader(),
       new ToolTelemetry(contextProvider),
+      new ToolCallContextGuard(() => contextProvider),
+      new ToolPrerequisiteChecker(contextProvider),
     );
   }
 

@@ -15,6 +15,7 @@ import assert from 'node:assert';
 import { describe, it, beforeEach, afterEach } from 'node:test';
 
 import {
+  getUserConfigPath,
   getDefaultLLMProvider,
   getAIConfig,
   getBrowserConfig,
@@ -55,6 +56,14 @@ describe('Configuration Management', () => {
   afterEach(() => {
     // Restore original environment variables
     process.env = { ...originalEnv };
+  });
+
+  describe('user config path', () => {
+    it('stores user configuration in ~/.jsreverse/config.json', () => {
+      const expectedSuffix = ['.jsreverse', 'config.json'].join('/');
+
+      assert.ok(getUserConfigPath().replace(/\\/g, '/').endsWith(expectedSuffix));
+    });
   });
 
   describe('getDefaultLLMProvider', () => {

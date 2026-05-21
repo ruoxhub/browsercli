@@ -17,5 +17,9 @@
     "browserURL": "http://127.0.0.1:19222",
     "wsEndpoint": ""
   },
+  "toolResultRecording": {
+    "enabled": false,
+    "outputDir": "~/.jsreverse/tool-results"
+  },
   "debug": false
 }

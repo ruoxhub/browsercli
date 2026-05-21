@@ -11,14 +11,18 @@
  * name / description / schema 从对应 defineTool 的导出自动提取。
  */
 
-import type {ToolDefinition} from '../tools/ToolDefinition.js';
 import {GENERATED_DOMAIN_MANIFESTS} from '../tools/generated-tools-index.js';
 import type {ToolProfile} from '../tools/manifest.js';
-import {ToolRegistry} from '../tools/registry/ToolRegistry.js';
+import {
+  ToolRegistry,
+  type RegisteredToolEntry,
+} from '../tools/registry/ToolRegistry.js';
+import type {ToolDefinition} from '../tools/ToolDefinition.js';
+
+import {ToolSearchEngine} from './tool-search-engine.js';
 import {
   extractArgSpecsFromSchema,
   extractSchemaTypeMap,
-  type ToolArgSpec,
   type ToolArgSpecMap,
 } from './zod-introspect.js';
 
@@ -30,6 +34,13 @@ export type ToolCallMode = 'defineTool';
 export interface ToolRegistryEntry {
   modulePath: string;
   handlerName: string;
+  domain: string;
+  profile: ToolProfile;
+  dependencies?: string[];
+  prerequisites?: RegisteredToolEntry['prerequisites'];
+  toolDependencies?: RegisteredToolEntry['toolDependencies'];
+  sceneKeywords?: string[];
+  workflowRule?: RegisteredToolEntry['workflowRule'];
 }
 
 /**
@@ -45,6 +56,13 @@ export interface ToolMeta {
   modulePath: string;
   handlerName: string;
   callMode: ToolCallMode;
+  domain: string;
+  profile: ToolProfile;
+  dependencies?: string[];
+  prerequisites?: ToolRegistryEntry['prerequisites'];
+  toolDependencies?: ToolRegistryEntry['toolDependencies'];
+  sceneKeywords?: string[];
+  workflowRule?: ToolRegistryEntry['workflowRule'];
 }
 
 /**
@@ -105,6 +123,13 @@ async function loadToolMeta(
         modulePath: entry.modulePath,
         handlerName: entry.handlerName,
         callMode: 'defineTool',
+        domain: entry.domain,
+        profile: entry.profile,
+        dependencies: entry.dependencies,
+        prerequisites: entry.prerequisites,
+        toolDependencies: entry.toolDependencies,
+        sceneKeywords: entry.sceneKeywords,
+        workflowRule: entry.workflowRule,
       };
     }
 
@@ -195,6 +220,13 @@ export function getToolMeta(name: string): ToolMeta | undefined {
     modulePath: entry.modulePath,
     handlerName: entry.handlerName,
     callMode: 'defineTool',
+    domain: entry.domain,
+    profile: entry.profile,
+    dependencies: entry.dependencies,
+    prerequisites: entry.prerequisites,
+    toolDependencies: entry.toolDependencies,
+    sceneKeywords: entry.sceneKeywords,
+    workflowRule: entry.workflowRule,
   };
 }
 
@@ -223,12 +255,7 @@ export function getAllToolNames(): string[] {
  */
 export async function searchTools(query: string): Promise<ToolMeta[]> {
   const meta = await getToolsMeta();
-  const lower = query.toLowerCase();
-  return meta.filter(
-    t =>
-      t.name.toLowerCase().includes(lower) ||
-      t.description.toLowerCase().includes(lower),
-  );
+  return new ToolSearchEngine(meta).search(query);
 }
 
 /**

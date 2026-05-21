@@ -16,6 +16,8 @@
  * 6. 进入运行状态，等待 Server 转发请求
  */
 
+import './utils/logger.js';
+
 import {resolveConfig} from './config.js';
 import {RpcClient} from './protocol/Client.js';
 import {getRuntime} from './runtime.js';
@@ -50,7 +52,8 @@ async function main(): Promise<void> {
 
   // 3. 确保浏览器已连接并获取 BrowserContext
   const browser = await runtime.browserManager.ensureBrowser();
-  const browserContext = runtime.browserManager.getContext() ?? browser.contexts()[0] ?? null;
+  const browserContext =
+    runtime.browserManager.getContext() ?? browser.contexts()[0] ?? null;
 
   // 4. 将 Runtime 注入 ToolContextProvider，复用同一套服务实例
   const contextProvider = new ToolContextProvider(runtime);

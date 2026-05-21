@@ -78,4 +78,63 @@ describe('ToolRegistry profile filtering', () => {
       'workflow',
     );
   });
+
+  it('listTools carries optional manifest metadata without changing legacy fields', () => {
+    const registry = new ToolRegistry([
+      {
+        name: 'hook',
+        description: 'Hook tools',
+        profile: 'workflow',
+        dependencies: ['browser'],
+        version: 1,
+        prerequisites: {
+          injectHook: [
+            {
+              condition: 'requiresPage',
+              fix: 'Start or attach a browser page first.',
+            },
+          ],
+        },
+        toolDependencies: [
+          {
+            from: 'injectHook',
+            to: 'createHook',
+            relation: 'requires',
+            weight: 1,
+          },
+        ],
+        sceneKeywords: {
+          injectHook: ['runtime', 'hook', 'instrumentation'],
+        },
+        tools: [
+          {modulePath: './hook/InjectHook.js', handlerName: 'injectHook'},
+        ],
+      },
+    ]);
+
+    assert.deepStrictEqual(registry.listTools('workflow'), [
+      {
+        domain: 'hook',
+        modulePath: './hook/InjectHook.js',
+        handlerName: 'injectHook',
+        profile: 'workflow',
+        dependencies: ['browser'],
+        prerequisites: [
+          {
+            condition: 'requiresPage',
+            fix: 'Start or attach a browser page first.',
+          },
+        ],
+        toolDependencies: [
+          {
+            from: 'injectHook',
+            to: 'createHook',
+            relation: 'requires',
+            weight: 1,
+          },
+        ],
+        sceneKeywords: ['runtime', 'hook', 'instrumentation'],
+      },
+    ]);
+  });
 });

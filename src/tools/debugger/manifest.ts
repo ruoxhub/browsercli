@@ -9,6 +9,29 @@ import type {DomainManifest} from '../manifest.js';
 export const manifest = {
   name: 'debugger',
   description: 'Debugger protocol inspection and breakpoint tools.',
+  prerequisites: {
+    setBreakpoint: [
+      {condition: 'requiresPage', fix: 'Start or attach a browser page first.'},
+      {
+        condition: 'requiresDebugger',
+        fix: 'Ensure debugger context is available.',
+      },
+    ],
+    listScripts: [
+      {condition: 'requiresPage', fix: 'Start or attach a browser page first.'},
+      {
+        condition: 'requiresDebugger',
+        fix: 'Ensure debugger context is available.',
+      },
+    ],
+    traceFunction: [
+      {condition: 'requiresPage', fix: 'Start or attach a browser page first.'},
+      {
+        condition: 'requiresDebugger',
+        fix: 'Ensure debugger context is available.',
+      },
+    ],
+  },
   tools: [
     {modulePath: './debugger/index.js', handlerName: 'setBreakpoint'},
     {modulePath: './debugger/index.js', handlerName: 'removeBreakpoint'},
@@ -39,7 +62,10 @@ export const manifest = {
     {modulePath: './debugger/hookFunction.js', handlerName: 'hookFunction'},
     {modulePath: './debugger/unhookFunction.js', handlerName: 'unhookFunction'},
     {modulePath: './debugger/index.js', handlerName: 'xhrToJsBreakpoint'},
-    {modulePath: './debugger/index.js', handlerName: 'startContinuousDebugging'},
+    {
+      modulePath: './debugger/index.js',
+      handlerName: 'startContinuousDebugging',
+    },
     {modulePath: './debugger/index.js', handlerName: 'stopContinuousDebugging'},
   ],
 } satisfies DomainManifest;

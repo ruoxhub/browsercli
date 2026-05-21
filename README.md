@@ -333,7 +333,7 @@ JSReverser-CLI/
 | 方面 | 分析 |
 |------|------|
 | **职责** | 统一管理所有运行时配置 — 浏览器连接、AI 提供商、数据库、RPC 通信 |
-| **实现逻辑** | `resolveConfig()` 实现 CLI 参数 > 环境变量 (dotenv) > config.json > js-reverse.config.json > .jsreverserrc.json > 内置默认值的优先级合并 |
+| **实现逻辑** | `resolveConfig()` 实现 CLI 参数 > 环境变量 (dotenv) > config.json > js-reverse.config.json > ~/.jsreverse/config.json > 内置默认值的优先级合并 |
 | **关键函数** | `resolveConfig()` — 返回扁平 `ResolvedConfig`; `getSystemConfig()` — 构建 `SystemConfig` (AI+Browser+Debug); `getBrowserManagerConfig()` — 解析 25 个浏览器参数; `createAIService()` — 从配置实例化 AI 服务 |
 | **被调用方** | `src/index.ts` (Worker入口)、`src/cli/commands/start.ts`、`src/cli/app.ts`、`src/runtime.ts` |
 | **隐式耦合** | `LLMProvider` 类型仅限 `'openai'`，但 AI 层已支持 Anthropic/Gemini，配置系统尚未暴露对应选项; `schema.ts` 为空占位文件 |

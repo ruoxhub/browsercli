@@ -11,7 +11,6 @@ import {manifest as antiDebugManifest} from './anti-debug/manifest.js';
 import {manifest as codeTemplatesManifest} from './code-templates/manifest.js';
 import {manifest as collectorManifest} from './collector/manifest.js';
 import {manifest as consoleManifest} from './console/manifest.js';
-import {manifest as cryptoManifest} from './crypto/manifest.js';
 import {manifest as debuggerManifest} from './debugger/manifest.js';
 import {manifest as dialogManifest} from './dialog/manifest.js';
 import {manifest as domManifest} from './dom/manifest.js';
@@ -41,7 +40,6 @@ export const GENERATED_DOMAIN_MANIFESTS = [
   codeTemplatesManifest,
   collectorManifest,
   consoleManifest,
-  cryptoManifest,
   debuggerManifest,
   dialogManifest,
   domManifest,
@@ -138,18 +136,6 @@ export const GENERATED_TOOL_REGISTRY = [
   {
     modulePath: './console/getConsoleMessage.js',
     handlerName: 'getConsoleMessage',
-  },
-  {
-    modulePath: './crypto/hookCryptoJS.js',
-    handlerName: 'hookCryptoJS',
-  },
-  {
-    modulePath: './crypto/hookJSEncrypt.js',
-    handlerName: 'hookJSEncrypt',
-  },
-  {
-    modulePath: './crypto/hookSMCrypto.js',
-    handlerName: 'hookSMCrypto',
   },
   {
     modulePath: './debugger/index.js',

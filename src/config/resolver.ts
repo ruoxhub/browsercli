@@ -12,7 +12,7 @@
  * 2. 环境变量（RPC_HOST, OPENAI_API_KEY 等）
  * 3. 项目根目录配置文件（<cwd>/config.json）
  * 4. 项目级配置文件（<cwd>/js-reverse.config.json）
- * 5. 用户级配置文件（~/.jsreverserrc.json）
+ * 5. 用户级配置文件（~/.jsreverse/config.json）
  * 6. 内置默认值
  *
  * 本文件合并了原先分散在以下三处的配置逻辑：
@@ -27,18 +27,29 @@ import path from 'node:path';
 
 import {config as dotenvConfig} from 'dotenv';
 
-import {BrowserManagerConfig} from '../browser/browser.js';
+import type {BrowserManagerConfig} from '../browser/browser.js';
 import {AIService} from '../services/AIService.js';
 import {OpenAIProvider} from '../services/OpenAIProvider.js';
 import {resolveDefaultEnvPath} from '../utils/projectPaths.js';
+
 import {
   DEFAULT_GROUP,
   DEFAULT_RPC_HOST,
   PROJECT_CONFIG_FILENAME,
   ROOT_CONFIG_FILENAME,
   RUNTIME_DIR_NAME,
+  USER_CONFIG_DIR_NAME,
   USER_CONFIG_FILENAME,
 } from './constants.js';
+import {
+  type AIConfig,
+  type GlobalConfig,
+  type SystemConfig,
+  SystemConfigSchema,
+  formatConfigValidationError,
+  validateGlobalConfig,
+  validateSystemConfig,
+} from './schema.js';
 
 // ==================== .env 加载 ====================
 
@@ -56,97 +67,16 @@ if (existsSync(envPath)) {
 // ==========================================================================
 
 /** LLM 提供商类型 */
-export type LLMProvider = 'openai';
+export type LLMProvider = GlobalConfig['llmProvider'] & string;
 
 /** 用户级全局配置结构（配置文件可写的所有字段） */
-export interface GlobalConfig {
-  /** Sekiro Server WebSocket 地址 */
-  rpcHost?: string;
-  /** Sekiro 分组名 */
-  group?: string;
-  /** 浏览器调试 URL */
-  browserUrl?: string;
-  /** WebSocket 端点 */
-  wsEndpoint?: string;
-  /** 无头模式 */
-  headless?: boolean;
-  /** 浏览器可执行路径 */
-  executablePath?: string;
-  /** PostgreSQL 连接字符串 */
-  databaseUrl?: string;
-  /** Worker 运行时目录名 */
-  runtimeDirName?: string;
-  /** AI 提供商 */
-  llmProvider?: LLMProvider;
-  /** OpenAI 配置 */
-  openai?: {
-    apiKey?: string;
-    baseURL?: string;
-    model?: string;
-  };
-  /** 浏览器配置 */
-  browser?: {
-    headless?: boolean;
-    isolated?: boolean;
-    executablePath?: string;
-    channel?:
-      | 'chrome'
-      | 'chrome-beta'
-      | 'chrome-dev'
-      | 'chrome-canary'
-      | 'msedge';
-    useStealthScripts?: boolean;
-    viewport?: {width: number; height: number};
-    browserURL?: string;
-    wsEndpoint?: string;
-    remoteDebuggingUrl?: string;
-    remoteDebuggingPort?: number;
-    wsHeaders?: Record<string, string>;
-    acceptInsecureCerts?: boolean;
-    userDataDir?: string;
-    args?: string[];
-    devtools?: boolean;
-    autoLaunch?: boolean;
-    browserPath?: string;
-    waitForBrowserTimeoutMs?: number;
-    waitForBrowserPollMs?: number;
-    timeout?: number;
-    maxCollectedUrls?: number;
-    maxFilesPerCollect?: number;
-    maxTotalContentSize?: number;
-    maxSingleFileSize?: number;
-    userAgent?: string;
-  };
-  /** 调试模式 */
-  debug?: boolean;
-  /** 日志级别 */
-  logLevel?: string;
-  /** 输出目录 */
-  outputDir?: string;
-  /** 会话状态 TTL（毫秒） */
-  sessionStateTtlMs?: number;
-  /** 会话状态清理间隔（毫秒） */
-  sessionStateCleanupIntervalMs?: number;
-  /** 会话状态加密密钥 */
-  sessionStateEncryptionKey?: string;
-}
+export type {GlobalConfig};
 
 /** AI Service 配置（运行时解析后的完整结构） */
-export interface AIConfig {
-  provider: LLMProvider;
-  openai?: {
-    apiKey: string;
-    baseURL?: string;
-    model?: string;
-  };
-}
+export type {AIConfig};
 
 /** 系统配置（AI + Browser + Debug） */
-export interface SystemConfig {
-  ai?: AIConfig;
-  browser: BrowserManagerConfig;
-  debug?: boolean;
-}
+export type {SystemConfig};
 
 /** 配置来源标记 */
 export interface ConfigSource {
@@ -171,6 +101,11 @@ export interface ResolvedConfig {
   debug: boolean;
 }
 
+export interface ResolvedToolResultRecordingConfig {
+  enabled: boolean;
+  outputDir: string;
+}
+
 /** 内置默认值 */
 const DEFAULTS: Readonly<ResolvedConfig> = {
   rpcHost: DEFAULT_RPC_HOST,
@@ -181,12 +116,12 @@ const DEFAULTS: Readonly<ResolvedConfig> = {
 } as const;
 
 // ==========================================================================
-// 第三部分：全局配置文件管理（~/.jsreverserrc.json + js-reverse.config.json）
+// 第三部分：全局配置文件管理（~/.jsreverse/config.json + js-reverse.config.json）
 // ==========================================================================
 
-/** 获取用户级配置文件路径 (~/.jsreverserrc.json) */
+/** 获取用户级配置文件路径 (~/.jsreverse/config.json) */
 export function getUserConfigPath(): string {
-  return path.join(os.homedir(), USER_CONFIG_FILENAME);
+  return path.join(os.homedir(), USER_CONFIG_DIR_NAME, USER_CONFIG_FILENAME);
 }
 
 /** 获取项目级配置文件路径 (<cwd>/js-reverse.config.json) */
@@ -205,7 +140,7 @@ function readConfigFile(filePath: string): GlobalConfig | null {
     if (!existsSync(filePath)) return null;
     const content = readFileSync(filePath, 'utf-8').trim();
     if (!content) return null;
-    return JSON.parse(content) as GlobalConfig;
+    return validateGlobalConfig(JSON.parse(content));
   } catch (error) {
     console.warn(
       `[Config] 读取配置文件失败: ${filePath} — ${error instanceof Error ? error.message : error}`,
@@ -220,7 +155,8 @@ export function writeConfigFile(filePath: string, config: GlobalConfig): void {
   if (!existsSync(dir)) {
     mkdirSync(dir, {recursive: true});
   }
-  writeFileSync(filePath, JSON.stringify(config, null, 2) + '\n', 'utf-8');
+  const parsed = validateGlobalConfig(config);
+  writeFileSync(filePath, JSON.stringify(parsed, null, 2) + '\n', 'utf-8');
 }
 
 /** 加载用户级配置 */
@@ -263,13 +199,14 @@ export function mergeConfigs(
   const result: GlobalConfig = {};
   for (const cfg of configs) {
     if (!cfg) continue;
-    for (const [key, value] of Object.entries(cfg)) {
+    const parsed = validateGlobalConfig(cfg);
+    for (const [key, value] of Object.entries(parsed)) {
       if (value !== undefined) {
         (result as Record<string, unknown>)[key] = value;
       }
     }
   }
-  return result;
+  return validateGlobalConfig(result);
 }
 
 /**
@@ -327,10 +264,36 @@ const ENV_MAP: Readonly<Record<string, keyof GlobalConfig>> = {
   // 日志与会话
   LOG_LEVEL: 'logLevel',
   JSREVERSER_OUTPUT_DIR: 'outputDir',
+  JSREVERSER_RECORD_TOOL_RESULTS: 'toolResultRecording',
+  JSREVERSER_TOOL_RESULTS_DIR: 'toolResultRecording',
   SESSION_STATE_TTL_MS: 'sessionStateTtlMs',
   SESSION_STATE_CLEANUP_INTERVAL_MS: 'sessionStateCleanupIntervalMs',
   SESSION_STATE_ENCRYPTION_KEY: 'sessionStateEncryptionKey',
 };
+
+const BROWSER_ENV_MAP = {
+  BROWSER_HEADLESS: 'headless',
+  BROWSER_EXECUTABLE_PATH: 'executablePath',
+  BROWSER_WS_ENDPOINT: 'wsEndpoint',
+  BROWSER_ISOLATED: 'isolated',
+  USE_STEALTH_SCRIPTS: 'useStealthScripts',
+  BROWSER_CHANNEL: 'channel',
+  REMOTE_DEBUGGING_URL: 'remoteDebuggingUrl',
+  REMOTE_DEBUGGING_PORT: 'remoteDebuggingPort',
+  BROWSER_USER_DATA_DIR: 'userDataDir',
+  BROWSER_PATH: 'browserPath',
+  BROWSER_USER_AGENT: 'userAgent',
+  BROWSER_ACCEPT_INSECURE_CERTS: 'acceptInsecureCerts',
+  BROWSER_DEVTOOLS: 'devtools',
+  BROWSER_AUTO_LAUNCH: 'autoLaunch',
+  BROWSER_WAIT_TIMEOUT_MS: 'waitForBrowserTimeoutMs',
+  BROWSER_WAIT_POLL_MS: 'waitForBrowserPollMs',
+  BROWSER_TIMEOUT: 'timeout',
+  BROWSER_MAX_COLLECTED_URLS: 'maxCollectedUrls',
+  BROWSER_MAX_FILES_PER_COLLECT: 'maxFilesPerCollect',
+  BROWSER_MAX_TOTAL_CONTENT_SIZE: 'maxTotalContentSize',
+  BROWSER_MAX_SINGLE_FILE_SIZE: 'maxSingleFileSize',
+} as const;
 
 /**
  * 统一读取环境变量（字符串）
@@ -393,6 +356,12 @@ function configFromEnv(): GlobalConfig {
   for (const [envKey, configKey] of Object.entries(ENV_MAP)) {
     const value = process.env[envKey];
     if (value === undefined || value === '') continue;
+    if (
+      configKey === 'openai' ||
+      configKey === 'browser' ||
+      configKey === 'toolResultRecording'
+    )
+      continue;
 
     if (configKey === 'headless' || configKey === 'debug') {
       (result as Record<string, unknown>)[configKey] =
@@ -402,7 +371,60 @@ function configFromEnv(): GlobalConfig {
     }
   }
 
-  return result;
+  const openai: GlobalConfig['openai'] = {};
+  const openaiApiKey = getEnvValue('OPENAI_API_KEY');
+  const openaiBaseURL = getEnvValue('OPENAI_BASE_URL');
+  const openaiModel = getEnvValue('OPENAI_MODEL');
+  if (openaiApiKey !== undefined) openai.apiKey = openaiApiKey;
+  if (openaiBaseURL !== undefined) openai.baseURL = openaiBaseURL;
+  if (openaiModel !== undefined) openai.model = openaiModel;
+  if (Object.keys(openai).length > 0) result.openai = openai;
+
+  const browser: NonNullable<GlobalConfig['browser']> = {};
+  for (const [envKey, browserKey] of Object.entries(BROWSER_ENV_MAP)) {
+    const value = process.env[envKey];
+    if (value === undefined || value === '') continue;
+    (browser as Record<string, unknown>)[browserKey] = value;
+  }
+
+  const envBrowserURL = getEnvValue('BROWSER_URL');
+  if (envBrowserURL !== undefined) browser.browserURL = envBrowserURL;
+
+  const envWsHeaders = getEnvValue('BROWSER_WS_HEADERS');
+  if (envWsHeaders !== undefined) {
+    browser.wsHeaders = JSON.parse(envWsHeaders) as Record<string, string>;
+  }
+
+  const envArgs = getEnvValue('BROWSER_ARGS');
+  if (envArgs !== undefined) {
+    browser.args = envArgs
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+  }
+
+  if (Object.keys(browser).length > 0) {
+    result.browser = {
+      ...result.browser,
+      ...browser,
+    };
+  }
+
+  const toolResultRecording: NonNullable<GlobalConfig['toolResultRecording']> =
+    {};
+  const recordToolResults = getEnvBoolean('JSREVERSER_RECORD_TOOL_RESULTS');
+  const toolResultsDir = getEnvValue('JSREVERSER_TOOL_RESULTS_DIR');
+  if (recordToolResults !== undefined) {
+    toolResultRecording.enabled = recordToolResults;
+  }
+  if (toolResultsDir !== undefined) {
+    toolResultRecording.outputDir = toolResultsDir;
+  }
+  if (Object.keys(toolResultRecording).length > 0) {
+    result.toolResultRecording = toolResultRecording;
+  }
+
+  return validateGlobalConfig(result);
 }
 
 /**
@@ -418,17 +440,18 @@ export function resolveConfig(envArgs?: Partial<GlobalConfig>): ResolvedConfig {
 
   // 按优先级合并：文件配置 < 环境变量 < 显式参数
   const merged = mergeConfigs(fileConfig, envConfig, envArgs);
+  const parsed = validateGlobalConfig(merged);
 
   return {
-    rpcHost: merged.rpcHost ?? DEFAULTS.rpcHost,
-    group: merged.group ?? DEFAULTS.group,
-    browserUrl: merged.browserUrl || undefined,
-    wsEndpoint: merged.wsEndpoint || undefined,
-    headless: merged.headless ?? DEFAULTS.headless,
-    executablePath: merged.executablePath,
-    databaseUrl: merged.databaseUrl || undefined,
-    runtimeDirName: merged.runtimeDirName ?? DEFAULTS.runtimeDirName,
-    debug: merged.debug ?? DEFAULTS.debug,
+    rpcHost: parsed.rpcHost ?? DEFAULTS.rpcHost,
+    group: parsed.group ?? DEFAULTS.group,
+    browserUrl: parsed.browserUrl || undefined,
+    wsEndpoint: parsed.wsEndpoint || undefined,
+    headless: parsed.headless ?? DEFAULTS.headless,
+    executablePath: parsed.executablePath,
+    databaseUrl: parsed.databaseUrl || undefined,
+    runtimeDirName: parsed.runtimeDirName ?? DEFAULTS.runtimeDirName,
+    debug: parsed.debug ?? DEFAULTS.debug,
   };
 }
 
@@ -493,6 +516,23 @@ export function showConfigInfo(): {
   const resolved = resolveConfig();
 
   return {resolved, sources, envOverrides};
+}
+
+export function getToolResultRecordingConfig(): ResolvedToolResultRecordingConfig {
+  const {merged: fileConfig} = loadFullConfig();
+  const envEnabled = getEnvBoolean('JSREVERSER_RECORD_TOOL_RESULTS');
+  const envOutputDir = getEnvValue('JSREVERSER_TOOL_RESULTS_DIR');
+  const outputDir =
+    envOutputDir ??
+    fileConfig.toolResultRecording?.outputDir ??
+    (fileConfig.outputDir
+      ? path.join(fileConfig.outputDir, 'tool-results')
+      : path.join(os.homedir(), USER_CONFIG_DIR_NAME, 'tool-results'));
+
+  return {
+    enabled: envEnabled ?? fileConfig.toolResultRecording?.enabled ?? false,
+    outputDir,
+  };
 }
 
 // ==========================================================================
@@ -742,11 +782,11 @@ export const getBrowserConfig = getBrowserManagerConfig;
  * 获取完整系统配置
  */
 export function getSystemConfig(): SystemConfig {
-  return {
+  return validateSystemConfig({
     ai: getAIConfig(),
     browser: getBrowserManagerConfig(),
     debug: isDebugEnabled(),
-  };
+  });
 }
 
 /**
@@ -756,28 +796,14 @@ export function validateConfig(config: SystemConfig): {
   valid: boolean;
   errors: string[];
 } {
-  const errors: string[] = [];
-
-  if (config.browser.remoteDebuggingPort !== undefined) {
-    const port = config.browser.remoteDebuggingPort;
-    if (port < 1 || port > 65535) {
-      errors.push(
-        `Invalid REMOTE_DEBUGGING_PORT: ${port}. Must be between 1 and 65535.`,
-      );
-    }
-  }
-
-  if (config.ai) {
-    const {provider} = config.ai;
-
-    if (provider === 'openai' && !config.ai.openai) {
-      errors.push('OpenAI provider selected but OPENAI_API_KEY not configured');
-    }
+  const result = SystemConfigSchema.safeParse(config);
+  if (result.success) {
+    return {valid: true, errors: []};
   }
 
   return {
-    valid: errors.length === 0,
-    errors,
+    valid: false,
+    errors: [formatConfigValidationError(result.error)],
   };
 }
 

@@ -26,9 +26,7 @@ import {
   setUserConfigValue,
   deleteUserConfigValue,
   getUserConfigPath,
-  getProjectConfigPath,
   loadUserConfig,
-  loadProjectConfig,
   writeConfigFile,
   type GlobalConfig,
 } from '../../config.js';
@@ -46,6 +44,7 @@ const CONFIG_KEY_DESCRIPTIONS: Record<string, string> = {
   executablePath: '浏览器可执行路径',
   runtimeDirName: '运行时目录名',
   llmProvider: 'AI 提供商 (openai)',
+  toolResultRecording: '工具结果记录配置',
   debug: '调试模式 (true/false)',
 };
 
@@ -62,16 +61,17 @@ const NESTED_KEYS: Record<string, string> = {
   'browser.executablePath': 'browser',
   'browser.channel': 'browser',
   'browser.useStealthScripts': 'browser',
+  'toolResultRecording.enabled': 'toolResultRecording',
+  'toolResultRecording.outputDir': 'toolResultRecording',
 };
 
 function parseSetValue(raw: string): {key: string; value: string} {
   const eqIdx = raw.indexOf('=');
   if (eqIdx === -1) {
-    throw new AxiError(
-      `--set 格式错误：${raw}`,
-      'VALIDATION_ERROR',
-      ['正确格式：--set key=value', '示例：--set rpcHost=ws://127.0.0.1:5612'],
-    );
+    throw new AxiError(`--set 格式错误：${raw}`, 'VALIDATION_ERROR', [
+      '正确格式：--set key=value',
+      '示例：--set rpcHost=ws://127.0.0.1:5612',
+    ]);
   }
   return {key: raw.slice(0, eqIdx), value: raw.slice(eqIdx + 1)};
 }
@@ -79,14 +79,10 @@ function parseSetValue(raw: string): {key: string; value: string} {
 function validateKey(key: string): void {
   if (VALID_KEYS.has(key)) return;
   if (key in NESTED_KEYS) return;
-  throw new AxiError(
-    `未知配置键：${key}`,
-    'VALIDATION_ERROR',
-    [
-      '合法的顶级键：' + Object.keys(CONFIG_KEY_DESCRIPTIONS).join(', '),
-      '嵌套键示例：openai.apiKey, browser.headless',
-    ],
-  );
+  throw new AxiError(`未知配置键：${key}`, 'VALIDATION_ERROR', [
+    '合法的顶级键：' + Object.keys(CONFIG_KEY_DESCRIPTIONS).join(', '),
+    '嵌套键示例：openai.apiKey, browser.headless',
+  ]);
 }
 
 function coerceValue(key: string, value: string): unknown {
@@ -97,7 +93,14 @@ function coerceValue(key: string, value: string): unknown {
   if (/^\d+$/.test(value)) return parseInt(value, 10);
 
   // 嵌套键的布尔处理
-  if ((key.endsWith('.headless') || key.endsWith('.isolated') || key.endsWith('.useStealthScripts') || key === 'headless' || key === 'debug') && (value === 'true' || value === 'false')) {
+  if (
+    (key.endsWith('.headless') ||
+      key.endsWith('.isolated') ||
+      key.endsWith('.useStealthScripts') ||
+      key === 'headless' ||
+      key === 'debug') &&
+    (value === 'true' || value === 'false')
+  ) {
     return value === 'true';
   }
 
@@ -139,7 +142,10 @@ export const configCommand: AxiCliCommand<WorkerContext> = async (
       // 读取当前配置，修改嵌套值，写回
       const userConfig = loadUserConfig();
       const existing = userConfig.config ?? ({} as GlobalConfig);
-      const parent = (existing as Record<string, unknown>)[parentKey] as Record<string, unknown> | undefined ?? {};
+      const parent =
+        ((existing as Record<string, unknown>)[parentKey] as
+          | Record<string, unknown>
+          | undefined) ?? {};
       parent[subKey] = coerced;
       (existing as Record<string, unknown>)[parentKey] = parent;
       writeConfigFile(getUserConfigPath(), existing);
@@ -181,7 +187,9 @@ export const configCommand: AxiCliCommand<WorkerContext> = async (
       const userConfig = loadUserConfig();
       const existing = userConfig.config;
       if (existing) {
-        const parent = (existing as Record<string, unknown>)[parentKey] as Record<string, unknown> | undefined;
+        const parent = (existing as Record<string, unknown>)[parentKey] as
+          | Record<string, unknown>
+          | undefined;
         if (parent && subKey in parent) {
           delete parent[subKey];
           writeConfigFile(getUserConfigPath(), existing);
@@ -213,9 +221,7 @@ export const configCommand: AxiCliCommand<WorkerContext> = async (
   // --list: 列出配置文件路径和来源
   if (hasFlag(parsed, 'list')) {
     const userPath = getUserConfigPath();
-    const projectPath = getProjectConfigPath();
     const userConfig = loadUserConfig();
-    const projectConfig = loadProjectConfig();
 
     return successOutput({
       command: 'config',
@@ -227,15 +233,13 @@ export const configCommand: AxiCliCommand<WorkerContext> = async (
           exists: userConfig.exists,
           config: userConfig.config ?? null,
         },
-        {
-          type: 'project',
-          path: projectPath,
-          exists: projectConfig.exists,
-          config: projectConfig.config ?? null,
-        },
       ],
-      envOverrides: Object.keys(process.env).filter(k =>
-        k.startsWith('SEKIRO_') || k.startsWith('BROWSER_') || k.startsWith('JSREVERSER_') || k === 'DEFAULT_LLM_PROVIDER',
+      envOverrides: Object.keys(process.env).filter(
+        k =>
+          k.startsWith('SEKIRO_') ||
+          k.startsWith('BROWSER_') ||
+          k.startsWith('JSREVERSER_') ||
+          k === 'DEFAULT_LLM_PROVIDER',
       ),
     });
   }
