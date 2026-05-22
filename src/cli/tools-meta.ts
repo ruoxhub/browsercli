@@ -69,6 +69,19 @@ export interface ToolMeta {
  * 工具注册表 — 只需声明 modulePath 和 handlerName
  * name / description / schema 从 defineTool 自动提取
  */
+/**
+ * Resolve the active tool profile from environment.
+ *
+ * | Profile     | Token cost (approx) | Purpose                                |
+ * |-------------|---------------------|----------------------------------------|
+ * | `search`    | ~500 tokens         | Only `search_tools`; LLM discovers     |
+ * |             |                     | concrete tools on demand.              |
+ * | `workflow`  | ~15K tokens         | Browser + reverse-engineering daily.   |
+ * | `full`      | ~40K+ tokens        | Adds debugger, wasm, anti-debug, etc.  |
+ *
+ * Default: `full` to preserve current behaviour. Set
+ * `JS_REVERSE_TOOL_PROFILE=workflow` (or `search`) to scope down.
+ */
 function getConfiguredToolProfile(): ToolProfile {
   const value = process.env.JS_REVERSE_TOOL_PROFILE;
   if (value === 'search' || value === 'workflow' || value === 'full') {

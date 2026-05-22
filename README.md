@@ -929,6 +929,27 @@ node build/src/bin/js-reverse.js call get_page_title
 
 ---
 
+## Tool Profiles
+
+`JSReverser-CLI` 通过 `JS_REVERSE_TOOL_PROFILE` 环境变量在三档工具集中切换，用 token 成本换取覆盖范围。
+
+| Profile    | 工具数     | 适用场景                                                |
+| ---------- | ---------- | ------------------------------------------------------- |
+| `search`   | 1          | 上下文极紧的 LLM 宿主：仅暴露 `search_tools`，按需发现工具 |
+| `workflow` | ~110       | 浏览器自动化 + JS 逆向日常：分析、Hook、采集、网络观察   |
+| `full`     | 全量 (126) | 加上 debugger / wasm / anti-debug / perf / rebuild       |
+
+默认值是 `full`，与既有行为一致。示例：
+
+```bash
+JS_REVERSE_TOOL_PROFILE=workflow npm run cli:start
+JS_REVERSE_TOOL_PROFILE=search node build/src/bin/js-reverse.js list-tools
+```
+
+档位继承关系：`search ⊂ workflow ⊂ full`。即 `workflow` 包含所有 `search` 工具，`full` 包含所有 `workflow` 工具。
+
+---
+
 ## 附录 A: 数据库 Schema
 
 ```sql
