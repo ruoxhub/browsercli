@@ -18,6 +18,7 @@ import {manifest as emulationManifest} from './emulation/manifest.js';
 import {manifest as extensionsManifest} from './extensions/manifest.js';
 import {manifest as framesManifest} from './frames/manifest.js';
 import {manifest as inputManifest} from './input/manifest.js';
+import {manifest as metaManifest} from './meta/manifest.js';
 import {manifest as navigationManifest} from './navigation/manifest.js';
 import {manifest as networkManifest} from './network/manifest.js';
 import {manifest as pageManifest} from './page/manifest.js';
@@ -44,6 +45,7 @@ export const GENERATED_DOMAIN_MANIFESTS = [
   extensionsManifest,
   framesManifest,
   inputManifest,
+  metaManifest,
   navigationManifest,
   networkManifest,
   pageManifest,
@@ -334,6 +336,10 @@ export const GENERATED_TOOL_REGISTRY = [
   {
     modulePath: './input/fill.js',
     handlerName: 'fill',
+  },
+  {
+    modulePath: './meta/searchTools.js',
+    handlerName: 'searchToolsMeta',
   },
   {
     modulePath: './navigation/listPages.js',
