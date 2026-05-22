@@ -13,7 +13,7 @@
 import assert from 'node:assert';
 import {describe, it, beforeEach, afterEach} from 'node:test';
 
-import {BrowserManager} from '../../../src/browser.js';
+import {BrowserManager} from '../../../src/browser/index.js';
 
 const runBrowserTests = process.env.RUN_BROWSER_TESTS === 'true';
 
@@ -103,7 +103,7 @@ describe('BrowserManager', {skip: !runBrowserTests}, () => {
       const browser = await manager.ensureBrowser();
 
       assert.ok(browser, 'Browser should be launched');
-      assert.ok(browser.connected, 'Browser should be connected');
+      assert.ok(browser.isConnected(), 'Browser should be connected');
     });
 
     it('should return same browser instance on multiple ensureBrowser calls', async () => {
@@ -178,7 +178,7 @@ describe('BrowserManager', {skip: !runBrowserTests}, () => {
 
       const browser = await manager.ensureBrowser();
 
-      assert.ok(browser.connected);
+      assert.ok(browser.isConnected());
     });
   });
 
@@ -224,15 +224,15 @@ describe('BrowserManager', {skip: !runBrowserTests}, () => {
       });
 
       const browser1 = await manager.ensureBrowser();
-      const pid1 = browser1.process()?.pid;
+      const pid1 = (browser1 as any).process()?.pid;
 
       await manager.restart();
 
       const browser2 = await manager.getBrowser();
-      const pid2 = browser2.process()?.pid;
+      const pid2 = (browser2 as any)?.process()?.pid;
 
       assert.ok(
-        browser2.connected,
+        browser2?.isConnected(),
         'Browser should be connected after restart',
       );
       assert.notStrictEqual(
@@ -368,7 +368,7 @@ describe('BrowserManager', {skip: !runBrowserTests}, () => {
       });
 
       const browser = await manager.ensureBrowser();
-      const pages = await browser.pages();
+      const pages = browser.contexts().flatMap(c => c.pages());
 
       if (pages.length > 0) {
         const page = pages[0];
@@ -457,7 +457,7 @@ describe('BrowserManager', {skip: !runBrowserTests}, () => {
       });
 
       const browser = await manager.ensureBrowser();
-      assert.ok(browser.connected);
+      assert.ok(browser.isConnected());
     });
 
     it('should accept isolated option', async () => {
@@ -467,7 +467,7 @@ describe('BrowserManager', {skip: !runBrowserTests}, () => {
       });
 
       const browser = await manager.ensureBrowser();
-      assert.ok(browser.connected);
+      assert.ok(browser.isConnected());
     });
 
     it('should accept channel option', async () => {
@@ -478,7 +478,7 @@ describe('BrowserManager', {skip: !runBrowserTests}, () => {
       });
 
       const browser = await manager.ensureBrowser();
-      assert.ok(browser.connected);
+      assert.ok(browser.isConnected());
     });
 
     it('should accept devtools option', async () => {
@@ -489,7 +489,7 @@ describe('BrowserManager', {skip: !runBrowserTests}, () => {
       });
 
       const browser = await manager.ensureBrowser();
-      assert.ok(browser.connected);
+      assert.ok(browser.isConnected());
     });
 
     it('should accept custom args', async () => {
@@ -500,7 +500,7 @@ describe('BrowserManager', {skip: !runBrowserTests}, () => {
       });
 
       const browser = await manager.ensureBrowser();
-      assert.ok(browser.connected);
+      assert.ok(browser.isConnected());
     });
   });
 });

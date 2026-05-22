@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {zod} from '../../third_party/index.js';
 import {getRuntime} from '../../runtime.js';
-import {defineTool} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
+import {defineTool} from '../ToolDefinition.js';
+
 import type {UnderstandCodeFnResult} from './types.js';
 
 export const understandCode = defineTool({
@@ -20,7 +21,7 @@ export const understandCode = defineTool({
   },
   handler: async (request, response) => {
     try {
-      const result = await getRuntime().analyzer.understand(request.params);
+      const result = await getRuntime().analyzer.understand(request.params as any);
       response.setStructuredContent({
         success: true,
         message: 'Code analysis completed',

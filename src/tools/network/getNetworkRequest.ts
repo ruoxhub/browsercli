@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {defineTool} from '../ToolDefinition.js';
+import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
-import {getRuntime} from '../../runtime.js';
+import {defineTool} from '../ToolDefinition.js';
 
 export const getNetworkRequest = defineTool({
   name: 'get_network_request',
@@ -38,7 +38,7 @@ export const getNetworkRequest = defineTool({
       let reqid = request.params.reqid;
       if (!reqid) {
         const devToolsData =
-          await getRuntime().contextProvider!.getDevToolsData();
+          (await getRuntime().contextProvider!.getDevToolsData()) as any;
         if (devToolsData?.cdpRequestId) {
           reqid = getRuntime().contextProvider!.resolveCdpRequestId(
             devToolsData.cdpRequestId,

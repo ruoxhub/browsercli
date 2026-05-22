@@ -5,8 +5,8 @@
  */
 
 import {zod} from '../../third_party/index.js';
-import {defineTool, type Context} from '../ToolDefinition.js';
 import {ToolCategory} from '../categories.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
 
 /**
  * 点击页面元素。

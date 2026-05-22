@@ -7,7 +7,34 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {observeFlow} from '../../../../src/tools/workflow/observeFlow.js';
+import {observeFlow as observeFlowTool} from '../../../../src/tools/workflow/observeFlow.js';
+import {getRuntime} from '../../../../src/runtime.js';
+
+async function observeFlow(params?: any): Promise<any> {
+  const originalProvider = getRuntime().contextProvider;
+  getRuntime().contextProvider = {
+    collector: getRuntime().collector,
+  } as any;
+  let result: any = null;
+  const response = {
+    appendResponseLine: (line: string) => {
+      if (line.startsWith('```json')) return;
+      if (line.startsWith('```')) return;
+      try {
+        result = JSON.parse(line);
+      } catch (e) {}
+    },
+    setStructuredContent: (content: unknown) => {
+      result = content;
+    },
+  } as any;
+  try {
+    await observeFlowTool.handler({ params: params ?? {} } as any, response, null as any);
+  } finally {
+    getRuntime().contextProvider = originalProvider;
+  }
+  return result;
+}
 
 // 测试辅助函数（直接复制被测试函数的逻辑以便单元测试）
 function detectEncryption(content: string): boolean {

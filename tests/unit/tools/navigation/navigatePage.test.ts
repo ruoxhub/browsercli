@@ -41,8 +41,8 @@ function createPage(overrides: Partial<TestPage> = {}): TestPage {
 
 function createRuntime(
   overrides: Record<string, unknown> = {},
-): ToolContextProvider {
-  return overrides as unknown as ToolContextProvider;
+): any {
+  return overrides;
 }
 
 function createResponse() {
@@ -53,6 +53,7 @@ function createResponse() {
       appendResponseLine(value: string) {
         lines.push(value);
       },
+      setStructuredContent() {},
       setIncludePages() {},
       setIncludeNetworkRequests() {},
       setIncludeConsoleData() {},

@@ -10,30 +10,77 @@ import {describe, it, mock} from 'node:test';
 import type {Frame} from '../../../src/third_party/index.js';
 
 import {
-  hookXhrOpen,
-  hookXhrSetRequestHeader,
-  hookFetch,
-  hookCookie,
-  hookWebSocket,
-  hookJsonParse,
-  hookJsonStringify,
-  hookLocalStorage,
-  hookSessionStorage,
-  hookDateNow,
-  hookPerformanceNow,
-  hookRandom,
-  hookPromise,
-  hookHistory,
-  hookHistoryGo,
-  hookLocationHref,
-  hookClose,
-  hookConsoleLog,
-  hookConsoleClear,
-  hookConsoleProtect,
-  hookConsoleTable,
-  fixedWindowSize,
-  antiAntiHook,
+  hookXhrOpen as toolHookXhrOpen,
+  hookXhrSetRequestHeader as toolHookXhrSetRequestHeader,
+  hookFetch as toolHookFetch,
+  hookCookie as toolHookCookie,
+  hookWebSocket as toolHookWebSocket,
+  hookJsonParse as toolHookJsonParse,
+  hookJsonStringify as toolHookJsonStringify,
+  hookLocalStorage as toolHookLocalStorage,
+  hookSessionStorage as toolHookSessionStorage,
+  hookDateNow as toolHookDateNow,
+  hookPerformanceNow as toolHookPerformanceNow,
+  hookRandom as toolHookRandom,
+  hookPromise as toolHookPromise,
+  hookHistory as toolHookHistory,
+  hookHistoryGo as toolHookHistoryGo,
+  hookLocationHref as toolHookLocationHref,
+  hookClose as toolHookClose,
+  hookConsoleLog as toolHookConsoleLog,
+  hookConsoleClear as toolHookConsoleClear,
+  hookConsoleProtect as toolHookConsoleProtect,
+  hookConsoleTable as toolHookConsoleTable,
+  fixedWindowSize as toolFixedWindowSize,
+  antiAntiHook as toolAntiAntiHook,
 } from '../../../src/tools/hook/index.js';
+
+function wrapHookTool(tool: any, paramNames: string[]) {
+  return async (frame: any, ...args: any[]) => {
+    const params: Record<string, any> = {};
+    paramNames.forEach((name, i) => {
+      if (args[i] !== undefined) {
+        params[name] = args[i];
+      }
+    });
+    const request = { params };
+    const response = {
+      structuredContent: null as any,
+      setStructuredContent(content: any) {
+        this.structuredContent = content;
+      }
+    };
+    const context = {
+      getSelectedFrame: () => frame
+    };
+    await tool.handler(request as any, response as any, context as any);
+    return response.structuredContent;
+  };
+}
+
+const hookXhrOpen = wrapHookTool(toolHookXhrOpen, []);
+const hookXhrSetRequestHeader = wrapHookTool(toolHookXhrSetRequestHeader, []);
+const hookFetch = wrapHookTool(toolHookFetch, []);
+const hookCookie = wrapHookTool(toolHookCookie, []);
+const hookWebSocket = wrapHookTool(toolHookWebSocket, []);
+const hookJsonParse = wrapHookTool(toolHookJsonParse, []);
+const hookJsonStringify = wrapHookTool(toolHookJsonStringify, []);
+const hookLocalStorage = wrapHookTool(toolHookLocalStorage, ['actions']);
+const hookSessionStorage = wrapHookTool(toolHookSessionStorage, []);
+const hookDateNow = wrapHookTool(toolHookDateNow, ['fixedValue']);
+const hookPerformanceNow = wrapHookTool(toolHookPerformanceNow, ['fixedValue']);
+const hookRandom = wrapHookTool(toolHookRandom, ['fixedValue']);
+const hookPromise = wrapHookTool(toolHookPromise, []);
+const hookHistory = wrapHookTool(toolHookHistory, []);
+const hookHistoryGo = wrapHookTool(toolHookHistoryGo, []);
+const hookLocationHref = wrapHookTool(toolHookLocationHref, []);
+const hookClose = wrapHookTool(toolHookClose, []);
+const hookConsoleLog = wrapHookTool(toolHookConsoleLog, []);
+const hookConsoleClear = wrapHookTool(toolHookConsoleClear, []);
+const hookConsoleProtect = wrapHookTool(toolHookConsoleProtect, ['mode']);
+const hookConsoleTable = wrapHookTool(toolHookConsoleTable, []);
+const fixedWindowSize = wrapHookTool(toolFixedWindowSize, ['innerHeight', 'innerWidth', 'outerHeight', 'outerWidth']);
+const antiAntiHook = wrapHookTool(toolAntiAntiHook, ['hookedMethods']);
 import type {
   StorageAction,
   ConsoleProtectMode,

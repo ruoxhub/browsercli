@@ -13,8 +13,8 @@ import {
   getAllToolsMeta,
   getToolMeta,
 } from '../tools-meta.js';
-import type {ToolArgSpecMap} from '../zod-introspect.js';
 import type {WorkerContext} from '../types.js';
+import type {ToolArgSpecMap} from '../zod-introspect.js';
 
 interface ListedTool {
   name: string;

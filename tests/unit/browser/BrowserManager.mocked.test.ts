@@ -9,7 +9,7 @@ import {beforeEach, afterEach, describe, it} from 'node:test';
 import {
   BrowserManager,
   isPatchrightDetachedFrameError,
-} from '../../../src/browser.js';
+} from '../../../src/browser/index.js';
 import {StealthScripts2025} from '../../../src/modules/stealth/StealthScripts2025.js';
 
 interface ResettableStealthScripts {

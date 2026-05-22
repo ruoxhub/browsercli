@@ -4,16 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {defineTool} from '../ToolDefinition.js';
+import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
-import {ToolCategory} from '../categories.js';
 import type {CollectCodeOptions} from '../../types/index.js';
+import {ToolCategory} from '../categories.js';
+import {defineTool} from '../ToolDefinition.js';
+
 import type {
   CollectCodeData,
   CollectCodeParams,
   FileSummaryEntry,
 } from './types.js';
-import {getRuntime} from '../../runtime.js';
+
 
 /**
  * 从页面收集 JavaScript 代码（标准 MCP 工具版本）。

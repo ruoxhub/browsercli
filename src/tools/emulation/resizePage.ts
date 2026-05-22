@@ -5,8 +5,8 @@
  */
 
 import {zod} from '../../third_party/index.js';
-import {defineTool, type Context} from '../ToolDefinition.js';
 import {ToolCategory} from '../categories.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
 
 /**
  * 调整页面窗口尺寸。

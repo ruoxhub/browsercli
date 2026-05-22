@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {zod} from '../../third_party/index.js';
 import {getRuntime} from '../../runtime.js';
-import {defineTool} from '../ToolDefinition.js';
-import {ToolCategory} from '../categories.js';
+import {zod} from '../../third_party/index.js';
 import type {CodeFile} from '../../types/index.js';
+import {ToolCategory} from '../categories.js';
+import {defineTool} from '../ToolDefinition.js';
 
 import type {
   SummarizeFileResult,
@@ -135,7 +135,7 @@ export const summarizeCode = defineTool({
     try {
       if (request.params.mode === 'project') {
         const result = await withTimeout(
-          runtime.summarizer.summarizeProject(request.params.files ?? []),
+          runtime.summarizer.summarizeProject(request.params.files as any ?? []),
           SUMMARIZE_TIMEOUT_MS,
         );
         response.setStructuredContent({
@@ -150,7 +150,7 @@ export const summarizeCode = defineTool({
 
       if (request.params.mode === 'batch') {
         const result = await withTimeout(
-          runtime.summarizer.summarizeBatch(request.params.files ?? []),
+          runtime.summarizer.summarizeBatch(request.params.files as any ?? []),
           SUMMARIZE_TIMEOUT_MS,
         );
         response.setStructuredContent({

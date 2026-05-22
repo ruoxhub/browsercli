@@ -7,8 +7,8 @@
 import {execFile} from 'node:child_process';
 
 import {zod} from '../../third_party/index.js';
-import {defineTool} from '../ToolDefinition.js';
 import {ToolCategory} from '../categories.js';
+import {defineTool} from '../ToolDefinition.js';
 
 function runCommand(
   cmd: string,
@@ -20,7 +20,7 @@ function runCommand(
       resolve({
         stdout: stdout ?? '',
         stderr: stderr ?? '',
-        exitCode: error?.code ?? (error ? 1 : 0),
+        exitCode: typeof error?.code === 'number' ? error.code : (error ? 1 : 0),
       });
     });
     child.on('error', () => {

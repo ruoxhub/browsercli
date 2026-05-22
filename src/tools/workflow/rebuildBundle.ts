@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {logger} from '../../utils/logger.js';
 import {zod} from '../../third_party/index.js';
-import {defineTool} from '../ToolDefinition.js';
+import {logger} from '../../utils/logger.js';
 import {ToolCategory} from '../categories.js';
+import {defineTool} from '../ToolDefinition.js';
 
 /**
  * 本地复现工具配置

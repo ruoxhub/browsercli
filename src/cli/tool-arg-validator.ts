@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {getAliasesForTool, suggestSimilarKeys} from './tool-aliases.js';
+import {getToolMeta} from './tools-meta.js';
 import {
   type ToolArgSpec,
   type ToolArgSpecMap,
 } from './zod-introspect.js';
-import {getToolMeta} from './tools-meta.js';
-import {getAliasesForTool, suggestSimilarKeys} from './tool-aliases.js';
 
 export interface ValidationSuccess {
   ok: true;

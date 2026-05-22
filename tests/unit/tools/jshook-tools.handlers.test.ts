@@ -11,30 +11,30 @@ import {describe, it} from 'node:test';
 
 import {StealthScripts2025} from '../../../src/modules/stealth/StealthScripts2025.js';
 import {
-  analyzeTarget,
+  analyze_target,
   deobfuscateCode,
   detectCrypto,
-  exportSessionReport,
+  export_session_report,
   riskPanel,
   summarizeCode,
   understandCode,
-} from '../../../src/tools/analyzer.js';
+} from '../../../src/tools/analyzer/index.js';
 import {
   collectCode,
   collectionDiff,
   searchInScripts,
-} from '../../../src/tools/collector.js';
+} from '../../../src/tools/collector/index.js';
 import {
   findClickableElements,
   getDomStructure,
   queryDom,
-} from '../../../src/tools/dom.js';
+} from '../../../src/tools/dom/index.js';
 import {
   createHook,
   getHookData,
   injectHook,
   removeHook,
-} from '../../../src/tools/hook.js';
+} from '../../../src/tools/hook/index.js';
 import {
   checkBrowserHealth,
   deleteSessionState,
@@ -46,15 +46,15 @@ import {
   saveSessionState,
   typeText,
   waitForElement,
-} from '../../../src/tools/page.js';
-import {getPerformanceMetrics} from '../../../src/tools/performance.js';
-import {getJSHookRuntime} from '../../../src/tools/runtime.js';
+} from '../../../src/tools/page/index.js';
+import {getPerformanceMetrics} from '../../../src/tools/performance/index.js';
+import {getRuntime} from '../../../src/runtime.js';
 import {
   injectStealth,
   listStealthFeatures,
   listStealthPresets,
   setUserAgent,
-} from '../../../src/tools/stealth.js';
+} from '../../../src/tools/stealth/index.js';
 
 type RuntimeMethod = (...args: unknown[]) => unknown;
 
@@ -172,7 +172,7 @@ function makeResponse(): ToolResponseHarness {
 
 describe('jshook tools handlers', () => {
   it('covers analyzer/collector/dom/hook/page/stealth handlers', async () => {
-    const runtime = getJSHookRuntime() as unknown as RuntimeHarness;
+    const runtime = getRuntime() as unknown as RuntimeHarness;
     const stealth = StealthScripts2025 as unknown as StealthStaticHarness;
 
     const originals = {
@@ -473,13 +473,13 @@ describe('jshook tools handlers', () => {
         runtime,
       );
       await invokeTool(
-        analyzeTarget as unknown as ToolDefinitionHarness,
+        analyze_target as unknown as ToolDefinitionHarness,
         {url: 'https://example.com', hookPreset: 'api-signature'},
         res,
         runtime,
       );
       await invokeTool(
-        analyzeTarget as unknown as ToolDefinitionHarness,
+        analyze_target as unknown as ToolDefinitionHarness,
         {
           url: 'https://example.com',
           hookPreset: 'none',
@@ -494,7 +494,7 @@ describe('jshook tools handlers', () => {
       );
       runtime.collector.collect = async () => null;
       await invokeTool(
-        analyzeTarget as unknown as ToolDefinitionHarness,
+        analyze_target as unknown as ToolDefinitionHarness,
         {
           url: 'https://example.com',
           hookPreset: 'none',
@@ -505,7 +505,7 @@ describe('jshook tools handlers', () => {
       );
       runtime.collector.collect = async () => ({files: 'bad-shape'});
       await invokeTool(
-        analyzeTarget as unknown as ToolDefinitionHarness,
+        analyze_target as unknown as ToolDefinitionHarness,
         {
           url: 'https://example.com',
           hookPreset: 'none',
@@ -521,7 +521,7 @@ describe('jshook tools handlers', () => {
         totalFiles: 0,
       });
       await invokeTool(
-        analyzeTarget as unknown as ToolDefinitionHarness,
+        analyze_target as unknown as ToolDefinitionHarness,
         {
           url: 'https://example.com',
           hookPreset: 'none',
@@ -547,7 +547,7 @@ describe('jshook tools handlers', () => {
         totalFiles: 1,
       });
       await invokeTool(
-        analyzeTarget as unknown as ToolDefinitionHarness,
+        analyze_target as unknown as ToolDefinitionHarness,
         {
           url: 'https://example.com',
           hookPreset: 'none',
@@ -595,13 +595,13 @@ describe('jshook tools handlers', () => {
         totalFiles: 1,
       });
       await invokeTool(
-        exportSessionReport as unknown as ToolDefinitionHarness,
+        export_session_report as unknown as ToolDefinitionHarness,
         {format: 'json'},
         res,
         runtime,
       );
       await invokeTool(
-        exportSessionReport as unknown as ToolDefinitionHarness,
+        export_session_report as unknown as ToolDefinitionHarness,
         {format: 'markdown', includeHookData: true},
         res,
         runtime,

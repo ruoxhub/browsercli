@@ -29,8 +29,6 @@ import {manifest as screenshotManifest} from './screenshot/manifest.js';
 import {manifest as scriptManifest} from './script/manifest.js';
 import {manifest as siteExperienceManifest} from './site-experience/manifest.js';
 import {manifest as stealthManifest} from './stealth/manifest.js';
-import {manifest as vjstoolsManifest} from './vjstools/manifest.js';
-import {manifest as vueManifest} from './vue/manifest.js';
 import {manifest as wasmManifest} from './wasm/manifest.js';
 import {manifest as workflowManifest} from './workflow/manifest.js';
 
@@ -58,8 +56,6 @@ export const GENERATED_DOMAIN_MANIFESTS = [
   scriptManifest,
   siteExperienceManifest,
   stealthManifest,
-  vjstoolsManifest,
-  vueManifest,
   wasmManifest,
   workflowManifest,
 ] as const;
@@ -632,38 +628,6 @@ export const GENERATED_TOOL_REGISTRY = [
   {
     modulePath: './stealth/stealth.js',
     handlerName: 'listStealthPresets',
-  },
-  {
-    modulePath: './vjstools/deobfuscate.js',
-    handlerName: 'deobfuscateCodeVj',
-  },
-  {
-    modulePath: './vjstools/deobfuscate.js',
-    handlerName: 'minifyCode',
-  },
-  {
-    modulePath: './vjstools/deobfuscate.js',
-    handlerName: 'transpileCodeTool',
-  },
-  {
-    modulePath: './vjstools/deobfuscate.js',
-    handlerName: 'analyzeAstTool',
-  },
-  {
-    modulePath: './vjstools/deobfuscate.js',
-    handlerName: 'diffCodeTool',
-  },
-  {
-    modulePath: './vue/activateVueDevtools.js',
-    handlerName: 'activateVueDevtools',
-  },
-  {
-    modulePath: './vue/clearVueGuards.js',
-    handlerName: 'clearVueGuards',
-  },
-  {
-    modulePath: './vue/getVueRoutes.js',
-    handlerName: 'getVueRoutes',
   },
   {
     modulePath: './wasm/index.js',

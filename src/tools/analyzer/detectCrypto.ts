@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {zod} from '../../third_party/index.js';
 import {getRuntime} from '../../runtime.js';
-import {defineTool} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
+import {defineTool} from '../ToolDefinition.js';
+
 import type {DetectCryptoFnResult} from './types.js';
 
 export const detectCrypto = defineTool({
@@ -20,7 +21,7 @@ export const detectCrypto = defineTool({
   },
   handler: async (request, response) => {
     try {
-      const raw = await getRuntime().cryptoDetector.detect(request.params);
+      const raw = await getRuntime().cryptoDetector.detect(request.params as any);
       response.setStructuredContent<DetectCryptoFnResult>({
         success: true,
         message: 'Crypto detection completed',

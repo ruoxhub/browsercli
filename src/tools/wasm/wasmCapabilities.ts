@@ -7,8 +7,8 @@
 import {execFile} from 'node:child_process';
 
 import {getRuntime} from '../../runtime.js';
-import {defineTool} from '../ToolDefinition.js';
 import {ToolCategory} from '../categories.js';
+import {defineTool} from '../ToolDefinition.js';
 
 import type {NativeToolInfo, WasmCapabilitiesData} from './types.js';
 function probeNativeTool(name: string, flag: string): Promise<NativeToolInfo> {

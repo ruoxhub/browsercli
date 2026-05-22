@@ -4,11 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {defineTool} from '../ToolDefinition.js';
 import {zod} from '../../third_party/index.js';
-import {ToolCategory} from '../categories.js';
-
 import type {ToolContextProvider} from '../../worker/ToolContextProvider.js';
+import {ToolCategory} from '../categories.js';
+import {defineTool} from '../ToolDefinition.js';
 
 /**
  * 按索引选择页面中的 Frame，将执行上下文切换到该 Frame。

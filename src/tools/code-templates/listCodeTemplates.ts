@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {defineTool} from '../ToolDefinition.js';
 import {ToolCategory} from '../categories.js';
+import {defineTool} from '../ToolDefinition.js';
 
 import {CODE_TEMPLATES, listTemplateInfos} from './templates.js';
 import type {CodeTemplateName} from './types.js';

@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {defineTool, type Context} from '../ToolDefinition.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
 
 /**
  * 将元素从源选择器拖拽到目标选择器。

@@ -47,7 +47,7 @@ export class ToolError extends Error {
     public readonly code: ToolErrorCode,
     message: string,
     public readonly context?: Record<string, unknown>,
-    public readonly recoverable: boolean = !NON_RECOVERABLE_CODES.has(code),
+    public readonly recoverable = !NON_RECOVERABLE_CODES.has(code),
   ) {
     super(message);
     this.name = 'ToolError';

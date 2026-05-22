@@ -50,7 +50,7 @@ describe('console and network formatters', () => {
     const body = await Promise.race([
       formatter({
         buffer: async () => await new Promise<Buffer>(() => undefined),
-      } as Parameters<typeof getFormattedResponseBody>[0], 1000, 10),
+      } as unknown as Parameters<typeof getFormattedResponseBody>[0], 1000, 10),
       new Promise<string>((resolve) => {
         setTimeout(() => resolve('<test-timeout>'), 50);
       }),

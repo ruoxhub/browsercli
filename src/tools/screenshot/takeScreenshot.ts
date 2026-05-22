@@ -7,16 +7,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import {defineTool} from '../ToolDefinition.js';
 import {zod} from '../../third_party/index.js';
+import type {ToolContextProvider} from '../../worker/ToolContextProvider.js';
 import {ToolCategory} from '../categories.js';
 import {
   getActivePageWithGuard,
   normalizeBrowserRuntimeError,
   withOperationTimeout,
 } from '../shared/browserRuntime.js';
-
-import type {ToolContextProvider} from '../../worker/ToolContextProvider.js';
+import {defineTool} from '../ToolDefinition.js';
 
 /**
  * 截图页面（defineTool 版本）。

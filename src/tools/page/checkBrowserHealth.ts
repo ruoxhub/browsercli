@@ -4,15 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {zod} from '../../third_party/index.js';
-import {defineTool, type Context} from '../ToolDefinition.js';
-import {ToolCategory} from '../categories.js';
 import {getRuntime} from '../../runtime.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
 import {
   getActivePageWithGuard,
   normalizeBrowserRuntimeError,
   withOperationTimeout,
 } from '../shared/browserRuntime.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
 
 /**
  * 检查浏览器连接健康状态和页面可用性。

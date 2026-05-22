@@ -4,15 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {defineTool} from '../ToolDefinition.js';
+import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
+import {defineTool} from '../ToolDefinition.js';
+
 import type {
   SearchInScriptsParams,
   SearchInScriptsData,
   SearchInScriptsResult,
 } from './types.js';
-import {getRuntime} from '../../runtime.js';
+
 
 /**
  * 在已收集的脚本缓存中搜索匹配正则的代码（标准 MCP 工具版本）。

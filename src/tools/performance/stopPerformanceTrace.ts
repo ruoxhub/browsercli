@@ -4,15 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {zod} from '../../third_party/index.js';
 import {
   parseRawTraceBuffer,
   traceResultIsSuccess,
   getTraceSummary,
 } from '../../trace-processing/parse.js';
 import {logger} from '../../utils/logger.js';
-import {zod} from '../../third_party/index.js';
-import {defineTool, type Context} from '../ToolDefinition.js';
 import {ToolCategory} from '../categories.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
 
 /**
  * 停止当前页面的性能追踪录制并分析结果。

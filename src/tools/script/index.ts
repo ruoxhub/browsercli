@@ -6,25 +6,22 @@
 
 // ─── Script 执行与预加载注入 ───────────────────────────
 
-export {evaluateScriptFn, injectPreloadScriptFn} from './script.js';
+export {evaluateScriptFn} from './script.js';
 
 // ─── Script Injector 配置管理 ───────────────────────────
 
-export {createInjectScript, getInjectConfigStore, getNextId, setNextId} from './createInjectScript.js';
+export {
+  createInjectScript,
+  getInjectConfigStore,
+  getNextId,
+  setNextId,
+} from './createInjectScript.js';
 export {listInjectScripts} from './listInjectScripts.js';
 export {updateInjectScript} from './updateInjectScript.js';
 export {deleteInjectScript} from './deleteInjectScript.js';
 export {checkUrlMatches} from './checkUrlMatches.js';
 
-// ─── 类型导出 ─────────────────────────────────────────
 
-export type {
-  ScriptResult,
-  EvaluateScriptParams,
-  EvaluateScriptResult,
-  InjectPreloadScriptParams,
-  InjectPreloadScriptResult,
-} from './script.js';
 
 export type {
   InjectConfigEntry,

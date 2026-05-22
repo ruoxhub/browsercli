@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {defineTool, type Context} from '../ToolDefinition.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
 
 /**
  * 通过 CDP 在元素坐标处派发真实鼠标点击事件。

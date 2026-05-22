@@ -8,7 +8,37 @@ import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {zod} from '../../../src/third_party/index.js';
-import {traceSignatureGeneration} from '../../../src/tools/workflow/traceSignatureGeneration.js';
+import {traceSignatureGeneration as traceSignatureGenerationTool} from '../../../src/tools/workflow/traceSignatureGeneration.js';
+import { getRuntime } from '../../../src/runtime.js';
+
+const traceSignatureGeneration = Object.assign(
+  async (runtime: any, params: any): Promise<any> => {
+    const originalProvider = getRuntime().contextProvider;
+    getRuntime().contextProvider = runtime;
+    let result: any = null;
+    const response = {
+      appendResponseLine: (line: string) => {
+        if (line.startsWith('```json')) return;
+        if (line.startsWith('```')) return;
+        try {
+          result = JSON.parse(line);
+        } catch (e) {}
+      },
+      setStructuredContent: (content: unknown) => {
+        result = content;
+      },
+    } as any;
+    try {
+      await traceSignatureGenerationTool.handler({ params } as any, response, runtime);
+    } finally {
+      getRuntime().contextProvider = originalProvider;
+    }
+    return result;
+  },
+  {
+    schema: traceSignatureGenerationTool.schema,
+  }
+);
 
 function createRuntime() {
   const signedRequest = {

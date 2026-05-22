@@ -131,13 +131,6 @@ describe('tools-meta', () => {
       assert.strictEqual(meta!.handlerName, 'autoHook');
     });
 
-    it('uses the corrected vjstools module path', async () => {
-      await ensureToolsMeta();
-      const meta = getToolMeta('deobfuscate_code_vj');
-      assert.ok(meta);
-      assert.strictEqual(meta!.modulePath, './vjstools/deobfuscate.js');
-    });
-
     it('includes argSpecs for scroll_by', async () => {
       await ensureToolsMeta();
       const meta = getToolMeta('scroll_by');

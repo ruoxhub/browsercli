@@ -4,12 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {zod} from '../../third_party/index.js';
 import {getInsightOutput} from '../../trace-processing/parse.js';
 import type {InsightName} from '../../trace-processing/parse.js';
-
-import {defineTool} from '../ToolDefinition.js';
 import {ToolCategory} from '../categories.js';
-import {zod} from '../../third_party/index.js';
+import {defineTool} from '../ToolDefinition.js';
 
 /**
  * 获取性能追踪录制中某个 Insight 的详细信息（纯函数版本）。

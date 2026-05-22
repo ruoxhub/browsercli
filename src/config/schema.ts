@@ -26,8 +26,8 @@ const positiveIntSchema = zod.coerce.number().int().positive();
 const portSchema = zod.coerce
   .number()
   .int()
-  .min(1, 'must be between 1 and 65535')
-  .max(65535, 'must be between 1 and 65535');
+  .min(1024, 'Invalid REMOTE_DEBUGGING_PORT')
+  .max(65535, 'Invalid REMOTE_DEBUGGING_PORT');
 
 const nonNegativeIntSchema = zod.coerce.number().int().nonnegative();
 
@@ -38,8 +38,8 @@ const ViewportSchema: zodType.ZodType<{width: number; height: number}> = zod
   })
   .strip() as zodType.ZodType<{width: number; height: number}>;
 
-export const LLMProviderSchema = zod.enum(['openai'], {
-  errorMap: () => ({message: 'must be one of: openai'}),
+export const LLMProviderSchema = zod.enum(['openai', 'gemini', 'anthropic'], {
+  errorMap: () => ({message: 'must be one of: openai, gemini, anthropic'}),
 });
 
 export const OpenAIConfigSchema = zod

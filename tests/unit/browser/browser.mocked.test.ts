@@ -11,12 +11,12 @@ import {
   BrowserManager,
   launch,
   resolveAutoConnectTarget,
-} from '../../../src/browser.js';
+} from '../../../src/browser/index.js';
 import {
   StealthScripts2025,
   type StealthReport,
 } from '../../../src/modules/stealth/StealthScripts2025.js';
-import {puppeteer} from '../../../src/third_party/index.js';
+import {chromium} from 'patchright';
 
 interface ResettableStealthScripts {
   injectAll: typeof StealthScripts2025.injectAll;
@@ -61,20 +61,20 @@ function makeStealthReport(preset: string): StealthReport {
 }
 
 describe('browser.ts mocked', () => {
-  let originalLaunch: typeof puppeteer.launch;
-  let originalConnect: typeof puppeteer.connect;
+  let originalLaunch: typeof chromium.launch;
+  let originalConnect: typeof chromium.connectOverCDP;
   let originalInjectAll: typeof StealthScripts2025.injectAll;
 
   beforeEach(async () => {
     await BrowserManager.resetInstance();
-    originalLaunch = puppeteer.launch;
-    originalConnect = puppeteer.connect;
+    originalLaunch = chromium.launch;
+    originalConnect = chromium.connectOverCDP;
     originalInjectAll = StealthScripts2025.injectAll;
   });
 
   afterEach(async () => {
-    puppeteer.launch = originalLaunch;
-    puppeteer.connect = originalConnect;
+    chromium.launch = originalLaunch;
+    chromium.connectOverCDP = originalConnect;
     (StealthScripts2025 as unknown as ResettableStealthScripts).injectAll =
       originalInjectAll;
     try {
@@ -109,10 +109,10 @@ describe('browser.ts mocked', () => {
       close: async () => undefined,
     };
 
-    puppeteer.launch = async opts => {
+    chromium.launch = async opts => {
       launchArgs = (opts ?? {}) as Record<string, unknown>;
       return fakeBrowser as unknown as Awaited<
-        ReturnType<typeof puppeteer.launch>
+        ReturnType<typeof chromium.launch>
       >;
     };
 
@@ -127,13 +127,13 @@ describe('browser.ts mocked', () => {
 
     assert.strictEqual(
       out,
-      fakeBrowser as unknown as Awaited<ReturnType<typeof puppeteer.launch>>,
+      fakeBrowser as unknown as Awaited<ReturnType<typeof chromium.launch>>,
     );
     assert.ok(launchArgs);
     assert.strictEqual(Array.isArray((launchArgs ?? {})['args']), true);
     assert.strictEqual(resized, 1);
 
-    puppeteer.launch = async () => {
+    chromium.launch = async () => {
       throw new Error('The browser is already running');
     };
     await assert.rejects(async () => {
@@ -160,15 +160,15 @@ describe('browser.ts mocked', () => {
       pages: async () => [],
       close: async () => undefined,
     };
-    puppeteer.connect = async () =>
-      browser as unknown as Awaited<ReturnType<typeof puppeteer.connect>>;
+    chromium.connectOverCDP = async () =>
+      browser as unknown as Awaited<ReturnType<typeof chromium.connectOverCDP>>;
 
     const connected = await (
       manager as unknown as BrowserManagerLike
     ).connectToRemoteBrowser();
     assert.strictEqual(connected, browser);
 
-    puppeteer.connect = async () => {
+    chromium.connectOverCDP = async () => {
       throw new Error('refused');
     };
     await assert.rejects(async () => {
@@ -220,15 +220,15 @@ describe('browser.ts mocked', () => {
       pages: async () => [],
       close: async () => undefined,
     };
-    puppeteer.launch = async () =>
-      browser as unknown as Awaited<ReturnType<typeof puppeteer.launch>>;
+    chromium.launch = async () =>
+      browser as unknown as Awaited<ReturnType<typeof chromium.launch>>;
     const launched = await (
       manager as unknown as BrowserManagerLike
     ).launchBrowser();
     assert.strictEqual(launched, browser);
     assert.strictEqual(manager.isConnected(), true);
 
-    puppeteer.launch = async () => {
+    chromium.launch = async () => {
       throw new Error('failed to spawn');
     };
     await assert.rejects(async () => {

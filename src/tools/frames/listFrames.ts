@@ -5,10 +5,10 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
-import {defineTool} from '../ToolDefinition.js';
-import {ToolCategory} from '../categories.js';
-
 import type {ToolContextProvider} from '../../worker/ToolContextProvider.js';
+import {ToolCategory} from '../categories.js';
+import {defineTool} from '../ToolDefinition.js';
+
 
 /**
  * 计算 Frame 的嵌套深度。

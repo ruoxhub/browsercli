@@ -5,8 +5,8 @@
  */
 
 import {zod} from '../../third_party/index.js';
-import {defineTool, type Context} from '../ToolDefinition.js';
 import {ToolCategory} from '../categories.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
 
 function appendJson(
   response: {appendResponseLine(value: string): void},
@@ -50,7 +50,7 @@ export const wasmMemoryInspect = defineTool({
       }
 
       const result = await page.evaluate(
-        (evalOffset: number, evalLength: number, evalFormat: string, searchPattern?: string) => {
+        ({evalOffset, evalLength, evalFormat, searchPattern}: {evalOffset: number; evalLength: number; evalFormat: string; searchPattern?: string}) => {
           // 查找页面中导出的 WebAssembly.Memory
           const memories: Array<{exportName: string; buffer: ArrayBuffer}> = [];
 
@@ -151,10 +151,7 @@ export const wasmMemoryInspect = defineTool({
             searchResults: searchResults.length > 0 ? searchResults : undefined,
           };
         },
-        offset,
-        length,
-        format,
-        searchPattern,
+        {evalOffset: offset, evalLength: length, evalFormat: format, searchPattern},
       );
 
       if (!result.found) {

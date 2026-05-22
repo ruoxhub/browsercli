@@ -17,7 +17,7 @@ interface RuntimeEvaluateResult<T> {
   };
 }
 
-function hasPage(frame: Frame): frame is Frame & {page(): Page} {
+function hasPage(frame: Frame): boolean {
   return typeof (frame as Frame & {page?: () => Page}).page === 'function';
 }
 

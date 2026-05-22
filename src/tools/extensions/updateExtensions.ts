@@ -5,8 +5,8 @@
  */
 
 import {zod} from '../../third_party/index.js';
-import {defineTool, type Context} from '../ToolDefinition.js';
 import {ToolCategory} from '../categories.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
 
 /**
  * 更新 Chrome 扩展：导航到 chrome://extensions/ 并点击更新按钮。

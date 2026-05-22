@@ -9,13 +9,26 @@ import {describe, it} from 'node:test';
 
 import {rebuildBundle} from '../../../../src/tools/workflow/rebuildBundle.js';
 
+async function callRebuildBundle(params: any): Promise<any> {
+  let result: any = null;
+  const response = {
+    appendResponseLine: (line: string) => {},
+    setStructuredContent: (content: unknown) => {
+      result = content;
+    },
+  } as any;
+  await rebuildBundle.handler({params} as any, response, null as any);
+  return result;
+}
+
 describe('rebuildBundle tool', () => {
-  it('exports rebuildBundle tool function', () => {
-    assert.strictEqual(typeof rebuildBundle, 'function');
+  it('exports rebuildBundle tool object', () => {
+    assert.strictEqual(typeof rebuildBundle, 'object');
+    assert.strictEqual(typeof rebuildBundle.handler, 'function');
   });
 
   it('builds default environment code with browser shims', async () => {
-    const result = await rebuildBundle({url: 'https://example.com'});
+    const result = await callRebuildBundle({url: 'https://example.com'});
 
     assert.ok(result.success);
     assert.ok(result.data);
@@ -26,7 +39,7 @@ describe('rebuildBundle tool', () => {
   });
 
   it('builds environment code with captured cookies and storage', async () => {
-    const result = await rebuildBundle({url: 'https://example.com/product'});
+    const result = await callRebuildBundle({url: 'https://example.com/product'});
 
     assert.ok(result.success);
     assert.ok(result.data);
@@ -36,7 +49,7 @@ describe('rebuildBundle tool', () => {
   });
 
   it('filters runtime evidence by target keywords', async () => {
-    const result = await rebuildBundle({
+    const result = await callRebuildBundle({
       url: 'https://example.com',
       targetKeywords: ['h5st'],
       targetUrlPatterns: ['api.m.jd.com'],
@@ -48,7 +61,7 @@ describe('rebuildBundle tool', () => {
   });
 
   it('filters runtime evidence by target function names', async () => {
-    const result = await rebuildBundle({
+    const result = await callRebuildBundle({
       url: 'https://example.com/order',
       targetFunctionNames: ['computeQtk9'],
       goal: 'submit order',
@@ -66,7 +79,7 @@ describe('rebuildBundle tool', () => {
   });
 
   it('handles errors gracefully', async () => {
-    const result = await rebuildBundle({url: 'https://example.com'});
+    const result = await callRebuildBundle({url: 'https://example.com'});
 
     if (!result.success) {
       assert.ok(result.error);
@@ -76,7 +89,7 @@ describe('rebuildBundle tool', () => {
   });
 
   it('returns entry code with proper structure', async () => {
-    const result = await rebuildBundle({url: 'https://example.com'});
+    const result = await callRebuildBundle({url: 'https://example.com'});
 
     assert.ok(result.success);
     assert.ok(result.data);
@@ -87,7 +100,7 @@ describe('rebuildBundle tool', () => {
   });
 
   it('uses targetUrl from options when url is not provided', async () => {
-    const result = await rebuildBundle({
+    const result = await callRebuildBundle({
       targetUrl: 'https://api.example.com/v1',
     });
 
@@ -97,7 +110,7 @@ describe('rebuildBundle tool', () => {
   });
 
   it('returns empty evidence count for new sessions', async () => {
-    const result = await rebuildBundle({url: 'https://example.com'});
+    const result = await callRebuildBundle({url: 'https://example.com'});
 
     assert.ok(result.success);
     assert.ok(result.data);

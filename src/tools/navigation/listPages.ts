@@ -4,13 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {defineTool} from '../ToolDefinition.js';
 import {ToolCategory} from '../categories.js';
-
 import {
   normalizeBrowserRuntimeError,
   withOperationTimeout,
 } from '../shared/browserRuntime.js';
+import {defineTool} from '../ToolDefinition.js';
 
 /**
  * 列出浏览器中所有已打开的页面。
@@ -61,7 +60,7 @@ export const listPages = defineTool({
        data = {
          pageInfos,
          selectedIndex
-       }
+       };
 
        response.setStructuredContent({
          success: true,

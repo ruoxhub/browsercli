@@ -74,6 +74,7 @@ export class ToolExecutionPipeline {
         success: true,
         startedAt: new Date(startedAt).toISOString(),
         durationMs: Date.now() - startedAt,
+        input: params,
         request: params,
         response,
       });
@@ -93,6 +94,7 @@ export class ToolExecutionPipeline {
         success: false,
         startedAt: new Date(startedAt).toISOString(),
         durationMs: Date.now() - startedAt,
+        input: params,
         request: params,
         error: {
           code: toolError.code,

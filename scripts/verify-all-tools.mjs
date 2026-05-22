@@ -309,7 +309,6 @@ function categorizeTool(name) {
   if (name.includes('experience') || name.includes('extension') || name.includes('dialog') || name.includes('evaluate') || name.includes('inject') || name.includes('script')) return 'Skill/Extension';
   if (name.includes('storage') || name.includes('cookie') || name.includes('local_storage') || name.includes('session_storage') || name.includes('dom') || name.includes('find_clickable') || name.includes('query_dom')) return 'DOM/Storage';
   if (name.includes('monitor') || name.includes('trace') || name.includes('inspect') || name.includes('list_hooks') || name.includes('find_in') || name.includes('paused') || name.includes('callframe') || name.includes('unhook') || name.includes('remove_hook') || name.includes('get_hook') || name.includes('list_created') || name.includes('get_hook_data') || name.includes('get_ai_debug')) return 'Debug/Inspect';
-  if (name.includes('vue')) return 'Vue';
   if (name.includes('wasm')) return 'WASM';
   if (name.includes('crypto') || name.includes('anti_')) return 'Crypto/Anti';
   if (name.includes('observe') || name.includes('auto_hook') || name === 'trace_signature_generation') return 'Workflow';

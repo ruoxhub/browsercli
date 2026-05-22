@@ -4,16 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {defineTool} from '../ToolDefinition.js';
+import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
+import {defineTool} from '../ToolDefinition.js';
+
 import type {
   CollectionDiffParams,
   CollectionDiffData,
   DiffChangedEntry,
   FileSummaryEntry,
 } from './types.js';
-import {getRuntime} from '../../runtime.js';
+
 
 /**
  * 对比两次收集的文件摘要差异（标准 MCP 工具版本）。

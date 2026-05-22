@@ -20,6 +20,7 @@ import {fileURLToPath} from 'node:url';
 
 import {RUNTIME_DIR_NAME} from '../config.js';
 import type {WorkerStartOptions} from '../types/platform.js';
+
 import {
   WorkerGuardian,
   type RestartPolicy,

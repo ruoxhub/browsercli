@@ -5,21 +5,21 @@
  */
 import {BrowserManager, type BrowserManagerConfig} from './browser/index.js';
 import {getBrowserManagerConfig} from './config.js';
-import {AISummarizer} from './modules/analyzer/AISummarizer.js';
-import {CodeAnalyzer} from './modules/analyzer/CodeAnalyzer.js';
+import type {AISummarizer} from './modules/analyzer/AISummarizer.js';
+import type {CodeAnalyzer} from './modules/analyzer/CodeAnalyzer.js';
 import {CodeCollector} from './modules/collector/CodeCollector.js';
 import {DOMInspector} from './modules/collector/DOMInspector.js';
 import {PageController} from './modules/collector/PageController.js';
-import {CryptoDetector} from './modules/crypto/CryptoDetector.js';
-import {Deobfuscator} from './modules/deobfuscator/Deobfuscator.js';
+import type {CryptoDetector} from './modules/crypto/CryptoDetector.js';
+import type {Deobfuscator} from './modules/deobfuscator/Deobfuscator.js';
 import {HookManager} from './modules/hook/HookManager.js';
-import {WasmAnalyzer} from './modules/wasm/WasmAnalyzer.js';
-import {WasmCollector} from './modules/wasm/WasmCollector.js';
-import {WasmDecompiler} from './modules/wasm/WasmDecompiler.js';
-import {WasmRuntimeInspector} from './modules/wasm/WasmRuntimeInspector.js';
+import type {WasmAnalyzer} from './modules/wasm/WasmAnalyzer.js';
+import type {WasmCollector} from './modules/wasm/WasmCollector.js';
+import type {WasmDecompiler} from './modules/wasm/WasmDecompiler.js';
+import type {WasmRuntimeInspector} from './modules/wasm/WasmRuntimeInspector.js';
 import {ReverseTaskStore} from './reverse/ReverseTaskStore.js';
 import {RuntimeServices} from './runtime/RuntimeServices.js';
-import {LLMService} from './services/LLMService.js';
+import type {LLMService} from './services/LLMService.js';
 import type {Page} from './third_party/index.js';
 import {createAppEventBusOptions, type AppEventMap} from './types/events.js';
 import {
@@ -132,4 +132,8 @@ export function getRuntime(): Runtime {
   };
 
   return runtime;
+}
+
+export function setRuntime(customRuntime: Runtime | undefined): void {
+  runtime = customRuntime;
 }

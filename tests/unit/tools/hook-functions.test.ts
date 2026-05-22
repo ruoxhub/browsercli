@@ -14,7 +14,7 @@ import {
   inferCandidateEnvNeeds,
   buildRequestBindings,
   toHookRecordArray,
-} from '../../../src/tools/hook.js';
+} from '../../../src/tools/hook/index.js';
 
 describe('hook.ts pure functions', () => {
   describe('normalizeHookRecord', () => {

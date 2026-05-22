@@ -161,13 +161,13 @@ export function matchesTargetText(
  * 按目标条件过滤运行时证据记录。
  */
 export function filterRuntimeEvidence(
-  records: Record<string, unknown>[],
+  records: Array<Record<string, unknown>>,
   targetKeywords: string[],
   targetUrlPatterns: string[],
   targetFunctionNames: string[],
   targetActionDescription: string,
   maxEvidenceItems: number,
-): Record<string, unknown>[] {
+): Array<Record<string, unknown>> {
   const hasTargets =
     targetKeywords.length > 0 ||
     targetUrlPatterns.length > 0 ||

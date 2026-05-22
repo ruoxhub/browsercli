@@ -200,7 +200,6 @@ export interface DomainManifest {
 - `src/tools/stealth/manifest.ts`
 - `src/tools/rebuild/manifest.ts`
 - `src/tools/reverse/manifest.ts`（如存在）
-- `src/tools/vue/manifest.ts`
 - `src/tools/vjstools/manifest.ts`
 - `src/tools/anti-debug/manifest.ts`
 - `src/tools/site-experience/manifest.ts`

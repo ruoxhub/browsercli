@@ -269,25 +269,7 @@
 | `wasm_vmp_trace` | | 追踪 Wasm 运行时事件 |
 | `wasm_memory_inspect` | | 检查 Wasm 内存导出 |
 
-## 23. Vue.js (Vue)
-
-| 工具 | 必填参数 | 用途 |
-|------|----------|------|
-| `activate_vue_devtools` | | 启用 Vue/Pinia DevTools |
-| `clear_vue_guards` | | 清除 Vue Router 全局守卫 |
-| `get_vue_routes` | | 获取 Vue Router 路由表 |
-
-## 24. VJSTools (AST 处理)
-
-| 工具 | 必填参数 | 用途 |
-|------|----------|------|
-| `deobfuscate_code_vj` | `--code*` | AST 去混淆（sojson/ob/jsfuck/general） |
-| `minify_code` | `--code*` | 压缩/格式化 JS（Terser） |
-| `transpile_code` | `--code*` | 转译 JS/TS/JSX（Babel） |
-| `analyze_ast` | `--code*` | 分析 AST 结构 |
-| `diff_code` | `--text1* --text2*` | 代码差异对比 |
-
-## 25. 代码模板 (Code Templates)
+## 23. 代码模板 (Code Templates)
 
 | 工具 | 必填参数 | 用途 |
 |------|----------|------|
@@ -295,7 +277,7 @@
 | `inject_code_template` | `--templateName*` | 注入代码模板到页面 |
 | `list_code_templates` | | 列出可用代码模板 |
 
-## 26. WebSocket
+## 25. WebSocket
 
 | 工具 | 必填参数 | 用途 |
 |------|----------|------|

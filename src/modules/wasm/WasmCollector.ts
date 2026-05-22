@@ -8,8 +8,7 @@ import {createHash} from 'node:crypto';
 import {mkdir, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 
-import type {HTTPResponse, Page} from 'puppeteer';
-
+import type {HTTPResponse, Page} from '../../third_party/index.js';
 import type {ReverseTaskHandle} from '../../types/index.js';
 import {logger} from '../../utils/logger.js';
 import type {PageController} from '../collector/PageController.js';
@@ -166,7 +165,7 @@ export class WasmCollector {
     page.on('response', handleResponse);
     try {
       await page.goto(options.url, {
-        waitUntil: 'networkidle2',
+        waitUntil: 'networkidle',
         timeout,
       });
       if (waitAfterLoadMs > 0) {
@@ -284,7 +283,7 @@ export class WasmCollector {
         return;
       }
 
-      const buffer = await response.buffer();
+      const buffer = await response.body();
       const bytes = Uint8Array.from(buffer);
       if (!isWasmBinary(bytes)) {
         logger.debug(`[WasmCollector] Ignored non-wasm response body from ${url}`);

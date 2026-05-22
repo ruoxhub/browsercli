@@ -546,12 +546,18 @@ export function getToolResultRecordingConfig(): ResolvedToolResultRecordingConfi
  */
 export function getDefaultLLMProvider(): LLMProvider {
   const envProvider = getEnvValue('DEFAULT_LLM_PROVIDER')?.toLowerCase();
-  if (envProvider === 'openai') return envProvider;
+  if (
+    envProvider === 'openai' ||
+    envProvider === 'gemini' ||
+    envProvider === 'anthropic'
+  ) {
+    return envProvider as LLMProvider;
+  }
 
   const {merged: fileConfig} = loadFullConfig();
-  if (fileConfig.llmProvider) return fileConfig.llmProvider;
+  if (fileConfig.llmProvider) return fileConfig.llmProvider as LLMProvider;
 
-  return 'openai';
+  return 'gemini';
 }
 
 /**
@@ -801,9 +807,14 @@ export function validateConfig(config: SystemConfig): {
     return {valid: true, errors: []};
   }
 
+  const errors = result.error.issues.map(issue => {
+    const pathStr = issue.path.join('.');
+    return `${pathStr}: ${issue.message}`;
+  });
+
   return {
     valid: false,
-    errors: [formatConfigValidationError(result.error)],
+    errors,
   };
 }
 

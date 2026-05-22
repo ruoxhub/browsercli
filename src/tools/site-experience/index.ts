@@ -14,17 +14,4 @@ export {
   listSiteExperiences,
 } from './siteExperience.js';
 
-// ─── 类型导出 ─────────────────────────────────────────
 
-export type {
-  SiteExperienceResult,
-  SearchParams,
-  SearchResult,
-  CreateParams,
-  CreateResult,
-  UpdateParams,
-  UpdateResult,
-  DeleteParams,
-  DeleteResult,
-  ListResult,
-} from './siteExperience.js';

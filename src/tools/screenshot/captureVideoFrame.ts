@@ -7,11 +7,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import {defineTool} from '../ToolDefinition.js';
 import {zod} from '../../third_party/index.js';
-import {ToolCategory} from '../categories.js';
-
 import type {ToolContextProvider} from '../../worker/ToolContextProvider.js';
+import {ToolCategory} from '../categories.js';
+import {defineTool} from '../ToolDefinition.js';
 
 /**
  * 捕获视频当前帧（defineTool 版本）。
@@ -63,14 +62,13 @@ export const captureVideoFrame = defineTool({
       // 先定位到指定时间点
       if (request.params.seekTime !== undefined) {
         await page.evaluate(
-          (sel, t) => {
+          ({sel, t}) => {
             const video = document.querySelector(sel) as HTMLVideoElement;
             if (video) {
               video.currentTime = t;
             }
           },
-          request.params.selector,
-          request.params.seekTime,
+          {sel: request.params.selector, t: request.params.seekTime},
         );
         // 等待 seek 完成
         await new Promise(resolve => setTimeout(resolve, 300));

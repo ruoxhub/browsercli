@@ -1,13 +1,13 @@
 ---
 name: jsreverser-playbook
-description: JSReverser CLI 工具导航与选择指南。在需要查询 js-reverse 可用的 161 个 MCP 工具、选择合适的工具组合完成逆向任务、理解工具分类与参数时使用。涵盖观察取证、Hook 注入、调试器、代码分析、反调试、加密库拦截、Wasm 逆向、本地复现等全部功能域。当用户提到 js-reverse 工具、需要知道某个逆向操作该用哪个工具、或在 JSReverser-CLI 上下文中需要工具选型指导时触发。
+description: JSReverser CLI 工具导航与选择指南。在需要查询 js-reverse 可用的 156 个 MCP 工具、选择合适的工具组合完成逆向任务、理解工具分类与参数时使用。涵盖观察取证、Hook 注入、调试器、代码分析、反调试、加密库拦截、Wasm 逆向、本地复现等全部功能域。当用户提到 js-reverse 工具、需要知道某个逆向操作该用哪个工具、或在 JSReverser-CLI 上下文中需要工具选型指导时触发。
 ---
 
 # JSReverser playbook — 工具导航
 
 ## 工具总览
 
-js-reverse 提供 161 个 MCP 工具，按 26 个功能域组织：
+js-reverse 提供 156 个 MCP 工具，按 25 个功能域组织：
 
 | 域 | 工具数 | 核心用途 |
 |----|--------|---------|
@@ -26,8 +26,6 @@ js-reverse 提供 161 个 MCP 工具，按 26 个功能域组织：
 | Rebuild | 2 | 本地复现导出/环境差异对比 |
 | Wasm | 9 | Wasm 模块分析/反编译/离线执行 |
 | Stealth | 4 | 反检测注入 |
-| Vue | 3 | Vue.js DevTools/路由/守卫 |
-| VJSTools | 5 | AST 去混淆/转译/差异 |
 | Emulation | 4 | 设备/网络/CPU 模拟 |
 | WebSocket | 4 | WS 连接监控与消息分析 |
 

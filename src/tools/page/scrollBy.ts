@@ -5,8 +5,8 @@
  */
 
 import {zod} from '../../third_party/index.js';
-import {defineTool, type Context} from '../ToolDefinition.js';
 import {ToolCategory} from '../categories.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
 
 /**
  * 按方向滚动页面。
@@ -31,7 +31,7 @@ export const scrollBy = defineTool({
       const page = context.getSelectedPage();
 
       const result = await page.evaluate(
-        (dir: string, px: number) => {
+        ({dir, px}: {dir: string; px: number}) => {
           switch (dir) {
             case 'top':
               window.scrollTo(0, 0);
@@ -49,8 +49,7 @@ export const scrollBy = defineTool({
               return 'unknown direction';
           }
         },
-        direction,
-        pixels,
+        {dir: direction, px: pixels},
       );
 
       // 等待懒加载触发

@@ -17,7 +17,6 @@ export {WaitForHelper} from './WaitForHelper.js';
 // ─── 类型导出 ─────────────────────────────────────────
 
 export type {
-  DomResult,
   ElementInfo,
   ClickableElement,
   QueryDomParams,

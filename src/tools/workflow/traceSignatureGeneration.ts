@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {zod} from '../../third_party/index.js';
 import {getRuntime} from '../../runtime.js';
-import {defineTool} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import type {RequestInitiator} from '../network/types.js';
+import {defineTool} from '../ToolDefinition.js';
 
 const SIGNATURE_HEADER_PATTERN =
   /(^|[-_])(sign|signature|token|auth|nonce|timestamp)([-_]|$)|x-sign/i;

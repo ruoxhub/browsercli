@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {getRuntime} from '../../runtime.js';
+import {zod} from '../../third_party/index.js';
 import {
   mapIssueToMessageObject,
 } from '../../utils/DevtoolsUtils.js';
-import {defineTool} from '../ToolDefinition.js';
 import {ToolCategory} from '../categories.js';
-import {getRuntime} from '../../runtime.js';
-import {zod} from '../../third_party/index.js';
+import {defineTool} from '../ToolDefinition.js';
 
 import type {
   ConsoleMessageData,
@@ -162,7 +162,7 @@ export const listConsoleMessages = defineTool({
         tooltype: 'list_console_messages',
         logFormat: 'json',
         data,
-      }
+      };
       // response.appendResponseLine('```json');
       // response.appendResponseLine(JSON.stringify(data, null, 2));
       // response.appendResponseLine('```');
@@ -174,7 +174,7 @@ export const listConsoleMessages = defineTool({
         tooltype: 'list_console_messages',
         logFormat: 'json',
         data: null
-      }
+      };
       // response.appendResponseLine(`Error: ${error instanceof Error ? error.message : String(error)}`);
     }
   },

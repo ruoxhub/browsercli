@@ -7,10 +7,10 @@
 import {writeFile} from 'node:fs/promises';
 import path from 'node:path';
 
-import {zod} from '../../third_party/index.js';
 import {getRuntime} from '../../runtime.js';
-import {defineTool} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
+import {defineTool} from '../ToolDefinition.js';
 
 function appendJson(
   response: {appendResponseLine(value: string): void},

@@ -4,11 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {defineTool, type Context} from '../ToolDefinition.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
-
 import {NO_ACTIVE_PAGE_MESSAGE} from '../shared/activePageResolver.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
 
 import type {ClickableElement} from './types.js';
 

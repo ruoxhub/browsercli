@@ -6,10 +6,10 @@
 
 import type {
   Browser,
+  BrowserContext,
   CDPSession,
   Page,
   Protocol,
-  Target,
 } from '../../third_party/index.js';
 
 import type {RequestInitiator} from './types.js';
@@ -112,6 +112,14 @@ export class WebSocketCollector {
   >();
 
   #maxNavigationSaved = 3;
+  #boundContexts = new Set<BrowserContext>();
+
+  #onPageCreated = (page: Page) => {
+    this.addPage(page);
+    page.once('close', () => {
+      this.#cleanupPage(page);
+    });
+  };
 
   constructor(browser: Browser, includeAllPages?: boolean) {
     this.#browser = browser;
@@ -119,35 +127,29 @@ export class WebSocketCollector {
   }
 
   async init() {
-    const pages = await this.#browser.pages(this.#includeAllPages);
-    for (const page of pages) {
-      this.addPage(page);
+    const pages: Page[] = [];
+    for (const context of this.#browser.contexts()) {
+      if (!this.#boundContexts.has(context)) {
+        this.#boundContexts.add(context);
+        context.on('page', this.#onPageCreated);
+      }
+      pages.push(...context.pages());
     }
 
-    this.#browser.on('targetcreated', this.#onTargetCreated);
-    this.#browser.on('targetdestroyed', this.#onTargetDestroyed);
+    for (const page of pages) {
+      this.addPage(page);
+      page.once('close', () => {
+        this.#cleanupPage(page);
+      });
+    }
   }
 
   dispose() {
-    this.#browser.off('targetcreated', this.#onTargetCreated);
-    this.#browser.off('targetdestroyed', this.#onTargetDestroyed);
+    for (const context of this.#boundContexts) {
+      context.off('page', this.#onPageCreated);
+    }
+    this.#boundContexts.clear();
   }
-
-  #onTargetCreated = async (target: Target) => {
-    const page = await target.page();
-    if (!page) {
-      return;
-    }
-    this.addPage(page);
-  };
-
-  #onTargetDestroyed = async (target: Target) => {
-    const page = await target.page();
-    if (!page) {
-      return;
-    }
-    this.#cleanupPage(page);
-  };
 
   addPage(page: Page) {
     if (this.#storage.has(page)) {

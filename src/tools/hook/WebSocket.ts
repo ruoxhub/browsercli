@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {defineTool, type Context} from '../ToolDefinition.js';
+import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
-import {getRuntime} from '../../runtime.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
 
 import {buildHookStoreRuntime} from './store-utils.js';
 

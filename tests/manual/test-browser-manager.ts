@@ -16,7 +16,7 @@
  * Run with: npm run build && node build/tests/manual/test-browser-manager.js
  */
 
-import {BrowserManager} from '../../src/browser.js';
+import {BrowserManager} from '../../src/browser/index.js';
 
 async function testBrowserManager() {
   console.log('=== Testing BrowserManager ===\n');
@@ -34,7 +34,7 @@ async function testBrowserManager() {
     // Test 2: Launch browser
     console.log('\nTest 2: Launch browser');
     const browser = await manager1.ensureBrowser();
-    console.log('✓ Browser launched:', browser.connected);
+    console.log('✓ Browser launched:', browser.isConnected());
 
     // Test 3: Get browser (should return same instance)
     console.log('\nTest 3: Get browser instance');
@@ -48,7 +48,7 @@ async function testBrowserManager() {
     // Test 5: Test stealth injection
     console.log('\nTest 5: Test stealth injection');
     await manager1.injectStealth();
-    const pages = await browser.pages();
+    const pages = browser.contexts().flatMap(c => c.pages());
     if (pages.length > 0) {
       const page = pages[0];
       await page.goto('about:blank');
@@ -84,9 +84,9 @@ async function testBrowserManager() {
       useStealthScripts: true,
     });
     const browser3 = await manager3.ensureBrowser();
-    console.log('✓ Browser launched with stealth:', browser3.connected);
+    console.log('✓ Browser launched with stealth:', browser3.isConnected());
 
-    const pages3 = await browser3.pages();
+    const pages3 = browser3.contexts().flatMap(c => c.pages());
     if (pages3.length > 0) {
       const page = pages3[0];
       await page.goto('about:blank');

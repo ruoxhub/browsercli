@@ -62,7 +62,6 @@ JSReverser-CLI/
 │   │   ├── script/               # 脚本管理工具
 │   │   ├── shared/               # 共享工具逻辑
 │   │   ├── stealth/              # Stealth 注入工具
-│   │   ├── vue/                  # Vue 框架专用工具
 │   │   ├── wasm/                 # WebAssembly 分析工具（11 文件）
 │   │   └── workflow/             # 工作流工具
 │   ├── modules/                  # 核心业务模块

@@ -4,11 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {zod} from '../../third_party/index.js';
 import {getRuntime} from '../../runtime.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
 import {withOperationTimeout} from '../shared/browserRuntime.js';
 import {defineTool} from '../ToolDefinition.js';
-import {ToolCategory} from '../categories.js';
+
 import {
   buildRequestFingerprints,
   buildPriorityTargets,
@@ -208,14 +209,14 @@ export const analyze_target = defineTool({
 
     const {collectResult, normalizedFiles, candidateFiles, analysisCode} =
       await withOperationTimeout(
-        collectAnalyzeTargetCode(runtime, params),
+        collectAnalyzeTargetCode(runtime, params as AnalyzeTargetParams),
         'analyze_target 代码收集',
         30000,
       );
     const injectedHooks = await installAnalyzeHooks(runtime, hookPreset, autoInjectHooks);
 
     const replayResults = params.autoReplayActions?.length
-      ? await runtime.pageController.replayActions(params.autoReplayActions)
+      ? await runtime.pageController.replayActions(params.autoReplayActions as any)
       : [];
 
     if (params.waitAfterHookMs && params.waitAfterHookMs > 0) {

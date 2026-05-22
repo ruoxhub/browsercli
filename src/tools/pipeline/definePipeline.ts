@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {defineTool, type ToolDefinition} from '../ToolDefinition.js';
 import type {zod} from '../../third_party/index.js';
+import {defineTool, type ToolDefinition} from '../ToolDefinition.js';
+
 import type {PipelineContext, PipelineDef, PipelineStep, StepResult} from './types.js';
 
 /**
@@ -241,7 +242,7 @@ export function when(
  */
 export function parallel(
   name: string,
-  steps: Omit<PipelineStep, 'name'>[],
+  steps: Array<Omit<PipelineStep, 'name'>>,
   options?: {onError?: 'fail' | 'skip' | 'continue'},
 ): PipelineStep {
   return {

@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {zod} from '../../third_party/index.js';
 import {getRuntime} from '../../runtime.js';
+import {zod} from '../../third_party/index.js';
 import {TokenBudgetManager} from '../../utils/TokenBudgetManager.js';
-import {defineTool} from '../ToolDefinition.js';
 import {ToolCategory} from '../categories.js';
+import {defineTool} from '../ToolDefinition.js';
 
+import {toMirroredNetworkEntry, toMirroredScriptEntry} from './normalize.js';
 import type {
   CorrelatedFlow,
   PriorityTarget,
@@ -17,7 +18,6 @@ import type {
   RecordEvidenceResult,
   ExportSessionReportResult,
 } from './types.js';
-import {toMirroredNetworkEntry, toMirroredScriptEntry} from './normalize.js';
 
 export function buildActionPlan(result: {
   target: string;

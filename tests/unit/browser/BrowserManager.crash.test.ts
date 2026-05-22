@@ -6,7 +6,7 @@
 import assert from 'node:assert';
 import {afterEach, beforeEach, describe, it} from 'node:test';
 
-import {BrowserManager} from '../../../src/browser.js';
+import {BrowserManager} from '../../../src/browser/index.js';
 
 interface BrowserLike {
   connected: boolean;

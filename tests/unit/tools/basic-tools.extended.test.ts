@@ -17,7 +17,7 @@ import {
   newPage,
   selectPage,
 } from '../../../src/tools/pages.js';
-import {getJSHookRuntime} from '../../../src/tools/runtime.js';
+import {getRuntime} from '../../../src/runtime.js';
 import {screenshot} from '../../../src/tools/screenshot.js';
 import {evaluateScript} from '../../../src/tools/script.js';
 
@@ -172,7 +172,7 @@ describe('tools extended coverage', () => {
       getSelectedPage: () => page,
     };
 
-    const runtime = getJSHookRuntime();
+    const runtime = getRuntime();
     const originalSyncPageContext = (
       runtime as unknown as {
         syncPageContext?: (page: TestPageHarness, frame?: unknown) => void;
@@ -287,7 +287,7 @@ describe('tools extended coverage', () => {
 
   it('covers network list/get branches', async () => {
     const response = makeResponse();
-    const runtime = getJSHookRuntime();
+    const runtime = getRuntime();
 
     const context: NetworkContextHarness = {
       getDevToolsData: async () => ({cdpRequestId: 'abc'}),
@@ -489,8 +489,8 @@ describe('tools extended coverage', () => {
   });
 
   it('covers jshook runtime singleton creation', () => {
-    const first = getJSHookRuntime();
-    const second = getJSHookRuntime();
+    const first = getRuntime();
+    const second = getRuntime();
 
     assert.ok(first.browserManager);
     assert.ok(first.collector);

@@ -7,7 +7,7 @@ import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 async function importFreshRuntime(tag: string) {
-  return import(`../../../src/tools/runtime.js?branch=${tag}_${Date.now()}`);
+  return import(`../../../src/runtime.js?branch=${tag}_${Date.now()}`);
 }
 
 describe('jshook runtime branch coverage', () => {
@@ -20,14 +20,14 @@ describe('jshook runtime branch coverage', () => {
       delete process.env.BROWSER_HEADLESS;
       process.env.USE_STEALTH_SCRIPTS = 'true';
       const runtimeDefault = await importFreshRuntime('default');
-      const defaultInstance = runtimeDefault.getJSHookRuntime();
+      const defaultInstance = runtimeDefault.getRuntime();
       assert.ok(defaultInstance.browserManager);
 
       process.env.REMOTE_DEBUGGING_PORT = '9333';
       process.env.BROWSER_HEADLESS = 'false';
       process.env.USE_STEALTH_SCRIPTS = 'false';
       const runtimeExplicit = await importFreshRuntime('explicit');
-      const explicitInstance = runtimeExplicit.getJSHookRuntime();
+      const explicitInstance = runtimeExplicit.getRuntime();
       assert.ok(explicitInstance.browserManager);
     } finally {
       process.env.REMOTE_DEBUGGING_PORT = originalPort;

@@ -38,8 +38,6 @@ const DOMAIN_DESCRIPTIONS: Record<string, string> = {
   script: 'Page script evaluation and preload tools.',
   'site-experience': 'Site-specific reverse engineering experience tools.',
   stealth: 'Browser stealth and fingerprint tools.',
-  vjstools: 'VJSTools code transformation tools.',
-  vue: 'Vue runtime inspection tools.',
   wasm: 'WebAssembly reverse engineering tools.',
   workflow: 'High-level reverse engineering workflow tools.',
 };
@@ -141,7 +139,7 @@ function parseManifest(source: string, sourcePath: string): DomainManifest {
   };
 }
 
-function renderToolEntry(entry: ToolEntry, indent: string = '    '): string {
+function renderToolEntry(entry: ToolEntry, indent = '    '): string {
   return [
     `${indent}{`,
     `${indent}  modulePath: '${entry.modulePath}',`,

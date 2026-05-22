@@ -5,15 +5,15 @@
  */
 
 import {getRuntime} from '../../runtime.js';
-import { defineTool } from '../ToolDefinition.js';
-import { ToolCategory } from '../categories.js';
 import { zod } from '../../third_party/index.js';
+import type {Page} from '../../third_party/index.js';
 import {
   parseRawTraceBuffer,
   traceResultIsSuccess,
   getTraceSummary,
 } from '../../trace-processing/parse.js';
-import type {Page} from '../../third_party/index.js';
+import { ToolCategory } from '../categories.js';
+import { defineTool } from '../ToolDefinition.js';
 import type {Response, Context} from '../ToolDefinition.js';
 
 /**

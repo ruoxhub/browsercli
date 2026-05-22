@@ -23,6 +23,7 @@ export class WaitForHelper {
   #abortController = new AbortController();
   #page: Page;
   #cdpSession?: CDPSession;
+  #cdpSessionClosed = false;
   #stableDomTimeout: number;
   #stableDomFor: number;
   #expectNavigationIn: number;
@@ -44,8 +45,12 @@ export class WaitForHelper {
    * 获取或创建 CDP Session（Playwright 通过 context.newCDPSession 访问 CDP）
    */
   async #ensureCdpSession(): Promise<CDPSession> {
-    if (!this.#cdpSession || this.#cdpSession.isClosed()) {
+    if (!this.#cdpSession || this.#cdpSessionClosed) {
       this.#cdpSession = await this.#page.context().newCDPSession(this.#page);
+      this.#cdpSessionClosed = false;
+      this.#cdpSession.on('close', () => {
+        this.#cdpSessionClosed = true;
+      });
     }
     return this.#cdpSession;
   }
@@ -220,7 +225,7 @@ export class WaitForHelper {
         this.#abortController.abort();
         // 清理 CDP Session
         try {
-          if (this.#cdpSession && !this.#cdpSession.isClosed()) {
+          if (this.#cdpSession && !this.#cdpSessionClosed) {
             await this.#cdpSession.detach();
           }
         } catch {

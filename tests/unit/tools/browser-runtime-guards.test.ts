@@ -8,15 +8,52 @@ import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {listPages} from '../../../src/tools/navigation/listPages.js';
-import {checkBrowserHealth} from '../../../src/tools/page/checkBrowserHealth.js';
-import {saveSessionState} from '../../../src/tools/page/sessionState.js';
-import {takeScreenshot} from '../../../src/tools/screenshot/takeScreenshot.js';
+import {checkBrowserHealth as toolCheckBrowserHealth} from '../../../src/tools/page/checkBrowserHealth.js';
+import {saveSessionState as toolSaveSessionState} from '../../../src/tools/page/sessionState.js';
+import {takeScreenshot as toolTakeScreenshot} from '../../../src/tools/screenshot/takeScreenshot.js';
+
+async function checkBrowserHealth(runtime: any, params?: any) {
+  const request = { params: params || {} };
+  const response = {
+    structuredContent: null as any,
+    setStructuredContent(content: any) {
+      this.structuredContent = content;
+    }
+  };
+  await toolCheckBrowserHealth.handler(request as any, response as any, runtime as any);
+  return response.structuredContent;
+}
+
+async function saveSessionState(runtime: any, params?: any) {
+  const request = { params: params || {} };
+  const response = {
+    structuredContent: null as any,
+    setStructuredContent(content: any) {
+      this.structuredContent = content;
+    }
+  };
+  await toolSaveSessionState.handler(request as any, response as any, runtime as any);
+  return response.structuredContent;
+}
+
+async function takeScreenshot(runtime: any, params?: any) {
+  const request = { params: params || {} };
+  const response = {
+    structuredContent: null as any,
+    setStructuredContent(content: any) {
+      this.structuredContent = content;
+    }
+  };
+  await toolTakeScreenshot.handler(request as any, response as any, runtime as any);
+  return response.structuredContent;
+}
 
 function createResponse() {
   const lines: string[] = [];
   return {
     lines,
     response: {
+      lines,
       appendResponseLine(value: string) {
         lines.push(value);
       },
@@ -28,7 +65,8 @@ function createResponse() {
       attachConsoleMessage() {},
       setIncludeWebSocketConnections() {},
       attachWebSocket() {},
-    },
+      setStructuredContent(content: any) {}
+    } as any,
   };
 }
 

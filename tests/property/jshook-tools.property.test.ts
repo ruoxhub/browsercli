@@ -11,12 +11,12 @@ import fc from 'fast-check';
 
 
 import {zod} from '../../src/third_party/index.js';
-import {summarizeCode} from '../../src/tools/analyzer.js';
-import {collectCode} from '../../src/tools/collector.js';
-import {queryDom} from '../../src/tools/dom.js';
-import {createHook} from '../../src/tools/hook.js';
-import {clickElement} from '../../src/tools/page.js';
-import {injectStealth} from '../../src/tools/stealth.js';
+import {summarizeCode} from '../../src/tools/analyzer/summarize.js';
+import {collectCode} from '../../src/tools/collector/collectCode.js';
+import {queryDom} from '../../src/tools/dom/queryDom.js';
+import {createHook} from '../../src/tools/hook/CreateHook.js';
+import {clickElement} from '../../src/tools/page/clickElement.js';
+import {injectStealth} from '../../src/tools/stealth/stealth.js';
 
 const collectSchema = zod.object(collectCode.schema);
 const summarizeSchema = zod.object(summarizeCode.schema);

@@ -4,27 +4,23 @@
 
 > 快速按逆向目标查工具，请先看：[`reverse-task-index.md`](./reverse-task-index.md)
 
-- **[Navigation automation](#navigation-automation)** (20 tools)
-  - [`check_browser_health`](#check_browser_health)
-  - [`click_element`](#click_element)
-  - [`delete_session_state`](#delete_session_state)
-  - [`dump_session_state`](#dump_session_state)
+- **[Navigation automation](#navigation-automation)** (16 tools)
+  - [`click`](#click)
+  - [`click_at`](#click_at)
+  - [`drag`](#drag)
+  - [`fill`](#fill)
+  - [`fill_form`](#fill_form)
   - [`find_clickable_elements`](#find_clickable_elements)
   - [`get_dom_structure`](#get_dom_structure)
+  - [`hover`](#hover)
   - [`list_pages`](#list_pages)
-  - [`list_session_states`](#list_session_states)
-  - [`load_session_state`](#load_session_state)
   - [`navigate_page`](#navigate_page)
   - [`new_page`](#new_page)
+  - [`press_key`](#press_key)
   - [`query_dom`](#query_dom)
-  - [`restore_session_state`](#restore_session_state)
-  - [`save_session_state`](#save_session_state)
-  - [`scroll_by`](#scroll_by)
-  - [`seek_video`](#seek_video)
   - [`select_page`](#select_page)
-  - [`type_text`](#type_text)
-  - [`update_extensions`](#update_extensions)
-  - [`wait_for_element`](#wait_for_element)
+  - [`set_files`](#set_files)
+  - [`upload_file`](#upload_file)
 - **[Network](#network)** (6 tools)
   - [`analyze_websocket_messages`](#analyze_websocket_messages)
   - [`get_network_request`](#get_network_request)
@@ -32,91 +28,54 @@
   - [`get_websocket_messages`](#get_websocket_messages)
   - [`list_network_requests`](#list_network_requests)
   - [`list_websocket_connections`](#list_websocket_connections)
-- **[Debugging](#debugging)** (9 tools)
+- **[Debugging](#debugging)** (22 tools)
   - [`capture_video_frame`](#capture_video_frame)
-  - [`evaluate_script`](#evaluate_script)
+  - [`evaluate_on_callframe`](#evaluate_on_callframe)
+  - [`get_ai_debug_status`](#get_ai_debug_status)
   - [`get_console_message`](#get_console_message)
+  - [`get_paused_info`](#get_paused_info)
   - [`get_video_info`](#get_video_info)
-  - [`inject_preload_script`](#inject_preload_script)
+  - [`inspect_locals`](#inspect_locals)
+  - [`list_breakpoints`](#list_breakpoints)
   - [`list_console_messages`](#list_console_messages)
   - [`list_frames`](#list_frames)
-  - [`select_frame`](#select_frame)
-  - [`take_screenshot`](#take_screenshot)
-- **[JS Reverse Engineering](#js-reverse-engineering)** (68 tools)
-  - [`analyze_ast`](#analyze_ast)
-  - [`analyze_target`](#analyze_target)
-  - [`anti_anti_debug`](#anti_anti_debug)
-  - [`break_on_xhr`](#break_on_xhr)
-  - [`bypass_debugger`](#bypass_debugger)
-  - [`check_url_matches`](#check_url_matches)
-  - [`collect_code`](#collect_code)
-  - [`collection_diff`](#collection_diff)
-  - [`create_hook`](#create_hook)
-  - [`create_inject_script`](#create_inject_script)
-  - [`delete_inject_script`](#delete_inject_script)
-  - [`deobfuscate_code`](#deobfuscate_code)
-  - [`deobfuscate_code_vj`](#deobfuscate_code_vj)
-  - [`detect_crypto`](#detect_crypto)
-  - [`diff_code`](#diff_code)
-  - [`diff_env_requirements`](#diff_env_requirements)
-  - [`evaluate_on_callframe`](#evaluate_on_callframe)
-  - [`export_rebuild_bundle`](#export_rebuild_bundle)
-  - [`export_session_report`](#export_session_report)
-  - [`find_in_script`](#find_in_script)
-  - [`get_ai_debug_status`](#get_ai_debug_status)
-  - [`get_code_template`](#get_code_template)
-  - [`get_hook_data`](#get_hook_data)
-  - [`get_paused_info`](#get_paused_info)
-  - [`get_request_initiator`](#get_request_initiator)
-  - [`get_script_source`](#get_script_source)
-  - [`get_storage`](#get_storage)
-  - [`hook_function`](#hook_function)
-  - [`inject_hook`](#inject_hook)
-  - [`inject_stealth`](#inject_stealth)
-  - [`inspect_object`](#inspect_object)
-  - [`invoke-skill`](#invoke-skill)
-  - [`list_breakpoints`](#list_breakpoints)
-  - [`list_code_templates`](#list_code_templates)
-  - [`list_created_hooks`](#list_created_hooks)
-  - [`list_hooks`](#list_hooks)
-  - [`list_inject_scripts`](#list_inject_scripts)
-  - [`list_scripts`](#list_scripts)
-  - [`list_stealth_features`](#list_stealth_features)
-  - [`list_stealth_presets`](#list_stealth_presets)
-  - [`list-skills`](#list-skills)
-  - [`minify_code`](#minify_code)
-  - [`monitor_events`](#monitor_events)
   - [`pause`](#pause)
-  - [`record_reverse_evidence`](#record_reverse_evidence)
   - [`remove_breakpoint`](#remove_breakpoint)
-  - [`remove_hook`](#remove_hook)
-  - [`remove_xhr_breakpoint`](#remove_xhr_breakpoint)
   - [`resume`](#resume)
-  - [`risk_panel`](#risk_panel)
-  - [`search_in_scripts`](#search_in_scripts)
-  - [`search_in_sources`](#search_in_sources)
+  - [`seek_video`](#seek_video)
+  - [`select_frame`](#select_frame)
   - [`set_breakpoint`](#set_breakpoint)
-  - [`set_breakpoint_on_text`](#set_breakpoint_on_text)
-  - [`set_user_agent`](#set_user_agent)
   - [`start_continuous_debugging`](#start_continuous_debugging)
   - [`step_into`](#step_into)
   - [`step_out`](#step_out)
   - [`step_over`](#step_over)
   - [`stop_continuous_debugging`](#stop_continuous_debugging)
-  - [`stop_monitor`](#stop_monitor)
-  - [`summarize_code`](#summarize_code)
-  - [`trace_function`](#trace_function)
-  - [`transpile_code`](#transpile_code)
-  - [`understand_code`](#understand_code)
-  - [`unhook_function`](#unhook_function)
-  - [`update_inject_script`](#update_inject_script)
-  - [`xhr_to_js_breakpoint`](#xhr_to_js_breakpoint)
-- **[Hook & Injection](#hook-&-injection)** (26 tools)
-  - [`activate_vue_devtools`](#activate_vue_devtools)
+  - [`take_screenshot`](#take_screenshot)
+- **[JS Reverse Engineering](#js-reverse-engineering)** (84 tools)
+  - [`analyze_pipeline`](#analyze_pipeline)
+  - [`analyze_target`](#analyze_target)
+  - [`anti_anti_debug`](#anti_anti_debug)
   - [`anti_anti_hook`](#anti_anti_hook)
-  - [`clear_vue_guards`](#clear_vue_guards)
+  - [`auto_hook`](#auto_hook)
+  - [`break_on_xhr`](#break_on_xhr)
+  - [`bypass_debugger`](#bypass_debugger)
+  - [`collect_code`](#collect_code)
+  - [`collection_diff`](#collection_diff)
+  - [`create_hook`](#create_hook)
+  - [`deobfuscate_code`](#deobfuscate_code)
+  - [`detect_crypto`](#detect_crypto)
+  - [`diff_env_requirements`](#diff_env_requirements)
+  - [`export_rebuild_bundle`](#export_rebuild_bundle)
+  - [`export_session_report`](#export_session_report)
+  - [`find_in_script`](#find_in_script)
   - [`fixed_window_size`](#fixed_window_size)
-  - [`get_vue_routes`](#get_vue_routes)
+  - [`get_code_template`](#get_code_template)
+  - [`get_hook_data`](#get_hook_data)
+  - [`get_request_initiator`](#get_request_initiator)
+  - [`get_script_source`](#get_script_source)
+  - [`get_storage`](#get_storage)
+  - [`hook_close`](#hook_close)
+  - [`hook_console_clear`](#hook_console_clear)
   - [`hook_console_log`](#hook_console_log)
   - [`hook_console_protect`](#hook_console_protect)
   - [`hook_console_table`](#hook_console_table)
@@ -124,7 +83,9 @@
   - [`hook_cryptojs`](#hook_cryptojs)
   - [`hook_date_now`](#hook_date_now)
   - [`hook_fetch`](#hook_fetch)
+  - [`hook_function`](#hook_function)
   - [`hook_history`](#hook_history)
+  - [`hook_history_go`](#hook_history_go)
   - [`hook_jsencrypt`](#hook_jsencrypt)
   - [`hook_json_parse`](#hook_json_parse)
   - [`hook_json_stringify`](#hook_json_stringify)
@@ -138,18 +99,48 @@
   - [`hook_websocket`](#hook_websocket)
   - [`hook_xhr_open`](#hook_xhr_open)
   - [`hook_xhr_set_request_header`](#hook_xhr_set_request_header)
-- **[Input automation](#input-automation)** (11 tools)
-  - [`cdp_upload_files`](#cdp_upload_files)
-  - [`click`](#click)
-  - [`click_at`](#click_at)
-  - [`drag`](#drag)
-  - [`fill`](#fill)
-  - [`fill_form`](#fill_form)
-  - [`handle_dialog`](#handle_dialog)
-  - [`hover`](#hover)
-  - [`press_key`](#press_key)
-  - [`set_files`](#set_files)
-  - [`upload_file`](#upload_file)
+  - [`inject_code_template`](#inject_code_template)
+  - [`inject_hook`](#inject_hook)
+  - [`inject_stealth`](#inject_stealth)
+  - [`inspect_object`](#inspect_object)
+  - [`list_code_templates`](#list_code_templates)
+  - [`list_created_hooks`](#list_created_hooks)
+  - [`list_hooks`](#list_hooks)
+  - [`list_scripts`](#list_scripts)
+  - [`list_stealth_features`](#list_stealth_features)
+  - [`list_stealth_presets`](#list_stealth_presets)
+  - [`monitor_events`](#monitor_events)
+  - [`observe_flow`](#observe_flow)
+  - [`rebuild_bundle`](#rebuild_bundle)
+  - [`record_reverse_evidence`](#record_reverse_evidence)
+  - [`remove_hook`](#remove_hook)
+  - [`remove_xhr_breakpoint`](#remove_xhr_breakpoint)
+  - [`risk_panel`](#risk_panel)
+  - [`search_in_scripts`](#search_in_scripts)
+  - [`search_in_sources`](#search_in_sources)
+  - [`set_breakpoint_on_text`](#set_breakpoint_on_text)
+  - [`set_user_agent`](#set_user_agent)
+  - [`stop_monitor`](#stop_monitor)
+  - [`summarize_code`](#summarize_code)
+  - [`trace_function`](#trace_function)
+  - [`trace_signature_generation`](#trace_signature_generation)
+  - [`understand_code`](#understand_code)
+  - [`unhook_function`](#unhook_function)
+  - [`wasm_capabilities`](#wasm_capabilities)
+  - [`wasm_decompile`](#wasm_decompile)
+  - [`wasm_disassemble`](#wasm_disassemble)
+  - [`wasm_dump`](#wasm_dump)
+  - [`wasm_inspect_sections`](#wasm_inspect_sections)
+  - [`wasm_memory_inspect`](#wasm_memory_inspect)
+  - [`wasm_offline_run`](#wasm_offline_run)
+  - [`wasm_optimize`](#wasm_optimize)
+  - [`wasm_vmp_trace`](#wasm_vmp_trace)
+  - [`xhr_to_js_breakpoint`](#xhr_to_js_breakpoint)
+- **[Input automation](#input-automation)** (4 tools)
+  - [`click_element`](#click_element)
+  - [`scroll_by`](#scroll_by)
+  - [`type_text`](#type_text)
+  - [`wait_for_element`](#wait_for_element)
 - **[Emulation](#emulation)** (4 tools)
   - [`emulate_cpu`](#emulate_cpu)
   - [`emulate_mobile`](#emulate_mobile)
@@ -160,20 +151,16 @@
   - [`performance_analyze_insight`](#performance_analyze_insight)
   - [`start_performance_trace`](#start_performance_trace)
   - [`stop_performance_trace`](#stop_performance_trace)
-- **[DOM manipulation](#dom-manipulation)** (4 tools)
-  - [`cdp_click`](#cdp_click)
-  - [`cdp_click_at`](#cdp_click_at)
-  - [`cdp_eval`](#cdp_eval)
-  - [`cdp_scroll`](#cdp_scroll)
-- **[Screenshot](#screenshot)** (1 tools)
-  - [`cdp_screenshot`](#cdp_screenshot)
-- **[Pages](#pages)** (6 tools)
-  - [`cdp_close_page`](#cdp_close_page)
-  - [`cdp_get_targets`](#cdp_get_targets)
-  - [`cdp_navigate`](#cdp_navigate)
-  - [`cdp_new_page`](#cdp_new_page)
-  - [`cdp_page_info`](#cdp_page_info)
-  - [`cdp_start_proxy`](#cdp_start_proxy)
+- **[Pages](#pages)** (9 tools)
+  - [`check_browser_health`](#check_browser_health)
+  - [`delete_session_state`](#delete_session_state)
+  - [`dump_session_state`](#dump_session_state)
+  - [`handle_dialog`](#handle_dialog)
+  - [`list_session_states`](#list_session_states)
+  - [`load_session_state`](#load_session_state)
+  - [`restore_session_state`](#restore_session_state)
+  - [`save_session_state`](#save_session_state)
+  - [`update_extensions`](#update_extensions)
 - **[Data](#data)** (5 tools)
   - [`create_site_experience`](#create_site_experience)
   - [`delete_site_experience`](#delete_site_experience)
@@ -183,76 +170,81 @@
 
 ## Navigation automation
 
-### `check_browser_health` — Check browser health
+### `click` — 点击元素
 
-**Description:** Check browser connectivity and active page readiness before running reverse workflows.
+**Description:** Click on an element matched by CSS selector. Supports single and double click.
 
-### `click_element` — Click element by selector
+**Parameters:**
 
-**Description:** Click an element by selector.
+- `selector`
+- `dblClick`
+
+### `click_at` — 坐标点击
+
+**Description:** Perform a real mouse click at the center coordinates of an element using CDP Input.dispatchMouseEvent. Useful when Playwright click is intercepted.
 
 **Parameters:**
 
 - `selector`
 
-### `delete_session_state` — Delete session snapshot
+### `drag` — 拖拽元素
 
-**Description:** Delete one in-memory session snapshot by sessionId.
-
-**Parameters:**
-
-- `sessionId`
-
-### `dump_session_state` — Export session snapshot
-
-**Description:** Export a saved session snapshot as JSON, optionally writing to a file.
+**Description:** Drag an element from a source CSS selector to a target CSS selector using mouse events.
 
 **Parameters:**
 
-- `sessionId`
-- `path`
-- `pretty`
-- `encrypt`
+- `fromSelector`
+- `toSelector`
 
-### `find_clickable_elements` — Find clickable buttons and links
+### `fill` — 填充输入
 
-**Description:** Find clickable buttons/links, optionally filtered by text.
+**Description:** Fill a value into an input, textarea, or select element matched by CSS selector. Automatically handles <select> via selectOption.
+
+**Parameters:**
+
+- `selector`
+- `value`
+
+### `fill_form` — 批量填充表单
+
+**Description:** Fill multiple form elements in one call. Each entry specifies a CSS selector and a value. Automatically handles <select> via selectOption.
+
+**Parameters:**
+
+- `elements`
+
+### `find_clickable_elements` — 查找可点击元素
+
+**Description:** Find clickable buttons and links on the current page. Optionally filter by text content. Returns selector, text, type, visibility, and bounding box.
 
 **Parameters:**
 
 - `filterText`
 
-### `get_dom_structure` — Get DOM tree structure
+### `get_dom_structure` — 获取DOM结构
 
-**Description:** Get DOM tree structure for current page.
+**Description:** Get DOM tree structure for the current page. Returns a hierarchical tree with tag names, IDs, classes, and optional text content.
 
 **Parameters:**
 
 - `maxDepth`
 - `includeText`
 
-### `list_pages` — List pages
+### `hover` — 悬停元素
 
-**Description:** Get a list of pages open in the browser.
-
-### `list_session_states` — List saved session snapshots
-
-**Description:** List all saved session snapshots in memory.
-
-### `load_session_state` — Load session snapshot from JSON
-
-**Description:** Load a session snapshot from JSON string or file into memory.
+**Description:** Hover the mouse over an element matched by CSS selector.
 
 **Parameters:**
 
-- `sessionId`
-- `path`
-- `snapshotJson`
-- `overwrite`
+- `selector`
 
-### `navigate_page` — Navigate page
+### `list_pages` — 列出页面
 
-**Description:** Navigates the currently selected page to a URL, or performs back/forward/reload navigation. Waits for DOMContentLoaded event (not full page load). Default timeout is 10 seconds.
+**Description:** List all open browser pages with their index, URL and title. Use this to find the page index before calling select_page.
+
+### `navigate_page` — 导航页面
+
+**Description:** Navigate the current page. Supports URL navigation, back, forward, and reload. Waits for DOMContentLoaded event.
 
 **Parameters:**
 
@@ -261,18 +253,28 @@
 - `ignoreCache`
 - `timeout`
 
-### `new_page` — Create new page
+### `new_page` — 新建页面
 
-**Description:** Creates a new page and navigates to the specified URL. Waits for DOMContentLoaded event (not full page load). Default timeout is 10 seconds.
+**Description:** Create a new browser page and navigate to the specified URL. The new page will be automatically selected.
 
 **Parameters:**
 
 - `url`
 - `timeout`
+- `preloadHook`
+- `preloadPreset`
 
-### `query_dom` — Query DOM elements by CSS selector
+### `press_key` — 按键
 
-**Description:** Query one or multiple elements by CSS selector.
+**Description:** Press a keyboard key or key combination (e.g. "Enter", "Control+A", "Alt+Shift+F"). Supports modifier keys.
+
+**Parameters:**
+
+- `key`
+
+### `query_dom` — 查询DOM元素
+
+**Description:** Query one or multiple DOM elements by CSS selector. Returns structured element info including tag, attributes, bounding box, and visibility.
 
 **Parameters:**
 
@@ -280,79 +282,35 @@
 - `all`
 - `limit`
 
-### `restore_session_state` — Restore page session state
+### `select_page` — 选择页面
 
-**Description:** Restore a previously saved session snapshot to current page.
-
-**Parameters:**
-
-- `sessionId`
-- `navigateToSavedUrl`
-- `clearStorageBeforeRestore`
-
-### `save_session_state` — Save page session state
-
-**Description:** Save current page session state (cookies/localStorage/sessionStorage) into in-memory snapshot.
-
-**Parameters:**
-
-- `sessionId`
-- `includeCookies`
-- `includeLocalStorage`
-- `includeSessionStorage`
-
-### `scroll_by` — Scroll page by direction
-
-**Description:** Scroll page by direction (up/down/top/bottom). Automatically waits 800ms for lazy-loaded content to load.
-
-**Parameters:**
-
-- `direction`
-- `pixels`
-
-### `seek_video` — Seek video
-
-**Description:** Seek video element to specified time (in seconds).
-
-**Parameters:**
-
-- `selector`
-- `time`
-
-### `select_page` — Select page
-
-**Description:** Select a page as a context for future tool calls.
+**Description:** Select a page by index to bring it to the foreground and switch context. Use list_pages first to find the page index.
 
 **Parameters:**
 
 - `pageIdx`
 
-### `type_text` — Type text into input element
+### `set_files` — 设置文件
 
-**Description:** Type text into an input element.
-
-**Parameters:**
-
-- `selector`
-- `text`
-- `delay`
-
-### `update_extensions` — Update browser extensions
-
-**Description:** Update Chrome extensions by navigating to chrome://extensions/ and clicking the "Update now" button.
-
-### `wait_for_element` — Wait for element to appear
-
-**Description:** Wait for selector to appear.
+**Description:** Set files on a file input element using CDP DOM.setFileInputFiles. Useful when Playwright setInputFiles is blocked.
 
 **Parameters:**
 
 - `selector`
-- `timeout`
+- `filePaths`
+
+### `upload_file` — 上传文件
+
+**Description:** Upload a file to a file input element. Tries Playwright setInputFiles first, then falls back to filechooser event pattern.
+
+**Parameters:**
+
+- `selector`
+- `filePath`
 
 ## Network
 
-### `analyze_websocket_messages` — Analyze and group WebSocket message patterns
+### `analyze_websocket_messages` — analyze_websocket_messages
 
 **Description:** Analyzes WebSocket messages and groups them by pattern/fingerprint. Essential for understanding binary/protobuf message types in live streaming scenarios. Returns statistics and sample indices for each message type.
 
@@ -361,15 +319,16 @@
 - `wsid`
 - `direction`
 
-### `get_network_request` — Get a network request by ID
+### `get_network_request` — get_network_request
 
 **Description:** Gets a network request by an optional reqid, if omitted returns the currently selected request in the DevTools Network panel.
 
 **Parameters:**
 
 - `reqid`
+- `maxBodyLength`
 
-### `get_websocket_message` — Get a single WebSocket message by frame index
+### `get_websocket_message` — get_websocket_message
 
 **Description:** Gets a single WebSocket message by its frame index. Use get_websocket_messages or analyze_websocket_messages first to find the frame index.
 
@@ -378,7 +337,7 @@
 - `wsid`
 - `frameIndex`
 
-### `get_websocket_messages` — Get WebSocket messages for a connection
+### `get_websocket_messages` — get_websocket_messages
 
 **Description:** Gets messages for a WebSocket connection. IMPORTANT: For binary/protobuf messages (like live streaming), use analyze_websocket_messages FIRST to understand message types, then use groupId parameter to filter specific types. Default mode shows summary only.
 
@@ -391,9 +350,9 @@
 - `pageIdx`
 - `show_content`
 
-### `list_network_requests` — List network requests for selected page
+### `list_network_requests` — list_network_requests
 
-**Description:** List all requests for the currently selected page since the last navigation.
+**Description:** List all requests for the currently selected page since the last navigation. Supports filtering by resource type, header keyword, pagination, and waiting for matching requests.
 
 **Parameters:**
 
@@ -401,8 +360,13 @@
 - `pageIdx`
 - `resourceTypes`
 - `includePreservedRequests`
+- `targetPageIdx`
+- `waitForRequest`
+- `waitTimeoutMs`
+- `headerFilter`
+- `includeSignatureEvidence`
 
-### `list_websocket_connections` — List WebSocket connections for selected page
+### `list_websocket_connections` — list_websocket_connections
 
 **Description:** List all WebSocket connections. After getting wsid, use analyze_websocket_messages(wsid) FIRST to understand message patterns before viewing individual messages.
 
@@ -415,9 +379,9 @@
 
 ## Debugging
 
-### `capture_video_frame` — Capture video frame
+### `capture_video_frame` — 捕获视频帧
 
-**Description:** Capture a specific frame from a video element. Can seek to a specific time before capturing.
+**Description:** Capture the current frame of a video element. Optionally seek to a specific time first. Returns the frame as an image.
 
 **Parameters:**
 
@@ -427,42 +391,55 @@
 - `format`
 - `quality`
 
-### `evaluate_script` — Evaluate JavaScript
+### `evaluate_on_callframe` — 在调用帧上执行
 
-**Description:** Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON
-so returned values have to JSON-serializable.
+**Description:** 在暂停时的指定调用帧上下文中执行 JavaScript 表达式。允许检查变量和执行代码。
 
 **Parameters:**
 
-- `function`
+- `expression`
+- `frameIndex`
 
-### `get_console_message` — Get console message by index
+### `get_ai_debug_status` — 获取 AI 调试状态
 
-**Description:** Gets a console message by its ID. You can get all messages by calling list_console_messages.
+**Description:** 获取当前调试状态，包括暂停状态、断点数量、脚本数量等。
+
+### `get_console_message` — get_console_message
+
+**Description:** Gets a console message by its ID. Returns structured message data including type, text, and arguments.
 
 **Parameters:**
 
 - `msgid`
 
-### `get_video_info` — Get video info
+### `get_paused_info` — 获取暂停信息
 
-**Description:** Get HTMLVideoElement info including duration, currentTime, paused state, and src.
+**Description:** 获取当前暂停状态信息，包括调用栈、当前位置和作用域变量。在断点命中后使用此工具了解执行上下文。
+
+**Parameters:**
+
+- `includeScopes`
+- `maxScopeDepth`
+
+### `get_video_info` — 获取视频信息
+
+**Description:** Get video element information by CSS selector. Returns duration, currentTime, paused state, and src.
 
 **Parameters:**
 
 - `selector`
 
-### `inject_preload_script` — Inject preload script
+### `inspect_locals` — 检查局部变量
 
-**Description:** Register a JavaScript snippet that will run on future document loads before page scripts execute. Use this for preload hooks, environment patches, and early instrumentation.
+**Description:** 检查当前暂停栈所有帧的局部变量摘要。
 
-**Parameters:**
+### `list_breakpoints` — 列出断点
 
-- `script`
+**Description:** 列出当前调试会话中的所有活跃断点。
 
-### `list_console_messages` — List console messages
+### `list_console_messages` — list_console_messages
 
-**Description:** List all console messages for the currently selected page since the last navigation.
+**Description:** List all console messages for the currently selected page since the last navigation. Supports filtering by type and pagination.
 
 **Parameters:**
 
@@ -471,11 +448,36 @@ so returned values have to JSON-serializable.
 - `types`
 - `includePreservedMessages`
 
-### `list_frames` — List Frames
+### `list_frames` — 列出 Frame
 
 **Description:** Lists all frames (including iframes) in the current page as a tree. Shows frame index, name, and URL. Use select_frame to switch execution context to a specific frame.
 
-### `select_frame` — Select Frame
+### `pause` — 暂停执行
+
+**Description:** 暂停 JavaScript 执行。用于中断运行中的代码。
+
+### `remove_breakpoint` — 移除断点
+
+**Description:** 移除指定 ID 的断点。使用 list_breakpoints 查看活跃断点。
+
+**Parameters:**
+
+- `breakpointId`
+
+### `resume` — 恢复执行
+
+**Description:** 从暂停状态恢复执行，直到下一个断点或执行结束。
+
+### `seek_video` — 跳转视频
+
+**Description:** Seek a video element to a specific time position by CSS selector.
+
+**Parameters:**
+
+- `selector`
+- `time`
+
+### `select_frame` — 选择 Frame
 
 **Description:** Selects a frame (by index from list_frames) as the execution context for evaluate_script, hook_function, inspect_object, and other tools that run JavaScript in the page.
 
@@ -483,7 +485,39 @@ so returned values have to JSON-serializable.
 
 - `frameIdx`
 
-### `take_screenshot` — Take screenshot
+### `set_breakpoint` — 设置断点
+
+**Description:** 设置 JavaScript 断点。支持按脚本 URL 和行号设置，可选条件表达式。注意：优先使用 hook_function 或 trace_function 进行监控，断点需要暂停/恢复协调，在自动化流程中容易出错。
+
+**Parameters:**
+
+- `url`
+- `lineNumber`
+- `columnNumber`
+- `condition`
+- `isRegex`
+
+### `start_continuous_debugging` — 开始连续调试
+
+**Description:** 开始连续调试会话。注意：当前工具层尚未接入 AIContinuousDebugger 运行时，请改用 pause/set_breakpoint/get_paused_info 组合。
+
+### `step_into` — 单步进入
+
+**Description:** 单步进入函数调用。用于进入函数体内部进行调试。需要先在断点暂停。
+
+### `step_out` — 单步跳出
+
+**Description:** 单步跳出当前函数，继续执行直到函数返回。用于快速退出函数。需要先在断点暂停。
+
+### `step_over` — 单步跳过
+
+**Description:** 单步跳过函数调用，将函数调用视为一个步骤。用于跳过函数体。需要先在断点暂停。
+
+### `stop_continuous_debugging` — 停止连续调试
+
+**Description:** 停止连续调试会话。
+
+### `take_screenshot` — 截图
 
 **Description:** Take a screenshot of the page or element.
 
@@ -496,17 +530,16 @@ so returned values have to JSON-serializable.
 
 ## JS Reverse Engineering
 
-### `analyze_ast` — Analyze AST
+### `analyze_pipeline` — analyze_pipeline
 
-**Description:** AST 分析：解析 JavaScript 代码并返回 AST 结构信息，包括节点类型、位置、标识符等
+**Description:** 分析流水线：采集 → 并行分析(加密检测+混淆分析) → 生成报告。演示 Pipeline 编排模式的完整工作流。
 
 **Parameters:**
 
-- `code`
-- `detail`
-- `filterType`
+- `url`
+- `deep`
 
-### `analyze_target` — Analyze reverse engineering target
+### `analyze_target` — analyze_target
 
 **Description:** One-shot reverse workflow: collect code, run security/crypto analysis, optional deobfuscation, and hook timeline correlation.
 
@@ -525,17 +558,47 @@ so returned values have to JSON-serializable.
 - `autoReplayActions`
 - `collect`
 
-### `anti_anti_debug` — Anti-Anti-Debug
+### `anti_anti_debug` — Anti Anti-Debug
 
-**Description:** 反反调试工具集：窗口尺寸/时间函数/页面关闭/历史跳转/控制台清除
+**Description:** Anti-anti-debug toolkit: fix window size, freeze time, block page close, block history navigation, block console clear, hide webdriver flag.
 
 **Parameters:**
 
 - `features`
 
-### `break_on_xhr` — Break on XHR
+### `anti_anti_hook` — Anti Anti-Hook
 
-**Description:** Sets a breakpoint that triggers when an XHR/Fetch request URL contains the specified string.
+**Description:** Anti-anti-hook: protect Function.prototype.toString to make hooked methods look native. Also protects Object.getOwnPropertyDescriptor and iframe contentWindow/contentDocument.
+
+**Parameters:**
+
+- `hookedMethods`
+
+### `auto_hook` — auto_hook
+
+**Description:** Auto-hook: generate and inject debug hooks and crypto library hooks based on preset or custom options
+
+**Parameters:**
+
+- `url`
+- `preset`
+- `autoInject`
+- `waitAfterHookMs`
+- `useAI`
+- `hookCrypto`
+- `hookRsa`
+- `hookSmCrypto`
+- `hookTimers`
+- `hookEval`
+- `hookCookie`
+- `hookXhr`
+- `hookFetch`
+- `exportResults`
+- `exportWaitMs`
+
+### `break_on_xhr` — 设置 XHR 断点
+
+**Description:** 在 XHR/Fetch 请求 URL 包含指定字符串时触发断点。
 
 **Parameters:**
 
@@ -543,21 +606,13 @@ so returned values have to JSON-serializable.
 
 ### `bypass_debugger` — Bypass Debugger
 
-**Description:** 绕过无限 debugger：自动移除 eval/Function/constructor 中的 debugger 关键字
+**Description:** Bypass infinite debugger statements by removing debugger keywords from eval/Function/constructor.
 
 **Parameters:**
 
 - `targets`
 
-### `check_url_matches` — Check URL Matches
-
-**Description:** 检查 URL 匹配：测试给定 URL 会触发哪些已配置的注入脚本
-
-**Parameters:**
-
-- `url`
-
-### `collect_code` — Collect JavaScript code from a page
+### `collect_code` — collect_code
 
 **Description:** Collect JavaScript code from a page with smart modes (summary/priority/incremental/full).
 
@@ -575,7 +630,7 @@ so returned values have to JSON-serializable.
 - `limit`
 - `topN`
 
-### `collection_diff` — Compare collected code snapshots
+### `collection_diff` — collection_diff
 
 **Description:** Compare previous and current collected file summaries.
 
@@ -585,9 +640,9 @@ so returned values have to JSON-serializable.
 - `current`
 - `includeUnchanged`
 
-### `create_hook` — Create hook
+### `create_hook` — create_hook
 
-**Description:** RECOMMENDED: Create hook script for function/fetch/xhr/property/cookie/websocket/eval/timer. Hooks run without pausing page execution and are the preferred approach over breakpoints for monitoring and interception.
+**Description:** RECOMMENDED: Create hook script for function/fetch/xhr/property/cookie/websocket/eval/timer. Hooks run without pausing page execution and are the preferred approach over breakpoints for monitoring and interception. Returns hookId and script for use with inject_hook.
 
 **Parameters:**
 
@@ -595,27 +650,11 @@ so returned values have to JSON-serializable.
 - `params`
 - `description`
 - `action`
+- `hookId`
+- `capture`
+- `condition`
 
-### `create_inject_script` — Create Inject Script
-
-**Description:** 创建注入脚本：添加一个 URL 匹配的脚本配置，支持后续注入到浏览器页面
-
-**Parameters:**
-
-- `name`
-- `urlPattern`
-- `code`
-- `enabled`
-
-### `delete_inject_script` — Delete Inject Script
-
-**Description:** 删除注入脚本：移除指定的脚本配置
-
-**Parameters:**
-
-- `id`
-
-### `deobfuscate_code` — Deobfuscate JavaScript
+### `deobfuscate_code` — deobfuscate_code
 
 **Description:** AI-assisted JavaScript deobfuscation.
 
@@ -625,18 +664,7 @@ so returned values have to JSON-serializable.
 - `aggressive`
 - `renameVariables`
 
-### `deobfuscate_code_vj` — Deobfuscate Code
-
-**Description:** 代码解混淆（v_jstools）：对混淆的 JavaScript 代码执行多通道 AST 转换，包括 sojson 解混淆、OB 解混淆、控制流平坦化还原、字符串数组还原、死代码消除等
-
-**Parameters:**
-
-- `code`
-- `mode`
-- `clearExtra`
-- `clearUnused`
-
-### `detect_crypto` — Detect cryptographic patterns
+### `detect_crypto` — detect_crypto
 
 **Description:** Detect cryptographic algorithms/libraries from JavaScript source.
 
@@ -645,17 +673,7 @@ so returned values have to JSON-serializable.
 - `code`
 - `useAI`
 
-### `diff_code` — Diff Code
-
-**Description:** 代码对比：对比两段代码或文本的差异，支持 2-way 对比
-
-**Parameters:**
-
-- `text1`
-- `text2`
-- `mode`
-
-### `diff_env_requirements` — Compare environment requirements
+### `diff_env_requirements` — diff_env_requirements
 
 **Description:** Compare local runtime failures with observed browser capabilities and suggest the next environment patches.
 
@@ -664,23 +682,14 @@ so returned values have to JSON-serializable.
 - `runtimeError`
 - `observedCapabilities`
 
-### `evaluate_on_callframe` — Evaluate on Call Frame
-
-**Description:** Evaluates a JavaScript expression in the context of a specific call frame while paused. This allows you to inspect variables and execute code in the paused scope.
-
-**Parameters:**
-
-- `expression`
-- `frameIndex`
-
-### `export_rebuild_bundle` — Export rebuild bundle
+### `export_rebuild_bundle` — export_rebuild_bundle
 
 **Description:** Export a local Node rebuild bundle from observed reverse-engineering evidence.
 
 **Parameters:**
 
-- `taskSlug`
 - `taskId`
+- `taskSlug`
 - `targetUrl`
 - `goal`
 - `autoGenerate`
@@ -695,7 +704,7 @@ so returned values have to JSON-serializable.
 - `capture`
 - `notes`
 
-### `export_session_report` — Export session report
+### `export_session_report` — export_session_report
 
 **Description:** Export current reverse-engineering session as JSON or Markdown.
 
@@ -704,9 +713,9 @@ so returned values have to JSON-serializable.
 - `format`
 - `includeHookData`
 
-### `find_in_script` — Find in Script
+### `find_in_script` — 在脚本中查找
 
-**Description:** Finds a string in a specific script and returns its exact line/column position with surrounding context. Ideal for setting breakpoints in minified files where the entire code is on one line.
+**Description:** 在指定脚本中查找字符串，返回精确的行号/列号及周围上下文。适用于在压缩文件中设置断点。
 
 **Parameters:**
 
@@ -716,21 +725,28 @@ so returned values have to JSON-serializable.
 - `occurrence`
 - `caseSensitive`
 
-### `get_ai_debug_status` — Get AI Debug Status
+### `fixed_window_size` — Fixed Window Size
 
-**Description:** 获取当前 AI 调试会话的状态和统计信息。
-
-### `get_code_template` — Get Code Template
-
-**Description:** 获取代码模板：返回 v_jstools 中预置的常用 JS 逆向代码模板，包括 CryptoJS、JSEncrypt、Cheerio、Babel AST、Terser 等
+**Description:** Fix window dimensions by intercepting innerHeight/innerWidth/outerHeight/outerWidth getters and setters.
 
 **Parameters:**
 
-- `name`
+- `innerHeight`
+- `innerWidth`
+- `outerHeight`
+- `outerWidth`
 
-### `get_hook_data` — Get hook captured data
+### `get_code_template` — Get Code Template
 
-**Description:** Get captured data for one hook or all hooks. Supports raw view, summary view, and detail view for normalized analysis.
+**Description:** Read a code template file and return its source code, description and size.
+
+**Parameters:**
+
+- `templateName`
+
+### `get_hook_data` — Get Hook Data
+
+**Description:** Get captured hook data. Syncs from browser to HookManager first, then returns data. Supports raw, summary, and detail views with filtering.
 
 **Parameters:**
 
@@ -741,30 +757,17 @@ so returned values have to JSON-serializable.
 - `event`
 - `phase`
 
-### `get_paused_info` — Get Paused Info
+### `get_request_initiator` — 获取请求发起者
 
-**Description:** Gets information about the current paused state including call stack, current location, and scope variables. Use this after a breakpoint is hit to understand the execution context.
-
-**Parameters:**
-
-- `includeScopes`
-- `maxScopeDepth`
-
-### `get_request_initiator` — Get Request Initiator
-
-**Description:** Gets the JavaScript call stack that initiated a network request. This helps trace which code triggered an API call.
+**Description:** 获取网络请求的 JavaScript 调用栈（发起者）。帮助追踪哪个代码触发了 API 调用。
 
 **Parameters:**
 
 - `requestId`
-- `taskId`
-- `taskSlug`
-- `targetUrl`
-- `goal`
 
-### `get_script_source` — Get Script Source
+### `get_script_source` — 获取脚本源码
 
-**Description:** Gets the source code of a JavaScript script by its script ID. Supports line range (for normal files) or character offset (for minified single-line files). Use list_scripts first to find the script ID.
+**Description:** 根据脚本 ID 获取 JavaScript 脚本源码。支持行范围（多行文件）或字符偏移（单行压缩文件）。先使用 list_scripts 查找脚本 ID。
 
 **Parameters:**
 
@@ -773,8 +776,9 @@ so returned values have to JSON-serializable.
 - `endLine`
 - `offset`
 - `length`
+- `prettyPrint`
 
-### `get_storage` — Get Storage
+### `get_storage` — 获取存储
 
 **Description:** Gets browser storage data including cookies, localStorage, and sessionStorage.
 
@@ -782,6 +786,77 @@ so returned values have to JSON-serializable.
 
 - `type`
 - `filter`
+
+### `hook_close` — Hook Close
+
+**Description:** Block window.close to prevent anti-debugging page closure.
+
+### `hook_console_clear` — Hook Console Clear
+
+**Description:** Block console.clear to prevent websites from clearing the console.
+
+### `hook_console_log` — Hook Console Log
+
+**Description:** Protect console.log from being overwritten by websites. Supports proxy/toString/freeze modes.
+
+**Parameters:**
+
+- `mode`
+
+### `hook_console_protect` — Hook Console Protect
+
+**Description:** Protect console methods (log/trace/groupCollapsed/groupEnd) from being overwritten by website code.
+
+**Parameters:**
+
+- `protectedMethods`
+
+### `hook_console_table` — Hook Console Table
+
+**Description:** Neutralize console.table to bypass timing-based anti-debugging detection.
+
+**Parameters:**
+
+- `enabled`
+
+### `hook_cookie` — Hook Cookie
+
+**Description:** Hook document.cookie to monitor Cookie read/write operations. Supports filtering by cookie name.
+
+**Parameters:**
+
+- `filterKeys`
+- `showStack`
+- `triggerDebugger`
+
+### `hook_cryptojs` — hook_cryptojs
+
+**Description:** Hook CryptoJS library: intercept AES, DES, MD5, SHA, HMAC and other symmetric/hash algorithms
+
+**Parameters:**
+
+- `algorithms`
+- `logFormat`
+
+### `hook_date_now` — Hook Date.now
+
+**Description:** Hook Date.now() to fix its return value. Useful for bypassing time-based anti-debugging.
+
+**Parameters:**
+
+- `fixedValue`
+- `showStack`
+- `triggerDebugger`
+
+### `hook_fetch` — Hook Fetch
+
+**Description:** Hook window.fetch to monitor fetch API calls, logging request parameters and stack traces. Supports optional --url filter.
+
+**Parameters:**
+
+- `url`
+- `showStack`
+- `triggerDebugger`
 
 ### `hook_function` — Hook Function
 
@@ -795,23 +870,172 @@ so returned values have to JSON-serializable.
 - `logStack`
 - `hookId`
 
-### `inject_hook` — Inject hook
+### `hook_history` — Hook History
 
-**Description:** Inject an existing hook into the current page.
+**Description:** Hook History API to monitor pushState/replaceState operations. Supports URL filtering.
+
+**Parameters:**
+
+- `filterUrls`
+- `showStack`
+- `triggerDebugger`
+
+### `hook_history_go` — Hook History Go
+
+**Description:** Block history.go and history.back to prevent anti-debugging page navigation.
+
+### `hook_jsencrypt` — hook_jsencrypt
+
+**Description:** Hook JSEncrypt RSA library: intercept public/private key, plaintext, ciphertext
+
+**Parameters:**
+
+- `logFormat`
+
+### `hook_json_parse` — Hook JSON.parse
+
+**Description:** Hook JSON.parse to monitor JSON parsing operations. Supports content filtering.
+
+**Parameters:**
+
+- `filterKeys`
+- `showStack`
+- `triggerDebugger`
+
+### `hook_json_stringify` — Hook JSON.stringify
+
+**Description:** Hook JSON.stringify to monitor JSON serialization operations.
+
+**Parameters:**
+
+- `showStack`
+- `triggerDebugger`
+
+### `hook_local_storage` — Hook LocalStorage
+
+**Description:** Hook localStorage to monitor setItem/getItem/removeItem/clear operations. Supports key filtering.
+
+**Parameters:**
+
+- `actions`
+- `filterKeys`
+- `showStack`
+- `triggerDebugger`
+
+### `hook_location_href` — Hook Location Href
+
+**Description:** Block page navigation by hooking onbeforeunload. Useful for preventing anti-debugging redirects.
+
+**Parameters:**
+
+- `triggerDebugger`
+
+### `hook_performance_now` — Hook performance.now
+
+**Description:** Hook performance.now() to fix its return value. Useful for bypassing timing-based anti-debugging.
+
+**Parameters:**
+
+- `fixedValue`
+- `showStack`
+- `triggerDebugger`
+
+### `hook_promise` — Hook Promise
+
+**Description:** Hook Promise to monitor resolve calls, printing resolve arguments and call stacks for quick async callback location.
+
+**Parameters:**
+
+- `showStack`
+- `triggerDebugger`
+
+### `hook_random` — Hook Math.random
+
+**Description:** Hook Math.random to fix its return value. Useful for bypassing random-based anti-debugging.
+
+**Parameters:**
+
+- `fixedValue`
+- `showStack`
+- `triggerDebugger`
+
+### `hook_session_storage` — Hook SessionStorage
+
+**Description:** Hook sessionStorage to monitor setItem/getItem/removeItem/clear operations. Supports key filtering.
+
+**Parameters:**
+
+- `actions`
+- `filterKeys`
+- `showStack`
+- `triggerDebugger`
+
+### `hook_smcrypto` — hook_smcrypto
+
+**Description:** Hook SM-crypto library: intercept SM2, SM3, SM4 algorithms
+
+**Parameters:**
+
+- `algorithms`
+- `logFormat`
+
+### `hook_websocket` — Hook WebSocket
+
+**Description:** Hook WebSocket to monitor connections, message send/receive. Supports URL filtering.
+
+**Parameters:**
+
+- `filterUrls`
+- `showStack`
+- `triggerDebugger`
+
+### `hook_xhr_open` — Hook XHR Open
+
+**Description:** Hook XMLHttpRequest.open to monitor XHR request initialization. Supports URL filtering.
+
+**Parameters:**
+
+- `filterUrls`
+- `showStack`
+- `triggerDebugger`
+
+### `hook_xhr_set_request_header` — Hook XHR SetRequestHeader
+
+**Description:** Hook XMLHttpRequest.setRequestHeader to monitor request header setting. Supports header name filtering.
+
+**Parameters:**
+
+- `filterKeys`
+- `showStack`
+- `triggerDebugger`
+
+### `inject_code_template` — Inject Code Template
+
+**Description:** Inject a code template into the browser page for execution via frame.evaluate.
+
+**Parameters:**
+
+- `templateName`
+
+### `inject_hook` — Inject Hook
+
+**Description:** Inject a hook script. Use persistent=true to keep the hook alive across page navigations (registers via Page.addScriptToEvaluateOnNewDocument and also runs once on the current frame).
 
 **Parameters:**
 
 - `hookId`
+- `script`
+- `persistent`
 
-### `inject_stealth` — Inject stealth scripts
+### `inject_stealth` — inject_stealth
 
-**Description:** Inject anti-detection stealth scripts to current page.
+**Description:** Inject anti-detection stealth scripts (hide webdriver, mock chrome, canvas noise, etc.)
 
 **Parameters:**
 
 - `preset`
 
-### `inspect_object` — Inspect Object
+### `inspect_object` — 检查对象
 
 **Description:** Deeply inspects a JavaScript object, showing its properties, prototype chain, and methods. Useful for understanding object structure.
 
@@ -822,74 +1046,41 @@ so returned values have to JSON-serializable.
 - `showMethods`
 - `showPrototype`
 
-### `invoke-skill` — Invoke skill
-
-**Description:** 调用已注册的逆向工程技能（observe-flow, auto-hook, rebuild-bundle）
-
-**Parameters:**
-
-- `skillName`
-- `options`
-- `url`
-
-### `list_breakpoints` — List Breakpoints
-
-**Description:** Lists all active breakpoints in the current debugging session.
-
 ### `list_code_templates` — List Code Templates
 
-**Description:** 列出所有可用的代码模板，包括 CryptoJS、JSEncrypt、Cheerio、Babel AST 等常用库
+**Description:** List all available code templates with their names, descriptions and file info.
 
-### `list_created_hooks` — List created hooks
+### `list_created_hooks` — List Created Hooks
 
-**Description:** List hookStore records grouped by hookId, with optional verbose summaries and filters.
+**Description:** List all created hooks from HookManager. Optionally syncs browser-side data for record counts.
 
 **Parameters:**
 
 - `hookId`
 - `verbose`
-- `type`
-- `event`
-- `phase`
+- `syncFromBrowser`
 
-### `list_hooks` — List Hooks
+### `list_hooks` — 列出 Hook
 
 **Description:** Lists all active function hooks.
 
-### `list_inject_scripts` — List Inject Scripts
+### `list_scripts` — 列出脚本
 
-**Description:** 列出所有已配置的注入脚本，包括 URL 匹配规则和启用状态
-
-### `list_scripts` — List Scripts
-
-**Description:** Lists all JavaScript scripts loaded in the current page. Returns script ID, URL, and source map information. Use this to find scripts before setting breakpoints or searching.
+**Description:** 列出当前页面加载的所有 JavaScript 脚本。返回脚本 ID、URL 和 Source Map 信息。在设置断点或搜索前使用此工具查找脚本。
 
 **Parameters:**
 
 - `filter`
 
-### `list_stealth_features` — List stealth feature toggles
+### `list_stealth_features` — list_stealth_features
 
-**Description:** List available stealth feature toggles.
+**Description:** List available stealth features
 
-### `list_stealth_presets` — List stealth presets
+### `list_stealth_presets` — list_stealth_presets
 
-**Description:** List available stealth presets.
+**Description:** List available stealth presets
 
-### `list-skills` — List skills
-
-**Description:** 列出所有可用的逆向工程技能
-
-### `minify_code` — Minify Code
-
-**Description:** 代码压缩/格式化：使用 Terser 对 JavaScript 代码进行压缩或格式化美化
-
-**Parameters:**
-
-- `code`
-- `action`
-
-### `monitor_events` — Monitor Events
+### `monitor_events` — 监控事件
 
 **Description:** Monitors DOM events on a specified element or window. Events will be logged to console.
 
@@ -898,16 +1089,46 @@ so returned values have to JSON-serializable.
 - `selector`
 - `events`
 - `monitorId`
+
+### `observe_flow` — observe_flow
+
+**Description:** Observe mode: collect and analyze page scripts, identify encryption and obfuscation, generate risk assessment report
+
+**Parameters:**
+
+- `url`
+- `includeDynamic`
+- `includeExternal`
+- `includeInline`
+- `includeServiceWorker`
+- `includeWebWorker`
+- `maxFileSize`
+- `maxTotalSize`
+- `mode`
+- `smartMode`
+- `dynamicWaitMs`
+- `priorities`
+- `compress`
+- `timeout`
+
+### `rebuild_bundle` — rebuild_bundle
+
+**Description:** Build local Node.js reproduction environment from captured evidence and target script
+
+**Parameters:**
+
+- `url`
+- `targetUrl`
+- `targetFunctionNames`
+- `targetKeywords`
+- `targetUrlPatterns`
+- `goal`
+- `autoGenerate`
+- `maxEvidenceItems`
 - `taskId`
 - `taskSlug`
-- `targetUrl`
-- `goal`
 
-### `pause` — Pause Execution
-
-**Description:** Pauses JavaScript execution at the current point. Use this to interrupt running code.
-
-### `record_reverse_evidence` — Record reverse engineering evidence
+### `record_reverse_evidence` — record_reverse_evidence
 
 **Description:** Append structured reverse-engineering evidence to a task artifact log.
 
@@ -924,35 +1145,24 @@ so returned values have to JSON-serializable.
 - `targetActionDescription`
 - `entry`
 
-### `remove_breakpoint` — Remove Breakpoint
+### `remove_hook` — remove_hook
 
-**Description:** Removes a breakpoint by its ID. Use list_breakpoints to see active breakpoints.
-
-**Parameters:**
-
-- `breakpointId`
-
-### `remove_hook` — Remove hook
-
-**Description:** Remove a hook by id.
+**Description:** Remove a hook by id. Removes from in-process HookManager and optionally cleans browser-side data.
 
 **Parameters:**
 
 - `hookId`
+- `cleanBrowser`
 
-### `remove_xhr_breakpoint` — Remove XHR Breakpoint
+### `remove_xhr_breakpoint` — 移除 XHR 断点
 
-**Description:** Removes an XHR/Fetch breakpoint.
+**Description:** 移除 XHR/Fetch 断点。
 
 **Parameters:**
 
 - `url`
 
-### `resume` — Resume Execution
-
-**Description:** Resumes JavaScript execution after being paused at a breakpoint. Execution continues until the next breakpoint or completion.
-
-### `risk_panel` — Assess reverse engineering risk
+### `risk_panel` — risk_panel
 
 **Description:** Build a combined risk score from analyzer, crypto detector and hook signals.
 
@@ -964,7 +1174,7 @@ so returned values have to JSON-serializable.
 - `hookId`
 - `topN`
 
-### `search_in_scripts` — Search collected scripts with regex
+### `search_in_scripts` — search_in_scripts
 
 **Description:** Search in collected script cache with regex pattern.
 
@@ -974,9 +1184,9 @@ so returned values have to JSON-serializable.
 - `limit`
 - `maxTotalSize`
 
-### `search_in_sources` — Search in Sources
+### `search_in_sources` — 在源码中搜索
 
-**Description:** Searches for a string or regex pattern in all loaded JavaScript sources. Returns matching lines with script ID, URL, and line number. Use get_script_source with startLine/endLine to view full context around matches.
+**Description:** 在所有已加载的 JavaScript 源码中搜索字符串或正则表达式。返回匹配行及脚本 ID、URL 和行号。使用 get_script_source 和 startLine/endLine 查看匹配周围的完整上下文。
 
 **Parameters:**
 
@@ -987,22 +1197,11 @@ so returned values have to JSON-serializable.
 - `maxLineLength`
 - `excludeMinified`
 - `urlFilter`
+- `source`
 
-### `set_breakpoint` — Set Breakpoint
+### `set_breakpoint_on_text` — 在文本上设置断点
 
-**Description:** Sets a breakpoint in a JavaScript file at the specified line. The breakpoint will trigger when the code executes. NOTE: Prefer hook_function or create_hook for monitoring function calls — breakpoints require pause/resume coordination and are error-prone in automated workflows. Use breakpoints only when you need to inspect local variables inside a function.
-
-**Parameters:**
-
-- `url`
-- `lineNumber`
-- `columnNumber`
-- `condition`
-- `isRegex`
-
-### `set_breakpoint_on_text` — Set Breakpoint on Text
-
-**Description:** Sets a breakpoint on specific code (function name, statement, etc.) by searching for it and automatically determining the exact position. Works with both normal and minified files. NOTE: Prefer hook_function for monitoring function calls — it captures args/results without pausing execution. Use this only when you need to inspect local variables at a specific code location.
+**Description:** 在指定代码文本（函数名、语句等）上设置断点，通过搜索自动确定精确位置。适用于正常和压缩文件。注意：优先使用 hook_function 监控函数调用 — 它无需暂停执行即可捕获参数/返回值。仅在需要检查特定代码位置的局部变量时使用此工具。
 
 **Parameters:**
 
@@ -1011,45 +1210,15 @@ so returned values have to JSON-serializable.
 - `occurrence`
 - `condition`
 
-### `set_user_agent` — Set user agent
+### `set_user_agent` — set_user_agent
 
-**Description:** Set custom user-agent for active page.
+**Description:** Set custom User-Agent for the current page via CDP
 
 **Parameters:**
 
 - `userAgent`
 
-### `start_continuous_debugging` — Start Continuous Debugging
-
-**Description:** 启动 AI 辅助的连续调试循环。设置 XHR 断点（可选），然后自动分析每个断点并决定下一步。
-
-**Parameters:**
-
-- `targetUrl`
-- `xhrBreakPatterns`
-- `maxIterations`
-- `timeoutMs`
-- `aiProvider`
-- `model`
-- `systemPrompt`
-
-### `step_into` — Step Into
-
-**Description:** Steps into the next function call. Use this to enter and debug function bodies.
-
-### `step_out` — Step Out
-
-**Description:** Steps out of the current function, continuing until the function returns. Use this to quickly exit a function.
-
-### `step_over` — Step Over
-
-**Description:** Steps over to the next statement, treating function calls as a single step. Use this to move through code without entering function bodies.
-
-### `stop_continuous_debugging` — Stop Continuous Debugging
-
-**Description:** 停止正在运行的 AI 连续调试循环。
-
-### `stop_monitor` — Stop Monitor
+### `stop_monitor` — 停止监控
 
 **Description:** Stops an event monitor.
 
@@ -1057,7 +1226,7 @@ so returned values have to JSON-serializable.
 
 - `monitorId`
 
-### `summarize_code` — Summarize code at scale
+### `summarize_code` — summarize_code
 
 **Description:** Summarize one code file, multiple files, or project-level context.
 
@@ -1068,33 +1237,32 @@ so returned values have to JSON-serializable.
 - `url`
 - `files`
 
-### `trace_function` — Trace Function
+### `trace_function` — 追踪函数
 
-**Description:** Traces calls to a function by its name in the source code. Works for ANY function including module-internal functions (webpack/rollup bundled). Uses "logpoints" (conditional breakpoints) to log arguments without pausing execution.
+**Description:** 追踪源码中指定名称的函数调用。适用于任何函数（包括 webpack/rollup 打包的内部函数）。使用"日志点"（条件断点）记录参数而不暂停执行。
 
 **Parameters:**
 
-- `functionName`
+- `target`
 - `urlFilter`
 - `logArgs`
-- `logThis`
-- `pause`
-- `traceId`
-- `taskId`
-- `taskSlug`
-- `targetUrl`
-- `goal`
+- `logResult`
+- `logStack`
+- `hookId`
 
-### `transpile_code` — Transpile Code
+### `trace_signature_generation` — trace_signature_generation
 
-**Description:** 代码转译：将 TypeScript/JSX/ES6+ 代码转换为 ES5 JavaScript（使用 Babel）
+**Description:** Signature tracing workflow: correlate network requests, hook diagnostics, XHR breakpoints and call frame inspection from header/URL clues
 
 **Parameters:**
 
-- `code`
-- `presets`
+- `requestUrlPattern`
+- `headerKeyword`
+- `maxResults`
+- `includeSensitiveValues`
+- `taskId`
 
-### `understand_code` — Analyze code structure and logic
+### `understand_code` — understand_code
 
 **Description:** Analyze code structure/business/security with AI + static analysis.
 
@@ -1111,393 +1279,173 @@ so returned values have to JSON-serializable.
 
 - `hookId`
 
-### `update_inject_script` — Update Inject Script
+### `wasm_capabilities` — wasm_capabilities
 
-**Description:** 更新注入脚本：修改已有脚本的代码、名称或启用状态
+**Description:** Detect available native Wasm toolchain (wabt, binaryen, wasmtime, wasmer) and session state.
 
-**Parameters:**
+### `wasm_decompile` — wasm_decompile
 
-- `id`
-- `name`
-- `urlPattern`
-- `code`
-- `enabled`
-
-### `xhr_to_js_breakpoint` — XHR to JS Breakpoint
-
-**Description:** 两阶段断点工作流：先通过 XHR 断点捕获调用栈，然后在顶层用户代码位置设置 JS 断点。
+**Description:** Decompile a .wasm file with function-level summaries and suspicious-pattern detection.
 
 **Parameters:**
 
-- `urlPattern`
-- `maxWaitMs`
+- `inputPath`
+- `outputPath`
+- `foldExprs`
+- `inlineExport`
+- `maxWatChars`
 
-## Hook & Injection
+### `wasm_disassemble` — wasm_disassemble
 
-### `activate_vue_devtools` — Activate Vue Devtools
-
-**Description:** 激活 Vue Devtools：强制启用 Vue.js 开发者工具
-
-### `anti_anti_hook` — Anti-Anti-Hook
-
-**Description:** 反 Hook 检测：保护 Function.prototype.toString，使被 Hook 的方法看起来像原生代码
+**Description:** Disassemble a .wasm file to WAT (WebAssembly Text Format) using the built-in decompiler.
 
 **Parameters:**
 
-- `hookedMethods`
+- `inputPath`
+- `outputPath`
+- `foldExprs`
 
-### `clear_vue_guards` — Clear Vue Guards
+### `wasm_dump` — wasm_dump
 
-**Description:** 清除 Vue Router 全局守卫：beforeEach、beforeResolve
-
-**Parameters:**
-
-- `guards`
-
-### `fixed_window_size` — Fixed Window Size
-
-**Description:** 固定窗口尺寸：拦截 window.innerHeight/innerWidth/outerHeight/outerWidth 的读取和设置
+**Description:** Dump a captured Wasm module to a .wasm file on disk.
 
 **Parameters:**
 
-- `innerHeight`
-- `innerWidth`
-- `outerHeight`
-- `outerWidth`
+- `moduleIndex`
+- `outputPath`
 
-### `get_vue_routes` — Get Vue Routes
+### `wasm_inspect_sections` — wasm_inspect_sections
 
-**Description:** 获取 Vue Router 路由表：已加载的路由配置信息
+**Description:** Inspect Wasm binary sections: section map, function signatures, string scan, and import/export summary.
 
 **Parameters:**
 
-- `includeChildren`
-- `maxDepth`
+- `inputPath`
+- `sections`
+- `includeFunctionSignatures`
+- `includeStringScan`
+- `maskSensitiveStrings`
+- `maxStringSlots`
+- `maxSummaryLines`
 
-### `hook_console_log` — Hook Console Log
+### `wasm_memory_inspect` — wasm_memory_inspect
 
-**Description:** Hook console.log：防止网站重写 console.log 方法，保持日志输出能力
-
-**Parameters:**
-
-- `mode`
-
-### `hook_console_protect` — Hook Console Protect
-
-**Description:** 保护 console：防止代码重写 console.log/trace/groupCollapsed/groupEnd 等方法
+**Description:** Inspect WebAssembly.Memory exports in the current page — hex/ascii dump, pattern search.
 
 **Parameters:**
 
-- `protectedMethods`
+- `offset`
+- `length`
+- `format`
+- `searchPattern`
 
-### `hook_console_table` — Hook Console Table
+### `wasm_offline_run` — wasm_offline_run
 
-**Description:** Hook console.table：绕过通过 console.table 检测运行时间差的反调试
-
-**Parameters:**
-
-- `enabled`
-
-### `hook_cookie` — Hook Cookie
-
-**Description:** Hook document.cookie：监控 Cookie 的读写操作，支持过滤特定 Cookie 名
+**Description:** Execute a Wasm function offline using wasmtime or wasmer CLI runtime.
 
 **Parameters:**
 
-- `filterKeys`
-- `showStack`
-- `triggerDebugger`
+- `inputPath`
+- `functionName`
+- `args`
+- `runtime`
+- `timeoutMs`
 
-### `hook_cryptojs` — Hook CryptoJS
+### `wasm_optimize` — wasm_optimize
 
-**Description:** Hook CryptoJS 加密库：AES、DES、MD5、SHA 等对称/哈希/HMAC 算法
-
-**Parameters:**
-
-- `algorithms`
-- `logFormat`
-
-### `hook_date_now` — Hook Date Now
-
-**Description:** Hook Date.now()：固定 Date.now() 的返回值，支持调用栈打印和 debugger 触发
+**Description:** Optimize a .wasm file using binaryen wasm-opt with selectable optimization level.
 
 **Parameters:**
 
-- `fixedValue`
-- `showStack`
-- `triggerDebugger`
+- `inputPath`
+- `outputPath`
+- `level`
 
-### `hook_fetch` — Hook Fetch
+### `wasm_vmp_trace` — wasm_vmp_trace
 
-**Description:** Hook window.fetch：监控 fetch API 调用，打印请求参数和堆栈
-
-**Parameters:**
-
-- `showStack`
-- `triggerDebugger`
-
-### `hook_history` — Hook History API
-
-**Description:** Hook History API：监控 history.pushState/replaceState 操作，支持 URL 过滤
+**Description:** Trace Wasm runtime events captured by the JS-Wasm boundary hooks, with optional module filter.
 
 **Parameters:**
 
-- `filterUrls`
-- `showStack`
-- `triggerDebugger`
+- `maxEvents`
+- `filterModule`
 
-### `hook_jsencrypt` — Hook JSEncrypt
+### `xhr_to_js_breakpoint` — XHR 到 JS 断点
 
-**Description:** Hook JSEncrypt RSA 加密库：公钥/私钥、原始数据、密文
-
-**Parameters:**
-
-- `logFormat`
-
-### `hook_json_parse` — Hook JSON Parse
-
-**Description:** Hook JSON.parse：监控 JSON 解析操作，支持过滤特定字符串
+**Description:** 设置 XHR 断点；命中后可结合 get_paused_info / set_breakpoint 完成 JS 断点定位。
 
 **Parameters:**
 
-- `filterKeys`
-- `showStack`
-- `triggerDebugger`
-
-### `hook_json_stringify` — Hook JSON Stringify
-
-**Description:** Hook JSON.stringify：监控 JSON 序列化操作
-
-**Parameters:**
-
-- `showStack`
-- `triggerDebugger`
-
-### `hook_local_storage` — Hook Local Storage
-
-**Description:** Hook localStorage：监控 setItem/getItem/removeItem/clear 操作，支持过滤特定键
-
-**Parameters:**
-
-- `actions`
-- `filterKeys`
-- `showStack`
-- `triggerDebugger`
-
-### `hook_location_href` — Hook Location Href
-
-**Description:** Hook location.href：阻断页面跳转，触发 debugger 以定位跳转代码位置
-
-**Parameters:**
-
-- `triggerDebugger`
-
-### `hook_performance_now` — Hook Performance Now
-
-**Description:** Hook performance.now()：固定返回值，支持调用栈打印和 debugger 触发
-
-**Parameters:**
-
-- `fixedValue`
-- `showStack`
-- `triggerDebugger`
-
-### `hook_promise` — Hook Promise
-
-**Description:** Hook Promise：监控 Promise resolve，打印 resolve 参数和调用栈，快速定位异步回调位置
-
-**Parameters:**
-
-- `showStack`
-- `triggerDebugger`
-
-### `hook_random` — Hook Random
-
-**Description:** Hook Math.random：固定 Math.random 的返回值
-
-**Parameters:**
-
-- `fixedValue`
-- `showStack`
-- `triggerDebugger`
-
-### `hook_session_storage` — Hook Session Storage
-
-**Description:** Hook sessionStorage：监控 setItem/getItem/removeItem/clear 操作
-
-**Parameters:**
-
-- `actions`
-- `filterKeys`
-- `showStack`
-- `triggerDebugger`
-
-### `hook_smcrypto` — Hook SM-Crypto
-
-**Description:** Hook SM-crypto 国密库：SM2、SM3、SM4 算法
-
-**Parameters:**
-
-- `algorithms`
-- `logFormat`
-
-### `hook_websocket` — Hook WebSocket
-
-**Description:** Hook WebSocket：监控 WebSocket 连接、消息收发操作，支持按 URL 过滤
-
-**Parameters:**
-
-- `filterUrls`
-- `showStack`
-- `triggerDebugger`
-
-### `hook_xhr_open` — Hook XHR Open
-
-**Description:** Hook XMLHttpRequest.open：监控 XHR 请求初始化，支持过滤特定 URL
-
-**Parameters:**
-
-- `filterUrls`
-- `showStack`
-- `triggerDebugger`
-
-### `hook_xhr_set_request_header` — Hook XHR Set Request Header
-
-**Description:** Hook XMLHttpRequest.setRequestHeader：监控请求头设置，支持过滤特定 Header 名
-
-**Parameters:**
-
-- `filterKeys`
-- `showStack`
-- `triggerDebugger`
+- `url`
 
 ## Input automation
 
-### `cdp_upload_files` — CDP upload files
+### `click_element` — click_element
 
-**Description:** 向文件输入框上传文件
-
-**Parameters:**
-
-- `selector`
-- `files`
-
-### `click` — Click element by CSS selector
-
-**Description:** Clicks on the provided element identified by CSS selector
-
-**Parameters:**
-
-- `selector`
-- `dblClick`
-
-### `click_at` — Click at specific coordinates
-
-**Description:** Real mouse click using CDP Input.dispatchMouseEvent. Acts as user gesture, can trigger file dialogs and bypass some anti-automation detection.
+**Description:** Click on an element by CSS selector
 
 **Parameters:**
 
 - `selector`
 
-### `drag` — Drag element onto another element
+### `scroll_by` — scroll_by
 
-**Description:** Drag an element onto another element
-
-**Parameters:**
-
-- `fromSelector`
-- `toSelector`
-
-### `fill` — Fill text input or select option
-
-**Description:** Type text into an input, text area or select an option from a <select> element
+**Description:** Scroll page by direction (up/down/top/bottom), automatically waits 800ms for lazy-loaded content
 
 **Parameters:**
 
-- `selector`
-- `value`
+- `direction`
+- `pixels`
 
-### `fill_form` — Fill multiple form fields at once
+### `type_text` — type_text
 
-**Description:** Fill out multiple form elements at once
-
-**Parameters:**
-
-- `elements`
-
-### `handle_dialog` — Handle dialog (accept/dismiss)
-
-**Description:** If a browser dialog was opened (alert, confirm, prompt), use this command to handle it. Accepts or dismisses the dialog.
-
-**Parameters:**
-
-- `action`
-- `promptText`
-
-### `hover` — Hover over element by CSS selector
-
-**Description:** Hover over the provided element identified by CSS selector
+**Description:** Type text into an input element by CSS selector
 
 **Parameters:**
 
 - `selector`
+- `text`
+- `delay`
 
-### `press_key` — Press a key or key combination
+### `wait_for_element` — wait_for_element
 
-**Description:** Press a key or key combination. Use this when other input methods like fill() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations).
-
-**Parameters:**
-
-- `key`
-
-### `set_files` — Set files on a file input element
-
-**Description:** Set files to a file input element using CDP DOM.setFileInputFiles. Bypasses file chooser dialog completely.
+**Description:** Wait for an element matching the CSS selector to appear on the page
 
 **Parameters:**
 
 - `selector`
-- `filePaths`
-
-### `upload_file` — Upload file through file input
-
-**Description:** Upload a file through a file input element
-
-**Parameters:**
-
-- `selector`
-- `filePath`
+- `timeout`
 
 ## Emulation
 
-### `emulate_cpu` — Emulate CPU throttling
+### `emulate_cpu` — emulate_cpu
 
-**Description:** Emulates CPU throttling by slowing down the selected page's execution. Useful for detecting race conditions and timing-dependent issues.
+**Description:** Emulate CPU throttling via CDP Performance.setCPUThrottlingRate
 
 **Parameters:**
 
 - `throttlingRate`
 
-### `emulate_mobile` — Emulate mobile device viewport
+### `emulate_mobile` — emulate_mobile
 
-**Description:** Emulates mobile device viewport, user-agent, and touch events. Use this to test mobile layouts and touch interactions.
+**Description:** Emulate mobile device viewport, user-agent and touch events, or restore desktop mode
 
 **Parameters:**
 
 - `enable`
 - `device`
 
-### `emulate_network` — Emulate network conditions
+### `emulate_network` — emulate_network
 
-**Description:** Emulates network conditions such as throttling or offline mode on the selected page. Available options: No emulation, Offline, Slow 3G, Fast 3G, Slow 4G, Fast 4G
+**Description:** Emulate network conditions (throttling/offline) via CDP Network.emulateNetworkConditions
 
 **Parameters:**
 
 - `throttlingOption`
 
-### `resize_page` — Resize browser window dimensions
+### `resize_page` — resize_page
 
-**Description:** Resizes the browser window so that the page has specified dimensions. Useful for testing responsive layouts and mobile views.
+**Description:** Resize page viewport to specified width and height
 
 **Parameters:**
 
@@ -1506,11 +1454,11 @@ so returned values have to JSON-serializable.
 
 ## Performance
 
-### `get_performance_metrics` — Get performance metrics
+### `get_performance_metrics` — get_performance_metrics
 
 **Description:** Gets page performance metrics from the Performance API, including navigation timing, resource timing, and paint events.
 
-### `performance_analyze_insight` — Analyze performance insight
+### `performance_analyze_insight` — performance_analyze_insight
 
 **Description:** Provides more detailed information on a specific Performance Insight that was highlighted in the results of a trace recording.
 
@@ -1518,7 +1466,7 @@ so returned values have to JSON-serializable.
 
 - `insightName`
 
-### `start_performance_trace` — Start performance trace
+### `start_performance_trace` — start_performance_trace
 
 **Description:** Starts a performance trace recording on the selected page. This can be used to look for performance problems and insights to improve the performance of the page. It will also report Core Web Vital (CWV) scores for the page.
 
@@ -1527,104 +1475,89 @@ so returned values have to JSON-serializable.
 - `reload`
 - `autoStop`
 
-### `stop_performance_trace` — Stop performance trace
+### `stop_performance_trace` — stop_performance_trace
 
-**Description:** Stops the active performance trace recording on the selected page and analyzes the results.
-
-## DOM manipulation
-
-### `cdp_click` — CDP click element
-
-**Description:** 点击当前选中页面中的元素（JS click）
-
-**Parameters:**
-
-- `selector`
-
-### `cdp_click_at` — CDP click at coordinates
-
-**Description:** 使用真实鼠标事件点击元素（可触发文件对话框等）
-
-**Parameters:**
-
-- `selector`
-
-### `cdp_eval` — CDP evaluate JavaScript
-
-**Description:** 在当前选中的页面中执行 JavaScript 表达式
-
-**Parameters:**
-
-- `expr`
-
-### `cdp_scroll` — CDP scroll
-
-**Description:** 滚动当前选中的页面
-
-**Parameters:**
-
-- `y`
-- `direction`
-
-## Screenshot
-
-### `cdp_screenshot` — CDP screenshot
-
-**Description:** 对当前选中的页面截图
-
-**Parameters:**
-
-- `file`
-- `type`
-- `fullPage`
+**Description:** Stop performance trace recording and analyze results via CDP Tracing.end
 
 ## Pages
 
-### `cdp_close_page` — Close CDP page
+### `check_browser_health` — check_browser_health
 
-**Description:** 关闭指定的页面
+**Description:** Check browser connection health and page availability
 
-**Parameters:**
+### `delete_session_state` — delete_session_state
 
-- `pageIdx`
-
-### `cdp_get_targets` — Get CDP targets
-
-**Description:** 获取所有可用的页面 target 列表
-
-### `cdp_navigate` — CDP navigate
-
-**Description:** 在当前选中的页面中导航到指定 URL
+**Description:** 删除会话状态
 
 **Parameters:**
 
-- `url`
+- `sessionId`
 
-### `cdp_new_page` — Create new CDP page
+### `dump_session_state` — dump_session_state
 
-**Description:** 创建一个新的后台页面
-
-**Parameters:**
-
-- `url`
-
-### `cdp_page_info` — CDP page info
-
-**Description:** 获取当前选中页面的基本信息
-
-### `cdp_start_proxy` — Start CDP proxy
-
-**Description:** 启动 CDP Proxy HTTP 服务器，允许通过 HTTP API 操控浏览器。代理运行在 localhost:3456。
+**Description:** 导出会话状态
 
 **Parameters:**
 
-- `port`
+- `sessionId`
+- `path`
+- `pretty`
+- `encrypt`
+
+### `handle_dialog` — handle_dialog
+
+**Description:** Handle browser dialogs (alert/confirm/prompt) - accept or dismiss
+
+**Parameters:**
+
+- `action`
+- `promptText`
+
+### `list_session_states` — list_session_states
+
+**Description:** 列出会话状态
+
+### `load_session_state` — load_session_state
+
+**Description:** 加载会话状态
+
+**Parameters:**
+
+- `sessionId`
+- `path`
+- `snapshotJson`
+- `overwrite`
+
+### `restore_session_state` — restore_session_state
+
+**Description:** 恢复会话状态
+
+**Parameters:**
+
+- `sessionId`
+- `navigateToSavedUrl`
+- `clearStorageBeforeRestore`
+
+### `save_session_state` — save_session_state
+
+**Description:** 保存会话状态
+
+**Parameters:**
+
+- `sessionId`
+- `includeCookies`
+- `includeLocalStorage`
+- `includeSessionStorage`
+
+### `update_extensions` — update_extensions
+
+**Description:** Update Chrome extensions by clicking the update button on chrome://extensions/
 
 ## Data
 
-### `create_site_experience` — Create site experience
+### `create_site_experience` — create_site_experience
 
-**Description:** 创建新的站点经验记录
+**Description:** Create a new site experience entry
 
 **Parameters:**
 
@@ -1635,30 +1568,30 @@ so returned values have to JSON-serializable.
 - `validPatterns`
 - `knownPitfalls`
 
-### `delete_site_experience` — Delete site experience
+### `delete_site_experience` — delete_site_experience
 
-**Description:** 删除站点经验记录
+**Description:** Delete a site experience entry by ID
 
 **Parameters:**
 
 - `id`
 
-### `list_site_experiences` — List site experiences
+### `list_site_experiences` — list_site_experiences
 
-**Description:** 列出所有已保存的站点经验
+**Description:** List all site experience entries
 
-### `search_site_experience` — Search site experience
+### `search_site_experience` — search_site_experience
 
-**Description:** 按 URL 或名称搜索站点经验。支持从完整 URL 自动提取域名进行匹配。
+**Description:** Search site experience by URL or name
 
 **Parameters:**
 
 - `url`
 - `name`
 
-### `update_site_experience` — Update site experience
+### `update_site_experience` — update_site_experience
 
-**Description:** 更新现有的站点经验记录
+**Description:** Update an existing site experience entry
 
 **Parameters:**
 
@@ -1668,3 +1601,4 @@ so returned values have to JSON-serializable.
 - `platformFeatures`
 - `validPatterns`
 - `knownPitfalls`
+

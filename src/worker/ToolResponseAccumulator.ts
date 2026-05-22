@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {PaginationOptions} from '../utils/types.js';
 import type {ImageContentData, Response} from '../tools/ToolDefinition.js';
+import type {PaginationOptions} from '../utils/types.js';
 
 /**
  * ToolResponseAccumulator — 复刻 Daemon 中 response 对象的 accumulator 模式

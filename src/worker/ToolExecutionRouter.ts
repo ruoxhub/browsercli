@@ -11,8 +11,8 @@ import type {Response, ToolDefinition} from '../tools/ToolDefinition.js';
 import {createToolError, ErrorCodes} from '../utils/errors.js';
 
 import type {DefineToolContextFactory} from './DefineToolContextFactory.js';
-import type {LoadedHandler} from './ToolHandlerLoader.js';
 import type {ToolContextProvider} from './ToolContextProvider.js';
+import type {LoadedHandler} from './ToolHandlerLoader.js';
 import {ToolResponseAccumulator} from './ToolResponseAccumulator.js';
 
 const FRAME_EVALUATE_TIMEOUT = 10_000;

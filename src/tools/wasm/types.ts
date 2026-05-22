@@ -12,7 +12,6 @@ import type {
   WasmRuntimeEvent,
   WasmSignatureDiffResult,
 } from '../../modules/wasm/WasmTypes.js';
-
 import type {MessagesResult} from '../shared/types.js';
 
 // ─── 基础结果类型 ────────────────────────────────────

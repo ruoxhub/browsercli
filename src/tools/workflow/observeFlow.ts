@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {zod} from '../../third_party/index.js';
-import {defineTool} from '../ToolDefinition.js';
-import {ToolCategory} from '../categories.js';
 import {getRuntime} from '../../runtime.js';
+import {zod} from '../../third_party/index.js';
 import {logger} from '../../utils/logger.js';
+import {ToolCategory} from '../categories.js';
+import {defineTool} from '../ToolDefinition.js';
 
 /**
  * 观察模式工具 - 收集和分析页面脚本
@@ -113,14 +113,14 @@ export const observeFlow = defineTool({
         success: false,
         message: error instanceof Error ? error.message : String(error),
         tooltype: 'observe_flow',
-      })
+      });
     }
   },
 });
 
 // ==================== 辅助类型和函数 ====================
 
-interface ScriptAnalysis {
+export interface ScriptAnalysis {
   url: string;
   type: string;
   size: number;
@@ -134,7 +134,7 @@ interface ScriptAnalysis {
   riskScore: number;
 }
 
-interface DependencyInfo {
+export interface DependencyInfo {
   nodes: Array<{id: string; url: string; type: string}>;
   edges: Array<{from: string; to: string; type: string}>;
   entryPoints: string[];
@@ -162,7 +162,7 @@ async function collectScripts(
         maxTotalSize: (options.maxTotalSize as number) ?? 512 * 1024,
         timeout: (options.timeout as number) ?? 30000,
         dynamicWaitMs: (options.dynamicWaitMs as number) ?? 3000,
-        smartMode: (options.mode as string) ?? 'full',
+        smartMode: (options.mode as 'summary' | 'priority' | 'incremental' | 'full') ?? 'full',
         compress: (options.compress as boolean) ?? false,
       });
       return {

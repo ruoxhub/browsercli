@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {zod} from '../../third_party/index.js';
 import {getRuntime} from '../../runtime.js';
-import {defineTool} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
+import {defineTool} from '../ToolDefinition.js';
+
 import type {DeobfuscateCodeResult} from './types.js';
 
 export const deobfuscateCode = defineTool({
@@ -21,7 +22,7 @@ export const deobfuscateCode = defineTool({
   },
   handler: async (request, response) => {
     try {
-      const result = await getRuntime().deobfuscator.deobfuscate(request.params);
+      const result = await getRuntime().deobfuscator.deobfuscate(request.params as any);
       response.setStructuredContent<DeobfuscateCodeResult>({
         success: true,
         message: 'Deobfuscation completed',

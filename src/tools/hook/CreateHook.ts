@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {zod} from '../../third_party/index.js';
 import {getRuntime} from '../../runtime.js';
-import {defineTool} from '../ToolDefinition.js';
+import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
+import {defineTool} from '../ToolDefinition.js';
 
 /**
  * 创建 Hook 定义：在进程内生成 hook 脚本和元数据，不注入浏览器。
@@ -45,7 +45,7 @@ export const createHook = defineTool({
   handler: async (request, response) => {
     const runtime = getRuntime();
     try {
-      const result = runtime.hookManager.create(request.params);
+      const result = runtime.hookManager.create(request.params as any);
       response.setStructuredContent({
         success: true,
         message: result.hookId ? `Hook created: ${result.hookId}` : 'Hook created',

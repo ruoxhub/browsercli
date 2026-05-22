@@ -7,16 +7,63 @@ import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {
-  evaluateScript,
+  evaluateScript as evaluateScriptTool,
   evaluateScriptFn,
-  injectPreloadScript,
+  injectPreloadScript as injectPreloadScriptTool,
 } from '../../../src/tools/script/script.js';
+import { getRuntime } from '../../../src/runtime.js';
 
-type EvaluateScriptRuntime = Parameters<typeof evaluateScript>[0];
-type InjectPreloadRuntime = Parameters<typeof injectPreloadScript>[0];
-type EvaluateScriptDebuggerContext = Awaited<
-  ReturnType<NonNullable<EvaluateScriptRuntime['getDebuggerContext']>>
->;
+async function evaluateScript(runtime: any, params: any): Promise<any> {
+  const originalProvider = getRuntime().contextProvider;
+  getRuntime().contextProvider = runtime;
+  let result: any = null;
+  const response = {
+    appendResponseLine: (line: string) => {
+      if (line.startsWith('```json')) return;
+      if (line.startsWith('```')) return;
+      try {
+        result = JSON.parse(line);
+      } catch (e) {}
+    },
+    setStructuredContent: (content: unknown) => {
+      result = content;
+    },
+  } as any;
+  try {
+    await evaluateScriptTool.handler({ params } as any, response, runtime);
+  } finally {
+    getRuntime().contextProvider = originalProvider;
+  }
+  return result;
+}
+
+async function injectPreloadScript(runtime: any, params: any): Promise<any> {
+  const originalProvider = getRuntime().contextProvider;
+  getRuntime().contextProvider = runtime;
+  let result: any = null;
+  const response = {
+    appendResponseLine: (line: string) => {
+      if (line.startsWith('```json')) return;
+      if (line.startsWith('```')) return;
+      try {
+        result = JSON.parse(line);
+      } catch (e) {}
+    },
+    setStructuredContent: (content: unknown) => {
+      result = content;
+    },
+  } as any;
+  try {
+    await injectPreloadScriptTool.handler({ params } as any, response, runtime);
+  } finally {
+    getRuntime().contextProvider = originalProvider;
+  }
+  return result;
+}
+
+type EvaluateScriptRuntime = any;
+type InjectPreloadRuntime = any;
+type EvaluateScriptDebuggerContext = any;
 
 interface HandleLike {
   dispose(): Promise<void>;

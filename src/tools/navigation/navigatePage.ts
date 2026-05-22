@@ -4,14 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {defineTool} from '../ToolDefinition.js';
 import {zod} from '../../third_party/index.js';
+import type {ToolContextProvider} from '../../worker/ToolContextProvider.js';
 import {ToolCategory} from '../categories.js';
-
 import {resolveActivePage} from '../shared/activePageResolver.js';
 import {explainPageError} from '../shared/pageDiagnostics.js';
-
-import type {ToolContextProvider} from '../../worker/ToolContextProvider.js';
+import {defineTool} from '../ToolDefinition.js';
 
 // Default navigation timeout in milliseconds (10 seconds)
 const DEFAULT_NAV_TIMEOUT = 10_000;
@@ -68,7 +66,7 @@ export const navigatePage = defineTool({
 
     const resolvedPage = resolveActivePage(runtime);
     if (!resolvedPage.ok) {
-      response.appendResponseLine(resolvedPage.message);
+      response.appendResponseLine((resolvedPage as {message: string}).message);
       return;
     }
 

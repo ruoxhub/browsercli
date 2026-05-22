@@ -10,7 +10,7 @@ import {describe, it} from 'node:test';
 import fc from 'fast-check';
 
 import {parseArguments} from '../../src/cli.js';
-import * as scriptTools from '../../src/tools/script.js';
+import * as scriptTools from '../../src/tools/script/script.js';
 
 describe('Property 3/27/28: Backward compatibility', () => {
   it('Property 3/27: original tools preserved', () => {

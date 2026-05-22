@@ -16,11 +16,6 @@ export {
 // ─── 类型导出 ─────────────────────────────────────────
 
 export type {
-  StealthResult,
-  InjectStealthResult,
-  ListPresetsResult,
-  ListFeaturesResult,
-  SetUserAgentResult,
   StealthInjectionOptions,
   StealthPreset,
   StealthReport,

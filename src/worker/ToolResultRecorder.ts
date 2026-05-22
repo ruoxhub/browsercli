@@ -18,6 +18,7 @@ export interface ToolResultRecord {
   success: boolean;
   startedAt: string;
   durationMs: number;
+  input?: Record<string, unknown>;
   request?: Record<string, unknown>;
   response?: unknown;
   error?: {
@@ -37,10 +38,16 @@ export class ToolResultRecorder {
     if (!config.enabled) return;
 
     try {
-      this.write(config, record);
+      this.write(config, this.normalizeRecord(record));
     } catch {
       // Tool result recording is diagnostic only; it must not affect tools.
     }
+  }
+
+  private normalizeRecord(record: ToolResultRecord): ToolResultRecord {
+    const inputSource = record.input ?? record.request;
+    const input = inputSource ? {...inputSource} : undefined;
+    return input ? {...record, input} : record;
   }
 
   private write(

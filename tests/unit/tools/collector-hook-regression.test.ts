@@ -6,17 +6,84 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {collectCode} from '../../../src/tools/collector/collectCode.js';
+import {collectCode as toolCollectCode} from '../../../src/tools/collector/collectCode.js';
+import {setRuntime} from '../../../src/runtime.js';
 import {
   buildRequestBindings,
-  getHookData,
+  getHookData as toolGetHookData,
   inferCandidateEnvNeeds,
   normalizeHookRecord,
-  removeHookBrowser,
+  removeHookBrowser as toolRemoveHookBrowser,
   summarizeHookRecords,
-  syncHookRecords,
+  syncHookRecords as toolSyncHookRecords,
   toHookRecordArray,
 } from '../../../src/tools/hook/index.js';
+
+async function collectCode(runtime: any, params?: any) {
+  setRuntime(runtime);
+  const request = { params: params || {} };
+  const response = {
+    structuredContent: null as any,
+    setStructuredContent(content: any) {
+      this.structuredContent = content;
+    }
+  };
+  const context = {
+    getSelectedFrame: () => null
+  };
+  try {
+    await toolCollectCode.handler(request as any, response as any, context as any);
+    return response.structuredContent;
+  } finally {
+    setRuntime(undefined);
+  }
+}
+
+
+async function getHookData(frame: any, params?: any) {
+  const request = { params: params || {} };
+  const response = {
+    structuredContent: null as any,
+    setStructuredContent(content: any) {
+      this.structuredContent = content;
+    }
+  };
+  const context = {
+    getSelectedFrame: () => frame
+  };
+  await toolGetHookData.handler(request as any, response as any, context as any);
+  return response.structuredContent;
+}
+
+async function syncHookRecords(frame: any, params?: any) {
+  const request = { params: params || {} };
+  const response = {
+    structuredContent: null as any,
+    setStructuredContent(content: any) {
+      this.structuredContent = content;
+    }
+  };
+  const context = {
+    getSelectedFrame: () => frame
+  };
+  await toolSyncHookRecords.handler(request as any, response as any, context as any);
+  return response.structuredContent;
+}
+
+async function removeHookBrowser(frame: any, params?: any) {
+  const request = { params: params || {} };
+  const response = {
+    structuredContent: null as any,
+    setStructuredContent(content: any) {
+      this.structuredContent = content;
+    }
+  };
+  const context = {
+    getSelectedFrame: () => frame
+  };
+  await toolRemoveHookBrowser.handler(request as any, response as any, context as any);
+  return response.structuredContent;
+}
 
 describe('collector/hook regressions', () => {
   it('collect_code should collect before top-priority view', async () => {

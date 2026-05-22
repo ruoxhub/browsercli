@@ -8,12 +8,13 @@ import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {parseArguments} from '../../../src/cli.js';
-import * as consoleTools from '../../../src/tools/console.js';
+import * as consoleTools from '../../../src/tools/console/index.js';
 import * as debuggerTools from '../../../src/tools/debugger/index.js';
-import * as networkTools from '../../../src/tools/network.js';
-import * as pagesTools from '../../../src/tools/pages.js';
-import * as screenshotTools from '../../../src/tools/screenshot.js';
-import * as scriptTools from '../../../src/tools/script.js';
+import * as networkTools from '../../../src/tools/network/index.js';
+import * as navigationTools from '../../../src/tools/navigation/index.js';
+import * as pageTools from '../../../src/tools/page/index.js';
+import * as screenshotTools from '../../../src/tools/screenshot/index.js';
+import * as scriptTools from '../../../src/tools/script/index.js';
 
 interface NamedToolExport {
   name?: string;
@@ -25,7 +26,8 @@ describe('Backward compatibility', () => {
       ...Object.values(consoleTools),
       ...Object.values(debuggerTools),
       ...Object.values(networkTools),
-      ...Object.values(pagesTools),
+      ...Object.values(navigationTools),
+      ...Object.values(pageTools),
       ...Object.values(screenshotTools),
       ...Object.values(scriptTools),
     ] as NamedToolExport[];

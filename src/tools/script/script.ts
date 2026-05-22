@@ -4,13 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {CDPSession, Frame, JSHandle} from '../../third_party/index.js';
 import {getRuntime} from '../../runtime.js';
+import type {CDPSession, Frame, JSHandle} from '../../third_party/index.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
 import {selectExecutionContext} from '../debugger/contextSelector.js';
 import type {ExecutionContextInfo} from '../debugger/executionContexts.js';
-import {zod} from '../../third_party/index.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
-import {ToolCategory} from '../categories.js';
+
 import {type PreloadPreset, getPreloadPreset} from './preload-presets.js';
 
 // Default script evaluation timeout in milliseconds (30 seconds)
@@ -162,7 +163,12 @@ async function evaluateScriptInExecutionContext(
   client: CDPSession,
   executionContext: ExecutionContextInfo,
   functionCode: string,
-): Promise<{success: boolean; message: string; tooltype: string; result?: string}> {
+): Promise<{
+  success: boolean;
+  message: string;
+  tooltype: string;
+  result?: string;
+}> {
   const runtimeResult = (await withTimeout(
     client.send('Runtime.evaluate', {
       expression: buildContextEvaluationExpression(functionCode),
@@ -189,10 +195,15 @@ async function evaluateScriptInExecutionContext(
 /**
  * 在 Frame 上执行脚本（辅助函数）。
  */
-async function evaluateScriptFn(
+export async function evaluateScriptFn(
   frame: Frame,
   functionCode: string,
-): Promise<{success: boolean; message: string; tooltype: string; result?: string}> {
+): Promise<{
+  success: boolean;
+  message: string;
+  tooltype: string;
+  result?: string;
+}> {
   let fn: JSHandle<unknown> | undefined;
   try {
     fn = await withTimeout(
@@ -234,7 +245,8 @@ async function evaluateScriptFn(
  */
 export const evaluateScript = defineTool({
   name: 'evaluate_script',
-  description: 'Execute JavaScript on the page; supports page / content-script context, with verbose parameter passthrough',
+  description:
+    'Execute JavaScript on the page; supports page / content-script context, with verbose parameter passthrough',
   annotations: {category: ToolCategory.DEBUGGING, readOnlyHint: false},
   schema: {
     function: zod.string().describe('JavaScript function code to execute'),
@@ -254,10 +266,7 @@ export const evaluateScript = defineTool({
       .describe(
         '当存在多个匹配的执行上下文且无法精确定位时，是否回退到第一个可用上下文。默认 false。',
       ),
-    verbose: zod
-      .boolean()
-      .optional()
-      .describe('Enable verbose output'),
+    verbose: zod.boolean().optional().describe('Enable verbose output'),
   },
   handler: async (request, response, _context) => {
     const functionCode = request.params.function;
@@ -285,14 +294,11 @@ export const evaluateScript = defineTool({
         const selectedFrameId = getFrameId(frame);
         // frameId 优先级：explicitFrameId > selectedFrameId
         const effectiveFrameId = explicitFrameId ?? selectedFrameId;
-        const executionContext = selectExecutionContext(
-          executionContexts,
-          {
-            context: desiredContext,
-            frameId: effectiveFrameId,
-            fallbackToFirst: allowAnyFrame,
-          },
-        );
+        const executionContext = selectExecutionContext(executionContexts, {
+          context: desiredContext,
+          frameId: effectiveFrameId,
+          fallbackToFirst: allowAnyFrame,
+        });
 
         if (!executionContext) {
           response.setStructuredContent({
@@ -426,15 +432,29 @@ export const evaluateScript = defineTool({
  */
 export const injectPreloadScript = defineTool({
   name: 'inject_preload_script',
-  description: 'Register a preload script for future documents on the current page/context',
+  description:
+    'Register a preload script for future documents on the current page/context',
   annotations: {category: ToolCategory.DEBUGGING, readOnlyHint: false},
   schema: {
-    script: zod.string().optional().describe('JavaScript code to inject as preload script'),
-    preset: zod.enum(['capture-all-fetch', 'capture-all-xhr', 'capture-all-requests', 'log-cookies']).optional().describe('预设 hook 模板，与 script 参数互斥'),
+    script: zod
+      .string()
+      .optional()
+      .describe('JavaScript code to inject as preload script'),
+    preset: zod
+      .enum([
+        'capture-all-fetch',
+        'capture-all-xhr',
+        'capture-all-requests',
+        'log-cookies',
+      ])
+      .optional()
+      .describe('预设 hook 模板，与 script 参数互斥'),
   },
   handler: async (request, response, _context) => {
     const {preset} = request.params;
-    const script = preset ? getPreloadPreset(preset as PreloadPreset) : (request.params.script ?? '');
+    const script = preset
+      ? getPreloadPreset(preset as PreloadPreset)
+      : (request.params.script ?? '');
 
     if (!script || script.trim().length === 0) {
       response.appendResponseLine('```json');
@@ -476,7 +496,9 @@ export const injectPreloadScript = defineTool({
     }
 
     const isClosed =
-      ('isClosed' in target && typeof target.isClosed === 'function' && target.isClosed()) ||
+      ('isClosed' in target &&
+        typeof target.isClosed === 'function' &&
+        target.isClosed()) ||
       (selectedPage && selectedPage.isClosed());
 
     if (isClosed) {

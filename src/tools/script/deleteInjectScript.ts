@@ -25,6 +25,7 @@ export function deleteInjectScript(id: string): DeleteInjectScriptResult {
       message: `未找到 ID 为 "${id}" 的注入脚本`,
       tooltype: 'delete_inject_script',
       logFormat: 'json',
+      data: undefined as any,
     };
   }
 

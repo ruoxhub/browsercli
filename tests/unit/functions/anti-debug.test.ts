@@ -10,10 +10,44 @@ import {describe, it, mock} from 'node:test';
 import type {Frame} from '../../../src/third_party/index.js';
 
 import {
-  bypassDebugger,
-  antiAntiDebug,
+  bypassDebugger as toolBypassDebugger,
+  antiAntiDebug as toolAntiAntiDebug,
 } from '../../../src/tools/anti-debug/index.js';
 import type {BypassTarget, AntiAntiDebugFeature} from '../../../src/tools/anti-debug/types.js';
+
+function wrapAntiDebugTool(tool: any, paramNames: string[]) {
+  return async (frame: any, ...args: any[]) => {
+    const params: Record<string, any> = {};
+    paramNames.forEach((name, i) => {
+      if (args[i] !== undefined) {
+        params[name] = args[i];
+      }
+    });
+    const request = { params };
+    let responseText = '';
+    const response = {
+      appendResponseLine(line: string) {
+        responseText += line + '\n';
+      }
+    };
+    const context = {
+      getSelectedFrame: () => frame
+    };
+    await tool.handler(request as any, response as any, context as any);
+    const jsonMatch = responseText.match(/```json\s+([\s\S]*?)\s+```/);
+    if (jsonMatch && jsonMatch[1]) {
+      try {
+        return JSON.parse(jsonMatch[1]);
+      } catch (e) {
+        throw new Error('Failed to parse JSON response: ' + jsonMatch[1]);
+      }
+    }
+    throw new Error('No JSON block found in response');
+  };
+}
+
+const bypassDebugger = wrapAntiDebugTool(toolBypassDebugger, ['targets']);
+const antiAntiDebug = wrapAntiDebugTool(toolAntiAntiDebug, ['features']);
 
 function createErrorFrame(errorMsg: string): Frame {
   return {

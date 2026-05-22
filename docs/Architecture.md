@@ -287,7 +287,6 @@ handleMCPRequest(toolName, params)
         ├─► tools/collector/* (采集工具)
         ├─► tools/analyzer/* (分析工具)
         ├─► tools/rebuild/* (复现工具)
-        ├─► tools/vue/* (Vue 工具)
         ├─► tools/crypto/* (加密检测)
         └─► tools/anti-debug/* (反调试)
               │
@@ -575,13 +574,6 @@ class DetailedDataManagerAdapter implements CacheAdapter { /* ... */ }
 | export_rebuild_bundle | 导出复现包 |
 | diff_env_requirements | 环境差异比对 |
 | record_reverse_evidence | 证据记录 |
-
-### Vue 工具 (vue/)
-| 工具 | 职责 |
-|------|------|
-| activateVueDevtools | 激活 Vue 开发者工具 |
-| getVueRoutes | 获取 Vue 路由 |
-| clearVueGuards | 清除 Vue 守卫 |
 
 ### 反调试 (anti-debug/)
 | 工具 | 职责 |

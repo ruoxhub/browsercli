@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {TrafficSummary} from '../../formatters/websocketFormatter.js';
 import type {HTTPRequest, Page, ResourceType} from '../../third_party/index.js';
+import type {MessagesResult} from '../shared/types.js';
+
+import type {WebSocketData, WebSocketFrame} from './WebSocketCollector.js';
 
 // ─── 可过滤的资源类型 ──────────────────────────────────
 
@@ -16,18 +20,16 @@ export const FILTERABLE_RESOURCE_TYPES: [ResourceType, ...ResourceType[]] = [
   'media',
   'font',
   'script',
-  'texttrack',
+  'text-track',
   'xhr',
   'fetch',
-  'prefetch',
-  'eventsource',
+  'event-source',
   'websocket',
   'manifest',
-  'signedexchange',
+  'signed-exchange',
   'ping',
-  'cspviolationreport',
+  'csp-violation-report',
   'preflight',
-  'fedcm',
   'other',
 ];
 
@@ -201,9 +203,6 @@ export interface GetNetworkRequestData {
   responseBody?: string;
 }
 
-import type {TrafficSummary} from '../../formatters/websocketFormatter.js';
-import type {WebSocketData, WebSocketFrame} from './WebSocketCollector.js';
-import type {MessagesResult} from '../shared/types.js';
 
 // ─── WebSocket 参数类型 ──────────────────────────────────
 

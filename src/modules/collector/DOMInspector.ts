@@ -131,8 +131,8 @@ export class DOMInspector {
     try {
       const page = await this.collector.getActivePage();
 
-      const elements = await page.evaluate(
-        (sel, maxLimit) => {
+      const elements = (await page.evaluate(
+        ({sel, maxLimit}) => {
           const nodeList = document.querySelectorAll(sel);
 
           // 🔧 如果超过限制，输出警告
@@ -186,9 +186,8 @@ export class DOMInspector {
 
           return results;
         },
-        selector,
-        limit,
-      );
+        {sel: selector, maxLimit: limit},
+      )) as ElementInfo[];
 
       logger.info(
         `querySelectorAll: ${selector} - found ${elements.length} elements (limit: ${limit})`,
@@ -208,7 +207,7 @@ export class DOMInspector {
       const page = await this.collector.getActivePage();
 
       const structure = await page.evaluate(
-        (depth, withText) => {
+        ({depth, withText}) => {
           function buildTree(node: Element, currentDepth: number): any {
             if (currentDepth > depth) {
               return null;
@@ -247,8 +246,7 @@ export class DOMInspector {
 
           return buildTree(document.body, 0);
         },
-        maxDepth,
-        includeText,
+        {depth: maxDepth, withText: includeText},
       );
 
       logger.info('DOM structure retrieved');
@@ -515,8 +513,8 @@ export class DOMInspector {
     try {
       const page = await this.collector.getActivePage();
 
-      const elements = await page.evaluate(
-        (searchText, tagName) => {
+      const elements = (await page.evaluate(
+        ({searchText, tagName}) => {
           // 转义 XPath 中的引号，防止注入
           const escapeXPathString = (str: string): string => {
             if (!str.includes('"')) return `"${str}"`;
@@ -579,9 +577,8 @@ export class DOMInspector {
 
           return elements;
         },
-        text,
-        tag,
-      );
+        {searchText: text, tagName: tag},
+      )) as ElementInfo[];
 
       logger.info(`findByText: "${text}" - found ${elements.length} elements`);
       return elements;

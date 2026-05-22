@@ -15,12 +15,12 @@ import {readFile, writeFile} from 'node:fs/promises';
 import {getEnvValue, getEnvNumber} from '../../config.js';
 import {zod} from '../../third_party/index.js';
 import {validateOutputPath} from '../../utils/fsSafe.js';
-import {defineTool, type Context} from '../ToolDefinition.js';
 import {ToolCategory} from '../categories.js';
 import {
   withOperationTimeout,
   normalizeBrowserRuntimeError,
 } from '../shared/browserRuntime.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
 
 import type {SessionSnapshot} from './types.js';
 

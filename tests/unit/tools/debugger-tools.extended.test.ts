@@ -38,8 +38,8 @@ import {
   stopMonitor,
   traceFunction,
 } from '../../../src/tools/debugger/index.js';
-import {listFrames, selectFrame} from '../../../src/tools/frames.js';
-import {getJSHookRuntime} from '../../../src/tools/runtime.js';
+import {listFrames, selectFrame} from '../../../src/tools/frames/index.js';
+import {getRuntime as getJSHookRuntime} from '../../../src/runtime.js';
 
 interface DebuggerResponseHarness {
   lines: string[];
@@ -244,25 +244,21 @@ describe('debugger tools extended', () => {
       {params: {}},
       response as unknown as Parameters<typeof listScripts.handler>[1],
       context as unknown as Parameters<typeof listScripts.handler>[2],
-      runtime as unknown as Parameters<typeof listScripts.handler>[3],
     );
     await listScripts.handler(
       {params: {filter: 'b'}},
       response as unknown as Parameters<typeof listScripts.handler>[1],
       context as unknown as Parameters<typeof listScripts.handler>[2],
-      runtime as unknown as Parameters<typeof listScripts.handler>[3],
     );
     await getScriptSource.handler(
       {params: {scriptId: '2', startLine: 1, endLine: 2, length: 1000}},
       response as unknown as Parameters<typeof getScriptSource.handler>[1],
       context as unknown as Parameters<typeof getScriptSource.handler>[2],
-      runtime as unknown as Parameters<typeof getScriptSource.handler>[3],
     );
     await getScriptSource.handler(
       {params: {scriptId: '2', offset: 1, length: 5}},
       response as unknown as Parameters<typeof getScriptSource.handler>[1],
       context as unknown as Parameters<typeof getScriptSource.handler>[2],
-      runtime as unknown as Parameters<typeof getScriptSource.handler>[3],
     );
 
     assert.ok(response.lines.some(x => x.includes('Found')));
@@ -303,7 +299,6 @@ describe('debugger tools extended', () => {
       },
       response as unknown as Parameters<typeof findInScript.handler>[1],
       context as unknown as Parameters<typeof findInScript.handler>[2],
-      runtime as unknown as Parameters<typeof findInScript.handler>[3],
     );
     await findInScript.handler(
       {
@@ -317,7 +312,6 @@ describe('debugger tools extended', () => {
       },
       response as unknown as Parameters<typeof findInScript.handler>[1],
       context as unknown as Parameters<typeof findInScript.handler>[2],
-      runtime as unknown as Parameters<typeof findInScript.handler>[3],
     );
     await searchInSources.handler(
       {
@@ -333,7 +327,6 @@ describe('debugger tools extended', () => {
       },
       response as unknown as Parameters<typeof searchInSources.handler>[1],
       context as unknown as Parameters<typeof searchInSources.handler>[2],
-      runtime as unknown as Parameters<typeof searchInSources.handler>[3],
     );
 
     assert.ok(response.lines.some(x => x.includes('Found "abc"')));
@@ -390,31 +383,26 @@ describe('debugger tools extended', () => {
       {params: {url: 'a.js', lineNumber: 3, columnNumber: 0, isRegex: false}},
       response as unknown as Parameters<typeof setBreakpoint.handler>[1],
       context as unknown as Parameters<typeof setBreakpoint.handler>[2],
-      runtime as unknown as Parameters<typeof setBreakpoint.handler>[3],
     );
     await setBreakpoint.handler(
       {params: {url: '.*a.js', lineNumber: 3, columnNumber: 0, isRegex: true}},
       response as unknown as Parameters<typeof setBreakpoint.handler>[1],
       context as unknown as Parameters<typeof setBreakpoint.handler>[2],
-      runtime as unknown as Parameters<typeof setBreakpoint.handler>[3],
     );
     await listBreakpoints.handler(
       {params: {}},
       response as unknown as Parameters<typeof listBreakpoints.handler>[1],
       context as unknown as Parameters<typeof listBreakpoints.handler>[2],
-      runtime as unknown as Parameters<typeof listBreakpoints.handler>[3],
     );
     await removeBreakpoint.handler(
       {params: {breakpointId: 'bp-1'}},
       response as unknown as Parameters<typeof removeBreakpoint.handler>[1],
       context as unknown as Parameters<typeof removeBreakpoint.handler>[2],
-      runtime as unknown as Parameters<typeof removeBreakpoint.handler>[3],
     );
     await getRequestInitiator.handler(
       {params: {requestId: 1}},
       response as unknown as Parameters<typeof getRequestInitiator.handler>[1],
       context as unknown as Parameters<typeof getRequestInitiator.handler>[2],
-      runtime as unknown as Parameters<typeof getRequestInitiator.handler>[3],
     );
 
     assert.ok(
@@ -470,37 +458,31 @@ describe('debugger tools extended', () => {
       {params: {includeScopes: true, maxScopeDepth: 2}},
       response as unknown as Parameters<typeof getPausedInfo.handler>[1],
       context as unknown as Parameters<typeof getPausedInfo.handler>[2],
-      runtime as unknown as Parameters<typeof getPausedInfo.handler>[3],
     );
     await evaluateOnCallframe.handler(
       {params: {expression: 'x', frameIndex: 0}},
       response as unknown as Parameters<typeof evaluateOnCallframe.handler>[1],
       context as unknown as Parameters<typeof evaluateOnCallframe.handler>[2],
-      runtime as unknown as Parameters<typeof evaluateOnCallframe.handler>[3],
     );
     await resume.handler(
       {params: {}},
       response as unknown as Parameters<typeof resume.handler>[1],
       context as unknown as Parameters<typeof resume.handler>[2],
-      runtime as unknown as Parameters<typeof resume.handler>[3],
     );
     await stepOver.handler(
       {params: {}},
       response as unknown as Parameters<typeof stepOver.handler>[1],
       context as unknown as Parameters<typeof stepOver.handler>[2],
-      runtime as unknown as Parameters<typeof stepOver.handler>[3],
     );
     await stepInto.handler(
       {params: {}},
       response as unknown as Parameters<typeof stepInto.handler>[1],
       context as unknown as Parameters<typeof stepInto.handler>[2],
-      runtime as unknown as Parameters<typeof stepInto.handler>[3],
     );
     await stepOut.handler(
       {params: {}},
       response as unknown as Parameters<typeof stepOut.handler>[1],
       context as unknown as Parameters<typeof stepOut.handler>[2],
-      runtime as unknown as Parameters<typeof stepOut.handler>[3],
     );
 
     context.debuggerContext.isPaused = () => false;
@@ -508,7 +490,6 @@ describe('debugger tools extended', () => {
       {params: {}},
       response as unknown as Parameters<typeof pause.handler>[1],
       context as unknown as Parameters<typeof pause.handler>[2],
-      runtime as unknown as Parameters<typeof pause.handler>[3],
     );
 
     assert.ok(response.lines.some(x => x.includes('Execution Paused')));
@@ -564,20 +545,16 @@ describe('debugger tools extended', () => {
       {params: {text: 'targetFn', occurrence: 1, condition: 'a>0'}},
       response as unknown as Parameters<typeof setBreakpointOnText.handler>[1],
       context as unknown as Parameters<typeof setBreakpointOnText.handler>[2],
-      runtime as unknown as Parameters<typeof setBreakpointOnText.handler>[3],
     );
     await traceFunction.handler(
       {
         params: {
-          functionName: 'targetFn',
+          target: 'targetFn',
           logArgs: true,
-          logThis: true,
-          pause: false,
         },
       },
       response as unknown as Parameters<typeof traceFunction.handler>[1],
       context as unknown as Parameters<typeof traceFunction.handler>[2],
-      runtime as unknown as Parameters<typeof traceFunction.handler>[3],
     );
 
     assert.ok(
@@ -659,7 +636,6 @@ describe('debugger tools extended', () => {
           typeof getRequestInitiator.handler
         >[1],
         context as unknown as Parameters<typeof getRequestInitiator.handler>[2],
-        runtime as unknown as Parameters<typeof getRequestInitiator.handler>[3],
       );
       await monitorEvents.handler(
         {
@@ -672,12 +648,11 @@ describe('debugger tools extended', () => {
         } as unknown as Parameters<typeof monitorEvents.handler>[0],
         response as unknown as Parameters<typeof monitorEvents.handler>[1],
         context as unknown as Parameters<typeof monitorEvents.handler>[2],
-        runtime as unknown as Parameters<typeof monitorEvents.handler>[3],
       );
       await traceFunction.handler(
         {
           params: {
-            functionName: 'targetFn',
+            target: 'targetFn',
             pause: false,
             logArgs: true,
             logThis: false,
@@ -686,7 +661,6 @@ describe('debugger tools extended', () => {
         } as unknown as Parameters<typeof traceFunction.handler>[0],
         response as unknown as Parameters<typeof traceFunction.handler>[1],
         context as unknown as Parameters<typeof traceFunction.handler>[2],
-        runtime as unknown as Parameters<typeof traceFunction.handler>[3],
       );
 
       const evidenceLog = (
@@ -780,19 +754,25 @@ describe('debugger tools extended', () => {
       },
       response as unknown as Parameters<typeof hookFunction.handler>[1],
       context as unknown as Parameters<typeof hookFunction.handler>[2],
-      runtime as unknown as Parameters<typeof hookFunction.handler>[3],
+    );
+    await hookFunction.handler(
+      {
+        params: {
+          target: 'console.log',
+        },
+      },
+      response as unknown as Parameters<typeof hookFunction.handler>[1],
+      context as unknown as Parameters<typeof hookFunction.handler>[2],
     );
     await listHooks.handler(
       {params: {}},
       response as unknown as Parameters<typeof listHooks.handler>[1],
       context as unknown as Parameters<typeof listHooks.handler>[2],
-      runtime as unknown as Parameters<typeof listHooks.handler>[3],
     );
     await unhookFunction.handler(
       {params: {hookId: 'h1'}},
       response as unknown as Parameters<typeof unhookFunction.handler>[1],
       context as unknown as Parameters<typeof unhookFunction.handler>[2],
-      runtime as unknown as Parameters<typeof unhookFunction.handler>[3],
     );
     await inspectObject.handler(
       {
@@ -805,13 +785,11 @@ describe('debugger tools extended', () => {
       },
       response as unknown as Parameters<typeof inspectObject.handler>[1],
       context as unknown as Parameters<typeof inspectObject.handler>[2],
-      runtime as unknown as Parameters<typeof inspectObject.handler>[3],
     );
     await getStorage.handler(
       {params: {type: 'all', filter: 'tok'}},
       response as unknown as Parameters<typeof getStorage.handler>[1],
       context as unknown as Parameters<typeof getStorage.handler>[2],
-      runtime as unknown as Parameters<typeof getStorage.handler>[3],
     );
     await monitorEvents.handler(
       {
@@ -823,13 +801,11 @@ describe('debugger tools extended', () => {
       },
       response as unknown as Parameters<typeof monitorEvents.handler>[1],
       context as unknown as Parameters<typeof monitorEvents.handler>[2],
-      runtime as unknown as Parameters<typeof monitorEvents.handler>[3],
     );
     await stopMonitor.handler(
       {params: {monitorId: 'm1'}},
       response as unknown as Parameters<typeof stopMonitor.handler>[1],
       context as unknown as Parameters<typeof stopMonitor.handler>[2],
-      runtime as unknown as Parameters<typeof stopMonitor.handler>[3],
     );
 
     assert.ok(
@@ -880,19 +856,16 @@ describe('debugger tools extended', () => {
       {params: {}},
       response as unknown as Parameters<typeof listFrames.handler>[1],
       context as unknown as Parameters<typeof listFrames.handler>[2],
-      runtime as unknown as Parameters<typeof listFrames.handler>[3],
     );
     await selectFrame.handler(
       {params: {frameIdx: 1}},
       response as unknown as Parameters<typeof selectFrame.handler>[1],
       context as unknown as Parameters<typeof selectFrame.handler>[2],
-      runtime as unknown as Parameters<typeof selectFrame.handler>[3],
     );
     await selectFrame.handler(
       {params: {frameIdx: 0}},
       response as unknown as Parameters<typeof selectFrame.handler>[1],
       context as unknown as Parameters<typeof selectFrame.handler>[2],
-      runtime as unknown as Parameters<typeof selectFrame.handler>[3],
     );
 
     assert.ok(response.lines.some(line => line.includes('Frames (2 total)')));
@@ -928,13 +901,11 @@ describe('debugger tools extended', () => {
       {params: {url: '/api'}},
       response as unknown as Parameters<typeof breakOnXhr.handler>[1],
       context as unknown as Parameters<typeof breakOnXhr.handler>[2],
-      runtime as unknown as Parameters<typeof breakOnXhr.handler>[3],
     );
     await removeXhrBreakpoint.handler(
       {params: {url: '/api'}},
       response as unknown as Parameters<typeof removeXhrBreakpoint.handler>[1],
       context as unknown as Parameters<typeof removeXhrBreakpoint.handler>[2],
-      runtime as unknown as Parameters<typeof removeXhrBreakpoint.handler>[3],
     );
     assert.ok(response.lines.some(x => x.includes('XHR breakpoint set')));
     assert.ok(response.lines.some(x => x.includes('XHR breakpoint removed')));
@@ -1004,10 +975,9 @@ describe('debugger tools extended', () => {
     });
 
     await xhrToJsBreakpoint.handler(
-      {params: {urlPattern: '/api/data', maxWaitMs: 5000}},
+      {params: {url: '/api/data'}},
       response as unknown as Parameters<typeof xhrToJsBreakpoint.handler>[1],
       context as unknown as Parameters<typeof xhrToJsBreakpoint.handler>[2],
-      runtime as unknown as Parameters<typeof xhrToJsBreakpoint.handler>[3],
     );
 
     assert.ok(xhrBreakpointSet, 'XHR breakpoint should be set');

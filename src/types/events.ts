@@ -55,8 +55,13 @@ export const appEventSchemas = {
     code: z.string(),
     message: z.string(),
   }),
-} satisfies {
-  [K in keyof AppEventMap]: z.ZodType<AppEventMap[K]>;
+} satisfies Record<keyof AppEventMap, z.ZodTypeAny>;
+
+// 编译期静态校验：确保 appEventSchemas 推导出的 Output 类型与 AppEventMap 完全一致
+type AssertEqual<T, U> = T extends U ? (U extends T ? true : never) : never;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type VerifyEventSchemas = {
+  [K in keyof AppEventMap]: AssertEqual<z.output<typeof appEventSchemas[K]>, AppEventMap[K]>;
 };
 
 export const appEventValidators = Object.fromEntries(

@@ -4,11 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {defineTool} from '../ToolDefinition.js';
 import {zod} from '../../third_party/index.js';
-import {ToolCategory} from '../categories.js';
-
 import type {ToolContextProvider} from '../../worker/ToolContextProvider.js';
+import {ToolCategory} from '../categories.js';
+import {defineTool} from '../ToolDefinition.js';
 
 /**
  * 定位视频到指定时间点（defineTool 版本）。
@@ -37,14 +36,13 @@ export const seekVideo = defineTool({
     try {
       const page = await runtime.getActivePage();
       await page.evaluate(
-        (sel, t) => {
+        ({sel, t}) => {
           const video = document.querySelector(sel) as HTMLVideoElement;
           if (video) {
             video.currentTime = t;
           }
         },
-        request.params.selector,
-        request.params.time,
+        {sel: request.params.selector, t: request.params.time},
       );
 
       response.setStructuredContent({

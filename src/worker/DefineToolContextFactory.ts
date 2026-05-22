@@ -5,8 +5,8 @@
  */
 
 import type {TrafficSummary} from '../formatters/websocketFormatter.js';
-import type {TraceResult} from '../trace-processing/parse.js';
 import type {Context} from '../tools/ToolDefinition.js';
+import type {TraceResult} from '../trace-processing/parse.js';
 
 import type {ToolContextProvider} from './ToolContextProvider.js';
 import {wrapFrameWithTimeout} from './ToolExecutionRouter.js';

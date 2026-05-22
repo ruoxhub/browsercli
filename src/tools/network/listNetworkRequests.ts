@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {defineTool} from '../ToolDefinition.js';
-import {zod} from '../../third_party/index.js';
-import {ToolCategory} from '../categories.js';
 import {getRuntime} from '../../runtime.js';
-import {resolveActivePageIndex} from '../shared/activePageResolver.js';
+import {zod} from '../../third_party/index.js';
 import type {HTTPRequest, ResourceType} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
+import {resolveActivePageIndex} from '../shared/activePageResolver.js';
+import {defineTool} from '../ToolDefinition.js';
+
 import type {
   ListNetworkRequestsData,
   ListNetworkRequestsParams,

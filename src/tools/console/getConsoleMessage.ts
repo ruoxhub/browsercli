@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {AggregatedIssue} from '../../third_party/index.js';
-import {defineTool} from '../ToolDefinition.js';
-import {ToolCategory} from '../categories.js';
 import {getRuntime} from '../../runtime.js';
+import type {AggregatedIssue} from '../../third_party/index.js';
 import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
+import {defineTool} from '../ToolDefinition.js';
 
 import type {
   ConsoleMessageEntry,
@@ -40,12 +40,13 @@ export const getConsoleMessage = defineTool({
       const consoleMessage = getRuntime().contextProvider!.getConsoleMessageById(request.params.msgid);
       const consoleMessageStableId = request.params.msgid;
 
-      if ('args' in message) {
-        message = consoleMessage.text()
+      if (!(consoleMessage instanceof Error) && typeof (consoleMessage as any).args === 'function') {
+        const msg = consoleMessage as any;
+        message = msg.text();
         data = {
           consoleMessageStableId,
           args: await Promise.all(
-            consoleMessage.args().map(async arg => {
+            msg.args().map(async (arg: any) => {
               const remoteObj = arg.remoteObject();
               const value = remoteObj.value;
               const stringArg =
@@ -58,21 +59,20 @@ export const getConsoleMessage = defineTool({
             }),
           ),
         };
-      } else if (isAggregatedIssue(message)) {
-        const issue = message as unknown as AggregatedIssue;
-        message: issue.title?.() ?? issue.code() ?? '<unknown error>',
+      } else if (isAggregatedIssue(consoleMessage)) {
+        const issue = consoleMessage as unknown as AggregatedIssue;
+        message = issue.title?.() ?? issue.code() ?? '<unknown error>';
         data = {
           consoleMessageStableId,
           args: [],
         };
       } else {
+        const err = consoleMessage as Error;
+        message = err.message ?? '<unknown error>';
         data = {
           consoleMessageStableId,
           type: 'error',
-          message: String(
-            (message as unknown as Record<string, unknown>).message ??
-              '<unknown error>',
-          ),
+          message: String(err.message ?? '<unknown error>'),
           args: [],
         };
       }
@@ -90,14 +90,14 @@ export const getConsoleMessage = defineTool({
         type: 'error',
         message: `Error: ${error instanceof Error ? error.message : String(error)}`,
         args: [],
-      }
+      };
       const responseData = {
           success: true,
           message: `Console message retrieved error`,
           tooltype: 'get_console_message',
           data: data
       };
-      response.setStructuredContent(responseData)
+      response.setStructuredContent(responseData);
     }
   },
 });

@@ -1,6 +1,6 @@
 # 工具选择决策指南
 
-按逆向场景推荐工具组合，避免在 161 个工具中迷失。
+按逆向场景推荐工具组合，避免在 156 个工具中迷失。
 
 ## 场景 1：定位签名/加密参数
 
@@ -98,14 +98,6 @@ anti_anti_debug
 6. **离线执行**：`wasm_offline_run --inputPath <path> --functionName <name>`
 7. **内存检查**：`wasm_memory_inspect`
 8. **运行时追踪**：`wasm_vmp_trace`
-
-## 场景 7：Vue.js 应用逆向
-
-**目标**：分析 Vue 单页应用的路由/状态。
-
-1. **启用 DevTools**：`activate_vue_devtools`
-2. **获取路由**：`get_vue_routes --includeChildren true`
-3. **清除守卫**：`clear_vue_guards`（绕过路由拦截）
 
 ## 通用原则
 

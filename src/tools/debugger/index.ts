@@ -4,12 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {ToolContextProvider} from '../../worker/ToolContextProvider.js';
-
-import {defineTool} from '../ToolDefinition.js';
-import {zod} from '../../third_party/index.js';
-import {ToolCategory} from '../categories.js';
 import {PackerDeobfuscator} from '../../modules/deobfuscator/PackerDeobfuscator.js';
+import {zod} from '../../third_party/index.js';
+import type {ToolContextProvider} from '../../worker/ToolContextProvider.js';
+import type {ToolCategory} from '../categories.js';
+import {defineTool} from '../ToolDefinition.js';
 
 // ─── 子模块工具导出（defineTool 格式）─────────────────────
 

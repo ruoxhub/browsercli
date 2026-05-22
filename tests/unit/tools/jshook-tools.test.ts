@@ -8,42 +8,39 @@ import {describe, it} from 'node:test';
 
 import {zod} from '../../../src/third_party/index.js';
 import {
-  analyzeTarget,
+  analyze_target,
   riskPanel,
   summarizeCode,
-  exportSessionReport,
-} from '../../../src/tools/analyzer.js';
-import {collectCode, collectionDiff} from '../../../src/tools/collector.js';
-import {queryDom} from '../../../src/tools/dom.js';
+  export_session_report,
+} from '../../../src/tools/analyzer/index.js';
+import {collectCode, collectionDiff} from '../../../src/tools/collector/index.js';
+import {queryDom} from '../../../src/tools/dom/index.js';
 import {
   createHook,
   getHookData,
   listCreatedHooks,
   removeHook,
-} from '../../../src/tools/hook.js';
-import {hookConsoleLog} from '../../../src/tools/hook/hookConsoleLog.js';
-import {hookConsoleTable} from '../../../src/tools/hook/hookConsoleTable.js';
-import {hookLocationHref} from '../../../src/tools/hook/hookLocationHref.js';
-import {hookCookie} from '../../../src/tools/hook/hookCookie.js';
-import {hookXhrOpen} from '../../../src/tools/hook/hookXhrOpen.js';
-import {hookXhrSetRequestHeader} from '../../../src/tools/hook/hookXhrSetRequestHeader.js';
-import {hookFetch} from '../../../src/tools/hook/hookFetch.js';
-import {hookJsonParse} from '../../../src/tools/hook/hookJsonParse.js';
-import {hookJsonStringify} from '../../../src/tools/hook/hookJsonStringify.js';
-import {hookPromise} from '../../../src/tools/hook/hookPromise.js';
-import {hookRandom} from '../../../src/tools/hook/hookRandom.js';
-import {hookLocalStorage} from '../../../src/tools/hook/hookLocalStorage.js';
-import {hookSessionStorage} from '../../../src/tools/hook/hookSessionStorage.js';
-import {antiAntiHook} from '../../../src/tools/hook/antiAntiHook.js';
-import {hookWebSocket} from '../../../src/tools/hook/hookWebSocket.js';
-import {hookHistory} from '../../../src/tools/hook/hookHistory.js';
-import {hookPerformanceNow} from '../../../src/tools/hook/hookPerformanceNow.js';
-import {hookDateNow} from '../../../src/tools/hook/hookDateNow.js';
-import {fixedWindowSize} from '../../../src/tools/hook/fixedWindowSize.js';
-import {hookConsoleProtect} from '../../../src/tools/hook/hookConsoleProtect.js';
-import {clearVueGuards} from '../../../src/tools/vue/clearVueGuards.js';
-import {getVueRoutes} from '../../../src/tools/vue/getVueRoutes.js';
-import {activateVueDevtools} from '../../../src/tools/vue/activateVueDevtools.js';
+  hookConsoleLog,
+  hookConsoleTable,
+  hookLocationHref,
+  hookCookie,
+  hookXhrOpen,
+  hookXhrSetRequestHeader,
+  hookFetch,
+  hookJsonParse,
+  hookJsonStringify,
+  hookPromise,
+  hookRandom,
+  hookLocalStorage,
+  hookSessionStorage,
+  antiAntiHook,
+  hookWebSocket,
+  hookHistory,
+  hookPerformanceNow,
+  hookDateNow,
+  fixedWindowSize,
+  hookConsoleProtect,
+} from '../../../src/tools/hook/index.js';
 import {
   clickElement,
   checkBrowserHealth,
@@ -53,8 +50,8 @@ import {
   loadSessionState,
   restoreSessionState,
   saveSessionState,
-} from '../../../src/tools/page.js';
-import {injectStealth} from '../../../src/tools/stealth.js';
+} from '../../../src/tools/page/index.js';
+import {injectStealth} from '../../../src/tools/stealth/index.js';
 
 describe('jshook tools schema', () => {
   it('validates collect_code schema', () => {
@@ -89,8 +86,8 @@ describe('jshook tools schema', () => {
 
   it('validates risk_panel and export_session_report schemas', () => {
     const riskSchema = zod.object(riskPanel.schema);
-    const analyzeSchema = zod.object(analyzeTarget.schema);
-    const reportSchema = zod.object(exportSessionReport.schema);
+    const analyzeSchema = zod.object(analyze_target.schema);
+    const reportSchema = zod.object(export_session_report.schema);
 
     const risk = riskSchema.parse({code: 'md5(x)', includeHookSignals: true});
     const workflow = analyzeSchema.parse({
@@ -400,38 +397,5 @@ describe('jshook tools schema', () => {
       protectedMethods: ['log', 'warn'],
     });
     assert.deepStrictEqual(protectCustom.protectedMethods, ['log', 'warn']);
-  });
-
-  it('validates Vue tools schemas', () => {
-    // clear_vue_guards
-    const clearGuardsSchema = zod.object(clearVueGuards.schema);
-    const clearGuardsDefault = clearGuardsSchema.parse({});
-    assert.deepStrictEqual(clearGuardsDefault.guards, undefined);
-    const clearGuardsSpecific = clearGuardsSchema.parse({
-      guards: ['beforeEach', 'afterEach'],
-    });
-    assert.deepStrictEqual(clearGuardsSpecific.guards, [
-      'beforeEach',
-      'afterEach',
-    ]);
-    const clearGuardsAll = clearGuardsSchema.parse({guards: ['all']});
-    assert.deepStrictEqual(clearGuardsAll.guards, ['all']);
-
-    // get_vue_routes
-    const routesSchema = zod.object(getVueRoutes.schema);
-    const routesDefault = routesSchema.parse({});
-    assert.strictEqual(routesDefault.includeChildren, true);
-    assert.strictEqual(routesDefault.maxDepth, 3);
-    const routesCustom = routesSchema.parse({
-      includeChildren: false,
-      maxDepth: 5,
-    });
-    assert.strictEqual(routesCustom.includeChildren, false);
-    assert.strictEqual(routesCustom.maxDepth, 5);
-
-    // activate_vue_devtools
-    const vueDevtoolsSchema = zod.object(activateVueDevtools.schema);
-    const vueDevtoolsDefault = vueDevtoolsSchema.parse({});
-    assert.deepStrictEqual(vueDevtoolsDefault, {});
   });
 });

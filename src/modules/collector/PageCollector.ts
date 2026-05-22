@@ -14,8 +14,8 @@ import type {
   CDPSession,
   ConsoleMessage,
   Protocol,
-  Target,
   Browser,
+  BrowserContext,
   Frame,
   Handler,
   HTTPRequest,
@@ -111,7 +111,7 @@ export class PageCollector<T> {
   ) => ListenerMap<PageEvents>;
   #listeners = new WeakMap<Page, ListenerMap>();
   #maxNavigationSaved = 3;
-  #includeAllPages?: boolean;
+
 
   /**
    * This maps a Page to a list of navigations with a sub-list
@@ -119,47 +119,67 @@ export class PageCollector<T> {
    * The newer navigations come first.
    */
   protected storage = new WeakMap<Page, Array<Array<WithSymbolId<T>>>>();
+  #idGenerators = new WeakMap<Page, () => number>();
+  #contexts = new Set<BrowserContext>();
 
   constructor(
     browser: Browser,
     listeners: (collector: (item: T) => void) => ListenerMap<PageEvents>,
-    includeAllPages?: boolean,
+    _includeAllPages?: boolean,
   ) {
     this.#browser = browser;
     this.#listenersInitializer = listeners;
-    this.#includeAllPages = includeAllPages;
+
   }
 
   async init() {
-    const pages = await this.#browser.pages(this.#includeAllPages);
-    for (const page of pages) {
-      this.addPage(page);
+    for (const context of this.#browser.contexts()) {
+      this.#setupContext(context);
+      const pages = await context.pages();
+      for (const page of pages) {
+        this.addPage(page);
+      }
     }
 
-    this.#browser.on('targetcreated', this.#onTargetCreated);
-    this.#browser.on('targetdestroyed', this.#onTargetDestroyed);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    this.#browser.on('context' as any, this.#onContextCreated as any);
   }
 
   dispose() {
-    this.#browser.off('targetcreated', this.#onTargetCreated);
-    this.#browser.off('targetdestroyed', this.#onTargetDestroyed);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    this.#browser.off('context' as any, this.#onContextCreated as any);
+    for (const context of this.#contexts) {
+      context.off('page', this.#onPageCreated);
+    }
+    this.#contexts.clear();
   }
 
-  #onTargetCreated = async (target: Target) => {
-    const page = await target.page();
-    if (!page) {
+  #onContextCreated = (context: BrowserContext) => {
+    this.#setupContext(context);
+  };
+
+  #setupContext(context: BrowserContext) {
+    if (this.#contexts.has(context)) {
       return;
     }
+    this.#contexts.add(context);
+    context.on('page', this.#onPageCreated);
+  }
+
+  #onPageCreated = (page: Page) => {
     this.addPage(page);
   };
 
-  #onTargetDestroyed = async (target: Target) => {
-    const page = await target.page();
-    if (!page) {
-      return;
+  public collect(page: Page, value: T) {
+    const withId = value as WithSymbolId<T>;
+    const idGen = this.#idGenerators.get(page);
+    if (idGen && withId[stableIdSymbol] === undefined) {
+      withId[stableIdSymbol] = idGen();
     }
-    this.cleanupPageDestroyed(page);
-  };
+
+    const navigations = this.storage.get(page) ?? [[]];
+    navigations[0].push(withId);
+  }
 
   public addPage(page: Page) {
     this.#initializePage(page);
@@ -170,15 +190,12 @@ export class PageCollector<T> {
       return;
     }
     const idGenerator = createIdGenerator();
+    this.#idGenerators.set(page, idGenerator);
     const storedLists: Array<Array<WithSymbolId<T>>> = [[]];
     this.storage.set(page, storedLists);
 
     const listeners = this.#listenersInitializer(value => {
-      const withId = value as WithSymbolId<T>;
-      withId[stableIdSymbol] = idGenerator();
-
-      const navigations = this.storage.get(page) ?? [[]];
-      navigations[0].push(withId);
+      this.collect(page, value);
     });
 
     listeners['framenavigated'] = (frame: Frame) => {
@@ -190,11 +207,18 @@ export class PageCollector<T> {
     };
 
     for (const [name, listener] of Object.entries(listeners)) {
-      page.on(name, listener as Handler<unknown>);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      page.on(name as any, listener as Handler<unknown>);
     }
+
+    page.on('close', this.#onPageClosed);
 
     this.#listeners.set(page, listeners);
   }
+
+  #onPageClosed = (page: Page) => {
+    this.cleanupPageDestroyed(page);
+  };
 
   protected splitAfterNavigation(page: Page) {
     const navigations = this.storage.get(page);
@@ -207,13 +231,16 @@ export class PageCollector<T> {
   }
 
   protected cleanupPageDestroyed(page: Page) {
+    page.off('close', this.#onPageClosed);
     const listeners = this.#listeners.get(page);
     if (listeners) {
       for (const [name, listener] of Object.entries(listeners)) {
-        page.off(name, listener as Handler<unknown>);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        page.off(name as any, listener as Handler<unknown>);
       }
     }
     this.storage.delete(page);
+    this.#idGenerators.delete(page);
   }
 
   getData(page: Page, includePreservedData?: boolean): T[] {
@@ -284,7 +311,9 @@ export class ConsoleCollector extends PageCollector<
       return;
     }
     if (!this.#subscribedPages.has(page)) {
-      const subscriber = new PageIssueSubscriber(page);
+      const subscriber = new PageIssueSubscriber(page, (issue) => {
+        this.collect(page, issue);
+      });
       this.#subscribedPages.set(page, subscriber);
       void subscriber.subscribe();
     }
@@ -304,9 +333,11 @@ class PageIssueSubscriber {
   #seenIssues = new Set<AggregatedIssue>();
   #page: Page;
   #session: CDPSession;
+  #onIssue: (issue: AggregatedIssue) => void;
 
-  constructor(page: Page) {
+  constructor(page: Page, onIssue: (issue: AggregatedIssue) => void) {
     this.#page = page;
+    this.#onIssue = onIssue;
     // @ts-expect-error use existing CDP client (internal Puppeteer API).
     this.#session = this.#page._client() as CDPSession;
     // 懒初始化 IssueAggregator，避免循环依赖
@@ -363,7 +394,7 @@ class PageIssueSubscriber {
       return;
     }
     this.#seenIssues.add(event.data);
-    this.#page.emit('issue', event.data);
+    this.#onIssue(event.data);
   };
 
   // On navigation, we reset issue aggregation.

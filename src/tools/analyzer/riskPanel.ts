@@ -4,11 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {zod} from '../../third_party/index.js';
 import {getRuntime} from '../../runtime.js';
+import {zod} from '../../third_party/index.js';
+import {ToolCategory} from '../categories.js';
 import {withOperationTimeout} from '../shared/browserRuntime.js';
 import {defineTool} from '../ToolDefinition.js';
-import {ToolCategory} from '../categories.js';
+
 import type {RiskPanelResult, RiskPanelData} from './types.js';
 
 export const riskPanel = defineTool({

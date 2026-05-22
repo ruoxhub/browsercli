@@ -1283,27 +1283,6 @@ js-reverse call hook_smcrypto
 js-reverse call hook_smcrypto --algorithms '["SM2","SM4"]'
 ```
 
-### Vue DevTools
-
-|                         | 工具名            | 说明                                    | 示例 |
-| ----------------------- | ----------------- | --------------------------------------- | ---- |
-| `activate_vue_devtools` | 激活 Vue DevTools | `js-reverse call activate_vue_devtools` |
-| `clear_vue_guards`      | 清除 Vue 路由守卫 | `js-reverse call clear_vue_guards`      |
-| `get_vue_routes`        | 获取 Vue 路由信息 | `js-reverse call get_vue_routes`        |
-
-**示例：**
-
-```bash
-# 激活 Vue DevTools
-js-reverse call activate_vue_devtools
-
-# 清除路由守卫
-js-reverse call clear_vue_guards
-
-# 获取路由信息
-js-reverse call get_vue_routes
-```
-
 ### 会话状态
 
 |                         | 工具名             | 说明                                                                             | 示例 |

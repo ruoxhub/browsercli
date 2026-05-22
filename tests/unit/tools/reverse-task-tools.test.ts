@@ -12,11 +12,11 @@ import {describe, it, after} from 'node:test';
 
 import {ReverseTaskStore} from '../../../src/reverse/ReverseTaskStore.js';
 import {
-  analyzeTarget,
-  recordReverseEvidence,
-} from '../../../src/tools/analyzer.js';
-import {getHookData} from '../../../src/tools/hook.js';
-import {getJSHookRuntime} from '../../../src/tools/runtime.js';
+  analyze_target,
+  record_reverse_evidence,
+} from '../../../src/tools/analyzer/index.js';
+import {getHookData} from '../../../src/tools/hook/index.js';
+import {getRuntime} from '../../../src/runtime.js';
 import type {
   CollectCodeResult,
   DetectCryptoResult,
@@ -53,7 +53,7 @@ describe('reverse task tools', () => {
     const rootDir = await mkdtemp(
       path.join(tmpdir(), 'js-reverse-task-mirror-'),
     );
-    const runtime = getJSHookRuntime();
+    const runtime = getRuntime();
     const originalStore = runtime.reverseTaskStore;
 
     runtime.reverseTaskStore = new ReverseTaskStore({rootDir});
@@ -73,7 +73,7 @@ describe('reverse task tools', () => {
       );
 
       const networkResponse = makeResponse();
-      await recordReverseEvidence.handler(
+      await record_reverse_evidence.handler(
         {
           params: {
             taskId: 'task-mirror',
@@ -97,16 +97,15 @@ describe('reverse task tools', () => {
               note: 'captured request',
             },
           },
-        } as Parameters<typeof recordReverseEvidence.handler>[0],
+        } as Parameters<typeof record_reverse_evidence.handler>[0],
         networkResponse as unknown as Parameters<
-          typeof recordReverseEvidence.handler
+          typeof record_reverse_evidence.handler
         >[1],
-        {} as Parameters<typeof recordReverseEvidence.handler>[2],
-        runtime,
+        {} as Parameters<typeof record_reverse_evidence.handler>[2],
       );
 
       const scriptResponse = makeResponse();
-      await recordReverseEvidence.handler(
+      await record_reverse_evidence.handler(
         {
           params: {
             taskId: 'task-mirror',
@@ -123,12 +122,11 @@ describe('reverse task tools', () => {
               note: 'candidate sign chain',
             },
           },
-        } as Parameters<typeof recordReverseEvidence.handler>[0],
+        } as Parameters<typeof record_reverse_evidence.handler>[0],
         scriptResponse as unknown as Parameters<
-          typeof recordReverseEvidence.handler
+          typeof record_reverse_evidence.handler
         >[1],
-        {} as Parameters<typeof recordReverseEvidence.handler>[2],
-        runtime,
+        {} as Parameters<typeof record_reverse_evidence.handler>[2],
       );
 
       const network = (
@@ -166,7 +164,7 @@ describe('reverse task tools', () => {
     const rootDir = await mkdtemp(
       path.join(tmpdir(), 'js-reverse-task-tools-'),
     );
-    const runtime = getJSHookRuntime();
+    const runtime = getRuntime();
     const originals = {
       reverseTaskStore: runtime.reverseTaskStore,
       collectorCollect: runtime.collector.collect,
@@ -257,7 +255,7 @@ describe('reverse task tools', () => {
 
     try {
       const recordResponse = makeResponse();
-      await recordReverseEvidence.handler(
+      await record_reverse_evidence.handler(
         {
           params: {
             taskId: 'task-001',
@@ -274,12 +272,11 @@ describe('reverse task tools', () => {
               note: 'captured sign parameters',
             },
           },
-        } as Parameters<typeof recordReverseEvidence.handler>[0],
+        } as Parameters<typeof record_reverse_evidence.handler>[0],
         recordResponse as unknown as Parameters<
-          typeof recordReverseEvidence.handler
+          typeof record_reverse_evidence.handler
         >[1],
-        {} as Parameters<typeof recordReverseEvidence.handler>[2],
-        runtime,
+        {} as Parameters<typeof record_reverse_evidence.handler>[2],
       );
 
       const recorded = (
@@ -315,19 +312,18 @@ describe('reverse task tools', () => {
       });
 
       const analyzeResponse = makeResponse();
-      await analyzeTarget.handler(
+      await analyze_target.handler(
         {
           params: {
             url: 'https://example.com',
             hookPreset: 'api-signature',
             autoInjectHooks: false,
           },
-        } as Parameters<typeof analyzeTarget.handler>[0],
+        } as Parameters<typeof analyze_target.handler>[0],
         analyzeResponse as unknown as Parameters<
-          typeof analyzeTarget.handler
+          typeof analyze_target.handler
         >[1],
-        {} as Parameters<typeof analyzeTarget.handler>[2],
-        runtime,
+        {} as Parameters<typeof analyze_target.handler>[2],
       );
       const analyzeJson = extractFirstJsonBlock(analyzeResponse.lines);
       assert.ok(Array.isArray(analyzeJson.recommendedNextSteps));
@@ -345,7 +341,6 @@ describe('reverse task tools', () => {
         } as Parameters<typeof getHookData.handler>[0],
         hookResponse as unknown as Parameters<typeof getHookData.handler>[1],
         {} as Parameters<typeof getHookData.handler>[2],
-        runtime,
       );
       const hookJson = extractFirstJsonBlock(hookResponse.lines);
       assert.ok(Array.isArray(hookJson.candidateEnvNeeds));

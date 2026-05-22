@@ -318,11 +318,32 @@ describe('ToolExecutionPipeline', () => {
         success: true,
         startedAt: '2026-05-21T00:00:00.000Z',
         durationMs: 5,
+        input: {value: 'ok'},
         request: {value: 'ok'},
         response: {structuredContent: {value: 'ok'}},
       });
     } finally {
       rmSync(outputDir, {force: true, recursive: true});
     }
+  });
+
+  it('records tool call input in pipeline records', async () => {
+    const recorder: TestResultRecorder = {
+      records: [],
+      record(record: unknown) {
+        this.records.push(record);
+      },
+    };
+    const {pipeline} = createPipeline({
+      result: {value: 'ok'},
+      recorder,
+    });
+
+    await pipeline.execute(meta(), {value: 'ok'});
+
+    assert.deepStrictEqual(
+      (recorder.records[0] as Record<string, unknown>).input,
+      {value: 'ok'},
+    );
   });
 });

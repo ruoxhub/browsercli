@@ -5,7 +5,27 @@
  */
 
 import type {AggregatedIssue} from '../../third_party/index.js';
-import type {ConsoleMessageType} from '../../third_party/index.js';
+
+export type ConsoleMessageType = 
+  | 'log'
+  | 'debug'
+  | 'info'
+  | 'error'
+  | 'warn'
+  | 'dir'
+  | 'dirxml'
+  | 'table'
+  | 'trace'
+  | 'clear'
+  | 'startGroup'
+  | 'startGroupCollapsed'
+  | 'endGroup'
+  | 'assert'
+  | 'profile'
+  | 'profileEnd'
+  | 'count'
+  | 'timeEnd'
+  | 'verbose';
 
 /** Console 响应类型（兼容 puppeteer ConsoleMessageType + issue） */
 export type ConsoleResponseType = ConsoleMessageType | 'issue';

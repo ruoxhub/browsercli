@@ -9,27 +9,27 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {describe, it} from 'node:test';
 
-import {parseArgs} from '../../src/bin/scaffold.js';
+import {parseArgs, getFlag} from '../../src/cli/args-parser.js';
 
 describe('Scaffold parseArgs', () => {
   it('parses name argument', () => {
     const result = parseArgs(['--name', 'test-task']);
-    assert.strictEqual(result.name, 'test-task');
+    assert.strictEqual(getFlag(result, 'name'), 'test-task');
   });
 
   it('parses description argument', () => {
     const result = parseArgs(['--desc', '测试任务描述']);
-    assert.strictEqual(result.description, '测试任务描述');
+    assert.strictEqual(getFlag(result, 'desc'), '测试任务描述');
   });
 
   it('parses url argument', () => {
     const result = parseArgs(['--url', 'https://example.com']);
-    assert.strictEqual(result.targetUrl, 'https://example.com');
+    assert.strictEqual(getFlag(result, 'url'), 'https://example.com');
   });
 
   it('parses output argument', () => {
     const result = parseArgs(['--output', 'custom/path']);
-    assert.strictEqual(result.outputPath, 'custom/path');
+    assert.strictEqual(getFlag(result, 'output'), 'custom/path');
   });
 
   it('parses multiple arguments', () => {
@@ -39,26 +39,15 @@ describe('Scaffold parseArgs', () => {
       '--url', 'https://test.com',
       '--output', 'my/output',
     ]);
-    assert.strictEqual(result.name, 'my-task');
-    assert.strictEqual(result.description, 'My Description');
-    assert.strictEqual(result.targetUrl, 'https://test.com');
-    assert.strictEqual(result.outputPath, 'my/output');
+    assert.strictEqual(getFlag(result, 'name'), 'my-task');
+    assert.strictEqual(getFlag(result, 'desc'), 'My Description');
+    assert.strictEqual(getFlag(result, 'url'), 'https://test.com');
+    assert.strictEqual(getFlag(result, 'output'), 'my/output');
   });
 
-  it('handles short form -h', () => {
-    let exited = false;
-    const originalExit = process.exit;
-    process.exit = (() => { exited = true; }) as never;
-
-    parseArgs(['--help']);
-    assert.ok(exited);
-
-    process.exit = originalExit;
-  });
-
-  it('returns empty object for no args', () => {
+  it('returns empty flags for no args', () => {
     const result = parseArgs([]);
-    assert.deepStrictEqual(result, {});
+    assert.deepStrictEqual(result.flags, {});
   });
 });
 

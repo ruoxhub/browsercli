@@ -7,59 +7,56 @@
 import fs from 'node:fs';
 
 import {cliOptions} from '../build/src/cli.js';
-import * as analyzerTools from '../build/src/tools/analyzer.js';
+import * as analyzerTools from '../build/src/tools/analyzer/index.js';
 import * as antiDebugTools from '../build/src/tools/anti-debug/antiAntiDebug.js';
 import * as bypassDebuggerTools from '../build/src/tools/anti-debug/bypassDebugger.js';
 import {ToolCategory, labels} from '../build/src/tools/categories.js';
-import * as codeTemplateTools from '../build/src/tools/code-templates.js';
-import * as collectorTools from '../build/src/tools/collector.js';
-import * as consoleTools from '../build/src/tools/console.js';
+import * as codeTemplateTools from '../build/src/tools/code-templates/index.js';
+import * as collectorTools from '../build/src/tools/collector/index.js';
+import * as consoleTools from '../build/src/tools/console/index.js';
 import * as hookCryptoJS from '../build/src/tools/crypto/hookCryptoJS.js';
 import * as hookJSEncrypt from '../build/src/tools/crypto/hookJSEncrypt.js';
 import * as hookSMCrypto from '../build/src/tools/crypto/hookSMCrypto.js';
-import * as debuggerTools from '../build/src/tools/debugger.js';
-import * as dialogTools from '../build/src/tools/dialog.js';
-import * as domTools from '../build/src/tools/dom.js';
-import * as emulationTools from '../build/src/tools/emulation.js';
-import * as extensionsTools from '../build/src/tools/extensions.js';
-import * as framesTools from '../build/src/tools/frames.js';
+import * as debuggerTools from '../build/src/tools/debugger/index.js';
+import * as dialogTools from '../build/src/tools/dialog/index.js';
+import * as domTools from '../build/src/tools/dom/index.js';
+import * as emulationTools from '../build/src/tools/emulation/index.js';
+import * as extensionsTools from '../build/src/tools/extensions/index.js';
+import * as framesTools from '../build/src/tools/frames/index.js';
 import * as hookAntiAntiHook from '../build/src/tools/hook/antiAntiHook.js';
+import * as hookConsoleLog from '../build/src/tools/hook/ConsoleLog.js';
+import * as hookConsoleProtect from '../build/src/tools/hook/ConsoleProtect.js';
+import * as hookConsoleTable from '../build/src/tools/hook/ConsoleTable.js';
+import * as hookCookie from '../build/src/tools/hook/Cookie.js';
+import * as hookDateNow from '../build/src/tools/hook/DateNow.js';
+import * as hookFetch from '../build/src/tools/hook/Fetch.js';
 import * as hookFixedWindowSize from '../build/src/tools/hook/fixedWindowSize.js';
-import * as hookConsoleLog from '../build/src/tools/hook/hookConsoleLog.js';
-import * as hookConsoleProtect from '../build/src/tools/hook/hookConsoleProtect.js';
-import * as hookConsoleTable from '../build/src/tools/hook/hookConsoleTable.js';
-import * as hookCookie from '../build/src/tools/hook/hookCookie.js';
-import * as hookDateNow from '../build/src/tools/hook/hookDateNow.js';
-import * as hookFetch from '../build/src/tools/hook/hookFetch.js';
-import * as hookHistory from '../build/src/tools/hook/hookHistory.js';
-import * as hookJsonParse from '../build/src/tools/hook/hookJsonParse.js';
-import * as hookJsonStringify from '../build/src/tools/hook/hookJsonStringify.js';
-import * as hookLocalStorage from '../build/src/tools/hook/hookLocalStorage.js';
-import * as hookLocationHref from '../build/src/tools/hook/hookLocationHref.js';
-import * as hookPerformanceNow from '../build/src/tools/hook/hookPerformanceNow.js';
-import * as hookPromise from '../build/src/tools/hook/hookPromise.js';
-import * as hookRandom from '../build/src/tools/hook/hookRandom.js';
-import * as hookSessionStorage from '../build/src/tools/hook/hookSessionStorage.js';
-import * as hookWebSocket from '../build/src/tools/hook/hookWebSocket.js';
-import * as hookXhrOpen from '../build/src/tools/hook/hookXhrOpen.js';
-import * as hookXhrSetRequestHeader from '../build/src/tools/hook/hookXhrSetRequestHeader.js';
-import * as hookTools from '../build/src/tools/hook.js';
-import * as inputTools from '../build/src/tools/input.js';
-import * as networkTools from '../build/src/tools/network.js';
-import * as pageTools from '../build/src/tools/page.js';
-import * as pagesTools from '../build/src/tools/pages.js';
-import * as performanceTools from '../build/src/tools/performance.js';
-import * as rebuildTools from '../build/src/tools/rebuild.js';
-import * as screenshotTools from '../build/src/tools/screenshot.js';
-import * as scriptTools from '../build/src/tools/script.js';
-import * as siteExperienceTools from '../build/src/tools/siteExperience.js';
-import * as skillTools from '../build/src/tools/skill.js';
-import * as stealthTools from '../build/src/tools/stealth.js';
-import * as vJsTools from '../build/src/tools/v-jstools.js';
-import * as vueDevtoolsTools from '../build/src/tools/vue/activateVueDevtools.js';
-import * as vueClearGuardTools from '../build/src/tools/vue/clearVueGuards.js';
-import * as vueRouteTools from '../build/src/tools/vue/getVueRoutes.js';
-import * as websocketTools from '../build/src/tools/websocket/index.js';
+import * as hookHistory from '../build/src/tools/hook/History.js';
+import * as hookTools from '../build/src/tools/hook/index.js';
+import * as hookJsonParse from '../build/src/tools/hook/JsonParse.js';
+import * as hookJsonStringify from '../build/src/tools/hook/JsonStringify.js';
+import * as hookLocalStorage from '../build/src/tools/hook/LocalStorage.js';
+import * as hookLocationHref from '../build/src/tools/hook/LocationHref.js';
+import * as hookPerformanceNow from '../build/src/tools/hook/PerformanceNow.js';
+import * as hookPromise from '../build/src/tools/hook/Promise.js';
+import * as hookRandom from '../build/src/tools/hook/Random.js';
+import * as hookSessionStorage from '../build/src/tools/hook/SessionStorage.js';
+import * as hookWebSocket from '../build/src/tools/hook/WebSocket.js';
+import * as hookXhrOpen from '../build/src/tools/hook/XhrOpen.js';
+import * as hookXhrSetRequestHeader from '../build/src/tools/hook/XhrSetRequestHeader.js';
+import * as inputTools from '../build/src/tools/input/index.js';
+import * as navigationTools from '../build/src/tools/navigation/index.js';
+import * as networkTools from '../build/src/tools/network/index.js';
+import * as pageTools from '../build/src/tools/page/index.js';
+import * as performanceTools from '../build/src/tools/performance/index.js';
+import * as pipelineTools from '../build/src/tools/pipeline/index.js';
+import * as rebuildTools from '../build/src/tools/rebuild/index.js';
+import * as screenshotTools from '../build/src/tools/screenshot/index.js';
+import * as scriptTools from '../build/src/tools/script/index.js';
+import * as siteExperienceTools from '../build/src/tools/site-experience/index.js';
+import * as stealthTools from '../build/src/tools/stealth/index.js';
+import * as wasmTools from '../build/src/tools/wasm/index.js';
+import * as workflowTools from '../build/src/tools/workflow/index.js';
 
 const OUTPUT_PATH = './docs/reference/tool-reference.md';
 const README_PATH = './README.md';
@@ -110,21 +107,18 @@ function allTools(): ToolDef[] {
     ...Object.values(hookXhrOpen),
     ...Object.values(hookXhrSetRequestHeader),
     ...Object.values(inputTools),
+    ...Object.values(navigationTools),
     ...Object.values(networkTools),
     ...Object.values(pageTools),
-    ...Object.values(pagesTools),
     ...Object.values(performanceTools),
+    ...Object.values(pipelineTools),
     ...Object.values(rebuildTools),
     ...Object.values(screenshotTools),
     ...Object.values(scriptTools),
     ...Object.values(siteExperienceTools),
-    ...Object.values(skillTools),
     ...Object.values(stealthTools),
-    ...Object.values(vJsTools),
-    ...Object.values(vueDevtoolsTools),
-    ...Object.values(vueClearGuardTools),
-    ...Object.values(vueRouteTools),
-    ...Object.values(websocketTools),
+    ...Object.values(wasmTools),
+    ...Object.values(workflowTools),
   ] as ToolDef[];
 }
 
