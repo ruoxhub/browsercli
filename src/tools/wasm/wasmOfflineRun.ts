@@ -29,14 +29,7 @@ function runCommand(
   });
 }
 
-function appendJson(
-  response: {appendResponseLine(value: string): void},
-  value: unknown,
-): void {
-  response.appendResponseLine('```json');
-  response.appendResponseLine(JSON.stringify(value, null, 2));
-  response.appendResponseLine('```');
-}
+
 
 export const wasmOfflineRun = defineTool({
   name: 'wasm_offline_run',
@@ -89,7 +82,7 @@ export const wasmOfflineRun = defineTool({
           [inputPath, '--invoke', functionName, ...args],
           timeoutMs,
         );
-        appendJson(response, {
+        response.setStructuredContent({
           success: wasmerResult.exitCode === 0,
           message: wasmerResult.exitCode === 0
             ? `wasmer 执行成功（${durationMs}ms）`
@@ -107,7 +100,7 @@ export const wasmOfflineRun = defineTool({
         return;
       }
 
-      appendJson(response, {
+      response.setStructuredContent({
         success: result.exitCode === 0,
         message: result.exitCode === 0
           ? `${cmd} 执行成功（${durationMs}ms）`
@@ -123,7 +116,7 @@ export const wasmOfflineRun = defineTool({
         },
       });
     } catch (error) {
-      appendJson(response, {
+      response.setStructuredContent({
         success: false,
         message: `离线执行 WASM 失败：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'wasm_offline_run',

@@ -9,14 +9,7 @@ import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
-function appendJson(
-  response: {appendResponseLine(value: string): void},
-  value: unknown,
-): void {
-  response.appendResponseLine('```json');
-  response.appendResponseLine(JSON.stringify(value, null, 2));
-  response.appendResponseLine('```');
-}
+
 
 export const wasmVmpTrace = defineTool({
   name: 'wasm_vmp_trace',
@@ -46,7 +39,7 @@ export const wasmVmpTrace = defineTool({
         })
         .slice(0, maxEvents);
 
-      appendJson(response, {
+      response.setStructuredContent({
         success: true,
         message: `捕获到 ${filtered.length} 个运行时事件（共 ${allEvents.length} 个，${modules.length} 个模块）`,
         tooltype: 'wasm_vmp_trace',
@@ -59,7 +52,7 @@ export const wasmVmpTrace = defineTool({
         },
       });
     } catch (error) {
-      appendJson(response, {
+      response.setStructuredContent({
         success: false,
         message: `获取 VMP trace 失败：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'wasm_vmp_trace',

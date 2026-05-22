@@ -11,14 +11,6 @@ import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
-function appendJson(
-  response: {appendResponseLine(value: string): void},
-  value: unknown,
-): void {
-  response.appendResponseLine('```json');
-  response.appendResponseLine(JSON.stringify(value, null, 2));
-  response.appendResponseLine('```');
-}
 
 export const wasmDisassemble = defineTool({
   name: 'wasm_disassemble',
@@ -47,7 +39,7 @@ export const wasmDisassemble = defineTool({
         await writeFile(outputPath, decompiled.wat, 'utf-8');
       }
 
-      appendJson(response, {
+      response.setStructuredContent({
         success: true,
         message: `反汇编完成：${decompiled.functionCount} 个函数，${decompiled.lineCount} 行 WAT`,
         tooltype: 'wasm_disassemble',
@@ -59,7 +51,7 @@ export const wasmDisassemble = defineTool({
         },
       });
     } catch (error) {
-      appendJson(response, {
+      response.setStructuredContent({
         success: false,
         message: `WASM 反汇编失败：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'wasm_disassemble',

@@ -11,14 +11,6 @@ import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
-function appendJson(
-  response: {appendResponseLine(value: string): void},
-  value: unknown,
-): void {
-  response.appendResponseLine('```json');
-  response.appendResponseLine(JSON.stringify(value, null, 2));
-  response.appendResponseLine('```');
-}
 
 export const wasmDecompile = defineTool({
   name: 'wasm_decompile',
@@ -55,7 +47,7 @@ export const wasmDecompile = defineTool({
         ? `${decompiled.wat.slice(0, maxWatChars)}\n;; ... truncated ...`
         : decompiled.wat;
 
-      appendJson(response, {
+      response.setStructuredContent({
         success: true,
         message: `反编译完成：${decompiled.functionCount} 个函数，${decompiled.exportCount} 个导出`,
         tooltype: 'wasm_decompile',
@@ -70,7 +62,7 @@ export const wasmDecompile = defineTool({
         },
       });
     } catch (error) {
-      appendJson(response, {
+      response.setStructuredContent({
         success: false,
         message: `WASM 反编译失败：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'wasm_decompile',

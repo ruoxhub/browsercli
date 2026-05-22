@@ -12,14 +12,6 @@ import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
-function appendJson(
-  response: {appendResponseLine(value: string): void},
-  value: unknown,
-): void {
-  response.appendResponseLine('```json');
-  response.appendResponseLine(JSON.stringify(value, null, 2));
-  response.appendResponseLine('```');
-}
 
 export const wasmDump = defineTool({
   name: 'wasm_dump',
@@ -40,7 +32,7 @@ export const wasmDump = defineTool({
       const modules = runtime.wasmCollector.getModules();
 
       if (modules.length === 0) {
-        appendJson(response, {
+        response.setStructuredContent({
           success: false,
           message: '当前会话未捕获任何 WASM 模块，请先使用 collect_wasm 捕获',
           tooltype: 'wasm_dump',
@@ -49,7 +41,7 @@ export const wasmDump = defineTool({
       }
 
       if (moduleIndex < 0 || moduleIndex >= modules.length) {
-        appendJson(response, {
+        response.setStructuredContent({
           success: false,
           message: `模块索引 ${moduleIndex} 超出范围（共 ${modules.length} 个模块）`,
           tooltype: 'wasm_dump',
@@ -61,7 +53,7 @@ export const wasmDump = defineTool({
       const bytes = runtime.wasmCollector.getModuleBytes(module.id);
 
       if (!bytes) {
-        appendJson(response, {
+        response.setStructuredContent({
           success: false,
           message: `模块 ${module.id} 的二进制数据不可用`,
           tooltype: 'wasm_dump',
@@ -74,7 +66,7 @@ export const wasmDump = defineTool({
 
       await writeFile(outputPath, bytes);
 
-      appendJson(response, {
+      response.setStructuredContent({
         success: true,
         message: `已导出模块 ${module.id}（${bytes.byteLength} 字节）到 ${outputPath}`,
         tooltype: 'wasm_dump',
@@ -88,7 +80,7 @@ export const wasmDump = defineTool({
         },
       });
     } catch (error) {
-      appendJson(response, {
+      response.setStructuredContent({
         success: false,
         message: `导出 WASM 模块失败：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'wasm_dump',

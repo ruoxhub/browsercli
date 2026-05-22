@@ -11,14 +11,6 @@ import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
-function appendJson(
-  response: {appendResponseLine(value: string): void},
-  value: unknown,
-): void {
-  response.appendResponseLine('```json');
-  response.appendResponseLine(JSON.stringify(value, null, 2));
-  response.appendResponseLine('```');
-}
 
 export const wasmInspectSections = defineTool({
   name: 'wasm_inspect_sections',
@@ -60,7 +52,7 @@ export const wasmInspectSections = defineTool({
         maxSummaryLines,
       });
 
-      appendJson(response, {
+      response.setStructuredContent({
         success: true,
         message: `分析完成：${analysis.sections.length} 个 section，${analysis.functionCount} 个函数，${analysis.importFunctionCount} 个导入，${analysis.exportFunctionCount} 个导出`,
         tooltype: 'wasm_inspect_sections',
@@ -71,7 +63,7 @@ export const wasmInspectSections = defineTool({
         },
       });
     } catch (error) {
-      appendJson(response, {
+      response.setStructuredContent({
         success: false,
         message: `WASM section 检查失败：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'wasm_inspect_sections',

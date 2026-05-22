@@ -24,14 +24,6 @@ function probeNativeTool(name: string, flag: string): Promise<NativeToolInfo> {
   });
 }
 
-function appendJson(
-  response: {appendResponseLine(value: string): void},
-  value: unknown,
-): void {
-  response.appendResponseLine('```json');
-  response.appendResponseLine(JSON.stringify(value, null, 2));
-  response.appendResponseLine('```');
-}
 
 export const wasmCapabilities = defineTool({
   name: 'wasm_capabilities',
@@ -54,7 +46,7 @@ export const wasmCapabilities = defineTool({
       const modules = runtime.wasmCollector.getModules();
       const events = runtime.wasmCollector.getRuntimeEvents();
 
-      appendJson(response, {
+      response.setStructuredContent({
         success: true,
         message: `检测完成：${modules.length} 个模块，${events.length} 个运行时事件`,
         tooltype: 'wasm_capabilities',
@@ -69,7 +61,7 @@ export const wasmCapabilities = defineTool({
         } satisfies WasmCapabilitiesData,
       });
     } catch (error) {
-      appendJson(response, {
+      response.setStructuredContent({
         success: false,
         message: `检测 WASM 能力失败：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'wasm_capabilities',

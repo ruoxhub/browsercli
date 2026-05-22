@@ -26,14 +26,7 @@ function runCommand(
   });
 }
 
-function appendJson(
-  response: {appendResponseLine(value: string): void},
-  value: unknown,
-): void {
-  response.appendResponseLine('```json');
-  response.appendResponseLine(JSON.stringify(value, null, 2));
-  response.appendResponseLine('```');
-}
+
 
 export const wasmOptimize = defineTool({
   name: 'wasm_optimize',
@@ -59,7 +52,7 @@ export const wasmOptimize = defineTool({
       const result = await runCommand('wasm-opt', args);
 
       if (result.exitCode !== 0) {
-        appendJson(response, {
+        response.setStructuredContent({
           success: false,
           message: `wasm-opt 优化失败：${result.stderr.slice(0, 500)}`,
           tooltype: 'wasm_optimize',
@@ -72,7 +65,7 @@ export const wasmOptimize = defineTool({
         ? Math.round((1 - optimizedStats.size / originalStats.size) * 100)
         : 0;
 
-      appendJson(response, {
+      response.setStructuredContent({
         success: true,
         message: `优化完成（${level}）：${originalStats.size} → ${optimizedStats.size} 字节（${reduction > 0 ? '-' : '+'}${Math.abs(reduction)}%）`,
         tooltype: 'wasm_optimize',
@@ -89,7 +82,7 @@ export const wasmOptimize = defineTool({
         },
       });
     } catch (error) {
-      appendJson(response, {
+      response.setStructuredContent({
         success: false,
         message: `WASM 优化失败：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'wasm_optimize',

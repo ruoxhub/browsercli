@@ -8,14 +8,7 @@ import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 
-function appendJson(
-  response: {appendResponseLine(value: string): void},
-  value: unknown,
-): void {
-  response.appendResponseLine('```json');
-  response.appendResponseLine(JSON.stringify(value, null, 2));
-  response.appendResponseLine('```');
-}
+
 
 export const wasmMemoryInspect = defineTool({
   name: 'wasm_memory_inspect',
@@ -41,7 +34,7 @@ export const wasmMemoryInspect = defineTool({
     try {
       const page = context.getSelectedPage();
       if (!page) {
-        appendJson(response, {
+        response.setStructuredContent({
           success: false,
           message: '没有选中的页面，请先选择一个页面',
           tooltype: 'wasm_memory_inspect',
@@ -155,7 +148,7 @@ export const wasmMemoryInspect = defineTool({
       );
 
       if (!result.found) {
-        appendJson(response, {
+        response.setStructuredContent({
           success: false,
           message: '当前页面未找到导出的 WebAssembly.Memory',
           tooltype: 'wasm_memory_inspect',
@@ -163,7 +156,7 @@ export const wasmMemoryInspect = defineTool({
         return;
       }
 
-      appendJson(response, {
+      response.setStructuredContent({
         success: true,
         message: `检查了 ${(result as {memorySize: number}).memorySize} 字节内存（${(result as {memories: string[]}).memories.join(', ')}）`,
         tooltype: 'wasm_memory_inspect',
@@ -178,7 +171,7 @@ export const wasmMemoryInspect = defineTool({
         },
       });
     } catch (error) {
-      appendJson(response, {
+      response.setStructuredContent({
         success: false,
         message: `检查 WASM 内存失败：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'wasm_memory_inspect',

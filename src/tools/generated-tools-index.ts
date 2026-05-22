@@ -11,12 +11,14 @@ import {manifest as antiDebugManifest} from './anti-debug/manifest.js';
 import {manifest as codeTemplatesManifest} from './code-templates/manifest.js';
 import {manifest as collectorManifest} from './collector/manifest.js';
 import {manifest as consoleManifest} from './console/manifest.js';
+import {manifest as cryptoManifest} from './crypto/manifest.js';
 import {manifest as debuggerManifest} from './debugger/manifest.js';
 import {manifest as dialogManifest} from './dialog/manifest.js';
 import {manifest as domManifest} from './dom/manifest.js';
 import {manifest as emulationManifest} from './emulation/manifest.js';
 import {manifest as extensionsManifest} from './extensions/manifest.js';
 import {manifest as framesManifest} from './frames/manifest.js';
+import {manifest as hookManifest} from './hook/manifest.js';
 import {manifest as inputManifest} from './input/manifest.js';
 import {manifest as metaManifest} from './meta/manifest.js';
 import {manifest as navigationManifest} from './navigation/manifest.js';
@@ -38,12 +40,14 @@ export const GENERATED_DOMAIN_MANIFESTS = [
   codeTemplatesManifest,
   collectorManifest,
   consoleManifest,
+  cryptoManifest,
   debuggerManifest,
   dialogManifest,
   domManifest,
   emulationManifest,
   extensionsManifest,
   framesManifest,
+  hookManifest,
   inputManifest,
   metaManifest,
   navigationManifest,
@@ -132,6 +136,18 @@ export const GENERATED_TOOL_REGISTRY = [
   {
     modulePath: './console/getConsoleMessage.js',
     handlerName: 'getConsoleMessage',
+  },
+  {
+    modulePath: './crypto/hookCryptoJS.js',
+    handlerName: 'hookCryptoJS',
+  },
+  {
+    modulePath: './crypto/hookJSEncrypt.js',
+    handlerName: 'hookJSEncrypt',
+  },
+  {
+    modulePath: './crypto/hookSMCrypto.js',
+    handlerName: 'hookSMCrypto',
   },
   {
     modulePath: './debugger/index.js',
@@ -300,6 +316,30 @@ export const GENERATED_TOOL_REGISTRY = [
   {
     modulePath: './frames/selectFrame.js',
     handlerName: 'selectFrame',
+  },
+  {
+    modulePath: './hook/CreateHook.js',
+    handlerName: 'createHook',
+  },
+  {
+    modulePath: './hook/InjectHook.js',
+    handlerName: 'injectHook',
+  },
+  {
+    modulePath: './hook/InjectHook.js',
+    handlerName: 'listPersistentHooks',
+  },
+  {
+    modulePath: './hook/GetHookData.js',
+    handlerName: 'getHookData',
+  },
+  {
+    modulePath: './hook/RemoveHook.js',
+    handlerName: 'removeHook',
+  },
+  {
+    modulePath: './hook/ListCreatedHooks.js',
+    handlerName: 'listCreatedHooks',
   },
   {
     modulePath: './input/click.js',
