@@ -9,6 +9,7 @@ import type {DomainManifest} from '../manifest.js';
 export const manifest = {
   name: 'analyzer',
   description: 'Static and AI-assisted JavaScript analysis tools.',
+  profile: 'workflow',
   tools: [
     {modulePath: './analyzer/deobfuscate.js', handlerName: 'deobfuscateCode'},
     {modulePath: './analyzer/understand.js', handlerName: 'understandCode'},

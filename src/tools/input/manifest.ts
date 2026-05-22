@@ -9,6 +9,7 @@ import type {DomainManifest} from '../manifest.js';
 export const manifest = {
   name: 'input',
   description: 'User input simulation tools.',
+  profile: 'workflow',
   tools: [
     {modulePath: './input/click.js', handlerName: 'click'},
     {modulePath: './input/pressKey.js', handlerName: 'pressKey'},

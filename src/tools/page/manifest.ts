@@ -9,6 +9,7 @@ import type {DomainManifest} from '../manifest.js';
 export const manifest = {
   name: 'page',
   description: 'Page interaction and state tools.',
+  profile: 'workflow',
   tools: [
     {modulePath: './page/clickElement.js', handlerName: 'clickElement'},
     {modulePath: './page/typeText.js', handlerName: 'typeText'},

@@ -9,6 +9,7 @@ import type {DomainManifest} from '../manifest.js';
 export const manifest = {
   name: 'frames',
   description: 'Frame listing and selection tools.',
+  profile: 'workflow',
   tools: [
     {modulePath: './frames/listFrames.js', handlerName: 'listFrames'},
     {modulePath: './frames/selectFrame.js', handlerName: 'selectFrame'},

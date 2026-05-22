@@ -9,6 +9,7 @@ import type {DomainManifest} from '../manifest.js';
 export const manifest = {
   name: 'collector',
   description: 'Code and script collection tools.',
+  profile: 'workflow',
   tools: [
     {modulePath: './collector/collectCode.js', handlerName: 'collectCode'},
     {modulePath: './collector/collectionDiff.js', handlerName: 'collectionDiff'},

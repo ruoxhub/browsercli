@@ -9,6 +9,7 @@ import type {DomainManifest} from '../manifest.js';
 export const manifest = {
   name: 'dom',
   description: 'DOM inspection and querying tools.',
+  profile: 'workflow',
   tools: [
     {modulePath: './dom/queryDom.js', handlerName: 'queryDom'},
     {modulePath: './dom/getDomStructure.js', handlerName: 'getDomStructure'},

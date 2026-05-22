@@ -9,6 +9,7 @@ import type {DomainManifest} from '../manifest.js';
 export const manifest = {
   name: 'navigation',
   description: 'Browser page navigation tools.',
+  profile: 'workflow',
   tools: [
     {modulePath: './navigation/listPages.js', handlerName: 'listPages'},
     {modulePath: './navigation/selectPage.js', handlerName: 'selectPage'},

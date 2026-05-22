@@ -9,6 +9,7 @@ import type {DomainManifest} from '../manifest.js';
 export const manifest = {
   name: 'workflow',
   description: 'High-level reverse engineering workflow tools.',
+  profile: 'workflow',
   prerequisites: {
     observeFlow: [
       {condition: 'requiresPage', fix: 'Start or attach a browser page first.'},

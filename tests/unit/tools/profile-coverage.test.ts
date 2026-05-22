@@ -8,12 +8,13 @@ import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {GENERATED_DOMAIN_MANIFESTS} from '../../../src/tools/generated-tools-index.js';
+import type {DomainManifest} from '../../../src/tools/manifest.js';
+
+const manifests: readonly DomainManifest[] = GENERATED_DOMAIN_MANIFESTS;
 
 describe('Profile coverage', () => {
   it('every domain manifest declares an explicit profile', () => {
-    const missing = GENERATED_DOMAIN_MANIFESTS.filter(m => !m.profile).map(
-      m => m.name,
-    );
+    const missing = manifests.filter(m => !m.profile).map(m => m.name);
 
     assert.deepStrictEqual(
       missing,
@@ -23,7 +24,7 @@ describe('Profile coverage', () => {
   });
 
   it('search profile yields at least one tool (meta domain present)', () => {
-    const searchTools = GENERATED_DOMAIN_MANIFESTS.flatMap(manifest =>
+    const searchTools = manifests.flatMap(manifest =>
       manifest.tools.filter(
         tool => (tool.profile ?? manifest.profile) === 'search',
       ),

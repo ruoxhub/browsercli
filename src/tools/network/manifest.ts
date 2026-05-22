@@ -9,6 +9,7 @@ import type {DomainManifest} from '../manifest.js';
 export const manifest = {
   name: 'network',
   description: 'Network and WebSocket inspection tools.',
+  profile: 'workflow',
   tools: [
     {modulePath: './network/listNetworkRequests.js', handlerName: 'listNetworkRequests'},
     {modulePath: './network/getNetworkRequest.js', handlerName: 'getNetworkRequest'},
