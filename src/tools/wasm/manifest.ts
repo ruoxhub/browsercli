@@ -9,6 +9,7 @@ import type {DomainManifest} from '../manifest.js';
 export const manifest = {
   name: 'wasm',
   description: 'WebAssembly reverse engineering tools.',
+  profile: 'full',
   tools: [
     {modulePath: './wasm/index.js', handlerName: 'wasmCapabilities'},
     {modulePath: './wasm/index.js', handlerName: 'wasmDump'},

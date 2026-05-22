@@ -9,6 +9,7 @@ import type {DomainManifest} from '../manifest.js';
 export const manifest = {
   name: 'debugger',
   description: 'Debugger protocol inspection and breakpoint tools.',
+  profile: 'full',
   prerequisites: {
     setBreakpoint: [
       {condition: 'requiresPage', fix: 'Start or attach a browser page first.'},

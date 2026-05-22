@@ -9,6 +9,7 @@ import type {DomainManifest} from '../manifest.js';
 export const manifest = {
   name: 'emulation',
   description: 'Device, CPU, network, and viewport emulation tools.',
+  profile: 'full',
   tools: [
     {modulePath: './emulation/emulateMobile.js', handlerName: 'emulateMobile'},
     {modulePath: './emulation/emulateNetwork.js', handlerName: 'emulateNetwork'},

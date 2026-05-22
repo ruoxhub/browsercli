@@ -9,6 +9,7 @@ import type {DomainManifest} from '../manifest.js';
 export const manifest = {
   name: 'performance',
   description: 'Performance trace and metrics tools.',
+  profile: 'full',
   tools: [
     {modulePath: './performance/startPerformanceTrace.js', handlerName: 'startPerformanceTrace'},
     {modulePath: './performance/stopPerformanceTrace.js', handlerName: 'stopPerformanceTrace'},

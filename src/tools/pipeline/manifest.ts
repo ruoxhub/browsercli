@@ -9,6 +9,7 @@ import type {DomainManifest} from '../manifest.js';
 export const manifest = {
   name: 'pipeline',
   description: 'Analysis pipeline example tools.',
+  profile: 'full',
   tools: [
     {modulePath: './pipeline/examples.js', handlerName: 'analyzePipeline'},
   ],

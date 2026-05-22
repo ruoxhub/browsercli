@@ -9,6 +9,7 @@ import type {DomainManifest} from '../manifest.js';
 export const manifest = {
   name: 'stealth',
   description: 'Browser stealth and fingerprint tools.',
+  profile: 'full',
   tools: [
     {modulePath: './stealth/stealth.js', handlerName: 'setUserAgent'},
     {modulePath: './stealth/stealth.js', handlerName: 'injectStealth'},
