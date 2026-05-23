@@ -138,6 +138,7 @@
   },
   "optionalDependencies": {
     "@swc/core-linux-x64-gnu": "^1.15.33",
-    "chrome-devtools-frontend": "^1.0.1608868"
+    "chrome-devtools-frontend": "^1.0.1608868",
+    "webcrack": "^2.16.0"
   }
 }
