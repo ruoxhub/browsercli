@@ -58,6 +58,7 @@ import {
   URLEncodeDeobfuscator,
   UniversalUnpacker,
 } from './PackerDeobfuscator.js';
+import {runWebcrack, type WebcrackExecutionResult} from './webcrack.js';
 
 function getStaticNumber(node: t.Node | null | undefined): number | null {
   if (!node) return null;
@@ -151,7 +152,7 @@ export class Deobfuscator {
     const cached = this.resultCache.get(cacheKey);
     if (cached) {
       logger.debug('Deobfuscation result from cache');
-      return cached;
+      return {...cached, cached: true};
     }
 
     logger.info('Starting deobfuscation pipeline...');
@@ -161,6 +162,12 @@ export class Deobfuscator {
     // 最终完整透传给外部 AI，让外部 AI 基于这些信息做更深度的推理
     const pipelineWarnings: string[] = [];
     const pipelineUnresolved: UnresolvedPart[] = [];
+    let pipelineBundle: import('../../types/index.js').DeobfuscateBundleSummary | undefined;
+    let pipelineSavedTo: string | undefined;
+    let pipelineSavedArtifacts:
+      | import('../../types/index.js').DeobfuscateSavedArtifact[]
+      | undefined;
+    let webcrackApplied = false;
 
     try {
       let code = options.code;
@@ -171,6 +178,29 @@ export class Deobfuscator {
       const obfuscationType = this.detectObfuscationType(code);
       logger.info(`Detected obfuscation types: ${obfuscationType.join(', ')}`);
       pipelineWarnings.push(`检测到的混淆类型: ${obfuscationType.join(', ')}`);
+
+      // ── Step 0.5: webcrack 前置 ──
+      if (
+        this.shouldRun(options.webcrack, autoMode, obfuscationType, [
+          'webpack',
+          'javascript-obfuscator',
+          'uglify',
+        ])
+      ) {
+        const wc = await this.runWebcrack(
+          code,
+          options,
+          transformations,
+          pipelineWarnings,
+        );
+        if (wc.applied) {
+          code = wc.code;
+          webcrackApplied = true;
+          pipelineBundle = wc.bundle;
+          pipelineSavedTo = wc.savedTo;
+          pipelineSavedArtifacts = wc.savedArtifacts;
+        }
+      }
 
       // ── Step 1: Packer / AAEncode / URLEncode 自动解包 ──
       if (
@@ -284,6 +314,15 @@ export class Deobfuscator {
         `Deobfuscation completed in ${deobfuscateTime}ms (confidence: ${(confidence * 100).toFixed(1)}%)`,
       );
 
+      const otherTransforms = transformations.filter(
+        t => t.type !== 'webcrack' && t.success,
+      );
+      const engine: 'legacy' | 'webcrack' | 'hybrid' = webcrackApplied
+        ? otherTransforms.length > 0
+          ? 'hybrid'
+          : 'webcrack'
+        : 'legacy';
+
       const result: DeobfuscateResult = {
         code,
         readabilityScore,
@@ -295,6 +334,12 @@ export class Deobfuscator {
         warnings: pipelineWarnings.length > 0 ? pipelineWarnings : undefined,
         unresolvedParts:
           pipelineUnresolved.length > 0 ? pipelineUnresolved : undefined,
+        bundle: pipelineBundle,
+        savedTo: pipelineSavedTo,
+        savedArtifacts: pipelineSavedArtifacts,
+        engine,
+        webcrackApplied,
+        cached: false,
       };
 
       this.cacheResult(cacheKey, result);
@@ -536,6 +581,87 @@ export class Deobfuscator {
     return code;
   }
 
+  /**
+   * webcrack 前置策略：bundle 拆包 + unminify + javascript-obfuscator 反向
+   * 失败/不可用时返回 applied:false，由后续管线兜底
+   */
+  private async runWebcrack(
+    code: string,
+    options: DeobfuscateFullOptions,
+    transformations: Transformation[],
+    pipelineWarnings: string[],
+  ): Promise<WebcrackExecutionResult> {
+    try {
+      logger.info('Running webcrack...');
+      const result = await runWebcrack(code, {
+        unpack: options.unpack,
+        unminify: options.unminify,
+        jsx: options.jsx,
+        mangle: options.mangle ?? options.renameVariables,
+        mappings: options.mappings,
+        outputDir: options.outputDir,
+        forceOutput: options.forceOutput,
+        includeModuleCode: options.includeModuleCode,
+        maxBundleModules: options.maxBundleModules,
+      });
+
+      if (!result.applied) {
+        if (result.reason) {
+          pipelineWarnings.push(`[webcrack] ${result.reason}`);
+        }
+        transformations.push({
+          type: 'webcrack',
+          description: `webcrack skipped: ${result.reason ?? 'unknown reason'}`,
+          success: false,
+        });
+        return result;
+      }
+
+      const detail: Record<string, unknown> = {
+        optionsUsed: result.optionsUsed,
+      };
+      if (result.bundle) {
+        detail.bundle = {
+          type: result.bundle.type,
+          moduleCount: result.bundle.moduleCount,
+          truncated: result.bundle.truncated,
+          mappingsApplied: result.bundle.mappingsApplied,
+        };
+      }
+      if (result.savedTo) detail.savedTo = result.savedTo;
+
+      transformations.push({
+        type: 'webcrack',
+        description:
+          `webcrack applied (unpack=${result.optionsUsed.unpack}, ` +
+          `unminify=${result.optionsUsed.unminify}, ` +
+          `jsx=${result.optionsUsed.jsx}, mangle=${result.optionsUsed.mangle})` +
+          (result.bundle
+            ? ` — recovered ${result.bundle.moduleCount} modules`
+            : ''),
+        success: true,
+        detail,
+      });
+
+      return result;
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      logger.warn('webcrack pipeline error', error);
+      pipelineWarnings.push(`[webcrack] ${reason}`);
+      transformations.push({
+        type: 'webcrack',
+        description: `webcrack pipeline error: ${reason}`,
+        success: false,
+      });
+      return {
+        applied: false,
+        code,
+        optionsUsed: {jsx: true, mangle: false, unminify: true, unpack: true},
+        reason,
+      };
+    }
+  }
+
   // ==================== 检测 ====================
 
   /**
@@ -683,6 +809,24 @@ export class Deobfuscator {
           t.description.includes('dead-code-injection')
         )
           types.add('dead-code-injection');
+
+        if (t.type === 'webcrack') {
+          types.add('webcrack');
+          const detail = t.detail as
+            | {
+                bundle?: {type?: string};
+                optionsUsed?: {
+                  unminify?: boolean;
+                  mangle?: boolean;
+                  jsx?: boolean;
+                };
+              }
+            | undefined;
+          if (detail?.bundle?.type) types.add('bundle-unpack');
+          if (detail?.optionsUsed?.unminify) types.add('unminify');
+          if (detail?.optionsUsed?.mangle) types.add('mangle');
+          if (detail?.optionsUsed?.jsx) types.add('jsx-decompile');
+        }
       }
     }
 
@@ -1696,6 +1840,15 @@ export class Deobfuscator {
       astOptimize: options.astOptimize,
       unpack: options.unpack,
       auto: options.auto,
+      webcrack: options.webcrack,
+      unminify: options.unminify,
+      jsx: options.jsx,
+      mangle: options.mangle,
+      includeModuleCode: options.includeModuleCode,
+      maxBundleModules: options.maxBundleModules,
+      outputDir: options.outputDir,
+      forceOutput: options.forceOutput,
+      mappingsCount: options.mappings?.length ?? 0,
     });
     return crypto.createHash('md5').update(key).digest('hex');
   }
