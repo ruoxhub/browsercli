@@ -127,6 +127,66 @@ export interface DeobfuscateOptions {
   preserveLogic?: boolean; // 保留原始逻辑
   renameVariables?: boolean; // 重命名变量为有意义的名称
   inlineFunctions?: boolean; // 内联简单函数
+
+  /** 显式开关 webcrack 子管线（auto 模式下检测到 webpack/javascript-obfuscator 自动启用） */
+  webcrack?: boolean;
+  /** webcrack: 解 bundle */
+  unpack?: boolean;
+  /** webcrack: 反 minify（变量重命名/控制流恢复等） */
+  unminify?: boolean;
+  /** webcrack: 反 JSX 编译 */
+  jsx?: boolean;
+  /** webcrack: 反 mangle */
+  mangle?: boolean;
+  /** webcrack: 把还原产物写入指定目录（必须在项目根目录内） */
+  outputDir?: string;
+  /** outputDir 已存在时是否先清空 */
+  forceOutput?: boolean;
+  /** bundle 摘要中是否带模块源码 */
+  includeModuleCode?: boolean;
+  /** 摘要中保留的最大模块数，默认 100 */
+  maxBundleModules?: number;
+  /** 把还原后的模块按规则重映射到工程路径 */
+  mappings?: DeobfuscateMappingRule[];
+}
+
+export interface DeobfuscateMappingRule {
+  /** 重映射后的目标路径，如 'src/auth/login.js' */
+  path: string;
+  /** 用于匹配模块的字符串/正则源 */
+  pattern: string;
+  /** 匹配方式，默认 'includes' */
+  matchType?: 'includes' | 'regex' | 'exact';
+  /** 匹配字段，默认 'code' */
+  target?: 'code' | 'path';
+}
+
+export interface DeobfuscateSavedArtifact {
+  path: string;
+  size: number;
+  type: 'file';
+}
+
+export interface DeobfuscateBundleModuleSummary {
+  id: string;
+  path: string;
+  isEntry: boolean;
+  size: number;
+  /** 仅当 includeModuleCode=true 时返回 */
+  code?: string;
+  /** 触发了 mapping 规则时记录原路径 */
+  mappedPathFrom?: string;
+}
+
+export interface DeobfuscateBundleSummary {
+  type: 'webpack' | 'browserify';
+  entryId: string;
+  moduleCount: number;
+  /** moduleCount 超过 maxBundleModules 时为 true */
+  truncated: boolean;
+  /** 应用了多少条 mapping 规则 */
+  mappingsApplied?: number;
+  modules: DeobfuscateBundleModuleSummary[];
 }
 
 export interface DeobfuscateResult {
@@ -148,6 +208,19 @@ export interface DeobfuscateResult {
    * 外部 AI 可据此决定是否进行针对性的二次分析
    */
   unresolvedParts?: UnresolvedPart[];
+
+  /** webcrack 解出的 bundle 摘要（webpack/browserify） */
+  bundle?: DeobfuscateBundleSummary;
+  /** outputDir 落盘路径（绝对路径） */
+  savedTo?: string;
+  /** 落盘的文件清单 */
+  savedArtifacts?: DeobfuscateSavedArtifact[];
+  /** 实际生效的引擎组合 */
+  engine?: 'legacy' | 'webcrack' | 'hybrid';
+  /** webcrack 是否被实际执行（与 engine 区分：webcrack 跳过时为 false） */
+  webcrackApplied?: boolean;
+  /** 本次结果是否来自 LRU 缓存 */
+  cached?: boolean;
 }
 
 export type ObfuscationType =
@@ -171,7 +244,12 @@ export type ObfuscationType =
   | 'jscrambler' // JScrambler商业混淆
   | 'urlencoded' // URL编码混淆
   | 'custom' // 自定义/魔改混淆
-  | 'unknown';
+  | 'unknown'
+  | 'bundle-unpack' // webcrack 拆 webpack/browserify bundle
+  | 'unminify' // webcrack unminify (恢复语义结构)
+  | 'jsx-decompile' // webcrack 反 JSX 编译
+  | 'mangle' // webcrack 反 mangle
+  | 'webcrack'; // webcrack 引擎产出的标记类型
 
 export interface Transformation {
   type: string;
