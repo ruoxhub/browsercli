@@ -7,11 +7,6 @@
 /**
  * RpcClient — Node.js 端 Sekiro 客户端
  *
- * 替代浏览器端 BaseClient，删除所有浏览器绑定：
- * - 无 Chrome Storage 配置加载
- * - 无 window 域名检测
- * - 无 window.postMessage 桥接
- *
  * 职责：管理 Action 注册、WebSocket 生命周期、连接/重连、消息处理
  */
 
@@ -28,7 +23,10 @@ import type {
 /** 默认配置 */
 const DEFAULT_RECONNECT_BASE_DELAY = 2000;
 const DEFAULT_RECONNECT_MAX_DELAY = 30000;
-const DEFAULT_HEARTBEAT_INTERVAL = 30000;
+// 服务端 SetReadDeadline = HeartbeatTimeout/2 = 30s。
+// 心跳间隔必须 << 30s 才能覆盖事件循环抖动 / GC / IO 突发，否则首心跳会被服务端读超时直接 RST（code=1006）。
+// 经验值取 15s：30s 死线一半，留 15s 安全边距。
+const DEFAULT_HEARTBEAT_INTERVAL = 15000;
 const DEFAULT_PONG_TIMEOUT = 10000;
 
 export class RpcClient {
@@ -283,14 +281,6 @@ export class RpcClient {
       this.socket.onerror = (event: WebSocket.ErrorEvent) => {
         this.log(`WebSocket 错误：${event.message || '未知错误'}`);
       };
-
-      // ws 包支持 pong 事件，收到后清除超时计时器
-      this.socket.on('pong', () => {
-        if (this.pongTimeoutTimer) {
-          clearTimeout(this.pongTimeoutTimer);
-          this.pongTimeoutTimer = null;
-        }
-      });
     } catch (e) {
       this.log(`创建连接失败，将自动重连：${e}`);
       this.scheduleReconnect();
@@ -298,28 +288,54 @@ export class RpcClient {
   }
 
   /**
-   * 启动心跳，每次 ping 后设置 pong 超时，超时则主动断开重连
+   * 启动心跳：发送应用层 JSON heartbeat 消息。
+   *
+   * 服务端 SetReadDeadline = HeartbeatTimeout/2 = 30s 内必须收到任意消息，
+   * 且只识别 {type:"heartbeat",...} 这种 JSON 心跳后才会 UpdateActive()。
+   * WebSocket 协议层 ping/pong 不会触发服务端 ReadMessage 返回，无法续命。
+   *
+   * 关键：连接建立后必须立即同步发一次心跳，再启动周期性 setInterval。
+   * 否则首心跳要等 heartbeatInterval 才发出，期间任何抖动都会让服务端读超时关连接。
    */
   private startHeartbeat(): void {
     this.stopHeartbeat();
     if (this.heartbeatInterval <= 0) return;
 
+    // 立即发首条心跳，避免连接建立到首心跳之间被服务端读超时关掉
+    this.sendHeartbeat();
+
     this.heartbeatTimer = setInterval(() => {
-      if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-        try {
-          this.socket.ping();
-          // pong 超时检测：若在 pongTimeout 内未收到 pong，主动断开触发重连
-          this.pongTimeoutTimer = setTimeout(() => {
-            this.log('心跳 pong 超时，主动断开重连', 'warn');
-            this._internalDisconnect();
-            this.isManualDisconnect = false;
-            this.scheduleReconnect();
-          }, this.pongTimeout);
-        } catch {
-          this.log('心跳 ping 发送失败');
-        }
-      }
+      this.sendHeartbeat();
     }, this.heartbeatInterval);
+  }
+
+  /**
+   * 发送一条心跳消息并启动 pong 超时检测
+   */
+  private sendHeartbeat(): void {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+      return;
+    }
+    try {
+      this.socket.send(
+        JSON.stringify({
+          type: 'heartbeat',
+          group: this.config.group,
+          clientId: this.clientId,
+          timestamp: Date.now(),
+        }),
+      );
+      // pong 超时检测：若在 pongTimeout 内未收到任何消息（含心跳响应），主动断开重连
+      if (this.pongTimeoutTimer) clearTimeout(this.pongTimeoutTimer);
+      this.pongTimeoutTimer = setTimeout(() => {
+        this.log('心跳响应超时，主动断开重连', 'warn');
+        this._internalDisconnect();
+        this.isManualDisconnect = false;
+        this.scheduleReconnect();
+      }, this.pongTimeout);
+    } catch (e) {
+      this.log(`心跳发送失败：${e}`, 'warn');
+    }
   }
 
   /**
@@ -399,9 +415,27 @@ export class RpcClient {
       return;
     }
 
+    // 服务端会主动下发的非业务控制消息：heartbeat 响应、error 通知、invoke_response。
+    // 这些消息没有 action，但同样没有 __sekiro_seq__；不能当 RPC 请求回失败响应，
+    // 否则会触发服务端 unknown-type 兜底再次回包，形成"缺少 action ↔ unknown type"无限回环。
+    const msgType = (request as unknown as {type?: string}).type;
+    if (msgType === 'heartbeat' || msgType === 'error' || msgType === 'invoke_response') {
+      // 任意来自服务端的消息都视为"还活着"，清掉 pong 超时计时器
+      if (this.pongTimeoutTimer) {
+        clearTimeout(this.pongTimeoutTimer);
+        this.pongTimeoutTimer = null;
+      }
+      return;
+    }
+
     const seq = request.__sekiro_seq__ || '';
 
     if (!request.action) {
+      // 没有 action 也没有 seq 的消息一定不是合法 RPC 请求，静默丢弃避免回环
+      if (!seq) {
+        this.log(`忽略无 action 且无 seq 的消息：${requestJson}`, 'warn');
+        return;
+      }
       this.sendFailed(seq, '缺少 request 参数 {action}');
       return;
     }

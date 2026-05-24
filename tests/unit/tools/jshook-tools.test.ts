@@ -13,7 +13,10 @@ import {
   summarizeCode,
   export_session_report,
 } from '../../../src/tools/analyzer/index.js';
-import {collectCode, collectionDiff} from '../../../src/tools/collector/index.js';
+import {
+  collectCode,
+  collectionDiff,
+} from '../../../src/tools/collector/index.js';
 import {queryDom} from '../../../src/tools/dom/index.js';
 import {
   createHook,
@@ -153,5 +156,4 @@ describe('jshook tools schema', () => {
     assert.strictEqual(dumped.pretty, false);
     assert.strictEqual(loaded.overwrite, true);
   });
-
 });

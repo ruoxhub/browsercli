@@ -13,6 +13,7 @@ import type {ExecutionContextInfo} from '../debugger/executionContexts.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 
 import {type PreloadPreset, getPreloadPreset} from './preload-presets.js';
+import {checkScriptSyntaxBalance} from './validate-script-syntax.js';
 
 // Default script evaluation timeout in milliseconds (30 seconds)
 const DEFAULT_SCRIPT_TIMEOUT = 30000;
@@ -249,7 +250,15 @@ export const evaluateScript = defineTool({
     'Execute JavaScript on the page; supports page / content-script context, with verbose parameter passthrough',
   annotations: {category: ToolCategory.DEBUGGING, readOnlyHint: false},
   schema: {
-    function: zod.string().describe('JavaScript function code to execute'),
+    function: zod
+      .string()
+      .describe(
+        'A complete, syntactically balanced JavaScript expression that evaluates to a function. ' +
+          '必须是「完整的」函数表达式，括号/大括号/字符串/模板字符串都要闭合，不能传半截定义。' +
+          '示例：`() => 1 + 1`、`async () => await fetch("/api").then(r => r.json())`、' +
+          '`function () { return document.cookie; }`。' +
+          '不要写 `function name() {`（缺 `}`）或 `() => {`（缺 `}`）。',
+      ),
     context: zod
       .enum(['page', 'content-script'])
       .optional()
@@ -278,6 +287,17 @@ export const evaluateScript = defineTool({
       response.setStructuredContent({
         success: false,
         message: 'function 参数不能为空',
+        tooltype: 'evaluate_script',
+        result: '',
+      });
+      return;
+    }
+
+    const syntaxIssue = checkScriptSyntaxBalance(functionCode);
+    if (syntaxIssue) {
+      response.setStructuredContent({
+        success: false,
+        message: `脚本未送入页面执行：${syntaxIssue.reason}。请先补全 function 体后再调用 evaluate_script，不要逐字符重试。`,
         tooltype: 'evaluate_script',
         result: '',
       });

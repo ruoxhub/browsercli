@@ -37,8 +37,8 @@ const IS_WIN = process.platform === 'win32';
 const RUNTIME_DIR = path.join(os.tmpdir(), RUNTIME_DIR_NAME);
 const PID_FILE = path.join(RUNTIME_DIR, 'worker.pid');
 
-/** Worker 启动成功标志行 */
-const WORKER_READY_MARKER = '[Worker] 已启动并连接到 Sekiro Server';
+/** Worker 启动成功标志行 — 必须与 src/index.ts 中的 console.log 严格一致 */
+const WORKER_READY_MARKER = '[Worker] 已启动并连接到 Rpc Server';
 
 export class WorkerManager {
   private workerProcess: ChildProcess | null = null;

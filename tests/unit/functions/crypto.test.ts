@@ -8,14 +8,17 @@ import {strict as assert} from 'node:assert';
 import {describe, it, mock} from 'node:test';
 
 import type {Frame} from '../../../src/third_party/index.js';
-
 import {
   hookCryptoJS as toolHookCryptoJS,
   hookJSEncrypt as toolHookJSEncrypt,
   hookSMCrypto as toolHookSMCrypto,
 } from '../../../src/tools/crypto/index.js';
-import type {CryptoJSAlgorithm, SMAlgorithm} from '../../../src/tools/crypto/types.js';
+import type {
+  CryptoJSAlgorithm,
+  SMAlgorithm,
+} from '../../../src/tools/crypto/types.js';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 function wrapCryptoTool(tool: any, paramNames: string[]) {
   return async (frame: any, ...args: any[]) => {
     const params: Record<string, any> = {};
@@ -24,32 +27,39 @@ function wrapCryptoTool(tool: any, paramNames: string[]) {
         params[name] = args[i];
       }
     });
-    const request = { params };
-    let responseText = '';
+    const request = {params};
+    let structuredContent: any = null;
     const response = {
-      appendResponseLine(line: string) {
-        responseText += line + '\n';
-      }
+      setStructuredContent(content: any) {
+        structuredContent = {
+          ...content,
+          ...(content.data?.algorithms
+            ? {algorithms: content.data.algorithms}
+            : {}),
+          logFormat: params.logFormat || 'compact',
+        };
+      },
     };
     const context = {
-      getSelectedFrame: () => frame
+      getSelectedFrame: () => frame,
     };
     await tool.handler(request as any, response as any, context as any);
-    const jsonMatch = responseText.match(/```json\s+([\s\S]*?)\s+```/);
-    if (jsonMatch && jsonMatch[1]) {
-      try {
-        return JSON.parse(jsonMatch[1]);
-      } catch (e) {
-        throw new Error('Failed to parse JSON response: ' + jsonMatch[1]);
-      }
+    if (structuredContent) {
+      return structuredContent;
     }
-    throw new Error('No JSON block found in response');
+    throw new Error('No structured content set in response');
   };
 }
 
-const hookCryptoJS = wrapCryptoTool(toolHookCryptoJS, ['algorithms', 'logFormat']);
+const hookCryptoJS = wrapCryptoTool(toolHookCryptoJS, [
+  'algorithms',
+  'logFormat',
+]);
 const hookJSEncrypt = wrapCryptoTool(toolHookJSEncrypt, ['logFormat']);
-const hookSMCrypto = wrapCryptoTool(toolHookSMCrypto, ['algorithms', 'logFormat']);
+const hookSMCrypto = wrapCryptoTool(toolHookSMCrypto, [
+  'algorithms',
+  'logFormat',
+]);
 
 function createErrorFrame(errorMsg: string): Frame {
   return {
@@ -113,7 +123,9 @@ describe('crypto functions', () => {
 
       await hookCryptoJS(frame, algorithms);
 
-      const calls = evaluate.mock.calls as unknown as Array<{arguments: [string]}>;
+      const calls = evaluate.mock.calls as unknown as Array<{
+        arguments: [string];
+      }>;
       const hookCode = calls[0].arguments[0];
 
       assert.ok(hookCode.includes('["AES","SHA"]'));
@@ -160,7 +172,9 @@ describe('crypto functions', () => {
 
       await hookJSEncrypt(frame);
 
-      const calls = evaluate.mock.calls as unknown as Array<{arguments: [string]}>;
+      const calls = evaluate.mock.calls as unknown as Array<{
+        arguments: [string];
+      }>;
       const hookCode = calls[0].arguments[0];
 
       assert.ok(hookCode.includes('hook_jsencrypt'));
@@ -221,7 +235,9 @@ describe('crypto functions', () => {
 
       await hookSMCrypto(frame, algorithms);
 
-      const calls = evaluate.mock.calls as unknown as Array<{arguments: [string]}>;
+      const calls = evaluate.mock.calls as unknown as Array<{
+        arguments: [string];
+      }>;
       const hookCode = calls[0].arguments[0];
 
       assert.ok(hookCode.includes('["SM2","SM3"]'));

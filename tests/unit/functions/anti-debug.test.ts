@@ -8,13 +8,16 @@ import {strict as assert} from 'node:assert';
 import {describe, it, mock} from 'node:test';
 
 import type {Frame} from '../../../src/third_party/index.js';
-
 import {
   bypassDebugger as toolBypassDebugger,
   antiAntiDebug as toolAntiAntiDebug,
 } from '../../../src/tools/anti-debug/index.js';
-import type {BypassTarget, AntiAntiDebugFeature} from '../../../src/tools/anti-debug/types.js';
+import type {
+  BypassTarget,
+  AntiAntiDebugFeature,
+} from '../../../src/tools/anti-debug/types.js';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 function wrapAntiDebugTool(tool: any, paramNames: string[]) {
   return async (frame: any, ...args: any[]) => {
     const params: Record<string, any> = {};
@@ -23,26 +26,21 @@ function wrapAntiDebugTool(tool: any, paramNames: string[]) {
         params[name] = args[i];
       }
     });
-    const request = { params };
-    let responseText = '';
+    const request = {params};
+    let structuredContent: any = null;
     const response = {
-      appendResponseLine(line: string) {
-        responseText += line + '\n';
-      }
+      setStructuredContent(content: any) {
+        structuredContent = content;
+      },
     };
     const context = {
-      getSelectedFrame: () => frame
+      getSelectedFrame: () => frame,
     };
     await tool.handler(request as any, response as any, context as any);
-    const jsonMatch = responseText.match(/```json\s+([\s\S]*?)\s+```/);
-    if (jsonMatch && jsonMatch[1]) {
-      try {
-        return JSON.parse(jsonMatch[1]);
-      } catch (e) {
-        throw new Error('Failed to parse JSON response: ' + jsonMatch[1]);
-      }
+    if (structuredContent) {
+      return structuredContent;
     }
-    throw new Error('No JSON block found in response');
+    throw new Error('No structured content set in response');
   };
 }
 
@@ -97,7 +95,10 @@ describe('anti-debug functions', () => {
     it('应该调用 frame.evaluate 并返回成功结果', async () => {
       const evaluate = mock.fn(async () => undefined);
       const frame = {evaluate} as unknown as Frame;
-      const features: AntiAntiDebugFeature[] = ['fixedWindowSize', 'preventClose'];
+      const features: AntiAntiDebugFeature[] = [
+        'fixedWindowSize',
+        'preventClose',
+      ];
 
       const result = await antiAntiDebug(frame, features);
 
