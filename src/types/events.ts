@@ -14,8 +14,18 @@ export interface AppEventMap {
   'network:captured': {requestId: string; url: string; method: string};
   'debugger:paused': {reason: string; scriptId: string};
   'debugger:resumed': Record<string, never>;
-  'tool:called': {name: string; durationMs: number; success: boolean};
-  'tool:error': {name: string; code: string; message: string};
+  'tool:called': {
+    name: string;
+    durationMs: number;
+    success: boolean;
+    traceId: string;
+  };
+  'tool:error': {
+    name: string;
+    code: string;
+    message: string;
+    traceId: string;
+  };
 }
 
 export const appEventSchemas = {
@@ -49,11 +59,13 @@ export const appEventSchemas = {
     name: z.string(),
     durationMs: z.number().finite().nonnegative(),
     success: z.boolean(),
+    traceId: z.string(),
   }),
   'tool:error': z.object({
     name: z.string(),
     code: z.string(),
     message: z.string(),
+    traceId: z.string(),
   }),
 } satisfies Record<keyof AppEventMap, z.ZodTypeAny>;
 

@@ -299,6 +299,7 @@ describe('ToolExecutionPipeline', () => {
 
       recorder.record({
         toolName: 'pipeline_fixture',
+        traceId: 'tr_pipeline_recorder_001',
         success: true,
         startedAt: '2026-05-21T00:00:00.000Z',
         durationMs: 5,
@@ -315,6 +316,7 @@ describe('ToolExecutionPipeline', () => {
       assert.strictEqual(content.length, 1);
       assert.deepStrictEqual(JSON.parse(content[0]!), {
         toolName: 'pipeline_fixture',
+        traceId: 'tr_pipeline_recorder_001',
         success: true,
         startedAt: '2026-05-21T00:00:00.000Z',
         durationMs: 5,

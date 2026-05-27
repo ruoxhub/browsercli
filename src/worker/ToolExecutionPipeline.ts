@@ -30,6 +30,7 @@ export class ToolExecutionPipeline {
 
   async execute(meta: ToolMeta, rawParams: unknown): Promise<unknown> {
     const startedAt = Date.now();
+    const traceId = `tr_${startedAt.toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
     const toolName = meta.name;
     let params: Record<string, unknown> | undefined;
 
@@ -68,9 +69,11 @@ export class ToolExecutionPipeline {
         params,
         response,
         Date.now() - startedAt,
+        traceId,
       );
       this.resultRecorder.record({
         toolName,
+        traceId,
         success: true,
         startedAt: new Date(startedAt).toISOString(),
         durationMs: Date.now() - startedAt,
@@ -88,9 +91,10 @@ export class ToolExecutionPipeline {
               error instanceof Error ? error.message : String(error),
               {toolName},
             );
-      this.telemetry.failure(toolName, toolError, Date.now() - startedAt);
+      this.telemetry.failure(toolName, toolError, Date.now() - startedAt, traceId);
       this.resultRecorder.record({
         toolName,
+        traceId,
         success: false,
         startedAt: new Date(startedAt).toISOString(),
         durationMs: Date.now() - startedAt,

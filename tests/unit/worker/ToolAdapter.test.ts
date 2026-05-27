@@ -183,7 +183,12 @@ describe('ToolAdapter', () => {
 
   it('wrapTool emits tool:error for thrown errors', async () => {
     const provider = new ToolContextProvider();
-    const events: unknown[] = [];
+    const events: Array<{
+      name: string;
+      code: string;
+      message: string;
+      traceId: string;
+    }> = [];
     provider.eventBus.on('tool:error', payload => {
       events.push(payload);
     });
@@ -200,13 +205,20 @@ describe('ToolAdapter', () => {
         error instanceof ToolError && error.code === ErrorCodes.RUNTIME,
     );
 
-    assert.deepStrictEqual(events, [
+    assert.strictEqual(events.length, 1);
+    assert.deepStrictEqual(
+      {
+        name: events[0]!.name,
+        code: events[0]!.code,
+        message: events[0]!.message,
+      },
       {
         name: 'throwing_fixture',
         code: ErrorCodes.RUNTIME,
         message: 'fixture failure',
       },
-    ]);
+    );
+    assert.match(events[0]!.traceId, /^tr_/);
   });
 
   it('passes params objects through params-only site experience tools', async () => {
@@ -336,5 +348,70 @@ describe('ToolAdapter', () => {
     const cleanupCall = evaluateCalls.find(call => call.kind === 'cleanup');
     assert.ok(cleanupCall?.script?.includes('window.__hookStore'));
     assert.ok(cleanupCall?.script?.includes('"hook_from_params"'));
+  });
+
+  it('onInvoke bridges tool:called and tool:error into ToolInvokeEvent', async () => {
+    const provider = new ToolContextProvider();
+    const adapter = new ToolAdapter(provider);
+    const events: Array<{
+      traceId: string;
+      toolName: string;
+      phase: 'end';
+      ts: number;
+      durationMs?: number;
+      success: boolean;
+      error?: {code: string; message: string};
+    }> = [];
+    const unsubscribe = adapter.onInvoke(event => {
+      events.push(event);
+    });
+
+    // success path
+    const successMeta = legacyFixtureMeta({
+      name: 'default_function_fixture',
+      handlerName: 'defaultFunctionFixture',
+      callMode: undefined,
+      argSpecs: {
+        value: {type: 'string', required: true, description: ''},
+      },
+    });
+    await invokeTool(adapter, successMeta, {value: 'ok'});
+
+    // failure path
+    const failureMeta = fixtureMeta({
+      name: 'throwing_fixture',
+      handlerName: 'throwingFixture',
+      callMode: undefined,
+    });
+    await assert.rejects(
+      invokeTool(adapter, failureMeta),
+      (error: unknown) =>
+        error instanceof ToolError && error.code === ErrorCodes.RUNTIME,
+    );
+
+    assert.strictEqual(events.length, 2);
+
+    const success = events[0]!;
+    assert.strictEqual(success.toolName, 'default_function_fixture');
+    assert.strictEqual(success.phase, 'end');
+    assert.strictEqual(success.success, true);
+    assert.match(success.traceId, /^tr_/);
+    assert.strictEqual(typeof success.durationMs, 'number');
+    assert.strictEqual(success.error, undefined);
+
+    const failure = events[1]!;
+    assert.strictEqual(failure.toolName, 'throwing_fixture');
+    assert.strictEqual(failure.phase, 'end');
+    assert.strictEqual(failure.success, false);
+    assert.match(failure.traceId, /^tr_/);
+    assert.deepStrictEqual(failure.error, {
+      code: ErrorCodes.RUNTIME,
+      message: 'fixture failure',
+    });
+
+    // unsubscribe stops further events
+    unsubscribe();
+    await invokeTool(adapter, successMeta, {value: 'after-unsub'});
+    assert.strictEqual(events.length, 2);
   });
 });

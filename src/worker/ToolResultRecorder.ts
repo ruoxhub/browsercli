@@ -15,6 +15,7 @@ import {safeStringify} from '../utils/safeJson.js';
 
 export interface ToolResultRecord {
   toolName: string;
+  traceId: string;
   success: boolean;
   startedAt: string;
   durationMs: number;

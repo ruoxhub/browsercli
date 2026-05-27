@@ -18,6 +18,7 @@ export class ToolTelemetry {
     request: Record<string, unknown>,
     response: unknown,
     durationMs: number,
+    traceId: string,
   ): void {
     TokenBudgetManager.getInstance().recordToolCall(
       toolName,
@@ -28,20 +29,28 @@ export class ToolTelemetry {
       name: toolName,
       durationMs,
       success: true,
+      traceId,
     });
-    logger.info('tool.completed', {toolName, durationMs});
+    logger.info('tool.completed', {toolName, durationMs, traceId});
   }
 
-  failure(toolName: string, error: ToolError, durationMs: number): void {
+  failure(
+    toolName: string,
+    error: ToolError,
+    durationMs: number,
+    traceId: string,
+  ): void {
     this.contextProvider.eventBus.emit('tool:error', {
       name: toolName,
       code: error.code,
       message: error.message,
+      traceId,
     });
     logger.warn('tool.failed', {
       toolName,
       durationMs,
       code: error.code,
+      traceId,
     });
   }
 }

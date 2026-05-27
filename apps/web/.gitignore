@@ -1,0 +1,17 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+
+# tsc incremental
+.tsbuildinfo-node/
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+# editor / OS
+.DS_Store
+Thumbs.db
+
+# project artifacts (generated)
+artifacts/

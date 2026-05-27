@@ -11,6 +11,10 @@
  * Sekiro Action 签名: handler(request, resolve, reject) => void
  *
  * 通过 tools-meta.ts 中的 ToolMeta 动态加载 handler，适配为 Action
+ *
+ * 此外，对外暴露 onInvoke(listener) 用于监听 tool 调用事件，
+ * 内部桥接 contextProvider.eventBus 的 tool:called / tool:error。
+ * Phase 3 ConsoleServer 通过此入口把事件广播到 WebSocket。
  */
 
 import type {ToolMeta} from '../cli/tools-meta.js';
@@ -31,13 +35,31 @@ import {ToolHandlerLoader} from './ToolHandlerLoader.js';
 import {ToolResponseOffloader} from './ToolResponseOffloader.js';
 import {ToolTelemetry} from './ToolTelemetry.js';
 
+/**
+ * 跨 worker / web 边界的统一 tool 调用事件 payload。
+ * Phase 1 (T1) 会被 src/web/types.ts re-export 给前端用。
+ */
+export interface ToolInvokeEvent {
+  traceId: string;
+  toolName: string;
+  phase: 'end';
+  ts: number;
+  durationMs?: number;
+  success: boolean;
+  error?: {code: string; message: string};
+}
+
+export type ToolInvokeListener = (event: ToolInvokeEvent) => void;
+
 export class ToolAdapter {
   private readonly loader: ToolHandlerLoader;
   private readonly defineToolContextFactory: DefineToolContextFactory;
   private readonly router: ToolExecutionRouter;
   private readonly pipeline: ToolExecutionPipeline;
+  private readonly contextProvider: ToolContextProvider;
 
   constructor(contextProvider: ToolContextProvider) {
+    this.contextProvider = contextProvider;
     this.loader = new ToolHandlerLoader();
     this.defineToolContextFactory = new DefineToolContextFactory(
       contextProvider,
@@ -91,5 +113,45 @@ export class ToolAdapter {
     console.log(
       `[Worker][ToolAdapter] 注册了 ${registered}/${toolNames.length} 个 Tool`,
     );
+  }
+
+  /**
+   * 订阅 tool 调用事件。
+   * 内部桥接 contextProvider.eventBus 的 tool:called / tool:error，
+   * 把两种 payload 归一化为 ToolInvokeEvent 给上层（ConsoleServer / WsHub）使用。
+   *
+   * @returns 取消订阅函数（一次性取消两条订阅）
+   */
+  onInvoke(listener: ToolInvokeListener): () => void {
+    const unsubscribeCalled = this.contextProvider.eventBus.on(
+      'tool:called',
+      payload => {
+        listener({
+          traceId: payload.traceId,
+          toolName: payload.name,
+          phase: 'end',
+          ts: Date.now(),
+          durationMs: payload.durationMs,
+          success: true,
+        });
+      },
+    );
+    const unsubscribeError = this.contextProvider.eventBus.on(
+      'tool:error',
+      payload => {
+        listener({
+          traceId: payload.traceId,
+          toolName: payload.name,
+          phase: 'end',
+          ts: Date.now(),
+          success: false,
+          error: {code: payload.code, message: payload.message},
+        });
+      },
+    );
+    return () => {
+      unsubscribeCalled();
+      unsubscribeError();
+    };
   }
 }

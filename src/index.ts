@@ -29,6 +29,17 @@ import {parseWorkerArgs, toWorkerOptions} from './worker/WorkerArgs.js';
 import {createGracefulShutdown} from './worker/WorkerLifecycle.js';
 
 /**
+ * Worker 启动上下文：暴露 main() 解析后的 RPC 连接信息，
+ * 供 Phase 3 ConsoleServer 启动时读取（SekiroInvoker 不暴露 group/rpcHost）。
+ *
+ * 仅 main() 内部赋值；外部模块只读不写。
+ */
+export const workerStartContext: {
+  group?: string;
+  rpcHost?: string;
+} = {};
+
+/**
  * Worker 主函数
  */
 async function main(): Promise<void> {
@@ -36,6 +47,10 @@ async function main(): Promise<void> {
   const cliConfig = parseWorkerArgs(process.argv.slice(2));
   const resolved = resolveConfig(cliConfig);
   const options = toWorkerOptions(resolved);
+
+  // 暴露 RPC 连接信息给 ConsoleServer（Phase 3 启动时读取）
+  workerStartContext.group = options.group;
+  workerStartContext.rpcHost = options.rpcHost;
 
   console.log('[Worker] 启动中...');
   console.log(`[Worker] Rpc Host: ${options.rpcHost}`);

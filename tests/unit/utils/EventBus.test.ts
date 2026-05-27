@@ -25,12 +25,14 @@ describe('EventBus', () => {
       name: 'collect_scripts',
       durationMs: 25,
       success: true,
+      traceId: 'tr_test_001',
     });
 
     assert.deepStrictEqual(received, {
       name: 'collect_scripts',
       durationMs: 25,
       success: true,
+      traceId: 'tr_test_001',
     });
   });
 
@@ -48,6 +50,7 @@ describe('EventBus', () => {
           name: 'collect_scripts',
           durationMs: -1,
           success: true,
+          traceId: 'tr_test_002',
         }),
       /Invalid event payload for "tool:called"/,
     );
@@ -66,6 +69,7 @@ describe('EventBus', () => {
       name: 'collect_scripts',
       durationMs: -1,
       success: true,
+      traceId: 'tr_test_003',
     });
 
     assert.strictEqual(received?.durationMs, -1);
@@ -86,6 +90,7 @@ describe('EventBus', () => {
       name: 'collect_scripts',
       durationMs: -1,
       success: true,
+      traceId: 'tr_test_004',
     });
 
     assert.strictEqual(received?.durationMs, -1);
@@ -104,6 +109,7 @@ describe('EventBus', () => {
       name: 'collect_scripts',
       durationMs: 25,
       success: true,
+      traceId: 'tr_test_005',
     });
 
     assert.deepStrictEqual(calls, ['collect_scripts']);
@@ -121,6 +127,7 @@ describe('EventBus', () => {
         name: 'collect_scripts',
         durationMs: 25,
         success: true,
+        traceId: 'tr_test_006',
       }),
       /subscriber failed/,
     );

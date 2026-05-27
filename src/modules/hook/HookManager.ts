@@ -277,6 +277,15 @@ export class HookManager {
     return this.hooks.get(hookId);
   }
 
+  /**
+   * 获取底层 HookStore 实例。
+   * 主要供 ConsoleServer 在启动时订阅 hookStore.events('sample', ...) 用，
+   * 以便把浏览器回传的采样数据桥接到 WebSocket。
+   */
+  getHookStore(): HookStore<HookDataRecord> {
+    return this.hookStore;
+  }
+
   /** 获取所有 hook */
   getAllHooks(): HookMeta[] {
     return Array.from(this.hooks.values());
