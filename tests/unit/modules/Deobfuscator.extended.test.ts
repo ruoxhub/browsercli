@@ -212,7 +212,6 @@ describe('Deobfuscator extended', () => {
       code: obfuscated,
       aggressive: true,
       renameVariables: true,
-      webcrack: false,
     });
 
     assert.ok(result.code.includes('demo-token'));
@@ -391,7 +390,7 @@ describe('Deobfuscator extended', () => {
     assert.ok(Array.isArray(r1.unresolvedParts));
 
     const r2 = await d.deobfuscate(opts);
-    assert.strictEqual(r2.cached, true);
+    assert.strictEqual((r2 as any).cached, true);
     assert.strictEqual(r2.code, r1.code);
     assert.deepStrictEqual(r2.transformations, r1.transformations);
   });

@@ -54,7 +54,7 @@ describe('start command', () => {
     const {ctx, starts} = createWorkerContext();
 
     await startCommand(
-      ['--databaseUrl', 'postgresql://from-cli/db'],
+      ['--databaseUrl', 'postgresql://from-cli/db', '--no-open'],
       ctx,
     );
 
@@ -68,7 +68,7 @@ describe('start command', () => {
   it('falls back to resolved databaseUrl when CLI arg is absent', async () => {
     const {ctx, starts} = createWorkerContext();
 
-    await startCommand([], ctx);
+    await startCommand(['--no-open'], ctx);
 
     assert.strictEqual(starts.length, 1);
     assert.strictEqual(starts[0]?.databaseUrl, 'postgresql://from-config/db');

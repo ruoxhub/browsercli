@@ -4,14 +4,33 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {existsSync} from 'node:fs';
+import {dirname, join, resolve} from 'node:path';
+import {fileURLToPath} from 'node:url';
+
 import type {AxiCliCommand} from 'axi-sdk-js';
 import {AxiError} from 'axi-sdk-js';
 
 import {resolveConfig} from '../../config.js';
 import {parseArgs, getFlag, getBoolFlag} from '../args-parser.js';
+import {openInBrowser} from '../open-browser.js';
 import {successOutput} from '../output.js';
 import {SekiroInvoker} from '../sekiro-invoker.js';
 import type {WorkerContext} from '../types.js';
+
+const DEFAULT_CONSOLE_PORT = 8765;
+
+function findWebDistRoot(): string | null {
+  let dir = dirname(fileURLToPath(import.meta.url));
+  while (true) {
+    if (existsSync(join(dir, 'package.json'))) {
+      return resolve(dir, 'apps/web/dist');
+    }
+    const parent = dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
 
 const BROWSER_POLL_ATTEMPTS = 60;
 const BROWSER_POLL_INTERVAL_MS = 500;
@@ -115,11 +134,31 @@ export const startCommand: AxiCliCommand<WorkerContext> = async (
     throw new AxiError('Worker 启动后未能注册到 Sekiro Server', 'WORKER_REGISTER_TIMEOUT');
   }
 
+  // 6. 自动打开 Web 控制台（除非显式 --no-open）
+  const noOpen = getBoolFlag(parsed, 'no-open');
+  const consolePortFlag = getFlag(parsed, 'console-port');
+  const consolePort = consolePortFlag ? parseInt(consolePortFlag, 10) || DEFAULT_CONSOLE_PORT : DEFAULT_CONSOLE_PORT;
+  const consoleUrl = `http://127.0.0.1:${consolePort}`;
+  let consoleOpened = false;
+  let consoleHint: string | undefined;
+
+  if (!noOpen) {
+    const distRoot = findWebDistRoot();
+    if (distRoot && existsSync(join(distRoot, 'index.html'))) {
+      consoleOpened = openInBrowser(consoleUrl);
+    } else {
+      consoleHint = '前台资源未构建，运行 `npm run web:build` 后再启动，或访问 http://127.0.0.1:5173 (Vite 开发模式)';
+    }
+  }
+
   return successOutput({
     command: 'start',
     message: 'Worker 启动成功，已连接到 Sekiro Server',
     rpcHost: cfg.rpcHost,
     group: cfg.group,
+    consoleUrl,
+    consoleOpened,
+    ...(consoleHint && {consoleHint}),
     ...(waitForBrowser && cfg.browserUrl && {browserUrl: cfg.browserUrl, waitedForBrowser: true}),
   });
 };

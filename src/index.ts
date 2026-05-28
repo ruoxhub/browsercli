@@ -27,6 +27,8 @@ import {ToolAdapter} from './worker/ToolAdapter.js';
 import {ToolContextProvider} from './worker/ToolContextProvider.js';
 import {parseWorkerArgs, toWorkerOptions} from './worker/WorkerArgs.js';
 import {createGracefulShutdown} from './worker/WorkerLifecycle.js';
+import {ConsoleServer} from './web/ConsoleServer.js';
+import {SekiroInvoker} from './cli/sekiro-invoker.js';
 
 /**
  * Worker 启动上下文：暴露 main() 解析后的 RPC 连接信息，
@@ -98,14 +100,59 @@ async function main(): Promise<void> {
 
   console.log('[Worker] 已启动并连接到 Rpc Server');
 
+  // 启动 Web 控制台
+  const noConsole = process.argv.includes('--no-console');
+  const consolePortIndex = process.argv.indexOf('--console-port');
+  let consolePort = 8765;
+  if (consolePortIndex !== -1 && consolePortIndex + 1 < process.argv.length) {
+    const portNum = parseInt(process.argv[consolePortIndex + 1], 10);
+    if (!isNaN(portNum) && portNum > 0) {
+      consolePort = portNum;
+    }
+  }
+
+  let consoleServer: ConsoleServer | undefined;
+  if (!noConsole) {
+    try {
+      const invoker = new SekiroInvoker({
+        rpcHost: options.rpcHost,
+      });
+      consoleServer = new ConsoleServer({
+        port: consolePort,
+        group: options.group,
+        rpcHost: options.rpcHost,
+        runtime,
+        invoker,
+        toolAdapter,
+      });
+      await consoleServer.start();
+      console.log(`[Worker] 本地工作台 Web 控制台已启动: http://127.0.0.1:${consolePort}`);
+    } catch (err) {
+      console.error('[Worker] 启动 Web 控制台服务失败:', err);
+    }
+  }
+
   // 9. 注册信号处理
   const gracefulShutdown = createGracefulShutdown({
     browserManager: runtime.browserManager,
     client,
     contextProvider,
   });
-  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+  const handleShutdown = async (signal: string) => {
+    if (consoleServer) {
+      try {
+        await consoleServer.stop();
+        console.log('[Worker] 控制台服务已关闭');
+      } catch (err) {
+        console.error('[Worker] 关闭控制台服务失败:', err);
+      }
+    }
+    await gracefulShutdown(signal);
+  };
+
+  process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+  process.on('SIGINT', () => handleShutdown('SIGINT'));
 }
 
 main().catch(err => {
