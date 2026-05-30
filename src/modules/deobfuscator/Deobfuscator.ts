@@ -165,7 +165,7 @@ export class Deobfuscator {
     let pipelineBundle: import('../../types/index.js').DeobfuscateBundleSummary | undefined;
     let pipelineSavedTo: string | undefined;
     let pipelineSavedArtifacts:
-      | import('../../types/index.js').DeobfuscateSavedArtifact[]
+      | Array<import('../../types/index.js').DeobfuscateSavedArtifact>
       | undefined;
     let webcrackApplied = false;
 

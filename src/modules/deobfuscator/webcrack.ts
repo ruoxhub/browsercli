@@ -23,40 +23,40 @@ import type {
 } from '../../types/index.js';
 import {logger} from '../../utils/logger.js';
 
-type WebcrackModuleLike = {
+interface WebcrackModuleLike {
   id: string;
   path: string;
   isEntry: boolean;
   code: string;
-};
+}
 
-type WebcrackBundleLike = {
+interface WebcrackBundleLike {
   type: 'webpack' | 'browserify';
   entryId: string;
   modules: Map<string, WebcrackModuleLike>;
-};
+}
 
-type WebcrackResultLike = {
+interface WebcrackResultLike {
   code: string;
   bundle?: WebcrackBundleLike;
   save: (targetPath: string) => Promise<void>;
-};
+}
 
-type WebcrackRuntimeOptions = {
+interface WebcrackRuntimeOptions {
   jsx?: boolean;
   unpack?: boolean;
   deobfuscate?: boolean;
   unminify?: boolean;
   mangle?: boolean;
   sandbox?: unknown;
-};
+}
 
-type WebcrackModuleImport = {
+interface WebcrackModuleImport {
   webcrack: (
     code: string,
     options?: WebcrackRuntimeOptions,
   ) => Promise<WebcrackResultLike>;
-};
+}
 
 type WebcrackInvocationOptions = Pick<
   DeobfuscateOptions,
@@ -94,7 +94,7 @@ const DEFAULT_OPTIONS: Required<
 
 const MAX_BUNDLE_MODULES = 100;
 
-type MappingMetadata = {fromPath: string};
+interface MappingMetadata {fromPath: string}
 
 function normalizeOptions(
   options: WebcrackInvocationOptions,

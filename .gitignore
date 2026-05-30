@@ -194,3 +194,5 @@ src/graphify-out/
 .planning
 old-source
 artifacts/
+.antigravitycli
+.codegraph

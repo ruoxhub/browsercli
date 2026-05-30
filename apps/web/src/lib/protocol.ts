@@ -186,3 +186,18 @@ export interface InvocationRecord {
   result?: unknown;
   error?: {code: string; message: string};
 }
+
+// ==================== Site Experience ====================
+
+export interface SiteExperience {
+  id: number;
+  domain: string;
+  name: string;
+  aliases: string[];
+  platformFeatures: string | null;
+  validPatterns: string | null;
+  knownPitfalls: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+

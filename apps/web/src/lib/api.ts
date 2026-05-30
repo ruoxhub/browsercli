@@ -1,4 +1,4 @@
-import type { ApiResponse, WorkerFullStatus, InvocationRecord } from './protocol';
+import type { ApiResponse, WorkerFullStatus, InvocationRecord, SiteExperience } from './protocol';
 
 export interface ToolSummary {
   name: string;
@@ -81,5 +81,24 @@ export const api = {
   },
   deleteHook(hookId: string): Promise<any> {
     return request<any>('DELETE', `/api/hooks/${encodeURIComponent(hookId)}`);
+  },
+  getSiteExperiences(params?: { url?: string; name?: string }): Promise<SiteExperience[]> {
+    const searchParams = new URLSearchParams();
+    if (params?.url) searchParams.append('url', params.url);
+    if (params?.name) searchParams.append('name', params.name);
+    const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    return request<SiteExperience[]>('GET', `/api/site-experiences${query}`);
+  },
+  getSiteExperienceById(id: number): Promise<SiteExperience> {
+    return request<SiteExperience>('GET', `/api/site-experiences/${id}`);
+  },
+  createSiteExperience(data: Omit<SiteExperience, 'id' | 'createdAt' | 'updatedAt'>): Promise<SiteExperience> {
+    return request<SiteExperience>('POST', '/api/site-experiences', data);
+  },
+  updateSiteExperience(id: number, data: Partial<Omit<SiteExperience, 'id' | 'createdAt' | 'updatedAt'>>): Promise<SiteExperience> {
+    return request<SiteExperience>('PUT', `/api/site-experiences/${id}`, data);
+  },
+  deleteSiteExperience(id: number): Promise<{ success: boolean; id: number }> {
+    return request<{ success: boolean; id: number }>('DELETE', `/api/site-experiences/${id}`);
   },
 };

@@ -4,24 +4,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { createServer, type IncomingMessage, type ServerResponse, type Server as HttpServer } from 'node:http';
 import { existsSync, readFileSync, createReadStream, lstatSync } from 'node:fs';
+import { createServer, type Server as HttpServer } from 'node:http';
 import { resolve, join, extname, relative, isAbsolute, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
 import { WebSocketServer } from 'ws';
 
-import type { Runtime } from '../runtime.js';
 import type { SekiroInvoker } from '../cli/sekiro-invoker.js';
-import type { ToolAdapter } from '../worker/ToolAdapter.js';
-import { RestRouter } from './RestRouter.js';
-import { rejectIfNotLocal } from './middleware/localOnly.js';
-import { createWorkerRoutes, type WorkerRoutesConfig } from './routes/worker.js';
-import { createToolsRoutes } from './routes/tools.js';
-import { createInvocationsRoutes } from './routes/invocations.js';
-import { createHookRoutes } from './routes/hooks.js';
-import { InvocationStore } from './adapters/InvocationStore.js';
-import { WsHub } from './ws/WsHub.js';
 import { getAllToolNames } from '../cli/tools-meta.js';
+import type { Runtime } from '../runtime.js';
+import type { ToolAdapter } from '../worker/ToolAdapter.js';
+
+import { InvocationStore } from './adapters/InvocationStore.js';
+import { rejectIfNotLocal } from './middleware/localOnly.js';
+import { RestRouter } from './RestRouter.js';
+import { createHookRoutes } from './routes/hooks.js';
+import { createInvocationsRoutes } from './routes/invocations.js';
+import { createSiteExperienceRoutes } from './routes/site-experiences.js';
+import { createToolsRoutes } from './routes/tools.js';
+import { createWorkerRoutes, type WorkerRoutesConfig } from './routes/worker.js';
+import { WsHub } from './ws/WsHub.js';
+
 
 export interface ConsoleServerOptions {
   port: number;
@@ -93,6 +97,7 @@ export class ConsoleServer {
       // ignore
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
     const self = this;
     const workerConfig: WorkerRoutesConfig = {
       runtime: this.options.runtime,
@@ -127,6 +132,9 @@ export class ConsoleServer {
     );
     this.router.mount(
       createHookRoutes(this.options.invoker, this.options.group)
+    );
+    this.router.mount(
+      createSiteExperienceRoutes()
     );
   }
 

@@ -18,17 +18,17 @@
 
 import './utils/logger.js';
 
+import {SekiroInvoker} from './cli/sekiro-invoker.js';
 import {resolveConfig} from './config.js';
 import {RpcClient} from './protocol/Client.js';
 import {getRuntime} from './runtime.js';
 import {dbService} from './services/DatabaseService.js';
+import {ConsoleServer} from './web/ConsoleServer.js';
 import {registerBuiltinActions} from './worker/BuiltinActions.js';
 import {ToolAdapter} from './worker/ToolAdapter.js';
 import {ToolContextProvider} from './worker/ToolContextProvider.js';
 import {parseWorkerArgs, toWorkerOptions} from './worker/WorkerArgs.js';
 import {createGracefulShutdown} from './worker/WorkerLifecycle.js';
-import {ConsoleServer} from './web/ConsoleServer.js';
-import {SekiroInvoker} from './cli/sekiro-invoker.js';
 
 /**
  * Worker 启动上下文：暴露 main() 解析后的 RPC 连接信息，

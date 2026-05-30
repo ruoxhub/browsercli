@@ -17,8 +17,8 @@
 
 import type {IncomingMessage, ServerResponse} from 'node:http';
 
-import {getAllToolsMeta, getToolMeta} from '../../cli/tools-meta.js';
 import type {SekiroInvoker} from '../../cli/sekiro-invoker.js';
+import {getAllToolsMeta, getToolMeta} from '../../cli/tools-meta.js';
 import type {InvocationStore} from '../adapters/InvocationStore.js';
 import {toolMetaToJsonSchema} from '../adapters/ZodToJsonSchema.js';
 import {sendError, sendJson, sendUnexpected} from '../middleware/error.js';

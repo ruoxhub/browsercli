@@ -11,11 +11,13 @@ import {
   Radio, 
   Menu, 
   X, 
-  Terminal 
+  Terminal,
+  Globe
 } from 'lucide-react';
 import OverviewPage from './routes/overview';
 import ToolsPage from './routes/tools';
 import HooksPage from './routes/hooks';
+import SiteExperiencesPage from './routes/site-experiences';
 import wsClient from './lib/ws';
 
 function Layout() {
@@ -83,6 +85,10 @@ function Layout() {
             <Radio size={16} />
             <span>Hook 监控点</span>
           </NavLink>
+          <NavLink to="/site-experiences" onClick={() => setSidebarOpen(false)} className={getNavLinkClass}>
+            <Globe size={16} />
+            <span>站点经验</span>
+          </NavLink>
         </nav>
 
         {/* Bottom copyright info */}
@@ -107,6 +113,7 @@ function Layout() {
           <Route path="/" element={<OverviewPage />} />
           <Route path="/tools" element={<ToolsPage />} />
           <Route path="/hooks" element={<HooksPage />} />
+          <Route path="/site-experiences" element={<SiteExperiencesPage />} />
         </Routes>
       </main>
     </div>

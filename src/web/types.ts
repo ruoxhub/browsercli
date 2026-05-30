@@ -48,7 +48,7 @@ export type Channel = StateChannel | StreamChannel;
  * 运行时常量：用于 WsHub 判断「订阅时是否回放快照」。
  * 必须包含 StateChannel 联合类型的所有成员。
  */
-export const STATE_CHANNELS: ReadonlyArray<StateChannel> = [
+export const STATE_CHANNELS: readonly StateChannel[] = [
   'worker.status',
   'browser.event',
 ];
@@ -119,12 +119,12 @@ export interface HookSampleEvent {
   ts: number;
   args?: unknown[];
   retVal?: unknown;
-  stack?: {
+  stack?: Array<{
     url: string;
     line: number;
     col: number;
     functionName?: string;
-  }[];
+  }>;
   truncated?: boolean;
   artifactRef?: string;
 }
