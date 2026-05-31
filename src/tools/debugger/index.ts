@@ -59,6 +59,116 @@ async function getDebugger(runtime: DebuggerRuntime) {
   }
 }
 
+/**
+ * Shape of the structured `data` field returned by `get_paused_info` and
+ * embedded in `step_*` responses when execution stays paused.
+ */
+export interface PausedInfoData {
+  isPaused: true;
+  reason?: string;
+  hitBreakpoints?: string[];
+  callFrames: Array<{
+    index: number;
+    functionName: string;
+    url: string;
+    lineNumber: number;
+    columnNumber: number;
+    callFrameId: string;
+  }>;
+  scopes?: Array<{
+    scopeName: string;
+    scopeType: string;
+    variables?: Array<{name: string; value: unknown}>;
+  }>;
+}
+
+/**
+ * Build the structured paused-info payload from the debugger's current state.
+ * Returns `null` when execution is not paused so callers can short-circuit.
+ *
+ * Why a shared helper: `get_paused_info`, `step_into`, `step_over`, and
+ * `step_out` all need the same shape; without this, single-step flows pay
+ * an extra MCP roundtrip just to read the call stack after stepping.
+ */
+export async function buildPausedInfoData(
+  debuggerContext: Awaited<ReturnType<DebuggerRuntime['getDebuggerContext']>>,
+  options: {includeScopes?: boolean} = {},
+): Promise<PausedInfoData | null> {
+  const pausedState = debuggerContext.getPausedState();
+  if (!pausedState.isPaused) {
+    return null;
+  }
+
+  const callFrames = pausedState.callFrames.map((frame, i) => {
+    const script = debuggerContext.getScriptById(frame.location.scriptId);
+    const url =
+      script?.url || frame.url || `script:${frame.location.scriptId}`;
+    return {
+      index: i + 1,
+      functionName: frame.functionName,
+      url,
+      lineNumber: frame.location.lineNumber + 1,
+      columnNumber: frame.location.columnNumber,
+      callFrameId: frame.callFrameId,
+    };
+  });
+
+  const result: PausedInfoData = {
+    isPaused: true,
+    reason: pausedState.reason || undefined,
+    hitBreakpoints:
+      pausedState.hitBreakpoints?.length > 0
+        ? pausedState.hitBreakpoints
+        : undefined,
+    callFrames,
+  };
+
+  if (options.includeScopes !== false && pausedState.callFrames.length > 0) {
+    const topFrame = pausedState.callFrames[0];
+    const scopes: NonNullable<PausedInfoData['scopes']> = [];
+
+    for (const scope of topFrame.scopeChain) {
+      if (scope.type === 'global') {
+        continue;
+      }
+
+      const scopeData: NonNullable<PausedInfoData['scopes']>[number] = {
+        scopeName: scope.name || scope.type,
+        scopeType: scope.type,
+      };
+
+      if (scope.object.objectId) {
+        try {
+          const variables = await debuggerContext.getScopeVariables(
+            scope.object.objectId,
+          );
+
+          if (variables.length > 0) {
+            scopeData.variables = variables.slice(0, 20).map(v => ({
+              name: v.name,
+              value: v.value,
+            }));
+            if (variables.length > 20) {
+              scopeData.variables.push({
+                name: `... 还有 ${variables.length - 20} 个`,
+                value: null,
+              });
+            }
+          }
+        } catch {
+          // ignore individual scope read failures
+        }
+      }
+
+      scopes.push(scopeData);
+    }
+
+    result.scopes = scopes;
+  }
+
+  return result;
+}
+
 // ─── 工具定义（defineTool 格式）───────────────────────────────
 
 /**
@@ -250,13 +360,24 @@ export const listBreakpoints = defineTool({
 export const stepInto = defineTool({
   name: 'step_into',
   description:
-    '单步进入函数调用。用于进入函数体内部进行调试。需要先在断点暂停。',
+    '单步进入函数调用。用于进入函数体内部进行调试。需要先在断点暂停。返回结果默认包含暂停后的调用栈/作用域，省去再次调用 get_paused_info。',
   annotations: {
     title: '单步进入',
     category: 'debugging' as ToolCategory,
     readOnlyHint: false,
   },
-  schema: {},
+  schema: {
+    includePausedInfo: zod
+      .boolean()
+      .optional()
+      .default(true)
+      .describe('返回值是否携带暂停后的 callFrames/scopes（默认 true）。'),
+    includeScopes: zod
+      .boolean()
+      .optional()
+      .default(true)
+      .describe('暂停信息中是否包含作用域变量（默认 true）。'),
+  },
   handler: async (request, response, context) => {
     const runtime = context as unknown as DebuggerRuntime;
 
@@ -273,11 +394,21 @@ export const stepInto = defineTool({
         return;
       }
       await debuggerContext.stepInto();
+      const pausedInfo =
+        request.params.includePausedInfo !== false
+          ? await buildPausedInfoData(debuggerContext, {
+              includeScopes: request.params.includeScopes,
+            })
+          : null;
       response.setStructuredContent({
         success: true,
         message: '单步进入执行完成',
         tooltype: 'step_into',
-        data: { action: 'stepInto', isPaused: debuggerContext.getPausedState().isPaused }
+        data: {
+          action: 'stepInto',
+          isPaused: pausedInfo !== null,
+          pausedInfo: pausedInfo ?? undefined,
+        }
       });
     } catch (error) {
       response.setStructuredContent({
@@ -296,13 +427,24 @@ export const stepInto = defineTool({
 export const stepOver = defineTool({
   name: 'step_over',
   description:
-    '单步跳过函数调用，将函数调用视为一个步骤。用于跳过函数体。需要先在断点暂停。',
+    '单步跳过函数调用，将函数调用视为一个步骤。用于跳过函数体。需要先在断点暂停。返回结果默认包含暂停后的调用栈/作用域，省去再次调用 get_paused_info。',
   annotations: {
     title: '单步跳过',
     category: 'debugging' as ToolCategory,
     readOnlyHint: false,
   },
-  schema: {},
+  schema: {
+    includePausedInfo: zod
+      .boolean()
+      .optional()
+      .default(true)
+      .describe('返回值是否携带暂停后的 callFrames/scopes（默认 true）。'),
+    includeScopes: zod
+      .boolean()
+      .optional()
+      .default(true)
+      .describe('暂停信息中是否包含作用域变量（默认 true）。'),
+  },
   handler: async (request, response, context) => {
     const runtime = context as unknown as DebuggerRuntime;
 
@@ -319,11 +461,21 @@ export const stepOver = defineTool({
         return;
       }
       await debuggerContext.stepOver();
+      const pausedInfo =
+        request.params.includePausedInfo !== false
+          ? await buildPausedInfoData(debuggerContext, {
+              includeScopes: request.params.includeScopes,
+            })
+          : null;
       response.setStructuredContent({
         success: true,
         message: '单步跳过执行完成',
         tooltype: 'step_over',
-        data: { action: 'stepOver', isPaused: debuggerContext.getPausedState().isPaused }
+        data: {
+          action: 'stepOver',
+          isPaused: pausedInfo !== null,
+          pausedInfo: pausedInfo ?? undefined,
+        }
       });
     } catch (error) {
       response.setStructuredContent({
@@ -342,13 +494,24 @@ export const stepOver = defineTool({
 export const stepOut = defineTool({
   name: 'step_out',
   description:
-    '单步跳出当前函数，继续执行直到函数返回。用于快速退出函数。需要先在断点暂停。',
+    '单步跳出当前函数，继续执行直到函数返回。用于快速退出函数。需要先在断点暂停。返回结果默认包含暂停后的调用栈/作用域，省去再次调用 get_paused_info。',
   annotations: {
     title: '单步跳出',
     category: 'debugging' as ToolCategory,
     readOnlyHint: false,
   },
-  schema: {},
+  schema: {
+    includePausedInfo: zod
+      .boolean()
+      .optional()
+      .default(true)
+      .describe('返回值是否携带暂停后的 callFrames/scopes（默认 true）。'),
+    includeScopes: zod
+      .boolean()
+      .optional()
+      .default(true)
+      .describe('暂停信息中是否包含作用域变量（默认 true）。'),
+  },
   handler: async (request, response, context) => {
     const runtime = context as unknown as DebuggerRuntime;
 
@@ -365,11 +528,21 @@ export const stepOut = defineTool({
         return;
       }
       await debuggerContext.stepOut();
+      const pausedInfo =
+        request.params.includePausedInfo !== false
+          ? await buildPausedInfoData(debuggerContext, {
+              includeScopes: request.params.includeScopes,
+            })
+          : null;
       response.setStructuredContent({
         success: true,
         message: '单步跳出执行完成',
         tooltype: 'step_out',
-        data: { action: 'stepOut', isPaused: debuggerContext.getPausedState().isPaused }
+        data: {
+          action: 'stepOut',
+          isPaused: pausedInfo !== null,
+          pausedInfo: pausedInfo ?? undefined,
+        }
       });
     } catch (error) {
       response.setStructuredContent({
@@ -578,7 +751,15 @@ export const getScriptSource = defineTool({
 
     try {
       const debuggerContext = await getDebugger(runtime);
-      let source = await debuggerContext.getScriptSource(scriptId);
+      let source: string;
+      if (prettyPrint) {
+        source = await debuggerContext.getBeautifiedScriptSource(
+          scriptId,
+          raw => new PackerDeobfuscator().beautify(raw),
+        );
+      } else {
+        source = await debuggerContext.getScriptSource(scriptId);
+      }
 
       if (!source) {
         response.setStructuredContent({
@@ -1513,9 +1694,11 @@ export const getPausedInfo = defineTool({
 
     try {
       const debuggerContext = await getDebugger(runtime);
-      const pausedState = debuggerContext.getPausedState();
+      const pausedInfo = await buildPausedInfoData(debuggerContext, {
+        includeScopes: request.params.includeScopes,
+      });
 
-      if (!pausedState.isPaused) {
+      if (!pausedInfo) {
         response.setStructuredContent({
           success: false,
           message: '执行未暂停。',
@@ -1528,92 +1711,11 @@ export const getPausedInfo = defineTool({
         return;
       }
 
-      const callFrames = pausedState.callFrames.map((frame, i) => {
-        const script = debuggerContext.getScriptById(frame.location.scriptId);
-        const url =
-          script?.url || frame.url || `script:${frame.location.scriptId}`;
-        return {
-          index: i + 1,
-          functionName: frame.functionName,
-          url,
-          lineNumber: frame.location.lineNumber + 1,
-          columnNumber: frame.location.columnNumber,
-          callFrameId: frame.callFrameId
-        };
-      });
-
-      const result: {
-        isPaused: true;
-        reason?: string;
-        hitBreakpoints?: string[];
-        callFrames: typeof callFrames;
-        scopes?: Array<{
-          scopeName: string;
-          scopeType: string;
-          variables?: Array<{name: string; value: unknown}>;
-        }>;
-      } = {
-        isPaused: true,
-        reason: pausedState.reason || undefined,
-        hitBreakpoints: pausedState.hitBreakpoints?.length > 0 ? pausedState.hitBreakpoints : undefined,
-        callFrames
-      };
-
-      // 包含作用域变量
-      if (request.params.includeScopes && pausedState.callFrames.length > 0) {
-        const topFrame = pausedState.callFrames[0];
-        const scopes = [];
-
-        for (const scope of topFrame.scopeChain) {
-          // 只显示 local 和 closure 作用域，跳过 global
-          if (scope.type === 'global') {
-            continue;
-          }
-
-          const scopeName = scope.name || scope.type;
-          const scopeData: {
-            scopeName: string;
-            scopeType: string;
-            variables?: Array<{name: string; value: unknown}>;
-          } = {
-            scopeName,
-            scopeType: scope.type
-          };
-
-          if (scope.object.objectId) {
-            try {
-              const variables = await debuggerContext.getScopeVariables(
-                scope.object.objectId,
-              );
-
-              if (variables.length > 0) {
-                scopeData.variables = variables.slice(0, 20).map(v => ({
-                  name: v.name,
-                  value: v.value
-                }));
-                if (variables.length > 20) {
-                  scopeData.variables.push({
-                    name: `... 还有 ${variables.length - 20} 个`,
-                    value: null
-                  });
-                }
-              }
-            } catch {
-              // 忽略单个作用域读取失败
-            }
-          }
-
-          scopes.push(scopeData);
-        }
-
-        result.scopes = scopes;
-      }
-
       response.setStructuredContent({
         success: true,
         message: '执行已暂停',
         tooltype: 'get_paused_info',
-        data: result
+        data: pausedInfo
       });
 
       response.appendResponseLine(

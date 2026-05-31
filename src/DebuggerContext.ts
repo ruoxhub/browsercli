@@ -27,6 +27,11 @@ export interface ScriptInfo {
   sourceMapURL?: string;
 }
 
+interface ScriptSourceCacheEntry {
+  raw: string;
+  beautified?: string;
+}
+
 export interface BreakpointInfo {
   breakpointId: string;
   url: string;
@@ -148,6 +153,7 @@ export class DebuggerContext {
   #client: CDPSession | null = null;
   #scripts = new Map<string, ScriptInfo>(); // scriptId -> info
   #urlToScripts = new Map<string, string[]>(); // url -> scriptId[]
+  #scriptSourceCache = new Map<string, ScriptSourceCacheEntry>(); // scriptId -> {raw, beautified?}
   #breakpoints = new Map<string, BreakpointInfo>(); // breakpointId -> info
   #executionContexts = new Map<number, ExecutionContextInfo>(); // contextId -> info
   #enabled = false;
@@ -246,8 +252,8 @@ export class DebuggerContext {
 
     this.#scripts.clear();
     this.#urlToScripts.clear();
+    this.#scriptSourceCache.clear();
     this.#executionContexts.clear();
-    this.#breakpoints.clear();
     this.#pausedState = {isPaused: false, callFrames: []};
     this.#breakpointLoopTracker.clear();
     this.#lastAutoRecoveryEvent = null;
@@ -606,9 +612,16 @@ export class DebuggerContext {
   }
 
   /**
-   * Get the source code of a script.
+   * Get the source code of a script. CDP result is cached per scriptId — subsequent
+   * calls return without a roundtrip. Scripts are immutable once parsed, so the cache
+   * is invalidated only by `disable()`.
    */
   async getScriptSource(scriptId: string): Promise<string> {
+    const cached = this.#scriptSourceCache.get(scriptId);
+    if (cached) {
+      return cached.raw;
+    }
+
     if (!this.#client) {
       throw new Error('Debugger not enabled');
     }
@@ -617,7 +630,31 @@ export class DebuggerContext {
       scriptId,
     });
 
+    this.#scriptSourceCache.set(scriptId, {raw: result.scriptSource});
     return result.scriptSource;
+  }
+
+  /**
+   * Get a beautified version of a script's source, computed lazily and cached.
+   * The producer runs once per scriptId and the result is reused across calls;
+   * if it throws, the original source is returned and not memoized.
+   */
+  async getBeautifiedScriptSource(
+    scriptId: string,
+    beautify: (source: string) => string,
+  ): Promise<string> {
+    const raw = await this.getScriptSource(scriptId);
+    const cached = this.#scriptSourceCache.get(scriptId)!;
+    if (cached.beautified !== undefined) {
+      return cached.beautified;
+    }
+    try {
+      const result = beautify(raw);
+      cached.beautified = result;
+      return result;
+    } catch {
+      return raw;
+    }
   }
 
   /**
