@@ -308,6 +308,15 @@ js-reverse config --list                 # 列出配置文件路径和来源
 - `gemini.apiKey` / `gemini.cliPath` / `gemini.model`
 - `browser.headless` / `browser.isolated` / `browser.executablePath` / `browser.channel` / `browser.useStealthScripts`
 
+`browser.channel` 取值（按引擎分组）：
+
+- Chromium (CDP)：`stable`、`beta`、`dev`、`canary`、`chrome`、`chrome-beta`、`chrome-dev`、`chrome-canary`、`chromium`
+- Chromium (WebDriver BiDi)：`bidi-chrome`、`bidi-chrome-beta`、`bidi-chrome-dev`、`bidi-chrome-canary`、`bidi-chromium`
+- Firefox (Juggler，默认)：`firefox`
+- Firefox (WebDriver BiDi)：`moz-firefox`
+
+> **使用 Camoufox 等 Firefox 衍生产品**：必须使用 `channel: "firefox"` + `executablePath` 指向 `camoufox.exe`，**不要用 `moz-firefox`**。Camoufox 仅实现 Playwright 自家的 Juggler 协议；`moz-firefox` 走的是 W3C WebDriver BiDi 路径，启动期会发送 `network.addDataCollector` 等命令，Camoufox 不支持，会立刻报 `Protocol error: unknown command`。
+
 **示例：**
 
 ```bash

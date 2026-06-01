@@ -30,6 +30,8 @@ import {config as dotenvConfig} from 'dotenv';
 import type {BrowserManagerConfig} from '../browser/browser.js';
 import {AIService} from '../services/AIService.js';
 import {OpenAIProvider} from '../services/OpenAIProvider.js';
+import {GeminiProvider} from '../services/GeminiProvider.js';
+import {AnthropicProvider} from '../services/AnthropicProvider.js';
 import {resolveDefaultEnvPath} from '../utils/projectPaths.js';
 
 import {
@@ -589,7 +591,46 @@ export function getAIConfig(): AIConfig | undefined {
     };
   }
 
-  const hasAnyProvider = config.openai;
+  // Gemini：环境变量 > config.json
+  const geminiApiKey = getEnvValue('GEMINI_API_KEY');
+  const geminiCliPath = getEnvValue('GEMINI_CLI_PATH');
+  const geminiUseAPI = getEnvBoolean('GEMINI_USE_API');
+  const geminiModel = getEnvValue('GEMINI_MODEL');
+  if (geminiApiKey || geminiCliPath || geminiUseAPI || geminiModel) {
+    config.gemini = {
+      apiKey: geminiApiKey,
+      cliPath: geminiCliPath,
+      useAPI: geminiUseAPI,
+      model: geminiModel,
+    };
+  } else if (fileConfig.gemini) {
+    config.gemini = {
+      apiKey: fileConfig.gemini.apiKey,
+      cliPath: fileConfig.gemini.cliPath,
+      useAPI: fileConfig.gemini.useAPI,
+      model: fileConfig.gemini.model,
+    };
+  } else if (provider === 'gemini') {
+    config.gemini = {};
+  }
+
+  // Anthropic：环境变量 > config.json
+  const anthropicApiKey = getEnvValue('ANTHROPIC_API_KEY');
+  if (anthropicApiKey) {
+    config.anthropic = {
+      apiKey: anthropicApiKey,
+      baseURL: getEnvValue('ANTHROPIC_BASE_URL'),
+      model: getEnvValue('ANTHROPIC_MODEL') || 'claude-3-5-sonnet-20241022',
+    };
+  } else if (fileConfig.anthropic) {
+    config.anthropic = {
+      apiKey: fileConfig.anthropic.apiKey || '',
+      baseURL: fileConfig.anthropic.baseURL,
+      model: fileConfig.anthropic.model || 'claude-3-5-sonnet-20241022',
+    };
+  }
+
+  const hasAnyProvider = config.openai || config.gemini || config.anthropic;
 
   return hasAnyProvider ? config : undefined;
 }
@@ -856,6 +897,33 @@ export function createAIService(config?: AIConfig): AIService | undefined {
           apiKey: aiConfig.openai.apiKey,
           baseURL: aiConfig.openai.baseURL,
           model: aiConfig.openai.model,
+        }),
+      );
+    }
+
+    case 'gemini': {
+      if (!aiConfig.gemini) {
+        throw new Error('Gemini configuration not found');
+      }
+      return new AIService(
+        new GeminiProvider({
+          apiKey: aiConfig.gemini.apiKey,
+          cliPath: aiConfig.gemini.cliPath,
+          useAPI: aiConfig.gemini.useAPI,
+          model: aiConfig.gemini.model,
+        }),
+      );
+    }
+
+    case 'anthropic': {
+      if (!aiConfig.anthropic) {
+        throw new Error('Anthropic configuration not found');
+      }
+      return new AIService(
+        new AnthropicProvider({
+          apiKey: aiConfig.anthropic.apiKey,
+          baseURL: aiConfig.anthropic.baseURL,
+          model: aiConfig.anthropic.model,
         }),
       );
     }

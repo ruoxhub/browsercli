@@ -50,6 +50,24 @@ export const OpenAIConfigSchema = zod
   })
   .strip();
 
+export const GeminiConfigSchema = zod
+  .object({
+    apiKey: optionalStringSchema.optional(),
+    cliPath: optionalStringSchema.optional(),
+    useAPI: booleanSchema.optional(),
+    model: optionalStringSchema.optional(),
+  })
+  .strip();
+
+export const AnthropicConfigSchema = zod
+  .object({
+    apiKey: optionalStringSchema.optional(),
+    baseURL: optionalStringSchema.optional(),
+    model: optionalStringSchema.optional(),
+  })
+  .strip();
+
+
 export const BrowserConfigSchema = zod
   .object({
     headless: booleanSchema.optional(),
@@ -57,6 +75,7 @@ export const BrowserConfigSchema = zod
     executablePath: optionalStringSchema.optional(),
     channel: zod
       .enum([
+        // Chromium (CDP)
         'stable',
         'beta',
         'dev',
@@ -65,8 +84,20 @@ export const BrowserConfigSchema = zod
         'chrome-beta',
         'chrome-dev',
         'chrome-canary',
+        'chromium',
+        // Chromium (WebDriver BiDi) — patchright routes channel.startsWith('bidi-') to BidiChromium
+        'bidi-chromium',
+        'bidi-chrome',
+        'bidi-chrome-beta',
+        'bidi-chrome-dev',
+        'bidi-chrome-canary',
+        // Firefox — patchright routes channel.startsWith('moz-') to Firefox launcher
+        'firefox',
+        'moz-firefox',
       ])
       .transform(channel => {
+        // Only Chrome CDP aliases collapse to short forms; bidi-* and moz-* pass through unchanged
+        // because patchright dispatches on their prefixes.
         const aliases = {
           chrome: 'stable',
           'chrome-beta': 'beta',
@@ -127,6 +158,8 @@ export const GlobalConfigSchema = zod
     runtimeDirName: optionalStringSchema.optional(),
     llmProvider: LLMProviderSchema.optional(),
     openai: OpenAIConfigSchema.optional(),
+    gemini: GeminiConfigSchema.optional(),
+    anthropic: AnthropicConfigSchema.optional(),
     browser: BrowserConfigSchema.optional(),
     debug: booleanSchema.optional(),
     logLevel: optionalStringSchema.optional(),
@@ -145,6 +178,13 @@ export const GlobalConfigSchema = zod
         message: 'must not be empty when llmProvider is openai',
       });
     }
+    if (config.llmProvider === 'anthropic' && config.anthropic?.apiKey === '') {
+      ctx.addIssue({
+        code: zod.ZodIssueCode.custom,
+        path: ['anthropic', 'apiKey'],
+        message: 'must not be empty when llmProvider is anthropic',
+      });
+    }
   });
 
 export type GlobalConfig = zodType.infer<typeof GlobalConfigSchema>;
@@ -160,6 +200,15 @@ export const AIConfigSchema = zod
       })
       .strip()
       .optional(),
+    gemini: GeminiConfigSchema.optional(),
+    anthropic: zod
+      .object({
+        apiKey: nonEmptyStringSchema,
+        baseURL: optionalStringSchema.optional(),
+        model: optionalStringSchema.optional(),
+      })
+      .strip()
+      .optional(),
   })
   .strip()
   .superRefine((config, ctx) => {
@@ -168,6 +217,13 @@ export const AIConfigSchema = zod
         code: zod.ZodIssueCode.custom,
         path: ['openai'],
         message: 'is required when provider is openai',
+      });
+    }
+    if (config.provider === 'anthropic' && !config.anthropic) {
+      ctx.addIssue({
+        code: zod.ZodIssueCode.custom,
+        path: ['anthropic'],
+        message: 'is required when provider is anthropic',
       });
     }
   });

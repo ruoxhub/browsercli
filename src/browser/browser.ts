@@ -11,6 +11,7 @@ import path from 'node:path';
 
 import {
   chromium,
+  firefox,
   type Browser,
   type BrowserContext,
   type Page,
@@ -258,10 +259,10 @@ interface McpLaunchOptions {
 
 export async function launch(options: McpLaunchOptions): Promise<Browser> {
   const {channel, executablePath, headless, isolated} = options;
+  const engine = resolveEngine(channel);
+  const profileBase = engine === 'firefox' ? 'firefox-profile' : 'chrome-profile';
   const profileDirName =
-    channel && channel !== 'stable'
-      ? `chrome-profile-${channel}`
-      : 'chrome-profile';
+    channel && channel !== 'stable' ? `${profileBase}-${channel}` : profileBase;
 
   let userDataDir = options.userDataDir;
   if (!isolated && !userDataDir) {
@@ -276,27 +277,27 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     });
   }
 
-  const args = [...(options.args ?? []), '--hide-crash-restore-bubble'];
-  if (headless) {
-    args.push('--screen-info={3840x2160}');
+  const args = [...(options.args ?? [])];
+  if (engine === 'chromium') {
+    args.push('--hide-crash-restore-bubble');
+    if (headless) {
+      args.push('--screen-info={3840x2160}');
+    }
+    if (options.devtools) {
+      args.push('--auto-open-devtools-for-tabs');
+    }
   }
 
-  let launchChannel: string | undefined;
-  if (options.devtools) {
-    args.push('--auto-open-devtools-for-tabs');
-  }
-  if (!executablePath) {
-    launchChannel =
-      channel && channel !== 'stable' ? `chrome-${channel}` : 'chrome';
-  }
+  const launchChannel = resolveLaunchChannel(channel, engine, !!executablePath);
+  const launcher = engine === 'firefox' ? firefox : chromium;
 
   try {
-    const browser = await chromium.launch({
+    const browser = await launcher.launch({
       channel: launchChannel,
       executablePath,
       headless,
       args,
-      ignoreDefaultArgs: HARMFUL_ARGS,
+      ...(engine === 'chromium' ? {ignoreDefaultArgs: HARMFUL_ARGS} : {}),
     });
 
     if (options.viewport) {
@@ -346,7 +347,49 @@ export async function ensureBrowserLaunched(
   return manager.ensureBrowser();
 }
 
-export type Channel = 'stable' | 'canary' | 'beta' | 'dev';
+export type Channel =
+  // Chromium (CDP) — schema collapses chrome/chrome-* aliases into stable/beta/dev/canary
+  | 'stable'
+  | 'beta'
+  | 'dev'
+  | 'canary'
+  | 'chromium'
+  // Chromium (WebDriver BiDi)
+  | 'bidi-chromium'
+  | 'bidi-chrome'
+  | 'bidi-chrome-beta'
+  | 'bidi-chrome-dev'
+  | 'bidi-chrome-canary'
+  // Firefox
+  | 'firefox'
+  | 'moz-firefox';
+
+type Engine = 'chromium' | 'firefox';
+
+function resolveEngine(channel?: string): Engine {
+  if (channel === 'firefox' || channel?.startsWith('moz-')) {
+    return 'firefox';
+  }
+  return 'chromium';
+}
+
+function resolveLaunchChannel(
+  channel: string | undefined,
+  engine: Engine,
+  hasExecutablePath: boolean,
+): string | undefined {
+  // Pass-through routes for patchright's prefix-based dispatch
+  if (channel?.startsWith('bidi-')) return channel;
+  if (channel?.startsWith('moz-')) return channel;
+
+  // Firefox without explicit channel: let patchright pick the default firefox build
+  if (engine === 'firefox') return undefined;
+
+  // Chromium CDP: only inject a Playwright channel name when no explicit executable
+  if (hasExecutablePath) return undefined;
+  if (!channel || channel === 'stable') return 'chrome';
+  return `chrome-${channel}`;
+}
 
 /**
  * Configuration options for BrowserManager
@@ -775,10 +818,13 @@ export class BrowserManager {
     const {channel, executablePath, headless, isolated, useStealthScripts} =
       this.config;
 
+    const engine = resolveEngine(channel);
+    const profileBase =
+      engine === 'firefox' ? 'firefox-profile' : 'chrome-profile';
     const profileDirName =
       channel && channel !== 'stable'
-        ? `chrome-profile-${channel}`
-        : 'chrome-profile';
+        ? `${profileBase}-${channel}`
+        : profileBase;
 
     let userDataDir = this.config.userDataDir;
     if (!isolated && !userDataDir) {
@@ -793,34 +839,33 @@ export class BrowserManager {
       });
     }
 
-    // Build args: start with DEFAULT_ARGS, add user args, then STEALTH_ARGS if enabled
-    const args = [
-      ...DEFAULT_ARGS,
-      ...(this.config.args ?? []),
-      '--hide-crash-restore-bubble',
-    ];
-
-    // Add stealth args if useStealthScripts is enabled
-    if (useStealthScripts) {
-      args.push(...STEALTH_ARGS);
+    // Chromium-specific args do not apply to Firefox; patchright surfaces unknown
+    // Firefox flags as launch errors.
+    const args = [...(this.config.args ?? [])];
+    if (engine === 'chromium') {
+      args.unshift(...DEFAULT_ARGS);
+      args.push('--hide-crash-restore-bubble');
+      if (useStealthScripts) {
+        args.push(...STEALTH_ARGS);
+      }
+      if (headless) {
+        args.push('--screen-info={3840x2160}');
+      }
+      if (this.config.devtools) {
+        args.push('--auto-open-devtools-for-tabs');
+      }
     }
 
-    if (headless) {
-      args.push('--screen-info={3840x2160}');
-    }
-
-    let launchChannel: string | undefined;
-    if (this.config.devtools) {
-      args.push('--auto-open-devtools-for-tabs');
-    }
-
-    if (!executablePath) {
-      launchChannel =
-        channel && channel !== 'stable' ? `chrome-${channel}` : 'chrome';
-    }
+    const launchChannel = resolveLaunchChannel(
+      channel,
+      engine,
+      !!executablePath,
+    );
+    const launcher = engine === 'firefox' ? firefox : chromium;
 
     try {
       logger.debug('Launching browser with config:', {
+        engine,
         channel: launchChannel,
         executablePath,
         headless,
@@ -828,12 +873,12 @@ export class BrowserManager {
         useStealthScripts,
       });
 
-      this.browser = await chromium.launch({
+      this.browser = await launcher.launch({
         channel: launchChannel,
         executablePath,
         headless,
         args,
-        ignoreDefaultArgs: HARMFUL_ARGS,
+        ...(engine === 'chromium' ? {ignoreDefaultArgs: HARMFUL_ARGS} : {}),
       });
 
       logger.debug('Browser launched successfully');

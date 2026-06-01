@@ -110,6 +110,34 @@ describe('config schema validation', {concurrency: false}, () => {
     }
   });
 
+  it('accepts moz-firefox channel without aliasing it', () => {
+    const config = validateGlobalConfig({
+      browser: {channel: 'moz-firefox'},
+    });
+    assert.strictEqual(config.browser?.channel, 'moz-firefox');
+  });
+
+  it('accepts firefox channel as a plain Firefox launcher hint', () => {
+    const config = validateGlobalConfig({
+      browser: {channel: 'firefox'},
+    });
+    assert.strictEqual(config.browser?.channel, 'firefox');
+  });
+
+  it('accepts bidi-chrome channel without aliasing it', () => {
+    const config = validateGlobalConfig({
+      browser: {channel: 'bidi-chrome'},
+    });
+    assert.strictEqual(config.browser?.channel, 'bidi-chrome');
+  });
+
+  it('accepts bidi-chromium channel without aliasing it', () => {
+    const config = validateGlobalConfig({
+      browser: {channel: 'bidi-chromium'},
+    });
+    assert.strictEqual(config.browser?.channel, 'bidi-chromium');
+  });
+
   it('validates and coerces environment-backed config before resolution', () => {
     process.env.BROWSER_HEADLESS = 'false';
     process.env.REMOTE_DEBUGGING_PORT = '9223';

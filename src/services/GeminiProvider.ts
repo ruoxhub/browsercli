@@ -12,7 +12,7 @@
  */
 
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 import type { AIProvider, AIMessage, AIResponse, ChatOptions } from './AIService.js';
 
@@ -85,6 +85,9 @@ export class GeminiProvider implements AIProvider {
     }
   }
 
+
+
+
   /**
    * Chat using Gemini API
    * @param messages - Array of messages
@@ -92,7 +95,71 @@ export class GeminiProvider implements AIProvider {
    * @returns AI response
    */
   private async chatAPI(messages: AIMessage[], options?: ChatOptions): Promise<AIResponse> {
-    throw new Error('Gemini API mode not yet implemented. Please use CLI mode or install gemini-cli.');
+    if (!this.apiKey) {
+      throw new Error('Gemini API key is required for API mode.');
+    }
+
+    const model = options?.model || this.defaultModel;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKey}`;
+
+    const systemMessage = messages.find(msg => msg.role === 'system');
+    const contents = messages
+      .filter(msg => msg.role !== 'system')
+      .map(msg => ({
+        role: msg.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: msg.content }]
+      }));
+
+    const body: any = {
+      contents,
+      generationConfig: {
+        temperature: options?.temperature,
+        maxOutputTokens: options?.maxTokens,
+      }
+    };
+
+    if (systemMessage) {
+      body.systemInstruction = {
+        parts: [{ text: systemMessage.content }]
+      };
+    }
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Gemini API error: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      const data = await response.json() as any;
+      const candidate = data.candidates?.[0];
+      if (!candidate || !candidate.content || !candidate.content.parts?.[0]) {
+        throw new Error('No response content from Gemini API');
+      }
+
+      const text = candidate.content.parts[0].text || '';
+      const usage = data.usageMetadata
+        ? {
+            promptTokens: data.usageMetadata.promptTokenCount,
+            completionTokens: data.usageMetadata.candidatesTokenCount,
+            totalTokens: data.usageMetadata.totalTokenCount,
+          }
+        : undefined;
+
+      return {
+        content: text,
+        usage,
+      };
+    } catch (error) {
+      throw this.handleError(error);
+    }
   }
 
   /**
@@ -140,7 +207,80 @@ export class GeminiProvider implements AIProvider {
     prompt: string,
     isFilePath: boolean
   ): Promise<string> {
-    throw new Error('Gemini API mode not yet implemented. Please use CLI mode or install gemini-cli.');
+    if (!this.apiKey) {
+      throw new Error('Gemini API key is required for API mode.');
+    }
+
+    let imageData: string;
+    let mediaType: string;
+
+    if (isFilePath) {
+      if (!existsSync(imageInput)) {
+        throw new Error(`Image file not found: ${imageInput}`);
+      }
+      const imageBuffer = readFileSync(imageInput);
+      imageData = imageBuffer.toString('base64');
+      const ext = imageInput.toLowerCase().split('.').pop() || '';
+      mediaType = this.getMediaType(ext);
+    } else {
+      if (imageInput.startsWith('data:')) {
+        const matches = imageInput.match(/^data:([^;]+);base64,(.+)$/);
+        if (!matches) {
+          throw new Error('Invalid data URL format');
+        }
+        mediaType = matches[1];
+        imageData = matches[2];
+      } else {
+        imageData = imageInput;
+        mediaType = 'image/png'; // Default to PNG
+      }
+    }
+
+    const model = this.defaultModel;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKey}`;
+
+    const body = {
+      contents: [
+        {
+          parts: [
+            {
+              inlineData: {
+                mimeType: mediaType,
+                data: imageData,
+              }
+            },
+            {
+              text: prompt,
+            }
+          ]
+        }
+      ]
+    };
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Gemini API error: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      const data = await response.json() as any;
+      const candidate = data.candidates?.[0];
+      if (!candidate || !candidate.content || !candidate.content.parts?.[0]) {
+        throw new Error('No response content from Gemini API');
+      }
+
+      return candidate.content.parts[0].text || '';
+    } catch (error) {
+      throw this.handleError(error);
+    }
   }
 
   /**
@@ -354,6 +494,25 @@ export class GeminiProvider implements AIProvider {
       this.cliAvailable = false;
       GeminiProvider.cliAvailabilityCache.set(this.cliPath, false);
       return false;
+    }
+  }
+
+  /**
+   * Get media type from file extension
+   */
+  private getMediaType(ext: string): string {
+    switch (ext.toLowerCase()) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'gif':
+        return 'image/gif';
+      case 'webp':
+        return 'image/webp';
+      default:
+        return 'image/png'; // Default to PNG
     }
   }
 

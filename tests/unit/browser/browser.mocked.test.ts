@@ -16,7 +16,7 @@ import {
   StealthScripts2025,
   type StealthReport,
 } from '../../../src/modules/stealth/StealthScripts2025.js';
-import {chromium} from 'patchright';
+import {chromium, firefox} from 'patchright';
 
 interface ResettableStealthScripts {
   injectAll: typeof StealthScripts2025.injectAll;
@@ -234,6 +234,112 @@ describe('browser.ts mocked', () => {
     await assert.rejects(async () => {
       await (manager as unknown as BrowserManagerLike).launchBrowser();
     }, /Failed to launch browser: failed to spawn/);
+  });
+
+  it('routes moz-firefox channel to firefox.launch without Chromium-only args', async () => {
+    await BrowserManager.resetInstance();
+    const manager = BrowserManager.getInstance({
+      channel: 'moz-firefox',
+      isolated: true,
+      headless: true,
+      devtools: true,
+      useStealthScripts: true,
+      args: ['--user-flag'],
+    });
+
+    let firefoxArgs: Record<string, unknown> | null = null;
+    let chromiumCalled = false;
+    const originalFirefoxLaunch = firefox.launch;
+    const fakeFirefoxBrowser = {
+      connected: true,
+      on: () => undefined,
+      pages: async () => [],
+      contexts: () => [] as unknown[],
+      close: async () => undefined,
+      isConnected: () => true,
+    };
+    firefox.launch = async opts => {
+      firefoxArgs = (opts ?? {}) as Record<string, unknown>;
+      return fakeFirefoxBrowser as unknown as Awaited<
+        ReturnType<typeof firefox.launch>
+      >;
+    };
+    const originalChromiumLaunch = chromium.launch;
+    chromium.launch = async () => {
+      chromiumCalled = true;
+      throw new Error('chromium.launch should not be called for moz-firefox');
+    };
+
+    try {
+      await (manager as unknown as BrowserManagerLike).launchBrowser();
+    } finally {
+      firefox.launch = originalFirefoxLaunch;
+      chromium.launch = originalChromiumLaunch;
+    }
+
+    assert.strictEqual(chromiumCalled, false);
+    assert.ok(firefoxArgs, 'firefox.launch should have been invoked');
+    assert.strictEqual(
+      (firefoxArgs as Record<string, unknown>)['channel'],
+      'moz-firefox',
+      'Firefox channel must pass through unchanged for prefix dispatch',
+    );
+    assert.strictEqual(
+      'ignoreDefaultArgs' in (firefoxArgs as Record<string, unknown>),
+      false,
+      'ignoreDefaultArgs is Chromium-only and must not be sent to firefox.launch',
+    );
+    const passedArgs = (firefoxArgs as Record<string, unknown>)[
+      'args'
+    ] as string[];
+    assert.ok(Array.isArray(passedArgs));
+    assert.ok(
+      passedArgs.includes('--user-flag'),
+      'user-supplied args must still be forwarded',
+    );
+    assert.ok(
+      !passedArgs.includes('--hide-crash-restore-bubble'),
+      'Chromium-only flag must not leak into Firefox launch args',
+    );
+    assert.ok(
+      !passedArgs.includes('--auto-open-devtools-for-tabs'),
+      'devtools flag is Chromium-only',
+    );
+  });
+
+  it('passes bidi-chrome channel through to chromium.launch unchanged', async () => {
+    await BrowserManager.resetInstance();
+    const manager = BrowserManager.getInstance({
+      channel: 'bidi-chrome',
+      isolated: true,
+      headless: true,
+      devtools: false,
+    });
+
+    let chromiumArgs: Record<string, unknown> | null = null;
+    const fakeChromiumBrowser = {
+      connected: true,
+      on: () => undefined,
+      pages: async () => [],
+      contexts: () => [] as unknown[],
+      close: async () => undefined,
+      isConnected: () => true,
+    };
+    chromium.launch = async opts => {
+      chromiumArgs = (opts ?? {}) as Record<string, unknown>;
+      return fakeChromiumBrowser as unknown as Awaited<
+        ReturnType<typeof chromium.launch>
+      >;
+    };
+
+    await (manager as unknown as BrowserManagerLike).launchBrowser();
+
+    assert.ok(chromiumArgs);
+    assert.strictEqual(
+      (chromiumArgs as Record<string, unknown>)['channel'],
+      'bidi-chrome',
+      'bidi-* channels must pass through verbatim so patchright dispatches to BidiChromium',
+    );
   });
 
   it('injectStealth supports duplicate skip and targetcreated injection', async () => {

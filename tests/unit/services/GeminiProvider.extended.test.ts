@@ -239,4 +239,158 @@ exit 0
       globalThis.clearTimeout = originalClearTimeout;
     }
   });
+
+  describe('GeminiProvider API mode', () => {
+    it('covers API chat success', async () => {
+      const originalFetch = globalThis.fetch;
+      
+      const mockFetchResponse = {
+        candidates: [
+          {
+            content: {
+              parts: [{ text: 'API response text' }]
+            }
+          }
+        ],
+        usageMetadata: {
+          promptTokenCount: 12,
+          candidatesTokenCount: 34,
+          totalTokenCount: 46
+        }
+      };
+
+      let requestedUrl = '';
+      let requestedBody: any = null;
+
+      globalThis.fetch = (async (url: string, options: any) => {
+        requestedUrl = url;
+        requestedBody = JSON.parse(options.body);
+        return {
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          json: async () => mockFetchResponse,
+        } as Response;
+      }) as any;
+
+      try {
+        const provider = new GeminiProvider({ apiKey: 'mock-gemini-key', useAPI: true, model: 'gemini-1.5-pro' });
+        const res = await provider.chat([
+          { role: 'system', content: 'system-instruction' },
+          { role: 'user', content: 'hello' }
+        ], { temperature: 0.5, maxTokens: 100 });
+
+        assert.strictEqual(res.content, 'API response text');
+        assert.deepStrictEqual(res.usage, {
+          promptTokens: 12,
+          completionTokens: 34,
+          totalTokens: 46
+        });
+        assert.ok(requestedUrl.includes('gemini-1.5-pro'));
+        assert.ok(requestedUrl.includes('key=mock-gemini-key'));
+        assert.deepStrictEqual(requestedBody.systemInstruction, {
+          parts: [{ text: 'system-instruction' }]
+        });
+        assert.deepStrictEqual(requestedBody.contents, [
+          { role: 'user', parts: [{ text: 'hello' }] }
+        ]);
+        assert.strictEqual(requestedBody.generationConfig.temperature, 0.5);
+        assert.strictEqual(requestedBody.generationConfig.maxOutputTokens, 100);
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+
+    it('covers API chat error and empty response paths', async () => {
+      const originalFetch = globalThis.fetch;
+
+      // 1. Error path
+      globalThis.fetch = (async () => {
+        return {
+          ok: false,
+          status: 500,
+          statusText: 'Internal Error',
+          text: async () => 'Error payload details',
+        } as Response;
+      }) as any;
+
+      try {
+        const provider = new GeminiProvider({ apiKey: 'mock-gemini-key', useAPI: true });
+        await assert.rejects(
+          async () => provider.chat([{ role: 'user', content: 'hello' }]),
+          /Gemini API error: 500 Internal Error/
+        );
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+
+      // 2. Empty response path
+      globalThis.fetch = (async () => {
+        return {
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          json: async () => ({ candidates: [] }),
+        } as Response;
+      }) as any;
+
+      try {
+        const provider = new GeminiProvider({ apiKey: 'mock-gemini-key', useAPI: true });
+        await assert.rejects(
+          async () => provider.chat([{ role: 'user', content: 'hello' }]),
+          /No response content from Gemini API/
+        );
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+
+    it('covers API analyzeImage success with file path and base64', async () => {
+      const originalFetch = globalThis.fetch;
+
+      let requestedBody: any = null;
+
+      globalThis.fetch = (async (url: string, options: any) => {
+        requestedBody = JSON.parse(options.body);
+        return {
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          json: async () => ({
+            candidates: [
+              {
+                content: {
+                  parts: [{ text: 'image analysis text' }]
+                }
+              }
+            ]
+          }),
+        } as Response;
+      }) as any;
+
+      try {
+        const provider = new GeminiProvider({ apiKey: 'mock-gemini-key', useAPI: true });
+        
+        // Test base64 format imageInput
+        const res1 = await provider.analyzeImage('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'describe this');
+        assert.strictEqual(res1, 'image analysis text');
+        assert.strictEqual(requestedBody.contents[0].parts[0].inlineData.mimeType, 'image/png');
+        assert.strictEqual(requestedBody.contents[0].parts[0].inlineData.data, 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=');
+        assert.strictEqual(requestedBody.contents[0].parts[1].text, 'describe this');
+
+        // Test normal base64 format imageInput without header
+        const res2 = await provider.analyzeImage('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'describe this');
+        assert.strictEqual(res2, 'image analysis text');
+        assert.strictEqual(requestedBody.contents[0].parts[0].inlineData.mimeType, 'image/png'); // defaults to png
+
+        // Test invalid data URL
+        await assert.rejects(
+          async () => provider.analyzeImage('data:invalid', 'describe this'),
+          /Invalid data URL format/
+        );
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+  });
 });

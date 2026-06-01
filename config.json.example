@@ -4,14 +4,16 @@
   "databaseUrl": "postgresql://ruoxing:mrx123456@127.0.0.1:5432/js_reverse_mcp",
   "llmProvider": "openai",
   "openai": {
-    "baseURL": "https://newapi.ruoxhub.com/v1",
+    "baseURL": "",
     "model": "deepseek-v4-flash",
-    "apiKey": "sk-pfPtBFEKkZzT30rJxEKRIcC6viLZMEcb7SNmxaHQZWBK5xDP"
+    "apiKey": ""
   },
   "browser": {
     "headless": false,
     "isolated": true,
     "executablePath": "",
+    "_channel_options": "stable | beta | dev | canary | chrome[-beta|-dev|-canary] | chromium | bidi-chrome[-beta|-dev|-canary] | bidi-chromium | firefox | moz-firefox",
+    "_camoufox_note": "Camoufox 等 Firefox 衍生产品请用 channel='firefox' + executablePath 指向 camoufox.exe；moz-firefox 走 BiDi 协议，Camoufox 不支持。",
     "channel": "chrome",
     "useStealthScripts": true,
     "browserURL": "http://127.0.0.1:19222",
