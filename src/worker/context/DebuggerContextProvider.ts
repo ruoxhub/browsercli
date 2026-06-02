@@ -5,7 +5,7 @@
  */
 
 /**
- * DebuggerSessionManager — CDP 调试上下文的创建、复用和释放
+ * DebuggerContextProvider — CDP 调试上下文的创建、复用和释放
  *
  * 每个 Page 绑定一个 DebuggerContext + CDPSession。
  * 复用已启用的 DebuggerContext，避免重复 attach。
@@ -15,15 +15,13 @@ import type {CDPSession, Page} from 'patchright';
 
 import {DebuggerContext} from '../../DebuggerContext.js';
 
-export class DebuggerSessionManager {
+export class DebuggerContextProvider {
   private _debuggerContexts = new WeakMap<Page, DebuggerContext>();
   private _debuggerSessions = new WeakMap<Page, CDPSession>();
 
   /**
    * 获取或创建指定页面的 DebuggerContext。
    * 已启用的会被复用；未启用或未创建的会重新 attach CDP session。
-   *
-   * 页面关闭时会自动清理（绑定在 page.once('close', ...)）。
    */
   async ensureForPage(page: Page): Promise<DebuggerContext> {
     const existing = this._debuggerContexts.get(page);
@@ -47,7 +45,6 @@ export class DebuggerSessionManager {
 
   /**
    * 释放指定页面的 DebuggerContext 与 CDPSession。
-   * 忽略清理过程中可能抛出的错误（页面/会话可能已经不存在）。
    */
   async dispose(page: Page): Promise<void> {
     const debuggerContext = this._debuggerContexts.get(page);

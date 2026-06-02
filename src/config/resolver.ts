@@ -29,9 +29,9 @@ import {config as dotenvConfig} from 'dotenv';
 
 import type {BrowserManagerConfig} from '../browser/browser.js';
 import {AIService} from '../services/AIService.js';
-import {OpenAIProvider} from '../services/OpenAIProvider.js';
-import {GeminiProvider} from '../services/GeminiProvider.js';
 import {AnthropicProvider} from '../services/AnthropicProvider.js';
+import {GeminiProvider} from '../services/GeminiProvider.js';
+import {OpenAIProvider} from '../services/OpenAIProvider.js';
 import {resolveDefaultEnvPath} from '../utils/projectPaths.js';
 
 import {

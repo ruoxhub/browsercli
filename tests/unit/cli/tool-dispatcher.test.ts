@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import {describe, it} from 'node:test';
+import {before, describe, it} from 'node:test';
 
 import {AxiError} from 'axi-sdk-js';
 
 import {toolDispatcherCommand} from '../../../src/cli/commands/tool-dispatcher.js';
 import {validateToolArgs} from '../../../src/cli/tool-arg-validator.js';
+import {ensureToolsMeta, getToolMeta} from '../../../src/cli/tools-meta.js';
 import type {WorkerContext} from '../../../src/cli/types.js';
 
 interface InvokeCall {
@@ -42,6 +43,9 @@ function createWorkerContext() {
 }
 
 describe('tool-arg-validator', () => {
+  before(async () => {
+    await ensureToolsMeta();
+  });
   it('rejects unsupported params before invocation', () => {
     const result = validateToolArgs('scroll_by', {
       direction: 'down',
@@ -118,6 +122,35 @@ describe('tool-arg-validator', () => {
     assert.deepStrictEqual(result, {
       ok: false,
       error: 'scroll_by 的参数 pixels 必须是数字',
+    });
+  });
+
+  it('implicitly converts valid number strings', () => {
+    const result = validateToolArgs('select_page', {
+      pageIdx: '2',
+    });
+
+    assert.deepStrictEqual(result, {
+      ok: true,
+      value: {
+        pageIdx: 2,
+      },
+    });
+  });
+
+  it('implicitly converts valid boolean strings', () => {
+    const result = validateToolArgs('evaluate_script', {
+      function: '() => 1',
+      verbose: 'true',
+    });
+
+    assert.deepStrictEqual(result, {
+      ok: true,
+      value: {
+        function: '() => 1',
+        verbose: true,
+        context: 'page',
+      },
     });
   });
 });

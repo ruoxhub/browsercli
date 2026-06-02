@@ -6,10 +6,7 @@
 
 import {getAliasesForTool, suggestSimilarKeys} from './tool-aliases.js';
 import {getToolMeta} from './tools-meta.js';
-import {
-  type ToolArgSpec,
-  type ToolArgSpecMap,
-} from './zod-introspect.js';
+import {type ToolArgSpec, type ToolArgSpecMap} from './zod-introspect.js';
 
 export interface ValidationSuccess {
   ok: true;
@@ -85,7 +82,7 @@ function validateType(
   key: string,
   spec: ToolArgSpec,
   value: unknown,
-): ValidationFailure | null {
+): {ok: true; value: unknown} | ValidationFailure {
   switch (spec.type) {
     case 'string':
       if (typeof value !== 'string') {
@@ -94,23 +91,40 @@ function validateType(
           error: `${toolName} 的参数 ${key} 必须是字符串`,
         };
       }
-      return null;
-    case 'number':
-      if (typeof value !== 'number' || !Number.isFinite(value)) {
+      return {ok: true, value};
+    case 'number': {
+      let numValue = value;
+      if (typeof value === 'string') {
+        const parsed = Number(value);
+        if (value.trim() !== '' && !isNaN(parsed) && Number.isFinite(parsed)) {
+          numValue = parsed;
+        }
+      }
+      if (typeof numValue !== 'number' || !Number.isFinite(numValue)) {
         return {
           ok: false,
           error: `${toolName} 的参数 ${key} 必须是数字`,
         };
       }
-      return null;
-    case 'boolean':
-      if (typeof value !== 'boolean') {
+      return {ok: true, value: numValue};
+    }
+    case 'boolean': {
+      let boolValue = value;
+      if (typeof value === 'string') {
+        if (value.toLowerCase() === 'true') {
+          boolValue = true;
+        } else if (value.toLowerCase() === 'false') {
+          boolValue = false;
+        }
+      }
+      if (typeof boolValue !== 'boolean') {
         return {
           ok: false,
           error: `${toolName} 的参数 ${key} 必须是布尔值`,
         };
       }
-      return null;
+      return {ok: true, value: boolValue};
+    }
     case 'string[]':
       if (
         !Array.isArray(value) ||
@@ -121,21 +135,17 @@ function validateType(
           error: `${toolName} 的参数 ${key} 必须是字符串数组`,
         };
       }
-      return null;
+      return {ok: true, value};
     case 'object':
-      if (
-        value === null ||
-        typeof value !== 'object' ||
-        Array.isArray(value)
-      ) {
+      if (value === null || typeof value !== 'object' || Array.isArray(value)) {
         return {
           ok: false,
           error: `${toolName} 的参数 ${key} 必须是 JSON 对象（提示：用 --data '{...}' 或 --file params.json 传递）`,
         };
       }
-      return null;
+      return {ok: true, value};
     default:
-      return null;
+      return {ok: true, value};
   }
 }
 
@@ -173,19 +183,25 @@ export function validateToolArgs(
       continue;
     }
 
-    const typeError = validateType(toolName, key, spec, value);
-    if (typeError) {
-      return typeError;
+    const typeResult = validateType(toolName, key, spec, value);
+    if (!typeResult.ok) {
+      return typeResult as ValidationFailure;
     }
 
-    if (spec.enum && typeof value === 'string' && !spec.enum.includes(value)) {
+    const validatedValue = (typeResult as {value: unknown}).value;
+
+    if (
+      spec.enum &&
+      typeof validatedValue === 'string' &&
+      !spec.enum.includes(validatedValue)
+    ) {
       return {
         ok: false,
         error: `${toolName} 的参数 ${key} 仅支持：${spec.enum.join(', ')}`,
       };
     }
 
-    normalized[key] = value;
+    normalized[key] = validatedValue;
   }
 
   return {ok: true, value: normalized};

@@ -7,15 +7,11 @@
 /**
  * ToolContextProvider — Tool 执行上下文的 Facade
  *
- * 本类拆分为四个单一职责的子模块，各自承担原本散落在这里的逻辑：
- *   - PageManager            页面/Frame/Dialog/超时与网络 CPU 节流
- *   - DebuggerSessionManager CDP DebuggerContext 的创建与释放
- *   - DataCollectorManager   Network/Console/WebSocket 收集与查询
- *   - ServiceLocator         Deobfuscator/CodeAnalyzer/AISummarizer 等
- *                            分析服务的惰性装配
- *
- * 本文件保留所有既有公开方法签名，调用转发给对应子模块，
- * 以避免破坏 ToolAdapter、Runtime、各 Tool handler 等现有消费者。
+ * 把原单体的职责拆到四个子模块，本类只做转发以保持公共 API 不变：
+ *   - BrowserContextProvider   页面/Frame/Dialog/超时与节流
+ *   - DebuggerContextProvider  CDP DebuggerContext 的创建与释放
+ *   - CollectorContextProvider Network/Console/WebSocket 收集与查询
+ *   - ServiceLocator           分析服务的惰性装配
  */
 
 import type {
@@ -41,23 +37,22 @@ import type {
   NetworkRequestCollector,
   WsCollector,
 } from './collectors.js';
-import {DataCollectorManager} from './context/DataCollectorManager.js';
-import {DebuggerSessionManager} from './context/DebuggerSessionManager.js';
-import {PageManager} from './context/PageManager.js';
+import {BrowserContextProvider} from './context/BrowserContextProvider.js';
+import {CollectorContextProvider} from './context/CollectorContextProvider.js';
+import {DebuggerContextProvider} from './context/DebuggerContextProvider.js';
 import {ServiceLocator} from './context/ServiceLocator.js';
 import type {ToolTabContext} from './ToolCallContextGuard.js';
 
 type TraceResult = unknown;
 
 function ignoreDebuggerWarmupError(): void {
-  // DebuggerContext warmup is opportunistic; callers still resolve frames/pages
-  // through the selected Page if a CDP session cannot be established yet.
+  // CDP warmup is best-effort; the caller can still resolve frames/pages without it.
 }
 
 export class ToolContextProvider {
-  private readonly _pageManager = new PageManager();
-  private readonly _debuggerManager = new DebuggerSessionManager();
-  private readonly _dataCollectorManager = new DataCollectorManager();
+  private readonly _browserContext = new BrowserContextProvider();
+  private readonly _debuggerContext = new DebuggerContextProvider();
+  private readonly _collectorContext = new CollectorContextProvider();
   private readonly _serviceLocator: ServiceLocator;
 
   private _isRunningPerformanceTrace = false;
@@ -82,11 +77,11 @@ export class ToolContextProvider {
     if (this._isDisposed) {
       throw new Error('ToolContextProvider 已销毁，无法重新初始化');
     }
-    await this._pageManager.syncPages();
+    await this._browserContext.syncPages();
 
-    const context = this._pageManager.getContext();
+    const context = this._browserContext.getContext();
     if (context) {
-      this._dataCollectorManager.start(context);
+      this._collectorContext.start(context);
     }
   }
 
@@ -97,23 +92,23 @@ export class ToolContextProvider {
     if (this._isDisposed) return;
     this._isDisposed = true;
 
-    void this._debuggerManager.disposeAll(this._pageManager.getPages());
-    this._dataCollectorManager.dispose();
-    this._pageManager.dispose();
+    void this._debuggerContext.disposeAll(this._browserContext.getPages());
+    this._collectorContext.dispose();
+    this._browserContext.dispose();
   }
 
   // ─── Browser / Context 管理 ──────────────────────────
 
   setBrowser(browser: Browser): void {
-    this._pageManager.setBrowser(browser);
+    this._browserContext.setBrowser(browser);
   }
 
   getBrowser(): Browser | null {
-    return this._pageManager.getBrowser();
+    return this._browserContext.getBrowser();
   }
 
   setBrowserManager(browserManager: BrowserManager): void {
-    this._pageManager.setBrowserManager(browserManager);
+    this._browserContext.setBrowserManager(browserManager);
     this._serviceLocator.setBrowserManager(browserManager);
   }
 
@@ -122,54 +117,54 @@ export class ToolContextProvider {
   }
 
   setContext(context: BrowserContext): void {
-    this._pageManager.setContext(context);
+    this._browserContext.setContext(context);
     // BrowserContext 就绪后立刻启动收集器，保证在 init() 之前发生的
     // 页面创建也会被收集到。
-    this._dataCollectorManager.start(context);
+    this._collectorContext.start(context);
   }
 
   getContext(): BrowserContext | null {
-    return this._pageManager.getContext();
+    return this._browserContext.getContext();
   }
 
   isBrowserConnected(): boolean {
-    return this._pageManager.isBrowserConnected();
+    return this._browserContext.isBrowserConnected();
   }
 
   async isCollectorRunning(): Promise<boolean> {
-    return this._pageManager.getContext() !== null;
+    return this._browserContext.getContext() !== null;
   }
 
   // ─── PageCollector 访问（保留旧 API） ─────────────────
 
   get networkCollector(): NetworkRequestCollector {
-    return this._dataCollectorManager.networkCollector;
+    return this._collectorContext.networkCollector;
   }
 
   get consoleCollector(): ConsoleMessageCollector {
-    return this._dataCollectorManager.consoleCollector;
+    return this._collectorContext.consoleCollector;
   }
 
   get wsCollector(): WsCollector {
-    return this._dataCollectorManager.wsCollector;
+    return this._collectorContext.wsCollector;
   }
 
   // ─── 页面/Frame 管理 ─────────────────────────────────
 
   getSelectedPage(): Page | null {
-    return this._pageManager.getSelectedPage();
+    return this._browserContext.getSelectedPage();
   }
 
   setSelectedPage(page: Page | null): void {
-    this._pageManager.setSelectedPage(page);
+    this._browserContext.setSelectedPage(page);
   }
 
   getSelectedFrame(): Frame | null {
-    return this._pageManager.getSelectedFrame();
+    return this._browserContext.getSelectedFrame();
   }
 
   setSelectedFrame(frame: Frame | null): void {
-    this._pageManager.setSelectedFrame(frame);
+    this._browserContext.setSelectedFrame(frame);
   }
 
   /**
@@ -177,11 +172,11 @@ export class ToolContextProvider {
    * 选中后异步触发 DebuggerContext 初始化，与旧行为保持一致。
    */
   selectFrameByIdx(frameIdx: number): Frame | null {
-    const frame = this._pageManager.selectFrameByIdx(frameIdx);
+    const frame = this._browserContext.selectFrameByIdx(frameIdx);
     if (frame) {
-      const page = this._pageManager.getSelectedPage();
+      const page = this._browserContext.getSelectedPage();
       if (page) {
-        void this._debuggerManager
+        void this._debuggerContext
           .ensureForPage(page)
           .catch(ignoreDebuggerWarmupError);
       }
@@ -190,7 +185,7 @@ export class ToolContextProvider {
   }
 
   getPages(): Page[] {
-    return this._pageManager.getPages();
+    return this._browserContext.getPages();
   }
 
   getContextMeta(): ToolTabContext {
@@ -206,58 +201,58 @@ export class ToolContextProvider {
   }
 
   async syncPages(): Promise<Page[]> {
-    return this._pageManager.syncPages();
+    return this._browserContext.syncPages();
   }
 
   setPages(pages: Page[]): void {
-    this._pageManager.setPages(pages);
+    this._browserContext.setPages(pages);
   }
 
   getPageByIdx(idx: number): Page {
-    return this._pageManager.getPageByIdx(idx);
+    return this._browserContext.getPageByIdx(idx);
   }
 
   async newPage(): Promise<Page> {
-    const page = await this._pageManager.newPage();
+    const page = await this._browserContext.newPage();
     // BrowserContext 级监听器已经会自动注册新页面，但如果 context 收集尚未启动
     // （例如 setContext 之前调用了 newPage，理论上不会发生但保守处理），补一刀。
-    if (!this._dataCollectorManager.isStarted()) {
-      this._dataCollectorManager.attachPage(page);
+    if (!this._collectorContext.isStarted()) {
+      this._collectorContext.attachPage(page);
     }
     return page;
   }
 
   selectPage(page: Page): void {
-    this._pageManager.selectPage(page);
+    this._browserContext.selectPage(page);
     // 页面切换后重新初始化 debugger，与旧实现一致
-    void this._debuggerManager
+    void this._debuggerContext
       .ensureForPage(page)
       .catch(ignoreDebuggerWarmupError);
   }
 
   async bringPageToFront(page: Page): Promise<void> {
-    await this._pageManager.bringPageToFront(page);
+    await this._browserContext.bringPageToFront(page);
   }
 
   syncPageContext(page: Page): void {
-    this._pageManager.syncPageContext(page);
+    this._browserContext.syncPageContext(page);
   }
 
   async getActivePage(): Promise<Page> {
-    return this._pageManager.getActivePage();
+    return this._browserContext.getActivePage();
   }
 
   // ─── Debugger 管理 ───────────────────────────────────
 
   async getDebuggerContext(page?: Page): Promise<DebuggerContext> {
-    const activePage = page ?? (await this._pageManager.getActivePage());
-    return this._debuggerManager.ensureForPage(activePage);
+    const activePage = page ?? (await this._browserContext.getActivePage());
+    return this._debuggerContext.ensureForPage(activePage);
   }
 
   async disposeDebuggerContext(page?: Page): Promise<void> {
-    const activePage = page ?? this._pageManager.getSelectedPage();
+    const activePage = page ?? this._browserContext.getSelectedPage();
     if (!activePage) return;
-    await this._debuggerManager.dispose(activePage);
+    await this._debuggerContext.dispose(activePage);
   }
 
   // ─── 分析服务（ServiceLocator 代理）──────────────────
@@ -289,38 +284,38 @@ export class ToolContextProvider {
   // ─── Dialog ─────────────────────────────────────────
 
   getDialog(): Dialog | undefined {
-    return this._pageManager.getDialog();
+    return this._browserContext.getDialog();
   }
 
   clearDialog(): void {
-    this._pageManager.clearDialog();
+    this._browserContext.clearDialog();
   }
 
   // ─── 网络/CPU 节流 ───────────────────────────────────
 
   setNetworkConditions(conditions: string | null): void {
-    this._pageManager.setNetworkConditions(conditions);
+    this._browserContext.setNetworkConditions(conditions);
   }
 
   getNetworkConditions(): string | null {
-    return this._pageManager.getNetworkConditions();
+    return this._browserContext.getNetworkConditions();
   }
 
   setCpuThrottlingRate(rate: number): void {
-    this._pageManager.setCpuThrottlingRate(rate);
+    this._browserContext.setCpuThrottlingRate(rate);
   }
 
   getCpuThrottlingRate(): number {
-    return this._pageManager.getCpuThrottlingRate();
+    return this._browserContext.getCpuThrottlingRate();
   }
 
   // ─── Network 数据查询 ────────────────────────────────
 
   private _resolveNetworkPage(pageIdx?: number): Page | null {
     if (typeof pageIdx === 'number') {
-      return this._pageManager.getPageByIdx(pageIdx);
+      return this._browserContext.getPageByIdx(pageIdx);
     }
-    return this._pageManager.getSelectedPage();
+    return this._browserContext.getSelectedPage();
   }
 
   getNetworkRequests(
@@ -328,22 +323,22 @@ export class ToolContextProvider {
     pageIdx?: number,
   ): HTTPRequest[] {
     const page = this._resolveNetworkPage(pageIdx);
-    return this._dataCollectorManager.getNetworkRequests(
+    return this._collectorContext.getNetworkRequests(
       page,
       includePreservedRequests,
     );
   }
 
   getNetworkRequestById(reqid: number): HTTPRequest {
-    return this._dataCollectorManager.getNetworkRequestById(
-      this._pageManager.getCandidatePages(),
+    return this._collectorContext.getNetworkRequestById(
+      this._browserContext.getCandidatePages(),
       reqid,
     );
   }
 
   getNetworkRequestStableId(request: unknown): number {
-    return this._dataCollectorManager.getNetworkRequestStableId(
-      this._pageManager.getCandidatePages(),
+    return this._collectorContext.getNetworkRequestStableId(
+      this._browserContext.getCandidatePages(),
       request,
     );
   }
@@ -370,22 +365,22 @@ export class ToolContextProvider {
   getConsoleData(
     includePreservedMessages?: boolean,
   ): Array<ConsoleMessage | Error> {
-    return this._dataCollectorManager.getConsoleData(
-      this._pageManager.getSelectedPage(),
+    return this._collectorContext.getConsoleData(
+      this._browserContext.getSelectedPage(),
       includePreservedMessages,
     );
   }
 
   getConsoleMessageById(id: number): ConsoleMessage | Error {
-    return this._dataCollectorManager.getConsoleMessageById(
-      this._pageManager.getSelectedPage(),
+    return this._collectorContext.getConsoleMessageById(
+      this._browserContext.getSelectedPage(),
       id,
     );
   }
 
   getConsoleMessageStableId(message: unknown): number {
-    return this._dataCollectorManager.getConsoleMessageStableId(
-      this._pageManager.getCandidatePages(),
+    return this._collectorContext.getConsoleMessageStableId(
+      this._browserContext.getCandidatePages(),
       message,
     );
   }
@@ -393,22 +388,22 @@ export class ToolContextProvider {
   // ─── WebSocket 数据查询 ──────────────────────────────
 
   getWebSocketConnections(includePreservedData?: boolean): WebSocketData[] {
-    return this._dataCollectorManager.getWebSocketConnections(
-      this._pageManager.getSelectedPage(),
+    return this._collectorContext.getWebSocketConnections(
+      this._browserContext.getSelectedPage(),
       includePreservedData,
     );
   }
 
   getWebSocketConnectionById(wsid: number): WebSocketData {
-    return this._dataCollectorManager.getWebSocketConnectionById(
-      this._pageManager.getSelectedPage(),
+    return this._collectorContext.getWebSocketConnectionById(
+      this._browserContext.getSelectedPage(),
       wsid,
     );
   }
 
   getWebSocketStableId(ws: unknown): number {
-    return this._dataCollectorManager.getWebSocketStableId(
-      this._pageManager.getCandidatePages(),
+    return this._collectorContext.getWebSocketStableId(
+      this._browserContext.getCandidatePages(),
       ws,
     );
   }

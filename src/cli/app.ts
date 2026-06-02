@@ -21,8 +21,8 @@ import {SekiroInvoker} from './sekiro-invoker.js';
 import type {WorkerContext} from './types.js';
 import {WorkerManager} from './worker-manager.js';
 
-export const cliDescription = 'JS逆向工程MCP服务 — 标准化前端JavaScript逆向流程';
-export const cliVersion = '2.0.3';
+export const cliDescription = '逆向工程CLI服务';
+export const cliVersion = '1.0.0';
 
 export const cliCommands: Record<string, AxiCliCommand<WorkerContext>> = {
   call: toolDispatcherCommand,

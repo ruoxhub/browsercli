@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {ToolResponseAccumulator} from '../../../src/worker/ToolResponseAccumulator.js';
+import {ToolResponseAccumulator} from '../../../src/worker/ToolResponseProcessor.js';
 import {deobfuscateCode} from '../../../src/tools/analyzer/deobfuscate.js';
 import {ToolContextProvider} from '../../../src/worker/ToolContextProvider.js';
 

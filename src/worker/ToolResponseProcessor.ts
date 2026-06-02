@@ -5,6 +5,7 @@
  */
 
 import type {ImageContentData, Response} from '../tools/ToolDefinition.js';
+import {DetailedDataManager} from '../utils/detailedDataManager.js';
 import type {PaginationOptions} from '../utils/types.js';
 
 /**
@@ -112,5 +113,49 @@ function parseFencedJson(text: string): unknown {
     return JSON.parse(match[1]);
   } catch {
     return undefined;
+  }
+}
+
+/**
+ * ToolResponseProcessor — 统一的响应处理器，融合了规范化与大响应 Offload 逻辑
+ */
+export class ToolResponseProcessor {
+  constructor(
+    private readonly manager = DetailedDataManager.getInstance(),
+    private readonly thresholdBytes = 512 * 1024,
+  ) {}
+
+  /**
+   * 将 handler 原始返回值规范化为标准 MCP Tool 响应结构
+   */
+  normalize(result: unknown): unknown {
+    if (this.isToolDefinitionResponse(result)) {
+      return result;
+    }
+
+    const accumulator = new ToolResponseAccumulator();
+    if (typeof result === 'object' && result !== null) {
+      accumulator.setStructuredContent(result);
+    } else if (typeof result === 'string') {
+      accumulator.appendResponseLine(result);
+    } else {
+      accumulator.setStructuredContent(result);
+    }
+    return accumulator.toJSON();
+  }
+
+  /**
+   * 统一处理响应，对超大字段进行 Offload 暂存
+   */
+  process(response: unknown): unknown {
+    return this.manager.smartHandle(response, this.thresholdBytes);
+  }
+
+  private isToolDefinitionResponse(result: unknown): boolean {
+    return (
+      typeof result === 'object' &&
+      result !== null &&
+      ('content' in result || 'structuredContent' in result || 'text' in result)
+    );
   }
 }

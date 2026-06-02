@@ -13,7 +13,7 @@ import {createToolError, ErrorCodes} from '../utils/errors.js';
 import type {DefineToolContextFactory} from './DefineToolContextFactory.js';
 import type {ToolContextProvider} from './ToolContextProvider.js';
 import type {LoadedHandler} from './ToolHandlerLoader.js';
-import {ToolResponseAccumulator} from './ToolResponseAccumulator.js';
+import {ToolResponseAccumulator} from './ToolResponseProcessor.js';
 
 const FRAME_EVALUATE_TIMEOUT = 10_000;
 

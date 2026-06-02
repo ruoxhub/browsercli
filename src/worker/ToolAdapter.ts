@@ -25,6 +25,7 @@ import {
 } from '../cli/tools-meta.js';
 import {ToolPrerequisiteChecker} from '../tools/prerequisites/ToolPrerequisiteChecker.js';
 import type {ActionHandler} from '../types/rpc.js';
+import type {ToolInvokeEvent} from '../web/types.js';
 
 import {DefineToolContextFactory} from './DefineToolContextFactory.js';
 import {ToolCallContextGuard} from './ToolCallContextGuard.js';
@@ -32,22 +33,8 @@ import type {ToolContextProvider} from './ToolContextProvider.js';
 import {ToolExecutionPipeline} from './ToolExecutionPipeline.js';
 import {ToolExecutionRouter} from './ToolExecutionRouter.js';
 import {ToolHandlerLoader} from './ToolHandlerLoader.js';
-import {ToolResponseOffloader} from './ToolResponseOffloader.js';
+import {ToolResponseProcessor} from './ToolResponseProcessor.js';
 import {ToolTelemetry} from './ToolTelemetry.js';
-
-/**
- * 跨 worker / web 边界的统一 tool 调用事件 payload。
- * Phase 1 (T1) 会被 src/web/types.ts re-export 给前端用。
- */
-export interface ToolInvokeEvent {
-  traceId: string;
-  toolName: string;
-  phase: 'end';
-  ts: number;
-  durationMs?: number;
-  success: boolean;
-  error?: {code: string; message: string};
-}
 
 export type ToolInvokeListener = (event: ToolInvokeEvent) => void;
 
@@ -71,7 +58,7 @@ export class ToolAdapter {
     this.pipeline = new ToolExecutionPipeline(
       this.loader,
       this.router,
-      new ToolResponseOffloader(),
+      new ToolResponseProcessor(),
       new ToolTelemetry(contextProvider),
       new ToolCallContextGuard(() => contextProvider),
       new ToolPrerequisiteChecker(contextProvider),

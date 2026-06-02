@@ -5,15 +5,12 @@
  */
 
 /**
- * PageManager — 页面级状态管理
+ * BrowserContextProvider — 浏览器及页面级状态管理
  *
  * 职责：
  * - 维护 Browser / BrowserContext / Page 列表 / 选中 Page / 选中 Frame
  * - Dialog 监听器生命周期
  * - 超时、网络/CPU 节流与选中页联动
- *
- * 不负责：数据收集（DataCollectorManager）、调试会话（DebuggerSessionManager）、
- *         分析服务（ServiceLocator）。
  */
 
 import type {
@@ -44,7 +41,7 @@ function getNetworkMultiplierFromString(condition: string | null): number {
   }
 }
 
-export class PageManager {
+export class BrowserContextProvider {
   private _browser: Browser | null = null;
   private _context: BrowserContext | null = null;
   private _browserManager: BrowserManager | null = null;
@@ -121,7 +118,6 @@ export class PageManager {
 
   /**
    * 同步页面列表并在必要时回退选中第一个可用页面。
-   * 参考 McpContext.createPagesSnapshot。
    */
   async syncPages(): Promise<Page[]> {
     const context = this._context;
@@ -156,7 +152,6 @@ export class PageManager {
 
   /**
    * 设置选中页但不做 Dialog/Timeout 副作用（用于底层状态同步）。
-   * 如需联动 Dialog、超时、调试器，请使用 {@link selectPage}。
    */
   setSelectedPage(page: Page | null): void {
     this.selectedPage = page;
@@ -165,7 +160,6 @@ export class PageManager {
 
   /**
    * 切换选中页，并负责 Dialog 监听器迁移与超时更新。
-   * 调用方（ToolContextProvider）应在此之后驱动 Debugger 初始化。
    */
   selectPage(page: Page): void {
     const oldPage = this.selectedPage;
@@ -214,7 +208,6 @@ export class PageManager {
 
   /**
    * 按索引选择 Frame，返回选中的 Frame；返回 null 表示索引越界或无页面。
-   * 注意：调用方负责在成功后触发 Debugger 重新初始化。
    */
   selectFrameByIdx(frameIdx: number): Frame | null {
     const page = this.selectedPage;
@@ -303,7 +296,6 @@ export class PageManager {
 
   /**
    * 候选查询页面：优先当前选中页，其次其他页面。
-   * 主要供 DataCollectorManager 等依赖 selected+others 顺序的模块使用。
    */
   getCandidatePages(): Page[] {
     return this.selectedPage

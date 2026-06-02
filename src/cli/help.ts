@@ -27,8 +27,8 @@ export function generateTopLevelHelp(options?: {
 }): string {
   const bin = options?.bin ?? 'js-reverse';
   const description =
-    options?.description ?? 'JS逆向工程MCP服务 — 标准化前端JavaScript逆向流程';
-  const version = options?.version ?? '2.0.3';
+    options?.description ?? '逆向工程CLI服务';
+  const version = options?.version ?? '1.0.0';
   const commands = options?.commands ?? [
     'start',
     'stop',

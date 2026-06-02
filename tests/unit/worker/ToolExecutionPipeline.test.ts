@@ -19,7 +19,7 @@ import {ErrorCodes, ToolError} from '../../../src/utils/errors.js';
 import {ToolExecutionPipeline} from '../../../src/worker/ToolExecutionPipeline.js';
 import type {ToolExecutionRouter} from '../../../src/worker/ToolExecutionRouter.js';
 import type {ToolHandlerLoader} from '../../../src/worker/ToolHandlerLoader.js';
-import type {ToolResponseOffloader} from '../../../src/worker/ToolResponseOffloader.js';
+import {ToolResponseProcessor} from '../../../src/worker/ToolResponseProcessor.js';
 import {ToolResultRecorder} from '../../../src/worker/ToolResultRecorder.js';
 import type {ToolTelemetry} from '../../../src/worker/ToolTelemetry.js';
 
@@ -64,9 +64,10 @@ function createPipeline(
       return options.result ?? {ok: true};
     },
   } as unknown as ToolExecutionRouter;
-  const offloader = {
-    handle: options.offload ?? (response => response),
-  } as unknown as ToolResponseOffloader;
+  const processor = {
+    normalize: (result: unknown) => new ToolResponseProcessor().normalize(result),
+    process: options.offload ?? (response => response),
+  } as unknown as ToolResponseProcessor;
   const telemetryState = options.telemetry ?? {
     successes: [],
     failures: [],
@@ -80,7 +81,7 @@ function createPipeline(
     pipeline: new ToolExecutionPipeline(
       loader,
       router,
-      offloader,
+      processor,
       telemetry,
       undefined,
       undefined,
@@ -141,9 +142,10 @@ describe('ToolExecutionPipeline', () => {
     const router = {
       execute: async () => ({ok: true}),
     } as unknown as ToolExecutionRouter;
-    const offloader = {
-      handle: (response: unknown) => response,
-    } as unknown as ToolResponseOffloader;
+    const processor = {
+      normalize: (result: unknown) => new ToolResponseProcessor().normalize(result),
+      process: (response: unknown) => response,
+    } as unknown as ToolResponseProcessor;
     const failures: unknown[] = [];
     const telemetry = {
       success: () => undefined,
@@ -152,7 +154,7 @@ describe('ToolExecutionPipeline', () => {
     const pipeline = new ToolExecutionPipeline(
       loader,
       router,
-      offloader,
+      processor,
       telemetry,
     );
 
@@ -221,9 +223,10 @@ describe('ToolExecutionPipeline', () => {
     const router = {
       execute: async () => ({ok: true}),
     } as unknown as ToolExecutionRouter;
-    const offloader = {
-      handle: (response: unknown) => response,
-    } as unknown as ToolResponseOffloader;
+    const processor = {
+      normalize: (result: unknown) => new ToolResponseProcessor().normalize(result),
+      process: (response: unknown) => response,
+    } as unknown as ToolResponseProcessor;
     const failures: unknown[] = [];
     const telemetry = {
       success: () => undefined,
@@ -232,7 +235,7 @@ describe('ToolExecutionPipeline', () => {
     const pipeline = new ToolExecutionPipeline(
       loader,
       router,
-      offloader,
+      processor,
       telemetry,
       undefined,
       {

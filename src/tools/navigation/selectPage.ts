@@ -6,6 +6,10 @@
 
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
+import {
+  normalizeBrowserRuntimeError,
+  withOperationTimeout,
+} from '../shared/browserRuntime.js';
 import {defineTool} from '../ToolDefinition.js';
 
 /**
@@ -34,6 +38,16 @@ export const selectPage = defineTool({
     context.selectPage(page);
     context.syncPageContext(page);
 
+    let title: string;
+    try {
+      title = await withOperationTimeout(
+        page.title(),
+        `读取页面 ${pageIdx} 标题`,
+      );
+    } catch (error) {
+      title = `[unavailable] ${normalizeBrowserRuntimeError(error)}`;
+    }
+
     response.setStructuredContent({
       success: true,
       message: `已选择页面 ${pageIdx}`,
@@ -41,7 +55,7 @@ export const selectPage = defineTool({
       data: {
         selectedIndex: pageIdx,
         url: page.url(),
-        title: await page.title(),
+        title,
       }
     });
   },

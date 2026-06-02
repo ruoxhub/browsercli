@@ -12,8 +12,7 @@ import {createToolError, ErrorCodes, ToolError} from '../utils/errors.js';
 import type {ToolCallContextGuard} from './ToolCallContextGuard.js';
 import type {ToolExecutionRouter} from './ToolExecutionRouter.js';
 import type {ToolHandlerLoader} from './ToolHandlerLoader.js';
-import {ToolResponseAccumulator} from './ToolResponseAccumulator.js';
-import type {ToolResponseOffloader} from './ToolResponseOffloader.js';
+import type {ToolResponseProcessor} from './ToolResponseProcessor.js';
 import {ToolResultRecorder} from './ToolResultRecorder.js';
 import type {ToolTelemetry} from './ToolTelemetry.js';
 
@@ -21,7 +20,7 @@ export class ToolExecutionPipeline {
   constructor(
     private readonly loader: ToolHandlerLoader,
     private readonly router: ToolExecutionRouter,
-    private readonly offloader: ToolResponseOffloader,
+    private readonly processor: ToolResponseProcessor,
     private readonly telemetry: ToolTelemetry,
     private readonly contextGuard?: ToolCallContextGuard,
     private readonly prerequisiteChecker?: ToolPrerequisiteChecker,
@@ -59,11 +58,11 @@ export class ToolExecutionPipeline {
       }
 
       const rawResult = await this.router.execute(meta, handler, params);
-      const normalized = this.normalizeResponse(rawResult);
+      const normalized = this.processor.normalize(rawResult);
       this.contextGuard?.recordCall(toolName);
       const enriched =
         this.contextGuard?.enrichResponse(toolName, normalized) ?? normalized;
-      const response = this.offloader.handle(enriched);
+      const response = this.processor.process(enriched);
       this.telemetry.success(
         toolName,
         params,
@@ -91,7 +90,12 @@ export class ToolExecutionPipeline {
               error instanceof Error ? error.message : String(error),
               {toolName},
             );
-      this.telemetry.failure(toolName, toolError, Date.now() - startedAt, traceId);
+      this.telemetry.failure(
+        toolName,
+        toolError,
+        Date.now() - startedAt,
+        traceId,
+      );
       this.resultRecorder.record({
         toolName,
         traceId,
@@ -107,29 +111,5 @@ export class ToolExecutionPipeline {
       });
       throw toolError;
     }
-  }
-
-  private normalizeResponse(result: unknown): unknown {
-    if (this.isToolDefinitionResponse(result)) {
-      return result;
-    }
-
-    const accumulator = new ToolResponseAccumulator();
-    if (typeof result === 'object' && result !== null) {
-      accumulator.setStructuredContent(result);
-    } else if (typeof result === 'string') {
-      accumulator.appendResponseLine(result);
-    } else {
-      accumulator.setStructuredContent(result);
-    }
-    return accumulator.toJSON();
-  }
-
-  private isToolDefinitionResponse(result: unknown): boolean {
-    return (
-      typeof result === 'object' &&
-      result !== null &&
-      ('content' in result || 'structuredContent' in result || 'text' in result)
-    );
   }
 }

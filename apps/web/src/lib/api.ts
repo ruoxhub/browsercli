@@ -32,6 +32,19 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
 
   const response = await fetch(url, options);
   if (!response.ok) {
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      try {
+        const errResult = await response.json() as any;
+        if (errResult && errResult.error?.message) {
+          throw new Error(errResult.error.message);
+        }
+      } catch (e) {
+        if (e instanceof Error && e.message !== `HTTP error! status: ${response.status}`) {
+          throw e;
+        }
+      }
+    }
     throw new Error(`HTTP error! status: ${response.status}`);
   }
 

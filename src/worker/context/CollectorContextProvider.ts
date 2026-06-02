@@ -5,16 +5,12 @@
  */
 
 /**
- * DataCollectorManager — 网络/Console/WebSocket 三个 PageCollector 的 Facade
+ * CollectorContextProvider — 网络/Console/WebSocket 三个 PageCollector 的 Facade/Provider
  *
  * 职责：
  * - 统一创建/销毁 NetworkRequestCollector、ConsoleMessageCollector、WsCollector
  * - 在 BrowserContext 就绪后启动上下文级别的新页面自动注册
- * - 对外暴露数据查询 API（供 ToolContextProvider 委托给工具层）
- *
- * 设计目标：
- * - 废除原 ToolContextProvider 中的 inline WeakMap 收集路径，统一走 PageCollector
- * - 查询 API 的页面候选列表由调用方（PageManager）提供
+ * - 对外暴露数据查询 API
  */
 
 import type {
@@ -35,7 +31,7 @@ import {
   type TrackedWebSocketData,
 } from '../collectors.js';
 
-export class DataCollectorManager {
+export class CollectorContextProvider {
   private readonly _networkCollector = new NetworkRequestCollector();
   private readonly _consoleCollector = new ConsoleMessageCollector();
   private readonly _wsCollector = new WsCollector();
@@ -59,7 +55,6 @@ export class DataCollectorManager {
 
   /**
    * 启动上下文级别的收集（监听新页面创建、为已有页面注册收集器）。
-   * 幂等：重复调用只会对新的 context 重新绑定。
    */
   start(context: BrowserContext): void {
     this._networkCollector.startContextCollection(context);
@@ -69,8 +64,7 @@ export class DataCollectorManager {
   }
 
   /**
-   * 为单个 Page 手动注册收集器，用于在 context 之外新建的页面
-   * 或在 start() 之前就已存在的页面同步。
+   * 为单个 Page 手动注册收集器。
    */
   attachPage(page: Page): void {
     this._networkCollector.attachToPage(page);

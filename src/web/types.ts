@@ -13,8 +13,6 @@
  * 任何字段变更必须**同时**改两处，否则会出现序列化层的静默错位。
  */
 
-import type {ToolInvokeEvent} from '../worker/ToolAdapter.js';
-
 // ==================== HTTP API ====================
 
 export interface ApiResponse<T = unknown> {
@@ -133,10 +131,16 @@ export interface HookSampleEvent {
  * Tool 调用事件（tool.invoke 频道 payload 类型）。
  * 由 ToolAdapter.onInvoke 桥接 contextProvider.eventBus 的
  * tool:called/error 转译产出。同一个 traceId 出现一次（phase: 'end'）。
- *
- * 复用 P0.3 在 ToolAdapter 已定义的 ToolInvokeEvent，避免双源真理。
  */
-export type {ToolInvokeEvent};
+export interface ToolInvokeEvent {
+  traceId: string;
+  toolName: string;
+  phase: 'end';
+  ts: number;
+  durationMs?: number;
+  success: boolean;
+  error?: {code: string; message: string};
+}
 
 // ==================== Worker Status (state channel: worker.status) ====================
 
