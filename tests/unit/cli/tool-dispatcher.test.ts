@@ -68,8 +68,6 @@ describe('tool-arg-validator', () => {
       ok: true,
       value: {
         function: '() => 1',
-        context: 'page',
-        verbose: false,
       },
     });
   });
@@ -95,7 +93,6 @@ describe('tool-arg-validator', () => {
       ok: true,
       value: {
         inputPath: 'artifacts/wasm/sample.wasm',
-        foldExprs: true,
       },
     });
   });
@@ -149,7 +146,23 @@ describe('tool-arg-validator', () => {
       value: {
         function: '() => 1',
         verbose: true,
-        context: 'page',
+      },
+    });
+  });
+
+  it('strips redundant args nesting if args is an object and the tool does not accept args param', () => {
+    const result = validateToolArgs('scroll_by', {
+      args: {
+        direction: 'down',
+        pixels: 500,
+      },
+    });
+
+    assert.deepStrictEqual(result, {
+      ok: true,
+      value: {
+        direction: 'down',
+        pixels: 500,
       },
     });
   });
@@ -210,8 +223,6 @@ describe('tool-dispatcher', () => {
         toolName: 'evaluate_script',
         toolArgs: {
           function: '() => 1',
-          context: 'page',
-          verbose: false,
         },
       },
     ]);

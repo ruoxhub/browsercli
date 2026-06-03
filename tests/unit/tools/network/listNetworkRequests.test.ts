@@ -45,6 +45,9 @@ function createMockResponse() {
     attachConsoleMessage: () => undefined,
     setIncludeWebSocketConnections: () => undefined,
     attachWebSocket: () => undefined,
+    setStructuredContent: (content: unknown) => {
+      lines.push(JSON.stringify(content));
+    },
   };
 }
 
@@ -465,5 +468,43 @@ describe('listNetworkRequests', () => {
         ],
       },
     ]);
+  });
+
+  it('filters requests by URL keyword', async () => {
+    const pages = [{id: 0}];
+    const selectedPage = pages[0];
+    const zhihuRequest = createRequest('https://www.zhihu.com/api/v4/feed');
+    const otherRequest = createRequest('https://example.test/api/order');
+
+    const response = createMockResponse();
+    setupContextProvider({
+      getPages: () => pages as never[],
+      getSelectedPage: () => selectedPage as never,
+      getSelectedPageIndex: () => 0,
+      getNetworkRequests: () => [zhihuRequest, otherRequest] as never[],
+      getNetworkRequestById: () => {
+        throw new Error('unused');
+      },
+      getNetworkRequestStableId: request =>
+        request === (zhihuRequest as never) ? 301 : 302,
+      getRequestInitiator: () => undefined,
+      getDevToolsData: async () => undefined,
+      resolveCdpRequestId: () => undefined,
+    });
+
+    await listNetworkRequests.handler(
+      {params: {urlFilter: 'zhihu.com'}} as never,
+      response as never,
+      undefined,
+    );
+
+    const result = parseResult(response);
+    assert.equal(result.success, true);
+    const data = result.data as Record<string, unknown>;
+    assert.equal((data.requests as unknown[]).length, 1);
+    assert.equal(
+      (data.requests as Array<Record<string, unknown>>)[0]?.url,
+      'https://www.zhihu.com/api/v4/feed',
+    );
   });
 });

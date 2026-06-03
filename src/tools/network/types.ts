@@ -123,6 +123,8 @@ export interface ListNetworkRequestsParams {
   waitTimeoutMs?: number;
   /** 按请求头关键词过滤 */
   headerFilter?: string;
+  /** 按 URL 关键词过滤（不区分大小写） */
+  urlFilter?: string;
   /** 是否返回签名相关证据关联 */
   includeSignatureEvidence?: boolean;
 }

@@ -884,7 +884,14 @@ export class BrowserManager {
       logger.debug('Browser launched successfully');
 
       // 获取默认 BrowserContext
-      this.context = this.browser.contexts()[0] ?? undefined;
+      let ctx = this.browser.contexts()[0] ?? undefined;
+      if (!ctx) {
+        ctx = await this.browser.newContext({
+          bypassCSP: true,
+          acceptInsecureCerts: this.config.acceptInsecureCerts,
+        });
+      }
+      this.context = ctx;
 
       // Set up crash detection
       this.setupCrashDetection();

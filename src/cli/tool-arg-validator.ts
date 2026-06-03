@@ -155,11 +155,25 @@ export function validateToolArgs(
 ): ValidationSuccess | ValidationFailure {
   const meta = getToolMeta(toolName);
   const specs = meta?.argSpecs;
-  if (!specs || Object.keys(specs).length === 0) {
-    return {ok: true, value: rawArgs};
+
+  let actualArgs = rawArgs;
+  if (
+    rawArgs &&
+    typeof rawArgs === 'object' &&
+    'args' in rawArgs &&
+    rawArgs.args &&
+    typeof rawArgs.args === 'object' &&
+    !Array.isArray(rawArgs.args) &&
+    (!specs || !('args' in specs))
+  ) {
+    actualArgs = rawArgs.args as Record<string, unknown>;
   }
 
-  const normalizedRawArgs = normalizeRawArgs(toolName, rawArgs, specs);
+  if (!specs || Object.keys(specs).length === 0) {
+    return {ok: true, value: actualArgs};
+  }
+
+  const normalizedRawArgs = normalizeRawArgs(toolName, actualArgs, specs);
   if (!normalizedRawArgs.ok) {
     return normalizedRawArgs;
   }

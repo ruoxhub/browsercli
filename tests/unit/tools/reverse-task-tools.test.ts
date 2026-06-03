@@ -26,15 +26,33 @@ import {DetailedDataManager} from '../../../src/utils/detailedDataManager.js';
 
 interface ResponseShape {
   lines: string[];
+  structuredContent?: unknown;
   appendResponseLine(value: string): void;
+  setStructuredContent(content: unknown): void;
 }
 
 function makeResponse(): ResponseShape {
   const lines: string[] = [];
+  let structuredContent: unknown = undefined;
   return {
     lines,
+    get structuredContent() {
+      return structuredContent;
+    },
     appendResponseLine: (value: string) => {
       lines.push(value);
+    },
+    setStructuredContent: (content: unknown) => {
+      structuredContent = content;
+      if (content && typeof content === 'object' && 'success' in content && content.success === false) {
+        console.error('DEBUG setStructuredContent failure:', JSON.stringify(content));
+      }
+      lines.push('```json');
+      const payload = (content && typeof content === 'object' && 'data' in content && content.data)
+        ? content.data
+        : content;
+      lines.push(JSON.stringify(payload, null, 2));
+      lines.push('```');
     },
   };
 }
@@ -335,7 +353,7 @@ describe('reverse task tools', () => {
         {
           params: {
             hookId: 'fetch-hook-1',
-            view: 'summary',
+            view: 'detail',
             maxRecords: 5,
           },
         } as Parameters<typeof getHookData.handler>[0],

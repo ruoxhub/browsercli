@@ -177,6 +177,12 @@ export const listNetworkRequests = defineTool({
       .describe(
         'Filter requests by a keyword present in their headers (case-insensitive).',
       ),
+    urlFilter: zod
+      .string()
+      .optional()
+      .describe(
+        'Filter requests by a keyword present in their URL (case-insensitive).',
+      ),
     includeSignatureEvidence: zod
       .boolean()
       .optional()
@@ -234,6 +240,12 @@ export const listNetworkRequests = defineTool({
           existingRequests = existingRequests.filter(request =>
             request.url().includes(params.waitForRequest!),
           );
+          if (params.urlFilter) {
+            const filter = params.urlFilter.toLowerCase();
+            existingRequests = existingRequests.filter(request =>
+              request.url().toLowerCase().includes(filter),
+            );
+          }
           const existingData: NetworkRequestData[] = existingRequests.map(request => {
             const reqid =
               getRuntime().contextProvider!.getNetworkRequestStableId(request);
@@ -280,6 +292,13 @@ export const listNetworkRequests = defineTool({
           return Object.entries(headers).some(([key, value]) => {
             return `${key}: ${value}`.toLowerCase().includes(keyword);
           });
+        });
+      }
+
+      if (params.urlFilter) {
+        const filter = params.urlFilter.toLowerCase();
+        requests = requests.filter(request => {
+          return request.url().toLowerCase().includes(filter);
         });
       }
 

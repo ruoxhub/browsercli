@@ -50,9 +50,8 @@ export const TOOL_ALIASES: Readonly<Record<string, Readonly<Record<string, strin
     regex: 'pattern',
   },
   list_network_requests: {
-    url: 'headerFilter',
-    urlFilter: 'headerFilter',
-    filter: 'headerFilter',
+    url: 'urlFilter',
+    filter: 'urlFilter',
   },
   collect_code: {
     mode: 'smartMode',
