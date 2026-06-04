@@ -188,28 +188,42 @@ export class CodeCompressor {
    * 解压代码（增强版）
    */
   async decompress(compressed: string, maxRetries = 3): Promise<string> {
-    let lastError: Error | null = null;
-
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      try {
+    return this.retryUntilSuccess(
+      async () => {
         const buffer = Buffer.from(compressed, 'base64');
         const decompressed = await gunzipAsync(buffer);
         return decompressed.toString('utf-8');
+      },
+      maxRetries,
+      'Decompression',
+    );
+  }
+
+  /**
+   * 通用重试包装：失败时线性退避后重试
+   */
+  private async retryUntilSuccess<T>(
+    operation: () => Promise<T>,
+    maxRetries: number,
+    operationName: string,
+  ): Promise<T> {
+    let lastError: Error | null = null;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        return await operation();
       } catch (error) {
         lastError = error as Error;
         logger.warn(
-          `Decompression attempt ${attempt + 1}/${maxRetries} failed:`,
+          `${operationName} attempt ${attempt + 1}/${maxRetries} failed:`,
           error,
         );
-
         if (attempt < maxRetries - 1) {
           await this.waitBeforeRetry(attempt);
         }
       }
     }
-
-    logger.error('Failed to decompress code after retries:', lastError);
-    throw lastError || new Error('Decompression failed');
+    logger.error(`${operationName} failed after retries:`, lastError);
+    throw lastError || new Error(`${operationName} failed`);
   }
 
   /**

@@ -68,6 +68,31 @@ export interface ScreenshotOptions {
   fullPage?: boolean;
 }
 
+interface EmulatedDevice {
+  viewport: {width: number; height: number};
+  userAgent: string;
+}
+
+const EMULATED_DEVICES: Record<'iPhone' | 'iPad' | 'Android', EmulatedDevice> = {
+  iPhone: {
+    viewport: {width: 375, height: 812},
+    userAgent:
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15',
+  },
+  iPad: {
+    viewport: {width: 768, height: 1024},
+    userAgent:
+      'Mozilla/5.0 (iPad; CPU OS 14_0 like Mac OS X) AppleWebKit/605.1.15',
+  },
+  Android: {
+    viewport: {width: 360, height: 640},
+    userAgent:
+      'Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 Chrome/91.0.4472.120',
+  },
+};
+
+const DEFAULT_NAVIGATION_TIMEOUT_MS = 30000;
+
 export class PageController {
   constructor(private collector: CodeCollector) {}
 
@@ -87,7 +112,7 @@ export class PageController {
 
     await page.goto(url, {
       waitUntil: options?.waitUntil || 'networkidle',
-      timeout: options?.timeout || 30000,
+      timeout: options?.timeout || DEFAULT_NAVIGATION_TIMEOUT_MS,
     });
 
     const loadTime = Date.now() - startTime;
@@ -110,7 +135,7 @@ export class PageController {
     const page = await this.collector.getActivePage();
     await page.reload({
       waitUntil: options?.waitUntil || 'networkidle',
-      timeout: options?.timeout || 30000,
+      timeout: options?.timeout || DEFAULT_NAVIGATION_TIMEOUT_MS,
     });
     logger.info('Page reloaded');
   }
@@ -331,12 +356,10 @@ export class PageController {
     try {
       const page = await this.collector.getActivePage();
 
-      // 等待元素出现
       await page.waitForSelector(selector, {
-        timeout: timeout || 30000,
+        timeout: timeout || DEFAULT_NAVIGATION_TIMEOUT_MS,
       });
 
-      // 获取元素信息
       const element = await page.evaluate(sel => {
         const el = document.querySelector(sel);
         if (!el) return null;
@@ -379,7 +402,7 @@ export class PageController {
     const page = await this.collector.getActivePage();
     await page.waitForNavigation({
       waitUntil: 'networkidle',
-      timeout: timeout || 30000,
+      timeout: timeout || DEFAULT_NAVIGATION_TIMEOUT_MS,
     });
     logger.info('Navigation completed');
   }
@@ -700,26 +723,7 @@ export class PageController {
     deviceName: 'iPhone' | 'iPad' | 'Android',
   ): Promise<void> {
     const page = await this.collector.getActivePage();
-
-    const devices = {
-      iPhone: {
-        viewport: {width: 375, height: 812},
-        userAgent:
-          'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15',
-      },
-      iPad: {
-        viewport: {width: 768, height: 1024},
-        userAgent:
-          'Mozilla/5.0 (iPad; CPU OS 14_0 like Mac OS X) AppleWebKit/605.1.15',
-      },
-      Android: {
-        viewport: {width: 360, height: 640},
-        userAgent:
-          'Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 Chrome/91.0.4472.120',
-      },
-    };
-
-    const device = devices[deviceName];
+    const device = EMULATED_DEVICES[deviceName];
     await page.setViewportSize(device.viewport);
 
     // Playwright: setUserAgent via CDP
@@ -734,7 +738,7 @@ export class PageController {
   /**
    * 🆕 等待网络空闲
    */
-  async waitForNetworkIdle(timeout = 30000): Promise<void> {
+  async waitForNetworkIdle(timeout = DEFAULT_NAVIGATION_TIMEOUT_MS): Promise<void> {
     const page = await this.collector.getActivePage();
     // Playwright: use waitForURL with networkidle instead of waitForNetworkIdle
     await page.waitForURL('**', {waitUntil: 'networkidle', timeout});

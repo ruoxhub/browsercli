@@ -32,6 +32,7 @@ import {CodeCompressor} from './CodeCompressor.js';
 import {parseComboUrl} from './comboUrlParser.js';
 import {
   SmartCodeCollector,
+  type CodeSummary,
   type SmartCollectOptions,
 } from './SmartCodeCollector.js';
 // import { StreamingCollector } from './StreamingCollector.js'; // 暂不使用
@@ -229,6 +230,57 @@ export class CodeCollector {
   }
 
   /**
+   * 检查是否已达到文件数量上限
+   */
+  private hasReachedFileLimit(currentCount: number): boolean {
+    return currentCount >= this.MAX_FILES_PER_COLLECT;
+  }
+
+  /**
+   * 检查并维护 collectedFilesCache 的大小限制（FIFO 策略）
+   */
+  private evictOldestFileIfNeeded(): void {
+    if (this.collectedFilesCache.size >= this.MAX_FILES_CACHE_SIZE) {
+      const firstKey = this.collectedFilesCache.keys().next().value;
+      if (firstKey) {
+        this.collectedFilesCache.delete(firstKey);
+        logger.debug(
+          `[Cache] Removed oldest file to maintain cache limit: ${firstKey}`,
+        );
+      }
+    }
+  }
+
+  /**
+   * 构造 combo URL 元数据，保留 truncation 标记
+   */
+  private buildFileMetadata(
+    truncated: boolean,
+    originalSize: number,
+    truncatedSize: number,
+    url: string,
+  ): Record<string, unknown> | undefined {
+    const comboInfo = parseComboUrl(url);
+    if (!truncated && !comboInfo) {
+      return undefined;
+    }
+    const metadata: Record<string, unknown> = {};
+    if (truncated) {
+      metadata.truncated = true;
+      metadata.originalSize = originalSize;
+      metadata.truncatedSize = truncatedSize;
+    }
+    if (comboInfo) {
+      metadata.combo = true;
+      metadata.comboHost = comboInfo.host;
+      metadata.comboPrefix = comboInfo.prefix;
+      metadata.subFiles = comboInfo.subPaths;
+      metadata.subUrls = comboInfo.subUrls;
+    }
+    return metadata;
+  }
+
+  /**
    * 等待动态脚本基本稳定，优先使用 Puppeteer 的网络空闲能力
    */
   private async waitForDynamicScripts(
@@ -383,36 +435,19 @@ export class CodeCollector {
     pagesCount: number;
     version?: string;
   }> {
-    if (!this.browser || !this.browser.isConnected()) {
-      const managedBrowser = this.browserManager.getBrowser();
-      if (managedBrowser && managedBrowser.isConnected()) {
-        this.browser = managedBrowser;
-      } else {
-        return {
-          running: false,
-          pagesCount: 0,
-        };
-      }
-    }
-
-    // ✅ 修复：使用 try-catch 而不是 isConnected()
-    if (!this.browser) {
-      return {
-        running: false,
-        pagesCount: 0,
-      };
+    const browser = await this.resolveBrowser();
+    if (!browser) {
+      return {running: false, pagesCount: 0};
     }
 
     try {
       // 尝试获取 pages，如果浏览器已关闭会抛出异常
-      const context = this.browser.contexts()[0];
+      const context = browser.contexts()[0];
       const pages = context ? await context.pages() : [];
-      const version = this.browser.version();
-
       return {
         running: true,
         pagesCount: pages.length,
-        version,
+        version: browser.version(),
       };
     } catch (error) {
       // 浏览器已关闭或连接断开
@@ -422,6 +457,21 @@ export class CodeCollector {
         pagesCount: 0,
       };
     }
+  }
+
+  /**
+   * 解析可用的浏览器实例（优先使用 BrowserManager 托管的实例）
+   */
+  private async resolveBrowser(): Promise<Browser | null> {
+    if (this.browser && this.browser.isConnected()) {
+      return this.browser;
+    }
+    const managedBrowser = this.browserManager.getBrowser();
+    if (managedBrowser && managedBrowser.isConnected()) {
+      this.browser = managedBrowser;
+      return managedBrowser;
+    }
+    return null;
   }
 
   /**
@@ -484,7 +534,7 @@ export class CodeCollector {
         const url = response.url;
 
         // 🔧 修复：只限制文件数量，不限制总大小（支持大型网站完整收集）
-        if (files.length >= this.MAX_FILES_PER_COLLECT) {
+        if (this.hasReachedFileLimit(files.length)) {
           if (files.length === this.MAX_FILES_PER_COLLECT) {
             logger.warn(
               `⚠️  Reached max files limit (${this.MAX_FILES_PER_COLLECT}), will skip remaining files`,
@@ -521,15 +571,12 @@ export class CodeCollector {
             const content = base64Encoded
               ? Buffer.from(body, 'base64').toString('utf-8')
               : body;
-
-            // 🔧 限制单文件大小（防止单个文件过大）
             const contentSize = content.length;
 
+            // 🔧 限制单文件大小（防止单个文件过大）
             let finalContent = content;
             let truncated = false;
-
             if (contentSize > this.MAX_SINGLE_FILE_SIZE) {
-              // 截断超大文件，保留前面部分
               finalContent = content.substring(0, this.MAX_SINGLE_FILE_SIZE);
               truncated = true;
               logger.warn(
@@ -541,51 +588,22 @@ export class CodeCollector {
             if (!this.collectedUrls.has(url)) {
               this.collectedUrls.add(url);
 
-              // 识别 combo URL，附加 subFiles 元数据便于后续检索溯源
-              const comboInfo = parseComboUrl(url);
-
-              const metadata: Record<string, unknown> | undefined =
-                truncated || comboInfo
-                  ? {
-                      ...(truncated
-                        ? {
-                            truncated: true,
-                            originalSize: contentSize,
-                            truncatedSize: finalContent.length,
-                          }
-                        : {}),
-                      ...(comboInfo
-                        ? {
-                            combo: true,
-                            comboHost: comboInfo.host,
-                            comboPrefix: comboInfo.prefix,
-                            subFiles: comboInfo.subPaths,
-                            subUrls: comboInfo.subUrls,
-                          }
-                        : {}),
-                    }
-                  : undefined;
-
               const file: CodeFile = {
                 url,
                 content: finalContent,
                 size: finalContent.length,
                 type: 'external',
-                metadata,
+                metadata: this.buildFileMetadata(
+                  truncated,
+                  contentSize,
+                  finalContent.length,
+                  url,
+                ),
               };
               files.push(file);
 
               // ✅ 修复：检查缓存大小限制，防止内存泄漏
-              if (this.collectedFilesCache.size >= this.MAX_FILES_CACHE_SIZE) {
-                // 删除最早添加的文件（FIFO策略）
-                const firstKey = this.collectedFilesCache.keys().next().value;
-                if (firstKey) {
-                  this.collectedFilesCache.delete(firstKey);
-                  logger.debug(
-                    `[Cache] Removed oldest file to maintain cache limit: ${firstKey}`,
-                  );
-                }
-              }
+              this.evictOldestFileIfNeeded();
 
               // 🆕 同时存储到缓存，供后续按需获取
               this.collectedFilesCache.set(url, file);
@@ -690,30 +708,14 @@ export class CodeCollector {
             smartOptions,
           );
 
-          // 如果是摘要模式，返回摘要而不是完整文件
+          // 摘要模式直接返回 summaries（不包含完整文件）
           if (options.smartMode === 'summary') {
-            logger.info(`📊 Returning ${smartResult.length} code summaries`);
-
-            // ✅ 类型安全：summary 模式返回 CodeSummary[]
-            if (
-              Array.isArray(smartResult) &&
-              smartResult.length > 0 &&
-              smartResult[0] &&
-              'hasEncryption' in smartResult[0]
-            ) {
+            const summaries = this.asSummaries(smartResult);
+            if (summaries) {
+              logger.info(`📊 Returning ${summaries.length} code summaries`);
               return {
-                files: [], // 摘要模式不返回完整文件
-                summaries: smartResult as Array<{
-                  url: string;
-                  size: number;
-                  type: string;
-                  hasEncryption: boolean;
-                  hasAPI: boolean;
-                  hasObfuscation: boolean;
-                  functions: string[];
-                  imports: string[];
-                  preview: string;
-                }>,
+                files: [],
+                summaries,
                 dependencies: {nodes: [], edges: []},
                 totalSize: 0,
                 collectTime: Date.now() - startTime,
@@ -721,22 +723,17 @@ export class CodeCollector {
             }
           }
 
-          // ✅ 类型安全：priority/incremental 模式返回 CodeFile[]
-          if (
-            Array.isArray(smartResult) &&
-            (smartResult.length === 0 ||
-              (smartResult[0] && 'content' in smartResult[0]))
-          ) {
-            processedFiles = smartResult as CodeFile[];
+          // priority / incremental 模式：使用 CodeFile[]
+          const filteredFiles = this.asCodeFiles(smartResult);
+          if (filteredFiles) {
+            processedFiles = filteredFiles;
           } else {
             logger.warn(
               'Smart collection returned unexpected type, using original files',
             );
-            processedFiles = files;
           }
         } catch (error) {
           logger.error('Smart collection failed, using original files:', error);
-          processedFiles = files;
         }
       }
 
@@ -1483,5 +1480,37 @@ export class CodeCollector {
     const count = this.collectedFilesCache.size;
     this.collectedFilesCache.clear();
     logger.info(`🧹 Cleared collected files cache (${count} files)`);
+  }
+
+  /**
+   * 类型守卫：将智能收集结果窄化为 CodeSummary 数组
+   */
+  private asSummaries(
+    result: CodeFile[] | CodeSummary[],
+  ): CodeSummary[] | null {
+    if (
+      Array.isArray(result) &&
+      result.length > 0 &&
+      result[0] &&
+      'hasEncryption' in result[0]
+    ) {
+      return result as CodeSummary[];
+    }
+    return null;
+  }
+
+  /**
+   * 类型守卫：将智能收集结果窄化为 CodeFile 数组
+   */
+  private asCodeFiles(
+    result: CodeFile[] | CodeSummary[],
+  ): CodeFile[] | null {
+    if (
+      Array.isArray(result) &&
+      (result.length === 0 || (result[0] && 'content' in result[0]))
+    ) {
+      return result as CodeFile[];
+    }
+    return null;
   }
 }

@@ -3,9 +3,12 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+
 /**
  * Type definitions for Code Collector module
  */
+
+import type {CodeSummary} from './SmartCodeCollector.js';
 
 export interface CodeFile {
   url: string;
@@ -37,17 +40,7 @@ export interface CollectCodeResult {
   dependencies: DependencyGraph;
   totalSize: number;
   collectTime: number;
-  summaries?: Array<{
-    url: string;
-    size: number;
-    type: string;
-    hasEncryption: boolean;
-    hasAPI: boolean;
-    hasObfuscation: boolean;
-    functions: string[];
-    imports: string[];
-    preview: string;
-  }>;
+  summaries?: CodeSummary[];
 }
 
 export interface DependencyGraph {

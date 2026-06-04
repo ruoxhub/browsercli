@@ -185,6 +185,13 @@ export class CodeCache {
   }
 
   /**
+   * 检查缓存文件路径是否为合法的 JSON 缓存文件
+   */
+  private isJsonCacheFile(file: string): boolean {
+    return file.endsWith('.json');
+  }
+
+  /**
    * 清理过期缓存
    */
   async cleanup(): Promise<void> {
@@ -194,7 +201,7 @@ export class CodeCache {
       const entries: Array<{file: string; mtime: Date; size: number}> = [];
 
       for (const file of files) {
-        if (!file.endsWith('.json')) continue;
+        if (!this.isJsonCacheFile(file)) continue;
 
         const filePath = path.join(this.cacheDir, file);
         const stats = await fs.stat(filePath);
@@ -235,7 +242,7 @@ export class CodeCache {
       const files = await fs.readdir(this.cacheDir);
 
       for (const file of files) {
-        if (file.endsWith('.json')) {
+        if (this.isJsonCacheFile(file)) {
           await fs.unlink(path.join(this.cacheDir, file));
         }
       }
@@ -260,7 +267,7 @@ export class CodeCache {
       let diskEntries = 0;
 
       for (const file of files) {
-        if (!file.endsWith('.json')) continue;
+        if (!this.isJsonCacheFile(file)) continue;
 
         const filePath = path.join(this.cacheDir, file);
         const stats = await fs.stat(filePath);
@@ -354,7 +361,7 @@ export class CodeCache {
     try {
       const files = await fs.readdir(this.cacheDir);
       for (const file of files) {
-        if (!file.endsWith('.json')) continue;
+        if (!this.isJsonCacheFile(file)) continue;
         try {
           const data = await fs.readFile(path.join(this.cacheDir, file), 'utf-8');
           const entry: CacheEntry = JSON.parse(data);

@@ -265,89 +265,60 @@ export class DOMInspector {
       const page = await this.collector.getActivePage();
 
       const clickableElements = await page.evaluate(filter => {
-        const results: any[] = [];
-
-        // 查找按钮
-        const buttons = document.querySelectorAll(
-          'button, input[type="button"], input[type="submit"]',
-        );
-        buttons.forEach(btn => {
-          const text =
-            btn.textContent?.trim() || (btn as HTMLInputElement).value || '';
-          if (filter && !text.toLowerCase().includes(filter.toLowerCase())) {
-            return;
-          }
-
-          const rect = btn.getBoundingClientRect();
-          const style = window.getComputedStyle(btn);
-          const visible =
+        // 浏览器上下文内的纯辅助函数
+        const isElementVisible = (el: Element): boolean => {
+          const rect = el.getBoundingClientRect();
+          const style = window.getComputedStyle(el);
+          return (
             style.display !== 'none' &&
             style.visibility !== 'hidden' &&
             style.opacity !== '0' &&
             rect.width > 0 &&
-            rect.height > 0;
-
-          // 生成选择器
-          let selector = btn.tagName.toLowerCase();
-          if (btn.id) {
-            selector = `#${btn.id}`;
-          } else if (btn.className) {
-            selector = `${btn.tagName.toLowerCase()}.${btn.className.split(' ')[0]}`;
+            rect.height > 0
+          );
+        };
+        const buildSelector = (el: Element): string => {
+          if (el.id) return `#${el.id}`;
+          if (el.className && typeof el.className === 'string') {
+            const firstClass = el.className
+              .split(' ')
+              .filter(c => c)[0];
+            if (firstClass) {
+              return `${el.tagName.toLowerCase()}.${firstClass}`;
+            }
           }
-
-          results.push({
-            selector,
-            text,
-            type: 'button',
-            visible,
-            boundingBox: {
-              x: rect.x,
-              y: rect.y,
-              width: rect.width,
-              height: rect.height,
-            },
+          return el.tagName.toLowerCase();
+        };
+        const collect = (root: ParentNode, type: 'button' | 'link') => {
+          const sel =
+            type === 'button'
+              ? 'button, input[type="button"], input[type="submit"]'
+              : 'a[href]';
+          const items: any[] = [];
+          root.querySelectorAll(sel).forEach(el => {
+            const text =
+              el.textContent?.trim() || (el as HTMLInputElement).value || '';
+            if (filter && !text.toLowerCase().includes(filter.toLowerCase())) {
+              return;
+            }
+            const rect = el.getBoundingClientRect();
+            items.push({
+              selector: buildSelector(el),
+              text,
+              type,
+              visible: isElementVisible(el),
+              boundingBox: {
+                x: rect.x,
+                y: rect.y,
+                width: rect.width,
+                height: rect.height,
+              },
+            });
           });
-        });
+          return items;
+        };
 
-        // 查找链接
-        const links = document.querySelectorAll('a[href]');
-        links.forEach(link => {
-          const text = link.textContent?.trim() || '';
-          if (filter && !text.toLowerCase().includes(filter.toLowerCase())) {
-            return;
-          }
-
-          const rect = link.getBoundingClientRect();
-          const style = window.getComputedStyle(link);
-          const visible =
-            style.display !== 'none' &&
-            style.visibility !== 'hidden' &&
-            style.opacity !== '0' &&
-            rect.width > 0 &&
-            rect.height > 0;
-
-          let selector = 'a';
-          if (link.id) {
-            selector = `#${link.id}`;
-          } else if (link.className) {
-            selector = `a.${link.className.split(' ')[0]}`;
-          }
-
-          results.push({
-            selector,
-            text,
-            type: 'link',
-            visible,
-            boundingBox: {
-              x: rect.x,
-              y: rect.y,
-              width: rect.width,
-              height: rect.height,
-            },
-          });
-        });
-
-        return results;
+        return [...collect(document, 'button'), ...collect(document, 'link')];
       }, filterText);
 
       logger.info(
@@ -519,12 +490,30 @@ export class DOMInspector {
           const escapeXPathString = (str: string): string => {
             if (!str.includes('"')) return `"${str}"`;
             if (!str.includes("'")) return `'${str}'`;
-            // 同时包含单双引号时，使用 concat 拼接
             return `concat(${str
               .split('"')
               .map((part, i) => (i === 0 ? `"${part}"` : `'"',"${part}"`))
               .join(',')})`;
           };
+          const buildSelector = (el: Element): string => {
+            if (el.id) return `#${el.id}`;
+            if (el.className && typeof el.className === 'string') {
+              const classes = el.className.split(' ').filter(c => c);
+              if (classes.length > 0) {
+                return `${el.tagName.toLowerCase()}.${classes[0]}`;
+              }
+            }
+            return el.tagName.toLowerCase();
+          };
+          const isElementVisible = (el: Element): boolean => {
+            const style = window.getComputedStyle(el);
+            return (
+              style.display !== 'none' &&
+              style.visibility !== 'hidden' &&
+              style.opacity !== '0'
+            );
+          };
+
           const escaped = escapeXPathString(searchText);
           const xpath = tagName
             ? `//${tagName}[contains(text(), ${escaped})]`
@@ -544,34 +533,18 @@ export class DOMInspector {
             if (!element) continue;
 
             const rect = element.getBoundingClientRect();
-            const style = window.getComputedStyle(element);
-
-            // 生成选择器
-            let selector = element.tagName.toLowerCase();
-            if (element.id) {
-              selector = `#${element.id}`;
-            } else if (element.className) {
-              const classes = element.className.split(' ').filter(c => c);
-              if (classes.length > 0) {
-                selector = `${element.tagName.toLowerCase()}.${classes[0]}`;
-              }
-            }
-
             elements.push({
               found: true,
               nodeName: element.tagName,
               textContent: element.textContent?.trim(),
-              selector,
+              selector: buildSelector(element),
               boundingBox: {
                 x: rect.x,
                 y: rect.y,
                 width: rect.width,
                 height: rect.height,
               },
-              visible:
-                style.display !== 'none' &&
-                style.visibility !== 'hidden' &&
-                style.opacity !== '0',
+              visible: isElementVisible(element),
             });
           }
 
