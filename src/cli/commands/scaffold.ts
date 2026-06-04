@@ -16,6 +16,24 @@ import type {WorkerContext} from '../types.js';
 
 const TASK_NAME_RE = /^[a-z][a-z0-9-]*$/;
 
+/** 检查 targetPath 是否在 root 目录内（防止目录穿越） */
+function isPathWithinRoot(targetPath: string, root: string): boolean {
+  const resolved = resolve(targetPath);
+  const resolvedRoot = resolve(root);
+  const rootWithSep = resolvedRoot.endsWith(sep)
+    ? resolvedRoot
+    : resolvedRoot + sep;
+  return resolved === resolvedRoot || resolved.startsWith(rootWithSep);
+}
+
+/** 检查路径是否在允许的根目录内（cwd 或 tmpdir） */
+function isPathAllowed(targetPath: string): boolean {
+  return (
+    isPathWithinRoot(targetPath, process.cwd()) ||
+    isPathWithinRoot(targetPath, os.tmpdir())
+  );
+}
+
 // JavaScript reserved words that cannot be used as function names
 const RESERVED_WORDS = new Set([
   'break',
@@ -111,37 +129,16 @@ export const scaffoldCommand: AxiCliCommand<WorkerContext> = async (
     ? join(output, name)
     : join(process.cwd(), 'tasks', name);
 
-  if (isAbsolute(output ?? '')) {
-    const normalized = resolve(output!);
-    const allowedRoots = [resolve(os.tmpdir()), resolve(process.cwd())];
-    const isAllowed = allowedRoots.some(root => {
-      const rootWithSep = root.endsWith(sep) ? root : root + sep;
-      return normalized.startsWith(rootWithSep) || normalized === root;
-    });
-    if (!isAllowed) {
-      throw new AxiError(
-        '无效的 --output 绝对路径，仅允许 tmpdir 或 cwd 下的路径',
-        'VALIDATION_ERROR',
-        ['请使用当前目录下的相对路径'],
-      );
-    }
+  if (isAbsolute(output ?? '') && !isPathAllowed(output!)) {
+    throw new AxiError(
+      '无效的 --output 绝对路径，仅允许 tmpdir 或 cwd 下的路径',
+      'VALIDATION_ERROR',
+      ['请使用当前目录下的相对路径'],
+    );
   }
 
   // Ensure the final task dir stays within allowed boundaries
-  const resolvedTaskDir = resolve(taskDir);
-  const cwdResolved = resolve(process.cwd());
-  const tmpResolved = resolve(os.tmpdir());
-  const isUnderCwd =
-    resolvedTaskDir === cwdResolved ||
-    resolvedTaskDir.startsWith(
-      cwdResolved.endsWith(sep) ? cwdResolved : cwdResolved + sep,
-    );
-  const isUnderTmp =
-    resolvedTaskDir === tmpResolved ||
-    resolvedTaskDir.startsWith(
-      tmpResolved.endsWith(sep) ? tmpResolved : tmpResolved + sep,
-    );
-  if (!isUnderCwd && !isUnderTmp) {
+  if (!isPathAllowed(taskDir)) {
     throw new AxiError(
       '无效的 --output 路径，禁止目录穿越',
       'VALIDATION_ERROR',

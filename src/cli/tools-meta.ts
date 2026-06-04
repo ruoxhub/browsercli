@@ -66,10 +66,8 @@ export interface ToolMeta {
 }
 
 /**
- * 工具注册表 — 只需声明 modulePath 和 handlerName
- * name / description / schema 从 defineTool 自动提取
- */
-/**
+ * 工具注册表 — name / description / schema 从 defineTool 自动提取
+ *
  * Resolve the active tool profile from environment.
  *
  * | Profile     | Token cost (approx) | Purpose                                |
@@ -193,6 +191,28 @@ function toSnakeCase(value: string): string {
     .toLowerCase();
 }
 
+function buildMinimalMeta(
+  name: string,
+  entry: ToolRegistryEntry,
+): ToolMeta {
+  return {
+    name,
+    description: '',
+    schema: {},
+    argSpecs: {},
+    modulePath: entry.modulePath,
+    handlerName: entry.handlerName,
+    callMode: 'defineTool',
+    domain: entry.domain,
+    profile: entry.profile,
+    dependencies: entry.dependencies,
+    prerequisites: entry.prerequisites,
+    toolDependencies: entry.toolDependencies,
+    sceneKeywords: entry.sceneKeywords,
+    workflowRule: entry.workflowRule,
+  };
+}
+
 // ─── 公共 API ────────────────────────────────────────────
 
 /**
@@ -225,22 +245,7 @@ export function getToolMeta(name: string): ToolMeta | undefined {
   const entry = registryByHandlerNameCache.get(name);
   if (!entry) return undefined;
 
-  return {
-    name,
-    description: '',
-    schema: {},
-    argSpecs: {},
-    modulePath: entry.modulePath,
-    handlerName: entry.handlerName,
-    callMode: 'defineTool',
-    domain: entry.domain,
-    profile: entry.profile,
-    dependencies: entry.dependencies,
-    prerequisites: entry.prerequisites,
-    toolDependencies: entry.toolDependencies,
-    sceneKeywords: entry.sceneKeywords,
-    workflowRule: entry.workflowRule,
-  };
+  return buildMinimalMeta(name, entry);
 }
 
 /**

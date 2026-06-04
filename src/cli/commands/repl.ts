@@ -156,28 +156,6 @@ function printHelp(): void {
   replLog('');
 }
 
-/** 导出 complete 供外部使用（保持向后兼容） */
-export async function complete(input: string): Promise<string[]> {
-  const {getAllToolNames} = await import('../tools-meta.js');
-  const parts = input.split(/\s+/);
-  const isLastCharSpace = input.endsWith(' ') && input.length > 0;
-
-  if (parts.length <= 1 && !isLastCharSpace) {
-    const partial = parts[0].toLowerCase();
-    return REPL_COMMANDS.filter(cmd => cmd.startsWith(partial));
-  }
-
-  if (parts.length === 2 && !isLastCharSpace) {
-    const cmd = parts[0].toLowerCase();
-    const partial = parts[1].toLowerCase();
-    if (cmd === 'tool') {
-      return getAllToolNames().filter(t => t.startsWith(partial));
-    }
-  }
-
-  return [];
-}
-
 export const replCommand: AxiCliCommand<WorkerContext> = async (_args, ctx) => {
   const cfg = ctx?.resolvedConfig ?? resolveConfig();
   const invoker =

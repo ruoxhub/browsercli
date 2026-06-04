@@ -85,25 +85,10 @@ function validateKey(key: string): void {
   ]);
 }
 
-function coerceValue(key: string, value: string): unknown {
-  // 布尔值
+function coerceValue(value: string): unknown {
   if (value === 'true') return true;
   if (value === 'false') return false;
-  // 数字
   if (/^\d+$/.test(value)) return parseInt(value, 10);
-
-  // 嵌套键的布尔处理
-  if (
-    (key.endsWith('.headless') ||
-      key.endsWith('.isolated') ||
-      key.endsWith('.useStealthScripts') ||
-      key === 'headless' ||
-      key === 'debug') &&
-    (value === 'true' || value === 'false')
-  ) {
-    return value === 'true';
-  }
-
   return value;
 }
 
@@ -133,7 +118,7 @@ export const configCommand: AxiCliCommand<WorkerContext> = async (
     const {key, value} = parseSetValue(setRaw);
     validateKey(key);
 
-    const coerced = coerceValue(key, value);
+    const coerced = coerceValue(value);
 
     // 嵌套键处理
     if (key in NESTED_KEYS) {

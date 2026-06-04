@@ -21,19 +21,20 @@ interface ListedTool {
   description?: string;
 }
 
+function typeLabelFor(type: string): string {
+  switch (type) {
+    case 'string': return '<str>';
+    case 'number': return '<num>';
+    case 'boolean': return '<bool>';
+    default: return '<arr>';
+  }
+}
+
 function formatArgSignature(argSpecs?: ToolArgSpecMap): string {
   if (!argSpecs || Object.keys(argSpecs).length === 0) return '';
   const parts: string[] = [];
   for (const [key, spec] of Object.entries(argSpecs)) {
-    const typeLabel =
-      spec.type === 'string'
-        ? '<str>'
-        : spec.type === 'number'
-          ? '<num>'
-          : spec.type === 'boolean'
-            ? '<bool>'
-            : '<arr>';
-    const param = `--${key} ${typeLabel}`;
+    const param = `--${key} ${typeLabelFor(spec.type)}`;
     parts.push(spec.required ? param : `[${param}]`);
   }
   return parts.join(' ');

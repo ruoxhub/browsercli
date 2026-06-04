@@ -10,7 +10,6 @@
  */
 
 import {zod} from '../third_party/index.js';
-import type {ToolDefinition} from '../tools/ToolDefinition.js';
 
 export type ToolArgType = 'string' | 'number' | 'boolean' | 'string[]' | 'object';
 
@@ -135,15 +134,6 @@ export function extractArgSpecsFromSchema(
   }
 
   return result;
-}
-
-/**
- * 从 defineTool 定义中提取 arg specs
- */
-export function extractArgSpecsFromDefinition(
-  definition: ToolDefinition,
-): ToolArgSpecMap {
-  return extractArgSpecsFromSchema(definition.schema);
 }
 
 /**

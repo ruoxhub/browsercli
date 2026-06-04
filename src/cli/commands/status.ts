@@ -54,6 +54,16 @@ function healthEmoji(status: string): string {
   }
 }
 
+function determineOverallHealth(
+  rpcConnected: boolean,
+  workerStatusOk: boolean,
+  guardianHealth: string,
+): string {
+  if (!rpcConnected) return 'unhealthy';
+  if (!workerStatusOk && guardianHealth === 'degraded') return 'degraded';
+  return guardianHealth;
+}
+
 export const statusCommand: AxiCliCommand<WorkerContext> = async (
   _args,
   ctx,
@@ -156,11 +166,11 @@ export const statusCommand: AxiCliCommand<WorkerContext> = async (
   // 确定总体健康状态
   const guardianHealth = guardianSnapshot?.health ?? 'healthy';
   const workerStatusOk = workerHealth?.health === 'healthy';
-  const overallHealth = !rpcConnected
-    ? 'unhealthy'
-    : !workerStatusOk && guardianHealth === 'degraded'
-      ? 'degraded'
-      : guardianHealth;
+  const overallHealth = determineOverallHealth(
+    rpcConnected,
+    workerStatusOk,
+    guardianHealth,
+  );
 
   output.overallHealth = overallHealth;
 
