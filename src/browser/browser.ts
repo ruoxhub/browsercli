@@ -5,7 +5,6 @@
  */
 
 import fs from 'node:fs';
-import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -24,9 +23,43 @@ import {
 } from '../modules/stealth/index.js';
 import {logger} from '../utils/logger.js';
 
-import {HARMFUL_ARGS, DEFAULT_ARGS, STEALTH_ARGS} from './stealth-args.js';
+import {resolveAutoConnectTarget} from './browser-discovery.js';
+import {
+  detectAllBrowsers,
+  launchBrowserProcess as spawnBrowserProcess,
+  waitForBrowserReady,
+} from './browser-detect.js';
+import {
+  resolveEngine,
+  resolveLaunchChannel,
+  resolveUserDataDir,
+  ensureUserDataDir,
+  buildLaunchArgs,
+  getIgnoreDefaultArgs,
+  type Engine,
+} from './browser-helpers.js';
+
+// Re-export for backward compatibility
+export {resolveAutoConnectTarget};
 
 let browserManager: BrowserManager | undefined;
+
+export type Channel =
+  // Chromium (CDP) — schema collapses chrome/chrome-* aliases into stable/beta/dev/canary
+  | 'stable'
+  | 'beta'
+  | 'dev'
+  | 'canary'
+  | 'chromium'
+  // Chromium (WebDriver BiDi)
+  | 'bidi-chromium'
+  | 'bidi-chrome'
+  | 'bidi-chrome-beta'
+  | 'bidi-chrome-dev'
+  | 'bidi-chrome-canary'
+  // Firefox
+  | 'firefox'
+  | 'moz-firefox';
 
 export function isPatchrightDetachedFrameError(error: unknown): boolean {
   if (!(error instanceof Error)) {
@@ -45,7 +78,6 @@ export async function ensureBrowserConnected(options: {
   wsHeaders?: Record<string, string>;
   devtools: boolean;
 }) {
-  // Use BrowserManager for connection management
   const config: BrowserManagerConfig = {
     browserURL: options.browserURL,
     wsEndpoint: options.wsEndpoint,
@@ -55,190 +87,6 @@ export async function ensureBrowserConnected(options: {
 
   const manager = BrowserManager.getInstance(config);
   return manager.ensureBrowser();
-}
-
-/**
- * 发现 Chrome 调试端口
- * 1. 读取 DevToolsActivePort 文件（跨平台）
- * 2. 扫描常见端口 [9222, 9229, 9333]
- * 3. 使用 TCP 探测避免触发 Chrome 安全弹窗
- */
-async function discoverChromeDebugPort(): Promise<{
-  port: number;
-  wsPath?: string;
-} | null> {
-  // 1. 尝试读取 DevToolsActivePort 文件
-  const possiblePaths: string[] = [];
-  const platform = os.platform();
-  const home = os.homedir();
-  const localAppData = process.env.LOCALAPPDATA || '';
-
-  if (platform === 'darwin') {
-    possiblePaths.push(
-      path.join(
-        home,
-        'Library/Application Support/Google/Chrome/DevToolsActivePort',
-      ),
-      path.join(
-        home,
-        'Library/Application Support/Google/Chrome Canary/DevToolsActivePort',
-      ),
-      path.join(
-        home,
-        'Library/Application Support/Chromium/DevToolsActivePort',
-      ),
-    );
-  } else if (platform === 'linux') {
-    possiblePaths.push(
-      path.join(home, '.config/google-chrome/DevToolsActivePort'),
-      path.join(home, '.config/chromium/DevToolsActivePort'),
-    );
-  } else if (platform === 'win32') {
-    possiblePaths.push(
-      path.join(localAppData, 'Google/Chrome/User Data/DevToolsActivePort'),
-      path.join(localAppData, 'Chromium/User Data/DevToolsActivePort'),
-    );
-  }
-
-  for (const filePath of possiblePaths) {
-    try {
-      const content = fs.readFileSync(filePath, 'utf-8').trim();
-      const lines = content.split('\n').filter(Boolean);
-      const port = parseInt(lines[0], 10);
-      if (port > 0 && port < 65536) {
-        const ok = await checkPort(port);
-        if (ok) {
-          const wsPath = lines[1] || null;
-          logger.debug(
-            `[discoverChromeDebugPort] 从 DevToolsActivePort 发现端口：${port}${wsPath ? ' (带 wsPath)' : ''}`,
-          );
-          return {port, wsPath: wsPath || undefined};
-        }
-      }
-    } catch {
-      // 文件不存在，继续尝试
-    }
-  }
-
-  // 2. 扫描常见端口
-  const commonPorts = [9222, 9229, 9333];
-  for (const port of commonPorts) {
-    const ok = await checkPort(port);
-    if (ok) {
-      logger.debug(
-        `[discoverChromeDebugPort] 扫描发现 Chrome 调试端口：${port}`,
-      );
-      return {port, wsPath: undefined};
-    }
-  }
-
-  return null;
-}
-
-/**
- * TCP 端口探测（避免触发 Chrome 安全弹窗）
- */
-function checkPort(port: number): Promise<boolean> {
-  return new Promise(resolve => {
-    const socket = net.createConnection(port, '127.0.0.1');
-    const timer = setTimeout(() => {
-      socket.destroy();
-      resolve(false);
-    }, 2000);
-    socket.once('connect', () => {
-      clearTimeout(timer);
-      socket.destroy();
-      resolve(true);
-    });
-    socket.once('error', () => {
-      clearTimeout(timer);
-      resolve(false);
-    });
-  });
-}
-
-export async function resolveAutoConnectTarget(options?: {
-  candidates?: string[];
-  fetchImpl?: typeof fetch;
-}): Promise<{browserURL: string; wsEndpoint?: string} | undefined> {
-  const fetchImpl = options?.fetchImpl ?? fetch;
-
-  // 1. 如果提供了 candidates 参数，优先使用 candidates（测试模式）
-  if (options?.candidates && options.candidates.length > 0) {
-    for (const candidate of options.candidates) {
-      try {
-        const response = await fetchImpl(`${candidate}/json/version`);
-        if (!response.ok) {
-          continue;
-        }
-        const payload = (await response.json()) as {
-          webSocketDebuggerUrl?: string;
-        };
-        return {
-          browserURL: candidate,
-          wsEndpoint: payload.webSocketDebuggerUrl,
-        };
-      } catch {
-        // Keep probing the next candidate.
-      }
-    }
-    return undefined;
-  }
-
-  // 2. 自动发现 Chrome 调试端口（生产模式）
-  const discovered = await discoverChromeDebugPort();
-  if (discovered) {
-    const {port, wsPath} = discovered;
-    const browserURL = `http://127.0.0.1:${port}`;
-
-    // 尝试获取完整的 WebSocket URL
-    try {
-      const response = await fetchImpl(`${browserURL}/json/version`);
-      if (response.ok) {
-        const payload = (await response.json()) as {
-          webSocketDebuggerUrl?: string;
-        };
-        return {
-          browserURL,
-          wsEndpoint:
-            payload.webSocketDebuggerUrl || wsPath
-              ? `ws://127.0.0.1:${port}${wsPath || '/devtools/browser'}`
-              : undefined,
-        };
-      }
-    } catch {
-      // 如果 /json/version 失败，返回基础 URL
-      return {browserURL};
-    }
-  }
-
-  // 3. 回退到默认候选列表
-  const candidates = [
-    'http://127.0.0.1:9222',
-    'http://127.0.0.1:9223',
-    'http://127.0.0.1:9224',
-    'http://127.0.0.1:9225',
-  ];
-
-  for (const candidate of candidates) {
-    try {
-      const response = await fetchImpl(`${candidate}/json/version`);
-      if (!response.ok) {
-        continue;
-      }
-      const payload = (await response.json()) as {
-        webSocketDebuggerUrl?: string;
-      };
-      return {
-        browserURL: candidate,
-        wsEndpoint: payload.webSocketDebuggerUrl,
-      };
-    } catch {
-      // Keep probing the next candidate.
-    }
-  }
-
-  return undefined;
 }
 
 interface McpLaunchOptions {
@@ -260,36 +108,16 @@ interface McpLaunchOptions {
 export async function launch(options: McpLaunchOptions): Promise<Browser> {
   const {channel, executablePath, headless, isolated} = options;
   const engine = resolveEngine(channel);
-  const profileBase = engine === 'firefox' ? 'firefox-profile' : 'chrome-profile';
-  const profileDirName =
-    channel && channel !== 'stable' ? `${profileBase}-${channel}` : profileBase;
 
-  let userDataDir = options.userDataDir;
-  if (!isolated && !userDataDir) {
-    userDataDir = path.join(
-      os.homedir(),
-      '.cache',
-      'chrome-devtools-mcp',
-      profileDirName,
-    );
-    await fs.promises.mkdir(userDataDir, {
-      recursive: true,
-    });
+  let userDataDir = resolveUserDataDir(isolated, options.userDataDir, channel);
+  if (userDataDir) {
+    await ensureUserDataDir(userDataDir);
   }
 
-  const args = [...(options.args ?? [])];
-  if (engine === 'chromium') {
-    args.push('--hide-crash-restore-bubble');
-    if (headless) {
-      args.push('--screen-info={3840x2160}');
-    }
-    if (options.devtools) {
-      args.push('--auto-open-devtools-for-tabs');
-    }
-  }
-
+  const args = buildLaunchArgs(options.args, engine, {headless, devtools: options.devtools});
   const launchChannel = resolveLaunchChannel(channel, engine, !!executablePath);
   const launcher = engine === 'firefox' ? firefox : chromium;
+  const ignoreDefaultArgs = getIgnoreDefaultArgs(engine);
 
   try {
     const browser = await launcher.launch({
@@ -297,7 +125,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
       executablePath,
       headless,
       args,
-      ...(engine === 'chromium' ? {ignoreDefaultArgs: HARMFUL_ARGS} : {}),
+      ...(ignoreDefaultArgs ? {ignoreDefaultArgs} : {}),
     });
 
     if (options.viewport) {
@@ -318,9 +146,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     ) {
       throw new Error(
         `The browser is already running for ${userDataDir}. Use --isolated to run multiple browser instances.`,
-        {
-          cause: error,
-        },
+        {cause: error},
       );
     }
     throw error;
@@ -330,7 +156,6 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
 export async function ensureBrowserLaunched(
   options: McpLaunchOptions,
 ): Promise<Browser> {
-  // Use BrowserManager for browser management
   const config: BrowserManagerConfig = {
     headless: options.headless,
     executablePath: options.executablePath,
@@ -345,50 +170,6 @@ export async function ensureBrowserLaunched(
 
   const manager = BrowserManager.getInstance(config);
   return manager.ensureBrowser();
-}
-
-export type Channel =
-  // Chromium (CDP) — schema collapses chrome/chrome-* aliases into stable/beta/dev/canary
-  | 'stable'
-  | 'beta'
-  | 'dev'
-  | 'canary'
-  | 'chromium'
-  // Chromium (WebDriver BiDi)
-  | 'bidi-chromium'
-  | 'bidi-chrome'
-  | 'bidi-chrome-beta'
-  | 'bidi-chrome-dev'
-  | 'bidi-chrome-canary'
-  // Firefox
-  | 'firefox'
-  | 'moz-firefox';
-
-type Engine = 'chromium' | 'firefox';
-
-function resolveEngine(channel?: string): Engine {
-  if (channel === 'firefox' || channel?.startsWith('moz-')) {
-    return 'firefox';
-  }
-  return 'chromium';
-}
-
-function resolveLaunchChannel(
-  channel: string | undefined,
-  engine: Engine,
-  hasExecutablePath: boolean,
-): string | undefined {
-  // Pass-through routes for patchright's prefix-based dispatch
-  if (channel?.startsWith('bidi-')) return channel;
-  if (channel?.startsWith('moz-')) return channel;
-
-  // Firefox without explicit channel: let patchright pick the default firefox build
-  if (engine === 'firefox') return undefined;
-
-  // Chromium CDP: only inject a Playwright channel name when no explicit executable
-  if (hasExecutablePath) return undefined;
-  if (!channel || channel === 'stable') return 'chrome';
-  return `chrome-${channel}`;
 }
 
 /**
@@ -461,9 +242,6 @@ export class BrowserManager {
     };
   }
 
-  /**
-   * Get the singleton instance of BrowserManager
-   */
   static getInstance(config?: BrowserManagerConfig): BrowserManager {
     if (!browserManager) {
       if (!config) {
@@ -476,9 +254,6 @@ export class BrowserManager {
     return browserManager;
   }
 
-  /**
-   * Reset the singleton instance (useful for testing)
-   */
   static async resetInstance(): Promise<void> {
     if (browserManager) {
       try {
@@ -490,9 +265,6 @@ export class BrowserManager {
     }
   }
 
-  /**
-   * Ensure browser is connected and running
-   */
   async ensureBrowser(): Promise<Browser> {
     if (this.browser?.isConnected()) {
       return this.browser;
@@ -521,41 +293,22 @@ export class BrowserManager {
     return this.launchPromise;
   }
 
-  /**
-   * Launch browser and return instance (alias for ensureBrowser, for BrowserModeManager compatibility)
-   */
   async launch(): Promise<Browser> {
     return this.ensureBrowser();
   }
 
-  /**
-   * Get the current browser instance
-   */
   getBrowser(): Browser | null {
     return this.browser ?? null;
   }
 
-  /**
-   * Get the current browser context
-   */
   getContext(): BrowserContext | null {
     return this.context ?? null;
   }
 
-  /**
-   * Create a new page in the browser with full initialization.
-   *
-   * Initialization chain (参考 old-source BrowserModeManager):
-   * 1. 确保 BrowserContext 存在
-   * 2. 创建新页面（不复用已有页面）
-   * 3. 启用缓存、绕过 CSP
-   * 4. 追踪当前页面
-   */
   async newPage(): Promise<Page> {
     const browser = await this.ensureBrowser();
     let ctx = this.context ?? browser.contexts()[0];
     if (!ctx) {
-      // bypassCSP 为 context 级选项，在创建 context 时设置
       ctx = await browser.newContext({bypassCSP: true});
       this.context = ctx;
     }
@@ -581,175 +334,163 @@ export class BrowserManager {
     this.trackCurrentPage(page);
   }
 
-  /**
-   * Get current page
-   */
   getCurrentPage(): Page | null {
     return this.currentPage && !this.currentPage.isClosed()
       ? this.currentPage
       : null;
   }
 
-  /**
-   * Check if browser is connected
-   */
   isConnected(): boolean {
     return this.browser?.isConnected() ?? false;
   }
 
-  /**
-   * Connect to a remote browser instance via CDP
-   */
+  // ─── Remote Connection ───────────────────────────────────────────────
+
   private async connectToRemoteBrowser(): Promise<Browser> {
     try {
       const debugUrl =
         this.config.wsEndpoint ||
         this.config.browserURL ||
         this.config.remoteDebuggingUrl;
-
       logger.debug('Connecting to remote browser at:', debugUrl);
 
-      // First, verify the endpoint is accessible and get version info
-      let browserURL: string | undefined;
-      let webSocketDebuggerUrl: string | undefined;
-      if (this.config.browserURL || this.config.remoteDebuggingUrl) {
-        browserURL = this.config.browserURL || this.config.remoteDebuggingUrl;
-        try {
-          const response = await fetch(`${browserURL}/json/version`);
-          if (response.ok) {
-            const versionInfo = (await response.json()) as {
-              Browser?: string;
-              'Protocol-Version'?: string;
-              webSocketDebuggerUrl?: string;
-            };
-            logger.debug('Browser version info:', {
-              browser: versionInfo.Browser,
-              protocolVersion: versionInfo['Protocol-Version'],
-            });
-            webSocketDebuggerUrl = versionInfo.webSocketDebuggerUrl;
-          } else {
-            logger.debug(
-              'Warning: /json/version returned non-OK status:',
-              response.status,
-            );
-          }
-        } catch (err) {
-          logger.debug('Warning: Could not fetch browser version:', err);
-        }
-      }
-
-      // Use Playwright connectOverCDP
-      // Prefer explicit WebSocket endpoint over browserURL
+      // Fetch version info and resolve WebSocket endpoint
+      const versionInfo = await this.fetchVersionInfo();
       const connectEndpoint =
         this.config.wsEndpoint ||
-        webSocketDebuggerUrl ||
+        versionInfo.webSocketDebuggerUrl ||
         this.config.browserURL ||
         this.config.remoteDebuggingUrl;
 
-      const connectOptions = {
+      // Connect via CDP
+      this.installDetachedFrameGuard();
+      this.browser = await chromium.connectOverCDP(connectEndpoint!, {
         timeout: 30000,
         ...(this.config.wsHeaders ? {headers: this.config.wsHeaders} : {}),
-      };
-
-      this.installDetachedFrameGuard();
-      this.browser = await chromium.connectOverCDP(
-        connectEndpoint!,
-        connectOptions,
-      );
+      });
       logger.debug('Connected to remote browser via Playwright');
-
-      // Get the default context
       this.context = this.browser.contexts()[0];
 
-      // 连接成功后，获取浏览器窗口边界并应用到页面（自动适配）
-      try {
-        if (this.context) {
-          const pages = this.context.pages();
-          if (pages.length > 0) {
-            const page = pages[0];
-            this.trackCurrentPage(page);
-
-            // 使用 CDP 命令获取浏览器窗口边界
-            const client = await this.context.newCDPSession(page);
-            const {windowId: _windowId, bounds} = await client.send(
-              'Browser.getWindowForTarget',
-              {},
-            );
-
-            logger.debug(
-              `Browser window bounds: ${bounds.width}x${bounds.height} at (${bounds.left}, ${bounds.top})`,
-            );
-
-            // 优先使用配置的 viewport，否则使用浏览器窗口边界
-            if (this.config.viewport) {
-              await page.setViewportSize({
-                width: this.config.viewport.width,
-                height: this.config.viewport.height,
-              });
-              logger.debug(
-                `Viewport set to ${this.config.viewport.width}x${this.config.viewport.height} (configured)`,
-              );
-            } else {
-              // 自动适配：使用浏览器窗口边界作为 viewport
-              await page.setViewportSize({
-                width: bounds.width,
-                height: bounds.height,
-              });
-              logger.debug(
-                `Viewport auto-adapted to ${bounds.width}x${bounds.height} (from browser window)`,
-              );
-            }
-
-            await client.detach();
-          }
-        }
-      } catch (err) {
-        logger.debug(
-          'Warning: Could not set viewport from browser bounds:',
-          err,
-        );
-      }
-
-      // Verify connection by checking browser version
-      try {
-        const browserVersion = this.browser.version();
-        logger.debug('Browser version:', browserVersion);
-      } catch (versionErr) {
-        logger.debug('Warning: Could not get browser version:', versionErr);
-      }
-
-      // Set up crash detection
+      // Post-connection setup
+      await this.configureRemoteViewport();
+      this.logBrowserVersion();
       this.setupCrashDetection();
 
-      // Inject stealth if configured
       if (this.config.useStealthScripts) {
         await this.injectStealth();
       }
 
       return this.browser;
     } catch (error) {
-      const errorMessage = (error as Error).message;
-
-      // 如果连接失败但配置了 autoLaunch，尝试自动启动浏览器
+      // Auto-launch fallback
       if (this.config.autoLaunch) {
         logger.debug(
           'Remote browser connection failed, attempting auto-launch...',
         );
         try {
           await this.launchBrowserProcess();
-          // 重新尝试连接
           return this.connectToRemoteBrowser();
         } catch (launchError) {
           logger.debug('Auto-launch failed:', launchError);
-          // 抛出原始连接错误，因为 autoLaunch 只是回退方案
           throw error;
         }
       }
 
-      // Provide specific guidance for common connection issues
-      if (errorMessage.includes('Page.enable')) {
-        throw new Error(
-          `CDP 协议错误：'Page.enable' 命令未找到。
+      throw this.mapConnectionError(error);
+    }
+  }
+
+  private async fetchVersionInfo(): Promise<{
+    webSocketDebuggerUrl?: string;
+    Browser?: string;
+    'Protocol-Version'?: string;
+  }> {
+    const browserURL = this.config.browserURL || this.config.remoteDebuggingUrl;
+    if (!browserURL) {
+      return {};
+    }
+
+    try {
+      const response = await fetch(`${browserURL}/json/version`);
+      if (!response.ok) {
+        logger.debug(
+          'Warning: /json/version returned non-OK status:',
+          response.status,
+        );
+        return {};
+      }
+      const versionInfo = (await response.json()) as {
+        Browser?: string;
+        'Protocol-Version'?: string;
+        webSocketDebuggerUrl?: string;
+      };
+      logger.debug('Browser version info:', {
+        browser: versionInfo.Browser,
+        protocolVersion: versionInfo['Protocol-Version'],
+      });
+      return versionInfo;
+    } catch (err) {
+      logger.debug('Warning: Could not fetch browser version:', err);
+      return {};
+    }
+  }
+
+  private async configureRemoteViewport(): Promise<void> {
+    if (!this.context) return;
+
+    const pages = this.context.pages();
+    if (pages.length === 0) return;
+
+    const page = pages[0];
+    this.trackCurrentPage(page);
+
+    try {
+      const client = await this.context.newCDPSession(page);
+      const {bounds} = await client.send('Browser.getWindowForTarget', {});
+
+      logger.debug(
+        `Browser window bounds: ${bounds.width}x${bounds.height} at (${bounds.left}, ${bounds.top})`,
+      );
+
+      if (this.config.viewport) {
+        await page.setViewportSize({
+          width: this.config.viewport.width,
+          height: this.config.viewport.height,
+        });
+        logger.debug(
+          `Viewport set to ${this.config.viewport.width}x${this.config.viewport.height} (configured)`,
+        );
+      } else {
+        await page.setViewportSize({
+          width: bounds.width,
+          height: bounds.height,
+        });
+        logger.debug(
+          `Viewport auto-adapted to ${bounds.width}x${bounds.height} (from browser window)`,
+        );
+      }
+
+      await client.detach();
+    } catch (err) {
+      logger.debug('Warning: Could not set viewport from browser bounds:', err);
+    }
+  }
+
+  private logBrowserVersion(): void {
+    try {
+      const browserVersion = this.browser!.version();
+      logger.debug('Browser version:', browserVersion);
+    } catch (versionErr) {
+      logger.debug('Warning: Could not get browser version:', versionErr);
+    }
+  }
+
+  private mapConnectionError(error: unknown): Error {
+    const errorMessage = (error as Error).message;
+
+    if (errorMessage.includes('Page.enable')) {
+      return new Error(
+        `CDP 协议错误：'Page.enable' 命令未找到。
 原因：Chrome 版本与 Playwright 不兼容，或连接到了错误的端点。
 
 解决方法：
@@ -759,13 +500,13 @@ export class BrowserManager {
 4. 尝试重启 Chrome 后重新连接
 
 原始错误：${errorMessage}`,
-          {cause: error},
-        );
-      }
+        {cause: error},
+      );
+    }
 
-      if (errorMessage.includes('connect ECONNREFUSED')) {
-        throw new Error(
-          `无法连接到 Chrome：连接被拒绝。
+    if (errorMessage.includes('connect ECONNREFUSED')) {
+      return new Error(
+        `无法连接到 Chrome：连接被拒绝。
 
 解决方法：
 1. 确认 Chrome 已通过 --remote-debugging-port 启动
@@ -773,15 +514,156 @@ export class BrowserManager {
 3. 访问 http://127.0.0.1:<端口>/json/version 验证
 
 原始错误：${errorMessage}`,
+        {cause: error},
+      );
+    }
+
+    return new Error(`Failed to connect to remote browser: ${errorMessage}`, {
+      cause: error,
+    });
+  }
+
+  // ─── Launch ──────────────────────────────────────────────────────────
+
+  private async launchBrowser(): Promise<Browser> {
+    const {channel, executablePath, headless, isolated, useStealthScripts} =
+      this.config;
+    const engine = resolveEngine(channel);
+
+    let userDataDir = resolveUserDataDir(isolated, this.config.userDataDir, channel);
+    if (userDataDir) {
+      await ensureUserDataDir(userDataDir);
+    }
+
+    const args = buildLaunchArgs(this.config.args, engine, {
+      headless,
+      devtools: this.config.devtools,
+      useStealthScripts,
+      includeDefaults: true,
+    });
+
+    const launchChannel = resolveLaunchChannel(channel, engine, !!executablePath);
+    const launcher = engine === 'firefox' ? firefox : chromium;
+    const ignoreDefaultArgs = getIgnoreDefaultArgs(engine);
+
+    try {
+      logger.debug('Launching browser with config:', {
+        engine,
+        channel: launchChannel,
+        executablePath,
+        headless,
+        isolated,
+        useStealthScripts,
+      });
+
+      this.browser = await launcher.launch({
+        channel: launchChannel,
+        executablePath,
+        headless,
+        args,
+        ...(ignoreDefaultArgs ? {ignoreDefaultArgs} : {}),
+      });
+
+      logger.debug('Browser launched successfully');
+
+      // 获取默认 BrowserContext
+      let ctx = this.browser.contexts()[0] ?? undefined;
+      if (!ctx) {
+        ctx = await this.browser.newContext({
+          bypassCSP: true,
+          ignoreHTTPSErrors: this.config.acceptInsecureCerts,
+        });
+      }
+      this.context = ctx;
+
+      this.setupCrashDetection();
+
+      // Set viewport if configured
+      if (this.config.viewport) {
+        const ctx = this.browser.contexts()[0];
+        const page = ctx?.pages()[0];
+        if (page) {
+          this.trackCurrentPage(page);
+          await page.setViewportSize({
+            width: this.config.viewport.width,
+            height: this.config.viewport.height,
+          });
+        }
+      }
+
+      if (useStealthScripts) {
+        this.stealthInjected = true;
+      }
+
+      return this.browser;
+    } catch (error) {
+      if (
+        userDataDir &&
+        (error as Error).message.includes('The browser is already running')
+      ) {
+        throw new Error(
+          `The browser is already running for ${userDataDir}. Use --isolated to run multiple browser instances.`,
           {cause: error},
         );
       }
-
-      throw new Error(`Failed to connect to remote browser: ${errorMessage}`, {
+      throw new Error(`Failed to launch browser: ${(error as Error).message}`, {
         cause: error,
       });
     }
   }
+
+  // ─── Crash Detection ─────────────────────────────────────────────────
+
+  private setupCrashDetection(): void {
+    if (!this.browser) return;
+
+    if (this.crashCheckInterval) {
+      clearInterval(this.crashCheckInterval);
+    }
+
+    this.browser.on('disconnected', () => {
+      logger.debug('Browser closed');
+      if (!this.isRestarting) {
+        void this.handleBrowserCrash();
+      }
+    });
+
+    this.crashCheckInterval = setInterval(() => {
+      if (this.browser && !this.browser.isConnected() && !this.isRestarting) {
+        logger.debug('Browser connection lost, attempting restart');
+        void this.handleBrowserCrash();
+      }
+    }, 5000);
+  }
+
+  private async handleBrowserCrash(): Promise<void> {
+    if (this.isRestarting || !this.browser) return;
+
+    this.isRestarting = true;
+    logger.debug('Attempting to restart browser after crash');
+
+    try {
+      if (this.browser) {
+        try {
+          await this.browser.close();
+        } catch (err) {
+          logger.debug('Error closing crashed browser:', err);
+        }
+        this.browser = undefined;
+        this.context = undefined;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      await this.ensureBrowser();
+      logger.debug('Browser restarted successfully');
+    } catch (error) {
+      logger.debug('Failed to restart browser:', error);
+    } finally {
+      this.isRestarting = false;
+    }
+  }
+
+  // ─── Detached Frame Guard ────────────────────────────────────────────
 
   private installDetachedFrameGuard(): void {
     if (this.detachedFrameGuard) {
@@ -811,196 +693,8 @@ export class BrowserManager {
     this.detachedFrameGuard = undefined;
   }
 
-  /**
-   * Launch a new browser instance using Playwright
-   */
-  private async launchBrowser(): Promise<Browser> {
-    const {channel, executablePath, headless, isolated, useStealthScripts} =
-      this.config;
+  // ─── Stealth ─────────────────────────────────────────────────────────
 
-    const engine = resolveEngine(channel);
-    const profileBase =
-      engine === 'firefox' ? 'firefox-profile' : 'chrome-profile';
-    const profileDirName =
-      channel && channel !== 'stable'
-        ? `${profileBase}-${channel}`
-        : profileBase;
-
-    let userDataDir = this.config.userDataDir;
-    if (!isolated && !userDataDir) {
-      userDataDir = path.join(
-        os.homedir(),
-        '.cache',
-        'chrome-devtools-mcp',
-        profileDirName,
-      );
-      await fs.promises.mkdir(userDataDir, {
-        recursive: true,
-      });
-    }
-
-    // Chromium-specific args do not apply to Firefox; patchright surfaces unknown
-    // Firefox flags as launch errors.
-    const args = [...(this.config.args ?? [])];
-    if (engine === 'chromium') {
-      args.unshift(...DEFAULT_ARGS);
-      args.push('--hide-crash-restore-bubble');
-      if (useStealthScripts) {
-        args.push(...STEALTH_ARGS);
-      }
-      if (headless) {
-        args.push('--screen-info={3840x2160}');
-      }
-      if (this.config.devtools) {
-        args.push('--auto-open-devtools-for-tabs');
-      }
-    }
-
-    const launchChannel = resolveLaunchChannel(
-      channel,
-      engine,
-      !!executablePath,
-    );
-    const launcher = engine === 'firefox' ? firefox : chromium;
-
-    try {
-      logger.debug('Launching browser with config:', {
-        engine,
-        channel: launchChannel,
-        executablePath,
-        headless,
-        isolated,
-        useStealthScripts,
-      });
-
-      this.browser = await launcher.launch({
-        channel: launchChannel,
-        executablePath,
-        headless,
-        args,
-        ...(engine === 'chromium' ? {ignoreDefaultArgs: HARMFUL_ARGS} : {}),
-      });
-
-      logger.debug('Browser launched successfully');
-
-      // 获取默认 BrowserContext
-      let ctx = this.browser.contexts()[0] ?? undefined;
-      if (!ctx) {
-        ctx = await this.browser.newContext({
-          bypassCSP: true,
-          ignoreHTTPSErrors: this.config.acceptInsecureCerts,
-        });
-      }
-      this.context = ctx;
-
-      // Set up crash detection
-      this.setupCrashDetection();
-
-      // Set viewport if configured
-      if (this.config.viewport) {
-        const ctx = this.browser.contexts()[0];
-        const page = ctx?.pages()[0];
-        if (page) {
-          this.trackCurrentPage(page);
-          await page.setViewportSize({
-            width: this.config.viewport.width,
-            height: this.config.viewport.height,
-          });
-        }
-      }
-
-      // Mark stealth as injected if enabled
-      if (useStealthScripts) {
-        this.stealthInjected = true;
-      }
-
-      return this.browser;
-    } catch (error) {
-      if (
-        userDataDir &&
-        (error as Error).message.includes('The browser is already running')
-      ) {
-        throw new Error(
-          `The browser is already running for ${userDataDir}. Use --isolated to run multiple browser instances.`,
-          {
-            cause: error,
-          },
-        );
-      }
-      throw new Error(`Failed to launch browser: ${(error as Error).message}`, {
-        cause: error,
-      });
-    }
-  }
-
-  /**
-   * Set up crash detection and auto-restart
-   */
-  private setupCrashDetection(): void {
-    if (!this.browser) return;
-
-    // Clear any existing interval
-    if (this.crashCheckInterval) {
-      clearInterval(this.crashCheckInterval);
-    }
-
-    // Listen for disconnect events (Playwright's equivalent of Puppeteer 'disconnected')
-    this.browser.on('disconnected', () => {
-      logger.debug('Browser closed');
-      if (!this.isRestarting) {
-        void this.handleBrowserCrash();
-      }
-    });
-
-    // Periodically check if browser is still connected
-    this.crashCheckInterval = setInterval(() => {
-      if (this.browser && !this.browser.isConnected() && !this.isRestarting) {
-        logger.debug('Browser connection lost, attempting restart');
-        void this.handleBrowserCrash();
-      }
-    }, 5000); // Check every 5 seconds
-  }
-
-  /**
-   * Handle browser crash by attempting to restart
-   */
-  private async handleBrowserCrash(): Promise<void> {
-    if (this.isRestarting || !this.browser) return;
-
-    this.isRestarting = true;
-    logger.debug('Attempting to restart browser after crash');
-
-    try {
-      // Clean up old browser instance
-      if (this.browser) {
-        try {
-          await this.browser.close();
-        } catch (err) {
-          // Ignore errors when closing crashed browser
-          logger.debug('Error closing crashed browser:', err);
-        }
-        this.browser = undefined;
-        this.context = undefined;
-      }
-
-      // Wait a bit before restarting
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Restart browser
-      await this.ensureBrowser();
-      logger.debug('Browser restarted successfully');
-    } catch (error) {
-      logger.debug('Failed to restart browser:', error);
-    } finally {
-      this.isRestarting = false;
-    }
-  }
-
-  /**
-   * Inject stealth scripts into all pages using advanced StealthScripts2025
-   * @param preset - Platform preset (windows-chrome, mac-chrome, etc.)
-   * @param options - Custom stealth options to override preset
-   */
   async injectStealth(
     preset?: StealthPreset,
     options?: StealthInjectionOptions,
@@ -1020,13 +714,11 @@ export class BrowserManager {
         ...options,
       };
 
-      // Inject stealth into all pages across all contexts
       for (const ctx of this.browser.contexts()) {
         for (const page of ctx.pages()) {
           await StealthScripts2025.injectAll(page, stealthOptions);
         }
 
-        // Listen for new pages and inject stealth
         ctx.on('page', async page => {
           await StealthScripts2025.injectAll(page, stealthOptions);
         });
@@ -1037,16 +729,11 @@ export class BrowserManager {
     } catch (error) {
       throw new Error(
         `Failed to inject stealth scripts: ${(error as Error).message}`,
-        {
-          cause: error,
-        },
+        {cause: error},
       );
     }
   }
 
-  /**
-   * Get available stealth presets
-   */
   getStealthPresets(): Array<{
     name: StealthPreset;
     userAgent: string;
@@ -1055,9 +742,6 @@ export class BrowserManager {
     return StealthScripts2025.getPresets();
   }
 
-  /**
-   * Get list of available stealth features
-   */
   getStealthFeatures(): string[] {
     return [
       'hideWebDriver',
@@ -1079,12 +763,11 @@ export class BrowserManager {
     ];
   }
 
-  /**
-   * Launch browser process with remote debugging (auto-launch capability)
-   */
+  // ─── Auto-Launch ─────────────────────────────────────────────────────
+
   private async launchBrowserProcess(): Promise<void> {
     const port = this.config.remoteDebuggingPort ?? 9222;
-    const browsers = this.detectAllBrowsers();
+    const browsers = detectAllBrowsers(this.config.browserPath);
 
     if (browsers.length === 0) {
       throw new Error(
@@ -1094,154 +777,27 @@ export class BrowserManager {
     }
 
     const selectedBrowser = browsers[0];
-    logger.debug(`Launching browser: ${selectedBrowser.path}`);
-    logger.debug(`Remote debugging port: ${port}`);
-
-    const {spawn} = await import('node:child_process');
-    const browserProcess = spawn(
+    await spawnBrowserProcess(
+      port,
       selectedBrowser.path,
-      [
-        `--remote-debugging-port=${port}`,
-        '--no-first-run',
-        '--no-default-browser-check',
-      ],
-      {
-        detached: true,
-        stdio: 'ignore',
-      },
+      p => this.waitForBrowser(p),
     );
-
-    browserProcess.unref();
-
-    // Wait for browser to be ready
-    await this.waitForBrowser(port);
-    logger.debug('Browser launched successfully');
   }
 
-  /**
-   * Wait for browser to be ready
-   */
-  private async waitForBrowser(port: number, timeout?: number): Promise<void> {
-    const startTime = Date.now();
-    const maxTimeout = timeout ?? this.config.waitForBrowserTimeoutMs ?? 5000;
-    const pollInterval = this.config.waitForBrowserPollMs ?? 500;
-
-    while (Date.now() - startTime < maxTimeout) {
-      try {
-        const response = await fetch(`http://127.0.0.1:${port}/json/version`);
-        if (response.ok) {
-          return;
-        }
-      } catch {
-        // Browser not ready yet, retry
-      }
-      await new Promise(resolve => setTimeout(resolve, pollInterval));
-    }
-    throw new Error('Browser failed to start within timeout');
+  private async waitForBrowser(port: number): Promise<void> {
+    const timeoutMs = this.config.waitForBrowserTimeoutMs ?? 5000;
+    const pollMs = this.config.waitForBrowserPollMs ?? 500;
+    await waitForBrowserReady(port, timeoutMs, pollMs);
   }
 
-  /**
-   * Detect all available browsers
-   */
-  private detectAllBrowsers(): Array<{name: string; path: string}> {
-    const foundBrowsers: Array<{name: string; path: string}> = [];
+  // ─── Lifecycle ───────────────────────────────────────────────────────
 
-    // Use configured browser path if specified
-    if (this.config.browserPath) {
-      try {
-        if (fs.existsSync(this.config.browserPath)) {
-          foundBrowsers.push({
-            name: 'Custom Browser',
-            path: this.config.browserPath,
-          });
-          return foundBrowsers;
-        }
-      } catch {
-        // Ignore and continue with default detection
-      }
-    }
-
-    if (process.platform !== 'win32') {
-      // Unix-like platforms
-      const unixCandidates =
-        process.platform === 'darwin'
-          ? [
-              {
-                name: 'Chrome (macOS)',
-                path: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-              },
-              {
-                name: 'Edge (macOS)',
-                path: '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
-              },
-            ]
-          : [
-              {name: 'Chrome (linux)', path: '/usr/bin/google-chrome'},
-              {name: 'Chrome (linux)', path: '/usr/bin/google-chrome-stable'},
-              {name: 'Chromium (linux)', path: '/usr/bin/chromium-browser'},
-              {name: 'Chromium (linux)', path: '/usr/bin/chromium'},
-              {name: 'Edge (linux)', path: '/usr/bin/microsoft-edge'},
-            ];
-
-      const {existsSync} = fs;
-      for (const candidate of unixCandidates) {
-        if (existsSync(candidate.path)) {
-          foundBrowsers.push({name: candidate.name, path: candidate.path});
-        }
-      }
-      return foundBrowsers;
-    }
-
-    // Windows: scan common drive letters
-    const browserTemplates = [
-      {
-        name: 'Chrome',
-        paths: [
-          'Google\\Chrome\\Application\\chrome.exe',
-          'Program Files\\Google\\Chrome\\Application\\chrome.exe',
-          'Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-        ],
-      },
-      {
-        name: 'Edge',
-        paths: [
-          'Microsoft\\Edge\\Application\\msedge.exe',
-          'Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
-          'Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
-        ],
-      },
-    ];
-
-    const driveLetters = 'CDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-    for (const drive of driveLetters) {
-      for (const template of browserTemplates) {
-        for (const browserPath of template.paths) {
-          const fullPath = `${drive}:\\${browserPath}`;
-          if (fs.existsSync(fullPath)) {
-            foundBrowsers.push({
-              name: `${template.name} (${drive}:)`,
-              path: fullPath,
-            });
-          }
-        }
-      }
-    }
-
-    return foundBrowsers;
-  }
-
-  /**
-   * Restart the browser
-   */
   async restart(): Promise<void> {
     logger.debug('Manually restarting browser');
     await this.close();
     await this.ensureBrowser();
   }
 
-  /**
-   * Close the browser and clean up resources
-   */
   async close(): Promise<void> {
     if (!this.browser) return;
 
