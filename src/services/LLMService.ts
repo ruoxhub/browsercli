@@ -7,18 +7,15 @@ import {createAIService} from '../config.js';
 
 import type {AIMessage, AIResponse, ChatOptions} from './AIService.js';
 
-export type LLMMessage = AIMessage;
-export type LLMResponse = AIResponse;
-
 export class LLMService {
   constructor(
     private readonly serviceFactory: typeof createAIService = createAIService,
   ) {}
 
   async chat(
-    messages: LLMMessage[],
+    messages: AIMessage[],
     options?: {temperature?: number; maxTokens?: number},
-  ): Promise<LLMResponse> {
+  ): Promise<AIResponse> {
     const service = this.serviceFactory();
     if (!service) {
       throw new Error(
@@ -34,7 +31,7 @@ export class LLMService {
     return service.chat(messages, chatOptions);
   }
 
-  generateCodeAnalysisPrompt(code: string, focus: string): LLMMessage[] {
+  generateCodeAnalysisPrompt(code: string, focus: string): AIMessage[] {
     return [
       {
         role: 'system',
@@ -53,7 +50,7 @@ export class LLMService {
     ];
   }
 
-  generateCryptoDetectionPrompt(code: string): LLMMessage[] {
+  generateCryptoDetectionPrompt(code: string): AIMessage[] {
     return [
       {
         role: 'system',
@@ -71,7 +68,7 @@ export class LLMService {
     ];
   }
 
-  generateDeobfuscationPrompt(code: string): LLMMessage[] {
+  generateDeobfuscationPrompt(code: string): AIMessage[] {
     return [
       {
         role: 'system',
@@ -93,7 +90,7 @@ export class LLMService {
     code: string,
     sources: string[],
     sinks: string[],
-  ): LLMMessage[] {
+  ): AIMessage[] {
     return [
       {
         role: 'system',

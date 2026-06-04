@@ -1,41 +1,27 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-/**
- * Anthropic Provider Implementation
- * 
- * Implements the AIProvider interface for Anthropic's Claude API
- */
-
-import { readFileSync } from 'node:fs';
-
 import Anthropic from '@anthropic-ai/sdk';
 
-import type { AIProvider, AIMessage, AIResponse, ChatOptions } from './AIService.js';
+import {
+  decodeImageInput,
+  formatProviderError,
+  type FormattedProviderError,
+} from './image-helpers.js';
+import type {AIProvider, AIMessage, AIResponse, ChatOptions} from './AIService.js';
 
-/**
- * Anthropic provider configuration
- */
 export interface AnthropicConfig {
   apiKey: string;
   baseURL?: string;
   model?: string;
 }
 
-/**
- * Anthropic provider implementation
- */
 export class AnthropicProvider implements AIProvider {
-  private client: Anthropic;
-  private defaultModel: string;
+  private readonly client: Anthropic;
+  private readonly defaultModel: string;
 
-  /**
-   * Create a new Anthropic provider
-   * @param config - Anthropic configuration
-   */
   constructor(config: AnthropicConfig) {
     if (!config.apiKey) {
       throw new Error('Anthropic API key is required');
@@ -43,39 +29,32 @@ export class AnthropicProvider implements AIProvider {
 
     this.client = new Anthropic({
       apiKey: config.apiKey,
-      ...(config.baseURL && { baseURL: config.baseURL }),
+      ...(config.baseURL && {baseURL: config.baseURL}),
     });
 
     this.defaultModel = config.model || 'claude-3-5-sonnet-20241022';
   }
 
-  /**
-   * Send a chat request to Anthropic
-   * @param messages - Array of messages in the conversation
-   * @param options - Optional chat configuration
-   * @returns AI response with content and usage information
-   */
   async chat(messages: AIMessage[], options?: ChatOptions): Promise<AIResponse> {
     try {
       // Anthropic requires system messages to be separate from the messages array
-      const systemMessage = messages.find((msg) => msg.role === 'system');
-      const conversationMessages = messages.filter((msg) => msg.role !== 'system');
+      const systemMessage = messages.find(msg => msg.role === 'system');
+      const conversationMessages = messages.filter(msg => msg.role !== 'system');
 
       const response = await this.client.messages.create({
         model: options?.model || this.defaultModel,
         max_tokens: options?.maxTokens || 4096,
         temperature: options?.temperature,
         system: systemMessage?.content,
-        messages: conversationMessages.map((msg) => ({
+        messages: conversationMessages.map(msg => ({
           role: msg.role as 'user' | 'assistant',
           content: msg.content,
         })),
       });
 
-      // Extract text content from the response
       const textContent = response.content
-        .filter((block) => block.type === 'text')
-        .map((block) => (block as Anthropic.TextBlock).text)
+        .filter((block): block is Anthropic.TextBlock => block.type === 'text')
+        .map(block => block.text)
         .join('');
 
       return {
@@ -91,42 +70,13 @@ export class AnthropicProvider implements AIProvider {
     }
   }
 
-  /**
-   * Analyze an image with Anthropic's vision capabilities
-   * @param imageInput - Image data (base64 string or file path)
-   * @param prompt - Text prompt describing what to analyze
-   * @param isFilePath - Whether imageInput is a file path (default: false)
-   * @returns Analysis result as text
-   */
-  async analyzeImage(imageInput: string, prompt: string, isFilePath = false): Promise<string> {
+  async analyzeImage(
+    imageInput: string,
+    prompt: string,
+    isFilePath = false,
+  ): Promise<string> {
     try {
-      let imageData: string;
-      let mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
-
-      if (isFilePath) {
-        // Read file and convert to base64
-        const imageBuffer = readFileSync(imageInput);
-        imageData = imageBuffer.toString('base64');
-        
-        // Detect image type from file extension
-        const ext = imageInput.toLowerCase().split('.').pop();
-        mediaType = this.getMediaType(ext || '');
-      } else {
-        // Handle different input formats
-        if (imageInput.startsWith('data:')) {
-          // Extract base64 data from data URL
-          const matches = imageInput.match(/^data:([^;]+);base64,(.+)$/);
-          if (!matches) {
-            throw new Error('Invalid data URL format');
-          }
-          mediaType = matches[1] as typeof mediaType;
-          imageData = matches[2];
-        } else {
-          // Assume it's raw base64
-          imageData = imageInput;
-          mediaType = 'image/png'; // Default to PNG
-        }
-      }
+      const {mediaType, data: imageData} = decodeImageInput(imageInput, isFilePath);
 
       const response = await this.client.messages.create({
         model: this.defaultModel,
@@ -137,25 +87,17 @@ export class AnthropicProvider implements AIProvider {
             content: [
               {
                 type: 'image',
-                source: {
-                  type: 'base64',
-                  media_type: mediaType,
-                  data: imageData,
-                },
+                source: {type: 'base64', media_type: mediaType, data: imageData},
               },
-              {
-                type: 'text',
-                text: prompt,
-              },
+              {type: 'text', text: prompt},
             ],
           },
         ],
       });
 
-      // Extract text content from the response
       const textContent = response.content
-        .filter((block) => block.type === 'text')
-        .map((block) => (block as Anthropic.TextBlock).text)
+        .filter((block): block is Anthropic.TextBlock => block.type === 'text')
+        .map(block => block.text)
         .join('');
 
       return textContent;
@@ -164,41 +106,18 @@ export class AnthropicProvider implements AIProvider {
     }
   }
 
-  /**
-   * Get media type from file extension
-   * @param ext - File extension
-   * @returns Media type
-   */
-  private getMediaType(ext: string): 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp' {
-    const mediaTypes: Record<string, 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'> = {
-      png: 'image/png',
-      jpg: 'image/jpeg',
-      jpeg: 'image/jpeg',
-      gif: 'image/gif',
-      webp: 'image/webp',
-    };
-
-    return mediaTypes[ext] || 'image/png';
-  }
-
-  /**
-   * Handle and format errors from Anthropic API
-   * @param error - The error to handle
-   * @returns Formatted error
-   */
-  private handleError(error: unknown): Error {
+  private handleError(error: unknown): FormattedProviderError {
     if (error instanceof Anthropic.APIError) {
-      const message = `Anthropic API error (${error.status}): ${error.message}`;
-      const formattedError = new Error(message);
-      
-      // Preserve status code for retry logic
-      (formattedError as any).status = error.status;
-      
-      return formattedError;
+      const formatted = formatProviderError(
+        `Anthropic API error (${error.status})`,
+        error,
+      );
+      formatted.status = error.status;
+      return formatted;
     }
 
     if (error instanceof Error) {
-      return error;
+      return error as FormattedProviderError;
     }
 
     return new Error(`Unknown error: ${String(error)}`);

@@ -1,24 +1,18 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-/**
- * Gemini Provider Implementation
- * 
- * Implements the AIProvider interface for Google's Gemini API
- * Supports both API mode (with API key) and CLI mode (using gemini-cli)
- */
+import {spawn, spawnSync} from 'node:child_process';
+import {existsSync} from 'node:fs';
 
-import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import {
+  decodeImageInput,
+  formatProviderError,
+  type FormattedProviderError,
+} from './image-helpers.js';
+import type {AIProvider, AIMessage, AIResponse, ChatOptions} from './AIService.js';
 
-import type { AIProvider, AIMessage, AIResponse, ChatOptions } from './AIService.js';
-
-/**
- * Gemini provider configuration
- */
 export interface GeminiConfig {
   apiKey?: string;
   cliPath?: string;
@@ -26,74 +20,38 @@ export interface GeminiConfig {
   model?: string;
 }
 
-/**
- * Gemini provider implementation
- * Supports both API mode and CLI mode
- */
+const CLI_TIMEOUT_MS = 60_000;
+const CLI_AVAILABILITY_TIMEOUT_MS = 1_500;
+
 export class GeminiProvider implements AIProvider {
-  private static cliAvailabilityCache = new Map<string, boolean>();
-  private apiKey?: string;
-  private cliPath: string;
-  private useAPI: boolean;
-  private defaultModel: string;
+  private static readonly cliAvailabilityCache = new Map<string, boolean>();
+
+  private readonly apiKey?: string;
+  private readonly cliPath: string;
+  private readonly useAPI: boolean;
+  private readonly defaultModel: string;
   private cliAvailable?: boolean;
 
-  /**
-   * Create a new Gemini provider
-   * @param config - Gemini configuration
-   */
   constructor(config: GeminiConfig) {
     this.apiKey = config.apiKey;
     this.cliPath = config.cliPath || 'gemini-cli';
-    this.useAPI = config.useAPI ?? !!config.apiKey;
     this.defaultModel = config.model || 'gemini-2.0-flash-exp';
-
-    // If API mode is requested but no API key, fall back to CLI
-    if (this.useAPI && !this.apiKey) {
-      this.useAPI = false;
-    }
-
-    // CLI availability check is intentionally lazy to avoid startup overhead.
+    // Fall back to CLI mode if API mode was requested but no key was provided.
+    this.useAPI = (config.useAPI ?? !!config.apiKey) && !!this.apiKey;
   }
 
-  /**
-   * Send a chat request to Gemini
-   * @param messages - Array of messages in the conversation
-   * @param options - Optional chat configuration
-   * @returns AI response with content and usage information
-   */
-  async chat(messages: AIMessage[], options?: ChatOptions): Promise<AIResponse> {
-    if (this.useAPI) {
-      return this.chatAPI(messages, options);
-    } else {
-      return this.chatCLI(messages, options);
-    }
+  chat(messages: AIMessage[], options?: ChatOptions): Promise<AIResponse> {
+    return this.useAPI
+      ? this.chatAPI(messages, options)
+      : this.chatCLI(messages, options);
   }
 
-  /**
-   * Analyze an image with Gemini's vision capabilities
-   * @param imageInput - Image data (base64 string or file path)
-   * @param prompt - Text prompt describing what to analyze
-   * @param isFilePath - Whether imageInput is a file path (default: false)
-   * @returns Analysis result as text
-   */
-  async analyzeImage(imageInput: string, prompt: string, isFilePath = false): Promise<string> {
-    if (this.useAPI) {
-      return this.analyzeImageAPI(imageInput, prompt, isFilePath);
-    } else {
-      return this.analyzeImageCLI(imageInput, prompt, isFilePath);
-    }
+  analyzeImage(imageInput: string, prompt: string, isFilePath = false): Promise<string> {
+    return this.useAPI
+      ? this.analyzeImageAPI(imageInput, prompt, isFilePath)
+      : this.analyzeImageCLI(imageInput, prompt, isFilePath);
   }
 
-
-
-
-  /**
-   * Chat using Gemini API
-   * @param messages - Array of messages
-   * @param options - Chat options
-   * @returns AI response
-   */
   private async chatAPI(messages: AIMessage[], options?: ChatOptions): Promise<AIResponse> {
     if (!this.apiKey) {
       throw new Error('Gemini API key is required for API mode.');
@@ -107,368 +65,225 @@ export class GeminiProvider implements AIProvider {
       .filter(msg => msg.role !== 'system')
       .map(msg => ({
         role: msg.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: msg.content }]
+        parts: [{text: msg.content}],
       }));
 
-    const body: any = {
+    const body: Record<string, unknown> = {
       contents,
       generationConfig: {
         temperature: options?.temperature,
         maxOutputTokens: options?.maxTokens,
-      }
+      },
     };
 
     if (systemMessage) {
-      body.systemInstruction = {
-        parts: [{ text: systemMessage.content }]
-      };
+      body.systemInstruction = {parts: [{text: systemMessage.content}]};
     }
 
     try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      });
+      const data = await this.postJSON<GeminiChatResponse>(url, body);
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Gemini API error: ${response.status} ${response.statusText} - ${errorText}`);
-      }
-
-      const data = await response.json() as any;
       const candidate = data.candidates?.[0];
-      if (!candidate || !candidate.content || !candidate.content.parts?.[0]) {
+      const firstPart = candidate?.content?.parts?.[0];
+      if (!candidate || !firstPart) {
         throw new Error('No response content from Gemini API');
       }
 
-      const text = candidate.content.parts[0].text || '';
-      const usage = data.usageMetadata
-        ? {
-            promptTokens: data.usageMetadata.promptTokenCount,
-            completionTokens: data.usageMetadata.candidatesTokenCount,
-            totalTokens: data.usageMetadata.totalTokenCount,
-          }
-        : undefined;
-
       return {
-        content: text,
-        usage,
+        content: firstPart.text || '',
+        usage: data.usageMetadata
+          ? {
+              promptTokens: data.usageMetadata.promptTokenCount,
+              completionTokens: data.usageMetadata.candidatesTokenCount,
+              totalTokens: data.usageMetadata.totalTokenCount,
+            }
+          : undefined,
       };
     } catch (error) {
       throw this.handleError(error);
     }
   }
 
-  /**
-   * Chat using Gemini CLI
-   * @param messages - Array of messages
-   * @param options - Chat options
-   * @returns AI response
-   */
   private async chatCLI(messages: AIMessage[], options?: ChatOptions): Promise<AIResponse> {
-    // Check CLI availability
-    if (!this.checkCLIAvailable()) {
-      throw new Error(
-        'gemini-cli is not available. Please install it:\n' +
-        '  npm install -g @google/generative-ai-cli\n' +
-        'Or set GEMINI_API_KEY to use API mode.'
-      );
-    }
-
-    try {
-      // Combine messages into a single prompt
-      const prompt = this.formatMessagesForCLI(messages);
-      
-      // Execute CLI command
-      const response = await this.executeCLI(prompt, options);
-      
-      return {
-        content: response,
-        // CLI mode doesn't provide token usage
-        usage: undefined,
-      };
-    } catch (error) {
-      throw this.handleError(error);
-    }
+    this.ensureCLIAvailable();
+    const prompt = this.formatMessagesForCLI(messages);
+    const response = await this.executeCLI(prompt, options);
+    // CLI mode does not provide token usage.
+    return {content: response};
   }
 
-  /**
-   * Analyze image using Gemini API
-   * @param imageInput - Image data
-   * @param prompt - Analysis prompt
-   * @param isFilePath - Whether input is a file path
-   * @returns Analysis result
-   */
   private async analyzeImageAPI(
     imageInput: string,
     prompt: string,
-    isFilePath: boolean
+    isFilePath: boolean,
   ): Promise<string> {
     if (!this.apiKey) {
       throw new Error('Gemini API key is required for API mode.');
     }
 
-    let imageData: string;
-    let mediaType: string;
-
-    if (isFilePath) {
-      if (!existsSync(imageInput)) {
-        throw new Error(`Image file not found: ${imageInput}`);
-      }
-      const imageBuffer = readFileSync(imageInput);
-      imageData = imageBuffer.toString('base64');
-      const ext = imageInput.toLowerCase().split('.').pop() || '';
-      mediaType = this.getMediaType(ext);
-    } else {
-      if (imageInput.startsWith('data:')) {
-        const matches = imageInput.match(/^data:([^;]+);base64,(.+)$/);
-        if (!matches) {
-          throw new Error('Invalid data URL format');
-        }
-        mediaType = matches[1];
-        imageData = matches[2];
-      } else {
-        imageData = imageInput;
-        mediaType = 'image/png'; // Default to PNG
-      }
+    if (isFilePath && !existsSync(imageInput)) {
+      throw new Error(`Image file not found: ${imageInput}`);
     }
 
-    const model = this.defaultModel;
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKey}`;
+    const {mediaType, data} = decodeImageInput(imageInput, isFilePath);
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.defaultModel}:generateContent?key=${this.apiKey}`;
 
     const body = {
       contents: [
         {
           parts: [
-            {
-              inlineData: {
-                mimeType: mediaType,
-                data: imageData,
-              }
-            },
-            {
-              text: prompt,
-            }
-          ]
-        }
-      ]
+            {inlineData: {mimeType: mediaType, data}},
+            {text: prompt},
+          ],
+        },
+      ],
     };
 
     try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Gemini API error: ${response.status} ${response.statusText} - ${errorText}`);
-      }
-
-      const data = await response.json() as any;
-      const candidate = data.candidates?.[0];
-      if (!candidate || !candidate.content || !candidate.content.parts?.[0]) {
+      const response = await this.postJSON<GeminiChatResponse>(url, body);
+      const firstPart = response.candidates?.[0]?.content?.parts?.[0];
+      if (!firstPart) {
         throw new Error('No response content from Gemini API');
       }
-
-      return candidate.content.parts[0].text || '';
+      return firstPart.text || '';
     } catch (error) {
       throw this.handleError(error);
     }
   }
 
-  /**
-   * Analyze image using Gemini CLI
-   * @param imageInput - Image data
-   * @param prompt - Analysis prompt
-   * @param isFilePath - Whether input is a file path
-   * @returns Analysis result
-   */
   private async analyzeImageCLI(
     imageInput: string,
     prompt: string,
-    isFilePath: boolean
+    isFilePath: boolean,
   ): Promise<string> {
-    // Check CLI availability
-    if (!this.checkCLIAvailable()) {
+    this.ensureCLIAvailable();
+    if (!isFilePath) {
       throw new Error(
-        'gemini-cli is not available. Please install it:\n' +
-        '  npm install -g @google/generative-ai-cli\n' +
-        'Or set GEMINI_API_KEY to use API mode.'
+        'CLI mode requires image file paths. Please provide a file path or use API mode.',
+      );
+    }
+    if (!existsSync(imageInput)) {
+      throw new Error(`Image file not found: ${imageInput}`);
+    }
+    return this.executeCLI(prompt, undefined, imageInput);
+  }
+
+  private async postJSON<T>(url: string, body: unknown): Promise<T> {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Gemini API error: ${response.status} ${response.statusText} - ${errorText}`,
       );
     }
 
-    try {
-      let imagePath: string;
-
-      if (isFilePath) {
-        // Use the file path directly
-        if (!existsSync(imageInput)) {
-          throw new Error(`Image file not found: ${imageInput}`);
-        }
-        imagePath = imageInput;
-      } else {
-        // For base64 or data URLs, we need to save to a temp file
-        // For now, throw an error as CLI mode works best with file paths
-        throw new Error(
-          'CLI mode requires image file paths. Please provide a file path or use API mode.'
-        );
-      }
-
-      // Execute CLI with image
-      const response = await this.executeCLI(prompt, undefined, imagePath);
-      
-      return response;
-    } catch (error) {
-      throw this.handleError(error);
-    }
+    return (await response.json()) as T;
   }
 
-  /**
-   * Format messages for CLI input
-   * @param messages - Array of messages
-   * @returns Formatted prompt string
-   */
   private formatMessagesForCLI(messages: AIMessage[]): string {
-    const parts: string[] = [];
-
-    for (const message of messages) {
-      switch (message.role) {
-        case 'system':
-          parts.push(`System: ${message.content}`);
-          break;
-        case 'user':
-          parts.push(`User: ${message.content}`);
-          break;
-        case 'assistant':
-          parts.push(`Assistant: ${message.content}`);
-          break;
-      }
-    }
-
-    return parts.join('\n\n');
+    return messages
+      .map(msg => {
+        const label = msg.role === 'system'
+          ? 'System'
+          : msg.role === 'user'
+            ? 'User'
+            : 'Assistant';
+        return `${label}: ${msg.content}`;
+      })
+      .join('\n\n');
   }
 
-  /**
-   * Execute gemini-cli command
-   * @param prompt - The prompt to send
-   * @param options - Chat options
-   * @param imagePath - Optional image file path
-   * @returns CLI output
-   */
-  private async executeCLI(
+  private executeCLI(
     prompt: string,
     options?: ChatOptions,
-    imagePath?: string
+    imagePath?: string,
   ): Promise<string> {
     return new Promise((resolve, reject) => {
+      const args = this.buildCLIArgs(prompt, options, imagePath);
+      const child = spawn(this.cliPath, args, {stdio: ['pipe', 'pipe', 'pipe']});
+
       let settled = false;
-      let timeout: NodeJS.Timeout | undefined;
-      const settle = (handler: (value: any) => void, value: any): void => {
-        if (settled) {
-          return;
-        }
-        settled = true;
-        if (timeout) {
-          clearTimeout(timeout);
-        }
-        handler(value);
-      };
-
-      const args: string[] = [];
-
-      // Add model if specified
-      const model = options?.model || this.defaultModel;
-      if (model) {
-        args.push('--model', model);
-      }
-
-      // Add temperature if specified
-      if (options?.temperature !== undefined) {
-        args.push('--temperature', options.temperature.toString());
-      }
-
-      // Add max tokens if specified
-      if (options?.maxTokens !== undefined) {
-        args.push('--max-tokens', options.maxTokens.toString());
-      }
-
-      // Add image if provided
-      if (imagePath) {
-        args.push('--image', imagePath);
-      }
-
-      // Add prompt
-      args.push(prompt);
-
-      // Spawn the CLI process
-      const child = spawn(this.cliPath, args, {
-        stdio: ['pipe', 'pipe', 'pipe'],
-      });
-
       let stdout = '';
       let stderr = '';
 
-      child.stdout.on('data', (data) => {
-        stdout += data.toString();
+      const settleResolve = (value: string): void => {
+        if (settled) return;
+        settled = true;
+        if (timeout) clearTimeout(timeout);
+        resolve(value);
+      };
+
+      const settleReject = (reason: Error): void => {
+        if (settled) return;
+        settled = true;
+        if (timeout) clearTimeout(timeout);
+        reject(reason);
+      };
+
+      const timeout = setTimeout(() => {
+        if (settled) return;
+        child.kill();
+        settleReject(
+          new Error(`gemini-cli execution timed out after ${CLI_TIMEOUT_MS / 1000} seconds`),
+        );
+      }, CLI_TIMEOUT_MS);
+
+      child.stdout.on('data', chunk => { stdout += chunk.toString(); });
+      child.stderr.on('data', chunk => { stderr += chunk.toString(); });
+
+      child.once('error', error => {
+        settleReject(new Error(`Failed to execute gemini-cli: ${error.message}`));
       });
 
-      child.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-
-      child.once('error', (error) => {
-        settle(reject, new Error(`Failed to execute gemini-cli: ${error.message}`));
-      });
-
-      child.once('close', (code) => {
+      child.once('close', code => {
         if (code !== 0) {
-          settle(
-            reject,
-            new Error(
-              `gemini-cli exited with code ${code}${stderr ? `\nError: ${stderr}` : ''}`
-            )
-          );
-        } else {
-          // Parse and clean the output
-          const response = this.parseCliOutput(stdout);
-          settle(resolve, response);
-        }
-      });
-
-      // Set timeout (default 60 seconds)
-      timeout = setTimeout(() => {
-        if (settled) {
+          const detail = stderr ? `\nError: ${stderr}` : '';
+          settleReject(new Error(`gemini-cli exited with code ${code}${detail}`));
           return;
         }
-        child.kill();
-        settle(reject, new Error('gemini-cli execution timed out after 60 seconds'));
-      }, 60000);
+        settleResolve(this.parseCliOutput(stdout));
+      });
     });
   }
 
-  /**
-   * Parse CLI output to extract the response
-   * @param output - Raw CLI output
-   * @returns Cleaned response text
-   */
+  private buildCLIArgs(prompt: string, options?: ChatOptions, imagePath?: string): string[] {
+    const args: string[] = [];
+
+    const model = options?.model || this.defaultModel;
+    if (model) args.push('--model', model);
+
+    if (options?.temperature !== undefined) {
+      args.push('--temperature', options.temperature.toString());
+    }
+
+    if (options?.maxTokens !== undefined) {
+      args.push('--max-tokens', options.maxTokens.toString());
+    }
+
+    if (imagePath) args.push('--image', imagePath);
+
+    args.push(prompt);
+    return args;
+  }
+
   private parseCliOutput(output: string): string {
-    // Remove any CLI formatting or metadata
-    // The actual response format depends on gemini-cli implementation
-    // For now, return the output as-is, trimmed
     return output.trim();
   }
 
-  /**
-   * Check if gemini-cli is available
-   * @returns True if CLI is available
-   */
+  private ensureCLIAvailable(): void {
+    if (this.checkCLIAvailable()) return;
+    throw new Error(
+      'gemini-cli is not available. Please install it:\n' +
+        '  npm install -g @google/generative-ai-cli\n' +
+        'Or set GEMINI_API_KEY to use API mode.',
+    );
+  }
+
   private checkCLIAvailable(): boolean {
     if (this.cliAvailable !== undefined) {
       return this.cliAvailable;
@@ -480,52 +295,39 @@ export class GeminiProvider implements AIProvider {
       return cached;
     }
 
-    try {
-      // Try to execute gemini-cli --version
-      const result = spawnSync(this.cliPath, ['--version'], {
-        stdio: 'pipe',
-        timeout: 1500,
-      });
+    const available = (() => {
+      try {
+        const result = spawnSync(this.cliPath, ['--version'], {
+          stdio: 'pipe',
+          timeout: CLI_AVAILABILITY_TIMEOUT_MS,
+        });
+        return result.status === 0;
+      } catch {
+        return false;
+      }
+    })();
 
-      this.cliAvailable = result.status === 0;
-      GeminiProvider.cliAvailabilityCache.set(this.cliPath, this.cliAvailable);
-      return this.cliAvailable;
-    } catch (error) {
-      this.cliAvailable = false;
-      GeminiProvider.cliAvailabilityCache.set(this.cliPath, false);
-      return false;
-    }
+    this.cliAvailable = available;
+    GeminiProvider.cliAvailabilityCache.set(this.cliPath, available);
+    return available;
   }
 
-  /**
-   * Get media type from file extension
-   */
-  private getMediaType(ext: string): string {
-    switch (ext.toLowerCase()) {
-      case 'jpg':
-      case 'jpeg':
-        return 'image/jpeg';
-      case 'png':
-        return 'image/png';
-      case 'gif':
-        return 'image/gif';
-      case 'webp':
-        return 'image/webp';
-      default:
-        return 'image/png'; // Default to PNG
-    }
+  private handleError(error: unknown): FormattedProviderError {
+    return error instanceof Error
+      ? (error as FormattedProviderError)
+      : formatProviderError('Unknown error', error);
   }
+}
 
-  /**
-   * Handle and format errors
-   * @param error - The error to handle
-   * @returns Formatted error
-   */
-  private handleError(error: unknown): Error {
-    if (error instanceof Error) {
-      return error;
-    }
-
-    return new Error(`Unknown error: ${String(error)}`);
-  }
+interface GeminiChatResponse {
+  candidates?: Array<{
+    content?: {
+      parts?: Array<{text?: string}>;
+    };
+  }>;
+  usageMetadata?: {
+    promptTokenCount: number;
+    candidatesTokenCount: number;
+    totalTokenCount: number;
+  };
 }

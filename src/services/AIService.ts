@@ -3,7 +3,6 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
 export type MessageRole = 'system' | 'user' | 'assistant';
 
@@ -39,15 +38,6 @@ export interface AIProvider {
   ): Promise<string>;
 }
 
-export interface AIConfig {
-  provider: 'openai';
-  openai?: {
-    apiKey: string;
-    baseURL?: string;
-    model?: string;
-  };
-}
-
 interface RetryConfig {
   maxRetries: number;
   initialDelay: number;
@@ -62,30 +52,37 @@ const DEFAULT_RETRY_CONFIG: RetryConfig = {
   backoffMultiplier: 2,
 };
 
+/**
+ * HTTP/network error codes that should trigger a retry attempt.
+ */
+const RETRYABLE_NETWORK_CODES = new Set([
+  'ECONNRESET',
+  'ETIMEDOUT',
+  'ENOTFOUND',
+  'ECONNREFUSED',
+]);
+
+const RETRYABLE_MESSAGE_FRAGMENTS = ['Connection error', 'connect', 'ECONNREFUSED'];
+
 export class AIService {
-  private provider: AIProvider;
-  private retryConfig: RetryConfig;
+  private readonly provider: AIProvider;
+  private readonly retryConfig: RetryConfig;
 
   constructor(provider: AIProvider, retryConfig?: Partial<RetryConfig>) {
     this.provider = provider;
     this.retryConfig = {...DEFAULT_RETRY_CONFIG, ...retryConfig};
   }
 
-  async chat(
-    messages: AIMessage[],
-    options?: ChatOptions,
-  ): Promise<AIResponse> {
+  chat(messages: AIMessage[], options?: ChatOptions): Promise<AIResponse> {
     return this.withRetry(() => this.provider.chat(messages, options));
   }
 
-  async analyzeImage(
+  analyzeImage(
     imageInput: string,
     prompt: string,
     isFilePath?: boolean,
   ): Promise<string> {
-    return this.withRetry(() =>
-      this.provider.analyzeImage(imageInput, prompt, isFilePath),
-    );
+    return this.withRetry(() => this.provider.analyzeImage(imageInput, prompt, isFilePath));
   }
 
   private async withRetry<T>(fn: () => Promise<T>): Promise<T> {
@@ -98,16 +95,11 @@ export class AIService {
       } catch (error) {
         lastError = error as Error;
 
-        if (attempt === this.retryConfig.maxRetries) {
+        if (attempt === this.retryConfig.maxRetries || !this.isRetryableError(error)) {
           break;
         }
 
-        if (!this.isRetryableError(error)) {
-          throw error;
-        }
-
         await this.sleep(delay);
-
         delay = Math.min(
           delay * this.retryConfig.backoffMultiplier,
           this.retryConfig.maxDelay,
@@ -125,34 +117,18 @@ export class AIService {
       return false;
     }
 
-    const err = error as any;
+    const err = error as {code?: string; message?: string; status?: number; statusCode?: number};
 
-    // 网络相关错误码
-    if (
-      err.code === 'ECONNRESET' ||
-      err.code === 'ETIMEDOUT' ||
-      err.code === 'ENOTFOUND' ||
-      err.code === 'ECONNREFUSED'
-    ) {
+    if (err.code && RETRYABLE_NETWORK_CODES.has(err.code)) {
       return true;
     }
 
-    // 错误消息包含连接错误特征
-    if (
-      err.message?.includes('Connection error') ||
-      err.message?.includes('connect') ||
-      err.message?.includes('ECONNREFUSED')
-    ) {
+    if (err.message && RETRYABLE_MESSAGE_FRAGMENTS.some(fragment => err.message!.includes(fragment))) {
       return true;
     }
 
-    // HTTP 429 请求过多
-    if (err.status === 429 || err.statusCode === 429) {
-      return true;
-    }
-
-    // 5xx 服务器错误
-    if (err.status >= 500 || err.statusCode >= 500) {
+    const status = err.status ?? err.statusCode;
+    if (status === 429 || (typeof status === 'number' && status >= 500)) {
       return true;
     }
 

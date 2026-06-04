@@ -195,17 +195,14 @@ export class SiteExperienceService {
   }
 
   /**
-   * 从 URL 提取域名
+   * 从 URL 提取域名；URL 非法时返回 null，由调用方决定是否继续其他搜索维度。
    */
   private extractDomain(url: string): string | null {
     try {
-      // 如果 URL 没有协议，添加 http:// 以便解析
       const urlWithProtocol = url.startsWith('http') ? url : `http://${url}`;
-      const parsed = new URL(urlWithProtocol);
-      return parsed.hostname;
+      return new URL(urlWithProtocol).hostname;
     } catch {
-      // 如果不是有效 URL，返回原始输入
-      return url;
+      return null;
     }
   }
 }
