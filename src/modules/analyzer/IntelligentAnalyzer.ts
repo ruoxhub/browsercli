@@ -78,6 +78,13 @@ export interface AntiDebugPattern {
   code: string;
 }
 
+function formatEvidence(evidence: unknown): string {
+  if (Array.isArray(evidence)) {
+    return evidence.join(', ');
+  }
+  return evidence ? String(evidence) : '';
+}
+
 export class IntelligentAnalyzer {
   analyze(data: {
     requests: AnalyzerNetworkRequest[];
@@ -180,11 +187,7 @@ export class IntelligentAnalyzer {
     if (result.patterns.encryption && result.patterns.encryption.length > 0) {
       lines.push(`Encryption Patterns (${result.patterns.encryption.length}):`);
       result.patterns.encryption.slice(0, 5).forEach(pattern => {
-        const evidence = Array.isArray(pattern.evidence)
-          ? pattern.evidence.join(', ')
-          : pattern.evidence
-            ? String(pattern.evidence)
-            : '';
+        const evidence = formatEvidence(pattern.evidence);
         lines.push(
           `  - ${pattern.type} (confidence: ${(pattern.confidence * 100).toFixed(0)}%)`,
         );
@@ -197,11 +200,7 @@ export class IntelligentAnalyzer {
     if (result.patterns.signature && result.patterns.signature.length > 0) {
       lines.push(`Signature Patterns (${result.patterns.signature.length}):`);
       result.patterns.signature.slice(0, 5).forEach(pattern => {
-        const parameters = Array.isArray(pattern.parameters)
-          ? pattern.parameters.join(', ')
-          : pattern.parameters
-            ? String(pattern.parameters)
-            : '';
+        const parameters = formatEvidence(pattern.parameters);
         lines.push(`  - ${pattern.type}`);
         lines.push(`    parameters: ${parameters}`);
       });

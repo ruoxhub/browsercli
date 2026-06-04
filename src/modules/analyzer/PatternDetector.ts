@@ -212,71 +212,64 @@ export function deduplicatePatterns<T extends {location: string; type: string}>(
   return result;
 }
 
+const CRYPTO_KEYWORDS = {
+  AES: ['aes', 'cipher', 'encrypt', 'decrypt', 'CryptoJS.AES'],
+  RSA: ['rsa', 'publickey', 'privatekey', 'RSA.encrypt'],
+  MD5: ['md5', 'MD5', 'CryptoJS.MD5'],
+  SHA: ['sha', 'sha1', 'sha256', 'sha512', 'CryptoJS.SHA'],
+  Base64: ['base64', 'btoa', 'atob', 'Base64.encode'],
+} as const;
+
+type CryptoType = keyof typeof CRYPTO_KEYWORDS;
+
+function findMatchedCryptoKeywords(text: string, keywords: readonly string[]): string[] {
+  const textLower = text.toLowerCase();
+  return keywords.filter(kw => textLower.includes(kw.toLowerCase()));
+}
+
 export function detectEncryptionPatterns(
   requests: AnalyzerNetworkRequest[],
   logs: AnalyzerConsoleMessage[],
 ): EncryptionPattern[] {
   const patterns: EncryptionPattern[] = [];
 
-  const cryptoKeywords = {
-    AES: ['aes', 'cipher', 'encrypt', 'decrypt', 'CryptoJS.AES'],
-    RSA: ['rsa', 'publickey', 'privatekey', 'RSA.encrypt'],
-    MD5: ['md5', 'MD5', 'CryptoJS.MD5'],
-    SHA: ['sha', 'sha1', 'sha256', 'sha512', 'CryptoJS.SHA'],
-    Base64: ['base64', 'btoa', 'atob', 'Base64.encode'],
-  } as const;
-  const isEncryptionPatternType = (
-    value: string,
-  ): value is EncryptionPattern['type'] =>
-    Object.prototype.hasOwnProperty.call(cryptoKeywords, value);
-
   for (const req of requests) {
-    for (const [type, keywords] of Object.entries(cryptoKeywords)) {
-      if (!isEncryptionPatternType(type)) continue;
-      for (const keyword of keywords) {
-        if (req.url.toLowerCase().includes(keyword.toLowerCase())) {
+    for (const [type, keywords] of Object.entries(CRYPTO_KEYWORDS) as [CryptoType, readonly string[]][]) {
+      const urlMatches = findMatchedCryptoKeywords(req.url, keywords);
+      urlMatches.forEach(kw => {
+        patterns.push({
+          type,
+          location: req.url,
+          confidence: 0.7,
+          evidence: [kw, 'Found in URL'],
+        });
+      });
+
+      if (req.postData) {
+        const postMatches = findMatchedCryptoKeywords(req.postData, keywords);
+        postMatches.forEach(kw => {
           patterns.push({
             type,
             location: req.url,
-            confidence: 0.7,
-            evidence: [keyword, 'Found in URL'],
+            confidence: 0.8,
+            evidence: [kw, 'Found in POST data'],
           });
-        }
-      }
-    }
-
-    if (req.postData) {
-      const postData = req.postData.toLowerCase();
-      for (const [type, keywords] of Object.entries(cryptoKeywords)) {
-        if (!isEncryptionPatternType(type)) continue;
-        for (const keyword of keywords) {
-          if (postData.includes(keyword.toLowerCase())) {
-            patterns.push({
-              type,
-              location: req.url,
-              confidence: 0.8,
-              evidence: [keyword, 'Found in POST data'],
-            });
-          }
-        }
+        });
       }
     }
   }
 
   for (const log of logs) {
-    const text = log.text.toLowerCase();
-    for (const [type, keywords] of Object.entries(cryptoKeywords)) {
-      if (!isEncryptionPatternType(type)) continue;
-      for (const keyword of keywords) {
-        if (text.includes(keyword.toLowerCase())) {
-          patterns.push({
-            type,
-            location: log.url || 'console',
-            confidence: 0.9,
-            evidence: [keyword, 'Found in console log', log.text.substring(0, 100)],
-          });
-        }
-      }
+    for (const [type, keywords] of Object.entries(CRYPTO_KEYWORDS) as [CryptoType, readonly string[]][]) {
+      const logMatches = findMatchedCryptoKeywords(log.text, keywords);
+      logMatches.forEach(kw => {
+        patterns.push({
+          type,
+          location: log.url || 'console',
+          confidence: 0.9,
+          evidence: [kw, 'Found in console log', log.text.substring(0, 100)],
+        });
+      });
     }
   }
 

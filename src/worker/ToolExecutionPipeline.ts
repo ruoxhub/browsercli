@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {validateToolArgs} from '../cli/tool-arg-validator.js';
+import {validateToolArgs, type ValidationFailure} from '../cli/tool-arg-validator.js';
 import type {ToolMeta} from '../cli/tools-meta.js';
 import type {ToolPrerequisiteChecker} from '../tools/prerequisites/ToolPrerequisiteChecker.js';
 import {createToolError, ErrorCodes, ToolError} from '../utils/errors.js';
@@ -41,7 +41,7 @@ export class ToolExecutionPipeline {
       if (!validated.ok) {
         throw createToolError(
           ErrorCodes.VALIDATION,
-          validated.error,
+          (validated as ValidationFailure).error,
           {toolName},
         );
       }
