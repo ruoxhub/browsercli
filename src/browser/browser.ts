@@ -888,7 +888,7 @@ export class BrowserManager {
       if (!ctx) {
         ctx = await this.browser.newContext({
           bypassCSP: true,
-          acceptInsecureCerts: this.config.acceptInsecureCerts,
+          ignoreHTTPSErrors: this.config.acceptInsecureCerts,
         });
       }
       this.context = ctx;

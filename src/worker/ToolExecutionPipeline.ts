@@ -41,12 +41,12 @@ export class ToolExecutionPipeline {
       if (!validated.ok) {
         throw createToolError(
           ErrorCodes.VALIDATION,
-          (validated as {ok: false; error: string}).error,
+          validated.error,
           {toolName},
         );
       }
 
-      params = (validated as {ok: true; value: Record<string, unknown>}).value;
+      params = validated.value;
       this.prerequisiteChecker?.check(toolName, meta.prerequisites);
       const handler = await this.loader.load(meta);
       if (!handler) {
