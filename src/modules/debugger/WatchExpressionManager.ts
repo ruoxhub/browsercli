@@ -3,17 +3,16 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
 /**
  * WatchExpressionManager - 监视表达式管理
  *
- * 功能：
+ * 功能:
  * 1. 添加/删除/启用/禁用监视表达式
  * 2. 在每次暂停时自动求值所有监视表达式
  * 3. 追踪表达式值的变化历史
  *
- * 设计原则：
+ * 设计原则:
  * - 依赖 RuntimeInspector 进行表达式求值
  * - 自动在断点暂停时求值
  * - 提供值变化检测
@@ -23,45 +22,36 @@ import {logger} from '../../utils/logger.js';
 
 import type {RuntimeInspector} from './RuntimeInspector.js';
 
-/**
- * 监视表达式
- */
 export interface WatchExpression {
   id: string;
   expression: string;
   name: string;
   enabled: boolean;
-  lastValue: any;
+  lastValue: unknown;
   lastError: Error | null;
-  valueHistory: Array<{value: any; timestamp: number}>;
+  valueHistory: Array<{value: unknown; timestamp: number}>;
   createdAt: number;
 }
 
-/**
- * 监视表达式求值结果
- */
 export interface WatchResult {
   watchId: string;
   name: string;
   expression: string;
-  value: any;
+  value: unknown;
   error: Error | null;
   valueChanged: boolean;
   timestamp: number;
 }
 
-/**
- * 监视表达式管理器
- */
+const MAX_HISTORY_LENGTH = 100;
+const DEFAULT_EVAL_TIMEOUT_MS = 5000;
+
 export class WatchExpressionManager {
   private watches = new Map<string, WatchExpression>();
   private watchCounter = 0;
 
   constructor(private runtimeInspector: RuntimeInspector) {}
 
-  /**
-   * 添加监视表达式
-   */
   addWatch(expression: string, name?: string): string {
     const watchId = `watch_${++this.watchCounter}`;
 
@@ -80,9 +70,6 @@ export class WatchExpressionManager {
     return watchId;
   }
 
-  /**
-   * 删除监视表达式
-   */
   removeWatch(watchId: string): boolean {
     const deleted = this.watches.delete(watchId);
     if (deleted) {
@@ -91,9 +78,6 @@ export class WatchExpressionManager {
     return deleted;
   }
 
-  /**
-   * 启用/禁用监视表达式
-   */
   setWatchEnabled(watchId: string, enabled: boolean): boolean {
     const watch = this.watches.get(watchId);
     if (!watch) return false;
@@ -105,173 +89,155 @@ export class WatchExpressionManager {
     return true;
   }
 
-  /**
-   * 获取所有监视表达式
-   */
   getAllWatches(): WatchExpression[] {
     return Array.from(this.watches.values());
   }
 
-  /**
-   * 获取特定监视表达式
-   */
   getWatch(watchId: string): WatchExpression | undefined {
     return this.watches.get(watchId);
   }
 
-  /**
-   * 求值所有启用的监视表达式
-   *
-   * @param callFrameId 可选的调用帧 ID（在断点暂停时使用）
-   * @param timeout 单个表达式的超时时间（毫秒，默认5000ms）
-   */
   async evaluateAll(
     callFrameId?: string,
-    timeout = 5000,
+    timeout = DEFAULT_EVAL_TIMEOUT_MS,
   ): Promise<WatchResult[]> {
     const results: WatchResult[] = [];
 
     for (const watch of this.watches.values()) {
       if (!watch.enabled) continue;
-
-      try {
-        // ✅ 修复：添加超时控制，防止表达式求值卡死，并清理定时器
-        let timeoutId: NodeJS.Timeout | null = null;
-        const value = await Promise.race([
-          this.runtimeInspector.evaluate(watch.expression, callFrameId),
-          new Promise((_, reject) => {
-            timeoutId = setTimeout(
-              () => reject(new Error(`Evaluation timeout after ${timeout}ms`)),
-              timeout,
-            );
-          }),
-        ]).finally(() => {
-          // ✅ 清理定时器，防止内存泄漏
-          if (timeoutId) clearTimeout(timeoutId);
-        });
-
-        // 检测值是否变化
-        const valueChanged = !this.deepEqual(value, watch.lastValue);
-
-        // 更新历史
-        if (valueChanged) {
-          watch.valueHistory.push({
-            value,
-            timestamp: Date.now(),
-          });
-
-          // 限制历史记录数量（最多保留 100 条）
-          if (watch.valueHistory.length > 100) {
-            watch.valueHistory.shift();
-          }
-        }
-
-        // 更新最后的值和错误
-        watch.lastValue = value;
-        watch.lastError = null;
-
-        results.push({
-          watchId: watch.id,
-          name: watch.name,
-          expression: watch.expression,
-          value,
-          error: null,
-          valueChanged,
-          timestamp: Date.now(),
-        });
-      } catch (error) {
-        watch.lastError = error as Error;
-
-        results.push({
-          watchId: watch.id,
-          name: watch.name,
-          expression: watch.expression,
-          value: null,
-          error: error as Error,
-          valueChanged: false,
-          timestamp: Date.now(),
-        });
-      }
+      results.push(await this.evaluateOne(watch, callFrameId, timeout));
     }
 
     return results;
   }
 
-  /**
-   * 清除所有监视表达式
-   */
+  private async evaluateOne(
+    watch: WatchExpression,
+    callFrameId: string | undefined,
+    timeoutMs: number,
+  ): Promise<WatchResult> {
+    try {
+      const value = await this.evaluateWithTimeout(
+        watch.expression,
+        callFrameId,
+        timeoutMs,
+      );
+
+      const valueChanged = !this.deepEqual(value, watch.lastValue);
+
+      if (valueChanged) {
+        watch.valueHistory.push({value, timestamp: Date.now()});
+        if (watch.valueHistory.length > MAX_HISTORY_LENGTH) {
+          watch.valueHistory.shift();
+        }
+      }
+
+      watch.lastValue = value;
+      watch.lastError = null;
+
+      return {
+        watchId: watch.id,
+        name: watch.name,
+        expression: watch.expression,
+        value,
+        error: null,
+        valueChanged,
+        timestamp: Date.now(),
+      };
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      watch.lastError = err;
+
+      return {
+        watchId: watch.id,
+        name: watch.name,
+        expression: watch.expression,
+        value: null,
+        error: err,
+        valueChanged: false,
+        timestamp: Date.now(),
+      };
+    }
+  }
+
+  private evaluateWithTimeout(
+    expression: string,
+    callFrameId: string | undefined,
+    timeoutMs: number,
+  ): Promise<unknown> {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error(`Evaluation timeout after ${timeoutMs}ms`));
+      }, timeoutMs);
+
+      this.runtimeInspector
+        .evaluate(expression, callFrameId)
+        .then(value => {
+          clearTimeout(timer);
+          resolve(value);
+        })
+        .catch(error => {
+          clearTimeout(timer);
+          reject(error);
+        });
+    });
+  }
+
   clearAll(): void {
     this.watches.clear();
     logger.info('All watch expressions cleared');
   }
 
-  /**
-   * 获取监视表达式的值变化历史
-   */
   getValueHistory(
     watchId: string,
-  ): Array<{value: any; timestamp: number}> | null {
+  ): Array<{value: unknown; timestamp: number}> | null {
     const watch = this.watches.get(watchId);
     return watch ? watch.valueHistory : null;
   }
 
-  /**
-   * 深度比较两个值是否相等
-   *
-   * ✅ 修复：添加循环引用检测、深度限制、数组处理
-   */
+  /** 深度比较两个值,支持循环引用检测和深度限制 */
   private deepEqual(
-    a: any,
-    b: any,
+    a: unknown,
+    b: unknown,
     depth = 0,
     maxDepth = 10,
-    seen = new WeakSet(),
+    seen: WeakSet<object> = new WeakSet(),
   ): boolean {
-    // 基本类型和引用相等
     if (a === b) return true;
     if (a == null || b == null) return false;
     if (typeof a !== 'object' || typeof b !== 'object') return false;
 
-    // ✅ 深度限制（防止深层嵌套）
-    if (depth > maxDepth) {
-      return false;
-    }
+    if (depth > maxDepth) return false;
 
-    // ✅ 循环引用检测
-    if (seen.has(a) || seen.has(b)) {
-      return false;
-    }
-    seen.add(a);
-    seen.add(b);
+    const aObj = a as object;
+    const bObj = b as object;
+    if (seen.has(aObj) || seen.has(bObj)) return false;
+    seen.add(aObj);
+    seen.add(bObj);
 
-    // ✅ 数组处理
     if (Array.isArray(a) && Array.isArray(b)) {
       if (a.length !== b.length) return false;
       for (let i = 0; i < a.length; i++) {
-        if (!this.deepEqual(a[i], b[i], depth + 1, maxDepth, seen))
+        if (!this.deepEqual(a[i], b[i], depth + 1, maxDepth, seen)) {
           return false;
+        }
       }
       return true;
     }
 
-    // 对象处理
-    const keysA = Object.keys(a);
-    const keysB = Object.keys(b);
-
+    const keysA = Object.keys(aObj);
+    const keysB = Object.keys(bObj);
     if (keysA.length !== keysB.length) return false;
 
     for (const key of keysA) {
       if (!keysB.includes(key)) return false;
-      if (!this.deepEqual(a[key], b[key], depth + 1, maxDepth, seen))
+      if (!this.deepEqual((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key], depth + 1, maxDepth, seen)) {
         return false;
+      }
     }
-
     return true;
   }
 
-  /**
-   * 导出监视表达式配置
-   */
   exportWatches(): Array<{expression: string; name: string; enabled: boolean}> {
     return Array.from(this.watches.values()).map(watch => ({
       expression: watch.expression,
@@ -279,10 +245,6 @@ export class WatchExpressionManager {
       enabled: watch.enabled,
     }));
   }
-
-  /**
-   * 导入监视表达式配置
-   */
 
   importWatches(
     watches: Array<{expression: string; name?: string; enabled?: boolean}>,
