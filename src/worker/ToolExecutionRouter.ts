@@ -12,7 +12,7 @@ import {createToolError, ErrorCodes} from '../utils/errors.js';
 
 import type {DefineToolContextFactory} from './DefineToolContextFactory.js';
 import type {ToolContextProvider} from './ToolContextProvider.js';
-import type {LoadedHandler} from './ToolHandlerLoader.js';
+import {isToolDefinition, type LoadedHandler} from './ToolHandlerLoader.js';
 import {ToolResponseAccumulator} from './ToolResponseProcessor.js';
 
 const FRAME_EVALUATE_TIMEOUT = 10_000;
@@ -60,8 +60,8 @@ export class ToolExecutionRouter {
     handler: LoadedHandler,
     params: Record<string, unknown>,
   ): Promise<unknown> {
-    if (this.isToolDefinition(handler) || meta.callMode === 'defineTool') {
-      if (!this.isToolDefinition(handler)) {
+    if (isToolDefinition(handler) || meta.callMode === 'defineTool') {
+      if (!isToolDefinition(handler)) {
         throw createToolError(
           ErrorCodes.RUNTIME,
           `Tool "${meta.name}" marked as defineTool but handler is not a ToolDefinition`,
@@ -98,13 +98,5 @@ export class ToolExecutionRouter {
     }
 
     return handler(params);
-  }
-
-  private isToolDefinition(handler: LoadedHandler): handler is ToolDefinition {
-    return (
-      typeof handler === 'object' &&
-      handler !== null &&
-      typeof handler.handler === 'function'
-    );
   }
 }

@@ -10,6 +10,24 @@ import {PageCollector} from '../PageCollector.js';
 import type {RequestInitiator} from '../tools/network/types.js';
 import type {WebSocketData} from '../tools/network/WebSocketCollector.js';
 
+// ─── 辅助函数 ────────────────────────────────────────
+
+function safeDetach<T extends Page, K>(
+  page: T,
+  handlers: WeakMap<T, K>,
+  detach: (handler: K) => void,
+): void {
+  const handler = handlers.get(page);
+  if (handler) {
+    try {
+      detach(handler);
+    } catch {
+      // Page closed
+    }
+    handlers.delete(page);
+  }
+}
+
 // ─── 数据类型 ────────────────────────────────────────
 
 export interface TrackedRequest {
@@ -65,15 +83,7 @@ export class NetworkRequestCollector extends PageCollector<TrackedRequest> {
   }
 
   protected detachListeners(page: Page): void {
-    const handler = this._onRequestHandlers.get(page);
-    if (handler) {
-      try {
-        page.off('request', handler);
-      } catch {
-        // Page closed
-      }
-      this._onRequestHandlers.delete(page);
-    }
+    safeDetach(page, this._onRequestHandlers, handler => page.off('request', handler));
   }
 }
 
@@ -98,24 +108,8 @@ export class ConsoleMessageCollector extends PageCollector<TrackedConsoleMessage
   }
 
   protected detachListeners(page: Page): void {
-    const onConsole = this._onConsoleHandlers.get(page);
-    const onPageError = this._onPageErrorHandlers.get(page);
-    if (onConsole) {
-      try {
-        page.off('console', onConsole);
-      } catch {
-        // Page closed
-      }
-      this._onConsoleHandlers.delete(page);
-    }
-    if (onPageError) {
-      try {
-        page.off('pageerror', onPageError);
-      } catch {
-        // Page closed
-      }
-      this._onPageErrorHandlers.delete(page);
-    }
+    safeDetach(page, this._onConsoleHandlers, handler => page.off('console', handler));
+    safeDetach(page, this._onPageErrorHandlers, handler => page.off('pageerror', handler));
   }
 }
 
@@ -178,15 +172,7 @@ export class WsCollector extends PageCollector<TrackedWebSocketData> {
   }
 
   protected detachListeners(page: Page): void {
-    const handler = this._onWebSocketHandlers.get(page);
-    if (handler) {
-      try {
-        page.off('websocket', handler);
-      } catch {
-        // Page closed
-      }
-      this._onWebSocketHandlers.delete(page);
-    }
+    safeDetach(page, this._onWebSocketHandlers, handler => page.off('websocket', handler));
     this.connectionMaps.delete(page);
     this.requestIdCounters.delete(page);
   }

@@ -11,6 +11,14 @@ export type LoadedHandler =
   | ((...args: unknown[]) => Promise<unknown>)
   | ToolDefinition;
 
+export function isToolDefinition(value: unknown): value is ToolDefinition {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as ToolDefinition).handler === 'function'
+  );
+}
+
 export class ToolHandlerLoader {
   private readonly loadedHandlers = new Map<string, LoadedHandler>();
 
@@ -24,7 +32,7 @@ export class ToolHandlerLoader {
       const module = await import(modulePath);
       const handler = module[meta.handlerName];
 
-      if (typeof handler === 'function' || this.isToolDefinition(handler)) {
+      if (typeof handler === 'function' || isToolDefinition(handler)) {
         this.loadedHandlers.set(cacheKey, handler);
         return handler;
       }
@@ -39,13 +47,5 @@ export class ToolHandlerLoader {
       );
       return null;
     }
-  }
-
-  private isToolDefinition(value: unknown): value is ToolDefinition {
-    return (
-      typeof value === 'object' &&
-      value !== null &&
-      typeof (value as ToolDefinition).handler === 'function'
-    );
   }
 }

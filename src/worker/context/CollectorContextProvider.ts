@@ -22,6 +22,7 @@ import type {
 
 import type {HTTPRequest} from '../../third_party/index.js';
 import type {WebSocketData} from '../../tools/network/WebSocketCollector.js';
+import {PageCollector} from '../../PageCollector.js';
 import {
   ConsoleMessageCollector,
   NetworkRequestCollector,
@@ -157,14 +158,14 @@ export class CollectorContextProvider {
     page: Page | null,
     id: number,
   ): ConsoleMessage | Error {
-    if (!page) throw new Error('未选中页面');
-    const navigations = this._consoleCollector.getNavigations(page);
-    if (!navigations) throw new Error('Console 收集器未初始化');
-    for (const navigation of navigations) {
-      const found = navigation.find(t => t.stableId === id);
-      if (found) return found.message;
-    }
-    throw new Error(`Console 消息 ID ${id} 未找到`);
+    return this.findById(
+      this._consoleCollector,
+      page,
+      id,
+      'Console',
+      t => t.stableId === id,
+      t => t.message,
+    );
   }
 
   getConsoleMessageStableId(
@@ -202,14 +203,14 @@ export class CollectorContextProvider {
   }
 
   getWebSocketConnectionById(page: Page | null, wsid: number): WebSocketData {
-    if (!page) throw new Error('未选中页面');
-    const navigations = this._wsCollector.getNavigations(page);
-    if (!navigations) throw new Error('WebSocket 收集器未初始化');
-    for (const navigation of navigations) {
-      const found = navigation.find(t => t.stableId === wsid);
-      if (found) return found;
-    }
-    throw new Error(`WebSocket ID ${wsid} 未找到`);
+    return this.findById(
+      this._wsCollector,
+      page,
+      wsid,
+      'WebSocket',
+      t => t.stableId === wsid,
+      t => t,
+    );
   }
 
   getWebSocketStableId(candidatePages: Page[], ws: unknown): number {
@@ -218,5 +219,25 @@ export class CollectorContextProvider {
       (t: TrackedWebSocketData) => t === ws,
     );
     return found?.stableId ?? -1;
+  }
+
+  // ─── 辅助方法 ──────────────────────────────────────────
+
+  private findById<T extends {stableId: number}, R>(
+    collector: PageCollector<T>,
+    page: Page | null,
+    id: number,
+    typeName: string,
+    predicate: (item: T) => boolean,
+    extract: (item: T) => R,
+  ): R {
+    if (!page) throw new Error('未选中页面');
+    const navigations = collector.getNavigations(page);
+    if (!navigations) throw new Error(`${typeName} 收集器未初始化`);
+    for (const navigation of navigations) {
+      const found = navigation.find(predicate);
+      if (found) return extract(found);
+    }
+    throw new Error(`${typeName} ID ${id} 未找到`);
   }
 }

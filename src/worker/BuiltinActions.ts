@@ -40,10 +40,11 @@ export function registerBuiltinActions(client: BuiltinActionClient): void {
   client.registerAction('_status', (_request, resolve, _reject) => {
     const mem = process.memoryUsage();
     const clientStatus = client.getStatus() as Record<string, unknown> | null;
-    const isConnected =
-      clientStatus && typeof clientStatus === 'object'
-        ? Boolean((clientStatus as {isConnected?: boolean}).isConnected)
-        : false;
+    const isConnected = Boolean(
+      clientStatus &&
+      typeof clientStatus === 'object' &&
+      (clientStatus as {isConnected?: boolean}).isConnected,
+    );
 
     resolve({
       pid: process.pid,

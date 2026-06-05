@@ -58,6 +58,18 @@ export class ServiceLocator {
     return this._browserManager;
   }
 
+  // ─── 惰性加载辅助 ─────────────────────────────────────
+
+  private getOrCreate<T>(
+    cached: T | null,
+    runtimeKey: keyof Runtime,
+    factory: () => T,
+  ): T {
+    const fromRuntime = this._runtime?.[runtimeKey] as T | undefined;
+    if (fromRuntime) return fromRuntime;
+    return cached ?? factory();
+  }
+
   // ─── CodeCollector（必须持有 BrowserManager）──────────
 
   getCollector(): CodeCollector {
@@ -81,62 +93,53 @@ export class ServiceLocator {
   // ─── LLM 服务 ───────────────────────────────────────
 
   getLlmService(): LLMService {
-    if (this._runtime?.llmService) {
-      return this._runtime.llmService;
-    }
-    if (!this._llmService) {
+    return this.getOrCreate(this._llmService, 'llmService', () => {
       this._llmService = new LLMService();
-    }
-    return this._llmService;
+      return this._llmService;
+    });
   }
 
   // ─── 分析服务 ───────────────────────────────────────
 
   getDeobfuscator(): Deobfuscator {
-    if (this._runtime?.deobfuscator) return this._runtime.deobfuscator;
-    if (!this._deobfuscator) {
+    return this.getOrCreate(this._deobfuscator, 'deobfuscator', () => {
       this._deobfuscator = new Deobfuscator(this.getLlmService());
-    }
-    return this._deobfuscator;
+      return this._deobfuscator;
+    });
   }
 
   getAnalyzer(): CodeAnalyzer {
-    if (this._runtime?.analyzer) return this._runtime.analyzer;
-    if (!this._analyzer) {
+    return this.getOrCreate(this._analyzer, 'analyzer', () => {
       this._analyzer = new CodeAnalyzer(this.getLlmService());
-    }
-    return this._analyzer;
+      return this._analyzer;
+    });
   }
 
   getSummarizer(): AISummarizer {
-    if (this._runtime?.summarizer) return this._runtime.summarizer;
-    if (!this._summarizer) {
+    return this.getOrCreate(this._summarizer, 'summarizer', () => {
       this._summarizer = new AISummarizer(this.getLlmService());
-    }
-    return this._summarizer;
+      return this._summarizer;
+    });
   }
 
   getCryptoDetector(): CryptoDetector {
-    if (this._runtime?.cryptoDetector) return this._runtime.cryptoDetector;
-    if (!this._cryptoDetector) {
+    return this.getOrCreate(this._cryptoDetector, 'cryptoDetector', () => {
       this._cryptoDetector = new CryptoDetector(this.getLlmService());
-    }
-    return this._cryptoDetector;
+      return this._cryptoDetector;
+    });
   }
 
   getHookManager(): HookManager {
-    if (this._runtime?.hookManager) return this._runtime.hookManager;
-    if (!this._hookManager) {
+    return this.getOrCreate(this._hookManager, 'hookManager', () => {
       this._hookManager = new HookManager();
-    }
-    return this._hookManager;
+      return this._hookManager;
+    });
   }
 
   getPageController(): PageController {
-    if (this._runtime?.pageController) return this._runtime.pageController;
-    if (!this._pageController) {
+    return this.getOrCreate(this._pageController, 'pageController', () => {
       this._pageController = new PageController(this.getCollector());
-    }
-    return this._pageController;
+      return this._pageController;
+    });
   }
 }

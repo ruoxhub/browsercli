@@ -46,9 +46,8 @@ export class ToolResultRecorder {
   }
 
   private normalizeRecord(record: ToolResultRecord): ToolResultRecord {
-    const inputSource = record.input ?? record.request;
-    const input = inputSource ? {...inputSource} : undefined;
-    return input ? {...record, input} : record;
+    const input = record.input ?? record.request;
+    return input ? {...record, input: {...input}} : record;
   }
 
   private write(

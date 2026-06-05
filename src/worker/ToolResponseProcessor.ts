@@ -82,6 +82,7 @@ export class ToolResponseAccumulator implements Response {
 
   toJSON(): Record<string, unknown> {
     const result: Record<string, unknown> = {};
+
     if (this.lines.length > 0) {
       const text = this.lines.join('\n');
       result.text = text;
@@ -92,15 +93,13 @@ export class ToolResponseAccumulator implements Response {
         }
       }
     }
+
     if (this.structuredContent !== null) {
       result.structuredContent = this.structuredContent;
     }
-    if (this.includePages) {
-      result.pages = [];
-    }
-    if (this.includeNetwork) {
-      result.network = [];
-    }
+    if (this.includePages) result.pages = [];
+    if (this.includeNetwork) result.network = [];
+
     return result;
   }
 }
