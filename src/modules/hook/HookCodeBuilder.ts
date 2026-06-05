@@ -347,9 +347,8 @@ export class HookCodeBuilder {
     if (capture.args) lines.push(`      args: args,`);
     if (capture.thisContext) lines.push(`      thisArg: this,`);
     if (capture.stack) {
-      const maxFrames = typeof capture.stack === 'number' ? capture.stack : 10;
       lines.push(
-        `      stack: new Error().stack.split('\\n').slice(2, ${2 + maxFrames}).join('\\n'),`,
+        `      stack: ${this.formatStack(capture.stack)},`,
       );
     }
     lines.push(`    };`);
@@ -445,6 +444,16 @@ export class HookCodeBuilder {
   }
 
   // ==================== 内部构建方法 ====================
+
+  /**
+   * 生成栈帧截取 JS 表达式字符串。
+   * 多处插件重复同一段 new Error().stack.split('\\n').slice(2, N+2).join('\\n')，
+   * 抽出来既消重也保证栈深度默认值一致（number → 精确帧数；true → 10 帧）。
+   */
+  private formatStack(maxFrames: boolean | number): string {
+    const frames = typeof maxFrames === 'number' ? maxFrames : 10;
+    return `new Error().stack.split('\\n').slice(2, ${2 + frames}).join('\\n')`;
+  }
 
   private buildReplaceHook(): string {
     const {target, hookId, lifecycle, description, asyncAutoDetect} =

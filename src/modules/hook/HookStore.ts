@@ -42,11 +42,12 @@ export class HookStore<RecordType> {
   }
 
   add(hookId: string, record: RecordType): void {
-    const records = this.recordsByHook.get(hookId) ?? [];
-    if (!this.recordsByHook.has(hookId)) {
-      this.recordsByHook.set(hookId, records);
+    const records = this.recordsByHook.get(hookId);
+    if (records === undefined) {
+      this.recordsByHook.set(hookId, [record]);
+      this.events.emit('sample', hookId, record);
+      return;
     }
-
     if (records.length >= this.maxRecordsPerHook) {
       records.shift();
     }

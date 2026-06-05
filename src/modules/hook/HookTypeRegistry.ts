@@ -14,7 +14,6 @@
  */
 
 import type {HookCodeBuilder} from './HookCodeBuilder.js';
-import {type BuilderConfig as _BuilderConfig} from './HookCodeBuilder.js';
 
 // ==================== 插件接口 ====================
 
@@ -926,8 +925,11 @@ function createCookiePlugin(): HookTypePlugin {
       const hookId = config.hookId;
       const storeKey = config.store.globalKey || '__hookStore';
       const max = config.store.maxRecords || 500;
+      const stackExpr = config.capture.stack
+        ? `        stack: new Error().stack.split('\\n').slice(2, ${typeof config.capture.stack === 'number' ? 2 + config.capture.stack : 12}).join('\\n'),`
+        : '';
 
-      return [
+      const lines: string[] = [
         `// Hook: document.cookie`,
         `// ID: ${hookId}`,
         `(function() {`,
@@ -946,16 +948,16 @@ function createCookiePlugin(): HookTypePlugin {
         `      const hookData = {`,
         `        hookId: '${hookId}', target: 'document.cookie', operation: 'get',`,
         `        value: val, timestamp: Date.now(), callCount: __callCount,`,
-        config.capture.stack
-          ? `        stack: new Error().stack.split('\\n').slice(2, ${typeof config.capture.stack === 'number' ? 2 + config.capture.stack : 12}).join('\\n'),`
-          : '',
+        stackExpr,
         `      };`,
         `      const __records = window.${storeKey}['${hookId}'];`,
         `      if (__records.length >= ${max}) __records.shift();`,
         `      __records.push(hookData);`,
-        config.store.console
-          ? `      console.log('[${hookId}] cookie get', hookData);`
-          : '',
+      ];
+      if (config.store.console) {
+        lines.push(`      console.log('[${hookId}] cookie get', hookData);`);
+      }
+      lines.push(
         `      return val;`,
         `    },`,
         `    set(val) {`,
@@ -963,29 +965,32 @@ function createCookiePlugin(): HookTypePlugin {
         `      const hookData = {`,
         `        hookId: '${hookId}', target: 'document.cookie', operation: 'set',`,
         `        value: val, timestamp: Date.now(), callCount: __callCount,`,
-        config.capture.stack
-          ? `        stack: new Error().stack.split('\\n').slice(2, ${typeof config.capture.stack === 'number' ? 2 + config.capture.stack : 12}).join('\\n'),`
-          : '',
+        stackExpr,
         `      };`,
-        config.lifecycle.before
-          ? `      const args = [val]; ${config.lifecycle.before}`
-          : '',
-        config.action === 'block'
-          ? `      hookData.blocked = true;`
-          : `      __desc.set.call(this, val);`,
+      );
+      if (config.lifecycle.before) {
+        lines.push(`      const args = [val]; ${config.lifecycle.before}`);
+      }
+      if (config.action === 'block') {
+        lines.push(`      hookData.blocked = true;`);
+      } else {
+        lines.push(`      __desc.set.call(this, val);`);
+      }
+      lines.push(
         `      const __records = window.${storeKey}['${hookId}'];`,
         `      if (__records.length >= ${max}) __records.shift();`,
         `      __records.push(hookData);`,
-        config.store.console
-          ? `      console.log('[${hookId}] cookie set', hookData);`
-          : '',
+      );
+      if (config.store.console) {
+        lines.push(`      console.log('[${hookId}] cookie set', hookData);`);
+      }
+      lines.push(
         `    },`,
         `  });`,
         `  console.log('[${hookId}] ✅ Hooked: document.cookie');`,
         `})();`,
-      ]
-        .filter(Boolean)
-        .join('\n');
+      );
+      return lines.join('\n');
     },
   };
 }
