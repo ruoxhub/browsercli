@@ -6,42 +6,55 @@
 
 import type {SignatureChainHints} from './types.js';
 
+const MAX_HINTS = 20;
+
 const SIGNATURE_PARAM_REGEX =
   /\b(sign(?:ature)?|token|auth|nonce|timestamp|x-sign)\b/gi;
 const FUNCTION_NAME_REGEX =
   /(function\s+([A-Za-z_$][\w$]*)\s*\(|const\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\(|([A-Za-z_$][\w$]*)\s*:\s*(?:async\s*)?function)/g;
 const REQUEST_SINK_REGEX =
   /\b(fetch|XMLHttpRequest|sendBeacon|axios\.(?:get|post|request)|\$.ajax)\b/g;
+const SIGNING_KEYWORD_REGEX = /(sign|token|encrypt|hash|auth|nonce|hmac|md5|sha)/i;
+
+function collectUniqueMatches(
+  source: string,
+  regex: RegExp,
+  pickGroup: (match: RegExpExecArray) => string | undefined,
+  normalizer: (value: string) => string = value => value,
+): string[] {
+  const values = new Set<string>();
+  for (const match of source.matchAll(regex)) {
+    const raw = pickGroup(match);
+    if (raw) {
+      values.add(normalizer(raw));
+    }
+  }
+  return Array.from(values).slice(0, MAX_HINTS);
+}
+
+function pickFunctionName(match: RegExpExecArray): string | undefined {
+  return match[2] || match[3] || match[4];
+}
 
 export function extractSignatureChainHints(code: string): SignatureChainHints {
-  const params = new Set<string>();
-  for (const match of code.matchAll(SIGNATURE_PARAM_REGEX)) {
-    if (match[1]) {
-      params.add(match[1].toLowerCase());
-    }
-  }
-
-  const functions = new Set<string>();
-  for (const match of code.matchAll(FUNCTION_NAME_REGEX)) {
-    const name = match[2] || match[3] || match[4];
-    if (
-      name &&
-      /(sign|token|encrypt|hash|auth|nonce|hmac|md5|sha)/i.test(name)
-    ) {
-      functions.add(name);
-    }
-  }
-
-  const sinks = new Set<string>();
-  for (const match of code.matchAll(REQUEST_SINK_REGEX)) {
-    if (match[1]) {
-      sinks.add(match[1]);
-    }
-  }
-
   return {
-    signatureParams: Array.from(params).slice(0, 20),
-    candidateFunctions: Array.from(functions).slice(0, 20),
-    requestSinks: Array.from(sinks).slice(0, 20),
+    signatureParams: collectUniqueMatches(
+      code,
+      SIGNATURE_PARAM_REGEX,
+      match => match[1],
+      value => value.toLowerCase(),
+    ),
+    candidateFunctions: collectUniqueMatches(
+      code,
+      FUNCTION_NAME_REGEX,
+      match => {
+        const name = pickFunctionName(match);
+        if (name && SIGNING_KEYWORD_REGEX.test(name)) {
+          return name;
+        }
+        return undefined;
+      },
+    ),
+    requestSinks: collectUniqueMatches(code, REQUEST_SINK_REGEX, match => match[1]),
   };
 }

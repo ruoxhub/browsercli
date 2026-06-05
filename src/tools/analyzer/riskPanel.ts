@@ -12,6 +12,69 @@ import {defineTool} from '../ToolDefinition.js';
 
 import type {RiskPanelResult, RiskPanelData} from './types.js';
 
+const RISK_PANEL_TIMEOUT_MS = 10_000;
+const DANGEROUS_ALGORITHMS = new Set(['md5', 'sha1', 'rc4', 'des']);
+const HIGH_SEVERITY_WEIGHT = 20;
+const CRYPTO_ISSUE_WEIGHT = 15;
+const DANGEROUS_ALGORITHM_WEIGHT = 10;
+const HOOK_SIGNAL_WEIGHT = 2;
+const HOOK_SIGNAL_CAP = 10;
+const HIGH_RISK_THRESHOLD = 70;
+const MEDIUM_RISK_THRESHOLD = 40;
+
+function emptyRiskPanelData(): RiskPanelData {
+  return {
+    score: 0,
+    level: 'low',
+    factors: {
+      securityRisks: 0,
+      highSeverityRisks: 0,
+      cryptoAlgorithms: 0,
+      cryptoIssues: 0,
+      dangerousAlgorithms: [],
+      hookSignals: 0,
+    },
+    recommendations: [],
+  };
+}
+
+function getLevelForScore(score: number): 'high' | 'medium' | 'low' {
+  if (score >= HIGH_RISK_THRESHOLD) return 'high';
+  if (score >= MEDIUM_RISK_THRESHOLD) return 'medium';
+  return 'low';
+}
+
+function countHookSignals(
+  runtime: ReturnType<typeof getRuntime>,
+  hookId: string | undefined,
+): number {
+  if (hookId) {
+    return runtime.hookManager.getRecords(hookId).length;
+  }
+  return runtime.hookManager
+    .getAllKnownHookIds()
+    .reduce((sum, id) => sum + runtime.hookManager.getRecords(id).length, 0);
+}
+
+function buildRiskRecommendations(input: {
+  highSeverityCount: number;
+  dangerousAlgorithmCount: number;
+  hookSignalCount: number;
+}): string[] {
+  const items: Array<string | null> = [
+    input.highSeverityCount > 0
+      ? 'Prioritize high-severity security findings first.'
+      : null,
+    input.dangerousAlgorithmCount > 0
+      ? 'Replace weak crypto algorithms (MD5/SHA1/RC4/DES).'
+      : null,
+    input.hookSignalCount > 0
+      ? 'Review hook records to confirm if suspicious paths are expected.'
+      : null,
+  ];
+  return items.filter((item): item is string => Boolean(item));
+}
+
 export const riskPanel = defineTool({
   name: 'risk_panel',
   description: 'Build a combined risk score from analyzer, crypto detector and hook signals.',
@@ -30,20 +93,7 @@ export const riskPanel = defineTool({
         success: false,
         message: 'risk_panel requires analyzer.understand and cryptoDetector.detect runtime services',
         tooltype: 'riskPanel',
-        // logFormat: 'json',
-        data: {
-          score: 0,
-          level: 'low',
-          factors: {
-            securityRisks: 0,
-            highSeverityRisks: 0,
-            cryptoAlgorithms: 0,
-            cryptoIssues: 0,
-            dangerousAlgorithms: [],
-            hookSignals: 0,
-          },
-          recommendations: [],
-        } as RiskPanelData,
+        data: emptyRiskPanelData(),
       });
       return;
     }
@@ -57,19 +107,7 @@ export const riskPanel = defineTool({
           message: 'No code provided and no collected files found. Run collect_code first.',
           tooltype: 'riskPanel',
           logFormat: 'json',
-          data: {
-            score: 0,
-            level: 'low',
-            factors: {
-              securityRisks: 0,
-              highSeverityRisks: 0,
-              cryptoAlgorithms: 0,
-              cryptoIssues: 0,
-              dangerousAlgorithms: [],
-              hookSignals: 0,
-            },
-            recommendations: [],
-          } as RiskPanelData,
+          data: emptyRiskPanelData(),
         });
         return;
       }
@@ -85,7 +123,7 @@ export const riskPanel = defineTool({
         runtime.cryptoDetector.detect({code: code ?? ''}),
       ]),
       'risk_panel 分析',
-      10000,
+      RISK_PANEL_TIMEOUT_MS,
     );
 
     const securityRisks = Array.isArray(understand.securityRisks)
@@ -106,42 +144,21 @@ export const riskPanel = defineTool({
       ? cryptoResult.algorithms
       : [];
     const dangerousAlgorithms = algorithms.filter(algo =>
-      ['md5', 'sha1', 'rc4', 'des'].includes(
-        String(algo.name ?? '').toLowerCase(),
-      ),
+      DANGEROUS_ALGORITHMS.has(String(algo.name ?? '').toLowerCase()),
     );
 
-    let hookSignalCount = 0;
-    if (request.params.includeHookSignals !== false) {
-      if (request.params.hookId) {
-        hookSignalCount = runtime.hookManager.getRecords(request.params.hookId).length;
-      } else {
-        hookSignalCount = runtime.hookManager
-          .getAllKnownHookIds()
-          .reduce((sum, hookId) => sum + runtime.hookManager.getRecords(hookId).length, 0);
-      }
-    }
+    const hookSignalCount =
+      request.params.includeHookSignals !== false
+        ? countHookSignals(runtime, request.params.hookId)
+        : 0;
 
     const rawScore =
-      highSeverityCount * 20 +
-      cryptoIssues.length * 15 +
-      dangerousAlgorithms.length * 10 +
-      Math.min(hookSignalCount, 10) * 2;
+      highSeverityCount * HIGH_SEVERITY_WEIGHT +
+      cryptoIssues.length * CRYPTO_ISSUE_WEIGHT +
+      dangerousAlgorithms.length * DANGEROUS_ALGORITHM_WEIGHT +
+      Math.min(hookSignalCount, HOOK_SIGNAL_CAP) * HOOK_SIGNAL_WEIGHT;
 
     const score = Math.max(0, Math.min(100, rawScore));
-    const level = score >= 70 ? 'high' : score >= 40 ? 'medium' : 'low';
-
-    const recommendations = [
-      highSeverityCount > 0
-        ? 'Prioritize high-severity security findings first.'
-        : null,
-      dangerousAlgorithms.length > 0
-        ? 'Replace weak crypto algorithms (MD5/SHA1/RC4/DES).'
-        : null,
-      hookSignalCount > 0
-        ? 'Review hook records to confirm if suspicious paths are expected.'
-        : null,
-    ].filter((item): item is string => Boolean(item));
 
     response.setStructuredContent<RiskPanelResult>({
       success: true,
@@ -149,18 +166,20 @@ export const riskPanel = defineTool({
       tooltype: 'riskPanel',
       data: {
         score,
-        level,
+        level: getLevelForScore(score),
         factors: {
           securityRisks: securityRisks.length,
           highSeverityRisks: highSeverityCount,
           cryptoAlgorithms: algorithms.length,
           cryptoIssues: cryptoIssues.length,
-          dangerousAlgorithms: dangerousAlgorithms.map(
-            algo => algo.name ?? 'unknown',
-          ),
+          dangerousAlgorithms: dangerousAlgorithms.map(algo => algo.name ?? 'unknown'),
           hookSignals: hookSignalCount,
         },
-        recommendations,
+        recommendations: buildRiskRecommendations({
+          highSeverityCount,
+          dangerousAlgorithmCount: dangerousAlgorithms.length,
+          hookSignalCount,
+        }),
       },
     });
   },

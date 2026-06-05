@@ -19,6 +19,9 @@ import type {
   ExportSessionReportResult,
 } from './types.js';
 
+const HOOK_RECORD_STOP_THRESHOLD = 200;
+const NETWORK_CHANNEL = 'runtime-evidence';
+
 export function buildActionPlan(result: {
   target: string;
   topHookIds: Array<{hookId: string; type: string}>;
@@ -118,10 +121,43 @@ export function buildStopConditions(input: {
     input.suspiciousFlowCount > 0
       ? '目标请求路径确认后即可停止扩大采集范围，并导出重建 Bundle。'
       : '若尚未确认可疑请求路径，应先触发目标操作后再停止分析。',
-    input.hookRecordCount > 200
+    input.hookRecordCount > HOOK_RECORD_STOP_THRESHOLD
       ? 'Hook 数据超过 200 条时应先降噪（summary 视图或缩小目标），再决定是否注入新 Hook。'
       : 'Hook 证据不足以定位问题时，再考虑升级到断点调试。',
   ];
+}
+
+function getMissingEvidenceFields(params: {
+  taskId?: string;
+  taskSlug?: string;
+  targetUrl?: string;
+  goal?: string;
+}): string[] {
+  const required: Array<keyof typeof params> = ['taskId', 'taskSlug', 'targetUrl', 'goal'];
+  return required.filter(field => !params[field]);
+}
+
+function buildTargetContext(params: {
+  targetKeywords?: string[];
+  targetUrlPatterns?: string[];
+  targetFunctionNames?: string[];
+  targetActionDescription?: string;
+}) {
+  return {
+    targetKeywords: params.targetKeywords ?? [],
+    targetUrlPatterns: params.targetUrlPatterns ?? [],
+    targetFunctionNames: params.targetFunctionNames ?? [],
+    targetActionDescription: params.targetActionDescription ?? '',
+  };
+}
+
+function hasMeaningfulTargetContext(targetContext: ReturnType<typeof buildTargetContext>): boolean {
+  return (
+    targetContext.targetKeywords.length > 0 ||
+    targetContext.targetUrlPatterns.length > 0 ||
+    targetContext.targetFunctionNames.length > 0 ||
+    targetContext.targetActionDescription.length > 0
+  );
 }
 
 /**
@@ -129,9 +165,6 @@ export function buildStopConditions(input: {
  *
  * 将逆向分析过程中发现的关键证据结构化记录，
  * 供后续导出会话报告使用。
- *
- * @param params - 证据参数
- * @returns 结构化结果对象
  */
 export const record_reverse_evidence = defineTool({
   name: 'record_reverse_evidence',
@@ -142,7 +175,7 @@ export const record_reverse_evidence = defineTool({
     taskSlug: zod.string(),
     targetUrl: zod.string(),
     goal: zod.string(),
-    channel: zod.string().default('runtime-evidence'),
+    channel: zod.string().default(NETWORK_CHANNEL),
     targetKeywords: zod.array(zod.string()).optional(),
     targetUrlPatterns: zod.array(zod.string()).optional(),
     targetFunctionNames: zod.array(zod.string()).optional(),
@@ -150,19 +183,15 @@ export const record_reverse_evidence = defineTool({
     entry: zod.record(zod.string(), zod.unknown()),
   },
   handler: async (request, response) => {
-    // 防御性参数归一化：entry 可能因未经严格校验而为 undefined/非对象
+    // Defensive normalization: entry may be undefined or non-object.
     const rawEntry = request.params.entry;
     const safeEntry: Record<string, unknown> =
       rawEntry && typeof rawEntry === 'object' && !Array.isArray(rawEntry)
         ? (rawEntry as Record<string, unknown>)
         : {};
 
-    // 必填字段校验兜底（zod.record 类型 introspect 不能识别，在此补一层）
-    const missing: string[] = [];
-    if (!request.params.taskId) missing.push('taskId');
-    if (!request.params.taskSlug) missing.push('taskSlug');
-    if (!request.params.targetUrl) missing.push('targetUrl');
-    if (!request.params.goal) missing.push('goal');
+    // Required-field fallback (zod.record introspection cannot enforce shape here).
+    const missing = getMissingEvidenceFields(request.params);
     if (missing.length > 0) {
       response.setStructuredContent({
         success: false,
@@ -180,27 +209,19 @@ export const record_reverse_evidence = defineTool({
       targetUrl: request.params.targetUrl,
       goal: request.params.goal,
     });
-    const targetContext = {
-      targetKeywords: request.params.targetKeywords ?? [],
-      targetUrlPatterns: request.params.targetUrlPatterns ?? [],
-      targetFunctionNames: request.params.targetFunctionNames ?? [],
-      targetActionDescription: request.params.targetActionDescription ?? '',
-    };
-    const hasTargetContext = targetContext.targetKeywords.length > 0 ||
-      targetContext.targetUrlPatterns.length > 0 ||
-      targetContext.targetFunctionNames.length > 0 ||
-      targetContext.targetActionDescription.length > 0;
+    const targetContext = buildTargetContext(request.params);
+    const hasTargetContext = hasMeaningfulTargetContext(targetContext);
 
     const artifactEntry = {
       ...safeEntry,
       ...(hasTargetContext ? {targetContext} : {}),
     };
 
-    const channel = request.params.channel ?? 'runtime-evidence';
+    const channel = request.params.channel ?? NETWORK_CHANNEL;
     await task.appendLog(channel, artifactEntry);
 
     const mirroredChannels: string[] = [];
-    if (channel === 'runtime-evidence') {
+    if (channel === NETWORK_CHANNEL) {
       const mirroredNetworkEntry = toMirroredNetworkEntry(safeEntry);
       if (mirroredNetworkEntry) {
         await task.appendLog('network', mirroredNetworkEntry);
@@ -225,20 +246,19 @@ export const record_reverse_evidence = defineTool({
     }
 
     response.setStructuredContent({
-        success: true,
-        message: 'Evidence recorded',
-        tooltype: 'record_reverse_evidence',
-        // logFormat: 'json',
-        data: {
-          ok: true,
-          taskId: task.taskId,
-          taskDir: task.taskDir,
-          channel,
-          mirroredChannels,
-          entryProvided: rawEntry !== undefined,
-          targetContext: hasTargetContext ? targetContext : undefined,
-        },
-      });
+      success: true,
+      message: 'Evidence recorded',
+      tooltype: 'record_reverse_evidence',
+      data: {
+        ok: true,
+        taskId: task.taskId,
+        taskDir: task.taskDir,
+        channel,
+        mirroredChannels,
+        entryProvided: rawEntry !== undefined,
+        targetContext: hasTargetContext ? targetContext : undefined,
+      },
+    });
   },
 });
 
@@ -247,9 +267,6 @@ export const record_reverse_evidence = defineTool({
  *
  * 汇总当前逆向分析会话中的所有证据和发现，
  * 生成结构化的会话报告。
- *
- * @param params - 报告参数
- * @returns 结构化结果对象
  */
 export const export_session_report = defineTool({
   name: 'export_session_report',
@@ -296,12 +313,11 @@ export const export_session_report = defineTool({
     }
 
     response.setStructuredContent({
-        success: true,
-        message: `会话报告已导出 (格式: ${request.params.format})`,
-        tooltype: 'export_session_report',
-        // logFormat: 'json',
-        data: report,
-      });
+      success: true,
+      message: `会话报告已导出 (格式: ${request.params.format})`,
+      tooltype: 'export_session_report',
+      data: report,
+    });
   },
 });
 
