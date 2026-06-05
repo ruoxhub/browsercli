@@ -18,18 +18,16 @@
  */
 
 import generateImport from '@babel/generator';
-const generate =
-  (generateImport as unknown as {default?: typeof generateImport}).default ??
-  generateImport;
 import * as parser from '@babel/parser';
 import traverseImport from '@babel/traverse';
-const traverse =
-  (traverseImport as unknown as {default?: typeof traverseImport}).default ??
-  traverseImport;
 import * as t from '@babel/types';
 
 import type {LLMService} from '../../services/LLMService.js';
 import {logger} from '../../utils/logger.js';
+import {evalBinaryNumbers, truncateCode, unwrapBabelDefault} from './astUtils.js';
+
+const generate = unwrapBabelDefault<typeof generateImport>(generateImport);
+const traverse = unwrapBabelDefault<typeof traverseImport>(traverseImport);
 
 export interface AdvancedDeobfuscateOptions {
   code: string;
@@ -51,6 +49,59 @@ export interface AdvancedDeobfuscateResult {
     deobfuscated: boolean;
   };
 }
+
+// 不可见字符到二进制位的映射
+const INVISIBLE_CHAR_TO_BIT: Record<string, string> = {
+  '​': '0',
+  '‌': '1',
+  '‍': '00',
+  '⁠': '01',
+  '﻿': '10',
+};
+
+const INVISIBLE_CHARS = Object.keys(INVISIBLE_CHAR_TO_BIT);
+const INVISIBLE_PATTERN = new RegExp(`[${INVISIBLE_CHARS.join('')}]+`, 'g');
+
+// 简单的数字比较运算符 -> 实际比较函数
+const NUMERIC_COMPARATORS: Record<string, (l: number, r: number) => boolean> = {
+  '>': (l, r) => l > r,
+  '<': (l, r) => l < r,
+  '>=': (l, r) => l >= r,
+  '<=': (l, r) => l <= r,
+  '===': (l, r) => l === r,
+  '==': (l, r) => l === r,
+  '!==': (l, r) => l !== r,
+  '!=': (l, r) => l !== r,
+};
+
+// VM 解释器的关键特征
+const VM_PATTERNS = [
+  /while\s*\(\s*true\s*\)\s*\{[\s\S]*?switch\s*\(/i,
+  /var\s+\w+\s*=\s*\[\s*\d+(?:\s*,\s*\d+){10,}\s*\]/i,
+  /\w+\[pc\+\+\]/i,
+  /stack\.push|stack\.pop/i,
+];
+
+// 控制流平坦化特征
+const CONTROL_FLOW_FLATTEN_PATTERN =
+  /while\s*\(\s*!!\s*\[\s*\]\s*\)\s*\{[\s\S]*?switch\s*\(/i;
+
+// 死代码注入特征
+const DEAD_CODE_PATTERN = /if\s*\(\s*false\s*\)|if\s*\(\s*!!\s*\[\s*\]\s*\)/;
+
+// 不透明谓词特征（简单的数字字面量比较）
+const OPAQUE_PREDICATE_PATTERN = /if\s*\(\s*\d+\s*[<>!=]+\s*\d+\s*\)/;
+
+// 字符串编码特征
+const STRING_ENCODING_PATTERNS = [
+  /\\x[0-9a-f]{2}/i,
+  /\\u[0-9a-f]{4}/i,
+  /String\.fromCharCode/i,
+  /atob\(/i,
+];
+
+// 字符串数组旋转特征
+const STRING_ARRAY_ROTATION_PATTERN = /\w+\s*=\s*\w+\s*\+\s*0x[0-9a-f]+/;
 
 export class AdvancedDeobfuscator {
   private llm?: LLMService;
@@ -255,20 +306,7 @@ export class AdvancedDeobfuscator {
     type: string;
     instructionCount: number;
   } {
-    // VM特征：
-    // 1. 大量switch-case语句
-    // 2. 指令数组
-    // 3. 程序计数器(PC)
-    // 4. 栈操作
-
-    const vmPatterns = [
-      /while\s*\(\s*true\s*\)\s*\{[\s\S]*?switch\s*\(/i, // 无限循环+switch
-      /var\s+\w+\s*=\s*\[\s*\d+(?:\s*,\s*\d+){10,}\s*\]/i, // 指令数组
-      /\w+\[pc\+\+\]/i, // PC递增
-      /stack\.push|stack\.pop/i, // 栈操作
-    ];
-
-    const matchCount = vmPatterns.filter(pattern => pattern.test(code)).length;
+    const matchCount = VM_PATTERNS.filter(pattern => pattern.test(code)).length;
 
     if (matchCount >= 2) {
       return {
@@ -524,10 +562,7 @@ Return clean JavaScript code without any wrapper or formatting.`,
     vmStructure: any,
     vmComponents: any,
   ): string {
-    const codeSnippet =
-      code.length > 6000
-        ? code.substring(0, 6000) + '\n\n// ... (code truncated)'
-        : code;
+    const codeSnippet = truncateCode(code, 6000);
 
     return `# VM Deobfuscation Analysis
 
@@ -682,9 +717,7 @@ Return clean JavaScript code starting immediately (no preamble).`;
    * 检测控制流平坦化
    */
   private detectControlFlowFlattening(code: string): boolean {
-    // 特征：大量连续的switch-case + 状态变量
-    const pattern = /while\s*\(\s*!!\s*\[\s*\]\s*\)\s*\{[\s\S]*?switch\s*\(/i;
-    return pattern.test(code);
+    return CONTROL_FLOW_FLATTEN_PATTERN.test(code);
   }
 
   /**
@@ -696,19 +729,16 @@ Return clean JavaScript code starting immediately (no preamble).`;
   private async unflattenControlFlow(code: string): Promise<string> {
     logger.info('Unflattening control flow...');
 
-    // 使用LLM辅助 (优化后的提示词)
-    if (this.llm) {
-      try {
-        const codeSnippet =
-          code.length > 3000
-            ? code.substring(0, 3000) + '\n\n// ... (truncated)'
-            : code;
+    if (!this.llm) return code;
 
-        const response = await this.llm.chat(
-          [
-            {
-              role: 'system',
-              content: `# Role
+    try {
+      const codeSnippet = truncateCode(code, 3000);
+
+      const response = await this.llm.chat(
+        [
+          {
+            role: 'system',
+            content: `# Role
 You are an expert in JavaScript control flow deobfuscation specializing in:
 - Control flow flattening detection and removal
 - Switch-case state machine analysis
@@ -771,14 +801,13 @@ Output the deobfuscated JavaScript code:`,
       } catch (error) {
         logger.warn('LLM control flow unflattening failed', error);
       }
-    }
 
     return code;
   }
 
   // 其他检测和反混淆方法的占位符
   private detectStringArrayRotation(code: string): boolean {
-    return /\w+\s*=\s*\w+\s*\+\s*0x[0-9a-f]+/.test(code);
+    return STRING_ARRAY_ROTATION_PATTERN.test(code);
   }
 
   /**
@@ -856,7 +885,7 @@ Output the deobfuscated JavaScript code:`,
   }
 
   private detectDeadCodeInjection(code: string): boolean {
-    return /if\s*\(\s*false\s*\)|if\s*\(\s*!!\s*\[\s*\]\s*\)/.test(code);
+    return DEAD_CODE_PATTERN.test(code);
   }
 
   /**
@@ -880,32 +909,29 @@ Output the deobfuscated JavaScript code:`,
       let removed = 0;
 
       traverse(ast, {
-        // 移除 if (false) { ... }
-        IfStatement(path: any) {
+        // 移除 if (false) { ... } 与 if (true) { ... }
+        IfStatement(path) {
           const test = path.node.test;
 
-          // 检查 if (false)
+          // if (false) -> 保留 alternate 或删除
           if (t.isBooleanLiteral(test) && test.value === false) {
             if (path.node.alternate) {
-              // 有else分支,保留else
               path.replaceWith(path.node.alternate);
             } else {
-              // 没有else,直接移除
               path.remove();
             }
             removed++;
             return;
           }
 
-          // 检查 if (true)
+          // if (true) -> 保留 then
           if (t.isBooleanLiteral(test) && test.value === true) {
-            // 保留then分支
             path.replaceWith(path.node.consequent);
             removed++;
             return;
           }
 
-          // 检查 if (!![] ) - 永远为true
+          // if (!![]) -> 永远为 true
           if (
             t.isUnaryExpression(test) &&
             test.operator === '!' &&
@@ -915,19 +941,18 @@ Output the deobfuscated JavaScript code:`,
           ) {
             path.replaceWith(path.node.consequent);
             removed++;
-            return;
           }
         },
 
-        // 移除return/throw后的不可达代码
-        BlockStatement(path: any) {
+        // 移除 return/throw 后的不可达代码
+        BlockStatement(path) {
           const body = path.node.body;
           let foundTerminator = false;
-          const newBody: any[] = [];
+          const newBody: t.Statement[] = [];
 
           for (const stmt of body) {
             if (foundTerminator) {
-              // 跳过return/throw后的代码
+              // 跳过 return/throw 后的代码
               removed++;
               continue;
             }
@@ -958,7 +983,7 @@ Output the deobfuscated JavaScript code:`,
   }
 
   private detectOpaquePredicates(code: string): boolean {
-    return /if\s*\(\s*\d+\s*[<>!=]+\s*\d+\s*\)/.test(code);
+    return OPAQUE_PREDICATE_PATTERN.test(code);
   }
 
   /**
@@ -983,85 +1008,41 @@ Output the deobfuscated JavaScript code:`,
       let removed = 0;
 
       traverse(ast, {
-        IfStatement(path: any) {
+        IfStatement(path) {
           const test = path.node.test;
+          if (!t.isBinaryExpression(test)) return;
 
-          // 检查简单的数字比较: if (5 > 3)
-          if (t.isBinaryExpression(test)) {
-            const left = test.left;
-            const right = test.right;
-            const operator = test.operator;
+          // 1) 简单数字字面量比较：if (5 > 3) / if (1 === 2)
+          if (
+            t.isNumericLiteral(test.left) &&
+            t.isNumericLiteral(test.right)
+          ) {
+            const comparator = NUMERIC_COMPARATORS[test.operator];
+            if (!comparator) return;
 
-            // 两边都是数字字面量
-            if (t.isNumericLiteral(left) && t.isNumericLiteral(right)) {
-              let result: boolean | undefined;
-
-              switch (operator) {
-                case '>':
-                  result = left.value > right.value;
-                  break;
-                case '<':
-                  result = left.value < right.value;
-                  break;
-                case '>=':
-                  result = left.value >= right.value;
-                  break;
-                case '<=':
-                  result = left.value <= right.value;
-                  break;
-                case '===':
-                case '==':
-                  result = left.value === right.value;
-                  break;
-                case '!==':
-                case '!=':
-                  result = left.value !== right.value;
-                  break;
-              }
-
-              if (result !== undefined) {
-                if (result) {
-                  // 条件永远为true,保留then分支
-                  path.replaceWith(path.node.consequent);
-                } else {
-                  // 条件永远为false
-                  if (path.node.alternate) {
-                    path.replaceWith(path.node.alternate);
-                  } else {
-                    path.remove();
-                  }
-                }
-                removed++;
-                return;
-              }
+            const truthy = comparator(test.left.value, test.right.value);
+            if (truthy) {
+              path.replaceWith(path.node.consequent);
+            } else if (path.node.alternate) {
+              path.replaceWith(path.node.alternate);
+            } else {
+              path.remove();
             }
+            removed++;
+            return;
           }
 
-          // 检查 x * 0 === 0 类型的谓词
+          // 2) x * 0 === 0：左操作数含 0 乘子则永真
           if (
-            t.isBinaryExpression(test) &&
-            (test.operator === '===' || test.operator === '==')
+            (test.operator === '===' || test.operator === '==') &&
+            t.isNumericLiteral(test.right) &&
+            test.right.value === 0 &&
+            t.isBinaryExpression(test.left) &&
+            test.left.operator === '*' &&
+            isMultiplyByZero(test.left)
           ) {
-            const left = test.left;
-            const right = test.right;
-
-            // x * 0 === 0
-            if (
-              t.isBinaryExpression(left) &&
-              left.operator === '*' &&
-              t.isNumericLiteral(right) &&
-              right.value === 0
-            ) {
-              if (
-                (t.isNumericLiteral(left.left) && left.left.value === 0) ||
-                (t.isNumericLiteral(left.right) && left.right.value === 0)
-              ) {
-                // 永远为true
-                path.replaceWith(path.node.consequent);
-                removed++;
-                return;
-              }
-            }
+            path.replaceWith(path.node.consequent);
+            removed++;
           }
         },
       });
@@ -1094,10 +1075,7 @@ Output the deobfuscated JavaScript code:`,
     if (!this.llm) return null;
 
     try {
-      const codeSnippet =
-        code.length > 3000
-          ? code.substring(0, 3000) + '\n\n// ... (code truncated)'
-          : code;
+      const codeSnippet = truncateCode(code, 3000);
 
       const prompt = `# Code Cleanup Task
 
@@ -1225,14 +1203,7 @@ Return ONLY the cleaned JavaScript code (no markdown, no explanations).`,
    * 检测字符串编码
    */
   private detectStringEncoding(code: string): boolean {
-    // 检测常见的字符串编码模式
-    const patterns = [
-      /\\x[0-9a-f]{2}/i, // 十六进制编码
-      /\\u[0-9a-f]{4}/i, // Unicode编码
-      /String\.fromCharCode/i, // fromCharCode
-      /atob\(/i, // Base64解码
-    ];
-    return patterns.some(p => p.test(code));
+    return STRING_ENCODING_PATTERNS.some(p => p.test(code));
   }
 
   /**
@@ -1251,26 +1222,25 @@ Return ONLY the cleaned JavaScript code (no markdown, no explanations).`,
 
       traverse(ast, {
         // 解码 String.fromCharCode(...)
-        CallExpression(path: any) {
+        CallExpression(path) {
+          const callee = path.node.callee;
           if (
-            t.isMemberExpression(path.node.callee) &&
-            t.isIdentifier(path.node.callee.object, {name: 'String'}) &&
-            t.isIdentifier(path.node.callee.property, {name: 'fromCharCode'})
+            !t.isMemberExpression(callee) ||
+            !t.isIdentifier(callee.object, {name: 'String'}) ||
+            !t.isIdentifier(callee.property, {name: 'fromCharCode'})
           ) {
-            // 检查所有参数是否都是数字
-            const allNumbers = path.node.arguments.every((arg: any) =>
-              t.isNumericLiteral(arg),
-            );
-
-            if (allNumbers) {
-              const charCodes = path.node.arguments.map(
-                (arg: any) => arg.value,
-              );
-              const decodedString = String.fromCharCode(...charCodes);
-              path.replaceWith(t.stringLiteral(decodedString));
-              decoded++;
-            }
+            return;
           }
+
+          // 所有参数都是数字字面量才安全替换
+          const allNumbers = path.node.arguments.every(arg =>
+            t.isNumericLiteral(arg),
+          );
+          if (!allNumbers) return;
+
+          const charCodes = path.node.arguments.map(arg => (arg as t.NumericLiteral).value);
+          path.replaceWith(t.stringLiteral(String.fromCharCode(...charCodes)));
+          decoded++;
         },
       });
 
@@ -1302,33 +1272,11 @@ Return ONLY the cleaned JavaScript code (no markdown, no explanations).`,
 
       traverse(ast, {
         // 常量折叠：计算常量表达式
-        BinaryExpression(path: any) {
+        BinaryExpression(path) {
           const {left, right, operator} = path.node;
 
           if (t.isNumericLiteral(left) && t.isNumericLiteral(right)) {
-            let result: number | undefined;
-
-            switch (operator) {
-              case '+':
-                result = left.value + right.value;
-                break;
-              case '-':
-                result = left.value - right.value;
-                break;
-              case '*':
-                result = left.value * right.value;
-                break;
-              case '/':
-                result = left.value / right.value;
-                break;
-              case '%':
-                result = left.value % right.value;
-                break;
-              case '**':
-                result = Math.pow(left.value, right.value);
-                break;
-            }
-
+            const result = evalBinaryNumbers(left, right, operator);
             if (result !== undefined) {
               path.replaceWith(t.numericLiteral(result));
               optimized++;
@@ -1337,7 +1285,7 @@ Return ONLY the cleaned JavaScript code (no markdown, no explanations).`,
         },
 
         // 简化逻辑表达式
-        LogicalExpression(path: any) {
+        LogicalExpression(path) {
           const {left, right, operator} = path.node;
 
           // true && x => x
@@ -1362,26 +1310,20 @@ Return ONLY the cleaned JavaScript code (no markdown, no explanations).`,
         },
 
         // 移除空语句
-        EmptyStatement(path: any) {
+        EmptyStatement(path) {
           path.remove();
           optimized++;
         },
 
         // 简化三元表达式
-        ConditionalExpression(path: any) {
+        ConditionalExpression(path) {
           const {test, consequent, alternate} = path.node;
 
-          // true ? a : b => a
-          if (t.isBooleanLiteral(test) && test.value === true) {
-            path.replaceWith(consequent);
-            optimized++;
-          }
+          if (!t.isBooleanLiteral(test)) return;
 
-          // false ? a : b => b
-          if (t.isBooleanLiteral(test) && test.value === false) {
-            path.replaceWith(alternate);
-            optimized++;
-          }
+          // true ? a : b => a；false ? a : b => b
+          path.replaceWith(test.value ? consequent : alternate);
+          optimized++;
         },
       });
 
@@ -1517,4 +1459,16 @@ Return ONLY the cleaned JavaScript code (no markdown, no explanations).`,
       return 100;
     }
   }
+
+  /**
+   * 判断二元表达式是否为 "x * 0" 或 "0 * x" 形式。
+   * 用于识别 `x * 0 === 0` 这类恒真不透明谓词。
+   */
+}
+
+function isMultiplyByZero(expr: t.BinaryExpression): boolean {
+  return (
+    (t.isNumericLiteral(expr.left) && expr.left.value === 0) ||
+    (t.isNumericLiteral(expr.right) && expr.right.value === 0)
+  );
 }

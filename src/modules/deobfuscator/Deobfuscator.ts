@@ -25,25 +25,25 @@ import crypto from 'node:crypto';
 import vm from 'node:vm';
 
 import generateImport from '@babel/generator';
-const generate =
-  (generateImport as unknown as {default?: typeof generateImport}).default ??
-  generateImport;
 import * as parser from '@babel/parser';
 import traverseImport from '@babel/traverse';
-const traverse =
-  (traverseImport as unknown as {default?: typeof traverseImport}).default ??
-  traverseImport;
 import * as t from '@babel/types';
 
 import type {LLMService} from '../../services/LLMService.js';
 import type {
+  DeobfuscateBundleSummary,
   DeobfuscateOptions,
   DeobfuscateResult,
+  DeobfuscateSavedArtifact,
   ObfuscationType,
   Transformation,
   UnresolvedPart,
 } from '../../types/index.js';
 import {logger} from '../../utils/logger.js';
+import {evalBinaryNumbers, unwrapBabelDefault} from './astUtils.js';
+
+const generate = unwrapBabelDefault<typeof generateImport>(generateImport);
+const traverse = unwrapBabelDefault<typeof traverseImport>(traverseImport);
 
 // 子模块
 import {
@@ -162,11 +162,9 @@ export class Deobfuscator {
     // 最终完整透传给外部 AI，让外部 AI 基于这些信息做更深度的推理
     const pipelineWarnings: string[] = [];
     const pipelineUnresolved: UnresolvedPart[] = [];
-    let pipelineBundle: import('../../types/index.js').DeobfuscateBundleSummary | undefined;
+    let pipelineBundle: DeobfuscateBundleSummary | undefined;
     let pipelineSavedTo: string | undefined;
-    let pipelineSavedArtifacts:
-      | Array<import('../../types/index.js').DeobfuscateSavedArtifact>
-      | undefined;
+    let pipelineSavedArtifacts: DeobfuscateSavedArtifact[] | undefined;
     let webcrackApplied = false;
 
     try {
@@ -317,11 +315,14 @@ export class Deobfuscator {
       const otherTransforms = transformations.filter(
         t => t.type !== 'webcrack' && t.success,
       );
-      const engine: 'legacy' | 'webcrack' | 'hybrid' = webcrackApplied
-        ? otherTransforms.length > 0
-          ? 'hybrid'
-          : 'webcrack'
-        : 'legacy';
+
+      // engine 标记：webcrack 启用 + 其他管线也生效 = hybrid；纯 webcrack = webcrack；否则 = legacy
+      let engine: 'legacy' | 'webcrack' | 'hybrid';
+      if (webcrackApplied) {
+        engine = otherTransforms.length > 0 ? 'hybrid' : 'webcrack';
+      } else {
+        engine = 'legacy';
+      }
 
       const result: DeobfuscateResult = {
         code,
@@ -780,53 +781,41 @@ export class Deobfuscator {
     const types = new Set<ObfuscationType>(original);
 
     // 从 transformations 推断新发现的类型
-    for (const t of transformations) {
-      if (t.success) {
-        if (t.type === 'unpack' && t.description.includes('Packer'))
-          types.add('packer');
-        if (t.type === 'unpack' && t.description.includes('AAEncode'))
-          types.add('aaencode');
-        if (t.type === 'unpack' && t.description.includes('URLEncode'))
-          types.add('urlencoded');
-        if (t.type === 'jsvmp') types.add('vm-protection');
-        if (
-          t.type === 'advanced' &&
-          t.description.includes('invisible-unicode')
-        )
-          types.add('invisible-unicode');
-        if (
-          t.type === 'advanced' &&
-          t.description.includes('control-flow-flattening')
-        )
-          types.add('control-flow-flattening');
-        if (
-          t.type === 'advanced' &&
-          t.description.includes('opaque-predicates')
-        )
-          types.add('opaque-predicates');
-        if (
-          t.type === 'advanced' &&
-          t.description.includes('dead-code-injection')
-        )
-          types.add('dead-code-injection');
+    for (const transformation of transformations) {
+      if (!transformation.success) continue;
 
-        if (t.type === 'webcrack') {
-          types.add('webcrack');
-          const detail = t.detail as
-            | {
-                bundle?: {type?: string};
-                optionsUsed?: {
-                  unminify?: boolean;
-                  mangle?: boolean;
-                  jsx?: boolean;
-                };
-              }
-            | undefined;
-          if (detail?.bundle?.type) types.add('bundle-unpack');
-          if (detail?.optionsUsed?.unminify) types.add('unminify');
-          if (detail?.optionsUsed?.mangle) types.add('mangle');
-          if (detail?.optionsUsed?.jsx) types.add('jsx-decompile');
-        }
+      // 用 description 子串做关键字匹配：避免硬编码每个管线产物的格式
+      if (transformation.type === 'unpack') {
+        this.addTypeIfDescriptionMatches(
+          types,
+          transformation.description,
+          ['Packer', 'AAEncode', 'URLEncode'],
+          ['packer', 'aaencode', 'urlencoded'],
+        );
+      }
+      if (transformation.type === 'jsvmp') {
+        types.add('vm-protection');
+      }
+      if (transformation.type === 'advanced') {
+        this.addTypeIfDescriptionMatches(
+          types,
+          transformation.description,
+          [
+            'invisible-unicode',
+            'control-flow-flattening',
+            'opaque-predicates',
+            'dead-code-injection',
+          ],
+          [
+            'invisible-unicode',
+            'control-flow-flattening',
+            'opaque-predicates',
+            'dead-code-injection',
+          ],
+        );
+      }
+      if (transformation.type === 'webcrack') {
+        this.applyWebcrackDetailTypes(types, transformation);
       }
     }
 
@@ -836,6 +825,48 @@ export class Deobfuscator {
     }
 
     return [...types];
+  }
+
+  private applyWebcrackDetailTypes(
+    types: Set<ObfuscationType>,
+    transformation: Transformation,
+  ): void {
+    types.add('webcrack');
+
+    const detail = transformation.detail as
+      | {
+          bundle?: {type?: string};
+          optionsUsed?: {
+            unminify?: boolean;
+            mangle?: boolean;
+            jsx?: boolean;
+          };
+        }
+      | undefined;
+
+    if (detail?.bundle?.type) types.add('bundle-unpack');
+    if (detail?.optionsUsed?.unminify) types.add('unminify');
+    if (detail?.optionsUsed?.mangle) types.add('mangle');
+    if (detail?.optionsUsed?.jsx) types.add('jsx-decompile');
+  }
+
+  /**
+   * 并行遍历关键字列表/类型列表：当 description 包含某个关键字时，添加对应类型。
+   * 仅做 description.includes 匹配（O(N*M) 但 N 极小），不要用于大文本。
+   */
+  private addTypeIfDescriptionMatches(
+    types: Set<ObfuscationType>,
+    description: string,
+    keywords: string[],
+    typeNames: ObfuscationType[],
+  ): void {
+    for (let i = 0; i < keywords.length; i++) {
+      const keyword = keywords[i];
+      if (keyword && description.includes(keyword)) {
+        const typeName = typeNames[i];
+        if (typeName) types.add(typeName);
+      }
+    }
   }
 
   // ==================== 基础管线方法 ====================
@@ -860,48 +891,12 @@ export class Deobfuscator {
             t.isNumericLiteral(path.node.left) &&
             t.isNumericLiteral(path.node.right)
           ) {
-            const l = path.node.left.value;
-            const r = path.node.right.value;
-            let result: number | undefined;
-            switch (path.node.operator) {
-              case '+':
-                result = l + r;
-                break;
-              case '-':
-                result = l - r;
-                break;
-              case '*':
-                result = l * r;
-                break;
-              case '/':
-                result = r !== 0 ? l / r : undefined;
-                break;
-              case '%':
-                result = r !== 0 ? l % r : undefined;
-                break;
-              case '**':
-                result = l ** r;
-                break;
-              case '|':
-                result = l | r;
-                break;
-              case '&':
-                result = l & r;
-                break;
-              case '^':
-                result = l ^ r;
-                break;
-              case '<<':
-                result = l << r;
-                break;
-              case '>>':
-                result = l >> r;
-                break;
-              case '>>>':
-                result = l >>> r;
-                break;
-            }
-            if (result !== undefined && isFinite(result)) {
+            const result = evalBinaryNumbers(
+              path.node.left,
+              path.node.right,
+              path.node.operator,
+            );
+            if (result !== undefined) {
               path.replaceWith(t.numericLiteral(result));
             }
           }
@@ -1817,12 +1812,16 @@ export class Deobfuscator {
     let score = 0;
     if (code.includes('\n')) score += 20;
     if (code.includes('//') || code.includes('/*')) score += 10;
-    const varNames: string[] =
-      code.match(/\b[a-zA-Z_$][a-zA-Z0-9_$]*\b/g) || [];
-    const avgLength =
-      varNames.reduce((sum, name) => sum + name.length, 0) /
-      (varNames.length || 1);
+
+    // 显式声明类型，避免 ?? 与 RegExpMatchArray 合并时被推为 never[]
+    const varNames: string[] = code.match(/\b[a-zA-Z_$][a-zA-Z0-9_$]*\b/g) ?? [];
+    const totalNameLength = varNames.reduce(
+      (sum, name) => sum + name.length,
+      0,
+    );
+    const avgLength = totalNameLength / (varNames.length || 1);
     if (avgLength > 3) score += 30;
+
     const density = code.replace(/\s/g, '').length / (code.length || 1);
     if (density < 0.8) score += 20;
     if (!code.includes('_0x') && !code.includes('\\x')) score += 20;

@@ -19,17 +19,15 @@
  */
 
 import generateImport from '@babel/generator';
-const generate =
-  (generateImport as unknown as {default?: typeof generateImport}).default ??
-  generateImport;
 import * as parser from '@babel/parser';
 import traverseImport from '@babel/traverse';
-const traverse =
-  (traverseImport as unknown as {default?: typeof traverseImport}).default ??
-  traverseImport;
 import * as t from '@babel/types';
 
+import {evalBinaryNumbers, unwrapBabelDefault} from './astUtils.js';
 import {logger} from '../../utils/logger.js';
+
+const generate = unwrapBabelDefault<typeof generateImport>(generateImport);
+const traverse = unwrapBabelDefault<typeof traverseImport>(traverseImport);
 
 export class ASTOptimizer {
   /**
@@ -78,32 +76,11 @@ export class ASTOptimizer {
         const {left, right, operator} = path.node;
 
         if (t.isNumericLiteral(left) && t.isNumericLiteral(right)) {
-          let result: number;
-
-          switch (operator) {
-            case '+':
-              result = left.value + right.value;
-              break;
-            case '-':
-              result = left.value - right.value;
-              break;
-            case '*':
-              result = left.value * right.value;
-              break;
-            case '/':
-              result = left.value / right.value;
-              break;
-            case '%':
-              result = left.value % right.value;
-              break;
-            case '**':
-              result = left.value ** right.value;
-              break;
-            default:
-              return;
+          const result = evalBinaryNumbers(left, right, operator);
+          if (result !== undefined) {
+            path.replaceWith(t.numericLiteral(result));
           }
-
-          path.replaceWith(t.numericLiteral(result));
+          return;
         }
 
         // 字符串拼接
@@ -147,16 +124,16 @@ export class ASTOptimizer {
       VariableDeclarator(path) {
         const {id, init} = path.node;
 
-        if (t.isIdentifier(id) && init && t.isLiteral(init)) {
+        // 字面量是 Expression 的子集，narrow 后能安全 clone
+        if (t.isIdentifier(id) && init && t.isExpression(init)) {
           constants.set(id.name, init);
         }
       },
 
       Identifier(path: any) {
-        const name = path.node.name;
-        const constant = constants.get(name);
-
-        if (constant && !path.isBindingIdentifier()) {
+        if (path.isBindingIdentifier()) return;
+        const constant = constants.get(path.node.name);
+        if (constant) {
           path.replaceWith(t.cloneNode(constant));
         }
       },
@@ -172,18 +149,16 @@ export class ASTOptimizer {
       IfStatement(path) {
         const {test, consequent, alternate} = path.node;
 
-        if (t.isBooleanLiteral(test)) {
-          if (test.value) {
-            // if (true) -> 保留consequent
-            path.replaceWith(consequent);
-          } else {
-            // if (false) -> 保留alternate或删除
-            if (alternate) {
-              path.replaceWith(alternate);
-            } else {
-              path.remove();
-            }
-          }
+        if (!t.isBooleanLiteral(test)) return;
+
+        if (test.value) {
+          // if (true) -> 保留consequent
+          path.replaceWith(consequent);
+        } else if (alternate) {
+          // if (false) -> 保留alternate
+          path.replaceWith(alternate);
+        } else {
+          path.remove();
         }
       },
 
@@ -198,12 +173,14 @@ export class ASTOptimizer {
       LogicalExpression(path) {
         const {left, right, operator} = path.node;
 
-        if (t.isBooleanLiteral(left)) {
-          if (operator === '&&') {
-            path.replaceWith(left.value ? right : left);
-          } else if (operator === '||') {
-            path.replaceWith(left.value ? left : right);
-          }
+        if (!t.isBooleanLiteral(left)) return;
+
+        if (operator === '&&') {
+          // true && x -> x; false && x -> false
+          path.replaceWith(left.value ? right : left);
+        } else if (operator === '||') {
+          // true || x -> true; false || x -> x
+          path.replaceWith(left.value ? left : right);
         }
       },
     });
@@ -213,49 +190,44 @@ export class ASTOptimizer {
    * 表达式简化
    */
   private expressionSimplification(ast: t.File): void {
+    // 二元运算符的代数恒等式：右侧字面量是特定值时，左侧可整体替换为结果
+    const algebraIdentities: Array<{
+      op: string;
+      literal: number;
+      replace: (left: t.Expression) => t.Expression;
+    }> = [
+      // x + 0 -> x
+      {op: '+', literal: 0, replace: left => left},
+      // x * 1 -> x
+      {op: '*', literal: 1, replace: left => left},
+      // x * 0 -> 0
+      {op: '*', literal: 0, replace: () => t.numericLiteral(0)},
+    ];
+
     traverse(ast, {
       BinaryExpression(path) {
-        const {left, right, operator} = path.node;
-
-        // x + 0 -> x
-        if (
-          operator === '+' &&
-          t.isNumericLiteral(right) &&
-          right.value === 0
-        ) {
-          path.replaceWith(left);
-        }
-
-        // x * 1 -> x
-        if (
-          operator === '*' &&
-          t.isNumericLiteral(right) &&
-          right.value === 1
-        ) {
-          path.replaceWith(left);
-        }
-
-        // x * 0 -> 0
-        if (
-          operator === '*' &&
-          t.isNumericLiteral(right) &&
-          right.value === 0
-        ) {
-          path.replaceWith(t.numericLiteral(0));
+        for (const identity of algebraIdentities) {
+          if (
+            path.node.operator === identity.op &&
+            t.isNumericLiteral(path.node.right) &&
+            path.node.right.value === identity.literal &&
+            t.isExpression(path.node.left)
+          ) {
+            path.replaceWith(identity.replace(path.node.left));
+            return;
+          }
         }
       },
 
       UnaryExpression(path) {
-        const {argument, operator} = path.node;
-
         // !!x -> Boolean(x)
         if (
-          operator === '!' &&
-          t.isUnaryExpression(argument) &&
-          argument.operator === '!'
+          path.node.operator === '!' &&
+          t.isUnaryExpression(path.node.argument) &&
+          path.node.argument.operator === '!'
         ) {
           path.replaceWith(
-            t.callExpression(t.identifier('Boolean'), [argument.argument]),
+            t.callExpression(t.identifier('Boolean'), [path.node.argument.argument]),
           );
         }
       },
@@ -265,6 +237,8 @@ export class ASTOptimizer {
   /**
    * 变量内联
    * 例如: const a = 5; console.log(a); -> console.log(5);
+   *
+   * 两遍：先扫描所有字面量初始化的 const/let/var，再替换使用 ≤3 次的标识符。
    */
   private variableInlining(ast: t.File): void {
     const inlineCandidates = new Map<
@@ -283,9 +257,7 @@ export class ASTOptimizer {
       },
 
       Identifier(path) {
-        const name = path.node.name;
-        const candidate = inlineCandidates.get(name);
-
+        const candidate = inlineCandidates.get(path.node.name);
         if (candidate && !path.isBindingIdentifier()) {
           candidate.usageCount++;
         }
@@ -295,8 +267,7 @@ export class ASTOptimizer {
     // 第二遍：内联使用次数少的变量
     traverse(ast, {
       Identifier(path: any) {
-        const name = path.node.name;
-        const candidate = inlineCandidates.get(name);
+        const candidate = inlineCandidates.get(path.node.name);
 
         if (
           candidate &&
@@ -357,12 +328,13 @@ export class ASTOptimizer {
       SequenceExpression(path: any) {
         const {expressions} = path.node;
 
-        // 如果序列表达式只有一个元素，直接替换
+        // 单元序列：直接取出唯一元素
         if (expressions.length === 1 && expressions[0]) {
           path.replaceWith(expressions[0]);
+          return;
         }
 
-        // 如果在表达式语句中，展开为多个语句
+        // 在表达式语句中：把 (a, b, c) 拆成多行表达式语句
         if (path.parentPath.isExpressionStatement()) {
           const statements = expressions.map((expr: t.Expression) =>
             t.expressionStatement(expr),

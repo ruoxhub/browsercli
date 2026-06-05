@@ -10,14 +10,8 @@
  */
 
 import generateImport from '@babel/generator';
-const generate =
-  (generateImport as unknown as {default?: typeof generateImport}).default ??
-  generateImport;
 import * as parser from '@babel/parser';
 import traverseImport from '@babel/traverse';
-const traverse =
-  (traverseImport as unknown as {default?: typeof traverseImport}).default ??
-  traverseImport;
 import * as t from '@babel/types';
 
 import type {LLMService} from '../../services/LLMService.js';
@@ -31,6 +25,10 @@ import type {
   UnresolvedPart,
 } from '../../types/index.js';
 import {logger} from '../../utils/logger.js';
+import {truncateCode, unwrapBabelDefault} from './astUtils.js';
+
+const generate = unwrapBabelDefault<typeof generateImport>(generateImport);
+const traverse = unwrapBabelDefault<typeof traverseImport>(traverseImport);
 
 /**
  * JSVMP反混淆器
@@ -342,32 +340,27 @@ export class JSVMPDeobfuscator {
         plugins: ['jsx', 'typescript'],
       });
 
-      // 查找switch语句并提取case
-      // eslint-disable-next-line @typescript-eslint/no-this-alias
-      const self = this;
+      // 用箭头函数保持 this（避免 const self = this 反模式）
       traverse(ast, {
-        SwitchStatement(path) {
-          if (path.node.cases.length === features.instructionCount) {
-            path.node.cases.forEach((caseNode, index) => {
-              const opcode = caseNode.test
-                ? t.isNumericLiteral(caseNode.test)
+        SwitchStatement: path => {
+          if (path.node.cases.length !== features.instructionCount) return;
+
+          path.node.cases.forEach((caseNode, index) => {
+            const opcode = caseNode.test
+              ? t.isNumericLiteral(caseNode.test)
+                ? caseNode.test.value
+                : t.isStringLiteral(caseNode.test)
                   ? caseNode.test.value
-                  : t.isStringLiteral(caseNode.test)
-                    ? caseNode.test.value
-                    : index
-                : index;
+                  : index
+              : index;
 
-              // 推断指令类型
-              const type = self.inferInstructionType(caseNode);
-
-              instructions.push({
-                opcode,
-                name: `INST_${opcode}`,
-                type,
-                description: `Instruction ${opcode}`,
-              });
+            instructions.push({
+              opcode,
+              name: `INST_${opcode}`,
+              type: this.inferInstructionType(caseNode),
+              description: `Instruction ${opcode}`,
             });
-          }
+          });
         },
       });
     } catch (error) {
@@ -496,25 +489,26 @@ export class JSVMPDeobfuscator {
     const unresolvedParts: UnresolvedPart[] = [];
 
     // 根据VM类型选择还原策略
-    if (vmType === 'obfuscator.io') {
-      return await this.restoreObfuscatorIO(
-        code,
-        aggressive,
-        warnings,
-        unresolvedParts,
-      );
-    } else if (vmType === 'jsfuck') {
-      return await this.restoreJSFuck(code, warnings);
-    } else if (vmType === 'jjencode') {
-      return await this.restoreJJEncode(code, warnings);
-    } else {
-      // 自定义VM，使用LLM辅助
-      return await this.restoreCustomVM(
-        code,
-        aggressive,
-        warnings,
-        unresolvedParts,
-      );
+    switch (vmType) {
+      case 'obfuscator.io':
+        return await this.restoreObfuscatorIO(
+          code,
+          aggressive,
+          warnings,
+          unresolvedParts,
+        );
+      case 'jsfuck':
+        return await this.restoreJSFuck(code, warnings);
+      case 'jjencode':
+        return await this.restoreJJEncode(code, warnings);
+      default:
+        // 自定义VM，使用LLM辅助
+        return await this.restoreCustomVM(
+          code,
+          aggressive,
+          warnings,
+          unresolvedParts,
+        );
     }
   }
 
@@ -808,10 +802,7 @@ export class JSVMPDeobfuscator {
       logger.info(`🤖 使用LLM辅助分析${encodingType}混淆...`);
 
       // 截取代码片段，避免token超限
-      const snippet =
-        code.length > 5000
-          ? code.substring(0, 5000) + '\n\n// ... (code truncated)'
-          : code;
+      const snippet = truncateCode(code, 5000);
 
       const response = await this.llm.chat(
         [
@@ -962,7 +953,7 @@ Return a JSON object:
       logger.info('🤖 使用LLM辅助分析自定义VM...');
 
       // 1. 提取VM的关键代码片段（限制长度避免token超限）
-      const codeSnippet = code.substring(0, 5000);
+      const codeSnippet = truncateCode(code, 5000);
 
       // 2. 构建专业的LLM提示词
       const prompt = `你是一个JavaScript逆向工程专家，专门分析JSVMP（JavaScript Virtual Machine Protection）混淆代码。
@@ -1125,10 +1116,7 @@ ${codeSnippet}
       if (this.llm) {
         try {
           logger.info('🤖 使用LLM对自定义VM进行结构分析...');
-          const snippet =
-            code.length > 4000
-              ? code.substring(0, 4000) + '\n// ... truncated'
-              : code;
+          const snippet = truncateCode(code, 4000);
 
           const response = await this.llm.chat(
             [
