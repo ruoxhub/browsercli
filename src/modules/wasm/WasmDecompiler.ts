@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -29,6 +28,10 @@ function countMatches(text: string, pattern: RegExp): number {
   return [...text.matchAll(pattern)].length;
 }
 
+function parensDelta(line: string): number {
+  return countMatches(line, /\(/g) - countMatches(line, /\)/g);
+}
+
 function parseFunctionBlocks(wat: string): FunctionBlock[] {
   const lines = wat.split('\n');
   const blocks: FunctionBlock[] = [];
@@ -39,6 +42,18 @@ function parseFunctionBlocks(wat: string): FunctionBlock[] {
   let currentName = 'func';
   let funcCounter = 0;
 
+  const finishBlock = () => {
+    blocks.push({
+      name: currentName,
+      index: funcCounter - 1,
+      lines: [...currentLines],
+      signatureLine,
+    });
+    inFunc = false;
+    currentLines = [];
+    signatureLine = '';
+  };
+
   for (const line of lines) {
     const trimmed = line.trim();
     if (!inFunc && trimmed.startsWith('(func')) {
@@ -48,15 +63,9 @@ function parseFunctionBlocks(wat: string): FunctionBlock[] {
       const nameMatch = trimmed.match(/^\(func\s+(\$\S+)/);
       currentName = nameMatch?.[1] ?? `func_${funcCounter}`;
       funcCounter += 1;
-      depth = countMatches(line, /\(/g) - countMatches(line, /\)/g);
+      depth = parensDelta(line);
       if (depth <= 0) {
-        blocks.push({
-          name: currentName,
-          index: funcCounter - 1,
-          lines: [...currentLines],
-          signatureLine,
-        });
-        inFunc = false;
+        finishBlock();
       }
       continue;
     }
@@ -66,36 +75,47 @@ function parseFunctionBlocks(wat: string): FunctionBlock[] {
     }
 
     currentLines.push(line);
-    depth += countMatches(line, /\(/g) - countMatches(line, /\)/g);
+    depth += parensDelta(line);
     if (depth <= 0) {
-      blocks.push({
-        name: currentName,
-        index: funcCounter - 1,
-        lines: [...currentLines],
-        signatureLine,
-      });
-      inFunc = false;
-      currentLines = [];
-      signatureLine = '';
+      finishBlock();
     }
   }
 
   return blocks;
 }
 
-function summarizeFunction(block: FunctionBlock): WasmFunctionDisassemblySummary {
+const VALUE_TYPES = 'i32|i64|f32|f64|v128';
+const MEMORY_LOAD_PATTERN = new RegExp(
+  `\\b(?:${VALUE_TYPES})\\.(?:load|load8|load16|load32)`,
+  'g',
+);
+const MEMORY_STORE_PATTERN = new RegExp(
+  `\\b(?:${VALUE_TYPES})\\.(?:store|store8|store16|store32)`,
+  'g',
+);
+const CALL_PATTERN = /\bcall\b(?!_indirect)/g;
+const CALL_INDIRECT_PATTERN = /\bcall_indirect\b/g;
+const LOCAL_ACCESS_PATTERN = /\blocal\.(?:get|set|tee)\b/g;
+const CRYPTO_NAME_PATTERN =
+  /(sign|hash|encrypt|decrypt|token|nonce|sha|aes|sm3|sm4|md5)/i;
+
+function summarizeFunction(
+  block: FunctionBlock,
+): WasmFunctionDisassemblySummary {
   const text = block.lines.join('\n');
   const paramCount = countMatches(block.signatureLine, /\(param\b/g);
   const resultCount = countMatches(block.signatureLine, /\(result\b/g);
-  const memoryLoadCount = countMatches(text, /\b(?:i32|i64|f32|f64|v128)\.(?:load|load8|load16|load32)/g);
-  const memoryStoreCount = countMatches(text, /\b(?:i32|i64|f32|f64|v128)\.(?:store|store8|store16|store32)/g);
-  const callCount = countMatches(text, /\bcall\b(?!_indirect)/g);
-  const indirectCallCount = countMatches(text, /\bcall_indirect\b/g);
-  const localAccessCount = countMatches(text, /\blocal\.(?:get|set|tee)\b/g);
+  const memoryLoadCount = countMatches(text, MEMORY_LOAD_PATTERN);
+  const memoryStoreCount = countMatches(text, MEMORY_STORE_PATTERN);
+  const callCount = countMatches(text, CALL_PATTERN);
+  const indirectCallCount = countMatches(text, CALL_INDIRECT_PATTERN);
+  const localAccessCount = countMatches(text, LOCAL_ACCESS_PATTERN);
   const instructionCount = block.lines
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0 && !line.startsWith('(func') && !line.startsWith(')'))
-    .length;
+    .map(line => line.trim())
+    .filter(
+      line =>
+        line.length > 0 && !line.startsWith('(func') && !line.startsWith(')'),
+    ).length;
 
   const suspiciousTags: string[] = [];
   if (memoryLoadCount + memoryStoreCount >= 8) {
@@ -104,7 +124,7 @@ function summarizeFunction(block: FunctionBlock): WasmFunctionDisassemblySummary
   if (indirectCallCount > 0) {
     suspiciousTags.push('indirect-call');
   }
-  if (/(sign|hash|encrypt|decrypt|token|nonce|sha|aes|sm3|sm4|md5)/i.test(block.name)) {
+  if (CRYPTO_NAME_PATTERN.test(block.name)) {
     suspiciousTags.push('crypto-name');
   }
   if (callCount >= 8) {
@@ -126,7 +146,7 @@ function summarizeFunction(block: FunctionBlock): WasmFunctionDisassemblySummary
     memoryStoreCount,
     localAccessCount,
     suspiciousTags,
-    preview: block.lines.slice(0, 8).map((line) => line.trim()),
+    preview: block.lines.slice(0, 8).map(line => line.trim()),
   };
 }
 
@@ -169,7 +189,9 @@ export class WasmDecompiler {
         foldExprs: options.foldExprs ?? false,
         inlineExport: options.inlineExport ?? false,
       });
-      const functionSummaries = parseFunctionBlocks(wat).map((block) => summarizeFunction(block));
+      const functionSummaries = parseFunctionBlocks(wat).map(block =>
+        summarizeFunction(block),
+      );
 
       return {
         moduleId: options.moduleId,
@@ -182,8 +204,14 @@ export class WasmDecompiler {
         exportCount: countMatches(wat, /^\s*\(export\b/gm),
         functionSummaries: functionSummaries.sort(
           (a, b) =>
-            (b.memoryLoadCount + b.memoryStoreCount + b.callCount + b.indirectCallCount) -
-            (a.memoryLoadCount + a.memoryStoreCount + a.callCount + a.indirectCallCount),
+            b.memoryLoadCount +
+            b.memoryStoreCount +
+            b.callCount +
+            b.indirectCallCount -
+            (a.memoryLoadCount +
+              a.memoryStoreCount +
+              a.callCount +
+              a.indirectCallCount),
         ),
       };
     } finally {

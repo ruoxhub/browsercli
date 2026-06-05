@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -30,7 +29,26 @@ interface WasmExportUsageSummary {
 }
 
 function uniqueStrings(values: Array<string | undefined>): string[] {
-  return [...new Set(values.filter((value): value is string => typeof value === 'string' && value.length > 0))];
+  return [
+    ...new Set(
+      values.filter(
+        (value): value is string =>
+          typeof value === 'string' && value.length > 0,
+      ),
+    ),
+  ];
+}
+
+function joinOrNone(values: string[], separator = ', '): string {
+  return values.join(separator) || 'none';
+}
+
+function joinOrFallback(
+  values: string[],
+  fallback: string,
+  separator = ', ',
+): string {
+  return values.join(separator) || fallback;
 }
 
 function normalizeHeaderName(name: string): string {
@@ -45,7 +63,10 @@ function maskHeaderValue(value: string): string {
 }
 
 function isSensitiveHeader(name: string, value: string): boolean {
-  return /(authorization|signature|token|secret|key|cookie)/i.test(name) || value.length >= 24;
+  return (
+    /(authorization|signature|token|secret|key|cookie)/i.test(name) ||
+    value.length >= 24
+  );
 }
 
 function classifyBodyKind(value?: string): WasmBodyKind {
@@ -53,7 +74,10 @@ function classifyBodyKind(value?: string): WasmBodyKind {
   if (trimmed.length === 0) {
     return 'empty';
   }
-  if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+  if (
+    (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+    (trimmed.startsWith('[') && trimmed.endsWith(']'))
+  ) {
     return 'json';
   }
   if (trimmed.includes('=') && trimmed.includes('&')) {
@@ -65,27 +89,16 @@ function classifyBodyKind(value?: string): WasmBodyKind {
   if (/^[A-Za-z0-9+/=_-]+$/.test(trimmed) && trimmed.length >= 16) {
     return 'base64ish';
   }
-  if (trimmed.length > 0) {
-    return 'plain-text';
-  }
-  return 'unknown';
+  return 'plain-text';
 }
 
-function splitBodySegments(bodySnippet?: string, bodyKind?: WasmBodyKind): WasmBodySegmentHint[] {
+function splitBodySegments(
+  bodySnippet?: string,
+  bodyKind?: WasmBodyKind,
+): WasmBodySegmentHint[] {
   const body = bodySnippet ?? '';
   const kind = bodyKind ?? classifyBodyKind(body);
-  const parts: string[] =
-    kind === 'json'
-      ? Object.keys(safeParseJson(body))
-      : kind === 'urlencoded'
-        ? body.split('&').map((entry) => entry.split('=').slice(1).join('=') || entry)
-        : body.includes('.')
-          ? body.split('.')
-          : body.includes(':')
-            ? body.split(':')
-            : body.length > 0
-              ? [body]
-              : [];
+  const parts = collectBodyParts(body, kind);
 
   return parts
     .map((raw, index) => {
@@ -104,7 +117,28 @@ function splitBodySegments(bodySnippet?: string, bodyKind?: WasmBodyKind): WasmB
         likelySignatureMaterial,
       };
     })
-    .filter((entry) => entry.raw.length > 0);
+    .filter(entry => entry.raw.length > 0);
+}
+
+function collectBodyParts(body: string, kind: WasmBodyKind): string[] {
+  if (kind === 'json') {
+    return Object.keys(safeParseJson(body));
+  }
+  if (kind === 'urlencoded') {
+    return body
+      .split('&')
+      .map(entry => entry.split('=').slice(1).join('=') || entry);
+  }
+  if (body.includes('.')) {
+    return body.split('.');
+  }
+  if (body.includes(':')) {
+    return body.split(':');
+  }
+  if (body.length > 0) {
+    return [body];
+  }
+  return [];
 }
 
 function safeParseJson(value: string): Record<string, unknown> {
@@ -182,7 +216,7 @@ function dedupeHeaders(entries: WasmHeaderEntry[]): WasmHeaderEntry[] {
 
 function dedupeKeyValue(entries: WasmKeyValuePreview[]): WasmKeyValuePreview[] {
   const seen = new Set<string>();
-  return entries.filter((entry) => {
+  return entries.filter(entry => {
     const key = `${entry.key}:${entry.value}`;
     if (seen.has(key)) {
       return false;
@@ -192,38 +226,57 @@ function dedupeKeyValue(entries: WasmKeyValuePreview[]): WasmKeyValuePreview[] {
   });
 }
 
+type ExportSuspicion = 'high' | 'medium' | 'low';
+
+function determineSuspicion(
+  reasonCount: number,
+  callCount: number,
+): ExportSuspicion {
+  if (reasonCount >= 2 || callCount >= 10) {
+    return 'high';
+  }
+  if (reasonCount === 1 || callCount >= 3) {
+    return 'medium';
+  }
+  return 'low';
+}
+
 export class WasmRuntimeInspector {
   summarizeExports(
     module: WasmModuleRecord,
     events: WasmRuntimeEvent[],
   ): WasmExportUsageSummary[] {
-    const relevantEvents = events.filter((event) => event.moduleId === module.id);
+    const relevantEvents = events.filter(event => event.moduleId === module.id);
     const callCounts = new Map<string, number>();
     for (const event of relevantEvents) {
       if (event.type !== 'export_call' || !event.exportName) {
         continue;
       }
-      callCounts.set(event.exportName, (callCounts.get(event.exportName) ?? 0) + 1);
+      callCounts.set(
+        event.exportName,
+        (callCounts.get(event.exportName) ?? 0) + 1,
+      );
     }
 
     return module.exports
-      .map((entry) => {
+      .map(entry => {
         const callCount = callCounts.get(entry.name) ?? entry.callCount ?? 0;
         const reasons: string[] = [];
         if (callCount >= 5) {
           reasons.push('high runtime call count');
         }
-        if (/(sign|sha|aes|sm3|sm4|md5|encrypt|decrypt|token|nonce)/i.test(entry.name)) {
+        if (
+          /(sign|sha|aes|sm3|sm4|md5|encrypt|decrypt|token|nonce)/i.test(
+            entry.name,
+          )
+        ) {
           reasons.push('name matches signature/crypto keywords');
         }
-        if ((entry.params?.length ?? 0) >= 2 && (entry.results?.length ?? 0) <= 1) {
+        if (
+          (entry.params?.length ?? 0) >= 2 &&
+          (entry.results?.length ?? 0) <= 1
+        ) {
           reasons.push('shape looks like transform routine');
-        }
-        let suspicion: 'high' | 'medium' | 'low' = 'low';
-        if (reasons.length >= 2 || callCount >= 10) {
-          suspicion = 'high';
-        } else if (reasons.length === 1 || callCount >= 3) {
-          suspicion = 'medium';
         }
         return {
           name: entry.name,
@@ -231,11 +284,13 @@ export class WasmRuntimeInspector {
           callCount,
           params: entry.params,
           results: entry.results,
-          suspicion,
+          suspicion: determineSuspicion(reasons.length, callCount),
           reasons,
         };
       })
-      .sort((a, b) => b.callCount - a.callCount || a.name.localeCompare(b.name));
+      .sort(
+        (a, b) => b.callCount - a.callCount || a.name.localeCompare(b.name),
+      );
   }
 
   summarizeBoundary(
@@ -248,20 +303,25 @@ export class WasmRuntimeInspector {
     sideEffectHints: string[];
     candidateChains: WasmBoundaryChain[];
   } {
-    const relevantEvents = events.filter((event) => event.moduleId === module.id);
-    const instantiateEvents = relevantEvents.filter((event) => event.type !== 'export_call');
+    const relevantEvents = events.filter(event => event.moduleId === module.id);
+    const instantiateEvents = relevantEvents.filter(
+      event => event.type !== 'export_call',
+    );
     const exportUsage = this.summarizeExports(module, events).slice(0, 5);
-    const candidateChains = this.buildBoundaryChains(module, events).slice(0, 5);
+    const candidateChains = this.buildBoundaryChains(module, events).slice(
+      0,
+      5,
+    );
     return {
-      importNamespaces: [...new Set(module.imports.map((entry) => entry.module))],
-      topExports: exportUsage.map((entry) => entry.name),
+      importNamespaces: [...new Set(module.imports.map(entry => entry.module))],
+      topExports: exportUsage.map(entry => entry.name),
       stackSamples: instantiateEvents
-        .map((event) => event.stackSummary ?? [])
-        .filter((stack) => stack.length > 0)
+        .map(event => event.stackSummary ?? [])
+        .filter(stack => stack.length > 0)
         .slice(0, 3),
       sideEffectHints: [
         ...new Set(
-          relevantEvents.flatMap((event) => event.sideEffectHints ?? []),
+          relevantEvents.flatMap(event => event.sideEffectHints ?? []),
         ),
       ],
       candidateChains,
@@ -273,7 +333,7 @@ export class WasmRuntimeInspector {
     events: WasmRuntimeEvent[],
   ): WasmBoundaryChain[] {
     const relevantEvents = events
-      .filter((event) => event.moduleId === module.id)
+      .filter(event => event.moduleId === module.id)
       .sort((a, b) => a.timestamp - b.timestamp);
     const chains: WasmBoundaryChain[] = [];
 
@@ -285,8 +345,11 @@ export class WasmRuntimeInspector {
       const runtimeModuleId = event.runtimeModuleId;
       const windowStart = event.timestamp - 1500;
       const windowEnd = event.timestamp + 2500;
-      const related = relevantEvents.filter((candidate) => {
-        if (candidate.timestamp < windowStart || candidate.timestamp > windowEnd) {
+      const related = relevantEvents.filter(candidate => {
+        if (
+          candidate.timestamp < windowStart ||
+          candidate.timestamp > windowEnd
+        ) {
           return false;
         }
         if (!runtimeModuleId || !candidate.runtimeModuleId) {
@@ -295,54 +358,93 @@ export class WasmRuntimeInspector {
         return candidate.runtimeModuleId === runtimeModuleId;
       });
 
-      const before = related.filter((candidate) => candidate.timestamp <= event.timestamp);
-      const after = related.filter((candidate) => candidate.timestamp >= event.timestamp);
-
-      const writerEvents = before.filter((candidate) =>
-        candidate.type === 'memory_write' ||
-        candidate.type === 'text_encode' ||
-        candidate.type === 'memory_view_create' ||
-        candidate.type === 'memory_buffer_access',
+      const before = related.filter(
+        candidate => candidate.timestamp <= event.timestamp,
       );
-      const readerEvents = after.filter((candidate) =>
-        candidate.type === 'memory_read' ||
-        candidate.type === 'text_decode',
+      const after = related.filter(
+        candidate => candidate.timestamp >= event.timestamp,
       );
-      const sinkEvents = after.filter((candidate) => candidate.type === 'network_request');
 
-      const writerHints = [...new Set(writerEvents.map((candidate) => this.describeHint(candidate)).filter(Boolean))];
-      const readerHints = [...new Set(readerEvents.map((candidate) => this.describeHint(candidate)).filter(Boolean))];
-      const sinkHints = [...new Set(sinkEvents.map((candidate) => this.describeSink(candidate)).filter(Boolean))];
+      const writerEvents = before.filter(
+        candidate =>
+          candidate.type === 'memory_write' ||
+          candidate.type === 'text_encode' ||
+          candidate.type === 'memory_view_create' ||
+          candidate.type === 'memory_buffer_access',
+      );
+      const readerEvents = after.filter(
+        candidate =>
+          candidate.type === 'memory_read' || candidate.type === 'text_decode',
+      );
+      const sinkEvents = after.filter(
+        candidate => candidate.type === 'network_request',
+      );
+
+      const writerHints = [
+        ...new Set(
+          writerEvents
+            .map(candidate => this.describeHint(candidate))
+            .filter(Boolean),
+        ),
+      ];
+      const readerHints = [
+        ...new Set(
+          readerEvents
+            .map(candidate => this.describeHint(candidate))
+            .filter(Boolean),
+        ),
+      ];
+      const sinkHints = [
+        ...new Set(
+          sinkEvents
+            .map(candidate => this.describeSink(candidate))
+            .filter(Boolean),
+        ),
+      ];
       const candidateJsCallers = [
         ...new Set(
           related
-            .flatMap((candidate) => candidate.stackSummary ?? [])
-            .filter((line) => !line.includes('WebAssembly.') && !line.includes('at wrappedExports')),
+            .flatMap(candidate => candidate.stackSummary ?? [])
+            .filter(
+              line =>
+                !line.includes('WebAssembly.') &&
+                !line.includes('at wrappedExports'),
+            ),
         ),
       ].slice(0, 6);
-      const bodyAnalysis = this.buildBodyAnalysis(writerEvents, readerEvents, sinkEvents);
+      const bodyAnalysis = this.buildBodyAnalysis(
+        writerEvents,
+        readerEvents,
+        sinkEvents,
+      );
       const headerCandidates = dedupeHeaders([
-        ...sinkEvents.flatMap((candidate) => candidate.requestHeaders ?? []),
-        ...((event.resultEntries ?? []).map((entry) => ({
+        ...sinkEvents.flatMap(candidate => candidate.requestHeaders ?? []),
+        ...(event.resultEntries ?? []).map(entry => ({
           name: entry.key,
           value: entry.value,
           masked: entry.masked,
-        }))),
+        })),
       ]);
       const returnValueHints = dedupeKeyValue(event.resultEntries ?? []);
 
       const steps: WasmBoundaryStep[] = related
-        .map((candidate) => this.toStep(candidate))
+        .map(candidate => this.toStep(candidate))
         .sort((a, b) => a.timestamp - b.timestamp);
 
       const score =
         writerEvents.length * 2 +
         readerEvents.length * 2 +
         sinkEvents.length * 3 +
-        (writerEvents.some((candidate) => candidate.type === 'text_encode') ? 2 : 0) +
-        (readerEvents.some((candidate) => candidate.type === 'text_decode') ? 2 : 0) +
+        (writerEvents.some(candidate => candidate.type === 'text_encode')
+          ? 2
+          : 0) +
+        (readerEvents.some(candidate => candidate.type === 'text_decode')
+          ? 2
+          : 0) +
         (sinkEvents.length > 0 ? 2 : 0) +
-        (bodyAnalysis.segments.some((segment) => segment.likelySignatureMaterial) ? 2 : 0) +
+        (bodyAnalysis.segments.some(segment => segment.likelySignatureMaterial)
+          ? 2
+          : 0) +
         (headerCandidates.length > 0 ? 1 : 0);
 
       chains.push({
@@ -359,12 +461,14 @@ export class WasmRuntimeInspector {
         headerCandidates,
         returnValueHints,
         bodyAnalysis,
-        networkTargets: sinkEvents.map((candidate) => ({
+        networkTargets: sinkEvents.map(candidate => ({
           method: candidate.method,
           url: candidate.url,
           bodySnippet: candidate.bodySnippet,
           bodyKind: candidate.bodyKind,
-          requestHeaders: candidate.requestHeaders ? [...candidate.requestHeaders] : undefined,
+          requestHeaders: candidate.requestHeaders
+            ? [...candidate.requestHeaders]
+            : undefined,
         })),
         steps,
       });
@@ -373,7 +477,10 @@ export class WasmRuntimeInspector {
     return chains.sort((a, b) => b.score - a.score || b.endedAt - a.endedAt);
   }
 
-  buildStructuredBoundaryArtifact(modules: WasmModuleRecord[], events: WasmRuntimeEvent[]): {
+  buildStructuredBoundaryArtifact(
+    modules: WasmModuleRecord[],
+    events: WasmRuntimeEvent[],
+  ): {
     generatedAt: string;
     modules: Array<{
       moduleId: string;
@@ -384,7 +491,7 @@ export class WasmRuntimeInspector {
   } {
     return {
       generatedAt: new Date().toISOString(),
-      modules: modules.map((module) => ({
+      modules: modules.map(module => ({
         moduleId: module.id,
         hash: module.hash,
         boundary: this.summarizeBoundary(module, events),
@@ -402,8 +509,10 @@ export class WasmRuntimeInspector {
     } = {},
   ): WasmSignatureDiffResult {
     const chains = this.buildBoundaryChains(module, events)
-      .filter((chain) => !options.exportName || chain.exportName === options.exportName)
-      .filter((chain) => chain.networkTargets.length > 0)
+      .filter(
+        chain => !options.exportName || chain.exportName === options.exportName,
+      )
+      .filter(chain => chain.networkTargets.length > 0)
       .slice(0, options.maxChains ?? 12);
 
     const changedFields: WasmSignatureDiffFieldChange[] = [];
@@ -433,7 +542,9 @@ export class WasmRuntimeInspector {
         set.add(header.value);
         headerFields.set(key, set);
       }
-      const segments = chain.bodyAnalysis?.segments ?? splitBodySegments(target?.bodySnippet, target?.bodyKind);
+      const segments =
+        chain.bodyAnalysis?.segments ??
+        splitBodySegments(target?.bodySnippet, target?.bodyKind);
       for (const segment of segments) {
         const key = `segment_${segment.index}`;
         const set = bodyFields.get(key) ?? new Set<string>();
@@ -449,9 +560,12 @@ export class WasmRuntimeInspector {
         variationCount: queryOrderValues.size,
         examples: Array.from(queryOrderValues).slice(0, 4),
         impact: 'contextual',
-        notes: 'Observed different raw query-string ordering across boundary chains.',
+        notes:
+          'Observed different raw query-string ordering across boundary chains.',
       });
-      observations.push('URL query parameter order changes across captured boundary chains.');
+      observations.push(
+        'URL query parameter order changes across captured boundary chains.',
+      );
     }
 
     for (const [field, values] of queryFields.entries()) {
@@ -459,16 +573,19 @@ export class WasmRuntimeInspector {
         continue;
       }
       const impact: WasmSignatureDiffFieldChange['impact'] =
-        /(timestamp|nonce|sign|signature|token)/i.test(field) ? 'signature-candidate' : 'contextual';
+        /(timestamp|nonce|sign|signature|token)/i.test(field)
+          ? 'signature-candidate'
+          : 'contextual';
       changedFields.push({
         field,
         location: 'url-query',
         variationCount: values.size,
         examples: Array.from(values).slice(0, 4),
         impact,
-        notes: impact === 'signature-candidate'
-          ? 'This query key looks directly related to freshness or signature material.'
-          : 'This query key changed across observed request variants.',
+        notes:
+          impact === 'signature-candidate'
+            ? 'This query key looks directly related to freshness or signature material.'
+            : 'This query key changed across observed request variants.',
       });
     }
 
@@ -477,18 +594,23 @@ export class WasmRuntimeInspector {
         continue;
       }
       const impact: WasmSignatureDiffFieldChange['impact'] =
-        /(signature|timestamp|token|authorization)/i.test(field) ? 'signature-candidate' : 'transport-only';
+        /(signature|timestamp|token|authorization)/i.test(field)
+          ? 'signature-candidate'
+          : 'transport-only';
       changedFields.push({
         field,
         location: 'request-header',
         variationCount: values.size,
-        examples: Array.from(values).slice(0, 4).map((value) =>
-          isSensitiveHeader(field, value) ? maskHeaderValue(value) : value,
-        ),
+        examples: Array.from(values)
+          .slice(0, 4)
+          .map(value =>
+            isSensitiveHeader(field, value) ? maskHeaderValue(value) : value,
+          ),
         impact,
-        notes: impact === 'signature-candidate'
-          ? 'Header value shifts look consistent with runtime signature generation.'
-          : 'Header value variation looks more transport/context oriented.',
+        notes:
+          impact === 'signature-candidate'
+            ? 'Header value shifts look consistent with runtime signature generation.'
+            : 'Header value variation looks more transport/context oriented.',
       });
     }
 
@@ -497,30 +619,48 @@ export class WasmRuntimeInspector {
         continue;
       }
       const examples = Array.from(values).slice(0, 4);
-      const impact: WasmSignatureDiffFieldChange['impact'] =
-        examples.some((value) => /^[0-9a-f]{16,}$/i.test(value) || /^[A-Za-z0-9+/=_-]{16,}$/.test(value))
-          ? 'signature-candidate'
-          : 'contextual';
+      const impact: WasmSignatureDiffFieldChange['impact'] = examples.some(
+        value =>
+          /^[0-9a-f]{16,}$/i.test(value) ||
+          /^[A-Za-z0-9+/=_-]{16,}$/.test(value),
+      )
+        ? 'signature-candidate'
+        : 'contextual';
       changedFields.push({
         field,
         location: 'body-segment',
         variationCount: values.size,
-        examples: examples.map((value) => (impact === 'signature-candidate' ? maskHeaderValue(value) : value)),
+        examples: examples.map(value =>
+          impact === 'signature-candidate' ? maskHeaderValue(value) : value,
+        ),
         impact,
-        notes: impact === 'signature-candidate'
-          ? 'Body segment value looks like an encoded digest or token.'
-          : 'Body segment varies, but does not look directly like a digest.',
+        notes:
+          impact === 'signature-candidate'
+            ? 'Body segment value looks like an encoded digest or token.'
+            : 'Body segment varies, but does not look directly like a digest.',
       });
     }
 
-    if (changedFields.some((field) => field.impact === 'signature-candidate')) {
-      observations.push('At least one varying header/body/query field looks like candidate signature material.');
+    if (changedFields.some(field => field.impact === 'signature-candidate')) {
+      observations.push(
+        'At least one varying header/body/query field looks like candidate signature material.',
+      );
     }
-    if (chains.some((chain) => chain.bodyAnalysis?.segments.some((segment) => segment.likelySignatureMaterial))) {
-      observations.push('Body-path tracing observed encoded-looking segments after Wasm export calls.');
+    if (
+      chains.some(chain =>
+        chain.bodyAnalysis?.segments.some(
+          segment => segment.likelySignatureMaterial,
+        ),
+      )
+    ) {
+      observations.push(
+        'Body-path tracing observed encoded-looking segments after Wasm export calls.',
+      );
     }
     if (observations.length === 0) {
-      observations.push('No strong differential signal was found from the captured Wasm boundary chains.');
+      observations.push(
+        'No strong differential signal was found from the captured Wasm boundary chains.',
+      );
     }
 
     return {
@@ -533,7 +673,10 @@ export class WasmRuntimeInspector {
     };
   }
 
-  buildBoundaryReport(modules: WasmModuleRecord[], events: WasmRuntimeEvent[]): string {
+  buildBoundaryReport(
+    modules: WasmModuleRecord[],
+    events: WasmRuntimeEvent[],
+  ): string {
     const lines: string[] = ['# Wasm Boundary Report', ''];
     if (modules.length === 0) {
       lines.push('No Wasm modules captured in the current session.');
@@ -547,23 +690,27 @@ export class WasmRuntimeInspector {
       lines.push(`## ${module.id}`);
       lines.push(`- Hash: ${module.hash}`);
       lines.push(`- Load methods: ${module.loadMethods.join(', ')}`);
-      lines.push(`- Import namespaces: ${boundary.importNamespaces.join(', ') || 'none'}`);
-      lines.push(`- Top exports: ${boundary.topExports.join(', ') || 'none'}`);
-      lines.push(`- Side effects: ${boundary.sideEffectHints.join(', ') || 'not observed'}`);
+      lines.push(
+        `- Import namespaces: ${joinOrNone(boundary.importNamespaces)}`,
+      );
+      lines.push(`- Top exports: ${joinOrNone(boundary.topExports)}`);
+      lines.push(
+        `- Side effects: ${joinOrFallback(boundary.sideEffectHints, 'not observed')}`,
+      );
       if (boundary.candidateChains.length > 0) {
         lines.push('- Boundary chains:');
         for (const chain of boundary.candidateChains.slice(0, 3)) {
           lines.push(
-            `  - ${chain.exportName}: score=${chain.score}, writers=${chain.writerHints.join('; ') || 'none'}, readers=${chain.readerHints.join('; ') || 'none'}, sinks=${chain.sinkHints.join('; ') || 'none'}`,
+            `  - ${chain.exportName}: score=${chain.score}, writers=${joinOrNone(chain.writerHints)}, readers=${joinOrNone(chain.readerHints)}, sinks=${joinOrNone(chain.sinkHints)}`,
           );
           if (chain.bodyAnalysis && chain.bodyAnalysis.segments.length > 0) {
             lines.push(
-              `    body=${chain.bodyAnalysis.bodyKind}; segments=${chain.bodyAnalysis.segments.map((segment) => segment.displayValue).join(' | ')}`,
+              `    body=${chain.bodyAnalysis.bodyKind}; segments=${chain.bodyAnalysis.segments.map(segment => segment.displayValue).join(' | ')}`,
             );
           }
           if (chain.headerCandidates.length > 0) {
             lines.push(
-              `    headers=${chain.headerCandidates.map((entry) => `${entry.name}=${entry.value}`).join('; ')}`,
+              `    headers=${chain.headerCandidates.map(entry => `${entry.name}=${entry.value}`).join('; ')}`,
             );
           }
         }
@@ -596,25 +743,31 @@ export class WasmRuntimeInspector {
     const bodyKind = sink?.bodyKind ?? classifyBodyKind(sink?.bodySnippet);
     const segments =
       sink?.bodySegments && sink.bodySegments.length > 0
-        ? sink.bodySegments.map((segment) => ({...segment}))
+        ? sink.bodySegments.map(segment => ({...segment}))
         : splitBodySegments(sink?.bodySnippet, bodyKind);
     const hints = uniqueStrings([
       bodyKind !== 'unknown' ? `body-kind:${bodyKind}` : undefined,
-      writerEvents.some((event) => event.type === 'text_encode') ? 'text-encode-before-network' : undefined,
-      readerEvents.some((event) => event.type === 'text_decode') ? 'text-decode-after-export' : undefined,
-      segments.some((segment) => segment.likelySignatureMaterial) ? 'encoded-body-segment-observed' : undefined,
+      writerEvents.some(event => event.type === 'text_encode')
+        ? 'text-encode-before-network'
+        : undefined,
+      readerEvents.some(event => event.type === 'text_decode')
+        ? 'text-decode-after-export'
+        : undefined,
+      segments.some(segment => segment.likelySignatureMaterial)
+        ? 'encoded-body-segment-observed'
+        : undefined,
     ]);
     return {
       bodyKind,
       segments,
       hints,
       candidateWriters: writerEvents
-        .flatMap((event) => event.argsPreview ?? [])
-        .filter((entry) => typeof entry === 'string')
+        .flatMap(event => event.argsPreview ?? [])
+        .filter(entry => typeof entry === 'string')
         .slice(0, 6),
       candidateReaders: readerEvents
-        .flatMap((event) => event.argsPreview ?? [])
-        .filter((entry) => typeof entry === 'string')
+        .flatMap(event => event.argsPreview ?? [])
+        .filter(entry => typeof entry === 'string')
         .slice(0, 6),
     };
   }
@@ -656,7 +809,9 @@ export class WasmRuntimeInspector {
       method: event.method,
       bodySnippet: event.bodySnippet,
       bodyKind: event.bodyKind,
-      requestHeaders: event.requestHeaders ? [...event.requestHeaders] : undefined,
+      requestHeaders: event.requestHeaders
+        ? [...event.requestHeaders]
+        : undefined,
       resultEntries: event.resultEntries ? [...event.resultEntries] : undefined,
       stackSummary: event.stackSummary ? [...event.stackSummary] : undefined,
     };

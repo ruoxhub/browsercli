@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -59,7 +58,7 @@ const DEFAULT_WAIT_AFTER_LOAD_MS = 1000;
 const DEFAULT_MAX_MODULES = 20;
 
 function wait(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 function uniqueValues<T>(values: T[]): T[] {
@@ -95,19 +94,21 @@ function mergeOrigin(
 }
 
 function sortModules(modules: WasmModuleRecord[]): WasmModuleRecord[] {
-  return [...modules].sort((a, b) => b.lastSeenAt - a.lastSeenAt || a.id.localeCompare(b.id));
+  return [...modules].sort(
+    (a, b) => b.lastSeenAt - a.lastSeenAt || a.id.localeCompare(b.id),
+  );
 }
 
 function cloneModuleRecord(record: WasmModuleRecord): WasmModuleRecord {
   return {
     ...record,
     loadMethods: [...record.loadMethods],
-    imports: record.imports.map((entry) => ({...entry})),
-    exports: record.exports.map((entry) => ({...entry})),
-    memories: record.memories.map((entry) => ({...entry})),
-    sections: record.sections.map((entry) => ({...entry})),
+    imports: record.imports.map(entry => ({...entry})),
+    exports: record.exports.map(entry => ({...entry})),
+    memories: record.memories.map(entry => ({...entry})),
+    sections: record.sections.map(entry => ({...entry})),
     runtimeModuleIds: [...record.runtimeModuleIds],
-    fingerprints: record.fingerprints.map((entry) => ({...entry})),
+    fingerprints: record.fingerprints.map(entry => ({...entry})),
     styleHints: [...record.styleHints],
     riskTags: [...record.riskTags],
     purposeHints: [...record.purposeHints],
@@ -119,13 +120,21 @@ function cloneRuntimeEvent(event: WasmRuntimeEvent): WasmRuntimeEvent {
     ...event,
     importKeys: event.importKeys ? [...event.importKeys] : undefined,
     exportKeys: event.exportKeys ? [...event.exportKeys] : undefined,
-    requestHeaders: event.requestHeaders ? event.requestHeaders.map((entry) => ({...entry})) : undefined,
-    bodySegments: event.bodySegments ? event.bodySegments.map((entry) => ({...entry})) : undefined,
+    requestHeaders: event.requestHeaders
+      ? event.requestHeaders.map(entry => ({...entry}))
+      : undefined,
+    bodySegments: event.bodySegments
+      ? event.bodySegments.map(entry => ({...entry}))
+      : undefined,
     argsPreview: event.argsPreview ? [...event.argsPreview] : undefined,
     stackSummary: event.stackSummary ? [...event.stackSummary] : undefined,
-    memory: event.memory ? event.memory.map((entry) => ({...entry})) : undefined,
-    resultEntries: event.resultEntries ? event.resultEntries.map((entry) => ({...entry})) : undefined,
-    sideEffectHints: event.sideEffectHints ? [...event.sideEffectHints] : undefined,
+    memory: event.memory ? event.memory.map(entry => ({...entry})) : undefined,
+    resultEntries: event.resultEntries
+      ? event.resultEntries.map(entry => ({...entry}))
+      : undefined,
+    sideEffectHints: event.sideEffectHints
+      ? [...event.sideEffectHints]
+      : undefined,
   };
 }
 
@@ -150,11 +159,14 @@ export class WasmCollector {
     const runtimeEnabled = options.includeRuntimeEvents !== false;
     const maxModules = options.maxModules ?? DEFAULT_MAX_MODULES;
     const timeout = options.timeout ?? DEFAULT_TIMEOUT_MS;
-    const waitAfterLoadMs = options.waitAfterLoadMs ?? DEFAULT_WAIT_AFTER_LOAD_MS;
+    const waitAfterLoadMs =
+      options.waitAfterLoadMs ?? DEFAULT_WAIT_AFTER_LOAD_MS;
     const networkEntries: NetworkCaptureEntry[] = [];
     const pendingResponseCaptures = new Set<Promise<void>>();
 
-    await this.pageController.injectScriptOnNewDocument(this.buildPreloadScript());
+    await this.pageController.injectScriptOnNewDocument(
+      this.buildPreloadScript(),
+    );
 
     const handleResponse = (response: HTTPResponse) => {
       const capture = this.captureNetworkResponse(response, networkEntries);
@@ -180,7 +192,7 @@ export class WasmCollector {
       const runtimeModuleIds = new Map<string, string>();
 
       for (const entry of networkEntries) {
-        const record = this.registerBinary(entry.bytes, {
+        this.registerBinary(entry.bytes, {
           sourceUrl: entry.url,
           contentType: entry.contentType,
           loadMethod: 'network',
@@ -188,16 +200,15 @@ export class WasmCollector {
           source: 'network',
           captureBase64,
         });
-        if (captureBase64 && !record.base64) {
-          record.base64 = Buffer.from(entry.bytes).toString('base64');
-        }
       }
 
       for (const moduleCapture of runtimeState.modules ?? []) {
         if (!moduleCapture.base64) {
           continue;
         }
-        const bytes = Uint8Array.from(Buffer.from(moduleCapture.base64, 'base64'));
+        const bytes = Uint8Array.from(
+          Buffer.from(moduleCapture.base64, 'base64'),
+        );
         if (!isWasmBinary(bytes)) {
           continue;
         }
@@ -215,7 +226,11 @@ export class WasmCollector {
       for (const event of runtimeState.events ?? []) {
         const normalized = cloneRuntimeEvent({
           ...event,
-          moduleId: event.moduleId ?? (event.runtimeModuleId ? runtimeModuleIds.get(event.runtimeModuleId) : undefined),
+          moduleId:
+            event.moduleId ??
+            (event.runtimeModuleId
+              ? runtimeModuleIds.get(event.runtimeModuleId)
+              : undefined),
         });
         this.runtimeEvents.push(normalized);
       }
@@ -224,19 +239,23 @@ export class WasmCollector {
 
       const modules = sortModules(Array.from(this.modulesById.values()));
       const selectedModules = modules.slice(0, maxModules);
-      const selectedIds = new Set(selectedModules.map((module) => module.id));
+      const selectedIds = new Set(selectedModules.map(module => module.id));
       const selectedEvents = this.runtimeEvents.filter(
-        (event) => !event.moduleId || selectedIds.has(event.moduleId),
+        event => !event.moduleId || selectedIds.has(event.moduleId),
       );
 
       let artifacts: WasmDetectionResult['artifacts'];
       if (task) {
-        artifacts = await this.persistArtifacts(task, modules, this.runtimeEvents);
+        artifacts = await this.persistArtifacts(
+          task,
+          modules,
+          this.runtimeEvents,
+        );
       }
 
       return {
-        modules: selectedModules.map((module) => cloneModuleRecord(module)),
-        runtimeEvents: selectedEvents.map((event) => cloneRuntimeEvent(event)),
+        modules: selectedModules.map(module => cloneModuleRecord(module)),
+        runtimeEvents: selectedEvents.map(event => cloneRuntimeEvent(event)),
         totalModules: modules.length,
         totalRuntimeEvents: this.runtimeEvents.length,
         collectedAt: new Date().toISOString(),
@@ -248,7 +267,9 @@ export class WasmCollector {
   }
 
   getModules(): WasmModuleRecord[] {
-    return sortModules(Array.from(this.modulesById.values())).map((module) => cloneModuleRecord(module));
+    return sortModules(Array.from(this.modulesById.values())).map(module =>
+      cloneModuleRecord(module),
+    );
   }
 
   getModuleById(moduleId: string): WasmModuleRecord | undefined {
@@ -263,8 +284,8 @@ export class WasmCollector {
 
   getRuntimeEvents(moduleId?: string): WasmRuntimeEvent[] {
     return this.runtimeEvents
-      .filter((event) => !moduleId || event.moduleId === moduleId)
-      .map((event) => cloneRuntimeEvent(event));
+      .filter(event => !moduleId || event.moduleId === moduleId)
+      .map(event => cloneRuntimeEvent(event));
   }
 
   private async captureNetworkResponse(
@@ -274,7 +295,10 @@ export class WasmCollector {
     try {
       const url = response.url();
       const headers = response.headers();
-      const contentType = typeof headers['content-type'] === 'string' ? headers['content-type'] : undefined;
+      const contentType =
+        typeof headers['content-type'] === 'string'
+          ? headers['content-type']
+          : undefined;
       const looksLikeWasm =
         (contentType?.toLowerCase().includes('application/wasm') ?? false) ||
         url.toLowerCase().endsWith('.wasm');
@@ -286,7 +310,9 @@ export class WasmCollector {
       const buffer = await response.body();
       const bytes = Uint8Array.from(buffer);
       if (!isWasmBinary(bytes)) {
-        logger.debug(`[WasmCollector] Ignored non-wasm response body from ${url}`);
+        logger.debug(
+          `[WasmCollector] Ignored non-wasm response body from ${url}`,
+        );
         return;
       }
 
@@ -301,15 +327,19 @@ export class WasmCollector {
     }
   }
 
-  private async readRuntimeCaptureState(page: Page): Promise<PageRuntimeCaptureState> {
+  private async readRuntimeCaptureState(
+    page: Page,
+  ): Promise<PageRuntimeCaptureState> {
     try {
-      return await page.evaluate(() => {
-        const capture = (globalThis as typeof globalThis & {
-          __jshookWasmCapture__?: {
-            modules?: unknown[];
-            events?: unknown[];
-          };
-        }).__jshookWasmCapture__;
+      return (await page.evaluate(() => {
+        const capture = (
+          globalThis as typeof globalThis & {
+            __jshookWasmCapture__?: {
+              modules?: unknown[];
+              events?: unknown[];
+            };
+          }
+        ).__jshookWasmCapture__;
         if (!capture) {
           return {modules: [], events: []};
         }
@@ -317,35 +347,49 @@ export class WasmCollector {
           modules: unknown[];
           events: unknown[];
         };
-      }) as PageRuntimeCaptureState;
+      })) as PageRuntimeCaptureState;
     } catch (error) {
-      logger.warn('[WasmCollector] Failed to read runtime capture state', error);
+      logger.warn(
+        '[WasmCollector] Failed to read runtime capture state',
+        error,
+      );
       return {modules: [], events: []};
     }
   }
 
-  private registerBinary(bytes: Uint8Array, options: RegisterBinaryOptions): WasmModuleRecord {
+  private registerBinary(
+    bytes: Uint8Array,
+    options: RegisterBinaryOptions,
+  ): WasmModuleRecord {
     const hash = createWasmHash(bytes);
     const existingId = this.moduleIdsByHash.get(hash);
-    const base64 = options.captureBase64 ? Buffer.from(bytes).toString('base64') : undefined;
+    const base64 = options.captureBase64
+      ? Buffer.from(bytes).toString('base64')
+      : undefined;
 
     if (existingId) {
       const existing = this.modulesById.get(existingId);
       if (!existing) {
         throw new Error(`Wasm module index is inconsistent for ${existingId}`);
       }
-      existing.lastSeenAt = Math.max(existing.lastSeenAt, options.timestamp);
-      existing.loadMethods = uniqueValues([...existing.loadMethods, options.loadMethod]);
-      existing.origin = mergeOrigin(existing.origin, options.source);
-      existing.sourceUrl = existing.sourceUrl ?? options.sourceUrl;
-      existing.contentType = existing.contentType ?? options.contentType;
-      if (options.runtimeModuleId) {
-        existing.runtimeModuleIds = uniqueValues([...existing.runtimeModuleIds, options.runtimeModuleId]);
-      }
-      if (base64 && !existing.base64) {
-        existing.base64 = base64;
-      }
-      return existing;
+      const nextRuntimeIds = options.runtimeModuleId
+        ? uniqueValues([...existing.runtimeModuleIds, options.runtimeModuleId])
+        : existing.runtimeModuleIds;
+      const updated: WasmModuleRecord = {
+        ...existing,
+        lastSeenAt: Math.max(existing.lastSeenAt, options.timestamp),
+        loadMethods: uniqueValues([
+          ...existing.loadMethods,
+          options.loadMethod,
+        ]),
+        origin: mergeOrigin(existing.origin, options.source),
+        sourceUrl: existing.sourceUrl ?? options.sourceUrl,
+        contentType: existing.contentType ?? options.contentType,
+        runtimeModuleIds: nextRuntimeIds,
+        base64: existing.base64 ?? base64,
+      };
+      this.modulesById.set(updated.id, updated);
+      return updated;
     }
 
     const id = createModuleId(hash);
@@ -374,7 +418,9 @@ export class WasmCollector {
       exports: analysis.exports,
       memories: analysis.memories,
       sections: analysis.sections,
-      runtimeModuleIds: options.runtimeModuleId ? [options.runtimeModuleId] : [],
+      runtimeModuleIds: options.runtimeModuleId
+        ? [options.runtimeModuleId]
+        : [],
       origin: options.source,
       base64,
       artifactPath: undefined,
@@ -393,7 +439,11 @@ export class WasmCollector {
   private applyExportCallCounts(): void {
     const counts = new Map<string, number>();
     for (const event of this.runtimeEvents) {
-      if (event.type !== 'export_call' || !event.moduleId || !event.exportName) {
+      if (
+        event.type !== 'export_call' ||
+        !event.moduleId ||
+        !event.exportName
+      ) {
         continue;
       }
       const key = `${event.moduleId}::${event.exportName}`;
@@ -401,10 +451,12 @@ export class WasmCollector {
     }
 
     for (const record of this.modulesById.values()) {
-      record.exports = record.exports.map((entry) => ({
+      const updatedExports = record.exports.map(entry => ({
         ...entry,
-        callCount: counts.get(`${record.id}::${entry.name}`) ?? entry.callCount ?? 0,
+        callCount:
+          counts.get(`${record.id}::${entry.name}`) ?? entry.callCount ?? 0,
       }));
+      this.modulesById.set(record.id, {...record, exports: updatedExports});
     }
   }
 
@@ -446,26 +498,41 @@ export class WasmCollector {
       );
 
       await writeFile(binPath, Buffer.from(bytes));
-      await writeFile(analysisPath, `${JSON.stringify(analysis, null, 2)}\n`, 'utf8');
-      module.artifactPath = binPath;
+      await writeFile(
+        analysisPath,
+        `${JSON.stringify(analysis, null, 2)}\n`,
+        'utf8',
+      );
+      this.modulesById.set(module.id, {...module, artifactPath: binPath});
     }
 
-    const boundaryReport = this.runtimeInspector.buildBoundaryReport(modules, runtimeEvents);
-    const boundaryJson = this.runtimeInspector.buildStructuredBoundaryArtifact(modules, runtimeEvents);
+    const boundaryReport = this.runtimeInspector.buildBoundaryReport(
+      modules,
+      runtimeEvents,
+    );
+    const boundaryJson = this.runtimeInspector.buildStructuredBoundaryArtifact(
+      modules,
+      runtimeEvents,
+    );
     await writeFile(
       moduleIndexPath,
-      `${JSON.stringify(modules.map((module) => ({...module, base64: undefined})), null, 2)}\n`,
+      `${JSON.stringify(
+        modules.map(module => ({...module, base64: undefined})),
+        null,
+        2,
+      )}\n`,
       'utf8',
     );
     await writeFile(
       runtimeEventsPath,
-      runtimeEvents.map((event) => JSON.stringify(event)).join('\n') + (runtimeEvents.length > 0 ? '\n' : ''),
+      runtimeEvents.map(event => JSON.stringify(event)).join('\n') +
+        (runtimeEvents.length > 0 ? '\n' : ''),
       'utf8',
     );
     await writeFile(
       importsExportsPath,
       `${JSON.stringify(
-        modules.map((module) => ({
+        modules.map(module => ({
           id: module.id,
           hash: module.hash,
           imports: module.imports,
@@ -478,7 +545,11 @@ export class WasmCollector {
       'utf8',
     );
     await writeFile(boundaryReportPath, `${boundaryReport}\n`, 'utf8');
-    await writeFile(boundaryJsonPath, `${JSON.stringify(boundaryJson, null, 2)}\n`, 'utf8');
+    await writeFile(
+      boundaryJsonPath,
+      `${JSON.stringify(boundaryJson, null, 2)}\n`,
+      'utf8',
+    );
 
     return {
       rootDir,
