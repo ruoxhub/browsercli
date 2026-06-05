@@ -12,3 +12,12 @@ export type {
   AntiAntiDebugFeature,
   Frame,
 } from './types.js';
+export {
+  ANTI_ANTI_DEBUG_TOOLTYPE,
+  BYPASS_DEBUGGER_TOOLTYPE,
+  antiAntiDebugFeatureSchema,
+  bypassTargetSchema,
+  DEFAULT_BYPASS_TARGETS,
+} from './schema.js';
+export {buildAntiAntiDebugScript, buildBypassDebuggerScript} from './hooks.js';
+export {runHook} from './result.js';

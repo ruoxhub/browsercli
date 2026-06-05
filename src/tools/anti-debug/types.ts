@@ -27,5 +27,5 @@ export type AntiAntiDebugFeature =
   | 'preventConsoleClear'
   | 'hideWebdriver';
 
-/** 重新导出 Frame 类型，方便调用方导入 */
+/** 重新导出 Frame 类型，方便调用方从 anti-debug 统一导入 */
 export type {Frame};
