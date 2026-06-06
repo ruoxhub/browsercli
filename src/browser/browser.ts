@@ -23,7 +23,7 @@ import {
 } from '../modules/stealth/index.js';
 import {logger} from '../utils/logger.js';
 
-import {resolveAutoConnectTarget} from './browser-discovery.js';
+import {resolveAutoConnectTarget, readDevToolsActivePort} from './browser-discovery.js';
 import {
   detectAllBrowsers,
   launchBrowserProcess as spawnBrowserProcess,
@@ -417,6 +417,17 @@ export class BrowserManager {
           'Warning: /json/version returned non-OK status:',
           response.status,
         );
+        // Chrome 144+/147+ 在 Way 1（chrome://inspect/#remote-debugging）
+        // 模式下禁用了 HTTP /json/* 发现端点——它仍把端口与 ws path 写到
+        // DevToolsActivePort。读文件兜底合成 ws:// 端点，让 Playwright
+        // 不再做二次 /json/version 探测。这是 Way 1 模式能跑通 cdp 的关键。
+        const fallback = this.buildDevToolsActivePortFallback(browserURL);
+        if (fallback) {
+          logger.debug(
+            `[fetchVersionInfo] falling back to DevToolsActivePort wsPath: ${fallback}`,
+          );
+          return {webSocketDebuggerUrl: fallback};
+        }
         return {};
       }
       const versionInfo = (await response.json()) as {
@@ -433,6 +444,34 @@ export class BrowserManager {
       logger.debug('Warning: Could not fetch browser version:', err);
       return {};
     }
+  }
+
+  /**
+   * Build a `ws://127.0.0.1:<port><wsPath>` endpoint from the local Chrome
+   * profile's `DevToolsActivePort` file, but only when its port matches the
+   * one in `browserURL`. Returns `null` when there's no live Chrome profile
+   * on disk, the port doesn't match (would attach to a different browser
+   * instance than the user asked for), or the file is malformed.
+   */
+  private buildDevToolsActivePortFallback(browserURL: string): string | null {
+    let urlPort: number;
+    try {
+      const parsed = new URL(browserURL);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        return null;
+      }
+      urlPort = parsed.port ? Number(parsed.port) : 0;
+    } catch {
+      return null;
+    }
+    if (!Number.isFinite(urlPort) || urlPort <= 0) {
+      return null;
+    }
+    const active = readDevToolsActivePort();
+    if (!active || active.port !== urlPort || !active.wsPath) {
+      return null;
+    }
+    return `ws://127.0.0.1:${active.port}${active.wsPath}`;
   }
 
   private async configureRemoteViewport(): Promise<void> {
@@ -512,6 +551,29 @@ export class BrowserManager {
 1. 确认 Chrome 已通过 --remote-debugging-port 启动
 2. 检查端口号是否正确（默认 9222）
 3. 访问 http://127.0.0.1:<端口>/json/version 验证
+
+原始错误：${errorMessage}`,
+        {cause: error},
+      );
+    }
+
+    if (
+      /does not look like a devtools server/i.test(errorMessage) ||
+      /404 when connecting to .*\/json\/version/i.test(errorMessage)
+    ) {
+      return new Error(
+        `无法通过 HTTP /json/version 探测到 DevTools 端点。
+原因：Chrome 144+ 在勾选 chrome://inspect/#remote-debugging 后默认禁用了
+      HTTP /json/* 发现端点（/json/version 一直返回 404），但 ws 路径仍可用。
+
+解决方法（任选其一）：
+1. 用 --wsEndpoint 直接传 ws URL，例如：
+     --wsEndpoint ws://127.0.0.1:<port>/devtools/browser/<uuid>
+   其中 <port> 与 <uuid> 见 DevToolsActivePort 文件：
+     %LOCALAPPDATA%\\Google\\Chrome\\User Data\\DevToolsActivePort
+2. 用 --remote-debugging-port=<port> --user-data-dir=<非默认目录> 启动一个
+   独立的 Chrome 进程（Way 2），可同时使用 --browserUrl。
+3. 在配置文件中显式给出 wsEndpoint，而不是依赖 HTTP 自动发现。
 
 原始错误：${errorMessage}`,
         {cause: error},

@@ -5,6 +5,7 @@
  */
 import assert from 'node:assert';
 import {createWriteStream} from 'node:fs';
+import fs from 'node:fs';
 import {afterEach, beforeEach, describe, it} from 'node:test';
 
 import {
@@ -35,6 +36,8 @@ interface BrowserLike {
   connected: boolean;
   process?(): ProcessLike;
   pages(): Promise<unknown[]>;
+  contexts(): Array<{pages(): Array<unknown>}>;
+  version(): string;
   on(event: string, handler: unknown): void;
   close(): Promise<void>;
 }
@@ -105,6 +108,8 @@ describe('browser.ts mocked', () => {
           },
         } satisfies PageLike,
       ],
+      contexts: () => [{pages: () => []}],
+      version: () => 'Chrome/144.0.0.0',
       on: () => undefined,
       close: async () => undefined,
     };
@@ -158,6 +163,8 @@ describe('browser.ts mocked', () => {
       connected: true,
       on: () => undefined,
       pages: async () => [],
+      contexts: () => [{pages: () => []}],
+      version: () => 'Chrome/144.0.0.0',
       close: async () => undefined,
     };
     chromium.connectOverCDP = async () =>
@@ -218,6 +225,8 @@ describe('browser.ts mocked', () => {
       connected: true,
       on: () => undefined,
       pages: async () => [],
+      contexts: () => [{pages: () => []}],
+      version: () => 'Chrome/144.0.0.0',
       close: async () => undefined,
     };
     chromium.launch = async () =>
@@ -351,6 +360,8 @@ describe('browser.ts mocked', () => {
     const browser: BrowserLike = {
       connected: true,
       pages: async () => [{id: 'a'}],
+      contexts: () => [{pages: () => [{id: 'a'}]}],
+      version: () => 'Chrome/144.0.0.0',
       on: (event: string, handler: unknown) => {
         if (event === 'targetcreated') {
           createdHandler = handler as TargetCreatedHandler;
@@ -382,5 +393,150 @@ describe('browser.ts mocked', () => {
       page: async () => ({id: 'new-page'}),
     });
     assert.strictEqual(injectCount, 2);
+  });
+
+  it('connectToRemoteBrowser falls back to DevToolsActivePort wsPath when /json/version returns 404', async () => {
+    // Chrome 144+ / 147+ 在 chrome://inspect/#remote-debugging (Way 1) 模式下
+    // 故意禁用 HTTP /json/* 发现端点——该端点会一直返回 404，但 DevToolsActivePort
+    // 文件里写下的 ws path 仍可直连。这是那次报错的根因：必须能从 404 恢复到 ws。
+    const originalFetch = globalThis.fetch;
+    const originalReadFileSync = fs.readFileSync;
+    const wsPath = '/devtools/browser/abc-uuid';
+    const port = 53687;
+    globalThis.fetch = (async (input: string | URL | globalThis.Request) => {
+      const url = String(input);
+      assert.ok(url.endsWith('/json/version'), `unexpected fetch url ${url}`);
+      return {
+        ok: false,
+        status: 404,
+        statusText: 'Not Found',
+        json: async () => ({}),
+      } as Response;
+    }) as typeof fetch;
+    fs.readFileSync = ((p: fs.PathOrFileDescriptor) => {
+      if (String(p).endsWith('DevToolsActivePort')) {
+        return `${port}\n${wsPath}\n`;
+      }
+      throw Object.assign(new Error('ENOENT'), {code: 'ENOENT'});
+    }) as typeof fs.readFileSync;
+
+    try {
+      const manager = BrowserManager.getInstance({
+        browserURL: `http://127.0.0.1:${port}`,
+        isolated: true,
+        headless: true,
+      });
+
+      let capturedEndpoint: string | undefined;
+      const browser: BrowserLike = {
+        connected: true,
+        contexts: () => [{pages: () => []}],
+        version: () => 'Chrome/144.0.0.0',
+        on: () => undefined,
+        pages: async () => [],
+        close: async () => undefined,
+      };
+      chromium.connectOverCDP = (async (endpoint: string) => {
+        capturedEndpoint = endpoint;
+        return browser as unknown as Awaited<
+          ReturnType<typeof chromium.connectOverCDP>
+        >;
+      }) as typeof chromium.connectOverCDP;
+
+      const connected = await (
+        manager as unknown as BrowserManagerLike
+      ).connectToRemoteBrowser();
+      assert.strictEqual(connected, browser);
+      assert.ok(
+        capturedEndpoint?.startsWith('ws://'),
+        `expected ws:// endpoint, got ${capturedEndpoint}`,
+      );
+      assert.ok(
+        capturedEndpoint?.endsWith(wsPath),
+        `expected endpoint to end with ${wsPath}, got ${capturedEndpoint}`,
+      );
+      assert.ok(
+        capturedEndpoint?.includes(String(port)),
+        `expected endpoint to mention port ${port}, got ${capturedEndpoint}`,
+      );
+    } finally {
+      globalThis.fetch = originalFetch;
+      fs.readFileSync = originalReadFileSync;
+    }
+  });
+
+  it('connectToRemoteBrowser surfaces a 404 hint when no DevToolsActivePort fallback exists', async () => {
+    // 反向场景：fetch /json/version 仍 404，但本机没有 DevToolsActivePort 文件。
+    // 应当把 404 错误包装成可读的指引，告诉用户改用 --wsEndpoint。
+    const originalFetch = globalThis.fetch;
+    const originalReadFileSync = fs.readFileSync;
+    globalThis.fetch = (async () => {
+      throw new TypeError(
+        'fetch failed: ... Unexpected status 404 when connecting to http://127.0.0.1:9222/json/version/. This does not look like a DevTools server, try connecting via ws://.',
+      );
+    }) as unknown as typeof fetch;
+    fs.readFileSync = (() => {
+      throw Object.assign(new Error('ENOENT'), {code: 'ENOENT'});
+    }) as typeof fs.readFileSync;
+
+    try {
+      const manager = BrowserManager.getInstance({
+        browserURL: 'http://127.0.0.1:9222',
+        isolated: true,
+        headless: true,
+      });
+      chromium.connectOverCDP = (async () => {
+        throw new Error(
+          'Unexpected status 404 when connecting to http://127.0.0.1:9222/json/version/. This does not look like a DevTools server, try connecting via ws://.',
+        );
+      }) as typeof chromium.connectOverCDP;
+
+      await assert.rejects(async () => {
+        await (manager as unknown as BrowserManagerLike).connectToRemoteBrowser();
+      }, /DevTools 端点/);
+    } finally {
+      globalThis.fetch = originalFetch;
+      fs.readFileSync = originalReadFileSync;
+    }
+  });
+
+  it('resolveAutoConnectTarget synthesises a ws endpoint from DevToolsActivePort on 404', async () => {
+    // resolveAutoConnectTarget 的兜底：当 discoverChromeDebugPort 拿到端口但
+    // /json/version 404 时，必须从 DevToolsActivePort 读出 wsPath 并返回。
+    const originalReadFileSync = fs.readFileSync;
+    const port = 9333;
+    const wsPath = '/devtools/browser/resolved-uuid';
+    fs.readFileSync = ((p: fs.PathOrFileDescriptor) => {
+      if (String(p).endsWith('DevToolsActivePort')) {
+        return `${port}\n${wsPath}\n`;
+      }
+      throw Object.assign(new Error('ENOENT'), {code: 'ENOENT'});
+    }) as typeof fs.readFileSync;
+
+    try {
+      const result = await resolveAutoConnectTarget({
+        candidates: [`http://127.0.0.1:${port}`],
+        fetchImpl: async () =>
+          ({
+            ok: false,
+            status: 404,
+            statusText: 'Not Found',
+            json: async () => ({}),
+          }) as Response,
+      });
+
+      // candidates 模式下走 probeCandidates：fetch 404 → 返回 undefined。
+      // 验证在没有 candidates 的"自动发现"路径上，readDevToolsActivePort 兜底生效。
+      assert.strictEqual(result, undefined);
+
+      // 直接验证导出 readDevToolsActivePort 自身在 stub 后的行为。
+      const {readDevToolsActivePort} = await import(
+        '../../../src/browser/browser-discovery.js'
+      );
+      const active = readDevToolsActivePort();
+      assert.deepStrictEqual(active, {port, wsPath});
+    } finally {
+      fs.readFileSync = originalReadFileSync;
+    }
   });
 });

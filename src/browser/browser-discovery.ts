@@ -68,11 +68,48 @@ function getDevToolsActivePortPaths(): string[] {
   if (platform === 'win32') {
     return [
       path.join(localAppData, 'Google/Chrome/User Data/DevToolsActivePort'),
+      path.join(localAppData, 'Google/Chrome SxS/User Data/DevToolsActivePort'),
       path.join(localAppData, 'Chromium/User Data/DevToolsActivePort'),
+      path.join(localAppData, 'Microsoft/Edge/User Data/DevToolsActivePort'),
+      path.join(localAppData, 'Microsoft/Edge Beta/User Data/DevToolsActivePort'),
+      path.join(localAppData, 'Microsoft/Edge Dev/User Data/DevToolsActivePort'),
+      path.join(localAppData, 'Microsoft/Edge SxS/User Data/DevToolsActivePort'),
+      path.join(
+        localAppData,
+        'BraveSoftware/Brave-Browser/User Data/DevToolsActivePort',
+      ),
     ];
   }
 
   return [];
+}
+
+/**
+ * Pure-file reader for `DevToolsActivePort`. Returns the first profile whose
+ * file is well-formed, or `null` if none are. Unlike `discoverChromeDebugPort`
+ * this does NOT require the port to be TCP-reachable — that lets `fetchVersionInfo`
+ * fall back to the ws path when the user's browser instance has not been started
+ * or is firewalled (typical for tests and for the 144+ Way 1 mode where HTTP
+ * discovery is disabled but the ws path stored in this file still resolves).
+ */
+export function readDevToolsActivePort(): {port: number; wsPath: string} | null {
+  for (const filePath of getDevToolsActivePortPaths()) {
+    try {
+      const lines = fs
+        .readFileSync(filePath, 'utf-8')
+        .trim()
+        .split('\n')
+        .filter(Boolean);
+      const port = parseInt(lines[0] ?? '', 10);
+      const wsPath = (lines[1] ?? '').trim();
+      if (port > 0 && port < 65536 && wsPath.startsWith('/')) {
+        return {port, wsPath};
+      }
+    } catch {
+      // 文件不存在或不可读，继续尝试下一个
+    }
+  }
+  return null;
 }
 
 /**
@@ -191,9 +228,24 @@ export async function resolveAutoConnectTarget(options?: {
         };
       }
     } catch {
-      // 如果 /json/version 失败，返回基础 URL
-      return {browserURL};
+      // ignore — handled by wsPath fallback below
     }
+
+    // /json/version 失败（404/网络错）。Chrome 144+/147+ 在 Way 1 模式下
+    // 故意禁用了 HTTP /json/* 发现端点，但 DevToolsActivePort 文件里的
+    // wsPath 仍可直连。`discoverChromeDebugPort` 已经验证过 TCP 端口可达，
+    // 这里再读一次 wsPath 合成 ws:// 端点，绕过 Playwright 的二次探测。
+    const active = readDevToolsActivePort();
+    if (active && active.port === port && active.wsPath) {
+      logger.debug(
+        `[resolveAutoConnectTarget] /json/version unavailable, using DevToolsActivePort wsPath for port ${port}`,
+      );
+      return {
+        browserURL,
+        wsEndpoint: `ws://127.0.0.1:${port}${active.wsPath}`,
+      };
+    }
+    return {browserURL};
   }
 
   // 3. 回退到默认候选列表
