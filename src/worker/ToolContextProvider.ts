@@ -83,6 +83,20 @@ export class ToolContextProvider {
     if (context) {
       this._collectorContext.start(context);
     }
+
+    // Firefox 通道下，BrowserManager 启动时会主动 newPage() 补一个
+    // fallback page（见 BrowserManager.launchBrowser），但该 page 只写入了
+    // BrowserManager.currentPage，没有同步给 BrowserContextProvider.selectedPage。
+    // 此处兜底：若 syncPages 之后 selectedPage 仍为 null，但 BrowserManager
+    // 持有可用 currentPage，则把 currentPage 同步过来，避免 list_pages 等
+    // 工具启动后就抛 "没有选中的页面"。
+    if (!this._browserContext.getSelectedPage()) {
+      const mgr = this._browserContext.getBrowserManager();
+      const currentPage = mgr?.getCurrentPage();
+      if (currentPage && !currentPage.isClosed()) {
+        this._browserContext.setSelectedPage(currentPage);
+      }
+    }
   }
 
   /**

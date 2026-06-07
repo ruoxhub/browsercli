@@ -28,7 +28,15 @@ export const listPages = defineTool({
     let data;
     try {
       const pages = context.getPages();
-      const selectedPage = context.getSelectedPage();
+      // getSelectedPage 会在无选中页时抛错；list_pages 工具设计上
+      // 不依赖选中页（schema 为空），所以降级为 selectedIndex=-1。
+      let selectedPage: ReturnType<typeof context.getSelectedPage> | null =
+        null;
+      try {
+        selectedPage = context.getSelectedPage();
+      } catch {
+        selectedPage = null;
+      }
       let unavailableTitleCount = 0;
       const pageInfos: Array<{index: number; url: string; title: string}> = [];
 
@@ -50,7 +58,7 @@ export const listPages = defineTool({
         });
       }
 
-      const selectedIndex = pages.indexOf(selectedPage!);
+      const selectedIndex = selectedPage ? pages.indexOf(selectedPage) : -1;
 
       if (pageInfos.length === 0) {
         response.appendResponseLine('当前没有打开的页面。');

@@ -638,6 +638,14 @@ export class BrowserManager {
       }
       this.context = ctx;
 
+      // Firefox 启动后默认 BrowserContext 不包含 page（Chromium 会自动建
+      // 一个 about:blank tab），需要主动补一个，避免所有依赖 getSelectedPage
+      // 的工具在 firefox 通道下启动后就抛 "没有选中的页面"。
+      if (engine === 'firefox' && ctx.pages().length === 0) {
+        const fallbackPage = await ctx.newPage();
+        this.trackCurrentPage(fallbackPage);
+      }
+
       this.setupCrashDetection();
 
       // Set viewport if configured
