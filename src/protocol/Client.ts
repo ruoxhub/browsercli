@@ -66,6 +66,26 @@ export class RpcClient {
   }
 
   /**
+   * 清除 Timeout 计时器并返回 null
+   */
+  private clearTimeoutTimer(timer: ReturnType<typeof setTimeout> | null): null {
+    if (timer) {
+      clearTimeout(timer);
+    }
+    return null;
+  }
+
+  /**
+   * 清除 Interval 计时器并返回 null
+   */
+  private clearIntervalTimer(timer: ReturnType<typeof setInterval> | null): null {
+    if (timer) {
+      clearInterval(timer);
+    }
+    return null;
+  }
+
+  /**
    * 统一日志
    */
   private log(message: string, level: 'log' | 'warn' | 'error' = 'log'): void {
@@ -144,16 +164,13 @@ export class RpcClient {
    * 使用新地址重新连接
    */
   reconnect(newSekiroHost: string): void {
-    this.log('正在重新连接...');
     this.config.rpcHost = newSekiroHost;
     const wsURL = this.buildWebSocketURL();
     this.log(`切换地址重连：${wsURL}`);
     // 先断开，保持 isManualDisconnect=true 直到新连接发起，防止旧 onclose 触发重连
     this._internalDisconnect();
     this.wsURL = wsURL;
-    // 在 connect() 内部会将 isManualDisconnect 重置为 false
     this.connect();
-    this.log(`连接新地址：${wsURL}`);
   }
 
   /**
@@ -208,23 +225,17 @@ export class RpcClient {
 
     try {
       const fn = new Function(
-        'return (async () => { return ' + param + ' })()',
+        `return (async () => { return ${param} })()`,
       );
-      const result = fn();
-
-      if (result && typeof result.then === 'function') {
-        (result as Promise<unknown>)
-          .then(res =>
-            resolve(res !== undefined ? res : '执行成功 (无返回值)'),
-          )
-          .catch((err: unknown) =>
-            reject('执行错误：' + ((err as Error).message || err)),
-          );
-      } else {
-        resolve(result !== undefined ? result : '执行成功 (无返回值)');
-      }
+      Promise.resolve(fn())
+        .then(res =>
+          resolve(res !== undefined ? res : '执行成功 (无返回值)'),
+        )
+        .catch((err: unknown) =>
+          reject(`执行错误：${(err as Error).message || err}`),
+        );
     } catch (err: unknown) {
-      reject('语法错误：' + ((err as Error).message || err));
+      reject(`语法错误：${(err as Error).message || err}`);
     }
   }
 
@@ -240,7 +251,6 @@ export class RpcClient {
    * 连接 WebSocket
    */
   private connect(): void {
-    // this.log(`正在连接 wsURL: ${this.wsURL}`);
     this.isManualDisconnect = false;
     this.setConnectionState('connecting');
 
@@ -248,7 +258,6 @@ export class RpcClient {
       this.socket = new WebSocket(this.wsURL);
 
       this.socket.onopen = () => {
-        // this.log('成功建立连接');
         this.setConnectionState('connected');
         this.reconnectAttempts = 0;
         this.startHeartbeat();
@@ -266,15 +275,13 @@ export class RpcClient {
         }
       };
 
-      this.socket.onclose = (event: WebSocket.CloseEvent) => {
+      this.socket.onclose = () => {
         this.stopHeartbeat();
 
         if (this.isManualDisconnect) {
-          // this.log('连接已手动断开');
           this.setConnectionState('disconnected');
           return;
         }
-        // this.log(`连接断开 (code=${event.code})，将自动重连`);
         this.scheduleReconnect();
       };
 
@@ -326,7 +333,7 @@ export class RpcClient {
         }),
       );
       // pong 超时检测：若在 pongTimeout 内未收到任何消息（含心跳响应），主动断开重连
-      if (this.pongTimeoutTimer) clearTimeout(this.pongTimeoutTimer);
+      this.pongTimeoutTimer = this.clearTimeoutTimer(this.pongTimeoutTimer);
       this.pongTimeoutTimer = setTimeout(() => {
         this.log('心跳响应超时，主动断开重连', 'warn');
         this._internalDisconnect();
@@ -342,14 +349,8 @@ export class RpcClient {
    * 停止心跳并清除 pong 超时计时器
    */
   private stopHeartbeat(): void {
-    if (this.heartbeatTimer) {
-      clearInterval(this.heartbeatTimer);
-      this.heartbeatTimer = null;
-    }
-    if (this.pongTimeoutTimer) {
-      clearTimeout(this.pongTimeoutTimer);
-      this.pongTimeoutTimer = null;
-    }
+    this.heartbeatTimer = this.clearIntervalTimer(this.heartbeatTimer);
+    this.pongTimeoutTimer = this.clearTimeoutTimer(this.pongTimeoutTimer);
   }
 
   /**
@@ -359,10 +360,7 @@ export class RpcClient {
     if (this.isManualDisconnect) return;
 
     this.setConnectionState('reconnecting');
-
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-    }
+    this.reconnectTimer = this.clearTimeoutTimer(this.reconnectTimer);
 
     // 指数退避: base * 2^attempts，封顶 maxDelay
     const delay = Math.min(
@@ -371,7 +369,6 @@ export class RpcClient {
     );
     this.reconnectAttempts++;
 
-    // this.log(`${delay}ms 后重连 (attempt=${this.reconnectAttempts})`);
     this.reconnectTimer = setTimeout(() => {
       if (!this.isManualDisconnect) {
         this.connect();
@@ -385,11 +382,7 @@ export class RpcClient {
   private _internalDisconnect(): void {
     this.isManualDisconnect = true;
     this.stopHeartbeat();
-
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
+    this.reconnectTimer = this.clearTimeoutTimer(this.reconnectTimer);
 
     if (this.socket) {
       try {
@@ -421,10 +414,7 @@ export class RpcClient {
     const msgType = (request as unknown as {type?: string}).type;
     if (msgType === 'heartbeat' || msgType === 'error' || msgType === 'invoke_response') {
       // 任意来自服务端的消息都视为"还活着"，清掉 pong 超时计时器
-      if (this.pongTimeoutTimer) {
-        clearTimeout(this.pongTimeoutTimer);
-        this.pongTimeoutTimer = null;
-      }
+      this.pongTimeoutTimer = this.clearTimeoutTimer(this.pongTimeoutTimer);
       return;
     }
 
@@ -472,35 +462,25 @@ export class RpcClient {
    * 发送成功响应
    */
   private sendSuccess(seq: string, response: unknown): void {
-    let responseJson: Record<string, unknown>;
-
+    let data = response;
     if (typeof response === 'string') {
       try {
-        const parsed = JSON.parse(response);
-        if (Array.isArray(parsed)) {
-          responseJson = {data: parsed};
-        } else if (typeof parsed === 'object' && parsed !== null) {
-          responseJson = parsed as Record<string, unknown>;
-        } else {
-          responseJson = {data: parsed};
-        }
+        data = JSON.parse(response);
       } catch {
-        responseJson = {data: response};
+        // Ignore JSON parse error, keep as string
       }
-    } else if (Array.isArray(response)) {
-      responseJson = {data: response};
-    } else if (typeof response === 'object' && response !== null) {
-      responseJson = response as Record<string, unknown>;
-    } else {
-      responseJson = {data: response};
     }
+
+    const responseJson: Record<string, unknown> =
+      typeof data === 'object' && data !== null && !Array.isArray(data)
+        ? (data as Record<string, unknown>)
+        : {data};
 
     responseJson.code = 0;
     responseJson.status = 0;
     responseJson.__sekiro_seq__ = seq;
 
-    const responseText = JSON.stringify(responseJson);
-    this.send(responseText);
+    this.send(JSON.stringify(responseJson));
   }
 
   /**
