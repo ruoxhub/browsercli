@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'node:fs';
+import type fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -23,12 +23,12 @@ import {
 } from '../modules/stealth/index.js';
 import {logger} from '../utils/logger.js';
 
-import {resolveAutoConnectTarget, readDevToolsActivePort} from './browser-discovery.js';
 import {
   detectAllBrowsers,
   launchBrowserProcess as spawnBrowserProcess,
   waitForBrowserReady,
 } from './browser-detect.js';
+import {resolveAutoConnectTarget, readDevToolsActivePort} from './browser-discovery.js';
 import {
   resolveEngine,
   resolveLaunchChannel,
@@ -109,7 +109,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   const {channel, executablePath, headless, isolated} = options;
   const engine = resolveEngine(channel);
 
-  let userDataDir = resolveUserDataDir(isolated, options.userDataDir, channel);
+  const userDataDir = resolveUserDataDir(isolated, options.userDataDir, channel);
   if (userDataDir) {
     await ensureUserDataDir(userDataDir);
   }
@@ -592,7 +592,7 @@ export class BrowserManager {
       this.config;
     const engine = resolveEngine(channel);
 
-    let userDataDir = resolveUserDataDir(isolated, this.config.userDataDir, channel);
+    const userDataDir = resolveUserDataDir(isolated, this.config.userDataDir, channel);
     if (userDataDir) {
       await ensureUserDataDir(userDataDir);
     }

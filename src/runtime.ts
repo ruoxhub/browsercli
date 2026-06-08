@@ -30,7 +30,7 @@ import {
 import {DetailedDataManager} from './utils/detailedDataManager.js';
 import {EventBus} from './utils/EventBus.js';
 import {UnifiedCacheManager} from './utils/UnifiedCacheManager.js';
-import type {ToolContextProvider} from './worker/ToolContextProvider.js';
+import type {ToolContextProvider} from './worker/ToolContext.js';
 let runtime: Runtime | undefined;
 
 export interface Runtime {

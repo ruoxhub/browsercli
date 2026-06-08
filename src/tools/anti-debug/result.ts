@@ -5,6 +5,7 @@
  */
 
 import type {Response} from '../ToolDefinition.js';
+
 import type {HookResult} from './types.js';
 
 /** 从任意 unknown 中提取安全的错误消息 */

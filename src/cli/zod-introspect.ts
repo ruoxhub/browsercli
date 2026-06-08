@@ -56,6 +56,31 @@ function unwrapOptional(
 }
 
 /**
+ * 从解包后的 zod 类型推断简化的类型字符串。
+ * 返回 null 表示不支持的类型。
+ */
+function resolveSimpleType(
+  inner: zod.ZodTypeAny,
+): ToolArgType | 'unknown' | null {
+  if (inner instanceof zod.ZodString) return 'string';
+  if (inner instanceof zod.ZodNumber) return 'number';
+  if (inner instanceof zod.ZodBoolean) return 'boolean';
+  if (inner instanceof zod.ZodRecord || inner instanceof zod.ZodObject) return 'object';
+  if (inner instanceof zod.ZodEnum || inner instanceof zod.ZodNativeEnum) return 'string';
+  if (inner instanceof zod.ZodArray) {
+    return inner.element instanceof zod.ZodString ? 'string[]' : null;
+  }
+  if (inner instanceof zod.ZodUnion) {
+    const first = inner._def.options[0] as zod.ZodTypeAny;
+    if (first instanceof zod.ZodString) return 'string';
+    if (first instanceof zod.ZodNumber) return 'number';
+    if (first instanceof zod.ZodBoolean) return 'boolean';
+    return null;
+  }
+  return null;
+}
+
+/**
  * 从单个 zod schema 字段提取 ToolArgSpec
  */
 function extractArgSpec(
@@ -63,54 +88,20 @@ function extractArgSpec(
   rawSchema: zod.ZodTypeAny,
 ): ToolArgSpec | null {
   const {inner, isOptional, defaultValue} = unwrapOptional(rawSchema);
+  const resolved = resolveSimpleType(inner);
+  if (!resolved || resolved === 'unknown') return null;
 
-  let type: ToolArgType;
   let enumValues: string[] | undefined;
-
-  if (inner instanceof zod.ZodString) {
-    type = 'string';
-  } else if (inner instanceof zod.ZodNumber) {
-    type = 'number';
-  } else if (inner instanceof zod.ZodBoolean) {
-    type = 'boolean';
-  } else if (inner instanceof zod.ZodArray) {
-    const element = inner.element;
-    if (element instanceof zod.ZodString) {
-      type = 'string[]';
-    } else {
-      // 无法识别的数组类型，跳过
-      return null;
-    }
-  } else if (inner instanceof zod.ZodEnum) {
-    type = 'string';
+  if (inner instanceof zod.ZodEnum) {
     enumValues = inner._def.values as string[];
   } else if (inner instanceof zod.ZodNativeEnum) {
-    type = 'string';
     enumValues = Object.values(inner._def.values as Record<string, string>);
-  } else if (inner instanceof zod.ZodUnion) {
-    // 取第一个选项作为类型参考
-    const first = inner._def.options[0] as zod.ZodTypeAny;
-    if (first instanceof zod.ZodString) {
-      type = 'string';
-    } else if (first instanceof zod.ZodNumber) {
-      type = 'number';
-    } else if (first instanceof zod.ZodBoolean) {
-      type = 'boolean';
-    } else {
-      return null;
-    }
-  } else if (inner instanceof zod.ZodRecord || inner instanceof zod.ZodObject) {
-    type = 'object';
-  } else {
-    // 不支持的类型，跳过
-    return null;
   }
 
-  // 提取 description
   const description = inner.description ?? rawSchema.description ?? '';
 
   return {
-    type,
+    type: resolved as ToolArgType,
     required: !isOptional,
     ...(defaultValue !== undefined && {defaultValue}),
     ...(enumValues && {enum: enumValues}),
@@ -146,33 +137,11 @@ export function extractSchemaTypeMap(
 
   for (const [key, field] of Object.entries(schema)) {
     const {inner} = unwrapOptional(field as zod.ZodTypeAny);
-
-    if (inner instanceof zod.ZodString || inner instanceof zod.ZodEnum) {
-      result[key] = 'string';
-    } else if (inner instanceof zod.ZodNumber) {
-      result[key] = 'number';
-    } else if (inner instanceof zod.ZodBoolean) {
-      result[key] = 'boolean';
+    const resolved = resolveSimpleType(inner);
+    if (resolved) {
+      result[key] = resolved;
     } else if (inner instanceof zod.ZodArray) {
-      const element = inner.element;
-      if (element instanceof zod.ZodString) {
-        result[key] = 'string[]';
-      } else {
-        result[key] = 'unknown[]';
-      }
-    } else if (inner instanceof zod.ZodUnion) {
-      const first = inner._def.options[0] as zod.ZodTypeAny;
-      if (first instanceof zod.ZodString) {
-        result[key] = 'string';
-      } else if (first instanceof zod.ZodNumber) {
-        result[key] = 'number';
-      } else if (first instanceof zod.ZodBoolean) {
-        result[key] = 'boolean';
-      } else {
-        result[key] = 'unknown';
-      }
-    } else if (inner instanceof zod.ZodRecord || inner instanceof zod.ZodObject) {
-      result[key] = 'object';
+      result[key] = 'unknown[]';
     } else {
       result[key] = 'unknown';
     }

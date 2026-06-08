@@ -23,8 +23,9 @@ import * as parser from '@babel/parser';
 import traverseImport from '@babel/traverse';
 import * as t from '@babel/types';
 
-import {evalBinaryNumbers, unwrapBabelDefault} from './astUtils.js';
 import {logger} from '../../utils/logger.js';
+
+import {evalBinaryNumbers, unwrapBabelDefault} from './astUtils.js';
 
 const generate = unwrapBabelDefault<typeof generateImport>(generateImport);
 const traverse = unwrapBabelDefault<typeof traverseImport>(traverseImport);

@@ -33,10 +33,11 @@ import type {
 import {logger} from '../../utils/logger.js';
 import {resolveDefaultDebuggerSessionsDir} from '../../utils/projectPaths.js';
 import type {CodeCollector} from '../collector/CodeCollector.js';
-import type {RuntimeInspector} from './RuntimeInspector.js';
+
 
 import {BlackboxManager} from './BlackboxManager.js';
 import {EventBreakpointManager} from './EventBreakpointManager.js';
+import type {RuntimeInspector} from './RuntimeInspector.js';
 import {WatchExpressionManager} from './WatchExpressionManager.js';
 import {XHRBreakpointManager} from './XHRBreakpointManager.js';
 
@@ -166,7 +167,7 @@ export class DebuggerManager {
   private toScopeVariableScopeType(
     scopeType: Scope['type'],
   ): ScopeVariable['scope'] {
-    const known: ScopeVariable['scope'][] = [
+    const known: Array<ScopeVariable['scope']> = [
       'global',
       'local',
       'with',

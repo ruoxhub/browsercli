@@ -25,6 +25,7 @@ import type {
   UnresolvedPart,
 } from '../../types/index.js';
 import {logger} from '../../utils/logger.js';
+
 import {truncateCode, unwrapBabelDefault} from './astUtils.js';
 
 const generate = unwrapBabelDefault<typeof generateImport>(generateImport);

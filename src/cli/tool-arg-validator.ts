@@ -149,6 +149,26 @@ function validateType(
   }
 }
 
+/**
+ * 如果 rawArgs 包裹在 { args: {...} } 中且 schema 没有 "args" 字段，
+ * 则解包返回内层对象；否则原样返回。
+ */
+function unwrapArgsWrapper(
+  rawArgs: Record<string, unknown>,
+  specs: ToolArgSpecMap,
+): Record<string, unknown> {
+  const inner = rawArgs.args;
+  if (
+    typeof inner === 'object' &&
+    inner !== null &&
+    !Array.isArray(inner) &&
+    (!specs || !('args' in specs))
+  ) {
+    return inner as Record<string, unknown>;
+  }
+  return rawArgs;
+}
+
 export function validateToolArgs(
   toolName: string,
   rawArgs: Record<string, unknown>,
@@ -156,18 +176,10 @@ export function validateToolArgs(
   const meta = getToolMeta(toolName);
   const specs = meta?.argSpecs;
 
-  let actualArgs = rawArgs;
-  if (
-    rawArgs &&
-    typeof rawArgs === 'object' &&
-    'args' in rawArgs &&
-    rawArgs.args &&
-    typeof rawArgs.args === 'object' &&
-    !Array.isArray(rawArgs.args) &&
-    (!specs || !('args' in specs))
-  ) {
-    actualArgs = rawArgs.args as Record<string, unknown>;
-  }
+  const actualArgs =
+    rawArgs && typeof rawArgs === 'object' && 'args' in rawArgs && rawArgs.args
+      ? unwrapArgsWrapper(rawArgs, specs ?? {})
+      : rawArgs;
 
   if (!specs || Object.keys(specs).length === 0) {
     return {ok: true, value: actualArgs};

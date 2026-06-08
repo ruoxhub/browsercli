@@ -6,7 +6,7 @@
 
 import {PackerDeobfuscator} from '../../modules/deobfuscator/PackerDeobfuscator.js';
 import {zod} from '../../third_party/index.js';
-import type {ToolContextProvider} from '../../worker/ToolContextProvider.js';
+import type {ToolContextProvider} from '../../worker/ToolContext.js';
 import type {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 

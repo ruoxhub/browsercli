@@ -4,17 +4,150 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {Frame} from 'patchright';
+
 import {validateToolArgs, type ValidationFailure} from '../cli/tool-arg-validator.js';
 import type {ToolMeta} from '../cli/tools-meta.js';
 import type {ToolPrerequisiteChecker} from '../tools/prerequisites/ToolPrerequisiteChecker.js';
+import type {Response, ToolDefinition} from '../tools/ToolDefinition.js';
 import {createToolError, ErrorCodes, ToolError} from '../utils/errors.js';
 
 import type {ToolCallContextGuard} from './ToolCallContextGuard.js';
-import type {ToolExecutionRouter} from './ToolExecutionRouter.js';
-import {type LoadedHandler, type ToolHandlerLoader} from './ToolHandlerLoader.js';
-import type {ToolResponseProcessor} from './ToolResponseProcessor.js';
-import {ToolResultRecorder} from './ToolResultRecorder.js';
-import type {ToolTelemetry} from './ToolTelemetry.js';
+import type {DefineToolContextFactory, ToolContextProvider} from './ToolContext.js';
+import {ToolResponseAccumulator, ToolResultRecorder} from './ToolResponse.js';
+import type {ToolResponseProcessor, ToolTelemetry} from './ToolResponse.js';
+
+export type LoadedHandler =
+  | ((...args: unknown[]) => Promise<unknown>)
+  | ToolDefinition;
+
+export function isToolDefinition(value: unknown): value is ToolDefinition {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as ToolDefinition).handler === 'function'
+  );
+}
+
+export class ToolHandlerLoader {
+  private readonly loadedHandlers = new Map<string, LoadedHandler>();
+
+  async load(meta: ToolMeta): Promise<LoadedHandler | null> {
+    const cacheKey = `${meta.modulePath}:${meta.handlerName}`;
+    const cached = this.loadedHandlers.get(cacheKey);
+    if (cached) return cached;
+
+    try {
+      const modulePath = `../tools${meta.modulePath.replace(/^\./, '')}`;
+      const module = await import(modulePath);
+      const handler = module[meta.handlerName];
+
+      if (typeof handler === 'function' || isToolDefinition(handler)) {
+        this.loadedHandlers.set(cacheKey, handler);
+        return handler;
+      }
+
+      console.warn(
+        `[ToolHandlerLoader] ${cacheKey} handler 不是函数也不是 ToolDefinition`,
+      );
+      return null;
+    } catch (error) {
+      console.warn(
+        `[ToolHandlerLoader] 加载 ${cacheKey} 失败: ${error instanceof Error ? error.message : error}`,
+      );
+      return null;
+    }
+  }
+}
+
+const FRAME_EVALUATE_TIMEOUT = 10_000;
+
+export function wrapFrameWithTimeout(
+  frame: Frame,
+  timeoutMs: number = FRAME_EVALUATE_TIMEOUT,
+): Frame {
+  return new Proxy(frame, {
+    get(target, prop, receiver) {
+      const value = Reflect.get(target, prop, receiver);
+      if (prop === 'evaluate') {
+        return function evaluateWithTimeout(this: unknown, ...args: unknown[]) {
+          const evalPromise = (value as (...args: unknown[]) => unknown).apply(
+            target,
+            args,
+          );
+          const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(
+              () =>
+                reject(
+                  new Error(
+                    `frame.evaluate() 超时 (${timeoutMs}ms)，可能调试器已暂停`,
+                  ),
+                ),
+              timeoutMs,
+            ),
+          );
+          return Promise.race([evalPromise, timeoutPromise]);
+        };
+      }
+      if (typeof value === 'function') {
+        return value.bind(target);
+      }
+      return value;
+    },
+  });
+}
+
+export class ToolExecutionRouter {
+  constructor(
+    private readonly contextProvider: ToolContextProvider,
+    private readonly defineToolContextFactory: DefineToolContextFactory,
+  ) {}
+
+  async execute(
+    meta: ToolMeta,
+    handler: LoadedHandler,
+    params: Record<string, unknown>,
+  ): Promise<unknown> {
+    if (isToolDefinition(handler) || meta.callMode === 'defineTool') {
+      if (!isToolDefinition(handler)) {
+        throw createToolError(
+          ErrorCodes.RUNTIME,
+          `Tool "${meta.name}" marked as defineTool but handler is not a ToolDefinition`,
+          {toolName: meta.name},
+        );
+      }
+
+      const accumulator = new ToolResponseAccumulator();
+      await handler.handler(
+        {params},
+        accumulator as Response,
+        this.defineToolContextFactory.create(),
+      );
+      return accumulator.toJSON();
+    }
+
+    if (meta.callMode === ('frame' as ToolMeta['callMode'])) {
+      const frame =
+        this.contextProvider.getSelectedFrame() ??
+        this.contextProvider.getSelectedPage()?.mainFrame() ??
+        null;
+      if (!frame) {
+        throw createToolError(
+          ErrorCodes.CONNECTION,
+          `Tool "${meta.name}" 需要页面上下文，但当前没有可用页面`,
+          {toolName: meta.name},
+        );
+      }
+      return handler(wrapFrameWithTimeout(frame), params);
+    }
+
+    if (meta.callMode === ('context' as ToolMeta['callMode'])) {
+      return handler(this.contextProvider, params);
+    }
+
+    return handler(params);
+  }
+}
 
 export class ToolExecutionPipeline {
   constructor(

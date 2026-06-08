@@ -24,6 +24,7 @@ import * as t from '@babel/types';
 
 import type {LLMService} from '../../services/LLMService.js';
 import {logger} from '../../utils/logger.js';
+
 import {evalBinaryNumbers, truncateCode, unwrapBabelDefault} from './astUtils.js';
 
 const generate = unwrapBabelDefault<typeof generateImport>(generateImport);

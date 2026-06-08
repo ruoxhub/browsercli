@@ -30,8 +30,7 @@ export interface AxiStructuredOutput extends Record<string, unknown> {
 export function successOutput(
   data: Record<string, unknown>,
 ): AxiStructuredOutput {
-  const {status: _ignored, ...rest} = data;
-  return {status: 'success', ...rest};
+  return {...data, status: 'success'};
 }
 
 export function tableOutput(

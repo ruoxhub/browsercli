@@ -40,7 +40,7 @@ import type {
   UnresolvedPart,
 } from '../../types/index.js';
 import {logger} from '../../utils/logger.js';
-import {evalBinaryNumbers, unwrapBabelDefault} from './astUtils.js';
+
 
 const generate = unwrapBabelDefault<typeof generateImport>(generateImport);
 const traverse = unwrapBabelDefault<typeof traverseImport>(traverseImport);
@@ -51,6 +51,7 @@ import {
   type AdvancedDeobfuscateOptions,
 } from './AdvancedDeobfuscator.js';
 import {ASTOptimizer} from './ASTOptimizer.js';
+import {evalBinaryNumbers, unwrapBabelDefault} from './astUtils.js';
 import {JSVMPDeobfuscator} from './JSVMPDeobfuscator.js';
 import {
   PackerDeobfuscator,
@@ -970,24 +971,8 @@ export class Deobfuscator {
 
       traverse(ast, {
         StringLiteral(path) {
-          const value = path.node.value;
-          let newValue = value;
-
-          // 十六进制
-          if (value.includes('\\x')) {
-            newValue = newValue.replace(/\\x([0-9A-Fa-f]{2})/g, (_, hex) =>
-              String.fromCharCode(parseInt(hex, 16)),
-            );
-          }
-          // Unicode
-          if (value.includes('\\u')) {
-            newValue = newValue.replace(/\\u([0-9A-Fa-f]{4})/g, (_, hex) =>
-              String.fromCharCode(parseInt(hex, 16)),
-            );
-          }
-
-          if (newValue !== value) {
-            path.node.value = newValue;
+          if (path.node.extra) {
+            delete path.node.extra;
             decoded++;
           }
         },

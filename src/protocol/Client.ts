@@ -60,9 +60,7 @@ export class RpcClient {
     this.reconnectMaxDelay = config.reconnectMaxDelay ?? DEFAULT_RECONNECT_MAX_DELAY;
     this.heartbeatInterval = config.heartbeatInterval ?? DEFAULT_HEARTBEAT_INTERVAL;
     this.pongTimeout = config.pongTimeout ?? DEFAULT_PONG_TIMEOUT;
-
-    // 注册默认的 _execjs handler
-    this.handlers.set('_execjs', this._execjsHandler.bind(this));
+    
   }
 
   /**
@@ -206,38 +204,6 @@ export class RpcClient {
   }
 
   // ==================== WebSocket 核心（原 SekiroClient）====================
-
-  /**
-   * 默认 _execjs handler — 执行 JavaScript 代码
-   */
-  private _execjsHandler(
-    request: RpcRequest,
-    resolve: (response: unknown) => void,
-    reject: (error: string) => void,
-  ): void {
-    const extraFields = request as unknown as Record<string, unknown>;
-    const param =
-      extraFields.param || request.params || extraFields.code || '';
-    if (!param) {
-      reject('缺少执行参数 param');
-      return;
-    }
-
-    try {
-      const fn = new Function(
-        `return (async () => { return ${param} })()`,
-      );
-      Promise.resolve(fn())
-        .then(res =>
-          resolve(res !== undefined ? res : '执行成功 (无返回值)'),
-        )
-        .catch((err: unknown) =>
-          reject(`执行错误：${(err as Error).message || err}`),
-        );
-    } catch (err: unknown) {
-      reject(`语法错误：${(err as Error).message || err}`);
-    }
-  }
 
   /**
    * 更新连接状态

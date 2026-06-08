@@ -20,9 +20,9 @@ import type {
   Request,
 } from 'patchright';
 
+import type {PageCollector} from '../../PageCollector.js';
 import type {HTTPRequest} from '../../third_party/index.js';
 import type {WebSocketData} from '../../tools/network/WebSocketCollector.js';
-import {PageCollector} from '../../PageCollector.js';
 import {
   ConsoleMessageCollector,
   NetworkRequestCollector,

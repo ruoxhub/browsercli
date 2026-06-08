@@ -4,16 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/**
- * ToolContextProvider — Tool 执行上下文的 Facade
- *
- * 把原单体的职责拆到四个子模块，本类只做转发以保持公共 API 不变：
- *   - BrowserContextProvider   页面/Frame/Dialog/超时与节流
- *   - DebuggerContextProvider  CDP DebuggerContext 的创建与释放
- *   - CollectorContextProvider Network/Console/WebSocket 收集与查询
- *   - ServiceLocator           分析服务的惰性装配
- */
-
 import type {
   Browser,
   BrowserContext,
@@ -25,10 +15,23 @@ import type {
 
 import type {BrowserManager} from '../browser/index.js';
 import type {DebuggerContext} from '../DebuggerContext.js';
+import type {TrafficSummary} from '../formatters/websocketFormatter.js';
+import type {AISummarizer} from '../modules/analyzer/AISummarizer.js';
+import {AISummarizer as FallbackAISummarizer} from '../modules/analyzer/AISummarizer.js';
+import type {CodeAnalyzer} from '../modules/analyzer/CodeAnalyzer.js';
+import {CodeAnalyzer as FallbackCodeAnalyzer} from '../modules/analyzer/CodeAnalyzer.js';
+import {CodeCollector} from '../modules/collector/CodeCollector.js';
+import {PageController} from '../modules/collector/PageController.js';
+import {CryptoDetector} from '../modules/crypto/CryptoDetector.js';
+import {Deobfuscator} from '../modules/deobfuscator/Deobfuscator.js';
+import {HookManager} from '../modules/hook/HookManager.js';
 import type {Runtime} from '../runtime.js';
+import {LLMService} from '../services/LLMService.js';
 import type {HTTPRequest} from '../third_party/index.js';
 import type {RequestInitiator} from '../tools/network/types.js';
 import type {WebSocketData} from '../tools/network/WebSocketCollector.js';
+import type {Context} from '../tools/ToolDefinition.js';
+import type {TraceResult} from '../trace-processing/parse.js';
 import {createAppEventBusOptions, type AppEventMap} from '../types/events.js';
 import {EventBus} from '../utils/EventBus.js';
 
@@ -40,10 +43,115 @@ import type {
 import {BrowserContextProvider} from './context/BrowserContextProvider.js';
 import {CollectorContextProvider} from './context/CollectorContextProvider.js';
 import {DebuggerContextProvider} from './context/DebuggerContextProvider.js';
-import {ServiceLocator} from './context/ServiceLocator.js';
 import type {ToolTabContext} from './ToolCallContextGuard.js';
+import {wrapFrameWithTimeout} from './ToolExecutionPipeline.js';
 
-type TraceResult = unknown;
+export class ServiceLocator {
+  private _runtime: Runtime | null = null;
+
+  private _browserManager: BrowserManager | null = null;
+  private _collector: CodeCollector | null = null;
+  private _llmService: LLMService | null = null;
+  private _deobfuscator: Deobfuscator | null = null;
+  private _analyzer: CodeAnalyzer | null = null;
+  private _summarizer: AISummarizer | null = null;
+  private _cryptoDetector: CryptoDetector | null = null;
+  private _hookManager: HookManager | null = null;
+  private _pageController: PageController | null = null;
+
+  constructor(runtime?: Runtime) {
+    if (runtime) {
+      this._runtime = runtime;
+      this._browserManager = runtime.browserManager;
+      this._collector = runtime.collector;
+    }
+  }
+
+  setBrowserManager(browserManager: BrowserManager): void {
+    this._browserManager = browserManager;
+  }
+
+  getBrowserManager(): BrowserManager | null {
+    return this._browserManager;
+  }
+
+  private getOrCreate<T>(
+    cached: T | null,
+    runtimeKey: keyof Runtime,
+    factory: () => T,
+  ): T {
+    const fromRuntime = this._runtime?.[runtimeKey] as T | undefined;
+    if (fromRuntime) return fromRuntime;
+    return cached ?? factory();
+  }
+
+  getCollector(): CodeCollector {
+    if (this._collector) return this._collector;
+    if (!this._browserManager) {
+      throw new Error(
+        'BrowserManager 未初始化，无法创建 CodeCollector。请先调用 setBrowserManager()。',
+      );
+    }
+    const config = {
+      timeout: 30000,
+      maxCollectedUrls: 10000,
+      maxFilesPerCollect: 200,
+      maxTotalContentSize: 512 * 1024,
+      maxSingleFileSize: 200 * 1024,
+    };
+    this._collector = new CodeCollector(config, this._browserManager);
+    return this._collector;
+  }
+
+  getLlmService(): LLMService {
+    return this.getOrCreate(this._llmService, 'llmService', () => {
+      this._llmService = new LLMService();
+      return this._llmService;
+    });
+  }
+
+  getDeobfuscator(): Deobfuscator {
+    return this.getOrCreate(this._deobfuscator, 'deobfuscator', () => {
+      this._deobfuscator = new Deobfuscator(this.getLlmService());
+      return this._deobfuscator;
+    });
+  }
+
+  getAnalyzer(): CodeAnalyzer {
+    return this.getOrCreate(this._analyzer, 'analyzer', () => {
+      this._analyzer = new FallbackCodeAnalyzer(this.getLlmService());
+      return this._analyzer;
+    });
+  }
+
+  getSummarizer(): AISummarizer {
+    return this.getOrCreate(this._summarizer, 'summarizer', () => {
+      this._summarizer = new FallbackAISummarizer(this.getLlmService());
+      return this._summarizer;
+    });
+  }
+
+  getCryptoDetector(): CryptoDetector {
+    return this.getOrCreate(this._cryptoDetector, 'cryptoDetector', () => {
+      this._cryptoDetector = new CryptoDetector(this.getLlmService());
+      return this._cryptoDetector;
+    });
+  }
+
+  getHookManager(): HookManager {
+    return this.getOrCreate(this._hookManager, 'hookManager', () => {
+      this._hookManager = new HookManager();
+      return this._hookManager;
+    });
+  }
+
+  getPageController(): PageController {
+    return this.getOrCreate(this._pageController, 'pageController', () => {
+      this._pageController = new PageController(this.getCollector());
+      return this._pageController;
+    });
+  }
+}
 
 function ignoreDebuggerWarmupError(): void {
   // CDP warmup is best-effort; the caller can still resolve frames/pages without it.
@@ -67,12 +175,6 @@ export class ToolContextProvider {
       new EventBus<AppEventMap>(createAppEventBusOptions());
   }
 
-  // ─── 生命周期 ────────────────────────────────────────
-
-  /**
-   * 初始化收集器并同步当前页面列表。
-   * 应在 BrowserContext 就绪后调用一次。
-   */
   async init(): Promise<void> {
     if (this._isDisposed) {
       throw new Error('ToolContextProvider 已销毁，无法重新初始化');
@@ -84,12 +186,6 @@ export class ToolContextProvider {
       this._collectorContext.start(context);
     }
 
-    // Firefox 通道下，BrowserManager 启动时会主动 newPage() 补一个
-    // fallback page（见 BrowserManager.launchBrowser），但该 page 只写入了
-    // BrowserManager.currentPage，没有同步给 BrowserContextProvider.selectedPage。
-    // 此处兜底：若 syncPages 之后 selectedPage 仍为 null，但 BrowserManager
-    // 持有可用 currentPage，则把 currentPage 同步过来，避免 list_pages 等
-    // 工具启动后就抛 "没有选中的页面"。
     if (!this._browserContext.getSelectedPage()) {
       const mgr = this._browserContext.getBrowserManager();
       const currentPage = mgr?.getCurrentPage();
@@ -99,9 +195,6 @@ export class ToolContextProvider {
     }
   }
 
-  /**
-   * 释放所有资源、监听器和会话。
-   */
   dispose(): void {
     if (this._isDisposed) return;
     this._isDisposed = true;
@@ -110,8 +203,6 @@ export class ToolContextProvider {
     this._collectorContext.dispose();
     this._browserContext.dispose();
   }
-
-  // ─── Browser / Context 管理 ──────────────────────────
 
   setBrowser(browser: Browser): void {
     this._browserContext.setBrowser(browser);
@@ -132,8 +223,6 @@ export class ToolContextProvider {
 
   setContext(context: BrowserContext): void {
     this._browserContext.setContext(context);
-    // BrowserContext 就绪后立刻启动收集器，保证在 init() 之前发生的
-    // 页面创建也会被收集到。
     this._collectorContext.start(context);
   }
 
@@ -149,8 +238,6 @@ export class ToolContextProvider {
     return this._browserContext.getContext() !== null;
   }
 
-  // ─── PageCollector 访问（保留旧 API） ─────────────────
-
   get networkCollector(): NetworkRequestCollector {
     return this._collectorContext.networkCollector;
   }
@@ -162,8 +249,6 @@ export class ToolContextProvider {
   get wsCollector(): WsCollector {
     return this._collectorContext.wsCollector;
   }
-
-  // ─── 页面/Frame 管理 ─────────────────────────────────
 
   getSelectedPage(): Page | null {
     return this._browserContext.getSelectedPage();
@@ -181,10 +266,6 @@ export class ToolContextProvider {
     this._browserContext.setSelectedFrame(frame);
   }
 
-  /**
-   * 按索引选择 Frame（0 = 主 frame），返回选中的 Frame。
-   * 选中后异步触发 DebuggerContext 初始化，与旧行为保持一致。
-   */
   selectFrameByIdx(frameIdx: number): Frame | null {
     const frame = this._browserContext.selectFrameByIdx(frameIdx);
     if (frame) {
@@ -228,8 +309,6 @@ export class ToolContextProvider {
 
   async newPage(): Promise<Page> {
     const page = await this._browserContext.newPage();
-    // BrowserContext 级监听器已经会自动注册新页面，但如果 context 收集尚未启动
-    // （例如 setContext 之前调用了 newPage，理论上不会发生但保守处理），补一刀。
     if (!this._collectorContext.isStarted()) {
       this._collectorContext.attachPage(page);
     }
@@ -238,7 +317,6 @@ export class ToolContextProvider {
 
   selectPage(page: Page): void {
     this._browserContext.selectPage(page);
-    // 页面切换后重新初始化 debugger，与旧实现一致
     void this._debuggerContext
       .ensureForPage(page)
       .catch(ignoreDebuggerWarmupError);
@@ -256,8 +334,6 @@ export class ToolContextProvider {
     return this._browserContext.getActivePage();
   }
 
-  // ─── Debugger 管理 ───────────────────────────────────
-
   async getDebuggerContext(page?: Page): Promise<DebuggerContext> {
     const activePage = page ?? (await this._browserContext.getActivePage());
     return this._debuggerContext.ensureForPage(activePage);
@@ -268,8 +344,6 @@ export class ToolContextProvider {
     if (!activePage) return;
     await this._debuggerContext.dispose(activePage);
   }
-
-  // ─── 分析服务（ServiceLocator 代理）──────────────────
 
   get deobfuscator() {
     return this._serviceLocator.getDeobfuscator();
@@ -295,8 +369,6 @@ export class ToolContextProvider {
     return this._serviceLocator.getPageController();
   }
 
-  // ─── Dialog ─────────────────────────────────────────
-
   getDialog(): Dialog | undefined {
     return this._browserContext.getDialog();
   }
@@ -304,8 +376,6 @@ export class ToolContextProvider {
   clearDialog(): void {
     this._browserContext.clearDialog();
   }
-
-  // ─── 网络/CPU 节流 ───────────────────────────────────
 
   setNetworkConditions(conditions: string | null): void {
     this._browserContext.setNetworkConditions(conditions);
@@ -322,8 +392,6 @@ export class ToolContextProvider {
   getCpuThrottlingRate(): number {
     return this._browserContext.getCpuThrottlingRate();
   }
-
-  // ─── Network 数据查询 ────────────────────────────────
 
   private _resolveNetworkPage(pageIdx?: number): Page | null {
     if (typeof pageIdx === 'number') {
@@ -350,9 +418,6 @@ export class ToolContextProvider {
     );
   }
 
-  /**
-   * 清空指定页面的网络请求缓存。`pageIdx` 省略时清空当前选中页。
-   */
   clearNetworkRequests(pageIdx?: number): void {
     const page = this._resolveNetworkPage(pageIdx);
     this._collectorContext.clearNetworkRequests(page);
@@ -366,7 +431,6 @@ export class ToolContextProvider {
   }
 
   getRequestInitiator(request: unknown): RequestInitiator | undefined {
-    // Playwright 的 Request 对象有 initiator() 方法
     const req = request as {initiator?: () => RequestInitiator};
     if (typeof req.initiator === 'function') {
       return req.initiator();
@@ -381,8 +445,6 @@ export class ToolContextProvider {
   resolveCdpRequestId(_cdpRequestId: string): undefined {
     return undefined;
   }
-
-  // ─── Console 数据查询 ────────────────────────────────
 
   getConsoleData(
     includePreservedMessages?: boolean,
@@ -407,8 +469,6 @@ export class ToolContextProvider {
     );
   }
 
-  // ─── WebSocket 数据查询 ──────────────────────────────
-
   getWebSocketConnections(includePreservedData?: boolean): WebSocketData[] {
     return this._collectorContext.getWebSocketConnections(
       this._browserContext.getSelectedPage(),
@@ -430,8 +490,6 @@ export class ToolContextProvider {
     );
   }
 
-  // ─── 性能 Trace ──────────────────────────────────────
-
   isRunningPerformanceTrace(): boolean {
     return this._isRunningPerformanceTrace;
   }
@@ -446,5 +504,83 @@ export class ToolContextProvider {
 
   recordedTraces(): TraceResult[] {
     return this._traceRecordings;
+  }
+}
+
+export class DefineToolContextFactory {
+  private readonly trafficSummaryCache = new Map<number, TrafficSummary>();
+
+  constructor(private readonly provider: ToolContextProvider) {}
+
+  create(): Context {
+    const provider = this.provider;
+    return {
+      isRunningPerformanceTrace: () => provider.isRunningPerformanceTrace(),
+      setIsRunningPerformanceTrace: (x: boolean) =>
+        provider.setIsRunningPerformanceTrace(x),
+      recordedTraces: () => provider.recordedTraces() as TraceResult[],
+      storeTraceRecording: (result: TraceResult) =>
+        provider.storeTraceRecording(result),
+      getSelectedPage: () => {
+        const page = provider.getSelectedPage();
+        if (!page) throw new Error('没有选中的页面');
+        return page;
+      },
+      getDialog: () => provider.getDialog(),
+      clearDialog: () => provider.clearDialog(),
+      getPageByIdx: idx => provider.getPageByIdx(idx),
+      isPageSelected: page => provider.getSelectedPage() === page,
+      newPage: () => provider.newPage(),
+      closePage: async (pageIdx: number) => {
+        const page = provider.getPageByIdx(pageIdx);
+        await page.close();
+        await provider.syncPages();
+      },
+      selectPage: page => provider.selectPage(page),
+      bringPageToFront: page => provider.bringPageToFront(page),
+      syncPageContext: page => provider.syncPageContext(page),
+      getPages: () => provider.getPages(),
+      getSelectedFrame: () => {
+        const frame =
+          provider.getSelectedFrame() ??
+          provider.getSelectedPage()?.mainFrame();
+        if (!frame) {
+          throw new Error('没有可用的 Frame，可能页面未选中或已关闭');
+        }
+        return wrapFrameWithTimeout(frame);
+      },
+      selectFrame: frame => provider.setSelectedFrame(frame),
+      resetSelectedFrame: () => provider.setSelectedFrame(null),
+      setNetworkConditions: conditions =>
+        provider.setNetworkConditions(conditions),
+      setCpuThrottlingRate: rate => provider.setCpuThrottlingRate(rate),
+      saveTemporaryFile: async (_data, _mimeType) => {
+        throw new Error('saveTemporaryFile not supported in worker mode');
+      },
+      saveFile: async (_data, _filename) => {
+        throw new Error('saveFile not supported in worker mode');
+      },
+      waitForEventsAfterAction: async action => {
+        await action();
+      },
+      waitForTextOnPage: async _params => {
+        throw new Error('waitForTextOnPage not supported in worker mode');
+      },
+      getDevToolsData: () => provider.getDevToolsData(),
+      resolveCdpRequestId: cdpRequestId =>
+        provider.resolveCdpRequestId(cdpRequestId),
+      getDebuggerContext: () => provider.getDebuggerContext(),
+      getRequestInitiator: request => provider.getRequestInitiator(request),
+      getRequestInitiatorById: _requestId => undefined,
+      getNetworkRequestById: reqid => provider.getNetworkRequestById(reqid),
+      getWebSocketConnections: includePreservedData =>
+        provider.getWebSocketConnections(includePreservedData),
+      getWebSocketById: wsid => provider.getWebSocketConnectionById(wsid),
+      getWebSocketStableId: ws => provider.getWebSocketStableId(ws),
+      cacheTrafficSummary: (wsid, summary) => {
+        this.trafficSummaryCache.set(wsid, summary);
+      },
+      getCachedTrafficSummary: wsid => this.trafficSummaryCache.get(wsid),
+    };
   }
 }

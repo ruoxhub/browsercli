@@ -5,18 +5,18 @@
  */
 import OpenAI from 'openai';
 
-import {
-  decodeImageInput,
-  formatProviderError,
-  toImageDataUrl,
-  type FormattedProviderError,
-} from './image-helpers.js';
 import type {
   AIProvider,
   AIMessage,
   AIResponse,
   ChatOptions,
 } from './AIService.js';
+import {
+  decodeImageInput,
+  formatProviderError,
+  toImageDataUrl,
+  type FormattedProviderError,
+} from './image-helpers.js';
 
 export interface OpenAIConfig {
   apiKey: string;

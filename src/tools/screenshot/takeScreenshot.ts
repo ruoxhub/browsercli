@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import {zod} from '../../third_party/index.js';
-import type {ToolContextProvider} from '../../worker/ToolContextProvider.js';
+import type {ToolContextProvider} from '../../worker/ToolContext.js';
 import {ToolCategory} from '../categories.js';
 import {
   getActivePageWithGuard,

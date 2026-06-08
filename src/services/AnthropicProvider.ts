@@ -5,12 +5,12 @@
  */
 import Anthropic from '@anthropic-ai/sdk';
 
+import type {AIProvider, AIMessage, AIResponse, ChatOptions} from './AIService.js';
 import {
   decodeImageInput,
   formatProviderError,
   type FormattedProviderError,
 } from './image-helpers.js';
-import type {AIProvider, AIMessage, AIResponse, ChatOptions} from './AIService.js';
 
 export interface AnthropicConfig {
   apiKey: string;

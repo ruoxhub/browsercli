@@ -7,10 +7,9 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {ToolContextProvider} from '../../../src/worker/ToolContextProvider.js';
-import {DefineToolContextFactory} from '../../../src/worker/DefineToolContextFactory.js';
+import {ToolContextProvider, DefineToolContextFactory} from '../../../src/worker/ToolContext.js';
 import {listPages} from '../../../src/tools/navigation/listPages.js';
-import {ToolResponseAccumulator} from '../../../src/worker/ToolResponseProcessor.js';
+import {ToolResponseAccumulator} from '../../../src/worker/ToolResponse.js';
 
 describe('listPages tool local verification', () => {
   it('handles empty pages without throwing unhandled error', async () => {

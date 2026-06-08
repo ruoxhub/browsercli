@@ -4,16 +4,29 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {appendFileSync, mkdirSync} from 'node:fs';
+import path from 'node:path';
+
+import {
+  getToolResultRecordingConfig,
+  type ResolvedToolResultRecordingConfig,
+} from '../config.js';
 import type {ImageContentData, Response} from '../tools/ToolDefinition.js';
 import {DetailedDataManager} from '../utils/detailedDataManager.js';
+import type {ToolError} from '../utils/errors.js';
+import {logger} from '../utils/logger.js';
+import {safeStringify} from '../utils/safeJson.js';
+import {TokenBudgetManager} from '../utils/TokenBudgetManager.js';
 import type {PaginationOptions} from '../utils/types.js';
+
+import type {ToolContextProvider} from './ToolContext.js';
 
 /**
  * ToolResponseAccumulator — 复刻 Daemon 中 response 对象的 accumulator 模式
  *
  * Tool handler 通过 appendResponseLine / setStructuredContent 等方法累积结果，
  * 最终通过 toJSON() 输出统一格式。
- * 实现 defineTool 所需的 Response 接口。
+ * 实现 defineTool 所需 the Response 接口。
  */
 export class ToolResponseAccumulator implements Response {
   private lines: string[] = [];
@@ -156,5 +169,101 @@ export class ToolResponseProcessor {
       result !== null &&
       ('content' in result || 'structuredContent' in result || 'text' in result)
     );
+  }
+}
+
+export interface ToolResultRecord {
+  toolName: string;
+  traceId: string;
+  success: boolean;
+  startedAt: string;
+  durationMs: number;
+  input?: Record<string, unknown>;
+  request?: Record<string, unknown>;
+  response?: unknown;
+  error?: {
+    code: string;
+    message: string;
+  };
+}
+
+export class ToolResultRecorder {
+  constructor(
+    private readonly configProvider = getToolResultRecordingConfig,
+    private readonly now = () => new Date(),
+  ) {}
+
+  record(record: ToolResultRecord): void {
+    const config = this.configProvider();
+    if (!config.enabled) return;
+
+    try {
+      this.write(config, this.normalizeRecord(record));
+    } catch {
+      // Tool result recording is diagnostic only; it must not affect tools.
+    }
+  }
+
+  private normalizeRecord(record: ToolResultRecord): ToolResultRecord {
+    const input = record.input ?? record.request;
+    return input ? {...record, input: {...input}} : record;
+  }
+
+  private write(
+    config: ResolvedToolResultRecordingConfig,
+    record: ToolResultRecord,
+  ): void {
+    mkdirSync(config.outputDir, {recursive: true});
+    const filePath = path.join(config.outputDir, this.fileName());
+    appendFileSync(filePath, safeStringify(record) + '\n', 'utf-8');
+  }
+
+  private fileName(): string {
+    return `${this.now().toISOString().slice(0, 10)}.jsonl`;
+  }
+}
+
+export class ToolTelemetry {
+  constructor(private readonly contextProvider: ToolContextProvider) {}
+
+  success(
+    toolName: string,
+    request: Record<string, unknown>,
+    response: unknown,
+    durationMs: number,
+    traceId: string,
+  ): void {
+    TokenBudgetManager.getInstance().recordToolCall(
+      toolName,
+      request,
+      response,
+    );
+    this.contextProvider.eventBus.emit('tool:called', {
+      name: toolName,
+      durationMs,
+      success: true,
+      traceId,
+    });
+    logger.info('tool.completed', {toolName, durationMs, traceId});
+  }
+
+  failure(
+    toolName: string,
+    error: ToolError,
+    durationMs: number,
+    traceId: string,
+  ): void {
+    this.contextProvider.eventBus.emit('tool:error', {
+      name: toolName,
+      code: error.code,
+      message: error.message,
+      traceId,
+    });
+    logger.warn('tool.failed', {
+      toolName,
+      durationMs,
+      code: error.code,
+      traceId,
+    });
   }
 }

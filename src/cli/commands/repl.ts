@@ -85,6 +85,8 @@ class ReplSession {
   async processLine(rl: readline.Interface, line: string): Promise<boolean> {
     const trimmed = line.trim();
 
+    if (!trimmed) return true;
+
     if (trimmed === 'exit' || trimmed === 'quit') {
       rl.close();
       return false;
@@ -98,11 +100,7 @@ class ReplSession {
     if (trimmed === 'status') {
       const running = this.workerManager.isRunning();
       const pid = this.workerManager.getPid();
-      if (running) {
-        replLog(`状态：PID=${pid} | Worker 运行中`);
-      } else {
-        replLog('状态：Worker 未运行');
-      }
+      replLog(running ? `状态：PID=${pid} | Worker 运行中` : '状态：Worker 未运行');
       return true;
     }
 
@@ -111,29 +109,20 @@ class ReplSession {
       return true;
     }
 
-    if (!trimmed) {
-      return true;
-    }
-
     const parts = trimmed.split(/\s+/);
     const [type, name, ...restArgs] = parts;
 
-    if (!type || !name) {
+    if (type !== 'tool' || !name) {
       replLog('用法：tool <name> [args...]');
       replLog('输入 "help" 查看完整帮助');
       return true;
     }
 
     try {
-      if (type === 'tool') {
-        const result = await this.invoker.invoke(this.group, name, {
-          args: restArgs,
-        });
-        replLog(JSON.stringify(result, null, 2));
-      } else {
-        replLog('未知命令类型，使用 "tool"');
-        replLog('输入 "help" 查看完整帮助');
-      }
+      const result = await this.invoker.invoke(this.group, name, {
+        args: restArgs,
+      });
+      replLog(JSON.stringify(result, null, 2));
     } catch (error) {
       replLog(`执行失败：${error instanceof Error ? error.message : error}`);
     }

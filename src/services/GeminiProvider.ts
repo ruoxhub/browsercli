@@ -6,12 +6,12 @@
 import {spawn, spawnSync} from 'node:child_process';
 import {existsSync} from 'node:fs';
 
+import type {AIProvider, AIMessage, AIResponse, ChatOptions} from './AIService.js';
 import {
   decodeImageInput,
   formatProviderError,
   type FormattedProviderError,
 } from './image-helpers.js';
-import type {AIProvider, AIMessage, AIResponse, ChatOptions} from './AIService.js';
 
 export interface GeminiConfig {
   apiKey?: string;

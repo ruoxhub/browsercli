@@ -16,12 +16,16 @@ import {
   type ToolMeta,
 } from '../../../src/cli/tools-meta.js';
 import {ErrorCodes, ToolError} from '../../../src/utils/errors.js';
-import {ToolExecutionPipeline} from '../../../src/worker/ToolExecutionPipeline.js';
-import type {ToolExecutionRouter} from '../../../src/worker/ToolExecutionRouter.js';
-import type {ToolHandlerLoader} from '../../../src/worker/ToolHandlerLoader.js';
-import {ToolResponseProcessor} from '../../../src/worker/ToolResponseProcessor.js';
-import {ToolResultRecorder} from '../../../src/worker/ToolResultRecorder.js';
-import type {ToolTelemetry} from '../../../src/worker/ToolTelemetry.js';
+import {
+  ToolExecutionPipeline,
+  type ToolExecutionRouter,
+  type ToolHandlerLoader,
+} from '../../../src/worker/ToolExecutionPipeline.js';
+import {
+  ToolResponseProcessor,
+  ToolResultRecorder,
+  type ToolTelemetry,
+} from '../../../src/worker/ToolResponse.js';
 
 interface TestResultRecorder {
   records: unknown[];

@@ -11,7 +11,7 @@ import {DetailedDataManager} from '../../../src/utils/detailedDataManager.js';
 import {
   ToolResponseAccumulator,
   ToolResponseProcessor,
-} from '../../../src/worker/ToolResponseProcessor.js';
+} from '../../../src/worker/ToolResponse.js';
 
 describe('ToolResponseProcessor', () => {
   afterEach(() => {

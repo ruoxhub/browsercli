@@ -56,29 +56,10 @@ export class WorkerGuardian {
 
   /** 记录 worker 退出，返回是否应重启 */
   shouldRestart(exitCode: number | null, signal: string | null): boolean {
-    // 正常退出（code=0 且无 signal）不重启
-    if (exitCode === 0 && !signal) {
-      return false;
-    }
+    if (exitCode === 0 && !signal) return false;
 
-    const now = Date.now();
-
-    // 清理窗口外的旧记录
-    const windowStart = now - this.policy.restartWindowMs;
-    this.restartTimestamps = this.restartTimestamps.filter(
-      t => t >= windowStart,
-    );
-
-    // 记录本次退出
-    this.restartTimestamps.push(now);
-    this.totalRestarts++;
-
-    // 检查是否超过窗口内最大重启次数
-    if (this.restartTimestamps.length > this.policy.maxRestarts) {
-      return false;
-    }
-
-    return true;
+    this.recordRestart();
+    return this.getRecentRestartCount() <= this.policy.maxRestarts;
   }
 
   /** 获取重启前需等待的延迟 ms */
@@ -88,13 +69,9 @@ export class WorkerGuardian {
 
   /** 获取健康状态 */
   getHealth(): HealthStatus {
-    const windowStart = Date.now() - this.policy.restartWindowMs;
-    const recentRestarts = this.restartTimestamps.filter(
-      t => t >= windowStart,
-    ).length;
-
-    if (recentRestarts === 0) return 'healthy';
-    if (recentRestarts <= Math.ceil(this.policy.maxRestarts / 2)) return 'degraded';
+    const recent = this.getRecentRestartCount();
+    if (recent === 0) return 'healthy';
+    if (recent <= Math.ceil(this.policy.maxRestarts / 2)) return 'degraded';
     return 'unhealthy';
   }
 
@@ -115,9 +92,18 @@ export class WorkerGuardian {
     return Math.floor((Date.now() - this.startTime) / 1000);
   }
 
+  /** 记录一次重启事件 */
+  private recordRestart(): void {
+    const now = Date.now();
+    const cutoff = now - this.policy.restartWindowMs;
+    this.restartTimestamps = this.restartTimestamps.filter(t => t >= cutoff);
+    this.restartTimestamps.push(now);
+    this.totalRestarts++;
+  }
+
   /** 窗口内重启次数 */
   private getRecentRestartCount(): number {
-    const windowStart = Date.now() - this.policy.restartWindowMs;
-    return this.restartTimestamps.filter(t => t >= windowStart).length;
+    const cutoff = Date.now() - this.policy.restartWindowMs;
+    return this.restartTimestamps.filter(t => t >= cutoff).length;
   }
 }

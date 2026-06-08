@@ -92,6 +92,37 @@ function coerceValue(value: string): unknown {
   return value;
 }
 
+/** 更新用户配置文件中的嵌套键值 */
+function setNestedConfigValue(
+  dottedKey: string,
+  value: unknown,
+): void {
+  const parentKey = NESTED_KEYS[dottedKey]!;
+  const subKey = dottedKey.split('.')[1]!;
+  const userConfig = loadUserConfig();
+  const existing = (userConfig.config ?? {}) as Record<string, unknown>;
+  const parent = (existing[parentKey] as Record<string, unknown> | undefined) ?? {};
+  parent[subKey] = value;
+  existing[parentKey] = parent;
+  writeConfigFile(getUserConfigPath(), existing);
+}
+
+/** 删除用户配置文件中的嵌套键值，返回是否成功删除 */
+function unsetNestedConfigValue(dottedKey: string): boolean {
+  const parentKey = NESTED_KEYS[dottedKey]!;
+  const subKey = dottedKey.split('.')[1]!;
+  const userConfig = loadUserConfig();
+  const parent = userConfig.config?.[parentKey as keyof GlobalConfig] as
+    | Record<string, unknown>
+    | undefined;
+  if (parent && subKey in parent) {
+    delete parent[subKey];
+    writeConfigFile(getUserConfigPath(), userConfig.config!);
+    return true;
+  }
+  return false;
+}
+
 export const configCommand: AxiCliCommand<WorkerContext> = async (
   args,
   _ctx,
@@ -122,18 +153,7 @@ export const configCommand: AxiCliCommand<WorkerContext> = async (
 
     // 嵌套键处理
     if (key in NESTED_KEYS) {
-      const parentKey = NESTED_KEYS[key]!;
-      const subKey = key.split('.')[1]!;
-      // 读取当前配置，修改嵌套值，写回
-      const userConfig = loadUserConfig();
-      const existing = userConfig.config ?? ({} as GlobalConfig);
-      const parent =
-        ((existing as Record<string, unknown>)[parentKey] as
-          | Record<string, unknown>
-          | undefined) ?? {};
-      parent[subKey] = coerced;
-      (existing as Record<string, unknown>)[parentKey] = parent;
-      writeConfigFile(getUserConfigPath(), existing);
+      setNestedConfigValue(key, coerced);
     } else {
       setUserConfigValue(key as keyof GlobalConfig, coerced);
     }
@@ -166,31 +186,12 @@ export const configCommand: AxiCliCommand<WorkerContext> = async (
   if (unsetKey) {
     validateKey(unsetKey);
     if (unsetKey in NESTED_KEYS) {
-      // 嵌套键：将子项设为 undefined 然后写回
-      const parentKey = NESTED_KEYS[unsetKey]!;
-      const subKey = unsetKey.split('.')[1]!;
-      const userConfig = loadUserConfig();
-      const existing = userConfig.config;
-      if (existing) {
-        const parent = (existing as Record<string, unknown>)[parentKey] as
-          | Record<string, unknown>
-          | undefined;
-        if (parent && subKey in parent) {
-          delete parent[subKey];
-          writeConfigFile(getUserConfigPath(), existing);
-          return successOutput({
-            command: 'config',
-            action: 'unset',
-            key: unsetKey,
-            path: getUserConfigPath(),
-          });
-        }
-      }
+      const deleted = unsetNestedConfigValue(unsetKey);
       return successOutput({
         command: 'config',
         action: 'unset',
         key: unsetKey,
-        message: '键不存在于配置文件中',
+        ...(deleted ? {path: getUserConfigPath()} : {message: '键不存在于配置文件中'}),
       });
     }
     const deleted = deleteUserConfigValue(unsetKey as keyof GlobalConfig);

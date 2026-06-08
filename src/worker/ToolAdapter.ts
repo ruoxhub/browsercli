@@ -27,14 +27,11 @@ import {ToolPrerequisiteChecker} from '../tools/prerequisites/ToolPrerequisiteCh
 import type {ActionHandler} from '../types/rpc.js';
 import type {ToolInvokeEvent} from '../web/types.js';
 
-import {DefineToolContextFactory} from './DefineToolContextFactory.js';
 import {ToolCallContextGuard} from './ToolCallContextGuard.js';
-import type {ToolContextProvider} from './ToolContextProvider.js';
-import {ToolExecutionPipeline} from './ToolExecutionPipeline.js';
-import {ToolExecutionRouter} from './ToolExecutionRouter.js';
-import {ToolHandlerLoader} from './ToolHandlerLoader.js';
-import {ToolResponseProcessor} from './ToolResponseProcessor.js';
-import {ToolTelemetry} from './ToolTelemetry.js';
+import type { ToolContextProvider} from './ToolContext.js';
+import {DefineToolContextFactory} from './ToolContext.js';
+import {ToolExecutionPipeline, ToolExecutionRouter, ToolHandlerLoader} from './ToolExecutionPipeline.js';
+import {ToolResponseProcessor, ToolTelemetry} from './ToolResponse.js';
 
 export type ToolInvokeListener = (event: ToolInvokeEvent) => void;
 

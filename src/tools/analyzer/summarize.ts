@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {CodeSummary} from '../../modules/analyzer/AISummarizer.js';
 import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
 import type {CodeFile} from '../../types/index.js';
-import type {CodeSummary} from '../../modules/analyzer/AISummarizer.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 

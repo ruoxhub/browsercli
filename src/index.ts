@@ -26,7 +26,7 @@ import {dbService} from './services/DatabaseService.js';
 import {ConsoleServer} from './web/ConsoleServer.js';
 import {registerBuiltinActions} from './worker/BuiltinActions.js';
 import {ToolAdapter} from './worker/ToolAdapter.js';
-import {ToolContextProvider} from './worker/ToolContextProvider.js';
+import {ToolContextProvider} from './worker/ToolContext.js';
 import {parseWorkerArgs, toWorkerOptions} from './worker/WorkerArgs.js';
 import {createGracefulShutdown} from './worker/WorkerLifecycle.js';
 

@@ -5,7 +5,7 @@
  */
 
 import {zod} from '../../third_party/index.js';
-import type {ToolContextProvider} from '../../worker/ToolContextProvider.js';
+import type {ToolContextProvider} from '../../worker/ToolContext.js';
 import {ToolCategory} from '../categories.js';
 import {resolveActivePage} from '../shared/activePageResolver.js';
 import {explainPageError} from '../shared/pageDiagnostics.js';

@@ -65,6 +65,7 @@ export namespace I18n {
 }
 
 // PipeTransport - not available in Playwright, provide stub
-export const PipeTransport = class PipeTransport {
+export class PipeTransport {
   // Stub - Playwright uses different transport mechanisms
-};
+}
+

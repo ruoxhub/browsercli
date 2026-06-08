@@ -37,9 +37,4 @@ export interface AggregatedIssue {
 }
 
 export type Issue = unknown;
-export type IssuesManagerEventTypes = unknown;
 
-// ─── PageEvents (used by modules/collector/PageCollector.ts) ───
-export namespace PageEvents {
-  export type FrameNavigated = unknown;
-}

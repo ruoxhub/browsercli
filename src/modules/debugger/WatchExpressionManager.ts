@@ -201,7 +201,7 @@ export class WatchExpressionManager {
     b: unknown,
     depth = 0,
     maxDepth = 10,
-    seen: WeakSet<object> = new WeakSet(),
+    seen = new WeakSet<object>(),
   ): boolean {
     if (a === b) return true;
     if (a == null || b == null) return false;

@@ -8,7 +8,7 @@ import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {navigatePage} from '../../../../src/tools/navigation/navigatePage.js';
-import type {ToolContextProvider} from '../../../../src/worker/ToolContextProvider.js';
+import type {ToolContextProvider} from '../../../../src/worker/ToolContext.js';
 
 interface MockCDPSession {
   send(method: string, params: unknown): Promise<void>;
