@@ -205,6 +205,22 @@ export abstract class PageCollector<T extends {stableId: number}> {
   }
 
   /**
+   * 清空指定页面的所有导航段数据，并重置稳定 ID 计数器。
+   *
+   * 用于"清空网络请求缓存"等场景：清空后页面再次触发的新事件会从 1 开始
+   * 重新分配 stableId，旧 ID 不再被引用。
+   *
+   * 监听器和 BrowserContext 级别的新页面自动注册不会受影响。
+   *
+   * @param page 要清空数据的页面；未注册的页面会被忽略
+   */
+  clear(page: Page): void {
+    if (!this.storage.has(page)) return;
+    this.storage.set(page, [[]]);
+    this.idGenerators.set(page, this.createIdGenerator());
+  }
+
+  /**
    * 测试/注入用：直接写入某页面的导航分组存储。
    * 单元测试中在无法真实触发 Playwright 事件的场景下使用。
    * 生产代码应走 attachToPage / startContextCollection 路径。

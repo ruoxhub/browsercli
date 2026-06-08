@@ -8,6 +8,7 @@
 
 export {listNetworkRequests} from './listNetworkRequests.js';
 export {getNetworkRequest} from './getNetworkRequest.js';
+export {clearNetworkRequests} from './clearNetworkRequests.js';
 
 // ─── WebSocket 工具（defineTool 模式）──────────────────
 
@@ -35,12 +36,15 @@ export type {
   RequestInitiator,
   ListNetworkRequestsParams,
   GetNetworkRequestParams,
+  ClearNetworkRequestsParams,
   NetworkRequestData,
   ListNetworkRequestsData,
   NetworkEvidenceCorrelation,
+  ClearNetworkRequestsData,
   GetNetworkRequestData,
   ListNetworkRequestsResult,
   GetNetworkRequestResult,
+  ClearNetworkRequestsResult,
   // WebSocket 参数类型
   ListWebSocketConnectionsParams,
   GetWebSocketMessagesParams,

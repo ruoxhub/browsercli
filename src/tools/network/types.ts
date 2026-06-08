@@ -63,6 +63,11 @@ export interface NetworkRuntimeServices {
   getDevToolsData: () => Promise<DevToolsData | undefined>;
   /** 将 CDP request ID 解析为稳定 ID */
   resolveCdpRequestId: (cdpRequestId: string) => number | undefined;
+  /**
+   * 清空指定页面的网络请求缓存。`pageIdx` 省略时清空当前选中页。
+   * 调用后已收集的请求从当前导航段移除，stableId 计数器也会重置。
+   */
+  clearNetworkRequests: (pageIdx?: number) => void;
 }
 
 /** DevTools 数据 */
@@ -137,6 +142,12 @@ export interface GetNetworkRequestParams {
   maxBodyLength?: number;
 }
 
+/** clearNetworkRequests 参数 */
+export interface ClearNetworkRequestsParams {
+  /** 浏览器页面索引，省略时使用当前活跃页 */
+  targetPageIdx?: number;
+}
+
 // ─── 数据类型 ──────────────────────────────────────────
 
 /** 单条网络请求的摘要数据（精简版） */
@@ -175,6 +186,14 @@ export interface NetworkEvidenceCorrelation {
   signatureIndicators: string[];
   initiator?: RequestInitiator;
   nextSteps: string[];
+}
+
+/** clearNetworkRequests 返回数据 */
+export interface ClearNetworkRequestsData {
+  /** 实际清空的请求数量 */
+  clearedCount: number;
+  /** 实际清空的浏览器页面索引 */
+  targetPageIdx: number;
 }
 
 /** getNetworkRequest 返回数据（完整详情） */
@@ -251,6 +270,12 @@ export interface ListNetworkRequestsResult extends MessagesResult<ListNetworkReq
 
 /** getNetworkRequest 结果 */
 export interface GetNetworkRequestResult extends MessagesResult<GetNetworkRequestData> {
+  tooltype: string;
+  logFormat: string;
+}
+
+/** clearNetworkRequests 结果 */
+export interface ClearNetworkRequestsResult extends MessagesResult<ClearNetworkRequestsData> {
   tooltype: string;
   logFormat: string;
 }

@@ -350,6 +350,14 @@ export class ToolContextProvider {
     );
   }
 
+  /**
+   * 清空指定页面的网络请求缓存。`pageIdx` 省略时清空当前选中页。
+   */
+  clearNetworkRequests(pageIdx?: number): void {
+    const page = this._resolveNetworkPage(pageIdx);
+    this._collectorContext.clearNetworkRequests(page);
+  }
+
   getNetworkRequestStableId(request: unknown): number {
     return this._collectorContext.getNetworkRequestStableId(
       this._browserContext.getCandidatePages(),

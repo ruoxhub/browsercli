@@ -120,6 +120,19 @@ export class CollectorContextProvider {
     return found.request as unknown as HTTPRequest;
   }
 
+  /**
+   * 清空指定页面的网络请求缓存。
+   *
+   * 调用后该页面已收集到的所有网络请求会从当前导航段中移除，
+   * 稳定 ID 计数器也会重置——后续新产生的请求会从 1 重新分配 stableId。
+   *
+   * 监听器（page.on('request', …)）保持挂载状态，新事件继续按原样收集。
+   */
+  clearNetworkRequests(page: Page | null): void {
+    if (!page) return;
+    this._networkCollector.clear(page);
+  }
+
   getNetworkRequestStableId(
     candidatePages: Page[],
     request: unknown,

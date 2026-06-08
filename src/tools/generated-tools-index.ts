@@ -406,6 +406,10 @@ export const GENERATED_TOOL_REGISTRY = [
     handlerName: 'getNetworkRequest',
   },
   {
+    modulePath: './network/clearNetworkRequests.js',
+    handlerName: 'clearNetworkRequests',
+  },
+  {
     modulePath: './network/listConnections.js',
     handlerName: 'listWebSocketConnections',
   },

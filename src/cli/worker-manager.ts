@@ -58,10 +58,19 @@ export class WorkerManager {
       throw new Error('Worker 已在运行中 (PID: ' + this.getPid() + ')');
     }
 
+    // 自愈：清理上次残留的 PID 文件（进程已死但文件还在）
+    this.removePidFile();
+
     this.lastStartOptions = {...options};
     this.stoppingIntentionally = false;
 
-    await this.spawnWorker(options);
+    try {
+      await this.spawnWorker(options);
+    } catch (err) {
+      // 启动失败时清理 PID 文件与内存引用，避免下次 start 误判
+      this.cleanup();
+      throw err;
+    }
   }
 
   /**
@@ -72,6 +81,12 @@ export class WorkerManager {
 
     const pid = this.getPid();
     if (!pid) {
+      throw new Error('Worker 未运行');
+    }
+
+    // 自愈：PID 文件存在但进程已死 — 清理后告知用户 Worker 未运行
+    if (!this.isRunning()) {
+      this.cleanup();
       throw new Error('Worker 未运行');
     }
 
@@ -113,7 +128,12 @@ export class WorkerManager {
 
     try {
       if (IS_WIN) {
-        return this.isPidAliveWindows(pid);
+        const alive = this.isPidAliveWindows(pid);
+        if (!alive) {
+          // PID 文件存在但进程已死 — 自愈清理
+          this.removePidFile();
+        }
+        return alive;
       }
       process.kill(pid, 0);
       return true;
