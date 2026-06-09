@@ -1,6 +1,0 @@
-{
-  "message": "pong",
-  "source": "debugger-lab",
-  "token": "token-watch",
-  "routes": ["fetchEcho", "xhrEcho"]
-}
