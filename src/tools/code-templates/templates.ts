@@ -84,8 +84,27 @@ export const CODE_TEMPLATES: Record<
   },
 };
 
+/** 模板名称列表，用于运行时校验。 */
+export const CODE_TEMPLATE_NAMES = Object.keys(CODE_TEMPLATES) as [
+  CodeTemplateName,
+  ...CodeTemplateName[],
+];
+
 /** 模板文件根目录 */
 export const TEMPLATES_DIR = '/mnt/d/browserplugs/v_jstools/tools/model_codes';
+
+/** 获取模板文件路径。 */
+export function getTemplatePath(template: {file: string}): string {
+  return `${TEMPLATES_DIR}/${template.file}.js`;
+}
+
+/** 读取模板文件内容。 */
+export async function readTemplateCode(template: {
+  file: string;
+}): Promise<string> {
+  const fs = await import('node:fs/promises');
+  return fs.readFile(getTemplatePath(template), 'utf-8');
+}
 
 /** 格式化字节数 */
 export function formatBytes(bytes: number): string {

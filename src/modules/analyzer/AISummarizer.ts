@@ -280,8 +280,13 @@ Provide analysis in JSON format with the following structure:
 
     // 评估复杂度
     const avgLineLength = content.length / lines.length;
-    const complexity: 'low' | 'medium' | 'high' =
-      avgLineLength > 100 ? 'high' : avgLineLength > 50 ? 'medium' : 'low';
+    let complexity: CodeSummary['complexity'] = 'low';
+
+    if (avgLineLength > 100) {
+      complexity = 'high';
+    } else if (avgLineLength > 50) {
+      complexity = 'medium';
+    }
 
     return {
       url: file.url,

@@ -8,16 +8,16 @@ import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
-import {CODE_TEMPLATES, TEMPLATES_DIR, formatBytes} from './templates.js';
-import type {CodeTemplateName} from './types.js';
+import {
+  CODE_TEMPLATE_NAMES,
+  CODE_TEMPLATES,
+  formatBytes,
+  readTemplateCode,
+} from './templates.js';
 
 const codeTemplateNameSchema = zod
-  .enum(
-    Object.keys(CODE_TEMPLATES) as [CodeTemplateName, ...CodeTemplateName[]],
-  )
-  .describe(
-    `Template name. Available: ${Object.keys(CODE_TEMPLATES).join(', ')}`,
-  );
+  .enum(CODE_TEMPLATE_NAMES)
+  .describe(`Template name. Available: ${CODE_TEMPLATE_NAMES.join(', ')}`);
 
 /**
  * 获取代码模板文件内容。
@@ -48,30 +48,25 @@ export const getCodeTemplate = defineTool({
           description: '',
           code: '',
           sizeBytes: 0,
-        }
+        },
       };
-      // response.appendResponseLine('```json');
-      // response.appendResponseLine(JSON.stringify(result, null, 2));
-      // response.appendResponseLine('```');
       response.setStructuredContent(result);
       return;
     }
 
     try {
-      const fs = await import('node:fs/promises');
-      const templatePath = `${TEMPLATES_DIR}/${templateInfo.file}.js`;
-      const code = await fs.readFile(templatePath, 'utf-8');
+      const code = await readTemplateCode(templateInfo);
       const sizeBytes = new TextEncoder().encode(code).length;
 
       const result = {
         success: true,
         message: `已获取模板：${templateInfo.name}（${formatBytes(sizeBytes)}）`,
         tooltype: 'get_code_template',
-        data:{
+        data: {
           name: templateName,
           description: templateInfo.description,
           code,
-          sizeBytes
+          sizeBytes,
         },
       };
 
@@ -81,12 +76,12 @@ export const getCodeTemplate = defineTool({
         success: false,
         message: `读取模板失败：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'get_code_template',
-        data:{
+        data: {
           name: templateName,
           description: templateInfo.description,
           code: '',
           sizeBytes: 0,
-        }
+        },
       };
 
       response.setStructuredContent(result);

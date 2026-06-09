@@ -8,15 +8,16 @@ import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 
-import {CODE_TEMPLATES, TEMPLATES_DIR} from './templates.js';
-import type {CodeTemplateName} from './types.js';
+import {
+  CODE_TEMPLATE_NAMES,
+  CODE_TEMPLATES,
+  readTemplateCode,
+} from './templates.js';
 
 const codeTemplateNameSchema = zod
-  .enum(
-    Object.keys(CODE_TEMPLATES) as [CodeTemplateName, ...CodeTemplateName[]],
-  )
+  .enum(CODE_TEMPLATE_NAMES)
   .describe(
-    `Template name to inject. Available: ${Object.keys(CODE_TEMPLATES).join(', ')}`,
+    `Template name to inject. Available: ${CODE_TEMPLATE_NAMES.join(', ')}`,
   );
 
 /**
@@ -45,17 +46,15 @@ export const injectCodeTemplate = defineTool({
         message: `未找到模板 "${templateName}"`,
         tooltype: 'inject_code_template',
         data: {
-          name: templateName
-        }
+          name: templateName,
+        },
       };
       response.setStructuredContent(result);
       return;
     }
 
     try {
-      const fs = await import('node:fs/promises');
-      const templatePath = `${TEMPLATES_DIR}/${templateInfo.file}.js`;
-      const code = await fs.readFile(templatePath, 'utf-8');
+      const code = await readTemplateCode(templateInfo);
 
       await frame.evaluate(code);
 
@@ -63,7 +62,7 @@ export const injectCodeTemplate = defineTool({
         success: true,
         message: `已注入模板：${templateInfo.name}`,
         tooltype: 'inject_code_template',
-        data: {name: templateName}
+        data: {name: templateName},
       };
       response.setStructuredContent(result);
     } catch (error) {
@@ -71,7 +70,7 @@ export const injectCodeTemplate = defineTool({
         success: false,
         message: `注入模板失败：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'inject_code_template',
-        data: {name: templateName}
+        data: {name: templateName},
       };
       response.setStructuredContent(result);
     }
