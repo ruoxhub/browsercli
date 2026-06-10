@@ -24,8 +24,5 @@ export function withOptionalTraceIdContent(
   if (mode !== 'all') {
     return content;
   }
-  return [
-    {type: 'text', text: JSON.stringify({traceId}, null, 2)},
-    ...content,
-  ];
+  return [{type: 'text', text: JSON.stringify({traceId}, null, 2)}, ...content];
 }

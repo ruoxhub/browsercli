@@ -13,6 +13,7 @@ import {manifest as collectorManifest} from './collector/manifest.js';
 import {manifest as consoleManifest} from './console/manifest.js';
 import {manifest as cryptoManifest} from './crypto/manifest.js';
 import {manifest as debuggerManifest} from './debugger/manifest.js';
+import {manifest as diagnosticsManifest} from './diagnostics/manifest.js';
 import {manifest as dialogManifest} from './dialog/manifest.js';
 import {manifest as domManifest} from './dom/manifest.js';
 import {manifest as emulationManifest} from './emulation/manifest.js';
@@ -42,6 +43,7 @@ export const GENERATED_DOMAIN_MANIFESTS = [
   consoleManifest,
   cryptoManifest,
   debuggerManifest,
+  diagnosticsManifest,
   dialogManifest,
   domManifest,
   emulationManifest,
@@ -272,6 +274,10 @@ export const GENERATED_TOOL_REGISTRY = [
   {
     modulePath: './debugger/index.js',
     handlerName: 'stopContinuousDebugging',
+  },
+  {
+    modulePath: './diagnostics/diagnoseEnvironment.js',
+    handlerName: 'diagnoseEnvironmentTool',
   },
   {
     modulePath: './dialog/handleDialog.js',

@@ -71,6 +71,10 @@ export const startCommand: AxiCliCommand<WorkerContext> = async (args, ctx) => {
   const executablePath = getFlag(parsed, 'executablePath');
   const databaseUrl = getFlag(parsed, 'databaseUrl');
   const waitForBrowser = getBoolFlag(parsed, 'wait-for-browser');
+  const traceOutput = getFlag(parsed, 'traceOutput') as
+    | 'errors'
+    | 'all'
+    | undefined;
 
   // 合并配置：CLI 参数 > 环境变量 > 配置文件 > 默认值
   const cfg = resolveConfig({
@@ -117,6 +121,7 @@ export const startCommand: AxiCliCommand<WorkerContext> = async (args, ctx) => {
       headless: cfg.headless,
       executablePath: cfg.executablePath,
       databaseUrl: cfg.databaseUrl,
+      traceOutput,
     });
   }
 

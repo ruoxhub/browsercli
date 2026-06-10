@@ -192,6 +192,8 @@ export class WorkerManager {
       workerArgs.push('--executablePath', options.executablePath);
     if (options.databaseUrl)
       workerArgs.push('--databaseUrl', options.databaseUrl);
+    if (options.traceOutput)
+      workerArgs.push('--traceOutput', options.traceOutput);
 
     const execPath = process.execPath;
     const workerEntry = path.resolve(__dirname, '../index.js');

@@ -186,6 +186,13 @@ export const cliOptions = {
     description: 'Host to bind to when HTTP mode is enabled.',
     default: '127.0.0.1',
   },
+  traceOutput: {
+    type: 'string',
+    description:
+      'Trace output mode: "errors" (default) only includes traceId on error responses, "all" includes traceId on every response.',
+    choices: ['errors', 'all'] as const,
+    default: 'errors',
+  },
 } satisfies Record<string, YargsOptions>;
 
 export function parseArguments(version: string, argv = process.argv) {

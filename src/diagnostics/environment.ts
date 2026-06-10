@@ -56,7 +56,9 @@ function getBuildOutputStatus(packageRoot: string): DiagnosticCheck {
     reason: exists
       ? `Build entry exists at ${buildEntry}.`
       : `Build entry is missing at ${buildEntry}.`,
-    fix: exists ? 'No action required.' : 'Run `npm run build` before starting.',
+    fix: exists
+      ? 'No action required.'
+      : 'Run `npm run build` before starting.',
     details: {buildEntry},
   };
 }

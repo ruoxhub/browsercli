@@ -59,12 +59,16 @@ interface WorkerStartOptions {
   executablePath?: string;
   /** PostgreSQL 连接字符串 */
   databaseUrl?: string;
+  /** Trace 输出模式: errors 或 all */
+  traceOutput?: 'errors' | 'all';
 }
 
 // ==================== Action 配置（兼容旧 BaseClient） ====================
 
 /** 简单 Action 处理函数 */
-type SimpleActionHandler = (params: Record<string, unknown>) => Promise<unknown>;
+type SimpleActionHandler = (
+  params: Record<string, unknown>,
+) => Promise<unknown>;
 
 /** Action 配置对象 */
 interface ActionConfig {
