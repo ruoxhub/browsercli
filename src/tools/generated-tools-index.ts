@@ -609,4 +609,24 @@ export const GENERATED_TOOL_REGISTRY = [
     modulePath: './workflow/traceSignatureGeneration.js',
     handlerName: 'traceSignatureGeneration',
   },
+  {
+    modulePath: './workflow/advisor.js',
+    handlerName: 'recommendNextStepTool',
+  },
+  {
+    modulePath: './workflow/advisor.js',
+    handlerName: 'explainReverseStage',
+  },
+  {
+    modulePath: './workflow/parameterWorkflows.js',
+    handlerName: 'listParameterWorkflowsTool',
+  },
+  {
+    modulePath: './workflow/parameterWorkflows.js',
+    handlerName: 'getParameterWorkflowTool',
+  },
+  {
+    modulePath: './workflow/parameterWorkflows.js',
+    handlerName: 'recommendParameterWorkflowTool',
+  },
 ] as const;
