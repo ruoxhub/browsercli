@@ -16,6 +16,7 @@ export enum ToolCategory {
   SCREENSHOT = 'screenshot',
   PAGES = 'pages',
   DATA = 'data',
+  DIAGNOSTICS = 'diagnostics',
 }
 
 export const labels = {
@@ -30,5 +31,6 @@ export const labels = {
   [ToolCategory.SCREENSHOT]: 'Screenshot',
   [ToolCategory.PAGES]: 'Pages',
   [ToolCategory.DATA]: 'Data',
+  [ToolCategory.DIAGNOSTICS]: 'Diagnostics',
 };
 
