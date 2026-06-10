@@ -63,10 +63,7 @@ async function waitForBrowserReachable(browserUrl: string): Promise<void> {
   );
 }
 
-export const startCommand: AxiCliCommand<WorkerContext> = async (
-  args,
-  ctx,
-) => {
+export const startCommand: AxiCliCommand<WorkerContext> = async (args, ctx) => {
   const parsed = parseArgs(args);
   const browserUrl = getFlag(parsed, 'browserUrl');
   const wsEndpoint = getFlag(parsed, 'wsEndpoint');
@@ -131,13 +128,16 @@ export const startCommand: AxiCliCommand<WorkerContext> = async (
   // 5. 轮询等待 Worker 注册到 Sekiro Server
   const workerReady = await waitForWorkerRegistered(invoker, cfg.group);
   if (!workerReady) {
-    throw new AxiError('Worker 启动后未能注册到 Sekiro Server', 'WORKER_REGISTER_TIMEOUT');
+    throw new AxiError(
+      'Worker 启动后未能注册到 Sekiro Server',
+      'WORKER_REGISTER_TIMEOUT',
+    );
   }
 
   // 6. 自动打开 Web 控制台（除非显式 --no-open）
   const noOpen = getBoolFlag(parsed, 'no-open');
-  const consolePortFlag = getFlag(parsed, 'console-port');
-  const consolePort = consolePortFlag ? parseInt(consolePortFlag, 10) || DEFAULT_CONSOLE_PORT : DEFAULT_CONSOLE_PORT;
+  const consolePort =
+    parseInt(getFlag(parsed, 'console-port') ?? '', 10) || DEFAULT_CONSOLE_PORT;
   const consoleUrl = `http://127.0.0.1:${consolePort}`;
   let consoleOpened = false;
   let consoleHint: string | undefined;
@@ -147,7 +147,8 @@ export const startCommand: AxiCliCommand<WorkerContext> = async (
     if (distRoot && existsSync(join(distRoot, 'index.html'))) {
       consoleOpened = openInBrowser(consoleUrl);
     } else {
-      consoleHint = '前台资源未构建，运行 `npm run web:build` 后再启动，或访问 http://127.0.0.1:5173 (Vite 开发模式)';
+      consoleHint =
+        '前台资源未构建，运行 `npm run web:build` 后再启动，或访问 http://127.0.0.1:5173 (Vite 开发模式)';
     }
   }
 
@@ -159,7 +160,8 @@ export const startCommand: AxiCliCommand<WorkerContext> = async (
     consoleUrl,
     consoleOpened,
     ...(consoleHint && {consoleHint}),
-    ...(waitForBrowser && cfg.browserUrl && {browserUrl: cfg.browserUrl, waitedForBrowser: true}),
+    ...(waitForBrowser &&
+      cfg.browserUrl && {browserUrl: cfg.browserUrl, waitedForBrowser: true}),
   });
 };
 
@@ -173,7 +175,7 @@ async function waitForWorkerRegistered(
 ): Promise<boolean> {
   for (let i = 0; i < maxAttempts; i++) {
     try {
-      const result = await invoker.listClients(group) as {
+      const result = (await invoker.listClients(group)) as {
         data?: unknown[];
         clients?: unknown[];
         status?: number;

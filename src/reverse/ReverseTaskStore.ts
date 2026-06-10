@@ -3,7 +3,14 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import {appendFile, mkdir, readFile, stat, writeFile} from 'node:fs/promises';
+import {
+  appendFile,
+  mkdir,
+  readFile,
+  readdir,
+  stat,
+  writeFile,
+} from 'node:fs/promises';
 import path from 'node:path';
 
 import type {
@@ -105,11 +112,32 @@ export class ReverseTaskStore implements ReverseTaskReadApi {
       slug: input.slug,
       targetUrl: input.targetUrl,
       goal: input.goal,
+      ...(input.currentStage ? {currentStage: input.currentStage} : {}),
+      ...(input.currentSummary ? {currentSummary: input.currentSummary} : {}),
+      ...(input.successCriteria
+        ? {successCriteria: input.successCriteria}
+        : {}),
+      ...(input.targetContext ? {targetContext: input.targetContext} : {}),
       createdAt: nowTimestamp(),
       updatedAt: nowTimestamp(),
     };
 
     if (existing) {
+      descriptor.slug = input.slug;
+      descriptor.targetUrl = input.targetUrl;
+      descriptor.goal = input.goal;
+      if (input.currentStage !== undefined) {
+        descriptor.currentStage = input.currentStage;
+      }
+      if (input.currentSummary !== undefined) {
+        descriptor.currentSummary = input.currentSummary;
+      }
+      if (input.successCriteria !== undefined) {
+        descriptor.successCriteria = input.successCriteria;
+      }
+      if (input.targetContext !== undefined) {
+        descriptor.targetContext = input.targetContext;
+      }
       descriptor.updatedAt = nowTimestamp();
     }
 
@@ -170,6 +198,17 @@ export class ReverseTaskStore implements ReverseTaskReadApi {
       .map(line => line.trim())
       .filter(line => line.length > 0)
       .map(line => JSON.parse(line) as Record<string, unknown>);
+  }
+
+  async listTaskIds(): Promise<string[]> {
+    if (!(await pathExists(this.rootDir))) {
+      return [];
+    }
+    const entries = await readdir(this.rootDir, {withFileTypes: true});
+    return entries
+      .filter(entry => entry.isDirectory())
+      .map(entry => entry.name)
+      .sort();
   }
 
   private async appendJsonLine(

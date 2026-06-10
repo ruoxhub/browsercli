@@ -18,6 +18,8 @@ export interface ValidationFailure {
   error: string;
 }
 
+type TypeValidationResult = {ok: true; value: unknown} | ValidationFailure;
+
 /**
  * 构造给定工具的别名映射。
  * 只保留 "别名目标存在于 schema、别名本身不在 schema" 的条目，
@@ -77,73 +79,68 @@ function normalizeRawArgs(
   return {ok: true, value: normalized};
 }
 
+function coerceNumber(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+
+  const parsed = Number(value);
+  if (value.trim() !== '' && !isNaN(parsed) && Number.isFinite(parsed)) {
+    return parsed;
+  }
+
+  return value;
+}
+
+function coerceBoolean(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+
+  const normalized = value.toLowerCase();
+  if (normalized === 'true') return true;
+  if (normalized === 'false') return false;
+
+  return value;
+}
+
+function typeError(toolName: string, key: string, expected: string): string {
+  return `${toolName} 的参数 ${key} 必须是${expected}`;
+}
+
 function validateType(
   toolName: string,
   key: string,
   spec: ToolArgSpec,
   value: unknown,
-): {ok: true; value: unknown} | ValidationFailure {
+): TypeValidationResult {
   switch (spec.type) {
     case 'string':
-      if (typeof value !== 'string') {
-        return {
-          ok: false,
-          error: `${toolName} 的参数 ${key} 必须是字符串`,
-        };
-      }
-      return {ok: true, value};
+      return typeof value === 'string'
+        ? {ok: true, value}
+        : {ok: false, error: typeError(toolName, key, '字符串')};
     case 'number': {
-      let numValue = value;
-      if (typeof value === 'string') {
-        const parsed = Number(value);
-        if (value.trim() !== '' && !isNaN(parsed) && Number.isFinite(parsed)) {
-          numValue = parsed;
-        }
-      }
-      if (typeof numValue !== 'number' || !Number.isFinite(numValue)) {
-        return {
-          ok: false,
-          error: `${toolName} 的参数 ${key} 必须是数字`,
-        };
-      }
-      return {ok: true, value: numValue};
+      const numValue = coerceNumber(value);
+      return typeof numValue === 'number' && Number.isFinite(numValue)
+        ? {ok: true, value: numValue}
+        : {ok: false, error: typeError(toolName, key, '数字')};
     }
     case 'boolean': {
-      let boolValue = value;
-      if (typeof value === 'string') {
-        if (value.toLowerCase() === 'true') {
-          boolValue = true;
-        } else if (value.toLowerCase() === 'false') {
-          boolValue = false;
-        }
-      }
-      if (typeof boolValue !== 'boolean') {
-        return {
-          ok: false,
-          error: `${toolName} 的参数 ${key} 必须是布尔值`,
-        };
-      }
-      return {ok: true, value: boolValue};
+      const boolValue = coerceBoolean(value);
+      return typeof boolValue === 'boolean'
+        ? {ok: true, value: boolValue}
+        : {ok: false, error: typeError(toolName, key, '布尔值')};
     }
     case 'string[]':
-      if (
-        !Array.isArray(value) ||
-        value.some(item => typeof item !== 'string')
-      ) {
-        return {
-          ok: false,
-          error: `${toolName} 的参数 ${key} 必须是字符串数组`,
-        };
-      }
-      return {ok: true, value};
+      return Array.isArray(value) &&
+        value.every(item => typeof item === 'string')
+        ? {ok: true, value}
+        : {ok: false, error: typeError(toolName, key, '字符串数组')};
     case 'object':
-      if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-        return {
-          ok: false,
-          error: `${toolName} 的参数 ${key} 必须是 JSON 对象（提示：用 --data '{...}' 或 --file params.json 传递）`,
-        };
-      }
-      return {ok: true, value};
+      return value !== null &&
+        typeof value === 'object' &&
+        !Array.isArray(value)
+        ? {ok: true, value}
+        : {
+            ok: false,
+            error: `${toolName} 的参数 ${key} 必须是 JSON 对象（提示：用 --data '{...}' 或 --file params.json 传递）`,
+          };
     default:
       return {ok: true, value};
   }
@@ -162,7 +159,7 @@ function unwrapArgsWrapper(
     typeof inner === 'object' &&
     inner !== null &&
     !Array.isArray(inner) &&
-    (!specs || !('args' in specs))
+    !('args' in specs)
   ) {
     return inner as Record<string, unknown>;
   }
@@ -214,7 +211,7 @@ export function validateToolArgs(
       return typeResult as ValidationFailure;
     }
 
-    const validatedValue = (typeResult as {value: unknown}).value;
+    const validatedValue = typeResult.value;
 
     if (
       spec.enum &&

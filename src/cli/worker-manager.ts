@@ -91,20 +91,8 @@ export class WorkerManager {
     }
 
     try {
-      if (IS_WIN) {
-        process.kill(pid);
-      } else {
-        process.kill(pid, 'SIGTERM');
-      }
-
-      // 等待进程退出（最多 10s）
-      const deadline = Date.now() + 10000;
-      while (Date.now() < deadline) {
-        if (!this.isRunning()) break;
-        await new Promise(r => setTimeout(r, 500));
-      }
-
-      // 如果还在运行，强制 kill (Unix only)
+      process.kill(pid, IS_WIN ? undefined : 'SIGTERM');
+      await this.waitForExit(10_000);
       if (!IS_WIN && this.isRunning()) {
         process.kill(pid, 'SIGKILL');
       }
@@ -192,14 +180,18 @@ export class WorkerManager {
    */
   private async spawnWorker(options: WorkerStartOptions): Promise<void> {
     const workerArgs: string[] = [
-      '--rpcHost', options.rpcHost,
-      '--group', options.group,
+      '--rpcHost',
+      options.rpcHost,
+      '--group',
+      options.group,
     ];
     if (options.browserUrl) workerArgs.push('--browserUrl', options.browserUrl);
     if (options.wsEndpoint) workerArgs.push('--wsEndpoint', options.wsEndpoint);
     if (options.headless) workerArgs.push('--headless');
-    if (options.executablePath) workerArgs.push('--executablePath', options.executablePath);
-    if (options.databaseUrl) workerArgs.push('--databaseUrl', options.databaseUrl);
+    if (options.executablePath)
+      workerArgs.push('--executablePath', options.executablePath);
+    if (options.databaseUrl)
+      workerArgs.push('--databaseUrl', options.databaseUrl);
 
     const execPath = process.execPath;
     const workerEntry = path.resolve(__dirname, '../index.js');
@@ -297,14 +289,26 @@ export class WorkerManager {
   }
 
   /**
+   * 轮询等待 Worker 进程退出，超时后静默返回（由调用方决定是否强制 kill）。
+   */
+  private async waitForExit(timeoutMs: number): Promise<void> {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      if (!this.isRunning()) return;
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+  }
+
+  /**
    * Windows: 使用 tasklist 检测进程是否存活
    */
   private isPidAliveWindows(pid: number): boolean {
     try {
-      const result = execSync(
-        `tasklist /FI "PID eq ${pid}" /NH /FO CSV`,
-        {encoding: 'utf-8', timeout: 3000, windowsHide: true},
-      );
+      const result = execSync(`tasklist /FI "PID eq ${pid}" /NH /FO CSV`, {
+        encoding: 'utf-8',
+        timeout: 3000,
+        windowsHide: true,
+      });
       return result.includes(`"${pid}"`);
     } catch {
       return false;

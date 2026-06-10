@@ -270,7 +270,26 @@ export interface ParsedArgs {
  * 规则：以单个 - 开头，后面紧跟数字或 . 数字
  */
 function isNegativeNumber(arg: string): boolean {
-  return /^-\d/.test(arg) || /^-\.\d/.test(arg);
+  return /^-(\d|\.\d)/.test(arg);
+}
+
+/**
+ * 消费紧跟在 flag 后面的值：若下一个 token 存在且不以 `-` 开头则作为字符串值，
+ * 否则视为布尔 flag。返回新的游标位置（已消费时 +1）。
+ */
+function consumeFlagValue(
+  rawArgs: string[],
+  index: number,
+  flags: Record<string, string | boolean>,
+  key: string,
+): number {
+  const next = rawArgs[index + 1];
+  if (next !== undefined && !next.startsWith('-')) {
+    flags[key] = next;
+    return index + 1;
+  }
+  flags[key] = true;
+  return index;
 }
 
 export function parseArgs(rawArgs: string[]): ParsedArgs {
@@ -288,18 +307,9 @@ export function parseArgs(rawArgs: string[]): ParsedArgs {
       // 长选项
       const eqIndex = arg.indexOf('=');
       if (eqIndex !== -1) {
-        const key = arg.slice(2, eqIndex);
-        const value = arg.slice(eqIndex + 1);
-        result.flags[key] = value;
+        result.flags[arg.slice(2, eqIndex)] = arg.slice(eqIndex + 1);
       } else {
-        const key = arg.slice(2);
-        const next = rawArgs[i + 1];
-        if (next !== undefined && !next.startsWith('-')) {
-          result.flags[key] = next;
-          i++;
-        } else {
-          result.flags[key] = true;
-        }
+        i = consumeFlagValue(rawArgs, i, result.flags, arg.slice(2));
       }
     } else if (
       arg.startsWith('-') &&
@@ -307,22 +317,14 @@ export function parseArgs(rawArgs: string[]): ParsedArgs {
       !isNegativeNumber(arg)
     ) {
       // 短选项 -x
-      const key = arg.slice(1);
-      const next = rawArgs[i + 1];
-      if (next !== undefined && !next.startsWith('-')) {
-        result.flags[key] = next;
-        i++;
-      } else {
-        result.flags[key] = true;
-      }
+      i = consumeFlagValue(rawArgs, i, result.flags, arg.slice(1));
     } else if (
       arg.startsWith('-') &&
       arg.length > 2 &&
       !isNegativeNumber(arg)
     ) {
       // 组合短选项 -abc → -a -b -c
-      const letters = arg.slice(1).split('');
-      for (const letter of letters) {
+      for (const letter of arg.slice(1)) {
         result.flags[letter] = true;
       }
     } else {

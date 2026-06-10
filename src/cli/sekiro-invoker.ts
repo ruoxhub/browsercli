@@ -88,10 +88,12 @@ export class SekiroInvoker {
         });
 
         if (!response.ok) {
-          throw new Error(`Sekiro HTTP ${response.status}: ${await response.text()}`);
+          throw new Error(
+            `Sekiro HTTP ${response.status}: ${await response.text()}`,
+          );
         }
 
-        const result = await response.json() as RpcResponse;
+        const result = (await response.json()) as RpcResponse;
 
         // Sekiro 返回 status=-1 或 code=-1 表示失败
         if (result.status === -1 || result.code === -1) {
@@ -103,13 +105,18 @@ export class SekiroInvoker {
         lastError = error instanceof Error ? error : new Error(String(error));
 
         // 不可重试的错误直接抛出
-        if (error instanceof Error && error.message.startsWith('Sekiro HTTP 4')) {
+        if (
+          error instanceof Error &&
+          error.message.startsWith('Sekiro HTTP 4')
+        ) {
           throw error;
         }
 
         // 还有重试机会，等待后继续
         if (attempt < this.maxRetries - 1) {
-          await new Promise(r => setTimeout(r, this.retryDelay * (attempt + 1)));
+          await new Promise(r =>
+            setTimeout(r, this.retryDelay * (attempt + 1)),
+          );
         }
       }
     }
@@ -157,28 +164,9 @@ export class SekiroInvoker {
    */
   async isServerAvailable(maxAttempts = 2): Promise<boolean> {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      // 1. 先尝试根路径（最轻量）
-      try {
-        const response = await fetch(this.baseUrl, {
-          signal: AbortSignal.timeout(this.healthTimeout),
-        });
-        if (response.ok || response.status === 302) return true;
-      } catch {
-        // 根路径不可达，尝试业务端点
+      if ((await this.probeRoot()) || (await this.probeClientQueue())) {
+        return true;
       }
-
-      // 2. 回退到 clientQueue 端点（某些 rpc-go 版本没有 groupQueue）
-      try {
-        const url = `${this.baseUrl}/business/clientQueue?group=healthcheck`;
-        const response = await fetch(url, {
-          signal: AbortSignal.timeout(this.healthTimeout),
-        });
-        if (response.ok) return true;
-      } catch {
-        // 两个端点均不可达
-      }
-
-      // 还有重试机会则等待
       if (attempt < maxAttempts - 1) {
         await new Promise(r => setTimeout(r, 500));
       }
@@ -191,5 +179,28 @@ export class SekiroInvoker {
    */
   getHttpUrl(): string {
     return this.baseUrl;
+  }
+
+  private async probeRoot(): Promise<boolean> {
+    try {
+      const response = await fetch(this.baseUrl, {
+        signal: AbortSignal.timeout(this.healthTimeout),
+      });
+      return response.ok || response.status === 302;
+    } catch {
+      return false;
+    }
+  }
+
+  private async probeClientQueue(group = 'healthcheck'): Promise<boolean> {
+    try {
+      const url = `${this.baseUrl}/business/clientQueue?group=${encodeURIComponent(group)}`;
+      const response = await fetch(url, {
+        signal: AbortSignal.timeout(this.healthTimeout),
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
   }
 }

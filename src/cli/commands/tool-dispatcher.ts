@@ -29,16 +29,15 @@ export const toolDispatcherCommand: AxiCliCommand<WorkerContext> = async (
   }
 
   await ensureToolsMeta();
-  // 兼容旧技能名：observe-flow → observe_flow
   const normalizedName = requestedName.includes('-')
     ? requestedName.replaceAll('-', '_')
     : requestedName;
   const meta = getToolMeta(requestedName) ?? getToolMeta(normalizedName);
 
   if (!meta) {
-    const suggestions = (
-      await searchTools(requestedName)
-    ).map(t => t.name).slice(0, 5);
+    const suggestions = (await searchTools(requestedName))
+      .map(t => t.name)
+      .slice(0, 5);
     throw new AxiError(
       `未知工具：${requestedName}`,
       'UNKNOWN_TOOL',
@@ -75,4 +74,3 @@ export const toolDispatcherCommand: AxiCliCommand<WorkerContext> = async (
     );
   }
 };
-

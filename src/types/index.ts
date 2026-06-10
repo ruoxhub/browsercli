@@ -887,6 +887,10 @@ export interface ReverseTaskOpenInput {
   slug: string;
   targetUrl: string;
   goal: string;
+  currentStage?: string;
+  currentSummary?: string;
+  successCriteria?: Record<string, unknown>;
+  targetContext?: Record<string, unknown>;
 }
 
 export interface ReverseTaskDescriptor {
@@ -894,6 +898,12 @@ export interface ReverseTaskDescriptor {
   slug: string;
   targetUrl: string;
   goal: string;
+  currentStage?: string;
+  currentSummary?: string;
+  successCriteria?: Record<string, unknown>;
+  targetContext?: Record<string, unknown>;
+  tags?: string[];
+  archivedAt?: number;
   createdAt: number;
   updatedAt: number;
 }
@@ -921,6 +931,18 @@ export interface ReverseTaskReadApi {
     name: string,
     taskId: string,
   ): Promise<Array<Record<string, unknown>>>;
+}
+
+export interface ReverseTaskState {
+  taskId: string;
+  currentStage: string;
+  status: string;
+  nextStepHint?: string;
+  successCriteria?: Record<string, unknown>;
+  currentSummary?: string;
+  signals?: Record<string, unknown>;
+  reasoning?: string[];
+  updatedAt: number;
 }
 
 // ==================== 全局类型扩展 ====================
