@@ -4,38 +4,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {CodeSummary} from '../../modules/analyzer/AISummarizer.js';
 import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
 import type {CodeFile} from '../../types/index.js';
 import {ToolCategory} from '../categories.js';
+import {withOperationTimeout} from '../shared/browserRuntime.js';
 import {defineTool} from '../ToolDefinition.js';
 
-import type {
-  SummarizeFileResult,
-  SummarizeBatchResult,
-  SummarizeProjectResult,
-  SummarizeProjectData,
-} from './types.js';
+import type {SummarizeFileResult} from './types.js';
 
 const SUMMARIZE_TIMEOUT_MS = 15_000;
 
 const FUNCTION_NAME_REGEX = /function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)/g;
 
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error('Summarization timed out')), ms),
-    ),
-  ]);
-}
-
-function buildEmptyFileSummary(code: string, url: string): CodeSummary {
+function buildEmptyFileSummary(code: string, url: string) {
   const lines = code.split('\n');
   const averageLineLength = code.length / Math.max(lines.length, 1);
   const complexity: 'low' | 'medium' | 'high' =
-    averageLineLength > 100 ? 'high' : averageLineLength > 50 ? 'medium' : 'low';
+    averageLineLength > 100
+      ? 'high'
+      : averageLineLength > 50
+        ? 'medium'
+        : 'low';
   const keyFunctions = [...code.matchAll(FUNCTION_NAME_REGEX)]
     .map(match => match[1])
     .slice(0, 10);
@@ -55,7 +45,7 @@ function buildEmptyFileSummary(code: string, url: string): CodeSummary {
   };
 }
 
-function buildEmptyProjectSummary(files: Array<{size?: number}>): SummarizeProjectData {
+function buildEmptyProjectSummary(files: Array<{size?: number}>) {
   return {
     totalFiles: files.length,
     totalSize: files.reduce((sum, file) => sum + (file.size ?? 0), 0),
@@ -67,84 +57,31 @@ function buildEmptyProjectSummary(files: Array<{size?: number}>): SummarizeProje
   };
 }
 
-export async function summarizeFile(
-  file: CodeFile,
-): Promise<SummarizeFileResult> {
-  try {
-    const data = await getRuntime().summarizer.summarizeFile(file);
-    return {
-      success: true,
-      message: 'File summarization completed',
-      tooltype: 'summarize',
-      data,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `File summarization failed: ${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'summarize',
-      data: {} as SummarizeFileResult['data'],
-    };
-  }
-}
-
-export async function summarizeBatch(
-  files: CodeFile[],
-  maxConcurrent?: number,
-): Promise<SummarizeBatchResult> {
-  try {
-    const data = await getRuntime().summarizer.summarizeBatch(files, maxConcurrent);
-    return {
-      success: true,
-      message: 'Batch summarization completed',
-      tooltype: 'summarize',
-      data,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `Batch summarization failed: ${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'summarize',
-      data: [],
-    };
-  }
-}
-
-export async function summarizeProject(
-  files: CodeFile[],
-): Promise<SummarizeProjectResult> {
-  try {
-    const data = await getRuntime().summarizer.summarizeProject(files);
-    return {
-      success: true,
-      message: 'Project summarization completed',
-      tooltype: 'summarize',
-      data,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `Project summarization failed: ${error instanceof Error ? error.message : String(error)}`,
-      tooltype: 'summarize',
-      data: {} as SummarizeProjectResult['data'],
-    };
-  }
-}
-
 export const summarizeCode = defineTool({
   name: 'summarize_code',
-  description: 'Summarize one code file, multiple files, or project-level context.',
+  description:
+    'Summarize one code file, multiple files, or project-level context.',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
   schema: {
     mode: zod.enum(['single', 'batch', 'project']).default('single'),
     code: zod.string().optional(),
     url: zod.string().optional(),
-    files: zod.array(zod.object({
-      url: zod.string(),
-      content: zod.string(),
-      size: zod.number().int().nonnegative(),
-      type: zod.enum(['inline', 'external', 'dynamic', 'service-worker', 'web-worker']),
-    })).optional(),
+    files: zod
+      .array(
+        zod.object({
+          url: zod.string(),
+          content: zod.string(),
+          size: zod.number().int().nonnegative(),
+          type: zod.enum([
+            'inline',
+            'external',
+            'dynamic',
+            'service-worker',
+            'web-worker',
+          ]),
+        }),
+      )
+      .optional(),
   },
   handler: async (request, response) => {
     const runtime = getRuntime();
@@ -153,8 +90,9 @@ export const summarizeCode = defineTool({
 
     try {
       if (mode === 'project') {
-        const data = await withTimeout(
+        const data = await withOperationTimeout(
           runtime.summarizer.summarizeProject(safeFiles as any),
+          'summarize project',
           SUMMARIZE_TIMEOUT_MS,
         );
         response.setStructuredContent({
@@ -167,8 +105,9 @@ export const summarizeCode = defineTool({
       }
 
       if (mode === 'batch') {
-        const data = await withTimeout(
+        const data = await withOperationTimeout(
           runtime.summarizer.summarizeBatch(safeFiles as any),
+          'summarize batch',
           SUMMARIZE_TIMEOUT_MS,
         );
         response.setStructuredContent({
@@ -187,8 +126,9 @@ export const summarizeCode = defineTool({
         size: (code ?? '').length,
         type: 'inline',
       };
-      const data = await withTimeout(
+      const data = await withOperationTimeout(
         runtime.summarizer.summarizeFile(file),
+        'summarize file',
         SUMMARIZE_TIMEOUT_MS,
       );
       response.setStructuredContent<SummarizeFileResult>({
@@ -198,26 +138,26 @@ export const summarizeCode = defineTool({
         logFormat: 'json',
         data,
       });
-    } catch (error) {
-      // Fallback to basic analysis on timeout or LLM failure.
-      const fallback =
-        mode === 'project'
-          ? buildEmptyProjectSummary(safeFiles)
-          : mode === 'batch'
-            ? safeFiles.map(file => buildEmptyFileSummary(file.content, file.url))
-            : buildEmptyFileSummary(code ?? '', url ?? 'inline-input.js');
+    } catch {
+      let fallback;
+      if (mode === 'project') {
+        fallback = buildEmptyProjectSummary(safeFiles);
+      } else if (mode === 'batch') {
+        fallback = safeFiles.map(file =>
+          buildEmptyFileSummary(file.content, file.url),
+        );
+      } else {
+        fallback = buildEmptyFileSummary(code ?? '', url ?? 'inline-input.js');
+      }
 
       response.setStructuredContent({
         success: true,
-        message: 'Summarization completed (fallback: AI unavailable or timed out)',
+        message:
+          'Summarization completed (fallback: AI unavailable or timed out)',
         tooltype: 'summarize',
         logFormat: 'json',
         data: fallback,
       });
-
-      // Touch the error to keep types honest in the no-unused-vars sense
-      // (we surface the failure via the fallback message above).
-      void error;
     }
   },
 });

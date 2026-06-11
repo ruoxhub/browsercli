@@ -75,7 +75,11 @@ function emptyAnalyzeTargetData(target: string): AnalyzeTargetData {
     },
     requestFingerprints: [],
     priorityTargets: [],
-    signatureChain: {signatureParams: [], candidateFunctions: [], requestSinks: []},
+    signatureChain: {
+      signatureParams: [],
+      candidateFunctions: [],
+      requestSinks: [],
+    },
     actionPlan: [],
     recommendedNextSteps: [],
     whyTheseSteps: [],
@@ -96,7 +100,14 @@ export interface AnalyzeTargetParams {
   maxCorrelatedFlows?: number;
   maxFingerprints?: number;
   autoReplayActions?: Array<{
-    action: 'navigate' | 'click' | 'type' | 'wait' | 'scroll' | 'pressKey' | 'evaluate';
+    action:
+      | 'navigate'
+      | 'click'
+      | 'type'
+      | 'wait'
+      | 'scroll'
+      | 'pressKey'
+      | 'evaluate';
     url?: string;
     selector?: string;
     text?: string;
@@ -142,7 +153,9 @@ async function collectAnalyzeTargetCode(
   const normalizedFiles = normalizeCollectedFiles(collectResult);
   const topPriority = runtime.collector.getTopPriorityFiles(topN);
   const candidateFiles =
-    topPriority.files.length > 0 ? topPriority.files : normalizedFiles.slice(0, topN);
+    topPriority.files.length > 0
+      ? topPriority.files
+      : normalizedFiles.slice(0, topN);
   const mergedCode = candidateFiles
     .map(file => `// ${file.url}\n${file.content}`)
     .join('\n\n');
@@ -185,18 +198,22 @@ async function installAnalyzeHooks(
   return injectedHooks;
 }
 
-function extractCollectionDependencies(
-  collectResult: unknown,
-): {nodes: unknown[]; edges: unknown[]} {
+function extractCollectionDependencies(collectResult: unknown): {
+  nodes: unknown[];
+  edges: unknown[];
+} {
   if (!collectResult || typeof collectResult !== 'object') {
     return EMPTY_DEPENDENCIES;
   }
-  const dependencies = (collectResult as {dependencies?: {nodes: unknown[]; edges: unknown[]}})
-    .dependencies;
+  const dependencies = (
+    collectResult as {dependencies?: {nodes: unknown[]; edges: unknown[]}}
+  ).dependencies;
   return dependencies ?? EMPTY_DEPENDENCIES;
 }
 
-function buildActiveUrls(timeline: HookTimelineEntry[]): Array<{url: string; count: number}> {
+function buildActiveUrls(
+  timeline: HookTimelineEntry[],
+): Array<{url: string; count: number}> {
   const urlActivity = timeline.reduce<Record<string, number>>((acc, item) => {
     if (item.url) {
       acc[item.url] = (acc[item.url] ?? 0) + 1;
@@ -214,24 +231,31 @@ function buildNextActions(input: {
   hookTimelineLength: number;
   hasSecurityRisks: boolean;
 }): string[] {
-  const actions: Array<string | null> = [
-    input.cryptoAlgorithmCount > 0
-      ? 'Focus on crypto-related files from top-priority list.'
-      : null,
-    input.hookTimelineLength === 0
-      ? 'Trigger page interactions and rerun get_hook_data / analyze_target.'
-      : null,
-    input.hasSecurityRisks
-      ? 'Review high-severity security findings and verify call stacks.'
-      : null,
-  ];
-  return actions.filter((item): item is string => Boolean(item));
+  const actions: string[] = [];
+  if (input.cryptoAlgorithmCount > 0) {
+    actions.push('Focus on crypto-related files from top-priority list.');
+  }
+  if (input.hookTimelineLength === 0) {
+    actions.push(
+      'Trigger page interactions and rerun get_hook_data / analyze_target.',
+    );
+  }
+  if (input.hasSecurityRisks) {
+    actions.push(
+      'Review high-severity security findings and verify call stacks.',
+    );
+  }
+  return actions;
 }
 
 export const analyze_target = defineTool({
   name: 'analyze_target',
-  description: 'One-shot reverse workflow: collect code, run security/crypto analysis, optional deobfuscation, and hook timeline correlation.',
-  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: false},
+  description:
+    'One-shot reverse workflow: collect code, run security/crypto analysis, optional deobfuscation, and hook timeline correlation.',
+  annotations: {
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: false,
+  },
   schema: {
     url: zod.string().url(),
     topN: zod.number().int().positive().optional(),
@@ -243,26 +267,42 @@ export const analyze_target = defineTool({
     correlationWindowMs: zod.number().int().positive().optional(),
     maxCorrelatedFlows: zod.number().int().positive().optional(),
     maxFingerprints: zod.number().int().positive().optional(),
-    autoReplayActions: zod.array(zod.object({
-      action: zod.enum(['navigate', 'click', 'type', 'wait', 'scroll', 'pressKey', 'evaluate']),
-      url: zod.string().url().optional(),
-      selector: zod.string().optional(),
-      text: zod.string().optional(),
-      delay: zod.number().int().nonnegative().optional(),
-      timeout: zod.number().int().positive().optional(),
-      x: zod.number().optional(),
-      y: zod.number().optional(),
-      key: zod.string().optional(),
-      code: zod.string().optional(),
-    })).optional(),
-    collect: zod.object({
-      smartMode: zod.enum(['summary', 'priority', 'incremental', 'full']).optional(),
-      includeInline: zod.boolean().optional(),
-      includeExternal: zod.boolean().optional(),
-      includeDynamic: zod.boolean().optional(),
-      maxTotalSize: zod.number().int().positive().optional(),
-      maxFileSize: zod.number().int().positive().optional(),
-    }).optional(),
+    autoReplayActions: zod
+      .array(
+        zod.object({
+          action: zod.enum([
+            'navigate',
+            'click',
+            'type',
+            'wait',
+            'scroll',
+            'pressKey',
+            'evaluate',
+          ]),
+          url: zod.string().url().optional(),
+          selector: zod.string().optional(),
+          text: zod.string().optional(),
+          delay: zod.number().int().nonnegative().optional(),
+          timeout: zod.number().int().positive().optional(),
+          x: zod.number().optional(),
+          y: zod.number().optional(),
+          key: zod.string().optional(),
+          code: zod.string().optional(),
+        }),
+      )
+      .optional(),
+    collect: zod
+      .object({
+        smartMode: zod
+          .enum(['summary', 'priority', 'incremental', 'full'])
+          .optional(),
+        includeInline: zod.boolean().optional(),
+        includeExternal: zod.boolean().optional(),
+        includeDynamic: zod.boolean().optional(),
+        maxTotalSize: zod.number().int().positive().optional(),
+        maxFileSize: zod.number().int().positive().optional(),
+      })
+      .optional(),
   },
   handler: async (request, response) => {
     const runtime = getRuntime();
@@ -282,8 +322,10 @@ export const analyze_target = defineTool({
     const startedAt = Date.now();
     const hookPreset = params.hookPreset ?? 'api-signature';
     const autoInjectHooks = params.autoInjectHooks ?? true;
-    const correlationWindowMs = params.correlationWindowMs ?? DEFAULT_CORRELATION_WINDOW_MS;
-    const maxCorrelatedFlows = params.maxCorrelatedFlows ?? DEFAULT_MAX_CORRELATED_FLOWS;
+    const correlationWindowMs =
+      params.correlationWindowMs ?? DEFAULT_CORRELATION_WINDOW_MS;
+    const maxCorrelatedFlows =
+      params.maxCorrelatedFlows ?? DEFAULT_MAX_CORRELATED_FLOWS;
     const maxFingerprints = params.maxFingerprints ?? DEFAULT_MAX_FINGERPRINTS;
 
     const {collectResult, normalizedFiles, candidateFiles, analysisCode} =
@@ -292,10 +334,16 @@ export const analyze_target = defineTool({
         'analyze_target 代码收集',
         COLLECT_TIMEOUT_MS,
       );
-    const injectedHooks = await installAnalyzeHooks(runtime, hookPreset, autoInjectHooks);
+    const injectedHooks = await installAnalyzeHooks(
+      runtime,
+      hookPreset,
+      autoInjectHooks,
+    );
 
     const replayResults = params.autoReplayActions?.length
-      ? await runtime.pageController.replayActions(params.autoReplayActions as any)
+      ? await runtime.pageController.replayActions(
+          params.autoReplayActions as any,
+        )
       : [];
 
     if (params.waitAfterHookMs && params.waitAfterHookMs > 0) {
@@ -322,14 +370,25 @@ export const analyze_target = defineTool({
 
     const hookRecords = injectedHooks.map(hook => ({
       hookId: hook.hookId,
-      records: runtime.hookManager.getRecords(hook.hookId) as Array<Record<string, unknown>>,
+      records: runtime.hookManager.getRecords(hook.hookId) as Array<
+        Record<string, unknown>
+      >,
     }));
 
     const hookTimeline = buildHookTimeline(hookRecords);
     const activeUrls = buildActiveUrls(hookTimeline);
-    const correlatedFlows = correlateNetworkFlows(hookTimeline, correlationWindowMs, maxCorrelatedFlows);
-    const suspiciousFlows = correlatedFlows.filter(flow => flow.signatureIndicators.length > 0);
-    const requestFingerprints = buildRequestFingerprints(correlatedFlows, maxFingerprints);
+    const correlatedFlows = correlateNetworkFlows(
+      hookTimeline,
+      correlationWindowMs,
+      maxCorrelatedFlows,
+    );
+    const suspiciousFlows = correlatedFlows.filter(
+      flow => flow.signatureIndicators.length > 0,
+    );
+    const requestFingerprints = buildRequestFingerprints(
+      correlatedFlows,
+      maxFingerprints,
+    );
     const signatureHints = extractSignatureChainHints(analysisCode);
     const priorityTargets = buildPriorityTargets({
       requestFingerprints,
@@ -371,7 +430,10 @@ export const analyze_target = defineTool({
         totalRecords: hookTimeline.length,
         activeUrls,
         correlatedFlows,
-        suspiciousFlows: suspiciousFlows.slice(0, DEFAULT_SUSPICIOUS_FLOWS_LIMIT),
+        suspiciousFlows: suspiciousFlows.slice(
+          0,
+          DEFAULT_SUSPICIOUS_FLOWS_LIMIT,
+        ),
         timelineSample: hookTimeline.slice(0, DEFAULT_TIMELINE_SAMPLE_LIMIT),
       },
       requestFingerprints,

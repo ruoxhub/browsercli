@@ -61,23 +61,25 @@ function buildRiskRecommendations(input: {
   dangerousAlgorithmCount: number;
   hookSignalCount: number;
 }): string[] {
-  const items: Array<string | null> = [
-    input.highSeverityCount > 0
-      ? 'Prioritize high-severity security findings first.'
-      : null,
-    input.dangerousAlgorithmCount > 0
-      ? 'Replace weak crypto algorithms (MD5/SHA1/RC4/DES).'
-      : null,
-    input.hookSignalCount > 0
-      ? 'Review hook records to confirm if suspicious paths are expected.'
-      : null,
-  ];
-  return items.filter((item): item is string => Boolean(item));
+  const items: string[] = [];
+  if (input.highSeverityCount > 0) {
+    items.push('Prioritize high-severity security findings first.');
+  }
+  if (input.dangerousAlgorithmCount > 0) {
+    items.push('Replace weak crypto algorithms (MD5/SHA1/RC4/DES).');
+  }
+  if (input.hookSignalCount > 0) {
+    items.push(
+      'Review hook records to confirm if suspicious paths are expected.',
+    );
+  }
+  return items;
 }
 
 export const riskPanel = defineTool({
   name: 'risk_panel',
-  description: 'Build a combined risk score from analyzer, crypto detector and hook signals.',
+  description:
+    'Build a combined risk score from analyzer, crypto detector and hook signals.',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
   schema: {
     code: zod.string().optional(),
@@ -91,7 +93,8 @@ export const riskPanel = defineTool({
     if (!runtime?.analyzer?.understand || !runtime?.cryptoDetector?.detect) {
       response.setStructuredContent({
         success: false,
-        message: 'risk_panel requires analyzer.understand and cryptoDetector.detect runtime services',
+        message:
+          'risk_panel requires analyzer.understand and cryptoDetector.detect runtime services',
         tooltype: 'riskPanel',
         data: emptyRiskPanelData(),
       });
@@ -100,27 +103,32 @@ export const riskPanel = defineTool({
 
     let code = request.params.code;
     if (!code) {
-      const top = runtime.collector.getTopPriorityFiles(request.params.topN ?? 5);
+      const top = runtime.collector.getTopPriorityFiles(
+        request.params.topN ?? 5,
+      );
       if (top.files.length === 0) {
         response.setStructuredContent({
           success: false,
-          message: 'No code provided and no collected files found. Run collect_code first.',
+          message:
+            'No code provided and no collected files found. Run collect_code first.',
           tooltype: 'riskPanel',
           logFormat: 'json',
           data: emptyRiskPanelData(),
         });
         return;
       }
-      code = top.files.map(file => `// ${file.url}\n${file.content}`).join('\n\n');
+      code = top.files
+        .map(file => `// ${file.url}\n${file.content}`)
+        .join('\n\n');
     }
 
     const [understand, crypto] = await withOperationTimeout(
       Promise.all([
         runtime.analyzer.understand({
-          code: code ?? '',
+          code,
           focus: 'security',
         }),
-        runtime.cryptoDetector.detect({code: code ?? ''}),
+        runtime.cryptoDetector.detect({code}),
       ]),
       'risk_panel 分析',
       RISK_PANEL_TIMEOUT_MS,
@@ -172,7 +180,9 @@ export const riskPanel = defineTool({
           highSeverityRisks: highSeverityCount,
           cryptoAlgorithms: algorithms.length,
           cryptoIssues: cryptoIssues.length,
-          dangerousAlgorithms: dangerousAlgorithms.map(algo => algo.name ?? 'unknown'),
+          dangerousAlgorithms: dangerousAlgorithms.map(
+            algo => algo.name ?? 'unknown',
+          ),
           hookSignals: hookSignalCount,
         },
         recommendations: buildRiskRecommendations({

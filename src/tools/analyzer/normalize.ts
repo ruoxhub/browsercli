@@ -6,9 +6,7 @@
 
 import type {CollectedFileEntry} from './types.js';
 
-export function normalizeCollectedFiles(
-  result: unknown,
-): Array<{url: string; content: string; size: number; type: string}> {
+export function normalizeCollectedFiles(result: unknown): CollectedFileEntry[] {
   if (!result || typeof result !== 'object') {
     return [];
   }
@@ -40,9 +38,7 @@ export function normalizeCollectedFiles(
     }));
 }
 
-export function toRecord(
-  value: unknown,
-): Record<string, unknown> | undefined {
+export function toRecord(value: unknown): Record<string, unknown> | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return undefined;
   }

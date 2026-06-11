@@ -4,7 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {CorrelatedFlow, RequestFingerprint, PriorityTarget, SignatureChainHints} from './types.js';
+import type {
+  CorrelatedFlow,
+  RequestFingerprint,
+  PriorityTarget,
+  SignatureChainHints,
+} from './types.js';
 
 const URL_NUMBER_SEGMENT = /\/\d{2,}(?=\/|$)/g;
 const URL_HEX_SEGMENT = /\/[a-f0-9]{8,}(?=\/|$)/gi;
@@ -54,14 +59,21 @@ function scoreFlow(flow: {
 }): number {
   return (
     Math.min(flow.eventCount, MAX_EVENTS_FOR_SCORE) +
-    Math.min(flow.signatureIndicators.length, MAX_INDICATORS_FOR_SCORE) * SCORE_PER_INDICATOR +
+    Math.min(flow.signatureIndicators.length, MAX_INDICATORS_FOR_SCORE) *
+      SCORE_PER_INDICATOR +
     (flow.statuses.some(status => status >= 400) ? ERROR_STATUS_BONUS : 0)
   );
 }
 
 function mergeFingerprintBucket(
   bucket: FingerprintBucket,
-  flow: {url: string; method: string; eventCount: number; signatureIndicators: string[]; statuses: number[]},
+  flow: {
+    url: string;
+    method: string;
+    eventCount: number;
+    signatureIndicators: string[];
+    statuses: number[];
+  },
   flowScore: number,
 ): void {
   bucket.methods.add(flow.method);
@@ -130,43 +142,53 @@ export function buildRequestFingerprints(
     .map(bucketToFingerprint);
 }
 
-function buildNetworkTarget(item: {
-  urlPattern: string;
-  methods: string[];
-  suspiciousScore: number;
-  signatureIndicatorCount: number;
-}, signatureHints: SignatureChainHints): PriorityTarget {
+function buildNetworkTarget(
+  item: {
+    urlPattern: string;
+    methods: string[];
+    suspiciousScore: number;
+    signatureIndicatorCount: number;
+  },
+  signatureHints: SignatureChainHints,
+): PriorityTarget {
   const isWritePath = item.methods.some(method => WRITE_METHODS.has(method));
   const score =
     item.suspiciousScore +
     item.signatureIndicatorCount * PRIORITY_INDICATOR_WEIGHT +
     (isWritePath ? PRIORITY_WRITE_BONUS : 0) +
     (signatureHints.requestSinks.length > 0 ? 1 : 0);
+  const reasons: string[] = [];
+  if (item.signatureIndicatorCount > 0) {
+    reasons.push(`signature indicators: ${item.signatureIndicatorCount}`);
+  }
+  if (isWritePath) {
+    reasons.push(`write-like methods: ${item.methods.join(', ')}`);
+  }
   return {
     target: item.urlPattern,
     type: 'network',
     priorityScore: score,
-    reasons: [
-      item.signatureIndicatorCount > 0
-        ? `signature indicators: ${item.signatureIndicatorCount}`
-        : null,
-      isWritePath ? `write-like methods: ${item.methods.join(', ')}` : null,
-    ].filter((value): value is string => Boolean(value)),
+    reasons,
   };
 }
 
-function buildFunctionTarget(name: string, signatureHints: SignatureChainHints): PriorityTarget {
+function buildFunctionTarget(
+  name: string,
+  signatureHints: SignatureChainHints,
+): PriorityTarget {
+  const reasons: string[] = ['name matches signing/encryption keywords'];
+  if (signatureHints.signatureParams.length > 0) {
+    reasons.push(
+      `related params: ${signatureHints.signatureParams.slice(0, PRIORITY_MAX_PARAMS).join(', ')}`,
+    );
+  }
   return {
     target: name,
     type: 'function',
     priorityScore:
-      PRIORITY_FUNCTION_BASE + Math.min(signatureHints.signatureParams.length, PRIORITY_MAX_PARAMS),
-    reasons: [
-      'name matches signing/encryption keywords',
-      signatureHints.signatureParams.length > 0
-        ? `related params: ${signatureHints.signatureParams.slice(0, PRIORITY_MAX_PARAMS).join(', ')}`
-        : null,
-    ].filter((value): value is string => Boolean(value)),
+      PRIORITY_FUNCTION_BASE +
+      Math.min(signatureHints.signatureParams.length, PRIORITY_MAX_PARAMS),
+    reasons,
   };
 }
 
