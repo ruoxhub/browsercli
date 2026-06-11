@@ -6,6 +6,7 @@
 
 import type {Frame} from '../../third_party/index.js';
 import {evaluateInPageRuntime} from '../debugger/evaluateInPageRuntime.js';
+import {inferTypeFromTarget} from './record-utils.js';
 
 export const HOOK_STORE_KEY = '__hookStore';
 export const DEFAULT_HOOK_STORE_MAX_RECORDS = 500;
@@ -295,35 +296,7 @@ function filterHookRecords(
 }
 
 function inferTypeFromRecordTarget(target: unknown): string | undefined {
-  if (typeof target !== 'string') {
-    return undefined;
-  }
-
-  if (target.includes('fetch')) return 'fetch';
-  if (target.includes('XMLHttpRequest')) return 'xhr';
-  if (target.includes('cookie')) return 'cookie';
-  if (target.includes('WebSocket')) return 'websocket';
-  if (target.includes('setTimeout') || target.includes('setInterval')) {
-    return 'timer';
-  }
-  if (target.includes('window.eval') || target.includes('window.Function')) {
-    return 'eval';
-  }
-  if (target.includes('JSEncrypt')) return 'jsencrypt';
-  if (
-    target.includes('sm2') ||
-    target.includes('sm3') ||
-    target.includes('sm4')
-  ) {
-    return 'smcrypto';
-  }
-  if (
-    target.includes('CryptoJS') ||
-    target.includes('Function.prototype.apply')
-  ) {
-    return 'cryptojs';
-  }
-  return undefined;
+  return typeof target === 'string' ? inferTypeFromTarget(target) : undefined;
 }
 
 function inferHookType(hookId: string, records: unknown[]): string {

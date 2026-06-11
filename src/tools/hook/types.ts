@@ -32,12 +32,9 @@ export type BypassTarget = 'eval' | 'Function' | 'constructor';
 // ─── Hook 管理函数返回类型 ─────────────────────────────
 
 /**
- * Hook 管理操作统一返回结构（兼容旧字段 logFormat）。
+ * Hook 管理操作统一返回结构（与 HookResult 相同）。
  */
-export interface HookManagementResult<T = unknown> extends MessagesResult<T> {
-  /** 使用的日志格式 */
-  logFormat?: string;
-}
+export type HookManagementResult<T = unknown> = HookResult<T>;
 
 /** 注入 Hook 返回数据 */
 export interface InjectHookData {

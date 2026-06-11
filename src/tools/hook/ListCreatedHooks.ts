@@ -89,16 +89,16 @@ export const listCreatedHooks = defineTool({
         return entry;
       });
 
-      // 3. 如果有浏览器同步数据，合并记录数
-      const legacySummary =
-        browserData && typeof browserData === 'object'
-          ? summarizeHookStore(browserData, {
-              preserveEmpty: true,
-            })
-          : null;
-      if (browserData && typeof browserData === 'object') {
+      // 3. 如果有浏览器同步数据，合并记录数并构建摘要
+      const hasBrowserData =
+        browserData !== null && typeof browserData === 'object';
+      const legacySummary = hasBrowserData
+        ? summarizeHookStore(browserData!, {preserveEmpty: true})
+        : null;
+
+      if (legacySummary) {
         for (const hook of hooks) {
-          const browserHook = legacySummary?.hooks.find(
+          const browserHook = legacySummary.hooks.find(
             h => h.hookId === (hook as {hookId: string}).hookId,
           );
           if (browserHook) {
@@ -108,34 +108,32 @@ export const listCreatedHooks = defineTool({
         }
       }
 
-      response.setStructuredContent({
-        success: true,
-        message: legacySummary
-          ? `同步完成，${legacySummary.totalHooks} 个 Hook，共 ${legacySummary.totalRecords} 条记录`
-          : `共 ${hooks.length} 个 Hook`,
-        tooltype: 'list_created_hooks',
-        ...(legacySummary
-          ? {
-              syncedHookIds: legacySummary.hooks.map(h => h.hookId),
-              totalRecords: legacySummary.totalRecords,
-              hooks: legacySummary.hooks.map(h => ({
-                hookId: h.hookId,
-                total: h.total,
-                type: h.type,
-              })),
-            }
-          : {}),
-        ...(legacySummary
-          ? {}
-          : {
-              data: {
-                totalHooks: hooks.length,
-                totalEnabled: allHooks.filter(h => h.enabled).length,
-                totalDisabled: allHooks.filter(h => !h.enabled).length,
-                hooks,
-              },
-            }),
-      });
+      if (legacySummary) {
+        response.setStructuredContent({
+          success: true,
+          message: `同步完成，${legacySummary.totalHooks} 个 Hook，共 ${legacySummary.totalRecords} 条记录`,
+          tooltype: 'list_created_hooks',
+          syncedHookIds: legacySummary.hooks.map(h => h.hookId),
+          totalRecords: legacySummary.totalRecords,
+          hooks: legacySummary.hooks.map(h => ({
+            hookId: h.hookId,
+            total: h.total,
+            type: h.type,
+          })),
+        });
+      } else {
+        response.setStructuredContent({
+          success: true,
+          message: `共 ${hooks.length} 个 Hook`,
+          tooltype: 'list_created_hooks',
+          data: {
+            totalHooks: hooks.length,
+            totalEnabled: allHooks.filter(h => h.enabled).length,
+            totalDisabled: allHooks.filter(h => !h.enabled).length,
+            hooks,
+          },
+        });
+      }
     } catch (error) {
       response.setStructuredContent({
         success: false,

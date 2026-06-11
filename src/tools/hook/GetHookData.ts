@@ -82,7 +82,10 @@ export const getHookData = defineTool({
           for (const record of toHookRecordArray(records)) {
             runtime.hookManager.addRecord(id, {
               hookId: id,
-              timestamp: typeof record.timestamp === 'number' ? record.timestamp : Date.now(),
+              timestamp:
+                typeof record.timestamp === 'number'
+                  ? record.timestamp
+                  : Date.now(),
               ...record,
             });
           }
@@ -90,40 +93,35 @@ export const getHookData = defineTool({
         storeSnapshot = browserData;
       } catch {
         // 浏览器不可用，从 HookManager 读取已有数据
-        const allIds = hookId ? [hookId] : runtime.hookManager.getAllKnownHookIds();
+        const allIds = hookId
+          ? [hookId]
+          : runtime.hookManager.getAllKnownHookIds();
         for (const id of allIds) {
           storeSnapshot[id] = runtime.hookManager.getRecords(id);
         }
       }
 
       const filters = {type, event, phase, preserveEmpty: Boolean(hookId)};
-      const data =
-        view === 'summary'
-          ? {
-              view: 'summary' as const,
-              ...summarizeHookStore(storeSnapshot, filters, maxRecords),
-            }
-          : view === 'detail'
-            ? buildDetailedView(
-                filterHookStore(storeSnapshot, filters, maxRecords),
-                maxRecords,
-              )
-            : filterHookStore(storeSnapshot, filters, maxRecords);
+      let data: unknown;
+      if (view === 'summary') {
+        data = {
+          view: 'summary' as const,
+          ...summarizeHookStore(storeSnapshot, filters, maxRecords),
+        };
+      } else if (view === 'detail') {
+        data = buildDetailedView(
+          filterHookStore(storeSnapshot, filters, maxRecords),
+          maxRecords,
+        );
+      } else {
+        data = filterHookStore(storeSnapshot, filters, maxRecords);
+      }
 
+      const viewLabel = getViewLabel(view);
+      const scopeLabel = hookId ? ` Hook ${hookId} 的` : '全部 Hook';
       const result = {
         success: true,
-        message:
-          view === 'summary'
-            ? hookId
-              ? `已获取 Hook ${hookId} 的摘要`
-              : '已获取全部 Hook 摘要'
-            : view === 'detail'
-              ? hookId
-                ? `已获取 Hook ${hookId} 的详情`
-                : '已获取全部 Hook 详情'
-              : hookId
-                ? `已获取 Hook ${hookId} 的数据`
-                : '已获取全部 Hook 数据',
+        message: `已获取${scopeLabel}${viewLabel}`,
         tooltype: 'get_hook_data',
         data,
       };
@@ -201,4 +199,10 @@ function inferDiagnosticHookType(hookId: string): string {
   if (hookId.includes('storage')) return 'storage';
   if (hookId.includes('cookie')) return 'cookie';
   return 'unknown';
+}
+
+function getViewLabel(view: string | undefined): string {
+  if (view === 'summary') return '摘要';
+  if (view === 'detail') return '详情';
+  return '数据';
 }

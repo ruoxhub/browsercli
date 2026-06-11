@@ -226,7 +226,7 @@ function normalizeMethod(value: unknown): string {
   return typeof value === 'string' ? value.toUpperCase() : '';
 }
 
-function inferTypeFromTarget(target?: string): string | undefined {
+export function inferTypeFromTarget(target?: string): string | undefined {
   if (!target) return undefined;
   if (target.includes('fetch')) return 'fetch';
   if (target.includes('XMLHttpRequest')) return 'xhr';
