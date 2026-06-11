@@ -21,6 +21,9 @@ export const manifest = {
     {modulePath: './page/sessionState.js', handlerName: 'deleteSessionState'},
     {modulePath: './page/sessionState.js', handlerName: 'dumpSessionState'},
     {modulePath: './page/sessionState.js', handlerName: 'loadSessionState'},
-    {modulePath: './page/checkBrowserHealth.js', handlerName: 'checkBrowserHealth'},
+    {
+      modulePath: './page/checkBrowserHealth.js',
+      handlerName: 'checkBrowserHealth',
+    },
   ],
 } satisfies DomainManifest;

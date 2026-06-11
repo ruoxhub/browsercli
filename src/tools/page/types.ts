@@ -5,6 +5,7 @@
  */
 
 import type {Page} from '../../third_party/index.js';
+import type {MessagesResult} from '../shared/types.js';
 
 // ─── 运行时服务接口 ──────────────────────────────────
 
@@ -248,8 +249,6 @@ export interface CheckBrowserHealthData {
   issues: HealthIssue[];
 }
 
-import type {MessagesResult} from '../shared/types.js';
-
 // ─── 结果类型 ──────────────────────────────────────────
 
 /**
@@ -281,43 +280,36 @@ export interface ScrollByResult extends PageResult<ScrollByData> {
 }
 
 /** saveSessionState 结果 */
-export interface SaveSessionStateResult
-  extends PageResult<SaveSessionStateData> {
+export interface SaveSessionStateResult extends PageResult<SaveSessionStateData> {
   tooltype: 'save_session_state';
 }
 
 /** restoreSessionState 结果 */
-export interface RestoreSessionStateResult
-  extends PageResult<RestoreSessionStateData> {
+export interface RestoreSessionStateResult extends PageResult<RestoreSessionStateData> {
   tooltype: 'restore_session_state';
 }
 
 /** listSessionStates 结果 */
-export interface ListSessionStatesResult
-  extends PageResult<ListSessionStatesData> {
+export interface ListSessionStatesResult extends PageResult<ListSessionStatesData> {
   tooltype: 'list_session_states';
 }
 
 /** deleteSessionState 结果 */
-export interface DeleteSessionStateResult
-  extends PageResult<DeleteSessionStateData> {
+export interface DeleteSessionStateResult extends PageResult<DeleteSessionStateData> {
   tooltype: 'delete_session_state';
 }
 
 /** dumpSessionState 结果 */
-export interface DumpSessionStateResult
-  extends PageResult<DumpSessionStateData> {
+export interface DumpSessionStateResult extends PageResult<DumpSessionStateData> {
   tooltype: 'dump_session_state';
 }
 
 /** loadSessionState 结果 */
-export interface LoadSessionStateResult
-  extends PageResult<LoadSessionStateData> {
+export interface LoadSessionStateResult extends PageResult<LoadSessionStateData> {
   tooltype: 'load_session_state';
 }
 
 /** checkBrowserHealth 结果 */
-export interface CheckBrowserHealthResult
-  extends PageResult<CheckBrowserHealthData> {
+export interface CheckBrowserHealthResult extends PageResult<CheckBrowserHealthData> {
   tooltype: 'check_browser_health';
 }

@@ -6,7 +6,8 @@
 
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
-import {defineTool, type Context} from '../ToolDefinition.js';
+import {sendJson} from '../shared/pageResponse.js';
+import {defineTool} from '../ToolDefinition.js';
 
 /**
  * 点击页面元素。
@@ -23,36 +24,19 @@ export const clickElement = defineTool({
     try {
       const page = context.getSelectedPage();
       await page.click(selector);
-
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: true,
-            message: `元素已点击: ${selector}`,
-            tooltype: 'click_element',
-            data: {selector, clicked: true},
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      sendJson(response, {
+        success: true,
+        message: `元素已点击: ${selector}`,
+        tooltype: 'click_element',
+        data: {selector, clicked: true},
+      });
     } catch (error) {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: false,
-            message: `点击元素失败: ${error instanceof Error ? error.message : String(error)}`,
-            tooltype: 'click_element',
-            data: {selector, clicked: false},
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      sendJson(response, {
+        success: false,
+        message: `点击元素失败: ${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'click_element',
+        data: {selector, clicked: false},
+      });
     }
   },
 });

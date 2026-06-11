@@ -6,14 +6,16 @@
 
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
-import {defineTool, type Context} from '../ToolDefinition.js';
+import {errorMessage, sendJson} from '../shared/pageResponse.js';
+import {defineTool} from '../ToolDefinition.js';
 
 /**
  * 按方向滚动页面。
  */
 export const scrollBy = defineTool({
   name: 'scroll_by',
-  description: 'Scroll page by direction (up/down/top/bottom), automatically waits 800ms for lazy-loaded content',
+  description:
+    'Scroll page by direction (up/down/top/bottom), automatically waits 800ms for lazy-loaded content',
   annotations: {category: ToolCategory.INPUT, readOnlyHint: true},
   schema: {
     direction: zod
@@ -55,35 +57,19 @@ export const scrollBy = defineTool({
       // 等待懒加载触发
       await new Promise(resolve => setTimeout(resolve, 800));
 
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: true,
-            message: `页面已滚动: ${direction}`,
-            tooltype: 'scroll_by',
-            data: {direction, pixels, result},
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      sendJson(response, {
+        success: true,
+        message: `页面已滚动: ${direction}`,
+        tooltype: 'scroll_by',
+        data: {direction, pixels, result},
+      });
     } catch (error) {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: false,
-            message: `滚动页面失败: ${error instanceof Error ? error.message : String(error)}`,
-            tooltype: 'scroll_by',
-            data: {direction, pixels, result: ''},
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      sendJson(response, {
+        success: false,
+        message: `滚动页面失败: ${errorMessage(error)}`,
+        tooltype: 'scroll_by',
+        data: {direction, pixels, result: ''},
+      });
     }
   },
 });

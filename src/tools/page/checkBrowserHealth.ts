@@ -12,7 +12,10 @@ import {
   normalizeBrowserRuntimeError,
   withOperationTimeout,
 } from '../shared/browserRuntime.js';
-import {defineTool, type Context} from '../ToolDefinition.js';
+import {sendJson} from '../shared/pageResponse.js';
+import {defineTool} from '../ToolDefinition.js';
+
+import type {HealthIssue} from './types.js';
 
 /**
  * 检查浏览器连接健康状态和页面可用性。
@@ -23,11 +26,6 @@ export const checkBrowserHealth = defineTool({
   annotations: {category: ToolCategory.PAGES, readOnlyHint: true},
   schema: {},
   handler: async (_request, response, _context) => {
-    interface HealthIssue {
-      code: string;
-      message: string;
-    }
-
     const issues: HealthIssue[] = [];
     let connected = getRuntime().contextProvider!.isBrowserConnected();
     try {
@@ -85,20 +83,12 @@ export const checkBrowserHealth = defineTool({
       issues,
     };
 
-    response.appendResponseLine('```json');
-    response.appendResponseLine(
-      JSON.stringify(
-        {
-          success: issues.length === 0,
-          message:
-            issues.length === 0 ? '浏览器健康' : `发现 ${issues.length} 个问题`,
-          tooltype: 'check_browser_health',
-          data,
-        },
-        null,
-        2,
-      ),
-    );
-    response.appendResponseLine('```');
+    sendJson(response, {
+      success: issues.length === 0,
+      message:
+        issues.length === 0 ? '浏览器健康' : `发现 ${issues.length} 个问题`,
+      tooltype: 'check_browser_health',
+      data,
+    });
   },
 });

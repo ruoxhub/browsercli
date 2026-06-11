@@ -20,7 +20,8 @@ import {
   withOperationTimeout,
   normalizeBrowserRuntimeError,
 } from '../shared/browserRuntime.js';
-import {defineTool, type Context} from '../ToolDefinition.js';
+import {errorMessage, sendJson} from '../shared/pageResponse.js';
+import {defineTool} from '../ToolDefinition.js';
 
 import type {SessionSnapshot} from './types.js';
 
@@ -63,6 +64,14 @@ function ensureCleanupLoop(): void {
 
 // ─── 加密辅助 ──────────────────────────────────────────
 
+interface EncryptedPayload {
+  encrypted: true;
+  algorithm: 'aes-256-gcm';
+  iv: string;
+  tag: string;
+  data: string;
+}
+
 function getEncryptionKey(): Buffer | undefined {
   const configured = getEnvValue('SESSION_STATE_ENCRYPTION_KEY');
   if (!configured || configured.length === 0) {
@@ -71,13 +80,7 @@ function getEncryptionKey(): Buffer | undefined {
   return createHash('sha256').update(configured).digest();
 }
 
-function encryptText(plainText: string): {
-  encrypted: true;
-  algorithm: 'aes-256-gcm';
-  iv: string;
-  tag: string;
-  data: string;
-} {
+function encryptText(plainText: string): EncryptedPayload {
   const key = getEncryptionKey();
   if (!key) {
     throw new Error('SESSION_STATE_ENCRYPTION_KEY is required for encryption.');
@@ -98,13 +101,7 @@ function encryptText(plainText: string): {
   };
 }
 
-function decryptText(payload: {
-  encrypted: true;
-  algorithm: 'aes-256-gcm';
-  iv: string;
-  tag: string;
-  data: string;
-}): string {
+function decryptText(payload: EncryptedPayload): string {
   const key = getEncryptionKey();
   if (!key) {
     throw new Error('SESSION_STATE_ENCRYPTION_KEY is required for decryption.');
@@ -165,14 +162,8 @@ export const saveSessionState = defineTool({
   description: '保存会话状态',
   annotations: {category: ToolCategory.PAGES, readOnlyHint: false},
   schema: {
-    sessionId: zod
-      .string()
-      .optional()
-      .describe('会话 ID，省略则自动生成'),
-    includeCookies: zod
-      .boolean()
-      .optional()
-      .describe('是否包含 cookies'),
+    sessionId: zod.string().optional().describe('会话 ID，省略则自动生成'),
+    includeCookies: zod.boolean().optional().describe('是否包含 cookies'),
     includeLocalStorage: zod
       .boolean()
       .optional()
@@ -183,8 +174,12 @@ export const saveSessionState = defineTool({
       .describe('是否包含 sessionStorage'),
   },
   handler: async (request, response, _context) => {
-    const {sessionId, includeCookies, includeLocalStorage, includeSessionStorage} =
-      request.params;
+    const {
+      sessionId,
+      includeCookies,
+      includeLocalStorage,
+      includeSessionStorage,
+    } = request.params;
     try {
       ensureCleanupLoop();
       cleanupExpiredSessions();
@@ -192,10 +187,7 @@ export const saveSessionState = defineTool({
       const page = _context.getSelectedPage();
       const sid = sessionId ?? `session_${Date.now()}`;
       const cookies = includeCookies
-        ? await withOperationTimeout(
-            page.context().cookies(),
-            '读取 cookies',
-          )
+        ? await withOperationTimeout(page.context().cookies(), '读取 cookies')
         : [];
       const localStorageData: Record<string, string> = includeLocalStorage
         ? await withOperationTimeout(
@@ -240,44 +232,28 @@ export const saveSessionState = defineTool({
       };
       sessionSnapshots.set(sid, snapshot);
 
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: true,
-            message: `会话已保存: ${sid}`,
-            tooltype: 'save_session_state',
-            data: {
-              sessionId: sid,
-              savedAt: snapshot.savedAt,
-              url: snapshot.url,
-              title: snapshot.title,
-              counts: {
-                cookies: snapshot.cookies.length,
-                localStorage: Object.keys(snapshot.localStorage).length,
-                sessionStorage: Object.keys(snapshot.sessionStorage).length,
-              },
-            },
+      sendJson(response, {
+        success: true,
+        message: `会话已保存: ${sid}`,
+        tooltype: 'save_session_state',
+        data: {
+          sessionId: sid,
+          savedAt: snapshot.savedAt,
+          url: snapshot.url,
+          title: snapshot.title,
+          counts: {
+            cookies: snapshot.cookies.length,
+            localStorage: Object.keys(snapshot.localStorage).length,
+            sessionStorage: Object.keys(snapshot.sessionStorage).length,
           },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+        },
+      });
     } catch (error) {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: false,
-            message: `保存会话失败: ${normalizeBrowserRuntimeError(error)}`,
-            tooltype: 'save_session_state',
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      sendJson(response, {
+        success: false,
+        message: `保存会话失败: ${normalizeBrowserRuntimeError(error)}`,
+        tooltype: 'save_session_state',
+      });
     }
   },
 });
@@ -301,27 +277,22 @@ export const restoreSessionState = defineTool({
       .describe('恢复前是否清除现有存储'),
   },
   handler: async (request, response, _context) => {
-    const {sessionId: sid, navigateToSavedUrl, clearStorageBeforeRestore} =
-      request.params;
+    const {
+      sessionId: sid,
+      navigateToSavedUrl,
+      clearStorageBeforeRestore,
+    } = request.params;
     try {
       ensureCleanupLoop();
       cleanupExpiredSessions();
 
       const snapshot = sessionSnapshots.get(sid);
       if (!snapshot) {
-        response.appendResponseLine('```json');
-        response.appendResponseLine(
-          JSON.stringify(
-            {
-              success: false,
-              message: `会话快照未找到: ${sid}`,
-              tooltype: 'restore_session_state',
-            },
-            null,
-            2,
-          ),
-        );
-        response.appendResponseLine('```');
+        sendJson(response, {
+          success: false,
+          message: `会话快照未找到: ${sid}`,
+          tooltype: 'restore_session_state',
+        });
         return;
       }
 
@@ -367,43 +338,27 @@ export const restoreSessionState = defineTool({
         );
       }
 
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: true,
-            message: `会话已恢复: ${sid}`,
-            tooltype: 'restore_session_state',
-            data: {
-              sessionId: snapshot.id,
-              restoredAt: new Date().toISOString(),
-              url: snapshot.url,
-              restored: {
-                cookies: snapshot.cookies.length,
-                localStorage: Object.keys(snapshot.localStorage).length,
-                sessionStorage: Object.keys(snapshot.sessionStorage).length,
-              },
-            },
+      sendJson(response, {
+        success: true,
+        message: `会话已恢复: ${sid}`,
+        tooltype: 'restore_session_state',
+        data: {
+          sessionId: snapshot.id,
+          restoredAt: new Date().toISOString(),
+          url: snapshot.url,
+          restored: {
+            cookies: snapshot.cookies.length,
+            localStorage: Object.keys(snapshot.localStorage).length,
+            sessionStorage: Object.keys(snapshot.sessionStorage).length,
           },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+        },
+      });
     } catch (error) {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: false,
-            message: `恢复会话失败: ${error instanceof Error ? error.message : String(error)}`,
-            tooltype: 'restore_session_state',
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      sendJson(response, {
+        success: false,
+        message: `恢复会话失败: ${errorMessage(error)}`,
+        tooltype: 'restore_session_state',
+      });
     }
   },
 });
@@ -433,24 +388,16 @@ export const listSessionStates = defineTool({
       expiresAt: snapshot.expiresAt,
     }));
 
-    response.appendResponseLine('```json');
-    response.appendResponseLine(
-      JSON.stringify(
-        {
-          success: true,
-          message: `共 ${sessions.length} 个会话快照`,
-          tooltype: 'list_session_states',
-          data: {
-            total: sessions.length,
-            cleanedExpired: removed,
-            sessions,
-          },
-        },
-        null,
-        2,
-      ),
-    );
-    response.appendResponseLine('```');
+    sendJson(response, {
+      success: true,
+      message: `共 ${sessions.length} 个会话快照`,
+      tooltype: 'list_session_states',
+      data: {
+        total: sessions.length,
+        cleanedExpired: removed,
+        sessions,
+      },
+    });
   },
 });
 
@@ -471,26 +418,16 @@ export const deleteSessionState = defineTool({
 
     const deleted = sessionSnapshots.delete(sid);
 
-    response.appendResponseLine('```json');
-    response.appendResponseLine(
-      JSON.stringify(
-        {
-          success: true,
-          message: deleted
-            ? `会话已删除: ${sid}`
-            : `会话不存在: ${sid}`,
-          tooltype: 'delete_session_state',
-          data: {
-            sessionId: sid,
-            deleted,
-            remaining: sessionSnapshots.size,
-          },
-        },
-        null,
-        2,
-      ),
-    );
-    response.appendResponseLine('```');
+    sendJson(response, {
+      success: true,
+      message: deleted ? `会话已删除: ${sid}` : `会话不存在: ${sid}`,
+      tooltype: 'delete_session_state',
+      data: {
+        sessionId: sid,
+        deleted,
+        remaining: sessionSnapshots.size,
+      },
+    });
   },
 });
 
@@ -503,18 +440,9 @@ export const dumpSessionState = defineTool({
   annotations: {category: ToolCategory.PAGES, readOnlyHint: false},
   schema: {
     sessionId: zod.string().describe('会话 ID'),
-    path: zod
-      .string()
-      .optional()
-      .describe('导出文件路径'),
-    pretty: zod
-      .boolean()
-      .optional()
-      .describe('是否美化输出'),
-    encrypt: zod
-      .boolean()
-      .optional()
-      .describe('是否加密'),
+    path: zod.string().optional().describe('导出文件路径'),
+    pretty: zod.boolean().optional().describe('是否美化输出'),
+    encrypt: zod.boolean().optional().describe('是否加密'),
   },
   handler: async (request, response, _context) => {
     const {sessionId: sid, path, pretty, encrypt} = request.params;
@@ -524,32 +452,23 @@ export const dumpSessionState = defineTool({
 
       const snapshot = sessionSnapshots.get(sid);
       if (!snapshot) {
-        response.appendResponseLine('```json');
-        response.appendResponseLine(
-          JSON.stringify(
-            {
-              success: false,
-              message: `会话快照未找到: ${sid}`,
-              tooltype: 'dump_session_state',
-              data: {
-                sessionId: sid,
-                path: null,
-                bytes: 0,
-                encrypted: false,
-              },
-            },
-            null,
-            2,
-          ),
-        );
-        response.appendResponseLine('```');
+        sendJson(response, {
+          success: false,
+          message: `会话快照未找到: ${sid}`,
+          tooltype: 'dump_session_state',
+          data: {
+            sessionId: sid,
+            path: null,
+            bytes: 0,
+            encrypted: false,
+          },
+        });
         return;
       }
 
       const isPretty = pretty !== false;
       const rawJson = JSON.stringify(snapshot, null, isPretty ? 2 : 0);
-      const encryptedPayload =
-        encrypt === true ? encryptText(rawJson) : null;
+      const encryptedPayload = encrypt === true ? encryptText(rawJson) : null;
       const json = encryptedPayload
         ? JSON.stringify(encryptedPayload, null, isPretty ? 2 : 0)
         : rawJson;
@@ -559,45 +478,29 @@ export const dumpSessionState = defineTool({
         await writeFile(safePath, json, 'utf8');
       }
 
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: true,
-            message: `会话已导出: ${sid}`,
-            tooltype: 'dump_session_state',
-            data: {
-              sessionId: snapshot.id,
-              path: path ?? null,
-              bytes: Buffer.byteLength(json, 'utf8'),
-              encrypted: encrypt === true,
-            },
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      sendJson(response, {
+        success: true,
+        message: `会话已导出: ${sid}`,
+        tooltype: 'dump_session_state',
+        data: {
+          sessionId: snapshot.id,
+          path: path ?? null,
+          bytes: Buffer.byteLength(json, 'utf8'),
+          encrypted: encrypt === true,
+        },
+      });
     } catch (error) {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: false,
-            message: `导出会话失败: ${error instanceof Error ? error.message : String(error)}`,
-            tooltype: 'dump_session_state',
-            data: {
-              sessionId: sid,
-              path: path ?? null,
-              bytes: 0,
-              encrypted: encrypt === true,
-            },
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      sendJson(response, {
+        success: false,
+        message: `导出会话失败: ${errorMessage(error)}`,
+        tooltype: 'dump_session_state',
+        data: {
+          sessionId: sid,
+          path: path ?? null,
+          bytes: 0,
+          encrypted: encrypt === true,
+        },
+      });
     }
   },
 });
@@ -610,22 +513,10 @@ export const loadSessionState = defineTool({
   description: '加载会话状态',
   annotations: {category: ToolCategory.PAGES, readOnlyHint: false},
   schema: {
-    sessionId: zod
-      .string()
-      .optional()
-      .describe('会话 ID'),
-    path: zod
-      .string()
-      .optional()
-      .describe('从文件路径加载'),
-    snapshotJson: zod
-      .string()
-      .optional()
-      .describe('从 JSON 字符串加载'),
-    overwrite: zod
-      .boolean()
-      .optional()
-      .describe('是否覆盖已存在的快照'),
+    sessionId: zod.string().optional().describe('会话 ID'),
+    path: zod.string().optional().describe('从文件路径加载'),
+    snapshotJson: zod.string().optional().describe('从 JSON 字符串加载'),
+    overwrite: zod.boolean().optional().describe('是否覆盖已存在的快照'),
   },
   handler: async (request, response, _context) => {
     const {sessionId: sid, path, snapshotJson, overwrite} = request.params;
@@ -633,50 +524,32 @@ export const loadSessionState = defineTool({
       ensureCleanupLoop();
       cleanupExpiredSessions();
 
-      // 如果仅提供 sessionId，尝试从内存获取
       if (!path && !snapshotJson && sid) {
         const existingSnapshot = sessionSnapshots.get(sid);
         if (existingSnapshot) {
-          response.appendResponseLine('```json');
-          response.appendResponseLine(
-            JSON.stringify(
-              {
-                success: true,
-                message: `会话已从内存加载: ${sid}`,
-                tooltype: 'load_session_state',
-                data: {
-                  sessionId: sid,
-                  loaded: true,
-                  source: 'memory',
-                  counts: {
-                    cookies: existingSnapshot.cookies.length,
-                    localStorage: Object.keys(existingSnapshot.localStorage)
-                      .length,
-                    sessionStorage: Object.keys(existingSnapshot.sessionStorage)
-                      .length,
-                  },
-                },
+          sendJson(response, {
+            success: true,
+            message: `会话已从内存加载: ${sid}`,
+            tooltype: 'load_session_state',
+            data: {
+              sessionId: sid,
+              loaded: true,
+              source: 'memory',
+              counts: {
+                cookies: existingSnapshot.cookies.length,
+                localStorage: Object.keys(existingSnapshot.localStorage).length,
+                sessionStorage: Object.keys(existingSnapshot.sessionStorage)
+                  .length,
               },
-              null,
-              2,
-            ),
-          );
-          response.appendResponseLine('```');
+            },
+          });
           return;
         }
-        response.appendResponseLine('```json');
-        response.appendResponseLine(
-          JSON.stringify(
-            {
-              success: false,
-              message: `会话快照未在内存中找到: ${sid}，请提供 path 或 snapshotJson`,
-              tooltype: 'load_session_state',
-            },
-            null,
-            2,
-          ),
-        );
-        response.appendResponseLine('```');
+        sendJson(response, {
+          success: false,
+          message: `会话快照未在内存中找到: ${sid}，请提供 path 或 snapshotJson`,
+          tooltype: 'load_session_state',
+        });
         return;
       }
 
@@ -684,19 +557,11 @@ export const loadSessionState = defineTool({
         ? await readFile(validateOutputPath(path), 'utf8')
         : snapshotJson;
       if (!rawJson) {
-        response.appendResponseLine('```json');
-        response.appendResponseLine(
-          JSON.stringify(
-            {
-              success: false,
-              message: '必须提供 path 或 snapshotJson',
-              tooltype: 'load_session_state',
-            },
-            null,
-            2,
-          ),
-        );
-        response.appendResponseLine('```');
+        sendJson(response, {
+          success: false,
+          message: '必须提供 path 或 snapshotJson',
+          tooltype: 'load_session_state',
+        });
         return;
       }
 
@@ -704,19 +569,11 @@ export const loadSessionState = defineTool({
       try {
         parsed = JSON.parse(rawJson);
       } catch {
-        response.appendResponseLine('```json');
-        response.appendResponseLine(
-          JSON.stringify(
-            {
-              success: false,
-              message: '无效的快照 JSON 内容',
-              tooltype: 'load_session_state',
-            },
-            null,
-            2,
-          ),
-        );
-        response.appendResponseLine('```');
+        sendJson(response, {
+          success: false,
+          message: '无效的快照 JSON 内容',
+          tooltype: 'load_session_state',
+        });
         return;
       }
 
@@ -725,26 +582,18 @@ export const loadSessionState = defineTool({
         typeof parsed === 'object' &&
         (parsed as Record<string, unknown>).encrypted === true &&
         (parsed as Record<string, unknown>).algorithm === 'aes-256-gcm'
-          ? JSON.parse(decryptText(parsed as Parameters<typeof decryptText>[0]))
+          ? JSON.parse(decryptText(parsed as EncryptedPayload))
           : parsed;
 
       const snapshot = normalizeSnapshot(normalizedRaw, sid);
       const targetId = sid ?? snapshot.id;
       const existing = sessionSnapshots.has(targetId);
       if (existing && overwrite !== true) {
-        response.appendResponseLine('```json');
-        response.appendResponseLine(
-          JSON.stringify(
-            {
-              success: false,
-              message: `会话快照已存在: ${targetId}，设置 overwrite=true 覆盖`,
-              tooltype: 'load_session_state',
-            },
-            null,
-            2,
-          ),
-        );
-        response.appendResponseLine('```');
+        sendJson(response, {
+          success: false,
+          message: `会话快照已存在: ${targetId}，设置 overwrite=true 覆盖`,
+          tooltype: 'load_session_state',
+        });
         return;
       }
 
@@ -755,44 +604,28 @@ export const loadSessionState = defineTool({
       sessionSnapshots.set(targetId, normalized);
 
       const source = path ? 'file' : 'json';
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: true,
-            message: `会话已加载: ${targetId}`,
-            tooltype: 'load_session_state',
-            data: {
-              sessionId: targetId,
-              loaded: true,
-              source,
-              overwritten: existing,
-              counts: {
-                cookies: normalized.cookies.length,
-                localStorage: Object.keys(normalized.localStorage).length,
-                sessionStorage: Object.keys(normalized.sessionStorage).length,
-              },
-            },
+      sendJson(response, {
+        success: true,
+        message: `会话已加载: ${targetId}`,
+        tooltype: 'load_session_state',
+        data: {
+          sessionId: targetId,
+          loaded: true,
+          source,
+          overwritten: existing,
+          counts: {
+            cookies: normalized.cookies.length,
+            localStorage: Object.keys(normalized.localStorage).length,
+            sessionStorage: Object.keys(normalized.sessionStorage).length,
           },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+        },
+      });
     } catch (error) {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: false,
-            message: `加载会话失败: ${error instanceof Error ? error.message : String(error)}`,
-            tooltype: 'load_session_state',
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      sendJson(response, {
+        success: false,
+        message: `加载会话失败: ${errorMessage(error)}`,
+        tooltype: 'load_session_state',
+      });
     }
   },
 });

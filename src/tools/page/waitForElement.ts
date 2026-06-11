@@ -6,18 +6,23 @@
 
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
-import {defineTool, type Context} from '../ToolDefinition.js';
+import {sendJson} from '../shared/pageResponse.js';
+import {defineTool} from '../ToolDefinition.js';
 
 /**
  * 等待选择器对应的元素出现在页面中。
  */
 export const waitForElement = defineTool({
   name: 'wait_for_element',
-  description: 'Wait for an element matching the CSS selector to appear on the page',
+  description:
+    'Wait for an element matching the CSS selector to appear on the page',
   annotations: {category: ToolCategory.INPUT, readOnlyHint: true},
   schema: {
     selector: zod.string().describe('CSS selector to wait for'),
-    timeout: zod.number().optional().describe('Maximum wait time in ms (default 30000)'),
+    timeout: zod
+      .number()
+      .optional()
+      .describe('Maximum wait time in ms (default 30000)'),
   },
   handler: async (request, response, context) => {
     const {selector, timeout} = request.params;
@@ -48,35 +53,19 @@ export const waitForElement = defineTool({
         };
       }, selector);
 
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: true,
-            message: `元素已出现: ${selector}`,
-            tooltype: 'wait_for_element',
-            data: {selector, appeared: true, element},
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
-    } catch (error) {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: false,
-            message: `等待元素超时: ${selector}`,
-            tooltype: 'wait_for_element',
-            data: {selector, appeared: false, element: null},
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      sendJson(response, {
+        success: true,
+        message: `元素已出现: ${selector}`,
+        tooltype: 'wait_for_element',
+        data: {selector, appeared: true, element},
+      });
+    } catch {
+      sendJson(response, {
+        success: false,
+        message: `等待元素超时: ${selector}`,
+        tooltype: 'wait_for_element',
+        data: {selector, appeared: false, element: null},
+      });
     }
   },
 });
