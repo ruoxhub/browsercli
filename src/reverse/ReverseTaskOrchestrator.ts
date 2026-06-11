@@ -5,6 +5,7 @@
  */
 
 import {recommendNextStep} from '../modules/workflows/NextStepAdvisor.js';
+import {buildOrchestrationContinuation} from '../tools/shared/response-builder.js';
 
 import {autoProgressReverseTask} from './ReverseTaskAutoProgress.js';
 import {
@@ -339,6 +340,7 @@ export async function orchestrateReverseTask(
   };
   execution?: Awaited<ReturnType<typeof executeReverseTaskPlan>>;
   summary?: Awaited<ReturnType<typeof getReverseTaskState>>;
+  continuation: ReturnType<typeof buildOrchestrationContinuation>;
 }> {
   const outputMode = options.outputMode ?? 'verbose';
   const persistState = options.persistState ?? true;
@@ -370,7 +372,7 @@ export async function orchestrateReverseTask(
     taskGoal: String(snapshot.task?.goal ?? ''),
     hasTargetRequest: Boolean(
       snapshot.targetContext?.targetRequest ||
-        snapshot.recentEvidence.some(entry => Boolean(entry.request)),
+      snapshot.recentEvidence.some(entry => Boolean(entry.request)),
     ),
     hookRecordCount: snapshot.recentEvidence.filter(
       entry => entry.kind === 'hook-hit' || entry.source === 'hook',
@@ -552,9 +554,26 @@ export async function orchestrateReverseTask(
       : postExecution;
   const filtersApplied = Boolean(
     (options.skipSteps && options.skipSteps.length > 0) ||
-      options.fromStep ||
-      (options.onlySteps && options.onlySteps.length > 0),
+    options.fromStep ||
+    (options.onlySteps && options.onlySteps.length > 0),
   );
+  const fallback = buildFallbackPlan(taskId, execution);
+  const continuation = buildOrchestrationContinuation({
+    failedStep: execution?.failedStep,
+    shouldResume: !execution?.failedStep || Boolean(fallback),
+    fallbackPlan: fallback
+      ? {
+          steps: fallback.steps,
+          recommendedStrategy: fallback.recommendedStrategy,
+        }
+      : undefined,
+    agentGuidance: {
+      summary: fallback?.reason ?? advice.why,
+      recommendedTool: primaryStep.tool,
+      recommendedParams: primaryStep.params,
+      recommendedStrategy: fallback?.recommendedStrategy,
+    },
+  });
 
   return {
     taskId,
@@ -578,11 +597,10 @@ export async function orchestrateReverseTask(
           ? filteredSteps.map(compactStep)
           : filteredSteps,
     },
-    ...(buildFallbackPlan(taskId, execution)
-      ? {fallbackPlan: buildFallbackPlan(taskId, execution)}
-      : {}),
+    ...(fallback ? {fallbackPlan: fallback} : {}),
     ...(execution ? {execution} : {}),
     ...(summary ? {summary} : {}),
+    continuation,
   };
 }
 

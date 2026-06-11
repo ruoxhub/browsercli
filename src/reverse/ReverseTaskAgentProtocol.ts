@@ -4,6 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {
+  buildManageContinuation,
+  buildOrchestrationContinuation,
+  buildRebuildContinuation,
+  compactAgentPayload,
+  withSchemaVersion,
+} from '../tools/shared/response-builder.js';
+import type {UnifiedContinuationFields} from '../tools/shared/response-builder.js';
 import {buildLocalCliCommand} from '../utils/projectPaths.js';
 
 import type {
@@ -32,6 +40,7 @@ export interface ReverseTaskAgentHints {
   recommendedParams?: Record<string, unknown>;
   confidence: number;
   resumeHint?: string;
+  continuation?: UnifiedContinuationFields;
 }
 
 function inferStrategyFromStep(
@@ -441,4 +450,16 @@ export function buildRunReverseAgentHints(args: {
     confidence: stopReason === 'stalled' ? 0.63 : 0.75,
     resumeHint: `可执行 --runReverseAgent ${taskId} --maxRounds ${maxRounds}`,
   };
+}
+
+export function hintsToContinuation(
+  action: string,
+  hints: ReverseTaskAgentHints,
+  fallbackReason?: string,
+): UnifiedContinuationFields {
+  return buildManageContinuation(
+    action,
+    {agentGuidance: {...hints}},
+    fallbackReason ?? hints.summary,
+  );
 }
