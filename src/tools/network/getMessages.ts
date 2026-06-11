@@ -13,9 +13,29 @@ import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
-const trafficSummaryCache = new Map<number, ReturnType<typeof analyzeWebSocketFramesV2>>();
+import type {WebSocketFrame} from './types.js';
 
 const DIRECTION_OPTIONS: readonly ['sent', 'received'] = ['sent', 'received'];
+
+function buildFrameData(
+  frames: WebSocketFrame[],
+  baseIndex: number,
+  showContent: boolean | undefined,
+): Array<Record<string, unknown>> {
+  return frames.map((frame, i) => {
+    if (!showContent) {
+      return {index: baseIndex + i};
+    }
+    return {
+      index: baseIndex + i,
+      direction: frame.direction,
+      timestamp: frame.timestamp,
+      opcode: frame.opcode,
+      payloadSize: frame.payloadData.length,
+      payloadPreview: frame.payloadData.slice(0, 200),
+    };
+  });
+}
 
 export const getWebSocketMessages = defineTool({
   name: 'get_websocket_messages',
@@ -72,9 +92,7 @@ export const getWebSocketMessages = defineTool({
       if (request.params.groupId) {
         const groupId = request.params.groupId.toUpperCase();
 
-        let summary =
-          context.getCachedTrafficSummary(request.params.wsid) ??
-          trafficSummaryCache.get(request.params.wsid);
+        let summary = context.getCachedTrafficSummary(request.params.wsid);
 
         if (!summary) {
           summary = analyzeWebSocketFramesV2(
@@ -82,7 +100,7 @@ export const getWebSocketMessages = defineTool({
             request.params.wsid,
             ws.connection.url,
           );
-          trafficSummaryCache.set(request.params.wsid, summary);
+          context.cacheTrafficSummary(request.params.wsid, summary);
         }
 
         const indices = summary.groupToIndices.get(groupId);
@@ -115,19 +133,12 @@ export const getWebSocketMessages = defineTool({
 
         const offset = pageIdx * pageSize;
         const paginatedIndices = filteredIndices.slice(offset, offset + pageSize);
-        const frameData = request.params.show_content
-          ? paginatedIndices.map(idx => {
-              const frame = ws.frames[idx];
-              return {
-                index: idx,
-                direction: frame.direction,
-                timestamp: frame.timestamp,
-                opcode: frame.opcode,
-                payloadSize: frame.payloadData.length,
-                payloadPreview: frame.payloadData.slice(0, 200),
-              };
-            })
-          : paginatedIndices.map(idx => ({index: idx}));
+        const paginatedFrames = paginatedIndices.map(idx => ws.frames[idx]!);
+        const frameData = buildFrameData(
+          paginatedFrames,
+          0,
+          request.params.show_content,
+        );
 
         response.setStructuredContent({
           success: true,
@@ -155,17 +166,12 @@ export const getWebSocketMessages = defineTool({
       });
 
       const offset = pageIdx * pageSize;
-      const paginatedFrames = frames.slice(offset, offset + pageSize);
-      const frameData = request.params.show_content
-        ? paginatedFrames.map((frame, i) => ({
-            index: offset + i,
-            direction: frame.direction,
-            timestamp: frame.timestamp,
-            opcode: frame.opcode,
-            payloadSize: frame.payloadData.length,
-            payloadPreview: frame.payloadData.slice(0, 200),
-          }))
-        : paginatedFrames.map((_, i) => ({index: offset + i}));
+      const pageFrames = frames.slice(offset, offset + pageSize);
+      const frameData = buildFrameData(
+        pageFrames,
+        offset,
+        request.params.show_content,
+      );
 
       response.setStructuredContent({
         success: true,

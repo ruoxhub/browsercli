@@ -262,20 +262,17 @@ export type {WebSocketData, WebSocketFrame, TrafficSummary};
 
 // ─── 结果类型 ──────────────────────────────────────────
 
-/** listNetworkRequests 结果 */
-export interface ListNetworkRequestsResult extends MessagesResult<ListNetworkRequestsData> {
+/** 通用 Network 工具结果结构 */
+interface NetworkResult<T> extends MessagesResult<T> {
   tooltype: string;
   logFormat: string;
 }
+
+/** listNetworkRequests 结果 */
+export type ListNetworkRequestsResult = NetworkResult<ListNetworkRequestsData>;
 
 /** getNetworkRequest 结果 */
-export interface GetNetworkRequestResult extends MessagesResult<GetNetworkRequestData> {
-  tooltype: string;
-  logFormat: string;
-}
+export type GetNetworkRequestResult = NetworkResult<GetNetworkRequestData>;
 
 /** clearNetworkRequests 结果 */
-export interface ClearNetworkRequestsResult extends MessagesResult<ClearNetworkRequestsData> {
-  tooltype: string;
-  logFormat: string;
-}
+export type ClearNetworkRequestsResult = NetworkResult<ClearNetworkRequestsData>;

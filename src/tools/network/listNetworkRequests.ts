@@ -36,6 +36,30 @@ function getRequestHeaders(request: HTTPRequest): Record<string, string> {
   }
 }
 
+function serializeRequests(requests: HTTPRequest[]): NetworkRequestData[] {
+  return requests.map(request => {
+    const reqid = getRuntime().contextProvider!.getNetworkRequestStableId(request);
+    return serializeRequest(request, reqid);
+  });
+}
+
+function emptyPageData(
+  pageIdx: number,
+  pageSize: number | undefined,
+  targetPageIdx: number,
+  extra: Partial<ListNetworkRequestsData> = {},
+): ListNetworkRequestsData {
+  return {
+    requests: [],
+    total: 0,
+    pageIdx,
+    pageSize,
+    targetPageIdx,
+    timedOut: false,
+    ...extra,
+  };
+}
+
 const SIGNATURE_HEADER_PATTERN =
   /(^|[-_])(sign|signature|token|auth|nonce|timestamp)([-_]|$)|x-sign/i;
 
@@ -208,14 +232,7 @@ export const listNetworkRequests = defineTool({
             message: resolvedPage.message,
             tooltype: 'list_network_requests',
             logFormat: 'json',
-            data: {
-              requests: [],
-              total: 0,
-              pageIdx: resultPageIdx,
-              pageSize,
-              targetPageIdx: 0,
-              timedOut: false,
-            },
+            data: emptyPageData(resultPageIdx, pageSize, 0),
           });
           return;
         }
@@ -231,40 +248,33 @@ export const listNetworkRequests = defineTool({
         });
         if (!matched) {
           const timeoutMs = params.waitTimeoutMs ?? DEFAULT_WAIT_TIMEOUT_MS;
-          // 轮询超时：返回已有的请求而非空列表，方便用户排查
-          let existingRequests = getRuntime().contextProvider!.getNetworkRequests(
+          let timedOutRequests = getRuntime().contextProvider!.getNetworkRequests(
             includePreserved,
             targetPageIdx,
           );
-          // 对已有请求也应用 URL 过滤
-          existingRequests = existingRequests.filter(request =>
+          timedOutRequests = timedOutRequests.filter(request =>
             request.url().includes(params.waitForRequest!),
           );
           if (params.urlFilter) {
             const filter = params.urlFilter.toLowerCase();
-            existingRequests = existingRequests.filter(request =>
+            timedOutRequests = timedOutRequests.filter(request =>
               request.url().toLowerCase().includes(filter),
             );
           }
-          const existingData: NetworkRequestData[] = existingRequests.map(request => {
-            const reqid =
-              getRuntime().contextProvider!.getNetworkRequestStableId(request);
-            return serializeRequest(request, reqid);
-          });
+          const timedOutData = serializeRequests(timedOutRequests);
 
           response.setStructuredContent({
-            success: existingData.length > 0,
-            message: existingData.length > 0
-              ? `等待请求超时（${timeoutMs}ms），但发现 ${existingData.length} 个历史匹配 ${params.waitForRequest} 的请求`
-              : `等待请求超时：${timeoutMs}ms 内未发现匹配 ${params.waitForRequest} 的请求`,
+            success: timedOutData.length > 0,
+            message:
+              timedOutData.length > 0
+                ? `等待请求超时（${timeoutMs}ms），但发现 ${timedOutData.length} 个历史匹配 ${params.waitForRequest} 的请求`
+                : `等待请求超时：${timeoutMs}ms 内未发现匹配 ${params.waitForRequest} 的请求`,
             tooltype: 'list_network_requests',
             logFormat: 'json',
             data: {
-              requests: existingData,
-              total: existingData.length,
-              pageIdx: resultPageIdx,
-              pageSize,
-              targetPageIdx,
+              ...emptyPageData(resultPageIdx, pageSize, targetPageIdx),
+              requests: timedOutData,
+              total: timedOutData.length,
               timedOut: true,
               waitedFor: params.waitForRequest,
             },
@@ -302,12 +312,7 @@ export const listNetworkRequests = defineTool({
         });
       }
 
-      const allData: NetworkRequestData[] = requests.map(request => {
-        const reqid =
-          getRuntime().contextProvider!.getNetworkRequestStableId(request);
-        return serializeRequest(request, reqid);
-      });
-
+      const allData = serializeRequests(requests);
       const total = allData.length;
 
       let pagedData: NetworkRequestData[];
@@ -343,14 +348,7 @@ export const listNetworkRequests = defineTool({
         success: false,
         message: `列出请求失败：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'list_network_requests',
-        data: {
-          requests: [],
-          total: 0,
-          pageIdx: request.params.pageIdx ?? 0,
-          pageSize: request.params.pageSize,
-          targetPageIdx: 0,
-          timedOut: false,
-        },
+        data: emptyPageData(request.params.pageIdx ?? 0, request.params.pageSize, 0),
       });
     }
   },

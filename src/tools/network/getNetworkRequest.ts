@@ -9,6 +9,22 @@ import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
+const EMPTY_REQUEST_DATA = {
+  reqid: 0,
+  url: '',
+  method: '',
+  resourceType: '',
+  statusCode: 0,
+  requestHeaders: {},
+  responseHeaders: {},
+} as const;
+
+const TEXTUAL_CONTENT_TYPES = ['json', 'text', 'javascript'];
+
+function isTextualContentType(contentType: string): boolean {
+  return TEXTUAL_CONTENT_TYPES.some(token => contentType.includes(token));
+}
+
 export const getNetworkRequest = defineTool({
   name: 'get_network_request',
   description:
@@ -47,21 +63,12 @@ export const getNetworkRequest = defineTool({
       }
 
       if (!reqid) {
-        const result = {
+        response.setStructuredContent({
           success: false,
           message: '未指定 reqid，且 DevTools Network 面板未选中任何请求',
           tooltype: 'get_network_request',
-          data: {
-            reqid: 0,
-            url: '',
-            method: '',
-            resourceType: '',
-            statusCode: 0,
-            requestHeaders: {},
-            responseHeaders: {},
-          },
-        };
-        response.setStructuredContent(result);
+          data: {...EMPTY_REQUEST_DATA},
+        });
         return;
       }
 
@@ -74,11 +81,7 @@ export const getNetworkRequest = defineTool({
       if (httpResponse) {
         try {
           const contentType = httpResponse.headers()['content-type'] ?? '';
-          if (
-            contentType.includes('json') ||
-            contentType.includes('text') ||
-            contentType.includes('javascript')
-          ) {
+          if (isTextualContentType(contentType)) {
             const fullBody = await httpResponse.text();
             responseBody =
               fullBody.length > maxBodyLength
@@ -105,31 +108,23 @@ export const getNetworkRequest = defineTool({
         responseBody,
       };
 
-      const result = {
+      response.setStructuredContent({
         success: true,
         message: `请求 ID=${reqid} 获取成功`,
         tooltype: 'get_network_request',
         data,
-      };
-
-      response.setStructuredContent(result);
+      });
     } catch (error) {
-      const result = {
+      response.setStructuredContent({
         success: false,
         message: `获取请求失败：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'get_network_request',
         logFormat: 'json',
         data: {
+          ...EMPTY_REQUEST_DATA,
           reqid: request.params.reqid ?? 0,
-          url: '',
-          method: '',
-          resourceType: '',
-          statusCode: 0,
-          requestHeaders: {},
-          responseHeaders: {},
         },
-      };
-      response.setStructuredContent(result);
+      });
     }
   },
 });

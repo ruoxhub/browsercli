@@ -200,7 +200,10 @@ export class WebSocketCollector {
       wsData.connection.status = 'open';
     };
 
-    const onFrameSent = (event: unknown): void => {
+    const recordFrame = (
+      direction: WebSocketDirection,
+      event: unknown,
+    ): void => {
       const e = event as {
         requestId: string;
         timestamp: number;
@@ -213,32 +216,17 @@ export class WebSocketCollector {
 
       wsData.frames.push({
         requestId: e.requestId,
-        direction: 'sent',
+        direction,
         timestamp: e.timestamp * 1000,
         opcode: e.response.opcode,
         payloadData: e.response.payloadData,
       });
     };
 
-    const onFrameReceived = (event: unknown): void => {
-      const e = event as {
-        requestId: string;
-        timestamp: number;
-        response: {opcode: number; payloadData: string};
-      };
-      const wsData = connectionMap.get(e.requestId);
-      if (!wsData) {
-        return;
-      }
-
-      wsData.frames.push({
-        requestId: e.requestId,
-        direction: 'received',
-        timestamp: e.timestamp * 1000,
-        opcode: e.response.opcode,
-        payloadData: e.response.payloadData,
-      });
-    };
+    const onFrameSent = (event: unknown): void =>
+      recordFrame('sent', event);
+    const onFrameReceived = (event: unknown): void =>
+      recordFrame('received', event);
 
     const onClosed = (event: Protocol.Network.WebSocketClosedEvent): void => {
       const wsData = connectionMap.get(event.requestId);
