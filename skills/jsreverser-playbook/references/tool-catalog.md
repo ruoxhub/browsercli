@@ -1,4 +1,4 @@
-# 工具分类速查（135 个 MCP 工具）
+# 工具分类速查（141 个 MCP 工具）
 
 > **权威来源**：`js-reverse list-tools --json`。任何文档与 list-tools 冲突时，**以 list-tools 为准**。
 >
@@ -6,9 +6,9 @@
 
 ---
 
-## 1. 工作流（Workflow, 6）
+## 1. 工作流（Workflow, 11）
 
-端到端自动化工作流，覆盖 Observe → Capture → Rebuild → Patch → PureExtraction 全流程。
+端到端自动化工作流，覆盖 Observe → Capture → Rebuild → Patch → PureExtraction 全流程，含阶段顾问与参数 blueprint 推荐。
 
 | 工具 | 必填参数 | 用途 |
 |------|----------|------|
@@ -18,6 +18,11 @@
 | `auto_hook` | `--url*` | 自动生成并注入 Hook（基于 preset 或自定义选项） |
 | `rebuild_bundle` | `--url*` | 从证据构建本地 Node.js 复现环境 |
 | `trace_signature_generation` | | 签名追踪：关联网络请求、Hook 诊断、XHR 断点 |
+| `recommend_next_step` | | 逆向阶段顾问：根据任务状态推荐下一步动作（Observe/Capture/Rebuild/Patch/PureExtraction/Port） |
+| `explain_reverse_stage` | `--stage*` | 解释指定逆向阶段的目标、准入条件、避免事项和推荐工具 |
+| `list_parameter_workflows` | | 列出所有已打包的参数 blueprint 工作流 |
+| `get_parameter_workflow` | `--id*` | 按 id 或别名获取指定参数工作流详情（含 parts/mutations） |
+| `recommend_parameter_workflow` | `--query*` | 按关键词或自然语言推荐最匹配的参数工作流 |
 
 ---
 
@@ -404,3 +409,4 @@ js-reverse call check_browser_health
 | Wasm | `wasm_capabilities` / `wasm_dump` / `wasm_decompile` |
 | 反检测 | `inject_stealth` / `set_user_agent` / `emulate_mobile` |
 | 设备调试 | `emulate_network` / `emulate_cpu` / `resize_page` |
+| 阶段规划 | `recommend_next_step` / `explain_reverse_stage` / `recommend_parameter_workflow` |

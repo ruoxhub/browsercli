@@ -1,6 +1,6 @@
 # Profile 工具档位（Gating）
 
-`JS_REVERSE_TOOL_PROFILE` 环境变量控制 js-reverse 向 LLM 宿主暴露的工具集。**根据当前任务复杂度选择档位**，避免在上下文窗口里堆 135 个工具定义。
+`JS_REVERSE_TOOL_PROFILE` 环境变量控制 js-reverse 向 LLM 宿主暴露的工具集。**根据当前任务复杂度选择档位**，避免在上下文窗口里堆 141 个工具定义。
 
 ## 三档关系
 
@@ -11,8 +11,8 @@ search ⊂ workflow ⊂ full
 | Profile | 工具数 | 暴露范围 | 适用场景 |
 |---------|--------|----------|----------|
 | `search` | 1 | 仅 `search_tools` | 上下文极紧的 LLM 宿主（7B/13B 模型、长上下文不可用），按需发现工具 |
-| `workflow` | ~95 | search + 日常逆向（Observe / Capture / Network / Hook / Analyzer / WebSocket / Console / Stealth / Emulation / Site Experience） | **默认推荐** — 浏览器自动化 + JS 逆向日常 |
-| `full` | 135 | 全部（追加 Debugger / Wasm / Anti-Debug / Performance / Rebuild） | 调试器分析、Wasm 逆向、env rebuild 导出、perf 诊断 |
+| `workflow` | ~100 | search + 日常逆向（Observe / Capture / Network / Hook / Analyzer / WebSocket / Console / Stealth / Emulation / Site Experience / Workflow Advisor） | **默认推荐** — 浏览器自动化 + JS 逆向日常 |
+| `full` | 141 | 全部（追加 Debugger / Wasm / Anti-Debug / Performance / Rebuild） | 调试器分析、Wasm 逆向、env rebuild 导出、perf 诊断 |
 
 ## 怎么设置
 
@@ -73,7 +73,7 @@ js-reverse search-tools "debugger breakpoint"
 ```bash
 # 1. 看当前暴露的工具数
 js-reverse list-tools --json | jq 'length'
-# → 1 / ~95 / 135
+# → 1 / ~100 / 141
 
 # 2. 验证关键工具是否暴露
 js-reverse list-tools --json | jq -r '.[].name' | grep -E "^(hook_function|export_rebuild_bundle|wasm_decompile)$"

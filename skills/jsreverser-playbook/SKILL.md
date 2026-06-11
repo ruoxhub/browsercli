@@ -1,6 +1,6 @@
 ---
 name: jsreverser-playbook
-description: JSReverser CLI 工具导航与选择指南。当用户提到 js-reverse / js-reverse-mcp 工具、需要查询可用工具列表（135 个 MCP 工具）、为逆向任务选择工具组合、理解工具分类与参数时触发。涵盖 25 个功能域：观察取证、Hook 注入、调试器、代码分析、反调试、加密库拦截、Wasm 逆向、本地复现、WebSocket / Console / Stealth / Emulation 等。场景包含：定位签名/加密参数、反调试对抗、AST 去混淆、WebSocket 协议逆向、Wasm 二进制分析、Node 本地补环境复现、Hook/Breakpoint 选型决策。
+description: JSReverser CLI 工具导航与选择指南。当用户提到 js-reverse / js-reverse-mcp 工具、需要查询可用工具列表（141 个 MCP 工具）、为逆向任务选择工具组合、理解工具分类与参数时触发。涵盖 25 个功能域：观察取证、Hook 注入、调试器、代码分析、反调试、加密库拦截、Wasm 逆向、本地复现、WebSocket / Console / Stealth / Emulation 等。场景包含：定位签名/加密参数、反调试对抗、AST 去混淆、WebSocket 协议逆向、Wasm 二进制分析、Node 本地补环境复现、Hook/Breakpoint 选型决策、逆向阶段顾问与参数工作流推荐。
 ---
 
 # JSReverser playbook — 工具导航
@@ -18,11 +18,11 @@ description: JSReverser CLI 工具导航与选择指南。当用户提到 js-rev
 
 ---
 
-## 工具总览（135 个 MCP 工具，25 个功能域）
+## 工具总览（141 个 MCP 工具，25 个功能域）
 
 | 域 | 工具数 | 域 | 工具数 |
 |----|--------|----|--------|
-| Workflow（端到端自动化） | 6 | Dialog / Frames | 3 |
+| Workflow（端到端自动化） | 11 | Dialog / Frames | 3 |
 | DOM 操作 | 3 | Script 执行 | 2 |
 | Network 请求 | 2 | Site Experience CRUD | 5 |
 | Input 交互 | 9 | Extensions | 1 |
@@ -41,8 +41,8 @@ description: JSReverser CLI 工具导航与选择指南。当用户提到 js-rev
 
 > **Profile 提示**（按 `JS_REVERSE_TOOL_PROFILE` 切换）：
 > - `search` — 仅 `search_tools`（1 工具），给上下文极紧的 LLM 宿主按需发现工具
-> - `workflow` — `search` + 日常逆向（≈87 工具：Observe/Capture/Network/Hook/Analyzer/WebSocket/Console/Stealth/Emulation/Site Experience 等）
-> - `full` — `workflow` + 全量逆向（135 工具；额外含 Debugger / Wasm / Anti-Debug / Performance / Rebuild）
+> - `workflow` — `search` + 日常逆向（≈92 工具：Observe/Capture/Network/Hook/Analyzer/WebSocket/Console/Stealth/Emulation/Site Experience/Workflow Advisor 等）
+> - `full` — `workflow` + 全量逆向（141 工具；额外含 Debugger / Wasm / Anti-Debug / Performance / Rebuild）
 >
 > 完整对照 + 启动 / 切换 / 错误处理：`references/profile-tool-gating.md`。
 
