@@ -59,13 +59,13 @@ export function classifyExecutionContextWorld(
 export function createExecutionContextInfo(
   context: RawExecutionContextDescription,
 ): ExecutionContextInfo {
+  const originExt = extractExtensionId(context.origin);
   return {
     id: context.id,
     frameId: context.auxData?.frameId,
     origin: context.origin ?? '',
     name: context.name ?? '',
     world: classifyExecutionContextWorld(context),
-    extensionId:
-      extractExtensionId(context.origin) ?? extractExtensionId(context.name),
+    extensionId: originExt ?? extractExtensionId(context.name),
   };
 }

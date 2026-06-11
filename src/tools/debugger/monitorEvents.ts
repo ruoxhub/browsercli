@@ -25,6 +25,15 @@ const DEFAULT_EVENTS = [
   'blur',
 ];
 
+interface MonitorRecord {
+  target: EventTarget;
+  listeners: Record<string, EventListener>;
+}
+
+interface MonitorWindow extends Window {
+  __mcp_monitors__?: Record<string, MonitorRecord>;
+}
+
 /**
  * 监控指定元素或 window 上的 DOM 事件，事件将输出到控制台。
  */
@@ -73,15 +82,7 @@ export const monitorEvents = defineTool({
           events: string[];
           monitorId: string;
         }) => {
-          const browserWindow = window as typeof window & {
-            __mcp_monitors__?: Record<
-              string,
-              {
-                target: EventTarget;
-                listeners: Record<string, EventListener>;
-              }
-            >;
-          };
+          const browserWindow = window as unknown as MonitorWindow;
 
           browserWindow.__mcp_monitors__ = browserWindow.__mcp_monitors__ || {};
           if (browserWindow.__mcp_monitors__[monitorId]) {

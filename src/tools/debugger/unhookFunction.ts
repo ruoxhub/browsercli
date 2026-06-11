@@ -1,5 +1,5 @@
 /**
- * @license`
+ * @license
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -27,14 +27,14 @@ export const unhookFunction = defineTool({
       .describe('The hook ID to remove (from hook_function).'),
   },
   handler: async (request, response, context) => {
-    const hookId = request.params.hookId;
+    const {hookId} = request.params;
 
-    if (!hookId || typeof hookId !== 'string' || hookId.trim() === '') {
+    if (!hookId.trim()) {
       response.setStructuredContent({
         success: false,
-        message: "hookId 参数不能为空。",
+        message: 'hookId 参数不能为空。',
         tooltype: 'unhook_function',
-        data: {}
+        data: {},
       });
       return;
     }

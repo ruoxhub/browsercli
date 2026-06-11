@@ -45,6 +45,25 @@ export const getStorage = defineTool({
     return key.toLowerCase().includes(filter.toLowerCase());
   }
 
+  function readNamedStorage(storage) {
+    const out = {};
+    for (let i = 0; i < storage.length; i++) {
+      const key = storage.key(i);
+      if (!key || !matchFilter(key)) continue;
+      try {
+        const value = storage.getItem(key);
+        try {
+          out[key] = JSON.parse(value);
+        } catch {
+          out[key] = value;
+        }
+      } catch {
+        out[key] = '[Error reading]';
+      }
+    }
+    return out;
+  }
+
   if (type === 'all' || type === 'cookies') {
     const cookies = {};
     document.cookie.split(';').forEach(c => {
@@ -57,43 +76,11 @@ export const getStorage = defineTool({
   }
 
   if (type === 'all' || type === 'localStorage') {
-    const local = {};
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && matchFilter(key)) {
-        try {
-          const value = localStorage.getItem(key);
-          try {
-            local[key] = JSON.parse(value);
-          } catch {
-            local[key] = value;
-          }
-        } catch(e) {
-          local[key] = '[Error reading]';
-        }
-      }
-    }
-    result.localStorage = local;
+    result.localStorage = readNamedStorage(localStorage);
   }
 
   if (type === 'all' || type === 'sessionStorage') {
-    const session = {};
-    for (let i = 0; i < sessionStorage.length; i++) {
-      const key = sessionStorage.key(i);
-      if (key && matchFilter(key)) {
-        try {
-          const value = sessionStorage.getItem(key);
-          try {
-            session[key] = JSON.parse(value);
-          } catch {
-            session[key] = value;
-          }
-        } catch(e) {
-          session[key] = '[Error reading]';
-        }
-      }
-    }
-    result.sessionStorage = session;
+    result.sessionStorage = readNamedStorage(sessionStorage);
   }
 
   return result;

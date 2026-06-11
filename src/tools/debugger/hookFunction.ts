@@ -1,5 +1,5 @@
 /**
- * @license`
+ * @license
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -53,16 +53,6 @@ export const hookFunction = defineTool({
   handler: async (request, response, context) => {
     const {target, logArgs = true, logResult = true, logStack = false, hookId} =
       request.params;
-
-    if (!target || typeof target !== 'string') {
-      response.setStructuredContent({
-        success: false,
-        message: 'hook_function requires a "target" string parameter (e.g. "XMLHttpRequest.prototype.open")',
-        tooltype: 'hook_function',
-        data: {}
-      });
-      return;
-    }
 
     const id = hookId || target.replace(/[^a-zA-Z0-9]/g, '_');
     // Split target into object path and method
@@ -139,6 +129,21 @@ export const hookFunction = defineTool({
     if (store.length > 1000) store.shift();
   };
 
+  const buildRecord = (event, extra) => ({
+    hook: hookId,
+    target: objectPath + '.' + methodName,
+    timestamp: Date.now(),
+    isoTime: new Date().toISOString(),
+    event,
+    ...extra,
+  });
+
+  const report = (event, extra, flag) => {
+    const record = buildRecord(event, extra);
+    if (flag) pushHookData(record);
+    console.log('[MCP Hook ' + event + ']', record);
+  };
+
   obj[methodName] = function(...args) {
     const callInfo = {
       hook: hookId,
@@ -164,61 +169,18 @@ export const hookFunction = defineTool({
 
       if (result && typeof result.then === 'function') {
         return result.then(res => {
-          if (logResult) {
-            const resInfo = safeClone(res);
-            const resultInfo = {
-              hook: hookId,
-              target: objectPath + '.' + methodName,
-              timestamp: Date.now(),
-              isoTime: new Date().toISOString(),
-              event: 'result',
-              result: resInfo,
-            };
-            pushHookData(resultInfo);
-            console.log('[MCP Hook Result]', { hook: hookId, result: resInfo });
-          }
+          report('result', {result: safeClone(res)}, logResult);
           return res;
         }).catch(err => {
-          const errorInfo = {
-            hook: hookId,
-            target: objectPath + '.' + methodName,
-            timestamp: Date.now(),
-            isoTime: new Date().toISOString(),
-            event: 'error',
-            error: err && err.message ? err.message : String(err),
-          };
-          pushHookData(errorInfo);
-          console.log('[MCP Hook Error]', { hook: hookId, error: err.message });
+          report('error', {error: err && err.message ? err.message : String(err)}, true);
           throw err;
         });
       }
 
-      if (logResult) {
-        const resInfo = safeClone(result);
-        const resultInfo = {
-          hook: hookId,
-          target: objectPath + '.' + methodName,
-          timestamp: Date.now(),
-          isoTime: new Date().toISOString(),
-          event: 'result',
-          result: resInfo,
-        };
-        pushHookData(resultInfo);
-        console.log('[MCP Hook Result]', { hook: hookId, result: resInfo });
-      }
-
+      report('result', {result: safeClone(result)}, logResult);
       return result;
     } catch(err) {
-      const errorInfo = {
-        hook: hookId,
-        target: objectPath + '.' + methodName,
-        timestamp: Date.now(),
-        isoTime: new Date().toISOString(),
-        event: 'error',
-        error: err && err.message ? err.message : String(err),
-      };
-      pushHookData(errorInfo);
-      console.log('[MCP Hook Error]', { hook: hookId, error: err.message });
+      report('error', {error: err && err.message ? err.message : String(err)}, true);
       throw err;
     }
   };

@@ -8,6 +8,15 @@ import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 
+interface MonitorRecord {
+  target: EventTarget;
+  listeners: Record<string, EventListener>;
+}
+
+interface MonitorWindow extends Window {
+  __mcp_monitors__?: Record<string, MonitorRecord>;
+}
+
 /**
  * 停止指定的事件监控。
  */
@@ -28,15 +37,7 @@ export const stopMonitor = defineTool({
     try {
       const frame = (context as Context).getSelectedFrame();
       const result = await frame.evaluate((id: string) => {
-        const browserWindow = window as typeof window & {
-          __mcp_monitors__?: Record<
-            string,
-            {
-              target: EventTarget;
-              listeners: Record<string, EventListener>;
-            }
-          >;
-        };
+        const browserWindow = window as unknown as MonitorWindow;
 
         if (!browserWindow.__mcp_monitors__ || !browserWindow.__mcp_monitors__[id]) {
           return {success: false, message: `Monitor not found: ${id}`};

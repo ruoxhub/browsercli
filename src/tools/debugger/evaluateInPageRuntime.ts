@@ -17,10 +17,6 @@ interface RuntimeEvaluateResult<T> {
   };
 }
 
-function hasPage(frame: Frame): boolean {
-  return typeof (frame as Frame & {page?: () => Page}).page === 'function';
-}
-
 /**
  * 默认超时时间（毫秒）。
  * 当调试器暂停时，Runtime.evaluate 会无限等待，因此必须手动超时。
@@ -38,12 +34,13 @@ export async function evaluateInPageRuntime<T>(
   expression: string,
   timeoutMs: number = EVALUATE_TIMEOUT,
 ): Promise<T> {
-  if (!hasPage(frame)) {
+  const frameWithPage = frame as Frame & {page?: () => Page};
+  if (typeof frameWithPage.page !== 'function') {
     // 无 CDP 可用，回退到 frame.evaluate（已有 Proxy 超时保护）
     return (await frame.evaluate(expression)) as T;
   }
 
-  const page = frame.page();
+  const page = frameWithPage.page();
   const client: CDPSession = await page.context().newCDPSession(page);
 
   try {

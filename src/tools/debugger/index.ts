@@ -60,6 +60,175 @@ async function getDebugger(runtime: DebuggerRuntime) {
 }
 
 /**
+ * 工具 handler 通用包装：成功路径执行 `run()`，异常路径自动填充
+ * `{success: false, tooltype, message, data}` 结构化响应。
+ *
+ * 用于消除各 defineTool handler 中重复的 try/catch + setStructuredContent
+ * 样板。`errorData` 允许按请求参数回填少量字段（如 url、hookId）。
+ */
+async function runTool<P = unknown>(
+  response: {setStructuredContent(content: unknown): void},
+  request: {params: P},
+  tooltype: string,
+  run: () => Promise<void>,
+  options: {
+    errorData?: (params: P) => Record<string, unknown>;
+    errorPrefix?: string;
+  } = {},
+): Promise<void> {
+  const {errorData = () => ({}), errorPrefix} = options;
+  try {
+    await run();
+  } catch (error) {
+    const raw = error instanceof Error ? error.message : String(error);
+    const message = errorPrefix ? `${errorPrefix}: ${raw}` : raw;
+    response.setStructuredContent({
+      success: false,
+      message,
+      tooltype,
+      data: errorData(request.params),
+    });
+  }
+}
+
+/**
+ * step_into / step_over / step_out 三工具共享逻辑：校验暂停态、执行
+ * 单步动作、组装 pausedInfo 响应。
+ */
+function defineStepTool(config: {
+  name: 'step_into' | 'step_over' | 'step_out';
+  title: string;
+  description: string;
+  action: 'stepInto' | 'stepOver' | 'stepOut';
+  notPausedMessage: string;
+  successMessage: string;
+  failurePrefix: string;
+}) {
+  return defineTool({
+    name: config.name,
+    description: config.description,
+    annotations: {
+      title: config.title,
+      category: 'debugging' as ToolCategory,
+      readOnlyHint: false,
+    },
+    schema: {
+      includePausedInfo: zod
+        .boolean()
+        .optional()
+        .default(true)
+        .describe('返回值是否携带暂停后的 callFrames/scopes（默认 true）。'),
+      includeScopes: zod
+        .boolean()
+        .optional()
+        .default(true)
+        .describe('暂停信息中是否包含作用域变量（默认 true）。'),
+    },
+    handler: async (request, response, context) => {
+      const runtime = context as unknown as DebuggerRuntime;
+
+      await runTool(
+        response,
+        request,
+        config.name,
+        async () => {
+          const debuggerContext = await getDebugger(runtime);
+          const pausedState = debuggerContext.getPausedState();
+          if (!pausedState.isPaused) {
+            response.setStructuredContent({
+              success: false,
+              message: config.notPausedMessage,
+              tooltype: config.name,
+              data: {isPaused: false},
+            });
+            return;
+          }
+          await debuggerContext[config.action]();
+          const pausedInfo =
+            request.params.includePausedInfo !== false
+              ? await buildPausedInfoData(debuggerContext, {
+                  includeScopes: request.params.includeScopes,
+                })
+              : null;
+          response.setStructuredContent({
+            success: true,
+            message: config.successMessage,
+            tooltype: config.name,
+            data: {
+              action: config.action,
+              isPaused: pausedInfo !== null,
+              pausedInfo: pausedInfo ?? undefined,
+            },
+          });
+        },
+        {errorPrefix: config.failurePrefix},
+      );
+    },
+  });
+}
+
+/**
+ * break_on_xhr / remove_xhr_breakpoint / xhr_to_js_breakpoint 共享的
+ * CDP 调用与响应结构。
+ */
+function defineXhrBreakpointTool(config: {
+  name: string;
+  description: string;
+  title: string;
+  cdpMethod: string;
+  buildSuccessMessage: (url: string) => string;
+  successData: (url: string) => Record<string, unknown>;
+  failurePrefix: string;
+}) {
+  return defineTool({
+    name: config.name,
+    description: config.description,
+    annotations: {
+      title: config.title,
+      category: 'reverse_engineering' as ToolCategory,
+      readOnlyHint: false,
+    },
+    schema: {
+      url: zod.string().optional().describe('XHR URL 模式（部分匹配）。'),
+    },
+    handler: async (request, response, context) => {
+      const runtime = context as unknown as DebuggerRuntime;
+      const url = request.params.url ?? '';
+
+      await runTool(
+        response,
+        request,
+        config.name,
+        async () => {
+          const debuggerContext = await getDebugger(runtime);
+          const client = debuggerContext.getClient();
+          if (!client) {
+            response.setStructuredContent({
+              success: false,
+              message: 'Debugger 客户端不可用。',
+              tooltype: config.name,
+              data: {},
+            });
+            return;
+          }
+          await client.send(config.cdpMethod as 'DOMDebugger.setXHRBreakpoint', {url});
+          response.setStructuredContent({
+            success: true,
+            message: config.buildSuccessMessage(url || '*'),
+            tooltype: config.name,
+            data: config.successData(url || '*'),
+          });
+        },
+        {
+          errorPrefix: config.failurePrefix,
+          errorData: () => ({url: request.params.url}),
+        },
+      );
+    },
+  });
+}
+
+/**
  * Shape of the structured `data` field returned by `get_paused_info` and
  * embedded in `step_*` responses when execution stays paused.
  */
@@ -357,202 +526,43 @@ export const listBreakpoints = defineTool({
 /**
  * 单步进入。
  */
-export const stepInto = defineTool({
+export const stepInto = defineStepTool({
   name: 'step_into',
+  title: '单步进入',
   description:
     '单步进入函数调用。用于进入函数体内部进行调试。需要先在断点暂停。返回结果默认包含暂停后的调用栈/作用域，省去再次调用 get_paused_info。',
-  annotations: {
-    title: '单步进入',
-    category: 'debugging' as ToolCategory,
-    readOnlyHint: false,
-  },
-  schema: {
-    includePausedInfo: zod
-      .boolean()
-      .optional()
-      .default(true)
-      .describe('返回值是否携带暂停后的 callFrames/scopes（默认 true）。'),
-    includeScopes: zod
-      .boolean()
-      .optional()
-      .default(true)
-      .describe('暂停信息中是否包含作用域变量（默认 true）。'),
-  },
-  handler: async (request, response, context) => {
-    const runtime = context as unknown as DebuggerRuntime;
-
-    try {
-      const debuggerContext = await getDebugger(runtime);
-      const pausedState = debuggerContext.getPausedState();
-      if (!pausedState.isPaused) {
-        response.setStructuredContent({
-          success: false,
-          message: '当前未处于暂停状态，无法单步进入。请先命中断点或调用 pause。',
-          tooltype: 'step_into',
-          data: { isPaused: false }
-        });
-        return;
-      }
-      await debuggerContext.stepInto();
-      const pausedInfo =
-        request.params.includePausedInfo !== false
-          ? await buildPausedInfoData(debuggerContext, {
-              includeScopes: request.params.includeScopes,
-            })
-          : null;
-      response.setStructuredContent({
-        success: true,
-        message: '单步进入执行完成',
-        tooltype: 'step_into',
-        data: {
-          action: 'stepInto',
-          isPaused: pausedInfo !== null,
-          pausedInfo: pausedInfo ?? undefined,
-        }
-      });
-    } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `单步进入失败: ${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'step_into',
-        data: {}
-      });
-    }
-  },
+  action: 'stepInto',
+  notPausedMessage: '当前未处于暂停状态，无法单步进入。请先命中断点或调用 pause。',
+  successMessage: '单步进入执行完成',
+  failurePrefix: '单步进入失败',
 });
 
 /**
  * 单步跳过。
  */
-export const stepOver = defineTool({
+export const stepOver = defineStepTool({
   name: 'step_over',
+  title: '单步跳过',
   description:
     '单步跳过函数调用，将函数调用视为一个步骤。用于跳过函数体。需要先在断点暂停。返回结果默认包含暂停后的调用栈/作用域，省去再次调用 get_paused_info。',
-  annotations: {
-    title: '单步跳过',
-    category: 'debugging' as ToolCategory,
-    readOnlyHint: false,
-  },
-  schema: {
-    includePausedInfo: zod
-      .boolean()
-      .optional()
-      .default(true)
-      .describe('返回值是否携带暂停后的 callFrames/scopes（默认 true）。'),
-    includeScopes: zod
-      .boolean()
-      .optional()
-      .default(true)
-      .describe('暂停信息中是否包含作用域变量（默认 true）。'),
-  },
-  handler: async (request, response, context) => {
-    const runtime = context as unknown as DebuggerRuntime;
-
-    try {
-      const debuggerContext = await getDebugger(runtime);
-      const pausedState = debuggerContext.getPausedState();
-      if (!pausedState.isPaused) {
-        response.setStructuredContent({
-          success: false,
-          message: '当前未处于暂停状态，无法单步跳过。请先命中断点或调用 pause。',
-          tooltype: 'step_over',
-          data: { isPaused: false }
-        });
-        return;
-      }
-      await debuggerContext.stepOver();
-      const pausedInfo =
-        request.params.includePausedInfo !== false
-          ? await buildPausedInfoData(debuggerContext, {
-              includeScopes: request.params.includeScopes,
-            })
-          : null;
-      response.setStructuredContent({
-        success: true,
-        message: '单步跳过执行完成',
-        tooltype: 'step_over',
-        data: {
-          action: 'stepOver',
-          isPaused: pausedInfo !== null,
-          pausedInfo: pausedInfo ?? undefined,
-        }
-      });
-    } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `单步跳过失败: ${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'step_over',
-        data: {}
-      });
-    }
-  },
+  action: 'stepOver',
+  notPausedMessage: '当前未处于暂停状态，无法单步跳过。请先命中断点或调用 pause。',
+  successMessage: '单步跳过执行完成',
+  failurePrefix: '单步跳过失败',
 });
 
 /**
  * 单步跳出。
  */
-export const stepOut = defineTool({
+export const stepOut = defineStepTool({
   name: 'step_out',
+  title: '单步跳出',
   description:
     '单步跳出当前函数，继续执行直到函数返回。用于快速退出函数。需要先在断点暂停。返回结果默认包含暂停后的调用栈/作用域，省去再次调用 get_paused_info。',
-  annotations: {
-    title: '单步跳出',
-    category: 'debugging' as ToolCategory,
-    readOnlyHint: false,
-  },
-  schema: {
-    includePausedInfo: zod
-      .boolean()
-      .optional()
-      .default(true)
-      .describe('返回值是否携带暂停后的 callFrames/scopes（默认 true）。'),
-    includeScopes: zod
-      .boolean()
-      .optional()
-      .default(true)
-      .describe('暂停信息中是否包含作用域变量（默认 true）。'),
-  },
-  handler: async (request, response, context) => {
-    const runtime = context as unknown as DebuggerRuntime;
-
-    try {
-      const debuggerContext = await getDebugger(runtime);
-      const pausedState = debuggerContext.getPausedState();
-      if (!pausedState.isPaused) {
-        response.setStructuredContent({
-          success: false,
-          message: '当前未处于暂停状态，无法单步跳出。请先命中断点或调用 pause。',
-          tooltype: 'step_out',
-          data: { isPaused: false }
-        });
-        return;
-      }
-      await debuggerContext.stepOut();
-      const pausedInfo =
-        request.params.includePausedInfo !== false
-          ? await buildPausedInfoData(debuggerContext, {
-              includeScopes: request.params.includeScopes,
-            })
-          : null;
-      response.setStructuredContent({
-        success: true,
-        message: '单步跳出执行完成',
-        tooltype: 'step_out',
-        data: {
-          action: 'stepOut',
-          isPaused: pausedInfo !== null,
-          pausedInfo: pausedInfo ?? undefined,
-        }
-      });
-    } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `单步跳出失败: ${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'step_out',
-        data: {}
-      });
-    }
-  },
+  action: 'stepOut',
+  notPausedMessage: '当前未处于暂停状态，无法单步跳出。请先命中断点或调用 pause。',
+  successMessage: '单步跳出执行完成',
+  failurePrefix: '单步跳出失败',
 });
 
 /**
@@ -1102,102 +1112,27 @@ export const searchInSources = defineTool({
 /**
  * 设置 XHR 断点。
  */
-export const breakOnXhr = defineTool({
+export const breakOnXhr = defineXhrBreakpointTool({
   name: 'break_on_xhr',
-  description:
-    '在 XHR/Fetch 请求 URL 包含指定字符串时触发断点。',
-  annotations: {
-    title: '设置 XHR 断点',
-    category: 'reverse_engineering' as ToolCategory,
-    readOnlyHint: false,
-  },
-  schema: {
-    url: zod.string().describe('要断点的 URL 模式（部分匹配）。'),
-  },
-  handler: async (request, response, context) => {
-    const runtime = context as unknown as DebuggerRuntime;
-    const {url} = request.params;
-
-    try {
-      const debuggerContext = await getDebugger(runtime);
-      const client = debuggerContext.getClient();
-
-      if (!client) {
-        response.setStructuredContent({
-          success: false,
-          message: 'Debugger 客户端不可用。',
-          tooltype: 'break_on_xhr',
-          data: {}
-        });
-        return;
-      }
-
-      await client.send('DOMDebugger.setXHRBreakpoint', {url});
-      response.setStructuredContent({
-        success: true,
-        message: `XHR 断点已设置，URL 模式: "${url}"`,
-        tooltype: 'break_on_xhr',
-        data: { url, hint: '匹配的 XHR/Fetch 请求发出时将暂停执行。' }
-      });
-    } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `设置 XHR 断点失败: ${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'break_on_xhr',
-        data: { url: request.params.url }
-      });
-    }
-  },
+  description: '在 XHR/Fetch 请求 URL 包含指定字符串时触发断点。',
+  title: '设置 XHR 断点',
+  cdpMethod: 'DOMDebugger.setXHRBreakpoint',
+  buildSuccessMessage: url => `XHR 断点已设置，URL 模式: "${url}"`,
+  successData: url => ({url, hint: '匹配的 XHR/Fetch 请求发出时将暂停执行。'}),
+  failurePrefix: '设置 XHR 断点失败',
 });
 
 /**
  * 移除 XHR 断点。
  */
-export const removeXhrBreakpoint = defineTool({
+export const removeXhrBreakpoint = defineXhrBreakpointTool({
   name: 'remove_xhr_breakpoint',
   description: '移除 XHR/Fetch 断点。',
-  annotations: {
-    title: '移除 XHR 断点',
-    category: 'reverse_engineering' as ToolCategory,
-    readOnlyHint: false,
-  },
-  schema: {
-    url: zod.string().describe('要移除断点的 URL 模式。'),
-  },
-  handler: async (request, response, context) => {
-    const runtime = context as unknown as DebuggerRuntime;
-    const {url} = request.params;
-
-    try {
-      const debuggerContext = await getDebugger(runtime);
-      const client = debuggerContext.getClient();
-
-      if (!client) {
-        response.setStructuredContent({
-          success: false,
-          message: 'Debugger 客户端不可用。',
-          tooltype: 'remove_xhr_breakpoint',
-          data: {}
-        });
-        return;
-      }
-
-      await client.send('DOMDebugger.removeXHRBreakpoint', {url});
-      response.setStructuredContent({
-        success: true,
-        message: `XHR 断点已移除: "${url}"`,
-        tooltype: 'remove_xhr_breakpoint',
-        data: { url }
-      });
-    } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `移除 XHR 断点失败: ${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'remove_xhr_breakpoint',
-        data: { url: request.params.url }
-      });
-    }
-  },
+  title: '移除 XHR 断点',
+  cdpMethod: 'DOMDebugger.removeXHRBreakpoint',
+  buildSuccessMessage: url => `XHR 断点已移除: "${url}"`,
+  successData: url => ({url}),
+  failurePrefix: '移除 XHR 断点失败',
 });
 
 /**
@@ -2086,58 +2021,18 @@ export const setBreakpointOnText = defineTool({
 /**
  * XHR 到 JS 断点转换。
  */
-export const xhrToJsBreakpoint = defineTool({
+export const xhrToJsBreakpoint = defineXhrBreakpointTool({
   name: 'xhr_to_js_breakpoint',
   description:
     '设置 XHR 断点；命中后可结合 get_paused_info / set_breakpoint 完成 JS 断点定位。',
-  annotations: {
-    title: 'XHR 到 JS 断点',
-    category: 'reverse_engineering' as ToolCategory,
-    readOnlyHint: false,
-  },
-  schema: {
-    url: zod
-      .string()
-      .optional()
-      .describe('要监控的 URL 模式（部分匹配）。'),
-  },
-  handler: async (request, response, context) => {
-    const runtime = context as unknown as DebuggerRuntime;
-    const {url} = request.params;
-
-    try {
-      const debuggerContext = await getDebugger(runtime);
-      const client = debuggerContext.getClient();
-
-      if (!client) {
-        response.setStructuredContent({
-          success: false,
-          message: 'Debugger 客户端不可用。',
-          tooltype: 'xhr_to_js_breakpoint',
-          data: {}
-        });
-        return;
-      }
-
-      await client.send('DOMDebugger.setXHRBreakpoint', {url});
-      response.setStructuredContent({
-        success: true,
-        message: `XHR 断点已设置: ${url || '*'}`,
-        tooltype: 'xhr_to_js_breakpoint',
-        data: {
-          url: url || '*',
-          hint: '命中后可结合 get_paused_info / set_breakpoint 完成 JS 断点定位'
-        }
-      });
-    } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `错误: ${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'xhr_to_js_breakpoint',
-        data: { url: request.params.url }
-      });
-    }
-  },
+  title: 'XHR 到 JS 断点',
+  cdpMethod: 'DOMDebugger.setXHRBreakpoint',
+  buildSuccessMessage: url => `XHR 断点已设置: ${url}`,
+  successData: url => ({
+    url,
+    hint: '命中后可结合 get_paused_info / set_breakpoint 完成 JS 断点定位',
+  }),
+  failurePrefix: '设置 XHR 断点失败',
 });
 
 /**

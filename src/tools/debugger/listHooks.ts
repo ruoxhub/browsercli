@@ -40,21 +40,23 @@ export const listHooks = defineTool({
 `,
       );
 
-      if (!hooks || hooks.length === 0) {
+      if (!Array.isArray(hooks)) {
         response.setStructuredContent({
-          success: true,
-          message: '当前没有已安装的 Hook',
+          success: false,
+          message: 'list_hooks 返回格式异常',
           tooltype: 'list_hooks',
-          data: { hooks: [] }
+          data: {},
         });
         return;
       }
 
       response.setStructuredContent({
         success: true,
-        message: `活跃 Hook（${hooks.length} 个）`,
+        message: hooks.length
+          ? `活跃 Hook（${hooks.length} 个）`
+          : '当前没有已安装的 Hook',
         tooltype: 'list_hooks',
-        data: { hooks }
+        data: {hooks},
       });
     } catch (error) {
       response.setStructuredContent({
