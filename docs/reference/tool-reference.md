@@ -1602,3 +1602,28 @@
 - `validPatterns`
 - `knownPitfalls`
 
+### `diagnose_environment` — diagnose_environment
+
+**Description:** Run environment diagnostics to check Node version, build output, AI configuration, and artifacts directory status.
+
+**Category:** diagnostics (read-only)
+
+**Parameters:**
+
+- `checks` (optional, string[]): List of check names to run. If omitted, all checks are executed. Available checks: `node_version`, `build_output`, `ai_provider_selection`, `gemini_cli`, `artifacts_dir`.
+
+**Example output:**
+
+```json
+{
+  "status": "warn",
+  "summary": "3/5 checks passed",
+  "checks": [
+    {"name": "node_version", "status": "ok", "reason": "v24.3.0", "fix": ""},
+    {"name": "build_output", "status": "ok", "reason": "build/src/bin/js-reverse.js exists", "fix": ""},
+    {"name": "ai_provider_selection", "status": "warn", "reason": "No AI provider configured", "fix": "Set GEMINI_API_KEY or configure provider in settings"},
+    {"name": "artifacts_dir", "status": "ok", "reason": "artifacts/tasks/ exists", "fix": ""}
+  ]
+}
+```
+
