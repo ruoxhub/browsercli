@@ -268,14 +268,6 @@ export const GENERATED_TOOL_REGISTRY = [
     handlerName: 'xhrToJsBreakpoint',
   },
   {
-    modulePath: './debugger/index.js',
-    handlerName: 'startContinuousDebugging',
-  },
-  {
-    modulePath: './debugger/index.js',
-    handlerName: 'stopContinuousDebugging',
-  },
-  {
     modulePath: './diagnostics/diagnoseEnvironment.js',
     handlerName: 'diagnoseEnvironmentTool',
   },

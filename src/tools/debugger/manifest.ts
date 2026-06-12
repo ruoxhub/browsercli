@@ -63,10 +63,5 @@ export const manifest = {
     {modulePath: './debugger/hookFunction.js', handlerName: 'hookFunction'},
     {modulePath: './debugger/unhookFunction.js', handlerName: 'unhookFunction'},
     {modulePath: './debugger/index.js', handlerName: 'xhrToJsBreakpoint'},
-    {
-      modulePath: './debugger/index.js',
-      handlerName: 'startContinuousDebugging',
-    },
-    {modulePath: './debugger/index.js', handlerName: 'stopContinuousDebugging'},
   ],
 } satisfies DomainManifest;

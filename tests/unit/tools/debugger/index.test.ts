@@ -26,11 +26,9 @@ import {
   searchInSources,
   setBreakpoint,
   setBreakpointOnText,
-  startContinuousDebugging,
   stepInto,
   stepOut,
   stepOver,
-  stopContinuousDebugging,
   traceFunction,
   xhrToJsBreakpoint,
 } from '../../../../src/tools/debugger/index.js';
@@ -415,19 +413,6 @@ describe('src/tools/debugger/index.ts', () => {
     ]);
   });
 
-  it('fails explicitly for unsupported continuous debugging entrypoints', async () => {
-    const {context} = createRuntime();
-
-    const startLines = await callTool(startContinuousDebugging, {}, context);
-    const stopLines = await callTool(stopContinuousDebugging, {}, context);
-
-    const startText = linesToText(startLines);
-    const stopText = linesToText(stopLines);
-
-    assert.match(startText, /尚未接入/);
-    assert.match(stopText, /没有/);
-  });
-
   it('trace_function uses setStructuredContent for empty target validation', async () => {
     const {context} = createRuntime();
     let structuredContent: unknown = undefined;
@@ -564,5 +549,37 @@ describe('src/tools/debugger/index.ts', () => {
     } finally {
       PackerDeobfuscator.prototype.beautify = originalBeautify;
     }
+  });
+
+  it('does NOT export or register stub tools startContinuousDebugging / stopContinuousDebugging', async () => {
+    // Regression: these stub tools were never implemented and must not
+    // appear as exports or in the generated tool registry.
+    const debuggerModule = await import(
+      '../../../../src/tools/debugger/index.js'
+    );
+    assert.equal(
+      'startContinuousDebugging' in debuggerModule,
+      false,
+      'startContinuousDebugging must not be exported from debugger/index',
+    );
+    assert.equal(
+      'stopContinuousDebugging' in debuggerModule,
+      false,
+      'stopContinuousDebugging must not be exported from debugger/index',
+    );
+
+    const {GENERATED_TOOL_REGISTRY} = await import(
+      '../../../../src/tools/generated-tools-index.js'
+    );
+    const stubEntries = GENERATED_TOOL_REGISTRY.filter(
+      entry =>
+        (entry.handlerName as string) === 'startContinuousDebugging' ||
+        (entry.handlerName as string) === 'stopContinuousDebugging',
+    );
+    assert.equal(
+      stubEntries.length,
+      0,
+      'generated tool registry must not contain start/stopContinuousDebugging stubs',
+    );
   });
 });
