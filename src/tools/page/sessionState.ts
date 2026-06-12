@@ -62,6 +62,11 @@ function ensureCleanupLoop(): void {
   cleanupTimer.unref?.();
 }
 
+function prepareSessionStore(): number {
+  ensureCleanupLoop();
+  return cleanupExpiredSessions();
+}
+
 // ─── 加密辅助 ──────────────────────────────────────────
 
 interface EncryptedPayload {
@@ -181,8 +186,7 @@ export const saveSessionState = defineTool({
       includeSessionStorage,
     } = request.params;
     try {
-      ensureCleanupLoop();
-      cleanupExpiredSessions();
+      prepareSessionStore();
 
       const page = _context.getSelectedPage();
       const sid = sessionId ?? `session_${Date.now()}`;
@@ -283,8 +287,7 @@ export const restoreSessionState = defineTool({
       clearStorageBeforeRestore,
     } = request.params;
     try {
-      ensureCleanupLoop();
-      cleanupExpiredSessions();
+      prepareSessionStore();
 
       const snapshot = sessionSnapshots.get(sid);
       if (!snapshot) {
@@ -372,8 +375,7 @@ export const listSessionStates = defineTool({
   annotations: {category: ToolCategory.PAGES, readOnlyHint: true},
   schema: {},
   handler: async (_request, response, _context) => {
-    ensureCleanupLoop();
-    const removed = cleanupExpiredSessions();
+    const removed = prepareSessionStore();
 
     const sessions = Array.from(sessionSnapshots.values()).map(snapshot => ({
       sessionId: snapshot.id,
@@ -413,8 +415,7 @@ export const deleteSessionState = defineTool({
   },
   handler: async (request, response, _context) => {
     const {sessionId: sid} = request.params;
-    ensureCleanupLoop();
-    cleanupExpiredSessions();
+    prepareSessionStore();
 
     const deleted = sessionSnapshots.delete(sid);
 
@@ -447,8 +448,7 @@ export const dumpSessionState = defineTool({
   handler: async (request, response, _context) => {
     const {sessionId: sid, path, pretty, encrypt} = request.params;
     try {
-      ensureCleanupLoop();
-      cleanupExpiredSessions();
+      prepareSessionStore();
 
       const snapshot = sessionSnapshots.get(sid);
       if (!snapshot) {
@@ -521,8 +521,7 @@ export const loadSessionState = defineTool({
   handler: async (request, response, _context) => {
     const {sessionId: sid, path, snapshotJson, overwrite} = request.params;
     try {
-      ensureCleanupLoop();
-      cleanupExpiredSessions();
+      prepareSessionStore();
 
       if (!path && !snapshotJson && sid) {
         const existingSnapshot = sessionSnapshots.get(sid);
