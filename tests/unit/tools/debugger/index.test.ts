@@ -59,6 +59,14 @@ function createRuntime() {
         : undefined,
     getScriptSource: async () =>
       'const token = 1;\nfunction test(){ return token; }\nconst token2 = token;',
+    getBeautifiedScriptSource: async (
+      _scriptId: string,
+      beautify: (source: string) => string,
+    ) => {
+      const raw =
+        'const token = 1;\nfunction test(){ return token; }\nconst token2 = token;';
+      return beautify(raw);
+    },
     searchInScripts: async (query: string) => ({
       query,
       matches:
@@ -173,9 +181,14 @@ async function callTool(
   context: unknown,
 ): Promise<string[]> {
   const lines: string[] = [];
+  let structuredContent: unknown = undefined;
   const response = {
     appendResponseLine: (value: string) => {
       lines.push(value);
+    },
+    setStructuredContent: (content: unknown) => {
+      structuredContent = content;
+      lines.push(JSON.stringify(content));
     },
     setIncludePages: () => {},
     setIncludeNetworkRequests: () => {},
@@ -198,6 +211,36 @@ async function callTool(
 /** 将输出行合并为文本 */
 function linesToText(lines: string[]): string {
   return lines.join('\n');
+}
+
+/** 执行 defineTool 工具并返回结构化内容对象 */
+async function callToolContent<T = Record<string, unknown>>(
+  tool: ToolDefinition,
+  params: Record<string, unknown>,
+  context: unknown,
+): Promise<T> {
+  let content: unknown = undefined;
+  const response = {
+    appendResponseLine: () => {},
+    setStructuredContent: (value: unknown) => {
+      content = value;
+    },
+    setIncludePages: () => {},
+    setIncludeNetworkRequests: () => {},
+    setIncludeConsoleData: () => {},
+    attachImage: () => {},
+    attachNetworkRequest: () => {},
+    attachConsoleMessage: () => {},
+    setIncludeWebSocketConnections: () => {},
+    attachWebSocket: () => {},
+  };
+  const request = {params};
+  await tool.handler(
+    request as never,
+    response as never,
+    context as never,
+  );
+  return content as T;
 }
 
 describe('src/tools/debugger/index.ts', () => {
@@ -383,5 +426,57 @@ describe('src/tools/debugger/index.ts', () => {
 
     assert.match(startText, /尚未接入/);
     assert.match(stopText, /没有/);
+  });
+
+  it('getScriptSource with prettyPrint beautifies only once, not twice', async () => {
+    const {PackerDeobfuscator} = await import(
+      '../../../../src/modules/deobfuscator/PackerDeobfuscator.js'
+    );
+    const rawSource = 'var a=1;var b=2;';
+
+    // Spy on the prototype to intercept calls from ANY instance
+    // (the handler creates its own PackerDeobfuscator internally)
+    let beautifyCallCount = 0;
+    const originalBeautify = PackerDeobfuscator.prototype.beautify;
+    PackerDeobfuscator.prototype.beautify = function (code: string) {
+      beautifyCallCount++;
+      return originalBeautify.call(this, code);
+    };
+
+    try {
+      const {context} = createRuntime();
+      const dc = await (
+        context as never as {
+          getDebuggerContext: () => Promise<Record<string, unknown>>;
+        }
+      ).getDebuggerContext();
+
+      dc.getScriptSource = async () => rawSource;
+      dc.getBeautifiedScriptSource = async (
+        _scriptId: string,
+        beautify: (source: string) => string,
+      ) => beautify(rawSource);
+      dc.getScriptById = () => ({
+        scriptId: '1',
+        url: 'https://example.com/app.js',
+      });
+
+      const result = await callToolContent<{
+        success: boolean;
+        data: {source: string};
+      }>(getScriptSource, {scriptId: '1', prettyPrint: true}, context);
+
+      assert.equal(result.success, true);
+      // Core regression check: beautify must be called exactly once
+      assert.equal(
+        beautifyCallCount,
+        1,
+        `beautify should be called exactly once, but was called ${beautifyCallCount} times`,
+      );
+      // Verify the returned source differs from raw (beautify actually ran)
+      assert.notEqual(result.data.source, rawSource);
+    } finally {
+      PackerDeobfuscator.prototype.beautify = originalBeautify;
+    }
   });
 });

@@ -761,11 +761,12 @@ export const getScriptSource = defineTool({
 
     try {
       const debuggerContext = await getDebugger(runtime);
+      const deobfuscator = new PackerDeobfuscator();
       let source: string;
       if (prettyPrint) {
         source = await debuggerContext.getBeautifiedScriptSource(
           scriptId,
-          raw => new PackerDeobfuscator().beautify(raw),
+          raw => deobfuscator.beautify(raw),
         );
       } else {
         source = await debuggerContext.getScriptSource(scriptId);
@@ -779,15 +780,6 @@ export const getScriptSource = defineTool({
           data: { scriptId }
         });
         return;
-      }
-
-      // 格式化源码（可选）
-      if (prettyPrint) {
-        try {
-          source = new PackerDeobfuscator().beautify(source);
-        } catch {
-          // 格式化失败时 fallback 返回原始源码
-        }
       }
 
       const script = debuggerContext.getScriptById(scriptId);
