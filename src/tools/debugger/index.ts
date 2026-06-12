@@ -32,7 +32,7 @@ export {stopMonitor} from './stopMonitor.js';
 
 // ─── 类型导出 ─────────────────────────────────────────
 
-export type {Frame} from './types.js';
+export type {Frame} from '../../third_party/index.js';
 
 // ─── 辅助函数 ───────────────────────────────────────────────
 
