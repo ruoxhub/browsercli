@@ -951,100 +951,38 @@ function mergePresetConfig(options: AutoHookOptions): AutoHookOptions {
   };
 }
 
+interface HookPreset {
+  optionKey: keyof AutoHookOptions;
+  hookId: string;
+  type: string;
+  description: string;
+  buildScript: () => string;
+}
+
+const HOOK_PRESETS: HookPreset[] = [
+  {optionKey: 'hookFetch', hookId: 'hook_fetch_auto', type: 'fetch', description: 'Hook fetch API - capture requests and responses', buildScript: () => _generateFetchHookScript()},
+  {optionKey: 'hookXhr', hookId: 'hook_xhr_auto', type: 'xhr', description: 'Hook XMLHttpRequest - capture XHR requests', buildScript: () => _generateXhrHookScript()},
+  {optionKey: 'hookTimers', hookId: 'hook_timers_auto', type: 'timer', description: 'Hook setTimeout/setInterval', buildScript: () => _generateTimerHookScript()},
+  {optionKey: 'hookEval', hookId: 'hook_eval_auto', type: 'eval', description: 'Hook eval and Function constructor', buildScript: () => _generateEvalHookScript()},
+  {optionKey: 'hookCookie', hookId: 'hook_cookie_auto', type: 'cookie', description: 'Hook document.cookie getter/setter', buildScript: () => _generateCookieHookScript()},
+  {optionKey: 'hookCrypto', hookId: 'hook_cryptojs_auto', type: 'cryptojs', description: 'Hook CryptoJS - AES, DES, MD5, SHA, HMAC', buildScript: () => _generateCryptoJsHookScript()},
+  {optionKey: 'hookRsa', hookId: 'hook_jsencrypt_auto', type: 'jsencrypt', description: 'Hook JSEncrypt - RSA encryption/decryption', buildScript: () => _generateJsEncryptHookScript()},
+  {optionKey: 'hookSmCrypto', hookId: 'hook_smcrypto_auto', type: 'smcrypto', description: 'Hook SM-Crypto - SM2, SM3, SM4', buildScript: () => _generateSmCryptoHookScript()},
+];
+
 function buildHookPlans(
   options: AutoHookOptions,
 ): Array<HookInjectionRecord & {script: string}> {
-  const plans: Array<HookInjectionRecord & {script: string}> = [];
-
-  if (options.hookFetch) {
-    plans.push({
-      hookId: 'hook_fetch_auto',
-      type: 'fetch',
-      description: 'Hook fetch API - capture requests and responses',
+  return HOOK_PRESETS
+    .filter(p => options[p.optionKey])
+    .map(p => ({
+      hookId: p.hookId,
+      type: p.type,
+      description: p.description,
       success: true,
       injected: false,
-      script: _generateFetchHookScript(),
-    });
-  }
-
-  if (options.hookXhr) {
-    plans.push({
-      hookId: 'hook_xhr_auto',
-      type: 'xhr',
-      description: 'Hook XMLHttpRequest - capture XHR requests',
-      success: true,
-      injected: false,
-      script: _generateXhrHookScript(),
-    });
-  }
-
-  if (options.hookTimers) {
-    plans.push({
-      hookId: 'hook_timers_auto',
-      type: 'timer',
-      description: 'Hook setTimeout/setInterval',
-      success: true,
-      injected: false,
-      script: _generateTimerHookScript(),
-    });
-  }
-
-  if (options.hookEval) {
-    plans.push({
-      hookId: 'hook_eval_auto',
-      type: 'eval',
-      description: 'Hook eval and Function constructor',
-      success: true,
-      injected: false,
-      script: _generateEvalHookScript(),
-    });
-  }
-
-  if (options.hookCookie) {
-    plans.push({
-      hookId: 'hook_cookie_auto',
-      type: 'cookie',
-      description: 'Hook document.cookie getter/setter',
-      success: true,
-      injected: false,
-      script: _generateCookieHookScript(),
-    });
-  }
-
-  if (options.hookCrypto) {
-    plans.push({
-      hookId: 'hook_cryptojs_auto',
-      type: 'cryptojs',
-      description: 'Hook CryptoJS - AES, DES, MD5, SHA, HMAC',
-      success: true,
-      injected: false,
-      script: _generateCryptoJsHookScript(),
-    });
-  }
-
-  if (options.hookRsa) {
-    plans.push({
-      hookId: 'hook_jsencrypt_auto',
-      type: 'jsencrypt',
-      description: 'Hook JSEncrypt - RSA encryption/decryption',
-      success: true,
-      injected: false,
-      script: _generateJsEncryptHookScript(),
-    });
-  }
-
-  if (options.hookSmCrypto) {
-    plans.push({
-      hookId: 'hook_smcrypto_auto',
-      type: 'smcrypto',
-      description: 'Hook SM-Crypto - SM2, SM3, SM4',
-      success: true,
-      injected: false,
-      script: _generateSmCryptoHookScript(),
-    });
-  }
-
-  return plans;
+      script: p.buildScript(),
+    }));
 }
 
 async function injectHookPlans(
