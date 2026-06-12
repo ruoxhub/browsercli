@@ -200,7 +200,7 @@ function analyzeSingleScript(file: {
 }): ScriptAnalysis {
   const {url, content, size, type} = file;
   const hasEncryption = detectEncryption(content);
-  const cryptoAlgorithms = extractCryptoAlgorithms(content);
+  const cryptoAlgorithms = extractCryptoAlgo(content);
   const hasAPI = detectAPI(content);
   const hasObfuscation = detectObfuscation(content);
   const functions = extractFunctions(content);
@@ -358,10 +358,6 @@ function extractCryptoAlgo(content: string): string[] {
     if (pattern.test(content) && !algorithms.includes(name)) algorithms.push(name);
   });
   return algorithms;
-}
-
-function extractCryptoAlgorithms(content: string): string[] {
-  return extractCryptoAlgo(content);
 }
 
 function detectCryptoLibraries(content: string): string[] {

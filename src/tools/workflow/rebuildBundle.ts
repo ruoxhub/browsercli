@@ -188,92 +188,6 @@ function pickTargetScript(
   );
 }
 
-/**
- * 过滤运行时证据
- */
-function _filterRuntimeEvidence(
-  records: Array<Record<string, unknown>>,
-  targetKeywords: string[],
-  targetUrlPatterns: string[],
-  targetFunctionNames: string[],
-  targetActionDescription: string,
-  maxEvidenceItems: number,
-): Array<Record<string, unknown>> {
-  const filtered =
-    targetKeywords.length === 0 &&
-    targetUrlPatterns.length === 0 &&
-    targetFunctionNames.length === 0 &&
-    targetActionDescription.length === 0
-      ? records
-      : records.filter(record =>
-          matchesTargetText(
-            record,
-            targetKeywords,
-            targetUrlPatterns,
-            targetFunctionNames,
-            targetActionDescription,
-          ),
-        );
-  return filtered.slice(0, maxEvidenceItems);
-}
-
-/**
- * 推断缺失的能力
- */
-function _inferMissingCapabilities(
-  runtimeError: string,
-  observedCapabilities: string[],
-): Array<{
-  capability: string;
-  reason: string;
-  priority: number;
-}> {
-  const available = new Set(
-    observedCapabilities.map(item => item.toLowerCase()),
-  );
-  const normalizedError = runtimeError.toLowerCase();
-  const candidates = [
-    {
-      capability: 'window',
-      patterns: ['window is not defined'],
-      reason: 'Browser global root is missing in local execution.',
-      priority: 100,
-    },
-    {
-      capability: 'document',
-      patterns: ['document is not defined'],
-      reason: 'DOM access is required by the captured browser path.',
-      priority: 90,
-    },
-    {
-      capability: 'localStorage',
-      patterns: ['localstorage is not defined'],
-      reason: 'Captured path reads browser storage values.',
-      priority: 80,
-    },
-    {
-      capability: 'sessionStorage',
-      patterns: ['sessionstorage is not defined'],
-      reason: 'Captured path reads session-scoped browser storage.',
-      priority: 75,
-    },
-    {
-      capability: 'crypto',
-      patterns: ["reading 'subtle'", 'crypto is not defined'],
-      reason: 'Captured path depends on browser crypto primitives.',
-      priority: 85,
-    },
-  ];
-
-  return candidates
-    .filter(
-      candidate =>
-        available.has(candidate.capability.toLowerCase()) &&
-        candidate.patterns.some(pattern => normalizedError.includes(pattern)),
-    )
-    .sort((a, b) => b.priority - a.priority);
-}
-
 /** 本地复现工具统一返回结构 */
 export interface RebuildBundleToolResult {
   success: boolean;
@@ -335,19 +249,16 @@ export const rebuildBundle = defineTool({
     logger.debug('[rebuild-bundle] Starting skill with options:', options);
 
     try {
-      // 1. 收集逆向工程证据
       const runtimeEvidence: Array<Record<string, unknown>> = [];
       if (options.taskId) {
         logger.debug('[rebuild-bundle] Reading runtime evidence for task:', options.taskId);
       }
 
-      // 2. 分析目标函数和关键字
       const targetKeywords = options.targetKeywords ?? [];
       const targetUrlPatterns = options.targetUrlPatterns ?? [];
       const targetFunctionNames = options.targetFunctionNames ?? [];
       const targetActionDescription = options.goal ?? '';
 
-      // 3. 模拟收集页面数据
       const pageData = {
         url: url ?? options.targetUrl ?? '',
         cookies: [] as Array<{name: string; value: string}>,
@@ -355,7 +266,6 @@ export const rebuildBundle = defineTool({
         sessionStorage: {} as Record<string, unknown>,
       };
 
-      // 4. 构建环境代码
       const capture: Record<string, unknown> = {
         page: {url: pageData.url, title: ''},
         cookies: pageData.cookies,
@@ -368,11 +278,9 @@ export const rebuildBundle = defineTool({
       const envCode = buildAutoEnvCode(capture);
       const polyfillsCode = '';
 
-      // 5. 构建入口代码
       const targetScript = pickTargetScript([], targetKeywords, targetUrlPatterns, targetFunctionNames, targetActionDescription);
       const entryCode = buildEntryCode(targetScript, capture);
 
-      // 6. 返回结果
       const result = {
         url: url ?? options.targetUrl,
         bundlePath: '',
