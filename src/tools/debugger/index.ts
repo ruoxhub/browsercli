@@ -9,7 +9,15 @@ import {zod} from '../../third_party/index.js';
 import type {ToolContextProvider} from '../../worker/ToolContext.js';
 import type {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
-import {getDebuggerFromContext, runTool} from './runtime-helpers.js';
+import {
+  DEFAULT_PREVIEW_LENGTH,
+  filterMatchesByUrl,
+  getDebuggerFromContext,
+  LARGE_FILE_THRESHOLD,
+  MINIFIED_LINE_THRESHOLD,
+  runTool,
+  SCOPE_VAR_LIMIT,
+} from './runtime-helpers.js';
 
 // ─── 子模块工具导出（defineTool 格式）─────────────────────
 
@@ -264,7 +272,7 @@ export async function buildPausedInfoData(
               name: v.name,
               value: v.value,
             }));
-            if (variables.length > 20) {
+            if (variables.length > SCOPE_VAR_LIMIT) {
               scopeData.variables.push({
                 name: `... 还有 ${variables.length - 20} 个`,
                 value: null,
@@ -735,7 +743,7 @@ export const getScriptSource = defineTool({
       // 字符偏移模式（用于压缩文件）
       if (offset !== undefined) {
         const start = Math.max(0, offset);
-        const end = Math.min(source.length, start + (length || 1000));
+        const end = Math.min(source.length, start + (length || DEFAULT_PREVIEW_LENGTH));
         const extract = source.substring(start, end);
         const prefix = start > 0 ? '...' : '';
         const suffix = end < source.length ? '...' : '';
@@ -787,7 +795,7 @@ export const getScriptSource = defineTool({
       }
 
       // 完整源码 - 但警告如果太大
-      if (source.length > 50000) {
+      if (source.length > LARGE_FILE_THRESHOLD) {
         response.setStructuredContent({
           success: true,
           message: `脚本 ${scriptId} 很大（${source.length} 字符）。请使用 offset/length 或 startLine/endLine 读取部分。`,
@@ -797,7 +805,7 @@ export const getScriptSource = defineTool({
             url,
             mode: 'full',
             sourceLength: source.length,
-            sourcePreview: source.substring(0, 1000) + '...',
+            sourcePreview: source.substring(0, DEFAULT_PREVIEW_LENGTH) + '...',
             warning: 'Source too large, use offset/length or startLine/endLine for partial view'
           }
         });
@@ -941,12 +949,7 @@ export const searchInSources = defineTool({
       let filteredMatches = matches;
 
       // 应用 URL 过滤
-      if (urlFilter) {
-        const lowerFilter = urlFilter.toLowerCase();
-        filteredMatches = filteredMatches.filter(
-          m => m.url && m.url.toLowerCase().includes(lowerFilter),
-        );
-      }
+      filteredMatches = filterMatchesByUrl(filteredMatches, urlFilter, m => m.url);
 
       // 过滤掉压缩文件（行 > 10000 字符）
       const minifiedThreshold = 10000;
@@ -1166,15 +1169,10 @@ export const traceFunction = defineTool({
         let matches = result.matches;
 
         // 应用 URL 过滤
-        if (urlFilter) {
-          const lowerFilter = urlFilter.toLowerCase();
-          matches = matches.filter(
-            m => m.url && m.url.toLowerCase().includes(lowerFilter),
-          );
-        }
+        matches = filterMatchesByUrl(matches, urlFilter, m => m.url);
 
         // 跳过压缩文件
-        matches = matches.filter(m => m.lineContent.length < 100000);
+        matches = matches.filter(m => m.lineContent.length < MINIFIED_LINE_THRESHOLD);
 
         if (matches.length > 0) {
           foundMatch = {pattern, match: matches[0]};
@@ -1857,21 +1855,15 @@ export const setBreakpointOnText = defineTool({
       }
 
       // 应用 URL 过滤
-      let matches = searchResult.matches;
-      if (urlFilter) {
-        const lowerFilter = urlFilter.toLowerCase();
-        matches = matches.filter(
-          m => m.url && m.url.toLowerCase().includes(lowerFilter),
-        );
-        if (matches.length === 0) {
-          response.setStructuredContent({
-            success: false,
-            message: `"${text}" 在未匹配 "${urlFilter}" 的脚本中找到。`,
-            tooltype: 'set_breakpoint_on_text',
-            data: { text, urlFilter }
-          });
-          return;
-        }
+      let matches = filterMatchesByUrl(searchResult.matches, urlFilter, m => m.url);
+      if (matches.length === 0) {
+        response.setStructuredContent({
+          success: false,
+          message: `"${text}" 在未匹配 "${urlFilter}" 的脚本中找到。`,
+          tooltype: 'set_breakpoint_on_text',
+          data: { text, urlFilter }
+        });
+        return;
       }
 
       // 获取指定的匹配项

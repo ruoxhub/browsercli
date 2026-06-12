@@ -52,3 +52,21 @@ export async function runTool<P = unknown>(
     });
   }
 }
+
+export function filterMatchesByUrl<T>(
+  matches: T[],
+  urlFilter: string | undefined,
+  getUrl: (m: T) => string | undefined | null,
+): T[] {
+  if (!urlFilter) return matches;
+  const lower = urlFilter.toLowerCase();
+  return matches.filter(m => {
+    const u = getUrl(m);
+    return typeof u === 'string' && u.toLowerCase().includes(lower);
+  });
+}
+
+export const MINIFIED_LINE_THRESHOLD = 100_000;
+export const LARGE_FILE_THRESHOLD = 50_000;
+export const DEFAULT_PREVIEW_LENGTH = 1_000;
+export const SCOPE_VAR_LIMIT = 20;
