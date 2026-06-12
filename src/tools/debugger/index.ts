@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {DebuggerContext} from '../../DebuggerContext.js';
 import {PackerDeobfuscator} from '../../modules/deobfuscator/PackerDeobfuscator.js';
 import {zod} from '../../third_party/index.js';
 import type {ToolContextProvider} from '../../worker/ToolContext.js';
@@ -32,17 +33,6 @@ export {stopMonitor} from './stopMonitor.js';
 // ─── 类型导出 ─────────────────────────────────────────
 
 export type {Frame} from './types.js';
-
-// ─── 内部类型 ─────────────────────────────────────────
-
-type DebuggerRuntime = Pick<
-  ToolContextProvider,
-  | 'getDebuggerContext'
-  | 'getSelectedPage'
-  | 'getSelectedFrame'
-  | 'getNetworkRequestById'
-  | 'getRequestInitiator'
->;
 
 // ─── 辅助函数 ───────────────────────────────────────────────
 
@@ -80,14 +70,13 @@ function defineStepTool(config: {
         .describe('暂停信息中是否包含作用域变量（默认 true）。'),
     },
     handler: async (request, response, context) => {
-      const runtime = context as unknown as DebuggerRuntime;
-
+  
       await runTool(
         response,
         request,
         config.name,
         async () => {
-          const debuggerContext = await getDebuggerFromContext(runtime);
+          const debuggerContext = await getDebuggerFromContext(context);
           const pausedState = debuggerContext.getPausedState();
           if (!pausedState.isPaused) {
             response.setStructuredContent({
@@ -147,15 +136,14 @@ function defineXhrBreakpointTool(config: {
       url: zod.string().optional().describe('XHR URL 模式（部分匹配）。'),
     },
     handler: async (request, response, context) => {
-      const runtime = context as unknown as DebuggerRuntime;
-      const url = request.params.url ?? '';
+        const url = request.params.url ?? '';
 
       await runTool(
         response,
         request,
         config.name,
         async () => {
-          const debuggerContext = await getDebuggerFromContext(runtime);
+          const debuggerContext = await getDebuggerFromContext(context);
           const client = debuggerContext.getClient();
           if (!client) {
             response.setStructuredContent({
@@ -215,7 +203,7 @@ export interface PausedInfoData {
  * an extra MCP roundtrip just to read the call stack after stepping.
  */
 export async function buildPausedInfoData(
-  debuggerContext: Awaited<ReturnType<DebuggerRuntime['getDebuggerContext']>>,
+  debuggerContext: DebuggerContext,
   options: {includeScopes?: boolean} = {},
 ): Promise<PausedInfoData | null> {
   const pausedState = debuggerContext.getPausedState();
@@ -315,7 +303,6 @@ export const setBreakpoint = defineTool({
     isRegex: zod.boolean().optional().default(false).describe('是否将 URL 视为正则表达式.'),
   },
   handler: async (request, response, context) => {
-    const runtime = context as unknown as DebuggerRuntime;
     const url = request.params.url;
     const lineNumber = request.params.lineNumber;
     const columnNumber = request.params.columnNumber;
@@ -335,7 +322,7 @@ export const setBreakpoint = defineTool({
     const lineNum = typeof lineNumber === 'number' ? lineNumber : 1;
 
     try {
-      const debuggerContext = await getDebuggerFromContext(runtime);
+      const debuggerContext = await getDebuggerFromContext(context);
       const breakpoint = isRegex
         ? await debuggerContext.setBreakpointByUrlRegex(
             url,
@@ -390,7 +377,6 @@ export const removeBreakpoint = defineTool({
     breakpointId: zod.string().describe('要移除的断点 ID（来自 list_breakpoints 或 set_breakpoint）。'),
   },
   handler: async (request, response, context) => {
-    const runtime = context as unknown as DebuggerRuntime;
     const breakpointId = request.params.breakpointId;
 
     if (!breakpointId || typeof breakpointId !== 'string' || breakpointId.trim() === '') {
@@ -404,7 +390,7 @@ export const removeBreakpoint = defineTool({
     }
 
     try {
-      const debuggerContext = await getDebuggerFromContext(runtime);
+      const debuggerContext = await getDebuggerFromContext(context);
       await debuggerContext.removeBreakpoint(breakpointId);
       response.setStructuredContent({
         success: true,
@@ -436,10 +422,9 @@ export const listBreakpoints = defineTool({
   },
   schema: {},
   handler: async (request, response, context) => {
-    const runtime = context as unknown as DebuggerRuntime;
 
     try {
-      const debuggerContext = await getDebuggerFromContext(runtime);
+      const debuggerContext = await getDebuggerFromContext(context);
       const breakpoints = debuggerContext.getBreakpoints();
 
       if (breakpoints.length === 0) {
@@ -533,10 +518,9 @@ export const resume = defineTool({
   },
   schema: {},
   handler: async (request, response, context) => {
-    const runtime = context as unknown as DebuggerRuntime;
 
     try {
-      const debuggerContext = await getDebuggerFromContext(runtime);
+      const debuggerContext = await getDebuggerFromContext(context);
       await debuggerContext.resume();
       response.setStructuredContent({
         success: true,
@@ -568,10 +552,9 @@ export const pause = defineTool({
   },
   schema: {},
   handler: async (request, response, context) => {
-    const runtime = context as unknown as DebuggerRuntime;
 
     try {
-      const debuggerContext = await getDebuggerFromContext(runtime);
+      const debuggerContext = await getDebuggerFromContext(context);
       const client = debuggerContext.getClient();
       if (!client) {
         response.setStructuredContent({
@@ -619,10 +602,9 @@ export const listScripts = defineTool({
       .describe('可选的过滤字符串，匹配脚本 URL（不区分大小写）.'),
   },
   handler: async (request, response, context) => {
-    const runtime = context as unknown as DebuggerRuntime;
 
     try {
-      const debuggerContext = await getDebuggerFromContext(runtime);
+      const debuggerContext = await getDebuggerFromContext(context);
       let scripts = debuggerContext.getScripts();
 
       // 应用过滤
@@ -711,11 +693,10 @@ export const getScriptSource = defineTool({
       .describe('是否对返回的源码进行格式化（适用于压缩文件）'),
   },
   handler: async (request, response, context) => {
-    const runtime = context as unknown as DebuggerRuntime;
     const {scriptId, startLine, endLine, offset, length, prettyPrint} = request.params;
 
     try {
-      const debuggerContext = await getDebuggerFromContext(runtime);
+      const debuggerContext = await getDebuggerFromContext(context);
       const deobfuscator = new PackerDeobfuscator();
       let source: string;
       if (prettyPrint) {
@@ -887,7 +868,6 @@ export const searchInSources = defineTool({
       .describe("搜索来源：'live' 只走 CDP，'cache' 只走本地缓存，'auto' 先尝试 CDP 失败时 fallback 到缓存"),
   },
   handler: async (request, response, context) => {
-    const runtime = context as unknown as DebuggerRuntime;
     const {
       query,
       caseSensitive,
@@ -900,7 +880,7 @@ export const searchInSources = defineTool({
     } = request.params;
 
     const searchWithCdp = async () => {
-      const debuggerContext = await getDebuggerFromContext(runtime);
+      const debuggerContext = await getDebuggerFromContext(context);
       return debuggerContext.searchInScripts(query, { caseSensitive, isRegex });
     };
 
@@ -1120,7 +1100,6 @@ export const traceFunction = defineTool({
       .describe('自定义追踪 ID，用于后续识别日志。'),
   },
   handler: async (request, response, context) => {
-    const runtime = context as unknown as DebuggerRuntime;
     const {target, urlFilter, logArgs, logResult, logStack, hookId} = request.params;
 
     if (!target || typeof target !== 'string') {
@@ -1133,7 +1112,7 @@ export const traceFunction = defineTool({
       return;
     }
 
-    const debugger_ = await getDebuggerFromContext(runtime);
+    const debugger_ = await getDebuggerFromContext(context);
     if (!debugger_.isEnabled()) {
       response.setStructuredContent({
         success: false,
@@ -1293,10 +1272,9 @@ export const getAiDebugStatus = defineTool({
   },
   schema: {},
   handler: async (request, response, context) => {
-    const runtime = context as unknown as DebuggerRuntime;
 
     try {
-      const debuggerContext = await getDebuggerFromContext(runtime);
+      const debuggerContext = await getDebuggerFromContext(context);
       const pausedState = debuggerContext.getPausedState();
       const breakpoints = debuggerContext.getBreakpoints();
       const scripts = debuggerContext.getScripts();
@@ -1366,12 +1344,11 @@ export const findInScript = defineTool({
       .describe('搜索是否区分大小写（默认: true）。'),
   },
   handler: async (request, response, context) => {
-    const runtime = context as unknown as DebuggerRuntime;
     const {scriptId, query, contextChars, occurrence, caseSensitive} =
       request.params;
 
     try {
-      const debuggerContext = await getDebuggerFromContext(runtime);
+      const debuggerContext = await getDebuggerFromContext(context);
       const source = await debuggerContext.getScriptSource(scriptId);
 
       if (!source) {
@@ -1492,12 +1469,12 @@ export const getRequestInitiator = defineTool({
       .describe('请求 ID（来自 list_network_requests）用于获取发起者。'),
   },
   handler: async (request, response, context) => {
-    const runtime = context as unknown as DebuggerRuntime;
     const {requestId} = request.params;
 
     try {
-      const httpRequest = runtime.getNetworkRequestById(requestId);
-      const initiator = runtime.getRequestInitiator(httpRequest);
+      const ctx = context as unknown as ToolContextProvider;
+      const httpRequest = ctx.getNetworkRequestById(requestId);
+      const initiator = ctx.getRequestInitiator(httpRequest);
 
       if (!initiator) {
         response.setStructuredContent({
@@ -1566,10 +1543,9 @@ export const getPausedInfo = defineTool({
       .describe('是否包含作用域变量（默认: true）。'),
   },
   handler: async (request, response, context) => {
-    const runtime = context as unknown as DebuggerRuntime;
 
     try {
-      const debuggerContext = await getDebuggerFromContext(runtime);
+      const debuggerContext = await getDebuggerFromContext(context);
       const pausedInfo = await buildPausedInfoData(debuggerContext, {
         includeScopes: request.params.includeScopes,
       });
@@ -1630,11 +1606,10 @@ export const evaluateOnCallframe = defineTool({
       .describe('要执行表达式的调用帧索引（0=顶层帧，默认: 0）。'),
   },
   handler: async (request, response, context) => {
-    const runtime = context as unknown as DebuggerRuntime;
     const {expression, frameIndex} = request.params;
 
     try {
-      const debuggerContext = await getDebuggerFromContext(runtime);
+      const debuggerContext = await getDebuggerFromContext(context);
       const pausedState = debuggerContext.getPausedState();
 
       if (!pausedState.isPaused) {
@@ -1717,10 +1692,9 @@ export const inspectLocals = defineTool({
   },
   schema: {},
   handler: async (request, response, context) => {
-    const runtime = context as unknown as DebuggerRuntime;
 
     try {
-      const debuggerContext = await getDebuggerFromContext(runtime);
+      const debuggerContext = await getDebuggerFromContext(context);
       const pausedState = debuggerContext.getPausedState();
 
       if (!pausedState.isPaused) {
@@ -1832,11 +1806,10 @@ export const setBreakpointOnText = defineTool({
       .describe('条件表达式，断点仅在表达式求值为 true 时触发。'),
   },
   handler: async (request, response, context) => {
-    const runtime = context as unknown as DebuggerRuntime;
     const {text, urlFilter, occurrence, condition} = request.params;
 
     try {
-      const debuggerContext = await getDebuggerFromContext(runtime);
+      const debuggerContext = await getDebuggerFromContext(context);
 
       // 步骤 1: 在所有脚本中搜索文本
       const searchResult = await debuggerContext.searchInScripts(text, {
