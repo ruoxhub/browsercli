@@ -18,7 +18,7 @@ import {HOOK_STORE_KEY} from './store-utils.js';
  * 因为恢复可能导致页面状态不一致。
  */
 export const removeHookBrowser = defineTool({
-  name: 'remove_hook',
+  name: 'remove_hook_browser',
   description:
     'Remove hook data from the browser side. Note: this does not restore monkey-patched native methods.',
   annotations: {
@@ -37,7 +37,7 @@ export const removeHookBrowser = defineTool({
       response.setStructuredContent({
         success: false,
         message: 'hookId 参数不能为空',
-        tooltype: 'remove_hook',
+        tooltype: 'remove_hook_browser',
         data: {hookId: ''},
       });
       return;
@@ -57,14 +57,14 @@ export const removeHookBrowser = defineTool({
       response.setStructuredContent({
         success: true,
         message: `浏览器端 Hook 数据已清理：${hookId}`,
-        tooltype: 'remove_hook',
+        tooltype: 'remove_hook_browser',
         data: {hookId},
       });
     } catch (error) {
       response.setStructuredContent({
         success: false,
         message: `清理失败（页面可能已关闭）：${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'remove_hook',
+        tooltype: 'remove_hook_browser',
         data: {hookId},
       });
     }

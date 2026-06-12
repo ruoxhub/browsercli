@@ -14,7 +14,7 @@ import {summarizeHookStore, readHookStore} from './store-utils.js';
  * 将 Hook 记录从浏览器端同步到 Node.js 端。
  */
 export const syncHookRecords = defineTool({
-  name: 'list_created_hooks',
+  name: 'sync_hook_records',
   description:
     'Sync hook records from the browser and list all created hooks with their status.',
   annotations: {
@@ -46,7 +46,7 @@ export const syncHookRecords = defineTool({
         response.setStructuredContent({
           success: true,
           message: '浏览器端无 Hook 数据',
-          tooltype: 'list_created_hooks',
+          tooltype: 'sync_hook_records',
           data: {
             syncedHookIds: [] as string[],
             totalRecords: 0,
@@ -73,7 +73,7 @@ export const syncHookRecords = defineTool({
       response.setStructuredContent({
         success: true,
         message: `同步完成，${summary.totalHooks} 个 Hook，共 ${summary.totalRecords} 条记录`,
-        tooltype: 'list_created_hooks',
+        tooltype: 'sync_hook_records',
         data: {
           syncedHookIds: summary.hooks.map(item => item.hookId),
           totalRecords: summary.totalRecords,
@@ -84,7 +84,7 @@ export const syncHookRecords = defineTool({
       response.setStructuredContent({
         success: false,
         message: `同步失败：${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'list_created_hooks',
+        tooltype: 'sync_hook_records',
         data: {
           syncedHookIds: [] as string[],
           totalRecords: 0,
