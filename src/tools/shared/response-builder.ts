@@ -88,6 +88,47 @@ export function withSchemaVersion(
   };
 }
 
+interface InvokeHintRow {
+  requiredParams: string[];
+  exampleDefaults?: Record<string, unknown>;
+  conditionalExample?: boolean;
+}
+
+const INVOKE_HINT_TABLE: Record<string, InvokeHintRow> = {
+  orchestrate_reverse_task: {
+    requiredParams: ['taskId'],
+    exampleDefaults: {taskId: '<taskId>'},
+  },
+  run_reverse_agent: {
+    requiredParams: ['taskId'],
+    exampleDefaults: {taskId: '<taskId>'},
+  },
+  get_rebuild_health_report: {
+    requiredParams: ['taskId'],
+    exampleDefaults: {taskId: '<taskId>', outputMode: 'compact'},
+  },
+  export_rebuild_bundle: {
+    requiredParams: ['taskId'],
+    conditionalExample: true,
+  },
+  export_portable_bundle: {
+    requiredParams: ['taskId'],
+    conditionalExample: true,
+  },
+  diff_env_requirements: {
+    requiredParams: ['runtimeError', 'observedCapabilities'],
+    conditionalExample: true,
+  },
+  locate_signature_function: {
+    requiredParams: ['url', 'targetParam'],
+    exampleDefaults: {url: 'https://example.com/api/sign', targetParam: 'sign'},
+  },
+  extract_function_tree: {
+    requiredParams: ['scriptId', 'functionName'],
+    exampleDefaults: {scriptId: '<scriptId>', functionName: 'genSign'},
+  },
+};
+
 function buildInvokeHint(
   tool: string | undefined,
   params: Record<string, unknown> | undefined,
@@ -129,123 +170,27 @@ function buildInvokeHint(
     };
   }
 
-  if (tool === 'orchestrate_reverse_task') {
-    const requiredParams = ['taskId'];
-    const optionalParams = paramKeys.filter(
-      key => !requiredParams.includes(key),
-    );
-    return {
-      requiredParams,
-      ...(optionalParams.length ? {optionalParams} : {}),
-      example: {
-        taskId: normalizedParams.taskId ?? '<taskId>',
-        ...normalizedParams,
-      },
-    };
+  const row = INVOKE_HINT_TABLE[tool];
+  if (!row) {
+    return paramKeys.length
+      ? {requiredParams: [], example: normalizedParams}
+      : {requiredParams: []};
   }
 
-  if (tool === 'run_reverse_agent') {
-    const requiredParams = ['taskId'];
-    const optionalParams = paramKeys.filter(
-      key => !requiredParams.includes(key),
-    );
-    return {
-      requiredParams,
-      ...(optionalParams.length ? {optionalParams} : {}),
-      example: {
-        taskId: normalizedParams.taskId ?? '<taskId>',
-        ...normalizedParams,
-      },
-    };
-  }
+  const optionalParams = paramKeys.filter(
+    key => !row.requiredParams.includes(key),
+  );
+  const example = row.exampleDefaults
+    ? {...row.exampleDefaults, ...normalizedParams}
+    : row.conditionalExample && paramKeys.length > 0
+      ? normalizedParams
+      : undefined;
 
-  if (tool === 'get_rebuild_health_report') {
-    const requiredParams = ['taskId'];
-    const optionalParams = paramKeys.filter(
-      key => !requiredParams.includes(key),
-    );
-    return {
-      requiredParams,
-      ...(optionalParams.length ? {optionalParams} : {}),
-      example: {
-        taskId: normalizedParams.taskId ?? '<taskId>',
-        outputMode: normalizedParams.outputMode ?? 'compact',
-        ...normalizedParams,
-      },
-    };
-  }
-
-  if (tool === 'export_rebuild_bundle') {
-    const requiredParams = ['taskId'];
-    const optionalParams = paramKeys.filter(
-      key => !requiredParams.includes(key),
-    );
-    return {
-      requiredParams,
-      ...(optionalParams.length ? {optionalParams} : {}),
-      ...(paramKeys.length ? {example: normalizedParams} : {}),
-    };
-  }
-
-  if (tool === 'export_portable_bundle') {
-    const requiredParams = ['taskId'];
-    const optionalParams = paramKeys.filter(
-      key => !requiredParams.includes(key),
-    );
-    return {
-      requiredParams,
-      ...(optionalParams.length ? {optionalParams} : {}),
-      ...(paramKeys.length ? {example: normalizedParams} : {}),
-    };
-  }
-
-  if (tool === 'diff_env_requirements') {
-    const requiredParams = ['runtimeError', 'observedCapabilities'];
-    const optionalParams = paramKeys.filter(
-      key => !requiredParams.includes(key),
-    );
-    return {
-      requiredParams,
-      ...(optionalParams.length ? {optionalParams} : {}),
-      ...(paramKeys.length ? {example: normalizedParams} : {}),
-    };
-  }
-
-  if (tool === 'locate_signature_function') {
-    const requiredParams = ['url', 'targetParam'];
-    const optionalParams = paramKeys.filter(
-      key => !requiredParams.includes(key),
-    );
-    return {
-      requiredParams,
-      ...(optionalParams.length ? {optionalParams} : {}),
-      example: {
-        url: normalizedParams.url ?? 'https://example.com/api/sign',
-        targetParam: normalizedParams.targetParam ?? 'sign',
-        ...normalizedParams,
-      },
-    };
-  }
-
-  if (tool === 'extract_function_tree') {
-    const requiredParams = ['scriptId', 'functionName'];
-    const optionalParams = paramKeys.filter(
-      key => !requiredParams.includes(key),
-    );
-    return {
-      requiredParams,
-      ...(optionalParams.length ? {optionalParams} : {}),
-      example: {
-        scriptId: normalizedParams.scriptId ?? '<scriptId>',
-        functionName: normalizedParams.functionName ?? 'genSign',
-        ...normalizedParams,
-      },
-    };
-  }
-
-  return paramKeys.length
-    ? {requiredParams: [], example: normalizedParams}
-    : {requiredParams: []};
+  return {
+    requiredParams: row.requiredParams,
+    ...(optionalParams.length ? {optionalParams} : {}),
+    ...(example !== undefined ? {example} : {}),
+  };
 }
 
 export function inferBlockedBy(reason: unknown): string | undefined {
