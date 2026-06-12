@@ -8,6 +8,7 @@ import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
+import {errorMessage} from '../shared/pageResponse.js';
 
 import {
   buildRequestBindings,
@@ -70,7 +71,6 @@ export const getHookData = defineTool({
     const runtime = getRuntime();
 
     try {
-      // 1. 先从浏览器同步数据到 HookManager（参考 old-source 的 syncHookRecordsFromPage）
       let storeSnapshot: Record<string, unknown[]> = {};
       try {
         const frame = (context as Context).getSelectedFrame();
@@ -129,7 +129,7 @@ export const getHookData = defineTool({
     } catch (error) {
       response.setStructuredContent({
         success: false,
-        message: `获取失败：${error instanceof Error ? error.message : String(error)}`,
+        message: `获取失败：${errorMessage(error)}`,
         tooltype: 'get_hook_data',
         data: null,
       });

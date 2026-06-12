@@ -7,6 +7,7 @@
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
+import {errorMessage} from '../shared/pageResponse.js';
 
 import {summarizeHookStore, readHookStore} from './store-utils.js';
 
@@ -83,7 +84,7 @@ export const syncHookRecords = defineTool({
     } catch (error) {
       response.setStructuredContent({
         success: false,
-        message: `同步失败：${error instanceof Error ? error.message : String(error)}`,
+        message: `同步失败：${errorMessage(error)}`,
         tooltype: 'sync_hook_records',
         data: {
           syncedHookIds: [] as string[],

@@ -8,6 +8,7 @@ import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
+import {errorMessage} from '../shared/pageResponse.js';
 
 /**
  * 创建 Hook 定义：在进程内生成 hook 脚本和元数据，不注入浏览器。
@@ -55,12 +56,12 @@ export const createHook = defineTool({
     } catch (error) {
       response.setStructuredContent({
         success: false,
-        message: error instanceof Error ? error.message : String(error),
+        message: errorMessage(error),
         tooltype: 'create_hook',
         data: {
           hookId: null,
           script: null,
-          error: error instanceof Error ? error.message : String(error),
+          error: errorMessage(error),
         },
       });
     }

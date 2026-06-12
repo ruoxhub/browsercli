@@ -47,10 +47,8 @@ export const removeHook = defineTool({
       return;
     }
 
-    // 1. 从进程内 HookManager 删除（核心操作，不需要浏览器）
     const removed = runtime.hookManager.remove(hookId);
 
-    // 2. 可选：清理浏览器端数据（非核心操作，失败不影响 HookManager 删除结果）
     let browserCleaned = false;
     if (cleanBrowser) {
       try {

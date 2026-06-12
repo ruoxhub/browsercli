@@ -8,6 +8,7 @@ import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
+import {errorMessage} from '../shared/pageResponse.js';
 
 import {readHookStore, summarizeHookStore} from './store-utils.js';
 
@@ -48,7 +49,6 @@ export const listCreatedHooks = defineTool({
     const runtime = getRuntime();
 
     try {
-      // 1. 可选：从浏览器同步数据到 HookStore
       let browserData: Record<string, unknown[]> | null = null;
       if (syncFromBrowser) {
         try {
@@ -59,7 +59,6 @@ export const listCreatedHooks = defineTool({
         }
       }
 
-      // 2. 从进程内 HookManager 获取 hook 元数据（核心操作，不需要浏览器）
       const allHooks = runtime.hookManager.getAllHooks();
       const allKnownIds = runtime.hookManager.getAllKnownHookIds();
 
@@ -89,7 +88,6 @@ export const listCreatedHooks = defineTool({
         return entry;
       });
 
-      // 3. 如果有浏览器同步数据，合并记录数并构建摘要
       const hasBrowserData =
         browserData !== null && typeof browserData === 'object';
       const legacySummary = hasBrowserData
@@ -137,7 +135,7 @@ export const listCreatedHooks = defineTool({
     } catch (error) {
       response.setStructuredContent({
         success: false,
-        message: `列出 Hook 失败：${error instanceof Error ? error.message : String(error)}`,
+        message: `列出 Hook 失败：${errorMessage(error)}`,
         tooltype: 'list_created_hooks',
         data: {
           hooks: [] as unknown[],

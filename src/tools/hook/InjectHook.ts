@@ -7,6 +7,7 @@
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
+import {errorMessage} from '../shared/pageResponse.js';
 
 /**
  * Hook 持久化注册表：
@@ -115,7 +116,7 @@ export const injectHook = defineTool({
     } catch (error) {
       response.setStructuredContent({
         success: false,
-        message: `注入失败：${error instanceof Error ? error.message : String(error)}`,
+        message: `注入失败：${errorMessage(error)}`,
         tooltype: 'inject_hook',
         data: {
           hookId,

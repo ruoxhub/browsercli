@@ -7,6 +7,7 @@
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
+import {errorMessage} from '../shared/pageResponse.js';
 
 import {HOOK_STORE_KEY} from './store-utils.js';
 
@@ -63,7 +64,7 @@ export const removeHookBrowser = defineTool({
     } catch (error) {
       response.setStructuredContent({
         success: false,
-        message: `清理失败（页面可能已关闭）：${error instanceof Error ? error.message : String(error)}`,
+        message: `清理失败（页面可能已关闭）：${errorMessage(error)}`,
         tooltype: 'remove_hook_browser',
         data: {hookId},
       });
