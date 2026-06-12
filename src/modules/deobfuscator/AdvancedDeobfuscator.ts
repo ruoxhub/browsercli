@@ -51,18 +51,6 @@ export interface AdvancedDeobfuscateResult {
   };
 }
 
-// 不可见字符到二进制位的映射
-const INVISIBLE_CHAR_TO_BIT: Record<string, string> = {
-  '​': '0',
-  '‌': '1',
-  '‍': '00',
-  '⁠': '01',
-  '﻿': '10',
-};
-
-const INVISIBLE_CHARS = Object.keys(INVISIBLE_CHAR_TO_BIT);
-const INVISIBLE_PATTERN = new RegExp(`[${INVISIBLE_CHARS.join('')}]+`, 'g');
-
 // 简单的数字比较运算符 -> 实际比较函数
 const NUMERIC_COMPARATORS: Record<string, (l: number, r: number) => boolean> = {
   '>': (l, r) => l > r,
