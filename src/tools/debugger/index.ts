@@ -9,6 +9,7 @@ import {zod} from '../../third_party/index.js';
 import type {ToolContextProvider} from '../../worker/ToolContext.js';
 import type {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
+import {getDebuggerFromContext, runTool} from './runtime-helpers.js';
 
 // ─── 子模块工具导出（defineTool 格式）─────────────────────
 
@@ -36,60 +37,6 @@ type DebuggerRuntime = Pick<
 >;
 
 // ─── 辅助函数 ───────────────────────────────────────────────
-
-/**
- * 从工具 Context 获取 DebuggerContext。
- *
- * 注：Context 既可能是 ToolAdapter 构建的 defineTool Context（拥有
- * `getDebuggerContext(): Promise<DebuggerContext>`），也可能直接是
- * ToolContextProvider 本身（旧路径，历史兼容）。两者都暴露同名方法，
- * 所以这里用鸭子类型。
- */
-async function getDebugger(runtime: DebuggerRuntime) {
-  if (!runtime || typeof runtime.getDebuggerContext !== 'function') {
-    throw new Error(
-      '缺少调试运行时上下文。请确保：1) 已选中页面；2) 工具通过 defineTool 上下文调用（ToolAdapter）。',
-    );
-  }
-  try {
-    return await runtime.getDebuggerContext();
-  } catch (err) {
-    const detail = err instanceof Error ? err.message : String(err);
-    throw new Error(`获取调试上下文失败: ${detail}`);
-  }
-}
-
-/**
- * 工具 handler 通用包装：成功路径执行 `run()`，异常路径自动填充
- * `{success: false, tooltype, message, data}` 结构化响应。
- *
- * 用于消除各 defineTool handler 中重复的 try/catch + setStructuredContent
- * 样板。`errorData` 允许按请求参数回填少量字段（如 url、hookId）。
- */
-async function runTool<P = unknown>(
-  response: {setStructuredContent(content: unknown): void},
-  request: {params: P},
-  tooltype: string,
-  run: () => Promise<void>,
-  options: {
-    errorData?: (params: P) => Record<string, unknown>;
-    errorPrefix?: string;
-  } = {},
-): Promise<void> {
-  const {errorData = () => ({}), errorPrefix} = options;
-  try {
-    await run();
-  } catch (error) {
-    const raw = error instanceof Error ? error.message : String(error);
-    const message = errorPrefix ? `${errorPrefix}: ${raw}` : raw;
-    response.setStructuredContent({
-      success: false,
-      message,
-      tooltype,
-      data: errorData(request.params),
-    });
-  }
-}
 
 /**
  * step_into / step_over / step_out 三工具共享逻辑：校验暂停态、执行
@@ -132,7 +79,7 @@ function defineStepTool(config: {
         request,
         config.name,
         async () => {
-          const debuggerContext = await getDebugger(runtime);
+          const debuggerContext = await getDebuggerFromContext(runtime);
           const pausedState = debuggerContext.getPausedState();
           if (!pausedState.isPaused) {
             response.setStructuredContent({
@@ -200,7 +147,7 @@ function defineXhrBreakpointTool(config: {
         request,
         config.name,
         async () => {
-          const debuggerContext = await getDebugger(runtime);
+          const debuggerContext = await getDebuggerFromContext(runtime);
           const client = debuggerContext.getClient();
           if (!client) {
             response.setStructuredContent({
@@ -380,7 +327,7 @@ export const setBreakpoint = defineTool({
     const lineNum = typeof lineNumber === 'number' ? lineNumber : 1;
 
     try {
-      const debuggerContext = await getDebugger(runtime);
+      const debuggerContext = await getDebuggerFromContext(runtime);
       const breakpoint = isRegex
         ? await debuggerContext.setBreakpointByUrlRegex(
             url,
@@ -449,7 +396,7 @@ export const removeBreakpoint = defineTool({
     }
 
     try {
-      const debuggerContext = await getDebugger(runtime);
+      const debuggerContext = await getDebuggerFromContext(runtime);
       await debuggerContext.removeBreakpoint(breakpointId);
       response.setStructuredContent({
         success: true,
@@ -484,7 +431,7 @@ export const listBreakpoints = defineTool({
     const runtime = context as unknown as DebuggerRuntime;
 
     try {
-      const debuggerContext = await getDebugger(runtime);
+      const debuggerContext = await getDebuggerFromContext(runtime);
       const breakpoints = debuggerContext.getBreakpoints();
 
       if (breakpoints.length === 0) {
@@ -581,7 +528,7 @@ export const resume = defineTool({
     const runtime = context as unknown as DebuggerRuntime;
 
     try {
-      const debuggerContext = await getDebugger(runtime);
+      const debuggerContext = await getDebuggerFromContext(runtime);
       await debuggerContext.resume();
       response.setStructuredContent({
         success: true,
@@ -616,7 +563,7 @@ export const pause = defineTool({
     const runtime = context as unknown as DebuggerRuntime;
 
     try {
-      const debuggerContext = await getDebugger(runtime);
+      const debuggerContext = await getDebuggerFromContext(runtime);
       const client = debuggerContext.getClient();
       if (!client) {
         response.setStructuredContent({
@@ -667,7 +614,7 @@ export const listScripts = defineTool({
     const runtime = context as unknown as DebuggerRuntime;
 
     try {
-      const debuggerContext = await getDebugger(runtime);
+      const debuggerContext = await getDebuggerFromContext(runtime);
       let scripts = debuggerContext.getScripts();
 
       // 应用过滤
@@ -760,7 +707,7 @@ export const getScriptSource = defineTool({
     const {scriptId, startLine, endLine, offset, length, prettyPrint} = request.params;
 
     try {
-      const debuggerContext = await getDebugger(runtime);
+      const debuggerContext = await getDebuggerFromContext(runtime);
       const deobfuscator = new PackerDeobfuscator();
       let source: string;
       if (prettyPrint) {
@@ -945,7 +892,7 @@ export const searchInSources = defineTool({
     } = request.params;
 
     const searchWithCdp = async () => {
-      const debuggerContext = await getDebugger(runtime);
+      const debuggerContext = await getDebuggerFromContext(runtime);
       return debuggerContext.searchInScripts(query, { caseSensitive, isRegex });
     };
 
@@ -1183,7 +1130,7 @@ export const traceFunction = defineTool({
       return;
     }
 
-    const debugger_ = await getDebugger(runtime);
+    const debugger_ = await getDebuggerFromContext(runtime);
     if (!debugger_.isEnabled()) {
       response.setStructuredContent({
         success: false,
@@ -1351,7 +1298,7 @@ export const getAiDebugStatus = defineTool({
     const runtime = context as unknown as DebuggerRuntime;
 
     try {
-      const debuggerContext = await getDebugger(runtime);
+      const debuggerContext = await getDebuggerFromContext(runtime);
       const pausedState = debuggerContext.getPausedState();
       const breakpoints = debuggerContext.getBreakpoints();
       const scripts = debuggerContext.getScripts();
@@ -1426,7 +1373,7 @@ export const findInScript = defineTool({
       request.params;
 
     try {
-      const debuggerContext = await getDebugger(runtime);
+      const debuggerContext = await getDebuggerFromContext(runtime);
       const source = await debuggerContext.getScriptSource(scriptId);
 
       if (!source) {
@@ -1624,7 +1571,7 @@ export const getPausedInfo = defineTool({
     const runtime = context as unknown as DebuggerRuntime;
 
     try {
-      const debuggerContext = await getDebugger(runtime);
+      const debuggerContext = await getDebuggerFromContext(runtime);
       const pausedInfo = await buildPausedInfoData(debuggerContext, {
         includeScopes: request.params.includeScopes,
       });
@@ -1689,7 +1636,7 @@ export const evaluateOnCallframe = defineTool({
     const {expression, frameIndex} = request.params;
 
     try {
-      const debuggerContext = await getDebugger(runtime);
+      const debuggerContext = await getDebuggerFromContext(runtime);
       const pausedState = debuggerContext.getPausedState();
 
       if (!pausedState.isPaused) {
@@ -1775,7 +1722,7 @@ export const inspectLocals = defineTool({
     const runtime = context as unknown as DebuggerRuntime;
 
     try {
-      const debuggerContext = await getDebugger(runtime);
+      const debuggerContext = await getDebuggerFromContext(runtime);
       const pausedState = debuggerContext.getPausedState();
 
       if (!pausedState.isPaused) {
@@ -1891,7 +1838,7 @@ export const setBreakpointOnText = defineTool({
     const {text, urlFilter, occurrence, condition} = request.params;
 
     try {
-      const debuggerContext = await getDebugger(runtime);
+      const debuggerContext = await getDebuggerFromContext(runtime);
 
       // 步骤 1: 在所有脚本中搜索文本
       const searchResult = await debuggerContext.searchInScripts(text, {
