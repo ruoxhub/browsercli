@@ -428,6 +428,92 @@ describe('src/tools/debugger/index.ts', () => {
     assert.match(stopText, /没有/);
   });
 
+  it('trace_function uses setStructuredContent for empty target validation', async () => {
+    const {context} = createRuntime();
+    let structuredContent: unknown = undefined;
+    let appendCalled = false;
+    const response = {
+      appendResponseLine: () => {
+        appendCalled = true;
+      },
+      setStructuredContent: (value: unknown) => {
+        structuredContent = value;
+      },
+      setIncludePages: () => {},
+      setIncludeNetworkRequests: () => {},
+      setIncludeConsoleData: () => {},
+      attachImage: () => {},
+      attachNetworkRequest: () => {},
+      attachConsoleMessage: () => {},
+      setIncludeWebSocketConnections: () => {},
+      attachWebSocket: () => {},
+    };
+    const request = {params: {target: ''}};
+    await traceFunction.handler(
+      request as never,
+      response as never,
+      context as never,
+    );
+
+    assert.equal(appendCalled, false, 'appendResponseLine should NOT be called');
+    assert.notEqual(structuredContent, undefined, 'setStructuredContent should be called');
+    const content = structuredContent as {
+      success: boolean;
+      tooltype: string;
+      message: string;
+    };
+    assert.equal(content.success, false);
+    assert.equal(content.tooltype, 'trace_function');
+    assert.match(content.message, /target/);
+  });
+
+  it('trace_function uses setStructuredContent when debugger is not enabled', async () => {
+    const {context} = createRuntime();
+
+    // Override the debugger context to return isEnabled = false
+    const originalGetDebuggerContext = context.getDebuggerContext;
+    context.getDebuggerContext = async () => {
+      const dc = await originalGetDebuggerContext();
+      return {...dc, isEnabled: () => false};
+    };
+
+    let structuredContent: unknown = undefined;
+    let appendCalled = false;
+    const response = {
+      appendResponseLine: () => {
+        appendCalled = true;
+      },
+      setStructuredContent: (value: unknown) => {
+        structuredContent = value;
+      },
+      setIncludePages: () => {},
+      setIncludeNetworkRequests: () => {},
+      setIncludeConsoleData: () => {},
+      attachImage: () => {},
+      attachNetworkRequest: () => {},
+      attachConsoleMessage: () => {},
+      setIncludeWebSocketConnections: () => {},
+      attachWebSocket: () => {},
+    };
+    const request = {params: {target: 'someFunction'}};
+    await traceFunction.handler(
+      request as never,
+      response as never,
+      context as never,
+    );
+
+    assert.equal(appendCalled, false, 'appendResponseLine should NOT be called');
+    assert.notEqual(structuredContent, undefined, 'setStructuredContent should be called');
+    const content = structuredContent as {
+      success: boolean;
+      tooltype: string;
+      message: string;
+    };
+    assert.equal(content.success, false);
+    assert.equal(content.tooltype, 'trace_function');
+    assert.match(content.message, /调试器未启用/);
+  });
+
   it('getScriptSource with prettyPrint beautifies only once, not twice', async () => {
     const {PackerDeobfuscator} = await import(
       '../../../../src/modules/deobfuscator/PackerDeobfuscator.js'

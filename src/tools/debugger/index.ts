@@ -1174,13 +1174,23 @@ export const traceFunction = defineTool({
     const {target, urlFilter, logArgs, logResult, logStack, hookId} = request.params;
 
     if (!target || typeof target !== 'string') {
-      response.appendResponseLine('target 参数不能为空。需要提供一个函数名。');
+      response.setStructuredContent({
+        success: false,
+        message: 'target 参数不能为空。需要提供一个函数名。',
+        tooltype: 'trace_function',
+        data: {target},
+      });
       return;
     }
 
     const debugger_ = await getDebugger(runtime);
     if (!debugger_.isEnabled()) {
-      response.appendResponseLine('调试器未启用，请先选择页面。');
+      response.setStructuredContent({
+        success: false,
+        message: '调试器未启用，请先选择页面。',
+        tooltype: 'trace_function',
+        data: {target},
+      });
       return;
     }
 
