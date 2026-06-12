@@ -8,7 +8,7 @@ import type {DebuggerContext} from '../../DebuggerContext.js';
 import {PackerDeobfuscator} from '../../modules/deobfuscator/PackerDeobfuscator.js';
 import {zod} from '../../third_party/index.js';
 import type {ToolContextProvider} from '../../worker/ToolContext.js';
-import type {ToolCategory} from '../categories.js';
+import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 import {
   DEFAULT_PREVIEW_LENGTH,
@@ -54,7 +54,7 @@ function defineStepTool(config: {
     description: config.description,
     annotations: {
       title: config.title,
-      category: 'debugging' as ToolCategory,
+      category: ToolCategory.DEBUGGING,
       readOnlyHint: false,
     },
     schema: {
@@ -129,7 +129,7 @@ function defineXhrBreakpointTool(config: {
     description: config.description,
     annotations: {
       title: config.title,
-      category: 'reverse_engineering' as ToolCategory,
+      category: ToolCategory.REVERSE_ENGINEERING,
       readOnlyHint: false,
     },
     schema: {
@@ -292,7 +292,7 @@ export const setBreakpoint = defineTool({
     '设置 JavaScript 断点。支持按脚本 URL 和行号设置，可选条件表达式。注意：优先使用 hook_function 或 trace_function 进行监控，断点需要暂停/恢复协调，在自动化流程中容易出错。',
   annotations: {
     title: '设置断点',
-    category: 'debugging' as ToolCategory,
+    category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
   },
   schema: {
@@ -370,7 +370,7 @@ export const removeBreakpoint = defineTool({
   description: '移除指定 ID 的断点。使用 list_breakpoints 查看活跃断点。',
   annotations: {
     title: '移除断点',
-    category: 'debugging' as ToolCategory,
+    category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
   },
   schema: {
@@ -417,7 +417,7 @@ export const listBreakpoints = defineTool({
   description: '列出当前调试会话中的所有活跃断点。',
   annotations: {
     title: '列出断点',
-    category: 'debugging' as ToolCategory,
+    category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
   },
   schema: {},
@@ -513,7 +513,7 @@ export const resume = defineTool({
   description: '从暂停状态恢复执行，直到下一个断点或执行结束。',
   annotations: {
     title: '恢复执行',
-    category: 'debugging' as ToolCategory,
+    category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
   },
   schema: {},
@@ -547,7 +547,7 @@ export const pause = defineTool({
   description: '暂停 JavaScript 执行。用于中断运行中的代码。',
   annotations: {
     title: '暂停执行',
-    category: 'debugging' as ToolCategory,
+    category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
   },
   schema: {},
@@ -592,7 +592,7 @@ export const listScripts = defineTool({
     '列出当前页面加载的所有 JavaScript 脚本。返回脚本 ID、URL 和 Source Map 信息。在设置断点或搜索前使用此工具查找脚本。',
   annotations: {
     title: '列出脚本',
-    category: 'reverse_engineering' as ToolCategory,
+    category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: true,
   },
   schema: {
@@ -659,7 +659,7 @@ export const getScriptSource = defineTool({
     '根据脚本 ID 获取 JavaScript 脚本源码。支持行范围（多行文件）或字符偏移（单行压缩文件）。先使用 list_scripts 查找脚本 ID。',
   annotations: {
     title: '获取脚本源码',
-    category: 'reverse_engineering' as ToolCategory,
+    category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: true,
   },
   schema: {
@@ -825,7 +825,7 @@ export const searchInSources = defineTool({
     '在所有已加载的 JavaScript 源码中搜索字符串或正则表达式。返回匹配行及脚本 ID、URL 和行号。使用 get_script_source 和 startLine/endLine 查看匹配周围的完整上下文。',
   annotations: {
     title: '在源码中搜索',
-    category: 'reverse_engineering' as ToolCategory,
+    category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: true,
   },
   schema: {
@@ -1066,7 +1066,7 @@ export const traceFunction = defineTool({
     '追踪源码中指定名称的函数调用。适用于任何函数（包括 webpack/rollup 打包的内部函数）。使用"日志点"（条件断点）记录参数而不暂停执行。',
   annotations: {
     title: '追踪函数',
-    category: 'reverse_engineering' as ToolCategory,
+    category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: false,
   },
   schema: {
@@ -1267,7 +1267,7 @@ export const getAiDebugStatus = defineTool({
   description: '获取当前调试状态，包括暂停状态、断点数量、脚本数量等。',
   annotations: {
     title: '获取 AI 调试状态',
-    category: 'debugging' as ToolCategory,
+    category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
   },
   schema: {},
@@ -1317,7 +1317,7 @@ export const findInScript = defineTool({
     '在指定脚本中查找字符串，返回精确的行号/列号及周围上下文。适用于在压缩文件中设置断点。',
   annotations: {
     title: '在脚本中查找',
-    category: 'reverse_engineering' as ToolCategory,
+    category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: true,
   },
   schema: {
@@ -1459,7 +1459,7 @@ export const getRequestInitiator = defineTool({
     '获取网络请求的 JavaScript 调用栈（发起者）。帮助追踪哪个代码触发了 API 调用。',
   annotations: {
     title: '获取请求发起者',
-    category: 'reverse_engineering' as ToolCategory,
+    category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: true,
   },
   schema: {
@@ -1532,7 +1532,7 @@ export const getPausedInfo = defineTool({
     '获取当前暂停状态信息，包括调用栈、当前位置和作用域变量。在断点命中后使用此工具了解执行上下文。',
   annotations: {
     title: '获取暂停信息',
-    category: 'debugging' as ToolCategory,
+    category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
   },
   schema: {
@@ -1593,7 +1593,7 @@ export const evaluateOnCallframe = defineTool({
     '在暂停时的指定调用帧上下文中执行 JavaScript 表达式。允许检查变量和执行代码。',
   annotations: {
     title: '在调用帧上执行',
-    category: 'debugging' as ToolCategory,
+    category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
   },
   schema: {
@@ -1687,7 +1687,7 @@ export const inspectLocals = defineTool({
   description: '检查当前暂停栈所有帧的局部变量摘要。',
   annotations: {
     title: '检查局部变量',
-    category: 'debugging' as ToolCategory,
+    category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
   },
   schema: {},
@@ -1779,7 +1779,7 @@ export const setBreakpointOnText = defineTool({
     '在指定代码文本（函数名、语句等）上设置断点，通过搜索自动确定精确位置。适用于正常和压缩文件。注意：优先使用 hook_function 监控函数调用 — 它无需暂停执行即可捕获参数/返回值。仅在需要检查特定代码位置的局部变量时使用此工具。',
   annotations: {
     title: '在文本上设置断点',
-    category: 'reverse_engineering' as ToolCategory,
+    category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: false,
   },
   schema: {
