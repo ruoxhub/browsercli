@@ -10,6 +10,7 @@ import type {HTTPRequest, ResourceType} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {resolveActivePageIndex} from '../shared/activePageResolver.js';
 import {defineTool} from '../ToolDefinition.js';
+import {SIGNATURE_HEADER_PATTERN} from './constants.js';
 
 import type {
   ListNetworkRequestsData,
@@ -59,9 +60,6 @@ function emptyPageData(
     ...extra,
   };
 }
-
-const SIGNATURE_HEADER_PATTERN =
-  /(^|[-_])(sign|signature|token|auth|nonce|timestamp)([-_]|$)|x-sign/i;
 
 async function waitForMatchingRequest(options: {
   includePreservedRequests: boolean;

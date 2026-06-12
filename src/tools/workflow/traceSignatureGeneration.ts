@@ -10,9 +10,7 @@ import {ToolCategory} from '../categories.js';
 import type {RequestInitiator} from '../network/types.js';
 import {defineTool} from '../ToolDefinition.js';
 import type {ToolContextProvider} from '../../worker/ToolContext.js';
-
-const SIGNATURE_HEADER_PATTERN =
-  /(^|[-_])(sign|signature|token|auth|nonce|timestamp)([-_]|$)|x-sign/i;
+import {SIGNATURE_HEADER_PATTERN} from '../network/constants.js';
 
 function findSignatureIndicators(headers: Record<string, string>): string[] {
   return Object.keys(headers).filter(key => SIGNATURE_HEADER_PATTERN.test(key));
