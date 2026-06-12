@@ -644,152 +644,73 @@ export function getBrowserManagerConfig(): BrowserManagerConfig {
   const {merged: fileConfig} = loadFullConfig();
   const fileBrowser = fileConfig.browser;
 
+  type ResolverKind = 'boolean' | 'number' | 'value';
+  interface FieldDef {
+    key: keyof BrowserManagerConfig;
+    envKey: string;
+    kind: ResolverKind;
+    fileKey?: string;
+    default?: boolean | number | string;
+    extraFallback?: keyof typeof fileConfig;
+    cast?: (v: string) => BrowserManagerConfig[keyof BrowserManagerConfig];
+  }
+
+  const fields: FieldDef[] = [
+    {key: 'headless', envKey: 'BROWSER_HEADLESS', kind: 'boolean', default: true},
+    {key: 'isolated', envKey: 'BROWSER_ISOLATED', kind: 'boolean', default: true},
+    {key: 'useStealthScripts', envKey: 'USE_STEALTH_SCRIPTS', kind: 'boolean', default: false},
+    {key: 'executablePath', envKey: 'BROWSER_EXECUTABLE_PATH', kind: 'value'},
+    {key: 'channel', envKey: 'BROWSER_CHANNEL', kind: 'value', cast: v => v as BrowserManagerConfig['channel']},
+    {key: 'browserURL', envKey: 'BROWSER_URL', kind: 'value', extraFallback: 'browserUrl'},
+    {key: 'wsEndpoint', envKey: 'BROWSER_WS_ENDPOINT', kind: 'value', extraFallback: 'wsEndpoint'},
+    {key: 'remoteDebuggingUrl', envKey: 'REMOTE_DEBUGGING_URL', kind: 'value'},
+    {key: 'remoteDebuggingPort', envKey: 'REMOTE_DEBUGGING_PORT', kind: 'number'},
+    {key: 'userDataDir', envKey: 'BROWSER_USER_DATA_DIR', kind: 'value'},
+    {key: 'browserPath', envKey: 'BROWSER_PATH', kind: 'value'},
+    {key: 'userAgent', envKey: 'BROWSER_USER_AGENT', kind: 'value'},
+    {key: 'acceptInsecureCerts', envKey: 'BROWSER_ACCEPT_INSECURE_CERTS', kind: 'boolean'},
+    {key: 'devtools', envKey: 'BROWSER_DEVTOOLS', kind: 'boolean'},
+    {key: 'autoLaunch', envKey: 'BROWSER_AUTO_LAUNCH', kind: 'boolean'},
+    {key: 'waitForBrowserTimeoutMs', envKey: 'BROWSER_WAIT_TIMEOUT_MS', kind: 'number'},
+    {key: 'waitForBrowserPollMs', envKey: 'BROWSER_WAIT_POLL_MS', kind: 'number'},
+    {key: 'timeout', envKey: 'BROWSER_TIMEOUT', kind: 'number'},
+    {key: 'maxCollectedUrls', envKey: 'BROWSER_MAX_COLLECTED_URLS', kind: 'number'},
+    {key: 'maxFilesPerCollect', envKey: 'BROWSER_MAX_FILES_PER_COLLECT', kind: 'number'},
+    {key: 'maxTotalContentSize', envKey: 'BROWSER_MAX_TOTAL_CONTENT_SIZE', kind: 'number'},
+    {key: 'maxSingleFileSize', envKey: 'BROWSER_MAX_SINGLE_FILE_SIZE', kind: 'number'},
+  ];
+
   const config: BrowserManagerConfig = {
-    headless:
-      getEnvBoolean('BROWSER_HEADLESS') ?? fileBrowser?.headless ?? true,
-    isolated:
-      getEnvBoolean('BROWSER_ISOLATED') ?? fileBrowser?.isolated ?? true,
-    useStealthScripts:
-      getEnvBoolean('USE_STEALTH_SCRIPTS') ??
-      fileBrowser?.useStealthScripts ??
-      false,
+    headless: true,
+    isolated: true,
+    useStealthScripts: false,
   };
 
-  const envExecutablePath = getEnvValue('BROWSER_EXECUTABLE_PATH');
-  if (envExecutablePath) {
-    config.executablePath = envExecutablePath;
-  } else if (fileBrowser?.executablePath) {
-    config.executablePath = fileBrowser.executablePath;
-  }
+  const getters = {
+    boolean: getEnvBoolean,
+    number: getEnvNumber,
+    value: getEnvValue,
+  };
 
-  const envChannel = getEnvValue('BROWSER_CHANNEL');
-  if (envChannel) {
-    config.channel = envChannel as BrowserManagerConfig['channel'];
-  } else if (fileBrowser?.channel) {
-    config.channel = fileBrowser.channel as BrowserManagerConfig['channel'];
-  }
+  for (const field of fields) {
+    const fbKey = field.fileKey ?? (field.key as string);
+    let envVal = getters[field.kind](field.envKey) as unknown;
+    if (envVal === undefined && field.default !== undefined) {
+      envVal = field.default;
+    }
+    const fileVal = fileBrowser?.[fbKey as keyof typeof fileBrowser] as unknown;
 
-  const envBrowserURL = getEnvValue('BROWSER_URL');
-  if (envBrowserURL) {
-    config.browserURL = envBrowserURL;
-  } else if (fileBrowser?.browserURL) {
-    config.browserURL = fileBrowser.browserURL;
-  } else if (fileConfig.browserUrl) {
-    config.browserURL = fileConfig.browserUrl;
-  }
-
-  const envWsEndpoint = getEnvValue('BROWSER_WS_ENDPOINT');
-  if (envWsEndpoint) {
-    config.wsEndpoint = envWsEndpoint;
-  } else if (fileBrowser?.wsEndpoint) {
-    config.wsEndpoint = fileBrowser.wsEndpoint;
-  } else if (fileConfig.wsEndpoint) {
-    config.wsEndpoint = fileConfig.wsEndpoint;
-  }
-
-  const envRemoteDebuggingUrl = getEnvValue('REMOTE_DEBUGGING_URL');
-  if (envRemoteDebuggingUrl) {
-    config.remoteDebuggingUrl = envRemoteDebuggingUrl;
-  } else if (fileBrowser?.remoteDebuggingUrl) {
-    config.remoteDebuggingUrl = fileBrowser.remoteDebuggingUrl;
-  }
-
-  const envRemoteDebuggingPort = getEnvNumber('REMOTE_DEBUGGING_PORT');
-  if (envRemoteDebuggingPort !== undefined) {
-    config.remoteDebuggingPort = envRemoteDebuggingPort;
-  } else if (fileBrowser?.remoteDebuggingPort !== undefined) {
-    config.remoteDebuggingPort = fileBrowser.remoteDebuggingPort;
-  }
-
-  const envUserDataDir = getEnvValue('BROWSER_USER_DATA_DIR');
-  if (envUserDataDir) {
-    config.userDataDir = envUserDataDir;
-  } else if (fileBrowser?.userDataDir) {
-    config.userDataDir = fileBrowser.userDataDir;
-  }
-
-  const envBrowserPath = getEnvValue('BROWSER_PATH');
-  if (envBrowserPath) {
-    config.browserPath = envBrowserPath;
-  } else if (fileBrowser?.browserPath) {
-    config.browserPath = fileBrowser.browserPath;
-  }
-
-  const envUserAgent = getEnvValue('BROWSER_USER_AGENT');
-  if (envUserAgent) {
-    config.userAgent = envUserAgent;
-  } else if (fileBrowser?.userAgent) {
-    config.userAgent = fileBrowser.userAgent;
-  }
-
-  const envAcceptInsecureCerts = getEnvBoolean('BROWSER_ACCEPT_INSECURE_CERTS');
-  if (envAcceptInsecureCerts !== undefined) {
-    config.acceptInsecureCerts = envAcceptInsecureCerts;
-  } else if (fileBrowser?.acceptInsecureCerts !== undefined) {
-    config.acceptInsecureCerts = fileBrowser.acceptInsecureCerts;
-  }
-
-  const envDevtools = getEnvBoolean('BROWSER_DEVTOOLS');
-  if (envDevtools !== undefined) {
-    config.devtools = envDevtools;
-  } else if (fileBrowser?.devtools !== undefined) {
-    config.devtools = fileBrowser.devtools;
-  }
-
-  const envAutoLaunch = getEnvBoolean('BROWSER_AUTO_LAUNCH');
-  if (envAutoLaunch !== undefined) {
-    config.autoLaunch = envAutoLaunch;
-  } else if (fileBrowser?.autoLaunch !== undefined) {
-    config.autoLaunch = fileBrowser.autoLaunch;
-  }
-
-  const envWaitTimeout = getEnvNumber('BROWSER_WAIT_TIMEOUT_MS');
-  if (envWaitTimeout !== undefined) {
-    config.waitForBrowserTimeoutMs = envWaitTimeout;
-  } else if (fileBrowser?.waitForBrowserTimeoutMs !== undefined) {
-    config.waitForBrowserTimeoutMs = fileBrowser.waitForBrowserTimeoutMs;
-  }
-
-  const envWaitPoll = getEnvNumber('BROWSER_WAIT_POLL_MS');
-  if (envWaitPoll !== undefined) {
-    config.waitForBrowserPollMs = envWaitPoll;
-  } else if (fileBrowser?.waitForBrowserPollMs !== undefined) {
-    config.waitForBrowserPollMs = fileBrowser.waitForBrowserPollMs;
-  }
-
-  const envTimeout = getEnvNumber('BROWSER_TIMEOUT');
-  if (envTimeout !== undefined) {
-    config.timeout = envTimeout;
-  } else if (fileBrowser?.timeout !== undefined) {
-    config.timeout = fileBrowser.timeout;
-  }
-
-  const envMaxUrls = getEnvNumber('BROWSER_MAX_COLLECTED_URLS');
-  if (envMaxUrls !== undefined) {
-    config.maxCollectedUrls = envMaxUrls;
-  } else if (fileBrowser?.maxCollectedUrls !== undefined) {
-    config.maxCollectedUrls = fileBrowser.maxCollectedUrls;
-  }
-
-  const envMaxFiles = getEnvNumber('BROWSER_MAX_FILES_PER_COLLECT');
-  if (envMaxFiles !== undefined) {
-    config.maxFilesPerCollect = envMaxFiles;
-  } else if (fileBrowser?.maxFilesPerCollect !== undefined) {
-    config.maxFilesPerCollect = fileBrowser.maxFilesPerCollect;
-  }
-
-  const envMaxTotalSize = getEnvNumber('BROWSER_MAX_TOTAL_CONTENT_SIZE');
-  if (envMaxTotalSize !== undefined) {
-    config.maxTotalContentSize = envMaxTotalSize;
-  } else if (fileBrowser?.maxTotalContentSize !== undefined) {
-    config.maxTotalContentSize = fileBrowser.maxTotalContentSize;
-  }
-
-  const envMaxSingleSize = getEnvNumber('BROWSER_MAX_SINGLE_FILE_SIZE');
-  if (envMaxSingleSize !== undefined) {
-    config.maxSingleFileSize = envMaxSingleSize;
-  } else if (fileBrowser?.maxSingleFileSize !== undefined) {
-    config.maxSingleFileSize = fileBrowser.maxSingleFileSize;
+    if (envVal !== undefined) {
+      (config as Record<string, unknown>)[field.key as string] = field.cast
+        ? field.cast(envVal as string)
+        : envVal;
+    } else if (fileVal !== undefined) {
+      (config as Record<string, unknown>)[field.key as string] = field.cast
+        ? field.cast(fileVal as string)
+        : fileVal;
+    } else if (field.extraFallback && fileConfig[field.extraFallback] !== undefined) {
+      (config as Record<string, unknown>)[field.key as string] = fileConfig[field.extraFallback];
+    }
   }
 
   const envWsHeaders = getEnvValue('BROWSER_WS_HEADERS');
