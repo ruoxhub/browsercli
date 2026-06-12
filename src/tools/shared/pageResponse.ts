@@ -10,6 +10,9 @@ export function sendJson(response: Response, payload: unknown): void {
   response.setStructuredContent(payload);
 }
 
-export function errorMessage(error: unknown): string {
+export function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
+
+/** @deprecated 别名，新代码请用 getErrorMessage */
+export const errorMessage = getErrorMessage;
