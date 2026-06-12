@@ -8,6 +8,8 @@ import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 
+import {getFrameOrRespond} from './evaluateAndRespond.js';
+
 /**
  * 获取浏览器存储数据（cookies、localStorage、sessionStorage）。
  */
@@ -26,10 +28,7 @@ export const getStorage = defineTool({
       .optional()
       .default('all')
       .describe('要获取的存储类型（默认: all）。'),
-    filter: zod
-      .string()
-      .optional()
-      .describe('按键名过滤（不区分大小写）。'),
+    filter: zod.string().optional().describe('按键名过滤（不区分大小写）。'),
   },
   handler: async (request, response, context) => {
     const {type, filter} = request.params;
@@ -88,7 +87,13 @@ export const getStorage = defineTool({
 `;
 
     try {
-      const frame = (context as Context).getSelectedFrame();
+      const frame = getFrameOrRespond(
+        context as Context,
+        response,
+        'get_storage',
+      );
+      if (!frame) return;
+
       const result = await frame.evaluate(storageCode);
 
       response.setStructuredContent({
@@ -98,8 +103,8 @@ export const getStorage = defineTool({
         data: {
           type: type || 'all',
           filter: filter || null,
-          storage: result
-        }
+          storage: result,
+        },
       });
     } catch (error) {
       response.setStructuredContent({
@@ -108,8 +113,8 @@ export const getStorage = defineTool({
         tooltype: 'get_storage',
         data: {
           type: request.params.type || 'all',
-          filter: request.params.filter || null
-        }
+          filter: request.params.filter || null,
+        },
       });
     }
   },

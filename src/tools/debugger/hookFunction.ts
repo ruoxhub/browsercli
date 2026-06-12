@@ -8,6 +8,7 @@ import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 
+import {evaluateAndRespond} from './evaluateAndRespond.js';
 import {evaluateInPageRuntime} from './evaluateInPageRuntime.js';
 
 /**
@@ -51,30 +52,31 @@ export const hookFunction = defineTool({
       ),
   },
   handler: async (request, response, context) => {
-    const {target, logArgs = true, logResult = true, logStack = false, hookId} =
-      request.params;
+    const {
+      target,
+      logArgs = true,
+      logResult = true,
+      logStack = false,
+      hookId,
+    } = request.params;
 
     const id = hookId || target.replace(/[^a-zA-Z0-9]/g, '_');
-    // Split target into object path and method
     const parts = target.split('.');
     const methodName = parts.pop()!;
     const objectPath = parts.length > 0 ? parts.join('.') : 'window';
 
-    try {
-      const frame = (context as Context).getSelectedFrame();
-      if (!frame) {
-        response.setStructuredContent({
-          success: false,
-          message: '当前没有可用的页面或 Frame',
-          tooltype: 'hook_function',
-          data: {}
-        });
-        return;
-      }
-
-      const result = await evaluateInPageRuntime(
-        frame,
-        `
+    await evaluateAndRespond<{
+      success: boolean;
+      hookId?: string;
+      message?: string;
+    }>({
+      context: context as Context,
+      response,
+      tooltype: 'hook_function',
+      evaluate: frame =>
+        evaluateInPageRuntime(
+          frame,
+          `
 (function() {
   const hookId = ${JSON.stringify(id)};
   const objectPath = ${JSON.stringify(objectPath)};
@@ -192,41 +194,31 @@ export const hookFunction = defineTool({
   return { success: true, hookId: hookId };
 })();
 `,
-      );
-
-      if (result && typeof result === 'object') {
-        const r = result as {success: boolean; hookId?: string; message?: string};
-        if (r.success) {
-          response.setStructuredContent({
-            success: true,
-            message: `Hook 已安装：${target}`,
-            tooltype: 'hook_function',
-            data: {
-              hookId: r.hookId ?? id,
-              target,
-              logArgs,
-              logResult,
-              logStack,
-              hint: '函数调用将被记录到控制台。使用 list_console_messages 查看。',
-              unhookCommand: `unhook_function(hookId: "${r.hookId ?? id}")`
-            }
-          });
-        } else {
-          response.setStructuredContent({
-            success: false,
-            message: r.message || 'Hook 安装失败',
-            tooltype: 'hook_function',
-            data: { target }
-          });
-        }
-      }
-    } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `错误：${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'hook_function',
-        data: { target }
-      });
-    }
+        ),
+      onSuccess: result => {
+        response.setStructuredContent({
+          success: true,
+          message: `Hook 已安装：${target}`,
+          tooltype: 'hook_function',
+          data: {
+            hookId: result.hookId ?? id,
+            target,
+            logArgs,
+            logResult,
+            logStack,
+            hint: '函数调用将被记录到控制台。使用 list_console_messages 查看。',
+            unhookCommand: `unhook_function(hookId: "${result.hookId ?? id}")`,
+          },
+        });
+      },
+      onEvaluateFail: () => {
+        response.setStructuredContent({
+          success: false,
+          message: 'Hook 安装失败',
+          tooltype: 'hook_function',
+          data: {target},
+        });
+      },
+    });
   },
 });

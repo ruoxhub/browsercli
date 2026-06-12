@@ -8,6 +8,7 @@ import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 
+import {getFrameOrRespond} from './evaluateAndRespond.js';
 import {evaluateInPageRuntime} from './evaluateInPageRuntime.js';
 
 /**
@@ -23,8 +24,10 @@ export const listHooks = defineTool({
   },
   schema: {},
   handler: async (request, response, context) => {
+    const frame = getFrameOrRespond(context as Context, response, 'list_hooks');
+    if (!frame) return;
+
     try {
-      const frame = (context as Context).getSelectedFrame();
       const hooks = await evaluateInPageRuntime<
         Array<{id: string; target: string}>
       >(
@@ -63,7 +66,7 @@ export const listHooks = defineTool({
         success: false,
         message: `错误：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'list_hooks',
-        data: {}
+        data: {},
       });
     }
   },

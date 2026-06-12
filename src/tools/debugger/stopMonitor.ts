@@ -8,14 +8,8 @@ import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 
-interface MonitorRecord {
-  target: EventTarget;
-  listeners: Record<string, EventListener>;
-}
-
-interface MonitorWindow extends Window {
-  __mcp_monitors__?: Record<string, MonitorRecord>;
-}
+import {evaluateAndRespond} from './evaluateAndRespond.js';
+import type {MonitorWindow} from './monitorTypes.js';
 
 /**
  * 停止指定的事件监控。
@@ -34,49 +28,45 @@ export const stopMonitor = defineTool({
   handler: async (request, response, context) => {
     const {monitorId} = request.params;
 
-    try {
-      const frame = (context as Context).getSelectedFrame();
-      const result = await frame.evaluate((id: string) => {
-        const browserWindow = window as unknown as MonitorWindow;
+    await evaluateAndRespond<{success: boolean; message?: string}>({
+      context: context as Context,
+      response,
+      tooltype: 'stop_monitor',
+      evaluate: frame =>
+        frame.evaluate((id: string) => {
+          const browserWindow = window as unknown as MonitorWindow;
 
-        if (!browserWindow.__mcp_monitors__ || !browserWindow.__mcp_monitors__[id]) {
-          return {success: false, message: `Monitor not found: ${id}`};
-        }
+          if (
+            !browserWindow.__mcp_monitors__ ||
+            !browserWindow.__mcp_monitors__[id]
+          ) {
+            return {success: false, message: `Monitor not found: ${id}`};
+          }
 
-        const {target, listeners} = browserWindow.__mcp_monitors__[id];
-        Object.entries(listeners).forEach(([eventType, handler]) => {
-          target.removeEventListener(eventType, handler, true);
+          const {target, listeners} = browserWindow.__mcp_monitors__[id];
+          Object.entries(listeners).forEach(([eventType, handler]) => {
+            target.removeEventListener(eventType, handler, true);
+          });
+
+          delete browserWindow.__mcp_monitors__[id];
+          return {success: true};
+        }, monitorId),
+      onSuccess: () => {
+        response.setStructuredContent({
+          success: true,
+          message: `监控 "${monitorId}" 已停止`,
+          tooltype: 'stop_monitor',
+          data: {monitorId},
         });
-
-        delete browserWindow.__mcp_monitors__[id];
-        return {success: true};
-      }, monitorId);
-
-      if (result && typeof result === 'object') {
-        const r = result as {success: boolean; message?: string};
-        if (r.success) {
-          response.setStructuredContent({
-            success: true,
-            message: `监控 "${monitorId}" 已停止`,
-            tooltype: 'stop_monitor',
-            data: { monitorId }
-          });
-        } else {
-          response.setStructuredContent({
-            success: false,
-            message: r.message || `监控未找到：${monitorId}`,
-            tooltype: 'stop_monitor',
-            data: { monitorId }
-          });
-        }
-      }
-    } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `错误：${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'stop_monitor',
-        data: { monitorId: request.params.monitorId }
-      });
-    }
+      },
+      onEvaluateFail: () => {
+        response.setStructuredContent({
+          success: false,
+          message: `监控未找到：${monitorId}`,
+          tooltype: 'stop_monitor',
+          data: {monitorId},
+        });
+      },
+    });
   },
 });

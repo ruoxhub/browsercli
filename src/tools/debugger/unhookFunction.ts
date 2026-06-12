@@ -8,6 +8,7 @@ import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 
+import {evaluateAndRespond} from './evaluateAndRespond.js';
 import {evaluateInPageRuntime} from './evaluateInPageRuntime.js';
 
 /**
@@ -39,21 +40,14 @@ export const unhookFunction = defineTool({
       return;
     }
 
-    try {
-      const frame = (context as Context).getSelectedFrame();
-      if (!frame) {
-        response.setStructuredContent({
-          success: false,
-          message: '当前没有可用的页面或 Frame',
-          tooltype: 'unhook_function',
-          data: {}
-        });
-        return;
-      }
-
-      const result = await evaluateInPageRuntime(
-        frame,
-        `
+    await evaluateAndRespond<{success: boolean; message?: string}>({
+      context: context as Context,
+      response,
+      tooltype: 'unhook_function',
+      evaluate: frame =>
+        evaluateInPageRuntime(
+          frame,
+          `
 (function() {
   const hookId = ${JSON.stringify(hookId)};
   if (!window.__mcp_hooks__ || !window.__mcp_hooks__[hookId]) {
@@ -67,33 +61,23 @@ export const unhookFunction = defineTool({
   return { success: true };
 })()
 `,
-      );
-
-      if (result && typeof result === 'object') {
-        const r = result as {success: boolean; message?: string};
-        if (r.success) {
-          response.setStructuredContent({
-            success: true,
-            message: `Hook "${hookId}" 已移除`,
-            tooltype: 'unhook_function',
-            data: { hookId }
-          });
-        } else {
-          response.setStructuredContent({
-            success: false,
-            message: r.message || 'Hook 移除失败',
-            tooltype: 'unhook_function',
-            data: { hookId }
-          });
-        }
-      }
-    } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `错误：${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'unhook_function',
-        data: { hookId: request.params.hookId }
-      });
-    }
+        ),
+      onSuccess: () => {
+        response.setStructuredContent({
+          success: true,
+          message: `Hook "${hookId}" 已移除`,
+          tooltype: 'unhook_function',
+          data: {hookId},
+        });
+      },
+      onEvaluateFail: () => {
+        response.setStructuredContent({
+          success: false,
+          message: 'Hook 移除失败',
+          tooltype: 'unhook_function',
+          data: {hookId},
+        });
+      },
+    });
   },
 });

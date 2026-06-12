@@ -8,7 +8,8 @@ import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 
-import {evaluateInPageRuntime} from './evaluateInPageRuntime.js';
+import {evaluateAndRespond} from './evaluateAndRespond.js';
+import type {MonitorWindow} from './monitorTypes.js';
 
 const DEFAULT_EVENTS = [
   'click',
@@ -24,15 +25,6 @@ const DEFAULT_EVENTS = [
   'focus',
   'blur',
 ];
-
-interface MonitorRecord {
-  target: EventTarget;
-  listeners: Record<string, EventListener>;
-}
-
-interface MonitorWindow extends Window {
-  __mcp_monitors__?: Record<string, MonitorRecord>;
-}
 
 /**
  * 监控指定元素或 window 上的 DOM 事件，事件将输出到控制台。
@@ -51,9 +43,7 @@ export const monitorEvents = defineTool({
       .string()
       .optional()
       .default('window')
-      .describe(
-        'CSS 选择器或 "window"/"document"（默认: window）.',
-      ),
+      .describe('CSS 选择器或 "window"/"document"（默认: window）.'),
     events: zod
       .array(zod.string())
       .optional()
@@ -70,118 +60,121 @@ export const monitorEvents = defineTool({
     const id = monitorId || selector.replace(/[^a-zA-Z0-9]/g, '_') || 'window';
     const eventList = events || DEFAULT_EVENTS;
 
-    try {
-      const frame = (context as Context).getSelectedFrame();
-      const result = await frame.evaluate(
-        ({
-          selector,
-          events,
-          monitorId,
-        }: {
-          selector: string;
-          events: string[];
-          monitorId: string;
-        }) => {
-          const browserWindow = window as unknown as MonitorWindow;
+    await evaluateAndRespond<{
+      success: boolean;
+      monitorId?: string;
+      eventCount?: number;
+      message?: string;
+    }>({
+      context: context as Context,
+      response,
+      tooltype: 'monitor_events',
+      evaluate: frame =>
+        frame.evaluate(
+          ({
+            selector,
+            events,
+            monitorId,
+          }: {
+            selector: string;
+            events: string[];
+            monitorId: string;
+          }) => {
+            const browserWindow = window as unknown as MonitorWindow;
 
-          browserWindow.__mcp_monitors__ = browserWindow.__mcp_monitors__ || {};
-          if (browserWindow.__mcp_monitors__[monitorId]) {
-            return {success: false, message: `Monitor already exists: ${monitorId}`};
-          }
-
-          let target: EventTarget | null;
-          if (selector === 'window') {
-            target = window;
-          } else if (selector === 'document') {
-            target = document;
-          } else {
-            target = document.querySelector(selector);
-            if (!target) {
-              return {success: false, message: `Element not found: ${selector}`};
+            browserWindow.__mcp_monitors__ =
+              browserWindow.__mcp_monitors__ || {};
+            if (browserWindow.__mcp_monitors__[monitorId]) {
+              return {
+                success: false,
+                message: `Monitor already exists: ${monitorId}`,
+              };
             }
-          }
 
-          const listeners: Record<string, EventListener> = {};
-
-          events.forEach(eventType => {
-            const handler: EventListener = event => {
-              const typedEvent = event as Event & {
-                target?: EventTarget & {
-                  tagName?: string;
-                  id?: string;
-                  className?: string;
+            let target: EventTarget | null;
+            if (selector === 'window') {
+              target = window;
+            } else if (selector === 'document') {
+              target = document;
+            } else {
+              target = document.querySelector(selector);
+              if (!target) {
+                return {
+                  success: false,
+                  message: `Element not found: ${selector}`,
                 };
-                key?: string;
-                code?: string;
-                clientX?: number;
-                clientY?: number;
-              };
-              const info: Record<string, unknown> = {
-                monitor: monitorId,
-                event: eventType,
-                timestamp: new Date().toISOString(),
-                target: typedEvent.target?.tagName || 'unknown',
-              };
-
-              if (typedEvent.target?.id) info.targetId = typedEvent.target.id;
-              if (typedEvent.target?.className) {
-                info.targetClass = typedEvent.target.className;
               }
-              if (typedEvent.key) info.key = typedEvent.key;
-              if (typedEvent.code) info.code = typedEvent.code;
-              if (typedEvent.clientX !== undefined) {
-                info.position = {x: typedEvent.clientX, y: typedEvent.clientY};
-              }
-
-              console.log('[MCP Event]', info);
-            };
-
-            target.addEventListener(eventType, handler, true);
-            listeners[eventType] = handler;
-          });
-
-          browserWindow.__mcp_monitors__[monitorId] = {target, listeners};
-          return {success: true, monitorId, eventCount: events.length};
-        },
-        {selector, events: eventList, monitorId: id},
-      );
-
-      if (result && typeof result === 'object') {
-        const r = result as {
-          success: boolean;
-          monitorId?: string;
-          eventCount?: number;
-          message?: string;
-        };
-        if (r.success) {
-          response.setStructuredContent({
-            success: true,
-            message: `事件监控已启动：${selector}`,
-            tooltype: 'monitor_events',
-            data: {
-              monitorId: r.monitorId ?? id,
-              selector,
-              eventCount: r.eventCount ?? 0,
-              hint: '事件将被记录到控制台。使用 list_console_messages 查看。',
-              stopCommand: `stop_monitor(monitorId: "${r.monitorId ?? id}")`
             }
-          });
-        } else {
-          response.setStructuredContent({
-            success: false,
-            message: r.message || '事件监控启动失败',
-            tooltype: 'monitor_events',
-            data: { selector }
-          });
-        }
-      }
-    } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `错误：${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'monitor_events',
-        data: { selector: request.params.selector }
-      });
-    }
+
+            const listeners: Record<string, EventListener> = {};
+
+            events.forEach(eventType => {
+              const handler: EventListener = event => {
+                const typedEvent = event as Event & {
+                  target?: EventTarget & {
+                    tagName?: string;
+                    id?: string;
+                    className?: string;
+                  };
+                  key?: string;
+                  code?: string;
+                  clientX?: number;
+                  clientY?: number;
+                };
+                const info: Record<string, unknown> = {
+                  monitor: monitorId,
+                  event: eventType,
+                  timestamp: new Date().toISOString(),
+                  target: typedEvent.target?.tagName || 'unknown',
+                };
+
+                if (typedEvent.target?.id) info.targetId = typedEvent.target.id;
+                if (typedEvent.target?.className) {
+                  info.targetClass = typedEvent.target.className;
+                }
+                if (typedEvent.key) info.key = typedEvent.key;
+                if (typedEvent.code) info.code = typedEvent.code;
+                if (typedEvent.clientX !== undefined) {
+                  info.position = {
+                    x: typedEvent.clientX,
+                    y: typedEvent.clientY,
+                  };
+                }
+
+                console.log('[MCP Event]', info);
+              };
+
+              target.addEventListener(eventType, handler, true);
+              listeners[eventType] = handler;
+            });
+
+            browserWindow.__mcp_monitors__[monitorId] = {target, listeners};
+            return {success: true, monitorId, eventCount: events.length};
+          },
+          {selector, events: eventList, monitorId: id},
+        ),
+      onSuccess: result => {
+        response.setStructuredContent({
+          success: true,
+          message: `事件监控已启动：${selector}`,
+          tooltype: 'monitor_events',
+          data: {
+            monitorId: result.monitorId ?? id,
+            selector,
+            eventCount: result.eventCount ?? 0,
+            hint: '事件将被记录到控制台。使用 list_console_messages 查看。',
+            stopCommand: `stop_monitor(monitorId: "${result.monitorId ?? id}")`,
+          },
+        });
+      },
+      onEvaluateFail: () => {
+        response.setStructuredContent({
+          success: false,
+          message: '事件监控启动失败',
+          tooltype: 'monitor_events',
+          data: {selector},
+        });
+      },
+    });
   },
 });
