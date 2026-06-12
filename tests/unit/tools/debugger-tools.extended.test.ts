@@ -455,7 +455,7 @@ describe('debugger tools extended', () => {
     });
 
     await getPausedInfo.handler(
-      {params: {includeScopes: true, maxScopeDepth: 2}},
+      {params: {includeScopes: true}},
       response as unknown as Parameters<typeof getPausedInfo.handler>[1],
       context as unknown as Parameters<typeof getPausedInfo.handler>[2],
     );

@@ -160,7 +160,7 @@ describe('debugger tools error paths', () => {
     await setBreakpoint.handler({params: {url: 'a.js', lineNumber: 1, columnNumber: 0, isRegex: false}}, response as unknown as Parameters<typeof setBreakpoint.handler>[1], context as unknown as Parameters<typeof setBreakpoint.handler>[2]);
     await removeBreakpoint.handler({params: {breakpointId: 'bp'}}, response as unknown as Parameters<typeof removeBreakpoint.handler>[1], context as unknown as Parameters<typeof removeBreakpoint.handler>[2]);
     await listBreakpoints.handler({params: {}} as EmptyRequestHarness, response as unknown as Parameters<typeof listBreakpoints.handler>[1], context as unknown as Parameters<typeof listBreakpoints.handler>[2]);
-    await getPausedInfo.handler({params: {includeScopes: false, maxScopeDepth: 3}}, response as unknown as Parameters<typeof getPausedInfo.handler>[1], context as unknown as Parameters<typeof getPausedInfo.handler>[2]);
+    await getPausedInfo.handler({params: {includeScopes: false}}, response as unknown as Parameters<typeof getPausedInfo.handler>[1], context as unknown as Parameters<typeof getPausedInfo.handler>[2]);
     await resume.handler({params: {}} as EmptyRequestHarness, response as unknown as Parameters<typeof resume.handler>[1], context as unknown as Parameters<typeof resume.handler>[2]);
     await pause.handler({params: {}} as EmptyRequestHarness, response as unknown as Parameters<typeof pause.handler>[1], context as unknown as Parameters<typeof pause.handler>[2]);
     await stepOver.handler({params: {}} as EmptyRequestHarness, response as unknown as Parameters<typeof stepOver.handler>[1], context as unknown as Parameters<typeof stepOver.handler>[2]);

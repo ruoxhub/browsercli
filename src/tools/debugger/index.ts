@@ -1609,12 +1609,6 @@ export const getPausedInfo = defineTool({
       .optional()
       .default(true)
       .describe('是否包含作用域变量（默认: true）。'),
-    maxScopeDepth: zod
-      .number()
-      .int()
-      .optional()
-      .default(2)
-      .describe('遍历的最大作用域深度（默认: 2）。'),
   },
   handler: async (request, response, context) => {
     const runtime = context as unknown as DebuggerRuntime;
