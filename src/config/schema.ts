@@ -110,6 +110,14 @@ export const BrowserConfigSchema = zod
       })
       .optional(),
     useStealthScripts: booleanSchema.optional(),
+    /** Opt-in 注入 StealthScripts2025 JS 反检测脚本（覆盖 navigator/canvas/WebGL/audio）。默认 false（jshookmcp 哲学：零 JS 注入）。 */
+    jsStealth: booleanSchema.optional(),
+    /** 启用 CloakBrowser 二进制 + 49 个 C++ 源码层指纹 patch；profile 目录切到 `cloak-profile`。 */
+    cloak: booleanSchema.optional(),
+    /** 使用历史 60+ 启动参数集（`FULL_STEALTH_ARGS`）。默认 false：其中多个 flag 已是反爬检测信号。 */
+    fullStealthArgs: booleanSchema.optional(),
+    /** 启用最小启动参数集（`MINIMAL_STEALTH_ARGS`：`--test-type` + `--hide-crash-restore-bubble`）。默认 true。 */
+    minimalStealth: booleanSchema.optional(),
     viewport: ViewportSchema.optional(),
     browserURL: optionalStringSchema.optional(),
     wsEndpoint: optionalStringSchema.optional(),
@@ -154,6 +162,12 @@ export const GlobalConfigSchema = zod
     wsEndpoint: optionalStringSchema.optional(),
     headless: booleanSchema.optional(),
     executablePath: optionalStringSchema.optional(),
+    /** `--cloak` CLI flag：启用 CloakBrowser + 49 C++ patch + cloak-profile。 */
+    cloak: booleanSchema.optional(),
+    /** `--js-stealth` CLI flag：opt-in StealthScripts2025 JS 注入。 */
+    jsStealth: booleanSchema.optional(),
+    /** `--full-stealth-args` CLI flag：回退到历史 60+ 启动参数集。 */
+    fullStealthArgs: booleanSchema.optional(),
     databaseUrl: optionalStringSchema.optional(),
     runtimeDirName: optionalStringSchema.optional(),
     llmProvider: LLMProviderSchema.optional(),

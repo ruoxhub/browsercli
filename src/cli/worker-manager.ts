@@ -194,6 +194,9 @@ export class WorkerManager {
       workerArgs.push('--databaseUrl', options.databaseUrl);
     if (options.traceOutput)
       workerArgs.push('--traceOutput', options.traceOutput);
+    if (options.cloak) workerArgs.push('--cloak');
+    if (options.jsStealth) workerArgs.push('--js-stealth');
+    if (options.fullStealthArgs) workerArgs.push('--full-stealth-args');
 
     const execPath = process.execPath;
     const workerEntry = path.resolve(__dirname, '../index.js');

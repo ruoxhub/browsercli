@@ -143,6 +143,7 @@
   "optionalDependencies": {
     "@swc/core-linux-x64-gnu": "^1.15.33",
     "chrome-devtools-frontend": "^1.0.1608868",
+    "cloakbrowser": "^0.3.28",
     "webcrack": "^2.16.0"
   }
 }

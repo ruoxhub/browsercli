@@ -41,16 +41,33 @@ export const DEFAULT_ARGS = [
 ];
 
 /**
- * 60+ anti-detection arguments covering:
- * - Automation feature removal
- * - Headless detection bypass
- * - Device fingerprint spoofing
- * - GPU & rendering normalization
- * - Network characteristics
- * - Behavioral trait hiding
- * - Privacy & security hardening
+ * 最小隐身参数集。
+ *
+ * 与 jshookmcp 的默认 args 对齐：只下两个 UX 向 flag，不做任何浏览器指纹
+ * 篡改。这两个 flag 都不会被主流反爬系统（Cloudflare Turnstile / DataDome /
+ * FingerprintJS）作为检测信号：
+ *
+ * - `--test-type`：告诉 Chrome 自己正跑在自动化 harness 下，**只为**压制
+ *   Patchright / cloak 额外 args 带来的 "unsupported command-line flag"
+ *   黄条。纯粹是 banner 抑制器，不是配置级指纹信号（jshookmcp
+ *   browser.ts:110 注释已说明）。
+ * - `--hide-crash-restore-bubble`：压制 MCP/Worker 被 kill 后下次启动的
+ *   "Chrome didn't shut down correctly" 气泡。纯 UX。
+ *
+ * 强反检测能力由协议层（Patchright）+ 源码层（`--cloak` 启用 CloakBrowser
+ * 49 个 C++ patch）提供，不在 args 里堆 60 个 flag。
  */
-export const STEALTH_ARGS = [
+export const MINIMAL_STEALTH_ARGS = [
+  '--test-type',
+  '--hide-crash-restore-bubble',
+];
+
+/**
+ * 完整（历史）隐身参数集：60+ 个 flag，覆盖自动化特征、GPU、网络、音频、
+ * 行为特征等。保留供 `--full-stealth-args` 回退使用；默认不再启用，因为
+ * 其中多个 flag 本身已是反爬系统的检测信号。
+ */
+export const FULL_STEALTH_ARGS = [
   // Automation feature removal
   '--disable-blink-features=AutomationControlled',
   '--test-type',
@@ -134,3 +151,11 @@ export const STEALTH_ARGS = [
   '--disable-layer-tree-host-memory-pressure',
   '--disable-component-extensions-with-background-pages',
 ];
+
+/**
+ * Backward-compat alias：外部模块（browser-helpers.ts、browser/index.ts）
+ * 历史上按 `STEALTH_ARGS` 引用完整集。重命名后保留该别名，避免破坏现有
+ * 导入；新代码应优先 `MINIMAL_STEALTH_ARGS`（默认）或显式
+ * `FULL_STEALTH_ARGS`（`--full-stealth-args` 回退）。
+ */
+export const STEALTH_ARGS = FULL_STEALTH_ARGS;

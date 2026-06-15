@@ -15,6 +15,13 @@ type ResolvedWorkerConfig = Required<
     'browserUrl' | 'wsEndpoint' | 'executablePath' | 'databaseUrl'
   >;
 
+const BOOLEAN_FLAGS: Record<string, keyof GlobalConfig> = {
+  '--headless': 'headless',
+  '--cloak': 'cloak',
+  '--js-stealth': 'jsStealth',
+  '--full-stealth-args': 'fullStealthArgs',
+};
+
 const VALUE_FLAGS: Record<string, keyof GlobalConfig> = {
   '--browserUrl': 'browserUrl',
   '--databaseUrl': 'databaseUrl',
@@ -32,8 +39,9 @@ export function parseWorkerArgs(args: string[]): GlobalConfig {
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    if (arg === '--headless') {
-      cliConfig.headless = true;
+    const boolKey = BOOLEAN_FLAGS[arg];
+    if (boolKey) {
+      (cliConfig as Record<string, unknown>)[boolKey] = true;
       continue;
     }
 

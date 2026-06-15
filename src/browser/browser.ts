@@ -38,6 +38,7 @@ import {
   getIgnoreDefaultArgs,
   type Engine,
 } from './browser-helpers.js';
+import {setupCloak} from './cloak.js';
 
 // Re-export for backward compatibility
 export {resolveAutoConnectTarget};
@@ -114,7 +115,11 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     await ensureUserDataDir(userDataDir);
   }
 
-  const args = buildLaunchArgs(options.args, engine, {headless, devtools: options.devtools});
+  const args = buildLaunchArgs(options.args, engine, {
+    headless,
+    devtools: options.devtools,
+    minimalStealth: true,
+  });
   const launchChannel = resolveLaunchChannel(channel, engine, !!executablePath);
   const launcher = engine === 'firefox' ? firefox : chromium;
   const ignoreDefaultArgs = getIgnoreDefaultArgs(engine);
@@ -140,15 +145,8 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
     }
     return browser;
   } catch (error) {
-    if (
-      userDataDir &&
-      (error as Error).message.includes('The browser is already running')
-    ) {
-      throw new Error(
-        `The browser is already running for ${userDataDir}. Use --isolated to run multiple browser instances.`,
-        {cause: error},
-      );
-    }
+    const wrapped = wrapAlreadyRunningError(error, userDataDir);
+    if (wrapped) throw wrapped;
     throw error;
   }
 }
@@ -186,6 +184,30 @@ export interface BrowserManagerConfig {
   remoteDebuggingPort?: number;
   wsHeaders?: Record<string, string>;
   useStealthScripts?: boolean;
+  /**
+   * 启用 CloakBrowser 二进制 + 49 个 C++ 源码层指纹 patch（替代系统 Chrome）。
+   * 强反爬站点（Cloudflare Turnstile / DataDome / FingerprintJS）的逃生通道。
+   * 开启时 profile 目录自动切到 `cloak-profile`（与默认 `chrome-profile`
+   * 物理隔离，避免两个 Chromium 二进制的 state 互踩）。
+   */
+  cloak?: boolean;
+  /**
+   * Opt-in 注入 StealthScripts2025（覆盖 navigator/canvas/WebGL/audio 等）。
+   * 默认不开：与 jshookmcp 的"零 JS 注入"哲学对齐 —— `Object.defineProperty`
+   * hack 本身就是检测信号。需要显式 opt-in 才注入。
+   */
+  jsStealth?: boolean;
+  /**
+   * 使用历史 60+ 启动参数集（`FULL_STEALTH_ARGS`）。默认不开：其中多个 flag
+   * 已是反爬系统的已知检测信号。回退开关，给依赖旧行为的部署用。
+   */
+  fullStealthArgs?: boolean;
+  /**
+   * 启用最小启动参数集（`MINIMAL_STEALTH_ARGS`：`--test-type` banner 抑制
+   * + `--hide-crash-restore-bubble`）。默认 false 保持向后兼容；顶层
+   * launch() 与新的 CLI 默认路径传 true。
+   */
+  minimalStealth?: boolean;
   acceptInsecureCerts?: boolean;
   userDataDir?: string;
   viewport?: {
@@ -205,6 +227,26 @@ export interface BrowserManagerConfig {
   maxTotalContentSize?: number;
   maxSingleFileSize?: number;
   userAgent?: string;
+}
+
+/**
+ * Wrap 'The browser is already running' errors with a user-facing hint.
+ * Returns null for any other error so callers can apply their own wrapping.
+ */
+function wrapAlreadyRunningError(
+  error: unknown,
+  userDataDir: string | undefined,
+): Error | null {
+  if (
+    userDataDir &&
+    (error as Error).message?.includes('The browser is already running')
+  ) {
+    return new Error(
+      `The browser is already running for ${userDataDir}. Use --isolated to run multiple browser instances.`,
+      {cause: error},
+    );
+  }
+  return null;
 }
 
 /**
@@ -348,30 +390,24 @@ export class BrowserManager {
 
   private async connectToRemoteBrowser(): Promise<Browser> {
     try {
-      const debugUrl =
-        this.config.wsEndpoint ||
-        this.config.browserURL ||
-        this.config.remoteDebuggingUrl;
-      logger.debug('Connecting to remote browser at:', debugUrl);
+      logger.debug('Connecting to remote browser at:', this.debugUrl());
 
-      // Fetch version info and resolve WebSocket endpoint
-      const versionInfo = await this.fetchVersionInfo();
-      const connectEndpoint =
-        this.config.wsEndpoint ||
-        versionInfo.webSocketDebuggerUrl ||
-        this.config.browserURL ||
-        this.config.remoteDebuggingUrl;
+      const connectEndpoint = await this.resolveConnectEndpoint();
+      if (!connectEndpoint) {
+        throw new Error(
+          'No WebSocket endpoint available for remote browser connection. ' +
+            'Provide wsEndpoint, browserURL, or remoteDebuggingUrl in config.',
+        );
+      }
 
-      // Connect via CDP
       this.installDetachedFrameGuard();
-      this.browser = await chromium.connectOverCDP(connectEndpoint!, {
+      this.browser = await chromium.connectOverCDP(connectEndpoint, {
         timeout: 30000,
         ...(this.config.wsHeaders ? {headers: this.config.wsHeaders} : {}),
       });
       logger.debug('Connected to remote browser via Playwright');
       this.context = this.browser.contexts()[0];
 
-      // Post-connection setup
       await this.configureRemoteViewport();
       this.logBrowserVersion();
       this.setupCrashDetection();
@@ -382,7 +418,6 @@ export class BrowserManager {
 
       return this.browser;
     } catch (error) {
-      // Auto-launch fallback
       if (this.config.autoLaunch) {
         logger.debug(
           'Remote browser connection failed, attempting auto-launch...',
@@ -398,6 +433,24 @@ export class BrowserManager {
 
       throw this.mapConnectionError(error);
     }
+  }
+
+  private debugUrl(): string | undefined {
+    return (
+      this.config.wsEndpoint ||
+      this.config.browserURL ||
+      this.config.remoteDebuggingUrl
+    );
+  }
+
+  private async resolveConnectEndpoint(): Promise<string | undefined> {
+    if (this.config.wsEndpoint) return this.config.wsEndpoint;
+    const versionInfo = await this.fetchVersionInfo();
+    return (
+      versionInfo.webSocketDebuggerUrl ||
+      this.config.browserURL ||
+      this.config.remoteDebuggingUrl
+    );
   }
 
   private async fetchVersionInfo(): Promise<{
@@ -588,21 +641,57 @@ export class BrowserManager {
   // ─── Launch ──────────────────────────────────────────────────────────
 
   private async launchBrowser(): Promise<Browser> {
-    const {channel, executablePath, headless, isolated, useStealthScripts} =
-      this.config;
+    const {
+      channel,
+      executablePath: configExecutablePath,
+      headless,
+      isolated,
+      useStealthScripts,
+      jsStealth,
+      fullStealthArgs,
+      minimalStealth,
+      cloak,
+    } = this.config;
     const engine = resolveEngine(channel);
 
-    const userDataDir = resolveUserDataDir(isolated, this.config.userDataDir, channel);
+    // cloak 仅对 chromium 生效；firefox 通道下忽略（cloakbrowser 是 chromium 二进制）。
+    const cloakSetup =
+      cloak && engine === 'chromium'
+        ? await setupCloak(
+            resolveUserDataDir(!!isolated, this.config.userDataDir, channel, true),
+          )
+        : null;
+    const executablePath = cloakSetup?.executablePath ?? configExecutablePath;
+
+    const userDataDir = resolveUserDataDir(
+      !!isolated,
+      this.config.userDataDir,
+      channel,
+      !!cloak,
+    );
     if (userDataDir) {
       await ensureUserDataDir(userDataDir);
     }
 
+    // jsStealth 是 useStealthScripts 的新名字（opt-in JS 注入）。两者
+    // 任一为 true 都走 StealthScripts2025；新代码用 jsStealth，旧代码保留
+    // useStealthScripts 别名。
+    const shouldInjectJsStealth = !!(jsStealth || useStealthScripts);
+
     const args = buildLaunchArgs(this.config.args, engine, {
       headless,
       devtools: this.config.devtools,
-      useStealthScripts,
+      useStealthScripts: shouldInjectJsStealth,
+      fullStealthArgs,
+      minimalStealth,
       includeDefaults: true,
     });
+
+    // cloak args（指纹种子 + 平台预设）追加到 args 末尾。它们不在
+    // STEALTH_ARGS / MINIMAL_STEALTH_ARGS 里，只在 cloakSetup 里计算。
+    if (cloakSetup) {
+      args.push(...cloakSetup.args);
+    }
 
     const launchChannel = resolveLaunchChannel(channel, engine, !!executablePath);
     const launcher = engine === 'firefox' ? firefox : chromium;
@@ -615,7 +704,10 @@ export class BrowserManager {
         executablePath,
         headless,
         isolated,
-        useStealthScripts,
+        cloak: !!cloak,
+        jsStealth: shouldInjectJsStealth,
+        fullStealthArgs,
+        minimalStealth,
       });
 
       this.browser = await launcher.launch({
@@ -648,34 +740,29 @@ export class BrowserManager {
 
       this.setupCrashDetection();
 
-      // Set viewport if configured
-      if (this.config.viewport) {
-        const ctx = this.browser.contexts()[0];
-        const page = ctx?.pages()[0];
-        if (page) {
-          this.trackCurrentPage(page);
-          await page.setViewportSize({
-            width: this.config.viewport.width,
-            height: this.config.viewport.height,
-          });
-        }
+      // Viewport：默认关掉 Playwright 的 1280×720 仿真（jshookmcp
+      // browser.ts:121），暴露真实 OS 屏幕尺寸。1280×720 是 Chromium
+      // 自动化框架的默认值，已是反爬系统的常见 bot 信号。
+      //
+      // 仅当用户显式传 `config.viewport` 时按指定尺寸覆盖。
+      const pageForViewport = ctx.pages()[0];
+      if (pageForViewport) {
+        this.trackCurrentPage(pageForViewport);
+        await pageForViewport.setViewportSize(
+          this.config.viewport
+            ? {width: this.config.viewport.width, height: this.config.viewport.height}
+            : null,
+        );
       }
 
-      if (useStealthScripts) {
+      if (shouldInjectJsStealth) {
         this.stealthInjected = true;
       }
 
       return this.browser;
     } catch (error) {
-      if (
-        userDataDir &&
-        (error as Error).message.includes('The browser is already running')
-      ) {
-        throw new Error(
-          `The browser is already running for ${userDataDir}. Use --isolated to run multiple browser instances.`,
-          {cause: error},
-        );
-      }
+      const wrapped = wrapAlreadyRunningError(error, userDataDir);
+      if (wrapped) throw wrapped;
       throw new Error(`Failed to launch browser: ${(error as Error).message}`, {
         cause: error,
       });

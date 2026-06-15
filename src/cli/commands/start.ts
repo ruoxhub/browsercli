@@ -71,6 +71,9 @@ export const startCommand: AxiCliCommand<WorkerContext> = async (args, ctx) => {
   const executablePath = getFlag(parsed, 'executablePath');
   const databaseUrl = getFlag(parsed, 'databaseUrl');
   const waitForBrowser = getBoolFlag(parsed, 'wait-for-browser');
+  const cloak = getBoolFlag(parsed, 'cloak');
+  const jsStealth = getBoolFlag(parsed, 'js-stealth');
+  const fullStealthArgs = getBoolFlag(parsed, 'full-stealth-args');
   const traceOutput = getFlag(parsed, 'traceOutput') as
     | 'errors'
     | 'all'
@@ -85,6 +88,9 @@ export const startCommand: AxiCliCommand<WorkerContext> = async (args, ctx) => {
     headless: headless || undefined,
     executablePath: executablePath || ctx?.resolvedConfig.executablePath,
     databaseUrl: databaseUrl || ctx?.resolvedConfig.databaseUrl,
+    cloak: cloak || ctx?.resolvedConfig.cloak,
+    jsStealth: jsStealth || ctx?.resolvedConfig.jsStealth,
+    fullStealthArgs: fullStealthArgs || ctx?.resolvedConfig.fullStealthArgs,
   });
 
   // 1. 检查 Sekiro Server 是否可用
@@ -121,6 +127,9 @@ export const startCommand: AxiCliCommand<WorkerContext> = async (args, ctx) => {
       headless: cfg.headless,
       executablePath: cfg.executablePath,
       databaseUrl: cfg.databaseUrl,
+      cloak: cfg.cloak,
+      jsStealth: cfg.jsStealth,
+      fullStealthArgs: cfg.fullStealthArgs,
       traceOutput,
     });
   }

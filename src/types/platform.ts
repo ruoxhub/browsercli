@@ -61,6 +61,12 @@ interface WorkerStartOptions {
   databaseUrl?: string;
   /** Trace 输出模式: errors 或 all */
   traceOutput?: 'errors' | 'all';
+  /** 启用 CloakBrowser 二进制 + 49 C++ patch；profile 切到 cloak-profile。 */
+  cloak?: boolean;
+  /** Opt-in StealthScripts2025 JS 注入（默认不注入）。 */
+  jsStealth?: boolean;
+  /** 回退到历史 60+ 启动参数集（默认不启用）。 */
+  fullStealthArgs?: boolean;
 }
 
 // ==================== Action 配置（兼容旧 BaseClient） ====================

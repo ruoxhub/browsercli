@@ -10,6 +10,7 @@
 ## 目录
 
 - [1. 项目概览](#1-项目概览)
+- [反检测哲学（与 jshookmcp 对齐）](#反检测哲学与-jshookmcp-对齐)
 - [2. 目录结构解析](#2-目录结构解析)
 - [3. 核心模块分析](#3-核心模块分析)
 - [4. 设计模式与架构风格分析](#4-设计模式与架构风格分析)
@@ -53,6 +54,44 @@ JSReverser-CLI 是一个**前端 JavaScript 逆向流程标准化的 MCP（Model
 | **WASM 处理** | wabt |
 | **国密** | sm-crypto |
 | **测试** | node:test + fast-check (属性测试) + Vitest |
+
+---
+
+## 反检测哲学（与 jshookmcp 对齐）
+
+JSReverser-CLI 与兄弟项目 [jshookmcp](https://github.com/zhizhuodemao/js-reverse-mcp)
+共享同一套反检测哲学：**默认零 JS 注入，反检测下沉到协议层和（可选的）源码层**。
+
+`Object.defineProperty` hack 本身就是反爬系统的检测信号 —— 一旦页面检测到
+"有人在覆盖 navigator / canvas / WebGL API"，整个隐身努力反而暴露。所以默认
+启动时 JSReverser **不会**向页面注入任何 JS，分四层提供反检测能力：
+
+| 层 | 默认模式 | `--cloak` 模式 |
+| --- | --- | --- |
+| **协议层**（CDP） | Patchright：不调 `Runtime.enable` / `Console.enable`，不在 isolated world 外 evaluate | 同 |
+| **源码层**（C++ 二进制 patch） | 无 —— 直接用系统 Google Chrome | CloakBrowser 二进制（49 个 C++ patch：`navigator.webdriver`、canvas、WebGL、audio、GPU、字体、屏幕、WebRTC、TLS） |
+| **Profile 目录** | `~/.cache/chrome-devtools-mcp/chrome-profile` | `~/.cache/chrome-devtools-mcp/cloak-profile`（与默认物理隔离） |
+| **实际浏览器** | 你装的 Google Chrome（带 Web Store、扩展、sync） | 定制 Chromium 编译版（无 Google 服务、无 Web Store） |
+
+导航级措施（两种模式都生效）：
+
+- **最小启动参数集**：默认只下 `--test-type`（banner 抑制器，不是检测信号）+
+  `--hide-crash-restore-bubble`。历史 60+ 参数集（`FULL_STEALTH_ARGS`，其中
+  多个 flag 本身已是反爬检测信号）通过 `--full-stealth-args` 回退启用。
+- **Viewport `null`**：关掉 Playwright 默认的 1280×720 假视口，暴露真实 OS
+  屏幕尺寸（1280×720 是自动化框架的常见 bot 信号）。
+
+### 三个隐身相关 CLI flag
+
+| Flag | 作用 | 默认 |
+|---|---|---|
+| `--cloak` | CloakBrowser 二进制 + 49 C++ patch + cloak-profile | `false` |
+| `--js-stealth` | 页面里 opt-in 注入 `StealthScripts2025`（覆盖 navigator/canvas/WebGL/audio） | `false` |
+| `--full-stealth-args` | 使用历史 60+ Chromium 启动参数集 | `false` |
+
+`--cloak` 是强反爬的逃生通道，详见 [`docs/cloak.md`](./docs/cloak.md)。
+`--js-stealth` 是历史兼容 opt-in（旧代码依赖 `navigator.webdriver === false`
+等覆盖时显式启用）。`--full-stealth-args` 不推荐：多个 flag 已是反爬检测信号。
 
 ---
 

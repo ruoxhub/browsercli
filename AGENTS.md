@@ -29,6 +29,35 @@
 ## Architecture Notes
 仓库默认遵循 README 中的逆向方法论：`Observe-first`、`Hook-preferred`、`Breakpoint-last`、`Evidence-first`。贡献新能力时，优先扩展可复用工具与证据沉淀链路，而不是把一次性调试逻辑直接写死在脚本里。涉及公开案例时，只保留抽象流程、字段规范和脱敏样例，避免提交可直接复用的生产链路。
 
+### 反检测分层（与 jshookmcp 对齐）
+
+默认启动路径遵循 **零 JS 注入** 哲学：`Object.defineProperty` hack 本身就是
+反爬系统的检测信号。反检测能力分四层，改动时不要破坏分层边界：
+
+1. **协议层（Patchright）**：始终启用。不调 `Runtime.enable` / `Console.enable`，
+   CDP 域只在工具显式需要时才激活（详见 `DebuggerContext.ts` /
+   `CodeCollector.ts` 的懒激活路径）。**不要**在启动流程里 eager-enable。
+2. **源码层（CloakBrowser 二进制）**：仅 `--cloak` 启用。实现在
+   `src/browser/cloak.ts`，49 个 C++ patch。cloak profile 目录与默认 profile
+   **物理隔离**（`cloak-profile` vs `chrome-profile`）—— 改动 profile 解析时
+   必须保留这一边界，见 `src/browser/browser-helpers.ts::resolveUserDataDir`。
+3. **启动参数**：默认走最小集 `MINIMAL_STEALTH_ARGS`（`--test-type` banner
+   抑制 + `--hide-crash-restore-bubble`）。**不要**在默认路径上追加历史
+   `FULL_STEALTH_ARGS` —— 其中多个 flag（`--window-size=1920,1080`、
+   `--disable-blink-features=AutomationControlled`、`--disable-logging`、
+   `--aggressive-cache-discard`）本身已是反爬检测信号。回退走
+   `--full-stealth-args` CLI flag。
+4. **JS 注入（`StealthScripts2025`）**：默认 **不** 注入。需要 opt-in：
+   `--js-stealth` CLI flag 或 `inject_stealth` 工具显式调用。**不要**在
+   `BrowserManager.launchBrowser()` 或 `src/index.ts` 里隐式调用
+   `StealthScripts2025.injectAll` —— 那会让所有用户都暴露 JS 注入检测面。
+
+Viewport 默认 `null`（`src/browser/browser.ts::launchBrowser` 末尾的
+`setViewportSize(null)` 分支）。Playwright 默认 1280×720 是自动化框架的常见
+bot 信号，关掉它暴露真实 OS 屏幕。只有用户显式传 `config.viewport` 才覆盖。
+
+强反爬逃生通道详见 [`docs/cloak.md`](./docs/cloak.md)。
+
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 

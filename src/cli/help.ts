@@ -68,7 +68,7 @@ export function generateCommandHelp(command: string): string | null {
     start: {
       description: '启动 Worker 并连接到 Sekiro Server，自动打开 Web 控制台',
       usage:
-        'js-reverse start [--browserUrl <url>] [--wsEndpoint <endpoint>] [--rpcHost <host>] [--group <name>] [--wait-for-browser] [--headless] [--no-open] [--console-port <port>]',
+        'js-reverse start [--browserUrl <url>] [--wsEndpoint <endpoint>] [--rpcHost <host>] [--group <name>] [--wait-for-browser] [--headless] [--cloak] [--js-stealth] [--full-stealth-args] [--no-open] [--console-port <port>]',
     },
     stop: {
       description: '停止 Worker 进程',

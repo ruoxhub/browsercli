@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import {HARMFUL_ARGS, DEFAULT_ARGS, STEALTH_ARGS} from './stealth-args.js';
+import {HARMFUL_ARGS, DEFAULT_ARGS, MINIMAL_STEALTH_ARGS, FULL_STEALTH_ARGS} from './stealth-args.js';
 
 export type Engine = 'chromium' | 'firefox';
 
@@ -24,8 +24,17 @@ export function resolveEngine(channel?: string): Engine {
 
 /**
  * 解析 profile 目录名称
+ *
+ * cloak 模式强制落到 `cloak-profile`，无论 channel 是什么； cloak 与默认
+ * 模式使用不同 Chromium 二进制（前者 patch 了 49 个 C++ 指纹点，后者是系统
+ * Chrome），混用 profile 会同时污染两边的 state（shader cache、service
+ * worker、扩展注册表），导致启动 race 和会话崩溃。
  */
-export function resolveProfileDirName(channel?: string): string {
+export function resolveProfileDirName(
+  channel?: string,
+  cloak?: boolean,
+): string {
+  if (cloak) return 'cloak-profile';
   const engine = resolveEngine(channel);
   const profileBase =
     engine === 'firefox' ? 'firefox-profile' : 'chrome-profile';
@@ -41,6 +50,7 @@ export function resolveUserDataDir(
   isolated: boolean,
   userDataDir: string | undefined,
   channel?: string,
+  cloak?: boolean,
 ): string | undefined {
   if (isolated || userDataDir) {
     return userDataDir;
@@ -49,7 +59,7 @@ export function resolveUserDataDir(
     os.homedir(),
     '.cache',
     'chrome-devtools-mcp',
-    resolveProfileDirName(channel),
+    resolveProfileDirName(channel, cloak),
   );
 }
 
@@ -107,6 +117,8 @@ export function buildLaunchArgs(
     devtools?: boolean;
     useStealthScripts?: boolean;
     includeDefaults?: boolean;
+    minimalStealth?: boolean;
+    fullStealthArgs?: boolean;
   } = {},
 ): string[] {
   const args = [...(baseArgs ?? [])];
@@ -119,10 +131,17 @@ export function buildLaunchArgs(
   if (options.includeDefaults) {
     args.unshift(...DEFAULT_ARGS);
   }
-  args.push('--hide-crash-restore-bubble');
-  if (options.useStealthScripts) {
-    args.push(...STEALTH_ARGS);
+
+  // Stealth args：默认不注入（历史行为）。新代码路径（顶层 launch() 与
+  // BrowserManager 的默认启动路径）通过 `minimalStealth: true` 显式拿
+  // 最小集；`fullStealthArgs: true` 或遗留 `useStealthScripts: true`
+  // 显式拿完整 60+ 集（`--full-stealth-args` 回退开关）。
+  if (options.fullStealthArgs || options.useStealthScripts) {
+    args.push(...FULL_STEALTH_ARGS);
+  } else if (options.minimalStealth) {
+    args.push(...MINIMAL_STEALTH_ARGS);
   }
+
   if (options.headless) {
     args.push('--screen-info={3840x2160}');
   }

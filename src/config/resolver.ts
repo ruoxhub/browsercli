@@ -101,6 +101,12 @@ export interface ResolvedConfig {
   databaseUrl?: string;
   runtimeDirName: string;
   debug: boolean;
+  /** 启用 CloakBrowser 二进制 + 49 C++ patch。 */
+  cloak: boolean;
+  /** Opt-in StealthScripts2025 JS 注入。 */
+  jsStealth: boolean;
+  /** 回退到历史 60+ 启动参数集。 */
+  fullStealthArgs: boolean;
 }
 
 export interface ResolvedToolResultRecordingConfig {
@@ -115,6 +121,9 @@ const DEFAULTS: Readonly<ResolvedConfig> = {
   headless: false,
   runtimeDirName: RUNTIME_DIR_NAME,
   debug: false,
+  cloak: false,
+  jsStealth: false,
+  fullStealthArgs: false,
 } as const;
 
 // ==========================================================================
@@ -351,6 +360,9 @@ export function getEnvBoolean(
   return defaultValue;
 }
 
+/** GlobalConfig keys that must be coerced to boolean when read from env. */
+const BOOLEAN_CONFIG_KEYS = new Set<keyof GlobalConfig>(['headless', 'debug']);
+
 /** 从环境变量提取配置 */
 function configFromEnv(): GlobalConfig {
   const result: GlobalConfig = {};
@@ -365,7 +377,7 @@ function configFromEnv(): GlobalConfig {
     )
       continue;
 
-    if (configKey === 'headless' || configKey === 'debug') {
+    if (BOOLEAN_CONFIG_KEYS.has(configKey)) {
       (result as Record<string, unknown>)[configKey] =
         value === 'true' || value === '1';
     } else {
@@ -454,6 +466,9 @@ export function resolveConfig(envArgs?: Partial<GlobalConfig>): ResolvedConfig {
     databaseUrl: parsed.databaseUrl || undefined,
     runtimeDirName: parsed.runtimeDirName ?? DEFAULTS.runtimeDirName,
     debug: parsed.debug ?? DEFAULTS.debug,
+    cloak: parsed.cloak ?? DEFAULTS.cloak,
+    jsStealth: parsed.jsStealth ?? DEFAULTS.jsStealth,
+    fullStealthArgs: parsed.fullStealthArgs ?? DEFAULTS.fullStealthArgs,
   };
 }
 
@@ -659,6 +674,10 @@ export function getBrowserManagerConfig(): BrowserManagerConfig {
     {key: 'headless', envKey: 'BROWSER_HEADLESS', kind: 'boolean', default: true},
     {key: 'isolated', envKey: 'BROWSER_ISOLATED', kind: 'boolean', default: true},
     {key: 'useStealthScripts', envKey: 'USE_STEALTH_SCRIPTS', kind: 'boolean', default: false},
+    {key: 'jsStealth', envKey: 'BROWSER_JS_STEALTH', kind: 'boolean', default: false},
+    {key: 'cloak', envKey: 'BROWSER_CLOAK', kind: 'boolean', default: false, extraFallback: 'cloak'},
+    {key: 'fullStealthArgs', envKey: 'BROWSER_FULL_STEALTH_ARGS', kind: 'boolean', default: false, extraFallback: 'fullStealthArgs'},
+    {key: 'minimalStealth', envKey: 'BROWSER_MINIMAL_STEALTH', kind: 'boolean', default: true},
     {key: 'executablePath', envKey: 'BROWSER_EXECUTABLE_PATH', kind: 'value'},
     {key: 'channel', envKey: 'BROWSER_CHANNEL', kind: 'value', cast: v => v as BrowserManagerConfig['channel']},
     {key: 'browserURL', envKey: 'BROWSER_URL', kind: 'value', extraFallback: 'browserUrl'},
@@ -684,6 +703,10 @@ export function getBrowserManagerConfig(): BrowserManagerConfig {
     headless: true,
     isolated: true,
     useStealthScripts: false,
+    jsStealth: false,
+    cloak: false,
+    fullStealthArgs: false,
+    minimalStealth: true,
   };
 
   const getters = {

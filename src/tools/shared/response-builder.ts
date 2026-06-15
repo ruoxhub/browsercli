@@ -287,39 +287,89 @@ export function compactManagePayload(
   return payload;
 }
 
+interface AgentGuidance {
+  summary?: string;
+  recommendedTool?: string;
+  recommendedParams?: Record<string, unknown>;
+  recommendedStrategy?: string;
+  resumeHint?: string;
+  toolClass?: 'task' | 'orchestration' | 'rebuild' | 'analysis';
+  routeHint?:
+    | 'stay_on_task_flow'
+    | 'switch_to_orchestration'
+    | 'switch_to_rebuild'
+    | 'switch_to_analysis';
+  avoidTools?: string[];
+}
+
+const STRATEGY_SWITCH_VALUES = new Set([
+  'rebuild-first',
+  'env-fix',
+  'artifact-sync',
+  'evidence-only',
+]);
+
+function buildRouteGuard(
+  hints: AgentGuidance | undefined,
+): UnifiedContinuationFields['routeGuard'] {
+  if (!hints?.toolClass && !hints?.routeHint && !hints?.avoidTools?.length) {
+    return undefined;
+  }
+  return {
+    ...(hints.toolClass ? {preferredToolClass: hints.toolClass} : {}),
+    ...(hints.routeHint ? {routeHint: hints.routeHint} : {}),
+    ...(hints.avoidTools?.length ? {avoidTools: hints.avoidTools} : {}),
+  };
+}
+
+function buildContinuationShape(params: {
+  reason: string;
+  outcome: AgentOutcome;
+  nextBestTool?: string;
+  nextBestParams?: Record<string, unknown>;
+  hints?: AgentGuidance;
+  strategy?: string;
+}): ContinuationShape {
+  const {reason, outcome, nextBestTool, nextBestParams, hints, strategy} =
+    params;
+  return {
+    ready: outcome !== 'blocked',
+    reason,
+    ...(nextBestTool ? {tool: nextBestTool, actionKey: nextBestTool} : {}),
+    ...(nextBestParams ? {params: nextBestParams} : {}),
+    ...(nextBestTool
+      ? {
+          invoke: {
+            tool: nextBestTool,
+            ...(nextBestParams ? {params: nextBestParams} : {}),
+          },
+        }
+      : {}),
+    ...(nextBestTool
+      ? {invokeHint: buildInvokeHint(nextBestTool, nextBestParams)}
+      : {}),
+    ...(hints?.toolClass ? {toolClass: hints.toolClass} : {}),
+    ...(hints?.routeHint ? {routeHint: hints.routeHint} : {}),
+    ...(strategy ? {strategy} : {}),
+    ...(hints?.resumeHint ? {resumeCommand: hints.resumeHint} : {}),
+  };
+}
+
 export function buildManageContinuation(
   action: string,
   payload: Record<string, unknown>,
   fallbackReason: string,
 ): UnifiedContinuationFields {
-  const hints = payload.agentGuidance as
-    | {
-        summary?: string;
-        recommendedTool?: string;
-        recommendedParams?: Record<string, unknown>;
-        recommendedStrategy?: string;
-        resumeHint?: string;
-        toolClass?: 'task' | 'orchestration' | 'rebuild' | 'analysis';
-        routeHint?:
-          | 'stay_on_task_flow'
-          | 'switch_to_orchestration'
-          | 'switch_to_rebuild'
-          | 'switch_to_analysis';
-        avoidTools?: string[];
-      }
-    | undefined;
+  const hints = payload.agentGuidance as AgentGuidance | undefined;
   const status =
     payload.status ??
     (payload.state && typeof payload.state === 'object'
       ? (payload.state as Record<string, unknown>).status
       : undefined);
-  const outcome =
-    action === 'get' ||
-    action === 'summarize' ||
-    action === 'progress' ||
-    action === 'update'
-      ? inferOutcomeFromStatus(status)
-      : 'success';
+  const statusActions = new Set(['get', 'summarize', 'progress', 'update']);
+  const outcome = statusActions.has(action)
+    ? inferOutcomeFromStatus(status)
+    : 'success';
   const nextBestTool = hints?.recommendedTool;
   const nextBestParams = hints?.recommendedParams;
   return {
@@ -327,12 +377,9 @@ export function buildManageContinuation(
     shouldResume: Boolean(
       action === 'progress' && outcome !== 'blocked' && nextBestTool,
     ),
-    shouldSwitchStrategy: [
-      'rebuild-first',
-      'env-fix',
-      'artifact-sync',
-      'evidence-only',
-    ].includes(String(hints?.recommendedStrategy ?? '')),
+    shouldSwitchStrategy: STRATEGY_SWITCH_VALUES.has(
+      String(hints?.recommendedStrategy ?? ''),
+    ),
     ...(nextBestTool ? {nextBestTool} : {}),
     ...(nextBestParams ? {nextBestParams} : {}),
     ...(outcome === 'blocked'
@@ -344,40 +391,15 @@ export function buildManageContinuation(
         }
       : {}),
     detailLevel: 'standard',
-    ...(hints?.toolClass || hints?.routeHint || hints?.avoidTools?.length
-      ? {
-          routeGuard: {
-            ...(hints?.toolClass ? {preferredToolClass: hints.toolClass} : {}),
-            ...(hints?.routeHint ? {routeHint: hints.routeHint} : {}),
-            ...(hints?.avoidTools?.length
-              ? {avoidTools: hints.avoidTools}
-              : {}),
-          },
-        }
-      : {}),
-    continuation: {
-      ready: outcome !== 'blocked',
+    ...(buildRouteGuard(hints) ? {routeGuard: buildRouteGuard(hints)} : {}),
+    continuation: buildContinuationShape({
       reason: hints?.summary ?? fallbackReason,
-      ...(nextBestTool ? {tool: nextBestTool, actionKey: nextBestTool} : {}),
-      ...(nextBestParams ? {params: nextBestParams} : {}),
-      ...(nextBestTool
-        ? {
-            invoke: {
-              tool: nextBestTool,
-              ...(nextBestParams ? {params: nextBestParams} : {}),
-            },
-          }
-        : {}),
-      ...(nextBestTool
-        ? {invokeHint: buildInvokeHint(nextBestTool, nextBestParams)}
-        : {}),
-      ...(hints?.toolClass ? {toolClass: hints.toolClass} : {}),
-      ...(hints?.routeHint ? {routeHint: hints.routeHint} : {}),
-      ...(hints?.recommendedStrategy
-        ? {strategy: hints.recommendedStrategy}
-        : {}),
-      ...(hints?.resumeHint ? {resumeCommand: hints.resumeHint} : {}),
-    },
+      outcome,
+      nextBestTool,
+      nextBestParams,
+      hints,
+      strategy: hints?.recommendedStrategy,
+    }),
   };
 }
 
@@ -388,20 +410,7 @@ export function buildOrchestrationContinuation(input: {
     steps: Array<{tool: string; params: Record<string, unknown>}>;
     recommendedStrategy?: string;
   };
-  agentGuidance?: {
-    summary?: string;
-    recommendedTool?: string;
-    recommendedParams?: Record<string, unknown>;
-    recommendedStrategy?: string;
-    resumeHint?: string;
-    toolClass?: 'task' | 'orchestration' | 'rebuild' | 'analysis';
-    routeHint?:
-      | 'stay_on_task_flow'
-      | 'switch_to_orchestration'
-      | 'switch_to_rebuild'
-      | 'switch_to_analysis';
-    avoidTools?: string[];
-  };
+  agentGuidance?: AgentGuidance;
 }): UnifiedContinuationFields {
   const nextStep = input.fallbackPlan?.steps[0];
   const outcome = input.failedStep
@@ -434,50 +443,17 @@ export function buildOrchestrationContinuation(input: {
       ? {blockedBy: inferBlockedBy(input.failedStep?.failureType)}
       : {}),
     detailLevel: 'standard',
-    ...(input.agentGuidance?.toolClass ||
-    input.agentGuidance?.routeHint ||
-    input.agentGuidance?.avoidTools?.length
-      ? {
-          routeGuard: {
-            ...(input.agentGuidance?.toolClass
-              ? {preferredToolClass: input.agentGuidance.toolClass}
-              : {}),
-            ...(input.agentGuidance?.routeHint
-              ? {routeHint: input.agentGuidance.routeHint}
-              : {}),
-            ...(input.agentGuidance?.avoidTools?.length
-              ? {avoidTools: input.agentGuidance.avoidTools}
-              : {}),
-          },
-        }
+    ...(buildRouteGuard(input.agentGuidance)
+      ? {routeGuard: buildRouteGuard(input.agentGuidance)}
       : {}),
-    continuation: {
-      ready: outcome !== 'blocked',
+    continuation: buildContinuationShape({
       reason: input.agentGuidance?.summary ?? '已生成下一步编排建议。',
-      ...(nextBestTool ? {tool: nextBestTool, actionKey: nextBestTool} : {}),
-      ...(nextBestParams ? {params: nextBestParams} : {}),
-      ...(nextBestTool
-        ? {
-            invoke: {
-              tool: nextBestTool,
-              ...(nextBestParams ? {params: nextBestParams} : {}),
-            },
-          }
-        : {}),
-      ...(nextBestTool
-        ? {invokeHint: buildInvokeHint(nextBestTool, nextBestParams)}
-        : {}),
-      ...(input.agentGuidance?.toolClass
-        ? {toolClass: input.agentGuidance.toolClass}
-        : {}),
-      ...(input.agentGuidance?.routeHint
-        ? {routeHint: input.agentGuidance.routeHint}
-        : {}),
-      ...(strategy ? {strategy} : {}),
-      ...(input.agentGuidance?.resumeHint
-        ? {resumeCommand: input.agentGuidance.resumeHint}
-        : {}),
-    },
+      outcome,
+      nextBestTool,
+      nextBestParams,
+      hints: input.agentGuidance,
+      strategy,
+    }),
   };
 }
 
@@ -485,20 +461,7 @@ export function buildRebuildContinuation(input: {
   status: string;
   missingCapabilitiesCount: number;
   patchSuggestionCount: number;
-  agentGuidance: {
-    summary: string;
-    recommendedTool?: string;
-    recommendedParams?: Record<string, unknown>;
-    recommendedStrategy?: string;
-    resumeHint?: string;
-    toolClass?: 'task' | 'orchestration' | 'rebuild' | 'analysis';
-    routeHint?:
-      | 'stay_on_task_flow'
-      | 'switch_to_orchestration'
-      | 'switch_to_rebuild'
-      | 'switch_to_analysis';
-    avoidTools?: string[];
-  };
+  agentGuidance: AgentGuidance & {summary: string};
 }): UnifiedContinuationFields {
   const outcome =
     input.status === 'blocked'
@@ -522,53 +485,18 @@ export function buildRebuildContinuation(input: {
         }
       : {}),
     detailLevel: 'standard',
-    ...(input.agentGuidance.toolClass ||
-    input.agentGuidance.routeHint ||
-    input.agentGuidance.avoidTools?.length
-      ? {
-          routeGuard: {
-            ...(input.agentGuidance.toolClass
-              ? {preferredToolClass: input.agentGuidance.toolClass}
-              : {}),
-            ...(input.agentGuidance.routeHint
-              ? {routeHint: input.agentGuidance.routeHint}
-              : {}),
-            ...(input.agentGuidance.avoidTools?.length
-              ? {avoidTools: input.agentGuidance.avoidTools}
-              : {}),
-          },
-        }
+    ...(buildRouteGuard(input.agentGuidance)
+      ? {routeGuard: buildRouteGuard(input.agentGuidance)}
       : {}),
     ...(nextBestTool ? {nextBestTool} : {}),
     ...(nextBestParams ? {nextBestParams} : {}),
-    continuation: {
-      ready: outcome !== 'blocked',
+    continuation: buildContinuationShape({
       reason: input.agentGuidance.summary,
-      ...(nextBestTool ? {tool: nextBestTool, actionKey: nextBestTool} : {}),
-      ...(nextBestParams ? {params: nextBestParams} : {}),
-      ...(nextBestTool
-        ? {
-            invoke: {
-              tool: nextBestTool,
-              ...(nextBestParams ? {params: nextBestParams} : {}),
-            },
-          }
-        : {}),
-      ...(nextBestTool
-        ? {invokeHint: buildInvokeHint(nextBestTool, nextBestParams)}
-        : {}),
-      ...(input.agentGuidance.toolClass
-        ? {toolClass: input.agentGuidance.toolClass}
-        : {}),
-      ...(input.agentGuidance.routeHint
-        ? {routeHint: input.agentGuidance.routeHint}
-        : {}),
-      ...(input.agentGuidance.recommendedStrategy
-        ? {strategy: input.agentGuidance.recommendedStrategy}
-        : {}),
-      ...(input.agentGuidance.resumeHint
-        ? {resumeCommand: input.agentGuidance.resumeHint}
-        : {}),
-    },
+      outcome,
+      nextBestTool,
+      nextBestParams,
+      hints: input.agentGuidance,
+      strategy: input.agentGuidance.recommendedStrategy,
+    }),
   };
 }
