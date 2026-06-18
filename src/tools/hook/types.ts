@@ -39,6 +39,11 @@ export type HookManagementResult<T = unknown> = HookResult<T>;
 /** 注入 Hook 返回数据 */
 export interface InjectHookData {
   hookId: string;
+  persisted: boolean;
+  ranOnCurrentFrame: boolean;
+  world: 'main' | 'isolated';
+  persistentStrategy: 'addInitScript + framenavigated' | 'evaluate-once';
+  warnings?: string[];
 }
 
 /** 注入 Hook 结果 */

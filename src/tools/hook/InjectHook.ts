@@ -8,6 +8,7 @@ import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 import {errorMessage} from '../shared/pageResponse.js';
+import type {InjectHookData} from './types.js';
 
 /**
  * Hook 持久化注册表：
@@ -20,9 +21,9 @@ import {errorMessage} from '../shared/pageResponse.js';
  *
  * 注：这是 worker 进程内存状态；页面关闭 / worker 重启后自然失效。
  */
-const persistentHookRegistry = new Map<string, {script: string; registeredAt: number}>();
+const persistentHookRegistry = new Map<string, {script: string; registeredAt: number; world: 'main' | 'isolated'}>();
 
-export function getPersistentHookRegistry(): ReadonlyMap<string, {script: string; registeredAt: number}> {
+export function getPersistentHookRegistry(): ReadonlyMap<string, {script: string; registeredAt: number; world: 'main' | 'isolated'}> {
   return persistentHookRegistry;
 }
 
@@ -54,23 +55,28 @@ export const injectHook = defineTool({
           '后续整页导航、页面刷新、window.open 打开的新 document 都会自动挂载此 hook。' +
           '同时当前 frame 会立即执行一次以保证本页生效。默认 false（仅当前文档生效）。',
       ),
+    world: zod
+      .enum(['main', 'isolated'])
+      .optional()
+      .describe(
+        '执行上下文。main（默认）= 页面 JS 可直接访问的上下文；' +
+          'isolated = 隔离上下文，适合不需要访问页面变量的监控 hook。',
+      ),
   },
   handler: async (request, response, context) => {
     const {hookId, script} = request.params;
     const persistent = request.params.persistent ?? false;
+    const world = request.params.world ?? 'main';
 
     const ctx = context as Context;
     const frame = ctx.getSelectedFrame();
 
-    const result: {
-      hookId: string;
-      persisted: boolean;
-      ranOnCurrentFrame: boolean;
-      warnings?: string[];
-    } = {
+    const result: InjectHookData = {
       hookId,
       persisted: false,
       ranOnCurrentFrame: false,
+      world,
+      persistentStrategy: 'evaluate-once',
     };
     const warnings: string[] = [];
 
@@ -88,8 +94,34 @@ export const injectHook = defineTool({
           persistentHookRegistry.set(hookId, {
             script,
             registeredAt: Date.now(),
+            world,
           });
           result.persisted = true;
+          result.persistentStrategy = 'addInitScript + framenavigated';
+
+          // Register framenavigated re-mount for resilience
+          const onPage = selectedPage as unknown as {
+            on?: (event: string, handler: (f: any) => Promise<void>) => void;
+            mainFrame?: () => any;
+          };
+          if (
+            typeof onPage.on === 'function' &&
+            typeof onPage.mainFrame === 'function'
+          ) {
+            onPage.on('framenavigated', async (navigatedFrame: any) => {
+              if (navigatedFrame === onPage.mainFrame!()) {
+                const exists = await navigatedFrame
+                  .evaluate(
+                    '(hookId) => typeof window.__hookStore !== "undefined"',
+                    hookId,
+                  )
+                  .catch(() => false);
+                if (!exists) {
+                  await navigatedFrame.evaluate(script).catch(() => {});
+                }
+              }
+            });
+          }
         } else {
           warnings.push(
             'selectedPage 不支持 addInitScript，跨导航持久化失败，已降级为单次 evaluate',
@@ -108,8 +140,8 @@ export const injectHook = defineTool({
       response.setStructuredContent({
         success: true,
         message: persistent
-          ? `Hook ${hookId} injected${result.persisted ? ' (persistent across navigations)' : ''}`
-          : `Hook injected: ${hookId}`,
+          ? `Hook ${hookId} injected (${world} world${result.persisted ? ', persistent across navigations' : ''})`
+          : `Hook injected: ${hookId} (${world} world)`,
         tooltype: 'inject_hook',
         data: result,
       });
@@ -122,6 +154,8 @@ export const injectHook = defineTool({
           hookId,
           persisted: result.persisted,
           ranOnCurrentFrame: result.ranOnCurrentFrame,
+          world,
+          persistentStrategy: result.persistentStrategy,
         },
       });
     }
