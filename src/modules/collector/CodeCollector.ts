@@ -488,6 +488,19 @@ export class CodeCollector {
     const startTime = Date.now();
     logger.info(`Collecting code from: ${options.url}`);
 
+    // 🛡️ Guard: pageResolver 未设置或返回空时，提前返回友好错误
+    if (!this.pageResolver?.()) {
+      return {
+        files: [],
+        dependencies: {nodes: [], edges: []},
+        totalSize: 0,
+        collectTime: Date.now() - startTime,
+        error: 'NO_PAGE_CONTEXT',
+        message:
+          '页面上下文未就绪。请先调用 select_page 或 new_page 选择一个页面。',
+      };
+    }
+
     // ✅ 检查缓存
     if (this.cacheEnabled) {
       const cached = await this.cache.get(options.url, options as any);
@@ -1317,7 +1330,23 @@ export class CodeCollector {
     matched: number;
     returned: number;
     truncated: boolean;
+    warning?: string;
+    error?: string;
+    message?: string;
   } {
+    // 🛡️ Guard: 缓存为空时提前返回友好提示
+    if (this.collectedFilesCache.size === 0) {
+      return {
+        files: [],
+        totalSize: 0,
+        matched: 0,
+        returned: 0,
+        truncated: false,
+        warning:
+          '脚本缓存为空。请先调用 collect_code 收集脚本后再搜索。',
+      };
+    }
+
     // ✅ 修复：添加错误处理，防止无效正则表达式导致崩溃
     let regex: RegExp;
     try {
@@ -1330,6 +1359,8 @@ export class CodeCollector {
         matched: 0,
         returned: 0,
         truncated: false,
+        error: 'INVALID_PATTERN',
+        message: `无效的正则表达式: ${pattern}`,
       };
     }
 

@@ -41,6 +41,9 @@ export interface CollectCodeResult {
   totalSize: number;
   collectTime: number;
   summaries?: CodeSummary[];
+  error?: string;
+  message?: string;
+  warning?: string;
 }
 
 export interface DependencyGraph {
