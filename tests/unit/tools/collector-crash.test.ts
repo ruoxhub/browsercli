@@ -126,8 +126,7 @@ describe('search_in_scripts tool-layer error handling', () => {
           matched: 0,
           returned: 0,
           truncated: false,
-          warning:
-            '脚本缓存为空。请先调用 collect_code 收集脚本后再搜索。',
+          warning: '脚本缓存为空。请先调用 collect_code 收集脚本后再搜索。',
         }),
       },
     } as any;

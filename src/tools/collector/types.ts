@@ -22,7 +22,12 @@ export type SmartMode = 'summary' | 'priority' | 'incremental' | 'full';
 export type ReturnMode = 'full' | 'summary' | 'pattern' | 'top-priority';
 
 /** 文件类型 */
-export type ScriptType = 'inline' | 'external' | 'dynamic' | 'service-worker' | 'web-worker';
+export type ScriptType =
+  | 'inline'
+  | 'external'
+  | 'dynamic'
+  | 'service-worker'
+  | 'web-worker';
 
 /** collectCode 参数 */
 export interface CollectCodeParams {

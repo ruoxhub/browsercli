@@ -16,7 +16,6 @@ import type {
   FileSummaryEntry,
 } from './types.js';
 
-
 /**
  * 从页面收集 JavaScript 代码（标准 MCP 工具版本）。
  *
@@ -37,12 +36,17 @@ import type {
  */
 export const collectCode = defineTool({
   name: 'collect_code',
-  description: 'Collect JavaScript code from a page with smart modes (summary/priority/incremental/full).',
+  description:
+    'Collect JavaScript code from a page with smart modes (summary/priority/incremental/full).',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
   schema: {
     url: zod.string().url(),
-    smartMode: zod.enum(['summary', 'priority', 'incremental', 'full']).optional(),
-    returnMode: zod.enum(['full', 'summary', 'pattern', 'top-priority']).optional(),
+    smartMode: zod
+      .enum(['summary', 'priority', 'incremental', 'full'])
+      .optional(),
+    returnMode: zod
+      .enum(['full', 'summary', 'pattern', 'top-priority'])
+      .optional(),
     includeInline: zod.boolean().optional(),
     includeExternal: zod.boolean().optional(),
     includeDynamic: zod.boolean().optional(),
@@ -63,7 +67,9 @@ export const collectCode = defineTool({
     try {
       // 执行收集
       if (shouldCollect) {
-        const collectResult = await runtime.collector.collect(params as CollectCodeOptions);
+        const collectResult = await runtime.collector.collect(
+          params as CollectCodeOptions,
+        );
         if (collectResult.error) {
           const isNoPage = collectResult.error === 'NO_PAGE_CONTEXT';
           response.setStructuredContent({
@@ -83,7 +89,8 @@ export const collectCode = defineTool({
       let message: string;
 
       if (returnMode === 'summary') {
-        const summary = runtime.collector.getCollectedFilesSummary() as FileSummaryEntry[];
+        const summary =
+          runtime.collector.getCollectedFilesSummary() as FileSummaryEntry[];
         data = {
           summary,
           count: summary.length,
@@ -138,7 +145,8 @@ export const collectCode = defineTool({
           })),
           totalSize: fullResult.totalSize,
           count: fullResult.files.length,
-          truncated: fullResult.files.length >= (params.maxFileSize ?? Infinity),
+          truncated:
+            fullResult.files.length >= (params.maxFileSize ?? Infinity),
           returnMode,
         };
         message = `代码全量收集完成，共 ${fullResult.files.length} 个文件，总大小 ${(fullResult.totalSize / 1024).toFixed(2)} KB`;
@@ -148,7 +156,7 @@ export const collectCode = defineTool({
         success: true,
         message,
         tooltype: 'collect_code',
-        data: data ,
+        data: data,
       };
       response.setStructuredContent(result);
     } catch (error) {

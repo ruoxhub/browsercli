@@ -15,7 +15,6 @@ import type {
   SearchInScriptsResult,
 } from './types.js';
 
-
 /**
  * 在已收集的脚本缓存中搜索匹配正则的代码（标准 MCP 工具版本）。
  *
@@ -42,9 +41,10 @@ export const searchInScripts = defineTool({
       );
 
       if (result.error) {
-        const suggestion = result.error === 'INVALID_PATTERN'
-          ? '请检查正则表达式语法，确保 pattern 是有效的正则。'
-          : '请确认已先调用 collect_code 收集脚本，然后重试搜索。';
+        const suggestion =
+          result.error === 'INVALID_PATTERN'
+            ? '请检查正则表达式语法，确保 pattern 是有效的正则。'
+            : '请确认已先调用 collect_code 收集脚本，然后重试搜索。';
         response.setStructuredContent({
           success: false,
           message: result.message ?? result.error,
@@ -81,7 +81,9 @@ export const searchInScripts = defineTool({
           : `搜索完成：匹配 ${data.matched} 个文件，返回 ${data.returned} 个`,
         tooltype: 'search_in_scripts',
         data: data,
-        ...(result.warning ? {suggestion: '请先调用 collect_code 收集脚本后再搜索。'} : {}),
+        ...(result.warning
+          ? {suggestion: '请先调用 collect_code 收集脚本后再搜索。'}
+          : {}),
       };
 
       response.setStructuredContent(responseData);
