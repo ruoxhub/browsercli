@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 /**
- * 代码缓存管理器 - 缓存已收集的代码，避免重复收集
+ * 代码文件缓存。基于 URL + 选项的哈希键缓存收集结果，支持 TTL 和 LRU 淘汰。
+ *
+ * @see {@link src/modules/collector/CodeCollector.ts} — collect() 在调用前检查缓存命中
+ * @see {@link src/utils/CacheAdapters.ts} — CodeCacheAdapter 注册到 UnifiedCacheManager
+ * @see {@link src/utils/UnifiedCacheManager.ts} — 全局缓存管理
  */
 
 import crypto from 'node:crypto';

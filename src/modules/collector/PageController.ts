@@ -5,13 +5,11 @@
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /**
- * 页面控制器 - 薄封装Playwright API
+ * 页面操作控制器。封装导航、等待、交互等操作，供工具层调用。
  *
- * 设计原则:
- * - 不重复实现Playwright已有的功能
- * - 直接调用page.click(), page.type()等API
- * - 依赖CodeCollector获取Page实例
- * - 所有方法都是薄封装，不超过5行代码
+ * @see {@link src/modules/collector/CodeCollector.ts} — 脚本收集依赖页面状态
+ * @see {@link src/modules/collector/DOMInspector.ts} — DOM 检查依赖 CodeCollector
+ * @see {@link src/runtime.ts} — getRuntime() 创建 PageController
  */
 
 import fs from 'node:fs';

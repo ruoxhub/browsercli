@@ -40,6 +40,16 @@ import {
 } from './browser-helpers.js';
 import {setupCloak} from './cloak.js';
 
+/**
+ * 浏览器生命周期管理：启动、连接、页面管理、反检测注入。
+ *
+ * @see {@link src/browser/SessionManager.ts} — 会话隔离
+ * @see {@link src/browser/cloak.ts} — CloakBrowser 二进制层反检测
+ * @see {@link src/browser/stealth-args.ts} — MINIMAL_STEALTH_ARGS
+ * @see {@link src/modules/collector/CodeCollector.ts} — 通过 BrowserManager 获取页面
+ * @see AGENTS.md — 反检测分层架构
+ */
+
 // Re-export for backward compatibility
 export {resolveAutoConnectTarget};
 

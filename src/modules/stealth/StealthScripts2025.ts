@@ -4,10 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 /**
- * StealthScripts2025 - 2024-2026 最新反检测脚本注入
+ * 2025 版反检测 JS 注入脚本集。默认不注入，需 opt-in（--js-stealth 或 inject_stealth 工具）。
  *
- * 基于 puppeteer-extra-plugin-stealth / undetected-chromedriver / playwright-stealth 最佳实践
- * 覆盖所有主流浏览器指纹检测维度
+ * @see {@link src/browser/cloak.ts} — CloakBrowser 源码层反检测（C++ 级）
+ * @see {@link src/browser/stealth-args.ts} — MINIMAL_STEALTH_ARGS 启动参数层
+ * @see {@link src/browser/browser.ts} — BrowserManager 中的 opt-in 注入路径
+ * @see AGENTS.md — 反检测分层架构说明
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */

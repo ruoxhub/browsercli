@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 /**
- * Stealth launch arguments for anti-detection.
+ * 最小隐蔽启动参数集。默认启用，仅含 --test-type 和 --hide-crash-restore-bubble。
  *
- * Based on Scrapling's multi-layer defense system:
- * - Layer 2: Chromium stealth launch arguments
- * - Layer 3: Browser context spoofing options
+ * @see {@link src/browser/browser.ts} — BrowserManager 在启动时消费此常量
+ * @see {@link src/browser/cloak.ts} — CloakBrowser 有独立的参数集
+ * @see AGENTS.md — 反检测分层第 3 层：启动参数
  */
 
 /**

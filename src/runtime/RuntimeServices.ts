@@ -15,6 +15,14 @@ import {WasmDecompiler} from '../modules/wasm/WasmDecompiler.js';
 import {WasmRuntimeInspector} from '../modules/wasm/WasmRuntimeInspector.js';
 import {LLMService} from '../services/LLMService.js';
 
+/**
+ * 延迟初始化的运行时服务集合。通过 getter 属性按需创建 AI、分析器、去混淆器等重服务。
+ *
+ * @see {@link src/runtime.ts} — getRuntime() 创建 RuntimeServices 并暴露 lazy getter
+ * @see {@link src/services/AIService.ts} — AI 服务（lazy）
+ * @see {@link src/modules/analyzer/CodeAnalyzer.ts} — 代码分析器（lazy）
+ * @see {@link src/modules/deobfuscator/Deobfuscator.ts} — 去混淆器（lazy）
+ */
 export class RuntimeServices {
   private llmService?: LLMService;
   private analyzer?: CodeAnalyzer;

@@ -4,6 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/**
+ * 类型安全的应用事件总线。
+ *
+ * @see {@link src/runtime.ts} — 在 getRuntime() 中创建全局 EventBus 实例
+ * @see {@link src/types/events.ts} — AppEventMap 事件类型定义
+ * @see {@link src/web/ConsoleServer.ts} — 订阅事件桥接到 WebSocket
+ * @see {@link src/modules/hook/HookManager.ts} — 通过 EventBus 发布 hook 状态变更
+ */
+
 type EventHandler<T> = (payload: T) => void | Promise<void>;
 type EventValidator<T> = (payload: unknown) => T;
 type EventValidators<TMap extends object> = Partial<{

@@ -5,15 +5,11 @@
  */
 
 /**
- * WsHub —— WebSocket 订阅广播枢纽。
+ * WebSocket 连接中心。管理客户端连接，分发事件到 ConsoleServer 和 RestRouter。
  *
- * 区分两种频道语义：
- * - state 频道（worker.status / browser.event）：订阅时立即回放 lastState 快照；
- *   后续仅在状态变化时通过 broadcast() 推送，且更新 lastState。
- * - stream 频道（tool.invoke / hook.event / hook.sample / log）：订阅后只接增量，
- *   不回放历史。
- *
- * 协议详见 src/web/types.ts (ClientMsg / ServerMsg)。
+ * @see {@link src/web/ConsoleServer.ts} — 通过 WsHub 推送 console/hook 事件
+ * @see {@link src/web/RestRouter.ts} — HTTP REST 路由，与 WsHub 共享端口
+ * @see {@link src/web/types.ts} — WebSocket 消息类型定义
  */
 
 import type {WebSocket} from 'ws';

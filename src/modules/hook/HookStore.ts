@@ -6,6 +6,14 @@
 
 import {EventEmitter} from 'node:events';
 
+/**
+ * Hook 数据存储层。保存浏览器回传的采样记录，支持按 hookId 查询、清理、快照。
+ *
+ * @see {@link src/modules/hook/HookManager.ts} — 门面模式，通过 HookStore 存取数据
+ * @see {@link src/web/ConsoleServer.ts} — 订阅 hookStore events 桥接到 WebSocket
+ * @see {@link src/tools/hook/InjectHook.ts} — inject_hook 工具调用 HookStore.ensure()
+ */
+
 export const DEFAULT_HOOK_STORE_KEY = '__hookStore';
 
 export type HookStoreSnapshot<RecordType> = Record<string, RecordType[]>;

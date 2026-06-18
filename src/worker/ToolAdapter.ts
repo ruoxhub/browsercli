@@ -5,16 +5,11 @@
  */
 
 /**
- * ToolAdapter — 将现有 Tool handler 包装为 Sekiro ActionHandler
+ * 将 MCP 工具请求适配到内部执行管线。
  *
- * Tool handler 签名: handler(params, runtimeServices) => Promise<result>
- * Sekiro Action 签名: handler(request, resolve, reject) => void
- *
- * 通过 tools-meta.ts 中的 ToolMeta 动态加载 handler，适配为 Action
- *
- * 此外，对外暴露 onInvoke(listener) 用于监听 tool 调用事件，
- * 内部桥接 contextProvider.eventBus 的 tool:called / tool:error。
- * Phase 3 ConsoleServer 通过此入口把事件广播到 WebSocket。
+ * @see {@link src/worker/ToolExecutionPipeline.ts} — 实际执行管线
+ * @see {@link src/worker/ToolContext.ts} — 工具上下文提供者
+ * @see {@link src/tools/ToolDefinition.ts} — defineTool 工具定义宏
  */
 
 import type {ToolMeta} from '../cli/tools-meta.js';

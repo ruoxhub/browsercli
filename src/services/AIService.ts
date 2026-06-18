@@ -4,6 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/**
+ * AI 服务统一入口，按 provider 配置分发请求。
+ *
+ * @see {@link src/services/LLMService.ts} — 底层 LLM 调用封装
+ * @see {@link src/services/AnthropicProvider.ts} — Anthropic Claude provider
+ * @see {@link src/services/GeminiProvider.ts} — Google Gemini provider
+ * @see {@link src/services/OpenAIProvider.ts} — OpenAI provider
+ * @see {@link src/runtime/RuntimeServices.ts} — lazy 初始化 AIService
+ */
+
 export type MessageRole = 'system' | 'user' | 'assistant';
 
 export interface AIMessage {

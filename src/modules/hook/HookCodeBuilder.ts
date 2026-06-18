@@ -4,14 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 /**
- * HookCodeBuilder — 可组合的 Hook 代码构建器
+ * Hook 脚本代码构建器。链式 API 生成带捕获、条件、存储逻辑的 hook 脚本。
  *
- * 设计理念：
- * - 用声明式链式调用取代硬编码模板字符串
- * - 每个阶段（before/condition/execute/after/store）都可以插入自定义代码
- * - 支持 async 函数感知
- * - 支持灵活的数据捕获和存储策略
- * - 生成的代码是自包含的 IIFE，可直接注入浏览器
+ * @see {@link src/modules/hook/HookManager.ts} — 通过 Builder 生成并注册 hook
+ * @see {@link src/modules/hook/HookTypeRegistry.ts} — 类型插件调用 Builder 注入配置
+ * @see {@link src/tools/hook/CreateHook.ts} — create_hook 工具的底层调用
  */
 
 // ==================== 构建器配置类型 ====================

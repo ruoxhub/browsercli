@@ -23,6 +23,14 @@ import type {
 } from '../types/index.js';
 import {resolveDefaultArtifactsTasksDir} from '../utils/projectPaths.js';
 
+/**
+ * 逆向任务持久化存储。管理任务创建、状态更新、证据记录。
+ *
+ * @see {@link src/reverse/ReverseTaskOrchestrator.ts} — 任务编排器
+ * @see {@link src/tools/workflow/} — 所有 reverse task 工具（manage/orchestrate/record 等）
+ * @see {@link src/runtime.ts} — getRuntime() 创建 ReverseTaskStore 实例
+ */
+
 function nowTimestamp(): number {
   return Date.now();
 }

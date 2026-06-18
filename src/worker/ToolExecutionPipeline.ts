@@ -17,6 +17,14 @@ import type {DefineToolContextFactory, ToolContextProvider} from './ToolContext.
 import {ToolResponseAccumulator, ToolResultRecorder} from './ToolResponse.js';
 import type {ToolResponseProcessor, ToolTelemetry} from './ToolResponse.js';
 
+/**
+ * 工具执行管线。负责参数校验、上下文注入、执行、响应构建的完整链路。
+ *
+ * @see {@link src/worker/ToolAdapter.ts} — 适配层，调用 Pipeline 执行
+ * @see {@link src/worker/ToolContext.ts} — 上下文提供者注入
+ * @see {@link src/worker/ToolResponse.ts} — 响应构建
+ */
+
 export type LoadedHandler =
   | ((...args: unknown[]) => Promise<unknown>)
   | ToolDefinition;
