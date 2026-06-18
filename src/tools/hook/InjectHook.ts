@@ -121,6 +121,11 @@ export const injectHook = defineTool({
                 }
               }
             });
+            if (world === 'isolated') {
+              warnings.push(
+                'framenavigated 重挂载在 main world 执行（Playwright 限制），isolated world hook 导航后可能无法访问隔离上下文',
+              );
+            }
           }
         } else {
           warnings.push(

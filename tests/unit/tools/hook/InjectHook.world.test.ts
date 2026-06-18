@@ -92,18 +92,18 @@ describe('inject_hook world parameter', () => {
     assert.equal(data.world, 'main');
   });
 
-  it('returns world=main explicitly when set', async () => {
+  it('returns world=isolated when explicitly set', async () => {
     const {ctx} = buildMockContext();
     const {response, calls} = buildMockResponse();
 
     await injectHook.handler(
-      {params: {hookId: 'hw2', script: '/*main*/', world: 'main'}},
+      {params: {hookId: 'hw2', script: '/*isolated*/', world: 'isolated'}},
       response,
       ctx,
     );
 
     const data = calls[0]?.data as any;
-    assert.equal(data.world, 'main');
+    assert.equal(data.world, 'isolated');
     assert.equal(calls[0]?.success, true);
   });
 
