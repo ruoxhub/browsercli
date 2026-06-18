@@ -59,8 +59,9 @@ export const injectHook = defineTool({
       .enum(['main', 'isolated'])
       .optional()
       .describe(
-        '执行上下文。main（默认）= 页面 JS 可直接访问的上下文；' +
-          'isolated = 隔离上下文，适合不需要访问页面变量的监控 hook。',
+        '执行上下文标记（预留参数）。当前 Playwright 限制下始终在 main world 执行。' +
+          '未来将通过 CDP Page.createIsolatedWorld 支持真正的 isolated 上下文。' +
+          '默认 main。',
       ),
   },
   handler: async (request, response, context) => {
@@ -97,36 +98,7 @@ export const injectHook = defineTool({
             world,
           });
           result.persisted = true;
-          result.persistentStrategy = 'addInitScript + framenavigated';
-
-          // Register framenavigated re-mount for resilience
-          const onPage = selectedPage as unknown as {
-            on?: (event: string, handler: (f: any) => Promise<void>) => void;
-            mainFrame?: () => any;
-          };
-          if (
-            typeof onPage.on === 'function' &&
-            typeof onPage.mainFrame === 'function'
-          ) {
-            onPage.on('framenavigated', async (navigatedFrame: any) => {
-              if (navigatedFrame === onPage.mainFrame!()) {
-                const exists = await navigatedFrame
-                  .evaluate(
-                    '(hookId) => typeof window.__hookStore !== "undefined"',
-                    hookId,
-                  )
-                  .catch(() => false);
-                if (!exists) {
-                  await navigatedFrame.evaluate(script).catch(() => {});
-                }
-              }
-            });
-            if (world === 'isolated') {
-              warnings.push(
-                'framenavigated 重挂载在 main world 执行（Playwright 限制），isolated world hook 导航后可能无法访问隔离上下文',
-              );
-            }
-          }
+          result.persistentStrategy = 'addInitScript';
         } else {
           warnings.push(
             'selectedPage 不支持 addInitScript，跨导航持久化失败，已降级为单次 evaluate',
@@ -185,12 +157,13 @@ export const listPersistentHooks = defineTool({
   schema: {},
   handler: async (_request, response) => {
     const entries = Array.from(persistentHookRegistry.entries()).map(
-      ([hookId, {script, registeredAt}]) => ({
+      ([hookId, {script, registeredAt, world}]) => ({
         hookId,
         registeredAt: new Date(registeredAt).toISOString(),
         scriptSize: script.length,
         scriptPreview:
           script.length > 200 ? `${script.slice(0, 200)}…` : script,
+        world,
       }),
     );
 

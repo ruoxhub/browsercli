@@ -42,7 +42,7 @@ export interface InjectHookData {
   persisted: boolean;
   ranOnCurrentFrame: boolean;
   world: 'main' | 'isolated';
-  persistentStrategy: 'addInitScript + framenavigated' | 'evaluate-once';
+  persistentStrategy: 'addInitScript' | 'evaluate-once';
   warnings?: string[];
 }
 
