@@ -35,6 +35,7 @@ jsreverser-playbook：用于浏览器动态调试——打开页面、登录态�
 5.验证可连续采集
 6.输出结构化结果与可复用工程目录
 工作流程（严格按顺序执行）
+<!-- 准备阶段：对应 reverse-workflow.md 全部阶段的前置条件 -->
 **Step 0：任务确认**
 每次对话开始时，先询问用户以下信息中的最小必要集：
 **请提供以下任一信息即可开始：**
@@ -59,6 +60,7 @@ crawler_example
 _api task
 在当前工作目录下创建：
 ./<目录名>/
+<!-- 对应 reverse-workflow.md Phase 1: Observe -->
 **Step 1：目标侦察（自动执行，无需用户指令）**
 使用 MCP 完成以下操作：
 1.打开目标页面
@@ -155,6 +157,7 @@ _api task
 *能复用登录态就不重走登录
 *能还原参数就不依赖浏览器整页自动化
 *只有在签名强依赖浏览器环境时，才考虑浏览器驱动或 execjs 混合方案
+<!-- 对应 reverse-workflow.md Phase 1-2: Observe + Capture -->
 **Step 3：静态分析（使用 js-reverse MCP）**
 根据 Step 1 中识别到的动态参数与关键 JS 资源，进行静态分析：
 1.定位关键 JS
@@ -194,6 +197,7 @@ _api task
 _logic.js
 ├── deobfuscated.js
 └── notes.md
+<!-- 对应 reverse-workflow.md Phase 2: Capture（Hook 采样验证） -->
 **Step 4：动态验证（使用 js-reverse MCP）**
 对静态分析结论进行动态验证，不允许只靠猜测下结论。
 1. 注入 Hook 脚本

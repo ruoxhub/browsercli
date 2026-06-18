@@ -322,128 +322,20 @@ Observe → Capture → Rebuild → Patch → PureExtraction → Port
 
 任何任务都应明确自己当前处于哪个阶段。
 
-### 7.2 阶段详解
+### 7.2 详细定义
 
-#### Phase 1: Observe（观察）
+完整的阶段定义、完成判据和禁止事项，见 [Reverse Workflow 协议](../reference/reverse-workflow.md)。
 
-**目标**：确认目标请求、关键脚本、候选函数、触发动作
+该文档是 6 阶段工作流的唯一权威来源。以下为本阶段快速参考：
 
-**必做动作**：
-
-- 确认目标请求 URL / 参数 / 响应特征
-- 定位 initiator、候选脚本 URL、候选函数名
-- 记录页面动作、触发条件
-- 把关键观察写入 task artifact
-
-**禁止**：
-
-- 还没确认目标请求就开始补环境
-- 还没定位关键脚本就开始手翻混淆代码
-
-**完成判据**：已能回答"目标请求是谁发起的、哪段脚本参与、页面上如何触发"
-
----
-
-#### Phase 2: Capture（采样）
-
-**目标**：用最小侵入方式拿到运行时样本
-
-**必做动作**：
-
-- 优先使用 Hook 或 preload hook
-- 采样 fetch/xhr、候选函数、关键对象字段
-- 获取调用前后输入输出
-- 持续把样本写入 task artifact
-
-**禁止**：
-
-- Hook 不足时立刻切断点
-- 一次性抓全部对象快照
-
-**完成判据**：已有至少一条可复用的真实运行样本
-
----
-
-#### Phase 3: Rebuild（复现）
-
-**目标**：把页面证据导出为本地可运行的 Node 工程
-
-**必做动作**：
-
-- 导出 local rebuild bundle
-- 固定入口、目标脚本、初始状态
-- 在 `env/entry.js` 上运行目标链路
-- 记录当前运行失败点
-
-**禁止**：
-
-- 没有页面证据就手写 window/document/navigator
-- 直接用 Python execjs 开始补环境
-
-**完成判据**：本地已有稳定复现入口，能看到当前运行错误
-
----
-
-#### Phase 4: Patch（补环境）
-
-**目标**：按代理日志和 first divergence 驱动补环境
-
-**必做动作**：
-
-- 优先读取代理 env log
-- 先记录 first divergence
-- 只补当前 first divergence 对应的最小因果单元
-- 每轮补丁后立即复测
-
-**禁止**：
-
-- 没有代理日志就补宿主
-- 没有 first divergence 记录就连补多个对象
-
-**完成判据**：
-
-- 本地 env rebuild 已稳定跑通
-- 已有一次服务端验收通过
-
----
-
-#### Phase 5: PureExtraction（纯算法提纯）
-
-**目标**：把"环境噪音"与"算法输入"分开
-
-**必做动作**：
-
-- 固定已通过验收的样本
-- 在本地 runtime 上继续 hook
-- 明确哪些是算法输入、哪些是环境状态
-- 构建 fixture 并提纯 Node pure implementation
-
-**禁止**：
-
-- env rebuild 还没通过就开始写 Python
-- 没有固定样本就开始提纯
-
-**完成判据**：
-
-- Node pure implementation 与 runtime fixture 对齐
-- 已明确哪些值属于算法输入
-
----
-
-#### Phase 6: Port（迁移）
-
-**目标**：把 Node 纯算实现迁移到 Python 或其他宿主
-
-**必做动作**：
-
-- 使用与 Node pure 相同夹具
-- 逐段对齐输入、关键中间值与最终输出
-
-**禁止**：
-
-- 直接以页面 runtime 为真值源跳过 Node pure
-
-**完成判据**：外部语言版本与 Node pure 对齐，至少一条服务端验收通过
+| 阶段 | 一句话目标 | 完成判据 |
+|------|-----------|---------|
+| 1. Observe | 确认目标请求、脚本、触发动作 | 能回答"请求谁发起、哪段脚本参与、如何触发" |
+| 2. Capture | Hook 采样运行时数据 | 至少一条可复用的真实运行样本 |
+| 3. Rebuild | 导出本地可运行 Node 工程 | 本地有稳定复现入口，能看到运行错误 |
+| 4. Patch | 按 first divergence 驱动补环境 | env rebuild 稳定跑通，服务端验收通过 |
+| 5. PureExtraction | 分离环境噪音和算法输入 | Node pure implementation 与 fixture 对齐 |
+| 6. Port | 迁移到 Python 或其他宿主 | 外部语言版本与 Node pure 对齐 |
 
 ---
 

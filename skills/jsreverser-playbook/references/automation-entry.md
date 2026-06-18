@@ -1,3 +1,7 @@
+> **工作流映射**：本文件是 [6 阶段逆向工作流](../../docs/reference/reverse-workflow.md) 的自动化简化版。
+> 3 阶段映射：观察 = Phase 1 Observe，采样 = Phase 2 Capture，补环境 = Phase 3-4 Rebuild+Patch。
+> PureExtraction 和 Port 阶段不在自动化入口覆盖。
+
 # 自动化入口剧本
 
 默认按三段式执行：
