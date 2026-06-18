@@ -122,6 +122,7 @@ export interface CollectCodeData {
 export interface CollectCodeResult extends CollectorResult {
   tooltype: 'collect_code';
   data: CollectCodeData | null;
+  suggestion?: string;
 }
 
 /** collectionDiff 返回结果 */
@@ -134,6 +135,7 @@ export interface CollectionDiffResult extends CollectorResult {
 export interface SearchInScriptsResult extends CollectorResult {
   tooltype: 'search_in_scripts';
   data: SearchInScriptsData;
+  suggestion?: string;
 }
 
 /** Collector 运行时服务（依赖注入） */

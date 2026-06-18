@@ -41,6 +41,26 @@ export const searchInScripts = defineTool({
         params.maxTotalSize,
       );
 
+      if (result.error) {
+        const suggestion = result.error === 'INVALID_PATTERN'
+          ? '请检查正则表达式语法，确保 pattern 是有效的正则。'
+          : '请确认已先调用 collect_code 收集脚本，然后重试搜索。';
+        response.setStructuredContent({
+          success: false,
+          message: result.message ?? result.error,
+          suggestion,
+          tooltype: 'search_in_scripts',
+          data: {
+            files: [],
+            totalSize: 0,
+            matched: 0,
+            returned: 0,
+            truncated: false,
+          },
+        });
+        return;
+      }
+
       const data: SearchInScriptsData = {
         files: result.files.map(file => ({
           url: file.url,
@@ -56,19 +76,26 @@ export const searchInScripts = defineTool({
 
       const responseData: SearchInScriptsResult = {
         success: true,
-        message: `搜索完成：匹配 ${data.matched} 个文件，返回 ${data.returned} 个`,
+        message: result.warning
+          ? result.warning
+          : `搜索完成：匹配 ${data.matched} 个文件，返回 ${data.returned} 个`,
         tooltype: 'search_in_scripts',
-        data: data
+        data: data,
+        ...(result.warning ? {suggestion: '请先调用 collect_code 收集脚本后再搜索。'} : {}),
       };
 
       response.setStructuredContent(responseData);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
+      const suggestion = errorMsg.includes('INVALID_PATTERN')
+        ? '请检查正则表达式语法，确保 pattern 是有效的正则。'
+        : '请确认已先调用 collect_code 收集脚本，然后重试搜索。';
       console.error('[searchInScripts] 搜索失败:', errorMsg);
 
-      const errorData: SearchInScriptsResult = {
+      response.setStructuredContent({
         success: false,
         message: `搜索失败：${errorMsg}`,
+        suggestion,
         tooltype: 'search_in_scripts',
         data: {
           files: [],
@@ -77,8 +104,7 @@ export const searchInScripts = defineTool({
           returned: 0,
           truncated: false,
         },
-      };
-      response.setStructuredContent(errorData);
+      });
     }
   },
 });

@@ -63,7 +63,20 @@ export const collectCode = defineTool({
     try {
       // 执行收集
       if (shouldCollect) {
-        await runtime.collector.collect(params as CollectCodeOptions);
+        const collectResult = await runtime.collector.collect(params as CollectCodeOptions);
+        if (collectResult.error) {
+          const isNoPage = collectResult.error === 'NO_PAGE_CONTEXT';
+          response.setStructuredContent({
+            success: false,
+            message: collectResult.message ?? collectResult.error,
+            suggestion: isNoPage
+              ? '请先调用 select_page 或 new_page 选择目标页面，然后重试。'
+              : '请检查浏览器连接状态（调用 check_browser_health）后重试。',
+            tooltype: 'collect_code',
+            data: {},
+          });
+          return;
+        }
       }
 
       let data: CollectCodeData;
@@ -140,14 +153,20 @@ export const collectCode = defineTool({
       response.setStructuredContent(result);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
+      const isNoPage =
+        errorMsg.includes('NO_PAGE_CONTEXT') ||
+        errorMsg.includes('pageResolver');
+      const suggestion = isNoPage
+        ? '请先调用 select_page 或 new_page 选择目标页面，然后重试。'
+        : '请检查浏览器连接状态（调用 check_browser_health）后重试。';
       console.error('[collectCode] 收集失败:', errorMsg);
-      const errorResult = {
+      response.setStructuredContent({
         success: false,
         message: `代码收集失败：${errorMsg}`,
+        suggestion,
         tooltype: 'collect_code',
         data: {},
-      };
-      response.setStructuredContent(errorResult);
+      });
     }
   },
 });
