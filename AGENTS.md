@@ -29,6 +29,24 @@
 ## Architecture Notes
 仓库默认遵循 README 中的逆向方法论：`Observe-first`、`Hook-preferred`、`Breakpoint-last`、`Evidence-first`。贡献新能力时，优先扩展可复用工具与证据沉淀链路，而不是把一次性调试逻辑直接写死在脚本里。涉及公开案例时，只保留抽象流程、字段规范和脱敏样例，避免提交可直接复用的生产链路。
 
+### 核心运行时组件
+
+以下组件构成 MCP 工具的运行时基础。修改时请注意依赖链。
+
+| 组件 | 文件 | 职责 |
+|------|------|------|
+| EventBus | `src/utils/EventBus.ts` | 类型安全事件总线，全局单例 |
+| RuntimeServices | `src/runtime/RuntimeServices.ts` | 延迟初始化服务集合（AI、分析器、去混淆器等） |
+| BrowserManager | `src/browser/browser.ts` | 浏览器生命周期、页面管理、反检测注入 |
+| CodeCollector | `src/modules/collector/CodeCollector.ts` | 脚本收集 + 缓存 + 搜索 |
+| HookManager | `src/modules/hook/HookManager.ts` | Hook 创建、管理、数据存取门面 |
+| HookStore | `src/modules/hook/HookStore.ts` | Hook 采样数据存储层 |
+| HookCodeBuilder | `src/modules/hook/HookCodeBuilder.ts` | Hook 脚本链式构建器 |
+| ReverseTaskStore | `src/reverse/ReverseTaskStore.ts` | 逆向任务持久化存储 |
+| ToolRegistry | `src/tools/registry/ToolRegistry.ts` | MCP 工具注册表 + toolProfile 过滤 |
+| ToolExecutionPipeline | `src/worker/ToolExecutionPipeline.ts` | 工具执行管线（校验→上下文→执行→响应） |
+| WsHub | `src/web/ws/WsHub.ts` | WebSocket 连接中心 |
+
 ### 反检测分层（与 jshookmcp 对齐）
 
 默认启动路径遵循 **零 JS 注入** 哲学：`Object.defineProperty` hack 本身就是
