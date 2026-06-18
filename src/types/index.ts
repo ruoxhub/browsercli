@@ -99,6 +99,9 @@ export interface CollectCodeResult {
     imports: string[];
     preview: string;
   }>; // 🆕 智能收集摘要模式返回
+  error?: string;
+  message?: string;
+  warning?: string;
 }
 
 export interface DependencyGraph {
