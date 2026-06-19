@@ -39,7 +39,9 @@ export function getStatusFromRequest(request: HTTPRequest): string {
  * Async version of getStatusFromRequest that can check response status.
  * Use this when you need the actual HTTP status code.
  */
-export async function getStatusFromRequestAsync(request: HTTPRequest): Promise<string> {
+export async function getStatusFromRequestAsync(
+  request: HTTPRequest,
+): Promise<string> {
   const httpResponse = await request.response();
   const failure = request.failure();
   if (httpResponse) {
@@ -51,16 +53,6 @@ export async function getStatusFromRequestAsync(request: HTTPRequest): Promise<s
     return `[failed - ${failure.errorText}]`;
   }
   return '[pending]';
-}
-
-export function getFormattedHeaderValue(
-  headers: Record<string, string>,
-): string[] {
-  const response: string[] = [];
-  for (const [name, value] of Object.entries(headers)) {
-    response.push(`- ${name}:${value}`);
-  }
-  return response;
 }
 
 export async function getFormattedResponseBody(
@@ -93,20 +85,6 @@ export async function getFormattedResponseBody(
     }
     return `<not available anymore>`;
   }
-}
-
-export async function getFormattedRequestBody(
-  httpRequest: HTTPRequest,
-  sizeLimit: number = BODY_CONTEXT_SIZE_LIMIT,
-): Promise<string | undefined> {
-  // Playwright: no hasPostData()/fetchPostData(), use postData() directly
-  const data = httpRequest.postData();
-
-  if (data) {
-    return `${getSizeLimitedString(data, sizeLimit)}`;
-  }
-
-  return;
 }
 
 function getSizeLimitedString(text: string, sizeLimit: number) {

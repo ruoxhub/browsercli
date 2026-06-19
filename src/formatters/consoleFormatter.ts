@@ -23,14 +23,6 @@ interface SerializedErrorLike {
   cause?: SerializedErrorLike;
 }
 
-// The short format for a console message, based on a previous format.
-export function formatConsoleEventShort(msg: ConsoleMessageData): string {
-  if (msg.type === 'issue') {
-    return `msgid=${msg.consoleMessageStableId} [${msg.type}] ${msg.message} (count: ${msg.count})`;
-  }
-  return `msgid=${msg.consoleMessageStableId} [${msg.type}] ${msg.message} (${msg.args?.length ?? 0} args)`;
-}
-
 function getArgs(msg: ConsoleMessageData) {
   const args = [...(msg.args ?? [])];
 

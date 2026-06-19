@@ -191,10 +191,7 @@ function toSnakeCase(value: string): string {
     .toLowerCase();
 }
 
-function buildMinimalMeta(
-  name: string,
-  entry: ToolRegistryEntry,
-): ToolMeta {
+function buildMinimalMeta(name: string, entry: ToolRegistryEntry): ToolMeta {
   return {
     name,
     description: '',
@@ -274,16 +271,6 @@ export function getAllToolNames(): string[] {
 export async function searchTools(query: string): Promise<ToolMeta[]> {
   const meta = await getToolsMeta();
   return new ToolSearchEngine(meta).search(query);
-}
-
-/**
- * 获取工具的参数规格（含 required / enum / defaultValue / description）
- */
-export async function getToolArgSpecs(
-  name: string,
-): Promise<ToolArgSpecMap | undefined> {
-  const meta = await getToolMetaAsync(name);
-  return meta?.argSpecs;
 }
 
 /**
