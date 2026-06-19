@@ -4,12 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import type {
-  WasmBodyKind,
-  WasmBodyPathAnalysis,
-  WasmBodySegmentHint,
   WasmBoundaryChain,
   WasmBoundaryStep,
-  WasmExportEntry,
   WasmHeaderEntry,
   WasmKeyValuePreview,
   WasmModuleRecord,
@@ -17,229 +13,26 @@ import type {
   WasmSignatureDiffFieldChange,
   WasmSignatureDiffResult,
 } from './WasmTypes.js';
-
-interface WasmExportUsageSummary {
-  name: string;
-  kind: WasmExportEntry['kind'];
-  callCount: number;
-  params?: WasmExportEntry['params'];
-  results?: WasmExportEntry['results'];
-  suspicion: 'high' | 'medium' | 'low';
-  reasons: string[];
-}
-
-function uniqueStrings(values: Array<string | undefined>): string[] {
-  return [
-    ...new Set(
-      values.filter(
-        (value): value is string =>
-          typeof value === 'string' && value.length > 0,
-      ),
-    ),
-  ];
-}
-
-function joinOrNone(values: string[], separator = ', '): string {
-  return values.join(separator) || 'none';
-}
-
-function joinOrFallback(
-  values: string[],
-  fallback: string,
-  separator = ', ',
-): string {
-  return values.join(separator) || fallback;
-}
-
-function normalizeHeaderName(name: string): string {
-  return name.trim().toLowerCase();
-}
-
-function maskHeaderValue(value: string): string {
-  if (value.length <= 8) {
-    return `${value.slice(0, 2)}***`;
-  }
-  return `${value.slice(0, 4)}***${value.slice(-4)}`;
-}
-
-function isSensitiveHeader(name: string, value: string): boolean {
-  return (
-    /(authorization|signature|token|secret|key|cookie)/i.test(name) ||
-    value.length >= 24
-  );
-}
-
-function classifyBodyKind(value?: string): WasmBodyKind {
-  const trimmed = (value ?? '').trim();
-  if (trimmed.length === 0) {
-    return 'empty';
-  }
-  if (
-    (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
-    (trimmed.startsWith('[') && trimmed.endsWith(']'))
-  ) {
-    return 'json';
-  }
-  if (trimmed.includes('=') && trimmed.includes('&')) {
-    return 'urlencoded';
-  }
-  if (/^[0-9a-f]+$/i.test(trimmed) && trimmed.length >= 16) {
-    return 'hexish';
-  }
-  if (/^[A-Za-z0-9+/=_-]+$/.test(trimmed) && trimmed.length >= 16) {
-    return 'base64ish';
-  }
-  return 'plain-text';
-}
-
-function splitBodySegments(
-  bodySnippet?: string,
-  bodyKind?: WasmBodyKind,
-): WasmBodySegmentHint[] {
-  const body = bodySnippet ?? '';
-  const kind = bodyKind ?? classifyBodyKind(body);
-  const parts = collectBodyParts(body, kind);
-
-  return parts
-    .map((raw, index) => {
-      const value = raw.trim();
-      const classification = classifySegment(value);
-      const likelySignatureMaterial =
-        /(sign|signature|token|nonce|hmac|digest)/i.test(value) ||
-        classification === 'base64ish' ||
-        classification === 'hexish';
-      const masked = likelySignatureMaterial && value.length >= 12;
-      return {
-        index,
-        raw: value,
-        displayValue: masked ? maskHeaderValue(value) : value,
-        classification,
-        likelySignatureMaterial,
-      };
-    })
-    .filter(entry => entry.raw.length > 0);
-}
-
-function collectBodyParts(body: string, kind: WasmBodyKind): string[] {
-  if (kind === 'json') {
-    return Object.keys(safeParseJson(body));
-  }
-  if (kind === 'urlencoded') {
-    return body
-      .split('&')
-      .map(entry => entry.split('=').slice(1).join('=') || entry);
-  }
-  if (body.includes('.')) {
-    return body.split('.');
-  }
-  if (body.includes(':')) {
-    return body.split(':');
-  }
-  if (body.length > 0) {
-    return [body];
-  }
-  return [];
-}
-
-function safeParseJson(value: string): Record<string, unknown> {
-  try {
-    const parsed = JSON.parse(value);
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      return parsed as Record<string, unknown>;
-    }
-  } catch {
-    // Ignore parse errors.
-  }
-  return {};
-}
-
-function classifySegment(value: string): WasmBodySegmentHint['classification'] {
-  if (value.length === 0) {
-    return 'empty';
-  }
-  if (/^\d+$/.test(value)) {
-    return 'numeric';
-  }
-  if (/^[0-9a-f]+$/i.test(value) && value.length >= 16) {
-    return 'hexish';
-  }
-  if (/^[A-Za-z0-9+/=_-]+$/.test(value) && value.length >= 16) {
-    return 'base64ish';
-  }
-  if ((value.startsWith('{') && value.endsWith('}')) || value.includes('":')) {
-    return 'json';
-  }
-  if (value.includes('=') && value.includes('&')) {
-    return 'urlencoded';
-  }
-  return 'plain-text';
-}
-
-function parseUrlDetails(url?: string): {
-  queryOrder?: string;
-  queryValues: Map<string, string[]>;
-} {
-  if (!url) {
-    return {
-      queryValues: new Map(),
-    };
-  }
-  try {
-    const parsed = new URL(url);
-    const queryValues = new Map<string, string[]>();
-    for (const [key, value] of parsed.searchParams.entries()) {
-      const values = queryValues.get(key) ?? [];
-      values.push(value);
-      queryValues.set(key, values);
-    }
-    return {
-      queryOrder: parsed.search ? parsed.search.slice(1) : undefined,
-      queryValues,
-    };
-  } catch {
-    return {
-      queryValues: new Map(),
-    };
-  }
-}
-
-function dedupeHeaders(entries: WasmHeaderEntry[]): WasmHeaderEntry[] {
-  const byName = new Map<string, WasmHeaderEntry>();
-  for (const entry of entries) {
-    const key = normalizeHeaderName(entry.name);
-    if (!byName.has(key)) {
-      byName.set(key, entry);
-    }
-  }
-  return Array.from(byName.values());
-}
-
-function dedupeKeyValue(entries: WasmKeyValuePreview[]): WasmKeyValuePreview[] {
-  const seen = new Set<string>();
-  return entries.filter(entry => {
-    const key = `${entry.key}:${entry.value}`;
-    if (seen.has(key)) {
-      return false;
-    }
-    seen.add(key);
-    return true;
-  });
-}
-
-type ExportSuspicion = 'high' | 'medium' | 'low';
-
-function determineSuspicion(
-  reasonCount: number,
-  callCount: number,
-): ExportSuspicion {
-  if (reasonCount >= 2 || callCount >= 10) {
-    return 'high';
-  }
-  if (reasonCount === 1 || callCount >= 3) {
-    return 'medium';
-  }
-  return 'low';
-}
+import {
+  buildBodyAnalysis,
+  classifyBodyKind,
+  dedupeHeaders,
+  dedupeKeyValue,
+  describeRuntimeEvent,
+  describeSink,
+  describeStep,
+  determineSuspicion,
+  type ExportSuspicion,
+  isSensitiveHeader,
+  joinOrFallback,
+  joinOrNone,
+  maskValue,
+  normalizeHeaderName,
+  parseUrlDetails,
+  splitBodySegments,
+  uniqueStrings,
+  type WasmExportUsageSummary,
+} from './WasmAnalysisUtils.js';
 
 export class WasmRuntimeInspector {
   summarizeExports(
@@ -383,22 +176,20 @@ export class WasmRuntimeInspector {
       const writerHints = [
         ...new Set(
           writerEvents
-            .map(candidate => this.describeHint(candidate))
+            .map(candidate => describeRuntimeEvent(candidate))
             .filter(Boolean),
         ),
       ];
       const readerHints = [
         ...new Set(
           readerEvents
-            .map(candidate => this.describeHint(candidate))
+            .map(candidate => describeRuntimeEvent(candidate))
             .filter(Boolean),
         ),
       ];
       const sinkHints = [
         ...new Set(
-          sinkEvents
-            .map(candidate => this.describeSink(candidate))
-            .filter(Boolean),
+          sinkEvents.map(candidate => describeSink(candidate)).filter(Boolean),
         ),
       ];
       const candidateJsCallers = [
@@ -412,7 +203,7 @@ export class WasmRuntimeInspector {
             ),
         ),
       ].slice(0, 6);
-      const bodyAnalysis = this.buildBodyAnalysis(
+      const bodyAnalysis = buildBodyAnalysis(
         writerEvents,
         readerEvents,
         sinkEvents,
@@ -604,7 +395,7 @@ export class WasmRuntimeInspector {
         examples: Array.from(values)
           .slice(0, 4)
           .map(value =>
-            isSensitiveHeader(field, value) ? maskHeaderValue(value) : value,
+            isSensitiveHeader(field, value) ? maskValue(value) : value,
           ),
         impact,
         notes:
@@ -631,7 +422,7 @@ export class WasmRuntimeInspector {
         location: 'body-segment',
         variationCount: values.size,
         examples: examples.map(value =>
-          impact === 'signature-candidate' ? maskHeaderValue(value) : value,
+          impact === 'signature-candidate' ? maskValue(value) : value,
         ),
         impact,
         notes:
@@ -734,75 +525,11 @@ export class WasmRuntimeInspector {
     return lines.join('\n');
   }
 
-  private buildBodyAnalysis(
-    writerEvents: WasmRuntimeEvent[],
-    readerEvents: WasmRuntimeEvent[],
-    sinkEvents: WasmRuntimeEvent[],
-  ): WasmBodyPathAnalysis {
-    const sink = sinkEvents[0];
-    const bodyKind = sink?.bodyKind ?? classifyBodyKind(sink?.bodySnippet);
-    const segments =
-      sink?.bodySegments && sink.bodySegments.length > 0
-        ? sink.bodySegments.map(segment => ({...segment}))
-        : splitBodySegments(sink?.bodySnippet, bodyKind);
-    const hints = uniqueStrings([
-      bodyKind !== 'unknown' ? `body-kind:${bodyKind}` : undefined,
-      writerEvents.some(event => event.type === 'text_encode')
-        ? 'text-encode-before-network'
-        : undefined,
-      readerEvents.some(event => event.type === 'text_decode')
-        ? 'text-decode-after-export'
-        : undefined,
-      segments.some(segment => segment.likelySignatureMaterial)
-        ? 'encoded-body-segment-observed'
-        : undefined,
-    ]);
-    return {
-      bodyKind,
-      segments,
-      hints,
-      candidateWriters: writerEvents
-        .flatMap(event => event.argsPreview ?? [])
-        .filter(entry => typeof entry === 'string')
-        .slice(0, 6),
-      candidateReaders: readerEvents
-        .flatMap(event => event.argsPreview ?? [])
-        .filter(entry => typeof entry === 'string')
-        .slice(0, 6),
-    };
-  }
-
-  private describeHint(event: WasmRuntimeEvent): string {
-    switch (event.type) {
-      case 'memory_buffer_access':
-        return `buffer access on ${event.memoryExportName ?? 'memory'}`;
-      case 'memory_view_create':
-        return `${event.viewType ?? 'TypedArray'} view @${event.byteOffset ?? 0}:${event.byteLength ?? 0}`;
-      case 'memory_write':
-        return `${event.viewType ?? 'view'} write @${event.byteOffset ?? 0}:${event.byteLength ?? 0}`;
-      case 'memory_read':
-        return `${event.viewType ?? 'view'} read @${event.byteOffset ?? 0}:${event.byteLength ?? 0}`;
-      case 'text_encode':
-        return `TextEncoder -> ${event.viewType ?? 'view'}`;
-      case 'text_decode':
-        return `TextDecoder <- ${event.viewType ?? 'view'}`;
-      default:
-        return '';
-    }
-  }
-
-  private describeSink(event: WasmRuntimeEvent): string {
-    if (event.type !== 'network_request') {
-      return '';
-    }
-    return `${event.method ?? 'UNKNOWN'} ${event.url ?? 'unknown-url'}`;
-  }
-
   private toStep(event: WasmRuntimeEvent): WasmBoundaryStep {
     return {
       type: event.type,
       timestamp: event.timestamp,
-      description: this.describeStep(event),
+      description: describeStep(event),
       exportName: event.exportName,
       memoryExportName: event.memoryExportName,
       url: event.url,
@@ -815,28 +542,5 @@ export class WasmRuntimeInspector {
       resultEntries: event.resultEntries ? [...event.resultEntries] : undefined,
       stackSummary: event.stackSummary ? [...event.stackSummary] : undefined,
     };
-  }
-
-  private describeStep(event: WasmRuntimeEvent): string {
-    switch (event.type) {
-      case 'export_call':
-        return `call export ${event.exportName ?? 'unknown'}`;
-      case 'memory_buffer_access':
-        return `access ${event.memoryExportName ?? 'memory'}.buffer`;
-      case 'memory_view_create':
-        return `create ${event.viewType ?? 'view'} over wasm memory`;
-      case 'memory_write':
-        return `write via ${event.viewType ?? 'view'}`;
-      case 'memory_read':
-        return `read via ${event.viewType ?? 'view'}`;
-      case 'text_encode':
-        return 'encode text into wasm-backed memory';
-      case 'text_decode':
-        return 'decode text from wasm-backed memory';
-      case 'network_request':
-        return `network sink ${event.method ?? 'UNKNOWN'} ${event.url ?? 'unknown-url'}`;
-      default:
-        return event.type;
-    }
   }
 }
