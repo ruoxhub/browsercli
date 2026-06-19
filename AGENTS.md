@@ -47,6 +47,19 @@
 | ToolExecutionPipeline | `src/worker/ToolExecutionPipeline.ts` | 工具执行管线（校验→上下文→执行→响应） |
 | WsHub | `src/web/ws/WsHub.ts` | WebSocket 连接中心 |
 
+### 高扇入接口（@stable）
+
+以下函数/接口被大量调用方依赖，修改签名或返回类型前**必须**运行 impact 分析。
+扩展时使用可选属性或 `Partial<>`，不要修改必选参数。
+
+| 符号 | 文件 | 调用方数 | 说明 |
+|------|------|---------|------|
+| `defineTool` | `src/tools/ToolDefinition.ts` | 102+ | 工具定义工厂，所有 MCP 工具通过此注册 |
+| `Runtime` | `src/runtime.ts` | 57+ | 运行时服务接口，新增服务应走 `RuntimeServices` lazy getter |
+| `getRuntime` | `src/runtime.ts` | 57+ | 全局运行时访问器 |
+| `safeStringify` | `src/utils/safeJson.ts` | 16 | JSON 安全序列化 |
+| `getEnvValue` | `src/config/resolver.ts` | 11 | 环境变量读取 |
+
 ### 反检测分层（与 jshookmcp 对齐）
 
 默认启动路径遵循 **零 JS 注入** 哲学：`Object.defineProperty` hack 本身就是
@@ -79,7 +92,7 @@ bot 信号，关掉它暴露真实 OS 屏幕。只有用户显式传 `config.vie
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **JSReverser-CLI** (13258 symbols, 26802 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **JSReverser-CLI** (14386 symbols, 28573 relationships, 299 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 

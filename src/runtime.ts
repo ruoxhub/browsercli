@@ -33,6 +33,12 @@ import {UnifiedCacheManager} from './utils/UnifiedCacheManager.js';
 import type {ToolContextProvider} from './worker/ToolContext.js';
 let runtime: Runtime | undefined;
 
+/**
+ * 运行时服务集合。所有 MCP 工具通过 getRuntime() 访问共享服务。
+ *
+ * @stable 此接口被 57+ 个文件消费。新增服务应通过 RuntimeServices lazy getter 暴露，
+ * 而不是直接添加到此接口。修改字段前必须运行 impact 分析。
+ */
 export interface Runtime {
   browserManager: BrowserManager;
   collector: CodeCollector;
@@ -56,6 +62,11 @@ export interface Runtime {
   clearPageContext: () => void;
 }
 
+/**
+ * 获取全局运行时实例。
+ *
+ * @stable 高扇入函数（57+ 调用方）。修改返回类型前必须运行 impact 分析。
+ */
 export function getRuntime(): Runtime {
   if (runtime) {
     return runtime;

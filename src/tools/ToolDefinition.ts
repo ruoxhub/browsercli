@@ -167,6 +167,12 @@ export type Context = Readonly<{
   getCachedTrafficSummary(wsid: number): TrafficSummary | undefined;
 }>;
 
+/**
+ * 定义 MCP 工具的工厂函数。
+ *
+ * @stable 此函数被 102+ 个工具文件调用。修改签名前必须运行 impact 分析。
+ * 扩展参数时使用可选属性或 Partial<>，不要修改必选参数。
+ */
 export function defineTool<Schema extends zod.ZodRawShape>(
   definition: ToolDefinition<Schema>,
 ) {
