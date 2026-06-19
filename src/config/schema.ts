@@ -203,7 +203,7 @@ export const GlobalConfigSchema = zod
 
 export type GlobalConfig = zodType.infer<typeof GlobalConfigSchema>;
 
-export const AIConfigSchema = zod
+const AIConfigSchema = zod
   .object({
     provider: LLMProviderSchema,
     openai: zod
