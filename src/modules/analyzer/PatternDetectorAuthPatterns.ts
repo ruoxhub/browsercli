@@ -15,7 +15,7 @@ import {logger} from '../../utils/logger.js';
 import type {
   SignaturePattern,
   TokenPattern,
-} from './IntelligentAnalyzer.js';
+} from './IntelligentAnalyzer.types.js';
 import type {AnalyzerNetworkRequest} from './IntelligentAnalyzer.types.js';
 
 export function detectSignaturePatternsInternal(

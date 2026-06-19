@@ -15,7 +15,7 @@ import type {
   EncryptionPattern,
   SignaturePattern,
   TokenPattern,
-} from './IntelligentAnalyzer.js';
+} from './IntelligentAnalyzer.types.js';
 import type {
   AnalyzerConsoleMessage,
   AnalyzerNetworkRequest,

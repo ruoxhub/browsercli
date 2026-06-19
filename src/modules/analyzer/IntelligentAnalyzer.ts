@@ -17,6 +17,10 @@ import type {
   AnalyzerExceptionInfo,
   AnalyzerNetworkRequest,
   AnalyzerNetworkResponse,
+  AntiDebugPattern,
+  EncryptionPattern,
+  SignaturePattern,
+  TokenPattern,
 } from './IntelligentAnalyzer.types.js';
 import {
   detectAntiDebugPatterns,
@@ -29,6 +33,13 @@ import {
   filterCriticalRequests,
   filterCriticalResponses,
 } from './PatternDetector.js';
+
+export {
+  type AntiDebugPattern,
+  type EncryptionPattern,
+  type SignaturePattern,
+  type TokenPattern,
+} from './IntelligentAnalyzer.types.js';
 
 export interface AnalysisResult {
   criticalRequests: AnalyzerNetworkRequest[];
@@ -49,33 +60,6 @@ export interface AnalysisResult {
     suspiciousAPIs: string[];
     keyFunctions: string[];
   };
-}
-
-export interface EncryptionPattern {
-  type: 'AES' | 'RSA' | 'MD5' | 'SHA' | 'Base64' | 'Custom';
-  location: string;
-  confidence: number;
-  evidence: string[];
-}
-
-export interface SignaturePattern {
-  type: 'HMAC' | 'JWT' | 'Custom';
-  location: string;
-  parameters: string[];
-  confidence: number;
-}
-
-export interface TokenPattern {
-  type: 'OAuth' | 'JWT' | 'Custom';
-  location: string;
-  format: string;
-  confidence: number;
-}
-
-export interface AntiDebugPattern {
-  type: 'debugger' | 'console.log' | 'devtools-detect' | 'timing-check';
-  location: string;
-  code: string;
 }
 
 function formatEvidence(evidence: unknown): string {

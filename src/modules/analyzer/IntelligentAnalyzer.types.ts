@@ -53,3 +53,30 @@ export interface AnalyzerExceptionInfo {
   url?: string;
   timestamp?: number;
 }
+
+export interface EncryptionPattern {
+  type: 'AES' | 'RSA' | 'MD5' | 'SHA' | 'Base64' | 'Custom';
+  location: string;
+  confidence: number;
+  evidence: string[];
+}
+
+export interface SignaturePattern {
+  type: 'HMAC' | 'JWT' | 'Custom';
+  location: string;
+  parameters: string[];
+  confidence: number;
+}
+
+export interface TokenPattern {
+  type: 'OAuth' | 'JWT' | 'Custom';
+  location: string;
+  format: string;
+  confidence: number;
+}
+
+export interface AntiDebugPattern {
+  type: 'debugger' | 'console.log' | 'devtools-detect' | 'timing-check';
+  location: string;
+  code: string;
+}
