@@ -67,7 +67,6 @@ export const AnthropicConfigSchema = zod
   })
   .strip();
 
-
 export const BrowserConfigSchema = zod
   .object({
     headless: booleanSchema.optional(),

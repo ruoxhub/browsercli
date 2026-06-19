@@ -222,7 +222,10 @@ const CRYPTO_KEYWORDS = {
 
 type CryptoType = keyof typeof CRYPTO_KEYWORDS;
 
-function findMatchedCryptoKeywords(text: string, keywords: readonly string[]): string[] {
+function findMatchedCryptoKeywords(
+  text: string,
+  keywords: readonly string[],
+): string[] {
   const textLower = text.toLowerCase();
   return keywords.filter(kw => textLower.includes(kw.toLowerCase()));
 }
@@ -234,7 +237,9 @@ export function detectEncryptionPatterns(
   const patterns: EncryptionPattern[] = [];
 
   for (const req of requests) {
-    for (const [type, keywords] of Object.entries(CRYPTO_KEYWORDS) as Array<[CryptoType, readonly string[]]>) {
+    for (const [type, keywords] of Object.entries(CRYPTO_KEYWORDS) as Array<
+      [CryptoType, readonly string[]]
+    >) {
       const urlMatches = findMatchedCryptoKeywords(req.url, keywords);
       urlMatches.forEach(kw => {
         patterns.push({
@@ -260,7 +265,9 @@ export function detectEncryptionPatterns(
   }
 
   for (const log of logs) {
-    for (const [type, keywords] of Object.entries(CRYPTO_KEYWORDS) as Array<[CryptoType, readonly string[]]>) {
+    for (const [type, keywords] of Object.entries(CRYPTO_KEYWORDS) as Array<
+      [CryptoType, readonly string[]]
+    >) {
       const logMatches = findMatchedCryptoKeywords(log.text, keywords);
       logMatches.forEach(kw => {
         patterns.push({

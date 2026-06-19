@@ -11,7 +11,6 @@ import type {Dialog, Frame, HTTPRequest, Page} from '../third_party/index.js';
 import type {TraceResult} from '../trace-processing/parse.js';
 import type {PaginationOptions} from '../utils/types.js';
 
-
 import type {ToolCategory} from './categories.js';
 import type {RequestInitiator} from './network/types.js';
 import type {WebSocketData} from './network/WebSocketCollector.js';
