@@ -44,7 +44,7 @@ import {BrowserContextProvider} from './context/BrowserContextProvider.js';
 import {CollectorContextProvider} from './context/CollectorContextProvider.js';
 import {DebuggerContextProvider} from './context/DebuggerContextProvider.js';
 import type {ToolTabContext} from './ToolCallContextGuard.js';
-import {wrapFrameWithTimeout} from './ToolExecutionPipeline.js';
+import {wrapFrameWithTimeout} from './timeoutUtils.js';
 
 export class ServiceLocator {
   private _runtime: Runtime | null = null;

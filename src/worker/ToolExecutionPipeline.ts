@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Frame} from 'patchright';
-
 import {validateToolArgs, type ValidationFailure} from '../cli/tool-arg-validator.js';
 import type {ToolMeta} from '../cli/tools-meta.js';
 import type {ToolPrerequisiteChecker} from '../tools/prerequisites/ToolPrerequisiteChecker.js';
@@ -16,6 +14,9 @@ import type {ToolCallContextGuard} from './ToolCallContextGuard.js';
 import type {DefineToolContextFactory, ToolContextProvider} from './ToolContext.js';
 import {ToolResponseAccumulator, ToolResultRecorder} from './ToolResponse.js';
 import type {ToolResponseProcessor, ToolTelemetry} from './ToolResponse.js';
+import {wrapFrameWithTimeout} from './timeoutUtils.js';
+
+export {wrapFrameWithTimeout, FRAME_EVALUATE_TIMEOUT} from './timeoutUtils.js';
 
 /**
  * 工具执行管线。负责参数校验、上下文注入、执行、响应构建的完整链路。
@@ -66,43 +67,6 @@ export class ToolHandlerLoader {
       return null;
     }
   }
-}
-
-const FRAME_EVALUATE_TIMEOUT = 10_000;
-
-export function wrapFrameWithTimeout(
-  frame: Frame,
-  timeoutMs: number = FRAME_EVALUATE_TIMEOUT,
-): Frame {
-  return new Proxy(frame, {
-    get(target, prop, receiver) {
-      const value = Reflect.get(target, prop, receiver);
-      if (prop === 'evaluate') {
-        return function evaluateWithTimeout(this: unknown, ...args: unknown[]) {
-          const evalPromise = (value as (...args: unknown[]) => unknown).apply(
-            target,
-            args,
-          );
-          const timeoutPromise = new Promise<never>((_, reject) =>
-            setTimeout(
-              () =>
-                reject(
-                  new Error(
-                    `frame.evaluate() 超时 (${timeoutMs}ms)，可能调试器已暂停`,
-                  ),
-                ),
-              timeoutMs,
-            ),
-          );
-          return Promise.race([evalPromise, timeoutPromise]);
-        };
-      }
-      if (typeof value === 'function') {
-        return value.bind(target);
-      }
-      return value;
-    },
-  });
 }
 
 export class ToolExecutionRouter {
