@@ -10,10 +10,7 @@ import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
-import type {
-  ConsoleMessageEntry,
-  ConsoleMessageData,
-} from './types.js';
+import type {ConsoleMessageEntry, ConsoleMessageData} from './types.js';
 import {isAggregatedIssue} from './types.js';
 
 /**
@@ -23,7 +20,8 @@ import {isAggregatedIssue} from './types.js';
  */
 export const getConsoleMessage = defineTool({
   name: 'get_console_message',
-  description: 'Gets a console message by its ID. Returns structured message data including type, text, and arguments.',
+  description:
+    'Gets a console message by its ID. Returns structured message data including type, text, and arguments.',
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
@@ -31,16 +29,24 @@ export const getConsoleMessage = defineTool({
   schema: {
     msgid: zod
       .number()
-      .describe('The msgid of a console message on the page from the listed console messages'),
+      .describe(
+        'The msgid of a console message on the page from the listed console messages',
+      ),
   },
   handler: async (request, response) => {
     let data;
     let message;
     try {
-      const consoleMessage = getRuntime().contextProvider!.getConsoleMessageById(request.params.msgid);
+      const consoleMessage =
+        getRuntime().contextProvider!.getConsoleMessageById(
+          request.params.msgid,
+        );
       const consoleMessageStableId = request.params.msgid;
 
-      if (!(consoleMessage instanceof Error) && typeof (consoleMessage as any).args === 'function') {
+      if (
+        !(consoleMessage instanceof Error) &&
+        typeof (consoleMessage as any).args === 'function'
+      ) {
         const msg = consoleMessage as any;
         message = msg.text();
         data = {
@@ -52,7 +58,7 @@ export const getConsoleMessage = defineTool({
               const stringArg =
                 value !== undefined
                   ? value
-                  : remoteObj.description ?? String(undefined);
+                  : (remoteObj.description ?? String(undefined));
               return typeof stringArg === 'object'
                 ? JSON.stringify(stringArg)
                 : String(stringArg);
@@ -77,14 +83,13 @@ export const getConsoleMessage = defineTool({
         };
       }
       const responseData = {
-          success: true,
-          message: message,
-          tooltype: 'get_console_message',
-          data: data
+        success: true,
+        message: message,
+        tooltype: 'get_console_message',
+        data: data,
       };
       response.setStructuredContent(responseData);
     } catch (error) {
-      // response.appendResponseLine(`Error: ${error instanceof Error ? error.message : String(error)}`);
       data = {
         consoleMessageStableId: request.params.msgid,
         type: 'error',
@@ -92,10 +97,10 @@ export const getConsoleMessage = defineTool({
         args: [],
       };
       const responseData = {
-          success: true,
-          message: `Console message retrieved error`,
-          tooltype: 'get_console_message',
-          data: data
+        success: true,
+        message: `Console message retrieved error`,
+        tooltype: 'get_console_message',
+        data: data,
       };
       response.setStructuredContent(responseData);
     }

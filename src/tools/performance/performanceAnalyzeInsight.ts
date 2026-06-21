@@ -37,9 +37,12 @@ export const performanceAnalyzeInsight = defineTool({
   handler: async (request, response, context) => {
     const lastRecording = context.recordedTraces().at(-1);
     if (!lastRecording) {
-      response.appendResponseLine(
-        'No recorded traces found. Record a performance trace so you have Insights to analyze.',
-      );
+      response.setStructuredContent({
+        success: false,
+        message:
+          'No recorded traces found. Record a performance trace so you have Insights to analyze.',
+        tooltype: 'performance_analyze_insight',
+      });
       return;
     }
 
@@ -49,10 +52,22 @@ export const performanceAnalyzeInsight = defineTool({
       request.params.insightName as InsightName,
     );
     if ('error' in insightOutput) {
-      response.appendResponseLine(insightOutput.error);
+      response.setStructuredContent({
+        success: false,
+        message: insightOutput.error,
+        tooltype: 'performance_analyze_insight',
+      });
       return;
     }
 
-    response.appendResponseLine(insightOutput.output);
+    response.setStructuredContent({
+      success: true,
+      message: `已分析 insight: ${request.params.insightName}`,
+      tooltype: 'performance_analyze_insight',
+      data: {
+        insightName: request.params.insightName,
+        output: insightOutput.output,
+      },
+    });
   },
 });

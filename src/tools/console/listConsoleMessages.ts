@@ -6,9 +6,7 @@
 
 import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
-import {
-  mapIssueToMessageObject,
-} from '../../utils/DevtoolsUtils.js';
+import {mapIssueToMessageObject} from '../../utils/DevtoolsUtils.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -27,7 +25,8 @@ import {isAggregatedIssue} from './types.js';
  */
 export const listConsoleMessages = defineTool({
   name: 'list_console_messages',
-  description: 'List all console messages for the currently selected page since the last navigation. Supports filtering by type and pagination.',
+  description:
+    'List all console messages for the currently selected page since the last navigation. Supports filtering by type and pagination.',
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
@@ -67,13 +66,18 @@ export const listConsoleMessages = defineTool({
     let result: ListConsoleMessagesResult;
     try {
       const includePreserved = request.params.includePreservedMessages ?? false;
-      let messages = getRuntime().contextProvider!.getConsoleData(includePreserved);
+      let messages =
+        getRuntime().contextProvider!.getConsoleData(includePreserved);
 
       // 按类型过滤
       if (request.params.types?.length) {
         const normalizedTypes = new Set(request.params.types);
         messages = messages.filter(message => {
-          if ('type' in message && typeof (message as unknown as ConsoleMessageEntry).type === 'function') {
+          if (
+            'type' in message &&
+            typeof (message as unknown as ConsoleMessageEntry).type ===
+              'function'
+          ) {
             const msgType = (message as unknown as ConsoleMessageEntry).type();
             return normalizedTypes.has(msgType as ConsoleResponseType);
           }
@@ -106,7 +110,7 @@ export const listConsoleMessages = defineTool({
                     const stringArg =
                       value !== undefined
                         ? value
-                        : remoteObj.description ?? String(undefined);
+                        : (remoteObj.description ?? String(undefined));
                     return typeof stringArg === 'object'
                       ? JSON.stringify(stringArg)
                       : String(stringArg);
@@ -163,9 +167,6 @@ export const listConsoleMessages = defineTool({
         logFormat: 'json',
         data,
       };
-      // response.appendResponseLine('```json');
-      // response.appendResponseLine(JSON.stringify(data, null, 2));
-      // response.appendResponseLine('```');
       response.setStructuredContent(result);
     } catch (error) {
       result = {
@@ -173,9 +174,8 @@ export const listConsoleMessages = defineTool({
         message: `List console messages failed: ${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'list_console_messages',
         logFormat: 'json',
-        data: null
+        data: null,
       };
-      // response.appendResponseLine(`Error: ${error instanceof Error ? error.message : String(error)}`);
     }
   },
 });

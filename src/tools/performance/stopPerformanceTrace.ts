@@ -19,7 +19,8 @@ import {defineTool, type Context} from '../ToolDefinition.js';
  */
 export const stopPerformanceTrace = defineTool({
   name: 'stop_performance_trace',
-  description: 'Stop performance trace recording and analyze results via CDP Tracing.end',
+  description:
+    'Stop performance trace recording and analyze results via CDP Tracing.end',
   annotations: {category: ToolCategory.PERFORMANCE, readOnlyHint: true},
   schema: {},
   handler: async (_request, response, context) => {
@@ -42,7 +43,10 @@ export const stopPerformanceTrace = defineTool({
       const client = await page.context().newCDPSession(page);
 
       const traceChunks: string[] = [];
-      const eventHandler = (data: {method: string; params?: Record<string, unknown>}) => {
+      const eventHandler = (data: {
+        method: string;
+        params?: Record<string, unknown>;
+      }) => {
         if (data.method === 'Tracing.dataCollected' && data.params) {
           traceChunks.push((data.params as {value: string}).value);
         }
@@ -101,20 +105,12 @@ export const stopPerformanceTrace = defineTool({
     } catch (e) {
       const errorText = e instanceof Error ? e.message : JSON.stringify(e);
       logger.debug(`Error stopping performance trace: ${errorText}`);
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: false,
-            message: `停止性能追踪时出错：${errorText}`,
-            tooltype,
-            data,
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: false,
+        message: `停止性能追踪时出错：${errorText}`,
+        tooltype,
+        data,
+      });
     } finally {
       context.setIsRunningPerformanceTrace(false);
     }

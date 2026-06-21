@@ -68,7 +68,8 @@ interface DeviceProfileData {
  */
 export const emulateMobile = defineTool({
   name: 'emulate_mobile',
-  description: 'Emulate mobile device viewport, user-agent and touch events, or restore desktop mode',
+  description:
+    'Emulate mobile device viewport, user-agent and touch events, or restore desktop mode',
   annotations: {category: ToolCategory.EMULATION, readOnlyHint: false},
   schema: {
     enable: zod.boolean().describe('Enable or disable mobile emulation'),
@@ -87,19 +88,11 @@ export const emulateMobile = defineTool({
       if (enable) {
         const profile = DEVICE_PROFILES[device];
         if (!profile) {
-          response.appendResponseLine('```json');
-          response.appendResponseLine(
-            JSON.stringify(
-              {
-                success: false,
-                message: `未知的设备类型：${device}，支持：iphone, android, ipad`,
-                tooltype,
-              },
-              null,
-              2,
-            ),
-          );
-          response.appendResponseLine('```');
+          response.setStructuredContent({
+            success: false,
+            message: `未知的设备类型：${device}，支持：iphone, android, ipad`,
+            tooltype,
+          });
           return;
         }
 
@@ -113,31 +106,22 @@ export const emulateMobile = defineTool({
           userAgent: profile.userAgent,
         });
 
-        response.appendResponseLine('```json');
-        response.appendResponseLine(
-          JSON.stringify(
-            {
-              success: true,
-              message: `移动设备模拟已启用 (${device})`,
-              tooltype,
-              data: {
-                device,
-                viewport: {
-                  width: profile.viewport.width,
-                  height: profile.viewport.height,
-                },
-                userAgent: profile.userAgent.slice(0, 80) + '...',
-              },
+        response.setStructuredContent({
+          success: true,
+          message: `移动设备模拟已启用 (${device})`,
+          tooltype,
+          data: {
+            device,
+            viewport: {
+              width: profile.viewport.width,
+              height: profile.viewport.height,
             },
-            null,
-            2,
-          ),
-        );
-        response.appendResponseLine('```');
+            userAgent: profile.userAgent.slice(0, 80) + '...',
+          },
+        });
         return;
       }
 
-      // 关闭移动模拟，恢复桌面模式
       await page.setViewportSize({
         width: DESKTOP_VIEWPORT.width,
         height: DESKTOP_VIEWPORT.height,
@@ -148,33 +132,17 @@ export const emulateMobile = defineTool({
         userAgent: '',
       });
 
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: true,
-            message: '移动设备模拟已关闭',
-            tooltype,
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: true,
+        message: '移动设备模拟已关闭',
+        tooltype,
+      });
     } catch (error) {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: false,
-            message: `移动设备模拟失败：${error instanceof Error ? error.message : String(error)}`,
-            tooltype,
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: false,
+        message: `移动设备模拟失败：${error instanceof Error ? error.message : String(error)}`,
+        tooltype,
+      });
     }
   },
 });

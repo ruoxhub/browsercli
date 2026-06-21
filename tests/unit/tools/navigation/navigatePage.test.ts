@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2026 JSReverser-MCP
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -8,7 +8,7 @@ import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {navigatePage} from '../../../../src/tools/navigation/navigatePage.js';
-import type {ToolContextProvider} from '../../../../src/worker/ToolContext.js';
+import {ToolResponseAccumulator} from '../../../../src/worker/ToolResponse.js';
 
 interface MockCDPSession {
   send(method: string, params: unknown): Promise<void>;
@@ -39,31 +39,12 @@ function createPage(overrides: Partial<TestPage> = {}): TestPage {
   };
 }
 
-function createRuntime(
-  overrides: Record<string, unknown> = {},
-): any {
+function createRuntime(overrides: Record<string, unknown> = {}): any {
   return overrides;
 }
 
-function createResponse() {
-  const lines: string[] = [];
-  return {
-    lines,
-    response: {
-      appendResponseLine(value: string) {
-        lines.push(value);
-      },
-      setStructuredContent() {},
-      setIncludePages() {},
-      setIncludeNetworkRequests() {},
-      setIncludeConsoleData() {},
-      attachImage() {},
-      attachNetworkRequest() {},
-      attachConsoleMessage() {},
-      setIncludeWebSocketConnections() {},
-      attachWebSocket() {},
-    },
-  };
+function getOutput(response: ToolResponseAccumulator): string {
+  return (response.toJSON().text as string) ?? '';
 }
 
 describe('navigatePage (defineTool)', () => {
@@ -74,16 +55,11 @@ describe('navigatePage (defineTool)', () => {
       getSelectedPageIndex: () => null,
     });
 
-    const {response, lines} = createResponse();
+    const response = new ToolResponseAccumulator();
 
-    await navigatePage.handler(
-      {params: {type: 'reload'}},
-      response,
-      runtime,
-    );
+    await navigatePage.handler({params: {type: 'reload'}}, response, runtime);
 
-    const output = lines.join('\n');
-    assert.match(output, /new_page|select_page|无活跃页面/);
+    assert.match(getOutput(response), /new_page|select_page|无活跃页面/);
   });
 
   it('maps closed-page errors to actionable diagnostics', async () => {
@@ -99,16 +75,11 @@ describe('navigatePage (defineTool)', () => {
       getSelectedPageIndex: () => 0,
     });
 
-    const {response, lines} = createResponse();
+    const response = new ToolResponseAccumulator();
 
-    await navigatePage.handler(
-      {params: {type: 'reload'}},
-      response,
-      runtime,
-    );
+    await navigatePage.handler({params: {type: 'reload'}}, response, runtime);
 
-    const output = lines.join('\n');
-    assert.match(output, /页面已关闭|list_pages|导航失败/);
+    assert.match(getOutput(response), /页面已关闭|list_pages|导航失败/);
   });
 
   it('maps timeout errors to readable troubleshooting guidance', async () => {
@@ -124,7 +95,7 @@ describe('navigatePage (defineTool)', () => {
       getSelectedPageIndex: () => 0,
     });
 
-    const {response, lines} = createResponse();
+    const response = new ToolResponseAccumulator();
 
     await navigatePage.handler(
       {params: {type: 'url', url: 'https://slow.example'}},
@@ -132,7 +103,6 @@ describe('navigatePage (defineTool)', () => {
       runtime,
     );
 
-    const output = lines.join('\n');
-    assert.match(output, /超时/);
+    assert.match(getOutput(response), /超时/);
   });
 });

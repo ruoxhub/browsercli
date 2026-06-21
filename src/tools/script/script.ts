@@ -36,9 +36,15 @@ interface ScriptStructuredResult {
 }
 
 type DesiredContext = 'page' | 'content-script';
-type ContextProvider = NonNullable<ReturnType<typeof getRuntime>['contextProvider']>;
+type ContextProvider = NonNullable<
+  ReturnType<typeof getRuntime>['contextProvider']
+>;
 
-function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  message: string,
+): Promise<T> {
   return Promise.race([
     promise,
     new Promise<T>((_, reject) => {
@@ -90,7 +96,9 @@ function describeContextSelectionFailure(
   selectedFrameId?: string,
   explicitFrameId?: string,
 ): string {
-  const worldMatches = executionContexts.filter(ctx => ctx.world === desiredContext);
+  const worldMatches = executionContexts.filter(
+    ctx => ctx.world === desiredContext,
+  );
 
   if (worldMatches.length === 0) {
     return `脚本执行失败：当前页面没有可用的 ${desiredContext} 执行上下文`;
@@ -148,10 +156,12 @@ function getIsolationHint(
     return null;
   }
 
-  const looksLikeExtensionObject = /(window|globalThis|self)\.__[A-Za-z0-9_$]+/.test(functionCode);
-  const looksLikeIsolationMiss = /undefined|not defined|not a function|Cannot read properties/i.test(
-    errorMessage,
-  );
+  const looksLikeExtensionObject =
+    /(window|globalThis|self)\.__[A-Za-z0-9_$]+/.test(functionCode);
+  const looksLikeIsolationMiss =
+    /undefined|not defined|not a function|Cannot read properties/i.test(
+      errorMessage,
+    );
 
   if (!looksLikeExtensionObject || !looksLikeIsolationMiss) {
     return null;
@@ -177,7 +187,9 @@ function writeStructuredFailure(
   message: string,
   result?: string,
 ): void {
-  response.setStructuredContent(buildStructuredPayload(tooltype, false, message, result));
+  response.setStructuredContent(
+    buildStructuredPayload(tooltype, false, message, result),
+  );
 }
 
 async function writeEvaluationOutput(
@@ -196,16 +208,14 @@ async function writeEvaluationOutput(
     return;
   }
 
-  response.appendResponseLine('Script ran on page and returned:');
   response.setStructuredContent(
-    buildStructuredPayload('evaluate_script', true, 'Script ran on page and returned', resultString),
+    buildStructuredPayload(
+      'evaluate_script',
+      true,
+      'Script ran on page and returned',
+      resultString,
+    ),
   );
-}
-
-function writeJsonPayload(response: Response, payload: ScriptStructuredResult): void {
-  response.appendResponseLine('```json');
-  response.appendResponseLine(JSON.stringify(payload, null, 2));
-  response.appendResponseLine('```');
 }
 
 async function evaluateScriptInExecutionContext(
@@ -314,7 +324,11 @@ async function runOnDebuggerContext(
 
     const client = debuggerContext.getClient();
     if (!client) {
-      writeStructuredFailure(response, 'evaluate_script', '脚本执行失败：Debugger CDP 会话不可用');
+      writeStructuredFailure(
+        response,
+        'evaluate_script',
+        '脚本执行失败：Debugger CDP 会话不可用',
+      );
       return 'handled';
     }
 
@@ -362,8 +376,7 @@ function runOnFrame(
   response: Response,
 ): Promise<void> {
   if (request.desiredContext === 'content-script') {
-    writeJsonPayload(
-      response,
+    response.setStructuredContent(
       buildStructuredPayload(
         'evaluate_script',
         false,
@@ -375,8 +388,7 @@ function runOnFrame(
 
   const frame = ctx.getSelectedFrame();
   if (!frame) {
-    writeJsonPayload(
-      response,
+    response.setStructuredContent(
       buildStructuredPayload('evaluate_script', false, '当前没有可用的 Frame'),
     );
     return Promise.resolve();
@@ -393,7 +405,7 @@ function runOnFrame(
         result.message = hint;
       }
     }
-    writeJsonPayload(response, result);
+    response.setStructuredContent(result);
   });
 }
 
@@ -444,7 +456,12 @@ export const evaluateScript = defineTool({
     const filePath = request.params.filePath;
 
     if (!functionCode || functionCode.trim().length === 0) {
-      writeStructuredFailure(response, 'evaluate_script', 'function 参数不能为空', '');
+      writeStructuredFailure(
+        response,
+        'evaluate_script',
+        'function 参数不能为空',
+        '',
+      );
       return;
     }
 
@@ -461,13 +478,28 @@ export const evaluateScript = defineTool({
 
     const ctx = getRuntime().contextProvider;
     if (!ctx) {
-      writeStructuredFailure(response, 'evaluate_script', '脚本执行失败：运行时上下文不可用');
+      writeStructuredFailure(
+        response,
+        'evaluate_script',
+        '脚本执行失败：运行时上下文不可用',
+      );
       return;
     }
 
-    const evalRequest = {functionCode, desiredContext, explicitFrameId, allowAnyFrame, filePath};
+    const evalRequest = {
+      functionCode,
+      desiredContext,
+      explicitFrameId,
+      allowAnyFrame,
+      filePath,
+    };
 
-    const outcome = await runOnDebuggerContext(ctx, evalRequest, response, toolContext);
+    const outcome = await runOnDebuggerContext(
+      ctx,
+      evalRequest,
+      response,
+      toolContext,
+    );
     if (outcome === 'handled') {
       return;
     }
@@ -503,13 +535,21 @@ export const injectPreloadScript = defineTool({
       : (request.params.script ?? '');
 
     if (!script || script.trim().length === 0) {
-      response.setStructuredContent({success: false, message: '脚本内容不能为空', tooltype});
+      response.setStructuredContent({
+        success: false,
+        message: '脚本内容不能为空',
+        tooltype,
+      });
       return;
     }
 
     const ctx = getRuntime().contextProvider;
     if (!ctx) {
-      response.setStructuredContent({success: false, message: '当前运行时上下文不可用', tooltype});
+      response.setStructuredContent({
+        success: false,
+        message: '当前运行时上下文不可用',
+        tooltype,
+      });
       return;
     }
 

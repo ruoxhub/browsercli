@@ -24,20 +24,12 @@ export const searchSiteExperience = defineTool({
     const {url, name} = request.params;
 
     if (!url && !name) {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: false,
-            message: '请提供 url 或 name 参数进行搜索',
-            tooltype: 'search_site_experience',
-            results: [],
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: false,
+        message: '请提供 url 或 name 参数进行搜索',
+        tooltype: 'search_site_experience',
+        data: {results: []},
+      });
       return;
     }
 
@@ -46,35 +38,19 @@ export const searchSiteExperience = defineTool({
       if (url !== undefined) searchParams.url = url;
       if (name !== undefined) searchParams.name = name;
       const results = await siteExperienceService.search(searchParams);
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: true,
-            message: `找到 ${results.length} 条站点经验`,
-            tooltype: 'search_site_experience',
-            results,
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: true,
+        message: `找到 ${results.length} 条站点经验`,
+        tooltype: 'search_site_experience',
+        data: {results},
+      });
     } catch (error) {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: false,
-            message: `搜索失败：${error instanceof Error ? error.message : String(error)}`,
-            tooltype: 'search_site_experience',
-            results: [],
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: false,
+        message: `搜索失败：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'search_site_experience',
+        data: {results: []},
+      });
     }
   },
 });
@@ -111,19 +87,11 @@ export const createSiteExperience = defineTool({
       typeof params.domain !== 'string' ||
       !params.domain.trim()
     ) {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: false,
-            message: '创建失败：domain 为必填字段，且不能为空字符串',
-            tooltype: 'create_site_experience',
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: false,
+        message: '创建失败：domain 为必填字段，且不能为空字符串',
+        tooltype: 'create_site_experience',
+      });
       return;
     }
     if (
@@ -131,19 +99,11 @@ export const createSiteExperience = defineTool({
       typeof params.name !== 'string' ||
       !params.name.trim()
     ) {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: false,
-            message: '创建失败：name 为必填字段，且不能为空字符串',
-            tooltype: 'create_site_experience',
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: false,
+        message: '创建失败：name 为必填字段，且不能为空字符串',
+        tooltype: 'create_site_experience',
+      });
       return;
     }
 
@@ -152,20 +112,12 @@ export const createSiteExperience = defineTool({
         params.domain.trim(),
       );
       if (existing) {
-        response.appendResponseLine('```json');
-        response.appendResponseLine(
-          JSON.stringify(
-            {
-              success: false,
-              message: `域名 ${params.domain.trim()} 已存在（ID: ${existing.id}），请使用 update 更新`,
-              tooltype: 'create_site_experience',
-              result: existing,
-            },
-            null,
-            2,
-          ),
-        );
-        response.appendResponseLine('```');
+        response.setStructuredContent({
+          success: false,
+          message: `域名 ${params.domain.trim()} 已存在（ID: ${existing.id}），请使用 update 更新`,
+          tooltype: 'create_site_experience',
+          data: existing,
+        });
         return;
       }
 
@@ -180,34 +132,18 @@ export const createSiteExperience = defineTool({
         knownPitfalls: params.knownPitfalls ?? null,
       });
 
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: true,
-            message: `成功创建站点经验 (ID: ${result.id})`,
-            tooltype: 'create_site_experience',
-            result,
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: true,
+        message: `成功创建站点经验 (ID: ${result.id})`,
+        tooltype: 'create_site_experience',
+        data: result,
+      });
     } catch (error) {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: false,
-            message: `创建失败：${error instanceof Error ? error.message : String(error)}`,
-            tooltype: 'create_site_experience',
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: false,
+        message: `创建失败：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'create_site_experience',
+      });
     }
   },
 });
@@ -254,50 +190,26 @@ export const updateSiteExperience = defineTool({
       const result = await siteExperienceService.update(params.id, updateData);
 
       if (!result) {
-        response.appendResponseLine('```json');
-        response.appendResponseLine(
-          JSON.stringify(
-            {
-              success: false,
-              message: `未找到 ID 为 ${params.id} 的站点经验`,
-              tooltype: 'update_site_experience',
-            },
-            null,
-            2,
-          ),
-        );
-        response.appendResponseLine('```');
+        response.setStructuredContent({
+          success: false,
+          message: `未找到 ID 为 ${params.id} 的站点经验`,
+          tooltype: 'update_site_experience',
+        });
         return;
       }
 
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: true,
-            message: `成功更新站点经验 (ID: ${result.id})`,
-            tooltype: 'update_site_experience',
-            result,
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: true,
+        message: `成功更新站点经验 (ID: ${result.id})`,
+        tooltype: 'update_site_experience',
+        data: result,
+      });
     } catch (error) {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: false,
-            message: `更新失败：${error instanceof Error ? error.message : String(error)}`,
-            tooltype: 'update_site_experience',
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: false,
+        message: `更新失败：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'update_site_experience',
+      });
     }
   },
 });
@@ -319,49 +231,25 @@ export const deleteSiteExperience = defineTool({
       const deleted = await siteExperienceService.delete(id);
 
       if (!deleted) {
-        response.appendResponseLine('```json');
-        response.appendResponseLine(
-          JSON.stringify(
-            {
-              success: false,
-              message: `未找到 ID 为 ${id} 的站点经验`,
-              tooltype: 'delete_site_experience',
-            },
-            null,
-            2,
-          ),
-        );
-        response.appendResponseLine('```');
+        response.setStructuredContent({
+          success: false,
+          message: `未找到 ID 为 ${id} 的站点经验`,
+          tooltype: 'delete_site_experience',
+        });
         return;
       }
 
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: true,
-            message: `成功删除站点经验 (ID: ${id})`,
-            tooltype: 'delete_site_experience',
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: true,
+        message: `成功删除站点经验 (ID: ${id})`,
+        tooltype: 'delete_site_experience',
+      });
     } catch (error) {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: false,
-            message: `删除失败：${error instanceof Error ? error.message : String(error)}`,
-            tooltype: 'delete_site_experience',
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: false,
+        message: `删除失败：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'delete_site_experience',
+      });
     }
   },
 });
@@ -377,35 +265,19 @@ export const listSiteExperiences = defineTool({
   handler: async (_request, response) => {
     try {
       const results = await siteExperienceService.listAll();
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: true,
-            message: `共 ${results.length} 条站点经验`,
-            tooltype: 'list_site_experiences',
-            results,
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: true,
+        message: `共 ${results.length} 条站点经验`,
+        tooltype: 'list_site_experiences',
+        data: {results},
+      });
     } catch (error) {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: false,
-            message: `获取列表失败：${error instanceof Error ? error.message : String(error)}`,
-            tooltype: 'list_site_experiences',
-            results: [],
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: false,
+        message: `获取列表失败：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'list_site_experiences',
+        data: {results: []},
+      });
     }
   },
 });

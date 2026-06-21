@@ -133,7 +133,12 @@ function getMissingEvidenceFields(params: {
   targetUrl?: string;
   goal?: string;
 }): string[] {
-  const required: Array<keyof typeof params> = ['taskId', 'taskSlug', 'targetUrl', 'goal'];
+  const required: Array<keyof typeof params> = [
+    'taskId',
+    'taskSlug',
+    'targetUrl',
+    'goal',
+  ];
   return required.filter(field => !params[field]);
 }
 
@@ -151,7 +156,9 @@ function buildTargetContext(params: {
   };
 }
 
-function hasMeaningfulTargetContext(targetContext: ReturnType<typeof buildTargetContext>): boolean {
+function hasMeaningfulTargetContext(
+  targetContext: ReturnType<typeof buildTargetContext>,
+): boolean {
   return (
     targetContext.targetKeywords.length > 0 ||
     targetContext.targetUrlPatterns.length > 0 ||
@@ -168,8 +175,12 @@ function hasMeaningfulTargetContext(targetContext: ReturnType<typeof buildTarget
  */
 export const record_reverse_evidence = defineTool({
   name: 'record_reverse_evidence',
-  description: 'Append structured reverse-engineering evidence to a task artifact log.',
-  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: false},
+  description:
+    'Append structured reverse-engineering evidence to a task artifact log.',
+  annotations: {
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: false,
+  },
   schema: {
     taskId: zod.string(),
     taskSlug: zod.string(),
@@ -235,10 +246,9 @@ export const record_reverse_evidence = defineTool({
     }
 
     if (hasTargetContext) {
-      const existingTargetContext = await runtime.reverseTaskStore.readSnapshot<Record<string, unknown>>(
-        request.params.taskId,
-        'target-context.json',
-      );
+      const existingTargetContext = await runtime.reverseTaskStore.readSnapshot<
+        Record<string, unknown>
+      >(request.params.taskId, 'target-context.json');
       await task.writeSnapshot('target-context.json', {
         ...existingTargetContext,
         ...targetContext,
@@ -270,7 +280,8 @@ export const record_reverse_evidence = defineTool({
  */
 export const export_session_report = defineTool({
   name: 'export_session_report',
-  description: 'Export current reverse-engineering session as JSON or Markdown.',
+  description:
+    'Export current reverse-engineering session as JSON or Markdown.',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
   schema: {
     format: zod.enum(['json', 'markdown']).default('json'),
@@ -281,10 +292,12 @@ export const export_session_report = defineTool({
     const summaries = runtime.collector.getCollectedFilesSummary();
     const collectorStats = await runtime.collector.getAllStats();
     const hookStats = runtime.hookManager.getStats();
-    const totalHookRecords = runtime.hookManager.getAllKnownHookIds().reduce(
-      (sum, hookId) => sum + runtime.hookManager.getRecords(hookId).length,
-      0,
-    );
+    const totalHookRecords = runtime.hookManager
+      .getAllKnownHookIds()
+      .reduce(
+        (sum, hookId) => sum + runtime.hookManager.getRecords(hookId).length,
+        0,
+      );
     const tokenStats = TokenBudgetManager.getInstance().getStats();
 
     const report = {
@@ -303,12 +316,19 @@ export const export_session_report = defineTool({
         maxTokens: tokenStats.maxTokens,
         usagePercent: tokenStats.usagePercentage,
       },
-      hookData: request.params.includeHookData ? runtime.hookManager.exportData('json') : undefined,
+      hookData: request.params.includeHookData
+        ? runtime.hookManager.exportData('json')
+        : undefined,
     };
 
     if (request.params.format === 'markdown') {
       const markdown = toMarkdownReport(report);
-      response.appendResponseLine(markdown);
+      response.setStructuredContent({
+        success: true,
+        message: `会话报告已导出 (格式: markdown)`,
+        tooltype: 'export_session_report',
+        data: {format: 'markdown', markdown},
+      });
       return;
     }
 

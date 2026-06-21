@@ -37,8 +37,11 @@ export const diagnoseEnvironmentTool = defineTool({
       report.status = hasFail ? 'fail' : hasWarn ? 'warn' : 'ok';
     }
 
-    response.appendResponseLine('```json');
-    response.appendResponseLine(JSON.stringify(report, null, 2));
-    response.appendResponseLine('```');
+    response.setStructuredContent({
+      success: report.status !== 'fail',
+      message: `环境诊断完成 (status: ${report.status})`,
+      tooltype: 'diagnose_environment',
+      data: report,
+    });
   },
 });

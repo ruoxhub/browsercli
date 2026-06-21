@@ -13,7 +13,8 @@ import {defineTool, type Context} from '../ToolDefinition.js';
  */
 export const emulateCpu = defineTool({
   name: 'emulate_cpu',
-  description: 'Emulate CPU throttling via CDP Performance.setCPUThrottlingRate',
+  description:
+    'Emulate CPU throttling via CDP Performance.setCPUThrottlingRate',
   annotations: {category: ToolCategory.EMULATION, readOnlyHint: false},
   schema: {
     throttlingRate: zod
@@ -31,39 +32,26 @@ export const emulateCpu = defineTool({
     try {
       const client = await page.context().newCDPSession(page);
       await client.send('Performance.enable');
-      await (client.send as (
-        method: string,
-        params?: Record<string, unknown>,
-      ) => Promise<Record<string, unknown>>)('Performance.setCPUThrottlingRate', {
+      await (
+        client.send as (
+          method: string,
+          params?: Record<string, unknown>,
+        ) => Promise<Record<string, unknown>>
+      )('Performance.setCPUThrottlingRate', {
         rate: throttlingRate,
       });
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: true,
-            message: `CPU 降频已设置为 ${throttlingRate}x`,
-            tooltype,
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: true,
+        message: `CPU 降频已设置为 ${throttlingRate}x`,
+        tooltype,
+        data: {rate: throttlingRate},
+      });
     } catch (error) {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: false,
-            message: `CPU 降频设置失败：${error instanceof Error ? error.message : String(error)}`,
-            tooltype,
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: false,
+        message: `CPU 降频设置失败：${error instanceof Error ? error.message : String(error)}`,
+        tooltype,
+      });
     }
   },
 });

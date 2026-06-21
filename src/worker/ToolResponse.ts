@@ -97,19 +97,24 @@ export class ToolResponseAccumulator implements Response {
     const result: Record<string, unknown> = {};
 
     if (this.lines.length > 0) {
-      const text = this.lines.join('\n');
-      result.text = text;
-      if (this.structuredContent === null) {
-        const parsed = parseFencedJson(text);
-        if (parsed !== undefined) {
-          result.structuredContent = parsed;
-        }
-      }
+      result.text = this.lines.join('\n');
     }
 
     if (this.structuredContent !== null) {
       result.structuredContent = this.structuredContent;
+
+      if (
+        this.lines.length === 0 &&
+        typeof this.structuredContent === 'object' &&
+        this.structuredContent !== null &&
+        'message' in this.structuredContent &&
+        typeof (this.structuredContent as {message: unknown}).message ===
+          'string'
+      ) {
+        result.text = (this.structuredContent as {message: string}).message;
+      }
     }
+
     if (this.includePages) result.pages = [];
     if (this.includeNetwork) result.network = [];
 
@@ -117,6 +122,10 @@ export class ToolResponseAccumulator implements Response {
   }
 }
 
+/**
+ * @deprecated 所有工具 handler 已统一使用 setStructuredContent，不再产出 ```json 围栏。
+ * 仅为外部消费者保留向后兼容，内部管线不再调用。
+ */
 function parseFencedJson(text: string): unknown {
   const match = text.match(/^```json\s*\n([\s\S]*?)\n```$/);
   if (!match) return undefined;
@@ -127,6 +136,9 @@ function parseFencedJson(text: string): unknown {
     return undefined;
   }
 }
+
+// Keep the symbol referenced so tree-shaking doesn't drop it for external consumers.
+export const _legacyParseFencedJson = parseFencedJson;
 
 /**
  * ToolResponseProcessor — 统一的响应处理器，融合了规范化与大响应 Offload 逻辑

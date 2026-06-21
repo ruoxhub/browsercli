@@ -16,7 +16,7 @@ import {defineTool} from '../ToolDefinition.js';
  * 使用 context.getSelectedFrame().evaluate() 代替 page.evaluate()，
  * 以获得 ToolAdapter 提供的超时保护，防止调试器暂停时无限等待。
  *
- * @returns 结构化结果 { success, message, tooltype, logFormat, data }
+ * @returns 结构化结果 { success, message, tooltype, data }
  */
 export const getPerformanceMetrics = defineTool({
   name: 'get_performance_metrics',
@@ -56,13 +56,18 @@ export const getPerformanceMetrics = defineTool({
       }
 
       // Largest Contentful Paint (if available)
-      const lcpEntries = performance.getEntriesByType('largest-contentful-paint');
+      const lcpEntries = performance.getEntriesByType(
+        'largest-contentful-paint',
+      );
       if (lcpEntries.length > 0) {
-        performanceData.largestContentfulPaint = lcpEntries[lcpEntries.length - 1].startTime;
+        performanceData.largestContentfulPaint =
+          lcpEntries[lcpEntries.length - 1].startTime;
       }
 
       // Cumulative Layout Shift (if available)
-      const clsEntries = performance.getEntriesByType('layout-shift') as Array<PerformanceEntry & {value: number; hadRecentInput: boolean}>;
+      const clsEntries = performance.getEntriesByType('layout-shift') as Array<
+        PerformanceEntry & {value: number; hadRecentInput: boolean}
+      >;
       if (clsEntries.length > 0) {
         let clsValue = 0;
         for (const entry of clsEntries) {
@@ -85,15 +90,18 @@ export const getPerformanceMetrics = defineTool({
           const type = (resource as PerformanceResourceTiming).initiatorType;
           byType[type] = (byType[type] || 0) + 1;
         }
-        (performanceData.resources as {byType: Record<string, number>}).byType = byType;
+        (performanceData.resources as {byType: Record<string, number>}).byType =
+          byType;
       }
 
       return performanceData;
     });
 
-    response.appendResponseLine('## Performance Metrics');
-    response.appendResponseLine('```json');
-    response.appendResponseLine(JSON.stringify(metrics, null, 2));
-    response.appendResponseLine('```');
+    response.setStructuredContent({
+      success: true,
+      message: 'Performance metrics collected',
+      tooltype: 'get_performance_metrics',
+      data: metrics,
+    });
   },
 });

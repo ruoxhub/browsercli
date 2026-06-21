@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {StealthInjectionOptions, StealthPreset, StealthReport} from '../../modules/stealth/StealthScripts2025.js';
+import type {
+  StealthInjectionOptions,
+  StealthPreset,
+  StealthReport,
+} from '../../modules/stealth/StealthScripts2025.js';
 import {StealthScripts2025} from '../../modules/stealth/StealthScripts2025.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
@@ -15,8 +19,12 @@ import {defineTool, type Context} from '../ToolDefinition.js';
  */
 export const injectStealth = defineTool({
   name: 'inject_stealth',
-  description: 'Inject anti-detection stealth scripts (hide webdriver, mock chrome, canvas noise, etc.)',
-  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: false},
+  description:
+    'Inject anti-detection stealth scripts (hide webdriver, mock chrome, canvas noise, etc.)',
+  annotations: {
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: false,
+  },
   schema: {
     preset: zod.string().optional().describe('Stealth preset name'),
   },
@@ -25,34 +33,18 @@ export const injectStealth = defineTool({
     try {
       const page = context.getSelectedPage();
       const report = await StealthScripts2025.injectAll(page, {preset});
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: true,
-            message: `Stealth scripts injected: ${report.injectedFeatures.length} features`,
-            tooltype: 'inject_stealth',
-            report,
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: true,
+        message: `Stealth scripts injected: ${report.injectedFeatures.length} features`,
+        tooltype: 'inject_stealth',
+        data: report,
+      });
     } catch (error) {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: false,
-            message: `注入失败：${error instanceof Error ? error.message : String(error)}`,
-            tooltype: 'inject_stealth',
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: false,
+        message: `注入失败：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'inject_stealth',
+      });
     }
   },
 });
@@ -66,20 +58,12 @@ export const listStealthPresets = defineTool({
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
   schema: {},
   handler: async (_request, response, _context) => {
-    response.appendResponseLine('```json');
-    response.appendResponseLine(
-      JSON.stringify(
-        {
-          success: true,
-          message: 'Available stealth presets',
-          tooltype: 'list_stealth_presets',
-          presets: StealthScripts2025.getPresets(),
-        },
-        null,
-        2,
-      ),
-    );
-    response.appendResponseLine('```');
+    response.setStructuredContent({
+      success: true,
+      message: 'Available stealth presets',
+      tooltype: 'list_stealth_presets',
+      data: {presets: StealthScripts2025.getPresets()},
+    });
   },
 });
 
@@ -92,37 +76,31 @@ export const listStealthFeatures = defineTool({
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
   schema: {},
   handler: async (_request, response, _context) => {
-    response.appendResponseLine('```json');
-    response.appendResponseLine(
-      JSON.stringify(
-        {
-          success: true,
-          message: 'Available stealth features',
-          tooltype: 'list_stealth_features',
-          features: [
-            'hideWebDriver',
-            'mockChrome',
-            'setUserAgent',
-            'fixPermissions',
-            'mockPlugins',
-            'canvasNoise',
-            'webglOverride',
-            'audioContextNoise',
-            'fixLanguages',
-            'mockBattery',
-            'mockMediaDevices',
-            'mockNotifications',
-            'mockConnection',
-            'focusOverride',
-            'performanceNoise',
-            'overrideScreen',
-          ],
-        },
-        null,
-        2,
-      ),
-    );
-    response.appendResponseLine('```');
+    response.setStructuredContent({
+      success: true,
+      message: 'Available stealth features',
+      tooltype: 'list_stealth_features',
+      data: {
+        features: [
+          'hideWebDriver',
+          'mockChrome',
+          'setUserAgent',
+          'fixPermissions',
+          'mockPlugins',
+          'canvasNoise',
+          'webglOverride',
+          'audioContextNoise',
+          'fixLanguages',
+          'mockBattery',
+          'mockMediaDevices',
+          'mockNotifications',
+          'mockConnection',
+          'focusOverride',
+          'performanceNoise',
+          'overrideScreen',
+        ],
+      },
+    });
   },
 });
 
@@ -132,7 +110,10 @@ export const listStealthFeatures = defineTool({
 export const setUserAgent = defineTool({
   name: 'set_user_agent',
   description: 'Set custom User-Agent for the current page via CDP',
-  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: false},
+  annotations: {
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: false,
+  },
   schema: {
     userAgent: zod.string().describe('Custom User-Agent string'),
   },
@@ -142,33 +123,18 @@ export const setUserAgent = defineTool({
       const page = context.getSelectedPage();
       const client = await page.context().newCDPSession(page);
       await client.send('Network.setUserAgentOverride', {userAgent});
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: true,
-            message: 'User-Agent updated.',
-            tooltype: 'set_user_agent',
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: true,
+        message: 'User-Agent updated.',
+        tooltype: 'set_user_agent',
+        data: {userAgent},
+      });
     } catch (error) {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: false,
-            message: `设置失败：${error instanceof Error ? error.message : String(error)}`,
-            tooltype: 'set_user_agent',
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: false,
+        message: `设置失败：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'set_user_agent',
+      });
     }
   },
 });

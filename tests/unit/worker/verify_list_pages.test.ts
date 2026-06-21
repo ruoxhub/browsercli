@@ -7,7 +7,10 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {ToolContextProvider, DefineToolContextFactory} from '../../../src/worker/ToolContext.js';
+import {
+  ToolContextProvider,
+  DefineToolContextFactory,
+} from '../../../src/worker/ToolContext.js';
 import {listPages} from '../../../src/tools/navigation/listPages.js';
 import {ToolResponseAccumulator} from '../../../src/worker/ToolResponse.js';
 
@@ -22,8 +25,16 @@ describe('listPages tool local verification', () => {
     const result = response.toJSON();
 
     assert.ok(result.structuredContent);
-    const structured = result.structuredContent as Record<string, unknown>;
-    assert.strictEqual(structured.success, false);
-    assert.match(structured.message as string, /没有选中的页面/);
+    const structured = result.structuredContent as {
+      success: boolean;
+      message: string;
+      tooltype: string;
+      data: {pageInfos: Array<unknown>; selectedIndex: number};
+    };
+    assert.strictEqual(structured.success, true);
+    assert.match(structured.message, /当前没有打开的页面/);
+    assert.strictEqual(structured.tooltype, 'list_pages');
+    assert.ok(Array.isArray(structured.data.pageInfos));
+    assert.strictEqual(structured.data.pageInfos.length, 0);
   });
 });

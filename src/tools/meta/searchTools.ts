@@ -44,6 +44,11 @@ export const searchToolsMeta = defineTool({
       domain: t.domain,
       profile: t.profile,
     }));
-    response.appendResponseLine(JSON.stringify(hits, null, 2));
+    response.setStructuredContent({
+      success: true,
+      message: `找到 ${hits.length} 个匹配工具`,
+      tooltype: 'search_tools',
+      data: {hits},
+    });
   },
 });

@@ -27,33 +27,18 @@ export const resizePage = defineTool({
 
     try {
       await page.setViewportSize({width, height});
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: true,
-            message: `页面尺寸已调整为 ${width}x${height}`,
-            tooltype,
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: true,
+        message: `页面尺寸已调整为 ${width}x${height}`,
+        tooltype,
+        data: {width, height},
+      });
     } catch (error) {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: false,
-            message: `页面尺寸调整失败：${error instanceof Error ? error.message : String(error)}`,
-            tooltype,
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: false,
+        message: `页面尺寸调整失败：${error instanceof Error ? error.message : String(error)}`,
+        tooltype,
+      });
     }
   },
 });

@@ -29,13 +29,13 @@ export const captureVideoFrame = defineTool({
     readOnlyHint: false,
   },
   schema: {
-    selector: zod
-      .string()
-      .describe('CSS selector for the video element.'),
+    selector: zod.string().describe('CSS selector for the video element.'),
     seekTime: zod
       .number()
       .optional()
-      .describe('Time position in seconds to seek to before capturing (optional).'),
+      .describe(
+        'Time position in seconds to seek to before capturing (optional).',
+      ),
     outputPath: zod
       .string()
       .optional()
@@ -88,9 +88,11 @@ export const captureVideoFrame = defineTool({
       }, request.params.selector);
 
       if (!videoBox) {
-        response.appendResponseLine(
-          `视频元素未找到: ${request.params.selector}`,
-        );
+        response.setStructuredContent({
+          success: false,
+          message: `视频元素未找到: ${request.params.selector}`,
+          tooltype: 'capture_video_frame',
+        });
         return;
       }
 
@@ -138,9 +140,10 @@ export const captureVideoFrame = defineTool({
 
       response.setStructuredContent({
         success: true,
-        message: request.params.seekTime !== undefined
-          ? `Captured video frame at ${request.params.seekTime}s from ${request.params.selector}.`
-          : `Captured video frame from ${request.params.selector}.`,
+        message:
+          request.params.seekTime !== undefined
+            ? `Captured video frame at ${request.params.seekTime}s from ${request.params.selector}.`
+            : `Captured video frame from ${request.params.selector}.`,
         tooltype: 'capture_video_frame',
         data: {
           selector: request.params.selector,

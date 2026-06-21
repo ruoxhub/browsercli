@@ -5,15 +5,15 @@
  */
 
 import {getRuntime} from '../../runtime.js';
-import { zod } from '../../third_party/index.js';
+import {zod} from '../../third_party/index.js';
 import type {Page} from '../../third_party/index.js';
 import {
   parseRawTraceBuffer,
   traceResultIsSuccess,
   getTraceSummary,
 } from '../../trace-processing/parse.js';
-import { ToolCategory } from '../categories.js';
-import { defineTool } from '../ToolDefinition.js';
+import {ToolCategory} from '../categories.js';
+import {defineTool} from '../ToolDefinition.js';
 import type {Response, Context} from '../ToolDefinition.js';
 
 /**
@@ -28,7 +28,10 @@ async function stopTracingAndAppendOutput(
   const client = await page.context().newCDPSession(page);
 
   const traceChunks: string[] = [];
-  const eventHandler = (data: {method: string; params?: Record<string, unknown>}) => {
+  const eventHandler = (data: {
+    method: string;
+    params?: Record<string, unknown>;
+  }) => {
     if (data.method === 'Tracing.dataCollected' && data.params) {
       traceChunks.push((data.params as {value: string}).value);
     }
@@ -64,9 +67,18 @@ async function stopTracingAndAppendOutput(
   if (traceResultIsSuccess(result)) {
     context.storeTraceRecording(result);
     const traceSummaryText = await getTraceSummary(result);
-    response.appendResponseLine(traceSummaryText);
+    response.setStructuredContent({
+      success: true,
+      message: 'Performance trace completed.',
+      tooltype: 'start_performance_trace',
+      data: {traceSummary: traceSummaryText},
+    });
   } else {
-    response.appendResponseLine(`Error parsing trace: ${result.error}`);
+    response.setStructuredContent({
+      success: false,
+      message: `Error parsing trace: ${result.error}`,
+      tooltype: 'start_performance_trace',
+    });
   }
 
   context.setIsRunningPerformanceTrace(false);
@@ -104,9 +116,12 @@ export const startPerformanceTrace = defineTool({
   },
   handler: async (request, response, context) => {
     if (context.isRunningPerformanceTrace()) {
-      response.appendResponseLine(
-        'Error: a performance trace is already running. Use stop_performance_trace to stop it. Only one trace can be running at any given time.',
-      );
+      response.setStructuredContent({
+        success: false,
+        message:
+          'Error: a performance trace is already running. Use stop_performance_trace to stop it. Only one trace can be running at any given time.',
+        tooltype: 'start_performance_trace',
+      });
       return;
     }
     context.setIsRunningPerformanceTrace(true);
@@ -165,9 +180,12 @@ export const startPerformanceTrace = defineTool({
       await new Promise(resolve => setTimeout(resolve, 5_000));
       await stopTracingAndAppendOutput(page, response, context);
     } else {
-      response.appendResponseLine(
-        `The performance trace is being recorded. Use stop_performance_trace to stop it.`,
-      );
+      response.setStructuredContent({
+        success: true,
+        message:
+          'The performance trace is being recorded. Use stop_performance_trace to stop it.',
+        tooltype: 'start_performance_trace',
+      });
     }
   },
 });

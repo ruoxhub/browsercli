@@ -61,28 +61,33 @@ export const listPages = defineTool({
       const selectedIndex = selectedPage ? pages.indexOf(selectedPage) : -1;
 
       if (pageInfos.length === 0) {
-        response.appendResponseLine('当前没有打开的页面。');
+        response.setStructuredContent({
+          success: true,
+          message: '当前没有打开的页面。',
+          tooltype: 'list_pages',
+          data: {pageInfos: [], selectedIndex},
+        });
         return;
       }
 
-       data = {
-         pageInfos,
-         selectedIndex
-       };
+      data = {
+        pageInfos,
+        selectedIndex,
+      };
 
-       response.setStructuredContent({
-         success: true,
-         message: "",
-         tooltype: 'list_pages',
-         data: data
-       });
-     } catch (error) {
-       response.setStructuredContent({
-         success: false,
-         message: `列出页面失败：${error instanceof Error ? error.message : String(error)}`,
-         tooltype: 'list_pages',
-         data: {}
-       });
-     }
+      response.setStructuredContent({
+        success: true,
+        message: '',
+        tooltype: 'list_pages',
+        data: data,
+      });
+    } catch (error) {
+      response.setStructuredContent({
+        success: false,
+        message: `列出页面失败：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'list_pages',
+        data: {},
+      });
+    }
   },
 });

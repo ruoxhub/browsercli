@@ -40,10 +40,7 @@ export const navigatePage = defineTool({
       .enum(['url', 'back', 'forward', 'reload'])
       .optional()
       .describe('导航类型（默认 url）。'),
-    url: zod
-      .string()
-      .optional()
-      .describe('目标 URL（仅 type=url 时使用）。'),
+    url: zod.string().optional().describe('目标 URL（仅 type=url 时使用）。'),
     ignoreCache: zod
       .boolean()
       .optional()
@@ -66,54 +63,58 @@ export const navigatePage = defineTool({
 
     const resolvedPage = resolveActivePage(runtime);
     if (!resolvedPage.ok) {
-      response.appendResponseLine((resolvedPage as {message: string}).message);
+      response.setStructuredContent({
+        success: false,
+        message: (resolvedPage as {message: string}).message,
+        tooltype: 'navigate_page',
+      });
       return;
     }
 
     const page = resolvedPage.page;
 
-     try {
-       switch (navType) {
-         case 'url':
-           await page.goto(request.params.url!, options);
-           break;
-         case 'back':
-           await page.goBack(options);
-           break;
-         case 'forward':
-           await page.goForward(options);
-           break;
-         case 'reload':
-           if (request.params.ignoreCache) {
-             const client = await page.context().newCDPSession(page);
-             await client.send('Page.reload', {ignoreCache: true});
-           } else {
-             await page.reload(options);
-           }
-           break;
-       }
+    try {
+      switch (navType) {
+        case 'url':
+          await page.goto(request.params.url!, options);
+          break;
+        case 'back':
+          await page.goBack(options);
+          break;
+        case 'forward':
+          await page.goForward(options);
+          break;
+        case 'reload':
+          if (request.params.ignoreCache) {
+            const client = await page.context().newCDPSession(page);
+            await client.send('Page.reload', {ignoreCache: true});
+          } else {
+            await page.reload(options);
+          }
+          break;
+      }
 
-       response.setStructuredContent({
-         success: true,
-         message: `已${actionLabel[navType]}${navType === 'url' ? ` ${request.params.url}` : ''}`,
-         tooltype: 'navigate_page',
-         data: {
-           type: navType,
-           url: page.url(),
-           navigated: true,
-         }
-       });
-     } catch (error) {
-       response.setStructuredContent({
-         success: false,
-         message: explainPageError(error, '导航'),
-         tooltype: 'navigate_page',
-         data: {
-           type: navType,
-           url: page.url(),
-           navigated: false,
-         }
-       });
-     }
+      response.setStructuredContent({
+        success: true,
+        message: `已${actionLabel[navType]}${navType === 'url' ? ` ${request.params.url}` : ''}`,
+        tooltype: 'navigate_page',
+        data: {
+          type: navType,
+          url: page.url(),
+          navigated: true,
+        },
+      });
+    } catch (error) {
+      response.setStructuredContent({
+        success: false,
+        message: explainPageError(error, '导航'),
+        tooltype: 'navigate_page',
+        data: {
+          type: navType,
+          url: page.url(),
+          navigated: false,
+        },
+      });
+    }
   },
 });

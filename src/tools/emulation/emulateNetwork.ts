@@ -49,7 +49,8 @@ const PREDEFINED_NETWORK_CONDITIONS: Record<
  */
 export const emulateNetwork = defineTool({
   name: 'emulate_network',
-  description: 'Emulate network conditions (throttling/offline) via CDP Network.emulateNetworkConditions',
+  description:
+    'Emulate network conditions (throttling/offline) via CDP Network.emulateNetworkConditions',
   annotations: {category: ToolCategory.EMULATION, readOnlyHint: false},
   schema: {
     throttlingOption: zod
@@ -74,15 +75,11 @@ export const emulateNetwork = defineTool({
           downloadThroughput: -1,
           uploadThroughput: -1,
         });
-        response.appendResponseLine('```json');
-        response.appendResponseLine(
-          JSON.stringify(
-            {success: true, message: '网络模拟已关闭', tooltype},
-            null,
-            2,
-          ),
-        );
-        response.appendResponseLine('```');
+        response.setStructuredContent({
+          success: true,
+          message: '网络模拟已关闭',
+          tooltype,
+        });
         return;
       }
 
@@ -93,64 +90,37 @@ export const emulateNetwork = defineTool({
           downloadThroughput: 0,
           uploadThroughput: 0,
         });
-        response.appendResponseLine('```json');
-        response.appendResponseLine(
-          JSON.stringify(
-            {success: true, message: '网络模拟已设置为离线模式', tooltype},
-            null,
-            2,
-          ),
-        );
-        response.appendResponseLine('```');
+        response.setStructuredContent({
+          success: true,
+          message: '网络模拟已设置为离线模式',
+          tooltype,
+        });
         return;
       }
 
       if (throttlingOption in PREDEFINED_NETWORK_CONDITIONS) {
         const conditions = PREDEFINED_NETWORK_CONDITIONS[throttlingOption];
         await client.send('Network.emulateNetworkConditions', conditions);
-        response.appendResponseLine('```json');
-        response.appendResponseLine(
-          JSON.stringify(
-            {
-              success: true,
-              message: `网络模拟已设置为：${throttlingOption}`,
-              tooltype,
-            },
-            null,
-            2,
-          ),
-        );
-        response.appendResponseLine('```');
+        response.setStructuredContent({
+          success: true,
+          message: `网络模拟已设置为：${throttlingOption}`,
+          tooltype,
+          data: {option: throttlingOption, conditions},
+        });
         return;
       }
 
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: false,
-            message: `未知的网络节流选项：${throttlingOption}`,
-            tooltype,
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: false,
+        message: `未知的网络节流选项：${throttlingOption}`,
+        tooltype,
+      });
     } catch (error) {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: false,
-            message: `网络模拟失败：${error instanceof Error ? error.message : String(error)}`,
-            tooltype,
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: false,
+        message: `网络模拟失败：${error instanceof Error ? error.message : String(error)}`,
+        tooltype,
+      });
     }
   },
 });

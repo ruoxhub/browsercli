@@ -13,7 +13,8 @@ import {defineTool, type Context} from '../ToolDefinition.js';
  */
 export const updateExtensions = defineTool({
   name: 'update_extensions',
-  description: 'Update Chrome extensions by clicking the update button on chrome://extensions/',
+  description:
+    'Update Chrome extensions by clicking the update button on chrome://extensions/',
   annotations: {category: ToolCategory.PAGES, readOnlyHint: false},
   schema: {},
   handler: async (_request, response, context) => {
@@ -54,49 +55,25 @@ export const updateExtensions = defineTool({
       };
 
       if (result.success) {
-        response.appendResponseLine('```json');
-        response.appendResponseLine(
-          JSON.stringify(
-            {
-              success: true,
-              message: 'Chrome extensions update initiated successfully.',
-              tooltype: 'update_extensions',
-            },
-            null,
-            2,
-          ),
-        );
-        response.appendResponseLine('```');
+        response.setStructuredContent({
+          success: true,
+          message: 'Chrome extensions update initiated successfully.',
+          tooltype: 'update_extensions',
+        });
         return;
       }
 
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: false,
-            message: `Failed to update extensions: ${result.error ?? 'unknown error'}`,
-            tooltype: 'update_extensions',
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: false,
+        message: `Failed to update extensions: ${result.error ?? 'unknown error'}`,
+        tooltype: 'update_extensions',
+      });
     } catch (error) {
-      response.appendResponseLine('```json');
-      response.appendResponseLine(
-        JSON.stringify(
-          {
-            success: false,
-            message: `Error: ${error instanceof Error ? error.message : String(error)}`,
-            tooltype: 'update_extensions',
-          },
-          null,
-          2,
-        ),
-      );
-      response.appendResponseLine('```');
+      response.setStructuredContent({
+        success: false,
+        message: `Error: ${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'update_extensions',
+      });
     }
   },
 });

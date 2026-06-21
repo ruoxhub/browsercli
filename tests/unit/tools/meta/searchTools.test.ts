@@ -8,23 +8,7 @@ import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {searchToolsMeta} from '../../../../src/tools/meta/searchTools.js';
-
-interface FakeResponseLike {
-  appendResponseLine(value: string): void;
-}
-
-function createFakeResponse(): {
-  response: FakeResponseLike;
-  lines: string[];
-} {
-  const lines: string[] = [];
-  const response: FakeResponseLike = {
-    appendResponseLine(value: string) {
-      lines.push(value);
-    },
-  };
-  return {response, lines};
-}
+import {ToolResponseAccumulator} from '../../../../src/worker/ToolResponse.js';
 
 describe('searchToolsMeta', () => {
   it('exposes defineTool shape with correct name and category', () => {
@@ -42,18 +26,24 @@ describe('searchToolsMeta', () => {
     assert.ok(keys.includes('limit'));
   });
 
-  it('handler returns JSON list of matching tools through response', async () => {
-    const {response, lines} = createFakeResponse();
+  it('handler returns structured tool hits through response', async () => {
+    const response = new ToolResponseAccumulator();
 
     await searchToolsMeta.handler(
       {params: {query: 'screenshot', limit: 3}},
-      response as never,
+      response,
       {} as never,
     );
 
-    const payload = lines.join('\n');
-    const parsed = JSON.parse(payload) as Array<{name: string}>;
-    assert.ok(Array.isArray(parsed));
-    assert.ok(parsed.length <= 3);
+    const result = response.toJSON();
+    const structured = result.structuredContent as {
+      success: boolean;
+      tooltype: string;
+      data: {hits: Array<{name: string}>};
+    };
+    assert.strictEqual(structured.success, true);
+    assert.strictEqual(structured.tooltype, 'search_tools');
+    assert.ok(Array.isArray(structured.data.hits));
+    assert.ok(structured.data.hits.length <= 3);
   });
 });

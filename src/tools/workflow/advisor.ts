@@ -140,11 +140,17 @@ export const recommendNextStepTool = defineTool({
     firstDivergenceKnown: zod.boolean().optional(),
   },
   handler: async (request, response) => {
-    response.appendResponseLine('```json');
-    response.appendResponseLine(
-      JSON.stringify(await buildTaskAwareAdvice(request.params), null, 2),
-    );
-    response.appendResponseLine('```');
+    const advice = await buildTaskAwareAdvice(request.params);
+    const stage =
+      typeof advice === 'object' && advice !== null && 'stage' in advice
+        ? (advice as {stage: string}).stage
+        : undefined;
+    response.setStructuredContent({
+      success: true,
+      message: stage ? `推荐下一步: ${stage}` : '已生成下一步建议',
+      tooltype: 'recommend_next_step',
+      data: advice,
+    });
   },
 });
 
@@ -167,17 +173,15 @@ export const explainReverseStage = defineTool({
   },
   handler: async (request, response) => {
     const guide = getReverseStageGuide(request.params.stage);
-    response.appendResponseLine('```json');
-    response.appendResponseLine(
-      JSON.stringify(
-        {
-          ...guide,
-          ...(request.params.includeDocs === false ? {docRefs: undefined} : {}),
-        },
-        null,
-        2,
-      ),
-    );
-    response.appendResponseLine('```');
+    const payload =
+      request.params.includeDocs === false
+        ? {...guide, docRefs: undefined}
+        : guide;
+    response.setStructuredContent({
+      success: true,
+      message: `逆向阶段说明: ${request.params.stage}`,
+      tooltype: 'explain_reverse_stage',
+      data: payload,
+    });
   },
 });

@@ -18,9 +18,12 @@ export const listParameterWorkflowsTool = defineTool({
   handler: async (_request, response) => {
     const library = await getParameterWorkflowLibrary();
     const items = await library.listWorkflows();
-    response.appendResponseLine('```json');
-    response.appendResponseLine(JSON.stringify({items}, null, 2));
-    response.appendResponseLine('```');
+    response.setStructuredContent({
+      success: true,
+      message: `共 ${items.length} 个参数化工作流`,
+      tooltype: 'list_parameter_workflows',
+      data: {items},
+    });
   },
 });
 
@@ -37,24 +40,21 @@ export const getParameterWorkflowTool = defineTool({
   handler: async (request, response) => {
     const library = await getParameterWorkflowLibrary();
     const doc = await library.getWorkflow(request.params.id);
-    response.appendResponseLine('```json');
-    response.appendResponseLine(
-      JSON.stringify(
-        {
-          id: doc.metadata.id,
-          title: doc.metadata.title,
-          aliases: doc.metadata.aliases,
-          category: doc.metadata.category,
-          summary: doc.metadata.summary,
-          parts: doc.parts,
-          mutations: doc.mutations,
-          workflow: doc.workflow,
-        },
-        null,
-        2,
-      ),
-    );
-    response.appendResponseLine('```');
+    response.setStructuredContent({
+      success: true,
+      message: `已获取参数化工作流: ${doc.metadata.title}`,
+      tooltype: 'get_parameter_workflow',
+      data: {
+        id: doc.metadata.id,
+        title: doc.metadata.title,
+        aliases: doc.metadata.aliases,
+        category: doc.metadata.category,
+        summary: doc.metadata.summary,
+        parts: doc.parts,
+        mutations: doc.mutations,
+        workflow: doc.workflow,
+      },
+    });
   },
 });
 
@@ -74,23 +74,20 @@ export const recommendParameterWorkflowTool = defineTool({
   handler: async (request, response) => {
     const library = await getParameterWorkflowLibrary();
     const doc = await library.recommendWorkflow(request.params.query);
-    response.appendResponseLine('```json');
-    response.appendResponseLine(
-      JSON.stringify(
-        {
-          id: doc.metadata.id,
-          title: doc.metadata.title,
-          aliases: doc.metadata.aliases,
-          category: doc.metadata.category,
-          summary: doc.metadata.summary,
-          parts: doc.parts,
-          mutations: doc.mutations,
-          workflow: doc.workflow,
-        },
-        null,
-        2,
-      ),
-    );
-    response.appendResponseLine('```');
+    response.setStructuredContent({
+      success: true,
+      message: `推荐参数化工作流: ${doc.metadata.title}`,
+      tooltype: 'recommend_parameter_workflow',
+      data: {
+        id: doc.metadata.id,
+        title: doc.metadata.title,
+        aliases: doc.metadata.aliases,
+        category: doc.metadata.category,
+        summary: doc.metadata.summary,
+        parts: doc.parts,
+        mutations: doc.mutations,
+        workflow: doc.workflow,
+      },
+    });
   },
 });
