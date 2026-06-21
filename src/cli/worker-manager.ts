@@ -91,10 +91,27 @@ export class WorkerManager {
     }
 
     try {
-      process.kill(pid, IS_WIN ? undefined : 'SIGTERM');
+      // Windows: SIGINT 触发 process.on('SIGINT') → handleShutdown → consoleServer.stop()
+      // Unix:    SIGTERM 触发 process.on('SIGTERM') → handleShutdown
+      // 不传 signal (undefined) 在 Windows 上等价于 TerminateProcess()，跳过所有信号处理器，
+      // 导致 ConsoleServer 端口无法释放 (EADDRINUSE)。
+      process.kill(pid, IS_WIN ? 'SIGINT' : 'SIGTERM');
       await this.waitForExit(10_000);
-      if (!IS_WIN && this.isRunning()) {
-        process.kill(pid, 'SIGKILL');
+
+      if (this.isRunning()) {
+        if (IS_WIN) {
+          // taskkill /T 杀掉进程树（含孤儿浏览器子进程），/F 强制终止
+          try {
+            execSync(`taskkill /PID ${pid} /T /F`, {
+              timeout: 5000,
+              windowsHide: true,
+            });
+          } catch {
+            // 进程可能已退出
+          }
+        } else {
+          process.kill(pid, 'SIGKILL');
+        }
       }
     } catch {
       // 进程可能已退出
