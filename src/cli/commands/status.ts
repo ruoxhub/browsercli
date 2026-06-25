@@ -79,7 +79,7 @@ export const statusCommand: AxiCliCommand<WorkerContext> = async (
       command: 'status',
       running: false,
       message:
-        'Worker 未运行。请先执行：js-reverse start --browserUrl <chrome-debug-url>',
+        'Worker 未运行。请先执行：browsercli start --browserUrl <chrome-debug-url>',
     };
   }
 

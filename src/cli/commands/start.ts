@@ -113,7 +113,7 @@ export const startCommand: AxiCliCommand<WorkerContext> = async (args, ctx) => {
   const workerManager = ctx?.workerManager;
   if (workerManager?.isRunning()) {
     throw new AxiError('Worker 已经在运行中', 'WORKER_ALREADY_RUNNING', [
-      '如需重启，请先执行：js-reverse stop',
+      '如需重启，请先执行：browsercli stop',
     ]);
   }
 

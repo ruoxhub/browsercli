@@ -157,7 +157,7 @@ export const replCommand: AxiCliCommand<WorkerContext> = async (_args, ctx) => {
     const pid = workerManager.getPid();
     replLog(`Worker 运行中 (PID: ${pid})`);
   } else {
-    replLog('Worker 未运行，请先执行：js-reverse start --browserUrl <url>');
+    replLog('Worker 未运行，请先执行：browsercli start --browserUrl <url>');
     replLog('');
   }
 
@@ -193,7 +193,7 @@ export const replCommand: AxiCliCommand<WorkerContext> = async (_args, ctx) => {
   });
 
   const prompt = () => {
-    rl.question('js-reverse> ', async input => {
+    rl.question('browsercli> ', async input => {
       const shouldContinue = await session.processLine(rl, input);
       if (shouldContinue && isTTY) {
         prompt();

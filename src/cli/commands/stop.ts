@@ -18,7 +18,7 @@ export const stopCommand: AxiCliCommand<WorkerContext> = async (
 
   if (!workerManager?.isRunning()) {
     throw new AxiError('停止失败：Worker 未运行', 'WORKER_NOT_RUNNING', [
-      '请先执行：js-reverse start --browserUrl <chrome-debug-url>',
+      '请先执行：browsercli start --browserUrl <chrome-debug-url>',
     ]);
   }
 
@@ -32,7 +32,7 @@ export const stopCommand: AxiCliCommand<WorkerContext> = async (
     throw new AxiError(
       `停止失败：${error instanceof Error ? error.message : error}`,
       'WORKER_ERROR',
-      ['确保 Worker 正在运行：js-reverse status'],
+      ['确保 Worker 正在运行：browsercli status'],
     );
   }
 };

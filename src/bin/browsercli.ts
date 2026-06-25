@@ -7,9 +7,9 @@
  */
 
 /**
- * js-reverse CLI 入口 — 基于 axi-sdk-js runAxiCli 框架
+ * browsercli CLI 入口 — 基于 axi-sdk-js runAxiCli 框架
  *
- * 用法: js-reverse <command> [options]
+ * 用法: browsercli <command> [options]
  *
  * Commands:
  *   start         启动 Worker 并连接到 Sekiro Server
