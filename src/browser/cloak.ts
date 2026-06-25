@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2026 JSReverser-MCP
+ * Copyright 2026 Browser-CLI
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -14,7 +14,7 @@
  * `cloak-profile`），因为两者是不同的 Chromium 二进制，混用 state 会引发启动
  * race 和会话崩溃。详见 browser-helpers.ts::resolveUserDataDir。
  *
- * 移植自 D:/crawler-rpc/js-reverse-mcp/src/cloak.ts，仅替换 logger 路径。
+ * 移植自 D:/crawler-rpc/browsercli-mcp/src/cloak.ts，仅替换 logger 路径。
  */
 
 import {randomInt} from 'node:crypto';
@@ -34,7 +34,7 @@ async function loadCloakBrowser(): Promise<CloakBrowserModule> {
     throw new Error(
       '--cloak requires the `cloakbrowser` package. ' +
         'Install it with `npm install cloakbrowser`, or re-run via ' +
-        '`js-reverse start --cloak` to pull it as an optional dependency.',
+        '`browsercli start --cloak` to pull it as an optional dependency.',
     );
   }
 }

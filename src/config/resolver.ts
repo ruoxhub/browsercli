@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2026 JSReverser-MCP
+ * Copyright 2026 Browser-CLI
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -11,7 +11,7 @@
  * 1. CLI 参数（--rpcHost 等）
  * 2. 环境变量（RPC_HOST, OPENAI_API_KEY 等）
  * 3. 项目根目录配置文件（<cwd>/config.json）
- * 4. 项目级配置文件（<cwd>/js-reverse.config.json）
+ * 4. 项目级配置文件（<cwd>/browsercli.config.json）
  * 5. 用户级配置文件（~/.jsreverse/config.json）
  * 6. 内置默认值
  *
@@ -117,7 +117,7 @@ const DEFAULTS: Readonly<ResolvedConfig> = {
 } as const;
 
 // ==========================================================================
-// 第三部分：全局配置文件管理（~/.jsreverse/config.json + js-reverse.config.json）
+// 第三部分：全局配置文件管理（~/.jsreverse/config.json + browsercli.config.json）
 // ==========================================================================
 
 /** 获取用户级配置文件路径 (~/.jsreverse/config.json) */
@@ -125,7 +125,7 @@ export function getUserConfigPath(): string {
   return path.join(os.homedir(), USER_CONFIG_DIR_NAME, USER_CONFIG_FILENAME);
 }
 
-/** 获取项目级配置文件路径 (<cwd>/js-reverse.config.json) */
+/** 获取项目级配置文件路径 (<cwd>/browsercli.config.json) */
 export function getProjectConfigPath(cwd?: string): string {
   return path.join(cwd ?? process.cwd(), PROJECT_CONFIG_FILENAME);
 }

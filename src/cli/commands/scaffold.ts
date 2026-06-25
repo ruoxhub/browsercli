@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2026 JSReverser-MCP
+ * Copyright 2026 Browser-CLI
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -185,7 +185,7 @@ browsercli call <tool-or-skill-name> --url ${url || 'https://example.com'}
 
     const hookTemplate = `/**
  * @license
- * Copyright 2026 JSReverser-MCP
+ * Copyright 2026 Browser-CLI
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -204,7 +204,7 @@ browsercli call <tool-or-skill-name> --url ${url || 'https://example.com'}
 
     const bundleTemplate = `/**
  * @license
- * Copyright 2026 JSReverser-MCP
+ * Copyright 2026 Browser-CLI
  * SPDX-License-Identifier: Apache-2.0
  */
 

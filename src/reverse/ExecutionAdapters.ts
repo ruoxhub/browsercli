@@ -202,7 +202,7 @@ const exportRebuildBundleAdapter: ExecutionAdapter = async ({
         targetUrl: String(task.targetUrl ?? ''),
         goal: String(task.goal ?? ''),
         entryCode: `import "./env.js";\nimport "./polyfills.js";\nconsole.log("orchestrated rebuild entry");`,
-        envCode: `globalThis.window = globalThis;\nglobalThis.document ??= {cookie: "", location: {href: ""}};\nglobalThis.navigator ??= {userAgent: "JSReverser-MCP"};`,
+        envCode: `globalThis.window = globalThis;\nglobalThis.document ??= {cookie: "", location: {href: ""}};\nglobalThis.navigator ??= {userAgent: "Browser-CLI"};`,
         polyfillsCode: '',
         capture: {
           taskId,

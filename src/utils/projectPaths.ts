@@ -56,7 +56,7 @@ export function resolveArtifactsTasksDirForPackageRoot(
 
   return path.join(
     resolveUserStateHome(),
-    'jsreverser-mcp',
+    'Browser-CLI',
     'artifacts',
     'tasks',
   );

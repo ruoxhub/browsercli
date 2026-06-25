@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2026 JSReverser-MCP
+ * Copyright 2026 Browser-CLI
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -8,12 +8,12 @@
  * config 命令 — 查看/设置/初始化全局配置
  *
  * 用法：
- *   js-reverse config              — 显示当前生效的配置
- *   js-reverse config --init       — 初始化用户级配置文件
- *   js-reverse config --set key=value — 设置配置项
- *   js-reverse config --get key    — 获取配置项
- *   js-reverse config --list       — 列出配置文件路径和来源
- *   js-reverse config --unset key  — 删除配置项
+ *   browsercli config              — 显示当前生效的配置
+ *   browsercli config --init       — 初始化用户级配置文件
+ *   browsercli config --set key=value — 设置配置项
+ *   browsercli config --get key    — 获取配置项
+ *   browsercli config --list       — 列出配置文件路径和来源
+ *   browsercli config --unset key  — 删除配置项
  */
 
 import type {AxiCliCommand} from 'axi-sdk-js';
