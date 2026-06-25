@@ -1,20 +1,20 @@
 ---
-name: jsreverser-playbook
+name: browsercli-playbook
 description: Browser CLI 工具导航与选择指南。当用户提到 browsercli 工具、需要查询可用工具列表（141 个 MCP 工具）、为逆向任务选择工具组合、理解工具分类与参数时触发。涵盖 25 个功能域：观察取证、Hook 注入、调试器、代码分析、反调试、加密库拦截、Wasm 逆向、本地复现、WebSocket / Console / Stealth / Emulation 等。场景包含：定位签名/加密参数、反调试对抗、AST 去混淆、WebSocket 协议逆向、Wasm 二进制分析、Node 本地补环境复现、Hook/Breakpoint 选型决策、逆向阶段顾问与参数工作流推荐。
 ---
 
-# JSReverser playbook — 工具导航
+# Browser playbook — 工具导航
 
 ## 何时触发
 
 满足以下任一条件时，本 skill 优先加载：
 
-- 用户提到 `browsercli` / `browsercli-mcp` / `jsreverser` / 工具名（如 `hook_function` / `analyze_target` / `export_rebuild_bundle`）
+- 用户提到 `browsercli` / `browser` / `Browser` / 工具名（如 `hook_function` / `analyze_target` / `export_rebuild_bundle`）
 - 用户问"这些工具怎么用"、"该用哪个工具"、"先做哪一步"
 - 用户开始新逆向任务、问"如何定位签名"、"如何补环境"
 - 需要决定 Hook vs 断点、Observe vs Capture、Rebuild vs PureExtraction
 
-如果只是问"JSReverser-CLI 项目怎么用"或"怎么构建/发布",应直接读 `README.md` / `AGENTS.md`,不触发本 skill。
+如果只是问"Browser-CLI 项目怎么用"或"怎么构建/发布",应直接读 `README.md` / `AGENTS.md`,不触发本 skill。
 
 ---
 

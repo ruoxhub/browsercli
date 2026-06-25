@@ -224,7 +224,7 @@ export const configCommand: AxiCliCommand<WorkerContext> = async (
         k =>
           k.startsWith('SEKIRO_') ||
           k.startsWith('BROWSER_') ||
-          k.startsWith('JSREVERSER_') ||
+          k.startsWith('BROWSER_') ||
           k === 'DEFAULT_LLM_PROVIDER',
       ),
     });

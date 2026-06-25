@@ -35,7 +35,7 @@ interface LoggerConsoleState {
   writingFromLogger: boolean;
 }
 
-const LOGGER_CONSOLE_STATE = Symbol.for('jsreverser.logger.consoleState');
+const LOGGER_CONSOLE_STATE = Symbol.for('browser.logger.consoleState');
 
 function getConsoleState(): LoggerConsoleState {
   const globalWithState = globalThis as typeof globalThis & {
@@ -69,7 +69,7 @@ function createDefaultLogFileName(now = new Date()): string {
     state.defaultLogHome = home;
     state.defaultLogFileName = path.join(
       home,
-      '.jsreverse',
+      '.browsercli',
       'log',
       `${datetime}.log`,
     );

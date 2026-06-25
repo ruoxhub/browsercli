@@ -7,7 +7,7 @@
 /**
  * CloakBrowser 集成：源码层（C++ 二进制 patch）反检测。
  *
- * 仅在 worker 启动时传入 `--cloak` 才启用。不传时 JSReverser 走系统 Chrome
+ * 仅在 worker 启动时传入 `--cloak` 才启用。不传时 Browser 走系统 Chrome
  * + Patchright 协议层反检测（默认路径，零 JS 注入）。
  *
  * 默认模式与 cloak 模式使用不同的持久化 profile 目录（`chrome-profile` vs
@@ -42,7 +42,7 @@ async function loadCloakBrowser(): Promise<CloakBrowserModule> {
 /**
  * Redirect `console.log` / `console.info` to stderr for the duration of `fn`.
  *
- * JSReverser worker 的 stdout 是 Sekiro RPC 协议通道 —— 任何非协议字节
+ * Browser worker 的 stdout 是 Sekiro RPC 协议通道 —— 任何非协议字节
  * 都会让 Server 端断帧、客户端掉线。cloakbrowser 的 `ensureBinary()` 把
  * 下载进度写进 `console.log`（stdout），所以必须在它运行时重定向到 stderr。
  * 进度仍然可见（stderr 会进入 worker 日志面板）。
@@ -103,7 +103,7 @@ export async function setupCloak(
   const executablePath = await withStdoutRedirectedToStderr(async () => {
     if (!cloak.binaryInfo().installed) {
       process.stderr.write(
-        '[jsreverser] Downloading CloakBrowser stealth binary (~200MB, one-time setup)...\n',
+        '[browser] Downloading CloakBrowser stealth binary (~200MB, one-time setup)...\n',
       );
     }
     return cloak.ensureBinary();

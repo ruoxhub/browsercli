@@ -45,7 +45,7 @@ function resolveUserStateHome(): string {
 export function resolveArtifactsTasksDirForPackageRoot(
   packageRoot: string,
 ): string {
-  const explicitDir = process.env.JSREVERSER_ARTIFACTS_DIR;
+  const explicitDir = process.env.BROWSER_ARTIFACTS_DIR;
   if (explicitDir && explicitDir.trim().length > 0) {
     return path.resolve(explicitDir);
   }

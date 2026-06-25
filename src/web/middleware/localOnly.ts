@@ -7,7 +7,7 @@
 /**
  * localOnly 中间件 —— 仅允许来自 127.0.0.1 / ::1 的请求。
  *
- * 安全策略：JSReverser 控制台默认绑定 127.0.0.1:8765，但即便如此，宿主机上其它
+ * 安全策略：Browser 控制台默认绑定 127.0.0.1:8765，但即便如此，宿主机上其它
  * 进程理论上仍能通过本地接口访问。该中间件作为协议层兜底，强制返回 403 给所有
  * 非 loopback 来源。
  */
@@ -41,7 +41,7 @@ export function rejectIfNotLocal(
       success: false,
       error: {
         code: 'FORBIDDEN_NON_LOOPBACK',
-        message: 'JSReverser 控制台仅接受 127.0.0.1 来源',
+        message: 'Browser 控制台仅接受 127.0.0.1 来源',
       },
     }),
   );

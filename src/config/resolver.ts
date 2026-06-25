@@ -12,7 +12,7 @@
  * 2. 环境变量（RPC_HOST, OPENAI_API_KEY 等）
  * 3. 项目根目录配置文件（<cwd>/config.json）
  * 4. 项目级配置文件（<cwd>/browsercli.config.json）
- * 5. 用户级配置文件（~/.jsreverse/config.json）
+ * 5. 用户级配置文件（~/.browsercli/config.json）
  * 6. 内置默认值
  *
  * 服务相关配置（AI / Browser / System）已拆分至 servicesConfig.ts，
@@ -117,10 +117,10 @@ const DEFAULTS: Readonly<ResolvedConfig> = {
 } as const;
 
 // ==========================================================================
-// 第三部分：全局配置文件管理（~/.jsreverse/config.json + browsercli.config.json）
+// 第三部分：全局配置文件管理（~/.browsercli/config.json + browsercli.config.json）
 // ==========================================================================
 
-/** 获取用户级配置文件路径 (~/.jsreverse/config.json) */
+/** 获取用户级配置文件路径 (~/.browsercli/config.json) */
 export function getUserConfigPath(): string {
   return path.join(os.homedir(), USER_CONFIG_DIR_NAME, USER_CONFIG_FILENAME);
 }
@@ -249,9 +249,9 @@ const ENV_MAP: Readonly<Record<string, keyof GlobalConfig>> = {
   BROWSER_HEADLESS: 'headless',
   BROWSER_EXECUTABLE_PATH: 'executablePath',
   DATABASE_URL: 'databaseUrl',
-  JSREVERSER_RUNTIME_DIR: 'runtimeDirName',
+  BROWSER_RUNTIME_DIR: 'runtimeDirName',
   DEFAULT_LLM_PROVIDER: 'llmProvider',
-  JSREVERSER_DEBUG: 'debug',
+  BROWSER_DEBUG: 'debug',
   // OpenAI
   OPENAI_API_KEY: 'openai',
   OPENAI_BASE_URL: 'openai',
@@ -264,9 +264,9 @@ const ENV_MAP: Readonly<Record<string, keyof GlobalConfig>> = {
   REMOTE_DEBUGGING_PORT: 'browser',
   // 日志与会话
   LOG_LEVEL: 'logLevel',
-  JSREVERSER_OUTPUT_DIR: 'outputDir',
-  JSREVERSER_RECORD_TOOL_RESULTS: 'toolResultRecording',
-  JSREVERSER_TOOL_RESULTS_DIR: 'toolResultRecording',
+  BROWSER_OUTPUT_DIR: 'outputDir',
+  BROWSER_RECORD_TOOL_RESULTS: 'toolResultRecording',
+  BROWSER_TOOL_RESULTS_DIR: 'toolResultRecording',
   SESSION_STATE_TTL_MS: 'sessionStateTtlMs',
   SESSION_STATE_CLEANUP_INTERVAL_MS: 'sessionStateCleanupIntervalMs',
   SESSION_STATE_ENCRYPTION_KEY: 'sessionStateEncryptionKey',
@@ -416,8 +416,8 @@ function configFromEnv(): GlobalConfig {
 
   const toolResultRecording: NonNullable<GlobalConfig['toolResultRecording']> =
     {};
-  const recordToolResults = getEnvBoolean('JSREVERSER_RECORD_TOOL_RESULTS');
-  const toolResultsDir = getEnvValue('JSREVERSER_TOOL_RESULTS_DIR');
+  const recordToolResults = getEnvBoolean('BROWSER_RECORD_TOOL_RESULTS');
+  const toolResultsDir = getEnvValue('BROWSER_TOOL_RESULTS_DIR');
   if (recordToolResults !== undefined) {
     toolResultRecording.enabled = recordToolResults;
   }
@@ -527,8 +527,8 @@ export function showConfigInfo(): {
 
 export function getToolResultRecordingConfig(): ResolvedToolResultRecordingConfig {
   const {merged: fileConfig} = loadFullConfig();
-  const envEnabled = getEnvBoolean('JSREVERSER_RECORD_TOOL_RESULTS');
-  const envOutputDir = getEnvValue('JSREVERSER_TOOL_RESULTS_DIR');
+  const envEnabled = getEnvBoolean('BROWSER_RECORD_TOOL_RESULTS');
+  const envOutputDir = getEnvValue('BROWSER_TOOL_RESULTS_DIR');
   const outputDir =
     envOutputDir ??
     fileConfig.toolResultRecording?.outputDir ??

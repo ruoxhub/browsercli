@@ -108,7 +108,7 @@ function getArtifactsDirectoryStatus(): DiagnosticCheck {
       name: 'artifacts_dir',
       status: 'warn',
       reason: `Artifacts parent directory is not writable: ${String(error)}.`,
-      fix: 'Set JSREVERSER_ARTIFACTS_DIR to a writable path before running task exports.',
+      fix: 'Set BROWSER_ARTIFACTS_DIR to a writable path before running task exports.',
       details: {artifactsDir},
     };
   }

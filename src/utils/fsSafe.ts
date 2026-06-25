@@ -13,7 +13,7 @@ import {getEnvValue} from '../config.js';
  * Strategy:
  * - Absolute paths are allowed as-is (user/dev controls the destination)
  * - Relative paths with `..` that escape the allowed directory are rejected
- * - When JSREVERSER_OUTPUT_DIR is set, restrict relative paths to that directory
+ * - When BROWSER_OUTPUT_DIR is set, restrict relative paths to that directory
  *
  * @throws Error if the resolved path contains traversal sequences that escape
  *         the allowed directory (only applies to relative paths with `..`)
@@ -27,7 +27,7 @@ export function validateOutputPath(userPath: string): string {
   }
 
   // Relative paths: check for traversal outside allowed directory
-  const allowedBase = getEnvValue('JSREVERSER_OUTPUT_DIR') ?? process.cwd();
+  const allowedBase = getEnvValue('BROWSER_OUTPUT_DIR') ?? process.cwd();
   const normalizedBase = path.resolve(allowedBase) + path.sep;
   const resolvedWithTrailingSep = resolved + path.sep;
 
@@ -40,7 +40,7 @@ export function validateOutputPath(userPath: string): string {
   ) {
     throw new Error(
       `Path traversal blocked: "${userPath}" resolves to "${resolved}" outside allowed directory "${allowedBase}". ` +
-        `Set JSREVERSER_OUTPUT_DIR to configure the allowed output path.`,
+        `Set BROWSER_OUTPUT_DIR to configure the allowed output path.`,
     );
   }
 
