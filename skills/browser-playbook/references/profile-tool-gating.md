@@ -1,6 +1,6 @@
 # Profile 工具档位（Gating）
 
-`JS_REVERSE_TOOL_PROFILE` 环境变量控制 js-reverse 向 LLM 宿主暴露的工具集。**根据当前任务复杂度选择档位**，避免在上下文窗口里堆 141 个工具定义。
+`JS_REVERSE_TOOL_PROFILE` 环境变量控制 browsercli 向 LLM 宿主暴露的工具集。**根据当前任务复杂度选择档位**，避免在上下文窗口里堆 141 个工具定义。
 
 ## 三档关系
 
@@ -19,15 +19,15 @@ search ⊂ workflow ⊂ full
 ### 启动 Worker 时
 
 ```bash
-JS_REVERSE_TOOL_PROFILE=workflow js-reverse start
-JS_REVERSE_TOOL_PROFILE=full     js-reverse start
-JS_REVERSE_TOOL_PROFILE=search   js-reverse start   # 极少用
+JS_REVERSE_TOOL_PROFILE=workflow browsercli start
+JS_REVERSE_TOOL_PROFILE=full     browsercli start
+JS_REVERSE_TOOL_PROFILE=search   browsercli start   # 极少用
 ```
 
 ### CLI 单次调用
 
 ```bash
-JS_REVERSE_TOOL_PROFILE=workflow js-reverse call list-tools
+JS_REVERSE_TOOL_PROFILE=workflow browsercli call list-tools
 ```
 
 ### 编程式发现（推荐做法）
@@ -36,13 +36,13 @@ JS_REVERSE_TOOL_PROFILE=workflow js-reverse call list-tools
 
 ```bash
 # 发现所有 wasm 工具
-js-reverse search-tools "wasm"
+browsercli search-tools "wasm"
 
 # 发现所有 hook 工具
-js-reverse search-tools "hook"
+browsercli search-tools "hook"
 
 # 发现所有 debugger 工具（即使是 full-only）
-js-reverse search-tools "debugger breakpoint"
+browsercli search-tools "debugger breakpoint"
 ```
 
 `search_tools` 返回的字段：
@@ -72,17 +72,17 @@ js-reverse search-tools "debugger breakpoint"
 
 ```bash
 # 1. 看当前暴露的工具数
-js-reverse list-tools --json | jq 'length'
+browsercli list-tools --json | jq 'length'
 # → 1 / ~100 / 141
 
 # 2. 验证关键工具是否暴露
-js-reverse list-tools --json | jq -r '.[].name' | grep -E "^(hook_function|export_rebuild_bundle|wasm_decompile)$"
+browsercli list-tools --json | jq -r '.[].name' | grep -E "^(hook_function|export_rebuild_bundle|wasm_decompile)$"
 ```
 
 如果某个工具未暴露但你**确实需要它**，要么：
 
 - 用 `search_tools` 查（如果它在 full 中）
-- 切换 profile：`JS_REVERSE_TOOL_PROFILE=full js-reverse restart`（或 `start` + `stop`）
+- 切换 profile：`JS_REVERSE_TOOL_PROFILE=full browsercli restart`（或 `start` + `stop`）
 - 不要伪造工具调用或绕过 profile
 
 ## 错误处理

@@ -1,6 +1,6 @@
 # 工具分类速查（141 个 MCP 工具）
 
-> **权威来源**：`js-reverse list-tools --json`。任何文档与 list-tools 冲突时，**以 list-tools 为准**。
+> **权威来源**：`browsercli list-tools --json`。任何文档与 list-tools 冲突时，**以 list-tools 为准**。
 >
 > **Profile gating**：本目录按"工具能做什么"组织，不标 profile。若当前 profile 下找不到某个工具，先用 `search_tools --query <keyword>` 在 `search` profile 中发现它，然后看 `references/profile-tool-gating.md` 决定是否需要切换到 `workflow` / `full` profile。
 
@@ -377,7 +377,7 @@
 `check_browser_health` 在第 6 节"页面操作"。但在新会话开局时它有特殊地位 — 通常作为**第一个工具调用**：
 
 ```bash
-js-reverse call check_browser_health
+browsercli call check_browser_health
 # → {status: "ok", pageCount: 3, cdpConnected: true}
 ```
 

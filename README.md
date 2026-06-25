@@ -1,7 +1,7 @@
-# JSReverser-CLI 项目全面技术分析文档
+# Browser-CLI 项目全面技术分析文档
 
 > **生成日期**: 2026-05-20
-> **项目**: JSReverser-CLI (js-reverse-mcp)
+> **项目**: Browser-CLI (js-reverse-mcp)
 > **版本**: 2.0.3
 > **许可证**: Apache-2.0
 
@@ -22,7 +22,7 @@
 
 ## 1. 项目概览
 
-JSReverser-CLI 是一个**前端 JavaScript 逆向流程标准化的 MCP（Model Context Protocol）服务**。其核心目标不是简单的页面调试，而是将**页面观察→运行时采样→本地复现→补环境→证据沉淀**串成一套可复用工作流。
+Browser-CLI 是一个**前端 JavaScript 逆向流程标准化的 MCP（Model Context Protocol）服务**。其核心目标不是简单的页面调试，而是将**页面观察→运行时采样→本地复现→补环境→证据沉淀**串成一套可复用工作流。
 
 ### 核心方法论
 
@@ -59,7 +59,7 @@ JSReverser-CLI 是一个**前端 JavaScript 逆向流程标准化的 MCP（Model
 
 ## 反检测哲学（与 jshookmcp 对齐）
 
-JSReverser-CLI 与兄弟项目 [jshookmcp](https://github.com/zhizhuodemao/js-reverse-mcp)
+Browser-CLI 与兄弟项目 [jshookmcp](https://github.com/zhizhuodemao/js-reverse-mcp)
 共享同一套反检测哲学：**默认零 JS 注入，反检测下沉到协议层和（可选的）源码层**。
 
 `Object.defineProperty` hack 本身就是反爬系统的检测信号 —— 一旦页面检测到
@@ -98,7 +98,7 @@ JSReverser-CLI 与兄弟项目 [jshookmcp](https://github.com/zhizhuodemao/js-re
 ## 2. 目录结构解析
 
 ```
-JSReverser-CLI/
+Browser-CLI/
 ├── src/                              # 核心源码
 │   ├── index.ts                      # ★ Worker 进程入口 — RPC Worker 启动主函数
 │   ├── runtime.ts                    # ★ 运行时核心 — 单例，聚合所有模块实例
@@ -970,7 +970,7 @@ node build/src/bin/js-reverse.js call get_page_title
 
 ## Tool Profiles
 
-`JSReverser-CLI` 通过 `JS_REVERSE_TOOL_PROFILE` 环境变量在三档工具集中切换，用 token 成本换取覆盖范围。
+`Browser-CLI` 通过 `JS_REVERSE_TOOL_PROFILE` 环境变量在三档工具集中切换，用 token 成本换取覆盖范围。
 
 | Profile    | 工具数     | 适用场景                                                |
 | ---------- | ---------- | ------------------------------------------------------- |

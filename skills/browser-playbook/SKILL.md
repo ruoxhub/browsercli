@@ -1,6 +1,6 @@
 ---
 name: jsreverser-playbook
-description: JSReverser CLI 工具导航与选择指南。当用户提到 js-reverse / js-reverse-mcp 工具、需要查询可用工具列表（141 个 MCP 工具）、为逆向任务选择工具组合、理解工具分类与参数时触发。涵盖 25 个功能域：观察取证、Hook 注入、调试器、代码分析、反调试、加密库拦截、Wasm 逆向、本地复现、WebSocket / Console / Stealth / Emulation 等。场景包含：定位签名/加密参数、反调试对抗、AST 去混淆、WebSocket 协议逆向、Wasm 二进制分析、Node 本地补环境复现、Hook/Breakpoint 选型决策、逆向阶段顾问与参数工作流推荐。
+description: Browser CLI 工具导航与选择指南。当用户提到 browsercli 工具、需要查询可用工具列表（141 个 MCP 工具）、为逆向任务选择工具组合、理解工具分类与参数时触发。涵盖 25 个功能域：观察取证、Hook 注入、调试器、代码分析、反调试、加密库拦截、Wasm 逆向、本地复现、WebSocket / Console / Stealth / Emulation 等。场景包含：定位签名/加密参数、反调试对抗、AST 去混淆、WebSocket 协议逆向、Wasm 二进制分析、Node 本地补环境复现、Hook/Breakpoint 选型决策、逆向阶段顾问与参数工作流推荐。
 ---
 
 # JSReverser playbook — 工具导航
@@ -9,7 +9,7 @@ description: JSReverser CLI 工具导航与选择指南。当用户提到 js-rev
 
 满足以下任一条件时，本 skill 优先加载：
 
-- 用户提到 `js-reverse` / `js-reverse-mcp` / `jsreverser` / 工具名（如 `hook_function` / `analyze_target` / `export_rebuild_bundle`）
+- 用户提到 `browsercli` / `browsercli-mcp` / `jsreverser` / 工具名（如 `hook_function` / `analyze_target` / `export_rebuild_bundle`）
 - 用户问"这些工具怎么用"、"该用哪个工具"、"先做哪一步"
 - 用户开始新逆向任务、问"如何定位签名"、"如何补环境"
 - 需要决定 Hook vs 断点、Observe vs Capture、Rebuild vs PureExtraction
@@ -37,7 +37,7 @@ description: JSReverser CLI 工具导航与选择指南。当用户提到 js-rev
 | Console | 2 | — | — |
 
 完整参数：`references/tool-catalog.md`。
-权威 schema：`js-reverse list-tools --json`（任何文档与 list-tools 冲突时，以 list-tools 为准）。
+权威 schema：`browsercli list-tools --json`（任何文档与 list-tools 冲突时，以 list-tools 为准）。
 
 > **Profile 提示**（按 `JS_REVERSE_TOOL_PROFILE` 切换）：
 > - `search` — 仅 `search_tools`（1 工具），给上下文极紧的 LLM 宿主按需发现工具
@@ -52,19 +52,19 @@ description: JSReverser CLI 工具导航与选择指南。当用户提到 js-rev
 
 ```bash
 # 服务端命令
-js-reverse start [--browserUrl <url>] [--headless]
-js-reverse stop
-js-reverse status
-js-reverse config [--init|--list|--set k=v|--get k|--unset k]
+browsercli start [--browserUrl <url>] [--headless]
+browsercli stop
+browsercli status
+browsercli config [--init|--list|--set k=v|--get k|--unset k]
 
 # 工具调用
-js-reverse call <tool> [--param value]... [--file <params.json>]
-js-reverse list-tools [--json]            # 权威工具清单
-js-reverse search-tools <query>           # 在 search profile 下发现工具
+browsercli call <tool> [--param value]... [--file <params.json>]
+browsercli list-tools [--json]            # 权威工具清单
+browsercli search-tools <query>           # 在 search profile 下发现工具
 
 # 交互 / 脚手架
-js-reverse repl                           # Tab 补全的交互 REPL
-js-reverse scaffold --name <slug> --url <url>  # 创建任务目录
+browsercli repl                           # Tab 补全的交互 REPL
+browsercli scaffold --name <slug> --url <url>  # 创建任务目录
 ```
 
 - 工具名连字符↔下划线自动转换：`observe-flow` ⇄ `observe_flow`

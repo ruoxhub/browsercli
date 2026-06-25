@@ -1,10 +1,10 @@
 {
-  "name": "js-reverse-mcp",
+  "name": "browsercli",
   "version": "2.0.3",
   "description": "JavaScript reverse engineering and debugging",
   "type": "module",
   "bin": {
-    "js-reverse": "./build/src/bin/js-reverse.js",
+    "browsercli": "./build/src/bin/browsercli.js",
     "js-reverse-worker": "./build/src/index.js"
   },
   "main": "index.js",
@@ -44,9 +44,9 @@
     "prepare": "node --experimental-strip-types scripts/prepare.ts",
     "verify-server-json-version": "node --experimental-strip-types scripts/verify-server-json-version.ts",
     "case:jd:h5st:pure-node": "node scripts/cases/jd-h5st-pure-node.mjs",
-    "cli:start": "js-reverse start",
-    "cli:worker:stop": "js-reverse stop",
-    "cli:worker:status": "js-reverse status",
+    "cli:start": "browsercli start",
+    "cli:worker:stop": "browsercli stop",
+    "cli:worker:status": "browsercli status",
     "web:build": "npm --workspace @jsreverser/web run build",
     "web:dev": "npm --workspace @jsreverser/web run dev",
     "web:typecheck": "npm --workspace @jsreverser/web run typecheck",
@@ -70,7 +70,7 @@
   },
   "homepage": "https://github.com/zhizhuodemao/js-reverse-mcp#readme",
   "workspaces": ["apps/*"],
-  "mcpName": "io.github.zhizhuodemao/js-reverse-mcp",
+  "mcpName": "io.github.zhizhuodemao/browsercli",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
     "@babel/generator": "^7.26.5",
