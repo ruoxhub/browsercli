@@ -4,7 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {ConsoleMessage, Frame, Page, Request, WebSocket as PlaywrightWebSocket} from 'patchright';
+import type {
+  CDPSession,
+  ConsoleMessage,
+  Frame,
+  Page,
+  Request,
+  WebSocket as PlaywrightWebSocket,
+} from 'patchright';
 
 import {PageCollector} from '../PageCollector.js';
 import type {RequestInitiator} from '../tools/network/types.js';
@@ -50,7 +57,24 @@ export type TrackedWebSocketData = WebSocketData & {stableId: number};
  * 覆盖 splitOnNavigation：保留最后一个导航请求到新段
  */
 export class NetworkRequestCollector extends PageCollector<TrackedRequest> {
-  private readonly _onRequestHandlers = new WeakMap<Page, (req: Request) => void>();
+  private readonly _onRequestHandlers = new WeakMap<
+    Page,
+    (req: Request) => void
+  >();
+  private readonly _cdpSessions = new WeakMap<Page, CDPSession>();
+  private readonly _initiatorQueues = new WeakMap<
+    Page,
+    Map<string, RequestInitiator[]>
+  >();
+
+  private _getUrlPath(urlStr: string): string {
+    try {
+      const url = new URL(urlStr);
+      return url.pathname;
+    } catch {
+      return urlStr;
+    }
+  }
 
   protected override splitOnNavigation(page: Page): void {
     const navigations = this.storage.get(page);
@@ -75,25 +99,89 @@ export class NetworkRequestCollector extends PageCollector<TrackedRequest> {
 
   protected attachListeners(page: Page, navigations: TrackedRequest[][]): void {
     const idGenerator = this.idGenerators.get(page)!;
+    const initiatorQueueMap = new Map<string, RequestInitiator[]>();
+    this._initiatorQueues.set(page, initiatorQueueMap);
+
     const onRequest = (req: Request): void => {
-      navigations[0]!.push({stableId: idGenerator(), request: req});
+      const key = `${req.method()}:${this._getUrlPath(req.url())}`;
+      const queue = initiatorQueueMap.get(key);
+      const initiator = queue && queue.length > 0 ? queue.shift() : undefined;
+
+      const tracked: TrackedRequest = {
+        stableId: idGenerator(),
+        request: req,
+        initiator,
+      };
+      (req as any).initiator = () => tracked.initiator;
+
+      navigations[0]!.push(tracked);
     };
+
     page.on('request', onRequest);
     this._onRequestHandlers.set(page, onRequest);
+
+    page
+      .context()
+      .newCDPSession(page)
+      .then(client => {
+        this._cdpSessions.set(page, client);
+        const onCdpRequest = (event: any): void => {
+          if (event.request && event.initiator) {
+            const key = `${event.request.method}:${this._getUrlPath(
+              event.request.url,
+            )}`;
+            if (!initiatorQueueMap.has(key)) {
+              initiatorQueueMap.set(key, []);
+            }
+            initiatorQueueMap
+              .get(key)!
+              .push(event.initiator as RequestInitiator);
+          }
+        };
+        client.on('Network.requestWillBeSent', onCdpRequest);
+        (client as any)._onCdpRequest = onCdpRequest;
+        client.send('Network.enable').catch(() => {});
+      })
+      .catch(() => {});
   }
 
   protected detachListeners(page: Page): void {
-    safeDetach(page, this._onRequestHandlers, handler => page.off('request', handler));
+    safeDetach(page, this._onRequestHandlers, handler =>
+      page.off('request', handler),
+    );
+    const client = this._cdpSessions.get(page);
+    if (client) {
+      const listener = (client as any)._onCdpRequest;
+      if (listener) {
+        try {
+          client.off('Network.requestWillBeSent', listener);
+        } catch {}
+      }
+      try {
+        client.detach().catch(() => {});
+      } catch {}
+      this._cdpSessions.delete(page);
+    }
+    this._initiatorQueues.delete(page);
   }
 }
 
 // ─── ConsoleMessageCollector ──────────────────────────
 
 export class ConsoleMessageCollector extends PageCollector<TrackedConsoleMessage> {
-  private readonly _onConsoleHandlers = new WeakMap<Page, (msg: ConsoleMessage) => void>();
-  private readonly _onPageErrorHandlers = new WeakMap<Page, (err: Error) => void>();
+  private readonly _onConsoleHandlers = new WeakMap<
+    Page,
+    (msg: ConsoleMessage) => void
+  >();
+  private readonly _onPageErrorHandlers = new WeakMap<
+    Page,
+    (err: Error) => void
+  >();
 
-  protected attachListeners(page: Page, navigations: TrackedConsoleMessage[][]): void {
+  protected attachListeners(
+    page: Page,
+    navigations: TrackedConsoleMessage[][],
+  ): void {
     const idGenerator = this.idGenerators.get(page)!;
     const onConsole = (msg: ConsoleMessage): void => {
       navigations[0]!.push({stableId: idGenerator(), message: msg});
@@ -108,17 +196,27 @@ export class ConsoleMessageCollector extends PageCollector<TrackedConsoleMessage
   }
 
   protected detachListeners(page: Page): void {
-    safeDetach(page, this._onConsoleHandlers, handler => page.off('console', handler));
-    safeDetach(page, this._onPageErrorHandlers, handler => page.off('pageerror', handler));
+    safeDetach(page, this._onConsoleHandlers, handler =>
+      page.off('console', handler),
+    );
+    safeDetach(page, this._onPageErrorHandlers, handler =>
+      page.off('pageerror', handler),
+    );
   }
 }
 
 // ─── WebSocketCollector ──────────────────────────────
 
 export class WsCollector extends PageCollector<TrackedWebSocketData> {
-  private connectionMaps = new WeakMap<Page, Map<string, TrackedWebSocketData>>();
+  private connectionMaps = new WeakMap<
+    Page,
+    Map<string, TrackedWebSocketData>
+  >();
   private requestIdCounters = new WeakMap<Page, number>();
-  private readonly _onWebSocketHandlers = new WeakMap<Page, (ws: PlaywrightWebSocket) => void>();
+  private readonly _onWebSocketHandlers = new WeakMap<
+    Page,
+    (ws: PlaywrightWebSocket) => void
+  >();
 
   protected override splitOnNavigation(page: Page): void {
     super.splitOnNavigation(page);
@@ -126,7 +224,10 @@ export class WsCollector extends PageCollector<TrackedWebSocketData> {
     this.requestIdCounters.set(page, 0);
   }
 
-  protected attachListeners(page: Page, navigations: TrackedWebSocketData[][]): void {
+  protected attachListeners(
+    page: Page,
+    navigations: TrackedWebSocketData[][],
+  ): void {
     const idGenerator = this.idGenerators.get(page)!;
     this.connectionMaps.set(page, new Map());
     this.requestIdCounters.set(page, 0);
@@ -141,7 +242,12 @@ export class WsCollector extends PageCollector<TrackedWebSocketData> {
       const requestId = `ws-${counter}-${Date.now()}`;
 
       const tracked: TrackedWebSocketData = {
-        connection: {requestId, url: ws.url(), status: 'open', createdAt: Date.now()},
+        connection: {
+          requestId,
+          url: ws.url(),
+          status: 'open',
+          createdAt: Date.now(),
+        },
         frames: [],
         stableId: idGenerator(),
       };
@@ -150,15 +256,33 @@ export class WsCollector extends PageCollector<TrackedWebSocketData> {
       navigations[0]!.push(tracked);
 
       ws.on('framereceived', data => {
-        const payload = typeof data.payload === 'string' ? data.payload : data.payload.toString('base64');
+        const payload =
+          typeof data.payload === 'string'
+            ? data.payload
+            : data.payload.toString('base64');
         const opcode = typeof data.payload === 'string' ? 1 : 2;
-        tracked.frames.push({requestId, direction: 'received', timestamp: Date.now(), opcode, payloadData: payload});
+        tracked.frames.push({
+          requestId,
+          direction: 'received',
+          timestamp: Date.now(),
+          opcode,
+          payloadData: payload,
+        });
       });
 
       ws.on('framesent', data => {
-        const payload = typeof data.payload === 'string' ? data.payload : data.payload.toString('base64');
+        const payload =
+          typeof data.payload === 'string'
+            ? data.payload
+            : data.payload.toString('base64');
         const opcode = typeof data.payload === 'string' ? 1 : 2;
-        tracked.frames.push({requestId, direction: 'sent', timestamp: Date.now(), opcode, payloadData: payload});
+        tracked.frames.push({
+          requestId,
+          direction: 'sent',
+          timestamp: Date.now(),
+          opcode,
+          payloadData: payload,
+        });
       });
 
       ws.on('close', () => {
@@ -172,7 +296,9 @@ export class WsCollector extends PageCollector<TrackedWebSocketData> {
   }
 
   protected detachListeners(page: Page): void {
-    safeDetach(page, this._onWebSocketHandlers, handler => page.off('websocket', handler));
+    safeDetach(page, this._onWebSocketHandlers, handler =>
+      page.off('websocket', handler),
+    );
     this.connectionMaps.delete(page);
     this.requestIdCounters.delete(page);
   }

@@ -218,12 +218,13 @@ export interface GetNetworkRequestData {
   responseHeaders: Record<string, string>;
   /** 请求发起者 */
   initiator?: RequestInitiator;
+  /** 调用堆栈 */
+  stack?: RequestInitiator['stack'];
   /** 请求时间戳 */
   timestamp?: number;
   /** 响应体（文本，如果可读取） */
   responseBody?: string;
 }
-
 
 // ─── WebSocket 参数类型 ──────────────────────────────────
 
@@ -275,4 +276,5 @@ export type ListNetworkRequestsResult = NetworkResult<ListNetworkRequestsData>;
 export type GetNetworkRequestResult = NetworkResult<GetNetworkRequestData>;
 
 /** clearNetworkRequests 结果 */
-export type ClearNetworkRequestsResult = NetworkResult<ClearNetworkRequestsData>;
+export type ClearNetworkRequestsResult =
+  NetworkResult<ClearNetworkRequestsData>;

@@ -93,6 +93,9 @@ export const getNetworkRequest = defineTool({
         }
       }
 
+      const initiator =
+        getRuntime().contextProvider!.getRequestInitiator(networkRequest);
+
       const data = {
         reqid,
         url: networkRequest.url(),
@@ -103,8 +106,8 @@ export const getNetworkRequest = defineTool({
         statusText: httpResponse?.statusText?.(),
         requestHeaders: networkRequest.headers(),
         responseHeaders: httpResponse?.headers() ?? {},
-        initiator:
-          getRuntime().contextProvider!.getRequestInitiator(networkRequest),
+        // initiator,
+        stack: initiator?.stack,
         responseBody,
       };
 
