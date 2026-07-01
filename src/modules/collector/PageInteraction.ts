@@ -168,7 +168,10 @@ export async function hover(page: Page, selector: string): Promise<void> {
 /**
  * 滚动页面（薄封装page.evaluate）
  */
-export async function scroll(page: Page, options: ScrollOptions): Promise<void> {
+export async function scroll(
+  page: Page,
+  options: ScrollOptions,
+): Promise<void> {
   await page.evaluate(opts => {
     window.scrollTo(opts.x || 0, opts.y || 0);
   }, options);

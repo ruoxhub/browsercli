@@ -228,9 +228,7 @@ export async function getPerformanceMetrics(page: Page): Promise<any> {
     }
 
     // Largest Contentful Paint
-    const lcpEntries = performance.getEntriesByType(
-      'largest-contentful-paint',
-    );
+    const lcpEntries = performance.getEntriesByType('largest-contentful-paint');
     if (lcpEntries.length > 0) {
       result.largestContentfulPaint =
         lcpEntries[lcpEntries.length - 1].startTime;

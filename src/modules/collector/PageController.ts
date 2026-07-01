@@ -33,7 +33,10 @@ export * from './PageControllerTypes.js';
 export class PageController {
   constructor(private collector: CodeCollector) {}
 
-  async navigate(url: string, options?: NavigationOptions): Promise<{url: string; title: string; loadTime: number}> {
+  async navigate(
+    url: string,
+    options?: NavigationOptions,
+  ): Promise<{url: string; title: string; loadTime: number}> {
     const page = await this.collector.getActivePage();
     return PageNavigation.navigate(page, url, options);
   }
@@ -58,17 +61,26 @@ export class PageController {
     return PageInteraction.click(page, selector, options);
   }
 
-  async clickAt(selector: string): Promise<{x: number; y: number; tag: string; text: string}> {
+  async clickAt(
+    selector: string,
+  ): Promise<{x: number; y: number; tag: string; text: string}> {
     const page = await this.collector.getActivePage();
     return PageInteraction.clickAt(page, selector);
   }
 
-  async setFiles(selector: string, filePaths: string[]): Promise<{success: boolean; files: number}> {
+  async setFiles(
+    selector: string,
+    filePaths: string[],
+  ): Promise<{success: boolean; files: number}> {
     const page = await this.collector.getActivePage();
     return PageInteraction.setFiles(page, selector, filePaths);
   }
 
-  async type(selector: string, text: string, options?: TypeOptions): Promise<void> {
+  async type(
+    selector: string,
+    text: string,
+    options?: TypeOptions,
+  ): Promise<void> {
     const page = await this.collector.getActivePage();
     return PageInteraction.type(page, selector, text, options);
   }
@@ -88,12 +100,18 @@ export class PageController {
     return PageInteraction.scroll(page, options);
   }
 
-  async scrollBy(direction: 'up' | 'down' | 'top' | 'bottom', pixels = 1000): Promise<string> {
+  async scrollBy(
+    direction: 'up' | 'down' | 'top' | 'bottom',
+    pixels = 1000,
+  ): Promise<string> {
     const page = await this.collector.getActivePage();
     return PageInteraction.scrollBy(page, direction, pixels);
   }
 
-  async waitForSelector(selector: string, timeout?: number): Promise<{success: boolean; element?: any; message: string}> {
+  async waitForSelector(
+    selector: string,
+    timeout?: number,
+  ): Promise<{success: boolean; element?: any; message: string}> {
     const page = await this.collector.getActivePage();
     return PageInteraction.waitForSelector(page, selector, timeout);
   }
@@ -128,7 +146,14 @@ export class PageController {
     return PageInfo.screenshot(page, options);
   }
 
-  async getVideoInfo(selector: string): Promise<{duration: number; currentTime: number; paused: boolean; src: string} | null> {
+  async getVideoInfo(
+    selector: string,
+  ): Promise<{
+    duration: number;
+    currentTime: number;
+    paused: boolean;
+    src: string;
+  } | null> {
     const page = await this.collector.getActivePage();
     return PageInfo.getVideoInfo(page, selector);
   }
@@ -140,7 +165,12 @@ export class PageController {
 
   async captureVideoFrame(
     selector: string,
-    options?: {seekTime?: number; outputPath?: string; format?: 'png' | 'jpeg'; quality?: number},
+    options?: {
+      seekTime?: number;
+      outputPath?: string;
+      format?: 'png' | 'jpeg';
+      quality?: number;
+    },
   ): Promise<Buffer | string> {
     const page = await this.collector.getActivePage();
     return PageInfo.captureVideoFrame(page, selector, options);
@@ -161,16 +191,18 @@ export class PageController {
     return PageInfo.injectScriptOnNewDocument(page, scriptContent);
   }
 
-  async setCookies(cookies: Array<{
-    name: string;
-    value: string;
-    domain?: string;
-    path?: string;
-    expires?: number;
-    httpOnly?: boolean;
-    secure?: boolean;
-    sameSite?: 'Strict' | 'Lax' | 'None';
-  }>): Promise<void> {
+  async setCookies(
+    cookies: Array<{
+      name: string;
+      value: string;
+      domain?: string;
+      path?: string;
+      expires?: number;
+      httpOnly?: boolean;
+      secure?: boolean;
+      sameSite?: 'Strict' | 'Lax' | 'None';
+    }>,
+  ): Promise<void> {
     const page = await this.collector.getActivePage();
     return PageInfo.setCookies(page, cookies);
   }
@@ -190,7 +222,9 @@ export class PageController {
     return PageInfo.setViewport(page, width, height);
   }
 
-  async emulateDevice(deviceName: 'iPhone' | 'iPad' | 'Android'): Promise<void> {
+  async emulateDevice(
+    deviceName: 'iPhone' | 'iPad' | 'Android',
+  ): Promise<void> {
     const page = await this.collector.getActivePage();
     return PageInfo.emulateDevice(page, deviceName);
   }
@@ -249,8 +283,17 @@ export class PageController {
     return await this.collector.getActivePage();
   }
 
-  async replayActions(actions: ReplayAction[]): Promise<Array<{index: number; action: string; success: boolean; message: string}>> {
-    const results: Array<{index: number; action: string; success: boolean; message: string}> = [];
+  async replayActions(
+    actions: ReplayAction[],
+  ): Promise<
+    Array<{index: number; action: string; success: boolean; message: string}>
+  > {
+    const results: Array<{
+      index: number;
+      action: string;
+      success: boolean;
+      message: string;
+    }> = [];
     for (let index = 0; index < actions.length; index += 1) {
       const item = actions[index];
       try {
@@ -260,15 +303,20 @@ export class PageController {
             await this.navigate(item.url, {timeout: item.timeout});
             break;
           case 'click':
-            if (!item.selector) throw new Error('click action requires selector');
+            if (!item.selector)
+              throw new Error('click action requires selector');
             await this.click(item.selector);
             break;
           case 'type':
-            if (!item.selector) throw new Error('type action requires selector');
-            await this.type(item.selector, item.text ?? '', {delay: item.delay});
+            if (!item.selector)
+              throw new Error('type action requires selector');
+            await this.type(item.selector, item.text ?? '', {
+              delay: item.delay,
+            });
             break;
           case 'wait':
-            if (!item.selector) throw new Error('wait action requires selector');
+            if (!item.selector)
+              throw new Error('wait action requires selector');
             await this.waitForSelector(item.selector, item.timeout);
             break;
           case 'scroll':
@@ -283,9 +331,16 @@ export class PageController {
             await this.evaluate(item.code);
             break;
           default:
-            throw new Error(`Unsupported action: ${(item as {action?: string}).action ?? 'unknown'}`);
+            throw new Error(
+              `Unsupported action: ${(item as {action?: string}).action ?? 'unknown'}`,
+            );
         }
-        results.push({index, action: item.action, success: true, message: 'ok'});
+        results.push({
+          index,
+          action: item.action,
+          success: true,
+          message: 'ok',
+        });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         results.push({index, action: item.action, success: false, message});
