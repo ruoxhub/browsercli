@@ -1,0 +1,926 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/**
+ * Wasm preload script builder.
+ *
+ * 提取自 WasmCollector.ts —— 生成注入页面的 WebAssembly 拦截脚本。
+ *
+ * This is a pure function that returns a template literal. The string is
+ * injected into pages via `page.addInitScript` / `injectScriptOnNewDocument`
+ * and any character change risks breaking the runtime hook. Copy EXACTLY.
+ */
+export function buildPreloadScript(): string {
+  return `
+(() => {
+  if (globalThis.__jshookWasmCaptureInstalled__) {
+    return;
+  }
+  globalThis.__jshookWasmCaptureInstalled__ = true;
+
+  const state = globalThis.__jshookWasmCapture__ = globalThis.__jshookWasmCapture__ || {
+    modules: [],
+    events: [],
+    seq: 0,
+  };
+
+  const original = {
+    Module: WebAssembly.Module,
+    Instance: WebAssembly.Instance,
+    compile: WebAssembly.compile.bind(WebAssembly),
+    compileStreaming: WebAssembly.compileStreaming.bind(WebAssembly),
+    instantiate: WebAssembly.instantiate.bind(WebAssembly),
+    instantiateStreaming: WebAssembly.instantiateStreaming.bind(WebAssembly),
+    moduleImports: WebAssembly.Module.imports.bind(WebAssembly.Module),
+    moduleExports: WebAssembly.Module.exports.bind(WebAssembly.Module),
+    fetch: typeof globalThis.fetch === 'function' ? globalThis.fetch.bind(globalThis) : undefined,
+    XMLHttpRequest: globalThis.XMLHttpRequest,
+    TextEncoder: globalThis.TextEncoder,
+    TextDecoder: globalThis.TextDecoder,
+  };
+
+  const moduleRegistry = new WeakMap();
+  const trackedBuffers = new WeakMap();
+  const trackedViews = new WeakMap();
+  const xhrState = new WeakMap();
+  let lastWasmActivity = null;
+
+  function nextId(prefix) {
+    state.seq += 1;
+    return prefix + '_' + Date.now() + '_' + state.seq;
+  }
+
+  function takeStack() {
+    try {
+      return String(new Error().stack || '')
+        .split('\\n')
+        .slice(2, 8)
+        .map((line) => line.trim())
+        .filter(Boolean);
+    } catch {
+      return [];
+    }
+  }
+
+  function previewValue(value) {
+    try {
+      if (typeof value === 'string') {
+        return value.slice(0, 120);
+      }
+      if (typeof value === 'number' || typeof value === 'boolean' || value == null) {
+        return String(value);
+      }
+      if (value instanceof URLSearchParams) {
+        return value.toString().slice(0, 120);
+      }
+      if (value instanceof ArrayBuffer) {
+        return '[ArrayBuffer ' + value.byteLength + ']';
+      }
+      if (ArrayBuffer.isView(value)) {
+        return '[' + (value.constructor && value.constructor.name ? value.constructor.name : 'TypedArray') + ' ' + value.byteLength + ']';
+      }
+      return JSON.stringify(value).slice(0, 120);
+    } catch {
+      return '[unserializable]';
+    }
+  }
+
+  function maskSensitiveValue(value) {
+    if (typeof value !== 'string') {
+      return previewValue(value);
+    }
+    if (value.length <= 8) {
+      return value.slice(0, 2) + '***';
+    }
+    return value.slice(0, 4) + '***' + value.slice(-4);
+  }
+
+  function classifyBodyKind(value) {
+    const text = typeof value === 'string' ? value.trim() : '';
+    if (!text) {
+      return 'empty';
+    }
+    if ((text.startsWith('{') && text.endsWith('}')) || (text.startsWith('[') && text.endsWith(']'))) {
+      return 'json';
+    }
+    if (text.includes('=') && text.includes('&')) {
+      return 'urlencoded';
+    }
+    if (/^[0-9a-f]+$/i.test(text) && text.length >= 16) {
+      return 'hexish';
+    }
+    if (/^[A-Za-z0-9+/=_-]+$/.test(text) && text.length >= 16) {
+      return 'base64ish';
+    }
+    return 'plain-text';
+  }
+
+  function splitBodySegments(value, bodyKind) {
+    if (typeof value !== 'string' || value.length === 0) {
+      return [];
+    }
+    let parts;
+    if (bodyKind === 'json') {
+      try {
+        const parsed = JSON.parse(value);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          parts = Object.entries(parsed).map(([key, entryValue]) => key + '=' + previewValue(entryValue));
+        }
+      } catch {
+        parts = [value];
+      }
+    }
+    if (!parts && bodyKind === 'urlencoded') {
+      parts = value.split('&');
+    }
+    if (!parts && value.includes('.')) {
+      parts = value.split('.');
+    }
+    if (!parts && value.includes(':')) {
+      parts = value.split(':');
+    }
+    if (!parts) {
+      parts = [value];
+    }
+    return parts
+      .map((part, index) => {
+        const raw = String(part).trim();
+        if (!raw) {
+          return null;
+        }
+        const classification = classifyBodyKind(raw);
+        const likelySignatureMaterial =
+          /(sign|signature|token|nonce|digest)/i.test(raw) ||
+          classification === 'hexish' ||
+          classification === 'base64ish';
+        return {
+          index,
+          raw,
+          displayValue: likelySignatureMaterial ? maskSensitiveValue(raw) : raw,
+          classification: /^[0-9]+$/.test(raw) ? 'numeric' : classification,
+          likelySignatureMaterial,
+        };
+      })
+      .filter(Boolean);
+  }
+
+  function normalizeHeaderEntries(headers) {
+    try {
+      if (!headers) {
+        return [];
+      }
+      const entries = [];
+      if (headers instanceof Headers) {
+        for (const [name, value] of headers.entries()) {
+          entries.push([name, value]);
+        }
+      } else if (Array.isArray(headers)) {
+        for (const entry of headers) {
+          if (Array.isArray(entry) && entry.length >= 2) {
+            entries.push([String(entry[0]), String(entry[1])]);
+          }
+        }
+      } else if (typeof headers === 'object') {
+        for (const [name, value] of Object.entries(headers)) {
+          entries.push([String(name), Array.isArray(value) ? value.join(', ') : String(value)]);
+        }
+      }
+      return entries.slice(0, 20).map(([name, value]) => {
+        const masked = /(authorization|signature|token|secret|key|cookie)/i.test(name) || String(value).length >= 24;
+        return {
+          name,
+          value: masked ? maskSensitiveValue(String(value)) : previewValue(value),
+          masked,
+        };
+      });
+    } catch {
+      return [];
+    }
+  }
+
+  function previewEntries(value) {
+    try {
+      if (value instanceof Map) {
+        return Array.from(value.entries()).slice(0, 12).map(([key, entryValue]) => {
+          const keyText = String(key);
+          const valueText = previewValue(entryValue);
+          const masked = /(authorization|signature|token|secret|key|cookie)/i.test(keyText);
+          return {
+            key: keyText,
+            value: masked ? maskSensitiveValue(valueText) : valueText,
+            masked,
+          };
+        });
+      }
+      if (value && typeof value === 'object' && !ArrayBuffer.isView(value) && !(value instanceof ArrayBuffer)) {
+        return Object.entries(value).slice(0, 12).map(([key, entryValue]) => {
+          const valueText = previewValue(entryValue);
+          const masked = /(authorization|signature|token|secret|key|cookie)/i.test(key);
+          return {
+            key,
+            value: masked ? maskSensitiveValue(valueText) : valueText,
+            masked,
+          };
+        });
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  }
+
+  function setLastWasmActivity(runtimeModuleId, exportName) {
+    lastWasmActivity = {
+      runtimeModuleId,
+      exportName,
+      timestamp: Date.now(),
+    };
+  }
+
+  function trackBuffer(buffer, runtimeModuleId, memoryExportName) {
+    if (!buffer || typeof buffer !== 'object') {
+      return;
+    }
+    trackedBuffers.set(buffer, {
+      runtimeModuleId,
+      memoryExportName,
+    });
+  }
+
+  function getBufferMeta(buffer) {
+    if (!buffer || typeof buffer !== 'object') {
+      return null;
+    }
+    return trackedBuffers.get(buffer) || null;
+  }
+
+  function trackView(view, meta) {
+    if (!view || typeof view !== 'object') {
+      return;
+    }
+    trackedViews.set(view, meta);
+  }
+
+  function getViewMeta(view) {
+    if (!view || typeof view !== 'object') {
+      return null;
+    }
+    return trackedViews.get(view) || null;
+  }
+
+  function inferRuntimeContext(candidate) {
+    if (ArrayBuffer.isView(candidate)) {
+      const viewMeta = getViewMeta(candidate);
+      if (viewMeta) {
+        return viewMeta;
+      }
+      const bufferMeta = getBufferMeta(candidate.buffer);
+      if (bufferMeta) {
+        return {
+          ...bufferMeta,
+          viewType: candidate.constructor && candidate.constructor.name ? candidate.constructor.name : 'TypedArray',
+          byteOffset: candidate.byteOffset || 0,
+          byteLength: candidate.byteLength || 0,
+        };
+      }
+    }
+    if (candidate instanceof ArrayBuffer) {
+      return getBufferMeta(candidate);
+    }
+    if (lastWasmActivity && Date.now() - lastWasmActivity.timestamp <= 2500) {
+      return lastWasmActivity;
+    }
+    return null;
+  }
+
+  function recordBridgeEvent(type, context, extra) {
+    recordEvent({
+      id: nextId(type),
+      type,
+      timestamp: Date.now(),
+      runtimeModuleId: context && context.runtimeModuleId ? context.runtimeModuleId : undefined,
+      exportName: context && context.exportName ? context.exportName : undefined,
+      memoryExportName: context && context.memoryExportName ? context.memoryExportName : undefined,
+      viewType: context && context.viewType ? context.viewType : undefined,
+      byteOffset: context && typeof context.byteOffset === 'number' ? context.byteOffset : undefined,
+      byteLength: context && typeof context.byteLength === 'number' ? context.byteLength : undefined,
+      stackSummary: takeStack(),
+      ...extra,
+    });
+  }
+
+  function bytesToBase64(bytes) {
+    let binary = '';
+    const chunkSize = 0x8000;
+    for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+      const chunk = bytes.subarray(offset, offset + chunkSize);
+      binary += String.fromCharCode(...chunk);
+    }
+    return btoa(binary);
+  }
+
+  async function normalizeSource(source) {
+    if (!source) {
+      return null;
+    }
+    if (source instanceof Response) {
+      const clone = source.clone();
+      const bytes = new Uint8Array(await clone.arrayBuffer());
+      return {
+        bytes,
+        byteLength: bytes.byteLength,
+        base64: bytesToBase64(bytes),
+        sourceType: 'response',
+        sourceUrl: clone.url || undefined,
+      };
+    }
+    if (source instanceof ArrayBuffer) {
+      const bytes = new Uint8Array(source.slice(0));
+      return {
+        bytes,
+        byteLength: bytes.byteLength,
+        base64: bytesToBase64(bytes),
+        sourceType: 'array-buffer',
+      };
+    }
+    if (ArrayBuffer.isView(source)) {
+      const bytes = new Uint8Array(source.buffer.slice(source.byteOffset, source.byteOffset + source.byteLength));
+      return {
+        bytes,
+        byteLength: bytes.byteLength,
+        base64: bytesToBase64(bytes),
+        sourceType: source.constructor && source.constructor.name ? source.constructor.name : 'typed-array',
+      };
+    }
+    if (source instanceof original.Module) {
+      return moduleRegistry.get(source) || null;
+    }
+    return null;
+  }
+
+  function safeImportKeys(importObject) {
+    if (!importObject || typeof importObject !== 'object') {
+      return [];
+    }
+    return Object.keys(importObject);
+  }
+
+  function safeModuleImports(module) {
+    try {
+      return original.moduleImports(module).map((entry) => ({
+        module: entry.module,
+        name: entry.name,
+        kind: entry.kind || 'unknown',
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  function safeModuleExports(module) {
+    try {
+      return original.moduleExports(module).map((entry) => ({
+        name: entry.name,
+        kind: entry.kind || 'unknown',
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  function safeMemory(instance) {
+    try {
+      return Object.entries(instance && instance.exports ? instance.exports : {})
+        .flatMap(([name, value]) => {
+          if (value instanceof WebAssembly.Memory) {
+            return [{
+              minPages: Math.floor(value.buffer.byteLength / 65536),
+              exportedName: name,
+            }];
+          }
+          return [];
+        });
+    } catch {
+      return [];
+    }
+  }
+
+  function wrapMemory(runtimeModuleId, exportedName, memory) {
+    trackBuffer(memory.buffer, runtimeModuleId, exportedName);
+    return new Proxy(memory, {
+      get(target, property, receiver) {
+        if (property === 'buffer') {
+          const buffer = Reflect.get(target, property, receiver);
+          trackBuffer(buffer, runtimeModuleId, exportedName);
+          setLastWasmActivity(runtimeModuleId);
+          recordBridgeEvent('memory_buffer_access', {
+            runtimeModuleId,
+            memoryExportName: exportedName,
+            byteLength: buffer && typeof buffer.byteLength === 'number' ? buffer.byteLength : undefined,
+          }, {
+            accessKind: 'buffer',
+            sideEffectHints: ['memory-bridge'],
+          });
+          return buffer;
+        }
+
+        if (property === 'grow') {
+          return function (...args) {
+            setLastWasmActivity(runtimeModuleId);
+            return target.grow.apply(target, args);
+          };
+        }
+
+        return Reflect.get(target, property, receiver);
+      },
+    });
+  }
+
+  function safeExportKeys(instance) {
+    try {
+      return Object.keys(instance && instance.exports ? instance.exports : {});
+    } catch {
+      return [];
+    }
+  }
+
+  function exportCallHints(args, result, instance) {
+    const hints = [];
+    if (Array.isArray(args) && args.length >= 2 && args.every((value) => typeof value === 'number')) {
+      hints.push('ptr-len-shape');
+    }
+    if (typeof result === 'number') {
+      hints.push('numeric-result');
+    }
+    if (safeMemory(instance).length > 0) {
+      hints.push('memory-bridge');
+    }
+    return hints;
+  }
+
+  function wrapInstance(runtimeModuleId, instance) {
+    if (!instance || typeof instance !== 'object' || !instance.exports) {
+      return instance;
+    }
+
+    const originalExports = instance.exports;
+    const wrappedExports = {};
+
+    for (const [name, value] of Object.entries(originalExports)) {
+      if (value instanceof WebAssembly.Memory) {
+        wrappedExports[name] = wrapMemory(runtimeModuleId, name, value);
+        continue;
+      }
+      if (typeof value !== 'function') {
+        wrappedExports[name] = value;
+        continue;
+      }
+
+      wrappedExports[name] = function (...args) {
+        setLastWasmActivity(runtimeModuleId, name);
+        const result = value.apply(this, args);
+        state.events.push({
+          id: nextId('export_call'),
+          type: 'export_call',
+          timestamp: Date.now(),
+          runtimeModuleId,
+          exportName: name,
+          argsPreview: args.map((item) => previewValue(item)).slice(0, 6),
+          resultPreview: previewValue(result),
+          resultEntries: previewEntries(result),
+          stackSummary: takeStack(),
+          sideEffectHints: exportCallHints(args, result, instance),
+        });
+        setLastWasmActivity(runtimeModuleId, name);
+        return result;
+      };
+    }
+
+    return new Proxy(instance, {
+      get(target, property, receiver) {
+        if (property === 'exports') {
+          return wrappedExports;
+        }
+        return Reflect.get(target, property, receiver);
+      },
+    });
+  }
+
+  function recordModule(payload) {
+    state.modules.push(payload);
+  }
+
+  function recordEvent(payload) {
+    state.events.push(payload);
+  }
+
+  function installTypedArrayTracking() {
+    const typedArrayNames = [
+      'Int8Array',
+      'Uint8Array',
+      'Uint8ClampedArray',
+      'Int16Array',
+      'Uint16Array',
+      'Int32Array',
+      'Uint32Array',
+      'Float32Array',
+      'Float64Array',
+      'BigInt64Array',
+      'BigUint64Array',
+    ];
+
+    for (const name of typedArrayNames) {
+      const Original = globalThis[name];
+      if (typeof Original !== 'function') {
+        continue;
+      }
+
+      globalThis[name] = new Proxy(Original, {
+        construct(target, args, newTarget) {
+          const instance = Reflect.construct(target, args, newTarget);
+          const context = inferRuntimeContext(args[0]);
+          if (context) {
+            const meta = {
+              runtimeModuleId: context.runtimeModuleId,
+              exportName: context.exportName,
+              memoryExportName: context.memoryExportName,
+              viewType: name,
+              byteOffset: typeof args[1] === 'number' ? args[1] : instance.byteOffset || 0,
+              byteLength: typeof instance.byteLength === 'number' ? instance.byteLength : undefined,
+            };
+            trackView(instance, meta);
+            setLastWasmActivity(context.runtimeModuleId, context.exportName);
+            recordBridgeEvent('memory_view_create', meta, {
+              accessKind: 'create',
+              sideEffectHints: ['memory-bridge'],
+            });
+          }
+          return instance;
+        },
+      });
+
+      if (typeof Original.prototype?.set === 'function') {
+        const originalSet = Original.prototype.set;
+        Original.prototype.set = function (...args) {
+          const meta = getViewMeta(this);
+          if (meta) {
+            setLastWasmActivity(meta.runtimeModuleId, meta.exportName);
+            recordBridgeEvent('memory_write', meta, {
+              accessKind: 'write',
+              argsPreview: args.map((item) => previewValue(item)).slice(0, 4),
+              sideEffectHints: ['typed-array-set'],
+            });
+          }
+          return originalSet.apply(this, args);
+        };
+      }
+
+      if (typeof Original.prototype?.fill === 'function') {
+        const originalFill = Original.prototype.fill;
+        Original.prototype.fill = function (...args) {
+          const meta = getViewMeta(this);
+          if (meta) {
+            setLastWasmActivity(meta.runtimeModuleId, meta.exportName);
+            recordBridgeEvent('memory_write', meta, {
+              accessKind: 'write',
+              argsPreview: args.map((item) => previewValue(item)).slice(0, 3),
+              sideEffectHints: ['typed-array-fill'],
+            });
+          }
+          return originalFill.apply(this, args);
+        };
+      }
+
+      if (typeof Original.prototype?.copyWithin === 'function') {
+        const originalCopyWithin = Original.prototype.copyWithin;
+        Original.prototype.copyWithin = function (...args) {
+          const meta = getViewMeta(this);
+          if (meta) {
+            setLastWasmActivity(meta.runtimeModuleId, meta.exportName);
+            recordBridgeEvent('memory_write', meta, {
+              accessKind: 'write',
+              argsPreview: args.map((item) => previewValue(item)).slice(0, 3),
+              sideEffectHints: ['typed-array-copyWithin'],
+            });
+          }
+          return originalCopyWithin.apply(this, args);
+        };
+      }
+    }
+
+    if (typeof globalThis.DataView === 'function') {
+      const OriginalDataView = globalThis.DataView;
+      globalThis.DataView = new Proxy(OriginalDataView, {
+        construct(target, args, newTarget) {
+          const instance = Reflect.construct(target, args, newTarget);
+          const context = inferRuntimeContext(args[0]);
+          if (context) {
+            const meta = {
+              runtimeModuleId: context.runtimeModuleId,
+              exportName: context.exportName,
+              memoryExportName: context.memoryExportName,
+              viewType: 'DataView',
+              byteOffset: typeof args[1] === 'number' ? args[1] : instance.byteOffset || 0,
+              byteLength: typeof instance.byteLength === 'number' ? instance.byteLength : undefined,
+            };
+            trackView(instance, meta);
+            setLastWasmActivity(context.runtimeModuleId, context.exportName);
+            recordBridgeEvent('memory_view_create', meta, {
+              accessKind: 'create',
+              sideEffectHints: ['memory-bridge'],
+            });
+          }
+          return instance;
+        },
+      });
+
+      const readMethods = ['getInt8', 'getUint8', 'getInt16', 'getUint16', 'getInt32', 'getUint32', 'getFloat32', 'getFloat64', 'getBigInt64', 'getBigUint64'];
+      const writeMethods = ['setInt8', 'setUint8', 'setInt16', 'setUint16', 'setInt32', 'setUint32', 'setFloat32', 'setFloat64', 'setBigInt64', 'setBigUint64'];
+
+      for (const method of readMethods) {
+        if (typeof OriginalDataView.prototype[method] !== 'function') {
+          continue;
+        }
+        const originalMethod = OriginalDataView.prototype[method];
+        OriginalDataView.prototype[method] = function (...args) {
+          const meta = getViewMeta(this);
+          if (meta) {
+            setLastWasmActivity(meta.runtimeModuleId, meta.exportName);
+            recordBridgeEvent('memory_read', meta, {
+              accessKind: 'read',
+              argsPreview: args.map((item) => previewValue(item)).slice(0, 2),
+              sideEffectHints: ['data-view-read'],
+            });
+          }
+          return originalMethod.apply(this, args);
+        };
+      }
+
+      for (const method of writeMethods) {
+        if (typeof OriginalDataView.prototype[method] !== 'function') {
+          continue;
+        }
+        const originalMethod = OriginalDataView.prototype[method];
+        OriginalDataView.prototype[method] = function (...args) {
+          const meta = getViewMeta(this);
+          if (meta) {
+            setLastWasmActivity(meta.runtimeModuleId, meta.exportName);
+            recordBridgeEvent('memory_write', meta, {
+              accessKind: 'write',
+              argsPreview: args.map((item) => previewValue(item)).slice(0, 3),
+              sideEffectHints: ['data-view-write'],
+            });
+          }
+          return originalMethod.apply(this, args);
+        };
+      }
+    }
+  }
+
+  function installTextCodecTracking() {
+    if (typeof original.TextEncoder === 'function' && typeof original.TextEncoder.prototype?.encodeInto === 'function') {
+      const originalEncodeInto = original.TextEncoder.prototype.encodeInto;
+      original.TextEncoder.prototype.encodeInto = function (input, destination) {
+        const context = inferRuntimeContext(destination);
+        if (context) {
+          setLastWasmActivity(context.runtimeModuleId, context.exportName);
+          recordBridgeEvent('text_encode', {
+            ...context,
+            viewType: destination && destination.constructor ? destination.constructor.name : context.viewType,
+            byteOffset: destination && typeof destination.byteOffset === 'number' ? destination.byteOffset : context.byteOffset,
+            byteLength: destination && typeof destination.byteLength === 'number' ? destination.byteLength : context.byteLength,
+          }, {
+            accessKind: 'write',
+            argsPreview: [previewValue(input)],
+            sideEffectHints: ['text-encode-into-memory'],
+          });
+        }
+        return originalEncodeInto.call(this, input, destination);
+      };
+    }
+
+    if (typeof original.TextDecoder === 'function' && typeof original.TextDecoder.prototype?.decode === 'function') {
+      const originalDecode = original.TextDecoder.prototype.decode;
+      original.TextDecoder.prototype.decode = function (input, options) {
+        const context = inferRuntimeContext(input);
+        if (context) {
+          setLastWasmActivity(context.runtimeModuleId, context.exportName);
+          recordBridgeEvent('text_decode', {
+            ...context,
+            viewType: input && input.constructor ? input.constructor.name : context.viewType,
+            byteOffset: input && typeof input.byteOffset === 'number' ? input.byteOffset : context.byteOffset,
+            byteLength: input && typeof input.byteLength === 'number' ? input.byteLength : context.byteLength,
+          }, {
+            accessKind: 'read',
+            argsPreview: options ? [previewValue(options)] : undefined,
+            sideEffectHints: ['text-decode-from-memory'],
+          });
+        }
+        return originalDecode.call(this, input, options);
+      };
+    }
+  }
+
+  function installNetworkTracking() {
+    if (typeof original.fetch === 'function') {
+      globalThis.fetch = function (input, init) {
+        const requestUrl =
+          typeof input === 'string'
+            ? input
+            : (input && typeof input.url === 'string' ? input.url : undefined);
+        const requestMethod =
+          (init && init.method) ||
+          (input && typeof input.method === 'string' ? input.method : undefined) ||
+          'GET';
+        const requestBody = init ? init.body : undefined;
+        const requestHeaders = normalizeHeaderEntries(
+          init && init.headers
+            ? init.headers
+            : (input && typeof input.headers === 'object' ? input.headers : undefined),
+        );
+        const bodySnippet = previewValue(requestBody);
+        const bodyKind = classifyBodyKind(typeof requestBody === 'string' ? requestBody : bodySnippet);
+        const context = inferRuntimeContext(requestBody);
+        if (context) {
+          setLastWasmActivity(context.runtimeModuleId, context.exportName);
+        }
+        recordBridgeEvent('network_request', context, {
+          method: requestMethod,
+          url: requestUrl,
+          bodySnippet,
+          bodyKind,
+          bodySegments: splitBodySegments(typeof requestBody === 'string' ? requestBody : bodySnippet, bodyKind),
+          requestHeaders,
+          sideEffectHints: [
+            'fetch',
+            bodyKind !== 'empty' ? 'body-observed' : undefined,
+            ...(context ? ['post-wasm-activity'] : []),
+          ].filter(Boolean),
+        });
+        return original.fetch.apply(this, arguments);
+      };
+    }
+
+    if (typeof original.XMLHttpRequest === 'function') {
+      const proto = original.XMLHttpRequest.prototype;
+      if (typeof proto.open === 'function') {
+        const originalOpen = proto.open;
+        proto.open = function (method, url) {
+          xhrState.set(this, {method, url, headers: []});
+          return originalOpen.apply(this, arguments);
+        };
+      }
+      if (typeof proto.setRequestHeader === 'function') {
+        const originalSetRequestHeader = proto.setRequestHeader;
+        proto.setRequestHeader = function (name, value) {
+          const info = xhrState.get(this) || {headers: []};
+          info.headers = info.headers || [];
+          info.headers.push([String(name), String(value)]);
+          xhrState.set(this, info);
+          return originalSetRequestHeader.apply(this, arguments);
+        };
+      }
+      if (typeof proto.send === 'function') {
+        const originalSend = proto.send;
+        proto.send = function (body) {
+          const info = xhrState.get(this) || {};
+          const context = inferRuntimeContext(body);
+          const bodySnippet = previewValue(body);
+          const bodyKind = classifyBodyKind(typeof body === 'string' ? body : bodySnippet);
+          if (context) {
+            setLastWasmActivity(context.runtimeModuleId, context.exportName);
+          }
+          recordBridgeEvent('network_request', context, {
+            method: info.method || 'GET',
+            url: info.url,
+            bodySnippet,
+            bodyKind,
+            bodySegments: splitBodySegments(typeof body === 'string' ? body : bodySnippet, bodyKind),
+            requestHeaders: normalizeHeaderEntries(info.headers),
+            sideEffectHints: [
+              'xhr',
+              bodyKind !== 'empty' ? 'body-observed' : undefined,
+              ...(context ? ['post-wasm-activity'] : []),
+            ].filter(Boolean),
+          });
+          return originalSend.apply(this, arguments);
+        };
+      }
+    }
+  }
+
+  async function rememberModule(loadMethod, source, module, importObject, instance, runtimeModuleIdOverride) {
+    const normalized = await normalizeSource(source);
+    if (module && normalized) {
+      moduleRegistry.set(module, normalized);
+    }
+
+    const runtimeModuleId = runtimeModuleIdOverride || nextId('wasm_runtime');
+    const moduleImports = module ? safeModuleImports(module) : [];
+    const moduleExports = module ? safeModuleExports(module) : [];
+    const memory = instance ? safeMemory(instance) : [];
+
+    recordModule({
+      runtimeModuleId,
+      timestamp: Date.now(),
+      loadMethod,
+      sourceType: normalized && normalized.sourceType ? normalized.sourceType : undefined,
+      sourceUrl: normalized && normalized.sourceUrl ? normalized.sourceUrl : undefined,
+      byteLength: normalized && normalized.byteLength ? normalized.byteLength : undefined,
+      base64: normalized && normalized.base64 ? normalized.base64 : undefined,
+      importKeys: safeImportKeys(importObject),
+      exportKeys: instance ? safeExportKeys(instance) : moduleExports.map((entry) => entry.name),
+      stackSummary: takeStack(),
+      memory,
+      moduleImports,
+      moduleExports,
+    });
+
+    recordEvent({
+      id: nextId(loadMethod),
+      type: loadMethod,
+      timestamp: Date.now(),
+      runtimeModuleId,
+      loadMethod,
+      sourceType: normalized && normalized.sourceType ? normalized.sourceType : undefined,
+      importKeys: safeImportKeys(importObject),
+      exportKeys: instance ? safeExportKeys(instance) : moduleExports.map((entry) => entry.name),
+      stackSummary: takeStack(),
+      memory,
+      sideEffectHints: [
+        ...(memory.length > 0 ? ['memory-bridge'] : []),
+        ...(moduleExports.some((entry) => entry.kind === 'table') ? ['table-export'] : []),
+      ],
+    });
+
+    return runtimeModuleId;
+  }
+
+  installTypedArrayTracking();
+  installTextCodecTracking();
+  installNetworkTracking();
+
+  WebAssembly.Module = new Proxy(original.Module, {
+    construct(target, args, newTarget) {
+      const module = Reflect.construct(target, args, newTarget);
+      Promise.resolve()
+        .then(() => rememberModule('module', args[0], module))
+        .catch(() => undefined);
+      return module;
+    },
+  });
+
+  WebAssembly.Instance = new Proxy(original.Instance, {
+    construct(target, args, newTarget) {
+      const instance = Reflect.construct(target, args, newTarget);
+      const runtimeModuleId = nextId('wasm_runtime');
+      Promise.resolve()
+        .then(() => rememberModule('instantiate', args[0], args[0], args[1], instance, runtimeModuleId))
+        .catch(() => undefined);
+      return wrapInstance(runtimeModuleId, instance);
+    },
+  });
+
+  WebAssembly.compile = async function (source) {
+    const module = await original.compile(source);
+    await rememberModule('compile', source, module);
+    return module;
+  };
+
+  WebAssembly.compileStreaming = async function (source) {
+    const module = await original.compileStreaming(source);
+    await rememberModule('compileStreaming', source, module);
+    return module;
+  };
+
+  WebAssembly.instantiate = async function (source, importObject) {
+    const result = await original.instantiate(source, importObject);
+    const module = result instanceof WebAssembly.Instance ? source : result.module;
+    const instance = result instanceof WebAssembly.Instance ? result : result.instance;
+    const runtimeModuleId = nextId('wasm_runtime');
+    await rememberModule('instantiate', source, module, importObject, instance, runtimeModuleId);
+    const wrappedInstance = wrapInstance(runtimeModuleId, instance);
+    if (result instanceof WebAssembly.Instance) {
+      return wrappedInstance;
+    }
+    return {
+      ...result,
+      instance: wrappedInstance,
+    };
+  };
+
+  WebAssembly.instantiateStreaming = async function (source, importObject) {
+    const result = await original.instantiateStreaming(source, importObject);
+    const runtimeModuleId = nextId('wasm_runtime');
+    await rememberModule('instantiateStreaming', source, result.module, importObject, result.instance, runtimeModuleId);
+    return {
+      ...result,
+      instance: wrapInstance(runtimeModuleId, result.instance),
+    };
+  };
+})();
+`;
+}
