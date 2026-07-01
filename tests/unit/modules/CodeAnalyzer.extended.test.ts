@@ -6,10 +6,27 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
+import * as parser from '@babel/parser';
 import type * as t from '@babel/types';
 
 import {CodeAnalyzer} from '../../../src/modules/analyzer/CodeAnalyzer.js';
+import {
+  analyzeModules,
+  analyzeStructure,
+  buildCallGraph,
+} from '../../../src/modules/analyzer/CodeAnalyzerStructure.js';
 import {logger} from '../../../src/utils/logger.js';
+
+function parseAst(code: string): t.File | null {
+  try {
+    return parser.parse(code, {
+      sourceType: 'module',
+      plugins: ['jsx', 'typescript'],
+    });
+  } catch {
+    return null;
+  }
+}
 
 interface LLMServiceLike {
   generateCodeAnalysisPrompt(code: string, focus: string): unknown[];
@@ -38,12 +55,6 @@ interface CodeAnalyzerTestHarness {
     qualityScore: number;
     complexityMetrics: {cyclomaticComplexity: number};
   }>;
-  analyzeModules(code: string): Array<{name: string}>;
-  analyzeStructure(code: string): Promise<{functions: Array<{name: string}>}>;
-  buildCallGraph(
-    functions: Array<{name: string}>,
-    code: string,
-  ): {nodes: unknown[]; edges: unknown[]};
   aiAnalyze(code: string, focus: string): Promise<Record<string, unknown>>;
   detectTechStack(
     code: string,
@@ -177,11 +188,12 @@ describe('CodeAnalyzer extended', () => {
   it('covers private analyzers and helper methods', async () => {
     const analyzer = makeAnalyzer();
 
-    const modules = analyzer.analyzeModules(richCode);
+    const ast = parseAst(richCode);
+    const modules = analyzeModules(richCode, ast);
     assert.ok(modules.length >= 1);
 
-    const structure = await analyzer.analyzeStructure(richCode);
-    const cg = analyzer.buildCallGraph(structure.functions, richCode);
+    const structure = await analyzeStructure(richCode, ast);
+    const cg = buildCallGraph(structure.functions, ast);
     assert.ok(cg.nodes.length >= 1);
 
     const ai = await analyzer.aiAnalyze(richCode, 'security');
@@ -289,22 +301,25 @@ describe('CodeAnalyzer extended', () => {
     const empty = await analyzer.aiAnalyze('const b=1', 'all');
     assert.deepStrictEqual(empty, {});
 
-    // understand catch path
-    const originalAnalyzeStructure = analyzer.analyzeStructure;
-    analyzer.analyzeStructure = async () => {
+    // understand catch path — stub aiAnalyze (still an instance method) to throw
+    const originalAiAnalyze = analyzer.aiAnalyze;
+    analyzer.aiAnalyze = async () => {
       throw new Error('boom');
     };
     await assert.rejects(async () => {
       await analyzer.understand({code: 'const x=1'});
     }, /boom/);
-    analyzer.analyzeStructure = originalAnalyzeStructure;
+    analyzer.aiAnalyze = originalAiAnalyze;
 
     // parse failure branches
-    const badStructure = await analyzer.analyzeStructure('function(');
+    const badStructure = await analyzeStructure(
+      'function(',
+      parseAst('function('),
+    );
     assert.ok(Array.isArray(badStructure.functions));
-    const badModules = analyzer.analyzeModules('import ');
+    const badModules = analyzeModules('import ', parseAst('import '));
     assert.deepStrictEqual(badModules, []);
-    const badGraph = analyzer.buildCallGraph([], 'function(');
+    const badGraph = buildCallGraph([], parseAst('function('));
     assert.deepStrictEqual(badGraph.edges, []);
     const badFlow = await analyzer.analyzeDataFlow('function(');
     assert.deepStrictEqual(Array.isArray(badFlow.sources), true);

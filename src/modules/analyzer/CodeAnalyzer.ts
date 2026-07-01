@@ -16,10 +16,6 @@
  */
 
 import * as parser from '@babel/parser';
-import traverseImport from '@babel/traverse';
-const traverse =
-  (traverseImport as unknown as {default?: typeof traverseImport}).default ??
-  traverseImport;
 import type * as t from '@babel/types';
 
 import type {LLMService} from '../../services/LLMService.js';
@@ -31,9 +27,6 @@ import type {
   BusinessLogic,
   DataFlow,
   SecurityRisk,
-  FunctionInfo,
-  ClassInfo,
-  CallGraph,
 } from '../../types/index.js';
 import {logger} from '../../utils/logger.js';
 
@@ -51,6 +44,12 @@ import {
   detectDuplicateCodeInternal,
   normalizeCode as normalizeCodeImpl,
 } from './QualityAnalyzer.js';
+import {
+  analyzeStructure,
+  analyzeModules,
+  buildCallGraph,
+  calculateComplexity,
+} from './CodeAnalyzerStructure.js';
 import {
   checkSanitizer as checkSanitizerImpl,
   getMemberExpressionName as getMemberExpressionNameImpl,
@@ -91,7 +90,9 @@ export class CodeAnalyzer {
     }
 
     if (scriptBlocks.length > 0) {
-      logger.info(`Stripped HTML wrapper, extracted ${scriptBlocks.length} <script> blocks`);
+      logger.info(
+        `Stripped HTML wrapper, extracted ${scriptBlocks.length} <script> blocks`,
+      );
       return scriptBlocks.join('\n\n');
     }
     return code;
@@ -144,7 +145,7 @@ export class CodeAnalyzer {
       const {code, context, focus = 'all'} = options;
       const ast = this.parseCodeAst(code, 'Failed to parse code structure');
 
-      const structure = await this.analyzeStructure(code, ast);
+      const structure = await analyzeStructure(code, ast);
       logger.debug('Code structure analyzed');
 
       const aiAnalysis = await this.aiAnalyze(code, focus);
@@ -196,299 +197,6 @@ export class CodeAnalyzer {
       logger.error('Code understanding failed', error);
       throw error;
     }
-  }
-
-  // ── structure ─────────────────────────────────────────
-
-  private async analyzeStructure(
-    code: string,
-    ast: t.File | null = this.parseCodeAst(
-      code,
-      'Failed to parse code structure',
-    ),
-  ): Promise<CodeStructure> {
-    const functions: FunctionInfo[] = [];
-    const classes: ClassInfo[] = [];
-
-    if (ast) {
-      // eslint-disable-next-line @typescript-eslint/no-this-alias
-      const self = this;
-
-      traverse(ast, {
-        FunctionDeclaration(path) {
-          const node = path.node;
-          functions.push({
-            name: node.id?.name || 'anonymous',
-            params: node.params.map(p =>
-              p.type === 'Identifier' ? p.name : 'unknown',
-            ),
-            location: {
-              file: 'current',
-              line: node.loc?.start.line || 0,
-              column: node.loc?.start.column,
-            },
-            complexity: self.calculateComplexity(path),
-          });
-        },
-
-        FunctionExpression(path) {
-          const node = path.node;
-          const parent = path.parent;
-          let name = 'anonymous';
-
-          if (
-            parent.type === 'VariableDeclarator' &&
-            parent.id.type === 'Identifier'
-          ) {
-            name = parent.id.name;
-          } else if (
-            parent.type === 'AssignmentExpression' &&
-            parent.left.type === 'Identifier'
-          ) {
-            name = parent.left.name;
-          }
-
-          functions.push({
-            name,
-            params: node.params.map(p =>
-              p.type === 'Identifier' ? p.name : 'unknown',
-            ),
-            location: {
-              file: 'current',
-              line: node.loc?.start.line || 0,
-              column: node.loc?.start.column,
-            },
-            complexity: self.calculateComplexity(path),
-          });
-        },
-
-        ArrowFunctionExpression(path) {
-          const node = path.node;
-          const parent = path.parent;
-          let name = 'arrow';
-
-          if (
-            parent.type === 'VariableDeclarator' &&
-            parent.id.type === 'Identifier'
-          ) {
-            name = parent.id.name;
-          }
-
-          functions.push({
-            name,
-            params: node.params.map(p =>
-              p.type === 'Identifier' ? p.name : 'unknown',
-            ),
-            location: {
-              file: 'current',
-              line: node.loc?.start.line || 0,
-              column: node.loc?.start.column,
-            },
-            complexity: self.calculateComplexity(path),
-          });
-        },
-
-        ClassDeclaration(path) {
-          const node = path.node;
-          const methods: FunctionInfo[] = [];
-          const properties: ClassInfo['properties'] = [];
-
-          path.traverse({
-            ClassMethod(methodPath) {
-              const method = methodPath.node;
-              methods.push({
-                name:
-                  method.key.type === 'Identifier'
-                    ? method.key.name
-                    : 'unknown',
-                params: method.params.map(p =>
-                  p.type === 'Identifier' ? p.name : 'unknown',
-                ),
-                location: {
-                  file: 'current',
-                  line: method.loc?.start.line || 0,
-                  column: method.loc?.start.column,
-                },
-                complexity: 1,
-              });
-            },
-            ClassProperty(propertyPath) {
-              const property = propertyPath.node;
-              if (property.key.type === 'Identifier') {
-                properties.push({
-                  name: property.key.name,
-                  type: undefined,
-                  value: undefined,
-                });
-              }
-            },
-          });
-
-          classes.push({
-            name: node.id?.name || 'anonymous',
-            methods,
-            properties,
-            location: {
-              file: 'current',
-              line: node.loc?.start.line || 0,
-              column: node.loc?.start.column,
-            },
-          });
-        },
-      });
-    }
-
-    const modules = this.analyzeModules(code, ast);
-    const callGraph = this.buildCallGraph(functions, code, ast);
-
-    return {
-      functions,
-      classes,
-      modules,
-      callGraph,
-    };
-  }
-
-  private analyzeModules(
-    code: string,
-    ast: t.File | null = this.parseCodeAst(code, 'Module analysis failed'),
-  ): CodeStructure['modules'] {
-    const modules: CodeStructure['modules'] = [];
-
-    if (ast) {
-      const imports: string[] = [];
-      const exports: string[] = [];
-
-      traverse(ast, {
-        ImportDeclaration(path) {
-          imports.push(path.node.source.value);
-        },
-        ExportNamedDeclaration(path) {
-          if (path.node.source) {
-            exports.push(path.node.source.value);
-          }
-        },
-        ExportDefaultDeclaration() {
-          exports.push('default');
-        },
-      });
-
-      if (imports.length > 0 || exports.length > 0) {
-        modules.push({
-          name: 'current',
-          imports,
-          exports,
-        });
-      }
-    }
-
-    return modules;
-  }
-
-  private buildCallGraph(
-    functions: FunctionInfo[],
-    code: string,
-    ast: t.File | null = this.parseCodeAst(
-      code,
-      'Call graph construction failed',
-    ),
-  ): CallGraph {
-    const nodes: CallGraph['nodes'] = functions.map(fn => ({
-      id: fn.name,
-      name: fn.name,
-      type: 'function' as const,
-    }));
-
-    const edges: CallGraph['edges'] = [];
-
-    if (ast) {
-      let currentFunction = '';
-
-      traverse(ast, {
-        FunctionDeclaration(path) {
-          currentFunction = path.node.id?.name || '';
-        },
-        FunctionExpression(path) {
-          const parent = path.parent;
-          if (
-            parent.type === 'VariableDeclarator' &&
-            parent.id.type === 'Identifier'
-          ) {
-            currentFunction = parent.id.name;
-          }
-        },
-        CallExpression(path) {
-          if (currentFunction) {
-            const callee = path.node.callee;
-            let calledFunction = '';
-
-            if (callee.type === 'Identifier') {
-              calledFunction = callee.name;
-            } else if (
-              callee.type === 'MemberExpression' &&
-              callee.property.type === 'Identifier'
-            ) {
-              calledFunction = callee.property.name;
-            }
-
-            if (
-              calledFunction &&
-              functions.some(f => f.name === calledFunction)
-            ) {
-              edges.push({
-                from: currentFunction,
-                to: calledFunction,
-              });
-            }
-          }
-        },
-      });
-    }
-
-    return {nodes, edges};
-  }
-
-  private calculateComplexity(path: unknown): number {
-    let complexity = 1;
-
-    // 使用any类型绕过类型检查
-    const anyPath = path as any;
-
-    if (anyPath.traverse) {
-      anyPath.traverse({
-        IfStatement() {
-          complexity++;
-        },
-        SwitchCase() {
-          complexity++;
-        },
-        ForStatement() {
-          complexity++;
-        },
-        WhileStatement() {
-          complexity++;
-        },
-        DoWhileStatement() {
-          complexity++;
-        },
-        ConditionalExpression() {
-          complexity++;
-        },
-        LogicalExpression(logicalPath: any) {
-          if (
-            logicalPath.node.operator === '&&' ||
-            logicalPath.node.operator === '||'
-          ) {
-            complexity++;
-          }
-        },
-        CatchClause() {
-          complexity++;
-        },
-      });
-    }
-
-    return complexity;
   }
 
   // ── AI ────────────────────────────────────────────────
