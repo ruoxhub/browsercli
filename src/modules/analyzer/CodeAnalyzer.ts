@@ -44,12 +44,7 @@ import {
   detectDuplicateCodeInternal,
   normalizeCode as normalizeCodeImpl,
 } from './QualityAnalyzer.js';
-import {
-  analyzeStructure,
-  analyzeModules,
-  buildCallGraph,
-  calculateComplexity,
-} from './CodeAnalyzerStructure.js';
+import {analyzeStructure} from './CodeAnalyzerStructure.js';
 import {
   checkSanitizer as checkSanitizerImpl,
   getMemberExpressionName as getMemberExpressionNameImpl,
