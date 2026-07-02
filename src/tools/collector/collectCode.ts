@@ -56,10 +56,20 @@ export const collectCode = defineTool({
     limit: zod.number().int().positive().optional(),
     topN: zod.number().int().positive().optional(),
   },
-  handler: async (request, response) => {
+  handler: async (request, response, context) => {
     const params = request.params as CollectCodeParams;
     const returnMode = params.returnMode ?? 'full';
     const runtime = getRuntime();
+
+    // Sync page context from tool context to runtime.collector
+    // so that collector.collect() can resolve the current page.
+    try {
+      const page = context.getSelectedPage();
+      runtime.syncPageContext(page);
+    } catch {
+      // No page selected — collect() will return NO_PAGE_CONTEXT below
+    }
+
     const shouldCollect =
       returnMode !== 'summary' ||
       runtime.collector.getCollectedFilesSummary().length === 0;
