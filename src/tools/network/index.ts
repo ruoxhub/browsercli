@@ -9,6 +9,9 @@
 export {listNetworkRequests} from './listNetworkRequests.js';
 export {getNetworkRequest} from './getNetworkRequest.js';
 export {clearNetworkRequests} from './clearNetworkRequests.js';
+export {replayNetworkRequest} from './replayNetworkRequest.js';
+export {exportRequestAsCurl} from './exportRequestAsCurl.js';
+export {replayNetworkRequestBatch} from './replayNetworkRequestBatch.js';
 
 // ─── WebSocket 工具（defineTool 模式）──────────────────
 
@@ -45,6 +48,21 @@ export type {
   ListNetworkRequestsResult,
   GetNetworkRequestResult,
   ClearNetworkRequestsResult,
+  // Replay 参数与数据类型
+  ReplayOverride,
+  BuiltReplayRequest,
+  ReplayResponse,
+  BatchVariantResult,
+  BatchReplayResult,
+  ReplayNetworkRequestParams,
+  ReplayNetworkRequestData,
+  ReplayNetworkRequestResult,
+  ExportRequestAsCurlParams,
+  ExportRequestAsCurlData,
+  ExportRequestAsCurlResult,
+  ReplayNetworkRequestBatchParams,
+  ReplayNetworkRequestBatchData,
+  ReplayNetworkRequestBatchResult,
   // WebSocket 参数类型
   ListWebSocketConnectionsParams,
   GetWebSocketMessagesParams,
