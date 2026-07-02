@@ -95,11 +95,8 @@ export function isValidJavaScript(code: string): boolean {
  * 提取自 AdvancedDeobfuscator。
  */
 export function normalizeCode(code: string): string {
-  // 移除多余的空白字符
-  code = code.replace(/\s+/g, ' ');
-  // 移除注释中的混淆
-  code = code.replace(/\/\*[\s\S]*?\*\//g, '');
-  code = code.replace(/\/\/.*/g, '');
+  // Just return the code or do a safe trimming, do not use naive regex replacements
+  // that strip comments globally since they break string literals containing '//' or '/*'.
   return code.trim();
 }
 

@@ -1094,22 +1094,22 @@ ${codeSnippet}
 
     try {
       // 1. 移除常见的混淆模式
-      // 移除空的if语句
-      restored = restored.replace(/if\s*\([^)]*\)\s*\{\s*\}/g, '');
+      // 移除空的if语句（仅在后面没有else时移除，防止产生孤立的else语法错误）
+      restored = restored.replace(/if\s*\([^)]*\)\s*\{\s*\}(?!\s*else\b)/g, '');
 
       // 2. 简化布尔表达式
       restored = restored.replace(/!!\s*\(/g, 'Boolean(');
 
-      // 3. 还原简单的字符串拼接
-      restored = restored.replace(/""\s*\+\s*/g, '');
+      // 3. 还原简单的字符串拼接（已禁用，因为正则匹配不安全，会破坏含转义字符的字符串字面量，交由AST优化阶段处理）
+      // restored = restored.replace(/""\s*\+\s*/g, '');
 
       if (aggressive) {
         // 4. 移除debugger语句
         restored = restored.replace(/debugger;?/g, '');
         confidence += 0.1;
 
-        // 5. 简化三元表达式
-        restored = restored.replace(/\?\s*([^:]+)\s*:\s*\1/g, '$1');
+        // 5. 简化三元表达式（已禁用，因为正则匹配不安全，会破坏代码语法，交由AST优化阶段处理）
+        // restored = restored.replace(/\?\s*([^:]+)\s*:\s*\1/g, '$1');
         confidence += 0.05;
       }
 
