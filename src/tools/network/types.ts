@@ -278,3 +278,118 @@ export type GetNetworkRequestResult = NetworkResult<GetNetworkRequestData>;
 /** clearNetworkRequests 结果 */
 export type ClearNetworkRequestsResult =
   NetworkResult<ClearNetworkRequestsData>;
+
+// ─── Replay 类型 ──────────────────────────────────────────
+
+/** Replay 时可覆盖的字段。全部可选。 */
+export interface ReplayOverride {
+  /** 覆盖 HTTP 方法（大写化） */
+  method?: string;
+  /** 覆盖请求 URL */
+  url?: string;
+  /** 与原始 headers 合并（覆盖同名键，大小写不敏感）；replaceHeaders=true 时整体替换 */
+  headers?: Record<string, string>;
+  /** 整体替换请求体；null 清空 body；省略保留原始 */
+  body?: string | null;
+  /** 默认 false=合并；true=headers 参数整体替换原始 headers */
+  replaceHeaders?: boolean;
+}
+
+/** 发送给 APIRequestContext 的构建结果。 */
+export interface BuiltReplayRequest {
+  method: string;
+  url: string;
+  headers: Record<string, string>;
+  body?: string;
+}
+
+/** 单次 replay 的归一化响应。 */
+export interface ReplayResponse {
+  status: number;
+  statusText: string;
+  headers: Record<string, string>;
+  body: string;
+  bodyTruncated: boolean;
+  timingMs: number;
+  replayedUrl: string;
+}
+
+/** 批量 replay 中单个 variant 的结果。 */
+export interface BatchVariantResult {
+  index: number;
+  override: ReplayOverride;
+  result: ReplayResponse;
+  /** executeReplay 抛出时设置；HTTP 4xx/5xx 不视为 error */
+  error?: string;
+}
+
+/** 批量 replay 聚合结果。 */
+export interface BatchReplayResult {
+  total: number;
+  succeeded: number;
+  failed: number;
+  statusCodeDistribution: Record<number, number>;
+  results: BatchVariantResult[];
+}
+
+// ─── Replay 参数与结果类型 ──────────────────────────────────
+
+/** replay_network_request 参数 */
+export interface ReplayNetworkRequestParams {
+  reqid: number;
+  method?: string;
+  url?: string;
+  headers?: Record<string, string>;
+  body?: string | null;
+  replaceHeaders?: boolean;
+  maxBodyLength?: number;
+}
+
+/** replay_network_request 返回数据 */
+export interface ReplayNetworkRequestData extends ReplayResponse {
+  originalReqid: number;
+  override: ReplayOverride | null;
+}
+
+/** export_request_as_curl 参数 */
+export interface ExportRequestAsCurlParams {
+  reqid: number;
+  method?: string;
+  url?: string;
+  headers?: Record<string, string>;
+  body?: string | null;
+  replaceHeaders?: boolean;
+  includeCookies?: boolean;
+}
+
+/** export_request_as_curl 返回数据 */
+export interface ExportRequestAsCurlData {
+  curl: string;
+  originalReqid: number;
+  override: ReplayOverride | null;
+}
+
+/** replay_network_request_batch 参数 */
+export interface ReplayNetworkRequestBatchParams {
+  reqid: number;
+  variants: ReplayOverride[];
+  concurrency?: number;
+  maxBodyLength?: number;
+}
+
+/** replay_network_request_batch 返回数据 */
+export interface ReplayNetworkRequestBatchData extends BatchReplayResult {}
+
+// ─── Replay 结果类型 ──────────────────────────────────────
+
+/** replay_network_request 结果 */
+export type ReplayNetworkRequestResult =
+  NetworkResult<ReplayNetworkRequestData>;
+
+/** export_request_as_curl 结果 */
+export type ExportRequestAsCurlResult =
+  NetworkResult<ExportRequestAsCurlData>;
+
+/** replay_network_request_batch 结果 */
+export type ReplayNetworkRequestBatchResult =
+  NetworkResult<ReplayNetworkRequestBatchData>;

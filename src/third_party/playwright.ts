@@ -9,6 +9,8 @@ import type {CDPSession as PlaywrightCDPSession} from 'patchright';
 
 // Re-export all Playwright types for downstream consumers
 export type {
+  APIRequestContext,
+  APIResponse,
   Browser,
   BrowserContext,
   Page,
