@@ -116,15 +116,22 @@ export const replayNetworkRequest = defineTool({
         httpResponse,
       );
 
-      const override: ReplayOverride = {
-        method: params.method,
-        url: params.url,
-        headers: params.headers,
-        body: params.body,
-        replaceHeaders: params.replaceHeaders,
-      };
+      const override: ReplayOverride | null =
+        (params.method ??
+        params.url ??
+        params.headers ??
+        params.body ??
+        params.replaceHeaders !== undefined)
+          ? {
+              method: params.method,
+              url: params.url,
+              headers: params.headers,
+              body: params.body,
+              replaceHeaders: params.replaceHeaders,
+            }
+          : null;
 
-      const built = buildReplayRequest(originalData, override);
+      const built = buildReplayRequest(originalData, override ?? undefined);
       const maxBodyLength = params.maxBodyLength ?? DEFAULT_MAX_BODY_LENGTH;
 
       try {
