@@ -243,6 +243,12 @@ browsercli call clear_network_requests [--targetPageIdx <num>] # 清理抓包缓
 # Retrieve the initiator JavaScript stack trace for a request
 browsercli call get_request_initiator --requestId <num> # 获取发起指定网络请求的 JavaScript 调用栈轨迹。
 
+# Replay or export network requests
+browsercli call replay_network_request --reqid <num> [--method <str>] [--url <str>] [--headers <arr>] [--replaceHeaders <bool>] [--maxBodyLength <num>] # 重新播放指定的网络请求。
+browsercli call export_request_as_curl --reqid <num> [--method <str>] [--url <str>] [--headers <arr>] [--replaceHeaders <bool>] [--includeCookies <bool>] # 导出指定网络请求为 cURL 命令。
+browsercli call replay_network_request_batch --reqid <num> [--concurrency <num>] [--maxBodyLength <num>] # 批量并发重放指定的网络请求。
+
+
 # WebSocket Inspection
 browsercli call list_websocket_connections [--pageSize <num>] [--pageIdx <num>] [--urlFilter <str>] [--includePreservedConnections <bool>] # 列出当前页面开启的所有 WebSocket 连接。
 browsercli call get_websocket_messages --wsid <num> [--direction <str>] [--groupId <str>] [--pageSize <num>] [--pageIdx <num>] [--show_content <bool>] # 抓取并展示指定 WebSocket 连接收发的帧内容。
