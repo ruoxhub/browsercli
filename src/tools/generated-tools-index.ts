@@ -424,6 +424,18 @@ export const GENERATED_TOOL_REGISTRY = [
     handlerName: 'analyzeWebSocketMessages',
   },
   {
+    modulePath: './network/replayNetworkRequest.js',
+    handlerName: 'replayNetworkRequest',
+  },
+  {
+    modulePath: './network/exportRequestAsCurl.js',
+    handlerName: 'exportRequestAsCurl',
+  },
+  {
+    modulePath: './network/replayNetworkRequestBatch.js',
+    handlerName: 'replayNetworkRequestBatch',
+  },
+  {
     modulePath: './page/clickElement.js',
     handlerName: 'clickElement',
   },

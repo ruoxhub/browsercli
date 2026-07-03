@@ -67,10 +67,19 @@ import {
 import {
   runAdvanced,
   runASTOptimizer,
+  runEnhancedPass,
   runJSVMP,
+  runSiteAdapter,
   runUnpack,
   runWebcrackStep,
 } from './SubPipelineRunner.js';
+import {SiteAdapterRegistry} from './SiteAdapterRegistry.js';
+import {normalizeStructure} from './NormalizeStructurePass.js';
+import {pruneFakeBranches} from './PruneFakeBranchesPass.js';
+import {inlineLiterals} from './InlineLiteralsPass.js';
+import {enhancedControlFlow} from './EnhancedControlFlowPass.js';
+import {ifChainToSwitch} from './IfChainToSwitchPass.js';
+import {WrapperFolder} from './WrapperFolder.js';
 
 // ==================== 扩展选项 ====================
 
@@ -227,7 +236,20 @@ export class Deobfuscator {
         );
       }
 
-      // ── Step 4: 基础管线 ──
+      // ── Step 3.5: 站点适配器前置 pass ──
+      const siteRegistry = new SiteAdapterRegistry();
+      await registerAllAdapters(siteRegistry);
+      const siteDetection = siteRegistry.detect(code, options.siteAdapter);
+      const activeAdapter = siteRegistry.getAdapter(
+        options.siteAdapter || siteDetection.bestId,
+      );
+      if (activeAdapter && activeAdapter.prePasses && activeAdapter.prePasses.length > 0) {
+        code = await runSiteAdapter(activeAdapter, 'pre', code, transformations);
+      }
+
+      // ── Step 4: 基础管线（增强版） ──
+      const useEnhancedPasses = options.aggressive || (activeAdapter && activeAdapter.patternId !== 'generic');
+
       code = await extractStringArrays(
         code,
         transformations,
@@ -238,12 +260,26 @@ export class Deobfuscator {
       code = await decryptArrays(code, transformations, this.stringArrays);
       code = await inlineStringDecoderCalls(code, transformations);
       code = await evaluateStringDecoderCalls(code, transformations);
-      code = await basicTransform(code, transformations);
 
-      if (options.aggressive) {
-        code = await unflattenControlFlow(code, transformations);
+      if (useEnhancedPasses) {
+        code = await runEnhancedPass('normalize-structure', normalizeStructure, code, transformations);
+
+        code = await runEnhancedPass('enhanced-control-flow', enhancedControlFlow, code, transformations, {timeoutMs: 180000});
+        code = await runEnhancedPass('if-chain-to-switch', ifChainToSwitch, code, transformations);
+        code = await runEnhancedPass('prune-fake-branches', pruneFakeBranches, code, transformations);
       }
 
+      const useSitePasses = activeAdapter && activeAdapter.patternId !== 'generic';
+      if (useSitePasses) {
+        code = await runEnhancedPass('wrapper-folding', (ast) => {
+          const folder = new WrapperFolder();
+          const changed = folder.foldWrapperObjects(ast);
+          return {ast, changed};
+        }, code, transformations);
+        code = await runEnhancedPass('inline-literals', inlineLiterals, code, transformations);
+      }
+
+      code = await basicTransform(code, transformations);
       code = await simplifyExpressions(code, transformations);
 
       // ── Step 5: AST 优化器 ──
@@ -255,6 +291,11 @@ export class Deobfuscator {
         ])
       ) {
         code = await runASTOptimizer(this.astOptimizer, code, transformations);
+      }
+
+      // ── Step 5.5: 站点适配器后置 pass ──
+      if (activeAdapter && activeAdapter.postPasses && activeAdapter.postPasses.length > 0) {
+        code = await runSiteAdapter(activeAdapter, 'post', code, transformations);
       }
 
       // ── Step 6: 变量重命名 ──
@@ -426,5 +467,40 @@ export class Deobfuscator {
   clearCache(): void {
     this.resultCache.clear();
     this.stringArrays.clear();
+  }
+}
+
+async function registerAllAdapters(registry: SiteAdapterRegistry): Promise<void> {
+  const adapterModules = [
+    './adapters/Reese84Adapter.js',
+    './adapters/DingxiangAdapter.js',
+    './adapters/Geetest4Adapter.js',
+    './adapters/TonghuashunAdapter.js',
+    './adapters/YidunAdapter.js',
+    './adapters/XiaohongshuAdapter.js',
+    './adapters/ObVariantAdapter.js',
+  ];
+
+  for (const modulePath of adapterModules) {
+    try {
+      const mod = await import(modulePath);
+      const AdapterClass = Object.values(mod).find(
+        v => typeof v === 'function' && v.prototype && 'patternId' in v.prototype,
+      ) as (new () => import('./SiteAdapterRegistry.js').SiteAdapter) | undefined;
+      if (AdapterClass) {
+        registry.register(new AdapterClass());
+      }
+      // ObVariant also registers mps-ob variant
+      if (mod.MPS_OB_PATTERN_ID && AdapterClass) {
+        const mpsAdapter = new AdapterClass();
+        (mpsAdapter as {patternId: string}).patternId = mod.MPS_OB_PATTERN_ID;
+        registry.register(mpsAdapter);
+      }
+    } catch (err: unknown) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code !== 'ERR_MODULE_NOT_FOUND' && code !== 'MODULE_NOT_FOUND') {
+        logger.warn(`Failed to load adapter ${modulePath}`, err);
+      }
+    }
   }
 }

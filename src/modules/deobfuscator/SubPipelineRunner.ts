@@ -302,3 +302,63 @@ export async function runWebcrackStep(
     };
   }
 }
+
+/**
+ * 增强 AST Pass 运行器
+ */
+export async function runEnhancedPass(
+  passName: string,
+  passFn: (ast: import('@babel/types').File) => {ast: import('@babel/types').File; changed: boolean},
+  code: string,
+  transformations: Transformation[],
+  options?: {maxIterations?: number; timeoutMs?: number},
+): Promise<string> {
+  try {
+    const {AstPassRunner} = await import('./AstPassRunner.js');
+    const result = AstPassRunner.run(code, passFn, options);
+    if (result.changed) {
+      transformations.push({
+        type: `enhanced-${passName}`,
+        description: `${passName} applied (${result.iterations} iterations)`,
+        success: true,
+        detail: {iterations: result.iterations},
+      });
+      return result.code;
+    }
+  } catch (error) {
+    logger.warn(`Enhanced pass ${passName} failed`, error);
+    transformations.push({
+      type: `enhanced-${passName}`,
+      description: `${passName} failed: ${error}`,
+      success: false,
+    });
+  }
+  return code;
+}
+
+/**
+ * 站点适配器运行器
+ */
+export async function runSiteAdapter(
+  adapter: import('./SiteAdapterRegistry.js').SiteAdapter,
+  phase: 'pre' | 'post',
+  code: string,
+  transformations: Transformation[],
+): Promise<string> {
+  const passes = phase === 'pre' ? adapter.prePasses : adapter.postPasses;
+  if (!passes || passes.length === 0) {
+    return code;
+  }
+
+  let currentCode = code;
+  for (const passFn of passes) {
+    currentCode = await runEnhancedPass(
+      `site-${adapter.patternId}-${phase}`,
+      passFn,
+      currentCode,
+      transformations,
+      {timeoutMs: 60000},
+    );
+  }
+  return currentCode;
+}

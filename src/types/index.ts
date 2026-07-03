@@ -151,6 +151,8 @@ export interface DeobfuscateOptions {
   maxBundleModules?: number;
   /** 把还原后的模块按规则重映射到工程路径 */
   mappings?: DeobfuscateMappingRule[];
+  /** 显式指定站点适配器 ID（如 'reese84', 'dingxiang' 等），auto 模式下自动检测 */
+  siteAdapter?: string;
 }
 
 export interface DeobfuscateMappingRule {
@@ -252,7 +254,14 @@ export type ObfuscationType =
   | 'unminify' // webcrack unminify (恢复语义结构)
   | 'jsx-decompile' // webcrack 反 JSX 编译
   | 'mangle' // webcrack 反 mangle
-  | 'webcrack'; // webcrack 引擎产出的标记类型
+  | 'webcrack' // webcrack 引擎产出的标记类型
+  | 'reese84' // Reese84 VM 混淆
+  | 'dingxiang' // 顶象验证码
+  | 'geetest4' // 极验4代
+  | 'tonghuashun' // 同花顺/10jqka
+  | 'yidun' // 网易易盾
+  | 'xiaohongshu' // 小红书
+  | 'ob-variant'; // OBfuscator 变体（招标/公安部等）
 
 export interface Transformation {
   type: string;

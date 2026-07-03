@@ -32,3 +32,27 @@ export type {
   PackerDeobfuscatorOptions,
   PackerDeobfuscatorResult,
 } from './PackerDeobfuscator.js';
+
+// 增强基础设施
+export {AstPassRunner} from './AstPassRunner.js';
+export type {AstPassResult, AstPassOptions} from './AstPassRunner.js';
+export {StaticResolver, UNRESOLVED} from './StaticResolver.js';
+export {SandboxEvaluator} from './SandboxEvaluator.js';
+export type {SandboxOptions, PreludeResult, EvalResult} from './SandboxEvaluator.js';
+export {WrapperFolder} from './WrapperFolder.js';
+export type {WrapperDescriptor, WrapperFolderOptions} from './WrapperFolder.js';
+
+// 增强 AST Pass
+export {normalizeStructure} from './NormalizeStructurePass.js';
+export {pruneFakeBranches} from './PruneFakeBranchesPass.js';
+export {inlineLiterals} from './InlineLiteralsPass.js';
+export {enhancedControlFlow} from './EnhancedControlFlowPass.js';
+export {ifChainToSwitch} from './IfChainToSwitchPass.js';
+
+// 站点适配器
+export {SiteAdapterRegistry} from './SiteAdapterRegistry.js';
+export type {SitePattern, SiteAdapter} from './SiteAdapterRegistry.js';
+
+// 质量度量
+export {ResidueMetrics} from './ResidueMetrics.js';
+export type {ResidueMetricsResult} from './ResidueMetrics.js';

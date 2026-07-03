@@ -115,6 +115,41 @@ export function detectObfuscationType(code: string): ObfuscationType[] {
     types.push('base64-encoding');
   }
 
+  // Reese84 VM
+  if (/reese84/i.test(code)) {
+    types.push('reese84');
+  }
+
+  // 顶象验证码
+  if (/dingxiang/i.test(code)) {
+    types.push('dingxiang');
+  }
+
+  // 极验4代
+  if (/geetest/i.test(code)) {
+    types.push('geetest4');
+  }
+
+  // 同花顺/10jqka
+  if (/10jqka/i.test(code) || /split\(\s*["']\|["']\s*\)/.test(code)) {
+    types.push('tonghuashun');
+  }
+
+  // 网易易盾
+  if (/yidun/i.test(code)) {
+    types.push('yidun');
+  }
+
+  // 小红书
+  if (/xiaohongshu/i.test(code) || /\bxhs\b/i.test(code)) {
+    types.push('xiaohongshu');
+  }
+
+  // OBfuscator 变体（中国招标投标/公安部等）
+  if (/\b_0x[a-f0-9]+\b/i.test(code) && !types.includes('javascript-obfuscator')) {
+    types.push('ob-variant');
+  }
+
   if (types.length === 0) {
     types.push('unknown');
   }
