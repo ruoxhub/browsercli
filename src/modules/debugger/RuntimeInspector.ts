@@ -311,10 +311,10 @@ export class RuntimeInspector {
     });
 
     logger.info(`Expression evaluated: ${expression}`, {
-      result: (result as RemoteObject).value,
+      result: result.result.value,
     });
 
-    return this.formatValue(result as RemoteObject);
+    return this.formatValue(result.result);
   }
 
   async evaluateGlobal(expression: string): Promise<unknown> {

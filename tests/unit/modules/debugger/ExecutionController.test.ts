@@ -86,12 +86,16 @@ describe('ExecutionController', () => {
       callFrameId: 'cf-1',
       expression: '1 + 1',
     });
-    assert.deepStrictEqual(result, {value: 42, type: 'number'});
+    assert.deepStrictEqual(result, {
+      result: {value: 42, type: 'number'},
+      exceptionDetails: undefined,
+    });
     assert.strictEqual(session.calls[0].method, 'Debugger.evaluateOnCallFrame');
     assert.deepStrictEqual(session.calls[0].params, {
       callFrameId: 'cf-1',
       expression: '1 + 1',
       returnByValue: true,
+      generatePreview: true,
     });
   });
 

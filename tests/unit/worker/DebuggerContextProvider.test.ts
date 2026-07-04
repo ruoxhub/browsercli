@@ -9,7 +9,7 @@ import {describe, it} from 'node:test';
 import {DebuggerContextProvider} from '../../../src/worker/context/DebuggerContextProvider.js';
 
 describe('DebuggerContextProvider', () => {
-  it('enables debugger context only once for the same page', async () => {
+  it('enables debugger manager only once for the same page', async () => {
     const provider = new DebuggerContextProvider();
     let enabledCount = 0;
     const client = {

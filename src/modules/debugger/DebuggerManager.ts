@@ -25,19 +25,36 @@ import type {
 import {logger} from '../../utils/logger.js';
 import {resolveDefaultDebuggerSessionsDir} from '../../utils/projectPaths.js';
 import type {CodeCollector} from '../collector/CodeCollector.js';
+import type {Page} from '../../third_party/index.js';
+
+/**
+ * DebuggerManager 仅依赖 CodeCollector.getActivePage（用于自建 CDP session 的
+ * init() 路径）。当外部已持有 CDPSession 时（如 DebuggerContextProvider 走
+ * enable(client) 分支），无需完整 CodeCollector，只需提供该最小协议即可，
+ * 避免用 `as CodeCollector` 伪造依赖。
+ */
+export type DebuggerCollector = Pick<CodeCollector, 'getActivePage'>;
+
+/** 兼容旧名：兼容 {getActivePage(): Promise<Page>} 的最小实现。 */
+export type MinimalDebuggerCollector = {
+  getActivePage(): Promise<Page>;
+};
 
 import {BlackboxManager} from './BlackboxManager.js';
 import {BreakpointManager} from './BreakpointManager.js';
 import {DebuggerSessionStore} from './DebuggerSessionStore.js';
 import {EventBreakpointManager} from './EventBreakpointManager.js';
+import {ExecutionContextTracker} from './ExecutionContextTracker.js';
 import {ExecutionController} from './ExecutionController.js';
-import type {RuntimeInspector} from './RuntimeInspector.js';
+import {RuntimeInspector} from './RuntimeInspector.js';
 import {ScopeInspector} from './ScopeInspector.js';
+import {ScriptManager} from './ScriptManager.js';
 import {WatchExpressionManager} from './WatchExpressionManager.js';
 import {XHRBreakpointManager} from './XHRBreakpointManager.js';
 
 // 重新导出共享类型，保持向后兼容（AIContinuousDebugger / RuntimeInspector 等仍从此处导入）
 export type {
+  AutoRecoveryEvent,
   BreakpointInfo,
   CallFrame,
   DebuggerBreakpointResolvedEvent,
@@ -45,7 +62,12 @@ export type {
   PausedState,
   Scope,
 } from './types.js';
-import type {DebuggerPausedEvent, PausedState, Scope} from './types.js';
+import type {
+  AutoRecoveryEvent,
+  DebuggerPausedEvent,
+  PausedState,
+  Scope,
+} from './types.js';
 
 export class DebuggerManager {
   private cdpSession: CDPSession | null = null;
@@ -61,8 +83,19 @@ export class DebuggerManager {
   private readonly executionController: ExecutionController;
   private readonly scopeInspector: ScopeInspector;
   private readonly sessionStore: DebuggerSessionStore;
+  private readonly scriptManager: ScriptManager;
+  private readonly executionContextTracker: ExecutionContextTracker;
 
-  constructor(private collector: CodeCollector) {
+  // 断点循环自动恢复
+  private readonly breakpointHitWindowMs = 2000;
+  private readonly breakpointHitThreshold = 3;
+  private breakpointLoopTracker = new Map<
+    string,
+    {breakpointId: string; count: number; firstHitAt: number; lastHitAt: number}
+  >();
+  #lastAutoRecoveryEvent: AutoRecoveryEvent | null = null;
+
+  constructor(private collector: MinimalDebuggerCollector) {
     this.breakpointManager = new BreakpointManager(() => this.requireSession());
     this.executionController = new ExecutionController(() =>
       this.requireSession(),
@@ -76,6 +109,8 @@ export class DebuggerManager {
       () => this.getDefaultSessionsDir(),
       () => this.enabled,
     );
+    this.scriptManager = new ScriptManager(() => this.requireSession());
+    this.executionContextTracker = new ExecutionContextTracker();
   }
 
   private getDefaultSessionsDir(): string {
@@ -129,6 +164,7 @@ export class DebuggerManager {
     this.cdpSession = await page.context().newCDPSession(page);
 
     await this.cdpSession.send('Debugger.enable');
+    await this.cdpSession.send('Runtime.enable');
     this.enabled = true;
 
     // Debugger.paused 由 facade 统一监听（handlePaused 需协调多策略模块）
@@ -138,12 +174,36 @@ export class DebuggerManager {
     // 其余 listener 委托给策略模块
     this.executionController.attachListeners(this.cdpSession);
     this.breakpointManager.attachListeners(this.cdpSession);
+    this.scriptManager.attachListeners(this.cdpSession);
+    this.executionContextTracker.attachListeners(this.cdpSession);
 
     logger.info('Debugger enabled successfully');
   }
 
   /** enable 是 init 的别名,与其他模块保持一致 */
-  async enable(): Promise<void> {
+  async enable(client?: CDPSession): Promise<void> {
+    if (client) {
+      if (this.enabled) {
+        logger.warn('Debugger already enabled');
+        return;
+      }
+
+      this.cdpSession = client;
+      await this.cdpSession.send('Debugger.enable');
+      await this.cdpSession.send('Runtime.enable');
+      this.enabled = true;
+
+      this.pausedListener = params => this.handlePaused(params);
+      this.cdpSession.on('Debugger.paused', this.pausedListener);
+
+      this.executionController.attachListeners(this.cdpSession);
+      this.breakpointManager.attachListeners(this.cdpSession);
+      this.scriptManager.attachListeners(this.cdpSession);
+      this.executionContextTracker.attachListeners(this.cdpSession);
+
+      logger.info('Debugger enabled successfully (external CDP session)');
+      return;
+    }
     return this.init();
   }
 
@@ -200,6 +260,15 @@ export class DebuggerManager {
       }
       this.executionController.detachListeners(session);
       this.breakpointManager.detachListeners(session);
+      this.scriptManager.detachListeners(session);
+      this.scriptManager.clear();
+      this.executionContextTracker.detachListeners(session);
+
+      try {
+        await session.send('Runtime.disable');
+      } catch {
+        // Ignore errors during cleanup
+      }
 
       await session.send('Debugger.disable');
     } catch (error) {
@@ -208,6 +277,9 @@ export class DebuggerManager {
       this.enabled = false;
       this.breakpointManager.clearAllState();
       this.executionController.clearState();
+      this.executionContextTracker.clearState();
+      this.breakpointLoopTracker.clear();
+      this.#lastAutoRecoveryEvent = null;
 
       try {
         await session.detach();
@@ -239,6 +311,15 @@ export class DebuggerManager {
     condition?: string;
   }): Promise<import('./types.js').BreakpointInfo> {
     return this.breakpointManager.setBreakpointByUrl(params);
+  }
+
+  async setBreakpointByUrlRegex(params: {
+    urlRegex: string;
+    lineNumber: number;
+    columnNumber?: number;
+    condition?: string;
+  }): Promise<import('./types.js').BreakpointInfo> {
+    return this.breakpointManager.setBreakpointByUrlRegex(params);
   }
 
   async setBreakpoint(params: {
@@ -314,7 +395,25 @@ export class DebuggerManager {
     callFrameId: string;
     expression: string;
     returnByValue?: boolean;
-  }): Promise<unknown> {
+    generatePreview?: boolean;
+  }): Promise<{
+    result: {
+      type: string;
+      subtype?: string;
+      className?: string;
+      value?: unknown;
+      description?: string;
+      objectId?: string;
+    };
+    exceptionDetails?: {
+      text: string;
+      exception?: {
+        type?: string;
+        value?: unknown;
+        description?: string;
+      };
+    };
+  }> {
     return this.executionController.evaluateOnCallFrame(params);
   }
 
@@ -329,6 +428,13 @@ export class DebuggerManager {
   /** 将 CDP Scope.type 转换为 ScopeVariable.scope 兼容的联合类型。 */
   toScopeVariableScopeType(scopeType: Scope['type']): ScopeVariable['scope'] {
     return this.scopeInspector.toScopeVariableScopeType(scopeType);
+  }
+
+  /** 低层级 API：直接获取指定 objectId 的变量列表（兼容 DebuggerContext.getScopeVariables）。 */
+  async getScopeVariablesForObjectId(
+    objectId: string,
+  ): Promise<ScopeVariable[]> {
+    return this.scopeInspector.getScopeVariablesForObjectId(objectId);
   }
 
   // ==================== 断点命中回调（委托 BreakpointManager） ====================
@@ -354,7 +460,9 @@ export class DebuggerManager {
     this.executionController.setPausedState(params);
     // 2. BreakpointManager 更新命中断点的 hitCount
     this.breakpointManager.incrementHitCounts(params.hitBreakpoints);
-    // 3. 若有断点命中回调，异步预取变量并触发回调
+    // 3. 断点循环自动恢复检测
+    void this.#handlePotentialBreakpointLoop(params);
+    // 4. 若有断点命中回调，异步预取变量并触发回调
     if (
       !params.hitBreakpoints?.length ||
       !this.breakpointManager.hasBreakpointHitCallbacks()
@@ -396,6 +504,78 @@ export class DebuggerManager {
     })().catch(error => {
       logger.error('Breakpoint hit callback pipeline error:', error);
     });
+  }
+
+  async #handlePotentialBreakpointLoop(
+    event: DebuggerPausedEvent,
+  ): Promise<void> {
+    const breakpointId = event.hitBreakpoints?.[0];
+    if (!breakpointId) {
+      return;
+    }
+
+    const loc = event.callFrames?.[0]?.location;
+    const signature = `${breakpointId}|${loc?.scriptId ?? 'unknown'}:${loc?.lineNumber ?? -1}:${loc?.columnNumber ?? -1}`;
+    const now = Date.now();
+    const tracked = this.breakpointLoopTracker.get(signature);
+
+    if (!tracked || now - tracked.firstHitAt > this.breakpointHitWindowMs) {
+      this.breakpointLoopTracker.set(signature, {
+        breakpointId,
+        count: 1,
+        firstHitAt: now,
+        lastHitAt: now,
+      });
+      return;
+    }
+
+    tracked.count += 1;
+    tracked.lastHitAt = now;
+
+    if (tracked.count < this.breakpointHitThreshold || !this.cdpSession) {
+      return;
+    }
+
+    const actions: string[] = [];
+    let error: string | undefined;
+
+    try {
+      if (this.executionController.isPaused()) {
+        await this.cdpSession.send('Debugger.resume');
+        actions.push('resume');
+      }
+    } catch (e) {
+      error = `resume failed: ${e instanceof Error ? e.message : String(e)}`;
+    }
+
+    try {
+      await this.breakpointManager.removeBreakpoint(breakpointId);
+      actions.push('remove_breakpoint');
+    } catch (e) {
+      const detail = `removeBreakpoint failed: ${e instanceof Error ? e.message : String(e)}`;
+      error = error ? `${error}; ${detail}` : detail;
+    }
+
+    this.#lastAutoRecoveryEvent = {
+      breakpointId,
+      signature,
+      hitCount: tracked.count,
+      timestamp: Date.now(),
+      actions,
+      error,
+    };
+
+    this.breakpointLoopTracker.delete(signature);
+  }
+
+  getLastAutoRecoveryEvent(maxAgeMs = 30000): AutoRecoveryEvent | null {
+    if (!this.#lastAutoRecoveryEvent) {
+      return null;
+    }
+    if (Date.now() - this.#lastAutoRecoveryEvent.timestamp > maxAgeMs) {
+      return null;
+    }
+    return this.#lastAutoRecoveryEvent;
   }
 
   // ==================== 调试会话保存/恢复（委托 DebuggerSessionStore） ====================
@@ -441,5 +621,93 @@ export class DebuggerManager {
 
     this.breakpointManager.clearBreakpointHitCallbacks();
     logger.info('Debugger manager closed');
+  }
+
+  // ==================== 脚本管理（委托 ScriptManager） ====================
+
+  getScripts(): import('./ScriptManager.js').ScriptInfo[] {
+    return this.scriptManager.getAllScriptsSync();
+  }
+
+  getScriptById(
+    scriptId: string,
+  ): import('./ScriptManager.js').ScriptInfo | undefined {
+    return this.scriptManager.getScriptById(scriptId);
+  }
+
+  getScriptsByUrl(url: string): import('./ScriptManager.js').ScriptInfo[] {
+    return this.scriptManager.getScriptsByUrl(url);
+  }
+
+  async getScriptsByUrlPattern(
+    pattern: string,
+  ): Promise<import('./ScriptManager.js').ScriptInfo[]> {
+    return this.scriptManager.findScriptsByUrl(pattern);
+  }
+
+  async getScriptSource(scriptId: string): Promise<string> {
+    const script = await this.scriptManager.getScriptSource(scriptId);
+    if (!script || !script.source) {
+      throw new Error(`Script source not found: ${scriptId}`);
+    }
+    return script.source;
+  }
+
+  async getBeautifiedScriptSource(
+    scriptId: string,
+    beautify: (source: string) => string,
+  ): Promise<string> {
+    return this.scriptManager.getBeautifiedScriptSource(scriptId, beautify);
+  }
+
+  async searchInScripts(
+    query: string,
+    options: {caseSensitive?: boolean; isRegex?: boolean} = {},
+  ): Promise<{
+    query: string;
+    matches: Array<{
+      scriptId: string;
+      url: string;
+      lineNumber: number;
+      lineContent: string;
+    }>;
+  }> {
+    const result = await this.scriptManager.searchInScripts(query, {
+      caseSensitive: options.caseSensitive,
+      isRegex: options.isRegex,
+    });
+    return {
+      query: result.keyword,
+      matches: result.matches.map(m => ({
+        scriptId: m.scriptId,
+        url: m.url,
+        lineNumber: m.lineNumber,
+        lineContent: m.lineContent,
+      })),
+    };
+  }
+
+  // ==================== 执行上下文（委托 ExecutionContextTracker） ====================
+
+  getExecutionContexts(): import('./ExecutionContextTracker.js').ExecutionContextInfo[] {
+    return this.executionContextTracker.getExecutionContexts();
+  }
+
+  getExecutionContextById(
+    contextId: number,
+  ): import('./ExecutionContextTracker.js').ExecutionContextInfo | undefined {
+    return this.executionContextTracker.getExecutionContextById(contextId);
+  }
+
+  // ==================== 便捷访问器 ====================
+
+  /** getClient 是 getCDPSession 的别名，用于兼容 DebuggerContext 的 API。 */
+  getClient(): CDPSession | null {
+    return this.cdpSession;
+  }
+
+  /** getBreakpoints 是 listBreakpoints 的别名，用于兼容 DebuggerContext 的 API。 */
+  getBreakpoints(): import('./types.js').BreakpointInfo[] {
+    return this.breakpointManager.listBreakpoints();
   }
 }

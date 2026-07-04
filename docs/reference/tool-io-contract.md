@@ -34,31 +34,31 @@
 | `search_in_scripts` | `runtime.collector` + 页面脚本/网络 | `runtime.collector` 缓存 | Collector Cache / UnifiedCache |
 | `get_console_message` | Console 缓存 | Response attach only | CDP Console |
 | `list_console_messages` | Console 缓存 | Response attach only | CDP Console |
-| `break_on_xhr` | DebuggerContext + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `evaluate_on_callframe` | DebuggerContext + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `find_in_script` | DebuggerContext + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `get_paused_info` | DebuggerContext + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `get_request_initiator` | DebuggerContext + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `get_script_source` | DebuggerContext + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `get_storage` | DebuggerContext + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `break_on_xhr` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `evaluate_on_callframe` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `find_in_script` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `get_paused_info` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `get_request_initiator` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `get_script_source` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `get_storage` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
 | `hook_function` | 目标函数调用上下文 | `__mcp_hooks__` + `__hookStore[hookId]` | `__hookStore`（唯一数据面） |
-| `inspect_object` | DebuggerContext + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `list_breakpoints` | DebuggerContext + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `inspect_object` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `list_breakpoints` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
 | `list_hooks` | `__mcp_hooks__` | - | `__mcp_hooks__` |
-| `list_scripts` | DebuggerContext + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `monitor_events` | DebuggerContext + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `pause` | DebuggerContext + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `remove_breakpoint` | DebuggerContext + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `remove_xhr_breakpoint` | DebuggerContext + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `resume` | DebuggerContext + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `search_in_sources` | DebuggerContext + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `set_breakpoint` | DebuggerContext + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `set_breakpoint_on_text` | DebuggerContext + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `step_into` | DebuggerContext + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `step_out` | DebuggerContext + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `step_over` | DebuggerContext + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `stop_monitor` | DebuggerContext + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `trace_function` | DebuggerContext + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `list_scripts` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `monitor_events` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `pause` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `remove_breakpoint` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `remove_xhr_breakpoint` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `resume` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `search_in_sources` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `set_breakpoint` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `set_breakpoint_on_text` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `step_into` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `step_out` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `step_over` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `stop_monitor` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `trace_function` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
 | `unhook_function` | `__mcp_hooks__` | 恢复原函数并删除 `__mcp_hooks__[hookId]` | `__mcp_hooks__` |
 | `find_clickable_elements` | DOM Runtime | Response only | - |
 | `get_dom_structure` | DOM Runtime | Response only | - |

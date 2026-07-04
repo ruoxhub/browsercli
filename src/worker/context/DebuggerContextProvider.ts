@@ -13,44 +13,48 @@
 
 import type {CDPSession, Page} from 'patchright';
 
-import {DebuggerContext} from '../../DebuggerContext.js';
+import {DebuggerManager} from '../../modules/debugger/DebuggerManager.js';
 
 export class DebuggerContextProvider {
-  private _debuggerContexts = new WeakMap<Page, DebuggerContext>();
+  private _debuggerManagers = new WeakMap<Page, DebuggerManager>();
   private _debuggerSessions = new WeakMap<Page, CDPSession>();
 
   /**
-   * 获取或创建指定页面的 DebuggerContext。
+   * 获取或创建指定页面的 DebuggerManager。
    * 已启用的会被复用；未启用或未创建的会重新 attach CDP session。
    */
-  async ensureForPage(page: Page): Promise<DebuggerContext> {
-    const existing = this._debuggerContexts.get(page);
+  async ensureForPage(page: Page): Promise<DebuggerManager> {
+    const existing = this._debuggerManagers.get(page);
     if (existing?.isEnabled()) {
       return existing;
     }
 
     const client = await page.context().newCDPSession(page);
-    const debuggerContext = new DebuggerContext();
-    await debuggerContext.enable(client);
+    // 走 enable(client) 外部 session 分支，DebuggerManager 仅需 getActivePage
+    // 协议；无需伪造完整 CodeCollector。
+    const manager = new DebuggerManager({
+      getActivePage: async () => page,
+    });
+    await manager.enable(client);
 
-    this._debuggerContexts.set(page, debuggerContext);
+    this._debuggerManagers.set(page, manager);
     this._debuggerSessions.set(page, client);
 
     page.once('close', () => {
       void this.dispose(page);
     });
 
-    return debuggerContext;
+    return manager;
   }
 
   /**
-   * 释放指定页面的 DebuggerContext 与 CDPSession。
+   * 释放指定页面的 DebuggerManager 与 CDPSession。
    */
   async dispose(page: Page): Promise<void> {
-    const debuggerContext = this._debuggerContexts.get(page);
-    if (debuggerContext) {
+    const manager = this._debuggerManagers.get(page);
+    if (manager) {
       try {
-        await debuggerContext.disable();
+        await manager.disable();
       } catch {
         // Ignore cleanup errors when the page/session is already gone.
       }
@@ -65,7 +69,7 @@ export class DebuggerContextProvider {
       }
     }
 
-    this._debuggerContexts.delete(page);
+    this._debuggerManagers.delete(page);
     this._debuggerSessions.delete(page);
   }
 

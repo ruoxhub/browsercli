@@ -19,7 +19,6 @@
 
 import type {CDPSession} from '../../third_party/index.js';
 import {logger} from '../../utils/logger.js';
-import type {CodeCollector} from '../collector/CodeCollector.js';
 
 export interface ScriptInfo {
   scriptId: string;
@@ -30,6 +29,8 @@ export interface ScriptInfo {
   endColumn: number;
   sourceLength?: number;
   source?: string;
+  hash?: string;
+  sourceMapURL?: string;
 }
 
 interface ScriptChunk {
@@ -55,6 +56,8 @@ interface ScriptParsedEvent {
   endLine: number;
   endColumn: number;
   length?: number;
+  hash?: string;
+  sourceMapURL?: string;
 }
 
 interface SearchOptions {
@@ -71,6 +74,10 @@ interface SearchMatch {
   column: number;
   matchText: string;
   context: string;
+  /** 与 DebuggerContext.SearchMatch 兼容的别名 */
+  lineNumber: number;
+  /** 与 DebuggerContext.SearchMatch 兼容的别名 */
+  lineContent: string;
 }
 
 interface SearchResult {
@@ -93,36 +100,29 @@ const DEFAULT_MAX_MATCHES = 100;
 const DEFAULT_MAX_SCRIPTS = 1000;
 
 export class ScriptManager {
-  private cdpSession: CDPSession | null = null;
   private scripts = new Map<string, ScriptInfo>();
   private scriptsByUrl = new Map<string, ScriptInfo[]>();
-  private initialized = false;
 
   private keywordIndex = new Map<string, KeywordIndexEntry[]>();
   private scriptChunks = new Map<string, ScriptChunk[]>();
 
-  private scriptParsedListener: ((params: ScriptParsedEvent) => void) | null = null;
+  private scriptParsedListener: ((params: ScriptParsedEvent) => void) | null =
+    null;
 
-  constructor(private collector: CodeCollector) {}
+  constructor(private getCDPSession: () => CDPSession) {}
 
-  async init(): Promise<void> {
-    if (this.initialized) {
-      logger.warn('ScriptManager already initialized');
-      return;
-    }
-
-    const page = await this.collector.getActivePage();
-    this.cdpSession = await page.context().newCDPSession(page);
-    await this.cdpSession.send('Debugger.enable');
-
+  /** 注册 Debugger.scriptParsed 监听器。由 facade 在 init 时调用。 */
+  attachListeners(session: CDPSession): void {
     this.scriptParsedListener = params => this.handleScriptParsed(params);
-    this.cdpSession.on('Debugger.scriptParsed', this.scriptParsedListener);
+    session.on('Debugger.scriptParsed', this.scriptParsedListener);
+  }
 
-    await this.waitForScriptsToStabilize();
-    this.initialized = true;
-    logger.info(
-      `ScriptManager initialized, collected ${this.scripts.size} scripts`,
-    );
+  /** 注销 Debugger.scriptParsed 监听器。由 facade 在 disable 时调用。 */
+  detachListeners(session: CDPSession): void {
+    if (this.scriptParsedListener) {
+      session.off('Debugger.scriptParsed', this.scriptParsedListener);
+      this.scriptParsedListener = null;
+    }
   }
 
   private handleScriptParsed(params: ScriptParsedEvent): void {
@@ -134,6 +134,8 @@ export class ScriptManager {
       endLine: params.endLine,
       endColumn: params.endColumn,
       sourceLength: params.length,
+      hash: params.hash,
+      sourceMapURL: params.sourceMapURL,
     };
 
     this.scripts.set(params.scriptId, scriptInfo);
@@ -176,11 +178,6 @@ export class ScriptManager {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  /** enable 是 init 的别名,与其他模块保持一致 */
-  async enable(): Promise<void> {
-    return this.init();
-  }
-
   /**
    * 获取所有已加载的脚本列表
    *
@@ -190,13 +187,42 @@ export class ScriptManager {
    * @param includeSource 是否包含源码(默认 false,推荐 false)
    * @param maxScripts 最大脚本数量限制(默认 1000,防止内存溢出)
    */
+  /** 同步获取所有已加载脚本(不加载源码)。 */
+  getAllScriptsSync(): ScriptInfo[] {
+    return Array.from(this.scripts.values());
+  }
+
+  /** 按 scriptId 获取脚本信息。 */
+  getScriptById(scriptId: string): ScriptInfo | undefined {
+    return this.scripts.get(scriptId);
+  }
+
+  /** 按 URL 精确匹配获取脚本列表。 */
+  getScriptsByUrl(url: string): ScriptInfo[] {
+    return this.scriptsByUrl.get(url) ?? [];
+  }
+
+  /** 获取 beautified 版本的脚本源码（懒缓存）。 */
+  async getBeautifiedScriptSource(
+    scriptId: string,
+    beautify: (source: string) => string,
+  ): Promise<string> {
+    const script = await this.getScriptSource(scriptId);
+    if (!script || !script.source) {
+      throw new Error(`Script source not found: ${scriptId}`);
+    }
+    try {
+      return beautify(script.source);
+    } catch {
+      return script.source;
+    }
+  }
+
   async getAllScripts(
     includeSource = false,
     maxScripts = DEFAULT_MAX_SCRIPTS,
   ): Promise<ScriptInfo[]> {
-    if (!this.cdpSession) {
-      await this.init();
-    }
+    this.getCDPSession(); // 触发 requireSession 校验
 
     const scripts = Array.from(this.scripts.values());
 
@@ -220,7 +246,7 @@ export class ScriptManager {
   }
 
   private async loadSourcesForScripts(scripts: ScriptInfo[]): Promise<void> {
-    const session = this.cdpSession!;
+    const session = this.getCDPSession();
     logger.warn(
       `Loading source code for ${scripts.length} scripts. This may use significant memory.`,
     );
@@ -237,9 +263,7 @@ export class ScriptManager {
         script.source = scriptSource;
         loadedCount++;
         if (loadedCount % 10 === 0) {
-          logger.debug(
-            `Loaded ${loadedCount}/${scripts.length} scripts...`,
-          );
+          logger.debug(`Loaded ${loadedCount}/${scripts.length} scripts...`);
         }
       } catch (error) {
         logger.warn(
@@ -263,9 +287,7 @@ export class ScriptManager {
       throw new Error('Either scriptId or url parameter must be provided');
     }
 
-    if (!this.cdpSession) {
-      await this.init();
-    }
+    this.getCDPSession(); // 触发 requireSession 校验
 
     const targetScript = this.findScript(scriptId, url);
     if (!targetScript) {
@@ -311,7 +333,7 @@ export class ScriptManager {
   }
 
   private async loadScriptSource(script: ScriptInfo): Promise<boolean> {
-    const session = this.cdpSession!;
+    const session = this.getCDPSession();
     try {
       const {scriptSource} = await session.send('Debugger.getScriptSource', {
         scriptId: script.scriptId,
@@ -332,9 +354,7 @@ export class ScriptManager {
   }
 
   async findScriptsByUrl(urlPattern: string): Promise<ScriptInfo[]> {
-    if (!this.cdpSession) {
-      await this.init();
-    }
+    this.getCDPSession(); // 触发 requireSession 校验
 
     const pattern = urlPattern.replace(/\*/g, '.*');
     let regex: RegExp;
@@ -367,9 +387,7 @@ export class ScriptManager {
     keyword: string,
     options: SearchOptions = {},
   ): Promise<SearchResult> {
-    if (!this.cdpSession) {
-      await this.init();
-    }
+    this.getCDPSession(); // 触发 requireSession 校验
 
     const {
       isRegex = false,
@@ -378,7 +396,11 @@ export class ScriptManager {
       maxMatches = DEFAULT_MAX_MATCHES,
     } = options;
 
-    const searchRegex = this.compileSearchRegex(keyword, isRegex, caseSensitive);
+    const searchRegex = this.compileSearchRegex(
+      keyword,
+      isRegex,
+      caseSensitive,
+    );
     if (!searchRegex) {
       return {keyword, totalMatches: 0, matches: []};
     }
@@ -455,6 +477,8 @@ export class ScriptManager {
           column: match.index || 0,
           matchText: match[0],
           context,
+          lineNumber: i + 1,
+          lineContent: line,
         });
       }
     }
@@ -707,29 +731,6 @@ export class ScriptManager {
 
   async close(): Promise<void> {
     this.clear();
-
-    if (this.cdpSession && this.scriptParsedListener) {
-      try {
-        this.cdpSession.off('Debugger.scriptParsed', this.scriptParsedListener);
-        logger.debug('Event listener removed');
-      } catch (error) {
-        logger.warn('Failed to remove event listener:', error);
-      }
-      this.scriptParsedListener = null;
-    }
-
-    if (this.cdpSession) {
-      try {
-        await this.cdpSession.send('Debugger.disable');
-        await this.cdpSession.detach();
-        logger.info('CDP session closed');
-      } catch (error) {
-        logger.warn('Failed to close CDP session:', error);
-      }
-      this.cdpSession = null;
-    }
-
-    this.initialized = false;
     logger.info('ScriptManager closed');
   }
 
@@ -826,8 +827,11 @@ export class ScriptManager {
     keyword: string,
     options: SearchOptions = {},
   ): Promise<SearchResult> {
-    const {isRegex = false, caseSensitive = false, maxMatches = DEFAULT_MAX_MATCHES} =
-      options;
+    const {
+      isRegex = false,
+      caseSensitive = false,
+      maxMatches = DEFAULT_MAX_MATCHES,
+    } = options;
 
     if (isRegex) {
       const result = await this.searchInScripts(keyword, options);
@@ -841,6 +845,8 @@ export class ScriptManager {
       if (!indexedKeyword.includes(searchTerm)) continue;
 
       for (const entry of entries) {
+        // 从 context 中提取第一行作为 lineContent 兼容字段
+        const firstLine = entry.context.split('\n')[0] || '';
         matches.push({
           scriptId: entry.scriptId,
           url: entry.url,
@@ -848,6 +854,8 @@ export class ScriptManager {
           column: entry.column,
           matchText: indexedKeyword,
           context: entry.context,
+          lineNumber: entry.line,
+          lineContent: firstLine,
         });
         if (matches.length >= maxMatches) break;
       }

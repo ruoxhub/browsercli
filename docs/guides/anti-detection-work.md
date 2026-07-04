@@ -110,7 +110,7 @@ Patchright 的防检测核心之一是**静默 CDP**。但 MCP Server 原来在�
 
 | Collector          | CDP 域                           | 原来的初始化时机   |
 | ------------------ | -------------------------------- | ------------------ |
-| DebuggerContext    | `Debugger.enable`                | McpContext.#init() |
+| DebuggerManager    | `Debugger.enable`                | McpContext.#init() |
 | NetworkCollector   | `Network.requestWillBeSent` 监听 | init() → addPage() |
 | ConsoleCollector   | `Audits.enable`                  | init() → addPage() |
 | WebSocketCollector | Network.webSocket\* 监听         | init() → addPage() |

@@ -14,7 +14,7 @@ import type {
 } from 'patchright';
 
 import type {BrowserManager} from '../browser/index.js';
-import type {DebuggerContext} from '../DebuggerContext.js';
+import type {DebuggerManager} from '../modules/debugger/DebuggerManager.js';
 import type {Runtime} from '../runtime.js';
 import type {HTTPRequest} from '../third_party/index.js';
 import type {RequestInitiator} from '../tools/network/types.js';
@@ -218,7 +218,7 @@ export class ToolContextProvider {
     return this._browserContext.getActivePage();
   }
 
-  async getDebuggerContext(page?: Page): Promise<DebuggerContext> {
+  async getDebuggerContext(page?: Page): Promise<DebuggerManager> {
     const activePage = page ?? (await this._browserContext.getActivePage());
     return this._debuggerContext.ensureForPage(activePage);
   }

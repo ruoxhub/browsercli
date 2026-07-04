@@ -103,7 +103,6 @@ Browser-CLI/
 │   ├── index.ts                      # ★ Worker 进程入口 — RPC Worker 启动主函数
 │   ├── runtime.ts                    # ★ 运行时核心 — 单例，聚合所有模块实例
 │   ├── config.ts                     # 配置出口 (re-export config/index)
-│   ├── DebuggerContext.ts            # ★ CDP Debugger 会话上下文 (869 行)
 │   ├── PageCollector.ts              # ★ 泛型页面数据收集器基类 (模板方法)
 │   │
 │   ├── bin/                          # CLI 二进制入口
@@ -159,7 +158,7 @@ Browser-CLI/
 │   │   ├── collectors.ts            # 数据收集器定义
 │   │   └── context/                 # ToolContextProvider 子模块:
 │   │       ├── PageManager.ts       #   页面/Frame/Dialog/网络CPU节流管理
-│   │       ├── DebuggerSessionManager.ts # CDP DebuggerContext 创建与释放
+│   │       ├── DebuggerSessionManager.ts # CDP DebuggerManager 创建与释放
 │   │       ├── DataCollectorManager.ts   # Network/Console/WebSocket 收集与查询
 │   │       └── ServiceLocator.ts    #   分析服务惰性装配
 │   │
@@ -428,15 +427,15 @@ Browser-CLI/
 | **设计模式** | **Pipeline 模式、Strategy 模式** |
 | **改进空间** | 阶段间数据共享通过 `DeobfuscationContext` 进行，接口可更明确 |
 
-#### 3.2.7 调试器 (DebuggerContext / src/tools/debugger/)
+#### 3.2.7 调试器 (DebuggerManager / src/modules/debugger/)
 
 | 方面 | 分析 |
 |------|------|
 | **职责** | CDP Debugger 域的封装：脚本追踪、断点管理、暂停状态、调用帧检查、自动断点循环恢复 |
-| **实现逻辑** | `DebuggerContext` 管理 CDP Session 事件监听 (scriptParsed/paused/resumed)，提供脚本搜索 `searchInScripts()`、断点管理 `setBreakpoint/removeBreakpoint`、执行控制 `pause/resume/stepOver/stepInto/stepOut`、作用域变量获取 `getScopeVariables()`、调用帧表达式求值 `evaluateOnCallFrame()`。**断点循环检测**: 2s 窗口内同一断点命中 3 次 → 自动恢复 (resume + 移除断点) |
-| **关键类** | `DebuggerContext` — 869 行; DebuggerManager (src/modules/debugger/) — 子管理器延迟加载 |
-| **设计模式** | **薄封装模式** — 对 CDP Debugger 域的 1:1 方法包装 |
-| **改进空间** | DebuggerContext 与 DebuggerManager 之间存在职责重叠 |
+| **实现逻辑** | `DebuggerManager` 作为门面（Facade），协调 `BreakpointManager` / `ExecutionController` / `ScopeInspector` / `ScriptManager` / `ExecutionContextTracker` / `DebuggerSessionStore` 等策略模块。提供脚本搜索 `searchInScripts()`、断点管理 `setBreakpointByUrl/setBreakpointByUrlRegex`、执行控制 `pause/resume/stepOver/stepInto/stepOut`、作用域变量获取 `getScopeVariables()`、调用帧表达式求值 `evaluateOnCallFrame()`。**断点循环检测**: 2s 窗口内同一断点命中 3 次 → 自动恢复 (resume + 移除断点) |
+| **关键类** | `DebuggerManager` — 门面 ~600 行; `BreakpointManager` / `ExecutionController` / `ScopeInspector` / `ScriptManager` / `ExecutionContextTracker` / `DebuggerSessionStore` 等策略模块 |
+| **设计模式** | **Facade + Strategy 模式** — DebuggerManager 统一入口，策略模块各管 CDP 子域 |
+| **改进空间** | 已统一：原 `DebuggerContext`（869 行）已迁移至 `DebuggerManager` + 策略模块，消除了职责重叠 |
 
 #### 3.2.8 AI 服务层 (src/services/)
 
@@ -505,7 +504,7 @@ Browser-CLI/
 | **策略模式** | `BrowserManager` 双模式 (connect vs launch) + 端口发现三层策略; `Deobfuscator` 通过子模块实现不同混淆策略; `AIProvider` 接口 (OpenAI/Anthropic/Gemini) | 算法/策略的可替换性，运行时选择 | ✅ Strategy 接口定义清晰 |
 | **模板方法模式** | `PageCollector<T>` 抽象基类: `attachListeners()` / `detachListeners()` 由子类实现 | 多个收集器 (Network/Console/WSC) 共享导航分组和生命周期逻辑 | ✅ 减少大量重复代码 |
 | **管道模式** | `Deobfuscator` 反混淆管线: 检测 → 解包 → JSVMP → 高级 → 基础 → AST → 重命名 → AI | 多阶段处理，每阶段独立失败 | ✅ 高容错: 每步独立 try-catch |
-| **观察者模式** | `EventBus` (Pub/Sub 9 个事件); `DebuggerContext` CDP 事件监听 (scriptParsed/paused/resumed); `BrowserManager.on('disconnected')` 崩溃监听 | 模块间松散通信，事件驱动 | ✅ EventBus 有 Zod 校验加分 |
+| **观察者模式** | `EventBus` (Pub/Sub 9 个事件); `DebuggerManager` CDP 事件监听 (scriptParsed/paused/resumed); `BrowserManager.on('disconnected')` 崩溃监听 | 模块间松散通信，事件驱动 | ✅ EventBus 有 Zod 校验加分 |
 | **桥接模式** | `ToolAdapter` 将 `defineTool` 定义桥接到 Sekiro ActionHandler 协议 | 分离工具定义和传输协议 | ✅ 可独立替换协议层 |
 | **命令模式** | `RpcClient` 注册 `Map<string, ActionHandler>`, 按 action 名路由 | 请求封装为命令对象，支持注册/注销/路由 | ✅ 标准实现 |
 | **工厂模式** | `createAIService()` 根据 provider 创建对应实现; `getRuntime()` 首次创建所有实例 | 对象创建的集中管理 | ✅ 创建逻辑集中 |

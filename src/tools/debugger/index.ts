@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {DebuggerContext} from '../../DebuggerContext.js';
+import type {DebuggerManager} from '../../modules/debugger/DebuggerManager.js';
 import {PackerDeobfuscator} from '../../modules/deobfuscator/PackerDeobfuscator.js';
 import {zod} from '../../third_party/index.js';
 import type {ToolContextProvider} from '../../worker/ToolContext.js';
@@ -76,8 +76,7 @@ function defineStepTool(config: {
         config.name,
         async () => {
           const debuggerContext = await getDebuggerFromContext(context);
-          const pausedState = debuggerContext.getPausedState();
-          if (!pausedState.isPaused) {
+          if (!debuggerContext.isPaused()) {
             response.setStructuredContent({
               success: false,
               message: config.notPausedMessage,
@@ -205,11 +204,11 @@ export interface PausedInfoData {
  * an extra MCP roundtrip just to read the call stack after stepping.
  */
 export async function buildPausedInfoData(
-  debuggerContext: DebuggerContext,
+  debuggerContext: DebuggerManager,
   options: {includeScopes?: boolean} = {},
 ): Promise<PausedInfoData | null> {
   const pausedState = debuggerContext.getPausedState();
-  if (!pausedState.isPaused) {
+  if (!pausedState) {
     return null;
   }
 
@@ -221,7 +220,7 @@ export async function buildPausedInfoData(
       functionName: frame.functionName,
       url,
       lineNumber: frame.location.lineNumber + 1,
-      columnNumber: frame.location.columnNumber,
+      columnNumber: frame.location.columnNumber ?? 0,
       callFrameId: frame.callFrameId,
     };
   });
@@ -252,7 +251,7 @@ export async function buildPausedInfoData(
 
       if (scope.object.objectId) {
         try {
-          const variables = await debuggerContext.getScopeVariables(
+          const variables = await debuggerContext.getScopeVariablesForObjectId(
             scope.object.objectId,
           );
 
@@ -337,18 +336,18 @@ export const setBreakpoint = defineTool({
     try {
       const debuggerContext = await getDebuggerFromContext(context);
       const breakpoint = isRegex
-        ? await debuggerContext.setBreakpointByUrlRegex(
-            url,
-            lineNum - 1,
-            columnNumber ?? 0,
+        ? await debuggerContext.setBreakpointByUrlRegex({
+            urlRegex: url,
+            lineNumber: lineNum - 1,
+            columnNumber: columnNumber ?? 0,
             condition,
-          )
-        : await debuggerContext.setBreakpoint(
+          })
+        : await debuggerContext.setBreakpointByUrl({
             url,
-            lineNum - 1,
-            columnNumber ?? 0,
+            lineNumber: lineNum - 1,
+            columnNumber: columnNumber ?? 0,
             condition,
-          );
+          });
 
       response.setStructuredContent({
         success: true,
@@ -360,7 +359,6 @@ export const setBreakpoint = defineTool({
           lineNumber: lineNum,
           columnNumber: columnNumber ?? 0,
           condition: condition,
-          locationsCount: breakpoint.locations.length,
           hint: '如果执行卡住，先运行 resume。如果总是在同一位置暂停，移除断点后改用 trace_function(pause=false) 或 hook_function。',
         },
       });
@@ -457,11 +455,10 @@ export const listBreakpoints = defineTool({
 
       const breakpointData = breakpoints.map(bp => ({
         breakpointId: bp.breakpointId,
-        url: bp.url,
-        lineNumber: bp.lineNumber + 1,
-        columnNumber: bp.columnNumber,
+        url: bp.location.url || null,
+        lineNumber: (bp.location.lineNumber ?? 0) + 1,
+        columnNumber: bp.location.columnNumber ?? 0,
         condition: bp.condition || null,
-        locationsCount: bp.locations.length,
       }));
 
       response.setStructuredContent({
@@ -627,7 +624,9 @@ export const listScripts = defineTool({
 
       // 应用过滤
       if (request.params.filter) {
-        scripts = debuggerContext.getScriptsByUrlPattern(request.params.filter);
+        scripts = await debuggerContext.getScriptsByUrlPattern(
+          request.params.filter,
+        );
       }
 
       // 过滤掉没有 URL 的脚本（内联/eval 脚本），除非它们是唯一的
@@ -1273,12 +1272,12 @@ export const traceFunction = defineTool({
       const condition = logStack ? logExpr : `(${logExpr}, false)`;
 
       // 设置断点
-      const breakpointInfo = await debugger_.setBreakpoint(
+      const breakpointInfo = await debugger_.setBreakpointByUrl({
         url,
-        match.lineNumber,
+        lineNumber: match.lineNumber,
         columnNumber,
         condition,
-      );
+      });
 
       response.setStructuredContent({
         success: true,
@@ -1331,7 +1330,7 @@ export const getAiDebugStatus = defineTool({
         message: '已获取调试状态',
         tooltype: 'get_ai_debug_status',
         data: {
-          isPaused: pausedState.isPaused,
+          isPaused: debuggerContext.isPaused(),
           breakpointsCount: breakpoints.length,
           scriptsCount: scripts.length,
           lastAutoRecoveryEvent:
@@ -1654,13 +1653,14 @@ export const evaluateOnCallframe = defineTool({
       .describe('要执行表达式的调用帧索引（0=顶层帧，默认: 0）。'),
   },
   handler: async (request, response, context) => {
-    const {expression, frameIndex} = request.params;
+    const {expression, frameIndex: rawFrameIndex} = request.params;
+    const frameIndex = rawFrameIndex ?? 0;
 
     try {
       const debuggerContext = await getDebuggerFromContext(context);
       const pausedState = debuggerContext.getPausedState();
 
-      if (!pausedState.isPaused) {
+      if (!pausedState) {
         response.setStructuredContent({
           success: false,
           message: '执行未暂停，无法执行表达式。',
@@ -1685,11 +1685,12 @@ export const evaluateOnCallframe = defineTool({
 
       const callFrameId = pausedState.callFrames[frameIndex].callFrameId;
 
-      const result = await debuggerContext.evaluateOnCallFrame(
+      const result = await debuggerContext.evaluateOnCallFrame({
         callFrameId,
         expression,
-        {returnByValue: true, generatePreview: true},
-      );
+        returnByValue: true,
+        generatePreview: true,
+      });
 
       if (result.exceptionDetails) {
         response.setStructuredContent({
@@ -1745,7 +1746,7 @@ export const inspectLocals = defineTool({
       const debuggerContext = await getDebuggerFromContext(context);
       const pausedState = debuggerContext.getPausedState();
 
-      if (!pausedState.isPaused) {
+      if (!pausedState) {
         response.setStructuredContent({
           success: false,
           message: '当前未处于暂停状态',
@@ -1762,7 +1763,7 @@ export const inspectLocals = defineTool({
           const localScope = frame.scopeChain.find(s => s.type === 'local');
           if (localScope?.object?.objectId) {
             try {
-              const vars = await debuggerContext.getScopeVariables(
+              const vars = await debuggerContext.getScopeVariablesForObjectId(
                 localScope.object.objectId,
               );
               locals.push(
@@ -1934,12 +1935,12 @@ export const setBreakpointOnText = defineTool({
       }
 
       // 步骤 3: 设置断点
-      const breakpointInfo = await debuggerContext.setBreakpoint(
+      const breakpointInfo = await debuggerContext.setBreakpointByUrl({
         url,
-        match.lineNumber,
+        lineNumber: match.lineNumber,
         columnNumber,
         condition,
-      );
+      });
 
       // 获取上下文预览
       let contextPreview = null;

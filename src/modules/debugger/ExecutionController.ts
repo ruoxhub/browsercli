@@ -108,25 +108,66 @@ export class ExecutionController {
     callFrameId: string;
     expression: string;
     returnByValue?: boolean;
-  }): Promise<unknown> {
+    generatePreview?: boolean;
+  }): Promise<{
+    result: {
+      type: string;
+      subtype?: string;
+      className?: string;
+      value?: unknown;
+      description?: string;
+      objectId?: string;
+    };
+    exceptionDetails?: {
+      text: string;
+      exception?: {
+        type?: string;
+        value?: unknown;
+        description?: string;
+      };
+    };
+  }> {
     if (!this.pausedState) {
       throw new Error('Not in paused state');
     }
 
-    const result = await this.getCDPSession().send(
+    const response = await this.getCDPSession().send(
       'Debugger.evaluateOnCallFrame',
       {
         callFrameId: params.callFrameId,
         expression: params.expression,
         returnByValue: params.returnByValue !== false,
+        generatePreview: params.generatePreview ?? true,
       },
     );
 
     logger.info(`Evaluated on call frame: ${params.expression}`, {
-      result: result.result.value,
+      result: response.result.value,
     });
 
-    return result.result;
+    const result = {
+      type: response.result.type,
+      subtype: response.result.subtype,
+      className: response.result.className,
+      value: response.result.value,
+      description: response.result.description,
+      objectId: response.result.objectId,
+    };
+
+    const exceptionDetails = response.exceptionDetails
+      ? {
+          text: response.exceptionDetails.text,
+          exception: response.exceptionDetails.exception
+            ? {
+                type: response.exceptionDetails.exception.type,
+                value: response.exceptionDetails.exception.value,
+                description: response.exceptionDetails.exception.description,
+              }
+            : undefined,
+        }
+      : undefined;
+
+    return {result, exceptionDetails};
   }
 
   // ==================== 供 facade 协调的状态写入接口 ====================

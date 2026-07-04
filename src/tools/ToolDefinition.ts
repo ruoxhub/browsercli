@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {DebuggerContext} from '../DebuggerContext.js';
+import type {DebuggerManager} from '../modules/debugger/DebuggerManager.js';
 import type {TrafficSummary} from '../formatters/websocketFormatter.js';
 import {zod} from '../third_party/index.js';
 import type {Dialog, Frame, HTTPRequest, Page} from '../third_party/index.js';
@@ -131,7 +131,7 @@ export type Context = Readonly<{
    * Returns a promise because the underlying CDP session must be attached
    * lazily on first use.
    */
-  getDebuggerContext(): Promise<DebuggerContext>;
+  getDebuggerContext(): Promise<DebuggerManager>;
   /**
    * Get the initiator (call stack) for a network request.
    */

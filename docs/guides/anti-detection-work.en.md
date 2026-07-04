@@ -108,7 +108,7 @@ A core part of Patchright's anti-detection is **silent CDP**. However, the MCP S
 
 | Collector          | CDP Domain                           | Original Init Timing |
 | ------------------ | ------------------------------------ | -------------------- |
-| DebuggerContext    | `Debugger.enable`                    | McpContext.#init()   |
+| DebuggerManager    | `Debugger.enable`                    | McpContext.#init()   |
 | NetworkCollector   | `Network.requestWillBeSent` listener | init() → addPage()   |
 | ConsoleCollector   | `Audits.enable`                      | init() → addPage()   |
 | WebSocketCollector | Network.webSocket\* listener         | init() → addPage()   |

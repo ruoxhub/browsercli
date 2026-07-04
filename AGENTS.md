@@ -66,7 +66,7 @@
 反爬系统的检测信号。反检测能力分四层，改动时不要破坏分层边界：
 
 1. **协议层（Patchright）**：始终启用。不调 `Runtime.enable` / `Console.enable`，
-   CDP 域只在工具显式需要时才激活（详见 `DebuggerContext.ts` /
+   CDP 域只在工具显式需要时才激活（详见 `DebuggerManager.ts` /
    `CodeCollector.ts` 的懒激活路径）。**不要**在启动流程里 eager-enable。
 2. **源码层（CloakBrowser 二进制）**：仅 `--cloak` 启用。实现在
    `src/browser/cloak.ts`，49 个 C++ patch。cloak profile 目录与默认 profile

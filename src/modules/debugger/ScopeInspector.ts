@@ -52,6 +52,40 @@ export class ScopeInspector {
       : 'block';
   }
 
+  /** 低层级 API：直接获取指定 objectId 的变量列表（兼容 DebuggerContext.getScopeVariables）。 */
+  async getScopeVariablesForObjectId(
+    objectId: string,
+  ): Promise<ScopeVariable[]> {
+    this.getCDPSession(); // 触发 requireSession 校验
+
+    const properties = await this.getCDPSession().send(
+      'Runtime.getProperties',
+      {
+        objectId,
+        ownProperties: true,
+        accessorPropertiesOnly: false,
+        generatePreview: true,
+      },
+    );
+
+    const variables: ScopeVariable[] = [];
+    for (const prop of properties.result) {
+      if (prop.name.startsWith('__') || prop.name === 'this') {
+        continue;
+      }
+      const value = prop.value;
+      if (!value) continue;
+      variables.push({
+        name: prop.name,
+        type: value.type,
+        value: value.value ?? value.description ?? `[${value.type}]`,
+        objectId: value.objectId,
+        scope: 'local',
+      });
+    }
+    return variables;
+  }
+
   async getScopeVariables(
     options: GetScopeVariablesOptions = {},
   ): Promise<GetScopeVariablesResult> {

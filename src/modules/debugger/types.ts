@@ -86,3 +86,13 @@ export interface DebuggerBreakpointResolvedEvent {
 
 /** ScopeInspector 接受的选项（与 ../../types 中的 GetScopeVariablesOptions 等价，但内联以解耦）。 */
 export type ScopeVariableScope = ScopeVariable['scope'];
+
+/** 断点循环自动恢复事件 */
+export interface AutoRecoveryEvent {
+  breakpointId: string;
+  signature: string;
+  hitCount: number;
+  timestamp: number;
+  actions: string[];
+  error?: string;
+}

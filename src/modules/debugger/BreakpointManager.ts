@@ -110,6 +110,56 @@ export class BreakpointManager {
     return breakpointInfo;
   }
 
+  async setBreakpointByUrlRegex(params: {
+    urlRegex: string;
+    lineNumber: number;
+    columnNumber?: number;
+    condition?: string;
+  }): Promise<BreakpointInfo> {
+    if (!params.urlRegex) {
+      throw new Error('urlRegex parameter is required');
+    }
+    if (params.lineNumber < 0) {
+      throw new Error('lineNumber must be a non-negative number');
+    }
+    if (params.columnNumber !== undefined && params.columnNumber < 0) {
+      throw new Error('columnNumber must be a non-negative number');
+    }
+
+    const result = await this.getCDPSession().send(
+      'Debugger.setBreakpointByUrl',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      {
+        urlRegex: params.urlRegex,
+        lineNumber: params.lineNumber,
+        columnNumber: params.columnNumber,
+        condition: params.condition,
+      } as any,
+    );
+
+    const breakpointInfo: BreakpointInfo = {
+      breakpointId: result.breakpointId,
+      location: {
+        url: params.urlRegex,
+        lineNumber: params.lineNumber,
+        columnNumber: params.columnNumber,
+      },
+      condition: params.condition,
+      enabled: true,
+      hitCount: 0,
+      createdAt: Date.now(),
+    };
+
+    this.breakpoints.set(result.breakpointId, breakpointInfo);
+
+    logger.info(
+      `Breakpoint set (regex): ${params.urlRegex}:${params.lineNumber}`,
+      {breakpointId: result.breakpointId, condition: params.condition},
+    );
+
+    return breakpointInfo;
+  }
+
   async setBreakpoint(params: {
     scriptId: string;
     lineNumber: number;

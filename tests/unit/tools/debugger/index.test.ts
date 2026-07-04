@@ -86,41 +86,53 @@ function createRuntime() {
               },
             ],
     }),
-    setBreakpoint: async (
-      url: string,
-      lineNumber: number,
-      columnNumber: number,
-      condition?: string,
-    ) => ({
+    setBreakpointByUrl: async (params: {
+      url: string;
+      lineNumber: number;
+      columnNumber: number;
+      condition?: string;
+    }) => ({
       breakpointId: 'bp-1',
-      url,
-      lineNumber,
-      columnNumber,
-      condition,
-      locations: [],
+      location: {
+        url: params.url,
+        lineNumber: params.lineNumber,
+        columnNumber: params.columnNumber,
+      },
+      condition: params.condition,
+      enabled: true,
+      hitCount: 0,
+      createdAt: Date.now(),
     }),
-    setBreakpointByUrlRegex: async (
-      urlRegex: string,
-      lineNumber: number,
-      columnNumber: number,
-      condition?: string,
-    ) => ({
+    setBreakpointByUrlRegex: async (params: {
+      urlRegex: string;
+      lineNumber: number;
+      columnNumber: number;
+      condition?: string;
+    }) => ({
       breakpointId: 'bp-regex',
-      url: urlRegex,
-      lineNumber,
-      columnNumber,
-      condition,
-      locations: [],
+      location: {
+        url: params.urlRegex,
+        lineNumber: params.lineNumber,
+        columnNumber: params.columnNumber,
+      },
+      condition: params.condition,
+      enabled: true,
+      hitCount: 0,
+      createdAt: Date.now(),
     }),
     removeBreakpoint: async (_breakpointId: string) => undefined,
     getBreakpoints: () => [
       {
         breakpointId: 'bp-1',
-        url: 'https://example.com/app.js',
-        lineNumber: 3,
-        columnNumber: 0,
+        location: {
+          url: 'https://example.com/app.js',
+          lineNumber: 3,
+          columnNumber: 0,
+        },
         condition: undefined,
-        locations: [],
+        enabled: true,
+        hitCount: 0,
+        createdAt: Date.now(),
       },
     ],
     stepInto: async () => undefined,
@@ -130,7 +142,6 @@ function createRuntime() {
     pause: async () => undefined,
     isPaused: () => true,
     getPausedState: () => ({
-      isPaused: true,
       reason: 'breakpoint',
       hitBreakpoints: [],
       callFrames: [
@@ -142,9 +153,16 @@ function createRuntime() {
           scopeChain: [],
         },
       ],
+      timestamp: Date.now(),
     }),
-    evaluateOnCallFrame: async (callFrameId: string, expression: string) => ({
-      result: {value: `${callFrameId}:${expression}`, type: 'string'},
+    evaluateOnCallFrame: async (params: {
+      callFrameId: string;
+      expression: string;
+    }) => ({
+      result: {
+        value: `${params.callFrameId}:${params.expression}`,
+        type: 'string',
+      },
     }),
     getClient: () => ({
       send: async (method: string, params?: unknown) => {
@@ -152,14 +170,17 @@ function createRuntime() {
       },
     }),
     getLastAutoRecoveryEvent: () => ({breakpointId: 'bp-1', hitCount: 3}),
-    getScopeVariables: async () => [],
+    getScopeVariablesForObjectId: async () => [],
   };
 
   const context = {
     getDebuggerContext: async () => debuggerContext,
     getSelectedPage: () => ({mainFrame: () => frame}),
     getSelectedFrame: () => frame,
-    getNetworkRequestById: (id: number) => ({id, url: () => `https://example.com/api/${id}`}),
+    getNetworkRequestById: (id: number) => ({
+      id,
+      url: () => `https://example.com/api/${id}`,
+    }),
     getRequestInitiator: (request: {id: number}) => ({
       requestId: request.id,
       type: 'script' as const,
@@ -198,11 +219,7 @@ async function callTool(
     attachWebSocket: () => {},
   };
   const request = {params};
-  await tool.handler(
-    request as never,
-    response as never,
-    context as never,
-  );
+  await tool.handler(request as never, response as never, context as never);
   return lines;
 }
 
@@ -233,11 +250,7 @@ async function callToolContent<T = Record<string, unknown>>(
     attachWebSocket: () => {},
   };
   const request = {params};
-  await tool.handler(
-    request as never,
-    response as never,
-    context as never,
-  );
+  await tool.handler(request as never, response as never, context as never);
   return content as T;
 }
 
@@ -311,8 +324,16 @@ describe('src/tools/debugger/index.ts', () => {
     const {context} = createRuntime();
 
     const scriptsLines = await callTool(listScripts, {}, context);
-    const filteredLines = await callTool(listScripts, {filter: 'app.js'}, context);
-    const sourceLines = await callTool(getScriptSource, {scriptId: '1'}, context);
+    const filteredLines = await callTool(
+      listScripts,
+      {filter: 'app.js'},
+      context,
+    );
+    const sourceLines = await callTool(
+      getScriptSource,
+      {scriptId: '1'},
+      context,
+    );
     const breakpointsLines = await callTool(listBreakpoints, {}, context);
 
     const scriptsText = linesToText(scriptsLines);
@@ -329,26 +350,46 @@ describe('src/tools/debugger/index.ts', () => {
   it('supports searching, finding, and setting breakpoints', async () => {
     const {context} = createRuntime();
 
-    const searchLines = await callTool(searchInSources, {
-      query: 'token',
-      maxResults: 1,
-    }, context);
-    const findLines = await callTool(findInScript, {
-      scriptId: '1',
-      query: 'token',
-    }, context);
-    const breakpointLines = await callTool(setBreakpoint, {
-      url: 'https://example.com/app.js',
-      lineNumber: 3,
-    }, context);
-    const regexBreakpointLines = await callTool(setBreakpoint, {
-      url: '.*app\\.js',
-      lineNumber: 3,
-      isRegex: true,
-    }, context);
-    const removedLines = await callTool(removeBreakpoint, {
-      breakpointId: 'bp-1',
-    }, context);
+    const searchLines = await callTool(
+      searchInSources,
+      {
+        query: 'token',
+        maxResults: 1,
+      },
+      context,
+    );
+    const findLines = await callTool(
+      findInScript,
+      {
+        scriptId: '1',
+        query: 'token',
+      },
+      context,
+    );
+    const breakpointLines = await callTool(
+      setBreakpoint,
+      {
+        url: 'https://example.com/app.js',
+        lineNumber: 3,
+      },
+      context,
+    );
+    const regexBreakpointLines = await callTool(
+      setBreakpoint,
+      {
+        url: '.*app\\.js',
+        lineNumber: 3,
+        isRegex: true,
+      },
+      context,
+    );
+    const removedLines = await callTool(
+      removeBreakpoint,
+      {
+        breakpointId: 'bp-1',
+      },
+      context,
+    );
 
     const searchText = linesToText(searchLines);
     const findText = linesToText(findLines);
@@ -366,20 +407,40 @@ describe('src/tools/debugger/index.ts', () => {
   it('supports pause-state, xhr, and trace operations', async () => {
     const {context, clientCalls} = createRuntime();
 
-    const pausedInfoLines = await callTool(getPausedInfo, {includeScopes: false}, context);
-    const evalLines = await callTool(evaluateOnCallframe, {
-      expression: 'token',
-    }, context);
+    const pausedInfoLines = await callTool(
+      getPausedInfo,
+      {includeScopes: false},
+      context,
+    );
+    const evalLines = await callTool(
+      evaluateOnCallframe,
+      {
+        expression: 'token',
+      },
+      context,
+    );
     const pauseLines = await callTool(pause, {}, context);
     const resumeLines = await callTool(resume, {}, context);
     const stepIntoLines = await callTool(stepInto, {}, context);
     const stepOverLines = await callTool(stepOver, {}, context);
     const stepOutLines = await callTool(stepOut, {}, context);
     const xhrLines = await callTool(breakOnXhr, {url: '/api'}, context);
-    const xhrRemoveLines = await callTool(removeXhrBreakpoint, {url: '/api'}, context);
-    const xhrToJsLines = await callTool(xhrToJsBreakpoint, {url: '/api'}, context);
+    const xhrRemoveLines = await callTool(
+      removeXhrBreakpoint,
+      {url: '/api'},
+      context,
+    );
+    const xhrToJsLines = await callTool(
+      xhrToJsBreakpoint,
+      {url: '/api'},
+      context,
+    );
     const statusLines = await callTool(getAiDebugStatus, {}, context);
-    const initiatorLines = await callTool(getRequestInitiator, {requestId: 7}, context);
+    const initiatorLines = await callTool(
+      getRequestInitiator,
+      {requestId: 7},
+      context,
+    );
 
     const pausedInfoText = linesToText(pausedInfoLines);
     const evalText = linesToText(evalLines);
@@ -440,8 +501,16 @@ describe('src/tools/debugger/index.ts', () => {
       context as never,
     );
 
-    assert.equal(appendCalled, false, 'appendResponseLine should NOT be called');
-    assert.notEqual(structuredContent, undefined, 'setStructuredContent should be called');
+    assert.equal(
+      appendCalled,
+      false,
+      'appendResponseLine should NOT be called',
+    );
+    assert.notEqual(
+      structuredContent,
+      undefined,
+      'setStructuredContent should be called',
+    );
     const content = structuredContent as {
       success: boolean;
       tooltype: string;
@@ -487,8 +556,16 @@ describe('src/tools/debugger/index.ts', () => {
       context as never,
     );
 
-    assert.equal(appendCalled, false, 'appendResponseLine should NOT be called');
-    assert.notEqual(structuredContent, undefined, 'setStructuredContent should be called');
+    assert.equal(
+      appendCalled,
+      false,
+      'appendResponseLine should NOT be called',
+    );
+    assert.notEqual(
+      structuredContent,
+      undefined,
+      'setStructuredContent should be called',
+    );
     const content = structuredContent as {
       success: boolean;
       tooltype: string;
@@ -500,9 +577,8 @@ describe('src/tools/debugger/index.ts', () => {
   });
 
   it('getScriptSource with prettyPrint beautifies only once, not twice', async () => {
-    const {PackerDeobfuscator} = await import(
-      '../../../../src/modules/deobfuscator/PackerDeobfuscator.js'
-    );
+    const {PackerDeobfuscator} =
+      await import('../../../../src/modules/deobfuscator/PackerDeobfuscator.js');
     const rawSource = 'var a=1;var b=2;';
 
     // Spy on the prototype to intercept calls from ANY instance
@@ -554,9 +630,8 @@ describe('src/tools/debugger/index.ts', () => {
   it('does NOT export or register stub tools startContinuousDebugging / stopContinuousDebugging', async () => {
     // Regression: these stub tools were never implemented and must not
     // appear as exports or in the generated tool registry.
-    const debuggerModule = await import(
-      '../../../../src/tools/debugger/index.js'
-    );
+    const debuggerModule =
+      await import('../../../../src/tools/debugger/index.js');
     assert.equal(
       'startContinuousDebugging' in debuggerModule,
       false,
@@ -568,9 +643,8 @@ describe('src/tools/debugger/index.ts', () => {
       'stopContinuousDebugging must not be exported from debugger/index',
     );
 
-    const {GENERATED_TOOL_REGISTRY} = await import(
-      '../../../../src/tools/generated-tools-index.js'
-    );
+    const {GENERATED_TOOL_REGISTRY} =
+      await import('../../../../src/tools/generated-tools-index.js');
     const stubEntries = GENERATED_TOOL_REGISTRY.filter(
       entry =>
         (entry.handlerName as string) === 'startContinuousDebugging' ||

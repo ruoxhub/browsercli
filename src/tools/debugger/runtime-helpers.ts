@@ -3,16 +3,16 @@
  * Copyright 2026 Browser-CLI
  * SPDX-License-Identifier: Apache-2.0
  */
-import type {DebuggerContext} from '../../DebuggerContext.js';
+import type {DebuggerManager} from '../../modules/debugger/DebuggerManager.js';
 import {getErrorMessage} from '../shared/pageResponse.js';
 
 export type DebuggerRuntime = {
-  getDebuggerContext(): Promise<DebuggerContext>;
+  getDebuggerContext(): Promise<DebuggerManager>;
 };
 
 export async function getDebuggerFromContext(
   runtime: unknown,
-): Promise<DebuggerContext> {
+): Promise<DebuggerManager> {
   if (
     !runtime ||
     typeof (runtime as DebuggerRuntime).getDebuggerContext !== 'function'
