@@ -80,6 +80,12 @@ import {inlineLiterals} from './InlineLiteralsPass.js';
 import {enhancedControlFlow} from './EnhancedControlFlowPass.js';
 import {ifChainToSwitch} from './IfChainToSwitchPass.js';
 import {WrapperFolder} from './WrapperFolder.js';
+import {
+  structuralEnhance,
+  objectDecode,
+  cleanupObfuscator,
+  callExpressToLiteral,
+} from './BabelPackEnhancer.js';
 
 // ==================== 扩展选项 ====================
 
@@ -243,12 +249,23 @@ export class Deobfuscator {
       const activeAdapter = siteRegistry.getAdapter(
         options.siteAdapter || siteDetection.bestId,
       );
-      if (activeAdapter && activeAdapter.prePasses && activeAdapter.prePasses.length > 0) {
-        code = await runSiteAdapter(activeAdapter, 'pre', code, transformations);
+      if (
+        activeAdapter &&
+        activeAdapter.prePasses &&
+        activeAdapter.prePasses.length > 0
+      ) {
+        code = await runSiteAdapter(
+          activeAdapter,
+          'pre',
+          code,
+          transformations,
+        );
       }
 
       // ── Step 4: 基础管线（增强版） ──
-      const useEnhancedPasses = options.aggressive || (activeAdapter && activeAdapter.patternId !== 'generic');
+      const useEnhancedPasses =
+        options.aggressive ||
+        (activeAdapter && activeAdapter.patternId !== 'generic');
 
       code = await extractStringArrays(
         code,
@@ -261,22 +278,78 @@ export class Deobfuscator {
       code = await inlineStringDecoderCalls(code, transformations);
       code = await evaluateStringDecoderCalls(code, transformations);
 
-      if (useEnhancedPasses) {
-        code = await runEnhancedPass('normalize-structure', normalizeStructure, code, transformations);
+      // ─�� Step 4.1: BabelPack 增强 ──
+      // 对象属性解码：合并分散属性 + 内联对象常量查询
+      code = await runEnhancedPass(
+        'object-decode',
+        objectDecode,
+        code,
+        transformations,
+      );
+      // VM 沙箱 eval 解码器：执行混淆器自带解码函数批量还原
+      code = await runEnhancedPass(
+        'call-express-to-literal',
+        callExpressToLiteral({vmTimeoutMs: 60000}),
+        code,
+        transformations,
+        {timeoutMs: 60000},
+      );
 
-        code = await runEnhancedPass('enhanced-control-flow', enhancedControlFlow, code, transformations, {timeoutMs: 180000});
-        code = await runEnhancedPass('if-chain-to-switch', ifChainToSwitch, code, transformations);
-        code = await runEnhancedPass('prune-fake-branches', pruneFakeBranches, code, transformations);
+      if (useEnhancedPasses) {
+        // 结构化增强：拆分多声明 / 函数提升 / key 规范化 / 删除冗余绑定
+        code = await runEnhancedPass(
+          'structural-enhance',
+          structuralEnhance,
+          code,
+          transformations,
+        );
+        code = await runEnhancedPass(
+          'normalize-structure',
+          normalizeStructure,
+          code,
+          transformations,
+        );
+
+        code = await runEnhancedPass(
+          'enhanced-control-flow',
+          enhancedControlFlow,
+          code,
+          transformations,
+          {timeoutMs: 180000},
+        );
+        code = await runEnhancedPass(
+          'if-chain-to-switch',
+          ifChainToSwitch,
+          code,
+          transformations,
+        );
+        code = await runEnhancedPass(
+          'prune-fake-branches',
+          pruneFakeBranches,
+          code,
+          transformations,
+        );
       }
 
-      const useSitePasses = activeAdapter && activeAdapter.patternId !== 'generic';
+      const useSitePasses =
+        activeAdapter && activeAdapter.patternId !== 'generic';
       if (useSitePasses) {
-        code = await runEnhancedPass('wrapper-folding', (ast) => {
-          const folder = new WrapperFolder();
-          const changed = folder.foldWrapperObjects(ast);
-          return {ast, changed};
-        }, code, transformations);
-        code = await runEnhancedPass('inline-literals', inlineLiterals, code, transformations);
+        code = await runEnhancedPass(
+          'wrapper-folding',
+          ast => {
+            const folder = new WrapperFolder();
+            const changed = folder.foldWrapperObjects(ast);
+            return {ast, changed};
+          },
+          code,
+          transformations,
+        );
+        code = await runEnhancedPass(
+          'inline-literals',
+          inlineLiterals,
+          code,
+          transformations,
+        );
       }
 
       code = await basicTransform(code, transformations);
@@ -293,9 +366,26 @@ export class Deobfuscator {
         code = await runASTOptimizer(this.astOptimizer, code, transformations);
       }
 
-      // ── Step 5.5: 站点适配器后置 pass ──
-      if (activeAdapter && activeAdapter.postPasses && activeAdapter.postPasses.length > 0) {
-        code = await runSiteAdapter(activeAdapter, 'post', code, transformations);
+      // ── Step 5.5: 混淆器残留清理 ──
+      code = await runEnhancedPass(
+        'cleanup-obfuscator',
+        cleanupObfuscator,
+        code,
+        transformations,
+      );
+
+      // ── Step 5.6: 站点适配器后置 pass ──
+      if (
+        activeAdapter &&
+        activeAdapter.postPasses &&
+        activeAdapter.postPasses.length > 0
+      ) {
+        code = await runSiteAdapter(
+          activeAdapter,
+          'post',
+          code,
+          transformations,
+        );
       }
 
       // ── Step 6: 变量重命名 ──
@@ -470,7 +560,9 @@ export class Deobfuscator {
   }
 }
 
-async function registerAllAdapters(registry: SiteAdapterRegistry): Promise<void> {
+async function registerAllAdapters(
+  registry: SiteAdapterRegistry,
+): Promise<void> {
   const adapterModules = [
     './adapters/Reese84Adapter.js',
     './adapters/DingxiangAdapter.js',
@@ -485,8 +577,11 @@ async function registerAllAdapters(registry: SiteAdapterRegistry): Promise<void>
     try {
       const mod = await import(modulePath);
       const AdapterClass = Object.values(mod).find(
-        v => typeof v === 'function' && v.prototype && 'patternId' in v.prototype,
-      ) as (new () => import('./SiteAdapterRegistry.js').SiteAdapter) | undefined;
+        v =>
+          typeof v === 'function' && v.prototype && 'patternId' in v.prototype,
+      ) as
+        | (new () => import('./SiteAdapterRegistry.js').SiteAdapter)
+        | undefined;
       if (AdapterClass) {
         registry.register(new AdapterClass());
       }

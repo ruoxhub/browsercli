@@ -56,3 +56,18 @@ export type {SitePattern, SiteAdapter} from './SiteAdapterRegistry.js';
 // 质量度量
 export {ResidueMetrics} from './ResidueMetrics.js';
 export type {ResidueMetricsResult} from './ResidueMetrics.js';
+
+// BabelPack 增强
+export {
+  keyToLiteral,
+  varDeclarToFuncDeclar,
+  declaratorToDeclaration,
+  deleteRepeatDefine,
+  preDecodeObject,
+  decodeObject,
+  deleteObfuscatorCode,
+  callExpressToLiteral,
+  structuralEnhance,
+  objectDecode,
+  cleanupObfuscator,
+} from './BabelPackEnhancer.js';

@@ -46,6 +46,44 @@ describe('ToolContextProvider', () => {
     assert.ok(result.data.code.includes('console'));
   });
 
+  it('provides analyzer runtime services for deobfuscate_code with scriptId', async () => {
+    const response = new ToolResponseAccumulator();
+    const mockDebugger = {
+      getScriptSource: async (id: string) => {
+        if (id === 'test-script-123') {
+          return 'console.log("deobfuscate this!");';
+        }
+        return null;
+      },
+    };
+    const mockContext = {
+      getDebuggerContext: async () => mockDebugger,
+    };
+
+    await deobfuscateCode.handler(
+      {
+        params: {
+          scriptId: 'test-script-123',
+          aggressive: true,
+          renameVariables: true,
+        },
+      },
+      response,
+      mockContext as any,
+    );
+
+    const result = response.toJSON().structuredContent as {
+      success: boolean;
+      tooltype: string;
+      message: string;
+      data: {code: string};
+    };
+    assert.equal(result.success, true);
+    assert.equal(result.tooltype, 'deobfuscate');
+    assert.match(result.message, /completed/i);
+    assert.ok(typeof result.data.code === 'string');
+  });
+
   it('reuses debugger context for the same page', async () => {
     const runtime = new ToolContextProvider();
     const client = {

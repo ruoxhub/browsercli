@@ -689,13 +689,13 @@ export class DebuggerManager {
 
   // ==================== 执行上下文（委托 ExecutionContextTracker） ====================
 
-  getExecutionContexts(): import('./ExecutionContextTracker.js').ExecutionContextInfo[] {
+  getExecutionContexts(): import('./ExecutionContextInfo.js').ExecutionContextInfo[] {
     return this.executionContextTracker.getExecutionContexts();
   }
 
   getExecutionContextById(
     contextId: number,
-  ): import('./ExecutionContextTracker.js').ExecutionContextInfo | undefined {
+  ): import('./ExecutionContextInfo.js').ExecutionContextInfo | undefined {
     return this.executionContextTracker.getExecutionContextById(contextId);
   }
 
