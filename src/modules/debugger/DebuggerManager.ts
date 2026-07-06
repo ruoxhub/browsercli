@@ -664,6 +664,12 @@ export class DebuggerManager {
     return content;
   }
 
+  async getScriptSourcePath(scriptId: string): Promise<string | null> {
+    const script = await this.scriptManager.getScriptSource(scriptId);
+    if (!script?.sourcePath) return null;
+    return script.sourcePath;
+  }
+
   async getBeautifiedScriptSource(
     scriptId: string,
     beautify: (source: string) => string,

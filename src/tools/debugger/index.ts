@@ -5,7 +5,6 @@
  */
 
 import type {DebuggerManager} from '../../modules/debugger/DebuggerManager.js';
-import {PackerDeobfuscator} from '../../modules/deobfuscator/PackerDeobfuscator.js';
 import {zod} from '../../third_party/index.js';
 import type {ToolContextProvider} from '../../worker/ToolContext.js';
 import {ToolCategory} from '../categories.js';
@@ -673,7 +672,7 @@ export const listScripts = defineTool({
 export const getScriptSource = defineTool({
   name: 'get_script_source',
   description:
-    '根据脚本 ID 获取 JavaScript 脚本源码。支持行范围（多行文件）或字符偏移（单行压缩文件）。先使用 list_scripts 查找脚本 ID。',
+    '根据脚本 ID 获取 JavaScript 脚本源码的本地缓存路径。触发 CDP 加载并写入临时文件，返回文件路径供后续直接读取。先使用 list_scripts 查找脚本 ID。',
   annotations: {
     title: '获取脚本源码',
     category: ToolCategory.REVERSE_ENGINEERING,
@@ -682,54 +681,19 @@ export const getScriptSource = defineTool({
   schema: {
     scriptId: zod
       .string()
-      .describe('脚本 ID（来自 list_scripts）用于获取源码。'),
-    startLine: zod
-      .number()
-      .int()
-      .optional()
-      .describe('起始行号（1-based）。用于多行文件。'),
-    endLine: zod
-      .number()
-      .int()
-      .optional()
-      .describe('结束行号（1-based）。用于多行文件。'),
-    offset: zod
-      .number()
-      .int()
-      .optional()
-      .describe('字符偏移量起始位置（0-based）。用于压缩文件。'),
-    length: zod
-      .number()
-      .int()
-      .optional()
-      .default(1000)
-      .describe('使用 offset 时返回的字符数（默认: 1000）。'),
-    prettyPrint: zod
-      .boolean()
-      .optional()
-      .describe('是否对返回的源码进行格式化（适用于压缩文件）'),
+      .describe('脚本 ID（来自 list_scripts）用于获取源码缓存路径。'),
   },
   handler: async (request, response, context) => {
-    const {scriptId, startLine, endLine, offset, length, prettyPrint} =
-      request.params;
+    const {scriptId} = request.params;
 
     try {
       const debuggerContext = await getDebuggerFromContext(context);
-      const deobfuscator = new PackerDeobfuscator();
-      let source: string;
-      if (prettyPrint) {
-        source = await debuggerContext.getBeautifiedScriptSource(
-          scriptId,
-          raw => deobfuscator.beautify(raw),
-        );
-      } else {
-        source = await debuggerContext.getScriptSource(scriptId);
-      }
+      const sourcePath = await debuggerContext.getScriptSourcePath(scriptId);
 
-      if (!source) {
+      if (!sourcePath) {
         response.setStructuredContent({
           success: false,
-          message: `未找到脚本 ${scriptId} 的源码。`,
+          message: `未找到脚本 ${scriptId} 的源码或加载失败。`,
           tooltype: 'get_script_source',
           data: {scriptId},
         });
@@ -737,100 +701,22 @@ export const getScriptSource = defineTool({
       }
 
       const script = debuggerContext.getScriptById(scriptId);
-      const url = script?.url || null;
 
-      // 字符偏移模式（用于压缩文件）
-      if (offset !== undefined) {
-        const start = Math.max(0, offset);
-        const end = Math.min(
-          source.length,
-          start + (length || DEFAULT_PREVIEW_LENGTH),
-        );
-        const extract = source.substring(start, end);
-        const prefix = start > 0 ? '...' : '';
-        const suffix = end < source.length ? '...' : '';
-
-        response.setStructuredContent({
-          success: true,
-          message: `脚本 ${scriptId} 的源码（字符 ${start}-${end} / ${source.length}）`,
-          tooltype: 'get_script_source',
-          data: {
-            scriptId,
-            url,
-            mode: 'offset',
-            sourceLength: source.length,
-            sourceStart: start,
-            sourceEnd: end,
-            sourcePreview: `${prefix}${extract}${suffix}`,
-            isComplete: end >= source.length && start === 0,
-          },
-        });
-        return;
-      }
-
-      // 行范围模式（用于正常文件）
-      if (startLine !== undefined || endLine !== undefined) {
-        const lines = source.split('\n');
-        const start = (startLine ?? 1) - 1; // 转换为 0-based
-        const end = endLine ?? lines.length;
-        const selectedLines = lines.slice(start, end);
-
-        response.setStructuredContent({
-          success: true,
-          message: `脚本 ${scriptId} 的源码（行 ${start + 1}-${Math.min(end, lines.length)}）`,
-          tooltype: 'get_script_source',
-          data: {
-            scriptId,
-            url,
-            mode: 'lineRange',
-            totalLines: lines.length,
-            startLine: start + 1,
-            endLine: Math.min(end, lines.length),
-            lines: selectedLines.map((line, i) => ({
-              lineNumber: start + i + 1,
-              content: line,
-            })),
-            isComplete: start === 0 && end >= lines.length,
-          },
-        });
-        return;
-      }
-
-      // 完整源码 - 但警告如果太大
-      if (source.length > LARGE_FILE_THRESHOLD) {
-        response.setStructuredContent({
-          success: true,
-          message: `脚本 ${scriptId} 很大（${source.length} 字符）。请使用 offset/length 或 startLine/endLine 读取部分。`,
-          tooltype: 'get_script_source',
-          data: {
-            scriptId,
-            url,
-            mode: 'full',
-            sourceLength: source.length,
-            sourcePreview: source.substring(0, DEFAULT_PREVIEW_LENGTH) + '...',
-            warning:
-              'Source too large, use offset/length or startLine/endLine for partial view',
-          },
-        });
-      } else {
-        response.setStructuredContent({
-          success: true,
-          message: `脚本 ${scriptId} 的源码`,
-          tooltype: 'get_script_source',
-          data: {
-            scriptId,
-            url,
-            mode: 'full',
-            sourceLength: source.length,
-            source: source,
-            isComplete: true,
-          },
-        });
-      }
+      response.setStructuredContent({
+        success: true,
+        message: `脚本 ${scriptId} 源码已缓存至 ${sourcePath}`,
+        tooltype: 'get_script_source',
+        data: {
+          scriptId,
+          url: script?.url || null,
+          sourceLength: script?.sourceLength || 0,
+          sourcePath,
+        },
+      });
     } catch (error) {
       response.setStructuredContent({
         success: false,
-        message: `获取脚本源码失败: ${error instanceof Error ? error.message : String(error)}`,
+        message: `获取脚本源码路径失败: ${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'get_script_source',
         data: {scriptId: request.params.scriptId},
       });

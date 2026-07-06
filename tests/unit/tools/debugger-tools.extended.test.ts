@@ -74,6 +74,7 @@ interface DebuggerContextHarness {
   getScripts(): ScriptHarness[];
   getScriptsByUrlPattern(pattern: string): ScriptHarness[];
   getScriptSource(scriptId: string): Promise<string>;
+  getScriptSourcePath(scriptId: string): Promise<string | null>;
   getScriptById(scriptId: string): ScriptHarness | undefined;
   searchInScripts(
     query: string,
@@ -189,6 +190,7 @@ function makeContext(
     getScripts: () => [],
     getScriptsByUrlPattern: () => [],
     getScriptSource: async () => '',
+    getScriptSourcePath: async () => '/tmp/browsercli-scripts/test.js',
     getScriptById: () => ({
       scriptId: '1',
       url: 'https://a.js',
@@ -237,8 +239,8 @@ describe('debugger tools extended', () => {
     context.debuggerContext.getScriptsByUrlPattern = () => [
       {scriptId: '2', url: 'https://b.js'},
     ];
-    context.debuggerContext.getScriptSource = async () =>
-      'line1\nline2\nconst x = 1;';
+    context.debuggerContext.getScriptSourcePath = async () =>
+      '/tmp/browsercli-scripts/test.js';
 
     await listScripts.handler(
       {params: {}},
@@ -251,18 +253,13 @@ describe('debugger tools extended', () => {
       context as unknown as Parameters<typeof listScripts.handler>[2],
     );
     await getScriptSource.handler(
-      {params: {scriptId: '2', startLine: 1, endLine: 2, length: 1000}},
-      response as unknown as Parameters<typeof getScriptSource.handler>[1],
-      context as unknown as Parameters<typeof getScriptSource.handler>[2],
-    );
-    await getScriptSource.handler(
-      {params: {scriptId: '2', offset: 1, length: 5}},
+      {params: {scriptId: '2'}},
       response as unknown as Parameters<typeof getScriptSource.handler>[1],
       context as unknown as Parameters<typeof getScriptSource.handler>[2],
     );
 
     assert.ok(response.lines.some(x => x.includes('Found')));
-    assert.ok(response.lines.some(x => x.includes('Source for script')));
+    assert.ok(response.lines.some(x => x.includes('sourcePath')));
   });
 
   it('covers find/search/source negative and formatting paths', async () => {
@@ -927,6 +924,7 @@ describe('debugger tools extended', () => {
         getScripts: () => [],
         getScriptsByUrlPattern: () => [],
         getScriptSource: async () => '',
+        getScriptSourcePath: async () => '/tmp/browsercli-scripts/test.js',
         getScriptById: () => ({scriptId: '1', url: 'https://app.js'}),
         searchInScripts: async () => ({matches: []}),
         setBreakpoint: async () => {
