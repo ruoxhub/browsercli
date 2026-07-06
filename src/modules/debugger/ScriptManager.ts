@@ -380,7 +380,7 @@ export class ScriptManager {
     script: ScriptInfo,
     session: CDPSession,
   ): Promise<boolean> {
-    if (script.source) {
+    if (script.sourcePath) {
       return true;
     }
 
@@ -388,7 +388,12 @@ export class ScriptManager {
       const {scriptSource} = await session.send('Debugger.getScriptSource', {
         scriptId: script.scriptId,
       });
-      script.source = scriptSource;
+      if (script.url) {
+        const filePath = this.cacheFilePath(script.url);
+        this.ensureCacheDir();
+        fs.writeFileSync(filePath, scriptSource, 'utf-8');
+        script.sourcePath = filePath;
+      }
       script.sourceLength = scriptSource.length;
 
       this.buildKeywordIndex(script.scriptId, script.url, scriptSource);
