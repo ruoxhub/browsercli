@@ -17,8 +17,15 @@
  * - 依赖 CodeCollector 获取 Page 实例
  */
 
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {setImmediate as waitForImmediate} from 'node:timers/promises';
+
 import type {CDPSession} from '../../third_party/index.js';
 import {logger} from '../../utils/logger.js';
+import {matchesWildcardPattern} from '../../utils/matchesWildcardPattern.js';
 
 export interface ScriptInfo {
   scriptId: string;
@@ -28,7 +35,7 @@ export interface ScriptInfo {
   endLine: number;
   endColumn: number;
   sourceLength?: number;
-  source?: string;
+  sourcePath?: string;
   hash?: string;
   sourceMapURL?: string;
 }
@@ -90,14 +97,25 @@ interface SearchResult {
 const CHUNK_SIZE = 100 * 1024;
 const KEYWORD_REGEX = /\b[a-zA-Z_$][a-zA-Z0-9_$]{2,}\b/g;
 const REGEX_SPECIAL_CHARS = /[.*+?^${}()|[\]\\]/g;
-const INIT_STABLE_ROUNDS = 3;
-const INIT_POLL_INTERVAL_MS = 200;
-const INIT_MAX_WAIT_MS = 5000;
 const KEYWORD_CONTEXT_LINES = 3;
-const MAX_HISTORY_LENGTH = 100;
 const DEFAULT_CONTEXT_LINES = 3;
 const DEFAULT_MAX_MATCHES = 100;
 const DEFAULT_MAX_SCRIPTS = 1000;
+
+/** 源码批量加载并发数。 */
+const SOURCE_LOAD_BATCH_SIZE = 8;
+/** 关键词索引条目上限,超出后淘汰最旧条目,防止内存膨胀。 */
+const MAX_KEYWORD_INDEX_ENTRIES = 50000;
+/** 搜索时每处理多少行让出事件循环一次,避免长时间阻塞。 */
+const SEARCH_LINE_YIELD_INTERVAL = 250;
+/** 搜索时每处理多少个脚本让出事件循环一次。 */
+const SEARCH_SCRIPT_YIELD_INTERVAL = 10;
+/** 单条 match context 的截断阈值(字符数)。 */
+const MATCH_CONTEXT_MAX_CHARS = 2000;
+/** 关键词索引 context 的截断阈值(字符数)。 */
+const KEYWORD_CONTEXT_MAX_CHARS = 1000;
+/** 上下文截断时围绕 match 提取的窗口大小。 */
+const CONTEXT_SNIPPET_WINDOW = 100;
 
 export class ScriptManager {
   private scripts = new Map<string, ScriptInfo>();
@@ -106,8 +124,9 @@ export class ScriptManager {
   private keywordIndex = new Map<string, KeywordIndexEntry[]>();
   private scriptChunks = new Map<string, ScriptChunk[]>();
 
-  private scriptParsedListener: ((params: ScriptParsedEvent) => void) | null =
-    null;
+  private scriptParsedListener: ((params: ScriptParsedEvent) => void) | null = null;
+
+  private cacheDir: string | null = null;
 
   constructor(private getCDPSession: () => CDPSession) {}
 
@@ -153,29 +172,32 @@ export class ScriptManager {
 
   /**
    * 等待脚本解析事件稳定(替代硬编码延迟)
-   * 当启用 Debugger 域时,CDP 会重新触发所有已解析脚本的事件。
-   * 通过轮询检测脚本数量是否稳定来判断事件是否完成。
+   *
+   * 监听器由 facade 在 Debugger.enable 之后通过 attachListeners 持续挂载,
+   * scriptParsed 事件会持续累加进 scripts/scripsByUrl 索引。当前实现不
+   * 再阻塞等待"稳定"——历史上靠轮询 scripts.size 是否变化来判定,但这
+   * 会引入最多 5s 的伪延迟,且无法保证后续页面不会再加载新脚本。调用方
+   * 应按需读取索引,或在明确需要快照时自行 sleep。
    */
   private async waitForScriptsToStabilize(): Promise<void> {
     let lastCount = 0;
     let stableRounds = 0;
     const startTime = Date.now();
+    const pollInterval = 200;
+    const maxWait = 5000;
+    const requiredStableRounds = 3;
 
-    while (Date.now() - startTime < INIT_MAX_WAIT_MS) {
-      await this.delay(INIT_POLL_INTERVAL_MS);
+    while (Date.now() - startTime < maxWait) {
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
       const currentCount = this.scripts.size;
       if (currentCount === lastCount && currentCount > 0) {
         stableRounds++;
-        if (stableRounds >= INIT_STABLE_ROUNDS) return;
+        if (stableRounds >= requiredStableRounds) return;
       } else {
         stableRounds = 0;
       }
       lastCount = currentCount;
     }
-  }
-
-  private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   /**
@@ -208,7 +230,14 @@ export class ScriptManager {
     beautify: (source: string) => string,
   ): Promise<string> {
     const script = await this.getScriptSource(scriptId);
-    if (!script || !script.source) {
+    if (!script) {
+      throw new Error(`Script source not found: ${scriptId}`);
+    }
+    if (!script.source) {
+      const loadError = (script as any).loadError;
+      if (loadError) {
+        throw new Error(`Failed to get script source for ${scriptId}: ${loadError.message || loadError}`);
+      }
       throw new Error(`Script source not found: ${scriptId}`);
     }
     try {
@@ -253,25 +282,42 @@ export class ScriptManager {
 
     let loadedCount = 0;
     let failedCount = 0;
+    const missingScripts = scripts.filter(script => !script.source);
+    const total = missingScripts.length;
 
-    for (const script of scripts) {
-      if (script.source) continue;
-      try {
-        const {scriptSource} = await session.send('Debugger.getScriptSource', {
-          scriptId: script.scriptId,
-        });
-        script.source = scriptSource;
-        loadedCount++;
-        if (loadedCount % 10 === 0) {
-          logger.debug(`Loaded ${loadedCount}/${scripts.length} scripts...`);
+    for (
+      let batchStart = 0;
+      batchStart < total;
+      batchStart += SOURCE_LOAD_BATCH_SIZE
+    ) {
+      const batch = missingScripts.slice(
+        batchStart,
+        batchStart + SOURCE_LOAD_BATCH_SIZE,
+      );
+      const settled = await Promise.allSettled(
+        batch.map(async script => {
+          const loaded = await this.loadScriptSourceInternal(script, session);
+          if (loaded) {
+            loadedCount++;
+            if (loadedCount % 10 === 0) {
+              logger.debug(
+                `Loaded ${loadedCount}/${scripts.length} scripts...`,
+              );
+            }
+          } else {
+            failedCount++;
+          }
+        }),
+      );
+
+      for (const result of settled) {
+        if (result.status === 'rejected') {
+          failedCount++;
         }
-      } catch (error) {
-        logger.warn(
-          `Failed to get source for script ${script.scriptId}:`,
-          error,
-        );
-        failedCount++;
       }
+
+      // 每批之间让出事件循环,避免在大型站点上长时间阻塞
+      await waitForImmediate();
     }
 
     logger.info(
@@ -315,25 +361,29 @@ export class ScriptManager {
     }
     if (!url) return undefined;
 
-    const urlPattern = url.replace(/\*/g, '.*');
-    let regex: RegExp;
-    try {
-      regex = new RegExp(urlPattern);
-    } catch (error) {
-      logger.error(`Invalid URL pattern: ${url}`, error);
-      return undefined;
-    }
-
     for (const [scriptUrl, scripts] of this.scriptsByUrl.entries()) {
-      if (regex.test(scriptUrl)) {
+      if (matchesWildcardPattern(scriptUrl, url)) {
         return scripts[0];
       }
     }
     return undefined;
   }
 
-  private async loadScriptSource(script: ScriptInfo): Promise<boolean> {
-    const session = this.getCDPSession();
+  /**
+   * 内部加载单个脚本源码并建立索引/分片。
+   *
+   * 与 loadScriptSource 的区别:前者复用调用方传入的 session,避免在
+   * 批量加载场景下重复 getCDPSession() 触发校验;后者作为公开入口
+   * 自行校验并加载,失败时把错误挂到 script.loadError 上供外层感知。
+   */
+  private async loadScriptSourceInternal(
+    script: ScriptInfo,
+    session: CDPSession,
+  ): Promise<boolean> {
+    if (script.source) {
+      return true;
+    }
+
     try {
       const {scriptSource} = await session.send('Debugger.getScriptSource', {
         scriptId: script.scriptId,
@@ -345,29 +395,36 @@ export class ScriptManager {
       this.chunkScript(script.scriptId, scriptSource);
       return true;
     } catch (error) {
-      logger.error(
-        `Failed to get script source for ${script.scriptId}:`,
+      logger.warn(
+        `Failed to get source for script ${script.scriptId}:`,
         error,
       );
       return false;
     }
   }
 
+  private async loadScriptSource(script: ScriptInfo): Promise<boolean> {
+    const session = this.getCDPSession();
+    const loaded = await this.loadScriptSourceInternal(script, session);
+    if (!loaded) {
+      // 记录错误详情到 script 对象上,便于外层感知底层 CDP 协议错误
+      const error = new Error(
+        `Failed to get script source for ${script.scriptId}`,
+      );
+      (script as any).loadError = error;
+      logger.error(
+        `Failed to get script source for ${script.scriptId}`,
+      );
+    }
+    return loaded;
+  }
+
   async findScriptsByUrl(urlPattern: string): Promise<ScriptInfo[]> {
     this.getCDPSession(); // 触发 requireSession 校验
 
-    const pattern = urlPattern.replace(/\*/g, '.*');
-    let regex: RegExp;
-    try {
-      regex = new RegExp(pattern);
-    } catch (error) {
-      logger.error(`Invalid URL pattern: ${urlPattern}`, error);
-      return [];
-    }
-
     const results: ScriptInfo[] = [];
-    for (const [scriptUrl, scripts] of this.scriptsByUrl.entries()) {
-      if (regex.test(scriptUrl)) {
+    for (const [url, scripts] of this.scriptsByUrl.entries()) {
+      if (matchesWildcardPattern(url, urlPattern)) {
         results.push(...scripts);
       }
     }
@@ -381,6 +438,30 @@ export class ScriptManager {
   /** 已废弃,使用 clear() 代替 */
   clearCache(): void {
     this.clear();
+  }
+
+  private readSource(scriptId: string): string | null {
+    const script = this.scripts.get(scriptId);
+    if (!script?.sourcePath) return null;
+    try {
+      return fs.readFileSync(script.sourcePath, 'utf-8');
+    } catch {
+      return null;
+    }
+  }
+
+  private ensureCacheDir(): string {
+    if (this.cacheDir) return this.cacheDir;
+    this.cacheDir = path.join(os.tmpdir(), 'browsercli-scripts');
+    if (!fs.existsSync(this.cacheDir)) {
+      fs.mkdirSync(this.cacheDir, {recursive: true});
+    }
+    return this.cacheDir;
+  }
+
+  private cacheFilePath(url: string): string {
+    const hash = crypto.createHash('md5').update(url).digest('hex');
+    return path.join(this.ensureCacheDir(), `${hash}.js`);
   }
 
   async searchInScripts(
@@ -406,22 +487,26 @@ export class ScriptManager {
     }
 
     const matches: SearchMatch[] = [];
-    const scriptList = await this.getAllScripts(false);
+    // 与 jshookmcp 对齐:批量加载源码(并发 8,带 yield),避免逐个串行
+    const scriptList = await this.getAllScripts(true, DEFAULT_MAX_SCRIPTS);
     logger.info(`Searching in ${scriptList.length} scripts...`);
 
-    for (const scriptInfo of scriptList) {
+    for (const [scriptIndex, script] of scriptList.entries()) {
       if (matches.length >= maxMatches) break;
+      if (!script.source) continue;
 
-      const script = await this.getScriptSource(scriptInfo.scriptId);
-      if (!script || !script.source) continue;
-
-      this.collectMatchesInScript(
+      await this.collectMatchesInScript(
         script,
         searchRegex,
         contextLines,
         maxMatches,
         matches,
       );
+
+      // 每处理 SEARCH_SCRIPT_YIELD_INTERVAL 个脚本让出一次事件循环
+      if ((scriptIndex + 1) % SEARCH_SCRIPT_YIELD_INTERVAL === 0) {
+        await waitForImmediate();
+      }
     }
 
     logger.info(
@@ -447,13 +532,13 @@ export class ScriptManager {
     }
   }
 
-  private collectMatchesInScript(
+  private async collectMatchesInScript(
     script: ScriptInfo,
     searchRegex: RegExp,
     contextLines: number,
     maxMatches: number,
     matches: SearchMatch[],
-  ): void {
+  ): Promise<void> {
     const lines = script.source!.split('\n');
 
     for (let i = 0; i < lines.length; i++) {
@@ -468,7 +553,21 @@ export class ScriptManager {
 
         const startLine = Math.max(0, i - contextLines);
         const endLine = Math.min(lines.length - 1, i + contextLines);
-        const context = lines.slice(startLine, endLine + 1).join('\n');
+        let context = lines.slice(startLine, endLine + 1).join('\n');
+
+        // 大型单行 bundle 的 context 可能极长,截断为围绕 match 的窗口
+        if (context.length > MATCH_CONTEXT_MAX_CHARS) {
+          const matchIndex = match.index || 0;
+          const snippetStart = Math.max(0, matchIndex - CONTEXT_SNIPPET_WINDOW);
+          const snippetEnd = Math.min(
+            line.length,
+            matchIndex + CONTEXT_SNIPPET_WINDOW,
+          );
+          context =
+            (snippetStart > 0 ? '...' : '') +
+            line.substring(snippetStart, snippetEnd) +
+            (snippetEnd < line.length ? '...' : '');
+        }
 
         matches.push({
           scriptId: script.scriptId,
@@ -480,6 +579,11 @@ export class ScriptManager {
           lineNumber: i + 1,
           lineContent: line,
         });
+      }
+
+      // 每处理 SEARCH_LINE_YIELD_INTERVAL 行让出一次事件循环
+      if ((i + 1) % SEARCH_LINE_YIELD_INTERVAL === 0) {
+        await waitForImmediate();
       }
     }
   }
@@ -770,7 +874,18 @@ export class ScriptManager {
         const keyword = match[0].toLowerCase();
         const startLine = Math.max(0, i - KEYWORD_CONTEXT_LINES);
         const endLine = Math.min(lines.length - 1, i + KEYWORD_CONTEXT_LINES);
-        const context = lines.slice(startLine, endLine + 1).join('\n');
+        let context = lines.slice(startLine, endLine + 1).join('\n');
+
+        // 大型单行 bundle 的 context 可能极长,截断为围绕 match 的窗口
+        if (context.length > KEYWORD_CONTEXT_MAX_CHARS) {
+          const matchIndex = match.index || 0;
+          const snippetStart = Math.max(0, matchIndex - 50);
+          const snippetEnd = Math.min(line.length, matchIndex + 50);
+          context =
+            (snippetStart > 0 ? '...' : '') +
+            line.substring(snippetStart, snippetEnd) +
+            (snippetEnd < line.length ? '...' : '');
+        }
 
         const entry: KeywordIndexEntry = {
           scriptId,
@@ -787,6 +902,20 @@ export class ScriptManager {
     }
 
     logger.debug(`Indexed ${this.keywordIndex.size} keywords for ${url}`);
+
+    // 关键词索引超出容量时淘汰最旧条目,防止内存膨胀
+    if (this.keywordIndex.size > MAX_KEYWORD_INDEX_ENTRIES) {
+      const excess = this.keywordIndex.size - MAX_KEYWORD_INDEX_ENTRIES;
+      let evicted = 0;
+      for (const [key] of this.keywordIndex) {
+        if (evicted >= excess) break;
+        this.keywordIndex.delete(key);
+        evicted++;
+      }
+      logger.debug(
+        `Keyword index pruned ${evicted} entries (cap: ${MAX_KEYWORD_INDEX_ENTRIES})`,
+      );
+    }
   }
 
   /** 分片存储脚本(在获取脚本源码时自动调用) */
