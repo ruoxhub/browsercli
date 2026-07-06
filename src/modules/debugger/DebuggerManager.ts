@@ -647,10 +647,21 @@ export class DebuggerManager {
 
   async getScriptSource(scriptId: string): Promise<string> {
     const script = await this.scriptManager.getScriptSource(scriptId);
-    if (!script || !script.source) {
+    if (!script) {
       throw new Error(`Script source not found: ${scriptId}`);
     }
-    return script.source;
+    if (!script.sourcePath) {
+      const loadError = (script as any).loadError;
+      if (loadError) {
+        throw new Error(`Failed to get script source for ${scriptId}: ${loadError.message || loadError}`);
+      }
+      throw new Error(`Script source not found: ${scriptId}`);
+    }
+    const content = this.scriptManager.getScriptContent(scriptId);
+    if (!content) {
+      throw new Error(`Script source file missing: ${scriptId}`);
+    }
+    return content;
   }
 
   async getBeautifiedScriptSource(

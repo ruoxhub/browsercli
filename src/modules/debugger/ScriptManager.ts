@@ -224,6 +224,11 @@ export class ScriptManager {
     return this.scriptsByUrl.get(url) ?? [];
   }
 
+  /** 从临时缓存读取脚本源码内容。 */
+  getScriptContent(scriptId: string): string | null {
+    return this.readSource(scriptId);
+  }
+
   /** 获取 beautified 版本的脚本源码（懒缓存）。 */
   async getBeautifiedScriptSource(
     scriptId: string,
@@ -233,17 +238,21 @@ export class ScriptManager {
     if (!script) {
       throw new Error(`Script source not found: ${scriptId}`);
     }
-    if (!script.source) {
+    if (!script.sourcePath) {
       const loadError = (script as any).loadError;
       if (loadError) {
         throw new Error(`Failed to get script source for ${scriptId}: ${loadError.message || loadError}`);
       }
       throw new Error(`Script source not found: ${scriptId}`);
     }
+    const source = this.readSource(scriptId);
+    if (!source) {
+      throw new Error(`Script source file missing: ${scriptId}`);
+    }
     try {
-      return beautify(script.source);
+      return beautify(source);
     } catch {
-      return script.source;
+      return source;
     }
   }
 
@@ -282,7 +291,7 @@ export class ScriptManager {
 
     let loadedCount = 0;
     let failedCount = 0;
-    const missingScripts = scripts.filter(script => !script.source);
+    const missingScripts = scripts.filter(script => !script.sourcePath);
     const total = missingScripts.length;
 
     for (
@@ -341,7 +350,7 @@ export class ScriptManager {
       return null;
     }
 
-    if (!targetScript.source) {
+    if (!targetScript.sourcePath) {
       const loaded = await this.loadScriptSource(targetScript);
       if (!loaded) return null;
     }
@@ -498,7 +507,7 @@ export class ScriptManager {
 
     for (const [scriptIndex, script] of scriptList.entries()) {
       if (matches.length >= maxMatches) break;
-      if (!script.source) continue;
+      if (!script.sourcePath) continue;
 
       await this.collectMatchesInScript(
         script,
@@ -544,7 +553,9 @@ export class ScriptManager {
     maxMatches: number,
     matches: SearchMatch[],
   ): Promise<void> {
-    const lines = script.source!.split('\n');
+    const source = this.readSource(script.scriptId);
+    if (!source) return;
+    const lines = source.split('\n');
 
     for (let i = 0; i < lines.length; i++) {
       if (matches.length >= maxMatches) return;
@@ -624,12 +635,17 @@ export class ScriptManager {
     const {maxDepth = 3, maxSize = 500, includeComments = true} = options;
 
     const script = await this.getScriptSource(scriptId);
-    if (!script || !script.source) {
+    if (!script || !script.sourcePath) {
       throw new Error(`Script not found: ${scriptId}`);
     }
 
+    const source = this.readSource(scriptId);
+    if (!source) {
+      throw new Error(`Script source file missing: ${scriptId}`);
+    }
+
     const babel = await this.loadBabel();
-    const ast = this.parseScriptWithBabel(babel, script.source, scriptId);
+    const ast = this.parseScriptWithBabel(babel, source, scriptId);
 
     const {allFunctions, callGraph} = this.collectFunctions(
       babel,
