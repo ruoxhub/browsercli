@@ -847,6 +847,16 @@ export class ScriptManager {
 
   /** 清除所有数据(换网站时调用) */
   clear(): void {
+    // 删除所有脚本临时文件
+    for (const script of this.scripts.values()) {
+      if (script.sourcePath) {
+        try {
+          fs.unlinkSync(script.sourcePath);
+        } catch {
+          // 忽略文件不存在或权限错误
+        }
+      }
+    }
     this.scripts.clear();
     this.scriptsByUrl.clear();
     this.keywordIndex.clear();
