@@ -1,116 +1,106 @@
-# Script Source 持久化缓存设计
+# Script Source 临时磁盘缓存设计
 
-**日期：** 2026-07-05  
+**日期：** 2026-07-05
 **状态：** 待实现
 
 ## 目标
 
-`get_script_source` 工具获取的脚本源码持久化到本地 `~/.browsercli/cache/script/` 目录，使得跨浏览器会话的脚本源码可复用，避免重复 CDP 请求。
+将 `ScriptManager` 中的脚本源码从内存（`ScriptInfo.source`）改为磁盘临时文件（`ScriptInfo.sourcePath`），降低运行时内存占用，同一会话内脚本源码可复用。
 
-## 缓存目录与文件结构
+## 改动范围
+
+**仅改动 `src/modules/debugger/ScriptManager.ts`**，不新增文件，不修改 MCP 工具层。
+
+## ScriptInfo 变更
+
+```typescript
+// 删除
+source?: string;
+
+// 新增
+sourcePath?: string; // 指向 os.tmpdir()/browsercli-scripts/<MD5(url)>.js
+```
+
+## 临时缓存目录
 
 ```
-~/.browsercli/cache/script/
+os.tmpdir()/browsercli-scripts/
 ├── a1b2c3d4e5f6....js   ← MD5("https://example.com/app.js")
 ├── f6e5d4c3b2a1....js   ← MD5("https://cdn.example.com/lib.js")
 └── ...
 ```
 
-- 目录：`~/.browsercli/cache/script/`（使用 `USER_CONFIG_DIR_NAME` 常量）
 - 文件命名：`<MD5(url)>.js`
-- 文件内容：**原始源码**（不格式化），直接按 `.js` 文本存储
-- 内联脚本（无 URL）：不缓存
+- 内联脚本（无 URL）：不写文件，`sourcePath` 为 `undefined`
+- 目录懒创建：首次 `loadScriptSource()` 时 `mkdirSync`
 
-## 新增组件：ScriptSourceCache
-
-**文件：** `src/utils/ScriptSourceCache.ts`
-
-### API
+## 新增私有辅助方法
 
 ```typescript
-class ScriptSourceCache {
-  /** 尝试从缓存读取脚本源码。未命中返回 null。 */
-  get(url: string): string | null;
-
-  /** 将脚本源码写入缓存。内联脚本（无 url）跳过。 */
-  set(url: string, source: string): void;
-
-  /** 判断指定 URL 是否已有缓存。 */
-  has(url: string): boolean;
-
-  /** 获取缓存统计信息。 */
-  stats(): { totalFiles: number; totalSize: number; cacheDir: string };
-}
-```
-
-- **纯同步**：所有方法同步文件 I/O，适合 MCP 工具 handler 低延迟要求
-- **懒创建目录**：首次 `set()` 或 `get()` 时自动 `mkdir`
-- **无 TTL 过期**：脚本源码不因时间失效，用户手动删除目录即可清理
-- **空 URL 直接跳过**：不写入、不产生垃圾文件
-
-### 存储格式
-
-每个 `.js` 文件直接包含原始脚本源码，无额外元数据包装。
-
-## 修改点：get_script_source handler
-
-**文件：** `src/tools/debugger/index.ts`
-
-### 缓存读取（handler 开头）
-
-```typescript
-// 尝试从缓存读取
-const script = debuggerContext.getScriptById(scriptId);
-const scriptUrl = script?.url;
-if (scriptUrl) {
-  const cached = scriptSourceCache.get(scriptUrl);
-  if (cached) {
-    source = cached;
-    // 跳过 CDP，走后续行范围/偏移/格式化逻辑
+private readSource(scriptId: string): string | null {
+  const script = this.scripts.get(scriptId);
+  if (!script?.sourcePath) return null;
+  try {
+    return fs.readFileSync(script.sourcePath, 'utf-8');
+  } catch {
+    return null;
   }
 }
 ```
 
-### 缓存写入（CDP 获取成功后）
+## loadScriptSource 修改
 
 ```typescript
-// 成功从 CDP 获取源码后
-if (source && script?.url) {
-  scriptSourceCache.set(script.url, source);
+// 原：script.source = scriptSource;
+// 改为：
+private ensureCacheDir(): string { ... }  // 懒创建临时目录
+private cacheFilePath(url: string): string { ... }  // 生成文件路径
+
+// loadScriptSource 中：
+const filePath = this.cacheFilePath(script.url);
+fs.writeFileSync(filePath, scriptSource, 'utf-8');
+script.sourcePath = filePath;
+```
+
+## 消费者适配
+
+`ScriptManager` 内部所有原本读取 `script.source` 的地方改为调用 `this.readSource(scriptId)`：
+
+| 方法 | 原读取方式 | 改为 |
+|------|-----------|------|
+| `collectMatchesInScript` | `script.source!` | `this.readSource(script.scriptId)` |
+| `getBeautifiedScriptSource` | `script.source` / `!script.source` | `!script.sourcePath` / `this.readSource(scriptId)` |
+| `buildKeywordIndex` | 参数 `content: string` | 调用方先 `readSource()` 再传入（保持不变） |
+| `chunkScript` | 参数 `content: string` | 同上 |
+| `extractFunctionTree` | `script.source` | `this.readSource(scriptId)` |
+| `searchInScriptsEnhanced` | 间接通过 keywordIndex | 不直接读 source，不受影响 |
+
+## 清理
+
+```typescript
+clear(): void {
+  // 新增：删除所有临时文件
+  for (const script of this.scripts.values()) {
+    if (script.sourcePath) {
+      try { fs.unlinkSync(script.sourcePath); } catch { /* 忽略 */ }
+    }
+  }
+  // 原有逻辑...
 }
 ```
 
-### 调用链
-
-```
-MCP Handler (index.ts)
-  ├─ ScriptSourceCache.get(url)  ← 先查缓存
-  ├─ debuggerContext.getScriptSource(scriptId) → CDP  ← 缓存未命中时走 CDP
-  └─ ScriptSourceCache.set(url, source)                ← CDP 成功后写入
-```
-
-缓存在**工具层**而非 `ScriptManager` 层注入，原因：
-- `ScriptManager` 职责是 CDP 交互，不应感知持久化
-- 工具层 handler 拥有完整请求上下文
-- 遵循关注点分离
+`close()` 调用 `clear()`，自然附带清理。
 
 ## 边界情况
 
 | 情况 | 行为 |
 |------|------|
-| 内联脚本（无 URL） | `get()`/`set()` 直接跳过，不报错 |
-| 同一 URL 多次请求 | 第二次命中缓存，跳过 CDP |
-| CDN query string（`?v=2`） | 视为不同 URL，缓存 key 不同 |
-| 缓存文件损坏 | `get()` 捕获异常，返回 null，走 CDP |
-| 磁盘写入失败 | `set()` 静默失败，不影响主流程 |
+| 内联脚本（无 URL） | 不写文件，`sourcePath` 为 `undefined` |
+| 同一 URL 多次请求 | 复用已有 `sourcePath`，不重复写入 |
+| 临时文件被外部删除 | `readSource()` 返回 `null`，调用方需重新走 CDP |
+| 磁盘写入失败 | `loadScriptSource()` 返回 `false`，行为与当前一致 |
+| `clear()` / `close()` | 删除所有 `.js` 临时文件 |
 
 ## 验证
 
-**单元测试：** `tests/unit/utils/ScriptSourceCache.test.ts`
-- 写入 → 读取 → 内容一致
-- 不存在 URL → `get()` 返回 `null`
-- 空 URL → `set()` 不写入文件
-- 重写同一 URL → 覆盖旧文件
-- `stats()` 统计文件数和大小
-
-运行：`npm run test:unit`
+`npm run test:unit` 现有的 `ScriptManager` 相关测试需要更新（删除对 `source` 属性的断言，改为验证 `sourcePath`）。
