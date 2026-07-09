@@ -11,17 +11,27 @@ import type {BreakpointHitEvent} from '../../../../src/types/index.js';
 
 interface MockSession {
   send: (method: string, params?: unknown) => Promise<unknown>;
+  on: (event: string, handler: Function) => void;
+  off: (event: string, handler: Function) => void;
 }
 
 function makeSession(
   sendImpl: (method: string, params?: unknown) => unknown = () => ({}),
-): MockSession & {calls: Array<{method: string; params?: unknown}>} {
+): MockSession & {calls: Array<{method: string; params?: unknown}>; listeners: Record<string, Function>} {
   const calls: Array<{method: string; params?: unknown}> = [];
+  const listeners: Record<string, Function> = {};
   return {
     calls,
+    listeners,
     async send(method: string, params?: unknown) {
       calls.push({method, params});
       return sendImpl(method, params);
+    },
+    on(event: string, handler: Function) {
+      listeners[event] = handler;
+    },
+    off(event: string) {
+      delete listeners[event];
     },
   };
 }
@@ -148,5 +158,60 @@ describe('BreakpointManager', () => {
 
     mgr.incrementHitCounts(undefined);
     assert.strictEqual(mgr.getBreakpoint('bp-1')!.hitCount, 1);
+  });
+
+  it('setBreakpointOnFunctionCall calls CDP and stores breakpoint', async () => {
+    const session = makeSession(() => ({breakpointId: 'fn-bp-1'}));
+    const mgr = new BreakpointManager(() => session as any);
+
+    const bp = await mgr.setBreakpointOnFunctionCall('obj-123', 'x > 5');
+
+    assert.strictEqual(bp.breakpointId, 'fn-bp-1');
+    assert.strictEqual(bp.condition, 'x > 5');
+    assert.strictEqual(bp.enabled, true);
+    assert.strictEqual(session.calls[0].method, 'Debugger.setBreakpointOnFunctionCall');
+    assert.deepStrictEqual(session.calls[0].params, {objectId: 'obj-123', condition: 'x > 5'});
+  });
+
+  it('getPossibleBreakpoints returns break locations from CDP', async () => {
+    const session = makeSession(() => ({
+      locations: [
+        {scriptId: 's1', lineNumber: 10, columnNumber: 0, type: 'call'},
+        {scriptId: 's1', lineNumber: 11, columnNumber: 4},
+      ],
+    }));
+    const mgr = new BreakpointManager(() => session as any);
+
+    const result = await mgr.getPossibleBreakpoints({scriptId: 's1', lineNumber: 10});
+
+    assert.strictEqual(result.length, 2);
+    assert.strictEqual(result[0].type, 'call');
+    assert.strictEqual(session.calls[0].method, 'Debugger.getPossibleBreakpoints');
+  });
+
+  it('handleBreakpointResolved updates breakpoint location', async () => {
+    const session = makeSession(() => ({breakpointId: 'bp-r', locations: []}));
+    const mgr = new BreakpointManager(() => session as any);
+
+    // Need to attach listeners first so breakpointResolved handler is registered
+    mgr.attachListeners(session as any);
+
+    await mgr.setBreakpointByUrl({url: 'https://example.com/a.js', lineNumber: 10});
+    const bpBefore = mgr.getBreakpoint('bp-r');
+    assert.strictEqual(bpBefore?.location.scriptId, undefined);
+
+    // Simulate breakpointResolved event via the listener
+    const handler = session.listeners['Debugger.breakpointResolved'];
+    if (handler) {
+      handler({
+        breakpointId: 'bp-r',
+        location: {scriptId: 's99', lineNumber: 12, columnNumber: 3},
+      });
+    }
+
+    const bpAfter = mgr.getBreakpoint('bp-r');
+    assert.strictEqual(bpAfter?.location.scriptId, 's99');
+    assert.strictEqual(bpAfter?.location.lineNumber, 12);
+    assert.strictEqual(bpAfter?.location.columnNumber, 3);
   });
 });

@@ -23,6 +23,7 @@ import type {
 } from '../../types/index.js';
 import {logger} from '../../utils/logger.js';
 import type {PausedState, Scope, ScopeVariableScope} from './types.js';
+import {shouldFilterPropertyName} from './types.js';
 
 const KNOWN_SCOPE_TYPES: ReadonlyArray<ScopeVariableScope> = [
   'global',
@@ -70,7 +71,7 @@ export class ScopeInspector {
 
     const variables: ScopeVariable[] = [];
     for (const prop of properties.result) {
-      if (prop.name.startsWith('__') || prop.name === 'this') {
+      if (shouldFilterPropertyName(prop.name, {filterUnderscorePrefix: true}) || prop.name === 'this') {
         continue;
       }
       const value = prop.value;
@@ -129,7 +130,7 @@ export class ScopeInspector {
         const scopeType = this.toScopeVariableScopeType(scope.type);
 
         for (const prop of properties.result) {
-          if (prop.name === '__proto__') continue;
+          if (shouldFilterPropertyName(prop.name)) continue;
 
           variables.push({
             name: prop.name,
@@ -216,7 +217,7 @@ export class ScopeInspector {
 
       const variables: ScopeVariable[] = [];
       for (const prop of properties.result) {
-        if (prop.name === '__proto__') continue;
+        if (shouldFilterPropertyName(prop.name)) continue;
         variables.push({
           name: prop.name,
           value: prop.value?.value,

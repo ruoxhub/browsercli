@@ -15,7 +15,7 @@
  *
  * 设计原则:
  * - 薄封装 CDP Runtime 域,直接调用 CDP API
- * - 依赖 DebuggerManager 获取暂停状态
+ * - 通过回调获取暂停状态和求值能力，不依赖 DebuggerManager
  * - 提供友好的数据格式化
  */
 
@@ -23,7 +23,7 @@ import type {CDPSession} from '../../third_party/index.js';
 import {logger} from '../../utils/logger.js';
 import type {CodeCollector} from '../collector/CodeCollector.js';
 
-import type {DebuggerManager, CallFrame, Scope} from './DebuggerManager.js';
+import type {CallFrame, PausedState, Scope} from './types.js';
 
 export interface VariableInfo {
   name: string;
@@ -68,13 +68,37 @@ interface RemoteObject {
   className?: string;
 }
 
+interface EvaluateParams {
+  callFrameId: string;
+  expression: string;
+  returnByValue?: boolean;
+  generatePreview?: boolean;
+}
+
+interface EvaluateResult {
+  result: {
+    type: string;
+    subtype?: string;
+    className?: string;
+    value?: unknown;
+    description?: string;
+    objectId?: string;
+  };
+  exceptionDetails?: {
+    text: string;
+    exception?: {type?: string; value?: unknown; description?: string};
+  };
+}
+
 export class RuntimeInspector {
   private cdpSession: CDPSession | null = null;
   private enabled = false;
 
   constructor(
     private collector: CodeCollector,
-    private debuggerManager: DebuggerManager,
+    private getPausedState: () => PausedState | null,
+    private evaluateOnCallFrameFn: (params: EvaluateParams) => Promise<EvaluateResult>,
+    private setAsyncCallStackDepthFn?: (maxDepth: number) => Promise<void>,
   ) {}
 
   private requireSession(): CDPSession {
@@ -108,24 +132,19 @@ export class RuntimeInspector {
     return this.enabled;
   }
 
-  /** 启用异步堆栈追踪(委托给 DebuggerManager,因为需要 Debugger 域) */
   async enableAsyncStackTraces(maxDepth = 32): Promise<void> {
-    if (!this.debuggerManager.isEnabled()) {
-      throw new Error(
-        'Debugger is not enabled. Call debuggerManager.enable() first.',
-      );
+    if (!this.setAsyncCallStackDepthFn) {
+      throw new Error('Async stack trace support not available');
     }
-
-    await this.debuggerManager.setAsyncCallStackDepth(maxDepth);
+    await this.setAsyncCallStackDepthFn(maxDepth);
     logger.info(`Async stack traces enabled with max depth: ${maxDepth}`);
   }
 
   async disableAsyncStackTraces(): Promise<void> {
-    if (!this.debuggerManager.isEnabled()) {
-      throw new Error('Debugger is not enabled');
+    if (!this.setAsyncCallStackDepthFn) {
+      throw new Error('Async stack trace support not available');
     }
-
-    await this.debuggerManager.setAsyncCallStackDepth(0);
+    await this.setAsyncCallStackDepthFn(0);
     logger.info('Async stack traces disabled');
   }
 
@@ -155,7 +174,7 @@ export class RuntimeInspector {
   // ==================== 调用堆栈 ====================
 
   async getCallStack(): Promise<CallStackInfo | null> {
-    const pausedState = this.debuggerManager.getPausedState();
+    const pausedState = this.getPausedState();
     if (!pausedState) {
       logger.warn('Not in paused state, cannot get call stack');
       return null;
@@ -169,7 +188,7 @@ export class RuntimeInspector {
           scriptId: frame.location.scriptId,
           url: frame.url,
           lineNumber: frame.location.lineNumber,
-          columnNumber: frame.location.columnNumber,
+          columnNumber: frame.location.columnNumber ?? 0,
         },
         scopeChain: frame.scopeChain.map((scope: Scope) => ({
           type: scope.type,
@@ -197,7 +216,7 @@ export class RuntimeInspector {
       throw new Error('callFrameId parameter is required');
     }
 
-    const pausedState = this.debuggerManager.getPausedState();
+    const pausedState = this.getPausedState();
     if (!pausedState) {
       throw new Error(
         'Not in paused state. Debugger must be paused to get scope variables.',
@@ -234,7 +253,7 @@ export class RuntimeInspector {
   }
 
   async getCurrentScopeVariables(): Promise<ScopeVariables[]> {
-    const pausedState = this.debuggerManager.getPausedState();
+    const pausedState = this.getPausedState();
 
     if (!pausedState || pausedState.callFrames.length === 0) {
       throw new Error('Not in paused state or no call frames');
@@ -291,7 +310,7 @@ export class RuntimeInspector {
       throw new Error('expression parameter is required and cannot be empty');
     }
 
-    const pausedState = this.debuggerManager.getPausedState();
+    const pausedState = this.getPausedState();
     if (!pausedState) {
       throw new Error(
         'Not in paused state. Use evaluateGlobal() for global context evaluation.',
@@ -304,7 +323,7 @@ export class RuntimeInspector {
       throw new Error('No call frame available for evaluation');
     }
 
-    const result = await this.debuggerManager.evaluateOnCallFrame({
+    const result = await this.evaluateOnCallFrameFn({
       callFrameId: targetCallFrameId,
       expression,
       returnByValue: true,
@@ -338,7 +357,6 @@ export class RuntimeInspector {
 
   // ==================== 辅助方法 ====================
 
-  /** 将 CDP 的 RemoteObject 转换为友好格式 */
   private formatValue(remoteObject: RemoteObject): unknown {
     if (remoteObject.type === 'undefined') {
       return undefined;

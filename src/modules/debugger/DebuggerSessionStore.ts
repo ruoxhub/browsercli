@@ -23,22 +23,25 @@ import * as path from 'node:path';
 import type {DebuggerSession} from '../../types/index.js';
 import {logger} from '../../utils/logger.js';
 import type {BreakpointManager} from './BreakpointManager.js';
+import type {WatchExpressionManager} from './WatchExpressionManager.js';
 
 export class DebuggerSessionStore {
   constructor(
     private getBreakpointManager: () => BreakpointManager,
     private getDefaultSessionsDir: () => string,
     private isEnabled: () => boolean,
+    private getWatchManager?: () => WatchExpressionManager | null,
   ) {}
 
   exportSession(metadata?: DebuggerSession['metadata']): DebuggerSession {
     const bpm = this.getBreakpointManager();
     const session: DebuggerSession = {
-      version: '1.0',
+      version: '1.1',
       timestamp: Date.now(),
       breakpoints: bpm.getBreakpointsForExport(),
       pauseOnExceptions: bpm.getPauseOnExceptionsState(),
       metadata: metadata || {},
+      watches: this.getWatchManager?.()?.exportWatches() ?? [],
     };
 
     logger.info('Session exported', {
@@ -92,9 +95,9 @@ export class DebuggerSessionStore {
     const session: DebuggerSession =
       typeof sessionData === 'string' ? JSON.parse(sessionData) : sessionData;
 
-    if (session.version !== '1.0') {
+    if (session.version !== '1.0' && session.version !== '1.1') {
       logger.warn(
-        `Session version mismatch: ${session.version} (expected 1.0)`,
+        `Session version mismatch: ${session.version} (expected 1.0 or 1.1)`,
       );
     }
 
@@ -142,12 +145,99 @@ export class DebuggerSessionStore {
       await bpm.setPauseOnExceptions(session.pauseOnExceptions);
     }
 
+    const watchData = (session as any).watches;
+    if (Array.isArray(watchData) && watchData.length > 0) {
+      const wm = this.getWatchManager?.();
+      if (wm) {
+        wm.importWatches(watchData);
+      }
+    }
+
     logger.info('Session imported', {
       totalBreakpoints: session.breakpoints.length,
       successCount,
       failCount,
       pauseOnExceptions: session.pauseOnExceptions,
     });
+  }
+
+  async mergeSession(sessionData: DebuggerSession | string): Promise<void> {
+    if (!this.isEnabled()) {
+      throw new Error('Debugger must be enabled before merging session.');
+    }
+
+    const session: DebuggerSession =
+      typeof sessionData === 'string' ? JSON.parse(sessionData) : sessionData;
+
+    const bpm = this.getBreakpointManager();
+    const existingBps = bpm.listBreakpoints();
+
+    let addedCount = 0;
+    let skippedCount = 0;
+
+    for (const bp of session.breakpoints) {
+      const isDuplicate = existingBps.some(existing => {
+        if (bp.location.url && existing.location.url) {
+          return (
+            existing.location.url === bp.location.url &&
+            existing.location.lineNumber === bp.location.lineNumber &&
+            existing.location.columnNumber === bp.location.columnNumber
+          );
+        }
+        if (bp.location.scriptId && existing.location.scriptId) {
+          return (
+            existing.location.scriptId === bp.location.scriptId &&
+            existing.location.lineNumber === bp.location.lineNumber &&
+            existing.location.columnNumber === bp.location.columnNumber
+          );
+        }
+        return false;
+      });
+
+      if (isDuplicate) {
+        skippedCount++;
+        continue;
+      }
+
+      try {
+        if (bp.location.url) {
+          await bpm.setBreakpointByUrl({
+            url: bp.location.url,
+            lineNumber: bp.location.lineNumber,
+            columnNumber: bp.location.columnNumber,
+            condition: bp.condition,
+          });
+        } else if (bp.location.scriptId) {
+          await bpm.setBreakpoint({
+            scriptId: bp.location.scriptId,
+            lineNumber: bp.location.lineNumber,
+            columnNumber: bp.location.columnNumber,
+            condition: bp.condition,
+          });
+        }
+        addedCount++;
+      } catch (error) {
+        logger.error('Failed to merge breakpoint:', error, bp);
+      }
+    }
+
+    if (session.pauseOnExceptions) {
+      const current = bpm.getPauseOnExceptionsState();
+      const severity: Record<string, number> = {none: 0, uncaught: 1, all: 2};
+      if ((severity[session.pauseOnExceptions] ?? 0) > (severity[current] ?? 0)) {
+        await bpm.setPauseOnExceptions(session.pauseOnExceptions);
+      }
+    }
+
+    const watchData = (session as any).watches;
+    if (Array.isArray(watchData) && watchData.length > 0) {
+      const wm = this.getWatchManager?.();
+      if (wm) {
+        wm.importWatches(watchData);
+      }
+    }
+
+    logger.info('Session merged', {addedCount, skippedCount});
   }
 
   async listSavedSessions(): Promise<

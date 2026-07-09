@@ -55,12 +55,16 @@ import {XHRBreakpointManager} from './XHRBreakpointManager.js';
 // 重新导出共享类型，保持向后兼容（AIContinuousDebugger / RuntimeInspector 等仍从此处导入）
 export type {
   AutoRecoveryEvent,
+  BreakLocation,
   BreakpointInfo,
+  CallArgument,
   CallFrame,
   DebuggerBreakpointResolvedEvent,
   DebuggerPausedEvent,
+  Location,
   PausedState,
   Scope,
+  ScriptPosition,
 } from './types.js';
 import type {
   AutoRecoveryEvent,
@@ -108,6 +112,7 @@ export class DebuggerManager {
       () => this.breakpointManager,
       () => this.getDefaultSessionsDir(),
       () => this.enabled,
+      () => this._watchManager,
     );
     this.scriptManager = new ScriptManager(() => this.requireSession());
     this.executionContextTracker = new ExecutionContextTracker();
@@ -217,13 +222,13 @@ export class DebuggerManager {
       logger.info('WatchExpressionManager initialized');
     }
 
-    this._xhrManager = new XHRBreakpointManager(cdpSession);
+    this._xhrManager = new XHRBreakpointManager(() => this.requireSession());
     logger.info('XHRBreakpointManager initialized');
 
-    this._eventManager = new EventBreakpointManager(cdpSession);
+    this._eventManager = new EventBreakpointManager(() => this.requireSession());
     logger.info('EventBreakpointManager initialized');
 
-    this._blackboxManager = new BlackboxManager(cdpSession);
+    this._blackboxManager = new BlackboxManager(() => this.requireSession());
     logger.info('BlackboxManager initialized');
 
     logger.info('All advanced debugging features initialized');
@@ -357,6 +362,21 @@ export class DebuggerManager {
     return this.breakpointManager.getPauseOnExceptionsState();
   }
 
+  async setBreakpointOnFunctionCall(
+    objectId: string,
+    condition?: string,
+  ): Promise<import('./types.js').BreakpointInfo> {
+    return this.breakpointManager.setBreakpointOnFunctionCall(objectId, condition);
+  }
+
+  async getPossibleBreakpoints(
+    start: import('./types.js').Location,
+    end?: import('./types.js').Location,
+    restrictToFunction?: boolean,
+  ): Promise<import('./types.js').BreakLocation[]> {
+    return this.breakpointManager.getPossibleBreakpoints(start, end, restrictToFunction);
+  }
+
   // ==================== 执行控制（委托 ExecutionController） ====================
 
   pause(): Promise<void> {
@@ -417,6 +437,30 @@ export class DebuggerManager {
     return this.executionController.evaluateOnCallFrame(params);
   }
 
+  async continueToLocation(
+    location: import('./types.js').Location,
+    targetCallFrames?: 'any' | 'current',
+  ): Promise<void> {
+    return this.executionController.continueToLocation(location, targetCallFrames);
+  }
+
+  async setVariableValue(
+    callFrameId: string,
+    scopeNumber: number,
+    variableName: string,
+    newValue: import('./types.js').CallArgument,
+  ): Promise<void> {
+    return this.executionController.setVariableValue(callFrameId, scopeNumber, variableName, newValue);
+  }
+
+  async restartFrame(callFrameId: string): Promise<void> {
+    return this.executionController.restartFrame(callFrameId);
+  }
+
+  async setReturnValue(newValue: import('./types.js').CallArgument): Promise<void> {
+    return this.executionController.setReturnValue(newValue);
+  }
+
   // ==================== 作用域变量（委托 ScopeInspector） ====================
 
   async getScopeVariables(
@@ -460,6 +504,31 @@ export class DebuggerManager {
     this.executionController.setPausedState(params);
     // 2. BreakpointManager 更新命中断点的 hitCount
     this.breakpointManager.incrementHitCounts(params.hitBreakpoints);
+
+    // XHR breakpoint hitCount
+    if (params.reason === 'XHR' && this._xhrManager) {
+      const data = params.data as {url?: string} | undefined;
+      if (data?.url) {
+        for (const bp of this._xhrManager.getAllXHRBreakpoints()) {
+          if (data.url.includes(bp.urlPattern)) {
+            this._xhrManager.incrementHitCount(bp.id);
+          }
+        }
+      }
+    }
+
+    // Event breakpoint hitCount
+    if (params.reason === 'EventListener' && this._eventManager) {
+      const data = params.data as {eventName?: string} | undefined;
+      if (data?.eventName) {
+        for (const bp of this._eventManager.getAllEventBreakpoints()) {
+          if (bp.eventName === data.eventName) {
+            this._eventManager.incrementHitCount(bp.id);
+          }
+        }
+      }
+    }
+
     // 3. 断点循环自动恢复检测
     void this.#handlePotentialBreakpointLoop(params);
     // 4. 若有断点命中回调，异步预取变量并触发回调
@@ -599,6 +668,10 @@ export class DebuggerManager {
     return this.sessionStore.importSession(sessionData);
   }
 
+  async mergeSession(sessionData: DebuggerSession | string): Promise<void> {
+    return this.sessionStore.mergeSession(sessionData);
+  }
+
   async listSavedSessions(): Promise<
     Array<{path: string; timestamp: number; metadata?: unknown}>
   > {
@@ -714,6 +787,15 @@ export class DebuggerManager {
     contextId: number,
   ): import('./ExecutionContextInfo.js').ExecutionContextInfo | undefined {
     return this.executionContextTracker.getExecutionContextById(contextId);
+  }
+
+  // ==================== 黑盒化范围（委托 BlackboxManager） ====================
+
+  async setBlackboxedRanges(
+    scriptId: string,
+    positions: import('./types.js').ScriptPosition[],
+  ): Promise<void> {
+    return this.getBlackboxManager().setBlackboxedRanges(scriptId, positions);
   }
 
   // ==================== 便捷访问器 ====================

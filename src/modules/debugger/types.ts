@@ -96,3 +96,41 @@ export interface AutoRecoveryEvent {
   actions: string[];
   error?: string;
 }
+
+/** CDP Debugger.Location — scriptId + line/column position. */
+export interface Location {
+  scriptId: string;
+  lineNumber: number;
+  columnNumber?: number;
+}
+
+/** CDP Debugger.BreakLocation — possible breakpoint position with type hint. */
+export interface BreakLocation {
+  scriptId: string;
+  lineNumber: number;
+  columnNumber?: number;
+  type?: 'debuggerStatement' | 'call' | 'return';
+}
+
+/** CDP Runtime.CallArgument — value descriptor for variable/return value mutation. */
+export interface CallArgument {
+  value?: unknown;
+  unserializableValue?: string;
+  objectId?: string;
+}
+
+/** CDP Debugger.ScriptPosition — line/column within a script for blackbox ranges. */
+export interface ScriptPosition {
+  lineNumber: number;
+  columnNumber: number;
+}
+
+/** Shared property filter for ScopeInspector. */
+export function shouldFilterPropertyName(
+  name: string,
+  options?: {filterUnderscorePrefix?: boolean},
+): boolean {
+  if (name === '__proto__') return true;
+  if (options?.filterUnderscorePrefix && name.startsWith('__')) return true;
+  return false;
+}

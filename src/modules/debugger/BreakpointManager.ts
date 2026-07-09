@@ -24,7 +24,12 @@ import type {
   BreakpointHitEvent,
 } from '../../types/index.js';
 import {logger} from '../../utils/logger.js';
-import type {BreakpointInfo, DebuggerBreakpointResolvedEvent} from './types.js';
+import type {
+  BreakLocation,
+  BreakpointInfo,
+  DebuggerBreakpointResolvedEvent,
+  Location,
+} from './types.js';
 
 export class BreakpointManager {
   private breakpoints = new Map<string, BreakpointInfo>();
@@ -208,6 +213,66 @@ export class BreakpointManager {
     return breakpointInfo;
   }
 
+  async setBreakpointOnFunctionCall(
+    objectId: string,
+    condition?: string,
+  ): Promise<BreakpointInfo> {
+    if (!objectId) {
+      throw new Error('objectId parameter is required');
+    }
+
+    const params: Record<string, unknown> = {objectId};
+    if (condition !== undefined) {
+      params.condition = condition;
+    }
+
+    const result = await this.getCDPSession().send(
+      'Debugger.setBreakpointOnFunctionCall',
+      params,
+    );
+
+    const breakpointInfo: BreakpointInfo = {
+      breakpointId: result.breakpointId,
+      location: {lineNumber: -1},
+      condition,
+      enabled: true,
+      hitCount: 0,
+      createdAt: Date.now(),
+    };
+
+    this.breakpoints.set(result.breakpointId, breakpointInfo);
+    logger.info(`Breakpoint set on function call: ${objectId}`, {
+      breakpointId: result.breakpointId,
+    });
+
+    return breakpointInfo;
+  }
+
+  async getPossibleBreakpoints(
+    start: Location,
+    end?: Location,
+    restrictToFunction?: boolean,
+  ): Promise<BreakLocation[]> {
+    if (!start.scriptId) {
+      throw new Error('start.scriptId is required');
+    }
+
+    const params: Record<string, unknown> = {start};
+    if (end) {
+      params.end = end;
+    }
+    if (restrictToFunction !== undefined) {
+      params.restrictToFunction = restrictToFunction;
+    }
+
+    const result = await this.getCDPSession().send(
+      'Debugger.getPossibleBreakpoints',
+      params,
+    );
+
+    return (result.locations ?? []) as BreakLocation[];
+  }
+
   async removeBreakpoint(breakpointId: string): Promise<void> {
     if (!breakpointId) {
       throw new Error('breakpointId parameter is required');
@@ -343,9 +408,18 @@ export class BreakpointManager {
   ): void {
     const bp = this.breakpoints.get(params.breakpointId);
     if (bp) {
+      const loc = params.location as {scriptId?: string; lineNumber?: number; columnNumber?: number} | undefined;
+      if (loc) {
+        bp.location = {
+          scriptId: loc.scriptId ?? bp.location.scriptId,
+          url: bp.location.url,
+          lineNumber: loc.lineNumber ?? bp.location.lineNumber,
+          columnNumber: loc.columnNumber ?? bp.location.columnNumber,
+        };
+      }
       logger.info('Breakpoint resolved', {
         breakpointId: params.breakpointId,
-        location: params.location,
+        location: bp.location,
       });
     }
   }

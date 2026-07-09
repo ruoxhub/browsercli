@@ -32,7 +32,7 @@ describe('DebuggerSessionStore', () => {
     );
 
     const session1 = store.exportSession({source: 'test'});
-    assert.strictEqual(session1.version, '1.0');
+    assert.strictEqual(session1.version, '1.1');
     assert.strictEqual(session1.breakpoints.length, 1);
     assert.strictEqual(session1.breakpoints[0].location.url, 'https://x.com');
     assert.strictEqual(session1.pauseOnExceptions, 'all');

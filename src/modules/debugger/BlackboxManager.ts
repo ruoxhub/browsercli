@@ -20,6 +20,7 @@
 
 import type {CDPSession} from '../../third_party/index.js';
 import {logger} from '../../utils/logger.js';
+import type {ScriptPosition} from './types.js';
 
 /**
  * 黑盒化管理器
@@ -46,7 +47,7 @@ export class BlackboxManager {
     '.*vendor.*\\.js',
   ];
 
-  constructor(private cdpSession: CDPSession) {
+  constructor(private getSession: () => CDPSession) {
     logger.info('BlackboxManager initialized with shared CDP session');
   }
 
@@ -54,7 +55,7 @@ export class BlackboxManager {
     this.blackboxedPatterns.add(urlPattern);
 
     try {
-      await this.cdpSession.send('Debugger.setBlackboxPatterns', {
+      await this.getSession().send('Debugger.setBlackboxPatterns', {
         patterns: Array.from(this.blackboxedPatterns),
       });
       logger.info(`Blackboxed pattern: ${urlPattern}`);
@@ -71,7 +72,7 @@ export class BlackboxManager {
     }
 
     try {
-      await this.cdpSession.send('Debugger.setBlackboxPatterns', {
+      await this.getSession().send('Debugger.setBlackboxPatterns', {
         patterns: Array.from(this.blackboxedPatterns),
       });
       logger.info(`Unblackboxed pattern: ${urlPattern}`);
@@ -88,7 +89,7 @@ export class BlackboxManager {
       this.blackboxedPatterns.add(pattern);
     }
 
-    await this.cdpSession.send('Debugger.setBlackboxPatterns', {
+    await this.getSession().send('Debugger.setBlackboxPatterns', {
       patterns: Array.from(this.blackboxedPatterns),
     });
 
@@ -103,8 +104,21 @@ export class BlackboxManager {
 
   async clearAllBlackboxedPatterns(): Promise<void> {
     this.blackboxedPatterns.clear();
-    await this.cdpSession.send('Debugger.setBlackboxPatterns', {patterns: []});
+    await this.getSession().send('Debugger.setBlackboxPatterns', {patterns: []});
     logger.info('All blackbox patterns cleared');
+  }
+
+  async setBlackboxedRanges(
+    scriptId: string,
+    positions: ScriptPosition[],
+  ): Promise<void> {
+    await this.getSession().send('Debugger.setBlackboxedRanges', {
+      scriptId,
+      positions,
+    });
+    logger.info(`Blackboxed ranges set for script: ${scriptId}`, {
+      rangeCount: positions.length,
+    });
   }
 
   async close(): Promise<void> {

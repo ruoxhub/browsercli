@@ -128,7 +128,34 @@ export class ScriptManager {
 
   private cacheDir: string | null = null;
 
-  constructor(private getCDPSession: () => CDPSession) {}
+  constructor(private getCDPSession: () => CDPSession) {
+    this.purgeCache();
+  }
+
+  /** 实例化时清空缓存目录,防止上次异常退出后残留文件堆积。 */
+  private purgeCache(): void {
+    const dir = path.join(os.tmpdir(), 'browsercli-scripts');
+    if (!fs.existsSync(dir)) return;
+
+    let removed = 0;
+    try {
+      for (const entry of fs.readdirSync(dir)) {
+        if (!entry.endsWith('.js')) continue;
+        try {
+          fs.unlinkSync(path.join(dir, entry));
+          removed++;
+        } catch {
+          // 单文件删除失败不影响其他文件清理
+        }
+      }
+    } catch {
+      // 目录读取失败时静默跳过
+    }
+
+    if (removed > 0) {
+      logger.info(`Purged ${removed} stale script cache file(s) from ${dir}`);
+    }
+  }
 
   /** 注册 Debugger.scriptParsed 监听器。由 facade 在 init 时调用。 */
   attachListeners(session: CDPSession): void {
@@ -482,7 +509,7 @@ export class ScriptManager {
     keyword: string,
     options: SearchOptions = {},
   ): Promise<SearchResult> {
-    this.getCDPSession(); // 触发 requireSession 校验
+    const session = this.getCDPSession();
 
     const {
       isRegex = false,
@@ -500,15 +527,27 @@ export class ScriptManager {
       return {keyword, totalMatches: 0, matches: []};
     }
 
+    const allScripts = this.getAllScriptsSync().slice(0, DEFAULT_MAX_SCRIPTS);
+    const cachedScripts: ScriptInfo[] = [];
+    const uncachedScripts: ScriptInfo[] = [];
+
+    for (const script of allScripts) {
+      if (script.sourcePath) {
+        cachedScripts.push(script);
+      } else {
+        uncachedScripts.push(script);
+      }
+    }
+
+    logger.info(
+      `Searching in ${allScripts.length} scripts (${cachedScripts.length} cached, ${uncachedScripts.length} uncached)...`,
+    );
+
     const matches: SearchMatch[] = [];
-    // 与 jshookmcp 对齐:批量加载源码(并发 8,带 yield),避免逐个串行
-    const scriptList = await this.getAllScripts(true, DEFAULT_MAX_SCRIPTS);
-    logger.info(`Searching in ${scriptList.length} scripts...`);
 
-    for (const [scriptIndex, script] of scriptList.entries()) {
+    // Phase 1: 已缓存脚本直接本地搜索（零额外开销）
+    for (const [i, script] of cachedScripts.entries()) {
       if (matches.length >= maxMatches) break;
-      if (!script.sourcePath) continue;
-
       await this.collectMatchesInScript(
         script,
         searchRegex,
@@ -516,10 +555,40 @@ export class ScriptManager {
         maxMatches,
         matches,
       );
-
-      // 每处理 SEARCH_SCRIPT_YIELD_INTERVAL 个脚本让出一次事件循环
-      if ((scriptIndex + 1) % SEARCH_SCRIPT_YIELD_INTERVAL === 0) {
+      if ((i + 1) % SEARCH_SCRIPT_YIELD_INTERVAL === 0) {
         await waitForImmediate();
+      }
+    }
+
+    // Phase 2: 未缓存脚本用 CDP Debugger.searchInContent 预筛
+    if (matches.length < maxMatches && uncachedScripts.length > 0) {
+      const cdpHits = await this.preFilterViaCDP(
+        session,
+        uncachedScripts,
+        keyword,
+        isRegex,
+        caseSensitive,
+      );
+
+      logger.info(
+        `CDP pre-filter: ${cdpHits.length}/${uncachedScripts.length} scripts matched`,
+      );
+
+      // 只对 CDP 命中的脚本加载源码并做精细搜索
+      for (const [i, script] of cdpHits.entries()) {
+        if (matches.length >= maxMatches) break;
+        const loaded = await this.loadScriptSourceInternal(script, session);
+        if (!loaded) continue;
+        await this.collectMatchesInScript(
+          script,
+          searchRegex,
+          contextLines,
+          maxMatches,
+          matches,
+        );
+        if ((i + 1) % SEARCH_SCRIPT_YIELD_INTERVAL === 0) {
+          await waitForImmediate();
+        }
       }
     }
 
@@ -528,6 +597,61 @@ export class ScriptManager {
     );
 
     return {keyword, totalMatches: matches.length, matches};
+  }
+
+  /**
+   * 使用 CDP Debugger.searchInContent 批量预筛未缓存脚本。
+   * 返回包含匹配结果的脚本列表（仅 lineNumber/lineContent，不含 column/context）。
+   * 并发控制与 yield 避免阻塞事件循环。
+   */
+  private async preFilterViaCDP(
+    session: CDPSession,
+    scripts: ScriptInfo[],
+    query: string,
+    isRegex: boolean,
+    caseSensitive: boolean,
+  ): Promise<ScriptInfo[]> {
+    const hits: ScriptInfo[] = [];
+
+    for (
+      let batchStart = 0;
+      batchStart < scripts.length;
+      batchStart += SOURCE_LOAD_BATCH_SIZE
+    ) {
+      const batch = scripts.slice(
+        batchStart,
+        batchStart + SOURCE_LOAD_BATCH_SIZE,
+      );
+
+      const settled = await Promise.allSettled(
+        batch.map(async script => {
+          try {
+            const result = await session.send('Debugger.searchInContent', {
+              scriptId: script.scriptId,
+              query,
+              caseSensitive,
+              isRegex,
+            });
+            if (result && Array.isArray(result.result) && result.result.length > 0) {
+              return script;
+            }
+          } catch {
+            // CDP 搜索失败时静默跳过，后续不会加载该脚本
+          }
+          return null;
+        }),
+      );
+
+      for (const r of settled) {
+        if (r.status === 'fulfilled' && r.value) {
+          hits.push(r.value);
+        }
+      }
+
+      await waitForImmediate();
+    }
+
+    return hits;
   }
 
   private compileSearchRegex(

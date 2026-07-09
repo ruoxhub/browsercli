@@ -20,7 +20,12 @@
 
 import type {CDPSession} from '../../third_party/index.js';
 import {logger} from '../../utils/logger.js';
-import type {DebuggerPausedEvent, PausedState} from './types.js';
+import type {
+  CallArgument,
+  DebuggerPausedEvent,
+  Location,
+  PausedState,
+} from './types.js';
 
 export class ExecutionController {
   private pausedState: PausedState | null = null;
@@ -72,6 +77,46 @@ export class ExecutionController {
   async stepOut(): Promise<void> {
     await this.getCDPSession().send('Debugger.stepOut');
     logger.info('Step out');
+  }
+
+  async continueToLocation(
+    location: Location,
+    targetCallFrames?: 'any' | 'current',
+  ): Promise<void> {
+    const params: Record<string, unknown> = {location};
+    if (targetCallFrames !== undefined) {
+      params.targetCallFrames = targetCallFrames;
+    }
+    await this.getCDPSession().send('Debugger.continueToLocation', params);
+    logger.info('Continue to location', {location});
+  }
+
+  async setVariableValue(
+    callFrameId: string,
+    scopeNumber: number,
+    variableName: string,
+    newValue: CallArgument,
+  ): Promise<void> {
+    await this.getCDPSession().send('Debugger.setVariableValue', {
+      callFrameId,
+      scopeNumber,
+      variableName,
+      newValue,
+    });
+    logger.info(`Variable value set: ${variableName}`, {scopeNumber});
+  }
+
+  async restartFrame(callFrameId: string): Promise<void> {
+    await this.getCDPSession().send('Debugger.restartFrame', {
+      callFrameId,
+      mode: 'StepInto',
+    });
+    logger.info(`Frame restarted: ${callFrameId}`);
+  }
+
+  async setReturnValue(newValue: CallArgument): Promise<void> {
+    await this.getCDPSession().send('Debugger.setReturnValue', {newValue});
+    logger.info('Return value overridden');
   }
 
   getPausedState(): PausedState | null {

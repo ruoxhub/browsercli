@@ -18,14 +18,10 @@
  */
 
 import type {AIService, AIMessage} from '../../services/AIService.js';
+import type {GetScopeVariablesOptions, GetScopeVariablesResult} from '../../types/index.js';
 import {logger} from '../../utils/logger.js';
 
-import type {
-  DebuggerManager,
-  CallFrame,
-  PausedState,
-} from './DebuggerManager.js';
-import type {XHRBreakpointManager} from './XHRBreakpointManager.js';
+import type {CallFrame, PausedState, BreakpointInfo} from './types.js';
 
 export interface ContinuousDebugConfig {
   /** 可选:调试开始前导航到的目标 URL */
@@ -161,6 +157,27 @@ interface IterationRecord {
   timestamp: number;
 }
 
+export function extractJsonFromResponse(content: string): string {
+  const match = content.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
+  return match ? match[1].trim() : content.trim();
+}
+
+export interface ContinuousDebuggerDeps {
+  setXHRBreakpoint: (urlPattern: string) => Promise<string>;
+  removeXHRBreakpoint: (id: string) => Promise<boolean>;
+  setBreakpoint: (params: {scriptId: string; lineNumber: number; columnNumber?: number; condition?: string}) => Promise<BreakpointInfo>;
+  removeBreakpoint: (id: string) => Promise<void>;
+  waitForPaused: (timeout?: number) => Promise<PausedState>;
+  resume: () => Promise<void>;
+  stepOver: () => Promise<void>;
+  stepInto: () => Promise<void>;
+  stepOut: () => Promise<void>;
+  getScopeVariables: (options?: GetScopeVariablesOptions) => Promise<GetScopeVariablesResult>;
+  evaluateOnCallFrame: (params: {callFrameId: string; expression: string; returnByValue?: boolean}) => Promise<{result: {value?: unknown; type: string}; exceptionDetails?: unknown}>;
+  getScripts: () => Array<{scriptId: string; url: string}>;
+  targetHostname?: string;
+}
+
 export class AIContinuousDebugger {
   private status: ContinuousDebugStatus = 'idle';
   private abortController: AbortController | null = null;
@@ -172,10 +189,10 @@ export class AIContinuousDebugger {
     errors: [],
   };
   private iterationHistory: IterationRecord[] = [];
+  private recentPauseLocations: Array<{scriptId: string; lineNumber: number; columnNumber?: number}> = [];
 
   constructor(
-    private debuggerManager: DebuggerManager,
-    private xhrManager: XHRBreakpointManager,
+    private deps: ContinuousDebuggerDeps,
     private aiService: AIService,
   ) {}
 
@@ -252,13 +269,13 @@ export class AIContinuousDebugger {
 
   /** XHR → JS 断点两阶段工作流 */
   async xhrToJsBreakpoint(urlPattern: string): Promise<XhrToJsResult> {
-    const breakpointId = await this.xhrManager.setXHRBreakpoint(urlPattern);
+    const breakpointId = await this.deps.setXHRBreakpoint(urlPattern);
     logger.info(
       `XHR breakpoint set: ${breakpointId} for pattern: ${urlPattern}`,
     );
 
     try {
-      const pausedState = await this.debuggerManager.waitForPaused(30000);
+      const pausedState = await this.deps.waitForPaused(30000);
       const callStack = pausedState.callFrames;
       logger.info(`XHR breakpoint hit. Call stack depth: ${callStack.length}`);
 
@@ -269,17 +286,17 @@ export class AIContinuousDebugger {
         lineNumber: targetFrame.location.lineNumber,
       });
 
-      const breakpointInfo = await this.debuggerManager.setBreakpoint({
+      const breakpointInfo = await this.deps.setBreakpoint({
         scriptId: targetFrame.location.scriptId,
         lineNumber: targetFrame.location.lineNumber,
         columnNumber: targetFrame.location.columnNumber,
       });
       logger.info(`JS breakpoint set: ${breakpointInfo.breakpointId}`);
 
-      await this.xhrManager.removeXHRBreakpoint(breakpointId);
+      await this.deps.removeXHRBreakpoint(breakpointId);
       logger.info(`XHR breakpoint removed: ${breakpointId}`);
 
-      await this.debuggerManager.resume();
+      await this.deps.resume();
 
       return {
         xhrBreakpointSet: true,
@@ -292,7 +309,7 @@ export class AIContinuousDebugger {
         },
       };
     } catch (error) {
-      await this.xhrManager.removeXHRBreakpoint(breakpointId).catch(() => {});
+      await this.deps.removeXHRBreakpoint(breakpointId).catch(() => {});
       throw error;
     }
   }
@@ -307,9 +324,10 @@ export class AIContinuousDebugger {
         pattern => url.includes(pattern) || functionName.includes(pattern),
       );
 
+      const hostname = this.deps.targetHostname ?? '';
       const isUserCode =
         !isVendor &&
-        (url.includes(window.location.hostname) || url.startsWith('/') || !url);
+        ((hostname && url.includes(hostname)) || url.startsWith('/') || !url);
 
       if (isUserCode) {
         return frame;
@@ -345,7 +363,36 @@ export class AIContinuousDebugger {
 
       try {
         this.status = 'waiting_breakpoint';
-        const pausedState = await this.debuggerManager.waitForPaused(5000);
+        const pausedState = await this.deps.waitForPaused(5000);
+
+        // Loop detection
+        const topLoc = pausedState.callFrames[0]?.location;
+        if (topLoc) {
+          this.recentPauseLocations.push({
+            scriptId: topLoc.scriptId,
+            lineNumber: topLoc.lineNumber,
+            columnNumber: topLoc.columnNumber,
+          });
+          if (this.recentPauseLocations.length > 5) {
+            this.recentPauseLocations.shift();
+          }
+
+          const lastThree = this.recentPauseLocations.slice(-3);
+          if (
+            lastThree.length === 3 &&
+            lastThree.every(
+              l =>
+                l.scriptId === lastThree[0]!.scriptId &&
+                l.lineNumber === lastThree[0]!.lineNumber &&
+                l.columnNumber === lastThree[0]!.columnNumber,
+            )
+          ) {
+            logger.warn('Loop detected at same location, auto-stepping over');
+            await this.deps.stepOver();
+            this.recentPauseLocations = [];
+            continue;
+          }
+        }
 
         const debugInfo = await this.collectDebugInfo(pausedState, iteration);
         logger.info(`Iteration ${iteration + 1}: Debug info collected`);
@@ -385,7 +432,7 @@ export class AIContinuousDebugger {
         this.stats.errors.push(errorMsg);
 
         try {
-          await this.debuggerManager.resume();
+          await this.deps.resume();
         } catch (resumeError) {
           logger.error('Failed to resume after error:', resumeError);
           throw error;
@@ -403,7 +450,7 @@ export class AIContinuousDebugger {
       throw new Error('No call frame available for debug info collection');
     }
 
-    const scopeResult = await this.debuggerManager.getScopeVariables({
+    const scopeResult = await this.deps.getScopeVariables({
       skipErrors: true,
       maxDepth: 1,
     });
@@ -467,7 +514,8 @@ export class AIContinuousDebugger {
       throw new Error('Empty AI response');
     }
 
-    const decision = JSON.parse(content) as Decision;
+    const cleaned = extractJsonFromResponse(content);
+    const decision = JSON.parse(cleaned) as Decision;
 
     if (!VALID_ACTIONS.includes(decision.action)) {
       logger.warn('Invalid AI decision, defaulting to step_over:', decision);
@@ -545,16 +593,16 @@ ${scopeVarsPreview || '(empty)'}
   private async executeDecision(decision: Decision): Promise<void> {
     switch (decision.action) {
       case 'step_into':
-        await this.debuggerManager.stepInto();
+        await this.deps.stepInto();
         break;
       case 'step_over':
-        await this.debuggerManager.stepOver();
+        await this.deps.stepOver();
         break;
       case 'step_out':
-        await this.debuggerManager.stepOut();
+        await this.deps.stepOut();
         break;
       case 'resume':
-        await this.debuggerManager.resume();
+        await this.deps.resume();
         break;
       case 'stop':
         // 循环会自然结束

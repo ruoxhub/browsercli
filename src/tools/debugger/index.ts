@@ -5,6 +5,7 @@
  */
 
 import type {DebuggerManager} from '../../modules/debugger/DebuggerManager.js';
+import {safeStringify} from '../../utils/safeJson.js';
 import {zod} from '../../third_party/index.js';
 import type {ToolContextProvider} from '../../worker/ToolContext.js';
 import {ToolCategory} from '../categories.js';
@@ -694,7 +695,6 @@ export const getScriptSource = defineTool({
         response.setStructuredContent({
           success: false,
           message: `未找到脚本 ${scriptId} 的源码或加载失败。`,
-          tooltype: 'get_script_source',
           data: {scriptId},
         });
         return;
@@ -705,7 +705,6 @@ export const getScriptSource = defineTool({
       response.setStructuredContent({
         success: true,
         message: `脚本 ${scriptId} 源码已缓存至 ${sourcePath}`,
-        tooltype: 'get_script_source',
         data: {
           scriptId,
           url: script?.url || null,
@@ -717,7 +716,6 @@ export const getScriptSource = defineTool({
       response.setStructuredContent({
         success: false,
         message: `获取脚本源码路径失败: ${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'get_script_source',
         data: {scriptId: request.params.scriptId},
       });
     }
@@ -725,12 +723,26 @@ export const getScriptSource = defineTool({
 });
 
 /**
+ * 中间截断 URL：保留头部（origin + 路径起点）与尾部（末段路径/查询），
+ * 比单纯末尾截断更利于识别 combo/合并服务脚本的来源。
+ */
+function truncateUrlMiddle(url: string, max: number): string {
+  if (max <= 0 || url.length <= max) return url;
+  const headLen = Math.ceil(max * 0.6);
+  const tailLen = max - headLen - 3; // 留 3 字符给 '...'
+  if (tailLen < 0) return url.substring(0, max) + '...';
+  return (
+    url.substring(0, headLen) + '...' + url.substring(url.length - tailLen)
+  );
+}
+
+/**
  * 在源码中搜索。
  */
 export const searchInSources = defineTool({
   name: 'search_in_sources',
   description:
-    '在所有已加载的 JavaScript 源码中搜索字符串或正则表达式。返回匹配行及脚本 ID、URL 和行号。使用 get_script_source 和 startLine/endLine 查看匹配周围的完整上下文。',
+    '在所有已加载的 JavaScript 源码中搜索字符串或正则表达式。返回脚本 ID、URL、行号与源码缓存路径（sourcePath）。不返回源码片段，避免上下文臃肿；需要查看代码内容时直接读取 sourcePath 或调用 get_script_source(scriptId, startLine, endLine)。',
   annotations: {
     title: '在源码中搜索',
     category: ToolCategory.REVERSE_ENGINEERING,
@@ -754,12 +766,6 @@ export const searchInSources = defineTool({
       .optional()
       .default(30)
       .describe('返回的最大结果数（默认: 30）。'),
-    maxLineLength: zod
-      .number()
-      .int()
-      .optional()
-      .default(150)
-      .describe('每行预览的最大字符数（默认: 150）。设为 0 显示完整行。'),
     excludeMinified: zod
       .boolean()
       .optional()
@@ -769,6 +775,14 @@ export const searchInSources = defineTool({
       .string()
       .optional()
       .describe('只搜索 URL 包含此字符串的脚本（不区分大小写）。'),
+    maxUrlLength: zod
+      .number()
+      .int()
+      .optional()
+      .default(200)
+      .describe(
+        '每条匹配 URL 的最大字符数（默认: 200）。combo/合并服务的 URL 可能极长，截断以避免响应过大。设为 0 表示不截断。',
+      ),
     source: zod
       .enum(['live', 'cache', 'auto'])
       .optional()
@@ -783,7 +797,7 @@ export const searchInSources = defineTool({
       caseSensitive,
       isRegex,
       maxResults,
-      maxLineLength,
+      maxUrlLength,
       excludeMinified,
       urlFilter,
       source,
@@ -870,6 +884,15 @@ export const searchInSources = defineTool({
         skippedMinified = beforeCount - filteredMatches.length;
       }
 
+      // CDP 对 combo/合并脚本可能对同一行返回多条匹配，按 (scriptId, lineNumber) 去重。
+      const seenPositions = new Set<string>();
+      filteredMatches = filteredMatches.filter(m => {
+        const key = `${m.scriptId}:${m.lineNumber}`;
+        if (seenPositions.has(key)) return false;
+        seenPositions.add(key);
+        return true;
+      });
+
       if (filteredMatches.length === 0) {
         response.setStructuredContent({
           success: true,
@@ -892,47 +915,88 @@ export const searchInSources = defineTool({
       const displayMatches = filteredMatches.slice(0, maxResults);
       const totalMatches = filteredMatches.length;
 
-      const matchData = displayMatches.map(match => {
-        const lineNum = match.lineNumber + 1;
-        const scriptId = match.scriptId;
-        const url = match.url || '(内联)';
+      // 按 scriptId 去重批量获取 sourcePath，避免重复 IO。
+      // cache 模式或调试器未启用时 debuggerContext 不可用，sourcePath 留 null。
+      let debuggerContextForPaths: Awaited<
+        ReturnType<typeof getDebuggerFromContext>
+      > | null = null;
+      try {
+        debuggerContextForPaths = await getDebuggerFromContext(context);
+      } catch {
+        debuggerContextForPaths = null;
+      }
 
-        // 截断行内容，尽可能以匹配位置为中心
-        let preview = match.lineContent.trim();
-        if (maxLineLength > 0 && preview.length > maxLineLength) {
-          // 尝试找到查询位置以居中预览
-          const lowerContent = caseSensitive ? preview : preview.toLowerCase();
-          const lowerQuery = caseSensitive ? query : query.toLowerCase();
-          const matchPos = isRegex ? 0 : lowerContent.indexOf(lowerQuery);
-
-          if (matchPos >= 0) {
-            // 以匹配位置为中心
-            const halfLen = Math.floor(maxLineLength / 2);
-            let start = Math.max(0, matchPos - halfLen);
-            let end = start + maxLineLength;
-
-            if (end > preview.length) {
-              end = preview.length;
-              start = Math.max(0, end - maxLineLength);
+      const uniqueScriptIds = [...new Set(displayMatches.map(m => m.scriptId))];
+      const sourcePathMap = new Map<string, string | null>();
+      if (debuggerContextForPaths) {
+        await Promise.all(
+          uniqueScriptIds.map(async id => {
+            try {
+              sourcePathMap.set(
+                id,
+                await debuggerContextForPaths!.getScriptSourcePath(id),
+              );
+            } catch {
+              sourcePathMap.set(id, null);
             }
+          }),
+        );
+      }
 
-            const prefix = start > 0 ? '...' : '';
-            const suffix = end < preview.length ? '...' : '';
-            preview = prefix + preview.substring(start, end) + suffix;
-          } else {
-            // 回退：从开头截断
-            preview = preview.substring(0, maxLineLength) + '...';
-          }
-        }
+      const matchData = displayMatches.map(match => {
+        const scriptId = match.scriptId;
+        const rawUrl = match.url || '(内联)';
+        const urlLength = rawUrl.length;
+        const truncatedUrl = truncateUrlMiddle(rawUrl, maxUrlLength);
 
         return {
           scriptId,
-          url,
-          lineNumber: lineNum,
-          preview,
-          lineContentLength: match.lineContent.length,
+          url: truncatedUrl,
+          urlLength,
+          urlTruncated: truncatedUrl !== rawUrl,
+          lineNumber: match.lineNumber + 1,
+          sourcePath: sourcePathMap.get(scriptId) ?? null,
         };
       });
+
+      // 防御性体积预判：即使 URL 已截断，匹配数量多时仍可能超过 512KB offload 阈值。
+      // 在工具层主动收窄 displayMatches，免去二次 get_detailed_data 调用。
+      const SAFETY_THRESHOLD = 200 * 1024;
+      const DEFAULT_HINT =
+        '直接读取 sourcePath 查看完整源码，或用 get_script_source(scriptId, startLine, endLine) 查看指定区间。';
+      const buildPayload = (matches: typeof matchData) => ({
+        success: true as const,
+        message: `找到 ${totalMatches} 个匹配 "${query}"${totalMatches > maxResults ? ` (显示前 ${maxResults})` : ''}`,
+        tooltype: 'search_in_sources',
+        data: {
+          query,
+          matches,
+          totalMatches,
+          displayedMatches: matches.length,
+          skippedMinified,
+          maxResults,
+          hint: DEFAULT_HINT,
+        },
+      });
+
+      let safeMatches = matchData;
+      let truncatedBySize = false;
+      if (
+        safeMatches.length > 1 &&
+        safeStringify(buildPayload(safeMatches)).length > SAFETY_THRESHOLD
+      ) {
+        while (
+          safeMatches.length > 1 &&
+          safeStringify(buildPayload(safeMatches)).length > SAFETY_THRESHOLD
+        ) {
+          safeMatches = safeMatches.slice(0, Math.ceil(safeMatches.length / 2));
+          truncatedBySize = true;
+        }
+      }
+
+      const hint = truncatedBySize
+        ? `${DEFAULT_HINT} 响应体积过大，已自动收窄显示数量（${safeMatches.length}/${matchData.length}）。使用 maxResults 或 urlFilter 收窄查询。`
+        : DEFAULT_HINT;
 
       response.setStructuredContent({
         success: true,
@@ -940,12 +1004,13 @@ export const searchInSources = defineTool({
         tooltype: 'search_in_sources',
         data: {
           query,
-          matches: matchData,
+          matches: safeMatches,
           totalMatches,
-          displayedMatches: displayMatches.length,
+          displayedMatches: safeMatches.length,
           skippedMinified,
           maxResults,
-          hint: '使用 get_script_source(scriptId, startLine, endLine) 查看匹配周围的完整上下文。',
+          truncatedBySize,
+          hint,
         },
       });
     } catch (error) {

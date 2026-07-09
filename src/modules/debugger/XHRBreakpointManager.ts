@@ -38,12 +38,12 @@ export class XHRBreakpointManager {
   private xhrBreakpoints = new Map<string, XHRBreakpoint>();
   private breakpointCounter = 0;
 
-  constructor(private cdpSession: CDPSession) {
+  constructor(private getSession: () => CDPSession) {
     logger.info('XHRBreakpointManager initialized with shared CDP session');
   }
 
   async setXHRBreakpoint(urlPattern: string): Promise<string> {
-    await this.cdpSession.send('DOMDebugger.setXHRBreakpoint', {
+    await this.getSession().send('DOMDebugger.setXHRBreakpoint', {
       url: urlPattern,
     });
 
@@ -66,7 +66,7 @@ export class XHRBreakpointManager {
       return false;
     }
 
-    await this.cdpSession.send('DOMDebugger.removeXHRBreakpoint', {
+    await this.getSession().send('DOMDebugger.removeXHRBreakpoint', {
       url: breakpoint.urlPattern,
     });
 
@@ -83,12 +83,19 @@ export class XHRBreakpointManager {
     return this.xhrBreakpoints.get(breakpointId);
   }
 
+  incrementHitCount(breakpointId: string): void {
+    const bp = this.xhrBreakpoints.get(breakpointId);
+    if (bp) {
+      bp.hitCount++;
+    }
+  }
+
   async clearAllXHRBreakpoints(): Promise<void> {
     const breakpoints = Array.from(this.xhrBreakpoints.values());
 
     for (const bp of breakpoints) {
       try {
-        await this.cdpSession.send('DOMDebugger.removeXHRBreakpoint', {
+        await this.getSession().send('DOMDebugger.removeXHRBreakpoint', {
           url: bp.urlPattern,
         });
       } catch (error) {

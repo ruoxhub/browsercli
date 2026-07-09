@@ -59,7 +59,7 @@ export class EventBreakpointManager {
   ];
   static readonly WEBSOCKET_EVENTS = ['message', 'open', 'close', 'error'];
 
-  constructor(private cdpSession: CDPSession) {
+  constructor(private getSession: () => CDPSession) {
     logger.info('EventBreakpointManager initialized with shared CDP session');
   }
 
@@ -67,7 +67,7 @@ export class EventBreakpointManager {
     eventName: string,
     targetName?: string,
   ): Promise<string> {
-    await this.cdpSession.send('DOMDebugger.setEventListenerBreakpoint', {
+    await this.getSession().send('DOMDebugger.setEventListenerBreakpoint', {
       eventName,
       targetName,
     });
@@ -103,11 +103,11 @@ export class EventBreakpointManager {
 
   private async sendRemoveBreakpoint(breakpoint: EventBreakpoint): Promise<void> {
     if (breakpoint.targetName === INSTRUMENTATION_TARGET) {
-      await this.cdpSession.send('DOMDebugger.removeInstrumentationBreakpoint', {
+      await this.getSession().send('DOMDebugger.removeInstrumentationBreakpoint', {
         eventName: breakpoint.eventName,
       });
     } else {
-      await this.cdpSession.send('DOMDebugger.removeEventListenerBreakpoint', {
+      await this.getSession().send('DOMDebugger.removeEventListenerBreakpoint', {
         eventName: breakpoint.eventName,
         targetName: breakpoint.targetName,
       });
@@ -129,7 +129,7 @@ export class EventBreakpointManager {
     const breakpointIds: string[] = [];
     for (const event of EventBreakpointManager.TIMER_INSTRUMENTATION_EVENTS) {
       try {
-        await this.cdpSession.send(
+        await this.getSession().send(
           'DOMDebugger.setInstrumentationBreakpoint',
           {eventName: event},
         );
@@ -183,6 +183,13 @@ export class EventBreakpointManager {
 
   getEventBreakpoint(breakpointId: string): EventBreakpoint | undefined {
     return this.eventBreakpoints.get(breakpointId);
+  }
+
+  incrementHitCount(breakpointId: string): void {
+    const bp = this.eventBreakpoints.get(breakpointId);
+    if (bp) {
+      bp.hitCount++;
+    }
   }
 
   async clearAllEventBreakpoints(): Promise<void> {
