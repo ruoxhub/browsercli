@@ -14,6 +14,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import {setImmediate as waitForImmediate} from 'node:timers/promises';
 
 import type {CodeFile, CollectCodeResult} from '../../types/index.js';
 import {logger} from '../../utils/logger.js';
@@ -317,9 +318,21 @@ export class CodeCache {
       isRegex?: boolean;
       urlFilter?: string;
     },
-  ): Promise<Array<{scriptId: string; url?: string; lineNumber: number; lineContent: string}>> {
+  ): Promise<
+    Array<{
+      scriptId: string;
+      url?: string;
+      lineNumber: number;
+      lineContent: string;
+    }>
+  > {
     const {caseSensitive = false, isRegex = false, urlFilter} = options ?? {};
-    const results: Array<{scriptId: string; url?: string; lineNumber: number; lineContent: string}> = [];
+    const results: Array<{
+      scriptId: string;
+      url?: string;
+      lineNumber: number;
+      lineContent: string;
+    }> = [];
 
     let pattern: RegExp;
     try {
@@ -333,10 +346,14 @@ export class CodeCache {
       return results;
     }
 
-    const searchEntry = (files: CodeFile[], entryUrl?: string) => {
+    const SEARCH_LINE_YIELD_INTERVAL = 250;
+    const searchEntry = async (files: CodeFile[], entryUrl?: string) => {
       for (const file of files) {
         const fileUrl = file.url ?? entryUrl ?? '';
-        if (urlFilter && !fileUrl.toLowerCase().includes(urlFilter.toLowerCase())) {
+        if (
+          urlFilter &&
+          !fileUrl.toLowerCase().includes(urlFilter.toLowerCase())
+        ) {
           continue;
         }
         const content = (file as any).content ?? (file as any).source ?? '';
@@ -352,13 +369,20 @@ export class CodeCache {
               lineContent: lines[i],
             });
           }
+          // 每处理 SEARCH_LINE_YIELD_INTERVAL 行让出一次事件循环，
+          // 让心跳 / 重连 timer 能穿插执行，避免 RPC 因长阻塞被 Sekiro 断开。
+          if ((i + 1) % SEARCH_LINE_YIELD_INTERVAL === 0) {
+            await waitForImmediate();
+          }
         }
+        // 单文件处理完也 yield 一次，避免超大单文件长时间冻结事件循环
+        await waitForImmediate();
       }
     };
 
     // 搜索内存缓存
     for (const entry of this.memoryCache.values()) {
-      searchEntry(entry.files, entry.url);
+      await searchEntry(entry.files, entry.url);
     }
 
     // 搜索磁盘缓存（跳过已在内存中的条目）
@@ -367,10 +391,13 @@ export class CodeCache {
       for (const file of files) {
         if (!this.isJsonCacheFile(file)) continue;
         try {
-          const data = await fs.readFile(path.join(this.cacheDir, file), 'utf-8');
+          const data = await fs.readFile(
+            path.join(this.cacheDir, file),
+            'utf-8',
+          );
           const entry: CacheEntry = JSON.parse(data);
           if (this.isExpired(entry)) continue;
-          searchEntry(entry.files, entry.url);
+          await searchEntry(entry.files, entry.url);
         } catch {
           // 跳过无法读取的缓存文件
         }

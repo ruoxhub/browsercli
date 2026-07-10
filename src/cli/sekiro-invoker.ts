@@ -29,6 +29,13 @@ interface SekiroInvokerConfig {
   maxRetries?: number;
   /** 重试间隔 ms（默认 1000） */
   retryDelay?: number;
+  /**
+   * "no client available" 场景专用重试次数（默认 3）。
+   * Worker 执行耗时操作期间 RPC 可能短暂断开，重连需等待，故单独给重试名额。
+   */
+  noClientRetries?: number;
+  /** "no client available" 重试间隔 ms（默认 2000） */
+  noClientRetryDelay?: number;
 }
 
 /** Sekiro 标准响应结构 */
@@ -46,6 +53,12 @@ export class SekiroInvoker {
   private readonly healthTimeout: number;
   private readonly maxRetries: number;
   private readonly retryDelay: number;
+  private readonly noClientRetries: number;
+  private readonly noClientRetryDelay: number;
+
+  /** 延时工具，便于测试时替换 / 统一语义 */
+  private readonly delay = (ms: number): Promise<void> =>
+    new Promise(resolve => setTimeout(resolve, ms));
 
   constructor(config: SekiroInvokerConfig) {
     // rpcHost 是 WebSocket 地址如 ws://127.0.0.1:5612，需转为 HTTP
@@ -59,6 +72,8 @@ export class SekiroInvoker {
     this.healthTimeout = config.healthTimeout ?? 3000;
     this.maxRetries = config.maxRetries ?? 1;
     this.retryDelay = config.retryDelay ?? 1000;
+    this.noClientRetries = config.noClientRetries ?? 3;
+    this.noClientRetryDelay = config.noClientRetryDelay ?? 2000;
   }
 
   /**
@@ -78,7 +93,11 @@ export class SekiroInvoker {
 
     let lastError: Error | null = null;
 
-    for (let attempt = 0; attempt < this.maxRetries; attempt++) {
+    // 总尝试次数取两者较大值：保证 "no client available" 的重试名额不被
+    // 普通网络抖动重试占满。Worker 重连需要时间，故专门给更长等待。
+    const maxAttempts = Math.max(this.maxRetries, this.noClientRetries + 1);
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
         const response = await fetch(url, {
           method: 'POST',
@@ -97,7 +116,21 @@ export class SekiroInvoker {
 
         // Sekiro 返回 status=-1 或 code=-1 表示失败
         if (result.status === -1 || result.code === -1) {
-          throw new Error(result.message || 'Sekiro action 执行失败');
+          const message = result.message || 'Sekiro action 执行失败';
+
+          // Worker 未连接（正在重连）：等待后重试，给连接恢复窗口
+          if (this.isNoClientAvailable(result)) {
+            lastError = new Error(`Sekiro 无可用客户端：${message}`);
+            // 用 noClientRetries 控制重试次数，而非 maxAttempts，
+            // 避免被普通重试名额稀释（普通错误不会走此分支）
+            if (attempt < this.noClientRetries) {
+              await this.delay(this.noClientRetryDelay * (attempt + 1));
+              continue;
+            }
+            throw lastError;
+          }
+
+          throw new Error(message);
         }
 
         return result.data ?? result;
@@ -112,16 +145,30 @@ export class SekiroInvoker {
           throw error;
         }
 
-        // 还有重试机会，等待后继续
+        // 普通网络抖动按计划重试（不超过 maxRetries 次）
         if (attempt < this.maxRetries - 1) {
-          await new Promise(r =>
-            setTimeout(r, this.retryDelay * (attempt + 1)),
-          );
+          await this.delay(this.retryDelay * (attempt + 1));
+          continue;
         }
+
+        // 普通重试名额用尽即停止（no-client 错误不会进入此 catch 分支，
+        // 它走上面的 try 分支），避免空转到 maxAttempts 放大故障
+        break;
       }
     }
 
     throw lastError;
+  }
+
+  /**
+   * 判定 Sekiro 响应是否为 "无可用客户端"。
+   * Worker 因耗时操作断开、尚未重连完成时命中此分支（code 3001 / "no client available"）。
+   */
+  private isNoClientAvailable(result: RpcResponse): boolean {
+    const message = (result.message ?? '').toLowerCase();
+    return (
+      message.includes('no client available') || message.includes('no client')
+    );
   }
 
   /**
