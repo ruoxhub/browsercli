@@ -9,6 +9,7 @@ import {CodeAnalyzer} from '../modules/analyzer/CodeAnalyzer.js';
 import type {PageController} from '../modules/collector/PageController.js';
 import {CryptoDetector} from '../modules/crypto/CryptoDetector.js';
 import {Deobfuscator} from '../modules/deobfuscator/Deobfuscator.js';
+import {NetworkModule} from '../modules/network/index.js';
 import {WasmAnalyzer} from '../modules/wasm/WasmAnalyzer.js';
 import {WasmCollector} from '../modules/wasm/WasmCollector.js';
 import {WasmDecompiler} from '../modules/wasm/WasmDecompiler.js';
@@ -29,6 +30,7 @@ export class RuntimeServices {
   private summarizer?: AISummarizer;
   private deobfuscator?: Deobfuscator;
   private cryptoDetector?: CryptoDetector;
+  private networkModule?: NetworkModule;
   private wasmAnalyzer?: WasmAnalyzer;
   private wasmDecompiler?: WasmDecompiler;
   private wasmRuntimeInspector?: WasmRuntimeInspector;
@@ -54,6 +56,10 @@ export class RuntimeServices {
 
   getCryptoDetector(): CryptoDetector {
     return (this.cryptoDetector ??= new CryptoDetector(this.getLLMService()));
+  }
+
+  getNetworkModule(): NetworkModule {
+    return (this.networkModule ??= new NetworkModule());
   }
 
   getWasmAnalyzer(): WasmAnalyzer {

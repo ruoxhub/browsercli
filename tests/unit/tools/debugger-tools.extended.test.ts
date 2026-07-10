@@ -43,7 +43,9 @@ import {getRuntime as getJSHookRuntime} from '../../../src/runtime.js';
 
 interface DebuggerResponseHarness {
   lines: string[];
+  structuredContents: unknown[];
   appendResponseLine(value: string): void;
+  setStructuredContent(content: unknown): void;
   setIncludePages(value: boolean): void;
   setIncludeNetworkRequests(value: boolean): void;
   setIncludeConsoleData(value: boolean): void;
@@ -160,13 +162,17 @@ interface ToolContextHarness {
   getNetworkRequestById(): {url(): string};
   getRequestInitiator(): unknown;
   debuggerContext: DebuggerContextHarness;
+  getDebuggerContext(): DebuggerContextHarness;
 }
 
 function makeResponse(): DebuggerResponseHarness {
   const lines: string[] = [];
+  const structuredContents: unknown[] = [];
   return {
     lines,
+    structuredContents,
     appendResponseLine: (v: string) => lines.push(v),
+    setStructuredContent: (c: unknown) => structuredContents.push(c),
     setIncludePages: () => undefined,
     setIncludeNetworkRequests: () => undefined,
     setIncludeConsoleData: () => undefined,
@@ -224,6 +230,7 @@ function makeContext(
     getNetworkRequestById: () => ({url: () => 'https://api.example.com'}),
     getRequestInitiator: () => undefined,
     debuggerContext,
+    getDebuggerContext: () => debuggerContext,
     ...overrides,
   };
 }
@@ -317,7 +324,6 @@ describe('debugger tools extended', () => {
           caseSensitive: false,
           isRegex: false,
           maxResults: 1,
-          maxLineLength: 20,
           excludeMinified: true,
           urlFilter: 'a.js',
         },
@@ -909,7 +915,8 @@ describe('debugger tools extended', () => {
   });
 
   it('covers xhr_to_js_breakpoint two-phase workflow', async () => {
-    const {xhrToJsBreakpoint} = await import('../../../src/tools/debugger/index.js');
+    const {xhrToJsBreakpoint} =
+      await import('../../../src/tools/debugger/index.js');
     const response = makeResponse();
     const runtime = getJSHookRuntime();
 
@@ -985,5 +992,135 @@ describe('debugger tools extended', () => {
     assert.ok(response.lines.some(x => x.includes('阶段 1')));
     assert.ok(response.lines.some(x => x.includes('阶段 2')));
     assert.ok(response.lines.some(x => x.includes('顶层用户代码位置')));
+  });
+
+  it('search_in_sources 截断超长 URL 并保留诊断字段', async () => {
+    const response = makeResponse();
+    const context = makeContext();
+    const longUrl = `https://combo.example.com/c?files=${'x'.repeat(300_000)}`;
+    context.debuggerContext.searchInScripts = async () => ({
+      matches: [
+        {
+          scriptId: '97',
+          url: longUrl,
+          lineNumber: 42,
+          lineContent: 'const RsaPubAes = function(){};',
+        },
+      ],
+    });
+
+    await searchInSources.handler(
+      {params: {query: 'RsaPubAes', maxUrlLength: 200}},
+      response as unknown as Parameters<typeof searchInSources.handler>[1],
+      context as unknown as Parameters<typeof searchInSources.handler>[2],
+    );
+
+    const last = response.structuredContents.at(-1) as {
+      success: boolean;
+      data: {
+        matches: Array<{
+          url: string;
+          urlLength: number;
+          urlTruncated: boolean;
+          sourcePath: string | null;
+          preview?: unknown;
+          lineContentLength?: unknown;
+        }>;
+      };
+    };
+    assert.ok(last.success, 'search 应成功');
+    const match = last.data.matches[0];
+    assert.ok(match, '应至少有一条匹配');
+    assert.strictEqual(match.urlLength, longUrl.length);
+    assert.strictEqual(match.urlTruncated, true);
+    // maxUrlLength=200，中间截断后含 '...' 总长应 ≤ 200
+    assert.ok(
+      match.url.length <= 200,
+      `截断后 URL 长度 ${match.url.length} 应 ≤ 200`,
+    );
+    assert.ok(match.url.includes('...'), '截断 URL 应包含省略号');
+    // 头部应保留 origin
+    assert.ok(
+      match.url.startsWith('https://combo.example.com'),
+      '截断 URL 头部应保留 origin',
+    );
+    // 改进：返回 sourcePath 而非源码片段，避免上下文臃肿
+    assert.strictEqual(
+      match.sourcePath,
+      '/tmp/browsercli-scripts/test.js',
+      '应返回 sourcePath',
+    );
+    assert.ok(!('preview' in match), '不应再返回 preview 字段');
+    assert.ok(
+      !('lineContentLength' in match),
+      '不应再返回 lineContentLength 字段',
+    );
+  });
+
+  it('search_in_sources maxUrlLength=0 关闭截断', async () => {
+    const response = makeResponse();
+    const context = makeContext();
+    const longUrl = `https://combo.example.com/c?files=${'y'.repeat(5000)}`;
+    context.debuggerContext.searchInScripts = async () => ({
+      matches: [
+        {
+          scriptId: '1',
+          url: longUrl,
+          lineNumber: 1,
+          lineContent: 'RsaPubAes()',
+        },
+      ],
+    });
+
+    await searchInSources.handler(
+      {params: {query: 'RsaPubAes', maxUrlLength: 0}},
+      response as unknown as Parameters<typeof searchInSources.handler>[1],
+      context as unknown as Parameters<typeof searchInSources.handler>[2],
+    );
+
+    const last = response.structuredContents.at(-1) as {
+      data: {matches: Array<{url: string; urlTruncated: boolean}>};
+    };
+    const match = last.data.matches[0];
+    assert.strictEqual(match.url, longUrl);
+    assert.strictEqual(match.urlTruncated, false);
+  });
+
+  it('search_in_sources 体积超阈值时自动收窄 displayMatches', async () => {
+    const response = makeResponse();
+    const context = makeContext();
+    // 60 条匹配，每条 URL 10KB（总约 600KB，超过 200KB 安全阈值）
+    const bigUrl = `https://combo.example.com/c?files=${'z'.repeat(10_000)}`;
+    const matches = Array.from({length: 60}, (_, i) => ({
+      scriptId: String(i),
+      url: bigUrl,
+      lineNumber: i + 1,
+      lineContent: `RsaPubAes_${i}()`,
+    }));
+    context.debuggerContext.searchInScripts = async () => ({matches});
+
+    await searchInSources.handler(
+      // maxResults 设大以保证不被 maxResults 截断，只被体积收窄
+      {params: {query: 'RsaPubAes', maxResults: 60, maxUrlLength: 0}},
+      response as unknown as Parameters<typeof searchInSources.handler>[1],
+      context as unknown as Parameters<typeof searchInSources.handler>[2],
+    );
+
+    const last = response.structuredContents.at(-1) as {
+      data: {
+        matches: unknown[];
+        totalMatches: number;
+        displayedMatches: number;
+        truncatedBySize: boolean;
+        hint: string;
+      };
+    };
+    assert.strictEqual(last.data.totalMatches, 60);
+    assert.ok(
+      last.data.displayedMatches < 60,
+      `应被收窄，实际 ${last.data.displayedMatches}`,
+    );
+    assert.strictEqual(last.data.truncatedBySize, true);
+    assert.ok(last.data.hint.includes('响应体积过大'), 'hint 应含体积收窄提示');
   });
 });

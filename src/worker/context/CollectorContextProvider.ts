@@ -22,7 +22,7 @@ import type {
 
 import type {PageCollector} from '../../PageCollector.js';
 import type {HTTPRequest} from '../../third_party/index.js';
-import type {WebSocketData} from '../../tools/network/WebSocketCollector.js';
+import type {WebSocketData} from '../../modules/network/NetworkTypes.js';
 import {
   ConsoleMessageCollector,
   NetworkRequestCollector,

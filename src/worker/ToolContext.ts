@@ -15,10 +15,12 @@ import type {
 
 import type {BrowserManager} from '../browser/index.js';
 import type {DebuggerManager} from '../modules/debugger/DebuggerManager.js';
+import type {
+  RequestInitiator,
+  WebSocketData,
+} from '../modules/network/NetworkTypes.js';
 import type {Runtime} from '../runtime.js';
 import type {HTTPRequest} from '../third_party/index.js';
-import type {RequestInitiator} from '../tools/network/types.js';
-import type {WebSocketData} from '../tools/network/WebSocketCollector.js';
 import type {TraceResult} from '../trace-processing/parse.js';
 import {createAppEventBusOptions, type AppEventMap} from '../types/events.js';
 import {EventBus} from '../utils/EventBus.js';

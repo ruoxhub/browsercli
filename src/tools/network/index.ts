@@ -20,23 +20,23 @@ export {getWebSocketMessages} from './getMessages.js';
 export {getWebSocketMessage} from './getMessage.js';
 export {analyzeWebSocketMessages} from './analyzeMessages.js';
 
-// ─── WebSocket Collector ──────────────────────────
+// ─── WebSocket Collector（遗留实现，保留以兼容）──────────────────
 
 export {WebSocketCollector} from './WebSocketCollector.js';
+
+// ─── 类型与领域逻辑（自 modules/network 单向 re-export）──────────────────
+
 export type {
+  NetworkServices,
+  DevToolsData,
+  RequestInitiator,
   WebSocketStatus,
   WebSocketDirection,
   WebSocketConnection,
   WebSocketFrame,
   WebSocketData,
-} from './WebSocketCollector.js';
-
-// ─── 类型导出 ─────────────────────────────────
-
-export type {
-  NetworkRuntimeServices,
-  DevToolsData,
-  RequestInitiator,
+  NetworkMethodResult,
+  // 请求参数与数据类型
   ListNetworkRequestsParams,
   GetNetworkRequestParams,
   ClearNetworkRequestsParams,
@@ -45,9 +45,13 @@ export type {
   NetworkEvidenceCorrelation,
   ClearNetworkRequestsData,
   GetNetworkRequestData,
-  ListNetworkRequestsResult,
-  GetNetworkRequestResult,
-  ClearNetworkRequestsResult,
+  // WebSocket 参数类型
+  ListWebSocketConnectionsParams,
+  GetWebSocketMessagesParams,
+  GetWebSocketMessageParams,
+  AnalyzeWebSocketMessagesParams,
+  ListWebSocketConnectionsData,
+  GetWebSocketMessageData,
   // Replay 参数与数据类型
   ReplayOverride,
   BuiltReplayRequest,
@@ -56,17 +60,23 @@ export type {
   BatchReplayResult,
   ReplayNetworkRequestParams,
   ReplayNetworkRequestData,
-  ReplayNetworkRequestResult,
   ExportRequestAsCurlParams,
   ExportRequestAsCurlData,
-  ExportRequestAsCurlResult,
   ReplayNetworkRequestBatchParams,
   ReplayNetworkRequestBatchData,
-  ReplayNetworkRequestBatchResult,
-  // WebSocket 参数类型
-  ListWebSocketConnectionsParams,
-  GetWebSocketMessagesParams,
-  GetWebSocketMessageParams,
-  AnalyzeWebSocketMessagesParams,
-} from './types.js';
-export {FILTERABLE_RESOURCE_TYPES} from './types.js';
+  TrafficSummary,
+} from '../../modules/network/NetworkTypes.js';
+export {FILTERABLE_RESOURCE_TYPES} from '../../modules/network/NetworkTypes.js';
+
+// ─── 领域逻辑 re-export（供需要直接调用的调用方）──────────────────
+
+export {
+  STRIPPED_HEADERS,
+  stripManagedHeaders,
+  buildReplayRequest,
+  emptyReplayResponse,
+  executeReplay,
+  formatCurl,
+} from '../../modules/network/replayEngine.js';
+export {buildEvidenceCorrelations} from '../../modules/network/signatureDetector.js';
+export {SIGNATURE_HEADER_PATTERN} from '../../modules/network/constants.js';

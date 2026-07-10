@@ -14,8 +14,10 @@ import type {
 } from 'patchright';
 
 import {PageCollector} from '../PageCollector.js';
-import type {RequestInitiator} from '../tools/network/types.js';
-import type {WebSocketData} from '../tools/network/WebSocketCollector.js';
+import type {
+  RequestInitiator,
+  WebSocketData,
+} from '../modules/network/NetworkTypes.js';
 
 // ─── 辅助函数 ────────────────────────────────────────
 

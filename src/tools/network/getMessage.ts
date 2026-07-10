@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {formatWebSocketFrameDetail} from '../../formatters/websocketFormatter.js';
+import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
+import type {GetWebSocketMessageParams} from './types.js';
 
 export const getWebSocketMessage = defineTool({
   name: 'get_websocket_message',
@@ -24,52 +25,14 @@ export const getWebSocketMessage = defineTool({
       .min(0)
       .describe('The frame index (0-based) to retrieve.'),
   },
-  handler: async (request, response, context) => {
-    try {
-      const ws = context.getWebSocketById(request.params.wsid);
-      const frameIndex = request.params.frameIndex;
-
-      if (frameIndex >= ws.frames.length) {
-        response.setStructuredContent({
-          success: false,
-          message: `Frame index ${frameIndex} out of range. Total frames: ${ws.frames.length}`,
-          tooltype: 'get_websocket_message',
-          data: {
-            wsid: request.params.wsid,
-            frameIndex,
-            totalFrames: ws.frames.length,
-          },
-        });
-        return;
-      }
-
-      const frame = ws.frames[frameIndex];
-      const lines = formatWebSocketFrameDetail(frame, frameIndex);
-
-      response.setStructuredContent({
-        success: true,
-        message: lines.join('\n'),
-        tooltype: 'get_websocket_message',
-        data: {
-          wsid: request.params.wsid,
-          frameIndex,
-          frame: {
-            direction: frame.direction,
-            timestamp: frame.timestamp,
-            timestampISO: new Date(frame.timestamp).toISOString(),
-            opcode: frame.opcode,
-            payloadSize: frame.payloadData.length,
-            payloadPreview: frame.payloadData.slice(0, 500),
-          },
-        },
-      });
-    } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `Error: ${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'get_websocket_message',
-        data: null,
-      });
-    }
+  handler: async (request, response) => {
+    const result = getRuntime().networkModule.getWebSocketMessage(
+      getRuntime().contextProvider!,
+      request.params as GetWebSocketMessageParams,
+    );
+    response.setStructuredContent({
+      ...result,
+      tooltype: 'get_websocket_message',
+    });
   },
 });

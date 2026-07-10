@@ -7,7 +7,8 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {replayNetworkRequest} from '../../../../src/tools/network/replayNetworkRequest.js';
+import {NetworkModule} from '../../../../src/modules/network/NetworkModule.js';
+import type {NetworkServices} from '../../../../src/modules/network/NetworkTypes.js';
 
 interface TestRequest {
   url(): string;
@@ -39,41 +40,18 @@ function createMockRequest(): TestRequest {
   };
 }
 
-function createMockResponse() {
-  const lines: string[] = [];
-  return {
-    lines,
-    appendResponseLine: (v: string) => lines.push(v),
-    setIncludePages: () => undefined,
-    setIncludeNetworkRequests: () => undefined,
-    setIncludeConsoleData: () => undefined,
-    attachImage: () => undefined,
-    attachNetworkRequest: () => undefined,
-    attachConsoleMessage: () => undefined,
-    setIncludeWebSocketConnections: () => undefined,
-    attachWebSocket: () => undefined,
-    setStructuredContent: (c: unknown) => lines.push(JSON.stringify(c)),
-  };
-}
-
-function parseResult(r: ReturnType<typeof createMockResponse>): any {
-  const jsonLine = r.lines.find(l => l.trim().startsWith('{'));
-  if (!jsonLine) throw new Error('No JSON in response');
-  return JSON.parse(jsonLine);
-}
-
-interface MockApiContext {
+interface MockApiRequestContext {
   fetch: (url: string, opts: any) => Promise<any>;
 }
 
-function createMockApiContext(opts: {
+function createMockApiRequestContext(opts: {
   status?: number;
   statusText?: string;
   headers?: Record<string, string>;
   body?: string;
   throwOnFetch?: Error;
   captureFetch?: (url: string, opts: any) => void;
-}): MockApiContext {
+}): MockApiRequestContext {
   return {
     fetch: async (url, fetchOpts) => {
       opts.captureFetch?.(url, fetchOpts);
@@ -90,43 +68,55 @@ function createMockApiContext(opts: {
   };
 }
 
-function createMockContext(
+function createMockServices(
   overrides: {
-    apiCtx?: MockApiContext;
+    apiCtx?: MockApiRequestContext;
     getRequestById?: (id: number) => unknown;
   } = {},
-) {
-  const defaultApiCtx = createMockApiContext({});
+): NetworkServices {
+  const defaultApiCtx = createMockApiRequestContext({});
   const page = {
     context: () => ({request: overrides.apiCtx ?? defaultApiCtx}),
   };
   return {
-    getSelectedPage: () => page,
+    getPages: () => [page as any],
+    getSelectedPage: () => page as any,
+    getNetworkRequests: () => [],
     getNetworkRequestById:
-      overrides.getRequestById ?? (() => createMockRequest()),
-  } as any;
+      overrides.getRequestById ?? (() => createMockRequest() as any),
+    getNetworkRequestStableId: () => 1,
+    getRequestInitiator: () => undefined,
+    clearNetworkRequests: () => {},
+    getWebSocketConnections: () => [],
+    getWebSocketConnectionById: () =>
+      ({
+        connection: {url: '', status: 'open', requestId: '', createdAt: 0},
+        frames: [],
+      }) as any,
+    getWebSocketStableId: () => 0,
+    getDevToolsData: async () => undefined,
+    resolveCdpRequestId: () => undefined,
+  } as NetworkServices;
 }
 
 describe('replay_network_request', () => {
+  const networkModule = new NetworkModule();
+
   it('returns success and echoes override on happy path', async () => {
-    const apiCtx = createMockApiContext({
+    const apiCtx = createMockApiRequestContext({
       status: 200,
       statusText: 'OK',
       body: '{"ok":true}',
       headers: {'content-type': 'application/json'},
     });
-    const ctx = createMockContext({apiCtx});
-    const response = createMockResponse();
+    const services = createMockServices({apiCtx});
 
-    await replayNetworkRequest.handler(
-      {params: {reqid: 5, headers: {'X-Test': '1'}}} as any,
-      response as any,
-      ctx,
-    );
+    const result = await networkModule.replayRequest(services, {
+      reqid: 5,
+      headers: {'X-Test': '1'},
+    });
 
-    const result = parseResult(response);
     assert.equal(result.success, true);
-    assert.equal(result.tooltype, 'replay_network_request');
     assert.equal(result.data.status, 200);
     assert.equal(result.data.originalReqid, 5);
     assert.equal(result.data.body, '{"ok":true}');
@@ -136,20 +126,14 @@ describe('replay_network_request', () => {
   });
 
   it('returns failure when reqid is invalid (getNetworkRequestById throws)', async () => {
-    const ctx = createMockContext({
+    const services = createMockServices({
       getRequestById: () => {
         throw new Error('reqid not found');
       },
     });
-    const response = createMockResponse();
 
-    await replayNetworkRequest.handler(
-      {params: {reqid: 999}} as any,
-      response as any,
-      ctx,
-    );
+    const result = await networkModule.replayRequest(services, {reqid: 999});
 
-    const result = parseResult(response);
     assert.equal(result.success, false);
     assert.match(result.message, /reqid not found/);
     assert.equal(result.data.originalReqid, 999);
@@ -157,37 +141,31 @@ describe('replay_network_request', () => {
   });
 
   it('returns failure when executeReplay throws (fetch rejects)', async () => {
-    const apiCtx = createMockApiContext({
+    const apiCtx = createMockApiRequestContext({
       throwOnFetch: new Error('network down'),
     });
-    const ctx = createMockContext({apiCtx});
-    const response = createMockResponse();
+    const services = createMockServices({apiCtx});
 
-    await replayNetworkRequest.handler(
-      {params: {reqid: 1}} as any,
-      response as any,
-      ctx,
-    );
+    const result = await networkModule.replayRequest(services, {reqid: 1});
 
-    const result = parseResult(response);
     assert.equal(result.success, false);
     assert.match(result.message, /network down/);
   });
 
   it('passes override to buildReplayRequest (override method/url reach fetch)', async () => {
     let capturedOpts: any;
-    const apiCtx = createMockApiContext({
+    const apiCtx = createMockApiRequestContext({
       captureFetch: (_url, opts) => {
         capturedOpts = opts;
       },
     });
-    const ctx = createMockContext({apiCtx});
+    const services = createMockServices({apiCtx});
 
-    await replayNetworkRequest.handler(
-      {params: {reqid: 7, method: 'PUT', url: 'https://z.test/w'}} as any,
-      createMockResponse() as any,
-      ctx,
-    );
+    await networkModule.replayRequest(services, {
+      reqid: 7,
+      method: 'PUT',
+      url: 'https://z.test/w',
+    });
 
     assert.equal(capturedOpts.method, 'PUT');
     // url is passed as the first arg to fetch
@@ -196,69 +174,58 @@ describe('replay_network_request', () => {
 
   it('uses overridden URL when fetching', async () => {
     let capturedUrl = '';
-    const apiCtx = createMockApiContext({
+    const apiCtx = createMockApiRequestContext({
       captureFetch: url => {
         capturedUrl = url;
       },
     });
-    const ctx = createMockContext({apiCtx});
+    const services = createMockServices({apiCtx});
 
-    await replayNetworkRequest.handler(
-      {params: {reqid: 7, url: 'https://z.test/w'}} as any,
-      createMockResponse() as any,
-      ctx,
-    );
+    await networkModule.replayRequest(services, {
+      reqid: 7,
+      url: 'https://z.test/w',
+    });
 
     assert.equal(capturedUrl, 'https://z.test/w');
   });
 
   it('applies default maxBodyLength=2000 when omitted', async () => {
-    let capturedBody = '';
-    const apiCtx = createMockApiContext({
+    const apiCtx = createMockApiRequestContext({
       body: 'x'.repeat(2500),
       captureFetch: (_url, _opts) => {},
     });
-    const ctx = createMockContext({apiCtx});
-    const response = createMockResponse();
+    const services = createMockServices({apiCtx});
 
-    await replayNetworkRequest.handler(
-      {params: {reqid: 1}} as any,
-      response as any,
-      ctx,
-    );
+    const result = await networkModule.replayRequest(services, {reqid: 1});
 
-    const result = parseResult(response);
     // 2000 chars + truncation suffix
     assert.equal(result.data.body.length, 2000 + '\n... [truncated]'.length);
     assert.equal(result.data.bodyTruncated, true);
   });
 
   it('applies custom maxBodyLength when provided', async () => {
-    const apiCtx = createMockApiContext({
+    const apiCtx = createMockApiRequestContext({
       body: 'x'.repeat(600),
     });
-    const ctx = createMockContext({apiCtx});
-    const response = createMockResponse();
+    const services = createMockServices({apiCtx});
 
-    await replayNetworkRequest.handler(
-      {params: {reqid: 1, maxBodyLength: 500}} as any,
-      response as any,
-      ctx,
-    );
+    const result = await networkModule.replayRequest(services, {
+      reqid: 1,
+      maxBodyLength: 500,
+    });
 
-    const result = parseResult(response);
     assert.equal(result.data.bodyTruncated, true);
     assert.equal(result.data.body.length, 500 + '\n... [truncated]'.length);
   });
 
   it('strips managed headers (Host, Content-Length) before fetch', async () => {
     let capturedOpts: any;
-    const apiCtx = createMockApiContext({
+    const apiCtx = createMockApiRequestContext({
       captureFetch: (_url, opts) => {
         capturedOpts = opts;
       },
     });
-    const ctx = createMockContext({
+    const services = createMockServices({
       apiCtx,
       getRequestById: () => ({
         ...createMockRequest(),
@@ -270,11 +237,7 @@ describe('replay_network_request', () => {
       }),
     });
 
-    await replayNetworkRequest.handler(
-      {params: {reqid: 1}} as any,
-      createMockResponse() as any,
-      ctx,
-    );
+    await networkModule.replayRequest(services, {reqid: 1});
 
     assert.equal(capturedOpts.headers['X-Sign'], 'keep-me');
     assert.equal(capturedOpts.headers['Host'], undefined);

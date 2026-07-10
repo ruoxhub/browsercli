@@ -7,8 +7,8 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {getRuntime} from '../../../../src/runtime.js';
-import {clearNetworkRequests} from '../../../../src/tools/network/clearNetworkRequests.js';
+import {NetworkModule} from '../../../../src/modules/network/NetworkModule.js';
+import type {NetworkServices} from '../../../../src/modules/network/NetworkTypes.js';
 import {NO_ACTIVE_PAGE_MESSAGE} from '../../../../src/tools/shared/activePageResolver.js';
 
 interface TestRequest {
@@ -29,38 +29,7 @@ function createRequest(url: string): TestRequest {
   };
 }
 
-function createMockResponse() {
-  const lines: string[] = [];
-  return {
-    lines,
-    appendResponseLine: (value: string) => lines.push(value),
-    setIncludePages: () => undefined,
-    setIncludeNetworkRequests: () => undefined,
-    setIncludeConsoleData: () => undefined,
-    attachImage: () => undefined,
-    attachNetworkRequest: () => undefined,
-    attachConsoleMessage: () => undefined,
-    setIncludeWebSocketConnections: () => undefined,
-    attachWebSocket: () => undefined,
-    setStructuredContent: (content: unknown) => {
-      lines.push(JSON.stringify(content));
-    },
-  };
-}
-
-function parseResult(
-  response: ReturnType<typeof createMockResponse>,
-): Record<string, unknown> {
-  const jsonLine = response.lines.find(line => line.trim().startsWith('{'));
-  if (!jsonLine) {
-    throw new Error(
-      'No JSON line found in response: ' + response.lines.join('\n'),
-    );
-  }
-  return JSON.parse(jsonLine);
-}
-
-function setupContextProvider(services: {
+function createMockServices(services: {
   getPages?: () => unknown[];
   getSelectedPage?: () => unknown | null;
   getSelectedPageIndex?: () => number | null;
@@ -69,13 +38,32 @@ function setupContextProvider(services: {
     pageIdx?: number,
   ) => unknown[];
   clearNetworkRequests?: (pageIdx?: number) => void;
-}) {
-  const runtime = getRuntime();
-  runtime.contextProvider = services as never;
+}): NetworkServices {
+  return {
+    getPages: services.getPages ?? (() => []),
+    getSelectedPage: services.getSelectedPage ?? (() => null),
+    getSelectedPageIndex: services.getSelectedPageIndex,
+    getNetworkRequests: services.getNetworkRequests ?? (() => []),
+    getNetworkRequestById: () => ({} as any),
+    getNetworkRequestStableId: () => 1,
+    getRequestInitiator: () => undefined,
+    clearNetworkRequests: services.clearNetworkRequests ?? (() => {}),
+    getWebSocketConnections: () => [],
+    getWebSocketConnectionById: () =>
+      ({
+        connection: {url: '', status: 'open', requestId: '', createdAt: 0},
+        frames: [],
+      }) as any,
+    getWebSocketStableId: () => 0,
+    getDevToolsData: async () => undefined,
+    resolveCdpRequestId: () => undefined,
+  } as NetworkServices;
 }
 
 describe('clearNetworkRequests', () => {
-  it('clears requests for the active page and reports the count', async () => {
+  const networkModule = new NetworkModule();
+
+  it('clears requests for the active page and reports the count', () => {
     const pages = [{id: 0}, {id: 1}];
     const selectedPage = pages[1];
     const clearedPageIndexes: Array<number | undefined> = [];
@@ -84,8 +72,7 @@ describe('clearNetworkRequests', () => {
       createRequest('https://example.test/b'),
     ];
 
-    const response = createMockResponse();
-    setupContextProvider({
+    const services = createMockServices({
       getPages: () => pages as never[],
       getSelectedPage: () => selectedPage as never,
       getSelectedPageIndex: () => 1,
@@ -95,54 +82,41 @@ describe('clearNetworkRequests', () => {
       },
     });
 
-    await clearNetworkRequests.handler(
-      {params: {}} as never,
-      response as never,
-      undefined,
-    );
+    const result = networkModule.clearRequests(services, {});
 
-    const result = parseResult(response);
     assert.equal(result.success, true);
     assert.deepStrictEqual(clearedPageIndexes, [1]);
-    const data = result.data as Record<string, unknown>;
-    assert.equal(data.clearedCount, 2);
-    assert.equal(data.targetPageIdx, 1);
-    assert.match(result.message as string, /页面 1/);
-    assert.match(result.message as string, /2 个/);
+    assert.equal(result.data.clearedCount, 2);
+    assert.equal(result.data.targetPageIdx, 1);
+    assert.match(result.message, /页面 1/);
+    assert.match(result.message, /2 个/);
   });
 
-  it('uses explicit targetPageIdx when provided', async () => {
+  it('uses explicit targetPageIdx when provided', () => {
     const clearedPageIndexes: Array<number | undefined> = [];
 
-    const response = createMockResponse();
-    setupContextProvider({
-      getNetworkRequests: () => [createRequest('https://example.test/x')] as never[],
+    const services = createMockServices({
+      getNetworkRequests: () =>
+        [createRequest('https://example.test/x')] as never[],
       clearNetworkRequests: pageIdx => {
         clearedPageIndexes.push(pageIdx);
       },
     });
 
-    await clearNetworkRequests.handler(
-      {params: {targetPageIdx: 3}} as never,
-      response as never,
-      undefined,
-    );
+    const result = networkModule.clearRequests(services, {targetPageIdx: 3});
 
-    const result = parseResult(response);
     assert.equal(result.success, true);
     assert.deepStrictEqual(clearedPageIndexes, [3]);
-    const data = result.data as Record<string, unknown>;
-    assert.equal(data.targetPageIdx, 3);
-    assert.equal(data.clearedCount, 1);
+    assert.equal(result.data.targetPageIdx, 3);
+    assert.equal(result.data.clearedCount, 1);
   });
 
-  it('reports zero cleared count and a friendly message when buffer is empty', async () => {
+  it('reports zero cleared count and a friendly message when buffer is empty', () => {
     const pages = [{id: 0}];
     const selectedPage = pages[0];
     const clearedCalls: Array<number | undefined> = [];
 
-    const response = createMockResponse();
-    setupContextProvider({
+    const services = createMockServices({
       getPages: () => pages as never[],
       getSelectedPage: () => selectedPage as never,
       getSelectedPageIndex: () => 0,
@@ -152,26 +126,19 @@ describe('clearNetworkRequests', () => {
       },
     });
 
-    await clearNetworkRequests.handler(
-      {params: {}} as never,
-      response as never,
-      undefined,
-    );
+    const result = networkModule.clearRequests(services, {});
 
-    const result = parseResult(response);
     assert.equal(result.success, true);
     assert.deepStrictEqual(clearedCalls, [0]);
-    const data = result.data as Record<string, unknown>;
-    assert.equal(data.clearedCount, 0);
-    assert.equal(data.targetPageIdx, 0);
-    assert.match(result.message as string, /没有可清空/);
+    assert.equal(result.data.clearedCount, 0);
+    assert.equal(result.data.targetPageIdx, 0);
+    assert.match(result.message, /没有可清空/);
   });
 
-  it('returns failure when there is no active page', async () => {
+  it('returns failure when there is no active page', () => {
     const clearedCalls: Array<number | undefined> = [];
 
-    const response = createMockResponse();
-    setupContextProvider({
+    const services = createMockServices({
       getPages: () => [],
       getSelectedPage: () => null,
       getSelectedPageIndex: () => null,
@@ -181,43 +148,31 @@ describe('clearNetworkRequests', () => {
       },
     });
 
-    await clearNetworkRequests.handler(
-      {params: {}} as never,
-      response as never,
-      undefined,
-    );
+    const result = networkModule.clearRequests(services, {});
 
-    const result = parseResult(response);
     assert.equal(result.success, false);
     assert.equal(result.message, NO_ACTIVE_PAGE_MESSAGE);
     assert.equal(clearedCalls.length, 0, '未选中页面时不应触发清空');
-    const data = result.data as Record<string, unknown>;
-    assert.equal(data.clearedCount, 0);
-    assert.equal(data.targetPageIdx, 0);
+    assert.equal(result.data.clearedCount, 0);
+    assert.equal(result.data.targetPageIdx, 0);
   });
 
-  it('catches and reports errors from the underlying collector', async () => {
-    const response = createMockResponse();
-    setupContextProvider({
+  it('catches and reports errors from the underlying collector', () => {
+    const services = createMockServices({
       getPages: () => [{id: 0}],
       getSelectedPage: () => ({id: 0}) as never,
       getSelectedPageIndex: () => 0,
-      getNetworkRequests: () => [createRequest('https://example.test/y')] as never[],
+      getNetworkRequests: () =>
+        [createRequest('https://example.test/y')] as never[],
       clearNetworkRequests: () => {
         throw new Error('boom from collector');
       },
     });
 
-    await clearNetworkRequests.handler(
-      {params: {}} as never,
-      response as never,
-      undefined,
-    );
+    const result = networkModule.clearRequests(services, {});
 
-    const result = parseResult(response);
     assert.equal(result.success, false);
-    assert.match(result.message as string, /boom from collector/);
-    const data = result.data as Record<string, unknown>;
-    assert.equal(data.clearedCount, 0);
+    assert.match(result.message, /boom from collector/);
+    assert.equal(result.data.clearedCount, 0);
   });
 });

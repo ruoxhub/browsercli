@@ -5,6 +5,10 @@
  */
 
 import type {DebuggerManager} from '../modules/debugger/DebuggerManager.js';
+import type {
+  RequestInitiator,
+  WebSocketData,
+} from '../modules/network/NetworkTypes.js';
 import type {TrafficSummary} from '../formatters/websocketFormatter.js';
 import {zod} from '../third_party/index.js';
 import type {Dialog, Frame, HTTPRequest, Page} from '../third_party/index.js';
@@ -12,8 +16,6 @@ import type {TraceResult} from '../trace-processing/parse.js';
 import type {PaginationOptions} from '../utils/types.js';
 
 import type {ToolCategory} from './categories.js';
-import type {RequestInitiator} from './network/types.js';
-import type {WebSocketData} from './network/WebSocketCollector.js';
 
 export interface ToolDefinition<
   Schema extends zod.ZodRawShape = zod.ZodRawShape,

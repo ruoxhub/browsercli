@@ -13,6 +13,7 @@ import {PageController} from './modules/collector/PageController.js';
 import type {CryptoDetector} from './modules/crypto/CryptoDetector.js';
 import type {Deobfuscator} from './modules/deobfuscator/Deobfuscator.js';
 import {HookManager} from './modules/hook/HookManager.js';
+import type {NetworkModule} from './modules/network/index.js';
 import type {WasmAnalyzer} from './modules/wasm/WasmAnalyzer.js';
 import type {WasmCollector} from './modules/wasm/WasmCollector.js';
 import type {WasmDecompiler} from './modules/wasm/WasmDecompiler.js';
@@ -50,6 +51,7 @@ export interface Runtime {
   summarizer: AISummarizer;
   deobfuscator: Deobfuscator;
   cryptoDetector: CryptoDetector;
+  networkModule: NetworkModule;
   wasmCollector: WasmCollector;
   wasmAnalyzer: WasmAnalyzer;
   wasmDecompiler: WasmDecompiler;
@@ -114,6 +116,9 @@ export function getRuntime(): Runtime {
     },
     get cryptoDetector() {
       return services.getCryptoDetector();
+    },
+    get networkModule() {
+      return services.getNetworkModule();
     },
     get wasmCollector() {
       return services.getWasmCollector();
