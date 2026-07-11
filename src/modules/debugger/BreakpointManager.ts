@@ -221,7 +221,7 @@ export class BreakpointManager {
       throw new Error('objectId parameter is required');
     }
 
-    const params: Record<string, unknown> = {objectId};
+    const params: {objectId: string; condition?: string} = {objectId};
     if (condition !== undefined) {
       params.condition = condition;
     }
@@ -257,7 +257,9 @@ export class BreakpointManager {
       throw new Error('start.scriptId is required');
     }
 
-    const params: Record<string, unknown> = {start};
+    const params: {start: Location; end?: Location; restrictToFunction?: boolean} = {
+      start,
+    };
     if (end) {
       params.end = end;
     }

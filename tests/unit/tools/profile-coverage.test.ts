@@ -24,23 +24,13 @@ describe('Profile coverage', () => {
     );
   });
 
-  it('search profile yields at least one tool (meta domain present)', () => {
-    const searchTools = manifests.flatMap(manifest =>
-      manifest.tools.filter(
-        tool => (tool.profile ?? manifest.profile) === 'search',
-      ),
-    );
-
-    assert.ok(
-      searchTools.length >= 1,
-      'search profile must include at least one tool (meta.search_tools)',
-    );
-  });
-
-  it('search profile yields exactly the meta domain tools', () => {
+  it('search profile no longer includes the meta domain', () => {
     const tools = new ToolRegistry(manifests).listTools('search');
-    assert.ok(tools.length >= 1);
-    assert.ok(tools.every(t => t.domain === 'meta'));
+    assert.ok(tools.length >= 1, 'search profile still exposes diagnostics');
+    assert.ok(
+      tools.every(t => t.domain !== 'meta'),
+      'meta domain must be gone from the search profile',
+    );
   });
 
   it('workflow profile excludes full-only domains like debugger and wasm', () => {
@@ -48,7 +38,6 @@ describe('Profile coverage', () => {
     const domains = new Set(tools.map(t => t.domain));
     assert.ok(!domains.has('debugger'), 'debugger should be full-only');
     assert.ok(!domains.has('wasm'), 'wasm should be full-only');
-    assert.ok(domains.has('meta'), 'meta should bubble up to workflow');
     assert.ok(domains.has('analyzer'), 'analyzer is workflow-tier');
   });
 

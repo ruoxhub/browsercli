@@ -855,6 +855,7 @@ export interface DebuggerSession {
     tags?: string[]; // 标签
     [key: string]: any; // 其他自定义元数据
   };
+  watches?: Array<{expression: string; name: string; enabled: boolean}>;
 }
 
 /**

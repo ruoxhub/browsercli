@@ -8,7 +8,6 @@
 
 import {manifest as analyzerManifest} from './analyzer/manifest.js';
 import {manifest as antiDebugManifest} from './anti-debug/manifest.js';
-import {manifest as codeTemplatesManifest} from './code-templates/manifest.js';
 import {manifest as collectorManifest} from './collector/manifest.js';
 import {manifest as consoleManifest} from './console/manifest.js';
 import {manifest as cryptoManifest} from './crypto/manifest.js';
@@ -21,7 +20,6 @@ import {manifest as extensionsManifest} from './extensions/manifest.js';
 import {manifest as framesManifest} from './frames/manifest.js';
 import {manifest as hookManifest} from './hook/manifest.js';
 import {manifest as inputManifest} from './input/manifest.js';
-import {manifest as metaManifest} from './meta/manifest.js';
 import {manifest as navigationManifest} from './navigation/manifest.js';
 import {manifest as networkManifest} from './network/manifest.js';
 import {manifest as pageManifest} from './page/manifest.js';
@@ -38,7 +36,6 @@ import {manifest as workflowManifest} from './workflow/manifest.js';
 export const GENERATED_DOMAIN_MANIFESTS = [
   analyzerManifest,
   antiDebugManifest,
-  codeTemplatesManifest,
   collectorManifest,
   consoleManifest,
   cryptoManifest,
@@ -51,7 +48,6 @@ export const GENERATED_DOMAIN_MANIFESTS = [
   framesManifest,
   hookManifest,
   inputManifest,
-  metaManifest,
   navigationManifest,
   networkManifest,
   pageManifest,
@@ -106,18 +102,6 @@ export const GENERATED_TOOL_REGISTRY = [
   {
     modulePath: './anti-debug/bypassDebugger.js',
     handlerName: 'bypassDebugger',
-  },
-  {
-    modulePath: './code-templates/getCodeTemplate.js',
-    handlerName: 'getCodeTemplate',
-  },
-  {
-    modulePath: './code-templates/injectCodeTemplate.js',
-    handlerName: 'injectCodeTemplate',
-  },
-  {
-    modulePath: './code-templates/listCodeTemplates.js',
-    handlerName: 'listCodeTemplates',
   },
   {
     modulePath: './collector/collectCode.js',
@@ -374,10 +358,6 @@ export const GENERATED_TOOL_REGISTRY = [
   {
     modulePath: './input/fill.js',
     handlerName: 'fill',
-  },
-  {
-    modulePath: './meta/searchTools.js',
-    handlerName: 'searchToolsMeta',
   },
   {
     modulePath: './navigation/listPages.js',

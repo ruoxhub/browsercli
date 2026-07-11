@@ -28,7 +28,6 @@ interface CloakBrowserModule {
 
 async function loadCloakBrowser(): Promise<CloakBrowserModule> {
   try {
-    // @ts-expect-error cloakbrowser is an optionalDependency; no type declarations shipped.
     return (await import('cloakbrowser')) as unknown as CloakBrowserModule;
   } catch {
     throw new Error(

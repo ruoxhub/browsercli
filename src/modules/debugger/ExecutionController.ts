@@ -83,7 +83,9 @@ export class ExecutionController {
     location: Location,
     targetCallFrames?: 'any' | 'current',
   ): Promise<void> {
-    const params: Record<string, unknown> = {location};
+    const params: {location: Location; targetCallFrames?: 'any' | 'current'} = {
+      location,
+    };
     if (targetCallFrames !== undefined) {
       params.targetCallFrames = targetCallFrames;
     }

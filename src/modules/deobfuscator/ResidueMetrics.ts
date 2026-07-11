@@ -1,5 +1,6 @@
 import * as parser from '@babel/parser';
 import traverseImport from '@babel/traverse';
+import type {NodePath} from '@babel/traverse';
 
 import {unwrapBabelDefault} from './astUtils.js';
 
@@ -34,7 +35,7 @@ export class ResidueMetrics {
         WhileStatement(path) {
           if (
             path.get('body').isBlockStatement() &&
-            (path.get('body.body.0') as ReturnType<typeof path.get>)?.isSwitchStatement()
+            (path.get('body.body.0') as NodePath)?.isSwitchStatement()
           ) {
             loopSwitchCount++;
           }
@@ -42,7 +43,7 @@ export class ResidueMetrics {
         ForStatement(path) {
           if (
             path.get('body').isBlockStatement() &&
-            (path.get('body.body.0') as ReturnType<typeof path.get>)?.isSwitchStatement()
+            (path.get('body.body.0') as NodePath)?.isSwitchStatement()
           ) {
             loopSwitchCount++;
           }
