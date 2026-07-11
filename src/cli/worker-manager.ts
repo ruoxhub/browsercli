@@ -67,7 +67,16 @@ export class WorkerManager {
     try {
       await this.spawnWorker(options);
     } catch (err) {
-      // 启动失败时清理 PID 文件与内存引用，避免下次 start 误判
+      // 启动失败时彻底清理：杀掉已 spawn 但未能就绪的子进程，
+      // 避免孤儿进程（Chromium / Sekiro 连接）泄漏且下次 start 误判
+      this.stoppingIntentionally = true;
+      if (this.workerProcess) {
+        try {
+          this.workerProcess.kill(IS_WIN ? 'SIGINT' : 'SIGKILL');
+        } catch {
+          // ignore
+        }
+      }
       this.cleanup();
       throw err;
     }
@@ -298,7 +307,7 @@ export class WorkerManager {
       const snapshot = this.guardian.getSnapshot();
       if (snapshot.restartCount > snapshot.policy.maxRestarts) {
         console.error(
-          `[WorkerManager] Worker 已达到最大重启次数 (${snapshot.policy.maxRestarts}/${snapshot.policy.restartWindowMs}ms)，停止重启`,
+          `[WorkerManager] Worker 已达到最大重启次数 (${snapshot.restartCount}/${snapshot.policy.maxRestarts})，停止重启`,
         );
       }
       this.cleanup();

@@ -126,7 +126,8 @@ export function buildToolArgs(
   // 0. 最低优先级：--stdin（从 stdin 读取 JSON）
   if (parsed.flags['stdin'] === true && !process.stdin.isTTY) {
     try {
-      const stdinData = readFileSync('/dev/stdin', 'utf8');
+      // fd 0 在 Windows / Unix 均可用，避免使用 /dev/stdin 这种非可移植路径
+      const stdinData = readFileSync(0, 'utf8');
       const stdinArgs = tryParseJsonObject(stdinData);
       if (stdinArgs) {
         Object.assign(toolArgs, stdinArgs);

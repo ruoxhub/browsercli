@@ -171,8 +171,15 @@ export const configCommand: AxiCliCommand<WorkerContext> = async (
   const getKey = getFlag(parsed, 'get');
   if (getKey) {
     validateKey(getKey);
-    const cfg = resolveConfig();
-    const value = (cfg as unknown as Record<string, unknown>)[getKey];
+    const cfg = resolveConfig() as unknown as Record<string, unknown>;
+    // 支持点号嵌套键，与 --set 对齐
+    const value = getKey.split('.').reduce<unknown>(
+      (acc, k) =>
+        acc && typeof acc === 'object'
+          ? (acc as Record<string, unknown>)[k]
+          : undefined,
+      cfg,
+    );
     return successOutput({
       command: 'config',
       action: 'get',
@@ -223,7 +230,6 @@ export const configCommand: AxiCliCommand<WorkerContext> = async (
       envOverrides: Object.keys(process.env).filter(
         k =>
           k.startsWith('SEKIRO_') ||
-          k.startsWith('BROWSER_') ||
           k.startsWith('BROWSER_') ||
           k === 'DEFAULT_LLM_PROVIDER',
       ),

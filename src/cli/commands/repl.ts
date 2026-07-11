@@ -9,9 +9,13 @@ import * as readline from 'node:readline';
 import type {AxiCliCommand} from 'axi-sdk-js';
 
 import {resolveConfig} from '../../config.js';
+import {parseArgs} from '../args-parser.js';
+import {getToolMeta} from '../tools-meta.js';
+import {validateToolArgs} from '../tool-arg-validator.js';
 import {SekiroInvoker} from '../sekiro-invoker.js';
 import type {WorkerContext} from '../types.js';
 import {WorkerManager} from '../worker-manager.js';
+import {buildToolArgs} from './shared/tool-args.js';
 
 const REPL_COMMANDS = ['status', 'list-tools', 'help', 'exit', 'quit'];
 
@@ -119,9 +123,22 @@ class ReplSession {
     }
 
     try {
-      const result = await this.invoker.invoke(this.group, name, {
-        args: restArgs,
-      });
+      // 复用与 `call` 一致的参数解析/构建/校验路径，保证类型强制、别名映射一致
+      const parsed = parseArgs(restArgs);
+      const normalizedName = name.includes('-')
+        ? name.replaceAll('-', '_')
+        : name;
+      const meta = getToolMeta(name) ?? getToolMeta(normalizedName);
+
+      const toolArgs = meta ? buildToolArgs(parsed, meta) : Object.fromEntries(
+        Object.entries(parsed.flags).filter(
+          ([k]) => !['file', 'data', 'stdin'].includes(k),
+        ),
+      );
+      const validated = validateToolArgs(meta?.name ?? name, toolArgs);
+      const payload = validated.ok ? validated.value : toolArgs;
+
+      const result = await this.invoker.invoke(this.group, name, payload);
       replLog(JSON.stringify(result, null, 2));
     } catch (error) {
       replLog(`执行失败：${error instanceof Error ? error.message : error}`);
