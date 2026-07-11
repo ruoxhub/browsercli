@@ -98,7 +98,7 @@ export class RpcClient {
    */
   private buildWebSocketURL(): string {
     const host = this.config.rpcHost || 'ws://127.0.0.1:5612';
-    return `${host}/business/register?group=${this.config.group}&clientId=${this.clientId}`;
+    return `${host}/business/register?group=${encodeURIComponent(this.config.group)}&clientId=${encodeURIComponent(this.clientId)}`;
   }
 
   /**
@@ -165,7 +165,8 @@ export class RpcClient {
     this.config.rpcHost = newSekiroHost;
     const wsURL = this.buildWebSocketURL();
     this.log(`切换地址重连：${wsURL}`);
-    // 先断开，保持 isManualDisconnect=true 直到新连接发起，防止旧 onclose 触发重连
+    // 新地址视为全新连接：重置退避计数，并由 connect() 内部用 socket 引用防止旧 onclose 误触发
+    this.reconnectAttempts = 0;
     this._internalDisconnect();
     this.wsURL = wsURL;
     this.connect();
@@ -221,15 +222,17 @@ export class RpcClient {
     this.setConnectionState('connecting');
 
     try {
-      this.socket = new WebSocket(this.wsURL);
+      const socket = new WebSocket(this.wsURL);
+      this.socket = socket;
 
-      this.socket.onopen = () => {
+      socket.onopen = () => {
+        if (this.socket !== socket) return;
         this.setConnectionState('connected');
         this.reconnectAttempts = 0;
         this.startHeartbeat();
       };
 
-      this.socket.onmessage = (event: WebSocket.MessageEvent) => {
+      socket.onmessage = (event: WebSocket.MessageEvent) => {
         try {
           const data =
             typeof event.data === 'string'
@@ -241,7 +244,9 @@ export class RpcClient {
         }
       };
 
-      this.socket.onclose = () => {
+      socket.onclose = () => {
+        // 忽略已被替换的旧 socket，避免误停新连接心跳 / 误触发重连
+        if (this.socket !== socket) return;
         this.stopHeartbeat();
 
         if (this.isManualDisconnect) {
@@ -251,7 +256,7 @@ export class RpcClient {
         this.scheduleReconnect();
       };
 
-      this.socket.onerror = (event: WebSocket.ErrorEvent) => {
+      socket.onerror = (event: WebSocket.ErrorEvent) => {
         this.log(`WebSocket 错误：${event.message || '未知错误'}`);
       };
     } catch (e) {
@@ -366,6 +371,9 @@ export class RpcClient {
    * 处理 Sekiro 请求
    */
   private handleRpcRequest(requestJson: string): void {
+    // 任意来自服务端的消息都表示连接存活，先清除 pong 超时计时器
+    this.pongTimeoutTimer = this.clearTimeoutTimer(this.pongTimeoutTimer);
+
     let request: RpcRequest;
     try {
       request = JSON.parse(requestJson);
@@ -379,8 +387,6 @@ export class RpcClient {
     // 否则会触发服务端 unknown-type 兜底再次回包，形成"缺少 action ↔ unknown type"无限回环。
     const msgType = (request as unknown as {type?: string}).type;
     if (msgType === 'heartbeat' || msgType === 'error' || msgType === 'invoke_response') {
-      // 任意来自服务端的消息都视为"还活着"，清掉 pong 超时计时器
-      this.pongTimeoutTimer = this.clearTimeoutTimer(this.pongTimeoutTimer);
       return;
     }
 
@@ -439,7 +445,7 @@ export class RpcClient {
 
     const responseJson: Record<string, unknown> =
       typeof data === 'object' && data !== null && !Array.isArray(data)
-        ? (data as Record<string, unknown>)
+        ? {...(data as Record<string, unknown>)}
         : {data};
 
     responseJson.code = 0;

@@ -203,3 +203,4 @@ artifacts/
 .codebuddy
 example
 scratch
+.mcp.json

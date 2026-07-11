@@ -1,565 +1,245 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Browser-CLI
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// 动态导入 chrome-devtools-frontend 以绕过类型检查
-
-import {createRequire} from 'node:module';
-
-import type {
-  AggregatedIssue,
-  Common,
-  CDPSession,
-  ConsoleMessage,
-  Protocol,
-  Browser,
-  BrowserContext,
-  Frame,
-  Handler,
-  HTTPRequest,
-  Page,
-} from '../../third_party/index.js';
-import {FakeIssuesManager} from '../../utils/DevtoolsUtils.js';
-import {features} from '../../utils/features.js';
-import {logger} from '../../utils/logger.js';
-
-// 动态导入 chrome-devtools-frontend 以绕过类型检查
-const require = createRequire(import.meta.url);
-const CDTP_MODULE_PATH = '../../../node_modules/chrome-devtools-frontend/mcp/mcp.js';
-const cdtp = require(CDTP_MODULE_PATH);
-
-// 从动态导入中获取运行时对象
-const {
-  IssueAggregatorEvents,
-  IssuesManagerEvents,
-  createIssuesFromProtocolIssue,
-  IssueAggregator,
-} = cdtp;
+import type {BrowserContext, Frame, Page} from 'patchright';
 
 /**
- * Initiator information for a network request.
- * Contains the call stack when the request was initiated.
+ * 泛型页面数据收集器基类
+ *
+ * 提取自 ToolContextProvider 中 Network/Console/WebSocket 三种收集器的共同模式：
+ * - WeakMap<Page, T[][]> 导航分组存储
+ * - WeakMap<Page, () => number> 稳定 ID 生成器
+ * - 主 frame 导航时自动分割存储（保留最近 N 段历史）
+ * - 页面关闭时自动清理监听器和存储
+ * - BrowserContext 新页面自动注册
+ *
+ * 子类只需实现 attachListeners() 和 detachListeners() 来注册/移除具体的事件监听。
  */
-export interface RequestInitiator {
-  type:
-    | 'parser'
-    | 'script'
-    | 'preload'
-    | 'SignedExchange'
-    | 'preflight'
-    | 'other';
-  url?: string;
-  lineNumber?: number;
-  columnNumber?: number;
-  stack?: {
-    callFrames: Array<{
-      functionName: string;
-      scriptId: string;
-      url: string;
-      lineNumber: number;
-      columnNumber: number;
-    }>;
-    parent?: {
-      callFrames: Array<{
-        functionName: string;
-        scriptId: string;
-        url: string;
-        lineNumber: number;
-        columnNumber: number;
-      }>;
-    };
-  };
-}
+export abstract class PageCollector<T extends {stableId: number}> {
+  protected storage = new WeakMap<Page, T[][]>();
+  protected idGenerators = new WeakMap<Page, () => number>();
+  protected readonly maxNavigationSaved: number;
 
-interface PuppeteerPageEvents {
-  request: HTTPRequest;
-  response: HTTPRequest;
-  console: ConsoleMessage;
-  pageerror: Error;
-  framenavigated: Frame;
-}
+  private frameNavHandlers = new WeakMap<Page, (frame: Frame) => void>();
+  private contextPageHandler: ((page: Page) => void) | null = null;
+  private context: BrowserContext | null = null;
 
-interface PageEvents extends PuppeteerPageEvents {
-  issue: AggregatedIssue;
-}
-
-export type ListenerMap<EventMap extends PageEvents = PageEvents> = {
-  [K in keyof EventMap]?: (event: EventMap[K]) => void;
-};
-
-function createIdGenerator() {
-  let i = 1;
-  return () => {
-    if (i === Number.MAX_SAFE_INTEGER) {
-      i = 0;
-    }
-    return i++;
-  };
-}
-
-export const stableIdSymbol = Symbol('stableIdSymbol');
-type WithSymbolId<T> = T & {
-  [stableIdSymbol]?: number;
-};
-
-export class PageCollector<T> {
-  #browser: Browser;
-  #listenersInitializer: (
-    collector: (item: T) => void,
-  ) => ListenerMap<PageEvents>;
-  #listeners = new WeakMap<Page, ListenerMap>();
-  #maxNavigationSaved = 3;
-
+  constructor(maxNavigationSaved = 3) {
+    this.maxNavigationSaved = maxNavigationSaved;
+  }
 
   /**
-   * This maps a Page to a list of navigations with a sub-list
-   * of all collected resources.
-   * The newer navigations come first.
+   * 子类实现：为页面注册具体事件监听，并将收集到的数据 push 到 navigations[0]
    */
-  protected storage = new WeakMap<Page, Array<Array<WithSymbolId<T>>>>();
-  #idGenerators = new WeakMap<Page, () => number>();
-  #contexts = new Set<BrowserContext>();
+  protected abstract attachListeners(page: Page, navigations: T[][]): void;
 
-  constructor(
-    browser: Browser,
-    listeners: (collector: (item: T) => void) => ListenerMap<PageEvents>,
-    _includeAllPages?: boolean,
-  ) {
-    this.#browser = browser;
-    this.#listenersInitializer = listeners;
+  /**
+   * 子类实现：移除页面的事件监听
+   */
+  protected abstract detachListeners(page: Page): void;
 
-  }
-
-  async init() {
-    for (const context of this.#browser.contexts()) {
-      this.#setupContext(context);
-      const pages = await context.pages();
-      for (const page of pages) {
-        this.addPage(page);
-      }
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this.#browser.on('context' as any, this.#onContextCreated as any);
-  }
-
-  dispose() {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this.#browser.off('context' as any, this.#onContextCreated as any);
-    for (const context of this.#contexts) {
-      context.off('page', this.#onPageCreated);
-    }
-    this.#contexts.clear();
-  }
-
-  #onContextCreated = (context: BrowserContext) => {
-    this.#setupContext(context);
-  };
-
-  #setupContext(context: BrowserContext) {
-    if (this.#contexts.has(context)) {
-      return;
-    }
-    this.#contexts.add(context);
-    context.on('page', this.#onPageCreated);
-  }
-
-  #onPageCreated = (page: Page) => {
-    this.addPage(page);
-  };
-
-  public collect(page: Page, value: T) {
-    const withId = value as WithSymbolId<T>;
-    const idGen = this.#idGenerators.get(page);
-    if (idGen && withId[stableIdSymbol] === undefined) {
-      withId[stableIdSymbol] = idGen();
-    }
-
-    const navigations = this.storage.get(page) ?? [[]];
-    navigations[0].push(withId);
-  }
-
-  public addPage(page: Page) {
-    this.#initializePage(page);
-  }
-
-  #initializePage(page: Page) {
-    if (this.storage.has(page)) {
-      return;
-    }
-    const idGenerator = createIdGenerator();
-    this.#idGenerators.set(page, idGenerator);
-    const storedLists: Array<Array<WithSymbolId<T>>> = [[]];
-    this.storage.set(page, storedLists);
-
-    const listeners = this.#listenersInitializer(value => {
-      this.collect(page, value);
-    });
-
-    listeners['framenavigated'] = (frame: Frame) => {
-      // Only split the storage on main frame navigation
-      if (frame !== page.mainFrame()) {
-        return;
-      }
-      this.splitAfterNavigation(page);
-    };
-
-    for (const [name, listener] of Object.entries(listeners)) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      page.on(name as any, listener as Handler<unknown>);
-    }
-
-    page.on('close', this.#onPageClosed);
-
-    this.#listeners.set(page, listeners);
-  }
-
-  #onPageClosed = (page: Page) => {
-    this.cleanupPageDestroyed(page);
-  };
-
-  protected splitAfterNavigation(page: Page) {
+  /**
+   * 子类可覆盖：主 frame 导航时的分割策略
+   * 默认行为：在头部插入空数组，保留最近 maxNavigationSaved 段
+   *
+   * NetworkRequestCollector 覆盖此方法以保留最后一个导航请求到新段
+   */
+  protected splitOnNavigation(page: Page): void {
     const navigations = this.storage.get(page);
-    if (!navigations) {
-      return;
-    }
-    // Add the latest navigation first
+    if (!navigations) return;
     navigations.unshift([]);
-    navigations.splice(this.#maxNavigationSaved);
+    navigations.splice(this.maxNavigationSaved);
   }
 
-  protected cleanupPageDestroyed(page: Page) {
-    page.off('close', this.#onPageClosed);
-    const listeners = this.#listeners.get(page);
-    if (listeners) {
-      for (const [name, listener] of Object.entries(listeners)) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        page.off(name as any, listener as Handler<unknown>);
+  /**
+   * 为单个页面注册收集器（幂等：已注册的页面不会重复注册）
+   */
+  attachToPage(page: Page): void {
+    if (this.storage.has(page)) return;
+
+    const idGenerator = this.createIdGenerator();
+    this.idGenerators.set(page, idGenerator);
+    const navigations: T[][] = [[]];
+    this.storage.set(page, navigations);
+
+    this.attachListeners(page, navigations);
+
+    // 主 frame 导航时分割存储
+    const onFrameNavigated = (frame: Frame): void => {
+      if (frame === page.mainFrame()) {
+        this.splitOnNavigation(page);
       }
-    }
-    this.storage.delete(page);
-    this.#idGenerators.delete(page);
+    };
+    page.on('framenavigated', onFrameNavigated);
+    this.frameNavHandlers.set(page, onFrameNavigated);
+
+    // 页面关闭时自动清理
+    page.once('close', () => {
+      this.detachFromPage(page);
+    });
   }
 
-  getData(page: Page, includePreservedData?: boolean): T[] {
-    const navigations = this.storage.get(page);
-    if (!navigations) {
-      return [];
+  /**
+   * 移除页面的事件监听和存储
+   */
+  detachFromPage(page: Page): void {
+    this.detachListeners(page);
+
+    const navHandler = this.frameNavHandlers.get(page);
+    if (navHandler) {
+      try {
+        page.off('framenavigated', navHandler);
+      } catch {
+        // Page might already be closed
+      }
+      this.frameNavHandlers.delete(page);
     }
 
-    if (!includePreservedData) {
-      return navigations[0];
+    this.storage.delete(page);
+    this.idGenerators.delete(page);
+  }
+
+  /**
+   * 监听 BrowserContext 的新页面事件，自动注册收集器
+   */
+  startContextCollection(context: BrowserContext): void {
+    this.context = context;
+
+    // 为已有页面注册
+    for (const page of context.pages()) {
+      this.attachToPage(page);
+    }
+
+    // 监听新页面
+    const onPage = (page: Page): void => {
+      this.attachToPage(page);
+    };
+    this.contextPageHandler = onPage;
+    context.on('page', onPage);
+  }
+
+  /**
+   * 释放所有资源
+   */
+  dispose(): void {
+    if (this.contextPageHandler && this.context) {
+      this.context.off('page', this.contextPageHandler);
+    }
+    this.contextPageHandler = null;
+    this.context = null;
+    // WeakMap 条目会在 Page GC 时自动清理
+  }
+
+  /**
+   * 获取页面的收集数据
+   * @param includeHistory 是否包含历史导航数据（默认只返回当前导航）
+   */
+  getData(page: Page, includeHistory = false): T[] {
+    const navigations = this.storage.get(page);
+    if (!navigations) return [];
+
+    if (!includeHistory) {
+      return navigations[0] ?? [];
     }
 
     const data: T[] = [];
-    for (let index = this.#maxNavigationSaved; index >= 0; index--) {
-      if (navigations[index]) {
-        data.push(...navigations[index]);
+    for (let i = this.maxNavigationSaved - 1; i >= 0; i--) {
+      if (navigations[i]) {
+        data.push(...navigations[i]!);
       }
     }
     return data;
   }
 
-  getIdForResource(resource: WithSymbolId<T>): number {
-    return resource[stableIdSymbol] ?? -1;
-  }
-
-  getById(page: Page, stableId: number): T {
-    const navigations = this.storage.get(page);
-    if (!navigations) {
-      throw new Error('No requests found for selected page');
-    }
-
-    const item = this.find(page, item => item[stableIdSymbol] === stableId);
-
-    if (item) {
-      return item;
-    }
-
-    throw new Error('Request not found for selected page');
-  }
-
-  find(
-    page: Page,
-    filter: (item: WithSymbolId<T>) => boolean,
-  ): WithSymbolId<T> | undefined {
-    const navigations = this.storage.get(page);
-    if (!navigations) {
-      return;
-    }
-
-    for (const navigation of navigations) {
-      const item = navigation.find(filter);
-      if (item) {
-        return item;
-      }
-    }
-    return;
-  }
-}
-
-export class ConsoleCollector extends PageCollector<
-  ConsoleMessage | Error | AggregatedIssue
-> {
-  #subscribedPages = new WeakMap<Page, PageIssueSubscriber>();
-
-  override addPage(page: Page): void {
-    super.addPage(page);
-    if (!features.issues) {
-      return;
-    }
-    if (!this.#subscribedPages.has(page)) {
-      const subscriber = new PageIssueSubscriber(page, (issue) => {
-        this.collect(page, issue);
-      });
-      this.#subscribedPages.set(page, subscriber);
-      void subscriber.subscribe();
-    }
-  }
-
-  protected override cleanupPageDestroyed(page: Page): void {
-    super.cleanupPageDestroyed(page);
-    this.#subscribedPages.get(page)?.unsubscribe();
-    this.#subscribedPages.delete(page);
-  }
-}
-
-class PageIssueSubscriber {
-  #issueManager: FakeIssuesManager | null = null;
-  #issueAggregator: typeof IssueAggregator | null = null;
-  #seenKeys = new Set<string>();
-  #seenIssues = new Set<AggregatedIssue>();
-  #page: Page;
-  #session: CDPSession;
-  #onIssue: (issue: AggregatedIssue) => void;
-
-  constructor(page: Page, onIssue: (issue: AggregatedIssue) => void) {
-    this.#page = page;
-    this.#onIssue = onIssue;
-    // @ts-expect-error use existing CDP client (internal Puppeteer API).
-    this.#session = this.#page._client() as CDPSession;
-    // 懒初始化 IssueAggregator，避免循环依赖
-    this.#resetIssueAggregator();
-  }
-
-  #resetIssueAggregator() {
-    this.#issueManager = new FakeIssuesManager();
-    if (this.#issueAggregator) {
-      this.#issueAggregator.removeEventListener(
-        IssueAggregatorEvents.AGGREGATED_ISSUE_UPDATED,
-        this.#onAggregatedissue,
-      );
-    }
-    this.#issueAggregator = new IssueAggregator(this.#issueManager);
-
-    this.#issueAggregator.addEventListener(
-      IssueAggregatorEvents.AGGREGATED_ISSUE_UPDATED,
-      this.#onAggregatedissue,
-    );
-  }
-
-  async subscribe() {
-    this.#resetIssueAggregator();
-    this.#page.on('framenavigated', this.#onFrameNavigated);
-    this.#session.on('Audits.issueAdded', this.#onIssueAdded);
-    try {
-      await this.#session.send('Audits.enable');
-    } catch (error) {
-      logger.debug('Error subscribing to issues', error);
-    }
-  }
-
-  unsubscribe() {
-    this.#seenKeys.clear();
-    this.#seenIssues.clear();
-    this.#page.off('framenavigated', this.#onFrameNavigated);
-    this.#session.off('Audits.issueAdded', this.#onIssueAdded);
-    if (this.#issueAggregator) {
-      this.#issueAggregator.removeEventListener(
-        IssueAggregatorEvents.AGGREGATED_ISSUE_UPDATED,
-        this.#onAggregatedissue,
-      );
-    }
-    void this.#session.send('Audits.disable').catch(() => {
-      // might fail.
-    });
-  }
-
-  #onAggregatedissue = (
-    event: Common.EventTarget.EventTargetEvent<AggregatedIssue>,
-  ) => {
-    if (this.#seenIssues.has(event.data)) {
-      return;
-    }
-    this.#seenIssues.add(event.data);
-    this.#onIssue(event.data);
-  };
-
-  // On navigation, we reset issue aggregation.
-  #onFrameNavigated = (frame: Frame) => {
-    // Only split the storage on main frame navigation
-    if (frame !== frame.page().mainFrame()) {
-      return;
-    }
-    this.#seenKeys.clear();
-    this.#seenIssues.clear();
-    this.#resetIssueAggregator();
-  };
-
-  #onIssueAdded = (data: Protocol.Audits.IssueAddedEvent) => {
-    try {
-      const inspectorIssue = data.issue as {code?: string};
-      const issue = createIssuesFromProtocolIssue(null, inspectorIssue)[0];
-      if (!issue) {
-        logger.debug('No issue mapping for for the issue: ', inspectorIssue?.code);
-        return;
-      }
-
-      const primaryKey = issue.primaryKey();
-      if (this.#seenKeys.has(primaryKey)) {
-        return;
-      }
-      this.#seenKeys.add(primaryKey);
-      (
-        this.#issueManager as unknown as {
-          dispatchEventToListeners: (event: string, data: unknown) => void;
-        }
-      ).dispatchEventToListeners(IssuesManagerEvents.ISSUE_ADDED, {
-        issue,
-        issuesModel: null,
-      });
-    } catch (error) {
-      logger.debug('Error creating a new issue', error);
-    }
-  };
-}
-
-export class NetworkCollector extends PageCollector<HTTPRequest> {
-  #initiators = new WeakMap<Page, Map<string, RequestInitiator>>();
-  #cdpListeners = new WeakMap<
-    Page,
-    (event: Protocol.Network.RequestWillBeSentEvent) => void
-  >();
-
-  constructor(
-    browser: Browser,
-    listeners: (
-      collector: (item: HTTPRequest) => void,
-    ) => ListenerMap<PageEvents> = collect => {
-      return {
-        request: req => {
-          collect(req);
-        },
-      } as ListenerMap;
-    },
-    includeAllPages?: boolean,
-  ) {
-    super(browser, listeners, includeAllPages);
-  }
-
-  override addPage(page: Page): void {
-    super.addPage(page);
-    this.#setupInitiatorCollection(page);
-  }
-
-  #setupInitiatorCollection(page: Page): void {
-    if (this.#initiators.has(page)) {
-      return;
-    }
-
-    const initiatorMap = new Map<string, RequestInitiator>();
-    this.#initiators.set(page, initiatorMap);
-
-    // Listen to CDP events for initiator info
-    const onRequestWillBeSent = (
-      event: Protocol.Network.RequestWillBeSentEvent,
-    ): void => {
-      if (event.initiator) {
-        initiatorMap.set(event.requestId, event.initiator as RequestInitiator);
-      }
-    };
-
-    this.#cdpListeners.set(page, onRequestWillBeSent);
-
-    // @ts-expect-error _client is internal Puppeteer API
-    const client = page._client() as CDPSession;
-    client.on('Network.requestWillBeSent', onRequestWillBeSent);
-  }
-
-  protected override cleanupPageDestroyed(page: Page): void {
-    super.cleanupPageDestroyed(page);
-
-    const listener = this.#cdpListeners.get(page);
-    if (listener) {
-      try {
-        // @ts-expect-error _client is internal Puppeteer API
-        const client = page._client() as CDPSession;
-        client.off('Network.requestWillBeSent', listener);
-      } catch {
-        // Page might already be closed
-      }
-    }
-    this.#cdpListeners.delete(page);
-    this.#initiators.delete(page);
+  /**
+   * 返回给定页面的导航分组存储（只读访问）。
+   * 主要供 DataCollectorManager 委托查询使用，避免暴露内部 WeakMap。
+   */
+  getNavigations(page: Page): T[][] | undefined {
+    return this.storage.get(page);
   }
 
   /**
-   * Get the initiator info for a request.
-   * @param page The page the request belongs to
-   * @param request The HTTP request
-   * @returns The initiator info or undefined if not found
+   * 按 stableId 查找数据项（跨所有页面和导航段）
    */
-  getInitiator(page: Page, request: HTTPRequest): RequestInitiator | undefined {
-    const initiatorMap = this.#initiators.get(page);
-    if (!initiatorMap) {
-      return undefined;
+  getById(id: number, pages: Page[]): T | undefined {
+    for (const page of pages) {
+      const navigations = this.storage.get(page);
+      if (!navigations) continue;
+      for (const navigation of navigations) {
+        const found = navigation.find(item => item.stableId === id);
+        if (found) return found;
+      }
     }
-    // @ts-expect-error id is internal Puppeteer API
-    const requestId = request.id as string;
-    return initiatorMap.get(requestId);
+    return undefined;
   }
 
   /**
-   * Get initiator by CDP request ID.
+   * 在给定页面集合中按自定义谓词查找首个匹配项。
+   * 用于 getNetworkRequestStableId / getConsoleMessageStableId 等场景，
+   * 统一收敛跨页面跨导航段遍历逻辑。
    */
-  getInitiatorByRequestId(
-    page: Page,
-    requestId: string,
-  ): RequestInitiator | undefined {
-    const initiatorMap = this.#initiators.get(page);
-    return initiatorMap?.get(requestId);
+  findBy(
+    pages: Page[],
+    predicate: (item: T) => boolean,
+  ): T | undefined {
+    for (const page of pages) {
+      const navigations = this.storage.get(page);
+      if (!navigations) continue;
+      for (const navigation of navigations) {
+        const found = navigation.find(predicate);
+        if (found) return found;
+      }
+    }
+    return undefined;
   }
 
-  override splitAfterNavigation(page: Page) {
-    const navigations = this.storage.get(page) ?? [];
-    if (!navigations) {
-      return;
-    }
+  /**
+   * 清空指定页面的所有导航段数据，并重置稳定 ID 计数器。
+   *
+   * 用于"清空网络请求缓存"等场景：清空后页面再次触发的新事件会从 1 开始
+   * 重新分配 stableId，旧 ID 不再被引用。
+   *
+   * 监听器和 BrowserContext 级别的新页面自动注册不会受影响。
+   *
+   * @param page 要清空数据的页面；未注册的页面会被忽略
+   */
+  clear(page: Page): void {
+    if (!this.storage.has(page)) return;
+    this.storage.set(page, [[]]);
+    this.idGenerators.set(page, this.createIdGenerator());
+  }
 
-    const requests = navigations[0];
-
-    const lastRequestIdx = requests.findLastIndex(request => {
-      return request.frame() === page.mainFrame()
-        ? request.isNavigationRequest()
-        : false;
-    });
-
-    // Keep all requests since the last navigation request including that
-    // navigation request itself.
-    // Keep the reference
-    if (lastRequestIdx !== -1) {
-      const fromCurrentNavigation = requests.splice(lastRequestIdx);
-      navigations.unshift(fromCurrentNavigation);
+  /**
+   * 测试/注入用：直接写入某页面的导航分组存储。
+   * 单元测试中在无法真实触发 Playwright 事件的场景下使用。
+   * 生产代码应走 attachToPage / startContextCollection 路径。
+   */
+  seedPageData(page: Page, navigations: T[][]): void {
+    const existing = this.storage.get(page);
+    if (existing) {
+      // 页面已注册且监听器闭包持有原 outer 数组引用：原地替换内容，
+      // 避免替换引用后事件回调写入孤儿数组（与 clear() 同样的坑）。
+      existing.length = 0;
+      existing.push(...navigations);
     } else {
-      navigations.unshift([]);
+      this.storage.set(page, navigations);
     }
+  }
 
-    // Clear old initiator data on navigation
-    const initiatorMap = this.#initiators.get(page);
-    if (initiatorMap) {
-      initiatorMap.clear();
-    }
+  /**
+   * 创建自增 ID 生成器（到 MAX_SAFE_INTEGER 后归零）
+   */
+  protected createIdGenerator(): () => number {
+    let i = 1;
+    return () => {
+      if (i === Number.MAX_SAFE_INTEGER) {
+        i = 0;
+      }
+      return i++;
+    };
   }
 }

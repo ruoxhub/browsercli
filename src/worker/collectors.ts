@@ -13,7 +13,7 @@ import type {
   WebSocket as PlaywrightWebSocket,
 } from 'patchright';
 
-import {PageCollector} from '../PageCollector.js';
+import {PageCollector} from '../modules/collector/PageCollector.js';
 import type {
   RequestInitiator,
   WebSocketData,

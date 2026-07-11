@@ -20,7 +20,7 @@ import type {
   Request,
 } from 'patchright';
 
-import type {PageCollector} from '../../PageCollector.js';
+import type {PageCollector} from '../../modules/collector/PageCollector.js';
 import type {HTTPRequest} from '../../third_party/index.js';
 import type {WebSocketData} from '../../modules/network/NetworkTypes.js';
 import {
@@ -99,7 +99,7 @@ export class CollectorContextProvider {
     }
 
     const requests: HTTPRequest[] = [];
-    for (let i = this._maxNavigationSaved; i >= 0; i--) {
+    for (let i = this._maxNavigationSaved - 1; i >= 0; i--) {
       if (navigations[i]) {
         requests.push(
           ...navigations[i]!.map(t => t.request as unknown as HTTPRequest),
