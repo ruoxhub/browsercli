@@ -9,7 +9,7 @@ import type {DomainManifest} from '../manifest.js';
 export const manifest = {
   name: 'diagnostics',
   description: 'Environment diagnostics and health checks.',
-  profile: 'search',
+  profile: 'workflow',
   tools: [
     {
       modulePath: './diagnostics/diagnoseEnvironment.js',

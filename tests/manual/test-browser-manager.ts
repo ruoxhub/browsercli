@@ -16,7 +16,7 @@
  * Run with: npm run build && node build/tests/manual/test-browser-manager.js
  */
 
-import {BrowserManager} from '../../src/browser/index.js';
+import {BrowserManager} from '../../src/modules/browser/index.js';
 
 async function testBrowserManager() {
   console.log('=== Testing BrowserManager ===\n');

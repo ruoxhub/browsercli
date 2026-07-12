@@ -21,7 +21,7 @@ import type {
   Page,
 } from 'patchright';
 
-import type {BrowserManager} from '../../browser/index.js';
+import type {BrowserManager} from '../../modules/browser/index.js';
 
 const DEFAULT_TIMEOUT = 5_000;
 const NAVIGATION_TIMEOUT = 10_000;

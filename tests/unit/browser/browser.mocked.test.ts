@@ -12,7 +12,7 @@ import {
   BrowserManager,
   launch,
   resolveAutoConnectTarget,
-} from '../../../src/browser/index.js';
+} from '../../../src/modules/browser/index.js';
 import {
   StealthScripts2025,
   type StealthReport,
@@ -531,7 +531,7 @@ describe('browser.ts mocked', () => {
 
       // 直接验证导出 readDevToolsActivePort 自身在 stub 后的行为。
       const {readDevToolsActivePort} = await import(
-        '../../../src/browser/browser-discovery.js'
+        '../../../src/modules/browser/browser-discovery.js'
       );
       const active = readDevToolsActivePort();
       assert.deepStrictEqual(active, {port, wsPath});

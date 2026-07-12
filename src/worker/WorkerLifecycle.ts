@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {BrowserManager} from '../browser/index.js';
-import type {RpcClient} from '../protocol/Client.js';
+import type {BrowserManager} from '../modules/browser/index.js';
+import type {RpcClient} from '../modules/protocol/Client.js';
 import {dbService} from '../services/DatabaseService.js';
 
 interface ShutdownDependencies {

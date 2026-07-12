@@ -20,8 +20,8 @@ import {
   StealthScripts2025,
   type StealthPreset,
   type StealthInjectionOptions,
-} from '../modules/stealth/index.js';
-import {logger} from '../utils/logger.js';
+} from '../stealth/index.js';
+import {logger} from '../../utils/logger.js';
 
 import {
   detectAllBrowsers,

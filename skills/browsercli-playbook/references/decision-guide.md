@@ -279,7 +279,7 @@ inject_code_template --templateName <name>   # 注入到当前页面
 - **先 observe 后 act**：`collect_code` / `list_network_requests` 先于 `auto_hook`
 - **先 summary 后 raw**：`get_hook_data --view summary`，按需切 raw
 - **先全局后聚焦**：`analyze_target` 一键 → 针对性 Hook → 断点精确定位
-- **Profile 优先**：`search` profile 用 `search_tools` 发现工具；`workflow` 是日常档；`full` 包含 debugger/wasm/anti-debug/perf/rebuild。详见 `references/profile-tool-gating.md`
+- **Profile 优先**：`workflow` 是日常档；`full` 包含 debugger/wasm/anti-debug/perf/rebuild。详见 `references/profile-tool-gating.md`
 
 ---
 

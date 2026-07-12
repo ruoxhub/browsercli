@@ -6,7 +6,7 @@
 
 import fs from 'node:fs';
 
-import {logger} from '../utils/logger.js';
+import {logger} from '../../utils/logger.js';
 
 interface BrowserInfo {
   name: string;

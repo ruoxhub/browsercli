@@ -291,14 +291,6 @@ browsercli call search_site_experience [--url <str>] [--name <str>] # 搜索获�
 browsercli call create_site_experience --domain <str> --name <str> [--aliases <arr>] [--platformFeatures <str>] [--validPatterns <str>] [--knownPitfalls <str>] # 新建目标站点逆向经验对抗策略档案。
 browsercli call update_site_experience --id <num> [--name <str>] [--aliases <arr>] [--platformFeatures <str>] [--validPatterns <str>] [--knownPitfalls <str>] # 更新已保存的目标站点逆向经验档案。
 browsercli call delete_site_experience --id <num> # 删除选定的站点逆向经验档案。
-
-# Search reverse engineering tools
-browsercli call search_tools --query <str> [--limit <num>] # 根据描述搜索需要的逆向分析工具所属包及状态。
-
-# Code templates
-browsercli call list_code_templates # 列出系统中所有保存的注入代码模板。
-browsercli call get_code_template --templateName <str> # 获取指定名称的代码模板源文件及详情。
-browsercli call inject_code_template --templateName <str> # 在浏览器页面中执行指定的脚本模板。
 ```
 
 ### 12. Session Management, Diagnostics & Video

@@ -8,7 +8,7 @@ import {
   createToolError,
   ErrorCodes,
   type ToolErrorCode,
-} from '../utils/errors.js';
+} from '../../utils/errors.js';
 
 interface CDPErrorPattern {
   pattern: RegExp;

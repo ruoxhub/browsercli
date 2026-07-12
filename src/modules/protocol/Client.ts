@@ -12,13 +12,13 @@
 
 import WebSocket from 'ws';
 
-import type {RpcClientConfig, ClientStatus} from '../types/platform.js';
+import type {RpcClientConfig, ClientStatus} from '../../types/platform.js';
 import type {
   RpcRequest,
   RpcResponse,
   ActionHandler,
   RpcConnectionState,
-} from '../types/rpc.js';
+} from '../../types/rpc.js';
 
 /** 默认配置 */
 const DEFAULT_RECONNECT_BASE_DELAY = 2000;

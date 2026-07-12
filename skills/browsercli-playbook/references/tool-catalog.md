@@ -1,8 +1,8 @@
-# 工具分类速查（141 个 MCP 工具）
+# 工具分类速查（139 个 MCP 工具）
 
 > **权威来源**：`browsercli list-tools --json`。任何文档与 list-tools 冲突时，**以 list-tools 为准**。
 >
-> **Profile gating**：本目录按"工具能做什么"组织，不标 profile。若当前 profile 下找不到某个工具，先用 `search_tools --query <keyword>` 在 `search` profile 中发现它，然后看 `references/profile-tool-gating.md` 决定是否需要切换到 `workflow` / `full` profile。
+> **Profile gating**：本目录按"工具能做什么"组织，不标 profile。若当前 profile 下找不到某个工具，看 `references/profile-tool-gating.md` 决定是否需要切换到 `workflow` / `full` profile。
 
 ---
 
@@ -23,16 +23,6 @@
 | `list_parameter_workflows` | | 列出所有已打包的参数 blueprint 工作流 |
 | `get_parameter_workflow` | `--id*` | 按 id 或别名获取指定参数工作流详情（含 parts/mutations） |
 | `recommend_parameter_workflow` | `--query*` | 按关键词或自然语言推荐最匹配的参数工作流 |
-
----
-
-## 2. 工具发现（Tool Discovery, 1）
-
-`search` profile 下的核心入口，用于在 LLM 上下文极紧时按需发现工具。
-
-| 工具 | 必填参数 | 用途 |
-|------|----------|------|
-| `search_tools` | `--query*` | 按自然语言查找工具，返回名称/描述/域/所属 profile |
 
 ---
 
@@ -339,16 +329,6 @@
 | `wasm_optimize` | `--inputPath*` | 用 binaryen wasm-opt 优化 |
 | `wasm_vmp_trace` | | 追踪 Wasm 运行时事件（VMP 调试） |
 | `wasm_memory_inspect` | | 检查 Wasm Memory 导出（hex/ascii + 模式搜索） |
-
----
-
-## 24. 代码模板（Code Templates, 3）
-
-| 工具 | 必填参数 | 用途 |
-|------|----------|------|
-| `list_code_templates` | | 列出可用代码模板 |
-| `get_code_template` | `--templateName*` | 读取代码模板（返回 source + description + size） |
-| `inject_code_template` | `--templateName*` | 注入代码模板到页面（`frame.evaluate`） |
 
 ---
 

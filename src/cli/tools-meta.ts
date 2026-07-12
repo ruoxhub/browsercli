@@ -70,19 +70,17 @@ export interface ToolMeta {
  *
  * Resolve the active tool profile from environment.
  *
- * | Profile     | Token cost (approx) | Purpose                                |
- * |-------------|---------------------|----------------------------------------|
- * | `search`    | ~500 tokens         | Only `search_tools`; LLM discovers     |
- * |             |                     | concrete tools on demand.              |
- * | `workflow`  | ~15K tokens         | Browser + reverse-engineering daily.   |
- * | `full`      | ~40K+ tokens        | Adds debugger, wasm, anti-debug, etc.  |
+ * | Profile    | Token cost (approx) | Purpose                              |
+ * |------------|---------------------|--------------------------------------|
+ * | `workflow` | ~15K tokens         | Browser + reverse-engineering daily. |
+ * | `full`     | ~40K+ tokens        | Adds debugger, wasm, anti-debug, etc.|
  *
  * Default: `full` to preserve current behaviour. Set
- * `JS_REVERSE_TOOL_PROFILE=workflow` (or `search`) to scope down.
+ * `JS_REVERSE_TOOL_PROFILE=workflow` to scope down.
  */
 function getConfiguredToolProfile(): ToolProfile {
   const value = process.env.JS_REVERSE_TOOL_PROFILE;
-  if (value === 'search' || value === 'workflow' || value === 'full') {
+  if (value === 'workflow' || value === 'full') {
     return value;
   }
   return 'full';

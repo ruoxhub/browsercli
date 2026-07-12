@@ -9,6 +9,7 @@ import type {DomainManifest} from '../manifest.js';
 export const manifest = {
   name: 'hook',
   description: 'JavaScript runtime hook creation and management tools.',
+  profile: 'workflow',
   prerequisites: {
     injectHook: [
       {condition: 'requiresPage', fix: 'Start or attach a browser page first.'},

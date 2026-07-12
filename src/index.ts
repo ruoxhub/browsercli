@@ -20,7 +20,7 @@ import './utils/logger.js';
 
 import {SekiroInvoker} from './cli/sekiro-invoker.js';
 import {resolveConfig} from './config.js';
-import {RpcClient} from './protocol/Client.js';
+import {RpcClient} from './modules/protocol/Client.js';
 import {getRuntime} from './runtime.js';
 import {dbService} from './services/DatabaseService.js';
 import {ConsoleServer} from './web/ConsoleServer.js';

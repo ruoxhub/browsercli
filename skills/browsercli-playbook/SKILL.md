@@ -5,9 +5,8 @@ description:
 ---
 
 > **Profile 提示**（按 `JS_REVERSE_TOOL_PROFILE` 切换）：
-> - `search` — 仅 `search_tools`（1 工具），给上下文极紧的 LLM 宿主按需发现工具
-> - `workflow` — `search` + 日常逆向（≈92 工具：Observe/Capture/Network/Hook/Analyzer/WebSocket/Console/Stealth/Emulation/Site Experience/Workflow Advisor 等）
-> - `full` — `workflow` + 全量逆向（141 工具；额外含 Debugger / Wasm / Anti-Debug / Performance / Rebuild）
+> - `workflow` — 日常逆向（≈110 工具：Observe/Capture/Network/Hook/Analyzer/WebSocket/Console/Stealth/Emulation/Site Experience/Workflow Advisor 等）
+> - `full` — `workflow` + 全量逆向（额外含 Debugger / Wasm / Anti-Debug / Performance / Rebuild）
 >
 > 完整对照 + 启动 / 切换 / 错误处理：`references/profile-tool-gating.md`。
 

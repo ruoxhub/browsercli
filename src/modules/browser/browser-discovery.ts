@@ -9,7 +9,7 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 
-import {logger} from '../utils/logger.js';
+import {logger} from '../../utils/logger.js';
 
 /**
  * TCP 端口探测（避免触发 Chrome 安全弹窗）

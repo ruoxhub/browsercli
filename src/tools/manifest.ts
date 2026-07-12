@@ -16,7 +16,7 @@ export interface ToolEntry {
   profile?: ToolProfile;
 }
 
-export type ToolProfile = 'search' | 'workflow' | 'full';
+export type ToolProfile = 'workflow' | 'full';
 
 export interface ToolPrerequisite {
   condition: 'requiresPage' | 'requiresDebugger' | 'requiresHookStore' | string;

@@ -6,7 +6,7 @@
 
 import type {BrowserContext, Page} from 'patchright';
 
-import {logger} from '../utils/logger.js';
+import {logger} from '../../utils/logger.js';
 
 const SESSION_ID_STORAGE_KEY = 'mcp-session-id';
 const SESSION_TAGS_STORAGE_KEY = 'mcp-session-tags';

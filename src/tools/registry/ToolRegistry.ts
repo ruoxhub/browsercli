@@ -15,9 +15,8 @@ import type {DomainManifest, ToolProfile} from '../manifest.js';
  */
 
 const PROFILE_ORDER: Record<ToolProfile, number> = {
-  search: 0,
-  workflow: 1,
-  full: 2,
+  workflow: 0,
+  full: 1,
 };
 
 export interface RegisteredToolEntry {

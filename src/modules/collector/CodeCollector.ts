@@ -25,7 +25,7 @@
 import type {
   BrowserManager,
   BrowserManagerConfig,
-} from '../../browser/index.js';
+} from '../browser/index.js';
 import type {Browser, Page} from '../../third_party/index.js';
 import type {
   CollectCodeOptions,

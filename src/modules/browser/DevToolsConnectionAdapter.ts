@@ -13,7 +13,7 @@ import type {
   CDPError,
   CommandParams,
   CommandResult,
-} from '../third_party/index.js';
+} from '../../third_party/index.js';
 
 /**
  * This class makes a Playwright CDP connection look like DevTools CDPConnection.

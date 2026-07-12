@@ -1,7 +1,7 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {mapCDPError, isCDPSessionGone, wrapCDPCall} from '../../../src/browser/CDPErrorMapper.js';
+import {mapCDPError, isCDPSessionGone, wrapCDPCall} from '../../../src/modules/browser/CDPErrorMapper.js';
 
 describe('CDPErrorMapper', () => {
   describe('mapCDPError', () => {

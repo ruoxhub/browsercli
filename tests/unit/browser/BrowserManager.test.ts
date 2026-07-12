@@ -13,7 +13,7 @@
 import assert from 'node:assert';
 import {describe, it, beforeEach, afterEach} from 'node:test';
 
-import {BrowserManager} from '../../../src/browser/index.js';
+import {BrowserManager} from '../../../src/modules/browser/index.js';
 
 const runBrowserTests = process.env.RUN_BROWSER_TESTS === 'true';
 

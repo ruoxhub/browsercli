@@ -20,7 +20,7 @@ describe('ToolRegistry', () => {
           {
             modulePath: './sample.js',
             handlerName: 'sampleTool',
-            profile: 'search',
+            profile: 'workflow',
           },
           {
             modulePath: './another.js',
@@ -36,7 +36,7 @@ describe('ToolRegistry', () => {
     assert.strictEqual(tools.length, 2);
     assert.strictEqual(tools[0].domain, 'sample_domain');
     assert.strictEqual(tools[0].handlerName, 'sampleTool');
-    assert.strictEqual(tools[0].profile, 'search');
+    assert.strictEqual(tools[0].profile, 'workflow');
     assert.strictEqual(tools[1].handlerName, 'anotherTool');
     assert.strictEqual(tools[1].profile, 'workflow'); // 回退到 manifest.profile
   });
@@ -48,7 +48,7 @@ describe('ToolRegistry', () => {
         description: 'a',
         profile: 'full',
         tools: [
-          {modulePath: './t1.js', handlerName: 'toolSearch', profile: 'search'},
+          {modulePath: './t1.js', handlerName: 'toolWorkflowLow', profile: 'workflow'},
           {modulePath: './t2.js', handlerName: 'toolWorkflow', profile: 'workflow'},
           {modulePath: './t3.js', handlerName: 'toolFull', profile: 'full'},
         ],
@@ -57,15 +57,10 @@ describe('ToolRegistry', () => {
 
     const registry = new ToolRegistry(mockManifests);
 
-    // search profile 只应该包含 toolSearch
-    const searchTools = registry.listTools('search');
-    assert.strictEqual(searchTools.length, 1);
-    assert.strictEqual(searchTools[0].handlerName, 'toolSearch');
-
-    // workflow profile 应该包含 search 和 workflow 级别的工具
+    // workflow profile 应该包含 workflow 级别的工具
     const workflowTools = registry.listTools('workflow');
     assert.strictEqual(workflowTools.length, 2);
-    assert.ok(workflowTools.some(t => t.handlerName === 'toolSearch'));
+    assert.ok(workflowTools.some(t => t.handlerName === 'toolWorkflowLow'));
     assert.ok(workflowTools.some(t => t.handlerName === 'toolWorkflow'));
 
     // full profile 应该包含全部

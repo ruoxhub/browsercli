@@ -24,15 +24,6 @@ describe('Profile coverage', () => {
     );
   });
 
-  it('search profile no longer includes the meta domain', () => {
-    const tools = new ToolRegistry(manifests).listTools('search');
-    assert.ok(tools.length >= 1, 'search profile still exposes diagnostics');
-    assert.ok(
-      tools.every(t => t.domain !== 'meta'),
-      'meta domain must be gone from the search profile',
-    );
-  });
-
   it('workflow profile excludes full-only domains like debugger and wasm', () => {
     const tools = new ToolRegistry(manifests).listTools('workflow');
     const domains = new Set(tools.map(t => t.domain));

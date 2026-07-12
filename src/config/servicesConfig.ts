@@ -12,7 +12,7 @@
  * 仍保留在 resolver.ts 中。
  */
 
-import type {BrowserManagerConfig} from '../browser/browser.js';
+import type {BrowserManagerConfig} from '../modules/browser/browser.js';
 import {AIService} from '../services/AIService.js';
 import {AnthropicProvider} from '../services/AnthropicProvider.js';
 import {GeminiProvider} from '../services/GeminiProvider.js';

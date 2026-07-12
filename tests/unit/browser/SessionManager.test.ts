@@ -6,7 +6,7 @@
 import assert from 'node:assert';
 import {afterEach, describe, it} from 'node:test';
 
-import {SessionManager} from '../../../src/browser/index.js';
+import {SessionManager} from '../../../src/modules/browser/index.js';
 
 interface StorageLike {
   getItem(key: string): string | null;

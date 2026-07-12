@@ -11,16 +11,16 @@ import type {DomainManifest} from '../../../src/tools/manifest.js';
 import {ToolRegistry} from '../../../src/tools/registry/ToolRegistry.js';
 
 describe('ToolRegistry profile filtering', () => {
-  it('includes search tools in workflow profile', () => {
+  it('includes workflow tools in workflow profile', () => {
     const manifests: DomainManifest[] = [
       {
-        name: 'search-domain',
-        description: 'Search tools',
+        name: 'wf-domain',
+        description: 'Workflow tools',
         tools: [
           {
-            modulePath: './search-domain/find.js',
+            modulePath: './wf-domain/find.js',
             handlerName: 'find',
-            profile: 'search',
+            profile: 'workflow',
           },
         ],
       },
@@ -28,10 +28,10 @@ describe('ToolRegistry profile filtering', () => {
 
     assert.deepStrictEqual(new ToolRegistry(manifests).listTools('workflow'), [
       {
-        domain: 'search-domain',
-        modulePath: './search-domain/find.js',
+        domain: 'wf-domain',
+        modulePath: './wf-domain/find.js',
         handlerName: 'find',
-        profile: 'search',
+        profile: 'workflow',
         dependencies: undefined,
       },
     ]);
@@ -72,7 +72,6 @@ describe('ToolRegistry profile filtering', () => {
       },
     ];
 
-    assert.deepStrictEqual(new ToolRegistry(manifests).listTools('search'), []);
     assert.deepStrictEqual(
       new ToolRegistry(manifests).listTools('workflow')[0]?.profile,
       'workflow',
