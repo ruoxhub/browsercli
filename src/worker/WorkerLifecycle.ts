@@ -11,7 +11,7 @@ import {dbService} from '../services/DatabaseService.js';
 interface ShutdownDependencies {
   browserManager: BrowserManager;
   client: RpcClient;
-  contextProvider?: {dispose(): void};
+  contextProvider?: {dispose(): void | Promise<void>};
   database?: Pick<typeof dbService, 'disconnect'>;
   exit?: (code: number) => never;
   timeoutMs?: number;
@@ -22,12 +22,15 @@ async function withTimeout<T>(
   timeoutMs: number,
   message: string,
 ): Promise<T> {
-  return await Promise.race([
-    operation,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error(message)), timeoutMs),
-    ),
-  ]);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<T>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+  try {
+    return await Promise.race([operation, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 /**
@@ -52,7 +55,11 @@ export function createGracefulShutdown({
 
     if (contextProvider) {
       try {
-        contextProvider.dispose();
+        await withTimeout(
+          Promise.resolve(contextProvider.dispose()),
+          timeoutMs,
+          '释放 ContextProvider 超时',
+        );
         console.log('[Worker] ContextProvider 已释放');
       } catch (err) {
         console.error('[Worker] 释放 ContextProvider 失败:', err);

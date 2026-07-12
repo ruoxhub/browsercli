@@ -21,8 +21,9 @@ export function wrapFrameWithTimeout(
             target,
             args,
           );
-          const timeoutPromise = new Promise<never>((_, reject) =>
-            setTimeout(
+          let timer: ReturnType<typeof setTimeout> | undefined;
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            timer = setTimeout(
               () =>
                 reject(
                   new Error(
@@ -30,9 +31,11 @@ export function wrapFrameWithTimeout(
                   ),
                 ),
               timeoutMs,
-            ),
-          );
-          return Promise.race([evalPromise, timeoutPromise]);
+            );
+          });
+          return Promise.race([evalPromise, timeoutPromise]).finally(() => {
+            if (timer) clearTimeout(timer);
+          });
         };
       }
       if (typeof value === 'function') {

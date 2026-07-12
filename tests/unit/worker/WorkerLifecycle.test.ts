@@ -45,4 +45,85 @@ describe('WorkerLifecycle', () => {
       'exit.0',
     ]);
   });
+
+  it('在关闭浏览器前 await contextProvider.dispose()', async () => {
+    const calls: string[] = [];
+    const shutdown = createGracefulShutdown({
+      browserManager: {
+        close: async () => {
+          calls.push('browser.close');
+        },
+      } as never,
+      client: {
+        disconnect: () => {
+          calls.push('client.disconnect');
+        },
+      } as never,
+      contextProvider: {
+        dispose: async () => {
+          calls.push('ctx.dispose');
+        },
+      },
+      database: {
+        disconnect: async () => {
+          calls.push('database.disconnect');
+        },
+      },
+      exit: ((code: number) => {
+        calls.push(`exit.${code}`);
+        throw new Error('exit');
+      }) as never,
+      timeoutMs: 100,
+    });
+
+    await assert.rejects(async () => await shutdown('SIGTERM'), /exit/);
+
+    assert.deepStrictEqual(calls, [
+      'client.disconnect',
+      'ctx.dispose',
+      'browser.close',
+      'database.disconnect',
+      'exit.0',
+    ]);
+  });
+
+  it('contextProvider.dispose() 超时/失败时仍继续关闭流程', async () => {
+    const calls: string[] = [];
+    const shutdown = createGracefulShutdown({
+      browserManager: {
+        close: async () => {
+          calls.push('browser.close');
+        },
+      } as never,
+      client: {
+        disconnect: () => {
+          calls.push('client.disconnect');
+        },
+      } as never,
+      contextProvider: {
+        dispose: async () => {
+          await new Promise(() => {}); // 永不 resolve，触发超时
+        },
+      },
+      database: {
+        disconnect: async () => {
+          calls.push('database.disconnect');
+        },
+      },
+      exit: ((code: number) => {
+        calls.push(`exit.${code}`);
+        throw new Error('exit');
+      }) as never,
+      timeoutMs: 10,
+    });
+
+    await assert.rejects(async () => await shutdown('SIGTERM'), /exit/);
+
+    assert.deepStrictEqual(calls, [
+      'client.disconnect',
+      'browser.close',
+      'database.disconnect',
+      'exit.0',
+    ]);
+  });
 });

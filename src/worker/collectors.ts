@@ -64,6 +64,10 @@ export class NetworkRequestCollector extends PageCollector<TrackedRequest> {
     (req: Request) => void
   >();
   private readonly _cdpSessions = new WeakMap<Page, CDPSession>();
+  private readonly _cdpRequestListeners = new WeakMap<
+    Page,
+    (event: any) => void
+  >();
   private readonly _initiatorQueues = new WeakMap<
     Page,
     Map<string, RequestInitiator[]>
@@ -127,21 +131,27 @@ export class NetworkRequestCollector extends PageCollector<TrackedRequest> {
       .newCDPSession(page)
       .then(client => {
         this._cdpSessions.set(page, client);
+        const MAX_QUEUE_PER_KEY = 50;
         const onCdpRequest = (event: any): void => {
           if (event.request && event.initiator) {
             const key = `${event.request.method}:${this._getUrlPath(
               event.request.url,
             )}`;
-            if (!initiatorQueueMap.has(key)) {
-              initiatorQueueMap.set(key, []);
+            let queue = initiatorQueueMap.get(key);
+            if (!queue) {
+              queue = [];
+              initiatorQueueMap.set(key, queue);
             }
-            initiatorQueueMap
-              .get(key)!
-              .push(event.initiator as RequestInitiator);
+            queue.push(event.initiator as RequestInitiator);
+            // 防止无匹配请求消费时队列无界增长：
+            // 队列满时丢弃最旧的 initiator，极端情况下后续匹配可能取到较新的 initiator（错配）。
+            if (queue.length > MAX_QUEUE_PER_KEY) {
+              queue.shift();
+            }
           }
         };
         client.on('Network.requestWillBeSent', onCdpRequest);
-        (client as any)._onCdpRequest = onCdpRequest;
+        this._cdpRequestListeners.set(page, onCdpRequest);
         client.send('Network.enable').catch(() => {});
       })
       .catch(() => {});
@@ -153,11 +163,12 @@ export class NetworkRequestCollector extends PageCollector<TrackedRequest> {
     );
     const client = this._cdpSessions.get(page);
     if (client) {
-      const listener = (client as any)._onCdpRequest;
+      const listener = this._cdpRequestListeners.get(page);
       if (listener) {
         try {
           client.off('Network.requestWillBeSent', listener);
         } catch {}
+        this._cdpRequestListeners.delete(page);
       }
       try {
         client.detach().catch(() => {});

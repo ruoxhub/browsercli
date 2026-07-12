@@ -81,11 +81,13 @@ export class ToolContextProvider {
     }
   }
 
-  dispose(): void {
+  async dispose(): Promise<void> {
     if (this._isDisposed) return;
     this._isDisposed = true;
 
-    void this._debuggerContext.disposeAll(this._browserContext.getPages());
+    await this._debuggerContext
+      .disposeAll(this._browserContext.getPages())
+      .catch(err => console.error('[ToolContext] 释放 debugger 失败:', err));
     this._collectorContext.dispose();
     this._browserContext.dispose();
   }
