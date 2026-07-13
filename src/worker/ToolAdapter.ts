@@ -71,6 +71,28 @@ export class ToolAdapter {
   }
 
   /**
+   * 直接经内部 pipeline 执行工具（绕过 Sekiro Action 包装）。
+   * 供 /api/v1 路由复用同一 pipeline 实例。
+   * sessionId 在执行前后注入/清除 active session（v1 逻辑命名空间）。
+   */
+  async executeTool(
+    meta: ToolMeta,
+    params: Record<string, unknown>,
+    sessionId?: string,
+  ): Promise<unknown> {
+    if (sessionId) {
+      this.contextProvider.setActiveSession?.(sessionId);
+    }
+    try {
+      return await this.pipeline.execute(meta, params);
+    } finally {
+      if (sessionId) {
+        this.contextProvider.clearActiveSession?.();
+      }
+    }
+  }
+
+  /**
    * 批量注册所有 Tools 为 Sekiro Actions
    */
   async registerAll(

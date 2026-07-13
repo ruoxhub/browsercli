@@ -52,6 +52,7 @@ export class ToolContextProvider {
   private _isRunningPerformanceTrace = false;
   private _traceRecordings: TraceResult[] = [];
   private _isDisposed = false;
+  private activeSessionId?: string;
   public readonly eventBus: EventBus<AppEventMap>;
 
   constructor(runtime?: Runtime) {
@@ -90,6 +91,18 @@ export class ToolContextProvider {
       .catch(err => console.error('[ToolContext] 释放 debugger 失败:', err));
     this._collectorContext.dispose();
     this._browserContext.dispose();
+  }
+
+  setActiveSession(id: string): void {
+    this.activeSessionId = id;
+  }
+
+  clearActiveSession(): void {
+    this.activeSessionId = undefined;
+  }
+
+  getActiveSession(): string | undefined {
+    return this.activeSessionId;
   }
 
   setBrowser(browser: Browser): void {
