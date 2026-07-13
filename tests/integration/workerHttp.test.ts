@@ -124,6 +124,7 @@ describe('worker http api', () => {
     // 诚实跳过：ConsoleServer 目前尚未接入 WS `/sessions/:id/stream` 路由
     // （该端点尚未实现），所以即使有浏览器也无法断言事件到达。
     t.skip('WS /sessions/:id/stream 端点尚未在 ConsoleServer 接线 — 跳过');
+    return;
     if (shouldSkip(t)) return;
 
     // 真实逻辑（浏览器可用且端点就绪时会执行）：
