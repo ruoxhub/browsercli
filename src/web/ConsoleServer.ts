@@ -179,7 +179,7 @@ export class ConsoleServer {
 
         // /api/v1/* 豁免本地校验，改走 Bearer Token 认证
         if (pathname.startsWith('/api/v1/')) {
-          if (bearerAuth(req, res, { apiToken: this.options.apiToken, bindHost: this.options.host })) {
+          if (bearerAuth(req, res, { apiToken: this.options.apiToken, bindHost: this.options.host ?? '127.0.0.1' })) {
             return;
           }
         } else if (rejectIfNotLocal(req, res)) {
