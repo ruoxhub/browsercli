@@ -80,7 +80,7 @@
 | POST | `/sessions` | body 可选 `{name?}` | `{sessionId, createdAt}` | 创建会话 |
 | GET | `/sessions` | — | `{sessions: SessionSummary[]}` | 列举活跃会话 |
 | DELETE | `/sessions/:id` | — | `{deleted:true}` | 销毁会话（清理其 hook/任务态） |
-| POST | `/sessions/:id/invoke` | body `{tool:string, params?:object}` | `{jobId, sessionId, status:'pending'}` | 提交异步 Job |
+| POST | `/sessions/:id/invoke` | body `{tool:string, params?:object}` | `202` + `{jobId, sessionId, status:'pending'}` | 提交异步 Job（立即返回，结果轮询 `/jobs/:id`） |
 | GET | `/jobs/:id` | — | `JobStatus`（见 §5.2） | 轮询任务状态/结果 |
 | WS | `/sessions/:id/stream` | — | 事件流 | 订阅该会话的 `hook.sample` / `log` / `job` 事件（按 sessionId 过滤） |
 
