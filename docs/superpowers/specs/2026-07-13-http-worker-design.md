@@ -183,10 +183,12 @@ interface Job {
 ## 8. CLI（客户端）设计
 
 ### 8.1 新增 `src/cli/WorkerHttpClient.ts`
-- 配置：`WORKER_URL`（默认 `http://127.0.0.1:8765`）、`WORKER_API_TOKEN`。
+- 配置：`WORKER_URL`（默认 `http://127.0.0.1:8765`）、`WORKER_API_TOKEN`、`WORKER_TIMEOUT_MS`（默认 300s）、`WORKER_POLL_MS`（默认 300ms）。
 - **两套接口并存**（request-response 对 CLI 透明）：
   - **底层原语**（供其他客户端/测试直接使用）：`submitInvoke(sessionId, tool, params)` → 返回 `jobId`；`getJob(id)` → 轮询 `JobStatus`；`openStream(sessionId, onEvent)`（WebSocket）。
-  - **request-response 封装**：`invoke(sessionId, tool, params, opts?)` 内部 `submitInvoke` → 循环 `getJob` 直到 `done`/`failed`（带超时与轮询间隔，默认超时 `WORKER_TIMEOUT_MS` 或 300s）→ **返回最终 `result` 或抛出 `job.error`**。CLI 命令代码只需 `const result = await httpClient.invoke(...)`，表现为单请求-单响应。
+  - **request-response 封装**：`invoke(sessionId, tool, params, opts?)` 内部 `submitInvoke` → 循环 `getJob` 直到 `done`/`failed`（带超时与轮询间隔）→ **返回最终 `result` 或抛出 `job.error`**。CLI 命令代码只需 `const result = await httpClient.invoke(...)`，表现为单请求-单响应。
+- **会话缓存（降低延迟）**：`WorkerHttpClient` 在进程内懒建并缓存一个 session（`ensureSession()`），多次 `invoke` 复用同一 `sessionId`，仅首次 `call` 付出建会话的 1 RTT；显式传入 `sessionId` 时直接复用、不新建。`--session <id>` 同样绕过懒建。
+- **首轮立即轮询（消除 interval 等待）**：`invoke` 在提交后第 0ms 先查一次 `getJob`，若已 `done`/`failed` 立即返回，**不空等一个 `pollInterval`**；之后才按 `WORKER_POLL_MS` 间隔轮询。因此异步封装相对同步阻塞的额外延迟 ≤ 一个 `WORKER_POLL_MS`（默认 300ms，可调到 100ms），而非常量倍率，长任务无感。
 - 自动附带 `Authorization: Bearer` 头（若 token 已配置）。
 
 ### 8.2 命令改造（复用现有 `src/cli/args-parser.ts`、`tool-args.ts` 的参数解析与类型强制）
