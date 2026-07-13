@@ -184,13 +184,15 @@ interface Job {
 
 ### 8.1 新增 `src/cli/WorkerHttpClient.ts`
 - 配置：`WORKER_URL`（默认 `http://127.0.0.1:8765`）、`WORKER_API_TOKEN`。
-- 方法：`health()`、`listTools()`、`getTool(name)`、`createSession()`、`listSessions()`、`deleteSession(id)`、`invoke(sessionId, tool, params)`（返回 `jobId`）、`getJob(id)`（轮询）、`openStream(sessionId, onEvent)`（WebSocket）。
+- **两套接口并存**（request-response 对 CLI 透明）：
+  - **底层原语**（供其他客户端/测试直接使用）：`submitInvoke(sessionId, tool, params)` → 返回 `jobId`；`getJob(id)` → 轮询 `JobStatus`；`openStream(sessionId, onEvent)`（WebSocket）。
+  - **request-response 封装**：`invoke(sessionId, tool, params, opts?)` 内部 `submitInvoke` → 循环 `getJob` 直到 `done`/`failed`（带超时与轮询间隔，默认超时 `WORKER_TIMEOUT_MS` 或 300s）→ **返回最终 `result` 或抛出 `job.error`**。CLI 命令代码只需 `const result = await httpClient.invoke(...)`，表现为单请求-单响应。
 - 自动附带 `Authorization: Bearer` 头（若 token 已配置）。
 
 ### 8.2 命令改造（复用现有 `src/cli/args-parser.ts`、`tool-args.ts` 的参数解析与类型强制）
 | 命令 | 行为 |
 |---|---|
-| `call <tool> [args...]` | 解析参数（flags > `--data` > `--file` > `--stdin`，含 zod 类型强制）→ 取/建 session（`--session <id>` 或自动建）→ `POST /invoke` → 轮询 `GET /jobs/:id` 至 `done`/`failed` → 打印结果；`--watch` 额外开 WS 流订阅该会话事件 |
+| `call <tool> [args...]` | 解析参数（flags > `--data` > `--file` > `--stdin`，含 zod 类型强制）→ 取/建 session（`--session <id>` 或自动建）→ **`await httpClient.invoke(sessionId, tool, params)`**（内部封装提交+轮询，对命令代码即 request-response）→ 打印结果；`--watch` 额外开 `openStream` 订阅该会话事件 |
 | `list-tools` | `GET /tools` |
 | `sessions` | `POST`（新建）/ `GET`（列举）/ `DELETE <id>`（销毁） |
 | `status` | `GET /health` |
