@@ -19,6 +19,7 @@ import {toolDispatcherCommand} from './commands/tool-dispatcher.js';
 import {generateTopLevelHelp} from './help.js';
 import {SekiroInvoker} from './sekiro-invoker.js';
 import type {WorkerContext} from './types.js';
+import {WorkerHttpClient} from './WorkerHttpClient.js';
 import {WorkerManager} from './worker-manager.js';
 
 export const cliDescription = '逆向工程CLI服务';
@@ -42,12 +43,21 @@ export function createWorkerContext(): WorkerContext {
   const resolvedConfig = resolveConfig();
   const invoker = new SekiroInvoker({rpcHost: resolvedConfig.rpcHost});
   const workerManager = new WorkerManager();
+  const transport = (process.env.WORKER_TRANSPORT ?? 'http') as
+    | 'http'
+    | 'sekiro';
+  const httpClient = new WorkerHttpClient({
+    baseUrl: process.env.WORKER_URL ?? 'http://127.0.0.1:8765',
+    apiToken: process.env.WORKER_API_TOKEN,
+  });
 
   return {
     rpcHost: resolvedConfig.rpcHost,
     group: resolvedConfig.group,
     invoker,
     workerManager,
+    httpClient,
+    transport,
     resolvedConfig,
     config: {
       browserUrl: resolvedConfig.browserUrl,

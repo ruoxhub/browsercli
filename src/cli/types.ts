@@ -11,6 +11,7 @@
 import type {ResolvedConfig} from '../config.js';
 
 import type {SekiroInvoker} from './sekiro-invoker.js';
+import type {WorkerHttpClient} from './WorkerHttpClient.js';
 import type {WorkerManager} from './worker-manager.js';
 
 export interface WorkerContext {
@@ -18,6 +19,10 @@ export interface WorkerContext {
   group: string;
   invoker: SekiroInvoker;
   workerManager: WorkerManager;
+  /** HTTP 传输模式下使用的 Worker 客户端（request-response 封装） */
+  httpClient?: WorkerHttpClient;
+  /** 传输方式：'http'（默认）= 纯 HTTP 客户端；'sekiro' = 旧 Sekiro RPC 路径 */
+  transport?: 'http' | 'sekiro';
   /** 解析后的完整配置（已合并配置文件、环境变量、默认值） */
   resolvedConfig: ResolvedConfig;
   /** 浏览器配置快捷访问 */

@@ -27,6 +27,7 @@ import {ConsoleServer} from './web/ConsoleServer.js';
 import {registerBuiltinActions} from './worker/BuiltinActions.js';
 import {ToolAdapter} from './worker/ToolAdapter.js';
 import {ToolContextProvider} from './worker/ToolContext.js';
+import {JobStore} from './worker/JobStore.js';
 import {parseWorkerArgs, toWorkerOptions} from './worker/WorkerArgs.js';
 import {createGracefulShutdown} from './worker/WorkerLifecycle.js';
 
@@ -80,25 +81,28 @@ async function main(): Promise<void> {
   }
   await contextProvider.init();
 
-  // 5. 创建 RpcClient
-  const client = new RpcClient({
-    group: options.group,
-    rpcHost: options.rpcHost,
-  });
+  // 5. 选择传输方式（默认 http，Sekiro 作为 opt-in 回退）
+  const transport = process.env.WORKER_TRANSPORT ?? 'http';
 
-  // 6. 注册内置 Actions
-  registerBuiltinActions(client);
-
-  // 7. 通过 ToolAdapter 注册所有 Tools
+  // ToolAdapter 始终创建（HTTP 模式也要用 executeTool 供 /api/v1 复用）
   const toolAdapter = new ToolAdapter(contextProvider);
-  await toolAdapter.registerAll((name, handler) => {
-    client.registerAction(name, handler);
-  });
 
-  // 8. 连接到 Rpc Server
-  await client.start();
-
-  console.log('[Worker] 已启动并连接到 Rpc Server');
+  // 6. Sekiro RPC 路径（transport==='sekiro' 才走 RpcClient + 注册 + 连接）
+  let client: RpcClient | undefined;
+  if (transport === 'sekiro') {
+    client = new RpcClient({
+      group: options.group,
+      rpcHost: options.rpcHost,
+    });
+    registerBuiltinActions(client);
+    await toolAdapter.registerAll((name, handler) => {
+      client!.registerAction(name, handler);
+    });
+    await client.start();
+    console.log('[Worker] 已通过 Sekiro 连接 Rpc Server');
+  } else {
+    console.log('[Worker] HTTP 传输模式：等待 /api/v1 请求（无需 Sekiro）');
+  }
 
   // 启动 Web 控制台
   const noConsole = process.argv.includes('--no-console');
@@ -119,14 +123,19 @@ async function main(): Promise<void> {
       });
       consoleServer = new ConsoleServer({
         port: consolePort,
+        host: process.env.WORKER_HOST ?? '127.0.0.1',
         group: options.group,
         rpcHost: options.rpcHost,
         runtime,
         invoker,
         toolAdapter,
+        jobStore: new JobStore(),
+        apiToken: process.env.WORKER_API_TOKEN,
       });
       await consoleServer.start();
-      console.log(`[Worker] 本地工作台 Web 控制台已启动: http://127.0.0.1:${consolePort}`);
+      console.log(
+        `[Worker] 本地工作台 Web 控制台已启动: http://127.0.0.1:${consolePort}`,
+      );
     } catch (err) {
       console.error('[Worker] 启动 Web 控制台服务失败:', err);
     }

@@ -197,7 +197,10 @@ describe('tool-dispatcher', () => {
 
     await assert.rejects(
       Promise.resolve(
-        toolDispatcherCommand(['scroll_by', '--direction', 'down', '--pixels'], ctx),
+        toolDispatcherCommand(
+          ['scroll_by', '--direction', 'down', '--pixels'],
+          ctx,
+        ),
       ),
       (error: unknown) => {
         assert.ok(error instanceof AxiError);
@@ -274,5 +277,61 @@ describe('tool-dispatcher', () => {
         },
       },
     ]);
+  });
+});
+
+describe('tool-dispatcher httpClient path', () => {
+  interface HttpCall {
+    sessionId: string | undefined;
+    toolName: string;
+    toolArgs: Record<string, unknown>;
+  }
+
+  function createHttpContext() {
+    const calls: HttpCall[] = [];
+    const httpClient = {
+      async invoke(
+        sessionId: string | undefined,
+        toolName: string,
+        toolArgs: Record<string, unknown>,
+      ): Promise<{ok: boolean; tool: string}> {
+        calls.push({sessionId, toolName, toolArgs});
+        return {ok: true, tool: toolName};
+      },
+      async openStream(): Promise<() => void> {
+        return () => {};
+      },
+    };
+    const ctx = {
+      rpcHost: 'http://localhost:5612',
+      group: 'test-group',
+      invoker: {} as WorkerContext['invoker'],
+      workerManager: {} as WorkerContext['workerManager'],
+      httpClient: httpClient as unknown as WorkerContext['httpClient'],
+      transport: 'http' as const,
+      resolvedConfig: {} as WorkerContext['resolvedConfig'],
+      config: {},
+    } as WorkerContext;
+
+    return {calls, ctx};
+  }
+
+  it('routes invoke through httpClient when transport is http', async () => {
+    const {calls, ctx} = createHttpContext();
+
+    const out = (await toolDispatcherCommand(
+      ['evaluate_script', '--function', '() => 1'],
+      ctx,
+    )) as {result: {ok: boolean; tool: string}};
+
+    assert.deepStrictEqual(calls, [
+      {
+        sessionId: undefined,
+        toolName: 'evaluate_script',
+        toolArgs: {function: '() => 1'},
+      },
+    ]);
+    assert.strictEqual(out.result.ok, true);
+    assert.strictEqual(out.result.tool, 'evaluate_script');
   });
 });

@@ -7,10 +7,11 @@
 import type {AxiCliCommand} from 'axi-sdk-js';
 import {AxiError} from 'axi-sdk-js';
 
-import {parseArgs} from '../args-parser.js';
+import {getBoolFlag, getFlag, parseArgs} from '../args-parser.js';
 import {successOutput} from '../output.js';
 import {validateToolArgs} from '../tool-arg-validator.js';
 import {ensureToolsMeta, getToolMeta, searchTools} from '../tools-meta.js';
+import type {WorkerHttpClient} from '../WorkerHttpClient.js';
 import type {WorkerContext} from '../types.js';
 
 import {buildToolArgs} from './shared/tool-args.js';
@@ -48,17 +49,44 @@ export const toolDispatcherCommand: AxiCliCommand<WorkerContext> = async (
   const toolArgs = buildToolArgs(parsed, meta);
 
   try {
-    const invoker = ctx?.invoker;
-    const group = ctx?.group;
-    if (!invoker || !group) {
-      throw new AxiError('Worker 未运行', 'WORKER_NOT_RUNNING');
-    }
+    const useHttp = ctx?.transport === 'http' && ctx?.httpClient;
     const validatedArgs = validateToolArgs(meta.name, toolArgs);
     if (validatedArgs.ok === false) {
       throw new AxiError(validatedArgs.error, 'VALIDATION_ERROR');
     }
 
-    const result = await invoker.invoke(group, meta.name, validatedArgs.value);
+    let result: unknown;
+    if (useHttp) {
+      const httpClient = ctx.httpClient as WorkerHttpClient;
+      const sessionId = getFlag(parsed, 'session'); // string | undefined
+      result = await httpClient.invoke(
+        sessionId,
+        meta.name,
+        validatedArgs.value,
+      );
+      // --watch：订阅该会话事件流（服务端 /stream 端点由后续任务挂载；
+      // 若端点不可用，openStream 会 reject，这里 catch 仅告警不中断主结果）。
+      if (getBoolFlag(parsed, 'watch')) {
+        try {
+          const close = await httpClient.openStream(sessionId, ev =>
+            console.log('[stream]', JSON.stringify(ev)),
+          );
+          process.once('exit', close);
+        } catch (streamErr) {
+          console.warn(
+            '[call] --watch 流不可用:',
+            streamErr instanceof Error ? streamErr.message : streamErr,
+          );
+        }
+      }
+    } else {
+      const invoker = ctx?.invoker;
+      const group = ctx?.group;
+      if (!invoker || !group) {
+        throw new AxiError('Worker 未运行', 'WORKER_NOT_RUNNING');
+      }
+      result = await invoker.invoke(group, meta.name, validatedArgs.value);
+    }
 
     return successOutput({
       command: 'call',
