@@ -16,6 +16,7 @@
 
 import assert from 'node:assert/strict';
 import {after, before, describe, it, type TestContext} from 'node:test';
+import {WebSocket} from 'ws';
 
 import {ensureToolsMeta, getToolMeta} from '../../src/cli/tools-meta.js';
 import {ConsoleServer} from '../../src/web/ConsoleServer.js';
@@ -98,7 +99,7 @@ describe('worker http api', () => {
     if (shouldSkip(t)) return;
     const meta = getToolMeta('get_runtime_info');
     if (!meta) {
-      console.warn('skip: get_runtime_info 不存在');
+      t.skip('get_runtime_info 不存在 — 跳过');
       return;
     }
     const s = (await (await fetch(`${BASE}/sessions`, {method: 'POST'})).json()) as any;
@@ -117,6 +118,66 @@ describe('worker http api', () => {
     }
     assert.equal(job.status, 'done');
     assert.ok(job.result !== undefined);
+  });
+
+  it('ws stream receives tool.invoke events', async (t: TestContext) => {
+    // 诚实跳过：ConsoleServer 目前尚未接入 WS `/sessions/:id/stream` 路由
+    // （该端点尚未实现），所以即使有浏览器也无法断言事件到达。
+    t.skip('WS /sessions/:id/stream 端点尚未在 ConsoleServer 接线 — 跳过');
+    if (shouldSkip(t)) return;
+
+    // 真实逻辑（浏览器可用且端点就绪时会执行）：
+    // 1. 创建会话
+    const s = (await (await fetch(`${BASE}/sessions`, {method: 'POST'})).json()) as any;
+    const sessionId: string = s.sessionId;
+    // 2. 打开该会话的 WS 流
+    const streamUrl = `ws://127.0.0.1:${PORT}/api/v1/sessions/${sessionId}/stream`;
+    const ws = new WebSocket(streamUrl);
+
+    const eventReceived = await new Promise<any>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        ws.close();
+        reject(new Error('超时：未在 5s 内收到 tool.invoke 事件'));
+      }, 5000);
+      ws.on('open', () => {
+        // 3. 在该会话中调用一个工具，触发流事件
+        fetch(`${BASE}/sessions/${sessionId}/invoke`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({tool: 'get_runtime_info', params: {}}),
+        }).catch(err => {
+          clearTimeout(timer);
+          ws.close();
+          reject(err);
+        });
+      });
+      ws.on('message', data => {
+        let ev: any;
+        try {
+          ev = JSON.parse(data.toString());
+        } catch {
+          return;
+        }
+        // 接受 tool.invoke 阶段事件或结束事件
+        if (ev?.type === 'tool.invoke' || ev?.phase === 'end') {
+          clearTimeout(timer);
+          ws.close();
+          resolve(ev);
+        }
+      });
+      ws.on('error', err => {
+        clearTimeout(timer);
+        reject(err);
+      });
+    });
+
+    // 4. 断言事件形状
+    assert.ok(
+      eventReceived?.type === 'tool.invoke' ||
+        eventReceived?.phase === 'end' ||
+        typeof eventReceived?.toolName === 'string',
+      `WS 事件形状不符：预期 tool.invoke / phase:end / toolName，实际 ${JSON.stringify(eventReceived)}`,
+    );
   });
 
   it('rejects when apiToken set but missing on loopback', async (t: TestContext) => {
