@@ -12,13 +12,21 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 
 import type { SekiroInvoker } from '../cli/sekiro-invoker.js';
-import { getAllToolNames } from '../cli/tools-meta.js';
+import {
+  ensureToolsMeta,
+  getAllToolNames,
+  getAllToolsMeta,
+  getToolMeta,
+} from '../cli/tools-meta.js';
 import type { Runtime } from '../runtime.js';
 import type { ToolAdapter } from '../worker/ToolAdapter.js';
+import { JobStore } from '../worker/JobStore.js';
 
 import { InvocationStore } from './adapters/InvocationStore.js';
+import { bearerAuth } from './middleware/bearerAuth.js';
 import { rejectIfNotLocal } from './middleware/localOnly.js';
 import { RestRouter } from './RestRouter.js';
+import { createApiV1Routes } from './routes/apiV1.js';
 import { createHookRoutes } from './routes/hooks.js';
 import { createInvocationsRoutes } from './routes/invocations.js';
 import { createSiteExperienceRoutes } from './routes/site-experiences.js';
@@ -29,11 +37,21 @@ import { WsHub } from './ws/WsHub.js';
 
 export interface ConsoleServerOptions {
   port: number;
+  host?: string;
   group: string;
   rpcHost: string;
   runtime: Runtime;
   invoker: SekiroInvoker;
   toolAdapter: ToolAdapter;
+  apiToken?: string;
+  jobStore?: JobStore;
+}
+
+// 调用方未显式注入时使用的兜底实例（保持 /api/v1 路由可挂载）。
+let defaultJobStore: JobStore | undefined;
+function getDefaultJobStore(): JobStore {
+  defaultJobStore ??= new JobStore();
+  return defaultJobStore;
 }
 
 const MIME_TYPES: Record<string, string> = {
@@ -136,6 +154,17 @@ export class ConsoleServer {
     this.router.mount(
       createSiteExperienceRoutes()
     );
+    this.router.mount(
+      createApiV1Routes({
+        toolAdapter: this.options.toolAdapter,
+        jobStore: this.options.jobStore ?? getDefaultJobStore(),
+        wsHub: this.wsHub,
+        getToolMeta: (name) => getToolMeta(name),
+        listToolsMeta: () => getAllToolsMeta(),
+        ensureToolsMeta,
+      }),
+    );
+    void ensureToolsMeta().catch(err => console.warn('[ConsoleServer] ensureToolsMeta 失败:', err));
   }
 
   async start(): Promise<void> {
@@ -146,12 +175,16 @@ export class ConsoleServer {
     // 1. 创建 HTTP Server 并处理请求
     this.httpServer = createServer(async (req, res) => {
       try {
-        // 安全策略：仅允许 loopback 来源
-        if (rejectIfNotLocal(req, res)) {
+        const pathname = (req.url ?? '').split('?')[0] || '/';
+
+        // /api/v1/* 豁免本地校验，改走 Bearer Token 认证
+        if (pathname.startsWith('/api/v1/')) {
+          if (bearerAuth(req, res, { apiToken: this.options.apiToken, bindHost: this.options.host })) {
+            return;
+          }
+        } else if (rejectIfNotLocal(req, res)) {
           return;
         }
-
-        const pathname = (req.url ?? '').split('?')[0] || '/';
 
         // 尝试 REST 路由分发
         const handled = await this.router.dispatch(req, res, pathname);
@@ -251,9 +284,9 @@ export class ConsoleServer {
       hookStore.events.on('sample', this.onSampleListener);
     }
 
-    // 4. 开启监听 127.0.0.1 端口
+    // 4. 开启监听（host 可配置，默认 127.0.0.1）
     await new Promise<void>((resolve, reject) => {
-      this.httpServer!.listen(this.options.port, '127.0.0.1', () => {
+      this.httpServer!.listen(this.options.port, this.options.host ?? '127.0.0.1', () => {
         resolve();
       });
       this.httpServer!.once('error', async (err) => {
