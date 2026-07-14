@@ -20,9 +20,7 @@ export const contextFunctionFixture = async (
   params: Record<string, unknown>,
 ) => ({
   sameProvider: Boolean(
-    context &&
-      typeof context === 'object' &&
-      'getSelectedPage' in context,
+    context && typeof context === 'object' && 'getSelectedPage' in context,
   ),
   received: params,
   tooltype: 'context_function_fixture',

@@ -8,6 +8,7 @@ import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
+
 import type {GetWebSocketMessagesParams} from './types.js';
 
 const DIRECTION_OPTIONS: readonly ['sent', 'received'] = ['sent', 'received'];
@@ -60,7 +61,9 @@ export const getWebSocketMessages = defineTool({
       groupId: raw.groupId,
       pageSize: raw.pageSize,
       pageIdx: raw.pageIdx,
-      showContent: (raw as Record<string, unknown>).show_content as boolean | undefined,
+      showContent: (raw as Record<string, unknown>).show_content as
+        | boolean
+        | undefined,
     };
     const result = await getRuntime().networkModule.getWebSocketMessages(
       getRuntime().contextProvider!,

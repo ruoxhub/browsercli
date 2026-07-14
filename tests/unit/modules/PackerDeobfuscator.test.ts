@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
 import {
   AAEncodeDeobfuscator,
@@ -25,21 +25,20 @@ describe('PackerDeobfuscator family', () => {
   it('deobfuscates with no-detect and warning branches', async () => {
     const p = new PackerDeobfuscator();
 
-    const plain = await p.deobfuscate({ code: 'const x = 1;' });
+    const plain = await p.deobfuscate({code: 'const x = 1;'});
     assert.strictEqual(plain.success, true);
     assert.strictEqual(plain.iterations, 0);
     assert.strictEqual(plain.code, 'const x = 1;');
 
-    (
-      p as unknown as { unpack(code: string): string }
-    ).unpack = () => 'eval(function(p,a,c,k,e,d){return p;}(...))';
+    (p as unknown as {unpack(code: string): string}).unpack = () =>
+      'eval(function(p,a,c,k,e,d){return p;}(...))';
     const warned = await p.deobfuscate({
       code: 'eval(function(p,a,c,k,e,d){return p;}(...))',
       maxIterations: 2,
     });
     assert.strictEqual(warned.success, true);
     assert.strictEqual(warned.iterations, 0);
-    assert.ok(warned.warnings.some((w) => w.includes('解包失败')));
+    assert.ok(warned.warnings.some(w => w.includes('解包失败')));
   });
 
   it('covers unpack/parse/execute/base/beautify private flows', () => {
@@ -65,7 +64,8 @@ describe('PackerDeobfuscator family', () => {
       beautify(code: string): string;
     };
 
-    const code = "eval(function(p,a,c,k,e,d){return p;}('0 1',62,2,'hello|world',0,{}))";
+    const code =
+      "eval(function(p,a,c,k,e,d){return p;}('0 1',62,2,'hello|world',0,{}))";
     const unpacked = p.unpack(code);
     assert.strictEqual(unpacked, 'hello world');
 
@@ -101,7 +101,7 @@ describe('PackerDeobfuscator family', () => {
   it('handles packer deobfuscate exception branch', async () => {
     const p = new PackerDeobfuscator() as unknown as {
       unpack(code: string): string;
-      deobfuscate(options: { code: string; maxIterations: number }): Promise<{
+      deobfuscate(options: {code: string; maxIterations: number}): Promise<{
         success: boolean;
         warnings: string[];
       }>;
@@ -127,7 +127,10 @@ describe('PackerDeobfuscator family', () => {
     assert.strictEqual(await aa.deobfuscate('('), '(');
 
     const url = new URLEncodeDeobfuscator();
-    assert.strictEqual(URLEncodeDeobfuscator.detect('%61%62%63%64%65%66%67%68%69%6A%6B'), true);
+    assert.strictEqual(
+      URLEncodeDeobfuscator.detect('%61%62%63%64%65%66%67%68%69%6A%6B'),
+      true,
+    );
     assert.strictEqual(URLEncodeDeobfuscator.detect('%61%62'), false);
     assert.strictEqual(await url.deobfuscate('%66%6f%6f'), 'foo');
     assert.strictEqual(await url.deobfuscate('%E0%A4%A'), '%E0%A4%A');
@@ -136,7 +139,9 @@ describe('PackerDeobfuscator family', () => {
   it('covers UniversalUnpacker for each type and unknown', async () => {
     const u = new UniversalUnpacker();
 
-    const packer = await u.deobfuscate("eval(function(p,a,c,k,e,d){return p;}('0',10,1,'ok',0,{}))");
+    const packer = await u.deobfuscate(
+      "eval(function(p,a,c,k,e,d){return p;}('0',10,1,'ok',0,{}))",
+    );
     assert.strictEqual(packer.type, 'Packer');
     assert.strictEqual(packer.success, true);
     assert.strictEqual(packer.code, 'ok');

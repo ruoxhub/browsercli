@@ -17,11 +17,7 @@ import type {IncomingMessage, ServerResponse} from 'node:http';
 export function isLoopback(req: IncomingMessage): boolean {
   // socket.remoteAddress 是 Node 提供的连接级真值；不信任任何 X-Forwarded-For 头
   const addr = req.socket.remoteAddress ?? '';
-  return (
-    addr === '127.0.0.1' ||
-    addr === '::1' ||
-    addr === '::ffff:127.0.0.1'
-  );
+  return addr === '127.0.0.1' || addr === '::1' || addr === '::ffff:127.0.0.1';
 }
 
 /**

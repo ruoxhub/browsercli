@@ -12,20 +12,19 @@
  * @see {@link src/tools/ToolDefinition.ts} — defineTool 工具定义宏
  */
 
-import type {ToolMeta} from '../tools/tools-meta.js';
-import {
-  ensureToolsMeta,
-  getAllToolNames,
-  getToolMeta,
-} from '../tools/tools-meta.js';
 import {ToolPrerequisiteChecker} from '../tools/prerequisites/ToolPrerequisiteChecker.js';
+import type {ToolMeta} from '../tools/tools-meta.js';
 import type {ActionHandler} from '../types/rpc.js';
 import type {ToolInvokeEvent} from '../web/types.js';
 
 import {ToolCallContextGuard} from './ToolCallContextGuard.js';
-import type { ToolContextProvider} from './ToolContext.js';
+import type {ToolContextProvider} from './ToolContext.js';
 import {DefineToolContextFactory} from './ToolContext.js';
-import {ToolExecutionPipeline, ToolExecutionRouter, ToolHandlerLoader} from './ToolExecutionPipeline.js';
+import {
+  ToolExecutionPipeline,
+  ToolExecutionRouter,
+  ToolHandlerLoader,
+} from './ToolExecutionPipeline.js';
 import {ToolResponseProcessor, ToolTelemetry} from './ToolResponse.js';
 
 export type ToolInvokeListener = (event: ToolInvokeEvent) => void;
@@ -90,30 +89,6 @@ export class ToolAdapter {
         this.contextProvider.clearActiveSession?.();
       }
     }
-  }
-
-  /**
-   * 批量注册所有 Tools 为 Sekiro Actions
-   */
-  async registerAll(
-    registerFn: (name: string, handler: ActionHandler) => void,
-  ): Promise<void> {
-    await ensureToolsMeta();
-    const toolNames = getAllToolNames();
-    let registered = 0;
-
-    for (const name of toolNames) {
-      const meta = getToolMeta(name);
-      if (!meta) continue;
-
-      const handler = this.wrapTool(meta);
-      registerFn(name, handler);
-      registered++;
-    }
-
-    console.log(
-      `[Worker][ToolAdapter] 注册了 ${registered}/${toolNames.length} 个 Tool`,
-    );
   }
 
   /**

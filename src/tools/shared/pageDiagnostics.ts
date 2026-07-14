@@ -11,9 +11,9 @@ export function explainPageError(error: unknown, action: string): string {
   const normalized = normalizeBrowserRuntimeError(error);
 
   if (
-    /Target page closed/i.test(raw)
-    || /Target page, context or browser has been closed/i.test(raw)
-    || /当前页面、上下文或浏览器已关闭/.test(normalized)
+    /Target page closed/i.test(raw) ||
+    /Target page, context or browser has been closed/i.test(raw) ||
+    /当前页面、上下文或浏览器已关闭/.test(normalized)
   ) {
     return `${action}失败：页面已关闭，请先通过 list_pages 确认页面状态，必要时用 new_page 新建页面或用 select_page 切换到可用页面`;
   }

@@ -23,7 +23,12 @@ export {
 export {generateTopLevelHelp, generateCommandHelp} from './help.js';
 export {WorkerHttpClient} from './WorkerHttpClient.js';
 export type {WorkerHttpClientOptions, JobStatus} from './WorkerHttpClient.js';
-export type {ToolMeta, ToolArgSpec, ToolArgSpecMap, ToolArgType} from './tool-meta-types.js';
+export type {
+  ToolMeta,
+  ToolArgSpec,
+  ToolArgSpecMap,
+  ToolArgType,
+} from './tool-meta-types.js';
 export {configCommand} from './commands/config.js';
 export {listToolsCommand} from './commands/list-tools.js';
 export {scaffoldCommand} from './commands/scaffold.js';

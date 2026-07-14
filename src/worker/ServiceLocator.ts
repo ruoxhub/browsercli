@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {BrowserManager} from '../modules/browser/index.js';
 import type {AISummarizer} from '../modules/analyzer/AISummarizer.js';
 import {AISummarizer as FallbackAISummarizer} from '../modules/analyzer/AISummarizer.js';
 import type {CodeAnalyzer} from '../modules/analyzer/CodeAnalyzer.js';
 import {CodeAnalyzer as FallbackCodeAnalyzer} from '../modules/analyzer/CodeAnalyzer.js';
+import type {BrowserManager} from '../modules/browser/index.js';
 import {CodeCollector} from '../modules/collector/CodeCollector.js';
 import {PageController} from '../modules/collector/PageController.js';
 import {CryptoDetector} from '../modules/crypto/CryptoDetector.js';

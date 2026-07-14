@@ -4,20 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import { writeFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { describe, it } from 'node:test';
+import {writeFileSync, rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {describe, it} from 'node:test';
 
 import Anthropic from '@anthropic-ai/sdk';
 
-import { AnthropicProvider } from '../../../src/services/AnthropicProvider.js';
+import {AnthropicProvider} from '../../../src/services/AnthropicProvider.js';
 
 interface AnthropicClientLike {
   messages: {
     create(input: unknown): Promise<{
-      content: Array<{ type: string; text: string }>;
-      usage?: { input_tokens: number; output_tokens: number };
+      content: Array<{type: string; text: string}>;
+      usage?: {input_tokens: number; output_tokens: number};
     }>;
   };
 }
@@ -55,16 +55,20 @@ interface AnthropicProviderHarness {
   client: AnthropicClientLike;
   getMediaType(extension: string): string;
   chat(
-    messages: Array<{ role: string; content: string }>,
-    options?: { model?: string; temperature?: number; maxTokens?: number },
+    messages: Array<{role: string; content: string}>,
+    options?: {model?: string; temperature?: number; maxTokens?: number},
   ): Promise<ChatResultLike>;
-  analyzeImage(imageInput: string, prompt: string, isFilePath?: boolean): Promise<string>;
+  analyzeImage(
+    imageInput: string,
+    prompt: string,
+    isFilePath?: boolean,
+  ): Promise<string>;
 }
 
 describe('AnthropicProvider (mocked)', () => {
   it('throws when api key is missing', () => {
     assert.throws(
-      () => new AnthropicProvider({ apiKey: '' }),
+      () => new AnthropicProvider({apiKey: ''}),
       /Anthropic API key is required/,
     );
   });
@@ -80,19 +84,19 @@ describe('AnthropicProvider (mocked)', () => {
           payloads.push(input as PayloadLike);
           return {
             content: [
-              { type: 'text', text: 'hello ' },
-              { type: 'text', text: 'world' },
+              {type: 'text', text: 'hello '},
+              {type: 'text', text: 'world'},
             ],
-            usage: { input_tokens: 5, output_tokens: 7 },
+            usage: {input_tokens: 5, output_tokens: 7},
           };
         },
       },
     };
 
     const result = await provider.chat([
-      { role: 'system', content: 'rules' },
-      { role: 'user', content: 'hi' },
-      { role: 'assistant', content: 'ok' },
+      {role: 'system', content: 'rules'},
+      {role: 'user', content: 'hi'},
+      {role: 'assistant', content: 'ok'},
     ]);
 
     assert.strictEqual(result.content, 'hello world');
@@ -107,13 +111,13 @@ describe('AnthropicProvider (mocked)', () => {
     }
     assert.strictEqual(chatPayload.system, 'rules');
     assert.deepStrictEqual(chatPayload.messages, [
-      { role: 'user', content: 'hi' },
-      { role: 'assistant', content: 'ok' },
+      {role: 'user', content: 'hi'},
+      {role: 'assistant', content: 'ok'},
     ]);
   });
 
   it('throws when invalid data URL is passed to analyzeImage', async () => {
-    const provider = new AnthropicProvider({ apiKey: 'sk-ant-test-key' });
+    const provider = new AnthropicProvider({apiKey: 'sk-ant-test-key'});
     await assert.rejects(
       async () => provider.analyzeImage('data:invalid', 'prompt', false),
       /Invalid data URL format/,
@@ -130,20 +134,27 @@ describe('AnthropicProvider (mocked)', () => {
         create: async (input: unknown) => {
           calls.push(input as AnalyzeImageCallLike);
           return {
-            content: [{ type: 'text', text: 'vision ok' }],
-            usage: { input_tokens: 1, output_tokens: 1 },
+            content: [{type: 'text', text: 'vision ok'}],
+            usage: {input_tokens: 1, output_tokens: 1},
           };
         },
       },
     };
 
     const out1 = await provider.analyzeImage('dGVzdA==', 'a', false);
-    const out2 = await provider.analyzeImage('data:image/gif;base64,abcd', 'b', false);
+    const out2 = await provider.analyzeImage(
+      'data:image/gif;base64,abcd',
+      'b',
+      false,
+    );
 
-    const tempPath = join(tmpdir(), `anthropic-provider-test-${Date.now()}.jpg`);
+    const tempPath = join(
+      tmpdir(),
+      `anthropic-provider-test-${Date.now()}.jpg`,
+    );
     writeFileSync(tempPath, Buffer.from([0xff, 0xd8, 0xff, 0xdb]));
     const out3 = await provider.analyzeImage(tempPath, 'c', true);
-    rmSync(tempPath, { force: true });
+    rmSync(tempPath, {force: true});
 
     assert.strictEqual(out1, 'vision ok');
     assert.strictEqual(out2, 'vision ok');
@@ -170,7 +181,7 @@ describe('AnthropicProvider (mocked)', () => {
       apiKey: 'sk-ant-test-key',
     }) as unknown as AnthropicProviderHarness;
 
-    const apiError = Object.assign(new Error('api down'), { status: 503 });
+    const apiError = Object.assign(new Error('api down'), {status: 503});
     Object.setPrototypeOf(apiError, Anthropic.APIError.prototype);
 
     provider.client = {
@@ -181,10 +192,12 @@ describe('AnthropicProvider (mocked)', () => {
       },
     };
     await assert.rejects(
-      async () => provider.chat([{ role: 'user', content: 'hi' }]),
+      async () => provider.chat([{role: 'user', content: 'hi'}]),
       (err: unknown) =>
-        typeof err === 'object' && err !== null && 'status' in err &&
-        (err as { status?: number }).status === 503,
+        typeof err === 'object' &&
+        err !== null &&
+        'status' in err &&
+        (err as {status?: number}).status === 503,
     );
 
     provider.client = {
@@ -195,7 +208,7 @@ describe('AnthropicProvider (mocked)', () => {
       },
     };
     await assert.rejects(
-      async () => provider.chat([{ role: 'user', content: 'hi' }]),
+      async () => provider.chat([{role: 'user', content: 'hi'}]),
       /Unknown error: 12345/,
     );
   });
@@ -210,14 +223,14 @@ describe('AnthropicProvider (mocked)', () => {
         create: async (input: unknown) => {
           payloads.push(input as PayloadLike);
           return {
-            content: [{ type: 'text', text: '' }],
-            usage: { input_tokens: 2, output_tokens: 3 },
+            content: [{type: 'text', text: ''}],
+            usage: {input_tokens: 2, output_tokens: 3},
           };
         },
       },
     };
 
-    await provider.chat([{ role: 'user', content: 'x' }], {
+    await provider.chat([{role: 'user', content: 'x'}], {
       model: 'claude-test',
       temperature: 0.1,
       maxTokens: 12,
@@ -233,7 +246,7 @@ describe('AnthropicProvider (mocked)', () => {
     const tempPath = join(tmpdir(), `anthropic-provider-test-${Date.now()}`);
     writeFileSync(tempPath, Buffer.from([0x01]));
     const result = await provider.analyzeImage(tempPath, 'prompt', true);
-    rmSync(tempPath, { force: true });
+    rmSync(tempPath, {force: true});
     assert.strictEqual(result, '');
   });
 });

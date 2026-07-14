@@ -124,7 +124,8 @@ export class ScriptManager {
   private keywordIndex = new Map<string, KeywordIndexEntry[]>();
   private scriptChunks = new Map<string, ScriptChunk[]>();
 
-  private scriptParsedListener: ((params: ScriptParsedEvent) => void) | null = null;
+  private scriptParsedListener: ((params: ScriptParsedEvent) => void) | null =
+    null;
 
   private cacheDir: string | null = null;
 
@@ -268,7 +269,9 @@ export class ScriptManager {
     if (!script.sourcePath) {
       const loadError = (script as any).loadError;
       if (loadError) {
-        throw new Error(`Failed to get script source for ${scriptId}: ${loadError.message || loadError}`);
+        throw new Error(
+          `Failed to get script source for ${scriptId}: ${loadError.message || loadError}`,
+        );
       }
       throw new Error(`Script source not found: ${scriptId}`);
     }
@@ -436,10 +439,7 @@ export class ScriptManager {
       this.chunkScript(script.scriptId, scriptSource);
       return true;
     } catch (error) {
-      logger.warn(
-        `Failed to get source for script ${script.scriptId}:`,
-        error,
-      );
+      logger.warn(`Failed to get source for script ${script.scriptId}:`, error);
       return false;
     }
   }
@@ -453,9 +453,7 @@ export class ScriptManager {
         `Failed to get script source for ${script.scriptId}`,
       );
       (script as any).loadError = error;
-      logger.error(
-        `Failed to get script source for ${script.scriptId}`,
-      );
+      logger.error(`Failed to get script source for ${script.scriptId}`);
     }
     return loaded;
   }
@@ -632,7 +630,11 @@ export class ScriptManager {
               caseSensitive,
               isRegex,
             });
-            if (result && Array.isArray(result.result) && result.result.length > 0) {
+            if (
+              result &&
+              Array.isArray(result.result) &&
+              result.result.length > 0
+            ) {
               return script;
             }
           } catch {

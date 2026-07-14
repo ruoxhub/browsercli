@@ -1,13 +1,12 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { ASTOptimizer } from '../../../src/modules/deobfuscator/ASTOptimizer.js';
+import {ASTOptimizer} from '../../../src/modules/deobfuscator/ASTOptimizer.js';
 
 describe('ASTOptimizer', () => {
   it('optimizes constants, dead code, inlining, and object/computed properties', () => {

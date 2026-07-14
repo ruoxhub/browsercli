@@ -184,13 +184,11 @@ export function calculateQualityScoreInternal(
   let complexityScore = 100;
   if (complexityMetrics) {
     if (complexityMetrics.cyclomaticComplexity > 20) complexityScore -= 30;
-    else if (complexityMetrics.cyclomaticComplexity > 10)
-      complexityScore -= 15;
+    else if (complexityMetrics.cyclomaticComplexity > 10) complexityScore -= 15;
     else if (complexityMetrics.cyclomaticComplexity > 5) complexityScore -= 5;
 
     if (complexityMetrics.cognitiveComplexity > 15) complexityScore -= 20;
-    else if (complexityMetrics.cognitiveComplexity > 10)
-      complexityScore -= 10;
+    else if (complexityMetrics.cognitiveComplexity > 10) complexityScore -= 10;
   } else {
     const avgComplexity =
       structure.functions.reduce((sum, fn) => sum + fn.complexity, 0) /
@@ -269,8 +267,7 @@ export function detectCodePatternsInternal(
           t.isFunctionExpression(init.callee) &&
           init.callee.body.body.some(
             stmt =>
-              t.isReturnStatement(stmt) &&
-              t.isObjectExpression(stmt.argument),
+              t.isReturnStatement(stmt) && t.isObjectExpression(stmt.argument),
           )
         ) {
           patterns.push({
@@ -379,7 +376,8 @@ export function detectCodePatternsInternal(
             name: 'Use of var',
             location: path.node.loc?.start.line || 0,
             severity: 'low',
-            recommendation: 'Use let or const instead of var for better scoping',
+            recommendation:
+              'Use let or const instead of var for better scoping',
           });
         }
       },
@@ -569,10 +567,7 @@ export function normalizeCode(node: t.Node): string {
   return JSON.stringify(clonedNode);
 }
 
-export function calculateCodeSimilarity(
-  code1: string,
-  code2: string,
-): number {
+export function calculateCodeSimilarity(code1: string, code2: string): number {
   const len1 = code1.length;
   const len2 = code2.length;
 

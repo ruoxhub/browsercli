@@ -43,7 +43,7 @@ export class CdpNetworkMonitor {
   /** 获取响应体的超时时间（毫秒） */
   readonly RESPONSE_BODY_TIMEOUT_MS: number;
 
-  constructor(responseBodyTimeoutMs: number = 3000) {
+  constructor(responseBodyTimeoutMs = 3000) {
     this.RESPONSE_BODY_TIMEOUT_MS = responseBodyTimeoutMs;
   }
 

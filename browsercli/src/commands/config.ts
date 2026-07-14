@@ -15,12 +15,12 @@
  * 环境变量 WORKER_URL / WORKER_API_TOKEN 优先级高于配置文件。
  */
 
-import type {AxiCliCommand} from 'axi-sdk-js';
-import {AxiError} from 'axi-sdk-js';
-
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import os from 'node:os';
 import {dirname, join} from 'node:path';
+
+import {AxiError} from 'axi-sdk-js';
+import type {AxiCliCommand} from 'axi-sdk-js';
 
 import {parseArgs, getFlag, hasFlag} from '../args-parser.js';
 import {successOutput} from '../output.js';

@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -11,7 +10,13 @@ import {UnifiedCacheManager} from '../../../src/utils/UnifiedCacheManager.js';
 
 interface MockCacheRegistration {
   name: string;
-  getStats(): {entries: number; size: number; hits: number; misses: number; hitRate: number};
+  getStats(): {
+    entries: number;
+    size: number;
+    hits: number;
+    misses: number;
+    hitRate: number;
+  };
   clear(): void;
 }
 
@@ -20,7 +25,13 @@ describe('UnifiedCacheManager', () => {
     const manager = UnifiedCacheManager.getInstance();
     const mockCache: MockCacheRegistration = {
       name: 'mock-cache',
-      getStats: () => ({entries: 2, size: 1024, hits: 1, misses: 1, hitRate: 0.5}),
+      getStats: () => ({
+        entries: 2,
+        size: 1024,
+        hits: 1,
+        misses: 1,
+        hitRate: 0.5,
+      }),
       clear: () => undefined,
     };
     manager.registerCache(mockCache);

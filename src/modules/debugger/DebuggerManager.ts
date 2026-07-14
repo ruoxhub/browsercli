@@ -14,6 +14,7 @@
  */
 
 import type {CDPSession} from '../../third_party/index.js';
+import type {Page} from '../../third_party/index.js';
 import type {
   BreakpointHitCallback,
   BreakpointHitEvent,
@@ -25,7 +26,6 @@ import type {
 import {logger} from '../../utils/logger.js';
 import {resolveDefaultDebuggerSessionsDir} from '../../utils/projectPaths.js';
 import type {CodeCollector} from '../collector/CodeCollector.js';
-import type {Page} from '../../third_party/index.js';
 
 /**
  * DebuggerManager 仅依赖 CodeCollector.getActivePage（用于自建 CDP session 的
@@ -36,9 +36,9 @@ import type {Page} from '../../third_party/index.js';
 export type DebuggerCollector = Pick<CodeCollector, 'getActivePage'>;
 
 /** 兼容旧名：兼容 {getActivePage(): Promise<Page>} 的最小实现。 */
-export type MinimalDebuggerCollector = {
+export interface MinimalDebuggerCollector {
   getActivePage(): Promise<Page>;
-};
+}
 
 import {BlackboxManager} from './BlackboxManager.js';
 import {BreakpointManager} from './BreakpointManager.js';
@@ -46,7 +46,7 @@ import {DebuggerSessionStore} from './DebuggerSessionStore.js';
 import {EventBreakpointManager} from './EventBreakpointManager.js';
 import {ExecutionContextTracker} from './ExecutionContextTracker.js';
 import {ExecutionController} from './ExecutionController.js';
-import {RuntimeInspector} from './RuntimeInspector.js';
+import type {RuntimeInspector} from './RuntimeInspector.js';
 import {ScopeInspector} from './ScopeInspector.js';
 import {ScriptManager} from './ScriptManager.js';
 import {WatchExpressionManager} from './WatchExpressionManager.js';
@@ -225,7 +225,9 @@ export class DebuggerManager {
     this._xhrManager = new XHRBreakpointManager(() => this.requireSession());
     logger.info('XHRBreakpointManager initialized');
 
-    this._eventManager = new EventBreakpointManager(() => this.requireSession());
+    this._eventManager = new EventBreakpointManager(() =>
+      this.requireSession(),
+    );
     logger.info('EventBreakpointManager initialized');
 
     this._blackboxManager = new BlackboxManager(() => this.requireSession());
@@ -340,7 +342,7 @@ export class DebuggerManager {
     return this.breakpointManager.removeBreakpoint(breakpointId);
   }
 
-  listBreakpoints(): import('./types.js').BreakpointInfo[] {
+  listBreakpoints(): Array<import('./types.js').BreakpointInfo> {
     return this.breakpointManager.listBreakpoints();
   }
 
@@ -366,15 +368,22 @@ export class DebuggerManager {
     objectId: string,
     condition?: string,
   ): Promise<import('./types.js').BreakpointInfo> {
-    return this.breakpointManager.setBreakpointOnFunctionCall(objectId, condition);
+    return this.breakpointManager.setBreakpointOnFunctionCall(
+      objectId,
+      condition,
+    );
   }
 
   async getPossibleBreakpoints(
     start: import('./types.js').Location,
     end?: import('./types.js').Location,
     restrictToFunction?: boolean,
-  ): Promise<import('./types.js').BreakLocation[]> {
-    return this.breakpointManager.getPossibleBreakpoints(start, end, restrictToFunction);
+  ): Promise<Array<import('./types.js').BreakLocation>> {
+    return this.breakpointManager.getPossibleBreakpoints(
+      start,
+      end,
+      restrictToFunction,
+    );
   }
 
   // ==================== 执行控制（委托 ExecutionController） ====================
@@ -441,7 +450,10 @@ export class DebuggerManager {
     location: import('./types.js').Location,
     targetCallFrames?: 'any' | 'current',
   ): Promise<void> {
-    return this.executionController.continueToLocation(location, targetCallFrames);
+    return this.executionController.continueToLocation(
+      location,
+      targetCallFrames,
+    );
   }
 
   async setVariableValue(
@@ -450,14 +462,21 @@ export class DebuggerManager {
     variableName: string,
     newValue: import('./types.js').CallArgument,
   ): Promise<void> {
-    return this.executionController.setVariableValue(callFrameId, scopeNumber, variableName, newValue);
+    return this.executionController.setVariableValue(
+      callFrameId,
+      scopeNumber,
+      variableName,
+      newValue,
+    );
   }
 
   async restartFrame(callFrameId: string): Promise<void> {
     return this.executionController.restartFrame(callFrameId);
   }
 
-  async setReturnValue(newValue: import('./types.js').CallArgument): Promise<void> {
+  async setReturnValue(
+    newValue: import('./types.js').CallArgument,
+  ): Promise<void> {
     return this.executionController.setReturnValue(newValue);
   }
 
@@ -698,7 +717,7 @@ export class DebuggerManager {
 
   // ==================== 脚本管理（委托 ScriptManager） ====================
 
-  getScripts(): import('./ScriptManager.js').ScriptInfo[] {
+  getScripts(): Array<import('./ScriptManager.js').ScriptInfo> {
     return this.scriptManager.getAllScriptsSync();
   }
 
@@ -708,13 +727,13 @@ export class DebuggerManager {
     return this.scriptManager.getScriptById(scriptId);
   }
 
-  getScriptsByUrl(url: string): import('./ScriptManager.js').ScriptInfo[] {
+  getScriptsByUrl(url: string): Array<import('./ScriptManager.js').ScriptInfo> {
     return this.scriptManager.getScriptsByUrl(url);
   }
 
   async getScriptsByUrlPattern(
     pattern: string,
-  ): Promise<import('./ScriptManager.js').ScriptInfo[]> {
+  ): Promise<Array<import('./ScriptManager.js').ScriptInfo>> {
     return this.scriptManager.findScriptsByUrl(pattern);
   }
 
@@ -726,7 +745,9 @@ export class DebuggerManager {
     if (!script.sourcePath) {
       const loadError = (script as any).loadError;
       if (loadError) {
-        throw new Error(`Failed to get script source for ${scriptId}: ${loadError.message || loadError}`);
+        throw new Error(
+          `Failed to get script source for ${scriptId}: ${loadError.message || loadError}`,
+        );
       }
       throw new Error(`Script source not found: ${scriptId}`);
     }
@@ -779,7 +800,9 @@ export class DebuggerManager {
 
   // ==================== 执行上下文（委托 ExecutionContextTracker） ====================
 
-  getExecutionContexts(): import('./ExecutionContextInfo.js').ExecutionContextInfo[] {
+  getExecutionContexts(): Array<
+    import('./ExecutionContextInfo.js').ExecutionContextInfo
+  > {
     return this.executionContextTracker.getExecutionContexts();
   }
 
@@ -793,7 +816,7 @@ export class DebuggerManager {
 
   async setBlackboxedRanges(
     scriptId: string,
-    positions: import('./types.js').ScriptPosition[],
+    positions: Array<import('./types.js').ScriptPosition>,
   ): Promise<void> {
     return this.getBlackboxManager().setBlackboxedRanges(scriptId, positions);
   }
@@ -806,7 +829,7 @@ export class DebuggerManager {
   }
 
   /** getBreakpoints 是 listBreakpoints 的别名，用于兼容 DebuggerContext 的 API。 */
-  getBreakpoints(): import('./types.js').BreakpointInfo[] {
+  getBreakpoints(): Array<import('./types.js').BreakpointInfo> {
     return this.breakpointManager.listBreakpoints();
   }
 }

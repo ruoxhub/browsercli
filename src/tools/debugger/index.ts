@@ -5,11 +5,12 @@
  */
 
 import type {DebuggerManager} from '../../modules/debugger/DebuggerManager.js';
-import {safeStringify} from '../../utils/safeJson.js';
 import {zod} from '../../third_party/index.js';
+import {safeStringify} from '../../utils/safeJson.js';
 import type {ToolContextProvider} from '../../worker/ToolContext.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
+
 import {
   DEFAULT_PREVIEW_LENGTH,
   filterMatchesByUrl,
@@ -1827,7 +1828,7 @@ export const setBreakpointOnText = defineTool({
       }
 
       // 应用 URL 过滤
-      let matches = filterMatchesByUrl(
+      const matches = filterMatchesByUrl(
         searchResult.matches,
         urlFilter,
         m => m.url,

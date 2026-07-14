@@ -30,12 +30,20 @@ export function bearerAuth(
   if (!requiresAuth) return false;
 
   const header = req.headers['authorization'];
-  if (typeof header === 'string' && cfg.apiToken && header === `Bearer ${cfg.apiToken}`) {
+  if (
+    typeof header === 'string' &&
+    cfg.apiToken &&
+    header === `Bearer ${cfg.apiToken}`
+  ) {
     return false;
   }
 
   res.statusCode = 401;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.end(JSON.stringify({error: {code: 'UNAUTHORIZED', message: 'Missing or invalid bearer token'}}));
+  res.end(
+    JSON.stringify({
+      error: {code: 'UNAUTHORIZED', message: 'Missing or invalid bearer token'},
+    }),
+  );
   return true;
 }

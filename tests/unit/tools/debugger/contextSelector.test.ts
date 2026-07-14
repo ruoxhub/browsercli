@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {describe, it} from 'node:test';
 import assert from 'node:assert/strict';
+import {describe, it} from 'node:test';
 
 import {selectExecutionContext} from '../../../../src/tools/debugger/contextSelector.js';
 import type {ExecutionContextInfo} from '../../../../src/tools/debugger/executionContexts.js';
@@ -29,10 +29,7 @@ function ctx(
 describe('selectExecutionContext', () => {
   it('空候选返回 null', () => {
     assert.equal(selectExecutionContext([]), null);
-    assert.equal(
-      selectExecutionContext([], {context: 'content-script'}),
-      null,
-    );
+    assert.equal(selectExecutionContext([], {context: 'content-script'}), null);
   });
 
   it('单个 page 候选直接命中', () => {
@@ -47,10 +44,7 @@ describe('selectExecutionContext', () => {
       ctx(1, 'page', 'frame-main'),
       ctx(2, 'page', 'frame-iframe'),
     ];
-    assert.equal(
-      selectExecutionContext(contexts, {context: 'page'}),
-      null,
-    );
+    assert.equal(selectExecutionContext(contexts, {context: 'page'}), null);
   });
 
   it('多个 page 候选、未传 frameId、开启 fallback → 第一个', () => {

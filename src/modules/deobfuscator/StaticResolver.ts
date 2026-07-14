@@ -1,5 +1,10 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import type {NodePath} from '@babel/traverse';
-import * as t from '@babel/types';
+import type * as t from '@babel/types';
 
 export const UNRESOLVED: unique symbol = Symbol('unresolved');
 export type Unresolved = typeof UNRESOLVED;
@@ -15,7 +20,9 @@ export class StaticResolver {
       path.isNumericLiteral() ||
       path.isBooleanLiteral()
     ) {
-      return (path.node as t.StringLiteral | t.NumericLiteral | t.BooleanLiteral).value;
+      return (
+        path.node as t.StringLiteral | t.NumericLiteral | t.BooleanLiteral
+      ).value;
     }
     if (path.isNullLiteral()) {
       return null;
@@ -24,7 +31,9 @@ export class StaticResolver {
       path.isTemplateLiteral() &&
       (path.node as t.TemplateLiteral).expressions.length === 0
     ) {
-      return (path.node as t.TemplateLiteral).quasis[0]?.value.cooked ?? UNRESOLVED;
+      return (
+        (path.node as t.TemplateLiteral).quasis[0]?.value.cooked ?? UNRESOLVED
+      );
     }
     if (path.isIdentifier({name: 'undefined'})) {
       return undefined;
@@ -61,7 +70,10 @@ export class StaticResolver {
         if (key === UNRESOLVED) {
           return UNRESOLVED;
         }
-        const value = this.resolveStatic(propPath.get('value') as NodePath, seenBindings);
+        const value = this.resolveStatic(
+          propPath.get('value') as NodePath,
+          seenBindings,
+        );
         if (value === UNRESOLVED) {
           return UNRESOLVED;
         }
@@ -152,7 +164,9 @@ export class StaticResolver {
       path.isCallExpression() &&
       (path.get('callee') as NodePath).isMemberExpression()
     ) {
-      const calleeProp = (path.get('callee') as NodePath).get('property') as NodePath;
+      const calleeProp = (path.get('callee') as NodePath).get(
+        'property',
+      ) as NodePath;
       const isSplit =
         calleeProp.isIdentifier({name: 'split'}) ||
         calleeProp.isStringLiteral({value: 'split'});
@@ -163,7 +177,8 @@ export class StaticResolver {
         );
         if (typeof source === 'string') {
           return source.split(
-            ((path.get('arguments.0') as NodePath).node as t.StringLiteral).value,
+            ((path.get('arguments.0') as NodePath).node as t.StringLiteral)
+              .value,
           );
         }
       }

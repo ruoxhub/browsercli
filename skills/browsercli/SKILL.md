@@ -8,6 +8,7 @@ The `browsercli` tool is a command-line interface for browser automation and Jav
 ## Status
 
 Check connection status and run environment diagnostics before starting a reverse-engineering session:
+
 ```bash
 browsercli status
 ```
@@ -22,6 +23,7 @@ browsercli status
 ## Command Usage
 
 All tool executions follow the pattern:
+
 ```bash
 browsercli call <tool_name> [arguments]
 ```
@@ -31,7 +33,9 @@ browsercli call <tool_name> [arguments]
 ## Detailed Tool Reference
 
 ### 1. Browser Navigation & Page Control
+
 Manage tabs, navigate URLs, and switch iframe execution contexts.
+
 ```bash
 # List all open browser pages with index, URL, and title
 browsercli call list_pages # 列出所有打开的浏览器页面。
@@ -53,7 +57,9 @@ browsercli call select_frame --frameIdx <num> # 选择特定的 Iframe 框架作
 ```
 
 ### 2. Script Collection & Search
+
 Identify and collect JavaScript source code from the active browser page.
+
 ```bash
 # List all loaded scripts
 browsercli call list_scripts [--filter <str>] # 列出当前页面加载的所有 JavaScript 脚本信息。
@@ -78,7 +84,9 @@ browsercli call collection_diff [--includeUnchanged <bool>] # 对比之前和当
 ```
 
 ### 3. JavaScript Code Analysis & Deobfuscation
+
 Analyze, summarize, and deobfuscate JavaScript with static analysis and AI support.
+
 ```bash
 # AI-assisted JavaScript deobfuscation
 browsercli call deobfuscate_code --code <str> [--aggressive <bool>] [--renameVariables <bool>] # AI 辅助的 JavaScript 反混淆。
@@ -94,7 +102,9 @@ browsercli call detect_crypto --code <str> [--useAI <bool>] # 检测 JavaScript 
 ```
 
 ### 4. Dynamic Hooking (Highly Recommended)
+
 Hooks are the preferred method for monitoring runtime behavior as they do not pause execution.
+
 ```bash
 # Create a hook configuration script
 browsercli call create_hook --type <str> [--params <arr>] [--description <str>] [--action <str>] [--hookId <str>] [--capture <arr>] [--condition <arr>] # 创建针对函数/请求/属性等的 Hook 脚本定义。
@@ -123,7 +133,9 @@ browsercli call auto_hook [--url <str>] [--preset <str>] [--autoInject <bool>] [
 ```
 
 ### 5. Debugging & Breakpoints
+
 Set breakpoints when you must inspect local stack frames and scoped variables.
+
 ```bash
 # Set JavaScript breakpoint
 browsercli call set_breakpoint --url <str> --lineNumber <num> [--condition <str>] # 设置 JavaScript 断点。支持按脚本 URL 和行号设置，可选条件表达式。
@@ -154,7 +166,9 @@ browsercli call evaluate_on_callframe --expression <str> # 在当前暂停调用
 ```
 
 ### 6. Anti-Detection & Stealth
+
 Bypass protection mechanisms, anti-debugging checks, and web driver detection.
+
 ```bash
 # Anti-anti-debug toolkit (fixes window size, freezes time, blocks page close/history navigation, etc.)
 browsercli call anti_anti_debug # 激活防反调试防护，锁定视口、冻结时间或防止页面关闭。
@@ -172,7 +186,9 @@ browsercli call list_stealth_presets # 列出可用的隐身防爬配置预设�
 ```
 
 ### 7. WebAssembly Analysis (Wasm)
+
 Decompile, optimize, disassemble, and run WebAssembly modules.
+
 ```bash
 # Detect available native Wasm toolchain
 browsercli call wasm_capabilities # 检测本地是否安装有 WASM 分析相关的 native 工具链。
@@ -203,7 +219,9 @@ browsercli call wasm_memory_inspect [--offset <num>] [--length <num>] [--format 
 ```
 
 ### 8. DOM Query & Element Interaction
+
 Automate page actions such as clicks, typing, and form submissions.
+
 ```bash
 # Query elements
 browsercli call query_dom --selector <str> [--all <bool>] [--limit <num>] # 根据 CSS 选择器查询 DOM 元素的位置、属性及可见性。
@@ -231,7 +249,9 @@ browsercli call take_screenshot [--format <str>] [--quality <num>] [--fullPage <
 ```
 
 ### 9. Network & WebSocket Analysis
+
 Inspect HTTPS requests, request initiators (call stack), and WebSockets.
+
 ```bash
 # List network requests
 browsercli call list_network_requests [--pageSize <num>] [--pageIdx <num>] [--includePreservedRequests <bool>] [--targetPageIdx <num>] [--waitForRequest <str>] [--waitTimeoutMs <num>] [--headerFilter <str>] [--urlFilter <str>] [--includeSignatureEvidence <bool>] # 检索并列出当前页面抓包捕获的所有 HTTP/HTTPS 请求报文。
@@ -257,7 +277,9 @@ browsercli call analyze_websocket_messages --wsid <num> [--direction <str>] # �
 ```
 
 ### 10. Environment Rebuilding & Evidence Logging
+
 Document clues and reconstruct local emulation scripts.
+
 ```bash
 # Append structured reverse-engineering evidence to task logs
 browsercli call record_reverse_evidence --taskId <str> --taskSlug <str> --targetUrl <str> --goal <str> [--channel <str>] [--targetKeywords <arr>] [--targetUrlPatterns <arr>] [--targetFunctionNames <arr>] [--targetActionDescription <str>] --entry <arr> # 将捕捉到的关键逆向证据结构化追加到任务凭证日志中。
@@ -276,7 +298,9 @@ browsercli call trace_signature_generation [--requestUrlPattern <str>] [--header
 ```
 
 ### 11. Workflow Helpers, Site Experiences & Templates
+
 Package specific patterns, target profiles, and reusable scripts.
+
 ```bash
 # Recommendation and workflow guidance
 browsercli call recommend_next_step [--taskId <str>] [--browserHealthy <bool>] [--pageReady <bool>] [--taskGoal <str>] [--currentStage <str>] [--taskStatus <str>] [--hasTargetRequest <bool>] [--hookRecordCount <num>] [--hasRebuildBundle <bool>] [--hasPassingRebuild <bool>] [--firstDivergenceKnown <bool>] # 根据当前的分析状态推荐后续逆向工程的建议步骤。
@@ -294,6 +318,7 @@ browsercli call delete_site_experience --id <num> # 删除选定的站点逆向�
 ```
 
 ### 12. Session Management, Diagnostics & Video
+
 ```bash
 # Save and restore browser state
 browsercli call save_session_state [--sessionId <str>] [--includeCookies <bool>] [--includeLocalStorage <bool>] [--includeSessionStorage <bool>] # 备份当前的浏览器 Cookie 与 Storage 会话状态。

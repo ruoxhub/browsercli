@@ -100,11 +100,11 @@ js-reverse start
 
 ## 与其他 stealth flag 的关系
 
-| Flag | 作用 | 默认 |
-|---|---|---|
-| `--cloak` | CloakBrowser 二进制 + 49 C++ patch + cloak-profile | `false` |
-| `--js-stealth` | 页面里注入 `StealthScripts2025`（覆盖 navigator/canvas/WebGL/audio） | `false` |
-| `--full-stealth-args` | 使用历史 60+ Chromium 启动参数集（多个 flag 已是检测信号，不推荐） | `false` |
+| Flag                  | 作用                                                                 | 默认    |
+| --------------------- | -------------------------------------------------------------------- | ------- |
+| `--cloak`             | CloakBrowser 二进制 + 49 C++ patch + cloak-profile                   | `false` |
+| `--js-stealth`        | 页面里注入 `StealthScripts2025`（覆盖 navigator/canvas/WebGL/audio） | `false` |
+| `--full-stealth-args` | 使用历史 60+ Chromium 启动参数集（多个 flag 已是检测信号，不推荐）   | `false` |
 
 默认情况下 worker 只用最小启动参数集（`MINIMAL_STEALTH_ARGS`：`--test-type`
 banner 抑制 + `--hide-crash-restore-bubble`），反检测能力由协议层

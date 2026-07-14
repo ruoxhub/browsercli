@@ -8,6 +8,8 @@ import {createWriteStream} from 'node:fs';
 import fs from 'node:fs';
 import {afterEach, beforeEach, describe, it} from 'node:test';
 
+import {chromium, firefox} from 'patchright';
+
 import {
   BrowserManager,
   launch,
@@ -17,7 +19,6 @@ import {
   StealthScripts2025,
   type StealthReport,
 } from '../../../src/modules/stealth/StealthScripts2025.js';
-import {chromium, firefox} from 'patchright';
 
 interface ResettableStealthScripts {
   injectAll: typeof StealthScripts2025.injectAll;
@@ -36,7 +37,7 @@ interface BrowserLike {
   connected: boolean;
   process?(): ProcessLike;
   pages(): Promise<unknown[]>;
-  contexts(): Array<{pages(): Array<unknown>}>;
+  contexts(): Array<{pages(): unknown[]}>;
   version(): string;
   on(event: string, handler: unknown): void;
   close(): Promise<void>;
@@ -492,7 +493,9 @@ describe('browser.ts mocked', () => {
       }) as typeof chromium.connectOverCDP;
 
       await assert.rejects(async () => {
-        await (manager as unknown as BrowserManagerLike).connectToRemoteBrowser();
+        await (
+          manager as unknown as BrowserManagerLike
+        ).connectToRemoteBrowser();
       }, /DevTools 端点/);
     } finally {
       globalThis.fetch = originalFetch;
@@ -530,9 +533,8 @@ describe('browser.ts mocked', () => {
       assert.strictEqual(result, undefined);
 
       // 直接验证导出 readDevToolsActivePort 自身在 stub 后的行为。
-      const {readDevToolsActivePort} = await import(
-        '../../../src/modules/browser/browser-discovery.js'
-      );
+      const {readDevToolsActivePort} =
+        await import('../../../src/modules/browser/browser-discovery.js');
       const active = readDevToolsActivePort();
       assert.deepStrictEqual(active, {port, wsPath});
     } finally {

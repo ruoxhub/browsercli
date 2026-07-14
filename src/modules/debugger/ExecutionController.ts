@@ -20,6 +20,7 @@
 
 import type {CDPSession} from '../../third_party/index.js';
 import {logger} from '../../utils/logger.js';
+
 import type {
   CallArgument,
   DebuggerPausedEvent,

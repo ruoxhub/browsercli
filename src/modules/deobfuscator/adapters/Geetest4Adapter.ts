@@ -1,3 +1,8 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import generateImport from '@babel/generator';
 import traverseImport from '@babel/traverse';
 import * as t from '@babel/types';
@@ -9,7 +14,8 @@ import type {SiteAdapter} from '../SiteAdapterRegistry.js';
 const generate = unwrapBabelDefault<typeof generateImport>(generateImport);
 const traverse = unwrapBabelDefault<typeof traverseImport>(traverseImport);
 
-type NodePath<T extends t.Node = t.Node> = import('@babel/traverse').NodePath<T>;
+type NodePath<T extends t.Node = t.Node> =
+  import('@babel/traverse').NodePath<T>;
 
 function generateCode(node: t.Node): string {
   return generate(node, {
@@ -52,9 +58,11 @@ function geetest4GuardedPass(ast: t.File): {ast: t.File; changed: boolean} {
     VariableDeclaration(path) {
       if (
         path.node.declarations.length !== 3 ||
-        !((path.get('declarations') as NodePath[])[0]!.get('init') as NodePath).node ||
+        !((path.get('declarations') as NodePath[])[0]!.get('init') as NodePath)
+          .node ||
         generateCode(
-          ((path.get('declarations') as NodePath[])[0]!.get('init') as NodePath).node!,
+          ((path.get('declarations') as NodePath[])[0]!.get('init') as NodePath)
+            .node!,
         ) !== decriptPropName
       ) {
         return;
@@ -67,7 +75,12 @@ function geetest4GuardedPass(ast: t.File): {ast: t.File; changed: boolean} {
       }
 
       const candidateNames = [0, 2]
-        .map(index => (path.get('declarations') as NodePath[])[index]!.get('id') as NodePath)
+        .map(
+          index =>
+            (path.get('declarations') as NodePath[])[index]!.get(
+              'id',
+            ) as NodePath,
+        )
         .filter(idPath => idPath && idPath.isIdentifier())
         .map(idPath => (idPath.node as t.Identifier).name);
 
@@ -82,13 +95,14 @@ function geetest4GuardedPass(ast: t.File): {ast: t.File; changed: boolean} {
             !parent ||
             !parent.isCallExpression() ||
             (parent.node as t.CallExpression).arguments.length !== 1 ||
-            !((parent.get('arguments') as NodePath[])[0] as NodePath).isNumericLiteral()
+            !(
+              (parent.get('arguments') as NodePath[])[0] as NodePath
+            ).isNumericLiteral()
           ) {
             return;
           }
           const argValue = (
-            (parent.node as t.CallExpression)
-              .arguments[0] as t.NumericLiteral
+            (parent.node as t.CallExpression).arguments[0] as t.NumericLiteral
           ).value;
           const result = evaluator.evaluateExpression(
             `${decriptPropName}(${argValue})`,
@@ -112,12 +126,22 @@ function geetest4GuardedPass(ast: t.File): {ast: t.File; changed: boolean} {
         path.node.init !== null ||
         path.node.update !== null ||
         !(path.get('test') as NodePath).isBinaryExpression() ||
-        !generateCode(
-          (path.get('test.right') as NodePath).node!,
-        ).includes(ctrlVarName) ||
+        !generateCode((path.get('test.right') as NodePath).node!).includes(
+          ctrlVarName,
+        ) ||
         !(path.get('body') as NodePath).isBlockStatement() ||
-        ((path.get('body') as NodePath<t.BlockStatement>).get('body') as NodePath[]).length !== 1 ||
-        !(((path.get('body') as NodePath<t.BlockStatement>).get('body') as NodePath[])[0] as NodePath).isSwitchStatement()
+        (
+          (path.get('body') as NodePath<t.BlockStatement>).get(
+            'body',
+          ) as NodePath[]
+        ).length !== 1 ||
+        !(
+          (
+            (path.get('body') as NodePath<t.BlockStatement>).get(
+              'body',
+            ) as NodePath[]
+          )[0] as NodePath
+        ).isSwitchStatement()
       ) {
         return;
       }
@@ -130,7 +154,11 @@ function geetest4GuardedPass(ast: t.File): {ast: t.File; changed: boolean} {
       const testName = (testNamePath.node as t.Identifier).name;
       const statements: t.Statement[] = [];
 
-      const switchPath = ((path.get('body') as NodePath<t.BlockStatement>).get('body') as NodePath[])[0] as NodePath<t.SwitchStatement>;
+      const switchPath = (
+        (path.get('body') as NodePath<t.BlockStatement>).get(
+          'body',
+        ) as NodePath[]
+      )[0] as NodePath<t.SwitchStatement>;
       (switchPath.get('cases') as NodePath[]).forEach(casePath => {
         (casePath.get('consequent') as NodePath[]).forEach(stmtPath => {
           if (stmtPath.isBreakStatement()) {

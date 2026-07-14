@@ -13,8 +13,12 @@ import {defineTool, type Context} from '../ToolDefinition.js';
  */
 export const hookCryptoJS = defineTool({
   name: 'hook_cryptojs',
-  description: 'Hook CryptoJS library: intercept AES, DES, MD5, SHA, HMAC and other symmetric/hash algorithms',
-  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: false},
+  description:
+    'Hook CryptoJS library: intercept AES, DES, MD5, SHA, HMAC and other symmetric/hash algorithms',
+  annotations: {
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: false,
+  },
   schema: {
     algorithms: zod
       .array(zod.string())
@@ -128,15 +132,14 @@ export const hookCryptoJS = defineTool({
         tooltype: 'hook_cryptojs',
         data: {
           algorithms: algos,
-        }
-        
+        },
       });
     } catch (error) {
       response.setStructuredContent({
         success: false,
         message: `错误：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'hook_cryptojs',
-        data: {}
+        data: {},
       });
     }
   },

@@ -54,9 +54,7 @@
   "mcpServers": {
     "js-reverse": {
       "command": "node",
-      "args": [
-        "/ABSOLUTE/PATH/JSReverser-MCP/build/src/index.js"
-      ]
+      "args": ["/ABSOLUTE/PATH/JSReverser-MCP/build/src/index.js"]
     }
   }
 }

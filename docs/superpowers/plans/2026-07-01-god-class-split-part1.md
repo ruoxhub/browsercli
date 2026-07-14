@@ -25,6 +25,7 @@
 ### Task 1.1: 阅读现有代码，判断拆分边界
 
 **Files:**
+
 - Read: `src/modules/analyzer/CodeAnalyzer.ts` (747 lines)
 
 行级别的拆分边界已经明确（见 spec），执行前只需确认最新代码与 spec 一致。
@@ -32,6 +33,7 @@
 - [ ] **Step 1: 确认待提取的 4 个方法范围**
 
 在 `src/modules/analyzer/CodeAnalyzer.ts` 中确认以下方法的起止行：
+
 - `analyzeStructure`（L203–L350）
 - `analyzeModules`（L352–L386）
 - `buildCallGraph`（L388–L449）
@@ -40,6 +42,7 @@
 - [ ] **Step 2: 确认被提取方法的依赖**
 
 这些方法使用了以下外部依赖（需在新文件中 import）：
+
 - `traverse` from `@babel/traverse`
 - `type * as t` from `@babel/types`
 - `FunctionInfo`, `ClassInfo`, `CallGraph`, `CodeStructure` from `../../types/index.js`
@@ -57,9 +60,11 @@ npm run build && npm run typecheck && npm run test:unit
 ### Task 1.2: 创建 CodeAnalyzerStructure.ts 策略文件
 
 **Files:**
+
 - Create: `src/modules/analyzer/CodeAnalyzerStructure.ts`
 
 **Interfaces:**
+
 - Produces: 4 个具名导出函数（`analyzeStructure`, `analyzeModules`, `buildCallGraph`, `calculateComplexity`）
 - 签名与现有私有方法一致，但不再通过 `this` 访问任何属性
 
@@ -112,7 +117,7 @@ export function analyzeModules(
       },
     });
     if (imports.length > 0 || exports.length > 0) {
-      modules.push({ name: 'current', imports, exports });
+      modules.push({name: 'current', imports, exports});
     }
   }
   return modules;
@@ -129,18 +134,35 @@ export function calculateComplexity(path: unknown): number {
   const anyPath = path as any;
   if (anyPath.traverse) {
     anyPath.traverse({
-      IfStatement() { complexity++; },
-      SwitchCase() { complexity++; },
-      ForStatement() { complexity++; },
-      WhileStatement() { complexity++; },
-      DoWhileStatement() { complexity++; },
-      ConditionalExpression() { complexity++; },
+      IfStatement() {
+        complexity++;
+      },
+      SwitchCase() {
+        complexity++;
+      },
+      ForStatement() {
+        complexity++;
+      },
+      WhileStatement() {
+        complexity++;
+      },
+      DoWhileStatement() {
+        complexity++;
+      },
+      ConditionalExpression() {
+        complexity++;
+      },
       LogicalExpression(logicalPath: any) {
-        if (logicalPath.node.operator === '&&' || logicalPath.node.operator === '||') {
+        if (
+          logicalPath.node.operator === '&&' ||
+          logicalPath.node.operator === '||'
+        ) {
           complexity++;
         }
       },
-      CatchClause() { complexity++; },
+      CatchClause() {
+        complexity++;
+      },
     });
   }
   return complexity;
@@ -170,7 +192,10 @@ export function buildCallGraph(
       },
       FunctionExpression(path) {
         const parent = path.parent;
-        if (parent.type === 'VariableDeclarator' && parent.id.type === 'Identifier') {
+        if (
+          parent.type === 'VariableDeclarator' &&
+          parent.id.type === 'Identifier'
+        ) {
           currentFunction = parent.id.name;
         }
       },
@@ -180,17 +205,23 @@ export function buildCallGraph(
           let calledFunction = '';
           if (callee.type === 'Identifier') {
             calledFunction = callee.name;
-          } else if (callee.type === 'MemberExpression' && callee.property.type === 'Identifier') {
+          } else if (
+            callee.type === 'MemberExpression' &&
+            callee.property.type === 'Identifier'
+          ) {
             calledFunction = callee.property.name;
           }
-          if (calledFunction && functions.some(f => f.name === calledFunction)) {
-            edges.push({ from: currentFunction, to: calledFunction });
+          if (
+            calledFunction &&
+            functions.some(f => f.name === calledFunction)
+          ) {
+            edges.push({from: currentFunction, to: calledFunction});
           }
         }
       },
     });
   }
-  return { nodes, edges };
+  return {nodes, edges};
 }
 ```
 
@@ -199,6 +230,7 @@ export function buildCallGraph(
 - [ ] **Step 5: 复制 `analyzeStructure`（改为调用本地函数、接受 calculateComplexity 回调）**
 
 从 `CodeAnalyzer.ts` L203–L350 复制。关键改动：
+
 1. 移除 `this.analyzeModules(this)` 和 `this.buildCallGraph(this)`
 2. 改为调用同文件的 `analyzeModules` 和 `buildCallGraph` 函数
 3. AST 参数改为必传（由调用方传入）
@@ -218,8 +250,14 @@ export async function analyzeStructure(
         const node = path.node;
         functions.push({
           name: node.id?.name || 'anonymous',
-          params: node.params.map(p => p.type === 'Identifier' ? p.name : 'unknown'),
-          location: { file: 'current', line: node.loc?.start.line || 0, column: node.loc?.start.column },
+          params: node.params.map(p =>
+            p.type === 'Identifier' ? p.name : 'unknown',
+          ),
+          location: {
+            file: 'current',
+            line: node.loc?.start.line || 0,
+            column: node.loc?.start.column,
+          },
           complexity: calculateComplexity(path),
         });
       },
@@ -233,7 +271,7 @@ export async function analyzeStructure(
   const modules = analyzeModules(code, ast);
   const callGraph = buildCallGraph(functions, ast);
 
-  return { functions, classes, modules, callGraph };
+  return {functions, classes, modules, callGraph};
 }
 ```
 
@@ -244,9 +282,11 @@ export async function analyzeStructure(
 ### Task 1.3: 更新 CodeAnalyzer 门面
 
 **Files:**
+
 - Modify: `src/modules/analyzer/CodeAnalyzer.ts`
 
 **Interfaces:**
+
 - Consumes: `analyzeStructure`, `analyzeModules`, `buildCallGraph`, `calculateComplexity` from `./CodeAnalyzerStructure.js`
 
 - [ ] **Step 1: 添加 import**
@@ -265,6 +305,7 @@ import {
 - [ ] **Step 2: 删除 4 个私有方法**
 
 删除 CodeAnalyzer 类中的以下方法（L203–L492）：
+
 - `analyzeStructure`（L203–L350）
 - `analyzeModules`（L352–L386）
 - `buildCallGraph`（L388–L449）
@@ -292,12 +333,13 @@ wc -l src/modules/analyzer/CodeAnalyzer.ts
 ### Task 1.4: 添加 CodeAnalyzerStructure 单元测试
 
 **Files:**
+
 - Create: `tests/unit/modules/analyzer/CodeAnalyzerStructure.test.ts`
 
 - [ ] **Step 1: 编写测试文件框架**
 
 ```typescript
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 import assert from 'node:assert';
 import * as parser from '@babel/parser';
 import {
@@ -313,40 +355,60 @@ import {
 describe('calculateComplexity', () => {
   it('returns 1 for empty function', () => {
     const code = `function empty() {}`;
-    const ast = parser.parse(code, { sourceType: 'module', plugins: ['jsx', 'typescript'] });
+    const ast = parser.parse(code, {
+      sourceType: 'module',
+      plugins: ['jsx', 'typescript'],
+    });
     let result = 1;
     require('@babel/traverse').default(ast, {
-      FunctionDeclaration(path: any) { result = calculateComplexity(path); }
+      FunctionDeclaration(path: any) {
+        result = calculateComplexity(path);
+      },
     });
     assert.strictEqual(result, 1);
   });
 
   it('increments for if statements', () => {
     const code = `function f() { if (true) { return 1; } }`;
-    const ast = parser.parse(code, { sourceType: 'module', plugins: ['jsx', 'typescript'] });
+    const ast = parser.parse(code, {
+      sourceType: 'module',
+      plugins: ['jsx', 'typescript'],
+    });
     let result = 1;
     require('@babel/traverse').default(ast, {
-      FunctionDeclaration(path: any) { result = calculateComplexity(path); }
+      FunctionDeclaration(path: any) {
+        result = calculateComplexity(path);
+      },
     });
     assert.strictEqual(result, 2);
   });
 
   it('increments for for/while loops', () => {
     const code = `function f() { for (let i = 0; i < 10; i++) { if (i > 5) break; } }`;
-    const ast = parser.parse(code, { sourceType: 'module', plugins: ['jsx', 'typescript'] });
+    const ast = parser.parse(code, {
+      sourceType: 'module',
+      plugins: ['jsx', 'typescript'],
+    });
     let result = 1;
     require('@babel/traverse').default(ast, {
-      FunctionDeclaration(path: any) { result = calculateComplexity(path); }
+      FunctionDeclaration(path: any) {
+        result = calculateComplexity(path);
+      },
     });
     assert.strictEqual(result, 3);
   });
 
   it('increments for switch/catch/conditional', () => {
     const code = `function f(x) { switch(x) { case 1: return 'a'; default: return 'b'; } }`;
-    const ast = parser.parse(code, { sourceType: 'module', plugins: ['jsx', 'typescript'] });
+    const ast = parser.parse(code, {
+      sourceType: 'module',
+      plugins: ['jsx', 'typescript'],
+    });
     let result = 1;
     require('@babel/traverse').default(ast, {
-      FunctionDeclaration(path: any) { result = calculateComplexity(path); }
+      FunctionDeclaration(path: any) {
+        result = calculateComplexity(path);
+      },
     });
     assert.strictEqual(result, 2);
   });
@@ -359,9 +421,24 @@ describe('calculateComplexity', () => {
 describe('buildCallGraph', () => {
   it('detects direct function calls', () => {
     const code = `function a() {} function b() { a(); }`;
-    const ast = parser.parse(code, { sourceType: 'module', plugins: ['jsx', 'typescript'] });
-    const functions = [{ name: 'a', params: [], location: { file: 'test', line: 1, column: 0 }, complexity: 1 },
-                       { name: 'b', params: [], location: { file: 'test', line: 1, column: 0 }, complexity: 1 }];
+    const ast = parser.parse(code, {
+      sourceType: 'module',
+      plugins: ['jsx', 'typescript'],
+    });
+    const functions = [
+      {
+        name: 'a',
+        params: [],
+        location: {file: 'test', line: 1, column: 0},
+        complexity: 1,
+      },
+      {
+        name: 'b',
+        params: [],
+        location: {file: 'test', line: 1, column: 0},
+        complexity: 1,
+      },
+    ];
     const graph = buildCallGraph(functions, ast);
     assert.ok(graph.edges.some(e => e.from === 'b' && e.to === 'a'));
   });
@@ -374,7 +451,10 @@ describe('buildCallGraph', () => {
 describe('analyzeStructure', () => {
   it('returns structure for simple code', async () => {
     const code = `function foo(x) { return x; }`;
-    const ast = parser.parse(code, { sourceType: 'module', plugins: ['jsx', 'typescript'] });
+    const ast = parser.parse(code, {
+      sourceType: 'module',
+      plugins: ['jsx', 'typescript'],
+    });
     const result = await analyzeStructure(code, ast);
     assert.ok(Array.isArray(result.functions));
     assert.ok(result.functions.some(f => f.name === 'foo'));
@@ -434,6 +514,7 @@ and AI-assisted analysis methods."
 ### Task 2.1: 阅读现有代码，熟悉方法分组
 
 **Files:**
+
 - Read: `src/modules/collector/PageController.ts` (993 lines)
 
 - [ ] **Step 1: 运行基线测试**
@@ -446,11 +527,11 @@ npm run build && npm run typecheck && npm run test:unit
 
 PageController 的所有方法都通过 `this.collector.getActivePage()` 获取页面，然后代理 Playwright 操作。分组如下：
 
-| 策略文件 | 方法 |
-|---|---|
-| PageNavigation | navigate, reload, goBack, goForward, waitForNavigation |
-| PageInteraction | click, clickAt, setFiles, type, select, hover, scroll, scrollBy, waitForSelector |
-| PageInfo | getURL, getTitle, getContent, screenshot, evaluate + storage 方法（setLocalStorage, clearLocalStorage, setSessionStorage, etc.）+ pressKey + emulateDevice |
+| 策略文件        | 方法                                                                                                                                                       |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PageNavigation  | navigate, reload, goBack, goForward, waitForNavigation                                                                                                     |
+| PageInteraction | click, clickAt, setFiles, type, select, hover, scroll, scrollBy, waitForSelector                                                                           |
+| PageInfo        | getURL, getTitle, getContent, screenshot, evaluate + storage 方法（setLocalStorage, clearLocalStorage, setSessionStorage, etc.）+ pressKey + emulateDevice |
 
 - [ ] **Step 3: 记录方法的公共签名，确保提取后不改动**
 
@@ -461,6 +542,7 @@ PageController 的所有方法都通过 `this.collector.getActivePage()` 获取�
 ### Task 2.2: 创建 PageNavigation.ts
 
 **Files:**
+
 - Create: `src/modules/collector/PageNavigation.ts`
 
 - [ ] **Step 1: 创建文件，复制导航方法**
@@ -468,9 +550,9 @@ PageController 的所有方法都通过 `this.collector.getActivePage()` 获取�
 从 PageController.ts 提取以下方法并改为导出函数，接受 `page: Page` 作为第一个参数，而非通过 `this.collector.getActivePage()`：
 
 ```typescript
-import type { Page } from 'playwright';
-import { logger } from '../../utils/logger.js';
-import type { NavigationOptions } from './PageController.js';
+import type {Page} from 'playwright';
+import {logger} from '../../utils/logger.js';
+import type {NavigationOptions} from './PageController.js';
 
 const DEFAULT_NAVIGATION_TIMEOUT_MS = 30000;
 
@@ -478,7 +560,7 @@ export async function navigate(
   page: Page,
   url: string,
   options?: NavigationOptions,
-): Promise<{ url: string; title: string; loadTime: number }> {
+): Promise<{url: string; title: string; loadTime: number}> {
   const startTime = Date.now();
   await page.goto(url, {
     waitUntil: options?.waitUntil || 'networkidle',
@@ -488,7 +570,7 @@ export async function navigate(
   const title = await page.title();
   const currentUrl = page.url();
   logger.info(`Navigated to: ${url}`);
-  return { url: currentUrl, title, loadTime };
+  return {url: currentUrl, title, loadTime};
 }
 
 export async function reload(
@@ -502,11 +584,11 @@ export async function reload(
 }
 
 export async function goBack(page: Page): Promise<void> {
-  await page.goBack({ timeout: DEFAULT_NAVIGATION_TIMEOUT_MS });
+  await page.goBack({timeout: DEFAULT_NAVIGATION_TIMEOUT_MS});
 }
 
 export async function goForward(page: Page): Promise<void> {
-  await page.goForward({ timeout: DEFAULT_NAVIGATION_TIMEOUT_MS });
+  await page.goForward({timeout: DEFAULT_NAVIGATION_TIMEOUT_MS});
 }
 
 export async function waitForNavigation(
@@ -526,62 +608,98 @@ export async function waitForNavigation(
 ### Task 2.3: 创建 PageInteraction.ts
 
 **Files:**
+
 - Create: `src/modules/collector/PageInteraction.ts`
 
 - [ ] **Step 1: 复制交互类方法，改为接受 page 参数的导出函数**
 
 ```typescript
-import type { Page, Frame, ElementHandle } from 'playwright';
-import { logger } from '../../utils/logger.js';
-import type { ClickOptions, TypeOptions, ScrollOptions } from './PageController.js';
-import type { CodeCollector } from './CodeCollector.js';
+import type {Page, Frame, ElementHandle} from 'playwright';
+import {logger} from '../../utils/logger.js';
+import type {
+  ClickOptions,
+  TypeOptions,
+  ScrollOptions,
+} from './PageController.js';
+import type {CodeCollector} from './CodeCollector.js';
 
 export async function click(
   page: Page,
   selector: string,
   options?: ClickOptions,
-): Promise<void> { /* 复制 click 方法体 */ }
+): Promise<void> {
+  /* 复制 click 方法体 */
+}
 
 export async function clickAt(
   page: Page,
   selector: string,
-): Promise<{ selector: string; x: number; y: number; width: number; height: number }> { /* 复制 clickAt 方法体 */ }
+): Promise<{
+  selector: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}> {
+  /* 复制 clickAt 方法体 */
+}
 
 export async function setFiles(
   page: Page,
   collector: CodeCollector,
   selector: string,
   filePaths: string[],
-): Promise<void> { /* 复制 setFiles 方法体 */ }
+): Promise<void> {
+  /* 复制 setFiles 方法体 */
+}
 
 export async function type(
   page: Page,
   selector: string,
   text: string,
   options?: TypeOptions,
-): Promise<void> { /* 复制 type 方法体 */ }
+): Promise<void> {
+  /* 复制 type 方法体 */
+}
 
 export async function select(
   page: Page,
   selector: string,
   ...values: string[]
-): Promise<void> { /* 复制 select 方法体 */ }
+): Promise<void> {
+  /* 复制 select 方法体 */
+}
 
-export async function hover(page: Page, selector: string): Promise<void> { /* 复制 hover 方法体 */ }
+export async function hover(page: Page, selector: string): Promise<void> {
+  /* 复制 hover 方法体 */
+}
 
-export async function scroll(page: Page, options: ScrollOptions): Promise<void> { /* 复制 scroll 方法体 */ }
+export async function scroll(
+  page: Page,
+  options: ScrollOptions,
+): Promise<void> {
+  /* 复制 scroll 方法体 */
+}
 
 export async function scrollBy(
   page: Page,
   direction: 'up' | 'down' | 'top' | 'bottom',
   pixels?: number,
-): Promise<void> { /* 复制 scrollBy 方法体 */ }
+): Promise<void> {
+  /* 复制 scrollBy 方法体 */
+}
 
 export async function waitForSelector(
   page: Page,
   selector: string,
   timeout?: number,
-): Promise<{ text: string; visible: boolean; attributes: Record<string, string> } | null> { /* 复制 waitForSelector 方法体 */ }
+): Promise<{
+  text: string;
+  visible: boolean;
+  attributes: Record<string, string>;
+} | null> {
+  /* 复制 waitForSelector 方法体 */
+}
 ```
 
 **注意**：此步骤需要从 PageController.ts 中精确复制 9 个方法的完整方法体。每个方法体的原始行数和逻辑保持一致。`setFiles` 额外需要 `Collector` 参数（原方法通过 `cdpSession` 做 CDP 调用）。
@@ -591,28 +709,39 @@ export async function waitForSelector(
 ### Task 2.4: 创建 PageInfo.ts
 
 **Files:**
+
 - Create: `src/modules/collector/PageInfo.ts`
 
 - [ ] **Step 1: 复制页面信息和 storage 方法**
 
 ```typescript
-import type { Page } from 'playwright';
+import type {Page} from 'playwright';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { ScreenshotOptions } from './PageController.js';
+import type {ScreenshotOptions} from './PageController.js';
 
-export async function getURL(page: Page): Promise<string> { /* 复制 getURL 方法体 */ }
+export async function getURL(page: Page): Promise<string> {
+  /* 复制 getURL 方法体 */
+}
 
-export async function getTitle(page: Page): Promise<string> { /* 复制 getTitle 方法体 */ }
+export async function getTitle(page: Page): Promise<string> {
+  /* 复制 getTitle 方法体 */
+}
 
-export async function getContent(page: Page): Promise<string> { /* 复制 getContent 方法体 */ }
+export async function getContent(page: Page): Promise<string> {
+  /* 复制 getContent 方法体 */
+}
 
 export async function screenshot(
   page: Page,
   options?: ScreenshotOptions,
-): Promise<Buffer> { /* 复制 screenshot 方法体 */ }
+): Promise<Buffer> {
+  /* 复制 screenshot 方法体 */
+}
 
-export async function evaluate<T>(page: Page, code: string): Promise<T> { /* 复制 evaluate 方法体 */ }
+export async function evaluate<T>(page: Page, code: string): Promise<T> {
+  /* 复制 evaluate 方法体 */
+}
 
 // storage 方法（setLocalStorage, clearLocalStorage, setSessionStorage, setCookie, clearCookies, pressKey, emulateDevice 等）
 ```
@@ -624,6 +753,7 @@ export async function evaluate<T>(page: Page, code: string): Promise<T> { /* 复
 ### Task 2.5: 更新 PageController 门面
 
 **Files:**
+
 - Modify: `src/modules/collector/PageController.ts`
 
 - [ ] **Step 1: 添加 import**
@@ -667,6 +797,7 @@ wc -l src/modules/collector/PageController.ts
 ### Task 2.6: 添加策略文件的单元测试
 
 **Files:**
+
 - Create: `tests/unit/modules/collector/PageNavigation.test.ts`
 - Create: `tests/unit/modules/collector/PageInteraction.test.ts`
 - Create: `tests/unit/modules/collector/PageInfo.test.ts`
@@ -676,18 +807,28 @@ wc -l src/modules/collector/PageController.ts
 由于 PageController 的方法是对 Playwright `Page` 的薄封装，测试可以使用 mock `Page` 对象：
 
 ```typescript
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 import assert from 'node:assert';
-import { navigate, reload } from '../../../src/modules/collector/PageNavigation.js';
+import {
+  navigate,
+  reload,
+} from '../../../src/modules/collector/PageNavigation.js';
 
 describe('PageNavigation', () => {
   it('navigate returns url, title, and loadTime', async () => {
     let calledUrl = '';
     let calledOptions: any = {};
     const mockPage = {
-      async goto(url: string, opts: any) { calledUrl = url; calledOptions = opts; },
-      async title() { return 'Mock Title'; },
-      url() { return 'https://example.com'; },
+      async goto(url: string, opts: any) {
+        calledUrl = url;
+        calledOptions = opts;
+      },
+      async title() {
+        return 'Mock Title';
+      },
+      url() {
+        return 'https://example.com';
+      },
     } as any;
 
     const result = await navigate(mockPage, 'https://example.com');
@@ -756,6 +897,7 @@ Public API unchanged, WasmCollector consumers unaffected."
 ### Task 3.1: 阅读代码，确认断点和执行的边界
 
 **Files:**
+
 - Read: `src/modules/debugger/DebuggerManager.ts` (1019 lines)
 
 - [ ] **Step 1: 运行基线测试**
@@ -769,14 +911,17 @@ npm run build && npm run typecheck && npm run test:unit
 列出所有断点管理方法和执行控制方法：
 
 **断点管理**（提取到 BreakpointManager）：
+
 - `setBreakpointByUrl`, `setBreakpoint`, `removeBreakpoint`, `listBreakpoints`, `getBreakpoint`, `clearAllBreakpoints`, `setPauseOnExceptions`
 - 状态：`breakpoints` Map, `pauseOnExceptionsState`, `breakpointResolvedListener`
 
 **执行控制**（提取到 ExecutionController）：
+
 - `pause`, `resume`, `stepInto`, `stepOver`, `stepOut`
 - 状态：`pausedState`, `pausedResolvers`, `pausedListener`, `resumedListener`
 
 **保留**（DebuggerManager 本体）：
+
 - CDP session 管理：`init`, `enable`, `disable`, `requireSession`, `getCDPSession`, `setAsyncCallStackDepth`
 - Sub-manager 访问器：`getWatchManager`, `getXHRManager`, `getEventManager`, `getBlackboxManager`
 - `constructScopeChain`, `toScopeVariableScopeType`（工具方法）
@@ -787,6 +932,7 @@ npm run build && npm run typecheck && npm run test:unit
 ### Task 3.2: 创建 BreakpointManager.ts
 
 **Files:**
+
 - Create: `src/modules/debugger/BreakpointManager.ts`
 
 - [ ] **Step 1: 创建文件，定义类**
@@ -811,6 +957,7 @@ export class BreakpointManager {
 - [ ] **Step 2: 复制断点方法**
 
 从 DebuggerManager.ts 复制以下方法的完整实现：
+
 - `setBreakpointByUrl`
 - `setBreakpoint`
 - `removeBreakpoint`
@@ -828,6 +975,7 @@ export class BreakpointManager {
 ### Task 3.3: 创建 ExecutionController.ts
 
 **Files:**
+
 - Create: `src/modules/debugger/ExecutionController.ts`
 
 - [ ] **Step 1: 创建文件，定义类**
@@ -849,6 +997,7 @@ export class ExecutionController {
 - [ ] **Step 2: 复制执行控制方法**
 
 从 DebuggerManager.ts 复制：
+
 - `pause`
 - `resume`
 - `stepInto`
@@ -863,6 +1012,7 @@ export class ExecutionController {
 ### Task 3.4: 更新 DebuggerManager 门面
 
 **Files:**
+
 - Modify: `src/modules/debugger/DebuggerManager.ts`
 
 - [ ] **Step 1: 添加 import 和实例化**
@@ -874,10 +1024,10 @@ import { ExecutionController } from './ExecutionController.js';
 export class DebuggerManager {
   private cdpSession: CDPSession | null = null;
   private enabled = false;
-  
+
   private breakpointManager: BreakpointManager;
   private executionController: ExecutionController;
-  
+
   // 保留现有的 sub-manager 引用
   private _watchManager: WatchExpressionManager | null = null;
   private _xhrManager: XHRBreakpointManager | null = null;
@@ -921,6 +1071,7 @@ async pause(): Promise<void> {
 ### Task 3.5: 添加 BreakpointManager 单元测试
 
 **Files:**
+
 - Create: `tests/unit/modules/debugger/BreakpointManager.test.ts`
 - Create: `tests/unit/modules/debugger/ExecutionController.test.ts`
 
@@ -929,9 +1080,9 @@ async pause(): Promise<void> {
 Mock `CDPSession` 的 `send` 方法验证参数传递：
 
 ```typescript
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 import assert from 'node:assert';
-import { BreakpointManager } from '../../../src/modules/debugger/BreakpointManager.js';
+import {BreakpointManager} from '../../../src/modules/debugger/BreakpointManager.js';
 
 describe('BreakpointManager', () => {
   it('setBreakpointByUrl validates and calls CDP', async () => {
@@ -941,7 +1092,7 @@ describe('BreakpointManager', () => {
       async send(method: string, params: any) {
         sentMethod = method;
         sentParams = params;
-        return { breakpointId: 'bp-1', locations: [] };
+        return {breakpointId: 'bp-1', locations: []};
       },
     } as any;
 

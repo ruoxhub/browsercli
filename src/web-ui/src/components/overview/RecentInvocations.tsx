@@ -1,4 +1,8 @@
-import { useState } from 'react';
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import {
   Terminal,
   CheckCircle,
@@ -10,15 +14,19 @@ import {
   ChevronUp,
   Cpu,
 } from 'lucide-react';
-import { useInvocationsStore } from '../../stores/invocations';
-import type { InvocationRecord } from '../../lib/protocol';
+import {useState} from 'react';
+
+import type {InvocationRecord} from '../../lib/protocol';
+import {useInvocationsStore} from '../../stores/invocations';
 
 interface RecentInvocationsProps {
   records?: InvocationRecord[];
 }
 
-export function RecentInvocations({ records: propRecords }: RecentInvocationsProps) {
-  const storeRecords = useInvocationsStore((state) => state.records);
+export function RecentInvocations({
+  records: propRecords,
+}: RecentInvocationsProps) {
+  const storeRecords = useInvocationsStore(state => state.records);
   const records = propRecords !== undefined ? propRecords : storeRecords;
 
   // 记录折叠状态，key 为 record.id
@@ -30,9 +38,9 @@ export function RecentInvocations({ records: propRecords }: RecentInvocationsPro
   const handleCopy = async (text: string, key: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      setCopyFeedback((prev) => ({ ...prev, [key]: true }));
+      setCopyFeedback(prev => ({...prev, [key]: true}));
       setTimeout(() => {
-        setCopyFeedback((prev) => ({ ...prev, [key]: false }));
+        setCopyFeedback(prev => ({...prev, [key]: false}));
       }, 2000);
     } catch (err) {
       console.error('Failed to copy text: ', err);
@@ -40,7 +48,7 @@ export function RecentInvocations({ records: propRecords }: RecentInvocationsPro
   };
 
   const toggleExpand = (id: string) => {
-    setExpandedId((prev) => (prev === id ? null : id));
+    setExpandedId(prev => (prev === id ? null : id));
   };
 
   const formatTime = (isoString: string) => {
@@ -56,8 +64,13 @@ export function RecentInvocations({ records: propRecords }: RecentInvocationsPro
     <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border-default)] rounded-xl p-6 shadow-lg shadow-black/25 space-y-4">
       <div className="flex items-center justify-between border-b border-[var(--color-border-muted)] pb-4">
         <div className="flex items-center gap-2">
-          <Terminal size={16} className="text-[var(--color-accent)]" />
-          <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">最近工具调用历史</h3>
+          <Terminal
+            size={16}
+            className="text-[var(--color-accent)]"
+          />
+          <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
+            最近工具调用历史
+          </h3>
         </div>
         <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[var(--color-bg-tertiary)] border border-[var(--color-border-default)] text-[var(--color-text-secondary)]">
           活跃记录: {records.length}
@@ -67,7 +80,10 @@ export function RecentInvocations({ records: propRecords }: RecentInvocationsPro
       {records.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 border border-dashed border-[var(--color-border-default)] rounded-lg bg-[var(--color-bg-primary)]/50">
           <div className="w-8 h-8 rounded-full bg-[var(--color-bg-secondary)] border border-[var(--color-border-default)] flex items-center justify-center mb-3">
-            <Cpu size={14} className="text-[var(--color-text-muted)]" />
+            <Cpu
+              size={14}
+              className="text-[var(--color-text-muted)]"
+            />
           </div>
           <p className="text-xs text-[var(--color-text-muted)] text-center max-w-[260px]">
             暂无工具调用记录。当您调用 RPC 工具时，记录将实时显示在此处。
@@ -75,10 +91,12 @@ export function RecentInvocations({ records: propRecords }: RecentInvocationsPro
         </div>
       ) : (
         <div className="divide-y divide-[var(--color-border-muted)] overflow-hidden rounded-lg border border-[var(--color-border-default)]">
-          {records.map((record) => {
+          {records.map(record => {
             const isExpanded = expandedId === record.id;
-            const hasArgs = !!record.args && Object.keys(record.args).length > 0;
-            const hasResult = record.result !== undefined && record.result !== null;
+            const hasArgs =
+              !!record.args && Object.keys(record.args).length > 0;
+            const hasResult =
+              record.result !== undefined && record.result !== null;
             const hasError = !!record.error;
 
             return (
@@ -93,9 +111,15 @@ export function RecentInvocations({ records: propRecords }: RecentInvocationsPro
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     {record.success ? (
-                      <CheckCircle size={16} className="text-[var(--color-status-green)] shrink-0" />
+                      <CheckCircle
+                        size={16}
+                        className="text-[var(--color-status-green)] shrink-0"
+                      />
                     ) : (
-                      <XCircle size={16} className="text-[var(--color-status-red)] shrink-0" />
+                      <XCircle
+                        size={16}
+                        className="text-[var(--color-status-red)] shrink-0"
+                      />
                     )}
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -113,11 +137,14 @@ export function RecentInvocations({ records: propRecords }: RecentInvocationsPro
                         </span>
                       </div>
                       <div className="flex items-center gap-2 text-[10px] text-[var(--color-text-muted)] mt-1 font-mono">
-                        <span className="truncate max-w-[120px] sm:max-w-[200px]" title={record.traceId}>
+                        <span
+                          className="truncate max-w-[120px] sm:max-w-[200px]"
+                          title={record.traceId}
+                        >
                           Trace: {record.traceId}
                         </span>
                         <button
-                          onClick={(e) => {
+                          onClick={e => {
                             e.stopPropagation();
                             handleCopy(record.traceId, `trace_${record.id}`);
                           }}
@@ -125,7 +152,10 @@ export function RecentInvocations({ records: propRecords }: RecentInvocationsPro
                           title="复制 Trace ID"
                         >
                           {copyFeedback[`trace_${record.id}`] ? (
-                            <Check size={10} className="text-[var(--color-status-green)]" />
+                            <Check
+                              size={10}
+                              className="text-[var(--color-status-green)]"
+                            />
                           ) : (
                             <Copy size={10} />
                           )}
@@ -136,14 +166,21 @@ export function RecentInvocations({ records: propRecords }: RecentInvocationsPro
 
                   <div className="flex items-center justify-between sm:justify-end gap-4 text-xs font-mono text-[var(--color-text-secondary)]">
                     <div className="flex items-center gap-1">
-                      <Clock size={11} className="text-[var(--color-text-muted)]" />
+                      <Clock
+                        size={11}
+                        className="text-[var(--color-text-muted)]"
+                      />
                       <span>{record.durationMs.toFixed(0)} ms</span>
                     </div>
                     <span className="text-[10px] text-[var(--color-text-muted)] text-right">
                       {formatTime(record.startedAt)}
                     </span>
                     <div className="text-[var(--color-text-muted)] hidden sm:block">
-                      {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                      {isExpanded ? (
+                        <ChevronUp size={14} />
+                      ) : (
+                        <ChevronDown size={14} />
+                      )}
                     </div>
                   </div>
                 </div>
@@ -167,8 +204,13 @@ export function RecentInvocations({ records: propRecords }: RecentInvocationsPro
                           >
                             {copyFeedback[`args_${record.id}`] ? (
                               <>
-                                <Check size={10} className="text-[var(--color-status-green)]" />
-                                <span className="text-[var(--color-status-green)]">已复制</span>
+                                <Check
+                                  size={10}
+                                  className="text-[var(--color-status-green)]"
+                                />
+                                <span className="text-[var(--color-status-green)]">
+                                  已复制
+                                </span>
                               </>
                             ) : (
                               <>
@@ -187,7 +229,11 @@ export function RecentInvocations({ records: propRecords }: RecentInvocationsPro
                     {/* 结果或报错 */}
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between text-[11px] font-semibold text-[var(--color-text-secondary)]">
-                        <span>{record.success ? '输出结果 (Result)' : '报错详情 (Error)'}</span>
+                        <span>
+                          {record.success
+                            ? '输出结果 (Result)'
+                            : '报错详情 (Error)'}
+                        </span>
                         {(hasResult || hasError) && (
                           <button
                             onClick={() =>
@@ -202,8 +248,13 @@ export function RecentInvocations({ records: propRecords }: RecentInvocationsPro
                           >
                             {copyFeedback[`res_${record.id}`] ? (
                               <>
-                                <Check size={10} className="text-[var(--color-status-green)]" />
-                                <span className="text-[var(--color-status-green)]">已复制</span>
+                                <Check
+                                  size={10}
+                                  className="text-[var(--color-status-green)]"
+                                />
+                                <span className="text-[var(--color-status-green)]">
+                                  已复制
+                                </span>
                               </>
                             ) : (
                               <>
@@ -216,7 +267,9 @@ export function RecentInvocations({ records: propRecords }: RecentInvocationsPro
                       </div>
                       {record.success ? (
                         <pre className="font-mono bg-[var(--color-bg-primary)] p-3 rounded-lg border border-[var(--color-border-default)] text-xs text-emerald-400 overflow-auto max-h-60 select-text">
-                          {hasResult ? JSON.stringify(record.result, null, 2) : 'null'}
+                          {hasResult
+                            ? JSON.stringify(record.result, null, 2)
+                            : 'null'}
                         </pre>
                       ) : (
                         <div className="bg-red-500/5 border border-red-500/20 p-3 rounded-lg text-red-400 font-mono text-xs space-y-2">

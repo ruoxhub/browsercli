@@ -5,6 +5,8 @@
 
 import WebSocket from 'ws';
 
+import type {ToolMeta} from './tool-meta-types.js';
+
 export interface WorkerHttpClientOptions {
   baseUrl: string; // 默认 http://127.0.0.1:8765
   apiToken?: string;
@@ -55,18 +57,42 @@ export class WorkerHttpClient {
       ...init,
       headers: {...this.authHeader(), ...(init?.headers ?? {})},
     });
+    const raw = await res.text();
     if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`HTTP ${res.status}: ${body}`);
+      throw new Error(`HTTP ${res.status}: ${raw}`);
     }
-    return (await res.json()) as T;
+    // 服务端统一信封：{ success, data, error }。解包 data，并把 success:false 转为异常。
+    let parsed: {
+      success?: boolean;
+      data?: T;
+      error?: {code?: string; message?: string};
+    };
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      throw new Error(
+        `非 JSON 响应 (HTTP ${res.status}): ${raw.slice(0, 200)}`,
+      );
+    }
+    if (parsed && parsed.success === false) {
+      const err = parsed.error;
+      throw new Error(
+        `Worker 错误 ${err?.code ?? 'UNKNOWN'}: ${err?.message ?? raw.slice(0, 200)}`,
+      );
+    }
+    return (parsed?.data ?? (parsed as unknown as T)) as T;
   }
 
   async health(): Promise<{status: string}> {
     return this.json('/health');
   }
-  async listTools(): Promise<{tools: unknown[]}> {
-    return this.json('/tools');
+  async listTools(): Promise<{tools: ToolMeta[]}> {
+    // 服务端契约为 { tools: ToolMeta[] }；但 CLI 与 worker 独立版本化，
+    // 旧版本/代理可能直接返回数组或省略 data 字段。此处归一化，避免调用方
+    // 在 undefined 上执行 .find/.map 而崩溃（报 "reading 'find'" 类错误）。
+    const payload = await this.json<{tools?: unknown[]}>('/tools');
+    const rawTools = Array.isArray(payload) ? payload : (payload?.tools ?? []);
+    return {tools: rawTools as ToolMeta[]};
   }
   async getTool(name: string): Promise<unknown> {
     return this.json(`/tools/${encodeURIComponent(name)}`);

@@ -6,7 +6,12 @@
 import {spawn, spawnSync} from 'node:child_process';
 import {existsSync} from 'node:fs';
 
-import type {AIProvider, AIMessage, AIResponse, ChatOptions} from './AIService.js';
+import type {
+  AIProvider,
+  AIMessage,
+  AIResponse,
+  ChatOptions,
+} from './AIService.js';
 import {
   decodeImageInput,
   formatProviderError,
@@ -46,13 +51,20 @@ export class GeminiProvider implements AIProvider {
       : this.chatCLI(messages, options);
   }
 
-  analyzeImage(imageInput: string, prompt: string, isFilePath = false): Promise<string> {
+  analyzeImage(
+    imageInput: string,
+    prompt: string,
+    isFilePath = false,
+  ): Promise<string> {
     return this.useAPI
       ? this.analyzeImageAPI(imageInput, prompt, isFilePath)
       : this.analyzeImageCLI(imageInput, prompt, isFilePath);
   }
 
-  private async chatAPI(messages: AIMessage[], options?: ChatOptions): Promise<AIResponse> {
+  private async chatAPI(
+    messages: AIMessage[],
+    options?: ChatOptions,
+  ): Promise<AIResponse> {
     if (!this.apiKey) {
       throw new Error('Gemini API key is required for API mode.');
     }
@@ -104,7 +116,10 @@ export class GeminiProvider implements AIProvider {
     }
   }
 
-  private async chatCLI(messages: AIMessage[], options?: ChatOptions): Promise<AIResponse> {
+  private async chatCLI(
+    messages: AIMessage[],
+    options?: ChatOptions,
+  ): Promise<AIResponse> {
     this.ensureCLIAvailable();
     const prompt = this.formatMessagesForCLI(messages);
     const response = await this.executeCLI(prompt, options);
@@ -131,10 +146,7 @@ export class GeminiProvider implements AIProvider {
     const body = {
       contents: [
         {
-          parts: [
-            {inlineData: {mimeType: mediaType, data}},
-            {text: prompt},
-          ],
+          parts: [{inlineData: {mimeType: mediaType, data}}, {text: prompt}],
         },
       ],
     };
@@ -188,11 +200,12 @@ export class GeminiProvider implements AIProvider {
   private formatMessagesForCLI(messages: AIMessage[]): string {
     return messages
       .map(msg => {
-        const label = msg.role === 'system'
-          ? 'System'
-          : msg.role === 'user'
-            ? 'User'
-            : 'Assistant';
+        const label =
+          msg.role === 'system'
+            ? 'System'
+            : msg.role === 'user'
+              ? 'User'
+              : 'Assistant';
         return `${label}: ${msg.content}`;
       })
       .join('\n\n');
@@ -205,7 +218,9 @@ export class GeminiProvider implements AIProvider {
   ): Promise<string> {
     return new Promise((resolve, reject) => {
       const args = this.buildCLIArgs(prompt, options, imagePath);
-      const child = spawn(this.cliPath, args, {stdio: ['pipe', 'pipe', 'pipe']});
+      const child = spawn(this.cliPath, args, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
 
       let settled = false;
       let stdout = '';
@@ -229,21 +244,31 @@ export class GeminiProvider implements AIProvider {
         if (settled) return;
         child.kill();
         settleReject(
-          new Error(`gemini-cli execution timed out after ${CLI_TIMEOUT_MS / 1000} seconds`),
+          new Error(
+            `gemini-cli execution timed out after ${CLI_TIMEOUT_MS / 1000} seconds`,
+          ),
         );
       }, CLI_TIMEOUT_MS);
 
-      child.stdout.on('data', chunk => { stdout += chunk.toString(); });
-      child.stderr.on('data', chunk => { stderr += chunk.toString(); });
+      child.stdout.on('data', chunk => {
+        stdout += chunk.toString();
+      });
+      child.stderr.on('data', chunk => {
+        stderr += chunk.toString();
+      });
 
       child.once('error', error => {
-        settleReject(new Error(`Failed to execute gemini-cli: ${error.message}`));
+        settleReject(
+          new Error(`Failed to execute gemini-cli: ${error.message}`),
+        );
       });
 
       child.once('close', code => {
         if (code !== 0) {
           const detail = stderr ? `\nError: ${stderr}` : '';
-          settleReject(new Error(`gemini-cli exited with code ${code}${detail}`));
+          settleReject(
+            new Error(`gemini-cli exited with code ${code}${detail}`),
+          );
           return;
         }
         settleResolve(this.parseCliOutput(stdout));
@@ -251,7 +276,11 @@ export class GeminiProvider implements AIProvider {
     });
   }
 
-  private buildCLIArgs(prompt: string, options?: ChatOptions, imagePath?: string): string[] {
+  private buildCLIArgs(
+    prompt: string,
+    options?: ChatOptions,
+    imagePath?: string,
+  ): string[] {
     const args: string[] = [];
 
     const model = options?.model || this.defaultModel;

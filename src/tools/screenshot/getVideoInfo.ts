@@ -23,9 +23,7 @@ export const getVideoInfo = defineTool({
     readOnlyHint: true,
   },
   schema: {
-    selector: zod
-      .string()
-      .describe('CSS selector for the video element.'),
+    selector: zod.string().describe('CSS selector for the video element.'),
   },
   handler: async (request, response, context) => {
     const runtime = context as unknown as ToolContextProvider;

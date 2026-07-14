@@ -29,14 +29,14 @@ inject_code_template --templateName <name>
 
 ## 典型使用场景
 
-| 场景 | 模板名（典型） | 行为 |
-|------|---------------|------|
-| 屏蔽 webdriver | `stealth-webdriver` | `Object.defineProperty(navigator, 'webdriver', ...)` |
-| Canvas 噪声 | `canvas-noise` | 改写 `HTMLCanvasElement.prototype.toDataURL` 加随机像素 |
-| WebGL 指纹屏蔽 | `webgl-mask` | 锁定 `WebGLRenderingContext` 的几个关键参数 |
-| 通用 Hook wrapper | `hook-wrapper` | 包装 `Function.prototype` 暴露 `window.__hooks` |
-| 持久化 cookie helper | `cookie-helper` | 暴露 `window.__cookie` 读 / 写接口 |
-| Fetch 拦截器 | `fetch-interceptor` | 全局 fetch 拦截（与 `create_hook --type fetch` 类似但更轻） |
+| 场景                 | 模板名（典型）      | 行为                                                        |
+| -------------------- | ------------------- | ----------------------------------------------------------- |
+| 屏蔽 webdriver       | `stealth-webdriver` | `Object.defineProperty(navigator, 'webdriver', ...)`        |
+| Canvas 噪声          | `canvas-noise`      | 改写 `HTMLCanvasElement.prototype.toDataURL` 加随机像素     |
+| WebGL 指纹屏蔽       | `webgl-mask`        | 锁定 `WebGLRenderingContext` 的几个关键参数                 |
+| 通用 Hook wrapper    | `hook-wrapper`      | 包装 `Function.prototype` 暴露 `window.__hooks`             |
+| 持久化 cookie helper | `cookie-helper`     | 暴露 `window.__cookie` 读 / 写接口                          |
+| Fetch 拦截器         | `fetch-interceptor` | 全局 fetch 拦截（与 `create_hook --type fetch` 类似但更轻） |
 
 > 实际模板名以 `list_code_templates` 输出为准。`get_code_template` 返回的 `description` 是最权威的语义说明。
 
@@ -44,12 +44,12 @@ inject_code_template --templateName <name>
 
 ## 何时用模板 vs `create_hook`
 
-| 需求 | 选 | 原因 |
-|------|----|------|
-| 预置反检测片段 | `inject_code_template` | 模板化，命名稳定 |
-| 自定义 Hook（参数动态、capture 配置） | `create_hook` | 完全自定义 |
-| 一过性探测（看 navigator 当前值） | `evaluate_script` | 单次执行 |
-| 跨 SPA 路由持续生效 | `inject_hook --persistent true` 或 `inject_preload_script` | 持久化路径 |
+| 需求                                  | 选                                                         | 原因             |
+| ------------------------------------- | ---------------------------------------------------------- | ---------------- |
+| 预置反检测片段                        | `inject_code_template`                                     | 模板化，命名稳定 |
+| 自定义 Hook（参数动态、capture 配置） | `create_hook`                                              | 完全自定义       |
+| 一过性探测（看 navigator 当前值）     | `evaluate_script`                                          | 单次执行         |
+| 跨 SPA 路由持续生效                   | `inject_hook --persistent true` 或 `inject_preload_script` | 持久化路径       |
 
 ---
 

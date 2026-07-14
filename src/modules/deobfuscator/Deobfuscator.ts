@@ -46,17 +46,29 @@ import {logger} from '../../utils/logger.js';
 import {AdvancedDeobfuscator} from './AdvancedDeobfuscator.js';
 import {ASTOptimizer} from './ASTOptimizer.js';
 import {
+  structuralEnhance,
+  objectDecode,
+  cleanupObfuscator,
+  callExpressToLiteral,
+} from './BabelPackEnhancer.js';
+import {
   basicTransform,
   renameVariables,
   simplifyExpressions,
 } from './CodeCleanupStrategy.js';
 import {unflattenControlFlow} from './ControlFlowStrategy.js';
+import {enhancedControlFlow} from './EnhancedControlFlowPass.js';
+import {ifChainToSwitch} from './IfChainToSwitchPass.js';
+import {inlineLiterals} from './InlineLiteralsPass.js';
 import {JSVMPDeobfuscator} from './JSVMPDeobfuscator.js';
+import {normalizeStructure} from './NormalizeStructurePass.js';
 import {
   detectObfuscationType,
   mergeObfuscationTypes,
 } from './ObfuscationDetector.js';
 import {UniversalUnpacker} from './PackerDeobfuscator.js';
+import {pruneFakeBranches} from './PruneFakeBranchesPass.js';
+import {SiteAdapterRegistry} from './SiteAdapterRegistry.js';
 import {
   decodeStrings,
   decryptArrays,
@@ -73,19 +85,7 @@ import {
   runUnpack,
   runWebcrackStep,
 } from './SubPipelineRunner.js';
-import {SiteAdapterRegistry} from './SiteAdapterRegistry.js';
-import {normalizeStructure} from './NormalizeStructurePass.js';
-import {pruneFakeBranches} from './PruneFakeBranchesPass.js';
-import {inlineLiterals} from './InlineLiteralsPass.js';
-import {enhancedControlFlow} from './EnhancedControlFlowPass.js';
-import {ifChainToSwitch} from './IfChainToSwitchPass.js';
 import {WrapperFolder} from './WrapperFolder.js';
-import {
-  structuralEnhance,
-  objectDecode,
-  cleanupObfuscator,
-  callExpressToLiteral,
-} from './BabelPackEnhancer.js';
 
 // ==================== 扩展选项 ====================
 

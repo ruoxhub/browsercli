@@ -7,10 +7,11 @@
 /**
  * src/web/types.ts —— Web 控制台协议类型真理源。
  *
- * 后端 ConsoleServer / WsHub / 路由共用此定义；前端 apps/web/src/lib/protocol.ts
- * 是它的镜像（apps/web 是独立 tsconfig，不能直接 import 后端文件，所以两边手动同步）。
+ * 后端 ConsoleServer / WsHub / 路由共用此定义；前端 src/web-ui/src/lib/protocol.ts
+ * 通过相对路径 `../../../web/types.js` 直接重新导出本文件（前端源码已迁入 src/web-ui，
+ * 与后端同源，故无需双源手动同步）。
  *
- * 任何字段变更必须**同时**改两处，否则会出现序列化层的静默错位。
+ * 任何字段变更需同步前端协议引用方（如 ws.ts / api.ts 的使用处）。
  */
 
 // ==================== HTTP API ====================

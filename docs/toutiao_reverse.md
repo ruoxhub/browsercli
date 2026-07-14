@@ -1,15 +1,16 @@
 ---
-title: "【完整记录】AI自动逆向补头条环境和采集数据"
-source: "https://mp.weixin.qq.com/s/M5KSXC2mvWCEAOW5SEYRmg"
+title: '【完整记录】AI自动逆向补头条环境和采集数据'
+source: 'https://mp.weixin.qq.com/s/M5KSXC2mvWCEAOW5SEYRmg'
 author:
-  - "[[编程如意]]"
+  - '[[编程如意]]'
 published:
 created: 2026-04-27
-description: "用claude code opus 4.6搞个jsvmp也就二十几块，某数、某验、某条直接给个指令就去逆向了，JS逆向基本也快到头了。"
+description: '用claude code opus 4.6搞个jsvmp也就二十几块，某数、某验、某条直接给个指令就去逆向了，JS逆向基本也快到头了。'
 tags:
-  - "clippings"
+  - 'clippings'
 ---
-原创 编程如意 *2026年4月26日 21:45*
+
+原创 编程如意 _2026年4月26日 21:45_
 
 > 分析日期：2026-04-21 分析目标： `https://www.toutiao.com/article/7630793912500437540/` API接口： `https://www.toutiao.com/article/v4/tab_comments/` 关键JS文件： `tt_pc_bricks.ec0a9f54.js` 、 `acrawler.js`
 
@@ -32,7 +33,24 @@ reqid=60 GET /api/pc/info?_signature=_02B4Z6wo00f01dBlsCAAAIDAqoxExnwDEN3QQZSAAB
 用户提供的关键代码在 `tt_pc_bricks.ec0a9f54.js` 中的 axios 拦截器：
 
 ```javascript
-Z.interceptors.request.use((function(e) {    var t;    if (!function(e) {        return !e || !P()(D).call(D, (function(t) {            return M()(e).call(e, t) > -1        }))    }(e.url))        return e;    (null === (t = e.params) || void 0 === t ? void 0 : t._signature) && delete e.params._signature;    var n = U(Z.getUri(e), e);    return e.params = j()(j()({}, e.params), {        _signature: n    }), e}))
+Z.interceptors.request.use(function (e) {
+  var t;
+  if (
+    !(function (e) {
+      return (
+        !e ||
+        !P()(D).call(D, function (t) {
+          return M()(e).call(e, t) > -1;
+        })
+      );
+    })(e.url)
+  )
+    return e;
+  (null === (t = e.params) || void 0 === t ? void 0 : t._signature) &&
+    delete e.params._signature;
+  var n = U(Z.getUri(e), e);
+  return ((e.params = j()(j()({}, e.params), {_signature: n})), e);
+});
 ```
 
 通过 WebFetch 获取完整 JS 文件（358,904 字节），搜索拦截器位置（偏移 179,218）。
@@ -64,7 +82,7 @@ https://lf3-cdn-tos.bytescm.com/obj/rc-web-sdk/acrawler.js
 页面中的初始化代码（内联 script）：
 
 ```javascript
-window.byted_acrawler && window.byted_acrawler.init({aid:24, dfp:!0})
+window.byted_acrawler && window.byted_acrawler.init({aid: 24, dfp: !0});
 ```
 
 ### 2.2 SDK 基本信息
@@ -116,13 +134,31 @@ var glb;(glb = "undefined" == typeof window ? global : window)._$jsvmprt = funct
 **环境检测函数：**
 
 ```js
-domDetect, hookDetect, nodeDetect, phantomDetect, webdriverDetect, incognitoDetect, debuggerDetect, locationDetect
+(domDetect,
+  hookDetect,
+  nodeDetect,
+  phantomDetect,
+  webdriverDetect,
+  incognitoDetect,
+  debuggerDetect,
+  locationDetect);
 ```
 
 **指纹收集函数：**
 
 ```js
-getGpu, getPlugins, canvas_fingerprint, getAbilities, getResolution, getBatteryInfo, getTouchInfo, getTimezone,getFonts, getSyntaxError, getNativeLength, getRtcIp
+(getGpu,
+  getPlugins,
+  canvas_fingerprint,
+  getAbilities,
+  getResolution,
+  getBatteryInfo,
+  getTouchInfo,
+  getTimezone,
+  getFonts,
+  getSyntaxError,
+  getNativeLength,
+  getRtcIp);
 ```
 
 **签名相关：**
@@ -131,7 +167,7 @@ getGpu, getPlugins, canvas_fingerprint, getAbilities, getResolution, getBatteryI
 getSignature, assembleResult, assembleParams, directSign,xxtea, encrypt, decrypt, base64StandardB[custom_table]
 ```
 
-****加密算法标识：****
+\***\*加密算法标识：\*\***
 
 ```apache
 base64StandardBDkdpgh4ZKsQB80/Mfvw36XI1R25+WUAlEi7NLboqYTOPuzmFjJnryx9HVGcaStCebase64_charIndexBABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/xxtea, encryptUint32Array, decryptUint32Array0
@@ -202,7 +238,7 @@ len: 45
 
 **关键发现：浏览器 iframe 中无论是否 init、无论 domDetect 是否通过，签名都是 147 字符。**
 
-### 4.2 排查 \_byted\_param\_sw 开关
+### 4.2 排查 \_byted_param_sw 开关
 
 通过追踪 localStorage/sessionStorage 读写：
 
@@ -245,7 +281,7 @@ len: 45
 // 在 vm.createContext 外部:Object.prototype.toString.call(env) // => "[object Window]" (通过 Symbol.toStringTag)// 在 vm.createContext 内部:// this (全局对象) => "[object Object]"  ← 这是 V8 vm 模块的限制！// document => "[object HTMLDocument]"    ← Symbol.toStringTag 生效// navigator => "[object Navigator]"     ← 生效// history => "[object History]"          ← 生效
 ```
 
-****修复：** Hook `Object.prototype.toString` ，对全局对象返回 `[object Window]` ：**
+\***\*修复：** Hook `Object.prototype.toString` ，对全局对象返回 `[object Window]` ：\*\*
 
 ```kotlin
 vm.runInContext(\`    (function(){        var _o = Object.prototype.toString;        var _g = this;        Object.prototype.toString = function(){            try { if (this === _g) return "[object Window]"; } catch(e) {}            return _o.call(this);        };    })();\`, context);
@@ -259,7 +295,7 @@ vm.runInContext(\`    (function(){        var _o = Object.prototype.toString;   
 // hookDetect 的检测逻辑:document.createElement.toString().replace(/\s*/g, '').indexOf('nativecode') > -1canvas.toDataURL.toString().replace(/\s*/g, '').indexOf('nativecode') > -1
 ```
 
-****修复：** 使用 `nativeFn` 包装函数的 toString：**
+\***\*修复：** 使用 `nativeFn` 包装函数的 toString：\*\*
 
 ```javascript
 function nativeFn(name, fn) {    fn.toString = () => \`function ${name}() { [native code] }\`;    return fn;}
@@ -293,7 +329,7 @@ VM 字节码中 `instanceof` 操作可能遇到 `undefined` 的构造函数（�
 URL: https://xxbg.snssdk.com/websdk/v1/p?callback=_9608_xxx响应: _9608_xxx("hfk1bFcH2Y5lTETUkxI=");作用: 设置 _byted_param_sw（签名参数开关）
 ```
 
-****请求 2 — 提交指纹、获取配置：****
+\***\*请求 2 — 提交指纹、获取配置：\*\***
 
 ```makefile
 URL: https://xxbg.snssdk.com/websdk/v1/getInfo?q=[加密的指纹数据]&callback=_5741_xxx响应: _5741_xxx({...配置数据...});作用: 提交设备指纹，获取签名配置参数
@@ -357,15 +393,15 @@ sig: _02B4Z6wo00f01U-H5SgAAIDBCYbwbxJ1.I1PoeGAADoLlkxz1n1EH0BuRRImZR247k6q3x-mjd
 以下是分析过程中走过的弯路：
 
 1. **误以为 `_byted_param_sw` 是签名长度的开关**
-	— 实际清除后浏览器签名仍然147字符
+   — 实际清除后浏览器签名仍然147字符
 2. **误以为 `domDetect` 通过就能解决**
-	— 通过 toString hook 让 domDetect 通过后签名仍然47字符
+   — 通过 toString hook 让 domDetect 通过后签名仍然47字符
 3. **误以为 VM 中正则不工作**
-	— 实际是测试代码中反斜杠转义问题（ `\\\\s` vs `\s` ），VM 内部正则完全正常
+   — 实际是测试代码中反斜杠转义问题（ `\\\\s` vs `\s` ），VM 内部正则完全正常
 4. **尝试传入外部 RegExp 修复 replace**
-	— 不必要，replace 在 VM 中本身就正确工作
+   — 不必要，replace 在 VM 中本身就正确工作
 5. **误以为 `init()` 是同步完成的**
-	— 实际 init 内部通过 JSONP 异步加载配置数据，这才是根因
+   — 实际 init 内部通过 JSONP 异步加载配置数据，这才是根因
 
 ### 项目文件结构
 
@@ -384,7 +420,9 @@ toutiao_signature/
 ### 使用方法
 
 ```javascript
-const { ToutiaoSigner } = require('./sign');const signer = new ToutiaoSigner({    cookie: 'tt_webid=xxx; ttcid=xxx',});await signer.init();  // 异步初始化（含 JSONP 请求）const signature = signer.sign(    'https://www.toutiao.com/article/v4/tab_comments/?aid=24&app_name=toutiao_web&offset=0&count=20&group_id=xxx&item_id=xxx');// => "_02B4Z6wo00f01..." (147字符)
+const {ToutiaoSigner} = require('./sign');
+const signer = new ToutiaoSigner({cookie: 'tt_webid=xxx; ttcid=xxx'});
+await signer.init(); // 异步初始化（含 JSONP 请求）const signature = signer.sign(    'https://www.toutiao.com/article/v4/tab_comments/?aid=24&app_name=toutiao_web&offset=0&count=20&group_id=xxx&item_id=xxx');// => "_02B4Z6wo00f01..." (147字符)
 ```
 
 ## 附录：关键代码执行结果全记录

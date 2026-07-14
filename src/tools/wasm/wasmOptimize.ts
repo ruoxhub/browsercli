@@ -15,35 +15,41 @@ function runCommand(
   cmd: string,
   args: string[],
 ): Promise<{stdout: string; stderr: string; exitCode: number}> {
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     execFile(cmd, args, {timeout: 30000}, (error, stdout, stderr) => {
       resolve({
         stdout: stdout ?? '',
         stderr: stderr ?? '',
-        exitCode: typeof error?.code === 'number' ? error.code : (error ? 1 : 0),
+        exitCode: typeof error?.code === 'number' ? error.code : error ? 1 : 0,
       });
     });
   });
 }
 
-
-
 export const wasmOptimize = defineTool({
   name: 'wasm_optimize',
-  description: 'Optimize a .wasm file using binaryen wasm-opt with selectable optimization level.',
+  description:
+    'Optimize a .wasm file using binaryen wasm-opt with selectable optimization level.',
   annotations: {
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: false,
   },
   schema: {
     inputPath: zod.string().describe('Path to the .wasm file to optimize'),
-    outputPath: zod.string().optional().describe('Output path for the optimized file'),
-    level: zod.enum(['O1', 'O2', 'O3', 'O4', 'Os', 'Oz']).optional().describe('Optimization level (default "O2")'),
+    outputPath: zod
+      .string()
+      .optional()
+      .describe('Output path for the optimized file'),
+    level: zod
+      .enum(['O1', 'O2', 'O3', 'O4', 'Os', 'Oz'])
+      .optional()
+      .describe('Optimization level (default "O2")'),
   },
   handler: async (request, response) => {
     const {inputPath, level = 'O2'} = request.params;
-    const outputPath = request.params.outputPath
-      ?? inputPath.replace(/\.wasm$/i, `.opt.${level}.wasm`);
+    const outputPath =
+      request.params.outputPath ??
+      inputPath.replace(/\.wasm$/i, `.opt.${level}.wasm`);
 
     try {
       const originalStats = await stat(inputPath);
@@ -61,9 +67,10 @@ export const wasmOptimize = defineTool({
       }
 
       const optimizedStats = await stat(outputPath);
-      const reduction = originalStats.size > 0
-        ? Math.round((1 - optimizedStats.size / originalStats.size) * 100)
-        : 0;
+      const reduction =
+        originalStats.size > 0
+          ? Math.round((1 - optimizedStats.size / originalStats.size) * 100)
+          : 0;
 
       response.setStructuredContent({
         success: true,

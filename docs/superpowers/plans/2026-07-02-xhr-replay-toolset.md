@@ -23,20 +23,20 @@
 
 ## File Structure
 
-| File | Status | Responsibility |
-|---|---|---|
-| `src/third_party/playwright.ts` | Modify | Re-export `APIRequestContext`, `APIResponse` types from `patchright`. |
-| `src/tools/network/types.ts` | Modify | Append replay types (`ReplayOverride`, `BuiltReplayRequest`, `ReplayResponse`, `BatchVariantResult`, `BatchReplayResult`, param/result types). |
-| `src/tools/network/replayEngine.ts` | Create | Pure functions: `STRIPPED_HEADERS`, `stripManagedHeaders`, `buildReplayRequest`, `executeReplay`, `emptyReplayResponse`, `formatCurl`. |
-| `src/tools/network/replayNetworkRequest.ts` | Create | Tool 1: single-request replay with overrides. |
-| `src/tools/network/exportRequestAsCurl.ts` | Create | Tool 2: curl command export. |
-| `src/tools/network/replayNetworkRequestBatch.ts` | Create | Tool 3: batch/fuzz replay with bounded concurrency. |
-| `src/tools/network/manifest.ts` | Modify | Register three new tools. |
-| `src/tools/network/index.ts` | Modify | Re-export new tools and types. |
-| `tests/unit/tools/network/replayEngine.test.ts` | Create | Pure-function unit tests for engine. |
-| `tests/unit/tools/network/replayNetworkRequest.test.ts` | Create | Tool 1 tests (mock engine + context). |
-| `tests/unit/tools/network/exportRequestAsCurl.test.ts` | Create | Tool 2 tests (mock engine + context). |
-| `tests/unit/tools/network/replayNetworkRequestBatch.test.ts` | Create | Tool 3 tests (mock engine + context). |
+| File                                                         | Status | Responsibility                                                                                                                                 |
+| ------------------------------------------------------------ | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/third_party/playwright.ts`                              | Modify | Re-export `APIRequestContext`, `APIResponse` types from `patchright`.                                                                          |
+| `src/tools/network/types.ts`                                 | Modify | Append replay types (`ReplayOverride`, `BuiltReplayRequest`, `ReplayResponse`, `BatchVariantResult`, `BatchReplayResult`, param/result types). |
+| `src/tools/network/replayEngine.ts`                          | Create | Pure functions: `STRIPPED_HEADERS`, `stripManagedHeaders`, `buildReplayRequest`, `executeReplay`, `emptyReplayResponse`, `formatCurl`.         |
+| `src/tools/network/replayNetworkRequest.ts`                  | Create | Tool 1: single-request replay with overrides.                                                                                                  |
+| `src/tools/network/exportRequestAsCurl.ts`                   | Create | Tool 2: curl command export.                                                                                                                   |
+| `src/tools/network/replayNetworkRequestBatch.ts`             | Create | Tool 3: batch/fuzz replay with bounded concurrency.                                                                                            |
+| `src/tools/network/manifest.ts`                              | Modify | Register three new tools.                                                                                                                      |
+| `src/tools/network/index.ts`                                 | Modify | Re-export new tools and types.                                                                                                                 |
+| `tests/unit/tools/network/replayEngine.test.ts`              | Create | Pure-function unit tests for engine.                                                                                                           |
+| `tests/unit/tools/network/replayNetworkRequest.test.ts`      | Create | Tool 1 tests (mock engine + context).                                                                                                          |
+| `tests/unit/tools/network/exportRequestAsCurl.test.ts`       | Create | Tool 2 tests (mock engine + context).                                                                                                          |
+| `tests/unit/tools/network/replayNetworkRequestBatch.test.ts` | Create | Tool 3 tests (mock engine + context).                                                                                                          |
 
 **Dependency direction:** tool files → `replayEngine.ts` → `types.ts` + `third_party`. No cross-tool imports (batch does not import single).
 
@@ -47,11 +47,13 @@
 ### Task 1: Add replay types and re-export Playwright API types
 
 **Files:**
+
 - Modify: `src/third_party/playwright.ts` (add `APIRequestContext`, `APIResponse` to the existing `export type {...} from 'patchright'` block)
 - Modify: `src/tools/network/types.ts` (append new types after the existing `ClearNetworkRequestsResult` at end of file)
 - Test: `tests/unit/tools/network/replayEngine.test.ts` (type-level only — no runtime test in this task)
 
 **Interfaces:**
+
 - Produces: `ReplayOverride`, `BuiltReplayRequest`, `ReplayResponse`, `BatchVariantResult`, `BatchReplayResult`, and the param/result types consumed by Tasks 3-5. Also produces `APIRequestContext`/`APIResponse` re-exports from `src/third_party/index.js`.
 
 - [ ] **Step 1: Add Playwright API type re-exports**
@@ -181,8 +183,7 @@ export type ReplayNetworkRequestResult =
   NetworkResult<ReplayNetworkRequestData>;
 
 /** export_request_as_curl 结果 */
-export type ExportRequestAsCurlResult =
-  NetworkResult<ExportRequestAsCurlData>;
+export type ExportRequestAsCurlResult = NetworkResult<ExportRequestAsCurlData>;
 
 /** replay_network_request_batch 结果 */
 export type ReplayNetworkRequestBatchResult =
@@ -206,10 +207,12 @@ git commit -m "feat(network): add replay types and re-export Playwright API type
 ### Task 2: Implement `replayEngine.ts` (TDD)
 
 **Files:**
+
 - Create: `src/tools/network/replayEngine.ts`
 - Test: `tests/unit/tools/network/replayEngine.test.ts`
 
 **Interfaces:**
+
 - Consumes: `ReplayOverride`, `BuiltReplayRequest`, `ReplayResponse`, `GetNetworkRequestData` from `./types.js`; `APIRequestContext`, `APIResponse` from `../../third_party/index.js`.
 - Produces: `STRIPPED_HEADERS` (const), `stripManagedHeaders`, `buildReplayRequest`, `executeReplay`, `emptyReplayResponse`, `formatCurl` — all consumed by Tasks 3-5.
 
@@ -295,10 +298,7 @@ Expected: FAIL — `Cannot find module '...replayEngine.js'`
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  APIRequestContext,
-  APIResponse,
-} from '../../third_party/index.js';
+import type {APIRequestContext, APIResponse} from '../../third_party/index.js';
 import type {
   BuiltReplayRequest,
   GetNetworkRequestData,
@@ -462,7 +462,9 @@ export function buildReplayRequest(
   headers = stripManagedHeaders(headers);
 
   const body =
-    override?.body !== undefined ? override.body ?? undefined : original.postData;
+    override?.body !== undefined
+      ? (override.body ?? undefined)
+      : original.postData;
 
   return {method, url, headers, body};
 }
@@ -654,10 +656,7 @@ describe('executeReplay', () => {
       url: 'https://x.test/y',
       headers: {},
     };
-    await assert.rejects(
-      executeReplay(ctx, built, 2000),
-      /network down/,
-    );
+    await assert.rejects(executeReplay(ctx, built, 2000), /network down/);
   });
 });
 ```
@@ -665,12 +664,8 @@ describe('executeReplay', () => {
 Also add these imports at the top of the test file:
 
 ```typescript
-import type {
-  APIRequestContext,
-} from '../../../../src/third_party/index.js';
-import type {
-  BuiltReplayRequest,
-} from '../../../../src/tools/network/types.js';
+import type {APIRequestContext} from '../../../../src/third_party/index.js';
+import type {BuiltReplayRequest} from '../../../../src/tools/network/types.js';
 ```
 
 - [ ] **Step 14: Run tests to verify they fail**
@@ -764,10 +759,7 @@ describe('formatCurl', () => {
       url: 'https://x.test/y',
       headers: {'X-A': '1'},
     };
-    assert.equal(
-      formatCurl(built, {}),
-      "curl 'https://x.test/y' -H 'X-A: 1'",
-    );
+    assert.equal(formatCurl(built, {}), "curl 'https://x.test/y' -H 'X-A: 1'");
   });
 
   it('emits -X POST and --data when body present', () => {
@@ -789,17 +781,14 @@ describe('formatCurl', () => {
       url: 'https://x.test/y',
       headers: {},
     };
-    assert.equal(
-      formatCurl(built, {}),
-      "curl -X POST 'https://x.test/y'",
-    );
+    assert.equal(formatCurl(built, {}), "curl -X POST 'https://x.test/y'");
   });
 
   it('escapes single quotes in URL, header values, and body', () => {
     const built: BuiltReplayRequest = {
       method: 'POST',
       url: "https://x.test/it's",
-      headers: {"X-Q": "va'lue"},
+      headers: {'X-Q': "va'lue"},
       body: "{'k':'v'}",
     };
     const curl = formatCurl(built, {});
@@ -928,10 +917,12 @@ git commit -m "feat(network): add replayEngine pure module with strip/build/exec
 ### Task 3: Implement `replay_network_request` tool
 
 **Files:**
+
 - Create: `src/tools/network/replayNetworkRequest.ts`
 - Test: `tests/unit/tools/network/replayNetworkRequest.test.ts`
 
 **Interfaces:**
+
 - Consumes: `defineTool` from `../ToolDefinition.js`; `getRuntime` from `../../runtime.js`; `zod`, `ToolCategory` from third_party/categories; `buildReplayRequest`, `executeReplay`, `emptyReplayResponse` from `./replayEngine.js`; types from `./types.js`.
 - Produces: exported `replayNetworkRequest` tool (consumed by Task 6's `manifest.ts` and `index.ts`).
 
@@ -968,22 +959,19 @@ const executeReplayMock = mock.fn(async () => ({
   replayedUrl: 'https://x.test/y',
 }));
 
-mock.module(
-  '../../../../src/tools/network/replayEngine.js',
-  () => ({
-    buildReplayRequest: buildReplayRequestMock,
-    executeReplay: executeReplayMock,
-    emptyReplayResponse: (url: string) => ({
-      status: 0,
-      statusText: '',
-      headers: {},
-      body: '',
-      bodyTruncated: false,
-      timingMs: 0,
-      replayedUrl: url,
-    }),
+mock.module('../../../../src/tools/network/replayEngine.js', () => ({
+  buildReplayRequest: buildReplayRequestMock,
+  executeReplay: executeReplayMock,
+  emptyReplayResponse: (url: string) => ({
+    status: 0,
+    statusText: '',
+    headers: {},
+    body: '',
+    bodyTruncated: false,
+    timingMs: 0,
+    replayedUrl: url,
   }),
-);
+}));
 
 interface TestRequest {
   url(): string;
@@ -1004,7 +992,10 @@ function createMockRequest(): TestRequest {
     method: () => 'POST',
     postData: () => '{"foo":"bar"}',
     resourceType: () => 'xhr',
-    headers: () => ({'X-Sign': 'original-signature', 'Content-Type': 'application/json'}),
+    headers: () => ({
+      'X-Sign': 'original-signature',
+      'Content-Type': 'application/json',
+    }),
     response: async () => ({
       status: () => 200,
       headers: () => ({}),
@@ -1035,16 +1026,19 @@ function parseResult(r: ReturnType<typeof createMockResponse>): any {
   return JSON.parse(jsonLine);
 }
 
-function createMockContext(overrides: {
-  page?: {context: () => {request: unknown}};
-  getRequestById?: (id: number) => unknown;
-} = {}) {
+function createMockContext(
+  overrides: {
+    page?: {context: () => {request: unknown}};
+    getRequestById?: (id: number) => unknown;
+  } = {},
+) {
   const defaultPage = {
     context: () => ({request: {}}),
   };
   return {
     getSelectedPage: () => overrides.page ?? defaultPage,
-    getNetworkRequestById: overrides.getRequestById ?? (() => createMockRequest()),
+    getNetworkRequestById:
+      overrides.getRequestById ?? (() => createMockRequest()),
   } as any;
 }
 
@@ -1126,7 +1120,8 @@ describe('replay_network_request', () => {
     );
 
     assert.equal(buildReplayRequestMock.mock.calls.length, 1);
-    const [originalArg, overrideArg] = buildReplayRequestMock.mock.calls[0].arguments;
+    const [originalArg, overrideArg] =
+      buildReplayRequestMock.mock.calls[0].arguments;
     assert.equal(originalArg.url, 'https://x.test/y');
     assert.equal(overrideArg.method, 'PUT');
     assert.equal(overrideArg.url, 'https://z.test/w');
@@ -1286,7 +1281,11 @@ export const replayNetworkRequest = defineTool({
       const page = context.getSelectedPage();
       const networkRequest = context.getNetworkRequestById(reqid);
       const httpResponse = await networkRequest.response().catch(() => null);
-      const originalData = buildOriginalData(reqid, networkRequest, httpResponse);
+      const originalData = buildOriginalData(
+        reqid,
+        networkRequest,
+        httpResponse,
+      );
 
       const override: ReplayOverride = {
         method: params.method,
@@ -1372,10 +1371,12 @@ git commit -m "feat(network): add replay_network_request tool"
 ### Task 4: Implement `export_request_as_curl` tool
 
 **Files:**
+
 - Create: `src/tools/network/exportRequestAsCurl.ts`
 - Test: `tests/unit/tools/network/exportRequestAsCurl.test.ts`
 
 **Interfaces:**
+
 - Consumes: same as Task 3 plus `formatCurl` from `./replayEngine.js`; `page.context().cookies()` for cookie extraction.
 - Produces: exported `exportRequestAsCurl` tool (consumed by Task 6).
 
@@ -1449,11 +1450,13 @@ function parseResult(r: ReturnType<typeof createMockResponse>): any {
   return JSON.parse(jsonLine);
 }
 
-function createMockContext(overrides: {
-  cookies?: Array<{name: string; value: string; domain: string}>;
-  cookiesThrow?: boolean;
-  getRequestById?: (id: number) => unknown;
-} = {}) {
+function createMockContext(
+  overrides: {
+    cookies?: Array<{name: string; value: string; domain: string}>;
+    cookiesThrow?: boolean;
+    getRequestById?: (id: number) => unknown;
+  } = {},
+) {
   const page = {
     context: () => ({
       cookies: async () => {
@@ -1487,11 +1490,18 @@ describe('export_request_as_curl', () => {
     assert.equal(result.tooltype, 'export_request_as_curl');
     assert.equal(result.data.originalReqid, 5);
     assert.equal(result.data.override, null);
-    assert.ok(result.data.curl.startsWith("curl -X POST 'https://api.example.com/v1/sign'"));
+    assert.ok(
+      result.data.curl.startsWith(
+        "curl -X POST 'https://api.example.com/v1/sign'",
+      ),
+    );
     assert.ok(result.data.curl.includes("-H 'X-Sign: original-signature'"));
     assert.ok(result.data.curl.includes("-H 'Content-Type: application/json'"));
-    assert.ok(!result.data.curl.includes('Host:'), 'Host header should be stripped');
-    assert.ok(result.data.curl.includes("--data '{\"foo\":\"bar\"}'"));
+    assert.ok(
+      !result.data.curl.includes('Host:'),
+      'Host header should be stripped',
+    );
+    assert.ok(result.data.curl.includes('--data \'{"foo":"bar"}\''));
     assert.ok(!result.data.curl.includes('Cookie'));
   });
 
@@ -1513,7 +1523,10 @@ describe('export_request_as_curl', () => {
     const result = parseResult(response);
     assert.equal(result.success, true);
     assert.ok(result.data.curl.includes("-H 'Cookie: session=abc'"));
-    assert.ok(!result.data.curl.includes('xyz'), 'other.test cookie should be filtered out');
+    assert.ok(
+      !result.data.curl.includes('xyz'),
+      'other.test cookie should be filtered out',
+    );
   });
 
   it('matches cookies on subdomain (api.example.com cookie matches sub.api.example.com URL)', async () => {
@@ -1534,7 +1547,7 @@ describe('export_request_as_curl', () => {
     );
 
     const result = parseResult(response);
-    assert.ok(result.data.curl.includes("Cookie: s=v"));
+    assert.ok(result.data.curl.includes('Cookie: s=v'));
   });
 
   it('does not match cookies on lookalike domain (example.com cookie does not match evil-example.com)', async () => {
@@ -1612,7 +1625,11 @@ describe('export_request_as_curl', () => {
     );
 
     const result = parseResult(response);
-    assert.ok(result.data.curl.startsWith("curl -X PUT 'https://api.example.com/v2/sign'"));
+    assert.ok(
+      result.data.curl.startsWith(
+        "curl -X PUT 'https://api.example.com/v2/sign'",
+      ),
+    );
     assert.ok(result.data.curl.includes("-H 'X-Test: 1'"));
     assert.equal(result.data.override.method, 'PUT');
   });
@@ -1692,14 +1709,8 @@ export const exportRequestAsCurl = defineTool({
       .int()
       .positive()
       .describe('The reqid of the captured network request to export.'),
-    method: zod
-      .string()
-      .optional()
-      .describe('Override the HTTP method.'),
-    url: zod
-      .string()
-      .optional()
-      .describe('Override the request URL.'),
+    method: zod.string().optional().describe('Override the HTTP method.'),
+    url: zod.string().optional().describe('Override the request URL.'),
     headers: zod
       .record(zod.string(), zod.string())
       .optional()
@@ -1732,7 +1743,11 @@ export const exportRequestAsCurl = defineTool({
       const page = context.getSelectedPage();
       const networkRequest = context.getNetworkRequestById(reqid);
       const httpResponse = await networkRequest.response().catch(() => null);
-      const originalData = buildOriginalData(reqid, networkRequest, httpResponse);
+      const originalData = buildOriginalData(
+        reqid,
+        networkRequest,
+        httpResponse,
+      );
 
       const override: ReplayOverride = {
         method: params.method,
@@ -1818,10 +1833,12 @@ git commit -m "feat(network): add export_request_as_curl tool"
 ### Task 5: Implement `replay_network_request_batch` tool
 
 **Files:**
+
 - Create: `src/tools/network/replayNetworkRequestBatch.ts`
 - Test: `tests/unit/tools/network/replayNetworkRequestBatch.test.ts`
 
 **Interfaces:**
+
 - Consumes: `buildReplayRequest`, `executeReplay`, `emptyReplayResponse` from `./replayEngine.js`; types from `./types.js`.
 - Produces: exported `replayNetworkRequestBatch` tool (consumed by Task 6).
 
@@ -1889,11 +1906,13 @@ function parseResult(r: ReturnType<typeof createMockResponse>): any {
 }
 
 /** Builds a mock context whose page.context().request.fetch returns per-variant statuses. */
-function createMockContext(opts: {
-  statuses?: number[];        // per-variant fetch status; default all 200
-  throwOnVariant?: number;    // variant index that should throw on fetch
-  getRequestById?: (id: number) => unknown;
-} = {}) {
+function createMockContext(
+  opts: {
+    statuses?: number[]; // per-variant fetch status; default all 200
+    throwOnVariant?: number; // variant index that should throw on fetch
+    getRequestById?: (id: number) => unknown;
+  } = {},
+) {
   let callIdx = -1;
   const fetchCalls: number[] = [];
   const requestObj = {
@@ -1916,8 +1935,7 @@ function createMockContext(opts: {
   return {
     ctx: {
       getSelectedPage: () => page,
-      getNetworkRequestById:
-        opts.getRequestById ?? (() => createMockRequest()),
+      getNetworkRequestById: opts.getRequestById ?? (() => createMockRequest()),
     } as any,
     fetchCalls,
   };
@@ -1997,7 +2015,10 @@ describe('replay_network_request_batch', () => {
     );
 
     const result = parseResult(response);
-    assert.deepStrictEqual(result.data.statusCodeDistribution, {200: 2, 500: 1});
+    assert.deepStrictEqual(result.data.statusCodeDistribution, {
+      200: 2,
+      500: 1,
+    });
     assert.equal(result.data.succeeded, 3, 'HTTP 500 is not a failure');
     assert.equal(result.data.failed, 0);
     assert.equal(result.success, true);
@@ -2022,7 +2043,9 @@ describe('replay_network_request_batch', () => {
     const result = parseResult(response);
     assert.equal(result.data.total, 5);
     assert.equal(result.data.succeeded, 5);
-    const indexes = result.data.results.map((r: any) => r.index).sort((a: number, b: number) => a - b);
+    const indexes = result.data.results
+      .map((r: any) => r.index)
+      .sort((a: number, b: number) => a - b);
     assert.deepStrictEqual(indexes, [0, 1, 2, 3, 4]);
   });
 
@@ -2186,14 +2209,25 @@ export const replayNetworkRequestBatch = defineTool({
       const page = context.getSelectedPage();
       const networkRequest = context.getNetworkRequestById(reqid);
       const httpResponse = await networkRequest.response().catch(() => null);
-      const originalData = buildOriginalData(reqid, networkRequest, httpResponse);
+      const originalData = buildOriginalData(
+        reqid,
+        networkRequest,
+        httpResponse,
+      );
 
       // Build all requests up front. Per-variant build errors are recorded, not thrown.
-      const built: Array<{built: ReturnType<typeof buildReplayRequest>; override: ReplayOverride; buildError?: string}> = [];
+      const built: Array<{
+        built: ReturnType<typeof buildReplayRequest>;
+        override: ReplayOverride;
+        buildError?: string;
+      }> = [];
       for (let i = 0; i < variants.length; i++) {
         const override = variants[i];
         try {
-          built.push({built: buildReplayRequest(originalData, override), override});
+          built.push({
+            built: buildReplayRequest(originalData, override),
+            override,
+          });
         } catch (e) {
           built.push({
             built: {method: '', url: '', headers: {}},
@@ -2253,7 +2287,8 @@ export const replayNetworkRequestBatch = defineTool({
           succeeded++;
         }
         const status = r.result.status;
-        statusCodeDistribution[status] = (statusCodeDistribution[status] ?? 0) + 1;
+        statusCodeDistribution[status] =
+          (statusCodeDistribution[status] ?? 0) + 1;
       }
 
       response.setStructuredContent({
@@ -2310,10 +2345,12 @@ git commit -m "feat(network): add replay_network_request_batch tool"
 ### Task 6: Register tools in manifest and re-export from index
 
 **Files:**
+
 - Modify: `src/tools/network/manifest.ts` (append 3 entries to `tools[]`)
 - Modify: `src/tools/network/index.ts` (append tool exports + type re-exports)
 
 **Interfaces:**
+
 - Consumes: `replayNetworkRequest`, `exportRequestAsCurl`, `replayNetworkRequestBatch` from their respective files; new types from `./types.js`.
 - Produces: tools registered in the MCP tool registry (visible to MCP clients); public exports from the network domain.
 
@@ -2343,16 +2380,43 @@ export const manifest = {
   description: 'Network and WebSocket inspection tools.',
   profile: 'workflow',
   tools: [
-    {modulePath: './network/listNetworkRequests.js', handlerName: 'listNetworkRequests'},
-    {modulePath: './network/getNetworkRequest.js', handlerName: 'getNetworkRequest'},
-    {modulePath: './network/clearNetworkRequests.js', handlerName: 'clearNetworkRequests'},
-    {modulePath: './network/listConnections.js', handlerName: 'listWebSocketConnections'},
-    {modulePath: './network/getMessages.js', handlerName: 'getWebSocketMessages'},
+    {
+      modulePath: './network/listNetworkRequests.js',
+      handlerName: 'listNetworkRequests',
+    },
+    {
+      modulePath: './network/getNetworkRequest.js',
+      handlerName: 'getNetworkRequest',
+    },
+    {
+      modulePath: './network/clearNetworkRequests.js',
+      handlerName: 'clearNetworkRequests',
+    },
+    {
+      modulePath: './network/listConnections.js',
+      handlerName: 'listWebSocketConnections',
+    },
+    {
+      modulePath: './network/getMessages.js',
+      handlerName: 'getWebSocketMessages',
+    },
     {modulePath: './network/getMessage.js', handlerName: 'getWebSocketMessage'},
-    {modulePath: './network/analyzeMessages.js', handlerName: 'analyzeWebSocketMessages'},
-    {modulePath: './network/replayNetworkRequest.js', handlerName: 'replayNetworkRequest'},
-    {modulePath: './network/exportRequestAsCurl.js', handlerName: 'exportRequestAsCurl'},
-    {modulePath: './network/replayNetworkRequestBatch.js', handlerName: 'replayNetworkRequestBatch'},
+    {
+      modulePath: './network/analyzeMessages.js',
+      handlerName: 'analyzeWebSocketMessages',
+    },
+    {
+      modulePath: './network/replayNetworkRequest.js',
+      handlerName: 'replayNetworkRequest',
+    },
+    {
+      modulePath: './network/exportRequestAsCurl.js',
+      handlerName: 'exportRequestAsCurl',
+    },
+    {
+      modulePath: './network/replayNetworkRequestBatch.js',
+      handlerName: 'replayNetworkRequestBatch',
+    },
   ],
 } satisfies DomainManifest;
 ```

@@ -11,7 +11,13 @@ export const manifest = {
   description: 'Browser console inspection tools.',
   profile: 'workflow',
   tools: [
-    {modulePath: './console/listConsoleMessages.js', handlerName: 'listConsoleMessages'},
-    {modulePath: './console/getConsoleMessage.js', handlerName: 'getConsoleMessage'},
+    {
+      modulePath: './console/listConsoleMessages.js',
+      handlerName: 'listConsoleMessages',
+    },
+    {
+      modulePath: './console/getConsoleMessage.js',
+      handlerName: 'getConsoleMessage',
+    },
   ],
 } satisfies DomainManifest;

@@ -13,16 +13,11 @@
  * - 对外暴露数据查询 API
  */
 
-import type {
-  BrowserContext,
-  ConsoleMessage,
-  Page,
-  Request,
-} from 'patchright';
+import type {BrowserContext, ConsoleMessage, Page, Request} from 'patchright';
 
 import type {PageCollector} from '../../modules/collector/PageCollector.js';
-import type {HTTPRequest} from '../../third_party/index.js';
 import type {WebSocketData} from '../../modules/network/NetworkTypes.js';
+import type {HTTPRequest} from '../../third_party/index.js';
 import {
   ConsoleMessageCollector,
   NetworkRequestCollector,
@@ -133,10 +128,7 @@ export class CollectorContextProvider {
     this._networkCollector.clear(page);
   }
 
-  getNetworkRequestStableId(
-    candidatePages: Page[],
-    request: unknown,
-  ): number {
+  getNetworkRequestStableId(candidatePages: Page[], request: unknown): number {
     const found = this._networkCollector.findBy(
       candidatePages,
       (t: TrackedRequest) => t.request === (request as Request),
@@ -167,10 +159,7 @@ export class CollectorContextProvider {
     return data;
   }
 
-  getConsoleMessageById(
-    page: Page | null,
-    id: number,
-  ): ConsoleMessage | Error {
+  getConsoleMessageById(page: Page | null, id: number): ConsoleMessage | Error {
     return this.findById(
       this._consoleCollector,
       page,
@@ -181,10 +170,7 @@ export class CollectorContextProvider {
     );
   }
 
-  getConsoleMessageStableId(
-    candidatePages: Page[],
-    message: unknown,
-  ): number {
+  getConsoleMessageStableId(candidatePages: Page[], message: unknown): number {
     const found = this._consoleCollector.findBy(
       candidatePages,
       (t: TrackedConsoleMessage) => t.message === message,

@@ -108,7 +108,7 @@ describe('PageInfo', () => {
   });
 
   it('localStorage operations forward to evaluate', async () => {
-    let evalCalls: {fn?: unknown; arg?: unknown}[] = [];
+    const evalCalls: Array<{fn?: unknown; arg?: unknown}> = [];
     const page = makePage({
       evaluate: async (fn: unknown, arg?: unknown) => {
         evalCalls.push({fn, arg});
@@ -129,7 +129,7 @@ describe('PageInfo', () => {
   });
 
   it('sessionStorage operations forward to evaluate', async () => {
-    let evalCalls: {fn?: unknown; arg?: unknown}[] = [];
+    const evalCalls: Array<{fn?: unknown; arg?: unknown}> = [];
     const page = makePage({
       evaluate: async (fn: unknown, arg?: unknown) => {
         evalCalls.push({fn, arg});

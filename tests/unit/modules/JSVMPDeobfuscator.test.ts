@@ -4,12 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
 import * as parser from '@babel/parser';
 
-import { JSVMPDeobfuscator } from '../../../src/modules/deobfuscator/JSVMPDeobfuscator.js';
-import type { VMFeatures, UnresolvedPart, VMType, VMInstruction } from '../../../src/types/index.js';
+import {JSVMPDeobfuscator} from '../../../src/modules/deobfuscator/JSVMPDeobfuscator.js';
+import type {
+  VMFeatures,
+  UnresolvedPart,
+  VMType,
+  VMInstruction,
+} from '../../../src/types/index.js';
 
 interface JSVMPHarness {
   detectJSVMP(code: string): VMFeatures | null;
@@ -27,21 +32,36 @@ interface JSVMPHarness {
     confidence: number;
     warnings?: string[];
     unresolvedParts?: UnresolvedPart[];
-    stats?: { processingTime: number };
+    stats?: {processingTime: number};
   }>;
   identifyVMType(code: string, features: VMFeatures): VMType;
   detectJSVMPWithRegex(code: string): VMFeatures | null;
   extractInstructions(code: string, features: VMFeatures): VMInstruction[];
   inferInstructionType(caseNode: unknown): string;
-  restoreJSFuck(code: string, warnings: string[]): Promise<{ code: string; confidence: number; warnings: string[] }>;
-  restoreJJEncode(code: string, warnings: string[]): Promise<{ code: string; confidence: number; warnings: string[] }>;
-  llmDecodeEncoding(code: string, encodingType: string, warnings: string[]): Promise<{ code: string; confidence: number; warnings: string[] }>;
+  restoreJSFuck(
+    code: string,
+    warnings: string[],
+  ): Promise<{code: string; confidence: number; warnings: string[]}>;
+  restoreJJEncode(
+    code: string,
+    warnings: string[],
+  ): Promise<{code: string; confidence: number; warnings: string[]}>;
+  llmDecodeEncoding(
+    code: string,
+    encodingType: string,
+    warnings: string[],
+  ): Promise<{code: string; confidence: number; warnings: string[]}>;
   restoreCustomVMBasic(
     code: string,
     aggressive: boolean,
     warnings: string[],
     unresolvedParts: UnresolvedPart[],
-  ): Promise<{ code: string; confidence: number; warnings: string[]; unresolvedParts?: UnresolvedPart[] }>;
+  ): Promise<{
+    code: string;
+    confidence: number;
+    warnings: string[];
+    unresolvedParts?: UnresolvedPart[];
+  }>;
   restoreCode(
     code: string,
     features: VMFeatures,
@@ -49,19 +69,34 @@ interface JSVMPHarness {
     aggressive: boolean,
     timeout: number,
     maxIterations: number,
-  ): Promise<{ code: string; confidence: number; warnings: string[]; unresolvedParts?: UnresolvedPart[] }>;
+  ): Promise<{
+    code: string;
+    confidence: number;
+    warnings: string[];
+    unresolvedParts?: UnresolvedPart[];
+  }>;
   restoreObfuscatorIO(
     code: string,
     aggressive: boolean,
     warnings: string[],
     unresolvedParts: UnresolvedPart[],
-  ): Promise<{ code: string; confidence: number; warnings: string[]; unresolvedParts?: UnresolvedPart[] }>;
+  ): Promise<{
+    code: string;
+    confidence: number;
+    warnings: string[];
+    unresolvedParts?: UnresolvedPart[];
+  }>;
   restoreCustomVM(
     code: string,
     aggressive: boolean,
     warnings: string[],
     unresolvedParts: UnresolvedPart[],
-  ): Promise<{ code: string; confidence: number; warnings: string[]; unresolvedParts?: UnresolvedPart[] }>;
+  ): Promise<{
+    code: string;
+    confidence: number;
+    warnings: string[];
+    unresolvedParts?: UnresolvedPart[];
+  }>;
 }
 
 function createVmFeatures(overrides: Partial<VMFeatures> = {}): VMFeatures {
@@ -107,15 +142,17 @@ describe('JSVMPDeobfuscator', () => {
       hasProgramCounter: true,
     });
     d.identifyVMType = () => 'custom';
-    d.extractInstructions = () => [{ opcode: 1, name: 'INST_1', type: 'call', description: 'd' }];
+    d.extractInstructions = () => [
+      {opcode: 1, name: 'INST_1', type: 'call', description: 'd'},
+    ];
     d.restoreCode = async () => ({
       code: 'restored',
       confidence: 0.88,
       warnings: ['ok'],
-      unresolvedParts: [{ location: 'x', reason: 'r', suggestion: 's' }],
+      unresolvedParts: [{location: 'x', reason: 'r', suggestion: 's'}],
     });
 
-    const res = await d.deobfuscate({ code: 'obf', extractInstructions: true });
+    const res = await d.deobfuscate({code: 'obf', extractInstructions: true});
     assert.strictEqual(res.isJSVMP, true);
     assert.strictEqual(res.vmType, 'custom');
     assert.strictEqual(res.instructions?.length, 1);
@@ -131,9 +168,15 @@ describe('JSVMPDeobfuscator', () => {
     assert.ok(regexDetect);
 
     const features = createVmFeatures();
-    assert.strictEqual(d.identifyVMType('_0xabc; function(_0x1){}', features), 'obfuscator.io');
+    assert.strictEqual(
+      d.identifyVMType('_0xabc; function(_0x1){}', features),
+      'obfuscator.io',
+    );
     assert.strictEqual(d.identifyVMType('[][(+[])]', features), 'jsfuck');
-    assert.strictEqual(d.identifyVMType('$=~[]; $$$$=1;', features), 'jjencode');
+    assert.strictEqual(
+      d.identifyVMType('$=~[]; $$$$=1;', features),
+      'jjencode',
+    );
     assert.strictEqual(d.identifyVMType('const x=1;', features), 'custom');
   });
 
@@ -150,11 +193,16 @@ describe('JSVMPDeobfuscator', () => {
         }
       }
     `;
-    const instructions = d.extractInstructions(code, createVmFeatures({ instructionCount: 5 }));
+    const instructions = d.extractInstructions(
+      code,
+      createVmFeatures({instructionCount: 5}),
+    );
     assert.strictEqual(instructions.length, 5);
 
-    const ast = parser.parse('switch(x){case 1: x=1; break;}', { sourceType: 'script' }) as {
-      program: { body: Array<{ cases: unknown[] }> };
+    const ast = parser.parse('switch(x){case 1: x=1; break;}', {
+      sourceType: 'script',
+    }) as {
+      program: {body: Array<{cases: unknown[]}>};
     };
     const switchCase = ast.program.body[0].cases[0];
     const tpe = d.inferInstructionType(switchCase);
@@ -176,10 +224,13 @@ describe('JSVMPDeobfuscator', () => {
 
     const llm = {
       chat: async () => ({
-        content: '{"decoded":"const ok = 1;","confidence":0.7,"mechanism":"m","keyFindings":["k"]}',
+        content:
+          '{"decoded":"const ok = 1;","confidence":0.7,"mechanism":"m","keyFindings":["k"]}',
       }),
     };
-    const withLlm = new JSVMPDeobfuscator(llm as unknown as ConstructorParameters<typeof JSVMPDeobfuscator>[0]) as unknown as JSVMPHarness;
+    const withLlm = new JSVMPDeobfuscator(
+      llm as unknown as ConstructorParameters<typeof JSVMPDeobfuscator>[0],
+    ) as unknown as JSVMPHarness;
     const decoded = await withLlm.llmDecodeEncoding('code', 'JSFuck', []);
     assert.strictEqual(decoded.code, 'const ok = 1;');
     assert.ok(decoded.confidence > 0.2);
@@ -202,68 +253,129 @@ describe('JSVMPDeobfuscator', () => {
           '{"vmStructure":{"interpreterLoop":"L1","bytecodeVar":"b","pcVar":"p","stackVar":"s"},"instructionMap":{"1":"LOAD"},"restorationApproach":"step-by-step","simplifiedLogic":"does x"}',
       }),
     };
-    const withLlm = new JSVMPDeobfuscator(llm as unknown as ConstructorParameters<typeof JSVMPDeobfuscator>[0]) as unknown as JSVMPHarness;
+    const withLlm = new JSVMPDeobfuscator(
+      llm as unknown as ConstructorParameters<typeof JSVMPDeobfuscator>[0],
+    ) as unknown as JSVMPHarness;
     const custom = await withLlm.restoreCustomVMBasic('code', false, [], []);
     assert.ok(custom.confidence >= 0.3);
-    assert.ok(custom.warnings.some((w: string) => w.includes('AI结构分析完成')));
+    assert.ok(
+      custom.warnings.some((w: string) => w.includes('AI结构分析完成')),
+    );
 
-    withLlm.restoreObfuscatorIO = async () => ({ code: 'o', confidence: 0.8, warnings: [] });
-    withLlm.restoreJSFuck = async () => ({ code: 'j', confidence: 0.7, warnings: [] });
-    withLlm.restoreJJEncode = async () => ({ code: 'jj', confidence: 0.7, warnings: [] });
-    withLlm.restoreCustomVM = async () => ({ code: 'c', confidence: 0.6, warnings: [] });
+    withLlm.restoreObfuscatorIO = async () => ({
+      code: 'o',
+      confidence: 0.8,
+      warnings: [],
+    });
+    withLlm.restoreJSFuck = async () => ({
+      code: 'j',
+      confidence: 0.7,
+      warnings: [],
+    });
+    withLlm.restoreJJEncode = async () => ({
+      code: 'jj',
+      confidence: 0.7,
+      warnings: [],
+    });
+    withLlm.restoreCustomVM = async () => ({
+      code: 'c',
+      confidence: 0.6,
+      warnings: [],
+    });
 
     const features = createVmFeatures();
-    assert.strictEqual((await withLlm.restoreCode('x', features, 'obfuscator.io', false, 0, 0)).code, 'o');
-    assert.strictEqual((await withLlm.restoreCode('x', features, 'jsfuck', false, 0, 0)).code, 'j');
-    assert.strictEqual((await withLlm.restoreCode('x', features, 'jjencode', false, 0, 0)).code, 'jj');
-    assert.strictEqual((await withLlm.restoreCode('x', features, 'custom', false, 0, 0)).code, 'c');
+    assert.strictEqual(
+      (await withLlm.restoreCode('x', features, 'obfuscator.io', false, 0, 0))
+        .code,
+      'o',
+    );
+    assert.strictEqual(
+      (await withLlm.restoreCode('x', features, 'jsfuck', false, 0, 0)).code,
+      'j',
+    );
+    assert.strictEqual(
+      (await withLlm.restoreCode('x', features, 'jjencode', false, 0, 0)).code,
+      'jj',
+    );
+    assert.strictEqual(
+      (await withLlm.restoreCode('x', features, 'custom', false, 0, 0)).code,
+      'c',
+    );
   });
 
   it('covers public deobfuscate no-detect and error branches', async () => {
     const d = new JSVMPDeobfuscator() as unknown as JSVMPHarness;
-    const notVm = await d.deobfuscate({ code: 'const x=1;' });
+    const notVm = await d.deobfuscate({code: 'const x=1;'});
     assert.strictEqual(notVm.isJSVMP, false);
 
     d.detectJSVMP = () => {
       throw new Error('boom');
     };
-    const failed = await d.deobfuscate({ code: 'const y=1;' });
+    const failed = await d.deobfuscate({code: 'const y=1;'});
     assert.strictEqual(failed.isJSVMP, false);
     assert.ok(failed.warnings?.some((w: string) => w.includes('反混淆失败')));
   });
 
   it('covers additional llm decode branches and custom VM fallback paths', async () => {
     const codeBlockLlm = {
-      chat: async () => ({ content: '{bad-json}\n```js\nconst fromBlock = 1;\n```' }),
+      chat: async () => ({
+        content: '{bad-json}\n```js\nconst fromBlock = 1;\n```',
+      }),
     };
-    const d1 = new JSVMPDeobfuscator(codeBlockLlm as unknown as ConstructorParameters<typeof JSVMPDeobfuscator>[0]) as unknown as JSVMPHarness;
+    const d1 = new JSVMPDeobfuscator(
+      codeBlockLlm as unknown as ConstructorParameters<
+        typeof JSVMPDeobfuscator
+      >[0],
+    ) as unknown as JSVMPHarness;
     const byBlock = await d1.llmDecodeEncoding('bad', 'JSFuck', []);
     assert.strictEqual(byBlock.code.includes('fromBlock'), true);
     assert.strictEqual(byBlock.confidence, 0.4);
 
     const analysisOnlyLlm = {
       chat: async () => ({
-        content: '{"mechanism":"ops","keyFindings":["k1"],"manualSteps":["m1"]}',
+        content:
+          '{"mechanism":"ops","keyFindings":["k1"],"manualSteps":["m1"]}',
       }),
     };
-    const d2 = new JSVMPDeobfuscator(analysisOnlyLlm as unknown as ConstructorParameters<typeof JSVMPDeobfuscator>[0]) as unknown as JSVMPHarness;
+    const d2 = new JSVMPDeobfuscator(
+      analysisOnlyLlm as unknown as ConstructorParameters<
+        typeof JSVMPDeobfuscator
+      >[0],
+    ) as unknown as JSVMPHarness;
     const analysisOnly = await d2.llmDecodeEncoding('orig', 'JJEncode', []);
     assert.strictEqual(analysisOnly.code, 'orig');
-    assert.ok(analysisOnly.warnings.some((w: string) => w.includes('未能完全解码')));
+    assert.ok(
+      analysisOnly.warnings.some((w: string) => w.includes('未能完全解码')),
+    );
 
     const throwingLlm = {
       chat: async () => {
         throw new Error('llm down');
       },
     };
-    const d3 = new JSVMPDeobfuscator(throwingLlm as unknown as ConstructorParameters<typeof JSVMPDeobfuscator>[0]) as unknown as JSVMPHarness;
+    const d3 = new JSVMPDeobfuscator(
+      throwingLlm as unknown as ConstructorParameters<
+        typeof JSVMPDeobfuscator
+      >[0],
+    ) as unknown as JSVMPHarness;
     const llmFailed = await d3.llmDecodeEncoding('orig', 'JSFuck', []);
     assert.strictEqual(llmFailed.code, 'orig');
-    assert.ok(llmFailed.warnings.some((w: string) => w.includes('AI辅助分析失败')));
+    assert.ok(
+      llmFailed.warnings.some((w: string) => w.includes('AI辅助分析失败')),
+    );
 
-    const badJsonLlm = { chat: async () => ({ content: '{not-json' }) };
-    const d4 = new JSVMPDeobfuscator(badJsonLlm as unknown as ConstructorParameters<typeof JSVMPDeobfuscator>[0]) as unknown as JSVMPHarness;
-    const customFallback = await d4.restoreCustomVM('if(x){}; debugger;', true, [], []);
+    const badJsonLlm = {chat: async () => ({content: '{not-json'})};
+    const d4 = new JSVMPDeobfuscator(
+      badJsonLlm as unknown as ConstructorParameters<
+        typeof JSVMPDeobfuscator
+      >[0],
+    ) as unknown as JSVMPHarness;
+    const customFallback = await d4.restoreCustomVM(
+      'if(x){}; debugger;',
+      true,
+      [],
+      [],
+    );
     assert.ok(customFallback.code.includes('debugger') === false);
     assert.ok(Array.isArray(customFallback.warnings));
   });
@@ -287,9 +399,11 @@ describe('JSVMPDeobfuscator', () => {
 
   it('covers restoreObfuscatorIO parse-fail branch with llm array extraction', async () => {
     const llm = {
-      chat: async () => ({ content: '["A","B","C"]' }),
+      chat: async () => ({content: '["A","B","C"]'}),
     };
-    const d = new JSVMPDeobfuscator(llm as unknown as ConstructorParameters<typeof JSVMPDeobfuscator>[0]) as unknown as JSVMPHarness;
+    const d = new JSVMPDeobfuscator(
+      llm as unknown as ConstructorParameters<typeof JSVMPDeobfuscator>[0],
+    ) as unknown as JSVMPHarness;
     const warnings: string[] = [];
     const unresolved: UnresolvedPart[] = [];
     const code = `
@@ -312,10 +426,17 @@ describe('JSVMPDeobfuscator', () => {
         }`,
       }),
     };
-    const d = new JSVMPDeobfuscator(llm as unknown as ConstructorParameters<typeof JSVMPDeobfuscator>[0]) as unknown as JSVMPHarness;
+    const d = new JSVMPDeobfuscator(
+      llm as unknown as ConstructorParameters<typeof JSVMPDeobfuscator>[0],
+    ) as unknown as JSVMPHarness;
     const warnings: string[] = [];
     const unresolved: UnresolvedPart[] = [];
-    const out = await d.restoreCustomVM('while(true){switch(x){case 1:break;}}', false, warnings, unresolved);
+    const out = await d.restoreCustomVM(
+      'while(true){switch(x){case 1:break;}}',
+      false,
+      warnings,
+      unresolved,
+    );
     assert.strictEqual(out.confidence >= 0.5, true);
     assert.ok((out.warnings ?? []).some((w: string) => w.includes('VM类型')));
     assert.ok(Array.isArray(out.unresolvedParts));

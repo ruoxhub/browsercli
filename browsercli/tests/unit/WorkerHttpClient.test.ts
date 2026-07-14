@@ -106,3 +106,51 @@ describe('WorkerHttpClient.invoke (request-response wrapper)', () => {
     failing.close();
   });
 });
+
+describe('WorkerHttpClient.listTools (normalization)', () => {
+  function startToolsServer(body: unknown) {
+    const server = createServer((_req, res) => {
+      res.setHeader('Content-Type', 'application/json');
+      res.statusCode = 200;
+      res.end(JSON.stringify(body));
+    });
+    return new Promise<{server: any; base: string}>(resolve => {
+      server.listen(0, '127.0.0.1', () => {
+        resolve({
+          server,
+          base: `http://127.0.0.1:${(server.address() as any).port}`,
+        });
+      });
+    });
+  }
+
+  it('returns tools from the standard {tools:[...]} envelope', async () => {
+    const {server, base} = await startToolsServer({
+      success: true,
+      data: {tools: [{name: 'list_pages'}]},
+    });
+    const client = new WorkerHttpClient({baseUrl: base});
+    const {tools} = await client.listTools();
+    assert.deepEqual(tools, [{name: 'list_pages'}]);
+    server.close();
+  });
+
+  it('tolerates data being the array directly (older worker)', async () => {
+    const {server, base} = await startToolsServer({
+      success: true,
+      data: [{name: 'list_pages'}],
+    });
+    const client = new WorkerHttpClient({baseUrl: base});
+    const {tools} = await client.listTools();
+    assert.deepEqual(tools, [{name: 'list_pages'}]);
+    server.close();
+  });
+
+  it('returns empty array when tools key is missing (never crashes)', async () => {
+    const {server, base} = await startToolsServer({success: true, data: {}});
+    const client = new WorkerHttpClient({baseUrl: base});
+    const {tools} = await client.listTools();
+    assert.deepEqual(tools, []);
+    server.close();
+  });
+});

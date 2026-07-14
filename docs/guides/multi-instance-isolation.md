@@ -98,28 +98,28 @@ MCP_SESSION_ID=bob npx chrome-devtools-mcp --browserUrl http://127.0.0.1:9222
 // src/SessionManager.ts
 export class SessionManager {
   // 为页面添加会话标签
-  async tagPage(page: Page): Promise<void>
+  async tagPage(page: Page): Promise<void>;
 
   // 移除页面的会话标签
-  async untagPage(page: Page): Promise<void>
+  async untagPage(page: Page): Promise<void>;
 
   // 检查页面是否属于当前会话
-  async ownsPage(page: Page): Promise<boolean>
+  async ownsPage(page: Page): Promise<boolean>;
 
   // 获取当前会话拥有的所有页面
-  async getOwnedPages(): Promise<Page[]>
+  async getOwnedPages(): Promise<Page[]>;
 
   // 创建带有会话标签的新页面
-  async newPage(): Promise<Page>
+  async newPage(): Promise<Page>;
 }
 ```
 
 ### 标签存储机制
 
-| 存储类型 | 键名 | 作用 | 生命周期 |
-|---------|------|------|---------|
-| `sessionStorage` | `mcp-session-id` | 页面级临时标签 | 页面关闭后清除 |
-| `localStorage` | `mcp-session-tags` | 持久化标签映射 | 跨页面刷新持久化 |
+| 存储类型         | 键名               | 作用           | 生命周期         |
+| ---------------- | ------------------ | -------------- | ---------------- |
+| `sessionStorage` | `mcp-session-id`   | 页面级临时标签 | 页面关闭后清除   |
+| `localStorage`   | `mcp-session-tags` | 持久化标签映射 | 跨页面刷新持久化 |
 
 ## 注意事项
 
@@ -145,6 +145,7 @@ A: 影响极小。标签只是简单的 sessionStorage/localStorage 操作，不
 ### Q: 如何清理会话标签？
 
 A: 关闭页面时会自动移除标签。如需手动清理，可以在浏览器中执行：
+
 ```javascript
 localStorage.removeItem('mcp-session-tags');
 sessionStorage.removeItem('mcp-session-id');

@@ -39,10 +39,16 @@ describe('ToolResponseProcessor', () => {
     it('passes standard ToolDefinitionResponse unchanged', () => {
       const processor = new ToolResponseProcessor();
       const standardResponse = {text: 'standard response'};
-      assert.strictEqual(processor.normalize(standardResponse), standardResponse);
+      assert.strictEqual(
+        processor.normalize(standardResponse),
+        standardResponse,
+      );
 
       const structuredResponse = {structuredContent: {foo: 'bar'}};
-      assert.strictEqual(processor.normalize(structuredResponse), structuredResponse);
+      assert.strictEqual(
+        processor.normalize(structuredResponse),
+        structuredResponse,
+      );
     });
 
     it('normalizes string response to text json', () => {

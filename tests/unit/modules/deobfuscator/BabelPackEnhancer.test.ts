@@ -5,8 +5,10 @@
  */
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
-import * as parser from '@babel/parser';
+
 import generateImport from '@babel/generator';
+import * as parser from '@babel/parser';
+
 import {unwrapBabelDefault} from '../../../../src/modules/deobfuscator/astUtils.js';
 import {
   keyToLiteral,

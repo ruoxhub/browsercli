@@ -14,7 +14,8 @@ const FUNCTION_NAME_REGEX =
   /(function\s+([A-Za-z_$][\w$]*)\s*\(|const\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\(|([A-Za-z_$][\w$]*)\s*:\s*(?:async\s*)?function)/g;
 const REQUEST_SINK_REGEX =
   /\b(fetch|XMLHttpRequest|sendBeacon|axios\.(?:get|post|request)|\$.ajax)\b/g;
-const SIGNING_KEYWORD_REGEX = /(sign|token|encrypt|hash|auth|nonce|hmac|md5|sha)/i;
+const SIGNING_KEYWORD_REGEX =
+  /(sign|token|encrypt|hash|auth|nonce|hmac|md5|sha)/i;
 
 function collectUniqueMatches(
   source: string,
@@ -55,6 +56,10 @@ export function extractSignatureChainHints(code: string): SignatureChainHints {
         return undefined;
       },
     ),
-    requestSinks: collectUniqueMatches(code, REQUEST_SINK_REGEX, match => match[1]),
+    requestSinks: collectUniqueMatches(
+      code,
+      REQUEST_SINK_REGEX,
+      match => match[1],
+    ),
   };
 }

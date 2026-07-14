@@ -1,13 +1,12 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import { describe, it, beforeEach } from 'node:test';
+import {describe, it, beforeEach} from 'node:test';
 
-import { UnifiedCacheManager } from '../../../src/utils/UnifiedCacheManager.js';
+import {UnifiedCacheManager} from '../../../src/utils/UnifiedCacheManager.js';
 
 interface ResettableUnifiedCacheManager {
   instance?: unknown;
@@ -20,7 +19,13 @@ interface ExtendedUnifiedCacheManager {
   GLOBAL_MAX_SIZE: number;
   registerCache(cache: {
     name: string;
-    getStats(): {entries: number; size: number; hits?: number; misses?: number; hitRate?: number};
+    getStats(): {
+      entries: number;
+      size: number;
+      hits?: number;
+      misses?: number;
+      hitRate?: number;
+    };
     cleanup?(): void | Promise<void>;
     clear?(): void | Promise<void>;
   }): void;
@@ -30,14 +35,21 @@ interface ExtendedUnifiedCacheManager {
 
 describe('UnifiedCacheManager extended', () => {
   beforeEach(() => {
-    (UnifiedCacheManager as unknown as ResettableUnifiedCacheManager).instance = undefined;
+    (UnifiedCacheManager as unknown as ResettableUnifiedCacheManager).instance =
+      undefined;
   });
 
   it('continues when a cache getStats throws', async () => {
     const manager = UnifiedCacheManager.getInstance();
     manager.registerCache({
       name: 'ok',
-      getStats: () => ({ entries: 1, size: 1024, hits: 1, misses: 1, hitRate: 0.5 }),
+      getStats: () => ({
+        entries: 1,
+        size: 1024,
+        hits: 1,
+        misses: 1,
+        hitRate: 0.5,
+      }),
     });
     manager.registerCache({
       name: 'bad',
@@ -57,7 +69,13 @@ describe('UnifiedCacheManager extended', () => {
     const manager = UnifiedCacheManager.getInstance();
     manager.registerCache({
       name: 'small',
-      getStats: () => ({ entries: 1, size: 1000, hits: 1, misses: 0, hitRate: 1 }),
+      getStats: () => ({
+        entries: 1,
+        size: 1000,
+        hits: 1,
+        misses: 0,
+        hitRate: 1,
+      }),
       cleanup: () => undefined,
       clear: () => undefined,
     });
@@ -74,7 +92,13 @@ describe('UnifiedCacheManager extended', () => {
 
     manager.registerCache({
       name: 'low-hit',
-      getStats: () => ({ entries: 10, size: 4000, hits: 1, misses: 99, hitRate: 0.01 }),
+      getStats: () => ({
+        entries: 10,
+        size: 4000,
+        hits: 1,
+        misses: 99,
+        hitRate: 0.01,
+      }),
       clear: () => {
         lowCleared += 1;
       },
@@ -82,16 +106,26 @@ describe('UnifiedCacheManager extended', () => {
 
     manager.registerCache({
       name: 'large-hit',
-      getStats: () => ({ entries: 20, size: 8000, hits: 90, misses: 10, hitRate: 0.9 }),
+      getStats: () => ({
+        entries: 20,
+        size: 8000,
+        hits: 90,
+        misses: 10,
+        hitRate: 0.9,
+      }),
       clear: () => {
         highCleared += 1;
       },
     });
 
-    await (manager as unknown as ExtendedUnifiedCacheManager).cleanupLowHitRate();
+    await (
+      manager as unknown as ExtendedUnifiedCacheManager
+    ).cleanupLowHitRate();
     assert.ok(lowCleared >= 1);
 
-    await (manager as unknown as ExtendedUnifiedCacheManager).cleanupLargeItems();
+    await (
+      manager as unknown as ExtendedUnifiedCacheManager
+    ).cleanupLargeItems();
     assert.ok(lowCleared + highCleared >= 1);
 
     manager.unregisterCache('low-hit');
@@ -104,7 +138,7 @@ describe('UnifiedCacheManager extended', () => {
     let clearCount = 0;
     manager.registerCache({
       name: 'x',
-      getStats: () => ({ entries: 0, size: 0 }),
+      getStats: () => ({entries: 0, size: 0}),
       cleanup: () => {
         cleanupCount += 1;
       },
@@ -123,25 +157,40 @@ describe('UnifiedCacheManager extended', () => {
   });
 
   it('generates recommendations for critical size and cache-specific issues', async () => {
-    const manager = UnifiedCacheManager.getInstance() as unknown as ExtendedUnifiedCacheManager;
+    const manager =
+      UnifiedCacheManager.getInstance() as unknown as ExtendedUnifiedCacheManager;
     manager.GLOBAL_MAX_SIZE = 1000;
 
     manager.registerCache({
       name: 'big-low-hit',
-      getStats: () => ({ entries: 10, size: 950, hits: 1, misses: 99, hitRate: 0.01 }),
+      getStats: () => ({
+        entries: 10,
+        size: 950,
+        hits: 1,
+        misses: 99,
+        hitRate: 0.01,
+      }),
       clear: () => undefined,
     });
 
     manager.registerCache({
       name: 'small-good-hit',
-      getStats: () => ({ entries: 1, size: 10, hits: 9, misses: 1, hitRate: 0.9 }),
+      getStats: () => ({
+        entries: 1,
+        size: 10,
+        hits: 9,
+        misses: 1,
+        hitRate: 0.9,
+      }),
       clear: () => undefined,
     });
 
     const stats = await manager.getGlobalStats();
     const joined = stats.recommendations.join('\n');
     assert.ok(joined.includes('CRITICAL'));
-    assert.ok(joined.includes('Low cache hit rate') || joined.includes('low hit rate'));
+    assert.ok(
+      joined.includes('Low cache hit rate') || joined.includes('low hit rate'),
+    );
     assert.ok(joined.includes('big-low-hit'));
 
     manager.unregisterCache('big-low-hit');
@@ -149,18 +198,26 @@ describe('UnifiedCacheManager extended', () => {
   });
 
   it('generates good-health recommendation when usage is low and hit rate is high', async () => {
-    const manager = UnifiedCacheManager.getInstance() as unknown as ExtendedUnifiedCacheManager;
+    const manager =
+      UnifiedCacheManager.getInstance() as unknown as ExtendedUnifiedCacheManager;
     manager.GLOBAL_MAX_SIZE = 1000;
     manager.registerCache({
       name: 'healthy',
-      getStats: () => ({ entries: 1, size: 50, hits: 8, misses: 2, hitRate: 0.8 }),
+      getStats: () => ({
+        entries: 1,
+        size: 50,
+        hits: 8,
+        misses: 2,
+        hitRate: 0.8,
+      }),
       clear: () => undefined,
     });
 
     const stats = await manager.getGlobalStats();
     assert.ok(
       stats.recommendations.some(
-        (r: string) => r.includes('Good cache hit rate') || r.includes('health is good'),
+        (r: string) =>
+          r.includes('Good cache hit rate') || r.includes('health is good'),
       ),
     );
 

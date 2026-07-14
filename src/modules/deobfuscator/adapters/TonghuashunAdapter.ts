@@ -1,3 +1,8 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import traverseImport from '@babel/traverse';
 import * as t from '@babel/types';
 
@@ -8,7 +13,8 @@ import {WrapperFolder} from '../WrapperFolder.js';
 
 const traverse = unwrapBabelDefault<typeof traverseImport>(traverseImport);
 
-type NodePath<T extends t.Node = t.Node> = import('@babel/traverse').NodePath<T>;
+type NodePath<T extends t.Node = t.Node> =
+  import('@babel/traverse').NodePath<T>;
 
 const STRING_METHODS = new Set(['substring', 'substr', 'slice', 'split']);
 
@@ -261,10 +267,8 @@ function replaceDecoderAliasCalls(
         (calleePath.get('right') as NodePath).isIdentifier()
       ) {
         isDecoderAliasCall = aliasNames.has(
-          (
-            (calleePath.node as t.AssignmentExpression)
-              .right as t.Identifier
-          ).name,
+          ((calleePath.node as t.AssignmentExpression).right as t.Identifier)
+            .name,
         );
       }
 
@@ -281,10 +285,8 @@ function replaceDecoderAliasCalls(
       let value: unknown;
       try {
         value = decoderFn(
-          (
-            (path.node as t.CallExpression)
-              .arguments[0] as t.NumericLiteral
-          ).value,
+          ((path.node as t.CallExpression).arguments[0] as t.NumericLiteral)
+            .value,
         );
       } catch {
         return;
@@ -311,7 +313,10 @@ function tonghuashunOrderPass(ast: t.File): {ast: t.File; changed: boolean} {
   const sandbox = evaluator.createSandbox();
   const preludeNodes = getDecoderPreludeNodes(ast);
 
-  if (preludeNodes.length > 0 && evaluator.evaluateNodes(preludeNodes, sandbox, 2000)) {
+  if (
+    preludeNodes.length > 0 &&
+    evaluator.evaluateNodes(preludeNodes, sandbox, 2000)
+  ) {
     while (evaluator.seedSandboxFromAliases(ast, sandbox)) {
       changed = true;
     }

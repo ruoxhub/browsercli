@@ -1,3 +1,8 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import traverseImport from '@babel/traverse';
 import * as t from '@babel/types';
 
@@ -5,7 +10,8 @@ import {unwrapBabelDefault} from './astUtils.js';
 
 const traverse = unwrapBabelDefault<typeof traverseImport>(traverseImport);
 
-type NodePath<T extends t.Node = t.Node> = import('@babel/traverse').NodePath<T>;
+type NodePath<T extends t.Node = t.Node> =
+  import('@babel/traverse').NodePath<T>;
 
 function isPrimitiveNode(node: t.Node | null | undefined): boolean {
   if (!node) return false;
@@ -20,10 +26,7 @@ function isPrimitiveNode(node: t.Node | null | undefined): boolean {
 
 function getReplacementTarget(path: NodePath): NodePath {
   let current = path;
-  while (
-    current.parentPath?.isMemberExpression() &&
-    current.key === 'object'
-  ) {
+  while (current.parentPath?.isMemberExpression() && current.key === 'object') {
     current = current.parentPath;
   }
   return current;

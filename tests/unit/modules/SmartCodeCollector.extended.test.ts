@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { SmartCodeCollector } from '../../../src/modules/collector/SmartCodeCollector.js';
+import {SmartCodeCollector} from '../../../src/modules/collector/SmartCodeCollector.js';
 
 interface CodeFileLike {
   url: string;
@@ -55,7 +55,8 @@ describe('SmartCodeCollector extended', () => {
   const files: CodeFileLike[] = [
     {
       url: 'https://site.com/main-crypto.js',
-      content: 'function enc(){return CryptoJS.AES.encrypt("a","b")} import x from "dep";',
+      content:
+        'function enc(){return CryptoJS.AES.encrypt("a","b")} import x from "dep";',
       size: 200,
       type: 'external',
       metadata: {},
@@ -77,8 +78,11 @@ describe('SmartCodeCollector extended', () => {
   ];
 
   it('routes by mode and returns summary details', async () => {
-    const collector = new SmartCodeCollector() as unknown as SmartCodeCollectorHarness;
-    const summary = await collector.smartCollect(null, files, { mode: 'summary' });
+    const collector =
+      new SmartCodeCollector() as unknown as SmartCodeCollectorHarness;
+    const summary = await collector.smartCollect(null, files, {
+      mode: 'summary',
+    });
     assert.strictEqual(Array.isArray(summary), true);
     assert.strictEqual(summary[0]?.hasEncryption, true);
     assert.strictEqual(
@@ -94,7 +98,8 @@ describe('SmartCodeCollector extended', () => {
   });
 
   it('collects by priority and applies truncation/size limits', () => {
-    const collector = new SmartCodeCollector() as unknown as SmartCodeCollectorHarness;
+    const collector =
+      new SmartCodeCollector() as unknown as SmartCodeCollectorHarness;
     const picked = collector.collectByPriority(files, {
       mode: 'priority',
       maxTotalSize: 250,
@@ -108,7 +113,8 @@ describe('SmartCodeCollector extended', () => {
   });
 
   it('supports incremental filtering, default include-all and regex patterns', () => {
-    const collector = new SmartCodeCollector() as unknown as SmartCodeCollectorHarness;
+    const collector =
+      new SmartCodeCollector() as unknown as SmartCodeCollectorHarness;
 
     const incremental = collector.collectIncremental(files, {
       mode: 'incremental',
@@ -130,7 +136,8 @@ describe('SmartCodeCollector extended', () => {
   });
 
   it('covers detection and extraction helper branches', () => {
-    const collector = new SmartCodeCollector() as unknown as SmartCodeCollectorHarness;
+    const collector =
+      new SmartCodeCollector() as unknown as SmartCodeCollectorHarness;
 
     assert.strictEqual(collector.detectEncryption('const x = md5("a")'), true);
     assert.strictEqual(collector.detectEncryption('const x = 1'), false);

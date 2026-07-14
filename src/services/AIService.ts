@@ -72,7 +72,11 @@ const RETRYABLE_NETWORK_CODES = new Set([
   'ECONNREFUSED',
 ]);
 
-const RETRYABLE_MESSAGE_FRAGMENTS = ['Connection error', 'connect', 'ECONNREFUSED'];
+const RETRYABLE_MESSAGE_FRAGMENTS = [
+  'Connection error',
+  'connect',
+  'ECONNREFUSED',
+];
 
 export class AIService {
   private readonly provider: AIProvider;
@@ -92,7 +96,9 @@ export class AIService {
     prompt: string,
     isFilePath?: boolean,
   ): Promise<string> {
-    return this.withRetry(() => this.provider.analyzeImage(imageInput, prompt, isFilePath));
+    return this.withRetry(() =>
+      this.provider.analyzeImage(imageInput, prompt, isFilePath),
+    );
   }
 
   private async withRetry<T>(fn: () => Promise<T>): Promise<T> {
@@ -105,7 +111,10 @@ export class AIService {
       } catch (error) {
         lastError = error as Error;
 
-        if (attempt === this.retryConfig.maxRetries || !this.isRetryableError(error)) {
+        if (
+          attempt === this.retryConfig.maxRetries ||
+          !this.isRetryableError(error)
+        ) {
           break;
         }
 
@@ -127,13 +136,23 @@ export class AIService {
       return false;
     }
 
-    const err = error as {code?: string; message?: string; status?: number; statusCode?: number};
+    const err = error as {
+      code?: string;
+      message?: string;
+      status?: number;
+      statusCode?: number;
+    };
 
     if (err.code && RETRYABLE_NETWORK_CODES.has(err.code)) {
       return true;
     }
 
-    if (err.message && RETRYABLE_MESSAGE_FRAGMENTS.some(fragment => err.message!.includes(fragment))) {
+    if (
+      err.message &&
+      RETRYABLE_MESSAGE_FRAGMENTS.some(fragment =>
+        err.message!.includes(fragment),
+      )
+    ) {
       return true;
     }
 

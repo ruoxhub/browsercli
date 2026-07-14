@@ -22,6 +22,7 @@ import * as path from 'node:path';
 
 import type {DebuggerSession} from '../../types/index.js';
 import {logger} from '../../utils/logger.js';
+
 import type {BreakpointManager} from './BreakpointManager.js';
 import type {WatchExpressionManager} from './WatchExpressionManager.js';
 
@@ -224,7 +225,9 @@ export class DebuggerSessionStore {
     if (session.pauseOnExceptions) {
       const current = bpm.getPauseOnExceptionsState();
       const severity: Record<string, number> = {none: 0, uncaught: 1, all: 2};
-      if ((severity[session.pauseOnExceptions] ?? 0) > (severity[current] ?? 0)) {
+      if (
+        (severity[session.pauseOnExceptions] ?? 0) > (severity[current] ?? 0)
+      ) {
         await bpm.setPauseOnExceptions(session.pauseOnExceptions);
       }
     }

@@ -12,7 +12,10 @@ export const manifest = {
   profile: 'full',
   tools: [
     {modulePath: './emulation/emulateMobile.js', handlerName: 'emulateMobile'},
-    {modulePath: './emulation/emulateNetwork.js', handlerName: 'emulateNetwork'},
+    {
+      modulePath: './emulation/emulateNetwork.js',
+      handlerName: 'emulateNetwork',
+    },
     {modulePath: './emulation/emulateCpu.js', handlerName: 'emulateCpu'},
     {modulePath: './emulation/resizePage.js', handlerName: 'resizePage'},
   ],

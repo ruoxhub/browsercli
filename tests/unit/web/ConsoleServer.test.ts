@@ -5,14 +5,14 @@
  */
 
 import assert from 'node:assert';
-import { EventEmitter } from 'node:events';
-import { describe, it, before, after } from 'node:test';
-import { request } from 'node:http';
+import {EventEmitter} from 'node:events';
+import {request} from 'node:http';
+import {describe, it, before, after} from 'node:test';
 
-import { ConsoleServer } from '../../../src/web/ConsoleServer.js';
-import type { Runtime } from '../../../src/runtime.js';
-import type { SekiroInvoker } from '../../../src/worker/SekiroInvoker.js';
-import type { ToolAdapter } from '../../../src/worker/ToolAdapter.js';
+import type {Runtime} from '../../../src/runtime.js';
+import {ConsoleServer} from '../../../src/web/ConsoleServer.js';
+import type {SekiroInvoker} from '../../../src/worker/SekiroInvoker.js';
+import type {ToolAdapter} from '../../../src/worker/ToolAdapter.js';
 
 describe('ConsoleServer', () => {
   let server: ConsoleServer;
@@ -41,7 +41,7 @@ describe('ConsoleServer', () => {
   } as unknown as Runtime;
 
   const mockInvoker = {
-    invoke: async () => ({ ok: true }),
+    invoke: async () => ({ok: true}),
   } as unknown as SekiroInvoker;
 
   const mockToolAdapter = {
@@ -75,10 +75,10 @@ describe('ConsoleServer', () => {
           path: '/api/health',
           method: 'GET',
         },
-        (res) => {
+        res => {
           assert.strictEqual(res.statusCode, 200);
           let data = '';
-          res.on('data', (chunk) => {
+          res.on('data', chunk => {
             data += chunk;
           });
           res.on('end', () => {
@@ -87,7 +87,7 @@ describe('ConsoleServer', () => {
             assert.strictEqual(body.data.ok, true);
             resolve();
           });
-        }
+        },
       );
       req.on('error', reject);
       req.end();
@@ -103,10 +103,10 @@ describe('ConsoleServer', () => {
           path: '/random-web-page-route',
           method: 'GET',
         },
-        (res) => {
+        res => {
           assert.ok(res.statusCode === 200 || res.statusCode === 404);
           resolve();
-        }
+        },
       );
       req.on('error', reject);
       req.end();

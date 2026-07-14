@@ -17,7 +17,10 @@ interface MockSession {
 
 function makeSession(
   sendImpl: (method: string, params?: unknown) => unknown = () => ({}),
-): MockSession & {calls: Array<{method: string; params?: unknown}>; listeners: Record<string, Function>} {
+): MockSession & {
+  calls: Array<{method: string; params?: unknown}>;
+  listeners: Record<string, Function>;
+} {
   const calls: Array<{method: string; params?: unknown}> = [];
   const listeners: Record<string, Function> = {};
   return {
@@ -169,8 +172,14 @@ describe('BreakpointManager', () => {
     assert.strictEqual(bp.breakpointId, 'fn-bp-1');
     assert.strictEqual(bp.condition, 'x > 5');
     assert.strictEqual(bp.enabled, true);
-    assert.strictEqual(session.calls[0].method, 'Debugger.setBreakpointOnFunctionCall');
-    assert.deepStrictEqual(session.calls[0].params, {objectId: 'obj-123', condition: 'x > 5'});
+    assert.strictEqual(
+      session.calls[0].method,
+      'Debugger.setBreakpointOnFunctionCall',
+    );
+    assert.deepStrictEqual(session.calls[0].params, {
+      objectId: 'obj-123',
+      condition: 'x > 5',
+    });
   });
 
   it('getPossibleBreakpoints returns break locations from CDP', async () => {
@@ -182,11 +191,17 @@ describe('BreakpointManager', () => {
     }));
     const mgr = new BreakpointManager(() => session as any);
 
-    const result = await mgr.getPossibleBreakpoints({scriptId: 's1', lineNumber: 10});
+    const result = await mgr.getPossibleBreakpoints({
+      scriptId: 's1',
+      lineNumber: 10,
+    });
 
     assert.strictEqual(result.length, 2);
     assert.strictEqual(result[0].type, 'call');
-    assert.strictEqual(session.calls[0].method, 'Debugger.getPossibleBreakpoints');
+    assert.strictEqual(
+      session.calls[0].method,
+      'Debugger.getPossibleBreakpoints',
+    );
   });
 
   it('handleBreakpointResolved updates breakpoint location', async () => {
@@ -196,7 +211,10 @@ describe('BreakpointManager', () => {
     // Need to attach listeners first so breakpointResolved handler is registered
     mgr.attachListeners(session as any);
 
-    await mgr.setBreakpointByUrl({url: 'https://example.com/a.js', lineNumber: 10});
+    await mgr.setBreakpointByUrl({
+      url: 'https://example.com/a.js',
+      lineNumber: 10,
+    });
     const bpBefore = mgr.getBreakpoint('bp-r');
     assert.strictEqual(bpBefore?.location.scriptId, undefined);
 

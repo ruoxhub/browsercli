@@ -14,10 +14,14 @@ import type {WorkerContext} from '../types.js';
 
 function typeLabelFor(type: string): string {
   switch (type) {
-    case 'string': return '<str>';
-    case 'number': return '<num>';
-    case 'boolean': return '<bool>';
-    default: return '<arr>';
+    case 'string':
+      return '<str>';
+    case 'number':
+      return '<num>';
+    case 'boolean':
+      return '<bool>';
+    default:
+      return '<arr>';
   }
 }
 

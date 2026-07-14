@@ -42,7 +42,9 @@ function makePage(overrides: Record<string, unknown> = {}) {
 describe('PageInteraction', () => {
   it('click forwards selector and options', async () => {
     let calledSelector = '';
-    let calledOptions: {button?: string; clickCount?: number; delay?: number} | undefined;
+    let calledOptions:
+      | {button?: string; clickCount?: number; delay?: number}
+      | undefined;
     const page = makePage({
       click: async (
         selector: string,
@@ -63,11 +65,7 @@ describe('PageInteraction', () => {
   it('type forwards text and delay', async () => {
     let calledArgs: {selector?: string; text?: string; delay?: number} = {};
     const page = makePage({
-      type: async (
-        selector: string,
-        text: string,
-        opts?: {delay?: number},
-      ) => {
+      type: async (selector: string, text: string, opts?: {delay?: number}) => {
         calledArgs = {selector, text, delay: opts?.delay};
       },
     });
@@ -157,7 +155,7 @@ describe('PageInteraction', () => {
   });
 
   it('setFiles uses CDP session', async () => {
-    let sentCommands: {method: string; params?: unknown}[] = [];
+    const sentCommands: Array<{method: string; params?: unknown}> = [];
     const page = makePage({
       context: () => ({
         newCDPSession: async () => ({

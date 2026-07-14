@@ -52,9 +52,8 @@ function createMockServices(services: {
     getSelectedPageIndex: services.getSelectedPageIndex,
     getNetworkRequests: services.getNetworkRequests ?? (() => []),
     getNetworkRequestById:
-      services.getNetworkRequestById ?? (() => ({} as any)),
-    getNetworkRequestStableId:
-      services.getNetworkRequestStableId ?? (() => 0),
+      services.getNetworkRequestById ?? (() => ({}) as any),
+    getNetworkRequestStableId: services.getNetworkRequestStableId ?? (() => 0),
     getRequestInitiator: services.getRequestInitiator ?? (() => undefined),
     clearNetworkRequests: () => {},
     getWebSocketConnections: () => [],
@@ -158,7 +157,10 @@ describe('listNetworkRequests', () => {
     assert.equal(result.data.pageIdx, 1);
     assert.equal(result.data.targetPageIdx, 0);
     assert.equal(result.data.requests.length, 1);
-    assert.equal(result.data.requests[0]?.url, 'https://example.test/request-2');
+    assert.equal(
+      result.data.requests[0]?.url,
+      'https://example.test/request-2',
+    );
   });
 
   it('returns actionable message when no active page is available', async () => {

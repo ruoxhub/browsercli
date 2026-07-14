@@ -21,12 +21,12 @@
 
 Worker 端实际读取的环境变量与 CLI 参数如下（见 `src/index.ts`）：
 
-| 变量 / 参数 | 默认值 | 说明 |
-|-------------|--------|------|
-| `WORKER_TRANSPORT` | `http` | 传输方式。`http` = 启动 `/api/v1`；`sekiro` = 回退旧 RpcClient 路径 |
-| `WORKER_HOST` | `127.0.0.1` | 绑定地址。跨网络绑 `0.0.0.0` 时必须配 Token + HTTPS 反代 |
-| `WORKER_API_TOKEN` | 未设置 | 设置后所有 `/api/v1/*` 需 `Authorization: Bearer <token>` |
-| `--console-port <port>` | `8765` | **HTTP 服务端口（CLI 参数，不是环境变量）** |
+| 变量 / 参数             | 默认值      | 说明                                                                |
+| ----------------------- | ----------- | ------------------------------------------------------------------- |
+| `WORKER_TRANSPORT`      | `http`      | 传输方式。`http` = 启动 `/api/v1`；`sekiro` = 回退旧 RpcClient 路径 |
+| `WORKER_HOST`           | `127.0.0.1` | 绑定地址。跨网络绑 `0.0.0.0` 时必须配 Token + HTTPS 反代            |
+| `WORKER_API_TOKEN`      | 未设置      | 设置后所有 `/api/v1/*` 需 `Authorization: Bearer <token>`           |
+| `--console-port <port>` | `8765`      | **HTTP 服务端口（CLI 参数，不是环境变量）**                         |
 
 > ⚠️ **端口不是环境变量 `WORKER_PORT`**。Worker 监听端口由 CLI 参数 `--console-port` 控制，
 > 默认 `8765`。
@@ -54,11 +54,11 @@ node build/src/index.js --console-port 8765
 
 CLI 端实际读取的环境变量（见 `src/cli/app.ts`）：
 
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `WORKER_URL` | `http://127.0.0.1:8765` | Worker 的 HTTP 基址（含端口） |
-| `WORKER_API_TOKEN` | 未设置 | 需与 Worker 端一致 |
-| `WORKER_TRANSPORT` | `http` | 与 Worker 端协商一致即可 |
+| 变量               | 默认值                  | 说明                          |
+| ------------------ | ----------------------- | ----------------------------- |
+| `WORKER_URL`       | `http://127.0.0.1:8765` | Worker 的 HTTP 基址（含端口） |
+| `WORKER_API_TOKEN` | 未设置                  | 需与 Worker 端一致            |
+| `WORKER_TRANSPORT` | `http`                  | 与 Worker 端协商一致即可      |
 
 调用示例：
 
@@ -123,17 +123,17 @@ WORKER_TRANSPORT=sekiro browsercli call <tool-name> --url <url>
 
 下表与 `src/web/routes/apiV1.ts` 实际路由一致（注意 `invoke` 返回 `202`、`jobs` 返回 Job 对象）：
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET  | `/api/v1/health` | 健康检查（`{status:'ok', uptimeMs, version}`） |
-| GET  | `/api/v1/tools` | 工具列表（`{tools:[...]}`） |
-| GET  | `/api/v1/tools/:name` | 单工具元信息（404 `TOOL_NOT_FOUND`） |
-| POST | `/api/v1/sessions` | 创建会话 → **201** `{sessionId, createdAt}` |
-| GET  | `/api/v1/sessions` | 会话列表（`{sessions:[...]}`） |
-| DELETE | `/api/v1/sessions/:id` | 删除会话（404 `SESSION_NOT_FOUND`） |
-| POST | `/api/v1/sessions/:id/invoke` | 提交 Job → **202** `{jobId, sessionId, status:'pending'}`（body 需 `{tool, params}`） |
-| GET  | `/api/v1/jobs/:id` | 查询 Job 状态/结果/错误（Job 对象） |
-| WS   | `/api/v1/sessions/:id/stream` | 会话事件流（**服务端端点尚未挂载，规划中**；客户端 `--watch` 已 try/catch 不崩） |
+| 方法   | 路径                          | 说明                                                                                  |
+| ------ | ----------------------------- | ------------------------------------------------------------------------------------- |
+| GET    | `/api/v1/health`              | 健康检查（`{status:'ok', uptimeMs, version}`）                                        |
+| GET    | `/api/v1/tools`               | 工具列表（`{tools:[...]}`）                                                           |
+| GET    | `/api/v1/tools/:name`         | 单工具元信息（404 `TOOL_NOT_FOUND`）                                                  |
+| POST   | `/api/v1/sessions`            | 创建会话 → **201** `{sessionId, createdAt}`                                           |
+| GET    | `/api/v1/sessions`            | 会话列表（`{sessions:[...]}`）                                                        |
+| DELETE | `/api/v1/sessions/:id`        | 删除会话（404 `SESSION_NOT_FOUND`）                                                   |
+| POST   | `/api/v1/sessions/:id/invoke` | 提交 Job → **202** `{jobId, sessionId, status:'pending'}`（body 需 `{tool, params}`） |
+| GET    | `/api/v1/jobs/:id`            | 查询 Job 状态/结果/错误（Job 对象）                                                   |
+| WS     | `/api/v1/sessions/:id/stream` | 会话事件流（**服务端端点尚未挂载，规划中**；客户端 `--watch` 已 try/catch 不崩）      |
 
 **Job 对象形状**（`GET /api/v1/jobs/:id` 返回）：
 

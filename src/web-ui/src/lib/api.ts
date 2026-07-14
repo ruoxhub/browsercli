@@ -1,4 +1,14 @@
-import type { ApiResponse, WorkerFullStatus, InvocationRecord, SiteExperience } from './protocol';
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+import type {
+  ApiResponse,
+  WorkerFullStatus,
+  InvocationRecord,
+  SiteExperience,
+} from './protocol';
 
 export interface ToolSummary {
   name: string;
@@ -10,7 +20,6 @@ export interface ToolSummary {
   inputSchema?: any;
 }
 
-
 export interface CallToolResult {
   invocationId: string;
   traceId: string;
@@ -18,7 +27,11 @@ export interface CallToolResult {
   durationMs: number;
 }
 
-async function request<T>(method: string, url: string, body?: unknown): Promise<T> {
+async function request<T>(
+  method: string,
+  url: string,
+  body?: unknown,
+): Promise<T> {
   const options: RequestInit = {
     method,
     headers: {
@@ -35,12 +48,15 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
     const contentType = response.headers.get('content-type');
     if (contentType && contentType.includes('application/json')) {
       try {
-        const errResult = await response.json() as any;
+        const errResult = (await response.json()) as any;
         if (errResult && errResult.error?.message) {
           throw new Error(errResult.error.message);
         }
       } catch (e) {
-        if (e instanceof Error && e.message !== `HTTP error! status: ${response.status}`) {
+        if (
+          e instanceof Error &&
+          e.message !== `HTTP error! status: ${response.status}`
+        ) {
           throw e;
         }
       }
@@ -65,25 +81,28 @@ export const api = {
     return request<WorkerFullStatus>('GET', '/api/worker/status');
   },
 
-  getTools(): Promise<{ tools: ToolSummary[]; total: number }> {
-    return request<{ tools: ToolSummary[]; total: number }>('GET', '/api/tools');
+  getTools(): Promise<{tools: ToolSummary[]; total: number}> {
+    return request<{tools: ToolSummary[]; total: number}>('GET', '/api/tools');
   },
 
-  getInvocations(limit?: number): Promise<{ records: InvocationRecord[] }> {
+  getInvocations(limit?: number): Promise<{records: InvocationRecord[]}> {
     const query = limit !== undefined ? `?limit=${limit}` : '';
-    return request<{ records: InvocationRecord[]; total: number; limit: number }>(
+    return request<{records: InvocationRecord[]; total: number; limit: number}>(
       'GET',
-      `/api/invocations${query}`
+      `/api/invocations${query}`,
     ).then(data => ({
       records: data.records,
     }));
   },
 
-  callTool(name: string, args: Record<string, unknown>): Promise<CallToolResult> {
+  callTool(
+    name: string,
+    args: Record<string, unknown>,
+  ): Promise<CallToolResult> {
     return request<CallToolResult>(
       'POST',
       `/api/tools/${encodeURIComponent(name)}`,
-      { args }
+      {args},
     );
   },
   getHooks(): Promise<any> {
@@ -95,7 +114,10 @@ export const api = {
   deleteHook(hookId: string): Promise<any> {
     return request<any>('DELETE', `/api/hooks/${encodeURIComponent(hookId)}`);
   },
-  getSiteExperiences(params?: { url?: string; name?: string }): Promise<SiteExperience[]> {
+  getSiteExperiences(params?: {
+    url?: string;
+    name?: string;
+  }): Promise<SiteExperience[]> {
     const searchParams = new URLSearchParams();
     if (params?.url) searchParams.append('url', params.url);
     if (params?.name) searchParams.append('name', params.name);
@@ -105,13 +127,21 @@ export const api = {
   getSiteExperienceById(id: number): Promise<SiteExperience> {
     return request<SiteExperience>('GET', `/api/site-experiences/${id}`);
   },
-  createSiteExperience(data: Omit<SiteExperience, 'id' | 'createdAt' | 'updatedAt'>): Promise<SiteExperience> {
+  createSiteExperience(
+    data: Omit<SiteExperience, 'id' | 'createdAt' | 'updatedAt'>,
+  ): Promise<SiteExperience> {
     return request<SiteExperience>('POST', '/api/site-experiences', data);
   },
-  updateSiteExperience(id: number, data: Partial<Omit<SiteExperience, 'id' | 'createdAt' | 'updatedAt'>>): Promise<SiteExperience> {
+  updateSiteExperience(
+    id: number,
+    data: Partial<Omit<SiteExperience, 'id' | 'createdAt' | 'updatedAt'>>,
+  ): Promise<SiteExperience> {
     return request<SiteExperience>('PUT', `/api/site-experiences/${id}`, data);
   },
-  deleteSiteExperience(id: number): Promise<{ success: boolean; id: number }> {
-    return request<{ success: boolean; id: number }>('DELETE', `/api/site-experiences/${id}`);
+  deleteSiteExperience(id: number): Promise<{success: boolean; id: number}> {
+    return request<{success: boolean; id: number}>(
+      'DELETE',
+      `/api/site-experiences/${id}`,
+    );
   },
 };

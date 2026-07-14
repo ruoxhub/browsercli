@@ -11,8 +11,14 @@ export const manifest = {
   description: 'Screenshot and video frame tools.',
   profile: 'workflow',
   tools: [
-    {modulePath: './screenshot/takeScreenshot.js', handlerName: 'takeScreenshot'},
-    {modulePath: './screenshot/captureVideoFrame.js', handlerName: 'captureVideoFrame'},
+    {
+      modulePath: './screenshot/takeScreenshot.js',
+      handlerName: 'takeScreenshot',
+    },
+    {
+      modulePath: './screenshot/captureVideoFrame.js',
+      handlerName: 'captureVideoFrame',
+    },
     {modulePath: './screenshot/getVideoInfo.js', handlerName: 'getVideoInfo'},
     {modulePath: './screenshot/seekVideo.js', handlerName: 'seekVideo'},
   ],

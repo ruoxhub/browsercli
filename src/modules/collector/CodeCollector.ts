@@ -22,10 +22,6 @@
  * - DynamicScriptWatcher: 动态脚本等待（network idle / 时间等待）
  */
 
-import type {
-  BrowserManager,
-  BrowserManagerConfig,
-} from '../browser/index.js';
 import type {Browser, Page} from '../../third_party/index.js';
 import type {
   CollectCodeOptions,
@@ -34,6 +30,7 @@ import type {
   DependencyGraph,
 } from '../../types/index.js';
 import {logger} from '../../utils/logger.js';
+import type {BrowserManager, BrowserManagerConfig} from '../browser/index.js';
 
 import {CdpNetworkMonitor} from './CdpNetworkMonitor.js';
 import {CodeCache} from './CodeCache.js';

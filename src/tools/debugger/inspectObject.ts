@@ -141,7 +141,7 @@ export const inspectObject = defineTool({
           success: false,
           message: (result as {error: string}).error,
           tooltype: 'inspect_object',
-          data: { expression }
+          data: {expression},
         });
         return;
       }
@@ -152,15 +152,15 @@ export const inspectObject = defineTool({
         tooltype: 'inspect_object',
         data: {
           expression,
-          result: result
-        }
+          result: result,
+        },
       });
     } catch (error) {
       response.setStructuredContent({
         success: false,
         message: `错误：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'inspect_object',
-        data: { expression: request.params.expression }
+        data: {expression: request.params.expression},
       });
     }
   },

@@ -184,10 +184,12 @@ if (persistent) {
   selectedPage.on('framenavigated', async (frame: Frame) => {
     if (frame === selectedPage.mainFrame()) {
       // 检查 hook 是否存在，不存在则重新注入
-      const exists = await frame.evaluate(
-        `(hookId) => typeof window.__hookStore !== 'undefined'`,
-        hookId,
-      ).catch(() => false);
+      const exists = await frame
+        .evaluate(
+          `(hookId) => typeof window.__hookStore !== 'undefined'`,
+          hookId,
+        )
+        .catch(() => false);
       if (!exists) {
         await frame.evaluate(script).catch(() => {});
       }
@@ -214,7 +216,9 @@ response.setStructuredContent({
   data: {
     ...result,
     world,
-    persistentStrategy: result.persisted ? 'addInitScript + framenavigated' : 'evaluate-once',
+    persistentStrategy: result.persisted
+      ? 'addInitScript + framenavigated'
+      : 'evaluate-once',
   },
 });
 ```
@@ -241,14 +245,15 @@ response.setStructuredContent({
 
 当前 6 阶段逆向工作流在多处定义：
 
-| 文件 | 定义 | 角色 |
-|------|------|------|
-| `docs/reference/reverse-workflow.md` | 6 阶段（Observe → Capture → Rebuild → Patch → PureExtraction → Port） | 模型执行协议，最详细 |
-| `docs/guides/full-usage-guide.md` §7 | 6 阶段（同上） | 人类使用指南，有额外示例 |
-| `skills/jsreverser-playbook/references/automation-entry.md` | 3 阶段（观察 → 采样 → 补环境） | 自动化入口简化版 |
-| `agent/crawler-reverse-agent.md` | 8 步操作序列（Step 0-7） | Agent 操作手册，不是工作流定义 |
+| 文件                                                        | 定义                                                                  | 角色                           |
+| ----------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------ |
+| `docs/reference/reverse-workflow.md`                        | 6 阶段（Observe → Capture → Rebuild → Patch → PureExtraction → Port） | 模型执行协议，最详细           |
+| `docs/guides/full-usage-guide.md` §7                        | 6 阶段（同上）                                                        | 人类使用指南，有额外示例       |
+| `skills/jsreverser-playbook/references/automation-entry.md` | 3 阶段（观察 → 采样 → 补环境）                                        | 自动化入口简化版               |
+| `agent/crawler-reverse-agent.md`                            | 8 步操作序列（Step 0-7）                                              | Agent 操作手册，不是工作流定义 |
 
 不一致点：
+
 - `full-usage-guide.md` §7 重复了 `reverse-workflow.md` 的全部内容但格式不同
 - `automation-entry.md` 的 3 阶段与 6 阶段的映射关系未声明
 - `crawler-reverse-agent.md` 的 8 步看起来是独立的操作序列，但与 6 阶段的对应关系不明确
@@ -295,9 +300,12 @@ response.setStructuredContent({
 
 ```markdown
 <!-- 对应 reverse-workflow.md Phase 1: Observe -->
+
 **Step 1：目标侦察**
 ...
+
 <!-- 对应 reverse-workflow.md Phase 2: Capture -->
+
 **Step 3：Hook 与采样**
 ...
 ```
@@ -327,23 +335,23 @@ response.setStructuredContent({
 
 以下节点按影响面（被引用次数 × 功能重要性）排序：
 
-| 节点 | 源文件 | 当前状态 | 应连接目标 |
-|------|--------|----------|-----------|
-| EventBus | `src/utils/EventBus.ts` | 0 连接 | RuntimeServices, HookManager, ConsoleServer |
-| ToolAdapter | `src/worker/ToolAdapter.ts` | 0 连接 | ToolExecutionPipeline, ToolContext, 所有工具定义 |
-| StealthScripts2025 | `src/modules/stealth/StealthScripts2025.ts` | 0 连接 | Anti-Detection Layering System, CloakBrowser, BrowserManager |
-| MINIMAL_STEALTH_ARGS | `src/browser/stealth-args.ts` | 0 连接 | BrowserManager, Anti-Detection Layering System, stealth-args 文档 |
-| AI Service Layer | `src/services/AIService.ts` | 0 连接 | LLMService, AnthropicProvider, GeminiProvider, OpenAIProvider |
-| RuntimeServices | `src/runtime/RuntimeServices.ts` | 0 连接 | Runtime (runtime.ts), 所有 lazy 加载的服务 |
-| BrowserManager | `src/browser/browser.ts` | 1 连接 | SessionManager, CloakBrowser, 所有需要浏览器的工具 |
-| HookStore | `src/modules/hook/HookStore.ts` | 0 连接 | HookManager, ConsoleServer, InjectHook |
-| CodeCache | `src/modules/collector/CodeCache.ts` | 0 连接 | CodeCollector, SmartCodeCollector, UnifiedCacheManager |
-| PageController | `src/modules/collector/PageController.ts` | 0 连接 | RuntimeServices, CodeCollector, DOMInspector |
-| ReverseTaskStore | `src/reverse/ReverseTaskStore.ts` | 0 连接 | 所有 reverse task 工具, Runtime |
-| WsHub | `src/web/ws/WsHub.ts` | 0 连接 | ConsoleServer, RestRouter, 所有 WebSocket 工具 |
-| ToolRegistry | `src/tools/registry/ToolRegistry.ts` | 0 连接 | 所有工具定义, ToolDefinition, CLI 工具分发 |
-| ToolExecutionPipeline | `src/worker/ToolExecutionPipeline.ts` | 0 连接 | ToolAdapter, ToolContext, ToolResponse |
-| HookCodeBuilder | `src/modules/hook/HookCodeBuilder.ts` | 0 连接 | HookManager, HookTypeRegistry, create_hook 工具 |
+| 节点                  | 源文件                                      | 当前状态 | 应连接目标                                                        |
+| --------------------- | ------------------------------------------- | -------- | ----------------------------------------------------------------- |
+| EventBus              | `src/utils/EventBus.ts`                     | 0 连接   | RuntimeServices, HookManager, ConsoleServer                       |
+| ToolAdapter           | `src/worker/ToolAdapter.ts`                 | 0 连接   | ToolExecutionPipeline, ToolContext, 所有工具定义                  |
+| StealthScripts2025    | `src/modules/stealth/StealthScripts2025.ts` | 0 连接   | Anti-Detection Layering System, CloakBrowser, BrowserManager      |
+| MINIMAL_STEALTH_ARGS  | `src/browser/stealth-args.ts`               | 0 连接   | BrowserManager, Anti-Detection Layering System, stealth-args 文档 |
+| AI Service Layer      | `src/services/AIService.ts`                 | 0 连接   | LLMService, AnthropicProvider, GeminiProvider, OpenAIProvider     |
+| RuntimeServices       | `src/runtime/RuntimeServices.ts`            | 0 连接   | Runtime (runtime.ts), 所有 lazy 加载的服务                        |
+| BrowserManager        | `src/browser/browser.ts`                    | 1 连接   | SessionManager, CloakBrowser, 所有需要浏览器的工具                |
+| HookStore             | `src/modules/hook/HookStore.ts`             | 0 连接   | HookManager, ConsoleServer, InjectHook                            |
+| CodeCache             | `src/modules/collector/CodeCache.ts`        | 0 连接   | CodeCollector, SmartCodeCollector, UnifiedCacheManager            |
+| PageController        | `src/modules/collector/PageController.ts`   | 0 连接   | RuntimeServices, CodeCollector, DOMInspector                      |
+| ReverseTaskStore      | `src/reverse/ReverseTaskStore.ts`           | 0 连接   | 所有 reverse task 工具, Runtime                                   |
+| WsHub                 | `src/web/ws/WsHub.ts`                       | 0 连接   | ConsoleServer, RestRouter, 所有 WebSocket 工具                    |
+| ToolRegistry          | `src/tools/registry/ToolRegistry.ts`        | 0 连接   | 所有工具定义, ToolDefinition, CLI 工具分发                        |
+| ToolExecutionPipeline | `src/worker/ToolExecutionPipeline.ts`       | 0 连接   | ToolAdapter, ToolContext, ToolResponse                            |
+| HookCodeBuilder       | `src/modules/hook/HookCodeBuilder.ts`       | 0 连接   | HookManager, HookTypeRegistry, create_hook 工具                   |
 
 ### 补全策略
 
@@ -354,6 +362,7 @@ response.setStructuredContent({
 3. **不创建新文档文件** — 只补连接，不补独立页面
 
 具体操作：
+
 - 在每个源文件的模块级 JSDoc 中，添加 `@see` 标签列出关键依赖方
 - 在 `AGENTS.md` 的 Architecture Notes 中添加这些组件的一句话描述和文件路径
 - 在 `tool-reference.md` 中为工具注册链路添加一段说明
@@ -375,11 +384,11 @@ response.setStructuredContent({
 
 ## 实施顺序
 
-| Phase | 类型 | 预估工作量 | 风险 |
-|-------|------|-----------|------|
-| 1. 工具崩溃修复 | 代码 | 小（4 文件） | 低 — 纯防御性添加 |
-| 2. Hook 注入修复 | 代码 | 中（3 文件） | 中 — persistent hook 重挂载需要集成测试 |
-| 3. 工作流统一 | 文档 | 小（4 文件） | 低 — 只改文档不改行为 |
-| 4. 孤立节点补全 | 文档 | 中（~20 文件） | 低 — 只加注释和链接 |
+| Phase            | 类型 | 预估工作量     | 风险                                    |
+| ---------------- | ---- | -------------- | --------------------------------------- |
+| 1. 工具崩溃修复  | 代码 | 小（4 文件）   | 低 — 纯防御性添加                       |
+| 2. Hook 注入修复 | 代码 | 中（3 文件）   | 中 — persistent hook 重挂载需要集成测试 |
+| 3. 工作流统一    | 文档 | 小（4 文件）   | 低 — 只改文档不改行为                   |
+| 4. 孤立节点补全  | 文档 | 中（~20 文件） | 低 — 只加注释和链接                     |
 
 建议按 1 → 2 → 3 → 4 顺序实施。Phase 1 和 2 可以独立合并；Phase 3 和 4 可合并为一个 PR。

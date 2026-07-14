@@ -30,7 +30,8 @@ function matchesUrlPattern(pattern: string, url: string): boolean {
  */
 export function checkUrlMatches(url: string): CheckUrlMatchesResult {
   const injectConfigs = getInjectConfigStore();
-  const matchedScripts: Array<{id: string; name: string; urlPattern: string}> = [];
+  const matchedScripts: Array<{id: string; name: string; urlPattern: string}> =
+    [];
 
   for (const config of injectConfigs.values()) {
     if (config.enabled && matchesUrlPattern(config.urlPattern, url)) {

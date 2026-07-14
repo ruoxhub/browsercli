@@ -13,6 +13,7 @@
 ## Global Constraints
 
 （与 Part 1 一致）
+
 - 每个策略文件 ≤500 行，每个门面 ≤450 行
 - 公共 API 签名不变，调用方代码不动
 - 每类独立 commit，可独立回退
@@ -40,6 +41,7 @@ npm run build && npm run typecheck && npm run test:unit
 - [ ] **Step 2: 确认待提取方法边界**
 
 在 `src/modules/deobfuscator/AdvancedDeobfuscator.ts`（1463 行）中定位每个 detect+decode 方法对的起止行：
+
 - InvisibleUnicode: `detectInvisibleUnicode` + `decodeInvisibleUnicode`
 - VM Protection: `detectVMProtection` + `countVMInstructions` + `deobfuscateVM` + `analyzeVMStructure` + `extractVMComponents` + `buildVMDeobfuscationPrompt` + `simplifyVMCode`
 - ControlFlow: `detectControlFlowFlattening` + 对应 deobfuscate 方法
@@ -52,6 +54,7 @@ npm run build && npm run typecheck && npm run test:unit
 ### Task 4.2: 创建 6 个策略文件
 
 **Files:**
+
 - Create: `src/modules/deobfuscator/InvisibleUnicodeDeobfuscator.ts`
 - Create: `src/modules/deobfuscator/VMProtectionDeobfuscator.ts`
 - Create: `src/modules/deobfuscator/ControlFlowDeobfuscator.ts`
@@ -67,7 +70,7 @@ npm run build && npm run typecheck && npm run test:unit
 /**
  * [Technique] 去混淆器。提取自 AdvancedDeobfuscator.ts。
  */
-import type { LLMService } from '../../services/LLMService.js';
+import type {LLMService} from '../../services/LLMService.js';
 
 export class InvisibleUnicodeDeobfuscator {
   constructor(private llm?: LLMService) {}
@@ -94,13 +97,36 @@ export class InvisibleUnicodeDeobfuscator {
 export class VMProtectionDeobfuscator {
   constructor(private llm?: LLMService) {}
 
-  static detectVMProtection(code: string): { detected: boolean; confidence: number } { /* ... */ }
-  static countVMInstructions(code: string): number { /* ... */ }
-  async deobfuscateVM(code: string, options: { aggressiveVM?: boolean }): Promise<VMDeobfuscateResult> { /* ... */ }
-  static analyzeVMStructure(code: string): VMStructure { /* ... */ }
-  static extractVMComponents(code: string): VMComponents { /* ... */ }
-  private buildVMDeobfuscationPrompt(code: string, vmStructure: VMStructure): string[] { /* ... */ }
-  static simplifyVMCode(code: string): string { /* ... */ }
+  static detectVMProtection(code: string): {
+    detected: boolean;
+    confidence: number;
+  } {
+    /* ... */
+  }
+  static countVMInstructions(code: string): number {
+    /* ... */
+  }
+  async deobfuscateVM(
+    code: string,
+    options: {aggressiveVM?: boolean},
+  ): Promise<VMDeobfuscateResult> {
+    /* ... */
+  }
+  static analyzeVMStructure(code: string): VMStructure {
+    /* ... */
+  }
+  static extractVMComponents(code: string): VMComponents {
+    /* ... */
+  }
+  private buildVMDeobfuscationPrompt(
+    code: string,
+    vmStructure: VMStructure,
+  ): string[] {
+    /* ... */
+  }
+  static simplifyVMCode(code: string): string {
+    /* ... */
+  }
 }
 ```
 
@@ -108,8 +134,12 @@ export class VMProtectionDeobfuscator {
 
 ```typescript
 export class ControlFlowDeobfuscator {
-  static detectControlFlowFlattening(code: string): boolean { /* ... */ }
-  async deobfuscateControlFlow(code: string): Promise<string> { /* ... */ }
+  static detectControlFlowFlattening(code: string): boolean {
+    /* ... */
+  }
+  async deobfuscateControlFlow(code: string): Promise<string> {
+    /* ... */
+  }
 }
 ```
 
@@ -124,17 +154,18 @@ export class ControlFlowDeobfuscator {
 ### Task 4.3: 更新 AdvancedDeobfuscator 门面
 
 **Files:**
+
 - Modify: `src/modules/deobfuscator/AdvancedDeobfuscator.ts`
 
 - [ ] **Step 1: 导入所有策略模块**
 
 ```typescript
-import { InvisibleUnicodeDeobfuscator } from './InvisibleUnicodeDeobfuscator.js';
-import { VMProtectionDeobfuscator } from './VMProtectionDeobfuscator.js';
-import { ControlFlowDeobfuscator } from './ControlFlowDeobfuscator.js';
-import { StringArrayDeobfuscator } from './StringArrayDeobfuscator.js';
-import { DeadCodeDeobfuscator } from './DeadCodeDeobfuscator.js';
-import { OpaquePredicateDeobfuscator } from './OpaquePredicateDeobfuscator.js';
+import {InvisibleUnicodeDeobfuscator} from './InvisibleUnicodeDeobfuscator.js';
+import {VMProtectionDeobfuscator} from './VMProtectionDeobfuscator.js';
+import {ControlFlowDeobfuscator} from './ControlFlowDeobfuscator.js';
+import {StringArrayDeobfuscator} from './StringArrayDeobfuscator.js';
+import {DeadCodeDeobfuscator} from './DeadCodeDeobfuscator.js';
+import {OpaquePredicateDeobfuscator} from './OpaquePredicateDeobfuscator.js';
 ```
 
 - [ ] **Step 2: 在 `deobfuscate` 方法中将 `this.detectXxx` 改为 `XxxDeobfuscator.detectXxx`**
@@ -167,6 +198,7 @@ async deobfuscate(code: string, options: DeobfuscateOptions = {}): Promise<Deobf
 ### Task 4.4: 添加策略文件的单元测试
 
 **Files:**
+
 - Create: `tests/unit/modules/deobfuscator/InvisibleUnicodeDeobfuscator.test.ts`
 - Create: `tests/unit/modules/deobfuscator/VMProtectionDeobfuscator.test.ts`
 - （其余 4 个策略文件同理）
@@ -174,13 +206,16 @@ async deobfuscate(code: string, options: DeobfuscateOptions = {}): Promise<Deobf
 - [ ] **Step 1: 编写 InvisibleUnicode 测试**
 
 ```typescript
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 import assert from 'node:assert';
-import { InvisibleUnicodeDeobfuscator } from '../../../src/modules/deobfuscator/InvisibleUnicodeDeobfuscator.js';
+import {InvisibleUnicodeDeobfuscator} from '../../../src/modules/deobfuscator/InvisibleUnicodeDeobfuscator.js';
 
 describe('InvisibleUnicodeDeobfuscator', () => {
   it('detects invisible unicode in code', () => {
-    assert.strictEqual(InvisibleUnicodeDeobfuscator.detectInvisibleUnicode('normal code'), false);
+    assert.strictEqual(
+      InvisibleUnicodeDeobfuscator.detectInvisibleUnicode('normal code'),
+      false,
+    );
     // 用包含不可见 Unicode 的代码测试 detectInvisibleUnicode
   });
 
@@ -254,6 +289,7 @@ grep -n "private buildPreloadScript\|^\s*}$" src/modules/wasm/WasmCollector.ts
 - [ ] **Step 3: 定位 binary registry 和 artifacts 方法**
 
 确认以下方法的起止行：
+
 - Binary registry: `registerBinary` + `applyExportCallCounts` + 3 个 Map 属性
 - Artifact 持久化：`persistArtifacts`
 
@@ -262,6 +298,7 @@ grep -n "private buildPreloadScript\|^\s*}$" src/modules/wasm/WasmCollector.ts
 ### Task 5.2: 创建 WasmPreloadScript.ts
 
 **Files:**
+
 - Create: `src/modules/wasm/WasmPreloadScript.ts`
 
 - [ ] **Step 1: 创建文件，导出 buildPreloadScript 函数**
@@ -272,7 +309,7 @@ grep -n "private buildPreloadScript\|^\s*}$" src/modules/wasm/WasmCollector.ts
  * 提取自 WasmCollector.ts —— 生成注入页面的 WebAssembly 拦截脚本。
  */
 
-import type { WasmRuntimeEvent } from './WasmTypes.js';
+import type {WasmRuntimeEvent} from './WasmTypes.js';
 
 export function buildPreloadScript(): string {
   // 完整复制 buildPreloadScript 方法的返回内容
@@ -286,6 +323,7 @@ export function buildPreloadScript(): string {
 ```
 
 **关键注意**：
+
 1. 模板字面量中使用了 `this.runtimeEvents` 和 `this.xxx` 访问 —— 检查 buildPreloadScript 内部是否真正使用了 `this`。如果使用了，预处理为接受参数。
 2. 从 WasmCollector.ts 精确复制字符串内容，保持所有转义不变。
 3. 如果 buildPreloadScript 内部有辅助函数（`normalizeSource`, `trackBuffer`, `recordEvent`, `setLastWasmActivity` 等），一并提取到这个文件中。
@@ -295,6 +333,7 @@ export function buildPreloadScript(): string {
 ### Task 5.3: 创建 WasmBinaryRegistry.ts
 
 **Files:**
+
 - Create: `src/modules/wasm/WasmBinaryRegistry.ts`
 
 - [ ] **Step 1: 提取 binary 注册逻辑**
@@ -303,14 +342,19 @@ export function buildPreloadScript(): string {
 /**
  * Wasm binary registry — 模块 ID、二进制数据和哈希值之间的映射管理。
  */
-import type { WasmModuleRecord, WasmRuntimeEvent } from './WasmTypes.js';
+import type {WasmModuleRecord, WasmRuntimeEvent} from './WasmTypes.js';
 
 export class WasmBinaryRegistry {
   readonly modulesById = new Map<string, WasmModuleRecord>();
   readonly moduleIdsByHash = new Map<string, string>();
   readonly bytesByModuleId = new Map<string, Uint8Array>();
 
-  registerBinary(moduleId: string, hash: string, bytes: Uint8Array, record: WasmModuleRecord): void {
+  registerBinary(
+    moduleId: string,
+    hash: string,
+    bytes: Uint8Array,
+    record: WasmModuleRecord,
+  ): void {
     // 复制 registerBinary 方法体
   }
 
@@ -318,9 +362,15 @@ export class WasmBinaryRegistry {
     // 复制 applyExportCallCounts 方法体
   }
 
-  getModules(): WasmModuleRecord[] { /* ... */ }
-  getModuleById(moduleId: string): WasmModuleRecord | undefined { /* ... */ }
-  getModuleBytes(moduleId: string): Uint8Array | undefined { /* ... */ }
+  getModules(): WasmModuleRecord[] {
+    /* ... */
+  }
+  getModuleById(moduleId: string): WasmModuleRecord | undefined {
+    /* ... */
+  }
+  getModuleBytes(moduleId: string): Uint8Array | undefined {
+    /* ... */
+  }
 }
 ```
 
@@ -331,6 +381,7 @@ export class WasmBinaryRegistry {
 ### Task 5.4: 创建 WasmArtifactStore.ts
 
 **Files:**
+
 - Create: `src/modules/wasm/WasmArtifactStore.ts`
 
 - [ ] **Step 1: 提取 artifact 持久化逻辑**
@@ -341,7 +392,7 @@ export class WasmBinaryRegistry {
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import type { WasmModuleRecord } from './WasmTypes.js';
+import type {WasmModuleRecord} from './WasmTypes.js';
 
 export class WasmArtifactStore {
   constructor(private baseDir: string) {}
@@ -349,7 +400,7 @@ export class WasmArtifactStore {
   async persistArtifacts(
     modules: WasmModuleRecord[],
     bytesByModuleId: Map<string, Uint8Array>,
-    task?: { outputDir: string },
+    task?: {outputDir: string},
   ): Promise<string[]> {
     // 复制 persistArtifacts 方法体
   }
@@ -361,14 +412,15 @@ export class WasmArtifactStore {
 ### Task 5.5: 更新 WasmCollector 门面
 
 **Files:**
+
 - Modify: `src/modules/wasm/WasmCollector.ts`
 
 - [ ] **Step 1: 导入策略模块，初始化子模块**
 
 ```typescript
-import { buildPreloadScript } from './WasmPreloadScript.js';
-import { WasmBinaryRegistry } from './WasmBinaryRegistry.js';
-import { WasmArtifactStore } from './WasmArtifactStore.js';
+import {buildPreloadScript} from './WasmPreloadScript.js';
+import {WasmBinaryRegistry} from './WasmBinaryRegistry.js';
+import {WasmArtifactStore} from './WasmArtifactStore.js';
 
 export class WasmCollector {
   private readonly binaryRegistry = new WasmBinaryRegistry();
@@ -450,23 +502,24 @@ npm run build && npm run typecheck && npm run test:unit
 
 - [ ] **Step 3: 确认以下待提取的子职责域**
 
-| 提取到 | 职责 | 状态/方法 |
-|---|---|---|
-| CollectedFileRegistry | 文件缓存管理 | `collectedFilesCache` Map, `buildFileMetadata`, `hasReachedFileLimit`, `evictOldestFileIfNeeded`, `cleanupCollectedUrls`, `clearFileCache`, `getFileCacheStats` |
-| CdpNetworkMonitor | CDP 会话 + 网络响应抓取 | `cdpSession`, `cdpListeners`, CDP 绑定/解绑逻辑 |
-| DynamicScriptWatcher | 动态脚本等待 | `waitForDynamicScripts` |
+| 提取到                | 职责                    | 状态/方法                                                                                                                                                       |
+| --------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CollectedFileRegistry | 文件缓存管理            | `collectedFilesCache` Map, `buildFileMetadata`, `hasReachedFileLimit`, `evictOldestFileIfNeeded`, `cleanupCollectedUrls`, `clearFileCache`, `getFileCacheStats` |
+| CdpNetworkMonitor     | CDP 会话 + 网络响应抓取 | `cdpSession`, `cdpListeners`, CDP 绑定/解绑逻辑                                                                                                                 |
+| DynamicScriptWatcher  | 动态脚本等待            | `waitForDynamicScripts`                                                                                                                                         |
 
 ---
 
 ### Task 6.2: 创建 CollectedFileRegistry.ts
 
 **Files:**
+
 - Create: `src/modules/collector/CollectedFileRegistry.ts`
 
 - [ ] **Step 1: 提取文件缓存管理逻辑**
 
 ```typescript
-import type { CodeFile } from './types.js'; // 验证正确导入路径
+import type {CodeFile} from './types.js'; // 验证正确导入路径
 
 export class CollectedFileRegistry {
   readonly collectedFilesCache = new Map<string, CodeFile>();
@@ -503,7 +556,7 @@ export class CollectedFileRegistry {
     this.collectedUrls.clear();
   }
 
-  getStats(): { cacheSize: number; urlCount: number } {
+  getStats(): {cacheSize: number; urlCount: number} {
     return {
       cacheSize: this.collectedFilesCache.size,
       urlCount: this.collectedUrls.size,
@@ -525,14 +578,15 @@ export class CollectedFileRegistry {
 ### Task 6.3: 创建 CdpNetworkMonitor.ts
 
 **Files:**
+
 - Create: `src/modules/collector/CdpNetworkMonitor.ts`
 
 - [ ] **Step 1: 提取 CDP 网络监听逻辑**
 
 ```typescript
-import type { CDPSession } from 'playwright';
-import { logger } from '../../utils/logger.js';
-import type { CodeCollector } from './CodeCollector.js'; // 验证是否需要前向引用
+import type {CDPSession} from 'playwright';
+import {logger} from '../../utils/logger.js';
+import type {CodeCollector} from './CodeCollector.js'; // 验证是否需要前向引用
 
 export class CdpNetworkMonitor {
   private cdpSession: CDPSession | null = null;
@@ -542,7 +596,10 @@ export class CdpNetworkMonitor {
     loadingFinished?: (params: any) => void;
   } = {};
 
-  async attach(cdpSession: CDPSession, onResponseReceived: (params: any) => void): Promise<void> {
+  async attach(
+    cdpSession: CDPSession,
+    onResponseReceived: (params: any) => void,
+  ): Promise<void> {
     this.cdpSession = cdpSession;
     await cdpSession.send('Network.enable');
     // 复制 CDP 事件绑定逻辑（Target.targetInfoChanged, Network.responseReceived, Network.loadingFinished）
@@ -572,12 +629,13 @@ export class CdpNetworkMonitor {
 ### Task 6.4: 创建 DynamicScriptWatcher.ts
 
 **Files:**
+
 - Create: `src/modules/collector/DynamicScriptWatcher.ts`
 
 - [ ] **Step 1: 提取动态脚本等待逻辑**
 
 ```typescript
-import type { Page } from 'playwright';
+import type {Page} from 'playwright';
 
 export class DynamicScriptWatcher {
   async waitForStability(page: Page, waitMs?: number): Promise<void> {
@@ -597,14 +655,15 @@ export class DynamicScriptWatcher {
 ### Task 6.5: 解构 `collect` 方法 + 更新门面
 
 **Files:**
+
 - Modify: `src/modules/collector/CodeCollector.ts`
 
 - [ ] **Step 1: 导入策略模块，初始化子模块**
 
 ```typescript
-import { CollectedFileRegistry } from './CollectedFileRegistry.js';
-import { CdpNetworkMonitor } from './CdpNetworkMonitor.js';
-import { DynamicScriptWatcher } from './DynamicScriptWatcher.js';
+import {CollectedFileRegistry} from './CollectedFileRegistry.js';
+import {CdpNetworkMonitor} from './CdpNetworkMonitor.js';
+import {DynamicScriptWatcher} from './DynamicScriptWatcher.js';
 ```
 
 在构造函数中初始化：
@@ -617,7 +676,10 @@ export class CodeCollector {
   // 保留 config, browserManager, cache, smartCollector, compressor, getActivePage, setPageResolver
 
   constructor(config: BrowserManagerConfig, browserManager: BrowserManager) {
-    this.fileRegistry = new CollectedFileRegistry(config.maxCollectedUrls, config.maxFilesCacheSize);
+    this.fileRegistry = new CollectedFileRegistry(
+      config.maxCollectedUrls,
+      config.maxFilesCacheSize,
+    );
     this.cdpMonitor = new CdpNetworkMonitor();
     this.scriptWatcher = new DynamicScriptWatcher();
     // ... existing init
@@ -667,6 +729,7 @@ private async collectWorkers(page: Page, options: CollectCodeOptions): Promise<C
 ```
 
 **关键约束**：
+
 - `collect` 方法变为编排逻辑，≤100 行
 - 每个阶段方法 ≤100 行
 - 原始 collect 中的错误处理（try-catch、重试、超时）必须在各阶段方法中完整保留
@@ -690,6 +753,7 @@ wc -l src/modules/collector/CodeCollector.ts
 ### Task 6.6: 添加策略文件的单元测试
 
 **Files:**
+
 - Create: `tests/unit/modules/collector/CollectedFileRegistry.test.ts`
 - Create: `tests/unit/modules/collector/CdpNetworkMonitor.test.ts`
 - Create: `tests/unit/modules/collector/DynamicScriptWatcher.test.ts`
@@ -697,30 +761,35 @@ wc -l src/modules/collector/CodeCollector.ts
 - [ ] **Step 1: 编写 CollectedFileRegistry 测试**
 
 ```typescript
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 import assert from 'node:assert';
-import { CollectedFileRegistry } from '../../../src/modules/collector/CollectedFileRegistry.js';
+import {CollectedFileRegistry} from '../../../src/modules/collector/CollectedFileRegistry.js';
 
 describe('CollectedFileRegistry', () => {
   it('adds and checks files', () => {
     const registry = new CollectedFileRegistry(100, 100);
     assert.strictEqual(registry.has('test.js'), false);
-    registry.addFile('test.js', { url: 'test.js', content: 'code', size: 4, type: 'script' } as any);
+    registry.addFile('test.js', {
+      url: 'test.js',
+      content: 'code',
+      size: 4,
+      type: 'script',
+    } as any);
     assert.strictEqual(registry.has('test.js'), true);
   });
 
   it('enforces FIFO eviction', () => {
     const registry = new CollectedFileRegistry(100, 2);
-    registry.addFile('1.js', { url: '1.js' } as any);
-    registry.addFile('2.js', { url: '2.js' } as any);
-    registry.addFile('3.js', { url: '3.js' } as any);
+    registry.addFile('1.js', {url: '1.js'} as any);
+    registry.addFile('2.js', {url: '2.js'} as any);
+    registry.addFile('3.js', {url: '3.js'} as any);
     assert.strictEqual(registry.has('1.js'), false); // evicted
     assert.strictEqual(registry.has('3.js'), true);
   });
 
   it('clear resets state', () => {
     const registry = new CollectedFileRegistry(100, 100);
-    registry.addFile('test.js', { url: 'test.js' } as any);
+    registry.addFile('test.js', {url: 'test.js'} as any);
     registry.clear();
     assert.strictEqual(registry.has('test.js'), false);
   });

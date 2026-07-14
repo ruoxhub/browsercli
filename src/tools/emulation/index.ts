@@ -7,7 +7,11 @@
 export {emulateNetwork} from './emulateNetwork.js';
 export {emulateCpu} from './emulateCpu.js';
 export {resizePage} from './resizePage.js';
-export {emulateMobile, DEVICE_PROFILES, DESKTOP_VIEWPORT} from './emulateMobile.js';
+export {
+  emulateMobile,
+  DEVICE_PROFILES,
+  DESKTOP_VIEWPORT,
+} from './emulateMobile.js';
 export type {
   EmulationResult,
   ThrottlingOption,

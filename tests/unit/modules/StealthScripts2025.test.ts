@@ -4,32 +4,59 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import { afterEach, beforeEach, describe, it } from 'node:test';
+import {afterEach, beforeEach, describe, it} from 'node:test';
 
-import { StealthScripts2025 } from '../../../src/modules/stealth/StealthScripts2025.js';
+import {StealthScripts2025} from '../../../src/modules/stealth/StealthScripts2025.js';
 
 interface StealthPageHarness {
   setUserAgent(userAgent: string): Promise<void>;
-  evaluateOnNewDocument<T extends unknown[]>(fn: (...args: T) => unknown, ...args: T): Promise<void>;
+  evaluateOnNewDocument<T extends unknown[]>(
+    fn: (...args: T) => unknown,
+    ...args: T
+  ): Promise<void>;
 }
 
 interface StealthStaticHarness {
   hideWebDriver(page: StealthPageHarness): Promise<void>;
   mockChrome(page: StealthPageHarness): Promise<void>;
-  setUserAgentConsistent(page: StealthPageHarness, options: Record<string, unknown>): Promise<void>;
+  setUserAgentConsistent(
+    page: StealthPageHarness,
+    options: Record<string, unknown>,
+  ): Promise<void>;
   fixPermissions(page: StealthPageHarness): Promise<void>;
-  mockPlugins(page: StealthPageHarness, options: Record<string, unknown>): Promise<void>;
+  mockPlugins(
+    page: StealthPageHarness,
+    options: Record<string, unknown>,
+  ): Promise<void>;
   mockCanvas(page: StealthPageHarness): Promise<void>;
-  mockWebGL(page: StealthPageHarness, options: Record<string, unknown>): Promise<void>;
+  mockWebGL(
+    page: StealthPageHarness,
+    options: Record<string, unknown>,
+  ): Promise<void>;
   mockAudioContext(page: StealthPageHarness): Promise<void>;
-  fixLanguages(page: StealthPageHarness, options: Record<string, unknown>): Promise<void>;
-  mockBattery(page: StealthPageHarness, options: Record<string, unknown>): Promise<void>;
-  fixMediaDevices(page: StealthPageHarness, options: Record<string, unknown>): Promise<void>;
+  fixLanguages(
+    page: StealthPageHarness,
+    options: Record<string, unknown>,
+  ): Promise<void>;
+  mockBattery(
+    page: StealthPageHarness,
+    options: Record<string, unknown>,
+  ): Promise<void>;
+  fixMediaDevices(
+    page: StealthPageHarness,
+    options: Record<string, unknown>,
+  ): Promise<void>;
   mockNotifications(page: StealthPageHarness): Promise<void>;
-  mockConnection(page: StealthPageHarness, options: Record<string, unknown>): Promise<void>;
+  mockConnection(
+    page: StealthPageHarness,
+    options: Record<string, unknown>,
+  ): Promise<void>;
   mockFocus(page: StealthPageHarness): Promise<void>;
   mockPerformanceNow(page: StealthPageHarness): Promise<void>;
-  mockScreen(page: StealthPageHarness, options: Record<string, unknown>): Promise<void>;
+  mockScreen(
+    page: StealthPageHarness,
+    options: Record<string, unknown>,
+  ): Promise<void>;
 }
 
 type StealthGlobalHarness = typeof globalThis & {
@@ -57,7 +84,7 @@ interface StealthNavigatorHarness {
     query(descriptor: PermissionDescriptor): Promise<StealthPermissionResult>;
   };
   mediaDevices: {
-    enumerateDevices(): Promise<Array<{ kind: string }>>;
+    enumerateDevices(): Promise<Array<{kind: string}>>;
   };
   userAgent?: string;
   languages?: string[];
@@ -67,7 +94,7 @@ interface StealthNavigatorHarness {
     item(index: number): unknown;
     namedItem(name: string): unknown;
   };
-  getBattery?(): Promise<{ charging: boolean; level: number }>;
+  getBattery?(): Promise<{charging: boolean; level: number}>;
 }
 
 interface StealthWindowHarness {
@@ -109,7 +136,7 @@ interface StealthPerformanceHarness {
 }
 
 interface StealthCanvasContextHarness {
-  getImageData(): { data: Uint8ClampedArray };
+  getImageData(): {data: Uint8ClampedArray};
   putImageData(): void;
 }
 
@@ -126,7 +153,11 @@ interface StealthWebGLHarness {
 }
 
 interface StealthAudioBufferHarness {
-  copyFromChannel(dest: Float32Array, channelNumber?: number, startInChannel?: number): void;
+  copyFromChannel(
+    dest: Float32Array,
+    channelNumber?: number,
+    startInChannel?: number,
+  ): void;
   getChannelData(channelNumber?: number): Float32Array;
 }
 
@@ -174,7 +205,7 @@ describe('StealthScripts2025', () => {
   it('returns presets, resolves options and tracks current options', async () => {
     const presets = StealthScripts2025.getPresets();
     assert.ok(presets.length > 0);
-    assert.ok(presets.some((p) => p.name === 'windows-chrome'));
+    assert.ok(presets.some(p => p.name === 'windows-chrome'));
 
     const resolved = StealthScripts2025.resolveOptions({
       preset: 'linux-chrome',
@@ -187,12 +218,15 @@ describe('StealthScripts2025', () => {
       setUserAgent: async () => undefined,
       evaluateOnNewDocument: async () => undefined,
     };
-    await StealthScripts2025.injectAll(page as unknown as Parameters<typeof StealthScripts2025.injectAll>[0], {
-      preset: 'mac-chrome',
-      mockConnection: false,
-      performanceNoise: false,
-      overrideScreen: false,
-    });
+    await StealthScripts2025.injectAll(
+      page as unknown as Parameters<typeof StealthScripts2025.injectAll>[0],
+      {
+        preset: 'mac-chrome',
+        mockConnection: false,
+        performanceNoise: false,
+        overrideScreen: false,
+      },
+    );
     const current = StealthScripts2025.getCurrentOptions();
     assert.strictEqual(current?.preset, 'mac-chrome');
   });
@@ -253,19 +287,22 @@ describe('StealthScripts2025', () => {
       evaluateOnNewDocument: async () => undefined,
     };
 
-    const report = await StealthScripts2025.injectAll(page as unknown as Parameters<typeof StealthScripts2025.injectAll>[0], {
-      preset: 'windows-chrome',
-      mockConnection: false,
-      performanceNoise: false,
-      overrideScreen: false,
-    });
+    const report = await StealthScripts2025.injectAll(
+      page as unknown as Parameters<typeof StealthScripts2025.injectAll>[0],
+      {
+        preset: 'windows-chrome',
+        mockConnection: false,
+        performanceNoise: false,
+        overrideScreen: false,
+      },
+    );
 
     assert.ok(called.includes('setUserAgent'));
     assert.ok(report.injectedFeatures.includes('hideWebDriver'));
     assert.ok(report.skippedFeatures.includes('mockConnection'));
     assert.ok(report.skippedFeatures.includes('performanceNoise'));
     assert.ok(report.skippedFeatures.includes('overrideScreen'));
-    assert.ok(report.skippedFeatures.some((s) => s.includes('fixPermissions')));
+    assert.ok(report.skippedFeatures.some(s => s.includes('fixPermissions')));
   });
 
   it('covers direct helper invocations and compatibility helper', async () => {
@@ -274,30 +311,89 @@ describe('StealthScripts2025', () => {
       evaluateOnNewDocument: async () => undefined,
     };
 
-    await StealthScripts2025.hideWebDriver(page as unknown as Parameters<typeof StealthScripts2025.hideWebDriver>[0]);
-    await StealthScripts2025.mockChrome(page as unknown as Parameters<typeof StealthScripts2025.mockChrome>[0]);
-    await StealthScripts2025.setUserAgentConsistent(page as unknown as Parameters<typeof StealthScripts2025.setUserAgentConsistent>[0], {
-      userAgent: 'UA',
-      navigatorPlatform: 'Win32',
-      vendor: 'Google Inc.',
-    });
-    await StealthScripts2025.fixPermissions(page as unknown as Parameters<typeof StealthScripts2025.fixPermissions>[0]);
-    await StealthScripts2025.mockPlugins(page as unknown as Parameters<typeof StealthScripts2025.mockPlugins>[0], {});
-    await StealthScripts2025.mockCanvas(page as unknown as Parameters<typeof StealthScripts2025.mockCanvas>[0]);
-    await StealthScripts2025.mockWebGL(page as unknown as Parameters<typeof StealthScripts2025.mockWebGL>[0], {});
-    await StealthScripts2025.mockAudioContext(page as unknown as Parameters<typeof StealthScripts2025.mockAudioContext>[0]);
-    await StealthScripts2025.fixLanguages(page as unknown as Parameters<typeof StealthScripts2025.fixLanguages>[0], {});
-    await StealthScripts2025.mockBattery(page as unknown as Parameters<typeof StealthScripts2025.mockBattery>[0], {});
-    await StealthScripts2025.fixMediaDevices(page as unknown as Parameters<typeof StealthScripts2025.fixMediaDevices>[0], {});
-    await StealthScripts2025.mockNotifications(page as unknown as Parameters<typeof StealthScripts2025.mockNotifications>[0]);
-    await StealthScripts2025.mockConnection(page as unknown as Parameters<typeof StealthScripts2025.mockConnection>[0], {});
-    await StealthScripts2025.mockFocus(page as unknown as Parameters<typeof StealthScripts2025.mockFocus>[0]);
-    await StealthScripts2025.mockPerformanceNow(page as unknown as Parameters<typeof StealthScripts2025.mockPerformanceNow>[0]);
-    await StealthScripts2025.mockScreen(page as unknown as Parameters<typeof StealthScripts2025.mockScreen>[0], {
-      screen: { width: 1280, height: 720 },
-    });
+    await StealthScripts2025.hideWebDriver(
+      page as unknown as Parameters<typeof StealthScripts2025.hideWebDriver>[0],
+    );
+    await StealthScripts2025.mockChrome(
+      page as unknown as Parameters<typeof StealthScripts2025.mockChrome>[0],
+    );
+    await StealthScripts2025.setUserAgentConsistent(
+      page as unknown as Parameters<
+        typeof StealthScripts2025.setUserAgentConsistent
+      >[0],
+      {
+        userAgent: 'UA',
+        navigatorPlatform: 'Win32',
+        vendor: 'Google Inc.',
+      },
+    );
+    await StealthScripts2025.fixPermissions(
+      page as unknown as Parameters<
+        typeof StealthScripts2025.fixPermissions
+      >[0],
+    );
+    await StealthScripts2025.mockPlugins(
+      page as unknown as Parameters<typeof StealthScripts2025.mockPlugins>[0],
+      {},
+    );
+    await StealthScripts2025.mockCanvas(
+      page as unknown as Parameters<typeof StealthScripts2025.mockCanvas>[0],
+    );
+    await StealthScripts2025.mockWebGL(
+      page as unknown as Parameters<typeof StealthScripts2025.mockWebGL>[0],
+      {},
+    );
+    await StealthScripts2025.mockAudioContext(
+      page as unknown as Parameters<
+        typeof StealthScripts2025.mockAudioContext
+      >[0],
+    );
+    await StealthScripts2025.fixLanguages(
+      page as unknown as Parameters<typeof StealthScripts2025.fixLanguages>[0],
+      {},
+    );
+    await StealthScripts2025.mockBattery(
+      page as unknown as Parameters<typeof StealthScripts2025.mockBattery>[0],
+      {},
+    );
+    await StealthScripts2025.fixMediaDevices(
+      page as unknown as Parameters<
+        typeof StealthScripts2025.fixMediaDevices
+      >[0],
+      {},
+    );
+    await StealthScripts2025.mockNotifications(
+      page as unknown as Parameters<
+        typeof StealthScripts2025.mockNotifications
+      >[0],
+    );
+    await StealthScripts2025.mockConnection(
+      page as unknown as Parameters<
+        typeof StealthScripts2025.mockConnection
+      >[0],
+      {},
+    );
+    await StealthScripts2025.mockFocus(
+      page as unknown as Parameters<typeof StealthScripts2025.mockFocus>[0],
+    );
+    await StealthScripts2025.mockPerformanceNow(
+      page as unknown as Parameters<
+        typeof StealthScripts2025.mockPerformanceNow
+      >[0],
+    );
+    await StealthScripts2025.mockScreen(
+      page as unknown as Parameters<typeof StealthScripts2025.mockScreen>[0],
+      {
+        screen: {width: 1280, height: 720},
+      },
+    );
 
-    await StealthScripts2025.setRealisticUserAgent(page as unknown as Parameters<typeof StealthScripts2025.setRealisticUserAgent>[0], 'linux');
+    await StealthScripts2025.setRealisticUserAgent(
+      page as unknown as Parameters<
+        typeof StealthScripts2025.setRealisticUserAgent
+      >[0],
+      'linux',
+    );
   });
 
   it('executes injected callbacks against mocked browser globals', async () => {
@@ -313,8 +409,10 @@ describe('StealthScripts2025', () => {
 
     class DocMock {}
     const nav: StealthNavigatorHarness = {
-      permissions: { query: async (_p: PermissionDescriptor) => ({ state: 'granted' }) },
-      mediaDevices: { enumerateDevices: async () => [] },
+      permissions: {
+        query: async (_p: PermissionDescriptor) => ({state: 'granted'}),
+      },
+      mediaDevices: {enumerateDevices: async () => []},
     };
     const doc: StealthDocumentHarness = new DocMock() as StealthDocumentHarness;
     doc.hasFocus = () => false;
@@ -328,7 +426,7 @@ describe('StealthScripts2025', () => {
     };
 
     setGlobal('navigator', nav);
-    setGlobal('window', { navigator: nav });
+    setGlobal('window', {navigator: nav});
     setGlobal('document', doc);
     setGlobal('Document', DocMock);
     setGlobal('Notification', {
@@ -336,27 +434,60 @@ describe('StealthScripts2025', () => {
       requestPermission: async () => 'denied',
     });
     setGlobal('screen', {});
-    setGlobal('performance', { now: () => 1 });
+    setGlobal('performance', {now: () => 1});
 
     try {
       const page = createStealthPage();
 
-      await StealthScripts2025.setUserAgentConsistent(page as unknown as Parameters<typeof StealthScripts2025.setUserAgentConsistent>[0], {
-        userAgent: 'UA-1',
-        navigatorPlatform: 'Win32',
-        vendor: 'Google Inc.',
-        hardwareConcurrency: 16,
-      });
-      await StealthScripts2025.fixLanguages(page as unknown as Parameters<typeof StealthScripts2025.fixLanguages>[0], { languages: ['zh-CN', 'en'] });
-      await StealthScripts2025.mockNotifications(page as unknown as Parameters<typeof StealthScripts2025.mockNotifications>[0]);
-      await StealthScripts2025.mockConnection(page as unknown as Parameters<typeof StealthScripts2025.mockConnection>[0], {
-        connection: { effectiveType: '4g', downlink: 10, rtt: 50, saveData: false },
-      });
-      await StealthScripts2025.mockFocus(page as unknown as Parameters<typeof StealthScripts2025.mockFocus>[0]);
-      await StealthScripts2025.mockPerformanceNow(page as unknown as Parameters<typeof StealthScripts2025.mockPerformanceNow>[0]);
-      await StealthScripts2025.mockScreen(page as unknown as Parameters<typeof StealthScripts2025.mockScreen>[0], {
-        screen: { width: 1200, height: 800 },
-      });
+      await StealthScripts2025.setUserAgentConsistent(
+        page as unknown as Parameters<
+          typeof StealthScripts2025.setUserAgentConsistent
+        >[0],
+        {
+          userAgent: 'UA-1',
+          navigatorPlatform: 'Win32',
+          vendor: 'Google Inc.',
+          hardwareConcurrency: 16,
+        },
+      );
+      await StealthScripts2025.fixLanguages(
+        page as unknown as Parameters<
+          typeof StealthScripts2025.fixLanguages
+        >[0],
+        {languages: ['zh-CN', 'en']},
+      );
+      await StealthScripts2025.mockNotifications(
+        page as unknown as Parameters<
+          typeof StealthScripts2025.mockNotifications
+        >[0],
+      );
+      await StealthScripts2025.mockConnection(
+        page as unknown as Parameters<
+          typeof StealthScripts2025.mockConnection
+        >[0],
+        {
+          connection: {
+            effectiveType: '4g',
+            downlink: 10,
+            rtt: 50,
+            saveData: false,
+          },
+        },
+      );
+      await StealthScripts2025.mockFocus(
+        page as unknown as Parameters<typeof StealthScripts2025.mockFocus>[0],
+      );
+      await StealthScripts2025.mockPerformanceNow(
+        page as unknown as Parameters<
+          typeof StealthScripts2025.mockPerformanceNow
+        >[0],
+      );
+      await StealthScripts2025.mockScreen(
+        page as unknown as Parameters<typeof StealthScripts2025.mockScreen>[0],
+        {
+          screen: {width: 1200, height: 800},
+        },
+      );
 
       assert.strictEqual(globals.navigator?.userAgent, 'UA-1');
       assert.deepStrictEqual(globals.navigator?.languages, ['zh-CN', 'en']);
@@ -402,7 +533,7 @@ describe('StealthScripts2025', () => {
 
     class CanvasCtxMock {
       getImageData() {
-        return { data: new Uint8ClampedArray([10, 10, 10, 255]) };
+        return {data: new Uint8ClampedArray([10, 10, 10, 255])};
       }
       putImageData() {
         return undefined;
@@ -442,8 +573,10 @@ describe('StealthScripts2025', () => {
     }
     class DocMock {}
     const nav: StealthNavigatorHarness = {
-      permissions: { query: async (_p: PermissionDescriptor) => ({ state: 'granted' }) },
-      mediaDevices: { enumerateDevices: async () => [] },
+      permissions: {
+        query: async (_p: PermissionDescriptor) => ({state: 'granted'}),
+      },
+      mediaDevices: {enumerateDevices: async () => []},
     };
 
     setGlobal('HTMLCanvasElement', CanvasMock);
@@ -453,39 +586,62 @@ describe('StealthScripts2025', () => {
     setGlobal('AudioBuffer', AudioBufferMock);
     setGlobal('OfflineAudioContext', class OfflineAudioContextMock {});
     setGlobal('navigator', nav);
-    setGlobal('window', { navigator: nav });
+    setGlobal('window', {navigator: nav});
     setGlobal('document', new DocMock());
     setGlobal('Document', DocMock);
-    setGlobal('Notification', { permission: 'default', requestPermission: async () => 'default' });
+    setGlobal('Notification', {
+      permission: 'default',
+      requestPermission: async () => 'default',
+    });
     setGlobal('screen', {});
-    setGlobal('performance', { now: () => 1, timing: {
-      responseStart: 1,
-      domContentLoadedEventEnd: 2,
-      loadEventEnd: 3,
-      navigationStart: 0,
-    } });
+    setGlobal('performance', {
+      now: () => 1,
+      timing: {
+        responseStart: 1,
+        domContentLoadedEventEnd: 2,
+        loadEventEnd: 3,
+        navigationStart: 0,
+      },
+    });
 
     try {
       const page = createStealthPage();
 
-      await StealthScripts2025.mockCanvas(page as unknown as Parameters<typeof StealthScripts2025.mockCanvas>[0]);
-      await StealthScripts2025.mockWebGL(page as unknown as Parameters<typeof StealthScripts2025.mockWebGL>[0], {
-        webglVendor: 'VENDOR-X',
-        webglRenderer: 'RENDERER-Y',
-      });
-      await StealthScripts2025.mockAudioContext(page as unknown as Parameters<typeof StealthScripts2025.mockAudioContext>[0]);
+      await StealthScripts2025.mockCanvas(
+        page as unknown as Parameters<typeof StealthScripts2025.mockCanvas>[0],
+      );
+      await StealthScripts2025.mockWebGL(
+        page as unknown as Parameters<typeof StealthScripts2025.mockWebGL>[0],
+        {
+          webglVendor: 'VENDOR-X',
+          webglRenderer: 'RENDERER-Y',
+        },
+      );
+      await StealthScripts2025.mockAudioContext(
+        page as unknown as Parameters<
+          typeof StealthScripts2025.mockAudioContext
+        >[0],
+      );
 
-      const canvas = new (globals.HTMLCanvasElement as NonNullable<StealthGlobalHarness['HTMLCanvasElement']>)();
+      const canvas = new (globals.HTMLCanvasElement as NonNullable<
+        StealthGlobalHarness['HTMLCanvasElement']
+      >)();
       assert.strictEqual(canvas.toDataURL().startsWith('data:'), true);
 
-      const gl1 = new (globals.WebGLRenderingContext as NonNullable<StealthGlobalHarness['WebGLRenderingContext']>)();
-      const gl2 = new (globals.WebGL2RenderingContext as NonNullable<StealthGlobalHarness['WebGL2RenderingContext']>)();
+      const gl1 = new (globals.WebGLRenderingContext as NonNullable<
+        StealthGlobalHarness['WebGLRenderingContext']
+      >)();
+      const gl2 = new (globals.WebGL2RenderingContext as NonNullable<
+        StealthGlobalHarness['WebGL2RenderingContext']
+      >)();
       assert.strictEqual(gl1.getParameter(0x9245), 'VENDOR-X');
       assert.strictEqual(gl1.getParameter(0x9246), 'RENDERER-Y');
       assert.strictEqual(gl2.getParameter(0x9245), 'VENDOR-X');
       assert.strictEqual(gl2.getParameter(0x9246), 'RENDERER-Y');
 
-      const audio = new (globals.AudioBuffer as NonNullable<StealthGlobalHarness['AudioBuffer']>)();
+      const audio = new (globals.AudioBuffer as NonNullable<
+        StealthGlobalHarness['AudioBuffer']
+      >)();
       const dest = new Float32Array(1);
       audio.copyFromChannel(dest, 0, 0);
       assert.notStrictEqual(dest[0], 0);
@@ -526,11 +682,13 @@ describe('StealthScripts2025', () => {
     };
 
     const nav: StealthNavigatorHarness = {
-      permissions: { query: async (_p: PermissionDescriptor) => ({ state: 'granted' }) },
-      mediaDevices: { enumerateDevices: async () => [] },
+      permissions: {
+        query: async (_p: PermissionDescriptor) => ({state: 'granted'}),
+      },
+      mediaDevices: {enumerateDevices: async () => []},
     };
     setGlobal('navigator', nav);
-    setGlobal('window', { navigator: nav });
+    setGlobal('window', {navigator: nav});
     setGlobal('Notification', {
       permission: 'granted',
       requestPermission: async () => 'granted',
@@ -555,32 +713,69 @@ describe('StealthScripts2025', () => {
     try {
       const page = createStealthPage();
 
-      await StealthScripts2025.hideWebDriver(page as unknown as Parameters<typeof StealthScripts2025.hideWebDriver>[0]);
-      await StealthScripts2025.mockChrome(page as unknown as Parameters<typeof StealthScripts2025.mockChrome>[0]);
-      await StealthScripts2025.fixPermissions(page as unknown as Parameters<typeof StealthScripts2025.fixPermissions>[0]);
-      await StealthScripts2025.mockPlugins(page as unknown as Parameters<typeof StealthScripts2025.mockPlugins>[0], {
-        plugins: [
-          {
-            name: 'P1',
-            filename: 'p1',
-            description: 'p1',
-            mimeTypes: [{ type: 'application/p1', description: 'd', suffixes: 'p1' }],
-          },
-        ],
-      });
-      await StealthScripts2025.mockBattery(page as unknown as Parameters<typeof StealthScripts2025.mockBattery>[0], { battery: { charging: false, level: 0.5 } });
-      await StealthScripts2025.fixMediaDevices(page as unknown as Parameters<typeof StealthScripts2025.fixMediaDevices>[0], {
-        mediaDevices: { audioInputs: 2, videoInputs: 1, speakers: 1 },
-      });
-      await StealthScripts2025.mockWebGL(page as unknown as Parameters<typeof StealthScripts2025.mockWebGL>[0], {
-        webglVendor: 'Vendor-Only',
-        webglRenderer: 'Renderer-Only',
-      });
+      await StealthScripts2025.hideWebDriver(
+        page as unknown as Parameters<
+          typeof StealthScripts2025.hideWebDriver
+        >[0],
+      );
+      await StealthScripts2025.mockChrome(
+        page as unknown as Parameters<typeof StealthScripts2025.mockChrome>[0],
+      );
+      await StealthScripts2025.fixPermissions(
+        page as unknown as Parameters<
+          typeof StealthScripts2025.fixPermissions
+        >[0],
+      );
+      await StealthScripts2025.mockPlugins(
+        page as unknown as Parameters<typeof StealthScripts2025.mockPlugins>[0],
+        {
+          plugins: [
+            {
+              name: 'P1',
+              filename: 'p1',
+              description: 'p1',
+              mimeTypes: [
+                {type: 'application/p1', description: 'd', suffixes: 'p1'},
+              ],
+            },
+          ],
+        },
+      );
+      await StealthScripts2025.mockBattery(
+        page as unknown as Parameters<typeof StealthScripts2025.mockBattery>[0],
+        {battery: {charging: false, level: 0.5}},
+      );
+      await StealthScripts2025.fixMediaDevices(
+        page as unknown as Parameters<
+          typeof StealthScripts2025.fixMediaDevices
+        >[0],
+        {
+          mediaDevices: {audioInputs: 2, videoInputs: 1, speakers: 1},
+        },
+      );
+      await StealthScripts2025.mockWebGL(
+        page as unknown as Parameters<typeof StealthScripts2025.mockWebGL>[0],
+        {
+          webglVendor: 'Vendor-Only',
+          webglRenderer: 'Renderer-Only',
+        },
+      );
 
       // hideWebDriver
       assert.strictEqual(globals.navigator?.webdriver, undefined);
-      assert.strictEqual(Object.getOwnPropertyNames(globals.navigator ?? {}).includes('webdriver'), false);
-      assert.strictEqual(Object.prototype.hasOwnProperty.call(Object.getOwnPropertyDescriptors(globals.navigator ?? {}), 'webdriver'), false);
+      assert.strictEqual(
+        Object.getOwnPropertyNames(globals.navigator ?? {}).includes(
+          'webdriver',
+        ),
+        false,
+      );
+      assert.strictEqual(
+        Object.prototype.hasOwnProperty.call(
+          Object.getOwnPropertyDescriptors(globals.navigator ?? {}),
+          'webdriver',
+        ),
+        false,
+      );
 
       // mockChrome
       const chromeObj = globals.window?.chrome;
@@ -590,7 +785,9 @@ describe('StealthScripts2025', () => {
       assert.ok(chromeObj.csi());
 
       // fixPermissions
-      const perm = await globals.navigator!.permissions.query({ name: 'notifications' });
+      const perm = await globals.navigator!.permissions.query({
+        name: 'notifications',
+      });
       assert.strictEqual(perm.state, 'granted');
 
       // mockPlugins
@@ -610,7 +807,9 @@ describe('StealthScripts2025', () => {
       assert.strictEqual(devices[0]?.kind, 'audioinput');
 
       // mockWebGL with no WebGL2
-      const gl1 = new (globals.WebGLRenderingContext as NonNullable<StealthGlobalHarness['WebGLRenderingContext']>)();
+      const gl1 = new (globals.WebGLRenderingContext as NonNullable<
+        StealthGlobalHarness['WebGLRenderingContext']
+      >)();
       assert.strictEqual(gl1.getParameter(0x9245), 'Vendor-Only');
       assert.strictEqual(gl1.getParameter(0x9246), 'Renderer-Only');
     } finally {

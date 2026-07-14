@@ -1,6 +1,8 @@
-import { readdirSync } from 'node:fs';
+import {readdirSync} from 'node:fs';
 
-const files = readdirSync('./build/src/commands').filter(f => f.endsWith('.js'));
+const files = readdirSync('./build/src/commands').filter(f =>
+  f.endsWith('.js'),
+);
 
 async function measure(name, path) {
   const start = Date.now();
@@ -12,7 +14,9 @@ async function measure(name, path) {
   }
 }
 
-await Promise.all(files.map(f => {
-  const name = f.replace('.js', '');
-  return measure(name, './build/src/commands/' + f);
-}));
+await Promise.all(
+  files.map(f => {
+    const name = f.replace('.js', '');
+    return measure(name, './build/src/commands/' + f);
+  }),
+);

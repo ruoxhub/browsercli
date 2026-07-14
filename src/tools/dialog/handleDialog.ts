@@ -45,7 +45,8 @@ async function waitForDialog(
  */
 export const handleDialog = defineTool({
   name: 'handle_dialog',
-  description: 'Handle browser dialogs (alert/confirm/prompt) - accept or dismiss',
+  description:
+    'Handle browser dialogs (alert/confirm/prompt) - accept or dismiss',
   annotations: {category: ToolCategory.PAGES, readOnlyHint: false},
   schema: {
     action: zod
@@ -66,7 +67,8 @@ export const handleDialog = defineTool({
     } catch {
       response.setStructuredContent({
         success: false,
-        message: 'No active page available. Open a page first before handling dialogs.',
+        message:
+          'No active page available. Open a page first before handling dialogs.',
         tooltype,
         data: {},
       });

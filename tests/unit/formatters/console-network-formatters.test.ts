@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { formatConsoleEventVerbose } from '../../../src/formatters/consoleFormatter.js';
-import { getFormattedResponseBody } from '../../../src/formatters/networkFormatter.js';
+import {formatConsoleEventVerbose} from '../../../src/formatters/consoleFormatter.js';
+import {getFormattedResponseBody} from '../../../src/formatters/networkFormatter.js';
 
 describe('console and network formatters', () => {
   it('renders error stack and cause chain for verbose console output', () => {
@@ -37,7 +37,9 @@ describe('console and network formatters', () => {
     assert.ok(output.includes('SourceMap: https://cdn.example.com/app.js.map'));
     assert.ok(output.includes('inner boom'));
     assert.ok(output.includes('vendor.js:2:1'));
-    assert.ok(output.includes('SourceMap: https://cdn.example.com/vendor.js.map'));
+    assert.ok(
+      output.includes('SourceMap: https://cdn.example.com/vendor.js.map'),
+    );
     assert.ok(output.includes('Cause'));
   });
 
@@ -48,10 +50,14 @@ describe('console and network formatters', () => {
       timeoutMs: number,
     ) => Promise<string | undefined>;
     const body = await Promise.race([
-      formatter({
-        buffer: async () => await new Promise<Buffer>(() => undefined),
-      } as unknown as Parameters<typeof getFormattedResponseBody>[0], 1000, 10),
-      new Promise<string>((resolve) => {
+      formatter(
+        {
+          buffer: async () => await new Promise<Buffer>(() => undefined),
+        } as unknown as Parameters<typeof getFormattedResponseBody>[0],
+        1000,
+        10,
+      ),
+      new Promise<string>(resolve => {
         setTimeout(() => resolve('<test-timeout>'), 50);
       }),
     ]);

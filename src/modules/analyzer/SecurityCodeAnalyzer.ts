@@ -69,7 +69,10 @@ export function identifySecurityRisksInternal(
         risks.push({
           type: (r.type as SecurityRisk['type']) || 'other',
           severity: (r.severity as SecurityRisk['severity']) || 'low',
-          location: {file: 'current', line: (r.location as {line?: number} | null)?.line || 0},
+          location: {
+            file: 'current',
+            line: (r.location as {line?: number} | null)?.line || 0,
+          },
           description: (r.description as string) || '',
           recommendation: (r.recommendation as string) || '',
         });

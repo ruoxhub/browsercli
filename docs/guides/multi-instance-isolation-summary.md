@@ -21,18 +21,18 @@
 
 ### 新增文件
 
-| 文件 | 说明 |
-|------|------|
-| `src/SessionManager.ts` | 会话管理器，处理页面标签的添加、移除和所有权检查 |
-| `docs/guides/multi-instance-isolation.md` | 多实例配置指南文档 |
+| 文件                                      | 说明                                             |
+| ----------------------------------------- | ------------------------------------------------ |
+| `src/SessionManager.ts`                   | 会话管理器，处理页面标签的添加、移除和所有权检查 |
+| `docs/guides/multi-instance-isolation.md` | 多实例配置指南文档                               |
 
 ### 修改文件
 
-| 文件 | 修改内容 |
-|------|----------|
-| `src/McpContext.ts` | 添加 `sessionId` 选项，集成 SessionManager 实现页面隔离 |
-| `src/main.ts` | 支持从 `MCP_SESSION_ID` 环境变量或 `--sessionId` 参数读取会话 ID |
-| `src/cli.ts` | 添加 `sessionId` 命令行参数 |
+| 文件                | 修改内容                                                         |
+| ------------------- | ---------------------------------------------------------------- |
+| `src/McpContext.ts` | 添加 `sessionId` 选项，集成 SessionManager 实现页面隔离          |
+| `src/main.ts`       | 支持从 `MCP_SESSION_ID` 环境变量或 `--sessionId` 参数读取会话 ID |
+| `src/cli.ts`        | 添加 `sessionId` 命令行参数                                      |
 
 ## 使用方式
 
@@ -66,43 +66,45 @@ npx chrome-devtools-mcp --isolated
 ```typescript
 class SessionManager {
   // 单例模式，按 sessionId 返回实例
-  static getInstance(sessionId: string, browser: Browser): SessionManager
+  static getInstance(sessionId: string, browser: Browser): SessionManager;
 
   // 为页面添加会话标签
-  async tagPage(page: Page): Promise<void>
+  async tagPage(page: Page): Promise<void>;
 
   // 移除页面的会话标签
-  async untagPage(page: Page): Promise<void>
+  async untagPage(page: Page): Promise<void>;
 
   // 检查页面是否属于当前会话
-  async ownsPage(page: Page): Promise<boolean>
+  async ownsPage(page: Page): Promise<boolean>;
 
   // 获取当前会话拥有的所有页面
-  async getOwnedPages(): Promise<Page[]>
+  async getOwnedPages(): Promise<Page[]>;
 
   // 创建带有会话标签的新页面
-  async newPage(): Promise<Page>
+  async newPage(): Promise<Page>;
 
   // 从 localStorage 恢复会话标签（浏览器重启后）
-  async restoreSessionTags(): Promise<void>
+  async restoreSessionTags(): Promise<void>;
 }
 ```
 
 ### 标签存储机制
 
-| 存储类型 | 键名 | 作用 | 生命周期 |
-|---------|------|------|---------|
-| `sessionStorage` | `mcp-session-id` | 页面级临时标签 | 页面关闭后清除 |
-| `localStorage` | `mcp-session-tags` | 持久化标签映射 | 跨页面刷新持久化 |
+| 存储类型         | 键名               | 作用           | 生命周期         |
+| ---------------- | ------------------ | -------------- | ---------------- |
+| `sessionStorage` | `mcp-session-id`   | 页面级临时标签 | 页面关闭后清除   |
+| `localStorage`   | `mcp-session-tags` | 持久化标签映射 | 跨页面刷新持久化 |
 
 ## 验证结果
 
 ### 构建验证
+
 ```bash
 npm run build  # 成功
 ```
 
 ### 测试验证
+
 ```bash
 npm test  # 383 个测试通过，7 个失败为已有问题（与本次修改无关）
 ```

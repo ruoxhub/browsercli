@@ -12,28 +12,28 @@
 
 ## File Structure
 
-| 类型 | 文件 | 职责 |
-|---|---|---|
-| **修改** | `src/tools/shared/pageResponse.ts` | 扩展为跨模块错误/响应 helper 集中地（新增 `getErrorMessage`、保留 `errorMessage` 别名） |
-| **修改** | `src/tools/debugger/index.ts` | 15 个工具改用 `runTool` 包装；删除双重 beautify；删除未用 `maxScopeDepth`；统一响应格式；提取 `getDebuggerFromContext`、`filterMatchesByUrl`、魔数常量 |
-| **修改** | `src/tools/debugger/manifest.ts` | 移除 `startContinuousDebugging` / `stopContinuousDebugging` 两条 stub 注册 |
-| **修改** | `src/tools/hook/RemoveHookBrowser.ts` | 重命名工具名为 `remove_hook_browser`（冲突修复） |
-| **修改** | `src/tools/hook/SyncHookRecords.ts` | 重命名工具名为 `sync_hook_records`（冲突修复） |
-| **修改** | `src/tools/hook/{CreateHook,GetHookData,InjectHook,ListCreatedHooks,RemoveHook,RemoveHookBrowser,SyncHookRecords}.ts` | 改用 `errorMessage()`，移除 WHAT 注释 |
-| **修改** | `src/tools/workflow/autoHook.ts` | 8 个 `_generateXxxHookScript` 数据驱动合并为 `buildHookScript(preset)`；`buildHookPlans` 改为遍历 `HOOK_PRESETS` 表；`detectCryptoLibraries` 去除 `as any` |
-| **修改** | `src/tools/workflow/observeFlow.ts` | 删除 `extractCryptoAlgorithms` 包装；内联正则提升为模块级 `const`；`options` 改为强类型接口 |
-| **修改** | `src/tools/workflow/rebuildBundle.ts` | 删除未使用的 `_filterRuntimeEvidence` / `_inferMissingCapabilities`；删除重复 WHAT 注释 |
-| **修改** | `src/tools/network/{listNetworkRequests,traceSignatureGeneration}.ts` | 提取共享 `SIGNATURE_HEADER_PATTERN` 到 `src/tools/network/constants.ts` |
-| **修改** | `src/tools/page/sessionState.ts` | 6 处 `ensureCleanupLoop+cleanupExpiredSessions` 提取为 `prepareSessionStore()`；消除 `as unknown as` |
-| **修改** | `src/tools/shared/response-builder.ts` | `buildInvokeHint` 数据驱动重构（9 同构分支 → 表） |
-| **修改** | `src/config/resolver.ts` | `getBrowserManagerConfig` 数据驱动重构（25 同构分支 → 表） |
-| **修改** | `src/modules/deobfuscator/AdvancedDeobfuscator.ts` | 删除模块级死代码 `INVISIBLE_CHAR_TO_BIT` / `INVISIBLE_CHARS` / `INVISIBLE_PATTERN` |
-| **新增** | `src/tools/network/constants.ts` | 存放 `SIGNATURE_HEADER_PATTERN` 等共享常量 |
-| **删除** | `src/tools/debugger/types.ts` | 纯再导出，由 `index.ts` 改为直接从 `../../third_party/index.js` 导出 `Frame` 替代 |
-| **测试** | `tests/unit/tools/debugger/index.test.ts` | 扩展：覆盖 `getDebuggerFromContext` / `filterMatchesByUrl` / 魔数阈值边界 |
-| **测试** | `tests/unit/tools/shared/pageResponse.test.ts`（新增） | 覆盖 `errorMessage` 与 `getErrorMessage` 语义 |
-| **测试** | `tests/unit/tools/workflow/autoHook.test.ts` | 扩展：覆盖 `buildHookScript` 对 8 个 preset 的输出契约 |
-| **测试** | `tests/unit/tools/hook/{RemoveHook,SyncHookRecords}.test.ts`（新增） | 覆盖改名后的工具仍能被 ToolRegistry 注册 |
+| 类型     | 文件                                                                                                                  | 职责                                                                                                                                                       |
+| -------- | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **修改** | `src/tools/shared/pageResponse.ts`                                                                                    | 扩展为跨模块错误/响应 helper 集中地（新增 `getErrorMessage`、保留 `errorMessage` 别名）                                                                    |
+| **修改** | `src/tools/debugger/index.ts`                                                                                         | 15 个工具改用 `runTool` 包装；删除双重 beautify；删除未用 `maxScopeDepth`；统一响应格式；提取 `getDebuggerFromContext`、`filterMatchesByUrl`、魔数常量     |
+| **修改** | `src/tools/debugger/manifest.ts`                                                                                      | 移除 `startContinuousDebugging` / `stopContinuousDebugging` 两条 stub 注册                                                                                 |
+| **修改** | `src/tools/hook/RemoveHookBrowser.ts`                                                                                 | 重命名工具名为 `remove_hook_browser`（冲突修复）                                                                                                           |
+| **修改** | `src/tools/hook/SyncHookRecords.ts`                                                                                   | 重命名工具名为 `sync_hook_records`（冲突修复）                                                                                                             |
+| **修改** | `src/tools/hook/{CreateHook,GetHookData,InjectHook,ListCreatedHooks,RemoveHook,RemoveHookBrowser,SyncHookRecords}.ts` | 改用 `errorMessage()`，移除 WHAT 注释                                                                                                                      |
+| **修改** | `src/tools/workflow/autoHook.ts`                                                                                      | 8 个 `_generateXxxHookScript` 数据驱动合并为 `buildHookScript(preset)`；`buildHookPlans` 改为遍历 `HOOK_PRESETS` 表；`detectCryptoLibraries` 去除 `as any` |
+| **修改** | `src/tools/workflow/observeFlow.ts`                                                                                   | 删除 `extractCryptoAlgorithms` 包装；内联正则提升为模块级 `const`；`options` 改为强类型接口                                                                |
+| **修改** | `src/tools/workflow/rebuildBundle.ts`                                                                                 | 删除未使用的 `_filterRuntimeEvidence` / `_inferMissingCapabilities`；删除重复 WHAT 注释                                                                    |
+| **修改** | `src/tools/network/{listNetworkRequests,traceSignatureGeneration}.ts`                                                 | 提取共享 `SIGNATURE_HEADER_PATTERN` 到 `src/tools/network/constants.ts`                                                                                    |
+| **修改** | `src/tools/page/sessionState.ts`                                                                                      | 6 处 `ensureCleanupLoop+cleanupExpiredSessions` 提取为 `prepareSessionStore()`；消除 `as unknown as`                                                       |
+| **修改** | `src/tools/shared/response-builder.ts`                                                                                | `buildInvokeHint` 数据驱动重构（9 同构分支 → 表）                                                                                                          |
+| **修改** | `src/config/resolver.ts`                                                                                              | `getBrowserManagerConfig` 数据驱动重构（25 同构分支 → 表）                                                                                                 |
+| **修改** | `src/modules/deobfuscator/AdvancedDeobfuscator.ts`                                                                    | 删除模块级死代码 `INVISIBLE_CHAR_TO_BIT` / `INVISIBLE_CHARS` / `INVISIBLE_PATTERN`                                                                         |
+| **新增** | `src/tools/network/constants.ts`                                                                                      | 存放 `SIGNATURE_HEADER_PATTERN` 等共享常量                                                                                                                 |
+| **删除** | `src/tools/debugger/types.ts`                                                                                         | 纯再导出，由 `index.ts` 改为直接从 `../../third_party/index.js` 导出 `Frame` 替代                                                                          |
+| **测试** | `tests/unit/tools/debugger/index.test.ts`                                                                             | 扩展：覆盖 `getDebuggerFromContext` / `filterMatchesByUrl` / 魔数阈值边界                                                                                  |
+| **测试** | `tests/unit/tools/shared/pageResponse.test.ts`（新增）                                                                | 覆盖 `errorMessage` 与 `getErrorMessage` 语义                                                                                                              |
+| **测试** | `tests/unit/tools/workflow/autoHook.test.ts`                                                                          | 扩展：覆盖 `buildHookScript` 对 8 个 preset 的输出契约                                                                                                     |
+| **测试** | `tests/unit/tools/hook/{RemoveHook,SyncHookRecords}.test.ts`（新增）                                                  | 覆盖改名后的工具仍能被 ToolRegistry 注册                                                                                                                   |
 
 ---
 
@@ -44,6 +44,7 @@
 ### Task 1: 删除 `get_script_source` 的双重 beautify bug
 
 **Files:**
+
 - Modify: `src/tools/debugger/index.ts:765-791`
 - Test: `tests/unit/tools/debugger/index.test.ts`（扩展 `get_script_source` 用例）
 
@@ -78,7 +79,9 @@ describe('getScriptSource prettyPrint', () => {
     };
     // 注入 fake runtime 略（使用 stub context）
     // ... 测试细节视项目 stub 框架而定
-    const result = response.payload as {data: {source?: string; sourcePreview?: string}};
+    const result = response.payload as {
+      data: {source?: string; sourcePreview?: string};
+    };
     assert.equal(beautifyCalls, 1, 'beautify 只应被回调一次');
     assert.ok(result.data.source || result.data.sourcePreview);
   });
@@ -111,9 +114,8 @@ if (prettyPrint) {
 ```typescript
 const beautifier = new PackerDeobfuscator();
 // ...
-source = await debuggerContext.getBeautifiedScriptSource(
-  scriptId,
-  raw => beautifier.beautify(raw),
+source = await debuggerContext.getBeautifiedScriptSource(scriptId, raw =>
+  beautifier.beautify(raw),
 );
 ```
 
@@ -134,6 +136,7 @@ git commit -m "fix(debugger): remove duplicate beautify in get_script_source"
 ### Task 2: 移除 `get_paused_info` 未使用的 `maxScopeDepth` 参数
 
 **Files:**
+
 - Modify: `src/tools/debugger/index.ts:1614-1634`
 - Test: `tests/unit/tools/debugger/buildPausedInfoData.test.ts`（确认现有测试仍通过）
 
@@ -167,6 +170,7 @@ git commit -m "fix(debugger): drop unused maxScopeDepth schema param in get_paus
 ### Task 3: 统一 `trace_function` 校验失败路径的响应格式
 
 **Files:**
+
 - Modify: `src/tools/debugger/index.ts:1180-1193`
 - Test: `tests/unit/tools/debugger/index.test.ts`
 
@@ -180,8 +184,12 @@ describe('trace_function validation', () => {
     const lines: string[] = [];
     let structured: unknown = undefined;
     const response = {
-      appendResponseLine(v: string) { lines.push(v); },
-      setStructuredContent(c: unknown) { structured = c; },
+      appendResponseLine(v: string) {
+        lines.push(v);
+      },
+      setStructuredContent(c: unknown) {
+        structured = c;
+      },
     };
     await traceFunction.handler(
       {params: {target: ''}},
@@ -193,10 +201,7 @@ describe('trace_function validation', () => {
       (structured as {success: boolean; tooltype: string}).success,
       false,
     );
-    assert.equal(
-      (structured as {tooltype: string}).tooltype,
-      'trace_function',
-    );
+    assert.equal((structured as {tooltype: string}).tooltype, 'trace_function');
   });
 });
 ```
@@ -250,6 +255,7 @@ git commit -m "fix(debugger): unify trace_function validation response format"
 ### Task 4: 从 manifest 移除 `startContinuousDebugging` / `stopContinuousDebugging` stub
 
 **Files:**
+
 - Modify: `src/tools/debugger/index.ts:2038-2083`（删除导出）
 - Modify: `src/tools/debugger/manifest.ts:66-71`（删除注册）
 - Test: `tests/unit/tools/ToolRegistry.test.ts`（确认不注册）
@@ -311,6 +317,7 @@ git commit -m "fix(debugger): drop stub tools start/stop_continuous_debugging"
 ### Task 5: 扩展 `pageResponse.ts` 为公共 helper 中心
 
 **Files:**
+
 - Modify: `src/tools/shared/pageResponse.ts`
 - Test: `tests/unit/tools/shared/pageResponse.test.ts`（新增）
 
@@ -321,7 +328,10 @@ git commit -m "fix(debugger): drop stub tools start/stop_continuous_debugging"
 ```typescript
 import {describe, it} from 'node:test';
 import {strict as assert} from 'node:assert';
-import {errorMessage, getErrorMessage} from '../../../src/tools/shared/pageResponse.js';
+import {
+  errorMessage,
+  getErrorMessage,
+} from '../../../src/tools/shared/pageResponse.js';
 
 describe('errorMessage / getErrorMessage', () => {
   it('Error 实例返回 message', () => {
@@ -384,6 +394,7 @@ git commit -m "refactor(shared): expose getErrorMessage helper"
 ### Task 6: 导出 debugger `runTool` 给其他模块复用
 
 **Files:**
+
 - Modify: `src/tools/debugger/index.ts:69-92`（加 `export`）
 - Modify: `src/tools/debugger/runtime-helpers.ts`（新增，抽出 `getDebugger` + `runTool`）
 - Test: `tests/unit/tools/debugger/index.test.ts`（既有）
@@ -476,6 +487,7 @@ git commit -m "refactor(debugger): extract runtime-helpers for reuse"
 ### Task 7: 提取 `filterMatchesByUrl` + 魔数常量
 
 **Files:**
+
 - Modify: `src/tools/debugger/index.ts`
 - Test: `tests/unit/tools/debugger/index.test.ts`
 
@@ -544,6 +556,7 @@ git commit -m "refactor(debugger): extract filterMatchesByUrl + named thresholds
 ### Task 8: 批量改写 15 个工具为 `runTool` 包装
 
 **Files:**
+
 - Modify: `src/tools/debugger/index.ts`
 - Test: `tests/unit/tools/debugger-tools.error-paths.test.ts`（既有）
 
@@ -577,36 +590,42 @@ handler: async (request, response, context) => {
 
 ```typescript
 handler: async (request, response, context) => {
-  await runTool(response, request, 'xxx', async () => {
-    const debuggerContext = await getDebuggerFromContext(context);
-    // 业务逻辑（成功路径直接调用 response.setStructuredContent）
-  }, {
-    errorPrefix: 'XXX失败',
-    errorData: params => ({scriptId: params.scriptId}), // 按需
-  });
-}
+  await runTool(
+    response,
+    request,
+    'xxx',
+    async () => {
+      const debuggerContext = await getDebuggerFromContext(context);
+      // 业务逻辑（成功路径直接调用 response.setStructuredContent）
+    },
+    {
+      errorPrefix: 'XXX失败',
+      errorData: params => ({scriptId: params.scriptId}), // 按需
+    },
+  );
+};
 ```
 
 按以下顺序改写（已核对行号范围）：
 
-| # | 工具 | 原行号 | errorPrefix |
-|---|---|---|---|
-| 1 | `setBreakpoint` | 382-419 | `'设置断点失败'` |
-| 2 | `removeBreakpoint` | 451-467 | `'删除断点失败'` |
-| 3 | `listBreakpoints` | 486-523 | `'列出断点失败'` |
-| 4 | `resume` | 583-600 | `'恢复执行失败'` |
-| 5 | `pause` | 618-645 | `'暂停执行失败'` |
-| 6 | `listScripts` | 669-713 | `'列出脚本失败'` |
-| 7 | `getScriptSource` | 762-888 | `'获取脚本源码失败'` |
-| 8 | `searchInSources` | 966-1109 | `'搜索脚本源码失败'` |
-| 9 | `traceFunction` | 1207-1332 | `'追踪函数失败'` |
-| 10 | `getAiDebugStatus` | 1351-1383 | `'获取 AI 调试状态失败'` |
-| 11 | `findInScript` | 1426-1526 | `'在脚本中查找失败'` |
-| 12 | `getRequestInitiator` | 1551-1599 | `'获取请求发起者失败'` |
-| 13 | `getPausedInfo` | 1630-1667 | `'获取暂停信息失败'` |
-| 14 | `evaluateOnCallframe` | 1695-1762 | `'在调用帧上执行失败'` |
-| 15 | `inspectLocals` | 1781-1855 | `'检查局部变量失败'` |
-| 16 | `setBreakpointOnText` | 1897-2017 | `'在文本上设置断点失败'` |
+| #   | 工具                  | 原行号    | errorPrefix              |
+| --- | --------------------- | --------- | ------------------------ |
+| 1   | `setBreakpoint`       | 382-419   | `'设置断点失败'`         |
+| 2   | `removeBreakpoint`    | 451-467   | `'删除断点失败'`         |
+| 3   | `listBreakpoints`     | 486-523   | `'列出断点失败'`         |
+| 4   | `resume`              | 583-600   | `'恢复执行失败'`         |
+| 5   | `pause`               | 618-645   | `'暂停执行失败'`         |
+| 6   | `listScripts`         | 669-713   | `'列出脚本失败'`         |
+| 7   | `getScriptSource`     | 762-888   | `'获取脚本源码失败'`     |
+| 8   | `searchInSources`     | 966-1109  | `'搜索脚本源码失败'`     |
+| 9   | `traceFunction`       | 1207-1332 | `'追踪函数失败'`         |
+| 10  | `getAiDebugStatus`    | 1351-1383 | `'获取 AI 调试状态失败'` |
+| 11  | `findInScript`        | 1426-1526 | `'在脚本中查找失败'`     |
+| 12  | `getRequestInitiator` | 1551-1599 | `'获取请求发起者失败'`   |
+| 13  | `getPausedInfo`       | 1630-1667 | `'获取暂停信息失败'`     |
+| 14  | `evaluateOnCallframe` | 1695-1762 | `'在调用帧上执行失败'`   |
+| 15  | `inspectLocals`       | 1781-1855 | `'检查局部变量失败'`     |
+| 16  | `setBreakpointOnText` | 1897-2017 | `'在文本上设置断点失败'` |
 
 > 注意：`traceFunction` 在校验失败路径已用 `setStructuredContent`（Task 3），改写时保持 early-return 不变，只包外层正常 try/catch。
 
@@ -637,6 +656,7 @@ git commit -m "refactor(debugger): wrap 15 tools with runTool + drop 18 double c
 ### Task 9: 统一 `ToolCategory` 字符串字面量为枚举
 
 **Files:**
+
 - Modify: `src/tools/debugger/index.ts`
 - Test: `tests/unit/tools/ToolRegistry.test.ts`
 
@@ -667,6 +687,7 @@ git commit -m "refactor(debugger): use ToolCategory enum instead of string liter
 ### Task 10: 删除 `src/tools/debugger/types.ts`
 
 **Files:**
+
 - Delete: `src/tools/debugger/types.ts`
 - Modify: `src/tools/debugger/index.ts:25`
 - Test: `tests/unit/tools/debugger/contextSelector.test.ts`（既有）
@@ -715,6 +736,7 @@ git commit -m "refactor(debugger): drop types.ts re-export shim"
 ### Task 11: 修复 hook 工具名冲突
 
 **Files:**
+
 - Modify: `src/tools/hook/RemoveHookBrowser.ts:21`
 - Modify: `src/tools/hook/SyncHookRecords.ts:17`
 - Modify: `src/tools/hook/manifest.ts`（若有）
@@ -798,6 +820,7 @@ git commit -m "fix(hook): disambiguate remove_hook and list_created_hooks tool n
 ### Task 12: hook 工具批量改用 `errorMessage` + 删除 WHAT 注释
 
 **Files:**
+
 - Modify: `src/tools/hook/{CreateHook,GetHookData,InjectHook,ListCreatedHooks,RemoveHook,RemoveHookBrowser,SyncHookRecords}.ts`
 - Test: `tests/unit/tools/jshook-tools.handlers.test.ts`（既有）
 
@@ -850,6 +873,7 @@ git commit -m "refactor(hook): use errorMessage helper and drop what-comments"
 ### Task 13: 提取 `prepareSessionStore` helper + 删除 `as unknown as`
 
 **Files:**
+
 - Modify: `src/tools/page/sessionState.ts`
 - Test: `tests/unit/tools/basic-tools.extended.test.ts`（既有）
 
@@ -892,6 +916,7 @@ git commit -m "refactor(page): extract prepareSessionStore and drop unsafe casts
 ### Task 14: 数据驱动重构 `autoHook.ts`
 
 **Files:**
+
 - Modify: `src/tools/workflow/autoHook.ts`
 - Test: `tests/unit/tools/workflow/autoHook.test.ts`（既有）
 
@@ -914,30 +939,62 @@ interface HookPreset {
 }
 
 const HOOK_PRESETS: HookPreset[] = [
-  {optionKey: 'hookFetch', hookId: 'hook_fetch_auto', type: 'fetch',
-   description: 'Hook fetch API - capture requests and responses',
-   buildScript: () => _generateFetchHookScript()},
-  {optionKey: 'hookXhr', hookId: 'hook_xhr_auto', type: 'xhr',
-   description: 'Hook XMLHttpRequest - capture XHR requests',
-   buildScript: () => _generateXhrHookScript()},
-  {optionKey: 'hookTimers', hookId: 'hook_timers_auto', type: 'timer',
-   description: 'Hook setTimeout/setInterval',
-   buildScript: () => _generateTimerHookScript()},
-  {optionKey: 'hookEval', hookId: 'hook_eval_auto', type: 'eval',
-   description: 'Hook eval and Function constructor',
-   buildScript: () => _generateEvalHookScript()},
-  {optionKey: 'hookStorage', hookId: 'hook_storage_auto', type: 'storage',
-   description: 'Hook localStorage/sessionStorage',
-   buildScript: () => _generateStorageHookScript()},
-  {optionKey: 'hookCookie', hookId: 'hook_cookie_auto', type: 'cookie',
-   description: 'Hook Document.cookie',
-   buildScript: () => _generateCookieHookScript()},
-  {optionKey: 'hookCryptoJs', hookId: 'hook_cryptojs_auto', type: 'cryptojs',
-   description: 'Hook CryptoJS',
-   buildScript: () => _generateCryptoJsHookScript()},
-  {optionKey: 'hookWebCrypto', hookId: 'hook_webcrypto_auto', type: 'webcrypto',
-   description: 'Hook WebCrypto subtle API',
-   buildScript: () => _generateWebCryptoHookScript()},
+  {
+    optionKey: 'hookFetch',
+    hookId: 'hook_fetch_auto',
+    type: 'fetch',
+    description: 'Hook fetch API - capture requests and responses',
+    buildScript: () => _generateFetchHookScript(),
+  },
+  {
+    optionKey: 'hookXhr',
+    hookId: 'hook_xhr_auto',
+    type: 'xhr',
+    description: 'Hook XMLHttpRequest - capture XHR requests',
+    buildScript: () => _generateXhrHookScript(),
+  },
+  {
+    optionKey: 'hookTimers',
+    hookId: 'hook_timers_auto',
+    type: 'timer',
+    description: 'Hook setTimeout/setInterval',
+    buildScript: () => _generateTimerHookScript(),
+  },
+  {
+    optionKey: 'hookEval',
+    hookId: 'hook_eval_auto',
+    type: 'eval',
+    description: 'Hook eval and Function constructor',
+    buildScript: () => _generateEvalHookScript(),
+  },
+  {
+    optionKey: 'hookStorage',
+    hookId: 'hook_storage_auto',
+    type: 'storage',
+    description: 'Hook localStorage/sessionStorage',
+    buildScript: () => _generateStorageHookScript(),
+  },
+  {
+    optionKey: 'hookCookie',
+    hookId: 'hook_cookie_auto',
+    type: 'cookie',
+    description: 'Hook Document.cookie',
+    buildScript: () => _generateCookieHookScript(),
+  },
+  {
+    optionKey: 'hookCryptoJs',
+    hookId: 'hook_cryptojs_auto',
+    type: 'cryptojs',
+    description: 'Hook CryptoJS',
+    buildScript: () => _generateCryptoJsHookScript(),
+  },
+  {
+    optionKey: 'hookWebCrypto',
+    hookId: 'hook_webcrypto_auto',
+    type: 'webcrypto',
+    description: 'Hook WebCrypto subtle API',
+    buildScript: () => _generateWebCryptoHookScript(),
+  },
 ];
 ```
 
@@ -947,16 +1004,14 @@ const HOOK_PRESETS: HookPreset[] = [
 function buildHookPlans(
   options: AutoHookOptions,
 ): Array<HookInjectionRecord & {script: string}> {
-  return HOOK_PRESETS
-    .filter(p => options[p.optionKey])
-    .map(p => ({
-      hookId: p.hookId,
-      type: p.type,
-      description: p.description,
-      success: true,
-      injected: false,
-      script: p.buildScript(),
-    }));
+  return HOOK_PRESETS.filter(p => options[p.optionKey]).map(p => ({
+    hookId: p.hookId,
+    type: p.type,
+    description: p.description,
+    success: true,
+    injected: false,
+    script: p.buildScript(),
+  }));
 }
 ```
 
@@ -979,6 +1034,7 @@ git commit -m "refactor(workflow): data-driven autoHook preset table"
 ### Task 15: 清理 `observeFlow.ts` + `rebuildBundle.ts` 死代码 + 正则提升
 
 **Files:**
+
 - Modify: `src/tools/workflow/observeFlow.ts`
 - Modify: `src/tools/workflow/rebuildBundle.ts`
 - Test: `tests/unit/tools/workflow/observeFlow.test.ts` / `rebuildBundle.test.ts`
@@ -1005,9 +1061,17 @@ function extractCryptoAlgorithms(content: string): string[] {
 在 `observeFlow.ts` 顶部新增：
 
 ```typescript
-const ENCRYPTION_KEYWORDS = /aes|rsa|des|md5|sha[0-9]*|hmac|pbkdf|encrypt|decrypt|cipher/i;
+const ENCRYPTION_KEYWORDS =
+  /aes|rsa|des|md5|sha[0-9]*|hmac|pbkdf|encrypt|decrypt|cipher/i;
 const API_KEYWORDS = /fetch|axios|xmlhttprequest|ajax|\/api\//i;
-const OBFUSCATION_PATTERNS = [/\\x[0-9a-f]{2}/i, /\\u[0-9a-f]{4}/i, /eval\s*\(/, /atob\s*\(/, /btoa\s*\(/, /unescape\s*\(/];
+const OBFUSCATION_PATTERNS = [
+  /\\x[0-9a-f]{2}/i,
+  /\\u[0-9a-f]{4}/i,
+  /eval\s*\(/,
+  /atob\s*\(/,
+  /btoa\s*\(/,
+  /unescape\s*\(/,
+];
 // ... 其他 8 类
 ```
 
@@ -1023,7 +1087,9 @@ interface CollectScriptsOptions {
   // 其他字段见 observeFlow.ts:146
 }
 
-function collectScripts(url: string, options: CollectScriptsOptions) { /* ... */ }
+function collectScripts(url: string, options: CollectScriptsOptions) {
+  /* ... */
+}
 ```
 
 删除 `(options.includeInline as boolean) ?? true` 等处的 `as boolean` 断言。
@@ -1060,6 +1126,7 @@ git commit -m "refactor(workflow): drop dead code, hoist regex, type options"
 ### Task 16: 提取 `SIGNATURE_HEADER_PATTERN` 共享常量
 
 **Files:**
+
 - Create: `src/tools/network/constants.ts`
 - Modify: `src/tools/network/listNetworkRequests.ts:63`
 - Modify: `src/tools/workflow/traceSignatureGeneration.ts:14`
@@ -1108,6 +1175,7 @@ git commit -m "refactor(network): share SIGNATURE_HEADER_PATTERN constant"
 ### Task 17: `response-builder.ts` `buildInvokeHint` 数据驱动
 
 **Files:**
+
 - Modify: `src/tools/shared/response-builder.ts`
 - Test: `tests/unit/tools/shared/response-builder.test.ts`（既有）
 
@@ -1140,7 +1208,9 @@ const INVOKE_HINT_TABLE: InvokeHintRow[] = [
 - [ ] **Step 4: 改写 `buildInvokeHint`**
 
 ```typescript
-export function buildInvokeHint(key: string): ContinuationInvokeHint | undefined {
+export function buildInvokeHint(
+  key: string,
+): ContinuationInvokeHint | undefined {
   const row = INVOKE_HINT_TABLE.find(r => r.key === key);
   if (!row) return undefined;
   return {
@@ -1168,6 +1238,7 @@ git commit -m "refactor(shared): data-drive buildInvokeHint"
 ### Task 18: `config/resolver.ts` `getBrowserManagerConfig` 数据驱动
 
 **Files:**
+
 - Modify: `src/config/resolver.ts`
 - Test: `tests/unit/config/resolver.test.ts`（若有）或 `tests/unit/basic-tools.extended.test.ts`
 
@@ -1202,7 +1273,14 @@ const BROWSER_CONFIG_TABLE: BrowserConfigRow[] = [
 export function getBrowserManagerConfig(kind: string): Record<string, unknown> {
   const row = BROWSER_CONFIG_TABLE.find(r => r.key === kind);
   if (!row) return DEFAULT_BROWSER_CONFIG;
-  return {...row.defaults, ...(process.env[row.envVar ?? ''] ? {/* env override */} : {})};
+  return {
+    ...row.defaults,
+    ...(process.env[row.envVar ?? '']
+      ? {
+          /* env override */
+        }
+      : {}),
+  };
 }
 ```
 
@@ -1225,6 +1303,7 @@ git commit -m "refactor(config): data-drive getBrowserManagerConfig"
 ### Task 19: 删除 `AdvancedDeobfuscator` 死代码常量
 
 **Files:**
+
 - Modify: `src/modules/deobfuscator/AdvancedDeobfuscator.ts:55-64`
 - Test: `tests/unit/modules/deobfuscator/*.test.ts`（若有）
 
@@ -1266,6 +1345,7 @@ git commit -m "refactor(deobfuscator): drop dead module-level constants in Advan
 > **Scope note**: 这是 modules 层最复杂的重复源（247 次 `lines.push`），但改造风险较高。若时间紧，可跳过，保留 TODO。
 
 **Files:**
+
 - Modify: `src/modules/hook/HookTypeRegistry.ts`
 - Test: `tests/unit/modules/hook/HookTypeRegistry.test.ts`（若有）
 
@@ -1339,15 +1419,15 @@ npm run test:unit
 
 涉及域：
 
-| Chunk | 必跑测试 |
-|---|---|
-| 1 | `debugger/*.test.js`、`ToolRegistry.test.js` |
-| 2 | `shared/pageResponse.test.js`、`debugger/*.test.js` |
-| 3 | `debugger/*.test.js`、`debugger-tools.*.test.js` |
-| 4 | `hook/*.test.js`、`jshook-tools.*.test.js`、`page/*.test.js`、`workflow/*.test.js`、`network/*.test.js` |
-| 5 | `shared/response-builder.test.js` |
-| 6 | `modules/deobfuscator/*.test.js`、`modules/hook/*.test.js`（若有） |
-| 7 | `npm run test:unit` 全量 |
+| Chunk | 必跑测试                                                                                                |
+| ----- | ------------------------------------------------------------------------------------------------------- |
+| 1     | `debugger/*.test.js`、`ToolRegistry.test.js`                                                            |
+| 2     | `shared/pageResponse.test.js`、`debugger/*.test.js`                                                     |
+| 3     | `debugger/*.test.js`、`debugger-tools.*.test.js`                                                        |
+| 4     | `hook/*.test.js`、`jshook-tools.*.test.js`、`page/*.test.js`、`workflow/*.test.js`、`network/*.test.js` |
+| 5     | `shared/response-builder.test.js`                                                                       |
+| 6     | `modules/deobfuscator/*.test.js`、`modules/hook/*.test.js`（若有）                                      |
+| 7     | `npm run test:unit` 全量                                                                                |
 
 ---
 

@@ -5,12 +5,12 @@
  */
 
 /**
- * apps/web/src/lib/protocol.ts —— 前端协议类型。
+ * src/web-ui/src/lib/protocol.ts —— 前端协议类型。
  *
  * 重新导出后端的 src/web/types.ts 协议定义，消除双源维护成本。
  */
 
-export * from '../../../../src/web/types.js';
+export * from '../../../web/types.js';
 
 // ==================== Site Experience ====================
 

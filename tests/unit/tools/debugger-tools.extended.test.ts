@@ -10,6 +10,7 @@ import path from 'node:path';
 import {describe, it} from 'node:test';
 
 import {ReverseTaskStore} from '../../../src/reverse/ReverseTaskStore.js';
+import {getRuntime as getJSHookRuntime} from '../../../src/runtime.js';
 import {
   listScripts,
   getScriptSource,
@@ -39,7 +40,6 @@ import {
   traceFunction,
 } from '../../../src/tools/debugger/index.js';
 import {listFrames, selectFrame} from '../../../src/tools/frames/index.js';
-import {getRuntime as getJSHookRuntime} from '../../../src/runtime.js';
 
 interface DebuggerResponseHarness {
   lines: string[];

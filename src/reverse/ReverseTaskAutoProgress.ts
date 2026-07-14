@@ -59,7 +59,7 @@ function collectSignals(
   const hasTargetRequest = Boolean(
     (state.targetContext as Record<string, unknown> | undefined)
       ?.targetRequest ||
-      state.recentEvidence.some(entry => Boolean(entry.request)),
+    state.recentEvidence.some(entry => Boolean(entry.request)),
   );
   const hookRecordCount = state.recentEvidence.filter(
     entry => entry.kind === 'hook-hit' || entry.source === 'hook',

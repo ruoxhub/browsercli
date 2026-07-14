@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -16,8 +15,17 @@ import {SmartCodeCollector} from '../../src/modules/collector/SmartCodeCollector
 describe('Property 5/8/29/30/31: Cache and performance', () => {
   it('Property 5: summary mode compression', async () => {
     const collector = new SmartCodeCollector();
-    const files = [{url: 'a.js', content: 'function a(){return 1;}', size: 24, type: 'external'}] as any;
-    const result = await collector.smartCollect({} as any, files, {mode: 'summary'} as any);
+    const files = [
+      {
+        url: 'a.js',
+        content: 'function a(){return 1;}',
+        size: 24,
+        type: 'external',
+      },
+    ] as any;
+    const result = await collector.smartCollect({} as any, files, {
+      mode: 'summary',
+    } as any);
     assert.ok(Array.isArray(result));
     assert.ok('preview' in result[0]);
   });
@@ -25,8 +33,14 @@ describe('Property 5/8/29/30/31: Cache and performance', () => {
   it('Property 8: size limit enforcement', async () => {
     const collector = new SmartCodeCollector();
     const content = 'x'.repeat(10000);
-    const files = [{url: 'a.js', content, size: content.length, type: 'external'}] as any;
-    const result = (await collector.smartCollect({} as any, files, {mode: 'full', maxFileSize: 100, maxTotalSize: 100} as any)) as any[];
+    const files = [
+      {url: 'a.js', content, size: content.length, type: 'external'},
+    ] as any;
+    const result = (await collector.smartCollect({} as any, files, {
+      mode: 'full',
+      maxFileSize: 100,
+      maxTotalSize: 100,
+    } as any)) as any[];
     assert.ok(result[0].size <= 100);
   });
 
@@ -48,7 +62,10 @@ describe('Property 5/8/29/30/31: Cache and performance', () => {
       {url: 'https://x/a.js', content: 'a', size: 1, type: 'external'},
       {url: 'https://x/b.js', content: 'b', size: 1, type: 'external'},
     ] as any;
-    const result = (await collector.smartCollect({} as any, files, {mode: 'incremental', includePatterns: ['a\\.js']} as any)) as any[];
+    const result = (await collector.smartCollect({} as any, files, {
+      mode: 'incremental',
+      includePatterns: ['a\\.js'],
+    } as any)) as any[];
     assert.strictEqual(result.length, 1);
   });
 

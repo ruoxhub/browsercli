@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -6,19 +5,18 @@
  */
 /**
  * Integration tests for Gemini CLI
- * 
+ *
  * These tests verify the actual CLI command execution, error handling, and timeout mechanisms.
  * Note: These tests require gemini-cli to be installed and configured.
- * 
+ *
  * **Validates: Requirements 5.1, 5.2, 5.3, 5.4, 5.5, 5.6**
  */
 
 import assert from 'node:assert';
-import { spawn } from 'node:child_process';
-import { describe, it, before } from 'node:test';
+import {spawn} from 'node:child_process';
+import {describe, it, before} from 'node:test';
 
-import { GeminiProvider } from '../../src/services/GeminiProvider.js';
-
+import {GeminiProvider} from '../../src/services/GeminiProvider.js';
 
 const runGeminiIntegration = process.env.RUN_GEMINI_CLI_TESTS === 'true';
 
@@ -27,7 +25,7 @@ const runGeminiIntegration = process.env.RUN_GEMINI_CLI_TESTS === 'true';
  */
 function isGeminiCLIAvailable(): boolean {
   try {
-    const { spawnSync } = require('node:child_process');
+    const {spawnSync} = require('node:child_process');
     const result = spawnSync('gemini-cli', ['--version'], {
       stdio: 'pipe',
       timeout: 5000,
@@ -44,7 +42,9 @@ describe('Gemini CLI Integration Tests', {skip: !runGeminiIntegration}, () => {
   before(() => {
     cliAvailable = isGeminiCLIAvailable();
     if (!cliAvailable) {
-      console.log('\n⚠️  Warning: gemini-cli is not available. Some tests will be skipped.');
+      console.log(
+        '\n⚠️  Warning: gemini-cli is not available. Some tests will be skipped.',
+      );
       console.log('   To run all tests, install gemini-cli:');
       console.log('   npm install -g @google/generative-ai-cli\n');
     }
@@ -60,12 +60,12 @@ describe('Gemini CLI Integration Tests', {skip: !runGeminiIntegration}, () => {
 
       await assert.rejects(
         async () => {
-          await provider.chat([{ role: 'user', content: 'Hello' }]);
+          await provider.chat([{role: 'user', content: 'Hello'}]);
         },
         {
           message: /gemini-cli is not available/,
         },
-        'Should throw error when CLI is not available'
+        'Should throw error when CLI is not available',
       );
     });
 
@@ -77,7 +77,7 @@ describe('Gemini CLI Integration Tests', {skip: !runGeminiIntegration}, () => {
       });
 
       try {
-        await provider.chat([{ role: 'user', content: 'Hello' }]);
+        await provider.chat([{role: 'user', content: 'Hello'}]);
         assert.fail('Should have thrown an error');
       } catch (error: any) {
         assert.ok(error.message.includes('gemini-cli is not available'));
@@ -100,7 +100,7 @@ describe('Gemini CLI Integration Tests', {skip: !runGeminiIntegration}, () => {
       });
 
       const response = await provider.chat([
-        { role: 'user', content: 'Say "test successful" and nothing else' },
+        {role: 'user', content: 'Say "test successful" and nothing else'},
       ]);
 
       assert.ok(response.content);
@@ -121,7 +121,7 @@ describe('Gemini CLI Integration Tests', {skip: !runGeminiIntegration}, () => {
 
       const testPrompt = 'What is 2+2? Answer with just the number.';
       const response = await provider.chat([
-        { role: 'user', content: testPrompt },
+        {role: 'user', content: testPrompt},
       ]);
 
       assert.ok(response.content);
@@ -140,10 +140,10 @@ describe('Gemini CLI Integration Tests', {skip: !runGeminiIntegration}, () => {
       });
 
       const messages = [
-        { role: 'system' as const, content: 'You are a helpful assistant.' },
-        { role: 'user' as const, content: 'My name is Alice.' },
-        { role: 'assistant' as const, content: 'Hello Alice!' },
-        { role: 'user' as const, content: 'What is my name?' },
+        {role: 'system' as const, content: 'You are a helpful assistant.'},
+        {role: 'user' as const, content: 'My name is Alice.'},
+        {role: 'assistant' as const, content: 'Hello Alice!'},
+        {role: 'user' as const, content: 'What is my name?'},
       ];
 
       const response = await provider.chat(messages);
@@ -151,7 +151,7 @@ describe('Gemini CLI Integration Tests', {skip: !runGeminiIntegration}, () => {
       assert.ok(response.content);
       assert.ok(
         response.content.toLowerCase().includes('alice'),
-        'Response should remember the name from conversation'
+        'Response should remember the name from conversation',
       );
     });
 
@@ -167,9 +167,7 @@ describe('Gemini CLI Integration Tests', {skip: !runGeminiIntegration}, () => {
         model: 'gemini-2.0-flash-exp',
       });
 
-      const response = await provider.chat([
-        { role: 'user', content: 'Hello' },
-      ]);
+      const response = await provider.chat([{role: 'user', content: 'Hello'}]);
 
       assert.ok(response.content);
     });
@@ -186,8 +184,8 @@ describe('Gemini CLI Integration Tests', {skip: !runGeminiIntegration}, () => {
       });
 
       const response = await provider.chat(
-        [{ role: 'user', content: 'Say hello' }],
-        { temperature: 0.5 }
+        [{role: 'user', content: 'Say hello'}],
+        {temperature: 0.5},
       );
 
       assert.ok(response.content);
@@ -205,14 +203,18 @@ describe('Gemini CLI Integration Tests', {skip: !runGeminiIntegration}, () => {
       });
 
       const response = await provider.chat([
-        { role: 'user', content: 'Respond with exactly: TEST_OUTPUT_123' },
+        {role: 'user', content: 'Respond with exactly: TEST_OUTPUT_123'},
       ]);
 
       assert.ok(response.content);
       assert.strictEqual(typeof response.content, 'string');
       assert.ok(response.content.trim().length > 0);
       // Response should be in standard format
-      assert.strictEqual(response.usage, undefined, 'CLI mode should not provide usage info');
+      assert.strictEqual(
+        response.usage,
+        undefined,
+        'CLI mode should not provide usage info',
+      );
     });
   });
 
@@ -226,10 +228,10 @@ describe('Gemini CLI Integration Tests', {skip: !runGeminiIntegration}, () => {
 
       await assert.rejects(
         async () => {
-          await provider.chat([{ role: 'user', content: 'Hello' }]);
+          await provider.chat([{role: 'user', content: 'Hello'}]);
         },
         Error,
-        'Should throw error when CLI execution fails'
+        'Should throw error when CLI execution fails',
       );
     });
 
@@ -242,12 +244,12 @@ describe('Gemini CLI Integration Tests', {skip: !runGeminiIntegration}, () => {
 
       await assert.rejects(
         async () => {
-          await provider.chat([{ role: 'user', content: 'Hello' }]);
+          await provider.chat([{role: 'user', content: 'Hello'}]);
         },
         {
           message: /exited with code/,
         },
-        'Should throw error with exit code information'
+        'Should throw error with exit code information',
       );
     });
 
@@ -267,13 +269,13 @@ describe('Gemini CLI Integration Tests', {skip: !runGeminiIntegration}, () => {
           await provider.analyzeImage(
             '/non/existent/image.png',
             'Describe this image',
-            true
+            true,
           );
         },
         {
           message: /Image file not found/,
         },
-        'Should throw error when image file does not exist'
+        'Should throw error when image file does not exist',
       );
     });
 
@@ -293,13 +295,13 @@ describe('Gemini CLI Integration Tests', {skip: !runGeminiIntegration}, () => {
           await provider.analyzeImage(
             'data:image/png;base64,iVBORw0KGgoAAAANS...',
             'Describe this image',
-            false
+            false,
           );
         },
         {
           message: /CLI mode requires image file paths/,
         },
-        'Should throw error for base64 images in CLI mode'
+        'Should throw error for base64 images in CLI mode',
       );
     });
   });
@@ -315,13 +317,18 @@ describe('Gemini CLI Integration Tests', {skip: !runGeminiIntegration}, () => {
 
       // Mock the executeCLI to have a shorter timeout for testing
       const originalExecuteCLI = (provider as any).executeCLI;
-      (provider as any).executeCLI = async function (prompt: string, options?: any) {
+      (provider as any).executeCLI = async function (
+        prompt: string,
+        options?: any,
+      ) {
         return new Promise((resolve, reject) => {
           const child = spawn('sleep', ['10']); // Sleep for 10 seconds
 
           const timeout = setTimeout(() => {
             child.kill();
-            reject(new Error('gemini-cli execution timed out after 60 seconds'));
+            reject(
+              new Error('gemini-cli execution timed out after 60 seconds'),
+            );
           }, 100); // Short timeout for testing
 
           child.on('close', () => {
@@ -329,7 +336,7 @@ describe('Gemini CLI Integration Tests', {skip: !runGeminiIntegration}, () => {
             resolve('');
           });
 
-          child.on('error', (error) => {
+          child.on('error', error => {
             clearTimeout(timeout);
             reject(error);
           });
@@ -338,12 +345,12 @@ describe('Gemini CLI Integration Tests', {skip: !runGeminiIntegration}, () => {
 
       await assert.rejects(
         async () => {
-          await provider.chat([{ role: 'user', content: 'Hello' }]);
+          await provider.chat([{role: 'user', content: 'Hello'}]);
         },
         {
           message: /timed out/,
         },
-        'Should throw timeout error for long-running commands'
+        'Should throw timeout error for long-running commands',
       );
 
       // Restore original method
@@ -359,11 +366,13 @@ describe('Gemini CLI Integration Tests', {skip: !runGeminiIntegration}, () => {
 
       // Mock executeCLI with timeout
       (provider as any).executeCLI = async function () {
-        return Promise.reject(new Error('gemini-cli execution timed out after 60 seconds'));
+        return Promise.reject(
+          new Error('gemini-cli execution timed out after 60 seconds'),
+        );
       };
 
       try {
-        await provider.chat([{ role: 'user', content: 'Hello' }]);
+        await provider.chat([{role: 'user', content: 'Hello'}]);
         assert.fail('Should have thrown timeout error');
       } catch (error: any) {
         assert.ok(error.message.includes('timed out'));
@@ -404,10 +413,10 @@ describe('Gemini CLI Integration Tests', {skip: !runGeminiIntegration}, () => {
 
       await assert.rejects(
         async () => {
-          await provider.chat([{ role: 'user', content: 'Hello' }]);
+          await provider.chat([{role: 'user', content: 'Hello'}]);
         },
         Error,
-        'Should attempt to use custom CLI path'
+        'Should attempt to use custom CLI path',
       );
     });
 

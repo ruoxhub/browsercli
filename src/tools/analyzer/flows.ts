@@ -19,11 +19,19 @@ interface FlowBucket {
   signatureIndicators: Set<string>;
 }
 
-function isInWindow(timestamp: number, bucketLastTimestamp: number, timeWindowMs: number): boolean {
+function isInWindow(
+  timestamp: number,
+  bucketLastTimestamp: number,
+  timeWindowMs: number,
+): boolean {
   return timestamp - bucketLastTimestamp <= timeWindowMs;
 }
 
-function mergeIntoBucket(bucket: FlowBucket, item: HookTimelineEntry, eventName: string): void {
+function mergeIntoBucket(
+  bucket: FlowBucket,
+  item: HookTimelineEntry,
+  eventName: string,
+): void {
   bucket.lastTimestamp = item.timestamp;
   bucket.eventCount += 1;
   bucket.hookIds.add(item.hookId);
@@ -36,7 +44,12 @@ function mergeIntoBucket(bucket: FlowBucket, item: HookTimelineEntry, eventName:
   }
 }
 
-function createBucket(item: HookTimelineEntry, key: string, method: string, eventName: string): FlowBucket {
+function createBucket(
+  item: HookTimelineEntry,
+  key: string,
+  method: string,
+  eventName: string,
+): FlowBucket {
   return {
     key,
     url: item.url,
@@ -46,7 +59,8 @@ function createBucket(item: HookTimelineEntry, key: string, method: string, even
     eventCount: 1,
     hookIds: new Set([item.hookId]),
     events: new Set([eventName]),
-    statuses: typeof item.status === 'number' ? new Set([item.status]) : new Set(),
+    statuses:
+      typeof item.status === 'number' ? new Set([item.status]) : new Set(),
     signatureIndicators: new Set(item.signatureIndicators ?? []),
   };
 }
@@ -76,11 +90,14 @@ export function correlateNetworkFlows(
     if (!item.url) {
       continue;
     }
-    const method = item.method ?? (item.target === 'websocket' ? 'WS' : 'UNKNOWN');
+    const method =
+      item.method ?? (item.target === 'websocket' ? 'WS' : 'UNKNOWN');
     const key = `${item.url}::${method}`;
     const eventName = item.event ?? item.target;
     const existing = buckets.find(
-      bucket => bucket.key === key && isInWindow(item.timestamp, bucket.lastTimestamp, timeWindowMs),
+      bucket =>
+        bucket.key === key &&
+        isInWindow(item.timestamp, bucket.lastTimestamp, timeWindowMs),
     );
 
     if (existing) {
@@ -92,7 +109,10 @@ export function correlateNetworkFlows(
   }
 
   return buckets
-    .sort((a, b) => b.eventCount - a.eventCount || b.lastTimestamp - a.lastTimestamp)
+    .sort(
+      (a, b) =>
+        b.eventCount - a.eventCount || b.lastTimestamp - a.lastTimestamp,
+    )
     .slice(0, maxFlows)
     .map(bucketToFlow);
 }

@@ -1,34 +1,40 @@
-import { useEffect, useState } from 'react';
-import { 
-  Wrench, 
-  Search, 
-  Play, 
-  AlertCircle, 
-  Loader2, 
-  Clock, 
-  Terminal, 
-  ChevronRight, 
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+import {
+  Wrench,
+  Search,
+  Play,
+  AlertCircle,
+  Loader2,
+  Clock,
+  Terminal,
+  ChevronRight,
   Layers,
-  HelpCircle
+  HelpCircle,
 } from 'lucide-react';
-import { api, type ToolSummary, type CallToolResult } from '../lib/api';
+import {useEffect, useState} from 'react';
+
+import {api, type ToolSummary, type CallToolResult} from '../lib/api';
 
 export default function ToolsPage() {
   const [tools, setTools] = useState<ToolSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // 搜索和过滤
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   // 当前选中的工具
   const [selectedTool, setSelectedTool] = useState<ToolSummary | null>(null);
-  
+
   // 表单状态
   const [formValues, setFormValues] = useState<Record<string, any>>({});
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  
+
   // 执行状态
   const [executing, setExecuting] = useState(false);
   const [execResult, setExecResult] = useState<CallToolResult | null>(null);
@@ -67,11 +73,11 @@ export default function ToolsPage() {
   // 当选中的工具改变时，初始化表单值
   useEffect(() => {
     if (!selectedTool) return;
-    
+
     const schema = selectedTool.inputSchema || selectedTool.jsonSchema || {};
     const properties = schema.properties || {};
     const initialValues: Record<string, any> = {};
-    
+
     // 遍历 schema 属性设置默认值
     Object.keys(properties).forEach(key => {
       const prop = properties[key];
@@ -83,7 +89,7 @@ export default function ToolsPage() {
         initialValues[key] = '';
       }
     });
-    
+
     setFormValues(initialValues);
     setFormErrors({});
     setExecResult(null);
@@ -94,7 +100,7 @@ export default function ToolsPage() {
   const handleFieldChange = (key: string, value: any, type: string) => {
     // 校验和清空当前字段的错误
     if (formErrors[key]) {
-      const newErrors = { ...formErrors };
+      const newErrors = {...formErrors};
       delete newErrors[key];
       setFormErrors(newErrors);
     }
@@ -111,7 +117,7 @@ export default function ToolsPage() {
 
     setFormValues(prev => ({
       ...prev,
-      [key]: parsedValue
+      [key]: parsedValue,
     }));
   };
 
@@ -129,14 +135,18 @@ export default function ToolsPage() {
     required.forEach(key => {
       const val = formValues[key];
       const prop = properties[key];
-      
+
       if (prop?.type === 'boolean') {
         // 布尔类型 false 也是有效输入，不能判断为空
         if (val === undefined || val === null) {
           errors[key] = '该字段是必填项';
         }
       } else {
-        if (val === undefined || val === null || (typeof val === 'string' && val.trim() === '')) {
+        if (
+          val === undefined ||
+          val === null ||
+          (typeof val === 'string' && val.trim() === '')
+        ) {
           errors[key] = '该字段是必填项';
         }
       }
@@ -148,7 +158,7 @@ export default function ToolsPage() {
       const firstErrorKey = Object.keys(errors)[0];
       const element = document.getElementById(`field-${firstErrorKey}`);
       if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        element.scrollIntoView({behavior: 'smooth', block: 'center'});
       }
       return;
     }
@@ -157,7 +167,7 @@ export default function ToolsPage() {
     const cleanedArgs: Record<string, any> = {};
     Object.keys(formValues).forEach(key => {
       const val = formValues[key];
-      
+
       // 如果字段是必填，或者非必填但用户输入了有效内容，就加入 payload
       if (required.includes(key)) {
         cleanedArgs[key] = val;
@@ -177,9 +187,9 @@ export default function ToolsPage() {
       setLastInvocation({
         traceId: res.traceId,
         status: 'success',
-        durationMs: res.durationMs || (Date.now() - startTime),
+        durationMs: res.durationMs || Date.now() - startTime,
         timestamp: Date.now(),
-        toolName: selectedTool.name
+        toolName: selectedTool.name,
       });
     } catch (err: any) {
       console.error('Tool execution failed:', err);
@@ -189,7 +199,7 @@ export default function ToolsPage() {
         status: 'failed',
         durationMs: Date.now() - startTime,
         timestamp: Date.now(),
-        toolName: selectedTool.name
+        toolName: selectedTool.name,
       });
     } finally {
       setExecuting(false);
@@ -207,14 +217,17 @@ export default function ToolsPage() {
   });
 
   // 按照 category 分组工具
-  const groupedTools = filteredTools.reduce((groups, tool) => {
-    const category = tool.category || '未分类';
-    if (!groups[category]) {
-      groups[category] = [];
-    }
-    groups[category].push(tool);
-    return groups;
-  }, {} as Record<string, ToolSummary[]>);
+  const groupedTools = filteredTools.reduce(
+    (groups, tool) => {
+      const category = tool.category || '未分类';
+      if (!groups[category]) {
+        groups[category] = [];
+      }
+      groups[category].push(tool);
+      return groups;
+    },
+    {} as Record<string, ToolSummary[]>,
+  );
 
   // 解析并生成 Schema 的控件配置
   const renderField = (key: string, prop: any, isRequired: boolean) => {
@@ -223,28 +236,38 @@ export default function ToolsPage() {
     const hasError = !!formErrors[key];
 
     // 判断是否自动升级为 Textarea
-    const isTextArea = 
-      type === 'string' && 
-      !prop.enum && 
-      (/code|script|text|body|payload|cookie|data|headers|json/i.test(key) || 
-       /code|script|text|body|payload|cookie|data|headers|json/i.test(desc));
+    const isTextArea =
+      type === 'string' &&
+      !prop.enum &&
+      (/code|script|text|body|payload|cookie|data|headers|json/i.test(key) ||
+        /code|script|text|body|payload|cookie|data|headers|json/i.test(desc));
 
     const inputBaseClass = `w-full bg-[var(--color-bg-primary)] border rounded-lg px-3.5 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:ring-1 transition-all duration-200 ${
-      hasError 
-        ? 'border-red-500/50 focus:border-red-500 focus:ring-red-500/30' 
+      hasError
+        ? 'border-red-500/50 focus:border-red-500 focus:ring-red-500/30'
         : 'border-[var(--color-border-default)] focus:border-[var(--color-accent)] focus:ring-[var(--color-accent)]/30 hover:border-[var(--color-border-default)]/80'
     }`;
 
     return (
-      <div key={key} id={`field-${key}`} className="space-y-1.5">
+      <div
+        key={key}
+        id={`field-${key}`}
+        className="space-y-1.5"
+      >
         <div className="flex justify-between items-center">
-          <label htmlFor={key} className="text-xs font-semibold text-[var(--color-text-secondary)] tracking-wide flex items-center gap-1">
+          <label
+            htmlFor={key}
+            className="text-xs font-semibold text-[var(--color-text-secondary)] tracking-wide flex items-center gap-1"
+          >
             {key}
-            {isRequired && <span className="text-[var(--color-status-red)]">*</span>}
+            {isRequired && (
+              <span className="text-[var(--color-status-red)]">*</span>
+            )}
           </label>
           {type && (
             <span className="text-[10px] font-mono text-[var(--color-text-muted)] bg-[var(--color-bg-primary)] px-1.5 py-0.5 rounded border border-[var(--color-border-muted)]">
-              {type}{prop.enum ? ' (enum)' : ''}
+              {type}
+              {prop.enum ? ' (enum)' : ''}
             </span>
           )}
         </div>
@@ -257,7 +280,9 @@ export default function ToolsPage() {
                 id={key}
                 type="checkbox"
                 checked={!!formValues[key]}
-                onChange={(e) => handleFieldChange(key, e.target.checked, 'boolean')}
+                onChange={e =>
+                  handleFieldChange(key, e.target.checked, 'boolean')
+                }
                 className="sr-only peer"
               />
               <div className="w-9 h-5 bg-[var(--color-bg-primary)] peer-focus:outline-none rounded-full peer border border-[var(--color-border-default)] peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-[var(--color-text-muted)] peer-checked:after:bg-[var(--color-bg-primary)] after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-[var(--color-accent)] peer-checked:border-[var(--color-accent)]" />
@@ -270,12 +295,21 @@ export default function ToolsPage() {
           <select
             id={key}
             value={formValues[key] || ''}
-            onChange={(e) => handleFieldChange(key, e.target.value, 'string')}
+            onChange={e => handleFieldChange(key, e.target.value, 'string')}
             className={inputBaseClass}
           >
-            <option value="" className="text-[var(--color-text-muted)]">请选择参数值...</option>
+            <option
+              value=""
+              className="text-[var(--color-text-muted)]"
+            >
+              请选择参数值...
+            </option>
             {prop.enum.map((opt: string) => (
-              <option key={opt} value={opt} className="bg-[var(--color-bg-secondary)]">
+              <option
+                key={opt}
+                value={opt}
+                className="bg-[var(--color-bg-secondary)]"
+              >
                 {opt}
               </option>
             ))}
@@ -286,7 +320,7 @@ export default function ToolsPage() {
             rows={5}
             placeholder={`请输入 ${key}...`}
             value={formValues[key] || ''}
-            onChange={(e) => handleFieldChange(key, e.target.value, 'string')}
+            onChange={e => handleFieldChange(key, e.target.value, 'string')}
             className={`${inputBaseClass} font-mono text-xs resize-y`}
           />
         ) : type === 'number' || type === 'integer' ? (
@@ -295,7 +329,13 @@ export default function ToolsPage() {
             type="number"
             placeholder={`请输入数值...`}
             value={formValues[key] ?? ''}
-            onChange={(e) => handleFieldChange(key, e.target.value === '' ? '' : Number(e.target.value), type)}
+            onChange={e =>
+              handleFieldChange(
+                key,
+                e.target.value === '' ? '' : Number(e.target.value),
+                type,
+              )
+            }
             className={inputBaseClass}
           />
         ) : (
@@ -304,7 +344,7 @@ export default function ToolsPage() {
             type="text"
             placeholder={`请输入内容...`}
             value={formValues[key] || ''}
-            onChange={(e) => handleFieldChange(key, e.target.value, 'string')}
+            onChange={e => handleFieldChange(key, e.target.value, 'string')}
             className={inputBaseClass}
           />
         )}
@@ -341,7 +381,10 @@ export default function ToolsPage() {
         <div className="p-4 border-b border-[var(--color-border-muted)] space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold tracking-wider text-[var(--color-text-primary)] flex items-center gap-2">
-              <Wrench size={14} className="text-[var(--color-accent)]" />
+              <Wrench
+                size={14}
+                className="text-[var(--color-accent)]"
+              />
               RPC 远程工具
             </h2>
             <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[var(--color-bg-tertiary)] border border-[var(--color-border-default)] text-[var(--color-text-secondary)]">
@@ -350,12 +393,15 @@ export default function ToolsPage() {
           </div>
 
           <div className="relative">
-            <Search className="absolute left-3 top-2.5 text-[var(--color-text-muted)]" size={14} />
+            <Search
+              className="absolute left-3 top-2.5 text-[var(--color-text-muted)]"
+              size={14}
+            />
             <input
               type="text"
               placeholder="搜索名称、描述或分类..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={e => setSearchQuery(e.target.value)}
               className="w-full bg-[var(--color-bg-primary)] border border-[var(--color-border-default)] focus:border-[var(--color-accent)] rounded-lg pl-9 pr-3 py-1.5 text-xs text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]/30 transition-all duration-200"
             />
           </div>
@@ -365,13 +411,16 @@ export default function ToolsPage() {
         <div className="flex-1 overflow-y-auto p-3 space-y-4">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-12 text-[var(--color-text-muted)] gap-2">
-              <Loader2 className="animate-spin text-[var(--color-accent)]" size={20} />
+              <Loader2
+                className="animate-spin text-[var(--color-accent)]"
+                size={20}
+              />
               <span className="text-xs">加载工具列表中...</span>
             </div>
           ) : error ? (
             <div className="p-4 text-center border border-red-500/20 bg-red-500/5 rounded-xl space-y-2">
               <p className="text-xs text-[var(--color-status-red)]">{error}</p>
-              <button 
+              <button
                 onClick={fetchTools}
                 className="text-[10px] px-3 py-1 bg-[var(--color-bg-tertiary)] hover:bg-[var(--color-bg-secondary)] border border-[var(--color-border-default)] text-[var(--color-text-primary)] rounded-md transition-all active:scale-95"
               >
@@ -384,9 +433,15 @@ export default function ToolsPage() {
             </div>
           ) : (
             Object.keys(groupedTools).map(category => (
-              <div key={category} className="space-y-1.5">
+              <div
+                key={category}
+                className="space-y-1.5"
+              >
                 <div className="flex items-center gap-1.5 px-2 text-[10px] font-bold text-[var(--color-text-muted)] tracking-widest uppercase">
-                  <Layers size={10} className="text-[var(--color-accent)]/60" />
+                  <Layers
+                    size={10}
+                    className="text-[var(--color-accent)]/60"
+                  />
                   {category}
                 </div>
                 <div className="space-y-1">
@@ -413,11 +468,13 @@ export default function ToolsPage() {
                             {tool.description}
                           </div>
                         </div>
-                        <ChevronRight 
-                          size={12} 
+                        <ChevronRight
+                          size={12}
                           className={`mt-0.5 shrink-0 transition-all duration-200 ${
-                            isSelected ? 'text-[var(--color-accent)] translate-x-0.5' : 'text-[var(--color-text-muted)] group-hover:text-[var(--color-text-primary)]'
-                          }`} 
+                            isSelected
+                              ? 'text-[var(--color-accent)] translate-x-0.5'
+                              : 'text-[var(--color-text-muted)] group-hover:text-[var(--color-text-primary)]'
+                          }`}
                         />
                       </button>
                     );
@@ -457,12 +514,14 @@ export default function ToolsPage() {
             {/* 滚动容器：包含配置表单与执行结果 */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
-                
                 {/* 1. 参数配置区 */}
                 <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border-default)] rounded-xl shadow-lg p-5 space-y-4">
                   <div className="flex items-center justify-between border-b border-[var(--color-border-muted)] pb-3">
                     <h3 className="text-xs font-bold tracking-wider text-[var(--color-text-primary)] uppercase flex items-center gap-2">
-                      <Terminal size={12} className="text-[var(--color-accent)]" />
+                      <Terminal
+                        size={12}
+                        className="text-[var(--color-accent)]"
+                      />
                       参数输入规范
                     </h3>
                     <span className="text-[10px] text-[var(--color-text-muted)]">
@@ -475,7 +534,10 @@ export default function ToolsPage() {
                       无参数需要输入，该工具可以直接触发。
                     </div>
                   ) : (
-                    <form onSubmit={handleExecute} className="space-y-4">
+                    <form
+                      onSubmit={handleExecute}
+                      className="space-y-4"
+                    >
                       <div className="space-y-4">
                         {propertyKeys.map(key => {
                           const prop = properties[key];
@@ -495,12 +557,18 @@ export default function ToolsPage() {
                     >
                       {executing ? (
                         <>
-                          <Loader2 size={13} className="animate-spin" />
+                          <Loader2
+                            size={13}
+                            className="animate-spin"
+                          />
                           <span>正在调用 RPC 方法...</span>
                         </>
                       ) : (
                         <>
-                          <Play size={12} fill="currentColor" />
+                          <Play
+                            size={12}
+                            fill="currentColor"
+                          />
                           <span>执行工具 (Execute)</span>
                         </>
                       )}
@@ -514,37 +582,61 @@ export default function ToolsPage() {
                   <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border-default)] rounded-xl shadow-lg p-5 flex flex-col min-h-[260px] relative overflow-hidden">
                     <div className="flex items-center justify-between border-b border-[var(--color-border-muted)] pb-3 mb-4">
                       <h3 className="text-xs font-bold tracking-wider text-[var(--color-text-primary)] uppercase flex items-center gap-2">
-                        <HelpCircle size={12} className="text-[var(--color-accent)]" />
+                        <HelpCircle
+                          size={12}
+                          className="text-[var(--color-accent)]"
+                        />
                         执行结果面板
                       </h3>
-                      {lastInvocation && lastInvocation.toolName === selectedTool.name && (
-                        <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full flex items-center gap-1 border ${
-                          lastInvocation.status === 'success'
-                            ? 'bg-emerald-500/10 text-[var(--color-status-green)] border-emerald-500/20'
-                            : 'bg-red-500/10 text-[var(--color-status-red)] border-red-500/20'
-                        }`}>
-                          <span className={`w-1 h-1 rounded-full ${lastInvocation.status === 'success' ? 'bg-[var(--color-status-green)]' : 'bg-[var(--color-status-red)]'}`} />
-                          {lastInvocation.status === 'success' ? 'SUCCESS' : 'FAILED'}
-                        </span>
-                      )}
+                      {lastInvocation &&
+                        lastInvocation.toolName === selectedTool.name && (
+                          <span
+                            className={`text-[10px] font-mono px-2 py-0.5 rounded-full flex items-center gap-1 border ${
+                              lastInvocation.status === 'success'
+                                ? 'bg-emerald-500/10 text-[var(--color-status-green)] border-emerald-500/20'
+                                : 'bg-red-500/10 text-[var(--color-status-red)] border-red-500/20'
+                            }`}
+                          >
+                            <span
+                              className={`w-1 h-1 rounded-full ${lastInvocation.status === 'success' ? 'bg-[var(--color-status-green)]' : 'bg-[var(--color-status-red)]'}`}
+                            />
+                            {lastInvocation.status === 'success'
+                              ? 'SUCCESS'
+                              : 'FAILED'}
+                          </span>
+                        )}
                     </div>
 
                     {executing ? (
                       <div className="flex-1 flex flex-col items-center justify-center py-12 gap-3">
                         <div className="relative">
-                          <Loader2 className="animate-spin text-[var(--color-accent)] relative z-10" size={32} />
+                          <Loader2
+                            className="animate-spin text-[var(--color-accent)] relative z-10"
+                            size={32}
+                          />
                           <div className="absolute inset-0 bg-[var(--color-accent)]/15 filter blur-lg rounded-full" />
                         </div>
                         <div className="text-center space-y-1">
-                          <p className="text-xs font-medium text-[var(--color-text-primary)]">通信中...</p>
-                          <p className="text-[10px] text-[var(--color-text-muted)] font-mono">发送 RPC 调用 payload 并等待回调</p>
+                          <p className="text-xs font-medium text-[var(--color-text-primary)]">
+                            通信中...
+                          </p>
+                          <p className="text-[10px] text-[var(--color-text-muted)] font-mono">
+                            发送 RPC 调用 payload 并等待回调
+                          </p>
                         </div>
                       </div>
                     ) : execResult ? (
                       <div className="flex-1 flex flex-col space-y-3">
                         <div className="flex items-center justify-between text-[10px] text-[var(--color-text-muted)] bg-[var(--color-bg-primary)] px-3 py-1.5 rounded-lg border border-[var(--color-border-muted)] font-mono">
-                          <span className="truncate max-w-[150px]" title={execResult.traceId}>Trace: {execResult.traceId}</span>
-                          <span>耗时: {execResult.durationMs.toFixed(1)}ms</span>
+                          <span
+                            className="truncate max-w-[150px]"
+                            title={execResult.traceId}
+                          >
+                            Trace: {execResult.traceId}
+                          </span>
+                          <span>
+                            耗时: {execResult.durationMs.toFixed(1)}ms
+                          </span>
                         </div>
                         <div className="relative flex-1 group">
                           <pre className="font-mono bg-[var(--color-bg-primary)] p-4 rounded-lg border border-[var(--color-border-default)] text-emerald-400 overflow-auto max-h-96 text-xs leading-relaxed select-text">
@@ -557,7 +649,9 @@ export default function ToolsPage() {
                         <div className="bg-red-500/5 border border-red-500/20 p-4 rounded-lg text-[var(--color-status-red)] text-xs space-y-2">
                           <div className="flex items-center gap-2">
                             <AlertCircle size={14} />
-                            <span className="font-semibold text-sm">RPC 调用失败</span>
+                            <span className="font-semibold text-sm">
+                              RPC 调用失败
+                            </span>
                           </div>
                           <p className="font-mono bg-[var(--color-bg-primary)] p-3 rounded border border-red-500/10 text-red-400 select-text overflow-auto max-h-40">
                             {execError.message || String(execError)}
@@ -571,8 +665,13 @@ export default function ToolsPage() {
                       </div>
                     ) : (
                       <div className="flex-1 flex flex-col items-center justify-center text-center py-12 border border-dashed border-[var(--color-border-default)] rounded-xl bg-[var(--color-bg-primary)]/20">
-                        <Terminal size={24} className="text-[var(--color-text-muted)] mb-3" />
-                        <p className="text-xs text-[var(--color-text-secondary)] font-medium">准备就绪</p>
+                        <Terminal
+                          size={24}
+                          className="text-[var(--color-text-muted)] mb-3"
+                        />
+                        <p className="text-xs text-[var(--color-text-secondary)] font-medium">
+                          准备就绪
+                        </p>
                         <p className="text-[11px] text-[var(--color-text-muted)] mt-1 max-w-[200px]">
                           在左侧填写配置，然后点击 "执行工具" 查看控制台输出。
                         </p>
@@ -584,39 +683,61 @@ export default function ToolsPage() {
                   {lastInvocation && (
                     <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border-default)] rounded-xl p-4 space-y-3">
                       <h4 className="text-xs font-semibold text-[var(--color-text-primary)] flex items-center gap-1.5">
-                        <Clock size={12} className="text-[var(--color-accent)]" />
+                        <Clock
+                          size={12}
+                          className="text-[var(--color-accent)]"
+                        />
                         最近执行统计 ({lastInvocation.toolName})
                       </h4>
                       <div className="grid grid-cols-2 gap-3 text-[10px] font-mono text-[var(--color-text-secondary)]">
                         <div className="bg-[var(--color-bg-primary)] p-2.5 rounded-lg border border-[var(--color-border-muted)]">
-                          <span className="text-[var(--color-text-muted)] block mb-1">执行状态</span>
-                          <span className={lastInvocation.status === 'success' ? 'text-emerald-400 font-bold' : 'text-red-400 font-bold'}>
-                            {lastInvocation.status === 'success' ? 'SUCCESS' : 'FAILED'}
+                          <span className="text-[var(--color-text-muted)] block mb-1">
+                            执行状态
+                          </span>
+                          <span
+                            className={
+                              lastInvocation.status === 'success'
+                                ? 'text-emerald-400 font-bold'
+                                : 'text-red-400 font-bold'
+                            }
+                          >
+                            {lastInvocation.status === 'success'
+                              ? 'SUCCESS'
+                              : 'FAILED'}
                           </span>
                         </div>
                         <div className="bg-[var(--color-bg-primary)] p-2.5 rounded-lg border border-[var(--color-border-muted)]">
-                          <span className="text-[var(--color-text-muted)] block mb-1">耗时</span>
+                          <span className="text-[var(--color-text-muted)] block mb-1">
+                            耗时
+                          </span>
                           <span className="text-[var(--color-text-primary)] font-bold">
-                            {lastInvocation.durationMs !== undefined ? `${lastInvocation.durationMs.toFixed(0)} ms` : '--'}
+                            {lastInvocation.durationMs !== undefined
+                              ? `${lastInvocation.durationMs.toFixed(0)} ms`
+                              : '--'}
                           </span>
                         </div>
                         <div className="bg-[var(--color-bg-primary)] p-2.5 rounded-lg border border-[var(--color-border-muted)] col-span-2">
-                          <span className="text-[var(--color-text-muted)] block mb-1">Trace ID</span>
+                          <span className="text-[var(--color-text-muted)] block mb-1">
+                            Trace ID
+                          </span>
                           <span className="text-[var(--color-text-primary)] break-all select-text">
                             {lastInvocation.traceId || 'N/A'}
                           </span>
                         </div>
                         <div className="bg-[var(--color-bg-primary)] p-2.5 rounded-lg border border-[var(--color-border-muted)] col-span-2">
-                          <span className="text-[var(--color-text-muted)] block mb-1">调用时间</span>
+                          <span className="text-[var(--color-text-muted)] block mb-1">
+                            调用时间
+                          </span>
                           <span className="text-[var(--color-text-primary)]">
-                            {new Date(lastInvocation.timestamp).toLocaleString()}
+                            {new Date(
+                              lastInvocation.timestamp,
+                            ).toLocaleString()}
                           </span>
                         </div>
                       </div>
                     </div>
                   )}
                 </div>
-
               </div>
             </div>
           </div>
@@ -624,9 +745,14 @@ export default function ToolsPage() {
           <div className="flex-1 flex flex-col items-center justify-center p-8 select-none">
             <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border-default)] rounded-xl p-8 text-center max-w-sm shadow-xl">
               <div className="w-12 h-12 rounded-full bg-[var(--color-bg-tertiary)] border border-[var(--color-border-default)] flex items-center justify-center mx-auto mb-4">
-                <Wrench className="text-[var(--color-text-muted)]" size={20} />
+                <Wrench
+                  className="text-[var(--color-text-muted)]"
+                  size={20}
+                />
               </div>
-              <h3 className="text-sm font-semibold text-[var(--color-text-primary)] mb-2">未选择工具</h3>
+              <h3 className="text-sm font-semibold text-[var(--color-text-primary)] mb-2">
+                未选择工具
+              </h3>
               <p className="text-xs text-[var(--color-text-muted)] leading-relaxed">
                 请在左侧列表中选择一个 RPC 工具以开始配置和触发调用。
               </p>

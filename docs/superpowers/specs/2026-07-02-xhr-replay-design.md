@@ -35,14 +35,14 @@ All four are unified under a single override model and a shared pure-function en
 
 ## Key Decisions
 
-| Decision | Choice | Rationale |
-|---|---|---|
-| Execution context | Page-off via `page.context().request` (`APIRequestContext`) | Reuses browser cookies/storage/UA; bypasses CORS and page JS interceptors; the headers you specify are the headers sent (no re-signing). |
-| Field override semantics | Merge by default; `replaceHeaders: true` for wholesale replace | Preserves signature headers while allowing targeted mutation — central to the verify-signature workflow. |
-| Tool surface | Three independent tools | Clean separation of concerns; isolated testing; predictable schemas. |
-| Architecture | `replayEngine.ts` pure module + three thin tool files | Matches `src/tools/network/` convention; testable without browser; no `@stable` high-fan-in interface touched. |
-| `readOnlyHint` | `false` for replay tools, `true` for export | Replay makes real network requests; export only reads and formats. |
-| Cookie embedding (export) | Off by default, opt-in via `includeCookies` | Cookies may be sensitive; matches "提交前确认敏感凭证已脱敏" rule in AGENTS.md. |
+| Decision                  | Choice                                                         | Rationale                                                                                                                                |
+| ------------------------- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Execution context         | Page-off via `page.context().request` (`APIRequestContext`)    | Reuses browser cookies/storage/UA; bypasses CORS and page JS interceptors; the headers you specify are the headers sent (no re-signing). |
+| Field override semantics  | Merge by default; `replaceHeaders: true` for wholesale replace | Preserves signature headers while allowing targeted mutation — central to the verify-signature workflow.                                 |
+| Tool surface              | Three independent tools                                        | Clean separation of concerns; isolated testing; predictable schemas.                                                                     |
+| Architecture              | `replayEngine.ts` pure module + three thin tool files          | Matches `src/tools/network/` convention; testable without browser; no `@stable` high-fan-in interface touched.                           |
+| `readOnlyHint`            | `false` for replay tools, `true` for export                    | Replay makes real network requests; export only reads and formats.                                                                       |
+| Cookie embedding (export) | Off by default, opt-in via `includeCookies`                    | Cookies may be sensitive; matches "提交前确认敏感凭证已脱敏" rule in AGENTS.md.                                                          |
 
 ## Architecture & File Layout
 
@@ -92,9 +92,9 @@ Five exported functions, no class, no state. Each independently testable.
 export interface ReplayOverride {
   method?: string;
   url?: string;
-  headers?: Record<string, string>;  // merged (see below)
-  body?: string;                      // whole-body replacement; null clears body
-  replaceHeaders?: boolean;           // default false → merge; true → headers replaces wholesale
+  headers?: Record<string, string>; // merged (see below)
+  body?: string; // whole-body replacement; null clears body
+  replaceHeaders?: boolean; // default false → merge; true → headers replaces wholesale
 }
 
 /** What gets sent to APIRequestContext. */
@@ -110,10 +110,10 @@ export interface ReplayResponse {
   status: number;
   statusText: string;
   headers: Record<string, string>;
-  body: string;              // truncated to maxBodyLength
+  body: string; // truncated to maxBodyLength
   bodyTruncated: boolean;
   timingMs: number;
-  replayedUrl: string;       // final URL after any overrides
+  replayedUrl: string; // final URL after any overrides
 }
 
 /** Per-variant result in batch. */
@@ -121,7 +121,7 @@ export interface BatchVariantResult {
   index: number;
   override: ReplayOverride;
   result: ReplayResponse;
-  error?: string;            // set when result is the empty-shape fallback
+  error?: string; // set when result is the empty-shape fallback
 }
 
 /** Batch aggregate. */
@@ -272,8 +272,8 @@ for review awareness.
 4. `const result = await executeReplay(page, built, maxBodyLength ?? 2000);` —
    wrapped in try/catch.
 5. On success: `response.setStructuredContent({ success: true, message:
-   '请求重放成功：HTTP ${status}', tooltype: 'replay_network_request', data:
-   { ...result, originalReqid: reqid, override: override ?? null } })`.
+'请求重放成功：HTTP ${status}', tooltype: 'replay_network_request', data:
+{ ...result, originalReqid: reqid, override: override ?? null } })`.
 6. On `executeReplay` failure: `success: false`, message includes status code if
    response was received (use `result.status` when available) or the error
    string, `data` is the empty `ReplayResponse` shell plus `originalReqid` and
@@ -284,7 +284,7 @@ for review awareness.
 ```typescript
 {
   originalReqid: number;
-  override: ReplayOverride | null;     // what was applied, for traceability
+  override: ReplayOverride | null; // what was applied, for traceability
   status: number;
   statusText: string;
   headers: Record<string, string>;
@@ -316,10 +316,11 @@ override model so the exported command reflects intended modifications.
 ```typescript
 export const exportRequestAsCurl = defineTool({
   name: 'export_request_as_curl',
-  description: 'Export a captured network request (by reqid) as a curl command. Supports the same overrides as replay_network_request. Useful for reproducing a request outside the browser or verifying that an exported command reproduces the captured response.',
+  description:
+    'Export a captured network request (by reqid) as a curl command. Supports the same overrides as replay_network_request. Useful for reproducing a request outside the browser or verifying that an exported command reproduces the captured response.',
   annotations: {
     category: ToolCategory.NETWORK,
-    readOnlyHint: true,   // builds a string, sends nothing
+    readOnlyHint: true, // builds a string, sends nothing
   },
 });
 ```
@@ -366,14 +367,14 @@ truncate.
      `"（Cookie 读取失败，已省略）"`.
 6. `const curl = formatCurl(built, { includeCookies, cookies });`
 7. `response.setStructuredContent({ success: true, message: '已导出 curl 命令',
-   tooltype: 'export_request_as_curl', data: { curl, originalReqid: reqid,
-   override: override ?? null } })`.
+tooltype: 'export_request_as_curl', data: { curl, originalReqid: reqid,
+override: override ?? null } })`.
 
 ### Response `data` shape
 
 ```typescript
 {
-  curl: string;                       // the full one-line command
+  curl: string; // the full one-line command
   originalReqid: number;
   override: ReplayOverride | null;
 }
@@ -399,7 +400,8 @@ bounded-concurrent execution, aggregate report. The "批量/模糊测试" tool.
 ```typescript
 export const replay_network_request_batch = defineTool({
   name: 'replay_network_request_batch',
-  description: 'Replay a captured network request multiple times with different overrides (variants). Useful for fuzzing signature fields, testing parameter boundaries, and observing response distribution. Sequential by default; bounded concurrency available.',
+  description:
+    'Replay a captured network request multiple times with different overrides (variants). Useful for fuzzing signature fields, testing parameter boundaries, and observing response distribution. Sequential by default; bounded concurrency available.',
   annotations: {
     category: ToolCategory.NETWORK,
     readOnlyHint: false,
@@ -438,8 +440,8 @@ export const replay_network_request_batch = defineTool({
 
 ```typescript
 const DEFAULT_BATCH_MAX_BODY_LENGTH = 500;
-const MAX_VARIANTS = 50;        // mirrored in schema .max(50)
-const MAX_CONCURRENCY = 10;     // mirrored in schema .max(10)
+const MAX_VARIANTS = 50; // mirrored in schema .max(50)
+const MAX_CONCURRENCY = 10; // mirrored in schema .max(10)
 ```
 
 ### Handler flow
@@ -447,7 +449,7 @@ const MAX_CONCURRENCY = 10;     // mirrored in schema .max(10)
 1. `const page = context.getSelectedPage();`
 2. Fetch original once via `context.getNetworkRequestById(reqid)` + `response()`.
    Bad reqid → `success: false`, `data: { total: variants.length, succeeded: 0,
-   failed: variants.length, statusCodeDistribution: {}, results: [] }`.
+failed: variants.length, statusCodeDistribution: {}, results: [] }`.
 3. Build all `BuiltReplayRequest`s up front via
    `variants.map(v => buildReplayRequest(originalData, v))`. Validation errors
    per variant caught here and recorded as a failed `BatchVariantResult` with
@@ -456,16 +458,20 @@ const MAX_CONCURRENCY = 10;     // mirrored in schema .max(10)
 
    ```typescript
    const results: BatchVariantResult[] = [];
-   const queue = built.map((b, i) => ({ b, i }));
+   const queue = built.map((b, i) => ({b, i}));
    const workers = Array.from(
-     { length: Math.min(concurrency, variants.length) },
+     {length: Math.min(concurrency, variants.length)},
      async () => {
        while (queue.length) {
          const next = queue.shift();
          if (!next) break;
          try {
            const r = await executeReplay(page, next.b, maxBodyLength);
-           results[next.i] = { index: next.i, override: variants[next.i], result: r };
+           results[next.i] = {
+             index: next.i,
+             override: variants[next.i],
+             result: r,
+           };
          } catch (e) {
            results[next.i] = {
              index: next.i,
@@ -475,7 +481,7 @@ const MAX_CONCURRENCY = 10;     // mirrored in schema .max(10)
            };
          }
        }
-     }
+     },
    );
    await Promise.all(workers);
    ```
@@ -484,9 +490,9 @@ const MAX_CONCURRENCY = 10;     // mirrored in schema .max(10)
    (including `0` for failures). `succeeded` = variants without `error`. `failed`
    = variants with `error`.
 6. `response.setStructuredContent({ success: failed === 0, message:
-   '批量重放完成：${succeeded}/${total} 成功', tooltype:
-   'replay_network_request_batch', data: { total, succeeded, failed,
-   statusCodeDistribution, results } })`.
+'批量重放完成：${succeeded}/${total} 成功', tooltype:
+'replay_network_request_batch', data: { total, succeeded, failed,
+statusCodeDistribution, results } })`.
    - `success: true` only when all variants succeeded. Partial failure still
      returns aggregated data.
 
@@ -620,11 +626,11 @@ coverage is sufficient and matches the `getNetworkRequest.test.ts` precedent.
 
 ## Error Handling Summary
 
-| Failure | Single | Export | Batch |
-|---|---|---|---|
-| No selected page | `context.getSelectedPage()` throws → `ToolExecutionPipeline` surfaces (no special handling) | same | same |
-| Bad reqid | `success: false`, empty shell, error message | `success: false`, empty curl | `success: false`, aggregate with all variants failed |
-| `buildReplayRequest` throws | caught in try/catch → `success: false` | same | per-variant `error`, batch continues |
-| `executeReplay` throws | `success: false`, error message | N/A (no execute) | per-variant `error`, batch continues |
-| Cookie read fails (export only) | N/A | proceeds without cookies, message notes failure | N/A |
-| Body read fails | `executeReplay` returns `body: ''`, `bodyTruncated: false` | N/A | same as single |
+| Failure                         | Single                                                                                      | Export                                          | Batch                                                |
+| ------------------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------------- | ---------------------------------------------------- |
+| No selected page                | `context.getSelectedPage()` throws → `ToolExecutionPipeline` surfaces (no special handling) | same                                            | same                                                 |
+| Bad reqid                       | `success: false`, empty shell, error message                                                | `success: false`, empty curl                    | `success: false`, aggregate with all variants failed |
+| `buildReplayRequest` throws     | caught in try/catch → `success: false`                                                      | same                                            | per-variant `error`, batch continues                 |
+| `executeReplay` throws          | `success: false`, error message                                                             | N/A (no execute)                                | per-variant `error`, batch continues                 |
+| Cookie read fails (export only) | N/A                                                                                         | proceeds without cookies, message notes failure | N/A                                                  |
+| Body read fails                 | `executeReplay` returns `body: ''`, `bodyTruncated: false`                                  | N/A                                             | same as single                                       |

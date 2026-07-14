@@ -1,3 +1,8 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import traverseImport from '@babel/traverse';
 import * as t from '@babel/types';
 
@@ -6,7 +11,8 @@ import type {SiteAdapter} from '../SiteAdapterRegistry.js';
 
 const traverse = unwrapBabelDefault<typeof traverseImport>(traverseImport);
 
-type NodePath<T extends t.Node = t.Node> = import('@babel/traverse').NodePath<T>;
+type NodePath<T extends t.Node = t.Node> =
+  import('@babel/traverse').NodePath<T>;
 
 interface TopLevelIifeInfo {
   statementPath: NodePath;
@@ -15,7 +21,9 @@ interface TopLevelIifeInfo {
   argPaths: NodePath[];
 }
 
-function getTopLevelIifeInfo(programPath: NodePath<t.Program>): TopLevelIifeInfo | null {
+function getTopLevelIifeInfo(
+  programPath: NodePath<t.Program>,
+): TopLevelIifeInfo | null {
   const first = (programPath.get('body') as NodePath[])[0];
   if (!first || !first.isExpressionStatement()) {
     return null;
@@ -57,7 +65,8 @@ function dingxiangArrayPass(ast: t.File): {ast: t.File; changed: boolean} {
 
       const actualArgs = info.argPaths.map(argPath => argPath.node);
       const formalParams = info.calleePath.node.params;
-      const paramElementMap: Record<string, t.Expression[]> = Object.create(null);
+      const paramElementMap: Record<string, t.Expression[]> =
+        Object.create(null);
 
       formalParams.forEach((paramNode, index) => {
         if (!t.isIdentifier(paramNode)) {
@@ -65,11 +74,10 @@ function dingxiangArrayPass(ast: t.File): {ast: t.File; changed: boolean} {
         }
         const actualNode = actualArgs[index];
         if (t.isArrayExpression(actualNode)) {
-          paramElementMap[paramNode.name] = actualNode.elements.map(
-            element =>
-              element
-                ? t.cloneNode(element) as t.Expression
-                : t.identifier('undefined'),
+          paramElementMap[paramNode.name] = actualNode.elements.map(element =>
+            element
+              ? (t.cloneNode(element) as t.Expression)
+              : t.identifier('undefined'),
           );
         }
       });
@@ -116,9 +124,7 @@ function dingxiangArrayPass(ast: t.File): {ast: t.File; changed: boolean} {
               ) {
                 return;
               }
-              const index = (
-                parent.node as t.MemberExpression
-              ).property;
+              const index = (parent.node as t.MemberExpression).property;
               if (!t.isNumericLiteral(index)) {
                 return;
               }
@@ -131,7 +137,9 @@ function dingxiangArrayPass(ast: t.File): {ast: t.File; changed: boolean} {
             });
           });
 
-          const bodyPath = callPath.get('callee.body') as NodePath<t.BlockStatement>;
+          const bodyPath = callPath.get(
+            'callee.body',
+          ) as NodePath<t.BlockStatement>;
           path.replaceWithMultiple(
             bodyPath.node.body.map(node => t.cloneNode(node)),
           );

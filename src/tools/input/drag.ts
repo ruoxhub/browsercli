@@ -77,7 +77,12 @@ export const drag = defineTool({
         success: true,
         message: `Successfully dragged element from ${fromSelector} to ${toSelector}`,
         tooltype: 'drag',
-        data: {fromSelector, toSelector, from: {x: fromX, y: fromY}, to: {x: toX, y: toY}},
+        data: {
+          fromSelector,
+          toSelector,
+          from: {x: fromX, y: fromY},
+          to: {x: toX, y: toY},
+        },
       });
     } catch (error) {
       response.setStructuredContent({

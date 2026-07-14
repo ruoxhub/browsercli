@@ -7,9 +7,9 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {ToolResponseAccumulator} from '../../../src/worker/ToolResponse.js';
 import {deobfuscateCode} from '../../../src/tools/analyzer/deobfuscate.js';
 import {ToolContextProvider} from '../../../src/worker/ToolContext.js';
+import {ToolResponseAccumulator} from '../../../src/worker/ToolResponse.js';
 
 describe('ToolContextProvider', () => {
   it('provides analyzer runtime services for deobfuscate_code', async () => {

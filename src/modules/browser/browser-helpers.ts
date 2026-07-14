@@ -8,7 +8,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import {HARMFUL_ARGS, DEFAULT_ARGS, MINIMAL_STEALTH_ARGS, FULL_STEALTH_ARGS} from './stealth-args.js';
+import {
+  HARMFUL_ARGS,
+  DEFAULT_ARGS,
+  MINIMAL_STEALTH_ARGS,
+  FULL_STEALTH_ARGS,
+} from './stealth-args.js';
 
 export type Engine = 'chromium' | 'firefox';
 

@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { GeminiProvider } from '../../../src/services/GeminiProvider.js';
+import {GeminiProvider} from '../../../src/services/GeminiProvider.js';
 
 interface GeminiProviderHarness {
   checkCLIAvailable(): boolean;
@@ -85,11 +85,11 @@ describe('GeminiProvider', () => {
 
       await assert.rejects(
         async () => {
-          await provider.chat([{ role: 'user', content: 'Hello' }]);
+          await provider.chat([{role: 'user', content: 'Hello'}]);
         },
         {
           message: /gemini-cli is not available/,
-        }
+        },
       );
     });
 
@@ -100,10 +100,10 @@ describe('GeminiProvider', () => {
       });
 
       const messages = [
-        { role: 'system' as const, content: 'You are a helpful assistant' },
-        { role: 'user' as const, content: 'Hello' },
-        { role: 'assistant' as const, content: 'Hi there!' },
-        { role: 'user' as const, content: 'How are you?' },
+        {role: 'system' as const, content: 'You are a helpful assistant'},
+        {role: 'user' as const, content: 'Hello'},
+        {role: 'assistant' as const, content: 'Hi there!'},
+        {role: 'user' as const, content: 'How are you?'},
       ];
 
       // This will fail because CLI is not available, but we're testing the error message
@@ -113,7 +113,7 @@ describe('GeminiProvider', () => {
         },
         {
           message: /gemini-cli is not available/,
-        }
+        },
       );
     });
   });
@@ -127,11 +127,11 @@ describe('GeminiProvider', () => {
 
       await assert.rejects(
         async () => {
-          await provider.chat([{ role: 'user', content: 'Hello' }]);
+          await provider.chat([{role: 'user', content: 'Hello'}]);
         },
         {
           message: /Gemini API mode not yet implemented/,
-        }
+        },
       );
     });
 
@@ -147,7 +147,7 @@ describe('GeminiProvider', () => {
         },
         {
           message: /Gemini API mode not yet implemented/,
-        }
+        },
       );
     });
   });
@@ -165,7 +165,7 @@ describe('GeminiProvider', () => {
         },
         {
           message: /gemini-cli is not available/,
-        }
+        },
       );
     });
 
@@ -182,11 +182,15 @@ describe('GeminiProvider', () => {
 
       await assert.rejects(
         async () => {
-          await provider.analyzeImage('base64data', 'Describe this image', false);
+          await provider.analyzeImage(
+            'base64data',
+            'Describe this image',
+            false,
+          );
         },
         {
           message: /CLI mode requires image file paths/,
-        }
+        },
       );
 
       // Restore original method
@@ -201,12 +205,9 @@ describe('GeminiProvider', () => {
         useAPI: true,
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.chat([{ role: 'user', content: 'Hello' }]);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.chat([{role: 'user', content: 'Hello'}]);
+      }, Error);
     });
   });
 });

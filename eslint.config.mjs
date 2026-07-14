@@ -14,7 +14,17 @@ import tseslint from 'typescript-eslint';
 import localPlugin from './scripts/eslint_rules/local-plugin.js';
 
 export default defineConfig([
-  globalIgnores(['**/node_modules', '**/build/']),
+  globalIgnores([
+    '**/node_modules',
+    '**/build/',
+    // Non-source / generated artifacts — not part of the linted codebase.
+    '**/scratch/**',
+    '**/example/Obfuscation/**',
+    '**/artifacts/**',
+    'browsercli/**',
+    'scripts/cases/**',
+    'test-load.mjs',
+  ]),
   importPlugin.flatConfigs.typescript,
   {
     languageOptions: {
@@ -27,12 +37,30 @@ export default defineConfig([
 
       parserOptions: {
         projectService: {
+          // Files outside the main tsconfig include that still need
+          // type-aware linting. The default-project cap is raised because
+          // we have more than 8 such files (build scripts, legacy test
+          // *.js, root config files).
           allowDefaultProject: [
             '.prettierrc.cjs',
             'puppeteer.config.cjs',
             'eslint.config.mjs',
             'rollup.config.mjs',
+            'vitest.config.ts',
+            'vite.web-ui.config.ts',
+            'scripts/eslint_rules/local-plugin.js',
+            'scripts/eslint_rules/check-license-rule.js',
+            'scripts/sed.ts',
+            'scripts/prepare.ts',
+            'scripts/post-build.ts',
+            'scripts/generate-tools-index.ts',
+            'scripts/generate-docs.ts',
+            'tests/setup.js',
+            'tests/new-tools.test.js',
+            'tests/daemon/start-daemon-helper.js',
+            'tests/unit/scripts/debugger-lab-server.test.js',
           ],
+          maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 50,
         },
       },
 

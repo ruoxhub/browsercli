@@ -4,15 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {ToolPrerequisiteChecker} from '../tools/prerequisites/ToolPrerequisiteChecker.js';
 import {
   validateToolArgs,
   type ValidationFailure,
 } from '../tools/tool-arg-validator.js';
-import type {ToolMeta} from '../tools/tools-meta.js';
-import type {ToolPrerequisiteChecker} from '../tools/prerequisites/ToolPrerequisiteChecker.js';
 import type {Response, ToolDefinition} from '../tools/ToolDefinition.js';
+import type {ToolMeta} from '../tools/tools-meta.js';
 import {createToolError, ErrorCodes, ToolError} from '../utils/errors.js';
 
+import {wrapFrameWithTimeout} from './timeoutUtils.js';
 import type {ToolCallContextGuard} from './ToolCallContextGuard.js';
 import type {
   DefineToolContextFactory,
@@ -20,7 +21,6 @@ import type {
 } from './ToolContext.js';
 import {ToolResponseAccumulator, ToolResultRecorder} from './ToolResponse.js';
 import type {ToolResponseProcessor, ToolTelemetry} from './ToolResponse.js';
-import {wrapFrameWithTimeout} from './timeoutUtils.js';
 
 export {wrapFrameWithTimeout, FRAME_EVALUATE_TIMEOUT} from './timeoutUtils.js';
 

@@ -16,19 +16,22 @@ import {
   type Page,
 } from 'patchright';
 
+import {logger} from '../../utils/logger.js';
 import {
   StealthScripts2025,
   type StealthPreset,
   type StealthInjectionOptions,
 } from '../stealth/index.js';
-import {logger} from '../../utils/logger.js';
 
 import {
   detectAllBrowsers,
   launchBrowserProcess as spawnBrowserProcess,
   waitForBrowserReady,
 } from './browser-detect.js';
-import {resolveAutoConnectTarget, readDevToolsActivePort} from './browser-discovery.js';
+import {
+  resolveAutoConnectTarget,
+  readDevToolsActivePort,
+} from './browser-discovery.js';
 import {
   resolveEngine,
   resolveLaunchChannel,
@@ -120,7 +123,11 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
   const {channel, executablePath, headless, isolated} = options;
   const engine = resolveEngine(channel);
 
-  const userDataDir = resolveUserDataDir(isolated, options.userDataDir, channel);
+  const userDataDir = resolveUserDataDir(
+    isolated,
+    options.userDataDir,
+    channel,
+  );
   if (userDataDir) {
     await ensureUserDataDir(userDataDir);
   }
@@ -668,7 +675,12 @@ export class BrowserManager {
     const cloakSetup =
       cloak && engine === 'chromium'
         ? await setupCloak(
-            resolveUserDataDir(!!isolated, this.config.userDataDir, channel, true),
+            resolveUserDataDir(
+              !!isolated,
+              this.config.userDataDir,
+              channel,
+              true,
+            ),
           )
         : null;
     const executablePath = cloakSetup?.executablePath ?? configExecutablePath;
@@ -703,7 +715,11 @@ export class BrowserManager {
       args.push(...cloakSetup.args);
     }
 
-    const launchChannel = resolveLaunchChannel(channel, engine, !!executablePath);
+    const launchChannel = resolveLaunchChannel(
+      channel,
+      engine,
+      !!executablePath,
+    );
     const launcher = engine === 'firefox' ? firefox : chromium;
     const ignoreDefaultArgs = getIgnoreDefaultArgs(engine);
 
@@ -760,7 +776,10 @@ export class BrowserManager {
         this.trackCurrentPage(pageForViewport);
         await pageForViewport.setViewportSize(
           this.config.viewport
-            ? {width: this.config.viewport.width, height: this.config.viewport.height}
+            ? {
+                width: this.config.viewport.width,
+                height: this.config.viewport.height,
+              }
             : null,
         );
       }
@@ -944,10 +963,8 @@ export class BrowserManager {
     }
 
     const selectedBrowser = browsers[0];
-    await spawnBrowserProcess(
-      port,
-      selectedBrowser.path,
-      p => this.waitForBrowser(p),
+    await spawnBrowserProcess(port, selectedBrowser.path, p =>
+      this.waitForBrowser(p),
     );
   }
 
@@ -990,7 +1007,9 @@ export class BrowserManager {
       ]);
       logger.debug('Browser closed successfully');
     } catch (error) {
-      const pid = (browser as unknown as {process(): {pid?: number} | null}).process()?.pid;
+      const pid = (
+        browser as unknown as {process(): {pid?: number} | null}
+      ).process()?.pid;
       if (pid) {
         try {
           process.kill(pid, 'SIGKILL');

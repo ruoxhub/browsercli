@@ -1,3 +1,8 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
@@ -26,7 +31,11 @@ describe('ExecutionController new methods', () => {
     const session = makeSession();
     const ctrl = new ExecutionController(() => session as any);
 
-    await ctrl.continueToLocation({scriptId: 's1', lineNumber: 42, columnNumber: 5});
+    await ctrl.continueToLocation({
+      scriptId: 's1',
+      lineNumber: 42,
+      columnNumber: 5,
+    });
 
     assert.strictEqual(session.calls[0].method, 'Debugger.continueToLocation');
     assert.deepStrictEqual(session.calls[0].params, {

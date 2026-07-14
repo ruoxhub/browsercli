@@ -10,6 +10,7 @@ import {join} from 'node:path';
 import {describe, it} from 'node:test';
 
 import {StealthScripts2025} from '../../../src/modules/stealth/StealthScripts2025.js';
+import {getRuntime} from '../../../src/runtime.js';
 import {
   analyze_target,
   deobfuscateCode,
@@ -48,7 +49,6 @@ import {
   waitForElement,
 } from '../../../src/tools/page/index.js';
 import {getPerformanceMetrics} from '../../../src/tools/performance/index.js';
-import {getRuntime} from '../../../src/runtime.js';
 import {
   injectStealth,
   listStealthFeatures,

@@ -623,16 +623,21 @@ export class StealthScripts2025 {
     });
 
     await page.addInitScript(
-      (
-        {uaStr, plat, vend, cores, mem, touch}: {
-          uaStr: string;
-          plat: string;
-          vend: string;
-          cores: number;
-          mem: number | null;
-          touch: number;
-        },
-      ) => {
+      ({
+        uaStr,
+        plat,
+        vend,
+        cores,
+        mem,
+        touch,
+      }: {
+        uaStr: string;
+        plat: string;
+        vend: string;
+        cores: number;
+        mem: number | null;
+        touch: number;
+      }) => {
         Object.defineProperty(navigator, 'userAgent', {get: () => uaStr});
         Object.defineProperty(navigator, 'platform', {get: () => plat});
         Object.defineProperty(navigator, 'vendor', {get: () => vend});
@@ -651,7 +656,14 @@ export class StealthScripts2025 {
           Object.defineProperty(navigator, 'deviceMemory', {get: () => mem});
         }
       },
-      {uaStr: ua, plat: platform, vend: vendor, cores: concurrency, mem: memory ?? null, touch: touchPoints},
+      {
+        uaStr: ua,
+        plat: platform,
+        vend: vendor,
+        cores: concurrency,
+        mem: memory ?? null,
+        touch: touchPoints,
+      },
     );
   }
 

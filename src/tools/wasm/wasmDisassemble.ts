@@ -11,18 +11,24 @@ import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
-
 export const wasmDisassemble = defineTool({
   name: 'wasm_disassemble',
-  description: 'Disassemble a .wasm file to WAT (WebAssembly Text Format) using the built-in decompiler.',
+  description:
+    'Disassemble a .wasm file to WAT (WebAssembly Text Format) using the built-in decompiler.',
   annotations: {
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: true,
   },
   schema: {
     inputPath: zod.string().describe('Path to the .wasm file to disassemble'),
-    outputPath: zod.string().optional().describe('Optional output path for the .wat file'),
-    foldExprs: zod.boolean().optional().describe('Fold expression blocks for readability (default true)'),
+    outputPath: zod
+      .string()
+      .optional()
+      .describe('Optional output path for the .wat file'),
+    foldExprs: zod
+      .boolean()
+      .optional()
+      .describe('Fold expression blocks for readability (default true)'),
   },
   handler: async (request, response) => {
     const {inputPath, outputPath, foldExprs = true} = request.params;

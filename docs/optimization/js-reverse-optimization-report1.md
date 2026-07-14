@@ -77,13 +77,13 @@
 
 ### 3.1 当前问题
 
-| 工具 | 报错信息 | 使用障碍 |
-| --- | --- | --- |
-| `search_in_sources` | `query 参数不能为空` | 不确定参数名是 `query` 还是 `pattern` |
-| `trace_function` | `target 参数不能为空` | 不确定参数名是 `target` 还是 `functionName` |
-| `hook_function` | `requires a "target" string parameter` | 参数格式不明确 |
-| `evaluate_on_callframe` | `Invalid parameters` | `callFrameId` 格式不清楚 |
-| `set_breakpoint` | `url 参数不能为空` | 必填参数不清楚 |
+| 工具                    | 报错信息                               | 使用障碍                                    |
+| ----------------------- | -------------------------------------- | ------------------------------------------- |
+| `search_in_sources`     | `query 参数不能为空`                   | 不确定参数名是 `query` 还是 `pattern`       |
+| `trace_function`        | `target 参数不能为空`                  | 不确定参数名是 `target` 还是 `functionName` |
+| `hook_function`         | `requires a "target" string parameter` | 参数格式不明确                              |
+| `evaluate_on_callframe` | `Invalid parameters`                   | `callFrameId` 格式不清楚                    |
+| `set_breakpoint`        | `url 参数不能为空`                     | 必填参数不清楚                              |
 
 ### 3.2 最小修复建议
 
@@ -116,11 +116,11 @@ hook_function     --target <str> [--captureArgs]
 
 ### 4.1 当前链路
 
-| 步骤 | 状态 | 结果 |
-| --- | --- | --- |
-| `xhr_to_js_breakpoint` 命中断点 | 成功 | 暂停在 `/api/v0/chat/completion` |
-| `get_paused_info` 获取调用栈 | 成功 | 返回 4 个 call frame |
-| `evaluate_on_callframe` 查看变量 | 失败 | `Invalid parameters` |
+| 步骤                             | 状态 | 结果                             |
+| -------------------------------- | ---- | -------------------------------- |
+| `xhr_to_js_breakpoint` 命中断点  | 成功 | 暂停在 `/api/v0/chat/completion` |
+| `get_paused_info` 获取调用栈     | 成功 | 返回 4 个 call frame             |
+| `evaluate_on_callframe` 查看变量 | 失败 | `Invalid parameters`             |
 
 ### 4.2 最小修复建议
 
@@ -140,11 +140,11 @@ hook_function     --target <str> [--captureArgs]
 
 ### 5.1 当前问题
 
-| 问题 | 现象 |
-| --- | --- |
+| 问题                     | 现象                      |
+| ------------------------ | ------------------------- |
 | `get_script_source` 超时 | 1.17MB 的压缩 JS 无法获取 |
-| 单行压缩输出 | 搜索命中后难以定位上下文 |
-| 无分片读取 | 不能只读取目标区域 |
+| 单行压缩输出             | 搜索命中后难以定位上下文  |
+| 无分片读取               | 不能只读取目标区域        |
 
 ### 5.2 最小修复建议
 
@@ -172,10 +172,10 @@ js-reverse call search_in_sources --query "powSolver" --scriptId "23" --contextC
 
 ### 6.1 当前问题
 
-| 问题 | 现象 |
-| --- | --- |
-| `hook_fetch` 无数据 | Hook 注入晚于页面初始化 |
-| `auto_hook` 返回 0 | `totalHooks: 0` |
+| 问题                       | 现象                          |
+| -------------------------- | ----------------------------- |
+| `hook_fetch` 无数据        | Hook 注入晚于页面初始化       |
+| `auto_hook` 返回 0         | `totalHooks: 0`               |
 | `observe_flow` 返回 0 脚本 | 页面已加载但 `scriptCount: 0` |
 
 ### 6.2 最小修复建议
@@ -196,10 +196,10 @@ js-reverse call search_in_sources --query "powSolver" --scriptId "23" --contextC
 
 ### 7.1 当前问题
 
-| 问题 | 说明 |
-| --- | --- |
-| `head` 不存在 | PowerShell 不支持常见 Unix 管道命令 |
-| 输出编码不稳定 | 中文输出偶现乱码 |
+| 问题           | 说明                                |
+| -------------- | ----------------------------------- |
+| `head` 不存在  | PowerShell 不支持常见 Unix 管道命令 |
+| 输出编码不稳定 | 中文输出偶现乱码                    |
 | 路径处理不一致 | 部分工具对 Windows 路径分隔符不兼容 |
 
 ### 7.2 最小修复建议
@@ -220,27 +220,27 @@ js-reverse call search_in_sources --query "powSolver" --scriptId "23" --contextC
 
 这些能力有价值，但不是当前链路的第一阻塞点。建议在 P0/P1 完成后再评估。
 
-| 优先级 | 能力 | 价值 | 风险 |
-| --- | --- | --- | --- |
-| P2 | 请求响应体捕获 | 减少手动抓包 | 需要处理体积、脱敏和隐私边界 |
-| P3 | WASM 模块检查 | 支持高级逆向场景 | 实现复杂，使用频率较低 |
-| P3 | 闭包变量检查 | 有助于定位私有状态 | 可能依赖 V8/Chrome 内部细节 |
-| P3 | 批量 Hook/断点配置 | 提升专家效率 | 容易扩大配置复杂度 |
-| P3 | 断点 REPL | 提升调试体验 | 需要清晰的暂停态生命周期管理 |
+| 优先级 | 能力               | 价值               | 风险                         |
+| ------ | ------------------ | ------------------ | ---------------------------- |
+| P2     | 请求响应体捕获     | 减少手动抓包       | 需要处理体积、脱敏和隐私边界 |
+| P3     | WASM 模块检查      | 支持高级逆向场景   | 实现复杂，使用频率较低       |
+| P3     | 闭包变量检查       | 有助于定位私有状态 | 可能依赖 V8/Chrome 内部细节  |
+| P3     | 批量 Hook/断点配置 | 提升专家效率       | 容易扩大配置复杂度           |
+| P3     | 断点 REPL          | 提升调试体验       | 需要清晰的暂停态生命周期管理 |
 
 ---
 
 ## 九、建议执行顺序
 
-| 顺序 | 优化项 | 理由 |
-| --- | --- | --- |
-| 1 | 修复 `collect_code` / `search_in_scripts` 崩溃 | 核心功能不可用 |
-| 2 | 改善必填参数错误提示 | 最小改动，直接降低试错成本 |
-| 3 | 修复 `evaluate_on_callframe` 参数链路 | 断点命中后才能继续分析 |
-| 4 | 支持大文件分片读取和搜索上下文 | 现代前端脚本常见问题 |
-| 5 | 增加 Hook 注入状态与 preload 验证 | 明确捕获失败原因 |
-| 6 | 补 Windows 适配文档与编码处理 | 提升基础可用性 |
-| 7 | 评估响应体、WASM、闭包、批量配置、REPL | 高级能力，后置 |
+| 顺序 | 优化项                                         | 理由                       |
+| ---- | ---------------------------------------------- | -------------------------- |
+| 1    | 修复 `collect_code` / `search_in_scripts` 崩溃 | 核心功能不可用             |
+| 2    | 改善必填参数错误提示                           | 最小改动，直接降低试错成本 |
+| 3    | 修复 `evaluate_on_callframe` 参数链路          | 断点命中后才能继续分析     |
+| 4    | 支持大文件分片读取和搜索上下文                 | 现代前端脚本常见问题       |
+| 5    | 增加 Hook 注入状态与 preload 验证              | 明确捕获失败原因           |
+| 6    | 补 Windows 适配文档与编码处理                  | 提升基础可用性             |
+| 7    | 评估响应体、WASM、闭包、批量配置、REPL         | 高级能力，后置             |
 
 ---
 

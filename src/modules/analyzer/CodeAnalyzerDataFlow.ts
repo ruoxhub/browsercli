@@ -93,7 +93,9 @@ export async function enhanceTaintAnalysisWithLLM(
 
     const jsonMatch = response.content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      const llmResult = JSON.parse(jsonMatch[0]) as {taintPaths?: Array<Record<string, unknown>>};
+      const llmResult = JSON.parse(jsonMatch[0]) as {
+        taintPaths?: Array<Record<string, unknown>>;
+      };
 
       if (Array.isArray(llmResult.taintPaths)) {
         logger.info(
@@ -135,10 +137,7 @@ export function analyzeDataFlowInternal(
   const sinks: DataFlow['sinks'] = [];
   const taintPaths: DataFlow['taintPaths'] = [];
 
-  const taintMap = new Map<
-    string,
-    {sourceType: string; sourceLine: number}
-  >();
+  const taintMap = new Map<string, {sourceType: string; sourceLine: number}>();
 
   const sanitizers = new Set([
     'encodeURIComponent',
@@ -256,9 +255,7 @@ export function analyzeDataFlowInternal(
           const funcName = callee.name;
 
           if (
-            ['eval', 'Function', 'setTimeout', 'setInterval'].includes(
-              funcName,
-            )
+            ['eval', 'Function', 'setTimeout', 'setInterval'].includes(funcName)
           ) {
             const sinkId = `sink-eval-${line}`;
             sinks.push({type: 'eval', location: {file: 'current', line}});
@@ -325,9 +322,7 @@ export function analyzeDataFlowInternal(
             );
           }
 
-          if (
-            ['exec', 'spawn', 'execSync', 'spawnSync'].includes(methodName)
-          ) {
+          if (['exec', 'spawn', 'execSync', 'spawnSync'].includes(methodName)) {
             const sinkId = `sink-command-${line}`;
             sinks.push({type: 'other', location: {file: 'current', line}});
             graph.nodes.push({
@@ -530,10 +525,7 @@ export function analyzeDataFlowInternal(
         const init = path.node.init;
 
         if (t.isIdentifier(id) && init) {
-          if (
-            t.isCallExpression(init) &&
-            checkSanitizer(init, sanitizers)
-          ) {
+          if (t.isCallExpression(init) && checkSanitizer(init, sanitizers)) {
             const arg = init.arguments[0];
             if (t.isIdentifier(arg) && taintMap.has(arg.name)) {
               logger.debug(

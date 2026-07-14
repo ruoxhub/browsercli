@@ -83,32 +83,27 @@ export interface ScriptInjectorResult<T = unknown> extends MessagesResult<T> {
 }
 
 /** 创建注入脚本结果 */
-export interface CreateInjectScriptResult
-  extends ScriptInjectorResult<CreateInjectScriptData> {
+export interface CreateInjectScriptResult extends ScriptInjectorResult<CreateInjectScriptData> {
   tooltype: 'create_inject_script';
 }
 
 /** 列出注入脚本结果 */
-export interface ListInjectScriptsResult
-  extends ScriptInjectorResult<ListInjectScriptsData> {
+export interface ListInjectScriptsResult extends ScriptInjectorResult<ListInjectScriptsData> {
   tooltype: 'list_inject_scripts';
 }
 
 /** 更新注入脚本结果 */
-export interface UpdateInjectScriptResult
-  extends ScriptInjectorResult<UpdateInjectScriptData> {
+export interface UpdateInjectScriptResult extends ScriptInjectorResult<UpdateInjectScriptData> {
   tooltype: 'update_inject_script';
 }
 
 /** 删除注入脚本结果 */
-export interface DeleteInjectScriptResult
-  extends ScriptInjectorResult<DeleteInjectScriptData> {
+export interface DeleteInjectScriptResult extends ScriptInjectorResult<DeleteInjectScriptData> {
   tooltype: 'delete_inject_script';
 }
 
 /** URL 匹配检查结果 */
-export interface CheckUrlMatchesResult
-  extends ScriptInjectorResult<CheckUrlMatchesData> {
+export interface CheckUrlMatchesResult extends ScriptInjectorResult<CheckUrlMatchesData> {
   tooltype: 'check_url_matches';
 }
 

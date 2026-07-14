@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {TrafficSummary} from '../formatters/websocketFormatter.js';
 import type {DebuggerManager} from '../modules/debugger/DebuggerManager.js';
 import type {
   RequestInitiator,
   WebSocketData,
 } from '../modules/network/NetworkTypes.js';
-import type {TrafficSummary} from '../formatters/websocketFormatter.js';
 import {zod} from '../third_party/index.js';
 import type {Dialog, Frame, HTTPRequest, Page} from '../third_party/index.js';
 import type {TraceResult} from '../trace-processing/parse.js';

@@ -112,10 +112,7 @@ export function parseComboUrl(url: string): ComboUrlInfo | undefined {
  *   2) 子路径包含 pattern（大小写不敏感）
  *   3) 把 pattern 当 regex 尝试匹配子路径
  */
-export function findMatchingSubFile(
-  url: string,
-  pattern: string,
-): string[] {
+export function findMatchingSubFile(url: string, pattern: string): string[] {
   const info = parseComboUrl(url);
   if (!info) return [];
 

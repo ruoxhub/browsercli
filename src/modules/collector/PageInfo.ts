@@ -15,7 +15,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import type {Page} from '../../third_party/index.js';
-
 import {logger} from '../../utils/logger.js';
 
 import type {ScreenshotOptions} from './PageControllerTypes.js';

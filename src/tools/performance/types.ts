@@ -93,25 +93,21 @@ export interface PerformanceResult<T = unknown> extends MessagesResult<T> {
 }
 
 /** startPerformanceTrace 结果 */
-export interface StartPerformanceTraceResult
-  extends PerformanceResult<StartPerformanceTraceData> {
+export interface StartPerformanceTraceResult extends PerformanceResult<StartPerformanceTraceData> {
   tooltype: 'start_performance_trace';
 }
 
 /** stopPerformanceTrace 结果 */
-export interface StopPerformanceTraceResult
-  extends PerformanceResult<StopPerformanceTraceData> {
+export interface StopPerformanceTraceResult extends PerformanceResult<StopPerformanceTraceData> {
   tooltype: 'stop_performance_trace';
 }
 
 /** performanceAnalyzeInsight 结果 */
-export interface PerformanceAnalyzeInsightResult
-  extends PerformanceResult<PerformanceAnalyzeInsightData> {
+export interface PerformanceAnalyzeInsightResult extends PerformanceResult<PerformanceAnalyzeInsightData> {
   tooltype: 'performance_analyze_insight';
 }
 
 /** getPerformanceMetrics 结果 */
-export interface GetPerformanceMetricsResult
-  extends PerformanceResult<GetPerformanceMetricsData> {
+export interface GetPerformanceMetricsResult extends PerformanceResult<GetPerformanceMetricsData> {
   tooltype: 'get_performance_metrics';
 }

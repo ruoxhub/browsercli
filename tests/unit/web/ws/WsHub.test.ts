@@ -8,10 +8,7 @@ import assert from 'node:assert';
 import {beforeEach, describe, it} from 'node:test';
 
 import type {ServerMsg} from '../../../../src/web/types.js';
-import {
-  WsHub,
-  type MinimalWebSocket,
-} from '../../../../src/web/ws/WsHub.js';
+import {WsHub, type MinimalWebSocket} from '../../../../src/web/ws/WsHub.js';
 
 interface MockWs extends MinimalWebSocket {
   sent: ServerMsg[];
@@ -49,7 +46,11 @@ describe('WsHub', () => {
 
     assert.strictEqual(ws.sent.length, 1);
     assert.strictEqual(ws.sent[0]!.type, 'snapshot');
-    const snap = ws.sent[0] as {type: 'snapshot'; channel: string; payload: unknown};
+    const snap = ws.sent[0] as {
+      type: 'snapshot';
+      channel: string;
+      payload: unknown;
+    };
     assert.strictEqual(snap.channel, 'worker.status');
     assert.deepStrictEqual(snap.payload, {ok: true, version: '2.0.3'});
   });
@@ -59,11 +60,19 @@ describe('WsHub', () => {
     hub.broadcast('tool.invoke', {traceId: 'tr_old_2', toolName: 'y'});
     hub.subscribe(ws, 'tool.invoke');
 
-    assert.strictEqual(ws.sent.length, 0, 'stream 频道订阅时不应回放任何旧事件');
+    assert.strictEqual(
+      ws.sent.length,
+      0,
+      'stream 频道订阅时不应回放任何旧事件',
+    );
 
     hub.broadcast('tool.invoke', {traceId: 'tr_new', toolName: 'z'});
     assert.strictEqual(ws.sent.length, 1);
-    const evt = ws.sent[0] as {type: 'event'; channel: string; payload: unknown};
+    const evt = ws.sent[0] as {
+      type: 'event';
+      channel: string;
+      payload: unknown;
+    };
     assert.strictEqual(evt.type, 'event');
     assert.deepStrictEqual(evt.payload, {traceId: 'tr_new', toolName: 'z'});
   });

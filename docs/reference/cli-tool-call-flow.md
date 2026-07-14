@@ -39,7 +39,7 @@ await runAxiCli<DaemonContext>({
     start: startCommand,
     stop: stopCommand,
     status: statusCommand,
-    call: toolDispatcherCommand,    // ← js-reverse call 走这里
+    call: toolDispatcherCommand, // ← js-reverse call 走这里
     'call-skill': callSkillCommand,
     'list-skills': listSkillsCommand,
     'list-tools': listToolsCommand,
@@ -81,6 +81,7 @@ export const toolDispatcherCommand: AxiCliCommand<DaemonContext> = async (args, 
 ```
 
 **关键逻辑**：
+
 - `parseArgs(args)` — 解析位置参数和 `--flag value` 格式
 - `getToolMeta(toolName)` — 从工具注册表查找 schema，用于参数类型推断
 - 类型转换：`string` → `number` / `boolean` / `string[]`（逗号分隔自动拆分数组）
@@ -93,8 +94,8 @@ export const toolDispatcherCommand: AxiCliCommand<DaemonContext> = async (args, 
 ```typescript
 const result = await sendCommand({
   method: 'invoke_tool',
-  tool: toolName,                    // "list-network-requests"
-  args: toolArgs,                    // { filter: "xhr", preserve: true }
+  tool: toolName, // "list-network-requests"
+  args: toolArgs, // { filter: "xhr", preserve: true }
 });
 ```
 
@@ -133,6 +134,7 @@ server = createServer(socket => {
 ```
 
 `PipeTransport` 是双向流式传输层，负责：
+
 - 消息边界检测（基于 `\0` 分隔符）
 - 自动分帧和重组
 - 错误处理和连接管理
@@ -147,24 +149,34 @@ async function handleRequest(msg: DaemonMessage) {
     const {tool, args = {}} = msg;
     // ...进入工具调用流程
   }
-  if (msg.method === 'invoke_skill') { /* ... */ }
-  if (msg.method === 'list_skills')   { /* ... */ }
-  if (msg.method === 'list_tools')   { /* ... */ }
-  if (msg.method === 'stop')         { /* ... */ }
-  if (msg.method === 'status')       { /* ... */ }
+  if (msg.method === 'invoke_skill') {
+    /* ... */
+  }
+  if (msg.method === 'list_skills') {
+    /* ... */
+  }
+  if (msg.method === 'list_tools') {
+    /* ... */
+  }
+  if (msg.method === 'stop') {
+    /* ... */
+  }
+  if (msg.method === 'status') {
+    /* ... */
+  }
 }
 ```
 
 IPC 协议支持 6 种方法：
 
-| 方法 | 用途 | CLI 对应 |
-|------|------|----------|
-| `invoke_tool` | 调用单个 MCP 工具 | `js-reverse call <tool>` |
-| `invoke_skill` | 调用逆向技能 | `js-reverse call-skill <skill>` |
-| `list_tools` | 列出所有可用工具 | `js-reverse list-tools` |
-| `list_skills` | 列出所有可用技能 | `js-reverse list-skills` |
-| `stop` | 停止 daemon | `js-reverse stop` |
-| `status` | 查看 daemon 状态 | `js-reverse status` |
+| 方法           | 用途              | CLI 对应                        |
+| -------------- | ----------------- | ------------------------------- |
+| `invoke_tool`  | 调用单个 MCP 工具 | `js-reverse call <tool>`        |
+| `invoke_skill` | 调用逆向技能      | `js-reverse call-skill <skill>` |
+| `list_tools`   | 列出所有可用工具  | `js-reverse list-tools`         |
+| `list_skills`  | 列出所有可用技能  | `js-reverse list-skills`        |
+| `stop`         | 停止 daemon       | `js-reverse stop`               |
+| `status`       | 查看 daemon 状态  | `js-reverse status`             |
 
 ### ⑥ 工具懒加载与浏览器上下文构造
 
@@ -202,6 +214,7 @@ const context = {
 ```
 
 **关键设计**：
+
 - **懒加载**：工具注册不在 daemon 启动时完成，而是首次调用时 `import()` 动态加载
 - **缓存**：`_cachedToolsList` 缓存工具列表，后续调用直接命中
 - **上下文注入**：每个工具 handler 接收 `request`、`response`、`context`、`runtime` 四个参数
@@ -234,6 +247,7 @@ const context = {
 ```
 
 Handler 通过 `context` 对象访问浏览器能力：
+
 - `context.getSelectedPage()` — 获取当前活动页面
 - `context.getNetworkRequests()` — 从 NetworkCollector 取数据
 - `response.appendResponseLine()` — 追加文本输出
@@ -295,10 +309,16 @@ if (result.success) {
 
 ```typescript
 interface DaemonMessage {
-  method: 'invoke_tool' | 'invoke_skill' | 'list_skills' | 'list_tools' | 'stop' | 'status';
-  tool?: string;                      // invoke_tool 时必填
-  skill?: string;                     // invoke_skill 时必填
-  args?: Record<string, unknown>;     // 工具/技能参数
+  method:
+    | 'invoke_tool'
+    | 'invoke_skill'
+    | 'list_skills'
+    | 'list_tools'
+    | 'stop'
+    | 'status';
+  tool?: string; // invoke_tool 时必填
+  skill?: string; // invoke_skill 时必填
+  args?: Record<string, unknown>; // 工具/技能参数
 }
 ```
 
@@ -307,9 +327,9 @@ interface DaemonMessage {
 ```typescript
 interface DaemonResponse {
   success: boolean;
-  result?: string;     // JSON 字符串，需要二次解析
-  error?: string;      // 错误信息
-  message?: string;    // 状态消息（如 "stopping"）
+  result?: string; // JSON 字符串，需要二次解析
+  error?: string; // 错误信息
+  message?: string; // 状态消息（如 "stopping"）
 }
 ```
 
@@ -325,14 +345,14 @@ interface DaemonResponse {
 
 ## 错误处理
 
-| 场景 | 行为 | 用户提示 |
-|------|------|----------|
-| Daemon 未运行 | `checkDaemonReady()` 返回 false | `后台服务未运行。请先执行：js-reverse start --browserUrl <chrome-debug-url>` |
-| 工具名不存在 | `tools.find()` 返回 undefined | `未知工具：xxx` + 模糊匹配建议 |
-| 工具执行失败 | handler 抛出异常 | `工具执行失败：${error}` |
-| IPC 超时 | 5 秒无响应 | `IPC 请求超时` |
-| JSON 解析失败 | `JSON.parse()` 抛出 | `响应解析失败：${err}` |
-| 浏览器未连接 | `runtime.browserManager.getBrowser()` 返回 null | 各工具 handler 内部处理 |
+| 场景          | 行为                                            | 用户提示                                                                     |
+| ------------- | ----------------------------------------------- | ---------------------------------------------------------------------------- |
+| Daemon 未运行 | `checkDaemonReady()` 返回 false                 | `后台服务未运行。请先执行：js-reverse start --browserUrl <chrome-debug-url>` |
+| 工具名不存在  | `tools.find()` 返回 undefined                   | `未知工具：xxx` + 模糊匹配建议                                               |
+| 工具执行失败  | handler 抛出异常                                | `工具执行失败：${error}`                                                     |
+| IPC 超时      | 5 秒无响应                                      | `IPC 请求超时`                                                               |
+| JSON 解析失败 | `JSON.parse()` 抛出                             | `响应解析失败：${err}`                                                       |
+| 浏览器未连接  | `runtime.browserManager.getBrowser()` 返回 null | 各工具 handler 内部处理                                                      |
 
 ---
 
@@ -429,19 +449,19 @@ User            CLI (js-reverse)            Daemon (daemon.ts)           Chrome
 
 ## 相关文件索引
 
-| 文件 | 职责 |
-|------|------|
-| `src/bin/js-reverse.ts` | CLI 入口，axi-sdk-js 命令注册 |
-| `src/cli/commands/tool-dispatcher.ts` | `call` 命令处理：参数解析、类型转换、IPC 调用 |
-| `src/cli/tools-meta.ts` | 工具元数据与 schema 定义 |
-| `src/cli/args-parser.ts` | CLI 参数解析器 |
-| `src/cli/output.ts` | TOON 格式化输出 |
-| `src/daemon/client.ts` | IPC 客户端：`sendCommand()`, `startDaemon()`, `stopDaemon()` |
-| `src/daemon/daemon.ts` | Daemon 主进程：socket 服务器、请求路由、工具调用 |
-| `src/daemon/types.ts` | IPC 协议类型定义（DaemonMessage, DaemonResponse） |
-| `src/daemon/utils.ts` | 工具函数：socket 路径、PID 管理、就绪检测 |
-| `src/tools/network.ts` | `list_network_requests` 等网络工具实现 |
-| `src/tools/runtime.ts` | JSHookRuntime 单例，浏览器管理器 |
-| `src/tools/index.ts` | 工具注册入口（懒加载） |
-| `src/PageCollector.ts` | NetworkCollector：网络请求数据收集器 |
-| `src/third_party/index.ts` | PipeTransport：IPC 双向流式传输层 |
+| 文件                                  | 职责                                                         |
+| ------------------------------------- | ------------------------------------------------------------ |
+| `src/bin/js-reverse.ts`               | CLI 入口，axi-sdk-js 命令注册                                |
+| `src/cli/commands/tool-dispatcher.ts` | `call` 命令处理：参数解析、类型转换、IPC 调用                |
+| `src/cli/tools-meta.ts`               | 工具元数据与 schema 定义                                     |
+| `src/cli/args-parser.ts`              | CLI 参数解析器                                               |
+| `src/cli/output.ts`                   | TOON 格式化输出                                              |
+| `src/daemon/client.ts`                | IPC 客户端：`sendCommand()`, `startDaemon()`, `stopDaemon()` |
+| `src/daemon/daemon.ts`                | Daemon 主进程：socket 服务器、请求路由、工具调用             |
+| `src/daemon/types.ts`                 | IPC 协议类型定义（DaemonMessage, DaemonResponse）            |
+| `src/daemon/utils.ts`                 | 工具函数：socket 路径、PID 管理、就绪检测                    |
+| `src/tools/network.ts`                | `list_network_requests` 等网络工具实现                       |
+| `src/tools/runtime.ts`                | JSHookRuntime 单例，浏览器管理器                             |
+| `src/tools/index.ts`                  | 工具注册入口（懒加载）                                       |
+| `src/PageCollector.ts`                | NetworkCollector：网络请求数据收集器                         |
+| `src/third_party/index.ts`            | PipeTransport：IPC 双向流式传输层                            |

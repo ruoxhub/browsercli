@@ -16,13 +16,25 @@ const SIGNATURE_KEYWORDS = [
   'nonce',
 ] as const;
 
-const SIGNATURE_INDICATOR_FIELDS = ['url', 'method', 'body', 'requestBody', 'data'] as const;
+const SIGNATURE_INDICATOR_FIELDS = [
+  'url',
+  'method',
+  'body',
+  'requestBody',
+  'data',
+] as const;
 
-function readString(record: Record<string, unknown>, key: string): string | undefined {
+function readString(
+  record: Record<string, unknown>,
+  key: string,
+): string | undefined {
   return typeof record[key] === 'string' ? (record[key] as string) : undefined;
 }
 
-function readNumber(record: Record<string, unknown>, key: string): number | undefined {
+function readNumber(
+  record: Record<string, unknown>,
+  key: string,
+): number | undefined {
   return typeof record[key] === 'number' ? (record[key] as number) : undefined;
 }
 
@@ -31,7 +43,9 @@ function findSignatureIndicators(value: unknown): string[] {
     return [];
   }
   const text = value.toLowerCase();
-  const indicators = SIGNATURE_KEYWORDS.filter(keyword => text.includes(keyword));
+  const indicators = SIGNATURE_KEYWORDS.filter(keyword =>
+    text.includes(keyword),
+  );
   return [...new Set(indicators)];
 }
 

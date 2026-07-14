@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { DOMInspector } from '../../../src/modules/collector/DOMInspector.js';
+import {DOMInspector} from '../../../src/modules/collector/DOMInspector.js';
 
 function makePage(results: Array<unknown | Error> = []) {
   return {
@@ -24,13 +24,13 @@ function makePage(results: Array<unknown | Error> = []) {
 describe('DOMInspector', () => {
   it('covers query and structure APIs', async () => {
     const page = makePage([
-      { found: true, nodeName: 'BUTTON', textContent: 'OK' },
-      [{ found: true, nodeName: 'DIV' }],
-      { tag: 'BODY' },
-      [{ selector: '#submit', text: 'Submit', type: 'button', visible: true }],
-      { color: 'rgb(0,0,0)' },
-      { found: true, nodeName: 'DIV', textContent: 'ready' },
-      [{ found: true, nodeName: 'SPAN', textContent: 'hello' }],
+      {found: true, nodeName: 'BUTTON', textContent: 'OK'},
+      [{found: true, nodeName: 'DIV'}],
+      {tag: 'BODY'},
+      [{selector: '#submit', text: 'Submit', type: 'button', visible: true}],
+      {color: 'rgb(0,0,0)'},
+      {found: true, nodeName: 'DIV', textContent: 'ready'},
+      [{found: true, nodeName: 'SPAN', textContent: 'hello'}],
       '//*[@id="root"]',
       true,
     ]);
@@ -45,7 +45,7 @@ describe('DOMInspector', () => {
     assert.strictEqual(list.length, 1);
 
     const tree = await inspector.getStructure(2, true);
-    assert.deepStrictEqual(tree, { tag: 'BODY' });
+    assert.deepStrictEqual(tree, {tag: 'BODY'});
 
     const clickable = await inspector.findClickable('submit');
     assert.strictEqual(clickable.length, 1);
@@ -72,11 +72,13 @@ describe('DOMInspector', () => {
       getActivePage: async () => page,
     } as unknown as ConstructorParameters<typeof DOMInspector>[0]);
 
-    await inspector.observeDOMChanges({ subtree: true });
+    await inspector.observeDOMChanges({subtree: true});
     await inspector.stopObservingDOM();
 
     let detached = 0;
-    (inspector as unknown as { cdpSession: { detach(): Promise<void> } | null }).cdpSession = {
+    (
+      inspector as unknown as {cdpSession: {detach(): Promise<void>} | null}
+    ).cdpSession = {
       detach: async () => {
         detached += 1;
       },
@@ -84,7 +86,8 @@ describe('DOMInspector', () => {
     await inspector.close();
     assert.strictEqual(detached, 1);
     assert.strictEqual(
-      (inspector as unknown as { cdpSession: { detach(): Promise<void> } | null }).cdpSession,
+      (inspector as unknown as {cdpSession: {detach(): Promise<void>} | null})
+        .cdpSession,
       null,
     );
   });

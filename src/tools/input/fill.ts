@@ -21,7 +21,9 @@ export const fill = defineTool({
     readOnlyHint: false,
   },
   schema: {
-    selector: zod.string().describe('CSS 选择器（input / textarea / select）。'),
+    selector: zod
+      .string()
+      .describe('CSS 选择器（input / textarea / select）。'),
     value: zod.string().describe('填充值。'),
   },
   handler: async (request, response, context) => {

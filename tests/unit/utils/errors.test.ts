@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -11,9 +10,13 @@ import {ErrorCodes, formatError} from '../../../src/utils/errors.js';
 
 describe('error formatting', () => {
   it('formats Error instances', () => {
-    const result = formatError(new Error('boom'), ErrorCodes.TOOL_EXECUTION_ERROR, {
-      tool: 'x',
-    });
+    const result = formatError(
+      new Error('boom'),
+      ErrorCodes.TOOL_EXECUTION_ERROR,
+      {
+        tool: 'x',
+      },
+    );
 
     assert.strictEqual(result.code, ErrorCodes.TOOL_EXECUTION_ERROR);
     assert.strictEqual(result.type, 'Error');

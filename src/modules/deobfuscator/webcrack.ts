@@ -94,11 +94,15 @@ const DEFAULT_OPTIONS: Required<
 
 const MAX_BUNDLE_MODULES = 100;
 
-interface MappingMetadata {fromPath: string}
+interface MappingMetadata {
+  fromPath: string;
+}
 
 function normalizeOptions(
   options: WebcrackInvocationOptions,
-): Required<Pick<DeobfuscateOptions, 'jsx' | 'mangle' | 'unminify' | 'unpack'>> {
+): Required<
+  Pick<DeobfuscateOptions, 'jsx' | 'mangle' | 'unminify' | 'unpack'>
+> {
   return {
     jsx: options.jsx ?? DEFAULT_OPTIONS.jsx,
     mangle: options.mangle ?? DEFAULT_OPTIONS.mangle,

@@ -29,13 +29,6 @@ import {
 } from '../../formatters/websocketFormatter.js';
 import type {HTTPRequest, ResourceType} from '../../third_party/index.js';
 
-import {buildEvidenceCorrelations} from './signatureDetector.js';
-import {
-  buildReplayRequest,
-  emptyReplayResponse,
-  executeReplay,
-  formatCurl,
-} from './replayEngine.js';
 import type {
   AnalyzeWebSocketMessagesData,
   AnalyzeWebSocketMessagesParams,
@@ -64,6 +57,13 @@ import type {
   ReplayOverride,
   WebSocketFrame,
 } from './NetworkTypes.js';
+import {
+  buildReplayRequest,
+  emptyReplayResponse,
+  executeReplay,
+  formatCurl,
+} from './replayEngine.js';
+import {buildEvidenceCorrelations} from './signatureDetector.js';
 
 const DEFAULT_WAIT_TIMEOUT_MS = 5000;
 const WAIT_POLL_INTERVAL_MS = 50;
@@ -196,9 +196,9 @@ export class NetworkModule {
 
   // ─── 页面索引解析 ────────────────────────────────────
 
-  private resolvePageIdx(services: NetworkServices):
-    | {ok: true; pageIdx: number}
-    | {ok: false; message: string} {
+  private resolvePageIdx(
+    services: NetworkServices,
+  ): {ok: true; pageIdx: number} | {ok: false; message: string} {
     const selected = services.getSelectedPage();
     if (!selected) {
       return {ok: false, message: NO_ACTIVE_PAGE_MESSAGE};
@@ -285,7 +285,10 @@ export class NetworkModule {
         }
       }
 
-      let requests = services.getNetworkRequests(includePreserved, targetPageIdx);
+      let requests = services.getNetworkRequests(
+        includePreserved,
+        targetPageIdx,
+      );
 
       if (params.resourceTypes?.length) {
         const normalizedTypes = new Set(params.resourceTypes);
@@ -331,7 +334,10 @@ export class NetworkModule {
         timedOut: false,
         ...(params.includeSignatureEvidence
           ? {
-              evidenceCorrelations: buildEvidenceCorrelations(requests, services),
+              evidenceCorrelations: buildEvidenceCorrelations(
+                requests,
+                services,
+              ),
             }
           : {}),
       };
@@ -532,7 +538,11 @@ export class NetworkModule {
       }
       const networkRequest = services.getNetworkRequestById(reqid);
       const httpResponse = await networkRequest.response().catch(() => null);
-      const originalData = buildOriginalData(reqid, networkRequest, httpResponse);
+      const originalData = buildOriginalData(
+        reqid,
+        networkRequest,
+        httpResponse,
+      );
 
       const override = this.buildOverride(params);
       const built = buildReplayRequest(originalData, override ?? undefined);
@@ -592,7 +602,11 @@ export class NetworkModule {
       }
       const networkRequest = services.getNetworkRequestById(reqid);
       const httpResponse = await networkRequest.response().catch(() => null);
-      const originalData = buildOriginalData(reqid, networkRequest, httpResponse);
+      const originalData = buildOriginalData(
+        reqid,
+        networkRequest,
+        httpResponse,
+      );
 
       const override = this.buildOverride(params);
       const built = buildReplayRequest(originalData, override ?? undefined);
@@ -664,7 +678,11 @@ export class NetworkModule {
       }
       const networkRequest = services.getNetworkRequestById(reqid);
       const httpResponse = await networkRequest.response().catch(() => null);
-      const originalData = buildOriginalData(reqid, networkRequest, httpResponse);
+      const originalData = buildOriginalData(
+        reqid,
+        networkRequest,
+        httpResponse,
+      );
 
       const built: Array<{
         built: ReturnType<typeof buildReplayRequest>;
@@ -674,7 +692,10 @@ export class NetworkModule {
       for (let i = 0; i < variants.length; i++) {
         const override = variants[i];
         try {
-          built.push({built: buildReplayRequest(originalData, override), override});
+          built.push({
+            built: buildReplayRequest(originalData, override),
+            override,
+          });
         } catch (e) {
           built.push({
             built: {method: '', url: '', headers: {}},
@@ -734,7 +755,8 @@ export class NetworkModule {
           succeeded++;
         }
         const status = r.result.status;
-        statusCodeDistribution[status] = (statusCodeDistribution[status] ?? 0) + 1;
+        statusCodeDistribution[status] =
+          (statusCodeDistribution[status] ?? 0) + 1;
       }
 
       return {
@@ -771,7 +793,7 @@ export class NetworkModule {
       params.url ??
       params.headers ??
       params.body ??
-      (params.replaceHeaders !== undefined);
+      params.replaceHeaders !== undefined;
     if (!hasOverride) {
       return null;
     }
@@ -893,7 +915,10 @@ export class NetworkModule {
         });
 
         const offset = pageIdx * pageSize;
-        const paginatedIndices = filteredIndices.slice(offset, offset + pageSize);
+        const paginatedIndices = filteredIndices.slice(
+          offset,
+          offset + pageSize,
+        );
         const paginatedFrames = paginatedIndices.map(idx => ws.frames[idx]!);
         const frameData = buildFrameData(
           paginatedFrames,
@@ -1032,9 +1057,13 @@ export class NetworkModule {
           min: g.minSize,
           max: g.maxSize,
           minFormatted:
-            g.minSize < 1024 ? `${g.minSize}B` : `${(g.minSize / 1024).toFixed(1)}KB`,
+            g.minSize < 1024
+              ? `${g.minSize}B`
+              : `${(g.minSize / 1024).toFixed(1)}KB`,
           maxFormatted:
-            g.maxSize < 1024 ? `${g.maxSize}B` : `${(g.maxSize / 1024).toFixed(1)}KB`,
+            g.maxSize < 1024
+              ? `${g.maxSize}B`
+              : `${(g.maxSize / 1024).toFixed(1)}KB`,
         },
         sampleIndices: g.sampleIndices,
       }));

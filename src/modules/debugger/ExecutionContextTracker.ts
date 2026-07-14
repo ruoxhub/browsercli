@@ -19,12 +19,13 @@
  */
 
 import type {CDPSession} from '../../third_party/index.js';
+import {logger} from '../../utils/logger.js';
+
 import type {
   ExecutionContextInfo,
   RawExecutionContextDescription,
 } from './ExecutionContextInfo.js';
 import {createExecutionContextInfo} from './ExecutionContextInfo.js';
-import {logger} from '../../utils/logger.js';
 
 interface ExecutionContextCreatedEvent {
   context: RawExecutionContextDescription;

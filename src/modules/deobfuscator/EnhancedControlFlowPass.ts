@@ -1,3 +1,8 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import generateImport from '@babel/generator';
 import traverseImport from '@babel/traverse';
 import * as t from '@babel/types';
@@ -8,16 +13,15 @@ import {StaticResolver, UNRESOLVED} from './StaticResolver.js';
 const generate = unwrapBabelDefault<typeof generateImport>(generateImport);
 const traverse = unwrapBabelDefault<typeof traverseImport>(traverseImport);
 
-type NodePath<T extends t.Node = t.Node> = import('@babel/traverse').NodePath<T>;
+type NodePath<T extends t.Node = t.Node> =
+  import('@babel/traverse').NodePath<T>;
 
 // StaticResolver is stateless — safe to share across iterations and passes.
 const resolver = new StaticResolver();
 
 function getCaseStatements(casePath: NodePath<t.SwitchCase>): t.Statement[] {
   return (casePath.get('consequent') as NodePath[])
-    .filter(
-      stmt => !stmt.isContinueStatement() && !stmt.isBreakStatement(),
-    )
+    .filter(stmt => !stmt.isContinueStatement() && !stmt.isBreakStatement())
     .map(stmt => t.cloneNode(stmt.node) as t.Statement);
 }
 
@@ -106,7 +110,9 @@ function replaceLoopSwitchWithIf(path: NodePath): boolean {
     return false;
   }
 
-  const statements = (body as NodePath<t.BlockStatement>).get('body') as NodePath[];
+  const statements = (body as NodePath<t.BlockStatement>).get(
+    'body',
+  ) as NodePath[];
   if (statements.length !== 1 || !statements[0]!.isSwitchStatement()) {
     return false;
   }
@@ -132,7 +138,9 @@ function normalizeKey(node: t.Node): string {
 
 function getCaseKey(casePath: NodePath<t.SwitchCase>): string | number {
   const value = resolver.getLiteralValue(casePath.get('test') as NodePath);
-  return value === null ? normalizeKey((casePath.node as t.SwitchCase).test!) : value;
+  return value === null
+    ? normalizeKey((casePath.node as t.SwitchCase).test!)
+    : value;
 }
 
 function getOrderFromInit(initPath: NodePath): Array<string | number> | null {
@@ -152,17 +160,23 @@ function getOrderFromInit(initPath: NodePath): Array<string | number> | null {
     initPath.isCallExpression() &&
     (initPath.get('callee') as NodePath).isMemberExpression()
   ) {
-    const calleeProp = (initPath.get('callee') as NodePath).get('property') as NodePath;
+    const calleeProp = (initPath.get('callee') as NodePath).get(
+      'property',
+    ) as NodePath;
     const isSplit =
       calleeProp.isIdentifier({name: 'split'}) ||
       calleeProp.isStringLiteral({value: 'split'});
-    if (isSplit && (initPath.get('arguments.0') as NodePath)?.isStringLiteral()) {
+    if (
+      isSplit &&
+      (initPath.get('arguments.0') as NodePath)?.isStringLiteral()
+    ) {
       const source = resolver.getLiteralValue(
         (initPath.get('callee') as NodePath).get('object') as NodePath,
       );
       if (typeof source === 'string') {
         return source.split(
-          ((initPath.get('arguments.0') as NodePath).node as t.StringLiteral).value,
+          ((initPath.get('arguments.0') as NodePath).node as t.StringLiteral)
+            .value,
         );
       }
     }
@@ -171,7 +185,9 @@ function getOrderFromInit(initPath: NodePath): Array<string | number> | null {
   return null;
 }
 
-function getOrderFromResolvedValue(value: unknown): Array<string | number> | null {
+function getOrderFromResolvedValue(
+  value: unknown,
+): Array<string | number> | null {
   if (!Array.isArray(value) || value.length === 0) {
     return null;
   }
@@ -280,7 +296,9 @@ function resolveObjectAliasNames(
       break;
     }
 
-    currentName = ((declaratorPath.get('init') as NodePath).node as t.Identifier).name;
+    currentName = (
+      (declaratorPath.get('init') as NodePath).node as t.Identifier
+    ).name;
   }
 
   return names;
@@ -295,7 +313,7 @@ function getAncestorBodyStatements(loopPath: NodePath): NodePath[][] {
     if (current.isProgram()) {
       const key = `program:${(current.node as {start?: number}).start || 0}`;
       if (!seen.has(key)) {
-        bodies.push((current.get('body') as NodePath[]));
+        bodies.push(current.get('body') as NodePath[]);
         seen.add(key);
       }
     } else if (
@@ -304,7 +322,7 @@ function getAncestorBodyStatements(loopPath: NodePath): NodePath[][] {
     ) {
       const key = `block:${(current.node as {start?: number}).start || 0}`;
       if (!seen.has(key)) {
-        bodies.push((current.get('body') as NodePath[]));
+        bodies.push(current.get('body') as NodePath[]);
         seen.add(key);
       }
     }
@@ -339,29 +357,31 @@ function collectObjectPipeStringCandidates(
         (stmtPath.get('declarations') as NodePath[]).forEach(declPath => {
           if (
             !(declPath.get('id') as NodePath).isIdentifier() ||
-            !objectNames.has(((declPath.get('id') as NodePath).node as t.Identifier).name) ||
+            !objectNames.has(
+              ((declPath.get('id') as NodePath).node as t.Identifier).name,
+            ) ||
             !(declPath.get('init') as NodePath).isObjectExpression()
           ) {
             return;
           }
-          ((declPath.get('init') as NodePath).get('properties') as NodePath[]).forEach(
-            propPath => {
-              if (!propPath.isObjectProperty()) {
-                return;
-              }
-              const keyNode = (propPath.node as t.ObjectProperty).key;
-              const key = getStaticPropertyKey(keyNode);
-              const valuePath = propPath.get('value') as NodePath;
-              const pipeOrder = getPipeOrderFromValuePath(valuePath);
-              if (pipeOrder) {
-                candidates.push({
-                  key,
-                  order: pipeOrder,
-                  start: (stmtPath.node as {start?: number}).start || 0,
-                });
-              }
-            },
-          );
+          (
+            (declPath.get('init') as NodePath).get('properties') as NodePath[]
+          ).forEach(propPath => {
+            if (!propPath.isObjectProperty()) {
+              return;
+            }
+            const keyNode = (propPath.node as t.ObjectProperty).key;
+            const key = getStaticPropertyKey(keyNode);
+            const valuePath = propPath.get('value') as NodePath;
+            const pipeOrder = getPipeOrderFromValuePath(valuePath);
+            if (pipeOrder) {
+              candidates.push({
+                key,
+                order: pipeOrder,
+                start: (stmtPath.node as {start?: number}).start || 0,
+              });
+            }
+          });
         });
         return;
       }
@@ -370,7 +390,9 @@ function collectObjectPipeStringCandidates(
         return;
       }
 
-      const exprPath = (stmtPath as NodePath<t.ExpressionStatement>).get('expression') as NodePath;
+      const exprPath = (stmtPath as NodePath<t.ExpressionStatement>).get(
+        'expression',
+      ) as NodePath;
       if (!exprPath.isAssignmentExpression({operator: '='})) {
         return;
       }
@@ -380,7 +402,9 @@ function collectObjectPipeStringCandidates(
       if (
         !leftPath.isMemberExpression() ||
         !(leftPath.get('object') as NodePath).isIdentifier() ||
-        !objectNames.has(((leftPath.get('object') as NodePath).node as t.Identifier).name)
+        !objectNames.has(
+          ((leftPath.get('object') as NodePath).node as t.Identifier).name,
+        )
       ) {
         return;
       }
@@ -417,21 +441,35 @@ function getOrderFromSplitCallWithObjectTable(
     return null;
   }
 
-  const calleeProp = (initPath.get('callee') as NodePath).get('property') as NodePath;
+  const calleeProp = (initPath.get('callee') as NodePath).get(
+    'property',
+  ) as NodePath;
   const isSplit =
     calleeProp.isIdentifier({name: 'split'}) ||
     calleeProp.isStringLiteral({value: 'split'});
-  if (!isSplit || !(initPath.get('arguments.0') as NodePath)?.isStringLiteral()) {
+  if (
+    !isSplit ||
+    !(initPath.get('arguments.0') as NodePath)?.isStringLiteral()
+  ) {
     return null;
   }
 
-  const sourcePath = (initPath.get('callee') as NodePath).get('object') as NodePath;
-  if (!sourcePath.isMemberExpression() || !(sourcePath.get('object') as NodePath).isIdentifier()) {
+  const sourcePath = (initPath.get('callee') as NodePath).get(
+    'object',
+  ) as NodePath;
+  if (
+    !sourcePath.isMemberExpression() ||
+    !(sourcePath.get('object') as NodePath).isIdentifier()
+  ) {
     return null;
   }
 
-  const objectName = ((sourcePath.get('object') as NodePath).node as t.Identifier).name;
-  const propertyKey = getStaticPropertyKey((sourcePath.node as t.MemberExpression).property);
+  const objectName = (
+    (sourcePath.get('object') as NodePath).node as t.Identifier
+  ).name;
+  const propertyKey = getStaticPropertyKey(
+    (sourcePath.node as t.MemberExpression).property,
+  );
   if (propertyKey === null) {
     return null;
   }
@@ -471,14 +509,24 @@ function findNearbyOrderDeclaration(
   loopPath: NodePath,
   maxSiblings = 3,
 ): {order: Array<string | number>; declarationPath: NodePath} | null {
-  let siblingPath: NodePath | null = loopPath.getPrevSibling() as NodePath | null;
-  for (let seen = 0; siblingPath && siblingPath.node && seen < maxSiblings; seen += 1) {
+  let siblingPath: NodePath | null =
+    loopPath.getPrevSibling() as NodePath | null;
+  for (
+    let seen = 0;
+    siblingPath && siblingPath.node && seen < maxSiblings;
+    seen += 1
+  ) {
     if (!siblingPath.isVariableDeclaration()) {
       break;
     }
 
-    for (const declaratorPath of (siblingPath as NodePath<t.VariableDeclaration>).get('declarations') as NodePath[]) {
-      if (!declaratorPath.node || !(declaratorPath.get('init') as NodePath).node) {
+    for (const declaratorPath of (
+      siblingPath as NodePath<t.VariableDeclaration>
+    ).get('declarations') as NodePath[]) {
+      if (
+        !declaratorPath.node ||
+        !(declaratorPath.get('init') as NodePath).node
+      ) {
         continue;
       }
       const initPath = declaratorPath.get('init') as NodePath;
@@ -497,14 +545,18 @@ function findNearbyOrderDeclaration(
   return null;
 }
 
-function getCaseKeys(switchStmt: NodePath<t.SwitchStatement>): Array<string | number> {
+function getCaseKeys(
+  switchStmt: NodePath<t.SwitchStatement>,
+): Array<string | number> {
   const keys: Array<string | number> = [];
-  (switchStmt.get('cases') as NodePath<t.SwitchCase>[]).forEach(casePath => {
-    if (!(casePath.node as t.SwitchCase).test) {
-      return;
-    }
-    keys.push(getCaseKey(casePath));
-  });
+  (switchStmt.get('cases') as Array<NodePath<t.SwitchCase>>).forEach(
+    casePath => {
+      if (!(casePath.node as t.SwitchCase).test) {
+        return;
+      }
+      keys.push(getCaseKey(casePath));
+    },
+  );
   return keys;
 }
 
@@ -517,7 +569,9 @@ function sameSequenceKeySet(
   }
 
   const counts = new Map<string, number>();
-  caseKeys.forEach(key => counts.set(String(key), (counts.get(String(key)) || 0) + 1));
+  caseKeys.forEach(key =>
+    counts.set(String(key), (counts.get(String(key)) || 0) + 1),
+  );
   for (const item of order) {
     const key = String(item);
     const count = counts.get(key);
@@ -538,7 +592,10 @@ function getOrderFromObjectStringTable(
   switchStmt: NodePath<t.SwitchStatement>,
 ): Array<string | number> | null {
   const discriminant = switchStmt.get('discriminant') as NodePath;
-  if (!discriminant.isMemberExpression() || !(discriminant.get('object') as NodePath).isIdentifier()) {
+  if (
+    !discriminant.isMemberExpression() ||
+    !(discriminant.get('object') as NodePath).isIdentifier()
+  ) {
     return null;
   }
 
@@ -566,12 +623,14 @@ function buildBlocksFromSwitchOrder(
   }
 
   const caseMap = new Map<string | number, t.Statement[]>();
-  (switchStmt.get('cases') as NodePath<t.SwitchCase>[]).forEach(casePath => {
-    if (!(casePath.node as t.SwitchCase).test) {
-      return;
-    }
-    caseMap.set(getCaseKey(casePath), getCaseStatements(casePath));
-  });
+  (switchStmt.get('cases') as Array<NodePath<t.SwitchCase>>).forEach(
+    casePath => {
+      if (!(casePath.node as t.SwitchCase).test) {
+        return;
+      }
+      caseMap.set(getCaseKey(casePath), getCaseStatements(casePath));
+    },
+  );
 
   const blocks: t.Statement[] = [];
   order.forEach(key => {
@@ -584,7 +643,10 @@ function buildBlocksFromSwitchOrder(
   return blocks.length > 0 ? blocks : null;
 }
 
-export function enhancedControlFlow(ast: t.File): {ast: t.File; changed: boolean} {
+export function enhancedControlFlow(ast: t.File): {
+  ast: t.File;
+  changed: boolean;
+} {
   let changed = false;
 
   traverse(ast, {
@@ -593,7 +655,9 @@ export function enhancedControlFlow(ast: t.File): {ast: t.File; changed: boolean
       if (!body.isBlockStatement()) {
         return;
       }
-      const bodyStmts = (body as NodePath<t.BlockStatement>).get('body') as NodePath[];
+      const bodyStmts = (body as NodePath<t.BlockStatement>).get(
+        'body',
+      ) as NodePath[];
       if (bodyStmts.length === 0) {
         return;
       }
@@ -605,33 +669,39 @@ export function enhancedControlFlow(ast: t.File): {ast: t.File; changed: boolean
       ) {
         let order: Array<string | number> | null = null;
         const leftovers: t.Statement[] = [];
-        ((path.get('init') as NodePath<t.VariableDeclaration>).get('declarations') as NodePath[]).forEach(
-          decl => {
-            const declarator = decl as NodePath<t.VariableDeclarator>;
-            if (declarator.node.init === null) {
-              leftovers.push(
-                t.variableDeclaration('var', [t.cloneNode(declarator.node) as t.VariableDeclarator]),
-              );
-              return;
-            }
-            const initPath = declarator.get('init') as NodePath;
-            const candidate =
-              getOrderFromInit(initPath) ||
-              getOrderFromSplitCallWithObjectTable(initPath, path) ||
-              getOrderFromResolvedValue(resolver.resolveStatic(initPath));
-            if (candidate) {
-              order = candidate;
-            }
-          },
-        );
+        (
+          (path.get('init') as NodePath<t.VariableDeclaration>).get(
+            'declarations',
+          ) as NodePath[]
+        ).forEach(decl => {
+          const declarator = decl as NodePath<t.VariableDeclarator>;
+          if (declarator.node.init === null) {
+            leftovers.push(
+              t.variableDeclaration('var', [
+                t.cloneNode(declarator.node) as t.VariableDeclarator,
+              ]),
+            );
+            return;
+          }
+          const initPath = declarator.get('init') as NodePath;
+          const candidate =
+            getOrderFromInit(initPath) ||
+            getOrderFromSplitCallWithObjectTable(initPath, path) ||
+            getOrderFromResolvedValue(resolver.resolveStatic(initPath));
+          if (candidate) {
+            order = candidate;
+          }
+        });
         if (order) {
           const caseMap = new Map<string | number, t.Statement[]>();
-          (firstStmt.get('cases') as NodePath<t.SwitchCase>[]).forEach(casePath => {
-            if (!(casePath.node as t.SwitchCase).test) {
-              return;
-            }
-            caseMap.set(getCaseKey(casePath), getCaseStatements(casePath));
-          });
+          (firstStmt.get('cases') as Array<NodePath<t.SwitchCase>>).forEach(
+            casePath => {
+              if (!(casePath.node as t.SwitchCase).test) {
+                return;
+              }
+              caseMap.set(getCaseKey(casePath), getCaseStatements(casePath));
+            },
+          );
           const blocks: t.Statement[] = [...leftovers];
           order.forEach(key => {
             const stmts = caseMap.get(key);
@@ -656,12 +726,18 @@ export function enhancedControlFlow(ast: t.File): {ast: t.File; changed: boolean
         (path.get('test') as NodePath).isUnaryExpression() &&
         (path.get('body') as NodePath).isBlockStatement()
       ) {
-        const switchStmt = ((path.get('body') as NodePath<t.BlockStatement>).get('body') as NodePath[])[0] as NodePath | undefined;
+        const switchStmt = (
+          (path.get('body') as NodePath<t.BlockStatement>).get(
+            'body',
+          ) as NodePath[]
+        )[0] as NodePath | undefined;
         if (switchStmt?.isSwitchStatement()) {
           const nearby = findNearbyOrderDeclaration(path);
           const order =
             (nearby && nearby.order) ||
-            getOrderFromDiscriminant(switchStmt.get('discriminant') as NodePath) ||
+            getOrderFromDiscriminant(
+              switchStmt.get('discriminant') as NodePath,
+            ) ||
             getOrderFromObjectStringTable(
               path,
               switchStmt as NodePath<t.SwitchStatement>,

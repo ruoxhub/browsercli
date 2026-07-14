@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { AnthropicProvider } from '../../../src/services/AnthropicProvider.js';
+import {AnthropicProvider} from '../../../src/services/AnthropicProvider.js';
 
 const runProviderTests = process.env.RUN_PROVIDER_TESTS === 'true';
-const runProviderNetworkTests = process.env.RUN_PROVIDER_NETWORK_TESTS === 'true';
+const runProviderNetworkTests =
+  process.env.RUN_PROVIDER_NETWORK_TESTS === 'true';
 
 describe('AnthropicProvider', {skip: !runProviderTests}, () => {
   describe('Constructor', () => {
@@ -30,7 +31,7 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
         },
         {
           message: /Anthropic API key is required/,
-        }
+        },
       );
     });
 
@@ -67,12 +68,9 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-ant-invalid-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.chat([{ role: 'user', content: 'Hello' }]);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.chat([{role: 'user', content: 'Hello'}]);
+      }, Error);
     });
 
     it('should handle empty messages array', async () => {
@@ -80,12 +78,9 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-ant-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.chat([]);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.chat([]);
+      }, Error);
     });
 
     it('should handle system messages separately', async () => {
@@ -94,15 +89,12 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
       });
 
       // Anthropic requires system messages to be separate
-      await assert.rejects(
-        async () => {
-          await provider.chat([
-            { role: 'system', content: 'You are helpful' },
-            { role: 'user', content: 'Hello' },
-          ]);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.chat([
+          {role: 'system', content: 'You are helpful'},
+          {role: 'user', content: 'Hello'},
+        ]);
+      }, Error);
     });
 
     it('should handle messages without system message', async () => {
@@ -110,14 +102,9 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-ant-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.chat([
-            { role: 'user', content: 'Hello' },
-          ]);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.chat([{role: 'user', content: 'Hello'}]);
+      }, Error);
     });
 
     it('should handle conversation history', async () => {
@@ -125,16 +112,13 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-ant-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.chat([
-            { role: 'user', content: 'What is 2+2?' },
-            { role: 'assistant', content: '4' },
-            { role: 'user', content: 'What is 3+3?' },
-          ]);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.chat([
+          {role: 'user', content: 'What is 2+2?'},
+          {role: 'assistant', content: '4'},
+          {role: 'user', content: 'What is 3+3?'},
+        ]);
+      }, Error);
     });
 
     it('should handle multiple system messages (use first one)', async () => {
@@ -142,16 +126,13 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-ant-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.chat([
-            { role: 'system', content: 'First system message' },
-            { role: 'system', content: 'Second system message' },
-            { role: 'user', content: 'Hello' },
-          ]);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.chat([
+          {role: 'system', content: 'First system message'},
+          {role: 'system', content: 'Second system message'},
+          {role: 'user', content: 'Hello'},
+        ]);
+      }, Error);
     });
 
     it('should pass temperature option', async () => {
@@ -159,15 +140,11 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-ant-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.chat(
-            [{ role: 'user', content: 'Hello' }],
-            { temperature: 0.7 }
-          );
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.chat([{role: 'user', content: 'Hello'}], {
+          temperature: 0.7,
+        });
+      }, Error);
     });
 
     it('should pass maxTokens option', async () => {
@@ -175,15 +152,11 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-ant-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.chat(
-            [{ role: 'user', content: 'Hello' }],
-            { maxTokens: 1000 }
-          );
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.chat([{role: 'user', content: 'Hello'}], {
+          maxTokens: 1000,
+        });
+      }, Error);
     });
 
     it('should use default maxTokens when not specified', async () => {
@@ -191,12 +164,9 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-ant-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.chat([{ role: 'user', content: 'Hello' }]);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.chat([{role: 'user', content: 'Hello'}]);
+      }, Error);
     });
 
     it('should pass model option', async () => {
@@ -204,15 +174,11 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-ant-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.chat(
-            [{ role: 'user', content: 'Hello' }],
-            { model: 'claude-3-opus-20240229' }
-          );
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.chat([{role: 'user', content: 'Hello'}], {
+          model: 'claude-3-opus-20240229',
+        });
+      }, Error);
     });
 
     it('should pass all chat options', async () => {
@@ -220,19 +186,13 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-ant-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.chat(
-            [{ role: 'user', content: 'Hello' }],
-            {
-              temperature: 0.8,
-              maxTokens: 2000,
-              model: 'claude-3-opus-20240229',
-            }
-          );
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.chat([{role: 'user', content: 'Hello'}], {
+          temperature: 0.8,
+          maxTokens: 2000,
+          model: 'claude-3-opus-20240229',
+        });
+      }, Error);
     });
   });
 
@@ -242,12 +202,9 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-ant-invalid-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.analyzeImage('test.png', 'Describe this image', true);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.analyzeImage('test.png', 'Describe this image', true);
+      }, Error);
     });
 
     it('should handle file path input', async () => {
@@ -256,12 +213,9 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
       });
 
       // This will fail because file doesn't exist, but tests the flow
-      await assert.rejects(
-        async () => {
-          await provider.analyzeImage('nonexistent.png', 'Describe', true);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.analyzeImage('nonexistent.png', 'Describe', true);
+      }, Error);
     });
 
     it('should handle base64 input', async () => {
@@ -269,14 +223,12 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-ant-test-key',
       });
 
-      const base64Image = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+      const base64Image =
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
 
-      await assert.rejects(
-        async () => {
-          await provider.analyzeImage(base64Image, 'Describe', false);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.analyzeImage(base64Image, 'Describe', false);
+      }, Error);
     });
 
     it('should handle data URL input', async () => {
@@ -284,14 +236,12 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-ant-test-key',
       });
 
-      const dataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+      const dataUrl =
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
 
-      await assert.rejects(
-        async () => {
-          await provider.analyzeImage(dataUrl, 'Describe', false);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.analyzeImage(dataUrl, 'Describe', false);
+      }, Error);
     });
 
     it('should reject invalid data URL format', async () => {
@@ -305,7 +255,7 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
         },
         {
           message: /Invalid data URL format/,
-        }
+        },
       );
     });
 
@@ -314,12 +264,9 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-ant-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.analyzeImage('test.png', 'Describe', true);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.analyzeImage('test.png', 'Describe', true);
+      }, Error);
     });
 
     it('should handle different image formats (JPEG)', async () => {
@@ -327,12 +274,9 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-ant-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.analyzeImage('test.jpg', 'Describe', true);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.analyzeImage('test.jpg', 'Describe', true);
+      }, Error);
     });
 
     it('should handle different image formats (GIF)', async () => {
@@ -340,12 +284,9 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-ant-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.analyzeImage('test.gif', 'Describe', true);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.analyzeImage('test.gif', 'Describe', true);
+      }, Error);
     });
 
     it('should handle different image formats (WEBP)', async () => {
@@ -353,12 +294,9 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-ant-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.analyzeImage('test.webp', 'Describe', true);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.analyzeImage('test.webp', 'Describe', true);
+      }, Error);
     });
 
     it('should default to PNG for unknown extensions', async () => {
@@ -366,12 +304,9 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-ant-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.analyzeImage('test.unknown', 'Describe', true);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.analyzeImage('test.unknown', 'Describe', true);
+      }, Error);
     });
 
     it('should handle empty prompt', async () => {
@@ -379,12 +314,9 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-ant-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.analyzeImage('test.png', '', true);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.analyzeImage('test.png', '', true);
+      }, Error);
     });
   });
 
@@ -396,13 +328,13 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
 
       await assert.rejects(
         async () => {
-          await provider.chat([{ role: 'user', content: 'Hello' }]);
+          await provider.chat([{role: 'user', content: 'Hello'}]);
         },
         (error: unknown) => {
           // Should be an Error object
           assert.ok(error instanceof Error);
           return true;
-        }
+        },
       );
     });
 
@@ -412,7 +344,7 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
       });
 
       try {
-        await provider.chat([{ role: 'user', content: 'Hello' }]);
+        await provider.chat([{role: 'user', content: 'Hello'}]);
         assert.fail('Should have thrown an error');
       } catch (error: unknown) {
         // Error should have status property for retry logic
@@ -425,12 +357,9 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-ant-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.chat([{ role: 'user', content: 'Hello' }]);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.chat([{role: 'user', content: 'Hello'}]);
+      }, Error);
     });
 
     it('should handle timeout errors', async () => {
@@ -438,12 +367,9 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-ant-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.chat([{ role: 'user', content: 'Hello' }]);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.chat([{role: 'user', content: 'Hello'}]);
+      }, Error);
     });
 
     it('should handle malformed responses', async () => {
@@ -451,12 +377,9 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-ant-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.chat([{ role: 'user', content: 'Hello' }]);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.chat([{role: 'user', content: 'Hello'}]);
+      }, Error);
     });
 
     it('should handle unknown error types', async () => {
@@ -464,12 +387,9 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-ant-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.chat([{ role: 'user', content: 'Hello' }]);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.chat([{role: 'user', content: 'Hello'}]);
+      }, Error);
     });
   });
 
@@ -479,12 +399,9 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-ant-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.analyzeImage('test.png', 'Describe', true);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.analyzeImage('test.png', 'Describe', true);
+      }, Error);
     });
 
     it('should detect JPEG media type', async () => {
@@ -492,12 +409,9 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-ant-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.analyzeImage('test.jpeg', 'Describe', true);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.analyzeImage('test.jpeg', 'Describe', true);
+      }, Error);
     });
 
     it('should detect GIF media type', async () => {
@@ -505,12 +419,9 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-ant-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.analyzeImage('test.gif', 'Describe', true);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.analyzeImage('test.gif', 'Describe', true);
+      }, Error);
     });
 
     it('should detect WEBP media type', async () => {
@@ -518,12 +429,9 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-ant-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.analyzeImage('test.webp', 'Describe', true);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.analyzeImage('test.webp', 'Describe', true);
+      }, Error);
     });
   });
 
@@ -533,12 +441,9 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-ant-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.chat([{ role: 'user', content: 'Hello' }]);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.chat([{role: 'user', content: 'Hello'}]);
+      }, Error);
     });
 
     it('should handle multiple text blocks', async () => {
@@ -546,12 +451,9 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-ant-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.chat([{ role: 'user', content: 'Hello' }]);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.chat([{role: 'user', content: 'Hello'}]);
+      }, Error);
     });
 
     it('should filter non-text blocks', async () => {
@@ -559,12 +461,9 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-ant-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.chat([{ role: 'user', content: 'Hello' }]);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.chat([{role: 'user', content: 'Hello'}]);
+      }, Error);
     });
   });
 
@@ -574,12 +473,9 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-ant-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.chat([{ role: 'user', content: 'Hello' }]);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.chat([{role: 'user', content: 'Hello'}]);
+      }, Error);
     });
 
     it('should calculate total tokens correctly', async () => {
@@ -587,12 +483,9 @@ describe('AnthropicProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-ant-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.chat([{ role: 'user', content: 'Hello' }]);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.chat([{role: 'user', content: 'Hello'}]);
+      }, Error);
     });
   });
 });

@@ -6,6 +6,7 @@
 
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
+
 import {CollectorContextProvider} from '../../../src/worker/context/CollectorContextProvider.js';
 
 describe('CollectorContextProvider', () => {
@@ -21,7 +22,10 @@ describe('CollectorContextProvider', () => {
     const reqs = provider.getNetworkRequests(mockPage as never, false);
     assert.deepStrictEqual(reqs, [request1]);
 
-    const stableId = provider.getNetworkRequestStableId([mockPage as never], request1);
+    const stableId = provider.getNetworkRequestStableId(
+      [mockPage as never],
+      request1,
+    );
     assert.strictEqual(stableId, 10);
 
     const found = provider.getNetworkRequestById([mockPage as never], 10);

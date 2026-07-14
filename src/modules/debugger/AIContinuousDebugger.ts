@@ -18,7 +18,10 @@
  */
 
 import type {AIService, AIMessage} from '../../services/AIService.js';
-import type {GetScopeVariablesOptions, GetScopeVariablesResult} from '../../types/index.js';
+import type {
+  GetScopeVariablesOptions,
+  GetScopeVariablesResult,
+} from '../../types/index.js';
 import {logger} from '../../utils/logger.js';
 
 import type {CallFrame, PausedState, BreakpointInfo} from './types.js';
@@ -165,15 +168,29 @@ export function extractJsonFromResponse(content: string): string {
 export interface ContinuousDebuggerDeps {
   setXHRBreakpoint: (urlPattern: string) => Promise<string>;
   removeXHRBreakpoint: (id: string) => Promise<boolean>;
-  setBreakpoint: (params: {scriptId: string; lineNumber: number; columnNumber?: number; condition?: string}) => Promise<BreakpointInfo>;
+  setBreakpoint: (params: {
+    scriptId: string;
+    lineNumber: number;
+    columnNumber?: number;
+    condition?: string;
+  }) => Promise<BreakpointInfo>;
   removeBreakpoint: (id: string) => Promise<void>;
   waitForPaused: (timeout?: number) => Promise<PausedState>;
   resume: () => Promise<void>;
   stepOver: () => Promise<void>;
   stepInto: () => Promise<void>;
   stepOut: () => Promise<void>;
-  getScopeVariables: (options?: GetScopeVariablesOptions) => Promise<GetScopeVariablesResult>;
-  evaluateOnCallFrame: (params: {callFrameId: string; expression: string; returnByValue?: boolean}) => Promise<{result: {value?: unknown; type: string}; exceptionDetails?: unknown}>;
+  getScopeVariables: (
+    options?: GetScopeVariablesOptions,
+  ) => Promise<GetScopeVariablesResult>;
+  evaluateOnCallFrame: (params: {
+    callFrameId: string;
+    expression: string;
+    returnByValue?: boolean;
+  }) => Promise<{
+    result: {value?: unknown; type: string};
+    exceptionDetails?: unknown;
+  }>;
   getScripts: () => Array<{scriptId: string; url: string}>;
   targetHostname?: string;
 }
@@ -189,7 +206,11 @@ export class AIContinuousDebugger {
     errors: [],
   };
   private iterationHistory: IterationRecord[] = [];
-  private recentPauseLocations: Array<{scriptId: string; lineNumber: number; columnNumber?: number}> = [];
+  private recentPauseLocations: Array<{
+    scriptId: string;
+    lineNumber: number;
+    columnNumber?: number;
+  }> = [];
 
   constructor(
     private deps: ContinuousDebuggerDeps,

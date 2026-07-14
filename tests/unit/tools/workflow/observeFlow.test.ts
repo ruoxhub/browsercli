@@ -7,8 +7,8 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {observeFlow as observeFlowTool} from '../../../../src/tools/workflow/observeFlow.js';
 import {getRuntime} from '../../../../src/runtime.js';
+import {observeFlow as observeFlowTool} from '../../../../src/tools/workflow/observeFlow.js';
 
 async function observeFlow(params?: any): Promise<any> {
   const originalProvider = getRuntime().contextProvider;
@@ -29,7 +29,11 @@ async function observeFlow(params?: any): Promise<any> {
     },
   } as any;
   try {
-    await observeFlowTool.handler({ params: params ?? {} } as any, response, null as any);
+    await observeFlowTool.handler(
+      {params: params ?? {}} as any,
+      response,
+      null as any,
+    );
   } finally {
     getRuntime().contextProvider = originalProvider;
   }

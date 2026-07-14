@@ -1,4 +1,15 @@
-import type { Channel, ClientMsg, ServerMsg, ServerMsgEvent, ServerMsgSnapshot } from './protocol';
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+import type {
+  Channel,
+  ClientMsg,
+  ServerMsg,
+  ServerMsgEvent,
+  ServerMsgSnapshot,
+} from './protocol';
 
 export type MessageHandler = (msg: ServerMsgEvent | ServerMsgSnapshot) => void;
 
@@ -6,7 +17,10 @@ class WebSocketClient {
   private url: string;
   private ws: WebSocket | null = null;
   private handlers = new Map<Channel, Set<MessageHandler>>();
-  private activeFilters = new Map<Channel, Record<string, unknown> | undefined>();
+  private activeFilters = new Map<
+    Channel,
+    Record<string, unknown> | undefined
+  >();
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private isClosedIntentionally = false;
 
@@ -15,7 +29,7 @@ class WebSocketClient {
   }
 
   private getWsUrl(): string {
-    const { protocol, host, port } = window.location;
+    const {protocol, host, port} = window.location;
     if (port === '5173') {
       return 'ws://127.0.0.1:8765/ws';
     }
@@ -24,7 +38,11 @@ class WebSocketClient {
   }
 
   public connect(): void {
-    if (this.ws && (this.ws.readyState === WebSocket.CONNECTING || this.ws.readyState === WebSocket.OPEN)) {
+    if (
+      this.ws &&
+      (this.ws.readyState === WebSocket.CONNECTING ||
+        this.ws.readyState === WebSocket.OPEN)
+    ) {
       return;
     }
 
@@ -46,11 +64,11 @@ class WebSocketClient {
       console.log('WebSocket connected to', this.url);
       // 重新发送现有的所有订阅
       for (const [channel, filter] of this.activeFilters.entries()) {
-        this.send({ type: 'subscribe', channel, filter });
+        this.send({type: 'subscribe', channel, filter});
       }
     };
 
-    this.ws.onmessage = (event) => {
+    this.ws.onmessage = event => {
       try {
         const msg: ServerMsg = JSON.parse(event.data);
         if (msg.type === 'event' || msg.type === 'snapshot') {
@@ -60,7 +78,10 @@ class WebSocketClient {
               try {
                 handler(msg);
               } catch (err) {
-                console.error(`Error in WebSocket handler for channel ${msg.channel}:`, err);
+                console.error(
+                  `Error in WebSocket handler for channel ${msg.channel}:`,
+                  err,
+                );
               }
             }
           }
@@ -70,15 +91,17 @@ class WebSocketClient {
       }
     };
 
-    this.ws.onclose = (event) => {
-      console.log(`WebSocket closed (code: ${event.code}, reason: ${event.reason})`);
+    this.ws.onclose = event => {
+      console.log(
+        `WebSocket closed (code: ${event.code}, reason: ${event.reason})`,
+      );
       this.ws = null;
       if (!this.isClosedIntentionally) {
         this.scheduleReconnect();
       }
     };
 
-    this.ws.onerror = (err) => {
+    this.ws.onerror = err => {
       console.error('WebSocket error:', err);
     };
   }
@@ -115,7 +138,7 @@ class WebSocketClient {
   public subscribe(
     channel: Channel,
     handler: MessageHandler,
-    filter?: Record<string, unknown>
+    filter?: Record<string, unknown>,
   ): () => void {
     const key = channel; // 严格匹配 v2 规范，只用 channel 作为 key
 
@@ -132,7 +155,7 @@ class WebSocketClient {
     // 如果是第一个 handler，且当前连接已开启，则发送 subscribe 消息
     if (handlerSet.size === 1) {
       if (this.ws?.readyState === WebSocket.OPEN) {
-        this.send({ type: 'subscribe', channel, filter });
+        this.send({type: 'subscribe', channel, filter});
       }
     }
 
@@ -144,7 +167,7 @@ class WebSocketClient {
           this.handlers.delete(key);
           this.activeFilters.delete(channel);
           if (this.ws?.readyState === WebSocket.OPEN) {
-            this.send({ type: 'unsubscribe', channel });
+            this.send({type: 'unsubscribe', channel});
           }
         }
       }

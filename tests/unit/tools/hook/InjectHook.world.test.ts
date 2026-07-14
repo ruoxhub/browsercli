@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {describe, it, beforeEach} from 'node:test';
 import assert from 'node:assert/strict';
+import {describe, it, beforeEach} from 'node:test';
 
 import {
   injectHook,
@@ -16,9 +16,11 @@ import type {Context} from '../../../../src/tools/ToolDefinition.js';
 /**
  * 构造最小 Context mock，包含 mainFrame / on 以触发 framenavigated 路径。
  */
-function buildMockContext(options: {
-  supportsAddInitScript?: boolean;
-} = {}) {
+function buildMockContext(
+  options: {
+    supportsAddInitScript?: boolean;
+  } = {},
+) {
   const supportsAddInitScript = options.supportsAddInitScript ?? true;
   const frameEvaluateCalls: string[] = [];
   const addInitScriptCalls: string[] = [];

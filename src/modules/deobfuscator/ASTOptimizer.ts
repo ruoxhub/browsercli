@@ -228,7 +228,9 @@ export class ASTOptimizer {
           path.node.argument.operator === '!'
         ) {
           path.replaceWith(
-            t.callExpression(t.identifier('Boolean'), [path.node.argument.argument]),
+            t.callExpression(t.identifier('Boolean'), [
+              path.node.argument.argument,
+            ]),
           );
         }
       },

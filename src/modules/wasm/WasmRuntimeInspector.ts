@@ -3,16 +3,6 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import type {
-  WasmBoundaryChain,
-  WasmBoundaryStep,
-  WasmHeaderEntry,
-  WasmKeyValuePreview,
-  WasmModuleRecord,
-  WasmRuntimeEvent,
-  WasmSignatureDiffFieldChange,
-  WasmSignatureDiffResult,
-} from './WasmTypes.js';
 import {
   buildBodyAnalysis,
   classifyBodyKind,
@@ -33,6 +23,16 @@ import {
   uniqueStrings,
   type WasmExportUsageSummary,
 } from './WasmAnalysisUtils.js';
+import type {
+  WasmBoundaryChain,
+  WasmBoundaryStep,
+  WasmHeaderEntry,
+  WasmKeyValuePreview,
+  WasmModuleRecord,
+  WasmRuntimeEvent,
+  WasmSignatureDiffFieldChange,
+  WasmSignatureDiffResult,
+} from './WasmTypes.js';
 
 export class WasmRuntimeInspector {
   summarizeExports(

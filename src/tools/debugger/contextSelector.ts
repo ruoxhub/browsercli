@@ -9,7 +9,10 @@ import type {
   ExecutionContextWorld,
 } from './executionContexts.js';
 
-type SelectableExecutionContextWorld = Exclude<ExecutionContextWorld, 'unknown'>;
+type SelectableExecutionContextWorld = Exclude<
+  ExecutionContextWorld,
+  'unknown'
+>;
 
 export interface SelectExecutionContextParams {
   context?: SelectableExecutionContextWorld;
@@ -28,9 +31,7 @@ export function selectExecutionContext(
   params: SelectExecutionContextParams = {},
 ): ExecutionContextInfo | null {
   const desiredWorld = params.context ?? 'page';
-  let candidates = contexts.filter(
-    context => context.world === desiredWorld,
-  );
+  let candidates = contexts.filter(context => context.world === desiredWorld);
 
   if (candidates.length === 0) {
     return null;

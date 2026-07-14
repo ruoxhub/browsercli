@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -33,8 +32,14 @@ describe('ToolExecutionScheduler', () => {
     const scheduler = new ToolExecutionScheduler();
     const start = Date.now();
     await Promise.all([
-      scheduler.execute(true, async () => new Promise(resolve => setTimeout(resolve, 40))),
-      scheduler.execute(true, async () => new Promise(resolve => setTimeout(resolve, 40))),
+      scheduler.execute(
+        true,
+        async () => new Promise(resolve => setTimeout(resolve, 40)),
+      ),
+      scheduler.execute(
+        true,
+        async () => new Promise(resolve => setTimeout(resolve, 40)),
+      ),
     ]);
     const elapsed = Date.now() - start;
     assert.ok(elapsed < 75);

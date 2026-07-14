@@ -36,7 +36,10 @@ describe('PageNavigation', () => {
     let calledUrl = '';
     let calledOptions: {waitUntil?: string; timeout?: number} | undefined;
     const page = makePage({
-      goto: async (url: string, opts?: {waitUntil?: string; timeout?: number}) => {
+      goto: async (
+        url: string,
+        opts?: {waitUntil?: string; timeout?: number},
+      ) => {
         calledUrl = url;
         calledOptions = opts;
       },
@@ -54,7 +57,10 @@ describe('PageNavigation', () => {
   it('navigate forwards options', async () => {
     let calledOptions: {waitUntil?: string; timeout?: number} | undefined;
     const page = makePage({
-      goto: async (_url: string, opts?: {waitUntil?: string; timeout?: number}) => {
+      goto: async (
+        _url: string,
+        opts?: {waitUntil?: string; timeout?: number},
+      ) => {
         calledOptions = opts;
       },
     });

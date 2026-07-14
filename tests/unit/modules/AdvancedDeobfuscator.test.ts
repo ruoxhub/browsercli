@@ -6,16 +6,16 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {
-  applyASTOptimizations,
-  estimateCodeComplexity,
-  normalizeCode,
-} from '../../../src/modules/deobfuscator/astUtils.js';
 import {AdvancedDeobfuscator} from '../../../src/modules/deobfuscator/AdvancedDeobfuscator.js';
 import type {
   AdvancedDeobfuscateOptions,
   AdvancedDeobfuscateResult,
 } from '../../../src/modules/deobfuscator/AdvancedDeobfuscator.js';
+import {
+  applyASTOptimizations,
+  estimateCodeComplexity,
+  normalizeCode,
+} from '../../../src/modules/deobfuscator/astUtils.js';
 
 interface LLMServiceLike {
   chat(messages: unknown[]): Promise<{content: string} | string>;

@@ -8,8 +8,8 @@ import type {TrafficSummary} from '../formatters/websocketFormatter.js';
 import type {Context} from '../tools/ToolDefinition.js';
 import type {TraceResult} from '../trace-processing/parse.js';
 
-import type {ToolContextProvider} from './ToolContext.js';
 import {wrapFrameWithTimeout} from './timeoutUtils.js';
+import type {ToolContextProvider} from './ToolContext.js';
 
 export class DefineToolContextFactory {
   private readonly trafficSummaryCache = new Map<number, TrafficSummary>();

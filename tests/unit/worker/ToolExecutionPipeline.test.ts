@@ -69,7 +69,8 @@ function createPipeline(
     },
   } as unknown as ToolExecutionRouter;
   const processor = {
-    normalize: (result: unknown) => new ToolResponseProcessor().normalize(result),
+    normalize: (result: unknown) =>
+      new ToolResponseProcessor().normalize(result),
     process: options.offload ?? (response => response),
   } as unknown as ToolResponseProcessor;
   const telemetryState = options.telemetry ?? {
@@ -147,7 +148,8 @@ describe('ToolExecutionPipeline', () => {
       execute: async () => ({ok: true}),
     } as unknown as ToolExecutionRouter;
     const processor = {
-      normalize: (result: unknown) => new ToolResponseProcessor().normalize(result),
+      normalize: (result: unknown) =>
+        new ToolResponseProcessor().normalize(result),
       process: (response: unknown) => response,
     } as unknown as ToolResponseProcessor;
     const failures: unknown[] = [];
@@ -228,7 +230,8 @@ describe('ToolExecutionPipeline', () => {
       execute: async () => ({ok: true}),
     } as unknown as ToolExecutionRouter;
     const processor = {
-      normalize: (result: unknown) => new ToolResponseProcessor().normalize(result),
+      normalize: (result: unknown) =>
+        new ToolResponseProcessor().normalize(result),
       process: (response: unknown) => response,
     } as unknown as ToolResponseProcessor;
     const failures: unknown[] = [];

@@ -4,7 +4,6 @@
   "description": "JavaScript reverse engineering and debugging",
   "type": "module",
   "bin": {
-    "browsercli": "./build/src/bin/browsercli.js",
     "js-reverse-worker": "./build/src/index.js"
   },
   "main": "index.js",
@@ -12,7 +11,7 @@
     "clean": "node -e \"require('fs').rmSync('build', {recursive: true, force: true})\"",
     "bundle": "npm run clean && npm run build && rollup -c rollup.config.mjs",
     "build:dev": "swc src tests -d build --extensions .ts",
-    "build": "npm run build:index && npm run build:compile && npm run build:post",
+    "build": "npm run build:index && npm run build:compile && npm run web:build && npm run build:post",
     "typecheck": "tsc --noEmit",
     "format": "eslint --cache --fix src/ scripts/ || true; prettier --write --cache src/ scripts/",
     "check-format": "eslint --cache . && prettier --check --cache .;",
@@ -47,17 +46,18 @@
     "cli:start": "browsercli start",
     "cli:worker:stop": "browsercli stop",
     "cli:worker:status": "browsercli status",
-    "web:build": "npm --workspace @jsreverser/web run build",
-    "web:dev": "npm --workspace @jsreverser/web run dev",
-    "web:typecheck": "npm --workspace @jsreverser/web run typecheck",
+    "web:build": "tsc --noEmit -p src/web-ui/tsconfig.json && vite build --config vite.web-ui.config.ts",
+    "web:dev": "vite --config vite.web-ui.config.ts",
+    "web:typecheck": "tsc --noEmit -p src/web-ui/tsconfig.json",
     "build:index": "node --experimental-strip-types scripts/generate-tools-index.ts",
-    "build:compile": "swc src tests -d build --extensions .ts",
+    "build:compile": "swc src tests -d build --extensions .ts --ignore \"src/web-ui/**\"",
     "build:post": "node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/post-build.ts",
     "test:worker": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/unit/worker/**/*.test.js",
     "test:registry": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/unit/tools/ToolRegistry*.test.js"
   },
   "files": [
     "build/src",
+    "build/web",
     "build/node_modules",
     "LICENSE",
     "!*.tsbuildinfo"
@@ -69,9 +69,6 @@
     "url": "https://github.com/zhizhuodemao/js-reverse-mcp/issues"
   },
   "homepage": "https://github.com/zhizhuodemao/js-reverse-mcp#readme",
-  "workspaces": [
-    "apps/*"
-  ],
   "mcpName": "io.github.zhizhuodemao/browsercli",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
@@ -97,7 +94,14 @@
     "ws": "^8.20.0",
     "xbogus": "^1.0.2",
     "yargs": "18.0.0",
-    "zod": "^3.25.76"
+    "zod": "^3.25.76",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.16.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^7.15.0",
+    "tailwind-merge": "^2.5.5",
+    "zustand": "^5.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.35.0",
@@ -137,7 +141,13 @@
     "sinon": "^21.0.0",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.43.0",
-    "vitest": "^4.1.6"
+    "vitest": "^4.1.6",
+    "@tailwindcss/vite": "^4.3.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^6.0.0",
+    "tailwindcss": "^4.3.0",
+    "vite": "^8.0.0"
   },
   "engines": {
     "node": "^20.19.0 || ^22.12.0 || >=23"

@@ -26,6 +26,7 @@
 ## File Structure
 
 **新建文件：**
+
 - `src/worker/JobStore.ts` — 内存 Job 生命周期存储（`pending→running→done/failed`）。
 - `src/web/middleware/bearerAuth.ts` — Bearer Token 中间件（仅 `/api/v1/*`，按 bind host + token 配置放行/拒绝）。
 - `src/web/routes/apiV1.ts` — `/api/v1` 全部路由（health/tools/sessions/invoke/jobs）。
@@ -36,6 +37,7 @@
 - `tests/integration/workerHttp.test.ts`
 
 **修改文件：**
+
 - `src/worker/ToolAdapter.ts` — 新增公共 `executeTool(meta, params, sessionId?)`。
 - `src/web/ConsoleServer.ts` — `ConsoleServerOptions` 增 `host`/`apiToken`/`jobStore`；`start()` 豁免 `/api/v1` 的 `rejectIfNotLocal`、改可配置 host、挂载 `/api/v1`、启动期 `ensureToolsMeta()`。
 - `src/index.ts` — 按 `WORKER_TRANSPORT` 分支：默认 `http` 跳过 `RpcClient`/`registerAll` 旧路径；保留 `sekiro` 回退。
@@ -48,10 +50,12 @@
 ## Task 1: JobStore（内存异步 Job 模型）
 
 **Files:**
+
 - Create: `src/worker/JobStore.ts`
 - Test: `tests/unit/web/JobStore.test.ts`
 
 **Interfaces:**
+
 - Consumes: `ToolMeta`（来自 `src/cli/tools-meta.ts`），`ToolAdapter`（后续 Task 5 提供 `executeTool`）。
 - Produces: `JobStore` 类，被 `src/web/routes/apiV1.ts` 在 `/invoke` 与 `/jobs/:id` 中使用。
 
@@ -140,7 +144,11 @@ export interface Job {
 export class JobStore {
   private readonly jobs = new Map<string, Job>();
 
-  create(sessionId: string, tool: string, params: Record<string, unknown>): Job {
+  create(
+    sessionId: string,
+    tool: string,
+    params: Record<string, unknown>,
+  ): Job {
     const jobId = `job_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
     const job: Job = {
       jobId,
@@ -202,10 +210,12 @@ git commit -m "feat(worker): 新增内存异步 JobStore"
 ## Task 2: Bearer Token 中间件
 
 **Files:**
+
 - Create: `src/web/middleware/bearerAuth.ts`
 - Test: `tests/unit/web/bearerAuth.test.ts`
 
 **Interfaces:**
+
 - Consumes: `IncomingMessage`/`ServerResponse`（`node:http`），配置 `{apiToken?: string; bindHost: string}`。
 - Produces: `bearerAuth(req, res, cfg): boolean` —— 返回 `true` 表示已拒绝（调用方应 `return`）；`false` 表示放行。
 
@@ -236,25 +246,52 @@ function mockRes() {
 describe('bearerAuth', () => {
   it('loopback + no token => allow', () => {
     const res = mockRes();
-    assert.equal(bearerAuth(mockReq({remote: '127.0.0.1'}), res, {bindHost: '127.0.0.1'}), false);
+    assert.equal(
+      bearerAuth(mockReq({remote: '127.0.0.1'}), res, {bindHost: '127.0.0.1'}),
+      false,
+    );
   });
   it('non-loopback + no token => reject 401', () => {
     const res = mockRes();
-    assert.equal(bearerAuth(mockReq({remote: '192.168.1.5'}), res, {bindHost: '0.0.0.0', apiToken: 'secret'}), true);
+    assert.equal(
+      bearerAuth(mockReq({remote: '192.168.1.5'}), res, {
+        bindHost: '0.0.0.0',
+        apiToken: 'secret',
+      }),
+      true,
+    );
     assert.equal(res.statusCode, 401);
   });
   it('non-loopback + wrong token => reject 401', () => {
     const res = mockRes();
-    assert.equal(bearerAuth(mockReq({remote: '192.168.1.5', auth: 'Bearer bad'}), res, {bindHost: '0.0.0.0', apiToken: 'secret'}), true);
+    assert.equal(
+      bearerAuth(mockReq({remote: '192.168.1.5', auth: 'Bearer bad'}), res, {
+        bindHost: '0.0.0.0',
+        apiToken: 'secret',
+      }),
+      true,
+    );
     assert.equal(res.statusCode, 401);
   });
   it('non-loopback + correct token => allow', () => {
     const res = mockRes();
-    assert.equal(bearerAuth(mockReq({remote: '192.168.1.5', auth: 'Bearer secret'}), res, {bindHost: '0.0.0.0', apiToken: 'secret'}), false);
+    assert.equal(
+      bearerAuth(mockReq({remote: '192.168.1.5', auth: 'Bearer secret'}), res, {
+        bindHost: '0.0.0.0',
+        apiToken: 'secret',
+      }),
+      false,
+    );
   });
   it('explicit token set on loopback but missing => reject 401', () => {
     const res = mockRes();
-    assert.equal(bearerAuth(mockReq({remote: '127.0.0.1'}), res, {bindHost: '127.0.0.1', apiToken: 'secret'}), true);
+    assert.equal(
+      bearerAuth(mockReq({remote: '127.0.0.1'}), res, {
+        bindHost: '127.0.0.1',
+        apiToken: 'secret',
+      }),
+      true,
+    );
     assert.equal(res.statusCode, 401);
   });
 });
@@ -301,13 +338,21 @@ export function bearerAuth(
   if (!requiresAuth) return false;
 
   const header = req.headers['authorization'];
-  if (typeof header === 'string' && cfg.apiToken && header === `Bearer ${cfg.apiToken}`) {
+  if (
+    typeof header === 'string' &&
+    cfg.apiToken &&
+    header === `Bearer ${cfg.apiToken}`
+  ) {
     return false;
   }
 
   res.statusCode = 401;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.end(JSON.stringify({error: {code: 'UNAUTHORIZED', message: 'Missing or invalid bearer token'}}));
+  res.end(
+    JSON.stringify({
+      error: {code: 'UNAUTHORIZED', message: 'Missing or invalid bearer token'},
+    }),
+  );
   return true;
 }
 ```
@@ -329,10 +374,12 @@ git commit -m "feat(web): 新增 Bearer Token 认证中间件"
 ## Task 3: ToolAdapter.executeTool 公共方法
 
 **Files:**
+
 - Modify: `src/worker/ToolAdapter.ts`（新增方法）
 - Test: 复用 `tests/integration/workerHttp.test.ts`（Task 6 统一集成）
 
 **Interfaces:**
+
 - Consumes: 现有 `this.pipeline: ToolExecutionPipeline`、`this.contextProvider: ToolContextProvider`（假定有 `setActiveSession`/`clearActiveSession`；若无，本任务内补 no-op 兼容方法）。
 - Produces: `executeTool(meta: ToolMeta, params: Record<string, unknown>, sessionId?: string): Promise<unknown>`，供 `apiV1` 路由调用。
 
@@ -396,11 +443,13 @@ git commit -m "feat(worker): ToolAdapter 暴露 executeTool 供 HTTP 路由复�
 ## Task 4: /api/v1 路由
 
 **Files:**
+
 - Create: `src/web/routes/apiV1.ts`
 - Modify: `src/web/ConsoleServer.ts`（Task 5 完成挂载，本任务仅产出路由工厂）
 - Test: `tests/integration/workerHttp.test.ts`（Task 6）
 
 **Interfaces:**
+
 - Consumes: `ToolAdapter.executeTool`（Task 3）、`JobStore`（Task 1）、`getToolMeta`/`ensureToolsMeta`/`getAllToolsMeta`（来自 `src/cli/tools-meta.ts`）、`WsHub`（来自 `src/web/ws/WsHub.ts`，用于 WS 流）。
 - Produces: `createApiV1Routes(deps): Map<string, RouteHandler>`，被 `ConsoleServer` 以 `router.mount(...)` 挂载。依赖形状：`{toolAdapter, jobStore, wsHub, getToolMeta, listToolsMeta, ensureToolsMeta}`。
 
@@ -440,12 +489,17 @@ const sessions = new Map<string, {sessionId: string; createdAt: string}>();
 const startTime = Date.now();
 let pkgVersion = '0.0.0';
 try {
-  pkgVersion = (await import('../../../package.json', {with: {type: 'json'}})).default.version ?? '0.0.0';
+  pkgVersion =
+    (await import('../../../package.json', {with: {type: 'json'}})).default
+      .version ?? '0.0.0';
 } catch {
   // ignore
 }
 
-function readJsonBody(req: IncomingMessage, limitBytes = 4 * 1024 * 1024): Promise<Record<string, unknown>> {
+function readJsonBody(
+  req: IncomingMessage,
+  limitBytes = 4 * 1024 * 1024,
+): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
     let received = 0;
     const chunks: Buffer[] = [];
@@ -475,7 +529,11 @@ export function createApiV1Routes(deps: ApiV1Deps): Map<string, RouteHandler> {
   const routes = new Map<string, RouteHandler>();
 
   routes.set('GET /health', async (_req, res) => {
-    sendJson(res, 200, {status: 'ok', uptimeMs: Date.now() - startTime, version: pkgVersion});
+    sendJson(res, 200, {
+      status: 'ok',
+      uptimeMs: Date.now() - startTime,
+      version: pkgVersion,
+    });
   });
 
   routes.set('GET /tools', async (_req, res) => {
@@ -504,14 +562,22 @@ export function createApiV1Routes(deps: ApiV1Deps): Map<string, RouteHandler> {
   routes.set('DELETE /sessions/:id', async (_req, res, params) => {
     const existed = sessions.delete(params!.id);
     if (!existed) {
-      sendError(res, 404, 'SESSION_NOT_FOUND', `session not found: ${params!.id}`);
+      sendError(
+        res,
+        404,
+        'SESSION_NOT_FOUND',
+        `session not found: ${params!.id}`,
+      );
       return;
     }
     sendJson(res, 200, {deleted: true});
   });
 
   routes.set('POST /sessions/:id/invoke', async (req, res, params) => {
-    const body = (await readJsonBody(req)) as {tool?: string; params?: Record<string, unknown>};
+    const body = (await readJsonBody(req)) as {
+      tool?: string;
+      params?: Record<string, unknown>;
+    };
     const tool = body.tool;
     if (!tool || typeof tool !== 'string') {
       sendError(res, 400, 'VALIDATION', 'body.tool (string) is required');
@@ -524,7 +590,12 @@ export function createApiV1Routes(deps: ApiV1Deps): Map<string, RouteHandler> {
     }
     const sessionId = params!.id;
     if (!sessions.has(sessionId)) {
-      sendError(res, 404, 'SESSION_NOT_FOUND', `session not found: ${sessionId}`);
+      sendError(
+        res,
+        404,
+        'SESSION_NOT_FOUND',
+        `session not found: ${sessionId}`,
+      );
       return;
     }
     const job = deps.jobStore.create(sessionId, tool, body.params ?? {});
@@ -558,7 +629,10 @@ async function runJob(
     deps.jobStore.complete(jobId, result);
   } catch (err) {
     const e = err as {code?: string; message?: string};
-    deps.jobStore.fail(jobId, {code: e.code ?? 'RUNTIME', message: e.message ?? String(err)});
+    deps.jobStore.fail(jobId, {
+      code: e.code ?? 'RUNTIME',
+      message: e.message ?? String(err),
+    });
   }
 }
 ```
@@ -582,10 +656,12 @@ git commit -m "feat(web): 新增 /api/v1 路由（tools/sessions/invoke/jobs）"
 ## Task 5: ConsoleServer 挂载 /api/v1 + 配置与豁免
 
 **Files:**
+
 - Modify: `src/web/ConsoleServer.ts:30-37`（Options）、`src/web/ConsoleServer.ts:90-139`（setupRoutes）、`src/web/ConsoleServer.ts:141-264`（start）
 - Test: `tests/integration/workerHttp.test.ts`（Task 6）
 
 **Interfaces:**
+
 - Consumes: `createApiV1Routes`（Task 4）、`bearerAuth`（Task 2）、`JobStore`（Task 1）、`ensureToolsMeta`（tools-meta）。
 - Produces: 改造后的 `ConsoleServer`，支持可配置 host、对 `/api/v1/*` 豁免 `rejectIfNotLocal` 并走 bearer 认证、启动期预热工具元信息。
 
@@ -596,31 +672,33 @@ git commit -m "feat(web): 新增 /api/v1 路由（tools/sessions/invoke/jobs）"
 ```ts
 export interface ConsoleServerOptions {
   port: number;
-  host: string;            // 新增：默认 '127.0.0.1'
+  host: string; // 新增：默认 '127.0.0.1'
   group: string;
   rpcHost: string;
   runtime: Runtime;
   invoker: SekiroInvoker;
   toolAdapter: ToolAdapter;
-  apiToken?: string;        // 新增
-  jobStore: JobStore;       // 新增
+  apiToken?: string; // 新增
+  jobStore: JobStore; // 新增
 }
 ```
 
 构造函数 `setupRoutes()` 末尾追加挂载（在 `this.router.mount(createSiteExperienceRoutes())` 之后）：
 
 ```ts
-    this.router.mount(
-      createApiV1Routes({
-        toolAdapter: this.options.toolAdapter,
-        jobStore: this.options.jobStore,
-        wsHub: this.wsHub,
-        getToolMeta: (name) => getToolMeta(name),
-        listToolsMeta: () => getAllToolsMeta(),
-        ensureToolsMeta,
-      }),
-    );
-    void ensureToolsMeta().catch(err => console.warn('[ConsoleServer] ensureToolsMeta 失败:', err));
+this.router.mount(
+  createApiV1Routes({
+    toolAdapter: this.options.toolAdapter,
+    jobStore: this.options.jobStore,
+    wsHub: this.wsHub,
+    getToolMeta: name => getToolMeta(name),
+    listToolsMeta: () => getAllToolsMeta(),
+    ensureToolsMeta,
+  }),
+);
+void ensureToolsMeta().catch(err =>
+  console.warn('[ConsoleServer] ensureToolsMeta 失败:', err),
+);
 ```
 
 > 需在文件顶部 import 增加：`import {JobStore} from '../worker/JobStore.js';`、`import {createApiV1Routes} from './routes/apiV1.js';`、`import {bearerAuth} from './middleware/bearerAuth.js';`（`getToolMeta`/`getAllToolsMeta`/`ensureToolsMeta` 已部分导入，按需补全）。
@@ -630,26 +708,31 @@ export interface ConsoleServerOptions {
 将 `start()` 中的：
 
 ```ts
-        if (rejectIfNotLocal(req, res)) {
-          return;
-        }
+if (rejectIfNotLocal(req, res)) {
+  return;
+}
 
-        const pathname = (req.url ?? '').split('?')[0] || '/';
+const pathname = (req.url ?? '').split('?')[0] || '/';
 ```
 
 改为：
 
 ```ts
-        const pathname = (req.url ?? '').split('?')[0] || '/';
+const pathname = (req.url ?? '').split('?')[0] || '/';
 
-        // /api/v1/* 豁免本地校验，改走 Bearer Token 认证
-        if (pathname.startsWith('/api/v1/')) {
-          if (bearerAuth(req, res, {apiToken: this.options.apiToken, bindHost: this.options.host})) {
-            return;
-          }
-        } else if (rejectIfNotLocal(req, res)) {
-          return;
-        }
+// /api/v1/* 豁免本地校验，改走 Bearer Token 认证
+if (pathname.startsWith('/api/v1/')) {
+  if (
+    bearerAuth(req, res, {
+      apiToken: this.options.apiToken,
+      bindHost: this.options.host,
+    })
+  ) {
+    return;
+  }
+} else if (rejectIfNotLocal(req, res)) {
+  return;
+}
 ```
 
 将监听行：
@@ -681,9 +764,11 @@ git commit -m "feat(web): ConsoleServer 挂载 /api/v1 并支持可配置 host �
 ## Task 6: 集成测试（loopback + 跨网络认证 + WS 流）
 
 **Files:**
+
 - Create: `tests/integration/workerHttp.test.ts`
 
 **Interfaces:**
+
 - Consumes: 完整 worker 启动链路（`getRuntime`、`ToolContextProvider`、`ToolAdapter`、`ConsoleServer` 带 `host`/`jobStore`/`apiToken`）。
 - Produces: 验证 (a) loopback 起 worker → `GET /api/v1/health`、`GET /api/v1/tools` 可用；(b) 非 loopback + 无 token → `401`；(c) 带 token 正常；(d) `POST /sessions` → `POST /sessions/:id/invoke` → 轮询 `GET /jobs/:id` 拿到 `done`+`result`；(e) WS `/sessions/:id/stream` 收到 `tool.invoke` 事件。
 
@@ -700,7 +785,11 @@ import {ConsoleServer} from '../../src/web/ConsoleServer.js';
 import {JobStore} from '../../src/worker/JobStore.js';
 import {ensureToolsMeta, getToolMeta} from '../../src/cli/tools-meta.js';
 
-async function startWorker(opts: {host: string; port: number; apiToken?: string}) {
+async function startWorker(opts: {
+  host: string;
+  port: number;
+  apiToken?: string;
+}) {
   const runtime = getRuntime();
   await runtime.browserManager.ensureBrowser();
   const ctx = new ToolContextProvider(runtime);
@@ -737,13 +826,13 @@ describe('worker http api', () => {
   it('health returns ok', async () => {
     const r = await fetch(`${BASE}/health`);
     assert.equal(r.status, 200);
-    const j = await r.json() as any;
+    const j = (await r.json()) as any;
     assert.equal(j.status, 'ok');
   });
 
   it('lists tools', async () => {
     const r = await fetch(`${BASE}/tools`);
-    const j = await r.json() as any;
+    const j = (await r.json()) as any;
     assert.ok(Array.isArray(j.tools) && j.tools.length > 0);
   });
 
@@ -753,7 +842,9 @@ describe('worker http api', () => {
       console.warn('skip: get_runtime_info 不存在');
       return;
     }
-    const s = await (await fetch(`${BASE}/sessions`, {method: 'POST'})).json() as any;
+    const s = (await (
+      await fetch(`${BASE}/sessions`, {method: 'POST'})
+    ).json()) as any;
     const inv = await fetch(`${BASE}/sessions/${s.sessionId}/invoke`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
@@ -783,27 +874,35 @@ Expected: PASS（health、tools、invoke 轮询均通过）。
 - [ ] **Step3: 补充认证与 WS 用例（追加到同一 describe）**
 
 ```ts
-  it('rejects when apiToken set but missing on loopback', async () => {
-    const s2 = await startWorker({host: '127.0.0.1', port: 18766, apiToken: 'secret'});
-    try {
-      const r = await fetch('http://127.0.0.1:18766/api/v1/health');
-      assert.equal(r.status, 401);
-    } finally {
-      await s2.stop();
-    }
+it('rejects when apiToken set but missing on loopback', async () => {
+  const s2 = await startWorker({
+    host: '127.0.0.1',
+    port: 18766,
+    apiToken: 'secret',
   });
+  try {
+    const r = await fetch('http://127.0.0.1:18766/api/v1/health');
+    assert.equal(r.status, 401);
+  } finally {
+    await s2.stop();
+  }
+});
 
-  it('allows with correct token', async () => {
-    const s2 = await startWorker({host: '127.0.0.1', port: 18767, apiToken: 'secret'});
-    try {
-      const r = await fetch('http://127.0.0.1:18767/api/v1/health', {
-        headers: {authorization: 'Bearer secret'},
-      });
-      assert.equal(r.status, 200);
-    } finally {
-      await s2.stop();
-    }
+it('allows with correct token', async () => {
+  const s2 = await startWorker({
+    host: '127.0.0.1',
+    port: 18767,
+    apiToken: 'secret',
   });
+  try {
+    const r = await fetch('http://127.0.0.1:18767/api/v1/health', {
+      headers: {authorization: 'Bearer secret'},
+    });
+    assert.equal(r.status, 200);
+  } finally {
+    await s2.stop();
+  }
+});
 ```
 
 - [ ] **Step4: 运行全部集成测试**
@@ -823,10 +922,12 @@ git commit -m "test(integration): 覆盖 /api/v1 健康检查、工具列表、�
 ## Task 7: WorkerHttpClient（CLI 客户端 + request-response 封装 + 会话缓存 + 首轮立即轮询）
 
 **Files:**
+
 - Create: `src/cli/WorkerHttpClient.ts`
 - Test: `tests/unit/cli/WorkerHttpClient.test.ts`
 
 **Interfaces:**
+
 - Consumes: `/api/v1` 端点（Task 4/5 已落地）。底层用 `fetch`（Node 18+ 内置）。
 - Produces: `WorkerHttpClient` 类，方法 `health()`、`listTools()`、`getTool(name)`、`createSession()`、`listSessions()`、`deleteSession(id)`、`submitInvoke(sessionId, tool, params): Promise<string>`（返回 jobId）、`getJob(id)`、`invoke(sessionId, tool, params, opts?): Promise<unknown>`（封装提交+轮询，返回 result 或抛 job.error）、`openStream(sessionId, onEvent): Promise<() => void>`（WebSocket）。`ensureSession()` 进程内懒建并缓存 session。
 
@@ -849,7 +950,12 @@ describe('WorkerHttpClient.invoke (request-response wrapper)', () => {
       if (req.method === 'POST' && url === '/api/v1/sessions') {
         res.statusCode = 201;
         res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({sessionId: 'sess_x', createdAt: new Date().toISOString()}));
+        res.end(
+          JSON.stringify({
+            sessionId: 'sess_x',
+            createdAt: new Date().toISOString(),
+          }),
+        );
         return;
       }
       const m = url.match(/^\/api\/v1\/jobs\/(.+)$/);
@@ -886,11 +992,25 @@ describe('WorkerHttpClient.invoke (request-response wrapper)', () => {
     const failing = createServer(async (req, res) => {
       const url = (req.url ?? '').split('?')[0];
       if (req.method === 'POST' && url === '/api/v1/sessions') {
-        res.statusCode = 201; res.end(JSON.stringify({sessionId: 's'})); return;
+        res.statusCode = 201;
+        res.end(JSON.stringify({sessionId: 's'}));
+        return;
       }
       const m = url.match(/^\/api\/v1\/jobs\/(.+)$/);
-      if (m) { res.statusCode = 200; res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({jobId: m[1], status: 'failed', error: {code: 'X', message: 'boom'}})); return; }
-      res.statusCode = 404; res.end('{}');
+      if (m) {
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(
+          JSON.stringify({
+            jobId: m[1],
+            status: 'failed',
+            error: {code: 'X', message: 'boom'},
+          }),
+        );
+        return;
+      }
+      res.statusCode = 404;
+      res.end('{}');
     });
     await new Promise<void>(r => failing.listen(0, '127.0.0.1', () => r()));
     const p = `http://127.0.0.1:${(failing.address() as any).port}`;
@@ -918,10 +1038,10 @@ Expected: FAIL（模块不存在）
 import {WebSocket} from 'ws';
 
 export interface WorkerHttpClientOptions {
-  baseUrl: string;            // 默认 http://127.0.0.1:8765
+  baseUrl: string; // 默认 http://127.0.0.1:8765
   apiToken?: string;
-  timeoutMs?: number;        // 默认 300000
-  pollIntervalMs?: number;   // 默认 300
+  timeoutMs?: number; // 默认 300000
+  pollIntervalMs?: number; // 默认 300
 }
 
 export interface JobStatus {
@@ -994,10 +1114,18 @@ export class WorkerHttpClient {
   }
 
   /** 底层原语：提交 Job，返回 jobId */
-  async submitInvoke(sessionId: string, tool: string, params: Record<string, unknown>): Promise<string> {
+  async submitInvoke(
+    sessionId: string,
+    tool: string,
+    params: Record<string, unknown>,
+  ): Promise<string> {
     const res = await this.json<{jobId: string}>(
       `/sessions/${encodeURIComponent(sessionId)}/invoke`,
-      {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({tool, params})},
+      {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({tool, params}),
+      },
     );
     return res.jobId;
   }
@@ -1008,7 +1136,11 @@ export class WorkerHttpClient {
 
   /** request-response 封装：提交 + 轮询至终态，返回 result 或抛 error。
    *  首轮第 0ms 立即查，避免空等一个 pollInterval。 */
-  async invoke(sessionId: string, tool: string, params: Record<string, unknown>): Promise<unknown> {
+  async invoke(
+    sessionId: string,
+    tool: string,
+    params: Record<string, unknown>,
+  ): Promise<unknown> {
     const sid = await this.ensureSession(sessionId);
     const jobId = await this.submitInvoke(sid, tool, params);
     const deadline = Date.now() + this.timeoutMs;
@@ -1016,7 +1148,9 @@ export class WorkerHttpClient {
     let job = await this.getJob(jobId);
     while (job.status === 'pending' || job.status === 'running') {
       if (Date.now() > deadline) {
-        throw new Error(`invoke timeout after ${this.timeoutMs}ms (job ${jobId} status=${job.status})`);
+        throw new Error(
+          `invoke timeout after ${this.timeoutMs}ms (job ${jobId} status=${job.status})`,
+        );
       }
       await new Promise(r => setTimeout(r, this.pollIntervalMs));
       job = await this.getJob(jobId);
@@ -1028,13 +1162,18 @@ export class WorkerHttpClient {
   }
 
   /** 订阅会话事件流（hook.sample / tool.invoke / log），返回取消函数 */
-  async openStream(sessionId: string, onEvent: (event: unknown) => void): Promise<() => void> {
+  async openStream(
+    sessionId: string,
+    onEvent: (event: unknown) => void,
+  ): Promise<() => void> {
     const sid = await this.ensureSession(sessionId);
     const ws = new WebSocket(
       `${this.baseUrl.replace(/^http/, 'ws')}/api/v1/sessions/${encodeURIComponent(sid)}/stream`,
-      this.apiToken ? {headers: {authorization: `Bearer ${this.apiToken}`}} : undefined,
+      this.apiToken
+        ? {headers: {authorization: `Bearer ${this.apiToken}`}}
+        : undefined,
     );
-    ws.on('message', (data) => {
+    ws.on('message', data => {
       try {
         onEvent(JSON.parse(data.toString()));
       } catch {
@@ -1067,10 +1206,12 @@ git commit -m "feat(cli): 新增 WorkerHttpClient（request-response 封装 + �
 ## Task 8: CLI 命令改造 + index.ts 分支 + Sekiro 回退
 
 **Files:**
+
 - Modify: `src/cli/app.ts`（`resolveContext`）、`src/cli/commands/call.ts`（或等价 call 命令实现）、`src/index.ts`（`WORKER_TRANSPORT` 分支）
 - Test: `tests/unit/cli/`（命令层使用 `WorkerHttpClient` 的调用可被 mock 验证）
 
 **Interfaces:**
+
 - Consumes: `WorkerHttpClient`（Task 7）、`WORKER_URL`/`WORKER_API_TOKEN`/`WORKER_TRANSPORT` 环境变量、`WORKER_HOST`/`WORKER_PORT`（worker 端读取）。
 - Produces: `browsercli` 命令经 HTTP 调用 worker；`call` 命令为单 `await httpClient.invoke(...)`（内部已会话缓存，仅首次付建会话 RTT）；`index.ts` 默认 `http` 跳过 RpcClient/registerAll 旧路径，保留 `sekiro` 回退。
 
@@ -1105,11 +1246,14 @@ const result = await invoker.invoke(group, meta.name, validatedArgs); // 旧 Sek
 
 ```ts
 const validatedArgs = buildToolArgs(parsed, meta); // 复用现有 tool-args.ts 强制逻辑
-const sessionId = (parsed.flags.session as string | undefined) ?? httpClient.cachedSessionId;
+const sessionId =
+  (parsed.flags.session as string | undefined) ?? httpClient.cachedSessionId;
 const result = await httpClient.invoke(sessionId, meta.name, validatedArgs); // request-response（内部会话缓存）
 // --watch：额外开流订阅该会话
 if (parsed.flags.watch) {
-  const close = await httpClient.openStream(sessionId, (ev) => console.log('[stream]', ev));
+  const close = await httpClient.openStream(sessionId, ev =>
+    console.log('[stream]', ev),
+  );
   process.once('exit', close);
 }
 printResult(result);
@@ -1124,9 +1268,14 @@ printResult(result);
 ```ts
 const transport = process.env.WORKER_TRANSPORT ?? 'http';
 if (transport === 'sekiro') {
-  const client = new RpcClient({group: options.group, rpcHost: options.rpcHost});
+  const client = new RpcClient({
+    group: options.group,
+    rpcHost: options.rpcHost,
+  });
   registerBuiltinActions(client);
-  await toolAdapter.registerAll((name, handler) => client.registerAction(name, handler));
+  await toolAdapter.registerAll((name, handler) =>
+    client.registerAction(name, handler),
+  );
   await client.start();
   console.log('[Worker] 已通过 Sekiro 连接 Rpc Server');
 } else {
@@ -1153,15 +1302,18 @@ git commit -m "feat(cli): browsercli 改为纯 HTTP 客户端，index.ts 默认 
 ## Task 9: 文档 — 独立部署 worker 指南
 
 **Files:**
+
 - Create: `docs/deploy-worker.md`（或并入现有 `docs/` 合适位置）
 
 **Interfaces:**
+
 - Consumes: 本计划全部运行时配置项（`WORKER_HOST`/`WORKER_PORT`/`WORKER_API_TOKEN`/`WORKER_URL`/`WORKER_API_TOKEN`/`WORKER_TRANSPORT`/`WORKER_TIMEOUT_MS`/`WORKER_POLL_MS`/`JS_REVERSE_TOOL_PROFILE`）。
 - Produces: 给用户的部署与调用说明。
 
 - [ ] **Step1: 写文档**
 
 包含：
+
 1. **启动 worker 服务**：`WORKER_HOST=0.0.0.0 WORKER_PORT=8765 WORKER_API_TOKEN=<token> node build/src/index.js`（默认 `WORKER_TRANSPORT=http`，不连 Sekiro）。
 2. **客户端配置**：`WORKER_URL=http://<host>:8765 WORKER_API_TOKEN=<token> browsercli call <tool> ...`。
 3. **nginx HTTPS 示例**：`location /api/v1/ { proxy_pass http://127.0.0.1:8765; proxy_set_header Authorization $http_authorization; }` + `listen 443 ssl;`。

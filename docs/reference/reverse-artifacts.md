@@ -53,6 +53,7 @@
 - 给 Codex / Claude / Gemini 续做同一个任务
 
 注意：
+
 - 可执行脚本与链路数据统一放 `artifacts/tasks/`，目录结构保持稳定便于复用。
 - `scripts/cases/*` 仍保持抽象模板，不放可直接复用实现。
 - 可直接复用任务骨架：`artifacts/tasks/_TEMPLATE/`。
@@ -63,10 +64,12 @@
 如果目标是让 Python 直接调用某个签名函数，推荐产出两类不同文件：
 
 1. local rebuild 文件
+
 - 用于补环境、调试、读取代理 env log、定位 first divergence
 - 典型文件：`env/env.js`、`env/polyfills.js`、`env/entry.js`
 
 2. portable runtime 文件
+
 - 用于外部宿主直接调用
 - 典型文件：`run/exported-runtime.js`
 
@@ -78,7 +81,6 @@
 4. 最后让 Python `execjs`、`quickjs` 或其他宿主调用导出函数
 
 不要反过来直接在 `execjs` 里做补环境，这会让调试和定位缺口变得更困难。
-
 
 ## 关于 pure algorithm 产物
 

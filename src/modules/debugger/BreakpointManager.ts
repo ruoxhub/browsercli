@@ -24,6 +24,7 @@ import type {
   BreakpointHitEvent,
 } from '../../types/index.js';
 import {logger} from '../../utils/logger.js';
+
 import type {
   BreakLocation,
   BreakpointInfo,
@@ -133,7 +134,7 @@ export class BreakpointManager {
 
     const result = await this.getCDPSession().send(
       'Debugger.setBreakpointByUrl',
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       {
         urlRegex: params.urlRegex,
         lineNumber: params.lineNumber,
@@ -257,7 +258,11 @@ export class BreakpointManager {
       throw new Error('start.scriptId is required');
     }
 
-    const params: {start: Location; end?: Location; restrictToFunction?: boolean} = {
+    const params: {
+      start: Location;
+      end?: Location;
+      restrictToFunction?: boolean;
+    } = {
       start,
     };
     if (end) {
@@ -410,7 +415,9 @@ export class BreakpointManager {
   ): void {
     const bp = this.breakpoints.get(params.breakpointId);
     if (bp) {
-      const loc = params.location as {scriptId?: string; lineNumber?: number; columnNumber?: number} | undefined;
+      const loc = params.location as
+        | {scriptId?: string; lineNumber?: number; columnNumber?: number}
+        | undefined;
       if (loc) {
         bp.location = {
           scriptId: loc.scriptId ?? bp.location.scriptId,

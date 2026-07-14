@@ -27,11 +27,11 @@ GitNexus 对当前项目做了全量代码智能分析，发现 4 类架构问�
 
 评估了 3 种方案：
 
-| 方案 | 描述 | 选择 |
-|------|------|------|
-| A. 自底向上，风险递进 | 死代码→循环依赖→上帝文件→高扇入 | **采用** |
-| B. 自顶向下，架构优先 | 先定义模块边界图再统一重构 | 前期成本过高，项目活跃迭代中 |
-| C. Hub-first，先拆 ToolContext | 直击耦合最严重的单点 | 单次改动影响面过大（12 个依赖文件） |
+| 方案                           | 描述                            | 选择                                |
+| ------------------------------ | ------------------------------- | ----------------------------------- |
+| A. 自底向上，风险递进          | 死代码→循环依赖→上帝文件→高扇入 | **采用**                            |
+| B. 自顶向下，架构优先          | 先定义模块边界图再统一重构      | 前期成本过高，项目活跃迭代中        |
+| C. Hub-first，先拆 ToolContext | 直击耦合最严重的单点            | 单次改动影响面过大（12 个依赖文件） |
 
 方案 A 与项目近期的小步重构节奏一致（最近 10 个 commit 均为局部重构），且每阶段产出独立可交付成果。
 
@@ -45,24 +45,24 @@ GitNexus 发现 40+ 个无调用者的函数。经交叉验证，大部分为误
 
 ### 确认的死导出
 
-| 文件 | 死导出 | 验证方式 |
-|------|--------|---------|
-| `src/formatters/consoleFormatter.ts` | `formatConsoleEventShort` | 全项目 grep 仅在本文件出现 |
-| `src/formatters/networkFormatter.ts` | `getFormattedHeaderValue` | 同上 |
-| `src/formatters/networkFormatter.ts` | `getFormattedResponseBody` | 同上 |
-| `src/formatters/networkFormatter.ts` | `getFormattedRequestBody` | 同上 |
-| `src/cli/tools-meta.ts` | `getToolArgSpecs` | 同上 |
-| `src/cli/tools-meta.ts` | `loadToolMeta` | 同上 |
+| 文件                                 | 死导出                     | 验证方式                   |
+| ------------------------------------ | -------------------------- | -------------------------- |
+| `src/formatters/consoleFormatter.ts` | `formatConsoleEventShort`  | 全项目 grep 仅在本文件出现 |
+| `src/formatters/networkFormatter.ts` | `getFormattedHeaderValue`  | 同上                       |
+| `src/formatters/networkFormatter.ts` | `getFormattedResponseBody` | 同上                       |
+| `src/formatters/networkFormatter.ts` | `getFormattedRequestBody`  | 同上                       |
+| `src/cli/tools-meta.ts`              | `getToolArgSpecs`          | 同上                       |
+| `src/cli/tools-meta.ts`              | `loadToolMeta`             | 同上                       |
 
 ### 确认的误报
 
-| 函数 | 实际状态 |
-|------|---------|
+| 函数                                           | 实际状态                                                        |
+| ---------------------------------------------- | --------------------------------------------------------------- |
 | CLI 命令（configCommand, listToolsCommand 等） | 通过 `src/cli/index.ts` re-export，被 `app.ts` 注册到 commander |
-| `createWorkerContext` | 被 `bin/js-reverse.ts` 导入 |
-| `resolveAutoConnectTarget` | 被 `src/browser/index.ts` re-export |
-| `ensureBrowserConnected/Launched` | 被 `src/browser/index.ts` re-export |
-| `callFrames`, `timer`, `found` 等 | 局部变量，GitNexus 误识别为独立函数 |
+| `createWorkerContext`                          | 被 `bin/js-reverse.ts` 导入                                     |
+| `resolveAutoConnectTarget`                     | 被 `src/browser/index.ts` re-export                             |
+| `ensureBrowserConnected/Launched`              | 被 `src/browser/index.ts` re-export                             |
+| `callFrames`, `timer`, `found` 等              | 局部变量，GitNexus 误识别为独立函数                             |
 
 ### 需要进一步确认的候选
 
@@ -105,20 +105,21 @@ GitNexus 发现 6 对文件存在双向 import。经分析，其中 4 对是纯 
 
 ### 循环依赖分类
 
-| 组 | 文件 A | 文件 B | A→B 类型 | B→A 类型 | 严重度 |
-|---|---|---|---|---|---|
-| 2 | IntelligentAnalyzer | PatternDetector | **值**（detect 函数） | 类型（Analyzer 接口） | **需修复** |
-| 4 | ToolContext | ToolExecutionPipeline | **值**（wrapFrameWithTimeout） | 类型（ToolContextProvider） | **需修复** |
-| 1 | DebuggerManager | RuntimeInspector | 类型 | 类型 | 低，不修 |
-| 3 | ToolContext | runtime | 类型 | 无直接导入 | 低，不修 |
-| 5 | tool-search-engine | tools-meta | 类型 | 值 | 低，单向值，不修 |
-| 6 | WebSocketCollector | types.ts (network) | 类型 | 类型 | 低，不修 |
+| 组  | 文件 A              | 文件 B                | A→B 类型                       | B→A 类型                    | 严重度           |
+| --- | ------------------- | --------------------- | ------------------------------ | --------------------------- | ---------------- |
+| 2   | IntelligentAnalyzer | PatternDetector       | **值**（detect 函数）          | 类型（Analyzer 接口）       | **需修复**       |
+| 4   | ToolContext         | ToolExecutionPipeline | **值**（wrapFrameWithTimeout） | 类型（ToolContextProvider） | **需修复**       |
+| 1   | DebuggerManager     | RuntimeInspector      | 类型                           | 类型                        | 低，不修         |
+| 3   | ToolContext         | runtime               | 类型                           | 无直接导入                  | 低，不修         |
+| 5   | tool-search-engine  | tools-meta            | 类型                           | 值                          | 低，单向值，不修 |
+| 6   | WebSocketCollector  | types.ts (network)    | 类型                           | 类型                        | 低，不修         |
 
 ### 修复方案
 
 #### 2.1 IntelligentAnalyzer ↔ PatternDetector
 
 **当前**：
+
 - `IntelligentAnalyzer.ts` 值导入 `detectAntiDebugPatterns`, `detectEncryptionPatterns`, `detectSignaturePatterns` 从 `PatternDetector.ts`
 - `PatternDetector.ts` 类型导入 `AnalyzerConsoleMessage`, `AnalyzerNetworkRequest` 等从 `IntelligentAnalyzer.ts`
 
@@ -127,6 +128,7 @@ GitNexus 发现 6 对文件存在双向 import。经分析，其中 4 对是纯 
 #### 2.2 ToolContext ↔ ToolExecutionPipeline
 
 **当前**：
+
 - `ToolContext.ts` 值导入 `wrapFrameWithTimeout` 从 `ToolExecutionPipeline.ts`
 - `ToolExecutionPipeline.ts` 类型导入 `DefineToolContextFactory`, `ToolContextProvider` 从 `ToolContext.ts`
 
@@ -161,13 +163,13 @@ GitNexus 发现 6 对文件存在双向 import。经分析，其中 4 对是纯 
 
 5 个文件承载了过多职责，行数和符号数远超合理范围：
 
-| 文件 | 行数 | 符号数 | 核心问题 |
-|------|------|--------|---------|
-| `src/modules/deobfuscator/Deobfuscator.ts` | 1853 | ~18 | 多种去混淆策略混合在一个类中 |
-| `src/modules/wasm/WasmAnalyzer.ts` | 1051 | ~25 | 静态分析和运行时检查混合 |
-| `src/config/resolver.ts` | 879 | ~30 | 所有配置域的解析逻辑集中 |
-| `src/modules/wasm/WasmRuntimeInspector.ts` | 842 | ~24 | 与 WasmAnalyzer 职责边界模糊 |
-| `src/worker/ToolContext.ts` | 586 | 98 (3 类) | 3 个不同职责的类共存一个文件 |
+| 文件                                       | 行数 | 符号数    | 核心问题                     |
+| ------------------------------------------ | ---- | --------- | ---------------------------- |
+| `src/modules/deobfuscator/Deobfuscator.ts` | 1853 | ~18       | 多种去混淆策略混合在一个类中 |
+| `src/modules/wasm/WasmAnalyzer.ts`         | 1051 | ~25       | 静态分析和运行时检查混合     |
+| `src/config/resolver.ts`                   | 879  | ~30       | 所有配置域的解析逻辑集中     |
+| `src/modules/wasm/WasmRuntimeInspector.ts` | 842  | ~24       | 与 WasmAnalyzer 职责边界模糊 |
+| `src/worker/ToolContext.ts`                | 586  | 98 (3 类) | 3 个不同职责的类共存一个文件 |
 
 ### 修复方案
 
@@ -177,17 +179,18 @@ GitNexus 发现 6 对文件存在双向 import。经分析，其中 4 对是纯 
 
 当前包含 3 个类，天然适合按类拆分：
 
-| 类 | 预估行数 | 职责 | 拆出到 |
-|---|---|---|---|
-| `ServiceLocator` | ~100 行 | 延迟服务工厂（getCollector, getAnalyzer 等） | `src/worker/ServiceLocator.ts` |
-| `ToolContextProvider` | ~350 行 | 浏览器/页面/网络/调试器状态管理 | 保留在 `src/worker/ToolContext.ts` |
-| `DefineToolContextFactory` | ~80 行 | 创建 MCP Context 对象供工具使用 | `src/worker/DefineToolContextFactory.ts` |
+| 类                         | 预估行数 | 职责                                         | 拆出到                                   |
+| -------------------------- | -------- | -------------------------------------------- | ---------------------------------------- |
+| `ServiceLocator`           | ~100 行  | 延迟服务工厂（getCollector, getAnalyzer 等） | `src/worker/ServiceLocator.ts`           |
+| `ToolContextProvider`      | ~350 行  | 浏览器/页面/网络/调试器状态管理              | 保留在 `src/worker/ToolContext.ts`       |
+| `DefineToolContextFactory` | ~80 行   | 创建 MCP Context 对象供工具使用              | `src/worker/DefineToolContextFactory.ts` |
 
 注意：此拆分与 Phase 2 的循环依赖修复有关联。必须先完成 Phase 2（提取 wrapFrameWithTimeout）再开始 3d。
 
 #### Phase 3a：Deobfuscator.ts 拆分
 
 **推荐策略**：
+
 - 按去混淆策略类型拆分为独立文件，每个策略一个文件
 - `Deobfuscator.ts` 保留为门面类（facade），协调各子策略的调用顺序
 - 每个子策略文件不超过 400 行
@@ -196,6 +199,7 @@ GitNexus 发现 6 对文件存在双向 import。经分析，其中 4 对是纯 
 #### Phase 3c：resolver.ts 拆分
 
 **推荐策略**：
+
 - 按配置域拆分：`browserResolver.ts`（浏览器相关）、`aiResolver.ts`（AI/LLM 相关）、`networkResolver.ts`（网络代理相关）
 - `resolver.ts` 保留为统一入口，re-export 各子解析器的公共函数
 - 提取共享的配置验证逻辑到 `configValidation.ts`（如果需要）
@@ -203,6 +207,7 @@ GitNexus 发现 6 对文件存在双向 import。经分析，其中 4 对是纯 
 #### Phase 3b：WasmAnalyzer.ts + WasmRuntimeInspector.ts 拆分
 
 **推荐策略**：
+
 - 提取共享的 Wasm 类型和辅助函数到 `WasmAnalysisUtils.ts`
 - WasmAnalyzer 聚焦静态分析（二进制解析、控制流图构建）
 - WasmRuntimeInspector 聚焦运行时检查（内存检查、函数调用追踪）
@@ -211,21 +216,25 @@ GitNexus 发现 6 对文件存在双向 import。经分析，其中 4 对是纯 
 ### 涉及文件
 
 **Phase 3d：**
+
 - 新建：`src/worker/ServiceLocator.ts`
 - 新建：`src/worker/DefineToolContextFactory.ts`
 - 修改：`src/worker/ToolContext.ts` — 移除拆出的类
 - 修改：所有 import ToolContext 中 ServiceLocator/DefineToolContextFactory 的文件
 
 **Phase 3a：**
+
 - 新建：2-4 个子策略文件（在 `src/modules/deobfuscator/` 下）
 - 修改：`src/modules/deobfuscator/Deobfuscator.ts` — 精简为门面
 - 修改：`src/modules/deobfuscator/index.ts` — 更新 re-export
 
 **Phase 3c：**
+
 - 新建：`src/config/browserResolver.ts`, `src/config/aiResolver.ts`, `src/config/networkResolver.ts`
 - 修改：`src/config/resolver.ts` — 精简为统一入口
 
 **Phase 3b：**
+
 - 新建：`src/modules/wasm/WasmAnalysisUtils.ts`
 - 修改：`src/modules/wasm/WasmAnalyzer.ts` — 聚焦静态分析
 - 修改：`src/modules/wasm/WasmRuntimeInspector.ts` — 聚焦运行时检查
@@ -249,12 +258,12 @@ GitNexus 发现 6 对文件存在双向 import。经分析，其中 4 对是纯 
 
 ### 问题描述
 
-| 函数 | 调用者数 | 所在文件 |
-|------|---------|---------|
-| `defineTool` | 102 | `src/tools/ToolDefinition.ts` |
-| `getRuntime` | 57 | `src/runtime.ts` |
-| `safeStringify` | 16 | `src/utils/safeJson.ts` |
-| `getEnvValue` | 11 | `src/config/resolver.ts` |
+| 函数            | 调用者数 | 所在文件                      |
+| --------------- | -------- | ----------------------------- |
+| `defineTool`    | 102      | `src/tools/ToolDefinition.ts` |
+| `getRuntime`    | 57       | `src/runtime.ts`              |
+| `safeStringify` | 16       | `src/utils/safeJson.ts`       |
+| `getEnvValue`   | 11       | `src/config/resolver.ts`      |
 
 这些是全局瓶颈——任何签名变更会影响数十到上百处调用方。
 
@@ -308,15 +317,15 @@ Phase 1-3 完成后，重新运行 GitNexus 分析，对比前后扇入变化。
 
 ## 实施顺序总览
 
-| Phase | 类型 | 预估影响文件数 | 风险 | 依赖 |
-|-------|------|-------------|------|------|
-| 1. 死代码清理 | 代码 | 3-5 | 极低 | 无 |
-| 2. 循环依赖 | 代码 | 6 | 低-中 | 无 |
-| 3d. ToolContext 拆分 | 代码 | 5+ | 中 | Phase 2 |
-| 3a. Deobfuscator 拆分 | 代码 | 4+ | 中 | 无 |
-| 3c. resolver 拆分 | 代码 | 4+ | 中 | 无 |
-| 3b. Wasm 模块拆分 | 代码 | 3+ | 中 | 无 |
-| 4. 高扇入稳定化 | 文档 | 3 | 极低 | Phase 1-3 |
+| Phase                 | 类型 | 预估影响文件数 | 风险  | 依赖      |
+| --------------------- | ---- | -------------- | ----- | --------- |
+| 1. 死代码清理         | 代码 | 3-5            | 极低  | 无        |
+| 2. 循环依赖           | 代码 | 6              | 低-中 | 无        |
+| 3d. ToolContext 拆分  | 代码 | 5+             | 中    | Phase 2   |
+| 3a. Deobfuscator 拆分 | 代码 | 4+             | 中    | 无        |
+| 3c. resolver 拆分     | 代码 | 4+             | 中    | 无        |
+| 3b. Wasm 模块拆分     | 代码 | 3+             | 中    | 无        |
+| 4. 高扇入稳定化       | 文档 | 3              | 极低  | Phase 1-3 |
 
 建议提交顺序：1 → 2 → 3d → (3a, 3c, 3b 互不依赖，可任意顺序) → 4。每个 Phase 独立 commit。
 

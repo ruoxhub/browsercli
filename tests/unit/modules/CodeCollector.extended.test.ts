@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { CodeCollector } from '../../../src/modules/collector/CodeCollector.js';
-import type { CodeFile, PuppeteerConfig } from '../../../src/types/index.js';
+import {CodeCollector} from '../../../src/modules/collector/CodeCollector.js';
+import type {CodeFile, PuppeteerConfig} from '../../../src/types/index.js';
 
 interface BrowserLike {
   isConnected(): boolean;
@@ -31,35 +31,41 @@ interface CodeCollectorHarness {
   cleanupCollectedUrls(): void;
   collectInlineScripts(page: object): Promise<CodeFile[]>;
   collectServiceWorkers(page: object): Promise<CodeFile[]>;
-  collectWebWorkers(page: { url(): string; evaluate(fn: unknown, workerUrl?: string): Promise<unknown> }): Promise<CodeFile[]>;
+  collectWebWorkers(page: {
+    url(): string;
+    evaluate(fn: unknown, workerUrl?: string): Promise<unknown>;
+  }): Promise<CodeFile[]>;
   extractDependencies(code: string): string[];
-  analyzeDependencies(files: CodeFile[]): { nodes: unknown[] };
+  analyzeDependencies(files: CodeFile[]): {nodes: unknown[]};
   getFilesByPattern(
     pattern: string,
     limit?: number,
     maxContentBytes?: number,
-  ): { matched: number; returned: number; files: CodeFile[] };
+  ): {matched: number; returned: number; files: CodeFile[]};
   getTopPriorityFiles(
     limit?: number,
     maxContentBytes?: number,
-  ): { files: CodeFile[] };
+  ): {files: CodeFile[]};
   calculatePriorityScore(file: CodeFile): number;
   getPerformanceMetrics(page: object): Promise<Record<string, number>>;
   collectPageMetadata(page: object): Promise<Record<string, unknown>>;
-  getCollectedFilesSummary(): Array<{ url: string }>;
+  getCollectedFilesSummary(): Array<{url: string}>;
   getFileByUrl(url: string): CodeFile | null;
-  getCollectionStats(): { totalCollected: number; uniqueUrls: number };
+  getCollectionStats(): {totalCollected: number; uniqueUrls: number};
   clearCollectedFilesCache(): void;
   clearCache(): void;
 }
 
 function makeCollector(): CodeCollectorHarness {
-  const cfg: PuppeteerConfig = { headless: true, timeout: 2000 } as PuppeteerConfig;
+  const cfg: PuppeteerConfig = {
+    headless: true,
+    timeout: 2000,
+  } as PuppeteerConfig;
   const browserManager = {
     getBrowser: () => null,
     getCurrentPage: () => null,
     newPage: async () => ({}),
-    launch: async () => ({ isConnected: () => true, on: () => undefined }),
+    launch: async () => ({isConnected: () => true, on: () => undefined}),
     close: async () => undefined,
   } satisfies BrowserManagerLike;
   return new CodeCollector(
@@ -106,9 +112,27 @@ describe('CodeCollector extended helpers', () => {
 
     const inlinePage = {
       evaluate: async () => [
-        { url: 'inline-1', content: 'a', size: 1, type: 'inline', metadata: { truncated: false } },
-        { url: 'inline-2', content: 'b', size: 1, type: 'inline', metadata: { truncated: true } },
-        { url: 'inline-3', content: 'c', size: 1, type: 'inline', metadata: { truncated: false } },
+        {
+          url: 'inline-1',
+          content: 'a',
+          size: 1,
+          type: 'inline',
+          metadata: {truncated: false},
+        },
+        {
+          url: 'inline-2',
+          content: 'b',
+          size: 1,
+          type: 'inline',
+          metadata: {truncated: true},
+        },
+        {
+          url: 'inline-3',
+          content: 'c',
+          size: 1,
+          type: 'inline',
+          metadata: {truncated: false},
+        },
       ],
     };
     const inline = await c.collectInlineScripts(inlinePage);
@@ -119,7 +143,7 @@ describe('CodeCollector extended helpers', () => {
       evaluate: async (_fn: unknown, url?: string) => {
         evalCount += 1;
         if (!url) {
-          return [{ url: 'https://a/sw.js', scope: '/', state: 'activated' }];
+          return [{url: 'https://a/sw.js', scope: '/', state: 'activated'}];
         }
         return 'console.log("sw")';
       },
@@ -157,8 +181,13 @@ describe('CodeCollector extended helpers', () => {
     assert.ok(deps.includes('./dyn'));
 
     const graph = c.analyzeDependencies([
-      { url: 'https://x/a.js', content: `import z from './b'`, size: 1, type: 'external' },
-      { url: 'https://x/b.js', content: '', size: 1, type: 'external' },
+      {
+        url: 'https://x/a.js',
+        content: `import z from './b'`,
+        size: 1,
+        type: 'external',
+      },
+      {url: 'https://x/b.js', content: '', size: 1, type: 'external'},
     ]);
     assert.strictEqual(graph.nodes.length, 2);
 
@@ -198,7 +227,7 @@ describe('CodeCollector extended helpers', () => {
     const c = makeCollector();
 
     const perfOk = await c.getPerformanceMetrics({
-      evaluate: async () => ({ totalTime: 1 }),
+      evaluate: async () => ({totalTime: 1}),
     });
     assert.strictEqual(perfOk.totalTime, 1);
 
@@ -210,7 +239,7 @@ describe('CodeCollector extended helpers', () => {
     assert.deepStrictEqual(perfBad, {});
 
     const metaOk = await c.collectPageMetadata({
-      evaluate: async () => ({ title: 't', url: 'u' }),
+      evaluate: async () => ({title: 't', url: 'u'}),
     });
     assert.strictEqual(metaOk.title, 't');
 
@@ -227,7 +256,7 @@ describe('CodeCollector extended helpers', () => {
       content: '1',
       size: 1,
       type: 'external',
-      metadata: { truncated: true, originalSize: 2 },
+      metadata: {truncated: true, originalSize: 2},
     });
     const summary = c.getCollectedFilesSummary();
     assert.strictEqual(summary.length, 1);

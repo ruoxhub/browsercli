@@ -16,16 +16,21 @@
 
 import assert from 'node:assert/strict';
 import {after, before, describe, it, type TestContext} from 'node:test';
+
 import {WebSocket} from 'ws';
 
+import {getRuntime} from '../../src/runtime.js';
 import {ensureToolsMeta, getToolMeta} from '../../src/tools/tools-meta.js';
 import {ConsoleServer} from '../../src/web/ConsoleServer.js';
 import {JobStore} from '../../src/worker/JobStore.js';
 import {ToolAdapter} from '../../src/worker/ToolAdapter.js';
 import {ToolContextProvider} from '../../src/worker/ToolContext.js';
-import {getRuntime} from '../../src/runtime.js';
 
-async function startWorker(opts: {host: string; port: number; apiToken?: string}) {
+async function startWorker(opts: {
+  host: string;
+  port: number;
+  apiToken?: string;
+}) {
   const runtime = getRuntime();
   await runtime.browserManager.ensureBrowser();
   const ctx = new ToolContextProvider(runtime);
@@ -102,7 +107,9 @@ describe('worker http api', () => {
       t.skip('get_runtime_info 不存在 — 跳过');
       return;
     }
-    const s = (await (await fetch(`${BASE}/sessions`, {method: 'POST'})).json()) as any;
+    const s = (await (
+      await fetch(`${BASE}/sessions`, {method: 'POST'})
+    ).json()) as any;
     const inv = await fetch(`${BASE}/sessions/${s.sessionId}/invoke`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
@@ -129,7 +136,9 @@ describe('worker http api', () => {
 
     // 真实逻辑（浏览器可用且端点就绪时会执行）：
     // 1. 创建会话
-    const s = (await (await fetch(`${BASE}/sessions`, {method: 'POST'})).json()) as any;
+    const s = (await (
+      await fetch(`${BASE}/sessions`, {method: 'POST'})
+    ).json()) as any;
     const sessionId: string = s.sessionId;
     // 2. 打开该会话的 WS 流
     const streamUrl = `ws://127.0.0.1:${PORT}/api/v1/sessions/${sessionId}/stream`;
@@ -183,7 +192,11 @@ describe('worker http api', () => {
 
   it('rejects when apiToken set but missing on loopback', async (t: TestContext) => {
     if (shouldSkip(t)) return;
-    const s2 = await startWorker({host: '127.0.0.1', port: 18766, apiToken: 'secret'});
+    const s2 = await startWorker({
+      host: '127.0.0.1',
+      port: 18766,
+      apiToken: 'secret',
+    });
     try {
       const r = await fetch('http://127.0.0.1:18766/api/v1/health');
       assert.equal(r.status, 401);
@@ -194,7 +207,11 @@ describe('worker http api', () => {
 
   it('allows with correct token', async (t: TestContext) => {
     if (shouldSkip(t)) return;
-    const s2 = await startWorker({host: '127.0.0.1', port: 18767, apiToken: 'secret'});
+    const s2 = await startWorker({
+      host: '127.0.0.1',
+      port: 18767,
+      apiToken: 'secret',
+    });
     try {
       const r = await fetch('http://127.0.0.1:18767/api/v1/health', {
         headers: {authorization: 'Bearer secret'},

@@ -41,7 +41,14 @@ export const manifest = {
     recommendParameterWorkflowTool: ['workflow', 'recommend', 'match'],
   },
   workflowRule: {
-    patterns: [/observe/i, /auto.*hook/i, /signature/i, /签名/u, /workflow/i, /blueprint/i],
+    patterns: [
+      /observe/i,
+      /auto.*hook/i,
+      /signature/i,
+      /签名/u,
+      /workflow/i,
+      /blueprint/i,
+    ],
     priority: 90,
     tools: [
       'observeFlow',

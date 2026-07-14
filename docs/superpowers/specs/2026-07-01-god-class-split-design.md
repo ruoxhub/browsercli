@@ -30,11 +30,11 @@
 
 评估了 3 种执行方案：
 
-| 方案 | 顺序 | 选择 |
-|------|------|------|
-| A. 风险递进 + 依赖优先 | CodeAnalyzer → PageController → DebuggerManager → AdvancedDeobfuscator → WasmCollector → CodeCollector | **采用** |
-| B. 价值优先 | 最大文件先拆，收益前置但风险高 | 第一刀啃最硬骨头，模式未验证 |
-| C. 模块域分组 | 按 analyzer/collector/debugger/deobfuscator 分组提交 | 回退粒度粗，与上一轮节奏不一致 |
+| 方案                   | 顺序                                                                                                   | 选择                           |
+| ---------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------ |
+| A. 风险递进 + 依赖优先 | CodeAnalyzer → PageController → DebuggerManager → AdvancedDeobfuscator → WasmCollector → CodeCollector | **采用**                       |
+| B. 价值优先            | 最大文件先拆，收益前置但风险高                                                                         | 第一刀啃最硬骨头，模式未验证   |
+| C. 模块域分组          | 按 analyzer/collector/debugger/deobfuscator 分组提交                                                   | 回退粒度粗，与上一轮节奏不一致 |
 
 方案 A 与上一轮"自底向上、风险递进"策略一致，PageController 在 WasmCollector 之前（依赖关系），最复杂的 CodeCollector 留到最后。
 
@@ -50,10 +50,10 @@
 
 ### 拆分方案
 
-| 目标文件 | 提取内容 | 预估行数 |
-|---|---|---|
-| `src/modules/analyzer/CodeAnalyzerStructure.ts` | `analyzeStructure`、`analyzeModules`、`buildCallGraph`、`calculateComplexity` —— 提取为纯函数，接受 `ast` 参数 | ~250 |
-| 保留 `src/modules/analyzer/CodeAnalyzer.ts` | `understand`（入口）、`aiAnalyze`、`detectTechStack`、`extractBusinessLogic`、`parseCodeAst`、`stripHtmlWrappers` | ~400 |
+| 目标文件                                        | 提取内容                                                                                                          | 预估行数 |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | -------- |
+| `src/modules/analyzer/CodeAnalyzerStructure.ts` | `analyzeStructure`、`analyzeModules`、`buildCallGraph`、`calculateComplexity` —— 提取为纯函数，接受 `ast` 参数    | ~250     |
+| 保留 `src/modules/analyzer/CodeAnalyzer.ts`     | `understand`（入口）、`aiAnalyze`、`detectTechStack`、`extractBusinessLogic`、`parseCodeAst`、`stripHtmlWrappers` | ~400     |
 
 **理由**：4 个结构分析方法是纯 AST 遍历，无 AI 依赖，天然可提取为独立函数集合。`parseCodeAst` 带 lastParseResult 缓存，与入口强相关，保留在门面。
 
@@ -90,12 +90,12 @@
 
 ### 拆分方案
 
-| 目标文件 | 提取方法 | 预估行数 |
-|---|---|---|
-| `src/modules/collector/PageNavigation.ts` | `navigate`、`reload`、`goBack`、`goForward`、`waitForNavigation` —— 提取为接受 `Page` 参数的纯函数 | ~180 |
-| `src/modules/collector/PageInteraction.ts` | `click`、`clickAt`、`setFiles`、`type`、`select`、`hover`、`scroll`、`scrollBy`、`waitForSelector` | ~300 |
-| `src/modules/collector/PageInfo.ts` | `getURL`、`getTitle`、`getContent`、`screenshot`、`evaluate`、storage 相关方法 | ~250 |
-| 保留 `src/modules/collector/PageController.ts` | 构造、`pageResolver` 委托、对各策略模块的薄分发 | ~250 |
+| 目标文件                                       | 提取方法                                                                                           | 预估行数 |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------- | -------- |
+| `src/modules/collector/PageNavigation.ts`      | `navigate`、`reload`、`goBack`、`goForward`、`waitForNavigation` —— 提取为接受 `Page` 参数的纯函数 | ~180     |
+| `src/modules/collector/PageInteraction.ts`     | `click`、`clickAt`、`setFiles`、`type`、`select`、`hover`、`scroll`、`scrollBy`、`waitForSelector` | ~300     |
+| `src/modules/collector/PageInfo.ts`            | `getURL`、`getTitle`、`getContent`、`screenshot`、`evaluate`、storage 相关方法                     | ~250     |
+| 保留 `src/modules/collector/PageController.ts` | 构造、`pageResolver` 委托、对各策略模块的薄分发                                                    | ~250     |
 
 **理由**：方法已是薄封装，提取为纯函数后门面仅做一行委托。保持 PageController 的公共方法签名不变，WasmCollector 等调用方无需改动。
 
@@ -131,11 +131,11 @@
 
 ### 拆分方案
 
-| 目标文件 | 提取方法 + 状态 | 预估行数 |
-|---|---|---|
-| `src/modules/debugger/BreakpointManager.ts` | `setBreakpointByUrl`、`setBreakpoint`、`removeBreakpoint`、`listBreakpoints`、`getBreakpoint`、`clearAllBreakpoints`、`setPauseOnExceptions` + `breakpoints` Map + `breakpointResolvedListener` | ~350 |
-| `src/modules/debugger/ExecutionController.ts` | `pause`、`resume`、`stepInto`、`stepOver`、`stepOut` + `pausedState`、`pausedResolvers`、`pausedListener`、`resumedListener` | ~300 |
-| 保留 `src/modules/debugger/DebuggerManager.ts` | CDP session 管理（`init`/`enable`/`disable`/`requireSession`/`getCDPSession`）、sub-manager 访问器、事件分发协调 | ~350 |
+| 目标文件                                       | 提取方法 + 状态                                                                                                                                                                                 | 预估行数 |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| `src/modules/debugger/BreakpointManager.ts`    | `setBreakpointByUrl`、`setBreakpoint`、`removeBreakpoint`、`listBreakpoints`、`getBreakpoint`、`clearAllBreakpoints`、`setPauseOnExceptions` + `breakpoints` Map + `breakpointResolvedListener` | ~350     |
+| `src/modules/debugger/ExecutionController.ts`  | `pause`、`resume`、`stepInto`、`stepOver`、`stepOut` + `pausedState`、`pausedResolvers`、`pausedListener`、`resumedListener`                                                                    | ~300     |
+| 保留 `src/modules/debugger/DebuggerManager.ts` | CDP session 管理（`init`/`enable`/`disable`/`requireSession`/`getCDPSession`）、sub-manager 访问器、事件分发协调                                                                                | ~350     |
 
 **理由**：断点管理和执行控制是两个独立 CDP 子域，各有独立状态。提取后 DebuggerManager 聚焦 session 生命周期与 sub-manager 编排。sub-manager 的访问器方法（`getWatchManager` 等）保留在门面。
 
@@ -171,15 +171,15 @@
 
 ### 拆分方案
 
-| 目标文件 | 提取方法 | 预估行数 |
-|---|---|---|
-| `src/modules/deobfuscator/InvisibleUnicodeDeobfuscator.ts` | `detectInvisibleUnicode`、`decodeInvisibleUnicode` | ~120 |
-| `src/modules/deobfuscator/VMProtectionDeobfuscator.ts` | `detectVMProtection`、`countVMInstructions`、`deobfuscateVM`、`analyzeVMStructure`、`extractVMComponents`、`buildVMDeobfuscationPrompt`、`simplifyVMCode` | ~450 |
-| `src/modules/deobfuscator/ControlFlowDeobfuscator.ts` | `detectControlFlowFlattening` + 对应 deobfuscate 方法 | ~150 |
-| `src/modules/deobfuscator/StringArrayDeobfuscator.ts` | `detectStringArrayRotation` + 对应 deobfuscate 方法 | ~150 |
-| `src/modules/deobfuscator/DeadCodeDeobfuscator.ts` | `detectDeadCodeInjection` + 对应 deobfuscate 方法 | ~120 |
-| `src/modules/deobfuscator/OpaquePredicateDeobfuscator.ts` | `detectOpaquePredicates` + 对应 deobfuscate 方法 | ~120 |
-| 保留 `src/modules/deobfuscator/AdvancedDeobfuscator.ts` | `deobfuscate`（入口编排）、`extractCodeFromLLMResponse`、`isValidJavaScript`、LLM 辅助调用 | ~350 |
+| 目标文件                                                   | 提取方法                                                                                                                                                  | 预估行数 |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| `src/modules/deobfuscator/InvisibleUnicodeDeobfuscator.ts` | `detectInvisibleUnicode`、`decodeInvisibleUnicode`                                                                                                        | ~120     |
+| `src/modules/deobfuscator/VMProtectionDeobfuscator.ts`     | `detectVMProtection`、`countVMInstructions`、`deobfuscateVM`、`analyzeVMStructure`、`extractVMComponents`、`buildVMDeobfuscationPrompt`、`simplifyVMCode` | ~450     |
+| `src/modules/deobfuscator/ControlFlowDeobfuscator.ts`      | `detectControlFlowFlattening` + 对应 deobfuscate 方法                                                                                                     | ~150     |
+| `src/modules/deobfuscator/StringArrayDeobfuscator.ts`      | `detectStringArrayRotation` + 对应 deobfuscate 方法                                                                                                       | ~150     |
+| `src/modules/deobfuscator/DeadCodeDeobfuscator.ts`         | `detectDeadCodeInjection` + 对应 deobfuscate 方法                                                                                                         | ~120     |
+| `src/modules/deobfuscator/OpaquePredicateDeobfuscator.ts`  | `detectOpaquePredicates` + 对应 deobfuscate 方法                                                                                                          | ~120     |
+| 保留 `src/modules/deobfuscator/AdvancedDeobfuscator.ts`    | `deobfuscate`（入口编排）、`extractCodeFromLLMResponse`、`isValidJavaScript`、LLM 辅助调用                                                                | ~350     |
 
 **理由**：与上一轮 `Deobfuscator.ts` 拆分完全同构——按混淆技术切分，每技术独立文件。VM 保护最大（~450 行），若实施时发现超 500 行，可在该 Phase 内进一步拆 `analyzeVMStructure` + `extractVMComponents` 到 `VMStructureAnalyzer.ts`。
 
@@ -216,12 +216,12 @@
 
 ### 拆分方案
 
-| 目标文件 | 提取内容 | 预估行数 |
-|---|---|---|
-| `src/modules/wasm/WasmPreloadScript.ts` | `buildPreloadScript` 的完整模板字面量 + 相关纯辅助函数（`normalizeSource`、`trackBuffer`、`recordEvent` 等） | ~500 |
-| `src/modules/wasm/WasmArtifactStore.ts` | `persistArtifacts`、`applyExportCallCounts` + artifact 路径管理 | ~200 |
-| `src/modules/wasm/WasmBinaryRegistry.ts` | `modulesById`/`moduleIdsByHash`/`bytesByModuleId` Map + `registerBinary`、`getModules`、`getModuleById`、`getModuleBytes` | ~250 |
-| 保留 `src/modules/wasm/WasmCollector.ts` | `collect`（协调）、`captureNetworkResponse`、`readRuntimeCaptureState`、`getRuntimeEvents` | ~400 |
+| 目标文件                                 | 提取内容                                                                                                                  | 预估行数 |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | -------- |
+| `src/modules/wasm/WasmPreloadScript.ts`  | `buildPreloadScript` 的完整模板字面量 + 相关纯辅助函数（`normalizeSource`、`trackBuffer`、`recordEvent` 等）              | ~500     |
+| `src/modules/wasm/WasmArtifactStore.ts`  | `persistArtifacts`、`applyExportCallCounts` + artifact 路径管理                                                           | ~200     |
+| `src/modules/wasm/WasmBinaryRegistry.ts` | `modulesById`/`moduleIdsByHash`/`bytesByModuleId` Map + `registerBinary`、`getModules`、`getModuleById`、`getModuleBytes` | ~250     |
+| 保留 `src/modules/wasm/WasmCollector.ts` | `collect`（协调）、`captureNetworkResponse`、`readRuntimeCaptureState`、`getRuntimeEvents`                                | ~400     |
 
 **理由**：preload script 是纯字符串生成，与收集逻辑无关；binary registry 是独立状态管理；artifact 持久化是 IO 操作。三者分离后 WasmCollector 聚焦收集协调。
 
@@ -256,12 +256,12 @@
 
 ### 拆分方案
 
-| 目标文件 | 提取方法 + 状态 | 预估行数 |
-|---|---|---|
-| `src/modules/collector/CollectedFileRegistry.ts` | `collectedFilesCache`、`collectedUrls`、`buildFileMetadata`、`hasReachedFileLimit`、`evictOldestFileIfNeeded`、`cleanupCollectedUrls`、`clearFileCache`、`getFileCacheStats` | ~300 |
-| `src/modules/collector/CdpNetworkMonitor.ts` | `cdpSession`、`cdpListeners`、CDP 事件绑定/解绑、网络响应抓取相关逻辑 | ~350 |
-| `src/modules/collector/DynamicScriptWatcher.ts` | `waitForDynamicScripts`、网络空闲等待逻辑 | ~150 |
-| 保留 `src/modules/collector/CodeCollector.ts` | `collect`（解构为编排方法）、`init`/`close`、`getActivePage`、`setPageResolver`、`getAllStats`、`getCache`/`getCompressor` | ~450 |
+| 目标文件                                         | 提取方法 + 状态                                                                                                                                                              | 预估行数 |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| `src/modules/collector/CollectedFileRegistry.ts` | `collectedFilesCache`、`collectedUrls`、`buildFileMetadata`、`hasReachedFileLimit`、`evictOldestFileIfNeeded`、`cleanupCollectedUrls`、`clearFileCache`、`getFileCacheStats` | ~300     |
+| `src/modules/collector/CdpNetworkMonitor.ts`     | `cdpSession`、`cdpListeners`、CDP 事件绑定/解绑、网络响应抓取相关逻辑                                                                                                        | ~350     |
+| `src/modules/collector/DynamicScriptWatcher.ts`  | `waitForDynamicScripts`、网络空闲等待逻辑                                                                                                                                    | ~150     |
+| 保留 `src/modules/collector/CodeCollector.ts`    | `collect`（解构为编排方法）、`init`/`close`、`getActivePage`、`setPageResolver`、`getAllStats`、`getCache`/`getCompressor`                                                   | ~450     |
 
 ### `collect` 方法解构
 
@@ -302,14 +302,14 @@
 
 ## 实施顺序总览
 
-| Phase | 目标文件 | 当前行数 | 策略文件数 | 风险 | 依赖 |
-|-------|---------|---------|-----------|------|------|
-| 1 | CodeAnalyzer.ts | 747 | 1 | 低 | 无 |
-| 2 | PageController.ts | 993 | 3 | 低-中 | 无 |
-| 3 | DebuggerManager.ts | 1019 | 2 | 中 | 无 |
-| 4 | AdvancedDeobfuscator.ts | 1463 | 6 | 中 | 无 |
-| 5 | WasmCollector.ts | 1477 | 3 | 中 | Phase 2（PageController） |
-| 6 | CodeCollector.ts | 1547 | 3 | 中-高 | 无 |
+| Phase | 目标文件                | 当前行数 | 策略文件数 | 风险  | 依赖                      |
+| ----- | ----------------------- | -------- | ---------- | ----- | ------------------------- |
+| 1     | CodeAnalyzer.ts         | 747      | 1          | 低    | 无                        |
+| 2     | PageController.ts       | 993      | 3          | 低-中 | 无                        |
+| 3     | DebuggerManager.ts      | 1019     | 2          | 中    | 无                        |
+| 4     | AdvancedDeobfuscator.ts | 1463     | 6          | 中    | 无                        |
+| 5     | WasmCollector.ts        | 1477     | 3          | 中    | Phase 2（PageController） |
+| 6     | CodeCollector.ts        | 1547     | 3          | 中-高 | 无                        |
 
 顺序：1 → 2 → 3 → 4 → 5 → 6。Phase 5 依赖 Phase 2（WasmCollector 使用 PageController）。每个 Phase 独立 commit。
 

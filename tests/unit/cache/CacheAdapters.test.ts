@@ -1,11 +1,10 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
 import type {CodeCache} from '../../../src/modules/collector/CodeCache.js';
 import type {CodeCompressor} from '../../../src/modules/collector/CodeCompressor.js';
@@ -60,7 +59,9 @@ describe('CacheAdapters', () => {
       },
     };
 
-    const adapter = new DetailedDataManagerAdapter(manager as unknown as DetailedDataManager);
+    const adapter = new DetailedDataManagerAdapter(
+      manager as unknown as DetailedDataManager,
+    );
     const stats = adapter.getStats();
 
     assert.strictEqual(stats.entries, 3);
@@ -114,7 +115,9 @@ describe('CacheAdapters', () => {
       },
     };
 
-    const adapter = new CodeCompressorAdapter(compressor as unknown as CodeCompressor);
+    const adapter = new CodeCompressorAdapter(
+      compressor as unknown as CodeCompressor,
+    );
     const stats = adapter.getStats();
 
     assert.strictEqual(stats.entries, 2);
@@ -129,14 +132,37 @@ describe('CacheAdapters', () => {
 
   it('creates all adapters from factory', () => {
     const adapters = createCacheAdapters(
-      { getStats: () => ({ cacheSize: 1, defaultTTLSeconds: 10, maxCacheSize: 20 }), clear: () => undefined } as unknown as DetailedDataManager,
-      { getStats: async () => ({ memoryEntries: 0, diskEntries: 0, totalSize: 0 }), cleanup: async () => undefined, clear: async () => undefined } as unknown as CodeCache,
-      { getStats: () => ({ cacheHits: 0, cacheMisses: 0, totalCompressedSize: 0 }), getCacheSize: () => 0, clearCache: () => undefined } as unknown as CodeCompressor,
+      {
+        getStats: () => ({
+          cacheSize: 1,
+          defaultTTLSeconds: 10,
+          maxCacheSize: 20,
+        }),
+        clear: () => undefined,
+      } as unknown as DetailedDataManager,
+      {
+        getStats: async () => ({
+          memoryEntries: 0,
+          diskEntries: 0,
+          totalSize: 0,
+        }),
+        cleanup: async () => undefined,
+        clear: async () => undefined,
+      } as unknown as CodeCache,
+      {
+        getStats: () => ({
+          cacheHits: 0,
+          cacheMisses: 0,
+          totalCompressedSize: 0,
+        }),
+        getCacheSize: () => 0,
+        clearCache: () => undefined,
+      } as unknown as CodeCompressor,
     );
 
     assert.strictEqual(adapters.length, 3);
     assert.deepStrictEqual(
-      adapters.map((a) => a.name),
+      adapters.map(a => a.name),
       ['DetailedDataManager', 'CodeCache', 'CodeCompressor'],
     );
   });

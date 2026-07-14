@@ -7,11 +7,11 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
+import {listPages} from '../../../src/tools/navigation/listPages.js';
 import {
   ToolContextProvider,
   DefineToolContextFactory,
 } from '../../../src/worker/ToolContext.js';
-import {listPages} from '../../../src/tools/navigation/listPages.js';
 import {ToolResponseAccumulator} from '../../../src/worker/ToolResponse.js';
 
 describe('listPages tool local verification', () => {
@@ -29,7 +29,7 @@ describe('listPages tool local verification', () => {
       success: boolean;
       message: string;
       tooltype: string;
-      data: {pageInfos: Array<unknown>; selectedIndex: number};
+      data: {pageInfos: unknown[]; selectedIndex: number};
     };
     assert.strictEqual(structured.success, true);
     assert.match(structured.message, /当前没有打开的页面/);

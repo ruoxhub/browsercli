@@ -6,8 +6,9 @@
 
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
-import {defineTool, type Context} from '../ToolDefinition.js';
 import {errorMessage} from '../shared/pageResponse.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
+
 import type {InjectHookData} from './types.js';
 
 /**
@@ -21,9 +22,15 @@ import type {InjectHookData} from './types.js';
  *
  * 注：这是 worker 进程内存状态；页面关闭 / worker 重启后自然失效。
  */
-const persistentHookRegistry = new Map<string, {script: string; registeredAt: number; world: 'main' | 'isolated'}>();
+const persistentHookRegistry = new Map<
+  string,
+  {script: string; registeredAt: number; world: 'main' | 'isolated'}
+>();
 
-export function getPersistentHookRegistry(): ReadonlyMap<string, {script: string; registeredAt: number; world: 'main' | 'isolated'}> {
+export function getPersistentHookRegistry(): ReadonlyMap<
+  string,
+  {script: string; registeredAt: number; world: 'main' | 'isolated'}
+> {
   return persistentHookRegistry;
 }
 
@@ -87,9 +94,11 @@ export const injectHook = defineTool({
         // 注：addInitScript 只对 this.selectedPage 生效，对未来用
         // context.newPage() 开启的新 page 不会自动继承。
         // TODO(P2-#7): 结合 page-state 持久化改造，升级成 browser-context 级别。
-        const addInit = (selectedPage as unknown as {
-          addInitScript?: (script: string) => Promise<void>;
-        }).addInitScript;
+        const addInit = (
+          selectedPage as unknown as {
+            addInitScript?: (script: string) => Promise<void>;
+          }
+        ).addInitScript;
         if (typeof addInit === 'function') {
           await addInit.call(selectedPage, script);
           persistentHookRegistry.set(hookId, {

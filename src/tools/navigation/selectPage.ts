@@ -25,10 +25,7 @@ export const selectPage = defineTool({
     readOnlyHint: false,
   },
   schema: {
-    pageIdx: zod
-      .number()
-      .int()
-      .describe('页面索引（从 list_pages 获取）.'),
+    pageIdx: zod.number().int().describe('页面索引（从 list_pages 获取）.'),
   },
   handler: async (request, response, context) => {
     const {pageIdx} = request.params;
@@ -56,7 +53,7 @@ export const selectPage = defineTool({
         selectedIndex: pageIdx,
         url: page.url(),
         title,
-      }
+      },
     });
   },
 });

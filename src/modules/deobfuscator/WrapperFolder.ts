@@ -1,3 +1,8 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import generateImport from '@babel/generator';
 import traverseImport from '@babel/traverse';
 import * as t from '@babel/types';
@@ -35,7 +40,8 @@ interface RemovableEntry {
   removable: boolean;
 }
 
-type NodePath<T extends t.Node = t.Node> = import('@babel/traverse').NodePath<T>;
+type NodePath<T extends t.Node = t.Node> =
+  import('@babel/traverse').NodePath<T>;
 
 export class WrapperFolder {
   private resolvePropertyKey(
@@ -90,10 +96,7 @@ export class WrapperFolder {
       return {type: 'literal', node: t.identifier('undefined')};
     }
 
-    if (
-      t.isMemberExpression(node) &&
-      t.isIdentifier(node.object)
-    ) {
+    if (t.isMemberExpression(node) && t.isIdentifier(node.object)) {
       const key = this.resolvePropertyKey(node.property, options);
       if (key !== null) {
         return {type: 'member', objectName: node.object.name, key};
@@ -119,10 +122,7 @@ export class WrapperFolder {
       ) {
         return {type: 'logical', operator: argument.operator};
       }
-      if (
-        t.isUnaryExpression(argument) &&
-        t.isIdentifier(argument.argument)
-      ) {
+      if (t.isUnaryExpression(argument) && t.isIdentifier(argument.argument)) {
         return {
           type: 'unary',
           operator: argument.operator,
@@ -158,8 +158,10 @@ export class WrapperFolder {
     wrapperMap: Record<string, Record<string, WrapperDescriptor>>;
     removableEntries: RemovableEntry[];
   } {
-    const wrapperMap: Record<string, Record<string, WrapperDescriptor>> =
-      Object.create(null);
+    const wrapperMap: Record<
+      string,
+      Record<string, WrapperDescriptor>
+    > = Object.create(null);
     const removableEntries: RemovableEntry[] = [];
 
     traverse(ast, {
@@ -255,18 +257,39 @@ export class WrapperFolder {
 
         const args = path.node.arguments.map(arg => t.cloneNode(arg));
         if (resolved.type === 'binary' && args.length >= 2) {
-          path.replaceWith(t.binaryExpression(resolved.operator as t.BinaryExpression['operator'], args[0]! as t.Expression, args[1]! as t.Expression));
+          path.replaceWith(
+            t.binaryExpression(
+              resolved.operator as t.BinaryExpression['operator'],
+              args[0]! as t.Expression,
+              args[1]! as t.Expression,
+            ),
+          );
           changed = true;
         } else if (resolved.type === 'logical' && args.length >= 2) {
-          path.replaceWith(t.logicalExpression(resolved.operator as t.LogicalExpression['operator'], args[0]! as t.Expression, args[1]! as t.Expression));
+          path.replaceWith(
+            t.logicalExpression(
+              resolved.operator as t.LogicalExpression['operator'],
+              args[0]! as t.Expression,
+              args[1]! as t.Expression,
+            ),
+          );
           changed = true;
         } else if (resolved.type === 'unary' && args.length >= 1) {
           path.replaceWith(
-            t.unaryExpression(resolved.operator as t.UnaryExpression['operator'], args[0]! as t.Expression, resolved.prefix),
+            t.unaryExpression(
+              resolved.operator as t.UnaryExpression['operator'],
+              args[0]! as t.Expression,
+              resolved.prefix,
+            ),
           );
           changed = true;
         } else if (resolved.type === 'call' && args.length >= 1) {
-          path.replaceWith(t.callExpression(args[0]! as t.Expression, args.slice(1) as t.Expression[]));
+          path.replaceWith(
+            t.callExpression(
+              args[0]! as t.Expression,
+              args.slice(1) as t.Expression[],
+            ),
+          );
           changed = true;
         }
       },
@@ -350,27 +373,27 @@ export class WrapperFolder {
         let supportedPropertyCount = 0;
         let collectedPropertyCount = 0;
 
-        ((path.get('init') as NodePath).get('properties') as NodePath[]).forEach(
-          propertyPath => {
-            if (!propertyPath.isObjectProperty()) {
-              return;
-            }
-            supportedPropertyCount += 1;
-            const keyNode = (propertyPath.node as t.ObjectProperty).key;
-            const key = t.isIdentifier(keyNode)
-              ? keyNode.name
-              : (keyNode as t.StringLiteral | t.NumericLiteral).value;
-            const value = collectDispatcherValue(
-              (propertyPath.node as t.ObjectProperty).value,
-              dispatcherMap,
-            );
-            if (value) {
-              collected[String(key)] = value;
-              localChanged = true;
-              collectedPropertyCount += 1;
-            }
-          },
-        );
+        (
+          (path.get('init') as NodePath).get('properties') as NodePath[]
+        ).forEach(propertyPath => {
+          if (!propertyPath.isObjectProperty()) {
+            return;
+          }
+          supportedPropertyCount += 1;
+          const keyNode = (propertyPath.node as t.ObjectProperty).key;
+          const key = t.isIdentifier(keyNode)
+            ? keyNode.name
+            : (keyNode as t.StringLiteral | t.NumericLiteral).value;
+          const value = collectDispatcherValue(
+            (propertyPath.node as t.ObjectProperty).value,
+            dispatcherMap,
+          );
+          if (value) {
+            collected[String(key)] = value;
+            localChanged = true;
+            collectedPropertyCount += 1;
+          }
+        });
 
         if (localChanged) {
           dispatcherMap[name] = collected;
@@ -404,13 +427,30 @@ export class WrapperFolder {
         }
         const args = path.node.arguments.map(arg => t.cloneNode(arg));
         if (entry.type === 'binary' && args.length >= 2) {
-          path.replaceWith(t.binaryExpression(entry.operator as t.BinaryExpression['operator'], args[0]! as t.Expression, args[1]! as t.Expression));
+          path.replaceWith(
+            t.binaryExpression(
+              entry.operator as t.BinaryExpression['operator'],
+              args[0]! as t.Expression,
+              args[1]! as t.Expression,
+            ),
+          );
           changed = true;
         } else if (entry.type === 'logical' && args.length >= 2) {
-          path.replaceWith(t.logicalExpression(entry.operator as t.LogicalExpression['operator'], args[0]! as t.Expression, args[1]! as t.Expression));
+          path.replaceWith(
+            t.logicalExpression(
+              entry.operator as t.LogicalExpression['operator'],
+              args[0]! as t.Expression,
+              args[1]! as t.Expression,
+            ),
+          );
           changed = true;
         } else if (entry.type === 'call' && args.length >= 1) {
-          path.replaceWith(t.callExpression(args[0]! as t.Expression, args.slice(1) as t.Expression[]));
+          path.replaceWith(
+            t.callExpression(
+              args[0]! as t.Expression,
+              args.slice(1) as t.Expression[],
+            ),
+          );
           changed = true;
         }
       },
@@ -536,8 +576,7 @@ export function resolveDescriptor(
   }
   localSeen.add(token);
 
-  const next =
-    wrapperMap[descriptor.objectName]?.[descriptor.key];
+  const next = wrapperMap[descriptor.objectName]?.[descriptor.key];
   if (!next) {
     return null;
   }
@@ -576,7 +615,9 @@ function getWrapperReturnArgument(
   return last.argument;
 }
 
-function isHarmlessWrapperPreludeInit(node: t.Node | null | undefined): boolean {
+function isHarmlessWrapperPreludeInit(
+  node: t.Node | null | undefined,
+): boolean {
   return (
     node == null ||
     t.isIdentifier(node) ||
@@ -594,13 +635,18 @@ function collectReferencedIdentifierNames(node: t.Node): Set<string> {
     return names;
   }
 
-  traverse(t.file(t.program([t.expressionStatement(t.cloneNode(node) as t.Expression)])), {
-    Identifier(path) {
-      if ((path as NodePath).isReferencedIdentifier()) {
-        names.add((path.node as t.Identifier).name);
-      }
+  traverse(
+    t.file(
+      t.program([t.expressionStatement(t.cloneNode(node) as t.Expression)]),
+    ),
+    {
+      Identifier(path) {
+        if ((path as NodePath).isReferencedIdentifier()) {
+          names.add((path.node as t.Identifier).name);
+        }
+      },
     },
-  });
+  );
 
   return names;
 }
@@ -623,12 +669,21 @@ function pruneResolvedWrapperProperties(
   let changed = false;
 
   removableEntries.forEach(({path, objectName, propertyEntries, removable}) => {
-    if (!path || !path.node || (path as {removed?: boolean}).removed || unsafeObjects.has(objectName)) {
+    if (
+      !path ||
+      !path.node ||
+      (path as {removed?: boolean}).removed ||
+      unsafeObjects.has(objectName)
+    ) {
       return;
     }
 
     propertyEntries.forEach(({key, path: propertyPath}) => {
-      if (!propertyPath || !propertyPath.node || (propertyPath as {removed?: boolean}).removed) {
+      if (
+        !propertyPath ||
+        !propertyPath.node ||
+        (propertyPath as {removed?: boolean}).removed
+      ) {
         return;
       }
       if (liveKeys.has(`${objectName}:${key}`)) {
@@ -645,7 +700,8 @@ function pruneResolvedWrapperProperties(
       return;
     }
 
-    const remainingProperties = (valuePath.get('properties') as NodePath[]).length;
+    const remainingProperties = (valuePath.get('properties') as NodePath[])
+      .length;
     if (remainingProperties > 0) {
       return;
     }
@@ -695,7 +751,8 @@ function collectLiveWrapperPropertyUsage(
         return;
       }
 
-      const objectName = ((path.get('object') as NodePath).node as t.Identifier).name;
+      const objectName = ((path.get('object') as NodePath).node as t.Identifier)
+        .name;
       if (!wrapperNames.has(objectName)) {
         return;
       }

@@ -16,7 +16,6 @@ import type {
   FileSummaryEntry,
 } from './types.js';
 
-
 /**
  * 对比两次收集的文件摘要差异（标准 MCP 工具版本）。
  *
@@ -51,9 +50,10 @@ export const collectionDiff = defineTool({
     const runtime = getRuntime();
 
     try {
-      const current: FileSummaryEntry[] =
-        (params.current ?? runtime.collector.getCollectedFilesSummary()) as FileSummaryEntry[];
-      const previous: FileSummaryEntry[] = (params.previous ?? []) as FileSummaryEntry[];
+      const current: FileSummaryEntry[] = (params.current ??
+        runtime.collector.getCollectedFilesSummary()) as FileSummaryEntry[];
+      const previous: FileSummaryEntry[] = (params.previous ??
+        []) as FileSummaryEntry[];
 
       const diff = diffSummaries(previous, current, params.includeUnchanged);
 
@@ -70,7 +70,7 @@ export const collectionDiff = defineTool({
         success: true,
         message: `对比完成：${data.addedCount} 新增, ${data.removedCount} 移除, ${data.changedCount} 变更`,
         tooltype: 'collection_diff',
-        data: data
+        data: data,
       };
       response.setStructuredContent(result);
     } catch (error) {

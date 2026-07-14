@@ -71,8 +71,6 @@ describe('HookStore', () => {
     store.events.off('sample', listener);
     store.add('hook-a', {value: 2});
 
-    assert.deepStrictEqual(samples, [
-      {hookId: 'hook-a', record: {value: 1}},
-    ]);
+    assert.deepStrictEqual(samples, [{hookId: 'hook-a', record: {value: 1}}]);
   });
 });

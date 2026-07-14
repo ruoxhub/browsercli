@@ -10,8 +10,8 @@ import type {IncomingMessage, ServerResponse} from 'node:http';
 import {beforeEach, describe, it} from 'node:test';
 
 import {InvocationStore} from '../../../../src/web/adapters/InvocationStore.js';
-import {createInvocationsRoutes} from '../../../../src/web/routes/invocations.js';
 import {RestRouter} from '../../../../src/web/RestRouter.js';
+import {createInvocationsRoutes} from '../../../../src/web/routes/invocations.js';
 import type {InvocationRecord} from '../../../../src/web/types.js';
 
 interface MockRes {

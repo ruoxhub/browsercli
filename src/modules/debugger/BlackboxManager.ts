@@ -20,6 +20,7 @@
 
 import type {CDPSession} from '../../third_party/index.js';
 import {logger} from '../../utils/logger.js';
+
 import type {ScriptPosition} from './types.js';
 
 /**
@@ -104,7 +105,9 @@ export class BlackboxManager {
 
   async clearAllBlackboxedPatterns(): Promise<void> {
     this.blackboxedPatterns.clear();
-    await this.getSession().send('Debugger.setBlackboxPatterns', {patterns: []});
+    await this.getSession().send('Debugger.setBlackboxPatterns', {
+      patterns: [],
+    });
     logger.info('All blackbox patterns cleared');
   }
 

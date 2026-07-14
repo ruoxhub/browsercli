@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { HookManager } from '../../../src/modules/hook/HookManager.js';
+import {HookManager} from '../../../src/modules/hook/HookManager.js';
 
 describe('HookManager extended', () => {
   it('creates hooks from options/builder/config and manages lifecycle', () => {
@@ -14,28 +14,54 @@ describe('HookManager extended', () => {
 
     const created = m.create({
       type: 'function',
-      params: { target: 'window.fetch' },
+      params: {target: 'window.fetch'},
       description: 'fetch monitor',
       action: 'log',
-      capture: { args: true, returnValue: true, stack: 3, timing: true, thisContext: true },
-      condition: { expression: 'args.length>0', maxCalls: 2, minInterval: 10, urlPattern: '/api' },
-      lifecycle: { before: 'a=1;', after: 'b=2;', onError: 'c=3;', onFinally: 'd=4;' },
-      store: { globalKey: '__s', maxRecords: 2, console: true, consoleFormat: 'compact' },
+      capture: {
+        args: true,
+        returnValue: true,
+        stack: 3,
+        timing: true,
+        thisContext: true,
+      },
+      condition: {
+        expression: 'args.length>0',
+        maxCalls: 2,
+        minInterval: 10,
+        urlPattern: '/api',
+      },
+      lifecycle: {
+        before: 'a=1;',
+        after: 'b=2;',
+        onError: 'c=3;',
+        onFinally: 'd=4;',
+      },
+      store: {
+        globalKey: '__s',
+        maxRecords: 2,
+        console: true,
+        consoleFormat: 'compact',
+      },
       asyncAware: true,
     });
     assert.ok(created.script.includes('window.fetch'));
 
     const created2 = m.createWithBuilder(
-      (b) => b.id('custom-1').intercept('window.alert').captureArgs(),
-      { type: 'custom', description: 'custom hook' },
+      b => b.id('custom-1').intercept('window.alert').captureArgs(),
+      {type: 'custom', description: 'custom hook'},
     );
     assert.strictEqual(created2.hookId, 'custom-1');
 
     const created3 = m.createFromConfig({
-      target: { expression: 'window.setTimeout', label: 'setTimeout' },
+      target: {expression: 'window.setTimeout', label: 'setTimeout'},
       capture: {},
       condition: {},
-      store: { globalKey: '__hookStore', maxRecords: 10, console: true, consoleFormat: 'compact' },
+      store: {
+        globalKey: '__hookStore',
+        maxRecords: 10,
+        console: true,
+        consoleFormat: 'compact',
+      },
       lifecycle: {},
       action: 'log',
       hookId: 'restored-1',
@@ -54,11 +80,14 @@ describe('HookManager extended', () => {
 
   it('records/exports data and reports stats', () => {
     const m = new HookManager(2);
-    const { hookId } = m.create({ type: 'function', params: { target: 'window.fetch' } });
+    const {hookId} = m.create({
+      type: 'function',
+      params: {target: 'window.fetch'},
+    });
 
-    m.addRecord(hookId, { hookId, timestamp: 1, target: 'window.fetch', a: 1 });
-    m.addRecord(hookId, { hookId, timestamp: 2, target: 'window.fetch', a: 2 });
-    m.addRecord(hookId, { hookId, timestamp: 3, target: 'window.fetch', a: 3 });
+    m.addRecord(hookId, {hookId, timestamp: 1, target: 'window.fetch', a: 1});
+    m.addRecord(hookId, {hookId, timestamp: 2, target: 'window.fetch', a: 2});
+    m.addRecord(hookId, {hookId, timestamp: 3, target: 'window.fetch', a: 3});
     const records = m.getRecords(hookId);
     assert.strictEqual(records.length, 2);
 
@@ -84,9 +113,6 @@ describe('HookManager extended', () => {
     assert.ok(anti.includes('Anti-debug bypass'));
     assert.ok(collector.includes('__getHookData'));
 
-    assert.throws(
-      () => m.create({ type: 'unknown-type' }),
-      /Unknown hook type/,
-    );
+    assert.throws(() => m.create({type: 'unknown-type'}), /Unknown hook type/);
   });
 });

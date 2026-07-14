@@ -4,7 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {diffEnvRequirements, exportRebuildBundle} from '../tools/rebuild/index.js';
+import {
+  diffEnvRequirements,
+  exportRebuildBundle,
+} from '../tools/rebuild/index.js';
 
 import {autoProgressReverseTask} from './ReverseTaskAutoProgress.js';
 import type {

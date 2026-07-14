@@ -6,10 +6,7 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {
-  generateCommandHelp,
-  generateTopLevelHelp,
-} from '../../src/help.js';
+import {generateCommandHelp, generateTopLevelHelp} from '../../src/help.js';
 
 describe('help', () => {
   describe('generateTopLevelHelp', () => {

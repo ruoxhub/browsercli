@@ -6,9 +6,9 @@
 import type {DebuggerManager} from '../../modules/debugger/DebuggerManager.js';
 import {getErrorMessage} from '../shared/pageResponse.js';
 
-export type DebuggerRuntime = {
+export interface DebuggerRuntime {
   getDebuggerContext(): Promise<DebuggerManager>;
-};
+}
 
 export async function getDebuggerFromContext(
   runtime: unknown,

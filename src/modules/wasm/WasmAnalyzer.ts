@@ -3,18 +3,6 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import type {
-  WasmAnalysisOptions,
-  WasmAnalysisResult,
-  WasmDataSegmentSummary,
-  WasmExportEntry,
-  WasmFunctionFingerprint,
-  WasmImportEntry,
-  WasmMemoryInfo,
-  WasmModuleRecord,
-  WasmSectionSummary,
-  WasmValueType,
-} from './WasmTypes.js';
 import {
   ByteReader,
   decodeExternalKind,
@@ -27,6 +15,18 @@ import {
   sectionName,
   uniqueStrings,
 } from './WasmAnalysisUtils.js';
+import type {
+  WasmAnalysisOptions,
+  WasmAnalysisResult,
+  WasmDataSegmentSummary,
+  WasmExportEntry,
+  WasmFunctionFingerprint,
+  WasmImportEntry,
+  WasmMemoryInfo,
+  WasmModuleRecord,
+  WasmSectionSummary,
+  WasmValueType,
+} from './WasmTypes.js';
 
 export class WasmAnalyzer {
   analyzeRecord(

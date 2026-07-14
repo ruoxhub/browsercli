@@ -16,9 +16,6 @@
 import type {Page} from '../../third_party/index.js';
 
 import type {CodeCollector} from './CodeCollector.js';
-import * as PageInfo from './PageInfo.js';
-import * as PageInteraction from './PageInteraction.js';
-import * as PageNavigation from './PageNavigation.js';
 import type {
   ClickOptions,
   NavigationOptions,
@@ -27,8 +24,11 @@ import type {
   ScrollOptions,
   TypeOptions,
 } from './PageControllerTypes.js';
+import * as PageInfo from './PageInfo.js';
+import * as PageInteraction from './PageInteraction.js';
+import * as PageNavigation from './PageNavigation.js';
 
-export * from './PageControllerTypes.js';
+export type * from './PageControllerTypes.js';
 
 export class PageController {
   constructor(private collector: CodeCollector) {}
@@ -146,9 +146,7 @@ export class PageController {
     return PageInfo.screenshot(page, options);
   }
 
-  async getVideoInfo(
-    selector: string,
-  ): Promise<{
+  async getVideoInfo(selector: string): Promise<{
     duration: number;
     currentTime: number;
     paused: boolean;

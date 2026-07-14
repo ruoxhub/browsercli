@@ -23,12 +23,8 @@ export const seekVideo = defineTool({
     readOnlyHint: false,
   },
   schema: {
-    selector: zod
-      .string()
-      .describe('CSS selector for the video element.'),
-    time: zod
-      .number()
-      .describe('Time position in seconds to seek to.'),
+    selector: zod.string().describe('CSS selector for the video element.'),
+    time: zod.number().describe('Time position in seconds to seek to.'),
   },
   handler: async (request, response, context) => {
     const runtime = context as unknown as ToolContextProvider;

@@ -71,9 +71,18 @@ function getDevToolsActivePortPaths(): string[] {
       path.join(localAppData, 'Google/Chrome SxS/User Data/DevToolsActivePort'),
       path.join(localAppData, 'Chromium/User Data/DevToolsActivePort'),
       path.join(localAppData, 'Microsoft/Edge/User Data/DevToolsActivePort'),
-      path.join(localAppData, 'Microsoft/Edge Beta/User Data/DevToolsActivePort'),
-      path.join(localAppData, 'Microsoft/Edge Dev/User Data/DevToolsActivePort'),
-      path.join(localAppData, 'Microsoft/Edge SxS/User Data/DevToolsActivePort'),
+      path.join(
+        localAppData,
+        'Microsoft/Edge Beta/User Data/DevToolsActivePort',
+      ),
+      path.join(
+        localAppData,
+        'Microsoft/Edge Dev/User Data/DevToolsActivePort',
+      ),
+      path.join(
+        localAppData,
+        'Microsoft/Edge SxS/User Data/DevToolsActivePort',
+      ),
       path.join(
         localAppData,
         'BraveSoftware/Brave-Browser/User Data/DevToolsActivePort',
@@ -92,7 +101,10 @@ function getDevToolsActivePortPaths(): string[] {
  * or is firewalled (typical for tests and for the 144+ Way 1 mode where HTTP
  * discovery is disabled but the ws path stored in this file still resolves).
  */
-export function readDevToolsActivePort(): {port: number; wsPath: string} | null {
+export function readDevToolsActivePort(): {
+  port: number;
+  wsPath: string;
+} | null {
   for (const filePath of getDevToolsActivePortPaths()) {
     try {
       const lines = fs

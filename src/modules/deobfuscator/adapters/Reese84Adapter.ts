@@ -1,3 +1,8 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import traverseImport from '@babel/traverse';
 import * as t from '@babel/types';
 
@@ -6,7 +11,8 @@ import type {SiteAdapter} from '../SiteAdapterRegistry.js';
 
 const traverse = unwrapBabelDefault<typeof traverseImport>(traverseImport);
 
-type NodePath<T extends t.Node = t.Node> = import('@babel/traverse').NodePath<T>;
+type NodePath<T extends t.Node = t.Node> =
+  import('@babel/traverse').NodePath<T>;
 
 const STRING_METHODS = new Set(['substring', 'substr', 'slice', 'split']);
 
@@ -51,9 +57,7 @@ function resolveStringValue(
     return (path.node as t.TemplateLiteral).quasis[0]!.value.cooked ?? null;
   }
   if (path.isIdentifier()) {
-    const binding = path.scope.getBinding(
-      (path.node as t.Identifier).name,
-    );
+    const binding = path.scope.getBinding((path.node as t.Identifier).name);
     if (
       !binding ||
       seen.has(binding) ||

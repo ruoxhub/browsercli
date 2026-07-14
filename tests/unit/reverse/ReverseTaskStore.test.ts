@@ -33,23 +33,37 @@ function findPackageRoot(fromDir: string): string {
 describe('ReverseTaskStore', () => {
   it('resolves the default task root from the package root instead of process cwd', () => {
     const originalCwd = process.cwd;
-    const fakeCwd = path.join(path.parse(process.cwd()).root, 'Windows', 'system32');
-    const repoRoot = findPackageRoot(path.dirname(fileURLToPath(import.meta.url)));
+    const fakeCwd = path.join(
+      path.parse(process.cwd()).root,
+      'Windows',
+      'system32',
+    );
+    const repoRoot = findPackageRoot(
+      path.dirname(fileURLToPath(import.meta.url)),
+    );
 
     process.cwd = () => fakeCwd;
 
     try {
       const store = new ReverseTaskStore();
 
-      assert.strictEqual(store.rootDir, path.join(repoRoot, 'artifacts', 'tasks'));
-      assert.notStrictEqual(store.rootDir, path.join(fakeCwd, 'artifacts', 'tasks'));
+      assert.strictEqual(
+        store.rootDir,
+        path.join(repoRoot, 'artifacts', 'tasks'),
+      );
+      assert.notStrictEqual(
+        store.rootDir,
+        path.join(fakeCwd, 'artifacts', 'tasks'),
+      );
     } finally {
       process.cwd = originalCwd;
     }
   });
 
   it('creates and reopens a reverse task with durable JSON and JSONL artifacts', async () => {
-    const rootDir = await mkdtemp(path.join(tmpdir(), 'js-reverse-task-store-'));
+    const rootDir = await mkdtemp(
+      path.join(tmpdir(), 'js-reverse-task-store-'),
+    );
 
     try {
       const store = new ReverseTaskStore({rootDir});
@@ -87,7 +101,10 @@ describe('ReverseTaskStore', () => {
       });
 
       const taskJson = JSON.parse(
-        await readFile(path.join(rootDir, '20260304-demo-task', 'task.json'), 'utf8'),
+        await readFile(
+          path.join(rootDir, '20260304-demo-task', 'task.json'),
+          'utf8',
+        ),
       );
       assert.strictEqual(taskJson.taskId, '20260304-demo-task');
       assert.strictEqual(taskJson.slug, 'demo-task');
@@ -95,7 +112,10 @@ describe('ReverseTaskStore', () => {
       assert.strictEqual(taskJson.goal, 'rebuild signature flow');
 
       const cookiesJson = JSON.parse(
-        await readFile(path.join(rootDir, '20260304-demo-task', 'cookies.json'), 'utf8'),
+        await readFile(
+          path.join(rootDir, '20260304-demo-task', 'cookies.json'),
+          'utf8',
+        ),
       );
       assert.deepStrictEqual(cookiesJson, {
         cookies: [
@@ -107,11 +127,14 @@ describe('ReverseTaskStore', () => {
       });
 
       const timelineLines = (
-        await readFile(path.join(rootDir, '20260304-demo-task', 'timeline.jsonl'), 'utf8')
+        await readFile(
+          path.join(rootDir, '20260304-demo-task', 'timeline.jsonl'),
+          'utf8',
+        )
       )
         .trim()
         .split('\n')
-        .map((line) => JSON.parse(line));
+        .map(line => JSON.parse(line));
 
       assert.strictEqual(timelineLines.length, 2);
       assert.strictEqual(timelineLines[0].stage, 'observe');

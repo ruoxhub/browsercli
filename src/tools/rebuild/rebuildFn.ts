@@ -10,7 +10,11 @@ import path from 'node:path';
 import type {Runtime} from '../../runtime.js';
 import type {CodeFile} from '../../types/index.js';
 
-import type {AutoBundleOptions, AutoBundleResult, MissingCapability} from './types.js';
+import type {
+  AutoBundleOptions,
+  AutoBundleResult,
+  MissingCapability,
+} from './types.js';
 
 // ─── 纯函数（无 Puppeteer 依赖） ────────────────────────
 

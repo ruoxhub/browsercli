@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {afterEach, beforeEach, describe, it} from 'node:test';
-import assert from 'node:assert/strict';
 
 import {CodeCache} from '../../../../src/modules/collector/CodeCache.js';
 
@@ -42,11 +42,17 @@ describe('CodeCache.searchInCache', () => {
       timestamp: Date.now(),
       hash: name,
     };
-    await fs.writeFile(path.join(cacheDir, `${name}.json`), JSON.stringify(entry));
+    await fs.writeFile(
+      path.join(cacheDir, `${name}.json`),
+      JSON.stringify(entry),
+    );
   }
 
   it('匹配文件内容关键词（走磁盘缓存路径）', async () => {
-    await writeEntry('a', 'function signRequest() { return encrypt(payload); }');
+    await writeEntry(
+      'a',
+      'function signRequest() { return encrypt(payload); }',
+    );
     await writeEntry('b', 'console.log("hello world");');
 
     const results = await cache.searchInCache('signRequest');

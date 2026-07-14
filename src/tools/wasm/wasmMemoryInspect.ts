@@ -8,20 +8,35 @@ import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 
-
-
 export const wasmMemoryInspect = defineTool({
   name: 'wasm_memory_inspect',
-  description: 'Inspect WebAssembly.Memory exports in the current page — hex/ascii dump, pattern search.',
+  description:
+    'Inspect WebAssembly.Memory exports in the current page — hex/ascii dump, pattern search.',
   annotations: {
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: true,
   },
   schema: {
-    offset: zod.number().int().nonnegative().optional().describe('Byte offset to start reading (default 0)'),
-    length: zod.number().int().positive().optional().describe('Number of bytes to read (default 256)'),
-    format: zod.enum(['hex', 'ascii', 'both']).optional().describe('Output format (default "both")'),
-    searchPattern: zod.string().optional().describe('Hex pattern (e.g. "00 FF") or ASCII string to search for'),
+    offset: zod
+      .number()
+      .int()
+      .nonnegative()
+      .optional()
+      .describe('Byte offset to start reading (default 0)'),
+    length: zod
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Number of bytes to read (default 256)'),
+    format: zod
+      .enum(['hex', 'ascii', 'both'])
+      .optional()
+      .describe('Output format (default "both")'),
+    searchPattern: zod
+      .string()
+      .optional()
+      .describe('Hex pattern (e.g. "00 FF") or ASCII string to search for'),
   },
   handler: async (request, response, context: Context) => {
     const {
@@ -43,7 +58,17 @@ export const wasmMemoryInspect = defineTool({
       }
 
       const result = await page.evaluate(
-        ({evalOffset, evalLength, evalFormat, searchPattern}: {evalOffset: number; evalLength: number; evalFormat: string; searchPattern?: string}) => {
+        ({
+          evalOffset,
+          evalLength,
+          evalFormat,
+          searchPattern,
+        }: {
+          evalOffset: number;
+          evalLength: number;
+          evalFormat: string;
+          searchPattern?: string;
+        }) => {
           // 查找页面中导出的 WebAssembly.Memory
           const memories: Array<{exportName: string; buffer: ArrayBuffer}> = [];
 
@@ -52,18 +77,31 @@ export const wasmMemoryInspect = defineTool({
             try {
               const obj = (globalThis as Record<string, unknown>)[key];
               if (obj && typeof obj === 'object') {
-                for (const prop of Object.keys(obj as Record<string, unknown>)) {
+                for (const prop of Object.keys(
+                  obj as Record<string, unknown>,
+                )) {
                   try {
                     const val = (obj as Record<string, unknown>)[prop];
                     if (val instanceof WebAssembly.Memory) {
-                      memories.push({exportName: `${key}.${prop}`, buffer: val.buffer});
+                      memories.push({
+                        exportName: `${key}.${prop}`,
+                        buffer: val.buffer,
+                      });
                     }
                     // 检查 Instance 的 exports
-                    if (val && typeof val === 'object' && 'exports' in (val as Record<string, unknown>)) {
-                      const exports = (val as Record<string, unknown>).exports as Record<string, unknown>;
+                    if (
+                      val &&
+                      typeof val === 'object' &&
+                      'exports' in (val as Record<string, unknown>)
+                    ) {
+                      const exports = (val as Record<string, unknown>)
+                        .exports as Record<string, unknown>;
                       for (const [expName, expVal] of Object.entries(exports)) {
                         if (expVal instanceof WebAssembly.Memory) {
-                          memories.push({exportName: `${key}.${prop}.${expName}`, buffer: expVal.buffer});
+                          memories.push({
+                            exportName: `${key}.${prop}.${expName}`,
+                            buffer: expVal.buffer,
+                          });
                         }
                       }
                     }
@@ -82,18 +120,26 @@ export const wasmMemoryInspect = defineTool({
           }
 
           const mem = memories[0];
-          const view = new Uint8Array(mem.buffer, evalOffset, Math.min(evalLength, mem.buffer.byteLength - evalOffset));
+          const view = new Uint8Array(
+            mem.buffer,
+            evalOffset,
+            Math.min(evalLength, mem.buffer.byteLength - evalOffset),
+          );
 
           let hex: string | undefined;
           let ascii: string | undefined;
           const searchResults: Array<{offset: number; match: string}> = [];
 
           if (evalFormat === 'hex' || evalFormat === 'both') {
-            hex = Array.from(view).map((b) => b.toString(16).padStart(2, '0')).join(' ');
+            hex = Array.from(view)
+              .map(b => b.toString(16).padStart(2, '0'))
+              .join(' ');
           }
 
           if (evalFormat === 'ascii' || evalFormat === 'both') {
-            ascii = Array.from(view).map((b) => (b >= 0x20 && b <= 0x7e) ? String.fromCharCode(b) : '.').join('');
+            ascii = Array.from(view)
+              .map(b => (b >= 0x20 && b <= 0x7e ? String.fromCharCode(b) : '.'))
+              .join('');
           }
 
           // 搜索模式
@@ -125,8 +171,10 @@ export const wasmMemoryInspect = defineTool({
                 if (match) {
                   searchResults.push({
                     offset: i,
-                    match: Array.from(fullView.slice(i, i + patternBytes.length))
-                      .map((b) => b.toString(16).padStart(2, '0'))
+                    match: Array.from(
+                      fullView.slice(i, i + patternBytes.length),
+                    )
+                      .map(b => b.toString(16).padStart(2, '0'))
                       .join(' '),
                   });
                   if (searchResults.length >= 100) break;
@@ -137,14 +185,19 @@ export const wasmMemoryInspect = defineTool({
 
           return {
             found: true,
-            memories: memories.map((m) => m.exportName),
+            memories: memories.map(m => m.exportName),
             memorySize: mem.buffer.byteLength,
             hex,
             ascii,
             searchResults: searchResults.length > 0 ? searchResults : undefined,
           };
         },
-        {evalOffset: offset, evalLength: length, evalFormat: format, searchPattern},
+        {
+          evalOffset: offset,
+          evalLength: length,
+          evalFormat: format,
+          searchPattern,
+        },
       );
 
       if (!result.found) {
@@ -167,7 +220,9 @@ export const wasmMemoryInspect = defineTool({
           format,
           hex: (result as {hex?: string}).hex,
           ascii: (result as {ascii?: string}).ascii,
-          searchResults: (result as {searchResults?: Array<{offset: number; match: string}>}).searchResults,
+          searchResults: (
+            result as {searchResults?: Array<{offset: number; match: string}>}
+          ).searchResults,
         },
       });
     } catch (error) {

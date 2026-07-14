@@ -42,7 +42,7 @@ describe('Deobfuscator', () => {
 
     assert.ok(
       result.code.toLowerCase().includes('hello \\u4e2d\\u6587') ||
-      result.code.includes('Hello 中文')
+        result.code.includes('Hello 中文'),
     );
   });
 });

@@ -87,13 +87,18 @@ export const exportRebuildBundle = defineTool({
     });
 
     const bundle = request.params.autoGenerate
-      ? await buildAutoBundle(request.params.taskId, {
-          targetKeywords: request.params.targetKeywords ?? [],
-          targetUrlPatterns: request.params.targetUrlPatterns ?? [],
-          targetFunctionNames: request.params.targetFunctionNames ?? [],
-          targetActionDescription: request.params.targetActionDescription ?? '',
-          maxEvidenceItems: request.params.maxEvidenceItems ?? 20,
-        }, runtime)
+      ? await buildAutoBundle(
+          request.params.taskId,
+          {
+            targetKeywords: request.params.targetKeywords ?? [],
+            targetUrlPatterns: request.params.targetUrlPatterns ?? [],
+            targetFunctionNames: request.params.targetFunctionNames ?? [],
+            targetActionDescription:
+              request.params.targetActionDescription ?? '',
+            maxEvidenceItems: request.params.maxEvidenceItems ?? 20,
+          },
+          runtime,
+        )
       : {
           entryCode: request.params.entryCode ?? '',
           envCode: request.params.envCode ?? '',
@@ -190,9 +195,10 @@ export const diffEnvRequirements = defineTool({
 
     response.setStructuredContent({
       success: true,
-      message: nextPatches.length > 0
-        ? `Found ${nextPatches.length} missing capabilities`
-        : 'No missing capabilities detected',
+      message:
+        nextPatches.length > 0
+          ? `Found ${nextPatches.length} missing capabilities`
+          : 'No missing capabilities detected',
       tooltype: 'diff_env_requirements',
       data: {
         taskId: '',

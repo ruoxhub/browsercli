@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { PageController } from '../../../src/modules/collector/PageController.js';
+import {PageController} from '../../../src/modules/collector/PageController.js';
 
 function makePage() {
   const page: Record<string, unknown> = {
@@ -27,7 +27,7 @@ function makePage() {
     content: async () => '<html></html>',
     screenshot: async () => Buffer.from('img'),
     setCookie: async () => undefined,
-    cookies: async () => [{ name: 'sid', value: '1' }],
+    cookies: async () => [{name: 'sid', value: '1'}],
     deleteCookie: async () => undefined,
     setViewport: async () => undefined,
     setUserAgent: async () => undefined,
@@ -57,20 +57,21 @@ describe('PageController', () => {
     assert.strictEqual(nav.title, 'Example');
     assert.ok(nav.loadTime >= 0);
 
-    await controller.reload({ timeout: 100 });
+    await controller.reload({timeout: 100});
     await controller.goBack();
     await controller.goForward();
-    await controller.click('#btn', { button: 'left', clickCount: 2, delay: 1 });
-    await controller.type('#input', 'hello', { delay: 1 });
+    await controller.click('#btn', {button: 'left', clickCount: 2, delay: 1});
+    await controller.type('#input', 'hello', {delay: 1});
     await controller.select('#sel', 'a', 'b');
     await controller.hover('#menu');
-    await controller.scroll({ x: 10, y: 20 });
+    await controller.scroll({x: 10, y: 20});
 
     const waited = await controller.waitForSelector('#ready', 100);
     assert.strictEqual(waited.success, true);
 
     await controller.waitForNavigation(100);
-    const evaluated = await controller.evaluate<Record<string, unknown>>('({ ok: true })');
+    const evaluated =
+      await controller.evaluate<Record<string, unknown>>('({ ok: true })');
     assert.deepStrictEqual(evaluated, {});
     assert.strictEqual(await controller.getURL(), 'https://example.com');
     assert.strictEqual(await controller.getTitle(), 'Example');
@@ -81,7 +82,10 @@ describe('PageController', () => {
     const page = makePage();
     let preloadCallback: ((script: string) => void) | undefined;
     let preloadScriptArg: string | undefined;
-    page.evaluateOnNewDocument = async (callback: (script: string) => void, script: string) => {
+    page.evaluateOnNewDocument = async (
+      callback: (script: string) => void,
+      script: string,
+    ) => {
       preloadCallback = callback;
       preloadScriptArg = script;
     };
@@ -103,8 +107,8 @@ describe('PageController', () => {
       undefined,
       undefined,
       undefined,
-      { k: 'v' },
-      [{ text: 'Home', href: 'https://example.com' }],
+      {k: 'v'},
+      [{text: 'Home', href: 'https://example.com'}],
     ];
     page.evaluate = async () => evaluateResults.shift();
 
@@ -126,9 +130,12 @@ describe('PageController', () => {
     assert.ok(preloadCallback);
     assert.strictEqual(preloadScriptArg, 'globalThis.__preload=1');
     preloadCallback?.(preloadScriptArg as string);
-    assert.strictEqual((globalThis as unknown as {__preload?: number}).__preload, 1);
+    assert.strictEqual(
+      (globalThis as unknown as {__preload?: number}).__preload,
+      1,
+    );
     delete (globalThis as unknown as {__preload?: number}).__preload;
-    await controller.setCookies([{ name: 'sid', value: '1' }]);
+    await controller.setCookies([{name: 'sid', value: '1'}]);
     const cookies = await controller.getCookies();
     assert.strictEqual(cookies.length, 1);
     await controller.clearCookies();
@@ -167,11 +174,8 @@ describe('PageController', () => {
     assert.strictEqual(waited.success, false);
 
     page.$ = async () => null;
-    await assert.rejects(
-      async () => {
-        await controller.uploadFile('#missing', '/tmp/nope');
-      },
-      /File input not found/,
-    );
+    await assert.rejects(async () => {
+      await controller.uploadFile('#missing', '/tmp/nope');
+    }, /File input not found/);
   });
 });

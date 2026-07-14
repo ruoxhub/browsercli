@@ -13,38 +13,50 @@ import {saveSessionState as toolSaveSessionState} from '../../../src/tools/page/
 import {takeScreenshot as toolTakeScreenshot} from '../../../src/tools/screenshot/takeScreenshot.js';
 
 async function checkBrowserHealth(runtime: any, params?: any) {
-  const request = { params: params || {} };
+  const request = {params: params || {}};
   const response = {
     structuredContent: null as any,
     setStructuredContent(content: any) {
       this.structuredContent = content;
-    }
+    },
   };
-  await toolCheckBrowserHealth.handler(request as any, response as any, runtime as any);
+  await toolCheckBrowserHealth.handler(
+    request as any,
+    response as any,
+    runtime as any,
+  );
   return response.structuredContent;
 }
 
 async function saveSessionState(runtime: any, params?: any) {
-  const request = { params: params || {} };
+  const request = {params: params || {}};
   const response = {
     structuredContent: null as any,
     setStructuredContent(content: any) {
       this.structuredContent = content;
-    }
+    },
   };
-  await toolSaveSessionState.handler(request as any, response as any, runtime as any);
+  await toolSaveSessionState.handler(
+    request as any,
+    response as any,
+    runtime as any,
+  );
   return response.structuredContent;
 }
 
 async function takeScreenshot(runtime: any, params?: any) {
-  const request = { params: params || {} };
+  const request = {params: params || {}};
   const response = {
     structuredContent: null as any,
     setStructuredContent(content: any) {
       this.structuredContent = content;
-    }
+    },
   };
-  await toolTakeScreenshot.handler(request as any, response as any, runtime as any);
+  await toolTakeScreenshot.handler(
+    request as any,
+    response as any,
+    runtime as any,
+  );
   return response.structuredContent;
 }
 
@@ -65,7 +77,7 @@ function createResponse() {
       attachConsoleMessage() {},
       setIncludeWebSocketConnections() {},
       attachWebSocket() {},
-      setStructuredContent(content: any) {}
+      setStructuredContent(content: any) {},
     } as any,
   };
 }

@@ -46,16 +46,17 @@ wasm_vmp_trace [--maxEvents 100] [--filterModule <name>]
 
 ### 反编译 vs 反汇编
 
-| 场景 | 选 | 原因 |
-|------|----|------|
-| 快速理解模块结构 | `wasm_decompile` | 函数级摘要，可疑模式标记 |
-| 看具体指令（VMP opcode） | `wasm_disassemble` | 原始 WAT，每条指令可追 |
-| 函数太多要快速定位 | `wasm_decompile --inlineExport true` | 展开 export 链 |
-| 调试器单步 | `wasm_offline_run` | 不用启动完整运行时 |
+| 场景                     | 选                                   | 原因                     |
+| ------------------------ | ------------------------------------ | ------------------------ |
+| 快速理解模块结构         | `wasm_decompile`                     | 函数级摘要，可疑模式标记 |
+| 看具体指令（VMP opcode） | `wasm_disassemble`                   | 原始 WAT，每条指令可追   |
+| 函数太多要快速定位       | `wasm_decompile --inlineExport true` | 展开 export 链           |
+| 调试器单步               | `wasm_offline_run`                   | 不用启动完整运行时       |
 
 ### 段信息 vs 直接反编译
 
 `wasm_inspect_sections` 适合：
+
 - 知道模块有 N 个函数但不知道哪个是入口 → 看 export 段
 - 怀疑有内嵌字符串 / URL / 域名 → `--includeStringScan true`
 - 想知道内存布局 → 看 Memory 段
@@ -98,38 +99,38 @@ wasm_vmp_trace  # 看 wasm→JS 边界调用
 
 ## 输出产物
 
-| 文件 | 内容 |
-|------|------|
-| `target.wasm` | 原始模块（从浏览器抓出） |
-| `target.decompiled.wat` | 反编译输出 |
-| `target.disassembled.wat` | 反汇编输出（如果做了） |
-| `target.sections.json` | 段信息 + 字符串扫描 |
-| `target.funcs.md` | export 函数表（按可疑度排序） |
-| `call-graph.md` | 从 vmp_trace 提取的调用关系 |
-| `record_reverse_evidence` | task artifact 条目 |
+| 文件                      | 内容                          |
+| ------------------------- | ----------------------------- |
+| `target.wasm`             | 原始模块（从浏览器抓出）      |
+| `target.decompiled.wat`   | 反编译输出                    |
+| `target.disassembled.wat` | 反汇编输出（如果做了）        |
+| `target.sections.json`    | 段信息 + 字符串扫描           |
+| `target.funcs.md`         | export 函数表（按可疑度排序） |
+| `call-graph.md`           | 从 vmp_trace 提取的调用关系   |
+| `record_reverse_evidence` | task artifact 条目            |
 
 ---
 
 ## 失败回退
 
-| 现象 | 解决 |
-|------|------|
-| `wasm_capabilities` 报 wabt 缺失 | `npm i -g wabt` 或 `apt install wabt` |
-| `wasm_capabilities` 报 wasmtime 缺失 | `curl https://wasmtime.dev/install.sh -sSf \| bash` |
-| `wasm_decompile` 慢 / 卡住 | 加 `--maxWatChars 500000` 限制输出 |
-| 反编译输出看不懂 | 改用 `wasm_disassemble` 看原始 WAT；或 `wasm_offline_run` 重放输入 |
-| 找不到入口函数 | 看 `wasm_inspect_sections` 的 export 段；用 `summarize_code` 辅助 JS 侧 |
-| 二进制字符串扫描报敏感 | `--maskSensitiveStrings true` 屏蔽，但记下索引回查 |
+| 现象                                 | 解决                                                                    |
+| ------------------------------------ | ----------------------------------------------------------------------- |
+| `wasm_capabilities` 报 wabt 缺失     | `npm i -g wabt` 或 `apt install wabt`                                   |
+| `wasm_capabilities` 报 wasmtime 缺失 | `curl https://wasmtime.dev/install.sh -sSf \| bash`                     |
+| `wasm_decompile` 慢 / 卡住           | 加 `--maxWatChars 500000` 限制输出                                      |
+| 反编译输出看不懂                     | 改用 `wasm_disassemble` 看原始 WAT；或 `wasm_offline_run` 重放输入      |
+| 找不到入口函数                       | 看 `wasm_inspect_sections` 的 export 段；用 `summarize_code` 辅助 JS 侧 |
+| 二进制字符串扫描报敏感               | `--maskSensitiveStrings true` 屏蔽，但记下索引回查                      |
 
 ---
 
 ## 工具链要求
 
-| 工具 | 用途 | 安装 |
-|------|------|------|
-| `wabt` | WAT 汇编/反汇编 | `apt install wabt` / `brew install wabt` |
-| `binaryen` (`wasm-opt`) | 优化 + 二次反编译 | `brew install binaryen` |
-| `wasmtime` | 离线执行 | `curl https://wasmtime.dev/install.sh -sSf \| bash` |
-| `wasmer` | 备用运行时 | `curl https://get.wasmer.io -sSf \| sh` |
+| 工具                    | 用途              | 安装                                                |
+| ----------------------- | ----------------- | --------------------------------------------------- |
+| `wabt`                  | WAT 汇编/反汇编   | `apt install wabt` / `brew install wabt`            |
+| `binaryen` (`wasm-opt`) | 优化 + 二次反编译 | `brew install binaryen`                             |
+| `wasmtime`              | 离线执行          | `curl https://wasmtime.dev/install.sh -sSf \| bash` |
+| `wasmer`                | 备用运行时        | `curl https://get.wasmer.io -sSf \| sh`             |
 
 `wasm_capabilities` 返回各工具可用性。**全缺失**时仍可做段信息 + 反编译，但离线执行不可用。

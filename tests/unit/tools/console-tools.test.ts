@@ -5,11 +5,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { setIssuesEnabled } from '../../../src/utils/features.js';
-import { zod } from '../../../src/third_party/index.js';
-import { getConsoleMessage, listConsoleMessages } from '../../../src/tools/console.js';
+import {zod} from '../../../src/third_party/index.js';
+import {
+  getConsoleMessage,
+  listConsoleMessages,
+} from '../../../src/tools/console.js';
+import {setIssuesEnabled} from '../../../src/utils/features.js';
 
 interface ConsoleIncludeOptions {
   pageSize?: number;
@@ -69,7 +72,7 @@ interface GetConsoleRequestHarness {
 describe('console tools', () => {
   it('lists console messages with filters and defaults', async () => {
     const schema = zod.object(listConsoleMessages.schema);
-    const parsed = schema.parse({ pageSize: 20, pageIdx: 1, types: ['error'] });
+    const parsed = schema.parse({pageSize: 20, pageIdx: 1, types: ['error']});
 
     let include = false;
     let options: ConsoleIncludeOptions | undefined;
@@ -89,7 +92,7 @@ describe('console tools', () => {
     };
 
     await listConsoleMessages.handler(
-      { params: parsed } as unknown as ListConsoleRequestHarness,
+      {params: parsed} as unknown as ListConsoleRequestHarness,
       response as unknown as Parameters<typeof listConsoleMessages.handler>[1],
       {} as Parameters<typeof listConsoleMessages.handler>[2],
     );
@@ -119,7 +122,7 @@ describe('console tools', () => {
     };
 
     await getConsoleMessage.handler(
-      { params: { msgid: 42 } } as unknown as GetConsoleRequestHarness,
+      {params: {msgid: 42}} as unknown as GetConsoleRequestHarness,
       response as unknown as Parameters<typeof getConsoleMessage.handler>[1],
       {} as Parameters<typeof getConsoleMessage.handler>[2],
     );
@@ -132,7 +135,7 @@ describe('console tools', () => {
       const url = new URL('../../../src/tools/console.js', import.meta.url);
       const mod = await import(`${url.href}?issues=on`);
       const schema = zod.object(mod.listConsoleMessages.schema);
-      const parsed = schema.parse({ types: ['issue'] });
+      const parsed = schema.parse({types: ['issue']});
       assert.deepStrictEqual(parsed.types, ['issue']);
     } finally {
       setIssuesEnabled(false);

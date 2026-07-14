@@ -11,12 +11,12 @@ import path from 'node:path';
 import {describe, it, after} from 'node:test';
 
 import {ReverseTaskStore} from '../../../src/reverse/ReverseTaskStore.js';
+import {getRuntime} from '../../../src/runtime.js';
 import {
   analyze_target,
   record_reverse_evidence,
 } from '../../../src/tools/analyzer/index.js';
 import {getHookData} from '../../../src/tools/hook/index.js';
-import {getRuntime} from '../../../src/runtime.js';
 import type {
   CollectCodeResult,
   DetectCryptoResult,
@@ -44,13 +44,25 @@ function makeResponse(): ResponseShape {
     },
     setStructuredContent: (content: unknown) => {
       structuredContent = content;
-      if (content && typeof content === 'object' && 'success' in content && content.success === false) {
-        console.error('DEBUG setStructuredContent failure:', JSON.stringify(content));
+      if (
+        content &&
+        typeof content === 'object' &&
+        'success' in content &&
+        content.success === false
+      ) {
+        console.error(
+          'DEBUG setStructuredContent failure:',
+          JSON.stringify(content),
+        );
       }
       lines.push('```json');
-      const payload = (content && typeof content === 'object' && 'data' in content && content.data)
-        ? content.data
-        : content;
+      const payload =
+        content &&
+        typeof content === 'object' &&
+        'data' in content &&
+        content.data
+          ? content.data
+          : content;
       lines.push(JSON.stringify(payload, null, 2));
       lines.push('```');
     },

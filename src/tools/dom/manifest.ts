@@ -13,6 +13,9 @@ export const manifest = {
   tools: [
     {modulePath: './dom/queryDom.js', handlerName: 'queryDom'},
     {modulePath: './dom/getDomStructure.js', handlerName: 'getDomStructure'},
-    {modulePath: './dom/findClickableElements.js', handlerName: 'findClickableElements'},
+    {
+      modulePath: './dom/findClickableElements.js',
+      handlerName: 'findClickableElements',
+    },
   ],
 } satisfies DomainManifest;

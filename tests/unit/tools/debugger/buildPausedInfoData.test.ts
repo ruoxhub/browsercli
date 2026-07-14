@@ -158,7 +158,11 @@ describe('buildPausedInfoData', () => {
             location: {scriptId: 's1', lineNumber: 0, columnNumber: 0},
             scopeChain: [
               {type: 'local', object: {objectId: 'obj-local'}},
-              {type: 'closure', name: 'outer', object: {objectId: 'obj-closure'}},
+              {
+                type: 'closure',
+                name: 'outer',
+                object: {objectId: 'obj-closure'},
+              },
               {type: 'global', object: {objectId: 'obj-global'}},
             ],
           },

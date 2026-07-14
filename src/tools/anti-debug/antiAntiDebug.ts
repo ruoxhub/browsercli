@@ -10,7 +10,10 @@ import {defineTool, type Context} from '../ToolDefinition.js';
 
 import {buildAntiAntiDebugScript} from './hooks.js';
 import {runHook} from './result.js';
-import {antiAntiDebugFeatureSchema, ANTI_ANTI_DEBUG_TOOLTYPE} from './schema.js';
+import {
+  antiAntiDebugFeatureSchema,
+  ANTI_ANTI_DEBUG_TOOLTYPE,
+} from './schema.js';
 
 /**
  * 反反调试工具集：窗口尺寸/时间函数/页面关闭/历史跳转/控制台清除/隐藏 webdriver。

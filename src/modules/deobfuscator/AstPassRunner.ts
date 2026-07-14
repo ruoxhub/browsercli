@@ -1,3 +1,8 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import generateImport from '@babel/generator';
 import * as parser from '@babel/parser';
 import traverseImport from '@babel/traverse';

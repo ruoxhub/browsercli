@@ -38,6 +38,5 @@ export const manifest = {
     {modulePath: './hook/GetHookData.js', handlerName: 'getHookData'},
     {modulePath: './hook/RemoveHook.js', handlerName: 'removeHook'},
     {modulePath: './hook/ListCreatedHooks.js', handlerName: 'listCreatedHooks'},
-    
   ],
 } satisfies DomainManifest;

@@ -1,3 +1,8 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import generateImport from '@babel/generator';
 import traverseImport from '@babel/traverse';
 import * as t from '@babel/types';
@@ -9,7 +14,8 @@ import type {SiteAdapter} from '../SiteAdapterRegistry.js';
 const generate = unwrapBabelDefault<typeof generateImport>(generateImport);
 const traverse = unwrapBabelDefault<typeof traverseImport>(traverseImport);
 
-type NodePath<T extends t.Node = t.Node> = import('@babel/traverse').NodePath<T>;
+type NodePath<T extends t.Node = t.Node> =
+  import('@babel/traverse').NodePath<T>;
 
 function generateCode(node: t.Node): string {
   return generate(node, {
@@ -45,8 +51,8 @@ function expandSequenceExpressions(ast: t.File): boolean {
     SequenceExpression(path) {
       if (path.parentPath!.isExpressionStatement()) {
         path.replaceWithMultiple(
-          path.node.expressions.map(
-            expr => t.expressionStatement(t.cloneNode(expr)),
+          path.node.expressions.map(expr =>
+            t.expressionStatement(t.cloneNode(expr)),
           ),
         );
         changed = true;
@@ -54,8 +60,8 @@ function expandSequenceExpressions(ast: t.File): boolean {
       }
 
       if (path.parentPath!.isReturnStatement()) {
-        const expressions = path.node.expressions.map(
-          expr => t.cloneNode(expr),
+        const expressions = path.node.expressions.map(expr =>
+          t.cloneNode(expr),
         );
         const last = expressions.pop();
         if (!last) {
@@ -70,14 +76,15 @@ function expandSequenceExpressions(ast: t.File): boolean {
       }
 
       if (path.parentPath!.isVariableDeclarator()) {
-        const declaratorPath = path.parentPath as NodePath<t.VariableDeclarator>;
+        const declaratorPath =
+          path.parentPath as NodePath<t.VariableDeclarator>;
         const declarationPath = declaratorPath.parentPath;
         if (!declarationPath || !declarationPath.isVariableDeclaration()) {
           return;
         }
 
-        const expressions = path.node.expressions.map(
-          expr => t.cloneNode(expr),
+        const expressions = path.node.expressions.map(expr =>
+          t.cloneNode(expr),
         );
         const last = expressions.pop();
         if (!last) {
@@ -94,9 +101,7 @@ function expandSequenceExpressions(ast: t.File): boolean {
 
         declarationPath.insertAfter(inserted);
         declaratorPath.remove();
-        if (
-          (declarationPath.get('declarations') as NodePath[]).length === 0
-        ) {
+        if ((declarationPath.get('declarations') as NodePath[]).length === 0) {
           declarationPath.remove();
         }
         changed = true;
@@ -115,9 +120,8 @@ function unwrapUnaryIifes(ast: t.File): boolean {
       if (
         path.node.operator !== '!' ||
         !(path.get('argument') as NodePath).isCallExpression() ||
-        (
-          (path.get('argument') as NodePath<t.CallExpression>).node
-        ).arguments.length !== 0 ||
+        (path.get('argument') as NodePath<t.CallExpression>).node.arguments
+          .length !== 0 ||
         !(
           (path.get('argument') as NodePath<t.CallExpression>).get(
             'callee',
@@ -216,9 +220,7 @@ function yidunDispatcherPass(ast: t.File): {ast: t.File; changed: boolean} {
             (
               declarationPath.get('init.object') as NodePath
             ).isNewExpression() &&
-            (
-              declarationPath.get('init.property') as NodePath
-            ).isStringLiteral()
+            (declarationPath.get('init.property') as NodePath).isStringLiteral()
           );
         })
       ) {
@@ -228,7 +230,14 @@ function yidunDispatcherPass(ast: t.File): {ast: t.File; changed: boolean} {
       const prev = path.getPrevSibling();
       const next1 = path.getNextSibling();
       const next2 = next1 ? next1.getNextSibling() : null;
-      if (!prev || !next1 || !next2 || !prev.node || !next1.node || !next2.node) {
+      if (
+        !prev ||
+        !next1 ||
+        !next2 ||
+        !prev.node ||
+        !next1.node ||
+        !next2.node
+      ) {
         return;
       }
 
@@ -243,16 +252,10 @@ function yidunDispatcherPass(ast: t.File): {ast: t.File; changed: boolean} {
       }
 
       const names: string[] = []
-        .concat(
-          (next1.node as t.VariableDeclaration).declarations || [],
-        )
-        .concat(
-          (next2.node as t.VariableDeclaration).declarations || [],
-        )
+        .concat((next1.node as t.VariableDeclaration).declarations || [])
+        .concat((next2.node as t.VariableDeclaration).declarations || [])
         .map(declaration => declaration.id)
-        .filter((idNode): idNode is t.Identifier =>
-          t.isIdentifier(idNode),
-        )
+        .filter((idNode): idNode is t.Identifier => t.isIdentifier(idNode))
         .map(idNode => idNode.name);
 
       names.forEach(name => {

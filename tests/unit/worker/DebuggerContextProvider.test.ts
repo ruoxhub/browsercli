@@ -6,6 +6,7 @@
 
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
+
 import {DebuggerContextProvider} from '../../../src/worker/context/DebuggerContextProvider.js';
 
 describe('DebuggerContextProvider', () => {

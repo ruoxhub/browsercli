@@ -7,7 +7,12 @@
 import type {zod} from '../../third_party/index.js';
 import {defineTool, type ToolDefinition} from '../ToolDefinition.js';
 
-import type {PipelineContext, PipelineDef, PipelineStep, StepResult} from './types.js';
+import type {
+  PipelineContext,
+  PipelineDef,
+  PipelineStep,
+  StepResult,
+} from './types.js';
 
 /**
  * 创建初始 Pipeline 上下文
@@ -73,7 +78,9 @@ async function executeStep(
 
       if (attempt < maxRetries) {
         retries++;
-        await new Promise(r => setTimeout(r, Math.min(100 * 2 ** attempt, 2000)));
+        await new Promise(r =>
+          setTimeout(r, Math.min(100 * 2 ** attempt, 2000)),
+        );
       }
     }
   }
@@ -162,7 +169,9 @@ export function definePipeline<Schema extends zod.ZodRawShape>(
     schema: def.schema,
     handler: async (request, response, _context) => {
       const pipelineStart = Date.now();
-      const ctx = createInitialContext(request.params as Record<string, unknown>);
+      const ctx = createInitialContext(
+        request.params as Record<string, unknown>,
+      );
       const stepResults: StepResult[] = [];
 
       const timeoutController = new AbortController();
@@ -177,11 +186,18 @@ export function definePipeline<Schema extends zod.ZodRawShape>(
           const stepPromise = executeStep(step, currentCtx);
           const abortPromise = new Promise<never>((_, reject) => {
             signal.addEventListener('abort', () =>
-              reject(new Error(`Pipeline 超时 (${timeoutMs}ms)，当前步骤: ${step.name}`)),
+              reject(
+                new Error(
+                  `Pipeline 超时 (${timeoutMs}ms)，当前步骤: ${step.name}`,
+                ),
+              ),
             );
           });
 
-          const {ctx: newCtx, stepResult} = await Promise.race([stepPromise, abortPromise]);
+          const {ctx: newCtx, stepResult} = await Promise.race([
+            stepPromise,
+            abortPromise,
+          ]);
           currentCtx = newCtx;
           stepResults.push(stepResult);
         }
@@ -248,9 +264,7 @@ export function parallel(
   return {
     name,
     fn: async ctx => {
-      const results = await Promise.allSettled(
-        steps.map(s => s.fn(ctx)),
-      );
+      const results = await Promise.allSettled(steps.map(s => s.fn(ctx)));
 
       const data: Record<string, unknown> = {};
       const errors: string[] = [];
@@ -260,7 +274,9 @@ export function parallel(
         if (r.status === 'fulfilled') {
           Object.assign(data, {[subName]: r.value});
         } else {
-          errors.push(`${subName}: ${r.reason instanceof Error ? r.reason.message : r.reason}`);
+          errors.push(
+            `${subName}: ${r.reason instanceof Error ? r.reason.message : r.reason}`,
+          );
         }
       });
 

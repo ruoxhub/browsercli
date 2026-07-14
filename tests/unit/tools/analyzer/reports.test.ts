@@ -14,8 +14,8 @@ function exportSessionReport(params: any) {
       workflowSteps: params.workflowSteps,
       requestFingerprints: params.requestFingerprints,
       evidence: params.evidence,
-      gaps: params.gaps
-    }
+      gaps: params.gaps,
+    },
   };
 }
 

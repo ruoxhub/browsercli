@@ -73,7 +73,10 @@ export const appEventSchemas = {
 type AssertEqual<T, U> = T extends U ? (U extends T ? true : never) : never;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type VerifyEventSchemas = {
-  [K in keyof AppEventMap]: AssertEqual<z.output<typeof appEventSchemas[K]>, AppEventMap[K]>;
+  [K in keyof AppEventMap]: AssertEqual<
+    z.output<(typeof appEventSchemas)[K]>,
+    AppEventMap[K]
+  >;
 };
 
 export const appEventValidators = Object.fromEntries(

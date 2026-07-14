@@ -4,25 +4,27 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import { writeFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { describe, it } from 'node:test';
+import {writeFileSync, rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {describe, it} from 'node:test';
 
 import OpenAI from 'openai';
 
-import { OpenAIProvider } from '../../../src/services/OpenAIProvider.js';
+import {OpenAIProvider} from '../../../src/services/OpenAIProvider.js';
 
 interface OpenAICompletionPayloadLike {
   model?: string;
   temperature?: number;
   max_tokens?: number;
   messages: Array<{
-    content: Array<{
-      image_url: {
-        url: string;
-      };
-    }> | string;
+    content:
+      | Array<{
+          image_url: {
+            url: string;
+          };
+        }>
+      | string;
   }>;
 }
 
@@ -30,7 +32,7 @@ interface OpenAIClientLike {
   chat: {
     completions: {
       create(payload?: unknown): Promise<{
-        choices: Array<{ message: { content: string | null } }>;
+        choices: Array<{message: {content: string | null}}>;
         usage?: {
           prompt_tokens: number;
           completion_tokens: number;
@@ -45,8 +47,8 @@ interface OpenAIProviderHarness {
   client: OpenAIClientLike;
   getMimeType(extension: string): string;
   chat(
-    messages: Array<{ role: string; content: string }>,
-    options?: { model?: string; temperature?: number; maxTokens?: number },
+    messages: Array<{role: string; content: string}>,
+    options?: {model?: string; temperature?: number; maxTokens?: number},
   ): Promise<{
     content: string;
     usage?: {
@@ -55,13 +57,17 @@ interface OpenAIProviderHarness {
       totalTokens: number;
     };
   }>;
-  analyzeImage(imageInput: string, prompt: string, isFilePath?: boolean): Promise<string>;
+  analyzeImage(
+    imageInput: string,
+    prompt: string,
+    isFilePath?: boolean,
+  ): Promise<string>;
 }
 
 describe('OpenAIProvider (mocked)', () => {
   it('throws when api key is missing', () => {
     assert.throws(
-      () => new OpenAIProvider({ apiKey: '' }),
+      () => new OpenAIProvider({apiKey: ''}),
       /OpenAI API key is required/,
     );
   });
@@ -74,14 +80,14 @@ describe('OpenAIProvider (mocked)', () => {
       chat: {
         completions: {
           create: async () => ({
-            choices: [{ message: { content: 'ok' } }],
-            usage: { prompt_tokens: 1, completion_tokens: 2, total_tokens: 3 },
+            choices: [{message: {content: 'ok'}}],
+            usage: {prompt_tokens: 1, completion_tokens: 2, total_tokens: 3},
           }),
         },
       },
     };
 
-    const out = await provider.chat([{ role: 'user', content: 'hello' }]);
+    const out = await provider.chat([{role: 'user', content: 'hello'}]);
     assert.strictEqual(out.content, 'ok');
     assert.deepStrictEqual(out.usage, {
       promptTokens: 1,
@@ -97,13 +103,13 @@ describe('OpenAIProvider (mocked)', () => {
     provider.client = {
       chat: {
         completions: {
-          create: async () => ({ choices: [] }),
+          create: async () => ({choices: []}),
         },
       },
     };
 
     await assert.rejects(
-      async () => provider.chat([{ role: 'user', content: 'hello' }]),
+      async () => provider.chat([{role: 'user', content: 'hello'}]),
       /No response from OpenAI/,
     );
   });
@@ -123,7 +129,7 @@ describe('OpenAIProvider (mocked)', () => {
     };
 
     await assert.rejects(
-      async () => provider.chat([{ role: 'user', content: 'hello' }]),
+      async () => provider.chat([{role: 'user', content: 'hello'}]),
       /network down/,
     );
   });
@@ -138,27 +144,35 @@ describe('OpenAIProvider (mocked)', () => {
         completions: {
           create: async (payload?: unknown) => {
             calls.push(payload as OpenAICompletionPayloadLike);
-            return { choices: [{ message: { content: 'vision-ok' } }] };
+            return {choices: [{message: {content: 'vision-ok'}}]};
           },
         },
       },
     };
 
     const out1 = await provider.analyzeImage('dGVzdA==', 'p1', false);
-    const out2 = await provider.analyzeImage('https://example.com/i.png', 'p2', false);
-    const out3 = await provider.analyzeImage('data:image/png;base64,abcd', 'p3', false);
+    const out2 = await provider.analyzeImage(
+      'https://example.com/i.png',
+      'p2',
+      false,
+    );
+    const out3 = await provider.analyzeImage(
+      'data:image/png;base64,abcd',
+      'p3',
+      false,
+    );
 
     const tempPath = join(tmpdir(), `openai-provider-test-${Date.now()}.png`);
     writeFileSync(tempPath, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
     const out4 = await provider.analyzeImage(tempPath, 'p4', true);
-    rmSync(tempPath, { force: true });
+    rmSync(tempPath, {force: true});
 
     assert.strictEqual(out1, 'vision-ok');
     assert.strictEqual(out2, 'vision-ok');
     assert.strictEqual(out3, 'vision-ok');
     assert.strictEqual(out4, 'vision-ok');
 
-    const urls = calls.map((c) => {
+    const urls = calls.map(c => {
       const content = c.messages[0]?.content;
       if (!Array.isArray(content)) {
         throw new Error('Expected image content payload');
@@ -204,11 +218,14 @@ describe('OpenAIProvider (mocked)', () => {
       },
     };
     await assert.rejects(
-      async () => provider.chat([{ role: 'user', content: 'hello' }]),
+      async () => provider.chat([{role: 'user', content: 'hello'}]),
       (err: unknown) =>
-        typeof err === 'object' && err !== null && 'status' in err && 'code' in err &&
-        (err as { status?: number; code?: string }).status === 429 &&
-        (err as { status?: number; code?: string }).code === 'rate_limit',
+        typeof err === 'object' &&
+        err !== null &&
+        'status' in err &&
+        'code' in err &&
+        (err as {status?: number; code?: string}).status === 429 &&
+        (err as {status?: number; code?: string}).code === 'rate_limit',
     );
 
     provider.client = {
@@ -221,7 +238,7 @@ describe('OpenAIProvider (mocked)', () => {
       },
     };
     await assert.rejects(
-      async () => provider.chat([{ role: 'user', content: 'hello' }]),
+      async () => provider.chat([{role: 'user', content: 'hello'}]),
       /Unknown error: non-error/,
     );
   });
@@ -233,7 +250,7 @@ describe('OpenAIProvider (mocked)', () => {
     provider.client = {
       chat: {
         completions: {
-          create: async () => ({ choices: [] }),
+          create: async () => ({choices: []}),
         },
       },
     };
@@ -254,13 +271,13 @@ describe('OpenAIProvider (mocked)', () => {
         completions: {
           create: async (input?: unknown) => {
             payloads.push(input as OpenAICompletionPayloadLike);
-            return { choices: [{ message: { content: null } }] };
+            return {choices: [{message: {content: null}}]};
           },
         },
       },
     };
 
-    const out = await provider.chat([{ role: 'assistant', content: 'x' }], {
+    const out = await provider.chat([{role: 'assistant', content: 'x'}], {
       model: 'gpt-test',
       temperature: 0.3,
       maxTokens: 99,
@@ -281,7 +298,7 @@ describe('OpenAIProvider (mocked)', () => {
     provider.client = {
       chat: {
         completions: {
-          create: async () => ({ choices: [{ message: { content: null } }] }),
+          create: async () => ({choices: [{message: {content: null}}]}),
         },
       },
     };
@@ -289,7 +306,7 @@ describe('OpenAIProvider (mocked)', () => {
     const tempPath = join(tmpdir(), `openai-provider-test-${Date.now()}`);
     writeFileSync(tempPath, Buffer.from([0x00]));
     const out = await provider.analyzeImage(tempPath, 'p', true);
-    rmSync(tempPath, { force: true });
+    rmSync(tempPath, {force: true});
     assert.strictEqual(out, '');
   });
 });

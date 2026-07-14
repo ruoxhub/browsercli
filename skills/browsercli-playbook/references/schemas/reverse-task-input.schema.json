@@ -4,21 +4,12 @@
   "title": "Reverse Task Input Contract",
   "description": "站点无关的逆向任务输入契约。仅允许脱敏种子，不包含真实敏感值。",
   "type": "object",
-  "required": [
-    "target",
-    "request",
-    "runtime",
-    "verify"
-  ],
+  "required": ["target", "request", "runtime", "verify"],
   "additionalProperties": false,
   "properties": {
     "target": {
       "type": "object",
-      "required": [
-        "site",
-        "entryType",
-        "entryName"
-      ],
+      "required": ["site", "entryType", "entryName"],
       "additionalProperties": false,
       "properties": {
         "site": {
@@ -33,11 +24,7 @@
         },
         "entryType": {
           "type": "string",
-          "enum": [
-            "function",
-            "class-method",
-            "expression"
-          ],
+          "enum": ["function", "class-method", "expression"],
           "description": "签名入口类型"
         },
         "entryName": {
@@ -67,11 +54,7 @@
     },
     "request": {
       "type": "object",
-      "required": [
-        "url",
-        "method",
-        "paramsTemplate"
-      ],
+      "required": ["url", "method", "paramsTemplate"],
       "additionalProperties": false,
       "properties": {
         "url": {
@@ -80,13 +63,7 @@
         },
         "method": {
           "type": "string",
-          "enum": [
-            "GET",
-            "POST",
-            "PUT",
-            "DELETE",
-            "PATCH"
-          ]
+          "enum": ["GET", "POST", "PUT", "DELETE", "PATCH"]
         },
         "paramsTemplate": {
           "type": "object",
@@ -104,18 +81,12 @@
     },
     "runtime": {
       "type": "object",
-      "required": [
-        "seedMode"
-      ],
+      "required": ["seedMode"],
       "additionalProperties": false,
       "properties": {
         "seedMode": {
           "type": "string",
-          "enum": [
-            "none",
-            "keys-only",
-            "masked-values"
-          ],
+          "enum": ["none", "keys-only", "masked-values"],
           "description": "运行种子模式"
         },
         "seedKeys": {
@@ -134,10 +105,7 @@
           "properties": {
             "mode": {
               "type": "string",
-              "enum": [
-                "system",
-                "fixed"
-              ],
+              "enum": ["system", "fixed"],
               "default": "system"
             },
             "fixedNow": {
@@ -158,10 +126,7 @@
     },
     "verify": {
       "type": "object",
-      "required": [
-        "enabled",
-        "expectStatus"
-      ],
+      "required": ["enabled", "expectStatus"],
       "additionalProperties": false,
       "properties": {
         "enabled": {

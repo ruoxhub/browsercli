@@ -39,7 +39,9 @@ describe('rebuildBundle tool', () => {
   });
 
   it('builds environment code with captured cookies and storage', async () => {
-    const result = await callRebuildBundle({url: 'https://example.com/product'});
+    const result = await callRebuildBundle({
+      url: 'https://example.com/product',
+    });
 
     assert.ok(result.success);
     assert.ok(result.data);

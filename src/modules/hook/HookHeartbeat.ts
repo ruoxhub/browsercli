@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -57,7 +56,10 @@ export class HookHeartbeat {
       await Promise.race([
         this.page.evaluate(this.hookScript),
         new Promise<void>((_, reject) =>
-          setTimeout(() => reject(new Error('Hook injection timeout')), INJECT_TIMEOUT_MS),
+          setTimeout(
+            () => reject(new Error('Hook injection timeout')),
+            INJECT_TIMEOUT_MS,
+          ),
         ),
       ]);
     } catch {

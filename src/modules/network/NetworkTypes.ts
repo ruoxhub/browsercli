@@ -15,8 +15,8 @@
  * `TrafficSummary` 仍由 `formatters/websocketFormatter.ts` 拥有，这里仅 type-only re-export。
  */
 
-import type {HTTPRequest, Page, ResourceType} from '../../third_party/index.js';
 import type {TrafficSummary} from '../../formatters/websocketFormatter.js';
+import type {HTTPRequest, Page, ResourceType} from '../../third_party/index.js';
 
 // ─── 可过滤的资源类型 ──────────────────────────────────
 

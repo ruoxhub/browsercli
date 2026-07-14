@@ -26,34 +26,34 @@ Browser-CLI 是一个**前端 JavaScript 逆向流程标准化的 MCP（Model Co
 
 ### 核心方法论
 
-| 原则 | 含义 |
-|------|------|
-| **Observe-first** | 先在浏览器里确认请求、脚本、函数和依赖来源 |
-| **Hook-preferred** | 先做最小化 Hook 采样，而非直接断点 |
-| **Breakpoint-last** | 只有 Hook 不够时才进入暂停式调试 |
-| **Rebuild-oriented** | 以本地可复现为最终产出目标 |
-| **Evidence-first** | 每一步都沉淀为 task artifact，不留在对话里 |
-| **Pure-extraction-after-pass** | 环境通过（env-pass）后才进入纯算法提纯 |
+| 原则                           | 含义                                       |
+| ------------------------------ | ------------------------------------------ |
+| **Observe-first**              | 先在浏览器里确认请求、脚本、函数和依赖来源 |
+| **Hook-preferred**             | 先做最小化 Hook 采样，而非直接断点         |
+| **Breakpoint-last**            | 只有 Hook 不够时才进入暂停式调试           |
+| **Rebuild-oriented**           | 以本地可复现为最终产出目标                 |
+| **Evidence-first**             | 每一步都沉淀为 task artifact，不留在对话里 |
+| **Pure-extraction-after-pass** | 环境通过（env-pass）后才进入纯算法提纯     |
 
 ### 技术栈
 
-| 领域 | 技术选型 |
-|------|----------|
-| **语言** | TypeScript 5.9 (ESM, ES2023 target) |
-| **运行时** | Node.js ^20.19.0 \|\| ^22.12.0 \|\| >=23 |
-| **浏览器自动化** | patchright (Playwright fork) |
-| **构建** | SWC (编译) + Rollup (打包) |
-| **CDP 协议** | Chrome DevTools Protocol 原生集成 |
-| **AI 集成** | OpenAI / Anthropic / Gemini (可选) |
-| **ORM** | Drizzle ORM (PostgreSQL pg-core) |
-| **RPC 协议** | Sekiro (WebSocket) |
-| **CLI 框架** | yargs |
-| **运行时校验** | Zod |
-| **代码分析** | Babel (parser/traverse/generator) |
-| **混淆处理** | javascript-obfuscator, terser |
-| **WASM 处理** | wabt |
-| **国密** | sm-crypto |
-| **测试** | node:test + fast-check (属性测试) + Vitest |
+| 领域             | 技术选型                                   |
+| ---------------- | ------------------------------------------ |
+| **语言**         | TypeScript 5.9 (ESM, ES2023 target)        |
+| **运行时**       | Node.js ^20.19.0 \|\| ^22.12.0 \|\| >=23   |
+| **浏览器自动化** | patchright (Playwright fork)               |
+| **构建**         | SWC (编译) + Rollup (打包)                 |
+| **CDP 协议**     | Chrome DevTools Protocol 原生集成          |
+| **AI 集成**      | OpenAI / Anthropic / Gemini (可选)         |
+| **ORM**          | Drizzle ORM (PostgreSQL pg-core)           |
+| **RPC 协议**     | Sekiro (WebSocket)                         |
+| **CLI 框架**     | yargs                                      |
+| **运行时校验**   | Zod                                        |
+| **代码分析**     | Babel (parser/traverse/generator)          |
+| **混淆处理**     | javascript-obfuscator, terser              |
+| **WASM 处理**    | wabt                                       |
+| **国密**         | sm-crypto                                  |
+| **测试**         | node:test + fast-check (属性测试) + Vitest |
 
 ---
 
@@ -66,12 +66,12 @@ Browser-CLI 与兄弟项目 [jshookmcp](https://github.com/zhizhuodemao/js-rever
 "有人在覆盖 navigator / canvas / WebGL API"，整个隐身努力反而暴露。所以默认
 启动时 JSReverser **不会**向页面注入任何 JS，分四层提供反检测能力：
 
-| 层 | 默认模式 | `--cloak` 模式 |
-| --- | --- | --- |
-| **协议层**（CDP） | Patchright：不调 `Runtime.enable` / `Console.enable`，不在 isolated world 外 evaluate | 同 |
-| **源码层**（C++ 二进制 patch） | 无 —— 直接用系统 Google Chrome | CloakBrowser 二进制（49 个 C++ patch：`navigator.webdriver`、canvas、WebGL、audio、GPU、字体、屏幕、WebRTC、TLS） |
-| **Profile 目录** | `~/.cache/chrome-devtools-mcp/chrome-profile` | `~/.cache/chrome-devtools-mcp/cloak-profile`（与默认物理隔离） |
-| **实际浏览器** | 你装的 Google Chrome（带 Web Store、扩展、sync） | 定制 Chromium 编译版（无 Google 服务、无 Web Store） |
+| 层                             | 默认模式                                                                              | `--cloak` 模式                                                                                                    |
+| ------------------------------ | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| **协议层**（CDP）              | Patchright：不调 `Runtime.enable` / `Console.enable`，不在 isolated world 外 evaluate | 同                                                                                                                |
+| **源码层**（C++ 二进制 patch） | 无 —— 直接用系统 Google Chrome                                                        | CloakBrowser 二进制（49 个 C++ patch：`navigator.webdriver`、canvas、WebGL、audio、GPU、字体、屏幕、WebRTC、TLS） |
+| **Profile 目录**               | `~/.cache/chrome-devtools-mcp/chrome-profile`                                         | `~/.cache/chrome-devtools-mcp/cloak-profile`（与默认物理隔离）                                                    |
+| **实际浏览器**                 | 你装的 Google Chrome（带 Web Store、扩展、sync）                                      | 定制 Chromium 编译版（无 Google 服务、无 Web Store）                                                              |
 
 导航级措施（两种模式都生效）：
 
@@ -83,11 +83,11 @@ Browser-CLI 与兄弟项目 [jshookmcp](https://github.com/zhizhuodemao/js-rever
 
 ### 三个隐身相关 CLI flag
 
-| Flag | 作用 | 默认 |
-|---|---|---|
-| `--cloak` | CloakBrowser 二进制 + 49 C++ patch + cloak-profile | `false` |
-| `--js-stealth` | 页面里 opt-in 注入 `StealthScripts2025`（覆盖 navigator/canvas/WebGL/audio） | `false` |
-| `--full-stealth-args` | 使用历史 60+ Chromium 启动参数集 | `false` |
+| Flag                  | 作用                                                                         | 默认    |
+| --------------------- | ---------------------------------------------------------------------------- | ------- |
+| `--cloak`             | CloakBrowser 二进制 + 49 C++ patch + cloak-profile                           | `false` |
+| `--js-stealth`        | 页面里 opt-in 注入 `StealthScripts2025`（覆盖 navigator/canvas/WebGL/audio） | `false` |
+| `--full-stealth-args` | 使用历史 60+ Chromium 启动参数集                                             | `false` |
 
 `--cloak` 是强反爬的逃生通道，详见 [`docs/cloak.md`](./docs/cloak.md)。
 `--js-stealth` 是历史兼容 opt-in（旧代码依赖 `navigator.webdriver === false`
@@ -345,129 +345,129 @@ Browser-CLI/
 
 #### 3.2.1 配置系统 (src/config/)
 
-| 方面 | 分析 |
-|------|------|
-| **职责** | 统一管理所有运行时配置 — 浏览器连接、AI 提供商、数据库、RPC 通信 |
-| **实现逻辑** | `resolveConfig()` 实现 CLI 参数 > 环境变量 (dotenv) > config.json > js-reverse.config.json > ~/.jsreverse/config.json > 内置默认值的优先级合并 |
+| 方面         | 分析                                                                                                                                                                                                        |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **职责**     | 统一管理所有运行时配置 — 浏览器连接、AI 提供商、数据库、RPC 通信                                                                                                                                            |
+| **实现逻辑** | `resolveConfig()` 实现 CLI 参数 > 环境变量 (dotenv) > config.json > js-reverse.config.json > ~/.jsreverse/config.json > 内置默认值的优先级合并                                                              |
 | **关键函数** | `resolveConfig()` — 返回扁平 `ResolvedConfig`; `getSystemConfig()` — 构建 `SystemConfig` (AI+Browser+Debug); `getBrowserManagerConfig()` — 解析 25 个浏览器参数; `createAIService()` — 从配置实例化 AI 服务 |
-| **被调用方** | `src/index.ts` (Worker入口)、`src/worker/WorkerArgs.ts`、`src/runtime.ts` |
-| **隐式耦合** | `LLMProvider` 类型仅限 `'openai'`，但 AI 层已支持 Anthropic/Gemini，配置系统尚未暴露对应选项; `schema.ts` 为空占位文件 |
-| **改进空间** | 扩展 `LLMProvider` 联合类型; 使用 Zod 对 `GlobalConfig` 做运行时校验 |
+| **被调用方** | `src/index.ts` (Worker入口)、`src/worker/WorkerArgs.ts`、`src/runtime.ts`                                                                                                                                   |
+| **隐式耦合** | `LLMProvider` 类型仅限 `'openai'`，但 AI 层已支持 Anthropic/Gemini，配置系统尚未暴露对应选项; `schema.ts` 为空占位文件                                                                                      |
+| **改进空间** | 扩展 `LLMProvider` 联合类型; 使用 Zod 对 `GlobalConfig` 做运行时校验                                                                                                                                        |
 
 #### 3.2.2 浏览器管理层 (src/browser/)
 
-| 方面 | 分析 |
-|------|------|
-| **职责** | 浏览器的启动、连接、会话管理、崩溃恢复、隐身注入 |
+| 方面         | 分析                                                                                                                                                                                                          |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **职责**     | 浏览器的启动、连接、会话管理、崩溃恢复、隐身注入                                                                                                                                                              |
 | **实现逻辑** | **双模式连接**: 已有浏览器 (connectOverCDP) / 自动启动新浏览器 (launch)。**三层端口发现**: DevToolsActivePort > 常见端口扫描 > 默认候选列表。**崩溃自愈**: 双重检测 (事件 + 5s 轮询) → close → 1s 延迟 → 重启 |
-| **关键类** | `BrowserManager` (单例) — 核心; `SessionManager` — 多会话页面隔离; `DevToolsConnectionAdapter` — Playwright→CDPConnection 适配器; `CDPErrorMapper` — 10 种错误模式映射 |
-| **被调用方** | `Runtime` 在 `getRuntime()` 中 init; `ToolContextProvider.PageManager` 持有引用 |
-| **隐式耦合** | `BrowserManager` 直接依赖 `patchright` 的 `Browser` / `BrowserContext` / `Page` 具体类型, 而不是抽象接口; 测试通过 `resetInstance()` 进行，但方案较脆弱 |
-| **设计模式** | **单例模式、适配器模式 (Playwright→CDPConnection)、策略模式 (端口发现三层策略)、观察者模式 (崩溃监听)** |
+| **关键类**   | `BrowserManager` (单例) — 核心; `SessionManager` — 多会话页面隔离; `DevToolsConnectionAdapter` — Playwright→CDPConnection 适配器; `CDPErrorMapper` — 10 种错误模式映射                                        |
+| **被调用方** | `Runtime` 在 `getRuntime()` 中 init; `ToolContextProvider.PageManager` 持有引用                                                                                                                               |
+| **隐式耦合** | `BrowserManager` 直接依赖 `patchright` 的 `Browser` / `BrowserContext` / `Page` 具体类型, 而不是抽象接口; 测试通过 `resetInstance()` 进行，但方案较脆弱                                                       |
+| **设计模式** | **单例模式、适配器模式 (Playwright→CDPConnection)、策略模式 (端口发现三层策略)、观察者模式 (崩溃监听)**                                                                                                       |
 
 #### 3.2.3 MCP 工具层 (src/tools/)
 
-| 方面 | 分析 |
-|------|------|
-| **职责** | 实现 100+ 个 MCP 工具，覆盖页面观察、Hook、断点、网络分析、WebSocket、代码分析、反混淆、加密检测、WASM、设备仿真、性能分析等全部能力 |
+| 方面         | 分析                                                                                                                                                                                                                                      |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **职责**     | 实现 100+ 个 MCP 工具，覆盖页面观察、Hook、断点、网络分析、WebSocket、代码分析、反混淆、加密检测、WASM、设备仿真、性能分析等全部能力                                                                                                      |
 | **实现逻辑** | 工具通过 `defineTool()` DSL 定义 (name + description + Zod schema + handler)。索引在 `generated-tools-index.ts` 中自动生成，通过 `tools-meta.ts` 动态加载并缓存。`ToolAdapter.wrapTool()` 将 `ToolDefinition` 包装为 Sekiro ActionHandler |
-| **关键文件** | `ToolDefinition.ts` — 工具定义接口; `generated-tools-index.ts` — 索引; `categories.ts` — 10 个分类枚举; `ToolAdapter.ts` — 包装器 |
-| **被调用方** | RpcClient 收到 Sekiro 请求 → 路由到对应 ActionHandler |
-| **边界问题** | 定义和使用之间有一层间接性 (modulePath → 动态 import)，加载失败时以警告非阻断方式处理 |
-| **改进空间** | 考虑将工具调用模式 (`frame`/`context`/`direct`) 表示为统一的 DSL 属性, 而非 ToolAdapter 中的条件分支 |
+| **关键文件** | `ToolDefinition.ts` — 工具定义接口; `generated-tools-index.ts` — 索引; `categories.ts` — 10 个分类枚举; `ToolAdapter.ts` — 包装器                                                                                                         |
+| **被调用方** | RpcClient 收到 Sekiro 请求 → 路由到对应 ActionHandler                                                                                                                                                                                     |
+| **边界问题** | 定义和使用之间有一层间接性 (modulePath → 动态 import)，加载失败时以警告非阻断方式处理                                                                                                                                                     |
+| **改进空间** | 考虑将工具调用模式 (`frame`/`context`/`direct`) 表示为统一的 DSL 属性, 而非 ToolAdapter 中的条件分支                                                                                                                                      |
 
 #### 3.2.4 代码收集模块 (src/modules/collector/)
 
-| 方面 | 分析 |
-|------|------|
-| **职责** | 采集页面所有 JavaScript 代码 (外部脚本、内联脚本、Service Worker、Web Worker) |
-| **实现逻辑** | CDP `Network.enable` 网络拦截 + `Page.enable` 脚本事件监听。支持 summary/priority/incremental 三种智能收集模式。收集后自动构建依赖图，支持按优先级获取|
-| **关键类** | `CodeCollector` — 主收集器; `CodeCache` — 内存缓存; `CodeCompressor` — 按需压缩; `SmartCodeCollector` — 智能策略 |
-| **被调用方** | Runtime → `collect_code` 工具 |
-| **改进空间** | 对大网站 (1000+ 脚本) 的收集性能需优化，当前智能模式可能仍会超时 |
+| 方面         | 分析                                                                                                                                                   |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **职责**     | 采集页面所有 JavaScript 代码 (外部脚本、内联脚本、Service Worker、Web Worker)                                                                          |
+| **实现逻辑** | CDP `Network.enable` 网络拦截 + `Page.enable` 脚本事件监听。支持 summary/priority/incremental 三种智能收集模式。收集后自动构建依赖图，支持按优先级获取 |
+| **关键类**   | `CodeCollector` — 主收集器; `CodeCache` — 内存缓存; `CodeCompressor` — 按需压缩; `SmartCodeCollector` — 智能策略                                       |
+| **被调用方** | Runtime → `collect_code` 工具                                                                                                                          |
+| **改进空间** | 对大网站 (1000+ 脚本) 的收集性能需优化，当前智能模式可能仍会超时                                                                                       |
 
 #### 3.2.5 Hook 系统 (src/modules/hook/)
 
-| 方面 | 分析 |
-|------|------|
-| **职责** | 声明式 Hook 定义、注入、数据回传、反调试绕过 |
+| 方面         | 分析                                                                                                                                                                                                     |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **职责**     | 声明式 Hook 定义、注入、数据回传、反调试绕过                                                                                                                                                             |
 | **实现逻辑** | **Facade 模式**: `HookManager` 聚合 `HookCodeBuilder` (脚本生成) + `HookTypeRegistry` (类型注册) + `HookStore` (数据存储)。支持 `create()` (声明式) 和 `createWithBuilder()` (链式 Builder) 两种创建方式 |
-| **关键类** | `HookManager` — 外观; `HookTypeRegistry` — 插件式扩展点; `AIHookGenerator` — AI 辅助生成 |
-| **设计模式** | **Facade 模式、Builder 模式、Plugin 模式 (通过 `registerType()` 注册自定义 Hook 类型)** |
-| **改进空间** | HookTypeRegistry 内置类型以硬编码方式加载，未来可考虑完全插件化 |
+| **关键类**   | `HookManager` — 外观; `HookTypeRegistry` — 插件式扩展点; `AIHookGenerator` — AI 辅助生成                                                                                                                 |
+| **设计模式** | **Facade 模式、Builder 模式、Plugin 模式 (通过 `registerType()` 注册自定义 Hook 类型)**                                                                                                                  |
+| **改进空间** | HookTypeRegistry 内置类型以硬编码方式加载，未来可考虑完全插件化                                                                                                                                          |
 
 #### 3.2.6 反混淆模块 (src/modules/deobfuscator/)
 
-| 方面 | 分析 |
-|------|------|
-| **职责** | 多策略反混淆管道，支持多种混淆类型 |
+| 方面         | 分析                                                                                                                                                                                                                                     |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **职责**     | 多策略反混淆管道，支持多种混淆类型                                                                                                                                                                                                       |
 | **实现逻辑** | **Pipeline + Strategy 模式**: 检测混淆类型 → 解包 Packer/AAEncode/URLEncode → JSVMP 虚拟化还原 → 高级混淆 (控制流平坦化、不透明谓词) → 基础管线 → AST 优化 → 变量重命名 → LLM 辅助分析。每个阶段独立 try-catch，非致命失败不阻断后续环节 |
-| **关键类** | `Deobfuscator` — 管道调度; `PackerDeobfuscator` / `JSVMPDeobfuscator` / `AdvancedDeobfuscator` — 策略实现; `ASTOptimizer` — AST 优化 |
-| **设计模式** | **Pipeline 模式、Strategy 模式** |
-| **改进空间** | 阶段间数据共享通过 `DeobfuscationContext` 进行，接口可更明确 |
+| **关键类**   | `Deobfuscator` — 管道调度; `PackerDeobfuscator` / `JSVMPDeobfuscator` / `AdvancedDeobfuscator` — 策略实现; `ASTOptimizer` — AST 优化                                                                                                     |
+| **设计模式** | **Pipeline 模式、Strategy 模式**                                                                                                                                                                                                         |
+| **改进空间** | 阶段间数据共享通过 `DeobfuscationContext` 进行，接口可更明确                                                                                                                                                                             |
 
 #### 3.2.7 调试器 (DebuggerManager / src/modules/debugger/)
 
-| 方面 | 分析 |
-|------|------|
-| **职责** | CDP Debugger 域的封装：脚本追踪、断点管理、暂停状态、调用帧检查、自动断点循环恢复 |
+| 方面         | 分析                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **职责**     | CDP Debugger 域的封装：脚本追踪、断点管理、暂停状态、调用帧检查、自动断点循环恢复                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | **实现逻辑** | `DebuggerManager` 作为门面（Facade），协调 `BreakpointManager` / `ExecutionController` / `ScopeInspector` / `ScriptManager` / `ExecutionContextTracker` / `DebuggerSessionStore` 等策略模块。提供脚本搜索 `searchInScripts()`、断点管理 `setBreakpointByUrl/setBreakpointByUrlRegex`、执行控制 `pause/resume/stepOver/stepInto/stepOut`、作用域变量获取 `getScopeVariables()`、调用帧表达式求值 `evaluateOnCallFrame()`。**断点循环检测**: 2s 窗口内同一断点命中 3 次 → 自动恢复 (resume + 移除断点) |
-| **关键类** | `DebuggerManager` — 门面 ~600 行; `BreakpointManager` / `ExecutionController` / `ScopeInspector` / `ScriptManager` / `ExecutionContextTracker` / `DebuggerSessionStore` 等策略模块 |
-| **设计模式** | **Facade + Strategy 模式** — DebuggerManager 统一入口，策略模块各管 CDP 子域 |
-| **改进空间** | 已统一：原 `DebuggerContext`（869 行）已迁移至 `DebuggerManager` + 策略模块，消除了职责重叠 |
+| **关键类**   | `DebuggerManager` — 门面 ~600 行; `BreakpointManager` / `ExecutionController` / `ScopeInspector` / `ScriptManager` / `ExecutionContextTracker` / `DebuggerSessionStore` 等策略模块                                                                                                                                                                                                                                                                                                                   |
+| **设计模式** | **Facade + Strategy 模式** — DebuggerManager 统一入口，策略模块各管 CDP 子域                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| **改进空间** | 已统一：原 `DebuggerContext`（869 行）已迁移至 `DebuggerManager` + 策略模块，消除了职责重叠                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 #### 3.2.8 AI 服务层 (src/services/)
 
-| 方面 | 分析 |
-|------|------|
-| **职责** | 提供统一的 LLM 调用封装，支持多提供商、重试、错误分类 |
+| 方面         | 分析                                                                                                                                                                                                                                                                       |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **职责**     | 提供统一的 LLM 调用封装，支持多提供商、重试、错误分类                                                                                                                                                                                                                      |
 | **实现逻辑** | `AIProvider` 接口定义 `chat()` 和 `analyzeImage()`。三个提供商实现: `OpenAIProvider`、`AnthropicProvider`、`GeminiProvider` (支持 API 和本地 CLI 两种模式)。`AIService` 包装器提供指数退避重试 (max 3 次) + 错误分类 (网络错误/429/5xx)。`LLMService` 提供业务级提示词模板 |
-| **关键类** | `AIProvider` 接口、`AIService` (重试封装)、`LLMService` (提示词工厂) |
-| **被调用方** | `CodeAnalyzer` / `AISummarizer` / `Deobfuscator` / `CryptoDetector` 等分析模块 |
-| **设计模式** | **策略模式 (不同 LLM 提供商的统一接口)、装饰器模式 (AIService 封装重试逻辑)** |
-| **隐式耦合** | `GeminiProvider` 对 `DEFAULT_LLM_PROVIDER` 有圈复杂度较高的条件分支 (API vs CLI 模式) |
-| **改进空间** | 配置系统应暴露 Anthropic/Gemini 的配置键; 考虑引入请求缓存减少重复调用 |
+| **关键类**   | `AIProvider` 接口、`AIService` (重试封装)、`LLMService` (提示词工厂)                                                                                                                                                                                                       |
+| **被调用方** | `CodeAnalyzer` / `AISummarizer` / `Deobfuscator` / `CryptoDetector` 等分析模块                                                                                                                                                                                             |
+| **设计模式** | **策略模式 (不同 LLM 提供商的统一接口)、装饰器模式 (AIService 封装重试逻辑)**                                                                                                                                                                                              |
+| **隐式耦合** | `GeminiProvider` 对 `DEFAULT_LLM_PROVIDER` 有圈复杂度较高的条件分支 (API vs CLI 模式)                                                                                                                                                                                      |
+| **改进空间** | 配置系统应暴露 Anthropic/Gemini 的配置键; 考虑引入请求缓存减少重复调用                                                                                                                                                                                                     |
 
 #### 3.2.9 事件总线 (src/utils/EventBus)
 
-| 方面 | 分析 |
-|------|------|
-| **职责** | 提供模块间松耦合的事件通信机制 |
+| 方面         | 分析                                                                                                                                                                                                                    |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **职责**     | 提供模块间松耦合的事件通信机制                                                                                                                                                                                          |
 | **实现逻辑** | 泛型 `EventBus<TMap>` 将事件名到 payload 类型通过类型参数 TMap 关联。`on()` 返回取消订阅函数。`emit()` 时通过 Option 中传入的 Zod validators 对 payload 进行运行时校验。异步 handler 以 `void` 调用，不阻塞 emit 调用方 |
-| **事件映射** | 9 个全局事件: `browser:launched/closed`、`hook:injected/triggered`、`network:captured`、`debugger:paused/resumed`、`tool:called/error` |
-| **设计模式** | **观察者模式 / Pub/Sub 模式** |
-| **改进空间** | 无异步事件中间件能力 (如日志、过滤、重试); 有些事件 (如 `hook:triggered`) 实际未被任何模块使用 |
+| **事件映射** | 9 个全局事件: `browser:launched/closed`、`hook:injected/triggered`、`network:captured`、`debugger:paused/resumed`、`tool:called/error`                                                                                  |
+| **设计模式** | **观察者模式 / Pub/Sub 模式**                                                                                                                                                                                           |
+| **改进空间** | 无异步事件中间件能力 (如日志、过滤、重试); 有些事件 (如 `hook:triggered`) 实际未被任何模块使用                                                                                                                          |
 
 #### 3.2.10 缓存系统 (src/utils/)
 
-| 方面 | 分析 |
-|------|------|
-| **职责** | 统一协调多级缓存，提供全局统计、智能清理、预警 |
+| 方面         | 分析                                                                                                                                                                                                            |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **职责**     | 统一协调多级缓存，提供全局统计、智能清理、预警                                                                                                                                                                  |
 | **实现逻辑** | `UnifiedCacheManager` (单例) 通过 `CacheAdapter` 适配器协调 3 个缓存: `DetailedDataManager` (LRU + TTL 自动续期)、`CodeCache` (代码文件)、`CodeCompressor` (压缩结果)。智能清理三阶段: 过期 → 低命中率 → 大体积 |
-| **关键类** | `UnifiedCacheManager` (协调者)、`DetailedDataManager` (分层存储 + LRU + 30min TTL + 自动续期) |
-| **设计模式** | **单例模式、适配器模式 (3 个异构缓存统一接口)、协调者模式** |
-| **改进空间** | 500MB 上限未软配置; `DetailedDataManager` 的大小估算不精确 (50KB/条固定); 预热 `preheat()` 仅为空壳 |
+| **关键类**   | `UnifiedCacheManager` (协调者)、`DetailedDataManager` (分层存储 + LRU + 30min TTL + 自动续期)                                                                                                                   |
+| **设计模式** | **单例模式、适配器模式 (3 个异构缓存统一接口)、协调者模式**                                                                                                                                                     |
+| **改进空间** | 500MB 上限未软配置; `DetailedDataManager` 的大小估算不精确 (50KB/条固定); 预热 `preheat()` 仅为空壳                                                                                                             |
 
 #### 3.2.11 RPC 协议层 (src/protocol/)
 
-| 方面 | 分析 |
-|------|------|
-| **职责** | Worker 与 RPC Server 之间的 WebSocket 通信 |
+| 方面         | 分析                                                                                                                                                                                                                                                                     |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **职责**     | Worker 与 RPC Server 之间的 WebSocket 通信                                                                                                                                                                                                                               |
 | **实现逻辑** | `RpcClient` 通过 Sekiro 协议连接到 RPC Server。Action 注册表管理 `Map<string, ActionHandler>`。心跳 30s 一次 ping，10s pong 超时断开触发重连。重连策略: 指数退避 (2s base × 2^attempts, max 30s)。请求处理: JSON.parse → action 路由 → handler(request, resolve, reject) |
-| **关键类** | `RpcClient` — 508 行 |
-| **被调用方** | Worker 主函数 `registerBuiltinActions()` + `ToolAdapter.registerAll()` |
-| **设计模式** | **命令模式 (Action Handler 注册表)、指数退避重连** |
-| **改进空间** | `_execjsHandler` 的安全性 (使用 `new Function()` 执行任意代码); 无请求超时机制; 响应序列化可优化 |
+| **关键类**   | `RpcClient` — 508 行                                                                                                                                                                                                                                                     |
+| **被调用方** | Worker 主函数 `registerBuiltinActions()` + `ToolAdapter.registerAll()`                                                                                                                                                                                                   |
+| **设计模式** | **命令模式 (Action Handler 注册表)、指数退避重连**                                                                                                                                                                                                                       |
+| **改进空间** | `_execjsHandler` 的安全性 (使用 `new Function()` 执行任意代码); 无请求超时机制; 响应序列化可优化                                                                                                                                                                         |
 
 #### 3.2.12 Worker 层 (src/worker/)
 
-| 方面 | 分析 |
-|------|------|
-| **职责** | 将所有 MCP 工具注册为 Sekiro Actions，管理执行上下文和生命周期 |
+| 方面         | 分析                                                                                                                                                                                                                                                                                                                                                            |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **职责**     | 将所有 MCP 工具注册为 Sekiro Actions，管理执行上下文和生命周期                                                                                                                                                                                                                                                                                                  |
 | **实现逻辑** | `ToolAdapter` 从 `generated-tools-index.ts` 动态加载工具定义，`wrapTool()` 建立 `defineTool → Sekiro ActionHandler` 的桥接。三个调用模式: `frame` (在页面 frame 上执行)、`context` (在 contextProvider 上执行)、`direct` (仅参数)。`ToolContextProvider` (Facade) 聚合 4 个子模块: PageManager + DebuggerSessionManager + DataCollectorManager + ServiceLocator |
-| **关键类** | `ToolAdapter` (464 行)、`ToolContextProvider` (420 行)、`WorkerLifecycle.createGracefulShutdown()` |
-| **设计模式** | **外观模式 (ToolContextProvider 统一 4 个子模块)、桥接模式 (ToolAdapter 桥接工具定义与 Sekiro 协议)** |
-| **改进空间** | Frame evaluate 超时 (10s) 通过 Proxy 实现，调试器暂停时 10s 可能不够 |
+| **关键类**   | `ToolAdapter` (464 行)、`ToolContextProvider` (420 行)、`WorkerLifecycle.createGracefulShutdown()`                                                                                                                                                                                                                                                              |
+| **设计模式** | **外观模式 (ToolContextProvider 统一 4 个子模块)、桥接模式 (ToolAdapter 桥接工具定义与 Sekiro 协议)**                                                                                                                                                                                                                                                           |
+| **改进空间** | Frame evaluate 超时 (10s) 通过 Proxy 实现，调试器暂停时 10s 可能不够                                                                                                                                                                                                                                                                                            |
 
 ---
 
@@ -475,47 +475,48 @@ Browser-CLI/
 
 ### 4.1 已使用的设计模式
 
-| 模式 | 使用位置 | 解决的问题 | 评价 |
-|------|---------|-----------|------|
-| **单例模式** | `Runtime.getRuntime()`, `BrowserManager.getInstance()`, `UnifiedCacheManager.getInstance()`, `DetailedDataManager.getInstance()`, `TokenBudgetManager.getInstance()`, `DatabaseService` 导出实例 | 确保全局唯一实例，避免重复初始化浏览器连接、缓存、数据库连接 | ⚠️ 使测试略复杂，需 `resetInstance()` 方案 |
-| **外观模式** | `ToolContextProvider` 聚合 PageManager / DebuggerSessionManager / DataCollectorManager / ServiceLocator; `HookManager` 聚合 HookCodeBuilder / HookTypeRegistry / HookStore | 为 Tool handler 提供统一入口，隐藏底部 4 个子模块的复杂性 | ✅ 职责分离好，单个入口降低耦合 |
-| **适配器模式** | `DevToolsConnectionAdapter` (Playwright CDPSession → CDPConnection); `CacheAdapters` (3 个缓存 → CacheInstance); `third_party/puppeteer-compat.ts` (Puppeteer 兼容) | 在不同接口间转换，实现 Puppeteer→Playwright 迁移、异构缓存统一 | ✅ 适配层干净，零侵入 |
-| **策略模式** | `BrowserManager` 双模式 (connect vs launch) + 端口发现三层策略; `Deobfuscator` 通过子模块实现不同混淆策略; `AIProvider` 接口 (OpenAI/Anthropic/Gemini) | 算法/策略的可替换性，运行时选择 | ✅ Strategy 接口定义清晰 |
-| **模板方法模式** | `PageCollector<T>` 抽象基类: `attachListeners()` / `detachListeners()` 由子类实现 | 多个收集器 (Network/Console/WSC) 共享导航分组和生命周期逻辑 | ✅ 减少大量重复代码 |
-| **管道模式** | `Deobfuscator` 反混淆管线: 检测 → 解包 → JSVMP → 高级 → 基础 → AST → 重命名 → AI | 多阶段处理，每阶段独立失败 | ✅ 高容错: 每步独立 try-catch |
-| **观察者模式** | `EventBus` (Pub/Sub 9 个事件); `DebuggerManager` CDP 事件监听 (scriptParsed/paused/resumed); `BrowserManager.on('disconnected')` 崩溃监听 | 模块间松散通信，事件驱动 | ✅ EventBus 有 Zod 校验加分 |
-| **桥接模式** | `ToolAdapter` 将 `defineTool` 定义桥接到 Sekiro ActionHandler 协议 | 分离工具定义和传输协议 | ✅ 可独立替换协议层 |
-| **命令模式** | `RpcClient` 注册 `Map<string, ActionHandler>`, 按 action 名路由 | 请求封装为命令对象，支持注册/注销/路由 | ✅ 标准实现 |
-| **工厂模式** | `createAIService()` 根据 provider 创建对应实现; `getRuntime()` 首次创建所有实例 | 对象创建的集中管理 | ✅ 创建逻辑集中 |
-| **Builder 模式** | `HookManager.createWithBuilder()` 链式构建 Hook | 复杂 Hook 配置的逐步构建 | ✅ 链式 API 清晰 |
-| **协调者模式** | `UnifiedCacheManager` 协调 3 个缓存实例 | 多个缓存的全局管理，不替代它们 | ✅ 非侵入式 |
-| **装饰器模式** | `AIService` 封装重试逻辑 + 错误分类，不影响 `AIProvider` 实现 | 在透明外层添加重试能力 | ✅ 关注点分离好 |
-| **代理模式** | `Frame evaluateWithTimeout` Proxy 拦截 `frame.evaluate()` 添加超时保护 | 在不修改 Playwright 对象的情况下扩展超时 | ✅ Proxy 方案轻量 |
+| 模式             | 使用位置                                                                                                                                                                                         | 解决的问题                                                     | 评价                                       |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- | ------------------------------------------ |
+| **单例模式**     | `Runtime.getRuntime()`, `BrowserManager.getInstance()`, `UnifiedCacheManager.getInstance()`, `DetailedDataManager.getInstance()`, `TokenBudgetManager.getInstance()`, `DatabaseService` 导出实例 | 确保全局唯一实例，避免重复初始化浏览器连接、缓存、数据库连接   | ⚠️ 使测试略复杂，需 `resetInstance()` 方案 |
+| **外观模式**     | `ToolContextProvider` 聚合 PageManager / DebuggerSessionManager / DataCollectorManager / ServiceLocator; `HookManager` 聚合 HookCodeBuilder / HookTypeRegistry / HookStore                       | 为 Tool handler 提供统一入口，隐藏底部 4 个子模块的复杂性      | ✅ 职责分离好，单个入口降低耦合            |
+| **适配器模式**   | `DevToolsConnectionAdapter` (Playwright CDPSession → CDPConnection); `CacheAdapters` (3 个缓存 → CacheInstance); `third_party/puppeteer-compat.ts` (Puppeteer 兼容)                              | 在不同接口间转换，实现 Puppeteer→Playwright 迁移、异构缓存统一 | ✅ 适配层干净，零侵入                      |
+| **策略模式**     | `BrowserManager` 双模式 (connect vs launch) + 端口发现三层策略; `Deobfuscator` 通过子模块实现不同混淆策略; `AIProvider` 接口 (OpenAI/Anthropic/Gemini)                                           | 算法/策略的可替换性，运行时选择                                | ✅ Strategy 接口定义清晰                   |
+| **模板方法模式** | `PageCollector<T>` 抽象基类: `attachListeners()` / `detachListeners()` 由子类实现                                                                                                                | 多个收集器 (Network/Console/WSC) 共享导航分组和生命周期逻辑    | ✅ 减少大量重复代码                        |
+| **管道模式**     | `Deobfuscator` 反混淆管线: 检测 → 解包 → JSVMP → 高级 → 基础 → AST → 重命名 → AI                                                                                                                 | 多阶段处理，每阶段独立失败                                     | ✅ 高容错: 每步独立 try-catch              |
+| **观察者模式**   | `EventBus` (Pub/Sub 9 个事件); `DebuggerManager` CDP 事件监听 (scriptParsed/paused/resumed); `BrowserManager.on('disconnected')` 崩溃监听                                                        | 模块间松散通信，事件驱动                                       | ✅ EventBus 有 Zod 校验加分                |
+| **桥接模式**     | `ToolAdapter` 将 `defineTool` 定义桥接到 Sekiro ActionHandler 协议                                                                                                                               | 分离工具定义和传输协议                                         | ✅ 可独立替换协议层                        |
+| **命令模式**     | `RpcClient` 注册 `Map<string, ActionHandler>`, 按 action 名路由                                                                                                                                  | 请求封装为命令对象，支持注册/注销/路由                         | ✅ 标准实现                                |
+| **工厂模式**     | `createAIService()` 根据 provider 创建对应实现; `getRuntime()` 首次创建所有实例                                                                                                                  | 对象创建的集中管理                                             | ✅ 创建逻辑集中                            |
+| **Builder 模式** | `HookManager.createWithBuilder()` 链式构建 Hook                                                                                                                                                  | 复杂 Hook 配置的逐步构建                                       | ✅ 链式 API 清晰                           |
+| **协调者模式**   | `UnifiedCacheManager` 协调 3 个缓存实例                                                                                                                                                          | 多个缓存的全局管理，不替代它们                                 | ✅ 非侵入式                                |
+| **装饰器模式**   | `AIService` 封装重试逻辑 + 错误分类，不影响 `AIProvider` 实现                                                                                                                                    | 在透明外层添加重试能力                                         | ✅ 关注点分离好                            |
+| **代理模式**     | `Frame evaluateWithTimeout` Proxy 拦截 `frame.evaluate()` 添加超时保护                                                                                                                           | 在不修改 Playwright 对象的情况下扩展超时                       | ✅ Proxy 方案轻量                          |
 
 ### 4.2 可以引入但尚未使用的设计模式
 
-| 模式 | 建议位置 | 理由 |
-|------|---------|------|
-| **工厂方法模式** | `ToolAdapter.loadHandler()` | 当前动态 import + `if-else` 分派创建不同模式 handler，可抽象为 `HandlerFactory.create(meta)` |
-| **访问者模式** | JS AST 分析 (CodeAnalyzer / CryptoDetector) | Babel traverse 已隐含访问者模式，但 `CodeAnalyzer` 的静态分析可封装为更细粒度的 AST Visitor |
-| **状态模式** | `BrowserManager` 状态管理 | 当前通过布尔 flags (`isRestarting`/`isConnected`) 控制，可引入显式状态机 (disconnected/connecting/connected/closing/closed) |
-| **责任链模式** | `ToolAdapter.wrapTool()` 的调用前/后处理 | 当前参数校验、执行、日志记录在单个函数中线性展开，可拆为独立中间件 |
-| **命令队列模式** | `ToolExecutionScheduler` | 当前只有简单读写分离，未来可扩展为带优先级、延迟执行、取消的任务队列 |
-| **空对象模式** | `SiteExperienceService\` 搜索返回 | 数据库未配置时统一返回空数组/空对象，减少消费者 if-null 检查 |
-| **规格模式** | `CryptoDetector` 规则引擎 | 当前规则是简单 if-else 判断，可用规格模式组合复杂检测条件 |
+| 模式             | 建议位置                                    | 理由                                                                                                                        |
+| ---------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| **工厂方法模式** | `ToolAdapter.loadHandler()`                 | 当前动态 import + `if-else` 分派创建不同模式 handler，可抽象为 `HandlerFactory.create(meta)`                                |
+| **访问者模式**   | JS AST 分析 (CodeAnalyzer / CryptoDetector) | Babel traverse 已隐含访问者模式，但 `CodeAnalyzer` 的静态分析可封装为更细粒度的 AST Visitor                                 |
+| **状态模式**     | `BrowserManager` 状态管理                   | 当前通过布尔 flags (`isRestarting`/`isConnected`) 控制，可引入显式状态机 (disconnected/connecting/connected/closing/closed) |
+| **责任链模式**   | `ToolAdapter.wrapTool()` 的调用前/后处理    | 当前参数校验、执行、日志记录在单个函数中线性展开，可拆为独立中间件                                                          |
+| **命令队列模式** | `ToolExecutionScheduler`                    | 当前只有简单读写分离，未来可扩展为带优先级、延迟执行、取消的任务队列                                                        |
+| **空对象模式**   | `SiteExperienceService\` 搜索返回           | 数据库未配置时统一返回空数组/空对象，减少消费者 if-null 检查                                                                |
+| **规格模式**     | `CryptoDetector` 规则引擎                   | 当前规则是简单 if-else 判断，可用规格模式组合复杂检测条件                                                                   |
 
 ### 4.3 架构层级模式分析
 
 项目采用一种**改良的分层架构**，接近于 **Hexagonal Architecture (Ports and Adapters)** 的变体:
 
-| 层级 | 对应目录 | Ports (接口) | Adapters (实现) |
-|------|---------|-------------|----------------|
-| **基础设施层** | `src/browser/`, `src/protocol/`, `src/services/DatabaseService.ts` | CDPSession, RPC protocol | BrowserManager (Chrome CDP), RpcClient (Sekiro WS), DatabaseService (pg) |
-| **核心领域层** | `src/modules/` | HookTypePlugin, AIProvider, DeobfuscatorStrategy (隐式) | HookManager, CodeAnalyzer, Deobfuscator |
-| **应用层** | `src/tools/` + `src/worker/` | ToolDefinition, Context | ~100 个具体工具 + ToolAdapter |
-| **配置层** | `src/config/` | — | 多源合并 + 环境变量 |
+| 层级           | 对应目录                                                           | Ports (接口)                                            | Adapters (实现)                                                          |
+| -------------- | ------------------------------------------------------------------ | ------------------------------------------------------- | ------------------------------------------------------------------------ |
+| **基础设施层** | `src/browser/`, `src/protocol/`, `src/services/DatabaseService.ts` | CDPSession, RPC protocol                                | BrowserManager (Chrome CDP), RpcClient (Sekiro WS), DatabaseService (pg) |
+| **核心领域层** | `src/modules/`                                                     | HookTypePlugin, AIProvider, DeobfuscatorStrategy (隐式) | HookManager, CodeAnalyzer, Deobfuscator                                  |
+| **应用层**     | `src/tools/` + `src/worker/`                                       | ToolDefinition, Context                                 | ~100 个具体工具 + ToolAdapter                                            |
+| **配置层**     | `src/config/`                                                      | —                                                       | 多源合并 + 环境变量                                                      |
 
-**不符合纯 Hexagonal 的地方**: 
+**不符合纯 Hexagonal 的地方**:
+
 - `BrowserManager` 直接暴露 `patchright.Browser` 具体类型（而非抽象接口）
 - 领域层模块之间硬编码的引用关系 (如 `WasmCollector` 接收 `PageController` 具体类)
 - 没有明确的 UseCase / Interactor 层来编排复杂业务流程
@@ -744,56 +745,56 @@ flowchart TB
 
 ### 🏆 建议 1: 引入显式状态机管理浏览器连接生命周期
 
-| 维度 | 内容 |
-|------|------|
-| **目标模块** | `src/browser/browser.ts` — BrowserManager |
-| **当前问题** | 浏览器状态通过分散的布尔标志管理 (`isRestarting` / `isConnected`), 状态转换在条件分支中隐式发生, 并发重启保护和边界条件依赖多个标志组合, 新增状态容易漏掉旧状态转换 |
-| **具体方案** | 引入显式有限状态机 (可用 `typescript-state-machine` 或纯 TypeScript 实现) |
-| | **状态**: `DISCONNECTED → CONNECTING → CONNECTED → RESTARTING → CLOSING` |
-| | **迁移**: 每个状态转换有明确的 guard 条件和副作用, 不合法状态转换为编译错误 |
-| | **继承**: 保留现有 API 签名, 内部将布尔标志替换为状态机 |
-| **预期收益** | 崩溃恢复路径 100% 可预测; 新增状态 (如 MAINTENANCE) 零风险; 并发竞态条件消除; 错误报告精确到具体状态 |
-| **风险与成本** | 中等: 需要仔细映射现有 ~15 种状态相关方法; 短期部分重写 `BrowserManager`; 测试用例需重新覆盖所有状态转换路径 |
+| 维度           | 内容                                                                                                                                                                |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **目标模块**   | `src/browser/browser.ts` — BrowserManager                                                                                                                           |
+| **当前问题**   | 浏览器状态通过分散的布尔标志管理 (`isRestarting` / `isConnected`), 状态转换在条件分支中隐式发生, 并发重启保护和边界条件依赖多个标志组合, 新增状态容易漏掉旧状态转换 |
+| **具体方案**   | 引入显式有限状态机 (可用 `typescript-state-machine` 或纯 TypeScript 实现)                                                                                           |
+|                | **状态**: `DISCONNECTED → CONNECTING → CONNECTED → RESTARTING → CLOSING`                                                                                            |
+|                | **迁移**: 每个状态转换有明确的 guard 条件和副作用, 不合法状态转换为编译错误                                                                                         |
+|                | **继承**: 保留现有 API 签名, 内部将布尔标志替换为状态机                                                                                                             |
+| **预期收益**   | 崩溃恢复路径 100% 可预测; 新增状态 (如 MAINTENANCE) 零风险; 并发竞态条件消除; 错误报告精确到具体状态                                                                |
+| **风险与成本** | 中等: 需要仔细映射现有 ~15 种状态相关方法; 短期部分重写 `BrowserManager`; 测试用例需重新覆盖所有状态转换路径                                                        |
 
 ### 🏆 建议 2: 将 `BrowserManager` 接口抽象化, 解耦核心领域层对 `patchright` 的直接依赖
 
-| 维度 | 内容 |
-|------|------|
-| **目标模块** | `src/browser/` / `runtime.ts` / 所有通过 Runtime 获取 Page/BrowserContext 的模块 |
-| **当前问题** | `BrowserManager` 直接导出 `patchright.Page`, `patchright.BrowserContext` 等具体类型; 整个 ~185 个文件通过 `third_party/index.ts` 引入 Playwright 具体类型; 更换浏览器引擎 (如 Puppeteer 换回) 或引入无头模式替换方案需要修改所有引用 |
-| **具体方案** | 在 `src/browser/` 中定义纯 TypeScript 接口: `IBrowserPage {navigate, evaluate, screenshot, ...}`, `IBrowser {launch, close, createPage, ...}`; `BrowserManager` 实现这些接口 + 适配器适配到具体引擎; 目前通过 `third_party/` 的兼容层可作为过渡 |
-| **预期收益** | 核心模块不依赖具体浏览器实现; 可同时支持多种浏览器引擎; 测试时可注入 Mock Page 无需启动真实浏览器 |
-| **风险与成本** | 高: 涉及全仓库 185+ 文件引用链; 需定义完整接口 (Page/Browser/Frame/BrowserContext 各 20+ 方法); 实施需分层推进, 不能一次性替换 |
+| 维度           | 内容                                                                                                                                                                                                                                            |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **目标模块**   | `src/browser/` / `runtime.ts` / 所有通过 Runtime 获取 Page/BrowserContext 的模块                                                                                                                                                                |
+| **当前问题**   | `BrowserManager` 直接导出 `patchright.Page`, `patchright.BrowserContext` 等具体类型; 整个 ~185 个文件通过 `third_party/index.ts` 引入 Playwright 具体类型; 更换浏览器引擎 (如 Puppeteer 换回) 或引入无头模式替换方案需要修改所有引用            |
+| **具体方案**   | 在 `src/browser/` 中定义纯 TypeScript 接口: `IBrowserPage {navigate, evaluate, screenshot, ...}`, `IBrowser {launch, close, createPage, ...}`; `BrowserManager` 实现这些接口 + 适配器适配到具体引擎; 目前通过 `third_party/` 的兼容层可作为过渡 |
+| **预期收益**   | 核心模块不依赖具体浏览器实现; 可同时支持多种浏览器引擎; 测试时可注入 Mock Page 无需启动真实浏览器                                                                                                                                               |
+| **风险与成本** | 高: 涉及全仓库 185+ 文件引用链; 需定义完整接口 (Page/Browser/Frame/BrowserContext 各 20+ 方法); 实施需分层推进, 不能一次性替换                                                                                                                  |
 
 ### 🏆 建议 3: 完善配置系统的 Zod schema 验证
 
-| 维度 | 内容 |
-|------|------|
-| **目标模块** | `src/config/schema.ts` |
-| **当前问题** | `schema.ts` 为空占位文件; 配置验证分散在 `resolver.ts` 的条件分支中; 对无效配置仅在运行时暴露 (如 LLM Provider 拼写错误); 嵌套配置对象 (OpenAI/浏览器) 处理不统一 |
-| **具体方案** | 使用 Zod 定义 `GlobalConfigSchema`, 在 `resolveConfig()` 最终合并后调用 `schema.parse()`; 利用 Zod 的能力: 默认值、类型强制、联合类型、`refine` 跨字段校验; 为空字段提供友好错误消息; 在 `getSystemConfig()` 和 `createAIService()` 中重复使用 |
-| **预期收益** | 启动时验证, 配置错误立即暴露; 自文档化的 Schema (Zod 自动推导类型); 减少 `resolver.ts` 中 ~100 行条件校验代码 |
-| **风险与成本** | 低: 纯新增, 不影响现有功能; 项目已在广泛使用 Zod (仅工具层就 185+引用), 无新增依赖; 两个工时 + 测试时间 |
+| 维度           | 内容                                                                                                                                                                                                                                           |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **目标模块**   | `src/config/schema.ts`                                                                                                                                                                                                                         |
+| **当前问题**   | `schema.ts` 为空占位文件; 配置验证分散在 `resolver.ts` 的条件分支中; 对无效配置仅在运行时暴露 (如 LLM Provider 拼写错误); 嵌套配置对象 (OpenAI/浏览器) 处理不统一                                                                              |
+| **具体方案**   | 使用 Zod 定义 `GlobalConfigSchema`, 在 `resolveConfig()` 最终合并后调用 `schema.parse()`; 利用 Zod 的能力: 默认值、类型强制、联合类型、`refine` 跨字段校验; 为空字段提供友好错误消息; 在 `getSystemConfig()` 和 `createAIService()` 中重复使用 |
+| **预期收益**   | 启动时验证, 配置错误立即暴露; 自文档化的 Schema (Zod 自动推导类型); 减少 `resolver.ts` 中 ~100 行条件校验代码                                                                                                                                  |
+| **风险与成本** | 低: 纯新增, 不影响现有功能; 项目已在广泛使用 Zod (仅工具层就 185+引用), 无新增依赖; 两个工时 + 测试时间                                                                                                                                        |
 
 ### 🏆 建议 4: 为数据库引入 drizzle-kit 正式迁移系统
 
-| 维度 | 内容 |
-|------|------|
-| **目标模块** | `src/database/` |
-| **当前问题** | 使用内联 `CREATE TABLE IF NOT EXISTS` 在运行时执行迁移; 无版本控制、无回滚、无迁移历史; 无法处理数据库模式变更; 多 Worker 实例同时启动时存在竞态 |
-| **具体方案** | 添加 `drizzle.config.ts`; 将当前 schema 转换为首个正式迁移; 在 `package.json` 添加 `drizzle-kit generate`/`push`/`migrate` 脚本; 将 `DatabaseService.migrate()` 切换到基于文件的迁移执行 |
-| **预期收益** | 模式变更可审计、可回滚; 多实例安全; 支持未来添加更多表 |
-| **风险与成本** | 低: drizzle-kit 已在 devDependencies 中, 只需配置即可; 添加新表即可看到迁移效果 |
+| 维度           | 内容                                                                                                                                                                                     |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **目标模块**   | `src/database/`                                                                                                                                                                          |
+| **当前问题**   | 使用内联 `CREATE TABLE IF NOT EXISTS` 在运行时执行迁移; 无版本控制、无回滚、无迁移历史; 无法处理数据库模式变更; 多 Worker 实例同时启动时存在竞态                                         |
+| **具体方案**   | 添加 `drizzle.config.ts`; 将当前 schema 转换为首个正式迁移; 在 `package.json` 添加 `drizzle-kit generate`/`push`/`migrate` 脚本; 将 `DatabaseService.migrate()` 切换到基于文件的迁移执行 |
+| **预期收益**   | 模式变更可审计、可回滚; 多实例安全; 支持未来添加更多表                                                                                                                                   |
+| **风险与成本** | 低: drizzle-kit 已在 devDependencies 中, 只需配置即可; 添加新表即可看到迁移效果                                                                                                          |
 
 ### 🏆 建议 5: 引入 Design System / UI 规范 (如未来构建前端的备选)
 
-| 维度 | 内容 |
-|------|------|
-| **目标模块** | 跨架构 — 构建 Web UI 时 |
-| **当前问题** | 当前项目为纯 CLI/MCP 模式; 如果未来需要构建 Dashboard/Web UI, 目前无 UI 架构约定 |
-| **具体方案** | 预留前端架构: 独立前端包 (如 `frontend/`); 使用 React + Tailwind CSS; MCP 工具 API 作为后端数据源; 工具执行结果标准化 JSON 格式 |
-| **预期收益** | 前端/后端分离; MCP 工具层天然是 RESTful 数据源 |
-| **风险与成本** | 仅备选建议; 当前无需实施 |
+| 维度           | 内容                                                                                                                            |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| **目标模块**   | 跨架构 — 构建 Web UI 时                                                                                                         |
+| **当前问题**   | 当前项目为纯 CLI/MCP 模式; 如果未来需要构建 Dashboard/Web UI, 目前无 UI 架构约定                                                |
+| **具体方案**   | 预留前端架构: 独立前端包 (如 `frontend/`); 使用 React + Tailwind CSS; MCP 工具 API 作为后端数据源; 工具执行结果标准化 JSON 格式 |
+| **预期收益**   | 前端/后端分离; MCP 工具层天然是 RESTful 数据源                                                                                  |
+| **风险与成本** | 仅备选建议; 当前无需实施                                                                                                        |
 
 ---
 
@@ -803,12 +804,12 @@ flowchart TB
 
 **所需软件**:
 
-| 软件 | 版本要求 | 说明 |
-|------|---------|------|
-| **Node.js** | ^20.19.0 \|\| ^22.12.0 \|\| >=23.0.0 | 推荐使用 v22 LTS |
-| **npm** | ~10.x (随 Node 分发) | 包管理器 |
-| **Git** | 任意现代版本 | 版本控制 |
-| **Chrome/Edge** | 最新稳定版 | 浏览器调试目标 (可选, 程序会自动启动) |
+| 软件            | 版本要求                             | 说明                                  |
+| --------------- | ------------------------------------ | ------------------------------------- |
+| **Node.js**     | ^20.19.0 \|\| ^22.12.0 \|\| >=23.0.0 | 推荐使用 v22 LTS                      |
+| **npm**         | ~10.x (随 Node 分发)                 | 包管理器                              |
+| **Git**         | 任意现代版本                         | 版本控制                              |
+| **Chrome/Edge** | 最新稳定版                           | 浏览器调试目标 (可选, 程序会自动启动) |
 
 **依赖安装**:
 
@@ -882,7 +883,7 @@ export const getPageTitle = defineTool({
     category: ToolCategory.NAVIGATION,
     readOnlyHint: true,
   },
-  schema: {},  // 无需参数
+  schema: {}, // 无需参数
   handler: async (_request, response, context) => {
     const frame = context.getSelectedFrame();
     const title = await frame.evaluate(() => document.title);
@@ -920,15 +921,15 @@ node js-reverser-cli/build/bin/browsercli.js call get_page_title
 
 ### 7.4 常见开发任务
 
-| 任务 | 命令 |
-|------|------|
-| 构建项目 | `npm run build` |
-| 类型检查 | `npm run typecheck` |
-| 运行单元测试 | `npm run test:unit` |
-| 运行所有测试 | `npm test` |
-| 代码格式化 | `npm run format` |
-| 检查格式 | `npm run check-format` |
-| 运行覆盖率 | `npm run coverage` |
+| 任务         | 命令                   |
+| ------------ | ---------------------- |
+| 构建项目     | `npm run build`        |
+| 类型检查     | `npm run typecheck`    |
+| 运行单元测试 | `npm run test:unit`    |
+| 运行所有测试 | `npm test`             |
+| 代码格式化   | `npm run format`       |
+| 检查格式     | `npm run check-format` |
+| 运行覆盖率   | `npm run coverage`     |
 
 ### 7.5 项目贡献指南
 
@@ -945,8 +946,8 @@ node js-reverser-cli/build/bin/browsercli.js call get_page_title
 
 `Browser-CLI` 通过 `JS_REVERSE_TOOL_PROFILE` 环境变量在两档工具集中切换，用 token 成本换取覆盖范围。
 
-| Profile    | 工具数     | 适用场景                                              |
-| ---------- | ---------- | ----------------------------------------------------- |
+| Profile    | 工具数     | 适用场景                                               |
+| ---------- | ---------- | ------------------------------------------------------ |
 | `workflow` | ~110       | 浏览器自动化 + JS 逆向日常：分析、Hook、采集、网络观察 |
 | `full`     | 全量 (126) | 加上 debugger / wasm / anti-debug / perf / rebuild     |
 
@@ -984,15 +985,15 @@ CREATE INDEX idx_site_experiences_domain ON site_experiences(domain);
 
 ```typescript
 interface AppEventMap {
-  'browser:launched':    {url: string; mode: string};
-  'browser:closed':      {reason: string};
-  'hook:injected':       {hookId: string; target: string; url: string};
-  'hook:triggered':      {hookId: string; data: unknown};
-  'network:captured':    {requestId: string; url: string; method: string};
-  'debugger:paused':     {reason: string; scriptId: string};
-  'debugger:resumed':    Record<string, never>;
-  'tool:called':         {name: string; durationMs: number; success: boolean};
-  'tool:error':          {name: string; code: string; message: string};
+  'browser:launched': {url: string; mode: string};
+  'browser:closed': {reason: string};
+  'hook:injected': {hookId: string; target: string; url: string};
+  'hook:triggered': {hookId: string; data: unknown};
+  'network:captured': {requestId: string; url: string; method: string};
+  'debugger:paused': {reason: string; scriptId: string};
+  'debugger:resumed': Record<string, never>;
+  'tool:called': {name: string; durationMs: number; success: boolean};
+  'tool:error': {name: string; code: string; message: string};
 }
 ```
 

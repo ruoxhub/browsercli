@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { HookCodeBuilder } from '../../../src/modules/hook/HookCodeBuilder.js';
+import {HookCodeBuilder} from '../../../src/modules/hook/HookCodeBuilder.js';
 
 describe('HookCodeBuilder extended', () => {
   it('builds rich hook code with capture/conditions/lifecycle/store', () => {
@@ -44,11 +44,16 @@ describe('HookCodeBuilder extended', () => {
   });
 
   it('throws when target is missing', () => {
-    assert.throws(() => new HookCodeBuilder('h3').build(), /Hook target is required/);
+    assert.throws(
+      () => new HookCodeBuilder('h3').build(),
+      /Hook target is required/,
+    );
   });
 
   it('can roundtrip config via fromConfig/getConfig', () => {
-    const builder = new HookCodeBuilder('h4').intercept('window.setTimeout').captureArgs();
+    const builder = new HookCodeBuilder('h4')
+      .intercept('window.setTimeout')
+      .captureArgs();
     const config = builder.getConfig();
     const restored = HookCodeBuilder.fromConfig(config);
     const code = restored.build();

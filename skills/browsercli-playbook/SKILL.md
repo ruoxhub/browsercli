@@ -5,6 +5,7 @@ description:
 ---
 
 > **Profile 提示**（按 `JS_REVERSE_TOOL_PROFILE` 切换）：
+>
 > - `workflow` — 日常逆向（≈110 工具：Observe/Capture/Network/Hook/Analyzer/WebSocket/Console/Stealth/Emulation/Site Experience/Workflow Advisor 等）
 > - `full` — `workflow` + 全量逆向（额外含 Debugger / Wasm / Anti-Debug / Performance / Rebuild）
 >
@@ -32,14 +33,14 @@ description:
 
 ## 六阶段工作流（与 `docs/reference/reverse-workflow.md` 对齐）
 
-| 阶段 | 目标 | 默认入口工具 | 禁止事项 |
-|------|------|------------|---------|
-| **Observe** | 确认目标请求、脚本、函数、触发动作 | `analyze_target` / `collect_code` / `list_network_requests` / `search_in_scripts` | 还没确认目标请求就开始补环境 |
-| **Capture** | 最小侵入采样，拿到参数样例、调用顺序 | `create_hook` + `inject_hook`（优先 fetch/xhr/timer）/ `inject_preload_script`（首屏逻辑） | hook 不足就立刻切断点 |
-| **Rebuild** | 把页面证据导出为本地可迭代的 Node 工程 | `export_rebuild_bundle` → 运行 `env/entry.js` | 没有页面证据就手写 `window/document/navigator` |
-| **Patch** | 按 `first divergence` + 代理 env log 逐项补环境 | `diff_env_requirements`（仅辅助）→ 手动补丁 → 复测 | 没有代理日志就补宿主 |
-| **PureExtraction** | env-pass 后，分离环境噪音与算法输入 | `deobfuscate_code` / `understand_code` / `summarize_code` / `detect_crypto` | env rebuild 没通过就开始翻 Python |
-| **Port** | 把已稳定 Node pure 迁移到 Python / 其他宿主 | 手工迁移 + 同 fixture 比对 | 跳过 Node pure 直接写 Python pure |
+| 阶段               | 目标                                            | 默认入口工具                                                                               | 禁止事项                                       |
+| ------------------ | ----------------------------------------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------- |
+| **Observe**        | 确认目标请求、脚本、函数、触发动作              | `analyze_target` / `collect_code` / `list_network_requests` / `search_in_scripts`          | 还没确认目标请求就开始补环境                   |
+| **Capture**        | 最小侵入采样，拿到参数样例、调用顺序            | `create_hook` + `inject_hook`（优先 fetch/xhr/timer）/ `inject_preload_script`（首屏逻辑） | hook 不足就立刻切断点                          |
+| **Rebuild**        | 把页面证据导出为本地可迭代的 Node 工程          | `export_rebuild_bundle` → 运行 `env/entry.js`                                              | 没有页面证据就手写 `window/document/navigator` |
+| **Patch**          | 按 `first divergence` + 代理 env log 逐项补环境 | `diff_env_requirements`（仅辅助）→ 手动补丁 → 复测                                         | 没有代理日志就补宿主                           |
+| **PureExtraction** | env-pass 后，分离环境噪音与算法输入             | `deobfuscate_code` / `understand_code` / `summarize_code` / `detect_crypto`                | env rebuild 没通过就开始翻 Python              |
+| **Port**           | 把已稳定 Node pure 迁移到 Python / 其他宿主     | 手工迁移 + 同 fixture 比对                                                                 | 跳过 Node pure 直接写 Python pure              |
 
 > 五阶段 → 六阶段的演进：原 SKILL.md 把 "DeepDive" 单独列为第 5 阶段；现在把"纯算法提纯"和"宿主迁移"拆开，让边界更清晰。文档不再使用 "DeepDive" 这个词，改用 `PureExtraction` + `Port`。
 
@@ -54,6 +55,7 @@ description:
 **一键**：`analyze_target --url <url> --autoInjectHooks true`
 
 **手动**（按顺序）：
+
 1. `collect_code --url <url> --smartMode priority`（仅优先脚本）
 2. `list_network_requests --headerFilter "sign"` → `get_network_request --reqid <id>`
 3. `get_request_initiator --requestId <id>`（找 JS 调用栈）
@@ -77,13 +79,13 @@ description:
 
 ### 场景 4：代码去混淆
 
-| 目标 | 工具 |
-|------|------|
+| 目标                            | 工具                                                                   |
+| ------------------------------- | ---------------------------------------------------------------------- |
 | 字符串表 + 索引函数（`_0x***`） | `deobfuscate_code --code <c> --aggressive true --renameVariables true` |
-| 理解结构/业务/安全 | `understand_code --code <c> --focus security` |
-| 文件/项目级摘要 | `summarize_code --code <c>` 或 `--url <repoUrl>` |
-| 检测加密算法 | `detect_crypto --code <c> --useAI true` |
-| 综合风险评分 | `risk_panel --code <c> --includeHookSignals true --hookId <id>` |
+| 理解结构/业务/安全              | `understand_code --code <c> --focus security`                          |
+| 文件/项目级摘要                 | `summarize_code --code <c>` 或 `--url <repoUrl>`                       |
+| 检测加密算法                    | `detect_crypto --code <c> --useAI true`                                |
+| 综合风险评分                    | `risk_panel --code <c> --includeHookSignals true --hookId <id>`        |
 
 > AST pass 顺序：`references/ast-deobfuscation.md`（常量传播 → 字符串表 → 控制流 → 死代码）
 
@@ -111,14 +113,14 @@ description:
 
 ### 场景 7：Stealth / 设备模拟
 
-| 目标 | 工具 |
-|------|------|
+| 目标                         | 工具                                                                 |
+| ---------------------------- | -------------------------------------------------------------------- |
 | 隐藏 webdriver / canvas 噪声 | `inject_stealth --preset <name>`（先 `list_stealth_presets` 看选项） |
-| 自定义 UA | `set_user_agent --userAgent <ua>` |
-| 移动端 UA + 视口 + 触摸 | `emulate_mobile --enable true --device "iPhone 14"` |
-| 网络限速 / 离线 | `emulate_network --throttlingOption Slow 3G` |
-| CPU 节流（复现弱机） | `emulate_cpu --throttlingRate 4` |
-| 自定义视口 | `resize_page --width 375 --height 812` |
+| 自定义 UA                    | `set_user_agent --userAgent <ua>`                                    |
+| 移动端 UA + 视口 + 触摸      | `emulate_mobile --enable true --device "iPhone 14"`                  |
+| 网络限速 / 离线              | `emulate_network --throttlingOption Slow 3G`                         |
+| CPU 节流（复现弱机）         | `emulate_cpu --throttlingRate 4`                                     |
+| 自定义视口                   | `resize_page --width 375 --height 812`                               |
 
 详见 `references/stealth-emulation.md`。
 
@@ -128,6 +130,7 @@ description:
 `get_console_message --msgid <id>`（单条详细）
 
 注意：Console 是当前唯一可回溯 page 历史的取证维度，常用于：
+
 - 找错误堆栈（`--type error`）→ 间接定位混淆函数
 - 找 `console.log('sign:', ...)` 等显式打印
 - 在断点循环时验证 `resume` 是否真的执行
@@ -136,17 +139,17 @@ description:
 
 ## Hook vs 断点决策（精简版）
 
-| 需求 | 选 | 不选 | 原因 |
-|------|----|------|------|
-| 参数/返回值 | `hook_function` / `trace_function` | 断点 | 不暂停，自动化友好 |
-| 函数调用链 / 上下文 | `trace_function --target <name>` | 单点断点 | 日志点连续观察 |
-| 局部变量 | `set_breakpoint_on_text` + `inspect_locals` | Hook | Hook 拿不到闭包内变量 |
-| 不知道函数名 | `create_hook --type fetch` | 断点 | 从网络层反查 |
-| 首屏初始化（脚本未注册） | `inject_preload_script` | Hook/断点 | 在脚本注册前采样 |
-| 持续高频调用 | `create_hook` + `inject_hook --persistent true` | 断点 | 避免断点循环检测 |
-| 加密库直接拦截 | `hook_cryptojs` / `hook_jsencrypt` / `hook_smcrypto` | 通用 Hook | 专项工具更稳定 |
-| 反调试绕过 | `anti_anti_debug` / `bypass_debugger` | 手动 Hook | 一键更可靠 |
-| 时间戳/随机数固定 | `create_hook --type timer --params <fixedValue>` | 改源码 | 仅影响运行时不改行为 |
+| 需求                     | 选                                                   | 不选      | 原因                  |
+| ------------------------ | ---------------------------------------------------- | --------- | --------------------- |
+| 参数/返回值              | `hook_function` / `trace_function`                   | 断点      | 不暂停，自动化友好    |
+| 函数调用链 / 上下文      | `trace_function --target <name>`                     | 单点断点  | 日志点连续观察        |
+| 局部变量                 | `set_breakpoint_on_text` + `inspect_locals`          | Hook      | Hook 拿不到闭包内变量 |
+| 不知道函数名             | `create_hook --type fetch`                           | 断点      | 从网络层反查          |
+| 首屏初始化（脚本未注册） | `inject_preload_script`                              | Hook/断点 | 在脚本注册前采样      |
+| 持续高频调用             | `create_hook` + `inject_hook --persistent true`      | 断点      | 避免断点循环检测      |
+| 加密库直接拦截           | `hook_cryptojs` / `hook_jsencrypt` / `hook_smcrypto` | 通用 Hook | 专项工具更稳定        |
+| 反调试绕过               | `anti_anti_debug` / `bypass_debugger`                | 手动 Hook | 一键更可靠            |
+| 时间戳/随机数固定        | `create_hook --type timer --params <fixedValue>`     | 改源码    | 仅影响运行时不改行为  |
 
 > 断点自动循环检测：同一断点 2s 内命中 3 次自动 resume + 移除。所以**断点不适合持续监控**。
 > 完整类型清单 + 用法：`references/hook-patterns.md`。
@@ -155,31 +158,32 @@ description:
 
 ## 必读引用（按加载顺序）
 
-| # | 文件 | 何时读 |
-|---|------|--------|
-| 1 | `references/tool-catalog.md` | 任何工具调用前 — 查参数与必填项 |
-| 2 | `references/profile-tool-gating.md` | 不确定工具是否可用时（profile gating） |
-| 3 | `references/decision-guide.md` | 需要决策路径（6 大场景 + Hook vs 断点） |
-| 4 | `references/hook-patterns.md` | 写 `create_hook` / `inject_hook` 时 |
-| 5 | `references/automation-entry.md` | 自动化任务执行时 |
-| 6 | `references/cli-task-template.md` | CLI 模式执行 |
-| 7 | `references/local-rebuild.md` | 导出 Node bundle 后 |
-| 8 | `references/env-patching.md` | 补环境时 |
-| 9 | `references/node-env-rebuild.md` | 扣包补环境时 |
-| 10 | `references/instrumentation.md` | VMP / 复杂插桩 |
-| 11 | `references/ast-deobfuscation.md` | AST 去混淆 |
-| 12 | `references/fallbacks.md` | 失败回退（含防护站点决策树） |
-| 13 | `references/output-contract.md` | 提交最终交付物时 |
-| 14 | `references/task-artifacts.md` | 任务产物约定 |
-| 15 | `references/task-input-template.md` + `schemas/reverse-task-input.schema.json` | 新任务输入 |
-| 16 | `references/websocket-reverse.md` | WebSocket 协议逆向 |
-| 17 | `references/wasm-reverse.md` | Wasm 逆向 |
-| 18 | `references/stealth-emulation.md` | 反检测 / 设备模拟 |
-| 19 | `references/code-templates.md` | 用 `get_code_template` / `inject_code_template` |
-| 20 | `references/tool-defaults.md` | 参数默认值速查 |
-| 21 | `references/cases/` | 抽象 case（ast-deobfuscation / signature-node / window-honeypot / websocket-protobuf） |
+| #   | 文件                                                                           | 何时读                                                                                 |
+| --- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| 1   | `references/tool-catalog.md`                                                   | 任何工具调用前 — 查参数与必填项                                                        |
+| 2   | `references/profile-tool-gating.md`                                            | 不确定工具是否可用时（profile gating）                                                 |
+| 3   | `references/decision-guide.md`                                                 | 需要决策路径（6 大场景 + Hook vs 断点）                                                |
+| 4   | `references/hook-patterns.md`                                                  | 写 `create_hook` / `inject_hook` 时                                                    |
+| 5   | `references/automation-entry.md`                                               | 自动化任务执行时                                                                       |
+| 6   | `references/cli-task-template.md`                                              | CLI 模式执行                                                                           |
+| 7   | `references/local-rebuild.md`                                                  | 导出 Node bundle 后                                                                    |
+| 8   | `references/env-patching.md`                                                   | 补环境时                                                                               |
+| 9   | `references/node-env-rebuild.md`                                               | 扣包补环境时                                                                           |
+| 10  | `references/instrumentation.md`                                                | VMP / 复杂插桩                                                                         |
+| 11  | `references/ast-deobfuscation.md`                                              | AST 去混淆                                                                             |
+| 12  | `references/fallbacks.md`                                                      | 失败回退（含防护站点决策树）                                                           |
+| 13  | `references/output-contract.md`                                                | 提交最终交付物时                                                                       |
+| 14  | `references/task-artifacts.md`                                                 | 任务产物约定                                                                           |
+| 15  | `references/task-input-template.md` + `schemas/reverse-task-input.schema.json` | 新任务输入                                                                             |
+| 16  | `references/websocket-reverse.md`                                              | WebSocket 协议逆向                                                                     |
+| 17  | `references/wasm-reverse.md`                                                   | Wasm 逆向                                                                              |
+| 18  | `references/stealth-emulation.md`                                              | 反检测 / 设备模拟                                                                      |
+| 19  | `references/code-templates.md`                                                 | 用 `get_code_template` / `inject_code_template`                                        |
+| 20  | `references/tool-defaults.md`                                                  | 参数默认值速查                                                                         |
+| 21  | `references/cases/`                                                            | 抽象 case（ast-deobfuscation / signature-node / window-honeypot / websocket-protobuf） |
 
 仓库硬边界（与 `docs/reference/case-safety-policy.md` 对齐）：
+
 - `scripts/cases/*` 只允许抽象 case（映射/判定口径/输入契约）
 - 站点级可复用流程统一维护在 `scripts/cases/*`
 - `artifacts/tasks/<task-id>/` 才放完整可执行实现 + 真实任务证据

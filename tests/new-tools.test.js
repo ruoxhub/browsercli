@@ -1,4 +1,9 @@
 /**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+/**
  * 测试新迁移的 input 和 emulation 工具
  */
 
@@ -25,8 +30,19 @@ async function runTests() {
   // 列出所有可用工具
   const tools = await client.listTools();
   const newTools = tools.tools.filter(t =>
-    ['click', 'hover', 'fill', 'drag', 'fill_form', 'upload_file', 'press_key',
-     'emulate_network', 'emulate_cpu', 'resize_page', 'handle_dialog'].includes(t.name)
+    [
+      'click',
+      'hover',
+      'fill',
+      'drag',
+      'fill_form',
+      'upload_file',
+      'press_key',
+      'emulate_network',
+      'emulate_cpu',
+      'resize_page',
+      'handle_dialog',
+    ].includes(t.name),
   );
 
   console.log('=== 新迁移的工具列表 ===');
@@ -154,7 +170,7 @@ async function runTests() {
         elements: [
           {selector: 'input[name="custname"]', value: '测试用户'},
           {selector: 'input[name="custtel"]', value: '123456789'},
-        ]
+        ],
       },
     });
     console.log('✓ 成功批量填充表单\n');

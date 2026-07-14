@@ -4,12 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {AISummarizer, CodeSummary} from '../../modules/analyzer/AISummarizer.js';
+import type {
+  AISummarizer,
+  CodeSummary,
+} from '../../modules/analyzer/AISummarizer.js';
 import type {CodeAnalyzer} from '../../modules/analyzer/CodeAnalyzer.js';
 import type {CodeCollector} from '../../modules/collector/CodeCollector.js';
 import type {PageController} from '../../modules/collector/PageController.js';
 import type {CryptoDetector} from '../../modules/crypto/CryptoDetector.js';
-import type {SecurityIssue, CryptoStrength} from '../../modules/crypto/CryptoDetectorEnhanced.js';
+import type {
+  SecurityIssue,
+  CryptoStrength,
+} from '../../modules/crypto/CryptoDetectorEnhanced.js';
 import type {Deobfuscator} from '../../modules/deobfuscator/Deobfuscator.js';
 import type {HookManager} from '../../modules/hook/HookManager.js';
 import type {Frame} from '../../third_party/index.js';
@@ -134,7 +140,12 @@ export interface AnalyzeTargetData {
   whyTheseSteps: string[];
   stopIf: string[];
   nextActions: string[];
-  replay?: Array<{index: number; action: string; success: boolean; message: string}>;
+  replay?: Array<{
+    index: number;
+    action: string;
+    success: boolean;
+    message: string;
+  }>;
 }
 
 /** analyze_target 结果 */
@@ -199,7 +210,9 @@ export interface SummarizeFileResult extends AnalyzerDataResult<CodeSummary> {
   tooltype: 'summarize';
 }
 
-export interface SummarizeBatchResult extends AnalyzerDataResult<CodeSummary[]> {
+export interface SummarizeBatchResult extends AnalyzerDataResult<
+  CodeSummary[]
+> {
   tooltype: 'summarize';
 }
 

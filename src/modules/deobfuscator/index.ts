@@ -38,7 +38,11 @@ export {AstPassRunner} from './AstPassRunner.js';
 export type {AstPassResult, AstPassOptions} from './AstPassRunner.js';
 export {StaticResolver, UNRESOLVED} from './StaticResolver.js';
 export {SandboxEvaluator} from './SandboxEvaluator.js';
-export type {SandboxOptions, PreludeResult, EvalResult} from './SandboxEvaluator.js';
+export type {
+  SandboxOptions,
+  PreludeResult,
+  EvalResult,
+} from './SandboxEvaluator.js';
 export {WrapperFolder} from './WrapperFolder.js';
 export type {WrapperDescriptor, WrapperFolderOptions} from './WrapperFolder.js';
 

@@ -35,6 +35,7 @@ import {
   checkTaintedArguments as checkTaintedArgumentsImpl,
   enhanceTaintAnalysisWithLLM as enhanceTaintAnalysisWithLLMImpl,
 } from './CodeAnalyzerDataFlow.js';
+import {analyzeStructure} from './CodeAnalyzerStructure.js';
 import {
   analyzeComplexityMetricsInternal,
   calculateCodeSimilarity as calculateCodeSimilarityImpl,
@@ -44,7 +45,6 @@ import {
   detectDuplicateCodeInternal,
   normalizeCode as normalizeCodeImpl,
 } from './QualityAnalyzer.js';
-import {analyzeStructure} from './CodeAnalyzerStructure.js';
 import {
   checkSanitizer as checkSanitizerImpl,
   getMemberExpressionName as getMemberExpressionNameImpl,

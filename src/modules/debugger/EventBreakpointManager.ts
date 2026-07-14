@@ -101,21 +101,32 @@ export class EventBreakpointManager {
     return true;
   }
 
-  private async sendRemoveBreakpoint(breakpoint: EventBreakpoint): Promise<void> {
+  private async sendRemoveBreakpoint(
+    breakpoint: EventBreakpoint,
+  ): Promise<void> {
     if (breakpoint.targetName === INSTRUMENTATION_TARGET) {
-      await this.getSession().send('DOMDebugger.removeInstrumentationBreakpoint', {
-        eventName: breakpoint.eventName,
-      });
+      await this.getSession().send(
+        'DOMDebugger.removeInstrumentationBreakpoint',
+        {
+          eventName: breakpoint.eventName,
+        },
+      );
     } else {
-      await this.getSession().send('DOMDebugger.removeEventListenerBreakpoint', {
-        eventName: breakpoint.eventName,
-        targetName: breakpoint.targetName,
-      });
+      await this.getSession().send(
+        'DOMDebugger.removeEventListenerBreakpoint',
+        {
+          eventName: breakpoint.eventName,
+          targetName: breakpoint.targetName,
+        },
+      );
     }
   }
 
   async setMouseEventBreakpoints(): Promise<string[]> {
-    return this.setBatchBreakpoints(EventBreakpointManager.MOUSE_EVENTS, 'mouse');
+    return this.setBatchBreakpoints(
+      EventBreakpointManager.MOUSE_EVENTS,
+      'mouse',
+    );
   }
 
   async setKeyboardEventBreakpoints(): Promise<string[]> {

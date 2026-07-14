@@ -11,10 +11,25 @@ export const manifest = {
   description: 'Site-specific reverse engineering experience tools.',
   profile: 'workflow',
   tools: [
-    {modulePath: './site-experience/siteExperience.js', handlerName: 'searchSiteExperience'},
-    {modulePath: './site-experience/siteExperience.js', handlerName: 'listSiteExperiences'},
-    {modulePath: './site-experience/siteExperience.js', handlerName: 'createSiteExperience'},
-    {modulePath: './site-experience/siteExperience.js', handlerName: 'updateSiteExperience'},
-    {modulePath: './site-experience/siteExperience.js', handlerName: 'deleteSiteExperience'},
+    {
+      modulePath: './site-experience/siteExperience.js',
+      handlerName: 'searchSiteExperience',
+    },
+    {
+      modulePath: './site-experience/siteExperience.js',
+      handlerName: 'listSiteExperiences',
+    },
+    {
+      modulePath: './site-experience/siteExperience.js',
+      handlerName: 'createSiteExperience',
+    },
+    {
+      modulePath: './site-experience/siteExperience.js',
+      handlerName: 'updateSiteExperience',
+    },
+    {
+      modulePath: './site-experience/siteExperience.js',
+      handlerName: 'deleteSiteExperience',
+    },
   ],
 } satisfies DomainManifest;

@@ -5,7 +5,12 @@
  */
 import Anthropic from '@anthropic-ai/sdk';
 
-import type {AIProvider, AIMessage, AIResponse, ChatOptions} from './AIService.js';
+import type {
+  AIProvider,
+  AIMessage,
+  AIResponse,
+  ChatOptions,
+} from './AIService.js';
 import {
   decodeImageInput,
   formatProviderError,
@@ -35,11 +40,16 @@ export class AnthropicProvider implements AIProvider {
     this.defaultModel = config.model || 'claude-3-5-sonnet-20241022';
   }
 
-  async chat(messages: AIMessage[], options?: ChatOptions): Promise<AIResponse> {
+  async chat(
+    messages: AIMessage[],
+    options?: ChatOptions,
+  ): Promise<AIResponse> {
     try {
       // Anthropic requires system messages to be separate from the messages array
       const systemMessage = messages.find(msg => msg.role === 'system');
-      const conversationMessages = messages.filter(msg => msg.role !== 'system');
+      const conversationMessages = messages.filter(
+        msg => msg.role !== 'system',
+      );
 
       const response = await this.client.messages.create({
         model: options?.model || this.defaultModel,
@@ -62,7 +72,8 @@ export class AnthropicProvider implements AIProvider {
         usage: {
           promptTokens: response.usage.input_tokens,
           completionTokens: response.usage.output_tokens,
-          totalTokens: response.usage.input_tokens + response.usage.output_tokens,
+          totalTokens:
+            response.usage.input_tokens + response.usage.output_tokens,
         },
       };
     } catch (error) {
@@ -76,7 +87,10 @@ export class AnthropicProvider implements AIProvider {
     isFilePath = false,
   ): Promise<string> {
     try {
-      const {mediaType, data: imageData} = decodeImageInput(imageInput, isFilePath);
+      const {mediaType, data: imageData} = decodeImageInput(
+        imageInput,
+        isFilePath,
+      );
 
       const response = await this.client.messages.create({
         model: this.defaultModel,
@@ -87,7 +101,11 @@ export class AnthropicProvider implements AIProvider {
             content: [
               {
                 type: 'image',
-                source: {type: 'base64', media_type: mediaType, data: imageData},
+                source: {
+                  type: 'base64',
+                  media_type: mediaType,
+                  data: imageData,
+                },
               },
               {type: 'text', text: prompt},
             ],

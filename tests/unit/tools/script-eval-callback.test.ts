@@ -6,12 +6,12 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
+import {getRuntime} from '../../../src/runtime.js';
 import {
   evaluateScript as evaluateScriptTool,
   evaluateScriptFn,
   injectPreloadScript as injectPreloadScriptTool,
 } from '../../../src/tools/script/script.js';
-import { getRuntime } from '../../../src/runtime.js';
 
 async function evaluateScript(runtime: any, params: any): Promise<any> {
   const originalProvider = getRuntime().contextProvider;
@@ -30,7 +30,7 @@ async function evaluateScript(runtime: any, params: any): Promise<any> {
     },
   } as any;
   try {
-    await evaluateScriptTool.handler({ params } as any, response, runtime);
+    await evaluateScriptTool.handler({params} as any, response, runtime);
   } finally {
     getRuntime().contextProvider = originalProvider;
   }
@@ -54,7 +54,7 @@ async function injectPreloadScript(runtime: any, params: any): Promise<any> {
     },
   } as any;
   try {
-    await injectPreloadScriptTool.handler({ params } as any, response, runtime);
+    await injectPreloadScriptTool.handler({params} as any, response, runtime);
   } finally {
     getRuntime().contextProvider = originalProvider;
   }
@@ -391,8 +391,7 @@ describe('evaluate_script callback path', () => {
     } as unknown as EvaluateScriptDebuggerContext;
     const cdpResult = await evaluateScript(
       {
-        getSelectedFrame: () =>
-          ({_id: 'frame-1'} as unknown as FrameLike),
+        getSelectedFrame: () => ({_id: 'frame-1'}) as unknown as FrameLike,
         getSelectedPage: () => null,
         getDebuggerContext: async () => debuggerContext,
       } as EvaluateScriptRuntime,

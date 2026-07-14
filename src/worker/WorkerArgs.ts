@@ -68,7 +68,22 @@ export function parseWorkerArgs(args: string[]): GlobalConfig {
 export function toWorkerOptions(
   resolved: ResolvedWorkerConfig,
 ): WorkerStartOptions {
-  const {browserUrl, databaseUrl, executablePath, group, headless, rpcHost, wsEndpoint} =
-    resolved;
-  return {browserUrl, databaseUrl, executablePath, group, headless, rpcHost, wsEndpoint};
+  const {
+    browserUrl,
+    databaseUrl,
+    executablePath,
+    group,
+    headless,
+    rpcHost,
+    wsEndpoint,
+  } = resolved;
+  return {
+    browserUrl,
+    databaseUrl,
+    executablePath,
+    group,
+    headless,
+    rpcHost,
+    wsEndpoint,
+  };
 }

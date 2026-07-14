@@ -1,3 +1,8 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import generateImport from '@babel/generator';
 import traverseImport from '@babel/traverse';
 import * as t from '@babel/types';
@@ -7,7 +12,8 @@ import {unwrapBabelDefault} from './astUtils.js';
 const generate = unwrapBabelDefault<typeof generateImport>(generateImport);
 const traverse = unwrapBabelDefault<typeof traverseImport>(traverseImport);
 
-type NodePath<T extends t.Node = t.Node> = import('@babel/traverse').NodePath<T>;
+type NodePath<T extends t.Node = t.Node> =
+  import('@babel/traverse').NodePath<T>;
 
 function normalizeCode(node: t.Node): string {
   return generate(node, {
@@ -38,11 +44,17 @@ function getCaseInfo(testNode: t.Node): CaseInfo | null {
 
   if (leftLiteral) {
     if (t.isPrivateName(testNode.right)) return null;
-    return {discriminant: testNode.right as t.Expression, caseValue: testNode.left as t.Expression};
+    return {
+      discriminant: testNode.right as t.Expression,
+      caseValue: testNode.left as t.Expression,
+    };
   }
 
   if (t.isPrivateName(testNode.left)) return null;
-  return {discriminant: testNode.left as t.Expression, caseValue: testNode.right as t.Expression};
+  return {
+    discriminant: testNode.left as t.Expression,
+    caseValue: testNode.right as t.Expression,
+  };
 }
 
 function toCaseStatements(node: t.Node | null | undefined): t.Statement[] {
@@ -120,11 +132,15 @@ function collectIfChain(path: NodePath<t.IfStatement>): IfChain | null {
 
     cases.push({
       test: t.cloneNode(info.caseValue),
-      statements: toCaseStatements((currentPath.node as t.IfStatement).consequent),
+      statements: toCaseStatements(
+        (currentPath.node as t.IfStatement).consequent,
+      ),
     });
 
     const alternate = unwrapAlternate(
-      (currentPath as NodePath<t.IfStatement>).get('alternate') as NodePath | null,
+      (currentPath as NodePath<t.IfStatement>).get(
+        'alternate',
+      ) as NodePath | null,
     );
     if (alternate.kind === 'empty') {
       break;
@@ -187,7 +203,9 @@ function collectConsecutiveIfCases(
   const cases: Array<{test: t.Expression; statements: t.Statement[]}> = [
     {
       test: t.cloneNode(firstInfo.caseValue),
-      statements: toCaseStatements((firstPath.node as t.IfStatement).consequent),
+      statements: toCaseStatements(
+        (firstPath.node as t.IfStatement).consequent,
+      ),
     },
   ];
 
@@ -266,9 +284,7 @@ export function ifChainToSwitch(ast: t.File): {ast: t.File; changed: boolean} {
     },
     'Program|BlockStatement': {
       exit(path) {
-        const nextBody = rewriteStatementList(
-          (path.get('body') as NodePath[]),
-        );
+        const nextBody = rewriteStatementList(path.get('body') as NodePath[]);
         if (nextBody) {
           (path.node as t.Program | t.BlockStatement).body = nextBody;
           changed = true;
@@ -278,7 +294,7 @@ export function ifChainToSwitch(ast: t.File): {ast: t.File; changed: boolean} {
     SwitchCase: {
       exit(path) {
         const nextConsequent = rewriteStatementList(
-          (path.get('consequent') as NodePath[]),
+          path.get('consequent') as NodePath[],
         );
         if (nextConsequent) {
           (path.node as t.SwitchCase).consequent = nextConsequent;

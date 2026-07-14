@@ -1,5 +1,10 @@
-import {describe, it} from 'node:test';
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import assert from 'node:assert/strict';
+import {describe, it} from 'node:test';
 
 import {
   errorMessage,

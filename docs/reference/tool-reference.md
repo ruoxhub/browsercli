@@ -1620,10 +1620,24 @@
   "summary": "3/5 checks passed",
   "checks": [
     {"name": "node_version", "status": "ok", "reason": "v24.3.0", "fix": ""},
-    {"name": "build_output", "status": "ok", "reason": "build/src/bin/js-reverse.js exists", "fix": ""},
-    {"name": "ai_provider_selection", "status": "warn", "reason": "No AI provider configured", "fix": "Set GEMINI_API_KEY or configure provider in settings"},
-    {"name": "artifacts_dir", "status": "ok", "reason": "artifacts/tasks/ exists", "fix": ""}
+    {
+      "name": "build_output",
+      "status": "ok",
+      "reason": "build/src/bin/js-reverse.js exists",
+      "fix": ""
+    },
+    {
+      "name": "ai_provider_selection",
+      "status": "warn",
+      "reason": "No AI provider configured",
+      "fix": "Set GEMINI_API_KEY or configure provider in settings"
+    },
+    {
+      "name": "artifacts_dir",
+      "status": "ok",
+      "reason": "artifacts/tasks/ exists",
+      "fix": ""
+    }
   ]
 }
 ```
-

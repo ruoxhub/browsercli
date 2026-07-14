@@ -1,20 +1,24 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+import vm from 'node:vm';
+
 import generateImport from '@babel/generator';
 import traverseImport from '@babel/traverse';
 import * as t from '@babel/types';
-import vm from 'node:vm';
 
 import {unwrapBabelDefault} from '../astUtils.js';
-import {
-  literalNodeFromValue,
-  SandboxEvaluator,
-} from '../SandboxEvaluator.js';
+import {literalNodeFromValue, SandboxEvaluator} from '../SandboxEvaluator.js';
 import type {SiteAdapter} from '../SiteAdapterRegistry.js';
 import {WrapperFolder} from '../WrapperFolder.js';
 
 const generate = unwrapBabelDefault<typeof generateImport>(generateImport);
 const traverse = unwrapBabelDefault<typeof traverseImport>(traverseImport);
 
-type NodePath<T extends t.Node = t.Node> = import('@babel/traverse').NodePath<T>;
+type NodePath<T extends t.Node = t.Node> =
+  import('@babel/traverse').NodePath<T>;
 
 function generateCode(node: t.Node): string {
   return generate(node, {
@@ -46,7 +50,9 @@ function inlineAssignmentObjects(ast: t.File): boolean {
         return;
       }
 
-      const declaration = path.get('declarations.0') as NodePath<t.VariableDeclarator>;
+      const declaration = path.get(
+        'declarations.0',
+      ) as NodePath<t.VariableDeclarator>;
       if (
         !(declaration.get('id') as NodePath).isIdentifier() ||
         !(declaration.get('init') as NodePath).isObjectExpression({
@@ -80,7 +86,9 @@ function inlineAssignmentObjects(ast: t.File): boolean {
 
         const memberNode = memberPath.node as t.MemberExpression;
         const key = memberNode.computed
-          ? String((memberNode.property as t.StringLiteral | t.NumericLiteral).value)
+          ? String(
+              (memberNode.property as t.StringLiteral | t.NumericLiteral).value,
+            )
           : (memberNode.property as t.Identifier).name;
         objectEntries[key] = t.cloneNode(
           (assignmentPath.node as t.AssignmentExpression).right,
@@ -89,8 +97,8 @@ function inlineAssignmentObjects(ast: t.File): boolean {
         changed = true;
       });
 
-      const properties = Object.entries(objectEntries).map(
-        ([key, valueNode]) => t.objectProperty(t.stringLiteral(key), valueNode),
+      const properties = Object.entries(objectEntries).map(([key, valueNode]) =>
+        t.objectProperty(t.stringLiteral(key), valueNode),
       );
       if (properties.length > 0) {
         (declaration.get('init') as NodePath).replaceWith(
@@ -199,8 +207,7 @@ function collectValidationTargets(ast: t.File): ValidationTarget[] {
       }
 
       const argValue = (
-        (propertyPath.node as t.CallExpression)
-          .arguments[0] as t.NumericLiteral
+        (propertyPath.node as t.CallExpression).arguments[0] as t.NumericLiteral
       ).value;
       const objectPath = path.get('callee.object') as NodePath;
       if (
@@ -211,8 +218,7 @@ function collectValidationTargets(ast: t.File): ValidationTarget[] {
       }
 
       const orderArgValue = (
-        (objectPath.node as t.CallExpression)
-          .arguments[0] as t.NumericLiteral
+        (objectPath.node as t.CallExpression).arguments[0] as t.NumericLiteral
       ).value;
       const token = `split:${argValue}:order:${orderArgValue}`;
       if (seen.has(token)) {
@@ -386,9 +392,7 @@ function obVariantPass(ast: t.File): {ast: t.File; changed: boolean} {
         timeoutMs: 1500,
       });
 
-  const sandbox = dynamicDecoder
-    ? dynamicDecoder.sandbox
-    : prelude!.sandbox;
+  const sandbox = dynamicDecoder ? dynamicDecoder.sandbox : prelude!.sandbox;
 
   if (dynamicDecoder || prelude!.executedCount > 0) {
     if (evaluator.seedSandboxFromAliases(ast, sandbox)) {
@@ -399,9 +403,9 @@ function obVariantPass(ast: t.File): {ast: t.File; changed: boolean} {
       evaluator.replaceCallsFromSandbox(ast, sandbox, {
         timeoutMs: 800,
         allowPredicate: (_path: unknown, _name: string) =>
-          ((_path as NodePath<t.CallExpression>).node as t.CallExpression).arguments.every(
-            arg => t.isLiteral(arg),
-          ),
+          (
+            (_path as NodePath<t.CallExpression>).node as t.CallExpression
+          ).arguments.every(arg => t.isLiteral(arg)),
       })
     ) {
       changed = true;
@@ -440,9 +444,9 @@ function obVariantPass(ast: t.File): {ast: t.File; changed: boolean} {
       evaluator.replaceCallsFromSandbox(ast, sandbox, {
         timeoutMs: 800,
         allowPredicate: (_path: unknown, _name: string) =>
-          ((_path as NodePath<t.CallExpression>).node as t.CallExpression).arguments.every(
-            arg => t.isLiteral(arg),
-          ),
+          (
+            (_path as NodePath<t.CallExpression>).node as t.CallExpression
+          ).arguments.every(arg => t.isLiteral(arg)),
       })
     ) {
       changed = true;

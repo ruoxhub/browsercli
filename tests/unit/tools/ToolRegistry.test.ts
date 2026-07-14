@@ -48,8 +48,16 @@ describe('ToolRegistry', () => {
         description: 'a',
         profile: 'full',
         tools: [
-          {modulePath: './t1.js', handlerName: 'toolWorkflowLow', profile: 'workflow'},
-          {modulePath: './t2.js', handlerName: 'toolWorkflow', profile: 'workflow'},
+          {
+            modulePath: './t1.js',
+            handlerName: 'toolWorkflowLow',
+            profile: 'workflow',
+          },
+          {
+            modulePath: './t2.js',
+            handlerName: 'toolWorkflow',
+            profile: 'workflow',
+          },
           {modulePath: './t3.js', handlerName: 'toolFull', profile: 'full'},
         ],
       },
@@ -73,9 +81,7 @@ describe('ToolRegistry', () => {
       {
         name: 'domain_b',
         description: 'b',
-        tools: [
-          {modulePath: './t.js', handlerName: 'toolFallback'},
-        ],
+        tools: [{modulePath: './t.js', handlerName: 'toolFallback'}],
       },
     ];
 

@@ -1,4 +1,8 @@
-import { useState, useEffect } from 'react';
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import {
   Globe,
   Search,
@@ -15,8 +19,10 @@ import {
   ChevronRight,
   Info,
 } from 'lucide-react';
-import { api } from '../lib/api';
-import type { SiteExperience } from '../lib/protocol';
+import {useState, useEffect} from 'react';
+
+import {api} from '../lib/api';
+import type {SiteExperience} from '../lib/protocol';
 
 export default function SiteExperiencesPage() {
   const [experiences, setExperiences] = useState<SiteExperience[]>([]);
@@ -26,7 +32,7 @@ export default function SiteExperiencesPage() {
 
   // 选中的经验
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  
+
   // 编辑/新增模式状态： 'view' | 'edit' | 'create'
   const [mode, setMode] = useState<'view' | 'edit' | 'create'>('view');
 
@@ -181,12 +187,16 @@ export default function SiteExperiencesPage() {
         setMode('view');
       } else if (mode === 'edit' && selectedId !== null) {
         const updated = await api.updateSiteExperience(selectedId, data);
-        setExperiences(experiences.map(e => e.id === selectedId ? updated : e));
+        setExperiences(
+          experiences.map(e => (e.id === selectedId ? updated : e)),
+        );
         setMode('view');
       }
     } catch (err) {
       console.error('Failed to save experience:', err);
-      setError(err instanceof Error ? err.message : '保存失败，请检查输入或后端状态');
+      setError(
+        err instanceof Error ? err.message : '保存失败，请检查输入或后端状态',
+      );
     } finally {
       setSubmitting(false);
     }
@@ -201,7 +211,7 @@ export default function SiteExperiencesPage() {
       await api.deleteSiteExperience(id);
       const nextExperiences = experiences.filter(e => e.id !== id);
       setExperiences(nextExperiences);
-      
+
       if (nextExperiences.length > 0) {
         setSelectedId(nextExperiences[0].id);
       } else {
@@ -222,7 +232,10 @@ export default function SiteExperiencesPage() {
         <div className="p-4 border-b border-[var(--color-border-muted)] flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-bold text-[var(--color-text-primary)] tracking-wide flex items-center gap-2">
-              <Globe className="text-[var(--color-accent)]" size={16} />
+              <Globe
+                className="text-[var(--color-accent)]"
+                size={16}
+              />
               站点经验板块
             </h2>
             <button
@@ -234,19 +247,28 @@ export default function SiteExperiencesPage() {
             </button>
           </div>
 
-          <form onSubmit={handleSearchSubmit} className="relative">
+          <form
+            onSubmit={handleSearchSubmit}
+            className="relative"
+          >
             <input
               type="text"
               placeholder="按名称/域名检索..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={e => setSearchQuery(e.target.value)}
               className="w-full pl-8 pr-4 py-1.5 rounded-lg text-xs bg-[var(--color-bg-primary)] border border-[var(--color-border-default)] text-[var(--color-text-primary)] focus:border-[var(--color-accent)] focus:outline-none transition-all placeholder:text-[var(--color-text-muted)]"
             />
-            <Search className="absolute left-2.5 top-2.5 text-[var(--color-text-muted)]" size={13} />
+            <Search
+              className="absolute left-2.5 top-2.5 text-[var(--color-text-muted)]"
+              size={13}
+            />
             {searchQuery && (
               <button
                 type="button"
-                onClick={() => { setSearchQuery(''); fetchExperiences(''); }}
+                onClick={() => {
+                  setSearchQuery('');
+                  fetchExperiences('');
+                }}
                 className="absolute right-2.5 top-2.5 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
               >
                 <X size={13} />
@@ -259,7 +281,10 @@ export default function SiteExperiencesPage() {
         <div className="flex-1 overflow-y-auto p-3 space-y-2">
           {error && experiences.length === 0 && (
             <div className="p-3 text-xs rounded-lg border border-red-500/20 bg-red-500/5 text-[var(--color-accent-red)] flex items-start gap-2">
-              <Info size={14} className="shrink-0 mt-0.5" />
+              <Info
+                size={14}
+                className="shrink-0 mt-0.5"
+              />
               <span>{error}</span>
             </div>
           )}
@@ -267,7 +292,10 @@ export default function SiteExperiencesPage() {
           {loading && experiences.length === 0 ? (
             <div className="space-y-3 p-2">
               {[1, 2, 3].map(i => (
-                <div key={i} className="h-16 bg-[var(--color-bg-primary)]/40 border border-[var(--color-border-muted)] rounded-lg animate-pulse" />
+                <div
+                  key={i}
+                  className="h-16 bg-[var(--color-bg-primary)]/40 border border-[var(--color-border-muted)] rounded-lg animate-pulse"
+                />
               ))}
             </div>
           ) : experiences.length === 0 ? (
@@ -275,10 +303,13 @@ export default function SiteExperiencesPage() {
               暂无匹配的站点经验记录
             </div>
           ) : (
-            experiences.map((exp) => (
+            experiences.map(exp => (
               <div
                 key={exp.id}
-                onClick={() => { setSelectedId(exp.id); setMode('view'); }}
+                onClick={() => {
+                  setSelectedId(exp.id);
+                  setMode('view');
+                }}
                 className={`group flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all duration-200 ${
                   selectedId === exp.id
                     ? 'bg-[var(--color-bg-tertiary)] border-[var(--color-accent)]/50 shadow-[0_0_12px_rgba(88,166,255,0.05)]'
@@ -296,7 +327,9 @@ export default function SiteExperiencesPage() {
                 <ChevronRight
                   size={12}
                   className={`text-[var(--color-text-muted)] transition-transform duration-200 ${
-                    selectedId === exp.id ? 'translate-x-0.5 text-[var(--color-accent)]' : 'group-hover:translate-x-0.5'
+                    selectedId === exp.id
+                      ? 'translate-x-0.5 text-[var(--color-accent)]'
+                      : 'group-hover:translate-x-0.5'
                   }`}
                 />
               </div>
@@ -322,7 +355,10 @@ export default function SiteExperiencesPage() {
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)] font-mono">
-                    <Globe size={12} className="text-[var(--color-accent)] shrink-0" />
+                    <Globe
+                      size={12}
+                      className="text-[var(--color-accent)] shrink-0"
+                    />
                     <span className="truncate">{activeExp.domain}</span>
                   </div>
 
@@ -348,7 +384,10 @@ export default function SiteExperiencesPage() {
                     onClick={handleEnterEdit}
                     className="p-2 rounded-lg border border-[var(--color-border-default)] bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)] active:scale-95 transition-all flex items-center gap-1.5 text-xs font-medium"
                   >
-                    <Edit3 size={13} className="text-[var(--color-accent)]" />
+                    <Edit3
+                      size={13}
+                      className="text-[var(--color-accent)]"
+                    />
                     <span>编辑</span>
                   </button>
                   <button
@@ -367,15 +406,22 @@ export default function SiteExperiencesPage() {
                 <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border-default)] rounded-xl p-5 hover:border-[var(--color-accent)]/20 transition-colors relative overflow-hidden group">
                   <div className="absolute left-0 top-0 bottom-0 w-1 bg-[var(--color-accent)]" />
                   <div className="flex items-center gap-2 mb-3">
-                    <FileText className="text-[var(--color-accent)]" size={15} />
-                    <h3 className="text-xs font-bold text-[var(--color-text-primary)] tracking-wide">平台特征 (Platform Features)</h3>
+                    <FileText
+                      className="text-[var(--color-accent)]"
+                      size={15}
+                    />
+                    <h3 className="text-xs font-bold text-[var(--color-text-primary)] tracking-wide">
+                      平台特征 (Platform Features)
+                    </h3>
                   </div>
                   {activeExp.platformFeatures ? (
                     <p className="text-xs leading-relaxed text-[var(--color-text-secondary)] whitespace-pre-wrap font-sans">
                       {activeExp.platformFeatures}
                     </p>
                   ) : (
-                    <p className="text-xs text-[var(--color-text-muted)] italic">暂未录入该站点的平台特征信息</p>
+                    <p className="text-xs text-[var(--color-text-muted)] italic">
+                      暂未录入该站点的平台特征信息
+                    </p>
                   )}
                 </div>
 
@@ -383,15 +429,22 @@ export default function SiteExperiencesPage() {
                 <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border-default)] rounded-xl p-5 hover:border-[var(--color-status-green)]/20 transition-colors relative overflow-hidden group">
                   <div className="absolute left-0 top-0 bottom-0 w-1 bg-[var(--color-status-green)]" />
                   <div className="flex items-center gap-2 mb-3">
-                    <CheckCircle2 className="text-[var(--color-status-green)]" size={15} />
-                    <h3 className="text-xs font-bold text-[var(--color-text-primary)] tracking-wide">验证模式 (Valid Patterns)</h3>
+                    <CheckCircle2
+                      className="text-[var(--color-status-green)]"
+                      size={15}
+                    />
+                    <h3 className="text-xs font-bold text-[var(--color-text-primary)] tracking-wide">
+                      验证模式 (Valid Patterns)
+                    </h3>
                   </div>
                   {activeExp.validPatterns ? (
                     <p className="text-xs leading-relaxed text-[var(--color-text-secondary)] whitespace-pre-wrap font-mono bg-[var(--color-bg-primary)] p-3 rounded-lg border border-[var(--color-border-muted)] select-text">
                       {activeExp.validPatterns}
                     </p>
                   ) : (
-                    <p className="text-xs text-[var(--color-text-muted)] italic">暂未录入验证规则与核心加密特征</p>
+                    <p className="text-xs text-[var(--color-text-muted)] italic">
+                      暂未录入验证规则与核心加密特征
+                    </p>
                   )}
                 </div>
 
@@ -399,15 +452,22 @@ export default function SiteExperiencesPage() {
                 <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border-default)] rounded-xl p-5 hover:border-[var(--color-status-yellow)]/20 transition-colors relative overflow-hidden group">
                   <div className="absolute left-0 top-0 bottom-0 w-1 bg-[var(--color-status-yellow)]" />
                   <div className="flex items-center gap-2 mb-3">
-                    <AlertTriangle className="text-[var(--color-status-yellow)]" size={15} />
-                    <h3 className="text-xs font-bold text-[var(--color-text-primary)] tracking-wide">已知踩坑点 (Known Pitfalls)</h3>
+                    <AlertTriangle
+                      className="text-[var(--color-status-yellow)]"
+                      size={15}
+                    />
+                    <h3 className="text-xs font-bold text-[var(--color-text-primary)] tracking-wide">
+                      已知踩坑点 (Known Pitfalls)
+                    </h3>
                   </div>
                   {activeExp.knownPitfalls ? (
                     <p className="text-xs leading-relaxed text-[var(--color-text-secondary)] whitespace-pre-wrap font-sans">
                       {activeExp.knownPitfalls}
                     </p>
                   ) : (
-                    <p className="text-xs text-[var(--color-text-muted)] italic">暂未录入该站点的反爬/反调试注意事项</p>
+                    <p className="text-xs text-[var(--color-text-muted)] italic">
+                      暂未录入该站点的反爬/反调试注意事项
+                    </p>
                   )}
                 </div>
 
@@ -425,21 +485,33 @@ export default function SiteExperiencesPage() {
             </div>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-[var(--color-text-muted)] space-y-4">
-              <Globe size={48} className="opacity-20 animate-pulse text-[var(--color-accent)]" />
+              <Globe
+                size={48}
+                className="opacity-20 animate-pulse text-[var(--color-accent)]"
+              />
               <div>
-                <h3 className="text-sm font-medium text-[var(--color-text-primary)]">暂无选择</h3>
-                <p className="text-xs mt-1">请在左侧选择站点经验，或者点击右上角“+”按钮新建一条记录。</p>
+                <h3 className="text-sm font-medium text-[var(--color-text-primary)]">
+                  暂无选择
+                </h3>
+                <p className="text-xs mt-1">
+                  请在左侧选择站点经验，或者点击右上角“+”按钮新建一条记录。
+                </p>
               </div>
             </div>
           )
         ) : (
           /* 编辑或新增表单模式 */
-          <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
+          <form
+            onSubmit={handleSubmit}
+            className="flex-1 flex flex-col overflow-hidden"
+          >
             {/* 表单头部 */}
             <div className="p-6 border-b border-[var(--color-border-muted)] flex items-center justify-between gap-4">
               <div>
                 <h2 className="text-sm font-bold text-[var(--color-text-primary)]">
-                  {mode === 'create' ? '新建站点经验' : `编辑站点经验: ${activeExp?.name}`}
+                  {mode === 'create'
+                    ? '新建站点经验'
+                    : `编辑站点经验: ${activeExp?.name}`}
                 </h2>
                 <p className="text-[10px] text-[var(--color-text-muted)] mt-1">
                   完善站点逆向经验细节，沉淀分析链路。
@@ -455,7 +527,9 @@ export default function SiteExperiencesPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={submitting || !formDomain.trim() || !formName.trim()}
+                  disabled={
+                    submitting || !formDomain.trim() || !formName.trim()
+                  }
                   className="px-3 py-1.5 rounded-lg bg-[var(--color-accent)] text-[var(--color-bg-primary)] hover:opacity-90 active:scale-95 transition-all text-xs font-bold flex items-center gap-1.5 disabled:opacity-50"
                 >
                   <Save size={13} />
@@ -468,7 +542,10 @@ export default function SiteExperiencesPage() {
             <div className="flex-1 overflow-y-auto p-6 space-y-5">
               {error && (
                 <div className="p-3 text-xs rounded-lg border border-red-500/20 bg-red-500/5 text-[var(--color-accent-red)] flex items-start gap-2">
-                  <Info size={14} className="shrink-0 mt-0.5" />
+                  <Info
+                    size={14}
+                    className="shrink-0 mt-0.5"
+                  />
                   <span>{error}</span>
                 </div>
               )}
@@ -477,27 +554,29 @@ export default function SiteExperiencesPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-[var(--color-text-secondary)] tracking-wide">
-                    站点名称 <span className="text-[var(--color-accent-red)]">*</span>
+                    站点名称{' '}
+                    <span className="text-[var(--color-accent-red)]">*</span>
                   </label>
                   <input
                     type="text"
                     required
                     value={formName}
-                    onChange={(e) => setFormName(e.target.value)}
+                    onChange={e => setFormName(e.target.value)}
                     placeholder="e.g. 京东 h5st"
                     className="w-full px-3 py-2 rounded-lg text-xs bg-[var(--color-bg-secondary)] border border-[var(--color-border-default)] text-[var(--color-text-primary)] focus:border-[var(--color-accent)] focus:outline-none transition-all"
                   />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-[var(--color-text-secondary)] tracking-wide">
-                    主要域名 <span className="text-[var(--color-accent-red)]">*</span>
+                    主要域名{' '}
+                    <span className="text-[var(--color-accent-red)]">*</span>
                   </label>
                   <input
                     type="text"
                     required
                     disabled={mode === 'edit'}
                     value={formDomain}
-                    onChange={(e) => setFormDomain(e.target.value)}
+                    onChange={e => setFormDomain(e.target.value)}
                     placeholder="e.g. api.m.jd.com"
                     className="w-full px-3 py-2 rounded-lg text-xs bg-[var(--color-bg-secondary)] border border-[var(--color-border-default)] text-[var(--color-text-primary)] focus:border-[var(--color-accent)] focus:outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   />
@@ -528,10 +607,12 @@ export default function SiteExperiencesPage() {
                   <input
                     type="text"
                     value={aliasInput}
-                    onChange={(e) => setAliasInput(e.target.value)}
+                    onChange={e => setAliasInput(e.target.value)}
                     onKeyDown={handleAddAlias}
                     onBlur={() => handleAddAlias()}
-                    placeholder={formAliases.length === 0 ? "e.g. m.jd.com, jd.com" : ""}
+                    placeholder={
+                      formAliases.length === 0 ? 'e.g. m.jd.com, jd.com' : ''
+                    }
                     className="flex-1 min-w-[120px] bg-transparent border-none text-xs text-[var(--color-text-primary)] focus:outline-none placeholder:text-[var(--color-text-muted)]"
                   />
                 </div>
@@ -545,7 +626,7 @@ export default function SiteExperiencesPage() {
                 </label>
                 <textarea
                   value={formPlatformFeatures}
-                  onChange={(e) => setFormPlatformFeatures(e.target.value)}
+                  onChange={e => setFormPlatformFeatures(e.target.value)}
                   placeholder="详细描述目标站点的网络请求、业务参数特征或反逆向大环境结构（如：包含多款自研浏览器指纹校验，使用 Webpack 打包，使用 H5 签名）"
                   rows={4}
                   className="w-full px-3 py-2 rounded-lg text-xs bg-[var(--color-bg-secondary)] border border-[var(--color-border-default)] text-[var(--color-text-primary)] focus:border-[var(--color-accent)] focus:outline-none transition-all placeholder:text-[var(--color-text-muted)] resize-y min-h-[80px]"
@@ -560,7 +641,7 @@ export default function SiteExperiencesPage() {
                 </label>
                 <textarea
                   value={formValidPatterns}
-                  onChange={(e) => setFormValidPatterns(e.target.value)}
+                  onChange={e => setFormValidPatterns(e.target.value)}
                   placeholder="记录关键的签名参数匹配模式、生成规则。例如：&#10;1. _cv = 3.1&#10;2. h5st 格式: t;appId;sign;uuid;...&#10;3. 请求头包含 Authorization"
                   rows={4}
                   className="w-full px-3 py-2 rounded-lg text-xs bg-[var(--color-bg-secondary)] border border-[var(--color-border-default)] text-[var(--color-text-primary)] focus:border-[var(--color-accent)] focus:outline-none transition-all placeholder:text-[var(--color-text-muted)] font-mono resize-y min-h-[80px]"
@@ -575,7 +656,7 @@ export default function SiteExperiencesPage() {
                 </label>
                 <textarea
                   value={formKnownPitfalls}
-                  onChange={(e) => setFormKnownPitfalls(e.target.value)}
+                  onChange={e => setFormKnownPitfalls(e.target.value)}
                   placeholder="记录曾经遭遇的蜜罐、封禁策略、检测面。如：&#10;1. 检测 window.navigator.webdriver&#10;2. CDP 被环境监测（需要 stealth 插件）&#10;3. 封禁频次阀值为 10 次/秒，封禁时间 1 小时"
                   rows={4}
                   className="w-full px-3 py-2 rounded-lg text-xs bg-[var(--color-bg-secondary)] border border-[var(--color-border-default)] text-[var(--color-text-primary)] focus:border-[var(--color-accent)] focus:outline-none transition-all placeholder:text-[var(--color-text-muted)] resize-y min-h-[80px]"

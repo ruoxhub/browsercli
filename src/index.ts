@@ -11,29 +11,26 @@
  * 1. 解析 CLI 参数
  * 2. 初始化 BrowserManager (连接/启动浏览器)
  * 3. 初始化 ToolContextProvider
- * 4. 创建 RpcClient，连接到 Rpc Server
- * 5. 通过 ToolAdapter 注册所有 Tools 为 Rpc Actions
- * 6. 进入运行状态，等待 Server 转发请求
+ * 4. 经 HTTP /api/v1 暴露工具执行能力
+ * 5. 进入运行状态，等待 HTTP 请求
  */
 
 import './utils/logger.js';
 
-import {SekiroInvoker} from './worker/SekiroInvoker.js';
 import {resolveConfig} from './config.js';
-import {RpcClient} from './modules/protocol/Client.js';
 import {getRuntime} from './runtime.js';
 import {dbService} from './services/DatabaseService.js';
 import {ConsoleServer} from './web/ConsoleServer.js';
-import {registerBuiltinActions} from './worker/BuiltinActions.js';
+import {JobStore} from './worker/JobStore.js';
+import {SekiroInvoker} from './worker/SekiroInvoker.js';
 import {ToolAdapter} from './worker/ToolAdapter.js';
 import {ToolContextProvider} from './worker/ToolContext.js';
-import {JobStore} from './worker/JobStore.js';
 import {parseWorkerArgs, toWorkerOptions} from './worker/WorkerArgs.js';
 import {createGracefulShutdown} from './worker/WorkerLifecycle.js';
 
 /**
- * Worker 启动上下文：暴露 main() 解析后的 RPC 连接信息，
- * 供 Phase 3 ConsoleServer 启动时读取（SekiroInvoker 不暴露 group/rpcHost）。
+ * Worker 启动上下文：暴露 main() 解析后的连接信息，
+ * 供 ConsoleServer 启动时读取。
  *
  * 仅 main() 内部赋值；外部模块只读不写。
  */
@@ -81,28 +78,12 @@ async function main(): Promise<void> {
   }
   await contextProvider.init();
 
-  // 5. 选择传输方式（默认 http，Sekiro 作为 opt-in 回退）
-  const transport = process.env.WORKER_TRANSPORT ?? 'http';
-
-  // ToolAdapter 始终创建（HTTP 模式也要用 executeTool 供 /api/v1 复用）
+  // 5. 创建 ToolAdapter（HTTP 模式用 executeTool 供 /api/v1 复用）
   const toolAdapter = new ToolAdapter(contextProvider);
 
-  // 6. Sekiro RPC 路径（transport==='sekiro' 才走 RpcClient + 注册 + 连接）
-  let client: RpcClient | undefined;
-  if (transport === 'sekiro') {
-    client = new RpcClient({
-      group: options.group,
-      rpcHost: options.rpcHost,
-    });
-    registerBuiltinActions(client);
-    await toolAdapter.registerAll((name, handler) => {
-      client!.registerAction(name, handler);
-    });
-    await client.start();
-    console.log('[Worker] 已通过 Sekiro 连接 Rpc Server');
-  } else {
-    console.log('[Worker] HTTP 传输模式：等待 /api/v1 请求（无需 Sekiro）');
-  }
+  console.log(
+    '[Worker] HTTP 传输模式：等待 /api/v1 请求（已移除 Sekiro 路径）',
+  );
 
   // 启动 Web 控制台
   const noConsole = process.argv.includes('--no-console');
@@ -144,7 +125,6 @@ async function main(): Promise<void> {
   // 9. 注册信号处理
   const gracefulShutdown = createGracefulShutdown({
     browserManager: runtime.browserManager,
-    client,
     contextProvider,
   });
 

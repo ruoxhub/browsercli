@@ -19,7 +19,11 @@ export interface Job {
 export class JobStore {
   private readonly jobs = new Map<string, Job>();
 
-  create(sessionId: string, tool: string, params: Record<string, unknown>): Job {
+  create(
+    sessionId: string,
+    tool: string,
+    params: Record<string, unknown>,
+  ): Job {
     const jobId = `job_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
     const job: Job = {
       jobId,

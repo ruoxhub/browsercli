@@ -1,4 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import {
   Activity,
   Trash2,
@@ -17,9 +21,11 @@ import {
   ShieldAlert,
   RefreshCw,
 } from 'lucide-react';
-import { api } from '../lib/api';
-import { wsClient } from '../lib/ws';
-import type { HookSampleEvent } from '../lib/protocol';
+import {useState, useEffect, useRef} from 'react';
+
+import {api} from '../lib/api';
+import type {HookSampleEvent} from '../lib/protocol';
+import {wsClient} from '../lib/ws';
 
 interface ActiveHook {
   hookId: string;
@@ -61,7 +67,9 @@ export default function HooksPage() {
   const paletteInputRef = useRef<HTMLInputElement>(null);
 
   // 弹窗与控制台输出折叠
-  const [expandedSamples, setExpandedSamples] = useState<Record<number, boolean>>({});
+  const [expandedSamples, setExpandedSamples] = useState<
+    Record<number, boolean>
+  >({});
 
   // 获取 Hook 列表
   const fetchHooks = async () => {
@@ -73,12 +81,15 @@ export default function HooksPage() {
       const hooksList = Array.isArray(response)
         ? response
         : response?.hooks || response?.data || [];
-      
+
       setHooks(hooksList);
-      
+
       if (hooksList.length > 0) {
         // 如果当前没有选中或者选中的不在列表中，选中第一个
-        if (!selectedHookId || !hooksList.find((h: any) => (h.hookId || h.id) === selectedHookId)) {
+        if (
+          !selectedHookId ||
+          !hooksList.find((h: any) => (h.hookId || h.id) === selectedHookId)
+        ) {
           setSelectedHookId(hooksList[0].hookId || hooksList[0].id);
         }
       } else {
@@ -106,18 +117,18 @@ export default function HooksPage() {
     // 订阅时指定过滤条件：
     const unsubscribe = wsClient.subscribe(
       'hook.sample',
-      (msg) => {
+      msg => {
         const payload = msg.payload as HookSampleEvent;
         // 实时接收新采样事件，按时间倒序排列并仅保留前 100 条
-        setSamples((prev) => {
+        setSamples(prev => {
           // 防重
-          if (prev.some((s) => s.seq === payload.seq && s.ts === payload.ts)) {
+          if (prev.some(s => s.seq === payload.seq && s.ts === payload.ts)) {
             return prev;
           }
           return [payload, ...prev].slice(0, 100);
         });
       },
-      { hookId: selectedHookId }
+      {hookId: selectedHookId},
     );
 
     return () => {
@@ -144,7 +155,7 @@ export default function HooksPage() {
       await api.createHook(args);
       setTarget('');
       setCustomHookId('');
-      
+
       // 刷新列表
       await fetchHooks();
     } catch (err) {
@@ -161,7 +172,9 @@ export default function HooksPage() {
     try {
       await api.deleteHook(hookId);
       // 在列表中实时剔除
-      setHooks((prev) => prev.filter((h) => (h.hookId || (h as any).id) !== hookId));
+      setHooks(prev =>
+        prev.filter(h => (h.hookId || (h as any).id) !== hookId),
+      );
       if (selectedHookId === hookId) {
         setSelectedHookId('');
         setSamples([]);
@@ -266,10 +279,10 @@ export default function HooksPage() {
 
   // 过滤命令列表
   const filteredCommands = commandList.filter(
-    (cmd) =>
+    cmd =>
       cmd.name.toLowerCase().includes(paletteQuery.toLowerCase()) ||
       cmd.desc.toLowerCase().includes(paletteQuery.toLowerCase()) ||
-      cmd.category.toLowerCase().includes(paletteQuery.toLowerCase())
+      cmd.category.toLowerCase().includes(paletteQuery.toLowerCase()),
   );
 
   // 注册快捷键监听
@@ -278,7 +291,7 @@ export default function HooksPage() {
       // Ctrl+K
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        setPaletteOpen((prev) => !prev);
+        setPaletteOpen(prev => !prev);
         setPaletteQuery('');
         setPaletteIndex(0);
         return;
@@ -320,11 +333,13 @@ export default function HooksPage() {
       setPaletteOpen(false);
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setPaletteIndex((prev) => (prev + 1) % Math.max(1, filteredCommands.length));
+      setPaletteIndex(
+        prev => (prev + 1) % Math.max(1, filteredCommands.length),
+      );
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setPaletteIndex((prev) =>
-        prev === 0 ? filteredCommands.length - 1 : prev - 1
+      setPaletteIndex(prev =>
+        prev === 0 ? filteredCommands.length - 1 : prev - 1,
       );
     } else if (e.key === 'Enter') {
       e.preventDefault();
@@ -336,7 +351,7 @@ export default function HooksPage() {
   };
 
   const toggleSampleExpand = (seq: number) => {
-    setExpandedSamples((prev) => ({
+    setExpandedSamples(prev => ({
       ...prev,
       [seq]: !prev[seq],
     }));
@@ -358,15 +373,16 @@ export default function HooksPage() {
 
   return (
     <div className="flex-1 flex flex-col md:flex-row h-full overflow-hidden select-none bg-[var(--color-bg-primary)] text-[var(--color-text-primary)]">
-      
       {/* 左侧栏 - 活跃 Hook 列表 */}
       <div className="w-full md:w-80 border-r border-[var(--color-border-default)] bg-[var(--color-bg-secondary)]/30 backdrop-blur-md flex flex-col h-2/5 md:h-full overflow-hidden">
-        
         {/* 顶部标题与信息 */}
         <div className="p-4 border-b border-[var(--color-border-muted)] space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold tracking-wider text-[var(--color-text-primary)] flex items-center gap-2">
-              <Activity size={14} className="text-[var(--color-accent)] animate-pulse" />
+              <Activity
+                size={14}
+                className="text-[var(--color-accent)] animate-pulse"
+              />
               注入的 Hook 拦截点
             </h2>
             <button
@@ -374,13 +390,29 @@ export default function HooksPage() {
               className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-all duration-150"
               title="重新加载"
             >
-              <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
+              <RefreshCw
+                size={12}
+                className={loading ? 'animate-spin' : ''}
+              />
             </button>
           </div>
-          
+
           <div className="flex items-center gap-1.5 text-[11px] text-[var(--color-text-muted)] bg-[var(--color-bg-primary)]/80 px-2 py-1.5 rounded-lg border border-[var(--color-border-default)]/60">
-            <Keyboard size={12} className="text-[var(--color-accent)]" />
-            <span>按 <kbd className="bg-[var(--color-bg-tertiary)] px-1 rounded font-mono border border-[var(--color-border-default)] text-[9px] font-bold">Ctrl+K</kbd> 或 <kbd className="bg-[var(--color-bg-tertiary)] px-1 rounded font-mono border border-[var(--color-border-default)] text-[9px] font-bold">.</kbd> 唤醒终端</span>
+            <Keyboard
+              size={12}
+              className="text-[var(--color-accent)]"
+            />
+            <span>
+              按{' '}
+              <kbd className="bg-[var(--color-bg-tertiary)] px-1 rounded font-mono border border-[var(--color-border-default)] text-[9px] font-bold">
+                Ctrl+K
+              </kbd>{' '}
+              或{' '}
+              <kbd className="bg-[var(--color-bg-tertiary)] px-1 rounded font-mono border border-[var(--color-border-default)] text-[9px] font-bold">
+                .
+              </kbd>{' '}
+              唤醒终端
+            </span>
           </div>
         </div>
 
@@ -395,13 +427,15 @@ export default function HooksPage() {
               <div className="w-8 h-8 rounded-full bg-[var(--color-bg-tertiary)] border border-[var(--color-border-default)]/50 flex items-center justify-center mx-auto text-[var(--color-text-muted)]">
                 <Code size={14} />
               </div>
-              <p className="text-xs text-[var(--color-text-secondary)] font-medium">暂无活跃 Hook 拦截点</p>
+              <p className="text-xs text-[var(--color-text-secondary)] font-medium">
+                暂无活跃 Hook 拦截点
+              </p>
               <p className="text-[10px] text-[var(--color-text-muted)] max-w-[180px] mx-auto leading-relaxed">
                 请在右侧新建面板中录入 Target 表达式并完成注入。
               </p>
             </div>
           ) : (
-            hooks.map((item) => {
+            hooks.map(item => {
               const hookId = item.hookId || (item as any).id;
               const isSelected = selectedHookId === hookId;
               return (
@@ -416,7 +450,9 @@ export default function HooksPage() {
                 >
                   <div className="space-y-1 flex-1 min-w-0 pr-4">
                     <div className="flex items-center gap-1.5">
-                      <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-[var(--color-accent)]' : 'bg-emerald-500'} animate-ping`} />
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-[var(--color-accent)]' : 'bg-emerald-500'} animate-ping`}
+                      />
                       <span className="text-xs font-mono font-bold truncate text-[var(--color-text-primary)]">
                         {item.target}
                       </span>
@@ -445,7 +481,7 @@ export default function HooksPage() {
                   </div>
 
                   <button
-                    onClick={(e) => {
+                    onClick={e => {
                       e.stopPropagation();
                       handleDeleteHook(hookId);
                     }}
@@ -463,51 +499,60 @@ export default function HooksPage() {
 
       {/* 右侧主工作区 */}
       <div className="flex-1 flex flex-col h-3/5 md:h-full overflow-hidden">
-        
         {/* Hook 注入面板与错误条 */}
         <div className="p-4 border-b border-[var(--color-border-default)] space-y-3 bg-[var(--color-bg-secondary)]/10">
-          
           {error && (
             <div className="flex items-start gap-2 p-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 text-xs animate-shake">
-              <ShieldAlert size={14} className="flex-shrink-0 mt-0.5" />
+              <ShieldAlert
+                size={14}
+                className="flex-shrink-0 mt-0.5"
+              />
               <div className="flex-1">
                 <span className="font-semibold">操作异常: </span>
                 {error}
               </div>
-              <button onClick={() => setError(null)} className="text-red-500/60 hover:text-red-500">
+              <button
+                onClick={() => setError(null)}
+                className="text-red-500/60 hover:text-red-500"
+              >
                 <X size={12} />
               </button>
             </div>
           )}
 
           <div className="flex flex-col xl:flex-row gap-4">
-            
             {/* 新建面板 */}
             <div className="flex-1 space-y-3">
               <h3 className="text-xs font-bold text-[var(--color-text-secondary)] uppercase tracking-wider flex items-center gap-1.5">
-                <Settings size={12} className="text-[var(--color-accent)]" />
+                <Settings
+                  size={12}
+                  className="text-[var(--color-accent)]"
+                />
                 逆向 Hook 安装器
               </h3>
-              
-              <form onSubmit={handleCreateHook} className="flex flex-col md:flex-row gap-3">
+
+              <form
+                onSubmit={handleCreateHook}
+                className="flex flex-col md:flex-row gap-3"
+              >
                 <div className="flex-1 flex flex-col md:flex-row gap-3">
                   <div className="flex-1 relative">
                     <input
                       type="text"
                       placeholder="Target 拦截对象 (例如: fetch, JSON.parse)"
                       value={target}
-                      onChange={(e) => setTarget(e.target.value)}
+                      onChange={e => setTarget(e.target.value)}
                       className="w-full bg-[var(--color-bg-primary)] border border-[var(--color-border-default)] rounded-lg px-3 py-2 text-xs text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)] focus:ring-1 focus:ring-[var(--color-accent)]/20 transition-all font-mono"
                       required
                     />
                   </div>
-                  
+
                   <div className="w-full md:w-44">
                     <input
                       type="text"
                       placeholder="自定义 Hook ID (选填)"
                       value={customHookId}
-                      onChange={(e) => setCustomHookId(e.target.value)}
+                      onChange={e => setCustomHookId(e.target.value)}
                       className="w-full bg-[var(--color-bg-primary)] border border-[var(--color-border-default)] rounded-lg px-3 py-2 text-xs text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)] focus:ring-1 focus:ring-[var(--color-accent)]/20 transition-all font-mono"
                     />
                   </div>
@@ -534,33 +579,38 @@ export default function HooksPage() {
                 <input
                   type="checkbox"
                   checked={logArgs}
-                  onChange={(e) => setLogArgs(e.target.checked)}
+                  onChange={e => setLogArgs(e.target.checked)}
                   className="rounded border-[var(--color-border-default)] text-[var(--color-accent)] focus:ring-[var(--color-accent)]/30 bg-[var(--color-bg-primary)] w-3.5 h-3.5"
                 />
-                <span className="text-xs text-[var(--color-text-secondary)] font-medium">捕获参数 (Args)</span>
+                <span className="text-xs text-[var(--color-text-secondary)] font-medium">
+                  捕获参数 (Args)
+                </span>
               </label>
 
               <label className="flex items-center gap-2 cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={logResult}
-                  onChange={(e) => setLogResult(e.target.checked)}
+                  onChange={e => setLogResult(e.target.checked)}
                   className="rounded border-[var(--color-border-default)] text-[var(--color-accent)] focus:ring-[var(--color-accent)]/30 bg-[var(--color-bg-primary)] w-3.5 h-3.5"
                 />
-                <span className="text-xs text-[var(--color-text-secondary)] font-medium">捕获返回值 (Result)</span>
+                <span className="text-xs text-[var(--color-text-secondary)] font-medium">
+                  捕获返回值 (Result)
+                </span>
               </label>
 
               <label className="flex items-center gap-2 cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={logStack}
-                  onChange={(e) => setLogStack(e.target.checked)}
+                  onChange={e => setLogStack(e.target.checked)}
                   className="rounded border-[var(--color-border-default)] text-[var(--color-accent)] focus:ring-[var(--color-accent)]/30 bg-[var(--color-bg-primary)] w-3.5 h-3.5"
                 />
-                <span className="text-xs text-[var(--color-text-secondary)] font-medium">捕获调用栈 (Stack)</span>
+                <span className="text-xs text-[var(--color-text-secondary)] font-medium">
+                  捕获调用栈 (Stack)
+                </span>
               </label>
             </div>
-
           </div>
         </div>
 
@@ -568,7 +618,10 @@ export default function HooksPage() {
         <div className="flex-1 flex flex-col min-h-0 bg-[var(--color-bg-primary)]">
           <div className="px-4 py-2 border-b border-[var(--color-border-default)] flex items-center justify-between bg-[var(--color-bg-secondary)]/10">
             <div className="flex items-center gap-2">
-              <Terminal size={14} className="text-[var(--color-text-secondary)]" />
+              <Terminal
+                size={14}
+                className="text-[var(--color-text-secondary)]"
+              />
               <span className="text-xs font-bold text-[var(--color-text-secondary)] uppercase tracking-wider">
                 Hook 实时采样流
               </span>
@@ -587,7 +640,9 @@ export default function HooksPage() {
                   <Activity size={18} />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-[var(--color-text-secondary)] font-semibold">请选择一个活跃 Hook 进行采样监听</p>
+                  <p className="text-xs text-[var(--color-text-secondary)] font-semibold">
+                    请选择一个活跃 Hook 进行采样监听
+                  </p>
                   <p className="text-[11px] text-[var(--color-text-muted)] max-w-sm leading-relaxed">
                     选择左侧列表中的拦截点后，当浏览器执行到目标函数时，此处会实时输出捕获的参数、返回值以及逆向堆栈镜像。
                   </p>
@@ -599,17 +654,19 @@ export default function HooksPage() {
                   <Sparkles size={18} />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-[var(--color-text-secondary)] font-semibold">等待拦截事件上报...</p>
+                  <p className="text-xs text-[var(--color-text-secondary)] font-semibold">
+                    等待拦截事件上报...
+                  </p>
                   <p className="text-[11px] text-[var(--color-text-muted)] max-w-xs leading-relaxed">
                     WebSocket 信道正常。请在目标页面触发被 Hook 函数的调用。
                   </p>
                 </div>
               </div>
             ) : (
-              samples.map((sample) => {
+              samples.map(sample => {
                 const isExpanded = !!expandedSamples[sample.seq];
                 const dateStr = new Date(sample.ts).toLocaleTimeString();
-                
+
                 return (
                   <div
                     key={`${sample.seq}-${sample.ts}`}
@@ -625,7 +682,7 @@ export default function HooksPage() {
                           {dateStr}
                         </span>
                       </div>
-                      
+
                       {sample.truncated && (
                         <span className="text-[9px] text-amber-500 bg-amber-500/10 px-1.5 rounded border border-amber-500/20">
                           Data Truncated
@@ -637,13 +694,21 @@ export default function HooksPage() {
                     {sample.args && sample.args.length > 0 ? (
                       <div className="space-y-1">
                         <div className="text-[10px] text-[var(--color-text-secondary)] font-bold uppercase tracking-wider flex items-center gap-1">
-                          <CornerDownRight size={10} className="text-[var(--color-accent)]" />
+                          <CornerDownRight
+                            size={10}
+                            className="text-[var(--color-accent)]"
+                          />
                           Arguments ({sample.args.length})
                         </div>
                         <pre className="p-2.5 bg-[var(--color-bg-primary)] border border-[var(--color-border-default)]/60 rounded-lg overflow-x-auto text-[11px] text-[var(--color-text-primary)] max-h-40 leading-relaxed font-mono">
                           {sample.args.map((arg, idx) => (
-                            <div key={idx} className="border-b border-[var(--color-border-muted)]/20 last:border-0 pb-1 mb-1 last:pb-0 last:mb-0">
-                              <span className="text-[var(--color-text-muted)]">[{idx}]: </span>
+                            <div
+                              key={idx}
+                              className="border-b border-[var(--color-border-muted)]/20 last:border-0 pb-1 mb-1 last:pb-0 last:mb-0"
+                            >
+                              <span className="text-[var(--color-text-muted)]">
+                                [{idx}]:{' '}
+                              </span>
                               {formatValue(arg)}
                             </div>
                           ))}
@@ -660,7 +725,10 @@ export default function HooksPage() {
                     {'retVal' in sample ? (
                       <div className="space-y-1">
                         <div className="text-[10px] text-blue-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                          <CornerDownRight size={10} className="text-blue-400" />
+                          <CornerDownRight
+                            size={10}
+                            className="text-blue-400"
+                          />
                           Return Value
                         </div>
                         <pre className="p-2.5 bg-[var(--color-bg-primary)] border border-[var(--color-border-default)]/60 rounded-lg overflow-x-auto text-[11px] text-blue-300 max-h-40 leading-relaxed font-mono">
@@ -681,14 +749,23 @@ export default function HooksPage() {
                           onClick={() => toggleSampleExpand(sample.seq)}
                           className="flex items-center gap-1 text-[10px] font-bold text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors duration-150 uppercase tracking-wider"
                         >
-                          {isExpanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
-                          <span>Stack Trace ({sample.stack.length} frames)</span>
+                          {isExpanded ? (
+                            <ChevronUp size={10} />
+                          ) : (
+                            <ChevronDown size={10} />
+                          )}
+                          <span>
+                            Stack Trace ({sample.stack.length} frames)
+                          </span>
                         </button>
-                        
+
                         {isExpanded && (
                           <div className="mt-2 pl-3 border-l-2 border-[var(--color-accent)]/30 space-y-1">
                             {sample.stack.map((frame, idx) => (
-                              <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between text-[11px] hover:bg-[var(--color-bg-primary)]/50 p-1 rounded transition-colors duration-100">
+                              <div
+                                key={idx}
+                                className="flex flex-col sm:flex-row sm:items-center justify-between text-[11px] hover:bg-[var(--color-bg-primary)]/50 p-1 rounded transition-colors duration-100"
+                              >
                                 <span className="text-[var(--color-text-primary)] font-semibold truncate max-w-xs">
                                   at {frame.functionName || '(anonymous)'}
                                 </span>
@@ -696,7 +773,8 @@ export default function HooksPage() {
                                   className="text-[10px] text-[var(--color-text-muted)] font-mono hover:text-[var(--color-accent)] cursor-help truncate max-w-sm select-text"
                                   title={`${frame.url}:${frame.line}:${frame.col}`}
                                 >
-                                  {frame.url.split('/').pop() || 'vm'}:{frame.line}:{frame.col}
+                                  {frame.url.split('/').pop() || 'vm'}:
+                                  {frame.line}:{frame.col}
                                 </span>
                               </div>
                             ))}
@@ -704,14 +782,12 @@ export default function HooksPage() {
                         )}
                       </div>
                     )}
-
                   </div>
                 );
               })
             )}
           </div>
         </div>
-
       </div>
 
       {/* 极客终端命令面板 (Command Palette Modal) */}
@@ -723,13 +799,16 @@ export default function HooksPage() {
           >
             {/* 头部搜索栏 */}
             <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--color-border-default)]">
-              <Search size={16} className="text-[var(--color-text-muted)]" />
+              <Search
+                size={16}
+                className="text-[var(--color-text-muted)]"
+              />
               <input
                 ref={paletteInputRef}
                 type="text"
                 placeholder="搜索逆向功能或快速指令..."
                 value={paletteQuery}
-                onChange={(e) => {
+                onChange={e => {
                   setPaletteQuery(e.target.value);
                   setPaletteIndex(0);
                 }}
@@ -778,11 +857,13 @@ export default function HooksPage() {
                             {cmd.category}
                           </span>
                         </div>
-                        <div className={`text-[10px] ${isSelected ? 'text-white/80' : 'text-[var(--color-text-muted)]'}`}>
+                        <div
+                          className={`text-[10px] ${isSelected ? 'text-white/80' : 'text-[var(--color-text-muted)]'}`}
+                        >
                           {cmd.desc}
                         </div>
                       </div>
-                      
+
                       {isSelected && (
                         <kbd className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded font-mono">
                           Enter
@@ -798,14 +879,16 @@ export default function HooksPage() {
             <div className="bg-[var(--color-bg-tertiary)] px-4 py-2 border-t border-[var(--color-border-default)] flex justify-between items-center text-[10px] text-[var(--color-text-muted)]">
               <span className="flex items-center gap-1">
                 <Info size={10} />
-                <span>使用方向键 <kbd>↑</kbd> <kbd>↓</kbd> 切换，<kbd>Enter</kbd> 触发，<kbd>Esc</kbd> 退出</span>
+                <span>
+                  使用方向键 <kbd>↑</kbd> <kbd>↓</kbd> 切换，<kbd>Enter</kbd>{' '}
+                  触发，<kbd>Esc</kbd> 退出
+                </span>
               </span>
               <span>JSReverser Terminal</span>
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 }

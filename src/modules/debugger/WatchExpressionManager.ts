@@ -231,7 +231,15 @@ export class WatchExpressionManager {
 
     for (const key of keysA) {
       if (!keysB.includes(key)) return false;
-      if (!this.deepEqual((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key], depth + 1, maxDepth, seen)) {
+      if (
+        !this.deepEqual(
+          (a as Record<string, unknown>)[key],
+          (b as Record<string, unknown>)[key],
+          depth + 1,
+          maxDepth,
+          seen,
+        )
+      ) {
         return false;
       }
     }

@@ -10,9 +10,9 @@ import {afterEach, beforeEach, describe, it} from 'node:test';
 
 import puppeteer from 'puppeteer';
 
+import {BrowserManager} from '../../../src/browser.js';
 import {BrowserModeManager} from '../../../src/modules/browser/BrowserModeManager.js';
 import {StealthScripts2025} from '../../../src/modules/stealth/StealthScripts2025.js';
-import {BrowserManager} from '../../../src/browser.js';
 
 interface BrowserLike {
   connected?: boolean;

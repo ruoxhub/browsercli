@@ -12,7 +12,7 @@ import {defineTool} from '../ToolDefinition.js';
 
 import type {NativeToolInfo, WasmCapabilitiesData} from './types.js';
 function probeNativeTool(name: string, flag: string): Promise<NativeToolInfo> {
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     execFile(name, [flag], {timeout: 5000}, (error, stdout) => {
       if (error) {
         resolve({name, available: false});
@@ -24,10 +24,10 @@ function probeNativeTool(name: string, flag: string): Promise<NativeToolInfo> {
   });
 }
 
-
 export const wasmCapabilities = defineTool({
   name: 'wasm_capabilities',
-  description: 'Detect available native Wasm toolchain (wabt, binaryen, wasmtime, wasmer) and session state.',
+  description:
+    'Detect available native Wasm toolchain (wabt, binaryen, wasmtime, wasmer) and session state.',
   annotations: {
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: true,

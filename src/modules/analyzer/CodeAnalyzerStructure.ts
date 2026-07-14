@@ -1,4 +1,9 @@
 /**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+/**
  * CodeAnalyzer 结构分析策略模块。
  * 提取自 CodeAnalyzer.ts 的 AST 遍历与分析逻辑。
  */
@@ -272,9 +277,7 @@ export async function analyzeStructure(
             const method = methodPath.node;
             methods.push({
               name:
-                method.key.type === 'Identifier'
-                  ? method.key.name
-                  : 'unknown',
+                method.key.type === 'Identifier' ? method.key.name : 'unknown',
               params: method.params.map(p =>
                 p.type === 'Identifier' ? p.name : 'unknown',
               ),

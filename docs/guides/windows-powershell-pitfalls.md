@@ -27,11 +27,13 @@ Get-Content script.js | js-reverse call evaluate_script --expression -
 ### 解决方案
 
 1. **优先使用 `--data` JSON 格式传参**：
+
    ```powershell
    js-reverse call evaluate_script --data '{"expression":"document.title"}'
    ```
 
 2. **将复杂 JS 写入文件，用简单调用引用**：
+
    ```powershell
    # 先写入脚本文件
    Set-Content -Path hook.js -Value 'document.querySelectorAll("script").length'
@@ -83,12 +85,12 @@ js-reverse call list_hooks
 
 ### 具体案例
 
-| 工具 | 问题 | 正确用法 |
-|------|------|----------|
-| `observe_flow` | 文档说支持 `--url`，实际需用 `--data` + JSON | `--data '{"url":"..."}'` |
-| `export_session_report` | `--taskId`/`--taskSlug` 与实际参数不符 | 无需参数，直接调用 |
-| `wait_for_request` | `--waitForRequest` 参数名风格不一致 | `--data '{"waitForRequest":"playurl"}'` |
-| `list_network_requests` | `--headerFilter` 传参方式不明 | `--data '{"headerFilter":"playurl"}'` |
+| 工具                    | 问题                                         | 正确用法                                |
+| ----------------------- | -------------------------------------------- | --------------------------------------- |
+| `observe_flow`          | 文档说支持 `--url`，实际需用 `--data` + JSON | `--data '{"url":"..."}'`                |
+| `export_session_report` | `--taskId`/`--taskSlug` 与实际参数不符       | 无需参数，直接调用                      |
+| `wait_for_request`      | `--waitForRequest` 参数名风格不一致          | `--data '{"waitForRequest":"playurl"}'` |
+| `list_network_requests` | `--headerFilter` 传参方式不明                | `--data '{"headerFilter":"playurl"}'`   |
 
 ### 建议
 
@@ -124,16 +126,17 @@ js-reverse call list_hooks
 
 ### 依赖关系
 
-| 工具 | 前置条件 | 失败表现 |
-|------|----------|----------|
-| `pause` | 调试器已附加 | "Debugger not attached" |
-| `set_breakpoint` | 调试器已附加 | 同上 |
-| `list_scripts` | 调试器已附加 | 返回空列表 |
-| `collect_code` | 调试器 + 页面就绪 | 调用失败 |
+| 工具             | 前置条件          | 失败表现                |
+| ---------------- | ----------------- | ----------------------- |
+| `pause`          | 调试器已附加      | "Debugger not attached" |
+| `set_breakpoint` | 调试器已附加      | 同上                    |
+| `list_scripts`   | 调试器已附加      | 返回空列表              |
+| `collect_code`   | 调试器 + 页面就绪 | 调用失败                |
 
 ### 解决方案
 
 使用调试器工具前，确保：
+
 1. 浏览器以 `--remote-debugging-port` 启动
 2. Worker 已成功连接
 3. 优先使用 Hook 类工具（不依赖调试器状态），仅在需要检查局部变量时使用断点
@@ -179,15 +182,15 @@ python script.py
 
 ## 改进建议汇总
 
-| 优先级 | 改进项 | 描述 | 状态 |
-|--------|--------|------|------|
-| P0 | CLI 增加 `--file` 参数 | 允许从文件读取复杂参数，彻底避免 PowerShell 转义问题 | ✅ 已实现 |
-| P0 | 统一参数格式文档 | 所有工具参数统一为 JSON schema，CLI 帮助信息需明确 `--data` 用法 | ✅ 已实现 |
-| P1 | `auto_hook` 增加 `--export-results` | 自动将 Hook 数据写入 `artifacts/`，无需手动 `get_hook_data` | ✅ 已实现 |
-| P1 | `list_network_requests` 轮询模式 | 超时后返回已有请求而非空列表，方便排查 | ✅ 已实现 |
-| P1 | 调试器工具增加状态检查 | 调用 `pause`/`set_breakpoint` 前自动检查调试器状态，给出明确提示 | 待实现 |
-| P2 | 补充 Windows PowerShell 使用指南 | 官方文档补充 Windows 专用示例与注意事项 | ✅ 已实现（本文档） |
-| P2 | 响应结构文档化 | 工具返回值结构需在 `tool-io-contract.md` 中明确记录 | 待实现 |
+| 优先级 | 改进项                              | 描述                                                             | 状态                |
+| ------ | ----------------------------------- | ---------------------------------------------------------------- | ------------------- |
+| P0     | CLI 增加 `--file` 参数              | 允许从文件读取复杂参数，彻底避免 PowerShell 转义问题             | ✅ 已实现           |
+| P0     | 统一参数格式文档                    | 所有工具参数统一为 JSON schema，CLI 帮助信息需明确 `--data` 用法 | ✅ 已实现           |
+| P1     | `auto_hook` 增加 `--export-results` | 自动将 Hook 数据写入 `artifacts/`，无需手动 `get_hook_data`      | ✅ 已实现           |
+| P1     | `list_network_requests` 轮询模式    | 超时后返回已有请求而非空列表，方便排查                           | ✅ 已实现           |
+| P1     | 调试器工具增加状态检查              | 调用 `pause`/`set_breakpoint` 前自动检查调试器状态，给出明确提示 | 待实现              |
+| P2     | 补充 Windows PowerShell 使用指南    | 官方文档补充 Windows 专用示例与注意事项                          | ✅ 已实现（本文档） |
+| P2     | 响应结构文档化                      | 工具返回值结构需在 `tool-io-contract.md` 中明确记录              | 待实现              |
 
 ### 已实现功能用法
 

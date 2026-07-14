@@ -36,7 +36,9 @@ export const GLOBAL_ALIASES: Readonly<Record<string, string>> = Object.freeze({
  * 工具专有别名：优先级高于全局别名
  * 结构：toolName → { aliasKey: canonicalKey }
  */
-export const TOOL_ALIASES: Readonly<Record<string, Readonly<Record<string, string>>>> = Object.freeze({
+export const TOOL_ALIASES: Readonly<
+  Record<string, Readonly<Record<string, string>>>
+> = Object.freeze({
   analyze_target: {
     keywords: 'topN',
     keyword: 'topN',

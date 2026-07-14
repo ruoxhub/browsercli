@@ -3,7 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-/* eslint-disable @typescript-eslint/no-explicit-any */
+
 /**
  * 页面导航策略模块。提取自 PageController.ts，封装导航相关 Playwright 操作。
  *
@@ -11,7 +11,6 @@
  */
 
 import type {Page} from '../../third_party/index.js';
-
 import {logger} from '../../utils/logger.js';
 
 import type {NavigationOptions} from './PageControllerTypes.js';

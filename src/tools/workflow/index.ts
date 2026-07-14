@@ -21,13 +21,8 @@ export type {
   CryptoDetectionResult,
   HookInjectionRecord,
 } from './autoHook.js';
-export type {
-  DependencyInfo,
-  ScriptAnalysis,
-} from './observeFlow.js';
+export type {DependencyInfo, ScriptAnalysis} from './observeFlow.js';
 export type {
   RebuildBundleOptions,
   RebuildBundleToolResult,
 } from './rebuildBundle.js';
-
-

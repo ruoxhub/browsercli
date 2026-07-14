@@ -44,7 +44,10 @@ export class OpenAIProvider implements AIProvider {
     this.defaultModel = config.model || 'gpt-4o';
   }
 
-  async chat(messages: AIMessage[], options?: ChatOptions): Promise<AIResponse> {
+  async chat(
+    messages: AIMessage[],
+    options?: ChatOptions,
+  ): Promise<AIResponse> {
     try {
       const response = await this.client.chat.completions.create({
         model: options?.model || this.defaultModel,
@@ -124,7 +127,10 @@ export class OpenAIProvider implements AIProvider {
   private handleError(error: unknown): FormattedProviderError {
     if (error instanceof OpenAI.APIError) {
       const status = error.status ?? 'NETWORK';
-      const formatted = formatProviderError(`OpenAI API error (${status})`, error);
+      const formatted = formatProviderError(
+        `OpenAI API error (${status})`,
+        error,
+      );
       formatted.status = typeof status === 'number' ? status : undefined;
       formatted.code = error.code;
       return formatted;

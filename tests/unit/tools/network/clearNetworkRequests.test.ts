@@ -44,7 +44,7 @@ function createMockServices(services: {
     getSelectedPage: services.getSelectedPage ?? (() => null),
     getSelectedPageIndex: services.getSelectedPageIndex,
     getNetworkRequests: services.getNetworkRequests ?? (() => []),
-    getNetworkRequestById: () => ({} as any),
+    getNetworkRequestById: () => ({}) as any,
     getNetworkRequestStableId: () => 1,
     getRequestInitiator: () => undefined,
     clearNetworkRequests: services.clearNetworkRequests ?? (() => {}),

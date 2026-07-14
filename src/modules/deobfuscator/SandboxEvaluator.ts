@@ -1,7 +1,13 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+import vm from 'node:vm';
+
 import generateImport from '@babel/generator';
 import traverseImport from '@babel/traverse';
 import * as t from '@babel/types';
-import vm from 'node:vm';
 
 import {unwrapBabelDefault} from './astUtils.js';
 
@@ -97,12 +103,13 @@ export class SandboxEvaluator {
   ): boolean {
     try {
       const code = nodes
-        .map(n =>
-          generate(n, {
-            compact: true,
-            comments: false,
-            jsescOption: {minimal: true},
-          }).code,
+        .map(
+          n =>
+            generate(n, {
+              compact: true,
+              comments: false,
+              jsescOption: {minimal: true},
+            }).code,
         )
         .join(';\n');
       vm.runInNewContext(code, sandbox, {timeout: timeoutMs});
@@ -247,7 +254,8 @@ export class SandboxEvaluator {
         );
         if (
           !node ||
-          (t.isIdentifier(node) && node.name === (path.node as t.Identifier).name)
+          (t.isIdentifier(node) &&
+            node.name === (path.node as t.Identifier).name)
         ) {
           return;
         }
@@ -262,11 +270,14 @@ export class SandboxEvaluator {
           if (!(path as NodePath).isReferencedIdentifier()) {
             return;
           }
-          const binding = path.scope.getBinding((path.node as t.Identifier).name);
+          const binding = path.scope.getBinding(
+            (path.node as t.Identifier).name,
+          );
           const node = binding ? bindingLiterals.get(binding) : null;
           if (
             !node ||
-            (t.isIdentifier(node) && node.name === (path.node as t.Identifier).name)
+            (t.isIdentifier(node) &&
+              node.name === (path.node as t.Identifier).name)
           ) {
             return;
           }
@@ -296,7 +307,10 @@ export class SandboxEvaluator {
   replaceCallsFromSandbox(
     ast: t.File,
     sandbox: Record<string, unknown>,
-    options?: {timeoutMs?: number; allowPredicate?: (path: unknown, name: string) => boolean},
+    options?: {
+      timeoutMs?: number;
+      allowPredicate?: (path: unknown, name: string) => boolean;
+    },
   ): boolean {
     const allowPredicate = options?.allowPredicate ?? (() => true);
     const timeoutMs = options?.timeoutMs ?? 1000;
@@ -332,7 +346,9 @@ export class SandboxEvaluator {
 
         let value: unknown;
         try {
-          value = (sandbox[calleeName] as (...args: unknown[]) => unknown)(...argValues);
+          value = (sandbox[calleeName] as (...args: unknown[]) => unknown)(
+            ...argValues,
+          );
         } catch {
           const code = generate(path.node, {
             compact: true,
@@ -395,9 +411,7 @@ export class SandboxEvaluator {
         ) {
           return;
         }
-        if (
-          !Object.prototype.hasOwnProperty.call(container, key)
-        ) {
+        if (!Object.prototype.hasOwnProperty.call(container, key)) {
           return;
         }
 
@@ -515,10 +529,11 @@ function shouldEvaluateTopLevelStatement(node: t.Node): boolean {
       t.isFunctionExpression(expr.callee) ||
       t.isArrowFunctionExpression(expr.callee)
     ) {
-      const body = (expr.callee as t.FunctionExpression | t.ArrowFunctionExpression).body;
+      const body = (
+        expr.callee as t.FunctionExpression | t.ArrowFunctionExpression
+      ).body;
       return (
-        body != null &&
-        (!t.isBlockStatement(body) || body.body.length <= 40)
+        body != null && (!t.isBlockStatement(body) || body.body.length <= 40)
       );
     }
     return t.isIdentifier(expr.callee);
@@ -529,10 +544,11 @@ function shouldEvaluateTopLevelStatement(node: t.Node): boolean {
       t.isFunctionExpression(call.callee) ||
       t.isArrowFunctionExpression(call.callee)
     ) {
-      const body = (call.callee as t.FunctionExpression | t.ArrowFunctionExpression).body;
+      const body = (
+        call.callee as t.FunctionExpression | t.ArrowFunctionExpression
+      ).body;
       return (
-        body != null &&
-        (!t.isBlockStatement(body) || body.body.length <= 40)
+        body != null && (!t.isBlockStatement(body) || body.body.length <= 40)
       );
     }
   }
@@ -547,14 +563,18 @@ function getBindingAliasInitPath(
   }
 
   if (binding.path.isVariableDeclarator()) {
-    const initPath = (binding.path as NodePath<t.VariableDeclarator>).get('init');
+    const initPath = (binding.path as NodePath<t.VariableDeclarator>).get(
+      'init',
+    );
     if (initPath && initPath.node) {
       return initPath as NodePath;
     }
   }
 
   if (binding.path.parentPath?.isVariableDeclarator()) {
-    const initPath = (binding.path.parentPath as NodePath<t.VariableDeclarator>).get('init');
+    const initPath = (
+      binding.path.parentPath as NodePath<t.VariableDeclarator>
+    ).get('init');
     if (initPath && initPath.node) {
       return initPath as NodePath;
     }
@@ -653,4 +673,5 @@ function resolveSandboxValueName(
   return resolveSandboxValueName(initPath, sandbox, localSeen);
 }
 
-type NodePath<T extends t.Node = t.Node> = import('@babel/traverse').NodePath<T>;
+type NodePath<T extends t.Node = t.Node> =
+  import('@babel/traverse').NodePath<T>;

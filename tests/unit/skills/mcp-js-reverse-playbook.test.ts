@@ -18,12 +18,24 @@ async function readRepoFile(relativePath: string): Promise<string> {
 describe('mcp-js-reverse-playbook docs contract', () => {
   it('defines the staged workflow, principles, task artifacts, and local rebuild references', async () => {
     const skill = await readRepoFile('skills/mcp-js-reverse-playbook/SKILL.md');
-    const automationEntry = await readRepoFile('skills/mcp-js-reverse-playbook/references/automation-entry.md');
-    const taskTemplate = await readRepoFile('skills/mcp-js-reverse-playbook/references/mcp-task-template.md');
-    const outputContract = await readRepoFile('skills/mcp-js-reverse-playbook/references/output-contract.md');
-    const fallbacks = await readRepoFile('skills/mcp-js-reverse-playbook/references/fallbacks.md');
-    const taskArtifacts = await readRepoFile('skills/mcp-js-reverse-playbook/references/task-artifacts.md');
-    const localRebuild = await readRepoFile('skills/mcp-js-reverse-playbook/references/local-rebuild.md');
+    const automationEntry = await readRepoFile(
+      'skills/mcp-js-reverse-playbook/references/automation-entry.md',
+    );
+    const taskTemplate = await readRepoFile(
+      'skills/mcp-js-reverse-playbook/references/mcp-task-template.md',
+    );
+    const outputContract = await readRepoFile(
+      'skills/mcp-js-reverse-playbook/references/output-contract.md',
+    );
+    const fallbacks = await readRepoFile(
+      'skills/mcp-js-reverse-playbook/references/fallbacks.md',
+    );
+    const taskArtifacts = await readRepoFile(
+      'skills/mcp-js-reverse-playbook/references/task-artifacts.md',
+    );
+    const localRebuild = await readRepoFile(
+      'skills/mcp-js-reverse-playbook/references/local-rebuild.md',
+    );
 
     for (const phrase of [
       'Observe',

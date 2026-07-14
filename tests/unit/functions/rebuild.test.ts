@@ -79,7 +79,12 @@ describe('rebuild functions', () => {
   describe('buildAutoEntryCode', () => {
     it('应生成包含 targetScript 的入口代码', () => {
       const code = buildAutoEntryCode(
-        {url: 'https://example.com/app.js', content: 'var x=1', size: 7, type: 'external'},
+        {
+          url: 'https://example.com/app.js',
+          content: 'var x=1',
+          size: 7,
+          type: 'external',
+        },
         {page: {url: 'https://example.com'}},
       );
       assert.ok(code.includes('import "./env.js"'));
@@ -88,22 +93,21 @@ describe('rebuild functions', () => {
     });
 
     it('应处理无 targetScript 的情况', () => {
-      const code = buildAutoEntryCode(undefined, {page: {url: 'https://example.com'}});
+      const code = buildAutoEntryCode(undefined, {
+        page: {url: 'https://example.com'},
+      });
       assert.ok(code.includes('capture.targetScript'));
     });
   });
 
   describe('appendTargetContextNotes', () => {
     it('应追加目标上下文到 notes', () => {
-      const notes = appendTargetContextNotes(
-        ['existing note'],
-        {
-          targetKeywords: ['encrypt', 'sign'],
-          targetUrlPatterns: ['/api/'],
-          targetFunctionNames: ['getToken'],
-          targetActionDescription: 'login flow',
-        },
-      );
+      const notes = appendTargetContextNotes(['existing note'], {
+        targetKeywords: ['encrypt', 'sign'],
+        targetUrlPatterns: ['/api/'],
+        targetFunctionNames: ['getToken'],
+        targetActionDescription: 'login flow',
+      });
       assert.ok(notes.includes('existing note'));
       assert.ok(notes.some(n => n.includes('encrypt, sign')));
       assert.ok(notes.some(n => n.includes('/api/')));
@@ -133,7 +137,13 @@ describe('rebuild functions', () => {
 
     it('应匹配 URL 模式', () => {
       assert.equal(
-        matchesTargetText({url: 'https://api.example.com/sign'}, [], ['api.example'], [], ''),
+        matchesTargetText(
+          {url: 'https://api.example.com/sign'},
+          [],
+          ['api.example'],
+          [],
+          '',
+        ),
         true,
       );
     });
@@ -146,10 +156,7 @@ describe('rebuild functions', () => {
     });
 
     it('应不匹配无目标时', () => {
-      assert.equal(
-        matchesTargetText('random text', [], [], [], ''),
-        false,
-      );
+      assert.equal(matchesTargetText('random text', [], [], [], ''), false);
     });
   });
 
@@ -161,7 +168,14 @@ describe('rebuild functions', () => {
     ];
 
     it('应按关键词过滤', () => {
-      const filtered = filterRuntimeEvidence(records, ['encrypt'], [], [], '', 10);
+      const filtered = filterRuntimeEvidence(
+        records,
+        ['encrypt'],
+        [],
+        [],
+        '',
+        10,
+      );
       assert.ok(filtered.length >= 1);
     });
 
@@ -178,8 +192,18 @@ describe('rebuild functions', () => {
 
   describe('pickTargetScript', () => {
     const files = [
-      {url: 'https://example.com/app.js', content: 'var a=1', size: 7, type: 'external' as const},
-      {url: 'https://example.com/crypto.js', content: 'var b=2', size: 7, type: 'external' as const},
+      {
+        url: 'https://example.com/app.js',
+        content: 'var a=1',
+        size: 7,
+        type: 'external' as const,
+      },
+      {
+        url: 'https://example.com/crypto.js',
+        content: 'var b=2',
+        size: 7,
+        type: 'external' as const,
+      },
     ];
 
     it('无目标时选择第一个', () => {
@@ -217,10 +241,9 @@ describe('rebuild functions', () => {
     });
 
     it('不应推断未观测到的能力', () => {
-      const missing = inferMissingCapabilities(
-        'window is not defined',
-        ['document'],
-      );
+      const missing = inferMissingCapabilities('window is not defined', [
+        'document',
+      ]);
       assert.equal(missing.length, 0);
     });
 
@@ -238,7 +261,10 @@ describe('rebuild functions', () => {
       const tmpDir = await mkdtemp(path.join(tmpdir(), 'rebuild-test-'));
       try {
         await writeArtifactFile(tmpDir, 'env/test.js', 'console.log("hello")');
-        const content = await readFile(path.join(tmpDir, 'env', 'test.js'), 'utf8');
+        const content = await readFile(
+          path.join(tmpDir, 'env', 'test.js'),
+          'utf8',
+        );
         assert.equal(content, 'console.log("hello")');
       } finally {
         await rm(tmpDir, {recursive: true});

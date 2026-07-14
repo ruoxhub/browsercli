@@ -57,11 +57,7 @@ export const toolDispatcherCommand: AxiCliCommand<WorkerContext> = async (
 
   try {
     const sessionId = getFlag(parsed, 'session'); // string | undefined
-    const result = await httpClient.invoke(
-      sessionId,
-      candidate.name,
-      toolArgs,
-    );
+    const result = await httpClient.invoke(sessionId, candidate.name, toolArgs);
 
     // --watch：订阅该会话事件流（非致命：流不可用时仅告警）
     if (getBoolFlag(parsed, 'watch')) {

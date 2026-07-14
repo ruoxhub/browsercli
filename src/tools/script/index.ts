@@ -21,8 +21,6 @@ export {updateInjectScript} from './updateInjectScript.js';
 export {deleteInjectScript} from './deleteInjectScript.js';
 export {checkUrlMatches} from './checkUrlMatches.js';
 
-
-
 export type {
   InjectConfigEntry,
   CreateInjectScriptData,

@@ -9,6 +9,7 @@
 ## 1. 背景与目标
 
 ### 1.1 现状
+
 仓库当前已把 CLI 与 Worker 解耦，但传输层依赖外部 broker **Sekiro (rpc-go)**：
 
 - CLI 端 `browsercli` 通过 `SekiroInvoker` 向 `POST /business/invoke` 发 HTTP 请求。
@@ -16,6 +17,7 @@
 - Worker 内的 `ConsoleServer`（`src/web/ConsoleServer.ts`）已自带一套 HTTP REST + WebSocket 服务（默认 `127.0.0.1:8765`，路由在 `src/web/routes/*`，事件经 `WsHub` 广播），但其 `tools` 路由当前仍通过 `SekiroInvoker` 代理转发。
 
 ### 1.2 目标
+
 1. **原生 HTTP 传输**：CLI 直接对 Worker 的 HTTP 接口发请求，去掉 Sekiro 这一外部依赖。
 2. **可跨网络部署**：Worker 监听可配置 host/port，支持非 loopback 绑定，并带 Bearer Token 认证。
 3. **通用 HTTP API**：设计稳定、通用的 REST 接口（工具发现 / 会话 / 异步任务），CLI 只是其中一个客户端，其他脚本/服务也能直接调用。
@@ -23,6 +25,7 @@
 5. **异步任务语义**：工具调用以异步 Job 提交，客户端轮询或通过 WebSocket 订阅结果/流，适配长耗时任务（去混淆、长分析、hook 持续采样）。
 
 ### 1.3 非目标（本设计不做）
+
 - 实现原生 TLS（建议生产环境用反向代理，如 nginx，做 HTTPS）。
 - 每会话独立浏览器隔离（v1 共享单例浏览器，见 §5.3）。
 - Job 结果持久化到数据库（v1 仅内存，见 §5.2）。
@@ -53,14 +56,16 @@
 ## 3. Worker 服务（服务端）设计
 
 ### 3.1 配置（env 或 `js-reverse-worker` 启动参数，优先级 CLI > env > 默认）
-| 配置项 | 默认 | 说明 |
-|---|---|---|
-| `WORKER_HOST` | `127.0.0.1` | 监听地址；跨网络设为 `0.0.0.0` |
-| `WORKER_PORT` | `8765` | 监听端口 |
-| `WORKER_API_TOKEN` | 未设置 | 设置后且绑定非 loopback → 强制 `Authorization: Bearer <token>` |
-| `JS_REVERSE_TOOL_PROFILE` | `full` | 工具发现时按 profile 过滤（`workflow` / `full`） |
+
+| 配置项                    | 默认        | 说明                                                           |
+| ------------------------- | ----------- | -------------------------------------------------------------- |
+| `WORKER_HOST`             | `127.0.0.1` | 监听地址；跨网络设为 `0.0.0.0`                                 |
+| `WORKER_PORT`             | `8765`      | 监听端口                                                       |
+| `WORKER_API_TOKEN`        | 未设置      | 设置后且绑定非 loopback → 强制 `Authorization: Bearer <token>` |
+| `JS_REVERSE_TOOL_PROFILE` | `full`      | 工具发现时按 profile 过滤（`workflow` / `full`）               |
 
 ### 3.2 `ConsoleServer` 改造
+
 当前 `ConsoleServer.start()` 对所有请求先调用 `rejectIfNotLocal(req, res)`（强制 loopback），且硬编码 `listen(port, '127.0.0.1')`。改造点：
 
 1. **监听 host 可配置**：新增 `ConsoleServerOptions.host`，`start()` 改为 `this.httpServer!.listen(this.options.port, this.options.host, ...)`。
@@ -72,17 +77,17 @@
 
 通过 `RestRouter.mount(createApiV1Routes(deps))` 挂载，路径前缀 `/api/v1`。
 
-| 方法 | 路径 | 请求 | 响应 | 说明 |
-|---|---|---|---|---|
-| GET | `/health` | — | `{status:'ok', version, uptimeMs, browserMode}` | 存活探针 |
-| GET | `/tools` | `?profile=`(可选) | `{tools: ToolMeta[]}` | 按 `JS_REVERSE_TOOL_PROFILE` 或 query 过滤 |
-| GET | `/tools/:name` | — | `ToolMeta` | 单工具 schema/元数据；404 若不存在 |
-| POST | `/sessions` | body 可选 `{name?}` | `{sessionId, createdAt}` | 创建会话 |
-| GET | `/sessions` | — | `{sessions: SessionSummary[]}` | 列举活跃会话 |
-| DELETE | `/sessions/:id` | — | `{deleted:true}` | 销毁会话（清理其 hook/任务态） |
-| POST | `/sessions/:id/invoke` | body `{tool:string, params?:object}` | `202` + `{jobId, sessionId, status:'pending'}` | 提交异步 Job（立即返回，结果轮询 `/jobs/:id`） |
-| GET | `/jobs/:id` | — | `JobStatus`（见 §5.2） | 轮询任务状态/结果 |
-| WS | `/sessions/:id/stream` | — | 事件流 | 订阅该会话的 `hook.sample` / `log` / `job` 事件（按 sessionId 过滤） |
+| 方法   | 路径                   | 请求                                 | 响应                                            | 说明                                                                 |
+| ------ | ---------------------- | ------------------------------------ | ----------------------------------------------- | -------------------------------------------------------------------- |
+| GET    | `/health`              | —                                    | `{status:'ok', version, uptimeMs, browserMode}` | 存活探针                                                             |
+| GET    | `/tools`               | `?profile=`(可选)                    | `{tools: ToolMeta[]}`                           | 按 `JS_REVERSE_TOOL_PROFILE` 或 query 过滤                           |
+| GET    | `/tools/:name`         | —                                    | `ToolMeta`                                      | 单工具 schema/元数据；404 若不存在                                   |
+| POST   | `/sessions`            | body 可选 `{name?}`                  | `{sessionId, createdAt}`                        | 创建会话                                                             |
+| GET    | `/sessions`            | —                                    | `{sessions: SessionSummary[]}`                  | 列举活跃会话                                                         |
+| DELETE | `/sessions/:id`        | —                                    | `{deleted:true}`                                | 销毁会话（清理其 hook/任务态）                                       |
+| POST   | `/sessions/:id/invoke` | body `{tool:string, params?:object}` | `202` + `{jobId, sessionId, status:'pending'}`  | 提交异步 Job（立即返回，结果轮询 `/jobs/:id`）                       |
+| GET    | `/jobs/:id`            | —                                    | `JobStatus`（见 §5.2）                          | 轮询任务状态/结果                                                    |
+| WS     | `/sessions/:id/stream` | —                                    | 事件流                                          | 订阅该会话的 `hook.sample` / `log` / `job` 事件（按 sessionId 过滤） |
 
 - 路由实现从 `getToolMeta(name)` 同步取得 `ToolMeta`，调用 `toolAdapter.executeTool(meta, params, sessionId)` 执行（见 §5.1）。
 - 所有 `/api/v1` 接口返回 `application/json`；错误统一 JSON 结构 `{error:{code,message,details?}}`（见 §6）。
@@ -103,6 +108,7 @@
 ## 5. 会话与任务模型
 
 ### 5.1 工具执行入口
+
 在 `ToolAdapter` 新增公共方法，复用其已有的 `pipeline` 实例：
 
 ```ts
@@ -124,6 +130,7 @@ async executeTool(
 - `getToolMeta(name)` 同步返回含 `modulePath`/`handlerName` 的 `ToolMeta`，正是 `pipeline` 所需。
 
 ### 5.2 异步 Job 模型（内存）
+
 新增 `src/worker/JobStore.ts`：
 
 ```ts
@@ -134,8 +141,8 @@ interface Job {
   params: Record<string, unknown>;
   status: 'pending' | 'running' | 'done' | 'failed';
   result?: unknown;
-  error?: { code: string; message: string };
-  logs: string[];        // 执行期可选日志（来自 eventBus / console）
+  error?: {code: string; message: string};
+  logs: string[]; // 执行期可选日志（来自 eventBus / console）
   createdAt: string;
   finishedAt?: string;
 }
@@ -147,6 +154,7 @@ interface Job {
 - 游标：`jobId` 用 `job_<base36时间戳>_<random>` 生成。
 
 ### 5.3 会话与状态隔离（已确认决策）
+
 - **v1：共享单例浏览器**，`sessionId` 作为**逻辑命名空间**，用于隔离 hook 配置与逆向任务态。
 - 实现：`contextProvider.setActiveSession(id)` 在执行前后设置/清除；`HookManager` / `ReverseTaskStore` 读取当前 active session 作为 key 前缀。
 - **已知限制**：若这些存储当前尚未 session-aware，v1 会话仍提供 Job 隔离与流订阅作用域，完整 hook/任务态隔离列为后续扩展（不阻塞本设计落地）。
@@ -156,15 +164,15 @@ interface Job {
 
 ## 6. 错误处理
 
-| 场景 | HTTP 状态 | 结构 |
-|---|---|---|
-| 工具不存在 | `404` | `{error:{code:'TOOL_NOT_FOUND',message}}` |
-| 参数校验失败（zod） | `400` | `{error:{code:'VALIDATION',message,details: <zod 错误>}}` |
-| 会话不存在 | `404` | `{error:{code:'SESSION_NOT_FOUND'}}` |
-| Job 不存在 | `404` | `{error:{code:'JOB_NOT_FOUND'}}` |
-| 缺少/错误 Token（受保护路由） | `401` | `{error:{code:'UNAUTHORIZED'}}` |
-| 执行期异常 | 提交时 `202`；结果经 `GET /jobs/:id` 返回 `status:'failed'` + `error` | `JobStatus` |
-| 服务器未启动 | CLI 侧捕获 ECONNREFUSED → 提示 “worker 是否运行？请先启动 js-reverse-worker” | — |
+| 场景                          | HTTP 状态                                                                    | 结构                                                      |
+| ----------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------- |
+| 工具不存在                    | `404`                                                                        | `{error:{code:'TOOL_NOT_FOUND',message}}`                 |
+| 参数校验失败（zod）           | `400`                                                                        | `{error:{code:'VALIDATION',message,details: <zod 错误>}}` |
+| 会话不存在                    | `404`                                                                        | `{error:{code:'SESSION_NOT_FOUND'}}`                      |
+| Job 不存在                    | `404`                                                                        | `{error:{code:'JOB_NOT_FOUND'}}`                          |
+| 缺少/错误 Token（受保护路由） | `401`                                                                        | `{error:{code:'UNAUTHORIZED'}}`                           |
+| 执行期异常                    | 提交时 `202`；结果经 `GET /jobs/:id` 返回 `status:'failed'` + `error`        | `JobStatus`                                               |
+| 服务器未启动                  | CLI 侧捕获 ECONNREFUSED → 提示 “worker 是否运行？请先启动 js-reverse-worker” | —                                                         |
 
 - Worker 内部异常统一经 `ToolError` 包装（已有 `createToolError` / `ErrorCodes`），写入 `job.error` 后由轮询接口返回，避免长连接中断导致结果丢失。
 - CLI 连接拒绝时给出可操作的提示，而非裸堆栈。
@@ -183,6 +191,7 @@ interface Job {
 ## 8. CLI（客户端）设计
 
 ### 8.1 新增 `src/cli/WorkerHttpClient.ts`
+
 - 配置：`WORKER_URL`（默认 `http://127.0.0.1:8765`）、`WORKER_API_TOKEN`、`WORKER_TIMEOUT_MS`（默认 300s）、`WORKER_POLL_MS`（默认 300ms）。
 - **两套接口并存**（request-response 对 CLI 透明）：
   - **底层原语**（供其他客户端/测试直接使用）：`submitInvoke(sessionId, tool, params)` → 返回 `jobId`；`getJob(id)` → 轮询 `JobStatus`；`openStream(sessionId, onEvent)`（WebSocket）。
@@ -192,13 +201,14 @@ interface Job {
 - 自动附带 `Authorization: Bearer` 头（若 token 已配置）。
 
 ### 8.2 命令改造（复用现有 `src/cli/args-parser.ts`、`tool-args.ts` 的参数解析与类型强制）
-| 命令 | 行为 |
-|---|---|
+
+| 命令                    | 行为                                                                                                                                                                                                                                                                                 |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `call <tool> [args...]` | 解析参数（flags > `--data` > `--file` > `--stdin`，含 zod 类型强制）→ 取/建 session（`--session <id>` 或自动建）→ **`await httpClient.invoke(sessionId, tool, params)`**（内部封装提交+轮询，对命令代码即 request-response）→ 打印结果；`--watch` 额外开 `openStream` 订阅该会话事件 |
-| `list-tools` | `GET /tools` |
-| `sessions` | `POST`（新建）/ `GET`（列举）/ `DELETE <id>`（销毁） |
-| `status` | `GET /health` |
-| `start` / `stop` | **不再 spawn 远程 worker**。改为本地便捷启动 `js-reverse-worker` 进程（不带 Sekiro）供开发用；生产文档明确 worker 作为独立服务运行（systemd / docker / 反向代理） |
+| `list-tools`            | `GET /tools`                                                                                                                                                                                                                                                                         |
+| `sessions`              | `POST`（新建）/ `GET`（列举）/ `DELETE <id>`（销毁）                                                                                                                                                                                                                                 |
+| `status`                | `GET /health`                                                                                                                                                                                                                                                                        |
+| `start` / `stop`        | **不再 spawn 远程 worker**。改为本地便捷启动 `js-reverse-worker` 进程（不带 Sekiro）供开发用；生产文档明确 worker 作为独立服务运行（systemd / docker / 反向代理）                                                                                                                    |
 
 - 移除 `src/cli/sekiro-invoker.ts` 在 CLI 主路径的引用（保留文件，见 §7）。
 

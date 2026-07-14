@@ -37,4 +37,3 @@ export interface AggregatedIssue {
 }
 
 export type Issue = unknown;
-

@@ -4,18 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { CryptoDetector } from '../../../src/modules/crypto/CryptoDetector.js';
+import {CryptoDetector} from '../../../src/modules/crypto/CryptoDetector.js';
 
 interface LLMServiceLike {
-  generateCryptoDetectionPrompt(code: string): Array<{ role: string; content: string }>;
-  chat(messages: unknown[]): Promise<{ content: string }>;
+  generateCryptoDetectionPrompt(
+    code: string,
+  ): Array<{role: string; content: string}>;
+  chat(messages: unknown[]): Promise<{content: string}>;
 }
 
 interface CryptoDetectorHarness {
-  detect(options: { code: string; useAI: boolean }): Promise<{
-    algorithms: Array<{ name: string; confidence: number }>;
+  detect(options: {code: string; useAI: boolean}): Promise<{
+    algorithms: Array<{name: string; confidence: number}>;
   }>;
   detectLibraries(code: string): unknown[];
   detectByKeywords(code: string): unknown[];
@@ -24,10 +26,10 @@ interface CryptoDetectorHarness {
       name: string;
       type: string;
       confidence: number;
-      location: { file: string; line: number };
+      location: {file: string; line: number};
       usage: string;
     }>,
-  ): Array<{ confidence: number }>;
+  ): Array<{confidence: number}>;
   detectByAI(code: string): Promise<unknown[]>;
   escapeRegex(input: string): string;
   findLineNumber(code: string, needle: string): number;
@@ -45,8 +47,8 @@ interface CryptoDetectorPublicHarness {
 describe('CryptoDetector extended', () => {
   it('covers load/export rules and keyword/library detection paths', async () => {
     const llm = {
-      generateCryptoDetectionPrompt: () => [{ role: 'user', content: 'crypto' }],
-      chat: async () => ({ content: '{"algorithms":[]}' }),
+      generateCryptoDetectionPrompt: () => [{role: 'user', content: 'crypto'}],
+      chat: async () => ({content: '{"algorithms":[]}'}),
     } satisfies LLMServiceLike;
     const detector = new CryptoDetector(
       llm as unknown as ConstructorParameters<typeof CryptoDetector>[0],
@@ -65,16 +67,19 @@ describe('CryptoDetector extended', () => {
     );
     assert.ok(libs.length >= 1);
 
-    const kws = detectorInternals.detectByKeywords('AES.encrypt(x); CBC; PKCS7;');
+    const kws = detectorInternals.detectByKeywords(
+      'AES.encrypt(x); CBC; PKCS7;',
+    );
     // mode/padding 关键词会被跳过，算法关键词应仍可命中
     assert.ok(Array.isArray(kws));
   });
 
   it('covers detect useAI true/false and merge ordering', async () => {
     const llm = {
-      generateCryptoDetectionPrompt: () => [{ role: 'user', content: 'crypto' }],
+      generateCryptoDetectionPrompt: () => [{role: 'user', content: 'crypto'}],
       chat: async () => ({
-        content: '{"algorithms":[{"name":"CustomAES","type":"symmetric","confidence":0.9,"usage":"x"}]}',
+        content:
+          '{"algorithms":[{"name":"CustomAES","type":"symmetric","confidence":0.9,"usage":"x"}]}',
       }),
     } satisfies LLMServiceLike;
     const detector = new CryptoDetector(
@@ -91,12 +96,30 @@ describe('CryptoDetector extended', () => {
       code: 'const h = md5(x); const x = CryptoJS.AES.encrypt(a,b);',
       useAI: true,
     });
-    assert.ok(withAI.algorithms.some((a) => a.name === 'CustomAES'));
+    assert.ok(withAI.algorithms.some(a => a.name === 'CustomAES'));
 
     const merged = detector.mergeResults([
-      { name: 'A', type: 'hash', confidence: 0.5, location: { file: 'current', line: 1 }, usage: '' },
-      { name: 'A', type: 'hash', confidence: 0.9, location: { file: 'current', line: 2 }, usage: '' },
-      { name: 'B', type: 'hash', confidence: 0.6, location: { file: 'current', line: 3 }, usage: '' },
+      {
+        name: 'A',
+        type: 'hash',
+        confidence: 0.5,
+        location: {file: 'current', line: 1},
+        usage: '',
+      },
+      {
+        name: 'A',
+        type: 'hash',
+        confidence: 0.9,
+        location: {file: 'current', line: 2},
+        usage: '',
+      },
+      {
+        name: 'B',
+        type: 'hash',
+        confidence: 0.6,
+        location: {file: 'current', line: 3},
+        usage: '',
+      },
     ]);
     assert.strictEqual(merged[0]?.confidence, 0.9);
   });
@@ -104,7 +127,7 @@ describe('CryptoDetector extended', () => {
   it('covers AI parser fallback branches and helper methods', async () => {
     const llmNoJson = {
       generateCryptoDetectionPrompt: () => [],
-      chat: async () => ({ content: 'no-json-content' }),
+      chat: async () => ({content: 'no-json-content'}),
     } satisfies LLMServiceLike;
     const detector1 = new CryptoDetector(
       llmNoJson as unknown as ConstructorParameters<typeof CryptoDetector>[0],
@@ -113,7 +136,7 @@ describe('CryptoDetector extended', () => {
 
     const llmBadShape = {
       generateCryptoDetectionPrompt: () => [],
-      chat: async () => ({ content: '{"algorithms":{}}' }),
+      chat: async () => ({content: '{"algorithms":{}}'}),
     } satisfies LLMServiceLike;
     const detector2 = new CryptoDetector(
       llmBadShape as unknown as ConstructorParameters<typeof CryptoDetector>[0],
@@ -139,7 +162,7 @@ describe('CryptoDetector extended', () => {
   it('covers detect catch path when rule manager throws', async () => {
     const llm = {
       generateCryptoDetectionPrompt: () => [],
-      chat: async () => ({ content: '{"algorithms":[]}' }),
+      chat: async () => ({content: '{"algorithms":[]}'}),
     } satisfies LLMServiceLike;
     const detector = new CryptoDetector(
       llm as unknown as ConstructorParameters<typeof CryptoDetector>[0],
@@ -151,11 +174,8 @@ describe('CryptoDetector extended', () => {
       getLibraryRules: () => [],
     };
 
-    await assert.rejects(
-      async () => {
-        await detector.detect({ code: 'const x=1', useAI: false });
-      },
-      /rules boom/,
-    );
+    await assert.rejects(async () => {
+      await detector.detect({code: 'const x=1', useAI: false});
+    }, /rules boom/);
   });
 });

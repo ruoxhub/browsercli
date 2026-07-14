@@ -328,14 +328,14 @@ Observe → Capture → Rebuild → Patch → PureExtraction → Port
 
 该文档是 6 阶段工作流的唯一权威来源。以下为本阶段快速参考：
 
-| 阶段 | 一句话目标 | 完成判据 |
-|------|-----------|---------|
-| 1. Observe | 确认目标请求、脚本、触发动作 | 能回答"请求谁发起、哪段脚本参与、如何触发" |
-| 2. Capture | Hook 采样运行时数据 | 至少一条可复用的真实运行样本 |
-| 3. Rebuild | 导出本地可运行 Node 工程 | 本地有稳定复现入口，能看到运行错误 |
-| 4. Patch | 按 first divergence 驱动补环境 | env rebuild 稳定跑通，服务端验收通过 |
-| 5. PureExtraction | 分离环境噪音和算法输入 | Node pure implementation 与 fixture 对齐 |
-| 6. Port | 迁移到 Python 或其他宿主 | 外部语言版本与 Node pure 对齐 |
+| 阶段              | 一句话目标                     | 完成判据                                   |
+| ----------------- | ------------------------------ | ------------------------------------------ |
+| 1. Observe        | 确认目标请求、脚本、触发动作   | 能回答"请求谁发起、哪段脚本参与、如何触发" |
+| 2. Capture        | Hook 采样运行时数据            | 至少一条可复用的真实运行样本               |
+| 3. Rebuild        | 导出本地可运行 Node 工程       | 本地有稳定复现入口，能看到运行错误         |
+| 4. Patch          | 按 first divergence 驱动补环境 | env rebuild 稳定跑通，服务端验收通过       |
+| 5. PureExtraction | 分离环境噪音和算法输入         | Node pure implementation 与 fixture 对齐   |
+| 6. Port           | 迁移到 Python 或其他宿主       | 外部语言版本与 Node pure 对齐              |
 
 ---
 

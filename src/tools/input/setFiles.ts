@@ -22,9 +22,7 @@ export const setFiles = defineTool({
   },
   schema: {
     selector: zod.string().describe('CSS 选择器（file input 元素）。'),
-    filePaths: zod
-      .array(zod.string())
-      .describe('文件绝对路径列表。'),
+    filePaths: zod.array(zod.string()).describe('文件绝对路径列表。'),
   },
   handler: async (request, response, context) => {
     const {selector, filePaths} = request.params;

@@ -19,83 +19,83 @@
 
 ## 工具读写契约（全量）
 
-| Tool | Read Sources | Write Sources | Canonical Store |
-|---|---|---|---|
-| `analyze_target` | `runtime.collector` + `runtime.hookManager` + 代码文本 | 分析结果；部分工具写 task artifact | HookManager / Artifacts |
-| `deobfuscate_code` | `runtime.collector` + `runtime.hookManager` + 代码文本 | 分析结果；部分工具写 task artifact | HookManager / Artifacts |
-| `detect_crypto` | `runtime.collector` + `runtime.hookManager` + 代码文本 | 分析结果；部分工具写 task artifact | HookManager / Artifacts |
-| `export_session_report` | `hookManager.getAllKnownHookIds()` + `getRecords()` | Response report | HookManager |
-| `record_reverse_evidence` | 请求参数 + 当前上下文 | task artifact 文件 | `artifacts/tasks/*` |
-| `risk_panel` | `hookManager.getAllKnownHookIds()` + `getRecords()` | Response report | HookManager |
-| `summarize_code` | `runtime.collector` + `runtime.hookManager` + 代码文本 | 分析结果；部分工具写 task artifact | HookManager / Artifacts |
-| `understand_code` | `runtime.collector` + `runtime.hookManager` + 代码文本 | 分析结果；部分工具写 task artifact | HookManager / Artifacts |
-| `collect_code` | `runtime.collector` + 页面脚本/网络 | `runtime.collector` 缓存 | Collector Cache / UnifiedCache |
-| `collection_diff` | `runtime.collector` + 页面脚本/网络 | `runtime.collector` 缓存 | Collector Cache / UnifiedCache |
-| `search_in_scripts` | `runtime.collector` + 页面脚本/网络 | `runtime.collector` 缓存 | Collector Cache / UnifiedCache |
-| `get_console_message` | Console 缓存 | Response attach only | CDP Console |
-| `list_console_messages` | Console 缓存 | Response attach only | CDP Console |
-| `break_on_xhr` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `evaluate_on_callframe` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `find_in_script` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `get_paused_info` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `get_request_initiator` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `get_script_source` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `get_storage` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `hook_function` | 目标函数调用上下文 | `__mcp_hooks__` + `__hookStore[hookId]` | `__hookStore`（唯一数据面） |
-| `inspect_object` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `list_breakpoints` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `list_hooks` | `__mcp_hooks__` | - | `__mcp_hooks__` |
-| `list_scripts` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `monitor_events` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `pause` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `remove_breakpoint` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `remove_xhr_breakpoint` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `resume` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `search_in_sources` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `set_breakpoint` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `set_breakpoint_on_text` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `step_into` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `step_out` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `step_over` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `stop_monitor` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `trace_function` | DebuggerManager + Page Runtime | 断点/XHR 规则/页面注入状态 | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
-| `unhook_function` | `__mcp_hooks__` | 恢复原函数并删除 `__mcp_hooks__[hookId]` | `__mcp_hooks__` |
-| `find_clickable_elements` | DOM Runtime | Response only | - |
-| `get_dom_structure` | DOM Runtime | Response only | - |
-| `query_dom` | DOM Runtime | Response only | - |
-| `list_frames` | Frame 列表 | selected frame | Runtime selectedFrame |
-| `select_frame` | Frame 列表 | selected frame | Runtime selectedFrame |
-| `create_hook` | `window.__hookStore` + `runtime.hookManager` | `runtime.hookManager`（同步后） | `__hookStore` / HookManager |
-| `get_hook_data` | `__hookStore` -> `hookManager` | `hookManager` 同步数据 | `__hookStore` / HookManager |
-| `inject_hook` | `window.__hookStore` + `runtime.hookManager` | `runtime.hookManager`（同步后） | `__hookStore` / HookManager |
-| `remove_hook` | `window.__hookStore` + `runtime.hookManager` | `runtime.hookManager`（同步后） | `__hookStore` / HookManager |
-| `get_network_request` | Network 面板缓存 | Response attach only | CDP Network |
-| `list_network_requests` | Network 面板缓存 | Response attach only | CDP Network |
-| `check_browser_health` | PageController + 浏览器会话状态 | SessionState 快照/恢复 | In-memory SessionState |
-| `click_element` | PageController + 浏览器会话状态 | SessionState 快照/恢复 | In-memory SessionState |
-| `delete_session_state` | SessionState 管理器 | SessionState 管理器 | In-memory SessionState |
-| `dump_session_state` | SessionState 管理器 | SessionState 管理器 | In-memory SessionState |
-| `get_performance_metrics` | PageController + 浏览器会话状态 | SessionState 快照/恢复 | In-memory SessionState |
-| `list_session_states` | SessionState 管理器 | SessionState 管理器 | In-memory SessionState |
-| `load_session_state` | SessionState 管理器 | SessionState 管理器 | In-memory SessionState |
-| `restore_session_state` | SessionState 管理器 | SessionState 管理器 | In-memory SessionState |
-| `save_session_state` | SessionState 管理器 | SessionState 管理器 | In-memory SessionState |
-| `type_text` | PageController + 浏览器会话状态 | SessionState 快照/恢复 | In-memory SessionState |
-| `wait_for_element` | PageController + 浏览器会话状态 | SessionState 快照/恢复 | In-memory SessionState |
-| `list_pages` | BrowserManager pages | 当前页选择/导航 | BrowserManager currentPage |
-| `navigate_page` | BrowserManager pages | 当前页选择/导航 | BrowserManager currentPage |
-| `new_page` | BrowserManager pages | 当前页选择/导航 | BrowserManager currentPage |
-| `select_page` | BrowserManager pages | 当前页选择/导航 | BrowserManager currentPage |
-| `diff_env_requirements` | 运行时失败信息 + 页面能力 + 证据输入（辅助补环境，不替代代理日志） | rebuild bundle/task artifacts | Artifacts |
-| `export_rebuild_bundle` | 请求参数 + 当前上下文 | task artifact 文件 | `artifacts/tasks/*` |
-| `take_screenshot` | 页面/元素渲染 | 截图文件或响应附件 | filesystem(optional) |
-| `evaluate_script` | 当前 frame runtime | 页面注入脚本 | PreloadScript Registry |
-| `inject_preload_script` | 当前 frame runtime | 页面注入脚本 | PreloadScript Registry |
-| `inject_stealth` | Stealth 配置 | 页面 stealth 注入 / UA | Stealth Runtime |
-| `list_stealth_features` | Stealth 配置 | 页面 stealth 注入 / UA | Stealth Runtime |
-| `list_stealth_presets` | Stealth 配置 | 页面 stealth 注入 / UA | Stealth Runtime |
-| `set_user_agent` | Stealth 配置 | 页面 stealth 注入 / UA | Stealth Runtime |
-| `analyze_websocket_messages` | WebSocket 帧缓存 | Response attach only | CDP WebSocket |
-| `get_websocket_message` | WebSocket 帧缓存 | Response attach only | CDP WebSocket |
-| `get_websocket_messages` | WebSocket 帧缓存 | Response attach only | CDP WebSocket |
-| `list_websocket_connections` | WebSocket 帧缓存 | Response attach only | CDP WebSocket |
+| Tool                         | Read Sources                                                       | Write Sources                            | Canonical Store                                      |
+| ---------------------------- | ------------------------------------------------------------------ | ---------------------------------------- | ---------------------------------------------------- |
+| `analyze_target`             | `runtime.collector` + `runtime.hookManager` + 代码文本             | 分析结果；部分工具写 task artifact       | HookManager / Artifacts                              |
+| `deobfuscate_code`           | `runtime.collector` + `runtime.hookManager` + 代码文本             | 分析结果；部分工具写 task artifact       | HookManager / Artifacts                              |
+| `detect_crypto`              | `runtime.collector` + `runtime.hookManager` + 代码文本             | 分析结果；部分工具写 task artifact       | HookManager / Artifacts                              |
+| `export_session_report`      | `hookManager.getAllKnownHookIds()` + `getRecords()`                | Response report                          | HookManager                                          |
+| `record_reverse_evidence`    | 请求参数 + 当前上下文                                              | task artifact 文件                       | `artifacts/tasks/*`                                  |
+| `risk_panel`                 | `hookManager.getAllKnownHookIds()` + `getRecords()`                | Response report                          | HookManager                                          |
+| `summarize_code`             | `runtime.collector` + `runtime.hookManager` + 代码文本             | 分析结果；部分工具写 task artifact       | HookManager / Artifacts                              |
+| `understand_code`            | `runtime.collector` + `runtime.hookManager` + 代码文本             | 分析结果；部分工具写 task artifact       | HookManager / Artifacts                              |
+| `collect_code`               | `runtime.collector` + 页面脚本/网络                                | `runtime.collector` 缓存                 | Collector Cache / UnifiedCache                       |
+| `collection_diff`            | `runtime.collector` + 页面脚本/网络                                | `runtime.collector` 缓存                 | Collector Cache / UnifiedCache                       |
+| `search_in_scripts`          | `runtime.collector` + 页面脚本/网络                                | `runtime.collector` 缓存                 | Collector Cache / UnifiedCache                       |
+| `get_console_message`        | Console 缓存                                                       | Response attach only                     | CDP Console                                          |
+| `list_console_messages`      | Console 缓存                                                       | Response attach only                     | CDP Console                                          |
+| `break_on_xhr`               | DebuggerManager + Page Runtime                                     | 断点/XHR 规则/页面注入状态               | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `evaluate_on_callframe`      | DebuggerManager + Page Runtime                                     | 断点/XHR 规则/页面注入状态               | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `find_in_script`             | DebuggerManager + Page Runtime                                     | 断点/XHR 规则/页面注入状态               | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `get_paused_info`            | DebuggerManager + Page Runtime                                     | 断点/XHR 规则/页面注入状态               | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `get_request_initiator`      | DebuggerManager + Page Runtime                                     | 断点/XHR 规则/页面注入状态               | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `get_script_source`          | DebuggerManager + Page Runtime                                     | 断点/XHR 规则/页面注入状态               | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `get_storage`                | DebuggerManager + Page Runtime                                     | 断点/XHR 规则/页面注入状态               | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `hook_function`              | 目标函数调用上下文                                                 | `__mcp_hooks__` + `__hookStore[hookId]`  | `__hookStore`（唯一数据面）                          |
+| `inspect_object`             | DebuggerManager + Page Runtime                                     | 断点/XHR 规则/页面注入状态               | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `list_breakpoints`           | DebuggerManager + Page Runtime                                     | 断点/XHR 规则/页面注入状态               | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `list_hooks`                 | `__mcp_hooks__`                                                    | -                                        | `__mcp_hooks__`                                      |
+| `list_scripts`               | DebuggerManager + Page Runtime                                     | 断点/XHR 规则/页面注入状态               | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `monitor_events`             | DebuggerManager + Page Runtime                                     | 断点/XHR 规则/页面注入状态               | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `pause`                      | DebuggerManager + Page Runtime                                     | 断点/XHR 规则/页面注入状态               | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `remove_breakpoint`          | DebuggerManager + Page Runtime                                     | 断点/XHR 规则/页面注入状态               | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `remove_xhr_breakpoint`      | DebuggerManager + Page Runtime                                     | 断点/XHR 规则/页面注入状态               | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `resume`                     | DebuggerManager + Page Runtime                                     | 断点/XHR 规则/页面注入状态               | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `search_in_sources`          | DebuggerManager + Page Runtime                                     | 断点/XHR 规则/页面注入状态               | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `set_breakpoint`             | DebuggerManager + Page Runtime                                     | 断点/XHR 规则/页面注入状态               | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `set_breakpoint_on_text`     | DebuggerManager + Page Runtime                                     | 断点/XHR 规则/页面注入状态               | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `step_into`                  | DebuggerManager + Page Runtime                                     | 断点/XHR 规则/页面注入状态               | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `step_out`                   | DebuggerManager + Page Runtime                                     | 断点/XHR 规则/页面注入状态               | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `step_over`                  | DebuggerManager + Page Runtime                                     | 断点/XHR 规则/页面注入状态               | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `stop_monitor`               | DebuggerManager + Page Runtime                                     | 断点/XHR 规则/页面注入状态               | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `trace_function`             | DebuggerManager + Page Runtime                                     | 断点/XHR 规则/页面注入状态               | `__hookStore` / `__mcp_hooks__` / `__mcp_monitors__` |
+| `unhook_function`            | `__mcp_hooks__`                                                    | 恢复原函数并删除 `__mcp_hooks__[hookId]` | `__mcp_hooks__`                                      |
+| `find_clickable_elements`    | DOM Runtime                                                        | Response only                            | -                                                    |
+| `get_dom_structure`          | DOM Runtime                                                        | Response only                            | -                                                    |
+| `query_dom`                  | DOM Runtime                                                        | Response only                            | -                                                    |
+| `list_frames`                | Frame 列表                                                         | selected frame                           | Runtime selectedFrame                                |
+| `select_frame`               | Frame 列表                                                         | selected frame                           | Runtime selectedFrame                                |
+| `create_hook`                | `window.__hookStore` + `runtime.hookManager`                       | `runtime.hookManager`（同步后）          | `__hookStore` / HookManager                          |
+| `get_hook_data`              | `__hookStore` -> `hookManager`                                     | `hookManager` 同步数据                   | `__hookStore` / HookManager                          |
+| `inject_hook`                | `window.__hookStore` + `runtime.hookManager`                       | `runtime.hookManager`（同步后）          | `__hookStore` / HookManager                          |
+| `remove_hook`                | `window.__hookStore` + `runtime.hookManager`                       | `runtime.hookManager`（同步后）          | `__hookStore` / HookManager                          |
+| `get_network_request`        | Network 面板缓存                                                   | Response attach only                     | CDP Network                                          |
+| `list_network_requests`      | Network 面板缓存                                                   | Response attach only                     | CDP Network                                          |
+| `check_browser_health`       | PageController + 浏览器会话状态                                    | SessionState 快照/恢复                   | In-memory SessionState                               |
+| `click_element`              | PageController + 浏览器会话状态                                    | SessionState 快照/恢复                   | In-memory SessionState                               |
+| `delete_session_state`       | SessionState 管理器                                                | SessionState 管理器                      | In-memory SessionState                               |
+| `dump_session_state`         | SessionState 管理器                                                | SessionState 管理器                      | In-memory SessionState                               |
+| `get_performance_metrics`    | PageController + 浏览器会话状态                                    | SessionState 快照/恢复                   | In-memory SessionState                               |
+| `list_session_states`        | SessionState 管理器                                                | SessionState 管理器                      | In-memory SessionState                               |
+| `load_session_state`         | SessionState 管理器                                                | SessionState 管理器                      | In-memory SessionState                               |
+| `restore_session_state`      | SessionState 管理器                                                | SessionState 管理器                      | In-memory SessionState                               |
+| `save_session_state`         | SessionState 管理器                                                | SessionState 管理器                      | In-memory SessionState                               |
+| `type_text`                  | PageController + 浏览器会话状态                                    | SessionState 快照/恢复                   | In-memory SessionState                               |
+| `wait_for_element`           | PageController + 浏览器会话状态                                    | SessionState 快照/恢复                   | In-memory SessionState                               |
+| `list_pages`                 | BrowserManager pages                                               | 当前页选择/导航                          | BrowserManager currentPage                           |
+| `navigate_page`              | BrowserManager pages                                               | 当前页选择/导航                          | BrowserManager currentPage                           |
+| `new_page`                   | BrowserManager pages                                               | 当前页选择/导航                          | BrowserManager currentPage                           |
+| `select_page`                | BrowserManager pages                                               | 当前页选择/导航                          | BrowserManager currentPage                           |
+| `diff_env_requirements`      | 运行时失败信息 + 页面能力 + 证据输入（辅助补环境，不替代代理日志） | rebuild bundle/task artifacts            | Artifacts                                            |
+| `export_rebuild_bundle`      | 请求参数 + 当前上下文                                              | task artifact 文件                       | `artifacts/tasks/*`                                  |
+| `take_screenshot`            | 页面/元素渲染                                                      | 截图文件或响应附件                       | filesystem(optional)                                 |
+| `evaluate_script`            | 当前 frame runtime                                                 | 页面注入脚本                             | PreloadScript Registry                               |
+| `inject_preload_script`      | 当前 frame runtime                                                 | 页面注入脚本                             | PreloadScript Registry                               |
+| `inject_stealth`             | Stealth 配置                                                       | 页面 stealth 注入 / UA                   | Stealth Runtime                                      |
+| `list_stealth_features`      | Stealth 配置                                                       | 页面 stealth 注入 / UA                   | Stealth Runtime                                      |
+| `list_stealth_presets`       | Stealth 配置                                                       | 页面 stealth 注入 / UA                   | Stealth Runtime                                      |
+| `set_user_agent`             | Stealth 配置                                                       | 页面 stealth 注入 / UA                   | Stealth Runtime                                      |
+| `analyze_websocket_messages` | WebSocket 帧缓存                                                   | Response attach only                     | CDP WebSocket                                        |
+| `get_websocket_message`      | WebSocket 帧缓存                                                   | Response attach only                     | CDP WebSocket                                        |
+| `get_websocket_messages`     | WebSocket 帧缓存                                                   | Response attach only                     | CDP WebSocket                                        |
+| `list_websocket_connections` | WebSocket 帧缓存                                                   | Response attach only                     | CDP WebSocket                                        |

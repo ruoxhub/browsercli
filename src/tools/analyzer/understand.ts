@@ -13,7 +13,8 @@ import type {UnderstandCodeFnResult} from './types.js';
 
 export const understandCode = defineTool({
   name: 'understand_code',
-  description: 'Analyze code structure/business/security with AI + static analysis.',
+  description:
+    'Analyze code structure/business/security with AI + static analysis.',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
   schema: {
     code: zod.string(),
@@ -21,7 +22,9 @@ export const understandCode = defineTool({
   },
   handler: async (request, response) => {
     try {
-      const result = await getRuntime().analyzer.understand(request.params as any);
+      const result = await getRuntime().analyzer.understand(
+        request.params as any,
+      );
       response.setStructuredContent({
         success: true,
         message: 'Code analysis completed',

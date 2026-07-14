@@ -93,9 +93,7 @@ function coerceFlagValue(rawValue: string | boolean): unknown {
  *   --data '{"k":"v"}'          行内 JSON 参数包
  *   --stdin                     从 stdin 读取 JSON 参数（最低优先级）
  */
-export function buildToolArgs(
-  parsed: ParsedArgs,
-): Record<string, unknown> {
+export function buildToolArgs(parsed: ParsedArgs): Record<string, unknown> {
   const toolArgs: Record<string, unknown> = {};
 
   // 0. 最低优先级：--stdin（从 stdin 读取 JSON）

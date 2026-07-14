@@ -16,51 +16,51 @@
 
 ### P0 — Core Runtime
 
-| Action | File | Responsibility |
-|--------|------|---------------|
-| Create | `src/diagnostics/types.ts` | DiagnosticCheck, DiagnosticReport, DiagnosticStatus types |
-| Create | `src/diagnostics/environment.ts` | Environment check implementations (node, build, AI, artifacts) |
-| Create | `src/diagnostics/index.ts` | Re-export barrel |
-| Create | `src/tools/diagnostics/diagnoseEnvironment.ts` | `diagnose_environment` tool via `defineTool` |
-| Create | `src/tools/diagnostics/manifest.ts` | DomainManifest for diagnostics domain |
-| Create | `src/tools/diagnostics/index.ts` | Re-export barrel |
-| Create | `src/tools/diagnostics/types.ts` | Tool-specific types |
-| Create | `src/tools/shared/trace-output.ts` | TraceOutputMode resolution and traceId injection |
-| Modify | `src/tools/categories.ts` | Add `DIAGNOSTICS` enum value |
-| Modify | `src/cli/args-parser.ts` | Add `--traceOutput` CLI option |
-| Modify | `src/cli/commands/start.ts` | Pass traceOutput to worker config |
-| Create | `tests/unit/diagnostics/environment.test.ts` | Unit tests for diagnostics |
-| Create | `tests/unit/tools/shared/trace-output.test.ts` | Unit tests for trace output |
+| Action | File                                           | Responsibility                                                 |
+| ------ | ---------------------------------------------- | -------------------------------------------------------------- |
+| Create | `src/diagnostics/types.ts`                     | DiagnosticCheck, DiagnosticReport, DiagnosticStatus types      |
+| Create | `src/diagnostics/environment.ts`               | Environment check implementations (node, build, AI, artifacts) |
+| Create | `src/diagnostics/index.ts`                     | Re-export barrel                                               |
+| Create | `src/tools/diagnostics/diagnoseEnvironment.ts` | `diagnose_environment` tool via `defineTool`                   |
+| Create | `src/tools/diagnostics/manifest.ts`            | DomainManifest for diagnostics domain                          |
+| Create | `src/tools/diagnostics/index.ts`               | Re-export barrel                                               |
+| Create | `src/tools/diagnostics/types.ts`               | Tool-specific types                                            |
+| Create | `src/tools/shared/trace-output.ts`             | TraceOutputMode resolution and traceId injection               |
+| Modify | `src/tools/categories.ts`                      | Add `DIAGNOSTICS` enum value                                   |
+| Modify | `src/cli/args-parser.ts`                       | Add `--traceOutput` CLI option                                 |
+| Modify | `src/cli/commands/start.ts`                    | Pass traceOutput to worker config                              |
+| Create | `tests/unit/diagnostics/environment.test.ts`   | Unit tests for diagnostics                                     |
+| Create | `tests/unit/tools/shared/trace-output.test.ts` | Unit tests for trace output                                    |
 
 ### P1 — Agent Response Protocol
 
-| Action | File | Responsibility |
-|--------|------|---------------|
-| Create | `src/tools/shared/response-builder.ts` | Continuation types + builder functions (~630 lines) |
-| Modify | `src/reverse/ReverseTaskAdmin.ts` | Integrate `buildManageContinuation` |
-| Modify | `src/reverse/ReverseTaskOrchestrator.ts` | Integrate `buildOrchestrationContinuation` |
-| Modify | `src/reverse/ReverseAgentRunner.ts` | Integrate `compactAgentPayload` + `withSchemaVersion` |
-| Create | `docs/reference/manage-response.schema.json` | manage_reverse_task response schema |
-| Create | `docs/reference/orchestrate-response.schema.json` | orchestrate response schema |
-| Create | `docs/reference/rebuild-health-response.schema.json` | rebuild health response schema |
-| Create | `docs/reference/reverse-agent-response.schema.json` | run_reverse_agent response schema |
-| Create | `docs/reference/reverse-agent-schema-versioning.md` | Schema versioning strategy |
-| Create | `tests/unit/tools/shared/response-builder.test.ts` | Unit tests for response builder |
+| Action | File                                                 | Responsibility                                        |
+| ------ | ---------------------------------------------------- | ----------------------------------------------------- |
+| Create | `src/tools/shared/response-builder.ts`               | Continuation types + builder functions (~630 lines)   |
+| Modify | `src/reverse/ReverseTaskAdmin.ts`                    | Integrate `buildManageContinuation`                   |
+| Modify | `src/reverse/ReverseTaskOrchestrator.ts`             | Integrate `buildOrchestrationContinuation`            |
+| Modify | `src/reverse/ReverseAgentRunner.ts`                  | Integrate `compactAgentPayload` + `withSchemaVersion` |
+| Create | `docs/reference/manage-response.schema.json`         | manage_reverse_task response schema                   |
+| Create | `docs/reference/orchestrate-response.schema.json`    | orchestrate response schema                           |
+| Create | `docs/reference/rebuild-health-response.schema.json` | rebuild health response schema                        |
+| Create | `docs/reference/reverse-agent-response.schema.json`  | run_reverse_agent response schema                     |
+| Create | `docs/reference/reverse-agent-schema-versioning.md`  | Schema versioning strategy                            |
+| Create | `tests/unit/tools/shared/response-builder.test.ts`   | Unit tests for response builder                       |
 
 ### P2 — Knowledge & Documentation
 
-| Action | File | Responsibility |
-|--------|------|---------------|
-| Copy | `docs/knowledge/parameter-blueprints/` (13+ files) | Structured parameter blueprint library |
-| Create | `docs/guides/troubleshooting.md` | Troubleshooting guide |
-| Create | `docs/guides/reverse-task-orchestration.md` | Task orchestration guide |
-| Create | `docs/guides/mcp-agent-quick-reference.md` | Agent quick reference |
-| Create | `docs/guides/mcp-client-auto-resume-example.md` | Auto-resume examples |
-| Create | `docs/guides/client-system-prompt.md` | Client system prompt template |
-| Create | `docs/reference/pure-extraction.md` | Pure extraction phase guide |
-| Create | `docs/reference/parameter-blueprint-template.md` | Blueprint contribution template |
-| Create | `docs/reference/parameter-blueprint-contribution.md` | Blueprint contribution guide |
-| Modify | `docs/reference/tool-reference.md` | Add diagnose_environment docs |
+| Action | File                                                 | Responsibility                         |
+| ------ | ---------------------------------------------------- | -------------------------------------- |
+| Copy   | `docs/knowledge/parameter-blueprints/` (13+ files)   | Structured parameter blueprint library |
+| Create | `docs/guides/troubleshooting.md`                     | Troubleshooting guide                  |
+| Create | `docs/guides/reverse-task-orchestration.md`          | Task orchestration guide               |
+| Create | `docs/guides/mcp-agent-quick-reference.md`           | Agent quick reference                  |
+| Create | `docs/guides/mcp-client-auto-resume-example.md`      | Auto-resume examples                   |
+| Create | `docs/guides/client-system-prompt.md`                | Client system prompt template          |
+| Create | `docs/reference/pure-extraction.md`                  | Pure extraction phase guide            |
+| Create | `docs/reference/parameter-blueprint-template.md`     | Blueprint contribution template        |
+| Create | `docs/reference/parameter-blueprint-contribution.md` | Blueprint contribution guide           |
+| Modify | `docs/reference/tool-reference.md`                   | Add diagnose_environment docs          |
 
 ---
 
@@ -69,6 +69,7 @@
 ### Task 1: Diagnostic Types
 
 **Files:**
+
 - Create: `src/diagnostics/types.ts`
 
 - [ ] **Step 1: Create the types file**
@@ -112,6 +113,7 @@ git commit -m "feat(diagnostics): add diagnostic types"
 ### Task 2: Environment Diagnostics Module
 
 **Files:**
+
 - Create: `src/diagnostics/environment.ts`
 - Create: `src/diagnostics/index.ts`
 - Create: `tests/unit/diagnostics/environment.test.ts`
@@ -181,6 +183,7 @@ Expected: FAIL — module not found
 - [ ] **Step 3: Write the environment diagnostics implementation**
 
 Adapt from MCP's `diagnostics/environment.ts`. Key differences:
+
 - Use `resolvePackageRoot(import.meta.url)` from `src/utils/projectPaths.ts` instead of `getPackageRootDirectory()`
 - Use `resolveArtifactsTasksDirForPackageRoot()` from `src/utils/projectPaths.ts` instead of `getArtifactsDirectory()`
 - Build entry path is `build/src/bin/js-reverse.js` (not `build/src/index.js`)
@@ -197,7 +200,11 @@ import {
   resolveArtifactsTasksDirForPackageRoot,
 } from '../utils/projectPaths.js';
 
-import type {DiagnosticCheck, DiagnosticReport, DiagnosticStatus} from './types.js';
+import type {
+  DiagnosticCheck,
+  DiagnosticReport,
+  DiagnosticStatus,
+} from './types.js';
 
 function getNodeVersionStatus(version: string): DiagnosticCheck {
   const [major, minor] = version.replace(/^v/, '').split('.').map(Number);
@@ -222,7 +229,13 @@ function getNodeVersionStatus(version: string): DiagnosticCheck {
 }
 
 function getBuildOutputStatus(packageRoot: string): DiagnosticCheck {
-  const buildEntry = path.join(packageRoot, 'build', 'src', 'bin', 'js-reverse.js');
+  const buildEntry = path.join(
+    packageRoot,
+    'build',
+    'src',
+    'bin',
+    'js-reverse.js',
+  );
   const exists = existsSync(buildEntry);
   return {
     name: 'build_output',
@@ -230,7 +243,9 @@ function getBuildOutputStatus(packageRoot: string): DiagnosticCheck {
     reason: exists
       ? `Build entry exists at ${buildEntry}.`
       : `Build entry is missing at ${buildEntry}.`,
-    fix: exists ? 'No action required.' : 'Run `npm run build` before starting.',
+    fix: exists
+      ? 'No action required.'
+      : 'Run `npm run build` before starting.',
     details: {buildEntry},
   };
 }
@@ -292,7 +307,10 @@ function summarizeStatus(checks: DiagnosticCheck[]): DiagnosticStatus {
   return 'ok';
 }
 
-function buildSummary(checks: DiagnosticCheck[], status: DiagnosticStatus): string {
+function buildSummary(
+  checks: DiagnosticCheck[],
+  status: DiagnosticStatus,
+): string {
   const counts = checks.reduce(
     (acc, item) => {
       acc[item.status] += 1;
@@ -326,7 +344,11 @@ export function runEnvironmentDiagnostics(): DiagnosticReport {
 
 ```typescript
 // src/diagnostics/index.ts
-export type {DiagnosticCheck, DiagnosticReport, DiagnosticStatus} from './types.js';
+export type {
+  DiagnosticCheck,
+  DiagnosticReport,
+  DiagnosticStatus,
+} from './types.js';
 export {runEnvironmentDiagnostics} from './environment.js';
 ```
 
@@ -345,6 +367,7 @@ git commit -m "feat(diagnostics): add environment diagnostics module"
 ### Task 3: Add DIAGNOSTICS ToolCategory
 
 **Files:**
+
 - Modify: `src/tools/categories.ts`
 
 - [ ] **Step 1: Add the enum value and label**
@@ -374,6 +397,7 @@ git commit -m "feat(tools): add DIAGNOSTICS tool category"
 ### Task 4: diagnose_environment Tool
 
 **Files:**
+
 - Create: `src/tools/diagnostics/diagnoseEnvironment.ts`
 - Create: `src/tools/diagnostics/manifest.ts`
 - Create: `src/tools/diagnostics/index.ts`
@@ -390,7 +414,7 @@ export type {DiagnosticReport} from '../../diagnostics/types.js';
 
 - [ ] **Step 2: Create the tool implementation**
 
-```typescript
+````typescript
 // src/tools/diagnostics/diagnoseEnvironment.ts
 import {runEnvironmentDiagnostics} from '../../diagnostics/environment.js';
 import {zod} from '../../third_party/index.js';
@@ -430,7 +454,7 @@ export const diagnoseEnvironmentTool = defineTool({
     response.appendResponseLine('```');
   },
 });
-```
+````
 
 - [ ] **Step 3: Create the manifest**
 
@@ -479,6 +503,7 @@ git commit -m "feat(tools): add diagnose_environment tool"
 ### Task 5: Trace Output Module
 
 **Files:**
+
 - Create: `src/tools/shared/trace-output.ts`
 - Create: `tests/unit/tools/shared/trace-output.test.ts`
 
@@ -567,10 +592,7 @@ export function withOptionalTraceIdContent(
   if (mode !== 'all') {
     return content;
   }
-  return [
-    {type: 'text', text: JSON.stringify({traceId}, null, 2)},
-    ...content,
-  ];
+  return [{type: 'text', text: JSON.stringify({traceId}, null, 2)}, ...content];
 }
 ```
 
@@ -589,6 +611,7 @@ git commit -m "feat(tools): add trace output module"
 ### Task 6: CLI traceOutput Integration
 
 **Files:**
+
 - Modify: `src/cli/args-parser.ts`
 - Modify: `src/cli/commands/start.ts`
 
@@ -642,6 +665,7 @@ Expected: PASS
 ### Task 8: Response Builder Module
 
 **Files:**
+
 - Create: `src/tools/shared/response-builder.ts`
 - Create: `tests/unit/tools/shared/response-builder.test.ts`
 
@@ -772,6 +796,7 @@ git commit -m "feat(tools): add agent response builder protocol"
 ### Task 9: Integrate Response Builder into ReverseTaskAdmin
 
 **Files:**
+
 - Modify: `src/reverse/ReverseTaskAdmin.ts`
 
 - [ ] **Step 1: Read the current file to understand the return structure**
@@ -781,8 +806,13 @@ Run: Read `src/reverse/ReverseTaskAdmin.ts` to identify where manage_reverse_tas
 - [ ] **Step 2: Import and integrate continuation builder**
 
 Add import:
+
 ```typescript
-import {buildManageContinuation, compactManagePayload, buildTaskDiagnostics} from '../tools/shared/response-builder.js';
+import {
+  buildManageContinuation,
+  compactManagePayload,
+  buildTaskDiagnostics,
+} from '../tools/shared/response-builder.js';
 ```
 
 At the return point for each manage action, call `buildManageContinuation(action, payload, fallbackReason)` and merge the result into the response payload.
@@ -802,6 +832,7 @@ git commit -m "feat(reverse): integrate response builder into ReverseTaskAdmin"
 ### Task 10: Integrate Response Builder into ReverseTaskOrchestrator
 
 **Files:**
+
 - Modify: `src/reverse/ReverseTaskOrchestrator.ts`
 
 - [ ] **Step 1: Import buildOrchestrationContinuation**
@@ -829,17 +860,22 @@ git commit -m "feat(reverse): integrate response builder into orchestrator"
 ### Task 11: Integrate Response Builder into ReverseAgentRunner
 
 **Files:**
+
 - Modify: `src/reverse/ReverseAgentRunner.ts`
 
 - [ ] **Step 1: Import compactAgentPayload and withSchemaVersion**
 
 ```typescript
-import {compactAgentPayload, withSchemaVersion} from '../tools/shared/response-builder.js';
+import {
+  compactAgentPayload,
+  withSchemaVersion,
+} from '../tools/shared/response-builder.js';
 ```
 
 - [ ] **Step 2: Wrap agent output with schema version and compact mode**
 
 At the final return point, wrap the payload:
+
 ```typescript
 const compacted = compactAgentPayload(payload, outputMode);
 return withSchemaVersion(compacted);
@@ -860,6 +896,7 @@ git commit -m "feat(reverse): integrate response builder into agent runner"
 ### Task 12: Response Schema Documentation
 
 **Files:**
+
 - Create: `docs/reference/manage-response.schema.json`
 - Create: `docs/reference/orchestrate-response.schema.json`
 - Create: `docs/reference/rebuild-health-response.schema.json`
@@ -907,6 +944,7 @@ Expected: PASS
 ### Task 14: Parameter Blueprints Knowledge Base
 
 **Files:**
+
 - Copy: `docs/knowledge/parameter-blueprints/` (entire directory tree from MCP)
 
 **Reference:** `JSReverser-MCP/docs/knowledge/parameter-blueprints/`
@@ -937,6 +975,7 @@ git commit -m "docs: add parameter blueprints knowledge base"
 ### Task 15: Guides Documentation
 
 **Files:**
+
 - Create: `docs/guides/troubleshooting.md`
 - Create: `docs/guides/reverse-task-orchestration.md`
 - Create: `docs/guides/mcp-agent-quick-reference.md`
@@ -952,6 +991,7 @@ Copy the 5 guide files from `JSReverser-MCP/docs/guides/` to `docs/guides/`.
 - [ ] **Step 2: Adapt CLI-specific content**
 
 For each copied guide:
+
 - Replace `node build/src/index.js` with `node build/src/bin/js-reverse.js` where applicable
 - Add CLI command equivalents alongside MCP tool references
 - In `troubleshooting.md`, add a section about CLI worker issues (`js-reverse stop`, `js-reverse status`)
@@ -966,6 +1006,7 @@ git commit -m "docs: add guides from MCP with CLI adaptations"
 ### Task 16: Reference Documentation
 
 **Files:**
+
 - Create: `docs/reference/pure-extraction.md`
 - Create: `docs/reference/parameter-blueprint-template.md`
 - Create: `docs/reference/parameter-blueprint-contribution.md`
@@ -982,6 +1023,7 @@ Create `docs/reference/parameter-blueprint-contribution.md` based on the MCP pro
 - [ ] **Step 3: Update tool-reference.md**
 
 Add `diagnose_environment` tool documentation to `docs/reference/tool-reference.md`, including:
+
 - Tool name, description, and category
 - Parameter schema (optional `checks` array)
 - Example output

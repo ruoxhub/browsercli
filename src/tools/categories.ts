@@ -33,4 +33,3 @@ export const labels = {
   [ToolCategory.DATA]: 'Data',
   [ToolCategory.DIAGNOSTICS]: 'Diagnostics',
 };
-

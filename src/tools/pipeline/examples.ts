@@ -91,12 +91,19 @@ export const analyzePipeline = definePipeline({
       name: 'report',
       fn: async (ctx: PipelineContext) => {
         const prevSteps = ctx.steps;
-        const collectResult = prevSteps.collect?.data as Record<string, unknown> | undefined;
-        const analyzeData = (prevSteps.analyze?.data ?? {}) as Record<string, unknown>;
-        const cryptoResult = (analyzeData['analyze[0]'] as Record<string, unknown> | undefined)
-          ?.crypto as Record<string, unknown> | undefined;
-        const obfResult = (analyzeData['analyze[1]'] as Record<string, unknown> | undefined)
-          ?.obfuscation as Record<string, unknown> | undefined;
+        const collectResult = prevSteps.collect?.data as
+          | Record<string, unknown>
+          | undefined;
+        const analyzeData = (prevSteps.analyze?.data ?? {}) as Record<
+          string,
+          unknown
+        >;
+        const cryptoResult = (
+          analyzeData['analyze[0]'] as Record<string, unknown> | undefined
+        )?.crypto as Record<string, unknown> | undefined;
+        const obfResult = (
+          analyzeData['analyze[1]'] as Record<string, unknown> | undefined
+        )?.obfuscation as Record<string, unknown> | undefined;
 
         return {
           data: {

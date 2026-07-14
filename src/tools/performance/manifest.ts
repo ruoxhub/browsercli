@@ -11,9 +11,21 @@ export const manifest = {
   description: 'Performance trace and metrics tools.',
   profile: 'full',
   tools: [
-    {modulePath: './performance/startPerformanceTrace.js', handlerName: 'startPerformanceTrace'},
-    {modulePath: './performance/stopPerformanceTrace.js', handlerName: 'stopPerformanceTrace'},
-    {modulePath: './performance/getPerformanceMetrics.js', handlerName: 'getPerformanceMetrics'},
-    {modulePath: './performance/performanceAnalyzeInsight.js', handlerName: 'performanceAnalyzeInsight'},
+    {
+      modulePath: './performance/startPerformanceTrace.js',
+      handlerName: 'startPerformanceTrace',
+    },
+    {
+      modulePath: './performance/stopPerformanceTrace.js',
+      handlerName: 'stopPerformanceTrace',
+    },
+    {
+      modulePath: './performance/getPerformanceMetrics.js',
+      handlerName: 'getPerformanceMetrics',
+    },
+    {
+      modulePath: './performance/performanceAnalyzeInsight.js',
+      handlerName: 'performanceAnalyzeInsight',
+    },
   ],
 } satisfies DomainManifest;

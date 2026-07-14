@@ -24,7 +24,12 @@ export function generateTopLevelHelp(options?: {
   const bin = options?.bin ?? 'browsercli';
   const description = options?.description ?? '逆向工程CLI服务';
   const version = options?.version ?? '1.0.0';
-  const commands = options?.commands ?? ['call', 'list-tools', 'config', 'scaffold'];
+  const commands = options?.commands ?? [
+    'call',
+    'list-tools',
+    'config',
+    'scaffold',
+  ];
 
   const lines = [
     `\n  ${bin} v${version}`,
@@ -35,9 +40,7 @@ export function generateTopLevelHelp(options?: {
 
   for (const cmd of commands) {
     const desc = commandDescriptions[cmd];
-    lines.push(
-      desc ? `    ${cmd.padEnd(14)}${desc}` : `    ${cmd}`,
-    );
+    lines.push(desc ? `    ${cmd.padEnd(14)}${desc}` : `    ${cmd}`);
   }
 
   lines.push('');
@@ -75,11 +78,7 @@ export function generateCommandHelp(command: string): string | null {
   const help = helpMap[command];
   if (!help) return null;
 
-  return [
-    '',
-    `  Usage: ${help.usage}`,
-    '',
-    `  ${help.description}`,
-    '',
-  ].join('\n');
+  return ['', `  Usage: ${help.usage}`, '', `  ${help.description}`, ''].join(
+    '\n',
+  );
 }

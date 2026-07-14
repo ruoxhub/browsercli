@@ -13,8 +13,7 @@ import {defineTool, type Context} from '../ToolDefinition.js';
  */
 export const hover = defineTool({
   name: 'hover',
-  description:
-    'Hover the mouse over an element matched by CSS selector.',
+  description: 'Hover the mouse over an element matched by CSS selector.',
   annotations: {
     title: '悬停元素',
     category: ToolCategory.NAVIGATION,

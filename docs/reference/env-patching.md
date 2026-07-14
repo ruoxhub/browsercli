@@ -148,15 +148,15 @@
 
 ## 补丁判定表
 
-| 观测现象 | 常见缺口类型 | 推荐补法 | 不该做什么 |
-|---|---|---|---|
-| `navigator.userAgent`、`location.href` 这类读取返回 `undefined` | 基础值缺失 | 直接补最小常量值 | 不要顺手补整套 `navigator` / `location` 伪实现 |
-| `document.createElement is not a function` | 函数壳缺失 | 先用 `makeFunction("createElement")` 挂函数壳 | 不要直接补完整 DOM 实现 |
-| `Cannot read properties of undefined (reading 'style')` 且前一步刚调用了 `createElement()` | 返回对象结构缺失 | 给该函数补最小返回对象 | 不要把无关字段一并补全 |
-| `localStorage.getItem is not a function` | 宿主对象方法缺失 | 补 storage shim 的最小方法集 | 不要引入站点私有缓存值 |
-| 同一对象连续出现多个接口缺失，且都指向同一 first divergence | 最小对象契约缺失 | 一次补该对象的最小接口集 | 不要顺手扩成完整浏览器对象 |
-| `Illegal invocation` / brand check 失败 | 宿主建模方式错误 | 先修对象形态或 this 绑定，再决定是否补值 | 不要把 brand-sensitive 对象直接套 Proxy 乱包 |
-| `crypto.subtle` / `TextEncoder` 缺失 | 平台 API 缺失 | 补最小平台 API 外壳或 polyfill | 不要臆造算法结果 |
+| 观测现象                                                                                   | 常见缺口类型     | 推荐补法                                      | 不该做什么                                     |
+| ------------------------------------------------------------------------------------------ | ---------------- | --------------------------------------------- | ---------------------------------------------- |
+| `navigator.userAgent`、`location.href` 这类读取返回 `undefined`                            | 基础值缺失       | 直接补最小常量值                              | 不要顺手补整套 `navigator` / `location` 伪实现 |
+| `document.createElement is not a function`                                                 | 函数壳缺失       | 先用 `makeFunction("createElement")` 挂函数壳 | 不要直接补完整 DOM 实现                        |
+| `Cannot read properties of undefined (reading 'style')` 且前一步刚调用了 `createElement()` | 返回对象结构缺失 | 给该函数补最小返回对象                        | 不要把无关字段一并补全                         |
+| `localStorage.getItem is not a function`                                                   | 宿主对象方法缺失 | 补 storage shim 的最小方法集                  | 不要引入站点私有缓存值                         |
+| 同一对象连续出现多个接口缺失，且都指向同一 first divergence                                | 最小对象契约缺失 | 一次补该对象的最小接口集                      | 不要顺手扩成完整浏览器对象                     |
+| `Illegal invocation` / brand check 失败                                                    | 宿主建模方式错误 | 先修对象形态或 this 绑定，再决定是否补值      | 不要把 brand-sensitive 对象直接套 Proxy 乱包   |
+| `crypto.subtle` / `TextEncoder` 缺失                                                       | 平台 API 缺失    | 补最小平台 API 外壳或 polyfill                | 不要臆造算法结果                               |
 
 ## 负面示例
 

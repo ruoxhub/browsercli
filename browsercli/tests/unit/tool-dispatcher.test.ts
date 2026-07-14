@@ -42,7 +42,7 @@ class MockHttpClient extends WorkerHttpClient {
     super({baseUrl: 'http://127.0.0.1:8765'});
   }
 
-  async listTools(): Promise<{tools: unknown[]}> {
+  async listTools(): Promise<{tools: ToolMeta[]}> {
     this.listToolsCalls++;
     return {tools: this.tools};
   }

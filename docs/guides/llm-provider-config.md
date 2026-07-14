@@ -6,11 +6,11 @@
 
 ## 支持的 Provider
 
-| Provider | 环境变量前缀 | 默认模型 |
-|----------|-------------|---------|
-| OpenAI | `OPENAI_` | gpt-4o |
+| Provider  | 环境变量前缀 | 默认模型                   |
+| --------- | ------------ | -------------------------- |
+| OpenAI    | `OPENAI_`    | gpt-4o                     |
 | Anthropic | `ANTHROPIC_` | claude-3-5-sonnet-20241022 |
-| Gemini | `GEMINI_` | gemini-2.0-flash-exp |
+| Gemini    | `GEMINI_`    | gemini-2.0-flash-exp       |
 
 ## 核心配置
 
@@ -24,6 +24,7 @@ DEFAULT_LLM_PROVIDER=anthropic
 ### 2. 配置 API Key
 
 **OpenAI / Claude:**
+
 ```bash
 DEFAULT_LLM_PROVIDER=anthropic
 ANTHROPIC_API_KEY=sk-ant-xxxxxxxx
@@ -41,6 +42,7 @@ OPENAI_BASE_URL=  # 可选，如 https://api.proxy.com/v1
 **Gemini (两种模式):**
 
 模式 A - API 方式:
+
 ```bash
 DEFAULT_LLM_PROVIDER=gemini
 GEMINI_API_KEY=AIzaSyxxxxxxxxxx
@@ -48,6 +50,7 @@ GEMINI_MODEL=gemini-2.0-flash-exp
 ```
 
 模式 B - 本地 CLI 方式 (无需 API Key):
+
 ```bash
 DEFAULT_LLM_PROVIDER=gemini
 GEMINI_CLI_PATH=gemini-cli  # gemini-cli 命令路径
@@ -58,6 +61,7 @@ GEMINI_CLI_PATH=gemini-cli  # gemini-cli 命令路径
 ### 方式 1: MCP 客户端配置 (推荐)
 
 **Claude Code:**
+
 ```toml
 # ~/.claude/settings.toml
 [mcp_servers.js-reverse.env]
@@ -67,6 +71,7 @@ ANTHROPIC_MODEL = "claude-3-5-sonnet-20241022"
 ```
 
 **JSON 格式配置:**
+
 ```json
 {
   "mcpServers": {
@@ -218,7 +223,12 @@ npm run start -- --http --port 3000 \
   "mcpServers": {
     "js-reverse-http": {
       "command": "node",
-      "args": ["D:/JSReverser-MCP/build/src/index.js", "--http", "--port", "3000"],
+      "args": [
+        "D:/JSReverser-MCP/build/src/index.js",
+        "--http",
+        "--port",
+        "3000"
+      ],
       "env": {
         "DEFAULT_LLM_PROVIDER": "anthropic",
         "ANTHROPIC_API_KEY": "sk-ant-xxx",
@@ -233,12 +243,12 @@ npm run start -- --http --port 3000 \
 
 ### 代码理解/反混淆
 
-| 任务类型 | 推荐模型 | 说明 |
-|---------|---------|------|
-| 代码语义理解 | claude-3-5-sonnet | 代码理解能力最强 |
-| 复杂混淆还原 | claude-3-5-sonnet | 长上下文 + 强推理 |
-| 加密算法识别 | gpt-4o / claude-3-5-sonnet | 两者效果接近 |
-| 快速分析 | gemini-2.0-flash-exp | 速度快，成本低 |
+| 任务类型     | 推荐模型                   | 说明              |
+| ------------ | -------------------------- | ----------------- |
+| 代码语义理解 | claude-3-5-sonnet          | 代码理解能力最强  |
+| 复杂混淆还原 | claude-3-5-sonnet          | 长上下文 + 强推理 |
+| 加密算法识别 | gpt-4o / claude-3-5-sonnet | 两者效果接近      |
+| 快速分析     | gemini-2.0-flash-exp       | 速度快，成本低    |
 
 ### 模型配置参考
 

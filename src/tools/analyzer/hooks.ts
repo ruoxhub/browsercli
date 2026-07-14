@@ -6,7 +6,10 @@
 
 import type {HookPreset} from './types.js';
 
-const HOOK_TYPES_BY_PRESET: Record<Exclude<HookPreset, 'none'>, readonly string[]> = {
+const HOOK_TYPES_BY_PRESET: Record<
+  Exclude<HookPreset, 'none'>,
+  readonly string[]
+> = {
   'network-core': ['fetch', 'xhr', 'websocket', 'eval', 'timer'],
   'api-signature': ['fetch', 'xhr', 'websocket'],
 };

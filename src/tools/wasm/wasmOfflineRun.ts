@@ -15,35 +15,53 @@ function runCommand(
   args: string[],
   timeoutMs: number,
 ): Promise<{stdout: string; stderr: string; exitCode: number}> {
-  return new Promise((resolve) => {
-    const child = execFile(cmd, args, {timeout: timeoutMs}, (error, stdout, stderr) => {
-      resolve({
-        stdout: stdout ?? '',
-        stderr: stderr ?? '',
-        exitCode: typeof error?.code === 'number' ? error.code : (error ? 1 : 0),
-      });
-    });
+  return new Promise(resolve => {
+    const child = execFile(
+      cmd,
+      args,
+      {timeout: timeoutMs},
+      (error, stdout, stderr) => {
+        resolve({
+          stdout: stdout ?? '',
+          stderr: stderr ?? '',
+          exitCode:
+            typeof error?.code === 'number' ? error.code : error ? 1 : 0,
+        });
+      },
+    );
     child.on('error', () => {
       resolve({stdout: '', stderr: `命令未找到: ${cmd}`, exitCode: -1});
     });
   });
 }
 
-
-
 export const wasmOfflineRun = defineTool({
   name: 'wasm_offline_run',
-  description: 'Execute a Wasm function offline using wasmtime or wasmer CLI runtime.',
+  description:
+    'Execute a Wasm function offline using wasmtime or wasmer CLI runtime.',
   annotations: {
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: false,
   },
   schema: {
     inputPath: zod.string().describe('Path to the .wasm file'),
-    functionName: zod.string().describe('Name of the exported Wasm function to invoke'),
-    args: zod.array(zod.string()).optional().describe('Arguments to pass to the function'),
-    runtime: zod.enum(['wasmtime', 'wasmer', 'auto']).optional().describe('Runtime to use (default "auto")'),
-    timeoutMs: zod.number().int().positive().optional().describe('Execution timeout in ms (default 10000)'),
+    functionName: zod
+      .string()
+      .describe('Name of the exported Wasm function to invoke'),
+    args: zod
+      .array(zod.string())
+      .optional()
+      .describe('Arguments to pass to the function'),
+    runtime: zod
+      .enum(['wasmtime', 'wasmer', 'auto'])
+      .optional()
+      .describe('Runtime to use (default "auto")'),
+    timeoutMs: zod
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Execution timeout in ms (default 10000)'),
   },
   handler: async (request, response) => {
     const {
@@ -76,7 +94,11 @@ export const wasmOfflineRun = defineTool({
       const durationMs = Date.now() - start;
 
       // auto fallback
-      if (result.exitCode !== 0 && runtimeChoice === 'auto' && result.stderr.includes('未找到')) {
+      if (
+        result.exitCode !== 0 &&
+        runtimeChoice === 'auto' &&
+        result.stderr.includes('未找到')
+      ) {
         const wasmerResult = await runCommand(
           'wasmer',
           [inputPath, '--invoke', functionName, ...args],
@@ -84,9 +106,10 @@ export const wasmOfflineRun = defineTool({
         );
         response.setStructuredContent({
           success: wasmerResult.exitCode === 0,
-          message: wasmerResult.exitCode === 0
-            ? `wasmer 执行成功（${durationMs}ms）`
-            : `wasmer 执行失败：${wasmerResult.stderr}`,
+          message:
+            wasmerResult.exitCode === 0
+              ? `wasmer 执行成功（${durationMs}ms）`
+              : `wasmer 执行失败：${wasmerResult.stderr}`,
           tooltype: 'wasm_offline_run',
           logFormat: 'json',
           data: {
@@ -102,9 +125,10 @@ export const wasmOfflineRun = defineTool({
 
       response.setStructuredContent({
         success: result.exitCode === 0,
-        message: result.exitCode === 0
-          ? `${cmd} 执行成功（${durationMs}ms）`
-          : `${cmd} 执行失败（exit ${result.exitCode}）：${result.stderr.slice(0, 500)}`,
+        message:
+          result.exitCode === 0
+            ? `${cmd} 执行成功（${durationMs}ms）`
+            : `${cmd} 执行失败（exit ${result.exitCode}）：${result.stderr.slice(0, 500)}`,
         tooltype: 'wasm_offline_run',
         logFormat: 'json',
         data: {

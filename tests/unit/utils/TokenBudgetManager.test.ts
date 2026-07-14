@@ -1,14 +1,13 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import { describe, it, beforeEach } from 'node:test';
+import {describe, it, beforeEach} from 'node:test';
 
-import { DetailedDataManager } from '../../../src/utils/detailedDataManager.js';
-import { TokenBudgetManager } from '../../../src/utils/TokenBudgetManager.js';
+import {DetailedDataManager} from '../../../src/utils/detailedDataManager.js';
+import {TokenBudgetManager} from '../../../src/utils/TokenBudgetManager.js';
 
 interface ResettableTokenBudgetManager {
   instance?: unknown;
@@ -25,7 +24,9 @@ interface MutableTokenBudgetManager {
   checkWarnings(): void;
   shouldAutoCleanup(): boolean;
   manualCleanup(): void;
-  generateSuggestions(topTools: Array<{tool: string; tokens: number; percentage: number}>): string[];
+  generateSuggestions(
+    topTools: Array<{tool: string; tokens: number; percentage: number}>,
+  ): string[];
   recordToolCall(toolName: string, request: unknown, response: unknown): void;
   getStats(): {
     currentUsage: number;
@@ -37,13 +38,14 @@ interface MutableTokenBudgetManager {
 
 describe('TokenBudgetManager', () => {
   beforeEach(() => {
-    (TokenBudgetManager as unknown as ResettableTokenBudgetManager).instance = undefined;
+    (TokenBudgetManager as unknown as ResettableTokenBudgetManager).instance =
+      undefined;
   });
 
   it('records tool calls and reports stats', () => {
     const manager = TokenBudgetManager.getInstance();
-    manager.recordToolCall('collect_code', { a: 1 }, { data: 'x'.repeat(100) });
-    manager.recordToolCall('page_evaluate', { b: 2 }, { data: 'y'.repeat(80) });
+    manager.recordToolCall('collect_code', {a: 1}, {data: 'x'.repeat(100)});
+    manager.recordToolCall('page_evaluate', {b: 2}, {data: 'y'.repeat(80)});
 
     const stats = manager.getStats();
     assert.ok(stats.currentUsage > 0);
@@ -53,8 +55,10 @@ describe('TokenBudgetManager', () => {
   });
 
   it('emits warning levels and triggers auto cleanup path', () => {
-    const manager = TokenBudgetManager.getInstance() as unknown as MutableTokenBudgetManager;
-    const detailed = DetailedDataManager.getInstance() as unknown as MutableDetailedDataManager;
+    const manager =
+      TokenBudgetManager.getInstance() as unknown as MutableTokenBudgetManager;
+    const detailed =
+      DetailedDataManager.getInstance() as unknown as MutableDetailedDataManager;
     let clearCount = 0;
     const originalClear = detailed.clear.bind(detailed);
     detailed.clear = () => {
@@ -92,23 +96,27 @@ describe('TokenBudgetManager', () => {
   });
 
   it('generates actionable suggestions by usage level and top tool', () => {
-    const manager = TokenBudgetManager.getInstance() as unknown as MutableTokenBudgetManager;
+    const manager =
+      TokenBudgetManager.getInstance() as unknown as MutableTokenBudgetManager;
 
     manager.currentUsage = 195000;
     const critical = manager.generateSuggestions([
-      { tool: 'collect_code', tokens: 150000, percentage: 77 },
+      {tool: 'collect_code', tokens: 150000, percentage: 77},
     ]);
     assert.ok(critical.some((s: string) => s.includes('CRITICAL')));
     assert.ok(critical.some((s: string) => s.includes('smartMode')));
 
     manager.currentUsage = 1000;
-    const healthy = manager.generateSuggestions([{ tool: 'x', tokens: 100, percentage: 10 }]);
+    const healthy = manager.generateSuggestions([
+      {tool: 'x', tokens: 100, percentage: 10},
+    ]);
     assert.ok(healthy.some((s: string) => s.includes('healthy')));
   });
 
   it('resets state completely', () => {
-    const manager = TokenBudgetManager.getInstance() as unknown as MutableTokenBudgetManager;
-    manager.recordToolCall('a', { p: 1 }, { q: 2 });
+    const manager =
+      TokenBudgetManager.getInstance() as unknown as MutableTokenBudgetManager;
+    manager.recordToolCall('a', {p: 1}, {q: 2});
     manager.warnings.add(0.8);
 
     manager.reset();

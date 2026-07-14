@@ -54,12 +54,7 @@ export function resolveArtifactsTasksDirForPackageRoot(
     return path.join(packageRoot, 'artifacts', 'tasks');
   }
 
-  return path.join(
-    resolveUserStateHome(),
-    'Browser-CLI',
-    'artifacts',
-    'tasks',
-  );
+  return path.join(resolveUserStateHome(), 'Browser-CLI', 'artifacts', 'tasks');
 }
 
 export function resolveDefaultArtifactsTasksDir(moduleUrl: string): string {

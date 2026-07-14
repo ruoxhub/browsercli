@@ -6,6 +6,7 @@
 
 import type {Frame} from '../../third_party/index.js';
 import {evaluateInPageRuntime} from '../debugger/evaluateInPageRuntime.js';
+
 import {inferTypeFromTarget} from './record-utils.js';
 
 export const HOOK_STORE_KEY = '__hookStore';

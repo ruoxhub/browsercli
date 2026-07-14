@@ -20,9 +20,11 @@
 ### Task 1: 更新 ScriptInfo 接口并添加私有辅助方法
 
 **Files:**
+
 - Modify: `src/modules/debugger/ScriptManager.ts`
 
 **Interfaces:**
+
 - Consumes: 无
 - Produces: `ScriptInfo.sourcePath?: string`, `private readSource(scriptId): string | null`, `private ensureCacheDir(): string`, `private cacheFilePath(url): string`
 
@@ -114,9 +116,11 @@ git commit -m "refactor(debugger): replace ScriptInfo.source with sourcePath, ad
 ### Task 2: 修改 loadScriptSource 写入临时文件
 
 **Files:**
+
 - Modify: `src/modules/debugger/ScriptManager.ts:341-362`
 
 **Interfaces:**
+
 - Consumes: `cacheFilePath()`, `ensureCacheDir()`
 - Produces: `script.sourcePath` 被写入
 
@@ -186,9 +190,11 @@ git commit -m "refactor(debugger): write script source to temp file in loadScrip
 ### Task 3: 适配所有 script.source 消费者
 
 **Files:**
+
 - Modify: `src/modules/debugger/ScriptManager.ts`
 
 **Interfaces:**
+
 - Consumes: `readSource()`
 - Produces: 所有消费者改用 `readSource()` 或 `sourcePath` 判断
 
@@ -289,9 +295,11 @@ git commit -m "refactor(debugger): adapt all callers from script.source to readS
 ### Task 4: 更新 clear() 添加临时文件清理
 
 **Files:**
+
 - Modify: `src/modules/debugger/ScriptManager.ts:732-738`
 
 **Interfaces:**
+
 - Consumes: `script.sourcePath`
 - Produces: `clear()` 中增加文件删除逻辑
 
@@ -333,6 +341,7 @@ git commit -m "feat(debugger): delete temp script files on clear()"
 ### Task 5: 运行全量测试
 
 **Files:**
+
 - 无代码修改
 
 - [ ] **Step 1: 构建**
@@ -360,6 +369,7 @@ npm run check-format
 ### Task 6: 修复测试（仅当 Task 5 失败时）
 
 **Files:**
+
 - 按测试失败输出确定具体文件
 
 - [ ] **Step 1: 搜索测试中对 script.source 的引用**

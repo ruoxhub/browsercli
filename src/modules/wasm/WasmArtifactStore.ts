@@ -7,13 +7,14 @@ import {mkdir, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 
 import type {ReverseTaskHandle} from '../../types/index.js';
+
+import type {WasmAnalyzer} from './WasmAnalyzer.js';
+import type {WasmRuntimeInspector} from './WasmRuntimeInspector.js';
 import type {
   WasmDetectionResult,
   WasmModuleRecord,
   WasmRuntimeEvent,
 } from './WasmTypes.js';
-import type {WasmAnalyzer} from './WasmAnalyzer.js';
-import type {WasmRuntimeInspector} from './WasmRuntimeInspector.js';
 
 /**
  * Wasm artifact persistence — 将收集的 Wasm 模块写入文件系统。

@@ -9,18 +9,25 @@ import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
-
-
 export const wasmVmpTrace = defineTool({
   name: 'wasm_vmp_trace',
-  description: 'Trace Wasm runtime events captured by the JS-Wasm boundary hooks, with optional module filter.',
+  description:
+    'Trace Wasm runtime events captured by the JS-Wasm boundary hooks, with optional module filter.',
   annotations: {
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: true,
   },
   schema: {
-    maxEvents: zod.number().int().positive().optional().describe('Maximum number of events to return (default 5000)'),
-    filterModule: zod.string().optional().describe('Filter events to a specific module ID'),
+    maxEvents: zod
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Maximum number of events to return (default 5000)'),
+    filterModule: zod
+      .string()
+      .optional()
+      .describe('Filter events to a specific module ID'),
   },
   handler: async (request, response) => {
     const {maxEvents = 5000, filterModule} = request.params;
@@ -31,7 +38,7 @@ export const wasmVmpTrace = defineTool({
       const modules = runtime.wasmCollector.getModules();
 
       const filtered = allEvents
-        .filter((event) => {
+        .filter(event => {
           if (filterModule && event.moduleId !== filterModule) {
             return false;
           }
@@ -48,7 +55,7 @@ export const wasmVmpTrace = defineTool({
           totalEvents: allEvents.length,
           filteredEvents: filtered.length,
           events: filtered,
-          modules: modules.map((m) => ({id: m.id, hash: m.hash, size: m.size})),
+          modules: modules.map(m => ({id: m.id, hash: m.hash, size: m.size})),
         },
       });
     } catch (error) {

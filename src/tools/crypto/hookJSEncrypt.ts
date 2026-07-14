@@ -13,8 +13,12 @@ import {defineTool, type Context} from '../ToolDefinition.js';
  */
 export const hookJSEncrypt = defineTool({
   name: 'hook_jsencrypt',
-  description: 'Hook JSEncrypt RSA library: intercept public/private key, plaintext, ciphertext',
-  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: false},
+  description:
+    'Hook JSEncrypt RSA library: intercept public/private key, plaintext, ciphertext',
+  annotations: {
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: false,
+  },
   schema: {
     logFormat: zod
       .enum(['compact', 'json'])
@@ -85,14 +89,14 @@ export const hookJSEncrypt = defineTool({
         success: true,
         message: 'JSEncrypt Hook 已安装',
         tooltype: 'hook_jsencrypt',
-        data: {}
+        data: {},
       });
     } catch (error) {
       response.setStructuredContent({
         success: false,
         message: `错误：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'hook_jsencrypt',
-        data: {}
+        data: {},
       });
     }
   },

@@ -1,12 +1,23 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {mapCDPError, isCDPSessionGone, wrapCDPCall} from '../../../src/modules/browser/CDPErrorMapper.js';
+import {
+  mapCDPError,
+  isCDPSessionGone,
+  wrapCDPCall,
+} from '../../../src/modules/browser/CDPErrorMapper.js';
 
 describe('CDPErrorMapper', () => {
   describe('mapCDPError', () => {
     it('should map "Session closed" to CDP_SESSION_CLOSED', () => {
-      const result = mapCDPError(new Error('Session closed. Most likely the page has been closed.'));
+      const result = mapCDPError(
+        new Error('Session closed. Most likely the page has been closed.'),
+      );
       assert.strictEqual(result.name, 'CDP_SESSION_CLOSED');
     });
 
@@ -16,7 +27,9 @@ describe('CDPErrorMapper', () => {
     });
 
     it('should map "Cannot find context" to CDP_CONTEXT_GONE', () => {
-      const result = mapCDPError(new Error('Cannot find context with specified id'));
+      const result = mapCDPError(
+        new Error('Cannot find context with specified id'),
+      );
       assert.strictEqual(result.name, 'CDP_CONTEXT_GONE');
     });
 
@@ -26,7 +39,9 @@ describe('CDPErrorMapper', () => {
     });
 
     it('should map Protocol timeout to CDP_TIMEOUT', () => {
-      const result = mapCDPError(new Error('Protocol error (Runtime.evaluate): Timeout'));
+      const result = mapCDPError(
+        new Error('Protocol error (Runtime.evaluate): Timeout'),
+      );
       assert.strictEqual(result.name, 'CDP_TIMEOUT');
     });
 
@@ -57,7 +72,10 @@ describe('CDPErrorMapper', () => {
     });
 
     it('should return true for connection closed errors', () => {
-      assert.strictEqual(isCDPSessionGone(new Error('Connection closed')), true);
+      assert.strictEqual(
+        isCDPSessionGone(new Error('Connection closed')),
+        true,
+      );
     });
 
     it('should return false for unrelated errors', () => {
@@ -73,7 +91,10 @@ describe('CDPErrorMapper', () => {
 
     it('should throw mapped error on failure', async () => {
       await assert.rejects(
-        () => wrapCDPCall(async () => { throw new Error('Session closed'); }),
+        () =>
+          wrapCDPCall(async () => {
+            throw new Error('Session closed');
+          }),
         (err: Error) => err.name === 'CDP_SESSION_CLOSED',
       );
     });

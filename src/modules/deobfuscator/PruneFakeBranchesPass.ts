@@ -1,3 +1,8 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import traverseImport from '@babel/traverse';
 import * as t from '@babel/types';
 
@@ -27,18 +32,18 @@ function evaluateBinary(node: t.Node): boolean | null {
   }
   const left = t.isIdentifier(node.left, {name: 'undefined'})
     ? undefined
-    : (node.left as t.StringLiteral | t.NumericLiteral | t.BooleanLiteral).value;
+    : (node.left as t.StringLiteral | t.NumericLiteral | t.BooleanLiteral)
+        .value;
   const right = t.isIdentifier(node.right, {name: 'undefined'})
     ? undefined
-    : (node.right as t.StringLiteral | t.NumericLiteral | t.BooleanLiteral).value;
+    : (node.right as t.StringLiteral | t.NumericLiteral | t.BooleanLiteral)
+        .value;
   switch (node.operator) {
     case '==':
-      // eslint-disable-next-line eqeqeq
       return left == right;
     case '===':
       return left === right;
     case '!=':
-      // eslint-disable-next-line eqeqeq
       return left != right;
     case '!==':
       return left !== right;
@@ -47,7 +52,8 @@ function evaluateBinary(node: t.Node): boolean | null {
   }
 }
 
-type NodePath<T extends t.Node = t.Node> = import('@babel/traverse').NodePath<T>;
+type NodePath<T extends t.Node = t.Node> =
+  import('@babel/traverse').NodePath<T>;
 
 function replaceStatement(
   path: NodePath<t.IfStatement>,
@@ -64,7 +70,10 @@ function replaceStatement(
   path.replaceWith(node);
 }
 
-export function pruneFakeBranches(ast: t.File): {ast: t.File; changed: boolean} {
+export function pruneFakeBranches(ast: t.File): {
+  ast: t.File;
+  changed: boolean;
+} {
   let changed = false;
 
   traverse(ast, {
@@ -80,7 +89,10 @@ export function pruneFakeBranches(ast: t.File): {ast: t.File; changed: boolean} 
         if (decision === null) {
           return;
         }
-        replaceStatement(path, decision ? path.node.consequent : path.node.alternate);
+        replaceStatement(
+          path,
+          decision ? path.node.consequent : path.node.alternate,
+        );
         changed = true;
       },
     },

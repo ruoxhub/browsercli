@@ -4,36 +4,35 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { existsSync, readFileSync, createReadStream, lstatSync } from 'node:fs';
-import { createServer, type Server as HttpServer } from 'node:http';
-import { resolve, join, extname, relative, isAbsolute, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import {existsSync, readFileSync, createReadStream, lstatSync} from 'node:fs';
+import {createServer, type Server as HttpServer} from 'node:http';
+import {resolve, join, extname, relative, isAbsolute, dirname} from 'node:path';
+import {fileURLToPath} from 'node:url';
 
-import { WebSocketServer } from 'ws';
+import {WebSocketServer} from 'ws';
 
-import type { SekiroInvoker } from '../worker/SekiroInvoker.js';
+import type {Runtime} from '../runtime.js';
 import {
   ensureToolsMeta,
   getAllToolNames,
   getAllToolsMeta,
   getToolMeta,
 } from '../tools/tools-meta.js';
-import type { Runtime } from '../runtime.js';
-import type { ToolAdapter } from '../worker/ToolAdapter.js';
-import { JobStore } from '../worker/JobStore.js';
+import {JobStore} from '../worker/JobStore.js';
+import type {SekiroInvoker} from '../worker/SekiroInvoker.js';
+import type {ToolAdapter} from '../worker/ToolAdapter.js';
 
-import { InvocationStore } from './adapters/InvocationStore.js';
-import { bearerAuth } from './middleware/bearerAuth.js';
-import { rejectIfNotLocal } from './middleware/localOnly.js';
-import { RestRouter } from './RestRouter.js';
-import { createApiV1Routes } from './routes/apiV1.js';
-import { createHookRoutes } from './routes/hooks.js';
-import { createInvocationsRoutes } from './routes/invocations.js';
-import { createSiteExperienceRoutes } from './routes/site-experiences.js';
-import { createToolsRoutes } from './routes/tools.js';
-import { createWorkerRoutes, type WorkerRoutesConfig } from './routes/worker.js';
-import { WsHub } from './ws/WsHub.js';
-
+import {InvocationStore} from './adapters/InvocationStore.js';
+import {bearerAuth} from './middleware/bearerAuth.js';
+import {rejectIfNotLocal} from './middleware/localOnly.js';
+import {RestRouter} from './RestRouter.js';
+import {createApiV1Routes} from './routes/apiV1.js';
+import {createHookRoutes} from './routes/hooks.js';
+import {createInvocationsRoutes} from './routes/invocations.js';
+import {createSiteExperienceRoutes} from './routes/site-experiences.js';
+import {createToolsRoutes} from './routes/tools.js';
+import {createWorkerRoutes, type WorkerRoutesConfig} from './routes/worker.js';
+import {WsHub} from './ws/WsHub.js';
 
 export interface ConsoleServerOptions {
   port: number;
@@ -108,7 +107,10 @@ export class ConsoleServer {
   private setupRoutes(): void {
     let version = '0.0.0';
     try {
-      const pkgContent = readFileSync(join(this.projectRoot, 'package.json'), 'utf-8');
+      const pkgContent = readFileSync(
+        join(this.projectRoot, 'package.json'),
+        'utf-8',
+      );
       const pkg = JSON.parse(pkgContent);
       version = pkg.version || '0.0.0';
     } catch {
@@ -125,7 +127,9 @@ export class ConsoleServer {
       startedAt: this.startedAt,
       get browserMode(): string {
         try {
-          const browser = self.options.runtime.browserManager.getContext()?.browser();
+          const browser = self.options.runtime.browserManager
+            .getContext()
+            ?.browser();
           return browser?.version() ?? 'CDP';
         } catch {
           return 'CDP';
@@ -134,37 +138,37 @@ export class ConsoleServer {
     };
 
     this.router.mount(
-      createWorkerRoutes(workerConfig, () => getAllToolNames().length)
+      createWorkerRoutes(workerConfig, () => getAllToolNames().length),
     );
     this.router.mount(
       createToolsRoutes({
         invoker: this.options.invoker,
         group: this.options.group,
         invocations: this.invocationStore,
-      })
+      }),
     );
     this.router.mount(
       createInvocationsRoutes({
         store: this.invocationStore,
-      })
+      }),
     );
     this.router.mount(
-      createHookRoutes(this.options.invoker, this.options.group)
+      createHookRoutes(this.options.invoker, this.options.group),
     );
-    this.router.mount(
-      createSiteExperienceRoutes()
-    );
+    this.router.mount(createSiteExperienceRoutes());
     this.router.mount(
       createApiV1Routes({
         toolAdapter: this.options.toolAdapter,
         jobStore: this.options.jobStore ?? getDefaultJobStore(),
         wsHub: this.wsHub,
-        getToolMeta: (name) => getToolMeta(name),
+        getToolMeta: name => getToolMeta(name),
         listToolsMeta: () => getAllToolsMeta(),
         ensureToolsMeta,
       }),
     );
-    void ensureToolsMeta().catch(err => console.warn('[ConsoleServer] ensureToolsMeta 失败:', err));
+    void ensureToolsMeta().catch(err =>
+      console.warn('[ConsoleServer] ensureToolsMeta 失败:', err),
+    );
   }
 
   async start(): Promise<void> {
@@ -179,7 +183,12 @@ export class ConsoleServer {
 
         // /api/v1/* 豁免本地校验，改走 Bearer Token 认证
         if (pathname.startsWith('/api/v1/')) {
-          if (bearerAuth(req, res, { apiToken: this.options.apiToken, bindHost: this.options.host ?? '127.0.0.1' })) {
+          if (
+            bearerAuth(req, res, {
+              apiToken: this.options.apiToken,
+              bindHost: this.options.host ?? '127.0.0.1',
+            })
+          ) {
             return;
           }
         } else if (rejectIfNotLocal(req, res)) {
@@ -194,18 +203,18 @@ export class ConsoleServer {
 
         // 如果未命中 API，尝试读取静态资源
         if (req.method !== 'GET' && req.method !== 'HEAD') {
-          res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+          res.writeHead(404, {'Content-Type': 'text/plain; charset=utf-8'});
           res.end('Not Found');
           return;
         }
 
-        const staticRoot = resolve(this.projectRoot, 'apps/web/dist');
+        const staticRoot = resolve(this.projectRoot, 'build/web');
         const filePath = join(staticRoot, pathname);
 
         // 防止目录穿越防御
         const rel = relative(staticRoot, filePath);
         if (rel.startsWith('..') || isAbsolute(rel)) {
-          res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
+          res.writeHead(403, {'Content-Type': 'text/plain; charset=utf-8'});
           res.end('Forbidden');
           return;
         }
@@ -222,7 +231,7 @@ export class ConsoleServer {
         if (fileExists) {
           const ext = extname(filePath).toLowerCase();
           const contentType = MIME_TYPES[ext] || 'application/octet-stream';
-          res.writeHead(200, { 'Content-Type': contentType });
+          res.writeHead(200, {'Content-Type': contentType});
           createReadStream(filePath).pipe(res);
           return;
         }
@@ -233,26 +242,26 @@ export class ConsoleServer {
         if (!isApiRequest && !hasExtension) {
           const indexPath = join(staticRoot, 'index.html');
           if (existsSync(indexPath)) {
-            res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+            res.writeHead(200, {'Content-Type': 'text/html; charset=utf-8'});
             createReadStream(indexPath).pipe(res);
             return;
           }
         }
 
-        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.writeHead(404, {'Content-Type': 'text/plain; charset=utf-8'});
         res.end('Not Found');
       } catch (err) {
         if (!res.headersSent) {
-          res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+          res.writeHead(500, {'Content-Type': 'text/plain; charset=utf-8'});
           res.end(err instanceof Error ? err.message : String(err));
         }
       }
     });
 
     // 2. 启动 WebSocket Server
-    this.wsServer = new WebSocketServer({ server: this.httpServer });
-    this.wsServer.on('connection', (ws) => {
-      ws.on('message', (data) => {
+    this.wsServer = new WebSocketServer({server: this.httpServer});
+    this.wsServer.on('connection', ws => {
+      ws.on('message', data => {
         try {
           this.wsHub.handleClientMessage(ws, data.toString());
         } catch (err) {
@@ -268,7 +277,7 @@ export class ConsoleServer {
     });
 
     // 3. WS 桥接逻辑订阅
-    this.unsubscribeToolInvoke = this.options.toolAdapter.onInvoke((event) => {
+    this.unsubscribeToolInvoke = this.options.toolAdapter.onInvoke(event => {
       this.wsHub.broadcast('tool.invoke', event);
     });
 
@@ -277,8 +286,8 @@ export class ConsoleServer {
       this.onSampleListener = (hookId: string, sample: unknown) => {
         this.wsHub.broadcast(
           'hook.sample',
-          { hookId, ...(sample as object) },
-          (sub) => !sub.filter?.hookId || sub.filter.hookId === hookId
+          {hookId, ...(sample as object)},
+          sub => !sub.filter?.hookId || sub.filter.hookId === hookId,
         );
       };
       hookStore.events.on('sample', this.onSampleListener);
@@ -286,10 +295,14 @@ export class ConsoleServer {
 
     // 4. 开启监听（host 可配置，默认 127.0.0.1）
     await new Promise<void>((resolve, reject) => {
-      this.httpServer!.listen(this.options.port, this.options.host ?? '127.0.0.1', () => {
-        resolve();
-      });
-      this.httpServer!.once('error', async (err) => {
+      this.httpServer!.listen(
+        this.options.port,
+        this.options.host ?? '127.0.0.1',
+        () => {
+          resolve();
+        },
+      );
+      this.httpServer!.once('error', async err => {
         await this.stop();
         reject(err);
       });
@@ -318,7 +331,7 @@ export class ConsoleServer {
         }
       }
       const wss = this.wsServer;
-      await new Promise<void>((resolve) => {
+      await new Promise<void>(resolve => {
         wss.close(() => resolve());
       });
       this.wsServer = undefined;
@@ -327,7 +340,7 @@ export class ConsoleServer {
     // 3. 关闭 HTTP Server 资源
     if (this.httpServer) {
       const server = this.httpServer;
-      await new Promise<void>((resolve) => {
+      await new Promise<void>(resolve => {
         server.close(() => resolve());
       });
       this.httpServer = undefined;

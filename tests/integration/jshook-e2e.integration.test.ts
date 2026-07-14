@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -17,8 +16,17 @@ const runE2E = process.env.RUN_E2E_TESTS === 'true';
 describe('E2E Scenarios', {skip: !runE2E}, () => {
   it('Scenario 1: code collection and analysis flow', async () => {
     const collector = new SmartCodeCollector();
-    const files = [{url: 'https://x/app.js', content: 'const sign=md5(a);', size: 18, type: 'external'}] as any;
-    const summaries = await collector.smartCollect({} as any, files, {mode: 'summary'} as any);
+    const files = [
+      {
+        url: 'https://x/app.js',
+        content: 'const sign=md5(a);',
+        size: 18,
+        type: 'external',
+      },
+    ] as any;
+    const summaries = await collector.smartCollect({} as any, files, {
+      mode: 'summary',
+    } as any);
     assert.ok(Array.isArray(summaries));
   });
 
@@ -29,8 +37,14 @@ describe('E2E Scenarios', {skip: !runE2E}, () => {
   });
 
   it('Scenario 3: gemini CLI mode flow', async () => {
-    const provider = new GeminiProvider({useAPI: false, cliPath: 'non-existent-gemini-cli-command'});
-    await assert.rejects(async () => provider.chat([{role: 'user', content: 'test'}]), /gemini-cli is not available/);
+    const provider = new GeminiProvider({
+      useAPI: false,
+      cliPath: 'non-existent-gemini-cli-command',
+    });
+    await assert.rejects(
+      async () => provider.chat([{role: 'user', content: 'test'}]),
+      /gemini-cli is not available/,
+    );
   });
 
   it('Scenario 4: multi-tool concurrency flow', async () => {

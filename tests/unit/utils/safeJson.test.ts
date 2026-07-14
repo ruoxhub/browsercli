@@ -1,13 +1,12 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { safeParse, safeStringify } from '../../../src/utils/safeJson.js';
+import {safeParse, safeStringify} from '../../../src/utils/safeJson.js';
 
 describe('safeJson', () => {
   it('serializes primitive and special values safely', () => {
@@ -46,7 +45,7 @@ describe('safeJson', () => {
   });
 
   it('handles circular references', () => {
-    const obj: Record<string, unknown> = { name: 'root' };
+    const obj: Record<string, unknown> = {name: 'root'};
     obj.self = obj;
 
     const text = safeStringify(obj);
@@ -54,7 +53,7 @@ describe('safeJson', () => {
   });
 
   it('supports custom maxDepth argument without throwing', () => {
-    const deep = { a: { b: { c: { d: { e: 1 } } } } };
+    const deep = {a: {b: {c: {d: {e: 1}}}}};
     const text = safeStringify(deep, 0, 2);
     assert.ok(text.includes('"e":1'));
   });
@@ -71,7 +70,7 @@ describe('safeJson', () => {
   });
 
   it('parses valid JSON and returns null for invalid JSON', () => {
-    assert.deepStrictEqual(safeParse('{"ok":true}'), { ok: true });
+    assert.deepStrictEqual(safeParse('{"ok":true}'), {ok: true});
     assert.strictEqual(safeParse('{"bad":'), null);
   });
 });

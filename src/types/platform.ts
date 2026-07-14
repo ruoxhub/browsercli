@@ -5,41 +5,10 @@
  */
 
 /**
- * 平台层类型定义 — RpcClient、Worker、CLI 共用
+ * 平台层类型定义 — Worker、CLI 共用
  */
 
 import type {ActionHandler} from './rpc.js';
-
-// ==================== RpcClient 配置 ====================
-
-/** RpcClient 构造配置 */
-interface RpcClientConfig {
-  /** 分组名 */
-  group: string;
-  /** rpc Server 地址，如 ws://127.0.0.1:5612 */
-  rpcHost: string;
-  /** 客户端 ID（默认自动生成） */
-  clientId?: string;
-  /** 重连基础间隔 ms */
-  reconnectBaseDelay?: number;
-  /** 重连最大间隔 ms */
-  reconnectMaxDelay?: number;
-  /** 心跳间隔 ms */
-  heartbeatInterval?: number;
-  /** pong 超时 ms，超时后主动断开重连 */
-  pongTimeout?: number;
-}
-
-/** RpcClient 状态快照 */
-interface ClientStatus {
-  isInitialized: boolean;
-  isConnected: boolean;
-  connectionState: import('./rpc.js').RpcConnectionState;
-  group: string;
-  clientId: string;
-  actionCount: number;
-  rpcHost: string;
-}
 
 // ==================== Worker 配置 ====================
 
@@ -84,10 +53,4 @@ interface ActionConfig {
   transform?: (response: unknown) => unknown;
 }
 
-export {
-  type RpcClientConfig,
-  type ClientStatus,
-  type WorkerStartOptions,
-  type SimpleActionHandler,
-  type ActionConfig,
-};
+export {type WorkerStartOptions, type SimpleActionHandler, type ActionConfig};

@@ -14,7 +14,10 @@ import {defineTool, type Context} from '../ToolDefinition.js';
 export const hookSMCrypto = defineTool({
   name: 'hook_smcrypto',
   description: 'Hook SM-crypto library: intercept SM2, SM3, SM4 algorithms',
-  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: false},
+  annotations: {
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: false,
+  },
   schema: {
     algorithms: zod
       .array(zod.string())
@@ -136,7 +139,7 @@ export const hookSMCrypto = defineTool({
         success: false,
         message: `错误：${error instanceof Error ? error.message : String(error)}`,
         tooltype: 'hook_smcrypto',
-        data: {}
+        data: {},
       });
     }
   },

@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { IncomingMessage, ServerResponse } from 'node:http';
+import type {IncomingMessage, ServerResponse} from 'node:http';
 
-import { siteExperienceService } from '../../services/SiteExperienceService.js';
-import { sendError, sendJson, sendUnexpected } from '../middleware/error.js';
+import {siteExperienceService} from '../../services/SiteExperienceService.js';
+import {sendError, sendJson, sendUnexpected} from '../middleware/error.js';
 
 const MAX_BODY_BYTES = 1 * 1024 * 1024;
 
@@ -111,15 +111,26 @@ export function createSiteExperienceRoutes(): Map<string, RouteHandler> {
           return;
         }
 
-        const domain = typeof body.domain === 'string' ? body.domain.trim() : '';
+        const domain =
+          typeof body.domain === 'string' ? body.domain.trim() : '';
         const name = typeof body.name === 'string' ? body.name.trim() : '';
 
         if (!domain) {
-          sendError(res, 'BAD_REQUEST', '创建失败：domain 为必填字段且不能为空', 400);
+          sendError(
+            res,
+            'BAD_REQUEST',
+            '创建失败：domain 为必填字段且不能为空',
+            400,
+          );
           return;
         }
         if (!name) {
-          sendError(res, 'BAD_REQUEST', '创建失败：name 为必填字段且不能为空', 400);
+          sendError(
+            res,
+            'BAD_REQUEST',
+            '创建失败：name 为必填字段且不能为空',
+            400,
+          );
           return;
         }
 
@@ -135,14 +146,25 @@ export function createSiteExperienceRoutes(): Map<string, RouteHandler> {
             return;
           }
 
-          const aliases = Array.isArray(body.aliases) ? body.aliases.map(String) : [];
+          const aliases = Array.isArray(body.aliases)
+            ? body.aliases.map(String)
+            : [];
           const result = await siteExperienceService.create({
             domain,
             name,
             aliases,
-            platformFeatures: typeof body.platformFeatures === 'string' ? body.platformFeatures : null,
-            validPatterns: typeof body.validPatterns === 'string' ? body.validPatterns : null,
-            knownPitfalls: typeof body.knownPitfalls === 'string' ? body.knownPitfalls : null,
+            platformFeatures:
+              typeof body.platformFeatures === 'string'
+                ? body.platformFeatures
+                : null,
+            validPatterns:
+              typeof body.validPatterns === 'string'
+                ? body.validPatterns
+                : null,
+            knownPitfalls:
+              typeof body.knownPitfalls === 'string'
+                ? body.knownPitfalls
+                : null,
           });
 
           sendJson(res, result);
@@ -189,18 +211,32 @@ export function createSiteExperienceRoutes(): Map<string, RouteHandler> {
             updateData.aliases = body.aliases.map(String);
           }
           if (body.platformFeatures !== undefined) {
-            updateData.platformFeatures = typeof body.platformFeatures === 'string' ? body.platformFeatures : null;
+            updateData.platformFeatures =
+              typeof body.platformFeatures === 'string'
+                ? body.platformFeatures
+                : null;
           }
           if (body.validPatterns !== undefined) {
-            updateData.validPatterns = typeof body.validPatterns === 'string' ? body.validPatterns : null;
+            updateData.validPatterns =
+              typeof body.validPatterns === 'string'
+                ? body.validPatterns
+                : null;
           }
           if (body.knownPitfalls !== undefined) {
-            updateData.knownPitfalls = typeof body.knownPitfalls === 'string' ? body.knownPitfalls : null;
+            updateData.knownPitfalls =
+              typeof body.knownPitfalls === 'string'
+                ? body.knownPitfalls
+                : null;
           }
 
           const result = await siteExperienceService.update(id, updateData);
           if (!result) {
-            sendError(res, 'NOT_FOUND', `未找到 ID 为 ${id} 的站点经验，更新失败`, 404);
+            sendError(
+              res,
+              'NOT_FOUND',
+              `未找到 ID 为 ${id} 的站点经验，更新失败`,
+              404,
+            );
             return;
           }
 
@@ -227,10 +263,15 @@ export function createSiteExperienceRoutes(): Map<string, RouteHandler> {
         try {
           const deleted = await siteExperienceService.delete(id);
           if (!deleted) {
-            sendError(res, 'NOT_FOUND', `未找到 ID 为 ${id} 的站点经验，删除失败`, 404);
+            sendError(
+              res,
+              'NOT_FOUND',
+              `未找到 ID 为 ${id} 的站点经验，删除失败`,
+              404,
+            );
             return;
           }
-          sendJson(res, { success: true, id });
+          sendJson(res, {success: true, id});
         } catch (err) {
           sendUnexpected(res, err);
         }

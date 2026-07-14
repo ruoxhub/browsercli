@@ -9,7 +9,6 @@ import type {ToolContextProvider} from '../../worker/ToolContext.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
-
 /**
  * 计算 Frame 的嵌套深度。
  */
@@ -64,9 +63,7 @@ export const listFrames = defineTool({
         return;
       }
 
-      const selectedIndex = currentFrame
-        ? frames.indexOf(currentFrame)
-        : -1;
+      const selectedIndex = currentFrame ? frames.indexOf(currentFrame) : -1;
 
       const frameInfos = frames.map((frame, i) => ({
         index: i,

@@ -9,14 +9,14 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
-import {WasmArtifactStore} from '../../../../src/modules/wasm/WasmArtifactStore.js';
 import type {WasmAnalyzer} from '../../../../src/modules/wasm/WasmAnalyzer.js';
+import {WasmArtifactStore} from '../../../../src/modules/wasm/WasmArtifactStore.js';
 import type {WasmRuntimeInspector} from '../../../../src/modules/wasm/WasmRuntimeInspector.js';
-import type {ReverseTaskHandle} from '../../../../src/types/index.js';
 import type {
   WasmAnalysisResult,
   WasmModuleRecord,
 } from '../../../../src/modules/wasm/WasmTypes.js';
+import type {ReverseTaskHandle} from '../../../../src/types/index.js';
 
 function makeTaskHandle(taskDir: string): ReverseTaskHandle {
   // Only taskDir is read by WasmArtifactStore; the rest are stubbed for type
@@ -149,7 +149,7 @@ describe('WasmArtifactStore', () => {
 
       const moduleIndex = JSON.parse(
         await readFile(artifacts.moduleIndexPath!, 'utf8'),
-      ) as Array<WasmModuleRecord>;
+      ) as WasmModuleRecord[];
       assert.strictEqual(moduleIndex.length, 2);
       assert.ok(moduleIndex.every(m => m.base64 === undefined));
 

@@ -12,7 +12,13 @@ export const manifest = {
   profile: 'workflow',
   tools: [
     {modulePath: './collector/collectCode.js', handlerName: 'collectCode'},
-    {modulePath: './collector/collectionDiff.js', handlerName: 'collectionDiff'},
-    {modulePath: './collector/searchInScripts.js', handlerName: 'searchInScripts'},
+    {
+      modulePath: './collector/collectionDiff.js',
+      handlerName: 'collectionDiff',
+    },
+    {
+      modulePath: './collector/searchInScripts.js',
+      handlerName: 'searchInScripts',
+    },
   ],
 } satisfies DomainManifest;

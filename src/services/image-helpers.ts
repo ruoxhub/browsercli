@@ -8,7 +8,11 @@ import {readFileSync} from 'node:fs';
 /**
  * Supported image MIME types for vision-capable providers.
  */
-export type ImageMediaType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
+export type ImageMediaType =
+  | 'image/jpeg'
+  | 'image/png'
+  | 'image/gif'
+  | 'image/webp';
 
 const MEDIA_TYPE_BY_EXT: Record<string, ImageMediaType> = {
   png: 'image/png',
@@ -29,7 +33,9 @@ export interface DecodedImage {
  * Resolve the MIME type for an image file extension.
  * Falls back to `image/png` when the extension is unknown.
  */
-export function getImageMediaType(extension: string | undefined): ImageMediaType {
+export function getImageMediaType(
+  extension: string | undefined,
+): ImageMediaType {
   if (!extension) {
     return 'image/png';
   }
@@ -42,7 +48,10 @@ export function getImageMediaType(extension: string | undefined): ImageMediaType
  * @param imageInput - Either a `data:` URL, raw base64, or (when `isFilePath` is true) a filesystem path.
  * @param isFilePath - Whether `imageInput` should be read from disk.
  */
-export function decodeImageInput(imageInput: string, isFilePath: boolean): DecodedImage {
+export function decodeImageInput(
+  imageInput: string,
+  isFilePath: boolean,
+): DecodedImage {
   if (isFilePath) {
     const buffer = readFileSync(imageInput);
     const extension = imageInput.toLowerCase().split('.').pop();
@@ -69,7 +78,10 @@ export function decodeImageInput(imageInput: string, isFilePath: boolean): Decod
 /**
  * Build a `data:` URL from raw base64 image data and a MIME type.
  */
-export function toImageDataUrl(mediaType: ImageMediaType, base64Data: string): string {
+export function toImageDataUrl(
+  mediaType: ImageMediaType,
+  base64Data: string,
+): string {
   return `data:${mediaType};base64,${base64Data}`;
 }
 
@@ -84,9 +96,14 @@ export interface FormattedProviderError extends Error {
 /**
  * Wrap an unknown error with a provider-specific message and standard status/code fields.
  */
-export function formatProviderError(prefix: string, error: unknown): FormattedProviderError {
+export function formatProviderError(
+  prefix: string,
+  error: unknown,
+): FormattedProviderError {
   if (error instanceof Error) {
-    const wrapped: FormattedProviderError = new Error(`${prefix}: ${error.message}`);
+    const wrapped: FormattedProviderError = new Error(
+      `${prefix}: ${error.message}`,
+    );
     wrapped.stack = error.stack;
     return wrapped;
   }

@@ -1,3 +1,8 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import generateImport from '@babel/generator';
 import traverseImport from '@babel/traverse';
 import * as t from '@babel/types';
@@ -10,7 +15,8 @@ import {WrapperFolder} from '../WrapperFolder.js';
 const generate = unwrapBabelDefault<typeof generateImport>(generateImport);
 const traverse = unwrapBabelDefault<typeof traverseImport>(traverseImport);
 
-type NodePath<T extends t.Node = t.Node> = import('@babel/traverse').NodePath<T>;
+type NodePath<T extends t.Node = t.Node> =
+  import('@babel/traverse').NodePath<T>;
 
 function generateCode(node: t.Node): string {
   return generate(node, {
@@ -135,17 +141,11 @@ function collectOpcodeCasesFromAlternate(
           withTrailingBreak(blockify(node.consequent)),
         ),
       );
-      collectOpcodeCasesFromAlternate(
-        node.alternate,
-        discriminantName,
-        cases,
-      );
+      collectOpcodeCasesFromAlternate(node.alternate, discriminantName, cases);
       return;
     }
 
-    cases.push(
-      t.switchCase(null, withTrailingBreak(blockify(node))),
-    );
+    cases.push(t.switchCase(null, withTrailingBreak(blockify(node))));
     return;
   }
 
@@ -171,7 +171,10 @@ function collectOpcodeCasesFromAlternate(
       }
 
       cases.push(
-        t.switchCase(null, withTrailingBreak([t.cloneNode(stmt) as t.Statement])),
+        t.switchCase(
+          null,
+          withTrailingBreak([t.cloneNode(stmt) as t.Statement]),
+        ),
       );
     }
     return;

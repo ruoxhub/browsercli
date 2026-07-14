@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -26,7 +25,9 @@ describe('Performance Tests', {skip: !runPerf}, () => {
   it('concurrency scheduler scales read-only calls', async () => {
     const scheduler = new ToolExecutionScheduler();
     const start = Date.now();
-    await Promise.all(Array.from({length: 8}, () => scheduler.execute(true, async () => 1)));
+    await Promise.all(
+      Array.from({length: 8}, () => scheduler.execute(true, async () => 1)),
+    );
     const elapsed = Date.now() - start;
     assert.ok(elapsed < 500);
   });

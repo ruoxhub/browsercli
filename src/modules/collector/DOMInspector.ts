@@ -280,9 +280,7 @@ export class DOMInspector {
         const buildSelector = (el: Element): string => {
           if (el.id) return `#${el.id}`;
           if (el.className && typeof el.className === 'string') {
-            const firstClass = el.className
-              .split(' ')
-              .filter(c => c)[0];
+            const firstClass = el.className.split(' ').filter(c => c)[0];
             if (firstClass) {
               return `${el.tagName.toLowerCase()}.${firstClass}`;
             }

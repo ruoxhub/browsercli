@@ -11,6 +11,9 @@ export const manifest = {
   description: 'Browser extension management tools.',
   profile: 'full',
   tools: [
-    {modulePath: './extensions/updateExtensions.js', handlerName: 'updateExtensions'},
+    {
+      modulePath: './extensions/updateExtensions.js',
+      handlerName: 'updateExtensions',
+    },
   ],
 } satisfies DomainManifest;

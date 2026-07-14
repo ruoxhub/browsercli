@@ -7,10 +7,10 @@
 import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
+import {getDebuggerFromContext} from '../debugger/runtime-helpers.js';
 import {defineTool} from '../ToolDefinition.js';
 
 import type {DeobfuscateCodeResult} from './types.js';
-import {getDebuggerFromContext} from '../debugger/runtime-helpers.js';
 export const deobfuscateCode = defineTool({
   name: 'deobfuscate_code',
   description: 'AI-assisted JavaScript deobfuscation.',

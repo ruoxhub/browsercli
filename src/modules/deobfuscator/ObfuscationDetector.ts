@@ -10,6 +10,7 @@
  */
 
 import type {ObfuscationType, Transformation} from '../../types/index.js';
+
 import {
   AAEncodeDeobfuscator,
   PackerDeobfuscator,
@@ -146,7 +147,10 @@ export function detectObfuscationType(code: string): ObfuscationType[] {
   }
 
   // OBfuscator 变体（中国招标投标/公安部等）
-  if (/\b_0x[a-f0-9]+\b/i.test(code) && !types.includes('javascript-obfuscator')) {
+  if (
+    /\b_0x[a-f0-9]+\b/i.test(code) &&
+    !types.includes('javascript-obfuscator')
+  ) {
     types.push('ob-variant');
   }
 

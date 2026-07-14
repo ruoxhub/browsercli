@@ -21,11 +21,11 @@ npm run start -- --http --host 0.0.0.0 --port 3000
 
 ## 参数说明
 
-| 参数 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `--http` | boolean | false | 启用 HTTP 服务器模式 |
-| `--port` | number | 3000 | HTTP 监听端口 |
-| `--host` | string | 127.0.0.1 | 绑定主机地址 |
+| 参数     | 类型    | 默认值    | 说明                 |
+| -------- | ------- | --------- | -------------------- |
+| `--http` | boolean | false     | 启用 HTTP 服务器模式 |
+| `--port` | number  | 3000      | HTTP 监听端口        |
+| `--host` | string  | 127.0.0.1 | 绑定主机地址         |
 
 ## 与其他参数组合使用
 
@@ -142,6 +142,7 @@ npm run start -- --http --port 3003 --headless --sessionId instance-3
 ```bash
 npx @modelcontextprotocol/inspector
 ```
+
 1. 选择 "Streamable HTTP" 连接类型
 2. 输入 URL: `http://localhost:3000/mcp`
 3. 点击连接
@@ -177,12 +178,14 @@ claude mcp remove js-reverse
 ### Cursor
 
 **方式 1：点击链接自动添加**
+
 ```
 cursor://anysphere.cursor-deeplink/mcp/install?name=js-reverse&config=eyJ1cmwiOiJodHRwOi8vbG9jYWxob3N0OjMwMDAvbWNwIn0=
 ```
 
 **方式 2：手动配置**
 在 Cursor 设置中找到 MCP Servers，添加：
+
 ```json
 {
   "js-reverse": {
@@ -194,6 +197,7 @@ cursor://anysphere.cursor-deeplink/mcp/install?name=js-reverse&config=eyJ1cmwiOi
 ### Windsurf
 
 在 Windsurf 设置中添加 MCP 服务器：
+
 ```json
 {
   "name": "js-reverse",
@@ -283,11 +287,11 @@ HTTP 模式支持有状态和无状态两种：
 
 ## API 端点
 
-| 端点 | 方法 | 说明 |
-|------|------|------|
-| `/mcp` | POST | 主要通信端点（JSON-RPC） |
-| `/mcp` | GET | SSE 流式响应（会话通知） |
-| `/mcp` | DELETE | 终止会话 |
+| 端点   | 方法   | 说明                     |
+| ------ | ------ | ------------------------ |
+| `/mcp` | POST   | 主要通信端点（JSON-RPC） |
+| `/mcp` | GET    | SSE 流式响应（会话通知） |
+| `/mcp` | DELETE | 终止会话                 |
 
 ## JSON-RPC 示例
 

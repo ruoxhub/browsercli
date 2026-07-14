@@ -11,8 +11,8 @@
  */
 
 import assert from 'node:assert';
-import {describe, it, beforeEach, afterEach, mock} from 'node:test';
 import os from 'node:os';
+import {describe, it, beforeEach, afterEach, mock} from 'node:test';
 
 import {
   getUserConfigPath,

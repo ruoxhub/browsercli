@@ -11,23 +11,38 @@ import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
-
 export const wasmDecompile = defineTool({
   name: 'wasm_decompile',
-  description: 'Decompile a .wasm file with function-level summaries and suspicious-pattern detection.',
+  description:
+    'Decompile a .wasm file with function-level summaries and suspicious-pattern detection.',
   annotations: {
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: true,
   },
   schema: {
     inputPath: zod.string().describe('Path to the .wasm file to decompile'),
-    outputPath: zod.string().optional().describe('Optional output path for the .wat file'),
-    foldExprs: zod.boolean().optional().describe('Fold expression blocks for readability'),
-    inlineExport: zod.boolean().optional().describe('Inline export names into function bodies'),
-    maxWatChars: zod.number().int().positive().optional().describe('Truncate WAT output beyond this many characters'),
+    outputPath: zod
+      .string()
+      .optional()
+      .describe('Optional output path for the .wat file'),
+    foldExprs: zod
+      .boolean()
+      .optional()
+      .describe('Fold expression blocks for readability'),
+    inlineExport: zod
+      .boolean()
+      .optional()
+      .describe('Inline export names into function bodies'),
+    maxWatChars: zod
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Truncate WAT output beyond this many characters'),
   },
   handler: async (request, response) => {
-    const {inputPath, outputPath, foldExprs, inlineExport, maxWatChars} = request.params;
+    const {inputPath, outputPath, foldExprs, inlineExport, maxWatChars} =
+      request.params;
 
     try {
       const bytes = Uint8Array.from(await readFile(inputPath));
@@ -43,9 +58,12 @@ export const wasmDecompile = defineTool({
       }
 
       // Optionally truncate WAT for large outputs
-      const wat = typeof maxWatChars === 'number' && maxWatChars > 0 && decompiled.wat.length > maxWatChars
-        ? `${decompiled.wat.slice(0, maxWatChars)}\n;; ... truncated ...`
-        : decompiled.wat;
+      const wat =
+        typeof maxWatChars === 'number' &&
+        maxWatChars > 0 &&
+        decompiled.wat.length > maxWatChars
+          ? `${decompiled.wat.slice(0, maxWatChars)}\n;; ... truncated ...`
+          : decompiled.wat;
 
       response.setStructuredContent({
         success: true,

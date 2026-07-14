@@ -196,11 +196,13 @@ export class WaitForHelper {
         .then(async navigationStarted => {
           if (navigationStarted) {
             // Playwright: waitForNavigation 在 action 前调用也能正常工作
-            await this.#page.waitForURL('**', {
-              timeout: this.#navigationTimeout,
-            }).catch(() => {
-              // 导航等待失败不中断流程
-            });
+            await this.#page
+              .waitForURL('**', {
+                timeout: this.#navigationTimeout,
+              })
+              .catch(() => {
+                // 导航等待失败不中断流程
+              });
           }
         })
         .catch(error => logger.debug('Wait error', error));

@@ -7,17 +7,17 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {
-  getNetworkRequest,
-  listNetworkRequests,
-} from '../../../src/tools/network/index.js';
+import {getRuntime} from '../../../src/runtime.js';
 import {
   listPages,
   navigatePage,
   newPage,
   selectPage,
 } from '../../../src/tools/navigation/index.js';
-import {getRuntime} from '../../../src/runtime.js';
+import {
+  getNetworkRequest,
+  listNetworkRequests,
+} from '../../../src/tools/network/index.js';
 import {takeScreenshot as screenshot} from '../../../src/tools/screenshot/takeScreenshot.js';
 import {evaluateScript} from '../../../src/tools/script/script.js';
 

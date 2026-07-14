@@ -19,11 +19,12 @@
  * 所有 pass 均遵循 AstPass 约定: (ast) => {ast, changed}
  */
 
+import vm from 'node:vm';
+
 import generateImport from '@babel/generator';
 import * as parser from '@babel/parser';
 import traverseImport from '@babel/traverse';
 import * as t from '@babel/types';
-import vm from 'node:vm';
 
 import {unwrapBabelDefault} from './astUtils.js';
 import {SandboxEvaluator} from './SandboxEvaluator.js';
@@ -148,7 +149,7 @@ export function deleteRepeatDefine(ast: t.File): {
 
   traverse(ast, {
     'VariableDeclarator|FunctionDeclaration'(path) {
-      let {node} = path;
+      const {node} = path;
       let scope = path.scope;
 
       if (path.isFunctionDeclaration()) {
@@ -280,7 +281,7 @@ export function decodeObject(ast: t.File): {ast: t.File; changed: boolean} {
       try {
         const replaced = replaceObjectReferences(
           valueMap,
-          binding.referencePaths as NodePath<t.Identifier>[],
+          binding.referencePaths as Array<NodePath<t.Identifier>>,
         );
         if (replaced) changed = true;
       } catch {
@@ -322,7 +323,7 @@ function checkBinaryParams(
 }
 
 function buildPropertiesMap(
-  properties: (t.ObjectMethod | t.ObjectProperty | t.SpreadElement)[],
+  properties: Array<t.ObjectMethod | t.ObjectProperty | t.SpreadElement>,
   valueMap: Map<string, string | t.Expression>,
 ): void {
   for (const prop of properties) {
@@ -382,7 +383,7 @@ function buildPropertiesMap(
 
 function replaceObjectReferences(
   valueMap: Map<string, string | t.Expression>,
-  referencePaths: NodePath<t.Identifier>[],
+  referencePaths: Array<NodePath<t.Identifier>>,
 ): boolean {
   let anyReplaced = false;
 

@@ -56,7 +56,10 @@ const VALID_CHANNELS: ReadonlySet<Channel> = new Set<Channel>([
 
 export class WsHub {
   /** 每个连接的活跃订阅集合。 */
-  private readonly subscriptions = new Map<MinimalWebSocket, Set<Subscription>>();
+  private readonly subscriptions = new Map<
+    MinimalWebSocket,
+    Set<Subscription>
+  >();
   /** state 频道的最新快照，订阅时回放。 */
   private readonly lastState = new Map<StateChannel, unknown>();
 

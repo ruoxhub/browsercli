@@ -69,9 +69,7 @@ export interface PipelineStep {
 /**
  * Pipeline 定义（definePipeline 的输入）
  */
-export interface PipelineDef<
-  Schema extends zod.ZodRawShape = zod.ZodRawShape,
-> {
+export interface PipelineDef<Schema extends zod.ZodRawShape = zod.ZodRawShape> {
   /** 工具名称 */
   name: string;
   /** 别名 */

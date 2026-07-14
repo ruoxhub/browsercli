@@ -5,14 +5,8 @@
     "entryType": "class-method",
     "entryName": "Signer.sign",
     "signatureField": "sign",
-    "targetUrlPatterns": [
-      "https://api.example.com/*"
-    ],
-    "targetKeywords": [
-      "sign",
-      "nonce",
-      "timestamp"
-    ]
+    "targetUrlPatterns": ["https://api.example.com/*"],
+    "targetKeywords": ["sign", "nonce", "timestamp"]
   },
   "request": {
     "url": "https://api.example.com/v1/demo",
@@ -31,33 +25,20 @@
   "runtime": {
     "seedMode": "keys-only",
     "seedKeys": {
-      "cookies": [
-        "cookie_key_a",
-        "cookie_key_b"
-      ],
-      "localStorage": [
-        "ls_key_a",
-        "ls_key_b"
-      ],
-      "sessionStorage": [
-        "ss_key_a"
-      ]
+      "cookies": ["cookie_key_a", "cookie_key_b"],
+      "localStorage": ["ls_key_a", "ls_key_b"],
+      "sessionStorage": ["ss_key_a"]
     },
     "clock": {
       "mode": "fixed",
       "fixedNow": 1700000000000
     },
-    "environmentHints": [
-      "requires-canvas",
-      "requires-webgl"
-    ]
+    "environmentHints": ["requires-canvas", "requires-webgl"]
   },
   "verify": {
     "enabled": true,
     "expectStatus": 200,
-    "expectBodyContains": [
-      "\"ok\":true"
-    ],
+    "expectBodyContains": ["\"ok\":true"],
     "maxAttempts": 1
   },
   "security": {

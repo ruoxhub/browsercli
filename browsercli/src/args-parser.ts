@@ -5,8 +5,8 @@
  */
 
 import {default as yargs} from 'yargs';
-import {hideBin} from 'yargs/helpers';
 import type {Options as YargsOptions} from 'yargs';
+import {hideBin} from 'yargs/helpers';
 
 export const cliOptions = {
   browserUrl: {

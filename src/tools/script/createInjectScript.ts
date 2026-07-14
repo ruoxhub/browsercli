@@ -4,10 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  CreateInjectScriptResult,
-  InjectConfigEntry,
-} from './types.js';
+import type {CreateInjectScriptResult, InjectConfigEntry} from './types.js';
 
 /** 注入脚本配置存储 */
 const injectConfigs = new Map<string, InjectConfigEntry>();

@@ -6,8 +6,8 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {WasmBinaryRegistry} from '../../../../src/modules/wasm/WasmBinaryRegistry.js';
 import type {WasmAnalyzer} from '../../../../src/modules/wasm/WasmAnalyzer.js';
+import {WasmBinaryRegistry} from '../../../../src/modules/wasm/WasmBinaryRegistry.js';
 import type {
   WasmAnalysisResult,
   WasmModuleRecord,

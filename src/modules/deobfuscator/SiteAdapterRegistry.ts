@@ -1,3 +1,8 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import type * as t from '@babel/types';
 
 export interface SitePattern {
@@ -106,8 +111,14 @@ export class SiteAdapterRegistry {
     sourceText: string,
     hint?: string,
     inputPath?: string,
-  ): {bestId: string; scores: Map<string, number>; detections: DetectionResult[]} {
-    const detections: DetectionResult[] = PATTERNS.filter(p => p.id !== 'generic')
+  ): {
+    bestId: string;
+    scores: Map<string, number>;
+    detections: DetectionResult[];
+  } {
+    const detections: DetectionResult[] = PATTERNS.filter(
+      p => p.id !== 'generic',
+    )
       .map(pattern => {
         let score = 0;
         const reasons: string[] = [];

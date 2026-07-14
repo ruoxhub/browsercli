@@ -13,7 +13,6 @@ import type {Browser, Page} from '../third_party/index.js';
 
 // ==================== 配置类型 ====================
 
-
 export interface PuppeteerConfig {
   timeout?: number;
   maxCollectedUrls?: number;
@@ -32,8 +31,6 @@ export interface LLMConfig {
     baseURL?: string;
   };
 }
-
-
 
 export interface MCPConfig {
   name: string;

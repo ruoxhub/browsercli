@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { OpenAIProvider } from '../../../src/services/OpenAIProvider.js';
+import {OpenAIProvider} from '../../../src/services/OpenAIProvider.js';
 
 const runProviderTests = process.env.RUN_PROVIDER_TESTS === 'true';
-const runProviderNetworkTests = process.env.RUN_PROVIDER_NETWORK_TESTS === 'true';
+const runProviderNetworkTests =
+  process.env.RUN_PROVIDER_NETWORK_TESTS === 'true';
 
 describe('OpenAIProvider', {skip: !runProviderTests}, () => {
   describe('Constructor', () => {
@@ -30,7 +31,7 @@ describe('OpenAIProvider', {skip: !runProviderTests}, () => {
         },
         {
           message: /OpenAI API key is required/,
-        }
+        },
       );
     });
 
@@ -77,12 +78,9 @@ describe('OpenAIProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-invalid-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.chat([{ role: 'user', content: 'Hello' }]);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.chat([{role: 'user', content: 'Hello'}]);
+      }, Error);
     });
 
     it('should handle empty messages array', async () => {
@@ -90,12 +88,9 @@ describe('OpenAIProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.chat([]);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.chat([]);
+      }, Error);
     });
 
     it('should handle system messages', async () => {
@@ -104,15 +99,12 @@ describe('OpenAIProvider', {skip: !runProviderTests}, () => {
       });
 
       // This will fail with invalid API key, but tests message handling
-      await assert.rejects(
-        async () => {
-          await provider.chat([
-            { role: 'system', content: 'You are helpful' },
-            { role: 'user', content: 'Hello' },
-          ]);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.chat([
+          {role: 'system', content: 'You are helpful'},
+          {role: 'user', content: 'Hello'},
+        ]);
+      }, Error);
     });
 
     it('should handle conversation history', async () => {
@@ -120,16 +112,13 @@ describe('OpenAIProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.chat([
-            { role: 'user', content: 'What is 2+2?' },
-            { role: 'assistant', content: '4' },
-            { role: 'user', content: 'What is 3+3?' },
-          ]);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.chat([
+          {role: 'user', content: 'What is 2+2?'},
+          {role: 'assistant', content: '4'},
+          {role: 'user', content: 'What is 3+3?'},
+        ]);
+      }, Error);
     });
 
     it('should pass temperature option', async () => {
@@ -137,15 +126,11 @@ describe('OpenAIProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.chat(
-            [{ role: 'user', content: 'Hello' }],
-            { temperature: 0.7 }
-          );
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.chat([{role: 'user', content: 'Hello'}], {
+          temperature: 0.7,
+        });
+      }, Error);
     });
 
     it('should pass maxTokens option', async () => {
@@ -153,15 +138,11 @@ describe('OpenAIProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.chat(
-            [{ role: 'user', content: 'Hello' }],
-            { maxTokens: 1000 }
-          );
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.chat([{role: 'user', content: 'Hello'}], {
+          maxTokens: 1000,
+        });
+      }, Error);
     });
 
     it('should pass model option', async () => {
@@ -169,15 +150,11 @@ describe('OpenAIProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.chat(
-            [{ role: 'user', content: 'Hello' }],
-            { model: 'gpt-3.5-turbo' }
-          );
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.chat([{role: 'user', content: 'Hello'}], {
+          model: 'gpt-3.5-turbo',
+        });
+      }, Error);
     });
 
     it('should pass all chat options', async () => {
@@ -185,19 +162,13 @@ describe('OpenAIProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.chat(
-            [{ role: 'user', content: 'Hello' }],
-            {
-              temperature: 0.8,
-              maxTokens: 2000,
-              model: 'gpt-4',
-            }
-          );
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.chat([{role: 'user', content: 'Hello'}], {
+          temperature: 0.8,
+          maxTokens: 2000,
+          model: 'gpt-4',
+        });
+      }, Error);
     });
   });
 
@@ -207,12 +178,9 @@ describe('OpenAIProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-invalid-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.analyzeImage('test.png', 'Describe this image', true);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.analyzeImage('test.png', 'Describe this image', true);
+      }, Error);
     });
 
     it('should handle file path input', async () => {
@@ -221,12 +189,9 @@ describe('OpenAIProvider', {skip: !runProviderTests}, () => {
       });
 
       // This will fail because file doesn't exist, but tests the flow
-      await assert.rejects(
-        async () => {
-          await provider.analyzeImage('nonexistent.png', 'Describe', true);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.analyzeImage('nonexistent.png', 'Describe', true);
+      }, Error);
     });
 
     it('should handle base64 input', async () => {
@@ -234,14 +199,12 @@ describe('OpenAIProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-test-key',
       });
 
-      const base64Image = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+      const base64Image =
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
 
-      await assert.rejects(
-        async () => {
-          await provider.analyzeImage(base64Image, 'Describe', false);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.analyzeImage(base64Image, 'Describe', false);
+      }, Error);
     });
 
     it('should handle data URL input', async () => {
@@ -249,14 +212,12 @@ describe('OpenAIProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-test-key',
       });
 
-      const dataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+      const dataUrl =
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
 
-      await assert.rejects(
-        async () => {
-          await provider.analyzeImage(dataUrl, 'Describe', false);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.analyzeImage(dataUrl, 'Describe', false);
+      }, Error);
     });
 
     it('should handle HTTP URL input', async () => {
@@ -264,12 +225,13 @@ describe('OpenAIProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.analyzeImage('https://example.com/image.png', 'Describe', false);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.analyzeImage(
+          'https://example.com/image.png',
+          'Describe',
+          false,
+        );
+      }, Error);
     });
 
     it('should handle HTTPS URL input', async () => {
@@ -277,12 +239,13 @@ describe('OpenAIProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.analyzeImage('https://example.com/image.png', 'Describe', false);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.analyzeImage(
+          'https://example.com/image.png',
+          'Describe',
+          false,
+        );
+      }, Error);
     });
 
     it('should handle different image formats (PNG)', async () => {
@@ -290,12 +253,9 @@ describe('OpenAIProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.analyzeImage('test.png', 'Describe', true);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.analyzeImage('test.png', 'Describe', true);
+      }, Error);
     });
 
     it('should handle different image formats (JPEG)', async () => {
@@ -303,12 +263,9 @@ describe('OpenAIProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.analyzeImage('test.jpg', 'Describe', true);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.analyzeImage('test.jpg', 'Describe', true);
+      }, Error);
     });
 
     it('should handle different image formats (GIF)', async () => {
@@ -316,12 +273,9 @@ describe('OpenAIProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.analyzeImage('test.gif', 'Describe', true);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.analyzeImage('test.gif', 'Describe', true);
+      }, Error);
     });
 
     it('should handle different image formats (WEBP)', async () => {
@@ -329,12 +283,9 @@ describe('OpenAIProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.analyzeImage('test.webp', 'Describe', true);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.analyzeImage('test.webp', 'Describe', true);
+      }, Error);
     });
 
     it('should handle empty prompt', async () => {
@@ -342,12 +293,9 @@ describe('OpenAIProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.analyzeImage('test.png', '', true);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.analyzeImage('test.png', '', true);
+      }, Error);
     });
   });
 
@@ -359,13 +307,13 @@ describe('OpenAIProvider', {skip: !runProviderTests}, () => {
 
       await assert.rejects(
         async () => {
-          await provider.chat([{ role: 'user', content: 'Hello' }]);
+          await provider.chat([{role: 'user', content: 'Hello'}]);
         },
         (error: unknown) => {
           // Should be an Error object
           assert.ok(error instanceof Error);
           return true;
-        }
+        },
       );
     });
 
@@ -375,7 +323,7 @@ describe('OpenAIProvider', {skip: !runProviderTests}, () => {
       });
 
       try {
-        await provider.chat([{ role: 'user', content: 'Hello' }]);
+        await provider.chat([{role: 'user', content: 'Hello'}]);
         assert.fail('Should have thrown an error');
       } catch (error: unknown) {
         // Error should have status property for retry logic
@@ -389,12 +337,9 @@ describe('OpenAIProvider', {skip: !runProviderTests}, () => {
         baseURL: 'https://invalid-domain-that-does-not-exist.com',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.chat([{ role: 'user', content: 'Hello' }]);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.chat([{role: 'user', content: 'Hello'}]);
+      }, Error);
     });
 
     it('should handle timeout errors', async () => {
@@ -403,12 +348,9 @@ describe('OpenAIProvider', {skip: !runProviderTests}, () => {
       });
 
       // This will timeout or fail with invalid key
-      await assert.rejects(
-        async () => {
-          await provider.chat([{ role: 'user', content: 'Hello' }]);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.chat([{role: 'user', content: 'Hello'}]);
+      }, Error);
     });
 
     it('should handle malformed responses', async () => {
@@ -416,12 +358,9 @@ describe('OpenAIProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.chat([{ role: 'user', content: 'Hello' }]);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.chat([{role: 'user', content: 'Hello'}]);
+      }, Error);
     });
   });
 
@@ -432,12 +371,9 @@ describe('OpenAIProvider', {skip: !runProviderTests}, () => {
       });
 
       // Test by attempting to analyze (will fail but tests MIME detection)
-      await assert.rejects(
-        async () => {
-          await provider.analyzeImage('test.png', 'Describe', true);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.analyzeImage('test.png', 'Describe', true);
+      }, Error);
     });
 
     it('should detect JPEG MIME type', async () => {
@@ -445,12 +381,9 @@ describe('OpenAIProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.analyzeImage('test.jpeg', 'Describe', true);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.analyzeImage('test.jpeg', 'Describe', true);
+      }, Error);
     });
 
     it('should default to PNG for unknown extensions', async () => {
@@ -458,12 +391,9 @@ describe('OpenAIProvider', {skip: !runProviderTests}, () => {
         apiKey: 'sk-test-key',
       });
 
-      await assert.rejects(
-        async () => {
-          await provider.analyzeImage('test.unknown', 'Describe', true);
-        },
-        Error
-      );
+      await assert.rejects(async () => {
+        await provider.analyzeImage('test.unknown', 'Describe', true);
+      }, Error);
     });
   });
 });

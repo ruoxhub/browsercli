@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
+import {describe, it} from 'node:test';
 
-import { DOMInspector } from '../../../src/modules/collector/DOMInspector.js';
+import {DOMInspector} from '../../../src/modules/collector/DOMInspector.js';
 
 interface FakeAttr {
   name: string;
@@ -33,9 +33,9 @@ interface FakeElement {
   value?: string;
   attributes: FakeAttr[];
   children: FakeElement[];
-  childNodes: Array<{ nodeType: number }>;
+  childNodes: Array<{nodeType: number}>;
   parentElement?: FakeElement;
-  parentNode?: { children: FakeElement[] };
+  parentNode?: {children: FakeElement[]};
   getBoundingClientRect: () => FakeRect;
 }
 
@@ -69,7 +69,7 @@ interface XPathSnapshot {
 
 interface DocumentStub {
   body: FakeElement;
-  documentElement: { clientHeight: number; clientWidth: number };
+  documentElement: {clientHeight: number; clientWidth: number};
   querySelector(sel: string): FakeElement | null;
   querySelectorAll(sel: string): FakeElement[];
   evaluate(xpath: string): XPathSnapshot;
@@ -78,8 +78,8 @@ interface DocumentStub {
 interface MutationObserverRecordStub {
   type: string;
   target: FakeElement | null;
-  addedNodes: { length: number };
-  removedNodes: { length: number };
+  addedNodes: {length: number};
+  removedNodes: {length: number};
   attributeName?: string;
 }
 
@@ -103,16 +103,28 @@ interface GlobalDomHarness {
   document?: DocumentStub;
   window?: WindowStub;
   MutationObserver?: MutationObserverConstructor;
-  XPathResult?: { ORDERED_NODE_SNAPSHOT_TYPE: number };
+  XPathResult?: {ORDERED_NODE_SNAPSHOT_TYPE: number};
 }
 
 interface EvaluatePage {
-  evaluate<T, Args extends unknown[]>(fn: (...args: Args) => T, ...args: Args): Promise<T>;
-  waitForSelector(selector: string, options: { timeout: number }): Promise<void>;
+  evaluate<T, Args extends unknown[]>(
+    fn: (...args: Args) => T,
+    ...args: Args
+  ): Promise<T>;
+  waitForSelector(selector: string, options: {timeout: number}): Promise<void>;
 }
 
 function makeRect(width = 100, height = 30): FakeRect {
-  return { x: 10, y: 20, width, height, top: 20, left: 10, right: 10 + width, bottom: 20 + height };
+  return {
+    x: 10,
+    y: 20,
+    width,
+    height,
+    top: 20,
+    left: 10,
+    right: 10 + width,
+    bottom: 20 + height,
+  };
 }
 
 function makeElement(partial: Partial<FakeElement>): FakeElement {
@@ -125,12 +137,12 @@ function makeElement(partial: Partial<FakeElement>): FakeElement {
     value: partial.value,
     attributes: partial.attributes ?? [],
     children: partial.children ?? [],
-    childNodes: partial.childNodes ?? [{ nodeType: 3 }],
+    childNodes: partial.childNodes ?? [{nodeType: 3}],
     getBoundingClientRect: partial.getBoundingClientRect ?? (() => makeRect()),
   };
-  el.children.forEach((child) => {
+  el.children.forEach(child => {
     child.parentElement = el;
-    child.parentNode = { children: el.children };
+    child.parentNode = {children: el.children};
   });
   return el;
 }
@@ -141,31 +153,46 @@ function setupFakeDOM() {
     id: 'submit',
     className: 'btn primary',
     textContent: 'Submit now',
-    attributes: [{ name: 'id', value: 'submit' }, { name: 'class', value: 'btn primary' }],
+    attributes: [
+      {name: 'id', value: 'submit'},
+      {name: 'class', value: 'btn primary'},
+    ],
   });
 
   const link = makeElement({
     tagName: 'A',
     className: 'go-link',
     textContent: 'Go',
-    attributes: [{ name: 'href', value: '/go' }],
+    attributes: [{name: 'href', value: '/go'}],
   });
 
   const span = makeElement({
     tagName: 'SPAN',
     className: 'quote-item',
     textContent: 'a"b\'c',
-    attributes: [{ name: 'class', value: 'quote-item' }],
+    attributes: [{name: 'class', value: 'quote-item'}],
   });
 
-  const childA = makeElement({ tagName: 'DIV', id: 'childA', textContent: 'hello' });
-  const childB = makeElement({ tagName: 'DIV', className: 'child-b', textContent: 'world' });
-  const body = makeElement({ tagName: 'BODY', id: 'root', children: [childA, childB] });
+  const childA = makeElement({
+    tagName: 'DIV',
+    id: 'childA',
+    textContent: 'hello',
+  });
+  const childB = makeElement({
+    tagName: 'DIV',
+    className: 'child-b',
+    textContent: 'world',
+  });
+  const body = makeElement({
+    tagName: 'BODY',
+    id: 'root',
+    children: [childA, childB],
+  });
 
   const bySelector: Record<string, FakeElement | null> = {
     '#submit': button,
     '#root': body,
-    'button': button,
+    button: button,
     '.missing': null,
   };
 
@@ -205,7 +232,7 @@ function setupFakeDOM() {
 
   const documentStub: DocumentStub = {
     body,
-    documentElement: { clientHeight: 800, clientWidth: 1200 },
+    documentElement: {clientHeight: 800, clientWidth: 1200},
     querySelector(sel: string) {
       return bySelector[sel] ?? null;
     },
@@ -261,21 +288,24 @@ describe('DOMInspector evaluate execution', () => {
       XPathResult: globals.XPathResult,
     };
 
-    const { documentStub, windowStub, MutationObserverStub } = setupFakeDOM();
+    const {documentStub, windowStub, MutationObserverStub} = setupFakeDOM();
     globals.document = documentStub;
     globals.window = windowStub;
     globals.MutationObserver = MutationObserverStub;
-    globals.XPathResult = { ORDERED_NODE_SNAPSHOT_TYPE: 7 };
+    globals.XPathResult = {ORDERED_NODE_SNAPSHOT_TYPE: 7};
 
     try {
       const page: EvaluatePage = {
-        evaluate: async <T, Args extends unknown[]>(fn: (...args: Args) => T, ...args: Args) => fn(...args),
+        evaluate: async <T, Args extends unknown[]>(
+          fn: (...args: Args) => T,
+          ...args: Args
+        ) => fn(...args),
         waitForSelector: async () => undefined,
       };
 
-      const inspector = new DOMInspector(
-        { getActivePage: async () => page } as unknown as ConstructorParameters<typeof DOMInspector>[0],
-      );
+      const inspector = new DOMInspector({
+        getActivePage: async () => page,
+      } as unknown as ConstructorParameters<typeof DOMInspector>[0]);
 
       const one = await inspector.querySelector('#submit');
       assert.strictEqual(one.found, true);
@@ -307,7 +337,7 @@ describe('DOMInspector evaluate execution', () => {
       const viewport = await inspector.isInViewport('#submit');
       assert.strictEqual(viewport, true);
 
-      await inspector.observeDOMChanges({ selector: '#root', subtree: true });
+      await inspector.observeDOMChanges({selector: '#root', subtree: true});
       assert.ok(globals.window?.__domObserver);
 
       await inspector.stopObservingDOM();

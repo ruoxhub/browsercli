@@ -5,12 +5,10 @@
  */
 
 import type {BrowserManager} from '../modules/browser/index.js';
-import type {RpcClient} from '../modules/protocol/Client.js';
 import {dbService} from '../services/DatabaseService.js';
 
 interface ShutdownDependencies {
   browserManager: BrowserManager;
-  client?: RpcClient; // HTTP 模式下无 RpcClient
   contextProvider?: {dispose(): void | Promise<void>};
   database?: Pick<typeof dbService, 'disconnect'>;
   exit?: (code: number) => never;
@@ -38,7 +36,6 @@ async function withTimeout<T>(
  */
 export function createGracefulShutdown({
   browserManager,
-  client,
   contextProvider,
   database = dbService,
   exit = process.exit,
@@ -51,7 +48,6 @@ export function createGracefulShutdown({
     isShuttingDown = true;
 
     console.log(`[Worker] 收到 ${signal}，开始优雅关闭...`);
-    client?.disconnect(); // 可选调用（HTTP 模式下为 undefined）
 
     if (contextProvider) {
       try {

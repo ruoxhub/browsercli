@@ -34,19 +34,19 @@ create_hook --type websocket --description "WS capture"  →  inject_hook --pers
 
 默认 `list_websocket_connections` 拿到的就是**已建立**的连接，但只读 message stream。如下场景才需要自己 hook：
 
-| 场景 | 原因 | 做法 |
-|------|------|------|
-| 拦截发送（伪造心跳） | 默认只观察收发的 server message | hook `WebSocket.send` 拦截 client 帧 |
-| 拦截构造（修改重连参数） | 默认只看到已建立连接 | hook `WebSocket` 构造函数记录 url/protocols |
-| 抓取握手 query 中的签名 | 默认不抓 HTTP 升级请求 | 配合 `list_network_requests --urlFilter <wss-host>` 查升级前的 HTTP 请求 |
+| 场景                     | 原因                            | 做法                                                                     |
+| ------------------------ | ------------------------------- | ------------------------------------------------------------------------ |
+| 拦截发送（伪造心跳）     | 默认只观察收发的 server message | hook `WebSocket.send` 拦截 client 帧                                     |
+| 拦截构造（修改重连参数） | 默认只看到已建立连接            | hook `WebSocket` 构造函数记录 url/protocols                              |
+| 抓取握手 query 中的签名  | 默认不抓 HTTP 升级请求          | 配合 `list_network_requests --urlFilter <wss-host>` 查升级前的 HTTP 请求 |
 
 ### 何时只读不 hook
 
-| 场景 | 原因 |
-|------|------|
-| 协议是文本 JSON | 直接 `get_websocket_messages --show_content true` 即可 |
-| 协议是二进制但有规律 | `analyze_websocket_messages` 会自动 fingerprint 分组 |
-| 目标只是看消息内容 | 不需要 hook，只读足够 |
+| 场景                 | 原因                                                   |
+| -------------------- | ------------------------------------------------------ |
+| 协议是文本 JSON      | 直接 `get_websocket_messages --show_content true` 即可 |
+| 协议是二进制但有规律 | `analyze_websocket_messages` 会自动 fingerprint 分组   |
+| 目标只是看消息内容   | 不需要 hook，只读足够                                  |
 
 ---
 
@@ -88,14 +88,14 @@ analyze_websocket_messages --wsid 3
 
 ## 协议推断速查
 
-| 现象 | 可能协议 |
-|------|---------|
-| 文本消息看着像 JSON | 直接 `JSON.parse` |
-| 文本消息像 base64 | 大概率 protobuf / msgpack |
-| 二进制且首字节是 `0x08` / `0x0A` 等 | protobuf（varint 编码） |
-| 二进制且每条前 4 字节是长度前缀 | 自定义 length-prefixed |
-| 二进制且每条前 2 字节是魔数（如 `0xBE 0xEF`） | 自定义 framed |
-| 偶发长消息 + 大量短消息 | 大量心跳 + 偶发数据 |
+| 现象                                          | 可能协议                  |
+| --------------------------------------------- | ------------------------- |
+| 文本消息看着像 JSON                           | 直接 `JSON.parse`         |
+| 文本消息像 base64                             | 大概率 protobuf / msgpack |
+| 二进制且首字节是 `0x08` / `0x0A` 等           | protobuf（varint 编码）   |
+| 二进制且每条前 4 字节是长度前缀               | 自定义 length-prefixed    |
+| 二进制且每条前 2 字节是魔数（如 `0xBE 0xEF`） | 自定义 framed             |
+| 偶发长消息 + 大量短消息                       | 大量心跳 + 偶发数据       |
 
 ---
 
@@ -103,24 +103,24 @@ analyze_websocket_messages --wsid 3
 
 WebSocket 逆向后建议沉淀：
 
-| 文件 | 内容 |
-|------|------|
-| `ws-protocol.md` | 消息分组表 + 心跳间隔 + 认证参数来源 |
-| `ws-samples/<group>.bin` | 各分组的 raw 样本（base64 编码） |
-| `ws-decode.js` | protobuf / 自定义格式的解码器（站点无关） |
+| 文件                         | 内容                                              |
+| ---------------------------- | ------------------------------------------------- |
+| `ws-protocol.md`             | 消息分组表 + 心跳间隔 + 认证参数来源              |
+| `ws-samples/<group>.bin`     | 各分组的 raw 样本（base64 编码）                  |
+| `ws-decode.js`               | protobuf / 自定义格式的解码器（站点无关）         |
 | `ws-record-reverse-evidence` | 写一条 `record_reverse_evidence` 到 task artifact |
 
 ---
 
 ## 失败回退
 
-| 现象 | 解决 |
-|------|------|
-| `analyze_websocket_messages` 返回空 | 连接已关闭，重建并立即抓 |
-| `get_websocket_message` 超时 | 消息体太大，先 `analyze` 看 avgSize |
-| 协议是 protobuf 但没 `.proto` | 用 `summarize_code` / `understand_code` 反推；或用 [protoscope](https://github.com/square/protoscope) 试解 |
-| WS 加密（WSS + 自实现） | 通常是 mTLS 或自定义 handshake 加密，先看 `list_network_requests` 找 handshake |
-| 心跳触发后立刻断连 | 可能是 client 必须发特定心跳格式才能保活；用 `create_hook --type websocket` 看真实心跳 |
+| 现象                                | 解决                                                                                                       |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `analyze_websocket_messages` 返回空 | 连接已关闭，重建并立即抓                                                                                   |
+| `get_websocket_message` 超时        | 消息体太大，先 `analyze` 看 avgSize                                                                        |
+| 协议是 protobuf 但没 `.proto`       | 用 `summarize_code` / `understand_code` 反推；或用 [protoscope](https://github.com/square/protoscope) 试解 |
+| WS 加密（WSS + 自实现）             | 通常是 mTLS 或自定义 handshake 加密，先看 `list_network_requests` 找 handshake                             |
+| 心跳触发后立刻断连                  | 可能是 client 必须发特定心跳格式才能保活；用 `create_hook --type websocket` 看真实心跳                     |
 
 ---
 

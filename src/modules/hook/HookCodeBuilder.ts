@@ -344,9 +344,7 @@ export class HookCodeBuilder {
     if (capture.args) lines.push(`      args: args,`);
     if (capture.thisContext) lines.push(`      thisArg: this,`);
     if (capture.stack) {
-      lines.push(
-        `      stack: ${this.formatStack(capture.stack)},`,
-      );
+      lines.push(`      stack: ${this.formatStack(capture.stack)},`);
     }
     lines.push(`    };`);
     lines.push(``);

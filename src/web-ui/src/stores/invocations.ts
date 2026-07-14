@@ -1,5 +1,11 @@
-import { create } from 'zustand';
-import type { InvocationRecord } from '../lib/protocol';
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+import {create} from 'zustand';
+
+import type {InvocationRecord} from '../lib/protocol';
 
 interface InvocationsState {
   records: InvocationRecord[];
@@ -7,12 +13,14 @@ interface InvocationsState {
   addRecord: (record: InvocationRecord) => void;
 }
 
-export const useInvocationsStore = create<InvocationsState>((set) => ({
+export const useInvocationsStore = create<InvocationsState>(set => ({
   records: [],
-  setRecords: (records) => set({ records }),
-  addRecord: (record) =>
-    set((state) => {
-      const existingIndex = state.records.findIndex((r) => r.traceId === record.traceId);
+  setRecords: records => set({records}),
+  addRecord: record =>
+    set(state => {
+      const existingIndex = state.records.findIndex(
+        r => r.traceId === record.traceId,
+      );
       let newRecords = [...state.records];
 
       if (existingIndex > -1) {
@@ -29,6 +37,6 @@ export const useInvocationsStore = create<InvocationsState>((set) => ({
         newRecords = newRecords.slice(0, 100);
       }
 
-      return { records: newRecords };
+      return {records: newRecords};
     }),
 }));

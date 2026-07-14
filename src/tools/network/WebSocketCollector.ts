@@ -223,8 +223,7 @@ export class WebSocketCollector {
       });
     };
 
-    const onFrameSent = (event: unknown): void =>
-      recordFrame('sent', event);
+    const onFrameSent = (event: unknown): void => recordFrame('sent', event);
     const onFrameReceived = (event: unknown): void =>
       recordFrame('received', event);
 

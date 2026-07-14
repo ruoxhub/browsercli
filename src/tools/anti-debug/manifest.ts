@@ -12,6 +12,9 @@ export const manifest = {
   profile: 'full',
   tools: [
     {modulePath: './anti-debug/antiAntiDebug.js', handlerName: 'antiAntiDebug'},
-    {modulePath: './anti-debug/bypassDebugger.js', handlerName: 'bypassDebugger'},
+    {
+      modulePath: './anti-debug/bypassDebugger.js',
+      handlerName: 'bypassDebugger',
+    },
   ],
 } satisfies DomainManifest;

@@ -9,7 +9,11 @@ import {describe, it} from 'node:test';
 
 import {zod} from '../../../../src/third_party/index.js';
 import {ToolCategory} from '../../../../src/tools/categories.js';
-import {definePipeline, parallel, when} from '../../../../src/tools/pipeline/definePipeline.js';
+import {
+  definePipeline,
+  parallel,
+  when,
+} from '../../../../src/tools/pipeline/definePipeline.js';
 import type {PipelineContext} from '../../../../src/tools/pipeline/types.js';
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -57,7 +61,10 @@ describe('definePipeline', () => {
       const pipeline = definePipeline({
         name: 'seq_test',
         description: '顺序执行测试',
-        annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+        annotations: {
+          category: ToolCategory.REVERSE_ENGINEERING,
+          readOnlyHint: true,
+        },
         schema: {x: zod.number()},
         steps: [
           {
@@ -96,7 +103,10 @@ describe('definePipeline', () => {
       const pipeline = definePipeline({
         name: 'context_test',
         description: '上下文传递测试',
-        annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+        annotations: {
+          category: ToolCategory.REVERSE_ENGINEERING,
+          readOnlyHint: true,
+        },
         schema: {url: zod.string()},
         steps: [
           {
@@ -114,7 +124,11 @@ describe('definePipeline', () => {
       });
 
       const res = makeMockResponse();
-      await pipeline.handler({params: {url: 'https://example.com'}}, res as any, {} as any);
+      await pipeline.handler(
+        {params: {url: 'https://example.com'}},
+        res as any,
+        {} as any,
+      );
 
       const output = res.result.content as Record<string, unknown>;
       assert.equal(output.success, true);
@@ -130,7 +144,10 @@ describe('definePipeline', () => {
       const pipeline = definePipeline({
         name: 'output_test',
         description: '输出测试',
-        annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+        annotations: {
+          category: ToolCategory.REVERSE_ENGINEERING,
+          readOnlyHint: true,
+        },
         schema: {},
         steps: [
           {name: 'a', fn: async () => ({data: 'hello'})},
@@ -162,7 +179,10 @@ describe('definePipeline', () => {
       const pipeline = definePipeline({
         name: 'merge_test',
         description: '上下文合并测试',
-        annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+        annotations: {
+          category: ToolCategory.REVERSE_ENGINEERING,
+          readOnlyHint: true,
+        },
         schema: {},
         steps: [
           {
@@ -172,7 +192,9 @@ describe('definePipeline', () => {
           {
             name: 's2',
             fn: async ctx => {
-              return {data: (ctx as unknown as Record<string, unknown>).extraKey};
+              return {
+                data: (ctx as unknown as Record<string, unknown>).extraKey,
+              };
             },
           },
         ],
@@ -192,7 +214,10 @@ describe('definePipeline', () => {
       const pipeline = definePipeline({
         name: 'fail_test',
         description: '失败测试',
-        annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+        annotations: {
+          category: ToolCategory.REVERSE_ENGINEERING,
+          readOnlyHint: true,
+        },
         schema: {},
         steps: [
           {
@@ -238,7 +263,10 @@ describe('definePipeline', () => {
       const pipeline = definePipeline({
         name: 'skip_test',
         description: '跳过测试',
-        annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+        annotations: {
+          category: ToolCategory.REVERSE_ENGINEERING,
+          readOnlyHint: true,
+        },
         schema: {},
         steps: [
           {
@@ -284,7 +312,10 @@ describe('definePipeline', () => {
       const pipeline = definePipeline({
         name: 'continue_test',
         description: '忽略错误测试',
-        annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+        annotations: {
+          category: ToolCategory.REVERSE_ENGINEERING,
+          readOnlyHint: true,
+        },
         schema: {},
         steps: [
           {
@@ -317,7 +348,10 @@ describe('definePipeline', () => {
       const pipeline = definePipeline({
         name: 'retry_test',
         description: '重试测试',
-        annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+        annotations: {
+          category: ToolCategory.REVERSE_ENGINEERING,
+          readOnlyHint: true,
+        },
         schema: {},
         steps: [
           {
@@ -348,7 +382,10 @@ describe('definePipeline', () => {
       const pipeline = definePipeline({
         name: 'retry_exhausted_test',
         description: '重试耗尽测试',
-        annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+        annotations: {
+          category: ToolCategory.REVERSE_ENGINEERING,
+          readOnlyHint: true,
+        },
         schema: {},
         steps: [
           {
@@ -382,7 +419,10 @@ describe('definePipeline', () => {
       const pipeline = definePipeline({
         name: 'timeout_test',
         description: '超时测试',
-        annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+        annotations: {
+          category: ToolCategory.REVERSE_ENGINEERING,
+          readOnlyHint: true,
+        },
         schema: {},
         timeoutMs: 50,
         steps: [
@@ -425,7 +465,10 @@ describe('definePipeline', () => {
       const pipeline = definePipeline({
         name: 'when_test',
         description: '条件步骤测试',
-        annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+        annotations: {
+          category: ToolCategory.REVERSE_ENGINEERING,
+          readOnlyHint: true,
+        },
         schema: {runMe: zod.string()},
         steps: [step],
       });
@@ -446,29 +489,29 @@ describe('definePipeline', () => {
   describe('parallel 并行步骤', () => {
     it('并行执行多个子步骤', async () => {
       const order: string[] = [];
-      const step = parallel(
-        'parallel_group',
-        [
-          {
-            fn: async () => {
-              await new Promise(r => setTimeout(r, 30));
-              order.push('a');
-              return {data: 'a'};
-            },
+      const step = parallel('parallel_group', [
+        {
+          fn: async () => {
+            await new Promise(r => setTimeout(r, 30));
+            order.push('a');
+            return {data: 'a'};
           },
-          {
-            fn: async () => {
-              order.push('b');
-              return {data: 'b'};
-            },
+        },
+        {
+          fn: async () => {
+            order.push('b');
+            return {data: 'b'};
           },
-        ],
-      );
+        },
+      ]);
 
       const pipeline = definePipeline({
         name: 'parallel_test',
         description: '并行测试',
-        annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+        annotations: {
+          category: ToolCategory.REVERSE_ENGINEERING,
+          readOnlyHint: true,
+        },
         schema: {},
         steps: [step],
       });
@@ -503,12 +546,12 @@ describe('definePipeline', () => {
       const pipeline = definePipeline({
         name: 'parallel_skip_test',
         description: '并行失败skip测试',
-        annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+        annotations: {
+          category: ToolCategory.REVERSE_ENGINEERING,
+          readOnlyHint: true,
+        },
         schema: {},
-        steps: [
-          step,
-          {name: 'after', fn: async () => ({data: 'continues'})},
-        ],
+        steps: [step, {name: 'after', fn: async () => ({data: 'continues'})}],
       });
 
       const res = makeMockResponse();
@@ -526,7 +569,10 @@ describe('definePipeline', () => {
         name: 'compat_test',
         aliases: ['ct'],
         description: '兼容性测试',
-        annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: false},
+        annotations: {
+          category: ToolCategory.REVERSE_ENGINEERING,
+          readOnlyHint: false,
+        },
         schema: {input: zod.string()},
         steps: [{name: 's1', fn: async () => ({data: 'ok'})}],
       });
@@ -543,7 +589,10 @@ describe('definePipeline', () => {
       const pipeline = definePipeline({
         name: 'empty_test',
         description: '空 pipeline',
-        annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
+        annotations: {
+          category: ToolCategory.REVERSE_ENGINEERING,
+          readOnlyHint: true,
+        },
         schema: {},
         steps: [],
       });

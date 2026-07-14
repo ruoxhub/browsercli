@@ -6,7 +6,7 @@
 
 import type {AggregatedIssue} from '../../third_party/index.js';
 
-export type ConsoleMessageType = 
+export type ConsoleMessageType =
   | 'log'
   | 'debug'
   | 'info'
@@ -100,17 +100,11 @@ export interface ConsoleRuntimeServices {
   /** 获取当前选中页面 */
   getSelectedPage: () => unknown;
   /** 获取 console 数据列表 */
-  getConsoleData: (
-    includePreservedMessages?: boolean,
-  ) => ConsoleMessageEntry[];
+  getConsoleData: (includePreservedMessages?: boolean) => ConsoleMessageEntry[];
   /** 通过 ID 获取单条 console 消息 */
-  getConsoleMessageById: (
-    id: number,
-  ) => ConsoleMessageEntry;
+  getConsoleMessageById: (id: number) => ConsoleMessageEntry;
   /** 获取消息的稳定 ID */
-  getConsoleMessageStableId: (
-    message: ConsoleMessageEntry,
-  ) => number;
+  getConsoleMessageStableId: (message: ConsoleMessageEntry) => number;
   /** SourceMap 提示获取（可选） */
   getConsoleSourceMapHints?: (
     message: ConsoleMessageEntry,

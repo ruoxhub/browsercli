@@ -23,16 +23,16 @@ inject_stealth --preset <name>
 
 ### 隐身能力清单（典型站点检测 → 对应屏蔽）
 
-| 检测点 | 隐身能力 |
-|--------|---------|
-| `navigator.webdriver === true` | hide-webdriver |
-| `window.chrome.runtime` 缺失 | mock-chrome |
-| Canvas 指纹 | canvas-noise |
-| WebGL 指纹 | webgl-mask |
-| AudioContext 指纹 | audio-fp-mask |
-| 字体枚举 | font-mask |
+| 检测点                                      | 隐身能力                  |
+| ------------------------------------------- | ------------------------- |
+| `navigator.webdriver === true`              | hide-webdriver            |
+| `window.chrome.runtime` 缺失                | mock-chrome               |
+| Canvas 指纹                                 | canvas-noise              |
+| WebGL 指纹                                  | webgl-mask                |
+| AudioContext 指纹                           | audio-fp-mask             |
+| 字体枚举                                    | font-mask                 |
 | `navigator.plugins` / `navigator.languages` | plugin-mask / locale-mask |
-| 屏幕 / 视口异常 | screen-mask |
+| 屏幕 / 视口异常                             | screen-mask               |
 
 ### 自定义 UA
 
@@ -110,24 +110,24 @@ evaluate_script --function "() => navigator.plugins.length"
 
 ## 何时用哪种
 
-| 目标 | 用什么 |
-|------|--------|
-| 站点检测了 webdriver | `inject_stealth --preset chrome-desktop` + `set_user_agent` |
-| 站点检测了 canvas | `inject_stealth --preset default`（含 canvas-noise） |
-| 站点是移动端 only | `emulate_mobile --device "iPhone 14"` + mobile UA + mobile preset |
-| 想看页面在弱网下表现 | `emulate_network --throttlingOption "Slow 3G"` |
-| 性能分析 | `emulate_cpu --throttlingRate 4` + `start_performance_trace` |
-| 自定义视口截图 | `resize_page --width 1440 --height 900` + `take_screenshot` |
+| 目标                 | 用什么                                                            |
+| -------------------- | ----------------------------------------------------------------- |
+| 站点检测了 webdriver | `inject_stealth --preset chrome-desktop` + `set_user_agent`       |
+| 站点检测了 canvas    | `inject_stealth --preset default`（含 canvas-noise）              |
+| 站点是移动端 only    | `emulate_mobile --device "iPhone 14"` + mobile UA + mobile preset |
+| 想看页面在弱网下表现 | `emulate_network --throttlingOption "Slow 3G"`                    |
+| 性能分析             | `emulate_cpu --throttlingRate 4` + `start_performance_trace`      |
+| 自定义视口截图       | `resize_page --width 1440 --height 900` + `take_screenshot`       |
 
 ---
 
 ## 失败回退
 
-| 现象 | 解决 |
-|------|------|
+| 现象                            | 解决                                                  |
+| ------------------------------- | ----------------------------------------------------- |
 | `inject_stealth` 后检测仍然命中 | 用 `evaluate_script` 看具体命中点；按检测点单独 patch |
-| 隐身脚本与业务 JS 冲突 | 改用 minimal preset，逐项加 |
-| 移动端 UA 但视口是桌面 | 一定配合 `emulate_mobile` |
-| 隐身导致某些功能不工作 | 取消对应 `feature` 注入；或换 minimal |
+| 隐身脚本与业务 JS 冲突          | 改用 minimal preset，逐项加                           |
+| 移动端 UA 但视口是桌面          | 一定配合 `emulate_mobile`                             |
+| 隐身导致某些功能不工作          | 取消对应 `feature` 注入；或换 minimal                 |
 
 完整 stealth 引擎实现：`src/modules/stealth/StealthScripts2025.ts`（60+ 项反检测启动参数）。

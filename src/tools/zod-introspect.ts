@@ -11,7 +11,12 @@
 
 import {zod} from '../third_party/index.js';
 
-export type ToolArgType = 'string' | 'number' | 'boolean' | 'string[]' | 'object';
+export type ToolArgType =
+  | 'string'
+  | 'number'
+  | 'boolean'
+  | 'string[]'
+  | 'object';
 
 export interface ToolArgSpec {
   type: ToolArgType;
@@ -26,9 +31,11 @@ export type ToolArgSpecMap = Record<string, ToolArgSpec>;
 /**
  * 判断 zod 类型是否为 optional（被 zod.optional() 包裹）
  */
-function unwrapOptional(
-  schema: zod.ZodTypeAny,
-): {inner: zod.ZodTypeAny; isOptional: boolean; defaultValue?: unknown} {
+function unwrapOptional(schema: zod.ZodTypeAny): {
+  inner: zod.ZodTypeAny;
+  isOptional: boolean;
+  defaultValue?: unknown;
+} {
   let current = schema;
   let isOptional = false;
   let defaultValue: unknown = undefined;
@@ -65,8 +72,10 @@ function resolveSimpleType(
   if (inner instanceof zod.ZodString) return 'string';
   if (inner instanceof zod.ZodNumber) return 'number';
   if (inner instanceof zod.ZodBoolean) return 'boolean';
-  if (inner instanceof zod.ZodRecord || inner instanceof zod.ZodObject) return 'object';
-  if (inner instanceof zod.ZodEnum || inner instanceof zod.ZodNativeEnum) return 'string';
+  if (inner instanceof zod.ZodRecord || inner instanceof zod.ZodObject)
+    return 'object';
+  if (inner instanceof zod.ZodEnum || inner instanceof zod.ZodNativeEnum)
+    return 'string';
   if (inner instanceof zod.ZodArray) {
     return inner.element instanceof zod.ZodString ? 'string[]' : null;
   }

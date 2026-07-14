@@ -15,7 +15,11 @@ import {resolveDefaultDebuggerSessionsDir} from '../../../src/utils/projectPaths
 describe('DebuggerManager default session paths', () => {
   it('saves and lists sessions under the package-root debugger-sessions directory', async () => {
     const originalCwd = process.cwd;
-    const fakeCwd = path.join(path.parse(process.cwd()).root, 'Windows', 'system32');
+    const fakeCwd = path.join(
+      path.parse(process.cwd()).root,
+      'Windows',
+      'system32',
+    );
     const manager = new DebuggerManager({} as never);
 
     process.cwd = () => fakeCwd;
@@ -29,7 +33,7 @@ describe('DebuggerManager default session paths', () => {
       assert.ok(!savedPath.startsWith(fakeCwd));
 
       const sessions = await manager.listSavedSessions();
-      assert.ok(sessions.some((session) => session.path === savedPath));
+      assert.ok(sessions.some(session => session.path === savedPath));
     } finally {
       process.cwd = originalCwd;
       if (savedPath) {

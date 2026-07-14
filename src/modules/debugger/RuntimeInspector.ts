@@ -97,7 +97,9 @@ export class RuntimeInspector {
   constructor(
     private collector: CodeCollector,
     private getPausedState: () => PausedState | null,
-    private evaluateOnCallFrameFn: (params: EvaluateParams) => Promise<EvaluateResult>,
+    private evaluateOnCallFrameFn: (
+      params: EvaluateParams,
+    ) => Promise<EvaluateResult>,
     private setAsyncCallStackDepthFn?: (maxDepth: number) => Promise<void>,
   ) {}
 

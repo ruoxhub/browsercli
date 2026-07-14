@@ -1,4 +1,5 @@
 # 自动化任务输入模板
+
 - 目标 URL
 - 目标接口关键字 / `targetUrlPatterns`
 - 目标字段 / `targetKeywords`
@@ -12,6 +13,7 @@
 - 是否允许补环境/断点
 
 ## 结构化输入（推荐）
+
 - 推荐使用 JSON Schema 约束输入结构：
   - `references/schemas/reverse-task-input.schema.json`
 - 最小脱敏示例：

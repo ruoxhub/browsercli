@@ -54,15 +54,15 @@ search_in_sources --query "encrypt|sign|hash"
 
 ### Hook vs 断点决策（详细）
 
-| 情况 | 推荐 | 原因 |
-|------|------|------|
-| 只需要参数/返回值 | `hook_function` / `trace_function` | 不暂停，自动化友好 |
-| 需要检查局部变量 | `set_breakpoint_on_text` + `inspect_locals` | Hook 拿不到闭包变量 |
-| 不知道函数名 | `create_hook --type fetch\|xhr` + `get_request_initiator` | 从网络层反查 |
-| 首屏初始化 | `inject_preload_script` | 脚本注册前采样 |
-| 高频调用 | `create_hook` + `inject_hook --persistent true` | 断点会被自动循环检测移除 |
-| 加密库专项 | `hook_cryptojs` / `hook_jsencrypt` / `hook_smcrypto` | 专项工具比通用 Hook 稳定 |
-| 反调试绕过 | `anti_anti_debug` / `bypass_debugger` | 一键更可靠 |
+| 情况              | 推荐                                                      | 原因                     |
+| ----------------- | --------------------------------------------------------- | ------------------------ |
+| 只需要参数/返回值 | `hook_function` / `trace_function`                        | 不暂停，自动化友好       |
+| 需要检查局部变量  | `set_breakpoint_on_text` + `inspect_locals`               | Hook 拿不到闭包变量      |
+| 不知道函数名      | `create_hook --type fetch\|xhr` + `get_request_initiator` | 从网络层反查             |
+| 首屏初始化        | `inject_preload_script`                                   | 脚本注册前采样           |
+| 高频调用          | `create_hook` + `inject_hook --persistent true`           | 断点会被自动循环检测移除 |
+| 加密库专项        | `hook_cryptojs` / `hook_jsencrypt` / `hook_smcrypto`      | 专项工具比通用 Hook 稳定 |
+| 反调试绕过        | `anti_anti_debug` / `bypass_debugger`                     | 一键更可靠               |
 
 ---
 
@@ -79,17 +79,17 @@ anti_anti_debug
 
 ### 针对性方案
 
-| 反调试手段 | 推荐工具 | 备注 |
-|-----------|---------|------|
-| 无限 `debugger` | `bypass_debugger` | 移除 eval/Function/constructor 里的 debugger 关键字 |
-| 时间差检测（`Date.now` / `performance.now`） | `create_hook --type timer --params <fixedValue>` | 固定返回值 |
-| `Math.random` 检测 | 同上 timer 类型（random 也算 time 类副作用） | 固定种子 |
-| `console.clear` 清屏 | `create_hook --type function --target console.clear` | 拦截清屏 |
-| 窗口大小检测 | `create_hook --type property --target window.outerWidth` | 固定属性值 |
-| 页面跳转 | `create_hook --type function --target history.go\|location.href\|window.close` | 拦截跳转 |
-| webdriver / chrome.runtime | `inject_stealth --preset <name>` | 先 `list_stealth_presets` 选 |
-| `console.table` 时间检测 | `create_hook --type function --target console.table` | 中和 |
-| Hook 检测（`Function.prototype.toString`） | `create_hook --type function --target Function.prototype.toString` | 替换为原生字符串 |
+| 反调试手段                                   | 推荐工具                                                                       | 备注                                                |
+| -------------------------------------------- | ------------------------------------------------------------------------------ | --------------------------------------------------- |
+| 无限 `debugger`                              | `bypass_debugger`                                                              | 移除 eval/Function/constructor 里的 debugger 关键字 |
+| 时间差检测（`Date.now` / `performance.now`） | `create_hook --type timer --params <fixedValue>`                               | 固定返回值                                          |
+| `Math.random` 检测                           | 同上 timer 类型（random 也算 time 类副作用）                                   | 固定种子                                            |
+| `console.clear` 清屏                         | `create_hook --type function --target console.clear`                           | 拦截清屏                                            |
+| 窗口大小检测                                 | `create_hook --type property --target window.outerWidth`                       | 固定属性值                                          |
+| 页面跳转                                     | `create_hook --type function --target history.go\|location.href\|window.close` | 拦截跳转                                            |
+| webdriver / chrome.runtime                   | `inject_stealth --preset <name>`                                               | 先 `list_stealth_presets` 选                        |
+| `console.table` 时间检测                     | `create_hook --type function --target console.table`                           | 中和                                                |
+| Hook 检测（`Function.prototype.toString`）   | `create_hook --type function --target Function.prototype.toString`             | 替换为原生字符串                                    |
 
 > 详细 hook 写法：`references/hook-patterns.md`。
 
@@ -137,15 +137,15 @@ diff_env_requirements --runtimeError "<error msg>"  # 仅作辅助
 
 **目标**：还原被混淆的 JS 代码，**目标是"可读语义块"而非一次性还原**。
 
-| 目标 | 工具 | 说明 |
-|------|------|------|
-| 字符串表 + `_0x***` 索引 | `deobfuscate_code --code <c> --aggressive true --renameVariables true` | AI 辅助批量替换 |
-| 控制流平坦化 | `deobfuscate_code` + 手动 pass（`references/ast-deobfuscation.md`） | AST 4-pass：常量→字符串→控制流→死代码 |
-| 理解业务逻辑 | `understand_code --code <c> --focus business` | AI + 静态分析 |
-| 理解安全/风控 | `understand_code --code <c> --focus security` | 同上，焦点切换 |
-| 文件/项目级摘要 | `summarize_code --mode project --code <path>` 或 `--url <repoUrl>` | 项目级概览 |
-| 检测加密算法 | `detect_crypto --code <c> --useAI true` | 识别 CryptoJS / WebCrypto / 自实现 |
-| 综合风险评分 | `risk_panel --code <c> --includeHookSignals true --hookId <id>` | 把 Hook 数据也纳入风险面板 |
+| 目标                     | 工具                                                                   | 说明                                  |
+| ------------------------ | ---------------------------------------------------------------------- | ------------------------------------- |
+| 字符串表 + `_0x***` 索引 | `deobfuscate_code --code <c> --aggressive true --renameVariables true` | AI 辅助批量替换                       |
+| 控制流平坦化             | `deobfuscate_code` + 手动 pass（`references/ast-deobfuscation.md`）    | AST 4-pass：常量→字符串→控制流→死代码 |
+| 理解业务逻辑             | `understand_code --code <c> --focus business`                          | AI + 静态分析                         |
+| 理解安全/风控            | `understand_code --code <c> --focus security`                          | 同上，焦点切换                        |
+| 文件/项目级摘要          | `summarize_code --mode project --code <path>` 或 `--url <repoUrl>`     | 项目级概览                            |
+| 检测加密算法             | `detect_crypto --code <c> --useAI true`                                | 识别 CryptoJS / WebCrypto / 自实现    |
+| 综合风险评分             | `risk_panel --code <c> --includeHookSignals true --hookId <id>`        | 把 Hook 数据也纳入风险面板            |
 
 > AST pass 固定顺序：常量传播 → 字符串表替换 → 控制流还原 → 死代码清理。
 > 每步后跑一次 I/O 对比（关键函数 + 关键请求），不一致回滚最近变换。
@@ -215,15 +215,15 @@ wasm_vmp_trace --maxEvents 100
 
 **目标**：隐藏自动化痕迹 / 复现特定设备环境。
 
-| 目标 | 工具 |
-|------|------|
+| 目标                         | 工具                                                          |
+| ---------------------------- | ------------------------------------------------------------- |
 | 隐藏 webdriver / canvas 噪声 | `inject_stealth --preset <name>`（先 `list_stealth_presets`） |
-| 自定义 UA | `set_user_agent --userAgent <ua>` |
-| 移动端 UA + 视口 + 触摸 | `emulate_mobile --enable true --device "iPhone 14"` |
-| 网络限速 / 离线 | `emulate_network --throttlingOption "Slow 3G"` |
-| CPU 节流（复现弱机） | `emulate_cpu --throttlingRate 4` |
-| 自定义视口 | `resize_page --width 375 --height 812` |
-| 哪些隐身项被启用 | `list_stealth_features` |
+| 自定义 UA                    | `set_user_agent --userAgent <ua>`                             |
+| 移动端 UA + 视口 + 触摸      | `emulate_mobile --enable true --device "iPhone 14"`           |
+| 网络限速 / 离线              | `emulate_network --throttlingOption "Slow 3G"`                |
+| CPU 节流（复现弱机）         | `emulate_cpu --throttlingRate 4`                              |
+| 自定义视口                   | `resize_page --width 375 --height 812`                        |
+| 哪些隐身项被启用             | `list_stealth_features`                                       |
 
 详见 `references/stealth-emulation.md`。
 
@@ -240,6 +240,7 @@ list_console_messages --includePreservedMessages true   # 翻页前
 ```
 
 常用于：
+
 - `error` 堆栈 → 间接定位混淆函数入口
 - 找 `console.log('sign:', ...)` 显式打印
 - 在断点循环时验证 `resume` 是否真的执行（应有新 error 出现）
@@ -285,12 +286,12 @@ inject_code_template --templateName <name>   # 注入到当前页面
 
 ## 阶段切换红线
 
-| 红线 | 后果 |
-|------|------|
-| 没做 Observe 就开始 Patch | 盲补环境，越补越乱 |
-| 没有 `first divergence` 就连补多个对象 | 不知道补丁是否生效 |
-| env rebuild 没通过就进 PureExtraction | 算法提纯跑在错误环境上 |
-| Node pure 没稳定就写 Python pure | 跨语言环境问题叠加 |
+| 红线                                        | 后果                                        |
+| ------------------------------------------- | ------------------------------------------- |
+| 没做 Observe 就开始 Patch                   | 盲补环境，越补越乱                          |
+| 没有 `first divergence` 就连补多个对象      | 不知道补丁是否生效                          |
+| env rebuild 没通过就进 PureExtraction       | 算法提纯跑在错误环境上                      |
+| Node pure 没稳定就写 Python pure            | 跨语言环境问题叠加                          |
 | 真实 cookie / token / storage 写进仓库 case | 违反 `docs/reference/case-safety-policy.md` |
 
 完整协议：`docs/reference/reverse-workflow.md`。

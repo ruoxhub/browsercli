@@ -22,10 +22,7 @@ export const click = defineTool({
   },
   schema: {
     selector: zod.string().describe('CSS 选择器。'),
-    dblClick: zod
-      .boolean()
-      .optional()
-      .describe('是否双击，默认 false。'),
+    dblClick: zod.boolean().optional().describe('是否双击，默认 false。'),
   },
   handler: async (request, response, context) => {
     const {selector, dblClick = false} = request.params;

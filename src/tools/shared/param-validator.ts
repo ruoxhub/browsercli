@@ -56,7 +56,14 @@ export function coerceParams<T extends ZodRawShape>(
   return coerced;
 }
 
-type ExpectedType = 'string' | 'number' | 'boolean' | 'string[]' | 'object' | 'enum' | 'unknown';
+type ExpectedType =
+  | 'string'
+  | 'number'
+  | 'boolean'
+  | 'string[]'
+  | 'object'
+  | 'enum'
+  | 'unknown';
 
 function inferZodType(schema: zod.ZodTypeAny): ExpectedType {
   let current = schema;
@@ -70,6 +77,7 @@ function inferZodType(schema: zod.ZodTypeAny): ExpectedType {
   if (current instanceof zod.ZodEnum) return 'enum';
   if (current instanceof zod.ZodNativeEnum) return 'enum';
   if (current instanceof zod.ZodArray) return 'string[]';
-  if (current instanceof zod.ZodObject || current instanceof zod.ZodRecord) return 'object';
+  if (current instanceof zod.ZodObject || current instanceof zod.ZodRecord)
+    return 'object';
   return 'unknown';
 }

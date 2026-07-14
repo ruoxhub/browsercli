@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -8,15 +7,16 @@
  * SiteExperienceService 单元测试
  */
 import assert from 'node:assert';
-import { describe, it, before, after } from 'node:test';
+import {describe, it, before, after} from 'node:test';
 
-import { DatabaseService } from '../../../src/services/DatabaseService.js';
-import { SiteExperienceService } from '../../../src/services/SiteExperienceService.js';
+import {DatabaseService} from '../../../src/services/DatabaseService.js';
+import {SiteExperienceService} from '../../../src/services/SiteExperienceService.js';
 
 describe('SiteExperienceService', () => {
   let dbService: DatabaseService;
   let service: SiteExperienceService;
-  const testDbUrl = 'postgresql://postgres:postgres@localhost:5432/js_reverse_mcp_test';
+  const testDbUrl =
+    'postgresql://postgres:postgres@localhost:5432/js_reverse_mcp_test';
 
   before(async () => {
     // 跳过测试如果数据库不可用
@@ -26,7 +26,9 @@ describe('SiteExperienceService', () => {
       await dbService.migrate();
       service = new SiteExperienceService();
     } catch {
-      console.warn('PostgreSQL not available, skipping SiteExperienceService tests');
+      console.warn(
+        'PostgreSQL not available, skipping SiteExperienceService tests',
+      );
     }
   });
 
@@ -64,7 +66,9 @@ describe('SiteExperienceService', () => {
       name: 'Test Example',
     });
 
-    const results = await service.search({ url: 'https://test-example.com/page' });
+    const results = await service.search({
+      url: 'https://test-example.com/page',
+    });
     assert.strictEqual(results.length, 1);
     assert.strictEqual(results[0].domain, 'test-example.com');
 
@@ -79,7 +83,7 @@ describe('SiteExperienceService', () => {
       name: 'Search Test Site',
     });
 
-    const results = await service.search({ name: 'Search Test' });
+    const results = await service.search({name: 'Search Test'});
     assert.ok(results.length > 0);
 
     await service.delete(created.id);

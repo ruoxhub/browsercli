@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {describe, it, beforeEach} from 'node:test';
 import assert from 'node:assert/strict';
+import {describe, it, beforeEach} from 'node:test';
 
 import {
   injectHook,
@@ -18,9 +18,11 @@ import type {Context} from '../../../../src/tools/ToolDefinition.js';
  * 构造最小 Context mock，仅暴露 inject_hook 用到的方法。
  * frame.evaluate + page.addInitScript 都记录调用痕迹供断言。
  */
-function buildMockContext(options: {
-  supportsAddInitScript?: boolean;
-} = {}) {
+function buildMockContext(
+  options: {
+    supportsAddInitScript?: boolean;
+  } = {},
+) {
   const supportsAddInitScript = options.supportsAddInitScript ?? true;
   const frameEvaluateCalls: string[] = [];
   const addInitScriptCalls: string[] = [];
@@ -86,7 +88,10 @@ describe('inject_hook persistent 模式', () => {
     assert.equal(frameEvaluateCalls.length, 1);
     assert.equal(addInitScriptCalls.length, 0);
     assert.equal(calls[0]?.success, true);
-    const data = calls[0]?.data as {persisted: boolean; ranOnCurrentFrame: boolean};
+    const data = calls[0]?.data as {
+      persisted: boolean;
+      ranOnCurrentFrame: boolean;
+    };
     assert.equal(data.persisted, false);
     assert.equal(data.ranOnCurrentFrame, true);
   });
@@ -104,7 +109,10 @@ describe('inject_hook persistent 模式', () => {
     assert.equal(frameEvaluateCalls.length, 1);
     assert.equal(addInitScriptCalls.length, 1);
     assert.equal(calls[0]?.success, true);
-    const data = calls[0]?.data as {persisted: boolean; ranOnCurrentFrame: boolean};
+    const data = calls[0]?.data as {
+      persisted: boolean;
+      ranOnCurrentFrame: boolean;
+    };
     assert.equal(data.persisted, true);
     assert.equal(data.ranOnCurrentFrame, true);
     // 写入了注册表

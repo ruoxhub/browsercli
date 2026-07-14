@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src/**/*.ts",
+    "tests/**/*.ts",
+    "tests/**/*.js",
+    "scripts/**/*.ts",
+    "scripts/eslint_rules/**/*.js",
+    "*.ts",
+    "*.mjs",
+    "*.js"
+  ],
+  "exclude": ["node_modules", "build", "src/web-ui"]
+}

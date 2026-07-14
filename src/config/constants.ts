@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-
 /** Sekiro 默认分组名 */
 export const DEFAULT_GROUP = 'browsercli';
 

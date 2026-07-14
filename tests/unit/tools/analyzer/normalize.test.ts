@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {describe, it} from 'node:test';
 import assert from 'node:assert/strict';
+import {describe, it} from 'node:test';
 
 import {
   toMirroredNetworkEntry,
@@ -59,10 +59,7 @@ describe('analyzer/normalize 防御性行为', () => {
     });
 
     it('缺少 scriptUrl 时返回 undefined', () => {
-      assert.equal(
-        toMirroredScriptEntry({scriptId: 'x'}),
-        undefined,
-      );
+      assert.equal(toMirroredScriptEntry({scriptId: 'x'}), undefined);
     });
 
     it('有 scriptUrl + scriptId 时正常镜像', () => {

@@ -17,8 +17,8 @@
 
 import type {IncomingMessage, ServerResponse} from 'node:http';
 
-import type {SekiroInvoker} from '../../worker/SekiroInvoker.js';
 import {getAllToolsMeta, getToolMeta} from '../../tools/tools-meta.js';
+import type {SekiroInvoker} from '../../worker/SekiroInvoker.js';
 import type {InvocationStore} from '../adapters/InvocationStore.js';
 import {toolMetaToJsonSchema} from '../adapters/ZodToJsonSchema.js';
 import {sendError, sendJson, sendUnexpected} from '../middleware/error.js';
@@ -116,8 +116,7 @@ export function createToolsRoutes(
               ? (body as Record<string, unknown>)
               : {};
         } catch (err) {
-          const code =
-            err instanceof Error ? err.message : 'INVALID_JSON';
+          const code = err instanceof Error ? err.message : 'INVALID_JSON';
           if (code === 'PAYLOAD_TOO_LARGE') {
             sendError(res, code, '请求体超过 1MB 上限', 413);
           } else {

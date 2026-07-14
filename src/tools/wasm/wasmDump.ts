@@ -12,7 +12,6 @@ import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
-
 export const wasmDump = defineTool({
   name: 'wasm_dump',
   description: 'Dump a captured Wasm module to a .wasm file on disk.',
@@ -21,8 +20,16 @@ export const wasmDump = defineTool({
     readOnlyHint: false,
   },
   schema: {
-    moduleIndex: zod.number().int().nonnegative().optional().describe('Index of the captured module (default 0)'),
-    outputPath: zod.string().optional().describe('Output file path for the .wasm binary'),
+    moduleIndex: zod
+      .number()
+      .int()
+      .nonnegative()
+      .optional()
+      .describe('Index of the captured module (default 0)'),
+    outputPath: zod
+      .string()
+      .optional()
+      .describe('Output file path for the .wasm binary'),
   },
   handler: async (request, response) => {
     const {moduleIndex = 0, outputPath: userOutputPath} = request.params;
@@ -61,8 +68,12 @@ export const wasmDump = defineTool({
         return;
       }
 
-      const outputPath = userOutputPath
-        ?? path.join(process.cwd(), `wasm_dump_${moduleIndex}_${module.hash.slice(0, 8)}.wasm`);
+      const outputPath =
+        userOutputPath ??
+        path.join(
+          process.cwd(),
+          `wasm_dump_${moduleIndex}_${module.hash.slice(0, 8)}.wasm`,
+        );
 
       await writeFile(outputPath, bytes);
 

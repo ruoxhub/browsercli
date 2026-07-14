@@ -14,22 +14,22 @@
 
 ## File Structure
 
-| File | Action | Responsibility |
-|------|--------|---------------|
-| `src/modules/collector/CodeCollector.ts` | Modify | Add pageResolver guard in `collect()` and empty-cache guard in `getFilesByPattern()` |
-| `src/modules/collector/types.ts` | Modify | Add optional `error`, `warning`, `message` fields to `CollectCodeResult` |
-| `src/tools/collector/collectCode.ts` | Modify | Add suggestion field to error responses |
-| `src/tools/collector/searchInScripts.ts` | Modify | Add suggestion field to error responses |
-| `src/tools/hook/InjectHook.ts` | Modify | Add `world` parameter, framenavigated re-mount, structured status response |
-| `src/tools/hook/types.ts` | Modify | Add `world` and `persistentStrategy` to `InjectHookData` |
-| `tests/unit/modules/CodeCollector.guards.test.ts` | Create | Test pageResolver guard and empty-cache guard |
-| `tests/unit/tools/collector-crash.test.ts` | Create | Test tool-layer structured error responses |
-| `tests/unit/tools/hook/InjectHook.world.test.ts` | Create | Test world parameter and persistence re-mount |
-| `docs/guides/full-usage-guide.md` | Modify | §7 slim to reference |
-| `skills/jsreverser-playbook/references/automation-entry.md` | Modify | Add workflow mapping header |
-| `agent/crawler-reverse-agent.md` | Modify | Add phase mapping comments |
-| `AGENTS.md` | Modify | Expand Architecture Notes with core runtime components |
-| 15 source files | Modify | Add `@see` JSDoc cross-references |
+| File                                                        | Action | Responsibility                                                                       |
+| ----------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------ |
+| `src/modules/collector/CodeCollector.ts`                    | Modify | Add pageResolver guard in `collect()` and empty-cache guard in `getFilesByPattern()` |
+| `src/modules/collector/types.ts`                            | Modify | Add optional `error`, `warning`, `message` fields to `CollectCodeResult`             |
+| `src/tools/collector/collectCode.ts`                        | Modify | Add suggestion field to error responses                                              |
+| `src/tools/collector/searchInScripts.ts`                    | Modify | Add suggestion field to error responses                                              |
+| `src/tools/hook/InjectHook.ts`                              | Modify | Add `world` parameter, framenavigated re-mount, structured status response           |
+| `src/tools/hook/types.ts`                                   | Modify | Add `world` and `persistentStrategy` to `InjectHookData`                             |
+| `tests/unit/modules/CodeCollector.guards.test.ts`           | Create | Test pageResolver guard and empty-cache guard                                        |
+| `tests/unit/tools/collector-crash.test.ts`                  | Create | Test tool-layer structured error responses                                           |
+| `tests/unit/tools/hook/InjectHook.world.test.ts`            | Create | Test world parameter and persistence re-mount                                        |
+| `docs/guides/full-usage-guide.md`                           | Modify | §7 slim to reference                                                                 |
+| `skills/jsreverser-playbook/references/automation-entry.md` | Modify | Add workflow mapping header                                                          |
+| `agent/crawler-reverse-agent.md`                            | Modify | Add phase mapping comments                                                           |
+| `AGENTS.md`                                                 | Modify | Expand Architecture Notes with core runtime components                               |
+| 15 source files                                             | Modify | Add `@see` JSDoc cross-references                                                    |
 
 ---
 
@@ -38,6 +38,7 @@
 ### Task 1: Module-layer defense in CodeCollector
 
 **Files:**
+
 - Modify: `src/modules/collector/CodeCollector.ts:487` (collect method entry)
 - Modify: `src/modules/collector/CodeCollector.ts:1310` (getFilesByPattern method entry)
 - Modify: `src/modules/collector/types.ts:38-44` (CollectCodeResult interface)
@@ -93,7 +94,10 @@ describe('CodeCollector defensive guards', () => {
     const collector = buildStubCollector();
     // Pre-populate cache so we pass the empty-cache guard
     (collector as any).collectedFilesCache.set('test', {
-      url: 'test.js', content: 'x', size: 1, type: 'inline',
+      url: 'test.js',
+      content: 'x',
+      size: 1,
+      type: 'inline',
     });
     const result = collector.getFilesByPattern('[invalid');
     assert.equal((result as any).error, 'INVALID_PATTERN');
@@ -212,6 +216,7 @@ git commit -m "fix(collector): add pageResolver and empty-cache guards to preven
 ### Task 2: Tool-layer structured error responses
 
 **Files:**
+
 - Modify: `src/tools/collector/collectCode.ts:141-151` (catch block)
 - Modify: `src/tools/collector/searchInScripts.ts:65-82` (catch block)
 - Test: `tests/unit/tools/collector-crash.test.ts`
@@ -231,7 +236,9 @@ function buildMockResponse() {
   let content: any = null;
   return {
     response: {
-      setStructuredContent(c: any) { content = c; },
+      setStructuredContent(c: any) {
+        content = c;
+      },
     },
     getContent: () => content,
   };
@@ -243,10 +250,13 @@ describe('collect_code error responses', () => {
       collector: {
         getCollectedFilesSummary: () => [],
         collect: async () => ({
-          files: [], dependencies: {nodes: [], edges: []},
-          totalSize: 0, collectTime: 0,
+          files: [],
+          dependencies: {nodes: [], edges: []},
+          totalSize: 0,
+          collectTime: 0,
           error: 'NO_PAGE_CONTEXT',
-          message: '页面上下文未就绪。请先调用 select_page 或 new_page 选择一个页面。',
+          message:
+            '页面上下文未就绪。请先调用 select_page 或 new_page 选择一个页面。',
         }),
       },
     } as any;
@@ -290,7 +300,10 @@ describe('collect_code error responses', () => {
       const result = getContent();
       assert.equal(result.success, false);
       assert.ok(result.suggestion);
-      assert.match(result.suggestion, /check_browser_health|select_page|new_page/);
+      assert.match(
+        result.suggestion,
+        /check_browser_health|select_page|new_page/,
+      );
     } finally {
       setRuntime(undefined);
     }
@@ -302,7 +315,11 @@ describe('search_in_scripts error responses', () => {
     const stubRuntime = {
       collector: {
         getFilesByPattern: () => ({
-          files: [], totalSize: 0, matched: 0, returned: 0, truncated: false,
+          files: [],
+          totalSize: 0,
+          matched: 0,
+          returned: 0,
+          truncated: false,
           warning: '脚本缓存为空。请先调用 collect_code 收集脚本后再搜索。',
         }),
       },
@@ -430,6 +447,7 @@ git commit -m "fix(collector): add suggestion field to structured error response
 ### Task 3: Add world parameter to inject_hook
 
 **Files:**
+
 - Modify: `src/tools/hook/InjectHook.ts:46-57` (schema)
 - Modify: `src/tools/hook/InjectHook.ts:58-128` (handler)
 - Modify: `src/tools/hook/types.ts:40-47` (InjectHookData)
@@ -480,7 +498,14 @@ function buildMockContext(options: {supportsAddInitScript?: boolean} = {}) {
     getSelectedPage: () => fakePage,
   } as unknown as Context;
 
-  return {ctx, fakeFrame, fakePage, frameEvaluateCalls, addInitScriptCalls, framenavigatedHandlers};
+  return {
+    ctx,
+    fakeFrame,
+    fakePage,
+    frameEvaluateCalls,
+    addInitScriptCalls,
+    framenavigatedHandlers,
+  };
 }
 
 function buildMockResponse() {
@@ -564,7 +589,14 @@ describe('inject_hook world parameter', () => {
     const {response} = buildMockResponse();
 
     await injectHook.handler(
-      {params: {hookId: 'hw5', script: '/*pw*/', persistent: true, world: 'main'}},
+      {
+        params: {
+          hookId: 'hw5',
+          script: '/*pw*/',
+          persistent: true,
+          world: 'main',
+        },
+      },
       response,
       ctx,
     );
@@ -749,6 +781,7 @@ git commit -m "fix(hook): add world parameter and framenavigated re-mount for pe
 ### Task 4: Unify workflow docs under reverse-workflow.md
 
 **Files:**
+
 - Modify: `docs/guides/full-usage-guide.md:313-448` (§7)
 - Modify: `skills/jsreverser-playbook/references/automation-entry.md:1-3` (header)
 - Modify: `agent/crawler-reverse-agent.md:37-80` (step descriptions)
@@ -764,14 +797,14 @@ In `docs/guides/full-usage-guide.md`, replace lines 325-448 (the entire §7.2 �
 
 该文档是 6 阶段工作流的唯一权威来源。以下为本阶段快速参考：
 
-| 阶段 | 一句话目标 | 完成判据 |
-|------|-----------|---------|
-| 1. Observe | 确认目标请求、脚本、触发动作 | 能回答"请求谁发起、哪段脚本参与、如何触发" |
-| 2. Capture | Hook 采样运行时数据 | 至少一条可复用的真实运行样本 |
-| 3. Rebuild | 导出本地可运行 Node 工程 | 本地有稳定复现入口，能看到运行错误 |
-| 4. Patch | 按 first divergence 驱动补环境 | env rebuild 稳定跑通，服务端验收通过 |
-| 5. PureExtraction | 分离环境噪音和算法输入 | Node pure implementation 与 fixture 对齐 |
-| 6. Port | 迁移到 Python 或其他宿主 | 外部语言版本与 Node pure 对齐 |
+| 阶段              | 一句话目标                     | 完成判据                                   |
+| ----------------- | ------------------------------ | ------------------------------------------ |
+| 1. Observe        | 确认目标请求、脚本、触发动作   | 能回答"请求谁发起、哪段脚本参与、如何触发" |
+| 2. Capture        | Hook 采样运行时数据            | 至少一条可复用的真实运行样本               |
+| 3. Rebuild        | 导出本地可运行 Node 工程       | 本地有稳定复现入口，能看到运行错误         |
+| 4. Patch          | 按 first divergence 驱动补环境 | env rebuild 稳定跑通，服务端验收通过       |
+| 5. PureExtraction | 分离环境噪音和算法输入         | Node pure implementation 与 fixture 对齐   |
+| 6. Port           | 迁移到 Python 或其他宿主       | 外部语言版本与 Node pure 对齐              |
 ```
 
 - [ ] **Step 2: Add mapping header to automation-entry.md**
@@ -789,21 +822,25 @@ In `skills/jsreverser-playbook/references/automation-entry.md`, add at the very 
 In `agent/crawler-reverse-agent.md`, insert phase mapping HTML comments before these step headings:
 
 Before line 38 (`**Step 0：任务确认**`), insert:
+
 ```markdown
 <!-- 准备阶段：对应 reverse-workflow.md 全部阶段的前置条件 -->
 ```
 
 Before line 62 (`**Step 1：目标侦察（自动执行，无需用户指令）**`), insert:
+
 ```markdown
 <!-- 对应 reverse-workflow.md Phase 1: Observe -->
 ```
 
 Before line 158 (`**Step 3：静态分析（使用 js-reverse MCP）**`), insert:
+
 ```markdown
 <!-- 对应 reverse-workflow.md Phase 1-2: Observe + Capture -->
 ```
 
 Before line 197 (`**Step 4：动态验证（使用 js-reverse MCP）**`), insert:
+
 ```markdown
 <!-- 对应 reverse-workflow.md Phase 2: Capture（Hook 采样验证） -->
 ```
@@ -827,6 +864,7 @@ git commit -m "docs(workflow): unify 6-phase workflow under reverse-workflow.md 
 ### Task 5: Add @see cross-references to 15 core source files
 
 **Files:**
+
 - Modify: 15 source files (JSDoc module-level comments)
 
 - [ ] **Step 1: Add @see to EventBus**
@@ -1058,6 +1096,7 @@ git commit -m "docs(jsdoc): add @see cross-references to 15 high-value isolated 
 ### Task 6: Expand AGENTS.md Architecture Notes
 
 **Files:**
+
 - Modify: `AGENTS.md` (Architecture Notes section, after line 29)
 
 - [ ] **Step 1: Add core runtime component table to AGENTS.md**
@@ -1069,20 +1108,19 @@ In `AGENTS.md`, after the line "### 反检测分层（与 jshookmcp 对齐）" (
 
 以下组件构成 MCP 工具的运行时基础。修改时请注意依赖链。
 
-| 组件 | 文件 | 职责 |
-|------|------|------|
-| EventBus | `src/utils/EventBus.ts` | 类型安全事件总线，全局单例 |
-| RuntimeServices | `src/runtime/RuntimeServices.ts` | 延迟初始化服务集合（AI、分析器、去混淆器等） |
-| BrowserManager | `src/browser/browser.ts` | 浏览器生命周期、页面管理、反检测注入 |
-| CodeCollector | `src/modules/collector/CodeCollector.ts` | 脚本收集 + 缓存 + 搜索 |
-| HookManager | `src/modules/hook/HookManager.ts` | Hook 创建、管理、数据存取门面 |
-| HookStore | `src/modules/hook/HookStore.ts` | Hook 采样数据存储层 |
-| HookCodeBuilder | `src/modules/hook/HookCodeBuilder.ts` | Hook 脚本链式构建器 |
-| ReverseTaskStore | `src/reverse/ReverseTaskStore.ts` | 逆向任务持久化存储 |
-| ToolRegistry | `src/tools/registry/ToolRegistry.ts` | MCP 工具注册表 + toolProfile 过滤 |
-| ToolExecutionPipeline | `src/worker/ToolExecutionPipeline.ts` | 工具执行管线（校验→上下文→执行→响应） |
-| WsHub | `src/web/ws/WsHub.ts` | WebSocket 连接中心 |
-
+| 组件                  | 文件                                     | 职责                                         |
+| --------------------- | ---------------------------------------- | -------------------------------------------- |
+| EventBus              | `src/utils/EventBus.ts`                  | 类型安全事件总线，全局单例                   |
+| RuntimeServices       | `src/runtime/RuntimeServices.ts`         | 延迟初始化服务集合（AI、分析器、去混淆器等） |
+| BrowserManager        | `src/browser/browser.ts`                 | 浏览器生命周期、页面管理、反检测注入         |
+| CodeCollector         | `src/modules/collector/CodeCollector.ts` | 脚本收集 + 缓存 + 搜索                       |
+| HookManager           | `src/modules/hook/HookManager.ts`        | Hook 创建、管理、数据存取门面                |
+| HookStore             | `src/modules/hook/HookStore.ts`          | Hook 采样数据存储层                          |
+| HookCodeBuilder       | `src/modules/hook/HookCodeBuilder.ts`    | Hook 脚本链式构建器                          |
+| ReverseTaskStore      | `src/reverse/ReverseTaskStore.ts`        | 逆向任务持久化存储                           |
+| ToolRegistry          | `src/tools/registry/ToolRegistry.ts`     | MCP 工具注册表 + toolProfile 过滤            |
+| ToolExecutionPipeline | `src/worker/ToolExecutionPipeline.ts`    | 工具执行管线（校验→上下文→执行→响应）        |
+| WsHub                 | `src/web/ws/WsHub.ts`                    | WebSocket 连接中心                           |
 ```
 
 - [ ] **Step 2: Commit**

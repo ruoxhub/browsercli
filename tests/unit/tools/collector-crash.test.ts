@@ -7,9 +7,9 @@
 import assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
 
+import {setRuntime} from '../../../src/runtime.js';
 import {collectCode} from '../../../src/tools/collector/collectCode.js';
 import {searchInScripts} from '../../../src/tools/collector/searchInScripts.js';
-import {setRuntime} from '../../../src/runtime.js';
 
 function buildMockResponse() {
   let content: any = null;

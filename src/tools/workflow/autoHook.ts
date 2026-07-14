@@ -960,29 +960,75 @@ interface HookPreset {
 }
 
 const HOOK_PRESETS: HookPreset[] = [
-  {optionKey: 'hookFetch', hookId: 'hook_fetch_auto', type: 'fetch', description: 'Hook fetch API - capture requests and responses', buildScript: () => _generateFetchHookScript()},
-  {optionKey: 'hookXhr', hookId: 'hook_xhr_auto', type: 'xhr', description: 'Hook XMLHttpRequest - capture XHR requests', buildScript: () => _generateXhrHookScript()},
-  {optionKey: 'hookTimers', hookId: 'hook_timers_auto', type: 'timer', description: 'Hook setTimeout/setInterval', buildScript: () => _generateTimerHookScript()},
-  {optionKey: 'hookEval', hookId: 'hook_eval_auto', type: 'eval', description: 'Hook eval and Function constructor', buildScript: () => _generateEvalHookScript()},
-  {optionKey: 'hookCookie', hookId: 'hook_cookie_auto', type: 'cookie', description: 'Hook document.cookie getter/setter', buildScript: () => _generateCookieHookScript()},
-  {optionKey: 'hookCrypto', hookId: 'hook_cryptojs_auto', type: 'cryptojs', description: 'Hook CryptoJS - AES, DES, MD5, SHA, HMAC', buildScript: () => _generateCryptoJsHookScript()},
-  {optionKey: 'hookRsa', hookId: 'hook_jsencrypt_auto', type: 'jsencrypt', description: 'Hook JSEncrypt - RSA encryption/decryption', buildScript: () => _generateJsEncryptHookScript()},
-  {optionKey: 'hookSmCrypto', hookId: 'hook_smcrypto_auto', type: 'smcrypto', description: 'Hook SM-Crypto - SM2, SM3, SM4', buildScript: () => _generateSmCryptoHookScript()},
+  {
+    optionKey: 'hookFetch',
+    hookId: 'hook_fetch_auto',
+    type: 'fetch',
+    description: 'Hook fetch API - capture requests and responses',
+    buildScript: () => _generateFetchHookScript(),
+  },
+  {
+    optionKey: 'hookXhr',
+    hookId: 'hook_xhr_auto',
+    type: 'xhr',
+    description: 'Hook XMLHttpRequest - capture XHR requests',
+    buildScript: () => _generateXhrHookScript(),
+  },
+  {
+    optionKey: 'hookTimers',
+    hookId: 'hook_timers_auto',
+    type: 'timer',
+    description: 'Hook setTimeout/setInterval',
+    buildScript: () => _generateTimerHookScript(),
+  },
+  {
+    optionKey: 'hookEval',
+    hookId: 'hook_eval_auto',
+    type: 'eval',
+    description: 'Hook eval and Function constructor',
+    buildScript: () => _generateEvalHookScript(),
+  },
+  {
+    optionKey: 'hookCookie',
+    hookId: 'hook_cookie_auto',
+    type: 'cookie',
+    description: 'Hook document.cookie getter/setter',
+    buildScript: () => _generateCookieHookScript(),
+  },
+  {
+    optionKey: 'hookCrypto',
+    hookId: 'hook_cryptojs_auto',
+    type: 'cryptojs',
+    description: 'Hook CryptoJS - AES, DES, MD5, SHA, HMAC',
+    buildScript: () => _generateCryptoJsHookScript(),
+  },
+  {
+    optionKey: 'hookRsa',
+    hookId: 'hook_jsencrypt_auto',
+    type: 'jsencrypt',
+    description: 'Hook JSEncrypt - RSA encryption/decryption',
+    buildScript: () => _generateJsEncryptHookScript(),
+  },
+  {
+    optionKey: 'hookSmCrypto',
+    hookId: 'hook_smcrypto_auto',
+    type: 'smcrypto',
+    description: 'Hook SM-Crypto - SM2, SM3, SM4',
+    buildScript: () => _generateSmCryptoHookScript(),
+  },
 ];
 
 function buildHookPlans(
   options: AutoHookOptions,
 ): Array<HookInjectionRecord & {script: string}> {
-  return HOOK_PRESETS
-    .filter(p => options[p.optionKey])
-    .map(p => ({
-      hookId: p.hookId,
-      type: p.type,
-      description: p.description,
-      success: true,
-      injected: false,
-      script: p.buildScript(),
-    }));
+  return HOOK_PRESETS.filter(p => options[p.optionKey]).map(p => ({
+    hookId: p.hookId,
+    type: p.type,
+    description: p.description,
+    success: true,
+    injected: false,
+    script: p.buildScript(),
+  }));
 }
 
 async function injectHookPlans(
@@ -1020,24 +1066,51 @@ async function injectHookPlans(
  */
 export const autoHook = defineTool({
   name: 'auto_hook',
-  description: 'Auto-hook: generate and inject debug hooks and crypto library hooks based on preset or custom options',
-  annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: false},
+  description:
+    'Auto-hook: generate and inject debug hooks and crypto library hooks based on preset or custom options',
+  annotations: {
+    category: ToolCategory.REVERSE_ENGINEERING,
+    readOnlyHint: false,
+  },
   schema: {
     url: zod.string().optional().describe('Target URL'),
-    preset: zod.enum(['none', 'api-signature', 'network-core']).optional().describe('Hook preset'),
-    autoInject: zod.boolean().optional().describe('Auto inject hooks into page'),
-    waitAfterHookMs: zod.number().optional().describe('Wait time after hook injection in ms'),
+    preset: zod
+      .enum(['none', 'api-signature', 'network-core'])
+      .optional()
+      .describe('Hook preset'),
+    autoInject: zod
+      .boolean()
+      .optional()
+      .describe('Auto inject hooks into page'),
+    waitAfterHookMs: zod
+      .number()
+      .optional()
+      .describe('Wait time after hook injection in ms'),
     useAI: zod.boolean().optional().describe('Use AI analysis'),
     hookCrypto: zod.boolean().optional().describe('Hook CryptoJS library'),
     hookRsa: zod.boolean().optional().describe('Hook JSEncrypt/RSA library'),
     hookSmCrypto: zod.boolean().optional().describe('Hook SM-Crypto library'),
-    hookTimers: zod.boolean().optional().describe('Hook setTimeout/setInterval'),
-    hookEval: zod.boolean().optional().describe('Hook eval/Function constructor'),
+    hookTimers: zod
+      .boolean()
+      .optional()
+      .describe('Hook setTimeout/setInterval'),
+    hookEval: zod
+      .boolean()
+      .optional()
+      .describe('Hook eval/Function constructor'),
     hookCookie: zod.boolean().optional().describe('Hook document.cookie'),
     hookXhr: zod.boolean().optional().describe('Hook XMLHttpRequest'),
     hookFetch: zod.boolean().optional().describe('Hook fetch API'),
-    exportResults: zod.boolean().optional().describe('Export hook data to artifacts/ after injection'),
-    exportWaitMs: zod.number().int().positive().optional().describe('Wait time in ms before exporting hook data (default 3000)'),
+    exportResults: zod
+      .boolean()
+      .optional()
+      .describe('Export hook data to artifacts/ after injection'),
+    exportWaitMs: zod
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Wait time in ms before exporting hook data (default 3000)'),
   },
   handler: async (request, response, context) => {
     const {url, ...rawOptions} = request.params;
@@ -1050,10 +1123,9 @@ export const autoHook = defineTool({
 
     try {
       const hookPlans = buildHookPlans(options);
-      hooksInjected =
-        options.autoInject
-          ? await injectHookPlans(hookPlans)
-          : hookPlans.map(({script: _script, ...plan}) => plan);
+      hooksInjected = options.autoInject
+        ? await injectHookPlans(hookPlans)
+        : hookPlans.map(({script: _script, ...plan}) => plan);
 
       // 在页面上下文中检测加密库（如果存在 frame）
       const frame = context.getSelectedFrame();
@@ -1073,7 +1145,9 @@ export const autoHook = defineTool({
         logger.warn('[AutoHook] 没有可用的页面 Frame，跳过页面加密库检测');
       }
 
-      const successfulInjections = hooksInjected.filter(h => h.success && h.injected).length;
+      const successfulInjections = hooksInjected.filter(
+        h => h.success && h.injected,
+      ).length;
       const failedInjections = hooksInjected.filter(h => !h.success).length;
       const detectedCryptoCount = cryptoDetected.filter(c => c.detected).length;
       const pageUrl = context.getSelectedPage()?.url?.();
@@ -1095,7 +1169,9 @@ export const autoHook = defineTool({
       let exportPath: string | undefined;
       if (options.exportResults && options.autoInject) {
         const waitMs = options.exportWaitMs ?? 3000;
-        logger.info(`[AutoHook] exportResults=true, 等待 ${waitMs}ms 后导出 Hook 数据`);
+        logger.info(
+          `[AutoHook] exportResults=true, 等待 ${waitMs}ms 后导出 Hook 数据`,
+        );
         await new Promise(resolve => setTimeout(resolve, waitMs));
 
         try {
@@ -1108,65 +1184,74 @@ export const autoHook = defineTool({
           exportPath = path.join(sessionDir, 'hook-data.json');
           await writeFile(
             exportPath,
-            JSON.stringify({
-              url: url || pageUrl || 'unknown',
-              exportedAt: new Date().toISOString(),
-              hooksInjected,
-              hookStore,
-              cryptoDetected,
-            }, null, 2),
+            JSON.stringify(
+              {
+                url: url || pageUrl || 'unknown',
+                exportedAt: new Date().toISOString(),
+                hooksInjected,
+                hookStore,
+                cryptoDetected,
+              },
+              null,
+              2,
+            ),
             'utf8',
           );
           logger.info(`[AutoHook] Hook 数据已导出到 ${exportPath}`);
         } catch (exportError) {
           logger.warn(
             '[AutoHook] Hook 数据导出失败: ' +
-              (exportError instanceof Error ? exportError.message : String(exportError)),
+              (exportError instanceof Error
+                ? exportError.message
+                : String(exportError)),
           );
         }
       } else if (options.exportResults && !options.autoInject) {
-        logger.warn('[AutoHook] exportResults=true 但 autoInject=false，跳过导出');
+        logger.warn(
+          '[AutoHook] exportResults=true 但 autoInject=false，跳过导出',
+        );
       }
 
       logger.info('[AutoHook] Completed successfully');
 
       const statusParts: string[] = [];
       if (options.autoInject) {
-        statusParts.push(`已注入 ${successfulInjections}/${hooksInjected.length} 个 Hook`);
-        if (failedInjections > 0) statusParts.push(`${failedInjections} 个注入失败`);
+        statusParts.push(
+          `已注入 ${successfulInjections}/${hooksInjected.length} 个 Hook`,
+        );
+        if (failedInjections > 0)
+          statusParts.push(`${failedInjections} 个注入失败`);
       } else {
-        statusParts.push(`已生成 ${hooksInjected.length} 个 Hook 计划（未注入）`);
+        statusParts.push(
+          `已生成 ${hooksInjected.length} 个 Hook 计划（未注入）`,
+        );
       }
       statusParts.push(`检测到 ${detectedCryptoCount} 个加密库`);
       if (!frame) statusParts.push('注意：未找到可用 Frame，加密库检测未执行');
       if (exportPath) statusParts.push(`Hook 数据已导出到 ${exportPath}`);
 
-
-      response.setStructuredContent(
-        {
-          success: true,
-          message: `自动 Hook 完成：${statusParts.join('，')}`,
-          tooltype: 'auto_hook',
-          data,
-          ...(exportPath ? {exportPath} : {}),
-        }
-      );
+      response.setStructuredContent({
+        success: true,
+        message: `自动 Hook 完成：${statusParts.join('，')}`,
+        tooltype: 'auto_hook',
+        data,
+        ...(exportPath ? {exportPath} : {}),
+      });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       logger.info('[AutoHook] Failed: ' + errorMessage);
 
-      response.setStructuredContent(
-        {
-          success: false,
-          error: errorMessage,
-          tooltype: 'auto_hook',
-          data: {
-            url: url || context.getSelectedPage()?.url?.() || 'unknown',
-            hooksInjected,
-            cryptoDetected,
-          } as AutoHookToolData,
-        }
-      );
+      response.setStructuredContent({
+        success: false,
+        error: errorMessage,
+        tooltype: 'auto_hook',
+        data: {
+          url: url || context.getSelectedPage()?.url?.() || 'unknown',
+          hooksInjected,
+          cryptoDetected,
+        } as AutoHookToolData,
+      });
     }
   },
 });

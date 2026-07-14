@@ -20,20 +20,20 @@ This plan covers Phases 1, 2, and 4 (well-scoped, low-to-medium risk). Phase 3 (
 
 ## File Structure
 
-| File | Action | Responsibility |
-|------|--------|---------------|
-| `src/formatters/consoleFormatter.ts` | Modify | Delete dead export `formatConsoleEventShort` |
-| `src/formatters/networkFormatter.ts` | Modify | Delete dead exports `getFormattedHeaderValue`, `getFormattedRequestBody`; keep `getFormattedResponseBody` (used in tests) |
-| `src/cli/tools-meta.ts` | Modify | Delete dead export `getToolArgSpecs` |
+| File                                                | Action | Responsibility                                                                                                                    |
+| --------------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| `src/formatters/consoleFormatter.ts`                | Modify | Delete dead export `formatConsoleEventShort`                                                                                      |
+| `src/formatters/networkFormatter.ts`                | Modify | Delete dead exports `getFormattedHeaderValue`, `getFormattedRequestBody`; keep `getFormattedResponseBody` (used in tests)         |
+| `src/cli/tools-meta.ts`                             | Modify | Delete dead export `getToolArgSpecs`                                                                                              |
 | `src/modules/analyzer/IntelligentAnalyzer.types.ts` | Modify | Add pattern types (`EncryptionPattern`, `SignaturePattern`, `TokenPattern`, `AntiDebugPattern`) moved from IntelligentAnalyzer.ts |
-| `src/modules/analyzer/IntelligentAnalyzer.ts` | Modify | Remove pattern type definitions; update import path for types |
-| `src/modules/analyzer/PatternDetector.ts` | Modify | Update type import path from IntelligentAnalyzer.ts to IntelligentAnalyzer.types.ts |
-| `src/worker/timeoutUtils.ts` | Create | Extracted `wrapFrameWithTimeout` + `FRAME_EVALUATE_TIMEOUT` from ToolExecutionPipeline.ts |
-| `src/worker/ToolExecutionPipeline.ts` | Modify | Remove `wrapFrameWithTimeout` + `FRAME_EVALUATE_TIMEOUT`; import from timeoutUtils.ts |
-| `src/worker/ToolContext.ts` | Modify | Update `wrapFrameWithTimeout` import path |
-| `src/tools/ToolDefinition.ts` | Modify | Add `@stable` JSDoc to `defineTool` |
-| `src/runtime.ts` | Modify | Add `@stable` JSDoc to `Runtime` interface and `getRuntime` |
-| `AGENTS.md` | Modify | Add high fan-in interface section |
+| `src/modules/analyzer/IntelligentAnalyzer.ts`       | Modify | Remove pattern type definitions; update import path for types                                                                     |
+| `src/modules/analyzer/PatternDetector.ts`           | Modify | Update type import path from IntelligentAnalyzer.ts to IntelligentAnalyzer.types.ts                                               |
+| `src/worker/timeoutUtils.ts`                        | Create | Extracted `wrapFrameWithTimeout` + `FRAME_EVALUATE_TIMEOUT` from ToolExecutionPipeline.ts                                         |
+| `src/worker/ToolExecutionPipeline.ts`               | Modify | Remove `wrapFrameWithTimeout` + `FRAME_EVALUATE_TIMEOUT`; import from timeoutUtils.ts                                             |
+| `src/worker/ToolContext.ts`                         | Modify | Update `wrapFrameWithTimeout` import path                                                                                         |
+| `src/tools/ToolDefinition.ts`                       | Modify | Add `@stable` JSDoc to `defineTool`                                                                                               |
+| `src/runtime.ts`                                    | Modify | Add `@stable` JSDoc to `Runtime` interface and `getRuntime`                                                                       |
+| `AGENTS.md`                                         | Modify | Add high fan-in interface section                                                                                                 |
 
 ---
 
@@ -42,6 +42,7 @@ This plan covers Phases 1, 2, and 4 (well-scoped, low-to-medium risk). Phase 3 (
 ### Task 1: Verify and delete confirmed dead exports
 
 **Files:**
+
 - Modify: `src/formatters/consoleFormatter.ts:27-32`
 - Modify: `src/formatters/networkFormatter.ts:56-110`
 - Modify: `src/cli/tools-meta.ts:282-287`
@@ -162,6 +163,7 @@ git commit -m "refactor: remove 4 dead exports identified by GitNexus analysis"
 ### Task 2: Verify and clean up "needs further confirmation" candidates
 
 **Files:**
+
 - Inspect: `src/browser/SessionManager.ts` — `remainingTags`
 - Inspect: `src/config/schema.ts` — `GlobalConfigSchema`, `AIConfigSchema`, `booleanSchema`, `errorMap`
 
@@ -209,6 +211,7 @@ If no deletions were made, skip this step.
 **Fix:** Move the 4 pattern type definitions from `IntelligentAnalyzer.ts` (lines 54-82) to the existing `IntelligentAnalyzer.types.ts` file. Both files then import types from the shared types file, breaking the cycle.
 
 **Files:**
+
 - Modify: `src/modules/analyzer/IntelligentAnalyzer.types.ts` — add 4 pattern types
 - Modify: `src/modules/analyzer/IntelligentAnalyzer.ts` — remove type definitions, import from .types.ts
 - Modify: `src/modules/analyzer/PatternDetector.ts` — update import path
@@ -337,6 +340,7 @@ export {
 In `src/modules/analyzer/PatternDetector.ts`, change lines 13-18:
 
 From:
+
 ```typescript
 import type {
   AntiDebugPattern,
@@ -347,6 +351,7 @@ import type {
 ```
 
 To:
+
 ```typescript
 import type {
   AntiDebugPattern,
@@ -398,6 +403,7 @@ the mixed value+type circular dependency."
 **Fix:** Extract `wrapFrameWithTimeout` and its constant `FRAME_EVALUATE_TIMEOUT` to a new `src/worker/timeoutUtils.ts` file.
 
 **Files:**
+
 - Create: `src/worker/timeoutUtils.ts`
 - Modify: `src/worker/ToolExecutionPipeline.ts` — remove function, re-export from new file
 - Modify: `src/worker/ToolContext.ts` — update import path
@@ -478,11 +484,13 @@ import {wrapFrameWithTimeout} from './timeoutUtils.js';
 In `src/worker/ToolContext.ts`, change line 47:
 
 From:
+
 ```typescript
 import {wrapFrameWithTimeout} from './ToolExecutionPipeline.js';
 ```
 
 To:
+
 ```typescript
 import {wrapFrameWithTimeout} from './timeoutUtils.js';
 ```
@@ -524,6 +532,7 @@ eliminating the mixed value+type circular dependency."
 ### Task 5: Add @stable annotations and AGENTS.md documentation
 
 **Files:**
+
 - Modify: `src/tools/ToolDefinition.ts` — add `@stable` JSDoc
 - Modify: `src/runtime.ts` — add `@stable` JSDoc
 - Modify: `AGENTS.md` — add high fan-in section
@@ -577,13 +586,13 @@ In `AGENTS.md`, after the "### 核心运行时组件" section, add:
 以下函数/接口被大量调用方依赖，修改签名或返回类型前**必须**运行 impact 分析。
 扩展时使用可选属性或 `Partial<>`，不要修改必选参数。
 
-| 符号 | 文件 | 调用方数 | 说明 |
-|------|------|---------|------|
-| `defineTool` | `src/tools/ToolDefinition.ts` | 102+ | 工具定义工厂，所有 MCP 工具通过此注册 |
-| `Runtime` | `src/runtime.ts` | 57+ | 运行时服务接口，新增服务应走 `RuntimeServices` lazy getter |
-| `getRuntime` | `src/runtime.ts` | 57+ | 全局运行时访问器 |
-| `safeStringify` | `src/utils/safeJson.ts` | 16 | JSON 安全序列化 |
-| `getEnvValue` | `src/config/resolver.ts` | 11 | 环境变量读取 |
+| 符号            | 文件                          | 调用方数 | 说明                                                       |
+| --------------- | ----------------------------- | -------- | ---------------------------------------------------------- |
+| `defineTool`    | `src/tools/ToolDefinition.ts` | 102+     | 工具定义工厂，所有 MCP 工具通过此注册                      |
+| `Runtime`       | `src/runtime.ts`              | 57+      | 运行时服务接口，新增服务应走 `RuntimeServices` lazy getter |
+| `getRuntime`    | `src/runtime.ts`              | 57+      | 全局运行时访问器                                           |
+| `safeStringify` | `src/utils/safeJson.ts`       | 16       | JSON 安全序列化                                            |
+| `getEnvValue`   | `src/config/resolver.ts`      | 11       | 环境变量读取                                               |
 ```
 
 - [ ] **Step 4: Commit**
@@ -624,10 +633,12 @@ Run: `npx gitnexus analyze --force`
 Expected: Index rebuilds successfully.
 
 Then verify circular dependencies are resolved:
+
 ```bash
 grep -rn "from.*IntelligentAnalyzer\.js" src/modules/analyzer/PatternDetector.ts
 grep -rn "from.*ToolExecutionPipeline" src/worker/ToolContext.ts
 ```
+
 Expected: Both produce no output (cycles broken).
 
 - [ ] **Step 5: Final commit (only if fixups needed)**

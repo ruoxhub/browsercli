@@ -169,8 +169,13 @@ export class PackerDeobfuscator {
     }
   }
 
-  private toDecoder(value: unknown, fallback: (...args: never[]) => unknown): PackerParams['e'] {
-    return typeof value === 'function' ? (value as PackerParams['e']) : (fallback as PackerParams['e']);
+  private toDecoder(
+    value: unknown,
+    fallback: (...args: never[]) => unknown,
+  ): PackerParams['e'] {
+    return typeof value === 'function'
+      ? (value as PackerParams['e'])
+      : (fallback as PackerParams['e']);
   }
 
   /**

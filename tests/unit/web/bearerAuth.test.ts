@@ -1,6 +1,12 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 // tests/unit/web/bearerAuth.test.ts
-import {describe, it} from 'node:test';
 import assert from 'node:assert/strict';
+import {describe, it} from 'node:test';
+
 import {bearerAuth} from '../../../src/web/middleware/bearerAuth.js';
 
 function mockReq(opts: {remote?: string; auth?: string}) {
@@ -22,25 +28,52 @@ function mockRes() {
 describe('bearerAuth', () => {
   it('loopback + no token => allow', () => {
     const res = mockRes();
-    assert.equal(bearerAuth(mockReq({remote: '127.0.0.1'}), res, {bindHost: '127.0.0.1'}), false);
+    assert.equal(
+      bearerAuth(mockReq({remote: '127.0.0.1'}), res, {bindHost: '127.0.0.1'}),
+      false,
+    );
   });
   it('non-loopback + no token => reject 401', () => {
     const res = mockRes();
-    assert.equal(bearerAuth(mockReq({remote: '192.168.1.5'}), res, {bindHost: '0.0.0.0', apiToken: 'secret'}), true);
+    assert.equal(
+      bearerAuth(mockReq({remote: '192.168.1.5'}), res, {
+        bindHost: '0.0.0.0',
+        apiToken: 'secret',
+      }),
+      true,
+    );
     assert.equal(res.statusCode, 401);
   });
   it('non-loopback + wrong token => reject 401', () => {
     const res = mockRes();
-    assert.equal(bearerAuth(mockReq({remote: '192.168.1.5', auth: 'Bearer bad'}), res, {bindHost: '0.0.0.0', apiToken: 'secret'}), true);
+    assert.equal(
+      bearerAuth(mockReq({remote: '192.168.1.5', auth: 'Bearer bad'}), res, {
+        bindHost: '0.0.0.0',
+        apiToken: 'secret',
+      }),
+      true,
+    );
     assert.equal(res.statusCode, 401);
   });
   it('non-loopback + correct token => allow', () => {
     const res = mockRes();
-    assert.equal(bearerAuth(mockReq({remote: '192.168.1.5', auth: 'Bearer secret'}), res, {bindHost: '0.0.0.0', apiToken: 'secret'}), false);
+    assert.equal(
+      bearerAuth(mockReq({remote: '192.168.1.5', auth: 'Bearer secret'}), res, {
+        bindHost: '0.0.0.0',
+        apiToken: 'secret',
+      }),
+      false,
+    );
   });
   it('explicit token set on loopback but missing => reject 401', () => {
     const res = mockRes();
-    assert.equal(bearerAuth(mockReq({remote: '127.0.0.1'}), res, {bindHost: '127.0.0.1', apiToken: 'secret'}), true);
+    assert.equal(
+      bearerAuth(mockReq({remote: '127.0.0.1'}), res, {
+        bindHost: '127.0.0.1',
+        apiToken: 'secret',
+      }),
+      true,
+    );
     assert.equal(res.statusCode, 401);
   });
 });

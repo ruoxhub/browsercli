@@ -217,17 +217,36 @@ export interface RebuildBundleToolResult {
  */
 export const rebuildBundle = defineTool({
   name: 'rebuild_bundle',
-  description: 'Build local Node.js reproduction environment from captured evidence and target script',
+  description:
+    'Build local Node.js reproduction environment from captured evidence and target script',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
   schema: {
     url: zod.string().optional().describe('Target URL'),
     targetUrl: zod.string().optional().describe('Target URL (alternative)'),
-    targetFunctionNames: zod.array(zod.string()).optional().describe('Target function names'),
-    targetKeywords: zod.array(zod.string()).optional().describe('Target keywords'),
-    targetUrlPatterns: zod.array(zod.string()).optional().describe('Target URL patterns'),
-    goal: zod.string().optional().describe('Reverse engineering goal description'),
-    autoGenerate: zod.boolean().optional().describe('Auto generate reproduction bundle'),
-    maxEvidenceItems: zod.number().optional().describe('Maximum evidence items'),
+    targetFunctionNames: zod
+      .array(zod.string())
+      .optional()
+      .describe('Target function names'),
+    targetKeywords: zod
+      .array(zod.string())
+      .optional()
+      .describe('Target keywords'),
+    targetUrlPatterns: zod
+      .array(zod.string())
+      .optional()
+      .describe('Target URL patterns'),
+    goal: zod
+      .string()
+      .optional()
+      .describe('Reverse engineering goal description'),
+    autoGenerate: zod
+      .boolean()
+      .optional()
+      .describe('Auto generate reproduction bundle'),
+    maxEvidenceItems: zod
+      .number()
+      .optional()
+      .describe('Maximum evidence items'),
     taskId: zod.string().optional().describe('Task ID'),
     taskSlug: zod.string().optional().describe('Task slug'),
   },
@@ -251,7 +270,10 @@ export const rebuildBundle = defineTool({
     try {
       const runtimeEvidence: Array<Record<string, unknown>> = [];
       if (options.taskId) {
-        logger.debug('[rebuild-bundle] Reading runtime evidence for task:', options.taskId);
+        logger.debug(
+          '[rebuild-bundle] Reading runtime evidence for task:',
+          options.taskId,
+        );
       }
 
       const targetKeywords = options.targetKeywords ?? [];
@@ -278,7 +300,13 @@ export const rebuildBundle = defineTool({
       const envCode = buildAutoEnvCode(capture);
       const polyfillsCode = '';
 
-      const targetScript = pickTargetScript([], targetKeywords, targetUrlPatterns, targetFunctionNames, targetActionDescription);
+      const targetScript = pickTargetScript(
+        [],
+        targetKeywords,
+        targetUrlPatterns,
+        targetFunctionNames,
+        targetActionDescription,
+      );
       const entryCode = buildEntryCode(targetScript, capture);
 
       const result = {
@@ -286,7 +314,12 @@ export const rebuildBundle = defineTool({
         bundlePath: '',
         evidenceCount: runtimeEvidence.length,
         files: {entryCode, envCode, polyfillsCode, capture},
-        targetContext: {targetKeywords, targetUrlPatterns, targetFunctionNames, targetActionDescription},
+        targetContext: {
+          targetKeywords,
+          targetUrlPatterns,
+          targetFunctionNames,
+          targetActionDescription,
+        },
       };
 
       response.setStructuredContent({

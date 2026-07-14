@@ -18,11 +18,6 @@ describe('WorkerLifecycle', () => {
           calls.push('browser.close');
         },
       } as never,
-      client: {
-        disconnect: () => {
-          calls.push('client.disconnect');
-        },
-      } as never,
       database: {
         disconnect: async () => {
           calls.push('database.disconnect');
@@ -39,7 +34,6 @@ describe('WorkerLifecycle', () => {
     await shutdown('SIGINT');
 
     assert.deepStrictEqual(calls, [
-      'client.disconnect',
       'browser.close',
       'database.disconnect',
       'exit.0',
@@ -52,11 +46,6 @@ describe('WorkerLifecycle', () => {
       browserManager: {
         close: async () => {
           calls.push('browser.close');
-        },
-      } as never,
-      client: {
-        disconnect: () => {
-          calls.push('client.disconnect');
         },
       } as never,
       contextProvider: {
@@ -79,7 +68,6 @@ describe('WorkerLifecycle', () => {
     await assert.rejects(async () => await shutdown('SIGTERM'), /exit/);
 
     assert.deepStrictEqual(calls, [
-      'client.disconnect',
       'ctx.dispose',
       'browser.close',
       'database.disconnect',
@@ -93,11 +81,6 @@ describe('WorkerLifecycle', () => {
       browserManager: {
         close: async () => {
           calls.push('browser.close');
-        },
-      } as never,
-      client: {
-        disconnect: () => {
-          calls.push('client.disconnect');
         },
       } as never,
       contextProvider: {
@@ -120,7 +103,6 @@ describe('WorkerLifecycle', () => {
     await assert.rejects(async () => await shutdown('SIGTERM'), /exit/);
 
     assert.deepStrictEqual(calls, [
-      'client.disconnect',
       'browser.close',
       'database.disconnect',
       'exit.0',

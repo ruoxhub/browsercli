@@ -54,7 +54,12 @@ export async function evaluateInPageRuntime<T>(
       evaluatePromise,
       new Promise<never>((_, reject) =>
         setTimeout(
-          () => reject(new Error(`Runtime.evaluate 超时 (${timeoutMs}ms)，可能调试器已暂停`)),
+          () =>
+            reject(
+              new Error(
+                `Runtime.evaluate 超时 (${timeoutMs}ms)，可能调试器已暂停`,
+              ),
+            ),
           timeoutMs,
         ),
       ),

@@ -6,11 +6,11 @@
  */
 
 import * as assert from 'node:assert';
+import {exec} from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import {fileURLToPath} from 'node:url';
-import {exec} from 'node:child_process';
 import {describe, it, beforeEach, afterEach} from 'node:test';
+import {fileURLToPath} from 'node:url';
 import {promisify} from 'node:util';
 
 const execAsync = promisify(exec);

@@ -57,4 +57,3 @@ describe('Property: ToolRegistry profile filtering', () => {
     );
   });
 });
-

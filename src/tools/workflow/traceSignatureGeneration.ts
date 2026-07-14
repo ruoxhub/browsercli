@@ -6,11 +6,11 @@
 
 import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
+import type {ToolContextProvider} from '../../worker/ToolContext.js';
 import {ToolCategory} from '../categories.js';
+import {SIGNATURE_HEADER_PATTERN} from '../network/constants.js';
 import type {RequestInitiator} from '../network/types.js';
 import {defineTool} from '../ToolDefinition.js';
-import type {ToolContextProvider} from '../../worker/ToolContext.js';
-import {SIGNATURE_HEADER_PATTERN} from '../network/constants.js';
 
 function findSignatureIndicators(headers: Record<string, string>): string[] {
   return Object.keys(headers).filter(key => SIGNATURE_HEADER_PATTERN.test(key));

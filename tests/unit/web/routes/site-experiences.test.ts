@@ -5,14 +5,14 @@
  */
 
 import assert from 'node:assert';
-import { EventEmitter } from 'node:events';
-import type { IncomingMessage, ServerResponse } from 'node:http';
-import { beforeEach, afterEach, describe, it } from 'node:test';
+import {EventEmitter} from 'node:events';
+import type {IncomingMessage, ServerResponse} from 'node:http';
+import {beforeEach, afterEach, describe, it} from 'node:test';
 
-import { siteExperienceService } from '../../../../src/services/SiteExperienceService.js';
-import { createSiteExperienceRoutes } from '../../../../src/web/routes/site-experiences.js';
-import { RestRouter } from '../../../../src/web/RestRouter.js';
-import type { SiteExperience } from '../../../../src/database/schema.js';
+import type {SiteExperience} from '../../../../src/database/schema.js';
+import {siteExperienceService} from '../../../../src/services/SiteExperienceService.js';
+import {RestRouter} from '../../../../src/web/RestRouter.js';
+import {createSiteExperienceRoutes} from '../../../../src/web/routes/site-experiences.js';
 
 interface MockRes {
   statusCode: number;
@@ -33,14 +33,18 @@ function mockReq(method: string, url: string): IncomingMessage {
   return e;
 }
 
-function mockReqWithBody(method: string, url: string, bodyObj: any): IncomingMessage {
+function mockReqWithBody(
+  method: string,
+  url: string,
+  bodyObj: any,
+): IncomingMessage {
   const e = new EventEmitter() as unknown as IncomingMessage & {
     method: string;
     url: string;
   };
   e.method = method;
   e.url = url;
-  
+
   process.nextTick(() => {
     e.emit('data', Buffer.from(JSON.stringify(bodyObj)));
     e.emit('end');
@@ -79,7 +83,7 @@ const mockRecord: SiteExperience = {
 
 describe('createSiteExperienceRoutes', () => {
   let router: RestRouter;
-  
+
   // 保存原始方法
   const originalListAll = siteExperienceService.listAll;
   const originalSearch = siteExperienceService.search;
@@ -125,7 +129,7 @@ describe('createSiteExperienceRoutes', () => {
   });
 
   it('GET /api/site-experiences?url=xxx calls search', async () => {
-    siteExperienceService.search = async (params) => {
+    siteExperienceService.search = async params => {
       assert.strictEqual(params.url, 'query.com');
       return [mockRecord];
     };
@@ -144,7 +148,7 @@ describe('createSiteExperienceRoutes', () => {
   });
 
   it('GET /api/site-experiences/:id returns specific record', async () => {
-    siteExperienceService.getById = async (id) => {
+    siteExperienceService.getById = async id => {
       assert.strictEqual(id, 1);
       return mockRecord;
     };
@@ -182,7 +186,7 @@ describe('createSiteExperienceRoutes', () => {
 
   it('POST /api/site-experiences creates record successfully', async () => {
     siteExperienceService.getByDomain = async () => null;
-    siteExperienceService.create = async (data) => {
+    siteExperienceService.create = async data => {
       assert.strictEqual(data.domain, 'new.com');
       assert.strictEqual(data.name, '新站点');
       return {
@@ -208,7 +212,7 @@ describe('createSiteExperienceRoutes', () => {
 
     assert.strictEqual(matched, true);
     // 等待异步流执行完
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await new Promise(resolve => setTimeout(resolve, 50));
     assert.strictEqual(res.statusCode, 200);
 
     const parsed = JSON.parse(res.body);
@@ -233,7 +237,7 @@ describe('createSiteExperienceRoutes', () => {
     );
 
     assert.strictEqual(matched, true);
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await new Promise(resolve => setTimeout(resolve, 50));
     assert.strictEqual(res.statusCode, 409);
     const parsed = JSON.parse(res.body);
     assert.strictEqual(parsed.success, false);
@@ -262,7 +266,7 @@ describe('createSiteExperienceRoutes', () => {
     );
 
     assert.strictEqual(matched, true);
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await new Promise(resolve => setTimeout(resolve, 50));
     assert.strictEqual(res.statusCode, 200);
     const parsed = JSON.parse(res.body);
     assert.strictEqual(parsed.success, true);
@@ -270,7 +274,7 @@ describe('createSiteExperienceRoutes', () => {
   });
 
   it('DELETE /api/site-experiences/:id deletes record successfully', async () => {
-    siteExperienceService.delete = async (id) => {
+    siteExperienceService.delete = async id => {
       assert.strictEqual(id, 1);
       return true;
     };

@@ -37,19 +37,3 @@ export type RpcConnectionState =
   | 'connecting'
   | 'connected'
   | 'reconnecting';
-
-/** SekiroClient 配置选项 */
-export interface RpcClientOptions {
-  /** WebSocket URL 前缀，如 ws://127.0.0.1:5612 */
-  rpcHost: string;
-  /** 分组名 */
-  group: string;
-  /** 客户端 ID（默认自动生成） */
-  clientId?: string;
-  /** 重连基础间隔 ms（默认 2000） */
-  reconnectBaseDelay?: number;
-  /** 重连最大间隔 ms（默认 30000） */
-  reconnectMaxDelay?: number;
-  /** 心跳间隔 ms（默认 30000，0 关闭） */
-  heartbeatInterval?: number;
-}

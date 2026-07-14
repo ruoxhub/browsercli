@@ -3,7 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-/* eslint-disable @typescript-eslint/no-explicit-any */
+
 /**
  * 高级反混淆模块 - 支持2024-2025最新混淆技术
  *

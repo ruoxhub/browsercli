@@ -66,14 +66,14 @@ script.sourcePath = filePath;
 
 `ScriptManager` 内部所有原本读取 `script.source` 的地方改为调用 `this.readSource(scriptId)`：
 
-| 方法 | 原读取方式 | 改为 |
-|------|-----------|------|
-| `collectMatchesInScript` | `script.source!` | `this.readSource(script.scriptId)` |
+| 方法                        | 原读取方式                         | 改为                                               |
+| --------------------------- | ---------------------------------- | -------------------------------------------------- |
+| `collectMatchesInScript`    | `script.source!`                   | `this.readSource(script.scriptId)`                 |
 | `getBeautifiedScriptSource` | `script.source` / `!script.source` | `!script.sourcePath` / `this.readSource(scriptId)` |
-| `buildKeywordIndex` | 参数 `content: string` | 调用方先 `readSource()` 再传入（保持不变） |
-| `chunkScript` | 参数 `content: string` | 同上 |
-| `extractFunctionTree` | `script.source` | `this.readSource(scriptId)` |
-| `searchInScriptsEnhanced` | 间接通过 keywordIndex | 不直接读 source，不受影响 |
+| `buildKeywordIndex`         | 参数 `content: string`             | 调用方先 `readSource()` 再传入（保持不变）         |
+| `chunkScript`               | 参数 `content: string`             | 同上                                               |
+| `extractFunctionTree`       | `script.source`                    | `this.readSource(scriptId)`                        |
+| `searchInScriptsEnhanced`   | 间接通过 keywordIndex              | 不直接读 source，不受影响                          |
 
 ## 清理
 
@@ -93,13 +93,13 @@ clear(): void {
 
 ## 边界情况
 
-| 情况 | 行为 |
-|------|------|
-| 内联脚本（无 URL） | 不写文件，`sourcePath` 为 `undefined` |
-| 同一 URL 多次请求 | 复用已有 `sourcePath`，不重复写入 |
-| 临时文件被外部删除 | `readSource()` 返回 `null`，调用方需重新走 CDP |
-| 磁盘写入失败 | `loadScriptSource()` 返回 `false`，行为与当前一致 |
-| `clear()` / `close()` | 删除所有 `.js` 临时文件 |
+| 情况                  | 行为                                              |
+| --------------------- | ------------------------------------------------- |
+| 内联脚本（无 URL）    | 不写文件，`sourcePath` 为 `undefined`             |
+| 同一 URL 多次请求     | 复用已有 `sourcePath`，不重复写入                 |
+| 临时文件被外部删除    | `readSource()` 返回 `null`，调用方需重新走 CDP    |
+| 磁盘写入失败          | `loadScriptSource()` 返回 `false`，行为与当前一致 |
+| `clear()` / `close()` | 删除所有 `.js` 临时文件                           |
 
 ## 验证
 

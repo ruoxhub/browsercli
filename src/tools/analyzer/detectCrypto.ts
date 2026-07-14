@@ -13,7 +13,8 @@ import type {DetectCryptoFnResult} from './types.js';
 
 export const detectCrypto = defineTool({
   name: 'detect_crypto',
-  description: 'Detect cryptographic algorithms/libraries from JavaScript source.',
+  description:
+    'Detect cryptographic algorithms/libraries from JavaScript source.',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
   schema: {
     code: zod.string(),
@@ -21,7 +22,9 @@ export const detectCrypto = defineTool({
   },
   handler: async (request, response) => {
     try {
-      const raw = await getRuntime().cryptoDetector.detect(request.params as any);
+      const raw = await getRuntime().cryptoDetector.detect(
+        request.params as any,
+      );
       response.setStructuredContent<DetectCryptoFnResult>({
         success: true,
         message: 'Crypto detection completed',

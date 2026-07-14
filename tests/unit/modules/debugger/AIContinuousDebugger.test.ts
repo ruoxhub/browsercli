@@ -1,3 +1,8 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
@@ -11,20 +16,31 @@ describe('AIContinuousDebugger utilities', () => {
   });
 
   it('extractJsonFromResponse extracts from markdown code block', () => {
-    const input = '```json\n{"action":"step_into","reason":"deep","confidence":0.8}\n```';
+    const input =
+      '```json\n{"action":"step_into","reason":"deep","confidence":0.8}\n```';
     const result = extractJsonFromResponse(input);
-    assert.strictEqual(result, '{"action":"step_into","reason":"deep","confidence":0.8}');
+    assert.strictEqual(
+      result,
+      '{"action":"step_into","reason":"deep","confidence":0.8}',
+    );
   });
 
   it('extractJsonFromResponse extracts from untagged code block', () => {
-    const input = '```\n{"action":"resume","reason":"done","confidence":1}\n```';
+    const input =
+      '```\n{"action":"resume","reason":"done","confidence":1}\n```';
     const result = extractJsonFromResponse(input);
-    assert.strictEqual(result, '{"action":"resume","reason":"done","confidence":1}');
+    assert.strictEqual(
+      result,
+      '{"action":"resume","reason":"done","confidence":1}',
+    );
   });
 
   it('extractJsonFromResponse trims whitespace', () => {
     const input = '  {"action":"stop","reason":"ok","confidence":0.5}  ';
     const result = extractJsonFromResponse(input);
-    assert.strictEqual(result, '{"action":"stop","reason":"ok","confidence":0.5}');
+    assert.strictEqual(
+      result,
+      '{"action":"stop","reason":"ok","confidence":0.5}',
+    );
   });
 });

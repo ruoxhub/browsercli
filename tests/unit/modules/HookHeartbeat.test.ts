@@ -1,6 +1,11 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import assert from 'node:assert';
-import {describe, it, afterEach} from 'node:test';
 import {EventEmitter} from 'node:events';
+import {describe, it, afterEach} from 'node:test';
 
 import {HookHeartbeat} from '../../../src/modules/hook/HookHeartbeat.js';
 

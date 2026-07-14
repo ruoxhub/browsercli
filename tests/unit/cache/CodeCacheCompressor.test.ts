@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -20,7 +19,11 @@ interface MutableCodeCache {
 describe('Code cache and compressor', () => {
   it('resolves the default cache directory from the package root instead of process cwd', () => {
     const originalCwd = process.cwd;
-    const fakeCwd = path.join(path.parse(process.cwd()).root, 'Windows', 'system32');
+    const fakeCwd = path.join(
+      path.parse(process.cwd()).root,
+      'Windows',
+      'system32',
+    );
 
     process.cwd = () => fakeCwd;
 
@@ -76,13 +79,27 @@ describe('Code cache and compressor', () => {
     mutableCache.MAX_MEMORY_CACHE_SIZE = 1;
     await cache.set(
       'https://example.com/a',
-      { files: [{url: 'a.js', content: 'a'.repeat(20), size: 20, type: 'external'}], dependencies: {nodes: [], edges: []}, totalSize: 20, collectTime: 1 },
-      { mode: 'x' },
+      {
+        files: [
+          {url: 'a.js', content: 'a'.repeat(20), size: 20, type: 'external'},
+        ],
+        dependencies: {nodes: [], edges: []},
+        totalSize: 20,
+        collectTime: 1,
+      },
+      {mode: 'x'},
     );
     await cache.set(
       'https://example.com/b',
-      { files: [{url: 'b.js', content: 'b'.repeat(20), size: 20, type: 'external'}], dependencies: {nodes: [], edges: []}, totalSize: 20, collectTime: 1 },
-      { mode: 'x' },
+      {
+        files: [
+          {url: 'b.js', content: 'b'.repeat(20), size: 20, type: 'external'},
+        ],
+        dependencies: {nodes: [], edges: []},
+        totalSize: 20,
+        collectTime: 1,
+      },
+      {mode: 'x'},
     );
     assert.strictEqual(mutableCache.memoryCache.size, 1);
 
@@ -107,11 +124,25 @@ describe('Code cache and compressor', () => {
 
     await cache.set(
       'https://example.com/disk',
-      { files: [{url: 'd.js', content: 'd'.repeat(3000), size: 3000, type: 'external'}], dependencies: {nodes: [], edges: []}, totalSize: 3000, collectTime: 1 },
-      { mode: 'x' },
+      {
+        files: [
+          {
+            url: 'd.js',
+            content: 'd'.repeat(3000),
+            size: 3000,
+            type: 'external',
+          },
+        ],
+        dependencies: {nodes: [], edges: []},
+        totalSize: 3000,
+        collectTime: 1,
+      },
+      {mode: 'x'},
     );
-    await new Promise((r) => setTimeout(r, 3));
-    const diskExpired = await cache.get('https://example.com/disk', { mode: 'x' });
+    await new Promise(r => setTimeout(r, 3));
+    const diskExpired = await cache.get('https://example.com/disk', {
+      mode: 'x',
+    });
     assert.strictEqual(diskExpired, null);
 
     const stats = await cache.getStats();
@@ -120,7 +151,7 @@ describe('Code cache and compressor', () => {
     await cache.cleanup();
     await cache.clear();
 
-    const bad = new CodeCache({ cacheDir: `${dir}-missing` });
+    const bad = new CodeCache({cacheDir: `${dir}-missing`});
     const badStats = await bad.getStats();
     assert.strictEqual(badStats.diskEntries, 0);
     await bad.clear();

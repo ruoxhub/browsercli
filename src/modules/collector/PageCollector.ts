@@ -182,10 +182,7 @@ export abstract class PageCollector<T extends {stableId: number}> {
    * 用于 getNetworkRequestStableId / getConsoleMessageStableId 等场景，
    * 统一收敛跨页面跨导航段遍历逻辑。
    */
-  findBy(
-    pages: Page[],
-    predicate: (item: T) => boolean,
-  ): T | undefined {
+  findBy(pages: Page[], predicate: (item: T) => boolean): T | undefined {
     for (const page of pages) {
       const navigations = this.storage.get(page);
       if (!navigations) continue;

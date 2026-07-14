@@ -1,6 +1,12 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 // tests/unit/web/JobStore.test.ts
-import {describe, it, beforeEach} from 'node:test';
 import assert from 'node:assert/strict';
+import {describe, it, beforeEach} from 'node:test';
+
 import {JobStore} from '../../../src/worker/JobStore.js';
 
 describe('JobStore', () => {

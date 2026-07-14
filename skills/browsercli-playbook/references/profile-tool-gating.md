@@ -8,10 +8,10 @@
 workflow ⊂ full
 ```
 
-| Profile | 工具数 | 暴露范围 | 适用场景 |
-|---------|--------|----------|----------|
-| `workflow` | ~110 | 日常逆向（Observe / Capture / Network / Hook / Analyzer / WebSocket / Console / Stealth / Emulation / Site Experience / Workflow Advisor） | **默认推荐** — 浏览器自动化 + JS 逆向日常 |
-| `full` | 141 | 全部（追加 Debugger / Wasm / Anti-Debug / Performance / Rebuild） | 调试器分析、Wasm 逆向、env rebuild 导出、perf 诊断 |
+| Profile    | 工具数 | 暴露范围                                                                                                                                   | 适用场景                                           |
+| ---------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------- |
+| `workflow` | ~110   | 日常逆向（Observe / Capture / Network / Hook / Analyzer / WebSocket / Console / Stealth / Emulation / Site Experience / Workflow Advisor） | **默认推荐** — 浏览器自动化 + JS 逆向日常          |
+| `full`     | 141    | 全部（追加 Debugger / Wasm / Anti-Debug / Performance / Rebuild）                                                                          | 调试器分析、Wasm 逆向、env rebuild 导出、perf 诊断 |
 
 ## 怎么设置
 
@@ -30,14 +30,14 @@ JS_REVERSE_TOOL_PROFILE=workflow browsercli call list-tools
 
 ## 切换决策
 
-| 你要做的 | 推荐 profile |
-|---------|------------|
-| 排查页面 / 找签名 / 装 hook / 看网络 | `workflow`（默认） |
-| 改 Wasm 模块 / 反编译 | `full` |
-| 调试器内看闭包变量 | `full` |
-| 跑 Performance trace | `full` |
-| 导出 Node bundle | `full` |
-| 一键反调试 | `full`（但有 `anti_anti_debug` 也可以在 workflow 中视配置而定） |
+| 你要做的                             | 推荐 profile                                                    |
+| ------------------------------------ | --------------------------------------------------------------- |
+| 排查页面 / 找签名 / 装 hook / 看网络 | `workflow`（默认）                                              |
+| 改 Wasm 模块 / 反编译                | `full`                                                          |
+| 调试器内看闭包变量                   | `full`                                                          |
+| 跑 Performance trace                 | `full`                                                          |
+| 导出 Node bundle                     | `full`                                                          |
+| 一键反调试                           | `full`（但有 `anti_anti_debug` 也可以在 workflow 中视配置而定） |
 
 ## 启动时检查
 

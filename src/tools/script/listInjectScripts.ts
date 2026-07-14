@@ -27,7 +27,7 @@ export function listInjectScripts(): ListInjectScriptsResult {
     };
   }
 
-  const scripts = Array.from(injectConfigs.values()).map((config) => ({
+  const scripts = Array.from(injectConfigs.values()).map(config => ({
     id: config.id,
     name: config.name,
     urlPattern: config.urlPattern,

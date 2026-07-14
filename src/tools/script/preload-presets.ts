@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type PreloadPreset = 'capture-all-fetch' | 'capture-all-xhr' | 'capture-all-requests' | 'log-cookies';
+export type PreloadPreset =
+  | 'capture-all-fetch'
+  | 'capture-all-xhr'
+  | 'capture-all-requests'
+  | 'log-cookies';
 
 export const PRELOAD_PRESETS: Record<PreloadPreset, string> = {
   'capture-all-fetch': `(function() {

@@ -13,13 +13,7 @@
  * - 超时、网络/CPU 节流与选中页联动
  */
 
-import type {
-  Browser,
-  BrowserContext,
-  Dialog,
-  Frame,
-  Page,
-} from 'patchright';
+import type {Browser, BrowserContext, Dialog, Frame, Page} from 'patchright';
 
 import type {BrowserManager} from '../../modules/browser/index.js';
 
@@ -101,9 +95,7 @@ export class BrowserContextProvider {
     const pages = this.getPages();
     const page = pages[idx];
     if (!page) {
-      throw new Error(
-        `页面索引 ${idx} 超出范围 (共 ${pages.length} 个页面)`,
-      );
+      throw new Error(`页面索引 ${idx} 超出范围 (共 ${pages.length} 个页面)`);
     }
     return page;
   }

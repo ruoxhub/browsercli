@@ -6,6 +6,7 @@
 
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
+
 import {BrowserContextProvider} from '../../../src/worker/context/BrowserContextProvider.js';
 
 describe('BrowserContextProvider', () => {

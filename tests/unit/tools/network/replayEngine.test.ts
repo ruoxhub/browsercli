@@ -7,6 +7,7 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
+import type {APIRequestContext} from '../../../../src/third_party/index.js';
 import {
   STRIPPED_HEADERS,
   stripManagedHeaders,
@@ -15,7 +16,6 @@ import {
   executeReplay,
   formatCurl,
 } from '../../../../src/tools/network/replayEngine.js';
-import type {APIRequestContext} from '../../../../src/third_party/index.js';
 import type {
   BuiltReplayRequest,
   GetNetworkRequestData,

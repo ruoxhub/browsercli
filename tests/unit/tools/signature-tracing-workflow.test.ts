@@ -7,9 +7,9 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
+import {getRuntime} from '../../../src/runtime.js';
 import {zod} from '../../../src/third_party/index.js';
 import {traceSignatureGeneration as traceSignatureGenerationTool} from '../../../src/tools/workflow/traceSignatureGeneration.js';
-import { getRuntime } from '../../../src/runtime.js';
 
 const traceSignatureGeneration = Object.assign(
   async (runtime: any, params: any): Promise<any> => {
@@ -29,7 +29,11 @@ const traceSignatureGeneration = Object.assign(
       },
     } as any;
     try {
-      await traceSignatureGenerationTool.handler({ params } as any, response, runtime);
+      await traceSignatureGenerationTool.handler(
+        {params} as any,
+        response,
+        runtime,
+      );
     } finally {
       getRuntime().contextProvider = originalProvider;
     }
@@ -37,7 +41,7 @@ const traceSignatureGeneration = Object.assign(
   },
   {
     schema: traceSignatureGenerationTool.schema,
-  }
+  },
 );
 
 function createRuntime() {
