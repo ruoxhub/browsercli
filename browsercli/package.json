@@ -1,5 +1,5 @@
 {
-  "name": "js-reverser-cli",
+  "name": "browsercli",
   "type": "module",
   "version": "1.0.0",
   "license": "Apache-2.0",
@@ -10,7 +10,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "typecheck:tests": "tsc -p tsconfig.test.json"
+    "typecheck:tests": "tsc -p tsconfig.test.json",
+    "test": "tsc -p tsconfig.test.json --noEmit false --outDir build && node --test build/tests/unit/**/*.test.js"
   },
   "dependencies": {
     "axi-sdk-js": "^0.1.4",

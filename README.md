@@ -105,33 +105,12 @@ Browser-CLI/
 │   ├── config.ts                     # 配置出口 (re-export config/index)
 │   ├── PageCollector.ts              # ★ 泛型页面数据收集器基类 (模板方法)
 │   │
-│   ├── bin/                          # CLI 二进制入口
-│   │   └── js-reverse.ts             # ★ js-reverse 命令入口 (yargs CLI)
 │   │
-│   ├── cli/                          # CLI 交互层
-│   │   ├── app.ts                    # CLI 应用主逻辑
-│   │   ├── args-parser.ts           # 参数解析器
-│   │   ├── commands/                # 命令实现:
-│   │   │   ├── start.ts             #   - start (启动 daemon)
-│   │   │   ├── stop.ts              #   - stop
-│   │   │   ├── status.ts            #   - status
-│   │   │   ├── repl.ts              #   - repl (交互式 REPL)
-│   │   │   ├── scaffold.ts          #   - scaffold (任务脚手架)
-│   │   │   ├── tool-dispatcher.ts   #   - call (工具调用)
-│   │   │   ├── list-tools.ts        #   - list-skills / list-tools
-│   │   │   └── config.ts            #   - config 管理
-│   │   ├── tools-meta.ts            # ★ 工具元信息注册表 — 动态从 defineTool 加载
-│   │   ├── tool-arg-validator.ts    # 工具参数校验器
-│   │   ├── tool-aliases.ts          # 工具别名管理
-│   │   ├── zod-introspect.ts        # Zod schema 自省工具
-│   │   ├── sekiro-invoker.ts        # Sekiro RPC 调用器
-│   │   ├── worker-manager.ts        # Worker 进程管理器
-│   │   ├── worker-guardian.ts       # Worker 守护进程
-│   │   ├── types.ts                 # CLI 类型定义
-│   │   ├── errors.ts                # CLI 错误处理
-│   │   ├── output.ts                # CLI 输出格式化
-│   │   └── help.ts                  # CLI 帮助生成
+│   ├── (CLI 客户端已抽离)            # `browsercli` → 独立包 `js-reverser-cli/`
+│   │                              #   纯 HTTP 客户端，经 worker `/api/v1` 调用；
+│   │                              #   本地 worker 进程管理(start/stop/status/repl)已删除
 │   │
+
 │   ├── config/                       # 配置系统
 │   │   ├── resolver.ts              # ★ 核心解析管线 (830行) — CLI > Env > JSON > 默认值
 │   │   ├── constants.ts             # 文件名常量与默认值
@@ -330,9 +309,9 @@ Browser-CLI/
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                     CLI 层 (src/cli/)                    │
-│    js-reverse start/stop/status/call/repl/scaffold      │
-│    yargs 解析 → SekiroInvoker → WorkerManager           │
+│            CLI 层 (js-reverser-cli/ · browsercli)         │
+│   纯 HTTP 客户端：yargs 解析 → WorkerHttpClient → /api/v1 │
+│   (本地 worker 进程管理 start/stop/status/repl 已删除)    │
 └────────────────────┬────────────────────────────────────┘
                      │
 ┌────────────────────▼────────────────────────────────────┐
@@ -371,7 +350,7 @@ Browser-CLI/
 | **职责** | 统一管理所有运行时配置 — 浏览器连接、AI 提供商、数据库、RPC 通信 |
 | **实现逻辑** | `resolveConfig()` 实现 CLI 参数 > 环境变量 (dotenv) > config.json > js-reverse.config.json > ~/.jsreverse/config.json > 内置默认值的优先级合并 |
 | **关键函数** | `resolveConfig()` — 返回扁平 `ResolvedConfig`; `getSystemConfig()` — 构建 `SystemConfig` (AI+Browser+Debug); `getBrowserManagerConfig()` — 解析 25 个浏览器参数; `createAIService()` — 从配置实例化 AI 服务 |
-| **被调用方** | `src/index.ts` (Worker入口)、`src/cli/commands/start.ts`、`src/cli/app.ts`、`src/runtime.ts` |
+| **被调用方** | `src/index.ts` (Worker入口)、`src/worker/WorkerArgs.ts`、`src/runtime.ts` |
 | **隐式耦合** | `LLMProvider` 类型仅限 `'openai'`，但 AI 层已支持 Anthropic/Gemini，配置系统尚未暴露对应选项; `schema.ts` 为空占位文件 |
 | **改进空间** | 扩展 `LLMProvider` 联合类型; 使用 Zod 对 `GlobalConfig` 做运行时校验 |
 
@@ -549,12 +528,11 @@ Browser-CLI/
 
 ```mermaid
 graph TB
-    subgraph CLI_SRC["CLI层 (src/cli/)"]
-        JSREV[js-reverse命令]
+    subgraph CLI_SRC["CLI层 (js-reverser-cli/ · browsercli)"]
+        BRC[browsercli 命令]
         YARGS[yargs CLI解析]
-        START[start命令]
-        CALL[call命令]
-        REPL[REPL模式]
+        HTTP[WorkerHttpClient]
+        CALL[call 命令 → /api/v1]
     end
 
     subgraph RPC["RPC协议层 (src/protocol/)"]
@@ -646,11 +624,10 @@ graph TB
     end
 
     %% 连接关系
-    JSREV --> YARGS
-    YARGS --> START
+    BRC --> YARGS
     YARGS --> CALL
-    YARGS --> REPL
-    START --> RESOLVER
+    CALL --> HTTP
+    HTTP -->|HTTP /api/v1| ADAPTER
     RESOLVER --> ENV & FILE & DEF
     START --> CLIENT
     CLIENT --- WS
@@ -879,13 +856,10 @@ npm run start -- --browserUrl http://127.0.0.1:9222
 
 # 4. 查看 CLI 交互 (新终端)
 # 查看可用命令
-node build/src/bin/js-reverse.js --help
-
-# 启动交互式 REPL
-node build/src/bin/js-reverse.js repl
+node js-reverser-cli/build/bin/browsercli.js --help
 
 # 查看所有可用工具
-node build/src/bin/js-reverse.js list-skills
+node js-reverser-cli/build/bin/browsercli.js list-tools
 ```
 
 ### 7.3 最小改动示例 (Hello World)
@@ -937,11 +911,11 @@ export const getPageTitle = defineTool({
 npm run build
 
 # 验证工具已注册
-node build/src/bin/js-reverse.js call get_page_title --help
+node js-reverser-cli/build/bin/browsercli.js call get_page_title --help
 
 # 启动 Worker 并调用
 npm run start  # 后台运行
-node build/src/bin/js-reverse.js call get_page_title
+node js-reverser-cli/build/bin/browsercli.js call get_page_title
 ```
 
 ### 7.4 常见开发任务

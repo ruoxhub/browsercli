@@ -7,7 +7,7 @@
 /**
  * config 命令 — 自包含实现，仅管理本地 JSON 配置文件
  *
- * 配置文件路径：~/.js-reverser-cli/config.json
+ * 配置文件路径：~/.browsercli/config.json
  * 支持的键：
  *   workerUrl  → 映射到环境变量 WORKER_URL
  *   apiToken   → 映射到环境变量 WORKER_API_TOKEN
@@ -35,7 +35,7 @@ interface CliConfig {
 }
 
 function getConfigPath(): string {
-  return join(os.homedir(), '.js-reverser-cli', 'config.json');
+  return join(os.homedir(), '.browsercli', 'config.json');
 }
 
 function loadConfigFile(): CliConfig {

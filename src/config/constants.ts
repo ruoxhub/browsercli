@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/** Sekiro Server 默认 WebSocket 地址 */
-export const DEFAULT_RPC_HOST = 'ws://127.0.0.1:5612';
 
 /** Sekiro 默认分组名 */
 export const DEFAULT_GROUP = 'browsercli';
@@ -24,3 +22,6 @@ export const PROJECT_CONFIG_FILENAME = 'browsercli.config.json';
 
 /** 项目根目录 config.json 文件名 */
 export const ROOT_CONFIG_FILENAME = 'config.json';
+
+/** Sekiro 默认 RPC (WebSocket) 地址 */
+export const DEFAULT_RPC_HOST = 'ws://127.0.0.1:5612';
