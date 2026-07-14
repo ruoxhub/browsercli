@@ -5,7 +5,7 @@
 
 import type {IncomingMessage, ServerResponse} from 'node:http';
 
-import type {ToolMeta} from '../../cli/tools-meta.js';
+import type {ToolMeta} from '../../tools/tools-meta.js';
 import type {JobStore} from '../../worker/JobStore.js';
 import type {ToolAdapter} from '../../worker/ToolAdapter.js';
 import {sendError, sendJson} from '../middleware/error.js';

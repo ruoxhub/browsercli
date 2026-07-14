@@ -11,7 +11,7 @@ import { request } from 'node:http';
 
 import { ConsoleServer } from '../../../src/web/ConsoleServer.js';
 import type { Runtime } from '../../../src/runtime.js';
-import type { SekiroInvoker } from '../../../src/cli/sekiro-invoker.js';
+import type { SekiroInvoker } from '../../../src/worker/SekiroInvoker.js';
 import type { ToolAdapter } from '../../../src/worker/ToolAdapter.js';
 
 describe('ConsoleServer', () => {

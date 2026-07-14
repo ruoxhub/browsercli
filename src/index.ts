@@ -18,7 +18,7 @@
 
 import './utils/logger.js';
 
-import {SekiroInvoker} from './cli/sekiro-invoker.js';
+import {SekiroInvoker} from './worker/SekiroInvoker.js';
 import {resolveConfig} from './config.js';
 import {RpcClient} from './modules/protocol/Client.js';
 import {getRuntime} from './runtime.js';

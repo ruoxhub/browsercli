@@ -7,8 +7,8 @@
 import {
   validateToolArgs,
   type ValidationFailure,
-} from '../cli/tool-arg-validator.js';
-import type {ToolMeta} from '../cli/tools-meta.js';
+} from '../tools/tool-arg-validator.js';
+import type {ToolMeta} from '../tools/tools-meta.js';
 import type {ToolPrerequisiteChecker} from '../tools/prerequisites/ToolPrerequisiteChecker.js';
 import type {Response, ToolDefinition} from '../tools/ToolDefinition.js';
 import {createToolError, ErrorCodes, ToolError} from '../utils/errors.js';

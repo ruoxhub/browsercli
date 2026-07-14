@@ -1,0 +1,29 @@
+{
+  "name": "js-reverser-cli",
+  "type": "module",
+  "version": "1.0.0",
+  "license": "Apache-2.0",
+  "description": "Standalone pure-remote HTTP CLI client for the JSReverser worker.",
+  "bin": {
+    "browsercli": "./build/bin/browsercli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck:tests": "tsc -p tsconfig.test.json"
+  },
+  "dependencies": {
+    "axi-sdk-js": "^0.1.4",
+    "yargs": "^18.0.0",
+    "zod": "^3.23.0",
+    "debug": "^4.3.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.0",
+    "@types/debug": "^4.1.0",
+    "@types/yargs": "^17.0.0"
+  }
+}

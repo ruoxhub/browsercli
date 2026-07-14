@@ -7,12 +7,12 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {ensureToolsMeta, getToolMeta} from '../../../src/cli/tools-meta.js';
+import {ensureToolsMeta, getToolMeta} from '../../../src/tools/tools-meta.js';
 import {siteExperienceService} from '../../../src/services/SiteExperienceService.js';
 import {ToolAdapter} from '../../../src/worker/ToolAdapter.js';
 import {ToolContextProvider} from '../../../src/worker/ToolContext.js';
 import {ErrorCodes, ToolError} from '../../../src/utils/errors.js';
-import type {ToolMeta} from '../../../src/cli/tools-meta.js';
+import type {ToolMeta} from '../../../src/tools/tools-meta.js';
 import type {RpcRequest} from '../../../src/types/rpc.js';
 
 interface ResolvePayload {

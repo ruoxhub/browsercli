@@ -15,8 +15,8 @@
  * 不支持的类型透传 type=null（前端会回退到 JSON 文本框）。
  */
 
-import type {ToolMeta} from '../../cli/tools-meta.js';
-import type {ToolArgSpec} from '../../cli/zod-introspect.js';
+import type {ToolMeta} from '../../tools/tools-meta.js';
+import type {ToolArgSpec} from '../../tools/zod-introspect.js';
 
 export interface JsonSchemaProperty {
   type?: 'string' | 'number' | 'boolean' | 'array' | 'object';

@@ -11,13 +11,13 @@ import { fileURLToPath } from 'node:url';
 
 import { WebSocketServer } from 'ws';
 
-import type { SekiroInvoker } from '../cli/sekiro-invoker.js';
+import type { SekiroInvoker } from '../worker/SekiroInvoker.js';
 import {
   ensureToolsMeta,
   getAllToolNames,
   getAllToolsMeta,
   getToolMeta,
-} from '../cli/tools-meta.js';
+} from '../tools/tools-meta.js';
 import type { Runtime } from '../runtime.js';
 import type { ToolAdapter } from '../worker/ToolAdapter.js';
 import { JobStore } from '../worker/JobStore.js';

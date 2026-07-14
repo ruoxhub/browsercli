@@ -11,7 +11,6 @@ import type {DomainManifest, ToolProfile} from '../manifest.js';
  *
  * @see {@link src/tools/ToolDefinition.ts} — defineTool 宏
  * @see {@link src/tools/categories.ts} — ToolCategory 分类枚举
- * @see {@link src/cli/commands/start.ts} — 启动时注册所有工具到 ToolRegistry
  */
 
 const PROFILE_ORDER: Record<ToolProfile, number> = {

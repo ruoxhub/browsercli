@@ -12,12 +12,12 @@
  * @see {@link src/tools/ToolDefinition.ts} — defineTool 工具定义宏
  */
 
-import type {ToolMeta} from '../cli/tools-meta.js';
+import type {ToolMeta} from '../tools/tools-meta.js';
 import {
   ensureToolsMeta,
   getAllToolNames,
   getToolMeta,
-} from '../cli/tools-meta.js';
+} from '../tools/tools-meta.js';
 import {ToolPrerequisiteChecker} from '../tools/prerequisites/ToolPrerequisiteChecker.js';
 import type {ActionHandler} from '../types/rpc.js';
 import type {ToolInvokeEvent} from '../web/types.js';

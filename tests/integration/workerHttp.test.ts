@@ -18,7 +18,7 @@ import assert from 'node:assert/strict';
 import {after, before, describe, it, type TestContext} from 'node:test';
 import {WebSocket} from 'ws';
 
-import {ensureToolsMeta, getToolMeta} from '../../src/cli/tools-meta.js';
+import {ensureToolsMeta, getToolMeta} from '../../src/tools/tools-meta.js';
 import {ConsoleServer} from '../../src/web/ConsoleServer.js';
 import {JobStore} from '../../src/worker/JobStore.js';
 import {ToolAdapter} from '../../src/worker/ToolAdapter.js';

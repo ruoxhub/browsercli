@@ -6,7 +6,7 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
-import type { SekiroInvoker } from '../../cli/sekiro-invoker.js';
+import type { SekiroInvoker } from '../../worker/SekiroInvoker.js';
 import { sendError, sendJson, sendUnexpected } from '../middleware/error.js';
 
 const MAX_BODY_BYTES = 1 * 1024 * 1024;

@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import type {ToolMeta} from '../../../../src/cli/tools-meta.js';
+import type {ToolMeta} from '../../../../src/tools/tools-meta.js';
 import {toolMetaToJsonSchema} from '../../../../src/web/adapters/ZodToJsonSchema.js';
 
 function meta(argSpecs: ToolMeta['argSpecs']): ToolMeta {

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type * as ToolsMeta from '../cli/tools-meta.js';
+import type * as ToolsMeta from '../tools/tools-meta.js';
 import type {ActionHandler} from '../types/rpc.js';
 
 interface BuiltinActionClient {
@@ -23,7 +23,7 @@ export function registerBuiltinActions(client: BuiltinActionClient): void {
   client.registerAction('_list_tools', async (_request, resolve, reject) => {
     try {
       if (!toolsMetaCache) {
-        toolsMetaCache = await import('../cli/tools-meta.js');
+        toolsMetaCache = await import('../tools/tools-meta.js');
       }
       const {ensureToolsMeta, getAllToolNames, getToolMeta} = toolsMetaCache;
       await ensureToolsMeta();

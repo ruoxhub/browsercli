@@ -14,7 +14,7 @@ import {
   ensureToolsMeta,
   getToolMeta,
   type ToolMeta,
-} from '../../../src/cli/tools-meta.js';
+} from '../../../src/tools/tools-meta.js';
 import {ErrorCodes, ToolError} from '../../../src/utils/errors.js';
 import {
   ToolExecutionPipeline,
