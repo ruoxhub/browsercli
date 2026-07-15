@@ -27,6 +27,7 @@ import {bearerAuth} from './middleware/bearerAuth.js';
 import {rejectIfNotLocal} from './middleware/localOnly.js';
 import {RestRouter} from './RestRouter.js';
 import {createApiV1Routes} from './routes/apiV1.js';
+import {createConfigRoutes} from './routes/config.js';
 import {createHookRoutes} from './routes/hooks.js';
 import {createInvocationsRoutes} from './routes/invocations.js';
 import {createSiteExperienceRoutes} from './routes/site-experiences.js';
@@ -121,15 +122,16 @@ export class ConsoleServer {
     const self = this;
     const workerConfig: WorkerRoutesConfig = {
       runtime: this.options.runtime,
+      contextProvider: this.options.runtime.contextProvider,
       group: this.options.group,
       rpcHost: this.options.rpcHost,
       version,
       startedAt: this.startedAt,
       get browserMode(): string {
         try {
-          const browser = self.options.runtime.browserManager
-            .getContext()
-            ?.browser();
+          const ctxProvider = self.options.runtime.contextProvider;
+          const browser = ctxProvider?.getBrowser()
+            ?? self.options.runtime.browserManager.getBrowser();
           return browser?.version() ?? 'CDP';
         } catch {
           return 'CDP';
@@ -139,6 +141,12 @@ export class ConsoleServer {
 
     this.router.mount(
       createWorkerRoutes(workerConfig, () => getAllToolNames().length),
+    );
+    this.router.mount(
+      createConfigRoutes({
+        contextProvider: this.options.runtime.contextProvider!,
+        wsHub: this.wsHub,
+      }),
     );
     this.router.mount(
       createToolsRoutes({

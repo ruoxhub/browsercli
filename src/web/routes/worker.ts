@@ -15,11 +15,14 @@
 import type {IncomingMessage, ServerResponse} from 'node:http';
 
 import type {Runtime} from '../../runtime.js';
+import type {ToolContextProvider} from '../../worker/ToolContext.js';
 import {sendJson, sendUnexpected} from '../middleware/error.js';
 import type {WorkerFullStatus, WorkerStatus} from '../types.js';
 
 export interface WorkerRoutesConfig {
   runtime: Runtime;
+  /** 工具上下文提供者，用于读取重连后的 browser 状态 */
+  contextProvider?: ToolContextProvider;
   /** 启动时传入的 RPC 连接信息（来自 src/index.ts 的 workerStartContext） */
   group: string;
   rpcHost: string;
@@ -49,9 +52,20 @@ function buildWorkerStatus(cfg: WorkerRoutesConfig): WorkerStatus {
 
 function buildFullStatus(cfg: WorkerRoutesConfig): WorkerFullStatus {
   const {runtime} = cfg;
-  const ctx = runtime.browserManager.getContext();
-  const pages = ctx?.pages().length ?? 0;
-  const isConnected = runtime.browserManager.isConnected();
+  const ctxProvider = cfg.contextProvider ?? runtime.contextProvider;
+
+  let isConnected: boolean;
+  let pages: number;
+  try {
+    const ctx = ctxProvider?.getContext() ?? runtime.browserManager.getContext();
+    pages = ctx?.pages().length ?? 0;
+    isConnected =
+      ctxProvider?.isBrowserConnected() ??
+      runtime.browserManager.isConnected();
+  } catch {
+    isConnected = false;
+    pages = 0;
+  }
 
   const hookStats = runtime.hookManager.getStats();
   const totalHooks = hookStats.totalHooks;
@@ -64,7 +78,7 @@ function buildFullStatus(cfg: WorkerRoutesConfig): WorkerFullStatus {
       connected: isConnected,
       mode: cfg.browserMode,
       pages,
-      sessions: pages, // sessions == pages until SessionManager exposes a count
+      sessions: pages,
     },
     hooks: {
       total: totalHooks,
