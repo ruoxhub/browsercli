@@ -8,6 +8,9 @@ import type {
   WorkerFullStatus,
   InvocationRecord,
   SiteExperience,
+  RuntimeConfig,
+  BrowserConfig,
+  ConnectResult,
 } from './protocol';
 
 export interface ToolSummary {
@@ -143,5 +146,40 @@ export const api = {
       'DELETE',
       `/api/site-experiences/${id}`,
     );
+  },
+
+  getConfig(): Promise<RuntimeConfig> {
+    return request<RuntimeConfig>('GET', '/api/config');
+  },
+
+  updateBrowserConfig(config: Partial<BrowserConfig>): Promise<RuntimeConfig> {
+    return request<RuntimeConfig>('PUT', '/api/config/browser', config);
+  },
+
+  updateLlmConfig(config: {
+    llmProvider?: string;
+    openai?: Record<string, unknown>;
+    gemini?: Record<string, unknown>;
+    anthropic?: Record<string, unknown>;
+  }): Promise<RuntimeConfig> {
+    return request<RuntimeConfig>('PUT', '/api/config/llm', config);
+  },
+
+  updateDatabaseConfig(databaseUrl: string): Promise<{databaseUrl: string}> {
+    return request<{databaseUrl: string}>('PUT', '/api/config/database', {
+      databaseUrl,
+    });
+  },
+
+  connectBrowser(): Promise<ConnectResult> {
+    return request<ConnectResult>('POST', '/api/browser/connect');
+  },
+
+  disconnectBrowser(): Promise<ConnectResult> {
+    return request<ConnectResult>('POST', '/api/browser/disconnect');
+  },
+
+  connectDatabase(): Promise<{connected: boolean}> {
+    return request<{connected: boolean}>('POST', '/api/database/connect');
   },
 };

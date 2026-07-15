@@ -57,11 +57,11 @@ function buildFullStatus(cfg: WorkerRoutesConfig): WorkerFullStatus {
   let isConnected: boolean;
   let pages: number;
   try {
-    const ctx = ctxProvider?.getContext() ?? runtime.browserManager.getContext();
+    const ctx =
+      ctxProvider?.getContext() ?? runtime.browserManager.getContext();
     pages = ctx?.pages().length ?? 0;
     isConnected =
-      ctxProvider?.isBrowserConnected() ??
-      runtime.browserManager.isConnected();
+      ctxProvider?.isBrowserConnected() ?? runtime.browserManager.isConnected();
   } catch {
     isConnected = false;
     pages = 0;

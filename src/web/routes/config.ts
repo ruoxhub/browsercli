@@ -21,10 +21,16 @@ import type {IncomingMessage, ServerResponse} from 'node:http';
 import {getRuntimeConfigStore} from '../../config/RuntimeConfigStore.js';
 import {getBrowserManagerConfig} from '../../config/servicesConfig.js';
 import type {GlobalConfig} from '../../config/schema.js';
-import {BrowserConfigSchema, formatConfigValidationError} from '../../config/schema.js';
+import {
+  BrowserConfigSchema,
+  formatConfigValidationError,
+} from '../../config/schema.js';
 import {dbService} from '../../services/DatabaseService.js';
 import type {ToolContextProvider} from '../../worker/ToolContext.js';
-import {connectBrowser, disconnectBrowser} from '../../worker/BrowserConnectionManager.js';
+import {
+  connectBrowser,
+  disconnectBrowser,
+} from '../../worker/BrowserConnectionManager.js';
 import {sendError, sendJson} from '../middleware/error.js';
 import type {WsHub} from '../ws/WsHub.js';
 
@@ -61,7 +67,10 @@ function maskSensitiveFields(config: GlobalConfig): GlobalConfig {
   const masked = {...config};
 
   if (masked.openai?.apiKey) {
-    masked.openai = {...masked.openai, apiKey: maskApiKey(masked.openai.apiKey)};
+    masked.openai = {
+      ...masked.openai,
+      apiKey: maskApiKey(masked.openai.apiKey),
+    };
   }
   if (masked.anthropic?.apiKey) {
     masked.anthropic = {
@@ -70,7 +79,10 @@ function maskSensitiveFields(config: GlobalConfig): GlobalConfig {
     };
   }
   if (masked.gemini?.apiKey) {
-    masked.gemini = {...masked.gemini, apiKey: maskApiKey(masked.gemini.apiKey)};
+    masked.gemini = {
+      ...masked.gemini,
+      apiKey: maskApiKey(masked.gemini.apiKey),
+    };
   }
 
   return masked;
@@ -151,7 +163,9 @@ export function createConfigRoutes(
           sendError(
             res,
             code,
-            code === 'PAYLOAD_TOO_LARGE' ? '请求体超过 1MB 上限' : '请求体不是合法 JSON',
+            code === 'PAYLOAD_TOO_LARGE'
+              ? '请求体超过 1MB 上限'
+              : '请求体不是合法 JSON',
             code === 'PAYLOAD_TOO_LARGE' ? 413 : 400,
           );
           return;

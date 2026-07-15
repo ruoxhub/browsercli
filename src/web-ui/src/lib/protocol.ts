@@ -25,3 +25,66 @@ export interface SiteExperience {
   createdAt: string;
   updatedAt: string;
 }
+
+// ==================== Runtime Config ====================
+
+export interface BrowserConfig {
+  headless?: boolean;
+  isolated?: boolean;
+  executablePath?: string;
+  channel?: string;
+  useStealthScripts?: boolean;
+  jsStealth?: boolean;
+  cloak?: boolean;
+  fullStealthArgs?: boolean;
+  minimalStealth?: boolean;
+  browserURL?: string;
+  wsEndpoint?: string;
+  remoteDebuggingUrl?: string;
+  remoteDebuggingPort?: number;
+  userDataDir?: string;
+  args?: string[];
+  devtools?: boolean;
+  autoLaunch?: boolean;
+  userAgent?: string;
+}
+
+export interface OpenAIConfig {
+  apiKey?: string;
+  baseURL?: string;
+  model?: string;
+}
+
+export interface GeminiConfig {
+  apiKey?: string;
+  cliPath?: string;
+  useAPI?: boolean;
+  model?: string;
+}
+
+export interface AnthropicConfig {
+  apiKey?: string;
+  baseURL?: string;
+  model?: string;
+}
+
+export interface RuntimeConfig {
+  rpcHost?: string;
+  group?: string;
+  browserUrl?: string;
+  wsEndpoint?: string;
+  headless?: boolean;
+  executablePath?: string;
+  databaseUrl?: string;
+  llmProvider?: 'openai' | 'gemini' | 'anthropic';
+  openai?: OpenAIConfig;
+  gemini?: GeminiConfig;
+  anthropic?: AnthropicConfig;
+  browser?: BrowserConfig;
+  debug?: boolean;
+}
+
+export interface ConnectResult {
+  connected: boolean;
+  mode?: string;
+}

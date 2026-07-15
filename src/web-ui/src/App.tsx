@@ -11,6 +11,7 @@ import {
   X,
   Terminal,
   Globe,
+  Settings,
 } from 'lucide-react';
 import {useEffect, useState} from 'react';
 import {HashRouter as Router, Routes, Route, NavLink} from 'react-router-dom';
@@ -18,6 +19,7 @@ import {HashRouter as Router, Routes, Route, NavLink} from 'react-router-dom';
 import wsClient from './lib/ws';
 import HooksPage from './routes/hooks';
 import OverviewPage from './routes/overview';
+import SettingsPage from './routes/settings';
 import SiteExperiencesPage from './routes/site-experiences';
 import ToolsPage from './routes/tools';
 
@@ -114,6 +116,14 @@ function Layout() {
             <Globe size={16} />
             <span>站点经验</span>
           </NavLink>
+          <NavLink
+            to="/settings"
+            onClick={() => setSidebarOpen(false)}
+            className={getNavLinkClass}
+          >
+            <Settings size={16} />
+            <span>连接设置</span>
+          </NavLink>
         </nav>
 
         {/* Bottom copyright info */}
@@ -150,6 +160,10 @@ function Layout() {
           <Route
             path="/site-experiences"
             element={<SiteExperiencesPage />}
+          />
+          <Route
+            path="/settings"
+            element={<SettingsPage />}
           />
         </Routes>
       </main>

@@ -130,8 +130,9 @@ export class ConsoleServer {
       get browserMode(): string {
         try {
           const ctxProvider = self.options.runtime.contextProvider;
-          const browser = ctxProvider?.getBrowser()
-            ?? self.options.runtime.browserManager.getBrowser();
+          const browser =
+            ctxProvider?.getBrowser() ??
+            self.options.runtime.browserManager.getBrowser();
           return browser?.version() ?? 'CDP';
         } catch {
           return 'CDP';
