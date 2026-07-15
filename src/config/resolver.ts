@@ -4,24 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/* eslint-disable import/no-cycle -- resolver re-exports servicesConfig factories for backward compat while servicesConfig consumes core resolver helpers (getEnvValue/loadFullConfig). The mutual dependency is intentional. */
+/* eslint-disable import/no-cycle -- resolver re-exports servicesConfig factories for backward compat while servicesConfig consumes core resolver helpers (getEnvValue/configFromEnv). The mutual dependency is intentional. */
 
 /**
- * 核心配置基础设施 — 配置文件读写、环境变量工具、CLI 配置解析
+ * 核心配置基础设施 — 环境变量工具、CLI 配置解析、RuntimeConfigStore 播种
  *
  * 配置优先级（高 → 低）：
  * 1. CLI 参数（--rpcHost 等）
  * 2. 环境变量（RPC_HOST, OPENAI_API_KEY 等）
- * 3. 项目根目录配置文件（<cwd>/config.json）
- * 4. 项目级配置文件（<cwd>/browsercli.config.json）
- * 5. 用户级配置文件（~/.browsercli/config.json）
- * 6. 内置默认值
+ * 3. 内置默认值
  *
- * 服务相关配置（AI / Browser / System）已拆分至 servicesConfig.ts，
- * 本文件通过 re-export 保持向后兼容。
+ * config.json 文件加载已移除，配置改为 RuntimeConfigStore 内存态，
+ * 由前端控制面板管理（见 RuntimeConfigStore.ts）。
  */
 
-import {existsSync, readFileSync, writeFileSync, mkdirSync} from 'node:fs';
+import {existsSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -34,11 +31,7 @@ import {getRuntimeConfigStore} from './RuntimeConfigStore.js';
 import {
   DEFAULT_GROUP,
   DEFAULT_RPC_HOST,
-  PROJECT_CONFIG_FILENAME,
-  ROOT_CONFIG_FILENAME,
   RUNTIME_DIR_NAME,
-  USER_CONFIG_DIR_NAME,
-  USER_CONFIG_FILENAME,
 } from './constants.js';
 import {
   type AIConfig,
@@ -55,11 +48,7 @@ if (existsSync(envPath)) {
 }
 
 // ==========================================================================
-// 第一部分：常量与默认值
-// ==========================================================================
-
-// ==========================================================================
-// 第二部分：类型定义
+// 第一部分：类型定义与默认值
 // ==========================================================================
 
 /** LLM 提供商类型 */
@@ -73,16 +62,6 @@ export type {AIConfig};
 
 /** 系统配置（AI + Browser + Debug） */
 export type {SystemConfig};
-
-/** 配置来源标记 */
-export interface ConfigSource {
-  /** 配置文件路径 */
-  filePath: string;
-  /** 是否存在 */
-  exists: boolean;
-  /** 加载的配置（仅 exists=true 时有值） */
-  config?: GlobalConfig;
-}
 
 /** CLI 层解析后的完整配置 */
 export interface ResolvedConfig {
@@ -121,127 +100,7 @@ const DEFAULTS: Readonly<ResolvedConfig> = {
 } as const;
 
 // ==========================================================================
-// 第三部分：全局配置文件管理（~/.browsercli/config.json + browsercli.config.json）
-// ==========================================================================
-
-/** 获取用户级配置文件路径 (~/.browsercli/config.json) */
-export function getUserConfigPath(): string {
-  return path.join(os.homedir(), USER_CONFIG_DIR_NAME, USER_CONFIG_FILENAME);
-}
-
-/** 获取项目级配置文件路径 (<cwd>/browsercli.config.json) */
-export function getProjectConfigPath(cwd?: string): string {
-  return path.join(cwd ?? process.cwd(), PROJECT_CONFIG_FILENAME);
-}
-
-/** 获取项目根目录 config.json 路径 (<cwd>/config.json) */
-export function getRootConfigPath(cwd?: string): string {
-  return path.join(cwd ?? process.cwd(), ROOT_CONFIG_FILENAME);
-}
-
-/** 安全读取 JSON 配置文件 */
-function readConfigFile(filePath: string): GlobalConfig | null {
-  try {
-    if (!existsSync(filePath)) return null;
-    const content = readFileSync(filePath, 'utf-8').trim();
-    if (!content) return null;
-    return validateGlobalConfig(JSON.parse(content));
-  } catch (error) {
-    console.warn(
-      `[Config] 读取配置文件失败: ${filePath} — ${error instanceof Error ? error.message : error}`,
-    );
-    return null;
-  }
-}
-
-/** 写入配置文件（自动创建目录） */
-export function writeConfigFile(filePath: string, config: GlobalConfig): void {
-  const dir = path.dirname(filePath);
-  if (!existsSync(dir)) {
-    mkdirSync(dir, {recursive: true});
-  }
-  const parsed = validateGlobalConfig(config);
-  writeFileSync(filePath, JSON.stringify(parsed, null, 2) + '\n', 'utf-8');
-}
-
-/** 加载用户级配置 */
-export function loadUserConfig(): ConfigSource {
-  const filePath = getUserConfigPath();
-  const config = readConfigFile(filePath);
-  return {
-    filePath,
-    exists: config !== null,
-    config: config ?? undefined,
-  };
-}
-
-/** 加载项目级配置 */
-export function loadProjectConfig(cwd?: string): ConfigSource {
-  const filePath = getProjectConfigPath(cwd);
-  const config = readConfigFile(filePath);
-  return {
-    filePath,
-    exists: config !== null,
-    config: config ?? undefined,
-  };
-}
-
-/** 加载项目根目录 config.json */
-export function loadRootConfig(cwd?: string): ConfigSource {
-  const filePath = getRootConfigPath(cwd);
-  const config = readConfigFile(filePath);
-  return {
-    filePath,
-    exists: config !== null,
-    config: config ?? undefined,
-  };
-}
-
-/** 合并多个 GlobalConfig（后者覆盖前者） */
-export function mergeConfigs(
-  ...configs: Array<GlobalConfig | undefined>
-): GlobalConfig {
-  const result: GlobalConfig = {};
-  for (const cfg of configs) {
-    if (!cfg) continue;
-    const parsed = validateGlobalConfig(cfg);
-    for (const [key, value] of Object.entries(parsed)) {
-      if (value !== undefined) {
-        (result as Record<string, unknown>)[key] = value;
-      }
-    }
-  }
-  return validateGlobalConfig(result);
-}
-
-/**
- * 加载完整配置链 — config.json 覆盖项目级，项目级覆盖用户级
- *
- * 返回合并后的 GlobalConfig（不含默认值，仅包含用户/项目显式配置）
- */
-export function loadFullConfig(): {
-  merged: GlobalConfig;
-  sources: ConfigSource[];
-} {
-  const userSource = loadUserConfig();
-  const projectSource = loadProjectConfig();
-  const rootSource = loadRootConfig();
-
-  // 合并优先级（低→高）：用户级 < 项目级 < 根目录 config.json
-  const merged = mergeConfigs(
-    userSource.config,
-    projectSource.config,
-    rootSource.config,
-  );
-
-  return {
-    merged,
-    sources: [userSource, projectSource, rootSource],
-  };
-}
-
-// ==========================================================================
-// 第四部分：统一环境变量读取 + 配置解析
+// 第二部分：环境变量读取 + 配置解析
 // ==========================================================================
 
 /** 所有已知环境变量 → GlobalConfig 键映射 */
@@ -460,97 +319,30 @@ export function configFromEnv(): GlobalConfig {
 }
 
 /**
- * 解析最终 CLI 配置 — 合并所有来源，应用默认值
+ * 解析最终 CLI 配置 — 合并环境变量与 CLI 参数，应用默认值
  *
- * 优先级（高→低）：envArgs > 环境变量 > 项目配置 > 用户配置 > 默认值
+ * 优先级（高→低）：envArgs > 环境变量 > 默认值
  *
  * @param envArgs CLI 参数或显式传入的覆盖值
  */
 export function resolveConfig(envArgs?: Partial<GlobalConfig>): ResolvedConfig {
-  const {merged: fileConfig} = loadFullConfig();
   const envConfig = configFromEnv();
-
-  // 按优先级合并：文件配置 < 环境变量 < 显式参数
-  const merged = mergeConfigs(fileConfig, envConfig, envArgs);
-  const parsed = validateGlobalConfig(merged);
+  const merged = validateGlobalConfig({...envConfig, ...envArgs});
 
   return {
-    rpcHost: parsed.rpcHost ?? DEFAULTS.rpcHost,
-    group: parsed.group ?? DEFAULTS.group,
-    browserUrl: parsed.browserUrl || undefined,
-    wsEndpoint: parsed.wsEndpoint || undefined,
-    headless: parsed.headless ?? DEFAULTS.headless,
-    executablePath: parsed.executablePath,
-    databaseUrl: parsed.databaseUrl || undefined,
-    runtimeDirName: parsed.runtimeDirName ?? DEFAULTS.runtimeDirName,
-    debug: parsed.debug ?? DEFAULTS.debug,
-    cloak: parsed.cloak ?? DEFAULTS.cloak,
-    jsStealth: parsed.jsStealth ?? DEFAULTS.jsStealth,
-    fullStealthArgs: parsed.fullStealthArgs ?? DEFAULTS.fullStealthArgs,
+    rpcHost: merged.rpcHost ?? DEFAULTS.rpcHost,
+    group: merged.group ?? DEFAULTS.group,
+    browserUrl: merged.browserUrl || undefined,
+    wsEndpoint: merged.wsEndpoint || undefined,
+    headless: merged.headless ?? DEFAULTS.headless,
+    executablePath: merged.executablePath,
+    databaseUrl: merged.databaseUrl || undefined,
+    runtimeDirName: merged.runtimeDirName ?? DEFAULTS.runtimeDirName,
+    debug: merged.debug ?? DEFAULTS.debug,
+    cloak: merged.cloak ?? DEFAULTS.cloak,
+    jsStealth: merged.jsStealth ?? DEFAULTS.jsStealth,
+    fullStealthArgs: merged.fullStealthArgs ?? DEFAULTS.fullStealthArgs,
   };
-}
-
-/**
- * 初始化用户级配置文件（若不存在则创建）
- */
-export function initUserConfig(): {path: string; created: boolean} {
-  const filePath = getUserConfigPath();
-  if (existsSync(filePath)) {
-    return {path: filePath, created: false};
-  }
-
-  const defaultConfig: GlobalConfig = {
-    rpcHost: DEFAULT_RPC_HOST,
-    group: DEFAULT_GROUP,
-    headless: false,
-    debug: false,
-  };
-
-  writeConfigFile(filePath, defaultConfig);
-  return {path: filePath, created: true};
-}
-
-/**
- * 设置用户级配置项
- */
-export function setUserConfigValue(
-  key: keyof GlobalConfig,
-  value: unknown,
-): void {
-  const filePath = getUserConfigPath();
-  const existing = readConfigFile(filePath) ?? {};
-  (existing as Record<string, unknown>)[key] = value;
-  writeConfigFile(filePath, existing);
-}
-
-/**
- * 删除用户级配置项
- */
-export function deleteUserConfigValue(key: keyof GlobalConfig): boolean {
-  const filePath = getUserConfigPath();
-  const existing = readConfigFile(filePath);
-  if (!existing || !(key in existing)) return false;
-  delete (existing as Record<string, unknown>)[key];
-  writeConfigFile(filePath, existing);
-  return true;
-}
-
-/**
- * 显示当前生效的配置及来源
- */
-export function showConfigInfo(): {
-  resolved: ResolvedConfig;
-  sources: ConfigSource[];
-  envOverrides: string[];
-} {
-  const {sources} = loadFullConfig();
-  const envOverrides = Object.keys(ENV_MAP).filter(
-    k => getEnvValue(k) !== undefined,
-  );
-
-  const resolved = resolveConfig();
-
-  return {resolved, sources, envOverrides};
 }
 
 export function getToolResultRecordingConfig(): ResolvedToolResultRecordingConfig {
@@ -562,7 +354,7 @@ export function getToolResultRecordingConfig(): ResolvedToolResultRecordingConfi
     fileConfig.toolResultRecording?.outputDir ??
     (fileConfig.outputDir
       ? path.join(fileConfig.outputDir, 'tool-results')
-      : path.join(os.homedir(), USER_CONFIG_DIR_NAME, 'tool-results'));
+      : path.join(os.homedir(), '.browsercli', 'tool-results'));
 
   return {
     enabled: envEnabled ?? fileConfig.toolResultRecording?.enabled ?? false,
@@ -571,7 +363,7 @@ export function getToolResultRecordingConfig(): ResolvedToolResultRecordingConfi
 }
 
 // ==========================================================================
-// 第五部分：服务配置（AI / Browser / System）— 已拆分至 servicesConfig.ts
+// 第三部分：服务配置（AI / Browser / System）— 已拆分至 servicesConfig.ts
 // ==========================================================================
 
 export {
