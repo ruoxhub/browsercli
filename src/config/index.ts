@@ -7,3 +7,4 @@
 export * from './constants.js';
 export * from './resolver.js';
 export * from './schema.js';
+export * from './RuntimeConfigStore.js';
