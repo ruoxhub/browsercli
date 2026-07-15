@@ -50,7 +50,7 @@ export class BrowserContextProvider {
 
   // ─── Browser / Context ───────────────────────────────
 
-  setBrowser(browser: Browser): void {
+  setBrowser(browser: Browser | null): void {
     this._browser = browser;
   }
 

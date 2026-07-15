@@ -105,7 +105,7 @@ export class ToolContextProvider {
     return this.activeSessionId;
   }
 
-  setBrowser(browser: Browser): void {
+  setBrowser(browser: Browser | null): void {
     this._browserContext.setBrowser(browser);
   }
 
