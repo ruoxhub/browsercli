@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 

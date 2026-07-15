@@ -6,7 +6,7 @@
 
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
-import {defineTool, type Context} from '../ToolDefinition.js';
+import {defineTool} from '../ToolDefinition.js';
 
 /**
  * Hook SM-crypto 国密库：SM2、SM3、SM4 算法。

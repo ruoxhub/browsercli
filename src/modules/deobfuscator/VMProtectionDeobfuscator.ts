@@ -14,7 +14,6 @@
  * 反混淆策略：识别 VM 结构 → 提取指令序列 → 符号执行 → 重建控制流 → LLM 辅助。
  */
 
-import generateImport from '@babel/generator';
 import * as parser from '@babel/parser';
 import traverseImport from '@babel/traverse';
 import * as t from '@babel/types';
@@ -29,7 +28,6 @@ import {
   unwrapBabelDefault,
 } from './astUtils.js';
 
-const generate = unwrapBabelDefault<typeof generateImport>(generateImport);
 const traverse = unwrapBabelDefault<typeof traverseImport>(traverseImport);
 
 // VM 解释器的关键特征

@@ -11,13 +11,7 @@ import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
 import {toMirroredNetworkEntry, toMirroredScriptEntry} from './normalize.js';
-import type {
-  CorrelatedFlow,
-  PriorityTarget,
-  SignatureChainHints,
-  RecordEvidenceResult,
-  ExportSessionReportResult,
-} from './types.js';
+import type {SignatureChainHints} from './types.js';
 
 const HOOK_RECORD_STOP_THRESHOLD = 200;
 const NETWORK_CHANNEL = 'runtime-evidence';

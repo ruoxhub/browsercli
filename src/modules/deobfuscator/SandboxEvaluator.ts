@@ -7,6 +7,7 @@ import vm from 'node:vm';
 
 import generateImport from '@babel/generator';
 import traverseImport from '@babel/traverse';
+import type {NodePath as BabelNodePath} from '@babel/traverse';
 import * as t from '@babel/types';
 
 import {unwrapBabelDefault} from './astUtils.js';
@@ -673,5 +674,4 @@ function resolveSandboxValueName(
   return resolveSandboxValueName(initPath, sandbox, localSeen);
 }
 
-type NodePath<T extends t.Node = t.Node> =
-  import('@babel/traverse').NodePath<T>;
+type NodePath<T extends t.Node = t.Node> = BabelNodePath<T>;

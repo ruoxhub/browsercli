@@ -6,7 +6,7 @@
 
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
-import {defineTool, type Context} from '../ToolDefinition.js';
+import {defineTool} from '../ToolDefinition.js';
 
 const DEVICE_PROFILES: Record<string, DeviceProfileData> = {
   android: {

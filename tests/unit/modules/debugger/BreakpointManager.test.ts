@@ -11,18 +11,18 @@ import type {BreakpointHitEvent} from '../../../../src/types/index.js';
 
 interface MockSession {
   send: (method: string, params?: unknown) => Promise<unknown>;
-  on: (event: string, handler: Function) => void;
-  off: (event: string, handler: Function) => void;
+  on: (event: string, handler: () => void) => void;
+  off: (event: string, handler: () => void) => void;
 }
 
 function makeSession(
   sendImpl: (method: string, params?: unknown) => unknown = () => ({}),
 ): MockSession & {
   calls: Array<{method: string; params?: unknown}>;
-  listeners: Record<string, Function>;
+  listeners: Record<string, (...args: unknown[]) => void>;
 } {
   const calls: Array<{method: string; params?: unknown}> = [];
-  const listeners: Record<string, Function> = {};
+  const listeners: Record<string, () => void> = {};
   return {
     calls,
     listeners,
@@ -30,7 +30,7 @@ function makeSession(
       calls.push({method, params});
       return sendImpl(method, params);
     },
-    on(event: string, handler: Function) {
+    on(event: string, handler: () => void) {
       listeners[event] = handler;
     },
     off(event: string) {

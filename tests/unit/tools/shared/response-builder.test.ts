@@ -13,7 +13,6 @@ import {
   inferOutcomeFromStatus,
   buildTaskDiagnostics,
   buildManageSummaryText,
-  compactManagePayload,
   REVERSE_AGENT_SCHEMA_VERSION,
 } from '../../../../src/tools/shared/response-builder.js';
 

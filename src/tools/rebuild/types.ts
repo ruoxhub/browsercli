@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {CodeFile} from '../../types/index.js';
-
 /** 单个缺失能力 */
 export interface MissingCapability {
   capability: string;

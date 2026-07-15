@@ -11,16 +11,8 @@ import {defineTool} from '../ToolDefinition.js';
 
 import {
   buildAutoBundle,
-  buildAutoEnvCode,
-  buildAutoEntryCode,
   writeArtifactFile,
   inferMissingCapabilities,
-  appendTargetContextNotes,
-  buildDefaultEnvCode,
-  filterRuntimeEvidence,
-  matchesTargetText,
-  pickTargetScript,
-  toStorageShimCode,
 } from './rebuildFn.js';
 
 export {

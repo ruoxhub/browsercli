@@ -34,6 +34,7 @@ function makeMockCdpSession() {
         if (idx >= 0) arr.splice(idx, 1);
       }
     },
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     async detach(): Promise<void> {},
     emit(event: string, params: unknown): void {
       (listeners[event] ?? []).forEach(h => h(params));

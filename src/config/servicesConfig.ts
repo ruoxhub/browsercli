@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/* eslint-disable import/no-cycle -- servicesConfig consumes core resolver helpers (getEnvValue/loadFullConfig) while resolver re-exports these factories for backward compat. The mutual dependency is intentional. */
+
 /**
  * 服务配置 — AI / Browser / System 配置读取与工厂函数
  *

@@ -18,11 +18,11 @@ import type {PipelineContext} from '../../../../src/tools/pipeline/types.js';
 
 // ── Helpers ──────────────────────────────────────────────────
 
-function okData<T>(data: T) {
+function _okData<T>(data: T) {
   return {data};
 }
 
-function accumulatorStep(name: string, acc: unknown[] = []) {
+function _accumulatorStep(name: string, acc: unknown[] = []) {
   return {
     name,
     fn: async (ctx: PipelineContext) => {
@@ -40,14 +40,23 @@ function makeMockResponse() {
     setStructuredContent(content: unknown) {
       result.content = content;
     },
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     appendResponseLine() {},
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     setIncludePages() {},
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     setIncludeNetworkRequests() {},
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     setIncludeConsoleData() {},
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     attachImage() {},
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     attachNetworkRequest() {},
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     attachConsoleMessage() {},
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     setIncludeWebSocketConnections() {},
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     attachWebSocket() {},
   };
 }

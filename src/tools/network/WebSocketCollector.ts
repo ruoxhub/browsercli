@@ -9,7 +9,10 @@ import type {
   BrowserContext,
   CDPSession,
   Page,
-  Protocol,
+  WebSocketClosedEvent,
+  WebSocketCreatedEvent,
+  WebSocketFrameReceivedEvent,
+  WebSocketFrameSentEvent,
 } from '../../third_party/index.js';
 
 import type {RequestInitiator} from './types.js';
@@ -77,7 +80,6 @@ function createIdGenerator() {
  */
 export class WebSocketCollector {
   #browser: Browser;
-  #includeAllPages?: boolean;
 
   /**
    * Storage: Page -> Array of navigations -> Array of WebSocket connections.
@@ -101,12 +103,10 @@ export class WebSocketCollector {
   #cdpListeners = new WeakMap<
     Page,
     {
-      onCreated: (event: Protocol.Network.WebSocketCreatedEvent) => void;
-      onFrameSent: (event: Protocol.Network.WebSocketFrameSentEvent) => void;
-      onFrameReceived: (
-        event: Protocol.Network.WebSocketFrameReceivedEvent,
-      ) => void;
-      onClosed: (event: Protocol.Network.WebSocketClosedEvent) => void;
+      onCreated: (event: WebSocketCreatedEvent) => void;
+      onFrameSent: (event: WebSocketFrameSentEvent) => void;
+      onFrameReceived: (event: WebSocketFrameReceivedEvent) => void;
+      onClosed: (event: WebSocketClosedEvent) => void;
       onFrameNavigated: () => void;
     }
   >();
@@ -121,9 +121,8 @@ export class WebSocketCollector {
     });
   };
 
-  constructor(browser: Browser, includeAllPages?: boolean) {
+  constructor(browser: Browser, _includeAllPages?: boolean) {
     this.#browser = browser;
-    this.#includeAllPages = includeAllPages;
   }
 
   async init() {
@@ -174,7 +173,7 @@ export class WebSocketCollector {
     const idGenerator = this.#idGenerators.get(page)!;
 
     const onCreated = (event: unknown): void => {
-      const e = event as Protocol.Network.WebSocketCreatedEvent & {
+      const e = event as WebSocketCreatedEvent & {
         initiator?: RequestInitiator;
       };
       const wsData: WebSocketDataWithId = {
@@ -227,7 +226,7 @@ export class WebSocketCollector {
     const onFrameReceived = (event: unknown): void =>
       recordFrame('received', event);
 
-    const onClosed = (event: Protocol.Network.WebSocketClosedEvent): void => {
+    const onClosed = (event: WebSocketClosedEvent): void => {
       const wsData = connectionMap.get(event.requestId);
       if (!wsData) {
         return;

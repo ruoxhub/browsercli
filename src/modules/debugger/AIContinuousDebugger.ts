@@ -330,7 +330,7 @@ export class AIContinuousDebugger {
         },
       };
     } catch (error) {
-      await this.deps.removeXHRBreakpoint(breakpointId).catch(() => {});
+      await this.deps.removeXHRBreakpoint(breakpointId).catch(() => undefined);
       throw error;
     }
   }

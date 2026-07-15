@@ -81,7 +81,7 @@ interface TestFrameHarness {
   evaluate(fn: unknown, arg: unknown): Promise<string>;
 }
 
-interface PageToolContextHarness {
+interface _PageToolContextHarness {
   getPageByIdx(idx: number): TestPageHarness;
   selectPage(page: TestPageHarness): void;
   newPage(): Promise<TestPageHarness>;
@@ -89,12 +89,12 @@ interface PageToolContextHarness {
   getSelectedPage(): TestPageHarness;
 }
 
-interface NetworkContextHarness {
+interface _NetworkContextHarness {
   getDevToolsData(): Promise<{cdpRequestId?: string}>;
   resolveCdpRequestId(id: string): number | undefined;
 }
 
-interface ScreenshotContextHarness {
+interface _ScreenshotContextHarness {
   getSelectedPage(): TestPageHarness;
   saveFile(data: Uint8Array, filename: string): Promise<{filename: string}>;
   saveTemporaryFile(
@@ -320,9 +320,9 @@ describe('tools extended coverage', () => {
       getSelectedPage: () => ({}),
       getSelectedPageIndex: () => 12,
       getNetworkRequests: () => [mockRequest as any],
-      getNetworkRequestById: (id: number) => mockRequest as any,
-      getNetworkRequestStableId: (request: any) => 12,
-      getRequestInitiator: (request: any) => ({
+      getNetworkRequestById: (_id: number) => mockRequest as any,
+      getNetworkRequestStableId: (_request: any) => 12,
+      getRequestInitiator: (_request: any) => ({
         type: 'script',
         stack: {
           callFrames: [

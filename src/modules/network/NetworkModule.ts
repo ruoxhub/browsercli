@@ -689,8 +689,7 @@ export class NetworkModule {
         override: ReplayOverride;
         buildError?: string;
       }> = [];
-      for (let i = 0; i < variants.length; i++) {
-        const override = variants[i];
+      for (const override of variants) {
         try {
           built.push({
             built: buildReplayRequest(originalData, override),

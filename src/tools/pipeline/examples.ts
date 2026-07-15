@@ -7,7 +7,7 @@
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 
-import {definePipeline, parallel, when} from './definePipeline.js';
+import {definePipeline, parallel} from './definePipeline.js';
 import type {PipelineContext} from './types.js';
 
 /**
@@ -31,7 +31,7 @@ function simulateCollection(url: string) {
   };
 }
 
-function simulateCryptoAnalysis(collectionResult: unknown) {
+function simulateCryptoAnalysis(_collectionResult: unknown) {
   return {
     algorithms: ['AES', 'RSA'],
     libraries: ['CryptoJS'],
@@ -39,7 +39,7 @@ function simulateCryptoAnalysis(collectionResult: unknown) {
   };
 }
 
-function simulateObfuscationAnalysis(collectionResult: unknown) {
+function simulateObfuscationAnalysis(_collectionResult: unknown) {
   return {
     detected: true,
     types: ['control_flow_flattening', 'string_array'],

@@ -67,7 +67,7 @@ export default function ToolsPage() {
   };
 
   useEffect(() => {
-    fetchTools();
+    void fetchTools();
   }, []);
 
   // 当选中的工具改变时，初始化表单值

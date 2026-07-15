@@ -79,7 +79,7 @@ export default function OverviewPage() {
   };
 
   useEffect(() => {
-    fetchStatus();
+    void fetchStatus();
 
     // 初始化获取最近 50 条历史记录
     api
@@ -175,7 +175,7 @@ export default function OverviewPage() {
           <button
             onClick={() => {
               setLoading(true);
-              fetchStatus();
+              void fetchStatus();
             }}
             className="px-4 py-2 text-xs font-medium rounded-lg bg-[var(--color-accent)] text-[var(--color-bg-primary)] hover:opacity-90 active:scale-95 transition-all flex items-center justify-center mx-auto gap-2"
           >

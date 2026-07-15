@@ -8,6 +8,7 @@
 // 原有的纯函数参数/返回类型不再需要。
 // 保留本文件以防其他模块有类型引用，后续可移除。
 import type {Browser, Page} from '../../third_party/index.js';
+import type {MessagesResult} from '../shared/types.js';
 
 // ─── 运行时服务接口 ──────────────────────────────────
 
@@ -41,7 +42,7 @@ export interface NavigationRuntimeServices {
 // ─── 参数类型 ──────────────────────────────────────────
 
 /** listPages 参数（无参数） */
-export interface ListPagesParams {}
+export type ListPagesParams = object;
 
 /** selectPage 参数 */
 export interface SelectPageParams {
@@ -107,8 +108,6 @@ export interface NavigatePageData {
   url: string;
   navigated: boolean;
 }
-
-import type {MessagesResult} from '../shared/types.js';
 
 // ─── 结果类型 ──────────────────────────────────────────
 

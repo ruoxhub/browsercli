@@ -22,9 +22,7 @@ import {
 import {
   decodeStrings,
   decryptArrays,
-  evaluateStringDecoderCalls,
   extractStringArrays,
-  inlineStringDecoderCalls,
 } from '../../../src/modules/deobfuscator/StringDecryptionStrategy.js';
 import {
   runAdvanced as runAdvancedDispatch,

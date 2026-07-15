@@ -113,7 +113,7 @@ export function createToolsRoutes(
           };
           args =
             typeof body === 'object' && body !== null && !Array.isArray(body)
-              ? body.args ?? {}
+              ? (body.args ?? {})
               : {};
         } catch (err) {
           const code = err instanceof Error ? err.message : 'INVALID_JSON';

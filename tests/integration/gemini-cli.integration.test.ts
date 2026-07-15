@@ -13,7 +13,7 @@
  */
 
 import assert from 'node:assert';
-import {spawn} from 'node:child_process';
+import {spawn, spawnSync} from 'node:child_process';
 import {describe, it, before} from 'node:test';
 
 import {GeminiProvider} from '../../src/services/GeminiProvider.js';
@@ -25,13 +25,12 @@ const runGeminiIntegration = process.env.RUN_GEMINI_CLI_TESTS === 'true';
  */
 function isGeminiCLIAvailable(): boolean {
   try {
-    const {spawnSync} = require('node:child_process');
     const result = spawnSync('gemini-cli', ['--version'], {
       stdio: 'pipe',
       timeout: 5000,
     });
     return result.status === 0;
-  } catch (error) {
+  } catch {
     return false;
   }
 }
@@ -318,8 +317,8 @@ describe('Gemini CLI Integration Tests', {skip: !runGeminiIntegration}, () => {
       // Mock the executeCLI to have a shorter timeout for testing
       const originalExecuteCLI = (provider as any).executeCLI;
       (provider as any).executeCLI = async function (
-        prompt: string,
-        options?: any,
+        _prompt: string,
+        _options?: any,
       ) {
         return new Promise((resolve, reject) => {
           const child = spawn('sleep', ['10']); // Sleep for 10 seconds

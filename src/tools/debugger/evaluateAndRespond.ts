@@ -5,7 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
-import {defineTool, type Context, type Response} from '../ToolDefinition.js';
+import {type Context, type Response} from '../ToolDefinition.js';
 
 /**
  * 获取当前选中的 Frame，若不存在则输出错误响应并返回 null。

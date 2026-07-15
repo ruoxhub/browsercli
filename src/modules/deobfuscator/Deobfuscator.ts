@@ -56,7 +56,6 @@ import {
   renameVariables,
   simplifyExpressions,
 } from './CodeCleanupStrategy.js';
-import {unflattenControlFlow} from './ControlFlowStrategy.js';
 import {enhancedControlFlow} from './EnhancedControlFlowPass.js';
 import {ifChainToSwitch} from './IfChainToSwitchPass.js';
 import {inlineLiterals} from './InlineLiteralsPass.js';
@@ -68,7 +67,7 @@ import {
 } from './ObfuscationDetector.js';
 import {UniversalUnpacker} from './PackerDeobfuscator.js';
 import {pruneFakeBranches} from './PruneFakeBranchesPass.js';
-import {SiteAdapterRegistry} from './SiteAdapterRegistry.js';
+import {SiteAdapterRegistry, type SiteAdapter} from './SiteAdapterRegistry.js';
 import {
   decodeStrings,
   decryptArrays,
@@ -579,9 +578,7 @@ async function registerAllAdapters(
       const AdapterClass = Object.values(mod).find(
         v =>
           typeof v === 'function' && v.prototype && 'patternId' in v.prototype,
-      ) as
-        | (new () => import('./SiteAdapterRegistry.js').SiteAdapter)
-        | undefined;
+      ) as (new () => SiteAdapter) | undefined;
       if (AdapterClass) {
         registry.register(new AdapterClass());
       }

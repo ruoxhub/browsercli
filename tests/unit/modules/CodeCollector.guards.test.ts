@@ -13,6 +13,7 @@ function buildStubCollector() {
     launch: async () => null,
     newPage: async () => null,
     getCurrentPage: () => null,
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     setCurrentPage: () => {},
   } as any;
   return new CodeCollector(

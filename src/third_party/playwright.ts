@@ -4,9 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// Import types that are also used locally in this file
-import type {CDPSession as PlaywrightCDPSession} from 'patchright';
-
 // Re-export all Playwright types for downstream consumers
 export type {
   APIRequestContext,

@@ -69,15 +69,24 @@ function createResponse() {
       appendResponseLine(value: string) {
         lines.push(value);
       },
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
       setIncludePages() {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
       setIncludeNetworkRequests() {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
       setIncludeConsoleData() {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
       attachImage() {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
       attachNetworkRequest() {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
       attachConsoleMessage() {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
       setIncludeWebSocketConnections() {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
       attachWebSocket() {},
-      setStructuredContent(content: any) {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
+      setStructuredContent(_content: any) {},
     } as any,
   };
 }

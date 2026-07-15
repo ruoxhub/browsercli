@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import traverseImport from '@babel/traverse';
+import type {NodePath as BabelNodePath} from '@babel/traverse';
 import * as t from '@babel/types';
 
 import {unwrapBabelDefault} from '../astUtils.js';
@@ -13,8 +14,7 @@ import {WrapperFolder} from '../WrapperFolder.js';
 
 const traverse = unwrapBabelDefault<typeof traverseImport>(traverseImport);
 
-type NodePath<T extends t.Node = t.Node> =
-  import('@babel/traverse').NodePath<T>;
+type NodePath<T extends t.Node = t.Node> = BabelNodePath<T>;
 
 const STRING_METHODS = new Set(['substring', 'substr', 'slice', 'split']);
 
@@ -114,9 +114,9 @@ function inlineStringMethodCalls(ast: t.File): boolean {
 
       let value: unknown;
       try {
-        value = (source as unknown as Record<string, Function>)[property](
-          ...argValues,
-        );
+        value = (
+          source as unknown as Record<string, (...args: unknown[]) => unknown>
+        )[property](...argValues);
       } catch {
         return;
       }

@@ -9,7 +9,6 @@
  * 从 CodeAnalyzer 中提取的独立纯函数，不依赖 LLM。
  */
 
-import * as parser from '@babel/parser';
 import traverseImport from '@babel/traverse';
 const traverse =
   (traverseImport as unknown as {default?: typeof traverseImport}).default ??

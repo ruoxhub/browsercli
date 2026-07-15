@@ -8,7 +8,6 @@ import {describe, it} from 'node:test';
 
 import fc from 'fast-check';
 
-import type {DomainManifest} from '../../src/tools/manifest.js';
 import {ToolRegistry} from '../../src/tools/registry/ToolRegistry.js';
 
 describe('Property: ToolRegistry profile filtering', () => {

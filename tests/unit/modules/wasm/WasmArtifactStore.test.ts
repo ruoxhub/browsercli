@@ -110,6 +110,7 @@ describe('WasmArtifactStore', () => {
         modules,
         [],
         bytesByModuleId,
+        // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
         () => {},
       );
 
@@ -272,6 +273,7 @@ describe('WasmArtifactStore', () => {
         modules,
         events,
         bytesByModuleId,
+        // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
         () => {},
       );
 

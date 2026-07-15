@@ -36,6 +36,7 @@ function mockFunctionInfo(name: string): FunctionInfo {
 describe('calculateComplexity', () => {
   it('returns 1 for empty function (no branch visitors fire)', () => {
     // Mock path whose traverse never invokes any visitor handlers.
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     const mockPath = {traverse: () => {}};
     assert.strictEqual(calculateComplexity(mockPath), 1);
   });

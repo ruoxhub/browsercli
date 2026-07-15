@@ -8,8 +8,6 @@
  * 平台层类型定义 — Worker、CLI 共用
  */
 
-import type {ActionHandler} from './rpc.js';
-
 // ==================== Worker 配置 ====================
 
 /** Worker 启动选项 */

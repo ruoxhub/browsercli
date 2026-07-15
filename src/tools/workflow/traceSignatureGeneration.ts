@@ -100,7 +100,7 @@ export const traceSignatureGeneration = defineTool({
       .describe('Include sensitive header values'),
     taskId: zod.string().optional().describe('Task ID for evidence tracking'),
   },
-  handler: async (request, response, context) => {
+  handler: async (request, response, _context) => {
     const params = request.params;
     const requestUrlPattern = params.requestUrlPattern ?? '';
     const headerKeyword = (params.headerKeyword ?? '').toLowerCase();

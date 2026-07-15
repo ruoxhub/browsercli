@@ -24,16 +24,6 @@ interface MockRes {
   headersSent: boolean;
 }
 
-function mockReq(method: string, url: string): IncomingMessage {
-  const e = new EventEmitter() as unknown as IncomingMessage & {
-    method: string;
-    url: string;
-  };
-  e.method = method;
-  e.url = url;
-  return e;
-}
-
 function mockReqWithBody(
   method: string,
   url: string,

@@ -5,14 +5,12 @@
  */
 import {
   buildBodyAnalysis,
-  classifyBodyKind,
   dedupeHeaders,
   dedupeKeyValue,
   describeRuntimeEvent,
   describeSink,
   describeStep,
   determineSuspicion,
-  type ExportSuspicion,
   isSensitiveHeader,
   joinOrFallback,
   joinOrNone,
@@ -20,14 +18,11 @@ import {
   normalizeHeaderName,
   parseUrlDetails,
   splitBodySegments,
-  uniqueStrings,
   type WasmExportUsageSummary,
 } from './WasmAnalysisUtils.js';
 import type {
   WasmBoundaryChain,
   WasmBoundaryStep,
-  WasmHeaderEntry,
-  WasmKeyValuePreview,
   WasmModuleRecord,
   WasmRuntimeEvent,
   WasmSignatureDiffFieldChange,

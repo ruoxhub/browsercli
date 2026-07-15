@@ -400,7 +400,7 @@ export interface ReplayNetworkRequestBatchParams {
 }
 
 /** replay_network_request_batch 返回数据 */
-export interface ReplayNetworkRequestBatchData extends BatchReplayResult {}
+export type ReplayNetworkRequestBatchData = BatchReplayResult;
 
 // ─── WebSocket 返回数据类型 ──────────────────────────────────
 

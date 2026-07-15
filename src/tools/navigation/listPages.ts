@@ -37,7 +37,6 @@ export const listPages = defineTool({
       } catch {
         selectedPage = null;
       }
-      let unavailableTitleCount = 0;
       const pageInfos: Array<{index: number; url: string; title: string}> = [];
 
       for (const [index, page] of pages.entries()) {
@@ -48,7 +47,6 @@ export const listPages = defineTool({
             `读取页面 ${index} 标题`,
           );
         } catch (error) {
-          unavailableTitleCount += 1;
           title = `[unavailable] ${normalizeBrowserRuntimeError(error)}`;
         }
         pageInfos.push({

@@ -7,7 +7,6 @@
 import type {
   CDPSession,
   ConsoleMessage,
-  Frame,
   Page,
   Request,
   WebSocket as PlaywrightWebSocket,
@@ -152,9 +151,13 @@ export class NetworkRequestCollector extends PageCollector<TrackedRequest> {
         };
         client.on('Network.requestWillBeSent', onCdpRequest);
         this._cdpRequestListeners.set(page, onCdpRequest);
-        client.send('Network.enable').catch(() => {});
+        client.send('Network.enable').catch(() => {
+          /* ignore */
+        });
       })
-      .catch(() => {});
+      .catch(() => {
+        /* ignore */
+      });
   }
 
   protected detachListeners(page: Page): void {
@@ -167,12 +170,18 @@ export class NetworkRequestCollector extends PageCollector<TrackedRequest> {
       if (listener) {
         try {
           client.off('Network.requestWillBeSent', listener);
-        } catch {}
+        } catch {
+          /* ignore */
+        }
         this._cdpRequestListeners.delete(page);
       }
       try {
-        client.detach().catch(() => {});
-      } catch {}
+        client.detach().catch(() => {
+          /* ignore */
+        });
+      } catch {
+        /* ignore */
+      }
       this._cdpSessions.delete(page);
     }
     this._initiatorQueues.delete(page);

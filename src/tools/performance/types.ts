@@ -6,6 +6,7 @@
 
 import type {Page} from '../../third_party/index.js';
 import type {InsightName, TraceResult} from '../../trace-processing/parse.js';
+import type {MessagesResult} from '../shared/types.js';
 
 // ─── 运行时服务接口 ──────────────────────────────────────
 
@@ -39,7 +40,7 @@ export interface StartPerformanceTraceParams {
 }
 
 /** stopPerformanceTrace 参数（无参数） */
-export interface StopPerformanceTraceParams {}
+export type StopPerformanceTraceParams = object;
 
 /** performanceAnalyzeInsight 参数 */
 export interface PerformanceAnalyzeInsightParams {
@@ -48,7 +49,7 @@ export interface PerformanceAnalyzeInsightParams {
 }
 
 /** getPerformanceMetrics 参数（无参数） */
-export interface GetPerformanceMetricsParams {}
+export type GetPerformanceMetricsParams = object;
 
 // ─── 数据类型 ────────────────────────────────────────────
 
@@ -79,8 +80,6 @@ export interface GetPerformanceMetricsData {
   /** 性能指标对象 */
   metrics: Record<string, unknown>;
 }
-
-import type {MessagesResult} from '../shared/types.js';
 
 // ─── 结果类型 ────────────────────────────────────────────
 

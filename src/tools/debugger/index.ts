@@ -12,10 +12,8 @@ import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
 import {
-  DEFAULT_PREVIEW_LENGTH,
   filterMatchesByUrl,
   getDebuggerFromContext,
-  LARGE_FILE_THRESHOLD,
   MINIFIED_LINE_THRESHOLD,
   runTool,
   SCOPE_VAR_LIMIT,
@@ -1094,8 +1092,7 @@ export const traceFunction = defineTool({
       .describe('自定义追踪 ID，用于后续识别日志。'),
   },
   handler: async (request, response, context) => {
-    const {target, urlFilter, logArgs, logResult, logStack, hookId} =
-      request.params;
+    const {target, urlFilter, logArgs, logStack, hookId} = request.params;
 
     if (!target || typeof target !== 'string') {
       response.setStructuredContent({
@@ -1273,7 +1270,6 @@ export const getAiDebugStatus = defineTool({
   handler: async (request, response, context) => {
     try {
       const debuggerContext = await getDebuggerFromContext(context);
-      const pausedState = debuggerContext.getPausedState();
       const breakpoints = debuggerContext.getBreakpoints();
       const scripts = debuggerContext.getScripts();
 

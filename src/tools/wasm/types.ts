@@ -6,11 +6,8 @@
 
 import type {
   WasmAnalysisResult,
-  WasmBoundaryChain,
   WasmDecompileResult,
-  WasmModuleRecord,
   WasmRuntimeEvent,
-  WasmSignatureDiffResult,
 } from '../../modules/wasm/WasmTypes.js';
 import type {MessagesResult} from '../shared/types.js';
 

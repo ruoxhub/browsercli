@@ -81,7 +81,9 @@ function waitForSocket() {
           .filter(f => f.includes('js-reverse'))
           .join(', ')}`,
       );
-    } catch {}
+    } catch {
+      // intentionally empty
+    }
     process.exit(1);
   }
 

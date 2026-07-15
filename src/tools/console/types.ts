@@ -5,6 +5,7 @@
  */
 
 import type {AggregatedIssue} from '../../third_party/index.js';
+import type {MessagesResult} from '../shared/types.js';
 
 export type ConsoleMessageType =
   | 'log'
@@ -137,9 +138,7 @@ export interface ListConsoleMessagesData {
 }
 
 /** getConsoleMessage 返回数据 */
-export interface GetConsoleMessageData extends ConsoleMessageData {}
-
-import type {MessagesResult} from '../shared/types.js';
+export type GetConsoleMessageData = ConsoleMessageData;
 
 /** listConsoleMessages 结果 */
 export interface ListConsoleMessagesResult extends MessagesResult<ListConsoleMessagesData> {

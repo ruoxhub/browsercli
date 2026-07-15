@@ -3,6 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+import type {NodePath as BabelNodePath} from '@babel/traverse';
 import traverseImport from '@babel/traverse';
 import * as t from '@babel/types';
 
@@ -10,8 +11,7 @@ import {unwrapBabelDefault} from './astUtils.js';
 
 const traverse = unwrapBabelDefault<typeof traverseImport>(traverseImport);
 
-type NodePath<T extends t.Node = t.Node> =
-  import('@babel/traverse').NodePath<T>;
+type NodePath<T extends t.Node = t.Node> = BabelNodePath<T>;
 
 function toStatements(expressions: t.Expression[]): t.ExpressionStatement[] {
   return expressions.map(expr => t.expressionStatement(expr));

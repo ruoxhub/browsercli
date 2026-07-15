@@ -45,7 +45,9 @@ describe('ConsoleServer', () => {
   } as unknown as SekiroInvoker;
 
   const mockToolAdapter = {
-    onInvoke: () => () => { /* no-op unsubscribe stub */ },
+    onInvoke: () => () => {
+      /* no-op unsubscribe stub */
+    },
     executeTool: async () => ({ok: true}),
   } as unknown as ToolAdapter;
 

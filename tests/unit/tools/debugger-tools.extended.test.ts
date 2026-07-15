@@ -238,7 +238,7 @@ function makeContext(
 describe('debugger tools extended', () => {
   it('covers script listing and source operations', async () => {
     const response = makeResponse();
-    const runtime = getJSHookRuntime();
+    const _runtime = getJSHookRuntime();
     const context = makeContext();
     context.debuggerContext.getScripts = () => [
       {scriptId: '1', url: 'https://a.js'},
@@ -271,7 +271,7 @@ describe('debugger tools extended', () => {
 
   it('covers find/search/source negative and formatting paths', async () => {
     const response = makeResponse();
-    const runtime = getJSHookRuntime();
+    const _runtime = getJSHookRuntime();
     const context = makeContext();
     context.debuggerContext.getScriptSource = async () => 'abc\ndef\nabc';
     context.debuggerContext.searchInScripts = async () => ({
@@ -341,7 +341,7 @@ describe('debugger tools extended', () => {
 
   it('covers breakpoint management and initiator rendering', async () => {
     const response = makeResponse();
-    const runtime = getJSHookRuntime();
+    const _runtime = getJSHookRuntime();
     const context = makeContext();
     context.debuggerContext.getBreakpoints = () => [
       {
@@ -426,7 +426,7 @@ describe('debugger tools extended', () => {
 
   it('covers paused state commands and evaluation branches', async () => {
     const response = makeResponse();
-    const runtime = getJSHookRuntime();
+    const _runtime = getJSHookRuntime();
     const context = makeContext();
     context.debuggerContext.getPausedState = () => ({
       isPaused: true,
@@ -508,7 +508,7 @@ describe('debugger tools extended', () => {
 
   it('covers set breakpoint on text and tracing workflows', async () => {
     const response = makeResponse();
-    const runtime = getJSHookRuntime();
+    const _runtime = getJSHookRuntime();
     const context = makeContext();
     context.debuggerContext.searchInScripts = async (q: string) => {
       if (q.includes('function targetFn')) {
@@ -693,7 +693,7 @@ describe('debugger tools extended', () => {
 
   it('covers page-eval tools: hook/list/unhook/inspect/storage/monitor', async () => {
     const response = makeResponse();
-    const runtime = getJSHookRuntime();
+    const _runtime = getJSHookRuntime();
     let evalCount = 0;
     let pageEvalCount = 0;
     let frameEvalCount = 0;
@@ -824,7 +824,7 @@ describe('debugger tools extended', () => {
 
   it('lists frames and switches execution context', async () => {
     const response = makeResponse();
-    const runtime = getJSHookRuntime();
+    const _runtime = getJSHookRuntime();
     const selectedCalls: unknown[] = [];
     let resetCount = 0;
     const mainFrame = {
@@ -898,7 +898,7 @@ describe('debugger tools extended', () => {
 
   it('covers XHR breakpoint helpers', async () => {
     const response = makeResponse();
-    const runtime = getJSHookRuntime();
+    const _runtime = getJSHookRuntime();
     const context = makeContext();
     await breakOnXhr.handler(
       {params: {url: '/api'}},
@@ -918,7 +918,7 @@ describe('debugger tools extended', () => {
     const {xhrToJsBreakpoint} =
       await import('../../../src/tools/debugger/index.js');
     const response = makeResponse();
-    const runtime = getJSHookRuntime();
+    const _runtime = getJSHookRuntime();
 
     let xhrBreakpointSet = false;
     let xhrBreakpointRemoved = false;
@@ -967,7 +967,7 @@ describe('debugger tools extended', () => {
         evaluateOnCallFrame: async () => ({result: {value: null}}),
         getScopeVariables: async () => [],
         getClient: () => ({
-          send: async (method: string, params?: unknown) => {
+          send: async (method: string, _params?: unknown) => {
             if (method === 'DOMDebugger.setXHRBreakpoint') {
               xhrBreakpointSet = true;
             } else if (method === 'DOMDebugger.removeXHRBreakpoint') {

@@ -10,14 +10,14 @@ import {ExecutionController} from '../../../../src/modules/debugger/ExecutionCon
 
 function makeSession() {
   const calls: Array<{method: string; params?: unknown}> = [];
-  const listeners: Record<string, Function> = {};
+  const listeners: Record<string, () => void> = {};
   return {
     calls,
     async send(method: string, params?: unknown) {
       calls.push({method, params});
       return {};
     },
-    on(event: string, handler: Function) {
+    on(event: string, handler: () => void) {
       listeners[event] = handler;
     },
     off(event: string) {

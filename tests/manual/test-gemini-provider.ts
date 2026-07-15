@@ -19,7 +19,7 @@ async function testGeminiProvider() {
   // Test 1: Initialize with CLI mode
   console.log('Test 1: Initialize GeminiProvider in CLI mode');
   try {
-    const provider = new GeminiProvider({
+    const _provider = new GeminiProvider({
       cliPath: 'gemini-cli',
       useAPI: false,
     });
@@ -31,7 +31,7 @@ async function testGeminiProvider() {
   // Test 2: Initialize with API mode (should work even without API key)
   console.log('Test 2: Initialize GeminiProvider in API mode');
   try {
-    const provider = new GeminiProvider({
+    const _provider = new GeminiProvider({
       apiKey: 'test-key',
       useAPI: true,
     });
@@ -43,7 +43,7 @@ async function testGeminiProvider() {
   // Test 3: Test fallback to CLI mode when no API key
   console.log('Test 3: Test fallback to CLI mode when no API key');
   try {
-    const provider = new GeminiProvider({
+    const _provider = new GeminiProvider({
       useAPI: true, // Request API mode
       // No API key provided
     });

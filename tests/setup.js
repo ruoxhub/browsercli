@@ -15,9 +15,13 @@ process.env.NODE_ENV = 'test';
 if (!process.env.DEBUG) {
   global.console = {
     ...console,
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub: suppress console output during tests
     log: () => {},
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub: suppress console output during tests
     debug: () => {},
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub: suppress console output during tests
     info: () => {},
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub: suppress console output during tests
     warn: () => {},
   };
 }

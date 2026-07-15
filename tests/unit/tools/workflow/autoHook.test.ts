@@ -20,7 +20,8 @@ import {
 async function callAutoHook(runtime: any, params: any): Promise<any> {
   let result: any = null;
   const response = {
-    appendResponseLine: (line: string) => {},
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
+    appendResponseLine: (_line: string) => {},
     setStructuredContent: (content: unknown) => {
       result = content;
     },

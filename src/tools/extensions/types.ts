@@ -10,7 +10,7 @@ import type {MessagesResult} from '../shared/types.js';
 /**
  * Extensions 函数统一返回结构。
  */
-export interface ExtensionsResult<T = unknown> extends MessagesResult<T> {}
+export type ExtensionsResult<T = unknown> = MessagesResult<T>;
 
 /** 重新导出 Frame 类型，方便调用方导入 */
 export type {Frame};

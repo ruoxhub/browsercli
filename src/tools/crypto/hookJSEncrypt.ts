@@ -6,7 +6,7 @@
 
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
-import {defineTool, type Context} from '../ToolDefinition.js';
+import {defineTool} from '../ToolDefinition.js';
 
 /**
  * Hook JSEncrypt RSA 加密库：公钥/私钥、原始数据、密文。

@@ -47,6 +47,7 @@ function createMockServices(services: {
     getNetworkRequestById: () => ({}) as any,
     getNetworkRequestStableId: () => 1,
     getRequestInitiator: () => undefined,
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     clearNetworkRequests: services.clearNetworkRequests ?? (() => {}),
     getWebSocketConnections: () => [],
     getWebSocketConnectionById: () =>

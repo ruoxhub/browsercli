@@ -85,6 +85,7 @@ describe('WorkerLifecycle', () => {
       } as never,
       contextProvider: {
         dispose: async () => {
+          // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
           await new Promise(() => {}); // 永不 resolve，触发超时
         },
       },

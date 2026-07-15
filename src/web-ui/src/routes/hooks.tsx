@@ -104,7 +104,7 @@ export default function HooksPage() {
   };
 
   useEffect(() => {
-    fetchHooks();
+    void fetchHooks();
   }, []);
 
   // 监听选中的 Hook ID，订阅 WS 频道
@@ -261,7 +261,7 @@ export default function HooksPage() {
       desc: '主动向底层 RPC 发起同步请求更新 Hook 表',
       category: '系统通信',
       action: () => {
-        fetchHooks();
+        void fetchHooks();
       },
     },
     {
@@ -271,7 +271,7 @@ export default function HooksPage() {
       category: '系统通信',
       action: () => {
         if (selectedHookId) {
-          handleDeleteHook(selectedHookId);
+          void handleDeleteHook(selectedHookId);
         }
       },
     },
@@ -483,7 +483,7 @@ export default function HooksPage() {
                   <button
                     onClick={e => {
                       e.stopPropagation();
-                      handleDeleteHook(hookId);
+                      void handleDeleteHook(hookId);
                     }}
                     className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-red-500/15 hover:text-red-500 text-[var(--color-text-muted)] transition-all duration-150"
                     title="卸载此 Hook"

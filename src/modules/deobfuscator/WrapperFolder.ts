@@ -5,13 +5,13 @@
  */
 import generateImport from '@babel/generator';
 import traverseImport from '@babel/traverse';
+import type {NodePath as BabelNodePath} from '@babel/traverse';
 import * as t from '@babel/types';
 
 import {unwrapBabelDefault} from './astUtils.js';
 import {
   getPropertyKey,
   isSafeMemberReplacement,
-  literalNodeFromValue,
   SandboxEvaluator,
 } from './SandboxEvaluator.js';
 
@@ -40,8 +40,7 @@ interface RemovableEntry {
   removable: boolean;
 }
 
-type NodePath<T extends t.Node = t.Node> =
-  import('@babel/traverse').NodePath<T>;
+type NodePath<T extends t.Node = t.Node> = BabelNodePath<T>;
 
 export class WrapperFolder {
   private resolvePropertyKey(
@@ -719,7 +718,7 @@ function pruneResolvedWrapperProperties(
 function collectLiveWrapperPropertyUsage(
   ast: t.File,
   wrapperNames: Set<string>,
-  options?: WrapperFolderOptions,
+  _options?: WrapperFolderOptions,
 ): {liveKeys: Set<string>; unsafeObjects: Set<string>} {
   const liveKeys = new Set<string>();
   const unsafeObjects = new Set<string>();

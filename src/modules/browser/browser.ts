@@ -5,8 +5,6 @@
  */
 
 import type fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
 
 import {
   chromium,
@@ -39,7 +37,6 @@ import {
   ensureUserDataDir,
   buildLaunchArgs,
   getIgnoreDefaultArgs,
-  type Engine,
 } from './browser-helpers.js';
 import {setupCloak} from './cloak.js';
 

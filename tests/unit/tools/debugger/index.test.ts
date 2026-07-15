@@ -25,7 +25,6 @@ import {
   resume,
   searchInSources,
   setBreakpoint,
-  setBreakpointOnText,
   stepInto,
   stepOut,
   stepOver,
@@ -200,22 +199,30 @@ async function callTool(
   context: unknown,
 ): Promise<string[]> {
   const lines: string[] = [];
-  let structuredContent: unknown = undefined;
+  let _structuredContent: unknown = undefined;
   const response = {
     appendResponseLine: (value: string) => {
       lines.push(value);
     },
     setStructuredContent: (content: unknown) => {
-      structuredContent = content;
+      _structuredContent = content;
       lines.push(JSON.stringify(content));
     },
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     setIncludePages: () => {},
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     setIncludeNetworkRequests: () => {},
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     setIncludeConsoleData: () => {},
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     attachImage: () => {},
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     attachNetworkRequest: () => {},
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     attachConsoleMessage: () => {},
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     setIncludeWebSocketConnections: () => {},
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     attachWebSocket: () => {},
   };
   const request = {params};
@@ -236,17 +243,26 @@ async function callToolContent<T = Record<string, unknown>>(
 ): Promise<T> {
   let content: unknown = undefined;
   const response = {
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     appendResponseLine: () => {},
     setStructuredContent: (value: unknown) => {
       content = value;
     },
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     setIncludePages: () => {},
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     setIncludeNetworkRequests: () => {},
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     setIncludeConsoleData: () => {},
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     attachImage: () => {},
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     attachNetworkRequest: () => {},
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     attachConsoleMessage: () => {},
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     setIncludeWebSocketConnections: () => {},
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     attachWebSocket: () => {},
   };
   const request = {params};
@@ -485,13 +501,21 @@ describe('src/tools/debugger/index.ts', () => {
       setStructuredContent: (value: unknown) => {
         structuredContent = value;
       },
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
       setIncludePages: () => {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
       setIncludeNetworkRequests: () => {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
       setIncludeConsoleData: () => {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
       attachImage: () => {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
       attachNetworkRequest: () => {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
       attachConsoleMessage: () => {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
       setIncludeWebSocketConnections: () => {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
       attachWebSocket: () => {},
     };
     const request = {params: {target: ''}};
@@ -540,13 +564,21 @@ describe('src/tools/debugger/index.ts', () => {
       setStructuredContent: (value: unknown) => {
         structuredContent = value;
       },
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
       setIncludePages: () => {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
       setIncludeNetworkRequests: () => {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
       setIncludeConsoleData: () => {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
       attachImage: () => {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
       attachNetworkRequest: () => {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
       attachConsoleMessage: () => {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
       setIncludeWebSocketConnections: () => {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
       attachWebSocket: () => {},
     };
     const request = {params: {target: 'someFunction'}};

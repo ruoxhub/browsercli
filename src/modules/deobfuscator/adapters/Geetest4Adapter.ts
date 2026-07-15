@@ -5,6 +5,7 @@
  */
 import generateImport from '@babel/generator';
 import traverseImport from '@babel/traverse';
+import type {NodePath as BabelNodePath} from '@babel/traverse';
 import * as t from '@babel/types';
 
 import {unwrapBabelDefault} from '../astUtils.js';
@@ -14,8 +15,7 @@ import type {SiteAdapter} from '../SiteAdapterRegistry.js';
 const generate = unwrapBabelDefault<typeof generateImport>(generateImport);
 const traverse = unwrapBabelDefault<typeof traverseImport>(traverseImport);
 
-type NodePath<T extends t.Node = t.Node> =
-  import('@babel/traverse').NodePath<T>;
+type NodePath<T extends t.Node = t.Node> = BabelNodePath<T>;
 
 function generateCode(node: t.Node): string {
   return generate(node, {

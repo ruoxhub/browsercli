@@ -81,7 +81,7 @@ export interface RestoreSessionStateParams {
 }
 
 /** listSessionStates 参数（无参数） */
-export interface ListSessionStatesParams {}
+export type ListSessionStatesParams = object;
 
 /** deleteSessionState 参数 */
 export interface DeleteSessionStateParams {
@@ -114,7 +114,7 @@ export interface LoadSessionStateParams {
 }
 
 /** checkBrowserHealth 参数（无参数） */
-export interface CheckBrowserHealthParams {}
+export type CheckBrowserHealthParams = object;
 
 // ─── 数据类型 ──────────────────────────────────────────
 

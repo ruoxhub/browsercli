@@ -10,7 +10,6 @@
  * LLM 增强为可选参数，由调用方注入。
  */
 
-import * as parser from '@babel/parser';
 import traverseImport from '@babel/traverse';
 const traverse =
   (traverseImport as unknown as {default?: typeof traverseImport}).default ??
@@ -20,10 +19,7 @@ import * as t from '@babel/types';
 import type {DataFlow} from '../../types/index.js';
 import {logger} from '../../utils/logger.js';
 
-import {
-  checkSanitizer,
-  getMemberExpressionName,
-} from './SecurityCodeAnalyzer.js';
+import {checkSanitizer} from './SecurityCodeAnalyzer.js';
 
 export function checkTaintedArguments(
   args: Array<t.Expression | t.SpreadElement | t.ArgumentPlaceholder>,

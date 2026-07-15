@@ -5,7 +5,6 @@
  */
 
 import type {
-  CorrelatedFlow,
   RequestFingerprint,
   PriorityTarget,
   SignatureChainHints,

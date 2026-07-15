@@ -84,7 +84,7 @@ export default function SiteExperiencesPage() {
   };
 
   useEffect(() => {
-    fetchExperiences();
+    void fetchExperiences();
   }, []);
 
   // 选中的经验对象
@@ -105,7 +105,7 @@ export default function SiteExperiencesPage() {
   // 处理搜索
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    fetchExperiences();
+    void fetchExperiences();
   };
 
   // 进入新增模式
@@ -267,7 +267,7 @@ export default function SiteExperiencesPage() {
                 type="button"
                 onClick={() => {
                   setSearchQuery('');
-                  fetchExperiences('');
+                  void fetchExperiences('');
                 }}
                 className="absolute right-2.5 top-2.5 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
               >

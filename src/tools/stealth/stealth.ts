@@ -12,7 +12,7 @@ import type {
 import {StealthScripts2025} from '../../modules/stealth/StealthScripts2025.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
-import {defineTool, type Context} from '../ToolDefinition.js';
+import {defineTool} from '../ToolDefinition.js';
 
 /**
  * 注入反检测隐身脚本。

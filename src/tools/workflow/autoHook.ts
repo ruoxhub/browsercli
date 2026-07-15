@@ -13,7 +13,7 @@ import {logger} from '../../utils/logger.js';
 import {resolveDefaultArtifactsTasksDir} from '../../utils/projectPaths.js';
 import {ToolCategory} from '../categories.js';
 import {readHookStore} from '../hook/store-utils.js';
-import {defineTool, type Context} from '../ToolDefinition.js';
+import {defineTool} from '../ToolDefinition.js';
 
 /**
  * 自动 Hook 工具配置
@@ -131,7 +131,7 @@ const PRESET_CONFIGS: Record<string, Partial<AutoHookOptions>> = {
   },
 };
 
-function _generateHookStoreHelpers(hookId: string): string {
+function _generateHookStoreHelpers(_hookId: string): string {
   return `
   window.__hookStore = window.__hookStore || {};
   if (!Array.isArray(window.__hookStore[hookId])) {

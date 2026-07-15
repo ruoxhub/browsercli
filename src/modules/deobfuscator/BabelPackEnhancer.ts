@@ -24,6 +24,10 @@ import vm from 'node:vm';
 import generateImport from '@babel/generator';
 import * as parser from '@babel/parser';
 import traverseImport from '@babel/traverse';
+import type {
+  NodePath as BabelNodePath,
+  Scope as BabelScope,
+} from '@babel/traverse';
 import * as t from '@babel/types';
 
 import {unwrapBabelDefault} from './astUtils.js';
@@ -32,8 +36,7 @@ import {SandboxEvaluator} from './SandboxEvaluator.js';
 const generate = unwrapBabelDefault<typeof generateImport>(generateImport);
 const traverse = unwrapBabelDefault<typeof traverseImport>(traverseImport);
 
-type NodePath<T extends t.Node = t.Node> =
-  import('@babel/traverse').NodePath<T>;
+type NodePath<T extends t.Node = t.Node> = BabelNodePath<T>;
 
 // ==================== 1. keyToLiteral ====================
 
@@ -856,7 +859,7 @@ function getObfuscatorPaths(
 }
 
 function getRedefineFunctions(
-  scope: import('@babel/traverse').Scope,
+  scope: BabelScope,
   funcNames: string[],
   removedPaths: NodePath[],
 ): string {

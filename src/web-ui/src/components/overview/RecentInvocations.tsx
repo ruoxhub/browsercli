@@ -146,7 +146,10 @@ export function RecentInvocations({
                         <button
                           onClick={e => {
                             e.stopPropagation();
-                            handleCopy(record.traceId, `trace_${record.id}`);
+                            void handleCopy(
+                              record.traceId,
+                              `trace_${record.id}`,
+                            );
                           }}
                           className="hover:text-[var(--color-text-primary)] transition-colors p-0.5"
                           title="复制 Trace ID"

@@ -14,13 +14,13 @@ import {
   startDebuggerLabSite,
 } from '../../../scripts/debugger-lab/server.mjs';
 
-describe('debugger-lab server script', () => {
-  it('resolves site dir inside scripts/debugger-lab', () => {
+void describe('debugger-lab server script', () => {
+  void it('resolves site dir inside scripts/debugger-lab', () => {
     const siteDir = resolveDebuggerLabDir();
     assert.match(siteDir, /scripts[\\/]+debugger-lab$/);
   });
 
-  it('serves the debugger lab homepage and app asset', async () => {
+  void it('serves the debugger lab homepage and app asset', async () => {
     const handle = await startDebuggerLabSite({port: 0});
 
     try {
@@ -39,7 +39,7 @@ describe('debugger-lab server script', () => {
     }
   });
 
-  it('returns dynamic ping payload for network testing', async () => {
+  void it('returns dynamic ping payload for network testing', async () => {
     const handle = await startDebuggerLabSite({port: 0});
 
     try {
@@ -60,7 +60,7 @@ describe('debugger-lab server script', () => {
     }
   });
 
-  it('accepts websocket connections and echoes messages', async () => {
+  void it('accepts websocket connections and echoes messages', async () => {
     const handle = await startDebuggerLabSite({port: 0});
 
     try {

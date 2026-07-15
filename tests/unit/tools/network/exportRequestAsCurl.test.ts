@@ -66,6 +66,7 @@ function createMockServices(
       overrides.getRequestById ?? (() => createMockRequest() as any),
     getNetworkRequestStableId: () => 1,
     getRequestInitiator: () => undefined,
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     clearNetworkRequests: () => {},
     getWebSocketConnections: () => [],
     getWebSocketConnectionById: () =>

@@ -23,7 +23,9 @@ async function evaluateScript(runtime: any, params: any): Promise<any> {
       if (line.startsWith('```')) return;
       try {
         result = JSON.parse(line);
-      } catch (e) {}
+      } catch {
+        /* intentionally empty */
+      }
     },
     setStructuredContent: (content: unknown) => {
       result = content;
@@ -47,7 +49,9 @@ async function injectPreloadScript(runtime: any, params: any): Promise<any> {
       if (line.startsWith('```')) return;
       try {
         result = JSON.parse(line);
-      } catch (e) {}
+      } catch {
+        /* intentionally empty */
+      }
     },
     setStructuredContent: (content: unknown) => {
       result = content;
@@ -77,9 +81,9 @@ interface PageLike {
   ): Promise<string | undefined>;
 }
 
-interface FrameLike extends PageLike {}
+type FrameLike = PageLike;
 
-interface ExecutionContextLike {
+interface _ExecutionContextLike {
   id: number;
   origin: string;
   name: string;

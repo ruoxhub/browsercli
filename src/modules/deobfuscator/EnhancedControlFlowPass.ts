@@ -4,17 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import generateImport from '@babel/generator';
+import type {NodePath as BabelNodePath} from '@babel/traverse';
 import traverseImport from '@babel/traverse';
 import * as t from '@babel/types';
 
 import {unwrapBabelDefault} from './astUtils.js';
-import {StaticResolver, UNRESOLVED} from './StaticResolver.js';
+import {StaticResolver} from './StaticResolver.js';
 
 const generate = unwrapBabelDefault<typeof generateImport>(generateImport);
 const traverse = unwrapBabelDefault<typeof traverseImport>(traverseImport);
 
-type NodePath<T extends t.Node = t.Node> =
-  import('@babel/traverse').NodePath<T>;
+type NodePath<T extends t.Node = t.Node> = BabelNodePath<T>;
 
 // StaticResolver is stateless — safe to share across iterations and passes.
 const resolver = new StaticResolver();

@@ -86,6 +86,7 @@ function createMockServices(
       overrides.getRequestById ?? (() => createMockRequest() as any),
     getNetworkRequestStableId: () => 1,
     getRequestInitiator: () => undefined,
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     clearNetworkRequests: () => {},
     getWebSocketConnections: () => [],
     getWebSocketConnectionById: () =>
@@ -192,6 +193,7 @@ describe('replay_network_request', () => {
   it('applies default maxBodyLength=2000 when omitted', async () => {
     const apiCtx = createMockApiRequestContext({
       body: 'x'.repeat(2500),
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
       captureFetch: (_url, _opts) => {},
     });
     const services = createMockServices({apiCtx});

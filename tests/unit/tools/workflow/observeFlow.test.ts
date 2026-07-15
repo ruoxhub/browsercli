@@ -22,7 +22,9 @@ async function observeFlow(params?: any): Promise<any> {
       if (line.startsWith('```')) return;
       try {
         result = JSON.parse(line);
-      } catch (e) {}
+      } catch {
+        /* intentionally empty */
+      }
     },
     setStructuredContent: (content: unknown) => {
       result = content;

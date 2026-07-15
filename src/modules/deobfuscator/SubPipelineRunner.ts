@@ -11,6 +11,8 @@
  * 这些函数是主 Deobfuscator 管线的"适配器"层。
  */
 
+import type {File} from '@babel/types';
+
 import type {Transformation, UnresolvedPart} from '../../types/index.js';
 import {logger} from '../../utils/logger.js';
 
@@ -22,6 +24,7 @@ import type {ASTOptimizer} from './ASTOptimizer.js';
 import type {DeobfuscateFullOptions} from './Deobfuscator.js';
 import type {JSVMPDeobfuscator} from './JSVMPDeobfuscator.js';
 import type {UniversalUnpacker} from './PackerDeobfuscator.js';
+import type {SiteAdapter} from './SiteAdapterRegistry.js';
 import {runWebcrack, type WebcrackExecutionResult} from './webcrack.js';
 
 /**
@@ -309,8 +312,8 @@ export async function runWebcrackStep(
  */
 export async function runEnhancedPass(
   passName: string,
-  passFn: (ast: import('@babel/types').File) => {
-    ast: import('@babel/types').File;
+  passFn: (ast: File) => {
+    ast: File;
     changed: boolean;
   },
   code: string,
@@ -344,7 +347,7 @@ export async function runEnhancedPass(
  * 站点适配器运行器
  */
 export async function runSiteAdapter(
-  adapter: import('./SiteAdapterRegistry.js').SiteAdapter,
+  adapter: SiteAdapter,
   phase: 'pre' | 'post',
   code: string,
   transformations: Transformation[],
