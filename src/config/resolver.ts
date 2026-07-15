@@ -29,6 +29,8 @@ import {config as dotenvConfig} from 'dotenv';
 
 import {resolveDefaultEnvPath} from '../utils/projectPaths.js';
 
+import {getRuntimeConfigStore} from './RuntimeConfigStore.js';
+
 import {
   DEFAULT_GROUP,
   DEFAULT_RPC_HOST,
@@ -552,7 +554,7 @@ export function showConfigInfo(): {
 }
 
 export function getToolResultRecordingConfig(): ResolvedToolResultRecordingConfig {
-  const {merged: fileConfig} = loadFullConfig();
+  const fileConfig = getRuntimeConfigStore().get();
   const envEnabled = getEnvBoolean('BROWSER_RECORD_TOOL_RESULTS');
   const envOutputDir = getEnvValue('BROWSER_TOOL_RESULTS_DIR');
   const outputDir =

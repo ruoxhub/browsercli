@@ -15,7 +15,6 @@ import os from 'node:os';
 import {describe, it, beforeEach, afterEach, mock} from 'node:test';
 
 import {
-  getUserConfigPath,
   getDefaultLLMProvider,
   getAIConfig,
   getBrowserConfig,
@@ -27,6 +26,10 @@ import {
   type SystemConfig,
   type AIConfig,
 } from '../../../src/config.js';
+import {
+  getRuntimeConfigStore,
+  resetRuntimeConfigStore,
+} from '../../../src/config/RuntimeConfigStore.js';
 
 describe('Configuration Management', () => {
   // Store original environment variables
@@ -55,6 +58,9 @@ describe('Configuration Management', () => {
     delete process.env.REMOTE_DEBUGGING_PORT;
     delete process.env.USE_STEALTH_SCRIPTS;
     delete process.env.DEBUG;
+
+    // Reset RuntimeConfigStore so it re-seeds from the (now clean) env
+    resetRuntimeConfigStore();
   });
 
   afterEach(() => {
@@ -63,16 +69,7 @@ describe('Configuration Management', () => {
 
     // Restore original environment variables
     process.env = {...originalEnv};
-  });
-
-  describe('user config path', () => {
-    it('stores user configuration in ~/.jsreverse/config.json', () => {
-      const expectedSuffix = ['.jsreverse', 'config.json'].join('/');
-
-      assert.ok(
-        getUserConfigPath().replace(/\\/g, '/').endsWith(expectedSuffix),
-      );
-    });
+    resetRuntimeConfigStore();
   });
 
   describe('getDefaultLLMProvider', () => {
@@ -109,6 +106,15 @@ describe('Configuration Management', () => {
       process.env.DEFAULT_LLM_PROVIDER = 'invalid-provider';
       const provider = getDefaultLLMProvider();
       assert.strictEqual(provider, 'gemini');
+    });
+
+    it('should reflect RuntimeConfigStore updates', () => {
+      resetRuntimeConfigStore({llmProvider: 'anthropic'});
+
+      assert.strictEqual(getDefaultLLMProvider(), 'anthropic');
+
+      getRuntimeConfigStore().update({llmProvider: 'openai'});
+      assert.strictEqual(getDefaultLLMProvider(), 'openai');
     });
   });
 

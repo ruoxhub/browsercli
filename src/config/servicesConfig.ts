@@ -20,11 +20,11 @@ import {AnthropicProvider} from '../services/AnthropicProvider.js';
 import {GeminiProvider} from '../services/GeminiProvider.js';
 import {OpenAIProvider} from '../services/OpenAIProvider.js';
 
+import {getRuntimeConfigStore} from './RuntimeConfigStore.js';
 import {
   getEnvBoolean,
   getEnvNumber,
   getEnvValue,
-  loadFullConfig,
   type LLMProvider,
 } from './resolver.js';
 import {
@@ -41,7 +41,7 @@ import {
 /**
  * 获取默认 LLM 提供商
  *
- * 优先级：环境变量 > config.json > 默认值
+ * 优先级：环境变量 > RuntimeConfigStore > 默认值
  */
 export function getDefaultLLMProvider(): LLMProvider {
   const envProvider = getEnvValue('DEFAULT_LLM_PROVIDER')?.toLowerCase();
@@ -53,20 +53,20 @@ export function getDefaultLLMProvider(): LLMProvider {
     return envProvider as LLMProvider;
   }
 
-  const {merged: fileConfig} = loadFullConfig();
+  const fileConfig = getRuntimeConfigStore().get();
   if (fileConfig.llmProvider) return fileConfig.llmProvider as LLMProvider;
 
   return 'gemini';
 }
 
 /**
- * 从环境变量 + config.json 获取 AI 配置
+ * 从环境变量 + RuntimeConfigStore 获取 AI 配置
  *
- * 优先级：环境变量 > config.json 中的对应字段
+ * 优先级：环境变量 > RuntimeConfigStore 中的对应字段
  */
 export function getAIConfig(): AIConfig | undefined {
   const provider = getDefaultLLMProvider();
-  const {merged: fileConfig} = loadFullConfig();
+  const fileConfig = getRuntimeConfigStore().get();
 
   const config: AIConfig = {
     provider,
@@ -133,12 +133,12 @@ export function getAIConfig(): AIConfig | undefined {
 }
 
 /**
- * 从环境变量 + config.json 获取浏览器配置
+ * 从环境变量 + RuntimeConfigStore 获取浏览器配置
  *
- * 优先级：环境变量 > config.json 中的 browser 字段
+ * 优先级：环境变量 > RuntimeConfigStore 中的 browser 字段
  */
 export function getBrowserManagerConfig(): BrowserManagerConfig {
-  const {merged: fileConfig} = loadFullConfig();
+  const fileConfig = getRuntimeConfigStore().get();
   const fileBrowser = fileConfig.browser;
 
   type ResolverKind = 'boolean' | 'number' | 'value';

@@ -76,7 +76,7 @@ describe('RuntimeConfigStore', () => {
     resetRuntimeConfigStore();
 
     assert.throws(
-      () => getRuntimeConfigStore().update({llmProvider: 'invalid-provider'}),
+      () => getRuntimeConfigStore().update({llmProvider: 'invalid-provider' as never}),
       /llmProvider/,
     );
   });
