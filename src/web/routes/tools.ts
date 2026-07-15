@@ -10,15 +10,14 @@
  *  GET  /api/tools             — 列出所有工具 + JSON Schema
  *  POST /api/tools/:name       — 调用工具（body ≤ 1MB），结果落 InvocationStore
  *
- * 调用路径：ConsoleServer 嵌在 Worker 进程内，但 Phase 1 仍走 SekiroInvoker.invoke
- * (group, name, args) 三参——保持与 LLM 调用同一条路径，便于 traceId / Recorder
- * / EventBus 全链路一致。后续若需要"控制台直连本地 Pipeline"再加分支。
+ * 调用路径：ConsoleServer 嵌在 Worker 进程内，直接走 ToolAdapter.executeTool，
+ * 复用与 /api/v1 同一条内部执行管线，不再经过 Sekiro。
  */
 
 import type {IncomingMessage, ServerResponse} from 'node:http';
 
 import {getAllToolsMeta, getToolMeta} from '../../tools/tools-meta.js';
-import type {SekiroInvoker} from '../../worker/SekiroInvoker.js';
+import type {ToolAdapter} from '../../worker/ToolAdapter.js';
 import type {InvocationStore} from '../adapters/InvocationStore.js';
 import {toolMetaToJsonSchema} from '../adapters/ZodToJsonSchema.js';
 import {sendError, sendJson, sendUnexpected} from '../middleware/error.js';
@@ -27,8 +26,7 @@ import type {InvocationRecord} from '../types.js';
 const MAX_BODY_BYTES = 1 * 1024 * 1024;
 
 export interface ToolsRoutesConfig {
-  invoker: SekiroInvoker;
-  group: string;
+  toolAdapter: ToolAdapter;
   invocations: InvocationStore;
 }
 
@@ -110,10 +108,12 @@ export function createToolsRoutes(
 
         let args: Record<string, unknown>;
         try {
-          const body = await readJsonBody(req);
+          const body = (await readJsonBody(req)) as {
+            args?: Record<string, unknown>;
+          };
           args =
             typeof body === 'object' && body !== null && !Array.isArray(body)
-              ? (body as Record<string, unknown>)
+              ? body.args ?? {}
               : {};
         } catch (err) {
           const code = err instanceof Error ? err.message : 'INVALID_JSON';
@@ -129,7 +129,7 @@ export function createToolsRoutes(
         const startedAt = Date.now();
 
         try {
-          const result = await cfg.invoker.invoke(cfg.group, toolName, args);
+          const result = await cfg.toolAdapter.executeTool(meta, args);
           const durationMs = Date.now() - startedAt;
           const record: InvocationRecord = cfg.invocations.add({
             traceId,

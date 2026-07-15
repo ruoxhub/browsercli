@@ -6,7 +6,8 @@
 
 import type {IncomingMessage, ServerResponse} from 'node:http';
 
-import type {SekiroInvoker} from '../../worker/SekiroInvoker.js';
+import {getToolMeta} from '../../tools/tools-meta.js';
+import type {ToolAdapter} from '../../worker/ToolAdapter.js';
 import {sendError, sendJson, sendUnexpected} from '../middleware/error.js';
 
 const MAX_BODY_BYTES = 1 * 1024 * 1024;
@@ -44,15 +45,19 @@ function readJsonBody(req: IncomingMessage): Promise<unknown> {
 }
 
 export function createHookRoutes(
-  invoker: SekiroInvoker,
-  group: string,
+  toolAdapter: ToolAdapter,
 ): Map<string, RouteHandler> {
   return new Map<string, RouteHandler>([
     [
       'GET /api/hooks',
       async (_req, res) => {
         try {
-          const list = await invoker.invoke(group, 'list_hooks', {});
+          const listHooksMeta = getToolMeta('list_hooks');
+          if (!listHooksMeta) {
+            sendError(res, 'NOT_FOUND', 'list_hooks tool not found', 404);
+            return;
+          }
+          const list = await toolAdapter.executeTool(listHooksMeta, {});
           sendJson(res, list);
         } catch (err) {
           sendUnexpected(res, err);
@@ -80,7 +85,12 @@ export function createHookRoutes(
         }
 
         try {
-          const result = await invoker.invoke(group, 'hook_function', args);
+          const hookFunctionMeta = getToolMeta('hook_function');
+          if (!hookFunctionMeta) {
+            sendError(res, 'NOT_FOUND', 'hook_function tool not found', 404);
+            return;
+          }
+          const result = await toolAdapter.executeTool(hookFunctionMeta, args);
           sendJson(res, result);
         } catch (err) {
           sendUnexpected(res, err);
@@ -96,7 +106,12 @@ export function createHookRoutes(
           return;
         }
         try {
-          const result = await invoker.invoke(group, 'unhook_function', {
+          const unhookFunctionMeta = getToolMeta('unhook_function');
+          if (!unhookFunctionMeta) {
+            sendError(res, 'NOT_FOUND', 'unhook_function tool not found', 404);
+            return;
+          }
+          const result = await toolAdapter.executeTool(unhookFunctionMeta, {
             hookId: id,
           });
           sendJson(res, result);

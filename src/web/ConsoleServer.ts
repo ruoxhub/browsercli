@@ -142,8 +142,7 @@ export class ConsoleServer {
     );
     this.router.mount(
       createToolsRoutes({
-        invoker: this.options.invoker,
-        group: this.options.group,
+        toolAdapter: this.options.toolAdapter,
         invocations: this.invocationStore,
       }),
     );
@@ -152,9 +151,7 @@ export class ConsoleServer {
         store: this.invocationStore,
       }),
     );
-    this.router.mount(
-      createHookRoutes(this.options.invoker, this.options.group),
-    );
+    this.router.mount(createHookRoutes(this.options.toolAdapter));
     this.router.mount(createSiteExperienceRoutes());
     this.router.mount(
       createApiV1Routes({
