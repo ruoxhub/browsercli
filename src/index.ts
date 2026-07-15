@@ -8,18 +8,18 @@
  * Worker — Rpc Worker 进程入口
  *
  * 职责：
- * 1. 解析 CLI 参数
- * 2. 初始化 BrowserManager (连接/启动浏览器)
- * 3. 初始化 ToolContextProvider
+ * 1. 解析 CLI 参数并播种 RuntimeConfigStore
+ * 2. 初始化 Runtime（创建 BrowserManager 实例但不自动连接）
+ * 3. 初始化 ToolContextProvider（未连接状态）
  * 4. 经 HTTP /api/v1 暴露工具执行能力
- * 5. 进入运行状态，等待 HTTP 请求
+ * 5. 启动 Web 控制台，浏览器/数据库由面板显式触发连接
  */
 
 import './utils/logger.js';
 
 import {resolveConfig} from './config.js';
+import {getRuntimeConfigStore} from './config/RuntimeConfigStore.js';
 import {getRuntime} from './runtime.js';
-import {dbService} from './services/DatabaseService.js';
 import {ConsoleServer} from './web/ConsoleServer.js';
 import {JobStore} from './worker/JobStore.js';
 import {SekiroInvoker} from './worker/SekiroInvoker.js';
@@ -43,8 +43,11 @@ export const workerStartContext: {
  * Worker 主函数
  */
 async function main(): Promise<void> {
-  // 1. 解析 CLI 参数并通过 config.ts 合并配置（CLI > 环境变量 > 配置文件 > 默认值）
+  // 1. 解析 CLI 参数，播种 RuntimeConfigStore（CLI > env > 默认值）
   const cliConfig = parseWorkerArgs(process.argv.slice(2));
+  getRuntimeConfigStore().update(cliConfig);
+
+  // 2. 解析启动选项（rpcHost/group 等启动期固定值，不随面板变更）
   const resolved = resolveConfig(cliConfig);
   const options = toWorkerOptions(resolved);
 
@@ -56,33 +59,19 @@ async function main(): Promise<void> {
   console.log(`[Worker] Rpc Host: ${options.rpcHost}`);
   console.log(`[Worker] Group: ${options.group}`);
 
-  if (options.databaseUrl) {
-    await dbService.connect(options.databaseUrl);
-    await dbService.migrate();
-    console.log('[Worker] 数据库已连接并完成迁移');
-  }
-
-  // 2. 初始化聚合 Runtime（统一创建 BrowserManager、Collector、LLM 等）
+  // 3. 初始化聚合 Runtime（创建 BrowserManager 实例但不自动连接）
   const runtime = getRuntime();
 
-  // 3. 确保浏览器已连接并获取 BrowserContext
-  const browser = await runtime.browserManager.ensureBrowser();
-  const browserContext =
-    runtime.browserManager.getContext() ?? browser.contexts()[0] ?? null;
-
-  // 4. 将 Runtime 注入 ToolContextProvider，复用同一套服务实例
+  // 4. 以未连接状态初始化 ToolContextProvider
   const contextProvider = new ToolContextProvider(runtime);
   runtime.contextProvider = contextProvider;
-  if (browserContext) {
-    contextProvider.setContext(browserContext);
-  }
   await contextProvider.init();
 
   // 5. 创建 ToolAdapter（HTTP 模式用 executeTool 供 /api/v1 复用）
   const toolAdapter = new ToolAdapter(contextProvider);
 
   console.log(
-    '[Worker] HTTP 传输模式：等待 /api/v1 请求（已移除 Sekiro 路径）',
+    '[Worker] HTTP 传输模式：等待 /api/v1 请求（浏览器/数据库需从控制面板连接）',
   );
 
   // 启动 Web 控制台
