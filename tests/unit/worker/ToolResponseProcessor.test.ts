@@ -19,19 +19,30 @@ describe('ToolResponseProcessor', () => {
   });
 
   describe('ToolResponseAccumulator', () => {
-    it('accumulates lines and formats JSON', () => {
+    it('emits only structuredContent, never a top-level text field', () => {
+      const accumulator = new ToolResponseAccumulator();
+      accumulator.setStructuredContent({message: 'hello'});
+      const json = accumulator.toJSON();
+      assert.strictEqual(json.text, undefined);
+      assert.deepStrictEqual(json.structuredContent, {message: 'hello'});
+    });
+
+    it('ignores appended lines in favor of structuredContent', () => {
       const accumulator = new ToolResponseAccumulator();
       accumulator.appendResponseLine('Line 1');
       accumulator.appendResponseLine('Line 2');
+      accumulator.setStructuredContent({message: 'done'});
       const json = accumulator.toJSON();
-      assert.strictEqual(json.text, 'Line 1\nLine 2');
+      assert.strictEqual(json.text, undefined);
+      assert.deepStrictEqual(json.structuredContent, {message: 'done'});
     });
 
-    it('parses fenced json if structuredContent is empty', () => {
+    it('does not parse fenced json into structuredContent (deprecated path)', () => {
       const accumulator = new ToolResponseAccumulator();
       accumulator.appendResponseLine('```json\n{"foo":"bar"}\n```');
       const json = accumulator.toJSON();
-      assert.deepStrictEqual(json.structuredContent, {foo: 'bar'});
+      assert.strictEqual(json.text, undefined);
+      assert.strictEqual(json.structuredContent, undefined);
     });
   });
 
@@ -51,10 +62,10 @@ describe('ToolResponseProcessor', () => {
       );
     });
 
-    it('normalizes string response to text json', () => {
+    it('normalizes string response to structuredContent json', () => {
       const processor = new ToolResponseProcessor();
-      const res = processor.normalize('hello') as {text: string};
-      assert.strictEqual(res.text, 'hello');
+      const res = processor.normalize('hello') as {structuredContent: unknown};
+      assert.strictEqual(res.structuredContent, 'hello');
     });
 
     it('normalizes object response to structuredContent json', () => {

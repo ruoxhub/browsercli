@@ -96,23 +96,8 @@ export class ToolResponseAccumulator implements Response {
   toJSON(): Record<string, unknown> {
     const result: Record<string, unknown> = {};
 
-    if (this.lines.length > 0) {
-      result.text = this.lines.join('\n');
-    }
-
     if (this.structuredContent !== null) {
       result.structuredContent = this.structuredContent;
-
-      if (
-        this.lines.length === 0 &&
-        typeof this.structuredContent === 'object' &&
-        this.structuredContent !== null &&
-        'message' in this.structuredContent &&
-        typeof (this.structuredContent as {message: unknown}).message ===
-          'string'
-      ) {
-        result.text = (this.structuredContent as {message: string}).message;
-      }
     }
 
     if (this.includePages) result.pages = [];
@@ -158,13 +143,7 @@ export class ToolResponseProcessor {
     }
 
     const accumulator = new ToolResponseAccumulator();
-    if (typeof result === 'object' && result !== null) {
-      accumulator.setStructuredContent(result);
-    } else if (typeof result === 'string') {
-      accumulator.appendResponseLine(result);
-    } else {
-      accumulator.setStructuredContent(result);
-    }
+    accumulator.setStructuredContent(result);
     return accumulator.toJSON();
   }
 

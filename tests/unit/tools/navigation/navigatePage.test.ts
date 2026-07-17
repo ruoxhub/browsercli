@@ -44,7 +44,9 @@ function createRuntime(overrides: Record<string, unknown> = {}): any {
 }
 
 function getOutput(response: ToolResponseAccumulator): string {
-  return (response.toJSON().text as string) ?? '';
+  const result = response.toJSON();
+  const structured = result.structuredContent as {message?: string} | undefined;
+  return structured?.message ?? '';
 }
 
 describe('navigatePage (defineTool)', () => {
