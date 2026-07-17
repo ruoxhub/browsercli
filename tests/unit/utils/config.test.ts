@@ -45,11 +45,6 @@ describe('Configuration Management', () => {
     delete process.env.OPENAI_API_KEY;
     delete process.env.OPENAI_BASE_URL;
     delete process.env.OPENAI_MODEL;
-    delete process.env.ANTHROPIC_API_KEY;
-    delete process.env.ANTHROPIC_MODEL;
-    delete process.env.GEMINI_API_KEY;
-    delete process.env.GEMINI_CLI_PATH;
-    delete process.env.GEMINI_MODEL;
     delete process.env.BROWSER_HEADLESS;
     delete process.env.BROWSER_ISOLATED;
     delete process.env.BROWSER_EXECUTABLE_PATH;
@@ -73,9 +68,9 @@ describe('Configuration Management', () => {
   });
 
   describe('getDefaultLLMProvider', () => {
-    it('should return gemini as default when no provider is set', () => {
+    it('should return openai as default when no provider is set', () => {
       const provider = getDefaultLLMProvider();
-      assert.strictEqual(provider, 'gemini');
+      assert.strictEqual(provider, 'openai');
     });
 
     it('should return openai when DEFAULT_LLM_PROVIDER is openai', () => {
@@ -84,34 +79,22 @@ describe('Configuration Management', () => {
       assert.strictEqual(provider, 'openai');
     });
 
-    it('should return anthropic when DEFAULT_LLM_PROVIDER is anthropic', () => {
-      process.env.DEFAULT_LLM_PROVIDER = 'anthropic';
-      const provider = getDefaultLLMProvider();
-      assert.strictEqual(provider, 'anthropic');
-    });
-
-    it('should return gemini when DEFAULT_LLM_PROVIDER is gemini', () => {
-      process.env.DEFAULT_LLM_PROVIDER = 'gemini';
-      const provider = getDefaultLLMProvider();
-      assert.strictEqual(provider, 'gemini');
-    });
-
     it('should handle case-insensitive provider names', () => {
       process.env.DEFAULT_LLM_PROVIDER = 'OPENAI';
       const provider = getDefaultLLMProvider();
       assert.strictEqual(provider, 'openai');
     });
 
-    it('should return gemini for invalid provider names', () => {
+    it('should return openai for invalid provider names', () => {
       process.env.DEFAULT_LLM_PROVIDER = 'invalid-provider';
       const provider = getDefaultLLMProvider();
-      assert.strictEqual(provider, 'gemini');
+      assert.strictEqual(provider, 'openai');
     });
 
     it('should reflect RuntimeConfigStore updates', () => {
-      resetRuntimeConfigStore({llmProvider: 'anthropic'});
+      resetRuntimeConfigStore({llmProvider: 'openai'});
 
-      assert.strictEqual(getDefaultLLMProvider(), 'anthropic');
+      assert.strictEqual(getDefaultLLMProvider(), 'openai');
 
       getRuntimeConfigStore().update({llmProvider: 'openai'});
       assert.strictEqual(getDefaultLLMProvider(), 'openai');
@@ -249,13 +232,13 @@ describe('Configuration Management', () => {
       assert.strictEqual(config.debug, true);
     });
 
-    it('should return system config with Gemini CLI when no API keys configured', () => {
+    it('should return system config with OpenAI when OPENAI_API_KEY is set', () => {
+      process.env.OPENAI_API_KEY = 'sk-test-key';
       const config = getSystemConfig();
 
       assert.ok(config);
-      // Gemini CLI is always available as fallback
       assert.ok(config.ai);
-      assert.strictEqual(config.ai.provider, 'gemini');
+      assert.strictEqual(config.ai.provider, 'openai');
       assert.ok(config.browser);
       assert.strictEqual(config.debug, false);
     });
@@ -438,34 +421,15 @@ describe('Configuration Management', () => {
   });
 
   describe('createAIService', () => {
-    it('should return Gemini CLI service when no AI configuration is provided', () => {
+    it('should return undefined when no AI configuration is provided', () => {
       const service = createAIService();
 
-      // Gemini CLI is always available as fallback
-      assert.ok(service);
+      assert.strictEqual(service, undefined);
     });
 
     it('should create OpenAI service when configured', () => {
       process.env.OPENAI_API_KEY = 'sk-test-key';
       process.env.DEFAULT_LLM_PROVIDER = 'openai';
-
-      const service = createAIService();
-
-      assert.ok(service);
-    });
-
-    it('should create Anthropic service when configured', () => {
-      process.env.ANTHROPIC_API_KEY = 'sk-ant-test-key';
-      process.env.DEFAULT_LLM_PROVIDER = 'anthropic';
-
-      const service = createAIService();
-
-      assert.ok(service);
-    });
-
-    it('should create Gemini service when configured', () => {
-      process.env.GEMINI_API_KEY = 'gemini-test-key';
-      process.env.DEFAULT_LLM_PROVIDER = 'gemini';
 
       const service = createAIService();
 

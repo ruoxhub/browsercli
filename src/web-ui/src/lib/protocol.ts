@@ -55,19 +55,6 @@ export interface OpenAIConfig {
   model?: string;
 }
 
-export interface GeminiConfig {
-  apiKey?: string;
-  cliPath?: string;
-  useAPI?: boolean;
-  model?: string;
-}
-
-export interface AnthropicConfig {
-  apiKey?: string;
-  baseURL?: string;
-  model?: string;
-}
-
 export interface RuntimeConfig {
   rpcHost?: string;
   group?: string;
@@ -76,10 +63,8 @@ export interface RuntimeConfig {
   headless?: boolean;
   executablePath?: string;
   databaseUrl?: string;
-  llmProvider?: 'openai' | 'gemini' | 'anthropic';
+  llmProvider?: 'openai';
   openai?: OpenAIConfig;
-  gemini?: GeminiConfig;
-  anthropic?: AnthropicConfig;
   browser?: BrowserConfig;
   debug?: boolean;
 }
@@ -87,4 +72,10 @@ export interface RuntimeConfig {
 export interface ConnectResult {
   connected: boolean;
   mode?: string;
+}
+
+export interface LlmTestResult {
+  ok: boolean;
+  provider?: 'openai';
+  latencyMs?: number;
 }

@@ -11,6 +11,7 @@
  *  PUT  /api/config/browser       — 更新 browser 配置
  *  PUT  /api/config/llm           — 更新 LLM 配置（掩码占位符不覆盖真实值）
  *  PUT  /api/config/database      — 更新 databaseUrl
+ *  POST /api/llm/test             — 用当前/传入配置做一次最小 chat 调用验证可用性
  *  POST /api/browser/connect      — 调用 connectBrowser
  *  POST /api/browser/disconnect   — 调用 disconnectBrowser
  *  POST /api/database/connect     — 调用 dbService.connect + migrate
@@ -18,9 +19,14 @@
 
 import type {IncomingMessage, ServerResponse} from 'node:http';
 
+import {AIService} from '../../services/AIService.js';
 import {getRuntimeConfigStore} from '../../config/RuntimeConfigStore.js';
-import {getBrowserManagerConfig} from '../../config/servicesConfig.js';
-import type {GlobalConfig} from '../../config/schema.js';
+import {
+  createAIService,
+  getBrowserManagerConfig,
+  getDefaultLLMProvider,
+} from '../../config/servicesConfig.js';
+import type {AIConfig, GlobalConfig} from '../../config/schema.js';
 import {
   BrowserConfigSchema,
   formatConfigValidationError,
@@ -45,6 +51,11 @@ type RouteHandler = (
 export interface ConfigRoutesConfig {
   contextProvider: ToolContextProvider;
   wsHub: WsHub;
+  /**
+   * LLM 连接测试用的 AIService 工厂，默认走真实 createAIService。
+   * 测试时注入 fake 以避免真实网络请求。
+   */
+  createAIService?: (config?: AIConfig) => AIService | undefined;
 }
 
 // ==================== 敏感字段掩码 ====================
@@ -72,20 +83,72 @@ function maskSensitiveFields(config: GlobalConfig): GlobalConfig {
       apiKey: maskApiKey(masked.openai.apiKey),
     };
   }
-  if (masked.anthropic?.apiKey) {
-    masked.anthropic = {
-      ...masked.anthropic,
-      apiKey: maskApiKey(masked.anthropic.apiKey),
-    };
-  }
-  if (masked.gemini?.apiKey) {
-    masked.gemini = {
-      ...masked.gemini,
-      apiKey: maskApiKey(masked.gemini.apiKey),
-    };
-  }
 
   return masked;
+}
+
+// ==================== /v1/models 端点解析 ====================
+
+/** 由 openai.baseURL 推导 OpenAI 兼容的 /v1/models 完整地址 */
+function resolveModelsUrl(baseURL?: string): string {
+  const base = (baseURL ?? 'https://api.openai.com/v1').replace(/\/+$/, '');
+  return base.endsWith('/v1') ? `${base}/models` : `${base}/v1/models`;
+}
+
+const BLOCKED_HOST_PATTERNS = [
+  /^localhost$/i,
+  /^127\.\d+\.\d+\.\d+$/,
+  /^10\.\d+\.\d+\.\d+$/,
+  /^172\.(1[6-9]|2\d|3[01])\.\d+\.\d+$/,
+  /^192\.168\.\d+\.\d+$/,
+  /^0\.0\.0\.0$/,
+  /^::1$/,
+  /^fc00:/i,
+  /^fd/i,
+  /^fe80:/i,
+  /^169\.254\.\d+\.\d+$/,
+];
+
+/**
+ * 校验 LLM baseURL 防止 SSRF 和 API Key 泄露。
+ * 仅允许 https 协议，拒绝私有/内网/本地地址。
+ */
+function validateLlmBaseUrl(
+  baseURL: string | undefined,
+): string | undefined {
+  if (!baseURL) return undefined;
+  let parsed: URL;
+  try {
+    parsed = new URL(baseURL);
+  } catch {
+    return '无效的 URL 格式';
+  }
+  if (parsed.protocol !== 'https:') {
+    return '仅允许 https 协议的 baseURL';
+  }
+  for (const pattern of BLOCKED_HOST_PATTERNS) {
+    if (pattern.test(parsed.hostname)) {
+      return `不允许使用内网/本地地址: ${parsed.hostname}`;
+    }
+  }
+  return undefined;
+}
+
+// ==================== LLM 掩码占位符合并 ====================
+
+function mergeOpenaiConfig(
+  incoming: unknown,
+  stored: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+  if (!incoming || typeof incoming !== 'object') return stored;
+  const merged = mergeLlmProvider(
+    incoming as Record<string, unknown>,
+    stored,
+  );
+  if (typeof merged.apiKey === 'string' && merged.apiKey === '') {
+    merged.apiKey = stored?.apiKey ?? '';
+  }
+  return merged;
 }
 
 // ==================== Body 读取 ====================
@@ -215,22 +278,158 @@ export function createConfigRoutes(
           ) as GlobalConfig['openai'];
         }
 
-        if (body.anthropic && typeof body.anthropic === 'object') {
-          update.anthropic = mergeLlmProvider(
-            body.anthropic as Record<string, unknown>,
-            current.anthropic as Record<string, unknown> | undefined,
-          ) as GlobalConfig['anthropic'];
-        }
-
-        if (body.gemini && typeof body.gemini === 'object') {
-          update.gemini = mergeLlmProvider(
-            body.gemini as Record<string, unknown>,
-            current.gemini as Record<string, unknown> | undefined,
-          ) as GlobalConfig['gemini'];
-        }
-
         const updated = getRuntimeConfigStore().update(update);
         sendJson(res, maskSensitiveFields(updated));
+      },
+    ],
+
+    [
+      'POST /api/llm/test',
+      async (req, res) => {
+        let body: Record<string, unknown>;
+        try {
+          body = (await readJsonBody(req)) as Record<string, unknown>;
+        } catch {
+          sendError(res, 'INVALID_JSON', '请求体不是合法 JSON', 400);
+          return;
+        }
+
+        const current = getRuntimeConfigStore().get();
+        const provider =
+          (body.llmProvider as GlobalConfig['llmProvider']) ||
+          current.llmProvider ||
+          getDefaultLLMProvider();
+
+        const openai = mergeOpenaiConfig(
+          body.openai,
+          current.openai as Record<string, unknown> | undefined,
+        ) as GlobalConfig['openai'];
+
+        const urlError = validateLlmBaseUrl(openai?.baseURL);
+        if (urlError) {
+          sendError(res, 'LLM_CONFIG_INVALID', urlError, 400);
+          return;
+        }
+
+        const makeAIService = cfg.createAIService ?? createAIService;
+
+        let service: AIService | undefined;
+        try {
+          service = makeAIService({provider, openai});
+        } catch (err) {
+          sendError(
+            res,
+            'LLM_CONFIG_INVALID',
+            err instanceof Error ? err.message : String(err),
+            400,
+          );
+          return;
+        }
+
+        if (!service) {
+          sendError(res, 'LLM_CONFIG_INVALID', '未找到可用的 LLM 配置', 400);
+          return;
+        }
+
+        const start = Date.now();
+        try {
+          await service.chat([{role: 'user', content: 'ping'}], {
+            maxTokens: 8,
+          });
+          const latencyMs = Date.now() - start;
+          sendJson(res, {ok: true, provider, latencyMs});
+        } catch (err) {
+          const latencyMs = Date.now() - start;
+          sendError(
+            res,
+            'LLM_TEST_FAILED',
+            err instanceof Error ? err.message : String(err),
+            502,
+            {ok: false, latencyMs},
+          );
+        }
+      },
+    ],
+
+    [
+      'POST /api/llm/models',
+      async (req, res) => {
+        let body: Record<string, unknown>;
+        try {
+          body = (await readJsonBody(req)) as Record<string, unknown>;
+        } catch {
+          sendError(res, 'INVALID_JSON', '请求体不是合法 JSON', 400);
+          return;
+        }
+
+        const current = getRuntimeConfigStore().get();
+
+        const openai = mergeOpenaiConfig(
+          body.openai,
+          current.openai as Record<string, unknown> | undefined,
+        ) as GlobalConfig['openai'];
+
+        if (!openai?.apiKey) {
+          sendError(
+            res,
+            'LLM_CONFIG_INVALID',
+            '未配置 API Key，无法获取模型列表',
+            400,
+          );
+          return;
+        }
+
+        const urlError = validateLlmBaseUrl(openai.baseURL);
+        if (urlError) {
+          sendError(res, 'LLM_CONFIG_INVALID', urlError, 400);
+          return;
+        }
+
+        const modelsUrl = resolveModelsUrl(openai.baseURL);
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 30000);
+
+        try {
+          const upstream = await fetch(modelsUrl, {
+            headers: {
+              Authorization: `Bearer ${openai.apiKey}`,
+              'Content-Type': 'application/json',
+            },
+            signal: controller.signal,
+          });
+
+          if (!upstream.ok) {
+            const text = await upstream.text().catch(() => '');
+            sendError(
+              res,
+              'LLM_MODELS_FETCH_FAILED',
+              `获取模型列表失败 (${upstream.status}): ${text.slice(0, 200)}`,
+              502,
+            );
+            return;
+          }
+
+          const payload = (await upstream.json()) as {
+            data?: Array<{id: string; object?: string; owned_by?: string}>;
+          };
+          const models = Array.isArray(payload.data)
+            ? payload.data.map(m => ({
+                id: m.id,
+                object: m.object,
+                owned_by: m.owned_by,
+              }))
+            : [];
+          sendJson(res, {models});
+        } catch (err) {
+          sendError(
+            res,
+            'LLM_MODELS_FETCH_FAILED',
+            err instanceof Error ? err.message : String(err),
+            502,
+          );
+        } finally {
+          clearTimeout(timeout);
+        }
       },
     ],
 

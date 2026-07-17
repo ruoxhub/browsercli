@@ -80,17 +80,6 @@ function getAISelectionStatus(): DiagnosticCheck {
   };
 }
 
-function getGeminiCliStatus(): DiagnosticCheck {
-  const cliPath = process.env.GEMINI_CLI_PATH || 'gemini-cli';
-  return {
-    name: 'gemini_cli',
-    status: 'warn',
-    reason: `Gemini CLI fallback path is set to ${cliPath}. Availability is not verified during static diagnostics.`,
-    fix: 'If you rely on Gemini CLI fallback, ensure the executable is installed and on PATH.',
-    details: {cliPath},
-  };
-}
-
 function getArtifactsDirectoryStatus(): DiagnosticCheck {
   const packageRoot = resolvePackageRoot(import.meta.url);
   const artifactsDir = resolveArtifactsTasksDirForPackageRoot(packageRoot);
@@ -140,7 +129,6 @@ export function runEnvironmentDiagnostics(): DiagnosticReport {
     getNodeVersionStatus(process.version),
     getBuildOutputStatus(packageRoot),
     getAISelectionStatus(),
-    getGeminiCliStatus(),
     getArtifactsDirectoryStatus(),
   ];
 

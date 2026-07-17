@@ -38,28 +38,11 @@ const ViewportSchema: zodType.ZodType<{width: number; height: number}> = zod
   })
   .strip() as zodType.ZodType<{width: number; height: number}>;
 
-export const LLMProviderSchema = zod.enum(['openai', 'gemini', 'anthropic'], {
-  errorMap: () => ({message: 'must be one of: openai, gemini, anthropic'}),
+export const LLMProviderSchema = zod.enum(['openai'], {
+  errorMap: () => ({message: 'must be one of: openai'}),
 });
 
 export const OpenAIConfigSchema = zod
-  .object({
-    apiKey: optionalStringSchema.optional(),
-    baseURL: optionalStringSchema.optional(),
-    model: optionalStringSchema.optional(),
-  })
-  .strip();
-
-export const GeminiConfigSchema = zod
-  .object({
-    apiKey: optionalStringSchema.optional(),
-    cliPath: optionalStringSchema.optional(),
-    useAPI: booleanSchema.optional(),
-    model: optionalStringSchema.optional(),
-  })
-  .strip();
-
-export const AnthropicConfigSchema = zod
   .object({
     apiKey: optionalStringSchema.optional(),
     baseURL: optionalStringSchema.optional(),
@@ -171,8 +154,6 @@ export const GlobalConfigSchema = zod
     runtimeDirName: optionalStringSchema.optional(),
     llmProvider: LLMProviderSchema.optional(),
     openai: OpenAIConfigSchema.optional(),
-    gemini: GeminiConfigSchema.optional(),
-    anthropic: AnthropicConfigSchema.optional(),
     browser: BrowserConfigSchema.optional(),
     debug: booleanSchema.optional(),
     logLevel: optionalStringSchema.optional(),
@@ -191,13 +172,6 @@ export const GlobalConfigSchema = zod
         message: 'must not be empty when llmProvider is openai',
       });
     }
-    if (config.llmProvider === 'anthropic' && config.anthropic?.apiKey === '') {
-      ctx.addIssue({
-        code: zod.ZodIssueCode.custom,
-        path: ['anthropic', 'apiKey'],
-        message: 'must not be empty when llmProvider is anthropic',
-      });
-    }
   });
 
 export type GlobalConfig = zodType.infer<typeof GlobalConfigSchema>;
@@ -213,15 +187,6 @@ const AIConfigSchema = zod
       })
       .strip()
       .optional(),
-    gemini: GeminiConfigSchema.optional(),
-    anthropic: zod
-      .object({
-        apiKey: nonEmptyStringSchema,
-        baseURL: optionalStringSchema.optional(),
-        model: optionalStringSchema.optional(),
-      })
-      .strip()
-      .optional(),
   })
   .strip()
   .superRefine((config, ctx) => {
@@ -230,13 +195,6 @@ const AIConfigSchema = zod
         code: zod.ZodIssueCode.custom,
         path: ['openai'],
         message: 'is required when provider is openai',
-      });
-    }
-    if (config.provider === 'anthropic' && !config.anthropic) {
-      ctx.addIssue({
-        code: zod.ZodIssueCode.custom,
-        path: ['anthropic'],
-        message: 'is required when provider is anthropic',
       });
     }
   });

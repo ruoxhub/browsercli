@@ -7,7 +7,10 @@
 import assert from 'node:assert';
 import {afterEach, describe, it} from 'node:test';
 
-import {resetRuntimeConfigStore, getRuntimeConfigStore} from '../../../../src/config/RuntimeConfigStore.js';
+import {
+  resetRuntimeConfigStore,
+  getRuntimeConfigStore,
+} from '../../../../src/config/RuntimeConfigStore.js';
 import {
   createConfigRoutes,
   isMaskPlaceholder,
@@ -41,7 +44,11 @@ function mockReqRes(method: string, body?: unknown) {
       return false;
     },
   } as never;
-  return {req, res, getBody: () => (res as {responseBody: string}).responseBody};
+  return {
+    req,
+    res,
+    getBody: () => (res as {responseBody: string}).responseBody,
+  };
 }
 
 describe('config routes', () => {
@@ -186,6 +193,215 @@ describe('config routes', () => {
       assert.strictEqual(parsed.success, false);
       assert.strictEqual(parsed.error.code, 'VALIDATION');
       assert.ok(parsed.error.message.includes('remoteDebuggingPort'));
+    });
+  });
+
+  describe('POST /api/llm/test', () => {
+    function fakeAIService(
+      factory: () => {chat: () => Promise<{content: string}>},
+    ) {
+      return {createAIService: factory};
+    }
+
+    it('returns ok:true when chat succeeds', async () => {
+      resetRuntimeConfigStore({
+        openai: {apiKey: 'sk-stored1234', model: 'gpt-4o'},
+        llmProvider: 'openai',
+      });
+
+      const routes = createConfigRoutes({
+        contextProvider: null,
+        wsHub: null,
+        ...fakeAIService(() => ({
+          chat: async () => ({content: 'pong'}),
+        })),
+      } as never);
+
+      const handler = routes.get('POST /api/llm/test')!;
+      const {req, res, getBody} = mockReqRes('POST', {
+        llmProvider: 'openai',
+        openai: {apiKey: 'sk-***1234'},
+      });
+
+      await handler(req, res);
+
+      const parsed = JSON.parse(getBody());
+      assert.ok(parsed.success);
+      assert.strictEqual(parsed.data.ok, true);
+      assert.strictEqual(parsed.data.provider, 'openai');
+      assert.ok(typeof parsed.data.latencyMs === 'number');
+    });
+
+    it('returns ok:false with 502 when chat fails', async () => {
+      resetRuntimeConfigStore({
+        openai: {apiKey: 'sk-stored1234', model: 'gpt-4o'},
+        llmProvider: 'openai',
+      });
+
+      const routes = createConfigRoutes({
+        contextProvider: null,
+        wsHub: null,
+        ...fakeAIService(() => ({
+          chat: async () => {
+            throw new Error('unauthorized');
+          },
+        })),
+      } as never);
+
+      const handler = routes.get('POST /api/llm/test')!;
+      const {req, res, getBody} = mockReqRes('POST', {
+        llmProvider: 'openai',
+        openai: {apiKey: 'sk-***1234'},
+      });
+
+      await handler(req, res);
+
+      const parsed = JSON.parse(getBody());
+      assert.strictEqual(parsed.success, false);
+      assert.strictEqual(parsed.error.code, 'LLM_TEST_FAILED');
+      assert.ok(parsed.error.message.includes('unauthorized'));
+    });
+
+    it('returns 400 when provider config is missing', async () => {
+      resetRuntimeConfigStore({llmProvider: 'openai'});
+
+      const routes = createConfigRoutes({
+        contextProvider: null,
+        wsHub: null,
+        createAIService: () => {
+          throw new Error('OpenAI configuration not found');
+        },
+      } as never);
+
+      const handler = routes.get('POST /api/llm/test')!;
+      const {req, res, getBody} = mockReqRes('POST', {llmProvider: 'openai'});
+
+      await handler(req, res);
+
+      const parsed = JSON.parse(getBody());
+      assert.strictEqual(parsed.success, false);
+      assert.strictEqual(parsed.error.code, 'LLM_CONFIG_INVALID');
+    });
+  });
+
+  describe('POST /api/llm/models', () => {
+    let originalFetch: typeof globalThis.fetch;
+
+    afterEach(() => {
+      globalThis.fetch = originalFetch;
+    });
+
+    function mockFetch(
+      impl: (
+        url: string,
+        init: {headers: Record<string, string>},
+      ) => {
+        ok: boolean;
+        status: number;
+        json: () => Promise<unknown>;
+        text: () => Promise<string>;
+      },
+    ) {
+      originalFetch = globalThis.fetch;
+      (globalThis as {fetch: unknown}).fetch = impl;
+    }
+
+    it('returns model list from /v1/models using stored real key', async () => {
+      resetRuntimeConfigStore({
+        openai: {apiKey: 'sk-stored1234', model: 'gpt-4o'},
+        llmProvider: 'openai',
+      });
+
+      let capturedUrl = '';
+      let capturedAuth = '';
+      mockFetch((url, init) => {
+        capturedUrl = url;
+        capturedAuth = init.headers['Authorization'] ?? '';
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            object: 'list',
+            data: [
+              {id: 'gpt-4o', object: 'model', owned_by: 'openai'},
+              {id: 'gpt-4o-mini', object: 'model', owned_by: 'openai'},
+            ],
+          }),
+          text: async () => '',
+        };
+      });
+
+      const routes = createConfigRoutes({
+        contextProvider: null,
+        wsHub: null,
+      } as never);
+
+      const handler = routes.get('POST /api/llm/models')!;
+      // 传入掩码占位符，后端应回退到存储的真实密钥
+      const {req, res, getBody} = mockReqRes('POST', {
+        llmProvider: 'openai',
+        openai: {apiKey: 'sk-***1234'},
+      });
+
+      await handler(req, res);
+
+      const parsed = JSON.parse(getBody());
+      assert.ok(parsed.success);
+      assert.strictEqual(parsed.data.models.length, 2);
+      assert.strictEqual(parsed.data.models[0].id, 'gpt-4o');
+      assert.strictEqual(capturedUrl, 'https://api.openai.com/v1/models');
+      // 真实密钥被带往上游客端
+      assert.strictEqual(capturedAuth, 'Bearer sk-stored1234');
+    });
+
+    it('returns 400 when no apiKey configured', async () => {
+      resetRuntimeConfigStore({llmProvider: 'openai'});
+
+      const routes = createConfigRoutes({
+        contextProvider: null,
+        wsHub: null,
+      } as never);
+
+      const handler = routes.get('POST /api/llm/models')!;
+      const {req, res, getBody} = mockReqRes('POST', {llmProvider: 'openai'});
+
+      await handler(req, res);
+
+      const parsed = JSON.parse(getBody());
+      assert.strictEqual(parsed.success, false);
+      assert.strictEqual(parsed.error.code, 'LLM_CONFIG_INVALID');
+    });
+
+    it('returns 502 when upstream fails', async () => {
+      resetRuntimeConfigStore({
+        openai: {apiKey: 'sk-stored1234', model: 'gpt-4o'},
+        llmProvider: 'openai',
+      });
+
+      mockFetch(() => ({
+        ok: false,
+        status: 401,
+        json: async () => ({}),
+        text: async () => 'unauthorized',
+      }));
+
+      const routes = createConfigRoutes({
+        contextProvider: null,
+        wsHub: null,
+      } as never);
+
+      const handler = routes.get('POST /api/llm/models')!;
+      const {req, res, getBody} = mockReqRes('POST', {
+        llmProvider: 'openai',
+        openai: {apiKey: 'sk-***1234'},
+      });
+
+      await handler(req, res);
+
+      const parsed = JSON.parse(getBody());
+      assert.strictEqual(parsed.success, false);
+      assert.strictEqual(parsed.error.code, 'LLM_MODELS_FETCH_FAILED');
+      assert.ok(parsed.error.message.includes('401'));
     });
   });
 });

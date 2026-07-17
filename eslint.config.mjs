@@ -98,8 +98,13 @@ export default defineConfig([
           varsIgnorePattern: '^_',
         },
       ],
+      // Relaxed to 'warn': this is a reverse-engineering tool that routinely
+      // handles arbitrary dynamic runtime values (CDP protocol objects, eval
+      // results, injected scripts), where `any` is legitimately the correct
+      // type. Keeping it as a warning preserves visibility without blocking
+      // the build on hundreds of intentional `any` sites.
       '@typescript-eslint/no-explicit-any': [
-        'error',
+        'warn',
         {
           ignoreRestArgs: true,
         },
@@ -158,11 +163,24 @@ export default defineConfig([
   },
   {
     name: 'Tests',
-    files: ['**/*.test.ts'],
+    files: ['**/*.test.ts', '**/*.test.js'],
     rules: {
       // With the Node.js test runner, `describe` and `it` are technically
       // promises, but we don't need to await them.
       '@typescript-eslint/no-floating-promises': 'off',
+      // Test files legitimately import build artifacts (../../../build/**),
+      // puppeteer, and use dynamic mocks — a file-level @ts-nocheck is the
+      // pragmatic suppression here. @ts-ignore/@ts-expect-error still require
+      // a description.
+      '@typescript-eslint/ban-ts-comment': [
+        'error',
+        {
+          // false = allow (rule only reports when the option is `true`).
+          'ts-nocheck': false,
+          'ts-ignore': 'allow-with-description',
+          'ts-expect-error': 'allow-with-description',
+        },
+      ],
     },
   },
 ]);

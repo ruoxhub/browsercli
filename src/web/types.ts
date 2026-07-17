@@ -190,6 +190,22 @@ export interface HookDetail extends HookSummary {
   samples: HookSampleEvent[];
 }
 
+// ==================== LLM Models ====================
+
+/**
+ * /v1/models 返回的单个模型条目（OpenAI 兼容协议子集）。
+ * 后端 POST /api/llm/models 代理上游 `/v1/models` 后裁剪为精简结构。
+ */
+export interface ModelInfo {
+  id: string;
+  object?: string;
+  owned_by?: string;
+}
+
+export interface LlmModelsResponse {
+  models: ModelInfo[];
+}
+
 // ==================== Invocation History ====================
 
 /**

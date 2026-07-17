@@ -11,6 +11,7 @@ import type {
   RuntimeConfig,
   BrowserConfig,
   ConnectResult,
+  LlmTestResult,
 } from './protocol';
 
 export interface ToolSummary {
@@ -159,10 +160,24 @@ export const api = {
   updateLlmConfig(config: {
     llmProvider?: string;
     openai?: Record<string, unknown>;
-    gemini?: Record<string, unknown>;
-    anthropic?: Record<string, unknown>;
   }): Promise<RuntimeConfig> {
     return request<RuntimeConfig>('PUT', '/api/config/llm', config);
+  },
+
+  testLlmConfig(config: {
+    llmProvider?: string;
+    openai?: Record<string, unknown>;
+  }): Promise<LlmTestResult> {
+    return request<LlmTestResult>('POST', '/api/llm/test', config);
+  },
+
+  listLlmModels(config?: {
+    llmProvider?: string;
+    openai?: Record<string, unknown>;
+  }): Promise<{models: {id: string; object?: string; owned_by?: string}[]}> {
+    return request<{
+      models: {id: string; object?: string; owned_by?: string}[];
+    }>('POST', '/api/llm/models', config ?? {});
   },
 
   updateDatabaseConfig(databaseUrl: string): Promise<{databaseUrl: string}> {

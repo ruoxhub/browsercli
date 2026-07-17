@@ -11,6 +11,7 @@ import {
   PlugZap,
   Save,
   RefreshCw,
+  Activity,
 } from 'lucide-react';
 import {useEffect, useState} from 'react';
 
@@ -24,6 +25,13 @@ export default function SettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
   const [browserConnected, setBrowserConnected] = useState(false);
+  const [llmTest, setLlmTest] = useState<{ok: boolean; message: string} | null>(
+    null,
+  );
+  const [models, setModels] = useState<
+    {id: string; object?: string; owned_by?: string}[]
+  >([]);
+  const [loadingModels, setLoadingModels] = useState(false);
 
   const fetchConfig = async () => {
     try {
@@ -83,8 +91,6 @@ export default function SettingsPage() {
       const updated = await api.updateLlmConfig({
         llmProvider: config.llmProvider,
         openai: config.openai as Record<string, unknown>,
-        gemini: config.gemini as Record<string, unknown>,
-        anthropic: config.anthropic as Record<string, unknown>,
       });
       setConfig(updated);
       setError(null);
@@ -105,6 +111,48 @@ export default function SettingsPage() {
       setError(err instanceof Error ? err.message : '保存失败');
     } finally {
       setSaving(null);
+    }
+  };
+
+  const handleTestLlm = async () => {
+    if (!config) return;
+    setSaving('test-llm');
+    setLlmTest(null);
+    try {
+      const result = await api.testLlmConfig({
+        llmProvider: config.llmProvider,
+        openai: config.openai as Record<string, unknown>,
+      });
+      setLlmTest({
+        ok: result.ok,
+        message: result.ok
+          ? `连接成功（${result.provider}，${result.latencyMs}ms）`
+          : '连接失败',
+      });
+    } catch (err) {
+      setLlmTest({
+        ok: false,
+        message: err instanceof Error ? err.message : '连接测试失败',
+      });
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const handleFetchModels = async () => {
+    if (!config) return;
+    setLoadingModels(true);
+    setError(null);
+    try {
+      const result = await api.listLlmModels({
+        llmProvider: config.llmProvider,
+        openai: config.openai as Record<string, unknown>,
+      });
+      setModels(result.models);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '获取模型列表失败');
+    } finally {
+      setLoadingModels(false);
     }
   };
 
@@ -234,8 +282,7 @@ export default function SettingsPage() {
             <span className="text-xs text-[var(--color-text-secondary)]">
               Channel
             </span>
-            <input
-              type="text"
+            <select
               value={config?.browser?.channel ?? ''}
               onChange={e =>
                 setConfig(prev =>
@@ -250,9 +297,22 @@ export default function SettingsPage() {
                     : prev,
                 )
               }
-              placeholder="stable / chrome / firefox..."
               className="bg-[var(--color-bg-primary)] border border-[var(--color-border-default)] rounded-lg px-3 py-2 text-xs text-[var(--color-text-primary)]"
-            />
+            >
+              <option value="">默认（内置浏览器）</option>
+              <option value="stable">stable</option>
+              <option value="beta">beta</option>
+              <option value="dev">dev</option>
+              <option value="canary">canary</option>
+              <option value="chromium">chromium</option>
+              <option value="bidi-chromium">bidi-chromium</option>
+              <option value="bidi-chrome">bidi-chrome</option>
+              <option value="bidi-chrome-beta">bidi-chrome-beta</option>
+              <option value="bidi-chrome-dev">bidi-chrome-dev</option>
+              <option value="bidi-chrome-canary">bidi-chrome-canary</option>
+              <option value="firefox">firefox</option>
+              <option value="moz-firefox">moz-firefox</option>
+            </select>
           </label>
 
           <label className="flex flex-col gap-1.5">
@@ -404,7 +464,7 @@ export default function SettingsPage() {
               Provider
             </span>
             <select
-              value={config?.llmProvider ?? 'gemini'}
+              value={config?.llmProvider ?? 'openai'}
               onChange={e =>
                 setConfig(prev =>
                   prev
@@ -418,9 +478,7 @@ export default function SettingsPage() {
               }
               className="bg-[var(--color-bg-primary)] border border-[var(--color-border-default)] rounded-lg px-3 py-2 text-xs text-[var(--color-text-primary)]"
             >
-              <option value="gemini">Gemini</option>
               <option value="openai">OpenAI</option>
-              <option value="anthropic">Anthropic</option>
             </select>
           </label>
 
@@ -468,12 +526,25 @@ export default function SettingsPage() {
             />
           </label>
 
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs text-[var(--color-text-secondary)]">
-              OpenAI Model
-            </span>
-            <input
-              type="text"
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-[var(--color-text-secondary)]">
+                OpenAI Model
+              </span>
+              <button
+                type="button"
+                onClick={handleFetchModels}
+                disabled={loadingModels}
+                className="text-xs text-[var(--color-accent)] hover:opacity-80 disabled:opacity-50 flex items-center gap-1 transition-opacity"
+              >
+                <RefreshCw
+                  size={12}
+                  className={loadingModels ? 'animate-spin' : ''}
+                />
+                {loadingModels ? '获取中...' : '获取模型列表'}
+              </button>
+            </div>
+            <select
               value={config?.openai?.model ?? ''}
               onChange={e =>
                 setConfig(prev =>
@@ -485,54 +556,25 @@ export default function SettingsPage() {
                     : prev,
                 )
               }
-              placeholder="gpt-4o"
               className="bg-[var(--color-bg-primary)] border border-[var(--color-border-default)] rounded-lg px-3 py-2 text-xs text-[var(--color-text-primary)] font-mono"
-            />
-          </label>
-
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs text-[var(--color-text-secondary)]">
-              Anthropic API Key
-            </span>
-            <input
-              type="password"
-              value={config?.anthropic?.apiKey ?? ''}
-              onChange={e =>
-                setConfig(prev =>
-                  prev
-                    ? {
-                        ...prev,
-                        anthropic: {...prev.anthropic, apiKey: e.target.value},
-                      }
-                    : prev,
-                )
-              }
-              placeholder="留空则不修改"
-              className="bg-[var(--color-bg-primary)] border border-[var(--color-border-default)] rounded-lg px-3 py-2 text-xs text-[var(--color-text-primary)] font-mono"
-            />
-          </label>
-
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs text-[var(--color-text-secondary)]">
-              Gemini API Key
-            </span>
-            <input
-              type="password"
-              value={config?.gemini?.apiKey ?? ''}
-              onChange={e =>
-                setConfig(prev =>
-                  prev
-                    ? {
-                        ...prev,
-                        gemini: {...prev.gemini, apiKey: e.target.value},
-                      }
-                    : prev,
-                )
-              }
-              placeholder="留空则不修改"
-              className="bg-[var(--color-bg-primary)] border border-[var(--color-border-default)] rounded-lg px-3 py-2 text-xs text-[var(--color-text-primary)] font-mono"
-            />
-          </label>
+            >
+              <option value="">请选择模型</option>
+              {models.map(m => (
+                <option
+                  key={m.id}
+                  value={m.id}
+                >
+                  {m.id}
+                </option>
+              ))}
+              {config?.openai?.model &&
+                !models.some(m => m.id === config.openai!.model) && (
+                  <option value={config.openai.model}>
+                    {config.openai.model}
+                  </option>
+                )}
+            </select>
+          </div>
         </div>
 
         <button
@@ -543,6 +585,25 @@ export default function SettingsPage() {
           <Save size={12} />
           {saving === 'llm' ? '保存中...' : '保存 LLM 配置'}
         </button>
+        <button
+          onClick={handleTestLlm}
+          disabled={saving === 'test-llm'}
+          className="px-4 py-2 text-xs font-medium rounded-lg bg-[var(--color-accent)] text-[var(--color-bg-primary)] hover:opacity-90 active:scale-95 transition-all flex items-center gap-2 disabled:opacity-50"
+        >
+          <Activity size={12} />
+          {saving === 'test-llm' ? '测试中...' : '测试连接'}
+        </button>
+        {llmTest && (
+          <span
+            className={`text-xs ${
+              llmTest.ok
+                ? 'text-[var(--color-status-green)]'
+                : 'text-[var(--color-status-red)]'
+            }`}
+          >
+            {llmTest.message}
+          </span>
+        )}
       </div>
 
       {/* 数据库区块 */}

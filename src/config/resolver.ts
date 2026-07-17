@@ -251,26 +251,6 @@ export function configFromEnv(): GlobalConfig {
   if (openaiModel !== undefined) openai.model = openaiModel;
   if (Object.keys(openai).length > 0) result.openai = openai;
 
-  const gemini: NonNullable<GlobalConfig['gemini']> = {};
-  const geminiApiKey = getEnvValue('GEMINI_API_KEY');
-  const geminiCliPath = getEnvValue('GEMINI_CLI_PATH');
-  const geminiUseAPI = getEnvBoolean('GEMINI_USE_API');
-  const geminiModel = getEnvValue('GEMINI_MODEL');
-  if (geminiApiKey !== undefined) gemini.apiKey = geminiApiKey;
-  if (geminiCliPath !== undefined) gemini.cliPath = geminiCliPath;
-  if (geminiUseAPI !== undefined) gemini.useAPI = geminiUseAPI;
-  if (geminiModel !== undefined) gemini.model = geminiModel;
-  if (Object.keys(gemini).length > 0) result.gemini = gemini;
-
-  const anthropic: NonNullable<GlobalConfig['anthropic']> = {};
-  const anthropicApiKey = getEnvValue('ANTHROPIC_API_KEY');
-  const anthropicBaseURL = getEnvValue('ANTHROPIC_BASE_URL');
-  const anthropicModel = getEnvValue('ANTHROPIC_MODEL');
-  if (anthropicApiKey !== undefined) anthropic.apiKey = anthropicApiKey;
-  if (anthropicBaseURL !== undefined) anthropic.baseURL = anthropicBaseURL;
-  if (anthropicModel !== undefined) anthropic.model = anthropicModel;
-  if (Object.keys(anthropic).length > 0) result.anthropic = anthropic;
-
   const browser: NonNullable<GlobalConfig['browser']> = {};
   for (const [envKey, browserKey] of Object.entries(BROWSER_ENV_MAP)) {
     const value = process.env[envKey];

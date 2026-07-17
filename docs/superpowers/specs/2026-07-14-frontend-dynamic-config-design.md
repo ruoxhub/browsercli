@@ -56,13 +56,13 @@
 
 ## 3. 移除范围（config.json 文件链路）
 
-| 文件 | 改动 |
-|---|---|
-| `src/config/resolver.ts` | 删除 `loadUserConfig` / `loadProjectConfig` / `loadRootConfig` / `readConfigFile` / `writeConfigFile` / `loadFullConfig`；`resolveConfig()` 改为只合并 `configFromEnv()` + 传入的 CLI 覆盖值 |
-| `src/config/servicesConfig.ts` | `getBrowserManagerConfig()` 改为从 `RuntimeConfigStore.get().browser` 取值（不再调用 `loadFullConfig()`）；`getAIConfig()`/`createAIService()` 同样改为读 `RuntimeConfigStore` |
-| `src/config/constants.ts` | 删除 `USER_CONFIG_DIR_NAME` / `USER_CONFIG_FILENAME` / `PROJECT_CONFIG_FILENAME` / `ROOT_CONFIG_FILENAME`（`DEFAULT_GROUP`、`RUNTIME_DIR_NAME`、`DEFAULT_RPC_HOST` 保留，与本次改动无关） |
-| `src/services/DatabaseService.ts` | 不改动实现，仅改变调用时机（由自动连接改为面板触发，见 §5） |
-| `tests/unit/utils/config.test.ts` | 删除针对文件加载/合并优先级的用例，保留/新增针对 `RuntimeConfigStore` 与 env 播种的用例 |
+| 文件                              | 改动                                                                                                                                                                                         |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/config/resolver.ts`          | 删除 `loadUserConfig` / `loadProjectConfig` / `loadRootConfig` / `readConfigFile` / `writeConfigFile` / `loadFullConfig`；`resolveConfig()` 改为只合并 `configFromEnv()` + 传入的 CLI 覆盖值 |
+| `src/config/servicesConfig.ts`    | `getBrowserManagerConfig()` 改为从 `RuntimeConfigStore.get().browser` 取值（不再调用 `loadFullConfig()`）；`getAIConfig()`/`createAIService()` 同样改为读 `RuntimeConfigStore`               |
+| `src/config/constants.ts`         | 删除 `USER_CONFIG_DIR_NAME` / `USER_CONFIG_FILENAME` / `PROJECT_CONFIG_FILENAME` / `ROOT_CONFIG_FILENAME`（`DEFAULT_GROUP`、`RUNTIME_DIR_NAME`、`DEFAULT_RPC_HOST` 保留，与本次改动无关）    |
+| `src/services/DatabaseService.ts` | 不改动实现，仅改变调用时机（由自动连接改为面板触发，见 §5）                                                                                                                                  |
+| `tests/unit/utils/config.test.ts` | 删除针对文件加载/合并优先级的用例，保留/新增针对 `RuntimeConfigStore` 与 env 播种的用例                                                                                                      |
 
 `browsercli/src/commands/config.ts`（独立 CLI 包里管理 `workerUrl`/`apiToken` 的本地文件）不在本次范围内 —— 它管理的是 **CLI 连哪个 Worker**，与本设计要移除的 **Worker 自身业务配置** 是两个不同的文件，且用户未要求变更 CLI 包的行为。
 
@@ -148,15 +148,15 @@ export async function disconnectBrowser(): Promise<void> {
 
 挂载在现有 `ConsoleServer.setupRoutes()`，风格与 `routes/worker.ts` 一致（`Map<string, RouteHandler>` + `sendJson`/`sendError`）。
 
-| 方法 | 路径 | 请求体 | 响应 | 说明 |
-|---|---|---|---|---|
-| GET | `/api/config` | — | `{browser, llmProvider, openai, gemini, anthropic, databaseUrl, ...}`（敏感字段见下） | 返回当前 `RuntimeConfigStore` 快照 |
-| PUT | `/api/config/browser` | `Partial<BrowserConfig>` | 更新后的 browser 配置 | zod 校验失败返回 `400` |
-| PUT | `/api/config/llm` | `{llmProvider, openai?, gemini?, anthropic?}` | 更新后的 LLM 配置 | 同上 |
-| PUT | `/api/config/database` | `{databaseUrl}` | 更新后的值 | 仅更新配置，不自动连接 |
-| POST | `/api/browser/connect` | — | `{connected:true, mode}` | 调用 `connectBrowser()`；失败返回 `502` + 错误详情 |
-| POST | `/api/browser/disconnect` | — | `{connected:false}` | 调用 `disconnectBrowser()` |
-| POST | `/api/database/connect` | — | `{connected:true}` | 调用 `dbService.connect()+migrate()`；失败 `502` |
+| 方法 | 路径                      | 请求体                                        | 响应                                                                                  | 说明                                               |
+| ---- | ------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| GET  | `/api/config`             | —                                             | `{browser, llmProvider, openai, gemini, anthropic, databaseUrl, ...}`（敏感字段见下） | 返回当前 `RuntimeConfigStore` 快照                 |
+| PUT  | `/api/config/browser`     | `Partial<BrowserConfig>`                      | 更新后的 browser 配置                                                                 | zod 校验失败返回 `400`                             |
+| PUT  | `/api/config/llm`         | `{llmProvider, openai?, gemini?, anthropic?}` | 更新后的 LLM 配置                                                                     | 同上                                               |
+| PUT  | `/api/config/database`    | `{databaseUrl}`                               | 更新后的值                                                                            | 仅更新配置，不自动连接                             |
+| POST | `/api/browser/connect`    | —                                             | `{connected:true, mode}`                                                              | 调用 `connectBrowser()`；失败返回 `502` + 错误详情 |
+| POST | `/api/browser/disconnect` | —                                             | `{connected:false}`                                                                   | 调用 `disconnectBrowser()`                         |
+| POST | `/api/database/connect`   | —                                             | `{connected:true}`                                                                    | 调用 `dbService.connect()+migrate()`；失败 `502`   |
 
 - **敏感字段处理**：`GET /api/config` 返回 apiKey 类字段时做掩码（如 `sk-***last4`），避免明文回显已保存的 key；面板“未修改则不清空”——`PUT /api/config/llm` 若传入的 apiKey 是掩码占位符（前端不回填真实值）则保留原值不更新，只有传入非掩码新字符串才覆盖。这是本设计对“面板显示密钥”场景的既定约定，前端表单需配合处理（密钥输入框默认留空，仅填写即覆盖）。
 - 连接类操作（`connect`/`disconnect`）结果通过 `WsHub.broadcast('worker.status', ...)` 现有机制推送，前端无需额外轮询即可感知状态变化（复用 `buildFullStatus()` 逻辑扩展 `browser.connected`，已有字段）。
@@ -177,13 +177,13 @@ export async function disconnectBrowser(): Promise<void> {
 
 ## 8. 错误处理
 
-| 场景 | 处理 |
-|---|---|
-| `PUT /api/config/*` 字段校验失败（zod） | `400` + `{error:{code:'VALIDATION', message, details}}`（复用 `formatConfigValidationError`） |
-| `POST /api/browser/connect` 失败（浏览器启动/连接异常） | `502` + 错误信息；`RuntimeConfigStore` 中的配置不回滚（用户可修正后重试） |
-| `POST /api/database/connect` 失败 | `502` + 错误信息，`dbService` 保持未连接 |
-| 浏览器未连接时调用浏览器相关工具 | 返回 `BROWSER_NOT_CONNECTED` 业务错误（非 5xx），提示去面板连接 |
-| 数据库未连接时调用站点经验相关接口 | 维持现状抛错（`Database not connected`），面板层通过状态展示提前预警 |
+| 场景                                                    | 处理                                                                                          |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `PUT /api/config/*` 字段校验失败（zod）                 | `400` + `{error:{code:'VALIDATION', message, details}}`（复用 `formatConfigValidationError`） |
+| `POST /api/browser/connect` 失败（浏览器启动/连接异常） | `502` + 错误信息；`RuntimeConfigStore` 中的配置不回滚（用户可修正后重试）                     |
+| `POST /api/database/connect` 失败                       | `502` + 错误信息，`dbService` 保持未连接                                                      |
+| 浏览器未连接时调用浏览器相关工具                        | 返回 `BROWSER_NOT_CONNECTED` 业务错误（非 5xx），提示去面板连接                               |
+| 数据库未连接时调用站点经验相关接口                      | 维持现状抛错（`Database not connected`），面板层通过状态展示提前预警                          |
 
 ---
 

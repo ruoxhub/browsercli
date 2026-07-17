@@ -1,2 +1,6 @@
 # Prettier-only ignores.
 CHANGELOG.md
+
+# Example/case scripts (abstract, non-runnable docs with embedded
+# unescaped backticks) — already excluded from ESLint via globalIgnores.
+scripts/cases/**

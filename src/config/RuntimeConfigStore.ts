@@ -10,7 +10,7 @@
  * 启动时用 configFromEnv() + CLI 参数播种，不读任何 JSON 文件。
  * 面板通过 update() 修改配置，重启后回落到种子值。
  *
- * 深层字段（browser/openai/gemini/anthropic/toolResultRecording）在 update()
+ * 深层字段（browser/openai/toolResultRecording）在 update()
  * 时做浅合并，避免面板只改一个字段却清空其余字段。
  */
 
@@ -21,8 +21,6 @@ import {type GlobalConfig, validateGlobalConfig} from './schema.js';
 const DEEP_MERGE_KEYS = new Set([
   'browser',
   'openai',
-  'gemini',
-  'anthropic',
   'toolResultRecording',
 ]);
 

@@ -9,7 +9,7 @@
  * **Property 9: AI Provider Support**
  * **Validates: Requirements 4.1**
  *
- * Tests that all three supported providers (OpenAI, Anthropic, Gemini) can be
+ * Tests that the supported provider (OpenAI) can be
  * initialized and make chat requests successfully.
  */
 
@@ -24,14 +24,12 @@ import {
   type AIMessage,
   type AIResponse,
 } from '../../src/services/AIService.js';
-import {AnthropicProvider} from '../../src/services/AnthropicProvider.js';
-import {GeminiProvider} from '../../src/services/GeminiProvider.js';
 import {OpenAIProvider} from '../../src/services/OpenAIProvider.js';
 
 /**
  * Generator for AI provider types
  */
-const providerTypeArb = fc.constantFrom('openai', 'anthropic', 'gemini');
+const providerTypeArb = fc.constantFrom('openai');
 
 /**
  * Generator for valid API keys (mock format)
@@ -84,7 +82,7 @@ describe('Property-Based Tests: AI Service', () => {
       /**
        * **Validates: Requirements 4.1**
        *
-       * Property: For any provider type (OpenAI, Anthropic, Gemini),
+       * Property: For the supported provider type (OpenAI),
        * the AIService should successfully initialize with a mock provider.
        */
       fc.assert(
@@ -187,7 +185,7 @@ describe('Property-Based Tests: AI Service', () => {
        */
       await fc.assert(
         fc.asyncProperty(messagesArb, async messages => {
-          const providers = ['openai', 'anthropic', 'gemini'];
+          const providers = ['openai'];
           const responses: AIResponse[] = [];
 
           for (const providerType of providers) {
@@ -237,51 +235,6 @@ describe('Property-Based Tests: AI Service', () => {
           assert.ok(
             service,
             'AIService should initialize with OpenAI provider',
-          );
-          return true;
-        }),
-        {numRuns: 50},
-      );
-    });
-
-    it('should initialize real Anthropic provider with valid configuration', () => {
-      /**
-       * **Validates: Requirements 4.1, 4.3**
-       *
-       * Property: For any valid API key, Anthropic provider should initialize successfully.
-       */
-      fc.assert(
-        fc.property(apiKeyArb, apiKey => {
-          const provider = new AnthropicProvider({apiKey});
-          const service = new AIService(provider);
-
-          assert.ok(provider, 'Anthropic provider should initialize');
-          assert.ok(
-            service,
-            'AIService should initialize with Anthropic provider',
-          );
-          return true;
-        }),
-        {numRuns: 50},
-      );
-    });
-
-    it('should initialize real Gemini provider in CLI mode', () => {
-      /**
-       * **Validates: Requirements 4.1, 4.4, 4.5**
-       *
-       * Property: Gemini provider should initialize successfully in CLI mode
-       * without requiring an API key.
-       */
-      fc.assert(
-        fc.property(fc.constant(undefined), () => {
-          const provider = new GeminiProvider({useAPI: false});
-          const service = new AIService(provider);
-
-          assert.ok(provider, 'Gemini provider should initialize in CLI mode');
-          assert.ok(
-            service,
-            'AIService should initialize with Gemini provider',
           );
           return true;
         }),

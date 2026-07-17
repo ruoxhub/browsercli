@@ -22,7 +22,7 @@ export const diagnoseEnvironmentTool = defineTool({
       .array(zod.string())
       .optional()
       .describe(
-        'Optional list of check names to run. If omitted, all checks run. Valid names: node_version, build_output, ai_provider_selection, gemini_cli, artifacts_dir.',
+        'Optional list of check names to run. If omitted, all checks run. Valid names: node_version, build_output, ai_provider_selection, artifacts_dir.',
       ),
   },
   handler: async (request, response) => {
