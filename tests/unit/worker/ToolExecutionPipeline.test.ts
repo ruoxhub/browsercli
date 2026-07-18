@@ -214,7 +214,7 @@ describe('ToolExecutionPipeline', () => {
     const result = await pipeline.execute(meta(), {});
 
     assert.deepStrictEqual(result, {
-      offloaded: {text: 'large text'},
+      offloaded: {structuredContent: 'large text'},
     });
   });
 

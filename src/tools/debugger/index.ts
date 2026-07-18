@@ -5,6 +5,7 @@
  */
 
 import type {DebuggerManager} from '../../modules/debugger/DebuggerManager.js';
+import path from 'node:path';
 import {zod} from '../../third_party/index.js';
 import {safeStringify} from '../../utils/safeJson.js';
 import type {ToolContextProvider} from '../../worker/ToolContext.js';
@@ -628,8 +629,13 @@ export const listScripts = defineTool({
         );
       }
 
+      // 只保留 http(s) 协议的脚本（目标站点），排除 chrome-extension:// 等扩展脚本。
+      const filteredScripts = scripts.filter(
+        s => !!s.url && s.url.startsWith('http'),
+      );
+
       // 过滤掉没有 URL 的脚本（内联/eval 脚本），除非它们是唯一的
-      const scriptsWithUrls = scripts.filter(s => s.url);
+      const scriptsWithUrls = filteredScripts.filter(s => s.url);
       const displayScripts =
         scriptsWithUrls.length > 0 ? scriptsWithUrls : scripts;
 
@@ -672,23 +678,35 @@ export const listScripts = defineTool({
 export const getScriptSource = defineTool({
   name: 'get_script_source',
   description:
-    '根据脚本 ID 获取 JavaScript 脚本源码的本地缓存路径。触发 CDP 加载并写入临时文件，返回文件路径供后续直接读取。先使用 list_scripts 查找脚本 ID。',
+    '根据脚本 ID 获取 JavaScript 脚本源码的本地缓存路径。触发 CDP 加载并写入临时文件，返回文件路径供后续直接读取。先使用 list_scripts 查找脚本 ID。可选 filePath 参数可将源码写入自定义路径并返回该绝对路径。',
   annotations: {
     title: '获取脚本源码',
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: true,
   },
   schema: {
+    // 接受字符串或数字：纯远程 CLI（browsercli）会把纯数字 ID 自动推断为
+    // number，这里统一归一化为 string，避免 [VALIDATION] 校验失败。
     scriptId: zod
-      .string()
+      .union([zod.string(), zod.number()])
+      .transform(value => String(value))
       .describe('脚本 ID（来自 list_scripts）用于获取源码缓存路径。'),
+    filePath: zod
+      .string()
+      .optional()
+      .describe(
+        '可选的自定义保存路径。提供时将源码写入该文件并返回其绝对路径；不传则使用内置临时缓存路径。',
+      ),
   },
   handler: async (request, response, context) => {
-    const {scriptId} = request.params;
+    const {scriptId, filePath} = request.params;
 
     try {
       const debuggerContext = await getDebuggerFromContext(context);
-      const sourcePath = await debuggerContext.getScriptSourcePath(scriptId);
+      const sourcePath = await debuggerContext.getScriptSourcePath(
+        scriptId,
+        filePath,
+      );
 
       if (!sourcePath) {
         response.setStructuredContent({
@@ -725,23 +743,13 @@ export const getScriptSource = defineTool({
  * 中间截断 URL：保留头部（origin + 路径起点）与尾部（末段路径/查询），
  * 比单纯末尾截断更利于识别 combo/合并服务脚本的来源。
  */
-function truncateUrlMiddle(url: string, max: number): string {
-  if (max <= 0 || url.length <= max) return url;
-  const headLen = Math.ceil(max * 0.6);
-  const tailLen = max - headLen - 3; // 留 3 字符给 '...'
-  if (tailLen < 0) return url.substring(0, max) + '...';
-  return (
-    url.substring(0, headLen) + '...' + url.substring(url.length - tailLen)
-  );
-}
-
 /**
  * 在源码中搜索。
  */
 export const searchInSources = defineTool({
   name: 'search_in_sources',
   description:
-    '在所有已加载的 JavaScript 源码中搜索字符串或正则表达式。返回脚本 ID、URL、行号与源码缓存路径（sourcePath）。不返回源码片段，避免上下文臃肿；需要查看代码内容时直接读取 sourcePath 或调用 get_script_source(scriptId, startLine, endLine)。',
+    '在所有已加载的 JavaScript 源码中搜索字符串或正则表达式。每条匹配仅返回脚本 ID、行号与源码缓存路径（sourcePath），避免上下文臃肿；需要查看代码内容时直接读取 sourcePath 或调用 get_script_source(scriptId, startLine, endLine)。可选 filePath 参数（目录）可将每个匹配脚本的源码写入该目录（<filePath>/<scriptId>.js）并返回绝对路径。',
   annotations: {
     title: '在源码中搜索',
     category: ToolCategory.REVERSE_ENGINEERING,
@@ -774,20 +782,18 @@ export const searchInSources = defineTool({
       .string()
       .optional()
       .describe('只搜索 URL 包含此字符串的脚本（不区分大小写）。'),
-    maxUrlLength: zod
-      .number()
-      .int()
-      .optional()
-      .default(200)
-      .describe(
-        '每条匹配 URL 的最大字符数（默认: 200）。combo/合并服务的 URL 可能极长，截断以避免响应过大。设为 0 表示不截断。',
-      ),
     source: zod
       .enum(['live', 'cache', 'auto'])
       .optional()
       .default('auto')
       .describe(
         "搜索来源：'live' 只走 CDP，'cache' 只走本地缓存，'auto' 先尝试 CDP 失败时 fallback 到缓存",
+      ),
+    filePath: zod
+      .string()
+      .optional()
+      .describe(
+        '可选的目录路径。提供时把每个匹配脚本的源码写入该目录下以脚本 ID 命名的文件（<filePath>/<scriptId>.js）并返回其绝对路径；不传则使用内置临时缓存路径。',
       ),
   },
   handler: async (request, response, context) => {
@@ -796,10 +802,10 @@ export const searchInSources = defineTool({
       caseSensitive,
       isRegex,
       maxResults,
-      maxUrlLength,
       excludeMinified,
       urlFilter,
       source,
+      filePath,
     } = request.params;
 
     const searchWithCdp = async () => {
@@ -842,6 +848,25 @@ export const searchInSources = defineTool({
           searchSource = 'cache (fallback)';
         }
       }
+
+      if (matches.length === 0) {
+        response.setStructuredContent({
+          success: true,
+          message: `未找到匹配 "${query}"。`,
+          tooltype: 'search_in_sources',
+          data: {
+            query,
+            matches: [],
+            totalMatches: 0,
+            filtered: false,
+            searchSource,
+          },
+        });
+        return;
+      }
+
+      // 只保留 http(s) 协议的脚本（目标站点），排除 chrome-extension:// 等扩展脚本。
+      matches = matches.filter(m => !!m.url && m.url.startsWith('http'));
 
       if (matches.length === 0) {
         response.setStructuredContent({
@@ -928,12 +953,18 @@ export const searchInSources = defineTool({
       const uniqueScriptIds = [...new Set(displayMatches.map(m => m.scriptId))];
       const sourcePathMap = new Map<string, string | null>();
       if (debuggerContextForPaths) {
+        // filePath 作为目录：把每个脚本源码写入 <filePath>/<scriptId>.js。
+        const savePathFor = (id: string) =>
+          filePath ? path.join(path.resolve(filePath), `${id}.js`) : undefined;
         await Promise.all(
           uniqueScriptIds.map(async id => {
             try {
               sourcePathMap.set(
                 id,
-                await debuggerContextForPaths!.getScriptSourcePath(id),
+                await debuggerContextForPaths!.getScriptSourcePath(
+                  id,
+                  savePathFor(id),
+                ),
               );
             } catch {
               sourcePathMap.set(id, null);
@@ -944,15 +975,9 @@ export const searchInSources = defineTool({
 
       const matchData = displayMatches.map(match => {
         const scriptId = match.scriptId;
-        const rawUrl = match.url || '(内联)';
-        const urlLength = rawUrl.length;
-        const truncatedUrl = truncateUrlMiddle(rawUrl, maxUrlLength);
 
         return {
           scriptId,
-          url: truncatedUrl,
-          urlLength,
-          urlTruncated: truncatedUrl !== rawUrl,
           lineNumber: match.lineNumber + 1,
           sourcePath: sourcePathMap.get(scriptId) ?? null,
         };
@@ -1316,7 +1341,11 @@ export const findInScript = defineTool({
     readOnlyHint: true,
   },
   schema: {
-    scriptId: zod.string().describe('要搜索的脚本 ID（来自 list_scripts）。'),
+    // 与 get_script_source 一致：CLI 可能传入数字 ID，统一归一化为 string。
+    scriptId: zod
+      .union([zod.string(), zod.number()])
+      .transform(value => String(value))
+      .describe('要搜索的脚本 ID（来自 list_scripts）。'),
     query: zod.string().describe('要在脚本中查找的字符串。'),
     contextChars: zod
       .number()

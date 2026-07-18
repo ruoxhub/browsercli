@@ -12,7 +12,6 @@ import {
   type ResolvedToolResultRecordingConfig,
 } from '../config.js';
 import type {ImageContentData, Response} from '../tools/ToolDefinition.js';
-import {DetailedDataManager} from '../utils/detailedDataManager.js';
 import type {ToolError} from '../utils/errors.js';
 import {logger} from '../utils/logger.js';
 import {safeStringify} from '../utils/safeJson.js';
@@ -129,11 +128,6 @@ export const _legacyParseFencedJson = parseFencedJson;
  * ToolResponseProcessor — 统一的响应处理器，融合了规范化与大响应 Offload 逻辑
  */
 export class ToolResponseProcessor {
-  constructor(
-    private readonly manager = DetailedDataManager.getInstance(),
-    private readonly thresholdBytes = 512 * 1024,
-  ) {}
-
   /**
    * 将 handler 原始返回值规范化为标准 MCP Tool 响应结构
    */
@@ -148,10 +142,16 @@ export class ToolResponseProcessor {
   }
 
   /**
-   * 统一处理响应，对超大字段进行 Offload 暂存
+   * 统一处理响应，原样返回。
+   *
+   * 历史上此处会对超过阈值的大响应做 Offload（替换为摘要 + detailId），
+   * 但那会破坏 MCP 工具响应的 `structuredContent` 契约，导致大模型拿不到
+   * 真实数据；且本仓库并未注册 `get_detailed_data` 取数工具，offload 出的
+   * detailId 永远无法被取回。现已取消该大小限制：响应原样返回，由调用方
+   * 自行决定是否需要分页 / 截断。
    */
   process(response: unknown): unknown {
-    return this.manager.smartHandle(response, this.thresholdBytes);
+    return response;
   }
 
   private isToolDefinitionResponse(result: unknown): boolean {

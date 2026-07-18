@@ -6,6 +6,7 @@
 
 import type {AxiCliCommand} from 'axi-sdk-js';
 import {AxiError} from 'axi-sdk-js';
+import path from 'node:path';
 
 import {getBoolFlag, getFlag, parseArgs} from '../args-parser.js';
 import {successOutput} from '../output.js';
@@ -54,6 +55,19 @@ export const toolDispatcherCommand: AxiCliCommand<WorkerContext> = async (
   }
 
   const toolArgs = buildToolArgs(parsed);
+
+  // get_script_source / search_in_sources 默认把源码保存到当前工作目录（pwd）。
+  // - get_script_source：filePath 为文件，文件名取脚本 ID（<pwd>/<scriptId>.js）。
+  // - search_in_sources：filePath 为目录，每个匹配脚本写入 <pwd>/<scriptId>.js。
+  // 调用方仍可用 --file-path 显式覆盖保存位置。
+  if (toolArgs.filePath === undefined) {
+    if (candidate.name === 'get_script_source') {
+      const scriptId = String(toolArgs.scriptId ?? 'script');
+      toolArgs.filePath = path.join(process.cwd(), `${scriptId}.js`);
+    } else if (candidate.name === 'search_in_sources') {
+      toolArgs.filePath = process.cwd();
+    }
+  }
 
   try {
     const sessionId = getFlag(parsed, 'session'); // string | undefined

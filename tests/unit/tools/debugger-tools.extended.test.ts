@@ -994,7 +994,7 @@ describe('debugger tools extended', () => {
     assert.ok(response.lines.some(x => x.includes('顶层用户代码位置')));
   });
 
-  it('search_in_sources 截断超长 URL 并保留诊断字段', async () => {
+  it('search_in_sources 超长 URL 仅返回 scriptId/lineNumber/sourcePath', async () => {
     const response = makeResponse();
     const context = makeContext();
     const longUrl = `https://combo.example.com/c?files=${'x'.repeat(300_000)}`;
@@ -1010,7 +1010,7 @@ describe('debugger tools extended', () => {
     });
 
     await searchInSources.handler(
-      {params: {query: 'RsaPubAes', maxUrlLength: 200}},
+      {params: {query: 'RsaPubAes'}},
       response as unknown as Parameters<typeof searchInSources.handler>[1],
       context as unknown as Parameters<typeof searchInSources.handler>[2],
     );
@@ -1019,37 +1019,27 @@ describe('debugger tools extended', () => {
       success: boolean;
       data: {
         matches: Array<{
-          url: string;
-          urlLength: number;
-          urlTruncated: boolean;
+          scriptId: string;
+          lineNumber: number;
           sourcePath: string | null;
-          preview?: unknown;
-          lineContentLength?: unknown;
         }>;
       };
     };
     assert.ok(last.success, 'search 应成功');
     const match = last.data.matches[0];
     assert.ok(match, '应至少有一条匹配');
-    assert.strictEqual(match.urlLength, longUrl.length);
-    assert.strictEqual(match.urlTruncated, true);
-    // maxUrlLength=200，中间截断后含 '...' 总长应 ≤ 200
-    assert.ok(
-      match.url.length <= 200,
-      `截断后 URL 长度 ${match.url.length} 应 ≤ 200`,
-    );
-    assert.ok(match.url.includes('...'), '截断 URL 应包含省略号');
-    // 头部应保留 origin
-    assert.ok(
-      match.url.startsWith('https://combo.example.com'),
-      '截断 URL 头部应保留 origin',
-    );
-    // 改进：返回 sourcePath 而非源码片段，避免上下文臃肿
+    assert.strictEqual(match.scriptId, '97');
+    assert.strictEqual(match.lineNumber, 43); // lineNumber + 1
+    // 新契约：返回 sourcePath 而非源码片段/URL，避免上下文臃肿
     assert.strictEqual(
       match.sourcePath,
       '/tmp/browsercli-scripts/test.js',
       '应返回 sourcePath',
     );
+    // URL 相关字段已移除，不再出现在响应中
+    assert.ok(!('url' in match), '不应再返回 url 字段');
+    assert.ok(!('urlLength' in match), '不应再返回 urlLength 字段');
+    assert.ok(!('urlTruncated' in match), '不应再返回 urlTruncated 字段');
     assert.ok(!('preview' in match), '不应再返回 preview 字段');
     assert.ok(
       !('lineContentLength' in match),
@@ -1057,43 +1047,16 @@ describe('debugger tools extended', () => {
     );
   });
 
-  it('search_in_sources maxUrlLength=0 关闭截断', async () => {
-    const response = makeResponse();
-    const context = makeContext();
-    const longUrl = `https://combo.example.com/c?files=${'y'.repeat(5000)}`;
-    context.debuggerContext.searchInScripts = async () => ({
-      matches: [
-        {
-          scriptId: '1',
-          url: longUrl,
-          lineNumber: 1,
-          lineContent: 'RsaPubAes()',
-        },
-      ],
-    });
-
-    await searchInSources.handler(
-      {params: {query: 'RsaPubAes', maxUrlLength: 0}},
-      response as unknown as Parameters<typeof searchInSources.handler>[1],
-      context as unknown as Parameters<typeof searchInSources.handler>[2],
-    );
-
-    const last = response.structuredContents.at(-1) as {
-      data: {matches: Array<{url: string; urlTruncated: boolean}>};
-    };
-    const match = last.data.matches[0];
-    assert.strictEqual(match.url, longUrl);
-    assert.strictEqual(match.urlTruncated, false);
-  });
-
   it('search_in_sources 体积超阈值时自动收窄 displayMatches', async () => {
     const response = makeResponse();
     const context = makeContext();
-    // 60 条匹配，每条 URL 10KB（总约 600KB，超过 200KB 安全阈值）
-    const bigUrl = `https://combo.example.com/c?files=${'z'.repeat(10_000)}`;
+    // URL 已不在输出中，体积主要来自 sourcePath。让每条 sourcePath 约 10KB，
+    // 60 条总计远超 200KB 安全阈值，触发按体积收窄。
+    const bigPath = 'x'.repeat(10_000);
+    context.debuggerContext.getScriptSourcePath = async () => bigPath;
     const matches = Array.from({length: 60}, (_, i) => ({
       scriptId: String(i),
-      url: bigUrl,
+      url: `https://combo.example.com/c?files=${'z'.repeat(10_000)}`,
       lineNumber: i + 1,
       lineContent: `RsaPubAes_${i}()`,
     }));
@@ -1101,7 +1064,7 @@ describe('debugger tools extended', () => {
 
     await searchInSources.handler(
       // maxResults 设大以保证不被 maxResults 截断，只被体积收窄
-      {params: {query: 'RsaPubAes', maxResults: 60, maxUrlLength: 0}},
+      {params: {query: 'RsaPubAes', maxResults: 60}},
       response as unknown as Parameters<typeof searchInSources.handler>[1],
       context as unknown as Parameters<typeof searchInSources.handler>[2],
     );

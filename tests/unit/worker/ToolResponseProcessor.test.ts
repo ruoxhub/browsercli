@@ -76,30 +76,24 @@ describe('ToolResponseProcessor', () => {
     });
   });
 
-  describe('Processor offload processing', () => {
+  describe('Processor response pass-through', () => {
     it('returns small response unchanged', () => {
       const response = {ok: true};
-      const processor = new ToolResponseProcessor(
-        DetailedDataManager.getInstance(),
-        1024,
-      );
+      const processor = new ToolResponseProcessor();
 
       assert.strictEqual(processor.process(response), response);
     });
 
-    it('returns detailed-data summary for large response', () => {
-      const response = {payload: 'x'.repeat(128)};
-      const processor = new ToolResponseProcessor(
-        DetailedDataManager.getInstance(),
-        16,
-      );
+    it('returns large response unchanged without offloading', () => {
+      const response = {structuredContent: {payload: 'x'.repeat(128)}};
+      const processor = new ToolResponseProcessor();
 
       const result = processor.process(response) as Record<string, unknown>;
 
-      assert.ok(result && typeof result === 'object');
-      assert.ok('detailId' in result);
-      assert.ok('summary' in result);
-      assert.ok('hint' in result);
+      assert.strictEqual(result, response);
+      assert.ok('structuredContent' in result);
+      assert.ok(!('detailId' in result));
+      assert.ok(!('summary' in result));
     });
   });
 });

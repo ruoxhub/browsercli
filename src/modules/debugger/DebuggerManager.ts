@@ -757,10 +757,11 @@ export class DebuggerManager {
     return content;
   }
 
-  async getScriptSourcePath(scriptId: string): Promise<string | null> {
-    const script = await this.scriptManager.getScriptSource(scriptId);
-    if (!script?.sourcePath) return null;
-    return script.sourcePath;
+  async getScriptSourcePath(
+    scriptId: string,
+    filePath?: string,
+  ): Promise<string | null> {
+    return this.scriptManager.getScriptSourcePath(scriptId, filePath);
   }
 
   async getBeautifiedScriptSource(

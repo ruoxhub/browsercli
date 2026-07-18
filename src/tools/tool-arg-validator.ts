@@ -90,6 +90,18 @@ function coerceNumber(value: unknown): unknown {
   return value;
 }
 
+/**
+ * 与 coerceNumber 对称：当 string 类型参数收到一个数字（纯远程 CLI 会把
+ * 纯数字 ID 自动推断为 number），归一化为字符串，避免误报类型错误。
+ */
+function coerceString(value: unknown): unknown {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value);
+  }
+
+  return value;
+}
+
 function coerceBoolean(value: unknown): unknown {
   if (typeof value !== 'string') return value;
 
@@ -111,10 +123,12 @@ function validateType(
   value: unknown,
 ): TypeValidationResult {
   switch (spec.type) {
-    case 'string':
-      return typeof value === 'string'
-        ? {ok: true, value}
+    case 'string': {
+      const strValue = coerceString(value);
+      return typeof strValue === 'string'
+        ? {ok: true, value: strValue}
         : {ok: false, error: typeError(toolName, key, '字符串')};
+    }
     case 'number': {
       const numValue = coerceNumber(value);
       return typeof numValue === 'number' && Number.isFinite(numValue)

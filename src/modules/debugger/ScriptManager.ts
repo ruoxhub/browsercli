@@ -474,6 +474,43 @@ export class ScriptManager {
     return results;
   }
 
+  /**
+   * 返回脚本源码的本地文件路径。
+   *
+   * - 未传 filePath 时返回内置临时缓存路径（os.tmpdir()/browsercli-scripts）。
+   * - 传 filePath 时，将已加载的源码内容写入该自定义路径（自动创建父目录、
+   *   解析为绝对路径）并返回之，便于调用方在固定位置持久化脚本。
+   *
+   * 返回 null 表示脚本未找到或源码加载/写入失败。
+   */
+  async getScriptSourcePath(
+    scriptId: string,
+    filePath?: string,
+  ): Promise<string | null> {
+    const script = await this.getScriptSource(scriptId);
+    if (!script?.sourcePath) return null;
+
+    if (!filePath) {
+      return script.sourcePath;
+    }
+
+    const content = this.readSource(scriptId);
+    if (content === null) return null;
+
+    const resolved = path.resolve(filePath);
+    try {
+      fs.mkdirSync(path.dirname(resolved), {recursive: true});
+      fs.writeFileSync(resolved, content, 'utf-8');
+      return resolved;
+    } catch (error) {
+      logger.warn(
+        `Failed to write script ${scriptId} to ${resolved}:`,
+        error,
+      );
+      return null;
+    }
+  }
+
   /** 已废弃,使用 clear() 代替 */
   clearCache(): void {
     this.clear();

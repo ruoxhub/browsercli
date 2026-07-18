@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-核心源码位于 `src/`。其中 `src/tools/` 提供 MCP 工具实现，`src/modules/` 放逆向分析、Hook、调试、去混淆等核心模块，`src/services/` 负责外部 AI 与服务集成；`src/worker/` 是后台 worker 运行时（`src/index.ts` 为进程入口）。命令行客户端已抽离为独立、零耦合的 `js-reverser-cli/` 包，仅通过 worker 的 `/api/v1` HTTP 契约通信，不再内置本地 worker 进程管理（start/stop/status/repl 等命令已删除）。构建产物输出到 `build/`，不要手改。文档集中在 `docs/`，公开案例与脚本入口在 `scripts/cases/`。真实任务证据默认保留在 `artifacts/tasks/<task-id>/`，仓库只跟踪模板目录。
+核心源码位于 `src/`。其中 `src/tools/` 提供 MCP 工具实现，`src/modules/` 放逆向分析、Hook、调试、去混淆等核心模块，`src/services/` 负责外部 AI 与服务集成；`src/worker/` 是后台 worker 运行时（`src/index.ts` 为进程入口）。命令行客户端已抽离为独立、零耦合的 `browsercli/` 包，仅通过 worker 的 `/api/v1` HTTP 契约通信，不再内置本地 worker 进程管理（start/stop/status/repl 等命令已删除）。构建产物输出到 `build/`，不要手改。文档集中在 `docs/`，公开案例与脚本入口在 `scripts/cases/`。真实任务证据默认保留在 `artifacts/tasks/<task-id>/`，仓库只跟踪模板目录。
 
 ## Build, Test, and Development Commands
 

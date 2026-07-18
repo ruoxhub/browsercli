@@ -17,6 +17,11 @@ function inferArgValue(value: string | boolean): unknown {
   return value;
 }
 
+/** 将 kebab-case 的 CLI flag 名转为 camelCase，对齐工具的 camelCase 参数名。 */
+function toCamelCase(flag: string): string {
+  return flag.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+}
+
 /**
  * 尝试把字符串解析为 JSON 对象；失败则返回 undefined。
  * 只接受 { 开头的内容，数组/原始值交由其它路径处理。
@@ -127,12 +132,14 @@ export function buildToolArgs(parsed: ParsedArgs): Record<string, unknown> {
   for (const [key, value] of Object.entries(parsed.flags)) {
     if (key === 'file' || key === 'data' || key === 'stdin') continue;
 
+    const argKey = toCamelCase(key);
+
     if (typeof value === 'boolean') {
-      toolArgs[key] = value;
+      toolArgs[argKey] = value;
       continue;
     }
 
-    toolArgs[key] = coerceFlagValue(value);
+    toolArgs[argKey] = coerceFlagValue(value);
   }
 
   return toolArgs;
