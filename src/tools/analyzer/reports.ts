@@ -169,8 +169,7 @@ function hasMeaningfulTargetContext(
  */
 export const record_reverse_evidence = defineTool({
   name: 'record_reverse_evidence',
-  description:
-    'Append structured reverse-engineering evidence to a task artifact log.',
+  description: '将结构化的逆向工程证据追加到任务产物日志中。',
   annotations: {
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: false,
@@ -274,8 +273,7 @@ export const record_reverse_evidence = defineTool({
  */
 export const export_session_report = defineTool({
   name: 'export_session_report',
-  description:
-    'Export current reverse-engineering session as JSON or Markdown.',
+  description: '将当前逆向工程会话导出为 JSON 或 Markdown。',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
   schema: {
     format: zod.enum(['json', 'markdown']).default('json'),

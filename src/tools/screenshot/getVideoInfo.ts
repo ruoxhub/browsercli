@@ -16,14 +16,14 @@ import {defineTool} from '../ToolDefinition.js';
  */
 export const getVideoInfo = defineTool({
   name: 'get_video_info',
-  description: `Get video element information by CSS selector. Returns duration, currentTime, paused state, and src.`,
+  description: `按 CSS 选择器获取视频元素信息。返回 duration、currentTime、暂停状态和 src。`,
   annotations: {
     title: '获取视频信息',
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
   },
   schema: {
-    selector: zod.string().describe('CSS selector for the video element.'),
+    selector: zod.string().describe('视频元素的 CSS 选择器。'),
   },
   handler: async (request, response, context) => {
     const runtime = context as unknown as ToolContextProvider;

@@ -14,11 +14,11 @@ import {defineTool} from '../ToolDefinition.js';
  */
 export const searchSiteExperience = defineTool({
   name: 'search_site_experience',
-  description: 'Search site experience by URL or name',
+  description: '按 URL 或名称搜索站点经验',
   annotations: {category: ToolCategory.DATA, readOnlyHint: true},
   schema: {
-    url: zod.string().optional().describe('Site URL to search'),
-    name: zod.string().optional().describe('Site name to search'),
+    url: zod.string().optional().describe('要搜索的站点 URL'),
+    name: zod.string().optional().describe('要搜索的站点名称'),
   },
   handler: async (request, response) => {
     const {url, name} = request.params;
@@ -60,24 +60,24 @@ export const searchSiteExperience = defineTool({
  */
 export const createSiteExperience = defineTool({
   name: 'create_site_experience',
-  description: 'Create a new site experience entry',
+  description: '创建新的站点经验条目',
   annotations: {category: ToolCategory.DATA, readOnlyHint: false},
   schema: {
-    domain: zod.string().describe('Site domain (required)'),
-    name: zod.string().describe('Site name (required)'),
-    aliases: zod.array(zod.string()).optional().describe('Domain aliases'),
+    domain: zod.string().describe('站点域名（必填）'),
+    name: zod.string().describe('站点名称（必填）'),
+    aliases: zod.array(zod.string()).optional().describe('域名别名'),
     platformFeatures: zod
       .string()
       .optional()
-      .describe('Platform features description'),
+      .describe('平台特性描述'),
     validPatterns: zod
       .string()
       .optional()
-      .describe('Valid patterns description'),
+      .describe('有效模式描述'),
     knownPitfalls: zod
       .string()
       .optional()
-      .describe('Known pitfalls description'),
+      .describe('已知坑点描述'),
   },
   handler: async (request, response) => {
     const params = request.params;
@@ -153,21 +153,21 @@ export const createSiteExperience = defineTool({
  */
 export const updateSiteExperience = defineTool({
   name: 'update_site_experience',
-  description: 'Update an existing site experience entry',
+  description: '更新已有的站点经验条目',
   annotations: {category: ToolCategory.DATA, readOnlyHint: false},
   schema: {
-    id: zod.number().describe('Site experience ID to update'),
-    name: zod.string().optional().describe('Updated site name'),
+    id: zod.number().describe('要更新的站点经验 ID'),
+    name: zod.string().optional().describe('更新后的站点名称'),
     aliases: zod
       .array(zod.string())
       .optional()
-      .describe('Updated domain aliases'),
+      .describe('更新后的域名别名'),
     platformFeatures: zod
       .string()
       .optional()
-      .describe('Updated platform features'),
-    validPatterns: zod.string().optional().describe('Updated valid patterns'),
-    knownPitfalls: zod.string().optional().describe('Updated known pitfalls'),
+      .describe('更新后的平台特性'),
+    validPatterns: zod.string().optional().describe('更新后的有效模式'),
+    knownPitfalls: zod.string().optional().describe('更新后的已知坑点'),
   },
   handler: async (request, response) => {
     const params = request.params;
@@ -219,10 +219,10 @@ export const updateSiteExperience = defineTool({
  */
 export const deleteSiteExperience = defineTool({
   name: 'delete_site_experience',
-  description: 'Delete a site experience entry by ID',
+  description: '按 ID 删除站点经验条目',
   annotations: {category: ToolCategory.DATA, readOnlyHint: false},
   schema: {
-    id: zod.number().describe('Site experience ID to delete'),
+    id: zod.number().describe('要删除的站点经验 ID'),
   },
   handler: async (request, response) => {
     const {id} = request.params;
@@ -259,7 +259,7 @@ export const deleteSiteExperience = defineTool({
  */
 export const listSiteExperiences = defineTool({
   name: 'list_site_experiences',
-  description: 'List all site experience entries',
+  description: '列出所有站点经验条目',
   annotations: {category: ToolCategory.DATA, readOnlyHint: true},
   schema: {},
   handler: async (_request, response) => {

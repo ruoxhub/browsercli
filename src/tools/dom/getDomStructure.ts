@@ -18,7 +18,7 @@ import {defineTool, type Context} from '../ToolDefinition.js';
 export const getDomStructure = defineTool({
   name: 'get_dom_structure',
   description:
-    'Get DOM tree structure for the current page. Returns a hierarchical tree with tag names, IDs, classes, and optional text content.',
+    '获取当前页面的 DOM 树结构，返回包含标签名、ID、类名及可选文本内容的层级树。',
   annotations: {
     title: '获取DOM结构',
     category: ToolCategory.NAVIGATION,

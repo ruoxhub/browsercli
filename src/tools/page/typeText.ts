@@ -14,12 +14,12 @@ import {defineTool} from '../ToolDefinition.js';
  */
 export const typeText = defineTool({
   name: 'type_text',
-  description: 'Type text into an input element by CSS selector',
+  description: '通过 CSS 选择器向输入框键入文本。',
   annotations: {category: ToolCategory.INPUT, readOnlyHint: false},
   schema: {
-    selector: zod.string().describe('CSS selector of the input element'),
-    text: zod.string().describe('Text to type'),
-    delay: zod.number().optional().describe('Delay between keystrokes in ms'),
+    selector: zod.string().describe('输入元素的 CSS 选择器。'),
+    text: zod.string().describe('要输入的文本。'),
+    delay: zod.number().optional().describe('每次按键之间的延迟（毫秒）。'),
   },
   handler: async (request, response, context) => {
     const {selector, text, delay} = request.params;

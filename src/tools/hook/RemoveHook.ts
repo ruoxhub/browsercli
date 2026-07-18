@@ -20,18 +20,18 @@ import {HOOK_STORE_KEY} from './store-utils.js';
 export const removeHook = defineTool({
   name: 'remove_hook',
   description:
-    'Remove a hook by id. Removes from in-process HookManager and optionally cleans browser-side data.',
+    '按 ID 移除 hook。会从进程内 HookManager 删除，并可选地清理浏览器端数据。',
   annotations: {
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: false,
   },
   schema: {
-    hookId: zod.string().describe('Hook ID to remove'),
+    hookId: zod.string().describe('要移除的 Hook ID'),
     cleanBrowser: zod
       .boolean()
       .optional()
       .default(true)
-      .describe('Also clean browser-side hook data (default: true)'),
+      .describe('同时清理浏览器端 hook 数据（默认：true）'),
   },
   handler: async (request, response, context) => {
     const {hookId, cleanBrowser = true} = request.params;

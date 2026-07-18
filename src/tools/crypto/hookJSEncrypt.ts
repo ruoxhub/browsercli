@@ -14,7 +14,7 @@ import {defineTool} from '../ToolDefinition.js';
 export const hookJSEncrypt = defineTool({
   name: 'hook_jsencrypt',
   description:
-    'Hook JSEncrypt RSA library: intercept public/private key, plaintext, ciphertext',
+    'Hook JSEncrypt RSA 加密库：拦截公钥/私钥、明文、密文。',
   annotations: {
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: false,
@@ -23,7 +23,7 @@ export const hookJSEncrypt = defineTool({
     logFormat: zod
       .enum(['compact', 'json'])
       .optional()
-      .describe('Log output format (default: "compact")'),
+      .describe('日志输出格式（默认 "compact"）。'),
   },
   handler: async (request, response, context) => {
     const format = request.params.logFormat || 'compact';

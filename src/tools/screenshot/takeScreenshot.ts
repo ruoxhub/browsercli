@@ -28,7 +28,7 @@ import {defineTool} from '../ToolDefinition.js';
  */
 export const takeScreenshot = defineTool({
   name: 'take_screenshot',
-  description: `Take a screenshot of the page or element.`,
+  description: `对页面或元素进行截图。`,
   annotations: {
     title: '截图',
     category: ToolCategory.DEBUGGING,
@@ -39,26 +39,26 @@ export const takeScreenshot = defineTool({
     format: zod
       .enum(['png', 'jpeg', 'webp'])
       .default('png')
-      .describe('Type of format to save the screenshot as. Default is "png"'),
+      .describe('截图保存的格式类型。默认 "png"'),
     quality: zod
       .number()
       .min(0)
       .max(100)
       .optional()
       .describe(
-        'Compression quality for JPEG and WebP formats (0-100). Higher values mean better quality but larger file sizes. Ignored for PNG format.',
+        'JPEG 与 WebP 格式的压缩质量（0-100）。值越大质量越好但文件越大。PNG 格式忽略此参数。',
       ),
     fullPage: zod
       .boolean()
       .optional()
       .describe(
-        'If set to true takes a screenshot of the full page instead of the currently visible viewport.',
+        '若为 true，截取整个页面而非当前可见视口。',
       ),
     filePath: zod
       .string()
       .optional()
       .describe(
-        'The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.',
+        '截图保存的绝对路径，或相对于当前工作目录的路径；指定后截图将保存到该路径而非附加到响应。',
       ),
   },
   handler: async (request, response, context) => {

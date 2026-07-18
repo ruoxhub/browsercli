@@ -13,8 +13,7 @@ import type {DetectCryptoFnResult} from './types.js';
 
 export const detectCrypto = defineTool({
   name: 'detect_crypto',
-  description:
-    'Detect cryptographic algorithms/libraries from JavaScript source.',
+  description: '从 JavaScript 源码中检测加密算法/库。',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
   schema: {
     code: zod.string(),

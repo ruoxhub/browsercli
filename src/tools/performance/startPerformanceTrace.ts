@@ -97,7 +97,7 @@ async function stopTracingAndAppendOutput(
 export const startPerformanceTrace = defineTool({
   name: 'start_performance_trace',
   description:
-    'Starts a performance trace recording on the selected page. This can be used to look for performance problems and insights to improve the performance of the page. It will also report Core Web Vital (CWV) scores for the page.',
+    '在当前选中页面上启动性能追踪录制，用于发现性能问题与可优化点，并报告页面的 Core Web Vitals (CWV) 评分。',
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: false,
@@ -106,12 +106,12 @@ export const startPerformanceTrace = defineTool({
     reload: zod
       .boolean()
       .describe(
-        'Determines if, once tracing has started, the page should be automatically reloaded.',
+        '追踪启动后是否自动重新加载页面。',
       ),
     autoStop: zod
       .boolean()
       .describe(
-        'Determines if the trace recording should be automatically stopped after 5 seconds.',
+        '是否在 5 秒后自动停止追踪录制。',
       ),
   },
   handler: async (request, response, context) => {

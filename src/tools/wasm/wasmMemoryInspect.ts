@@ -11,7 +11,7 @@ import {defineTool, type Context} from '../ToolDefinition.js';
 export const wasmMemoryInspect = defineTool({
   name: 'wasm_memory_inspect',
   description:
-    'Inspect WebAssembly.Memory exports in the current page — hex/ascii dump, pattern search.',
+    '检查当前页面中导出的 WebAssembly.Memory —— 提供 hex/ascii 转储与模式搜索。',
   annotations: {
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: true,
@@ -22,21 +22,21 @@ export const wasmMemoryInspect = defineTool({
       .int()
       .nonnegative()
       .optional()
-      .describe('Byte offset to start reading (default 0)'),
+      .describe('读取起始的字节偏移（默认 0）'),
     length: zod
       .number()
       .int()
       .positive()
       .optional()
-      .describe('Number of bytes to read (default 256)'),
+      .describe('要读取的字节数（默认 256）'),
     format: zod
       .enum(['hex', 'ascii', 'both'])
       .optional()
-      .describe('Output format (default "both")'),
+      .describe('输出格式（默认 "both"）'),
     searchPattern: zod
       .string()
       .optional()
-      .describe('Hex pattern (e.g. "00 FF") or ASCII string to search for'),
+      .describe('要搜索的十六进制模式（如 "00 FF"）或 ASCII 字符串'),
   },
   handler: async (request, response, context: Context) => {
     const {

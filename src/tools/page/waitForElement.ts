@@ -14,15 +14,14 @@ import {defineTool} from '../ToolDefinition.js';
  */
 export const waitForElement = defineTool({
   name: 'wait_for_element',
-  description:
-    'Wait for an element matching the CSS selector to appear on the page',
+  description: '等待匹配 CSS 选择器的元素出现在页面中。',
   annotations: {category: ToolCategory.INPUT, readOnlyHint: true},
   schema: {
-    selector: zod.string().describe('CSS selector to wait for'),
+    selector: zod.string().describe('要等待的 CSS 选择器。'),
     timeout: zod
       .number()
       .optional()
-      .describe('Maximum wait time in ms (default 30000)'),
+      .describe('最长等待时间（毫秒，默认 30000）。'),
   },
   handler: async (request, response, context) => {
     const {selector, timeout} = request.params;

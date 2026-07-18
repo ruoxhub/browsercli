@@ -13,7 +13,7 @@ import {defineTool} from '../ToolDefinition.js';
 export const updateExtensions = defineTool({
   name: 'update_extensions',
   description:
-    'Update Chrome extensions by clicking the update button on chrome://extensions/',
+    '通过点击 chrome://extensions/ 页面的更新按钮来更新 Chrome 扩展。',
   annotations: {category: ToolCategory.PAGES, readOnlyHint: false},
   schema: {},
   handler: async (_request, response, context) => {

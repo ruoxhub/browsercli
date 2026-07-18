@@ -14,7 +14,7 @@ import {defineTool} from '../ToolDefinition.js';
 
 export const wasmDump = defineTool({
   name: 'wasm_dump',
-  description: 'Dump a captured Wasm module to a .wasm file on disk.',
+  description: '将捕获的 Wasm 模块导出为磁盘上的 .wasm 文件。',
   annotations: {
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: false,
@@ -25,11 +25,11 @@ export const wasmDump = defineTool({
       .int()
       .nonnegative()
       .optional()
-      .describe('Index of the captured module (default 0)'),
+      .describe('捕获模块的索引（默认 0）'),
     outputPath: zod
       .string()
       .optional()
-      .describe('Output file path for the .wasm binary'),
+      .describe('.wasm 二进制文件的输出路径'),
   },
   handler: async (request, response) => {
     const {moduleIndex = 0, outputPath: userOutputPath} = request.params;

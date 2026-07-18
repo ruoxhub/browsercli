@@ -14,7 +14,7 @@ import {defineTool, type Context} from '../ToolDefinition.js';
 export const fill = defineTool({
   name: 'fill',
   description:
-    'Fill a value into an input, textarea, or select element matched by CSS selector. Automatically handles <select> via selectOption.',
+    '向匹配 CSS 选择器的 input、textarea 或 select 元素填入值，<select> 会通过 selectOption 自动处理。',
   annotations: {
     title: '填充输入',
     category: ToolCategory.NAVIGATION,

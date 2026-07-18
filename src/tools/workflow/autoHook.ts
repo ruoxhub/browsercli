@@ -1067,29 +1067,29 @@ async function injectHookPlans(
 export const autoHook = defineTool({
   name: 'auto_hook',
   description:
-    'Auto-hook: generate and inject debug hooks and crypto library hooks based on preset or custom options',
+    '自动 Hook：根据预设或自定义选项生成并注入调试 Hook 与加密库 Hook',
   annotations: {
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: false,
   },
   schema: {
-    url: zod.string().optional().describe('Target URL'),
+    url: zod.string().optional().describe('目标 URL'),
     preset: zod
       .enum(['none', 'api-signature', 'network-core'])
       .optional()
-      .describe('Hook preset'),
+      .describe('Hook 预设'),
     autoInject: zod
       .boolean()
       .optional()
-      .describe('Auto inject hooks into page'),
+      .describe('自动将 Hook 注入页面'),
     waitAfterHookMs: zod
       .number()
       .optional()
-      .describe('Wait time after hook injection in ms'),
-    useAI: zod.boolean().optional().describe('Use AI analysis'),
-    hookCrypto: zod.boolean().optional().describe('Hook CryptoJS library'),
-    hookRsa: zod.boolean().optional().describe('Hook JSEncrypt/RSA library'),
-    hookSmCrypto: zod.boolean().optional().describe('Hook SM-Crypto library'),
+      .describe('注入 Hook 后的等待时间（毫秒）'),
+    useAI: zod.boolean().optional().describe('使用 AI 分析'),
+    hookCrypto: zod.boolean().optional().describe('Hook CryptoJS 库'),
+    hookRsa: zod.boolean().optional().describe('Hook JSEncrypt/RSA 库'),
+    hookSmCrypto: zod.boolean().optional().describe('Hook SM-Crypto 库'),
     hookTimers: zod
       .boolean()
       .optional()
@@ -1097,20 +1097,20 @@ export const autoHook = defineTool({
     hookEval: zod
       .boolean()
       .optional()
-      .describe('Hook eval/Function constructor'),
+      .describe('Hook eval/Function 构造器'),
     hookCookie: zod.boolean().optional().describe('Hook document.cookie'),
     hookXhr: zod.boolean().optional().describe('Hook XMLHttpRequest'),
     hookFetch: zod.boolean().optional().describe('Hook fetch API'),
     exportResults: zod
       .boolean()
       .optional()
-      .describe('Export hook data to artifacts/ after injection'),
+      .describe('注入后将 Hook 数据导出到 artifacts/ 目录'),
     exportWaitMs: zod
       .number()
       .int()
       .positive()
       .optional()
-      .describe('Wait time in ms before exporting hook data (default 3000)'),
+      .describe('导出 Hook 数据前的等待时间（毫秒，默认 3000）'),
   },
   handler: async (request, response, context) => {
     const {url, ...rawOptions} = request.params;

@@ -17,7 +17,7 @@ import {evaluateInPageRuntime} from './evaluateInPageRuntime.js';
 export const hookFunction = defineTool({
   name: 'hook_function',
   description:
-    'RECOMMENDED for reverse engineering: Hooks a JavaScript function to log its calls, arguments, and return values without pausing execution. More reliable than breakpoints for automated workflows. Use this as the default approach for monitoring functions.',
+    '逆向工程推荐工具：Hook 一个 JavaScript 函数，记录其调用、参数与返回值，且不暂停执行。相比断点更适用于自动化工作流，建议作为监控函数的默认手段。',
   annotations: {
     title: 'Hook Function',
     category: ToolCategory.REVERSE_ENGINEERING,
@@ -27,28 +27,28 @@ export const hookFunction = defineTool({
     target: zod
       .string()
       .describe(
-        'The function to hook. Can be: global function name ("fetch"), object method ("XMLHttpRequest.prototype.open"), or path ("window.app.api.request").',
+        '要 Hook 的函数。可为：全局函数名（"fetch"）、对象方法（"XMLHttpRequest.prototype.open"）或路径（"window.app.api.request"）。',
       ),
     logArgs: zod
       .boolean()
       .optional()
       .default(true)
-      .describe('Whether to log function arguments (default: true).'),
+      .describe('是否记录函数参数（默认 true）。'),
     logResult: zod
       .boolean()
       .optional()
       .default(true)
-      .describe('Whether to log return value (default: true).'),
+      .describe('是否记录返回值（默认 true）。'),
     logStack: zod
       .boolean()
       .optional()
       .default(false)
-      .describe('Whether to log call stack (default: false).'),
+      .describe('是否记录调用栈（默认 false）。'),
     hookId: zod
       .string()
       .optional()
       .describe(
-        'Custom identifier for this hook. Used to unhook later. Defaults to target name.',
+        '本 Hook 的自定义标识，用于后续解除 Hook，默认取 target 名称。',
       ),
   },
   handler: async (request, response, context) => {

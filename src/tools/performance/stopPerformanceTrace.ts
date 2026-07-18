@@ -19,7 +19,7 @@ import {defineTool} from '../ToolDefinition.js';
 export const stopPerformanceTrace = defineTool({
   name: 'stop_performance_trace',
   description:
-    'Stop performance trace recording and analyze results via CDP Tracing.end',
+    '停止性能追踪录制并通过 CDP Tracing.end 分析其结果。',
   annotations: {category: ToolCategory.PERFORMANCE, readOnlyHint: true},
   schema: {},
   handler: async (_request, response, context) => {

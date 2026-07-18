@@ -14,7 +14,7 @@ import {defineTool, type Context} from '../ToolDefinition.js';
 export const fillForm = defineTool({
   name: 'fill_form',
   description:
-    'Fill multiple form elements in one call. Each entry specifies a CSS selector and a value. Automatically handles <select> via selectOption.',
+    '在一次调用中批量填充多个表单元素，每个条目指定 CSS 选择器与值，<select> 通过 selectOption 自动处理。',
   annotations: {
     title: '批量填充表单',
     category: ToolCategory.NAVIGATION,

@@ -20,7 +20,7 @@ import {isAggregatedIssue} from './types.js';
 export const getConsoleMessage = defineTool({
   name: 'get_console_message',
   description:
-    'Gets a console message by its ID. Returns structured message data including type, text, and arguments.',
+    '按 ID 获取单条 Console 消息，返回包含类型、文本与参数的结构化数据。',
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
@@ -29,7 +29,7 @@ export const getConsoleMessage = defineTool({
     msgid: zod
       .number()
       .describe(
-        'The msgid of a console message on the page from the listed console messages',
+        '页面 Console 消息的 msgid，来自已列出的 Console 消息列表。',
       ),
   },
   handler: async (request, response) => {

@@ -45,15 +45,15 @@ export function getPersistentHookRegistry(): ReadonlyMap<
 export const injectHook = defineTool({
   name: 'inject_hook',
   description:
-    'Inject a hook script. Use persistent=true to keep the hook alive across page navigations (registers via Page.addScriptToEvaluateOnNewDocument and also runs once on the current frame).',
+    '向页面注入 hook 脚本。使用 persistent=true 可让 hook 在页面导航间保持存活（通过 Page.addScriptToEvaluateOnNewDocument 注册，并会在当前 frame 立即执行一次）。',
   annotations: {
     title: 'Inject Hook',
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: false,
   },
   schema: {
-    hookId: zod.string().describe('Hook identifier for logging and tracking'),
-    script: zod.string().describe('Hook script code to inject'),
+    hookId: zod.string().describe('用于日志与追踪的 Hook 标识符'),
+    script: zod.string().describe('要注入的 Hook 脚本代码'),
     persistent: zod
       .boolean()
       .optional()
@@ -157,7 +157,7 @@ export const injectHook = defineTool({
 export const listPersistentHooks = defineTool({
   name: 'list_persistent_hooks',
   description:
-    'List persistent hooks registered via inject_hook --persistent=true in the current worker session.',
+    '列出当前 worker 会话中通过 inject_hook --persistent=true 注册的持久化 hook。',
   annotations: {
     title: 'List Persistent Hooks',
     category: ToolCategory.REVERSE_ENGINEERING,

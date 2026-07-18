@@ -15,7 +15,7 @@ import {defineTool, type Context} from '../ToolDefinition.js';
 export const pressKey = defineTool({
   name: 'press_key',
   description:
-    'Press a keyboard key or key combination (e.g. "Enter", "Control+A", "Alt+Shift+F"). Supports modifier keys.',
+    '按下键盘按键或组合键（如 "Enter"、"Control+A"、"Alt+Shift+F"），支持修饰键。',
   annotations: {
     title: '按键',
     category: ToolCategory.NAVIGATION,

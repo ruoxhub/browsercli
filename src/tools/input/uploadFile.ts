@@ -14,7 +14,7 @@ import {defineTool, type Context} from '../ToolDefinition.js';
 export const uploadFile = defineTool({
   name: 'upload_file',
   description:
-    'Upload a file to a file input element. Tries Playwright setInputFiles first, then falls back to filechooser event pattern.',
+    '向 file input 元素上传文件，优先使用 Playwright setInputFiles，失败则回退到 filechooser 事件模式。',
   annotations: {
     title: '上传文件',
     category: ToolCategory.NAVIGATION,

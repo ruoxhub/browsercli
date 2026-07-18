@@ -13,8 +13,7 @@ import {defineTool, type Context} from '../ToolDefinition.js';
  */
 export const click = defineTool({
   name: 'click',
-  description:
-    'Click on an element matched by CSS selector. Supports single and double click.',
+  description: '通过 CSS 选择器匹配元素并点击，支持单击与双击。',
   annotations: {
     title: '点击元素',
     category: ToolCategory.NAVIGATION,

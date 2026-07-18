@@ -21,7 +21,7 @@ const DEFAULT_NAV_TIMEOUT = 10_000;
 export const newPage = defineTool({
   name: 'new_page',
   description:
-    'Create a new browser page and navigate to the specified URL. The new page will be automatically selected.',
+    '创建新的浏览器页面并导航到指定 URL，新页面会自动被选中。',
   annotations: {
     title: '新建页面',
     category: ToolCategory.NAVIGATION,

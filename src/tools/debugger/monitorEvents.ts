@@ -31,8 +31,7 @@ const DEFAULT_EVENTS = [
  */
 export const monitorEvents = defineTool({
   name: 'monitor_events',
-  description:
-    'Monitors DOM events on a specified element or window. Events will be logged to console.',
+  description: '监控指定元素或 window 上的 DOM 事件，事件将输出到控制台。',
   annotations: {
     title: '监控事件',
     category: ToolCategory.REVERSE_ENGINEERING,

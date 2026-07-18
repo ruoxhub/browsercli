@@ -15,7 +15,7 @@ import {evaluateInPageRuntime} from './evaluateInPageRuntime.js';
  */
 export const listHooks = defineTool({
   name: 'list_hooks',
-  description: 'Lists all active function hooks.',
+  description: '列出当前所有已安装的函数 Hook。',
   annotations: {
     title: '列出 Hook',
     category: ToolCategory.REVERSE_ENGINEERING,

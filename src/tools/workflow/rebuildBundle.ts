@@ -218,37 +218,37 @@ export interface RebuildBundleToolResult {
 export const rebuildBundle = defineTool({
   name: 'rebuild_bundle',
   description:
-    'Build local Node.js reproduction environment from captured evidence and target script',
+    '根据捕获的证据与目标脚本，构建本地 Node.js 复现环境',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
   schema: {
-    url: zod.string().optional().describe('Target URL'),
-    targetUrl: zod.string().optional().describe('Target URL (alternative)'),
+    url: zod.string().optional().describe('目标 URL'),
+    targetUrl: zod.string().optional().describe('目标 URL（备选）'),
     targetFunctionNames: zod
       .array(zod.string())
       .optional()
-      .describe('Target function names'),
+      .describe('目标函数名'),
     targetKeywords: zod
       .array(zod.string())
       .optional()
-      .describe('Target keywords'),
+      .describe('目标关键字'),
     targetUrlPatterns: zod
       .array(zod.string())
       .optional()
-      .describe('Target URL patterns'),
+      .describe('目标 URL 模式'),
     goal: zod
       .string()
       .optional()
-      .describe('Reverse engineering goal description'),
+      .describe('逆向工程目标描述'),
     autoGenerate: zod
       .boolean()
       .optional()
-      .describe('Auto generate reproduction bundle'),
+      .describe('自动生成复现包'),
     maxEvidenceItems: zod
       .number()
       .optional()
-      .describe('Maximum evidence items'),
-    taskId: zod.string().optional().describe('Task ID'),
-    taskSlug: zod.string().optional().describe('Task slug'),
+      .describe('最大证据项数'),
+    taskId: zod.string().optional().describe('任务 ID'),
+    taskSlug: zod.string().optional().describe('任务 slug'),
   },
   handler: async (request, response, _context) => {
     const params = request.params;

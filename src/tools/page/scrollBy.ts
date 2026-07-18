@@ -15,16 +15,16 @@ import {defineTool} from '../ToolDefinition.js';
 export const scrollBy = defineTool({
   name: 'scroll_by',
   description:
-    'Scroll page by direction (up/down/top/bottom), automatically waits 800ms for lazy-loaded content',
+    '按方向（up/down/top/bottom）滚动页面，并自动等待 800ms 以触发懒加载内容。',
   annotations: {category: ToolCategory.INPUT, readOnlyHint: true},
   schema: {
     direction: zod
       .enum(['up', 'down', 'top', 'bottom'])
-      .describe('Scroll direction'),
+      .describe('滚动方向。'),
     pixels: zod
       .number()
       .optional()
-      .describe('Pixels to scroll (only for up/down, default 1000)'),
+      .describe('滚动像素（仅 up/down 生效，默认 1000）。'),
   },
   handler: async (request, response, context) => {
     const {direction, pixels = 1000} = request.params;

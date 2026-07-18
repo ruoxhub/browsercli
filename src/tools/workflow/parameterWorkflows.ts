@@ -11,7 +11,7 @@ import {defineTool} from '../ToolDefinition.js';
 export const listParameterWorkflowsTool = defineTool({
   name: 'list_parameter_workflows',
   description:
-    'List packaged parameter workflows that can guide reverse-engineering and rebuild steps.',
+    '列出可用于指导逆向工程与复现步骤的打包参数化工作流。',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
   schema: {},
   handler: async (_request, response) => {
@@ -28,13 +28,13 @@ export const listParameterWorkflowsTool = defineTool({
 
 export const getParameterWorkflowTool = defineTool({
   name: 'get_parameter_workflow',
-  description: 'Get one packaged parameter workflow by id or alias.',
+  description: '按 ID 或别名获取一个打包的参数化工作流。',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
   schema: {
     id: zod
       .string()
       .min(1)
-      .describe('Workflow id or alias, for example `jd-h5st` or `h5st`.'),
+      .describe('工作流 ID 或别名，例如 `jd-h5st` 或 `h5st`。'),
   },
   handler: async (request, response) => {
     const library = await getParameterWorkflowLibrary();
@@ -60,14 +60,14 @@ export const getParameterWorkflowTool = defineTool({
 export const recommendParameterWorkflowTool = defineTool({
   name: 'recommend_parameter_workflow',
   description:
-    'Recommend the closest packaged parameter workflow from a keyword, alias, or short natural-language query.',
+    '根据关键字、别名或简短自然语言查询，推荐最匹配的参数化工作流。',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
   schema: {
     query: zod
       .string()
       .min(1)
       .describe(
-        'Keyword or short query, for example `h5st` or `query token sign`.',
+        '关键字或简短查询，例如 `h5st` 或 `query token sign`。',
       ),
   },
   handler: async (request, response) => {

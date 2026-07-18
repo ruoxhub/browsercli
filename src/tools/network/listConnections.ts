@@ -11,7 +11,7 @@ import {defineTool} from '../ToolDefinition.js';
 
 export const listWebSocketConnections = defineTool({
   name: 'list_websocket_connections',
-  description: `List all WebSocket connections. After getting wsid, use analyze_websocket_messages(wsid) FIRST to understand message patterns before viewing individual messages.`,
+  description: `列出所有 WebSocket 连接。获取 wsid 后，请先使用 analyze_websocket_messages(wsid) 理解消息模式，再查看单条消息。`,
   annotations: {
     category: ToolCategory.NETWORK,
     readOnlyHint: true,
@@ -23,7 +23,7 @@ export const listWebSocketConnections = defineTool({
       .positive()
       .optional()
       .describe(
-        'Maximum number of connections to return. When omitted, returns all connections.',
+        '返回的最大连接数。省略时返回全部连接。',
       ),
     pageIdx: zod
       .number()
@@ -31,20 +31,20 @@ export const listWebSocketConnections = defineTool({
       .min(0)
       .optional()
       .describe(
-        'Page number to return (0-based). When omitted, returns the first page.',
+        '返回的页码（从 0 开始）。省略时返回第一页。',
       ),
     urlFilter: zod
       .string()
       .optional()
       .describe(
-        'Filter connections by URL. Only connections containing this substring will be returned.',
+        '按 URL 过滤连接。仅返回包含该子串的连接。',
       ),
     includePreservedConnections: zod
       .boolean()
       .default(false)
       .optional()
       .describe(
-        'Set to true to return the preserved connections over the last 3 navigations.',
+        '设为 true 可返回最近 3 次导航期间保留的连接。',
       ),
   },
   handler: async (request, response) => {

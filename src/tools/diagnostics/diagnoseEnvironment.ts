@@ -12,7 +12,7 @@ import {defineTool} from '../ToolDefinition.js';
 export const diagnoseEnvironmentTool = defineTool({
   name: 'diagnose_environment',
   description:
-    'Run environment diagnostics to check Node version, build output, AI configuration, and artifacts directory status.',
+    '运行环境诊断，检查 Node 版本、构建产物、AI 配置与 artifacts 目录状态。',
   annotations: {
     category: ToolCategory.DIAGNOSTICS,
     readOnlyHint: true,
@@ -22,7 +22,7 @@ export const diagnoseEnvironmentTool = defineTool({
       .array(zod.string())
       .optional()
       .describe(
-        'Optional list of check names to run. If omitted, all checks run. Valid names: node_version, build_output, ai_provider_selection, artifacts_dir.',
+        '可选的要运行的检查项名称列表；省略则运行全部检查。可选值：node_version、build_output、ai_provider_selection、artifacts_dir。',
       ),
   },
   handler: async (request, response) => {

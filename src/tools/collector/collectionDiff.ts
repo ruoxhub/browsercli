@@ -24,7 +24,7 @@ import type {
  */
 export const collectionDiff = defineTool({
   name: 'collection_diff',
-  description: 'Compare previous and current collected file summaries.',
+  description: '对比上一次与当前收集到的文件摘要。',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
   schema: {
     previous: zod.array(

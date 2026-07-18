@@ -13,7 +13,7 @@ import {defineTool} from '../ToolDefinition.js';
 import type {DeobfuscateCodeResult} from './types.js';
 export const deobfuscateCode = defineTool({
   name: 'deobfuscate_code',
-  description: 'AI-assisted JavaScript deobfuscation.',
+  description: 'AI 辅助的 JavaScript 反混淆。',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
   schema: {
     code: zod.string().optional().describe('要反混淆的 JavaScript 源码'),

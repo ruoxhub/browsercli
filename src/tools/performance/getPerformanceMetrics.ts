@@ -21,7 +21,7 @@ import {defineTool} from '../ToolDefinition.js';
 export const getPerformanceMetrics = defineTool({
   name: 'get_performance_metrics',
   description:
-    'Gets page performance metrics from the Performance API, including navigation timing, resource timing, and paint events.',
+    '通过 Performance API 获取页面性能指标，包括导航时序、资源时序与绘制事件。',
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: true,

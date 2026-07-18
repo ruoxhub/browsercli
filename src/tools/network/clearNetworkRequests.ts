@@ -12,7 +12,7 @@ import {defineTool} from '../ToolDefinition.js';
 export const clearNetworkRequests = defineTool({
   name: 'clear_network_requests',
   description:
-    'Clear the cached network requests for the currently selected page (or a specified page). After clearing, the request list returned by list_network_requests will be empty and stable IDs will be reissued from 1.',
+    '清空当前选中页面（或指定页面）的缓存网络请求。清空后，list_network_requests 返回的请求列表将为空，稳定的请求 ID 将从 1 重新编号。',
   annotations: {
     category: ToolCategory.NETWORK,
     readOnlyHint: false,
@@ -24,7 +24,7 @@ export const clearNetworkRequests = defineTool({
       .min(0)
       .optional()
       .describe(
-        'Browser page index. When omitted, uses the currently active page.',
+        '浏览器页面索引。省略时使用当前活动页面。',
       ),
   },
   handler: async (request, response) => {

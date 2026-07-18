@@ -13,18 +13,18 @@ import type {GetWebSocketMessageParams} from './types.js';
 
 export const getWebSocketMessage = defineTool({
   name: 'get_websocket_message',
-  description: `Gets a single WebSocket message by its frame index. Use get_websocket_messages or analyze_websocket_messages first to find the frame index.`,
+  description: `按帧索引获取单条 WebSocket 消息。请先使用 get_websocket_messages 或 analyze_websocket_messages 找到帧索引。`,
   annotations: {
     category: ToolCategory.NETWORK,
     readOnlyHint: true,
   },
   schema: {
-    wsid: zod.number().describe('The wsid of the WebSocket connection.'),
+    wsid: zod.number().describe('WebSocket 连接的 wsid。'),
     frameIndex: zod
       .number()
       .int()
       .min(0)
-      .describe('The frame index (0-based) to retrieve.'),
+      .describe('要获取的帧索引（从 0 开始）。'),
   },
   handler: async (request, response) => {
     const result = getRuntime().networkModule.getWebSocketMessage(

@@ -21,14 +21,14 @@ import {HOOK_STORE_KEY} from './store-utils.js';
 export const removeHookBrowser = defineTool({
   name: 'remove_hook_browser',
   description:
-    'Remove hook data from the browser side. Note: this does not restore monkey-patched native methods.',
+    '清理浏览器端的 hook 数据。注意：此操作不会恢复被 monkey-patch 的原生方法。',
   annotations: {
     title: 'Remove Hook',
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: false,
   },
   schema: {
-    hookId: zod.string().describe('Hook ID to remove'),
+    hookId: zod.string().describe('要移除的 Hook ID'),
   },
   handler: async (request, response, context) => {
     const {hookId} = request.params;

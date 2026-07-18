@@ -14,31 +14,31 @@ import {defineTool} from '../ToolDefinition.js';
 export const wasmDecompile = defineTool({
   name: 'wasm_decompile',
   description:
-    'Decompile a .wasm file with function-level summaries and suspicious-pattern detection.',
+    '反编译 .wasm 文件，提供函数级摘要与可疑模式检测。',
   annotations: {
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: true,
   },
   schema: {
-    inputPath: zod.string().describe('Path to the .wasm file to decompile'),
+    inputPath: zod.string().describe('要反编译的 .wasm 文件路径'),
     outputPath: zod
       .string()
       .optional()
-      .describe('Optional output path for the .wat file'),
+      .describe('.wat 文件的可选输出路径'),
     foldExprs: zod
       .boolean()
       .optional()
-      .describe('Fold expression blocks for readability'),
+      .describe('折叠表达式块以提升可读性'),
     inlineExport: zod
       .boolean()
       .optional()
-      .describe('Inline export names into function bodies'),
+      .describe('将导出名内联到函数体中'),
     maxWatChars: zod
       .number()
       .int()
       .positive()
       .optional()
-      .describe('Truncate WAT output beyond this many characters'),
+      .describe('WAT 输出超过该字符数后截断'),
   },
   handler: async (request, response) => {
     const {inputPath, outputPath, foldExprs, inlineExport, maxWatChars} =

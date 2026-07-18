@@ -22,7 +22,7 @@ import {defineTool} from '../ToolDefinition.js';
 export const performanceAnalyzeInsight = defineTool({
   name: 'performance_analyze_insight',
   description:
-    'Provides more detailed information on a specific Performance Insight that was highlighted in the results of a trace recording.',
+    '针对追踪录制结果中高亮的某个性能 Insight 提供更详细的信息。',
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: true,
@@ -31,7 +31,7 @@ export const performanceAnalyzeInsight = defineTool({
     insightName: zod
       .string()
       .describe(
-        'The name of the Insight you want more information on. For example: "DocumentLatency" or "LCPBreakdown"',
+        '需要详细信息的 Insight 名称，例如："DocumentLatency" 或 "LCPBreakdown"。',
       ),
   },
   handler: async (request, response, context) => {

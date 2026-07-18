@@ -17,7 +17,7 @@ import {defineTool} from '../ToolDefinition.js';
 export const listPages = defineTool({
   name: 'list_pages',
   description:
-    'List all open browser pages with their index, URL and title. Use this to find the page index before calling select_page.',
+    '列出浏览器中所有已打开的页面及其索引、URL 与标题。在调用 select_page 前可先使用本工具查找页面索引。',
   annotations: {
     title: '列出页面',
     category: ToolCategory.NAVIGATION,

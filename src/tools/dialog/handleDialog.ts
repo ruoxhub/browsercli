@@ -45,17 +45,16 @@ async function waitForDialog(
  */
 export const handleDialog = defineTool({
   name: 'handle_dialog',
-  description:
-    'Handle browser dialogs (alert/confirm/prompt) - accept or dismiss',
+  description: '处理浏览器弹窗（alert/confirm/prompt），可接收或取消。',
   annotations: {category: ToolCategory.PAGES, readOnlyHint: false},
   schema: {
     action: zod
       .enum(['accept', 'dismiss'])
-      .describe('Action to take on the dialog'),
+      .describe('对弹窗采取的操作。'),
     promptText: zod
       .string()
       .optional()
-      .describe('Text to enter for prompt dialogs (only with accept)'),
+      .describe('为 prompt 弹窗输入的文本（仅 accept 时生效）。'),
   },
   handler: async (request, response, context) => {
     const {action, promptText} = request.params;

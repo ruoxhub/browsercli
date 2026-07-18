@@ -13,11 +13,11 @@ import {defineTool} from '../ToolDefinition.js';
  */
 export const resizePage = defineTool({
   name: 'resize_page',
-  description: 'Resize page viewport to specified width and height',
+  description: '将页面视口调整为指定的宽度与高度。',
   annotations: {category: ToolCategory.EMULATION, readOnlyHint: false},
   schema: {
-    width: zod.number().describe('Viewport width in pixels'),
-    height: zod.number().describe('Viewport height in pixels'),
+    width: zod.number().describe('视口宽度（像素）。'),
+    height: zod.number().describe('视口高度（像素）。'),
   },
   handler: async (request, response, context) => {
     const {width, height} = request.params;

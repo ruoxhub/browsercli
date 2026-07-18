@@ -14,41 +14,41 @@ import {defineTool} from '../ToolDefinition.js';
 export const wasmInspectSections = defineTool({
   name: 'wasm_inspect_sections',
   description:
-    'Inspect Wasm binary sections: section map, function signatures, string scan, and import/export summary.',
+    '检查 Wasm 二进制节区：节区映射、函数签名、字符串扫描，以及导入/导出摘要。',
   annotations: {
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: true,
   },
   schema: {
-    inputPath: zod.string().describe('Path to the .wasm file to inspect'),
+    inputPath: zod.string().describe('要检查的 .wasm 文件路径'),
     sections: zod
       .enum(['headers', 'details', 'disassemble', 'all'])
       .optional()
-      .describe('Level of section detail (default "details")'),
+      .describe('节区详情级别（默认 "details"）'),
     includeFunctionSignatures: zod
       .boolean()
       .optional()
-      .describe('Include function signatures in output'),
+      .describe('在输出中包含函数签名'),
     includeStringScan: zod
       .boolean()
       .optional()
-      .describe('Scan for embedded strings'),
+      .describe('扫描内嵌字符串'),
     maskSensitiveStrings: zod
       .boolean()
       .optional()
-      .describe('Mask potentially sensitive strings'),
+      .describe('对可能敏感的字符串进行脱敏'),
     maxStringSlots: zod
       .number()
       .int()
       .positive()
       .optional()
-      .describe('Max string slots to return'),
+      .describe('返回的最大字符串槽位数'),
     maxSummaryLines: zod
       .number()
       .int()
       .positive()
       .optional()
-      .describe('Max summary lines per section'),
+      .describe('每个节区的最大摘要行数'),
   },
   handler: async (request, response) => {
     const {

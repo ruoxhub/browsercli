@@ -23,7 +23,7 @@ import type {BypassTarget} from './types.js';
 export const bypassDebugger = defineTool({
   name: 'bypass_debugger',
   description:
-    'Bypass infinite debugger statements by removing debugger keywords from eval/Function/constructor.',
+    '通过移除 eval/Function/constructor 中的 debugger 关键字来绕过无限 debugger 语句。',
   annotations: {
     title: 'Bypass Debugger',
     category: ToolCategory.REVERSE_ENGINEERING,
@@ -34,7 +34,7 @@ export const bypassDebugger = defineTool({
       .array(bypassTargetSchema)
       .optional()
       .describe(
-        'Targets to hook. Defaults to all: ["eval", "Function", "constructor"]',
+        '要 Hook 的目标，默认为全部：["eval", "Function", "constructor"]。',
       ),
   },
   handler: async (request, response, context) => {

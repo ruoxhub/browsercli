@@ -13,15 +13,14 @@ import {defineTool} from '../ToolDefinition.js';
  */
 export const emulateCpu = defineTool({
   name: 'emulate_cpu',
-  description:
-    'Emulate CPU throttling via CDP Performance.setCPUThrottlingRate',
+  description: '通过 CDP Performance.setCPUThrottlingRate 模拟 CPU 节流。',
   annotations: {category: ToolCategory.EMULATION, readOnlyHint: false},
   schema: {
     throttlingRate: zod
       .number()
       .min(1)
       .max(20)
-      .describe('CPU throttling rate (1-20x)'),
+      .describe('CPU 节流倍率（1-20 倍）。'),
   },
   handler: async (request, response, context) => {
     const {throttlingRate} = request.params;

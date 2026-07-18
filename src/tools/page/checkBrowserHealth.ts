@@ -21,7 +21,7 @@ import type {HealthIssue} from './types.js';
  */
 export const checkBrowserHealth = defineTool({
   name: 'check_browser_health',
-  description: 'Check browser connection health and page availability',
+  description: '检查浏览器连接健康状态与页面可用性。',
   annotations: {category: ToolCategory.PAGES, readOnlyHint: true},
   schema: {},
   handler: async (_request, response, _context) => {

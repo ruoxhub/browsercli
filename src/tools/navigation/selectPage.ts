@@ -18,7 +18,7 @@ import {defineTool} from '../ToolDefinition.js';
 export const selectPage = defineTool({
   name: 'select_page',
   description:
-    'Select a page by index to bring it to the foreground and switch context. Use list_pages first to find the page index.',
+    '按索引选择页面并将其带到前台、切换上下文。请先使用 list_pages 获取页面索引。',
   annotations: {
     title: '选择页面',
     category: ToolCategory.NAVIGATION,

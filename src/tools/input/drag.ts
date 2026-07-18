@@ -13,8 +13,7 @@ import {defineTool, type Context} from '../ToolDefinition.js';
  */
 export const drag = defineTool({
   name: 'drag',
-  description:
-    'Drag an element from a source CSS selector to a target CSS selector using mouse events.',
+  description: '通过鼠标事件将元素从源 CSS 选择器拖拽到目标 CSS 选择器。',
   annotations: {
     title: '拖拽元素',
     category: ToolCategory.NAVIGATION,

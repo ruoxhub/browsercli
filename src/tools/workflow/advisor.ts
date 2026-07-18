@@ -113,7 +113,7 @@ async function buildTaskAwareAdvice(params: RecommendNextStepParams) {
 export const recommendNextStepTool = defineTool({
   name: 'recommend_next_step',
   description:
-    'Recommend the next reverse-engineering action from lightweight workflow signals.',
+    '根据轻量级工作流信号，推荐下一步的逆向工程动作。',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
   schema: {
     taskId: zod.string().optional(),
@@ -156,7 +156,7 @@ export const recommendNextStepTool = defineTool({
 export const explainReverseStage = defineTool({
   name: 'explain_reverse_stage',
   description:
-    'Explain a reverse-engineering stage with goals, entry criteria, avoid list, and recommended tools.',
+    '解释某个逆向工程阶段的目标、进入条件、避免事项与推荐工具。',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
   schema: {
     stage: zod.enum([

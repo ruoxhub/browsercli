@@ -13,8 +13,7 @@ import type {UnderstandCodeFnResult} from './types.js';
 
 export const understandCode = defineTool({
   name: 'understand_code',
-  description:
-    'Analyze code structure/business/security with AI + static analysis.',
+  description: '结合 AI 与静态分析，分析代码结构、业务逻辑与安全性。',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
   schema: {
     code: zod.string(),

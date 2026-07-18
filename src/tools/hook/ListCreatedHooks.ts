@@ -21,7 +21,7 @@ import {readHookStore, summarizeHookStore} from './store-utils.js';
 export const listCreatedHooks = defineTool({
   name: 'list_created_hooks',
   description:
-    'List all created hooks from HookManager. Optionally syncs browser-side data for record counts.',
+    '列出 HookManager 中所有已创建的 hook。可选地同步浏览器端数据以统计记录数。',
   annotations: {
     title: 'List Created Hooks',
     category: ToolCategory.REVERSE_ENGINEERING,
@@ -31,17 +31,17 @@ export const listCreatedHooks = defineTool({
     hookId: zod
       .string()
       .optional()
-      .describe('Specific hook ID to inspect, omit for all'),
+      .describe('指定要查看的 Hook ID，省略则返回全部'),
     verbose: zod
       .boolean()
       .optional()
       .default(false)
-      .describe('Include detailed records per hook'),
+      .describe('包含每个 Hook 的详细记录'),
     syncFromBrowser: zod
       .boolean()
       .optional()
       .default(false)
-      .describe('Sync data from browser before listing'),
+      .describe('列出前先从浏览器同步数据'),
   },
   handler: async (request, response, context) => {
     const {hookId, verbose = false} = request.params;

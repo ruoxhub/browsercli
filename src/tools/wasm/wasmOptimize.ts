@@ -29,21 +29,21 @@ function runCommand(
 export const wasmOptimize = defineTool({
   name: 'wasm_optimize',
   description:
-    'Optimize a .wasm file using binaryen wasm-opt with selectable optimization level.',
+    '使用 binaryen 的 wasm-opt 优化 .wasm 文件，可指定优化级别。',
   annotations: {
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: false,
   },
   schema: {
-    inputPath: zod.string().describe('Path to the .wasm file to optimize'),
+    inputPath: zod.string().describe('要优化的 .wasm 文件路径'),
     outputPath: zod
       .string()
       .optional()
-      .describe('Output path for the optimized file'),
+      .describe('优化后文件的输出路径'),
     level: zod
       .enum(['O1', 'O2', 'O3', 'O4', 'Os', 'Oz'])
       .optional()
-      .describe('Optimization level (default "O2")'),
+      .describe('优化级别（默认 "O2"）'),
   },
   handler: async (request, response) => {
     const {inputPath, level = 'O2'} = request.params;

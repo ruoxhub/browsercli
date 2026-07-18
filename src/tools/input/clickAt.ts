@@ -14,7 +14,7 @@ import {defineTool, type Context} from '../ToolDefinition.js';
 export const clickAt = defineTool({
   name: 'click_at',
   description:
-    'Perform a real mouse click at the center coordinates of an element using CDP Input.dispatchMouseEvent. Useful when Playwright click is intercepted.',
+    '使用 CDP Input.dispatchMouseEvent 在元素中心坐标处派发真实鼠标点击事件，适用于 Playwright 点击被拦截的场景。',
   annotations: {
     title: '坐标点击',
     category: ToolCategory.NAVIGATION,

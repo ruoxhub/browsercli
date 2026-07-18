@@ -37,7 +37,7 @@ import type {
 export const collectCode = defineTool({
   name: 'collect_code',
   description:
-    'Collect JavaScript code from a page with smart modes (summary/priority/incremental/full).',
+    '从页面收集 JavaScript 代码，支持智能模式（summary/priority/incremental/full）。',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
   schema: {
     url: zod.string().url(),

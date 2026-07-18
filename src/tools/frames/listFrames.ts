@@ -28,7 +28,7 @@ function getFrameDepth(frame: Frame): number {
 export const listFrames = defineTool({
   name: 'list_frames',
   description:
-    'Lists all frames (including iframes) in the current page as a tree. Shows frame index, name, and URL. Use select_frame to switch execution context to a specific frame.',
+    '以树形结构列出当前页面中的所有 Frame（含 iframe），显示索引、名称与 URL。使用 select_frame 可将执行上下文切换到指定 Frame。',
   annotations: {
     title: '列出 Frame',
     category: ToolCategory.DEBUGGING,

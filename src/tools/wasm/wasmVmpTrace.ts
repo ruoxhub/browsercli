@@ -12,7 +12,7 @@ import {defineTool} from '../ToolDefinition.js';
 export const wasmVmpTrace = defineTool({
   name: 'wasm_vmp_trace',
   description:
-    'Trace Wasm runtime events captured by the JS-Wasm boundary hooks, with optional module filter.',
+    '追踪由 JS-Wasm 边界 hook 捕获的 Wasm 运行时事件，可选按模块过滤。',
   annotations: {
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: true,
@@ -23,11 +23,11 @@ export const wasmVmpTrace = defineTool({
       .int()
       .positive()
       .optional()
-      .describe('Maximum number of events to return (default 5000)'),
+      .describe('返回的最大事件数（默认 5000）'),
     filterModule: zod
       .string()
       .optional()
-      .describe('Filter events to a specific module ID'),
+      .describe('按指定模块 ID 过滤事件'),
   },
   handler: async (request, response) => {
     const {maxEvents = 5000, filterModule} = request.params;

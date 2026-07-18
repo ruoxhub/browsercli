@@ -16,7 +16,7 @@ import type {MonitorWindow} from './monitorTypes.js';
  */
 export const stopMonitor = defineTool({
   name: 'stop_monitor',
-  description: 'Stops an event monitor.',
+  description: '停止指定的事件监控。',
   annotations: {
     title: '停止监控',
     category: ToolCategory.REVERSE_ENGINEERING,

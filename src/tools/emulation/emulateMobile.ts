@@ -69,14 +69,14 @@ interface DeviceProfileData {
 export const emulateMobile = defineTool({
   name: 'emulate_mobile',
   description:
-    'Emulate mobile device viewport, user-agent and touch events, or restore desktop mode',
+    '模拟移动设备视口、User-Agent 与触摸事件，或恢复桌面模式。',
   annotations: {category: ToolCategory.EMULATION, readOnlyHint: false},
   schema: {
-    enable: zod.boolean().describe('Enable or disable mobile emulation'),
+    enable: zod.boolean().describe('是否启用移动设备模拟。'),
     device: zod
       .enum(['iphone', 'android', 'ipad'])
       .optional()
-      .describe('Device preset (default: iphone)'),
+      .describe('设备预设（默认 iphone）。'),
   },
   handler: async (request, response, context) => {
     const {enable, device = 'iphone'} = request.params;

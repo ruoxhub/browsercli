@@ -79,26 +79,26 @@ function buildNextActions(input: {
 export const traceSignatureGeneration = defineTool({
   name: 'trace_signature_generation',
   description:
-    'Signature tracing workflow: correlate network requests, hook diagnostics, XHR breakpoints and call frame inspection from header/URL clues',
+    '签名追踪工作流：根据请求头/URL 线索，关联网络请求、Hook 诊断、XHR 断点与调用帧检查',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
   schema: {
     requestUrlPattern: zod
       .string()
       .optional()
-      .describe('URL pattern to filter requests'),
+      .describe('用于过滤请求的 URL 模式'),
     headerKeyword: zod
       .string()
       .optional()
-      .describe('Header keyword to filter signature-related headers'),
+      .describe('用于过滤签名相关请求头的关键字'),
     maxResults: zod
       .number()
       .optional()
-      .describe('Maximum number of results (default: 10)'),
+      .describe('最大结果数（默认：10）'),
     includeSensitiveValues: zod
       .boolean()
       .optional()
-      .describe('Include sensitive header values'),
-    taskId: zod.string().optional().describe('Task ID for evidence tracking'),
+      .describe('包含敏感的请求头值'),
+    taskId: zod.string().optional().describe('用于证据追踪的任务 ID'),
   },
   handler: async (request, response, _context) => {
     const params = request.params;

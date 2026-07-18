@@ -21,7 +21,7 @@ import {
 export const antiAntiDebug = defineTool({
   name: 'anti_anti_debug',
   description:
-    'Anti-anti-debug toolkit: fix window size, freeze time, block page close, block history navigation, block console clear, hide webdriver flag.',
+    '反反调试工具集：固定窗口尺寸、冻结时间、阻止页面关闭、阻止历史导航、阻止控制台清除、隐藏 webdriver 标记。',
   annotations: {
     title: 'Anti Anti-Debug',
     category: ToolCategory.REVERSE_ENGINEERING,
@@ -32,7 +32,7 @@ export const antiAntiDebug = defineTool({
       .array(antiAntiDebugFeatureSchema)
       .min(1)
       .describe(
-        'Features to enable. Options: fixedWindowSize, fixedTime, preventClose, preventHistoryBack, preventConsoleClear, hideWebdriver',
+        '要启用的功能。可选：fixedWindowSize、fixedTime、preventClose、preventHistoryBack、preventConsoleClear、hideWebdriver。',
       ),
   },
   handler: async (request, response, context) => {

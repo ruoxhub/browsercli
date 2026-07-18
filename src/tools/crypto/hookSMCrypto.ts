@@ -13,7 +13,7 @@ import {defineTool} from '../ToolDefinition.js';
  */
 export const hookSMCrypto = defineTool({
   name: 'hook_smcrypto',
-  description: 'Hook SM-crypto library: intercept SM2, SM3, SM4 algorithms',
+  description: 'Hook SM-crypto 国密库：拦截 SM2、SM3、SM4 算法。',
   annotations: {
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: false,
@@ -22,11 +22,11 @@ export const hookSMCrypto = defineTool({
     algorithms: zod
       .array(zod.string())
       .optional()
-      .describe('Algorithms to hook (default: ["all"])'),
+      .describe('要 Hook 的算法（默认 ["all"]）。'),
     logFormat: zod
       .enum(['compact', 'json'])
       .optional()
-      .describe('Log output format (default: "compact")'),
+      .describe('日志输出格式（默认 "compact"）。'),
   },
   handler: async (request, response, context) => {
     const algos = request.params.algorithms || ['all'];

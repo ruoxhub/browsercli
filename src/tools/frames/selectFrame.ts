@@ -15,7 +15,7 @@ import {defineTool} from '../ToolDefinition.js';
 export const selectFrame = defineTool({
   name: 'select_frame',
   description:
-    'Selects a frame (by index from list_frames) as the execution context for evaluate_script, hook_function, inspect_object, and other tools that run JavaScript in the page.',
+    '选择一个 Frame（索引来自 list_frames）作为 evaluate_script、hook_function、inspect_object 等页面内 JavaScript 执行工具的运行上下文。',
   annotations: {
     title: '选择 Frame',
     category: ToolCategory.DEBUGGING,

@@ -14,7 +14,7 @@ import {FILTERABLE_RESOURCE_TYPES} from './types.js';
 export const listNetworkRequests = defineTool({
   name: 'list_network_requests',
   description:
-    'List all requests for the currently selected page since the last navigation. Supports filtering by resource type, header keyword, pagination, and waiting for matching requests.',
+    '列出当前选中页面自上次导航以来的所有请求。支持按资源类型、请求头关键字、分页过滤，以及等待匹配的请求。',
   annotations: {
     category: ToolCategory.NETWORK,
     readOnlyHint: true,
@@ -26,7 +26,7 @@ export const listNetworkRequests = defineTool({
       .positive()
       .optional()
       .describe(
-        'Maximum number of requests to return. When omitted, returns all requests.',
+        '返回的最大请求数。省略时返回全部请求。',
       ),
     pageIdx: zod
       .number()
@@ -34,20 +34,20 @@ export const listNetworkRequests = defineTool({
       .min(0)
       .optional()
       .describe(
-        'Page number to return (0-based). When omitted, returns the first page.',
+        '返回的页码（从 0 开始）。省略时返回第一页。',
       ),
     resourceTypes: zod
       .array(zod.enum(FILTERABLE_RESOURCE_TYPES))
       .optional()
       .describe(
-        'Filter requests to only return requests of the specified resource types. When omitted or empty, returns all requests.',
+        '仅返回指定资源类型的请求。省略或为空时返回全部请求。',
       ),
     includePreservedRequests: zod
       .boolean()
       .default(false)
       .optional()
       .describe(
-        'Set to true to return the preserved requests over the last 3 navigations.',
+        '设为 true 可返回最近 3 次导航期间保留的请求。',
       ),
     targetPageIdx: zod
       .number()
@@ -55,13 +55,13 @@ export const listNetworkRequests = defineTool({
       .min(0)
       .optional()
       .describe(
-        'Browser page index. When omitted, uses the currently active page.',
+        '浏览器页面索引。省略时使用当前活动页面。',
       ),
     waitForRequest: zod
       .string()
       .optional()
       .describe(
-        'Wait for a request whose URL contains this fragment before returning.',
+        '返回前等待 URL 包含该片段的请求出现。',
       ),
     waitTimeoutMs: zod
       .number()
@@ -69,25 +69,25 @@ export const listNetworkRequests = defineTool({
       .positive()
       .optional()
       .describe(
-        'Maximum time in milliseconds to wait for a matching request when waitForRequest is set.',
+        '设置 waitForRequest 时，等待匹配请求的最长时间（毫秒）。',
       ),
     headerFilter: zod
       .string()
       .optional()
       .describe(
-        'Filter requests by a keyword present in their headers (case-insensitive).',
+        '按请求头中包含的关键字过滤请求（大小写不敏感）。',
       ),
     urlFilter: zod
       .string()
       .optional()
       .describe(
-        'Filter requests by a keyword present in their URL (case-insensitive).',
+        '按 URL 中包含的关键字过滤请求（大小写不敏感）。',
       ),
     includeSignatureEvidence: zod
       .boolean()
       .optional()
       .describe(
-        'Include signature-related evidence correlations in the response.',
+        '在响应中包含与签名相关的证据关联。',
       ),
   },
   handler: async (request, response) => {

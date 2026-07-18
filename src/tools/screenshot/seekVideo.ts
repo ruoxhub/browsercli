@@ -16,15 +16,15 @@ import {defineTool} from '../ToolDefinition.js';
  */
 export const seekVideo = defineTool({
   name: 'seek_video',
-  description: `Seek a video element to a specific time position by CSS selector.`,
+  description: `按 CSS 选择器将视频元素定位到指定时间点。`,
   annotations: {
     title: '跳转视频',
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
   },
   schema: {
-    selector: zod.string().describe('CSS selector for the video element.'),
-    time: zod.number().describe('Time position in seconds to seek to.'),
+    selector: zod.string().describe('视频元素的 CSS 选择器。'),
+    time: zod.number().describe('要定位到的时间点（秒）。'),
   },
   handler: async (request, response, context) => {
     const runtime = context as unknown as ToolContextProvider;

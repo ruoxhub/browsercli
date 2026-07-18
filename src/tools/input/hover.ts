@@ -13,7 +13,7 @@ import {defineTool, type Context} from '../ToolDefinition.js';
  */
 export const hover = defineTool({
   name: 'hover',
-  description: 'Hover the mouse over an element matched by CSS selector.',
+  description: '将鼠标悬停在匹配 CSS 选择器的元素上。',
   annotations: {
     title: '悬停元素',
     category: ToolCategory.NAVIGATION,

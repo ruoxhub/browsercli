@@ -47,7 +47,7 @@ export type {
 export const exportRebuildBundle = defineTool({
   name: 'export_rebuild_bundle',
   description:
-    'Export a local Node rebuild bundle from observed reverse-engineering evidence.',
+    '根据观察到的逆向工程证据，导出本地 Node 重建 Bundle。',
   annotations: {
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: false,
@@ -165,7 +165,7 @@ export const exportRebuildBundle = defineTool({
 export const diffEnvRequirements = defineTool({
   name: 'diff_env_requirements',
   description:
-    'Compare local runtime failures with observed browser capabilities and suggest the next environment patches.',
+    '对比本地运行时失败与观察到的浏览器能力，并建议下一步的环境补丁。',
   annotations: {
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: true,

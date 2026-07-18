@@ -412,7 +412,7 @@ function runOnFrame(
 export const evaluateScript = defineTool({
   name: 'evaluate_script',
   description:
-    'Execute JavaScript on the page; supports page / content-script context. Optionally saves output to a file for large results.',
+    '在页面上执行 JavaScript；支持 page / content-script 上下文。可选的，对于较大的结果可将输出保存到文件。',
   annotations: {category: ToolCategory.DEBUGGING, readOnlyHint: false},
   schema: {
     function: zod
@@ -427,7 +427,7 @@ export const evaluateScript = defineTool({
     context: zod
       .enum(['page', 'content-script'])
       .optional()
-      .describe('Execution context (default: "page")'),
+      .describe('执行上下文（默认："page"）'),
     frameId: zod
       .string()
       .optional()
@@ -440,12 +440,12 @@ export const evaluateScript = defineTool({
       .describe(
         '当存在多个匹配的执行上下文且无法精确定位时，是否回退到第一个可用上下文。默认 false。',
       ),
-    verbose: zod.boolean().optional().describe('Enable verbose output'),
+    verbose: zod.boolean().optional().describe('启用详细输出'),
     filePath: zod
       .string()
       .optional()
       .describe(
-        'The absolute or relative path to a file to save the script output to. If omitted, the output is returned inline.',
+        '用于保存脚本输出的文件绝对或相对路径。省略时输出以内联方式返回。',
       ),
   },
   handler: async (request, response, toolContext) => {
@@ -510,13 +510,13 @@ export const evaluateScript = defineTool({
 export const injectPreloadScript = defineTool({
   name: 'inject_preload_script',
   description:
-    'Register a preload script for future documents on the current page/context',
+    '为当前页面/上下文的后续文档注册预加载脚本',
   annotations: {category: ToolCategory.DEBUGGING, readOnlyHint: false},
   schema: {
     script: zod
       .string()
       .optional()
-      .describe('JavaScript code to inject as preload script'),
+      .describe('要作为预加载脚本注入的 JavaScript 代码'),
     preset: zod
       .enum([
         'capture-all-fetch',

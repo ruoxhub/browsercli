@@ -17,7 +17,7 @@ const MAX_CONCURRENCY = 10;
 export const replayNetworkRequestBatch = defineTool({
   name: 'replay_network_request_batch',
   description:
-    'Replay a captured network request multiple times with different overrides (variants). Useful for fuzzing signature fields, testing parameter boundaries, and observing response distribution. Sequential by default; bounded concurrency available.',
+    '以不同覆盖项（变体）多次重放一个捕获的网络请求。适用于模糊测试签名字段、测试参数边界、观察响应分布。默认串行执行，也支持有界并发。',
   annotations: {
     category: ToolCategory.NETWORK,
     readOnlyHint: false,
@@ -27,7 +27,7 @@ export const replayNetworkRequestBatch = defineTool({
       .number()
       .int()
       .positive()
-      .describe('The reqid of the captured request to use as the template.'),
+      .describe('用作模板的已捕获请求的 reqid。'),
     variants: zod
       .array(
         zod.object({
@@ -41,7 +41,7 @@ export const replayNetworkRequestBatch = defineTool({
       .min(1)
       .max(MAX_VARIANTS)
       .describe(
-        'Override variants to apply. Each variant produces one replay. Max 50 to bound runtime.',
+        '要应用的覆盖变体。每个变体产生一次重放。最多 50 个以控制运行时长。',
       ),
     concurrency: zod
       .number()
@@ -50,7 +50,7 @@ export const replayNetworkRequestBatch = defineTool({
       .max(MAX_CONCURRENCY)
       .optional()
       .describe(
-        'Max parallel replays. Default 1 (sequential). Higher values risk server-side rate limiting.',
+        '最大并行重放数。默认 1（串行）。值越大越可能触发服务端限流。',
       ),
     maxBodyLength: zod
       .number()
@@ -58,7 +58,7 @@ export const replayNetworkRequestBatch = defineTool({
       .positive()
       .optional()
       .describe(
-        'Maximum length of each response body to return. Defaults to 500 (smaller than single-replay default since results aggregate).',
+        '每个响应体返回的最大长度。默认 500（因结果聚合，小于单次重放默认值）。',
       ),
   },
   handler: async (request, response) => {

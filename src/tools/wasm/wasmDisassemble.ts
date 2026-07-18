@@ -14,21 +14,21 @@ import {defineTool} from '../ToolDefinition.js';
 export const wasmDisassemble = defineTool({
   name: 'wasm_disassemble',
   description:
-    'Disassemble a .wasm file to WAT (WebAssembly Text Format) using the built-in decompiler.',
+    '使用内置反编译器将 .wasm 文件反汇编为 WAT（WebAssembly 文本格式）。',
   annotations: {
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: true,
   },
   schema: {
-    inputPath: zod.string().describe('Path to the .wasm file to disassemble'),
+    inputPath: zod.string().describe('要反汇编的 .wasm 文件路径'),
     outputPath: zod
       .string()
       .optional()
-      .describe('Optional output path for the .wat file'),
+      .describe('.wat 文件的可选输出路径'),
     foldExprs: zod
       .boolean()
       .optional()
-      .describe('Fold expression blocks for readability (default true)'),
+      .describe('折叠表达式块以提升可读性（默认 true）'),
   },
   handler: async (request, response) => {
     const {inputPath, outputPath, foldExprs = true} = request.params;

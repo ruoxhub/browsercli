@@ -16,7 +16,7 @@ import {getFrameOrRespond} from './evaluateAndRespond.js';
 export const getStorage = defineTool({
   name: 'get_storage',
   description:
-    'Gets browser storage data including cookies, localStorage, and sessionStorage.',
+    '获取浏览器存储数据，包括 cookies、localStorage 与 sessionStorage。',
   annotations: {
     title: '获取存储',
     category: ToolCategory.REVERSE_ENGINEERING,

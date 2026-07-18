@@ -14,10 +14,10 @@ import {defineTool} from '../ToolDefinition.js';
  */
 export const clickElement = defineTool({
   name: 'click_element',
-  description: 'Click on an element by CSS selector',
+  description: '通过 CSS 选择器点击页面元素。',
   annotations: {category: ToolCategory.INPUT, readOnlyHint: false},
   schema: {
-    selector: zod.string().describe('CSS selector of the element to click'),
+    selector: zod.string().describe('要点击元素的 CSS 选择器。'),
   },
   handler: async (request, response, context) => {
     const {selector} = request.params;

@@ -16,7 +16,7 @@ import {evaluateInPageRuntime} from './evaluateInPageRuntime.js';
  */
 export const unhookFunction = defineTool({
   name: 'unhook_function',
-  description: 'Removes a previously installed function hook.',
+  description: '移除已安装的函数 Hook。',
   annotations: {
     title: 'Unhook Function',
     category: ToolCategory.REVERSE_ENGINEERING,
@@ -25,7 +25,7 @@ export const unhookFunction = defineTool({
   schema: {
     hookId: zod
       .string()
-      .describe('The hook ID to remove (from hook_function).'),
+      .describe('要移除的 Hook ID（来自 hook_function）。'),
   },
   handler: async (request, response, context) => {
     const {hookId} = request.params;

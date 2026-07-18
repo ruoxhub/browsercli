@@ -59,8 +59,7 @@ function buildEmptyProjectSummary(files: Array<{size?: number}>) {
 
 export const summarizeCode = defineTool({
   name: 'summarize_code',
-  description:
-    'Summarize one code file, multiple files, or project-level context.',
+  description: '对单个代码文件、多个文件或项目级上下文进行总结。',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
   schema: {
     mode: zod.enum(['single', 'batch', 'project']).default('single'),

@@ -20,7 +20,7 @@ import type {ElementInfo} from './types.js';
 export const queryDom = defineTool({
   name: 'query_dom',
   description:
-    'Query one or multiple DOM elements by CSS selector. Returns structured element info including tag, attributes, bounding box, and visibility.',
+    '通过 CSS 选择器查询一个或多个 DOM 元素，返回包含标签、属性、包围盒与可见性的结构化信息。',
   annotations: {
     title: '查询DOM元素',
     category: ToolCategory.NAVIGATION,

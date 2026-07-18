@@ -975,9 +975,11 @@ export const searchInSources = defineTool({
 
       const matchData = displayMatches.map(match => {
         const scriptId = match.scriptId;
+        const rawUrl = match.url || '(内联)';
 
         return {
           scriptId,
+          url: rawUrl,
           lineNumber: match.lineNumber + 1,
           sourcePath: sourcePathMap.get(scriptId) ?? null,
         };

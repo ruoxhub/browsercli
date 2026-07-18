@@ -27,7 +27,7 @@ function probeNativeTool(name: string, flag: string): Promise<NativeToolInfo> {
 export const wasmCapabilities = defineTool({
   name: 'wasm_capabilities',
   description:
-    'Detect available native Wasm toolchain (wabt, binaryen, wasmtime, wasmer) and session state.',
+    '检测可用的原生 Wasm 工具链（wabt、binaryen、wasmtime、wasmer）与会话状态。',
   annotations: {
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: true,

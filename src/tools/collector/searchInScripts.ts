@@ -23,7 +23,7 @@ import type {
  */
 export const searchInScripts = defineTool({
   name: 'search_in_scripts',
-  description: 'Search in collected script cache with regex pattern.',
+  description: '使用正则表达式在已收集的脚本缓存中搜索。',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
   schema: {
     pattern: zod.string(),

@@ -50,13 +50,13 @@ const PREDEFINED_NETWORK_CONDITIONS: Record<
 export const emulateNetwork = defineTool({
   name: 'emulate_network',
   description:
-    'Emulate network conditions (throttling/offline) via CDP Network.emulateNetworkConditions',
+    '通过 CDP Network.emulateNetworkConditions 模拟网络条件（节流/离线）。',
   annotations: {category: ToolCategory.EMULATION, readOnlyHint: false},
   schema: {
     throttlingOption: zod
       .string()
       .describe(
-        'Network throttling option: "No emulation", "Offline", "Slow 3G", "Fast 3G", "4G", "WiFi"',
+        '网络节流选项："No emulation"、"Offline"、"Slow 3G"、"Fast 3G"、"4G"、"WiFi"。',
       ),
   },
   handler: async (request, response, context) => {

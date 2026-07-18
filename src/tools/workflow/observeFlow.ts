@@ -16,47 +16,47 @@ import {defineTool} from '../ToolDefinition.js';
 export const observeFlow = defineTool({
   name: 'observe_flow',
   description:
-    'Observe mode: collect and analyze page scripts, identify encryption and obfuscation, generate risk assessment report',
+    '观察模式：收集并分析页面脚本，识别加密与混淆，生成风险评估报告',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
   schema: {
-    url: zod.string().optional().describe('Target URL to observe'),
+    url: zod.string().optional().describe('要观察的目标 URL'),
     includeDynamic: zod
       .boolean()
       .optional()
-      .describe('Include dynamic scripts'),
+      .describe('包含动态脚本'),
     includeExternal: zod
       .boolean()
       .optional()
-      .describe('Include external scripts'),
-    includeInline: zod.boolean().optional().describe('Include inline scripts'),
+      .describe('包含外部脚本'),
+    includeInline: zod.boolean().optional().describe('包含内联脚本'),
     includeServiceWorker: zod
       .boolean()
       .optional()
-      .describe('Include Service Worker scripts'),
+      .describe('包含 Service Worker 脚本'),
     includeWebWorker: zod
       .boolean()
       .optional()
-      .describe('Include Web Worker scripts'),
-    maxFileSize: zod.number().optional().describe('Maximum file size in bytes'),
+      .describe('包含 Web Worker 脚本'),
+    maxFileSize: zod.number().optional().describe('最大文件大小（字节）'),
     maxTotalSize: zod
       .number()
       .optional()
-      .describe('Maximum total size in bytes'),
+      .describe('最大总大小（字节）'),
     mode: zod
       .enum(['summary', 'priority', 'incremental', 'full'])
       .optional()
-      .describe('Collection mode'),
-    smartMode: zod.boolean().optional().describe('Enable smart mode'),
+      .describe('收集模式'),
+    smartMode: zod.boolean().optional().describe('启用智能模式'),
     dynamicWaitMs: zod
       .number()
       .optional()
-      .describe('Dynamic script wait time in ms'),
+      .describe('动态脚本等待时间（毫秒）'),
     priorities: zod
       .array(zod.string())
       .optional()
-      .describe('Priority URL patterns'),
-    compress: zod.boolean().optional().describe('Compress code'),
-    timeout: zod.number().optional().describe('Timeout in ms'),
+      .describe('优先 URL 模式'),
+    compress: zod.boolean().optional().describe('压缩代码'),
+    timeout: zod.number().optional().describe('超时时间（毫秒）'),
   },
   handler: async (request, response, context) => {
     const options = request.params;

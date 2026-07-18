@@ -17,7 +17,7 @@ import {summarizeHookStore, readHookStore} from './store-utils.js';
 export const syncHookRecords = defineTool({
   name: 'sync_hook_records',
   description:
-    'Sync hook records from the browser and list all created hooks with their status.',
+    '从浏览器同步 hook 记录，并列出所有已创建 hook 及其状态。',
   annotations: {
     title: 'List Created Hooks',
     category: ToolCategory.REVERSE_ENGINEERING,
@@ -27,14 +27,14 @@ export const syncHookRecords = defineTool({
     hookId: zod
       .string()
       .optional()
-      .describe('Specific hook ID to sync, omit for all'),
+      .describe('指定要同步的 Hook ID，省略则同步全部'),
     verbose: zod
       .boolean()
       .optional()
-      .describe('Include detailed records per hook, default false'),
-    type: zod.string().optional().describe('Filter by hook type'),
-    event: zod.string().optional().describe('Filter by event name'),
-    phase: zod.string().optional().describe('Filter by phase'),
+      .describe('包含每个 Hook 的详细记录，默认 false'),
+    type: zod.string().optional().describe('按 Hook 类型过滤'),
+    event: zod.string().optional().describe('按事件名过滤'),
+    phase: zod.string().optional().describe('按阶段过滤'),
   },
   handler: async (request, response, context) => {
     const {hookId, verbose, type, event, phase} = request.params;

@@ -15,7 +15,7 @@ const DIRECTION_OPTIONS: readonly ['sent', 'received'] = ['sent', 'received'];
 
 export const analyzeWebSocketMessages = defineTool({
   name: 'analyze_websocket_messages',
-  description: `Analyzes WebSocket messages and groups them by pattern/fingerprint. Essential for understanding binary/protobuf message types in live streaming scenarios. Returns statistics and sample indices for each message type.`,
+  description: `分析 WebSocket 消息并按模式/指纹分组。对于理解直播等场景中的二进制/protobuf 消息类型至关重要。返回每种消息类型的统计信息与样本索引。`,
   annotations: {
     category: ToolCategory.NETWORK,
     readOnlyHint: true,
@@ -23,11 +23,11 @@ export const analyzeWebSocketMessages = defineTool({
   schema: {
     wsid: zod
       .number()
-      .describe('The wsid of the WebSocket connection to analyze.'),
+      .describe('要分析的 WebSocket 连接的 wsid。'),
     direction: zod
       .enum(DIRECTION_OPTIONS)
       .optional()
-      .describe('Only analyze messages in this direction.'),
+      .describe('仅分析该方向的消息。'),
   },
   handler: async (request, response) => {
     const result = await getRuntime().networkModule.analyzeWebSocketMessages(

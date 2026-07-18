@@ -12,7 +12,7 @@ import {defineTool} from '../ToolDefinition.js';
 export const getNetworkRequest = defineTool({
   name: 'get_network_request',
   description:
-    'Gets a network request by an optional reqid, if omitted returns the currently selected request in the DevTools Network panel.',
+    '按可选的 reqid 获取网络请求；若省略则返回 DevTools Network 面板中当前选中的请求。',
   annotations: {
     category: ToolCategory.NETWORK,
     readOnlyHint: true,
@@ -22,7 +22,7 @@ export const getNetworkRequest = defineTool({
       .number()
       .optional()
       .describe(
-        'The reqid of the network request. If omitted returns the currently selected request in the DevTools Network panel.',
+        '网络请求的 reqid。省略时返回 DevTools Network 面板中当前选中的请求。',
       ),
     maxBodyLength: zod
       .number()
@@ -30,7 +30,7 @@ export const getNetworkRequest = defineTool({
       .positive()
       .optional()
       .describe(
-        'Maximum length of the response body to return. Defaults to 300 characters.',
+        '返回的响应体最大长度。默认 300 字符。',
       ),
   },
   handler: async (request, response) => {

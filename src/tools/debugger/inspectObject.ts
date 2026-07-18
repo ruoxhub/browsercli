@@ -16,7 +16,7 @@ import {evaluateInPageRuntime} from './evaluateInPageRuntime.js';
 export const inspectObject = defineTool({
   name: 'inspect_object',
   description:
-    'Deeply inspects a JavaScript object, showing its properties, prototype chain, and methods. Useful for understanding object structure.',
+    '深度检查一个 JavaScript 对象，展示其属性、原型链与方法，便于理解对象结构。',
   annotations: {
     title: '检查对象',
     category: ToolCategory.REVERSE_ENGINEERING,

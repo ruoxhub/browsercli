@@ -26,7 +26,7 @@ import {isAggregatedIssue} from './types.js';
 export const listConsoleMessages = defineTool({
   name: 'list_console_messages',
   description:
-    'List all console messages for the currently selected page since the last navigation. Supports filtering by type and pagination.',
+    '列出当前选中页面自上次导航以来的所有 Console 消息，支持按类型过滤与分页。',
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
@@ -38,7 +38,7 @@ export const listConsoleMessages = defineTool({
       .positive()
       .optional()
       .describe(
-        'Maximum number of messages to return. When omitted, returns all messages.',
+        '返回的最大消息数量。省略时返回全部消息。',
       ),
     pageIdx: zod
       .number()
@@ -46,20 +46,20 @@ export const listConsoleMessages = defineTool({
       .min(0)
       .optional()
       .describe(
-        'Page number to return (0-based). When omitted, returns the first page.',
+        '要返回的页码（从 0 开始）。省略时返回第一页。',
       ),
     types: zod
       .array(zod.enum(FILTERABLE_MESSAGE_TYPES))
       .optional()
       .describe(
-        'Filter messages to only return messages of the specified types. When omitted or empty, returns all messages.',
+        '仅返回指定类型的消息。省略或为空时返回全部消息。',
       ),
     includePreservedMessages: zod
       .boolean()
       .default(false)
       .optional()
       .describe(
-        'Set to true to return the preserved messages over the last 3 navigations.',
+        '设为 true 可返回最近 3 次导航内保留的消息。',
       ),
   },
   handler: async (request, response) => {

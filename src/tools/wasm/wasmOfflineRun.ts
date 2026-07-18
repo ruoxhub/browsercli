@@ -38,30 +38,30 @@ function runCommand(
 export const wasmOfflineRun = defineTool({
   name: 'wasm_offline_run',
   description:
-    'Execute a Wasm function offline using wasmtime or wasmer CLI runtime.',
+    '使用 wasmtime 或 wasmer CLI 运行时离线执行 Wasm 函数。',
   annotations: {
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: false,
   },
   schema: {
-    inputPath: zod.string().describe('Path to the .wasm file'),
+    inputPath: zod.string().describe('.wasm 文件路径'),
     functionName: zod
       .string()
-      .describe('Name of the exported Wasm function to invoke'),
+      .describe('要调用的导出 Wasm 函数名'),
     args: zod
       .array(zod.string())
       .optional()
-      .describe('Arguments to pass to the function'),
+      .describe('传给函数的参数'),
     runtime: zod
       .enum(['wasmtime', 'wasmer', 'auto'])
       .optional()
-      .describe('Runtime to use (default "auto")'),
+      .describe('使用的运行时（默认 "auto"）'),
     timeoutMs: zod
       .number()
       .int()
       .positive()
       .optional()
-      .describe('Execution timeout in ms (default 10000)'),
+      .describe('执行超时时间（毫秒，默认 10000）'),
   },
   handler: async (request, response) => {
     const {

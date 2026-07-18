@@ -39,7 +39,7 @@ interface HookDiagnostic {
 export const getHookData = defineTool({
   name: 'get_hook_data',
   description:
-    'Get captured hook data. Syncs from browser to HookManager first, then returns data. Supports raw, summary, and detail views with filtering.',
+    '获取 Hook 采集到的数据。会先从浏览器同步到 HookManager，再返回数据。支持 raw、summary、detail 三种视图并支持过滤。',
   annotations: {
     title: 'Get Hook Data',
     category: ToolCategory.REVERSE_ENGINEERING,
@@ -49,22 +49,22 @@ export const getHookData = defineTool({
     hookId: zod
       .string()
       .optional()
-      .describe('Specific hook ID, omit for all hooks'),
+      .describe('指定 Hook ID，省略则返回全部 Hook'),
     view: zod
       .enum(['raw', 'summary', 'detail'])
       .optional()
       .describe(
-        'View mode: raw (original), summary (deduplicated), detail (with diagnostics), default raw',
+        '视图模式：raw（原始）、summary（去重摘要）、detail（含诊断信息），默认 raw',
       ),
     maxRecords: zod
       .number()
       .int()
       .positive()
       .optional()
-      .describe('Maximum number of records to return'),
-    type: zod.string().optional().describe('Filter by hook type'),
-    event: zod.string().optional().describe('Filter by event name'),
-    phase: zod.string().optional().describe('Filter by phase'),
+      .describe('返回的最大记录条数'),
+    type: zod.string().optional().describe('按 Hook 类型过滤'),
+    event: zod.string().optional().describe('按事件名过滤'),
+    phase: zod.string().optional().describe('按阶段过滤'),
   },
   handler: async (request, response, context) => {
     const {hookId, view, maxRecords, type, event, phase} = request.params;

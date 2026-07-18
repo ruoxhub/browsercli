@@ -14,7 +14,7 @@ import {defineTool, type Context} from '../ToolDefinition.js';
 export const setFiles = defineTool({
   name: 'set_files',
   description:
-    'Set files on a file input element using CDP DOM.setFileInputFiles. Useful when Playwright setInputFiles is blocked.',
+    '使用 CDP DOM.setFileInputFiles 为 file input 元素设置文件，适用于 Playwright setInputFiles 被拦截的场景。',
   annotations: {
     title: '设置文件',
     category: ToolCategory.NAVIGATION,

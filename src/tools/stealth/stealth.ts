@@ -20,13 +20,13 @@ import {defineTool} from '../ToolDefinition.js';
 export const injectStealth = defineTool({
   name: 'inject_stealth',
   description:
-    'Inject anti-detection stealth scripts (hide webdriver, mock chrome, canvas noise, etc.)',
+    '注入反检测隐身脚本（隐藏 webdriver、伪装 chrome、canvas 噪点等）',
   annotations: {
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: false,
   },
   schema: {
-    preset: zod.string().optional().describe('Stealth preset name'),
+    preset: zod.string().optional().describe('隐身预设名称'),
   },
   handler: async (request, response, context) => {
     const preset = request.params.preset as StealthPreset | undefined;
@@ -54,7 +54,7 @@ export const injectStealth = defineTool({
  */
 export const listStealthPresets = defineTool({
   name: 'list_stealth_presets',
-  description: 'List available stealth presets',
+  description: '列出可用的隐身预设',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
   schema: {},
   handler: async (_request, response, _context) => {
@@ -72,7 +72,7 @@ export const listStealthPresets = defineTool({
  */
 export const listStealthFeatures = defineTool({
   name: 'list_stealth_features',
-  description: 'List available stealth features',
+  description: '列出可用的隐身特性开关',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
   schema: {},
   handler: async (_request, response, _context) => {
@@ -109,13 +109,13 @@ export const listStealthFeatures = defineTool({
  */
 export const setUserAgent = defineTool({
   name: 'set_user_agent',
-  description: 'Set custom User-Agent for the current page via CDP',
+  description: '通过 CDP 为当前页面设置自定义 User-Agent',
   annotations: {
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: false,
   },
   schema: {
-    userAgent: zod.string().describe('Custom User-Agent string'),
+    userAgent: zod.string().describe('自定义 User-Agent 字符串'),
   },
   handler: async (request, response, context) => {
     const {userAgent} = request.params;

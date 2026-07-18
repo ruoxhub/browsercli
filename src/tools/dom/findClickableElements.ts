@@ -20,7 +20,7 @@ import type {ClickableElement} from './types.js';
 export const findClickableElements = defineTool({
   name: 'find_clickable_elements',
   description:
-    'Find clickable buttons and links on the current page. Optionally filter by text content. Returns selector, text, type, visibility, and bounding box.',
+    '查找当前页面中可点击的按钮与链接，可按文本内容过滤，返回选择器、文本、类型、可见性与包围盒。',
   annotations: {
     title: '查找可点击元素',
     category: ToolCategory.NAVIGATION,

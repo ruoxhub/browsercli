@@ -19,7 +19,7 @@ import {defineTool} from '../ToolDefinition.js';
 export const createHook = defineTool({
   name: 'create_hook',
   description:
-    'RECOMMENDED: Create hook script for function/fetch/xhr/property/cookie/websocket/eval/timer. Hooks run without pausing page execution and are the preferred approach over breakpoints for monitoring and interception. Returns hookId and script for use with inject_hook.',
+    '推荐：为 function/fetch/xhr/property/cookie/websocket/eval/timer 创建 hook 脚本。Hook 运行时不会暂停页面执行，相比断点是更优的监控与拦截手段。返回 hookId 与 script，供 inject_hook 使用。',
   annotations: {
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: false,
@@ -28,21 +28,21 @@ export const createHook = defineTool({
     type: zod
       .string()
       .describe(
-        'Hook type (e.g., "fetch", "xhr", "cookie", "websocket", "localStorage", "console", "timer", "eval", "cryptojs", "jsencrypt", "smcrypto")',
+        'Hook 类型（如 "fetch"、"xhr"、"cookie"、"websocket"、"localStorage"、"console"、"timer"、"eval"、"cryptojs"、"jsencrypt"、"smcrypto"）',
       ),
     params: zod
       .record(zod.string(), zod.unknown())
       .optional()
-      .describe('Type-specific parameters'),
+      .describe('类型相关参数'),
     description: zod
       .string()
       .optional()
-      .describe('Human-readable description of this hook'),
+      .describe('该 Hook 的可读描述'),
     action: zod
       .enum(['log', 'block', 'modify', 'passthrough'])
       .optional()
-      .describe('Hook action mode (default: log)'),
-    hookId: zod.string().optional().describe('Custom hook identifier'),
+      .describe('Hook 动作模式（默认：log）'),
+    hookId: zod.string().optional().describe('自定义 Hook 标识符'),
     capture: zod
       .object({
         args: zod.boolean().optional(),
@@ -52,7 +52,7 @@ export const createHook = defineTool({
         thisContext: zod.boolean().optional(),
       })
       .optional()
-      .describe('Capture configuration'),
+      .describe('采集配置'),
     condition: zod
       .object({
         expression: zod.string().optional(),
@@ -61,7 +61,7 @@ export const createHook = defineTool({
         urlPattern: zod.string().optional(),
       })
       .optional()
-      .describe('Conditional execution'),
+      .describe('条件执行'),
   },
   handler: async (request, response) => {
     const runtime = getRuntime();

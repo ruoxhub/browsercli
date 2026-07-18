@@ -14,7 +14,7 @@ import type {ExportRequestAsCurlParams} from './types.js';
 export const exportRequestAsCurl = defineTool({
   name: 'export_request_as_curl',
   description:
-    'Export a captured network request (by reqid) as a curl command. Supports the same overrides as replay_network_request. Useful for reproducing a request outside the browser or verifying that an exported command reproduces the captured response.',
+    '将捕获的网络请求（按 reqid）导出为 curl 命令。支持与 replay_network_request 相同的覆盖项。适用于在浏览器外复现请求，或验证导出的命令能否复现捕获的响应。',
   annotations: {
     category: ToolCategory.NETWORK,
     readOnlyHint: true,
@@ -24,31 +24,31 @@ export const exportRequestAsCurl = defineTool({
       .number()
       .int()
       .positive()
-      .describe('The reqid of the captured network request to export.'),
-    method: zod.string().optional().describe('Override the HTTP method.'),
-    url: zod.string().optional().describe('Override the request URL.'),
+      .describe('要导出的已捕获网络请求的 reqid。'),
+    method: zod.string().optional().describe('覆盖 HTTP 方法。'),
+    url: zod.string().optional().describe('覆盖请求 URL。'),
     headers: zod
       .record(zod.string(), zod.string())
       .optional()
       .describe(
-        'Headers to merge with the original (override wins on key collision, case-insensitive). Set replaceHeaders=true to replace wholesale.',
+        '与原请求头合并的头部（键冲突时覆盖优先，大小写不敏感）。设置 replaceHeaders=true 可整体替换。',
       ),
     body: zod
       .string()
       .nullable()
       .optional()
-      .describe('Override the request body. null clears the body.'),
+      .describe('覆盖请求体。null 表示清空请求体。'),
     replaceHeaders: zod
       .boolean()
       .optional()
       .describe(
-        'If true, the headers param replaces the original headers entirely. Default false (merge).',
+        '若为 true，headers 参数将整体替换原始请求头。默认 false（合并）。',
       ),
     includeCookies: zod
       .boolean()
       .optional()
       .describe(
-        'If true, embed cookies from the browser context as a Cookie header in the curl command. Default false (cookies are session-bound and may be sensitive).',
+        '若为 true，将浏览器上下文中的 Cookie 作为 Cookie 请求头嵌入 curl 命令。默认 false（Cookie 与会话绑定，可能含敏感信息）。',
       ),
   },
   handler: async (request, response) => {

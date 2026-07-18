@@ -29,7 +29,7 @@ const actionLabel: Record<NavType, string> = {
 export const navigatePage = defineTool({
   name: 'navigate_page',
   description:
-    'Navigate the current page. Supports URL navigation, back, forward, and reload. Waits for DOMContentLoaded event.',
+    '导航当前页面，支持 URL 导航、后退、前进与刷新，等待 DOMContentLoaded 事件。',
   annotations: {
     title: '导航页面',
     category: ToolCategory.NAVIGATION,

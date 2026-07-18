@@ -22,35 +22,35 @@ import {defineTool} from '../ToolDefinition.js';
  */
 export const captureVideoFrame = defineTool({
   name: 'capture_video_frame',
-  description: `Capture the current frame of a video element. Optionally seek to a specific time first. Returns the frame as an image.`,
+  description: `捕获视频元素的当前帧。可选地先定位到指定时间点。以图片形式返回该帧。`,
   annotations: {
     title: '捕获视频帧',
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
   },
   schema: {
-    selector: zod.string().describe('CSS selector for the video element.'),
+    selector: zod.string().describe('视频元素的 CSS 选择器。'),
     seekTime: zod
       .number()
       .optional()
       .describe(
-        'Time position in seconds to seek to before capturing (optional).',
+        '捕获前定位到的时间点（秒，可选）。',
       ),
     outputPath: zod
       .string()
       .optional()
-      .describe('File path to save the captured frame (optional).'),
+      .describe('保存捕获帧的文件路径（可选）。'),
     format: zod
       .enum(['png', 'jpeg'])
       .default('png')
-      .describe('Image format for the captured frame. Default is "png".'),
+      .describe('捕获帧的图片格式。默认 "png"。'),
     quality: zod
       .number()
       .min(0)
       .max(100)
       .optional()
       .describe(
-        'Compression quality for JPEG format (0-100). Ignored for PNG format.',
+        'JPEG 格式的压缩质量（0-100）。PNG 格式忽略此参数。',
       ),
   },
   handler: async (request, response, context) => {

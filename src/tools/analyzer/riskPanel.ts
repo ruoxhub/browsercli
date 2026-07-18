@@ -78,8 +78,7 @@ function buildRiskRecommendations(input: {
 
 export const riskPanel = defineTool({
   name: 'risk_panel',
-  description:
-    'Build a combined risk score from analyzer, crypto detector and hook signals.',
+  description: '综合分析器、加密检测与 Hook 信号构建统一风险评分。',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
   schema: {
     code: zod.string().optional(),
