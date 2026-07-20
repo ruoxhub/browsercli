@@ -5,6 +5,7 @@
  */
 
 import type {DebuggerManager} from '../../modules/debugger/DebuggerManager.js';
+import type {BreakpointInfo} from '../../modules/debugger/types.js';
 import path from 'node:path';
 import {zod} from '../../third_party/index.js';
 import {safeStringify} from '../../utils/safeJson.js';
@@ -289,14 +290,26 @@ export async function buildPausedInfoData(
 export const setBreakpoint = defineTool({
   name: 'set_breakpoint',
   description:
-    '设置 JavaScript 断点。支持按脚本 URL 和行号设置，可选条件表达式。注意：优先使用 hook_function 或 trace_function 进行监控，断点需要暂停/恢复协调，在自动化流程中容易出错。',
+    '设置 JavaScript 断点。支持按脚本 URL 或 scriptId（来自 list_scripts / search_in_sources）加行号设置，可选条件表达式。注意：优先使用 hook_function 或 trace_function 进行监控，断点需要暂停/恢复协调，在自动化流程中容易出错。',
   annotations: {
     title: '设置断点',
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
   },
   schema: {
-    url: zod.string().describe('JavaScript 文件的 URL（支持部分匹配或正则）.'),
+    url: zod
+      .string()
+      .optional()
+      .describe(
+        'JavaScript 文件的 URL（支持部分匹配或正则）。与 scriptId 二选一，优先使用 scriptId 精确定位。',
+      ),
+    scriptId: zod
+      .union([zod.string(), zod.number()])
+      .transform(value => String(value))
+      .optional()
+      .describe(
+        '脚本 ID（来自 list_scripts / search_in_sources）。按 scriptId 定位可避免 URL 歧义，要求该脚本在当前调试会话中仍已加载。',
+      ),
     lineNumber: zod.number().int().describe('断点行号（1-based）.'),
     columnNumber: zod
       .number()
@@ -312,19 +325,23 @@ export const setBreakpoint = defineTool({
       .boolean()
       .optional()
       .default(false)
-      .describe('是否将 URL 视为正则表达式.'),
+      .describe('是否将 URL 视为正则表达式（仅在使用 url 时生效）.'),
   },
   handler: async (request, response, context) => {
     const url = request.params.url;
+    const scriptId = request.params.scriptId;
     const lineNumber = request.params.lineNumber;
     const columnNumber = request.params.columnNumber;
     const condition = request.params.condition;
     const isRegex = request.params.isRegex;
 
-    if (!url || typeof url !== 'string' || url.trim() === '') {
+    // url 与 scriptId 必须提供其一。
+    const hasUrl = !!url && typeof url === 'string' && url.trim() !== '';
+    const hasScriptId = !!scriptId && scriptId.trim() !== '';
+    if (!hasUrl && !hasScriptId) {
       response.setStructuredContent({
         success: false,
-        message: 'url 参数不能为空。',
+        message: 'url 与 scriptId 至少提供一个。',
         tooltype: 'set_breakpoint',
         data: {},
       });
@@ -335,19 +352,29 @@ export const setBreakpoint = defineTool({
 
     try {
       const debuggerContext = await getDebuggerFromContext(context);
-      const breakpoint = isRegex
-        ? await debuggerContext.setBreakpointByUrlRegex({
-            urlRegex: url,
-            lineNumber: lineNum - 1,
-            columnNumber: columnNumber ?? 0,
-            condition,
-          })
-        : await debuggerContext.setBreakpointByUrl({
-            url,
-            lineNumber: lineNum - 1,
-            columnNumber: columnNumber ?? 0,
-            condition,
-          });
+      let breakpoint: BreakpointInfo;
+      if (hasScriptId) {
+        breakpoint = await debuggerContext.setBreakpoint({
+          scriptId,
+          lineNumber: lineNum - 1,
+          columnNumber: columnNumber ?? 0,
+          condition,
+        });
+      } else if (isRegex) {
+        breakpoint = await debuggerContext.setBreakpointByUrlRegex({
+          urlRegex: url,
+          lineNumber: lineNum - 1,
+          columnNumber: columnNumber ?? 0,
+          condition,
+        });
+      } else {
+        breakpoint = await debuggerContext.setBreakpointByUrl({
+          url,
+          lineNumber: lineNum - 1,
+          columnNumber: columnNumber ?? 0,
+          condition,
+        });
+      }
 
       response.setStructuredContent({
         success: true,
@@ -355,7 +382,8 @@ export const setBreakpoint = defineTool({
         tooltype: 'set_breakpoint',
         data: {
           breakpointId: breakpoint.breakpointId,
-          url: url,
+          url: hasUrl ? url : null,
+          scriptId: hasScriptId ? scriptId : null,
           lineNumber: lineNum,
           columnNumber: columnNumber ?? 0,
           condition: condition,

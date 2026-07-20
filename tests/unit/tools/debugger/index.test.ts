@@ -119,6 +119,23 @@ function createRuntime() {
       hitCount: 0,
       createdAt: Date.now(),
     }),
+    setBreakpoint: async (params: {
+      scriptId: string;
+      lineNumber: number;
+      columnNumber: number;
+      condition?: string;
+    }) => ({
+      breakpointId: 'bp-script',
+      location: {
+        scriptId: params.scriptId,
+        lineNumber: params.lineNumber,
+        columnNumber: params.columnNumber,
+      },
+      condition: params.condition,
+      enabled: true,
+      hitCount: 0,
+      createdAt: Date.now(),
+    }),
     removeBreakpoint: async (_breakpointId: string) => undefined,
     getBreakpoints: () => [
       {
@@ -418,6 +435,52 @@ describe('src/tools/debugger/index.ts', () => {
     assert.match(breakpointText, /bp-1/);
     assert.match(regexBreakpointText, /bp-regex/);
     assert.match(removedText, /已移除/);
+  });
+
+  it('set_breakpoint accepts scriptId and resolves to 0-based line', async () => {
+    const {context} = createRuntime();
+
+    const scriptBreakpointLines = await callTool(
+      setBreakpoint,
+      {
+        scriptId: '272508',
+        lineNumber: 31,
+      },
+      context,
+    );
+    const scriptBreakpointText = linesToText(scriptBreakpointLines);
+    const parsed = JSON.parse(scriptBreakpointText) as {
+      success: boolean;
+      data: {
+        breakpointId: string;
+        scriptId: string | null;
+        url: string | null;
+        lineNumber: number;
+      };
+    };
+
+    assert.equal(parsed.success, true);
+    assert.equal(parsed.data.breakpointId, 'bp-script');
+    assert.equal(parsed.data.scriptId, '272508');
+    assert.equal(parsed.data.url, null);
+    // 工具层 1-based -> CDP 0-based 的转换由底层 setBreakpoint 接收。
+    assert.equal(parsed.data.lineNumber, 31);
+  });
+
+  it('set_breakpoint requires url or scriptId', async () => {
+    const {context} = createRuntime();
+
+    const missingLines = await callTool(
+      setBreakpoint,
+      {
+        lineNumber: 31,
+      },
+      context,
+    );
+    const missingText = linesToText(missingLines);
+    const parsed = JSON.parse(missingText) as {success: boolean};
+
+    assert.equal(parsed.success, false);
   });
 
   it('supports pause-state, xhr, and trace operations', async () => {
