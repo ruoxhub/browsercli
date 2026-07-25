@@ -5,7 +5,6 @@
  */
 
 import {zod} from '../../third_party/index.js';
-import type {ToolContextProvider} from '../../worker/ToolContext.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -27,10 +26,16 @@ export const seekVideo = defineTool({
     time: zod.number().describe('要定位到的时间点（秒）。'),
   },
   handler: async (request, response, context) => {
-    const runtime = context as unknown as ToolContextProvider;
-
     try {
-      const page = await runtime.getActivePage();
+      const page = context.getSelectedPage();
+      if (!page) {
+        response.setStructuredContent({
+          success: false,
+          message: '未选中页面，请先使用 select_page 选择目标页面。',
+          tooltype: 'seek_video',
+        });
+        return;
+      }
       await page.evaluate(
         ({sel, t}) => {
           const video = document.querySelector(sel) as HTMLVideoElement;

@@ -38,3 +38,51 @@ describe('validateToolArgs numeric string-id coercion', () => {
     assert.equal(result.ok, false);
   });
 });
+
+describe('validateToolArgs array-of-object (json) param', () => {
+  before(async () => {
+    await ensureToolsMeta();
+  });
+
+  it('replay_network_request_batch 暴露 variants 为 json 规格', () => {
+    const meta = getToolMeta('replay_network_request_batch');
+    assert.ok(meta, 'replay_network_request_batch meta 应存在');
+    assert.equal(meta!.argSpecs.variants?.type, 'json');
+  });
+
+  it('接受以 JSON 字符串传入的 --variants 并解析为数组', () => {
+    const result = validateToolArgs('replay_network_request_batch', {
+      reqid: 1,
+      variants: '[{"method":"GET"}]',
+    });
+
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.ok(Array.isArray(result.value.variants));
+      assert.equal(
+        (result.value.variants as Array<{method?: string}>)[0].method,
+        'GET',
+      );
+    }
+  });
+
+  it('接受已解析的数组（非字符串）作为 variants', () => {
+    const result = validateToolArgs('replay_network_request_batch', {
+      reqid: 1,
+      variants: [{method: 'POST'}],
+    });
+
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.equal((result.value.variants as unknown[]).length, 1);
+    }
+  });
+
+  it('缺省 variants 时不报错（工具内部自动派生单变体）', () => {
+    const result = validateToolArgs('replay_network_request_batch', {
+      reqid: 1,
+    });
+
+    assert.equal(result.ok, true);
+  });
+});

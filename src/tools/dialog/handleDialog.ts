@@ -60,10 +60,8 @@ export const handleDialog = defineTool({
     const {action, promptText} = request.params;
     const tooltype = 'handle_dialog';
 
-    let page;
-    try {
-      page = context.getSelectedPage();
-    } catch {
+    const page = context.getSelectedPage();
+    if (!page) {
       response.setStructuredContent({
         success: false,
         message:

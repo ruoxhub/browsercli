@@ -155,6 +155,24 @@ function validateType(
             ok: false,
             error: `${toolName} 的参数 ${key} 必须是 JSON 对象（提示：用 --data '{...}' 或 --file params.json 传递）`,
           };
+    case 'json':
+      // 接受已解析的对象/数组，或 JSON 字符串（CLI 以字符串传入）。
+      if (typeof value === 'string') {
+        try {
+          value = JSON.parse(value);
+        } catch {
+          return {
+            ok: false,
+            error: `${toolName} 的参数 ${key} 必须是合法 JSON`,
+          };
+        }
+      }
+      return value !== null && typeof value === 'object'
+        ? {ok: true, value}
+        : {
+            ok: false,
+            error: `${toolName} 的参数 ${key} 必须是 JSON 对象或数组`,
+          };
     default:
       return {ok: true, value};
   }

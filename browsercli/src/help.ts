@@ -13,6 +13,7 @@ const commandDescriptions: Record<string, string> = {
   config: '查看/设置/初始化全局配置',
   'list-tools': '列出所有可用的 MCP 工具及旧技能兼容映射',
   scaffold: '创建新的逆向任务脚手架',
+  status: '查看 Worker 服务运行状态与统计信息',
 };
 
 export function generateTopLevelHelp(options?: {
@@ -29,6 +30,7 @@ export function generateTopLevelHelp(options?: {
     'list-tools',
     'config',
     'scaffold',
+    'status',
   ];
 
   const lines = [
@@ -72,6 +74,10 @@ export function generateCommandHelp(command: string): string | null {
       description: '创建新的逆向任务脚手架',
       usage:
         'browsercli scaffold --name <name> [--desc <description>] [--url <url>] [--output <directory>]',
+    },
+    status: {
+      description: '查看 Worker 服务运行状态与统计信息',
+      usage: 'browsercli status [--json]',
     },
   };
 

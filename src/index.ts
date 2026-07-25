@@ -15,9 +15,10 @@
  * 5. 启动 Web 控制台，浏览器/数据库由面板显式触发连接
  */
 
-import './utils/logger.js';
+import {logger} from './utils/logger.js';
 
 import {resolveConfig} from './config.js';
+import {dbService} from './services/DatabaseService.js';
 import {getRuntimeConfigStore} from './config/RuntimeConfigStore.js';
 import {getRuntime} from './runtime.js';
 import {ConsoleServer} from './web/ConsoleServer.js';
@@ -54,6 +55,24 @@ async function main(): Promise<void> {
   // 暴露 RPC 连接信息给 ConsoleServer（Phase 3 启动时读取）
   workerStartContext.group = options.group;
   workerStartContext.rpcHost = options.rpcHost;
+
+  // 3. 若配置了 databaseUrl，则自动连接站点经验库（非致命：失败仅告警，
+  //     不阻断 worker 启动；未配置时站点经验相关工具会返回 Database not connected）
+  const databaseUrl = resolved.databaseUrl;
+  if (databaseUrl) {
+    try {
+      await dbService.connect(databaseUrl);
+      await dbService.migrate().catch(err => {
+        logger.warn('[Worker] 站点经验库迁移跳过（可能已是最新表结构）:', err);
+      });
+      logger.info('[Worker] 站点经验库已连接');
+    } catch (err) {
+      logger.warn(
+        '[Worker] 数据库自动连接失败，站点经验相关工具将不可用:',
+        err,
+      );
+    }
+  }
 
   console.log('[Worker] 启动中...');
   console.log(`[Worker] Rpc Host: ${options.rpcHost}`);

@@ -36,6 +36,14 @@ export const typeText = defineTool({
 
     try {
       const page = context.getSelectedPage();
+      if (!page) {
+        sendJson(response, {
+          success: false,
+          message: '未选中页面，请先使用 select_page 选择目标页面。',
+          tooltype: 'type_text',
+        });
+        return;
+      }
       await page.type(selector, text, {delay});
       sendJson(response, {
         success: true,

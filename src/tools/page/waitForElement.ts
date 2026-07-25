@@ -28,6 +28,14 @@ export const waitForElement = defineTool({
 
     try {
       const page = context.getSelectedPage();
+      if (!page) {
+        sendJson(response, {
+          success: false,
+          message: '未选中页面，请先使用 select_page 选择目标页面。',
+          tooltype: 'wait_for_element',
+        });
+        return;
+      }
 
       await page.waitForSelector(selector, {
         timeout: timeout ?? 30000,

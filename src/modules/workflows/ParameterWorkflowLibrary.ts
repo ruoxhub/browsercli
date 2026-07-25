@@ -3,6 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+import {existsSync} from 'node:fs';
 import {access, mkdir, readFile, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -15,13 +16,52 @@ import type {
 } from './types.js';
 
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
-const BUILD_DIR = path.resolve(MODULE_DIR, '..', '..', '..');
-const KNOWLEDGE_ROOT = path.join(
-  BUILD_DIR,
-  'docs',
-  'knowledge',
-  'parameter-blueprints',
-);
+
+/**
+ * knowledge 源数据位于仓库根目录 `docs/knowledge/parameter-blueprints`，
+ * 但编译后（build/src/...）无法直接访问该路径，旧的推导 `build/docs/...`
+ * 会触发 ENOENT。这里同时列举编译产物与源码两种布局下可能的仓库根 docs 目录，
+ * 并选取实际存在的目录，确保 list/get/recommend_parameter_workflow 可用。
+ */
+function resolveKnowledgeRoot(): string {
+  const candidates = [
+    // 编译产物布局：build/src/modules/workflows → 回退 4 级到仓库根
+    path.resolve(
+      MODULE_DIR,
+      '..',
+      '..',
+      '..',
+      '..',
+      'docs',
+      'knowledge',
+      'parameter-blueprints',
+    ),
+    // 源码布局：src/modules/workflows → 回退 3 级到仓库根
+    path.resolve(
+      MODULE_DIR,
+      '..',
+      '..',
+      '..',
+      'docs',
+      'knowledge',
+      'parameter-blueprints',
+    ),
+  ];
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  // 兜底：沿用旧的 build 推导（保持历史行为，便于排错）
+  return path.join(
+    path.resolve(MODULE_DIR, '..', '..', '..'),
+    'docs',
+    'knowledge',
+    'parameter-blueprints',
+  );
+}
+
+const KNOWLEDGE_ROOT = resolveKnowledgeRoot();
 
 const TEMPLATE_METADATA = {
   id: 'replace-me',

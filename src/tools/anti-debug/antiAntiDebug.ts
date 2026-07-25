@@ -36,7 +36,7 @@ export const antiAntiDebug = defineTool({
       ),
   },
   handler: async (request, response, context) => {
-    const {features} = request.params;
+    const features = request.params.features ?? [];
 
     if (features.length === 0) {
       response.setStructuredContent({

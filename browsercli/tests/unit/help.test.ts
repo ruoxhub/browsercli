@@ -18,6 +18,7 @@ describe('help', () => {
       assert.ok(result.includes('list-tools'));
       assert.ok(result.includes('config'));
       assert.ok(result.includes('scaffold'));
+      assert.ok(result.includes('status'));
     });
 
     it('accepts custom bin name', () => {
@@ -74,10 +75,15 @@ describe('help', () => {
       assert.ok(result!.includes('--name'));
     });
 
+    it('returns help for status command', () => {
+      const result = generateCommandHelp('status');
+      assert.ok(result);
+      assert.ok(result!.includes('status'));
+    });
+
     it('returns null for removed commands', () => {
       assert.strictEqual(generateCommandHelp('start'), null);
       assert.strictEqual(generateCommandHelp('stop'), null);
-      assert.strictEqual(generateCommandHelp('status'), null);
       assert.strictEqual(generateCommandHelp('repl'), null);
     });
 
@@ -86,7 +92,7 @@ describe('help', () => {
     });
 
     it('returns help for all kept commands', () => {
-      const commands = ['call', 'list-tools', 'config', 'scaffold'];
+      const commands = ['call', 'list-tools', 'config', 'scaffold', 'status'];
       for (const cmd of commands) {
         const result = generateCommandHelp(cmd);
         assert.ok(result, `Expected help for ${cmd}`);

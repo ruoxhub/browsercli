@@ -12,7 +12,7 @@ import type {WorkerHttpClient} from './WorkerHttpClient.js';
 
 export interface WorkerContext {
   /** HTTP 传输模式下使用的 Worker 客户端（request-response 封装） */
-  httpClient: WorkerHttpClient;
+  httpClient?: WorkerHttpClient;
   /** 传输方式：'http'（默认）= 纯 HTTP 客户端；'sekiro' = 旧 Sekiro RPC 路径 */
   transport: 'http' | 'sekiro';
 }

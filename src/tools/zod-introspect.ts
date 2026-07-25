@@ -16,7 +16,10 @@ export type ToolArgType =
   | 'number'
   | 'boolean'
   | 'string[]'
-  | 'object';
+  | 'object'
+  // 'json'：任意 JSON 值（对象或数组），CLI 以 JSON 字符串传入；
+  // 校验层负责 JSON.parse。用于 array<object> 等复杂参数（如 variants）。
+  | 'json';
 
 export interface ToolArgSpec {
   type: ToolArgType;
@@ -77,7 +80,16 @@ function resolveSimpleType(
   if (inner instanceof zod.ZodEnum || inner instanceof zod.ZodNativeEnum)
     return 'string';
   if (inner instanceof zod.ZodArray) {
-    return inner.element instanceof zod.ZodString ? 'string[]' : null;
+    if (inner.element instanceof zod.ZodString) return 'string[]';
+    // 数组元素为对象/记录（如 array<object> 的 variants 参数）→
+    // 归为 'json'，交由校验层接受 JSON 数组或对象。
+    if (
+      inner.element instanceof zod.ZodObject ||
+      inner.element instanceof zod.ZodRecord
+    ) {
+      return 'json';
+    }
+    return null;
   }
   if (inner instanceof zod.ZodUnion) {
     const first = inner._def.options[0] as zod.ZodTypeAny;

@@ -8,10 +8,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import {zod} from '../../third_party/index.js';
-import type {ToolContextProvider} from '../../worker/ToolContext.js';
 import {ToolCategory} from '../categories.js';
 import {
-  getActivePageWithGuard,
   normalizeBrowserRuntimeError,
   withOperationTimeout,
 } from '../shared/browserRuntime.js';
@@ -62,12 +60,19 @@ export const takeScreenshot = defineTool({
       ),
   },
   handler: async (request, response, context) => {
-    const runtime = context as unknown as ToolContextProvider;
     const format = request.params.format;
     const quality = format === 'png' ? undefined : request.params.quality;
 
     try {
-      const page = await getActivePageWithGuard(runtime);
+      const page = context.getSelectedPage();
+      if (!page) {
+        response.setStructuredContent({
+          success: false,
+          message: '未选中页面，请先使用 select_page 选择目标页面。',
+          tooltype: 'take_screenshot',
+        });
+        return;
+      }
 
       // 自动创建截图目录
       const resolvedFilePath = request.params.filePath

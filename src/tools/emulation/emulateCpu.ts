@@ -30,13 +30,12 @@ export const emulateCpu = defineTool({
 
     try {
       const client = await page.context().newCDPSession(page);
-      await client.send('Performance.enable');
       await (
         client.send as (
           method: string,
           params?: Record<string, unknown>,
         ) => Promise<Record<string, unknown>>
-      )('Performance.setCPUThrottlingRate', {
+      )('Emulation.setCPUThrottlingRate', {
         rate: throttlingRate,
       });
       response.setStructuredContent({

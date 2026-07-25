@@ -63,11 +63,9 @@ export const collectCode = defineTool({
 
     // Sync page context from tool context to runtime.collector
     // so that collector.collect() can resolve the current page.
-    try {
-      const page = context.getSelectedPage();
-      runtime.syncPageContext(page);
-    } catch {
-      // No page selected — collect() will return NO_PAGE_CONTEXT below
+    const selectedPage = context.getSelectedPage();
+    if (selectedPage) {
+      runtime.syncPageContext(selectedPage);
     }
 
     const shouldCollect =

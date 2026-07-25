@@ -32,6 +32,14 @@ export const injectStealth = defineTool({
     const preset = request.params.preset as StealthPreset | undefined;
     try {
       const page = context.getSelectedPage();
+      if (!page) {
+        response.setStructuredContent({
+          success: false,
+          message: '未选中页面，请先使用 select_page 选择目标页面。',
+          tooltype: 'inject_stealth',
+        });
+        return;
+      }
       const report = await StealthScripts2025.injectAll(page, {preset});
       response.setStructuredContent({
         success: true,
@@ -121,6 +129,14 @@ export const setUserAgent = defineTool({
     const {userAgent} = request.params;
     try {
       const page = context.getSelectedPage();
+      if (!page) {
+        response.setStructuredContent({
+          success: false,
+          message: '未选中页面，请先使用 select_page 选择目标页面。',
+          tooltype: 'set_user_agent',
+        });
+        return;
+      }
       const client = await page.context().newCDPSession(page);
       await client.send('Network.setUserAgentOverride', {userAgent});
       response.setStructuredContent({

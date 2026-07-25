@@ -31,6 +31,14 @@ export const scrollBy = defineTool({
 
     try {
       const page = context.getSelectedPage();
+      if (!page) {
+        sendJson(response, {
+          success: false,
+          message: '未选中页面，请先使用 select_page 选择目标页面。',
+          tooltype: 'scroll_by',
+        });
+        return;
+      }
 
       const result = await page.evaluate(
         ({dir, px}: {dir: string; px: number}) => {

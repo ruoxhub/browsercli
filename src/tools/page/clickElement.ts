@@ -23,6 +23,14 @@ export const clickElement = defineTool({
     const {selector} = request.params;
     try {
       const page = context.getSelectedPage();
+      if (!page) {
+        sendJson(response, {
+          success: false,
+          message: '未选中页面，请先使用 select_page 选择目标页面。',
+          tooltype: 'click_element',
+        });
+        return;
+      }
       await page.click(selector);
       sendJson(response, {
         success: true,

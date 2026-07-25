@@ -657,9 +657,23 @@ export class NetworkModule {
     params: ReplayNetworkRequestBatchParams,
   ): Promise<NetworkMethodResult<ReplayNetworkRequestBatchData>> {
     const reqid = params.reqid;
-    const variants = params.variants;
+    const variants = params.variants ?? [];
     const concurrency = params.concurrency ?? 1;
     const maxBodyLength = params.maxBodyLength ?? DEFAULT_BATCH_MAX_BODY_LENGTH;
+
+    if (variants.length === 0) {
+      return {
+        success: false,
+        message: 'variants 不能为空，请至少提供一个重放变体',
+        data: {
+          total: 0,
+          succeeded: 0,
+          failed: 0,
+          statusCodeDistribution: {},
+          results: [],
+        },
+      };
+    }
 
     try {
       const page = services.getSelectedPage();

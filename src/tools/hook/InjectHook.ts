@@ -91,27 +91,33 @@ export const injectHook = defineTool({
     try {
       if (persistent) {
         const selectedPage = ctx.getSelectedPage();
-        // 注：addInitScript 只对 this.selectedPage 生效，对未来用
-        // context.newPage() 开启的新 page 不会自动继承。
-        // TODO(P2-#7): 结合 page-state 持久化改造，升级成 browser-context 级别。
-        const addInit = (
-          selectedPage as unknown as {
-            addInitScript?: (script: string) => Promise<void>;
-          }
-        ).addInitScript;
-        if (typeof addInit === 'function') {
-          await addInit.call(selectedPage, script);
-          persistentHookRegistry.set(hookId, {
-            script,
-            registeredAt: Date.now(),
-            world,
-          });
-          result.persisted = true;
-          result.persistentStrategy = 'addInitScript';
-        } else {
+        if (!selectedPage) {
           warnings.push(
-            'selectedPage 不支持 addInitScript，跨导航持久化失败，已降级为单次 evaluate',
+            '未选中页面，跨导航持久化不可用，已降级为单次 evaluate',
           );
+        } else {
+          // 注：addInitScript 只对 this.selectedPage 生效，对未来用
+          // context.newPage() 开启的新 page 不会自动继承。
+          // TODO(P2-#7): 结合 page-state 持久化改造，升级成 browser-context 级别。
+          const addInit = (
+            selectedPage as unknown as {
+              addInitScript?: (script: string) => Promise<void>;
+            }
+          ).addInitScript;
+          if (typeof addInit === 'function') {
+            await addInit.call(selectedPage, script);
+            persistentHookRegistry.set(hookId, {
+              script,
+              registeredAt: Date.now(),
+              world,
+            });
+            result.persisted = true;
+            result.persistentStrategy = 'addInitScript';
+          } else {
+            warnings.push(
+              'selectedPage 不支持 addInitScript，跨导航持久化失败，已降级为单次 evaluate',
+            );
+          }
         }
       }
 

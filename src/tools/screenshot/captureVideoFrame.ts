@@ -8,7 +8,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import {zod} from '../../third_party/index.js';
-import type {ToolContextProvider} from '../../worker/ToolContext.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -54,10 +53,16 @@ export const captureVideoFrame = defineTool({
       ),
   },
   handler: async (request, response, context) => {
-    const runtime = context as unknown as ToolContextProvider;
-
     try {
-      const page = await runtime.getActivePage();
+      const page = context.getSelectedPage();
+      if (!page) {
+        response.setStructuredContent({
+          success: false,
+          message: '未选中页面，请先使用 select_page 选择目标页面。',
+          tooltype: 'capture_video_frame',
+        });
+        return;
+      }
 
       // 先定位到指定时间点
       if (request.params.seekTime !== undefined) {

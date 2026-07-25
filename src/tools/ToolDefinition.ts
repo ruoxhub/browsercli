@@ -94,7 +94,11 @@ export type Context = Readonly<{
   setIsRunningPerformanceTrace(x: boolean): void;
   recordedTraces(): TraceResult[];
   storeTraceRecording(result: TraceResult): void;
-  getSelectedPage(): Page;
+  /**
+   * 返回当前选中的页面；若未选中任何页面则返回 null。
+   * 调用方必须在使用前做 null 检查，否则会在运行时得到 TypeError。
+   */
+  getSelectedPage(): Page | null;
   getDialog(): Dialog | undefined;
   clearDialog(): void;
   getPageByIdx(idx: number): Page;

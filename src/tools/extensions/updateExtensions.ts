@@ -6,6 +6,7 @@
 
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
+import {withOperationTimeout} from '../shared/browserRuntime.js';
 
 /**
  * 更新 Chrome 扩展：导航到 chrome://extensions/ 并点击更新按钮。
@@ -48,7 +49,11 @@ export const updateExtensions = defineTool({
   `;
 
     try {
-      const result = (await frame.evaluate(hookCode)) as {
+      const result = (await withOperationTimeout(
+        frame.evaluate(hookCode),
+        '更新扩展',
+        10_000,
+      )) as {
         success: boolean;
         error?: string;
       };

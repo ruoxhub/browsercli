@@ -15,6 +15,13 @@ import {
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 import type {Response, Context} from '../ToolDefinition.js';
+import {
+  beginTrace,
+  endTrace,
+  getTraceChunks,
+  getTraceClient,
+  waitForTracingComplete,
+} from './traceState.js';
 
 /**
  * 停止追踪并输出结果到 response。
@@ -25,35 +32,10 @@ async function stopTracingAndAppendOutput(
   response: Response,
   context: Context,
 ): Promise<void> {
-  const client = await page.context().newCDPSession(page);
-
-  const traceChunks: string[] = [];
-  const eventHandler = (data: {
-    method: string;
-    params?: Record<string, unknown>;
-  }) => {
-    if (data.method === 'Tracing.dataCollected' && data.params) {
-      traceChunks.push((data.params as {value: string}).value);
-    }
-  };
-  client.on('event', eventHandler);
+  const client = getTraceClient() ?? (await page.context().newCDPSession(page));
 
   await client.send('Tracing.end');
-
-  // Wait for tracingComplete with timeout
-  await new Promise<void>(resolve => {
-    const timeout = setTimeout(resolve, 10_000);
-    const completeHandler = (data: {method: string}) => {
-      if (data.method === 'Tracing.tracingComplete') {
-        clearTimeout(timeout);
-        client.off('event', completeHandler);
-        resolve();
-      }
-    };
-    client.on('event', completeHandler);
-  });
-
-  client.off('event', eventHandler);
+  await waitForTracingComplete(client);
 
   try {
     await client.detach();
@@ -61,7 +43,8 @@ async function stopTracingAndAppendOutput(
     // Ignore cleanup errors when the session is already gone
   }
 
-  const traceEventsBuffer = Buffer.from(traceChunks.join(''));
+  const traceEventsBuffer = Buffer.from(getTraceChunks().join(''));
+  endTrace();
   const result = await parseRawTraceBuffer(traceEventsBuffer);
 
   if (traceResultIsSuccess(result)) {
@@ -163,12 +146,8 @@ export const startPerformanceTrace = defineTool({
       categories: categories.join(','),
     });
 
-    // Detach the start session; stopTracingAndAppendOutput creates its own session
-    try {
-      await client.detach();
-    } catch {
-      // Ignore cleanup errors
-    }
+    // 保持会话存活（不 detach）：Tracing 数据只投递到本会话，stop 需复用同一会话。
+    beginTrace(client);
 
     if (request.params.reload) {
       await page.goto(pageUrlForTracing, {

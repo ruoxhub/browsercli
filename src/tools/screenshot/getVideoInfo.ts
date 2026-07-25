@@ -5,7 +5,6 @@
  */
 
 import {zod} from '../../third_party/index.js';
-import type {ToolContextProvider} from '../../worker/ToolContext.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -26,10 +25,16 @@ export const getVideoInfo = defineTool({
     selector: zod.string().describe('视频元素的 CSS 选择器。'),
   },
   handler: async (request, response, context) => {
-    const runtime = context as unknown as ToolContextProvider;
-
     try {
-      const page = await runtime.getActivePage();
+      const page = context.getSelectedPage();
+      if (!page) {
+        response.setStructuredContent({
+          success: false,
+          message: '未选中页面，请先使用 select_page 选择目标页面。',
+          tooltype: 'get_video_info',
+        });
+        return;
+      }
       const info = await page.evaluate(sel => {
         const video = document.querySelector(sel) as HTMLVideoElement;
         if (!video) return null;

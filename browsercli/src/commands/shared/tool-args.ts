@@ -8,12 +8,56 @@ import {readFileSync} from 'node:fs';
 import path from 'node:path';
 
 import type {ParsedArgs} from '../../args-parser.js';
+import type {ToolArgSpec, ToolArgSpecMap} from '../../tool-meta-types.js';
 
-function inferArgValue(value: string | boolean): unknown {
+/**
+ * 尝试把字符串当作 JSON 数组/对象字面量解析。
+ * 仅当字符串以 `[`/`]` 或 `{`/`}` 包裹且能成功 JSON.parse 时才解析，
+ * 否则原样返回。用于 `--flag '["a","b"]'` / `--flag '{"k":1}'` 这类
+ * 数组/对象参数，使其与 `--data` 行为一致，而非被整体当作字符串或按逗号拆分。
+ */
+function maybeParseJsonLiteral(raw: string): unknown {
+  const trimmed = raw.trim();
+  const looksLikeLiteral =
+    (trimmed.startsWith('[') && trimmed.endsWith(']')) ||
+    (trimmed.startsWith('{') && trimmed.endsWith('}'));
+  if (!looksLikeLiteral) return raw;
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return raw;
+  }
+}
+
+function inferArgValue(value: string | boolean, spec?: ToolArgSpec): unknown {
   if (typeof value === 'boolean') return value;
+  // 声明为 string 的参数（如 evaluate_script 的 function）原样保留，
+  // 绝不做 true/false → boolean 或纯数字 → number 的自动转换，
+  // 否则服务端会收到非字符串值并报"必须是字符串"校验错误。
+  if (spec?.type === 'string') {
+    return value;
+  }
+  // 数组参数：若传入的是 JSON 数组字面量（如 '["click"]'）直接解析为数组；
+  // 否则按逗号拆分（兼容 --events click,dialog 的简写）。
+  if (spec?.type === 'string[]') {
+    const parsed = maybeParseJsonLiteral(value);
+    if (Array.isArray(parsed)) return parsed;
+    return value.split(',').map(s => s.trim());
+  }
+  // 对象参数（如 create_hook 的 params、record_reverse_evidence 的 entry）：
+  // 若传入 JSON 对象字面量则解析为对象，否则原样返回交由服务端校验。
+  if (spec?.type === 'object') {
+    const parsed = maybeParseJsonLiteral(value);
+    if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed;
+    }
+    return value;
+  }
+  // 其它类型：尝试 JSON 字面量（数组/对象），失败再退回到布尔/数字推断。
+  const parsed = maybeParseJsonLiteral(value);
+  if (parsed !== value) return parsed;
   if (value === 'true' || value === 'false') return value === 'true';
   if (/^-?\d+(\.\d+)?$/.test(value)) return Number(value);
-  if (value.includes(',')) return value.split(',').map(s => s.trim());
   return value;
 }
 
@@ -83,9 +127,17 @@ function parseDataFlag(value: unknown): Record<string, unknown> {
  * 纯远程 CLI 不持有本地 ToolMeta，因此仅做轻量推断：
  * boolean / number / JSON 自动探测；其余按字符串返回。
  */
-function coerceFlagValue(rawValue: string | boolean): unknown {
-  if (typeof rawValue === 'boolean') return rawValue;
-  return inferArgValue(rawValue);
+function coerceFlagValue(rawValue: string | boolean, spec?: ToolArgSpec): unknown {
+  if (typeof rawValue === 'boolean') {
+    // consumeFlagValue 在下一参数以 '-' 开头时会将 flag 设为 true。
+    // 若该参数声明为 string（如 evaluate_script 的 function），
+    // 返回 undefined 让 dispatcher 的位置参数回退逻辑有机会补救。
+    if (rawValue === true && spec?.type === 'string') {
+      return undefined;
+    }
+    return rawValue;
+  }
+  return inferArgValue(rawValue, spec);
 }
 
 /**
@@ -98,7 +150,10 @@ function coerceFlagValue(rawValue: string | boolean): unknown {
  *   --data '{"k":"v"}'          行内 JSON 参数包
  *   --stdin                     从 stdin 读取 JSON 参数（最低优先级）
  */
-export function buildToolArgs(parsed: ParsedArgs): Record<string, unknown> {
+export function buildToolArgs(
+  parsed: ParsedArgs,
+  argSpecs?: ToolArgSpecMap,
+): Record<string, unknown> {
   const toolArgs: Record<string, unknown> = {};
 
   // 0. 最低优先级：--stdin（从 stdin 读取 JSON）
@@ -133,13 +188,14 @@ export function buildToolArgs(parsed: ParsedArgs): Record<string, unknown> {
     if (key === 'file' || key === 'data' || key === 'stdin') continue;
 
     const argKey = toCamelCase(key);
+    const spec = argSpecs?.[argKey];
 
     if (typeof value === 'boolean') {
       toolArgs[argKey] = value;
       continue;
     }
 
-    toolArgs[argKey] = coerceFlagValue(value);
+    toolArgs[argKey] = coerceFlagValue(value, spec);
   }
 
   return toolArgs;

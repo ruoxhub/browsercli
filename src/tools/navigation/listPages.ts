@@ -28,7 +28,7 @@ export const listPages = defineTool({
     let data;
     try {
       const pages = context.getPages();
-      // getSelectedPage 会在无选中页时抛错；list_pages 工具设计上
+      // getSelectedPage 未选中页面时返回 null；list_pages 工具设计上
       // 不依赖选中页（schema 为空），所以降级为 selectedIndex=-1。
       let selectedPage: ReturnType<typeof context.getSelectedPage> | null =
         null;

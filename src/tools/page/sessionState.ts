@@ -189,6 +189,14 @@ export const saveSessionState = defineTool({
       prepareSessionStore();
 
       const page = _context.getSelectedPage();
+      if (!page) {
+        response.setStructuredContent({
+          success: false,
+          message: '未选中页面，请先使用 select_page 选择目标页面。',
+          tooltype: 'save_session_state',
+        });
+        return;
+      }
       const sid = sessionId ?? `session_${Date.now()}`;
       const cookies = includeCookies
         ? await withOperationTimeout(page.context().cookies(), '读取 cookies')
@@ -300,6 +308,14 @@ export const restoreSessionState = defineTool({
       }
 
       const page = _context.getSelectedPage();
+      if (!page) {
+        sendJson(response, {
+          success: false,
+          message: '未选中页面，请先使用 select_page 选择目标页面。',
+          tooltype: 'restore_session_state',
+        });
+        return;
+      }
 
       if (navigateToSavedUrl !== false) {
         await page.goto(snapshot.url, {waitUntil: 'networkidle'});

@@ -284,6 +284,8 @@ function isNegativeNumber(arg: string): boolean {
 /**
  * 消费紧跟在 flag 后面的值：若下一个 token 存在且不以 `-` 开头则作为字符串值，
  * 否则视为布尔 flag。返回新的游标位置（已消费时 +1）。
+ *
+ * 例外：负数（如 `-1`、`-3.14`）虽然以 `-` 开头，但应作为值而非 flag 处理。
  */
 function consumeFlagValue(
   rawArgs: string[],
@@ -292,7 +294,7 @@ function consumeFlagValue(
   key: string,
 ): number {
   const next = rawArgs[index + 1];
-  if (next !== undefined && !next.startsWith('-')) {
+  if (next !== undefined && (!next.startsWith('-') || isNegativeNumber(next))) {
     flags[key] = next;
     return index + 1;
   }

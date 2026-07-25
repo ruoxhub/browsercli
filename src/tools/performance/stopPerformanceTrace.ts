@@ -12,6 +12,12 @@ import {
 import {logger} from '../../utils/logger.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
+import {
+  endTrace,
+  getTraceChunks,
+  getTraceClient,
+  waitForTracingComplete,
+} from './traceState.js';
 
 /**
  * 停止当前页面的性能追踪录制并分析结果。
@@ -35,47 +41,32 @@ export const stopPerformanceTrace = defineTool({
       return;
     }
 
+    const client = getTraceClient();
+    if (!client) {
+      context.setIsRunningPerformanceTrace(false);
+      response.setStructuredContent({
+        success: false,
+        message: '无法定位性能追踪的 CDP 会话，可能追踪已被异常中断。',
+        tooltype,
+        logFormat: 'json',
+      });
+      return;
+    }
+
     const data: Record<string, unknown> = {};
 
     try {
-      const page = context.getSelectedPage();
-      const client = await page.context().newCDPSession(page);
-
-      const traceChunks: string[] = [];
-      const eventHandler = (data: {
-        method: string;
-        params?: Record<string, unknown>;
-      }) => {
-        if (data.method === 'Tracing.dataCollected' && data.params) {
-          traceChunks.push((data.params as {value: string}).value);
-        }
-      };
-      client.on('event', eventHandler);
-
       await client.send('Tracing.end');
-
-      // Wait for tracingComplete with timeout
-      await new Promise<void>(resolve => {
-        const timeout = setTimeout(resolve, 10_000);
-        const completeHandler = (data: {method: string}) => {
-          if (data.method === 'Tracing.tracingComplete') {
-            clearTimeout(timeout);
-            client.off('event', completeHandler);
-            resolve();
-          }
-        };
-        client.on('event', completeHandler);
-      });
-
-      client.off('event', eventHandler);
+      await waitForTracingComplete(client);
 
       try {
         await client.detach();
       } catch {
-        // Ignore cleanup errors
+        // Ignore cleanup errors when the session is already gone
       }
 
-      const traceEventsBuffer = Buffer.from(traceChunks.join(''));
+      const traceEventsBuffer = Buffer.from(getTraceChunks().join(''));
+      endTrace();
       const result = await parseRawTraceBuffer(traceEventsBuffer);
 
       if (traceResultIsSuccess(result)) {
@@ -112,6 +103,7 @@ export const stopPerformanceTrace = defineTool({
       });
     } finally {
       context.setIsRunningPerformanceTrace(false);
+      endTrace();
     }
   },
 });

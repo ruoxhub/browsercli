@@ -25,14 +25,14 @@ async function getCdtp(): Promise<any> {
 }
 
 // 从动态导入中获取运行时对象 - 延迟初始化
-let _engine: any = null;
-
+//
+// 注意：CDP trace 引擎在单次解析内应保持“全新状态”，因此每次
+// parse 调用都创建一个全新的 Model（而非复用缓存实例）。这同时也规避了
+// 部分 chrome-devtools-frontend 构建里 `Model.createWithAllHandlers()`
+// 返回对象并不带 `resetProcessor()` 的问题（见 D2 报告）。
 async function getEngine(): Promise<any> {
-  if (!_engine) {
-    const {TraceEngine} = await getCdtp();
-    _engine = TraceEngine.TraceModel.Model.createWithAllHandlers();
-  }
-  return _engine;
+  const {TraceEngine} = await getCdtp();
+  return TraceEngine.TraceModel.Model.createWithAllHandlers();
 }
 
 export interface TraceResult {
@@ -53,13 +53,23 @@ export interface TraceParseError {
 export async function parseRawTraceBuffer(
   buffer: Uint8Array<ArrayBufferLike> | undefined,
 ): Promise<TraceResult | TraceParseError> {
-  const engine = await getEngine();
+  let engine: any;
+  try {
+    engine = await getEngine();
+  } catch (e) {
+    // getCdtp()/createWithAllHandlers 可能因依赖未构建或 API 不匹配而失败。
+    // 返回结构化错误，交由调用方（stop_performance_trace）优雅处理。
+    return {
+      error: `Failed to initialize trace engine: ${
+        e instanceof Error ? e.message : String(e)
+      }`,
+    };
+  }
   if (!engine) {
     return {
       error: 'Failed to initialize trace engine.',
     };
   }
-  engine.resetProcessor();
   if (!buffer) {
     return {
       error: 'No buffer was provided.',

@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {Page} from '../../third_party/index.js';
 import {zod} from '../../third_party/index.js';
-import type {ToolContextProvider} from '../../worker/ToolContext.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -29,11 +29,12 @@ export const selectFrame = defineTool({
       .describe('The frame index from list_frames. 0 = main frame.'),
   },
   handler: async (request, response, context) => {
-    const runtime = context as unknown as ToolContextProvider;
     const {frameIdx} = request.params;
 
     try {
-      const page = runtime.getSelectedPage();
+      // Context.getSelectedPage() 在未选中页面时返回 null（不抛异常），
+      // 这里统一归一化为 null 以给出友好的“无页面”提示。
+      const page = context.getSelectedPage();
       if (!page) {
         response.setStructuredContent({
           success: false,
@@ -58,7 +59,7 @@ export const selectFrame = defineTool({
 
       const frame = frames[frameIdx];
       if (frameIdx === 0) {
-        runtime.setSelectedFrame(null);
+        context.resetSelectedFrame();
         response.setStructuredContent({
           success: true,
           message: 'Switched to main frame.',
@@ -68,7 +69,7 @@ export const selectFrame = defineTool({
         return;
       }
 
-      runtime.setSelectedFrame(frame);
+      context.selectFrame(frame);
       const name = frame.name() || undefined;
       response.setStructuredContent({
         success: true,

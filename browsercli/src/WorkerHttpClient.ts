@@ -26,7 +26,7 @@ export interface JobStatus {
 }
 
 export class WorkerHttpClient {
-  private readonly baseUrl: string;
+  readonly baseUrl: string;
   private readonly apiToken?: string;
   private readonly timeoutMs: number;
   private readonly pollIntervalMs: number;

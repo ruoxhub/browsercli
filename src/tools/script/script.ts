@@ -455,6 +455,16 @@ export const evaluateScript = defineTool({
     const allowAnyFrame = request.params.allowAnyFrame ?? false;
     const filePath = request.params.filePath;
 
+    if (typeof functionCode !== 'string') {
+      writeStructuredFailure(
+        response,
+        'evaluate_script',
+        `function 参数必须是字符串，但收到 ${typeof functionCode}。请确保传入完整的函数表达式，如 () => { ... }`,
+        '',
+      );
+      return;
+    }
+
     if (!functionCode || functionCode.trim().length === 0) {
       writeStructuredFailure(
         response,

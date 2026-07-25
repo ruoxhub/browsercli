@@ -29,6 +29,56 @@ const SAMPLE_TOOLS: ToolMeta[] = [
   },
 ];
 
+const EVALUATE_SCRIPT_TOOL: ToolMeta = {
+  name: 'evaluate_script',
+  description: 'Evaluate a JS function on the page',
+  schema: {function: 'string', args: 'string[]'},
+  argSpecs: {
+    function: {type: 'string', required: true, description: 'fn'},
+    args: {type: 'string[]', required: false, description: 'args'},
+  },
+  modulePath: './evaluate_script.js',
+  handlerName: 'evaluateScript',
+  callMode: 'defineTool',
+  domain: 'reverse',
+  profile: 'full',
+};
+
+const SELECT_PAGE_TOOL: ToolMeta = {
+  name: 'select_page',
+  description: 'Select a page by id',
+  schema: {pageId: 'string'},
+  argSpecs: {
+    pageId: {type: 'string', required: true, description: 'page id'},
+  },
+  modulePath: './select_page.js',
+  handlerName: 'selectPage',
+  callMode: 'defineTool',
+  domain: 'reverse',
+  profile: 'full',
+};
+
+const SELECT_FRAME_TOOL: ToolMeta = {
+  name: 'select_frame',
+  description: 'Select a frame by id',
+  schema: {frameId: 'string'},
+  argSpecs: {
+    frameId: {type: 'string', required: true, description: 'frame id'},
+  },
+  modulePath: './select_frame.js',
+  handlerName: 'selectFrame',
+  callMode: 'defineTool',
+  domain: 'reverse',
+  profile: 'full',
+};
+
+const ALL_TOOLS: ToolMeta[] = [
+  ...SAMPLE_TOOLS,
+  EVALUATE_SCRIPT_TOOL,
+  SELECT_PAGE_TOOL,
+  SELECT_FRAME_TOOL,
+];
+
 class MockHttpClient extends WorkerHttpClient {
   listToolsCalls = 0;
   invokeCalls: Array<[string | undefined, string, Record<string, unknown>]> =
@@ -120,5 +170,99 @@ describe('tool-dispatcher (pure HTTP)', () => {
       ctxWith(client),
     );
     assert.deepStrictEqual(client.invokeCalls[0][0], 'sess_abc');
+  });
+
+  it('keeps a comma-containing --function as a string (no array split)', async () => {
+    const client = new MockHttpClient(ALL_TOOLS, {ok: true});
+    await toolDispatcherCommand(
+      ['evaluate_script', '--function', '(a, b) => a + b'],
+      ctxWith(client),
+    );
+    assert.deepStrictEqual(client.invokeCalls[0][2], {
+      function: '(a, b) => a + b',
+    });
+  });
+
+  it('does not convert --function "true"/"false"/"42" to boolean/number', async () => {
+    const client = new MockHttpClient(ALL_TOOLS, {ok: true});
+    await toolDispatcherCommand(
+      ['evaluate_script', '--function', 'true'],
+      ctxWith(client),
+    );
+    assert.strictEqual(
+      typeof client.invokeCalls[0][2].function,
+      'string',
+      'function "true" should stay string, not boolean',
+    );
+    assert.strictEqual(client.invokeCalls[0][2].function, 'true');
+
+    await toolDispatcherCommand(
+      ['evaluate_script', '--function', 'false'],
+      ctxWith(client),
+    );
+    assert.strictEqual(
+      typeof client.invokeCalls[1][2].function,
+      'string',
+      'function "false" should stay string, not boolean',
+    );
+
+    await toolDispatcherCommand(
+      ['evaluate_script', '--function', '42'],
+      ctxWith(client),
+    );
+    assert.strictEqual(
+      typeof client.invokeCalls[2][2].function,
+      'string',
+      'function "42" should stay string, not number',
+    );
+  });
+
+  it('supports positional function: call evaluate_script "<fn>"', async () => {
+    const client = new MockHttpClient(ALL_TOOLS, {ok: true});
+    await toolDispatcherCommand(
+      ['evaluate_script', '(a, b) => a + b'],
+      ctxWith(client),
+    );
+    assert.deepStrictEqual(client.invokeCalls[0][2], {
+      function: '(a, b) => a + b',
+    });
+  });
+
+  it('still splits string[] params (e.g. --args) on commas', async () => {
+    const client = new MockHttpClient(ALL_TOOLS, {ok: true});
+    await toolDispatcherCommand(
+      ['evaluate_script', '--function', '() => 1', '--args', 'u1,u2'],
+      ctxWith(client),
+    );
+    assert.deepStrictEqual(client.invokeCalls[0][2], {
+      function: '() => 1',
+      args: ['u1', 'u2'],
+    });
+  });
+
+  it('disambiguates `select` to select_page via --pageId', async () => {
+    const client = new MockHttpClient(ALL_TOOLS, {ok: true});
+    await toolDispatcherCommand(['select', '--pageId', '0'], ctxWith(client));
+    assert.strictEqual(client.invokeCalls[0][1], 'select_page');
+  });
+
+  it('disambiguates `select` to select_frame via --frameId', async () => {
+    const client = new MockHttpClient(ALL_TOOLS, {ok: true});
+    await toolDispatcherCommand(
+      ['select', '--frameId', 'f1'],
+      ctxWith(client),
+    );
+    assert.strictEqual(client.invokeCalls[0][1], 'select_frame');
+  });
+
+  it('still throws UNKNOWN_TOOL when `select` has no disambiguating flag', async () => {
+    const client = new MockHttpClient(ALL_TOOLS, {ok: true});
+    await assert.rejects(
+      async () => toolDispatcherCommand(['select'], ctxWith(client)),
+      (err: unknown) => {
+        const e = err as AxiError;
+        return e instanceof AxiError && e.code === 'UNKNOWN_TOOL';
+      },
+    );
   });
 });

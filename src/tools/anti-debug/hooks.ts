@@ -162,7 +162,7 @@ export function buildBypassDebuggerScript(
     BypassedFunction.prototype = originalFunction.prototype;
     // 兼容通过 window.Function 调用的场景
     Object.setPrototypeOf(BypassedFunction, originalFunction);
-    window.Function = BypassedFunction as unknown as FunctionConstructor;
+    window.Function = BypassedFunction;
     console.log('[' + hookId + '] ✅ Hooked: Function');
   }
 
@@ -177,7 +177,7 @@ export function buildBypassDebuggerScript(
       return originalFunction.apply(this, arguments);
     }
     BypassedConstructor.prototype = Function.prototype;
-    Function.prototype.constructor = BypassedConstructor as unknown as FunctionConstructor;
+    Function.prototype.constructor = BypassedConstructor;
     console.log('[' + hookId + '] ✅ Hooked: Function.prototype.constructor');
   }
 

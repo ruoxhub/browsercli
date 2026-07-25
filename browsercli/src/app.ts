@@ -9,6 +9,7 @@ import type {AxiCliCommand} from 'axi-sdk-js';
 import {configCommand} from './commands/config.js';
 import {listToolsCommand} from './commands/list-tools.js';
 import {scaffoldCommand} from './commands/scaffold.js';
+import {statusCommand} from './commands/status.js';
 import {toolDispatcherCommand} from './commands/tool-dispatcher.js';
 import {generateTopLevelHelp} from './help.js';
 import type {WorkerContext} from './types.js';
@@ -22,6 +23,7 @@ export const cliCommands: Record<string, AxiCliCommand<WorkerContext>> = {
   config: configCommand,
   'list-tools': listToolsCommand,
   scaffold: scaffoldCommand,
+  status: statusCommand,
 };
 
 export const homeCommand: AxiCliCommand<WorkerContext> = async () =>
