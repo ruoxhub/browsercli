@@ -159,28 +159,61 @@ export const explainReverseStage = defineTool({
     '解释某个逆向工程阶段的目标、进入条件、避免事项与推荐工具。',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
   schema: {
-    stage: zod.enum([
-      'Observe',
-      'Capture',
-      'Rebuild',
-      'Patch',
-      'DeepDive',
-      'PureExtraction',
-      'Port',
-    ]),
+    stage: zod
+      .string()
+      .optional()
+      .describe(
+        '逆向阶段名：Observe / Capture / Rebuild / Patch / DeepDive / PureExtraction / Port',
+      ),
     includeDocs: zod.boolean().optional(),
   },
   handler: async (request, response) => {
-    const guide = getReverseStageGuide(request.params.stage);
-    const payload =
-      request.params.includeDocs === false
-        ? {...guide, docRefs: undefined}
-        : guide;
-    response.setStructuredContent({
-      success: true,
-      message: `逆向阶段说明: ${request.params.stage}`,
-      tooltype: 'explain_reverse_stage',
-      data: payload,
-    });
+    try {
+      const stage = request.params.stage ?? 'Observe';
+      let guide: ReturnType<typeof getReverseStageGuide> | null = null;
+      try {
+        guide = getReverseStageGuide(stage as never);
+      } catch {
+        guide = null;
+      }
+
+      if (!guide) {
+        response.setStructuredContent({
+          success: false,
+          message: `未知的逆向阶段：${stage}。可选阶段：Observe, Capture, Rebuild, Patch, DeepDive, PureExtraction, Port。`,
+          tooltype: 'explain_reverse_stage',
+          data: {
+            validStages: [
+              'Observe',
+              'Capture',
+              'Rebuild',
+              'Patch',
+              'DeepDive',
+              'PureExtraction',
+              'Port',
+            ],
+          },
+        });
+        return;
+      }
+
+      const payload =
+        request.params.includeDocs === false
+          ? {...guide, docRefs: undefined}
+          : guide;
+      response.setStructuredContent({
+        success: true,
+        message: `逆向阶段说明: ${stage}`,
+        tooltype: 'explain_reverse_stage',
+        data: payload,
+      });
+    } catch (error) {
+      response.setStructuredContent({
+        success: false,
+        message: `解释逆向阶段失败：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'explain_reverse_stage',
+        data: {},
+      });
+    }
   },
 });

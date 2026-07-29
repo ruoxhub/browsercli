@@ -146,7 +146,15 @@ export const hookFunction = defineTool({
     console.log('[MCP Hook ' + event + ']', record);
   };
 
+  const __reentryFlag = '__mcp_reentry_' + hookId;
   obj[methodName] = function(...args) {
+    // 重入防护：当本 Hook 自身（或其内部日志调用）再次触发目标函数时，
+    // 直接走原始实现，避免 console.log 等被 Hook 后无限递归爆栈。
+    if (obj[__reentryFlag]) {
+      return original.apply(this, args);
+    }
+    obj[__reentryFlag] = true;
+    try {
     const callInfo = {
       hook: hookId,
       target: objectPath + '.' + methodName,
@@ -184,6 +192,9 @@ export const hookFunction = defineTool({
     } catch(err) {
       report('error', {error: err && err.message ? err.message : String(err)}, true);
       throw err;
+    }
+    } finally {
+      obj[__reentryFlag] = false;
     }
   };
 

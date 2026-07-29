@@ -68,29 +68,39 @@ interface DeviceProfileData {
  */
 export const emulateMobile = defineTool({
   name: 'emulate_mobile',
-  description:
-    '模拟移动设备视口、User-Agent 与触摸事件，或恢复桌面模式。',
+  description: '模拟移动设备视口、User-Agent 与触摸事件，或恢复桌面模式。',
   annotations: {category: ToolCategory.EMULATION, readOnlyHint: false},
   schema: {
     enable: zod.boolean().describe('是否启用移动设备模拟。'),
     device: zod
-      .enum(['iphone', 'android', 'ipad'])
+      .string()
       .optional()
-      .describe('设备预设（默认 iphone）。'),
+      .describe('设备预设或设备名称（默认 iphone）。'),
   },
   handler: async (request, response, context) => {
-    const {enable, device = 'iphone'} = request.params;
+    const {enable, device} = request.params;
     const tooltype = 'emulate_mobile';
     const frame = context.getSelectedFrame();
     const page = frame.page();
 
+    // 设备名归一化：容忍 "iphone" / "iPhone 12" / "iPad" / "Android" 等各种写法。
+    const normalizeDevice = (
+      raw: string | undefined,
+    ): keyof typeof DEVICE_PROFILES => {
+      const value = (raw ?? 'iphone').toLowerCase();
+      if (value.includes('ipad')) return 'ipad';
+      if (value.includes('android')) return 'android';
+      return 'iphone';
+    };
+    const deviceKey = normalizeDevice(device);
+
     try {
       if (enable) {
-        const profile = DEVICE_PROFILES[device];
+        const profile = DEVICE_PROFILES[deviceKey];
         if (!profile) {
           response.setStructuredContent({
             success: false,
-            message: `未知的设备类型：${device}，支持：iphone, android, ipad`,
+            message: `未知的设备类型：${device ?? ''}，支持：iphone, android, ipad`,
             tooltype,
           });
           return;
@@ -108,10 +118,10 @@ export const emulateMobile = defineTool({
 
         response.setStructuredContent({
           success: true,
-          message: `移动设备模拟已启用 (${device})`,
+          message: `移动设备模拟已启用 (${deviceKey})`,
           tooltype,
           data: {
-            device,
+            device: deviceKey,
             viewport: {
               width: profile.viewport.width,
               height: profile.viewport.height,

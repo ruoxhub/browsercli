@@ -27,13 +27,16 @@ export const collectionDiff = defineTool({
   description: '对比上一次与当前收集到的文件摘要。',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
   schema: {
-    previous: zod.array(
-      zod.object({
-        url: zod.string(),
-        size: zod.number().int().nonnegative(),
-        type: zod.string(),
-      }),
-    ),
+    previous: zod
+      .array(
+        zod.object({
+          url: zod.string(),
+          size: zod.number().int().nonnegative(),
+          type: zod.string(),
+        }),
+      )
+      .optional()
+      .default([]),
     current: zod
       .array(
         zod.object({

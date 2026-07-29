@@ -36,15 +36,27 @@ export const seekVideo = defineTool({
         });
         return;
       }
-      await page.evaluate(
+      const found = await page.evaluate(
         ({sel, t}) => {
-          const video = document.querySelector(sel) as HTMLVideoElement;
+          const video = document.querySelector(sel) as HTMLVideoElement | null;
           if (video) {
             video.currentTime = t;
+            return true;
           }
+          return false;
         },
         {sel: request.params.selector, t: request.params.time},
       );
+
+      if (!found) {
+        response.setStructuredContent({
+          success: false,
+          message: `未找到匹配的视频元素: ${request.params.selector}`,
+          tooltype: 'seek_video',
+          data: {selector: request.params.selector, time: request.params.time},
+        });
+        return;
+      }
 
       response.setStructuredContent({
         success: true,

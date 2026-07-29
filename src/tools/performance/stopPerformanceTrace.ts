@@ -56,8 +56,34 @@ export const stopPerformanceTrace = defineTool({
     const data: Record<string, unknown> = {};
 
     try {
-      await client.send('Tracing.end');
-      await waitForTracingComplete(client);
+      // Tracing.end 在部分 CDP 会话异常时可能长时间挂起（观测到 300s 卡死）。
+      // 用超时竞速保护：超时后不再等待，直接解析已收集到的分片数据（可能为部分）。
+      const TRACING_END_TIMEOUT_MS = 30_000;
+      let tracingEndTimedOut = false;
+      await Promise.race([
+        client.send('Tracing.end'),
+        new Promise<void>((_, reject) =>
+          setTimeout(
+            () => reject(new Error('Tracing.end 超时')),
+            TRACING_END_TIMEOUT_MS,
+          ),
+        ),
+      ]).catch(error => {
+        tracingEndTimedOut = true;
+        logger.debug(
+          `Tracing.end 未在超时内完成，将解析已收集的部分数据：${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      });
+
+      if (tracingEndTimedOut) {
+        data.partial = true;
+        data.warning =
+          'Tracing.end 超时，返回的追踪数据可能不完整。';
+      } else {
+        await waitForTracingComplete(client);
+      }
 
       try {
         await client.detach();

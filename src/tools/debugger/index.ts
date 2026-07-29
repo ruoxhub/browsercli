@@ -1914,6 +1914,19 @@ export const setBreakpointOnText = defineTool({
       }
 
       const match = matches[occurrence - 1];
+      if (!match) {
+        response.setStructuredContent({
+          success: false,
+          message: `未找到第 ${occurrence} 个匹配项。`,
+          tooltype: 'set_breakpoint_on_text',
+          data: {
+            text,
+            matchesCount: matches.length,
+            requestedOccurrence: occurrence,
+          },
+        });
+        return;
+      }
       const script = debuggerContext.getScriptById(match.scriptId);
       const url = script?.url || match.url;
 

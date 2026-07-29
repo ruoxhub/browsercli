@@ -121,6 +121,58 @@ function decryptText(payload: EncryptedPayload): string {
   );
 }
 
+/** Playwright `addCookies` 接受的 Cookie 字段子集。 */
+interface SanitizedCookie {
+  name: string;
+  value: string;
+  url?: string;
+  domain?: string;
+  path?: string;
+  expires?: number;
+  httpOnly?: boolean;
+  secure?: boolean;
+  sameSite?: 'Strict' | 'Lax' | 'None';
+}
+
+/**
+ * 清洗单个 Cookie，仅保留 Playwright `addCookies` 接受的字段，
+ * 并规范化 sameSite / domain / url，避免 "Storage.setCookies: Invalid cookie fields"。
+ */
+function sanitizeCookie(
+  c: Record<string, unknown>,
+): SanitizedCookie | null {
+  const name = c.name;
+  const value = c.value;
+  if (typeof name !== 'string' || typeof value !== 'string') {
+    return null;
+  }
+
+  const cookie: SanitizedCookie = {name, value};
+  const domain =
+    typeof c.domain === 'string' && c.domain.length > 0 ? c.domain : undefined;
+  const url = typeof c.url === 'string' && c.url.length > 0 ? c.url : undefined;
+
+  if (domain) {
+    cookie.domain = domain;
+  } else if (url) {
+    cookie.url = url;
+  } else {
+    // 既无 domain 也无 url，无法确定作用域，跳过该 Cookie。
+    return null;
+  }
+
+  if (typeof c.path === 'string') cookie.path = c.path;
+  if (typeof c.expires === 'number') cookie.expires = c.expires;
+  if (typeof c.httpOnly === 'boolean') cookie.httpOnly = c.httpOnly;
+  if (typeof c.secure === 'boolean') cookie.secure = c.secure;
+  const sameSite = c.sameSite;
+  if (sameSite === 'Strict' || sameSite === 'Lax' || sameSite === 'None') {
+    cookie.sameSite = sameSite;
+  }
+
+  return cookie;
+}
+
 function normalizeSnapshot(
   snapshot: unknown,
   fallbackId?: string,
@@ -330,15 +382,12 @@ export const restoreSessionState = defineTool({
       }
 
       if (snapshot.cookies.length > 0) {
-        const cookiesToAdd = snapshot.cookies.map(
-          (c: Record<string, unknown>) => ({
-            name: c.name as string,
-            value: c.value as string,
-            domain: c.domain as string | undefined,
-            path: c.path as string | undefined,
-          }),
-        );
-        await page.context().addCookies(cookiesToAdd);
+        const cookiesToAdd = snapshot.cookies
+          .map((c: Record<string, unknown>) => sanitizeCookie(c))
+          .filter((c): c is SanitizedCookie => c !== null);
+        if (cookiesToAdd.length > 0) {
+          await page.context().addCookies(cookiesToAdd);
+        }
       }
       for (const [key, value] of Object.entries(snapshot.localStorage)) {
         await page.evaluate(

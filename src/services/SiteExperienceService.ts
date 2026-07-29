@@ -19,12 +19,30 @@ import {dbService} from './DatabaseService.js';
  */
 export class SiteExperienceService {
   /**
+   * 数据库未连接时的进程内回退存储，保证 *_site_experience 工具仍可工作。
+   */
+  private memoryStore: SiteExperience[] = [];
+  private memoryIdSeq = 1;
+
+  /** 数据库未初始化时使用内存回退。 */
+  private isMemoryMode(): boolean {
+    return !dbService.isReady();
+  }
+
+  private nextMemoryId(): number {
+    return this.memoryIdSeq++;
+  }
+
+  /**
    * 搜索站点经验（按 URL 或名称）
    */
   async search(params: {
     url?: string;
     name?: string;
   }): Promise<SiteExperience[]> {
+    if (this.isMemoryMode()) {
+      return this.searchMemory(params);
+    }
     const db = dbService.getDb();
     const {url, name} = params;
 
@@ -61,10 +79,30 @@ export class SiteExperienceService {
     }
   }
 
+  private searchMemory(params: {
+    url?: string;
+    name?: string;
+  }): SiteExperience[] {
+    const {url, name} = params;
+    return this.memoryStore.filter(item => {
+      if (url) {
+        const domain = this.extractDomain(url) ?? '';
+        return domain.length > 0 && item.domain.includes(domain);
+      }
+      if (name) {
+        return item.name === name || item.name.includes(name);
+      }
+      return true;
+    });
+  }
+
   /**
    * 根据 ID 获取站点经验
    */
   async getById(id: number): Promise<SiteExperience | null> {
+    if (this.isMemoryMode()) {
+      return this.memoryStore.find(s => s.id === id) ?? null;
+    }
     const db = dbService.getDb();
 
     try {
@@ -85,6 +123,9 @@ export class SiteExperienceService {
    * 根据域名获取站点经验
    */
   async getByDomain(domain: string): Promise<SiteExperience | null> {
+    if (this.isMemoryMode()) {
+      return this.memoryStore.find(s => s.domain === domain) ?? null;
+    }
     const db = dbService.getDb();
 
     try {
@@ -105,6 +146,25 @@ export class SiteExperienceService {
    * 创建站点经验
    */
   async create(data: NewSiteExperience): Promise<SiteExperience> {
+    if (this.isMemoryMode()) {
+      const row: SiteExperience = {
+        id: this.nextMemoryId(),
+        domain: data.domain,
+        name: data.name,
+        aliases: (data.aliases as string[] | null) ?? [],
+        platformFeatures: data.platformFeatures ?? null,
+        validPatterns: data.validPatterns ?? null,
+        knownPitfalls: data.knownPitfalls ?? null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      this.memoryStore.push(row);
+      logger.info(
+        `[SiteExperienceService] Created experience (memory) for domain: ${data.domain}`,
+      );
+      return row;
+    }
+
     const db = dbService.getDb();
 
     try {
@@ -133,6 +193,21 @@ export class SiteExperienceService {
     id: number,
     data: Partial<NewSiteExperience>,
   ): Promise<SiteExperience | null> {
+    if (this.isMemoryMode()) {
+      const idx = this.memoryStore.findIndex(s => s.id === id);
+      if (idx < 0) return null;
+      const merged: SiteExperience = {
+        ...this.memoryStore[idx],
+        ...(data as Partial<SiteExperience>),
+        updatedAt: new Date(),
+      };
+      this.memoryStore[idx] = merged;
+      logger.info(
+        `[SiteExperienceService] Updated experience (memory) id: ${id}`,
+      );
+      return merged;
+    }
+
     const db = dbService.getDb();
 
     try {
@@ -161,6 +236,16 @@ export class SiteExperienceService {
    * 删除站点经验
    */
   async delete(id: number): Promise<boolean> {
+    if (this.isMemoryMode()) {
+      const idx = this.memoryStore.findIndex(s => s.id === id);
+      if (idx < 0) return false;
+      this.memoryStore.splice(idx, 1);
+      logger.info(
+        `[SiteExperienceService] Deleted experience (memory) id: ${id}`,
+      );
+      return true;
+    }
+
     const db = dbService.getDb();
 
     try {
@@ -184,6 +269,9 @@ export class SiteExperienceService {
    * 列出所有站点经验
    */
   async listAll(): Promise<SiteExperience[]> {
+    if (this.isMemoryMode()) {
+      return [...this.memoryStore];
+    }
     const db = dbService.getDb();
 
     try {

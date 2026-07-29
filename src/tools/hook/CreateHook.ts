@@ -31,9 +31,9 @@ export const createHook = defineTool({
         'Hook 类型（如 "fetch"、"xhr"、"cookie"、"websocket"、"localStorage"、"console"、"timer"、"eval"、"cryptojs"、"jsencrypt"、"smcrypto"）',
       ),
     params: zod
-      .record(zod.string(), zod.unknown())
+      .unknown()
       .optional()
-      .describe('类型相关参数'),
+      .describe('类型相关参数（对象、数组或任意值）'),
     description: zod
       .string()
       .optional()
@@ -66,7 +66,20 @@ export const createHook = defineTool({
   handler: async (request, response) => {
     const runtime = getRuntime();
     try {
-      const result = runtime.hookManager.create(request.params as any);
+      // 归一化 params：对象直接透传；数组/字符串等其他值包裹为 {value}。
+      const rawParams = (request.params as Record<string, unknown>).params;
+      let normalizedParams: Record<string, unknown> | undefined;
+      if (rawParams !== undefined && rawParams !== null) {
+        normalizedParams =
+          typeof rawParams === 'object' && !Array.isArray(rawParams)
+            ? (rawParams as Record<string, unknown>)
+            : {value: rawParams};
+      }
+
+      const result = runtime.hookManager.create({
+        ...(request.params as Record<string, unknown>),
+        params: normalizedParams,
+      } as any);
       response.setStructuredContent({
         success: true,
         message: result.hookId

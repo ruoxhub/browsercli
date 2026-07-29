@@ -62,6 +62,10 @@ export class ExecutionController {
 
   async resume(): Promise<void> {
     await this.getCDPSession().send('Debugger.resume');
+    // 乐观清空暂停状态：Debugger.resumed 事件在部分场景下可能延迟或丢失，
+    // 导致 isPaused() / get_ai_debug_status 报告陈旧的 isPaused=true。
+    // resume 指令成功下发后立即清空，保证状态与实际执行一致。
+    this.pausedState = null;
     logger.info('Execution resumed');
   }
 

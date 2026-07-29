@@ -175,6 +175,46 @@ export async function readHookStore(
   }
 }
 
+/**
+ * 读取 hook_function 写入的浏览器端活跃 Hook 注册表 window.__mcp_hooks__。
+ *
+ * 与 __hookStore（仅存记录）不同，__mcp_hooks__ 保存的是活跃 Hook 的注册信息
+ * （obj / methodName / original），即使某个 Hook 尚无任何调用记录也应出现在
+ * 已创建 Hook 列表中。用于 list_created_hooks 合并展示。
+ */
+export async function readMcpHookRegistry(
+  frame: Frame,
+): Promise<Array<{id: string; target: string}>> {
+  const expression = `(function() {
+  var reg = window.__mcp_hooks__;
+  if (!reg || typeof reg !== 'object') return [];
+  var out = [];
+  var keys = Object.keys(reg);
+  for (var i = 0; i < keys.length; i++) {
+    var id = keys[i];
+    var hook = reg[id];
+    var target = id;
+    try {
+      if (hook && hook.obj && hook.methodName) {
+        var ctorName = (hook.obj.constructor && hook.obj.constructor.name) || 'window';
+        target = ctorName + '.' + hook.methodName;
+      }
+    } catch (e) {}
+    out.push({ id: id, target: target });
+  }
+  return out;
+})()`;
+
+  try {
+    const result = await evaluateInPageRuntime<
+      Array<{id: string; target: string}>
+    >(frame, expression);
+    return Array.isArray(result) ? result : [];
+  } catch {
+    return [];
+  }
+}
+
 export function limitRecords(
   records: unknown[],
   maxRecords?: number,

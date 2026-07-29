@@ -175,10 +175,10 @@ export const record_reverse_evidence = defineTool({
     readOnlyHint: false,
   },
   schema: {
-    taskId: zod.string(),
-    taskSlug: zod.string(),
-    targetUrl: zod.string(),
-    goal: zod.string(),
+    taskId: zod.string().optional().default('default'),
+    taskSlug: zod.string().optional().default('default'),
+    targetUrl: zod.string().optional().default(''),
+    goal: zod.string().optional().default(''),
     channel: zod.string().default(NETWORK_CHANNEL),
     targetKeywords: zod.array(zod.string()).optional(),
     targetUrlPatterns: zod.array(zod.string()).optional(),
@@ -187,6 +187,7 @@ export const record_reverse_evidence = defineTool({
     entry: zod.record(zod.string(), zod.unknown()),
   },
   handler: async (request, response) => {
+    try {
     // Defensive normalization: entry may be undefined or non-object.
     const rawEntry = request.params.entry;
     const safeEntry: Record<string, unknown> =
@@ -262,6 +263,14 @@ export const record_reverse_evidence = defineTool({
         targetContext: hasTargetContext ? targetContext : undefined,
       },
     });
+    } catch (error) {
+      response.setStructuredContent({
+        success: false,
+        message: `记录证据失败：${error instanceof Error ? error.message : String(error)}`,
+        tooltype: 'record_reverse_evidence',
+        data: {ok: false},
+      });
+    }
   },
 });
 

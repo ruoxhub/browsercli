@@ -14,6 +14,17 @@ import {
   antiAntiDebugFeatureSchema,
   ANTI_ANTI_DEBUG_TOOLTYPE,
 } from './schema.js';
+import type {AntiAntiDebugFeature} from './types.js';
+
+/** 默认启用全部反反调试特性（在 features 未显式传入时使用）。 */
+const ALL_ANTI_ANTI_DEBUG_FEATURES: AntiAntiDebugFeature[] = [
+  'fixedWindowSize',
+  'fixedTime',
+  'preventClose',
+  'preventHistoryBack',
+  'preventConsoleClear',
+  'hideWebdriver',
+];
 
 /**
  * 反反调试工具集：窗口尺寸/时间函数/页面关闭/历史跳转/控制台清除/隐藏 webdriver。
@@ -30,24 +41,13 @@ export const antiAntiDebug = defineTool({
   schema: {
     features: zod
       .array(antiAntiDebugFeatureSchema)
-      .min(1)
+      .optional()
       .describe(
-        '要启用的功能。可选：fixedWindowSize、fixedTime、preventClose、preventHistoryBack、preventConsoleClear、hideWebdriver。',
+        '要启用的功能。可选：fixedWindowSize、fixedTime、preventClose、preventHistoryBack、preventConsoleClear、hideWebdriver。省略时启用全部。',
       ),
   },
   handler: async (request, response, context) => {
-    const features = request.params.features ?? [];
-
-    if (features.length === 0) {
-      response.setStructuredContent({
-        success: false,
-        message:
-          'anti_anti_debug requires a non-empty "features" array (e.g. ["fixedWindowSize", "hideWebdriver"])',
-        tooltype: ANTI_ANTI_DEBUG_TOOLTYPE,
-        data: null,
-      });
-      return;
-    }
+    const features = request.params.features ?? ALL_ANTI_ANTI_DEBUG_FEATURES;
 
     await runHook(response, ANTI_ANTI_DEBUG_TOOLTYPE, async () => {
       const frame = (context as Context).getSelectedFrame();

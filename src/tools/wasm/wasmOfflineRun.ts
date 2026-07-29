@@ -14,23 +14,46 @@ function runCommand(
   cmd: string,
   args: string[],
   timeoutMs: number,
-): Promise<{stdout: string; stderr: string; exitCode: number}> {
+): Promise<{
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+  notFound: boolean;
+}> {
   return new Promise(resolve => {
+    let settled = false;
+    const finish = (value: {
+      stdout: string;
+      stderr: string;
+      exitCode: number;
+      notFound: boolean;
+    }) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
     const child = execFile(
       cmd,
       args,
       {timeout: timeoutMs},
       (error, stdout, stderr) => {
-        resolve({
+        const notFound = !!error && (error as NodeJS.ErrnoException).code === 'ENOENT';
+        finish({
           stdout: stdout ?? '',
-          stderr: stderr ?? '',
+          stderr: stderr ?? (error ? String(error) : ''),
           exitCode:
             typeof error?.code === 'number' ? error.code : error ? 1 : 0,
+          notFound,
         });
       },
     );
-    child.on('error', () => {
-      resolve({stdout: '', stderr: `命令未找到: ${cmd}`, exitCode: -1});
+    child.on('error', (err: NodeJS.ErrnoException) => {
+      finish({
+        stdout: '',
+        stderr: `命令未找到: ${cmd} (${err.message})`,
+        exitCode: -1,
+        notFound: err.code === 'ENOENT',
+      });
     });
   });
 }
@@ -92,6 +115,24 @@ export const wasmOfflineRun = defineTool({
 
       const result = await runCommand(cmd, cmdArgs, timeoutMs);
       const durationMs = Date.now() - start;
+
+      // 运行时未安装：优雅返回 JSON 提示，而非直接崩溃。
+      // auto 模式会先尝试 wasmer 回退，因此仅在非 auto 或回退后仍缺失时直接返回。
+      if (result.notFound && runtimeChoice !== 'auto') {
+        response.setStructuredContent({
+          success: false,
+          message: `运行 WASM 失败：系统中未找到运行时 ${cmd}，请先安装 wasmtime 或 wasmer 后重试。`,
+          tooltype: 'wasm_offline_run',
+          data: {
+            inputPath,
+            functionName,
+            runtime: cmd,
+            exitCode: result.exitCode,
+            notFound: true,
+          },
+        });
+        return;
+      }
 
       // auto fallback
       if (
