@@ -54,7 +54,7 @@ function withTimeout<T>(
 }
 
 function buildContextEvaluationExpression(functionCode: string): string {
-  return `(async () => JSON.stringify(await (${functionCode})()))()`;
+  return `(async () => { const value = await (${functionCode}); return JSON.stringify(typeof value === 'function' ? await value() : value); })()`;
 }
 
 function hasDebuggerContextCapability(): boolean {
@@ -253,9 +253,12 @@ export async function evaluateScriptFn(
       'Script evaluation timed out',
     );
     const result = await withTimeout(
-      frame.evaluate(async (fn: unknown) => {
-        // @ts-expect-error no types.
-        return JSON.stringify(await fn());
+      frame.evaluate(async (value: unknown) => {
+        const result =
+          typeof value === 'function'
+            ? await (value as () => unknown)()
+            : await value;
+        return JSON.stringify(result);
       }, fn),
       DEFAULT_SCRIPT_TIMEOUT,
       'Script execution timed out',
@@ -418,10 +421,10 @@ export const evaluateScript = defineTool({
     function: zod
       .string()
       .describe(
-        'A complete, syntactically balanced JavaScript expression that evaluates to a function. ' +
-          '必须是「完整的」函数表达式，括号/大括号/字符串/模板字符串都要闭合，不能传半截定义。' +
-          '示例：`() => 1 + 1`、`async () => await fetch("/api").then(r => r.json())`、' +
-          '`function () { return document.cookie; }`。' +
+        'A complete, syntactically balanced JavaScript expression. ' +
+          '函数表达式会被调用，其他表达式会直接返回求值结果。括号/大括号/字符串/模板字符串都要闭合，不能传半截定义。' +
+          '示例：`document.title`、`(() => document.title)()`、`() => 1 + 1`、' +
+          '`async () => await fetch("/api").then(r => r.json())`。' +
           '不要写 `function name() {`（缺 `}`）或 `() => {`（缺 `}`）。',
       ),
     context: zod

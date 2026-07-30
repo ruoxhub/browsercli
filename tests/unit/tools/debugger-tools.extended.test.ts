@@ -111,9 +111,10 @@ interface DebuggerContextHarness {
     locations: unknown[];
   }>;
   getPausedState(): {
-    isPaused: boolean;
+    isPaused?: boolean;
     reason?: string;
     hitBreakpoints?: string[];
+    timestamp?: number;
     callFrames: Array<{
       functionName?: string;
       url?: string;
@@ -125,10 +126,15 @@ interface DebuggerContextHarness {
         object?: {objectId?: string};
       }>;
     }>;
-  };
+  } | null;
   isPaused(): boolean;
   resume(): Promise<void>;
   pause(): Promise<void>;
+  waitForPaused(timeout?: number): Promise<{
+    callFrames: unknown[];
+    reason: string;
+    timestamp: number;
+  }>;
   stepOver(): Promise<void>;
   stepInto(): Promise<void>;
   stepOut(): Promise<void>;
@@ -214,6 +220,11 @@ function makeContext(
     isPaused: () => false,
     resume: async () => undefined,
     pause: async () => undefined,
+    waitForPaused: async () => ({
+      callFrames: [],
+      reason: 'debugCommand',
+      timestamp: Date.now(),
+    }),
     stepOver: async () => undefined,
     stepInto: async () => undefined,
     stepOut: async () => undefined,
@@ -236,6 +247,89 @@ function makeContext(
 }
 
 describe('debugger tools extended', () => {
+  it('pause waits until the debugger reports a paused state', async () => {
+    const response = makeResponse();
+    const calls: string[] = [];
+    const context = makeContext();
+    context.debuggerContext.pause = async () => {
+      calls.push('pause');
+    };
+    context.debuggerContext.waitForPaused = async () => {
+      calls.push('waitForPaused');
+      return {
+        callFrames: [],
+        reason: 'debugCommand',
+        timestamp: Date.now(),
+      };
+    };
+
+    await pause.handler(
+      {params: {}},
+      response as unknown as Parameters<typeof pause.handler>[1],
+      context as unknown as Parameters<typeof pause.handler>[2],
+    );
+
+    assert.deepStrictEqual(calls, ['pause', 'waitForPaused']);
+    assert.deepStrictEqual(response.structuredContents.at(-1), {
+      success: true,
+      message: '执行已暂停',
+      tooltype: 'pause',
+      data: {action: 'pause', reason: 'debugCommand'},
+    });
+  });
+
+  it('pause reports a pending request when the page stays idle', async () => {
+    const response = makeResponse();
+    const context = makeContext();
+    context.debuggerContext.waitForPaused = async () => {
+      throw new Error('Timeout waiting for paused event');
+    };
+    context.debuggerContext.getPausedState = () => null;
+
+    await pause.handler(
+      {params: {}},
+      response as unknown as Parameters<typeof pause.handler>[1],
+      context as unknown as Parameters<typeof pause.handler>[2],
+    );
+
+    const last = response.structuredContents.at(-1) as {
+      success: boolean;
+      message: string;
+      tooltype: string;
+      data: {action: string; pending?: boolean};
+    };
+    assert.equal(last.success, false);
+    assert.match(last.message, /空闲/);
+    assert.match(last.message, /resume/);
+    assert.deepStrictEqual(last.data, {action: 'pause', pending: true});
+  });
+
+  it('pause succeeds via paused state that lands right after timeout', async () => {
+    const response = makeResponse();
+    const context = makeContext();
+    context.debuggerContext.waitForPaused = async () => {
+      throw new Error('Timeout waiting for paused event');
+    };
+    context.debuggerContext.getPausedState = () => ({
+      callFrames: [],
+      reason: 'other',
+      timestamp: Date.now(),
+    });
+
+    await pause.handler(
+      {params: {}},
+      response as unknown as Parameters<typeof pause.handler>[1],
+      context as unknown as Parameters<typeof pause.handler>[2],
+    );
+
+    assert.deepStrictEqual(response.structuredContents.at(-1), {
+      success: true,
+      message: '执行已暂停',
+      tooltype: 'pause',
+      data: {action: 'pause', reason: 'other'},
+    });
+  });
+
   it('covers script listing and source operations', async () => {
     const response = makeResponse();
     const _runtime = getJSHookRuntime();

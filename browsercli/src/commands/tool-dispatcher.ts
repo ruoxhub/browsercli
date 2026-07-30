@@ -8,7 +8,12 @@ import type {AxiCliCommand} from 'axi-sdk-js';
 import {AxiError} from 'axi-sdk-js';
 import path from 'node:path';
 
-import {getBoolFlag, getFlag, parseArgs, type ParsedArgs} from '../args-parser.js';
+import {
+  getBoolFlag,
+  getFlag,
+  parseArgs,
+  type ParsedArgs,
+} from '../args-parser.js';
 import {successOutput} from '../output.js';
 import type {ToolMeta} from '../tool-meta-types.js';
 import type {WorkerContext} from '../types.js';
@@ -44,6 +49,49 @@ function disambiguateByArgs(
   ) {
     return scored[0].tool;
   }
+  return undefined;
+}
+
+/**
+ * 从 MCP CallToolResult 中提取工具级失败信息：
+ * - 项目约定：structuredContent.success === false（优先取其 message）
+ * - MCP 标准：isError === true（优先取首个 text content）
+ * 成功或非对象结果返回 undefined。
+ */
+function extractToolFailure(result: unknown): string | undefined {
+  if (!result || typeof result !== 'object') {
+    return undefined;
+  }
+  const callResult = result as {
+    structuredContent?: unknown;
+    isError?: unknown;
+    content?: unknown;
+  };
+
+  const structured =
+    callResult.structuredContent &&
+    typeof callResult.structuredContent === 'object'
+      ? (callResult.structuredContent as Record<string, unknown>)
+      : undefined;
+  if (structured && structured.success === false) {
+    return typeof structured.message === 'string' && structured.message
+      ? structured.message
+      : '工具返回失败状态';
+  }
+
+  if (callResult.isError === true) {
+    const firstText = Array.isArray(callResult.content)
+      ? callResult.content.find(
+          (c): c is {type: 'text'; text: string} =>
+            !!c &&
+            typeof c === 'object' &&
+            (c as {type?: unknown}).type === 'text' &&
+            typeof (c as {text?: unknown}).text === 'string',
+        )
+      : undefined;
+    return firstText?.text || '工具返回错误状态';
+  }
+
   return undefined;
 }
 
@@ -141,6 +189,11 @@ export const toolDispatcherCommand: AxiCliCommand<WorkerContext> = async (
           streamErr instanceof Error ? streamErr.message : streamErr,
         );
       }
+    }
+
+    const failure = extractToolFailure(result);
+    if (failure) {
+      throw new AxiError(`工具执行失败：${failure}`, 'TOOL_FAILURE');
     }
 
     return successOutput({

@@ -83,6 +83,19 @@ export function isPatchrightDetachedFrameError(error: unknown): boolean {
   );
 }
 
+export function isPatchrightSessionClosedError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const protocolError = error as Error & {type?: unknown};
+  return (
+    protocolError.type === 'closed' &&
+    error.message.includes('session closed') &&
+    (error.stack?.includes('patchright-core') ?? false)
+  );
+}
+
 export async function ensureBrowserConnected(options: {
   browserURL?: string;
   wsEndpoint?: string;
@@ -854,8 +867,11 @@ export class BrowserManager {
     }
 
     this.detachedFrameGuard = error => {
-      if (isPatchrightDetachedFrameError(error)) {
-        logger.debug('Ignoring transient Patchright detached frame event');
+      if (
+        isPatchrightDetachedFrameError(error) ||
+        isPatchrightSessionClosedError(error)
+      ) {
+        logger.debug('Ignoring transient Patchright session teardown error');
         return;
       }
 

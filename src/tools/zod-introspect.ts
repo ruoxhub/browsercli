@@ -43,23 +43,28 @@ function unwrapOptional(schema: zod.ZodTypeAny): {
   let isOptional = false;
   let defaultValue: unknown = undefined;
 
-  // 处理 optional()
-  if (current instanceof zod.ZodOptional) {
-    isOptional = true;
-    current = current.unwrap();
-  }
+  while (true) {
+    if (current instanceof zod.ZodOptional) {
+      isOptional = true;
+      current = current.unwrap();
+      continue;
+    }
 
-  // 处理 default()
-  if (current instanceof zod.ZodDefault) {
-    isOptional = true;
-    defaultValue = current._def.defaultValue();
-    current = current.removeDefault();
-  }
+    if (current instanceof zod.ZodDefault) {
+      isOptional = true;
+      defaultValue = current._def.defaultValue();
+      current = current.removeDefault();
+      continue;
+    }
 
-  // 处理 ZodEffects（transform / preprocess / refine）
-  // 统一取 innerType()，无论 effects 类型
-  if (current instanceof zod.ZodEffects) {
-    current = current.innerType();
+    // 处理 ZodEffects（transform / preprocess / refine）
+    // 统一取 innerType()，无论 effects 类型
+    if (current instanceof zod.ZodEffects) {
+      current = current.innerType();
+      continue;
+    }
+
+    break;
   }
 
   return {inner: current, isOptional, defaultValue};

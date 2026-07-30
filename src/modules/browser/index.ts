@@ -11,6 +11,7 @@ export {
   ensureBrowserLaunched,
   BrowserManager,
   isPatchrightDetachedFrameError,
+  isPatchrightSessionClosedError,
 } from './browser.js';
 export type {BrowserManagerConfig, Channel} from './browser.js';
 

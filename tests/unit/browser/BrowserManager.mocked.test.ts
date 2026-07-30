@@ -9,6 +9,7 @@ import {beforeEach, afterEach, describe, it} from 'node:test';
 import {
   BrowserManager,
   isPatchrightDetachedFrameError,
+  isPatchrightSessionClosedError,
 } from '../../../src/modules/browser/index.js';
 import {StealthScripts2025} from '../../../src/modules/stealth/StealthScripts2025.js';
 
@@ -279,6 +280,28 @@ describe('BrowserManager mocked', () => {
     );
   });
 
+  it('classifies only Patchright closed-session protocol errors', () => {
+    const patchrightError = new Error(
+      'Protocol error (Network.setCacheDisabled): Internal server error, session closed.',
+    ) as Error & {type: string};
+    patchrightError.type = 'closed';
+    patchrightError.stack =
+      'ProtocolError: session closed\n    at patchright-core/lib/server/chromium/crConnection.js';
+
+    const sameErrorFromApp = new Error(
+      'Protocol error (Network.setCacheDisabled): Internal server error, session closed.',
+    ) as Error & {type: string};
+    sameErrorFromApp.type = 'closed';
+    sameErrorFromApp.stack = 'Error: session closed\n    at src/app.ts';
+
+    assert.strictEqual(isPatchrightSessionClosedError(patchrightError), true);
+    assert.strictEqual(isPatchrightSessionClosedError(sameErrorFromApp), false);
+    assert.strictEqual(
+      isPatchrightSessionClosedError(new Error('session closed')),
+      false,
+    );
+  });
+
   it('installs and removes the detached frame guard with browser cleanup', async () => {
     const manager = BrowserManager.getInstance({
       headless: true,
@@ -293,6 +316,15 @@ describe('BrowserManager mocked', () => {
     patchrightError.stack =
       'Error: Frame was detached\n    at patchright-core/lib/server/chromium/crPage.js';
     manager.detachedFrameGuard?.(patchrightError);
+    assert.strictEqual(process.listenerCount('uncaughtException'), before + 1);
+
+    const sessionClosedError = new Error(
+      'Protocol error (Network.setCacheDisabled): Internal server error, session closed.',
+    ) as Error & {type: string};
+    sessionClosedError.type = 'closed';
+    sessionClosedError.stack =
+      'ProtocolError: session closed\n    at patchright-core/lib/server/chromium/crConnection.js';
+    manager.detachedFrameGuard?.(sessionClosedError);
     assert.strictEqual(process.listenerCount('uncaughtException'), before + 1);
 
     await manager.close();

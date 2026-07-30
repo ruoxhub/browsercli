@@ -76,7 +76,7 @@ interface HandleLike {
 interface PageLike {
   evaluateHandle(): Promise<HandleLike>;
   evaluate(
-    callback: (fn: () => Promise<unknown>) => Promise<string | undefined>,
+    callback: (value: unknown) => Promise<string | undefined>,
     passedFn?: unknown,
   ): Promise<string | undefined>;
 }
@@ -118,6 +118,44 @@ describe('evaluate_script callback path', () => {
     assert.equal(result.result, '{"ok":true}');
     assert.strictEqual(disposed, 1);
     assert.match(result.message, /returned/);
+  });
+
+  it('returns an ordinary expression result without calling it', async () => {
+    const handle = {
+      dispose: async () => undefined,
+    } satisfies HandleLike;
+
+    const page: PageLike = {
+      evaluateHandle: async () => handle,
+      evaluate: async callback => callback('page title'),
+    };
+
+    const result = await evaluateScriptFn(
+      page as unknown as Parameters<typeof evaluateScriptFn>[0],
+      'document.title',
+    );
+
+    assert.equal(result.success, true);
+    assert.equal(result.result, '"page title"');
+  });
+
+  it('returns an IIFE result without calling it again', async () => {
+    const handle = {
+      dispose: async () => undefined,
+    } satisfies HandleLike;
+
+    const page: PageLike = {
+      evaluateHandle: async () => handle,
+      evaluate: async callback => callback({ok: true}),
+    };
+
+    const result = await evaluateScriptFn(
+      page as unknown as Parameters<typeof evaluateScriptFn>[0],
+      '(() => ({ok: true}))()',
+    );
+
+    assert.equal(result.success, true);
+    assert.equal(result.result, '{"ok":true}');
   });
 
   it('registers a preload script on future documents', async () => {
@@ -269,7 +307,7 @@ describe('evaluate_script callback path', () => {
         method: 'Runtime.evaluate',
         params: {
           expression:
-            '(async () => JSON.stringify(await (() => ({ ok: true, world: "content-script" }))()))()',
+            '(async () => { const value = await (() => ({ ok: true, world: "content-script" })); return JSON.stringify(typeof value === \'function\' ? await value() : value); })()',
           contextId: 2,
           returnByValue: true,
           awaitPromise: true,

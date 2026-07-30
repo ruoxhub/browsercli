@@ -86,3 +86,34 @@ describe('validateToolArgs array-of-object (json) param', () => {
     assert.equal(result.ok, true);
   });
 });
+
+describe('validateToolArgs browsercli regression contracts', () => {
+  before(async () => {
+    await ensureToolsMeta();
+  });
+
+  it('exposes task context arguments for evidence and rebuild tools', () => {
+    for (const toolName of [
+      'record_reverse_evidence',
+      'export_rebuild_bundle',
+    ]) {
+      const meta = getToolMeta(toolName);
+      assert.ok(meta, `${toolName} meta 应存在`);
+      assert.equal(meta.argSpecs.taskId?.type, 'string');
+      assert.equal(meta.argSpecs.taskSlug?.type, 'string');
+      assert.equal(meta.argSpecs.targetUrl?.type, 'string');
+      assert.equal(meta.argSpecs.goal?.type, 'string');
+    }
+  });
+
+  it('applies the default occurrence for set_breakpoint_on_text', () => {
+    const result = validateToolArgs('set_breakpoint_on_text', {
+      text: 'targetFn',
+    });
+
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.equal(result.value.occurrence, 1);
+    }
+  });
+});

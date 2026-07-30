@@ -201,7 +201,7 @@ export class WasmDecompiler {
         lineCount: wat.split('\n').length,
         functionCount: functionSummaries.length,
         importCount: countMatches(wat, /^\s*\(import\b/gm),
-        exportCount: countMatches(wat, /^\s*\(export\b/gm),
+        exportCount: countMatches(wat, /\(export\s+"/g),
         functionSummaries: functionSummaries.sort(
           (a, b) =>
             b.memoryLoadCount +

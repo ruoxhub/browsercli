@@ -610,11 +610,30 @@ export const pause = defineTool({
         return;
       }
       await debuggerContext.pause();
+      let reason: string;
+      try {
+        const pausedState = await debuggerContext.waitForPaused(5000);
+        reason = pausedState.reason;
+      } catch {
+        const current = debuggerContext.getPausedState();
+        if (!current) {
+          response.setStructuredContent({
+            success: false,
+            message:
+              '暂停请求已下发，但页面 5 秒内未执行 JavaScript（可能处于空闲状态）。' +
+              '请求仍然生效，下次 JS 执行时会暂停；可调用 resume 取消。',
+            tooltype: 'pause',
+            data: {action: 'pause', pending: true},
+          });
+          return;
+        }
+        reason = current.reason;
+      }
       response.setStructuredContent({
         success: true,
-        message: '已请求暂停执行，等待暂停...',
+        message: '执行已暂停',
         tooltype: 'pause',
-        data: {action: 'pause'},
+        data: {action: 'pause', reason},
       });
     } catch (error) {
       response.setStructuredContent({

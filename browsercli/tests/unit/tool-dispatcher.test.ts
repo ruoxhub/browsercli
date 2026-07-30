@@ -163,6 +163,38 @@ describe('tool-dispatcher (pure HTTP)', () => {
     ]);
   });
 
+  it('throws TOOL_FAILURE when the tool structured content reports failure', async () => {
+    const client = new MockHttpClient(SAMPLE_TOOLS, {
+      structuredContent: {
+        success: false,
+        message: 'operation failed',
+      },
+    });
+
+    await assert.rejects(
+      async () => toolDispatcherCommand(['my_tool'], ctxWith(client)),
+      (error: unknown) =>
+        error instanceof AxiError &&
+        error.code === 'TOOL_FAILURE' &&
+        error.message.includes('operation failed'),
+    );
+  });
+
+  it('throws TOOL_FAILURE when the MCP result sets isError', async () => {
+    const client = new MockHttpClient(SAMPLE_TOOLS, {
+      isError: true,
+      content: [{type: 'text', text: 'boom'}],
+    });
+
+    await assert.rejects(
+      async () => toolDispatcherCommand(['my_tool'], ctxWith(client)),
+      (error: unknown) =>
+        error instanceof AxiError &&
+        error.code === 'TOOL_FAILURE' &&
+        error.message.includes('boom'),
+    );
+  });
+
   it('wires --session to the invoke call', async () => {
     const client = new MockHttpClient(SAMPLE_TOOLS, {done: true});
     await toolDispatcherCommand(
@@ -248,10 +280,7 @@ describe('tool-dispatcher (pure HTTP)', () => {
 
   it('disambiguates `select` to select_frame via --frameId', async () => {
     const client = new MockHttpClient(ALL_TOOLS, {ok: true});
-    await toolDispatcherCommand(
-      ['select', '--frameId', 'f1'],
-      ctxWith(client),
-    );
+    await toolDispatcherCommand(['select', '--frameId', 'f1'], ctxWith(client));
     assert.strictEqual(client.invokeCalls[0][1], 'select_frame');
   });
 
