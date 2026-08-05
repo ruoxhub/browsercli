@@ -205,8 +205,11 @@ export abstract class PageCollector<T extends {stableId: number}> {
    * @param page 要清空数据的页面；未注册的页面会被忽略
    */
   clear(page: Page): void {
-    if (!this.storage.has(page)) return;
-    this.storage.set(page, [[]]);
+    const navigations = this.storage.get(page);
+    if (!navigations) return;
+    // 监听器闭包持有初始 outer 数组，必须原地清空，不能替换 WeakMap 中的引用。
+    navigations.length = 0;
+    navigations.push([]);
     this.idGenerators.set(page, this.createIdGenerator());
   }
 

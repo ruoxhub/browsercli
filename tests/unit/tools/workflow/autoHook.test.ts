@@ -77,8 +77,8 @@ describe('autoHook tool', () => {
       let evaluateCalls = 0;
       const runtime = {
         getSelectedFrame: () => ({
-          evaluate: async () => {
-            evaluateCalls += 1;
+          evaluate: async (value: unknown) => {
+            if (typeof value === 'string') evaluateCalls += 1;
           },
         }),
         getSelectedPage: () => ({
@@ -93,7 +93,7 @@ describe('autoHook tool', () => {
 
       assert.strictEqual(result.success, true);
       assert.strictEqual(evaluateCalls, 0);
-      assert.ok(result.message?.includes('未注入页面'));
+      assert.ok(result.message?.includes('未注入'));
       assert.strictEqual(result.data?.hooksInjected[0]?.injected, false);
     });
 
@@ -101,8 +101,8 @@ describe('autoHook tool', () => {
       const injectedScripts: string[] = [];
       const runtime = {
         getSelectedFrame: () => ({
-          evaluate: async (script: string) => {
-            injectedScripts.push(script);
+          evaluate: async (value: unknown) => {
+            if (typeof value === 'string') injectedScripts.push(value);
           },
         }),
         getSelectedPage: () => ({
@@ -146,7 +146,7 @@ describe('autoHook tool', () => {
             script.includes("target: 'Document.cookie'"),
         ),
       );
-      assert.ok(result.message?.includes('实际注入 2 个 Hook'));
+      assert.ok(result.message?.includes('已注入 2/2 个 Hook'));
       assert.strictEqual(
         result.data?.hooksInjected.every((item: any) => item.injected === true),
         true,
@@ -157,8 +157,8 @@ describe('autoHook tool', () => {
       const injectedScripts: string[] = [];
       const runtime = {
         getSelectedFrame: () => ({
-          evaluate: async (script: string) => {
-            injectedScripts.push(script);
+          evaluate: async (value: unknown) => {
+            if (typeof value === 'string') injectedScripts.push(value);
           },
         }),
         getSelectedPage: () => ({
@@ -195,8 +195,8 @@ describe('autoHook tool', () => {
       const injectedScripts: string[] = [];
       const runtime = {
         getSelectedFrame: () => ({
-          evaluate: async (script: string) => {
-            injectedScripts.push(script);
+          evaluate: async (value: unknown) => {
+            if (typeof value === 'string') injectedScripts.push(value);
           },
         }),
         getSelectedPage: () => ({
@@ -218,7 +218,8 @@ describe('autoHook tool', () => {
             script.includes('hook_cryptojs_auto') &&
             script.includes('window.__hookStore') &&
             script.includes("type: 'cryptojs'") &&
-            script.includes("target: 'window.CryptoJS'"),
+            script.includes('Reflect.apply(temp_apply, this, arguments)') &&
+            !script.includes('temp_apply.apply(this, arguments)'),
         ),
       );
       assert.ok(

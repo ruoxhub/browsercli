@@ -31,4 +31,44 @@ describe('CollectorContextProvider', () => {
     const found = provider.getNetworkRequestById([mockPage as never], 10);
     assert.strictEqual(found, request1);
   });
+
+  it('continues collecting requests after clearNetworkRequests', () => {
+    const provider = new CollectorContextProvider();
+    const handlers = new Map<string, (...args: unknown[]) => void>();
+    const mockPage = {
+      on: (event: string, handler: (...args: unknown[]) => void) => {
+        handlers.set(event, handler);
+      },
+      once: () => undefined,
+      off: () => undefined,
+      mainFrame: () => ({}),
+      context: () => ({
+        newCDPSession: async () => ({
+          on: () => undefined,
+          off: () => undefined,
+          send: async () => undefined,
+          detach: async () => undefined,
+        }),
+      }),
+    };
+    const request = {
+      url: () => 'https://example.com/api',
+      method: () => 'GET',
+      frame: () => ({}),
+      resourceType: () => 'fetch',
+    };
+
+    provider.attachPage(mockPage as never);
+    provider.clearNetworkRequests(mockPage as never);
+    handlers.get('request')?.(request);
+
+    assert.deepStrictEqual(
+      provider.getNetworkRequests(mockPage as never, false),
+      [request],
+    );
+    assert.strictEqual(
+      provider.getNetworkRequestStableId([mockPage as never], request),
+      1,
+    );
+  });
 });

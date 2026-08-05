@@ -197,7 +197,11 @@ artifacts/
 .antigravitycli
 .codegraph
 .understand-anything
-.agents
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/close-code-change/
+!.agents/skills/close-code-change/**
 .qoder
 .superpowers
 .codebuddy
@@ -207,3 +211,4 @@ scratch
 .workbuddy
 CODEBUDDY.md
 .omo
+.codex

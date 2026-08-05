@@ -125,7 +125,7 @@ export const hookCryptoJS = defineTool({
       }
     }
 
-    return temp_apply.apply(this, arguments);
+    return Reflect.apply(temp_apply, this, arguments);
   };
 
   console.log('[' + hookId + '] ✅ CryptoJS hook installed');

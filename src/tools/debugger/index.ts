@@ -4,9 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {readFile} from 'node:fs/promises';
+import path from 'node:path';
+
 import type {DebuggerManager} from '../../modules/debugger/DebuggerManager.js';
 import type {BreakpointInfo} from '../../modules/debugger/types.js';
-import path from 'node:path';
 import {zod} from '../../third_party/index.js';
 import {safeStringify} from '../../utils/safeJson.js';
 import type {ToolContextProvider} from '../../worker/ToolContext.js';
@@ -744,11 +746,36 @@ export const getScriptSource = defineTool({
       .describe(
         '可选的自定义保存路径。提供时将源码写入该文件并返回其绝对路径；不传则使用内置临时缓存路径。',
       ),
+    startLine: zod
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('可选的起始行号（从 1 开始，须与 endLine 同时提供）。'),
+    endLine: zod
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        '可选的结束行号（从 1 开始，包含该行，须与 startLine 同时提供）。',
+      ),
   },
   handler: async (request, response, context) => {
-    const {scriptId, filePath} = request.params;
+    const {scriptId, filePath, startLine, endLine} = request.params;
 
     try {
+      if ((startLine === undefined) !== (endLine === undefined)) {
+        throw new Error('startLine 与 endLine 必须同时提供');
+      }
+      if (
+        startLine !== undefined &&
+        endLine !== undefined &&
+        startLine > endLine
+      ) {
+        throw new Error('startLine 不能大于 endLine');
+      }
+
       const debuggerContext = await getDebuggerFromContext(context);
       const sourcePath = await debuggerContext.getScriptSourcePath(
         scriptId,
@@ -765,6 +792,13 @@ export const getScriptSource = defineTool({
       }
 
       const script = debuggerContext.getScriptById(scriptId);
+      const excerpt =
+        startLine !== undefined && endLine !== undefined
+          ? (await readFile(sourcePath, 'utf-8'))
+              .split(/\r?\n/)
+              .slice(startLine - 1, endLine)
+              .join('\n')
+          : undefined;
 
       response.setStructuredContent({
         success: true,
@@ -774,6 +808,9 @@ export const getScriptSource = defineTool({
           url: script?.url || null,
           sourceLength: script?.sourceLength || 0,
           sourcePath,
+          ...(excerpt === undefined
+            ? {}
+            : {startLine, endLine, source: excerpt}),
         },
       });
     } catch (error) {
@@ -823,8 +860,8 @@ export const searchInSources = defineTool({
     excludeMinified: zod
       .boolean()
       .optional()
-      .default(true)
-      .describe('跳过压缩文件（行长度 > 10000 字符）。默认: true。'),
+      .default(false)
+      .describe('跳过压缩文件（行长度 > 10000 字符）。默认: false。'),
     urlFilter: zod
       .string()
       .optional()

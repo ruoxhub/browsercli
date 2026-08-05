@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Close Code Change'
+  short_description: 'Close code changes with relevant verification'
+  default_prompt: 'Use $close-code-change to finish this code change with relevant checks and a verified handoff.'

@@ -5,7 +5,13 @@
  */
 
 import assert from 'node:assert';
-import {mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync} from 'node:fs';
+import {
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+  mkdirSync,
+} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {after, before, describe, it} from 'node:test';
@@ -90,7 +96,9 @@ describe('get_script_source filePath param', () => {
 
   it('returns the built-in cache path when filePath is omitted', async () => {
     const cachePath = path.join(os.tmpdir(), 'browsercli-scripts', 'abc.js');
-    const context = {getDebuggerContext: async () => makeDebuggerContext(cachePath)};
+    const context = {
+      getDebuggerContext: async () => makeDebuggerContext(cachePath),
+    };
     const response = makeResponse();
 
     await getScriptSource.handler(
@@ -109,7 +117,9 @@ describe('get_script_source filePath param', () => {
 
   it('accepts a numeric scriptId (CLI coerces IDs to number) and normalizes to string', async () => {
     const cachePath = path.join(os.tmpdir(), 'browsercli-scripts', 'num.js');
-    const context = {getDebuggerContext: async () => makeDebuggerContext(cachePath)};
+    const context = {
+      getDebuggerContext: async () => makeDebuggerContext(cachePath),
+    };
     const response = makeResponse();
 
     // browsercli 会把纯数字 ID 推断为 number，工具须能接受并归一化为 string。
@@ -148,5 +158,36 @@ describe('get_script_source filePath param', () => {
     assert.equal(content.success, true);
     assert.equal(content.data.sourcePath, path.resolve(target));
     assert.equal(readFileSync(target, 'utf-8'), SAMPLE_SOURCE);
+  });
+
+  it('returns an inclusive one-based line range', async () => {
+    const target = path.join(tmpDir, 'excerpt.js');
+    const context = {
+      getDebuggerContext: async () => makeDebuggerContext('/ignored.js'),
+    };
+    const response = makeResponse();
+
+    await getScriptSource.handler(
+      {
+        params: {scriptId: '1', filePath: target, startLine: 2, endLine: 2},
+      } as never,
+      response as never,
+      context as never,
+    );
+
+    const content = response.structured as {
+      success: boolean;
+      data: {startLine: number; endLine: number; source: string};
+    };
+    assert.equal(content.success, true);
+    assert.deepStrictEqual(content.data, {
+      scriptId: '1',
+      url: 'https://example.com/app.js',
+      sourceLength: SAMPLE_SOURCE.length,
+      sourcePath: path.resolve(target),
+      startLine: 2,
+      endLine: 2,
+      source: 'function test(){ return token; }',
+    });
   });
 });

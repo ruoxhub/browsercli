@@ -7,13 +7,18 @@
 import {mkdir, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 
-import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
 import {logger} from '../../utils/logger.js';
 import {resolveDefaultArtifactsTasksDir} from '../../utils/projectPaths.js';
+import type {ToolContextProvider} from '../../worker/ToolContext.js';
 import {ToolCategory} from '../categories.js';
 import {readHookStore} from '../hook/store-utils.js';
 import {defineTool} from '../ToolDefinition.js';
+
+type AutoHookContext = Pick<
+  ToolContextProvider,
+  'getSelectedFrame' | 'getSelectedPage'
+>;
 
 /**
  * 自动 Hook 工具配置
@@ -241,7 +246,7 @@ function _generateCryptoJsHookScript(algorithms: string[] = ['all']): string {
       }
     }
 
-    return temp_apply.apply(this, arguments);
+    return Reflect.apply(temp_apply, this, arguments);
   };
 
   pushHookRecord({
@@ -897,8 +902,9 @@ function _generateCookieHookScript(): string {
 /**
  * 检测页面中的加密库（在页面上下文中执行）
  */
-async function detectCryptoLibraries(): Promise<CryptoDetectionResult[]> {
-  const contextProvider = getRuntime().contextProvider!;
+async function detectCryptoLibraries(
+  contextProvider: AutoHookContext,
+): Promise<CryptoDetectionResult[]> {
   const selectedPage = contextProvider.getSelectedPage?.() ?? null;
   const frame =
     contextProvider.getSelectedFrame?.() ?? selectedPage?.mainFrame?.() ?? null;
@@ -907,7 +913,7 @@ async function detectCryptoLibraries(): Promise<CryptoDetectionResult[]> {
     return [];
   }
 
-  const results = (await frame.evaluate(() => {
+  const results = await frame.evaluate(() => {
     return [
       {
         name: 'CryptoJS',
@@ -933,9 +939,9 @@ async function detectCryptoLibraries(): Promise<CryptoDetectionResult[]> {
         detected: typeof (window as any).crypto?.subtle !== 'undefined',
       },
     ];
-  })) as CryptoDetectionResult[];
+  });
 
-  return results;
+  return Array.isArray(results) ? (results as CryptoDetectionResult[]) : [];
 }
 
 /**
@@ -1033,8 +1039,8 @@ function buildHookPlans(
 
 async function injectHookPlans(
   plans: Array<HookInjectionRecord & {script: string}>,
+  contextProvider: AutoHookContext,
 ): Promise<HookInjectionRecord[]> {
-  const contextProvider = getRuntime().contextProvider!;
   const selectedPage = contextProvider.getSelectedPage?.() ?? null;
   const frame =
     contextProvider.getSelectedFrame?.() ?? selectedPage?.mainFrame?.() ?? null;
@@ -1078,10 +1084,7 @@ export const autoHook = defineTool({
       .enum(['none', 'api-signature', 'network-core'])
       .optional()
       .describe('Hook 预设'),
-    autoInject: zod
-      .boolean()
-      .optional()
-      .describe('自动将 Hook 注入页面'),
+    autoInject: zod.boolean().optional().describe('自动将 Hook 注入页面'),
     waitAfterHookMs: zod
       .number()
       .optional()
@@ -1094,10 +1097,7 @@ export const autoHook = defineTool({
       .boolean()
       .optional()
       .describe('Hook setTimeout/setInterval'),
-    hookEval: zod
-      .boolean()
-      .optional()
-      .describe('Hook eval/Function 构造器'),
+    hookEval: zod.boolean().optional().describe('Hook eval/Function 构造器'),
     hookCookie: zod.boolean().optional().describe('Hook document.cookie'),
     hookXhr: zod.boolean().optional().describe('Hook XMLHttpRequest'),
     hookFetch: zod.boolean().optional().describe('Hook fetch API'),
@@ -1124,14 +1124,14 @@ export const autoHook = defineTool({
     try {
       const hookPlans = buildHookPlans(options);
       hooksInjected = options.autoInject
-        ? await injectHookPlans(hookPlans)
+        ? await injectHookPlans(hookPlans, context)
         : hookPlans.map(({script: _script, ...plan}) => plan);
 
       // 在页面上下文中检测加密库（如果存在 frame）
-      const frame = context.getSelectedFrame();
+      const frame = context?.getSelectedFrame?.() ?? null;
       if (frame) {
         try {
-          cryptoDetected = await detectCryptoLibraries();
+          cryptoDetected = await detectCryptoLibraries(context);
         } catch (detectError) {
           logger.warn(
             '[AutoHook] 页面加密库检测失败: ' +
@@ -1150,7 +1150,7 @@ export const autoHook = defineTool({
       ).length;
       const failedInjections = hooksInjected.filter(h => !h.success).length;
       const detectedCryptoCount = cryptoDetected.filter(c => c.detected).length;
-      const pageUrl = context.getSelectedPage()?.url?.();
+      const pageUrl = context?.getSelectedPage?.()?.url?.();
 
       const data: AutoHookToolData = {
         url: url || pageUrl || 'unknown',

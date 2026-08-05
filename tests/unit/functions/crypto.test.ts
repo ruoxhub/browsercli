@@ -129,6 +129,10 @@ describe('crypto functions', () => {
       const hookCode = calls[0].arguments[0];
 
       assert.ok(hookCode.includes('["AES","SHA"]'));
+      assert.ok(
+        hookCode.includes('Reflect.apply(temp_apply, this, arguments)'),
+      );
+      assert.ok(!hookCode.includes('temp_apply.apply(this, arguments)'));
     });
   });
 
