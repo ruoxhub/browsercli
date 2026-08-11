@@ -209,6 +209,7 @@ example
 scratch
 .mcp.json
 .workbuddy
+.worktrees/
 CODEBUDDY.md
 .omo
 .codex
