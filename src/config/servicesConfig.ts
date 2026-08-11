@@ -18,13 +18,13 @@ import type {BrowserManagerConfig} from '../modules/browser/browser.js';
 import {AIService} from '../services/AIService.js';
 import {OpenAIProvider} from '../services/OpenAIProvider.js';
 
-import {getRuntimeConfigStore} from './RuntimeConfigStore.js';
 import {
   getEnvBoolean,
   getEnvNumber,
   getEnvValue,
   type LLMProvider,
 } from './resolver.js';
+import {getRuntimeConfigStore} from './RuntimeConfigStore.js';
 import {
   type AIConfig,
   type SystemConfig,

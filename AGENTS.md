@@ -1,5 +1,13 @@
 # Repository Guidelines
 
+## 开发原则
+
+- **KISS（保持简单）**：优先选择最简单、直接且足以解决当前问题的实现。
+- **SRP（单一职责）**：一个模块只负责一件事，并明确其职责边界。
+- **DRY（不重复）**：避免重复实现相同逻辑，优先复用或提取公共能力。
+- **显式优于隐式**：配置、依赖和状态必须清晰、明确且可追踪。
+- **代码是给人看的**：可读性永远优先于炫技和不必要的技巧。
+
 ## Project Structure &amp; Module Organization
 
 核心源码位于 `src/`。其中 `src/tools/` 提供 MCP 工具实现，`src/modules/` 放逆向分析、Hook、调试、去混淆等核心模块，`src/services/` 负责外部 AI 与服务集成；`src/worker/` 是后台 worker 运行时（`src/index.ts` 为进程入口）。命令行客户端已抽离为独立、零耦合的 `browsercli/` 包，仅通过 worker 的 `/api/v1` HTTP 契约通信，不再内置本地 worker 进程管理（start/stop/status/repl 等命令已删除）。构建产物输出到 `build/`，不要手改。文档集中在 `docs/`，公开案例与脚本入口在 `scripts/cases/`。真实任务证据默认保留在 `artifacts/tasks/<task-id>/`，仓库只跟踪模板目录。
@@ -95,8 +103,21 @@ bot 信号，关掉它暴露真实 OS 屏幕。只有用户显式传 `config.vie
 
 强反爬逃生通道详见 [`docs/cloak.md`](./docs/cloak.md)。
 
-# graphify
+## 通用 Skill Usage
 
-- **graphify** `~/.agents/skills/graphify/[SKILL.md](http://SKILL.md)`) - any input to knowledge graph. Trigger: `/graphify`
+- 需求仍在探索、涉及创意设计或要新增功能方向时先使用 `brainstorming`；已有明确规格且属于多步骤任务时使用 `writing-plans`，执行既有书面计划时使用 `executing-plans`。
+- 实现功能或修复缺陷时使用 `test-driven-development`；遇到 bug、测试失败或异常行为时先使用 `systematic-debugging`；准备声明完成前必须使用 `verification-before-completion` 获取最后一次改动之后的新鲜验证证据。
+- 接收评审意见并准备修改前使用 `receiving-code-review`；完成较大功能或准备合并前使用 `requesting-code-review`；对分支、PR、WIP 或指定基点（commit/branch/tag/merge-base）做 Standards + Spec 双轴审查时使用 `code-review`；分支收尾与合并策略使用 `finishing-a-development-branch`，需要隔离工作区时使用 `using-git-worktrees`。
+- 代码发现优先使用 `codebase-memory` 及项目的 Codebase Knowledge Graph；仅在图谱不足、检索非代码文件或字符串字面量时回退到 `rg`。
+- 编写、审查或重构任何语言的代码时使用 `karpathy-guidelines`，控制假设、改动范围和验证标准；具体技术栈再叠加对应领域 skill。
+- 简化、清理或提升近期改动可读性且不改变行为时使用 `code-simplifier`；与 `karpathy-guidelines` 叠加时先保行为与范围，再做清晰度收敛。
+- REST API 的资源建模、状态码、分页、过滤、错误响应、版本和限流设计使用 `api-design`；框架实现规则仍使用对应的前端或后端 skill。
+- 模块边界、深模块、接口收敛、可测试性或 AI 可导航性设计使用 `codebase-design`。
+- Agent / LLM 系统按任务选择：全栈架构诊断使用 `agent-architecture-audit`，失败复盘与自调试使用 `agent-introspection-debugging`，工具与观测面设计使用 `agent-harness-construction`，编码 Agent 对比评测使用 `agent-eval`，x402 支付能力使用 `agent-payment-x402`。
+- MCP 开发先使用 `build-mcp-server` 确定部署和工具模型；需要聊天内交互 UI 时再使用 `build-mcp-app`，需要分发本地 MCP 包时使用 `build-mcpb`。
+- ECC 安装面裁剪与 DAILY / LIBRARY 分类使用 `agent-sort`；仅当用户明确要求多 Agent 编排或评估委派方案时，才使用 `cavecrew`、`dispatching-parallel-agents` 或 `subagent-driven-development`，不得据此自动扩大任务或启用委派。
+- 传统项目的风格继承仅在用户输入 `/inherit-legacy-style`，或明确要求为手写遗留项目建立长期风格约束时使用 `inherit-legacy-style`。
+- `caveman`、`caveman-commit`、`caveman-review`、`caveman-compress`、`caveman-help`、`caveman-stats` 仅在用户明确要求对应的压缩表达、提交、审查、文档压缩、帮助或统计模式时使用。
+- 非平凡任务完成后使用 `agent-self-evaluation` 做准确性、完整性、清晰度、可执行性和简洁性复核；它不替代项目要求的测试、类型检查或安全检查。
+- 在需要编写复杂、类型安全的 TS 代码时,使用`typescript-advanced-types`提供的从泛型/条件类型/映射类型到实战模式(事件总线、API 客户端、状态机)的现成模板与最佳实践
 
-When the user types `/graphify`, use the installed graphify skill or instructions before doing anything else.

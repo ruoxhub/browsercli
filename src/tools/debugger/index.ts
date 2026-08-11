@@ -40,6 +40,14 @@ export type {Frame} from '../../third_party/index.js';
 // ─── 辅助函数 ───────────────────────────────────────────────
 
 /**
+ * scriptId 参数 Schema：脚本 ID 可能是字符串或数字（CDP 返回 number），
+ * 统一收敛为字符串。list_scripts / search_in_sources / get_script_source / set_breakpoint 共用。
+ */
+const scriptIdSchema = zod
+  .union([zod.string(), zod.number()])
+  .transform(value => String(value));
+
+/**
  * step_into / step_over / step_out 三工具共享逻辑：校验暂停态、执行
  * 单步动作、组装 pausedInfo 响应。
  */
@@ -305,9 +313,7 @@ export const setBreakpoint = defineTool({
       .describe(
         'JavaScript 文件的 URL（支持部分匹配或正则）。与 scriptId 二选一，优先使用 scriptId 精确定位。',
       ),
-    scriptId: zod
-      .union([zod.string(), zod.number()])
-      .transform(value => String(value))
+    scriptId: scriptIdSchema
       .optional()
       .describe(
         '脚本 ID（来自 list_scripts / search_in_sources）。按 scriptId 定位可避免 URL 歧义，要求该脚本在当前调试会话中仍已加载。',
@@ -736,10 +742,9 @@ export const getScriptSource = defineTool({
   schema: {
     // 接受字符串或数字：纯远程 CLI（browsercli）会把纯数字 ID 自动推断为
     // number，这里统一归一化为 string，避免 [VALIDATION] 校验失败。
-    scriptId: zod
-      .union([zod.string(), zod.number()])
-      .transform(value => String(value))
-      .describe('脚本 ID（来自 list_scripts）用于获取源码缓存路径。'),
+    scriptId: scriptIdSchema.describe(
+      '脚本 ID（来自 list_scripts）用于获取源码缓存路径。',
+    ),
     filePath: zod
       .string()
       .optional()
@@ -1428,10 +1433,7 @@ export const findInScript = defineTool({
   },
   schema: {
     // 与 get_script_source 一致：CLI 可能传入数字 ID，统一归一化为 string。
-    scriptId: zod
-      .union([zod.string(), zod.number()])
-      .transform(value => String(value))
-      .describe('要搜索的脚本 ID（来自 list_scripts）。'),
+    scriptId: scriptIdSchema.describe('要搜索的脚本 ID（来自 list_scripts）。'),
     query: zod.string().describe('要在脚本中查找的字符串。'),
     contextChars: zod
       .number()

@@ -14,15 +14,12 @@
  * 时做浅合并，避免面板只改一个字段却清空其余字段。
  */
 
+/* eslint-disable import/no-cycle -- store seeds from configFromEnv() (resolver) while resolver reads store state via getRuntimeConfigStore(); the mutual dependency is intentional (same as resolver <-> servicesConfig). */
 import {configFromEnv} from './resolver.js';
 import {type GlobalConfig, validateGlobalConfig} from './schema.js';
 
 /** 需要浅合并的深层对象字段 */
-const DEEP_MERGE_KEYS = new Set([
-  'browser',
-  'openai',
-  'toolResultRecording',
-]);
+const DEEP_MERGE_KEYS = new Set(['browser', 'openai', 'toolResultRecording']);
 
 export class RuntimeConfigStore {
   private config: GlobalConfig;

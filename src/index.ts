@@ -15,12 +15,11 @@
  * 5. 启动 Web 控制台，浏览器/数据库由面板显式触发连接
  */
 
-import {logger} from './utils/logger.js';
-
-import {resolveConfig} from './config.js';
-import {dbService} from './services/DatabaseService.js';
 import {getRuntimeConfigStore} from './config/RuntimeConfigStore.js';
+import {resolveConfig} from './config.js';
 import {getRuntime} from './runtime.js';
+import {dbService} from './services/DatabaseService.js';
+import {logger} from './utils/logger.js';
 import {ConsoleServer} from './web/ConsoleServer.js';
 import {JobStore} from './worker/JobStore.js';
 import {SekiroInvoker} from './worker/SekiroInvoker.js';

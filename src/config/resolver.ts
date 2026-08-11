@@ -26,13 +26,12 @@ import {config as dotenvConfig} from 'dotenv';
 
 import {resolveDefaultEnvPath} from '../utils/projectPaths.js';
 
-import {getRuntimeConfigStore} from './RuntimeConfigStore.js';
-
 import {
   DEFAULT_GROUP,
   DEFAULT_RPC_HOST,
   RUNTIME_DIR_NAME,
 } from './constants.js';
+import {getRuntimeConfigStore} from './RuntimeConfigStore.js';
 import {
   type AIConfig,
   type GlobalConfig,

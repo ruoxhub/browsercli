@@ -300,41 +300,39 @@ export function detectTokenPatterns(
 export function detectAntiDebugPatterns(
   logs: AnalyzerConsoleMessage[],
 ): AntiDebugPattern[] {
+  type AntiDebugKind = AntiDebugPattern['type'];
+  const conditions: Array<{
+    kind: AntiDebugKind;
+    match: (text: string) => boolean;
+  }> = [
+    {kind: 'debugger', match: text => text.includes('debugger')},
+    {
+      kind: 'console.log',
+      match: text => text.includes('console.log') && text.includes('='),
+    },
+    {
+      kind: 'devtools-detect',
+      match: text => text.includes('devtools') || text.includes('firebug'),
+    },
+    {
+      kind: 'timing-check',
+      match: text =>
+        text.includes('performance.now') || text.includes('Date.now'),
+    },
+  ];
+
   const patterns: AntiDebugPattern[] = [];
 
   for (const log of logs) {
-    const text = log.text;
+    const context = {
+      location: log.url || 'unknown',
+      code: log.text.substring(0, 200),
+    };
 
-    if (text.includes('debugger')) {
-      patterns.push({
-        type: 'debugger',
-        location: log.url || 'unknown',
-        code: text.substring(0, 200),
-      });
-    }
-
-    if (text.includes('console.log') && text.includes('=')) {
-      patterns.push({
-        type: 'console.log',
-        location: log.url || 'unknown',
-        code: text.substring(0, 200),
-      });
-    }
-
-    if (text.includes('devtools') || text.includes('firebug')) {
-      patterns.push({
-        type: 'devtools-detect',
-        location: log.url || 'unknown',
-        code: text.substring(0, 200),
-      });
-    }
-
-    if (text.includes('performance.now') || text.includes('Date.now')) {
-      patterns.push({
-        type: 'timing-check',
-        location: log.url || 'unknown',
-        code: text.substring(0, 200),
-      });
+    for (const {kind, match} of conditions) {
+      if (match(log.text)) {
+        patterns.push({type: kind, ...context});
+      }
     }
   }
 

@@ -5,8 +5,8 @@
  */
 
 import {ToolCategory} from '../categories.js';
-import {defineTool} from '../ToolDefinition.js';
 import {withOperationTimeout} from '../shared/browserRuntime.js';
+import {defineTool} from '../ToolDefinition.js';
 
 /**
  * 更新 Chrome 扩展：导航到 chrome://extensions/ 并点击更新按钮。
