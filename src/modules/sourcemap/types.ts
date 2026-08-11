@@ -113,3 +113,34 @@ export interface SourceMapDiffResult {
   changes: Array<{kind: 'added' | 'removed'; mapping: string}>;
   truncated: boolean;
 }
+
+export interface SourceMapConfig {
+  maxBytes: number;
+  cacheMaxBytes: number;
+  cacheMaxEntries: number;
+  cacheTtlMs: number;
+  fetchTimeoutMs: number;
+  maxRedirects: 3;
+  maxIndexedDepth: number;
+  maxIndexedSections: number;
+  maxDiffChanges: number;
+}
+
+export interface SourceMapHttpResponse {
+  status: number;
+  headers: Record<string, string | string[] | undefined>;
+  body: NodeJS.ReadableStream;
+}
+
+export interface SourceMapResolverDependencies {
+  lookup(hostname: string): Promise<Array<{address: string; family: 4 | 6}>>;
+  request(
+    url: URL,
+    options: {
+      address: string;
+      family: 4 | 6;
+      headers: Record<string, string>;
+      timeoutMs: number;
+    },
+  ): Promise<SourceMapHttpResponse>;
+}
