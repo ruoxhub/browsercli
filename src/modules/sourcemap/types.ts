@@ -144,3 +144,43 @@ export interface SourceMapResolverDependencies {
     },
   ): Promise<SourceMapHttpResponse>;
 }
+
+export interface SourceMapScriptInfo {
+  scriptId: string;
+  generatedUrl: string;
+  sourceMapURL: string;
+}
+
+export interface SourceMapCapturedBody {
+  url: string;
+  content: string;
+  complete: boolean;
+}
+
+export interface SourceMapRuntimeAccess {
+  listScripts(): SourceMapScriptInfo[];
+  findCapturedBody(url: string): Promise<SourceMapCapturedBody | undefined>;
+  getCookies(url: string): Promise<Array<{name: string; value: string}>>;
+  getPageUrl(): string | undefined;
+  resolveExistingTaskDir(taskId: string): Promise<string | undefined>;
+}
+
+export interface SourceMapParseInput {
+  scriptId?: string;
+  mapUrl?: string;
+  mapContent?: string;
+  generatedUrl?: string;
+  allowCrossOrigin?: boolean;
+}
+
+export interface ResolvedSourceMap {
+  map: MaterializedSourceMap;
+  canonicalContent: string;
+  baseUrl?: string;
+  decodedBytes: number;
+  provenance: {
+    kind: 'content' | 'data' | 'captured' | 'same_origin' | 'cross_origin';
+    displayUrl?: string;
+  };
+  warnings: string[];
+}

@@ -200,7 +200,7 @@ function buildSummary(
     indexed: 'sections' in raw,
     sourcesCount: traceMap.sources.length,
     namesCount: traceMap.names.length,
-    sectionsCount: 'sections' in raw ? raw.sections.length : 0,
+    sectionsCount: Array.isArray(raw.sections) ? raw.sections.length : 0,
     mappingsCount: decodedMappings(traceMap).reduce(
       (count, line) => count + line.length,
       0,
