@@ -173,6 +173,32 @@ export interface SourceMapParseInput {
   allowCrossOrigin?: boolean;
 }
 
+export interface SourceMapReconstructInput {
+  mapId: string;
+  taskId?: string;
+  outputDir?: string;
+  overwrite: boolean;
+}
+
+export interface SourceMapManifestEntry {
+  source: string;
+  outputPath?: string;
+  status: 'written' | 'skipped' | 'missing' | 'collision';
+  sha256?: string;
+  bytes?: number;
+  warnings: string[];
+}
+
+export interface SourceMapReconstructResult {
+  rootDir: string;
+  manifestPath: string;
+  written: number;
+  skipped: number;
+  missing: number;
+  collisions: number;
+  entries: SourceMapManifestEntry[];
+}
+
 export interface ResolvedSourceMap {
   map: MaterializedSourceMap;
   canonicalContent: string;
