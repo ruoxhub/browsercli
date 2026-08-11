@@ -1,0 +1,9 @@
+{
+  "version": 3,
+  "file": "bundle.js",
+  "sourceRoot": "webpack:///",
+  "sources": ["src/answer.ts"],
+  "sourcesContent": ["export const answer = 42;\n"],
+  "names": [],
+  "mappings": "AAAA"
+}
