@@ -47,4 +47,55 @@ describe('SourceMapDocument.parse', () => {
         error instanceof SourceMapError && error.code === 'PARSE_FAILED',
     );
   });
+
+  it('maps generated and original positions with public coordinate rules', async () => {
+    const document = SourceMapDocument.parse(await fixture('basic-v3.json'));
+    const original = document.lookup({
+      direction: 'generated_to_original',
+      line: 1,
+      column: 0,
+      bias: 'greatest_lower_bound',
+    });
+    assert.equal(original.match?.line, 1);
+    assert.equal(original.match?.column, 0);
+    assert.match(original.match?.source ?? '', /src\/answer\.ts$/);
+
+    const generated = document.lookup({
+      direction: 'original_to_generated',
+      source: original.match?.source ?? '',
+      line: 1,
+      column: 0,
+      bias: 'least_upper_bound',
+    });
+    assert.deepEqual(generated.match, {line: 1, column: 0});
+  });
+
+  it('returns a successful null match for an unmapped position', async () => {
+    const document = SourceMapDocument.parse(await fixture('basic-v3.json'));
+    assert.equal(
+      document.lookup({
+        direction: 'generated_to_original',
+        line: 50,
+        column: 0,
+      }).match,
+      null,
+    );
+  });
+
+  it('reports exact diff totals while bounding details', async () => {
+    const left = SourceMapDocument.parse(await fixture('basic-v3.json'));
+    const right = SourceMapDocument.parse(
+      JSON.stringify({
+        version: 3,
+        sources: ['one.ts', 'two.ts'],
+        sourcesContent: ['one', 'two'],
+        names: [],
+        mappings: 'AAAA;ACAA',
+      }),
+    );
+    const diff = left.diff(right, {mode: 'mappings', maxChanges: 1});
+    assert.equal(diff.truncated, true);
+    assert.equal(diff.changes.length, 1);
+    assert.ok(diff.totalChanges > diff.changes.length);
+  });
 });

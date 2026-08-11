@@ -1,16 +1,86 @@
 import {createHash} from 'node:crypto';
 
-import {AnyMap, decodedMappings, TraceMap} from '@jridgewell/trace-mapping';
+import {
+  AnyMap,
+  decodedMappings,
+  generatedPositionFor,
+  GREATEST_LOWER_BOUND,
+  LEAST_UPPER_BOUND,
+  originalPositionFor,
+  TraceMap,
+} from '@jridgewell/trace-mapping';
 
 import {
   type BasicSourceMap,
   type IndexedSourceMap,
   type MaterializedSourceMap,
+  type SourceMapBias,
+  type SourceMapDiffInput,
+  type SourceMapDiffResult,
   SourceMapError,
   type SourceMapExtensionSummary,
+  type SourceMapLookupInput,
+  type SourceMapLookupResult,
   type SourceMapSourceEntry,
   type SourceMapSummary,
 } from './types.js';
+
+interface NormalizedMappingRow {
+  generatedLine: number;
+  generatedColumn: number;
+  source: string | null;
+  originalLine: number | null;
+  originalColumn: number | null;
+  name: string | null;
+}
+
+const coordinateConvention = {
+  line: '1-based',
+  column: '0-based',
+} as const;
+
+function toTraceBias(bias: SourceMapBias | undefined): 1 | -1 {
+  return bias === 'least_upper_bound'
+    ? LEAST_UPPER_BOUND
+    : GREATEST_LOWER_BOUND;
+}
+
+function compareNullable<T extends number | string>(
+  left: T | null,
+  right: T | null,
+): number {
+  if (left === right) return 0;
+  if (left === null) return -1;
+  if (right === null) return 1;
+  return left < right ? -1 : 1;
+}
+
+function compareMappingRows(
+  left: NormalizedMappingRow,
+  right: NormalizedMappingRow,
+): number {
+  return (
+    left.generatedLine - right.generatedLine ||
+    left.generatedColumn - right.generatedColumn ||
+    compareNullable(left.source, right.source) ||
+    compareNullable(left.originalLine, right.originalLine) ||
+    compareNullable(left.originalColumn, right.originalColumn) ||
+    compareNullable(left.name, right.name)
+  );
+}
+
+function nextMapping(
+  iterator: Generator<NormalizedMappingRow>,
+): NormalizedMappingRow | undefined {
+  const next = iterator.next();
+  return next.done ? undefined : next.value;
+}
+
+function contentHash(content: string | null): string {
+  return createHash('sha256')
+    .update(content === null ? 'null:' : `value:${content}`)
+    .digest('hex');
+}
 
 function parseFailed(message: string): never {
   throw new SourceMapError('PARSE_FAILED', message);
@@ -183,6 +253,196 @@ export class SourceMapDocument {
       resolvedSource,
       content: this.traceMap.sourcesContent?.[index] ?? null,
     }));
+  }
+
+  lookup(input: SourceMapLookupInput): SourceMapLookupResult {
+    const bias = toTraceBias(input.bias);
+    if (input.direction === 'generated_to_original') {
+      const match = originalPositionFor(this.traceMap, {
+        line: input.line,
+        column: input.column,
+        bias,
+      });
+      if (match.line === null || match.column === null) {
+        return {coordinateConvention, match: null, exact: false};
+      }
+      const reverse =
+        match.source === null
+          ? null
+          : generatedPositionFor(this.traceMap, {
+              source: match.source,
+              line: match.line,
+              column: match.column,
+              bias,
+            });
+      return {
+        coordinateConvention,
+        match: {
+          line: match.line,
+          column: match.column,
+          ...(match.source === null ? {} : {source: match.source}),
+          ...(match.name === null ? {} : {name: match.name}),
+        },
+        exact: reverse?.line === input.line && reverse.column === input.column,
+      };
+    }
+
+    const source = this.resolveOriginalSource(input.source);
+    if (source === undefined) {
+      return {coordinateConvention, match: null, exact: false};
+    }
+    const match = generatedPositionFor(this.traceMap, {
+      source,
+      line: input.line,
+      column: input.column,
+      bias,
+    });
+    if (match.line === null || match.column === null) {
+      return {coordinateConvention, match: null, exact: false};
+    }
+    const reverse = originalPositionFor(this.traceMap, {
+      line: match.line,
+      column: match.column,
+      bias,
+    });
+    return {
+      coordinateConvention,
+      match: {line: match.line, column: match.column},
+      exact:
+        reverse.line === input.line &&
+        reverse.column === input.column &&
+        reverse.source === source,
+    };
+  }
+
+  diff(
+    other: SourceMapDocument,
+    input: SourceMapDiffInput,
+  ): SourceMapDiffResult {
+    const summaryChanged =
+      'sections' in this.raw !== 'sections' in other.raw ||
+      JSON.stringify(this.summary) !== JSON.stringify(other.summary);
+    const sources = {added: [], removed: [], contentChanged: []} as {
+      added: string[];
+      removed: string[];
+      contentChanged: string[];
+    };
+
+    if (input.mode !== 'summary') {
+      const leftSources = new Map(
+        this.getSources().map(source => [
+          source.resolvedSource,
+          contentHash(source.content),
+        ]),
+      );
+      const rightSources = new Map(
+        other
+          .getSources()
+          .map(source => [source.resolvedSource, contentHash(source.content)]),
+      );
+      for (const [source, hash] of leftSources) {
+        const otherHash = rightSources.get(source);
+        if (otherHash === undefined) sources.removed.push(source);
+        else if (otherHash !== hash) sources.contentChanged.push(source);
+      }
+      for (const source of rightSources.keys()) {
+        if (!leftSources.has(source)) sources.added.push(source);
+      }
+    }
+
+    const changes: SourceMapDiffResult['changes'] = [];
+    let mappingChanges = 0;
+    if (input.mode === 'mappings') {
+      const maxChanges = Math.max(0, Math.floor(input.maxChanges));
+      const left = this.mappingRows();
+      const right = other.mappingRows();
+      let leftRow = nextMapping(left);
+      let rightRow = nextMapping(right);
+      while (leftRow !== undefined || rightRow !== undefined) {
+        const comparison =
+          leftRow === undefined
+            ? 1
+            : rightRow === undefined
+              ? -1
+              : compareMappingRows(leftRow, rightRow);
+        if (comparison === 0) {
+          leftRow = nextMapping(left);
+          rightRow = nextMapping(right);
+          continue;
+        }
+        const kind = comparison < 0 ? 'removed' : 'added';
+        const row = comparison < 0 ? leftRow : rightRow;
+        mappingChanges += 1;
+        if (changes.length < maxChanges && row !== undefined) {
+          changes.push({kind, mapping: JSON.stringify(row)});
+        }
+        if (comparison < 0) leftRow = nextMapping(left);
+        else rightRow = nextMapping(right);
+      }
+    }
+
+    const sourceChanges =
+      sources.added.length +
+      sources.removed.length +
+      sources.contentChanged.length;
+    const totalChanges =
+      input.mode === 'summary'
+        ? Number(summaryChanged)
+        : input.mode === 'sources'
+          ? sourceChanges
+          : mappingChanges;
+    return {
+      summaryChanged,
+      sources,
+      mappingChanges,
+      totalChanges,
+      changes,
+      truncated: mappingChanges > changes.length,
+    };
+  }
+
+  private resolveOriginalSource(input: string): string | undefined {
+    const exactIndex = this.traceMap.sources.findIndex(
+      (source, index) =>
+        source === input || this.traceMap.resolvedSources[index] === input,
+    );
+    if (exactIndex >= 0) {
+      return this.traceMap.resolvedSources[exactIndex] ?? input;
+    }
+
+    const suffix = input.replaceAll('\\', '/');
+    const matches = this.traceMap.resolvedSources.filter((source, index) => {
+      const rawSource = this.traceMap.sources[index]?.replaceAll('\\', '/');
+      return (
+        source.replaceAll('\\', '/').endsWith(suffix) ||
+        rawSource?.endsWith(suffix)
+      );
+    });
+    return matches.length === 1 ? matches[0] : undefined;
+  }
+
+  private *mappingRows(): Generator<NormalizedMappingRow> {
+    const lines = decodedMappings(this.traceMap);
+    for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
+      for (const segment of lines[lineIndex] ?? []) {
+        const sourceIndex = segment.length >= 4 ? segment[1] : undefined;
+        const nameIndex = segment.length === 5 ? segment[4] : undefined;
+        yield {
+          generatedLine: lineIndex + 1,
+          generatedColumn: segment[0],
+          source:
+            sourceIndex === undefined
+              ? null
+              : (this.traceMap.resolvedSources[sourceIndex] ?? null),
+          originalLine: segment.length >= 4 ? segment[2] + 1 : null,
+          originalColumn: segment.length >= 4 ? segment[3] : null,
+          name:
+            nameIndex === undefined
+              ? null
+              : (this.traceMap.names[nameIndex] ?? null),
+        };
+      }
+    }
   }
 
   getTraceMap(): TraceMap {

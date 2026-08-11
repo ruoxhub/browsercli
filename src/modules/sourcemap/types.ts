@@ -76,3 +76,40 @@ export interface SourceMapSourceEntry {
   resolvedSource: string;
   content: string | null;
 }
+
+export type SourceMapBias = 'greatest_lower_bound' | 'least_upper_bound';
+
+export type SourceMapLookupInput =
+  | {
+      direction: 'generated_to_original';
+      line: number;
+      column: number;
+      bias?: SourceMapBias;
+    }
+  | {
+      direction: 'original_to_generated';
+      source: string;
+      line: number;
+      column: number;
+      bias?: SourceMapBias;
+    };
+
+export interface SourceMapLookupResult {
+  coordinateConvention: {line: '1-based'; column: '0-based'};
+  match: {line: number; column: number; source?: string; name?: string} | null;
+  exact: boolean;
+}
+
+export interface SourceMapDiffInput {
+  mode: 'summary' | 'sources' | 'mappings';
+  maxChanges: number;
+}
+
+export interface SourceMapDiffResult {
+  summaryChanged: boolean;
+  sources: {added: string[]; removed: string[]; contentChanged: string[]};
+  mappingChanges: number;
+  totalChanges: number;
+  changes: Array<{kind: 'added' | 'removed'; mapping: string}>;
+  truncated: boolean;
+}
