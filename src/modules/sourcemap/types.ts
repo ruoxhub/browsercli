@@ -159,7 +159,10 @@ export interface SourceMapCapturedBody {
 
 export interface SourceMapRuntimeAccess {
   listScripts(): SourceMapScriptInfo[];
-  findCapturedBody(url: string): Promise<SourceMapCapturedBody | undefined>;
+  findCapturedBody(
+    url: string,
+    maxBytes?: number,
+  ): Promise<SourceMapCapturedBody | undefined>;
   getCookies(url: string): Promise<Array<{name: string; value: string}>>;
   getPageUrl(): string | undefined;
   resolveExistingTaskDir(taskId: string): Promise<string | undefined>;

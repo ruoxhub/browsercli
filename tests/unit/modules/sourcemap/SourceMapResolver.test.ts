@@ -138,6 +138,26 @@ describe('SourceMapResolver network boundaries', () => {
     assert.equal(requests, 0);
   });
 
+  it('passes the configured byte limit to captured-body preflight', async () => {
+    let observedLimit: number | undefined;
+    const content = await fixture('basic-v3.json');
+    const access: SourceMapRuntimeAccess = {
+      ...fakeAccess(),
+      findCapturedBody: async (url, maxBytes) => {
+        observedLimit = maxBytes;
+        return {url, content, complete: true};
+      },
+    };
+    await createResolver().resolve(
+      {
+        mapUrl: 'https://example.com/app.js.map',
+        generatedUrl: 'https://example.com/app.js',
+      },
+      access,
+    );
+    assert.equal(observedLimit, TEST_CONFIG.maxBytes);
+  });
+
   it('blocks cross-origin fetch unless explicitly allowed', async () => {
     const resolver = createResolver();
     await assert.rejects(

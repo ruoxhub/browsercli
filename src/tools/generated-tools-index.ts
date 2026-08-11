@@ -29,6 +29,7 @@ import {manifest as rebuildManifest} from './rebuild/manifest.js';
 import {manifest as screenshotManifest} from './screenshot/manifest.js';
 import {manifest as scriptManifest} from './script/manifest.js';
 import {manifest as siteExperienceManifest} from './site-experience/manifest.js';
+import {manifest as sourcemapManifest} from './sourcemap/manifest.js';
 import {manifest as stealthManifest} from './stealth/manifest.js';
 import {manifest as wasmManifest} from './wasm/manifest.js';
 import {manifest as workflowManifest} from './workflow/manifest.js';
@@ -57,6 +58,7 @@ export const GENERATED_DOMAIN_MANIFESTS = [
   screenshotManifest,
   scriptManifest,
   siteExperienceManifest,
+  sourcemapManifest,
   stealthManifest,
   wasmManifest,
   workflowManifest,
@@ -530,6 +532,26 @@ export const GENERATED_TOOL_REGISTRY = [
   {
     modulePath: './site-experience/siteExperience.js',
     handlerName: 'deleteSiteExperience',
+  },
+  {
+    modulePath: './sourcemap/index.js',
+    handlerName: 'sourcemapDiscover',
+  },
+  {
+    modulePath: './sourcemap/index.js',
+    handlerName: 'sourcemapParse',
+  },
+  {
+    modulePath: './sourcemap/index.js',
+    handlerName: 'sourcemapLookup',
+  },
+  {
+    modulePath: './sourcemap/index.js',
+    handlerName: 'sourcemapReconstructTree',
+  },
+  {
+    modulePath: './sourcemap/index.js',
+    handlerName: 'sourcemapDiff',
   },
   {
     modulePath: './stealth/stealth.js',

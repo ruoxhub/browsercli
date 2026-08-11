@@ -447,7 +447,10 @@ export class SourceMapResolver {
     let redirectCount = 0;
     while (true) {
       assertAllowedNetworkUrl(current);
-      const captured = await access.findCapturedBody(current.href);
+      const captured = await access.findCapturedBody(
+        current.href,
+        this.config.maxBytes,
+      );
       if (captured?.complete === true && captured.url === current.href) {
         assertSize(Buffer.byteLength(captured.content), this.config.maxBytes);
         return {content: captured.content, url: current.href, kind: 'captured'};
