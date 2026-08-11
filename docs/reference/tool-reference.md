@@ -3,6 +3,8 @@
 # Chrome DevTools MCP Tool Reference
 
 > 快速按逆向目标查工具，请先看：[`reverse-task-index.md`](./reverse-task-index.md)
+>
+> SourceMap 专题：[`sourcemap.md`](./sourcemap.md)
 
 - **[Navigation automation](#navigation-automation)** (16 tools)
   - [`click`](#click)

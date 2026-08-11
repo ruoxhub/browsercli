@@ -5,6 +5,7 @@ import {Readable} from 'node:stream';
 import {describe, it} from 'node:test';
 
 import {
+  assertAllowedNetworkUrl,
   assertPublicAddress,
   decodeDataUri,
   readBoundedBody,
@@ -75,6 +76,24 @@ function createResolverWithBodies(
 }
 
 describe('SourceMapResolver network boundaries', () => {
+  it('rejects unsafe URLs and malformed data URIs', () => {
+    assert.throws(
+      () => assertAllowedNetworkUrl(new URL('file:///tmp/app.js.map')),
+      SourceMapError,
+    );
+    assert.throws(
+      () => assertAllowedNetworkUrl(new URL('https://user:pass@example.com/a')),
+      SourceMapError,
+    );
+    assert.throws(
+      () => decodeDataUri('data:text/plain,hello', 100),
+      SourceMapError,
+    );
+    assert.throws(() => decodeDataUri('not-data', 100), SourceMapError);
+    assert.throws(() => decodeDataUri('data:,%', 100), SourceMapError);
+    assert.throws(() => decodeDataUri('data:,not-json', 100), SourceMapError);
+  });
+
   it('decodes base64 and percent data URIs', () => {
     assert.equal(
       decodeDataUri('data:application/json;base64,eyJ2ZXJzaW9uIjozfQ==', 100),
@@ -200,6 +219,162 @@ describe('SourceMapResolver network boundaries', () => {
     );
     assert.equal(result.provenance.kind, 'content');
     assert.equal(result.decodedBytes, Buffer.byteLength(content));
+  });
+
+  it('validates selectors and script metadata with stable errors', async () => {
+    const resolver = createResolver();
+    await assert.rejects(
+      resolver.resolve(
+        {mapContent: '{}', mapUrl: 'https://x.test/a'},
+        fakeAccess(),
+      ),
+      (error: unknown) =>
+        error instanceof SourceMapError &&
+        error.code === 'INVALID_SOURCE_INPUT',
+    );
+    await assert.rejects(
+      resolver.resolve({scriptId: 'missing'}, fakeAccess()),
+      (error: unknown) =>
+        error instanceof SourceMapError && error.code === 'SCRIPT_NOT_FOUND',
+    );
+    const noReference: SourceMapRuntimeAccess = {
+      ...fakeAccess(),
+      listScripts: () => [
+        {
+          scriptId: 'empty',
+          generatedUrl: 'https://x.test/a.js',
+          sourceMapURL: '',
+        },
+      ],
+    };
+    await assert.rejects(
+      resolver.resolve({scriptId: 'empty'}, noReference),
+      (error: unknown) =>
+        error instanceof SourceMapError &&
+        error.code === 'SOURCEMAP_REFERENCE_NOT_FOUND',
+    );
+    const data = Buffer.from(await fixture('basic-v3.json')).toString('base64');
+    assert.equal(
+      (
+        await resolver.resolve(
+          {mapUrl: `data:application/json;base64,${data}`},
+          fakeAccess(),
+        )
+      ).provenance.kind,
+      'data',
+    );
+  });
+
+  it('rejects missing DNS results, oversized declarations, and bad statuses', async () => {
+    await assert.rejects(
+      new SourceMapResolver(TEST_CONFIG, {lookup: async () => []}).fetchUrl(
+        new URL('https://example.com/a.map'),
+      ),
+      SourceMapError,
+    );
+    const oversized = createResolver({
+      request: async () => ({
+        status: 200,
+        headers: {'content-length': String(TEST_CONFIG.maxBytes + 1)},
+        body: Readable.from([]),
+      }),
+    });
+    await assert.rejects(
+      oversized.fetchUrl(new URL('https://example.com/a.map')),
+      (error: unknown) =>
+        error instanceof SourceMapError && error.code === 'FETCH_TOO_LARGE',
+    );
+    for (const response of [
+      {status: 500, headers: {}, body: Readable.from([''])},
+      {status: 302, headers: {}, body: Readable.from([''])},
+    ]) {
+      const resolver = createResolver({request: async () => response});
+      await assert.rejects(
+        resolver.resolve(
+          {
+            mapUrl: 'https://example.com/a.map',
+            generatedUrl: 'https://example.com/app.js',
+          },
+          fakeAccess(),
+        ),
+        SourceMapError,
+      );
+    }
+  });
+
+  it('rejects malformed and over-limit indexed sections', async () => {
+    const malformed = [
+      {version: 3, sections: [null]},
+      {version: 3, sections: [{offset: {line: -1, column: 0}, map: {}}]},
+      {
+        version: 3,
+        sections: [{offset: {line: 0, column: 0}, map: {}, url: 'part.map'}],
+      },
+      {version: 3, sections: [{offset: {line: 0, column: 0}, url: 'part.map'}]},
+    ];
+    for (const map of malformed) {
+      await assert.rejects(
+        createResolver().resolve(
+          {mapContent: JSON.stringify(map)},
+          fakeAccess(),
+        ),
+        SourceMapError,
+      );
+    }
+
+    const sectionLimited = new SourceMapResolver(
+      {...TEST_CONFIG, maxIndexedSections: 0},
+      {lookup: async () => [{address: '93.184.216.34', family: 4}]},
+    );
+    await assert.rejects(
+      sectionLimited.resolve(
+        {
+          mapContent: JSON.stringify({
+            version: 3,
+            sections: [
+              {
+                offset: {line: 0, column: 0},
+                map: JSON.parse(await fixture('basic-v3.json')),
+              },
+            ],
+          }),
+        },
+        fakeAccess(),
+      ),
+      SourceMapError,
+    );
+
+    const depthLimited = new SourceMapResolver(
+      {...TEST_CONFIG, maxIndexedDepth: 0},
+      {lookup: async () => [{address: '93.184.216.34', family: 4}]},
+    );
+    await assert.rejects(
+      depthLimited.resolve(
+        {
+          mapContent: JSON.stringify({
+            version: 3,
+            sections: [
+              {
+                offset: {line: 0, column: 0},
+                map: {
+                  version: 3,
+                  sections: [
+                    {
+                      offset: {line: 0, column: 0},
+                      map: JSON.parse(await fixture('basic-v3.json')),
+                    },
+                  ],
+                },
+              },
+            ],
+          }),
+        },
+        fakeAccess(),
+      ),
+      (error: unknown) =>
+        error instanceof SourceMapError &&
+        error.code === 'INDEXED_MAP_LIMIT_EXCEEDED',
+    );
   });
 
   it('discovers existing metadata without fetching', () => {

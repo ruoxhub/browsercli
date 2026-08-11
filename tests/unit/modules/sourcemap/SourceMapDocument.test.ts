@@ -48,6 +48,39 @@ describe('SourceMapDocument.parse', () => {
     );
   });
 
+  it('rejects malformed basic and indexed v3 fields', () => {
+    const invalidMaps = [
+      null,
+      {version: 2},
+      {version: 3, sources: [], names: [], mappings: 1},
+      {
+        version: 3,
+        sources: [],
+        names: [],
+        mappings: '',
+        sourcesContent: [1],
+      },
+      {version: 3, sources: [], names: [], mappings: '', file: 1},
+      {version: 3, sources: [], names: [], mappings: '', sourceRoot: 1},
+      {version: 3, sections: {}},
+      {version: 3, sections: [null]},
+      {version: 3, sections: [{offset: {line: -1, column: 0}, map: {}}]},
+    ];
+    for (const map of invalidMaps) {
+      assert.throws(
+        () => SourceMapDocument.parse(JSON.stringify(map)),
+        SourceMapError,
+      );
+    }
+  });
+
+  it('reports complete coverage for maps without sources', () => {
+    const document = SourceMapDocument.parse(
+      JSON.stringify({version: 3, sources: [], names: [], mappings: ''}),
+    );
+    assert.equal(document.getSummary().sourcesContentCoverage.ratio, 1);
+  });
+
   it('maps generated and original positions with public coordinate rules', async () => {
     const document = SourceMapDocument.parse(await fixture('basic-v3.json'));
     const original = document.lookup({
