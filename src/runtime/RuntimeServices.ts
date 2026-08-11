@@ -5,11 +5,13 @@
  */
 
 import {AISummarizer} from '../modules/analyzer/AISummarizer.js';
+import {getSourceMapConfig} from '../config/servicesConfig.js';
 import {CodeAnalyzer} from '../modules/analyzer/CodeAnalyzer.js';
 import type {PageController} from '../modules/collector/PageController.js';
 import {CryptoDetector} from '../modules/crypto/CryptoDetector.js';
 import {Deobfuscator} from '../modules/deobfuscator/Deobfuscator.js';
 import {NetworkModule} from '../modules/network/index.js';
+import {SourceMapService} from '../modules/sourcemap/SourceMapService.js';
 import {WasmAnalyzer} from '../modules/wasm/WasmAnalyzer.js';
 import {WasmCollector} from '../modules/wasm/WasmCollector.js';
 import {WasmDecompiler} from '../modules/wasm/WasmDecompiler.js';
@@ -35,6 +37,7 @@ export class RuntimeServices {
   private wasmDecompiler?: WasmDecompiler;
   private wasmRuntimeInspector?: WasmRuntimeInspector;
   private wasmCollector?: WasmCollector;
+  private sourceMapService: SourceMapService | null = null;
 
   constructor(private readonly pageController: PageController) {}
 
@@ -79,6 +82,12 @@ export class RuntimeServices {
       this.pageController,
       this.getWasmAnalyzer(),
       this.getWasmRuntimeInspector(),
+    ));
+  }
+
+  getSourceMapService(): SourceMapService {
+    return (this.sourceMapService ??= new SourceMapService(
+      getSourceMapConfig(),
     ));
   }
 }

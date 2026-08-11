@@ -10,6 +10,23 @@ import {describe, it} from 'node:test';
 import {DebuggerContextProvider} from '../../../src/worker/context/DebuggerContextProvider.js';
 
 describe('DebuggerContextProvider', () => {
+  it('peek does not create a CDP session', () => {
+    let newSessionCount = 0;
+    const page = {
+      isClosed: () => false,
+      context: () => ({
+        newCDPSession: async () => {
+          newSessionCount += 1;
+          throw new Error('peek must not create a session');
+        },
+      }),
+      once: () => undefined,
+    } as never;
+    const provider = new DebuggerContextProvider();
+    assert.equal(provider.getForPage(page), undefined);
+    assert.equal(newSessionCount, 0);
+  });
+
   it('enables debugger manager only once for the same page', async () => {
     const provider = new DebuggerContextProvider();
     let enabledCount = 0;

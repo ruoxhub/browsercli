@@ -19,6 +19,11 @@ export class DebuggerContextProvider {
   private _debuggerManagers = new WeakMap<Page, DebuggerManager>();
   private _debuggerSessions = new WeakMap<Page, CDPSession>();
 
+  getForPage(page: Page): DebuggerManager | undefined {
+    const manager = this._debuggerManagers.get(page);
+    return manager?.isEnabled() ? manager : undefined;
+  }
+
   /**
    * 获取或创建指定页面的 DebuggerManager。
    * 已启用的会被复用；未启用或未创建的会重新 attach CDP session。
