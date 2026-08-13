@@ -5,6 +5,7 @@
  */
 
 import {getRuntime} from '../../runtime.js';
+import {createPreloadHookId} from '../../modules/hook/index.js';
 import type {CDPSession, Frame, JSHandle} from '../../third_party/index.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
@@ -522,8 +523,7 @@ export const evaluateScript = defineTool({
 
 export const injectPreloadScript = defineTool({
   name: 'inject_preload_script',
-  description:
-    '为当前页面/上下文的后续文档注册预加载脚本',
+  description: '为当前页面/上下文的后续文档注册预加载脚本',
   annotations: {category: ToolCategory.DEBUGGING, readOnlyHint: false},
   schema: {
     script: zod
@@ -540,7 +540,7 @@ export const injectPreloadScript = defineTool({
       .optional()
       .describe('预设 hook 模板，与 script 参数互斥'),
   },
-  handler: async (request, response) => {
+  handler: async (request, response, toolContext) => {
     const tooltype = 'inject_preload_script';
     const {preset} = request.params;
     const script = preset
@@ -556,61 +556,51 @@ export const injectPreloadScript = defineTool({
       return;
     }
 
-    const ctx = getRuntime().contextProvider;
-    if (!ctx) {
+    const browserContext = toolContext.getBrowserContext();
+    if (!browserContext || browserContext.isClosed()) {
       response.setStructuredContent({
         success: false,
-        message: '当前运行时上下文不可用',
-        tooltype,
-      });
-      return;
-    }
-
-    const context = ctx.getContext?.() ?? null;
-    const selectedPage = ctx.getSelectedPage?.() ?? null;
-    const target = context ?? selectedPage ?? null;
-
-    if (!target?.addInitScript) {
-      response.setStructuredContent({
-        success: false,
-        message: '当前运行时不支持注入预加载脚本',
-        tooltype,
-      });
-      return;
-    }
-
-    const targetClosed =
-      'isClosed' in target &&
-      typeof target.isClosed === 'function' &&
-      target.isClosed();
-    const pageClosed =
-      selectedPage &&
-      typeof selectedPage.isClosed === 'function' &&
-      selectedPage.isClosed();
-    if (targetClosed || pageClosed) {
-      response.setStructuredContent({
-        success: false,
-        message: '当前页面或浏览器上下文已关闭，无法注入预加载脚本',
+        message: '当前 BrowserContext 不可用或已关闭，无法注入预加载脚本',
         tooltype,
       });
       return;
     }
 
     try {
-      await target.addInitScript(script);
+      const registrationId = createPreloadHookId(script);
+      const result = await toolContext.getPersistentHookRegistry().register({
+        context: browserContext,
+        hookId: registrationId,
+        script,
+        source: 'inject_preload_script',
+        requestedWorld: 'main',
+        applyMode: 'future-only',
+      });
+      response.setStructuredContent({
+        success: true,
+        message:
+          'Preload script registered for future documents in the current BrowserContext',
+        tooltype,
+        data: {
+          registrationId,
+          scriptHash: result.entry.scriptHash,
+          scriptSize: result.entry.scriptSize,
+          scriptPreview: result.entry.scriptPreview,
+          registeredAt: new Date(result.entry.registeredAt).toISOString(),
+          registered: result.registered,
+          idempotent: result.idempotent,
+          requestedWorld: result.entry.requestedWorld,
+          effectiveWorld: result.entry.effectiveWorld,
+          applyMode: result.entry.applyMode,
+          warnings: result.warnings,
+        },
+      });
     } catch (error) {
       response.setStructuredContent({
         success: false,
         message: `注入预加载脚本失败：${getUnknownErrorMessage(error)}`,
         tooltype,
       });
-      return;
     }
-
-    response.setStructuredContent({
-      success: true,
-      message: 'Preload script registered for future documents',
-      tooltype,
-    });
   },
 });

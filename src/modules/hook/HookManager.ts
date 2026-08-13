@@ -21,6 +21,7 @@
 import {HookCodeBuilder, type BuilderConfig} from './HookCodeBuilder.js';
 import {DEFAULT_HOOK_STORE_KEY, HookStore} from './HookStore.js';
 import {HookTypeRegistry, type HookTypePlugin} from './HookTypeRegistry.js';
+import {PersistentHookRegistry} from './PersistentHookRegistry.js';
 
 // ==================== 公共类型 ====================
 
@@ -107,6 +108,7 @@ export class HookManager {
   private registry: HookTypeRegistry;
   private hooks = new Map<string, HookMeta>();
   private hookStore: HookStore<HookDataRecord>;
+  private readonly persistentHookRegistry = new PersistentHookRegistry();
   private maxRecordsPerHook: number;
 
   constructor(maxRecordsPerHook = 1000) {
@@ -284,6 +286,10 @@ export class HookManager {
    */
   getHookStore(): HookStore<HookDataRecord> {
     return this.hookStore;
+  }
+
+  getPersistentHookRegistry(): PersistentHookRegistry {
+    return this.persistentHookRegistry;
   }
 
   /** 获取所有 hook */

@@ -35,6 +35,17 @@ export type {
 export {HookStore, DEFAULT_HOOK_STORE_KEY} from './HookStore.js';
 export type {HookStoreSnapshot} from './HookStore.js';
 
+export {
+  createPreloadHookId,
+  hashPersistentHookScript,
+  PersistentHookRegistry,
+} from './PersistentHookRegistry.js';
+export type {
+  PersistentHookEntry,
+  RegisterPersistentHookRequest,
+  RegisterPersistentHookResult,
+} from './PersistentHookRegistry.js';
+
 // AI Hook 生成器
 export {AIHookGenerator} from './AIHookGenerator.js';
 export type {

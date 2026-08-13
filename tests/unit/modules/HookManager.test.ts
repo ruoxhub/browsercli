@@ -9,6 +9,19 @@ import {describe, it} from 'node:test';
 import {HookManager} from '../../../src/modules/hook/HookManager.js';
 
 describe('HookManager', () => {
+  it('returns one persistent registry per HookManager', () => {
+    const manager = new HookManager();
+
+    assert.equal(
+      manager.getPersistentHookRegistry(),
+      manager.getPersistentHookRegistry(),
+    );
+    assert.notEqual(
+      manager.getPersistentHookRegistry(),
+      new HookManager().getPersistentHookRegistry(),
+    );
+  });
+
   it('creates/lists/removes hooks', () => {
     const manager = new HookManager();
 

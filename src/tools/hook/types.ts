@@ -5,6 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+import type {RegisterPersistentHookResult} from '../../modules/hook/index.js';
 import type {MessagesResult} from '../shared/types.js';
 
 // ─── Hook 安装函数返回类型 ─────────────────────────────
@@ -42,7 +43,15 @@ export interface InjectHookData {
   persisted: boolean;
   ranOnCurrentFrame: boolean;
   world: 'main' | 'isolated';
+  requestedWorld: 'main' | 'isolated';
+  effectiveWorld: 'main';
   persistentStrategy: 'addInitScript' | 'evaluate-once';
+  applyMode?: 'existing-and-future';
+  registered?: boolean;
+  idempotent?: boolean;
+  appliedFrames?: number;
+  failedFrames?: RegisterPersistentHookResult['failedFrames'];
+  partial?: boolean;
   warnings?: string[];
 }
 

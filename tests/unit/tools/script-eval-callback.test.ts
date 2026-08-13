@@ -40,8 +40,6 @@ async function evaluateScript(runtime: any, params: any): Promise<any> {
 }
 
 async function injectPreloadScript(runtime: any, params: any): Promise<any> {
-  const originalProvider = getRuntime().contextProvider;
-  getRuntime().contextProvider = runtime;
   let result: any = null;
   const response = {
     appendResponseLine: (line: string) => {
@@ -57,11 +55,7 @@ async function injectPreloadScript(runtime: any, params: any): Promise<any> {
       result = content;
     },
   } as any;
-  try {
-    await injectPreloadScriptTool.handler({params} as any, response, runtime);
-  } finally {
-    getRuntime().contextProvider = originalProvider;
-  }
+  await injectPreloadScriptTool.handler({params} as any, response, runtime);
   return result;
 }
 
@@ -159,23 +153,48 @@ describe('evaluate_script callback path', () => {
   });
 
   it('registers a preload script on future documents', async () => {
-    let injected: string | undefined;
+    let registration: any;
+    const browserContext = {isClosed: () => false};
 
     const result = await injectPreloadScript(
       {
-        getSelectedFrame: () => null,
-        getSelectedPage: () => ({
-          addInitScript: async (script: string) => {
-            injected = script;
+        getBrowserContext: () => browserContext,
+        getPersistentHookRegistry: () => ({
+          register: async (request: any) => {
+            registration = request;
+            return {
+              entry: {
+                hookId: request.hookId,
+                scriptHash: request.hookId.slice(8),
+                scriptSize: 21,
+                scriptPreview: request.script,
+                registeredAt: 1,
+                source: request.source,
+                requestedWorld: request.requestedWorld,
+                effectiveWorld: 'main',
+                applyMode: request.applyMode,
+              },
+              registered: true,
+              idempotent: false,
+              appliedFrames: 0,
+              failedFrames: [],
+              partial: false,
+              warnings: [],
+            };
           },
         }),
-        getContext: () => null,
       } as InjectPreloadRuntime,
       {script: 'window.__preload = 1;'},
     );
 
     assert.equal(result.success, true);
-    assert.strictEqual(injected, 'window.__preload = 1;');
+    assert.equal(registration.context, browserContext);
+    assert.equal(registration.script, 'window.__preload = 1;');
+    assert.equal(registration.source, 'inject_preload_script');
+    assert.equal(registration.requestedWorld, 'main');
+    assert.equal(registration.applyMode, 'future-only');
+    assert.match(result.data.registrationId, /^preload-[a-f0-9]{64}$/);
+    assert.equal(result.data.registered, true);
     assert.match(result.message, /registered/);
   });
 
@@ -488,22 +507,23 @@ describe('evaluate_script callback path', () => {
   });
 
   it('registers runtime preload script on the page context', async () => {
-    let injected: string | undefined;
+    let pageAddInitCalls = 0;
 
     const result = await injectPreloadScript(
       {
         getSelectedFrame: () => null,
         getSelectedPage: () => ({
-          addInitScript: async (script: string) => {
-            injected = script;
+          addInitScript: async () => {
+            pageAddInitCalls += 1;
           },
         }),
-        getContext: () => null,
+        getBrowserContext: () => null,
+        getPersistentHookRegistry: () => ({register: async () => undefined}),
       } as InjectPreloadRuntime,
       {script: 'window.__preload = 1;'},
     );
 
-    assert.equal(result.success, true);
-    assert.equal(injected, 'window.__preload = 1;');
+    assert.equal(result.success, false);
+    assert.equal(pageAddInitCalls, 0);
   });
 });

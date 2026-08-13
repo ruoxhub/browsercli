@@ -6,6 +6,7 @@
 
 import type {TrafficSummary} from '../formatters/websocketFormatter.js';
 import type {DebuggerManager} from '../modules/debugger/DebuggerManager.js';
+import type {PersistentHookRegistry} from '../modules/hook/index.js';
 import type {
   PageSelector,
   ResolvedPage,
@@ -16,7 +17,13 @@ import type {
   WebSocketData,
 } from '../modules/network/NetworkTypes.js';
 import {zod} from '../third_party/index.js';
-import type {Dialog, Frame, HTTPRequest, Page} from '../third_party/index.js';
+import type {
+  BrowserContext,
+  Dialog,
+  Frame,
+  HTTPRequest,
+  Page,
+} from '../third_party/index.js';
 import type {TraceResult} from '../trace-processing/parse.js';
 import type {PaginationOptions} from '../utils/types.js';
 
@@ -105,6 +112,8 @@ export type Context = Readonly<{
    * 调用方必须在使用前做 null 检查，否则会在运行时得到 TypeError。
    */
   getSelectedPage(): Page | null;
+  getBrowserContext(): BrowserContext | null;
+  getPersistentHookRegistry(): PersistentHookRegistry;
   getDialog(): Dialog | undefined;
   clearDialog(): void;
   getPageByIdx(idx: number): Page;

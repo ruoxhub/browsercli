@@ -26,6 +26,7 @@ import type {
   RequestInitiator,
   WebSocketData,
 } from '../modules/network/NetworkTypes.js';
+import type {PersistentHookRegistry} from '../modules/hook/index.js';
 import type {Runtime} from '../runtime.js';
 import type {HTTPRequest} from '../third_party/index.js';
 import type {TraceResult} from '../trace-processing/parse.js';
@@ -148,6 +149,10 @@ export class ToolContextProvider {
 
   getContext(): BrowserContext | null {
     return this._browserContext.getContext();
+  }
+
+  getPersistentHookRegistry(): PersistentHookRegistry {
+    return this.hookManager.getPersistentHookRegistry();
   }
 
   isBrowserConnected(): boolean {

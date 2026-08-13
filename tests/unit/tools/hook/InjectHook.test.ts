@@ -1,181 +1,198 @@
 /**
  * @license
- * Copyright 2026 JSReverser-MCP
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-
 import assert from 'node:assert/strict';
-import {describe, it, beforeEach} from 'node:test';
+import {describe, it} from 'node:test';
 
+import type {BrowserContext, Frame} from 'patchright';
+
+import {PersistentHookRegistry} from '../../../../src/modules/hook/PersistentHookRegistry.js';
 import {
   injectHook,
   listPersistentHooks,
-  getPersistentHookRegistry,
 } from '../../../../src/tools/hook/InjectHook.js';
 import type {Context} from '../../../../src/tools/ToolDefinition.js';
 
-/**
- * 构造最小 Context mock，仅暴露 inject_hook 用到的方法。
- * frame.evaluate + page.addInitScript 都记录调用痕迹供断言。
- */
-function buildMockContext(
-  options: {
-    supportsAddInitScript?: boolean;
-  } = {},
-) {
-  const supportsAddInitScript = options.supportsAddInitScript ?? true;
-  const frameEvaluateCalls: string[] = [];
-  const addInitScriptCalls: string[] = [];
-
-  const fakeFrame = {
-    evaluate: async (script: unknown) => {
-      frameEvaluateCalls.push(String(script));
-      return undefined;
+function responseHarness() {
+  let content: any;
+  return {
+    response: {
+      setStructuredContent(value: unknown) {
+        content = value;
+      },
+    } as any,
+    get content() {
+      return content;
     },
   };
-
-  const fakePage: Record<string, unknown> = {};
-  if (supportsAddInitScript) {
-    fakePage.addInitScript = async (script: string) => {
-      addInitScriptCalls.push(script);
-    };
-  }
-
-  const ctx = {
-    getSelectedFrame: () => fakeFrame,
-    getSelectedPage: () => fakePage,
-  } as unknown as Context;
-
-  return {ctx, frameEvaluateCalls, addInitScriptCalls};
 }
 
-/** 最小 Response mock：记录结构化输出。 */
-function buildMockResponse() {
-  const calls: Array<Record<string, unknown>> = [];
-  const response = {
-    setStructuredContent(content: Record<string, unknown>) {
-      calls.push(content);
+function contextHarness(options: {browserContext?: boolean} = {}) {
+  const frameScripts: string[] = [];
+  const registerRequests: unknown[] = [];
+  const frame = {
+    evaluate: async (script: string) => frameScripts.push(script),
+  } as unknown as Frame;
+  const browserContext =
+    options.browserContext === false
+      ? null
+      : ({isClosed: () => false} as unknown as BrowserContext);
+  const registry = {
+    register: async (request: any) => {
+      registerRequests.push(request);
+      return {
+        entry: {
+          hookId: request.hookId,
+          scriptHash: 'hash',
+          scriptSize: 8,
+          scriptPreview: 'preview',
+          registeredAt: 1,
+          source: request.source,
+          requestedWorld: request.requestedWorld,
+          effectiveWorld: 'main',
+          applyMode: request.applyMode,
+        },
+        registered: true,
+        idempotent: false,
+        appliedFrames: 2,
+        failedFrames: [{frameUrl: 'x', reason: 'detached'}],
+        partial: true,
+        warnings: ['warning'],
+      };
     },
-    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
-    appendResponseLine() {},
-    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
-    setIncludePages() {},
-    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
-    setIncludeNetworkRequests() {},
-    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
-    setIncludeConsoleData() {},
-    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
-    attachImage() {},
-    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
-    attachNetworkRequest() {},
-    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
-    attachConsoleMessage() {},
-    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
-    setIncludeWebSocketConnections() {},
-    // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
-    attachWebSocket() {},
+    list: () => [],
   };
-  return {response: response as never, calls};
+  return {
+    context: {
+      getSelectedFrame: () => frame,
+      getBrowserContext: () => browserContext,
+      getPersistentHookRegistry: () => registry,
+    } as unknown as Context,
+    frameScripts,
+    registerRequests,
+    registry,
+    browserContext,
+  };
 }
 
-describe('inject_hook persistent 模式', () => {
-  beforeEach(() => {
-    // 清空注册表，避免测试间串扰
-    (getPersistentHookRegistry() as unknown as Map<string, unknown>).clear();
-  });
-
-  it('persistent=false（默认）只 evaluate 当前 frame，不注册到 addInitScript', async () => {
-    const {ctx, frameEvaluateCalls, addInitScriptCalls} = buildMockContext();
-    const {response, calls} = buildMockResponse();
-
+describe('inject_hook persistent mode', () => {
+  it('evaluates only the selected frame when persistent is false', async () => {
+    const harness = contextHarness();
+    const output = responseHarness();
     await injectHook.handler(
-      {params: {hookId: 'h1', script: 'console.log(1)'}},
-      response,
-      ctx,
+      {params: {hookId: 'once', script: 'once();'}},
+      output.response,
+      harness.context,
     );
 
-    assert.equal(frameEvaluateCalls.length, 1);
-    assert.equal(addInitScriptCalls.length, 0);
-    assert.equal(calls[0]?.success, true);
-    const data = calls[0]?.data as {
-      persisted: boolean;
-      ranOnCurrentFrame: boolean;
-    };
-    assert.equal(data.persisted, false);
-    assert.equal(data.ranOnCurrentFrame, true);
-  });
-
-  it('persistent=true 既调 addInitScript 也 evaluate 当前 frame', async () => {
-    const {ctx, frameEvaluateCalls, addInitScriptCalls} = buildMockContext();
-    const {response, calls} = buildMockResponse();
-
-    await injectHook.handler(
-      {params: {hookId: 'h2', script: '/*hook*/', persistent: true}},
-      response,
-      ctx,
-    );
-
-    assert.equal(frameEvaluateCalls.length, 1);
-    assert.equal(addInitScriptCalls.length, 1);
-    assert.equal(calls[0]?.success, true);
-    const data = calls[0]?.data as {
-      persisted: boolean;
-      ranOnCurrentFrame: boolean;
-    };
-    assert.equal(data.persisted, true);
-    assert.equal(data.ranOnCurrentFrame, true);
-    // 写入了注册表
-    assert.equal(getPersistentHookRegistry().has('h2'), true);
-  });
-
-  it('页面不支持 addInitScript 时降级为单次 evaluate 并给 warning', async () => {
-    const {ctx, frameEvaluateCalls, addInitScriptCalls} = buildMockContext({
-      supportsAddInitScript: false,
+    assert.deepEqual(harness.frameScripts, ['once();']);
+    assert.deepEqual(harness.registerRequests, []);
+    assert.deepEqual(output.content.data, {
+      hookId: 'once',
+      persisted: false,
+      ranOnCurrentFrame: true,
+      world: 'main',
+      requestedWorld: 'main',
+      effectiveWorld: 'main',
+      persistentStrategy: 'evaluate-once',
+      warnings: [],
     });
-    const {response, calls} = buildMockResponse();
-
-    await injectHook.handler(
-      {params: {hookId: 'h3', script: '/*x*/', persistent: true}},
-      response,
-      ctx,
-    );
-
-    assert.equal(frameEvaluateCalls.length, 1);
-    assert.equal(addInitScriptCalls.length, 0);
-    assert.equal(calls[0]?.success, true);
-    const data = calls[0]?.data as {persisted: boolean; warnings?: string[]};
-    assert.equal(data.persisted, false);
-    assert.ok(data.warnings && data.warnings.length > 0);
   });
 
-  it('list_persistent_hooks 返回已注册的列表', async () => {
-    const {ctx} = buildMockContext();
-    const {response} = buildMockResponse();
-
+  it('delegates persistent registration and preserves old response fields', async () => {
+    const harness = contextHarness();
+    const output = responseHarness();
     await injectHook.handler(
-      {params: {hookId: 'persistent-a', script: '/*a*/', persistent: true}},
-      response,
-      ctx,
+      {params: {hookId: 'persist', script: 'hook();', persistent: true}},
+      output.response,
+      harness.context,
     );
+
+    assert.equal(harness.frameScripts.length, 0);
+    assert.deepEqual(harness.registerRequests, [
+      {
+        context: harness.browserContext,
+        hookId: 'persist',
+        script: 'hook();',
+        source: 'inject_hook',
+        requestedWorld: 'main',
+        applyMode: 'existing-and-future',
+      },
+    ]);
+    assert.equal(output.content.data.persisted, true);
+    assert.equal(output.content.data.ranOnCurrentFrame, true);
+    assert.equal(output.content.data.world, 'main');
+    assert.equal(output.content.data.persistentStrategy, 'addInitScript');
+    assert.equal(output.content.data.partial, true);
+    assert.deepEqual(output.content.data.failedFrames, [
+      {frameUrl: 'x', reason: 'detached'},
+    ]);
+  });
+
+  it('fails without a BrowserContext and does not fall back to evaluate', async () => {
+    const harness = contextHarness({browserContext: false});
+    const output = responseHarness();
     await injectHook.handler(
-      {params: {hookId: 'persistent-b', script: '/*b*/', persistent: true}},
-      response,
-      ctx,
+      {params: {hookId: 'persist', script: 'hook();', persistent: true}},
+      output.response,
+      harness.context,
     );
 
-    const listResponse = buildMockResponse();
-    await listPersistentHooks.handler(
-      {params: {}},
-      listResponse.response,
-      {} as never,
-    );
+    assert.equal(output.content.success, false);
+    assert.equal(harness.frameScripts.length, 0);
+    assert.equal(harness.registerRequests.length, 0);
+  });
 
-    const data = listResponse.calls[0]?.data as {
-      hooks: Array<{hookId: string}>;
-      count: number;
+  it('returns registry failures without evaluating once', async () => {
+    const harness = contextHarness();
+    harness.registry.register = async () => {
+      throw new Error('conflict');
     };
-    assert.equal(data.count, 2);
-    const ids = data.hooks.map(h => h.hookId).sort();
-    assert.deepEqual(ids, ['persistent-a', 'persistent-b']);
+    const output = responseHarness();
+    await injectHook.handler(
+      {params: {hookId: 'persist', script: 'hook();', persistent: true}},
+      output.response,
+      harness.context,
+    );
+
+    assert.equal(output.content.success, false);
+    assert.match(output.content.message, /conflict/);
+    assert.equal(harness.frameScripts.length, 0);
+  });
+
+  it('lists only the current context with compatibility metadata', async () => {
+    const registry = new PersistentHookRegistry();
+    const browserContext = {
+      isClosed: () => false,
+      once: () => browserContext,
+      addInitScript: async () => ({dispose: async () => undefined}),
+      pages: () => [],
+    } as unknown as BrowserContext;
+    await registry.register({
+      context: browserContext,
+      hookId: 'listed',
+      script: 'listed();',
+      source: 'inject_hook',
+      requestedWorld: 'main',
+      applyMode: 'existing-and-future',
+    });
+    const output = responseHarness();
+    await listPersistentHooks.handler({params: {}}, output.response, {
+      getBrowserContext: () => browserContext,
+      getPersistentHookRegistry: () => registry,
+    } as unknown as Context);
+
+    assert.equal(output.content.data.count, 1);
+    assert.equal(output.content.data.hooks[0].hookId, 'listed');
+    assert.equal(output.content.data.hooks[0].world, 'main');
+    assert.equal(output.content.data.hooks[0].removable, false);
+    assert.equal(output.content.data.hooks[0].script, undefined);
+    assert.equal(output.content.data.removable, false);
+    assert.equal(
+      output.content.data.clearBy,
+      'close-or-recreate-browser-context',
+    );
   });
 });

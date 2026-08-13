@@ -31,6 +31,8 @@ export class DefineToolContextFactory {
         if (!page) throw new Error('没有选中的页面');
         return page;
       },
+      getBrowserContext: () => provider.getContext(),
+      getPersistentHookRegistry: () => provider.getPersistentHookRegistry(),
       getDialog: () => provider.getDialog(),
       clearDialog: () => provider.clearDialog(),
       getPageByIdx: idx => provider.getPageByIdx(idx),
