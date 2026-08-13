@@ -13,7 +13,10 @@ import type {
   Page,
 } from 'patchright';
 
-import type {BrowserManager} from '../modules/browser/index.js';
+import {
+  BrowserTargetInspector,
+  type BrowserManager,
+} from '../modules/browser/index.js';
 import type {DebuggerManager} from '../modules/debugger/DebuggerManager.js';
 import type {
   RequestInitiator,
@@ -52,6 +55,7 @@ export class ToolContextProvider {
   private _isRunningPerformanceTrace = false;
   private _traceRecordings: TraceResult[] = [];
   private _isDisposed = false;
+  private _browserTargetInspector?: BrowserTargetInspector;
   private activeSessionId?: string;
   public readonly eventBus: EventBus<AppEventMap>;
 
@@ -111,6 +115,13 @@ export class ToolContextProvider {
 
   getBrowser(): Browser | null {
     return this._browserContext.getBrowser();
+  }
+
+  getBrowserTargetInspector(): BrowserTargetInspector {
+    this._browserTargetInspector ??= new BrowserTargetInspector(() =>
+      this.getBrowser(),
+    );
+    return this._browserTargetInspector;
   }
 
   setBrowserManager(browserManager: BrowserManager): void {

@@ -19,6 +19,7 @@ export class DefineToolContextFactory {
   create(): Context {
     const provider = this.provider;
     return {
+      getBrowserTargetInspector: () => provider.getBrowserTargetInspector(),
       isRunningPerformanceTrace: () => provider.isRunningPerformanceTrace(),
       setIsRunningPerformanceTrace: (x: boolean) =>
         provider.setIsRunningPerformanceTrace(x),

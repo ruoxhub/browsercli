@@ -20,5 +20,10 @@ export const manifest = {
       modulePath: './collector/searchInScripts.js',
       handlerName: 'searchInScripts',
     },
+    {modulePath: './collector/listTargets.js', handlerName: 'listTargets'},
+    {
+      modulePath: './collector/dumpTargetScripts.js',
+      handlerName: 'dumpTargetScripts',
+    },
   ],
 } satisfies DomainManifest;

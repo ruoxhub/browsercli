@@ -116,6 +116,14 @@ export const GENERATED_TOOL_REGISTRY = [
     handlerName: 'searchInScripts',
   },
   {
+    modulePath: './collector/listTargets.js',
+    handlerName: 'listTargets',
+  },
+  {
+    modulePath: './collector/dumpTargetScripts.js',
+    handlerName: 'dumpTargetScripts',
+  },
+  {
     modulePath: './console/listConsoleMessages.js',
     handlerName: 'listConsoleMessages',
   },

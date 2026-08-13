@@ -6,6 +6,7 @@
 
 import type {TrafficSummary} from '../formatters/websocketFormatter.js';
 import type {DebuggerManager} from '../modules/debugger/DebuggerManager.js';
+import type {BrowserTargetInspector} from '../modules/browser/BrowserTargetInspector.js';
 import type {
   RequestInitiator,
   WebSocketData,
@@ -90,6 +91,7 @@ export interface Response {
  * Only add methods required by tools/*.
  */
 export type Context = Readonly<{
+  getBrowserTargetInspector(): BrowserTargetInspector;
   isRunningPerformanceTrace(): boolean;
   setIsRunningPerformanceTrace(x: boolean): void;
   recordedTraces(): TraceResult[];
