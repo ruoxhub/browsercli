@@ -5,7 +5,6 @@
  */
 
 import {assessCaptchaSnapshot} from './rules.js';
-
 import type {Page} from '../../third_party/index.js';
 import type {
   CaptchaAssessment,
