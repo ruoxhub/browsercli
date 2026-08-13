@@ -22,3 +22,11 @@ export {SessionManager} from './SessionManager.js';
 export {HARMFUL_ARGS, DEFAULT_ARGS, STEALTH_ARGS} from './stealth-args.js';
 
 export {mapCDPError, isCDPSessionGone, wrapCDPCall} from './CDPErrorMapper.js';
+
+export {BrowserTargetInspector} from './BrowserTargetInspector.js';
+export type {
+  BrowserTargetInspectorOptions,
+  DumpTargetScriptsResult,
+  ScriptFailure,
+  TargetSummary,
+} from './BrowserTargetInspector.js';
