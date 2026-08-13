@@ -222,7 +222,12 @@ context.once('close', () => {
   this.disposablesByContext.delete(context);
   void Promise.allSettled(
     [...(handles?.values() ?? [])].map(handle => handle.dispose()),
-  );
+  ).then(results => {
+    for (const result of results) {
+      if (result.status === 'rejected')
+        logger.warn('persistent hook dispose failed', result.reason);
+    }
+  });
 });
 ```
 

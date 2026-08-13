@@ -521,6 +521,10 @@ const SCRIPT_TARGET_TYPES = new Set([
 ```
 
 `getBrowser()` 返回 null、断连或非 Chromium 时分别给出明确错误。`listTargets()` 只调用 `Target.getTargets`，结果保持 CDP 顺序；不要启动 Target discovery。
+Inspector 对根 Session 的 `Target.getTargets`、`Target.attachToTarget`、
+`Target.detachFromTarget`、`session.detach()` 统一使用有界 timeout wrapper；cleanup 超时只写
+warning，不能阻塞 handler。新增 fake Promise 永不 settle 的 get/attach/detach 测试，证明调用最终
+返回或失败而不会永久挂起。
 
 - [ ] **Step 3: 先写临时 attach、回放和 cleanup 失败测试**
 
@@ -573,6 +577,10 @@ dumpScripts(targetId: string): Promise<DumpTargetScriptsResult> {
 11. 读取源码并构造结果。
 12. best-effort `Debugger.disable`。
 13. finally 中 unregister、`Target.detachFromTarget`、router dispose、根 `detach()`。
+
+cleanup 失败统一写入 `logger.warn`；若主错误为 `ToolError`，同时把字符串数组合并到
+`ToolError.context.cleanupWarnings`，保持主错误 code/message/recoverable 不变。对应测试须断言
+日志/上下文均可观察，不能静默吞掉 cleanup 结果。
 
 默认 child command timeout 5,000ms、源码并发 4、`maxScriptCacheBytes` 2MiB、观察事件上限为
 `maxFiles * 4`。options 允许单测缩短时间，但工具 schema 不暴露这些内部旋钮。
