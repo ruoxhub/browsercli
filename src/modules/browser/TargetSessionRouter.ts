@@ -60,7 +60,10 @@ export class TargetSessionRouter {
     this.targetToSession.set(targetId, sessionId);
   }
 
-  unregisterSession(sessionId: string, reason = new Error('Session closed')): void {
+  unregisterSession(
+    sessionId: string,
+    reason = new Error('Session closed'),
+  ): void {
     const targetId = this.sessionToTarget.get(sessionId);
     if (!targetId) return;
     this.sessionToTarget.delete(sessionId);
@@ -100,7 +103,8 @@ export class TargetSessionRouter {
     params: Record<string, unknown> = {},
   ): Promise<T> {
     const targetId = this.sessionToTarget.get(sessionId);
-    if (!targetId) return Promise.reject(new Error(`Unknown session: ${sessionId}`));
+    if (!targetId)
+      return Promise.reject(new Error(`Unknown session: ${sessionId}`));
     const id = this.nextMessageId++;
     const key = `${sessionId}:${id}`;
     return new Promise<T>((resolve, reject) => {
@@ -123,7 +127,9 @@ export class TargetSessionRouter {
           sessionId,
           message: JSON.stringify({id, method, params}),
         })
-        .catch(error => this.rejectPending(key, mapCDPError(error, {sessionId, targetId})));
+        .catch(error =>
+          this.rejectPending(key, mapCDPError(error, {sessionId, targetId})),
+        );
     });
   }
 
@@ -180,7 +186,9 @@ export class TargetSessionRouter {
       return;
     }
     if (message.method) {
-      for (const listener of this.listeners.get(`${sessionId}:${message.method}`) ?? []) {
+      for (const listener of this.listeners.get(
+        `${sessionId}:${message.method}`,
+      ) ?? []) {
         listener(message.params ?? {});
       }
     }

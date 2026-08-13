@@ -3,11 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import {
-  ErrorCodes,
-  ToolError,
-  type ToolErrorCode,
-} from '../../utils/errors.js';
+import {ErrorCodes, ToolError, type ToolErrorCode} from '../../utils/errors.js';
 
 export interface CDPErrorContext {
   recoveryHint?: string;

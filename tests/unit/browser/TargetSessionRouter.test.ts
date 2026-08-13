@@ -15,7 +15,7 @@ class FakeRootSession extends EventEmitter {
   lastChildMessage(): {id: number; method: string} {
     const raw = this.sent.at(-1)?.params.message;
     assert.equal(typeof raw, 'string');
-    return JSON.parse(raw) as {id: number; method: string};
+    return JSON.parse(raw as string) as {id: number; method: string};
   }
 
   receive(sessionId: string, message: object): void {
@@ -35,8 +35,14 @@ describe('TargetSessionRouter', () => {
     router.on('session-1', 'Debugger.scriptParsed', params => {
       eventValue = params.value as number;
     });
-    root.receive('session-2', {method: 'Debugger.scriptParsed', params: {value: 1}});
-    root.receive('session-1', {method: 'Debugger.scriptParsed', params: {value: 2}});
+    root.receive('session-2', {
+      method: 'Debugger.scriptParsed',
+      params: {value: 1},
+    });
+    root.receive('session-1', {
+      method: 'Debugger.scriptParsed',
+      params: {value: 2},
+    });
     assert.equal(eventValue, 2);
 
     const pending = router.send<{scriptSource: string}>(
@@ -69,11 +75,20 @@ describe('TargetSessionRouter', () => {
     const root = new FakeRootSession();
     const router = new TargetSessionRouter(root as never, 5);
     router.registerSession('s1', 't1');
-    assert.throws(() => router.registerSession('s1', 't2'), /Duplicate sessionId/);
-    assert.throws(() => router.registerSession('s2', 't1'), /Duplicate targetId/);
+    assert.throws(
+      () => router.registerSession('s1', 't2'),
+      /Duplicate sessionId/,
+    );
+    assert.throws(
+      () => router.registerSession('s2', 't1'),
+      /Duplicate targetId/,
+    );
 
     const protocol = router.send('s1', 'Debugger.enable');
-    root.receive('s1', {id: root.lastChildMessage().id, error: {code: -1, message: 'denied'}});
+    root.receive('s1', {
+      id: root.lastChildMessage().id,
+      error: {code: -1, message: 'denied'},
+    });
     await assert.rejects(protocol, /denied/);
 
     const detached = router.send('s1', 'Debugger.enable');
