@@ -113,11 +113,13 @@ Puppeteer 的 Target/CDPSession 公共接口更直接，但全量切换会影响
 
 ### 5.3 持久 Hook 随 BrowserContext 生命周期存在
 
-Patchright 的 `BrowserContext.addInitScript()` 没有可靠的单条脚本卸载接口。批准的语义是：
+当前锁定的 Patchright 1.59.4 中，`BrowserContext.addInitScript()` 返回可调用
+`dispose()` 的内部句柄。注册表可以保留该句柄用于生命周期清理，但不把它放进工具响应，
+也不因此增加公开的单 Hook 删除工具。批准的产品语义是：
 
 - 注册成功后持续到当前 BrowserContext 关闭。
 - Context 关闭或重建后彻底清除。
-- 不提供运行时删除。
+- 不提供运行时删除工具；内部句柄不得被工具或列表响应暴露。
 - 相同 ID 不允许用不同脚本覆盖。
 
 ### 5.4 `pageId` 覆盖全部真实页面选择入口
@@ -584,13 +586,16 @@ interface RegisterPersistentHookResult {
 - 不同 hookId：允许，即使脚本内容相同。
 - 不同 BrowserContext：完全隔离。
 
-由于无法单独撤销已注册 init script，绝不实现“set 覆盖 Map 但旧脚本仍在运行”的伪更新。
+注册必须按 `(BrowserContext, hookId)` 串行化：同一 ID 的并发同脚本请求合并为一个 in-flight
+Promise，不得重复调用 `addInitScript`；并发不同脚本必须在产生浏览器副作用前拒绝。
+绝不实现“set 覆盖 Map 但旧脚本仍在运行”的伪更新。
 
 ### 9.6 回填语义
 
 - 回填目标是注册时快照中的所有未关闭 Page 的所有 Frame。
 - 单 Frame 失败不回滚已经注册的 init script。
-- Frame detach、导航竞态和 Context 关闭映射为 `failedFrames` 或可恢复错误。
+- Frame detach、导航竞态和 Context 关闭映射为 `failedFrames` 或可恢复错误；失败项只返回
+  `frameUrl` 与 `reason`，不让注册表额外依赖页面身份模块。
 - `partial=true` 表示至少一个 Frame 回填失败。
 - 不额外包裹用户脚本，不伪造全局幂等标记。
 - 导航竞态下存在极小概率同一文档同时被 init script 和回填执行；持久 Hook 脚本必须自行保证幂等。
@@ -662,6 +667,10 @@ Context 原生 init script 已覆盖所需的未来文档生命周期，保留 H
 
 `Target not found` 这类瞬时错误必须保持可恢复语义，不能仅因使用 `NOT_FOUND` code 而被默认标成不可恢复。
 
+恢复提示必须对 HTTP/browsercli 调用方可见：除写入 `ToolError.context.recoveryHint` 外，
+映射后的稳定 `Error.message` 必须包含短提示。本阶段不扩展传输 DTO，避免提示只留在 worker
+内部 context。
+
 ### 10.3 重试规则
 
 - 模块内部不做无限重试。
@@ -692,6 +701,8 @@ Context 原生 init script 已覆盖所需的未来文档生命周期，保留 H
 - `resolvePage`
 - navigation/network 工具兼容升级
 - `_tabContext` 修正
+- 浏览器断开时清空 Context、selected Page、反向 pageId 映射；`BrowserConnectionManager`
+  必须纳入实现和测试。
 
 进入下一阶段的门槛：所有旧索引测试保持通过，新测试证明页面重排不改变 ID、关闭后 ID 不复用。
 
@@ -824,25 +835,29 @@ npm run check-format
 - `persistent=false` 的 `inject_hook` 保持现有单次 evaluate 行为。
 - `persistent=true` 不再静默降级为单次执行，这是有意的正确性收紧。
 - `inject_preload_script` 从隐式 Context/Page fallback 收敛为明确的 Context 生命周期。
+- `inject_hook` 保留现有 `hookId`、`persisted`、`ranOnCurrentFrame`、`world`、
+  `persistentStrategy` 字段；`list_persistent_hooks` 保留 ISO `registeredAt` 与 `world`，
+  新字段只做增量添加。
 - 删除 `HookHeartbeat` 不影响公开工具，因为它没有生产调用方。
 
 ## 15. 风险与缓解
 
-| 风险                                                         | 影响                               | 缓解                                                                         |
-| ------------------------------------------------------------ | ---------------------------------- | ---------------------------------------------------------------------------- |
-| 非 flat `Target.sendMessageToTarget` 已被 CDP 标记为未来弃用 | 上游 Chromium 最终可能移除         | 完全封装在单一内部实现；加入真实 Chromium smoke test；不泄漏到工具 interface |
-| `Debugger.enable` 是可观测协议行为                           | 强反爬场景可能检测                 | 只在显式 dump 时短暂启用；默认路径不激活；文档提示调用代价                   |
-| 页面关闭事件丢失                                             | 反向 pageId Map 可能暂时残留       | 所有读取前 reconcile；关闭 listener 只是加速清理                             |
-| Hook 注册与 Frame 回填竞态                                   | 极小概率重复执行                   | 先注册 init script；明确要求持久 Hook 自身幂等；结果报告 partial             |
-| Context init script 无单条删除                               | 伪删除会导致状态与真实浏览器不一致 | 生命周期固定为 Context；不提供 remove/overwrite                              |
-| Target 脚本数量巨大                                          | 内存或 MCP 响应失控                | 有界并发、文件数、单文件和总字节限制                                         |
-| URL 去重误伤动态版本                                         | 同 URL 不同脚本丢失                | 去重键加入 CDP hash/SHA-256                                                  |
+| 风险                                                         | 影响                               | 缓解                                                                                       |
+| ------------------------------------------------------------ | ---------------------------------- | ------------------------------------------------------------------------------------------ |
+| 非 flat `Target.sendMessageToTarget` 已被 CDP 标记为未来弃用 | 上游 Chromium 最终可能移除         | 完全封装在单一内部实现；加入真实 Chromium smoke test；不泄漏到工具 interface               |
+| `Debugger.enable` 是可观测协议行为                           | 强反爬场景可能检测                 | 只在显式 dump 时短暂启用；默认路径不激活；文档提示调用代价                                 |
+| 页面关闭事件丢失                                             | 反向 pageId Map 可能暂时残留       | 所有读取前 reconcile；关闭 listener 只是加速清理                                           |
+| Hook 注册与 Frame 回填竞态                                   | 极小概率重复执行                   | 先注册 init script；按 Context+hookId 串行化；明确要求持久 Hook 自身幂等；结果报告 partial |
+| Context init script 无单条删除                               | 伪删除会导致状态与真实浏览器不一致 | 生命周期固定为 Context；不提供 remove/overwrite                                            |
+| Target 脚本数量巨大                                          | 内存或 MCP 响应失控                | 有界并发、文件数、单文件和总字节限制                                                       |
+| URL 去重误伤动态版本                                         | 同 URL 不同脚本丢失                | 去重键加入 CDP hash/SHA-256                                                                |
 
 ## 16. 验收标准
 
 ### 16.1 Target 观测
 
-- `list_targets` 能列出当前 Chromium 中的 page、iframe、Worker、SharedWorker 和 Service Worker Target。
+- `list_targets` 能列出当前 Chromium 中的 page、Worker、SharedWorker 和 Service Worker Target；
+  iframe 仅在其实际形成 `Target.getTargets` 条目的 OOPIF 场景断言，不把同进程 iframe 误当作独立 Target。
 - `dump_target_scripts` 能获取调用前已创建 Worker 的已解析源码。
 - 工具结束后没有遗留 Target 子会话或根 Session listener。
 - 单脚本失败产生 partial 结果，不丢失其他脚本。
@@ -861,7 +876,7 @@ npm run check-format
 
 - 持久 Hook 对当前 Context 的现存 Frame 尽力即时生效。
 - 未来导航和新页面继承 Hook。
-- 相同 ID 同脚本幂等，相同 ID 不同脚本拒绝。
+- 相同 ID 同脚本幂等（包括并发请求），相同 ID 不同脚本拒绝且不产生第二次浏览器注册。
 - Context 重建后旧 Hook 消失。
 - 工具和文档不再宣称支持运行时删除。
 - `HookHeartbeat` 在确认无生产调用后删除。

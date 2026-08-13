@@ -73,7 +73,10 @@
 
 - Create: `src/modules/browser/PageIdentity.ts`
 - Modify: `src/worker/context/BrowserContextProvider.ts`
+- Modify: `src/worker/BrowserConnectionManager.ts`
+- Modify: `src/worker/ToolContext.ts`
 - Modify: `tests/unit/worker/BrowserContextProvider.test.ts`
+- Modify: `tests/unit/worker/BrowserConnectionManager.test.ts`
 
 **Interfaces:**
 
@@ -187,6 +190,12 @@ private wasIssuedPageId(pageId: string): boolean;
 
 `setContext(newContext)` 在 Context 对象变化时清空 `pagesById`、`pagesList` 和 selected Page，但保留单调计数器；旧 WeakMap 项可以由 GC 回收，反向解析必须立即失效。
 
+增加 `clearContext()`（或等价的可传 `null` 入口），并在
+`BrowserConnectionManager.disconnectBrowser()` 的 `setBrowser(null)` 后调用。断开后
+`getPages()` 不得继续从旧 Context 读取，旧 pageId 必须立即解析失败；新增回归覆盖断开、
+重连新 Context 与旧 ID 不复用。
+`ToolContextProvider.clearContext()` 只做一行委托，供 BrowserConnectionManager 调用。
+
 - [ ] **Step 5: 先写统一 selector 失败测试**
 
 覆盖：
@@ -238,6 +247,7 @@ getPageByIdx(idx: number): Page {
 ```powershell
 npm run build:dev
 node --require ./build/tests/setup.js --test build/tests/unit/worker/BrowserContextProvider.test.js
+node --require ./build/tests/setup.js --test build/tests/unit/worker/BrowserConnectionManager.test.js
 ```
 
 Expected: PASS。
@@ -245,7 +255,7 @@ Expected: PASS。
 - [ ] **Step 8: 提交 Task 1**
 
 ```powershell
-git add src/modules/browser/PageIdentity.ts src/worker/context/BrowserContextProvider.ts tests/unit/worker/BrowserContextProvider.test.ts
+git add src/modules/browser/PageIdentity.ts src/worker/context/BrowserContextProvider.ts src/worker/ToolContext.ts src/worker/BrowserConnectionManager.ts tests/unit/worker/BrowserContextProvider.test.ts tests/unit/worker/BrowserConnectionManager.test.ts
 git commit -m "feat(browser): assign stable page identities"
 ```
 
@@ -531,6 +541,13 @@ getNetworkRequestsForPage(
 ): HTTPRequest[];
 clearNetworkRequestsForPage(page: Page): void;
 ```
+
+`NetworkModule.listRequests()` 在第一次 await 前解析并保存 `ResolvedPage.page`；等待、轮询、
+过滤、超时返回和 clear 全部只通过该 Page 对象访问 collector，不得把它降级为索引再解析。
+最终响应的 `targetPageIdx` 固定为首次解析时的索引（保持现有响应语义），`targetPageId` 始终来自
+同一对象；页面之后重排不会把结果索引重新解释为另一 Page。若目标 Page 在等待期间关闭，
+按既有失败/partial 契约返回解析时的 ID/index，不静默切换页面。补充页面重排、目标页关闭和
+跨页请求误读测试。
 
 参数和响应增加：
 

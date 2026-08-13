@@ -107,7 +107,6 @@ export interface RegisterPersistentHookResult {
   idempotent: boolean;
   appliedFrames: number;
   failedFrames: Array<{
-    pageId?: string;
     frameUrl: string;
     reason: string;
   }>;
@@ -132,7 +131,8 @@ fake Context 必须支持：
 
 - `isClosed()` 可切换。
 - `once('close', listener)` 保存 listener。
-- `addInitScript(script)` 记录调用或注入错误。
+- `addInitScript(script)` 记录调用或注入错误，并返回可调用 `dispose()` 的 fake Disposable；
+  测试失败回滚和 Context close 清理时可验证句柄不会暴露给工具响应。
 - `pages()` 返回 Page snapshot。
 - `closeForTest()` 触发 close listener。
 
@@ -201,13 +201,28 @@ private readonly entriesByContext = new WeakMap<
   Map<string, PersistentHookEntry>
 >();
 private readonly observedContexts = new WeakSet<BrowserContext>();
+private readonly inFlightByContext = new WeakMap<
+  BrowserContext,
+  Map<string, {scriptHash: string; promise: Promise<RegisterPersistentHookResult>}>
+>();
+private readonly disposablesByContext = new WeakMap<
+  BrowserContext,
+  Map<string, {dispose(): Promise<void>}>
+>();
 ```
 
-首次看到 Context 时创建空 Map，并只注册一次：
+首次看到 Context 时创建空 Map，并只注册一次；close 时先摘除 entries、in-flight reservation，
+再 best-effort dispose 所有已返回的私有句柄（清理失败只记 warning，不阻止其他清理）：
 
 ```typescript
 context.once('close', () => {
   this.entriesByContext.delete(context);
+  this.inFlightByContext.delete(context);
+  const handles = this.disposablesByContext.get(context);
+  this.disposablesByContext.delete(context);
+  void Promise.allSettled(
+    [...(handles?.values() ?? [])].map(handle => handle.dispose()),
+  );
 });
 ```
 
@@ -227,6 +242,8 @@ context.once('close', () => {
 - requested isolated 的 entry 仍是 `effectiveWorld:'main'`，warnings 明确说明限制。
 - emoji 等多字节脚本的 `scriptSize` 使用 UTF-8 字节数，preview 不超过 200 个 Unicode code point。
 - entry 与 `list()` 结果都不存在完整 `script` 字段。
+- 同 Context/同 hookId 的并发同脚本请求合并为一次 `addInitScript` 和一次回填；并发不同
+  脚本在任何浏览器副作用前拒绝；首个注册失败后允许后续重试。
 
 - [ ] **Step 6: 实现严格注册顺序和竞态检查**
 
@@ -235,13 +252,17 @@ context.once('close', () => {
 1. trim 校验 hookId 与 script 非空。
 2. `context.isClosed()` 校验。
 3. 计算 hash/entry 候选。
-4. 获取当前 Context Map并做幂等/冲突检查。
-5. `await context.addInitScript(script)`。
-6. 再次检查 Context 未关闭且 WeakMap 中仍是同一个 Map。
+4. 获取当前 Context Map，并做幂等/冲突检查；同时以 `(context, hookId)` 保存 in-flight
+   reservation。已有相同 hash 的 reservation 直接复用其 Promise，不重复副作用；已有不同
+   hash 或 reservation 中 hash 不同则立即拒绝。
+5. `await context.addInitScript(script)`，保存返回的 Disposable 句柄供 Context 清理（不暴露给工具）。
+6. 若 await 返回时 Context 已关闭，立即 best-effort `dispose()` 该 late handle，再抛可恢复错误；
+   否则把句柄放入 `disposablesByContext`，再检查 WeakMap 中仍是同一个 Map。
 7. `entries.set(hookId, entry)`。
 8. `future-only` 直接返回。
 9. 对 `context.pages()` 的当前 snapshot，枚举未关闭 Page 的 Frame snapshot并逐个 best-effort evaluate。
 10. 若 Context 在回填中关闭，抛可恢复错误；close listener 已确保 entry 不再可见。
+11. finally 清理 reservation；失败时不得留下 entry 或不可见的 reservation。
 
 不要并行 `Promise.all` 全部 Frame：顺序执行便于稳定汇报，Frame 数量来自用户显式 Context，首期不新增并发抽象。
 
@@ -317,7 +338,7 @@ getPersistentHookRegistry(): PersistentHookRegistry {
 
 - [ ] **Step 3: 从 hook index 导出窄 API**
 
-导出 `PersistentHookRegistry`、两个 helper 和四个 interface type。不要导出内部 WeakMap 或任何 remove 方法。
+导出 `PersistentHookRegistry`、两个 helper 和三个 interface type（Entry/Request/Result）。不要导出内部 WeakMap 或任何 remove 方法。
 
 - [ ] **Step 4: 给 ToolContextProvider 添加一行委托**
 
@@ -389,6 +410,10 @@ failedFrames?: RegisterPersistentHookResult['failedFrames'];
 partial?: boolean;
 warnings?: string[];
 ```
+
+兼容约束：`inject_hook` 上述旧字段继续返回；`list_persistent_hooks` 保留 ISO 字符串
+`registeredAt` 与旧 `world` 字段，新 registry 元数据仅增量添加。删除或重命名旧字段必须先
+更新客户端契约测试，不得默默改变响应形状。
 
 - [ ] **Step 1: 重写现有测试，使其针对 Context registry 行为**
 
@@ -470,7 +495,7 @@ const browserContext = context.getBrowserContext();
 const entries = context.getPersistentHookRegistry().list(browserContext);
 ```
 
-响应每项包含 hookId、scriptHash、scriptSize、scriptPreview、registeredAt ISO、source、requestedWorld、effectiveWorld、applyMode、`removable:false`。顶层 data 增加：
+响应每项包含 hookId、scriptHash、scriptSize、scriptPreview、registeredAt ISO、旧 `world`（值为 requestedWorld）、source、requestedWorld、effectiveWorld、applyMode、`removable:false`。顶层 data 增加：
 
 ```typescript
 {
@@ -662,6 +687,9 @@ try {
 
 Expected: PASS，且 suite 不处于 skipped。若本机缺少浏览器，明确记录阻塞，不得把 skip 当作完成。
 
+删除源文件后、最终 glob 测试前必须执行仓库 clean 脚本（若存在）再 build，确认
+`build/src/modules/hook/HookHeartbeat.js` 与对应测试产物不存在；不得手改 build 目录。
+
 - [ ] **Step 5: 提交 Task 5**
 
 ```powershell
@@ -711,11 +739,15 @@ Expected: PASS。
 - [ ] **Step 4: 运行最终项目检查**
 
 ```powershell
+npm run clean
 npm run typecheck
 npm run test:unit
 npm run test:integration
 npm run check-format
 ```
+
+同时重跑阶段 2 的 `BrowserContextProvider`、`BrowserConnectionManager`、page identity、
+`listNetworkRequests` 与 `clearNetworkRequests` 聚焦测试，避免共同修改的 Context 接线回归。
 
 Expected: 全部 PASS，且结果来自最后一次代码修改之后。
 

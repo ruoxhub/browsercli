@@ -154,6 +154,7 @@ it('maps a missing Target to a recoverable error with a fresh-list hint', () => 
   assert.equal(result.recoverable, true);
   assert.equal(result.context?.targetId, 'target-gone');
   assert.match(String(result.context?.recoveryHint), /list_targets/);
+  assert.match(result.message, /list_targets/);
 });
 
 it('keeps session context on mapped detach errors', () => {
@@ -203,6 +204,9 @@ export interface CDPErrorContext {
 
 `mapCDPError` 使用 `new ToolError(...)` 构造匹配错误，使该模式可覆盖 `NOT_FOUND` 的全局默认值；context 必须包含 `originalMessage`、调用方字段和 pattern 默认恢复提示。既有 stack/name 行为保持不变。
 
+恢复提示同时拼入稳定的 `Error.message`，确保 HTTP/browsercli 路径（只保留 code/message）也能看到；
+不要只放在 `ToolError.context`。
+
 ```typescript
 export function mapCDPError(
   error: unknown,
@@ -214,7 +218,7 @@ export function mapCDPError(
 
   const mapped = new ToolError(
     match.code,
-    `${match.message} (原始: ${message})`,
+    `${match.message}；${context.recoveryHint ?? match.recoveryHint ?? ''} (原始: ${message})`,
     {
       originalMessage: message,
       ...context,
@@ -300,6 +304,8 @@ export class TargetSessionRouter {
 - 只处理属于本 sessionId 的响应和事件。
 - 子命令协议错误拒绝对应 Promise，不影响其他 pending。
 - `Target.detachedFromTarget` 拒绝该 session 的全部 pending 并清理映射。
+- attach 返回到 `registerSession` 之间收到的 detach 记录为 early-detached tombstone；
+  随后注册立即失败并消费 tombstone，不发送 child command。
 - 根 Session `close` 拒绝所有 session 的 pending。
 - 命令超过 `commandTimeoutMs` 后失败并移除 pending。
 - `dispose` 移除三个根 listener；重复 dispose 无副作用。
@@ -354,6 +360,7 @@ private readonly listeners = new Map<
   string,
   Set<TargetEventListener>
 >();
+private readonly earlyDetachedSessions = new Set<string>();
 private disposed = false;
 ```
 
@@ -461,6 +468,7 @@ export interface BrowserTargetInspectorOptions {
   maxFiles?: number;
   maxSingleFileBytes?: number;
   maxResponseBytes?: number;
+  maxScriptCacheBytes?: number;
 }
 
 export class BrowserTargetInspector {
@@ -481,6 +489,9 @@ export class BrowserTargetInspector {
 - Firefox/WebKit 返回结构化可识别的 `VALIDATION`，不尝试 Page/fetch 降级。
 - `Target.getTargets` 映射所有 Target；仅 `page`、`iframe`、`worker`、`shared_worker`、`service_worker` 的 `canDumpScripts=true`。
 - `TargetInfo.attached=true` 仍使用独立临时 Session，不借用未知所有者的会话。
+- 同一 Target 的 attach 返回后必须立即完成 session 注册；若根 listener 在注册前收到
+  `Target.detachedFromTarget`，路由器要缓存该 session 的早期 detach 状态，注册后立即拒绝
+  该会话，不能让后续 `Debugger.enable` 等待到超时。
 - `listTargets` 总是在 finally detach 根 Session。
 - 同一 Target 两次并发调用返回同一个 Promise 结果且只 attach 一次。
 - 不同 Target 各 attach 一次。
@@ -517,6 +528,8 @@ const SCRIPT_TARGET_TYPES = new Set([
 
 - 调用顺序是根 listener 已注册 -> `Target.attachToTarget({flatten:false})` -> router register -> `Debugger.scriptParsed` listener -> `Debugger.enable`。
 - `Debugger.enable` 回放的事件在 idle window 后冻结。
+- `Debugger.enable` 显式传入有限的 `maxScriptsCacheSize`，并对已观察的
+  `scriptParsed` 数量设置上限；超限返回 `partial=true`/`omitted`，不得无限积累事件。
 - 冻结后发出的新 `scriptParsed` 不进入本次结果。
 - attach 成功、router register 抛错时仍调用 `Target.detachFromTarget` 和根 `detach()`。
 - `Debugger.enable` 失败仍执行两层 detach。
@@ -551,16 +564,18 @@ dumpScripts(targetId: string): Promise<DumpTargetScriptsResult> {
 3. 先构造 `TargetSessionRouter`，让根 listener 在 attach 前就绪。
 4. `Target.getTargets` 复核 Target。
 5. `Target.attachToTarget({targetId, flatten: false})`。
-6. `router.registerSession(sessionId, targetId)`。
+6. `router.registerSession(sessionId, targetId)`；若 attach 与注册之间已缓存 detach，立即以可恢复
+   错误结束，不发送 child command。
 7. 先 `router.on(sessionId, 'Debugger.scriptParsed', listener)`。
-8. 再 `router.send(sessionId, 'Debugger.enable')`。
+8. 再 `router.send(sessionId, 'Debugger.enable', {maxScriptsCacheSize})`。
 9. 等待 75ms idle window、最多 1,000ms；任一新 scriptParsed 重置 idle 计时。
 10. 移除 script listener并冻结数组。
 11. 读取源码并构造结果。
 12. best-effort `Debugger.disable`。
 13. finally 中 unregister、`Target.detachFromTarget`、router dispose、根 `detach()`。
 
-默认 child command timeout 5,000ms、源码并发 4。options 允许单测缩短时间，但工具 schema 不暴露这些内部旋钮。
+默认 child command timeout 5,000ms、源码并发 4、`maxScriptCacheBytes` 2MiB、观察事件上限为
+`maxFiles * 4`。options 允许单测缩短时间，但工具 schema 不暴露这些内部旋钮。
 
 - [ ] **Step 5: 先写 CodeFile 映射、去重和限额失败测试**
 
@@ -572,6 +587,9 @@ dumpScripts(targetId: string): Promise<DumpTargetScriptsResult> {
 - 无 URL 合成 `target://<targetId>/script/<scriptId>`。
 - metadata 包含 source、targetId、targetType、scriptIds、cdpHash、位置与 sourceMapURL。
 - 同 URL+同 CDP hash 合并 scriptIds；同 URL+不同 hash 保留。
+- `scriptLanguage === 'WebAssembly'` 跳过文本源码映射并计入 omitted/warning。
+- 零条有效 `scriptParsed` 返回成功的空快照（`partial=false`，stats 全为 0），只有协议/Target
+  错误才失败。
 - 无 CDP hash 时按源码 SHA-256 去重。
 - 单个 `getScriptSource` 错误产生 `ScriptFailure`，其他脚本仍返回。
 - UTF-8 多字节内容不会在截断边界产生超过上限的响应。
@@ -835,7 +853,9 @@ self.addEventListener('activate', event =>
 );
 ```
 
-`index.html` 在加载时创建普通 Worker、由 Blob 构造的 Worker、SharedWorker，并注册 Service Worker；所有对象保存在 `window` 属性上，避免被垃圾回收。
+`index.html` 在加载时创建普通 Worker、由 Blob 构造的 Worker、SharedWorker，并注册 Service Worker；所有对象保存在 `window` 属性上，避免被垃圾回收。若要断言 iframe Target，
+fixture 必须额外使用不同 origin（例如第二个随机端口）创建跨站 iframe，且只断言实际出现在
+`Target.getTargets` 的 OOPIF；同 origin/同进程 iframe 不得作为独立 Target 的必测条件。
 
 - [ ] **Step 2: 在测试内启动临时 HTTP server**
 
@@ -862,7 +882,8 @@ describe(
 至少覆盖：
 
 - 在构造 Inspector 和调用工具前，页面已收到 ordinary/blob worker 的 ready 消息。
-- `listTargets()` 可观察 `worker`、`shared_worker`、`service_worker`。
+- `listTargets()` 可观察 `worker`、`shared_worker`、`service_worker`；跨 origin iframe 仅在 Chromium
+  报告 OOPIF Target 时断言 `iframe`。
 - 对 ordinary Worker dump 能找到 ordinary marker 和 nested import marker。
 - 对 blob Worker dump 能找到 blob marker，且 `CodeFile.url` 是 blob URL 或规范合成 URL。
 - SharedWorker 与 Service Worker 各能读取自己的 marker。
@@ -903,7 +924,7 @@ git commit -m "test(browser): verify target script snapshots"
 ```powershell
 git diff HEAD~5 -- src/modules/browser src/modules/collector/CollectedFileRegistry.ts src/tools/collector src/worker/ToolContext.ts src/tools/ToolDefinition.ts src/worker/DefineToolContextFactory.ts tests/unit/browser tests/unit/tools/collector tests/integration/browserTargetInspector.integration.test.ts tests/fixtures/browser-targets
 rg -n "Target\.setAutoAttach|Runtime\.enable|Console\.enable" src/modules/browser/BrowserTargetInspector.ts src/modules/browser/TargetSessionRouter.ts
-rg -n "newBrowserCDPSession|Debugger\.enable" src/browser src/modules/browser/browser.ts src/index.ts
+rg -n "newBrowserCDPSession|Debugger\.enable" src/modules/browser/browser.ts src/modules/browser src/index.ts
 ```
 
 Expected:
