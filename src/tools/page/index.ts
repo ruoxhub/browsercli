@@ -62,3 +62,4 @@ export type {
   LoadSessionStateResult,
   CheckBrowserHealthResult,
 } from './types.js';
+export {detectCaptcha} from './detectCaptcha.js';

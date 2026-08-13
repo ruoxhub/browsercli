@@ -468,6 +468,10 @@ export const GENERATED_TOOL_REGISTRY = [
     handlerName: 'checkBrowserHealth',
   },
   {
+    modulePath: './page/detectCaptcha.js',
+    handlerName: 'detectCaptcha',
+  },
+  {
     modulePath: './performance/startPerformanceTrace.js',
     handlerName: 'startPerformanceTrace',
   },

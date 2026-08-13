@@ -25,5 +25,6 @@ export const manifest = {
       modulePath: './page/checkBrowserHealth.js',
       handlerName: 'checkBrowserHealth',
     },
+    {modulePath: './page/detectCaptcha.js', handlerName: 'detectCaptcha'},
   ],
 } satisfies DomainManifest;
