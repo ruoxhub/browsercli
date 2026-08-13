@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+  <body>
+    <script>
+      window.workerReady = new Promise(resolve => {
+        window.worker = new Worker('/worker.js');
+        window.worker.onmessage = event => event.data === 'ready' && resolve();
+      });
+      const blob = new Blob(
+        [
+          "self.__blobWorkerMarker = 'blob-worker-before-dump'; self.postMessage('ready');",
+        ],
+        {type: 'text/javascript'},
+      );
+      window.blobWorkerReady = new Promise(resolve => {
+        window.blobWorker = new Worker(URL.createObjectURL(blob));
+        window.blobWorker.onmessage = event =>
+          event.data === 'ready' && resolve();
+      });
+      window.sharedWorkerReady = new Promise(resolve => {
+        window.sharedWorker = new SharedWorker('/shared-worker.js');
+        window.sharedWorker.port.onmessage = event =>
+          event.data === 'ready' && resolve();
+        window.sharedWorker.port.start();
+      });
+      window.serviceWorkerReady = navigator.serviceWorker
+        .register('/service-worker.js')
+        .then(() => navigator.serviceWorker.ready);
+    </script>
+  </body>
+</html>
