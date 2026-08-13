@@ -521,7 +521,7 @@ const SCRIPT_TARGET_TYPES = new Set([
 ```
 
 `getBrowser()` 返回 null、断连或非 Chromium 时分别给出明确错误。`listTargets()` 只调用 `Target.getTargets`，结果保持 CDP 顺序；不要启动 Target discovery。
-Inspector 对根 Session 的 `Target.getTargets`、`Target.attachToTarget`、
+Inspector 对 `browser.newBrowserCDPSession()` 以及根 Session 的 `Target.getTargets`、`Target.attachToTarget`、
 `Target.detachFromTarget`、`session.detach()` 统一使用有界 timeout wrapper；cleanup 超时只写
 warning，不能阻塞 handler。新增 fake Promise 永不 settle 的 get/attach/detach 测试，证明调用最终
 返回或失败而不会永久挂起。

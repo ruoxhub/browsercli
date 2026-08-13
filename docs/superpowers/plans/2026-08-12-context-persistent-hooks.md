@@ -258,8 +258,8 @@ context.once('close', () => {
 2. `context.isClosed()` 校验。
 3. 计算 hash/entry 候选。
 4. 获取当前 Context Map，并做幂等/冲突检查；同时以 `(context, hookId)` 保存 in-flight
-   reservation。已有相同 hash 的 reservation 直接复用其 Promise，不重复副作用；已有不同
-   hash 或 reservation 中 hash 不同则立即拒绝。
+   reservation。已有相同 hash 的 reservation 共享底层副作用 Promise，但跟随调用必须将结果
+   映射为 `registered:false,idempotent:true`；已有不同 hash 或 reservation 中 hash 不同则立即拒绝。
 5. `await context.addInitScript(script)`，保存返回的 Disposable 句柄供 Context 清理（不暴露给工具）。
 6. 若 await 返回时 Context 已关闭，立即 best-effort `dispose()` 该 late handle，再抛可恢复错误；
    否则把句柄放入 `disposablesByContext`，再检查 WeakMap 中仍是同一个 Map。
