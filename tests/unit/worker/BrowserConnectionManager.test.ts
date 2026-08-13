@@ -65,13 +65,15 @@ describe('BrowserConnectionManager', () => {
     );
 
     const setBrowser = mock.fn();
-    const contextProvider = {setBrowser};
+    const clearContext = mock.fn();
+    const contextProvider = {setBrowser, clearContext};
 
     await disconnectBrowser(contextProvider as never);
 
     assert.strictEqual(resetMock.mock.callCount(), 1);
     assert.strictEqual(setBrowser.mock.callCount(), 1);
     assert.strictEqual(setBrowser.mock.calls[0].arguments[0], null);
+    assert.strictEqual(clearContext.mock.callCount(), 1);
 
     resetMock.mock.restore();
   });

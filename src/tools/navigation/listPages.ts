@@ -37,7 +37,12 @@ export const listPages = defineTool({
       } catch {
         selectedPage = null;
       }
-      const pageInfos: Array<{index: number; url: string; title: string}> = [];
+      const pageInfos: Array<{
+        index: number;
+        pageId: string;
+        url: string;
+        title: string;
+      }> = [];
 
       for (const [index, page] of pages.entries()) {
         let title: string;
@@ -51,19 +56,24 @@ export const listPages = defineTool({
         }
         pageInfos.push({
           index,
+          pageId: context.getPageId(page),
           url: page.url(),
           title,
         });
       }
 
       const selectedIndex = selectedPage ? pages.indexOf(selectedPage) : -1;
+      const selectedPageId =
+        selectedPage && selectedIndex >= 0
+          ? context.getPageId(selectedPage)
+          : null;
 
       if (pageInfos.length === 0) {
         response.setStructuredContent({
           success: true,
           message: '当前没有打开的页面。',
           tooltype: 'list_pages',
-          data: {pageInfos: [], selectedIndex},
+          data: {pageInfos: [], selectedIndex, selectedPageId},
         });
         return;
       }
@@ -71,6 +81,7 @@ export const listPages = defineTool({
       data = {
         pageInfos,
         selectedIndex,
+        selectedPageId,
       };
 
       response.setStructuredContent({

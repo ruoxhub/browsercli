@@ -16,6 +16,10 @@
 import type {Browser, BrowserContext, Dialog, Frame, Page} from 'patchright';
 
 import type {BrowserManager} from '../../modules/browser/index.js';
+import type {
+  PageSelector,
+  ResolvedPage,
+} from '../../modules/browser/PageIdentity.js';
 
 const DEFAULT_TIMEOUT = 5_000;
 const NAVIGATION_TIMEOUT = 10_000;
@@ -43,6 +47,9 @@ export class BrowserContextProvider {
   private selectedPage: Page | null = null;
   private selectedFrame: Frame | null = null;
   private pagesList: Page[] = [];
+  private pageIds = new WeakMap<Page, string>();
+  private readonly pagesById = new Map<string, Page>();
+  private nextPageId = 1;
 
   private _dialog?: Dialog;
   private _networkConditionsMap = new WeakMap<Page, string>();
@@ -67,7 +74,15 @@ export class BrowserContextProvider {
   }
 
   setContext(context: BrowserContext): void {
+    if (this._context !== context) {
+      this.resetPageIdentityState();
+    }
     this._context = context;
+  }
+
+  clearContext(): void {
+    this._context = null;
+    this.resetPageIdentityState();
   }
 
   getContext(): BrowserContext | null {
@@ -82,28 +97,82 @@ export class BrowserContextProvider {
 
   getPages(): Page[] {
     if (this._context) {
-      this.pagesList = this._context.pages();
+      return this.reconcilePages(this._context.pages());
     }
-    return this.pagesList;
+    return this.reconcilePages(this.pagesList);
   }
 
   setPages(pages: Page[]): void {
-    this.pagesList = pages;
+    this.reconcilePages(pages);
+  }
+
+  getPageId(page: Page): string {
+    const pages = this.getPages();
+    if (!pages.includes(page)) {
+      throw new Error('页面不属于当前 BrowserContext，请重新调用 list_pages');
+    }
+    return this.ensurePageId(page);
+  }
+
+  resolvePage(selector: PageSelector): ResolvedPage {
+    const pages = this.getPages();
+    let pageById: Page | undefined;
+    let pageByIdx: Page | undefined;
+
+    if (selector.pageId !== undefined) {
+      pageById = this.pagesById.get(selector.pageId);
+      if (!pageById) {
+        const state = this.wasIssuedPageId(selector.pageId) ? '已失效' : '未知';
+        throw new Error(
+          `${state}页面 ID ${selector.pageId}，请重新调用 list_pages`,
+        );
+      }
+    }
+
+    if (selector.pageIdx !== undefined) {
+      if (!Number.isInteger(selector.pageIdx) || selector.pageIdx < 0) {
+        throw new Error(`页面索引 ${selector.pageIdx} 必须是非负整数`);
+      }
+      pageByIdx = pages[selector.pageIdx];
+      if (!pageByIdx) {
+        throw new Error(
+          `页面索引 ${selector.pageIdx} 超出范围（共 ${pages.length} 个页面）`,
+        );
+      }
+    }
+
+    if (pageById && pageByIdx && pageById !== pageByIdx) {
+      throw new Error(
+        `pageId ${selector.pageId} 与 pageIdx ${selector.pageIdx} 指向不同页面`,
+      );
+    }
+
+    let page = pageById ?? pageByIdx;
+    if (!page) {
+      if (!selector.fallbackToSelected) {
+        throw new Error('未提供 pageId 或 pageIdx');
+      }
+      page = this.selectedPage ?? undefined;
+      if (!page) {
+        throw new Error('当前没有选中的页面，请先调用 new_page 或 select_page');
+      }
+    }
+
+    const pageIdx = pages.indexOf(page);
+    if (pageIdx < 0) {
+      throw new Error('当前没有选中的页面，请先调用 new_page 或 select_page');
+    }
+    return {page, pageId: this.ensurePageId(page), pageIdx};
   }
 
   getPageByIdx(idx: number): Page {
-    const pages = this.getPages();
-    const page = pages[idx];
-    if (!page) {
-      throw new Error(`页面索引 ${idx} 超出范围 (共 ${pages.length} 个页面)`);
-    }
-    return page;
+    return this.resolvePage({pageIdx: idx}).page;
   }
 
   async newPage(): Promise<Page> {
     if (!this._context) throw new Error('BrowserContext 未初始化');
     const page = await this._context.newPage();
-    this.pagesList = this._context.pages();
+    this.reconcilePages(this._context.pages());
     this.selectPage(page);
     return page;
   }
@@ -114,28 +183,23 @@ export class BrowserContextProvider {
   async syncPages(): Promise<Page[]> {
     const context = this._context;
     if (context) {
-      this.pagesList = context.pages();
+      return this.reconcilePages(context.pages());
     } else {
       const browser = this.getBrowser();
       if (browser) {
-        this.pagesList = browser.contexts().flatMap(ctx => ctx.pages());
+        return this.reconcilePages(
+          browser.contexts().flatMap(ctx => ctx.pages()),
+        );
       }
     }
+    return this.reconcilePages(this.pagesList);
+  }
 
-    if (
-      !this.selectedPage ||
-      this.selectedPage.isClosed() ||
-      this.pagesList.indexOf(this.selectedPage) === -1
-    ) {
-      const firstAvailable = this.pagesList.find(p => !p.isClosed());
-      if (firstAvailable) {
-        this.selectPage(firstAvailable);
-      } else {
-        this.setSelectedPage(null);
-      }
-    }
-
-    return this.pagesList;
+  getSelectedPageIndex(): number | null {
+    const page = this.selectedPage;
+    if (!page) return null;
+    const index = this.getPages().indexOf(page);
+    return index >= 0 ? index : null;
   }
 
   getSelectedPage(): Page | null {
@@ -282,6 +346,7 @@ export class BrowserContextProvider {
 
   dispose(): void {
     this.detachDialogListener();
+    this.clearContext();
     this._networkConditionsMap = new WeakMap();
     this._cpuThrottlingRateMap = new WeakMap();
   }
@@ -296,5 +361,53 @@ export class BrowserContextProvider {
           ...this.getPages().filter(p => p !== this.selectedPage),
         ]
       : this.getPages();
+  }
+
+  private ensurePageId(page: Page): string {
+    let pageId = this.pageIds.get(page);
+    if (!pageId) {
+      pageId = `page-${this.nextPageId++}`;
+      this.pageIds.set(page, pageId);
+    }
+    this.pagesById.set(pageId, page);
+    return pageId;
+  }
+
+  private reconcilePages(pages: Page[]): Page[] {
+    const activePages = pages.filter(page => !page.isClosed());
+    const activeSet = new Set(activePages);
+    for (const page of activePages) {
+      this.ensurePageId(page);
+    }
+    for (const [pageId, page] of this.pagesById) {
+      if (!activeSet.has(page)) {
+        this.pagesById.delete(pageId);
+      }
+    }
+    this.pagesList = activePages;
+
+    if (!this.selectedPage || !activeSet.has(this.selectedPage)) {
+      const firstAvailable = activePages[0];
+      if (firstAvailable) {
+        this.setSelectedPage(firstAvailable);
+      } else {
+        this.setSelectedPage(null);
+      }
+    }
+    return this.pagesList;
+  }
+
+  private wasIssuedPageId(pageId: string): boolean {
+    const match = /^page-(\d+)$/.exec(pageId);
+    if (!match) return false;
+    const value = Number(match[1]);
+    return value >= 1 && value < this.nextPageId;
+  }
+
+  private resetPageIdentityState(): void {
+    this.pageIds = new WeakMap();
+    this.pagesById.clear();
+    this.pagesList = [];
+    this.setSelectedPage(null);
   }
 }

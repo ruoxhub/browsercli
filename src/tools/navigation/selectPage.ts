@@ -25,12 +25,33 @@ export const selectPage = defineTool({
     readOnlyHint: false,
   },
   schema: {
-    pageIdx: zod.number().int().describe('页面索引（从 list_pages 获取）.'),
+    pageId: zod
+      .string()
+      .min(1)
+      .optional()
+      .describe('稳定页面 ID（从 list_pages 获取）。'),
+    pageIdx: zod
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe('兼容页面索引（从 list_pages 获取）。'),
   },
   handler: async (request, response, context) => {
-    const {pageIdx} = request.params;
+    const {pageId, pageIdx} = request.params;
 
-    const page = context.getPageByIdx(pageIdx);
+    if (pageId === undefined && pageIdx === undefined) {
+      response.setStructuredContent({
+        success: false,
+        message: '请至少提供 pageId 或 pageIdx',
+        tooltype: 'select_page',
+        data: {},
+      });
+      return;
+    }
+
+    const resolved = context.resolvePage({pageId, pageIdx});
+    const page = resolved.page;
     await context.bringPageToFront(page);
     context.selectPage(page);
     context.syncPageContext(page);
@@ -39,7 +60,7 @@ export const selectPage = defineTool({
     try {
       title = await withOperationTimeout(
         page.title(),
-        `读取页面 ${pageIdx} 标题`,
+        `读取页面 ${resolved.pageIdx} 标题`,
       );
     } catch (error) {
       title = `[unavailable] ${normalizeBrowserRuntimeError(error)}`;
@@ -47,10 +68,11 @@ export const selectPage = defineTool({
 
     response.setStructuredContent({
       success: true,
-      message: `已选择页面 ${pageIdx}`,
+      message: `已选择页面 ${resolved.pageIdx}`,
       tooltype: 'select_page',
       data: {
-        selectedIndex: pageIdx,
+        selectedIndex: resolved.pageIdx,
+        selectedPageId: resolved.pageId,
         url: page.url(),
         title,
       },

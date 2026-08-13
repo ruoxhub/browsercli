@@ -23,9 +23,12 @@ export const clearNetworkRequests = defineTool({
       .int()
       .min(0)
       .optional()
-      .describe(
-        '浏览器页面索引。省略时使用当前活动页面。',
-      ),
+      .describe('浏览器页面索引。省略时使用当前活动页面。'),
+    targetPageId: zod
+      .string()
+      .min(1)
+      .optional()
+      .describe('稳定浏览器页面 ID。可与 targetPageIdx 同时提供以校验一致性。'),
   },
   handler: async (request, response) => {
     const result = getRuntime().networkModule.clearRequests(

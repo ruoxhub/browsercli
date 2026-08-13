@@ -46,8 +46,8 @@ export type ListPagesParams = object;
 
 /** selectPage 参数 */
 export interface SelectPageParams {
-  /** 页面索引（从 listPages 获取） */
-  pageIdx: number;
+  pageId?: string;
+  pageIdx?: number;
 }
 
 /** newPage 参数 */
@@ -76,6 +76,7 @@ export interface NavigatePageParams {
 export interface PageInfo {
   /** 页面索引 */
   index: number;
+  pageId: string;
   /** 页面 URL */
   url: string;
   /** 页面标题 */
@@ -84,13 +85,15 @@ export interface PageInfo {
 
 /** listPages 返回数据 */
 export interface ListPagesData {
-  pages: PageInfo[];
+  pageInfos: PageInfo[];
   selectedIndex: number;
+  selectedPageId: string | null;
 }
 
 /** selectPage 返回数据 */
 export interface SelectPageData {
   selectedIndex: number;
+  selectedPageId: string;
   url: string;
   title: string;
 }
@@ -98,6 +101,7 @@ export interface SelectPageData {
 /** newPage 返回数据 */
 export interface NewPageData {
   index: number;
+  pageId: string;
   url: string;
   title: string;
 }

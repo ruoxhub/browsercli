@@ -29,12 +29,17 @@ describe('listPages tool local verification', () => {
       success: boolean;
       message: string;
       tooltype: string;
-      data: {pageInfos: unknown[]; selectedIndex: number};
+      data: {
+        pageInfos: unknown[];
+        selectedIndex: number;
+        selectedPageId: string | null;
+      };
     };
     assert.strictEqual(structured.success, true);
     assert.match(structured.message, /当前没有打开的页面/);
     assert.strictEqual(structured.tooltype, 'list_pages');
     assert.ok(Array.isArray(structured.data.pageInfos));
     assert.strictEqual(structured.data.pageInfos.length, 0);
+    assert.strictEqual(structured.data.selectedPageId, null);
   });
 });

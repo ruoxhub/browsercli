@@ -59,4 +59,5 @@ export async function disconnectBrowser(
 ): Promise<void> {
   await BrowserManager.resetInstance();
   contextProvider.setBrowser(null);
+  contextProvider.clearContext();
 }

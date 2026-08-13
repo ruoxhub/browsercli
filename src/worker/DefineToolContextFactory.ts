@@ -34,6 +34,8 @@ export class DefineToolContextFactory {
       getDialog: () => provider.getDialog(),
       clearDialog: () => provider.clearDialog(),
       getPageByIdx: idx => provider.getPageByIdx(idx),
+      getPageId: page => provider.getPageId(page),
+      resolvePage: selector => provider.resolvePage(selector),
       isPageSelected: page => provider.getSelectedPage() === page,
       newPage: () => provider.newPage(),
       closePage: async (pageIdx: number) => {

@@ -16,6 +16,7 @@
  */
 
 import type {TrafficSummary} from '../../formatters/websocketFormatter.js';
+import type {PageSelector, ResolvedPage} from '../browser/PageIdentity.js';
 import type {HTTPRequest, Page, ResourceType} from '../../third_party/index.js';
 
 // ─── 可过滤的资源类型 ──────────────────────────────────
@@ -53,6 +54,7 @@ export const FILTERABLE_RESOURCE_TYPES: [ResourceType, ...ResourceType[]] = [
  * 后者方法名不同且只暴露部分 API）。
  */
 export interface NetworkServices {
+  resolvePage(selector: PageSelector): ResolvedPage;
   /** 获取所有已打开的页面 */
   getPages(): Page[];
   /** 获取当前选中的页面（无选中时返回 null） */
@@ -64,6 +66,10 @@ export interface NetworkServices {
     includePreservedRequests?: boolean,
     pageIdx?: number,
   ): HTTPRequest[];
+  getNetworkRequestsForPage(
+    page: Page,
+    includePreservedRequests?: boolean,
+  ): HTTPRequest[];
   /** 通过稳定 ID 获取单条网络请求 */
   getNetworkRequestById(reqid: number): HTTPRequest;
   /** 获取请求的稳定 ID */
@@ -72,6 +78,7 @@ export interface NetworkServices {
   getRequestInitiator(request: HTTPRequest): RequestInitiator | undefined;
   /** 清空指定页面的网络请求缓存 */
   clearNetworkRequests(pageIdx?: number): void;
+  clearNetworkRequestsForPage(page: Page): void;
   /** 获取所有 WebSocket 连接 */
   getWebSocketConnections(includePreservedData?: boolean): WebSocketData[];
   /** 通过稳定 ID 获取 WebSocket 连接 */
@@ -165,6 +172,7 @@ export interface ListNetworkRequestsParams {
   pageIdx?: number;
   /** 浏览器页面索引，省略时使用当前活跃页 */
   targetPageIdx?: number;
+  targetPageId?: string;
   /** 按资源类型过滤 */
   resourceTypes?: ResourceType[];
   /** 是否包含最近 3 次导航的保留请求 */
@@ -191,6 +199,7 @@ export interface GetNetworkRequestParams {
 
 /** clearNetworkRequests 参数 */
 export interface ClearNetworkRequestsParams {
+  targetPageId?: string;
   /** 浏览器页面索引，省略时使用当前活跃页 */
   targetPageIdx?: number;
 }
@@ -215,6 +224,7 @@ export interface ListNetworkRequestsData {
   pageIdx: number;
   /** 实际使用的浏览器页面索引 */
   targetPageIdx: number;
+  targetPageId: string | null;
   pageSize: number | undefined;
   /** 是否因等待请求超时而提前返回 */
   timedOut?: boolean;
@@ -237,6 +247,7 @@ export interface ClearNetworkRequestsData {
   clearedCount: number;
   /** 实际清空的浏览器页面索引 */
   targetPageIdx: number;
+  targetPageId: string | null;
 }
 
 /** getNetworkRequest 返回数据（完整详情） */

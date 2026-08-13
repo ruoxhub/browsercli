@@ -27,7 +27,8 @@ import {
   formatWebSocketFrameDetail,
   type TrafficSummary,
 } from '../../formatters/websocketFormatter.js';
-import type {HTTPRequest, ResourceType} from '../../third_party/index.js';
+import type {HTTPRequest, Page, ResourceType} from '../../third_party/index.js';
+import type {ResolvedPage} from '../browser/PageIdentity.js';
 
 import type {
   AnalyzeWebSocketMessagesData,
@@ -118,6 +119,7 @@ function emptyPageData(
   pageIdx: number,
   pageSize: number | undefined,
   targetPageIdx: number,
+  targetPageId: string | null,
   extra: Partial<ListNetworkRequestsData> = {},
 ): ListNetworkRequestsData {
   return {
@@ -126,6 +128,7 @@ function emptyPageData(
     pageIdx,
     pageSize,
     targetPageIdx,
+    targetPageId,
     timedOut: false,
     ...extra,
   };
@@ -194,27 +197,17 @@ export class NetworkModule {
   /** 流量摘要缓存：wsid -> TrafficSummary。统一 analyze/getMessages 两路读写。 */
   private readonly trafficSummaryCache = new Map<number, TrafficSummary>();
 
-  // ─── 页面索引解析 ────────────────────────────────────
-
-  private resolvePageIdx(
+  private resolveTargetPage(
     services: NetworkServices,
-  ): {ok: true; pageIdx: number} | {ok: false; message: string} {
-    const selected = services.getSelectedPage();
-    if (!selected) {
-      return {ok: false, message: NO_ACTIVE_PAGE_MESSAGE};
-    }
-    if (typeof services.getSelectedPageIndex === 'function') {
-      const idx = services.getSelectedPageIndex();
-      if (typeof idx === 'number' && idx >= 0) {
-        return {ok: true, pageIdx: idx};
-      }
-    }
-    const pages = services.getPages();
-    const idx = pages.findIndex(p => p === selected);
-    if (idx >= 0) {
-      return {ok: true, pageIdx: idx};
-    }
-    return {ok: false, message: NO_ACTIVE_PAGE_MESSAGE};
+    selector: {targetPageId?: string; targetPageIdx?: number},
+  ): ResolvedPage {
+    return services.resolvePage({
+      pageId: selector.targetPageId,
+      pageIdx: selector.targetPageIdx,
+      fallbackToSelected:
+        selector.targetPageId === undefined &&
+        selector.targetPageIdx === undefined,
+    });
   }
 
   // ─── Network Requests ──────────────────────────────
@@ -226,36 +219,26 @@ export class NetworkModule {
     services: NetworkServices,
     params: ListNetworkRequestsParams,
   ): Promise<NetworkMethodResult<ListNetworkRequestsData>> {
+    let resolved: ResolvedPage | null = null;
     try {
       const resultPageIdx = params.pageIdx ?? 0;
       const pageSize = params.pageSize;
-      let targetPageIdx = params.targetPageIdx ?? 0;
-
       const includePreserved = params.includePreservedRequests ?? false;
-      if (params.targetPageIdx === undefined) {
-        const resolved = this.resolvePageIdx(services);
-        if ('message' in resolved) {
-          return {
-            success: false,
-            message: resolved.message,
-            data: emptyPageData(resultPageIdx, pageSize, 0),
-          };
-        }
-        targetPageIdx = resolved.pageIdx;
-      }
+      resolved = this.resolveTargetPage(services, params);
+      const {page, pageId: targetPageId, pageIdx: targetPageIdx} = resolved;
 
       if (params.waitForRequest) {
         const matched = await this.waitForMatchingRequest(services, {
           includePreservedRequests: includePreserved,
-          targetPageIdx,
+          targetPage: page,
           waitForRequest: params.waitForRequest,
           waitTimeoutMs: params.waitTimeoutMs,
         });
         if (!matched) {
           const timeoutMs = params.waitTimeoutMs ?? DEFAULT_WAIT_TIMEOUT_MS;
-          let timedOutRequests = services.getNetworkRequests(
+          let timedOutRequests = services.getNetworkRequestsForPage(
+            page,
             includePreserved,
-            targetPageIdx,
           );
           timedOutRequests = timedOutRequests.filter(request =>
             request.url().includes(params.waitForRequest!),
@@ -275,7 +258,12 @@ export class NetworkModule {
                 ? `等待请求超时（${timeoutMs}ms），但发现 ${timedOutData.length} 个历史匹配 ${params.waitForRequest} 的请求`
                 : `等待请求超时：${timeoutMs}ms 内未发现匹配 ${params.waitForRequest} 的请求`,
             data: {
-              ...emptyPageData(resultPageIdx, pageSize, targetPageIdx),
+              ...emptyPageData(
+                resultPageIdx,
+                pageSize,
+                targetPageIdx,
+                targetPageId,
+              ),
               requests: timedOutData,
               total: timedOutData.length,
               timedOut: true,
@@ -285,10 +273,7 @@ export class NetworkModule {
         }
       }
 
-      let requests = services.getNetworkRequests(
-        includePreserved,
-        targetPageIdx,
-      );
+      let requests = services.getNetworkRequestsForPage(page, includePreserved);
 
       if (params.resourceTypes?.length) {
         const normalizedTypes = new Set(params.resourceTypes);
@@ -330,6 +315,7 @@ export class NetworkModule {
         total,
         pageIdx: resultPageIdx,
         targetPageIdx,
+        targetPageId,
         pageSize,
         timedOut: false,
         ...(params.includeSignatureEvidence
@@ -348,10 +334,19 @@ export class NetworkModule {
         data,
       };
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       return {
         success: false,
-        message: `列出请求失败：${error instanceof Error ? error.message : String(error)}`,
-        data: emptyPageData(params.pageIdx ?? 0, params.pageSize, 0),
+        message:
+          message === NO_ACTIVE_PAGE_MESSAGE
+            ? message
+            : `列出请求失败：${message}`,
+        data: emptyPageData(
+          params.pageIdx ?? 0,
+          params.pageSize,
+          resolved?.pageIdx ?? 0,
+          resolved?.pageId ?? null,
+        ),
       };
     }
   }
@@ -360,7 +355,7 @@ export class NetworkModule {
     services: NetworkServices,
     options: {
       includePreservedRequests: boolean;
-      targetPageIdx: number;
+      targetPage: Page;
       waitForRequest: string;
       waitTimeoutMs?: number;
     },
@@ -369,9 +364,9 @@ export class NetworkModule {
     const deadline = Date.now() + timeoutMs;
 
     while (true) {
-      const requests = services.getNetworkRequests(
+      const requests = services.getNetworkRequestsForPage(
+        options.targetPage,
         options.includePreservedRequests,
-        options.targetPageIdx,
       );
       const hasMatch = requests.some(request =>
         request.url().includes(options.waitForRequest),
@@ -480,23 +475,12 @@ export class NetworkModule {
     services: NetworkServices,
     params: ClearNetworkRequestsParams,
   ): NetworkMethodResult<ClearNetworkRequestsData> {
+    let resolved: ResolvedPage | null = null;
     try {
-      let targetPageIdx = params.targetPageIdx ?? 0;
-
-      if (params.targetPageIdx === undefined) {
-        const resolved = this.resolvePageIdx(services);
-        if ('message' in resolved) {
-          return {
-            success: false,
-            message: resolved.message,
-            data: {clearedCount: 0, targetPageIdx: 0},
-          };
-        }
-        targetPageIdx = resolved.pageIdx;
-      }
-
-      const before = services.getNetworkRequests(false, targetPageIdx);
-      services.clearNetworkRequests(targetPageIdx);
+      resolved = this.resolveTargetPage(services, params);
+      const {page, pageId: targetPageId, pageIdx: targetPageIdx} = resolved;
+      const before = services.getNetworkRequestsForPage(page, false);
+      services.clearNetworkRequestsForPage(page);
 
       return {
         success: true,
@@ -504,13 +488,21 @@ export class NetworkModule {
           before.length > 0
             ? `已清空页面 ${targetPageIdx} 的 ${before.length} 个网络请求`
             : `页面 ${targetPageIdx} 当前没有可清空的网络请求`,
-        data: {clearedCount: before.length, targetPageIdx},
+        data: {clearedCount: before.length, targetPageIdx, targetPageId},
       };
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       return {
         success: false,
-        message: `清空请求失败：${error instanceof Error ? error.message : String(error)}`,
-        data: {clearedCount: 0, targetPageIdx: params.targetPageIdx ?? 0},
+        message:
+          message === NO_ACTIVE_PAGE_MESSAGE
+            ? message
+            : `清空请求失败：${message}`,
+        data: {
+          clearedCount: 0,
+          targetPageIdx: resolved?.pageIdx ?? params.targetPageIdx ?? 0,
+          targetPageId: resolved?.pageId ?? null,
+        },
       };
     }
   }

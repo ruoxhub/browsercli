@@ -6,6 +6,10 @@
 
 import type {TrafficSummary} from '../formatters/websocketFormatter.js';
 import type {DebuggerManager} from '../modules/debugger/DebuggerManager.js';
+import type {
+  PageSelector,
+  ResolvedPage,
+} from '../modules/browser/PageIdentity.js';
 import type {BrowserTargetInspector} from '../modules/browser/BrowserTargetInspector.js';
 import type {
   RequestInitiator,
@@ -104,6 +108,8 @@ export type Context = Readonly<{
   getDialog(): Dialog | undefined;
   clearDialog(): void;
   getPageByIdx(idx: number): Page;
+  getPageId(page: Page): string;
+  resolvePage(selector: PageSelector): ResolvedPage;
   isPageSelected(page: Page): boolean;
   newPage(): Promise<Page>;
   closePage(pageIdx: number): Promise<void>;

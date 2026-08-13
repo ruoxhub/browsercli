@@ -17,6 +17,10 @@ import {
   BrowserTargetInspector,
   type BrowserManager,
 } from '../modules/browser/index.js';
+import type {
+  PageSelector,
+  ResolvedPage,
+} from '../modules/browser/PageIdentity.js';
 import type {DebuggerManager} from '../modules/debugger/DebuggerManager.js';
 import type {
   RequestInitiator,
@@ -138,6 +142,10 @@ export class ToolContextProvider {
     this._collectorContext.start(context);
   }
 
+  clearContext(): void {
+    this._browserContext.clearContext();
+  }
+
   getContext(): BrowserContext | null {
     return this._browserContext.getContext();
   }
@@ -199,11 +207,13 @@ export class ToolContextProvider {
     const page = this.getSelectedPage();
     const pages = this.getPages();
     const tabIndex = page ? pages.indexOf(page) : null;
+    const pageId =
+      page && tabIndex !== null && tabIndex >= 0 ? this.getPageId(page) : null;
     return {
       url: page?.url() ?? null,
       title: null,
       tabIndex,
-      pageId: tabIndex === null || tabIndex < 0 ? null : String(tabIndex),
+      pageId,
     };
   }
 
@@ -217,6 +227,18 @@ export class ToolContextProvider {
 
   getPageByIdx(idx: number): Page {
     return this._browserContext.getPageByIdx(idx);
+  }
+
+  getPageId(page: Page): string {
+    return this._browserContext.getPageId(page);
+  }
+
+  resolvePage(selector: PageSelector): ResolvedPage {
+    return this._browserContext.resolvePage(selector);
+  }
+
+  getSelectedPageIndex(): number | null {
+    return this._browserContext.getSelectedPageIndex();
   }
 
   async newPage(): Promise<Page> {
@@ -323,6 +345,16 @@ export class ToolContextProvider {
     );
   }
 
+  getNetworkRequestsForPage(
+    page: Page,
+    includePreservedRequests?: boolean,
+  ): HTTPRequest[] {
+    return this._collectorContext.getNetworkRequests(
+      page,
+      includePreservedRequests,
+    );
+  }
+
   getNetworkRequestById(reqid: number): HTTPRequest {
     return this._collectorContext.getNetworkRequestById(
       this._browserContext.getCandidatePages(),
@@ -332,6 +364,10 @@ export class ToolContextProvider {
 
   clearNetworkRequests(pageIdx?: number): void {
     const page = this._resolveNetworkPage(pageIdx);
+    this._collectorContext.clearNetworkRequests(page);
+  }
+
+  clearNetworkRequestsForPage(page: Page): void {
     this._collectorContext.clearNetworkRequests(page);
   }
 

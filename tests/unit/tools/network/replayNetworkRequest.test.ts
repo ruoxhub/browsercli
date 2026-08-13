@@ -79,15 +79,18 @@ function createMockServices(
     context: () => ({request: overrides.apiCtx ?? defaultApiCtx}),
   };
   return {
+    resolvePage: () => ({page: page as any, pageId: 'page-1', pageIdx: 0}),
     getPages: () => [page as any],
     getSelectedPage: () => page as any,
     getNetworkRequests: () => [],
+    getNetworkRequestsForPage: () => [],
     getNetworkRequestById:
       overrides.getRequestById ?? (() => createMockRequest() as any),
     getNetworkRequestStableId: () => 1,
     getRequestInitiator: () => undefined,
     // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     clearNetworkRequests: () => {},
+    clearNetworkRequestsForPage: () => {},
     getWebSocketConnections: () => [],
     getWebSocketConnectionById: () =>
       ({

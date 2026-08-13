@@ -33,12 +33,21 @@ function createRequest(
 }
 
 function createMockServices(services: {
+  resolvePage?: (selector: {
+    pageId?: string;
+    pageIdx?: number;
+    fallbackToSelected?: boolean;
+  }) => {page: unknown; pageId: string; pageIdx: number};
   getPages?: () => unknown[];
   getSelectedPage?: () => unknown | null;
   getSelectedPageIndex?: () => number | null;
   getNetworkRequests?: (
     includePreserved?: boolean,
     pageIdx?: number,
+  ) => unknown[];
+  getNetworkRequestsForPage?: (
+    page: unknown,
+    includePreserved?: boolean,
   ) => unknown[];
   getNetworkRequestById?: (reqid: number) => unknown;
   getNetworkRequestStableId?: (request: unknown) => number;
@@ -47,16 +56,40 @@ function createMockServices(services: {
   resolveCdpRequestId?: (cdpRequestId: string) => number | undefined;
 }): NetworkServices {
   return {
+    resolvePage:
+      services.resolvePage ??
+      (selector => {
+        const pages = services.getPages?.() ?? [];
+        const pageIdx =
+          selector.pageIdx ??
+          services.getSelectedPageIndex?.() ??
+          pages.indexOf(services.getSelectedPage?.());
+        const page = pages[pageIdx];
+        if (!page) throw new Error(NO_ACTIVE_PAGE_MESSAGE);
+        return {page, pageId: `page-${pageIdx + 1}`, pageIdx};
+      }),
     getPages: services.getPages ?? (() => []),
     getSelectedPage: services.getSelectedPage ?? (() => null),
     getSelectedPageIndex: services.getSelectedPageIndex,
     getNetworkRequests: services.getNetworkRequests ?? (() => []),
+    getNetworkRequestsForPage:
+      services.getNetworkRequestsForPage ??
+      ((page, includePreserved) => {
+        const pages = services.getPages?.() ?? [];
+        return (
+          services.getNetworkRequests?.(
+            includePreserved,
+            pages.indexOf(page),
+          ) ?? []
+        );
+      }),
     getNetworkRequestById:
       services.getNetworkRequestById ?? (() => ({}) as any),
     getNetworkRequestStableId: services.getNetworkRequestStableId ?? (() => 0),
     getRequestInitiator: services.getRequestInitiator ?? (() => undefined),
     // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     clearNetworkRequests: () => {},
+    clearNetworkRequestsForPage: () => {},
     getWebSocketConnections: () => [],
     getWebSocketConnectionById: () =>
       ({
@@ -101,9 +134,10 @@ describe('listNetworkRequests', () => {
 
   it('uses targetPageIdx for browser page selection', async () => {
     const requestedPageIndexes: Array<number | undefined> = [];
+    const pages = [{id: 0}, {id: 1}, {id: 2}, {id: 3}];
 
     const services = createMockServices({
-      getPages: () => [],
+      getPages: () => pages,
       getSelectedPage: () => null,
       getSelectedPageIndex: () => null,
       getNetworkRequests: (_includePreserved, pageIdx) => {
@@ -250,6 +284,36 @@ describe('listNetworkRequests', () => {
       result.data.requests[0]?.url,
       'https://example.test/api/v4/feed',
     );
+  });
+
+  it('pins the resolved Page while waiting even if page order changes', async () => {
+    const firstPage = {id: 'first'};
+    const targetPage = {id: 'target'};
+    const matchingRequest = createRequest('https://example.test/pinned');
+    let pages = [firstPage, targetPage];
+    let reads = 0;
+    const services = createMockServices({
+      getPages: () => pages,
+      resolvePage: () => ({page: targetPage, pageId: 'page-2', pageIdx: 1}),
+      getNetworkRequestsForPage: page => {
+        assert.equal(page, targetPage);
+        reads += 1;
+        pages = [targetPage, firstPage];
+        return reads > 1 ? [matchingRequest] : [];
+      },
+      getNetworkRequestStableId: () => 700,
+    });
+
+    const result = await networkModule.listRequests(services, {
+      targetPageId: 'page-2',
+      waitForRequest: '/pinned',
+      waitTimeoutMs: 150,
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(result.data.targetPageIdx, 1);
+    assert.equal(result.data.targetPageId, 'page-2');
+    assert.equal(result.data.requests[0]?.reqid, 700);
   });
 
   it('returns timeout failure immediately when waitTimeoutMs is 0', async () => {

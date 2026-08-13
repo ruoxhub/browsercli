@@ -30,6 +30,11 @@ function createRequest(url: string): TestRequest {
 }
 
 function createMockServices(services: {
+  resolvePage?: (selector: {
+    pageId?: string;
+    pageIdx?: number;
+    fallbackToSelected?: boolean;
+  }) => {page: unknown; pageId: string; pageIdx: number};
   getPages?: () => unknown[];
   getSelectedPage?: () => unknown | null;
   getSelectedPageIndex?: () => number | null;
@@ -38,17 +43,51 @@ function createMockServices(services: {
     pageIdx?: number,
   ) => unknown[];
   clearNetworkRequests?: (pageIdx?: number) => void;
+  clearNetworkRequestsForPage?: (page: unknown) => void;
 }): NetworkServices {
   return {
+    resolvePage:
+      services.resolvePage ??
+      (selector => {
+        const pages = services.getPages?.() ?? [];
+        const pageIdx =
+          selector.pageIdx ??
+          services.getSelectedPageIndex?.() ??
+          pages.indexOf(services.getSelectedPage?.());
+        const page = pages[pageIdx];
+        if (!page && selector.pageIdx !== undefined)
+          return {page: {id: pageIdx}, pageId: `page-${pageIdx + 1}`, pageIdx};
+        if (!page) throw new Error(NO_ACTIVE_PAGE_MESSAGE);
+        return {page, pageId: `page-${pageIdx + 1}`, pageIdx};
+      }),
     getPages: services.getPages ?? (() => []),
     getSelectedPage: services.getSelectedPage ?? (() => null),
     getSelectedPageIndex: services.getSelectedPageIndex,
     getNetworkRequests: services.getNetworkRequests ?? (() => []),
+    getNetworkRequestsForPage: (page, includePreserved) => {
+      const pages = services.getPages?.() ?? [];
+      const pageIdx = pages.indexOf(page);
+      return (
+        services.getNetworkRequests?.(
+          includePreserved,
+          pageIdx >= 0 ? pageIdx : (page as any).id,
+        ) ?? []
+      );
+    },
     getNetworkRequestById: () => ({}) as any,
     getNetworkRequestStableId: () => 1,
     getRequestInitiator: () => undefined,
     // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     clearNetworkRequests: services.clearNetworkRequests ?? (() => {}),
+    clearNetworkRequestsForPage:
+      services.clearNetworkRequestsForPage ??
+      (page => {
+        const pages = services.getPages?.() ?? [];
+        const pageIdx = pages.indexOf(page);
+        services.clearNetworkRequests?.(
+          pageIdx >= 0 ? pageIdx : (page as any).id,
+        );
+      }),
     getWebSocketConnections: () => [],
     getWebSocketConnectionById: () =>
       ({

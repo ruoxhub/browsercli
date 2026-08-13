@@ -132,8 +132,20 @@ describe('ToolContextProvider', () => {
 
   it('reads network requests from the requested page index', () => {
     const runtime = new ToolContextProvider();
-    const selectedPage = {id: 'selected', mainFrame: () => null};
-    const targetPage = {id: 'target', mainFrame: () => null};
+    const selectedPage = {
+      id: 'selected',
+      isClosed: () => false,
+      mainFrame: () => null,
+      url: () => 'selected',
+      on: () => undefined,
+    };
+    const targetPage = {
+      id: 'target',
+      isClosed: () => false,
+      mainFrame: () => null,
+      url: () => 'target',
+      on: () => undefined,
+    };
     const selectedRequest = {url: () => 'https://example.test/selected'};
     const targetRequest = {url: () => 'https://example.test/target'};
 
@@ -154,5 +166,40 @@ describe('ToolContextProvider', () => {
     assert.deepStrictEqual(requests, [targetRequest]);
     assert.equal(runtime.getNetworkRequestStableId(targetRequest), 2);
     assert.equal(runtime.getNetworkRequestById(2), targetRequest);
+    assert.deepStrictEqual(
+      runtime.getNetworkRequestsForPage(targetPage as never, false),
+      [targetRequest],
+    );
+    runtime.clearNetworkRequestsForPage(targetPage as never);
+    assert.deepStrictEqual(
+      runtime.getNetworkRequestsForPage(targetPage as never, false),
+      [],
+    );
+  });
+
+  it('keeps context pageId stable while tabIndex follows reordering', () => {
+    const runtime = new ToolContextProvider();
+    const first = {
+      isClosed: () => false,
+      mainFrame: () => null,
+      url: () => 'first',
+      on: () => undefined,
+    };
+    const selected = {
+      isClosed: () => false,
+      mainFrame: () => null,
+      url: () => 'selected',
+      on: () => undefined,
+    };
+
+    runtime.setPages([first as never, selected as never]);
+    runtime.setSelectedPage(selected as never);
+    const stableId = runtime.getContextMeta().pageId;
+    runtime.setPages([selected as never, first as never]);
+
+    assert.equal(runtime.getContextMeta().pageId, stableId);
+    assert.equal(runtime.getContextMeta().tabIndex, 0);
+    assert.equal(runtime.resolvePage({pageId: stableId!}).page, selected);
+    assert.equal(runtime.getSelectedPageIndex(), 0);
   });
 });

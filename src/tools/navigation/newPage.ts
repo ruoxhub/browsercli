@@ -20,8 +20,7 @@ const DEFAULT_NAV_TIMEOUT = 10_000;
  */
 export const newPage = defineTool({
   name: 'new_page',
-  description:
-    '创建新的浏览器页面并导航到指定 URL，新页面会自动被选中。',
+  description: '创建新的浏览器页面并导航到指定 URL，新页面会自动被选中。',
   annotations: {
     title: '新建页面',
     category: ToolCategory.NAVIGATION,
@@ -72,6 +71,7 @@ export const newPage = defineTool({
       const pages = context.getPages();
       const index = pages.indexOf(page);
       const pageIndex = index >= 0 ? index : pages.length - 1;
+      const pageId = context.getPageId(page);
 
       response.setStructuredContent({
         success: true,
@@ -79,6 +79,7 @@ export const newPage = defineTool({
         tooltype: 'new_page',
         data: {
           index: pageIndex,
+          pageId,
           url: page.url(),
           title: await page.title(),
         },

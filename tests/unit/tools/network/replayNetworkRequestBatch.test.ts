@@ -62,15 +62,20 @@ function createMockServices(
   };
   const page = {context: () => ({request: requestObj})};
   const services = {
+    resolvePage: () => {
+      throw new Error('unused');
+    },
     getPages: () => [page as any],
     getSelectedPage: () => page as any,
     getNetworkRequests: () => [],
+    getNetworkRequestsForPage: () => [],
     getNetworkRequestById:
       opts.getRequestById ?? (() => createMockRequest() as any),
     getNetworkRequestStableId: () => 1,
     getRequestInitiator: () => undefined,
     // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     clearNetworkRequests: () => {},
+    clearNetworkRequestsForPage: () => {},
     getWebSocketConnections: () => [],
     getWebSocketConnectionById: () =>
       ({
