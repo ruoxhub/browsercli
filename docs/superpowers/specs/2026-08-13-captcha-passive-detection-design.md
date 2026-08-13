@@ -65,7 +65,7 @@
 
 ### 5.3 执行隔离
 
-发现阶段曾在确认许可证边界前打开参考实现。为保持 clean-room 过程，生产代码和测试的实现必须在新的、未读取参考实现的执行上下文中进行；该上下文只接收本规格、后续实现计划和当前仓库代码。当前会话可以完成规格与实现计划，但不直接编写生产实现。
+发现阶段曾在确认许可证边界前打开参考实现。为保持 clean-room 过程，生产代码和测试的实现必须在新的、未读取参考实现的执行上下文中进行；该上下文只接收本规格、后续实现计划和当前仓库代码。当前会话可以完成规格与实现计划，但不直接编写生产实现。执行使用新的隔离 git worktree，避免当前工作区的未提交修改进入 CAPTCHA 差异。
 
 ## 6. 选定方案与被拒方案
 
@@ -104,17 +104,18 @@
 
 ### 7.2 修改文件
 
-| 文件                         | 修改原因                                     |
-| ---------------------------- | -------------------------------------------- |
-| `src/tools/page/manifest.ts` | 将 `detectCaptcha` 加入现有 page 工具域。    |
-| `src/tools/page/index.ts`    | 导出 `detectCaptcha`，保持 page 域入口一致。 |
+| 文件                                 | 修改原因                                                    |
+| ------------------------------------ | ----------------------------------------------------------- |
+| `src/tools/page/manifest.ts`         | 将 `detectCaptcha` 加入现有 page 工具域。                   |
+| `src/tools/page/index.ts`            | 导出 `detectCaptcha`，保持 page 域入口一致。                |
+| `src/tools/generated-tools-index.ts` | 运行项目生成器后纳入 `detectCaptcha` 注册项；不得手工编辑。 |
 
 ### 7.3 明确不修改
 
 - 不向 `RuntimeServices` 增加服务。检测器无可变状态，不需要生命周期管理。
 - 不修改 `BrowserManager`、启动参数、配置 schema 或 worker 上下文。
 - 不新增工具分类或独立 manifest；工具属于现有 `page` 域和 `ToolCategory.PAGES`。
-- 不修改生成的 `build/`。
+- 不修改生成的 `build/`。`src/tools/generated-tools-index.ts` 是受版本控制的生成源码，只能通过 `npm run build:index` 更新。
 
 ## 8. 公共模块契约
 
@@ -475,7 +476,7 @@ URL、标题和文本规则均属于弱证据：
 必须覆盖：
 
 1. 工具名称、`ToolCategory.PAGES` 和 `readOnlyHint: true`。
-2. page manifest 与 index 注册。
+2. page manifest、page index 与生成工具索引注册，且生成索引中恰好出现一次 `detectCaptcha`。
 3. 未选择页面时返回明确失败。
 4. `detect` 默认值与响应形状。
 5. CAPTCHA 被检测到时工具仍返回 `success: true`。
@@ -501,16 +502,18 @@ URL、标题和文本规则均属于弱证据：
 实现完成后，以最终差异为边界依次运行：
 
 1. 新增模块和工具的聚焦单元测试。
-2. `npm run typecheck`。
-3. `npm run test:unit`。
-4. `npm run check-format`。
-5. 若仓库覆盖率命令可用，确认新增模块相关覆盖率不低于 80%；否则使用项目现有覆盖率采集方式记录无法自动证明的边界。
+2. `npm run build:index`，并确认只产生预期的 `detectCaptcha` 生成索引差异。
+3. `npm run typecheck`。
+4. `npm run test:unit`。
+5. `npm run check-format`。
+6. 若仓库覆盖率命令可用，确认新增模块相关覆盖率不低于 80%；否则使用项目现有覆盖率采集方式记录无法自动证明的边界。
 
 任一检查失败后，只修复与本任务相关的原因，并在最后一次代码修改后重跑同一检查。修改前的通过结果不能作为最终证据。
 
 最终差异检查必须确认：
 
 - `src/modules/captcha/`、`src/tools/page/detectCaptcha.ts` 和对应测试中没有 `open-source/jshookmcp` 或上游包引用；
+- `src/tools/generated-tools-index.ts` 由生成器更新，且只增加本任务对应的 page 工具项；
 - 没有 AI、截图、文件写入、自动输入、浏览器模式切换、启动脚本或 eager CDP 调用；
 - 没有新增依赖；
 - 没有修改 `build/`；
