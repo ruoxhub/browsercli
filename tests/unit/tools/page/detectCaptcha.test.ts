@@ -268,3 +268,4 @@ describe('detect_captcha handler', () => {
     }
   });
 });
+++ b/tests/unit/tools/page/detectCaptcha.test.ts

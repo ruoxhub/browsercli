@@ -542,3 +542,4 @@ describe('CaptchaDetector.waitForClear', () => {
     }
   });
 });
+++ b/tests/unit/modules/captcha/CaptchaDetector.test.ts
