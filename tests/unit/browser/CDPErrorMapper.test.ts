@@ -11,9 +11,32 @@ import {
   isCDPSessionGone,
   wrapCDPCall,
 } from '../../../src/modules/browser/CDPErrorMapper.js';
+import {ToolError} from '../../../src/utils/errors.js';
 
 describe('CDPErrorMapper', () => {
   describe('mapCDPError', () => {
+    it('maps a missing Target to a recoverable error with a fresh-list hint', () => {
+      const result = mapCDPError(new Error('No target with given id found'), {
+        targetId: 'target-gone',
+      });
+      assert.ok(result instanceof ToolError);
+      assert.equal(result.code, 'NOT_FOUND');
+      assert.equal(result.recoverable, true);
+      assert.equal(result.context?.targetId, 'target-gone');
+      assert.match(String(result.context?.recoveryHint), /list_targets/);
+      assert.match(result.message, /list_targets/);
+    });
+
+    it('keeps session context and a dump hint on detach errors', () => {
+      const result = mapCDPError(new Error('Session closed'), {
+        targetId: 'target-1',
+        sessionId: 'session-1',
+      }) as ToolError;
+      assert.equal(result.context?.targetId, 'target-1');
+      assert.equal(result.context?.sessionId, 'session-1');
+      assert.match(String(result.context?.recoveryHint), /dump/);
+      assert.match(result.message, /dump/);
+    });
     it('should map "Session closed" to CDP_SESSION_CLOSED', () => {
       const result = mapCDPError(
         new Error('Session closed. Most likely the page has been closed.'),

@@ -6,9 +6,27 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {CollectedFileRegistry} from '../../../../src/modules/collector/CollectedFileRegistry.js';
+import {
+  CollectedFileRegistry,
+  DEFAULT_COLLECTION_LIMITS,
+} from '../../../../src/modules/collector/CollectedFileRegistry.js';
 
 describe('CollectedFileRegistry', () => {
+  it('exports the canonical response limits used by target snapshots', () => {
+    const registry = new CollectedFileRegistry();
+    assert.equal(
+      registry.MAX_FILES_PER_COLLECT,
+      DEFAULT_COLLECTION_LIMITS.maxFilesPerCollect,
+    );
+    assert.equal(
+      registry.MAX_SINGLE_FILE_SIZE,
+      DEFAULT_COLLECTION_LIMITS.maxSingleFileSize,
+    );
+    assert.equal(
+      registry.MAX_RESPONSE_SIZE,
+      DEFAULT_COLLECTION_LIMITS.maxResponseSize,
+    );
+  });
   describe('basic add/has', () => {
     it('adds a file and reports has(url) true', () => {
       const registry = new CollectedFileRegistry({maxFilesCacheSize: 100});

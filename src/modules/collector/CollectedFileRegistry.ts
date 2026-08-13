@@ -29,6 +29,14 @@ export interface CollectedFileRegistryOptions {
   maxSingleFileSize?: number;
 }
 
+export const DEFAULT_COLLECTION_LIMITS = Object.freeze({
+  maxCollectedUrls: 10_000,
+  maxFilesCacheSize: 1_000,
+  maxFilesPerCollect: 200,
+  maxResponseSize: 512 * 1024,
+  maxSingleFileSize: 200 * 1024,
+});
+
 /**
  * 文件缓存注册表。所有文件级状态集中管理，方便 CodeCollector 门面委托。
  */
@@ -50,11 +58,16 @@ export class CollectedFileRegistry {
   readonly MAX_SINGLE_FILE_SIZE: number;
 
   constructor(opts: CollectedFileRegistryOptions = {}) {
-    this.MAX_COLLECTED_URLS = opts.maxCollectedUrls ?? 10000;
-    this.MAX_FILES_CACHE_SIZE = opts.maxFilesCacheSize ?? 1000;
-    this.MAX_FILES_PER_COLLECT = opts.maxFilesPerCollect ?? 200;
-    this.MAX_RESPONSE_SIZE = opts.maxResponseSize ?? 512 * 1024;
-    this.MAX_SINGLE_FILE_SIZE = opts.maxSingleFileSize ?? 200 * 1024;
+    this.MAX_COLLECTED_URLS =
+      opts.maxCollectedUrls ?? DEFAULT_COLLECTION_LIMITS.maxCollectedUrls;
+    this.MAX_FILES_CACHE_SIZE =
+      opts.maxFilesCacheSize ?? DEFAULT_COLLECTION_LIMITS.maxFilesCacheSize;
+    this.MAX_FILES_PER_COLLECT =
+      opts.maxFilesPerCollect ?? DEFAULT_COLLECTION_LIMITS.maxFilesPerCollect;
+    this.MAX_RESPONSE_SIZE =
+      opts.maxResponseSize ?? DEFAULT_COLLECTION_LIMITS.maxResponseSize;
+    this.MAX_SINGLE_FILE_SIZE =
+      opts.maxSingleFileSize ?? DEFAULT_COLLECTION_LIMITS.maxSingleFileSize;
   }
 
   /**
