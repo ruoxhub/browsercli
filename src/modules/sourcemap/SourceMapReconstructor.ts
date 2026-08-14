@@ -1,3 +1,8 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import {createHash, randomUUID} from 'node:crypto';
 import {lstat, mkdir, open, rename, rm} from 'node:fs/promises';
 import os from 'node:os';
@@ -14,6 +19,8 @@ import {
 } from './types.js';
 
 const RESERVED_WINDOWS_NAME = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i;
+// C0 control characters are intentionally rejected from reconstructed paths.
+// eslint-disable-next-line no-control-regex
 const INVALID_PATH_CHARACTER = /[\u0000-\u001f<>:"|?*]/g;
 
 function sha256(content: string): string {

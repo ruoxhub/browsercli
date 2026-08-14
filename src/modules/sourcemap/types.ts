@@ -1,3 +1,8 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 export type SourceMapErrorCode =
   | 'INVALID_SOURCE_INPUT'
   | 'SCRIPT_NOT_FOUND'

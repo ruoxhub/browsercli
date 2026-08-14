@@ -22,11 +22,11 @@ import type {
   ResolvedPage,
 } from '../modules/browser/PageIdentity.js';
 import type {DebuggerManager} from '../modules/debugger/DebuggerManager.js';
+import type {PersistentHookRegistry} from '../modules/hook/index.js';
 import type {
   RequestInitiator,
   WebSocketData,
 } from '../modules/network/NetworkTypes.js';
-import type {PersistentHookRegistry} from '../modules/hook/index.js';
 import type {Runtime} from '../runtime.js';
 import type {HTTPRequest} from '../third_party/index.js';
 import type {TraceResult} from '../trace-processing/parse.js';

@@ -1,8 +1,13 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import assert from 'node:assert/strict';
 import {afterEach, describe, it} from 'node:test';
 
-import {setRuntime} from '../../../../src/runtime.js';
 import {SourceMapError} from '../../../../src/modules/sourcemap/types.js';
+import {setRuntime} from '../../../../src/runtime.js';
 import {
   sourcemapDiff,
   sourcemapDiscover,

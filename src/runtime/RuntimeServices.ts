@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {AISummarizer} from '../modules/analyzer/AISummarizer.js';
 import {getSourceMapConfig} from '../config/servicesConfig.js';
+import {AISummarizer} from '../modules/analyzer/AISummarizer.js';
 import {CodeAnalyzer} from '../modules/analyzer/CodeAnalyzer.js';
 import type {PageController} from '../modules/collector/PageController.js';
 import {CryptoDetector} from '../modules/crypto/CryptoDetector.js';

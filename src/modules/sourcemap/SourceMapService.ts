@@ -1,3 +1,8 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import {createHash, randomBytes} from 'node:crypto';
 
 import {SourceMapDocument} from './SourceMapDocument.js';

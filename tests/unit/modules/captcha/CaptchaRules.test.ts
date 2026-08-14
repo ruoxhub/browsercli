@@ -8,7 +8,6 @@ import assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
 
 import {assessCaptchaSnapshot} from '../../../../src/modules/captcha/rules.js';
-
 import type {
   CaptchaElementSnapshot,
   CaptchaPageSnapshot,

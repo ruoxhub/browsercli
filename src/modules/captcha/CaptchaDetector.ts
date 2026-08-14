@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {assessCaptchaSnapshot} from './rules.js';
-
 import type {Page} from '../../third_party/index.js';
+
+import {assessCaptchaSnapshot} from './rules.js';
 import type {
   CaptchaAssessment,
   CaptchaPageSnapshot,

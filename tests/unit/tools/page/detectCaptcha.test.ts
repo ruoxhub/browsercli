@@ -9,16 +9,15 @@ import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
+import type {CaptchaPageSnapshot} from '../../../../src/modules/captcha/types.js';
 import {zod} from '../../../../src/third_party/index.js';
+import type {Page} from '../../../../src/third_party/index.js';
 import {ToolCategory} from '../../../../src/tools/categories.js';
 import {GENERATED_TOOL_REGISTRY} from '../../../../src/tools/generated-tools-index.js';
 import {detectCaptcha} from '../../../../src/tools/page/detectCaptcha.js';
 import * as pageTools from '../../../../src/tools/page/index.js';
 import {manifest as pageManifest} from '../../../../src/tools/page/manifest.js';
 import {ToolResponseAccumulator} from '../../../../src/worker/ToolResponse.js';
-
-import type {CaptchaPageSnapshot} from '../../../../src/modules/captcha/types.js';
-import type {Page} from '../../../../src/third_party/index.js';
 
 interface CaptchaToolPayload {
   success: boolean;

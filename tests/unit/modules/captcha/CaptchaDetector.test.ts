@@ -10,7 +10,6 @@ import {describe, it} from 'node:test';
 import sinon from 'sinon';
 
 import {CaptchaDetector} from '../../../../src/modules/captcha/CaptchaDetector.js';
-
 import type {
   CaptchaPageSnapshot,
   CaptchaStatus,

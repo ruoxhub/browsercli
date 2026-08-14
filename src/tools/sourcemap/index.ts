@@ -1,14 +1,19 @@
-import {getRuntime} from '../../runtime.js';
-import {zod} from '../../third_party/index.js';
-import type {HTTPRequest} from '../../third_party/index.js';
-import type {ToolContextProvider} from '../../worker/ToolContext.js';
-import type {ToolResponseAccumulator} from '../../worker/ToolResponse.js';
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import {
   type SourceMapLookupInput,
   type SourceMapReconstructInput,
   type SourceMapRuntimeAccess,
   SourceMapError,
 } from '../../modules/sourcemap/types.js';
+import {getRuntime} from '../../runtime.js';
+import {zod} from '../../third_party/index.js';
+import type {HTTPRequest} from '../../third_party/index.js';
+import type {ToolContextProvider} from '../../worker/ToolContext.js';
+import type {ToolResponseAccumulator} from '../../worker/ToolResponse.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
