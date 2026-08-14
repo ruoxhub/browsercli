@@ -1,0 +1,25 @@
+{
+  "version": 3,
+  "sections": [
+    {
+      "offset": {"line": 0, "column": 0},
+      "map": {
+        "version": 3,
+        "sources": ["first.ts"],
+        "sourcesContent": ["export const first = 1;\n"],
+        "names": [],
+        "mappings": "AAAA"
+      }
+    },
+    {
+      "offset": {"line": 2, "column": 0},
+      "map": {
+        "version": 3,
+        "sources": ["second.ts"],
+        "sourcesContent": ["export const second = 2;\n"],
+        "names": [],
+        "mappings": "AAAA"
+      }
+    }
+  ]
+}

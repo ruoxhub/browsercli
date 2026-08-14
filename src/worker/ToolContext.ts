@@ -278,6 +278,11 @@ export class ToolContextProvider {
     return this._debuggerContext.ensureForPage(activePage);
   }
 
+  getExistingDebuggerContext(page?: Page): DebuggerManager | undefined {
+    const target = page ?? this.getSelectedPage();
+    return target ? this._debuggerContext.getForPage(target) : undefined;
+  }
+
   async disposeDebuggerContext(page?: Page): Promise<void> {
     const activePage = page ?? this._browserContext.getSelectedPage();
     if (!activePage) return;

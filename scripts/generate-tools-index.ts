@@ -35,6 +35,8 @@ const DOMAIN_DESCRIPTIONS: Record<string, string> = {
   rebuild: 'Bundle rebuilding and environment diff tools.',
   screenshot: 'Screenshot and video frame tools.',
   script: 'Page script evaluation and preload tools.',
+  sourcemap:
+    'SourceMap discovery, parsing, lookup, reconstruction, and diff tools.',
   'site-experience': 'Site-specific reverse engineering experience tools.',
   stealth: 'Browser stealth and fingerprint tools.',
   wasm: 'WebAssembly reverse engineering tools.',

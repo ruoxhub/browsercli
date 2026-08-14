@@ -24,4 +24,10 @@ describe('RuntimeServices', () => {
     assert.doesNotThrow(() => new RuntimeServices({} as PageController));
     assert.strictEqual(services.getWasmAnalyzer(), services.getWasmAnalyzer());
   });
+
+  it('creates SourceMapService lazily and reuses it', () => {
+    const services = new RuntimeServices({} as PageController);
+    const first = services.getSourceMapService();
+    assert.equal(services.getSourceMapService(), first);
+  });
 });

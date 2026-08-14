@@ -17,6 +17,7 @@ import type {CryptoDetector} from './modules/crypto/CryptoDetector.js';
 import type {Deobfuscator} from './modules/deobfuscator/Deobfuscator.js';
 import {HookManager} from './modules/hook/HookManager.js';
 import type {NetworkModule} from './modules/network/index.js';
+import type {SourceMapService} from './modules/sourcemap/SourceMapService.js';
 import type {WasmAnalyzer} from './modules/wasm/WasmAnalyzer.js';
 import type {WasmCollector} from './modules/wasm/WasmCollector.js';
 import type {WasmDecompiler} from './modules/wasm/WasmDecompiler.js';
@@ -62,6 +63,7 @@ export interface Runtime {
   reverseTaskStore: ReverseTaskStore;
   eventBus: EventBus<AppEventMap>;
   contextProvider?: ToolContextProvider;
+  sourceMapService?: SourceMapService;
   bindPageContext: (resolver: () => Page) => void;
   syncPageContext: (page: Page) => void;
   clearPageContext: () => void;
@@ -134,6 +136,9 @@ export function getRuntime(): Runtime {
     },
     get wasmRuntimeInspector() {
       return services.getWasmRuntimeInspector();
+    },
+    get sourceMapService() {
+      return services.getSourceMapService();
     },
     reverseTaskStore,
     eventBus,

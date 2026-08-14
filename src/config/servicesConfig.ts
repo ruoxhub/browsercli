@@ -15,6 +15,10 @@
  */
 
 import type {BrowserManagerConfig} from '../modules/browser/browser.js';
+import {
+  type SourceMapConfig,
+  SourceMapError,
+} from '../modules/sourcemap/types.js';
 import {AIService} from '../services/AIService.js';
 import {OpenAIProvider} from '../services/OpenAIProvider.js';
 
@@ -35,6 +39,69 @@ import {
 // ==========================================================================
 // AI / Browser / System 配置
 // ==========================================================================
+
+function getBoundedPositiveInteger(
+  key: string,
+  defaultValue: number,
+  maximum: number,
+): number {
+  const value = getEnvNumber(key, defaultValue);
+  if (
+    value === undefined ||
+    !Number.isFinite(value) ||
+    !Number.isInteger(value) ||
+    value <= 0 ||
+    value > maximum
+  ) {
+    throw new SourceMapError(
+      'SOURCEMAP_CONFIG_INVALID',
+      `${key} must be a positive integer no greater than ${maximum}`,
+    );
+  }
+  return value;
+}
+
+export function getSourceMapConfig(): SourceMapConfig {
+  const maxBytes = getBoundedPositiveInteger(
+    'SOURCEMAP_MAX_BYTES',
+    20 * 1024 * 1024,
+    100 * 1024 * 1024,
+  );
+  const cacheMaxBytes = getBoundedPositiveInteger(
+    'SOURCEMAP_CACHE_MAX_BYTES',
+    64 * 1024 * 1024,
+    256 * 1024 * 1024,
+  );
+  if (cacheMaxBytes < maxBytes) {
+    throw new SourceMapError(
+      'SOURCEMAP_CONFIG_INVALID',
+      'SOURCEMAP_CACHE_MAX_BYTES must be at least SOURCEMAP_MAX_BYTES',
+    );
+  }
+  return {
+    maxBytes,
+    cacheMaxBytes,
+    cacheMaxEntries: getBoundedPositiveInteger(
+      'SOURCEMAP_CACHE_MAX_ENTRIES',
+      16,
+      64,
+    ),
+    cacheTtlMs: getBoundedPositiveInteger(
+      'SOURCEMAP_CACHE_TTL_MS',
+      30 * 60 * 1000,
+      24 * 60 * 60 * 1000,
+    ),
+    fetchTimeoutMs: getBoundedPositiveInteger(
+      'SOURCEMAP_FETCH_TIMEOUT_MS',
+      15_000,
+      60_000,
+    ),
+    maxRedirects: 3,
+    maxIndexedDepth: 8,
+    maxIndexedSections: 1000,
+    maxDiffChanges: 2000,
+  };
+}
 
 /**
  * 获取默认 LLM 提供商

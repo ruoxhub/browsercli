@@ -1,0 +1,11 @@
+{
+  "version": 3,
+  "sources": ["ignored.ts"],
+  "sourcesContent": [null],
+  "names": [],
+  "mappings": "AAAA",
+  "debugId": "8a1f9b89-41d4-4ccb-a785-6c31afc8f962",
+  "x_google_ignoreList": [0],
+  "x_com_bloomberg_sourcesFunctionMappings": [[0, 0, 0]],
+  "x_scope_info": {"format": "preserve-only"}
+}
