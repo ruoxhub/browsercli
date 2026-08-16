@@ -34,7 +34,6 @@ browsesr-playbook：用于浏览器动态调试——打开页面、登录态复
 **Step 0：任务确认**
 每次对话开始时，先询问用户以下信息中的最小必要集：
 **请提供以下任一信息即可开始：**
-*使用search_site_experience查询URL或站点名称搜索站点逆向经验
 *目标页面 URL
 *目标接口 URL
 *站点首页 URL + 采集目标说明
@@ -49,7 +48,7 @@ browsesr-playbook：用于浏览器动态调试——打开页面、登录态复
 收到信息后，自动创建项目目录：
 若用户提供站点域名 example.com，页面为 /product/list
 则目录名建议：
-crawler *example product \*list
+crawler \*example product \*list
 若为单接口任务，可用：
 crawler_example
 \_api task
@@ -325,7 +324,6 @@ crawler_example
 14. 是否存在频率限制
 15. 是否需要额外的会话保活
 16. 是否需要定期刷新 token / cookie
-17. 使用create_site_experience创建站点逆向经验或使用update_site_experience更新站点逆向经验
     若存在不稳定点，必须明确指出：
 
 - 不稳定原因

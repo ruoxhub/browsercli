@@ -381,13 +381,6 @@ browsercli call explain_reverse_stage --stage <str> [--includeDocs <bool>] # 解
 browsercli call list_parameter_workflows # 列出当前预置的各种业务解密工作流指引。
 browsercli call get_parameter_workflow --id <str> # 获取特定解密工作流的详细步骤说明。
 browsercli call recommend_parameter_workflow --query <str> # 根据用户的参数或目标描述推荐匹配的工作流。
-
-# Site Experience profiles
-browsercli call list_site_experiences # 列出所有已建档的目标站对抗及逆向实践经验。
-browsercli call search_site_experience [--url <str>] [--name <str>] # 搜索获取特定目标站点的逆向对抗建档。
-browsercli call create_site_experience --domain <str> --name <str> [--aliases <arr>] [--platformFeatures <str>] [--validPatterns <str>] [--knownPitfalls <str>] # 新建目标站点逆向经验对抗策略档案。
-browsercli call update_site_experience --id <num> [--name <str>] [--aliases <arr>] [--platformFeatures <str>] [--validPatterns <str>] [--knownPitfalls <str>] # 更新已保存的目标站点逆向经验档案。
-browsercli call delete_site_experience --id <num> # 删除选定的站点逆向经验档案。
 ```
 
 ### 12. Session Management, Diagnostics & Video

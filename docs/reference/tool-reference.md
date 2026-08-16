@@ -156,12 +156,6 @@
   - [`restore_session_state`](#restore_session_state)
   - [`save_session_state`](#save_session_state)
   - [`update_extensions`](#update_extensions)
-- **[Data](#data)** (5 tools)
-  - [`create_site_experience`](#create_site_experience)
-  - [`delete_site_experience`](#delete_site_experience)
-  - [`list_site_experiences`](#list_site_experiences)
-  - [`search_site_experience`](#search_site_experience)
-  - [`update_site_experience`](#update_site_experience)
 - **[Diagnostics](#diagnostics)** (1 tools)
   - [`diagnose_environment`](#diagnose_environment)
 
@@ -1578,55 +1572,6 @@
 ### `update_extensions` — update_extensions
 
 **Description:** 通过点击 chrome://extensions/ 页面的更新按钮来更新 Chrome 扩展。
-
-## Data
-
-### `create_site_experience` — create_site_experience
-
-**Description:** 创建新的站点经验条目
-
-**Parameters:**
-
-- `domain`
-- `name`
-- `aliases`
-- `platformFeatures`
-- `validPatterns`
-- `knownPitfalls`
-
-### `delete_site_experience` — delete_site_experience
-
-**Description:** 按 ID 删除站点经验条目
-
-**Parameters:**
-
-- `id`
-
-### `list_site_experiences` — list_site_experiences
-
-**Description:** 列出所有站点经验条目
-
-### `search_site_experience` — search_site_experience
-
-**Description:** 按 URL 或名称搜索站点经验
-
-**Parameters:**
-
-- `url`
-- `name`
-
-### `update_site_experience` — update_site_experience
-
-**Description:** 更新已有的站点经验条目
-
-**Parameters:**
-
-- `id`
-- `name`
-- `aliases`
-- `platformFeatures`
-- `validPatterns`
-- `knownPitfalls`
 
 ## Diagnostics
 

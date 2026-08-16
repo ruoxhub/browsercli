@@ -50,13 +50,6 @@ npm run start -- --http --channel dev
 npm run start -- --http --executablePath /path/to/chrome
 ```
 
-### 数据库相关
-
-```bash
-# PostgreSQL 存储
-npm run start -- --http --databaseUrl postgresql://user:pass@localhost:5432/dbname
-```
-
 ### 网络相关
 
 ```bash
