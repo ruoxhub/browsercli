@@ -12,20 +12,6 @@
 
 export * from '../../../web/types.js';
 
-// ==================== Site Experience ====================
-
-export interface SiteExperience {
-  id: number;
-  domain: string;
-  name: string;
-  aliases: string[];
-  platformFeatures: string | null;
-  validPatterns: string | null;
-  knownPitfalls: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
 // ==================== Runtime Config ====================
 
 export interface BrowserConfig {
@@ -62,7 +48,6 @@ export interface RuntimeConfig {
   wsEndpoint?: string;
   headless?: boolean;
   executablePath?: string;
-  databaseUrl?: string;
   llmProvider?: 'openai';
   openai?: OpenAIConfig;
   browser?: BrowserConfig;

@@ -10,7 +10,6 @@ import {
   Menu,
   X,
   Terminal,
-  Globe,
   Settings,
 } from 'lucide-react';
 import {useEffect, useState} from 'react';
@@ -20,7 +19,6 @@ import wsClient from './lib/ws';
 import HooksPage from './routes/hooks';
 import OverviewPage from './routes/overview';
 import SettingsPage from './routes/settings';
-import SiteExperiencesPage from './routes/site-experiences';
 import ToolsPage from './routes/tools';
 
 function Layout() {
@@ -109,14 +107,6 @@ function Layout() {
             <span>Hook 监控点</span>
           </NavLink>
           <NavLink
-            to="/site-experiences"
-            onClick={() => setSidebarOpen(false)}
-            className={getNavLinkClass}
-          >
-            <Globe size={16} />
-            <span>站点经验</span>
-          </NavLink>
-          <NavLink
             to="/settings"
             onClick={() => setSidebarOpen(false)}
             className={getNavLinkClass}
@@ -156,10 +146,6 @@ function Layout() {
           <Route
             path="/hooks"
             element={<HooksPage />}
-          />
-          <Route
-            path="/site-experiences"
-            element={<SiteExperiencesPage />}
           />
           <Route
             path="/settings"

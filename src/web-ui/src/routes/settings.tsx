@@ -6,7 +6,6 @@
 import {
   Globe,
   Key,
-  Database,
   Plug,
   PlugZap,
   Save,
@@ -101,19 +100,6 @@ export default function SettingsPage() {
     }
   };
 
-  const handleSaveDatabase = async () => {
-    if (!config?.databaseUrl) return;
-    setSaving('database');
-    try {
-      await api.updateDatabaseConfig(config.databaseUrl);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '保存失败');
-    } finally {
-      setSaving(null);
-    }
-  };
-
   const handleTestLlm = async () => {
     if (!config) return;
     setSaving('test-llm');
@@ -182,18 +168,6 @@ export default function SettingsPage() {
     }
   };
 
-  const handleConnectDatabase = async () => {
-    setSaving('connect-database');
-    try {
-      await api.connectDatabase();
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '连接数据库失败');
-    } finally {
-      setSaving(null);
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex-1 p-6 lg:p-8 space-y-6 animate-pulse">
@@ -210,8 +184,8 @@ export default function SettingsPage() {
           连接设置
         </h1>
         <p className="text-xs text-[var(--color-text-muted)] mt-1.5">
-          配置浏览器连接、LLM Provider
-          和数据库。配置仅存于内存，重启后回落到环境变量种子值。
+          配置浏览器连接、LLM
+          Provider。配置仅存于内存，重启后回落到环境变量种子值。
         </p>
       </div>
 
@@ -604,57 +578,6 @@ export default function SettingsPage() {
             {llmTest.message}
           </span>
         )}
-      </div>
-
-      {/* 数据库区块 */}
-      <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border-default)] rounded-xl p-6 shadow-lg shadow-black/25">
-        <div className="flex items-center gap-3 mb-6">
-          <Database
-            className="text-[var(--color-accent)]"
-            size={20}
-          />
-          <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">
-            数据库
-          </h2>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 mb-4">
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs text-[var(--color-text-secondary)]">
-              Database URL
-            </span>
-            <input
-              type="text"
-              value={config?.databaseUrl ?? ''}
-              onChange={e =>
-                setConfig(prev =>
-                  prev ? {...prev, databaseUrl: e.target.value} : prev,
-                )
-              }
-              placeholder="postgres://user:pass@localhost:5432/dbname"
-              className="bg-[var(--color-bg-primary)] border border-[var(--color-border-default)] rounded-lg px-3 py-2 text-xs text-[var(--color-text-primary)] font-mono"
-            />
-          </label>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleSaveDatabase}
-            disabled={saving === 'database'}
-            className="px-4 py-2 text-xs font-medium rounded-lg bg-[var(--color-bg-tertiary)] border border-[var(--color-border-default)] text-[var(--color-text-primary)] hover:bg-[var(--color-bg-secondary)] active:scale-95 transition-all flex items-center gap-2 disabled:opacity-50"
-          >
-            <Save size={12} />
-            {saving === 'database' ? '保存中...' : '保存配置'}
-          </button>
-          <button
-            onClick={handleConnectDatabase}
-            disabled={saving === 'connect-database'}
-            className="px-4 py-2 text-xs font-medium rounded-lg bg-[var(--color-accent)] text-[var(--color-bg-primary)] hover:opacity-90 active:scale-95 transition-all flex items-center gap-2 disabled:opacity-50"
-          >
-            <Plug size={12} />
-            {saving === 'connect-database' ? '连接中...' : '连接数据库'}
-          </button>
-        </div>
       </div>
 
       <button
