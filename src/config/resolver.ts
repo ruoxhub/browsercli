@@ -70,7 +70,6 @@ export interface ResolvedConfig {
   wsEndpoint?: string;
   headless: boolean;
   executablePath?: string;
-  databaseUrl?: string;
   runtimeDirName: string;
   debug: boolean;
   /** 启用 CloakBrowser 二进制 + 49 C++ patch。 */
@@ -110,7 +109,6 @@ const ENV_MAP: Readonly<Record<string, keyof GlobalConfig>> = {
   BROWSER_WS_ENDPOINT: 'wsEndpoint',
   BROWSER_HEADLESS: 'headless',
   BROWSER_EXECUTABLE_PATH: 'executablePath',
-  DATABASE_URL: 'databaseUrl',
   BROWSER_RUNTIME_DIR: 'runtimeDirName',
   DEFAULT_LLM_PROVIDER: 'llmProvider',
   BROWSER_DEBUG: 'debug',
@@ -315,7 +313,6 @@ export function resolveConfig(envArgs?: Partial<GlobalConfig>): ResolvedConfig {
     wsEndpoint: merged.wsEndpoint || undefined,
     headless: merged.headless ?? DEFAULTS.headless,
     executablePath: merged.executablePath,
-    databaseUrl: merged.databaseUrl || undefined,
     runtimeDirName: merged.runtimeDirName ?? DEFAULTS.runtimeDirName,
     debug: merged.debug ?? DEFAULTS.debug,
     cloak: merged.cloak ?? DEFAULTS.cloak,

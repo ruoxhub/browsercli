@@ -24,8 +24,6 @@ interface WorkerStartOptions {
   headless?: boolean;
   /** 浏览器可执行路径 */
   executablePath?: string;
-  /** PostgreSQL 连接字符串 */
-  databaseUrl?: string;
   /** Trace 输出模式: errors 或 all */
   traceOutput?: 'errors' | 'all';
   /** 启用 CloakBrowser 二进制 + 49 C++ patch；profile 切到 cloak-profile。 */

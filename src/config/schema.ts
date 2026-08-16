@@ -150,7 +150,6 @@ export const GlobalConfigSchema = zod
     jsStealth: booleanSchema.optional(),
     /** `--full-stealth-args` CLI flag：回退到历史 60+ 启动参数集。 */
     fullStealthArgs: booleanSchema.optional(),
-    databaseUrl: optionalStringSchema.optional(),
     runtimeDirName: optionalStringSchema.optional(),
     llmProvider: LLMProviderSchema.optional(),
     openai: OpenAIConfigSchema.optional(),
