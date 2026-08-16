@@ -165,12 +165,6 @@ export const cliOptions = {
     default: true,
     describe: 'Set to false to exclude tools related to network.',
   },
-  databaseUrl: {
-    type: 'string',
-    description:
-      'PostgreSQL connection URL for site experience storage (e.g., postgresql://user:password@localhost:5432/js_reverse_mcp).',
-    alias: 'd',
-  },
   http: {
     type: 'boolean',
     description:
@@ -226,10 +220,6 @@ export function parseArguments(version: string, argv = process.argv) {
       [
         '$0 --http --headless --port 3000',
         'Start HTTP server in headless mode for automation',
-      ],
-      [
-        '$0 --http --databaseUrl postgresql://localhost:5432/js_reverse_mcp',
-        'Start HTTP server with PostgreSQL storage',
       ],
       [
         '$0 --browserUrl http://127.0.0.1:9222',

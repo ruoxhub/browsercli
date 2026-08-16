@@ -5,12 +5,10 @@
  */
 
 import type {BrowserManager} from '../modules/browser/index.js';
-import {dbService} from '../services/DatabaseService.js';
 
 interface ShutdownDependencies {
   browserManager: BrowserManager;
   contextProvider?: {dispose(): void | Promise<void>};
-  database?: Pick<typeof dbService, 'disconnect'>;
   exit?: (code: number) => never;
   timeoutMs?: number;
 }
@@ -37,7 +35,6 @@ async function withTimeout<T>(
 export function createGracefulShutdown({
   browserManager,
   contextProvider,
-  database = dbService,
   exit = process.exit,
   timeoutMs = 10000,
 }: ShutdownDependencies): (signal: string) => Promise<void> {
@@ -67,13 +64,6 @@ export function createGracefulShutdown({
       console.log('[Worker] 浏览器已关闭');
     } catch (err) {
       console.error('[Worker] 关闭浏览器失败:', err);
-    }
-
-    try {
-      await withTimeout(database.disconnect(), timeoutMs, '关闭数据库连接超时');
-      console.log('[Worker] 数据库连接已关闭');
-    } catch (err) {
-      console.error('[Worker] 关闭数据库连接失败:', err);
     }
 
     console.log('[Worker] 已关闭');

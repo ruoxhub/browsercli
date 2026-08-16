@@ -12,14 +12,12 @@
  * 2. 初始化 Runtime（创建 BrowserManager 实例但不自动连接）
  * 3. 初始化 ToolContextProvider（未连接状态）
  * 4. 经 HTTP /api/v1 暴露工具执行能力
- * 5. 启动 Web 控制台，浏览器/数据库由面板显式触发连接
+ * 5. 启动 Web 控制台，浏览器由面板显式触发连接
  */
 
 import {getRuntimeConfigStore} from './config/RuntimeConfigStore.js';
 import {resolveConfig} from './config.js';
 import {getRuntime} from './runtime.js';
-import {dbService} from './services/DatabaseService.js';
-import {logger} from './utils/logger.js';
 import {ConsoleServer} from './web/ConsoleServer.js';
 import {JobStore} from './worker/JobStore.js';
 import {SekiroInvoker} from './worker/SekiroInvoker.js';
@@ -55,24 +53,6 @@ async function main(): Promise<void> {
   workerStartContext.group = options.group;
   workerStartContext.rpcHost = options.rpcHost;
 
-  // 3. 若配置了 databaseUrl，则自动连接站点经验库（非致命：失败仅告警，
-  //     不阻断 worker 启动；未配置时站点经验相关工具会返回 Database not connected）
-  const databaseUrl = resolved.databaseUrl;
-  if (databaseUrl) {
-    try {
-      await dbService.connect(databaseUrl);
-      await dbService.migrate().catch(err => {
-        logger.warn('[Worker] 站点经验库迁移跳过（可能已是最新表结构）:', err);
-      });
-      logger.info('[Worker] 站点经验库已连接');
-    } catch (err) {
-      logger.warn(
-        '[Worker] 数据库自动连接失败，站点经验相关工具将不可用:',
-        err,
-      );
-    }
-  }
-
   console.log('[Worker] 启动中...');
   console.log(`[Worker] Rpc Host: ${options.rpcHost}`);
   console.log(`[Worker] Group: ${options.group}`);
@@ -89,7 +69,7 @@ async function main(): Promise<void> {
   const toolAdapter = new ToolAdapter(contextProvider);
 
   console.log(
-    '[Worker] HTTP 传输模式：等待 /api/v1 请求（浏览器/数据库需从控制面板连接）',
+    '[Worker] HTTP 传输模式：等待 /api/v1 请求（浏览器需从控制面板连接）',
   );
 
   // 启动 Web 控制台

@@ -29,7 +29,6 @@ import {manifest as pipelineManifest} from './pipeline/manifest.js';
 import {manifest as rebuildManifest} from './rebuild/manifest.js';
 import {manifest as screenshotManifest} from './screenshot/manifest.js';
 import {manifest as scriptManifest} from './script/manifest.js';
-import {manifest as siteExperienceManifest} from './site-experience/manifest.js';
 import {manifest as sourcemapManifest} from './sourcemap/manifest.js';
 import {manifest as stealthManifest} from './stealth/manifest.js';
 import {manifest as wasmManifest} from './wasm/manifest.js';
@@ -59,7 +58,6 @@ export const GENERATED_DOMAIN_MANIFESTS = [
   rebuildManifest,
   screenshotManifest,
   scriptManifest,
-  siteExperienceManifest,
   sourcemapManifest,
   stealthManifest,
   wasmManifest,
@@ -534,26 +532,6 @@ export const GENERATED_TOOL_REGISTRY = [
   {
     modulePath: './script/script.js',
     handlerName: 'injectPreloadScript',
-  },
-  {
-    modulePath: './site-experience/siteExperience.js',
-    handlerName: 'searchSiteExperience',
-  },
-  {
-    modulePath: './site-experience/siteExperience.js',
-    handlerName: 'listSiteExperiences',
-  },
-  {
-    modulePath: './site-experience/siteExperience.js',
-    handlerName: 'createSiteExperience',
-  },
-  {
-    modulePath: './site-experience/siteExperience.js',
-    handlerName: 'updateSiteExperience',
-  },
-  {
-    modulePath: './site-experience/siteExperience.js',
-    handlerName: 'deleteSiteExperience',
   },
   {
     modulePath: './sourcemap/index.js',

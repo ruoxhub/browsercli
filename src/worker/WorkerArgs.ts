@@ -10,10 +10,7 @@ import type {WorkerStartOptions} from '../types/platform.js';
 type ResolvedWorkerConfig = Required<
   Pick<WorkerStartOptions, 'rpcHost' | 'group' | 'headless'>
 > &
-  Pick<
-    WorkerStartOptions,
-    'browserUrl' | 'wsEndpoint' | 'executablePath' | 'databaseUrl'
-  >;
+  Pick<WorkerStartOptions, 'browserUrl' | 'wsEndpoint' | 'executablePath'>;
 
 const BOOLEAN_FLAGS: Record<string, keyof GlobalConfig> = {
   '--headless': 'headless',
@@ -24,7 +21,6 @@ const BOOLEAN_FLAGS: Record<string, keyof GlobalConfig> = {
 
 const VALUE_FLAGS: Record<string, keyof GlobalConfig> = {
   '--browserUrl': 'browserUrl',
-  '--databaseUrl': 'databaseUrl',
   '--executablePath': 'executablePath',
   '--group': 'group',
   '--rpcHost': 'rpcHost',
@@ -68,18 +64,10 @@ export function parseWorkerArgs(args: string[]): GlobalConfig {
 export function toWorkerOptions(
   resolved: ResolvedWorkerConfig,
 ): WorkerStartOptions {
-  const {
-    browserUrl,
-    databaseUrl,
-    executablePath,
-    group,
-    headless,
-    rpcHost,
-    wsEndpoint,
-  } = resolved;
+  const {browserUrl, executablePath, group, headless, rpcHost, wsEndpoint} =
+    resolved;
   return {
     browserUrl,
-    databaseUrl,
     executablePath,
     group,
     headless,

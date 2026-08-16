@@ -30,7 +30,6 @@ import {createApiV1Routes} from './routes/apiV1.js';
 import {createConfigRoutes} from './routes/config.js';
 import {createHookRoutes} from './routes/hooks.js';
 import {createInvocationsRoutes} from './routes/invocations.js';
-import {createSiteExperienceRoutes} from './routes/site-experiences.js';
 import {createToolsRoutes} from './routes/tools.js';
 import {createWorkerRoutes, type WorkerRoutesConfig} from './routes/worker.js';
 import {WsHub} from './ws/WsHub.js';
@@ -161,7 +160,6 @@ export class ConsoleServer {
       }),
     );
     this.router.mount(createHookRoutes(this.options.toolAdapter));
-    this.router.mount(createSiteExperienceRoutes());
     this.router.mount(
       createApiV1Routes({
         contextProvider: this.options.runtime.contextProvider!,

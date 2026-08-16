@@ -10,11 +10,9 @@
  *  GET  /api/config               — 返回 RuntimeConfigStore 快照（敏感字段掩码）
  *  PUT  /api/config/browser       — 更新 browser 配置
  *  PUT  /api/config/llm           — 更新 LLM 配置（掩码占位符不覆盖真实值）
- *  PUT  /api/config/database      — 更新 databaseUrl
  *  POST /api/llm/test             — 用当前/传入配置做一次最小 chat 调用验证可用性
  *  POST /api/browser/connect      — 调用 connectBrowser
  *  POST /api/browser/disconnect   — 调用 disconnectBrowser
- *  POST /api/database/connect     — 调用 dbService.connect + migrate
  */
 
 import type {IncomingMessage, ServerResponse} from 'node:http';
@@ -31,7 +29,6 @@ import {
   getDefaultLLMProvider,
 } from '../../config/servicesConfig.js';
 import type {AIService} from '../../services/AIService.js';
-import {dbService} from '../../services/DatabaseService.js';
 import {
   connectBrowser,
   disconnectBrowser,
@@ -114,9 +111,7 @@ const BLOCKED_HOST_PATTERNS = [
  * 校验 LLM baseURL 防止 SSRF 和 API Key 泄露。
  * 仅允许 https 协议，拒绝私有/内网/本地地址。
  */
-function validateLlmBaseUrl(
-  baseURL: string | undefined,
-): string | undefined {
+function validateLlmBaseUrl(baseURL: string | undefined): string | undefined {
   if (!baseURL) return undefined;
   let parsed: URL;
   try {
@@ -142,10 +137,7 @@ function mergeOpenaiConfig(
   stored: Record<string, unknown> | undefined,
 ): Record<string, unknown> | undefined {
   if (!incoming || typeof incoming !== 'object') return stored;
-  const merged = mergeLlmProvider(
-    incoming as Record<string, unknown>,
-    stored,
-  );
+  const merged = mergeLlmProvider(incoming as Record<string, unknown>, stored);
   if (typeof merged.apiKey === 'string' && merged.apiKey === '') {
     merged.apiKey = stored?.apiKey ?? '';
   }
@@ -435,26 +427,6 @@ export function createConfigRoutes(
     ],
 
     [
-      'PUT /api/config/database',
-      async (req, res) => {
-        let body: Record<string, unknown>;
-        try {
-          body = (await readJsonBody(req)) as Record<string, unknown>;
-        } catch (err) {
-          const code = err instanceof Error ? err.message : 'INVALID_JSON';
-          sendError(res, code, '请求体不是合法 JSON', 400);
-          return;
-        }
-
-        const databaseUrl =
-          typeof body.databaseUrl === 'string' ? body.databaseUrl : undefined;
-
-        const updated = getRuntimeConfigStore().update({databaseUrl});
-        sendJson(res, {databaseUrl: updated.databaseUrl});
-      },
-    ],
-
-    [
       'POST /api/browser/connect',
       async (_req, res) => {
         try {
@@ -496,37 +468,6 @@ export function createConfigRoutes(
           sendError(
             res,
             'BROWSER_DISCONNECT_FAILED',
-            err instanceof Error ? err.message : String(err),
-            502,
-          );
-        }
-      },
-    ],
-
-    [
-      'POST /api/database/connect',
-      async (_req, res) => {
-        try {
-          const {databaseUrl} = getRuntimeConfigStore().get();
-          if (!databaseUrl) {
-            sendError(
-              res,
-              'DATABASE_URL_NOT_SET',
-              'databaseUrl 未配置，请先在面板设置',
-              400,
-            );
-            return;
-          }
-          await dbService.connect(databaseUrl);
-          await dbService.migrate();
-          cfg.wsHub.broadcast('worker.status', {
-            database: {connected: true},
-          });
-          sendJson(res, {connected: true});
-        } catch (err) {
-          sendError(
-            res,
-            'DATABASE_CONNECT_FAILED',
             err instanceof Error ? err.message : String(err),
             502,
           );
