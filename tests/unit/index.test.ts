@@ -14,7 +14,6 @@ describe('Worker main() startup', () => {
   const originalEnv = {...process.env};
 
   beforeEach(() => {
-    delete process.env.DATABASE_URL;
     delete process.env.RPC_HOST;
   });
 

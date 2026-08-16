@@ -127,12 +127,12 @@ describe('ToolExecutionPipeline', () => {
 
   it('execute throws VALIDATION when args are invalid', async () => {
     await ensureToolsMeta();
-    const validationMeta = getToolMeta('create_site_experience');
-    assert.ok(validationMeta, 'missing meta for create_site_experience');
+    const validationMeta = getToolMeta('recommend_next_step');
+    assert.ok(validationMeta, 'missing meta for recommend_next_step');
     const {pipeline, telemetryState} = createPipeline();
 
     await assert.rejects(
-      pipeline.execute(validationMeta, {domain: 42, name: 'fixture'}),
+      pipeline.execute(validationMeta, {currentStage: 'INVALID'}),
       (error: unknown) =>
         error instanceof ToolError && error.code === ErrorCodes.VALIDATION,
     );

@@ -26,13 +26,10 @@ describe('WorkerArgs', () => {
       '--headless',
       '--executablePath',
       'C:/Chrome/chrome.exe',
-      '--databaseUrl',
-      'postgres://local',
     ]);
 
     assert.deepStrictEqual(config, {
       browserUrl: 'http://127.0.0.1:9222',
-      databaseUrl: 'postgres://local',
       executablePath: 'C:/Chrome/chrome.exe',
       group: 'reverse',
       headless: true,
@@ -60,7 +57,6 @@ describe('WorkerArgs', () => {
   it('maps resolved config into WorkerStartOptions', () => {
     const options = toWorkerOptions({
       browserUrl: 'http://127.0.0.1:9222',
-      databaseUrl: undefined,
       executablePath: undefined,
       group: 'reverse',
       headless: false,
@@ -70,7 +66,6 @@ describe('WorkerArgs', () => {
 
     assert.deepStrictEqual(options, {
       browserUrl: 'http://127.0.0.1:9222',
-      databaseUrl: undefined,
       executablePath: undefined,
       group: 'reverse',
       headless: false,

@@ -89,7 +89,6 @@ describe('config routes', () => {
       resetRuntimeConfigStore({
         openai: {apiKey: 'sk-secretkey9999', model: 'gpt-4o'},
         llmProvider: 'openai',
-        databaseUrl: 'postgres://localhost/db',
       });
 
       const routes = createConfigRoutes({
@@ -106,7 +105,6 @@ describe('config routes', () => {
       assert.ok(parsed.success);
       assert.strictEqual(parsed.data.openai.apiKey, 'sk-***9999');
       assert.strictEqual(parsed.data.openai.model, 'gpt-4o');
-      assert.strictEqual(parsed.data.databaseUrl, 'postgres://localhost/db');
     });
   });
 

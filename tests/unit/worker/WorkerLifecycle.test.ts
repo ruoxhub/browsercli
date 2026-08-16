@@ -10,7 +10,7 @@ import {describe, it} from 'node:test';
 import {createGracefulShutdown} from '../../../src/worker/WorkerLifecycle.js';
 
 describe('WorkerLifecycle', () => {
-  it('disconnects client, closes browser and database, then exits once', async () => {
+  it('disconnects client, closes browser, then exits once', async () => {
     const calls: string[] = [];
     const shutdown = createGracefulShutdown({
       browserManager: {
@@ -18,11 +18,6 @@ describe('WorkerLifecycle', () => {
           calls.push('browser.close');
         },
       } as never,
-      database: {
-        disconnect: async () => {
-          calls.push('database.disconnect');
-        },
-      },
       exit: ((code: number) => {
         calls.push(`exit.${code}`);
         throw new Error('exit');
@@ -33,11 +28,7 @@ describe('WorkerLifecycle', () => {
     await assert.rejects(async () => await shutdown('SIGTERM'), /exit/);
     await shutdown('SIGINT');
 
-    assert.deepStrictEqual(calls, [
-      'browser.close',
-      'database.disconnect',
-      'exit.0',
-    ]);
+    assert.deepStrictEqual(calls, ['browser.close', 'exit.0']);
   });
 
   it('在关闭浏览器前 await contextProvider.dispose()', async () => {
@@ -53,11 +44,6 @@ describe('WorkerLifecycle', () => {
           calls.push('ctx.dispose');
         },
       },
-      database: {
-        disconnect: async () => {
-          calls.push('database.disconnect');
-        },
-      },
       exit: ((code: number) => {
         calls.push(`exit.${code}`);
         throw new Error('exit');
@@ -67,12 +53,7 @@ describe('WorkerLifecycle', () => {
 
     await assert.rejects(async () => await shutdown('SIGTERM'), /exit/);
 
-    assert.deepStrictEqual(calls, [
-      'ctx.dispose',
-      'browser.close',
-      'database.disconnect',
-      'exit.0',
-    ]);
+    assert.deepStrictEqual(calls, ['ctx.dispose', 'browser.close', 'exit.0']);
   });
 
   it('contextProvider.dispose() 超时/失败时仍继续关闭流程', async () => {
@@ -89,11 +70,6 @@ describe('WorkerLifecycle', () => {
           await new Promise(() => {}); // 永不 resolve，触发超时
         },
       },
-      database: {
-        disconnect: async () => {
-          calls.push('database.disconnect');
-        },
-      },
       exit: ((code: number) => {
         calls.push(`exit.${code}`);
         throw new Error('exit');
@@ -103,10 +79,6 @@ describe('WorkerLifecycle', () => {
 
     await assert.rejects(async () => await shutdown('SIGTERM'), /exit/);
 
-    assert.deepStrictEqual(calls, [
-      'browser.close',
-      'database.disconnect',
-      'exit.0',
-    ]);
+    assert.deepStrictEqual(calls, ['browser.close', 'exit.0']);
   });
 });

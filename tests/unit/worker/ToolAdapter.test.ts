@@ -8,7 +8,6 @@ import assert from 'node:assert';
 import {describe, it, mock} from 'node:test';
 
 import {BrowserManager} from '../../../src/modules/browser/index.js';
-import {siteExperienceService} from '../../../src/services/SiteExperienceService.js';
 import {ensureToolsMeta, getToolMeta} from '../../../src/tools/tools-meta.js';
 import type {ToolMeta} from '../../../src/tools/tools-meta.js';
 import type {RpcRequest} from '../../../src/types/rpc.js';
@@ -22,6 +21,7 @@ interface ResolvePayload {
   structuredContent?: {
     success: boolean;
     tooltype: string;
+    message?: string;
     hookId?: string;
     syncedHookIds?: string[];
     data?: unknown;
@@ -267,11 +267,11 @@ describe('ToolAdapter', () => {
     await ensureToolsMeta();
     const provider = new ToolContextProvider();
     const adapter = new ToolAdapter(provider);
-    const meta = getToolMeta('create_site_experience');
-    assert.ok(meta, 'missing meta for create_site_experience');
+    const meta = getToolMeta('recommend_next_step');
+    assert.ok(meta, 'missing meta for recommend_next_step');
 
     await assert.rejects(
-      invokeTool(adapter, meta, {domain: 42, name: 'fixture'}),
+      invokeTool(adapter, meta, {currentStage: 'INVALID'}),
       (error: unknown) =>
         error instanceof ToolError && error.code === ErrorCodes.VALIDATION,
     );
@@ -332,45 +332,37 @@ describe('ToolAdapter', () => {
     assert.match(events[0]!.traceId, /^tr_/);
   });
 
-  it('passes params objects through params-only site experience tools', async () => {
+  it('passes params objects through params-only workflow tools', async () => {
     const runtime = new ToolContextProvider();
     const adapter = new ToolAdapter(runtime);
-    const meta = getToolMeta('search_site_experience');
-    assert.ok(meta, 'missing meta for search_site_experience');
+    const meta = getToolMeta('explain_reverse_stage');
+    assert.ok(meta, 'missing meta for explain_reverse_stage');
 
-    const originalSearch = siteExperienceService.search;
-    let capturedParams: {url?: string; name?: string} | undefined;
+    const result = await new Promise<ResolvePayload>((resolve, reject) => {
+      void adapter.wrapTool(meta!)(
+        {
+          __sekiro_seq__: 'test',
+          action: meta!.name,
+          params: {stage: 'Observe'},
+        },
+        value => resolve(value as ResolvePayload),
+        reject,
+      );
+    });
 
-    siteExperienceService.search = async params => {
-      capturedParams = params;
-      return [];
-    };
-
-    try {
-      const result = await new Promise<ResolvePayload>((resolve, reject) => {
-        void adapter.wrapTool(meta!)(
-          {
-            __sekiro_seq__: 'test',
-            action: meta!.name,
-            params: {url: 'https://www.douyin.com'},
-          },
-          value => resolve(value as ResolvePayload),
-          reject,
-        );
-      });
-
-      assert.deepStrictEqual(capturedParams, {
-        url: 'https://www.douyin.com',
-      });
-      assert.deepStrictEqual(result.structuredContent, {
-        success: true,
-        message: '找到 0 条站点经验',
-        tooltype: 'search_site_experience',
-        results: [],
-      });
-    } finally {
-      siteExperienceService.search = originalSearch;
-    }
+    assert.strictEqual(result.structuredContent?.success, true);
+    assert.strictEqual(
+      result.structuredContent?.tooltype,
+      'explain_reverse_stage',
+    );
+    assert.strictEqual(
+      result.structuredContent?.message,
+      '逆向阶段说明: Observe',
+    );
+    assert.strictEqual(
+      (result.structuredContent?.data as {stage?: string})?.stage,
+      'Observe',
+    );
   });
 
   it('passes params objects through frame callMode hook management tools', async () => {
