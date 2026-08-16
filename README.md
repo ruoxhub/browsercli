@@ -116,14 +116,6 @@ Browser-CLI/
 │   │   ├── constants.ts             # 文件名常量与默认值
 │   │   └── schema.ts                # 占位 — 尚未实现
 │   │
-│   ├── browser/                      # 浏览器管理层
-│   │   ├── browser.ts               # ★ BrowserManager (1229行) — 单例 + 双模式连接/启动
-│   │   ├── SessionManager.ts        # 多会话页面隔离管理
-│   │   ├── CDPErrorMapper.ts        # CDP 错误模式匹配 → ToolError
-│   │   ├── DevToolsConnectionAdapter.ts # Playwright CDPSession → CDPConnection 适配器
-│   │   ├── stealth-args.ts          # 反检测启动参数 (60+ 项)
-│   │   └── polyfill.ts              # core-js polyfills
-│   │
 │   ├── protocol/                     # RPC 协议层
 │   │   └── Client.ts                # ★ RpcClient — Sekiro WebSocket 客户端 (508行)
 │   │
@@ -176,6 +168,11 @@ Browser-CLI/
 │   │   └── shared/                 # 共享辅助函数
 │   │
 │   ├── modules/                     # ★ 核心逆向模块
+│   │   ├── browser/                # 浏览器管理层
+│   │   │   ├── browser.ts          #   ★ BrowserManager — 单例 + 双模式连接/启动
+│   │   │   ├── SessionManager.ts   #   多会话页面隔离管理
+│   │   │   ├── cloak.ts            #   CloakBrowser 源码层反检测
+│   │   │   └── stealth-args.ts     #   反检测启动参数
 │   │   ├── collector/              # 代码收集
 │   │   │   ├── CodeCollector.ts    #   CDP 网络拦截 + 脚本采集 + 依赖图
 │   │   │   ├── CodeCache.ts        #   代码缓存
@@ -354,7 +351,7 @@ Browser-CLI/
 | **隐式耦合** | `LLMProvider` 类型仅限 `'openai'`，但 AI 层已支持 Anthropic/Gemini，配置系统尚未暴露对应选项; `schema.ts` 为空占位文件                                                                                      |
 | **改进空间** | 扩展 `LLMProvider` 联合类型; 使用 Zod 对 `GlobalConfig` 做运行时校验                                                                                                                                        |
 
-#### 3.2.2 浏览器管理层 (src/browser/)
+#### 3.2.2 浏览器管理层 (src/modules/browser/)
 
 | 方面         | 分析                                                                                                                                                                                                          |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -510,7 +507,7 @@ Browser-CLI/
 
 | 层级           | 对应目录                                                           | Ports (接口)                                            | Adapters (实现)                                                          |
 | -------------- | ------------------------------------------------------------------ | ------------------------------------------------------- | ------------------------------------------------------------------------ |
-| **基础设施层** | `src/browser/`, `src/protocol/`, `src/services/DatabaseService.ts` | CDPSession, RPC protocol                                | BrowserManager (Chrome CDP), RpcClient (Sekiro WS), DatabaseService (pg) |
+| **基础设施层** | `src/modules/browser/`, `src/protocol/`, `src/services/DatabaseService.ts` | CDPSession, RPC protocol                                | BrowserManager (Chrome CDP), RpcClient (Sekiro WS), DatabaseService (pg) |
 | **核心领域层** | `src/modules/`                                                     | HookTypePlugin, AIProvider, DeobfuscatorStrategy (隐式) | HookManager, CodeAnalyzer, Deobfuscator                                  |
 | **应用层**     | `src/tools/` + `src/worker/`                                       | ToolDefinition, Context                                 | ~100 个具体工具 + ToolAdapter                                            |
 | **配置层**     | `src/config/`                                                      | —                                                       | 多源合并 + 环境变量                                                      |
@@ -747,7 +744,7 @@ flowchart TB
 
 | 维度           | 内容                                                                                                                                                                |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **目标模块**   | `src/browser/browser.ts` — BrowserManager                                                                                                                           |
+| **目标模块**   | `src/modules/browser/browser.ts` — BrowserManager                                                                                                                   |
 | **当前问题**   | 浏览器状态通过分散的布尔标志管理 (`isRestarting` / `isConnected`), 状态转换在条件分支中隐式发生, 并发重启保护和边界条件依赖多个标志组合, 新增状态容易漏掉旧状态转换 |
 | **具体方案**   | 引入显式有限状态机 (可用 `typescript-state-machine` 或纯 TypeScript 实现)                                                                                           |
 |                | **状态**: `DISCONNECTED → CONNECTING → CONNECTED → RESTARTING → CLOSING`                                                                                            |
@@ -760,9 +757,9 @@ flowchart TB
 
 | 维度           | 内容                                                                                                                                                                                                                                            |
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **目标模块**   | `src/browser/` / `runtime.ts` / 所有通过 Runtime 获取 Page/BrowserContext 的模块                                                                                                                                                                |
+| **目标模块**   | `src/modules/browser/` / `runtime.ts` / 所有通过 Runtime 获取 Page/BrowserContext 的模块                                                                                                                                                         |
 | **当前问题**   | `BrowserManager` 直接导出 `patchright.Page`, `patchright.BrowserContext` 等具体类型; 整个 ~185 个文件通过 `third_party/index.ts` 引入 Playwright 具体类型; 更换浏览器引擎 (如 Puppeteer 换回) 或引入无头模式替换方案需要修改所有引用            |
-| **具体方案**   | 在 `src/browser/` 中定义纯 TypeScript 接口: `IBrowserPage {navigate, evaluate, screenshot, ...}`, `IBrowser {launch, close, createPage, ...}`; `BrowserManager` 实现这些接口 + 适配器适配到具体引擎; 目前通过 `third_party/` 的兼容层可作为过渡 |
+| **具体方案**   | 在 `src/modules/browser/` 中定义纯 TypeScript 接口: `IBrowserPage {navigate, evaluate, screenshot, ...}`, `IBrowser {launch, close, createPage, ...}`; `BrowserManager` 实现这些接口 + 适配器适配到具体引擎; 目前通过 `third_party/` 的兼容层可作为过渡 |
 | **预期收益**   | 核心模块不依赖具体浏览器实现; 可同时支持多种浏览器引擎; 测试时可注入 Mock Page 无需启动真实浏览器                                                                                                                                               |
 | **风险与成本** | 高: 涉及全仓库 185+ 文件引用链; 需定义完整接口 (Page/Browser/Frame/BrowserContext 各 20+ 方法); 实施需分层推进, 不能一次性替换                                                                                                                  |
 

@@ -201,7 +201,7 @@ export class ScriptManager {
   /**
    * 等待脚本解析事件稳定(替代硬编码延迟)
    *
-   * 监听器由 facade 在 Debugger.enable 之后通过 attachListeners 持续挂载,
+   * 监听器由 facade 在 Debugger.enable 之前通过 attachListeners 持续挂载,
    * scriptParsed 事件会持续累加进 scripts/scripsByUrl 索引。当前实现不
    * 再阻塞等待"稳定"——历史上靠轮询 scripts.size 是否变化来判定,但这
    * 会引入最多 5s 的伪延迟,且无法保证后续页面不会再加载新脚本。调用方
@@ -503,10 +503,7 @@ export class ScriptManager {
       fs.writeFileSync(resolved, content, 'utf-8');
       return resolved;
     } catch (error) {
-      logger.warn(
-        `Failed to write script ${scriptId} to ${resolved}:`,
-        error,
-      );
+      logger.warn(`Failed to write script ${scriptId} to ${resolved}:`, error);
       return null;
     }
   }

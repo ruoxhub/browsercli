@@ -6,6 +6,7 @@
 
 import type {
   WasmAnalysisResult,
+  WasmDetectionResult,
   WasmDecompileResult,
   WasmRuntimeEvent,
 } from '../../modules/wasm/WasmTypes.js';
@@ -35,6 +36,8 @@ export interface WasmCapabilitiesData {
   capturedModules: number;
   runtimeEvents: number;
 }
+
+export type WasmCollectData = WasmDetectionResult;
 
 export interface WasmDumpData {
   moduleId: string;
@@ -96,11 +99,13 @@ export interface WasmMemoryInspectData {
   hex?: string;
   ascii?: string;
   searchResults?: Array<{offset: number; match: string}>;
+  searchTruncated?: boolean;
 }
 
 // ─── 结果类型 ──────────────────────────────────────────
 
 export type WasmCapabilitiesResult = WasmToolResult<WasmCapabilitiesData>;
+export type WasmCollectResult = WasmToolResult<WasmCollectData>;
 export type WasmDumpResult = WasmToolResult<WasmDumpData>;
 export type WasmDisassembleResult = WasmToolResult<WasmDisassembleData>;
 export type WasmDecompileResult_ = WasmToolResult<WasmDecompileData>;

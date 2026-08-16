@@ -56,7 +56,7 @@
 | --------------------- | ---------------------------------------- | -------------------------------------------- |
 | EventBus              | `src/utils/EventBus.ts`                  | 类型安全事件总线，全局单例                   |
 | RuntimeServices       | `src/runtime/RuntimeServices.ts`         | 延迟初始化服务集合（AI、分析器、去混淆器等） |
-| BrowserManager        | `src/browser/browser.ts`                 | 浏览器生命周期、页面管理、反检测注入         |
+| BrowserManager        | `src/modules/browser/browser.ts`         | 浏览器生命周期、页面管理、反检测注入         |
 | CodeCollector         | `src/modules/collector/CodeCollector.ts` | 脚本收集 + 缓存 + 搜索                       |
 | HookManager           | `src/modules/hook/HookManager.ts`        | Hook 创建、管理、数据存取门面                |
 | HookStore             | `src/modules/hook/HookStore.ts`          | Hook 采样数据存储层                          |
@@ -88,7 +88,7 @@
    DP 域只在工具显式需要时才激活（详见 `DebuggerManager.ts` /
    CodeCollector.ts` 的懒激活路径）。**不要**在启动流程里 eager-enable。
 2. **源码层（CloakBrowser 二进制）**：仅 `--cloak` 启用。实现在
-   src/browser/cloak.ts`，49 个 C++ patch。cloak profile 目录与默认 profile *物理隔离**（`cloak-profile`vs`chrome-profile`）—— 改动 profile 解析时 须保留这一边界，见` src/browser/browser-helpers.ts::resolveUserDataDir`。
+   src/modules/browser/cloak.ts`，49 个 C++ patch。cloak profile 目录与默认 profile *物理隔离**（`cloak-profile`vs`chrome-profile`）—— 改动 profile 解析时 须保留这一边界，见` src/modules/browser/browser-helpers.ts::resolveUserDataDir`。
 3. **启动参数**：默认走最小集 `MINIMAL_STEALTH_ARGS`（`--test-type` banner
    制 + `--hide-crash-restore-bubble`）。**不要**在默认路径上追加历史
    FULL_STEALTH_ARGS `—— 其中多个 flag（`--window-size=1920,1080`、 --disable-blink-features=AutomationControlled`、`--disable-logging`、
@@ -97,7 +97,7 @@
    --js-stealth`CLI flag 或`inject_stealth `工具显式调用。**不要**在 BrowserManager.launchBrowser()` 或 `src/index.ts` 里隐式调用
    StealthScripts2025.injectAll` —— 那会让所有用户都暴露 JS 注入检测面。
 
-Viewport 默认 `null`（`src/browser/browser.ts::launchBrowser` 末尾的
+Viewport 默认 `null`（`src/modules/browser/browser.ts::launchBrowser` 末尾的
 `setViewportSize(null)` 分支）。Playwright 默认 1280×720 是自动化框架的常见
 bot 信号，关掉它暴露真实 OS 屏幕。只有用户显式传 `config.viewport` 才覆盖。
 
@@ -120,4 +120,4 @@ bot 信号，关掉它暴露真实 OS 屏幕。只有用户显式传 `config.vie
 - `caveman`、`caveman-commit`、`caveman-review`、`caveman-compress`、`caveman-help`、`caveman-stats` 仅在用户明确要求对应的压缩表达、提交、审查、文档压缩、帮助或统计模式时使用。
 - 非平凡任务完成后使用 `agent-self-evaluation` 做准确性、完整性、清晰度、可执行性和简洁性复核；它不替代项目要求的测试、类型检查或安全检查。
 - 在需要编写复杂、类型安全的 TS 代码时,使用`typescript-advanced-types`提供的从泛型/条件类型/映射类型到实战模式(事件总线、API 客户端、状态机)的现成模板与最佳实践
-
+- 用户请求代码评审、评审工作副本/提交/分支区间或“评审并修复”时使用 `open-code-review`；按其流程先检查并按需安装 `ocr`、验证 LLM 配置，再提取业务上下文运行评审，按 High / Medium / Low 分类报告，只有用户明确要求修复时才应用 High / Medium 项。

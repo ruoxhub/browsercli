@@ -77,8 +77,8 @@ Configuration aligned with Scrapling:
 
 Related files:
 
-- `src/stealth-args.ts` — Launch argument definitions (HARMFUL_ARGS / DEFAULT_ARGS / STEALTH_ARGS)
-- `src/browser.ts` — Browser launch/connect logic
+- `src/modules/browser/stealth-args.ts` — Launch argument definitions (HARMFUL_ARGS / DEFAULT_ARGS / STEALTH_ARGS)
+- `src/modules/browser/browser.ts` — Browser launch/connect logic
 
 ### 2. Google Referer Spoofing
 
@@ -93,7 +93,7 @@ Changes:
 
 ### 3. Viewport Uses Real Dimensions
 
-**File:** `src/browser.ts`, `src/stealth-args.ts`
+**File:** `src/modules/browser/browser.ts`, `src/modules/browser/stealth-args.ts`
 
 - `viewport: null` disables Playwright's viewport emulation, letting the OS manage window size natively
 - Added `--window-size=1920,1080` launch argument
@@ -173,7 +173,7 @@ Also removed the `--initScript` CLI argument.
 
 ### 7. Notification Permission Fix
 
-**File:** `src/browser.ts`
+**File:** `src/modules/browser/browser.ts`
 
 Added `'notifications'` to the permissions array, changing `Notification.permission` from `"denied"` to `"granted"`.
 
@@ -227,7 +227,7 @@ list_network_requests()  # Returns all requests
 | File                      | Change Type | Description                                                                                          |
 | ------------------------- | ----------- | ---------------------------------------------------------------------------------------------------- |
 | `src/tools/pages.ts`      | Modified    | Added Google Referer; removed waitForEventsAfterAction                                               |
-| `src/browser.ts`          | Modified    | viewport: null + conditional DPR; added notifications permission                                     |
+| `src/modules/browser/browser.ts` | Modified    | viewport: null + conditional DPR; added notifications permission                                     |
 | `src/stealth-args.ts`     | Modified    | Added --window-size=1920,1080                                                                        |
 | `src/McpContext.ts`       | Modified    | Lazy CDP collector initialization; createPagesSnapshot conditionally skips detectOpenDevToolsWindows |
 | `src/main.ts`             | Modified    | Navigation tools fully skip CDP operations; removed init script logic                                |

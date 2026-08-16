@@ -237,11 +237,16 @@ export class CodeCollector {
    * 🆕 获取当前活动的Page实例
    */
   async getActivePage(): Promise<Page> {
+    let resolvedPage = this.pageResolver?.();
+    if (resolvedPage && !resolvedPage.isClosed()) {
+      return resolvedPage;
+    }
+
     if (!this.browser || !this.browser.isConnected()) {
       await this.init();
     }
 
-    const resolvedPage = this.pageResolver?.();
+    resolvedPage = this.pageResolver?.();
     if (resolvedPage && !resolvedPage.isClosed()) {
       return resolvedPage;
     }

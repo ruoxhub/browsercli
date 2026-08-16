@@ -6,7 +6,13 @@
 
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
+import {
+  browserTimeoutSchema,
+  withDebuggerTrapBypass,
+} from '../shared/browserRuntime.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
+
+import {fillElement} from './fillElement.js';
 
 /**
  * 批量填充表单元素。
@@ -29,11 +35,13 @@ export const fillForm = defineTool({
         }),
       )
       .describe('要填充的元素列表。'),
+    timeoutMs: browserTimeoutSchema(
+      '每个元素的单次页面操作超时（毫秒，默认 10000）。',
+    ),
   },
   handler: async (request, response, context) => {
-    const elements = request.params.elements;
+    const {elements, timeoutMs} = request.params;
     const frame = (context as Context).getSelectedFrame();
-    const page = frame.page();
 
     if (!Array.isArray(elements) || elements.length === 0) {
       response.setStructuredContent({
@@ -48,22 +56,17 @@ export const fillForm = defineTool({
     let filled = 0;
 
     try {
-      for (const element of elements) {
-        const el = await page.$(element.selector);
-        if (el) {
-          const isSelect = await page.evaluate(sel => {
-            const ele = document.querySelector(sel);
-            return ele?.tagName === 'SELECT';
-          }, element.selector);
-
-          if (isSelect) {
-            await el.selectOption(element.value);
-          } else {
-            await el.fill(element.value);
-          }
-          filled += 1;
+      await withDebuggerTrapBypass(context, async () => {
+        for (const element of elements) {
+          const result = await fillElement(
+            frame,
+            element.selector,
+            element.value,
+            timeoutMs,
+          );
+          if (result.found) filled += 1;
         }
-      }
+      });
 
       response.setStructuredContent({
         success: true,

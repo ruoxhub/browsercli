@@ -23,6 +23,28 @@ function buildStubCollector() {
 }
 
 describe('CodeCollector defensive guards', () => {
+  it('uses an external page without launching an internal browser', async () => {
+    let launches = 0;
+    const browserManager = {
+      launch: async () => {
+        launches += 1;
+        return null;
+      },
+      newPage: async () => null,
+      getCurrentPage: () => null,
+      setCurrentPage: () => undefined,
+    } as any;
+    const collector = new CodeCollector(
+      {timeout: 5000, maxCollectedUrls: 100} as any,
+      browserManager,
+    );
+    const page = {isClosed: () => false};
+    collector.setPageResolver(() => page as never);
+
+    assert.equal(await collector.getActivePage(), page);
+    assert.equal(launches, 0);
+  });
+
   it('collect() returns NO_PAGE_CONTEXT when pageResolver is unset', async () => {
     const collector = buildStubCollector();
     const result = await collector.collect({url: 'https://example.com'});

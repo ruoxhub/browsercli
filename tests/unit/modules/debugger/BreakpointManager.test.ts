@@ -70,6 +70,51 @@ describe('BreakpointManager', () => {
     });
   });
 
+  it('stores locations resolved by CDP for URL breakpoints', async () => {
+    const session = makeSession(() => ({
+      breakpointId: 'bp-url-resolved',
+      locations: [{scriptId: 'script-1', lineNumber: 43, columnNumber: 18}],
+    }));
+    const mgr = new BreakpointManager(() => session as any);
+
+    const bp = await mgr.setBreakpointByUrl({
+      url: 'https://example.com/script.js',
+      lineNumber: 42,
+    });
+
+    assert.deepStrictEqual(bp.resolvedLocations, [
+      {scriptId: 'script-1', lineNumber: 43, columnNumber: 18},
+    ]);
+    assert.deepStrictEqual(bp.requestedLocation, {
+      url: 'https://example.com/script.js',
+      lineNumber: 42,
+      columnNumber: undefined,
+    });
+  });
+
+  it('stores the actual location returned for script breakpoints', async () => {
+    const session = makeSession(() => ({
+      breakpointId: 'bp-script-resolved',
+      actualLocation: {scriptId: 'script-1', lineNumber: 8, columnNumber: 12},
+    }));
+    const mgr = new BreakpointManager(() => session as any);
+
+    const bp = await mgr.setBreakpoint({
+      scriptId: 'script-1',
+      lineNumber: 7,
+      columnNumber: 0,
+    });
+
+    assert.deepStrictEqual(bp.resolvedLocations, [
+      {scriptId: 'script-1', lineNumber: 8, columnNumber: 12},
+    ]);
+    assert.deepStrictEqual(bp.requestedLocation, {
+      scriptId: 'script-1',
+      lineNumber: 7,
+      columnNumber: 0,
+    });
+  });
+
   it('setBreakpointByUrl rejects invalid parameters', async () => {
     const session = makeSession();
     const mgr = new BreakpointManager(() => session as any);
@@ -231,5 +276,49 @@ describe('BreakpointManager', () => {
     assert.strictEqual(bpAfter?.location.scriptId, 's99');
     assert.strictEqual(bpAfter?.location.lineNumber, 12);
     assert.strictEqual(bpAfter?.location.columnNumber, 3);
+  });
+
+  it('consumes modern resolvedBreakpoints from scriptParsed', async () => {
+    const session = makeSession(() => ({
+      breakpointId: 'bp-modern',
+      locations: [],
+    }));
+    const mgr = new BreakpointManager(() => session as any);
+    mgr.attachListeners(session as any);
+
+    await mgr.setBreakpointByUrl({
+      url: 'https://example.com/a.js',
+      lineNumber: 10,
+    });
+    session.listeners['Debugger.scriptParsed']?.({
+      scriptId: 's100',
+      url: 'https://example.com/a.js',
+      startLine: 0,
+      startColumn: 0,
+      endLine: 20,
+      endColumn: 0,
+      resolvedBreakpoints: [
+        {
+          breakpointId: 'bp-modern',
+          location: {scriptId: 's100', lineNumber: 10, columnNumber: 4},
+        },
+      ],
+    });
+
+    assert.deepStrictEqual(mgr.getBreakpoint('bp-modern')?.resolvedLocations, [
+      {scriptId: 's100', lineNumber: 10, columnNumber: 4},
+    ]);
+    assert.deepStrictEqual(mgr.getBreakpointsForExport(), [
+      {
+        location: {
+          scriptId: undefined,
+          url: 'https://example.com/a.js',
+          lineNumber: 10,
+          columnNumber: undefined,
+        },
+        condition: undefined,
+        enabled: true,
+      },
+    ]);
   });
 });

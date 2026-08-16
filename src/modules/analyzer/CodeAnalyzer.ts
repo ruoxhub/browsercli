@@ -137,13 +137,13 @@ export class CodeAnalyzer {
     const startTime = Date.now();
 
     try {
-      const {code, context, focus = 'all'} = options;
+      const {code, context, focus = 'all', useAI = true} = options;
       const ast = this.parseCodeAst(code, 'Failed to parse code structure');
 
       const structure = await analyzeStructure(code, ast);
       logger.debug('Code structure analyzed');
 
-      const aiAnalysis = await this.aiAnalyze(code, focus);
+      const aiAnalysis = useAI ? await this.aiAnalyze(code, focus) : {};
       logger.debug('AI analysis completed');
 
       const techStack = this.detectTechStack(code, aiAnalysis);
@@ -152,7 +152,7 @@ export class CodeAnalyzer {
       const businessLogic = this.extractBusinessLogic(aiAnalysis, context);
       logger.debug('Business logic extracted');
 
-      const dataFlow = await this.analyzeDataFlow(code, ast);
+      const dataFlow = await this.analyzeDataFlow(code, ast, useAI);
       logger.debug('Data flow analyzed');
 
       const securityRisks = this.identifySecurityRisks(code, aiAnalysis, ast);
@@ -299,10 +299,11 @@ export class CodeAnalyzer {
   private async analyzeDataFlow(
     code: string,
     ast: t.File | null = this.parseCodeAst(code, 'Data flow analysis failed'),
+    useAI = true,
   ): Promise<DataFlow> {
     const result = analyzeDataFlowInternal(code, ast);
 
-    if (result.taintPaths.length > 0 && this.llm) {
+    if (useAI && result.taintPaths.length > 0 && this.llm) {
       try {
         await enhanceTaintAnalysisWithLLMImpl(
           this.llm as any,

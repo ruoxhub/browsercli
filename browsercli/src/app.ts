@@ -6,7 +6,9 @@
 
 import type {AxiCliCommand} from 'axi-sdk-js';
 
+import {browserCommand} from './commands/browser.js';
 import {configCommand} from './commands/config.js';
+import {jobsCommand} from './commands/jobs.js';
 import {listToolsCommand} from './commands/list-tools.js';
 import {scaffoldCommand} from './commands/scaffold.js';
 import {statusCommand} from './commands/status.js';
@@ -20,8 +22,10 @@ export const cliVersion = '1.0.0';
 
 export const cliCommands: Record<string, AxiCliCommand<WorkerContext>> = {
   call: toolDispatcherCommand,
-  config: configCommand,
   'list-tools': listToolsCommand,
+  browser: browserCommand,
+  jobs: jobsCommand,
+  config: configCommand,
   scaffold: scaffoldCommand,
   status: statusCommand,
 };

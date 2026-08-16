@@ -4,77 +4,70 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {execFile} from 'node:child_process';
-
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
-import {defineTool} from '../ToolDefinition.js';
+import {defineTool, type Response} from '../ToolDefinition.js';
 
-function runCommand(
-  cmd: string,
+import {runNativeCommand, type NativeCommandResult} from './nativeCommand.js';
+
+type WasmRuntimeName = 'wasmtime' | 'wasmer';
+
+function invocationArgs(
+  inputPath: string,
+  functionName: string,
   args: string[],
-  timeoutMs: number,
-): Promise<{
-  stdout: string;
-  stderr: string;
-  exitCode: number;
-  notFound: boolean;
-}> {
-  return new Promise(resolve => {
-    let settled = false;
-    const finish = (value: {
-      stdout: string;
-      stderr: string;
-      exitCode: number;
-      notFound: boolean;
-    }) => {
-      if (settled) return;
-      settled = true;
-      resolve(value);
-    };
-    const child = execFile(
-      cmd,
-      args,
-      {timeout: timeoutMs},
-      (error, stdout, stderr) => {
-        const notFound = !!error && (error as NodeJS.ErrnoException).code === 'ENOENT';
-        finish({
-          stdout: stdout ?? '',
-          stderr: stderr ?? (error ? String(error) : ''),
-          exitCode:
-            typeof error?.code === 'number' ? error.code : error ? 1 : 0,
-          notFound,
-        });
-      },
-    );
-    child.on('error', (err: NodeJS.ErrnoException) => {
-      finish({
-        stdout: '',
-        stderr: `命令未找到: ${cmd} (${err.message})`,
-        exitCode: -1,
-        notFound: err.code === 'ENOENT',
-      });
-    });
+): string[] {
+  return [inputPath, '--invoke', functionName, ...args];
+}
+
+function executionMessage(
+  runtime: WasmRuntimeName,
+  result: NativeCommandResult,
+  durationMs: number,
+): string {
+  if (result.exitCode === 0) {
+    return `${runtime} 执行成功（${durationMs}ms）`;
+  }
+  if (result.timedOut) {
+    return `${runtime} 执行超时（${durationMs}ms）`;
+  }
+  return `${runtime} 执行失败（exit ${result.exitCode}）：${result.stderr.slice(0, 500)}`;
+}
+
+function setExecutionResult(
+  response: Response,
+  inputPath: string,
+  functionName: string,
+  runtime: WasmRuntimeName,
+  result: NativeCommandResult,
+  durationMs: number,
+): void {
+  response.setStructuredContent({
+    success: result.exitCode === 0,
+    message: executionMessage(runtime, result, durationMs),
+    tooltype: 'wasm_offline_run',
+    logFormat: 'json',
+    data: {
+      inputPath,
+      functionName,
+      runtime,
+      ...result,
+      durationMs,
+    },
   });
 }
 
 export const wasmOfflineRun = defineTool({
   name: 'wasm_offline_run',
-  description:
-    '使用 wasmtime 或 wasmer CLI 运行时离线执行 Wasm 函数。',
+  description: '使用 wasmtime 或 wasmer CLI 运行时离线执行 Wasm 函数。',
   annotations: {
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: false,
   },
   schema: {
     inputPath: zod.string().describe('.wasm 文件路径'),
-    functionName: zod
-      .string()
-      .describe('要调用的导出 Wasm 函数名'),
-    args: zod
-      .array(zod.string())
-      .optional()
-      .describe('传给函数的参数'),
+    functionName: zod.string().describe('要调用的导出 Wasm 函数名'),
+    args: zod.array(zod.string()).optional().describe('传给函数的参数'),
     runtime: zod
       .enum(['wasmtime', 'wasmer', 'auto'])
       .optional()
@@ -94,92 +87,92 @@ export const wasmOfflineRun = defineTool({
       runtime: runtimeChoice = 'auto',
       timeoutMs = 10000,
     } = request.params;
-
     const start = Date.now();
 
     try {
-      let cmd: string;
-      let cmdArgs: string[];
-
-      if (runtimeChoice === 'wasmer') {
-        cmd = 'wasmer';
-        cmdArgs = [inputPath, '--invoke', functionName, ...args];
-      } else if (runtimeChoice === 'wasmtime') {
-        cmd = 'wasmtime';
-        cmdArgs = [inputPath, '--invoke', functionName, ...args];
-      } else {
-        // auto: prefer wasmtime, fallback to wasmer
-        cmd = 'wasmtime';
-        cmdArgs = [inputPath, '--invoke', functionName, ...args];
-      }
-
-      const result = await runCommand(cmd, cmdArgs, timeoutMs);
-      const durationMs = Date.now() - start;
-
-      // 运行时未安装：优雅返回 JSON 提示，而非直接崩溃。
-      // auto 模式会先尝试 wasmer 回退，因此仅在非 auto 或回退后仍缺失时直接返回。
-      if (result.notFound && runtimeChoice !== 'auto') {
-        response.setStructuredContent({
-          success: false,
-          message: `运行 WASM 失败：系统中未找到运行时 ${cmd}，请先安装 wasmtime 或 wasmer 后重试。`,
-          tooltype: 'wasm_offline_run',
-          data: {
-            inputPath,
-            functionName,
-            runtime: cmd,
-            exitCode: result.exitCode,
-            notFound: true,
-          },
-        });
+      const commandArgs = invocationArgs(inputPath, functionName, args);
+      if (runtimeChoice !== 'auto') {
+        const result = await runNativeCommand(
+          runtimeChoice,
+          commandArgs,
+          timeoutMs,
+        );
+        if (result.notFound) {
+          response.setStructuredContent({
+            success: false,
+            message: `运行 WASM 失败：系统中未找到运行时 ${runtimeChoice}，请先安装 wasmtime 或 wasmer 后重试。`,
+            tooltype: 'wasm_offline_run',
+            data: {
+              inputPath,
+              functionName,
+              runtime: runtimeChoice,
+              ...result,
+            },
+          });
+          return;
+        }
+        setExecutionResult(
+          response,
+          inputPath,
+          functionName,
+          runtimeChoice,
+          result,
+          Date.now() - start,
+        );
         return;
       }
 
-      // auto fallback
-      if (
-        result.exitCode !== 0 &&
-        runtimeChoice === 'auto' &&
-        result.stderr.includes('未找到')
-      ) {
-        const wasmerResult = await runCommand(
-          'wasmer',
-          [inputPath, '--invoke', functionName, ...args],
-          timeoutMs,
+      const wasmtimeResult = await runNativeCommand(
+        'wasmtime',
+        commandArgs,
+        timeoutMs,
+      );
+      if (!wasmtimeResult.notFound) {
+        setExecutionResult(
+          response,
+          inputPath,
+          functionName,
+          'wasmtime',
+          wasmtimeResult,
+          Date.now() - start,
         );
+        return;
+      }
+
+      const wasmerResult = await runNativeCommand(
+        'wasmer',
+        commandArgs,
+        timeoutMs,
+      );
+      if (wasmerResult.notFound) {
         response.setStructuredContent({
-          success: wasmerResult.exitCode === 0,
+          success: false,
           message:
-            wasmerResult.exitCode === 0
-              ? `wasmer 执行成功（${durationMs}ms）`
-              : `wasmer 执行失败：${wasmerResult.stderr}`,
+            '运行 WASM 失败：系统中未找到 wasmtime 或 wasmer，请先安装任一运行时后重试。',
           tooltype: 'wasm_offline_run',
           logFormat: 'json',
           data: {
             inputPath,
             functionName,
-            runtime: 'wasmer',
-            ...wasmerResult,
+            runtime: 'auto',
+            attempts: {
+              wasmtime: wasmtimeResult,
+              wasmer: wasmerResult,
+            },
             durationMs: Date.now() - start,
           },
         });
         return;
       }
 
-      response.setStructuredContent({
-        success: result.exitCode === 0,
-        message:
-          result.exitCode === 0
-            ? `${cmd} 执行成功（${durationMs}ms）`
-            : `${cmd} 执行失败（exit ${result.exitCode}）：${result.stderr.slice(0, 500)}`,
-        tooltype: 'wasm_offline_run',
-        logFormat: 'json',
-        data: {
-          inputPath,
-          functionName,
-          runtime: cmd,
-          ...result,
-          durationMs,
-        },
-      });
+      setExecutionResult(
+        response,
+        inputPath,
+        functionName,
+        'wasmer',
+        wasmerResult,
+        Date.now() - start,
+      );
     } catch (error) {
       response.setStructuredContent({
         success: false,

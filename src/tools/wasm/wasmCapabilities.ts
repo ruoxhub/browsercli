@@ -4,24 +4,26 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {execFile} from 'node:child_process';
-
 import {getRuntime} from '../../runtime.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
+import {runNativeCommand} from './nativeCommand.js';
 import type {NativeToolInfo, WasmCapabilitiesData} from './types.js';
-function probeNativeTool(name: string, flag: string): Promise<NativeToolInfo> {
-  return new Promise(resolve => {
-    execFile(name, [flag], {timeout: 5000}, (error, stdout) => {
-      if (error) {
-        resolve({name, available: false});
-        return;
-      }
-      const version = stdout.trim().split('\n')[0]?.slice(0, 120);
-      resolve({name, available: true, version});
-    });
-  });
+
+async function probeNativeTool(
+  name: string,
+  flag: string,
+): Promise<NativeToolInfo> {
+  const result = await runNativeCommand(name, [flag], 5000);
+  if (result.exitCode !== 0) {
+    return {name, available: false};
+  }
+  const version = (result.stdout || result.stderr)
+    .trim()
+    .split('\n')[0]
+    ?.slice(0, 120);
+  return {name, available: true, version};
 }
 
 export const wasmCapabilities = defineTool({

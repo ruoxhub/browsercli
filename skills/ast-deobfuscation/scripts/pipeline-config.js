@@ -16,6 +16,7 @@ const STEP_LIBRARY = {
   flatten: step("flatten", "flatten-array-control-flow.js", { timeoutMs: 180000 }),
   ifToSwitch: step("if_to_switch", "if-chain-to-switch.js", { timeoutMs: 90000 }),
   inlineLiterals: step("inline_literals", "inline-literals.js", { timeoutMs: 90000 }),
+  decodeObfuscatorPass: step("decode_obfuscator_pass", "decode-obfuscator-pass.js", { timeoutMs: 90000 }),
   rename: step("rename_identifiers", "rename-identifiers.js", { timeoutMs: 120000 }),
   reese84HeavyPass: step("reese84_heavy_pass", "patterns/reese84-heavy-pass.js", { timeoutMs: 30000 }),
   dingxiangArrayPass: step("dingxiang_array_pass", "patterns/dingxiang-array-pass.js", { timeoutMs: 30000 }),
@@ -199,6 +200,7 @@ const PATTERNS = [
       "Track remaining loop-switch residue after the OB adapter stage."
     ],
     steps: [
+      STEP_LIBRARY.decodeObfuscatorPass,
       STEP_LIBRARY.normalize,
       STEP_LIBRARY.prune,
       STEP_LIBRARY.inlineDispatchers,
@@ -222,6 +224,7 @@ const PATTERNS = [
       "Compare remaining loop-switch blocks directly against the reference decode."
     ],
     steps: [
+      STEP_LIBRARY.decodeObfuscatorPass,
       STEP_LIBRARY.normalize,
       STEP_LIBRARY.prune,
       STEP_LIBRARY.inlineDispatchers,

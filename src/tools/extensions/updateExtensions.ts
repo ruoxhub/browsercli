@@ -26,6 +26,11 @@ export const updateExtensions = defineTool({
     const traverseShadowRoot = (selector, el) => {
       const found = el.querySelector(selector);
       if (found) return found;
+      const root = el.shadowRoot;
+      if (root) {
+        const deep = traverseShadowRoot(selector, root);
+        if (deep) return deep;
+      }
       for (const child of el.children) {
         const sr = child.shadowRoot;
         if (sr) {

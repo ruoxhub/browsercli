@@ -98,3 +98,25 @@ curl http://127.0.0.1:9222/json/version
 - 配了 `browserUrl`，但 Chrome 没开 remote debugging，连接不会成功
 - `--browserUrl` 和 `--wsEndpoint` 不要同时配置
 - 已经接管远程 Chrome 时，不要再强制 MCP 自己起一个新浏览器
+
+## Worker 被页面调试陷阱卡住时
+
+`fill` / `fill_form` 的单次页面操作有 10 秒上限，HTTP job 也有服务端
+deadline。超时 job 会进入 `timed_out` 终态，不会继续占用 Worker 的 job 槽位。
+
+如果底层浏览器调用仍未返回，使用强制断连终止当前 job 并清掉 Worker 持有的
+浏览器上下文，然后重新连接：
+
+```bash
+browsercli browser disconnect --force
+browsercli browser connect
+```
+
+强制断连会把当前 job 标记为 `cancelled`，并中断正在进行的页面操作；需要保留的
+页面状态应先保存。普通断连仍会在 Worker 忙时返回 `WORKER_BUSY`，避免误伤正常任务。
+
+已知 job ID 时也可以只取消 job：
+
+```http
+POST /api/v1/jobs/<job-id>/cancel
+```

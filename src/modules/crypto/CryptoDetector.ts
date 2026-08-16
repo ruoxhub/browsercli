@@ -3,7 +3,6 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
 /**
  * 加密检测模块 - 优化版本
@@ -102,7 +101,7 @@ export class CryptoDetector {
       );
 
       // 4. AI深度分析（默认关闭，需显式启用，避免不必要的 LLM 调用）
-      const useAI = (options as any).useAI === true;
+      const useAI = options.useAI === true;
       if (useAI) {
         const aiResults = await this.detectByAI(code);
         algorithms.push(...aiResults);

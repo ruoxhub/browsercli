@@ -126,8 +126,9 @@ export const riskPanel = defineTool({
         runtime.analyzer.understand({
           code,
           focus: 'security',
+          useAI: request.params.useAI,
         }),
-        runtime.cryptoDetector.detect({code}),
+        runtime.cryptoDetector.detect({code, useAI: request.params.useAI}),
       ]),
       'risk_panel 分析',
       RISK_PANEL_TIMEOUT_MS,

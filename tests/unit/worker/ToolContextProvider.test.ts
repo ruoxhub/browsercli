@@ -130,6 +130,34 @@ describe('ToolContextProvider', () => {
     assert.equal(runtime.getSelectedFrame(), newFrame);
   });
 
+  it('keeps the debugger disabled when selecting pages and frames', () => {
+    const runtime = new ToolContextProvider();
+    let debuggerWarmups = 0;
+    const debuggerContext = (
+      runtime as unknown as {
+        _debuggerContext: {ensureForPage: () => Promise<unknown>};
+      }
+    )._debuggerContext;
+    debuggerContext.ensureForPage = async () => {
+      debuggerWarmups += 1;
+    };
+
+    const frame = {name: 'main-frame'};
+    const page = {
+      frames: () => [frame],
+      mainFrame: () => frame,
+      on: () => undefined,
+      once: () => undefined,
+      setDefaultTimeout: () => undefined,
+      setDefaultNavigationTimeout: () => undefined,
+    };
+
+    runtime.selectPage(page as never);
+    runtime.selectFrameByIdx(0);
+
+    assert.equal(debuggerWarmups, 0);
+  });
+
   it('reads network requests from the requested page index', () => {
     const runtime = new ToolContextProvider();
     const selectedPage = {

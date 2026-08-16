@@ -5,13 +5,13 @@
  */
 
 import type {TrafficSummary} from '../formatters/websocketFormatter.js';
-import type {DebuggerManager} from '../modules/debugger/DebuggerManager.js';
-import type {PersistentHookRegistry} from '../modules/hook/index.js';
+import type {BrowserTargetInspector} from '../modules/browser/BrowserTargetInspector.js';
 import type {
   PageSelector,
   ResolvedPage,
 } from '../modules/browser/PageIdentity.js';
-import type {BrowserTargetInspector} from '../modules/browser/BrowserTargetInspector.js';
+import type {DebuggerManager} from '../modules/debugger/DebuggerManager.js';
+import type {PersistentHookRegistry} from '../modules/hook/index.js';
 import type {
   RequestInitiator,
   WebSocketData,
@@ -156,6 +156,10 @@ export type Context = Readonly<{
    */
   getDebuggerContext(): Promise<DebuggerManager>;
   /**
+   * Peek the debugger context without activating CDP.
+   */
+  getExistingDebuggerContext?(): DebuggerManager | undefined;
+  /**
    * Get the initiator (call stack) for a network request.
    */
   getRequestInitiator(request: HTTPRequest): RequestInitiator | undefined;
@@ -167,6 +171,10 @@ export type Context = Readonly<{
    * Get network request by ID.
    */
   getNetworkRequestById(reqid: number): HTTPRequest;
+  /**
+   * Get captured requests without selecting an individual request.
+   */
+  getNetworkRequests?(includePreservedRequests?: boolean): HTTPRequest[];
   /**
    * Get all WebSocket connections for the selected page.
    */

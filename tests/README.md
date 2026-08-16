@@ -6,15 +6,19 @@ This directory contains tests for the js-reverse-mcp project.
 
 ```
 tests/
-├── setup.js                 # Test setup and configuration
-├── unit/                    # Unit tests
-│   └── services/           # Service layer tests
-│       └── GeminiProvider.test.ts
-├── integration/             # Integration tests
-│   └── gemini-cli.integration.test.ts
-├── manual/                  # Manual test scripts
-│   └── test-gemini-provider.ts
-└── README.md               # This file
+├── setup.ts / setup.js      # Test setup
+├── unit/                    # Unit tests, mirrored from src/
+│   ├── browser/
+│   ├── modules/
+│   ├── tools/
+│   ├── worker/
+│   ├── services/
+│   └── ...
+├── integration/             # Integration tests (*.integration.test.ts)
+├── property/                # Property tests (fast-check)
+├── performance/             # Perf tests (opt-in via RUN_PERF_TESTS)
+├── manual/                  # Standalone scripts
+└── README.md
 ```
 
 ## Running Tests
@@ -118,11 +122,15 @@ describe('MyModule', () => {
 
 ## Test Coverage
 
-The project aims for 80% test coverage. Run tests with coverage:
+The project aims for 80% test coverage. Run coverage against the current tool/service include list:
 
 ```bash
-npm test
+npm run coverage
+# or the same include set explicitly:
+npm run coverage:core
 ```
+
+`coverage:core` includes `build/src/tools/dom/**`, `hook/**`, `stealth/**`, plus `AIService.js` and `LLMService.js`. For a full-src report use `npm run coverage:strict`.
 
 ## CI/CD
 

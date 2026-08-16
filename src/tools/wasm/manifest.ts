@@ -12,6 +12,7 @@ export const manifest = {
   profile: 'full',
   tools: [
     {modulePath: './wasm/index.js', handlerName: 'wasmCapabilities'},
+    {modulePath: './wasm/index.js', handlerName: 'collectWasm'},
     {modulePath: './wasm/index.js', handlerName: 'wasmDump'},
     {modulePath: './wasm/index.js', handlerName: 'wasmDisassemble'},
     {modulePath: './wasm/index.js', handlerName: 'wasmDecompile'},

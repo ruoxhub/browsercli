@@ -42,7 +42,7 @@ npx cloakbrowser install
 - 默认模式用系统 Chrome（带 Web Store、扩展、sync）
 
 混用 profile 会导致 shader cache、service worker、扩展注册表互踩，引发启动
-race 和会话崩溃。详见 `src/browser/browser-helpers.ts::resolveUserDataDir`。
+race 和会话崩溃。详见 `src/modules/browser/browser-helpers.ts::resolveUserDataDir`。
 
 ## 指纹种子持久化
 
@@ -110,4 +110,4 @@ js-reverse start
 banner 抑制 + `--hide-crash-restore-bubble`），反检测能力由协议层
 （Patchright）+ 源码层（cloak 启用时）提供。
 
-详见 `src/browser/stealth-args.ts` 与 `src/browser/cloak.ts`。
+详见 `src/modules/browser/stealth-args.ts` 与 `src/modules/browser/cloak.ts`。

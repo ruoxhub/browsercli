@@ -7,6 +7,13 @@ import WebSocket from 'ws';
 
 import type {ToolMeta} from './tool-meta-types.js';
 
+const STREAM_CHANNELS = [
+  'tool.invoke',
+  'hook.event',
+  'hook.sample',
+  'log',
+] as const;
+
 export interface WorkerHttpClientOptions {
   baseUrl: string; // 默认 http://127.0.0.1:8765
   apiToken?: string;
@@ -17,12 +24,46 @@ export interface WorkerHttpClientOptions {
 export interface JobStatus {
   jobId: string;
   sessionId: string;
-  status: 'pending' | 'running' | 'done' | 'failed';
+  tool?: string;
+  status: 'pending' | 'running' | 'done' | 'failed' | 'timed_out' | 'cancelled';
   result?: unknown;
   error?: {code: string; message: string};
   logs: string[];
   createdAt: string;
   finishedAt?: string;
+}
+
+export type BrowserConnectionMode =
+  | 'attach'
+  | 'ws-endpoint'
+  | 'launch'
+  | 'disconnected';
+
+export interface BrowserConnectionStatus {
+  connected: boolean;
+  mode: BrowserConnectionMode;
+  pages: number;
+}
+
+export interface BrowserConnectOptions {
+  acceptInsecureCerts?: boolean;
+  browserURL?: string;
+  channel?: string;
+  cloak?: boolean;
+  executablePath?: string;
+  fullStealthArgs?: boolean;
+  headless?: boolean;
+  isolated?: boolean;
+  jsStealth?: boolean;
+  minimalStealth?: boolean;
+  userDataDir?: string;
+  viewport?: {width: number; height: number};
+  wsEndpoint?: string;
+  wsHeaders?: Record<string, string>;
+}
+
+export interface BrowserDisconnectOptions {
+  force?: boolean;
 }
 
 export class WorkerHttpClient {
@@ -55,6 +96,7 @@ export class WorkerHttpClient {
   private async json<T>(path: string, init?: RequestInit): Promise<T> {
     const res = await fetch(`${this.baseUrl}/api/v1${path}`, {
       ...init,
+      signal: init?.signal ?? AbortSignal.timeout(this.timeoutMs),
       headers: {...this.authHeader(), ...(init?.headers ?? {})},
     });
     const raw = await res.text();
@@ -85,6 +127,33 @@ export class WorkerHttpClient {
 
   async health(): Promise<{status: string}> {
     return this.json('/health');
+  }
+  async getBrowserStatus(): Promise<BrowserConnectionStatus> {
+    return this.json('/browser/status');
+  }
+
+  async connectBrowser(
+    options: BrowserConnectOptions = {},
+  ): Promise<BrowserConnectionStatus> {
+    return this.json('/browser/connect', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(options),
+    });
+  }
+
+  async disconnectBrowser(
+    options: BrowserDisconnectOptions = {},
+  ): Promise<BrowserConnectionStatus> {
+    return this.json('/browser/disconnect', {
+      method: 'POST',
+      ...(options.force === undefined
+        ? {}
+        : {
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({force: options.force}),
+          }),
+    });
   }
   async listTools(): Promise<{tools: ToolMeta[]}> {
     // 服务端契约为 { tools: ToolMeta[] }；但 CLI 与 worker 独立版本化，
@@ -128,6 +197,16 @@ export class WorkerHttpClient {
     return this.json<JobStatus>(`/jobs/${encodeURIComponent(jobId)}`);
   }
 
+  async listJobs(): Promise<{jobs: JobStatus[]}> {
+    return this.json<{jobs: JobStatus[]}>('/jobs');
+  }
+
+  async cancelJob(jobId: string): Promise<JobStatus> {
+    return this.json<JobStatus>(`/jobs/${encodeURIComponent(jobId)}/cancel`, {
+      method: 'POST',
+    });
+  }
+
   /** request-response 封装：提交 + 轮询至终态，返回 result 或抛 error。
    *  首轮第 0ms 立即查，避免空等一个 pollInterval。 */
   async invoke(
@@ -142,6 +221,11 @@ export class WorkerHttpClient {
     let job = await this.getJob(jobId);
     while (job.status === 'pending' || job.status === 'running') {
       if (Date.now() > deadline) {
+        try {
+          await this.cancelJob(jobId);
+        } catch {
+          // The deadline error remains primary; jobs cancel can be retried manually.
+        }
         throw new Error(
           `invoke timeout after ${this.timeoutMs}ms (job ${jobId} status=${job.status})`,
         );
@@ -149,8 +233,10 @@ export class WorkerHttpClient {
       await new Promise(r => setTimeout(r, this.pollIntervalMs));
       job = await this.getJob(jobId);
     }
-    if (job.status === 'failed') {
-      throw new Error(`[${job.error?.code}] ${job.error?.message}`);
+    if (job.status !== 'done') {
+      throw new Error(
+        `[${job.error?.code ?? job.status}] ${job.error?.message ?? `job ${job.status}`}`,
+      );
     }
     return job.result;
   }
@@ -175,7 +261,17 @@ export class WorkerHttpClient {
       }
     });
     await new Promise<void>((resolve, reject) => {
-      ws.on('open', () => resolve());
+      ws.on('open', () => {
+        try {
+          for (const channel of STREAM_CHANNELS) {
+            ws.send(JSON.stringify({type: 'subscribe', channel}));
+          }
+          resolve();
+        } catch (error) {
+          ws.close();
+          reject(error);
+        }
+      });
       ws.on('error', reject);
     });
     return () => ws.close();

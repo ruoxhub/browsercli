@@ -6,7 +6,11 @@
 
 // ─── Script 执行与预加载注入 ───────────────────────────
 
-export {evaluateScriptFn} from './script.js';
+export {
+  evaluateScript,
+  evaluateScriptFn,
+  injectPreloadScript,
+} from './script.js';
 
 // ─── Script Injector 配置管理 ───────────────────────────
 

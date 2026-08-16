@@ -4,42 +4,24 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {execFile} from 'node:child_process';
 import {stat} from 'node:fs/promises';
 
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
-function runCommand(
-  cmd: string,
-  args: string[],
-): Promise<{stdout: string; stderr: string; exitCode: number}> {
-  return new Promise(resolve => {
-    execFile(cmd, args, {timeout: 30000}, (error, stdout, stderr) => {
-      resolve({
-        stdout: stdout ?? '',
-        stderr: stderr ?? '',
-        exitCode: typeof error?.code === 'number' ? error.code : error ? 1 : 0,
-      });
-    });
-  });
-}
+import {runNativeCommand} from './nativeCommand.js';
 
 export const wasmOptimize = defineTool({
   name: 'wasm_optimize',
-  description:
-    '使用 binaryen 的 wasm-opt 优化 .wasm 文件，可指定优化级别。',
+  description: '使用 binaryen 的 wasm-opt 优化 .wasm 文件，可指定优化级别。',
   annotations: {
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: false,
   },
   schema: {
     inputPath: zod.string().describe('要优化的 .wasm 文件路径'),
-    outputPath: zod
-      .string()
-      .optional()
-      .describe('优化后文件的输出路径'),
+    outputPath: zod.string().optional().describe('优化后文件的输出路径'),
     level: zod
       .enum(['O1', 'O2', 'O3', 'O4', 'Os', 'Oz'])
       .optional()
@@ -55,12 +37,24 @@ export const wasmOptimize = defineTool({
       const originalStats = await stat(inputPath);
 
       const args = [`-${level}`, inputPath, '-o', outputPath];
-      const result = await runCommand('wasm-opt', args);
+      const result = await runNativeCommand('wasm-opt', args, 30000);
+
+      if (result.notFound) {
+        response.setStructuredContent({
+          success: false,
+          message:
+            'wasm-opt 优化失败：系统中未找到 wasm-opt，请先安装 Binaryen 后重试。',
+          tooltype: 'wasm_optimize',
+        });
+        return;
+      }
 
       if (result.exitCode !== 0) {
         response.setStructuredContent({
           success: false,
-          message: `wasm-opt 优化失败：${result.stderr.slice(0, 500)}`,
+          message: result.timedOut
+            ? 'wasm-opt 优化失败：执行超时（30000ms）'
+            : `wasm-opt 优化失败：${result.stderr.slice(0, 500)}`,
           tooltype: 'wasm_optimize',
         });
         return;

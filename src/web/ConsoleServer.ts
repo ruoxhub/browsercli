@@ -164,6 +164,7 @@ export class ConsoleServer {
     this.router.mount(createSiteExperienceRoutes());
     this.router.mount(
       createApiV1Routes({
+        contextProvider: this.options.runtime.contextProvider!,
         toolAdapter: this.options.toolAdapter,
         jobStore: this.options.jobStore ?? getDefaultJobStore(),
         wsHub: this.wsHub,

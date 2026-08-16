@@ -175,10 +175,6 @@ export class DebuggerManager {
     const page = await this.collector.getActivePage();
     this.cdpSession = await page.context().newCDPSession(page);
 
-    await this.cdpSession.send('Debugger.enable');
-    await this.cdpSession.send('Runtime.enable');
-    this.enabled = true;
-
     // Debugger.paused 由 facade 统一监听（handlePaused 需协调多策略模块）
     this.pausedListener = params => this.handlePaused(params);
     this.cdpSession.on('Debugger.paused', this.pausedListener);
@@ -188,6 +184,12 @@ export class DebuggerManager {
     this.breakpointManager.attachListeners(this.cdpSession);
     this.scriptManager.attachListeners(this.cdpSession);
     this.executionContextTracker.attachListeners(this.cdpSession);
+
+    // CDP 在 enable 时会立即补发已有的 scriptParsed / executionContextCreated。
+    // 必须先注册监听器，否则初始脚本和上下文会永久丢失。
+    await this.cdpSession.send('Debugger.enable');
+    await this.cdpSession.send('Runtime.enable');
+    this.enabled = true;
 
     logger.info('Debugger enabled successfully');
   }
@@ -201,10 +203,6 @@ export class DebuggerManager {
       }
 
       this.cdpSession = client;
-      await this.cdpSession.send('Debugger.enable');
-      await this.cdpSession.send('Runtime.enable');
-      this.enabled = true;
-
       this.pausedListener = params => this.handlePaused(params);
       this.cdpSession.on('Debugger.paused', this.pausedListener);
 
@@ -212,6 +210,11 @@ export class DebuggerManager {
       this.breakpointManager.attachListeners(this.cdpSession);
       this.scriptManager.attachListeners(this.cdpSession);
       this.executionContextTracker.attachListeners(this.cdpSession);
+
+      // CDP enable 会同步补发已有事件，监听器必须先于域启用注册。
+      await this.cdpSession.send('Debugger.enable');
+      await this.cdpSession.send('Runtime.enable');
+      this.enabled = true;
 
       logger.info('Debugger enabled successfully (external CDP session)');
       return;

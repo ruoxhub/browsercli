@@ -16,6 +16,7 @@ import {
   sourcemapReconstructTree,
 } from '../../../../src/tools/sourcemap/index.js';
 import {manifest} from '../../../../src/tools/sourcemap/manifest.js';
+import {DefineToolContextFactory} from '../../../../src/worker/DefineToolContextFactory.js';
 import {ToolResponseAccumulator} from '../../../../src/worker/ToolResponse.js';
 
 afterEach(() => setRuntime(undefined));
@@ -129,6 +130,46 @@ describe('SourceMap tools', () => {
         }
       ).data.candidates,
       [],
+    );
+  });
+
+  it('peeks debugger metadata through the worker tool context', async () => {
+    setRuntime({
+      sourceMapService: {
+        discover: (_input: unknown, access: {listScripts(): unknown[]}) => ({
+          candidates: access.listScripts(),
+          warnings: [],
+        }),
+      },
+    } as never);
+    const context = new DefineToolContextFactory({
+      getExistingDebuggerContext: () => ({
+        getScripts: () => [
+          {
+            scriptId: '19',
+            url: 'https://example.com/app.js',
+            sourceMapURL: 'app.js.map',
+          },
+        ],
+      }),
+    } as never).create();
+    const response = new ToolResponseAccumulator();
+
+    await sourcemapDiscover.handler({params: {limit: 100}}, response, context);
+
+    assert.deepEqual(
+      (
+        response.toJSON().structuredContent as {
+          data: {candidates: unknown[]};
+        }
+      ).data.candidates,
+      [
+        {
+          scriptId: '19',
+          generatedUrl: 'https://example.com/app.js',
+          sourceMapURL: 'app.js.map',
+        },
+      ],
     );
   });
 

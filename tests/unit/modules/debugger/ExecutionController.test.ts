@@ -150,4 +150,17 @@ describe('ExecutionController', () => {
     const state = await ctrl.waitForPaused(100);
     assert.strictEqual(state.reason, 'debugCommand');
   });
+
+  it('removes a timed-out paused waiter', async () => {
+    const session = makeSession();
+    const ctrl = new ExecutionController(() => session as any);
+
+    await assert.rejects(
+      () => ctrl.waitForPaused(1),
+      /Timeout waiting for paused event/,
+    );
+
+    const state = ctrl as unknown as {pausedResolvers: unknown[]};
+    assert.strictEqual(state.pausedResolvers.length, 0);
+  });
 });

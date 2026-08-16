@@ -16,7 +16,7 @@ import type {CDPSession} from '../../third_party/index.js';
  */
 
 let activeClient: CDPSession | null = null;
-let chunks: string[] = [];
+let traceEvents: unknown[] = [];
 
 /**
  * 在发起 Tracing.start 的会话上注册数据收集监听，并记为活跃会话。
@@ -24,12 +24,16 @@ let chunks: string[] = [];
  */
 export function beginTrace(client: CDPSession): void {
   activeClient = client;
-  chunks = [];
-  client.on('event', (data: {method: string; params?: Record<string, unknown>}) => {
-    if (data.method === 'Tracing.dataCollected' && data.params) {
-      chunks.push((data.params as {value: string}).value);
-    }
-  });
+  traceEvents = [];
+  client.on(
+    'event',
+    (data: {method: string; params?: Record<string, unknown>}) => {
+      if (data.method === 'Tracing.dataCollected' && data.params) {
+        const value = data.params.value;
+        if (Array.isArray(value)) traceEvents.push(...value);
+      }
+    },
+  );
 }
 
 export function getTraceClient(): CDPSession | null {
@@ -37,13 +41,13 @@ export function getTraceClient(): CDPSession | null {
 }
 
 export function getTraceChunks(): string[] {
-  return chunks;
+  return [JSON.stringify(traceEvents)];
 }
 
 /** 结束追踪并清空状态（无论成功失败都应调用）。 */
 export function endTrace(): void {
   activeClient = null;
-  chunks = [];
+  traceEvents = [];
 }
 
 /**

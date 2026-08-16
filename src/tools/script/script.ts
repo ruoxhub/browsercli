@@ -4,13 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {getRuntime} from '../../runtime.js';
 import {createPreloadHookId} from '../../modules/hook/index.js';
+import {getRuntime} from '../../runtime.js';
 import type {CDPSession, Frame, JSHandle} from '../../third_party/index.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {selectExecutionContext} from '../debugger/contextSelector.js';
 import type {ExecutionContextInfo} from '../debugger/executionContexts.js';
+import {
+  browserTimeoutSchema,
+  withDebuggerTrapBypass,
+} from '../shared/browserRuntime.js';
 import {defineTool, type Context, type Response} from '../ToolDefinition.js';
 
 import {type PreloadPreset, getPreloadPreset} from './preload-presets.js';
@@ -34,6 +38,7 @@ interface ScriptStructuredResult {
   message: string;
   tooltype: string;
   result?: string;
+  data?: {value: unknown};
 }
 
 type DesiredContext = 'page' | 'content-script';
@@ -46,12 +51,15 @@ function withTimeout<T>(
   ms: number,
   message: string,
 ): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
   return Promise.race([
     promise,
     new Promise<T>((_, reject) => {
-      setTimeout(() => reject(new Error(message)), ms);
+      timer = setTimeout(() => reject(new Error(message)), ms);
     }),
-  ]);
+  ]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
 }
 
 function buildContextEvaluationExpression(functionCode: string): string {
@@ -177,9 +185,21 @@ function buildStructuredPayload(
   message: string,
   result?: string,
 ): ScriptStructuredResult {
-  return result === undefined
-    ? {success, message, tooltype}
-    : {success, message, tooltype, result};
+  if (result === undefined) {
+    return {success, message, tooltype};
+  }
+
+  if (!success) {
+    return {success, message, tooltype, result};
+  }
+
+  let value: unknown = result;
+  try {
+    value = JSON.parse(result) as unknown;
+  } catch {
+    // Keep non-JSON output usable while preserving the legacy result string.
+  }
+  return {success, message, tooltype, result, data: {value}};
 }
 
 function writeStructuredFailure(
@@ -223,6 +243,7 @@ async function evaluateScriptInExecutionContext(
   client: CDPSession,
   executionContext: ExecutionContextInfo,
   functionCode: string,
+  timeoutMs: number,
 ): Promise<string | undefined> {
   const runtimeResult = (await withTimeout(
     client.send('Runtime.evaluate', {
@@ -231,7 +252,7 @@ async function evaluateScriptInExecutionContext(
       returnByValue: true,
       awaitPromise: true,
     }),
-    DEFAULT_SCRIPT_TIMEOUT,
+    timeoutMs,
     'Script execution timed out',
   )) as RuntimeEvaluateResult;
 
@@ -245,12 +266,13 @@ async function evaluateScriptInExecutionContext(
 export async function evaluateScriptFn(
   frame: Frame,
   functionCode: string,
+  timeoutMs = DEFAULT_SCRIPT_TIMEOUT,
 ): Promise<ScriptStructuredResult> {
   let fn: JSHandle<unknown> | undefined;
   try {
     fn = await withTimeout(
       frame.evaluateHandle(`(${functionCode})`),
-      DEFAULT_SCRIPT_TIMEOUT,
+      timeoutMs,
       'Script evaluation timed out',
     );
     const result = await withTimeout(
@@ -261,7 +283,7 @@ export async function evaluateScriptFn(
             : await value;
         return JSON.stringify(result);
       }, fn),
-      DEFAULT_SCRIPT_TIMEOUT,
+      timeoutMs,
       'Script execution timed out',
     );
 
@@ -293,6 +315,7 @@ async function runOnDebuggerContext(
     explicitFrameId?: string;
     allowAnyFrame: boolean;
     filePath?: string;
+    timeoutMs: number;
   },
   response: Response,
   toolContext?: Context,
@@ -341,6 +364,7 @@ async function runOnDebuggerContext(
         client,
         executionContext,
         request.functionCode,
+        request.timeoutMs,
       );
       await writeEvaluationOutput(evalResult, response, {
         filePath: request.filePath,
@@ -376,6 +400,7 @@ function runOnFrame(
   request: {
     functionCode: string;
     desiredContext: DesiredContext;
+    timeoutMs: number;
   },
   response: Response,
 ): Promise<void> {
@@ -398,19 +423,21 @@ function runOnFrame(
     return Promise.resolve();
   }
 
-  return evaluateScriptFn(frame, request.functionCode).then(result => {
-    if (!result.success) {
-      const hint = getIsolationHint(
-        request.functionCode,
-        request.desiredContext,
-        result.message,
-      );
-      if (hint) {
-        result.message = hint;
+  return evaluateScriptFn(frame, request.functionCode, request.timeoutMs).then(
+    result => {
+      if (!result.success) {
+        const hint = getIsolationHint(
+          request.functionCode,
+          request.desiredContext,
+          result.message,
+        );
+        if (hint) {
+          result.message = hint;
+        }
       }
-    }
-    response.setStructuredContent(result);
-  });
+      response.setStructuredContent(result);
+    },
+  );
 }
 
 export const evaluateScript = defineTool({
@@ -451,6 +478,7 @@ export const evaluateScript = defineTool({
       .describe(
         '用于保存脚本输出的文件绝对或相对路径。省略时输出以内联方式返回。',
       ),
+    timeoutMs: browserTimeoutSchema('脚本执行超时（毫秒，默认 30000）。'),
   },
   handler: async (request, response, toolContext) => {
     const functionCode = request.params.function;
@@ -458,6 +486,7 @@ export const evaluateScript = defineTool({
     const explicitFrameId = request.params.frameId;
     const allowAnyFrame = request.params.allowAnyFrame ?? false;
     const filePath = request.params.filePath;
+    const timeoutMs = request.params.timeoutMs ?? DEFAULT_SCRIPT_TIMEOUT;
 
     if (typeof functionCode !== 'string') {
       writeStructuredFailure(
@@ -506,18 +535,21 @@ export const evaluateScript = defineTool({
       explicitFrameId,
       allowAnyFrame,
       filePath,
+      timeoutMs,
     };
 
-    const outcome = await runOnDebuggerContext(
-      ctx,
-      evalRequest,
-      response,
-      toolContext,
-    );
-    if (outcome === 'handled') {
-      return;
-    }
-    await runOnFrame(ctx, evalRequest, response);
+    await withDebuggerTrapBypass(toolContext, async () => {
+      const outcome = await runOnDebuggerContext(
+        ctx,
+        evalRequest,
+        response,
+        toolContext,
+      );
+      if (outcome === 'handled') {
+        return;
+      }
+      await runOnFrame(ctx, evalRequest, response);
+    });
   },
 });
 

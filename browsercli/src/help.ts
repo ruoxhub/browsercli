@@ -10,6 +10,8 @@
 
 const commandDescriptions: Record<string, string> = {
   call: '调用 MCP 工具，或兼容调用已迁移为 Tool 的旧技能',
+  browser: '连接、断开或查看 Worker 浏览器状态',
+  jobs: '列出或取消 Worker 工具任务',
   config: '查看/设置/初始化全局配置',
   'list-tools': '列出所有可用的 MCP 工具及旧技能兼容映射',
   scaffold: '创建新的逆向任务脚手架',
@@ -28,6 +30,8 @@ export function generateTopLevelHelp(options?: {
   const commands = options?.commands ?? [
     'call',
     'list-tools',
+    'browser',
+    'jobs',
     'config',
     'scaffold',
     'status',
@@ -60,6 +64,21 @@ export function generateCommandHelp(command: string): string | null {
       description: '调用 MCP 工具，或兼容调用已迁移为 Tool 的旧技能',
       usage:
         'browsercli call <tool-or-skill-name> [--param value] [--url <url>] [--data <json>]',
+    },
+    browser: {
+      description: '连接、断开或查看 Worker 浏览器状态',
+      usage: [
+        'browsercli browser connect [options]',
+        'browsercli browser disconnect [--force] [--json]',
+        'browsercli browser status [--json]',
+      ].join('\n         '),
+    },
+    jobs: {
+      description: '列出 Worker 任务，或取消卡住的活动任务',
+      usage: [
+        'browsercli jobs list [--json]',
+        'browsercli jobs cancel <job-id> [--json]',
+      ].join('\n         '),
     },
     config: {
       description: '查看/设置/初始化全局配置',

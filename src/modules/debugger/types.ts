@@ -14,14 +14,20 @@
 
 import type {ScopeVariable} from '../../types/index.js';
 
+export interface BreakpointLocation {
+  scriptId?: string;
+  url?: string;
+  lineNumber: number;
+  columnNumber?: number;
+}
+
 export interface BreakpointInfo {
   breakpointId: string;
-  location: {
-    scriptId?: string;
-    url?: string;
-    lineNumber: number;
-    columnNumber?: number;
-  };
+  location: BreakpointLocation;
+  /** CDP 请求中的原始位置（URL/正则或 scriptId）。 */
+  requestedLocation?: BreakpointLocation;
+  /** CDP 实际解析出的可命中位置。 */
+  resolvedLocations?: Location[];
   condition?: string;
   enabled: boolean;
   hitCount: number;

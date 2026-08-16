@@ -141,18 +141,19 @@ export class ExecutionController {
     }
 
     return new Promise((resolve, reject) => {
+      const resolver = (state: PausedState): void => {
+        clearTimeout(timer);
+        resolve(state);
+      };
       const timer = setTimeout(() => {
-        const index = this.pausedResolvers.indexOf(resolve);
+        const index = this.pausedResolvers.indexOf(resolver);
         if (index > -1) {
           this.pausedResolvers.splice(index, 1);
         }
         reject(new Error('Timeout waiting for paused event'));
       }, timeout);
 
-      this.pausedResolvers.push(state => {
-        clearTimeout(timer);
-        resolve(state);
-      });
+      this.pausedResolvers.push(resolver);
     });
   }
 
@@ -199,11 +200,21 @@ export class ExecutionController {
 
     const result = {
       type: response.result.type,
-      subtype: response.result.subtype,
-      className: response.result.className,
-      value: response.result.value,
-      description: response.result.description,
-      objectId: response.result.objectId,
+      ...(response.result.subtype !== undefined && {
+        subtype: response.result.subtype,
+      }),
+      ...(response.result.className !== undefined && {
+        className: response.result.className,
+      }),
+      ...(response.result.value !== undefined && {
+        value: response.result.value,
+      }),
+      ...(response.result.description !== undefined && {
+        description: response.result.description,
+      }),
+      ...(response.result.objectId !== undefined && {
+        objectId: response.result.objectId,
+      }),
     };
 
     const exceptionDetails = response.exceptionDetails

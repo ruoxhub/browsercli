@@ -10,6 +10,14 @@ import path from 'node:path';
 import type {ParsedArgs} from '../../args-parser.js';
 import type {ToolArgSpec, ToolArgSpecMap} from '../../tool-meta-types.js';
 
+export const TOOL_CONTROL_FLAGS: ReadonlySet<string> = new Set([
+  'file',
+  'data',
+  'stdin',
+  'session',
+  'watch',
+]);
+
 /**
  * 尝试把字符串当作 JSON 数组/对象字面量解析。
  * 仅当字符串以 `[`/`]` 或 `{`/`}` 包裹且能成功 JSON.parse 时才解析，
@@ -48,7 +56,11 @@ function inferArgValue(value: string | boolean, spec?: ToolArgSpec): unknown {
   // 若传入 JSON 对象字面量则解析为对象，否则原样返回交由服务端校验。
   if (spec?.type === 'object') {
     const parsed = maybeParseJsonLiteral(value);
-    if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    if (
+      parsed !== null &&
+      typeof parsed === 'object' &&
+      !Array.isArray(parsed)
+    ) {
       return parsed;
     }
     return value;
@@ -127,7 +139,10 @@ function parseDataFlag(value: unknown): Record<string, unknown> {
  * 纯远程 CLI 不持有本地 ToolMeta，因此仅做轻量推断：
  * boolean / number / JSON 自动探测；其余按字符串返回。
  */
-function coerceFlagValue(rawValue: string | boolean, spec?: ToolArgSpec): unknown {
+function coerceFlagValue(
+  rawValue: string | boolean,
+  spec?: ToolArgSpec,
+): unknown {
   if (typeof rawValue === 'boolean') {
     // consumeFlagValue 在下一参数以 '-' 开头时会将 flag 设为 true。
     // 若该参数声明为 string（如 evaluate_script 的 function），
@@ -185,7 +200,7 @@ export function buildToolArgs(
 
   // 3. 最高优先级：单个命令行 flag
   for (const [key, value] of Object.entries(parsed.flags)) {
-    if (key === 'file' || key === 'data' || key === 'stdin') continue;
+    if (TOOL_CONTROL_FLAGS.has(key)) continue;
 
     const argKey = toCamelCase(key);
     const spec = argSpecs?.[argKey];

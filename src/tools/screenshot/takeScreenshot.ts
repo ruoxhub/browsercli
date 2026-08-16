@@ -10,10 +10,14 @@ import path from 'node:path';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {
+  browserTimeoutSchema,
   normalizeBrowserRuntimeError,
+  withDebuggerTrapBypass,
   withOperationTimeout,
 } from '../shared/browserRuntime.js';
 import {defineTool} from '../ToolDefinition.js';
+
+const DEFAULT_SCREENSHOT_TIMEOUT_MS = 15_000;
 
 /**
  * 截图页面（defineTool 版本）。
@@ -49,19 +53,19 @@ export const takeScreenshot = defineTool({
     fullPage: zod
       .boolean()
       .optional()
-      .describe(
-        '若为 true，截取整个页面而非当前可见视口。',
-      ),
+      .describe('若为 true，截取整个页面而非当前可见视口。'),
     filePath: zod
       .string()
       .optional()
       .describe(
         '截图保存的绝对路径，或相对于当前工作目录的路径；指定后截图将保存到该路径而非附加到响应。',
       ),
+    timeoutMs: browserTimeoutSchema('截图超时（毫秒，默认 15000）。'),
   },
   handler: async (request, response, context) => {
     const format = request.params.format;
     const quality = format === 'png' ? undefined : request.params.quality;
+    const timeoutMs = request.params.timeoutMs ?? DEFAULT_SCREENSHOT_TIMEOUT_MS;
 
     try {
       const page = context.getSelectedPage();
@@ -83,14 +87,20 @@ export const takeScreenshot = defineTool({
         fs.mkdirSync(dir, {recursive: true});
       }
 
-      const screenshot = await withOperationTimeout(
-        page.screenshot({
-          type: format as 'png' | 'jpeg',
-          fullPage: request.params.fullPage,
-          quality,
-          path: resolvedFilePath,
-        }),
-        '执行截图',
+      const screenshot = await withDebuggerTrapBypass(
+        context,
+        async () =>
+          await withOperationTimeout(
+            page.screenshot({
+              type: format as 'png' | 'jpeg',
+              fullPage: request.params.fullPage,
+              quality,
+              path: resolvedFilePath,
+              timeout: timeoutMs,
+            }),
+            '执行截图',
+            timeoutMs,
+          ),
       );
 
       const screenshotBuffer = Buffer.isBuffer(screenshot)

@@ -13,11 +13,61 @@
 
 import type {BrowserManagerConfig} from '../modules/browser/index.js';
 import {BrowserManager} from '../modules/browser/index.js';
+
 import type {ToolContextProvider} from './ToolContext.js';
+import {workerActivityCoordinator} from './WorkerActivityCoordinator.js';
 
 export interface ConnectResult {
   connected: boolean;
-  mode: string;
+  mode: Exclude<BrowserConnectionMode, 'disconnected'>;
+}
+
+export type BrowserConnectionMode =
+  | 'attach'
+  | 'ws-endpoint'
+  | 'launch'
+  | 'disconnected';
+
+export interface BrowserConnectionStatus {
+  connected: boolean;
+  mode: BrowserConnectionMode;
+  pages: number;
+}
+
+export interface DisconnectBrowserOptions {
+  force?: boolean;
+}
+
+export function getBrowserConnectionMode(
+  config: BrowserManagerConfig,
+): Exclude<BrowserConnectionMode, 'disconnected'> {
+  if (
+    config.wsEndpoint ||
+    config.remoteDebuggingUrl?.startsWith('ws://') ||
+    config.remoteDebuggingUrl?.startsWith('wss://')
+  ) {
+    return 'ws-endpoint';
+  }
+  if (config.browserURL || config.remoteDebuggingUrl) return 'attach';
+  return 'launch';
+}
+
+export function getBrowserConnectionStatus(
+  contextProvider: ToolContextProvider,
+  config: BrowserManagerConfig,
+): BrowserConnectionStatus {
+  try {
+    if (!contextProvider.isBrowserConnected()) {
+      return {connected: false, mode: 'disconnected', pages: 0};
+    }
+    return {
+      connected: true,
+      mode: getBrowserConnectionMode(config),
+      pages: contextProvider.getContext()?.pages().length ?? 0,
+    };
+  } catch {
+    return {connected: false, mode: 'disconnected', pages: 0};
+  }
 }
 
 /**
@@ -30,25 +80,30 @@ export async function connectBrowser(
   contextProvider: ToolContextProvider,
   config: BrowserManagerConfig,
 ): Promise<ConnectResult> {
-  await BrowserManager.resetInstance();
-  const manager = BrowserManager.getInstance(config);
-  const browser = await manager.ensureBrowser();
-  const context = manager.getContext() ?? browser.contexts()[0] ?? null;
+  return await workerActivityCoordinator.runBrowserOperation(
+    'connect',
+    async () => {
+      await BrowserManager.resetInstance();
+      contextProvider.setBrowser(null);
+      contextProvider.clearContext();
+      const manager = BrowserManager.getInstance(config);
+      const browser = await manager.ensureBrowser();
+      const context = manager.getContext() ?? browser.contexts()[0] ?? null;
 
-  contextProvider.setBrowserManager(manager);
-  contextProvider.setBrowser(browser);
-  if (context) {
-    contextProvider.setContext(context);
-  }
-  await contextProvider.init();
+      contextProvider.setBrowserManager(manager);
+      contextProvider.setBrowser(browser);
+      if (context) {
+        contextProvider.setContext(context);
+      } else {
+        contextProvider.clearContext();
+      }
+      await contextProvider.init();
 
-  const mode = config.browserURL
-    ? 'attach'
-    : config.wsEndpoint
-      ? 'ws-endpoint'
-      : 'launch';
+      const mode = getBrowserConnectionMode(config);
 
-  return {connected: true, mode};
+      return {connected: true, mode};
+    },
+  );
 }
 
 /**
@@ -56,8 +111,16 @@ export async function connectBrowser(
  */
 export async function disconnectBrowser(
   contextProvider: ToolContextProvider,
+  options: DisconnectBrowserOptions = {},
 ): Promise<void> {
-  await BrowserManager.resetInstance();
-  contextProvider.setBrowser(null);
-  contextProvider.clearContext();
+  const disconnect = async () => {
+    await BrowserManager.resetInstance();
+    contextProvider.setBrowser(null);
+    contextProvider.clearContext();
+  };
+  await workerActivityCoordinator.runBrowserOperation(
+    'disconnect',
+    disconnect,
+    {allowActiveTools: options.force === true},
+  );
 }

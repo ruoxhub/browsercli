@@ -30,10 +30,44 @@ describe('DebuggerContextProvider', () => {
   it('enables debugger manager only once for the same page', async () => {
     const provider = new DebuggerContextProvider();
     let enabledCount = 0;
+    const listeners: Record<string, Array<(...args: unknown[]) => void>> = {};
     const client = {
-      on: () => undefined,
-      off: () => undefined,
-      send: async () => undefined,
+      on: (event: string, handler: (...args: unknown[]) => void) => {
+        (listeners[event] ??= []).push(handler);
+      },
+      off: (event: string, handler: (...args: unknown[]) => void) => {
+        listeners[event] = (listeners[event] ?? []).filter(
+          listener => listener !== handler,
+        );
+      },
+      send: async (method: string) => {
+        if (method === 'Debugger.enable') {
+          for (const listener of listeners['Debugger.scriptParsed'] ?? []) {
+            listener({
+              scriptId: 'script-at-enable',
+              url: 'https://example.com/enable.js',
+              startLine: 0,
+              startColumn: 0,
+              endLine: 1,
+              endColumn: 1,
+            });
+          }
+        }
+        if (method === 'Runtime.enable') {
+          for (const listener of listeners['Runtime.executionContextCreated'] ??
+            []) {
+            listener({
+              context: {
+                id: 1,
+                origin: 'https://example.com',
+                name: '',
+                auxData: {isDefault: true, frameId: 'frame-1'},
+              },
+            });
+          }
+        }
+        return undefined;
+      },
       detach: async () => undefined,
     };
     const page = {
@@ -52,5 +86,7 @@ describe('DebuggerContextProvider', () => {
 
     assert.strictEqual(first, second);
     assert.strictEqual(enabledCount, 1);
+    assert.strictEqual(first.getScripts().length, 1);
+    assert.strictEqual(first.getExecutionContexts().length, 1);
   });
 });

@@ -16,6 +16,8 @@ describe('help', () => {
       assert.ok(result.includes('逆向工程CLI服务'));
       assert.ok(result.includes('call'));
       assert.ok(result.includes('list-tools'));
+      assert.ok(result.includes('browser'));
+      assert.ok(result.includes('jobs'));
       assert.ok(result.includes('config'));
       assert.ok(result.includes('scaffold'));
       assert.ok(result.includes('status'));
@@ -63,6 +65,21 @@ describe('help', () => {
       assert.ok(result!.includes('list-tools'));
     });
 
+    it('returns help for browser control', () => {
+      const result = generateCommandHelp('browser');
+      assert.ok(result);
+      assert.ok(result.includes('browser connect'));
+      assert.ok(result.includes('browser disconnect [--force] [--json]'));
+      assert.ok(result.includes('browser status'));
+    });
+
+    it('returns help for job recovery', () => {
+      const result = generateCommandHelp('jobs');
+      assert.ok(result);
+      assert.ok(result.includes('jobs list'));
+      assert.ok(result.includes('jobs cancel <job-id>'));
+    });
+
     it('returns help for config command', () => {
       const result = generateCommandHelp('config');
       assert.ok(result);
@@ -92,7 +109,15 @@ describe('help', () => {
     });
 
     it('returns help for all kept commands', () => {
-      const commands = ['call', 'list-tools', 'config', 'scaffold', 'status'];
+      const commands = [
+        'call',
+        'list-tools',
+        'browser',
+        'jobs',
+        'config',
+        'scaffold',
+        'status',
+      ];
       for (const cmd of commands) {
         const result = generateCommandHelp(cmd);
         assert.ok(result, `Expected help for ${cmd}`);

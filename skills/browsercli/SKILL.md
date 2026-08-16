@@ -13,6 +13,21 @@ Check connection status and run environment diagnostics before starting a revers
 browsercli status
 ```
 
+## Worker Job Recovery
+
+List active and recent jobs when a tool call is stuck, then cancel the blocking
+job by ID. A browsercli polling timeout also attempts this cancellation
+automatically; the Worker has an independent hard deadline as a final guard.
+
+```bash
+browsercli jobs list
+browsercli jobs list --json
+browsercli jobs cancel <job-id>
+
+# Emergency browser teardown even while another job owns the Worker lane
+browsercli browser disconnect --force true
+```
+
 ## AI Workflow
 
 1. **Reconnaissance**: Start by listing pages, navigation, and script collection.
@@ -65,7 +80,7 @@ Identify and collect JavaScript source code from the active browser page.
 browsercli call list_scripts [--filter <str>] # 列出当前页面加载的所有 JavaScript 脚本信息。
 
 # Get JavaScript source code for a specific script ID
-browsercli call get_script_source --scriptId <str> [--startLine <num>] [--endLine <num>] [--offset <num>] [--prettyPrint <bool>] # 获取指定脚本 ID 的 JavaScript 源码。
+browsercli call get_script_source --scriptId <str> [--filePath <str>] [--startLine <num> --endLine <num>] # 获取指定脚本 ID 的 JavaScript 源码；行号必须成对提供。
 
 # Search in loaded script sources using strings or regex
 browsercli call search_in_sources --query <str> [--urlFilter <str>] # 在所有已加载的脚本中搜索字符串或正则表达式。
@@ -81,7 +96,15 @@ browsercli call collect_code --url <str> [--smartMode <str>] [--returnMode <str>
 
 # Compare collected file summaries
 browsercli call collection_diff [--includeUnchanged <bool>] # 对比之前和当前收集的代码文件摘要差异。
+
+# List Chromium targets and dump the scripts already parsed by a target
+browsercli call list_targets # 列出当前 Chromium Target 及其脚本快照能力。
+browsercli call dump_target_scripts --targetId <str> # 读取指定 Target 当前已解析的脚本源码；targetId 来自 list_targets。
 ```
+
+`list_targets` 和 `dump_target_scripts` 面向 Chromium Target 快照，适合补充常规
+Debugger 脚本收集无法覆盖的页面、Worker 或其他目标。先调用 `list_targets`，再把
+返回的 `targetId` 传给 `dump_target_scripts`。
 
 ### 3. JavaScript Code Analysis & Deobfuscation
 
@@ -99,6 +122,18 @@ browsercli call summarize_code [--mode <str>] [--code <str>] [--url <str>] # 对
 
 # Detect cryptographic algorithms/libraries from source code
 browsercli call detect_crypto --code <str> [--useAI <bool>] # 检测 JavaScript 源码中的加密算法和特征。
+```
+
+### 3.1 CAPTCHA 状态检测
+
+仅评估页面状态，不会自动求解 CAPTCHA 或操作页面：
+
+```bash
+# 立即评估当前页面
+browsercli call detect_captcha [--action <str>] # action 可选 detect（默认）或 wait_for_clear。
+
+# 等待 CAPTCHA 挑战稳定清除
+browsercli call detect_captcha --action wait_for_clear [--timeout <num>] # timeout 范围为 1000–300000 毫秒。
 ```
 
 ### 4. Dynamic Hooking (Highly Recommended)
@@ -163,6 +198,9 @@ browsercli call get_ai_debug_status # 获取当前调试器的综合状态信息
 browsercli call inspect_locals # 检查当前暂停调用栈中所有栈帧的局部变量。
 browsercli call inspect_object --expression <str> # 深度分析并结构化展示指定 JavaScript 对象结构。
 browsercli call evaluate_on_callframe --expression <str> # 在当前暂停调用栈帧的上下文中执行 JavaScript 表达式。
+
+# Direct page JavaScript execution (no breakpoint/pause required)
+browsercli call evaluate_script --function <str> [--context <str>] [--frameId <str>] [--allowAnyFrame <bool>] [--filePath <str>] [--timeoutMs <num>] # 在页面或 content-script 上下文执行任意完整表达式；JSON 值位于 data.value，兼容字符串位于 result。
 ```
 
 ### 6. Anti-Detection & Stealth
@@ -193,6 +231,9 @@ Decompile, optimize, disassemble, and run WebAssembly modules.
 # Detect available native Wasm toolchain
 browsercli call wasm_capabilities # 检测本地是否安装有 WASM 分析相关的 native 工具链。
 
+# Capture network-loaded and runtime-created Wasm modules before dumping
+browsercli call collect_wasm --url <str> [--timeout <num>] [--waitAfterLoadMs <num>] [--includeRuntimeEvents <bool>] [--maxModules <num>] [--captureBase64 <bool>] # 重新导航并捕获 Wasm；小模块可直接在结果中返回 Base64。
+
 # Dump a captured WebAssembly module
 browsercli call wasm_dump [--moduleIndex <num>] [--outputPath <str>] # 将网页已编译加载的 Wasm 模块提取并存盘为本地 .wasm 文件。
 
@@ -218,6 +259,9 @@ browsercli call wasm_vmp_trace [--maxEvents <num>] [--filterModule <str>] # 追�
 browsercli call wasm_memory_inspect [--offset <num>] [--length <num>] [--format <str>] [--searchPattern <str>] # 检查或在内存中检索导出的 WebAssembly.Memory 缓冲数据。
 ```
 
+`wasm_dump` 必须在同一 Worker 会话中先执行 `collect_wasm`。捕获与导出不依赖
+WABT/Binaryen/wasmtime/wasmer；这些 native 工具只影响后续反汇编、优化或离线运行。
+
 ### 8. DOM Query & Element Interaction
 
 Automate page actions such as clicks, typing, and form submissions.
@@ -229,11 +273,11 @@ browsercli call get_dom_structure [--maxDepth <num>] [--includeText <bool>] # �
 browsercli call find_clickable_elements [--filterText <str>] # 在当前页面智能搜索可点击的 DOM 元素。
 
 # Interaction
-browsercli call click --selector <str> [--dblClick <bool>] # 模拟点击指定的 DOM 元素。
+browsercli call click --selector <str> [--dblClick <bool>] [--timeoutMs <num>] # 模拟点击指定的 DOM 元素。
 browsercli call click_at --selector <str> # 在目标元素的中心物理坐标处执行 CDP 鼠标点击（防劫持）。
 browsercli call click_element --selector <str> # 点击指定的 DOM 元素。
-browsercli call fill --selector <str> --value <str> # 为输入框、下拉菜单等元素填充指定的值。
-browsercli call fill_form  # 批量填充页面上的表单数据（通常通过 stdin 输入 JSON 键值对）。
+browsercli call fill --selector <str> --value <str> [--timeoutMs <num>] # 为输入框、下拉菜单等元素填充指定的值。
+browsercli call fill_form [--timeoutMs <num>] # 批量填充页面上的表单数据（通常通过 stdin 输入 JSON 键值对）。
 browsercli call type_text --selector <str> --text <str> [--delay <num>] # 模拟真实键盘打字形式往输入框输入文本。
 browsercli call press_key --key <str> # 模拟触发特定的物理按键或快捷组合键。
 browsercli call hover --selector <str> # 将鼠标悬停在指定元素上方。
@@ -245,7 +289,7 @@ browsercli call wait_for_element --selector <str> [--timeout <num>] # 同步阻�
 browsercli call handle_dialog --action <str> [--promptText <str>] # 自动处理页面中弹出的 alert/confirm/prompt 对话框。
 
 # Capture
-browsercli call take_screenshot [--format <str>] [--quality <num>] [--fullPage <bool>] [--filePath <str>] # 对当前页面（或长页面）截图。
+browsercli call take_screenshot [--format <str>] [--quality <num>] [--fullPage <bool>] [--filePath <str>] [--timeoutMs <num>] # 对当前页面（或长页面）截图；默认超时 15000ms。
 ```
 
 ### 9. Network & WebSocket Analysis
@@ -297,6 +341,35 @@ browsercli call diff_env_requirements --runtimeError <str> [--observedCapabiliti
 browsercli call trace_signature_generation [--requestUrlPattern <str>] [--headerKeyword <str>] [--maxResults <num>] [--includeSensitiveValues <bool>] [--taskId <str>] # 针对签名机制自动串联请求、Hook、断点及变量关系以还原生成链。
 ```
 
+### 10.1 SourceMap 定位与重建
+
+SourceMap 工具使用 `sourcemap_discover` 返回的 `mapId` 作为后续解析、定位、比较和
+重建操作的句柄。`sourcemap_parse` 的 `scriptId`、`mapUrl`、`mapContent` 三者必须
+且只能提供一个。
+
+```bash
+# 从已收集的 Debugger 元数据发现 SourceMap 引用
+browsercli call sourcemap_discover [--scriptId <str>] [--urlPattern <str>] [--limit <num>]
+
+# 解析 SourceMap；三选一提供输入来源
+browsercli call sourcemap_parse [--scriptId <str>] [--mapUrl <str>] [--mapContent <str>] [--generatedUrl <str>] [--allowCrossOrigin <bool>]
+
+# 坐标双向定位
+browsercli call sourcemap_lookup --mapId <str> --direction <str> --line <num> --column <num> [--source <str>] [--bias <str>]
+
+# 将缓存的原始源码显式重建到安全目录
+browsercli call sourcemap_reconstruct_tree --mapId <str> [--taskId <str>] [--outputDir <str>] [--overwrite <bool>]
+
+# 比较两个已解析的 SourceMap
+browsercli call sourcemap_diff --leftMapId <str> --rightMapId <str> [--mode <str>] [--maxChanges <num>]
+```
+
+`sourcemap_lookup --direction original_to_generated` 时必须提供 `--source`。
+`--direction` 可选 `generated_to_original` 或 `original_to_generated`；`--mode` 可选
+`summary`、`sources` 或 `mappings`；`--bias` 可选 `greatest_lower_bound` 或
+`least_upper_bound`。`sourcemap_reconstruct_tree` 会写入文件，应显式确认输出目录和
+`--overwrite` 设置。
+
 ### 11. Workflow Helpers, Site Experiences & Templates
 
 Package specific patterns, target profiles, and reusable scripts.
@@ -320,6 +393,12 @@ browsercli call delete_site_experience --id <num> # 删除选定的站点逆向�
 ### 12. Session Management, Diagnostics & Video
 
 ```bash
+# Check browser/page health before or after a long-running workflow
+browsercli call check_browser_health # 检查浏览器连接、页面和关键运行时能力是否健康。
+
+# Export cookies/storage; cookies includes HttpOnly values and a ready-to-copy header
+browsercli call get_storage [--type <str>] [--filter <str>] # --type cookies 时从 data.cookieHeader 读取 "name=value; ..."。
+
 # Save and restore browser state
 browsercli call save_session_state [--sessionId <str>] [--includeCookies <bool>] [--includeLocalStorage <bool>] [--includeSessionStorage <bool>] # 备份当前的浏览器 Cookie 与 Storage 会话状态。
 browsercli call restore_session_state --sessionId <str> [--navigateToSavedUrl <bool>] [--clearStorageBeforeRestore <bool>] # 从备份中恢复浏览器的会话状态并还原环境。

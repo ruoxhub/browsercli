@@ -19,7 +19,7 @@ import type {ToolMeta} from '../tool-meta-types.js';
 import type {WorkerContext} from '../types.js';
 import {WorkerHttpClient} from '../WorkerHttpClient.js';
 
-import {buildToolArgs} from './shared/tool-args.js';
+import {buildToolArgs, TOOL_CONTROL_FLAGS} from './shared/tool-args.js';
 
 /**
  * 当请求的工具名模糊匹配到多个候选（如 `select` → select_frame / select_page）
@@ -31,7 +31,7 @@ function disambiguateByArgs(
   parsed: ParsedArgs,
 ): ToolMeta | undefined {
   const providedKeys = Object.keys(parsed.flags)
-    .filter(k => k !== 'file' && k !== 'data' && k !== 'stdin')
+    .filter(key => !TOOL_CONTROL_FLAGS.has(key))
     .map(k => k.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase()));
 
   const scored = candidates
@@ -172,17 +172,22 @@ export const toolDispatcherCommand: AxiCliCommand<WorkerContext> = async (
     }
   }
 
-  try {
-    const sessionId = getFlag(parsed, 'session'); // string | undefined
-    const result = await httpClient.invoke(sessionId, candidate.name, toolArgs);
+  const requestedSessionId = getFlag(parsed, 'session');
+  const watch = getBoolFlag(parsed, 'watch');
+  let closeStream: (() => void) | undefined;
 
-    // --watch：订阅该会话事件流（非致命：流不可用时仅告警）
-    if (getBoolFlag(parsed, 'watch')) {
+  try {
+    const sessionId = watch
+      ? await httpClient.ensureSession(requestedSessionId)
+      : requestedSessionId;
+
+    // --watch 必须先完成订阅，才能观察本次工具调用产生的事件。
+    if (watch) {
       try {
-        const close = await httpClient.openStream(sessionId, ev =>
+        closeStream = await httpClient.openStream(sessionId, ev =>
           console.log('[stream]', JSON.stringify(ev)),
         );
-        process.once('exit', close);
+        process.once('exit', closeStream);
       } catch (streamErr) {
         console.warn(
           '[call] --watch 流不可用:',
@@ -190,6 +195,8 @@ export const toolDispatcherCommand: AxiCliCommand<WorkerContext> = async (
         );
       }
     }
+
+    const result = await httpClient.invoke(sessionId, candidate.name, toolArgs);
 
     const failure = extractToolFailure(result);
     if (failure) {
@@ -203,6 +210,10 @@ export const toolDispatcherCommand: AxiCliCommand<WorkerContext> = async (
       result,
     });
   } catch (error) {
+    if (closeStream) {
+      process.removeListener('exit', closeStream);
+      closeStream();
+    }
     if (error instanceof AxiError) throw error;
     throw new AxiError(
       `工具调用失败：${error instanceof Error ? error.message : error}`,

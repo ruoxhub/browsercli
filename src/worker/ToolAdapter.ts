@@ -78,12 +78,13 @@ export class ToolAdapter {
     meta: ToolMeta,
     params: Record<string, unknown>,
     sessionId?: string,
+    signal?: AbortSignal,
   ): Promise<unknown> {
     if (sessionId) {
       this.contextProvider.setActiveSession?.(sessionId);
     }
     try {
-      return await this.pipeline.execute(meta, params);
+      return await this.pipeline.execute(meta, params, signal);
     } finally {
       if (sessionId) {
         this.contextProvider.clearActiveSession?.();

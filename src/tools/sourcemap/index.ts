@@ -12,10 +12,9 @@ import {
 import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
 import type {HTTPRequest} from '../../third_party/index.js';
-import type {ToolContextProvider} from '../../worker/ToolContext.js';
 import type {ToolResponseAccumulator} from '../../worker/ToolResponse.js';
 import {ToolCategory} from '../categories.js';
-import {defineTool} from '../ToolDefinition.js';
+import {defineTool, type Context} from '../ToolDefinition.js';
 
 const discoverSchema = {
   scriptId: zod.string().min(1).optional(),
@@ -106,13 +105,11 @@ async function capturedBody(
   return {url, content: body.toString('utf8'), complete: true};
 }
 
-function createRuntimeAccess(
-  context: ToolContextProvider,
-): SourceMapRuntimeAccess {
+function createRuntimeAccess(context: Context): SourceMapRuntimeAccess {
   const runtime = getRuntime();
   return {
     listScripts: () =>
-      (context.getExistingDebuggerContext()?.getScripts() ?? [])
+      (context.getExistingDebuggerContext?.()?.getScripts() ?? [])
         .filter(script => typeof script.sourceMapURL === 'string')
         .map(script => ({
           scriptId: script.scriptId,
@@ -120,7 +117,7 @@ function createRuntimeAccess(
           sourceMapURL: script.sourceMapURL ?? '',
         })),
     findCapturedBody: (url, maxBytes) =>
-      capturedBody(context.getNetworkRequests(true), url, maxBytes),
+      capturedBody(context.getNetworkRequests?.(true) ?? [], url, maxBytes),
     getCookies: async url => {
       const page = context.getSelectedPage();
       return page ? page.context().cookies(url) : [];
@@ -146,8 +143,8 @@ function service() {
   return sourceMapService;
 }
 
-function access(context: unknown): SourceMapRuntimeAccess {
-  return createRuntimeAccess(context as ToolContextProvider);
+function access(context: Context): SourceMapRuntimeAccess {
+  return createRuntimeAccess(context);
 }
 
 function assertSingleParseSource(input: {

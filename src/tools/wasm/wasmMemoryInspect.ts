@@ -4,9 +4,25 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {evaluateInPageRuntime} from '../../modules/debugger/evaluateInPageRuntime.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
+import {withOperationTimeout} from '../shared/browserRuntime.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
+
+const DEFAULT_TIMEOUT_MS = 5000;
+const MAX_SEARCH_BYTES = 64 * 1024 * 1024;
+
+interface MemoryInspectionResult {
+  found: boolean;
+  memories: string[];
+  memorySize?: number;
+  error?: string;
+  hex?: string;
+  ascii?: string;
+  searchResults?: Array<{offset: number; match: string}>;
+  searchTruncated?: boolean;
+}
 
 export const wasmMemoryInspect = defineTool({
   name: 'wasm_memory_inspect',
@@ -35,8 +51,16 @@ export const wasmMemoryInspect = defineTool({
       .describe('输出格式（默认 "both"）'),
     searchPattern: zod
       .string()
+      .max(4096)
       .optional()
       .describe('要搜索的十六进制模式（如 "00 FF"）或 ASCII 字符串'),
+    timeoutMs: zod
+      .number()
+      .int()
+      .positive()
+      .max(30000)
+      .optional()
+      .describe('页面内存检查超时时间（毫秒，默认 5000）'),
   },
   handler: async (request, response, context: Context) => {
     const {
@@ -44,6 +68,7 @@ export const wasmMemoryInspect = defineTool({
       length = 256,
       format = 'both',
       searchPattern,
+      timeoutMs = DEFAULT_TIMEOUT_MS,
     } = request.params;
 
     try {
@@ -57,147 +82,206 @@ export const wasmMemoryInspect = defineTool({
         return;
       }
 
-      const result = await page.evaluate(
-        ({
-          evalOffset,
-          evalLength,
-          evalFormat,
-          searchPattern,
-        }: {
-          evalOffset: number;
-          evalLength: number;
-          evalFormat: string;
-          searchPattern?: string;
-        }) => {
-          // 查找页面中导出的 WebAssembly.Memory
-          const memories: Array<{exportName: string; buffer: ArrayBuffer}> = [];
+      const inspectMemory = ({
+        evalOffset,
+        evalLength,
+        evalFormat,
+        searchPattern,
+        maxSearchBytes,
+      }: {
+        evalOffset: number;
+        evalLength: number;
+        evalFormat: string;
+        searchPattern?: string;
+        maxSearchBytes: number;
+      }) => {
+        const memories: Array<{
+          exportName: string;
+          memory: WebAssembly.Memory;
+        }> = [];
+        const seenMemories = new Set<WebAssembly.Memory>();
 
-          // 遍历全局对象查找 wasm 实例
-          for (const key of Object.keys(globalThis)) {
-            try {
-              const obj = (globalThis as Record<string, unknown>)[key];
-              if (obj && typeof obj === 'object') {
-                for (const prop of Object.keys(
-                  obj as Record<string, unknown>,
-                )) {
-                  try {
-                    const val = (obj as Record<string, unknown>)[prop];
-                    if (val instanceof WebAssembly.Memory) {
-                      memories.push({
-                        exportName: `${key}.${prop}`,
-                        buffer: val.buffer,
-                      });
-                    }
-                    // 检查 Instance 的 exports
-                    if (
-                      val &&
-                      typeof val === 'object' &&
-                      'exports' in (val as Record<string, unknown>)
-                    ) {
-                      const exports = (val as Record<string, unknown>)
-                        .exports as Record<string, unknown>;
-                      for (const [expName, expVal] of Object.entries(exports)) {
-                        if (expVal instanceof WebAssembly.Memory) {
-                          memories.push({
-                            exportName: `${key}.${prop}.${expName}`,
-                            buffer: expVal.buffer,
-                          });
-                        }
-                      }
-                    }
-                  } catch {
-                    // 跳过不可访问的属性
-                  }
-                }
-              }
-            } catch {
-              // 跳过不可访问的全局属性
+        function addMemory(name: string, value: unknown): void {
+          if (value instanceof WebAssembly.Memory && !seenMemories.has(value)) {
+            seenMemories.add(value);
+            memories.push({exportName: name, memory: value});
+          }
+        }
+
+        function inspectInstance(
+          name: string,
+          instance: WebAssembly.Instance,
+        ): void {
+          try {
+            inspectOwnDataProperties(`${name}.exports`, instance.exports);
+          } catch {
+            // 跳过已失效或不可访问的实例。
+          }
+        }
+
+        function inspectOwnDataProperties(prefix: string, value: object): void {
+          let descriptors: PropertyDescriptorMap;
+          try {
+            descriptors = Object.getOwnPropertyDescriptors(value);
+          } catch {
+            return;
+          }
+          for (const [propertyName, descriptor] of Object.entries(
+            descriptors,
+          )) {
+            if (!('value' in descriptor)) continue;
+            const propertyValue = descriptor.value as unknown;
+            const path = `${prefix}.${propertyName}`;
+            addMemory(path, propertyValue);
+            if (propertyValue instanceof WebAssembly.Instance) {
+              inspectInstance(path, propertyValue);
             }
           }
+        }
 
-          if (memories.length === 0) {
-            return {found: false, memories: []};
+        const globalDescriptors = Object.getOwnPropertyDescriptors(globalThis);
+        for (const [name, descriptor] of Object.entries(globalDescriptors)) {
+          if (!('value' in descriptor)) continue;
+          const value = descriptor.value as unknown;
+          addMemory(name, value);
+          if (value instanceof WebAssembly.Instance) {
+            inspectInstance(name, value);
+            continue;
           }
-
-          const mem = memories[0];
-          const view = new Uint8Array(
-            mem.buffer,
-            evalOffset,
-            Math.min(evalLength, mem.buffer.byteLength - evalOffset),
-          );
-
-          let hex: string | undefined;
-          let ascii: string | undefined;
-          const searchResults: Array<{offset: number; match: string}> = [];
-
-          if (evalFormat === 'hex' || evalFormat === 'both') {
-            hex = Array.from(view)
-              .map(b => b.toString(16).padStart(2, '0'))
-              .join(' ');
+          if (
+            value === globalThis ||
+            !value ||
+            (typeof value !== 'object' && typeof value !== 'function')
+          ) {
+            continue;
           }
-
-          if (evalFormat === 'ascii' || evalFormat === 'both') {
-            ascii = Array.from(view)
-              .map(b => (b >= 0x20 && b <= 0x7e ? String.fromCharCode(b) : '.'))
-              .join('');
-          }
-
-          // 搜索模式
-          if (searchPattern) {
-            const patternBytes: number[] = [];
-            // 尝试 hex 模式
-            if (/^[0-9a-fA-F\s]+$/.test(searchPattern)) {
-              const hexClean = searchPattern.replace(/\s/g, '');
-              for (let i = 0; i < hexClean.length; i += 2) {
-                patternBytes.push(parseInt(hexClean.slice(i, i + 2), 16));
-              }
-            } else {
-              // ASCII 模式
-              for (let i = 0; i < searchPattern.length; i++) {
-                patternBytes.push(searchPattern.charCodeAt(i));
-              }
+          try {
+            const prototype = Object.getPrototypeOf(value) as unknown;
+            if (prototype === null || prototype === Object.prototype) {
+              inspectOwnDataProperties(name, value);
             }
-
-            if (patternBytes.length > 0) {
-              const fullView = new Uint8Array(mem.buffer);
-              for (let i = 0; i <= fullView.length - patternBytes.length; i++) {
-                let match = true;
-                for (let j = 0; j < patternBytes.length; j++) {
-                  if (fullView[i + j] !== patternBytes[j]) {
-                    match = false;
-                    break;
-                  }
-                }
-                if (match) {
-                  searchResults.push({
-                    offset: i,
-                    match: Array.from(
-                      fullView.slice(i, i + patternBytes.length),
-                    )
-                      .map(b => b.toString(16).padStart(2, '0'))
-                      .join(' '),
-                  });
-                  if (searchResults.length >= 100) break;
-                }
-              }
-            }
+          } catch {
+            // 跳过 Proxy 或不可访问的宿主对象。
           }
+        }
 
+        if (memories.length === 0) {
+          return {found: false, memories: []};
+        }
+
+        const selected = memories[0];
+        const buffer = selected.memory.buffer;
+        const memoryNames = memories.map(memory => memory.exportName);
+        if (evalOffset > buffer.byteLength) {
           return {
             found: true,
-            memories: memories.map(m => m.exportName),
-            memorySize: mem.buffer.byteLength,
-            hex,
-            ascii,
-            searchResults: searchResults.length > 0 ? searchResults : undefined,
+            memories: memoryNames,
+            memorySize: buffer.byteLength,
+            error: `读取偏移 ${evalOffset} 超出内存大小 ${buffer.byteLength}`,
           };
-        },
+        }
+
+        const view = new Uint8Array(
+          buffer,
+          evalOffset,
+          Math.min(evalLength, buffer.byteLength - evalOffset),
+        );
+        let hex: string | undefined;
+        let ascii: string | undefined;
+        const searchResults: Array<{offset: number; match: string}> = [];
+
+        if (evalFormat === 'hex' || evalFormat === 'both') {
+          hex = Array.from(view)
+            .map(byte => byte.toString(16).padStart(2, '0'))
+            .join(' ');
+        }
+
+        if (evalFormat === 'ascii' || evalFormat === 'both') {
+          ascii = Array.from(view)
+            .map(byte =>
+              byte >= 0x20 && byte <= 0x7e ? String.fromCharCode(byte) : '.',
+            )
+            .join('');
+        }
+
+        let searchTruncated = false;
+        if (searchPattern) {
+          const compactHex = searchPattern.replace(/\s/g, '');
+          let patternBytes: number[];
+          if (/^(?:[0-9a-fA-F]{2})+$/.test(compactHex)) {
+            patternBytes = Array.from(
+              {length: compactHex.length / 2},
+              (_, index) =>
+                parseInt(compactHex.slice(index * 2, index * 2 + 2), 16),
+            );
+          } else {
+            patternBytes = Array.from(new TextEncoder().encode(searchPattern));
+          }
+
+          if (patternBytes.length > 0) {
+            const searchLength = Math.min(buffer.byteLength, maxSearchBytes);
+            const fullView = new Uint8Array(buffer, 0, searchLength);
+            searchTruncated = searchLength < buffer.byteLength;
+            for (
+              let index = 0;
+              index <= fullView.length - patternBytes.length;
+              index++
+            ) {
+              let matches = true;
+              for (
+                let patternIndex = 0;
+                patternIndex < patternBytes.length;
+                patternIndex++
+              ) {
+                if (
+                  fullView[index + patternIndex] !== patternBytes[patternIndex]
+                ) {
+                  matches = false;
+                  break;
+                }
+              }
+              if (matches) {
+                searchResults.push({
+                  offset: index,
+                  match: Array.from(
+                    fullView.slice(index, index + patternBytes.length),
+                  )
+                    .map(byte => byte.toString(16).padStart(2, '0'))
+                    .join(' '),
+                });
+                if (searchResults.length >= 100) break;
+              }
+            }
+          }
+        }
+
+        return {
+          found: true,
+          memories: memoryNames,
+          memorySize: buffer.byteLength,
+          hex,
+          ascii,
+          searchResults: searchResults.length > 0 ? searchResults : undefined,
+          searchTruncated: searchTruncated || undefined,
+        };
+      };
+      const inspectionExpression = `(${inspectMemory.toString()})(${JSON.stringify(
         {
           evalOffset: offset,
           evalLength: length,
           evalFormat: format,
           searchPattern,
+          maxSearchBytes: MAX_SEARCH_BYTES,
         },
+      )})`;
+      const result = await withOperationTimeout(
+        evaluateInPageRuntime<MemoryInspectionResult>(
+          page.mainFrame(),
+          inspectionExpression,
+          timeoutMs,
+        ),
+        '检查 WASM 内存',
+        timeoutMs,
       );
 
       if (!result.found) {
@@ -208,21 +292,32 @@ export const wasmMemoryInspect = defineTool({
         });
         return;
       }
+      if (result.error) {
+        response.setStructuredContent({
+          success: false,
+          message: result.error,
+          tooltype: 'wasm_memory_inspect',
+          data: {
+            memories: result.memories,
+            memorySize: result.memorySize,
+          },
+        });
+        return;
+      }
 
       response.setStructuredContent({
         success: true,
-        message: `检查了 ${(result as {memorySize: number}).memorySize} 字节内存（${(result as {memories: string[]}).memories.join(', ')}）`,
+        message: `检查了 ${result.memorySize} 字节内存（${result.memories.join(', ')}）`,
         tooltype: 'wasm_memory_inspect',
         logFormat: 'json',
         data: {
           offset,
           length,
           format,
-          hex: (result as {hex?: string}).hex,
-          ascii: (result as {ascii?: string}).ascii,
-          searchResults: (
-            result as {searchResults?: Array<{offset: number; match: string}>}
-          ).searchResults,
+          hex: result.hex,
+          ascii: result.ascii,
+          searchResults: result.searchResults,
+          searchTruncated: result.searchTruncated,
         },
       });
     } catch (error) {

@@ -28,6 +28,7 @@ import {logger} from '../../utils/logger.js';
 import type {
   BreakLocation,
   BreakpointInfo,
+  BreakpointLocation,
   DebuggerBreakpointResolvedEvent,
   Location,
 } from './types.js';
@@ -39,6 +40,11 @@ export class BreakpointManager {
   private breakpointResolvedListener:
     | ((params: DebuggerBreakpointResolvedEvent) => void)
     | null = null;
+  private scriptParsedListener:
+    | ((params: {
+        resolvedBreakpoints?: DebuggerBreakpointResolvedEvent[];
+      }) => void)
+    | null = null;
 
   constructor(private getCDPSession: () => CDPSession) {}
 
@@ -46,7 +52,13 @@ export class BreakpointManager {
   attachListeners(session: CDPSession): void {
     this.breakpointResolvedListener = params =>
       this.handleBreakpointResolved(params);
+    this.scriptParsedListener = params => {
+      for (const breakpoint of params.resolvedBreakpoints ?? []) {
+        this.handleBreakpointResolved(breakpoint);
+      }
+    };
     session.on('Debugger.breakpointResolved', this.breakpointResolvedListener);
+    session.on('Debugger.scriptParsed', this.scriptParsedListener);
   }
 
   /** 注销 Debugger.breakpointResolved 监听器。 */
@@ -57,6 +69,10 @@ export class BreakpointManager {
         this.breakpointResolvedListener,
       );
       this.breakpointResolvedListener = null;
+    }
+    if (this.scriptParsedListener) {
+      session.off('Debugger.scriptParsed', this.scriptParsedListener);
+      this.scriptParsedListener = null;
     }
   }
 
@@ -93,13 +109,18 @@ export class BreakpointManager {
       },
     );
 
+    const location: BreakpointLocation = {
+      url: params.url,
+      lineNumber: params.lineNumber,
+      columnNumber: params.columnNumber,
+    };
     const breakpointInfo: BreakpointInfo = {
       breakpointId: result.breakpointId,
-      location: {
-        url: params.url,
-        lineNumber: params.lineNumber,
-        columnNumber: params.columnNumber,
-      },
+      location,
+      requestedLocation: location,
+      resolvedLocations: Array.isArray(result.locations)
+        ? result.locations
+        : [],
       condition: params.condition,
       enabled: true,
       hitCount: 0,
@@ -143,13 +164,18 @@ export class BreakpointManager {
       } as any,
     );
 
+    const location: BreakpointLocation = {
+      url: params.urlRegex,
+      lineNumber: params.lineNumber,
+      columnNumber: params.columnNumber,
+    };
     const breakpointInfo: BreakpointInfo = {
       breakpointId: result.breakpointId,
-      location: {
-        url: params.urlRegex,
-        lineNumber: params.lineNumber,
-        columnNumber: params.columnNumber,
-      },
+      location,
+      requestedLocation: location,
+      resolvedLocations: Array.isArray(result.locations)
+        ? result.locations
+        : [],
       condition: params.condition,
       enabled: true,
       hitCount: 0,
@@ -191,13 +217,16 @@ export class BreakpointManager {
       condition: params.condition,
     });
 
+    const location: BreakpointLocation = {
+      scriptId: params.scriptId,
+      lineNumber: params.lineNumber,
+      columnNumber: params.columnNumber,
+    };
     const breakpointInfo: BreakpointInfo = {
       breakpointId: result.breakpointId,
-      location: {
-        scriptId: params.scriptId,
-        lineNumber: params.lineNumber,
-        columnNumber: params.columnNumber,
-      },
+      location,
+      requestedLocation: location,
+      resolvedLocations: result.actualLocation ? [result.actualLocation] : [],
       condition: params.condition,
       enabled: true,
       hitCount: 0,
@@ -384,20 +413,23 @@ export class BreakpointManager {
 
   /** 暴露给 DebuggerSessionStore 用于导出。 */
   getBreakpointsForExport(): Array<{
-    location: BreakpointInfo['location'];
+    location: BreakpointLocation;
     condition?: string;
     enabled: boolean;
   }> {
-    return Array.from(this.breakpoints.values()).map(bp => ({
-      location: {
-        scriptId: bp.location.scriptId,
-        url: bp.location.url,
-        lineNumber: bp.location.lineNumber,
-        columnNumber: bp.location.columnNumber,
-      },
-      condition: bp.condition,
-      enabled: bp.enabled,
-    }));
+    return Array.from(this.breakpoints.values()).map(bp => {
+      const location = bp.requestedLocation ?? bp.location;
+      return {
+        location: {
+          scriptId: location.scriptId,
+          url: location.url,
+          lineNumber: location.lineNumber,
+          columnNumber: location.columnNumber,
+        },
+        condition: bp.condition,
+        enabled: bp.enabled,
+      };
+    });
   }
 
   /** 暴露给 facade 用于在 handlePaused 中构造 BreakpointHitEvent。 */
@@ -419,6 +451,27 @@ export class BreakpointManager {
         | {scriptId?: string; lineNumber?: number; columnNumber?: number}
         | undefined;
       if (loc) {
+        if (
+          typeof loc.scriptId === 'string' &&
+          typeof loc.lineNumber === 'number'
+        ) {
+          const resolvedLocation: Location = {
+            scriptId: loc.scriptId,
+            lineNumber: loc.lineNumber,
+            columnNumber: loc.columnNumber,
+          };
+          const locations = bp.resolvedLocations ?? [];
+          if (
+            !locations.some(
+              existing =>
+                existing.scriptId === resolvedLocation.scriptId &&
+                existing.lineNumber === resolvedLocation.lineNumber &&
+                existing.columnNumber === resolvedLocation.columnNumber,
+            )
+          ) {
+            bp.resolvedLocations = [...locations, resolvedLocation];
+          }
+        }
         bp.location = {
           scriptId: loc.scriptId ?? bp.location.scriptId,
           url: bp.location.url,

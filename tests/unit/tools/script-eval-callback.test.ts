@@ -110,6 +110,7 @@ describe('evaluate_script callback path', () => {
 
     assert.equal(result.success, true);
     assert.equal(result.result, '{"ok":true}');
+    assert.deepEqual(result.data.value, {ok: true});
     assert.strictEqual(disposed, 1);
     assert.match(result.message, /returned/);
   });
@@ -131,6 +132,7 @@ describe('evaluate_script callback path', () => {
 
     assert.equal(result.success, true);
     assert.equal(result.result, '"page title"');
+    assert.equal(result.data.value, 'page title');
   });
 
   it('returns an IIFE result without calling it again', async () => {
@@ -321,6 +323,10 @@ describe('evaluate_script callback path', () => {
 
     assert.equal(result.success, true);
     assert.equal(result.result, '{"ok":true,"world":"content-script"}');
+    assert.deepEqual(result.data.value, {
+      ok: true,
+      world: 'content-script',
+    });
     assert.deepEqual(calls, [
       {
         method: 'Runtime.evaluate',
@@ -463,6 +469,23 @@ describe('evaluate_script callback path', () => {
     assert.equal(cdpResult.success, true);
     assert.equal(frameResult.result, undefined);
     assert.equal(cdpResult.result, undefined);
+  });
+
+  it('honors a caller-provided execution timeout', async () => {
+    const startedAt = Date.now();
+    const result = await evaluateScript(
+      {
+        getSelectedFrame: () => ({
+          evaluateHandle: async () => await new Promise<never>(() => undefined),
+        }),
+        getSelectedPage: () => null,
+      } as unknown as EvaluateScriptRuntime,
+      {function: 'document.title', timeoutMs: 10},
+    );
+
+    assert.equal(result.success, false);
+    assert.match(result.message, /timed out/);
+    assert.ok(Date.now() - startedAt < 1_000);
   });
 
   it('returns isolation hint when page context accesses extension object', async () => {

@@ -6,6 +6,7 @@
 
 import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
+import type {UnderstandCodeOptions} from '../../types/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -18,11 +19,12 @@ export const understandCode = defineTool({
   schema: {
     code: zod.string(),
     focus: zod.enum(['all', 'structure', 'business', 'security']).optional(),
+    useAI: zod.boolean().optional(),
   },
   handler: async (request, response) => {
     try {
       const result = await getRuntime().analyzer.understand(
-        request.params as any,
+        request.params as UnderstandCodeOptions,
       );
       response.setStructuredContent({
         success: true,

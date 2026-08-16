@@ -8,6 +8,7 @@ import {zod} from '../../third_party/index.js';
 import type {ToolContextProvider} from '../../worker/ToolContext.js';
 import {ToolCategory} from '../categories.js';
 import {resolveActivePage} from '../shared/activePageResolver.js';
+import {withDebuggerTrapBypass} from '../shared/browserRuntime.js';
 import {explainPageError} from '../shared/pageDiagnostics.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -74,25 +75,27 @@ export const navigatePage = defineTool({
     const page = resolvedPage.page;
 
     try {
-      switch (navType) {
-        case 'url':
-          await page.goto(request.params.url!, options);
-          break;
-        case 'back':
-          await page.goBack(options);
-          break;
-        case 'forward':
-          await page.goForward(options);
-          break;
-        case 'reload':
-          if (request.params.ignoreCache) {
-            const client = await page.context().newCDPSession(page);
-            await client.send('Page.reload', {ignoreCache: true});
-          } else {
-            await page.reload(options);
-          }
-          break;
-      }
+      await withDebuggerTrapBypass(context, async () => {
+        switch (navType) {
+          case 'url':
+            await page.goto(request.params.url!, options);
+            break;
+          case 'back':
+            await page.goBack(options);
+            break;
+          case 'forward':
+            await page.goForward(options);
+            break;
+          case 'reload':
+            if (request.params.ignoreCache) {
+              const client = await page.context().newCDPSession(page);
+              await client.send('Page.reload', {ignoreCache: true});
+            } else {
+              await page.reload(options);
+            }
+            break;
+        }
+      });
 
       response.setStructuredContent({
         success: true,

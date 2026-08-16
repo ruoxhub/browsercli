@@ -5,15 +5,18 @@
  */
 
 import assert from 'node:assert';
-import {describe, it} from 'node:test';
+import {describe, it, mock} from 'node:test';
 
+import {BrowserManager} from '../../../src/modules/browser/index.js';
 import {siteExperienceService} from '../../../src/services/SiteExperienceService.js';
 import {ensureToolsMeta, getToolMeta} from '../../../src/tools/tools-meta.js';
 import type {ToolMeta} from '../../../src/tools/tools-meta.js';
 import type {RpcRequest} from '../../../src/types/rpc.js';
 import {ErrorCodes, ToolError} from '../../../src/utils/errors.js';
+import {connectBrowser} from '../../../src/worker/BrowserConnectionManager.js';
 import {ToolAdapter} from '../../../src/worker/ToolAdapter.js';
 import {ToolContextProvider} from '../../../src/worker/ToolContext.js';
+import {workerActivityCoordinator} from '../../../src/worker/WorkerActivityCoordinator.js';
 
 interface ResolvePayload {
   structuredContent?: {
@@ -65,6 +68,114 @@ async function invokeTool(
 }
 
 describe('ToolAdapter', () => {
+  it('keeps browser lifecycle changes out while a wrapped tool is running', async () => {
+    let releaseTool!: () => void;
+    const toolGate = new Promise<void>(resolve => {
+      releaseTool = resolve;
+    });
+    let toolStarted!: () => void;
+    const started = new Promise<void>(resolve => {
+      toolStarted = resolve;
+    });
+    const provider = new ToolContextProvider();
+    provider.setSelectedFrame({
+      async evaluate() {
+        toolStarted();
+        await toolGate;
+        return 'done';
+      },
+    } as never);
+    const adapter = new ToolAdapter(provider);
+    const meta = legacyFixtureMeta({
+      name: 'frame_function_fixture',
+      handlerName: 'frameFunctionFixture',
+      callMode: 'frame' as ToolMeta['callMode'],
+    });
+    const reset = mock.method(
+      BrowserManager,
+      'resetInstance',
+      async () => undefined,
+    );
+    const getInstance = mock.method(BrowserManager, 'getInstance', () => ({
+      ensureBrowser: async () => {
+        throw new Error('browser lifecycle reached');
+      },
+      getContext: () => null,
+    }));
+    const running = invokeTool(adapter, meta);
+    await started;
+
+    try {
+      await assert.rejects(
+        connectBrowser(provider, {channel: 'stable'}),
+        (error: unknown) => (error as {code?: string}).code === 'WORKER_BUSY',
+      );
+      assert.equal(reset.mock.callCount(), 0);
+    } finally {
+      releaseTool();
+      await running;
+      reset.mock.restore();
+      getInstance.mock.restore();
+    }
+  });
+
+  it('propagates aborts and releases the browser lifecycle guard', async () => {
+    let releaseTool!: () => void;
+    const toolGate = new Promise<void>(resolve => {
+      releaseTool = resolve;
+    });
+    let toolStarted!: () => void;
+    const started = new Promise<void>(resolve => {
+      toolStarted = resolve;
+    });
+    const provider = new ToolContextProvider();
+    provider.setSelectedFrame({
+      async evaluate() {
+        toolStarted();
+        await toolGate;
+        return 'late result';
+      },
+    } as never);
+    const adapter = new ToolAdapter(provider);
+    const meta = legacyFixtureMeta({
+      name: 'frame_function_fixture',
+      handlerName: 'frameFunctionFixture',
+      callMode: 'frame' as ToolMeta['callMode'],
+    });
+    const controller = new AbortController();
+    const reason = new Error('job cancelled');
+    const executeTool = adapter.executeTool.bind(adapter) as (
+      meta: ToolMeta,
+      params: Record<string, unknown>,
+      sessionId?: string,
+      signal?: AbortSignal,
+    ) => Promise<unknown>;
+    const running = executeTool(meta, {}, undefined, controller.signal);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    await started;
+
+    try {
+      controller.abort(reason);
+      await assert.rejects(
+        Promise.race([
+          running,
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(
+              () => reject(new Error('abort was not propagated')),
+              50,
+            );
+          }),
+        ]),
+        error => error === reason,
+      );
+      assert.equal(workerActivityCoordinator.getState().activeTools, 0);
+    } finally {
+      if (timer) clearTimeout(timer);
+      releaseTool();
+      await running.catch(() => undefined);
+    }
+  });
+
   it('wrapTool executes default function handlers with validated params', async () => {
     const provider = new ToolContextProvider();
     const adapter = new ToolAdapter(provider);

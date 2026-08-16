@@ -79,9 +79,12 @@ export class DefineToolContextFactory {
       resolveCdpRequestId: cdpRequestId =>
         provider.resolveCdpRequestId(cdpRequestId),
       getDebuggerContext: () => provider.getDebuggerContext(),
+      getExistingDebuggerContext: () => provider.getExistingDebuggerContext(),
       getRequestInitiator: request => provider.getRequestInitiator(request),
       getRequestInitiatorById: _requestId => undefined,
       getNetworkRequestById: reqid => provider.getNetworkRequestById(reqid),
+      getNetworkRequests: includePreservedRequests =>
+        provider.getNetworkRequests(includePreservedRequests),
       getWebSocketConnections: includePreservedData =>
         provider.getWebSocketConnections(includePreservedData),
       getWebSocketById: wsid => provider.getWebSocketConnectionById(wsid),

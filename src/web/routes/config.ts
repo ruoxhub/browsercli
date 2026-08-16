@@ -37,6 +37,7 @@ import {
   disconnectBrowser,
 } from '../../worker/BrowserConnectionManager.js';
 import type {ToolContextProvider} from '../../worker/ToolContext.js';
+import {WorkerBusyError} from '../../worker/WorkerActivityCoordinator.js';
 import {sendError, sendJson} from '../middleware/error.js';
 import type {WsHub} from '../ws/WsHub.js';
 
@@ -464,6 +465,10 @@ export function createConfigRoutes(
           });
           sendJson(res, result);
         } catch (err) {
+          if (err instanceof WorkerBusyError) {
+            sendError(res, err.code, err.message, 409, err.state);
+            return;
+          }
           sendError(
             res,
             'BROWSER_CONNECT_FAILED',
@@ -484,6 +489,10 @@ export function createConfigRoutes(
           });
           sendJson(res, {connected: false});
         } catch (err) {
+          if (err instanceof WorkerBusyError) {
+            sendError(res, err.code, err.message, 409, err.state);
+            return;
+          }
           sendError(
             res,
             'BROWSER_DISCONNECT_FAILED',

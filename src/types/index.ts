@@ -274,6 +274,7 @@ export interface UnderstandCodeOptions {
   code: string;
   context?: Record<string, unknown>;
   focus?: 'structure' | 'business' | 'security' | 'all';
+  useAI?: boolean;
 }
 
 export interface UnderstandCodeResult {
@@ -443,6 +444,7 @@ export interface CodeLocation {
 export interface DetectCryptoOptions {
   code: string;
   testData?: unknown;
+  useAI?: boolean;
 }
 
 export interface DetectCryptoResult {

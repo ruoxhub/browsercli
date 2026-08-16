@@ -6,6 +6,7 @@
 
 // MCP Tools (defined with defineTool)
 export {wasmCapabilities} from './wasmCapabilities.js';
+export {collectWasm} from './collectWasm.js';
 export {wasmDump} from './wasmDump.js';
 export {wasmDisassemble} from './wasmDisassemble.js';
 export {wasmDecompile} from './wasmDecompile.js';

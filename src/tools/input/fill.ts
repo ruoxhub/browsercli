@@ -6,7 +6,13 @@
 
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
+import {
+  browserTimeoutSchema,
+  withDebuggerTrapBypass,
+} from '../shared/browserRuntime.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
+
+import {fillElement} from './fillElement.js';
 
 /**
  * 在 input/textarea/select 元素中填入值。
@@ -25,32 +31,24 @@ export const fill = defineTool({
       .string()
       .describe('CSS 选择器（input / textarea / select）。'),
     value: zod.string().describe('填充值。'),
+    timeoutMs: browserTimeoutSchema('单次页面操作超时（毫秒，默认 10000）。'),
   },
   handler: async (request, response, context) => {
-    const {selector, value} = request.params;
+    const {selector, timeoutMs, value} = request.params;
     const frame = (context as Context).getSelectedFrame();
-    const page = frame.page();
 
     try {
-      const element = await page.$(selector);
-      if (!element) {
+      const {found, isSelect} = await withDebuggerTrapBypass(
+        context,
+        async () => await fillElement(frame, selector, value, timeoutMs),
+      );
+      if (!found) {
         response.setStructuredContent({
           success: false,
           message: `Element not found: ${selector}`,
           tooltype: 'fill',
         });
         return;
-      }
-
-      const isSelect = await page.evaluate(sel => {
-        const el = document.querySelector(sel);
-        return el?.tagName === 'SELECT';
-      }, selector);
-
-      if (isSelect) {
-        await element.selectOption(value);
-      } else {
-        await element.fill(value);
       }
 
       response.setStructuredContent({

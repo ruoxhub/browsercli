@@ -1,6 +1,9 @@
 import {describe, it, before, after} from 'node:test';
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
+
+import {WebSocketServer} from 'ws';
+
 import {WorkerHttpClient} from '../../src/WorkerHttpClient.js';
 
 describe('WorkerHttpClient.invoke (request-response wrapper)', () => {
@@ -105,6 +108,91 @@ describe('WorkerHttpClient.invoke (request-response wrapper)', () => {
     await assert.rejects(() => client.invoke('s', 't', {}), /boom/);
     failing.close();
   });
+
+  it('invoke throws on timed out and cancelled jobs', async () => {
+    const terminalJobs = [
+      {
+        status: 'timed_out',
+        error: {code: 'JOB_TIMEOUT', message: 'timed out'},
+      },
+      {
+        status: 'cancelled',
+        error: {code: 'JOB_CANCELLED', message: 'cancelled'},
+      },
+    ];
+    const server = createServer(async (req, res) => {
+      const url = (req.url ?? '').split('?')[0];
+      res.setHeader('Content-Type', 'application/json');
+      if (req.method === 'POST' && /\/sessions\/.+\/invoke$/.test(url)) {
+        res.statusCode = 202;
+        res.end(JSON.stringify({jobId: 'job_1', status: 'pending'}));
+        return;
+      }
+      if (/\/jobs\/.+$/.test(url)) {
+        res.end(JSON.stringify({jobId: 'job_1', ...terminalJobs.shift()}));
+        return;
+      }
+      res.statusCode = 404;
+      res.end('{}');
+    });
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    const baseUrl = `http://127.0.0.1:${(server.address() as any).port}`;
+    const client = new WorkerHttpClient({baseUrl});
+
+    try {
+      await assert.rejects(
+        () => client.invoke('s', 't', {}),
+        /JOB_TIMEOUT.*timed out/,
+      );
+      await assert.rejects(
+        () => client.invoke('s', 't', {}),
+        /JOB_CANCELLED.*cancelled/,
+      );
+    } finally {
+      await new Promise<void>(resolve => server.close(() => resolve()));
+    }
+  });
+
+  it('cancels the worker job when its polling deadline expires', async () => {
+    let cancelCalls = 0;
+    const server = createServer(async (req, res) => {
+      const url = (req.url ?? '').split('?')[0];
+      res.setHeader('Content-Type', 'application/json');
+      if (req.method === 'POST' && /\/sessions\/.+\/invoke$/.test(url)) {
+        res.statusCode = 202;
+        res.end(JSON.stringify({jobId: 'job_stuck', status: 'pending'}));
+        return;
+      }
+      if (req.method === 'POST' && url === '/api/v1/jobs/job_stuck/cancel') {
+        cancelCalls += 1;
+        res.end(JSON.stringify({jobId: 'job_stuck', status: 'cancelled'}));
+        return;
+      }
+      if (req.method === 'GET' && url === '/api/v1/jobs/job_stuck') {
+        res.end(JSON.stringify({jobId: 'job_stuck', status: 'running'}));
+        return;
+      }
+      res.statusCode = 404;
+      res.end('{}');
+    });
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    const baseUrl = `http://127.0.0.1:${(server.address() as any).port}`;
+    const client = new WorkerHttpClient({
+      baseUrl,
+      timeoutMs: 20,
+      pollIntervalMs: 1,
+    });
+
+    try {
+      await assert.rejects(
+        () => client.invoke('s', 'fill', {}),
+        /invoke timeout.*job_stuck/,
+      );
+      assert.equal(cancelCalls, 1);
+    } finally {
+      await new Promise<void>(resolve => server.close(() => resolve()));
+    }
+  });
 });
 
 describe('WorkerHttpClient.listTools (normalization)', () => {
@@ -152,5 +240,70 @@ describe('WorkerHttpClient.listTools (normalization)', () => {
     const {tools} = await client.listTools();
     assert.deepEqual(tools, []);
     server.close();
+  });
+});
+
+describe('WorkerHttpClient transport bounds', () => {
+  it('aborts an HTTP request that exceeds timeoutMs', async () => {
+    const slowServer = createServer((_req, res) => {
+      setTimeout(() => {
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({status: 'ok'}));
+      }, 100);
+    });
+    await new Promise<void>(resolve =>
+      slowServer.listen(0, '127.0.0.1', resolve),
+    );
+    const baseUrl = `http://127.0.0.1:${(slowServer.address() as any).port}`;
+
+    try {
+      const client = new WorkerHttpClient({baseUrl, timeoutMs: 20});
+      await assert.rejects(() => client.health());
+    } finally {
+      await new Promise<void>(resolve => slowServer.close(() => resolve()));
+    }
+  });
+
+  it('subscribes to every stream channel after opening WebSocket', async () => {
+    const server = createServer();
+    const wsServer = new WebSocketServer({server});
+    const received: unknown[] = [];
+    let resolveMessages!: (messages: unknown[]) => void;
+    const messages = new Promise<unknown[]>(resolve => {
+      resolveMessages = resolve;
+    });
+    wsServer.on('connection', socket => {
+      socket.on('message', data => {
+        received.push(JSON.parse(data.toString()));
+        if (received.length === 4) resolveMessages(received);
+      });
+    });
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    const baseUrl = `http://127.0.0.1:${(server.address() as any).port}`;
+    const client = new WorkerHttpClient({baseUrl, timeoutMs: 200});
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+
+    try {
+      const close = await client.openStream('sess_x', () => {});
+      const actual = await Promise.race([
+        messages,
+        new Promise<unknown[]>(resolve => {
+          timeout = setTimeout(() => resolve(received), 100);
+        }),
+      ]);
+
+      assert.deepEqual(actual, [
+        {type: 'subscribe', channel: 'tool.invoke'},
+        {type: 'subscribe', channel: 'hook.event'},
+        {type: 'subscribe', channel: 'hook.sample'},
+        {type: 'subscribe', channel: 'log'},
+      ]);
+      close();
+    } finally {
+      if (timeout) clearTimeout(timeout);
+      for (const socket of wsServer.clients) socket.terminate();
+      await new Promise<void>(resolve => wsServer.close(() => resolve()));
+      await new Promise<void>(resolve => server.close(() => resolve()));
+    }
   });
 });

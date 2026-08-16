@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {HTTPResponse, Page} from '../../third_party/index.js';
+import type {CDPSession, HTTPResponse, Page} from '../../third_party/index.js';
 import type {ReverseTaskHandle} from '../../types/index.js';
 import {logger} from '../../utils/logger.js';
 import type {PageController} from '../collector/PageController.js';
+import {evaluateInPageRuntime} from '../debugger/evaluateInPageRuntime.js';
 
 import type {WasmAnalyzer} from './WasmAnalyzer.js';
 import {WasmArtifactStore} from './WasmArtifactStore.js';
@@ -21,7 +22,7 @@ import type {
   WasmRuntimeModuleCapture,
 } from './WasmTypes.js';
 
-interface CollectWasmOptions {
+export interface CollectWasmOptions {
   url: string;
   timeout?: number;
   waitAfterLoadMs?: number;
@@ -111,8 +112,9 @@ export class WasmCollector {
   async collect(
     options: CollectWasmOptions,
     task?: ReverseTaskHandle,
+    pageOverride?: Page,
   ): Promise<WasmDetectionResult> {
-    const page = await this.pageController.getPage();
+    const page = pageOverride ?? (await this.pageController.getPage());
     const captureBase64 = options.captureBase64 ?? false;
     const runtimeEnabled = options.includeRuntimeEvents !== false;
     const maxModules = options.maxModules ?? DEFAULT_MAX_MODULES;
@@ -121,8 +123,23 @@ export class WasmCollector {
       options.waitAfterLoadMs ?? DEFAULT_WAIT_AFTER_LOAD_MS;
     const networkEntries: NetworkCaptureEntry[] = [];
     const pendingResponseCaptures = new Set<Promise<void>>();
+    let preloadSession: CDPSession | undefined;
+    let preloadIdentifier: string | undefined;
 
-    await this.pageController.injectScriptOnNewDocument(buildPreloadScript());
+    if (runtimeEnabled) {
+      preloadSession = await page.context().newCDPSession(page);
+      try {
+        await preloadSession.send('Page.enable');
+        const preloadResult = (await preloadSession.send(
+          'Page.addScriptToEvaluateOnNewDocument',
+          {source: buildPreloadScript()},
+        )) as {identifier: string};
+        preloadIdentifier = preloadResult.identifier;
+      } catch (error) {
+        await preloadSession.detach().catch(() => undefined);
+        throw error;
+      }
+    }
 
     const handleResponse = (response: HTTPResponse) => {
       const capture = this.captureNetworkResponse(response, networkEntries);
@@ -133,7 +150,7 @@ export class WasmCollector {
     page.on('response', handleResponse);
     try {
       await page.goto(options.url, {
-        waitUntil: 'networkidle',
+        waitUntil: 'domcontentloaded',
         timeout,
       });
       if (waitAfterLoadMs > 0) {
@@ -142,7 +159,7 @@ export class WasmCollector {
       await Promise.allSettled(Array.from(pendingResponseCaptures));
 
       const runtimeState = runtimeEnabled
-        ? await this.readRuntimeCaptureState(page)
+        ? await this.readRuntimeCaptureState(page, timeout)
         : {modules: [], events: []};
 
       const runtimeModuleIds = new Map<string, string>();
@@ -229,6 +246,16 @@ export class WasmCollector {
       };
     } finally {
       page.off('response', handleResponse);
+      if (preloadSession) {
+        if (preloadIdentifier) {
+          await preloadSession
+            .send('Page.removeScriptToEvaluateOnNewDocument', {
+              identifier: preloadIdentifier,
+            })
+            .catch(() => undefined);
+        }
+        await preloadSession.detach().catch(() => undefined);
+      }
     }
   }
 
@@ -291,25 +318,21 @@ export class WasmCollector {
 
   private async readRuntimeCaptureState(
     page: Page,
+    timeoutMs: number,
   ): Promise<PageRuntimeCaptureState> {
     try {
-      return (await page.evaluate(() => {
-        const capture = (
-          globalThis as typeof globalThis & {
-            __jshookWasmCapture__?: {
-              modules?: unknown[];
-              events?: unknown[];
-            };
-          }
-        ).__jshookWasmCapture__;
+      const expression = `(() => {
+        const capture = globalThis.__jshookWasmCapture__;
         if (!capture) {
           return {modules: [], events: []};
         }
-        return JSON.parse(JSON.stringify(capture)) as {
-          modules: unknown[];
-          events: unknown[];
-        };
-      })) as PageRuntimeCaptureState;
+        return JSON.parse(JSON.stringify(capture));
+      })()`;
+      return await evaluateInPageRuntime<PageRuntimeCaptureState>(
+        page.mainFrame(),
+        expression,
+        timeoutMs,
+      );
     } catch (error) {
       logger.warn(
         '[WasmCollector] Failed to read runtime capture state',

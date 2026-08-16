@@ -84,6 +84,9 @@ class MockHttpClient extends WorkerHttpClient {
   invokeCalls: Array<[string | undefined, string, Record<string, unknown>]> =
     [];
   openStreamCalls = 0;
+  streamCloseCalls = 0;
+  callOrder: string[] = [];
+  invokeError?: Error;
 
   constructor(
     private readonly tools: ToolMeta[],
@@ -102,13 +105,23 @@ class MockHttpClient extends WorkerHttpClient {
     tool: string,
     params: Record<string, unknown>,
   ): Promise<unknown> {
+    this.callOrder.push('invoke');
     this.invokeCalls.push([sessionId, tool, params]);
+    if (this.invokeError) throw this.invokeError;
     return this.result;
   }
 
+  async ensureSession(explicitId?: string): Promise<string> {
+    this.callOrder.push('ensureSession');
+    return explicitId ?? 'sess_auto';
+  }
+
   async openStream(): Promise<() => void> {
+    this.callOrder.push('openStream');
     this.openStreamCalls++;
-    return () => {};
+    return () => {
+      this.streamCloseCalls++;
+    };
   }
 }
 
@@ -202,6 +215,42 @@ describe('tool-dispatcher (pure HTTP)', () => {
       ctxWith(client),
     );
     assert.deepStrictEqual(client.invokeCalls[0][0], 'sess_abc');
+  });
+
+  it('does not send CLI control flags as tool params', async () => {
+    const client = new MockHttpClient(SAMPLE_TOOLS, {done: true});
+    await toolDispatcherCommand(
+      ['my_tool', '--session', 'sess_abc', '--watch', '--foo', 'bar'],
+      ctxWith(client),
+    );
+
+    assert.deepStrictEqual(client.invokeCalls[0][2], {foo: 'bar'});
+  });
+
+  it('opens the watch stream before invoking the tool', async () => {
+    const client = new MockHttpClient(SAMPLE_TOOLS, {done: true});
+    await toolDispatcherCommand(['my_tool', '--watch'], ctxWith(client));
+
+    assert.deepStrictEqual(client.callOrder, [
+      'ensureSession',
+      'openStream',
+      'invoke',
+    ]);
+    assert.strictEqual(client.invokeCalls[0][0], 'sess_auto');
+  });
+
+  it('closes an opened watch stream when invocation fails', async () => {
+    const client = new MockHttpClient(SAMPLE_TOOLS, {done: true});
+    client.invokeError = new Error('invoke failed');
+
+    await assert.rejects(
+      async () =>
+        toolDispatcherCommand(['my_tool', '--watch'], ctxWith(client)),
+      /invoke failed/,
+    );
+
+    assert.strictEqual(client.openStreamCalls, 1);
+    assert.strictEqual(client.streamCloseCalls, 1);
   });
 
   it('keeps a comma-containing --function as a string (no array split)', async () => {

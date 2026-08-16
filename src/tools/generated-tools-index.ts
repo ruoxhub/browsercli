@@ -20,6 +20,7 @@ import {manifest as extensionsManifest} from './extensions/manifest.js';
 import {manifest as framesManifest} from './frames/manifest.js';
 import {manifest as hookManifest} from './hook/manifest.js';
 import {manifest as inputManifest} from './input/manifest.js';
+import {manifest as jsvmpManifest} from './jsvmp/manifest.js';
 import {manifest as navigationManifest} from './navigation/manifest.js';
 import {manifest as networkManifest} from './network/manifest.js';
 import {manifest as pageManifest} from './page/manifest.js';
@@ -49,6 +50,7 @@ export const GENERATED_DOMAIN_MANIFESTS = [
   framesManifest,
   hookManifest,
   inputManifest,
+  jsvmpManifest,
   navigationManifest,
   networkManifest,
   pageManifest,
@@ -370,6 +372,14 @@ export const GENERATED_TOOL_REGISTRY = [
     handlerName: 'fill',
   },
   {
+    modulePath: './jsvmp/jsvmp.js',
+    handlerName: 'hookJsvmpInterpreter',
+  },
+  {
+    modulePath: './jsvmp/jsvmp.js',
+    handlerName: 'compareEnv',
+  },
+  {
     modulePath: './navigation/listPages.js',
     handlerName: 'listPages',
   },
@@ -584,6 +594,10 @@ export const GENERATED_TOOL_REGISTRY = [
   {
     modulePath: './wasm/index.js',
     handlerName: 'wasmCapabilities',
+  },
+  {
+    modulePath: './wasm/index.js',
+    handlerName: 'collectWasm',
   },
   {
     modulePath: './wasm/index.js',

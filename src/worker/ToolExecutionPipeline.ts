@@ -21,6 +21,10 @@ import type {
 } from './ToolContext.js';
 import {ToolResponseAccumulator, ToolResultRecorder} from './ToolResponse.js';
 import type {ToolResponseProcessor, ToolTelemetry} from './ToolResponse.js';
+import {
+  type WorkerActivityCoordinator,
+  workerActivityCoordinator,
+} from './WorkerActivityCoordinator.js';
 
 export {wrapFrameWithTimeout, FRAME_EVALUATE_TIMEOUT} from './timeoutUtils.js';
 
@@ -136,30 +140,37 @@ export class ToolExecutionPipeline {
     private readonly contextGuard?: ToolCallContextGuard,
     private readonly prerequisiteChecker?: ToolPrerequisiteChecker,
     private readonly resultRecorder = new ToolResultRecorder(),
+    private readonly activityCoordinator: WorkerActivityCoordinator = workerActivityCoordinator,
   ) {}
 
-  async execute(meta: ToolMeta, rawParams: unknown): Promise<unknown> {
-    const startedAt = Date.now();
-    const traceId = this.generateTraceId(startedAt);
-    const toolName = meta.name;
-    let params: Record<string, unknown> | undefined;
+  async execute(
+    meta: ToolMeta,
+    rawParams: unknown,
+    signal?: AbortSignal,
+  ): Promise<unknown> {
+    return await this.activityCoordinator.runTool(async () => {
+      const startedAt = Date.now();
+      const traceId = this.generateTraceId(startedAt);
+      const toolName = meta.name;
+      let params: Record<string, unknown> | undefined;
 
-    try {
-      params = this.validateAndPrepare(toolName, rawParams, meta);
-      const handler = await this.loadHandler(toolName, meta);
-      const response = await this.processRequest(
-        meta,
-        handler,
-        params,
-        toolName,
-      );
+      try {
+        params = this.validateAndPrepare(toolName, rawParams, meta);
+        const handler = await this.loadHandler(toolName, meta);
+        const response = await this.processRequest(
+          meta,
+          handler,
+          params,
+          toolName,
+        );
 
-      this.recordSuccess(toolName, params, response, startedAt, traceId);
-      return response;
-    } catch (error) {
-      this.recordFailure(toolName, params, error, startedAt, traceId);
-      throw this.wrapError(error, toolName);
-    }
+        this.recordSuccess(toolName, params, response, startedAt, traceId);
+        return response;
+      } catch (error) {
+        this.recordFailure(toolName, params, error, startedAt, traceId);
+        throw this.wrapError(error, toolName);
+      }
+    }, signal);
   }
 
   private generateTraceId(startedAt: number): string {

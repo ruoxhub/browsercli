@@ -185,6 +185,29 @@ describe('CodeAnalyzer extended', () => {
     assert.ok(result.complexityMetrics.cyclomaticComplexity >= 1);
   });
 
+  it('skips AI analysis when useAI is false', async () => {
+    let aiCalls = 0;
+    const llm = {
+      generateCodeAnalysisPrompt: () => [],
+      chat: async () => {
+        aiCalls += 1;
+        throw new Error('AI must not be called');
+      },
+    } satisfies LLMServiceLike;
+    const analyzer = new CodeAnalyzer(
+      llm as unknown as ConstructorParameters<typeof CodeAnalyzer>[0],
+    );
+
+    const result = await analyzer.understand({
+      code: 'function add(a, b) { return a + b; }',
+      focus: 'structure',
+      useAI: false,
+    });
+
+    assert.equal(aiCalls, 0);
+    assert.equal(result.structure.functions[0]?.name, 'add');
+  });
+
   it('covers private analyzers and helper methods', async () => {
     const analyzer = makeAnalyzer();
 

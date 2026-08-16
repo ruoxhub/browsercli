@@ -5,6 +5,7 @@
  */
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
+import vm from 'node:vm';
 
 import {buildPreloadScript} from '../../../../src/modules/wasm/WasmPreloadScript.js';
 
@@ -76,5 +77,24 @@ describe('WasmPreloadScript', () => {
     const a = buildPreloadScript();
     const b = buildPreloadScript();
     assert.strictEqual(a, b, 'repeated calls return identical script');
+  });
+
+  it('keeps the exported memory buffer getter callable through its proxy', async () => {
+    const context = vm.createContext({
+      Response,
+      WebAssembly,
+      btoa,
+    });
+    vm.runInContext(buildPreloadScript(), context);
+    const byteLength = await vm.runInContext(
+      `WebAssembly.instantiate(new Uint8Array([
+        0, 97, 115, 109, 1, 0, 0, 0,
+        5, 3, 1, 0, 1,
+        7, 10, 1, 6, 109, 101, 109, 111, 114, 121, 2, 0
+      ])).then(result => result.instance.exports.memory.buffer.byteLength)`,
+      context,
+    );
+
+    assert.equal(byteLength, 65_536);
   });
 });

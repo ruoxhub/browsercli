@@ -79,8 +79,8 @@ MCP 框架在导航工具调用时，会在 `page.goto()` 前后执行多个涉�
 
 相关文件：
 
-- `src/stealth-args.ts` — 启动参数定义（HARMFUL_ARGS / DEFAULT_ARGS / STEALTH_ARGS）
-- `src/browser.ts` — 浏览器启动/连接逻辑
+- `src/modules/browser/stealth-args.ts` — 启动参数定义（HARMFUL_ARGS / DEFAULT_ARGS / STEALTH_ARGS）
+- `src/modules/browser/browser.ts` — 浏览器启动/连接逻辑
 
 ### 2. Google Referer 伪装
 
@@ -95,7 +95,7 @@ Scrapling 每次 `page.goto()` 都带 `referer: 'https://www.google.com/'`，模
 
 ### 3. viewport 使用真实尺寸
 
-**文件：** `src/browser.ts`, `src/stealth-args.ts`
+**文件：** `src/modules/browser/browser.ts`, `src/modules/browser/stealth-args.ts`
 
 - `viewport: null` 禁用 Playwright 的 viewport 模拟，让 OS 原生管理窗口大小
 - 添加 `--window-size=1920,1080` 启动参数
@@ -175,7 +175,7 @@ JS 层面的反检测 patch 被 Google 反爬系统检测到，导致触发 "unu
 
 ### 7. Notification 权限修复
 
-**文件：** `src/browser.ts`
+**文件：** `src/modules/browser/browser.ts`
 
 添加 `'notifications'` 到 permissions 数组，使 `Notification.permission` 从 `"denied"` 变为 `"granted"`。
 
@@ -229,7 +229,7 @@ list_network_requests()  # 返回所有请求
 | 文件                      | 修改类型   | 说明                                                                               |
 | ------------------------- | ---------- | ---------------------------------------------------------------------------------- |
 | `src/tools/pages.ts`      | 修改       | 添加 Google Referer；移除 waitForEventsAfterAction                                 |
-| `src/browser.ts`          | 修改       | viewport: null + 条件性 DPR；添加 notifications 权限                               |
+| `src/modules/browser/browser.ts` | 修改       | viewport: null + 条件性 DPR；添加 notifications 权限                               |
 | `src/stealth-args.ts`     | 修改       | 添加 --window-size=1920,1080                                                       |
 | `src/McpContext.ts`       | 修改       | 延迟 CDP collectors 初始化；createPagesSnapshot 条件跳过 detectOpenDevToolsWindows |
 | `src/main.ts`             | 修改       | 导航工具完全跳过 CDP 相关操作；删除 init script 相关逻辑                           |

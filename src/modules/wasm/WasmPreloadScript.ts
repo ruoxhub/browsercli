@@ -413,7 +413,7 @@ export function buildPreloadScript(): string {
     return new Proxy(memory, {
       get(target, property, receiver) {
         if (property === 'buffer') {
-          const buffer = Reflect.get(target, property, receiver);
+          const buffer = Reflect.get(target, property, target);
           trackBuffer(buffer, runtimeModuleId, exportedName);
           setLastWasmActivity(runtimeModuleId);
           recordBridgeEvent('memory_buffer_access', {

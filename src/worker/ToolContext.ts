@@ -47,10 +47,6 @@ import type {ToolTabContext} from './ToolCallContextGuard.js';
 export {ServiceLocator} from './ServiceLocator.js';
 export {DefineToolContextFactory} from './DefineToolContextFactory.js';
 
-function ignoreDebuggerWarmupError(): void {
-  // CDP warmup is best-effort; the caller can still resolve frames/pages without it.
-}
-
 export class ToolContextProvider {
   private readonly _browserContext = new BrowserContextProvider();
   private readonly _debuggerContext = new DebuggerContextProvider();
@@ -192,16 +188,7 @@ export class ToolContextProvider {
   }
 
   selectFrameByIdx(frameIdx: number): Frame | null {
-    const frame = this._browserContext.selectFrameByIdx(frameIdx);
-    if (frame) {
-      const page = this._browserContext.getSelectedPage();
-      if (page) {
-        void this._debuggerContext
-          .ensureForPage(page)
-          .catch(ignoreDebuggerWarmupError);
-      }
-    }
-    return frame;
+    return this._browserContext.selectFrameByIdx(frameIdx);
   }
 
   getPages(): Page[] {
@@ -256,9 +243,6 @@ export class ToolContextProvider {
 
   selectPage(page: Page): void {
     this._browserContext.selectPage(page);
-    void this._debuggerContext
-      .ensureForPage(page)
-      .catch(ignoreDebuggerWarmupError);
   }
 
   async bringPageToFront(page: Page): Promise<void> {

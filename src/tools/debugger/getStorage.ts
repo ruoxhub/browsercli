@@ -16,7 +16,7 @@ import {getFrameOrRespond} from './evaluateAndRespond.js';
 export const getStorage = defineTool({
   name: 'get_storage',
   description:
-    '获取浏览器存储数据，包括 cookies、localStorage 与 sessionStorage。',
+    '获取浏览器存储数据，包括 HttpOnly cookies、可复制的 Cookie 请求头、localStorage 与 sessionStorage。',
   annotations: {
     title: '获取存储',
     category: ToolCategory.REVERSE_ENGINEERING,
@@ -32,6 +32,9 @@ export const getStorage = defineTool({
   },
   handler: async (request, response, context) => {
     const {type, filter} = request.params;
+    const result: Record<string, unknown> = {};
+    let cookieHeader: string | undefined;
+    let cookieDetails: Array<Record<string, unknown>> | undefined;
 
     const storageCode = `
 (function() {
@@ -63,17 +66,6 @@ export const getStorage = defineTool({
     return out;
   }
 
-  if (type === 'all' || type === 'cookies') {
-    const cookies = {};
-    document.cookie.split(';').forEach(c => {
-      const [name, ...valueParts] = c.trim().split('=');
-      if (name && matchFilter(name)) {
-        cookies[name] = valueParts.join('=');
-      }
-    });
-    result.cookies = cookies;
-  }
-
   if (type === 'all' || type === 'localStorage') {
     result.localStorage = readNamedStorage(localStorage);
   }
@@ -87,14 +79,43 @@ export const getStorage = defineTool({
 `;
 
     try {
-      const frame = getFrameOrRespond(
-        context as Context,
-        response,
-        'get_storage',
-      );
-      if (!frame) return;
+      if (type === 'all' || type === 'cookies') {
+        const page = context.getSelectedPage();
+        if (!page) {
+          response.setStructuredContent({
+            success: false,
+            message: '当前没有选中的页面',
+            tooltype: 'get_storage',
+          });
+          return;
+        }
 
-      const result = await frame.evaluate(storageCode);
+        const cookies = (await page.context().cookies(page.url())).filter(
+          cookie =>
+            !filter || cookie.name.toLowerCase().includes(filter.toLowerCase()),
+        );
+        result.cookies = Object.fromEntries(
+          cookies.map(cookie => [cookie.name, cookie.value]),
+        );
+        cookieHeader = cookies
+          .map(cookie => `${cookie.name}=${cookie.value}`)
+          .join('; ');
+        cookieDetails = cookies as unknown as Array<Record<string, unknown>>;
+      }
+
+      if (
+        type === 'all' ||
+        type === 'localStorage' ||
+        type === 'sessionStorage'
+      ) {
+        const frame = getFrameOrRespond(
+          context as Context,
+          response,
+          'get_storage',
+        );
+        if (!frame) return;
+        Object.assign(result, await frame.evaluate(storageCode));
+      }
 
       response.setStructuredContent({
         success: true,
@@ -104,6 +125,7 @@ export const getStorage = defineTool({
           type: type || 'all',
           filter: filter || null,
           storage: result,
+          ...(cookieHeader === undefined ? {} : {cookieHeader, cookieDetails}),
         },
       });
     } catch (error) {
