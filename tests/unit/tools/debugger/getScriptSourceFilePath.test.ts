@@ -18,6 +18,8 @@ import os from 'node:os';
 import path from 'node:path';
 import {after, before, describe, it} from 'node:test';
 
+import {ScriptManager} from '../../../../src/modules/debugger/ScriptManager.js';
+import type {CDPSession} from '../../../../src/third_party/index.js';
 import {getScriptSource} from '../../../../src/tools/debugger/index.js';
 
 interface CapturedResponse {
@@ -66,27 +68,72 @@ const SAMPLE_SOURCE = 'const token = 1;\nfunction test(){ return token; }\n';
  * 模拟 DebuggerManager.getScriptSourcePath：无 filePath 时返回内置缓存路径，
  * 有 filePath 时把源码写入该路径并返回绝对路径（对齐 ScriptManager 的真实行为）。
  */
-function makeDebuggerContext(
-  cachePath: string,
-  source: string = SAMPLE_SOURCE,
-  url = 'https://example.com/app.js',
-) {
+function makeDebuggerContext(cachePath: string) {
   return {
     getScriptSourcePath: async (scriptId: string, filePath?: string) => {
       if (filePath) {
         const resolved = path.resolve(filePath);
         mkdirSync(path.dirname(resolved), {recursive: true});
-        writeFileSync(resolved, source, 'utf-8');
+        writeFileSync(resolved, SAMPLE_SOURCE, 'utf-8');
         return resolved;
       }
       return cachePath;
     },
     getScriptById: (id: string) => ({
       scriptId: id,
-      url,
-      sourceLength: source.length,
+      url: 'https://example.com/app.js',
+      sourceLength: SAMPLE_SOURCE.length,
     }),
   };
+}
+
+/**
+ * 构造真实的生产 ScriptManager 实例，仅 mock CDP session I/O。
+ * 用于直接测试真实的落盘持久化路径，确保回归测试能真实捕获任何潜在截断缺陷。
+ */
+function createProductionScriptManager(
+  fixtureSource: string,
+  scriptId = '67',
+  url = 'https://match.yuanrenxue.com/match/18/67.js',
+) {
+  const listeners: Record<string, (params: unknown) => void> = {};
+  const mockSession = {
+    send: async (method: string, params?: {scriptId?: string}) => {
+      if (
+        method === 'Debugger.getScriptSource' &&
+        params?.scriptId === scriptId
+      ) {
+        return {scriptSource: fixtureSource};
+      }
+      return {};
+    },
+    on: (event: string, handler: (params: unknown) => void) => {
+      listeners[event] = handler;
+    },
+    off: (event: string) => {
+      delete listeners[event];
+    },
+  };
+
+  const scriptManager = new ScriptManager(
+    () => mockSession as unknown as CDPSession,
+  );
+  scriptManager.attachListeners(mockSession as unknown as CDPSession);
+
+  if (listeners['Debugger.scriptParsed']) {
+    listeners['Debugger.scriptParsed']({
+      scriptId,
+      url,
+      startLine: 0,
+      startColumn: 0,
+      endLine: 100,
+      endColumn: 0,
+      length: fixtureSource.length,
+      hash: 'test-cdp-hash',
+    });
+  }
+
+  return scriptManager;
 }
 
 describe('get_script_source filePath param', () => {
@@ -198,28 +245,35 @@ describe('get_script_source filePath param', () => {
   });
 
   it('preserves complete match18 67.js fixture with exact byte length and hash', async () => {
+    const EXPECTED_FIXTURE_BYTE_LENGTH = 34498;
+    const EXPECTED_FIXTURE_SHA256 =
+      '57eaf2a680f33ab91ea6299519c676a97cb45b123c552a0e15d7715845461450';
+
     const fixturePath = path.resolve(
       process.cwd(),
       'tests/fixtures/jsvmp/match18/67.js',
     );
-    const fixtureSource = readFileSync(fixturePath, 'utf8');
-    assert.equal(Buffer.byteLength(fixtureSource, 'utf8'), 34498);
-    const expectedHash = createHash('sha256')
-      .update(fixtureSource, 'utf8')
-      .digest('hex');
+    const fixtureBuffer = readFileSync(fixturePath);
+    assert.equal(fixtureBuffer.length, EXPECTED_FIXTURE_BYTE_LENGTH);
+
+    const fixtureSource = fixtureBuffer.toString('utf8');
     assert.equal(
-      expectedHash,
-      '57eaf2a680f33ab91ea6299519c676a97cb45b123c552a0e15d7715845461450',
+      Buffer.byteLength(fixtureSource, 'utf8'),
+      EXPECTED_FIXTURE_BYTE_LENGTH,
     );
+    const expectedHash = createHash('sha256')
+      .update(fixtureBuffer)
+      .digest('hex');
+    assert.equal(expectedHash, EXPECTED_FIXTURE_SHA256);
 
     const outputPath = path.join(tmpDir, 'saved-67.js');
+    const scriptManager = createProductionScriptManager(
+      fixtureSource,
+      '67',
+      'https://match.yuanrenxue.com/match/18/67.js',
+    );
     const context = {
-      getDebuggerContext: async () =>
-        makeDebuggerContext(
-          '/ignored.js',
-          fixtureSource,
-          'https://match.yuanrenxue.com/match/18/67.js',
-        ),
+      getDebuggerContext: async () => scriptManager,
     };
     const response = makeResponse();
 
@@ -240,18 +294,17 @@ describe('get_script_source filePath param', () => {
     };
     assert.equal(content.success, true);
     assert.equal(content.data.sourcePath, path.resolve(outputPath));
-    assert.equal(content.data.sourceLength, fixtureSource.length);
+    assert.equal(content.data.scriptId, '67');
+    assert.equal(content.data.sourceLength, EXPECTED_FIXTURE_BYTE_LENGTH);
 
-    if (content.data.sha256) {
-      assert.equal(content.data.sha256, expectedHash);
+    if ('sha256' in content.data && typeof content.data.sha256 === 'string') {
+      assert.equal(content.data.sha256, EXPECTED_FIXTURE_SHA256);
     }
 
-    const savedContent = readFileSync(outputPath, 'utf8');
-    assert.equal(Buffer.byteLength(savedContent, 'utf8'), 34498);
-    assert.equal(statSync(outputPath).size, 34498);
-    const savedHash = createHash('sha256')
-      .update(readFileSync(outputPath))
-      .digest('hex');
-    assert.equal(savedHash, expectedHash);
+    const savedBuffer = readFileSync(outputPath);
+    assert.equal(savedBuffer.length, EXPECTED_FIXTURE_BYTE_LENGTH);
+    assert.equal(statSync(outputPath).size, EXPECTED_FIXTURE_BYTE_LENGTH);
+    const savedHash = createHash('sha256').update(savedBuffer).digest('hex');
+    assert.equal(savedHash, EXPECTED_FIXTURE_SHA256);
   });
 });
