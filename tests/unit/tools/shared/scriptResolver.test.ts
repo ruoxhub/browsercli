@@ -148,6 +148,39 @@ describe('ScriptResolver', () => {
     assert.equal(result.staleScriptIdRecovered, undefined);
   });
 
+  it('同 URL 相同内容（reload 后 stale+new）contentHash 折叠为唯一候选', async () => {
+    const url = 'https://example.com/reload.js';
+    const context = makeContext([
+      {scriptId: 'stale-9', url, source: SRC_A},
+      {scriptId: 'fresh-10', url, source: SRC_A},
+    ]);
+
+    const result = await resolveScript(context, {
+      locator: {url, contentHash: sha256(SRC_A)},
+    });
+
+    assert.equal(result.scriptId, 'fresh-10');
+    assert.equal(result.matchedBy, 'hash');
+    assert.equal(result.sha256, sha256(SRC_A));
+    assert.equal(result.staleScriptIdRecovered, undefined);
+  });
+
+  it('不同 URL 命中同一 contentHash 仍抛 SCRIPT_LOCATOR_AMBIGUOUS', async () => {
+    const context = makeContext([
+      {scriptId: '1', url: 'https://example.com/a.js', source: SRC_A},
+      {scriptId: '2', url: 'https://example.com/b.js', source: SRC_A},
+    ]);
+
+    await assert.rejects(
+      resolveScript(context, {locator: {contentHash: sha256(SRC_A)}}),
+      error => {
+        expectToolError(error, ErrorCodes.SCRIPT_LOCATOR_AMBIGUOUS);
+        assert.match(error.message, /\[1, 2\]/);
+        return true;
+      },
+    );
+  });
+
   it('contentHash 对源码现算 SHA-256，不误用 CDP 内部 hash', async () => {
     const context = makeContext([
       {

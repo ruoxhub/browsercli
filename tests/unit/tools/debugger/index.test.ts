@@ -777,7 +777,7 @@ describe('src/tools/debugger/index.ts', () => {
     assert.match(content.message, /已关闭或不存在/);
   });
 
-  it('get_script_source null-normalizes an empty inline URL in the locator', async () => {
+  it('get_script_source keeps an empty inline URL in the locator (round-trip exact)', async () => {
     const {context} = createRuntime();
     const dc = await context.getDebuggerContext();
     dc.getScripts = () => [{scriptId: '5', url: ''}];
@@ -785,12 +785,14 @@ describe('src/tools/debugger/index.ts', () => {
 
     const content = await callToolContent<{
       success: boolean;
-      data: {url: string | null; locator: {url: string | null}};
+      data: {url: string | null; locator: {url: string}};
     }>(getScriptSource, {scriptId: '5'}, context);
 
     assert.equal(content.success, true);
+    // 顶层 url 字段为展示用，空字符串归一化为 null。
     assert.equal(content.data.url, null);
-    assert.equal(content.data.locator.url, null);
+    // locator.url 保留原始空字符串，保证 locator 可往返精确匹配（见 Finding 2）。
+    assert.equal(content.data.locator.url, '');
   });
 
   it('does NOT export or register stub tools startContinuousDebugging / stopContinuousDebugging', async () => {

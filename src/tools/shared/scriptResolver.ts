@@ -169,6 +169,32 @@ export async function resolveScript(
       }
     }
     candidates = matched;
+
+    // contentHash 分支下所有存活候选内容字节一致。同一 URL 的重复条目
+    // （同会话 reload 遗留的 stale + fresh 两个 scriptId，url 与内容均相同）
+    // 折叠为单个代表，避免产生虚假的 SCRIPT_LOCATOR_AMBIGUOUS；不同 URL
+    // 命中同一 contentHash 仍保留，继续触发歧义错误。
+    const byUrl = new Map<string, ScriptInfo[]>();
+    for (const script of candidates) {
+      const group = byUrl.get(script.url) ?? [];
+      group.push(script);
+      byUrl.set(script.url, group);
+    }
+    const deduped: ScriptInfo[] = [];
+    for (const group of byUrl.values()) {
+      const remaining =
+        scriptId !== undefined
+          ? group.filter(script => script.scriptId !== scriptId)
+          : group;
+      // 排除 stale scriptId 后取最新解析的一条；若整组都是 stale scriptId
+      // 则回退到组内最后一条（内容完全一致，返回结果不受影响）。
+      deduped.push(
+        remaining.length > 0
+          ? remaining[remaining.length - 1]
+          : group[group.length - 1],
+      );
+    }
+    candidates = deduped;
   }
 
   // 4. 候选冲突判定。

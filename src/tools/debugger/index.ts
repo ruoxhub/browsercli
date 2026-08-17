@@ -890,8 +890,9 @@ export const getScriptSource = defineTool({
           matchedBy: resolved.matchedBy,
           locator: {
             ...(selectedPage ? {pageId: context.getPageId(selectedPage)} : {}),
-            // url 空字符串（内联/eval 脚本）统一归一化为 null，与顶层 url 字段一致。
-            url: resolved.url || null,
+            // url 保留原始值（内联/eval 脚本为 ''），确保 locator 可往返精确匹配；
+            // 顶层 url 字段仍归一化为 null 供展示。
+            url: resolved.url,
             sourceLength: resolved.sourceLength,
             contentHash: resolved.sha256,
           },

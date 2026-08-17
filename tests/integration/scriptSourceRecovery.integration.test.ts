@@ -223,20 +223,22 @@ describe(
       assert.equal(locator!.pageId, PAGE_ID);
       assert.equal(locator!.contentHash, first.data.sha256);
 
-      // 刷新页面，CDP 会为同一脚本重新分配 scriptId。
+      // 刷新页面，CDP 会为同一脚本重新分配 scriptId。复用同一个
+      // DebuggerManager（同会话）：旧 scriptId 条目仍残留在 getScripts() 中，
+      // 与新条目 url + 内容完全一致，必须等待新条目出现。
       await page.reload();
-
-      // 会话 2：全新 DebuggerManager，模拟刷新后的新调试会话（旧 scriptId 已失效）。
-      const freshProvider = new DebuggerContextProvider();
-      const freshManager = await freshProvider.ensureForPage(page);
       await waitFor<ScriptInfo>(() =>
-        freshManager
+        manager
           .getScripts()
-          .find(script => script.url === `${fixtureUrl}/app.js`),
+          .find(
+            script =>
+              script.url === `${fixtureUrl}/app.js` &&
+              script.scriptId !== app.scriptId,
+          ),
       );
 
       // 用旧 locator（pageId + url + contentHash）恢复脚本，断言 hash 稳定。
-      const recovered = await callGetScriptSource(freshManager, page, {
+      const recovered = await callGetScriptSource(manager, page, {
         locator,
         filePath: path.join(tmpDir, 'recovered-app.js'),
       });
