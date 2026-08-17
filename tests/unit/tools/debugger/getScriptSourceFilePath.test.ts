@@ -5,12 +5,14 @@
  */
 
 import assert from 'node:assert';
+import {createHash} from 'node:crypto';
 import {
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
+  statSync,
   writeFileSync,
-  mkdirSync,
 } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -64,21 +66,25 @@ const SAMPLE_SOURCE = 'const token = 1;\nfunction test(){ return token; }\n';
  * 模拟 DebuggerManager.getScriptSourcePath：无 filePath 时返回内置缓存路径，
  * 有 filePath 时把源码写入该路径并返回绝对路径（对齐 ScriptManager 的真实行为）。
  */
-function makeDebuggerContext(cachePath: string) {
+function makeDebuggerContext(
+  cachePath: string,
+  source: string = SAMPLE_SOURCE,
+  url = 'https://example.com/app.js',
+) {
   return {
     getScriptSourcePath: async (scriptId: string, filePath?: string) => {
       if (filePath) {
         const resolved = path.resolve(filePath);
         mkdirSync(path.dirname(resolved), {recursive: true});
-        writeFileSync(resolved, SAMPLE_SOURCE, 'utf-8');
+        writeFileSync(resolved, source, 'utf-8');
         return resolved;
       }
       return cachePath;
     },
     getScriptById: (id: string) => ({
       scriptId: id,
-      url: 'https://example.com/app.js',
-      sourceLength: SAMPLE_SOURCE.length,
+      url,
+      sourceLength: source.length,
     }),
   };
 }
@@ -189,5 +195,63 @@ describe('get_script_source filePath param', () => {
       endLine: 2,
       source: 'function test(){ return token; }',
     });
+  });
+
+  it('preserves complete match18 67.js fixture with exact byte length and hash', async () => {
+    const fixturePath = path.resolve(
+      process.cwd(),
+      'tests/fixtures/jsvmp/match18/67.js',
+    );
+    const fixtureSource = readFileSync(fixturePath, 'utf8');
+    assert.equal(Buffer.byteLength(fixtureSource, 'utf8'), 34498);
+    const expectedHash = createHash('sha256')
+      .update(fixtureSource, 'utf8')
+      .digest('hex');
+    assert.equal(
+      expectedHash,
+      '57eaf2a680f33ab91ea6299519c676a97cb45b123c552a0e15d7715845461450',
+    );
+
+    const outputPath = path.join(tmpDir, 'saved-67.js');
+    const context = {
+      getDebuggerContext: async () =>
+        makeDebuggerContext(
+          '/ignored.js',
+          fixtureSource,
+          'https://match.yuanrenxue.com/match/18/67.js',
+        ),
+    };
+    const response = makeResponse();
+
+    await getScriptSource.handler(
+      {params: {scriptId: '67', filePath: outputPath}} as never,
+      response as never,
+      context as never,
+    );
+
+    const content = response.structured as {
+      success: boolean;
+      data: {
+        scriptId: string;
+        sourcePath: string;
+        sourceLength: number;
+        sha256?: string;
+      };
+    };
+    assert.equal(content.success, true);
+    assert.equal(content.data.sourcePath, path.resolve(outputPath));
+    assert.equal(content.data.sourceLength, fixtureSource.length);
+
+    if (content.data.sha256) {
+      assert.equal(content.data.sha256, expectedHash);
+    }
+
+    const savedContent = readFileSync(outputPath, 'utf8');
+    assert.equal(Buffer.byteLength(savedContent, 'utf8'), 34498);
+    assert.equal(statSync(outputPath).size, 34498);
+    const savedHash = createHash('sha256')
+      .update(readFileSync(outputPath))
+      .digest('hex');
+    assert.equal(savedHash, expectedHash);
   });
 });
