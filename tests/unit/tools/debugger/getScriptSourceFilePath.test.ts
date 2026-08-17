@@ -176,6 +176,7 @@ describe('get_script_source filePath param', () => {
     const cachePath = path.join(os.tmpdir(), 'browsercli-scripts', 'abc.js');
     const context = {
       getDebuggerContext: async () => makeDebuggerContext(cachePath),
+      getSelectedPage: () => null,
     };
     const response = makeResponse();
 
@@ -197,6 +198,7 @@ describe('get_script_source filePath param', () => {
     const cachePath = path.join(os.tmpdir(), 'browsercli-scripts', 'num.js');
     const context = {
       getDebuggerContext: async () => makeDebuggerContext(cachePath, '185205'),
+      getSelectedPage: () => null,
     };
     const response = makeResponse();
 
@@ -220,6 +222,7 @@ describe('get_script_source filePath param', () => {
     const target = path.join(tmpDir, 'saved-script.js');
     const context = {
       getDebuggerContext: async () => makeDebuggerContext('/ignored.js'),
+      getSelectedPage: () => null,
     };
     const response = makeResponse();
 
@@ -242,6 +245,7 @@ describe('get_script_source filePath param', () => {
     const target = path.join(tmpDir, 'excerpt.js');
     const context = {
       getDebuggerContext: async () => makeDebuggerContext('/ignored.js'),
+      getSelectedPage: () => null,
     };
     const response = makeResponse();
 
@@ -265,6 +269,7 @@ describe('get_script_source filePath param', () => {
       sourcePath: path.resolve(target),
       sha256: SAMPLE_SHA256,
       responseTruncated: false,
+      matchedBy: 'scriptId',
       locator: {
         url: 'https://example.com/app.js',
         sourceLength: SAMPLE_SOURCE.length,
@@ -281,6 +286,7 @@ describe('get_script_source filePath param', () => {
     const target = path.join(tmpDir, 'preview-excerpt.js');
     const context = {
       getDebuggerContext: async () => makeDebuggerContext('/ignored.js'),
+      getSelectedPage: () => null,
     };
     const response = makeResponse();
 
@@ -317,6 +323,7 @@ describe('get_script_source filePath param', () => {
     const target = path.join(tmpDir, 'bytes-written.js');
     const context = {
       getDebuggerContext: async () => makeDebuggerContext('/ignored.js'),
+      getSelectedPage: () => null,
     };
     const response = makeResponse();
 
@@ -406,6 +413,7 @@ describe('get_script_source filePath param', () => {
     const context = {
       getDebuggerContext: async () =>
         makeResolverContextFromScriptManager(scriptManager),
+      getSelectedPage: () => null,
     };
     const response = makeResponse();
 
@@ -439,5 +447,153 @@ describe('get_script_source filePath param', () => {
     assert.equal(statSync(outputPath).size, EXPECTED_FIXTURE_BYTE_LENGTH);
     const savedHash = createHash('sha256').update(savedBuffer).digest('hex');
     assert.equal(savedHash, EXPECTED_FIXTURE_SHA256);
+  });
+});
+
+describe('get_script_source locator param', () => {
+  const APP_URL = 'https://example.com/app.js';
+
+  /** 构造可配置脚本集与页面解析的 resolver context。 */
+  function makeLocatorContext(options: {
+    scripts: Array<{scriptId: string; url: string}>;
+    resolvePage?: () => unknown;
+  }) {
+    const sources = new Map(
+      options.scripts.map(script => [
+        script.scriptId,
+        `// source of ${script.scriptId}\nwindow.__id = ${script.scriptId};\n`,
+      ]),
+    );
+    return {
+      getDebuggerContext: async () => ({
+        getScripts: () => options.scripts,
+        getScriptSource: async (id: string): Promise<string> => {
+          const source = sources.get(id);
+          if (source === undefined) {
+            throw new Error(`Script source not found: ${id}`);
+          }
+          return source;
+        },
+        getScriptSourcePath: async (id: string) => `/cache/${id}.js`,
+      }),
+      getSelectedPage: () => null,
+      ...(options.resolvePage ? {resolvePage: options.resolvePage} : {}),
+    };
+  }
+
+  it('accepts locator-only lookup and returns a complete locator', async () => {
+    const context = makeLocatorContext({
+      scripts: [{scriptId: '7', url: APP_URL}],
+    });
+    const response = makeResponse();
+
+    await getScriptSource.handler(
+      {params: {locator: {url: APP_URL}}} as never,
+      response as never,
+      context as never,
+    );
+
+    const content = response.structured as {
+      success: boolean;
+      data: {
+        scriptId: string;
+        matchedBy: string;
+        staleScriptIdRecovered?: boolean;
+        locator: {url: string; sourceLength: number; contentHash: string};
+      };
+    };
+    assert.equal(content.success, true);
+    assert.equal(content.data.scriptId, '7');
+    assert.equal(content.data.matchedBy, 'url');
+    assert.equal(content.data.staleScriptIdRecovered, undefined);
+    assert.equal(content.data.locator.url, APP_URL);
+    assert.ok(
+      /^[0-9a-f]{64}$/.test(content.data.locator.contentHash),
+      'locator.contentHash 应为 64 位十六进制 SHA-256',
+    );
+  });
+
+  it('recovers a stale scriptId via locator and flags staleScriptIdRecovered', async () => {
+    // 刷新后 CDP 重新分配 scriptId：旧 ID '1' 已失效，新 ID '9' 仍指向同一 URL。
+    const context = makeLocatorContext({
+      scripts: [{scriptId: '9', url: APP_URL}],
+    });
+    const response = makeResponse();
+
+    await getScriptSource.handler(
+      {params: {scriptId: '1', locator: {url: APP_URL}}} as never,
+      response as never,
+      context as never,
+    );
+
+    const content = response.structured as {
+      success: boolean;
+      data: {
+        scriptId: string;
+        matchedBy: string;
+        staleScriptIdRecovered?: boolean;
+      };
+    };
+    assert.equal(content.success, true);
+    assert.equal(content.data.scriptId, '9');
+    assert.equal(content.data.matchedBy, 'url');
+    assert.equal(content.data.staleScriptIdRecovered, true);
+  });
+
+  it('returns an ambiguity error when locator matches multiple scripts', async () => {
+    const context = makeLocatorContext({
+      scripts: [
+        {scriptId: '1', url: APP_URL},
+        {scriptId: '2', url: APP_URL},
+      ],
+    });
+    const response = makeResponse();
+
+    await getScriptSource.handler(
+      {params: {locator: {url: APP_URL}}} as never,
+      response as never,
+      context as never,
+    );
+
+    const content = response.structured as {success: boolean; message: string};
+    assert.equal(content.success, false);
+    assert.match(content.message, /定位器匹配到/);
+  });
+
+  it('returns PAGE_NOT_FOUND when locator pageId is closed', async () => {
+    const context = makeLocatorContext({
+      scripts: [{scriptId: '1', url: APP_URL}],
+      resolvePage: () => {
+        throw new Error('page closed');
+      },
+    });
+    const response = makeResponse();
+
+    await getScriptSource.handler(
+      {params: {locator: {pageId: 'page-1', url: APP_URL}}} as never,
+      response as never,
+      context as never,
+    );
+
+    const content = response.structured as {success: boolean; message: string};
+    assert.equal(content.success, false);
+    assert.match(content.message, /已关闭或不存在/);
+  });
+
+  it('requires at least one of scriptId or locator', async () => {
+    const context = makeLocatorContext({
+      scripts: [{scriptId: '1', url: APP_URL}],
+    });
+    const response = makeResponse();
+
+    await getScriptSource.handler(
+      {params: {}} as never,
+      response as never,
+      context as never,
+    );
+
+    const content = response.structured as {success: boolean; message: string};
+    assert.equal(content.success, false);
+    assert.match(content.message, /必须提供 scriptId 或 locator/);
   });
 });

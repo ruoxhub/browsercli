@@ -56,6 +56,7 @@ function createRuntime() {
         : undefined,
     getScriptSource: async () =>
       'const token = 1;\nfunction test(){ return token; }\nconst token2 = token;',
+    getScriptSourcePath: async (_scriptId: string) => '/cache/app.js',
     getBeautifiedScriptSource: async (
       _scriptId: string,
       beautify: (source: string) => string,
@@ -192,6 +193,13 @@ function createRuntime() {
   const context = {
     getDebuggerContext: async () => debuggerContext,
     getSelectedPage: () => ({mainFrame: () => frame}),
+    getPageId: () => 'page-1',
+    resolvePage: (selector: {pageId?: string}) => {
+      if (selector.pageId && selector.pageId !== 'page-1') {
+        throw new Error(`页面 ${selector.pageId} 已关闭或不存在`);
+      }
+      return {page: {mainFrame: () => frame}, pageId: 'page-1', pageIdx: 0};
+    },
     getSelectedFrame: () => frame,
     getNetworkRequestById: (id: number) => ({
       id,
@@ -376,7 +384,8 @@ describe('src/tools/debugger/index.ts', () => {
 
     assert.match(scriptsText, /2 个脚本/);
     assert.match(filteredText, /app\.js/);
-    assert.match(sourceText, /function test/);
+    // get_script_source 现在返回源码缓存路径与完整性字段，而非内联源码。
+    assert.match(sourceText, /sourcePath/);
     assert.match(breakpointsText, /bp-1/);
   });
 
@@ -671,55 +680,117 @@ describe('src/tools/debugger/index.ts', () => {
     assert.match(content.message, /调试器未启用/);
   });
 
-  it('getScriptSource with prettyPrint beautifies only once, not twice', async () => {
-    const {PackerDeobfuscator} =
-      await import('../../../../src/modules/deobfuscator/PackerDeobfuscator.js');
-    const rawSource = 'var a=1;var b=2;';
+  it('get_script_source keeps url and emits pageId in the returned locator', async () => {
+    const {context} = createRuntime();
 
-    // Spy on the prototype to intercept calls from ANY instance
-    // (the handler creates its own PackerDeobfuscator internally)
-    let beautifyCallCount = 0;
-    const originalBeautify = PackerDeobfuscator.prototype.beautify;
-    PackerDeobfuscator.prototype.beautify = function (code: string) {
-      beautifyCallCount++;
-      return originalBeautify.call(this, code);
-    };
+    const content = await callToolContent<{
+      success: boolean;
+      data: {
+        scriptId: string;
+        url: string | null;
+        sha256: string;
+        locator: {
+          pageId?: string;
+          url: string | null;
+          sourceLength: number;
+          contentHash: string;
+        };
+      };
+    }>(getScriptSource, {scriptId: '1'}, context);
 
-    try {
-      const {context} = createRuntime();
-      const dc = await (
-        context as never as {
-          getDebuggerContext: () => Promise<Record<string, unknown>>;
-        }
-      ).getDebuggerContext();
+    assert.equal(content.success, true);
+    assert.equal(content.data.scriptId, '1');
+    assert.equal(content.data.url, 'https://example.com/app.js');
+    assert.equal(content.data.locator.url, 'https://example.com/app.js');
+    assert.equal(content.data.locator.pageId, 'page-1');
+    assert.equal(content.data.locator.contentHash, content.data.sha256);
+    assert.equal(typeof content.data.locator.sourceLength, 'number');
+  });
 
-      dc.getScriptSource = async () => rawSource;
-      dc.getBeautifiedScriptSource = async (
-        _scriptId: string,
-        beautify: (source: string) => string,
-      ) => beautify(rawSource);
-      dc.getScriptById = () => ({
-        scriptId: '1',
-        url: 'https://example.com/app.js',
-      });
+  it('get_script_source recovers a stale scriptId via locator and reports staleScriptIdRecovered', async () => {
+    const {context} = createRuntime();
 
-      const result = await callToolContent<{
-        success: boolean;
-        data: {source: string};
-      }>(getScriptSource, {scriptId: '1', prettyPrint: true}, context);
+    const content = await callToolContent<{
+      success: boolean;
+      data: {
+        scriptId: string;
+        staleScriptIdRecovered?: boolean;
+        locator: {pageId?: string; url: string | null};
+      };
+    }>(
+      getScriptSource,
+      {
+        scriptId: 'stale-1',
+        locator: {url: 'https://example.com/app.js'},
+      },
+      context,
+    );
 
-      assert.equal(result.success, true);
-      // Core regression check: beautify must be called exactly once
-      assert.equal(
-        beautifyCallCount,
-        1,
-        `beautify should be called exactly once, but was called ${beautifyCallCount} times`,
-      );
-      // Verify the returned source differs from raw (beautify actually ran)
-      assert.notEqual(result.data.source, rawSource);
-    } finally {
-      PackerDeobfuscator.prototype.beautify = originalBeautify;
-    }
+    assert.equal(content.success, true);
+    assert.equal(content.data.scriptId, '1');
+    assert.equal(content.data.staleScriptIdRecovered, true);
+    assert.equal(content.data.locator.pageId, 'page-1');
+  });
+
+  it('get_script_source reports ambiguity when locator matches multiple scripts', async () => {
+    const {context} = createRuntime();
+    const dc = await context.getDebuggerContext();
+    dc.getScripts = () => [
+      {scriptId: '1', url: 'https://example.com/dup.js'},
+      {scriptId: '2', url: 'https://example.com/dup.js'},
+    ];
+
+    const content = await callToolContent<{
+      success: boolean;
+      message: string;
+      code: string;
+    }>(
+      getScriptSource,
+      {
+        locator: {url: 'https://example.com/dup.js'},
+      },
+      context,
+    );
+
+    assert.equal(content.success, false);
+    assert.equal(content.code, 'SCRIPT_LOCATOR_AMBIGUOUS');
+    assert.match(content.message, /定位器匹配到 2 个候选/);
+  });
+
+  it('get_script_source reports PAGE_NOT_FOUND for a closed pageId', async () => {
+    const {context} = createRuntime();
+
+    const content = await callToolContent<{
+      success: boolean;
+      message: string;
+      code: string;
+    }>(
+      getScriptSource,
+      {
+        locator: {pageId: 'page-closed', url: 'https://example.com/app.js'},
+      },
+      context,
+    );
+
+    assert.equal(content.success, false);
+    assert.equal(content.code, 'PAGE_NOT_FOUND');
+    assert.match(content.message, /已关闭或不存在/);
+  });
+
+  it('get_script_source null-normalizes an empty inline URL in the locator', async () => {
+    const {context} = createRuntime();
+    const dc = await context.getDebuggerContext();
+    dc.getScripts = () => [{scriptId: '5', url: ''}];
+    dc.getScriptSource = async () => 'console.log(1);';
+
+    const content = await callToolContent<{
+      success: boolean;
+      data: {url: string | null; locator: {url: string | null}};
+    }>(getScriptSource, {scriptId: '5'}, context);
+
+    assert.equal(content.success, true);
+    assert.equal(content.data.url, null);
+    assert.equal(content.data.locator.url, null);
   });
 
   it('does NOT export or register stub tools startContinuousDebugging / stopContinuousDebugging', async () => {

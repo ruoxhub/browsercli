@@ -6,9 +6,11 @@
 
 import path from 'node:path';
 
+import type {PageSelector} from '../../modules/browser/PageIdentity.js';
 import type {DebuggerManager} from '../../modules/debugger/DebuggerManager.js';
 import type {BreakpointInfo} from '../../modules/debugger/types.js';
 import {zod} from '../../third_party/index.js';
+import {ToolError} from '../../utils/errors.js';
 import {writeScriptFileAtomic} from '../../utils/fsSafe.js';
 import {safeStringify} from '../../utils/safeJson.js';
 import type {ToolContextProvider} from '../../worker/ToolContext.js';
@@ -47,6 +49,32 @@ export type {Frame} from '../../third_party/index.js';
 const scriptIdSchema = zod
   .union([zod.string(), zod.number()])
   .transform(value => String(value));
+
+/**
+ * 脚本定位器 Schema：页面刷新后 CDP scriptId 会重新分配，旧 scriptId 失效，
+ * 此时可用 get_script_source 返回的 locator 重新定位同一脚本。
+ */
+const scriptLocatorSchema = zod.object({
+  pageId: zod
+    .string()
+    .optional()
+    .describe('关联的稳定页面 ID（仅存在性校验，不用于缩小候选）。'),
+  url: zod.string().optional().describe('脚本 URL（精确匹配）。'),
+  domIndex: zod
+    .number()
+    .int()
+    .optional()
+    .describe('在候选脚本中的下标（0-based，用于同名 URL 消歧）。'),
+  contentHash: zod
+    .string()
+    .optional()
+    .describe('脚本源码 SHA-256（十六进制），用于精确匹配。'),
+  sourceLength: zod
+    .number()
+    .int()
+    .optional()
+    .describe('脚本源码字节长度（UTF-8）。'),
+});
 
 /**
  * step_into / step_over / step_out 三工具共享逻辑：校验暂停态、执行
@@ -743,9 +771,16 @@ export const getScriptSource = defineTool({
   schema: {
     // 接受字符串或数字：纯远程 CLI（browsercli）会把纯数字 ID 自动推断为
     // number，这里统一归一化为 string，避免 [VALIDATION] 校验失败。
-    scriptId: scriptIdSchema.describe(
-      '脚本 ID（来自 list_scripts）用于获取源码缓存路径。',
-    ),
+    scriptId: scriptIdSchema
+      .optional()
+      .describe(
+        '脚本 ID（来自 list_scripts）用于获取源码缓存路径。页面刷新后 scriptId 会重新分配，可搭配 locator 恢复定位。',
+      ),
+    locator: scriptLocatorSchema
+      .optional()
+      .describe(
+        '脚本定位器（来自 get_script_source 返回的 locator 字段）。当 scriptId 失效或省略时，用于按 URL/长度/hash 重新定位同一脚本。',
+      ),
     filePath: zod
       .string()
       .optional()
@@ -768,11 +803,15 @@ export const getScriptSource = defineTool({
       ),
   },
   handler: async (request, response, context) => {
-    const {filePath, startLine, endLine} = request.params;
+    const {filePath, startLine, endLine, locator} = request.params;
     // scriptId 可能被 browsercli 推断为 number，统一归一化为 string。
     // schema 的 transform 在生产管线会生效，但单测直接调用 handler 时不会经过
-    // schema，这里再做一次兜底，保证 resolveScript 的精确匹配。
-    const scriptId = String(request.params.scriptId);
+    // schema，这里再做一次兜底，保证 resolveScript 的精确匹配。scriptId 与
+    // locator 均为可选，由 resolver 校验至少提供其一。
+    const scriptId =
+      request.params.scriptId !== undefined
+        ? String(request.params.scriptId)
+        : undefined;
 
     try {
       if ((startLine === undefined) !== (endLine === undefined)) {
@@ -787,7 +826,20 @@ export const getScriptSource = defineTool({
       }
 
       const debuggerContext = await getDebuggerFromContext(context);
-      const resolved = await resolveScript(debuggerContext, {scriptId});
+      const resolved = await resolveScript(
+        {
+          getScripts: () => debuggerContext.getScripts(),
+          getScriptSource: (id: string) => debuggerContext.getScriptSource(id),
+          // DebuggerManager 自身不含 resolvePage，pageId 存在性校验须复用
+          // 工具上下文的页面解析能力。
+          resolvePage: (selector: PageSelector) =>
+            context.resolvePage(selector),
+        },
+        {
+          scriptId,
+          locator,
+        },
+      );
 
       let sourcePath: string;
       let bytesWritten: number | undefined;
@@ -805,8 +857,8 @@ export const getScriptSource = defineTool({
         if (!cachePath) {
           response.setStructuredContent({
             success: false,
-            message: `未找到脚本 ${scriptId} 的源码或加载失败。`,
-            data: {scriptId},
+            message: `未找到脚本 ${resolved.scriptId} 的源码或加载失败。`,
+            data: {scriptId: resolved.scriptId},
           });
           return;
         }
@@ -821,9 +873,11 @@ export const getScriptSource = defineTool({
               .join('\n')
           : undefined;
 
+      const selectedPage = context.getSelectedPage();
+
       response.setStructuredContent({
         success: true,
-        message: `脚本 ${scriptId} 源码已缓存至 ${sourcePath}`,
+        message: `脚本 ${resolved.scriptId} 源码已缓存至 ${sourcePath}`,
         data: {
           scriptId: resolved.scriptId,
           url: resolved.url || null,
@@ -833,11 +887,17 @@ export const getScriptSource = defineTool({
           // 该工具返回文件路径而非内联源码，磁盘文件始终是经 sha256 校验的完整源码，
           // 因此 responseTruncated 恒为 false（startLine/endLine 是用户显式请求的区间，非预算截断）。
           responseTruncated: false,
+          matchedBy: resolved.matchedBy,
           locator: {
-            url: resolved.url,
+            ...(selectedPage ? {pageId: context.getPageId(selectedPage)} : {}),
+            // url 空字符串（内联/eval 脚本）统一归一化为 null，与顶层 url 字段一致。
+            url: resolved.url || null,
             sourceLength: resolved.sourceLength,
             contentHash: resolved.sha256,
           },
+          ...(resolved.staleScriptIdRecovered
+            ? {staleScriptIdRecovered: true}
+            : {}),
           ...(bytesWritten === undefined ? {} : {bytesWritten}),
           ...(excerpt === undefined
             ? {}
@@ -845,10 +905,16 @@ export const getScriptSource = defineTool({
         },
       });
     } catch (error) {
+      const isToolError = error instanceof ToolError;
       response.setStructuredContent({
         success: false,
         message: `获取脚本源码路径失败: ${error instanceof Error ? error.message : String(error)}`,
-        data: {scriptId},
+        ...(isToolError ? {code: error.code} : {}),
+        ...(isToolError && error.context !== undefined
+          ? {context: error.context}
+          : {}),
+        ...(isToolError ? {recoverable: error.recoverable} : {}),
+        data: {...(scriptId !== undefined ? {scriptId} : {})},
       });
     }
   },
