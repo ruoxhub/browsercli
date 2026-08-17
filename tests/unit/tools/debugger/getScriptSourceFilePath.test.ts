@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import {createHash} from 'node:crypto';
 import {
-  mkdirSync,
+  chmodSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -63,33 +63,35 @@ function makeResponse(): CapturedResponse & {structured: unknown} {
 }
 
 const SAMPLE_SOURCE = 'const token = 1;\nfunction test(){ return token; }\n';
+const SAMPLE_SHA256 = createHash('sha256')
+  .update(SAMPLE_SOURCE, 'utf8')
+  .digest('hex');
 
 /**
- * 模拟 DebuggerManager.getScriptSourcePath：无 filePath 时返回内置缓存路径，
- * 有 filePath 时把源码写入该路径并返回绝对路径（对齐 ScriptManager 的真实行为）。
+ * 模拟 resolver 所需的 context（getScripts + getScriptSource）与
+ * getScriptSourcePath（无 filePath 时返回内置缓存路径，对齐 DebuggerManager 行为）。
  */
-function makeDebuggerContext(cachePath: string) {
+function makeDebuggerContext(cachePath: string, scriptId = '1') {
+  const script = {
+    scriptId,
+    url: 'https://example.com/app.js',
+    sourceLength: SAMPLE_SOURCE.length,
+  };
   return {
-    getScriptSourcePath: async (scriptId: string, filePath?: string) => {
-      if (filePath) {
-        const resolved = path.resolve(filePath);
-        mkdirSync(path.dirname(resolved), {recursive: true});
-        writeFileSync(resolved, SAMPLE_SOURCE, 'utf-8');
-        return resolved;
+    getScripts: () => [script],
+    getScriptSource: async (id: string) => {
+      if (id !== scriptId) {
+        throw new Error(`Script source not found: ${id}`);
       }
-      return cachePath;
+      return SAMPLE_SOURCE;
     },
-    getScriptById: (id: string) => ({
-      scriptId: id,
-      url: 'https://example.com/app.js',
-      sourceLength: SAMPLE_SOURCE.length,
-    }),
+    getScriptSourcePath: async (_id: string) => cachePath,
   };
 }
 
 /**
  * 构造真实的生产 ScriptManager 实例，仅 mock CDP session I/O。
- * 用于直接测试真实的落盘持久化路径，确保回归测试能真实捕获任何潜在截断缺陷。
+ * 用于直接测试真实的源码加载路径，确保回归测试能真实捕获任何潜在截断缺陷。
  */
 function createProductionScriptManager(
   fixtureSource: string,
@@ -136,6 +138,29 @@ function createProductionScriptManager(
   return scriptManager;
 }
 
+/**
+ * 把生产 ScriptManager 适配成 resolver 所需的 context 形状：
+ * DebuggerManager.getScriptSource 返回源码字符串（而非 ScriptInfo）。
+ */
+function makeResolverContextFromScriptManager(scriptManager: ScriptManager) {
+  return {
+    getScripts: () => scriptManager.getAllScriptsSync(),
+    getScriptSource: async (id: string): Promise<string> => {
+      const info = await scriptManager.getScriptSource(id);
+      if (!info?.sourcePath) {
+        throw new Error(`Script source not found: ${id}`);
+      }
+      const content = scriptManager.getScriptContent(id);
+      if (!content) {
+        throw new Error(`Script source file missing: ${id}`);
+      }
+      return content;
+    },
+    getScriptSourcePath: (id: string, filePath?: string) =>
+      scriptManager.getScriptSourcePath(id, filePath),
+  };
+}
+
 describe('get_script_source filePath param', () => {
   let tmpDir: string;
 
@@ -171,7 +196,7 @@ describe('get_script_source filePath param', () => {
   it('accepts a numeric scriptId (CLI coerces IDs to number) and normalizes to string', async () => {
     const cachePath = path.join(os.tmpdir(), 'browsercli-scripts', 'num.js');
     const context = {
-      getDebuggerContext: async () => makeDebuggerContext(cachePath),
+      getDebuggerContext: async () => makeDebuggerContext(cachePath, '185205'),
     };
     const response = makeResponse();
 
@@ -230,7 +255,7 @@ describe('get_script_source filePath param', () => {
 
     const content = response.structured as {
       success: boolean;
-      data: {startLine: number; endLine: number; source: string};
+      data: Record<string, unknown>;
     };
     assert.equal(content.success, true);
     assert.deepStrictEqual(content.data, {
@@ -238,10 +263,116 @@ describe('get_script_source filePath param', () => {
       url: 'https://example.com/app.js',
       sourceLength: SAMPLE_SOURCE.length,
       sourcePath: path.resolve(target),
+      sha256: SAMPLE_SHA256,
+      responseTruncated: false,
+      locator: {
+        url: 'https://example.com/app.js',
+        sourceLength: SAMPLE_SOURCE.length,
+        contentHash: SAMPLE_SHA256,
+      },
+      bytesWritten: SAMPLE_SOURCE.length,
       startLine: 2,
       endLine: 2,
       source: 'function test(){ return token; }',
     });
+  });
+
+  it('keeps the on-disk file complete when the response preview is a line excerpt', async () => {
+    const target = path.join(tmpDir, 'preview-excerpt.js');
+    const context = {
+      getDebuggerContext: async () => makeDebuggerContext('/ignored.js'),
+    };
+    const response = makeResponse();
+
+    await getScriptSource.handler(
+      {
+        params: {scriptId: '1', filePath: target, startLine: 1, endLine: 1},
+      } as never,
+      response as never,
+      context as never,
+    );
+
+    const content = response.structured as {
+      success: boolean;
+      data: {
+        source: string;
+        sourceLength: number;
+        responseTruncated: boolean;
+      };
+    };
+    assert.equal(content.success, true);
+    // 响应预览只是用户请求的行区间...
+    assert.equal(content.data.source, 'const token = 1;');
+    // ...但 responseTruncated 恒为 false（区间是用户显式请求，非预算截断），
+    // 磁盘文件保存完整源码。
+    assert.equal(content.data.responseTruncated, false);
+    assert.equal(
+      content.data.sourceLength,
+      Buffer.byteLength(SAMPLE_SOURCE, 'utf8'),
+    );
+    assert.equal(readFileSync(target, 'utf-8'), SAMPLE_SOURCE);
+  });
+
+  it('reports bytesWritten equal to Buffer.byteLength(source)', async () => {
+    const target = path.join(tmpDir, 'bytes-written.js');
+    const context = {
+      getDebuggerContext: async () => makeDebuggerContext('/ignored.js'),
+    };
+    const response = makeResponse();
+
+    await getScriptSource.handler(
+      {params: {scriptId: '1', filePath: target}} as never,
+      response as never,
+      context as never,
+    );
+
+    const content = response.structured as {
+      success: boolean;
+      data: {bytesWritten: number; sourceLength: number};
+    };
+    assert.equal(content.success, true);
+    assert.equal(
+      content.data.bytesWritten,
+      Buffer.byteLength(SAMPLE_SOURCE, 'utf8'),
+    );
+    assert.equal(content.data.bytesWritten, content.data.sourceLength);
+  });
+
+  it('leaves the pre-existing target unchanged when the atomic write fails', async () => {
+    const target = path.join(tmpDir, 'old-target.js');
+    writeFileSync(target, 'OLD CONTENT');
+
+    // 强制原子写入失败以覆盖失败/清理路径：Windows 下只读目标文件使
+    // rename() 报 EPERM；POSIX 下 rename() 忽略目标文件权限位，改为把目录
+    // 置为只读以阻断临时文件写入。
+    let restore: () => void;
+    if (process.platform === 'win32') {
+      chmodSync(target, 0o444);
+      restore = () => chmodSync(target, 0o666);
+    } else {
+      chmodSync(tmpDir, 0o555);
+      restore = () => chmodSync(tmpDir, 0o755);
+    }
+
+    try {
+      const context = {
+        getDebuggerContext: async () => makeDebuggerContext('/ignored.js'),
+      };
+      const response = makeResponse();
+
+      await getScriptSource.handler(
+        {params: {scriptId: '1', filePath: target}} as never,
+        response as never,
+        context as never,
+      );
+
+      const content = response.structured as {success: boolean};
+      assert.equal(content.success, false);
+    } finally {
+      restore();
+    }
+
+    assert.equal(readFileSync(target, 'utf-8'), 'OLD CONTENT');
   });
 
   it('preserves complete match18 67.js fixture with exact byte length and hash', async () => {
@@ -273,7 +404,8 @@ describe('get_script_source filePath param', () => {
       'https://match.yuanrenxue.com/match/18/67.js',
     );
     const context = {
-      getDebuggerContext: async () => scriptManager,
+      getDebuggerContext: async () =>
+        makeResolverContextFromScriptManager(scriptManager),
     };
     const response = makeResponse();
 
@@ -289,17 +421,18 @@ describe('get_script_source filePath param', () => {
         scriptId: string;
         sourcePath: string;
         sourceLength: number;
-        sha256?: string;
+        sha256: string;
+        bytesWritten: number;
+        responseTruncated: boolean;
       };
     };
     assert.equal(content.success, true);
     assert.equal(content.data.sourcePath, path.resolve(outputPath));
     assert.equal(content.data.scriptId, '67');
     assert.equal(content.data.sourceLength, EXPECTED_FIXTURE_BYTE_LENGTH);
-
-    if ('sha256' in content.data && typeof content.data.sha256 === 'string') {
-      assert.equal(content.data.sha256, EXPECTED_FIXTURE_SHA256);
-    }
+    assert.equal(content.data.sha256, EXPECTED_FIXTURE_SHA256);
+    assert.equal(content.data.bytesWritten, EXPECTED_FIXTURE_BYTE_LENGTH);
+    assert.equal(content.data.responseTruncated, false);
 
     const savedBuffer = readFileSync(outputPath);
     assert.equal(savedBuffer.length, EXPECTED_FIXTURE_BYTE_LENGTH);

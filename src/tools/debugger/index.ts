@@ -4,15 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 
 import type {DebuggerManager} from '../../modules/debugger/DebuggerManager.js';
 import type {BreakpointInfo} from '../../modules/debugger/types.js';
 import {zod} from '../../third_party/index.js';
+import {writeScriptFileAtomic} from '../../utils/fsSafe.js';
 import {safeStringify} from '../../utils/safeJson.js';
 import type {ToolContextProvider} from '../../worker/ToolContext.js';
 import {ToolCategory} from '../categories.js';
+import {resolveScript} from '../shared/scriptResolver.js';
 import {defineTool} from '../ToolDefinition.js';
 
 import {
@@ -767,7 +768,11 @@ export const getScriptSource = defineTool({
       ),
   },
   handler: async (request, response, context) => {
-    const {scriptId, filePath, startLine, endLine} = request.params;
+    const {filePath, startLine, endLine} = request.params;
+    // scriptId 可能被 browsercli 推断为 number，统一归一化为 string。
+    // schema 的 transform 在生产管线会生效，但单测直接调用 handler 时不会经过
+    // schema，这里再做一次兜底，保证 resolveScript 的精确匹配。
+    const scriptId = String(request.params.scriptId);
 
     try {
       if ((startLine === undefined) !== (endLine === undefined)) {
@@ -782,24 +787,35 @@ export const getScriptSource = defineTool({
       }
 
       const debuggerContext = await getDebuggerFromContext(context);
-      const sourcePath = await debuggerContext.getScriptSourcePath(
-        scriptId,
-        filePath,
-      );
+      const resolved = await resolveScript(debuggerContext, {scriptId});
 
-      if (!sourcePath) {
-        response.setStructuredContent({
-          success: false,
-          message: `未找到脚本 ${scriptId} 的源码或加载失败。`,
-          data: {scriptId},
-        });
-        return;
+      let sourcePath: string;
+      let bytesWritten: number | undefined;
+      if (filePath) {
+        // 显式 filePath：走原子写入器，完整落盘 + 字节长度/SHA-256 校验。
+        const target = path.resolve(filePath);
+        const written = await writeScriptFileAtomic(target, resolved.source);
+        sourcePath = target;
+        bytesWritten = written.bytesWritten;
+      } else {
+        // 未传 filePath：保持原有行为，返回内置缓存路径。
+        const cachePath = await debuggerContext.getScriptSourcePath(
+          resolved.scriptId,
+        );
+        if (!cachePath) {
+          response.setStructuredContent({
+            success: false,
+            message: `未找到脚本 ${scriptId} 的源码或加载失败。`,
+            data: {scriptId},
+          });
+          return;
+        }
+        sourcePath = cachePath;
       }
 
-      const script = debuggerContext.getScriptById(scriptId);
       const excerpt =
         startLine !== undefined && endLine !== undefined
-          ? (await readFile(sourcePath, 'utf-8'))
+          ? resolved.source
               .split(/\r?\n/)
               .slice(startLine - 1, endLine)
               .join('\n')
@@ -809,10 +825,20 @@ export const getScriptSource = defineTool({
         success: true,
         message: `脚本 ${scriptId} 源码已缓存至 ${sourcePath}`,
         data: {
-          scriptId,
-          url: script?.url || null,
-          sourceLength: script?.sourceLength || 0,
+          scriptId: resolved.scriptId,
+          url: resolved.url || null,
+          sourceLength: resolved.sourceLength,
           sourcePath,
+          sha256: resolved.sha256,
+          // 该工具返回文件路径而非内联源码，磁盘文件始终是经 sha256 校验的完整源码，
+          // 因此 responseTruncated 恒为 false（startLine/endLine 是用户显式请求的区间，非预算截断）。
+          responseTruncated: false,
+          locator: {
+            url: resolved.url,
+            sourceLength: resolved.sourceLength,
+            contentHash: resolved.sha256,
+          },
+          ...(bytesWritten === undefined ? {} : {bytesWritten}),
           ...(excerpt === undefined
             ? {}
             : {startLine, endLine, source: excerpt}),
@@ -822,7 +848,7 @@ export const getScriptSource = defineTool({
       response.setStructuredContent({
         success: false,
         message: `获取脚本源码路径失败: ${error instanceof Error ? error.message : String(error)}`,
-        data: {scriptId: request.params.scriptId},
+        data: {scriptId},
       });
     }
   },
