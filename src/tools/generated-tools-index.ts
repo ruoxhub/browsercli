@@ -378,6 +378,10 @@ export const GENERATED_TOOL_REGISTRY = [
     handlerName: 'compareEnv',
   },
   {
+    modulePath: './jsvmp/analyzeVm.js',
+    handlerName: 'analyzeJsvmpVm',
+  },
+  {
     modulePath: './navigation/listPages.js',
     handlerName: 'listPages',
   },
