@@ -244,7 +244,9 @@ describe('ToolAdapter', () => {
 
   it('wrapTool executes defineTool handlers with accumulated response', async () => {
     const provider = new ToolContextProvider();
-    provider.setSelectedPage({mainFrame: () => ({})} as never);
+    provider.setPages([
+      {mainFrame: () => ({}), isClosed: () => false} as never,
+    ]);
     const adapter = new ToolAdapter(provider);
     const meta = fixtureMeta({
       name: 'define_tool_fixture',
@@ -387,8 +389,10 @@ describe('ToolAdapter', () => {
     };
     const page = {
       mainFrame: () => frame,
+      isClosed: () => false,
     };
 
+    runtime.setPages([page as never]);
     runtime.setSelectedPage(page as never);
 
     const adapter = new ToolAdapter(runtime);

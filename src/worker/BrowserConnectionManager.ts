@@ -79,29 +79,44 @@ export function getBrowserConnectionStatus(
 export async function connectBrowser(
   contextProvider: ToolContextProvider,
   config: BrowserManagerConfig,
+  options: {maxRetries?: number; initialDelayMs?: number} = {},
 ): Promise<ConnectResult> {
+  const maxRetries = options.maxRetries ?? 3;
+  const initialDelayMs = options.initialDelayMs ?? 200;
+
   return await workerActivityCoordinator.runBrowserOperation(
     'connect',
     async () => {
-      await BrowserManager.resetInstance();
-      contextProvider.setBrowser(null);
-      contextProvider.clearContext();
-      const manager = BrowserManager.getInstance(config);
-      const browser = await manager.ensureBrowser();
-      const context = manager.getContext() ?? browser.contexts()[0] ?? null;
+      let lastError: unknown;
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          await BrowserManager.resetInstance();
+          contextProvider.setBrowser(null);
+          contextProvider.clearContext();
+          const manager = BrowserManager.getInstance(config);
+          const browser = await manager.ensureBrowser();
+          const context = manager.getContext() ?? browser.contexts()[0] ?? null;
 
-      contextProvider.setBrowserManager(manager);
-      contextProvider.setBrowser(browser);
-      if (context) {
-        contextProvider.setContext(context);
-      } else {
-        contextProvider.clearContext();
+          contextProvider.setBrowserManager(manager);
+          contextProvider.setBrowser(browser);
+          if (context) {
+            contextProvider.setContext(context);
+          } else {
+            contextProvider.clearContext();
+          }
+          await contextProvider.init();
+
+          const mode = getBrowserConnectionMode(config);
+          return {connected: true, mode};
+        } catch (err) {
+          lastError = err;
+          if (attempt < maxRetries - 1) {
+            const delay = initialDelayMs * Math.pow(2, attempt);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+        }
       }
-      await contextProvider.init();
-
-      const mode = getBrowserConnectionMode(config);
-
-      return {connected: true, mode};
+      throw lastError;
     },
   );
 }

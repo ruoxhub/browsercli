@@ -398,15 +398,23 @@ export function createApiV1Routes(
 
     if (!force && rejectIfBusy(res, 'browser')) return;
     try {
-      if (force && activeJob) {
+      if (activeJob) {
         const current = activeJob;
         current.controller.abort(
           new JobAbortError(
             'JOB_CANCELLED',
-            'job cancelled by force disconnect',
+            'job cancelled by browser disconnect',
           ),
         );
-        await current.execution;
+        const settled = await Promise.race([
+          current.execution.then(() => true).catch(() => true),
+          new Promise<boolean>(resolve =>
+            setTimeout(() => resolve(false), 1000),
+          ),
+        ]);
+        if (!settled || force) {
+          activeJob = undefined;
+        }
       }
       await disconnectBrowser(deps.contextProvider, {force});
       const status = getBrowserConnectionStatus(
@@ -542,7 +550,7 @@ export function createApiV1Routes(
     sendJson(res, {jobs: deps.jobStore.list()});
   });
 
-  routes.set('POST /api/v1/jobs/:id/cancel', async (_req, res, params) => {
+  routes.set('POST /api/v1/jobs/:id/cancel', async (req, res, params) => {
     const jobId = params!.id;
     let job;
     try {
@@ -561,10 +569,32 @@ export function createApiV1Routes(
       return;
     }
 
+    const url = new URL(req.url ?? '', 'http://localhost');
+    const force = url.searchParams.get('force') === 'true';
+
     current.controller.abort(
       new JobAbortError('JOB_CANCELLED', 'job cancelled by client'),
     );
-    await current.execution;
+
+    const settled = await Promise.race([
+      current.execution.then(() => true).catch(() => true),
+      new Promise<boolean>(resolve => setTimeout(() => resolve(false), 1000)),
+    ]);
+
+    if (!settled || force) {
+      if (activeJob?.jobId === jobId) {
+        activeJob = undefined;
+      }
+      try {
+        deps.jobStore.cancel(jobId, {
+          code: 'JOB_CANCELLED',
+          message: 'job forcefully cancelled by client',
+        });
+      } catch {
+        // empty
+      }
+    }
+
     sendJson(res, deps.jobStore.get(jobId));
   });
 

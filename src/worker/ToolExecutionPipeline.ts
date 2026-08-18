@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {Frame} from 'patchright';
 import type {ToolPrerequisiteChecker} from '../tools/prerequisites/ToolPrerequisiteChecker.js';
 import {
   validateToolArgs,
@@ -13,6 +14,10 @@ import type {Response, ToolDefinition} from '../tools/ToolDefinition.js';
 import type {ToolMeta} from '../tools/tools-meta.js';
 import {createToolError, ErrorCodes, ToolError} from '../utils/errors.js';
 
+import {
+  globalPageHealthTracker,
+  PageHealthTracker,
+} from './context/PageHealthTracker.js';
 import {wrapFrameWithTimeout} from './timeoutUtils.js';
 import type {ToolCallContextGuard} from './ToolCallContextGuard.js';
 import type {
@@ -27,6 +32,13 @@ import {
 } from './WorkerActivityCoordinator.js';
 
 export {wrapFrameWithTimeout, FRAME_EVALUATE_TIMEOUT} from './timeoutUtils.js';
+
+// 恢复工具白名单：页面被判定 UNRESPONSIVE 时仍允许执行，用于探测/恢复。
+// 只收录 src/tools/ 中真实注册的工具名。
+const RECOVERY_TOOL_NAMES = new Set<string>([
+  'check_browser_health',
+  'list_pages',
+]);
 
 /**
  * 工具执行管线。负责参数校验、上下文注入、执行、响应构建的完整链路。
@@ -83,6 +95,7 @@ export class ToolExecutionRouter {
   constructor(
     private readonly contextProvider: ToolContextProvider,
     private readonly defineToolContextFactory: DefineToolContextFactory,
+    private readonly pageHealthTracker: PageHealthTracker = globalPageHealthTracker,
   ) {}
 
   async execute(
@@ -120,7 +133,12 @@ export class ToolExecutionRouter {
           {toolName: meta.name},
         );
       }
-      return handler(wrapFrameWithTimeout(frame), params);
+      return handler(
+        wrapFrameWithTimeout(frame, {
+          onTimeout: () => this.recordFrameTimeout(frame),
+        }),
+        params,
+      );
     }
 
     if (meta.callMode === ('context' as ToolMeta['callMode'])) {
@@ -128,6 +146,21 @@ export class ToolExecutionRouter {
     }
 
     return handler(params);
+  }
+
+  /**
+   * frame.evaluate 超时时记录页面健康状态，供快速失败守卫使用。
+   */
+  private recordFrameTimeout(frame: Frame): void {
+    try {
+      const page = typeof frame.page === 'function' ? frame.page() : null;
+      if (!page) return;
+      this.pageHealthTracker.recordTimeout(
+        this.contextProvider.getPageId(page),
+      );
+    } catch {
+      // 拿不到 pageId（如页面已销毁）时跳过健康记录
+    }
   }
 }
 
@@ -141,6 +174,8 @@ export class ToolExecutionPipeline {
     private readonly prerequisiteChecker?: ToolPrerequisiteChecker,
     private readonly resultRecorder = new ToolResultRecorder(),
     private readonly activityCoordinator: WorkerActivityCoordinator = workerActivityCoordinator,
+    private readonly pageHealthTracker: PageHealthTracker = globalPageHealthTracker,
+    private readonly contextProvider?: ToolContextProvider,
   ) {}
 
   async execute(
@@ -155,6 +190,7 @@ export class ToolExecutionPipeline {
       let params: Record<string, unknown> | undefined;
 
       try {
+        this.checkPageHealthGuard(toolName);
         params = this.validateAndPrepare(toolName, rawParams, meta);
         const handler = await this.loadHandler(toolName, meta);
         const response = await this.processRequest(
@@ -171,6 +207,29 @@ export class ToolExecutionPipeline {
         throw this.wrapError(error, toolName);
       }
     }, signal);
+  }
+
+  private checkPageHealthGuard(toolName: string): void {
+    if (RECOVERY_TOOL_NAMES.has(toolName) || !this.contextProvider) {
+      return;
+    }
+    let pageId: string;
+    try {
+      const page = this.contextProvider.getSelectedPage();
+      if (!page) return;
+      pageId = this.contextProvider.getPageId(page);
+    } catch {
+      // 拿不到 pageId（页面不属于当前 context 等）时跳过健康守卫
+      return;
+    }
+    if (!this.pageHealthTracker.isPageHealthy(pageId)) {
+      const record = this.pageHealthTracker.getRecord(pageId);
+      throw createToolError(
+        ErrorCodes.PAGE_UNRESPONSIVE,
+        `页面 [${pageId}] 当前处于卡死状态 (UNRESPONSIVE: 连续 ${record.consecutiveTimeouts} 次超时)。请先调用 check_browser_health 探测页面状态，或通过浏览器重连恢复。`,
+        {toolName, pageId, healthRecord: record},
+      );
+    }
   }
 
   private generateTraceId(startedAt: number): string {
@@ -251,6 +310,20 @@ export class ToolExecutionPipeline {
       request: params,
       response,
     });
+    this.recordPageHealthy();
+  }
+
+  private recordPageHealthy(): void {
+    if (!this.contextProvider) return;
+    try {
+      const page = this.contextProvider.getSelectedPage();
+      if (!page) return;
+      this.pageHealthTracker.recordSuccess(
+        this.contextProvider.getPageId(page),
+      );
+    } catch {
+      // 拿不到 pageId 时跳过健康记录
+    }
   }
 
   private recordFailure(

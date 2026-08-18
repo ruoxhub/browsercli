@@ -8,7 +8,9 @@ import assert from 'node:assert';
 import {mkdtempSync, readFileSync, rmSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {describe, it} from 'node:test';
+import {describe, it, mock} from 'node:test';
+
+import type {Frame} from 'patchright';
 
 import {
   ensureToolsMeta,
@@ -18,7 +20,7 @@ import {
 import {ErrorCodes, ToolError} from '../../../src/utils/errors.js';
 import {
   ToolExecutionPipeline,
-  type ToolExecutionRouter,
+  ToolExecutionRouter,
   type ToolHandlerLoader,
 } from '../../../src/worker/ToolExecutionPipeline.js';
 import {
@@ -56,6 +58,8 @@ function createPipeline(
       failures: unknown[];
     };
     recorder?: TestResultRecorder;
+    healthTracker?: import('../../../src/worker/context/PageHealthTracker.js').PageHealthTracker;
+    contextProvider?: import('../../../src/worker/ToolContext.js').ToolContextProvider;
   } = {},
 ) {
   const handler = options.handler ?? (async () => undefined);
@@ -91,6 +95,9 @@ function createPipeline(
       undefined,
       undefined,
       options.recorder as never,
+      undefined,
+      options.healthTracker,
+      options.contextProvider,
     ),
     telemetryState,
   };
@@ -123,6 +130,140 @@ describe('ToolExecutionPipeline', () => {
         structuredContent: {value: 'ok'},
       },
     );
+  });
+
+  it('fails fast with PAGE_UNRESPONSIVE when page is marked UNRESPONSIVE', async () => {
+    const {PageHealthTracker} =
+      await import('../../../src/worker/context/PageHealthTracker.js');
+    const healthTracker = new PageHealthTracker();
+    healthTracker.markUnresponsive('page-dead-1', 'deadlock');
+
+    const contextProvider = {
+      getSelectedPage: () => ({}),
+      getPageId: () => 'page-dead-1',
+    } as unknown as import('../../../src/worker/ToolContext.js').ToolContextProvider;
+
+    const {pipeline} = createPipeline({
+      healthTracker,
+      contextProvider,
+    });
+
+    await assert.rejects(
+      pipeline.execute(meta({name: 'collect_code'}), {}),
+      (err: unknown) => {
+        const toolErr = err as ToolError;
+        assert.equal(toolErr.code, ErrorCodes.PAGE_UNRESPONSIVE);
+        assert.ok(toolErr.message.includes('卡死状态'));
+        return true;
+      },
+    );
+  });
+
+  it('allows recovery tools to run even when page is UNRESPONSIVE', async () => {
+    const {PageHealthTracker} =
+      await import('../../../src/worker/context/PageHealthTracker.js');
+    const healthTracker = new PageHealthTracker();
+    healthTracker.markUnresponsive('page-dead-2', 'deadlock');
+
+    const contextProvider = {
+      getSelectedPage: () => ({}),
+      getPageId: () => 'page-dead-2',
+    } as unknown as import('../../../src/worker/ToolContext.js').ToolContextProvider;
+
+    const {pipeline} = createPipeline({
+      healthTracker,
+      contextProvider,
+      result: {reloaded: true},
+    });
+
+    const result = await pipeline.execute(
+      meta({name: 'check_browser_health'}),
+      {},
+    );
+    assert.deepStrictEqual(result, {structuredContent: {reloaded: true}});
+  });
+
+  it('resets page health after a recovery tool succeeds', async () => {
+    const {PageHealthTracker} =
+      await import('../../../src/worker/context/PageHealthTracker.js');
+    const healthTracker = new PageHealthTracker();
+    healthTracker.markUnresponsive('page-recovered-1', 'deadlock');
+
+    const contextProvider = {
+      getSelectedPage: () => ({}),
+      getPageId: () => 'page-recovered-1',
+    } as unknown as import('../../../src/worker/ToolContext.js').ToolContextProvider;
+
+    const {pipeline} = createPipeline({
+      healthTracker,
+      contextProvider,
+      result: {value: 'ok'},
+    });
+
+    await pipeline.execute(meta({name: 'check_browser_health'}), {});
+
+    assert.equal(healthTracker.isPageHealthy('page-recovered-1'), true);
+    assert.equal(
+      healthTracker.getRecord('page-recovered-1').consecutiveTimeouts,
+      0,
+    );
+  });
+
+  it('records page timeout when frame evaluate times out via router', async () => {
+    const {PageHealthTracker} =
+      await import('../../../src/worker/context/PageHealthTracker.js');
+    const {FRAME_EVALUATE_TIMEOUT} =
+      await import('../../../src/worker/timeoutUtils.js');
+
+    const tracker = new PageHealthTracker();
+    const mockSession = {
+      send: async () => undefined,
+      detach: async () => undefined,
+    };
+    const mockPage = {
+      isClosed: () => false,
+      context: () => ({newCDPSession: async () => mockSession}),
+    };
+    const rawFrame = {
+      page: () => mockPage,
+      evaluate: () => new Promise(() => {}),
+    } as unknown as Frame;
+
+    const contextProvider = {
+      getSelectedPage: () => null,
+      getSelectedFrame: () => rawFrame,
+      getPageId: () => 'page-timeout-1',
+    } as unknown as import('../../../src/worker/ToolContext.js').ToolContextProvider;
+    const defineToolContextFactory = {
+      create: () => ({}),
+    } as unknown as import('../../../src/worker/ToolContext.js').DefineToolContextFactory;
+
+    const router = new ToolExecutionRouter(
+      contextProvider,
+      defineToolContextFactory,
+      tracker,
+    );
+    const handler = async (frame: Frame) => frame.evaluate('1+1');
+
+    mock.timers.enable({apis: ['setTimeout']});
+    try {
+      const execution = router.execute(
+        meta({
+          name: 'frame_tool',
+          callMode: 'frame' as ToolMeta['callMode'],
+        }),
+        handler,
+        {},
+      );
+      mock.timers.tick(FRAME_EVALUATE_TIMEOUT + 10);
+      await assert.rejects(execution, /frame\.evaluate\(\) 超时/);
+    } finally {
+      mock.timers.reset();
+    }
+
+    const record = tracker.getRecord('page-timeout-1');
+    assert.equal(record.status, 'DEGRADED');
+    assert.equal(record.consecutiveTimeouts, 1);
   });
 
   it('execute throws VALIDATION when args are invalid', async () => {

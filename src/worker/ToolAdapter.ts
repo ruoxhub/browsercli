@@ -53,6 +53,10 @@ export class ToolAdapter {
       new ToolTelemetry(contextProvider),
       new ToolCallContextGuard(() => contextProvider),
       new ToolPrerequisiteChecker(contextProvider),
+      undefined, // resultRecorder
+      undefined, // activityCoordinator
+      undefined, // pageHealthTracker（默认全局单例）
+      contextProvider,
     );
   }
 

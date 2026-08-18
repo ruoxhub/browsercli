@@ -54,4 +54,36 @@ describe('WorkerActivityCoordinator', () => {
       await running.catch(() => undefined);
     }
   });
+
+  it('triggers onAbortCleanup when aborted during execution', async () => {
+    const coordinator = new WorkerActivityCoordinator();
+    const controller = new AbortController();
+    let cleanupCalled = false;
+    let cleanupReason: unknown;
+
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => {
+      release = resolve;
+    });
+
+    const running = coordinator.runTool(
+      async () => {
+        await gate;
+        return 'done';
+      },
+      controller.signal,
+      reason => {
+        cleanupCalled = true;
+        cleanupReason = reason;
+      },
+    );
+
+    const abortReason = new Error('manual-abort');
+    controller.abort(abortReason);
+
+    await assert.rejects(running, err => err === abortReason);
+    assert.equal(cleanupCalled, true);
+    assert.equal(cleanupReason, abortReason);
+    release();
+  });
 });

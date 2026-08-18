@@ -179,6 +179,129 @@ describe('BrowserConnectionManager', () => {
     }
   });
 
+  it('retries failed connection attempts before succeeding', async () => {
+    const resetMock = mock.method(
+      BrowserManager,
+      'resetInstance',
+      async () => undefined,
+    );
+    let attempts = 0;
+    const fakeBrowser = {
+      contexts: () => [{pages: () => []}],
+      isConnected: () => true,
+      version: () => 'test',
+    };
+    const getInstanceMock = mock.method(BrowserManager, 'getInstance', () => ({
+      ensureBrowser: async () => {
+        attempts += 1;
+        if (attempts < 3) throw new Error('transient failure');
+        return fakeBrowser;
+      },
+      getContext: () => fakeBrowser.contexts()[0],
+    }));
+    const contextProvider = {
+      setBrowserManager: () => undefined,
+      setBrowser: () => undefined,
+      setContext: () => undefined,
+      clearContext: () => undefined,
+      init: async () => undefined,
+    };
+
+    try {
+      const result = await connectBrowser(
+        contextProvider as never,
+        {channel: 'stable'},
+        {maxRetries: 3, initialDelayMs: 1},
+      );
+      assert.strictEqual(attempts, 3);
+      assert.deepStrictEqual(result, {connected: true, mode: 'launch'});
+    } finally {
+      resetMock.mock.restore();
+      getInstanceMock.mock.restore();
+    }
+  });
+
+  it('throws the last error after exhausting all retries', async () => {
+    const resetMock = mock.method(
+      BrowserManager,
+      'resetInstance',
+      async () => undefined,
+    );
+    let attempts = 0;
+    const getInstanceMock = mock.method(BrowserManager, 'getInstance', () => ({
+      ensureBrowser: async () => {
+        attempts += 1;
+        throw new Error(`connect-failed-${attempts}`);
+      },
+    }));
+    const contextProvider = {
+      setBrowserManager: () => undefined,
+      setBrowser: () => undefined,
+      setContext: () => undefined,
+      clearContext: () => undefined,
+      init: async () => undefined,
+    };
+
+    try {
+      await assert.rejects(
+        connectBrowser(
+          contextProvider as never,
+          {channel: 'stable'},
+          {maxRetries: 2, initialDelayMs: 1},
+        ),
+        (error: unknown) =>
+          error instanceof Error && error.message === 'connect-failed-2',
+      );
+      assert.strictEqual(attempts, 2);
+    } finally {
+      resetMock.mock.restore();
+      getInstanceMock.mock.restore();
+    }
+  });
+
+  it('applies exponential backoff between retries', async () => {
+    const resetMock = mock.method(
+      BrowserManager,
+      'resetInstance',
+      async () => undefined,
+    );
+    const getInstanceMock = mock.method(BrowserManager, 'getInstance', () => ({
+      ensureBrowser: async () => {
+        throw new Error('still failing');
+      },
+    }));
+    const contextProvider = {
+      setBrowserManager: () => undefined,
+      setBrowser: () => undefined,
+      setContext: () => undefined,
+      clearContext: () => undefined,
+      init: async () => undefined,
+    };
+
+    const delays: number[] = [];
+    const originalSetTimeout = globalThis.setTimeout;
+    // @ts-expect-error spy on global setTimeout to capture delays
+    globalThis.setTimeout = ((handler: (...args: unknown[]) => void, ms: number, ...rest: unknown[]) => {
+      delays.push(ms);
+      return originalSetTimeout(handler, ms, ...rest);
+    });
+
+    try {
+      await assert.rejects(() =>
+        connectBrowser(
+          contextProvider as never,
+          {channel: 'stable'},
+          {maxRetries: 3, initialDelayMs: 200},
+        ),
+      );
+      assert.deepStrictEqual(delays, [200, 400]);
+    } finally {
+      globalThis.setTimeout = originalSetTimeout;
+      resetMock.mock.restore();
+      getInstanceMock.mock.restore();
+    }
+  });
+
   it('disconnectBrowser resets instance and clears contextProvider browser', async () => {
     const resetMock = mock.method(BrowserManager, 'resetInstance', () =>
       Promise.resolve(),

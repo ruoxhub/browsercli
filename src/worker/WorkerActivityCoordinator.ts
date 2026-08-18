@@ -34,13 +34,26 @@ function getAbortReason(signal: AbortSignal): unknown {
 export async function raceWithAbort<T>(
   operation: Promise<T>,
   signal?: AbortSignal,
+  onAbortCleanup?: (reason: unknown) => void | Promise<void>,
 ): Promise<T> {
   if (!signal) return await operation;
-  if (signal.aborted) throw getAbortReason(signal);
+  if (signal.aborted) {
+    const reason = getAbortReason(signal);
+    if (onAbortCleanup) {
+      void Promise.resolve(onAbortCleanup(reason)).catch(() => {});
+    }
+    throw reason;
+  }
 
   let onAbort: (() => void) | undefined;
   const aborted = new Promise<never>((_, reject) => {
-    onAbort = () => reject(getAbortReason(signal));
+    onAbort = () => {
+      const reason = getAbortReason(signal);
+      if (onAbortCleanup) {
+        void Promise.resolve(onAbortCleanup(reason)).catch(() => {});
+      }
+      reject(reason);
+    };
     signal.addEventListener('abort', onAbort, {once: true});
   });
   try {
@@ -61,12 +74,22 @@ export class WorkerActivityCoordinator {
     };
   }
 
-  async runTool<T>(action: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+  async runTool<T>(
+    action: () => Promise<T>,
+    signal?: AbortSignal,
+    onAbortCleanup?: (reason: unknown) => void | Promise<void>,
+  ): Promise<T> {
     if (this.browserOperation) throw new WorkerBusyError(this.getState());
-    if (signal?.aborted) throw getAbortReason(signal);
+    if (signal?.aborted) {
+      const reason = getAbortReason(signal);
+      if (onAbortCleanup) {
+        void Promise.resolve(onAbortCleanup(reason)).catch(() => {});
+      }
+      throw reason;
+    }
     this.activeTools += 1;
     try {
-      return await raceWithAbort(action(), signal);
+      return await raceWithAbort(action(), signal, onAbortCleanup);
     } finally {
       this.activeTools -= 1;
     }

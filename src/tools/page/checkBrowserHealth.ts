@@ -44,6 +44,10 @@ export const checkBrowserHealth = defineTool({
       url = page.url();
       title = await withOperationTimeout(page.title(), '读取页面标题');
       await withOperationTimeout(page.evaluate('1+1'), '执行页面健康探针');
+      const pageId = getRuntime().contextProvider!.getPageId(page);
+      const {globalPageHealthTracker} =
+        await import('../../worker/context/PageHealthTracker.js');
+      globalPageHealthTracker.recordSuccess(pageId);
     } catch (error) {
       const message = normalizeBrowserRuntimeError(error);
       issues.push({
