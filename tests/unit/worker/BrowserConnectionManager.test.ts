@@ -281,10 +281,14 @@ describe('BrowserConnectionManager', () => {
     const delays: number[] = [];
     const originalSetTimeout = globalThis.setTimeout;
     // @ts-expect-error spy on global setTimeout to capture delays
-    globalThis.setTimeout = ((handler: (...args: unknown[]) => void, ms: number, ...rest: unknown[]) => {
+    globalThis.setTimeout = (
+      handler: (...args: unknown[]) => void,
+      ms: number,
+      ...rest: unknown[]
+    ) => {
       delays.push(ms);
       return originalSetTimeout(handler, ms, ...rest);
-    });
+    };
 
     try {
       await assert.rejects(() =>
