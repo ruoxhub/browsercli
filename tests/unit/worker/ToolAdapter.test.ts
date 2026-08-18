@@ -430,11 +430,38 @@ describe('ToolAdapter', () => {
 
     assert.deepStrictEqual(listResult.structuredContent, {
       success: true,
-      message: '同步完成，1 个 Hook，共 1 条记录',
+      message: '共 1 个 Hook',
       tooltype: 'list_created_hooks',
       syncedHookIds: ['hook_from_params'],
       totalRecords: 1,
-      hooks: [{hookId: 'hook_from_params', total: 1, type: 'fetch'}],
+      hooks: [
+        {
+          hookId: 'hook_from_params',
+          source: 'manager',
+          type: 'unknown',
+          description: '',
+          enabled: true,
+          callCount: 1,
+          recordCount: 1,
+        },
+      ],
+      data: {
+        totalHooks: 1,
+        totalEnabled: 1,
+        totalDisabled: 0,
+        totalRecords: 1,
+        hooks: [
+          {
+            hookId: 'hook_from_params',
+            source: 'manager',
+            type: 'unknown',
+            description: '',
+            enabled: true,
+            callCount: 1,
+            recordCount: 1,
+          },
+        ],
+      },
     });
 
     assert.deepStrictEqual(removeResult.structuredContent, {
@@ -447,10 +474,7 @@ describe('ToolAdapter', () => {
     const readerHookIds = evaluateCalls
       .filter(call => call.kind === 'reader')
       .map(call => call.hookId);
-    assert.deepStrictEqual(readerHookIds, [
-      'hook_from_params',
-      'hook_from_params',
-    ]);
+    assert.deepStrictEqual(readerHookIds, ['hook_from_params']);
 
     const cleanupCall = evaluateCalls.find(call => call.kind === 'cleanup');
     assert.ok(cleanupCall?.script?.includes('window.__hookStore'));
