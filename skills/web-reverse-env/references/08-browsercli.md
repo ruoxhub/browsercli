@@ -67,7 +67,7 @@ browsercli call compare_env --properties '["navigator.userAgent","navigator.webd
 browsercli call evaluate_script --function "(() => JSON.stringify({ua:navigator.userAgent, wd:navigator.webdriver, p:navigator.plugins}))()"
 browsercli call evaluate_script --function "(() => Object.getOwnPropertyDescriptor(Navigator.prototype,'userAgent'))()"
 browsercli call evaluate_script --function "(() => Object.getPrototypeOf(navigator).constructor.name)()"
-browsercli call evaluate_script --file collect-env.js      # .js 文件内容作为 function
+browsercli call evaluate_script --filePath collect-env.js      # .js 文件内容作为 function
 browsercli call evaluate_script --function "..." --file-path out.json --timeout-ms 60000
 ```
 
@@ -266,9 +266,9 @@ browsercli call set_user_agent --user-agent "<UA string>"
 
 ```bash
 browsercli call list_network_requests
-browsercli call get_network_request --request-id "<id>"
+browsercli call get_network_request --reqid 1
 browsercli call list_websocket_connections
-browsercli call get_websocket_messages --connection-id "<id>"
+browsercli call get_websocket_messages --wsid 1
 ```
 
 ## 9. 端到端最小流程
