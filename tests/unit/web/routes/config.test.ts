@@ -15,6 +15,7 @@ import {
   createConfigRoutes,
   isMaskPlaceholder,
   maskApiKey,
+  validateLlmBaseUrl,
 } from '../../../../src/web/routes/config.js';
 
 function mockReqRes(method: string, body?: unknown) {
@@ -81,6 +82,53 @@ describe('config routes', () => {
 
     it('returns false for empty string', () => {
       assert.strictEqual(isMaskPlaceholder(''), false);
+    });
+  });
+
+  describe('validateLlmBaseUrl', () => {
+    it('accepts undefined/empty baseURL', () => {
+      assert.strictEqual(validateLlmBaseUrl(undefined), undefined);
+      assert.strictEqual(validateLlmBaseUrl(''), undefined);
+    });
+
+    it('accepts public https baseURL', () => {
+      assert.strictEqual(
+        validateLlmBaseUrl('https://api.openai.com/v1'),
+        undefined,
+      );
+    });
+
+    it('accepts local / LAN http baseURL', () => {
+      assert.strictEqual(
+        validateLlmBaseUrl('http://192.168.1.11:18000/v1'),
+        undefined,
+      );
+      assert.strictEqual(
+        validateLlmBaseUrl('http://localhost:11434/v1'),
+        undefined,
+      );
+      assert.strictEqual(
+        validateLlmBaseUrl('http://127.0.0.1:8000/v1'),
+        undefined,
+      );
+    });
+
+    it('rejects unsupported protocols', () => {
+      assert.strictEqual(
+        validateLlmBaseUrl('ftp://example.com/v1'),
+        '仅允许 http 或 https 协议的 baseURL',
+      );
+      assert.strictEqual(
+        validateLlmBaseUrl('file:///etc/passwd'),
+        '仅允许 http 或 https 协议的 baseURL',
+      );
+    });
+
+    it('rejects malformed URLs', () => {
+      assert.strictEqual(
+        validateLlmBaseUrl('not-a-valid-url'),
+        '无效的 URL 格式',
+      );
     });
   });
 
@@ -350,6 +398,53 @@ describe('config routes', () => {
       assert.strictEqual(capturedUrl, 'https://api.openai.com/v1/models');
       // 真实密钥被带往上游客端
       assert.strictEqual(capturedAuth, 'Bearer sk-stored1234');
+    });
+
+    it('supports custom http / LAN baseURL when fetching models', async () => {
+      resetRuntimeConfigStore({
+        openai: {
+          apiKey: 'sk-custom1234',
+          baseURL: 'http://192.168.1.11:18000/v1',
+          model: 'hy3-free',
+        },
+        llmProvider: 'openai',
+      });
+
+      let capturedUrl = '';
+      mockFetch(url => {
+        capturedUrl = url;
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            object: 'list',
+            data: [{id: 'hy3-free', object: 'model', owned_by: 'custom'}],
+          }),
+          text: async () => '',
+        };
+      });
+
+      const routes = createConfigRoutes({
+        contextProvider: null,
+        wsHub: null,
+      } as never);
+
+      const handler = routes.get('POST /api/llm/models')!;
+      const {req, res, getBody} = mockReqRes('POST', {
+        llmProvider: 'openai',
+        openai: {
+          apiKey: 'sk-***1234',
+          baseURL: 'http://192.168.1.11:18000/v1',
+        },
+      });
+
+      await handler(req, res);
+
+      const parsed = JSON.parse(getBody());
+      assert.ok(parsed.success);
+      assert.strictEqual(parsed.data.models.length, 1);
+      assert.strictEqual(parsed.data.models[0].id, 'hy3-free');
+      assert.strictEqual(capturedUrl, 'http://192.168.1.11:18000/v1/models');
     });
 
     it('returns 400 when no apiKey configured', async () => {

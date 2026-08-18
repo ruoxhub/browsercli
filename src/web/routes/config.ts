@@ -93,25 +93,13 @@ function resolveModelsUrl(baseURL?: string): string {
   return base.endsWith('/v1') ? `${base}/models` : `${base}/v1/models`;
 }
 
-const BLOCKED_HOST_PATTERNS = [
-  /^localhost$/i,
-  /^127\.\d+\.\d+\.\d+$/,
-  /^10\.\d+\.\d+\.\d+$/,
-  /^172\.(1[6-9]|2\d|3[01])\.\d+\.\d+$/,
-  /^192\.168\.\d+\.\d+$/,
-  /^0\.0\.0\.0$/,
-  /^::1$/,
-  /^fc00:/i,
-  /^fd/i,
-  /^fe80:/i,
-  /^169\.254\.\d+\.\d+$/,
-];
-
 /**
- * 校验 LLM baseURL 防止 SSRF 和 API Key 泄露。
- * 仅允许 https 协议，拒绝私有/内网/本地地址。
+ * 校验 LLM baseURL 格式。
+ * 允许 http 和 https 协议，支持公网、局域网及本地部署的模型服务。
  */
-function validateLlmBaseUrl(baseURL: string | undefined): string | undefined {
+export function validateLlmBaseUrl(
+  baseURL: string | undefined,
+): string | undefined {
   if (!baseURL) return undefined;
   let parsed: URL;
   try {
@@ -119,13 +107,8 @@ function validateLlmBaseUrl(baseURL: string | undefined): string | undefined {
   } catch {
     return '无效的 URL 格式';
   }
-  if (parsed.protocol !== 'https:') {
-    return '仅允许 https 协议的 baseURL';
-  }
-  for (const pattern of BLOCKED_HOST_PATTERNS) {
-    if (pattern.test(parsed.hostname)) {
-      return `不允许使用内网/本地地址: ${parsed.hostname}`;
-    }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    return '仅允许 http 或 https 协议的 baseURL';
   }
   return undefined;
 }
