@@ -96,4 +96,14 @@ describe('getNetworkRequest body handling', () => {
     assert.equal(result.data.responseBody, undefined);
     assert.equal(await readFile(target, 'utf8'), body);
   });
+
+  it('returns success:false when saveTo write fails', async () => {
+    const services = createServices('body');
+    const result = await networkModule.getRequest(services, {
+      reqid: 101,
+      saveTo: path.join(tmpDir, 'no-such-dir', 'out.json'),
+    });
+    assert.equal(result.success, false);
+    assert.match(result.message, /保存响应/);
+  });
 });

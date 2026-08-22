@@ -479,7 +479,14 @@ export class NetworkModule {
               responseBody = fullBody;
             }
           }
-        } catch {
+        } catch (error) {
+          if (params.saveTo) {
+            return {
+              success: false,
+              message: `保存响应到 ${params.saveTo} 失败：${error instanceof Error ? error.message : String(error)}`,
+              data: {...EMPTY, reqid: params.reqid ?? 0},
+            };
+          }
           // 忽略读取失败
         }
       }
