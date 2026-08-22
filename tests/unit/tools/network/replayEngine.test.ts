@@ -34,6 +34,9 @@ const ORIGINAL: GetNetworkRequestData = {
   },
   responseHeaders: {},
   postData: '{"foo":"bar"}',
+  isTruncated: false,
+  totalBodyLength: 0,
+  previewLength: 0,
 };
 
 describe('STRIPPED_HEADERS', () => {
