@@ -623,10 +623,19 @@ async function runJob(
     );
     deps.jobStore.complete(jobId, result);
   } catch (err) {
-    const e = err as {code?: string; message?: string};
+    const e = err as {
+      code?: string;
+      message?: string;
+      retryable?: boolean;
+      recovery?: import('../../utils/errors.js').ToolRecovery;
+      details?: Record<string, unknown>;
+    };
     const error = {
       code: e.code ?? 'RUNTIME',
       message: e.message ?? String(err),
+      ...(e.retryable !== undefined ? {retryable: e.retryable} : {}),
+      ...(e.recovery !== undefined ? {recovery: e.recovery} : {}),
+      ...(e.details !== undefined ? {details: e.details} : {}),
     };
     if (e.code === 'JOB_TIMEOUT') deps.jobStore.markTimedOut(jobId, error);
     else if (e.code === 'JOB_CANCELLED') deps.jobStore.cancel(jobId, error);

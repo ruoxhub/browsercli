@@ -4,7 +4,11 @@ import {createServer} from 'node:http';
 
 import {WebSocketServer} from 'ws';
 
-import {WorkerHttpClient} from '../../src/WorkerHttpClient.js';
+import {
+  WorkerHttpClient,
+  type JobStatus,
+  type ToolRecovery,
+} from '../../src/WorkerHttpClient.js';
 
 describe('WorkerHttpClient.invoke (request-response wrapper)', () => {
   let server: any;
@@ -107,6 +111,47 @@ describe('WorkerHttpClient.invoke (request-response wrapper)', () => {
     const client = new WorkerHttpClient({baseUrl: p});
     await assert.rejects(() => client.invoke('s', 't', {}), /boom/);
     failing.close();
+  });
+
+  it('getJob mirrors error recovery, retryable, and details in JobStatus', async () => {
+    const recovery: ToolRecovery = {
+      tool: 'launch_browser',
+      command: 'browsercli browser connect',
+      reason: 'Browser must be connected',
+    };
+    const expectedJob: JobStatus = {
+      jobId: 'job_rec_1',
+      sessionId: 'sess_x',
+      tool: 'navigate_page',
+      status: 'failed',
+      error: {
+        code: 'BROWSER_REQUIRED',
+        message: 'No browser connection',
+        retryable: false,
+        recovery,
+        details: {reason: 'detached'},
+      },
+      logs: ['starting job'],
+      createdAt: new Date().toISOString(),
+    };
+    const jobServer = createServer((_req, res) => {
+      res.setHeader('Content-Type', 'application/json');
+      res.statusCode = 200;
+      res.end(JSON.stringify(expectedJob));
+    });
+    await new Promise<void>(resolve =>
+      jobServer.listen(0, '127.0.0.1', resolve),
+    );
+    const p = `http://127.0.0.1:${(jobServer.address() as any).port}`;
+    const client = new WorkerHttpClient({baseUrl: p});
+    const job = await client.getJob('job_rec_1');
+
+    assert.equal(job.jobId, 'job_rec_1');
+    assert.equal(job.error?.code, 'BROWSER_REQUIRED');
+    assert.equal(job.error?.retryable, false);
+    assert.deepEqual(job.error?.recovery, recovery);
+    assert.deepEqual(job.error?.details, {reason: 'detached'});
+    jobServer.close();
   });
 
   it('invoke throws on timed out and cancelled jobs', async () => {

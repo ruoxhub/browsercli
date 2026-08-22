@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -45,11 +46,11 @@ export const emulateCpu = defineTool({
         data: {rate: throttlingRate},
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `CPU 降频设置失败：${error instanceof Error ? error.message : String(error)}`,
-        tooltype,
-      });
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `CPU 降频设置失败：${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'emulate_cpu', rate: throttlingRate},
+      );
     }
   },
 });

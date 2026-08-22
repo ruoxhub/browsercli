@@ -8,6 +8,7 @@ import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {navigatePage} from '../../../../src/tools/navigation/navigatePage.js';
+import {ToolError} from '../../../../src/utils/errors.js';
 import {ToolResponseAccumulator} from '../../../../src/worker/ToolResponse.js';
 
 interface MockCDPSession {
@@ -59,9 +60,12 @@ describe('navigatePage (defineTool)', () => {
 
     const response = new ToolResponseAccumulator();
 
-    await navigatePage.handler({params: {type: 'reload'}}, response, runtime);
-
-    assert.match(getOutput(response), /new_page|select_page|无活跃页面/);
+    await assert.rejects(
+      () => navigatePage.handler({params: {type: 'reload'}}, response, runtime),
+      (error: unknown) =>
+        error instanceof ToolError &&
+        /new_page|select_page|无活跃页面/.test(error.message),
+    );
   });
 
   it('maps closed-page errors to actionable diagnostics', async () => {
@@ -79,9 +83,12 @@ describe('navigatePage (defineTool)', () => {
 
     const response = new ToolResponseAccumulator();
 
-    await navigatePage.handler({params: {type: 'reload'}}, response, runtime);
-
-    assert.match(getOutput(response), /页面已关闭|list_pages|导航失败/);
+    await assert.rejects(
+      () => navigatePage.handler({params: {type: 'reload'}}, response, runtime),
+      (error: unknown) =>
+        error instanceof ToolError &&
+        /页面已关闭|list_pages|导航失败/.test(error.message),
+    );
   });
 
   it('maps timeout errors to readable troubleshooting guidance', async () => {
@@ -99,12 +106,15 @@ describe('navigatePage (defineTool)', () => {
 
     const response = new ToolResponseAccumulator();
 
-    await navigatePage.handler(
-      {params: {type: 'url', url: 'https://slow.example'}},
-      response,
-      runtime,
+    await assert.rejects(
+      () =>
+        navigatePage.handler(
+          {params: {type: 'url', url: 'https://slow.example'}},
+          response,
+          runtime,
+        ),
+      (error: unknown) =>
+        error instanceof ToolError && /超时/.test(error.message),
     );
-
-    assert.match(getOutput(response), /超时/);
   });
 });

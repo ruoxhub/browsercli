@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {NO_ACTIVE_PAGE_MESSAGE} from '../shared/activePageResolver.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
@@ -37,13 +38,11 @@ export const findClickableElements = defineTool({
     const frame = (context as Context).getSelectedFrame();
 
     if (!frame) {
-      response.setStructuredContent({
-        success: false,
-        message: NO_ACTIVE_PAGE_MESSAGE,
-        tooltype: 'find_clickable_elements',
-        data: null,
-      });
-      return;
+      throw createToolError(
+        ErrorCodes.FRAME_REQUIRED,
+        NO_ACTIVE_PAGE_MESSAGE,
+        {toolName: 'find_clickable_elements'},
+      );
     }
 
     try {
@@ -55,12 +54,11 @@ export const findClickableElements = defineTool({
         data: elements,
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `Failed to find clickable elements: ${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'find_clickable_elements',
-        data: null,
-      });
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `Failed to find clickable elements: ${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'find_clickable_elements'},
+      );
     }
   },
 });
@@ -68,20 +66,30 @@ export const findClickableElements = defineTool({
 /** 注入代码：查找可点击元素 */
 function findClickableCode(filter?: string): ClickableElement[] {
   const results: ClickableElement[] = [];
+  const elements = document.querySelectorAll('*');
 
-  // 查找按钮
-  const buttons = document.querySelectorAll(
-    'button, input[type="button"], input[type="submit"]',
-  );
-  buttons.forEach(btn => {
+  elements.forEach(element => {
+    const style = window.getComputedStyle(element);
+    const tagName = element.tagName.toLowerCase();
+    const clickable =
+      tagName === 'button' ||
+      (tagName === 'a' && element.hasAttribute('href')) ||
+      (tagName === 'input' &&
+        ['button', 'submit'].includes(
+          (element as HTMLInputElement).type.toLowerCase(),
+        )) ||
+      element.hasAttribute('onclick') ||
+      element.getAttribute('role')?.toLowerCase() === 'button' ||
+      style.cursor === 'pointer';
+    if (!clickable) return;
+
     const text =
-      btn.textContent?.trim() || (btn as HTMLInputElement).value || '';
+      element.textContent?.trim() || (element as HTMLInputElement).value || '';
     if (filter && !text.toLowerCase().includes(filter.toLowerCase())) {
       return;
     }
 
-    const rect = btn.getBoundingClientRect();
-    const style = window.getComputedStyle(btn);
+    const rect = element.getBoundingClientRect();
     const visible =
       style.display !== 'none' &&
       style.visibility !== 'hidden' &&
@@ -89,55 +97,17 @@ function findClickableCode(filter?: string): ClickableElement[] {
       rect.width > 0 &&
       rect.height > 0;
 
-    let selector = btn.tagName.toLowerCase();
-    if (btn.id) {
-      selector = `#${btn.id}`;
-    } else if (btn.className) {
-      selector = `${btn.tagName.toLowerCase()}.${btn.className.split(' ')[0]}`;
+    let selector = tagName;
+    if (element.id) {
+      selector = `#${element.id}`;
+    } else if (typeof element.className === 'string' && element.className) {
+      selector = `${tagName}.${element.className.split(' ')[0]}`;
     }
 
     results.push({
       selector,
       text,
-      type: 'button',
-      visible,
-      boundingBox: {
-        x: rect.x,
-        y: rect.y,
-        width: rect.width,
-        height: rect.height,
-      },
-    });
-  });
-
-  // 查找链接
-  const links = document.querySelectorAll('a[href]');
-  links.forEach(link => {
-    const text = link.textContent?.trim() || '';
-    if (filter && !text.toLowerCase().includes(filter.toLowerCase())) {
-      return;
-    }
-
-    const rect = link.getBoundingClientRect();
-    const style = window.getComputedStyle(link);
-    const visible =
-      style.display !== 'none' &&
-      style.visibility !== 'hidden' &&
-      style.opacity !== '0' &&
-      rect.width > 0 &&
-      rect.height > 0;
-
-    let selector = 'a';
-    if (link.id) {
-      selector = `#${link.id}`;
-    } else if (link.className) {
-      selector = `a.${link.className.split(' ')[0]}`;
-    }
-
-    results.push({
-      selector,
-      text,
-      type: 'link',
+      type: tagName === 'a' ? 'link' : 'button',
       visible,
       boundingBox: {
         x: rect.x,

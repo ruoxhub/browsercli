@@ -7,6 +7,7 @@
 import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
 import type {CollectCodeOptions} from '../../types/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -63,7 +64,7 @@ export const collectCode = defineTool({
 
     // Sync page context from tool context to runtime.collector
     // so that collector.collect() can resolve the current page.
-    const selectedPage = context.getSelectedPage();
+    const selectedPage = context.getSelectedPage?.();
     if (selectedPage) {
       runtime.syncPageContext(selectedPage);
     }
@@ -80,16 +81,16 @@ export const collectCode = defineTool({
         );
         if (collectResult.error) {
           const isNoPage = collectResult.error === 'NO_PAGE_CONTEXT';
-          response.setStructuredContent({
-            success: false,
-            message: collectResult.message ?? collectResult.error,
-            suggestion: isNoPage
-              ? '请先调用 select_page 或 new_page 选择目标页面，然后重试。'
-              : '请检查浏览器连接状态（调用 check_browser_health）后重试。',
-            tooltype: 'collect_code',
-            data: {},
-          });
-          return;
+          throw createToolError(
+            isNoPage ? ErrorCodes.PAGE_REQUIRED : ErrorCodes.RUNTIME,
+            collectResult.message ?? collectResult.error,
+            {toolName: 'collect_code'},
+            {
+              recovery: isNoPage
+                ? {tool: 'select_page', command: 'browsercli call select_page', reason: 'A page must be selected first'}
+                : {command: 'browsercli browser status', reason: 'Check browser connection'},
+            },
+          );
         }
       }
 
@@ -137,8 +138,7 @@ export const collectCode = defineTool({
             type: file.type,
           })),
           totalSize: priorityFiles.totalSize,
-          count: priorityFiles.files.length,
-          returnMode,
+          totalFiles: (priorityFiles as {totalFiles?: number}).totalFiles ?? priorityFiles.files.length,
         };
         message = `高优先级文件收集完成，共 ${priorityFiles.files.length} 个`;
       } else {
@@ -168,21 +168,16 @@ export const collectCode = defineTool({
       };
       response.setStructuredContent(result);
     } catch (error) {
+      if (error && typeof error === 'object' && 'code' in error) throw error;
       const errorMsg = error instanceof Error ? error.message : String(error);
       const isNoPage =
         errorMsg.includes('NO_PAGE_CONTEXT') ||
         errorMsg.includes('pageResolver');
-      const suggestion = isNoPage
-        ? '请先调用 select_page 或 new_page 选择目标页面，然后重试。'
-        : '请检查浏览器连接状态（调用 check_browser_health）后重试。';
-      console.error('[collectCode] 收集失败:', errorMsg);
-      response.setStructuredContent({
-        success: false,
-        message: `代码收集失败：${errorMsg}`,
-        suggestion,
-        tooltype: 'collect_code',
-        data: {},
-      });
+      throw createToolError(
+        isNoPage ? ErrorCodes.PAGE_REQUIRED : ErrorCodes.RUNTIME,
+        `代码收集失败：${errorMsg}`,
+        {toolName: 'collect_code'},
+      );
     }
   },
 });

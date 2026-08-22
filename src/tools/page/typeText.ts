@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {errorMessage, sendJson} from '../shared/pageResponse.js';
 import {defineTool} from '../ToolDefinition.js';
@@ -25,25 +26,23 @@ export const typeText = defineTool({
     const {selector, text, delay} = request.params;
 
     if (!selector || !text) {
-      sendJson(response, {
-        success: false,
-        message: 'type_text requires "selector" and "text" parameters',
-        tooltype: 'type_text',
-        data: {selector: selector ?? '', textLength: 0, typed: false},
-      });
-      return;
+      throw createToolError(
+        ErrorCodes.VALIDATION,
+        'type_text requires "selector" and "text" parameters',
+        {toolName: 'type_text'},
+      );
+    }
+
+    const page = context.getSelectedPage();
+    if (!page) {
+      throw createToolError(
+        ErrorCodes.PAGE_REQUIRED,
+        '未选中页面，请先使用 select_page 选择目标页面。',
+        {toolName: 'type_text'},
+      );
     }
 
     try {
-      const page = context.getSelectedPage();
-      if (!page) {
-        sendJson(response, {
-          success: false,
-          message: '未选中页面，请先使用 select_page 选择目标页面。',
-          tooltype: 'type_text',
-        });
-        return;
-      }
       await page.type(selector, text, {delay});
       sendJson(response, {
         success: true,
@@ -52,12 +51,11 @@ export const typeText = defineTool({
         data: {selector, textLength: text.length, typed: true},
       });
     } catch (error) {
-      sendJson(response, {
-        success: false,
-        message: `输入文本失败: ${errorMessage(error)}`,
-        tooltype: 'type_text',
-        data: {selector, textLength: text.length, typed: false},
-      });
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `输入文本失败: ${errorMessage(error)}`,
+        {toolName: 'type_text', selector, textLength: text.length},
+      );
     }
   },
 });

@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -26,16 +27,15 @@ export const seekVideo = defineTool({
     time: zod.number().describe('要定位到的时间点（秒）。'),
   },
   handler: async (request, response, context) => {
+    const page = context.getSelectedPage();
+    if (!page) {
+      throw createToolError(
+        ErrorCodes.PAGE_REQUIRED,
+        '未选中页面，请先使用 select_page 选择目标页面。',
+        {toolName: 'seek_video'},
+      );
+    }
     try {
-      const page = context.getSelectedPage();
-      if (!page) {
-        response.setStructuredContent({
-          success: false,
-          message: '未选中页面，请先使用 select_page 选择目标页面。',
-          tooltype: 'seek_video',
-        });
-        return;
-      }
       const found = await page.evaluate(
         ({sel, t}) => {
           const video = document.querySelector(sel) as HTMLVideoElement | null;
@@ -49,13 +49,11 @@ export const seekVideo = defineTool({
       );
 
       if (!found) {
-        response.setStructuredContent({
-          success: false,
-          message: `未找到匹配的视频元素: ${request.params.selector}`,
-          tooltype: 'seek_video',
-          data: {selector: request.params.selector, time: request.params.time},
-        });
-        return;
+        throw createToolError(
+          ErrorCodes.NOT_FOUND,
+          `未找到匹配的视频元素: ${request.params.selector}`,
+          {toolName: 'seek_video', selector: request.params.selector, time: request.params.time},
+        );
       }
 
       response.setStructuredContent({
@@ -68,13 +66,13 @@ export const seekVideo = defineTool({
         },
       });
     } catch (error) {
+      if (error && typeof error === 'object' && 'code' in error) throw error;
       const errorMsg = error instanceof Error ? error.message : String(error);
-      response.setStructuredContent({
-        success: false,
-        message: `视频定位失败: ${errorMsg}`,
-        tooltype: 'seek_video',
-        data: {},
-      });
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `视频定位失败: ${errorMsg}`,
+        {toolName: 'seek_video'},
+      );
     }
   },
 });

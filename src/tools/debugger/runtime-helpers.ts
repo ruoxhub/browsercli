@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import type {DebuggerManager} from '../../modules/debugger/DebuggerManager.js';
+import {createToolError, ErrorCodes, ToolError} from '../../utils/errors.js';
 import {getErrorMessage} from '../shared/pageResponse.js';
 
 export interface DebuggerRuntime {
@@ -17,14 +18,19 @@ export async function getDebuggerFromContext(
     !runtime ||
     typeof (runtime as DebuggerRuntime).getDebuggerContext !== 'function'
   ) {
-    throw new Error(
+    throw createToolError(
+      ErrorCodes.PAGE_REQUIRED,
       '缺少调试运行时上下文。请确保：1) 已选中页面；2) 工具通过 defineTool 上下文调用（ToolAdapter）。',
     );
   }
   try {
     return await (runtime as DebuggerRuntime).getDebuggerContext();
   } catch (err) {
-    throw new Error(`获取调试上下文失败: ${getErrorMessage(err)}`);
+    if (err instanceof ToolError) throw err;
+    throw createToolError(
+      ErrorCodes.RUNTIME,
+      `获取调试上下文失败: ${getErrorMessage(err)}`,
+    );
   }
 }
 
@@ -42,14 +48,14 @@ export async function runTool<P = unknown>(
   try {
     await run();
   } catch (error) {
+    if (error instanceof ToolError) throw error;
     const raw = getErrorMessage(error);
     const message = errorPrefix ? `${errorPrefix}: ${raw}` : raw;
-    response.setStructuredContent({
-      success: false,
+    throw createToolError(
+      ErrorCodes.RUNTIME,
       message,
-      tooltype,
-      data: errorData(request.params),
-    });
+      {toolName: tooltype, ...errorData(request.params)},
+    );
   }
 }
 

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {withOperationTimeout} from '../shared/browserRuntime.js';
 import {defineTool} from '../ToolDefinition.js';
@@ -42,14 +43,14 @@ export const updateExtensions = defineTool({
     };
 
     const manager = document.querySelector('extensions-manager');
-    if (!manager) return { success: false, error: 'extensions-manager not found' };
+    if (!manager) return { ok: false, error: 'extensions-manager not found' };
 
     const updateButton = traverseShadowRoot('#updateNow', manager);
-    if (!updateButton) return { success: false, error: '#updateNow button not found' };
-    if (updateButton.disabled) return { success: false, error: 'Update button is disabled' };
+    if (!updateButton) return { ok: false, error: '#updateNow button not found' };
+    if (updateButton.disabled) return { ok: false, error: 'Update button is disabled' };
 
     updateButton.click();
-    return { success: true };
+    return { ok: true };
   })();
   `;
 
@@ -59,11 +60,11 @@ export const updateExtensions = defineTool({
         '更新扩展',
         10_000,
       )) as {
-        success: boolean;
+        ok: boolean;
         error?: string;
       };
 
-      if (result.success) {
+      if (result.ok) {
         response.setStructuredContent({
           success: true,
           message: 'Chrome extensions update initiated successfully.',
@@ -72,17 +73,18 @@ export const updateExtensions = defineTool({
         return;
       }
 
-      response.setStructuredContent({
-        success: false,
-        message: `Failed to update extensions: ${result.error ?? 'unknown error'}`,
-        tooltype: 'update_extensions',
-      });
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `Failed to update extensions: ${result.error ?? 'unknown error'}`,
+        {toolName: 'update_extensions'},
+      );
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `Error: ${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'update_extensions',
-      });
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `Error: ${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'update_extensions'},
+      );
     }
   },
 });

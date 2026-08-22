@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -53,17 +54,15 @@ export const captureVideoFrame = defineTool({
       ),
   },
   handler: async (request, response, context) => {
+    const page = context.getSelectedPage();
+    if (!page) {
+      throw createToolError(
+        ErrorCodes.PAGE_REQUIRED,
+        '未选中页面，请先使用 select_page 选择目标页面。',
+        {toolName: 'capture_video_frame'},
+      );
+    }
     try {
-      const page = context.getSelectedPage();
-      if (!page) {
-        response.setStructuredContent({
-          success: false,
-          message: '未选中页面，请先使用 select_page 选择目标页面。',
-          tooltype: 'capture_video_frame',
-        });
-        return;
-      }
-
       // 先定位到指定时间点
       if (request.params.seekTime !== undefined) {
         await page.evaluate(
@@ -93,12 +92,11 @@ export const captureVideoFrame = defineTool({
       }, request.params.selector);
 
       if (!videoBox) {
-        response.setStructuredContent({
-          success: false,
-          message: `视频元素未找到: ${request.params.selector}`,
-          tooltype: 'capture_video_frame',
-        });
-        return;
+        throw createToolError(
+          ErrorCodes.NOT_FOUND,
+          `视频元素未找到: ${request.params.selector}`,
+          {toolName: 'capture_video_frame', selector: request.params.selector},
+        );
       }
 
       const format = request.params.format;
@@ -173,13 +171,13 @@ export const captureVideoFrame = defineTool({
         });
       }
     } catch (error) {
+      if (error && typeof error === 'object' && 'code' in error) throw error;
       const errorMsg = error instanceof Error ? error.message : String(error);
-      response.setStructuredContent({
-        success: false,
-        message: `捕获视频帧失败: ${errorMsg}`,
-        tooltype: 'capture_video_frame',
-        data: {},
-      });
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `捕获视频帧失败: ${errorMsg}`,
+        {toolName: 'capture_video_frame'},
+      );
     }
   },
 });

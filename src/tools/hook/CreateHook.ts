@@ -6,6 +6,7 @@
 
 import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {errorMessage} from '../shared/pageResponse.js';
 import {defineTool} from '../ToolDefinition.js';
@@ -89,16 +90,12 @@ export const createHook = defineTool({
         data: result,
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: errorMessage(error),
-        tooltype: 'create_hook',
-        data: {
-          hookId: null,
-          script: null,
-          error: errorMessage(error),
-        },
-      });
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        errorMessage(error),
+        {toolName: 'create_hook'},
+      );
     }
   },
 });

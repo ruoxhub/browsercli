@@ -8,6 +8,7 @@ import {createPreloadHookId} from '../../modules/hook/index.js';
 import {getRuntime} from '../../runtime.js';
 import type {CDPSession, Frame, JSHandle} from '../../third_party/index.js';
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {selectExecutionContext} from '../debugger/contextSelector.js';
 import type {ExecutionContextInfo} from '../debugger/executionContexts.js';
@@ -203,14 +204,12 @@ function buildStructuredPayload(
 }
 
 function writeStructuredFailure(
-  response: Response,
+  _response: Response,
   tooltype: string,
   message: string,
-  result?: string,
-): void {
-  response.setStructuredContent(
-    buildStructuredPayload(tooltype, false, message, result),
-  );
+  _result?: string,
+): never {
+  throw createToolError(ErrorCodes.RUNTIME, message, {toolName: tooltype});
 }
 
 async function writeEvaluationOutput(
@@ -284,7 +283,7 @@ export async function evaluateScriptFn(
         return JSON.stringify(result);
       }, fn),
       timeoutMs,
-      'Script execution timed out',
+      'Script evaluation timed out',
     );
 
     return buildStructuredPayload(
@@ -294,11 +293,11 @@ export async function evaluateScriptFn(
       result as string | undefined,
     );
   } catch (error) {
-    return buildStructuredPayload(
-      'evaluate_script',
-      false,
+    if (error && typeof error === 'object' && 'code' in error) throw error;
+    throw createToolError(
+      ErrorCodes.RUNTIME,
       `脚本执行失败：${getUnknownErrorMessage(error)}`,
-      '',
+      {toolName: 'evaluate_script'},
     );
   } finally {
     if (fn) {
@@ -395,7 +394,7 @@ async function runOnDebuggerContext(
   }
 }
 
-function runOnFrame(
+async function runOnFrame(
   ctx: ContextProvider,
   request: {
     functionCode: string;
@@ -405,39 +404,43 @@ function runOnFrame(
   response: Response,
 ): Promise<void> {
   if (request.desiredContext === 'content-script') {
-    response.setStructuredContent(
-      buildStructuredPayload(
-        'evaluate_script',
-        false,
-        '当前页面没有可用的 content-script 执行上下文',
-      ),
+    throw createToolError(
+      ErrorCodes.NOT_FOUND,
+      '当前页面没有可用的 content-script 执行上下文',
+      {toolName: 'evaluate_script'},
     );
-    return Promise.resolve();
   }
 
   const frame = ctx.getSelectedFrame();
   if (!frame) {
-    response.setStructuredContent(
-      buildStructuredPayload('evaluate_script', false, '当前没有可用的 Frame'),
+    throw createToolError(
+      ErrorCodes.FRAME_REQUIRED,
+      '当前没有可用的 Frame',
+      {toolName: 'evaluate_script'},
     );
-    return Promise.resolve();
   }
 
-  return evaluateScriptFn(frame, request.functionCode, request.timeoutMs).then(
-    result => {
-      if (!result.success) {
-        const hint = getIsolationHint(
-          request.functionCode,
-          request.desiredContext,
-          result.message,
-        );
-        if (hint) {
-          result.message = hint;
-        }
-      }
-      response.setStructuredContent(result);
-    },
-  );
+  try {
+    const result = await evaluateScriptFn(
+      frame,
+      request.functionCode,
+      request.timeoutMs,
+    );
+    response.setStructuredContent(result);
+  } catch (error) {
+    const raw = getUnknownErrorMessage(error);
+    const hint = getIsolationHint(
+      request.functionCode,
+      request.desiredContext,
+      raw,
+    );
+    if (hint) {
+      throw createToolError(ErrorCodes.RUNTIME, hint, {
+        toolName: 'evaluate_script',
+      });
+    }
+    throw error;
+  }
 }
 
 export const evaluateScript = defineTool({
@@ -489,44 +492,37 @@ export const evaluateScript = defineTool({
     const timeoutMs = request.params.timeoutMs ?? DEFAULT_SCRIPT_TIMEOUT;
 
     if (typeof functionCode !== 'string') {
-      writeStructuredFailure(
-        response,
-        'evaluate_script',
+      throw createToolError(
+        ErrorCodes.VALIDATION,
         `function 参数必须是字符串，但收到 ${typeof functionCode}。请确保传入完整的函数表达式，如 () => { ... }`,
-        '',
+        {toolName: 'evaluate_script'},
       );
-      return;
     }
 
     if (!functionCode || functionCode.trim().length === 0) {
-      writeStructuredFailure(
-        response,
-        'evaluate_script',
+      throw createToolError(
+        ErrorCodes.VALIDATION,
         'function 参数不能为空',
-        '',
+        {toolName: 'evaluate_script'},
       );
-      return;
     }
 
     const syntaxIssue = checkScriptSyntaxBalance(functionCode);
     if (syntaxIssue) {
-      writeStructuredFailure(
-        response,
-        'evaluate_script',
-        `脚本未送入页面执行：${syntaxIssue.reason}。请先补全 function 体后再调用 evaluate_script，不要逐字符重试。`,
-        '',
+      throw createToolError(
+        ErrorCodes.VALIDATION,
+        `脚本未送入页面执行：${syntaxIssue.reason}。请先补全 function 体后再调用 evaluate_script，不要逐字符重试。CLI 中的复杂或多行脚本请改用 --file <script.js>，或通过 --stdin 传入 JSON 参数。`,
+        {toolName: 'evaluate_script'},
       );
-      return;
     }
 
     const ctx = getRuntime().contextProvider;
     if (!ctx) {
-      writeStructuredFailure(
-        response,
-        'evaluate_script',
+      throw createToolError(
+        ErrorCodes.RUNTIME,
         '脚本执行失败：运行时上下文不可用',
+        {toolName: 'evaluate_script'},
       );
-      return;
     }
 
     const evalRequest = {
@@ -580,22 +576,20 @@ export const injectPreloadScript = defineTool({
       : (request.params.script ?? '');
 
     if (!script || script.trim().length === 0) {
-      response.setStructuredContent({
-        success: false,
-        message: '脚本内容不能为空',
-        tooltype,
-      });
-      return;
+      throw createToolError(
+        ErrorCodes.VALIDATION,
+        '脚本内容不能为空',
+        {toolName: tooltype},
+      );
     }
 
     const browserContext = toolContext.getBrowserContext();
     if (!browserContext || browserContext.isClosed()) {
-      response.setStructuredContent({
-        success: false,
-        message: '当前 BrowserContext 不可用或已关闭，无法注入预加载脚本',
-        tooltype,
-      });
-      return;
+      throw createToolError(
+        ErrorCodes.BROWSER_REQUIRED,
+        '当前 BrowserContext 不可用或已关闭，无法注入预加载脚本',
+        {toolName: tooltype},
+      );
     }
 
     try {
@@ -628,11 +622,12 @@ export const injectPreloadScript = defineTool({
         },
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `注入预加载脚本失败：${getUnknownErrorMessage(error)}`,
-        tooltype,
-      });
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `注入预加载脚本失败：${getUnknownErrorMessage(error)}`,
+        {toolName: tooltype},
+      );
     }
   },
 });

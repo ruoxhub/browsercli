@@ -61,9 +61,13 @@ export function generateTopLevelHelp(options?: {
 export function generateCommandHelp(command: string): string | null {
   const helpMap: Record<string, {description: string; usage: string}> = {
     call: {
-      description: '调用 MCP 工具，或兼容调用已迁移为 Tool 的旧技能',
-      usage:
-        'browsercli call <tool-or-skill-name> [--param value] [--url <url>] [--data <json>]',
+      description:
+        '调用 MCP 工具。复杂或多行 JavaScript 请保存为脚本文件后使用 --file，或通过 --stdin 传入 JSON 参数，避免 shell 转义破坏脚本。',
+      usage: [
+        'browsercli call <tool-or-skill-name> [--param value] [--data <json>] [--file <params.json>]',
+        'browsercli call evaluate_script --file <script.js>',
+        'browsercli call <tool-or-skill-name> --stdin',
+      ].join('\n         '),
     },
     browser: {
       description: '连接、断开或查看 Worker 浏览器状态',

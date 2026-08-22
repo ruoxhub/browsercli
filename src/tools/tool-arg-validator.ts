@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {getAliasesForTool, suggestSimilarKeys} from './tool-aliases.js';
+import {suggestSimilarKeys} from './tool-aliases.js';
 import {getToolMeta} from './tools-meta.js';
 import {type ToolArgSpec, type ToolArgSpecMap} from './zod-introspect.js';
 
@@ -20,46 +20,17 @@ export interface ValidationFailure {
 
 type TypeValidationResult = {ok: true; value: unknown} | ValidationFailure;
 
-/**
- * 构造给定工具的别名映射。
- * 只保留 "别名目标存在于 schema、别名本身不在 schema" 的条目，
- * 避免遮蔽真正支持的同名参数。
- */
-function buildAliasMap(
-  toolName: string,
-  specs: ToolArgSpecMap,
-): Map<string, string> {
-  const map = new Map<string, string>();
-  const supportedKeys = new Set(Object.keys(specs));
-  const aliases = getAliasesForTool(toolName);
-
-  for (const [alias, canonical] of Object.entries(aliases)) {
-    if (supportedKeys.has(alias)) {
-      // 别名本身就是合法参数 → 不做映射
-      continue;
-    }
-    if (!supportedKeys.has(canonical)) {
-      // 映射目标在当前工具上并不存在 → 跳过
-      continue;
-    }
-    map.set(alias, canonical);
-  }
-  return map;
-}
-
 function normalizeRawArgs(
   toolName: string,
   rawArgs: Record<string, unknown>,
   specs: ToolArgSpecMap,
 ): ValidationSuccess | ValidationFailure {
-  const aliases = buildAliasMap(toolName, specs);
   const normalized: Record<string, unknown> = {};
   const supportedKeys = Object.keys(specs);
   const supportedSet = new Set(supportedKeys);
 
   for (const [rawKey, value] of Object.entries(rawArgs)) {
-    const key = aliases.get(rawKey) ?? rawKey;
-    if (!supportedSet.has(key)) {
+    if (!supportedSet.has(rawKey)) {
       const suggestions = suggestSimilarKeys(rawKey, supportedKeys);
       const suggestionText = suggestions.length
         ? `（是否想用 ${suggestions.map(s => `--${s}`).join(' / ')}？）`
@@ -71,8 +42,8 @@ function normalizeRawArgs(
           `${toolName} 支持参数：${supportedKeys.join(', ')}`,
       };
     }
-    if (!(key in normalized)) {
-      normalized[key] = value;
+    if (!(rawKey in normalized)) {
+      normalized[rawKey] = value;
     }
   }
 

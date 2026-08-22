@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -25,16 +26,15 @@ export const getVideoInfo = defineTool({
     selector: zod.string().describe('视频元素的 CSS 选择器。'),
   },
   handler: async (request, response, context) => {
+    const page = context.getSelectedPage();
+    if (!page) {
+      throw createToolError(
+        ErrorCodes.PAGE_REQUIRED,
+        '未选中页面，请先使用 select_page 选择目标页面。',
+        {toolName: 'get_video_info'},
+      );
+    }
     try {
-      const page = context.getSelectedPage();
-      if (!page) {
-        response.setStructuredContent({
-          success: false,
-          message: '未选中页面，请先使用 select_page 选择目标页面。',
-          tooltype: 'get_video_info',
-        });
-        return;
-      }
       const info = await page.evaluate(sel => {
         const video = document.querySelector(sel) as HTMLVideoElement;
         if (!video) return null;
@@ -47,15 +47,11 @@ export const getVideoInfo = defineTool({
       }, request.params.selector);
 
       if (!info) {
-        response.setStructuredContent({
-          success: false,
-          message: `视频元素未找到: ${request.params.selector}`,
-          tooltype: 'get_video_info',
-          data: {
-            selector: request.params.selector,
-          },
-        });
-        return;
+        throw createToolError(
+          ErrorCodes.NOT_FOUND,
+          `视频元素未找到: ${request.params.selector}`,
+          {toolName: 'get_video_info', selector: request.params.selector},
+        );
       }
 
       response.setStructuredContent({
@@ -68,13 +64,13 @@ export const getVideoInfo = defineTool({
         },
       });
     } catch (error) {
+      if (error && typeof error === 'object' && 'code' in error) throw error;
       const errorMsg = error instanceof Error ? error.message : String(error);
-      response.setStructuredContent({
-        success: false,
-        message: `获取视频信息失败: ${errorMsg}`,
-        tooltype: 'get_video_info',
-        data: {},
-      });
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `获取视频信息失败: ${errorMsg}`,
+        {toolName: 'get_video_info'},
+      );
     }
   },
 });

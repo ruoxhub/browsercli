@@ -117,7 +117,7 @@ browsercli call wasm_vmp_trace --maxEvents 100 --filterModule <name>
 如果 wasm 是**代码保护器**（如某些商业 VMP 用的 wasm 壳），反编译可能输出大量无意义指令（`i32.const` / `local.get` / `i32.xor` 循环）。这时：
 
 1. `browsercli call wasm_vmp_trace` 抓运行时事件（每次进入 / 退出函数 + 参数摘要）
-2. 用 `browsercli call wasm_offline_run` 重放同一个输入多次，看哪条路径被命中
+2. 用 `browsercli call wasm_offline_run --inputPath <path> --functionName <name>` 重放同一个输入多次，看哪条路径被命中
 3. 关注 **dispatcher**（最外层 switch 调度函数）的输入输出
 
 不要试图"完整还原 VMP" — 通常目标是**只提取目标算法**（如签名函数），其他外壳可以跳过。

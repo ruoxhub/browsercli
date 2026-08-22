@@ -6,6 +6,7 @@
 
 import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {getDebuggerFromContext} from '../debugger/runtime-helpers.js';
 import {defineTool} from '../ToolDefinition.js';
@@ -50,12 +51,12 @@ export const deobfuscateCode = defineTool({
         data: result,
       });
     } catch (error) {
-      response.setStructuredContent<DeobfuscateCodeResult>({
-        success: false,
-        message: `Deobfuscation failed: ${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'deobfuscate',
-        data: {} as DeobfuscateCodeResult['data'],
-      });
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `Deobfuscation failed: ${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'deobfuscate'},
+      );
     }
   },
 });

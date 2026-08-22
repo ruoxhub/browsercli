@@ -8,13 +8,15 @@ import {describe, it} from 'node:test';
 
 import {
   AIService,
+  AIServiceError,
+  classifyAIError,
   type AIProvider,
   type AIMessage,
   type ChatOptions,
 } from '../../../src/services/AIService.js';
 
 type RetryableError = Error & {
-  code?: 'ECONNRESET' | 'ETIMEDOUT' | 'ENOTFOUND';
+  code?: 'ECONNRESET' | 'ETIMEDOUT' | 'ENOTFOUND' | 'ECONNREFUSED';
   status?: number;
   statusCode?: number;
 };
@@ -742,6 +744,271 @@ describe('AIService', () => {
       const response = await service.chat([{role: 'user', content: ''}]);
 
       assert.strictEqual(response.content, '');
+    });
+  });
+
+  describe('Bounded AI behavior and error classification', () => {
+    it('should fast-exit with zero provider calls and zero sleep when unconfigured', async () => {
+      let callCount = 0;
+      const unconfiguredProvider: AIProvider = {
+        chat: async () => {
+          callCount++;
+          return {content: 'should not be called'};
+        },
+        analyzeImage: async () => {
+          callCount++;
+          return 'should not be called';
+        },
+      };
+
+      const service = new AIService(unconfiguredProvider, {}, false);
+
+      assert.strictEqual(service.isAvailable(), false);
+      assert.deepStrictEqual(service.getAvailability(), {
+        available: false,
+        reason: 'not_configured',
+      });
+
+      const startTime = Date.now();
+      await assert.rejects(
+        async () => {
+          await service.chat([{role: 'user', content: 'test'}]);
+        },
+        (error: unknown) => {
+          assert.ok(error instanceof AIServiceError);
+          assert.strictEqual(error.reason, 'not_configured');
+          return true;
+        },
+      );
+
+      const elapsed = Date.now() - startTime;
+      assert.strictEqual(callCount, 0, 'Should make 0 provider calls');
+      assert.ok(
+        elapsed < 100,
+        `Should exit immediately (<100ms), took ${elapsed}ms`,
+      );
+    });
+
+    it('should fast-exit on analyzeImage when unconfigured', async () => {
+      const service = new AIService(
+        {chat: async () => ({content: ''}), analyzeImage: async () => ''},
+        {},
+        false,
+      );
+
+      await assert.rejects(
+        async () => {
+          await service.analyzeImage('img.png', 'prompt');
+        },
+        (error: unknown) => {
+          assert.ok(error instanceof AIServiceError);
+          assert.strictEqual(error.reason, 'not_configured');
+          return true;
+        },
+      );
+    });
+
+    it('should abort provider call when timeoutMs budget is exceeded', async () => {
+      const hangingProvider: AIProvider = {
+        chat: async (_messages, options) => {
+          return new Promise((resolve, reject) => {
+            const timer = setTimeout(() => {
+              resolve({content: 'done late'});
+            }, 2000);
+
+            if (options?.signal) {
+              options.signal.addEventListener('abort', () => {
+                clearTimeout(timer);
+                const abortErr = new Error('This operation was aborted');
+                abortErr.name = 'AbortError';
+                reject(abortErr);
+              });
+            }
+          });
+        },
+        analyzeImage: async () => 'test',
+      };
+
+      const service = new AIService(hangingProvider);
+      const startTime = Date.now();
+
+      await assert.rejects(
+        async () => {
+          await service.chat([{role: 'user', content: 'test'}], {
+            timeoutMs: 100,
+          });
+        },
+        (error: unknown) => {
+          assert.ok(error instanceof AIServiceError);
+          assert.strictEqual(error.reason, 'timeout');
+          return true;
+        },
+      );
+
+      const elapsed = Date.now() - startTime;
+      assert.ok(
+        elapsed < 1000,
+        `Abort should happen quickly around timeout budget (took ${elapsed}ms)`,
+      );
+    });
+
+    it('should stop retrying when totalBudgetMs expires', async () => {
+      let attempts = 0;
+      const retryableProvider: AIProvider = {
+        chat: async () => {
+          attempts++;
+          throw createRetryableError('Connection reset', {code: 'ECONNRESET'});
+        },
+        analyzeImage: async () => 'test',
+      };
+
+      const service = new AIService(retryableProvider, {
+        maxRetries: 10,
+        initialDelay: 50,
+        backoffMultiplier: 2,
+      });
+
+      const startTime = Date.now();
+      await assert.rejects(
+        async () => {
+          await service.chat([{role: 'user', content: 'test'}], {
+            totalBudgetMs: 120,
+          });
+        },
+        (error: unknown) => {
+          assert.ok(error instanceof AIServiceError);
+          assert.strictEqual(error.reason, 'timeout');
+          return true;
+        },
+      );
+
+      const elapsed = Date.now() - startTime;
+      assert.ok(
+        attempts < 10,
+        `Retries should be stopped before maxRetries (attempts=${attempts})`,
+      );
+      assert.ok(
+        elapsed < 500,
+        `Total time should respect budget, took ${elapsed}ms`,
+      );
+    });
+
+    it('should cancel retry sleep immediately when caller AbortSignal fires', async () => {
+      let attempts = 0;
+      const retryableProvider: AIProvider = {
+        chat: async () => {
+          attempts++;
+          throw createRetryableError('Connection reset', {code: 'ECONNRESET'});
+        },
+        analyzeImage: async () => 'test',
+      };
+
+      const service = new AIService(retryableProvider, {
+        maxRetries: 5,
+        initialDelay: 5000,
+      });
+
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), 50);
+
+      const startTime = Date.now();
+      await assert.rejects(
+        async () => {
+          await service.chat([{role: 'user', content: 'test'}], {
+            signal: controller.signal,
+          });
+        },
+        (error: unknown) => {
+          assert.ok(error instanceof AIServiceError);
+          assert.strictEqual(error.reason, 'timeout');
+          return true;
+        },
+      );
+
+      const elapsed = Date.now() - startTime;
+      assert.strictEqual(attempts, 1);
+      assert.ok(
+        elapsed < 500,
+        `Sleep should abort immediately when signal fires (took ${elapsed}ms instead of 5000ms)`,
+      );
+    });
+
+    describe('classifyAIError', () => {
+      it('should classify AIServiceError reasons directly', () => {
+        assert.strictEqual(
+          classifyAIError(
+            new AIServiceError('not_configured', 'not configured'),
+          ),
+          'not_configured',
+        );
+        assert.strictEqual(
+          classifyAIError(new AIServiceError('timeout', 'timed out')),
+          'timeout',
+        );
+        assert.strictEqual(
+          classifyAIError(new AIServiceError('unavailable', 'service down')),
+          'unavailable',
+        );
+      });
+
+      it('should classify timeout-related errors as timeout', () => {
+        const abortErr = new Error('The operation was aborted');
+        abortErr.name = 'AbortError';
+        assert.strictEqual(classifyAIError(abortErr), 'timeout');
+
+        const timeoutErr = new Error('Request timeout after 5000ms');
+        timeoutErr.name = 'TimeoutError';
+        assert.strictEqual(classifyAIError(timeoutErr), 'timeout');
+
+        const timedoutErr = createRetryableError('Connection timed out', {
+          code: 'ETIMEDOUT',
+        });
+        assert.strictEqual(classifyAIError(timedoutErr), 'timeout');
+      });
+
+      it('should classify unconfigured errors as not_configured', () => {
+        assert.strictEqual(
+          classifyAIError(
+            new Error(
+              'No AI provider configured. Set OPENAI_API_KEY environment variable.',
+            ),
+          ),
+          'not_configured',
+        );
+        assert.strictEqual(
+          classifyAIError(new Error('AI provider is not configured')),
+          'not_configured',
+        );
+        assert.strictEqual(
+          classifyAIError({code: 'AI_NOT_CONFIGURED', message: 'missing key'}),
+          'not_configured',
+        );
+      });
+
+      it('should classify connection/server errors as unavailable', () => {
+        assert.strictEqual(
+          classifyAIError(
+            createRetryableError('ECONNREFUSED', {code: 'ECONNREFUSED'}),
+          ),
+          'unavailable',
+        );
+        assert.strictEqual(
+          classifyAIError(
+            createRetryableError('Internal server error', {status: 500}),
+          ),
+          'unavailable',
+        );
+        assert.strictEqual(
+          classifyAIError(
+            createRetryableError('Rate limit exceeded', {status: 429}),
+          ),
+          'unavailable',
+        );
+        assert.strictEqual(
+          classifyAIError('random string error'),
+          'unavailable',
+        );
+      });
     });
   });
 });

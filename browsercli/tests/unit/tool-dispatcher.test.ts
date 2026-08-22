@@ -8,6 +8,8 @@ import {describe, it} from 'node:test';
 
 import {AxiError} from 'axi-sdk-js';
 
+import {parseArgs} from '../../src/args-parser.js';
+import {buildToolArgs} from '../../src/commands/shared/tool-args.js';
 import {toolDispatcherCommand} from '../../src/commands/tool-dispatcher.js';
 import type {ToolMeta} from '../../src/tool-meta-types.js';
 import type {WorkerContext} from '../../src/types.js';
@@ -309,15 +311,24 @@ describe('tool-dispatcher (pure HTTP)', () => {
     });
   });
 
-  it('still splits string[] params (e.g. --args) on commas', async () => {
+  it('parses string[] as JSON array literals and does not split on commas', async () => {
     const client = new MockHttpClient(ALL_TOOLS, {ok: true});
     await toolDispatcherCommand(
-      ['evaluate_script', '--function', '() => 1', '--args', 'u1,u2'],
+      ['evaluate_script', '--function', '() => 1', '--args', '["u1","u2"]'],
       ctxWith(client),
     );
     assert.deepStrictEqual(client.invokeCalls[0][2], {
       function: '() => 1',
       args: ['u1', 'u2'],
+    });
+
+    await toolDispatcherCommand(
+      ['evaluate_script', '--function', '() => 1', '--args', 'u1,u2'],
+      ctxWith(client),
+    );
+    assert.deepStrictEqual(client.invokeCalls[1][2], {
+      function: '() => 1',
+      args: 'u1,u2',
     });
   });
 
@@ -342,5 +353,33 @@ describe('tool-dispatcher (pure HTTP)', () => {
         return e instanceof AxiError && e.code === 'UNKNOWN_TOOL';
       },
     );
+  });
+});
+
+describe('buildToolArgs complex arguments parsing', () => {
+  it('parses JSON array for string[] and leaves comma-separated string as scalar', () => {
+    const parsedWithJson = buildToolArgs(
+      parseArgs(['--events', '["click","submit"]']),
+      {
+        events: {type: 'string[]', required: true, description: ''},
+      },
+    );
+    assert.deepStrictEqual(parsedWithJson, {events: ['click', 'submit']});
+
+    const parsedWithScalar = buildToolArgs(
+      parseArgs(['--events', 'click,submit']),
+      {
+        events: {type: 'string[]', required: true, description: ''},
+      },
+    );
+    assert.deepStrictEqual(parsedWithScalar, {events: 'click,submit'});
+  });
+
+  it('accepts JSON objects for --data', () => {
+    const parsedWithData = buildToolArgs(
+      parseArgs(['--data', '{"foo":"bar","num":42}']),
+      {},
+    );
+    assert.deepStrictEqual(parsedWithData, {foo: 'bar', num: 42});
   });
 });

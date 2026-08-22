@@ -22,7 +22,11 @@ export {
 } from './args-parser.js';
 export {generateTopLevelHelp, generateCommandHelp} from './help.js';
 export {WorkerHttpClient} from './WorkerHttpClient.js';
-export type {WorkerHttpClientOptions, JobStatus} from './WorkerHttpClient.js';
+export type {
+  WorkerHttpClientOptions,
+  JobStatus,
+  ToolRecovery,
+} from './WorkerHttpClient.js';
 export type {
   ToolMeta,
   ToolArgSpec,

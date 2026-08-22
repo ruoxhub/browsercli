@@ -147,6 +147,10 @@ export class ToolContextProvider {
     return this._browserContext.getContext();
   }
 
+  getBrowserContext(): BrowserContext | null {
+    return this._browserContext.getContext();
+  }
+
   getPersistentHookRegistry(): PersistentHookRegistry {
     return this.hookManager.getPersistentHookRegistry();
   }

@@ -16,6 +16,7 @@ import {
   sourcemapReconstructTree,
 } from '../../../../src/tools/sourcemap/index.js';
 import {manifest} from '../../../../src/tools/sourcemap/manifest.js';
+import {ToolError} from '../../../../src/utils/errors.js';
 import {DefineToolContextFactory} from '../../../../src/worker/DefineToolContextFactory.js';
 import {ToolResponseAccumulator} from '../../../../src/worker/ToolResponse.js';
 
@@ -53,24 +54,25 @@ describe('SourceMap tools', () => {
       },
     } as never);
     const response = new ToolResponseAccumulator();
-    await sourcemapLookup.handler(
-      {
-        params: {
-          mapId: `sm_${'0'.repeat(32)}`,
-          direction: 'generated_to_original',
-          line: 1,
-          column: 0,
-        },
-      },
-      response,
-      {} as never,
+    await assert.rejects(
+      () =>
+        sourcemapLookup.handler(
+          {
+            params: {
+              mapId: `sm_${'0'.repeat(32)}`,
+              direction: 'generated_to_original',
+              line: 1,
+              column: 0,
+            },
+          },
+          response,
+          {} as never,
+        ),
+      (error: unknown) =>
+        error instanceof ToolError &&
+        (error.code as string) === 'MAP_NOT_FOUND' &&
+        error.message === 'Map is unavailable',
     );
-    assert.deepEqual(response.toJSON().structuredContent, {
-      success: false,
-      message: 'Map is unavailable',
-      tooltype: 'sourcemap_lookup',
-      data: {code: 'MAP_NOT_FOUND'},
-    });
   });
 
   it('rejects ambiguous parse selectors at the handler boundary', async () => {
@@ -84,24 +86,25 @@ describe('SourceMap tools', () => {
       },
     } as never);
     const response = new ToolResponseAccumulator();
-    await sourcemapParse.handler(
-      {
-        params: {
-          mapUrl: 'https://example.com/app.js.map',
-          mapContent: '{}',
-          allowCrossOrigin: false,
-        },
-      },
-      response,
-      {} as never,
+    await assert.rejects(
+      () =>
+        sourcemapParse.handler(
+          {
+            params: {
+              mapUrl: 'https://example.com/app.js.map',
+              mapContent: '{}',
+              allowCrossOrigin: false,
+            },
+          },
+          response,
+          {} as never,
+        ),
+      (error: unknown) =>
+        error instanceof ToolError &&
+        (error.code as string) === 'INVALID_SOURCE_INPUT' &&
+        error.message === 'Exactly one SourceMap source must be provided',
     );
     assert.equal(serviceCalls, 0);
-    assert.deepEqual(response.toJSON().structuredContent, {
-      success: false,
-      message: 'Exactly one SourceMap source must be provided',
-      tooltype: 'sourcemap_parse',
-      data: {code: 'INVALID_SOURCE_INPUT'},
-    });
   });
 
   it('peeks existing debugger metadata without activating CDP', async () => {

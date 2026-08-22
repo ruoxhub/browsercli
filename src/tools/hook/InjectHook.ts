@@ -4,7 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {errorMessage} from '../shared/pageResponse.js';
 import {defineTool} from '../ToolDefinition.js';
@@ -25,7 +27,7 @@ export const injectHook = defineTool({
   },
   schema: {
     hookId: zod.string().describe('用于日志与追踪的 Hook 标识符'),
-    script: zod.string().describe('要注入的 Hook 脚本代码'),
+    script: zod.string().optional().describe('要注入的 Hook 脚本代码'),
     persistent: zod
       .boolean()
       .optional()
@@ -36,7 +38,25 @@ export const injectHook = defineTool({
       .describe('请求的执行 world；当前实际执行 world 始终为 main'),
   },
   handler: async (request, response, context) => {
-    const {hookId, script} = request.params;
+    const {hookId} = request.params;
+    const runtime = getRuntime();
+    const resolvedScript =
+      request.params.script ??
+      runtime.hookManager.getHook(hookId)?.script;
+
+    if (
+      !resolvedScript ||
+      typeof resolvedScript !== 'string' ||
+      resolvedScript.trim().length === 0
+    ) {
+      throw createToolError(
+        ErrorCodes.VALIDATION,
+        `未找到 Hook "${hookId}" 的脚本，请提供 script 参数或先调用 create_hook`,
+        {toolName: 'inject_hook', hookId},
+      );
+    }
+
+    const script = resolvedScript;
     const persistent = request.params.persistent ?? false;
     const requestedWorld = request.params.world ?? 'main';
     const base: InjectHookData = {
@@ -65,8 +85,10 @@ export const injectHook = defineTool({
 
       const browserContext = context.getBrowserContext();
       if (!browserContext || browserContext.isClosed()) {
-        throw new Error(
+        throw createToolError(
+          ErrorCodes.BROWSER_REQUIRED,
           '当前 BrowserContext 不可用或已关闭，无法注册持久 Hook',
+          {toolName: 'inject_hook'},
         );
       }
       const result = await context.getPersistentHookRegistry().register({
@@ -98,12 +120,12 @@ export const injectHook = defineTool({
         data,
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `注入失败：${errorMessage(error)}`,
-        tooltype: 'inject_hook',
-        data: base,
-      });
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `注入失败：${errorMessage(error)}`,
+        {toolName: 'inject_hook', ...base},
+      );
     }
   },
 });
@@ -120,12 +142,11 @@ export const listPersistentHooks = defineTool({
   handler: async (_request, response, context) => {
     const browserContext = context.getBrowserContext();
     if (!browserContext || browserContext.isClosed()) {
-      response.setStructuredContent({
-        success: false,
-        message: '当前 BrowserContext 不可用或已关闭',
-        tooltype: 'list_persistent_hooks',
-      });
-      return;
+      throw createToolError(
+        ErrorCodes.BROWSER_REQUIRED,
+        '当前 BrowserContext 不可用或已关闭',
+        {toolName: 'list_persistent_hooks'},
+      );
     }
     const hooks = context
       .getPersistentHookRegistry()

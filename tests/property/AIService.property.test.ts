@@ -20,6 +20,8 @@ import * as fc from 'fast-check';
 
 import {
   AIService,
+  AIServiceError,
+  classifyAIError,
   type AIProvider,
   type AIMessage,
   type AIResponse,
@@ -375,6 +377,81 @@ describe('Property-Based Tests: AI Service', () => {
           },
         ),
         {numRuns: 100},
+      );
+    });
+
+    it('should classify timeout errors consistently regardless of message text', () => {
+      fc.assert(
+        fc.property(fc.string({minLength: 1, maxLength: 50}), errorMessage => {
+          const timeoutErr = new Error(`Timeout: ${errorMessage}`);
+          timeoutErr.name = 'TimeoutError';
+          assert.strictEqual(classifyAIError(timeoutErr), 'timeout');
+
+          const abortErr = new Error(`Abort: ${errorMessage}`);
+          abortErr.name = 'AbortError';
+          assert.strictEqual(classifyAIError(abortErr), 'timeout');
+
+          return true;
+        }),
+        {numRuns: 50},
+      );
+    });
+
+    it('should classify unconfigured errors consistently', () => {
+      fc.assert(
+        fc.property(
+          fc.constantFrom(
+            'No AI provider configured. Set OPENAI_API_KEY environment variable.',
+            'AI provider not configured',
+            'not_configured',
+          ),
+          message => {
+            const err = new Error(message);
+            assert.strictEqual(classifyAIError(err), 'not_configured');
+            return true;
+          },
+        ),
+        {numRuns: 30},
+      );
+    });
+
+    it('should fast-exit for unconfigured service across random messages', async () => {
+      await fc.assert(
+        fc.asyncProperty(messagesArb, async messages => {
+          let called = false;
+          const dummyProvider: AIProvider = {
+            async chat() {
+              called = true;
+              return {content: ''};
+            },
+            async analyzeImage() {
+              called = true;
+              return '';
+            },
+          };
+
+          const unconfiguredService = new AIService(dummyProvider, {}, false);
+          assert.strictEqual(unconfiguredService.isAvailable(), false);
+          assert.deepStrictEqual(unconfiguredService.getAvailability(), {
+            available: false,
+            reason: 'not_configured',
+          });
+
+          await assert.rejects(
+            async () => {
+              await unconfiguredService.chat(messages);
+            },
+            (err: unknown) => {
+              assert.ok(err instanceof AIServiceError);
+              assert.strictEqual(err.reason, 'not_configured');
+              return true;
+            },
+          );
+
+          assert.strictEqual(called, false);
+          return true;
+        }),
+        {numRuns: 50},
       );
     });
   });

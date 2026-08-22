@@ -5,7 +5,8 @@
  */
 
 import type {Frame} from 'patchright';
-import type {ToolPrerequisiteChecker} from '../tools/prerequisites/ToolPrerequisiteChecker.js';
+
+import {ToolPrerequisiteChecker} from '../tools/prerequisites/ToolPrerequisiteChecker.js';
 import {
   validateToolArgs,
   type ValidationFailure,
@@ -16,7 +17,7 @@ import {createToolError, ErrorCodes, ToolError} from '../utils/errors.js';
 
 import {
   globalPageHealthTracker,
-  PageHealthTracker,
+  type PageHealthTracker,
 } from './context/PageHealthTracker.js';
 import {wrapFrameWithTimeout} from './timeoutUtils.js';
 import type {ToolCallContextGuard} from './ToolCallContextGuard.js';
@@ -32,13 +33,6 @@ import {
 } from './WorkerActivityCoordinator.js';
 
 export {wrapFrameWithTimeout, FRAME_EVALUATE_TIMEOUT} from './timeoutUtils.js';
-
-// 恢复工具白名单：页面被判定 UNRESPONSIVE 时仍允许执行，用于探测/恢复。
-// 只收录 src/tools/ 中真实注册的工具名。
-const RECOVERY_TOOL_NAMES = new Set<string>([
-  'check_browser_health',
-  'list_pages',
-]);
 
 /**
  * 工具执行管线。负责参数校验、上下文注入、执行、响应构建的完整链路。
@@ -165,18 +159,26 @@ export class ToolExecutionRouter {
 }
 
 export class ToolExecutionPipeline {
+  private readonly prerequisiteChecker?: ToolPrerequisiteChecker;
+
   constructor(
     private readonly loader: ToolHandlerLoader,
     private readonly router: ToolExecutionRouter,
     private readonly processor: ToolResponseProcessor,
     private readonly telemetry: ToolTelemetry,
     private readonly contextGuard?: ToolCallContextGuard,
-    private readonly prerequisiteChecker?: ToolPrerequisiteChecker,
+    prerequisiteChecker?: ToolPrerequisiteChecker,
     private readonly resultRecorder = new ToolResultRecorder(),
     private readonly activityCoordinator: WorkerActivityCoordinator = workerActivityCoordinator,
     private readonly pageHealthTracker: PageHealthTracker = globalPageHealthTracker,
     private readonly contextProvider?: ToolContextProvider,
-  ) {}
+  ) {
+    this.prerequisiteChecker =
+      prerequisiteChecker ??
+      (contextProvider
+        ? new ToolPrerequisiteChecker(contextProvider, this.pageHealthTracker)
+        : undefined);
+  }
 
   async execute(
     meta: ToolMeta,
@@ -190,7 +192,6 @@ export class ToolExecutionPipeline {
       let params: Record<string, unknown> | undefined;
 
       try {
-        this.checkPageHealthGuard(toolName);
         params = this.validateAndPrepare(toolName, rawParams, meta);
         const handler = await this.loadHandler(toolName, meta);
         const response = await this.processRequest(
@@ -207,29 +208,6 @@ export class ToolExecutionPipeline {
         throw this.wrapError(error, toolName);
       }
     }, signal);
-  }
-
-  private checkPageHealthGuard(toolName: string): void {
-    if (RECOVERY_TOOL_NAMES.has(toolName) || !this.contextProvider) {
-      return;
-    }
-    let pageId: string;
-    try {
-      const page = this.contextProvider.getSelectedPage();
-      if (!page) return;
-      pageId = this.contextProvider.getPageId(page);
-    } catch {
-      // 拿不到 pageId（页面不属于当前 context 等）时跳过健康守卫
-      return;
-    }
-    if (!this.pageHealthTracker.isPageHealthy(pageId)) {
-      const record = this.pageHealthTracker.getRecord(pageId);
-      throw createToolError(
-        ErrorCodes.PAGE_UNRESPONSIVE,
-        `页面 [${pageId}] 当前处于卡死状态 (UNRESPONSIVE: 连续 ${record.consecutiveTimeouts} 次超时)。请先调用 check_browser_health 探测页面状态，或通过浏览器重连恢复。`,
-        {toolName, pageId, healthRecord: record},
-      );
-    }
   }
 
   private generateTraceId(startedAt: number): string {
@@ -252,7 +230,11 @@ export class ToolExecutionPipeline {
         {toolName},
       );
     }
-    this.prerequisiteChecker?.check(toolName, meta.prerequisites);
+    this.prerequisiteChecker?.check(
+      toolName,
+      meta.requirements,
+      meta.prerequisites,
+    );
     return validated.value;
   }
 

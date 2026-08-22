@@ -42,7 +42,9 @@ describe('page identity navigation tools', () => {
 
   it('requires at least one selector', async () => {
     const response = new ToolResponseAccumulator();
-    await selectPage.handler({params: {}}, response, {} as never);
-    assert.equal((response.toJSON().structuredContent as any).success, false);
+    await assert.rejects(
+      selectPage.handler({params: {}}, response, {} as never),
+      /pageId 或 pageIdx/,
+    );
   });
 });

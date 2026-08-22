@@ -1,5 +1,5 @@
 import {zod} from '../../third_party/index.js';
-import {ErrorCodes, formatError} from '../../utils/errors.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -16,7 +16,11 @@ export const dumpTargetScripts = defineTool({
   handler: async (request, response, context) => {
     try {
       if (typeof context.getBrowserTargetInspector !== 'function') {
-        throw new Error('当前工具运行时未提供 BrowserTargetInspector 上下文');
+        throw createToolError(
+          ErrorCodes.RUNTIME,
+          '当前工具运行时未提供 BrowserTargetInspector 上下文',
+          {toolName: 'dump_target_scripts'},
+        );
       }
       const result = await context
         .getBrowserTargetInspector()
@@ -28,13 +32,12 @@ export const dumpTargetScripts = defineTool({
         data: result,
       });
     } catch (error) {
-      const formatted = formatError(error, ErrorCodes.RUNTIME);
-      response.setStructuredContent({
-        success: false,
-        message: formatted.message,
-        tooltype: 'dump_target_scripts',
-        data: {error: formatted},
-      });
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        error instanceof Error ? error.message : String(error),
+        {toolName: 'dump_target_scripts', targetId: request.params.targetId},
+      );
     }
   },
 });

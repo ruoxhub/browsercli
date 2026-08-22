@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {ToolRuntimeRequirements} from './ToolDefinition.js';
+
 export interface ToolEntry {
   /**
    * Path relative to src/tools/, using the emitted .js extension.
@@ -14,6 +16,7 @@ export interface ToolEntry {
    */
   handlerName: string;
   profile?: ToolProfile;
+  requirements?: ToolRuntimeRequirements;
 }
 
 export type ToolProfile = 'workflow' | 'full';

@@ -14,7 +14,7 @@ import {FILTERABLE_RESOURCE_TYPES} from './types.js';
 export const listNetworkRequests = defineTool({
   name: 'list_network_requests',
   description:
-    '列出当前选中页面自上次导航以来的所有请求。支持按资源类型、请求头关键字、分页过滤，以及等待匹配的请求。',
+    '列出当前选中页面自上次导航以来的请求。默认隐藏浏览器扩展请求；支持按资源类型、请求头关键字、分页过滤，以及等待匹配的请求。',
   annotations: {
     category: ToolCategory.NETWORK,
     readOnlyHint: true,
@@ -41,6 +41,11 @@ export const listNetworkRequests = defineTool({
       .default(false)
       .optional()
       .describe('设为 true 可返回最近 3 次导航期间保留的请求。'),
+    includeExtensionRequests: zod
+      .boolean()
+      .default(false)
+      .optional()
+      .describe('设为 true 可包含 chrome-extension:// 扩展请求。'),
     targetPageIdx: zod
       .number()
       .int()

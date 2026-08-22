@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -34,11 +35,11 @@ export const resizePage = defineTool({
         data: {width, height},
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `页面尺寸调整失败：${error instanceof Error ? error.message : String(error)}`,
-        tooltype,
-      });
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `页面尺寸调整失败：${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'resize_page', width, height},
+      );
     }
   },
 });

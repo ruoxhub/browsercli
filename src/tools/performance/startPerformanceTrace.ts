@@ -12,6 +12,7 @@ import {
   traceResultIsSuccess,
   getTraceSummary,
 } from '../../trace-processing/parse.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 import type {Response, Context} from '../ToolDefinition.js';
@@ -58,11 +59,11 @@ async function stopTracingAndAppendOutput(
       data: {traceSummary: traceSummaryText},
     });
   } else {
-    response.setStructuredContent({
-      success: false,
-      message: `Error parsing trace: ${result.error}`,
-      tooltype: 'start_performance_trace',
-    });
+    throw createToolError(
+      ErrorCodes.RUNTIME,
+      `Error parsing trace: ${result.error}`,
+      {toolName: 'start_performance_trace'},
+    );
   }
 
   context.setIsRunningPerformanceTrace(false);
@@ -87,26 +88,16 @@ export const startPerformanceTrace = defineTool({
     readOnlyHint: false,
   },
   schema: {
-    reload: zod
-      .boolean()
-      .describe(
-        '追踪启动后是否自动重新加载页面。',
-      ),
-    autoStop: zod
-      .boolean()
-      .describe(
-        '是否在 5 秒后自动停止追踪录制。',
-      ),
+    reload: zod.boolean().describe('追踪启动后是否自动重新加载页面。'),
+    autoStop: zod.boolean().describe('是否在 5 秒后自动停止追踪录制。'),
   },
   handler: async (request, response, context) => {
     if (context.isRunningPerformanceTrace()) {
-      response.setStructuredContent({
-        success: false,
-        message:
-          'Error: a performance trace is already running. Use stop_performance_trace to stop it. Only one trace can be running at any given time.',
-        tooltype: 'start_performance_trace',
-      });
-      return;
+      throw createToolError(
+        ErrorCodes.VALIDATION,
+        'Error: a performance trace is already running. Use stop_performance_trace to stop it. Only one trace can be running at any given time.',
+        {toolName: 'start_performance_trace'},
+      );
     }
     context.setIsRunningPerformanceTrace(true);
 

@@ -11,6 +11,7 @@ import type {
 } from '../../modules/stealth/StealthScripts2025.js';
 import {StealthScripts2025} from '../../modules/stealth/StealthScripts2025.js';
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -30,29 +31,29 @@ export const injectStealth = defineTool({
   },
   handler: async (request, response, context) => {
     const preset = request.params.preset as StealthPreset | undefined;
+    const page = context.getSelectedPage();
+    if (!page) {
+      throw createToolError(
+        ErrorCodes.PAGE_REQUIRED,
+        '未选中页面，请先使用 select_page 选择目标页面。',
+        {toolName: 'inject_stealth'},
+      );
+    }
     try {
-      const page = context.getSelectedPage();
-      if (!page) {
-        response.setStructuredContent({
-          success: false,
-          message: '未选中页面，请先使用 select_page 选择目标页面。',
-          tooltype: 'inject_stealth',
-        });
-        return;
-      }
       const report = await StealthScripts2025.injectAll(page, {preset});
+      const featureCount = report?.injectedFeatures?.length ?? 0;
       response.setStructuredContent({
         success: true,
-        message: `Stealth scripts injected: ${report.injectedFeatures.length} features`,
+        message: `Stealth scripts injected: ${featureCount} features`,
         tooltype: 'inject_stealth',
         data: report,
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `注入失败：${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'inject_stealth',
-      });
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `注入失败：${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'inject_stealth'},
+      );
     }
   },
 });
@@ -127,16 +128,15 @@ export const setUserAgent = defineTool({
   },
   handler: async (request, response, context) => {
     const {userAgent} = request.params;
+    const page = context.getSelectedPage();
+    if (!page) {
+      throw createToolError(
+        ErrorCodes.PAGE_REQUIRED,
+        '未选中页面，请先使用 select_page 选择目标页面。',
+        {toolName: 'set_user_agent'},
+      );
+    }
     try {
-      const page = context.getSelectedPage();
-      if (!page) {
-        response.setStructuredContent({
-          success: false,
-          message: '未选中页面，请先使用 select_page 选择目标页面。',
-          tooltype: 'set_user_agent',
-        });
-        return;
-      }
       const client = await page.context().newCDPSession(page);
       await client.send('Network.setUserAgentOverride', {userAgent});
       response.setStructuredContent({
@@ -146,11 +146,11 @@ export const setUserAgent = defineTool({
         data: {userAgent},
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `设置失败：${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'set_user_agent',
-      });
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `设置失败：${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'set_user_agent'},
+      );
     }
   },
 });

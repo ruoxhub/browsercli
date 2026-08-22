@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {errorMessage} from '../shared/pageResponse.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
@@ -35,13 +36,11 @@ export const removeHookBrowser = defineTool({
     const frame = (context as Context).getSelectedFrame();
 
     if (!hookId) {
-      response.setStructuredContent({
-        success: false,
-        message: 'hookId 参数不能为空',
-        tooltype: 'remove_hook_browser',
-        data: {hookId: ''},
-      });
-      return;
+      throw createToolError(
+        ErrorCodes.VALIDATION,
+        'hookId 参数不能为空',
+        {toolName: 'remove_hook_browser'},
+      );
     }
 
     const serializedHookId = JSON.stringify(hookId);
@@ -62,12 +61,11 @@ export const removeHookBrowser = defineTool({
         data: {hookId},
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `清理失败（页面可能已关闭）：${errorMessage(error)}`,
-        tooltype: 'remove_hook_browser',
-        data: {hookId},
-      });
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `清理失败（页面可能已关闭）：${errorMessage(error)}`,
+        {toolName: 'remove_hook_browser', hookId},
+      );
     }
   },
 });

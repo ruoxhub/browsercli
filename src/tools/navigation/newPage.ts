@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {
   type PreloadPreset,
@@ -85,12 +86,11 @@ export const newPage = defineTool({
         },
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `创建新页面失败：${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'new_page',
-        data: {},
-      });
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `创建新页面失败：${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'new_page', url},
+      );
     }
   },
 });

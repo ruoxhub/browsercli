@@ -12,12 +12,18 @@ import {describe, it, mock} from 'node:test';
 
 import type {Frame} from 'patchright';
 
+import type {ToolPrerequisiteChecker} from '../../../src/tools/prerequisites/ToolPrerequisiteChecker.js';
 import {
   ensureToolsMeta,
   getToolMeta,
   type ToolMeta,
 } from '../../../src/tools/tools-meta.js';
 import {ErrorCodes, ToolError} from '../../../src/utils/errors.js';
+import {PageHealthTracker} from '../../../src/worker/context/PageHealthTracker.js';
+import type {
+  DefineToolContextFactory,
+  ToolContextProvider,
+} from '../../../src/worker/ToolContext.js';
 import {
   ToolExecutionPipeline,
   ToolExecutionRouter,
@@ -58,8 +64,9 @@ function createPipeline(
       failures: unknown[];
     };
     recorder?: TestResultRecorder;
-    healthTracker?: import('../../../src/worker/context/PageHealthTracker.js').PageHealthTracker;
-    contextProvider?: import('../../../src/worker/ToolContext.js').ToolContextProvider;
+    healthTracker?: PageHealthTracker;
+    contextProvider?: ToolContextProvider;
+    prerequisiteChecker?: ToolPrerequisiteChecker;
   } = {},
 ) {
   const handler = options.handler ?? (async () => undefined);
@@ -93,7 +100,7 @@ function createPipeline(
       processor,
       telemetry,
       undefined,
-      undefined,
+      options.prerequisiteChecker,
       options.recorder as never,
       undefined,
       options.healthTracker,
@@ -133,15 +140,13 @@ describe('ToolExecutionPipeline', () => {
   });
 
   it('fails fast with PAGE_UNRESPONSIVE when page is marked UNRESPONSIVE', async () => {
-    const {PageHealthTracker} =
-      await import('../../../src/worker/context/PageHealthTracker.js');
     const healthTracker = new PageHealthTracker();
     healthTracker.markUnresponsive('page-dead-1', 'deadlock');
 
     const contextProvider = {
       getSelectedPage: () => ({}),
       getPageId: () => 'page-dead-1',
-    } as unknown as import('../../../src/worker/ToolContext.js').ToolContextProvider;
+    } as unknown as ToolContextProvider;
 
     const {pipeline} = createPipeline({
       healthTracker,
@@ -159,16 +164,14 @@ describe('ToolExecutionPipeline', () => {
     );
   });
 
-  it('allows recovery tools to run even when page is UNRESPONSIVE', async () => {
-    const {PageHealthTracker} =
-      await import('../../../src/worker/context/PageHealthTracker.js');
+  it('allows recovery tools with requirements.recovery = true to run even when page is UNRESPONSIVE', async () => {
     const healthTracker = new PageHealthTracker();
     healthTracker.markUnresponsive('page-dead-2', 'deadlock');
 
     const contextProvider = {
       getSelectedPage: () => ({}),
       getPageId: () => 'page-dead-2',
-    } as unknown as import('../../../src/worker/ToolContext.js').ToolContextProvider;
+    } as unknown as ToolContextProvider;
 
     const {pipeline} = createPipeline({
       healthTracker,
@@ -177,22 +180,23 @@ describe('ToolExecutionPipeline', () => {
     });
 
     const result = await pipeline.execute(
-      meta({name: 'check_browser_health'}),
+      meta({
+        name: 'check_browser_health',
+        requirements: {recovery: true},
+      }),
       {},
     );
     assert.deepStrictEqual(result, {structuredContent: {reloaded: true}});
   });
 
   it('resets page health after a recovery tool succeeds', async () => {
-    const {PageHealthTracker} =
-      await import('../../../src/worker/context/PageHealthTracker.js');
     const healthTracker = new PageHealthTracker();
     healthTracker.markUnresponsive('page-recovered-1', 'deadlock');
 
     const contextProvider = {
       getSelectedPage: () => ({}),
       getPageId: () => 'page-recovered-1',
-    } as unknown as import('../../../src/worker/ToolContext.js').ToolContextProvider;
+    } as unknown as ToolContextProvider;
 
     const {pipeline} = createPipeline({
       healthTracker,
@@ -200,7 +204,13 @@ describe('ToolExecutionPipeline', () => {
       result: {value: 'ok'},
     });
 
-    await pipeline.execute(meta({name: 'check_browser_health'}), {});
+    await pipeline.execute(
+      meta({
+        name: 'check_browser_health',
+        requirements: {recovery: true},
+      }),
+      {},
+    );
 
     assert.equal(healthTracker.isPageHealthy('page-recovered-1'), true);
     assert.equal(
@@ -209,9 +219,53 @@ describe('ToolExecutionPipeline', () => {
     );
   });
 
+  it('fails fast under 250ms with 0 handler calls when paused tool rejects', async () => {
+    let handlerExecuted = false;
+    const contextProvider = {
+      getSelectedPage: () => ({url: () => 'https://example.com'}),
+      getExistingDebuggerContext: () => ({
+        isPaused: () => true,
+        getPausedState: () => ({callFrames: []}),
+      }),
+    } as unknown as ToolContextProvider;
+
+    const {pipeline} = createPipeline({
+      contextProvider,
+      handler: async () => {
+        handlerExecuted = true;
+        return {ok: true};
+      },
+    });
+
+    const startedAt = performance.now();
+    await assert.rejects(
+      pipeline.execute(
+        meta({
+          name: 'click',
+          requirements: {
+            page: 'selected',
+            debugger: 'running',
+          },
+        }),
+        {},
+      ),
+      (error: unknown) => {
+        assert.ok(error instanceof ToolError);
+        assert.equal(error.code, ErrorCodes.DEBUGGER_PAUSED);
+        assert.equal(error.retryable, true);
+        assert.equal(error.recovery?.tool, 'resume');
+        return true;
+      },
+    );
+    const duration = performance.now() - startedAt;
+    assert.ok(
+      duration < 250,
+      `Expected fast fail under 250ms, took ${duration}ms`,
+    );
+    assert.strictEqual(handlerExecuted, false);
+  });
+
   it('records page timeout when frame evaluate times out via router', async () => {
-    const {PageHealthTracker} =
-      await import('../../../src/worker/context/PageHealthTracker.js');
     const {FRAME_EVALUATE_TIMEOUT} =
       await import('../../../src/worker/timeoutUtils.js');
 
@@ -226,17 +280,17 @@ describe('ToolExecutionPipeline', () => {
     };
     const rawFrame = {
       page: () => mockPage,
-      evaluate: () => new Promise(() => {}),
+      evaluate: () => new Promise<never>(() => undefined),
     } as unknown as Frame;
 
     const contextProvider = {
       getSelectedPage: () => null,
       getSelectedFrame: () => rawFrame,
       getPageId: () => 'page-timeout-1',
-    } as unknown as import('../../../src/worker/ToolContext.js').ToolContextProvider;
+    } as unknown as ToolContextProvider;
     const defineToolContextFactory = {
       create: () => ({}),
-    } as unknown as import('../../../src/worker/ToolContext.js').DefineToolContextFactory;
+    } as unknown as DefineToolContextFactory;
 
     const router = new ToolExecutionRouter(
       contextProvider,
@@ -279,6 +333,28 @@ describe('ToolExecutionPipeline', () => {
     );
     assert.strictEqual(telemetryState.successes.length, 0);
     assert.strictEqual(telemetryState.failures.length, 1);
+  });
+
+  it('validates arguments before checking prerequisites', async () => {
+    let prerequisiteChecked = false;
+    const {pipeline} = createPipeline({
+      prerequisiteChecker: {
+        check: () => {
+          prerequisiteChecked = true;
+        },
+      } as never,
+    });
+
+    await ensureToolsMeta();
+    const validationMeta = getToolMeta('recommend_next_step');
+    assert.ok(validationMeta, 'missing meta for recommend_next_step');
+
+    await assert.rejects(
+      pipeline.execute(validationMeta, {currentStage: 'INVALID'}),
+      (error: unknown) =>
+        error instanceof ToolError && error.code === ErrorCodes.VALIDATION,
+    );
+    assert.strictEqual(prerequisiteChecked, false);
   });
 
   it('execute throws NOT_FOUND when loader returns null', async () => {

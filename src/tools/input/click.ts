@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {
   browserTimeoutSchema,
@@ -25,6 +26,12 @@ export const click = defineTool({
     title: '点击元素',
     category: ToolCategory.NAVIGATION,
     readOnlyHint: false,
+    requirements: {
+      browser: 'connected',
+      page: 'selected',
+      frame: 'selected',
+      debugger: 'running',
+    },
   },
   schema: {
     selector: zod.string().describe('CSS 选择器。'),
@@ -39,12 +46,11 @@ export const click = defineTool({
     } = request.params;
 
     if (!selector) {
-      response.setStructuredContent({
-        success: false,
-        message: 'selector 参数不能为空',
-        tooltype: 'click',
-      });
-      return;
+      throw createToolError(
+        ErrorCodes.VALIDATION,
+        'selector 参数不能为空',
+        {toolName: 'click'},
+      );
     }
 
     const frame = (context as Context).getSelectedFrame();
@@ -67,12 +73,11 @@ export const click = defineTool({
         data: {selector, dblClick},
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: error instanceof Error ? error.message : String(error),
-        tooltype: 'click',
-        data: {selector, dblClick},
-      });
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        error instanceof Error ? error.message : String(error),
+        {toolName: 'click', selector, dblClick},
+      );
     }
   },
 });

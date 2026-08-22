@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 
@@ -31,16 +32,14 @@ export const unhookFunction = defineTool({
     const {hookId} = request.params;
 
     if (!hookId.trim()) {
-      response.setStructuredContent({
-        success: false,
-        message: 'hookId 参数不能为空。',
-        tooltype: 'unhook_function',
-        data: {},
-      });
-      return;
+      throw createToolError(
+        ErrorCodes.VALIDATION,
+        'hookId 参数不能为空。',
+        {toolName: 'unhook_function'},
+      );
     }
 
-    await evaluateAndRespond<{success: boolean; message?: string}>({
+    await evaluateAndRespond<{error?: string}>({
       context: context as Context,
       response,
       tooltype: 'unhook_function',
@@ -51,14 +50,14 @@ export const unhookFunction = defineTool({
 (function() {
   const hookId = ${JSON.stringify(hookId)};
   if (!window.__mcp_hooks__ || !window.__mcp_hooks__[hookId]) {
-    return { success: false, message: 'Hook not found: ' + hookId };
+    return { error: 'Hook not found: ' + hookId };
   }
 
   const { obj, methodName, original } = window.__mcp_hooks__[hookId];
   obj[methodName] = original;
   delete window.__mcp_hooks__[hookId];
 
-  return { success: true };
+  return {};
 })()
 `,
         ),
@@ -71,12 +70,11 @@ export const unhookFunction = defineTool({
         });
       },
       onEvaluateFail: () => {
-        response.setStructuredContent({
-          success: false,
-          message: 'Hook 移除失败',
-          tooltype: 'unhook_function',
-          data: {hookId},
-        });
+        throw createToolError(
+          ErrorCodes.NOT_FOUND,
+          `Hook not found: ${hookId}`,
+          {toolName: 'unhook_function', hookId},
+        );
       },
     });
   },

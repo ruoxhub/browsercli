@@ -7,6 +7,7 @@
 import {zod} from '../../third_party/index.js';
 import {getInsightOutput} from '../../trace-processing/parse.js';
 import type {InsightName} from '../../trace-processing/parse.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -21,8 +22,7 @@ import {defineTool} from '../ToolDefinition.js';
  */
 export const performanceAnalyzeInsight = defineTool({
   name: 'performance_analyze_insight',
-  description:
-    '针对追踪录制结果中高亮的某个性能 Insight 提供更详细的信息。',
+  description: '针对追踪录制结果中高亮的某个性能 Insight 提供更详细的信息。',
   annotations: {
     category: ToolCategory.PERFORMANCE,
     readOnlyHint: true,
@@ -37,13 +37,11 @@ export const performanceAnalyzeInsight = defineTool({
   handler: async (request, response, context) => {
     const lastRecording = context.recordedTraces().at(-1);
     if (!lastRecording) {
-      response.setStructuredContent({
-        success: false,
-        message:
-          'No recorded traces found. Record a performance trace so you have Insights to analyze.',
-        tooltype: 'performance_analyze_insight',
-      });
-      return;
+      throw createToolError(
+        ErrorCodes.NOT_FOUND,
+        'No recorded traces found. Record a performance trace so you have Insights to analyze.',
+        {toolName: 'performance_analyze_insight'},
+      );
     }
 
     const insightOutput = await getInsightOutput(
@@ -52,12 +50,9 @@ export const performanceAnalyzeInsight = defineTool({
       request.params.insightName as InsightName,
     );
     if ('error' in insightOutput) {
-      response.setStructuredContent({
-        success: false,
-        message: insightOutput.error,
-        tooltype: 'performance_analyze_insight',
+      throw createToolError(ErrorCodes.RUNTIME, insightOutput.error, {
+        toolName: 'performance_analyze_insight',
       });
-      return;
     }
 
     response.setStructuredContent({

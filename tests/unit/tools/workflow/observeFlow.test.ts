@@ -745,12 +745,11 @@ describe('observeFlow tool', () => {
       assert.strictEqual(result.data.url, 'https://example.com');
     });
 
-    it('returns error when url is missing', async () => {
-      const result = await observeFlow();
-
-      assert.strictEqual(result.success, false);
-      assert.strictEqual(result.tooltype, 'observe_flow');
-      assert.ok(result.error);
+    it('rejects when url is missing', async () => {
+      await assert.rejects(
+        () => observeFlow(),
+        (error: unknown) => error instanceof Error && /url/.test(error.message),
+      );
     });
     it('returns success result with report data', () => {
       const mockResult = {

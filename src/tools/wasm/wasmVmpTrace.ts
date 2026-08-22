@@ -6,6 +6,7 @@
 
 import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -24,10 +25,7 @@ export const wasmVmpTrace = defineTool({
       .positive()
       .optional()
       .describe('返回的最大事件数（默认 5000）'),
-    filterModule: zod
-      .string()
-      .optional()
-      .describe('按指定模块 ID 过滤事件'),
+    filterModule: zod.string().optional().describe('按指定模块 ID 过滤事件'),
   },
   handler: async (request, response) => {
     const {maxEvents = 5000, filterModule} = request.params;
@@ -59,11 +57,12 @@ export const wasmVmpTrace = defineTool({
         },
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `获取 VMP trace 失败：${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'wasm_vmp_trace',
-      });
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `获取 VMP trace 失败：${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'wasm_vmp_trace'},
+      );
     }
   },
 });

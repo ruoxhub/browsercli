@@ -32,6 +32,7 @@ import {
   xhrToJsBreakpoint,
 } from '../../../../src/tools/debugger/index.js';
 import type {ToolDefinition} from '../../../../src/tools/ToolDefinition.js';
+import {ToolError} from '../../../../src/utils/errors.js';
 
 // ─── 测试辅助函数 ──────────────────────────────────────────
 
@@ -479,17 +480,18 @@ describe('src/tools/debugger/index.ts', () => {
   it('set_breakpoint requires url or scriptId', async () => {
     const {context} = createRuntime();
 
-    const missingLines = await callTool(
-      setBreakpoint,
-      {
-        lineNumber: 31,
-      },
-      context,
+    await assert.rejects(
+      () =>
+        callTool(
+          setBreakpoint,
+          {
+            lineNumber: 31,
+          },
+          context,
+        ),
+      (error: unknown) =>
+        error instanceof ToolError && error.code === 'VALIDATION',
     );
-    const missingText = linesToText(missingLines);
-    const parsed = JSON.parse(missingText) as {success: boolean};
-
-    assert.equal(parsed.success, false);
   });
 
   it('supports pause-state, xhr, and trace operations', async () => {
@@ -564,15 +566,9 @@ describe('src/tools/debugger/index.ts', () => {
 
   it('trace_function uses setStructuredContent for empty target validation', async () => {
     const {context} = createRuntime();
-    let structuredContent: unknown = undefined;
-    let appendCalled = false;
     const response = {
-      appendResponseLine: () => {
-        appendCalled = true;
-      },
-      setStructuredContent: (value: unknown) => {
-        structuredContent = value;
-      },
+      appendResponseLine: () => {},
+      setStructuredContent: () => {},
       // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
       setIncludePages: () => {},
       // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
@@ -591,30 +587,16 @@ describe('src/tools/debugger/index.ts', () => {
       attachWebSocket: () => {},
     };
     const request = {params: {target: ''}};
-    await traceFunction.handler(
-      request as never,
-      response as never,
-      context as never,
+    await assert.rejects(
+      () =>
+        traceFunction.handler(
+          request as never,
+          response as never,
+          context as never,
+        ),
+      (error: unknown) =>
+        error instanceof ToolError && error.code === 'VALIDATION',
     );
-
-    assert.equal(
-      appendCalled,
-      false,
-      'appendResponseLine should NOT be called',
-    );
-    assert.notEqual(
-      structuredContent,
-      undefined,
-      'setStructuredContent should be called',
-    );
-    const content = structuredContent as {
-      success: boolean;
-      tooltype: string;
-      message: string;
-    };
-    assert.equal(content.success, false);
-    assert.equal(content.tooltype, 'trace_function');
-    assert.match(content.message, /target/);
   });
 
   it('trace_function uses setStructuredContent when debugger is not enabled', async () => {
@@ -627,15 +609,9 @@ describe('src/tools/debugger/index.ts', () => {
       return {...dc, isEnabled: () => false};
     };
 
-    let structuredContent: unknown = undefined;
-    let appendCalled = false;
     const response = {
-      appendResponseLine: () => {
-        appendCalled = true;
-      },
-      setStructuredContent: (value: unknown) => {
-        structuredContent = value;
-      },
+      appendResponseLine: () => {},
+      setStructuredContent: () => {},
       // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
       setIncludePages: () => {},
       // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
@@ -654,30 +630,16 @@ describe('src/tools/debugger/index.ts', () => {
       attachWebSocket: () => {},
     };
     const request = {params: {target: 'someFunction'}};
-    await traceFunction.handler(
-      request as never,
-      response as never,
-      context as never,
+    await assert.rejects(
+      () =>
+        traceFunction.handler(
+          request as never,
+          response as never,
+          context as never,
+        ),
+      (error: unknown) =>
+        error instanceof ToolError && error.code === 'PREREQUISITE',
     );
-
-    assert.equal(
-      appendCalled,
-      false,
-      'appendResponseLine should NOT be called',
-    );
-    assert.notEqual(
-      structuredContent,
-      undefined,
-      'setStructuredContent should be called',
-    );
-    const content = structuredContent as {
-      success: boolean;
-      tooltype: string;
-      message: string;
-    };
-    assert.equal(content.success, false);
-    assert.equal(content.tooltype, 'trace_function');
-    assert.match(content.message, /调试器未启用/);
   });
 
   it('get_script_source keeps url and emits pageId in the returned locator', async () => {
@@ -740,41 +702,39 @@ describe('src/tools/debugger/index.ts', () => {
       {scriptId: '2', url: 'https://example.com/dup.js'},
     ];
 
-    const content = await callToolContent<{
-      success: boolean;
-      message: string;
-      code: string;
-    }>(
-      getScriptSource,
-      {
-        locator: {url: 'https://example.com/dup.js'},
-      },
-      context,
+    await assert.rejects(
+      () =>
+        callToolContent(
+          getScriptSource,
+          {
+            locator: {url: 'https://example.com/dup.js'},
+          },
+          context,
+        ),
+      (error: unknown) =>
+        error instanceof ToolError &&
+        error.code === 'SCRIPT_LOCATOR_AMBIGUOUS' &&
+        /定位器匹配到 2 个候选/.test(error.message),
     );
-
-    assert.equal(content.success, false);
-    assert.equal(content.code, 'SCRIPT_LOCATOR_AMBIGUOUS');
-    assert.match(content.message, /定位器匹配到 2 个候选/);
   });
 
   it('get_script_source reports PAGE_NOT_FOUND for a closed pageId', async () => {
     const {context} = createRuntime();
 
-    const content = await callToolContent<{
-      success: boolean;
-      message: string;
-      code: string;
-    }>(
-      getScriptSource,
-      {
-        locator: {pageId: 'page-closed', url: 'https://example.com/app.js'},
-      },
-      context,
+    await assert.rejects(
+      () =>
+        callToolContent(
+          getScriptSource,
+          {
+            locator: {pageId: 'page-closed', url: 'https://example.com/app.js'},
+          },
+          context,
+        ),
+      (error: unknown) =>
+        error instanceof ToolError &&
+        error.code === 'PAGE_NOT_FOUND' &&
+        /已关闭或不存在/.test(error.message),
     );
-
-    assert.equal(content.success, false);
-    assert.equal(content.code, 'PAGE_NOT_FOUND');
-    assert.match(content.message, /已关闭或不存在/);
   });
 
   it('get_script_source keeps an empty inline URL in the locator (round-trip exact)', async () => {

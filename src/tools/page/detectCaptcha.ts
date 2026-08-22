@@ -6,6 +6,7 @@
 
 import {CaptchaDetector} from '../../modules/captcha/index.js';
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {normalizeBrowserRuntimeError} from '../shared/browserRuntime.js';
 import {sendJson} from '../shared/pageResponse.js';
@@ -52,12 +53,11 @@ export const detectCaptcha = defineTool({
     const {action, timeout} = request.params;
     const page = context.getSelectedPage();
     if (!page) {
-      sendJson(response, {
-        success: false,
-        message: '未选中页面，请先使用 select_page 选择目标页面。',
-        tooltype: 'detect_captcha',
-      });
-      return;
+      throw createToolError(
+        ErrorCodes.PAGE_REQUIRED,
+        '未选中页面，请先使用 select_page 选择目标页面。',
+        {toolName: 'detect_captcha'},
+      );
     }
     try {
       if (action === 'wait_for_clear') {
@@ -89,11 +89,11 @@ export const detectCaptcha = defineTool({
         data: {action, assessment},
       });
     } catch (error) {
-      sendJson(response, {
-        success: false,
-        message: safeCaptchaError(error),
-        tooltype: 'detect_captcha',
-      });
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        safeCaptchaError(error),
+        {toolName: 'detect_captcha'},
+      );
     }
   },
 });

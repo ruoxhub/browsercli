@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 
@@ -137,13 +138,11 @@ export const inspectObject = defineTool({
       );
 
       if (result && typeof result === 'object' && 'error' in result) {
-        response.setStructuredContent({
-          success: false,
-          message: (result as {error: string}).error,
-          tooltype: 'inspect_object',
-          data: {expression},
-        });
-        return;
+        throw createToolError(
+          ErrorCodes.RUNTIME,
+          (result as {error: string}).error,
+          {toolName: 'inspect_object', expression},
+        );
       }
 
       response.setStructuredContent({
@@ -156,12 +155,12 @@ export const inspectObject = defineTool({
         },
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `错误：${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'inspect_object',
-        data: {expression: request.params.expression},
-      });
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `错误：${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'inspect_object', expression: request.params.expression},
+      );
     }
   },
 });

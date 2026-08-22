@@ -10,7 +10,7 @@ import type {UnderstandCodeOptions} from '../../types/index.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
-import type {UnderstandCodeFnResult} from './types.js';
+import {executeAnalysis} from './analysisExecution.js';
 
 export const understandCode = defineTool({
   name: 'understand_code',
@@ -22,23 +22,31 @@ export const understandCode = defineTool({
     useAI: zod.boolean().optional(),
   },
   handler: async (request, response) => {
-    try {
-      const result = await getRuntime().analyzer.understand(
-        request.params as UnderstandCodeOptions,
-      );
-      response.setStructuredContent({
-        success: true,
-        message: 'Code analysis completed',
-        tooltype: 'understand',
-        data: result,
-      });
-    } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `Code analysis failed: ${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'understand',
-        data: {} as UnderstandCodeFnResult['data'],
-      });
-    }
+    const runtime = getRuntime();
+    const params = request.params as UnderstandCodeOptions;
+    const useAI = params.useAI ?? true;
+
+    const result = await executeAnalysis({
+      toolName: 'understand_code',
+      useAI,
+      localAnalysis: () =>
+        runtime.analyzer.understand({
+          ...params,
+          useAI: false,
+        }),
+      aiEnrichment: () =>
+        runtime.analyzer.understand({
+          ...params,
+          useAI: true,
+        }),
+    });
+
+    response.setStructuredContent({
+      success: true,
+      message: 'Code analysis completed',
+      tooltype: 'understand',
+      meta: result.meta,
+      data: result.data,
+    });
   },
 });

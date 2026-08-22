@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {
   browserTimeoutSchema,
@@ -43,12 +44,11 @@ export const fill = defineTool({
         async () => await fillElement(frame, selector, value, timeoutMs),
       );
       if (!found) {
-        response.setStructuredContent({
-          success: false,
-          message: `Element not found: ${selector}`,
-          tooltype: 'fill',
-        });
-        return;
+        throw createToolError(
+          ErrorCodes.NOT_FOUND,
+          `Element not found: ${selector}`,
+          {toolName: 'fill', selector},
+        );
       }
 
       response.setStructuredContent({
@@ -58,12 +58,12 @@ export const fill = defineTool({
         data: {selector, value, isSelect},
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: error instanceof Error ? error.message : String(error),
-        tooltype: 'fill',
-        data: {selector, value},
-      });
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        error instanceof Error ? error.message : String(error),
+        {toolName: 'fill', selector, value},
+      );
     }
   },
 });

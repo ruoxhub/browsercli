@@ -11,6 +11,7 @@ import {describe, it} from 'node:test';
 
 import {StealthScripts2025} from '../../../src/modules/stealth/StealthScripts2025.js';
 import {getRuntime} from '../../../src/runtime.js';
+import {ToolError} from '../../../src/utils/errors.js';
 import {
   analyze_target,
   deobfuscateCode,
@@ -144,13 +145,67 @@ interface StealthStaticHarness {
   getPresets: RuntimeMethod;
 }
 
+const mockFrame = {
+  evaluate: async (fnOrScript: unknown) => {
+    if (typeof fnOrScript === 'function') {
+      const fnStr = fnOrScript.toString();
+      if (fnStr.includes('__hookStore')) {
+        throw new Error('No in-page hook store');
+      }
+      return {
+        found: true,
+        nodeName: 'DIV',
+        elements: [{found: true, nodeName: 'SPAN'}],
+      };
+    }
+    if (typeof fnOrScript === 'string' && fnOrScript.includes('__hookStore')) {
+      throw new Error('No in-page hook store');
+    }
+    return {
+      found: true,
+      nodeName: 'DIV',
+      elements: [{found: true, nodeName: 'SPAN'}],
+    };
+  },
+};
+
+const defaultMockPage = {
+  setUserAgent: async () => undefined,
+  url: () => 'https://example.com/dashboard',
+  title: async () => 'Dashboard',
+  goto: async () => undefined,
+  click: async () => undefined,
+  type: async () => undefined,
+  waitForSelector: async () => ({}),
+  isClosed: () => false,
+  context: () => ({
+    cookies: async () => [],
+    clearCookies: async () => undefined,
+    addCookies: async () => undefined,
+    newCDPSession: async () => ({
+      send: async () => ({}),
+    }),
+  }),
+  evaluate: async () => undefined,
+  once: () => undefined,
+  on: () => undefined,
+  off: () => undefined,
+  removeListener: () => undefined,
+};
+
+const defaultTestContext = {
+  getSelectedFrame: () => mockFrame,
+  getSelectedPage: () => defaultMockPage,
+};
+
 const invokeTool = async (
   tool: ToolDefinitionHarness,
   params: Record<string, unknown>,
   response: ToolResponseHarness,
   runtime: RuntimeHarness,
+  context: object = defaultTestContext,
 ): Promise<void> => {
-  await tool.handler({params}, response, {}, runtime);
+  await tool.handler({params}, response, context, runtime);
 };
 
 function makeResponse(): ToolResponseHarness {
@@ -166,7 +221,11 @@ function makeResponse(): ToolResponseHarness {
     attachConsoleMessage: () => undefined,
     setIncludeWebSocketConnections: () => undefined,
     attachWebSocket: () => undefined,
-    setStructuredContent: () => undefined,
+    setStructuredContent: (payload?: unknown) => {
+      if (payload !== undefined) {
+        lines.push(JSON.stringify(payload));
+      }
+    },
   };
 }
 
@@ -247,8 +306,22 @@ describe('jshook tools handlers', () => {
       securityIssues: [],
     });
 
-    runtime.collector.collect = async () => ({files: [{url: 'a.js'}]});
-    runtime.collector.getFilesByPattern = () => [{url: 'b.js'}];
+    runtime.collector.collect = async () => ({
+      files: [
+        {url: 'a.js', content: 'const a = 1;', size: 10, type: 'external'},
+      ],
+      totalSize: 10,
+      collectTime: 1,
+    });
+    runtime.collector.getFilesByPattern = () => ({
+      files: [
+        {url: 'b.js', content: 'const b = 1;', size: 10, type: 'external'},
+      ],
+      totalSize: 10,
+      matched: 1,
+      returned: 1,
+      truncated: false,
+    });
     runtime.collector.getCollectedFilesSummary = () => [
       {url: 'b.js', size: 10, type: 'external'},
     ];
@@ -424,6 +497,12 @@ describe('jshook tools handlers', () => {
       setUserAgent: async () => undefined,
       url: () => 'https://example.com/dashboard',
       title: async () => 'Dashboard',
+      evaluate: async () => 2,
+      isClosed: () => false,
+      once: () => undefined,
+      on: () => undefined,
+      off: () => undefined,
+      removeListener: () => undefined,
     };
     runtime.pageController.getPage = async () => activePage;
     runtime.collector.getActivePage = async () => activePage;
@@ -514,7 +593,13 @@ describe('jshook tools handlers', () => {
         res,
         runtime,
       );
-      runtime.collector.collect = async () => ({files: [{url: 'a.js'}]});
+      runtime.collector.collect = async () => ({
+        files: [
+          {url: 'a.js', content: 'const a = 1;', size: 10, type: 'external'},
+        ],
+        totalSize: 10,
+        collectTime: 1,
+      });
       runtime.collector.getTopPriorityFiles = () => ({
         files: [],
         totalSize: 0,
@@ -607,6 +692,7 @@ describe('jshook tools handlers', () => {
         runtime,
       );
 
+      runtime.collector.collect = async () => ({files: [{url: 'a.js'}]});
       await invokeTool(
         collectCode as unknown as ToolDefinitionHarness,
         {url: 'https://example.com'},
@@ -718,7 +804,7 @@ describe('jshook tools handlers', () => {
       );
       await invokeTool(
         getHookData as unknown as ToolDefinitionHarness,
-        {hookId: 'h1'},
+        {hookId: 'h1', view: 'detail'},
         res,
         runtime,
       );
@@ -746,11 +832,16 @@ describe('jshook tools handlers', () => {
         res,
         runtime,
       );
-      await invokeTool(
-        removeHook as unknown as ToolDefinitionHarness,
-        {hookId: 'missing'},
-        res,
-        runtime,
+      await assert.rejects(
+        () =>
+          invokeTool(
+            removeHook as unknown as ToolDefinitionHarness,
+            {hookId: 'missing'},
+            res,
+            runtime,
+          ),
+        (err: unknown) =>
+          err instanceof ToolError && err.code === 'NOT_FOUND',
       );
 
       await invokeTool(
@@ -993,7 +1084,10 @@ describe('jshook tools handlers', () => {
       const falseNegativeHealth = res.lines
         .slice(falseNegativeHealthStart)
         .join('\n');
-      assert.ok(falseNegativeHealth.includes('"pageReady": true'));
+      assert.ok(
+        falseNegativeHealth.includes('"pageReady": true') ||
+          falseNegativeHealth.includes('"pageReady":true'),
+      );
       assert.ok(!falseNegativeHealth.includes('BROWSER_DISCONNECTED'));
       runtime.browserManager.getBrowser = () => ({isConnected: () => false});
       runtime.collector.getStatus = async () => ({
@@ -1036,17 +1130,24 @@ describe('jshook tools handlers', () => {
         runtime,
       );
 
-      // injectHook 现在对不存在的 hook 返回友好消息而不是抛错
-      await invokeTool(
-        injectHook as unknown as ToolDefinitionHarness,
-        {hookId: 'missing'},
-        res,
-        runtime,
+      await assert.rejects(
+        () =>
+          invokeTool(
+            injectHook as unknown as ToolDefinitionHarness,
+            {hookId: 'missing'},
+            res,
+            runtime,
+          ),
+        (err: unknown) => err instanceof ToolError,
       );
-      assert.ok(res.lines.some(line => line.includes('Hook 未找到')));
 
       assert.ok(res.lines.some(line => line.includes('Hook injected: h1')));
-      assert.ok(res.lines.some(line => line.includes('Element clicked.')));
+      assert.ok(
+        res.lines.some(
+          line =>
+            line.includes('Element clicked.') || line.includes('元素已点击'),
+        ),
+      );
       assert.ok(res.lines.some(line => line.includes('User-Agent updated.')));
       assert.ok(res.lines.some(line => line.includes('"signatureChain"')));
       assert.ok(res.lines.some(line => line.includes('"actionPlan"')));
@@ -1059,11 +1160,28 @@ describe('jshook tools handlers', () => {
       assert.ok(res.lines.some(line => line.includes('"overwritten"')));
       assert.ok(res.lines.some(line => line.includes('"remaining"')));
       assert.ok(res.lines.some(line => line.includes('"bodySnippet"')));
-      assert.ok(res.lines.some(line => line.includes('"encrypted": true')));
+      assert.ok(
+        res.lines.some(
+          line =>
+            line.includes('"encrypted": true') ||
+            line.includes('"encrypted":true'),
+        ),
+      );
       assert.ok(res.lines.some(line => line.includes('"cleanedExpired":')));
       assert.ok(res.lines.some(line => line.includes('hook-data-export')));
-      assert.ok(res.lines.some(line => line.includes('"method": "WS"')));
-      assert.ok(res.lines.some(line => line.includes('"type": "function"')));
+      assert.ok(
+        res.lines.some(
+          line =>
+            line.includes('"method": "WS"') || line.includes('"method":"WS"'),
+        ),
+      );
+      assert.ok(
+        res.lines.some(
+          line =>
+            line.includes('"type": "function"') ||
+            line.includes('"type":"function"'),
+        ),
+      );
     } finally {
       runtime.deobfuscator.deobfuscate = originals.deobfuscate;
       runtime.analyzer.understand = originals.understand;

@@ -7,6 +7,7 @@
 import type {RegisterPersistentHookResult} from '../../modules/hook/PersistentHookRegistry.js';
 import {zod} from '../../third_party/index.js';
 import type {BrowserContext} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {errorMessage} from '../shared/pageResponse.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
@@ -191,18 +192,21 @@ export const hookJsvmpInterpreter = defineTool({
         },
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `安装 JSVMP 探针失败：${errorMessage(error)}`,
-        tooltype: 'hook_jsvmp_interpreter',
-        data: {
-          status: 'error',
-          mode,
-          script_url: scriptUrl || '(all)',
-          persistent,
-          data_location: 'window.__mcp_jsvmp_log',
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `安装 JSVMP 探针失败：${errorMessage(error)}`,
+        {toolName: 'hook_jsvmp_interpreter'},
+        {
+          details: {
+            status: 'error',
+            mode,
+            script_url: scriptUrl || '(all)',
+            persistent,
+            data_location: 'window.__mcp_jsvmp_log',
+          },
         },
-      });
+      );
     }
   },
 });
@@ -348,12 +352,12 @@ export const compareEnv = defineTool({
         data,
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `浏览器环境采集失败：${errorMessage(error)}`,
-        tooltype: 'compare_env',
-        data: null,
-      });
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `浏览器环境采集失败：${errorMessage(error)}`,
+        {toolName: 'compare_env'},
+      );
     }
   },
 });

@@ -7,6 +7,7 @@
 import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
 import {mapIssueToMessageObject} from '../../utils/DevtoolsUtils.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -169,13 +170,11 @@ export const listConsoleMessages = defineTool({
       };
       response.setStructuredContent(result);
     } catch (error) {
-      result = {
-        success: false,
-        message: `List console messages failed: ${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'list_console_messages',
-        logFormat: 'json',
-        data: null,
-      };
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `List console messages failed: ${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'list_console_messages'},
+      );
     }
   },
 });

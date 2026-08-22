@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {NO_ACTIVE_PAGE_MESSAGE} from '../shared/activePageResolver.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
@@ -46,13 +47,11 @@ export const queryDom = defineTool({
     const frame = (context as Context).getSelectedFrame();
 
     if (!frame) {
-      response.setStructuredContent({
-        success: false,
-        message: NO_ACTIVE_PAGE_MESSAGE,
-        tooltype: 'query_dom',
-        data: null,
-      });
-      return;
+      throw createToolError(
+        ErrorCodes.FRAME_REQUIRED,
+        NO_ACTIVE_PAGE_MESSAGE,
+        {toolName: 'query_dom'},
+      );
     }
 
     try {
@@ -69,7 +68,7 @@ export const queryDom = defineTool({
 
       const element = await frame.evaluate(queryOneCode, selector);
       response.setStructuredContent({
-        success: element.found,
+        success: true,
         message: element.found
           ? `Found matching element: ${selector}`
           : `No matching element found: ${selector}`,
@@ -77,12 +76,11 @@ export const queryDom = defineTool({
         data: element.found ? element : null,
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `Query failed: ${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'query_dom',
-        data: null,
-      });
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `Query failed: ${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'query_dom', selector},
+      );
     }
   },
 });

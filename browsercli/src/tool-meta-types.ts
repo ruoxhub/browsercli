@@ -29,6 +29,16 @@ export interface ToolArgSpec {
 
 export type ToolArgSpecMap = Record<string, ToolArgSpec>;
 
+export interface ToolRuntimeRequirements {
+  browser?: 'connected';
+  page?: 'selected';
+  frame?: 'selected';
+  debugger?: 'available' | 'paused' | 'running';
+  ai?: 'optional' | 'required';
+  nativeTools?: string[];
+  recovery?: boolean;
+}
+
 export interface ToolMeta {
   name: string;
   description: string;
@@ -46,4 +56,5 @@ export interface ToolMeta {
   toolDependencies?: unknown;
   sceneKeywords?: string[];
   workflowRule?: unknown;
+  requirements?: ToolRuntimeRequirements;
 }

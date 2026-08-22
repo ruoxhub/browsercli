@@ -7,6 +7,7 @@
 import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
 import {TokenBudgetManager} from '../../utils/TokenBudgetManager.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -188,88 +189,88 @@ export const record_reverse_evidence = defineTool({
   },
   handler: async (request, response) => {
     try {
-    // Defensive normalization: entry may be undefined or non-object.
-    const rawEntry = request.params.entry;
-    const safeEntry: Record<string, unknown> =
-      rawEntry && typeof rawEntry === 'object' && !Array.isArray(rawEntry)
-        ? (rawEntry as Record<string, unknown>)
-        : {};
+      // Defensive normalization: entry may be undefined or non-object.
+      const rawEntry = request.params.entry;
+      const safeEntry: Record<string, unknown> =
+        rawEntry && typeof rawEntry === 'object' && !Array.isArray(rawEntry)
+          ? (rawEntry as Record<string, unknown>)
+          : {};
 
-    // Required-field fallback (zod.record introspection cannot enforce shape here).
-    const missing = getMissingEvidenceFields(request.params);
-    if (missing.length > 0) {
+      // Required-field fallback (zod.record introspection cannot enforce shape here).
+      const missing = getMissingEvidenceFields(request.params);
+      if (missing.length > 0) {
+        throw createToolError(
+          ErrorCodes.VALIDATION,
+          `缺少必填参数：${missing.join(', ')}`,
+          {toolName: 'record_reverse_evidence'},
+        );
+      }
+
+      const runtime = getRuntime();
+      const task = await runtime.reverseTaskStore.openTask({
+        taskId: request.params.taskId,
+        slug: request.params.taskSlug,
+        targetUrl: request.params.targetUrl,
+        goal: request.params.goal,
+      });
+      const targetContext = buildTargetContext(request.params);
+      const hasTargetContext = hasMeaningfulTargetContext(targetContext);
+
+      const artifactEntry = {
+        ...safeEntry,
+        ...(hasTargetContext ? {targetContext} : {}),
+      };
+
+      const channel = request.params.channel ?? NETWORK_CHANNEL;
+      await task.appendLog(channel, artifactEntry);
+
+      const mirroredChannels: string[] = [];
+      if (channel === NETWORK_CHANNEL) {
+        const mirroredNetworkEntry = toMirroredNetworkEntry(safeEntry);
+        if (mirroredNetworkEntry) {
+          await task.appendLog('network', mirroredNetworkEntry);
+          mirroredChannels.push('network');
+        }
+        const mirroredScriptEntry = toMirroredScriptEntry(safeEntry);
+        if (mirroredScriptEntry) {
+          await task.appendLog('scripts', mirroredScriptEntry);
+          mirroredChannels.push('scripts');
+        }
+      }
+
+      if (hasTargetContext) {
+        const existingTargetContext =
+          await runtime.reverseTaskStore.readSnapshot<Record<string, unknown>>(
+            request.params.taskId,
+            'target-context.json',
+          );
+        await task.writeSnapshot('target-context.json', {
+          ...existingTargetContext,
+          ...targetContext,
+        });
+      }
+
       response.setStructuredContent({
-        success: false,
-        message: `缺少必填参数：${missing.join(', ')}`,
+        success: true,
+        message: 'Evidence recorded',
         tooltype: 'record_reverse_evidence',
-        data: {ok: false, missing},
+        data: {
+          ok: true,
+          taskId: task.taskId,
+          taskDir: task.taskDir,
+          channel,
+          mirroredChannels,
+          entryProvided: rawEntry !== undefined,
+          targetContext: hasTargetContext ? targetContext : undefined,
+        },
       });
-      return;
-    }
-
-    const runtime = getRuntime();
-    const task = await runtime.reverseTaskStore.openTask({
-      taskId: request.params.taskId,
-      slug: request.params.taskSlug,
-      targetUrl: request.params.targetUrl,
-      goal: request.params.goal,
-    });
-    const targetContext = buildTargetContext(request.params);
-    const hasTargetContext = hasMeaningfulTargetContext(targetContext);
-
-    const artifactEntry = {
-      ...safeEntry,
-      ...(hasTargetContext ? {targetContext} : {}),
-    };
-
-    const channel = request.params.channel ?? NETWORK_CHANNEL;
-    await task.appendLog(channel, artifactEntry);
-
-    const mirroredChannels: string[] = [];
-    if (channel === NETWORK_CHANNEL) {
-      const mirroredNetworkEntry = toMirroredNetworkEntry(safeEntry);
-      if (mirroredNetworkEntry) {
-        await task.appendLog('network', mirroredNetworkEntry);
-        mirroredChannels.push('network');
-      }
-      const mirroredScriptEntry = toMirroredScriptEntry(safeEntry);
-      if (mirroredScriptEntry) {
-        await task.appendLog('scripts', mirroredScriptEntry);
-        mirroredChannels.push('scripts');
-      }
-    }
-
-    if (hasTargetContext) {
-      const existingTargetContext = await runtime.reverseTaskStore.readSnapshot<
-        Record<string, unknown>
-      >(request.params.taskId, 'target-context.json');
-      await task.writeSnapshot('target-context.json', {
-        ...existingTargetContext,
-        ...targetContext,
-      });
-    }
-
-    response.setStructuredContent({
-      success: true,
-      message: 'Evidence recorded',
-      tooltype: 'record_reverse_evidence',
-      data: {
-        ok: true,
-        taskId: task.taskId,
-        taskDir: task.taskDir,
-        channel,
-        mirroredChannels,
-        entryProvided: rawEntry !== undefined,
-        targetContext: hasTargetContext ? targetContext : undefined,
-      },
-    });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `记录证据失败：${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'record_reverse_evidence',
-        data: {ok: false},
-      });
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `记录证据失败：${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'record_reverse_evidence'},
+      );
     }
   },
 });
@@ -359,8 +360,9 @@ function toMarkdownReport(report: {
     maxTokens: number;
     usagePercent: number;
   };
+  hookData?: unknown;
 }): string {
-  return [
+  const sections = [
     '# Session Report',
     '',
     `Generated At: ${report.generatedAt}`,
@@ -377,5 +379,17 @@ function toMarkdownReport(report: {
     '## Token Budget',
     `- Used: ${report.tokenBudget.usedTokens}/${report.tokenBudget.maxTokens}`,
     `- Usage: ${report.tokenBudget.usagePercent.toFixed(2)}%`,
-  ].join('\n');
+  ];
+
+  if (report.hookData !== undefined) {
+    sections.push(
+      '',
+      '## Hook Data',
+      typeof report.hookData === 'string'
+        ? report.hookData
+        : JSON.stringify(report.hookData, null, 2),
+    );
+  }
+
+  return sections.join('\n');
 }

@@ -221,3 +221,6 @@ open-source
 
 # wiki
 wiki/
+
+# Local agent-tool state
+.pi-glla/

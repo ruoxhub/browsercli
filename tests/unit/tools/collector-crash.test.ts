@@ -85,7 +85,7 @@ describe('collect_code tool-layer error handling', () => {
 });
 
 describe('search_in_scripts tool-layer error handling', () => {
-  it('returns error with suggestion for INVALID_PATTERN', async () => {
+  it('rejects with a suggestion for INVALID_PATTERN', async () => {
     const stubRuntime = {
       collector: {
         getFilesByPattern: () => ({
@@ -101,17 +101,17 @@ describe('search_in_scripts tool-layer error handling', () => {
     } as any;
     setRuntime(stubRuntime);
 
-    const {response, getContent} = buildMockResponse();
+    const {response} = buildMockResponse();
     try {
-      await searchInScripts.handler(
-        {params: {pattern: '[invalid'}} as any,
-        response as any,
-        {} as any,
+      await assert.rejects(
+        searchInScripts.handler(
+          {params: {pattern: '[invalid'}} as any,
+          response as any,
+          {} as any,
+        ),
+        (error: unknown) =>
+          error instanceof Error && /正则/.test(error.message),
       );
-      const result = getContent();
-      assert.equal(result.success, false);
-      assert.ok(result.suggestion);
-      assert.match(result.suggestion, /正则/);
     } finally {
       setRuntime(undefined);
     }

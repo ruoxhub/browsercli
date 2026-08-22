@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {errorMessage} from '../shared/pageResponse.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
@@ -82,16 +83,11 @@ export const syncHookRecords = defineTool({
         },
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `同步失败：${errorMessage(error)}`,
-        tooltype: 'sync_hook_records',
-        data: {
-          syncedHookIds: [] as string[],
-          totalRecords: 0,
-          hooks: [] as unknown[],
-        },
-      });
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `同步失败：${errorMessage(error)}`,
+        {toolName: 'sync_hook_records'},
+      );
     }
   },
 });

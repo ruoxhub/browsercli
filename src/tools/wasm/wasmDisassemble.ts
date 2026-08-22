@@ -8,6 +8,7 @@ import {readFile, writeFile} from 'node:fs/promises';
 
 import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -21,10 +22,7 @@ export const wasmDisassemble = defineTool({
   },
   schema: {
     inputPath: zod.string().describe('要反汇编的 .wasm 文件路径'),
-    outputPath: zod
-      .string()
-      .optional()
-      .describe('.wat 文件的可选输出路径'),
+    outputPath: zod.string().optional().describe('.wat 文件的可选输出路径'),
     foldExprs: zod
       .boolean()
       .optional()
@@ -57,11 +55,12 @@ export const wasmDisassemble = defineTool({
         },
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `WASM 反汇编失败：${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'wasm_disassemble',
-      });
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `WASM 反汇编失败：${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'wasm_disassemble'},
+      );
     }
   },
 });

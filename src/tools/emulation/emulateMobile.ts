@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -98,12 +99,11 @@ export const emulateMobile = defineTool({
       if (enable) {
         const profile = DEVICE_PROFILES[deviceKey];
         if (!profile) {
-          response.setStructuredContent({
-            success: false,
-            message: `未知的设备类型：${device ?? ''}，支持：iphone, android, ipad`,
-            tooltype,
-          });
-          return;
+          throw createToolError(
+            ErrorCodes.VALIDATION,
+            `未知的设备类型：${device ?? ''}，支持：iphone, android, ipad`,
+            {toolName: 'emulate_mobile', device},
+          );
         }
 
         await page.setViewportSize({
@@ -148,11 +148,12 @@ export const emulateMobile = defineTool({
         tooltype,
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `移动设备模拟失败：${error instanceof Error ? error.message : String(error)}`,
-        tooltype,
-      });
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `移动设备模拟失败：${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'emulate_mobile'},
+      );
     }
   },
 });

@@ -6,6 +6,7 @@
 
 import {evaluateInPageRuntime} from '../../modules/debugger/evaluateInPageRuntime.js';
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {withOperationTimeout} from '../shared/browserRuntime.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
@@ -74,12 +75,11 @@ export const wasmMemoryInspect = defineTool({
     try {
       const page = context.getSelectedPage();
       if (!page) {
-        response.setStructuredContent({
-          success: false,
-          message: '没有选中的页面，请先选择一个页面',
-          tooltype: 'wasm_memory_inspect',
-        });
-        return;
+        throw createToolError(
+          ErrorCodes.PAGE_REQUIRED,
+          '没有选中的页面，请先选择一个页面',
+          {toolName: 'wasm_memory_inspect'},
+        );
       }
 
       const inspectMemory = ({
@@ -285,24 +285,24 @@ export const wasmMemoryInspect = defineTool({
       );
 
       if (!result.found) {
-        response.setStructuredContent({
-          success: false,
-          message: '当前页面未找到导出的 WebAssembly.Memory',
-          tooltype: 'wasm_memory_inspect',
-        });
-        return;
+        throw createToolError(
+          ErrorCodes.NOT_FOUND,
+          '当前页面未找到导出的 WebAssembly.Memory',
+          {toolName: 'wasm_memory_inspect'},
+        );
       }
       if (result.error) {
-        response.setStructuredContent({
-          success: false,
-          message: result.error,
-          tooltype: 'wasm_memory_inspect',
-          data: {
-            memories: result.memories,
-            memorySize: result.memorySize,
+        throw createToolError(
+          ErrorCodes.RUNTIME,
+          result.error,
+          {toolName: 'wasm_memory_inspect'},
+          {
+            details: {
+              memories: result.memories,
+              memorySize: result.memorySize,
+            },
           },
-        });
-        return;
+        );
       }
 
       response.setStructuredContent({
@@ -321,11 +321,12 @@ export const wasmMemoryInspect = defineTool({
         },
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `检查 WASM 内存失败：${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'wasm_memory_inspect',
-      });
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `检查 WASM 内存失败：${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'wasm_memory_inspect'},
+      );
     }
   },
 });

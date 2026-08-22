@@ -73,40 +73,41 @@ describe('target collector tools', () => {
 
   it('preserves structured recoverable errors and rejects missing context', async () => {
     const errorCapture = responseCapture();
-    await listTargets.handler(
-      {params: {}},
-      errorCapture.response as never,
-      {
-        getBrowserTargetInspector: () => ({
-          listTargets: async () => {
-            throw new ToolError(
-              'NOT_FOUND',
-              'gone；请重新调用 list_targets',
-              {targetId: 'gone', recoveryHint: 'list_targets'},
-              true,
-            );
-          },
-        }),
-      } as never,
+    await assert.rejects(
+      () =>
+        listTargets.handler(
+          {params: {}},
+          errorCapture.response as never,
+          {
+            getBrowserTargetInspector: () => ({
+              listTargets: async () => {
+                throw new ToolError(
+                  'NOT_FOUND',
+                  'gone；请重新调用 list_targets',
+                  {targetId: 'gone', recoveryHint: 'list_targets'},
+                  true,
+                );
+              },
+            }),
+          } as never,
+        ),
+      (err: unknown) =>
+        err instanceof ToolError &&
+        err.code === 'NOT_FOUND' &&
+        err.retryable === true,
     );
-    const error = (errorCapture.get().data as {error: Record<string, unknown>})
-      .error;
-    assert.equal(error.code, 'NOT_FOUND');
-    assert.equal(error.recoverable, true);
-    assert.deepEqual(error.context, {
-      targetId: 'gone',
-      recoveryHint: 'list_targets',
-    });
 
     const missingCapture = responseCapture();
-    await listTargets.handler(
-      {params: {}},
-      missingCapture.response as never,
-      {} as never,
-    );
-    assert.match(
-      String(missingCapture.get().message),
-      /BrowserTargetInspector/,
+    await assert.rejects(
+      () =>
+        listTargets.handler(
+          {params: {}},
+          missingCapture.response as never,
+          {} as never,
+        ),
+      (err: unknown) =>
+        err instanceof ToolError &&
+        /BrowserTargetInspector/.test(err.message),
     );
   });
 });

@@ -20,30 +20,23 @@ import type {Deobfuscator} from '../../modules/deobfuscator/Deobfuscator.js';
 import type {HookManager} from '../../modules/hook/HookManager.js';
 import type {Frame} from '../../third_party/index.js';
 import type {
-  DeobfuscateResult,
-  UnderstandCodeResult as UnderstandCodeResultType,
   CryptoAlgorithm,
   CryptoLibrary,
+  DeobfuscateResult,
+  UnderstandCodeResult as UnderstandCodeResultType,
 } from '../../types/index.js';
 import type {MessagesResult} from '../shared/types.js';
 
-/**
- * Analyzer 工具统一返回结构（兼容旧字段 logFormat）。
- *
- * 不携带 data 的基础类型；如需 data 字段，使用 MessagesResult<T>。
- */
+import type {AnalysisExecutionMeta} from './analysisExecution.js';
+
 export interface AnalyzerResult<T = unknown> extends MessagesResult<T> {
-  /** 使用的日志格式 */
   logFormat?: string;
+  meta?: AnalysisExecutionMeta;
 }
 
-/**
- * Analyzer 工具带数据的统一返回结构。
- * @deprecated 使用 AnalyzerResult<T> 即可，两者已统一。
- */
 export interface AnalyzerDataResult<T> extends MessagesResult<T> {
-  /** 使用的日志格式 */
   logFormat?: string;
+  meta?: AnalysisExecutionMeta;
 }
 
 export interface HookTimelineEntry {

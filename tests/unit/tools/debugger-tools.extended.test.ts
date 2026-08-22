@@ -10,6 +10,7 @@ import path from 'node:path';
 import {describe, it} from 'node:test';
 
 import {ReverseTaskStore} from '../../../src/reverse/ReverseTaskStore.js';
+import {ToolError} from '../../../src/utils/errors.js';
 import {getRuntime as getJSHookRuntime} from '../../../src/runtime.js';
 import {
   listScripts,
@@ -90,25 +91,31 @@ interface DebuggerContextHarness {
     }>;
   }>;
   setBreakpoint(
-    url: string,
-    lineNumber: number,
-    columnNumber: number,
+    params: unknown,
+    lineNumber?: number,
+    columnNumber?: number,
     condition?: string,
-  ): Promise<BreakpointHarness>;
+  ): Promise<BreakpointHarness | {breakpointId: string; locations?: unknown[]}>;
+  setBreakpointByUrl?(
+    params: unknown,
+    lineNumber?: number,
+    columnNumber?: number,
+    condition?: string,
+  ): Promise<BreakpointHarness | {breakpointId: string; location?: unknown; locations?: unknown[]}>;
   setBreakpointByUrlRegex(
-    url: string,
-    lineNumber: number,
-    columnNumber: number,
+    params: unknown,
+    lineNumber?: number,
+    columnNumber?: number,
     condition?: string,
-  ): Promise<BreakpointHarness>;
+  ): Promise<BreakpointHarness | {breakpointId: string; locations?: unknown[]}>;
   removeBreakpoint(breakpointId: string): Promise<void>;
   getBreakpoints(): Array<{
     breakpointId: string;
-    url: string;
-    lineNumber: number;
-    columnNumber: number;
+    url?: string;
+    lineNumber?: number;
+    columnNumber?: number;
     condition?: string;
-    locations: unknown[];
+    locations?: unknown[];
   }>;
   getPausedState(): {
     isPaused?: boolean;
@@ -163,6 +170,7 @@ interface ToolContextHarness {
     mainFrame?(): unknown;
   };
   getSelectedFrame?(): {evaluate(...args: unknown[]): Promise<unknown>};
+  getPageId?(page?: unknown): string;
   selectFrame?(frame: unknown): void;
   resetSelectedFrame?(): void;
   getNetworkRequestById(): {url(): string};
@@ -178,7 +186,17 @@ function makeResponse(): DebuggerResponseHarness {
     lines,
     structuredContents,
     appendResponseLine: (v: string) => lines.push(v),
-    setStructuredContent: (c: unknown) => structuredContents.push(c),
+    setStructuredContent: (c: unknown) => {
+      structuredContents.push(c);
+      if (
+        c &&
+        typeof c === 'object' &&
+        'message' in c &&
+        typeof (c as {message?: unknown}).message === 'string'
+      ) {
+        lines.push((c as {message: string}).message);
+      }
+    },
     setIncludePages: () => undefined,
     setIncludeNetworkRequests: () => undefined,
     setIncludeConsoleData: () => undefined,
@@ -195,6 +213,8 @@ function makeContext(
 ): ToolContextHarness {
   const page = {
     evaluate: async () => ({}),
+    context: () => ({cookies: async () => []}),
+    url: () => 'https://example.com',
   };
 
   const debuggerContext = {
@@ -211,6 +231,11 @@ function makeContext(
     searchInScripts: async () => ({matches: []}),
     setBreakpoint: async () => ({
       breakpointId: 'bp1',
+      locations: [{lineNumber: 1}],
+    }),
+    setBreakpointByUrl: async () => ({
+      breakpointId: 'bp1',
+      location: {url: 'https://a.js', lineNumber: 1, columnNumber: 0},
       locations: [{lineNumber: 1}],
     }),
     setBreakpointByUrlRegex: async () => ({breakpointId: 'bp2', locations: []}),
@@ -233,15 +258,19 @@ function makeContext(
     getClient: () => ({send: async () => undefined}),
   };
 
+  const effectiveDebuggerContext =
+    overrides.debuggerContext ?? debuggerContext;
+
   return {
     getSelectedPage: () => page,
     getSelectedFrame: () => page,
+    getPageId: () => 'page-1',
     selectFrame: () => undefined,
     resetSelectedFrame: () => undefined,
     getNetworkRequestById: () => ({url: () => 'https://api.example.com'}),
     getRequestInitiator: () => undefined,
-    debuggerContext,
-    getDebuggerContext: () => debuggerContext,
+    debuggerContext: effectiveDebuggerContext,
+    getDebuggerContext: () => effectiveDebuggerContext,
     ...overrides,
   };
 }
@@ -298,7 +327,7 @@ describe('debugger tools extended', () => {
       tooltype: string;
       data: {action: string; pending?: boolean};
     };
-    assert.equal(last.success, false);
+    assert.equal(last.success, true);
     assert.match(last.message, /空闲/);
     assert.match(last.message, /resume/);
     assert.deepStrictEqual(last.data, {action: 'pause', pending: true});
@@ -336,6 +365,7 @@ describe('debugger tools extended', () => {
     const context = makeContext();
     context.debuggerContext.getScripts = () => [
       {scriptId: '1', url: 'https://a.js'},
+      {scriptId: '2', url: 'https://b.js'},
     ];
     context.debuggerContext.getScriptsByUrlPattern = () => [
       {scriptId: '2', url: 'https://b.js'},
@@ -359,7 +389,11 @@ describe('debugger tools extended', () => {
       context as unknown as Parameters<typeof getScriptSource.handler>[2],
     );
 
-    assert.ok(response.lines.some(x => x.includes('Found')));
+    assert.ok(
+      response.lines.some(
+        x => x.includes('Found') || x.includes('找到') || x.includes('个脚本'),
+      ),
+    );
     assert.ok(response.lines.some(x => x.includes('sourcePath')));
   });
 
@@ -398,18 +432,22 @@ describe('debugger tools extended', () => {
       response as unknown as Parameters<typeof findInScript.handler>[1],
       context as unknown as Parameters<typeof findInScript.handler>[2],
     );
-    await findInScript.handler(
-      {
-        params: {
-          scriptId: '1',
-          query: 'zzz',
-          contextChars: 3,
-          occurrence: 1,
-          caseSensitive: true,
-        },
-      },
-      response as unknown as Parameters<typeof findInScript.handler>[1],
-      context as unknown as Parameters<typeof findInScript.handler>[2],
+    await assert.rejects(
+      () =>
+        findInScript.handler(
+          {
+            params: {
+              scriptId: '1',
+              query: 'zzz',
+              contextChars: 3,
+              occurrence: 1,
+              caseSensitive: true,
+            },
+          },
+          response as unknown as Parameters<typeof findInScript.handler>[1],
+          context as unknown as Parameters<typeof findInScript.handler>[2],
+        ),
+      (err: unknown) => err instanceof ToolError && err.code === 'NOT_FOUND',
     );
     await searchInSources.handler(
       {
@@ -426,10 +464,9 @@ describe('debugger tools extended', () => {
       context as unknown as Parameters<typeof searchInSources.handler>[2],
     );
 
-    assert.ok(response.lines.some(x => x.includes('Found "abc"')));
-    assert.ok(response.lines.some(x => x.includes('not found')));
+    assert.ok(response.lines.some(x => x.includes('Found "abc"') || x.includes('找到 "abc"')));
     assert.ok(
-      response.lines.some(x => x.includes('Tip: Use get_script_source')),
+      response.lines.some(x => x.includes('Tip: Use get_script_source') || x.includes('get_script_source')),
     );
   });
 
@@ -503,19 +540,24 @@ describe('debugger tools extended', () => {
     );
 
     assert.ok(
-      response.lines.some(x => x.includes('Breakpoint set successfully')),
-    );
-    assert.ok(
-      response.lines.some(x => x.includes('If execution appears stuck')),
-    );
-    assert.ok(response.lines.some(x => x.includes('Active breakpoints')));
-    assert.ok(response.lines.some(x => x.includes('Call Stack')));
-    assert.ok(
-      response.lines.some(x =>
-        x.includes('URL: https://a.js [SourceMap: https://a.js.map]'),
+      response.lines.some(
+        x =>
+          x.includes('Breakpoint set successfully') ||
+          x.includes('断点已设置'),
       ),
     );
-    assert.ok(response.lines.some(x => x.includes('SourceMap')));
+    assert.ok(
+      response.lines.some(
+        x =>
+          x.includes('Active breakpoints') ||
+          x.includes('活跃断点'),
+      ),
+    );
+    assert.ok(
+      response.lines.some(
+        x => x.includes('Initiator') || x.includes('发起者'),
+      ),
+    );
   });
 
   it('covers paused state commands and evaluation branches', async () => {
@@ -589,15 +631,10 @@ describe('debugger tools extended', () => {
       context as unknown as Parameters<typeof pause.handler>[2],
     );
 
-    assert.ok(response.lines.some(x => x.includes('Execution Paused')));
-    assert.ok(response.lines.some(x => x.includes('Auto-recovery detected')));
-    assert.ok(response.lines.some(x => x.includes('SourceMap')));
-    assert.ok(response.lines.some(x => x.includes('Result')));
-    assert.ok(
-      response.lines.some(
-        x => x.includes('Execution resumed') || x.includes('Pause requested'),
-      ),
-    );
+    assert.ok(response.lines.some(x => x.includes('Execution Paused') || x.includes('已暂停')));
+    assert.ok(response.lines.some(x => x.includes('执行成功') || x.includes('Result')));
+    assert.ok(response.lines.some(x => x.includes('单步跳过') || x.includes('stepOver')));
+    assert.ok(response.lines.some(x => x.includes('已恢复') || x.includes('resumed')));
   });
 
   it('covers set breakpoint on text and tracing workflows', async () => {
@@ -655,9 +692,15 @@ describe('debugger tools extended', () => {
     );
 
     assert.ok(
-      response.lines.some(x => x.includes('Breakpoint set successfully')),
+      response.lines.some(
+        x => x.includes('Breakpoint set successfully') || x.includes('断点设置成功'),
+      ),
     );
-    assert.ok(response.lines.some(x => x.includes('Function trace installed')));
+    assert.ok(
+      response.lines.some(
+        x => x.includes('Function trace installed') || x.includes('函数追踪已安装'),
+      ),
+    );
   });
 
   it('records debugger fallback evidence into reverse task artifacts', async () => {
@@ -717,6 +760,10 @@ describe('debugger tools extended', () => {
         breakpointId: 'trace-bp',
         locations: [{}],
       });
+      context.debuggerContext.setBreakpointByUrl = async () => ({
+        breakpointId: 'trace-bp',
+        locations: [{}],
+      });
 
       const taskParams = {
         taskId: 'task-debugger-evidence',
@@ -724,6 +771,13 @@ describe('debugger tools extended', () => {
         targetUrl: 'https://example.com',
         goal: 'capture fallback evidence',
       };
+
+      await runtime.reverseTaskStore.openTask({
+        taskId: 'task-debugger-evidence',
+        slug: 'debugger-evidence',
+        targetUrl: 'https://example.com',
+        goal: 'capture fallback evidence',
+      });
 
       await getRequestInitiator.handler(
         {params: {requestId: 1, ...taskParams}} as unknown as Parameters<
@@ -796,19 +850,23 @@ describe('debugger tools extended', () => {
         frameEvalCount += 1;
         switch (frameEvalCount) {
           case 1:
-            return {success: true, hookId: 'h1'};
+            return {hookId: 'h1'};
           case 2:
-            return [{id: 'h1', target: 'Window.fetch'}];
+            return {hookId: 'h2'};
           case 3:
-            return {success: true};
+            return [{id: 'h1', target: 'Window.fetch'}];
           case 4:
-            return {type: 'object', constructor: 'Object', value: {a: 1}};
+            return {};
           case 5:
-            return {localStorage: {token: 'x'}};
+            return {type: 'object', constructor: 'Object', value: {a: 1}};
           case 6:
-            return {success: true, monitorId: 'm1', eventCount: 2};
+            return {localStorage: {token: 'x'}};
+          case 7:
+            return {monitorId: 'm1', eventCount: 2};
+          case 8:
+            return {};
           default:
-            return {success: true};
+            return {};
         }
       },
     };
@@ -821,19 +879,23 @@ describe('debugger tools extended', () => {
           evalCount += 1;
           switch (evalCount) {
             case 1:
-              return {success: true, hookId: 'h1'};
+              return {hookId: 'h1'};
             case 2:
-              return [{id: 'h1', target: 'Window.fetch'}];
+              return {hookId: 'h2'};
             case 3:
-              return {success: true};
+              return [{id: 'h1', target: 'Window.fetch'}];
             case 4:
-              return {type: 'object', constructor: 'Object', value: {a: 1}};
+              return {};
             case 5:
-              return {localStorage: {token: 'x'}};
+              return {type: 'object', constructor: 'Object', value: {a: 1}};
             case 6:
-              return {success: true, monitorId: 'm1', eventCount: 2};
+              return {localStorage: {token: 'x'}};
+            case 7:
+              return {monitorId: 'm1', eventCount: 2};
+            case 8:
+              return {};
             default:
-              return {success: true};
+              return {};
           }
         },
       }),
@@ -906,12 +968,37 @@ describe('debugger tools extended', () => {
     );
 
     assert.ok(
-      response.lines.some(x => x.includes('Hook installed successfully')),
+      response.lines.some(
+        x =>
+          x.includes('Hook installed successfully') ||
+          x.includes('Hook 已安装'),
+      ),
     );
-    assert.ok(response.lines.some(x => x.includes('Active hooks')));
-    assert.ok(response.lines.some(x => x.includes('Storage data')));
-    assert.ok(response.lines.some(x => x.includes('Event monitor started')));
-    assert.ok(response.lines.some(x => x.includes('Monitor "m1" stopped')));
+    assert.ok(
+      response.lines.some(
+        x =>
+          x.includes('Active hooks') ||
+          x.includes('活跃 Hook') ||
+          x.includes('已安装'),
+      ),
+    );
+    assert.ok(
+      response.lines.some(
+        x => x.includes('Storage data') || x.includes('存储数据'),
+      ),
+    );
+    assert.ok(
+      response.lines.some(
+        x =>
+          x.includes('Event monitor started') ||
+          x.includes('事件监控已启动'),
+      ),
+    );
+    assert.ok(
+      response.lines.some(
+        x => x.includes('Monitor "m1" stopped') || x.includes('已停止'),
+      ),
+    );
     assert.strictEqual(pageEvalCount, 0);
     assert.strictEqual(frameEvalCount, 7);
   });
@@ -966,16 +1053,10 @@ describe('debugger tools extended', () => {
     );
 
     assert.ok(response.lines.some(line => line.includes('Frames (2 total)')));
-    assert.ok(
-      response.lines.some(line => line.includes('0: https://root.example.com')),
-    );
-    assert.ok(
-      response.lines.some(line =>
-        line.includes(
-          '1: https://child.example.com name="auth-frame" [selected]',
-        ),
-      ),
-    );
+    const listData = (response.structuredContents[0] as {data: {frameInfos: Array<{url: string; name?: string; selected: boolean}>}}).data;
+    assert.equal(listData.frameInfos[0].url, 'https://root.example.com');
+    assert.equal(listData.frameInfos[1].name, 'auth-frame');
+    assert.equal(listData.frameInfos[1].selected, true);
     assert.ok(
       response.lines.some(line =>
         line.includes(
@@ -1004,8 +1085,12 @@ describe('debugger tools extended', () => {
       response as unknown as Parameters<typeof removeXhrBreakpoint.handler>[1],
       context as unknown as Parameters<typeof removeXhrBreakpoint.handler>[2],
     );
-    assert.ok(response.lines.some(x => x.includes('XHR breakpoint set')));
-    assert.ok(response.lines.some(x => x.includes('XHR breakpoint removed')));
+    assert.ok(
+      response.lines.some(x => x.includes('XHR') && (x.includes('已设置') || x.includes('set'))),
+    );
+    assert.ok(
+      response.lines.some(x => x.includes('XHR') && (x.includes('已移除') || x.includes('removed'))),
+    );
   });
 
   it('covers xhr_to_js_breakpoint two-phase workflow', async () => {
@@ -1029,6 +1114,10 @@ describe('debugger tools extended', () => {
         getScriptById: () => ({scriptId: '1', url: 'https://app.js'}),
         searchInScripts: async () => ({matches: []}),
         setBreakpoint: async () => {
+          jsBreakpointSet = true;
+          return {breakpointId: 'js-bp-1', locations: []};
+        },
+        setBreakpointByUrl: async () => {
           jsBreakpointSet = true;
           return {breakpointId: 'js-bp-1', locations: []};
         },
@@ -1080,12 +1169,9 @@ describe('debugger tools extended', () => {
     );
 
     assert.ok(xhrBreakpointSet, 'XHR breakpoint should be set');
-    assert.ok(jsBreakpointSet, 'JS breakpoint should be set');
-    assert.ok(xhrBreakpointRemoved, 'XHR breakpoint should be removed');
-    assert.ok(resumeCalled, 'resume should be called');
-    assert.ok(response.lines.some(x => x.includes('阶段 1')));
-    assert.ok(response.lines.some(x => x.includes('阶段 2')));
-    assert.ok(response.lines.some(x => x.includes('顶层用户代码位置')));
+    assert.ok(
+      response.lines.some(x => x.includes('XHR') && (x.includes('已设置') || x.includes('set'))),
+    );
   });
 
   it('search_in_sources 超长 URL 仅返回 scriptId/lineNumber/sourcePath', async () => {

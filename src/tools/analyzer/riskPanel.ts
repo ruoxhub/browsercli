@@ -6,11 +6,12 @@
 
 import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
-import {withOperationTimeout} from '../shared/browserRuntime.js';
 import {defineTool} from '../ToolDefinition.js';
 
-import type {RiskPanelResult, RiskPanelData} from './types.js';
+import {executeAnalysis} from './analysisExecution.js';
+import type {RiskPanelResult} from './types.js';
 
 const RISK_PANEL_TIMEOUT_MS = 10_000;
 const DANGEROUS_ALGORITHMS = new Set(['md5', 'sha1', 'rc4', 'des']);
@@ -21,22 +22,6 @@ const HOOK_SIGNAL_WEIGHT = 2;
 const HOOK_SIGNAL_CAP = 10;
 const HIGH_RISK_THRESHOLD = 70;
 const MEDIUM_RISK_THRESHOLD = 40;
-
-function emptyRiskPanelData(): RiskPanelData {
-  return {
-    score: 0,
-    level: 'low',
-    factors: {
-      securityRisks: 0,
-      highSeverityRisks: 0,
-      cryptoAlgorithms: 0,
-      cryptoIssues: 0,
-      dangerousAlgorithms: [],
-      hookSignals: 0,
-    },
-    recommendations: [],
-  };
-}
 
 function getLevelForScore(score: number): 'high' | 'medium' | 'low' {
   if (score >= HIGH_RISK_THRESHOLD) return 'high';
@@ -90,14 +75,11 @@ export const riskPanel = defineTool({
   handler: async (request, response) => {
     const runtime = getRuntime();
     if (!runtime?.analyzer?.understand || !runtime?.cryptoDetector?.detect) {
-      response.setStructuredContent({
-        success: false,
-        message:
-          'risk_panel requires analyzer.understand and cryptoDetector.detect runtime services',
-        tooltype: 'riskPanel',
-        data: emptyRiskPanelData(),
-      });
-      return;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        'risk_panel requires analyzer.understand and cryptoDetector.detect runtime services',
+        {toolName: 'risk_panel'},
+      );
     }
 
     let code = request.params.code;
@@ -106,33 +88,46 @@ export const riskPanel = defineTool({
         request.params.topN ?? 5,
       );
       if (top.files.length === 0) {
-        response.setStructuredContent({
-          success: false,
-          message:
-            'No code provided and no collected files found. Run collect_code first.',
-          tooltype: 'riskPanel',
-          logFormat: 'json',
-          data: emptyRiskPanelData(),
-        });
-        return;
+        throw createToolError(
+          ErrorCodes.NOT_FOUND,
+          'No code provided and no collected files found. Run collect_code first.',
+          {toolName: 'risk_panel'},
+        );
       }
       code = top.files
         .map(file => `// ${file.url}\n${file.content}`)
         .join('\n\n');
     }
 
-    const [understand, crypto] = await withOperationTimeout(
-      Promise.all([
-        runtime.analyzer.understand({
-          code,
-          focus: 'security',
-          useAI: request.params.useAI,
-        }),
-        runtime.cryptoDetector.detect({code, useAI: request.params.useAI}),
-      ]),
-      'risk_panel 分析',
-      RISK_PANEL_TIMEOUT_MS,
-    );
+    const analysisResult = await executeAnalysis({
+      toolName: 'risk_panel',
+      useAI: request.params.useAI ?? true,
+      timeoutMs: RISK_PANEL_TIMEOUT_MS,
+      localAnalysis: async () => {
+        const [understand, crypto] = await Promise.all([
+          runtime.analyzer.understand({
+            code,
+            focus: 'security',
+            useAI: false,
+          }),
+          runtime.cryptoDetector.detect({code, useAI: false}),
+        ]);
+        return {understand, crypto};
+      },
+      aiEnrichment: async () => {
+        const [understand, crypto] = await Promise.all([
+          runtime.analyzer.understand({
+            code,
+            focus: 'security',
+            useAI: true,
+          }),
+          runtime.cryptoDetector.detect({code, useAI: true}),
+        ]);
+        return {understand, crypto};
+      },
+    });
+
+    const {understand, crypto} = analysisResult.data;
 
     const securityRisks = Array.isArray(understand.securityRisks)
       ? understand.securityRisks
@@ -172,6 +167,7 @@ export const riskPanel = defineTool({
       success: true,
       message: 'Risk panel analysis completed',
       tooltype: 'riskPanel',
+      meta: analysisResult.meta,
       data: {
         score,
         level: getLevelForScore(score),

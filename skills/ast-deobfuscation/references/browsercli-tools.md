@@ -37,7 +37,7 @@ browsercli call dump_target_scripts --targetId <target-id>
 
 ```bash
 browsercli call hook_function --target <function-path> --hookId <hook-id>
-browsercli call get_hook_data --hookId <hook-id> --view timeline
+browsercli call get_hook_data --hookId <hook-id> --view detail
 browsercli call list_network_requests --urlFilter <pattern>
 browsercli call get_request_initiator --requestId <request-id>
 ```

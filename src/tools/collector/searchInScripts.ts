@@ -6,6 +6,7 @@
 
 import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -41,24 +42,12 @@ export const searchInScripts = defineTool({
       );
 
       if (result.error) {
-        const suggestion =
-          result.error === 'INVALID_PATTERN'
-            ? '请检查正则表达式语法，确保 pattern 是有效的正则。'
-            : '请确认已先调用 collect_code 收集脚本，然后重试搜索。';
-        response.setStructuredContent({
-          success: false,
-          message: result.message ?? result.error,
-          suggestion,
-          tooltype: 'search_in_scripts',
-          data: {
-            files: [],
-            totalSize: 0,
-            matched: 0,
-            returned: 0,
-            truncated: false,
-          },
-        });
-        return;
+        const isPatternError = result.error === 'INVALID_PATTERN';
+        throw createToolError(
+          isPatternError ? ErrorCodes.VALIDATION : ErrorCodes.RUNTIME,
+          result.message ?? result.error,
+          {toolName: 'search_in_scripts', pattern: params.pattern},
+        );
       }
 
       const data: SearchInScriptsData = {
@@ -88,25 +77,14 @@ export const searchInScripts = defineTool({
 
       response.setStructuredContent(responseData);
     } catch (error) {
+      if (error && typeof error === 'object' && 'code' in error) throw error;
       const errorMsg = error instanceof Error ? error.message : String(error);
-      const suggestion = errorMsg.includes('INVALID_PATTERN')
-        ? '请检查正则表达式语法，确保 pattern 是有效的正则。'
-        : '请确认已先调用 collect_code 收集脚本，然后重试搜索。';
-      console.error('[searchInScripts] 搜索失败:', errorMsg);
-
-      response.setStructuredContent({
-        success: false,
-        message: `搜索失败：${errorMsg}`,
-        suggestion,
-        tooltype: 'search_in_scripts',
-        data: {
-          files: [],
-          totalSize: 0,
-          matched: 0,
-          returned: 0,
-          truncated: false,
-        },
-      });
+      const isPatternError = errorMsg.includes('INVALID_PATTERN');
+      throw createToolError(
+        isPatternError ? ErrorCodes.VALIDATION : ErrorCodes.RUNTIME,
+        `搜索失败：${errorMsg}`,
+        {toolName: 'search_in_scripts'},
+      );
     }
   },
 });

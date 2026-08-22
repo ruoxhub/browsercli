@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 
@@ -30,12 +31,11 @@ export const hover = defineTool({
     try {
       const element = await page.$(selector);
       if (!element) {
-        response.setStructuredContent({
-          success: false,
-          message: `Element not found: ${selector}`,
-          tooltype: 'hover',
-        });
-        return;
+        throw createToolError(
+          ErrorCodes.NOT_FOUND,
+          `Element not found: ${selector}`,
+          {toolName: 'hover', selector},
+        );
       }
 
       await element.hover();
@@ -46,12 +46,12 @@ export const hover = defineTool({
         data: {selector},
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: error instanceof Error ? error.message : String(error),
-        tooltype: 'hover',
-        data: {selector},
-      });
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        error instanceof Error ? error.message : String(error),
+        {toolName: 'hover', selector},
+      );
     }
   },
 });

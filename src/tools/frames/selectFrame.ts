@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -30,30 +31,26 @@ export const selectFrame = defineTool({
   handler: async (request, response, context) => {
     const {frameIdx} = request.params;
 
-    try {
-      // Context.getSelectedPage() 在未选中页面时返回 null（不抛异常），
-      // 这里统一归一化为 null 以给出友好的“无页面”提示。
-      const page = context.getSelectedPage();
-      if (!page) {
-        response.setStructuredContent({
-          success: false,
-          message: '没有可用的页面，请先导航到目标页面',
-          toolType: 'select_frame',
-          data: {},
-        });
-        return;
-      }
+    // Context.getSelectedPage() 在未选中页面时返回 null（不抛异常），
+    // 这里统一归一化为 null 以给出友好的“无页面”提示。
+    const page = context.getSelectedPage();
+    if (!page) {
+      throw createToolError(
+        ErrorCodes.PAGE_REQUIRED,
+        '没有可用的页面，请先导航到目标页面',
+        {toolName: 'select_frame'},
+      );
+    }
 
+    try {
       const frames = page.frames();
 
       if (frameIdx >= frames.length) {
-        response.setStructuredContent({
-          success: false,
-          message: `Invalid frame index ${frameIdx}. Use list_frames to see available frames (0-${frames.length - 1}).`,
-          toolType: 'select_frame',
-          data: {},
-        });
-        return;
+        throw createToolError(
+          ErrorCodes.VALIDATION,
+          `Invalid frame index ${frameIdx}. Use list_frames to see available frames (0-${frames.length - 1}).`,
+          {toolName: 'select_frame', frameIdx},
+        );
       }
 
       const frame = frames[frameIdx];
@@ -77,12 +74,12 @@ export const selectFrame = defineTool({
         data: {selectedIndex: frameIdx, selectedName: name},
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `选择 Frame 失败：${error instanceof Error ? error.message : String(error)}`,
-        toolType: 'select_frame',
-        data: {},
-      });
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `选择 Frame 失败：${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'select_frame', frameIdx},
+      );
     }
   },
 });

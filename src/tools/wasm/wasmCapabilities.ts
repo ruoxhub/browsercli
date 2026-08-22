@@ -5,6 +5,7 @@
  */
 
 import {getRuntime} from '../../runtime.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -63,11 +64,12 @@ export const wasmCapabilities = defineTool({
         } satisfies WasmCapabilitiesData,
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `检测 WASM 能力失败：${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'wasm_capabilities',
-      });
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `检测 WASM 能力失败：${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'wasm_capabilities'},
+      );
     }
   },
 });

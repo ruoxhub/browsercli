@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 
@@ -67,12 +68,11 @@ export const clickAt = defineTool({
         data: coords,
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: error instanceof Error ? error.message : String(error),
-        tooltype: 'click_at',
-        data: {x: 0, y: 0, tag: '', text: ''},
-      });
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        error instanceof Error ? error.message : String(error),
+        {toolName: 'click_at', selector},
+      );
     }
   },
 });

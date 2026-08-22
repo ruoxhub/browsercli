@@ -176,17 +176,28 @@ Format your response as JSON.`;
       };
     } catch (error) {
       logger.error('Failed to generate project summary:', error);
-
-      return {
-        totalFiles: files.length,
-        totalSize: files.reduce((sum, f) => sum + f.size, 0),
-        mainPurpose: 'Analysis failed',
-        architecture: 'Unknown',
-        technologies: [],
-        securityConcerns: [],
-        recommendations: [],
-      };
+      return this.basicProjectSummary(files);
     }
+  }
+
+  basicProjectSummary(files: CodeFile[]): {
+    totalFiles: number;
+    totalSize: number;
+    mainPurpose: string;
+    architecture: string;
+    technologies: string[];
+    securityConcerns: string[];
+    recommendations: string[];
+  } {
+    return {
+      totalFiles: files.length,
+      totalSize: files.reduce((sum, f) => sum + f.size, 0),
+      mainPurpose: 'Basic analysis (AI unavailable or timed out)',
+      architecture: 'Unknown',
+      technologies: [],
+      securityConcerns: [],
+      recommendations: [],
+    };
   }
 
   /**
@@ -254,10 +265,7 @@ Provide analysis in JSON format with the following structure:
     }
   }
 
-  /**
-   * 基础分析（降级方案）
-   */
-  private basicAnalysis(file: CodeFile): CodeSummary {
+  basicAnalysis(file: CodeFile): CodeSummary {
     const content = file.content;
     const lines = content.split('\n');
 

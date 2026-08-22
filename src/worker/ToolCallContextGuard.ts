@@ -60,7 +60,10 @@ export class ToolCallContextGuard {
         ? (target.structuredContent as Record<string, unknown>)
         : target;
 
-    if (this.consecutiveCount >= MAX_CONSECUTIVE_REPEATS) {
+    if (
+      toolName !== 'evaluate_script' &&
+      this.consecutiveCount >= MAX_CONSECUTIVE_REPEATS
+    ) {
       structured.repeatWarning = `Tool "${toolName}" was called ${this.consecutiveCount} times consecutively. Check whether a different observation or navigation tool is needed.`;
     }
 

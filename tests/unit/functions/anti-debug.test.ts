@@ -80,14 +80,14 @@ describe('anti-debug functions', () => {
       assert.ok(result.message.includes('Function'));
     });
 
-    it('应该在 evaluate 抛出错误时返回失败结果', async () => {
+    it('应该在 evaluate 抛出错误时抛出失败', async () => {
       const frame = createErrorFrame('注入失败');
 
-      const result = await bypassDebugger(frame);
-
-      assert.strictEqual(result.success, false);
-      assert.strictEqual(result.tooltype, 'bypass_debugger');
-      assert.ok(result.message.includes('注入失败'));
+      await assert.rejects(
+        () => bypassDebugger(frame),
+        (error: unknown) =>
+          error instanceof Error && /注入失败/.test(error.message),
+      );
     });
   });
 
@@ -125,13 +125,14 @@ describe('anti-debug functions', () => {
       assert.ok(result.message.includes('6'));
     });
 
-    it('应该在 evaluate 抛出错误时返回失败结果', async () => {
+    it('应该在 evaluate 抛出错误时抛出失败', async () => {
       const frame = createErrorFrame('Anti-debug 注入失败');
 
-      const result = await antiAntiDebug(frame, ['fixedWindowSize']);
-
-      assert.strictEqual(result.success, false);
-      assert.strictEqual(result.tooltype, 'anti_anti_debug');
+      await assert.rejects(
+        () => antiAntiDebug(frame, ['fixedWindowSize']),
+        (error: unknown) =>
+          error instanceof Error && /Anti-debug 注入失败/.test(error.message),
+      );
     });
   });
 });

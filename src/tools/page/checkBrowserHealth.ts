@@ -22,13 +22,27 @@ import type {HealthIssue} from './types.js';
 export const checkBrowserHealth = defineTool({
   name: 'check_browser_health',
   description: '检查浏览器连接健康状态与页面可用性。',
-  annotations: {category: ToolCategory.PAGES, readOnlyHint: true},
+  annotations: {
+    category: ToolCategory.PAGES,
+    readOnlyHint: true,
+    requirements: {
+      browser: 'connected',
+      recovery: true,
+    },
+  },
   schema: {},
   handler: async (_request, response, _context) => {
     const issues: HealthIssue[] = [];
-    let connected = getRuntime().contextProvider!.isBrowserConnected();
+    const runtime = getRuntime();
+    let connected =
+      runtime.contextProvider?.isBrowserConnected() ??
+      runtime.browserManager?.getBrowser()?.isConnected() ??
+      false;
     try {
-      const running = await getRuntime().contextProvider!.isCollectorRunning();
+      const running =
+        (await runtime.contextProvider?.isCollectorRunning()) ??
+        (await runtime.collector?.getStatus())?.running ??
+        false;
       connected = connected || running;
     } catch {
       // Fall through to page-level probes below.
@@ -38,16 +52,20 @@ export const checkBrowserHealth = defineTool({
     let url: string | null = null;
     let title: string | null = null;
     try {
-      const page = await getActivePageWithGuard(getRuntime().contextProvider!);
+      const page = runtime.contextProvider
+        ? await getActivePageWithGuard(runtime.contextProvider)
+        : await runtime.pageController.getPage();
       pageReady = true;
       connected = true;
       url = page.url();
       title = await withOperationTimeout(page.title(), '读取页面标题');
       await withOperationTimeout(page.evaluate('1+1'), '执行页面健康探针');
-      const pageId = getRuntime().contextProvider!.getPageId(page);
-      const {globalPageHealthTracker} =
-        await import('../../worker/context/PageHealthTracker.js');
-      globalPageHealthTracker.recordSuccess(pageId);
+      const pageId = runtime.contextProvider?.getPageId(page);
+      if (pageId) {
+        const {globalPageHealthTracker} =
+          await import('../../worker/context/PageHealthTracker.js');
+        globalPageHealthTracker.recordSuccess(pageId);
+      }
     } catch (error) {
       const message = normalizeBrowserRuntimeError(error);
       issues.push({

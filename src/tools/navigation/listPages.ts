@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {
   normalizeBrowserRuntimeError,
@@ -91,12 +92,11 @@ export const listPages = defineTool({
         data: data,
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `列出页面失败：${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'list_pages',
-        data: {},
-      });
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `列出页面失败：${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'list_pages'},
+      );
     }
   },
 });

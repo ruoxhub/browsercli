@@ -5,25 +5,24 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+import {createToolError, ErrorCodes, ToolError} from '../../utils/errors.js';
 import {type Context, type Response} from '../ToolDefinition.js';
 
 /**
- * 获取当前选中的 Frame，若不存在则输出错误响应并返回 null。
+ * 获取当前选中的 Frame，若不存在则抛出 ToolError。
  */
 export function getFrameOrRespond(
   context: Context,
-  response: Response,
+  _response: Response,
   tooltype: string,
-): Frame | null {
+): Frame {
   const frame = context.getSelectedFrame();
   if (!frame) {
-    response.setStructuredContent({
-      success: false,
-      message: '当前没有可用的页面或 Frame',
-      tooltype,
-      data: {},
-    });
-    return null;
+    throw createToolError(
+      ErrorCodes.FRAME_REQUIRED,
+      '当前没有可用的页面或 Frame',
+      {toolName: tooltype},
+    );
   }
   return frame;
 }
@@ -48,35 +47,29 @@ export async function evaluateAndRespond<T>(options: {
     options;
 
   const frame = getFrameOrRespond(context, response, tooltype);
-  if (!frame) return;
 
   try {
     const result = await evaluate(frame);
 
     if (result !== null && typeof result === 'object') {
-      const typed = result as unknown as {
-        success: boolean;
-        message?: string;
-      };
-      if (typed.success) {
-        onSuccess(result);
-      } else {
-        response.setStructuredContent({
-          success: false,
-          message: typed.message || '操作失败',
-          tooltype,
-          data: {},
-        });
+      const typed = result as Record<string, unknown>;
+      if (typed.error) {
+        throw createToolError(
+          ErrorCodes.RUNTIME,
+          String(typed.error) || '操作失败',
+          {toolName: tooltype},
+        );
       }
+      onSuccess(result);
     } else {
       onEvaluateFail(result);
     }
   } catch (error) {
-    response.setStructuredContent({
-      success: false,
-      message: `错误：${error instanceof Error ? error.message : String(error)}`,
-      tooltype,
-      data: {},
-    });
+    if (error instanceof ToolError) throw error;
+    throw createToolError(
+      ErrorCodes.RUNTIME,
+      `错误：${error instanceof Error ? error.message : String(error)}`,
+      {toolName: tooltype},
+    );
   }
 }

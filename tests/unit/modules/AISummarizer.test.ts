@@ -91,6 +91,9 @@ describe('AISummarizer', () => {
       llm as unknown as ConstructorParameters<typeof AISummarizer>[0],
     );
     const project = await s.summarizeProject([file]);
-    assert.strictEqual(project.mainPurpose, 'Analysis failed');
+    assert.strictEqual(
+      project.mainPurpose,
+      'Basic analysis (AI unavailable or timed out)',
+    );
   });
 });

@@ -14,6 +14,7 @@ import {
   listPersistentHooks,
 } from '../../../../src/tools/hook/InjectHook.js';
 import type {Context} from '../../../../src/tools/ToolDefinition.js';
+import {ToolError} from '../../../../src/utils/errors.js';
 
 function responseHarness() {
   let content: any;
@@ -134,13 +135,17 @@ describe('inject_hook persistent mode', () => {
   it('fails without a BrowserContext and does not fall back to evaluate', async () => {
     const harness = contextHarness({browserContext: false});
     const output = responseHarness();
-    await injectHook.handler(
-      {params: {hookId: 'persist', script: 'hook();', persistent: true}},
-      output.response,
-      harness.context,
+    await assert.rejects(
+      () =>
+        injectHook.handler(
+          {params: {hookId: 'persist', script: 'hook();', persistent: true}},
+          output.response,
+          harness.context,
+        ),
+      (error: unknown) =>
+        error instanceof ToolError && error.code === 'BROWSER_REQUIRED',
     );
 
-    assert.equal(output.content.success, false);
     assert.equal(harness.frameScripts.length, 0);
     assert.equal(harness.registerRequests.length, 0);
   });
@@ -151,14 +156,17 @@ describe('inject_hook persistent mode', () => {
       throw new Error('conflict');
     };
     const output = responseHarness();
-    await injectHook.handler(
-      {params: {hookId: 'persist', script: 'hook();', persistent: true}},
-      output.response,
-      harness.context,
+    await assert.rejects(
+      () =>
+        injectHook.handler(
+          {params: {hookId: 'persist', script: 'hook();', persistent: true}},
+          output.response,
+          harness.context,
+        ),
+      (error: unknown) =>
+        error instanceof ToolError && /conflict/.test(error.message),
     );
 
-    assert.equal(output.content.success, false);
-    assert.match(output.content.message, /conflict/);
     assert.equal(harness.frameScripts.length, 0);
   });
 

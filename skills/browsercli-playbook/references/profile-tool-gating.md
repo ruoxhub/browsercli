@@ -25,7 +25,7 @@ JS_REVERSE_TOOL_PROFILE=full     browsercli start
 ### CLI 单次调用
 
 ```bash
-JS_REVERSE_TOOL_PROFILE=workflow browsercli call list-tools
+JS_REVERSE_TOOL_PROFILE=workflow browsercli list-tools
 ```
 
 ## 切换决策

@@ -1,4 +1,4 @@
-import {ErrorCodes, formatError} from '../../utils/errors.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -10,7 +10,11 @@ export const listTargets = defineTool({
   handler: async (_request, response, context) => {
     try {
       if (typeof context.getBrowserTargetInspector !== 'function') {
-        throw new Error('当前工具运行时未提供 BrowserTargetInspector 上下文');
+        throw createToolError(
+          ErrorCodes.RUNTIME,
+          '当前工具运行时未提供 BrowserTargetInspector 上下文',
+          {toolName: 'list_targets'},
+        );
       }
       const targets = await context.getBrowserTargetInspector().listTargets();
       response.setStructuredContent({
@@ -20,13 +24,12 @@ export const listTargets = defineTool({
         data: {targets},
       });
     } catch (error) {
-      const formatted = formatError(error, ErrorCodes.RUNTIME);
-      response.setStructuredContent({
-        success: false,
-        message: formatted.message,
-        tooltype: 'list_targets',
-        data: {error: formatted},
-      });
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        error instanceof Error ? error.message : String(error),
+        {toolName: 'list_targets'},
+      );
     }
   },
 });

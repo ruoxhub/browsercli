@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {parseKey} from '../../utils/keyboard.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
@@ -48,12 +49,11 @@ export const pressKey = defineTool({
         data: {key, mainKey, modifiers},
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: error instanceof Error ? error.message : String(error),
-        tooltype: 'press_key',
-        data: {key},
-      });
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        error instanceof Error ? error.message : String(error),
+        {toolName: 'press_key', key},
+      );
     }
   },
 });

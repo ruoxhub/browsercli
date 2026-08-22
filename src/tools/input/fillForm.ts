@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {
   browserTimeoutSchema,
@@ -44,12 +45,11 @@ export const fillForm = defineTool({
     const frame = (context as Context).getSelectedFrame();
 
     if (!Array.isArray(elements) || elements.length === 0) {
-      response.setStructuredContent({
-        success: false,
-        message: 'fill_form requires a non-empty "elements" array',
-        tooltype: 'fill_form',
-      });
-      return;
+      throw createToolError(
+        ErrorCodes.VALIDATION,
+        'fill_form requires a non-empty "elements" array',
+        {toolName: 'fill_form'},
+      );
     }
 
     const total = elements.length;
@@ -75,12 +75,11 @@ export const fillForm = defineTool({
         data: {filled, total, elements},
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: error instanceof Error ? error.message : String(error),
-        tooltype: 'fill_form',
-        data: {filled, total},
-      });
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        error instanceof Error ? error.message : String(error),
+        {toolName: 'fill_form', filled, total},
+      );
     }
   },
 });

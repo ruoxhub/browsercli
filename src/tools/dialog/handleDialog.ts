@@ -7,6 +7,7 @@
 import type {Dialog} from 'patchright';
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 
@@ -62,26 +63,20 @@ export const handleDialog = defineTool({
 
     const page = context.getSelectedPage();
     if (!page) {
-      response.setStructuredContent({
-        success: false,
-        message:
-          'No active page available. Open a page first before handling dialogs.',
-        tooltype,
-        data: {},
-      });
-      return;
+      throw createToolError(
+        ErrorCodes.PAGE_REQUIRED,
+        'No active page available. Open a page first before handling dialogs.',
+        {toolName: 'handle_dialog'},
+      );
     }
 
     const dialog = await waitForDialog(page);
     if (!dialog) {
-      response.setStructuredContent({
-        success: false,
-        message:
-          'No open dialog found. Use an action that triggers a dialog first, then call this function.',
-        tooltype,
-        data: {},
-      });
-      return;
+      throw createToolError(
+        ErrorCodes.NOT_FOUND,
+        'No open dialog found. Use an action that triggers a dialog first, then call this function.',
+        {toolName: 'handle_dialog'},
+      );
     }
 
     try {
@@ -112,12 +107,11 @@ export const handleDialog = defineTool({
         },
       });
     } catch {
-      response.setStructuredContent({
-        success: false,
-        message: 'Dialog may have already been handled externally',
-        tooltype,
-        data: {},
-      });
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        'Dialog may have already been handled externally',
+        {toolName: 'handle_dialog', action},
+      );
     }
   },
 });

@@ -89,4 +89,41 @@ describe('ToolRegistry', () => {
     const tools = registry.listTools();
     assert.strictEqual(tools[0].profile, 'workflow'); // 默认回退为 'workflow'
   });
+
+  it('preserves requirements from manifest tool entries', () => {
+    const mockManifests: DomainManifest[] = [
+      {
+        name: 'sample_domain',
+        description: 'sample',
+        profile: 'workflow',
+        tools: [
+          {
+            modulePath: './click.js',
+            handlerName: 'click',
+            requirements: {
+              browser: 'connected',
+              page: 'selected',
+              frame: 'selected',
+              debugger: 'running',
+            },
+          },
+          {
+            modulePath: './no_req.js',
+            handlerName: 'noReq',
+          },
+        ],
+      },
+    ];
+
+    const registry = new ToolRegistry(mockManifests);
+    const tools = registry.listTools('full');
+
+    assert.deepStrictEqual(tools[0].requirements, {
+      browser: 'connected',
+      page: 'selected',
+      frame: 'selected',
+      debugger: 'running',
+    });
+    assert.strictEqual(tools[1].requirements, undefined);
+  });
 });

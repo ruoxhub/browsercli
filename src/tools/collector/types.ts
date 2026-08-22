@@ -117,6 +117,7 @@ export interface CollectCodeData {
   totalSize?: number;
   /** 收集的文件数量 */
   count?: number;
+  totalFiles?: number;
   /** 是否被截断 */
   truncated?: boolean;
   /** 返回模式 */

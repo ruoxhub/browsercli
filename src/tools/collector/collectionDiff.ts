@@ -6,6 +6,7 @@
 
 import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -79,24 +80,11 @@ export const collectionDiff = defineTool({
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.error('[collectionDiff] 对比失败:', errorMsg);
-
-      const errorResult = {
-        success: false,
-        message: `对比失败：${errorMsg}`,
-        tooltype: 'collection_diff',
-        logFormat: 'json',
-        data: {
-          previousCount: 0,
-          currentCount: 0,
-          addedCount: 0,
-          removedCount: 0,
-          changedCount: 0,
-          added: [],
-          removed: [],
-          changed: [],
-        },
-      };
-      response.setStructuredContent(errorResult);
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `对比失败：${errorMsg}`,
+        {toolName: 'collection_diff'},
+      );
     }
   },
 });

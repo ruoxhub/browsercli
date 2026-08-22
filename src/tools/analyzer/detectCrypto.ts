@@ -6,6 +6,7 @@
 
 import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -37,18 +38,12 @@ export const detectCrypto = defineTool({
         },
       });
     } catch (error) {
-      response.setStructuredContent<DetectCryptoFnResult>({
-        success: false,
-        message: `Crypto detection failed: ${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'detectCrypto',
-        data: {
-          algorithms: [],
-          libraries: [],
-          confidence: 0,
-          securityIssues: [],
-          strength: undefined,
-        },
-      });
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `Crypto detection failed: ${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'detect_crypto'},
+      );
     }
   },
 });

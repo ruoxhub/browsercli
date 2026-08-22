@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -13,8 +14,7 @@ import {defineTool} from '../ToolDefinition.js';
  */
 export const hookJSEncrypt = defineTool({
   name: 'hook_jsencrypt',
-  description:
-    'Hook JSEncrypt RSA 加密库：拦截公钥/私钥、明文、密文。',
+  description: 'Hook JSEncrypt RSA 加密库：拦截公钥/私钥、明文、密文。',
   annotations: {
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: false,
@@ -92,12 +92,12 @@ export const hookJSEncrypt = defineTool({
         data: {},
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `错误：${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'hook_jsencrypt',
-        data: {},
-      });
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `错误：${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'hook_jsencrypt'},
+      );
     }
   },
 });

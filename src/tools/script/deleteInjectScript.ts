@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {getInjectConfigStore} from './createInjectScript.js';
 import type {DeleteInjectScriptResult} from './types.js';
 
@@ -20,13 +21,11 @@ export function deleteInjectScript(id: string): DeleteInjectScriptResult {
   const config = injectConfigs.get(id);
 
   if (!config) {
-    return {
-      success: false,
-      message: `未找到 ID 为 "${id}" 的注入脚本`,
-      tooltype: 'delete_inject_script',
-      logFormat: 'json',
-      data: undefined as any,
-    };
+    throw createToolError(
+      ErrorCodes.NOT_FOUND,
+      `未找到 ID 为 "${id}" 的注入脚本`,
+      {toolName: 'delete_inject_script', id},
+    );
   }
 
   const name = config.name;

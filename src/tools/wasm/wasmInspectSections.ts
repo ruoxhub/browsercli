@@ -8,6 +8,7 @@ import {readFile} from 'node:fs/promises';
 
 import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -29,10 +30,7 @@ export const wasmInspectSections = defineTool({
       .boolean()
       .optional()
       .describe('在输出中包含函数签名'),
-    includeStringScan: zod
-      .boolean()
-      .optional()
-      .describe('扫描内嵌字符串'),
+    includeStringScan: zod.boolean().optional().describe('扫描内嵌字符串'),
     maskSensitiveStrings: zod
       .boolean()
       .optional()
@@ -85,11 +83,12 @@ export const wasmInspectSections = defineTool({
         },
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `WASM section 检查失败：${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'wasm_inspect_sections',
-      });
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `WASM section 检查失败：${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'wasm_inspect_sections'},
+      );
     }
   },
 });

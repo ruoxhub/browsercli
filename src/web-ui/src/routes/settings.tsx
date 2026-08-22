@@ -551,33 +551,35 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <button
-          onClick={handleSaveLlm}
-          disabled={saving === 'llm'}
-          className="px-4 py-2 text-xs font-medium rounded-lg bg-[var(--color-bg-tertiary)] border border-[var(--color-border-default)] text-[var(--color-text-primary)] hover:bg-[var(--color-bg-secondary)] active:scale-95 transition-all flex items-center gap-2 disabled:opacity-50"
-        >
-          <Save size={12} />
-          {saving === 'llm' ? '保存中...' : '保存 LLM 配置'}
-        </button>
-        <button
-          onClick={handleTestLlm}
-          disabled={saving === 'test-llm'}
-          className="px-4 py-2 text-xs font-medium rounded-lg bg-[var(--color-accent)] text-[var(--color-bg-primary)] hover:opacity-90 active:scale-95 transition-all flex items-center gap-2 disabled:opacity-50"
-        >
-          <Activity size={12} />
-          {saving === 'test-llm' ? '测试中...' : '测试连接'}
-        </button>
-        {llmTest && (
-          <span
-            className={`text-xs ${
-              llmTest.ok
-                ? 'text-[var(--color-status-green)]'
-                : 'text-[var(--color-status-red)]'
-            }`}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleSaveLlm}
+            disabled={saving === 'llm'}
+            className="px-4 py-2 text-xs font-medium rounded-lg bg-[var(--color-bg-tertiary)] border border-[var(--color-border-default)] text-[var(--color-text-primary)] hover:bg-[var(--color-bg-secondary)] active:scale-95 transition-all flex items-center gap-2 disabled:opacity-50"
           >
-            {llmTest.message}
-          </span>
-        )}
+            <Save size={12} />
+            {saving === 'llm' ? '保存中...' : '保存 LLM 配置'}
+          </button>
+          <button
+            onClick={handleTestLlm}
+            disabled={saving === 'test-llm'}
+            className="px-4 py-2 text-xs font-medium rounded-lg bg-[var(--color-accent)] text-[var(--color-bg-primary)] hover:opacity-90 active:scale-95 transition-all flex items-center gap-2 disabled:opacity-50"
+          >
+            <Activity size={12} />
+            {saving === 'test-llm' ? '测试中...' : '测试连接'}
+          </button>
+          {llmTest && (
+            <span
+              className={`text-xs ${
+                llmTest.ok
+                  ? 'text-[var(--color-status-green)]'
+                  : 'text-[var(--color-status-red)]'
+              }`}
+            >
+              {llmTest.message}
+            </span>
+          )}
+        </div>
       </div>
 
       <button

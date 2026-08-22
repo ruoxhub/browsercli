@@ -9,6 +9,7 @@ import {
   traceResultIsSuccess,
   getTraceSummary,
 } from '../../trace-processing/parse.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {logger} from '../../utils/logger.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
@@ -25,33 +26,28 @@ import {
  */
 export const stopPerformanceTrace = defineTool({
   name: 'stop_performance_trace',
-  description:
-    '停止性能追踪录制并通过 CDP Tracing.end 分析其结果。',
+  description: '停止性能追踪录制并通过 CDP Tracing.end 分析其结果。',
   annotations: {category: ToolCategory.PERFORMANCE, readOnlyHint: true},
   schema: {},
   handler: async (_request, response, context) => {
     const tooltype = 'stop_performance_trace';
 
     if (!context.isRunningPerformanceTrace()) {
-      response.setStructuredContent({
-        success: false,
-        message: '当前没有正在运行的性能追踪。',
-        tooltype,
-        logFormat: 'json',
-      });
-      return;
+      throw createToolError(
+        ErrorCodes.VALIDATION,
+        '当前没有正在运行的性能追踪。',
+        {toolName: tooltype},
+      );
     }
 
     const client = getTraceClient();
     if (!client) {
       context.setIsRunningPerformanceTrace(false);
-      response.setStructuredContent({
-        success: false,
-        message: '无法定位性能追踪的 CDP 会话，可能追踪已被异常中断。',
-        tooltype,
-        logFormat: 'json',
-      });
-      return;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        '无法定位性能追踪的 CDP 会话，可能追踪已被异常中断。',
+        {toolName: tooltype},
+      );
     }
 
     const data: Record<string, unknown> = {};
@@ -80,8 +76,7 @@ export const stopPerformanceTrace = defineTool({
 
       if (tracingEndTimedOut) {
         data.partial = true;
-        data.warning =
-          'Tracing.end 超时，返回的追踪数据可能不完整。';
+        data.warning = 'Tracing.end 超时，返回的追踪数据可能不完整。';
       } else {
         await waitForTracingComplete(client);
       }
@@ -112,22 +107,22 @@ export const stopPerformanceTrace = defineTool({
       }
 
       data.parseError = result.error;
-      response.setStructuredContent({
-        success: false,
-        message: '追踪数据解析出错。',
-        tooltype,
-        logFormat: 'json',
-        data,
-      });
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        '追踪数据解析出错。',
+        {toolName: tooltype},
+        {details: data},
+      );
     } catch (e) {
       const errorText = e instanceof Error ? e.message : JSON.stringify(e);
       logger.debug(`Error stopping performance trace: ${errorText}`);
-      response.setStructuredContent({
-        success: false,
-        message: `停止性能追踪时出错：${errorText}`,
-        tooltype,
-        data,
-      });
+      if (e && typeof e === 'object' && 'code' in e) throw e;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `停止性能追踪时出错：${errorText}`,
+        {toolName: tooltype},
+        {details: data},
+      );
     } finally {
       context.setIsRunningPerformanceTrace(false);
       endTrace();

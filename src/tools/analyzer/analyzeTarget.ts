@@ -10,6 +10,7 @@ import {ToolCategory} from '../categories.js';
 import {withOperationTimeout} from '../shared/browserRuntime.js';
 import {defineTool} from '../ToolDefinition.js';
 
+import {executeAnalysis} from './analysisExecution.js';
 import {
   buildRequestFingerprints,
   buildPriorityTargets,
@@ -25,7 +26,6 @@ import {
 import {extractSignatureChainHints} from './signature.js';
 import {buildHookTimeline} from './timeline.js';
 import type {
-  AnalyzeTargetResult,
   AnalyzerRuntimeServices,
   HookPreset,
   CollectedFileEntry,
@@ -51,42 +51,6 @@ const EMPTY_DEPENDENCIES: {nodes: unknown[]; edges: unknown[]} = {
   nodes: [],
   edges: [],
 };
-
-function emptyAnalyzeTargetData(target: string): AnalyzeTargetData {
-  return {
-    target,
-    durationMs: 0,
-    collection: {
-      totalCollected: 0,
-      selectedForAnalysis: 0,
-      dependencies: {nodes: [], edges: []},
-    },
-    analysis: {qualityScore: 0, securityRiskCount: 0, cryptoAlgorithms: []},
-    deobfuscation: null,
-    hooks: {
-      preset: 'none',
-      autoInjected: false,
-      hookIds: [],
-      totalRecords: 0,
-      activeUrls: [],
-      correlatedFlows: [],
-      suspiciousFlows: [],
-      timelineSample: [],
-    },
-    requestFingerprints: [],
-    priorityTargets: [],
-    signatureChain: {
-      signatureParams: [],
-      candidateFunctions: [],
-      requestSinks: [],
-    },
-    actionPlan: [],
-    recommendedNextSteps: [],
-    whyTheseSteps: [],
-    stopIf: [],
-    nextActions: [],
-  };
-}
 
 export interface AnalyzeTargetParams {
   url: string;
@@ -308,17 +272,6 @@ export const analyze_target = defineTool({
     const runtime = getRuntime();
     const params = request.params;
 
-    if (!params?.url) {
-      response.setStructuredContent<AnalyzeTargetResult>({
-        success: false,
-        message: 'analyze_target requires a "url" parameter',
-        tooltype: 'analyze_target',
-        logFormat: 'json',
-        data: emptyAnalyzeTargetData(''),
-      });
-      return;
-    }
-
     const startedAt = Date.now();
     const hookPreset = params.hookPreset ?? 'api-signature';
     const autoInjectHooks = params.autoInjectHooks ?? true;
@@ -342,7 +295,9 @@ export const analyze_target = defineTool({
 
     const replayResults = params.autoReplayActions?.length
       ? await runtime.pageController.replayActions(
-          params.autoReplayActions as any,
+          params.autoReplayActions as Parameters<
+            typeof runtime.pageController.replayActions
+          >[0],
         )
       : [];
 
@@ -350,15 +305,26 @@ export const analyze_target = defineTool({
       await new Promise(resolve => setTimeout(resolve, params.waitAfterHookMs));
     }
 
-    // crypto detection is fast and local-only; run it separately so it
-    // never gets killed by the understand timeout.
     const crypto = await runtime.cryptoDetector.detect({code: analysisCode});
 
-    const understand = await withOperationTimeout(
-      runtime.analyzer.understand({code: analysisCode, focus: 'security'}),
-      'analyze_target 安全分析',
-      UNDERSTAND_TIMEOUT_MS,
-    );
+    const understandResult = await executeAnalysis({
+      toolName: 'analyze_target',
+      useAI: params.useAI ?? true,
+      timeoutMs: UNDERSTAND_TIMEOUT_MS,
+      localAnalysis: () =>
+        runtime.analyzer.understand({
+          code: analysisCode,
+          focus: 'security',
+          useAI: false,
+        }),
+      aiEnrichment: () =>
+        runtime.analyzer.understand({
+          code: analysisCode,
+          focus: 'security',
+          useAI: true,
+        }),
+    });
+    const understand = understandResult.data;
 
     const deobfuscation = params.runDeobfuscation
       ? await runtime.deobfuscator.deobfuscate({
@@ -462,6 +428,7 @@ export const analyze_target = defineTool({
       success: true,
       message: `分析完成，目标: ${params.url}`,
       tooltype: 'analyze_target',
+      meta: understandResult.meta,
       data: result,
     });
   },

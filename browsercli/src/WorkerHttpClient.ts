@@ -14,6 +14,12 @@ const STREAM_CHANNELS = [
   'log',
 ] as const;
 
+export interface ToolRecovery {
+  tool?: string;
+  command?: string;
+  reason: string;
+}
+
 export interface WorkerHttpClientOptions {
   baseUrl: string; // 默认 http://127.0.0.1:8765
   apiToken?: string;
@@ -27,7 +33,13 @@ export interface JobStatus {
   tool?: string;
   status: 'pending' | 'running' | 'done' | 'failed' | 'timed_out' | 'cancelled';
   result?: unknown;
-  error?: {code: string; message: string};
+  error?: {
+    code: string;
+    message: string;
+    retryable?: boolean;
+    recovery?: ToolRecovery;
+    details?: Record<string, unknown>;
+  };
   logs: string[];
   createdAt: string;
   finishedAt?: string;
@@ -234,9 +246,16 @@ export class WorkerHttpClient {
       job = await this.getJob(jobId);
     }
     if (job.status !== 'done') {
-      throw new Error(
-        `[${job.error?.code ?? job.status}] ${job.error?.message ?? `job ${job.status}`}`,
-      );
+      const code = job.error?.code ?? job.status;
+      const message = job.error?.message ?? `job ${job.status}`;
+      const recoveryCmd = job.error?.recovery?.command
+        ? ` (recovery: ${job.error.recovery.command})`
+        : job.error?.recovery?.tool
+          ? ` (recovery: tool ${job.error.recovery.tool})`
+          : job.error?.recovery?.reason
+            ? ` (recovery: ${job.error.recovery.reason})`
+            : '';
+      throw new Error(`[${code}] ${message}${recoveryCmd}`);
     }
     return job.result;
   }

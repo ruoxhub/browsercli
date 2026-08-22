@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -135,12 +136,12 @@ export const hookSMCrypto = defineTool({
         data: {algorithms: algos},
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `错误：${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'hook_smcrypto',
-        data: {},
-      });
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `错误：${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'hook_smcrypto'},
+      );
     }
   },
 });

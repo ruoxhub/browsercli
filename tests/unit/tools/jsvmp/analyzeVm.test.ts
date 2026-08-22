@@ -194,10 +194,11 @@ describe('analyze_jsvmp_vm tool', () => {
       },
     } as never;
 
-    await analyzeJsvmpVm.handler({params: {}}, harness.response, context);
-
-    assert.equal(harness.content.success, false);
-    assert.match(harness.content.message, /code 或 scriptId/);
+    await assert.rejects(
+      analyzeJsvmpVm.handler({params: {}}, harness.response, context),
+      (error: unknown) =>
+        error instanceof Error && /code 或 scriptId/.test(error.message),
+    );
   });
 
   it('analyzes inline code and returns structured data', async () => {

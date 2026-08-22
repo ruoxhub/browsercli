@@ -26,6 +26,13 @@ export {
 } from './reports.js';
 export {pickHookTypes} from './hooks.js';
 
+export {
+  executeAnalysis,
+  type AnalysisExecutionMeta,
+  type ExecuteAnalysisOptions,
+  type AnalysisExecutionResult,
+} from './analysisExecution.js';
+
 // MCP Tools (defined with defineTool)
 export {deobfuscateCode} from './deobfuscate.js';
 export {understandCode} from './understand.js';

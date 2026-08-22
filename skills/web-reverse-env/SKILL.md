@@ -30,8 +30,8 @@ description: 面向 Web/JS 逆向中的浏览器补环境技能，覆盖 Proxy �
 | 打开页面 | `browsercli call navigate_page --url "<target>" --type url` | 导航到目标站 |
 | 采集环境种子 | `browsercli call compare_env`、`browsercli call evaluate_script --function "..."`、`browsercli call inspect_object --expression "navigator"`、`browsercli call get_storage --type all` | 观察真实浏览器环境，作为补环境基准 |
 | Hook 定位入口 | `browsercli call create_hook --type cookie --action log` → `inject_hook` → `get_hook_data`；或 `hook_function --target "..."`、`inject_preload_script --preset log-cookies` | Hook `document.cookie`/`fetch`/`xhr` 等，找回真实调用链 |
-| 差异分析与补丁建议 | `browsercli call diff_env_requirements --runtime-error "..." --observed-capabilities '[...]'` | 把运行时报错映射为缺失能力与下一步补丁 |
-| 导出重建 bundle | `browsercli call export_rebuild_bundle --auto-generate true --task-id ... --target-url ...` | 一键导出 entry/env/polyfills/capture 到任务 artifacts |
+| 差异分析与补丁建议 | `browsercli call diff_env_requirements --runtimeError "..." [--observedCapabilities <arr>]` | 把运行时报错映射为缺失能力与下一步补丁 |
+| 导出重建 bundle | `browsercli call export_rebuild_bundle --taskId <id> --taskSlug <slug> --targetUrl <url> --goal <goal> [--autoGenerate true]` | 一键导出 entry/env/polyfills/capture 到任务 artifacts |
 
 核心原则：**先 Observe（真实浏览器采集），再 Hook（不暂停执行），最后才补环境/断点**，与仓库的 `Observe-first`、`Hook-preferred`、`Breakpoint-last` 方法论一致。
 
@@ -78,7 +78,7 @@ description: 面向 Web/JS 逆向中的浏览器补环境技能，覆盖 Proxy �
 - [collect-browser-env.js](scripts/collect-browser-env.js)：离线采集环境种子
 - [observe-runtime.js](scripts/observe-runtime.js)：Proxy 吐环境与缺口聚合
 
-如果已有运行日志或报错，配合 `browsercli call diff_env_requirements --runtime-error "..." --observed-capabilities '[...]'` 把报错映射为缺失能力。
+如果已有运行日志或报错，配合 `browsercli call diff_env_requirements --runtimeError "..." [--observedCapabilities <arr>]` 把报错映射为缺失能力。
 
 不要在没有诊断信息的前提下大面积硬补对象。
 
@@ -237,9 +237,9 @@ worker 可用时，**优先用 `browsercli call` 完成采集、Hook、差异分
 
 在仓库内，这条替代路线落到具体工具就是 browsercli：
 
-- 真浏览器内执行 → `browsercli call evaluate_script`、`browsercli call navigate_page`
-- Hook 回传结果 → `browsercli call create_hook` + `inject_hook` + `get_hook_data`
-- WebSocket 链路观察 → `browsercli call list_websocket_connections` + `get_websocket_messages`
+- 真浏览器内执行 → `browsercli call evaluate_script --function "..."`、`browsercli call navigate_page [--url "<target>"]`
+- Hook 回传结果 → `browsercli call create_hook --type <type>` + `inject_hook --hookId <id> --script "<script>"` + `get_hook_data [--hookId <id>]`
+- WebSocket 链路观察 → `browsercli call list_websocket_connections` + `get_websocket_messages --wsid <id>`
 
 这属于技能允许的替代路线，不是偏题。
 

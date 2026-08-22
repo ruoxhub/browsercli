@@ -29,6 +29,16 @@ import type {PaginationOptions} from '../utils/types.js';
 
 import type {ToolCategory} from './categories.js';
 
+export interface ToolRuntimeRequirements {
+  browser?: 'connected';
+  page?: 'selected';
+  frame?: 'selected';
+  debugger?: 'available' | 'paused' | 'running';
+  ai?: 'optional' | 'required';
+  nativeTools?: string[];
+  recovery?: boolean;
+}
+
 export interface ToolDefinition<
   Schema extends zod.ZodRawShape = zod.ZodRawShape,
 > {
@@ -42,6 +52,7 @@ export interface ToolDefinition<
      * If true, the tool does not modify its environment.
      */
     readOnlyHint: boolean;
+    requirements?: ToolRuntimeRequirements;
   };
   schema: Schema;
   handler: (

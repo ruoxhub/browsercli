@@ -8,6 +8,7 @@ import {mkdir, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {logger} from '../../utils/logger.js';
 import {resolveDefaultArtifactsTasksDir} from '../../utils/projectPaths.js';
 import type {ToolContextProvider} from '../../worker/ToolContext.js';
@@ -65,7 +66,7 @@ export interface HookInjectionRecord {
   /** Hook 描述 */
   description: string;
   /** 是否成功注入 */
-  success: boolean;
+  ok: boolean;
   /** 是否实际执行过页面注入 */
   injected?: boolean;
   /** 错误信息 */
@@ -1031,7 +1032,7 @@ function buildHookPlans(
     hookId: p.hookId,
     type: p.type,
     description: p.description,
-    success: true,
+    ok: true,
     injected: false,
     script: p.buildScript(),
   }));
@@ -1053,11 +1054,11 @@ async function injectHookPlans(
   for (const plan of plans) {
     try {
       await frame.evaluate(plan.script);
-      injected.push({...plan, success: true, injected: true});
+      injected.push({...plan, ok: true, injected: true});
     } catch (error) {
       injected.push({
         ...plan,
-        success: false,
+        ok: false,
         injected: true,
         error: error instanceof Error ? error.message : String(error),
       });
@@ -1146,9 +1147,9 @@ export const autoHook = defineTool({
       }
 
       const successfulInjections = hooksInjected.filter(
-        h => h.success && h.injected,
+        h => h.ok && h.injected,
       ).length;
-      const failedInjections = hooksInjected.filter(h => !h.success).length;
+      const failedInjections = hooksInjected.filter(h => !h.ok).length;
       const detectedCryptoCount = cryptoDetected.filter(c => c.detected).length;
       const pageUrl = context?.getSelectedPage?.()?.url?.();
 
@@ -1238,20 +1239,23 @@ export const autoHook = defineTool({
         ...(exportPath ? {exportPath} : {}),
       });
     } catch (error) {
+      if (error && typeof error === 'object' && 'code' in error) throw error;
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       logger.info('[AutoHook] Failed: ' + errorMessage);
 
-      response.setStructuredContent({
-        success: false,
-        error: errorMessage,
-        tooltype: 'auto_hook',
-        data: {
-          url: url || context.getSelectedPage()?.url?.() || 'unknown',
-          hooksInjected,
-          cryptoDetected,
-        } as AutoHookToolData,
-      });
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        errorMessage,
+        {toolName: 'auto_hook'},
+        {
+          details: {
+            url: url || context.getSelectedPage()?.url?.() || 'unknown',
+            hooksInjected,
+            cryptoDetected,
+          },
+        },
+      );
     }
   },
 });

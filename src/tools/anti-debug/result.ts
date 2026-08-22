@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import type {Response} from '../ToolDefinition.js';
 
 import type {HookResult} from './types.js';
@@ -36,11 +37,11 @@ export async function runHook(
       data: null,
     } satisfies HookResult);
   } catch (error) {
-    response.setStructuredContent({
-      success: false,
-      message: `错误：${getErrorMessage(error)}`,
-      tooltype,
-      data: null,
-    } satisfies HookResult);
+    if (error && typeof error === 'object' && 'code' in error) throw error;
+    throw createToolError(
+      ErrorCodes.RUNTIME,
+      `错误：${getErrorMessage(error)}`,
+      {toolName: tooltype},
+    );
   }
 }

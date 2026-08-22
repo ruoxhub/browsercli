@@ -136,11 +136,11 @@ describe('detect_captcha schema and registration', {concurrency: false}, () => {
 
 describe('detect_captcha handler', {concurrency: false}, () => {
   it('fails clearly when no page is selected', async () => {
-    const result = await runTool({}, null);
-
-    assert.equal(result.success, false);
-    assert.equal(result.tooltype, 'detect_captcha');
-    assert.match(result.message, /select_page/);
+    await assert.rejects(
+      runTool({}, null),
+      (error: unknown) =>
+        error instanceof Error && /select_page/.test(error.message),
+    );
   });
 
   it('defaults to detect and treats a detected challenge as success', async () => {
@@ -199,28 +199,30 @@ describe('detect_captcha handler', {concurrency: false}, () => {
     assert.equal(detectWithWaitTimeout.data?.assessment.status, 'not_detected');
 
     const secret = 'private-page-body-secret';
-    const failed = await runTool(
-      {},
-      pageReturning(EMPTY_SNAPSHOT, {
-        title: async () => {
-          throw new Error(secret);
-        },
-      }),
+    await assert.rejects(
+      runTool(
+        {},
+        pageReturning(EMPTY_SNAPSHOT, {
+          title: async () => {
+            throw new Error(secret);
+          },
+        }),
+      ),
+      (error: unknown) =>
+        error instanceof Error &&
+        /无法读取当前页面/.test(error.message) &&
+        !new RegExp(secret).test(error.message),
     );
-    assert.equal(failed.success, false);
-    assert.match(failed.message, /无法读取当前页面/);
-    assert.doesNotMatch(failed.message, new RegExp(secret));
   });
 
   it('normalizes closed-page failures without exposing raw details', async () => {
-    const result = await runTool(
-      {},
-      pageReturning(EMPTY_SNAPSHOT, {closed: true}),
+    await assert.rejects(
+      runTool({}, pageReturning(EMPTY_SNAPSHOT, {closed: true})),
+      (error: unknown) =>
+        error instanceof Error &&
+        /已关闭/.test(error.message) &&
+        !/Target page/.test(error.message),
     );
-
-    assert.equal(result.success, false);
-    assert.match(result.message, /已关闭/);
-    assert.doesNotMatch(result.message, /Target page/);
   });
 
   it('maps connection, navigation, and assessment-timeout failures safely', async () => {
@@ -235,17 +237,20 @@ describe('detect_captcha handler', {concurrency: false}, () => {
       },
     ];
     for (const sample of cases) {
-      const result = await runTool(
-        {},
-        pageReturning(EMPTY_SNAPSHOT, {
-          title: async () => {
-            throw new Error(sample.raw);
-          },
-        }),
+      await assert.rejects(
+        runTool(
+          {},
+          pageReturning(EMPTY_SNAPSHOT, {
+            title: async () => {
+              throw new Error(sample.raw);
+            },
+          }),
+        ),
+        (error: unknown) =>
+          error instanceof Error &&
+          sample.expected.test(error.message) &&
+          !/private-detail/.test(error.message),
       );
-      assert.equal(result.success, false);
-      assert.match(result.message, sample.expected);
-      assert.doesNotMatch(result.message, /private-detail/);
     }
 
     const clock = sinon.useFakeTimers();
@@ -256,11 +261,12 @@ describe('detect_captcha handler', {concurrency: false}, () => {
           title: () => new Promise<string>(() => undefined),
         }),
       );
+      const rejection = assert.rejects(pending, (error: unknown) =>
+        error instanceof Error ? /评估超时/.test(error.message) : false,
+      );
       await clock.tickAsync(0);
       await clock.tickAsync(5000);
-      const timedOut = await pending;
-      assert.equal(timedOut.success, false);
-      assert.match(timedOut.message, /评估超时/);
+      await rejection;
       assert.ok(clock.countTimers() <= 1);
     } finally {
       clock.restore();

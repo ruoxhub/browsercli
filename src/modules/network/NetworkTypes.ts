@@ -16,8 +16,8 @@
  */
 
 import type {TrafficSummary} from '../../formatters/websocketFormatter.js';
-import type {PageSelector, ResolvedPage} from '../browser/PageIdentity.js';
 import type {HTTPRequest, Page, ResourceType} from '../../third_party/index.js';
+import type {PageSelector, ResolvedPage} from '../browser/PageIdentity.js';
 
 // ─── 可过滤的资源类型 ──────────────────────────────────
 
@@ -177,6 +177,8 @@ export interface ListNetworkRequestsParams {
   resourceTypes?: ResourceType[];
   /** 是否包含最近 3 次导航的保留请求 */
   includePreservedRequests?: boolean;
+  /** 是否包含浏览器扩展发起的请求 */
+  includeExtensionRequests?: boolean;
   /** 等待匹配 URL 片段的请求出现 */
   waitForRequest?: string;
   /** 等待请求超时时间（毫秒） */

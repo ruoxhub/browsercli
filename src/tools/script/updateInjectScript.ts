@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {getInjectConfigStore} from './createInjectScript.js';
 import type {UpdateInjectScriptResult} from './types.js';
 
@@ -33,13 +34,11 @@ export function updateInjectScript(
   const config = injectConfigs.get(id);
 
   if (!config) {
-    return {
-      success: false,
-      message: `未找到 ID 为 "${id}" 的注入脚本`,
-      tooltype: 'update_inject_script',
-      logFormat: 'json',
-      data: undefined as any,
-    };
+    throw createToolError(
+      ErrorCodes.NOT_FOUND,
+      `未找到 ID 为 "${id}" 的注入脚本`,
+      {toolName: 'update_inject_script', id},
+    );
   }
 
   if (options?.name !== undefined) config.name = options.name;

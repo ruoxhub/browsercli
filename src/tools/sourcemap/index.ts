@@ -12,6 +12,7 @@ import {
 import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
 import type {HTTPRequest} from '../../third_party/index.js';
+import {createToolError, type ToolErrorCode} from '../../utils/errors.js';
 import type {ToolResponseAccumulator} from '../../worker/ToolResponse.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
@@ -70,13 +71,14 @@ async function respond<T>(
       data,
     });
   } catch (error) {
-    if (!(error instanceof SourceMapError)) throw error;
-    response.setStructuredContent({
-      success: false,
-      message: error.message,
-      tooltype,
-      data: {code: error.code},
-    });
+    if (error instanceof SourceMapError) {
+      throw createToolError(
+        error.code as ToolErrorCode,
+        error.message,
+        {toolName: tooltype},
+      );
+    }
+    throw error;
   }
 }
 

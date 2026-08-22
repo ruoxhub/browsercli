@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {ToolRecovery} from '../utils/errors.js';
+
 export type JobStatus =
   | 'pending'
   | 'running'
@@ -18,6 +20,14 @@ const TERMINAL_JOB_STATUSES = new Set<JobStatus>([
   'cancelled',
 ]);
 
+export interface JobError {
+  code: string;
+  message: string;
+  retryable?: boolean;
+  recovery?: ToolRecovery;
+  details?: Record<string, unknown>;
+}
+
 export interface Job {
   jobId: string;
   sessionId: string;
@@ -25,7 +35,7 @@ export interface Job {
   params: Record<string, unknown>;
   status: JobStatus;
   result?: unknown;
-  error?: {code: string; message: string};
+  error?: JobError;
   logs: string[];
   createdAt: string;
   finishedAt?: string;
@@ -93,15 +103,15 @@ export class JobStore {
     job.finishedAt = new Date().toISOString();
   }
 
-  fail(jobId: string, error: {code: string; message: string}): void {
+  fail(jobId: string, error: JobError): void {
     this.finalize(jobId, 'failed', error);
   }
 
-  markTimedOut(jobId: string, error: {code: string; message: string}): void {
+  markTimedOut(jobId: string, error: JobError): void {
     this.finalize(jobId, 'timed_out', error);
   }
 
-  cancel(jobId: string, error: {code: string; message: string}): void {
+  cancel(jobId: string, error: JobError): void {
     this.finalize(jobId, 'cancelled', error);
   }
 
@@ -136,7 +146,7 @@ export class JobStore {
   private finalize(
     jobId: string,
     status: 'failed' | 'timed_out' | 'cancelled',
-    error: {code: string; message: string},
+    error: JobError,
   ): void {
     const job = this.get(jobId);
     job.status = status;

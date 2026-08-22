@@ -6,6 +6,7 @@
 
 import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 
@@ -38,13 +39,11 @@ export const removeHook = defineTool({
     const runtime = getRuntime();
 
     if (!hookId) {
-      response.setStructuredContent({
-        success: false,
-        message: 'hookId 参数不能为空',
-        tooltype: 'remove_hook',
-        data: {hookId: ''},
-      });
-      return;
+      throw createToolError(
+        ErrorCodes.VALIDATION,
+        'hookId 参数不能为空',
+        {toolName: 'remove_hook'},
+      );
     }
 
     const removed = runtime.hookManager.remove(hookId);
@@ -84,9 +83,17 @@ export const removeHook = defineTool({
       return;
     }
 
+    if (!removed) {
+      throw createToolError(
+        ErrorCodes.NOT_FOUND,
+        `Hook 未找到：${hookId}`,
+        {toolName: 'remove_hook', hookId},
+      );
+    }
+
     response.setStructuredContent({
-      success: removed,
-      message: removed ? `Hook 已移除：${hookId}` : `Hook 未找到：${hookId}`,
+      success: true,
+      message: `Hook 已移除：${hookId}`,
       tooltype: 'remove_hook',
       data: {
         hookId,

@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {sendJson} from '../shared/pageResponse.js';
 import {defineTool} from '../ToolDefinition.js';
@@ -21,16 +22,15 @@ export const clickElement = defineTool({
   },
   handler: async (request, response, context) => {
     const {selector} = request.params;
+    const page = context.getSelectedPage();
+    if (!page) {
+      throw createToolError(
+        ErrorCodes.PAGE_REQUIRED,
+        '未选中页面，请先使用 select_page 选择目标页面。',
+        {toolName: 'click_element'},
+      );
+    }
     try {
-      const page = context.getSelectedPage();
-      if (!page) {
-        sendJson(response, {
-          success: false,
-          message: '未选中页面，请先使用 select_page 选择目标页面。',
-          tooltype: 'click_element',
-        });
-        return;
-      }
       await page.click(selector);
       sendJson(response, {
         success: true,
@@ -39,12 +39,11 @@ export const clickElement = defineTool({
         data: {selector, clicked: true},
       });
     } catch (error) {
-      sendJson(response, {
-        success: false,
-        message: `点击元素失败: ${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'click_element',
-        data: {selector, clicked: false},
-      });
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `点击元素失败: ${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'click_element', selector},
+      );
     }
   },
 });

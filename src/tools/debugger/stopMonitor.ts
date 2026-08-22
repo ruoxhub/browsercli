@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 
@@ -28,7 +29,7 @@ export const stopMonitor = defineTool({
   handler: async (request, response, context) => {
     const {monitorId} = request.params;
 
-    await evaluateAndRespond<{success: boolean; message?: string}>({
+    await evaluateAndRespond<{error?: string}>({
       context: context as Context,
       response,
       tooltype: 'stop_monitor',
@@ -40,7 +41,7 @@ export const stopMonitor = defineTool({
             !browserWindow.__mcp_monitors__ ||
             !browserWindow.__mcp_monitors__[id]
           ) {
-            return {success: false, message: `Monitor not found: ${id}`};
+            return {error: `Monitor not found: ${id}`};
           }
 
           const {target, listeners} = browserWindow.__mcp_monitors__[id];
@@ -49,7 +50,7 @@ export const stopMonitor = defineTool({
           });
 
           delete browserWindow.__mcp_monitors__[id];
-          return {success: true};
+          return {};
         }, monitorId),
       onSuccess: () => {
         response.setStructuredContent({
@@ -60,12 +61,11 @@ export const stopMonitor = defineTool({
         });
       },
       onEvaluateFail: () => {
-        response.setStructuredContent({
-          success: false,
-          message: `监控未找到：${monitorId}`,
-          tooltype: 'stop_monitor',
-          data: {monitorId},
-        });
+        throw createToolError(
+          ErrorCodes.NOT_FOUND,
+          `监控未找到：${monitorId}`,
+          {toolName: 'stop_monitor', monitorId},
+        );
       },
     });
   },

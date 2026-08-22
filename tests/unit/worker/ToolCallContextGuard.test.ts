@@ -51,6 +51,21 @@ test('adds repeatWarning after three consecutive identical calls', () => {
   assert.equal(typeof result.structuredContent.repeatWarning, 'string');
 });
 
+test('does not warn for consecutive evaluate_script calls', () => {
+  const guard = new ToolCallContextGuard(() => null);
+
+  guard.recordCall('evaluate_script');
+  guard.recordCall('evaluate_script');
+  guard.recordCall('evaluate_script');
+  guard.recordCall('evaluate_script');
+
+  const result = guard.enrichResponse('evaluate_script', {
+    structuredContent: {ok: true} as Record<string, unknown>,
+  });
+
+  assert.equal(result.structuredContent.repeatWarning, undefined);
+});
+
 test('does not mutate non-context-sensitive tools without repeat loops', () => {
   const guard = new ToolCallContextGuard(() => {
     throw new Error('provider should not be called');

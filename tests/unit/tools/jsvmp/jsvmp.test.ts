@@ -261,23 +261,24 @@ describe('hook_jsvmp_interpreter', () => {
     assert.match(data.warnings[0], /detectable/i);
   });
 
-  it('returns a structured failure when current-frame injection fails', async () => {
+  it('rejects with a ToolError when current-frame injection fails', async () => {
     const harness = contextHarness({
       evaluateError: new Error('frame detached'),
     });
     const output = responseHarness();
 
-    await hookJsvmpInterpreter.handler(
-      {params: {persistent: false, mode: 'transparent'}},
-      output.response,
-      harness.context,
+    await assert.rejects(
+      hookJsvmpInterpreter.handler(
+        {params: {persistent: false, mode: 'transparent'}},
+        output.response,
+        harness.context,
+      ),
+      (error: unknown) =>
+        error instanceof Error && /frame detached/.test(error.message),
     );
-
-    assert.equal(output.content.success, false);
-    assert.match(output.content.message, /frame detached/);
   });
 
-  it('returns a structured failure when no frame is selected', async () => {
+  it('rejects with a ToolError when no frame is selected', async () => {
     const output = responseHarness();
     const context = {
       getSelectedFrame: () => {
@@ -285,16 +286,15 @@ describe('hook_jsvmp_interpreter', () => {
       },
     } as unknown as Context;
 
-    await assert.doesNotReject(
+    await assert.rejects(
       hookJsvmpInterpreter.handler(
         {params: {persistent: false, mode: 'transparent'}},
         output.response,
         context,
       ),
+      (error: unknown) =>
+        error instanceof Error && /no selected frame/.test(error.message),
     );
-
-    assert.equal(output.content.success, false);
-    assert.match(output.content.message, /no selected frame/);
   });
 });
 

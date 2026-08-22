@@ -37,7 +37,8 @@ describe('LLMService prompt generation', () => {
     if (!capturedMessages) {
       throw new Error('Expected chat call to be captured');
     }
-    assert.deepStrictEqual(capturedOptions, {temperature: 0.2, maxTokens: 123});
+    assert.strictEqual(capturedOptions?.temperature, 0.2);
+    assert.strictEqual(capturedOptions?.maxTokens, 123);
   });
 
   it('throws when no chat service is available', async () => {

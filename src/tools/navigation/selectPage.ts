@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {
   normalizeBrowserRuntimeError,
@@ -41,41 +42,48 @@ export const selectPage = defineTool({
     const {pageId, pageIdx} = request.params;
 
     if (pageId === undefined && pageIdx === undefined) {
-      response.setStructuredContent({
-        success: false,
-        message: '请至少提供 pageId 或 pageIdx',
-        tooltype: 'select_page',
-        data: {},
-      });
-      return;
-    }
-
-    const resolved = context.resolvePage({pageId, pageIdx});
-    const page = resolved.page;
-    await context.bringPageToFront(page);
-    context.selectPage(page);
-    context.syncPageContext(page);
-
-    let title: string;
-    try {
-      title = await withOperationTimeout(
-        page.title(),
-        `读取页面 ${resolved.pageIdx} 标题`,
+      throw createToolError(
+        ErrorCodes.VALIDATION,
+        '请至少提供 pageId 或 pageIdx',
+        {toolName: 'select_page'},
       );
-    } catch (error) {
-      title = `[unavailable] ${normalizeBrowserRuntimeError(error)}`;
     }
 
-    response.setStructuredContent({
-      success: true,
-      message: `已选择页面 ${resolved.pageIdx}`,
-      tooltype: 'select_page',
-      data: {
-        selectedIndex: resolved.pageIdx,
-        selectedPageId: resolved.pageId,
-        url: page.url(),
-        title,
-      },
-    });
+    try {
+      const resolved = context.resolvePage({pageId, pageIdx});
+      const page = resolved.page;
+      await context.bringPageToFront(page);
+      context.selectPage(page);
+      context.syncPageContext(page);
+
+      let title: string;
+      try {
+        title = await withOperationTimeout(
+          page.title(),
+          `读取页面 ${resolved.pageIdx} 标题`,
+        );
+      } catch (error) {
+        title = `[unavailable] ${normalizeBrowserRuntimeError(error)}`;
+      }
+
+      response.setStructuredContent({
+        success: true,
+        message: `已选择页面 ${resolved.pageIdx}`,
+        tooltype: 'select_page',
+        data: {
+          selectedIndex: resolved.pageIdx,
+          selectedPageId: resolved.pageId,
+          url: page.url(),
+          title,
+        },
+      });
+    } catch (error) {
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.NOT_FOUND,
+        `选择页面失败：${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'select_page', pageId, pageIdx},
+      );
+    }
   },
 });

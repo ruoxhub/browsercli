@@ -54,8 +54,8 @@ browsercli call get_websocket_messages --wsid <id> --groupId <g> \
 browsercli call get_websocket_message --wsid <id> --frameIndex <idx>
 
 # 5. 拦截 / 伪造（如需）
-browsercli call create_hook --type websocket --description "WS capture"
-browsercli call inject_hook --persistent true
+browsercli call create_hook --type websocket --description "WS capture" --hookId ws_hook
+browsercli call inject_hook --hookId ws_hook --script "<hook script>" --persistent true
 ```
 
 ---
@@ -105,7 +105,7 @@ browsercli call analyze_websocket_messages --wsid 3
 #   }
 ```
 
-`browsercli call get_websocket_messages --groupId B --show_content true` → 取 B 组的样本 raw bytes。
+`browsercli call get_websocket_messages --wsid 3 --groupId B --show_content true` → 取 B 组的样本 raw bytes。
 
 ---
 

@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes, ToolError} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 
@@ -82,12 +83,11 @@ export const getStorage = defineTool({
       if (type === 'all' || type === 'cookies') {
         const page = context.getSelectedPage();
         if (!page) {
-          response.setStructuredContent({
-            success: false,
-            message: '当前没有选中的页面',
-            tooltype: 'get_storage',
-          });
-          return;
+          throw createToolError(
+            ErrorCodes.PAGE_REQUIRED,
+            '当前没有选中的页面',
+            {toolName: 'get_storage'},
+          );
         }
 
         const cookies = (await page.context().cookies(page.url())).filter(
@@ -113,7 +113,6 @@ export const getStorage = defineTool({
           response,
           'get_storage',
         );
-        if (!frame) return;
         Object.assign(result, await frame.evaluate(storageCode));
       }
 
@@ -129,15 +128,16 @@ export const getStorage = defineTool({
         },
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `错误：${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'get_storage',
-        data: {
+      if (error instanceof ToolError) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `错误：${error instanceof Error ? error.message : String(error)}`,
+        {
+          toolName: 'get_storage',
           type: request.params.type || 'all',
           filter: request.params.filter || null,
         },
-      });
+      );
     }
   },
 });

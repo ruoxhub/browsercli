@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 
@@ -24,7 +25,6 @@ export const listHooks = defineTool({
   schema: {},
   handler: async (request, response, context) => {
     const frame = getFrameOrRespond(context as Context, response, 'list_hooks');
-    if (!frame) return;
 
     try {
       const hooks = await evaluateInPageRuntime<
@@ -43,13 +43,11 @@ export const listHooks = defineTool({
       );
 
       if (!Array.isArray(hooks)) {
-        response.setStructuredContent({
-          success: false,
-          message: 'list_hooks 返回格式异常',
-          tooltype: 'list_hooks',
-          data: {},
-        });
-        return;
+        throw createToolError(
+          ErrorCodes.RUNTIME,
+          'list_hooks 返回格式异常',
+          {toolName: 'list_hooks'},
+        );
       }
 
       response.setStructuredContent({
@@ -61,12 +59,12 @@ export const listHooks = defineTool({
         data: {hooks},
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `错误：${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'list_hooks',
-        data: {},
-      });
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `错误：${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'list_hooks'},
+      );
     }
   },
 });

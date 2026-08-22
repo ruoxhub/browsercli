@@ -7,6 +7,7 @@
 import {stat} from 'node:fs/promises';
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -40,24 +41,27 @@ export const wasmOptimize = defineTool({
       const result = await runNativeCommand('wasm-opt', args, 30000);
 
       if (result.notFound) {
-        response.setStructuredContent({
-          success: false,
-          message:
-            'wasm-opt 优化失败：系统中未找到 wasm-opt，请先安装 Binaryen 后重试。',
-          tooltype: 'wasm_optimize',
-        });
-        return;
+        throw createToolError(
+          ErrorCodes.NATIVE_TOOL_MISSING,
+          'wasm-opt 优化失败：系统中未找到 wasm-opt，请先安装 Binaryen 后重试。',
+          {toolName: 'wasm_optimize'},
+          {
+            recovery: {
+              command: 'npm install -g binaryen',
+              reason: 'Install Binaryen to enable wasm-opt',
+            },
+          },
+        );
       }
 
       if (result.exitCode !== 0) {
-        response.setStructuredContent({
-          success: false,
-          message: result.timedOut
+        throw createToolError(
+          result.timedOut ? ErrorCodes.TIMEOUT : ErrorCodes.RUNTIME,
+          result.timedOut
             ? 'wasm-opt 优化失败：执行超时（30000ms）'
             : `wasm-opt 优化失败：${result.stderr.slice(0, 500)}`,
-          tooltype: 'wasm_optimize',
-        });
-        return;
+          {toolName: 'wasm_optimize'},
+        );
       }
 
       const optimizedStats = await stat(outputPath);
@@ -83,11 +87,12 @@ export const wasmOptimize = defineTool({
         },
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `WASM 优化失败：${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'wasm_optimize',
-      });
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `WASM 优化失败：${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'wasm_optimize'},
+      );
     }
   },
 });

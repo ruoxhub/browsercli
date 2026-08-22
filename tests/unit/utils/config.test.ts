@@ -442,7 +442,7 @@ describe('Configuration Management', () => {
       };
 
       assert.throws(() => createAIService(config), {
-        message: /Failed to create AI service/,
+        message: /OpenAI configuration not found/,
       });
     });
 

@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 
@@ -42,13 +43,11 @@ export const setFiles = defineTool({
       });
 
       if (!node.nodeId) {
-        response.setStructuredContent({
-          success: false,
-          message: `Element not found: ${selector}`,
-          tooltype: 'set_files',
-          data: {files: 0},
-        });
-        return;
+        throw createToolError(
+          ErrorCodes.NOT_FOUND,
+          `Element not found: ${selector}`,
+          {toolName: 'set_files', selector},
+        );
       }
 
       await client.send('DOM.setFileInputFiles', {
@@ -63,12 +62,12 @@ export const setFiles = defineTool({
         data: {files: filePaths.length, filePaths},
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: error instanceof Error ? error.message : String(error),
-        tooltype: 'set_files',
-        data: {files: 0},
-      });
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        error instanceof Error ? error.message : String(error),
+        {toolName: 'set_files', selector},
+      );
     }
   },
 });

@@ -14,13 +14,14 @@ import {readFile, writeFile} from 'node:fs/promises';
 
 import {getEnvValue, getEnvNumber} from '../../config.js';
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes, ToolError} from '../../utils/errors.js';
 import {validateOutputPath} from '../../utils/fsSafe.js';
 import {ToolCategory} from '../categories.js';
 import {
   withOperationTimeout,
   normalizeBrowserRuntimeError,
 } from '../shared/browserRuntime.js';
-import {errorMessage, sendJson} from '../shared/pageResponse.js';
+import {sendJson} from '../shared/pageResponse.js';
 import {defineTool} from '../ToolDefinition.js';
 
 import type {SessionSnapshot} from './types.js';
@@ -138,9 +139,7 @@ interface SanitizedCookie {
  * 清洗单个 Cookie，仅保留 Playwright `addCookies` 接受的字段，
  * 并规范化 sameSite / domain / url，避免 "Storage.setCookies: Invalid cookie fields"。
  */
-function sanitizeCookie(
-  c: Record<string, unknown>,
-): SanitizedCookie | null {
+function sanitizeCookie(c: Record<string, unknown>): SanitizedCookie | null {
   const name = c.name;
   const value = c.value;
   if (typeof name !== 'string' || typeof value !== 'string') {
@@ -242,12 +241,11 @@ export const saveSessionState = defineTool({
 
       const page = _context.getSelectedPage();
       if (!page) {
-        response.setStructuredContent({
-          success: false,
-          message: '未选中页面，请先使用 select_page 选择目标页面。',
-          tooltype: 'save_session_state',
-        });
-        return;
+        throw createToolError(
+          ErrorCodes.PAGE_REQUIRED,
+          '未选中页面，请先使用 select_page 选择目标页面。',
+          {toolName: 'save_session_state'},
+        );
       }
       const sid = sessionId ?? `session_${Date.now()}`;
       const cookies = includeCookies
@@ -313,11 +311,12 @@ export const saveSessionState = defineTool({
         },
       });
     } catch (error) {
-      sendJson(response, {
-        success: false,
-        message: `保存会话失败: ${normalizeBrowserRuntimeError(error)}`,
-        tooltype: 'save_session_state',
-      });
+      if (error instanceof ToolError) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `保存会话失败: ${normalizeBrowserRuntimeError(error)}`,
+        {toolName: 'save_session_state'},
+      );
     }
   },
 });
@@ -346,88 +345,77 @@ export const restoreSessionState = defineTool({
       navigateToSavedUrl,
       clearStorageBeforeRestore,
     } = request.params;
-    try {
-      prepareSessionStore();
 
-      const snapshot = sessionSnapshots.get(sid);
-      if (!snapshot) {
-        sendJson(response, {
-          success: false,
-          message: `会话快照未找到: ${sid}`,
-          tooltype: 'restore_session_state',
-        });
-        return;
-      }
+    prepareSessionStore();
 
-      const page = _context.getSelectedPage();
-      if (!page) {
-        sendJson(response, {
-          success: false,
-          message: '未选中页面，请先使用 select_page 选择目标页面。',
-          tooltype: 'restore_session_state',
-        });
-        return;
-      }
-
-      if (navigateToSavedUrl !== false) {
-        await page.goto(snapshot.url, {waitUntil: 'networkidle'});
-      }
-
-      if (clearStorageBeforeRestore === true) {
-        await page.evaluate(() => {
-          window.localStorage.clear();
-          window.sessionStorage.clear();
-        });
-        await page.context().clearCookies();
-      }
-
-      if (snapshot.cookies.length > 0) {
-        const cookiesToAdd = snapshot.cookies
-          .map((c: Record<string, unknown>) => sanitizeCookie(c))
-          .filter((c): c is SanitizedCookie => c !== null);
-        if (cookiesToAdd.length > 0) {
-          await page.context().addCookies(cookiesToAdd);
-        }
-      }
-      for (const [key, value] of Object.entries(snapshot.localStorage)) {
-        await page.evaluate(
-          ({k, v}: {k: string; v: string}) => {
-            window.localStorage.setItem(k, v);
-          },
-          {k: key, v: value},
-        );
-      }
-      for (const [key, value] of Object.entries(snapshot.sessionStorage)) {
-        await page.evaluate(
-          ({k, v}: {k: string; v: string}) => {
-            window.sessionStorage.setItem(k, v);
-          },
-          {k: key, v: value},
-        );
-      }
-
-      sendJson(response, {
-        success: true,
-        message: `会话已恢复: ${sid}`,
-        tooltype: 'restore_session_state',
-        data: {
-          sessionId: snapshot.id,
-          restoredAt: new Date().toISOString(),
-          url: snapshot.url,
-          restored: {
-            cookies: snapshot.cookies.length,
-            localStorage: Object.keys(snapshot.localStorage).length,
-            sessionStorage: Object.keys(snapshot.sessionStorage).length,
-          },
-        },
-      });
-    } catch (error) {
-      sendJson(response, {
-        success: false,
-        message: `恢复会话失败: ${errorMessage(error)}`,
-        tooltype: 'restore_session_state',
+    const snapshot = sessionSnapshots.get(sid);
+    if (!snapshot) {
+      throw createToolError(ErrorCodes.NOT_FOUND, `会话快照未找到: ${sid}`, {
+        toolName: 'restore_session_state',
       });
     }
+
+    const page = _context.getSelectedPage();
+    if (!page) {
+      throw createToolError(
+        ErrorCodes.PAGE_REQUIRED,
+        '未选中页面，请先使用 select_page 选择目标页面。',
+        {toolName: 'restore_session_state'},
+      );
+    }
+
+    if (navigateToSavedUrl !== false) {
+      await page.goto(snapshot.url, {waitUntil: 'networkidle'});
+    }
+
+    if (clearStorageBeforeRestore === true) {
+      await page.evaluate(() => {
+        window.localStorage.clear();
+        window.sessionStorage.clear();
+      });
+      await page.context().clearCookies();
+    }
+
+    if (snapshot.cookies.length > 0) {
+      const cookiesToAdd = snapshot.cookies
+        .map((c: Record<string, unknown>) => sanitizeCookie(c))
+        .filter((c): c is SanitizedCookie => c !== null);
+      if (cookiesToAdd.length > 0) {
+        await page.context().addCookies(cookiesToAdd);
+      }
+    }
+    for (const [key, value] of Object.entries(snapshot.localStorage)) {
+      await page.evaluate(
+        ({k, v}: {k: string; v: string}) => {
+          window.localStorage.setItem(k, v);
+        },
+        {k: key, v: value},
+      );
+    }
+    for (const [key, value] of Object.entries(snapshot.sessionStorage)) {
+      await page.evaluate(
+        ({k, v}: {k: string; v: string}) => {
+          window.sessionStorage.setItem(k, v);
+        },
+        {k: key, v: value},
+      );
+    }
+
+    sendJson(response, {
+      success: true,
+      message: `会话已恢复: ${sid}`,
+      tooltype: 'restore_session_state',
+      data: {
+        sessionId: snapshot.id,
+        restoredAt: new Date().toISOString(),
+        url: snapshot.url,
+        restored: {
+          cookies: snapshot.cookies.length,
+          localStorage: Object.keys(snapshot.localStorage).length,
+          sessionStorage: Object.keys(snapshot.sessionStorage).length,
+        },
+      },
+    });
   },
 });
 
@@ -512,61 +500,38 @@ export const dumpSessionState = defineTool({
   },
   handler: async (request, response, _context) => {
     const {sessionId: sid, path, pretty, encrypt} = request.params;
-    try {
-      prepareSessionStore();
+    prepareSessionStore();
 
-      const snapshot = sessionSnapshots.get(sid);
-      if (!snapshot) {
-        sendJson(response, {
-          success: false,
-          message: `会话快照未找到: ${sid}`,
-          tooltype: 'dump_session_state',
-          data: {
-            sessionId: sid,
-            path: null,
-            bytes: 0,
-            encrypted: false,
-          },
-        });
-        return;
-      }
-
-      const isPretty = pretty !== false;
-      const rawJson = JSON.stringify(snapshot, null, isPretty ? 2 : 0);
-      const encryptedPayload = encrypt === true ? encryptText(rawJson) : null;
-      const json = encryptedPayload
-        ? JSON.stringify(encryptedPayload, null, isPretty ? 2 : 0)
-        : rawJson;
-
-      if (path) {
-        const safePath = validateOutputPath(path);
-        await writeFile(safePath, json, 'utf8');
-      }
-
-      sendJson(response, {
-        success: true,
-        message: `会话已导出: ${sid}`,
-        tooltype: 'dump_session_state',
-        data: {
-          sessionId: snapshot.id,
-          path: path ?? null,
-          bytes: Buffer.byteLength(json, 'utf8'),
-          encrypted: encrypt === true,
-        },
-      });
-    } catch (error) {
-      sendJson(response, {
-        success: false,
-        message: `导出会话失败: ${errorMessage(error)}`,
-        tooltype: 'dump_session_state',
-        data: {
-          sessionId: sid,
-          path: path ?? null,
-          bytes: 0,
-          encrypted: encrypt === true,
-        },
+    const snapshot = sessionSnapshots.get(sid);
+    if (!snapshot) {
+      throw createToolError(ErrorCodes.NOT_FOUND, `会话快照未找到: ${sid}`, {
+        toolName: 'dump_session_state',
       });
     }
+
+    const isPretty = pretty !== false;
+    const rawJson = JSON.stringify(snapshot, null, isPretty ? 2 : 0);
+    const encryptedPayload = encrypt === true ? encryptText(rawJson) : null;
+    const json = encryptedPayload
+      ? JSON.stringify(encryptedPayload, null, isPretty ? 2 : 0)
+      : rawJson;
+
+    if (path) {
+      const safePath = validateOutputPath(path);
+      await writeFile(safePath, json, 'utf8');
+    }
+
+    sendJson(response, {
+      success: true,
+      message: `会话已导出: ${sid}`,
+      tooltype: 'dump_session_state',
+      data: {
+        sessionId: snapshot.id,
+        path: path ?? null,
+        bytes: Buffer.byteLength(json, 'utf8'),
+        encrypted: encrypt === true,
+      },
+    });
   },
 });
 
@@ -585,111 +550,94 @@ export const loadSessionState = defineTool({
   },
   handler: async (request, response, _context) => {
     const {sessionId: sid, path, snapshotJson, overwrite} = request.params;
-    try {
-      prepareSessionStore();
+    prepareSessionStore();
 
-      if (!path && !snapshotJson && sid) {
-        const existingSnapshot = sessionSnapshots.get(sid);
-        if (existingSnapshot) {
-          sendJson(response, {
-            success: true,
-            message: `会话已从内存加载: ${sid}`,
-            tooltype: 'load_session_state',
-            data: {
-              sessionId: sid,
-              loaded: true,
-              source: 'memory',
-              counts: {
-                cookies: existingSnapshot.cookies.length,
-                localStorage: Object.keys(existingSnapshot.localStorage).length,
-                sessionStorage: Object.keys(existingSnapshot.sessionStorage)
-                  .length,
-              },
+    if (!path && !snapshotJson && sid) {
+      const existingSnapshot = sessionSnapshots.get(sid);
+      if (existingSnapshot) {
+        sendJson(response, {
+          success: true,
+          message: `会话已从内存加载: ${sid}`,
+          tooltype: 'load_session_state',
+          data: {
+            sessionId: sid,
+            loaded: true,
+            source: 'memory',
+            counts: {
+              cookies: existingSnapshot.cookies.length,
+              localStorage: Object.keys(existingSnapshot.localStorage).length,
+              sessionStorage: Object.keys(existingSnapshot.sessionStorage)
+                .length,
             },
-          });
-          return;
-        }
-        sendJson(response, {
-          success: false,
-          message: `会话快照未在内存中找到: ${sid}，请提供 path 或 snapshotJson`,
-          tooltype: 'load_session_state',
-        });
-        return;
-      }
-
-      const rawJson = path
-        ? await readFile(validateOutputPath(path), 'utf8')
-        : snapshotJson;
-      if (!rawJson) {
-        sendJson(response, {
-          success: false,
-          message: '必须提供 path 或 snapshotJson',
-          tooltype: 'load_session_state',
-        });
-        return;
-      }
-
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(rawJson);
-      } catch {
-        sendJson(response, {
-          success: false,
-          message: '无效的快照 JSON 内容',
-          tooltype: 'load_session_state',
-        });
-        return;
-      }
-
-      const normalizedRaw =
-        parsed &&
-        typeof parsed === 'object' &&
-        (parsed as Record<string, unknown>).encrypted === true &&
-        (parsed as Record<string, unknown>).algorithm === 'aes-256-gcm'
-          ? JSON.parse(decryptText(parsed as EncryptedPayload))
-          : parsed;
-
-      const snapshot = normalizeSnapshot(normalizedRaw, sid);
-      const targetId = sid ?? snapshot.id;
-      const existing = sessionSnapshots.has(targetId);
-      if (existing && overwrite !== true) {
-        sendJson(response, {
-          success: false,
-          message: `会话快照已存在: ${targetId}，设置 overwrite=true 覆盖`,
-          tooltype: 'load_session_state',
-        });
-        return;
-      }
-
-      const normalized = normalizeSnapshot(
-        {...snapshot, id: targetId},
-        targetId,
-      );
-      sessionSnapshots.set(targetId, normalized);
-
-      const source = path ? 'file' : 'json';
-      sendJson(response, {
-        success: true,
-        message: `会话已加载: ${targetId}`,
-        tooltype: 'load_session_state',
-        data: {
-          sessionId: targetId,
-          loaded: true,
-          source,
-          overwritten: existing,
-          counts: {
-            cookies: normalized.cookies.length,
-            localStorage: Object.keys(normalized.localStorage).length,
-            sessionStorage: Object.keys(normalized.sessionStorage).length,
           },
-        },
-      });
-    } catch (error) {
-      sendJson(response, {
-        success: false,
-        message: `加载会话失败: ${errorMessage(error)}`,
-        tooltype: 'load_session_state',
+        });
+        return;
+      }
+      throw createToolError(
+        ErrorCodes.NOT_FOUND,
+        `会话快照未在内存中找到: ${sid}，请提供 path 或 snapshotJson`,
+        {toolName: 'load_session_state'},
+      );
+    }
+
+    const rawJson = path
+      ? await readFile(validateOutputPath(path), 'utf8')
+      : snapshotJson;
+    if (!rawJson) {
+      throw createToolError(
+        ErrorCodes.VALIDATION,
+        '必须提供 path 或 snapshotJson',
+        {toolName: 'load_session_state'},
+      );
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(rawJson);
+    } catch {
+      throw createToolError(ErrorCodes.VALIDATION, '无效的快照 JSON 内容', {
+        toolName: 'load_session_state',
       });
     }
+
+    const normalizedRaw =
+      parsed &&
+      typeof parsed === 'object' &&
+      (parsed as Record<string, unknown>).encrypted === true &&
+      (parsed as Record<string, unknown>).algorithm === 'aes-256-gcm'
+        ? JSON.parse(decryptText(parsed as EncryptedPayload))
+        : parsed;
+
+    const snapshot = normalizeSnapshot(normalizedRaw, sid);
+    const targetId = sid ?? snapshot.id;
+    const existing = sessionSnapshots.has(targetId);
+    if (existing && overwrite !== true) {
+      throw createToolError(
+        ErrorCodes.VALIDATION,
+        `会话快照已存在: ${targetId}，设置 overwrite=true 覆盖`,
+        {toolName: 'load_session_state'},
+      );
+    }
+
+    const normalized = normalizeSnapshot({...snapshot, id: targetId}, targetId);
+    sessionSnapshots.set(targetId, normalized);
+
+    const source = path ? 'file' : 'json';
+    sendJson(response, {
+      success: true,
+      message: `会话已加载: ${targetId}`,
+      tooltype: 'load_session_state',
+      data: {
+        sessionId: targetId,
+        loaded: true,
+        source,
+        overwritten: existing,
+        counts: {
+          cookies: normalized.cookies.length,
+          localStorage: Object.keys(normalized.localStorage).length,
+          sessionStorage: Object.keys(normalized.sessionStorage).length,
+        },
+      },
+    });
   },
 });

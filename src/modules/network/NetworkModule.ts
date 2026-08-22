@@ -76,6 +76,17 @@ const TEXTUAL_CONTENT_TYPES = ['json', 'text', 'javascript'];
 const NO_ACTIVE_PAGE_MESSAGE =
   '当前无活跃页面，请先通过 new_page 或 select_page 创建/选择页面';
 
+function filterExtensionRequests(
+  requests: HTTPRequest[],
+  includeExtensionRequests = false,
+): HTTPRequest[] {
+  return includeExtensionRequests
+    ? requests
+    : requests.filter(
+        request => !request.url().startsWith('chrome-extension://'),
+      );
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => {
     setTimeout(resolve, ms);
@@ -229,6 +240,7 @@ export class NetworkModule {
 
       if (params.waitForRequest) {
         const matched = await this.waitForMatchingRequest(services, {
+          includeExtensionRequests: params.includeExtensionRequests,
           includePreservedRequests: includePreserved,
           targetPage: page,
           waitForRequest: params.waitForRequest,
@@ -239,6 +251,10 @@ export class NetworkModule {
           let timedOutRequests = services.getNetworkRequestsForPage(
             page,
             includePreserved,
+          );
+          timedOutRequests = filterExtensionRequests(
+            timedOutRequests,
+            params.includeExtensionRequests,
           );
           timedOutRequests = timedOutRequests.filter(request =>
             request.url().includes(params.waitForRequest!),
@@ -274,6 +290,10 @@ export class NetworkModule {
       }
 
       let requests = services.getNetworkRequestsForPage(page, includePreserved);
+      requests = filterExtensionRequests(
+        requests,
+        params.includeExtensionRequests,
+      );
 
       if (params.resourceTypes?.length) {
         const normalizedTypes = new Set(params.resourceTypes);
@@ -354,6 +374,7 @@ export class NetworkModule {
   private async waitForMatchingRequest(
     services: NetworkServices,
     options: {
+      includeExtensionRequests?: boolean;
       includePreservedRequests: boolean;
       targetPage: Page;
       waitForRequest: string;
@@ -364,9 +385,12 @@ export class NetworkModule {
     const deadline = Date.now() + timeoutMs;
 
     while (true) {
-      const requests = services.getNetworkRequestsForPage(
-        options.targetPage,
-        options.includePreservedRequests,
+      const requests = filterExtensionRequests(
+        services.getNetworkRequestsForPage(
+          options.targetPage,
+          options.includePreservedRequests,
+        ),
+        options.includeExtensionRequests,
       );
       const hasMatch = requests.some(request =>
         request.url().includes(options.waitForRequest),

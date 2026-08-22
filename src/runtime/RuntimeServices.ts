@@ -45,6 +45,10 @@ export class RuntimeServices {
     return (this.llmService ??= new LLMService());
   }
 
+  isAIConfigured(): boolean {
+    return this.getLLMService().isConfigured();
+  }
+
   getAnalyzer(): CodeAnalyzer {
     return (this.analyzer ??= new CodeAnalyzer(this.getLLMService()));
   }

@@ -6,6 +6,7 @@
 
 import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {errorMessage} from '../shared/pageResponse.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
@@ -70,6 +71,14 @@ export const getHookData = defineTool({
     const {hookId, view, maxRecords, type, event, phase} = request.params;
     const runtime = getRuntime();
 
+    if (view && !['raw', 'summary', 'detail'].includes(view)) {
+      throw createToolError(
+        ErrorCodes.VALIDATION,
+        `view 参数无效: "${view}"，支持: raw, summary, detail`,
+        {toolName: 'get_hook_data', view},
+      );
+    }
+
     try {
       let storeSnapshot: Record<string, unknown[]> = {};
       try {
@@ -127,12 +136,12 @@ export const getHookData = defineTool({
       };
       response.setStructuredContent(result);
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `获取失败：${errorMessage(error)}`,
-        tooltype: 'get_hook_data',
-        data: null,
-      });
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `获取失败：${errorMessage(error)}`,
+        {toolName: 'get_hook_data'},
+      );
     }
   },
 });

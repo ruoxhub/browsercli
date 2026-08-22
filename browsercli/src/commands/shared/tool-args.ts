@@ -45,12 +45,10 @@ function inferArgValue(value: string | boolean, spec?: ToolArgSpec): unknown {
   if (spec?.type === 'string') {
     return value;
   }
-  // 数组参数：若传入的是 JSON 数组字面量（如 '["click"]'）直接解析为数组；
-  // 否则按逗号拆分（兼容 --events click,dialog 的简写）。
   if (spec?.type === 'string[]') {
     const parsed = maybeParseJsonLiteral(value);
     if (Array.isArray(parsed)) return parsed;
-    return value.split(',').map(s => s.trim());
+    return value;
   }
   // 对象参数（如 create_hook 的 params、record_reverse_evidence 的 entry）：
   // 若传入 JSON 对象字面量则解析为对象，否则原样返回交由服务端校验。

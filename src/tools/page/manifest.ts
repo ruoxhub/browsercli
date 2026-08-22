@@ -24,6 +24,10 @@ export const manifest = {
     {
       modulePath: './page/checkBrowserHealth.js',
       handlerName: 'checkBrowserHealth',
+      requirements: {
+        browser: 'connected',
+        recovery: true,
+      },
     },
     {modulePath: './page/detectCaptcha.js', handlerName: 'detectCaptcha'},
   ],

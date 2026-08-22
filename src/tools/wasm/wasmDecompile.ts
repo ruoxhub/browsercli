@@ -8,31 +8,22 @@ import {readFile, writeFile} from 'node:fs/promises';
 
 import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
 export const wasmDecompile = defineTool({
   name: 'wasm_decompile',
-  description:
-    '反编译 .wasm 文件，提供函数级摘要与可疑模式检测。',
+  description: '反编译 .wasm 文件，提供函数级摘要与可疑模式检测。',
   annotations: {
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: true,
   },
   schema: {
     inputPath: zod.string().describe('要反编译的 .wasm 文件路径'),
-    outputPath: zod
-      .string()
-      .optional()
-      .describe('.wat 文件的可选输出路径'),
-    foldExprs: zod
-      .boolean()
-      .optional()
-      .describe('折叠表达式块以提升可读性'),
-    inlineExport: zod
-      .boolean()
-      .optional()
-      .describe('将导出名内联到函数体中'),
+    outputPath: zod.string().optional().describe('.wat 文件的可选输出路径'),
+    foldExprs: zod.boolean().optional().describe('折叠表达式块以提升可读性'),
+    inlineExport: zod.boolean().optional().describe('将导出名内联到函数体中'),
     maxWatChars: zod
       .number()
       .int()
@@ -80,11 +71,12 @@ export const wasmDecompile = defineTool({
         },
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `WASM 反编译失败：${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'wasm_decompile',
-      });
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `WASM 反编译失败：${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'wasm_decompile'},
+      );
     }
   },
 });

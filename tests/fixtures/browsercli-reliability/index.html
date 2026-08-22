@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>browsercli-reliability fixture</title>
+  </head>
+  <body>
+    <h1 id="heading">Reliability Fixture</h1>
+    <button id="clickTarget">Click me</button>
+    <input id="nameInput" type="text" value="fixture" />
+    <form id="demoForm" action="/submit" method="get">
+      <input name="q" value="hello" />
+    </form>
+    <iframe id="childFrame" src="/frame.html" title="child"></iframe>
+    <script>
+      // Inline script with a named function (SourceMap comment follows).
+      function fixtureGreet(name) {
+        return 'hello ' + name;
+      }
+      window.fixtureGreet = fixtureGreet;
+      localStorage.setItem('fixtureKey', 'local-value');
+      sessionStorage.setItem('fixtureSessionKey', 'session-value');
+      window.fixtureConstant = 42;
+      //# sourceMappingURL=app.js.map
+    </script>
+    <script src="/app.js"></script>
+    <script>
+      // Inline script for the breakpoint target with a controlled local variable.
+      function targetForBreakpoint(seed) {
+        const localValue = seed * 2 + 1;
+        return localValue;
+      }
+      window.targetForBreakpoint = targetForBreakpoint;
+    </script>
+  </body>
+</html>

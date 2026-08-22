@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Response} from '../ToolDefinition.js';
 
@@ -42,8 +43,25 @@ function setExecutionResult(
   result: NativeCommandResult,
   durationMs: number,
 ): void {
+  if (result.exitCode !== 0) {
+    throw createToolError(
+      result.timedOut ? ErrorCodes.TIMEOUT : ErrorCodes.RUNTIME,
+      executionMessage(runtime, result, durationMs),
+      {toolName: 'wasm_offline_run'},
+      {
+        details: {
+          inputPath,
+          functionName,
+          runtime,
+          exitCode: result.exitCode,
+          stderr: result.stderr,
+          durationMs,
+        },
+      },
+    );
+  }
   response.setStructuredContent({
-    success: result.exitCode === 0,
+    success: true,
     message: executionMessage(runtime, result, durationMs),
     tooltype: 'wasm_offline_run',
     logFormat: 'json',
@@ -98,18 +116,19 @@ export const wasmOfflineRun = defineTool({
           timeoutMs,
         );
         if (result.notFound) {
-          response.setStructuredContent({
-            success: false,
-            message: `运行 WASM 失败：系统中未找到运行时 ${runtimeChoice}，请先安装 wasmtime 或 wasmer 后重试。`,
-            tooltype: 'wasm_offline_run',
-            data: {
-              inputPath,
-              functionName,
-              runtime: runtimeChoice,
-              ...result,
+          throw createToolError(
+            ErrorCodes.NATIVE_TOOL_MISSING,
+            `运行 WASM 失败：系统中未找到运行时 ${runtimeChoice}，请先安装 wasmtime 或 wasmer 后重试。`,
+            {toolName: 'wasm_offline_run'},
+            {
+              details: {
+                inputPath,
+                functionName,
+                runtime: runtimeChoice,
+                ...result,
+              },
             },
-          });
-          return;
+          );
         }
         setExecutionResult(
           response,
@@ -145,24 +164,23 @@ export const wasmOfflineRun = defineTool({
         timeoutMs,
       );
       if (wasmerResult.notFound) {
-        response.setStructuredContent({
-          success: false,
-          message:
-            '运行 WASM 失败：系统中未找到 wasmtime 或 wasmer，请先安装任一运行时后重试。',
-          tooltype: 'wasm_offline_run',
-          logFormat: 'json',
-          data: {
-            inputPath,
-            functionName,
-            runtime: 'auto',
-            attempts: {
-              wasmtime: wasmtimeResult,
-              wasmer: wasmerResult,
+        throw createToolError(
+          ErrorCodes.NATIVE_TOOL_MISSING,
+          '运行 WASM 失败：系统中未找到 wasmtime 或 wasmer，请先安装任一运行时后重试。',
+          {toolName: 'wasm_offline_run'},
+          {
+            details: {
+              inputPath,
+              functionName,
+              runtime: 'auto',
+              attempts: {
+                wasmtime: wasmtimeResult,
+                wasmer: wasmerResult,
+              },
+              durationMs: Date.now() - start,
             },
-            durationMs: Date.now() - start,
           },
-        });
-        return;
+        );
       }
 
       setExecutionResult(
@@ -174,11 +192,12 @@ export const wasmOfflineRun = defineTool({
         Date.now() - start,
       );
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `离线执行 WASM 失败：${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'wasm_offline_run',
-      });
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `离线执行 WASM 失败：${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'wasm_offline_run'},
+      );
     }
   },
 });

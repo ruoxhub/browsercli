@@ -10,6 +10,7 @@ import {describe, it} from 'node:test';
 import {fill} from '../../../../src/tools/input/fill.js';
 import {fillElement} from '../../../../src/tools/input/fillElement.js';
 import {fillForm} from '../../../../src/tools/input/fillForm.js';
+import {ToolError} from '../../../../src/utils/errors.js';
 
 function captureResponse() {
   let content: Record<string, unknown> | undefined;
@@ -112,23 +113,28 @@ describe('input fill tools', () => {
     };
     const output = captureResponse();
 
-    await fill.handler(
-      {params: {selector: '#name', value: 'alice'}} as never,
-      output.response as never,
-      {
-        getSelectedFrame: () => frame,
-        getExistingDebuggerContext: () => ({
-          getPausedState: () => ({reason: 'debugCommand'}),
-          getClient: () => ({
-            send: async (method: string, params: Record<string, unknown>) => {
-              calls.push(`${method}:${JSON.stringify(params)}`);
-            },
-          }),
-          resume: async () => {
-            calls.push('resume');
-          },
-        }),
-      } as never,
+    await assert.rejects(
+      () =>
+        fill.handler(
+          {params: {selector: '#name', value: 'alice'}} as never,
+          output.response as never,
+          {
+            getSelectedFrame: () => frame,
+            getExistingDebuggerContext: () => ({
+              getPausedState: () => ({reason: 'debugCommand'}),
+              getClient: () => ({
+                send: async (method: string, params: Record<string, unknown>) => {
+                  calls.push(`${method}:${JSON.stringify(params)}`);
+                },
+              }),
+              resume: async () => {
+                calls.push('resume');
+              },
+            }),
+          } as never,
+        ),
+      (error: unknown) =>
+        error instanceof ToolError && error.code === 'NOT_FOUND',
     );
 
     assert.deepEqual(calls, [

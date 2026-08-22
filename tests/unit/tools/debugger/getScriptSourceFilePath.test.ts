@@ -367,14 +367,13 @@ describe('get_script_source filePath param', () => {
       };
       const response = makeResponse();
 
-      await getScriptSource.handler(
-        {params: {scriptId: '1', filePath: target}} as never,
-        response as never,
-        context as never,
+      await assert.rejects(
+        getScriptSource.handler(
+          {params: {scriptId: '1', filePath: target}} as never,
+          response as never,
+          context as never,
+        ),
       );
-
-      const content = response.structured as {success: boolean};
-      assert.equal(content.success, false);
     } finally {
       restore();
     }
@@ -549,15 +548,15 @@ describe('get_script_source locator param', () => {
     });
     const response = makeResponse();
 
-    await getScriptSource.handler(
-      {params: {locator: {url: APP_URL}}} as never,
-      response as never,
-      context as never,
+    await assert.rejects(
+      getScriptSource.handler(
+        {params: {locator: {url: APP_URL}}} as never,
+        response as never,
+        context as never,
+      ),
+      (error: unknown) =>
+        error instanceof Error && /定位器匹配到/.test(error.message),
     );
-
-    const content = response.structured as {success: boolean; message: string};
-    assert.equal(content.success, false);
-    assert.match(content.message, /定位器匹配到/);
   });
 
   it('returns PAGE_NOT_FOUND when locator pageId is closed', async () => {
@@ -569,15 +568,15 @@ describe('get_script_source locator param', () => {
     });
     const response = makeResponse();
 
-    await getScriptSource.handler(
-      {params: {locator: {pageId: 'page-1', url: APP_URL}}} as never,
-      response as never,
-      context as never,
+    await assert.rejects(
+      getScriptSource.handler(
+        {params: {locator: {pageId: 'page-1', url: APP_URL}}} as never,
+        response as never,
+        context as never,
+      ),
+      (error: unknown) =>
+        error instanceof Error && /已关闭或不存在/.test(error.message),
     );
-
-    const content = response.structured as {success: boolean; message: string};
-    assert.equal(content.success, false);
-    assert.match(content.message, /已关闭或不存在/);
   });
 
   it('requires at least one of scriptId or locator', async () => {
@@ -586,14 +585,15 @@ describe('get_script_source locator param', () => {
     });
     const response = makeResponse();
 
-    await getScriptSource.handler(
-      {params: {}} as never,
-      response as never,
-      context as never,
+    await assert.rejects(
+      getScriptSource.handler(
+        {params: {}} as never,
+        response as never,
+        context as never,
+      ),
+      (error: unknown) =>
+        error instanceof Error &&
+        /必须提供 scriptId 或 locator/.test(error.message),
     );
-
-    const content = response.structured as {success: boolean; message: string};
-    assert.equal(content.success, false);
-    assert.match(content.message, /必须提供 scriptId 或 locator/);
   });
 });

@@ -6,6 +6,7 @@
 
 import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {errorMessage} from '../shared/pageResponse.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
@@ -46,9 +47,12 @@ export const listCreatedHooks = defineTool({
       .optional()
       .default(false)
       .describe('列出前先从浏览器同步数据'),
+    type: zod.string().optional().describe('按 Hook 类型过滤'),
+    event: zod.string().optional().describe('按事件名过滤'),
+    phase: zod.string().optional().describe('按阶段过滤'),
   },
   handler: async (request, response, context) => {
-    const {hookId, verbose = false} = request.params;
+    const {hookId, verbose = false, type, event, phase} = request.params;
     // 默认从浏览器同步，确保 hook_function / inject_hook / auto_hook 等
     // 仅存在于页面侧（window.__mcp_hooks__ / window.__hookStore）的 Hook
     // 也能被完整列出（修复：此前浏览器与进程内 Hook 未合并展示）。
@@ -128,7 +132,12 @@ export const listCreatedHooks = defineTool({
 
       // 3) window.__hookStore（调用记录）
       if (browserStore && typeof browserStore === 'object') {
-        const summary = summarizeHookStore(browserStore, {preserveEmpty: true});
+        const summary = summarizeHookStore(browserStore, {
+          preserveEmpty: Boolean(hookId) || (!type && !event && !phase),
+          type,
+          event,
+          phase,
+        });
         for (const h of summary.hooks) {
           if (hookId && h.hookId !== hookId) {
             continue;
@@ -167,7 +176,10 @@ export const listCreatedHooks = defineTool({
 
       if (browserStore && typeof browserStore === 'object') {
         const summary = summarizeHookStore(browserStore, {
-          preserveEmpty: true,
+          preserveEmpty: Boolean(hookId) || (!type && !event && !phase),
+          type,
+          event,
+          phase,
         });
         response.setStructuredContent({
           success: true,
@@ -202,14 +214,12 @@ export const listCreatedHooks = defineTool({
         },
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `列出 Hook 失败：${errorMessage(error)}`,
-        tooltype: 'list_created_hooks',
-        data: {
-          hooks: [] as unknown[],
-        },
-      });
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `列出 Hook 失败：${errorMessage(error)}`,
+        {toolName: 'list_created_hooks'},
+      );
     }
   },
 });

@@ -12,12 +12,13 @@ import {
   buildRequestBindings,
   getHookData as toolGetHookData,
   inferCandidateEnvNeeds,
+  listCreatedHooks as toolSyncHookRecords,
   normalizeHookRecord,
   removeHookBrowser as toolRemoveHookBrowser,
   summarizeHookRecords,
-  syncHookRecords as toolSyncHookRecords,
   toHookRecordArray,
 } from '../../../src/tools/hook/index.js';
+import {ToolError} from '../../../src/utils/errors.js';
 
 async function collectCode(runtime: any, params?: any) {
   setRuntime(runtime);
@@ -427,13 +428,16 @@ describe('collector/hook regressions', () => {
       evaluate: async () => ({}),
     };
 
-    const result = await getHookData(frame as never, {
-      view: 'full' as 'raw',
-    });
-
-    assert.strictEqual(result.success, false);
-    assert.match(result.message, /view 参数无效/);
-    assert.strictEqual(result.data, null);
+    await assert.rejects(
+      () =>
+        getHookData(frame as never, {
+          view: 'full' as 'raw',
+        }),
+      (error: unknown) =>
+        error instanceof ToolError &&
+        error.code === 'VALIDATION' &&
+        /view 参数无效/.test(error.message),
+    );
   });
 
   it('hook browser management tools should accept frame callMode params objects', async () => {
@@ -481,8 +485,8 @@ describe('collector/hook regressions', () => {
     ]);
 
     assert.strictEqual(removeResult.success, true);
-    assert.strictEqual(removeResult.tooltype, 'remove_hook');
-    assert.strictEqual(removeResult.hookId, 'hook_from_params');
+    assert.strictEqual(removeResult.tooltype, 'remove_hook_browser');
+    assert.strictEqual(removeResult.data.hookId, 'hook_from_params');
     assert.match(removeResult.message, /hook_from_params/);
 
     const readerHookIds = evaluateCalls
@@ -493,7 +497,9 @@ describe('collector/hook regressions', () => {
       'hook_from_params',
     ]);
 
-    const cleanupCall = evaluateCalls.find(call => call.kind === 'cleanup');
+    const cleanupCall = evaluateCalls
+      .filter(call => call.kind === 'cleanup')
+      .at(-1);
     assert.ok(cleanupCall?.script?.includes('__hookStore'));
     assert.ok(cleanupCall?.script?.includes('"hook_from_params"'));
   });

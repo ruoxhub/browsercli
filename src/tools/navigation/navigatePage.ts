@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import type {ToolContextProvider} from '../../worker/ToolContext.js';
 import {ToolCategory} from '../categories.js';
 import {resolveActivePage} from '../shared/activePageResolver.js';
@@ -59,17 +60,20 @@ export const navigatePage = defineTool({
     const options = {timeout, waitUntil: 'domcontentloaded' as const};
 
     if (navType === 'url' && !request.params.url) {
-      throw new Error('导航类型为 url 时必须提供 url 参数。');
+      throw createToolError(
+        ErrorCodes.VALIDATION,
+        '导航类型为 url 时必须提供 url 参数。',
+        {toolName: 'navigate_page'},
+      );
     }
 
     const resolvedPage = resolveActivePage(runtime);
     if (!resolvedPage.ok) {
-      response.setStructuredContent({
-        success: false,
-        message: (resolvedPage as {message: string}).message,
-        tooltype: 'navigate_page',
-      });
-      return;
+      throw createToolError(
+        ErrorCodes.PAGE_REQUIRED,
+        (resolvedPage as {message: string}).message,
+        {toolName: 'navigate_page'},
+      );
     }
 
     const page = resolvedPage.page;
@@ -108,16 +112,11 @@ export const navigatePage = defineTool({
         },
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: explainPageError(error, '导航'),
-        tooltype: 'navigate_page',
-        data: {
-          type: navType,
-          url: page.url(),
-          navigated: false,
-        },
-      });
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        explainPageError(error, '导航'),
+        {toolName: 'navigate_page', type: navType, url: page.url()},
+      );
     }
   },
 });

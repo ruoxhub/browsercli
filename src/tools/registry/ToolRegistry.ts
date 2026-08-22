@@ -5,6 +5,7 @@
  */
 
 import type {DomainManifest, ToolProfile} from '../manifest.js';
+import type {ToolRuntimeRequirements} from '../ToolDefinition.js';
 
 /**
  * MCP 工具注册表。收集所有 defineTool 定义，按 toolProfile 过滤暴露给客户端。
@@ -28,6 +29,7 @@ export interface RegisteredToolEntry {
   toolDependencies?: DomainManifest['toolDependencies'];
   sceneKeywords?: string[];
   workflowRule?: DomainManifest['workflowRule'];
+  requirements?: ToolRuntimeRequirements;
 }
 
 export class ToolRegistry {
@@ -48,6 +50,7 @@ export class ToolRegistry {
           handlerName: tool.handlerName,
           profile: this.getEffectiveProfile(manifest, tool),
           dependencies: manifest.dependencies,
+          ...(tool.requirements ? {requirements: tool.requirements} : {}),
           ...(manifest.prerequisites?.[tool.handlerName]
             ? {prerequisites: manifest.prerequisites[tool.handlerName]}
             : {}),

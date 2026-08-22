@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
 
 import {click} from '../../../../src/tools/input/click.js';
+import {ToolError} from '../../../../src/utils/errors.js';
 
 function captureResponse() {
   let content: Record<string, unknown> | undefined;
@@ -59,13 +60,15 @@ describe('click', () => {
     };
     const output = captureResponse();
 
-    await click.handler(
-      {params: {selector: '#submit', timeoutMs: 10}} as never,
-      output.response as never,
-      {getSelectedFrame: () => frame} as never,
+    await assert.rejects(
+      () =>
+        click.handler(
+          {params: {selector: '#submit', timeoutMs: 10}} as never,
+          output.response as never,
+          {getSelectedFrame: () => frame} as never,
+        ),
+      (error: unknown) =>
+        error instanceof ToolError && /超时 \(10ms\)/.test(error.message),
     );
-
-    assert.equal(output.content?.success, false);
-    assert.match(String(output.content?.message), /超时 \(10ms\)/);
   });
 });

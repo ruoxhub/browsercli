@@ -11,7 +11,16 @@ export const manifest = {
   description: 'User input simulation tools.',
   profile: 'workflow',
   tools: [
-    {modulePath: './input/click.js', handlerName: 'click'},
+    {
+      modulePath: './input/click.js',
+      handlerName: 'click',
+      requirements: {
+        browser: 'connected',
+        page: 'selected',
+        frame: 'selected',
+        debugger: 'running',
+      },
+    },
     {modulePath: './input/pressKey.js', handlerName: 'pressKey'},
     {modulePath: './input/fillForm.js', handlerName: 'fillForm'},
     {modulePath: './input/uploadFile.js', handlerName: 'uploadFile'},

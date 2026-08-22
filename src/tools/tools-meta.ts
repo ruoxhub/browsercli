@@ -17,7 +17,10 @@ import {
   ToolRegistry,
   type RegisteredToolEntry,
 } from '../tools/registry/ToolRegistry.js';
-import type {ToolDefinition} from '../tools/ToolDefinition.js';
+import type {
+  ToolDefinition,
+  ToolRuntimeRequirements,
+} from '../tools/ToolDefinition.js';
 
 import {ToolSearchEngine} from './tool-search-engine.js';
 import {
@@ -41,6 +44,7 @@ export interface ToolRegistryEntry {
   toolDependencies?: RegisteredToolEntry['toolDependencies'];
   sceneKeywords?: string[];
   workflowRule?: RegisteredToolEntry['workflowRule'];
+  requirements?: ToolRuntimeRequirements;
 }
 
 /**
@@ -63,6 +67,7 @@ export interface ToolMeta {
   toolDependencies?: ToolRegistryEntry['toolDependencies'];
   sceneKeywords?: string[];
   workflowRule?: ToolRegistryEntry['workflowRule'];
+  requirements?: ToolRuntimeRequirements;
 }
 
 /**
@@ -96,10 +101,37 @@ let toolsMetaCache: ToolMeta[] | null = null;
 let toolsByNameCache: Map<string, ToolMeta> | null = null;
 let registryByHandlerNameCache: Map<string, ToolRegistryEntry> | null = null;
 
+export function areRequirementsEqual(
+  a?: ToolRuntimeRequirements,
+  b?: ToolRuntimeRequirements,
+): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  if (
+    a.browser !== b.browser ||
+    a.page !== b.page ||
+    a.frame !== b.frame ||
+    a.debugger !== b.debugger ||
+    a.ai !== b.ai ||
+    a.recovery !== b.recovery
+  ) {
+    return false;
+  }
+  const aNative = a.nativeTools ?? [];
+  const bNative = b.nativeTools ?? [];
+  if (aNative.length !== bNative.length) return false;
+  const aSorted = [...aNative].sort();
+  const bSorted = [...bNative].sort();
+  for (let i = 0; i < aSorted.length; i++) {
+    if (aSorted[i] !== bSorted[i]) return false;
+  }
+  return true;
+}
+
 /**
  * 从 defineTool 模块中提取 ToolMeta
  */
-async function loadToolMeta(
+export async function loadToolMeta(
   entry: ToolRegistryEntry,
 ): Promise<ToolMeta | null> {
   try {
@@ -121,6 +153,21 @@ async function loadToolMeta(
       typeof handler.handler === 'function'
     ) {
       const def = handler as ToolDefinition;
+
+      if (
+        entry.requirements &&
+        def.annotations?.requirements &&
+        !areRequirementsEqual(entry.requirements, def.annotations.requirements)
+      ) {
+        console.warn(
+          `[tools-meta] ${entry.modulePath}:${entry.handlerName} 声明式 requirements 冲突：manifest 与 ToolDefinition.annotations 不一致`,
+        );
+        return null;
+      }
+
+      const effectiveRequirements =
+        entry.requirements ?? def.annotations?.requirements;
+
       const argSpecs = extractArgSpecsFromSchema(def.schema);
       const schemaTypeMap = extractSchemaTypeMap(def.schema);
 
@@ -139,6 +186,7 @@ async function loadToolMeta(
         toolDependencies: entry.toolDependencies,
         sceneKeywords: entry.sceneKeywords,
         workflowRule: entry.workflowRule,
+        ...(effectiveRequirements ? {requirements: effectiveRequirements} : {}),
       };
     }
 
@@ -205,6 +253,7 @@ function buildMinimalMeta(name: string, entry: ToolRegistryEntry): ToolMeta {
     toolDependencies: entry.toolDependencies,
     sceneKeywords: entry.sceneKeywords,
     workflowRule: entry.workflowRule,
+    ...(entry.requirements ? {requirements: entry.requirements} : {}),
   };
 }
 

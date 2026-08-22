@@ -12,6 +12,7 @@ import {
   evaluateScriptFn,
   injectPreloadScript as injectPreloadScriptTool,
 } from '../../../src/tools/script/script.js';
+import {ToolError} from '../../../src/utils/errors.js';
 
 async function evaluateScript(runtime: any, params: any): Promise<any> {
   const originalProvider = getRuntime().contextProvider;
@@ -87,6 +88,19 @@ interface _ExecutionContextLike {
 }
 
 describe('evaluate_script callback path', () => {
+  it('suggests shell-safe input modes for truncated functions', async () => {
+    await assert.rejects(
+      () =>
+        evaluateScript({} as EvaluateScriptRuntime, {
+          function: '() => {',
+        }),
+      (error: unknown) =>
+        error instanceof ToolError &&
+        /--file/.test(error.message) &&
+        /--stdin/.test(error.message),
+    );
+  });
+
   it('executes page.evaluate callback body and disposes handle', async () => {
     let disposed = 0;
 
@@ -409,19 +423,22 @@ describe('evaluate_script callback path', () => {
       },
     };
 
-    const result = await evaluateScript(
-      {
-        getSelectedFrame: () => frame,
-        getSelectedPage: () => null,
-        getDebuggerContext: async () => {
-          throw new Error('cdp unavailable');
-        },
-      } as EvaluateScriptRuntime,
-      {function: '() => ({ ok: true })'},
+    await assert.rejects(
+      () =>
+        evaluateScript(
+          {
+            getSelectedFrame: () => frame,
+            getSelectedPage: () => null,
+            getDebuggerContext: async () => {
+              throw new Error('cdp unavailable');
+            },
+          } as EvaluateScriptRuntime,
+          {function: '() => ({ ok: true })'},
+        ),
+      (error: unknown) =>
+        error instanceof ToolError && /cdp unavailable/.test(error.message),
     );
 
-    assert.equal(result.success, false);
-    assert.match(result.message, /cdp unavailable/);
     assert.equal(frameUsed, false);
   });
 
@@ -473,18 +490,21 @@ describe('evaluate_script callback path', () => {
 
   it('honors a caller-provided execution timeout', async () => {
     const startedAt = Date.now();
-    const result = await evaluateScript(
-      {
-        getSelectedFrame: () => ({
-          evaluateHandle: async () => await new Promise<never>(() => undefined),
-        }),
-        getSelectedPage: () => null,
-      } as unknown as EvaluateScriptRuntime,
-      {function: 'document.title', timeoutMs: 10},
+    await assert.rejects(
+      () =>
+        evaluateScript(
+          {
+            getSelectedFrame: () => ({
+              evaluateHandle: async () => await new Promise<never>(() => undefined),
+            }),
+            getSelectedPage: () => null,
+          } as unknown as EvaluateScriptRuntime,
+          {function: 'document.title', timeoutMs: 10},
+        ),
+      (error: unknown) =>
+        error instanceof ToolError && /timed out/i.test(error.message),
     );
 
-    assert.equal(result.success, false);
-    assert.match(result.message, /timed out/);
     assert.ok(Date.now() - startedAt < 1_000);
   });
 
@@ -513,40 +533,46 @@ describe('evaluate_script callback path', () => {
       }),
     } as unknown as EvaluateScriptDebuggerContext;
 
-    const result = await evaluateScript(
-      {
-        getSelectedFrame: () => null,
-        getSelectedPage: () => null,
-        getDebuggerContext: async () => debuggerContext,
-      } as EvaluateScriptRuntime,
-      {
-        function: '() => window.__zhihu.get_zse_96()',
-        context: 'page',
-      },
+    await assert.rejects(
+      () =>
+        evaluateScript(
+          {
+            getSelectedFrame: () => null,
+            getSelectedPage: () => null,
+            getDebuggerContext: async () => debuggerContext,
+          } as EvaluateScriptRuntime,
+          {
+            function: '() => window.__zhihu.get_zse_96()',
+            context: 'page',
+          },
+        ),
+      (error: unknown) =>
+        error instanceof ToolError && /content script/i.test(error.message),
     );
-
-    assert.equal(result.success, false);
-    assert.match(result.message, /content script/i);
   });
 
   it('registers runtime preload script on the page context', async () => {
     let pageAddInitCalls = 0;
 
-    const result = await injectPreloadScript(
-      {
-        getSelectedFrame: () => null,
-        getSelectedPage: () => ({
-          addInitScript: async () => {
-            pageAddInitCalls += 1;
-          },
-        }),
-        getBrowserContext: () => null,
-        getPersistentHookRegistry: () => ({register: async () => undefined}),
-      } as InjectPreloadRuntime,
-      {script: 'window.__preload = 1;'},
+    await assert.rejects(
+      () =>
+        injectPreloadScript(
+          {
+            getSelectedFrame: () => null,
+            getSelectedPage: () => ({
+              addInitScript: async () => {
+                pageAddInitCalls += 1;
+              },
+            }),
+            getBrowserContext: () => null,
+            getPersistentHookRegistry: () => ({register: async () => undefined}),
+          } as InjectPreloadRuntime,
+          {script: 'window.__preload = 1;'},
+        ),
+      (error: unknown) =>
+        error instanceof ToolError && error.code === 'BROWSER_REQUIRED',
     );
 
-    assert.equal(result.success, false);
     assert.equal(pageAddInitCalls, 0);
   });
 });

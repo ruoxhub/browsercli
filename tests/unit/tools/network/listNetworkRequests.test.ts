@@ -89,7 +89,7 @@ function createMockServices(services: {
     getRequestInitiator: services.getRequestInitiator ?? (() => undefined),
     // eslint-disable-next-line @typescript-eslint/no-empty-function -- required stub
     clearNetworkRequests: () => {},
-    clearNetworkRequestsForPage: () => {},
+    clearNetworkRequestsForPage: () => undefined,
     getWebSocketConnections: () => [],
     getWebSocketConnectionById: () =>
       ({
@@ -502,6 +502,52 @@ describe('listNetworkRequests', () => {
     assert.equal(
       result.data.requests[0]?.url,
       'https://www.zhihu.com/api/v4/feed',
+    );
+  });
+
+  it('hides browser extension requests by default', async () => {
+    const page = {id: 0};
+    const siteRequest = createRequest('https://example.test/a/guide1');
+    const extensionRequest = createRequest(
+      'chrome-extension://abcdef/background.json',
+    );
+    const services = createMockServices({
+      getPages: () => [page],
+      getSelectedPage: () => page,
+      getSelectedPageIndex: () => 0,
+      getNetworkRequests: () => [extensionRequest, siteRequest] as never[],
+      getNetworkRequestStableId: request =>
+        request === (siteRequest as never) ? 401 : 402,
+    });
+
+    const result = await networkModule.listRequests(services, {});
+
+    assert.deepEqual(
+      result.data.requests.map(request => request.url),
+      ['https://example.test/a/guide1'],
+    );
+  });
+
+  it('can include browser extension requests explicitly', async () => {
+    const page = {id: 0};
+    const extensionRequest = createRequest(
+      'chrome-extension://abcdef/background.json',
+    );
+    const services = createMockServices({
+      getPages: () => [page],
+      getSelectedPage: () => page,
+      getSelectedPageIndex: () => 0,
+      getNetworkRequests: () => [extensionRequest] as never[],
+      getNetworkRequestStableId: () => 402,
+    });
+
+    const result = await networkModule.listRequests(services, {
+      includeExtensionRequests: true,
+    });
+
+    assert.equal(
+      result.data.requests[0]?.url,
+      'chrome-extension://abcdef/background.json',
     );
   });
 });

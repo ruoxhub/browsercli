@@ -8,6 +8,7 @@ import {getReverseStageGuide} from '../../modules/workflows/ReverseStageGuide.js
 import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
 import type {ReverseTaskState} from '../../types/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -112,8 +113,7 @@ async function buildTaskAwareAdvice(params: RecommendNextStepParams) {
 
 export const recommendNextStepTool = defineTool({
   name: 'recommend_next_step',
-  description:
-    '根据轻量级工作流信号，推荐下一步的逆向工程动作。',
+  description: '根据轻量级工作流信号，推荐下一步的逆向工程动作。',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
   schema: {
     taskId: zod.string().optional(),
@@ -155,8 +155,7 @@ export const recommendNextStepTool = defineTool({
 
 export const explainReverseStage = defineTool({
   name: 'explain_reverse_stage',
-  description:
-    '解释某个逆向工程阶段的目标、进入条件、避免事项与推荐工具。',
+  description: '解释某个逆向工程阶段的目标、进入条件、避免事项与推荐工具。',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
   schema: {
     stage: zod
@@ -178,23 +177,24 @@ export const explainReverseStage = defineTool({
       }
 
       if (!guide) {
-        response.setStructuredContent({
-          success: false,
-          message: `未知的逆向阶段：${stage}。可选阶段：Observe, Capture, Rebuild, Patch, DeepDive, PureExtraction, Port。`,
-          tooltype: 'explain_reverse_stage',
-          data: {
-            validStages: [
-              'Observe',
-              'Capture',
-              'Rebuild',
-              'Patch',
-              'DeepDive',
-              'PureExtraction',
-              'Port',
-            ],
+        throw createToolError(
+          ErrorCodes.VALIDATION,
+          `未知的逆向阶段：${stage}。可选阶段：Observe, Capture, Rebuild, Patch, DeepDive, PureExtraction, Port。`,
+          {toolName: 'explain_reverse_stage'},
+          {
+            details: {
+              validStages: [
+                'Observe',
+                'Capture',
+                'Rebuild',
+                'Patch',
+                'DeepDive',
+                'PureExtraction',
+                'Port',
+              ],
+            },
           },
-        });
-        return;
+        );
       }
 
       const payload =
@@ -208,12 +208,12 @@ export const explainReverseStage = defineTool({
         data: payload,
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `解释逆向阶段失败：${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'explain_reverse_stage',
-        data: {},
-      });
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `解释逆向阶段失败：${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'explain_reverse_stage'},
+      );
     }
   },
 });

@@ -6,6 +6,7 @@
 
 import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {withOperationTimeout} from '../shared/browserRuntime.js';
 import {defineTool} from '../ToolDefinition.js';
@@ -51,21 +52,26 @@ export const collectWasm = defineTool({
     try {
       const {url} = request.params;
       if (!url) {
-        response.setStructuredContent({
-          success: false,
-          message: '收集 WASM 失败：url 不能为空',
-          tooltype: 'collect_wasm',
-        });
-        return;
+        throw createToolError(
+          ErrorCodes.VALIDATION,
+          '收集 WASM 失败：url 不能为空',
+          {toolName: 'collect_wasm'},
+        );
       }
       const selectedPage = context.getSelectedPage();
       if (!selectedPage) {
-        response.setStructuredContent({
-          success: false,
-          message: '收集 WASM 失败：没有选中的页面',
-          tooltype: 'collect_wasm',
-        });
-        return;
+        throw createToolError(
+          ErrorCodes.PAGE_REQUIRED,
+          '收集 WASM 失败：没有选中的页面',
+          {toolName: 'collect_wasm'},
+          {
+            recovery: {
+              tool: 'select_page',
+              command: 'browsercli call select_page',
+              reason: 'A page must be selected before collecting WASM',
+            },
+          },
+        );
       }
       const runtime = getRuntime();
       runtime.syncPageContext(selectedPage);
@@ -87,11 +93,12 @@ export const collectWasm = defineTool({
         data: result,
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `收集 WASM 失败：${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'collect_wasm',
-      });
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `收集 WASM 失败：${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'collect_wasm'},
+      );
     }
   },
 });

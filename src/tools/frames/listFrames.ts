@@ -5,6 +5,7 @@
  */
 
 import type {Frame} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import type {ToolContextProvider} from '../../worker/ToolContext.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
@@ -38,18 +39,16 @@ export const listFrames = defineTool({
   handler: async (_request, response, context) => {
     const runtime = context as unknown as ToolContextProvider;
 
-    try {
-      const page = runtime.getSelectedPage();
-      if (!page) {
-        response.setStructuredContent({
-          success: false,
-          message: '没有可用的页面，请先导航到目标页面',
-          toolType: 'list_frames',
-          data: {},
-        });
-        return;
-      }
+    const page = runtime.getSelectedPage();
+    if (!page) {
+      throw createToolError(
+        ErrorCodes.PAGE_REQUIRED,
+        '没有可用的页面，请先导航到目标页面',
+        {toolName: 'list_frames'},
+      );
+    }
 
+    try {
       const frames = page.frames();
       const currentFrame = runtime.getSelectedFrame();
 
@@ -80,12 +79,11 @@ export const listFrames = defineTool({
         data: {frameInfos, selectedIndex},
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `列出 Frame 失败：${error instanceof Error ? error.message : String(error)}`,
-        toolType: 'list_frames',
-        data: {},
-      });
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `列出 Frame 失败：${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'list_frames'},
+      );
     }
   },
 });

@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {NO_ACTIVE_PAGE_MESSAGE} from '../shared/activePageResolver.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
@@ -41,13 +42,11 @@ export const getDomStructure = defineTool({
     const frame = (context as Context).getSelectedFrame();
 
     if (!frame) {
-      response.setStructuredContent({
-        success: false,
-        message: NO_ACTIVE_PAGE_MESSAGE,
-        tooltype: 'get_dom_structure',
-        data: null,
-      });
-      return;
+      throw createToolError(
+        ErrorCodes.FRAME_REQUIRED,
+        NO_ACTIVE_PAGE_MESSAGE,
+        {toolName: 'get_dom_structure'},
+      );
     }
 
     try {
@@ -104,12 +103,11 @@ export const getDomStructure = defineTool({
         data: structure ?? null,
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `Failed to get DOM structure: ${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'get_dom_structure',
-        data: null,
-      });
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `Failed to get DOM structure: ${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'get_dom_structure'},
+      );
     }
   },
 });

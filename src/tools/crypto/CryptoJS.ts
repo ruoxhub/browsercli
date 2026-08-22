@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Context, type Response} from '../ToolDefinition.js';
 
@@ -154,11 +155,12 @@ export const hookCryptoJS = defineTool({
         data: {algorithms, logFormat},
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `❌ 错误：${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'hook_cryptojs',
-      });
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `❌ 错误：${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'hook_cryptojs'},
+      );
     }
   },
 });

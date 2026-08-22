@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 
@@ -60,10 +61,9 @@ export const monitorEvents = defineTool({
     const eventList = events || DEFAULT_EVENTS;
 
     await evaluateAndRespond<{
-      success: boolean;
+      error?: string;
       monitorId?: string;
       eventCount?: number;
-      message?: string;
     }>({
       context: context as Context,
       response,
@@ -85,8 +85,7 @@ export const monitorEvents = defineTool({
               browserWindow.__mcp_monitors__ || {};
             if (browserWindow.__mcp_monitors__[monitorId]) {
               return {
-                success: false,
-                message: `Monitor already exists: ${monitorId}`,
+                error: `Monitor already exists: ${monitorId}`,
               };
             }
 
@@ -99,8 +98,7 @@ export const monitorEvents = defineTool({
               target = document.querySelector(selector);
               if (!target) {
                 return {
-                  success: false,
-                  message: `Element not found: ${selector}`,
+                  error: `Element not found: ${selector}`,
                 };
               }
             }
@@ -167,12 +165,11 @@ export const monitorEvents = defineTool({
         });
       },
       onEvaluateFail: () => {
-        response.setStructuredContent({
-          success: false,
-          message: '事件监控启动失败',
-          tooltype: 'monitor_events',
-          data: {selector},
-        });
+        throw createToolError(
+          ErrorCodes.RUNTIME,
+          '事件监控启动失败',
+          {toolName: 'monitor_events', selector},
+        );
       },
     });
   },

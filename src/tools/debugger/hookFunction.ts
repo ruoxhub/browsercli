@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 
@@ -66,9 +67,8 @@ export const hookFunction = defineTool({
     const objectPath = parts.length > 0 ? parts.join('.') : 'window';
 
     await evaluateAndRespond<{
-      success: boolean;
+      error?: string;
       hookId?: string;
-      message?: string;
     }>({
       context: context as Context,
       response,
@@ -99,7 +99,7 @@ export const hookFunction = defineTool({
   window.__mcp_hooks__ = window.__mcp_hooks__ || {};
   window.__hookStore = window.__hookStore || {};
   if (window.__mcp_hooks__[hookId]) {
-    return { success: false, message: 'Hook already exists with id: ' + hookId };
+    return { error: 'Hook already exists with id: ' + hookId };
   }
   if (!window.__hookStore[hookId]) {
     window.__hookStore[hookId] = [];
@@ -202,7 +202,7 @@ export const hookFunction = defineTool({
     try { obj[methodName][key] = original[key]; } catch(e) {}
   });
 
-  return { success: true, hookId: hookId };
+  return { hookId: hookId };
 })();
 `,
         ),
@@ -223,12 +223,11 @@ export const hookFunction = defineTool({
         });
       },
       onEvaluateFail: () => {
-        response.setStructuredContent({
-          success: false,
-          message: 'Hook 安装失败',
-          tooltype: 'hook_function',
-          data: {target},
-        });
+        throw createToolError(
+          ErrorCodes.RUNTIME,
+          'Hook 安装失败',
+          {toolName: 'hook_function', target},
+        );
       },
     });
   },

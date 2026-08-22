@@ -57,6 +57,8 @@ describe('help', () => {
       assert.ok(result);
       assert.ok(result!.includes('call'));
       assert.ok(result!.includes('<tool-or-skill-name>'));
+      assert.ok(result!.includes('--file <script.js>'));
+      assert.ok(result!.includes('--stdin'));
     });
 
     it('returns help for list-tools command', () => {

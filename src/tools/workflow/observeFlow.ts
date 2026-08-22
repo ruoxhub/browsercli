@@ -6,6 +6,7 @@
 
 import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {logger} from '../../utils/logger.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
@@ -15,46 +16,27 @@ import {defineTool} from '../ToolDefinition.js';
  */
 export const observeFlow = defineTool({
   name: 'observe_flow',
-  description:
-    '观察模式：收集并分析页面脚本，识别加密与混淆，生成风险评估报告',
+  description: '观察模式：收集并分析页面脚本，识别加密与混淆，生成风险评估报告',
   annotations: {category: ToolCategory.REVERSE_ENGINEERING, readOnlyHint: true},
   schema: {
     url: zod.string().optional().describe('要观察的目标 URL'),
-    includeDynamic: zod
-      .boolean()
-      .optional()
-      .describe('包含动态脚本'),
-    includeExternal: zod
-      .boolean()
-      .optional()
-      .describe('包含外部脚本'),
+    includeDynamic: zod.boolean().optional().describe('包含动态脚本'),
+    includeExternal: zod.boolean().optional().describe('包含外部脚本'),
     includeInline: zod.boolean().optional().describe('包含内联脚本'),
     includeServiceWorker: zod
       .boolean()
       .optional()
       .describe('包含 Service Worker 脚本'),
-    includeWebWorker: zod
-      .boolean()
-      .optional()
-      .describe('包含 Web Worker 脚本'),
+    includeWebWorker: zod.boolean().optional().describe('包含 Web Worker 脚本'),
     maxFileSize: zod.number().optional().describe('最大文件大小（字节）'),
-    maxTotalSize: zod
-      .number()
-      .optional()
-      .describe('最大总大小（字节）'),
+    maxTotalSize: zod.number().optional().describe('最大总大小（字节）'),
     mode: zod
       .enum(['summary', 'priority', 'incremental', 'full'])
       .optional()
       .describe('收集模式'),
     smartMode: zod.boolean().optional().describe('启用智能模式'),
-    dynamicWaitMs: zod
-      .number()
-      .optional()
-      .describe('动态脚本等待时间（毫秒）'),
-    priorities: zod
-      .array(zod.string())
-      .optional()
-      .describe('优先 URL 模式'),
+    dynamicWaitMs: zod.number().optional().describe('动态脚本等待时间（毫秒）'),
+    priorities: zod.array(zod.string()).optional().describe('优先 URL 模式'),
     compress: zod.boolean().optional().describe('压缩代码'),
     timeout: zod.number().optional().describe('超时时间（毫秒）'),
   },
@@ -66,16 +48,15 @@ export const observeFlow = defineTool({
       logger.info('Starting observe_flow tool...');
       const startTime = Date.now();
 
-      const url = paramUrl ?? context.getSelectedPage()?.url?.() ?? undefined;
+      const url =
+        paramUrl ?? context?.getSelectedPage?.()?.url?.() ?? undefined;
 
       if (!url) {
-        response.setStructuredContent({
-          success: false,
-          message:
-            '缺少 url 参数，且当前没有选中的页面。请提供 url 参数或先导航到目标页面。',
-          tooltype: 'observe_flow',
-        });
-        return;
+        throw createToolError(
+          ErrorCodes.VALIDATION,
+          '缺少 url 参数，且当前没有选中的页面。请提供 url 参数或先导航到目标页面。',
+          {toolName: 'observe_flow'},
+        );
       }
 
       // 1. 收集页面脚本
@@ -139,11 +120,12 @@ export const observeFlow = defineTool({
       });
     } catch (error) {
       logger.error('observe_flow tool failed', error);
-      response.setStructuredContent({
-        success: false,
-        message: error instanceof Error ? error.message : String(error),
-        tooltype: 'observe_flow',
-      });
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        error instanceof Error ? error.message : String(error),
+        {toolName: 'observe_flow'},
+      );
     }
   },
 });

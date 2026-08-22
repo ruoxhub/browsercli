@@ -20,6 +20,7 @@ import {manifest as wasmManifest} from '../../../../src/tools/wasm/manifest.js';
 import {wasmMemoryInspect} from '../../../../src/tools/wasm/wasmMemoryInspect.js';
 import {wasmOfflineRun} from '../../../../src/tools/wasm/wasmOfflineRun.js';
 import {wasmOptimize} from '../../../../src/tools/wasm/wasmOptimize.js';
+import {ErrorCodes, ToolError} from '../../../../src/utils/errors.js';
 import {ToolResponseAccumulator} from '../../../../src/worker/ToolResponse.js';
 
 afterEach(() => setRuntime(undefined));
@@ -187,7 +188,7 @@ describe('collect_wasm', () => {
     assert.match(content.message, /2 个运行时事件/);
   });
 
-  it('returns a structured timeout when collection never settles', async () => {
+  it('rejects when collection never settles', async () => {
     const selectedPage = {} as Page;
     setRuntime({
       syncPageContext: () => undefined,
@@ -197,25 +198,19 @@ describe('collect_wasm', () => {
     } as never);
     const response = new ToolResponseAccumulator();
 
-    const invocation = collectWasm.handler(
-      {
-        params: {
-          url: 'https://example.test/wasm',
-          timeout: 20,
+    await assert.rejects(
+      collectWasm.handler(
+        {
+          params: {
+            url: 'https://example.test/wasm',
+            timeout: 20,
+          },
         },
-      },
-      response,
-      {getSelectedPage: () => selectedPage} as unknown as Context,
+        response,
+        {getSelectedPage: () => selectedPage} as unknown as Context,
+      ),
+      (error: unknown) => error instanceof Error && /超时/.test(error.message),
     );
-    const completed = await Promise.race([
-      invocation.then(() => true),
-      new Promise<false>(resolve => setTimeout(() => resolve(false), 200)),
-    ]);
-
-    assert.equal(completed, true, 'handler should release the worker job');
-    const content = structuredContent(response);
-    assert.equal(content.success, false);
-    assert.match(content.message, /超时/);
   });
 });
 
@@ -243,7 +238,7 @@ describe('wasm_memory_inspect', () => {
     assert.equal(content.data?.hex, '00 00 00 00 00 00 00 00');
   });
 
-  it('returns a structured timeout when frame evaluation never settles', async () => {
+  it('rejects when frame evaluation never settles', async () => {
     const evaluate = () => new Promise<never>(() => undefined);
     const frame = {evaluate} as unknown as Frame;
     const page = {evaluate, mainFrame: () => frame} as unknown as Page;
@@ -253,20 +248,14 @@ describe('wasm_memory_inspect', () => {
     } as unknown as Context;
     const response = new ToolResponseAccumulator();
 
-    const invocation = wasmMemoryInspect.handler(
-      {params: {timeoutMs: 20}} as never,
-      response,
-      context,
+    await assert.rejects(
+      wasmMemoryInspect.handler(
+        {params: {timeoutMs: 20}} as never,
+        response,
+        context,
+      ),
+      (error: unknown) => error instanceof Error && /超时/.test(error.message),
     );
-    const completed = await Promise.race([
-      invocation.then(() => true),
-      new Promise<false>(resolve => setTimeout(() => resolve(false), 200)),
-    ]);
-
-    assert.equal(completed, true, 'handler should release the worker job');
-    const content = structuredContent(response);
-    assert.equal(content.success, false);
-    assert.match(content.message, /超时/);
   });
 });
 
@@ -286,35 +275,37 @@ describe('native WASM tool failures', () => {
 
     try {
       const offlineResponse = new ToolResponseAccumulator();
-      await wasmOfflineRun.handler(
-        {
-          params: {
-            inputPath,
-            functionName: 'encrypt',
-            runtime: 'auto',
+      await assert.rejects(
+        wasmOfflineRun.handler(
+          {
+            params: {
+              inputPath,
+              functionName: 'encrypt',
+              runtime: 'auto',
+            },
           },
-        },
-        offlineResponse,
-        {} as never,
+          offlineResponse,
+          {} as never,
+        ),
+        (error: unknown) =>
+          error instanceof ToolError &&
+          error.code === ErrorCodes.NATIVE_TOOL_MISSING &&
+          /wasmtime/.test(error.message) &&
+          /wasmer/.test(error.message),
       );
 
       const optimizeResponse = new ToolResponseAccumulator();
-      await wasmOptimize.handler(
-        {params: {inputPath}},
-        optimizeResponse,
-        {} as never,
+      await assert.rejects(
+        wasmOptimize.handler(
+          {params: {inputPath}},
+          optimizeResponse,
+          {} as never,
+        ),
+        (error: unknown) =>
+          error instanceof ToolError &&
+          error.code === ErrorCodes.NATIVE_TOOL_MISSING &&
+          /wasm-opt/.test(error.message),
       );
-
-      const offlineContent = structuredContent(offlineResponse);
-      assert.equal(offlineContent.success, false);
-      assert.match(offlineContent.message, /未找到/);
-      assert.match(offlineContent.message, /wasmtime/);
-      assert.match(offlineContent.message, /wasmer/);
-
-      const optimizeContent = structuredContent(optimizeResponse);
-      assert.equal(optimizeContent.success, false);
-      assert.match(optimizeContent.message, /未找到/);
-      assert.match(optimizeContent.message, /wasm-opt/);
     } finally {
       if (originalPath === undefined) {
         delete process.env[pathKey];

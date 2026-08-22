@@ -10,7 +10,7 @@ import type {PageSelector} from '../../modules/browser/PageIdentity.js';
 import type {DebuggerManager} from '../../modules/debugger/DebuggerManager.js';
 import type {BreakpointInfo} from '../../modules/debugger/types.js';
 import {zod} from '../../third_party/index.js';
-import {ToolError} from '../../utils/errors.js';
+import {createToolError, ErrorCodes, ToolError} from '../../utils/errors.js';
 import {writeScriptFileAtomic} from '../../utils/fsSafe.js';
 import {safeStringify} from '../../utils/safeJson.js';
 import type {ToolContextProvider} from '../../worker/ToolContext.js';
@@ -117,13 +117,18 @@ function defineStepTool(config: {
         async () => {
           const debuggerContext = await getDebuggerFromContext(context);
           if (!debuggerContext.isPaused()) {
-            response.setStructuredContent({
-              success: false,
-              message: config.notPausedMessage,
-              tooltype: config.name,
-              data: {isPaused: false},
-            });
-            return;
+            throw createToolError(
+              ErrorCodes.DEBUGGER_NOT_PAUSED,
+              config.notPausedMessage,
+              {toolName: config.name},
+              {
+                recovery: {
+                  tool: 'pause',
+                  command: 'browsercli call pause',
+                  reason: 'Pause execution first',
+                },
+              },
+            );
           }
           await debuggerContext[config.action]();
           const pausedInfo =
@@ -184,13 +189,11 @@ function defineXhrBreakpointTool(config: {
           const debuggerContext = await getDebuggerFromContext(context);
           const client = debuggerContext.getClient();
           if (!client) {
-            response.setStructuredContent({
-              success: false,
-              message: 'Debugger 客户端不可用。',
-              tooltype: config.name,
-              data: {},
-            });
-            return;
+            throw createToolError(
+              ErrorCodes.CONNECTION,
+              'Debugger 客户端不可用。',
+              {toolName: config.name},
+            );
           }
           await client.send(
             config.cdpMethod as 'DOMDebugger.setXHRBreakpoint',
@@ -376,13 +379,11 @@ export const setBreakpoint = defineTool({
     const hasUrl = !!url && typeof url === 'string' && url.trim() !== '';
     const hasScriptId = !!scriptId && scriptId.trim() !== '';
     if (!hasUrl && !hasScriptId) {
-      response.setStructuredContent({
-        success: false,
-        message: 'url 与 scriptId 至少提供一个。',
-        tooltype: 'set_breakpoint',
-        data: {},
-      });
-      return;
+      throw createToolError(
+        ErrorCodes.VALIDATION,
+        'url 与 scriptId 至少提供一个。',
+        {toolName: 'set_breakpoint'},
+      );
     }
 
     const lineNum = typeof lineNumber === 'number' ? lineNumber : 1;
@@ -428,12 +429,12 @@ export const setBreakpoint = defineTool({
         },
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `设置断点失败: ${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'set_breakpoint',
-        data: {},
-      });
+      if (error instanceof ToolError) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `设置断点失败: ${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'set_breakpoint'},
+      );
     }
   },
 });
@@ -462,13 +463,11 @@ export const removeBreakpoint = defineTool({
       typeof breakpointId !== 'string' ||
       breakpointId.trim() === ''
     ) {
-      response.setStructuredContent({
-        success: false,
-        message: 'breakpointId 参数不能为空。',
-        tooltype: 'remove_breakpoint',
-        data: {},
-      });
-      return;
+      throw createToolError(
+        ErrorCodes.VALIDATION,
+        'breakpointId 参数不能为空。',
+        {toolName: 'remove_breakpoint'},
+      );
     }
 
     try {
@@ -481,12 +480,12 @@ export const removeBreakpoint = defineTool({
         data: {breakpointId},
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `移除断点失败: ${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'remove_breakpoint',
-        data: {},
-      });
+      if (error instanceof ToolError) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `移除断点失败: ${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'remove_breakpoint', breakpointId},
+      );
     }
   },
 });
@@ -518,13 +517,19 @@ export const listBreakpoints = defineTool({
         return;
       }
 
-      const breakpointData = breakpoints.map(bp => ({
-        breakpointId: bp.breakpointId,
-        url: bp.location.url || null,
-        lineNumber: (bp.location.lineNumber ?? 0) + 1,
-        columnNumber: bp.location.columnNumber ?? 0,
-        condition: bp.condition || null,
-      }));
+      const breakpointData = breakpoints.map(bp => {
+        const loc = bp.location ?? (bp as unknown as {location?: {url?: string; lineNumber?: number; columnNumber?: number}}).location;
+        const url = loc?.url || (bp as unknown as {url?: string}).url || null;
+        const lineNumber = (loc?.lineNumber ?? (bp as unknown as {lineNumber?: number}).lineNumber ?? 0) + 1;
+        const columnNumber = loc?.columnNumber ?? (bp as unknown as {columnNumber?: number}).columnNumber ?? 0;
+        return {
+          breakpointId: bp.breakpointId,
+          url,
+          lineNumber,
+          columnNumber,
+          condition: bp.condition || null,
+        };
+      });
 
       response.setStructuredContent({
         success: true,
@@ -533,12 +538,12 @@ export const listBreakpoints = defineTool({
         data: {breakpoints: breakpointData},
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `列出断点失败: ${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'list_breakpoints',
-        data: {},
-      });
+      if (error instanceof ToolError) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `列出断点失败: ${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'list_breakpoints'},
+      );
     }
   },
 });
@@ -598,6 +603,12 @@ export const resume = defineTool({
     title: '恢复执行',
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
+    requirements: {
+      browser: 'connected',
+      page: 'selected',
+      debugger: 'available',
+      recovery: true,
+    },
   },
   schema: {},
   handler: async (request, response, context) => {
@@ -611,12 +622,12 @@ export const resume = defineTool({
         data: {action: 'resume'},
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `恢复执行失败: ${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'resume',
-        data: {},
-      });
+      if (error instanceof ToolError) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `恢复执行失败: ${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'resume'},
+      );
     }
   },
 });
@@ -638,13 +649,11 @@ export const pause = defineTool({
       const debuggerContext = await getDebuggerFromContext(context);
       const client = debuggerContext.getClient();
       if (!client) {
-        response.setStructuredContent({
-          success: false,
-          message: 'Debugger 尚未启用，无法暂停执行',
-          tooltype: 'pause',
-          data: {},
-        });
-        return;
+        throw createToolError(
+          ErrorCodes.CONNECTION,
+          'Debugger 尚未启用，无法暂停执行',
+          {toolName: 'pause'},
+        );
       }
       await debuggerContext.pause();
       let reason: string;
@@ -655,7 +664,7 @@ export const pause = defineTool({
         const current = debuggerContext.getPausedState();
         if (!current) {
           response.setStructuredContent({
-            success: false,
+            success: true,
             message:
               '暂停请求已下发，但页面 5 秒内未执行 JavaScript（可能处于空闲状态）。' +
               '请求仍然生效，下次 JS 执行时会暂停；可调用 resume 取消。',
@@ -673,12 +682,12 @@ export const pause = defineTool({
         data: {action: 'pause', reason},
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `暂停执行失败: ${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'pause',
-        data: {},
-      });
+      if (error instanceof ToolError) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `暂停执行失败: ${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'pause'},
+      );
     }
   },
 });
@@ -694,6 +703,11 @@ export const listScripts = defineTool({
     title: '列出脚本',
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: true,
+    requirements: {
+      browser: 'connected',
+      page: 'selected',
+      debugger: 'available',
+    },
   },
   schema: {
     filter: zod
@@ -746,12 +760,12 @@ export const listScripts = defineTool({
         data: {scripts: scriptData, filter: request.params.filter || null},
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `列出脚本失败: ${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'list_scripts',
-        data: {},
-      });
+      if (error instanceof ToolError) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `列出脚本失败: ${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'list_scripts'},
+      );
     }
   },
 });
@@ -855,12 +869,11 @@ export const getScriptSource = defineTool({
           resolved.scriptId,
         );
         if (!cachePath) {
-          response.setStructuredContent({
-            success: false,
-            message: `未找到脚本 ${resolved.scriptId} 的源码或加载失败。`,
-            data: {scriptId: resolved.scriptId},
-          });
-          return;
+          throw createToolError(
+            ErrorCodes.NOT_FOUND,
+            `未找到脚本 ${resolved.scriptId} 的源码或加载失败。`,
+            {toolName: 'get_script_source', scriptId: resolved.scriptId},
+          );
         }
         sourcePath = cachePath;
       }
@@ -906,17 +919,15 @@ export const getScriptSource = defineTool({
         },
       });
     } catch (error) {
-      const isToolError = error instanceof ToolError;
-      response.setStructuredContent({
-        success: false,
-        message: `获取脚本源码路径失败: ${error instanceof Error ? error.message : String(error)}`,
-        ...(isToolError ? {code: error.code} : {}),
-        ...(isToolError && error.context !== undefined
-          ? {context: error.context}
-          : {}),
-        ...(isToolError ? {recoverable: error.recoverable} : {}),
-        data: {...(scriptId !== undefined ? {scriptId} : {})},
-      });
+      if (error instanceof ToolError) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `获取脚本源码路径失败: ${error instanceof Error ? error.message : String(error)}`,
+        {
+          toolName: 'get_script_source',
+          ...(scriptId !== undefined ? {scriptId} : {}),
+        },
+      );
     }
   },
 });
@@ -1157,11 +1168,9 @@ export const searchInSources = defineTool({
 
       const matchData = displayMatches.map(match => {
         const scriptId = match.scriptId;
-        const rawUrl = match.url || '(内联)';
 
         return {
           scriptId,
-          url: rawUrl,
           lineNumber: match.lineNumber + 1,
           sourcePath: sourcePathMap.get(scriptId) ?? null,
         };
@@ -1222,12 +1231,12 @@ export const searchInSources = defineTool({
         },
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `搜索失败: ${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'search_in_sources',
-        data: {query: request.params.query},
-      });
+      if (error instanceof ToolError) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `搜索失败: ${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'search_in_sources', query: request.params.query},
+      );
     }
   },
 });
@@ -1304,24 +1313,20 @@ export const traceFunction = defineTool({
     const {target, urlFilter, logArgs, logStack, hookId} = request.params;
 
     if (!target || typeof target !== 'string') {
-      response.setStructuredContent({
-        success: false,
-        message: 'target 参数不能为空。需要提供一个函数名。',
-        tooltype: 'trace_function',
-        data: {target},
-      });
-      return;
+      throw createToolError(
+        ErrorCodes.VALIDATION,
+        'target 参数不能为空。需要提供一个函数名。',
+        {toolName: 'trace_function'},
+      );
     }
 
     const debugger_ = await getDebuggerFromContext(context);
     if (!debugger_.isEnabled()) {
-      response.setStructuredContent({
-        success: false,
-        message: '调试器未启用，请先选择页面。',
-        tooltype: 'trace_function',
-        data: {target},
-      });
-      return;
+      throw createToolError(
+        ErrorCodes.PREREQUISITE,
+        '调试器未启用，请先选择页面。',
+        {toolName: 'trace_function', target},
+      );
     }
 
     // 搜索函数名
@@ -1363,17 +1368,16 @@ export const traceFunction = defineTool({
       }
 
       if (!foundMatch) {
-        response.setStructuredContent({
-          success: false,
-          message: `未找到函数 "${target}"。`,
-          tooltype: 'trace_function',
-          data: {
+        throw createToolError(
+          ErrorCodes.NOT_FOUND,
+          `未找到函数 "${target}"。`,
+          {
+            toolName: 'trace_function',
             target,
             searchedPatterns: patterns.slice(0, 4),
             hint: '使用 search_in_sources 查找确切的函数签名，然后使用 set_breakpoint。',
           },
-        });
-        return;
+        );
       }
 
       const {match} = foundMatch;
@@ -1381,13 +1385,11 @@ export const traceFunction = defineTool({
       const url = script?.url || match.url;
 
       if (!url) {
-        response.setStructuredContent({
-          success: false,
-          message: '无法追踪：脚本没有 URL（内联脚本）。',
-          tooltype: 'trace_function',
-          data: {target},
-        });
-        return;
+        throw createToolError(
+          ErrorCodes.NOT_FOUND,
+          '无法追踪：脚本没有 URL（内联脚本）。',
+          {toolName: 'trace_function', target},
+        );
       }
 
       // 获取精确的列位置
@@ -1454,12 +1456,12 @@ export const traceFunction = defineTool({
         },
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `错误: ${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'trace_function',
-        data: {target: request.params.target},
-      });
+      if (error instanceof ToolError) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `错误: ${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'trace_function', target: request.params.target},
+      );
     }
   },
 });
@@ -1497,7 +1499,7 @@ export const getAiDebugStatus = defineTool({
       });
     } catch {
       response.setStructuredContent({
-        success: false,
+        success: true,
         message: '调试器尚未初始化',
         tooltype: 'get_ai_debug_status',
         data: {
@@ -1547,21 +1549,24 @@ export const findInScript = defineTool({
       .describe('搜索是否区分大小写（默认: true）。'),
   },
   handler: async (request, response, context) => {
-    const {scriptId, query, contextChars, occurrence, caseSensitive} =
-      request.params;
+    const {
+      scriptId,
+      query,
+      contextChars = 100,
+      occurrence = 1,
+      caseSensitive = true,
+    } = request.params;
 
     try {
       const debuggerContext = await getDebuggerFromContext(context);
       const source = await debuggerContext.getScriptSource(scriptId);
 
       if (!source) {
-        response.setStructuredContent({
-          success: false,
-          message: `未找到脚本 ${scriptId} 的源码。`,
-          tooltype: 'find_in_script',
-          data: {scriptId},
-        });
-        return;
+        throw createToolError(
+          ErrorCodes.NOT_FOUND,
+          `未找到脚本 ${scriptId} 的源码。`,
+          {toolName: 'find_in_script', scriptId},
+        );
       }
 
       // 查找指定匹配
@@ -1582,13 +1587,11 @@ export const findInScript = defineTool({
       }
 
       if (position === -1) {
-        response.setStructuredContent({
-          success: false,
-          message: `"${query}" 未在脚本 ${scriptId} 中找到${occurrence > 1 ? ` (第 ${occurrence} 个匹配)` : ''}。`,
-          tooltype: 'find_in_script',
-          data: {scriptId, query, occurrence},
-        });
-        return;
+        throw createToolError(
+          ErrorCodes.NOT_FOUND,
+          `"${query}" 未在脚本 ${scriptId} 中找到${occurrence > 1 ? ` (第 ${occurrence} 个匹配)` : ''}。`,
+          {toolName: 'find_in_script', scriptId, query, occurrence},
+        );
       }
 
       // 计算行号和列号（0-based）
@@ -1643,12 +1646,12 @@ export const findInScript = defineTool({
         },
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `错误: ${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'find_in_script',
-        data: {scriptId: request.params.scriptId},
-      });
+      if (error instanceof ToolError) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `错误: ${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'find_in_script', scriptId: request.params.scriptId},
+      );
     }
   },
 });
@@ -1680,16 +1683,15 @@ export const getRequestInitiator = defineTool({
       const initiator = ctx.getRequestInitiator(httpRequest);
 
       if (!initiator) {
-        response.setStructuredContent({
-          success: false,
-          message: `未找到请求 ${requestId} 的发起者信息。`,
-          tooltype: 'get_request_initiator',
-          data: {
+        throw createToolError(
+          ErrorCodes.NOT_FOUND,
+          `未找到请求 ${requestId} 的发起者信息。`,
+          {
+            toolName: 'get_request_initiator',
             requestId,
             hint: '这可能是导航请求或发起者未被捕获。',
           },
-        });
-        return;
+        );
       }
 
       const stackFrames =
@@ -1723,12 +1725,12 @@ export const getRequestInitiator = defineTool({
         },
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `获取发起者失败: ${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'get_request_initiator',
-        data: {requestId: request.params.requestId},
-      });
+      if (error instanceof ToolError) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `获取发起者失败: ${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'get_request_initiator', requestId: request.params.requestId},
+      );
     }
   },
 });
@@ -1760,16 +1762,18 @@ export const getPausedInfo = defineTool({
       });
 
       if (!pausedInfo) {
-        response.setStructuredContent({
-          success: false,
-          message: '执行未暂停。',
-          tooltype: 'get_paused_info',
-          data: {
-            isPaused: false,
-            hint: '请先设置断点并触发它来暂停执行。',
+        throw createToolError(
+          ErrorCodes.DEBUGGER_NOT_PAUSED,
+          '执行未暂停。',
+          {toolName: 'get_paused_info'},
+          {
+            recovery: {
+              tool: 'pause',
+              command: 'browsercli call pause',
+              reason: 'Pause execution first',
+            },
           },
-        });
-        return;
+        );
       }
 
       response.setStructuredContent({
@@ -1779,12 +1783,12 @@ export const getPausedInfo = defineTool({
         data: pausedInfo,
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `获取暂停信息失败: ${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'get_paused_info',
-        data: {isPaused: false},
-      });
+      if (error instanceof ToolError) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `获取暂停信息失败: ${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'get_paused_info'},
+      );
     }
   },
 });
@@ -1800,6 +1804,11 @@ export const evaluateOnCallframe = defineTool({
     title: '在调用帧上执行',
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
+    requirements: {
+      browser: 'connected',
+      page: 'selected',
+      debugger: 'paused',
+    },
   },
   schema: {
     expression: zod.string().describe('要执行的 JavaScript 表达式。'),
@@ -1819,26 +1828,30 @@ export const evaluateOnCallframe = defineTool({
       const pausedState = debuggerContext.getPausedState();
 
       if (!pausedState) {
-        response.setStructuredContent({
-          success: false,
-          message: '执行未暂停，无法执行表达式。',
-          tooltype: 'evaluate_on_callframe',
-          data: {isPaused: false},
-        });
-        return;
+        throw createToolError(
+          ErrorCodes.DEBUGGER_NOT_PAUSED,
+          '执行未暂停，无法执行表达式。',
+          {toolName: 'evaluate_on_callframe'},
+          {
+            recovery: {
+              tool: 'pause',
+              command: 'browsercli call pause',
+              reason: 'Pause execution first',
+            },
+          },
+        );
       }
 
       if (frameIndex >= pausedState.callFrames.length) {
-        response.setStructuredContent({
-          success: false,
-          message: `无效的帧索引 ${frameIndex}。可用帧: 0-${pausedState.callFrames.length - 1}`,
-          tooltype: 'evaluate_on_callframe',
-          data: {
+        throw createToolError(
+          ErrorCodes.VALIDATION,
+          `无效的帧索引 ${frameIndex}。可用帧: 0-${pausedState.callFrames.length - 1}`,
+          {
+            toolName: 'evaluate_on_callframe',
             frameIndex,
             availableFrames: pausedState.callFrames.length,
           },
-        });
-        return;
+        );
       }
 
       const callFrameId = pausedState.callFrames[frameIndex].callFrameId;
@@ -1851,16 +1864,16 @@ export const evaluateOnCallframe = defineTool({
       });
 
       if (result.exceptionDetails) {
-        response.setStructuredContent({
-          success: false,
-          message: `错误: ${result.exceptionDetails.text}`,
-          tooltype: 'evaluate_on_callframe',
-          data: {
+        throw createToolError(
+          ErrorCodes.RUNTIME,
+          `错误: ${result.exceptionDetails.text}`,
+          {
+            toolName: 'evaluate_on_callframe',
             expression,
             frameIndex,
             exception: result.exceptionDetails.exception?.description || null,
           },
-        });
+        );
       } else {
         response.setStructuredContent({
           success: true,
@@ -1877,12 +1890,12 @@ export const evaluateOnCallframe = defineTool({
         });
       }
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `执行失败: ${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'evaluate_on_callframe',
-        data: {expression: request.params.expression},
-      });
+      if (error instanceof ToolError) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `执行失败: ${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'evaluate_on_callframe', expression: request.params.expression},
+      );
     }
   },
 });
@@ -1905,13 +1918,18 @@ export const inspectLocals = defineTool({
       const pausedState = debuggerContext.getPausedState();
 
       if (!pausedState) {
-        response.setStructuredContent({
-          success: false,
-          message: '当前未处于暂停状态',
-          tooltype: 'inspect_locals',
-          data: {isPaused: false},
-        });
-        return;
+        throw createToolError(
+          ErrorCodes.DEBUGGER_NOT_PAUSED,
+          '当前未处于暂停状态',
+          {toolName: 'inspect_locals'},
+          {
+            recovery: {
+              tool: 'pause',
+              command: 'browsercli call pause',
+              reason: 'Pause execution first',
+            },
+          },
+        );
       }
 
       const frames = await Promise.all(
@@ -1968,12 +1986,12 @@ export const inspectLocals = defineTool({
         },
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `检查局部变量失败: ${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'inspect_locals',
-        data: {isPaused: false},
-      });
+      if (error instanceof ToolError) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `检查局部变量失败: ${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'inspect_locals'},
+      );
     }
   },
 });
@@ -2012,7 +2030,7 @@ export const setBreakpointOnText = defineTool({
       .describe('条件表达式，断点仅在表达式求值为 true 时触发。'),
   },
   handler: async (request, response, context) => {
-    const {text, urlFilter, occurrence, condition} = request.params;
+    const {text, urlFilter, occurrence = 1, condition} = request.params;
 
     try {
       const debuggerContext = await getDebuggerFromContext(context);
@@ -2024,13 +2042,11 @@ export const setBreakpointOnText = defineTool({
       });
 
       if (searchResult.matches.length === 0) {
-        response.setStructuredContent({
-          success: false,
-          message: `"${text}" 未在任何已加载脚本中找到。`,
-          tooltype: 'set_breakpoint_on_text',
-          data: {text},
-        });
-        return;
+        throw createToolError(
+          ErrorCodes.NOT_FOUND,
+          `"${text}" 未在任何已加载脚本中找到。`,
+          {toolName: 'set_breakpoint_on_text', text},
+        );
       }
 
       // 应用 URL 过滤
@@ -2040,55 +2056,49 @@ export const setBreakpointOnText = defineTool({
         m => m.url,
       );
       if (matches.length === 0) {
-        response.setStructuredContent({
-          success: false,
-          message: `"${text}" 在未匹配 "${urlFilter}" 的脚本中找到。`,
-          tooltype: 'set_breakpoint_on_text',
-          data: {text, urlFilter},
-        });
-        return;
+        throw createToolError(
+          ErrorCodes.NOT_FOUND,
+          `"${text}" 在未匹配 "${urlFilter}" 的脚本中找到。`,
+          {toolName: 'set_breakpoint_on_text', text, urlFilter},
+        );
       }
 
       // 获取指定的匹配项
       if (occurrence > matches.length) {
-        response.setStructuredContent({
-          success: false,
-          message: `只有 ${matches.length} 个匹配项，但请求了第 ${occurrence} 个。`,
-          tooltype: 'set_breakpoint_on_text',
-          data: {
+        throw createToolError(
+          ErrorCodes.VALIDATION,
+          `只有 ${matches.length} 个匹配项，但请求了第 ${occurrence} 个。`,
+          {
+            toolName: 'set_breakpoint_on_text',
             text,
             matchesCount: matches.length,
             requestedOccurrence: occurrence,
           },
-        });
-        return;
+        );
       }
 
       const match = matches[occurrence - 1];
       if (!match) {
-        response.setStructuredContent({
-          success: false,
-          message: `未找到第 ${occurrence} 个匹配项。`,
-          tooltype: 'set_breakpoint_on_text',
-          data: {
+        throw createToolError(
+          ErrorCodes.NOT_FOUND,
+          `未找到第 ${occurrence} 个匹配项。`,
+          {
+            toolName: 'set_breakpoint_on_text',
             text,
             matchesCount: matches.length,
             requestedOccurrence: occurrence,
           },
-        });
-        return;
+        );
       }
       const script = debuggerContext.getScriptById(match.scriptId);
       const url = script?.url || match.url;
 
       if (!url) {
-        response.setStructuredContent({
-          success: false,
-          message: '无法设置断点：脚本没有 URL（内联脚本）。',
-          tooltype: 'set_breakpoint_on_text',
-          data: {text},
-        });
-        return;
+        throw createToolError(
+          ErrorCodes.NOT_FOUND,
+          '无法设置断点：脚本没有 URL（内联脚本）。',
+          {toolName: 'set_breakpoint_on_text', text},
+        );
       }
 
       // 步骤 2: 通过搜索脚本源码获取精确列位置
@@ -2143,12 +2153,12 @@ export const setBreakpointOnText = defineTool({
         },
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `错误: ${error instanceof Error ? error.message : String(error)}`,
-        tooltype: 'set_breakpoint_on_text',
-        data: {text: request.params.text},
-      });
+      if (error instanceof ToolError) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `错误: ${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'set_breakpoint_on_text', text: request.params.text},
+      );
     }
   },
 });

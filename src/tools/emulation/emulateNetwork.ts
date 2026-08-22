@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -110,17 +111,18 @@ export const emulateNetwork = defineTool({
         return;
       }
 
-      response.setStructuredContent({
-        success: false,
-        message: `未知的网络节流选项：${throttlingOption}`,
-        tooltype,
-      });
+      throw createToolError(
+        ErrorCodes.VALIDATION,
+        `未知的网络节流选项：${throttlingOption}`,
+        {toolName: 'emulate_network', throttlingOption},
+      );
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `网络模拟失败：${error instanceof Error ? error.message : String(error)}`,
-        tooltype,
-      });
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `网络模拟失败：${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'emulate_network'},
+      );
     }
   },
 });

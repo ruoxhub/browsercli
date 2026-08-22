@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {errorMessage, sendJson} from '../shared/pageResponse.js';
 import {defineTool} from '../ToolDefinition.js';
@@ -29,17 +30,16 @@ export const scrollBy = defineTool({
   handler: async (request, response, context) => {
     const {direction, pixels = 1000} = request.params;
 
-    try {
-      const page = context.getSelectedPage();
-      if (!page) {
-        sendJson(response, {
-          success: false,
-          message: '未选中页面，请先使用 select_page 选择目标页面。',
-          tooltype: 'scroll_by',
-        });
-        return;
-      }
+    const page = context.getSelectedPage();
+    if (!page) {
+      throw createToolError(
+        ErrorCodes.PAGE_REQUIRED,
+        '未选中页面，请先使用 select_page 选择目标页面。',
+        {toolName: 'scroll_by'},
+      );
+    }
 
+    try {
       const result = await page.evaluate(
         ({dir, px}: {dir: string; px: number}) => {
           switch (dir) {
@@ -72,12 +72,11 @@ export const scrollBy = defineTool({
         data: {direction, pixels, result},
       });
     } catch (error) {
-      sendJson(response, {
-        success: false,
-        message: `滚动页面失败: ${errorMessage(error)}`,
-        tooltype: 'scroll_by',
-        data: {direction, pixels, result: ''},
-      });
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `滚动页面失败: ${errorMessage(error)}`,
+        {toolName: 'scroll_by', direction, pixels},
+      );
     }
   },
 });

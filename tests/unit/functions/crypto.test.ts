@@ -106,14 +106,14 @@ describe('crypto functions', () => {
       assert.strictEqual(result.logFormat, 'json');
     });
 
-    it('应该在 evaluate 抛出错误时返回失败结果', async () => {
+    it('应该在 evaluate 抛出错误时抛出失败', async () => {
       const frame = createErrorFrame('注入失败');
 
-      const result = await hookCryptoJS(frame);
-
-      assert.strictEqual(result.success, false);
-      assert.strictEqual(result.message, '错误：注入失败');
-      assert.strictEqual(result.tooltype, 'hook_cryptojs');
+      await assert.rejects(
+        () => hookCryptoJS(frame),
+        (error: unknown) =>
+          error instanceof Error && /注入失败/.test(error.message),
+      );
     });
 
     it('Hook 代码应该包含正确的算法配置', async () => {
@@ -160,14 +160,14 @@ describe('crypto functions', () => {
       assert.strictEqual(result.logFormat, 'full');
     });
 
-    it('应该在 evaluate 抛出错误时返回失败结果', async () => {
+    it('应该在 evaluate 抛出错误时抛出失败', async () => {
       const frame = createErrorFrame('JSEncrypt 未找到');
 
-      const result = await hookJSEncrypt(frame);
-
-      assert.strictEqual(result.success, false);
-      assert.strictEqual(result.message, '错误：JSEncrypt 未找到');
-      assert.strictEqual(result.tooltype, 'hook_jsencrypt');
+      await assert.rejects(
+        () => hookJSEncrypt(frame),
+        (error: unknown) =>
+          error instanceof Error && /JSEncrypt 未找到/.test(error.message),
+      );
     });
 
     it('Hook 代码应该包含 hook_jsencrypt 标识', async () => {
@@ -222,14 +222,14 @@ describe('crypto functions', () => {
       assert.strictEqual(result.logFormat, 'json');
     });
 
-    it('应该在 evaluate 抛出错误时返回失败结果', async () => {
+    it('应该在 evaluate 抛出错误时抛出失败', async () => {
       const frame = createErrorFrame('SM-Crypto 未加载');
 
-      const result = await hookSMCrypto(frame);
-
-      assert.strictEqual(result.success, false);
-      assert.strictEqual(result.message, '错误：SM-Crypto 未加载');
-      assert.strictEqual(result.tooltype, 'hook_smcrypto');
+      await assert.rejects(
+        () => hookSMCrypto(frame),
+        (error: unknown) =>
+          error instanceof Error && /SM-Crypto 未加载/.test(error.message),
+      );
     });
 
     it('Hook 代码应该包含 SM2、SM3、SM4 Hook 逻辑', async () => {

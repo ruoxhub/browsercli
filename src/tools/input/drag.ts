@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 
@@ -33,33 +34,29 @@ export const drag = defineTool({
       const toElement = await page.$(toSelector);
 
       if (!fromElement) {
-        response.setStructuredContent({
-          success: false,
-          message: `Source element not found: ${fromSelector}`,
-          tooltype: 'drag',
-        });
-        return;
+        throw createToolError(
+          ErrorCodes.NOT_FOUND,
+          `Source element not found: ${fromSelector}`,
+          {toolName: 'drag', fromSelector},
+        );
       }
       if (!toElement) {
-        response.setStructuredContent({
-          success: false,
-          message: `Target element not found: ${toSelector}`,
-          tooltype: 'drag',
-        });
-        return;
+        throw createToolError(
+          ErrorCodes.NOT_FOUND,
+          `Target element not found: ${toSelector}`,
+          {toolName: 'drag', toSelector},
+        );
       }
 
       const fromBox = await fromElement.boundingBox();
       const toBox = await toElement.boundingBox();
 
       if (!fromBox || !toBox) {
-        response.setStructuredContent({
-          success: false,
-          message: 'Element bounding box not available',
-          tooltype: 'drag',
-          data: {fromSelector, toSelector},
-        });
-        return;
+        throw createToolError(
+          ErrorCodes.RUNTIME,
+          'Element bounding box not available',
+          {toolName: 'drag', fromSelector, toSelector},
+        );
       }
 
       const fromX = fromBox.x + fromBox.width / 2;
@@ -84,12 +81,12 @@ export const drag = defineTool({
         },
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: error instanceof Error ? error.message : String(error),
-        tooltype: 'drag',
-        data: {fromSelector, toSelector},
-      });
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        error instanceof Error ? error.message : String(error),
+        {toolName: 'drag', fromSelector, toSelector},
+      );
     }
   },
 });

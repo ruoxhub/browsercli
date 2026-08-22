@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {
   browserTimeoutSchema,
@@ -67,17 +68,16 @@ export const takeScreenshot = defineTool({
     const quality = format === 'png' ? undefined : request.params.quality;
     const timeoutMs = request.params.timeoutMs ?? DEFAULT_SCREENSHOT_TIMEOUT_MS;
 
-    try {
-      const page = context.getSelectedPage();
-      if (!page) {
-        response.setStructuredContent({
-          success: false,
-          message: '未选中页面，请先使用 select_page 选择目标页面。',
-          tooltype: 'take_screenshot',
-        });
-        return;
-      }
+    const page = context.getSelectedPage();
+    if (!page) {
+      throw createToolError(
+        ErrorCodes.PAGE_REQUIRED,
+        '未选中页面，请先使用 select_page 选择目标页面。',
+        {toolName: 'take_screenshot'},
+      );
+    }
 
+    try {
       // 自动创建截图目录
       const resolvedFilePath = request.params.filePath
         ? path.resolve(request.params.filePath)
@@ -145,12 +145,11 @@ export const takeScreenshot = defineTool({
         });
       }
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `截图失败: ${normalizeBrowserRuntimeError(error)}`,
-        tooltype: 'screenshot',
-        data: {},
-      });
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `截图失败: ${normalizeBrowserRuntimeError(error)}`,
+        {toolName: 'take_screenshot'},
+      );
     }
   },
 });

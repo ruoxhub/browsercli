@@ -6,6 +6,7 @@
 
 import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -46,8 +47,7 @@ export type {
  */
 export const exportRebuildBundle = defineTool({
   name: 'export_rebuild_bundle',
-  description:
-    '根据观察到的逆向工程证据，导出本地 Node 重建 Bundle。',
+  description: '根据观察到的逆向工程证据，导出本地 Node 重建 Bundle。',
   annotations: {
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: false,
@@ -71,104 +71,103 @@ export const exportRebuildBundle = defineTool({
   },
   handler: async (request, response) => {
     try {
-    const runtime = getRuntime();
-    const task = await runtime.reverseTaskStore.openTask({
-      taskId: request.params.taskId,
-      slug: request.params.taskSlug,
-      targetUrl: request.params.targetUrl,
-      goal: request.params.goal,
-    });
+      const runtime = getRuntime();
+      const task = await runtime.reverseTaskStore.openTask({
+        taskId: request.params.taskId,
+        slug: request.params.taskSlug,
+        targetUrl: request.params.targetUrl,
+        goal: request.params.goal,
+      });
 
-    const bundle = request.params.autoGenerate
-      ? await buildAutoBundle(
-          request.params.taskId,
-          {
-            targetKeywords: request.params.targetKeywords ?? [],
-            targetUrlPatterns: request.params.targetUrlPatterns ?? [],
-            targetFunctionNames: request.params.targetFunctionNames ?? [],
-            targetActionDescription:
-              request.params.targetActionDescription ?? '',
-            maxEvidenceItems: request.params.maxEvidenceItems ?? 20,
-          },
-          runtime,
-        )
-      : {
-          entryCode: request.params.entryCode ?? '',
-          envCode: request.params.envCode ?? '',
-          polyfillsCode: request.params.polyfillsCode ?? '',
-          capture: request.params.capture ?? {},
-          notes: request.params.notes ?? [],
-        };
+      const bundle = request.params.autoGenerate
+        ? await buildAutoBundle(
+            request.params.taskId,
+            {
+              targetKeywords: request.params.targetKeywords ?? [],
+              targetUrlPatterns: request.params.targetUrlPatterns ?? [],
+              targetFunctionNames: request.params.targetFunctionNames ?? [],
+              targetActionDescription:
+                request.params.targetActionDescription ?? '',
+              maxEvidenceItems: request.params.maxEvidenceItems ?? 20,
+            },
+            runtime,
+          )
+        : {
+            entryCode: request.params.entryCode ?? '',
+            envCode: request.params.envCode ?? '',
+            polyfillsCode: request.params.polyfillsCode ?? '',
+            capture: request.params.capture ?? {},
+            notes: request.params.notes ?? [],
+          };
 
-    if (
-      !request.params.autoGenerate &&
-      (!request.params.entryCode ||
-        !request.params.envCode ||
-        !request.params.capture)
-    ) {
-      throw new Error(
-        'entryCode, envCode, and capture are required unless autoGenerate=true.',
+      if (
+        !request.params.autoGenerate &&
+        (!request.params.entryCode ||
+          !request.params.envCode ||
+          !request.params.capture)
+      ) {
+        throw new Error(
+          'entryCode, envCode, and capture are required unless autoGenerate=true.',
+        );
+      }
+
+      await writeArtifactFile(
+        task.taskDir,
+        'env/entry.js',
+        bundle.entryCode + '\n',
       );
-    }
+      await writeArtifactFile(
+        task.taskDir,
+        'env/env.js',
+        bundle.envCode + '\n',
+      );
+      await writeArtifactFile(
+        task.taskDir,
+        'env/polyfills.js',
+        bundle.polyfillsCode + '\n',
+      );
+      await writeArtifactFile(
+        task.taskDir,
+        'env/capture.json',
+        JSON.stringify(bundle.capture, null, 2) + '\n',
+      );
 
-    await writeArtifactFile(
-      task.taskDir,
-      'env/entry.js',
-      bundle.entryCode + '\n',
-    );
-    await writeArtifactFile(task.taskDir, 'env/env.js', bundle.envCode + '\n');
-    await writeArtifactFile(
-      task.taskDir,
-      'env/polyfills.js',
-      bundle.polyfillsCode + '\n',
-    );
-    await writeArtifactFile(
-      task.taskDir,
-      'env/capture.json',
-      JSON.stringify(bundle.capture, null, 2) + '\n',
-    );
+      const reportContent = [
+        '# Rebuild Bundle',
+        '',
+        `- Task: ${request.params.taskId}`,
+        `- Target URL: ${request.params.targetUrl}`,
+        `- Goal: ${request.params.goal}`,
+        '',
+        '## Notes',
+        ...bundle.notes.map(note => `- ${note}`),
+      ].join('\n');
+      await writeArtifactFile(task.taskDir, 'report.md', reportContent + '\n');
 
-    const reportContent = [
-      '# Rebuild Bundle',
-      '',
-      `- Task: ${request.params.taskId}`,
-      `- Target URL: ${request.params.targetUrl}`,
-      `- Goal: ${request.params.goal}`,
-      '',
-      '## Notes',
-      ...bundle.notes.map(note => `- ${note}`),
-    ].join('\n');
-    await writeArtifactFile(task.taskDir, 'report.md', reportContent + '\n');
-
-    response.setStructuredContent({
-      success: true,
-      message: bundle.notes.join('; ') || 'Bundle exported successfully',
-      tooltype: 'export_rebuild_bundle',
-      data: {
-        taskId: task.taskId,
-        taskDir: task.taskDir,
-        autoGenerated: Boolean(request.params.autoGenerate),
-        files: [
-          'env/entry.js',
-          'env/env.js',
-          'env/polyfills.js',
-          'env/capture.json',
-          'report.md',
-        ],
-      },
-    });
-    } catch (error) {
       response.setStructuredContent({
-        success: false,
-        message: `导出重建 Bundle 失败：${error instanceof Error ? error.message : String(error)}`,
+        success: true,
+        message: bundle.notes.join('; ') || 'Bundle exported successfully',
         tooltype: 'export_rebuild_bundle',
         data: {
-          taskId: request.params.taskId ?? '',
-          taskDir: '',
+          taskId: task.taskId,
+          taskDir: task.taskDir,
           autoGenerated: Boolean(request.params.autoGenerate),
-          files: [],
+          files: [
+            'env/entry.js',
+            'env/env.js',
+            'env/polyfills.js',
+            'env/capture.json',
+            'report.md',
+          ],
         },
       });
+    } catch (error) {
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `导出重建 Bundle 失败：${error instanceof Error ? error.message : String(error)}`,
+        {toolName: 'export_rebuild_bundle'},
+      );
     }
   },
 });

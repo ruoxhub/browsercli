@@ -18,6 +18,7 @@ import * as t from '@babel/types';
 
 import {unwrapBabelDefault} from '../../modules/deobfuscator/astUtils.js';
 import {zod} from '../../third_party/index.js';
+import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {getDebuggerFromContext} from '../debugger/runtime-helpers.js';
 import {errorMessage} from '../shared/pageResponse.js';
@@ -577,12 +578,12 @@ export const analyzeJsvmpVm = defineTool({
         data,
       });
     } catch (error) {
-      response.setStructuredContent({
-        success: false,
-        message: `JSVMP VM 分析失败：${errorMessage(error)}`,
-        tooltype: 'analyze_jsvmp_vm',
-        data: null,
-      });
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createToolError(
+        ErrorCodes.RUNTIME,
+        `JSVMP VM 分析失败：${errorMessage(error)}`,
+        {toolName: 'analyze_jsvmp_vm'},
+      );
     }
   },
 });

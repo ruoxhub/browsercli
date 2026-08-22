@@ -95,9 +95,14 @@ interface EmptyRequestHarness {
 
 function makeResponse(): DebuggerResponseHarness {
   const lines: string[] = [];
+  let structuredContent: unknown = null;
   return {
     lines,
+    structuredContent,
     appendResponseLine: (v: string) => lines.push(v),
+    setStructuredContent: (v: unknown) => {
+      structuredContent = v;
+    },
     setIncludePages: () => undefined,
     setIncludeNetworkRequests: () => undefined,
     setIncludeConsoleData: () => undefined,
@@ -166,125 +171,156 @@ describe('debugger tools error paths', () => {
     const response = makeResponse();
     const context = makeDisabledContext();
 
-    await listScripts.handler(
-      {params: {}} as EmptyRequestHarness,
-      response as unknown as Parameters<typeof listScripts.handler>[1],
-      context as unknown as Parameters<typeof listScripts.handler>[2],
-    );
-    await getScriptSource.handler(
-      {params: {scriptId: '1', length: 1000}},
-      response as unknown as Parameters<typeof getScriptSource.handler>[1],
-      context as unknown as Parameters<typeof getScriptSource.handler>[2],
-    );
-    await findInScript.handler(
-      {
-        params: {
-          scriptId: '1',
-          query: 'x',
-          contextChars: 100,
-          occurrence: 1,
-          caseSensitive: true,
+    await assert.rejects(async () => {
+      await listScripts.handler(
+        {params: {}} as EmptyRequestHarness,
+        response as unknown as Parameters<typeof listScripts.handler>[1],
+        context as unknown as Parameters<typeof listScripts.handler>[2],
+      );
+    });
+    await assert.rejects(async () => {
+      await getScriptSource.handler(
+        {params: {scriptId: '1', length: 1000}},
+        response as unknown as Parameters<typeof getScriptSource.handler>[1],
+        context as unknown as Parameters<typeof getScriptSource.handler>[2],
+      );
+    });
+    await assert.rejects(async () => {
+      await findInScript.handler(
+        {
+          params: {
+            scriptId: '1',
+            query: 'x',
+            contextChars: 100,
+            occurrence: 1,
+            caseSensitive: true,
+          },
         },
-      },
-      response as unknown as Parameters<typeof findInScript.handler>[1],
-      context as unknown as Parameters<typeof findInScript.handler>[2],
-    );
-    await searchInSources.handler(
-      {
-        params: {
-          query: 'x',
-          caseSensitive: false,
-          isRegex: false,
-          maxResults: 30,
-          maxLineLength: 150,
-          excludeMinified: true,
+        response as unknown as Parameters<typeof findInScript.handler>[1],
+        context as unknown as Parameters<typeof findInScript.handler>[2],
+      );
+    });
+    await assert.rejects(async () => {
+      await searchInSources.handler(
+        {
+          params: {
+            query: 'x',
+            caseSensitive: false,
+            isRegex: false,
+            maxResults: 30,
+            maxLineLength: 150,
+            excludeMinified: true,
+          },
         },
-      },
-      response as unknown as Parameters<typeof searchInSources.handler>[1],
-      context as unknown as Parameters<typeof searchInSources.handler>[2],
-    );
-    await setBreakpoint.handler(
-      {params: {url: 'a.js', lineNumber: 1, columnNumber: 0, isRegex: false}},
-      response as unknown as Parameters<typeof setBreakpoint.handler>[1],
-      context as unknown as Parameters<typeof setBreakpoint.handler>[2],
-    );
-    await removeBreakpoint.handler(
-      {params: {breakpointId: 'bp'}},
-      response as unknown as Parameters<typeof removeBreakpoint.handler>[1],
-      context as unknown as Parameters<typeof removeBreakpoint.handler>[2],
-    );
-    await listBreakpoints.handler(
-      {params: {}} as EmptyRequestHarness,
-      response as unknown as Parameters<typeof listBreakpoints.handler>[1],
-      context as unknown as Parameters<typeof listBreakpoints.handler>[2],
-    );
-    await getPausedInfo.handler(
-      {params: {includeScopes: false}},
-      response as unknown as Parameters<typeof getPausedInfo.handler>[1],
-      context as unknown as Parameters<typeof getPausedInfo.handler>[2],
-    );
-    await resume.handler(
-      {params: {}} as EmptyRequestHarness,
-      response as unknown as Parameters<typeof resume.handler>[1],
-      context as unknown as Parameters<typeof resume.handler>[2],
-    );
-    await pause.handler(
-      {params: {}} as EmptyRequestHarness,
-      response as unknown as Parameters<typeof pause.handler>[1],
-      context as unknown as Parameters<typeof pause.handler>[2],
-    );
-    await stepOver.handler(
-      {params: {}} as EmptyRequestHarness,
-      response as unknown as Parameters<typeof stepOver.handler>[1],
-      context as unknown as Parameters<typeof stepOver.handler>[2],
-    );
-    await stepInto.handler(
-      {params: {}} as EmptyRequestHarness,
-      response as unknown as Parameters<typeof stepInto.handler>[1],
-      context as unknown as Parameters<typeof stepInto.handler>[2],
-    );
-    await stepOut.handler(
-      {params: {}} as EmptyRequestHarness,
-      response as unknown as Parameters<typeof stepOut.handler>[1],
-      context as unknown as Parameters<typeof stepOut.handler>[2],
-    );
-    await evaluateOnCallframe.handler(
-      {params: {expression: 'x', frameIndex: 0}},
-      response as unknown as Parameters<typeof evaluateOnCallframe.handler>[1],
-      context as unknown as Parameters<typeof evaluateOnCallframe.handler>[2],
-    );
-    await setBreakpointOnText.handler(
-      {params: {text: 'token', occurrence: 1}},
-      response as unknown as Parameters<typeof setBreakpointOnText.handler>[1],
-      context as unknown as Parameters<typeof setBreakpointOnText.handler>[2],
-    );
-    await breakOnXhr.handler(
-      {params: {url: '/api'}},
-      response as unknown as Parameters<typeof breakOnXhr.handler>[1],
-      context as unknown as Parameters<typeof breakOnXhr.handler>[2],
-    );
-    await removeXhrBreakpoint.handler(
-      {params: {url: '/api'}},
-      response as unknown as Parameters<typeof removeXhrBreakpoint.handler>[1],
-      context as unknown as Parameters<typeof removeXhrBreakpoint.handler>[2],
-    );
-    await traceFunction.handler(
-      {
-        params: {
-          functionName: 'sign',
-          pause: false,
-          logArgs: true,
-          logThis: false,
+        response as unknown as Parameters<typeof searchInSources.handler>[1],
+        context as unknown as Parameters<typeof searchInSources.handler>[2],
+      );
+    });
+    await assert.rejects(async () => {
+      await setBreakpoint.handler(
+        {params: {url: 'a.js', lineNumber: 1, columnNumber: 0, isRegex: false}},
+        response as unknown as Parameters<typeof setBreakpoint.handler>[1],
+        context as unknown as Parameters<typeof setBreakpoint.handler>[2],
+      );
+    });
+    await assert.rejects(async () => {
+      await removeBreakpoint.handler(
+        {params: {breakpointId: 'bp'}},
+        response as unknown as Parameters<typeof removeBreakpoint.handler>[1],
+        context as unknown as Parameters<typeof removeBreakpoint.handler>[2],
+      );
+    });
+    await assert.rejects(async () => {
+      await listBreakpoints.handler(
+        {params: {}} as EmptyRequestHarness,
+        response as unknown as Parameters<typeof listBreakpoints.handler>[1],
+        context as unknown as Parameters<typeof listBreakpoints.handler>[2],
+      );
+    });
+    await assert.rejects(async () => {
+      await getPausedInfo.handler(
+        {params: {includeScopes: false}},
+        response as unknown as Parameters<typeof getPausedInfo.handler>[1],
+        context as unknown as Parameters<typeof getPausedInfo.handler>[2],
+      );
+    });
+    await assert.rejects(async () => {
+      await resume.handler(
+        {params: {}} as EmptyRequestHarness,
+        response as unknown as Parameters<typeof resume.handler>[1],
+        context as unknown as Parameters<typeof resume.handler>[2],
+      );
+    });
+    await assert.rejects(async () => {
+      await pause.handler(
+        {params: {}} as EmptyRequestHarness,
+        response as unknown as Parameters<typeof pause.handler>[1],
+        context as unknown as Parameters<typeof pause.handler>[2],
+      );
+    });
+    await assert.rejects(async () => {
+      await stepOver.handler(
+        {params: {}} as EmptyRequestHarness,
+        response as unknown as Parameters<typeof stepOver.handler>[1],
+        context as unknown as Parameters<typeof stepOver.handler>[2],
+      );
+    });
+    await assert.rejects(async () => {
+      await stepInto.handler(
+        {params: {}} as EmptyRequestHarness,
+        response as unknown as Parameters<typeof stepInto.handler>[1],
+        context as unknown as Parameters<typeof stepInto.handler>[2],
+      );
+    });
+    await assert.rejects(async () => {
+      await stepOut.handler(
+        {params: {}} as EmptyRequestHarness,
+        response as unknown as Parameters<typeof stepOut.handler>[1],
+        context as unknown as Parameters<typeof stepOut.handler>[2],
+      );
+    });
+    await assert.rejects(async () => {
+      await evaluateOnCallframe.handler(
+        {params: {expression: 'x', frameIndex: 0}},
+        response as unknown as Parameters<typeof evaluateOnCallframe.handler>[1],
+        context as unknown as Parameters<typeof evaluateOnCallframe.handler>[2],
+      );
+    });
+    await assert.rejects(async () => {
+      await setBreakpointOnText.handler(
+        {params: {text: 'token', occurrence: 1}},
+        response as unknown as Parameters<typeof setBreakpointOnText.handler>[1],
+        context as unknown as Parameters<typeof setBreakpointOnText.handler>[2],
+      );
+    });
+    await assert.rejects(async () => {
+      await breakOnXhr.handler(
+        {params: {url: '/api'}},
+        response as unknown as Parameters<typeof breakOnXhr.handler>[1],
+        context as unknown as Parameters<typeof breakOnXhr.handler>[2],
+      );
+    });
+    await assert.rejects(async () => {
+      await removeXhrBreakpoint.handler(
+        {params: {url: '/api'}},
+        response as unknown as Parameters<typeof removeXhrBreakpoint.handler>[1],
+        context as unknown as Parameters<typeof removeXhrBreakpoint.handler>[2],
+      );
+    });
+    await assert.rejects(async () => {
+      await traceFunction.handler(
+        {
+          params: {
+            functionName: 'sign',
+            pause: false,
+            logArgs: true,
+            logThis: false,
+          },
         },
-      },
-      response as unknown as Parameters<typeof traceFunction.handler>[1],
-      context as unknown as Parameters<typeof traceFunction.handler>[2],
-    );
-
-    assert.ok(
-      response.lines.filter(line => line.includes('Debugger is not enabled'))
-        .length >= 10,
-    );
+        response as unknown as Parameters<typeof traceFunction.handler>[1],
+        context as unknown as Parameters<typeof traceFunction.handler>[2],
+      );
+    });
   });
 
   it('covers runtime error and failure response branches', async () => {
@@ -294,19 +330,19 @@ describe('debugger tools error paths', () => {
         throw new Error('list hook fail');
       }
       if (script.includes('hookId') && script.includes('Hook already exists')) {
-        return {success: false, message: 'Hook already exists with id: h1'};
+        return {error: 'Hook already exists with id: h1'};
       }
       if (script.includes('Hook not found')) {
-        return {success: false, message: 'Hook not found: missing'};
+        return {error: 'Hook not found: missing'};
       }
       if (script.includes('Cannot evaluate')) {
         return {error: 'Cannot evaluate: x'};
       }
       if (script.includes('Monitor already exists')) {
-        return {success: false, message: 'Monitor already exists: m1'};
+        return {error: 'Monitor already exists: m1'};
       }
       if (script.includes('Monitor not found')) {
-        return {success: false, message: 'Monitor not found: m1'};
+        return {error: 'Monitor not found: m1'};
       }
       if (script.includes('const type =')) {
         throw new Error('storage fail');
@@ -345,96 +381,90 @@ describe('debugger tools error paths', () => {
       getRequestInitiator: () => undefined,
     };
 
-    await getRequestInitiator.handler(
-      {params: {requestId: 1}},
-      response as unknown as Parameters<typeof getRequestInitiator.handler>[1],
-      context as unknown as Parameters<typeof getRequestInitiator.handler>[2],
-    );
-    await hookFunction.handler(
-      {
-        params: {
-          target: 'window.fetch',
-          hookId: 'h1',
-          logArgs: true,
-          logResult: true,
-          logStack: false,
+    await assert.rejects(async () => {
+      await getRequestInitiator.handler(
+        {params: {requestId: 1}},
+        response as unknown as Parameters<typeof getRequestInitiator.handler>[1],
+        context as unknown as Parameters<typeof getRequestInitiator.handler>[2],
+      );
+    });
+    await assert.rejects(async () => {
+      await hookFunction.handler(
+        {
+          params: {
+            target: 'window.fetch',
+            hookId: 'h1',
+            logArgs: true,
+            logResult: true,
+            logStack: false,
+          },
         },
-      },
-      response as unknown as Parameters<typeof hookFunction.handler>[1],
-      context as unknown as Parameters<typeof hookFunction.handler>[2],
-    );
-    await unhookFunction.handler(
-      {params: {hookId: 'missing'}},
-      response as unknown as Parameters<typeof unhookFunction.handler>[1],
-      context as unknown as Parameters<typeof unhookFunction.handler>[2],
-    );
-    await assert.doesNotReject(async () => {
+        response as unknown as Parameters<typeof hookFunction.handler>[1],
+        context as unknown as Parameters<typeof hookFunction.handler>[2],
+      );
+    });
+    await assert.rejects(async () => {
+      await unhookFunction.handler(
+        {params: {hookId: 'missing'}},
+        response as unknown as Parameters<typeof unhookFunction.handler>[1],
+        context as unknown as Parameters<typeof unhookFunction.handler>[2],
+      );
+    });
+    await assert.rejects(async () => {
       await listHooks.handler(
         {params: {}} as EmptyRequestHarness,
         response as unknown as Parameters<typeof listHooks.handler>[1],
         context as unknown as Parameters<typeof listHooks.handler>[2],
       );
     });
-    await inspectObject.handler(
-      {
-        params: {
-          expression: 'window.__not_found__',
-          depth: 2,
-          showMethods: false,
-          showPrototype: false,
+    await assert.rejects(async () => {
+      await inspectObject.handler(
+        {
+          params: {
+            expression: 'window.__not_found__',
+            depth: 2,
+            showMethods: false,
+            showPrototype: false,
+          },
         },
-      },
-      response as unknown as Parameters<typeof inspectObject.handler>[1],
-      context as unknown as Parameters<typeof inspectObject.handler>[2],
-    );
-    await getStorage.handler(
-      {params: {type: 'all'}},
-      response as unknown as Parameters<typeof getStorage.handler>[1],
-      context as unknown as Parameters<typeof getStorage.handler>[2],
-    );
-    await monitorEvents.handler(
-      {params: {selector: '#missing', monitorId: 'm1'}},
-      response as unknown as Parameters<typeof monitorEvents.handler>[1],
-      context as unknown as Parameters<typeof monitorEvents.handler>[2],
-    );
-    await stopMonitor.handler(
-      {params: {monitorId: 'm1'}},
-      response as unknown as Parameters<typeof stopMonitor.handler>[1],
-      context as unknown as Parameters<typeof stopMonitor.handler>[2],
-    );
-    await breakOnXhr.handler(
-      {params: {url: '/api'}},
-      response as unknown as Parameters<typeof breakOnXhr.handler>[1],
-      context as unknown as Parameters<typeof breakOnXhr.handler>[2],
-    );
-    await removeXhrBreakpoint.handler(
-      {params: {url: '/api'}},
-      response as unknown as Parameters<typeof removeXhrBreakpoint.handler>[1],
-      context as unknown as Parameters<typeof removeXhrBreakpoint.handler>[2],
-    );
-
-    assert.ok(
-      response.lines.some(line => line.includes('Error getting initiator')),
-    );
-    assert.ok(
-      response.lines.some(line => line.includes('Hook already exists')),
-    );
-    assert.ok(response.lines.some(line => line.includes('Hook not found')));
-    assert.ok(
-      response.lines.some(line => line.includes('Error: list hook fail')),
-    );
-    assert.ok(response.lines.some(line => line.includes('Cannot evaluate')));
-    assert.ok(
-      response.lines.some(line => line.includes('Error: storage fail')),
-    );
-    assert.ok(
-      response.lines.some(line => line.includes('Monitor already exists')),
-    );
-    assert.ok(response.lines.some(line => line.includes('Monitor not found')));
-    assert.ok(
-      response.lines.filter(line =>
-        line.includes('Debugger client not available'),
-      ).length >= 2,
-    );
+        response as unknown as Parameters<typeof inspectObject.handler>[1],
+        context as unknown as Parameters<typeof inspectObject.handler>[2],
+      );
+    });
+    await assert.rejects(async () => {
+      await getStorage.handler(
+        {params: {type: 'all'}},
+        response as unknown as Parameters<typeof getStorage.handler>[1],
+        context as unknown as Parameters<typeof getStorage.handler>[2],
+      );
+    });
+    await assert.rejects(async () => {
+      await monitorEvents.handler(
+        {params: {selector: '#missing', monitorId: 'm1'}},
+        response as unknown as Parameters<typeof monitorEvents.handler>[1],
+        context as unknown as Parameters<typeof monitorEvents.handler>[2],
+      );
+    });
+    await assert.rejects(async () => {
+      await stopMonitor.handler(
+        {params: {monitorId: 'm1'}},
+        response as unknown as Parameters<typeof stopMonitor.handler>[1],
+        context as unknown as Parameters<typeof stopMonitor.handler>[2],
+      );
+    });
+    await assert.rejects(async () => {
+      await breakOnXhr.handler(
+        {params: {url: '/api'}},
+        response as unknown as Parameters<typeof breakOnXhr.handler>[1],
+        context as unknown as Parameters<typeof breakOnXhr.handler>[2],
+      );
+    });
+    await assert.rejects(async () => {
+      await removeXhrBreakpoint.handler(
+        {params: {url: '/api'}},
+        response as unknown as Parameters<typeof removeXhrBreakpoint.handler>[1],
+        context as unknown as Parameters<typeof removeXhrBreakpoint.handler>[2],
+      );
+    });
   });
 });

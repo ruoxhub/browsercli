@@ -3,11 +3,28 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+
+export interface ToolRecovery {
+  tool?: string;
+  command?: string;
+  reason: string;
+}
+
+export interface ToolErrorOptions {
+  retryable?: boolean;
+  recovery?: ToolRecovery;
+  details?: Record<string, unknown>;
+}
+
 export interface ErrorResponse {
   code: string;
   type: string;
   message: string;
   context?: Record<string, unknown>;
+  retryable?: boolean;
+  recovery?: ToolRecovery;
+  details?: Record<string, unknown>;
+  /** @deprecated Use retryable instead */
   recoverable?: boolean;
 }
 
@@ -19,6 +36,15 @@ export const ErrorCodes = {
   CONNECTION: 'CONNECTION',
   RUNTIME: 'RUNTIME',
   PERMISSION: 'PERMISSION',
+
+  // Canonical prerequisite & state error codes
+  BROWSER_REQUIRED: 'BROWSER_REQUIRED',
+  PAGE_REQUIRED: 'PAGE_REQUIRED',
+  FRAME_REQUIRED: 'FRAME_REQUIRED',
+  DEBUGGER_PAUSED: 'DEBUGGER_PAUSED',
+  DEBUGGER_NOT_PAUSED: 'DEBUGGER_NOT_PAUSED',
+  NATIVE_TOOL_MISSING: 'NATIVE_TOOL_MISSING',
+  AI_REQUIRED: 'AI_REQUIRED',
 
   // Script locator resolution（spec §4 错误分类）
   SCRIPT_NOT_FOUND: 'SCRIPT_NOT_FOUND',
@@ -48,20 +74,39 @@ export const LegacyErrorCodeMap = {
 
 export type ToolErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];
 
-const NON_RECOVERABLE_CODES = new Set<ToolErrorCode>([
-  ErrorCodes.PERMISSION,
+const NON_RETRYABLE_CODES = new Set<string>([
+  ErrorCodes.VALIDATION,
   ErrorCodes.NOT_FOUND,
+  ErrorCodes.PERMISSION,
+  ErrorCodes.NATIVE_TOOL_MISSING,
 ]);
 
 export class ToolError extends Error {
+  public readonly retryable: boolean;
+  public readonly recovery?: ToolRecovery;
+  public readonly details?: Record<string, unknown>;
+
   constructor(
     public readonly code: ToolErrorCode,
     message: string,
     public readonly context?: Record<string, unknown>,
-    public readonly recoverable = !NON_RECOVERABLE_CODES.has(code),
+    options?: ToolErrorOptions | boolean,
   ) {
     super(message);
     this.name = 'ToolError';
+    const opts: ToolErrorOptions =
+      typeof options === 'boolean' ? {retryable: options} : (options ?? {});
+    this.retryable =
+      opts.retryable !== undefined
+        ? opts.retryable
+        : !NON_RETRYABLE_CODES.has(code);
+    this.recovery = opts.recovery;
+    this.details = opts.details;
+  }
+
+  /** @deprecated Use retryable instead */
+  get recoverable(): boolean {
+    return this.retryable;
   }
 }
 
@@ -69,8 +114,9 @@ export function createToolError(
   code: ToolErrorCode,
   message: string,
   context?: Record<string, unknown>,
+  options?: ToolErrorOptions | boolean,
 ): ToolError {
-  return new ToolError(code, message, context);
+  return new ToolError(code, message, context, options);
 }
 
 export function formatError(
@@ -79,13 +125,21 @@ export function formatError(
   context?: Record<string, unknown>,
 ): ErrorResponse {
   if (error instanceof ToolError) {
-    return {
+    const response: ErrorResponse = {
       code: error.code,
       type: error.name,
       message: error.message,
       context: context ?? error.context,
+      retryable: error.retryable,
       recoverable: error.recoverable,
     };
+    if (error.recovery !== undefined) {
+      response.recovery = error.recovery;
+    }
+    if (error.details !== undefined) {
+      response.details = error.details;
+    }
+    return response;
   }
 
   if (error instanceof Error) {

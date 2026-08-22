@@ -5,20 +5,56 @@
  */
 import {createAIService} from '../config.js';
 
-import type {AIMessage, AIResponse, ChatOptions} from './AIService.js';
+import {
+  AIServiceError,
+  type AIAvailability,
+  type AIMessage,
+  type AIResponse,
+  type ChatOptions,
+} from './AIService.js';
+
+export interface LLMChatOptions {
+  temperature?: number;
+  maxTokens?: number;
+  signal?: AbortSignal;
+  timeoutMs?: number;
+  totalBudgetMs?: number;
+  model?: string;
+}
 
 export class LLMService {
   constructor(
     private readonly serviceFactory: typeof createAIService = createAIService,
   ) {}
 
+  isConfigured(): boolean {
+    try {
+      const service = this.serviceFactory();
+      return service ? service.isAvailable() : false;
+    } catch {
+      return false;
+    }
+  }
+
+  getAvailability(): AIAvailability {
+    try {
+      const service = this.serviceFactory();
+      return service
+        ? service.getAvailability()
+        : {available: false, reason: 'not_configured'};
+    } catch {
+      return {available: false, reason: 'not_configured'};
+    }
+  }
+
   async chat(
     messages: AIMessage[],
-    options?: {temperature?: number; maxTokens?: number},
+    options?: LLMChatOptions,
   ): Promise<AIResponse> {
     const service = this.serviceFactory();
-    if (!service) {
-      throw new Error(
+    if (!service || !service.isAvailable()) {
+      throw new AIServiceError(
+        'not_configured',
         'No AI provider configured. Set OPENAI_API_KEY environment variable.',
       );
     }
@@ -26,6 +62,10 @@ export class LLMService {
     const chatOptions: ChatOptions = {
       temperature: options?.temperature,
       maxTokens: options?.maxTokens,
+      model: options?.model,
+      signal: options?.signal,
+      timeoutMs: options?.timeoutMs,
+      totalBudgetMs: options?.totalBudgetMs,
     };
 
     return service.chat(messages, chatOptions);
