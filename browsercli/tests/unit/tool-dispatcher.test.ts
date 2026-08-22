@@ -229,6 +229,21 @@ describe('tool-dispatcher (pure HTTP)', () => {
     assert.deepStrictEqual(client.invokeCalls[0][2], {foo: 'bar'});
   });
 
+  it('emits raw tool result when --json is set', async () => {
+    const client = new MockHttpClient(SAMPLE_TOOLS, {hello: 'world'});
+    const result = await toolDispatcherCommand(
+      ['my_tool', '--json'],
+      ctxWith(client),
+    );
+    assert.deepStrictEqual(result, {hello: 'world'});
+  });
+
+  it('does not send --json as a tool param', async () => {
+    const client = new MockHttpClient(SAMPLE_TOOLS, {done: true});
+    await toolDispatcherCommand(['my_tool', '--json'], ctxWith(client));
+    assert.deepStrictEqual(client.invokeCalls[0][2], {});
+  });
+
   it('opens the watch stream before invoking the tool', async () => {
     const client = new MockHttpClient(SAMPLE_TOOLS, {done: true});
     await toolDispatcherCommand(['my_tool', '--watch'], ctxWith(client));

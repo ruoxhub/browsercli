@@ -203,6 +203,10 @@ export const toolDispatcherCommand: AxiCliCommand<WorkerContext> = async (
       throw new AxiError(`工具执行失败：${failure}`, 'TOOL_FAILURE');
     }
 
+    if (getBoolFlag(parsed, 'json')) {
+      return result as Record<string, unknown>;
+    }
+
     return successOutput({
       command: 'call',
       target: requestedName,

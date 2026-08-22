@@ -16,6 +16,7 @@ export const TOOL_CONTROL_FLAGS: ReadonlySet<string> = new Set([
   'stdin',
   'session',
   'watch',
+  'json',
 ]);
 
 /**
