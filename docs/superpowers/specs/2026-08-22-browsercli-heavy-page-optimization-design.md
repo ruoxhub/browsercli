@@ -74,14 +74,16 @@
   1. 解析 varint field tag + wire type；
   2. 扫描长度定界字段中的 UTF-8 切片，匹配 JSON 对象/数组边界（`{...}` / `[...]`）；
   3. 命中有效 JSON 时，置入 `decodedJson` 并标注 `decodeType: 'protobuf-embedded-json'`；否则 `decodeType: 'protobuf'`。
-- 挂载方式：给 `analyze_websocket_messages` 与 `get_websocket_message` 增加**可选** `decode?: 'auto' | 'protobuf' | 'json' | 'raw'`（默认 `'auto'`）；**不**在 `get_websocket_messages` 上新增解码参数（避免与“先 analyze 再按 groupId 取数”的既有工作流冲突，见决策 D2）。
+- 挂载方式（已落地）：给 `get_websocket_message` 增加**可选** `decode?: 'auto' | 'protobuf' | 'json' | 'raw'`（默认 `'auto'`），返回 `decodeType` 与可选的 `decodedJson`；**不**在 `get_websocket_messages` 上新增解码参数（避免与“先 analyze 再按 groupId 取数”的既有工作流冲突，见决策 D2）。
+- `analyze_websocket_messages` 的逐帧 `decode` 延后：其职责是按模式指纹分组统计而非逐帧解码，单帧解码以 `get_websocket_message` 承载（决策 D2 的细化）。
 - 关于负载上限：现状无 `maxPayloadSize` 参数（全仓无匹配）。若需限制单帧解码规模，在 `WebSocketCollector` 侧新增，取值与现状核对后再定。
 
 ### 增量 4：`create_hook` 协议级回退（P2，opt-in）
 
 - 位置：`src/tools/hook/CreateHook.ts`（`name: 'create_hook'`，`21`）+ `src/modules/hook/HookTypeRegistry.ts`。
 - 现状 `fetch`/`xhr` 分离类型已覆盖 JS 层双协议（见 §1 #4），**不新增**“统一 fetch+xhr”类型。
-- 新增 opt-in 参数 `protocolFallback?: boolean`（默认 `false`）：为 `true` 时启用 CDP `Fetch.enable` 协议级拦截，覆盖 JS hook 被绕过或加壳闭包的场景。
+- 新增 opt-in 参数 `protocolFallback?: boolean`（默认 `false`），随 `create()` 返回值与 `HookMeta.config` 透传留存。
+- **交付边界**：本迭代仅落地数据层透传；CDP `Fetch.enable` 协议级拦截的运行时启用接线依赖浏览器/CDP 会话生命周期，列为后续独立计划。
 - 保持默认零注入哲学（与 `AGENTS.md` 反检测分层一致，协议层仅在工具显式需要时激活）。
 
 ### 增量 5：`direction` 增加 `'both'`（P2）
@@ -89,10 +91,10 @@
 - 位置：`src/tools/network/getMessages.ts:14`、`src/tools/network/analyzeMessages.ts:14`（`DIRECTION_OPTIONS`）。
 - 新增可选值 `'both'`，按时间序合并 sent + received；**默认保持不变**（现状缺省即不过滤方向），不改破坏性默认。
 
-### 增量 6：list 命令 `--json`（P2）
+### 增量 6：CLI `call --json` 纯数据输出（P2）
 
-- 位置：`list_network_requests`、`list_pages`、`list_frames`、`list_scripts`（`src/tools/network/`、`src/tools/navigation/`、`src/tools/frames/`、`src/tools/debugger/`）。
-- 新增 `json?: boolean`：为 `true` 时输出纯 JSON 数组，不带 ANSI/表格装饰，便于 jq/grep 自动化。
+- 位置：`browsercli/src/commands/tool-dispatcher.ts` + `browsercli/src/commands/shared/tool-args.ts`（`TOOL_CONTROL_FLAGS`）。
+- 语义澄清：list 类工具（`list_network_requests`/`list_pages`/`list_frames`/`list_scripts`）经 `browsercli call <tool>` 统一入口调用；`--json` 是 CLI 输出层 flag，非 MCP 工具参数。为 `call --json` 时直接输出工具的原始 structuredContent（纯 JSON，无 `command/target/tool` 包装），便于 jq/grep 自动化。
 
 ---
 
