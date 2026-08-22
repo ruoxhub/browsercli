@@ -14,6 +14,10 @@ const STREAM_CHANNELS = [
   'log',
 ] as const;
 
+function isWorkerBusyError(err: unknown): boolean {
+  return err instanceof Error && /WORKER_BUSY/.test(err.message);
+}
+
 export interface ToolRecovery {
   tool?: string;
   command?: string;
@@ -25,6 +29,7 @@ export interface WorkerHttpClientOptions {
   apiToken?: string;
   timeoutMs?: number; // 默认 300000
   pollIntervalMs?: number; // 默认 300
+  busyRetryDelaysMs?: number[]; // WORKER_BUSY 退避序列，默认 [200, 500, 1000]
 }
 
 export interface JobStatus {
@@ -83,6 +88,7 @@ export class WorkerHttpClient {
   private readonly apiToken?: string;
   private readonly timeoutMs: number;
   private readonly pollIntervalMs: number;
+  private readonly busyRetryDelaysMs: number[];
   private cachedSessionId?: string;
 
   constructor(opts: WorkerHttpClientOptions) {
@@ -90,6 +96,7 @@ export class WorkerHttpClient {
     this.apiToken = opts.apiToken;
     this.timeoutMs = opts.timeoutMs ?? 300000;
     this.pollIntervalMs = opts.pollIntervalMs ?? 300;
+    this.busyRetryDelaysMs = opts.busyRetryDelaysMs ?? [200, 500, 1000];
   }
 
   /** 进程内懒建并缓存 session，多次 invoke 复用，仅首次付 1 RTT */
@@ -205,6 +212,25 @@ export class WorkerHttpClient {
     return res.jobId;
   }
 
+  private async submitInvokeWithBusyRetry(
+    sessionId: string,
+    tool: string,
+    params: Record<string, unknown>,
+  ): Promise<string> {
+    const delays = this.busyRetryDelaysMs;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await this.submitInvoke(sessionId, tool, params);
+      } catch (err) {
+        if (attempt < delays.length && isWorkerBusyError(err)) {
+          await new Promise(r => setTimeout(r, delays[attempt]));
+          continue;
+        }
+        throw err;
+      }
+    }
+  }
+
   async getJob(jobId: string): Promise<JobStatus> {
     return this.json<JobStatus>(`/jobs/${encodeURIComponent(jobId)}`);
   }
@@ -227,7 +253,7 @@ export class WorkerHttpClient {
     params: Record<string, unknown>,
   ): Promise<unknown> {
     const sid = await this.ensureSession(sessionId);
-    const jobId = await this.submitInvoke(sid, tool, params);
+    const jobId = await this.submitInvokeWithBusyRetry(sid, tool, params);
     const deadline = Date.now() + this.timeoutMs;
     // 首轮立即查
     let job = await this.getJob(jobId);

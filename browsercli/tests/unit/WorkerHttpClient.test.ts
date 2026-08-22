@@ -352,3 +352,81 @@ describe('WorkerHttpClient transport bounds', () => {
     }
   });
 });
+
+describe('WorkerHttpClient.invoke busy retry', () => {
+  it('retries a WORKER_BUSY 409 with backoff then succeeds', async () => {
+    let invokePosts = 0;
+    const server = createServer(async (req, res) => {
+      const url = (req.url ?? '').split('?')[0];
+      res.setHeader('Content-Type', 'application/json');
+      if (req.method === 'POST' && url === '/api/v1/sessions') {
+        res.statusCode = 201;
+        res.end(JSON.stringify({sessionId: 's'}));
+        return;
+      }
+      if (req.method === 'POST' && /\/sessions\/.+\/invoke$/.test(url)) {
+        invokePosts += 1;
+        if (invokePosts <= 2) {
+          res.statusCode = 409;
+          res.end(
+            JSON.stringify({
+              success: false,
+              error: {code: 'WORKER_BUSY', message: 'worker is busy'},
+            }),
+          );
+          return;
+        }
+        res.statusCode = 202;
+        res.end(JSON.stringify({jobId: 'job_ok', status: 'pending'}));
+        return;
+      }
+      if (url === '/api/v1/jobs/job_ok') {
+        res.end(
+          JSON.stringify({jobId: 'job_ok', status: 'done', result: {ok: 1}}),
+        );
+        return;
+      }
+      res.statusCode = 404;
+      res.end('{}');
+    });
+    await new Promise<void>(r => server.listen(0, '127.0.0.1', () => r()));
+    const baseUrl = `http://127.0.0.1:${(server.address() as any).port}`;
+    const client = new WorkerHttpClient({baseUrl, busyRetryDelaysMs: [1, 1]});
+    const result = await client.invoke('s', 't', {});
+    assert.deepEqual(result, {ok: 1});
+    assert.equal(invokePosts, 3);
+    await new Promise<void>(r => server.close(() => r()));
+  });
+
+  it('gives up after exhausting busy retries', async () => {
+    const server = createServer(async (req, res) => {
+      const url = (req.url ?? '').split('?')[0];
+      res.setHeader('Content-Type', 'application/json');
+      if (req.method === 'POST' && url === '/api/v1/sessions') {
+        res.statusCode = 201;
+        res.end(JSON.stringify({sessionId: 's'}));
+        return;
+      }
+      if (req.method === 'POST' && /\/sessions\/.+\/invoke$/.test(url)) {
+        res.statusCode = 409;
+        res.end(
+          JSON.stringify({
+            success: false,
+            error: {code: 'WORKER_BUSY', message: 'worker is busy'},
+          }),
+        );
+        return;
+      }
+      res.statusCode = 404;
+      res.end('{}');
+    });
+    await new Promise<void>(r => server.listen(0, '127.0.0.1', () => r()));
+    const baseUrl = `http://127.0.0.1:${(server.address() as any).port}`;
+    const client = new WorkerHttpClient({
+      baseUrl,
+      busyRetryDelaysMs: [1, 1, 1],
+    });
+    await assert.rejects(() => client.invoke('s', 't', {}), /WORKER_BUSY/);
+    await new Promise<void>(r => server.close(() => r()));
+  });
+});
