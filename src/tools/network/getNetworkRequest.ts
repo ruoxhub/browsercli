@@ -29,9 +29,15 @@ export const getNetworkRequest = defineTool({
       .int()
       .positive()
       .optional()
-      .describe(
-        '返回的响应体最大长度。默认 300 字符。',
-      ),
+      .describe('返回的响应体最大长度。默认 300 字符。'),
+    fullBody: zod
+      .boolean()
+      .optional()
+      .describe('返回完整响应体，跳过默认截断。'),
+    saveTo: zod
+      .string()
+      .optional()
+      .describe('将响应体保存到指定文件路径，返回 savedPath，不占用响应内存。'),
   },
   handler: async (request, response) => {
     const result = await getRuntime().networkModule.getRequest(

@@ -197,6 +197,10 @@ export interface GetNetworkRequestParams {
   reqid?: number;
   /** 响应体最大长度限制，默认 300 字符，超出部分截断 */
   maxBodyLength?: number;
+  /** 返回完整响应体（跳过默认截断） */
+  fullBody?: boolean;
+  /** 将响应体写入指定文件路径，返回 savedPath，不写入响应内存 */
+  saveTo?: string;
 }
 
 /** clearNetworkRequests 参数 */
@@ -280,6 +284,14 @@ export interface GetNetworkRequestData {
   timestamp?: number;
   /** 响应体（文本，如果可读取） */
   responseBody?: string;
+  /** 响应体是否被截断 */
+  isTruncated: boolean;
+  /** 完整响应体长度（字符） */
+  totalBodyLength: number;
+  /** 实际返回的预览长度 */
+  previewLength: number;
+  /** saveTo 时写入的文件路径 */
+  savedPath?: string;
 }
 
 // ─── WebSocket 参数类型 ──────────────────────────────────

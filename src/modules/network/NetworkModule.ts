@@ -19,6 +19,8 @@
  * - 不 import `worker/` 或 `tools/`，避免循环依赖。
  */
 
+import {writeFile} from 'node:fs/promises';
+
 import {
   analyzeWebSocketFramesV2,
   formatGroupMessages,
@@ -171,6 +173,9 @@ function buildOriginalData(
     requestHeaders: networkRequest.headers(),
     responseHeaders: httpResponse?.headers() ?? {},
     postData: networkRequest.postData() ?? undefined,
+    isTruncated: false,
+    totalBodyLength: 0,
+    previewLength: 0,
   };
 }
 
@@ -423,6 +428,9 @@ export class NetworkModule {
       statusCode: 0,
       requestHeaders: {},
       responseHeaders: {},
+      isTruncated: false,
+      totalBodyLength: 0,
+      previewLength: 0,
     } as const;
 
     try {
@@ -447,15 +455,28 @@ export class NetworkModule {
 
       const maxBodyLength = params.maxBodyLength ?? DEFAULT_GET_BODY_LENGTH;
       let responseBody: string | undefined;
+      let fullBody: string | undefined;
+      let isTruncated = false;
+      let totalBodyLength = 0;
+      let savedPath: string | undefined;
       if (httpResponse) {
         try {
           const contentType = httpResponse.headers()['content-type'] ?? '';
           if (isTextualContentType(contentType)) {
-            const fullBody = await httpResponse.text();
-            responseBody =
-              fullBody.length > maxBodyLength
-                ? fullBody.slice(0, maxBodyLength) + '\n... [truncated]'
-                : fullBody;
+            fullBody = await httpResponse.text();
+            totalBodyLength = fullBody.length;
+            if (params.saveTo) {
+              await writeFile(params.saveTo, fullBody, 'utf-8');
+              savedPath = params.saveTo;
+            } else if (params.fullBody) {
+              responseBody = fullBody;
+            } else if (fullBody.length > maxBodyLength) {
+              isTruncated = true;
+              responseBody =
+                fullBody.slice(0, maxBodyLength) + '\n... [truncated]';
+            } else {
+              responseBody = fullBody;
+            }
           }
         } catch {
           // 忽略读取失败
@@ -476,6 +497,10 @@ export class NetworkModule {
         responseHeaders: httpResponse?.headers() ?? {},
         stack: initiator?.stack,
         responseBody,
+        isTruncated,
+        totalBodyLength,
+        previewLength: responseBody?.length ?? 0,
+        ...(savedPath !== undefined && {savedPath}),
       };
 
       return {
