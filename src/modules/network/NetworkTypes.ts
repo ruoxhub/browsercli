@@ -15,7 +15,10 @@
  * `TrafficSummary` 仍由 `formatters/websocketFormatter.ts` 拥有，这里仅 type-only re-export。
  */
 
-import type {TrafficSummary} from '../../formatters/websocketFormatter.js';
+import type {
+  TrafficSummary,
+  WsDecodeMode,
+} from '../../formatters/websocketFormatter.js';
 import type {HTTPRequest, Page, ResourceType} from '../../third_party/index.js';
 import type {PageSelector, ResolvedPage} from '../browser/PageIdentity.js';
 
@@ -318,6 +321,7 @@ export interface GetWebSocketMessagesParams {
 export interface GetWebSocketMessageParams {
   wsid: number;
   frameIndex: number;
+  decode?: WsDecodeMode;
 }
 
 /** WebSocket 分析参数 */
@@ -454,6 +458,8 @@ export interface GetWebSocketMessageData {
     opcode: number;
     payloadSize: number;
     payloadPreview: string;
+    decodeType?: string;
+    decodedJson?: unknown;
   };
 }
 

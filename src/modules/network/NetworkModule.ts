@@ -23,6 +23,7 @@ import {writeFile} from 'node:fs/promises';
 
 import {
   analyzeWebSocketFramesV2,
+  decodeWsPayload,
   formatGroupMessages,
   formatRecentMessages,
   formatTrafficSummary,
@@ -1052,6 +1053,11 @@ export class NetworkModule {
       }
 
       const frame = ws.frames[frameIndex];
+      const decoded = decodeWsPayload(
+        frame.payloadData,
+        frame.opcode,
+        params.decode ?? 'auto',
+      );
       const lines = formatWebSocketFrameDetail(frame, frameIndex);
 
       return {
@@ -1067,6 +1073,10 @@ export class NetworkModule {
             opcode: frame.opcode,
             payloadSize: frame.payloadData.length,
             payloadPreview: frame.payloadData.slice(0, 500),
+            decodeType: decoded.decodeType,
+            ...(decoded.decodedJson !== undefined && {
+              decodedJson: decoded.decodedJson,
+            }),
           },
         },
       };

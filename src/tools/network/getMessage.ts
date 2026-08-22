@@ -25,6 +25,12 @@ export const getWebSocketMessage = defineTool({
       .int()
       .min(0)
       .describe('要获取的帧索引（从 0 开始）。'),
+    decode: zod
+      .enum(['auto', 'protobuf', 'json', 'raw'])
+      .optional()
+      .describe(
+        '解码模式：auto 自动识别，protobuf 按 protobuf 解析，json 提取 JSON，raw 原样。',
+      ),
   },
   handler: async (request, response) => {
     const result = getRuntime().networkModule.getWebSocketMessage(
