@@ -923,7 +923,7 @@ export class NetworkModule {
       const ws = services.getWebSocketConnectionById(params.wsid);
       let frames = ws.frames;
 
-      if (params.direction) {
+      if (params.direction && params.direction !== 'both') {
         frames = frames.filter(f => f.direction === params.direction);
       }
 
@@ -957,7 +957,7 @@ export class NetworkModule {
         }
 
         let filteredIndices = indices;
-        if (params.direction) {
+        if (params.direction && params.direction !== 'both') {
           filteredIndices = indices.filter(idx => {
             const frame = ws.frames[idx];
             return frame && frame.direction === params.direction;
@@ -1132,7 +1132,7 @@ export class NetworkModule {
         sampleIndices: g.sampleIndices,
       }));
 
-      if (params.direction) {
+      if (params.direction && params.direction !== 'both') {
         groups = groups.filter(g => g.direction === params.direction);
       }
 

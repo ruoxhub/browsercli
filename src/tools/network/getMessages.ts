@@ -11,7 +11,11 @@ import {defineTool} from '../ToolDefinition.js';
 
 import type {GetWebSocketMessagesParams} from './types.js';
 
-const DIRECTION_OPTIONS: readonly ['sent', 'received'] = ['sent', 'received'];
+const DIRECTION_OPTIONS: readonly ['sent', 'received', 'both'] = [
+  'sent',
+  'received',
+  'both',
+];
 
 export const getWebSocketMessages = defineTool({
   name: 'get_websocket_messages',
@@ -25,7 +29,9 @@ export const getWebSocketMessages = defineTool({
     direction: zod
       .enum(DIRECTION_OPTIONS)
       .optional()
-      .describe('按方向过滤："sent"（发送）或 "received"（接收）。'),
+      .describe(
+        '按方向过滤："sent"（发送）、"received"（接收）或 "both"（合并发送与接收，缺省等价于不过滤）。',
+      ),
     groupId: zod
       .string()
       .optional()

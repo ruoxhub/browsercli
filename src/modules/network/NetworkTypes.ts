@@ -310,7 +310,7 @@ export interface ListWebSocketConnectionsParams {
 /** WebSocket 消息列表参数 */
 export interface GetWebSocketMessagesParams {
   wsid: number;
-  direction?: 'sent' | 'received';
+  direction?: 'sent' | 'received' | 'both';
   groupId?: string;
   pageSize?: number;
   pageIdx?: number;
@@ -327,7 +327,7 @@ export interface GetWebSocketMessageParams {
 /** WebSocket 分析参数 */
 export interface AnalyzeWebSocketMessagesParams {
   wsid: number;
-  direction?: 'sent' | 'received';
+  direction?: 'sent' | 'received' | 'both';
 }
 
 // ─── Replay 类型 ──────────────────────────────────────────

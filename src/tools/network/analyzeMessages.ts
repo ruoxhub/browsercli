@@ -11,7 +11,11 @@ import {defineTool} from '../ToolDefinition.js';
 
 import type {AnalyzeWebSocketMessagesParams} from './types.js';
 
-const DIRECTION_OPTIONS: readonly ['sent', 'received'] = ['sent', 'received'];
+const DIRECTION_OPTIONS: readonly ['sent', 'received', 'both'] = [
+  'sent',
+  'received',
+  'both',
+];
 
 export const analyzeWebSocketMessages = defineTool({
   name: 'analyze_websocket_messages',
