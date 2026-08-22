@@ -69,6 +69,8 @@ export interface HookCreateOptions {
   };
   /** 是否启用 async 感知 */
   asyncAware?: boolean;
+  /** opt-in 协议级回退：为 true 时由注入方启用 CDP Fetch 域拦截 */
+  protocolFallback?: boolean;
 }
 
 export interface HookMeta {
@@ -140,7 +142,11 @@ export class HookManager {
    * 通过声明式配置创建 hook
    * 这是最常用的方式，传入配置对象即可生成脚本
    */
-  create(options: HookCreateOptions): {hookId: string; script: string} {
+  create(options: HookCreateOptions): {
+    hookId: string;
+    script: string;
+    protocolFallback?: boolean;
+  } {
     const {type, params = {}, hookId: customId} = options;
 
     // 查找插件
@@ -189,7 +195,7 @@ export class HookManager {
     this.hooks.set(hookId, meta);
     this.hookStore.ensure(hookId);
 
-    return {hookId, script};
+    return {hookId, script, protocolFallback: options.protocolFallback};
   }
 
   /**

@@ -39,4 +39,18 @@ describe('HookManager', () => {
     assert.strictEqual(removed, true);
     assert.strictEqual(manager.getAllHooks().length, 0);
   });
+
+  it('transparently carries protocolFallback through create()', () => {
+    const manager = new HookManager();
+
+    const result = manager.create({type: 'fetch', protocolFallback: true});
+    assert.equal(result.protocolFallback, true);
+  });
+
+  it('omits protocolFallback when not provided', () => {
+    const manager = new HookManager();
+
+    const result = manager.create({type: 'fetch'});
+    assert.equal(result.protocolFallback, undefined);
+  });
 });

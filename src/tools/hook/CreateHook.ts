@@ -63,6 +63,12 @@ export const createHook = defineTool({
       })
       .optional()
       .describe('条件执行'),
+    protocolFallback: zod
+      .boolean()
+      .optional()
+      .describe(
+        'opt-in 协议级拦截：为 true 时由注入方启用 CDP Fetch.enable 回退（默认 false）。',
+      ),
   },
   handler: async (request, response) => {
     const runtime = getRuntime();
