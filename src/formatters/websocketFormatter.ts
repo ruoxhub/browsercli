@@ -582,3 +582,102 @@ export function formatRecentMessages(
 
   return lines;
 }
+
+// ============================================================================
+// Zero-schema payload decoding
+// ============================================================================
+
+export type WsDecodeMode = 'auto' | 'protobuf' | 'json' | 'raw';
+
+export interface WsDecodeResult {
+  decodeType: 'json' | 'protobuf-embedded-json' | 'protobuf' | 'text' | 'raw';
+  decodedJson?: unknown;
+}
+
+function base64ToBytes(base64: string): Uint8Array | null {
+  try {
+    const bin = atob(base64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes;
+  } catch {
+    return null;
+  }
+}
+
+function bytesToUtf8(bytes: Uint8Array): string {
+  return new TextDecoder().decode(bytes);
+}
+
+function findJsonEnd(s: string): number {
+  const stack: string[] = [];
+  let inStr = false;
+  let esc = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (c === '\\') esc = true;
+      else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"') {
+      inStr = true;
+      continue;
+    }
+    if (c === '{' || c === '[') stack.push(c);
+    else if (c === '}' || c === ']') {
+      const open = stack.pop();
+      if ((c === '}' && open !== '{') || (c === ']' && open !== '[')) return -1;
+      if (stack.length === 0) return i + 1;
+    }
+  }
+  return -1;
+}
+
+function extractEmbeddedJson(bytes: Uint8Array): unknown {
+  for (let i = 0; i < bytes.length; i++) {
+    if (bytes[i] !== 0x7b && bytes[i] !== 0x5b) continue;
+    const tail = bytesToUtf8(bytes.subarray(i));
+    const end = findJsonEnd(tail);
+    if (end < 0) continue;
+    try {
+      return JSON.parse(tail.slice(0, end));
+    } catch {
+      continue;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * 对单条 WebSocket 帧负载做启发式解码：
+ * - 文本帧：尝试 JSON.parse，失败标记 text。
+ * - 二进制帧（base64）：扫描嵌入的 JSON 对象/数组边界，命中即标记
+ *   `protobuf-embedded-json`；否则标记 `protobuf`。
+ */
+export function decodeWsPayload(
+  payload: string,
+  opcode: number,
+  mode: WsDecodeMode = 'auto',
+): WsDecodeResult {
+  if (mode === 'raw') return {decodeType: 'raw'};
+  if (opcode === 1) {
+    if (mode === 'protobuf') return {decodeType: 'protobuf'};
+    try {
+      return {decodeType: 'json', decodedJson: JSON.parse(payload)};
+    } catch {
+      return {decodeType: 'text'};
+    }
+  }
+  if (opcode === 2) {
+    const bytes = base64ToBytes(payload);
+    if (!bytes) return {decodeType: 'protobuf'};
+    const embedded = extractEmbeddedJson(bytes);
+    if (embedded !== undefined) {
+      return {decodeType: 'protobuf-embedded-json', decodedJson: embedded};
+    }
+    return {decodeType: 'protobuf'};
+  }
+  return {decodeType: 'text'};
+}
