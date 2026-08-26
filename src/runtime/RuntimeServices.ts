@@ -11,6 +11,7 @@ import type {PageController} from '../modules/collector/PageController.js';
 import {CryptoDetector} from '../modules/crypto/CryptoDetector.js';
 import {Deobfuscator} from '../modules/deobfuscator/Deobfuscator.js';
 import {NetworkModule} from '../modules/network/index.js';
+import {MitmModule} from '../modules/proxy/index.js';
 import {SourceMapService} from '../modules/sourcemap/SourceMapService.js';
 import {WasmAnalyzer} from '../modules/wasm/WasmAnalyzer.js';
 import {WasmCollector} from '../modules/wasm/WasmCollector.js';
@@ -33,6 +34,7 @@ export class RuntimeServices {
   private deobfuscator?: Deobfuscator;
   private cryptoDetector?: CryptoDetector;
   private networkModule?: NetworkModule;
+  private mitmModule?: MitmModule;
   private wasmAnalyzer?: WasmAnalyzer;
   private wasmDecompiler?: WasmDecompiler;
   private wasmRuntimeInspector?: WasmRuntimeInspector;
@@ -67,6 +69,10 @@ export class RuntimeServices {
 
   getNetworkModule(): NetworkModule {
     return (this.networkModule ??= new NetworkModule());
+  }
+
+  getMitmModule(): MitmModule {
+    return (this.mitmModule ??= new MitmModule());
   }
 
   getWasmAnalyzer(): WasmAnalyzer {
