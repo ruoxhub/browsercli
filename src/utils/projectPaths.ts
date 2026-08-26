@@ -73,6 +73,15 @@ export function resolveDefaultEnvPath(moduleUrl: string): string {
   return path.join(resolvePackageRoot(moduleUrl), '.env');
 }
 
+export function resolveDefaultSessionDbFile(moduleUrl: string): string {
+  return path.join(
+    resolvePackageRoot(moduleUrl),
+    '.cache',
+    'reverser',
+    'reverser.db',
+  );
+}
+
 function quoteShellArg(value: string): string {
   if (/^[A-Za-z0-9_./:=@+-]+$/.test(value)) {
     return value;

@@ -12,9 +12,18 @@ import {
   resolveDefaultCodeCacheDir,
   resolveDefaultDebuggerSessionsDir,
   resolveDefaultEnvPath,
+  resolveDefaultSessionDbFile,
+  resolvePackageRoot,
 } from '../../../src/utils/projectPaths.js';
 
 describe('project path resolution', () => {
+  it('resolves session db under .cache/reverser from package root', () => {
+    const repoRoot = resolvePackageRoot(import.meta.url);
+    assert.strictEqual(
+      resolveDefaultSessionDbFile(import.meta.url),
+      path.join(repoRoot, '.cache', 'reverser', 'reverser.db'),
+    );
+  });
   it('resolves runtime default paths from the package root instead of process cwd', () => {
     const originalCwd = process.cwd;
     const fakeCwd = path.join(
