@@ -26,6 +26,7 @@ import {manifest as networkManifest} from './network/manifest.js';
 import {manifest as pageManifest} from './page/manifest.js';
 import {manifest as performanceManifest} from './performance/manifest.js';
 import {manifest as pipelineManifest} from './pipeline/manifest.js';
+import {manifest as proxyManifest} from './proxy/manifest.js';
 import {manifest as rebuildManifest} from './rebuild/manifest.js';
 import {manifest as screenshotManifest} from './screenshot/manifest.js';
 import {manifest as scriptManifest} from './script/manifest.js';
@@ -55,6 +56,7 @@ export const GENERATED_DOMAIN_MANIFESTS = [
   pageManifest,
   performanceManifest,
   pipelineManifest,
+  proxyManifest,
   rebuildManifest,
   screenshotManifest,
   scriptManifest,
@@ -504,6 +506,30 @@ export const GENERATED_TOOL_REGISTRY = [
   {
     modulePath: './pipeline/examples.js',
     handlerName: 'analyzePipeline',
+  },
+  {
+    modulePath: './proxy/startMitmProxy.js',
+    handlerName: 'startMitmProxy',
+  },
+  {
+    modulePath: './proxy/stopMitmProxy.js',
+    handlerName: 'stopMitmProxy',
+  },
+  {
+    modulePath: './proxy/listMitmRequests.js',
+    handlerName: 'listMitmRequests',
+  },
+  {
+    modulePath: './proxy/getMitmRequest.js',
+    handlerName: 'getMitmRequest',
+  },
+  {
+    modulePath: './proxy/clearMitmRequests.js',
+    handlerName: 'clearMitmRequests',
+  },
+  {
+    modulePath: './proxy/exportMitmCa.js',
+    handlerName: 'exportMitmCa',
   },
   {
     modulePath: './rebuild/index.js',
