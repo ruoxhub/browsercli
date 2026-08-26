@@ -11,6 +11,9 @@ import type {
   BrowserConfig,
   ConnectResult,
   LlmTestResult,
+  ProxyStatusPayload,
+  ListMitmRequestsData,
+  GetMitmRequestData,
 } from './protocol';
 
 export interface ToolSummary {
@@ -143,9 +146,11 @@ export const api = {
   listLlmModels(config?: {
     llmProvider?: string;
     openai?: Record<string, unknown>;
-  }): Promise<{models: {id: string; object?: string; owned_by?: string}[]}> {
+  }): Promise<{
+    models: Array<{id: string; object?: string; owned_by?: string}>;
+  }> {
     return request<{
-      models: {id: string; object?: string; owned_by?: string}[];
+      models: Array<{id: string; object?: string; owned_by?: string}>;
     }>('POST', '/api/llm/models', config ?? {});
   },
 
@@ -155,5 +160,48 @@ export const api = {
 
   disconnectBrowser(): Promise<ConnectResult> {
     return request<ConnectResult>('POST', '/api/browser/disconnect');
+  },
+
+  getProxyStatus(): Promise<ProxyStatusPayload> {
+    return request<ProxyStatusPayload>('GET', '/api/proxy/status');
+  },
+
+  startProxy(port?: number): Promise<{port: number; caCertPath: string}> {
+    return request<{port: number; caCertPath: string}>(
+      'POST',
+      '/api/proxy/start',
+      {port},
+    );
+  },
+
+  stopProxy(): Promise<ProxyStatusPayload> {
+    return request<ProxyStatusPayload>('POST', '/api/proxy/stop');
+  },
+
+  getProxyRequests(params?: {
+    urlFilter?: string;
+    pageIdx?: number;
+    pageSize?: number;
+  }): Promise<ListMitmRequestsData> {
+    const query = new URLSearchParams();
+    if (params?.urlFilter) query.set('urlFilter', params.urlFilter);
+    if (params?.pageIdx !== undefined)
+      query.set('pageIdx', String(params.pageIdx));
+    if (params?.pageSize !== undefined)
+      query.set('pageSize', String(params.pageSize));
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return request<ListMitmRequestsData>('GET', `/api/proxy/requests${qs}`);
+  },
+
+  getProxyRequestDetail(id: number): Promise<GetMitmRequestData> {
+    return request<GetMitmRequestData>('GET', `/api/proxy/requests/${id}`);
+  },
+
+  clearProxyRequests(): Promise<{clearedCount: number}> {
+    return request<{clearedCount: number}>('DELETE', '/api/proxy/requests');
+  },
+
+  getProxyLocalIps(): Promise<{ips: string[]}> {
+    return request<{ips: string[]}>('GET', '/api/proxy/ips');
   },
 };

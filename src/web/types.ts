@@ -29,7 +29,7 @@ export interface ApiResponse<T = unknown> {
  * 状态类频道：订阅时立即回放最新快照（lastState），后续仅在状态变化时推送。
  * 适合 worker 状态、browser 状态这类「最新值」语义。
  */
-export type StateChannel = 'worker.status' | 'browser.event';
+export type StateChannel = 'worker.status' | 'browser.event' | 'proxy.status';
 
 /**
  * 流式频道：订阅后只推增量事件，不回放历史。
@@ -39,7 +39,8 @@ export type StreamChannel =
   | 'tool.invoke'
   | 'hook.event'
   | 'hook.sample'
-  | 'log';
+  | 'log'
+  | 'proxy.request';
 
 export type Channel = StateChannel | StreamChannel;
 
@@ -50,6 +51,7 @@ export type Channel = StateChannel | StreamChannel;
 export const STATE_CHANNELS: readonly StateChannel[] = [
   'worker.status',
   'browser.event',
+  'proxy.status',
 ];
 
 // ==================== WebSocket Messages ====================
@@ -143,6 +145,26 @@ export interface ToolInvokeEvent {
   error?: {code: string; message: string};
 }
 
+// ==================== Proxy Types (channel: proxy.status / proxy.request) ====================
+
+export interface ProxyStatusPayload {
+  running: boolean;
+  port: number | null;
+  capturedCount: number;
+  caInitialized: boolean;
+  caCertPath: string;
+}
+
+export interface ProxyRequestSummaryEvent {
+  id: number;
+  method: string;
+  url: string;
+  statusCode: number;
+  contentType: string | null;
+  timestamp: number;
+  contentLength?: number;
+}
+
 // ==================== Worker Status (state channel: worker.status) ====================
 
 export interface WorkerStatus {
@@ -222,4 +244,41 @@ export interface InvocationRecord {
   args?: Record<string, unknown>;
   result?: unknown;
   error?: {code: string; message: string};
+}
+
+// ==================== MITM Proxy Data Types ====================
+
+export interface MitmRequestSummary {
+  id: number;
+  method: string;
+  url: string;
+  statusCode: number;
+  contentType: string | null;
+  timestamp: number;
+}
+
+export interface ListMitmRequestsData {
+  requests: MitmRequestSummary[];
+  total: number;
+  pageIdx: number;
+  pageSize: number | undefined;
+}
+
+export interface GetMitmRequestData {
+  id: number;
+  requestId: string;
+  method: string;
+  url: string;
+  requestHeaders: Record<string, string>;
+  requestBody: string | null;
+  statusCode: number;
+  responseHeaders: Record<string, string>;
+  responseBody: string | null;
+  contentType: string | null;
+  isStatic: boolean;
+  isStreaming: boolean;
+  isWebSocket: boolean;
+  truncated: boolean;
+  timestamp: number;
+  savedPath?: string;
 }

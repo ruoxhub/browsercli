@@ -30,6 +30,7 @@ import {createApiV1Routes} from './routes/apiV1.js';
 import {createConfigRoutes} from './routes/config.js';
 import {createHookRoutes} from './routes/hooks.js';
 import {createInvocationsRoutes} from './routes/invocations.js';
+import {createProxyRoutes} from './routes/proxy.js';
 import {createToolsRoutes} from './routes/tools.js';
 import {createWorkerRoutes, type WorkerRoutesConfig} from './routes/worker.js';
 import {WsHub} from './ws/WsHub.js';
@@ -83,6 +84,7 @@ export class ConsoleServer {
   private wsServer?: WebSocketServer;
   private unsubscribeToolInvoke?: () => void;
   private onSampleListener?: (hookId: string, sample: unknown) => void;
+  private onProxyCaptureListener?: (record: any) => void;
 
   constructor(options: ConsoleServerOptions) {
     this.options = options;
@@ -160,6 +162,9 @@ export class ConsoleServer {
       }),
     );
     this.router.mount(createHookRoutes(this.options.toolAdapter));
+    this.router.mount(
+      createProxyRoutes(this.options.runtime.mitmModule, this.wsHub),
+    );
     this.router.mount(
       createApiV1Routes({
         contextProvider: this.options.runtime.contextProvider!,
@@ -298,6 +303,21 @@ export class ConsoleServer {
       hookStore.events.on('sample', this.onSampleListener);
     }
 
+    const proxyStore = this.options.runtime.mitmModule?.getStore?.();
+    if (proxyStore) {
+      this.onProxyCaptureListener = (record: any) => {
+        this.wsHub.broadcast('proxy.request', {
+          id: record.id,
+          method: record.method,
+          url: record.url,
+          statusCode: record.statusCode,
+          contentType: record.contentType,
+          timestamp: record.timestamp,
+        });
+      };
+      proxyStore.events.on('capture', this.onProxyCaptureListener);
+    }
+
     // 4. 开启监听（host 可配置，默认 127.0.0.1）
     await new Promise<void>((resolve, reject) => {
       this.httpServer!.listen(
@@ -324,6 +344,11 @@ export class ConsoleServer {
       const hookStore = this.options.runtime.hookManager?.getHookStore?.();
       hookStore?.events.off('sample', this.onSampleListener);
       this.onSampleListener = undefined;
+    }
+    if (this.onProxyCaptureListener) {
+      const proxyStore = this.options.runtime.mitmModule?.getStore?.();
+      proxyStore?.events.off('capture', this.onProxyCaptureListener);
+      this.onProxyCaptureListener = undefined;
     }
 
     // 2. 关闭所有活动的 WebSocket 并销毁 ws 服务

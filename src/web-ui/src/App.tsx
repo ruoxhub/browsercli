@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Wrench,
   Radio,
+  Network,
   Menu,
   X,
   Terminal,
@@ -18,6 +19,7 @@ import {HashRouter as Router, Routes, Route, NavLink} from 'react-router-dom';
 import wsClient from './lib/ws';
 import HooksPage from './routes/hooks';
 import OverviewPage from './routes/overview';
+import ProxyPage from './routes/proxy';
 import SettingsPage from './routes/settings';
 import ToolsPage from './routes/tools';
 
@@ -99,6 +101,14 @@ function Layout() {
             <span>工具面板</span>
           </NavLink>
           <NavLink
+            to="/proxy"
+            onClick={() => setSidebarOpen(false)}
+            className={getNavLinkClass}
+          >
+            <Network size={16} />
+            <span>流量抓包</span>
+          </NavLink>
+          <NavLink
             to="/hooks"
             onClick={() => setSidebarOpen(false)}
             className={getNavLinkClass}
@@ -142,6 +152,10 @@ function Layout() {
           <Route
             path="/tools"
             element={<ToolsPage />}
+          />
+          <Route
+            path="/proxy"
+            element={<ProxyPage />}
           />
           <Route
             path="/hooks"

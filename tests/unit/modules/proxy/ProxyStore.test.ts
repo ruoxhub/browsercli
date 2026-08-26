@@ -59,4 +59,24 @@ describe('ProxyStore', () => {
     const next = store.add(makeExchange('http://b/'));
     assert.strictEqual(next.id, 1);
   });
+
+  it('add 与 clear 触发对应 events 事件', () => {
+    const store = new ProxyStore();
+    const captured: unknown[] = [];
+    let cleared = false;
+
+    store.events.on('capture', record => {
+      captured.push(record);
+    });
+    store.events.on('clear', () => {
+      cleared = true;
+    });
+
+    const rec = store.add(makeExchange('http://test/'));
+    assert.strictEqual(captured.length, 1);
+    assert.strictEqual(captured[0], rec);
+
+    store.clear();
+    assert.strictEqual(cleared, true);
+  });
 });

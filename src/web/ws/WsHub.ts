@@ -52,6 +52,7 @@ const VALID_CHANNELS: ReadonlySet<Channel> = new Set<Channel>([
   'hook.event',
   'hook.sample',
   'log',
+  'proxy.request',
 ]);
 
 export class WsHub {

@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {EventEmitter} from 'node:events';
+
 import type {CapturedExchange, CapturedRequest} from './types.js';
 
 /**
@@ -12,6 +14,7 @@ import type {CapturedExchange, CapturedRequest} from './types.js';
  * 稳定 id 从 1 递增，clear() 后重置。超过 maxRecords 时淘汰最旧记录。
  */
 export class ProxyStore {
+  readonly events = new EventEmitter();
   private readonly records: CapturedRequest[] = [];
   private readonly maxRecords: number;
   private nextId = 1;
@@ -26,6 +29,7 @@ export class ProxyStore {
       this.records.shift();
     }
     this.records.push(record);
+    this.events.emit('capture', record);
     return record;
   }
 
@@ -40,6 +44,7 @@ export class ProxyStore {
   clear(): void {
     this.records.length = 0;
     this.nextId = 1;
+    this.events.emit('clear');
   }
 
   size(): number {

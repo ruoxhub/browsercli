@@ -40,6 +40,14 @@ export class MitmModule {
     this.caManager = new CaManager(certsDir);
   }
 
+  getStore(): ProxyStore {
+    return this.store;
+  }
+
+  getCaManager(): CaManager {
+    return this.caManager;
+  }
+
   async start(
     port: number = DEFAULT_PORT,
   ): Promise<MitmMethodResult<StartMitmProxyData>> {

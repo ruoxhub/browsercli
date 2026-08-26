@@ -28,7 +28,7 @@ export default function SettingsPage() {
     null,
   );
   const [models, setModels] = useState<
-    {id: string; object?: string; owned_by?: string}[]
+    Array<{id: string; object?: string; owned_by?: string}>
   >([]);
   const [loadingModels, setLoadingModels] = useState(false);
 
