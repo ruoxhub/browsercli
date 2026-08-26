@@ -125,8 +125,12 @@ export class ASTOptimizer {
       VariableDeclarator(path) {
         const {id, init} = path.node;
 
-        // 字面量是 Expression 的子集，narrow 后能安全 clone
-        if (t.isIdentifier(id) && init && t.isExpression(init)) {
+        // 仅传播字面量常量。若放宽到任意 Expression（如 x + 0、!!n），
+        // 后续多轮 pass 里这些非字面量会被变换后克隆进任意 Identifier 位置
+        //（含 MemberExpression.property），触发 Babel 校验崩溃：
+        //   Property property of MemberExpression expected node to be of a
+        //   type ["Identifier","PrivateName"] but instead got "CallExpression"
+        if (t.isIdentifier(id) && init && t.isLiteral(init)) {
           constants.set(id.name, init);
         }
       },
