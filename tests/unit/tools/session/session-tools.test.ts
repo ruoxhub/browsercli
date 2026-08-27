@@ -12,6 +12,7 @@ import {getRuntime} from '../../../../src/runtime.js';
 import {ToolCategory} from '../../../../src/tools/categories.js';
 import {sessionAnalyzePurified} from '../../../../src/tools/session/session_analyze_purified.js';
 import {sessionCreate} from '../../../../src/tools/session/session_create.js';
+import {sessionGenerateReport} from '../../../../src/tools/session/session_generate_report.js';
 import {sessionGetData} from '../../../../src/tools/session/session_get_data.js';
 import {sessionList} from '../../../../src/tools/session/session_list.js';
 
@@ -28,6 +29,9 @@ interface CapturedContent {
   purifiedRequests?: unknown[];
   cryptoSnippets?: unknown[];
   recommendedPrompt?: string;
+  reportId?: string;
+  reportMarkdown?: string;
+  llmUsed?: boolean;
 }
 
 function responseCapture(): {
@@ -343,6 +347,113 @@ describe('session tools', () => {
           error.code === 'NOT_FOUND' &&
           typeof error.message === 'string' &&
           error.message.includes('non-existent-analyze-session-99999')
+        );
+      },
+    );
+  });
+
+  it('session_generate_report returns report and persists to ai_reports for active session', async () => {
+    const createCapture = responseCapture();
+    const sessionName = `gen-report-${Date.now()}`;
+    await sessionCreate.handler(
+      {
+        params: {
+          name: sessionName,
+          targetUrl: 'https://example.com/report',
+        },
+      },
+      createCapture.response as never,
+      {} as never,
+    );
+    const createdSession = createCapture.getStructuredContent()?.session;
+    assert.ok(createdSession, 'createdSession should exist');
+
+    const capture = responseCapture();
+    await sessionGenerateReport.handler(
+      {params: {}},
+      capture.response as never,
+      {} as never,
+    );
+
+    const content = capture.getStructuredContent();
+    assert.ok(content, 'structured content should be set');
+    assert.strictEqual(content.tooltype, 'session_generate_report');
+    assert.ok(
+      typeof content.reportId === 'string' && content.reportId.length > 0,
+      'reportId should be a non-empty string',
+    );
+    assert.ok(
+      typeof content.reportMarkdown === 'string' &&
+        content.reportMarkdown.length > 0,
+      'reportMarkdown should be a non-empty string',
+    );
+    assert.strictEqual(content.mode, 'auto');
+
+    const manager = getRuntime().captureSessionManager;
+    assert.ok(
+      manager.getReports(createdSession.id).length >= 1,
+      'report should be persisted in ai_reports',
+    );
+    const saved = manager.getReport(content.reportId!);
+    assert.ok(saved, 'getReport(reportId) should return the saved row');
+    assert.strictEqual(saved.sessionId, createdSession.id);
+    assert.strictEqual(saved.reportMarkdown, content.reportMarkdown);
+  });
+
+  it('session_generate_report falls back to offline report when LLM is not configured', async () => {
+    const createCapture = responseCapture();
+    const sessionName = `gen-report-fallback-${Date.now()}`;
+    await sessionCreate.handler(
+      {
+        params: {
+          name: sessionName,
+        },
+      },
+      createCapture.response as never,
+      {} as never,
+    );
+    assert.ok(
+      createCapture.getStructuredContent()?.session,
+      'createdSession should exist',
+    );
+
+    const capture = responseCapture();
+    await sessionGenerateReport.handler(
+      {params: {mode: 'js_crypto'}},
+      capture.response as never,
+      {} as never,
+    );
+
+    const content = capture.getStructuredContent();
+    assert.ok(content, 'structured content should be set');
+    assert.strictEqual(content.llmUsed, false, 'llmUsed should be false');
+    assert.strictEqual(content.mode, 'js_crypto');
+    assert.ok(
+      content.reportMarkdown?.includes('# AI 分析报告'),
+      'reportMarkdown should be the deterministic offline fallback',
+    );
+  });
+
+  it('session_generate_report throws not found when unknown sessionId', async () => {
+    const capture = responseCapture();
+    await assert.rejects(
+      async () => {
+        await sessionGenerateReport.handler(
+          {
+            params: {
+              sessionId: 'non-existent-report-session-77777',
+            },
+          },
+          capture.response as never,
+          {} as never,
+        );
+      },
+      (err: unknown) => {
+        const error = err as {code?: string; message?: string};
+        return (
+          error.code === 'NOT_FOUND' &&
+          typeof error.message === 'string' &&
+          error.message.includes('non-existent-report-session-77777')
         );
       },
     );

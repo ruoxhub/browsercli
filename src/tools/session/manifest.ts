@@ -27,5 +27,9 @@ export const manifest = {
       modulePath: './session/session_analyze_purified.js',
       handlerName: 'sessionAnalyzePurified',
     },
+    {
+      modulePath: './session/session_generate_report.js',
+      handlerName: 'sessionGenerateReport',
+    },
   ],
 } satisfies DomainManifest;
