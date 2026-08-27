@@ -30,6 +30,7 @@ import {manifest as proxyManifest} from './proxy/manifest.js';
 import {manifest as rebuildManifest} from './rebuild/manifest.js';
 import {manifest as screenshotManifest} from './screenshot/manifest.js';
 import {manifest as scriptManifest} from './script/manifest.js';
+import {manifest as sessionManifest} from './session/manifest.js';
 import {manifest as sourcemapManifest} from './sourcemap/manifest.js';
 import {manifest as stealthManifest} from './stealth/manifest.js';
 import {manifest as wasmManifest} from './wasm/manifest.js';
@@ -60,6 +61,7 @@ export const GENERATED_DOMAIN_MANIFESTS = [
   rebuildManifest,
   screenshotManifest,
   scriptManifest,
+  sessionManifest,
   sourcemapManifest,
   stealthManifest,
   wasmManifest,
@@ -562,6 +564,14 @@ export const GENERATED_TOOL_REGISTRY = [
   {
     modulePath: './script/script.js',
     handlerName: 'injectPreloadScript',
+  },
+  {
+    modulePath: './session/session_create.js',
+    handlerName: 'sessionCreate',
+  },
+  {
+    modulePath: './session/session_list.js',
+    handlerName: 'sessionList',
   },
   {
     modulePath: './sourcemap/index.js',
