@@ -85,6 +85,22 @@ export type HookRecordInput = Omit<HookRecordRow, 'sessionId'>;
 
 export type StorageSnapshotInput = Omit<StorageSnapshotRow, 'sessionId'>;
 
+export interface AiReportRow {
+  id: string;
+  sessionId: string;
+  mode: string;
+  sceneHints: string | null;
+  purifiedSummary: string | null;
+  reportMarkdown: string;
+  messages: string;
+  createdAt: number;
+}
+
+export type AiReportInput = Omit<AiReportRow, 'id' | 'createdAt'> & {
+  id?: string;
+  createdAt?: number;
+};
+
 export interface RequestFilter {
   sources?: CaptureSource[];
   urlFilter?: string;

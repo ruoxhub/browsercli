@@ -7,6 +7,8 @@ import {randomUUID} from 'node:crypto';
 
 import type {SessionStore} from './SessionStore.js';
 import type {
+  AiReportInput,
+  AiReportRow,
   CapturedRequestRow,
   HookRecordRow,
   RequestFilter,
@@ -94,5 +96,25 @@ export class CaptureSessionManager {
 
   getSnapshots(sessionId: string): StorageSnapshotRow[] {
     return this.store.getSnapshots(sessionId);
+  }
+
+  saveReport(input: AiReportInput): AiReportRow {
+    const id = input.id ?? randomUUID();
+    const createdAt = input.createdAt ?? Date.now();
+    const row: AiReportRow = {
+      ...input,
+      id,
+      createdAt,
+    };
+    this.store.saveReport(row);
+    return row;
+  }
+
+  getReport(id: string): AiReportRow | null {
+    return this.store.getReport(id);
+  }
+
+  getReports(sessionId: string): AiReportRow[] {
+    return this.store.getReports(sessionId);
   }
 }

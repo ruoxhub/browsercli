@@ -120,4 +120,33 @@ describe('CaptureSessionManager', () => {
       db.close();
     }
   });
+
+  it('saves and retrieves ai reports delegating to store', () => {
+    const {manager, db} = makeManager();
+    try {
+      const session = manager.createSession({name: 'demo'});
+      const created = manager.saveReport({
+        sessionId: session.id,
+        mode: 'full',
+        sceneHints: 'test scene',
+        purifiedSummary: null,
+        reportMarkdown: '# Test Report',
+        messages: '[]',
+      });
+
+      assert.ok(created.id);
+      assert.ok(created.createdAt);
+      assert.strictEqual(created.sessionId, session.id);
+      assert.strictEqual(created.mode, 'full');
+
+      const fetched = manager.getReport(created.id);
+      assert.deepStrictEqual(fetched, created);
+
+      const list = manager.getReports(session.id);
+      assert.strictEqual(list.length, 1);
+      assert.deepStrictEqual(list[0], created);
+    } finally {
+      db.close();
+    }
+  });
 });

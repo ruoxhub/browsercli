@@ -9,6 +9,7 @@ import type {DatabaseManager} from '../../database/DatabaseManager.js';
 
 import type {SessionStore} from './SessionStore.js';
 import type {
+  AiReportRow,
   CapturedRequestRow,
   HookRecordRow,
   RequestFilter,
@@ -67,6 +68,17 @@ interface SnapshotDbRow {
   value: string | null;
 }
 
+interface AiReportDbRow {
+  id: string;
+  session_id: string;
+  mode: string;
+  scene_hints: string | null;
+  purified_summary: string | null;
+  report_markdown: string;
+  messages: string;
+  created_at: number;
+}
+
 const toSession = (r: SessionDbRow): SessionRow => ({
   id: r.id,
   name: r.name,
@@ -115,6 +127,17 @@ const toSnapshot = (r: SnapshotDbRow): StorageSnapshotRow => ({
   origin: r.origin,
   key: r.key,
   value: r.value,
+});
+
+const toReport = (r: AiReportDbRow): AiReportRow => ({
+  id: r.id,
+  sessionId: r.session_id,
+  mode: r.mode,
+  sceneHints: r.scene_hints,
+  purifiedSummary: r.purified_summary,
+  reportMarkdown: r.report_markdown,
+  messages: r.messages,
+  createdAt: r.created_at,
 });
 
 export class SqliteSessionStore implements SessionStore {
@@ -268,6 +291,42 @@ export class SqliteSessionStore implements SessionStore {
       )
       .all(sessionId) as SnapshotDbRow[];
     return rows.map(toSnapshot);
+  }
+
+  saveReport(row: AiReportRow): void {
+    this.db
+      .prepare(
+        `INSERT INTO ai_reports (
+           id, session_id, mode, scene_hints, purified_summary,
+           report_markdown, messages, created_at
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        row.id,
+        row.sessionId,
+        row.mode,
+        row.sceneHints,
+        row.purifiedSummary,
+        row.reportMarkdown,
+        row.messages,
+        row.createdAt,
+      );
+  }
+
+  getReport(id: string): AiReportRow | null {
+    const row = this.db
+      .prepare(`SELECT * FROM ai_reports WHERE id = ?`)
+      .get(id) as AiReportDbRow | undefined;
+    return row ? toReport(row) : null;
+  }
+
+  getReports(sessionId: string): AiReportRow[] {
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM ai_reports WHERE session_id = ? ORDER BY created_at DESC`,
+      )
+      .all(sessionId) as AiReportDbRow[];
+    return rows.map(toReport);
   }
 
   close(): void {

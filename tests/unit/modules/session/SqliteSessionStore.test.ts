@@ -9,6 +9,7 @@ import {describe, it} from 'node:test';
 import {DatabaseManager} from '../../../../src/database/DatabaseManager.js';
 import {SqliteSessionStore} from '../../../../src/modules/session/SqliteSessionStore.js';
 import type {
+  AiReportRow,
   CapturedRequestRow,
   HookRecordRow,
   StorageSnapshotRow,
@@ -113,6 +114,52 @@ describe('SqliteSessionStore', () => {
       };
       store.appendSnapshot(snap);
       assert.strictEqual(store.getSnapshots('s1').length, 1);
+    } finally {
+      manager.close();
+    }
+  });
+
+  it('saves and retrieves ai reports', () => {
+    const {store, manager} = makeStore();
+    try {
+      store.createSession({id: 's1', name: 'demo'});
+      const r1: AiReportRow = {
+        id: 'rep-1',
+        sessionId: 's1',
+        mode: 'full',
+        sceneHints: 'login flow',
+        purifiedSummary: '{"endpoints":["/api/login"]}',
+        reportMarkdown: '# Analysis Report',
+        messages: JSON.stringify([{role: 'user', content: 'analyze'}]),
+        createdAt: 1000,
+      };
+      const r2: AiReportRow = {
+        id: 'rep-2',
+        sessionId: 's1',
+        mode: 'quick',
+        sceneHints: null,
+        purifiedSummary: null,
+        reportMarkdown: '# Quick Report',
+        messages: '[]',
+        createdAt: 2000,
+      };
+
+      store.saveReport(r1);
+      store.saveReport(r2);
+
+      const fetched1 = store.getReport('rep-1');
+      assert.deepStrictEqual(fetched1, r1);
+
+      const nonExistent = store.getReport('rep-none');
+      assert.strictEqual(nonExistent, null);
+
+      const reports = store.getReports('s1');
+      assert.strictEqual(reports.length, 2);
+      // Ordered by created_at DESC
+      assert.strictEqual(reports[0]?.id, 'rep-2');
+      assert.strictEqual(reports[1]?.id, 'rep-1');
+      assert.deepStrictEqual(reports[0], r2);
+      assert.deepStrictEqual(reports[1], r1);
     } finally {
       manager.close();
     }

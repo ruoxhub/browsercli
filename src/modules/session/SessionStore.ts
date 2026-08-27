@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import type {
+  AiReportRow,
   CapturedRequestRow,
   HookRecordRow,
   RequestFilter,
@@ -27,5 +28,8 @@ export interface SessionStore {
   getRequests(sessionId: string, filter?: RequestFilter): CapturedRequestRow[];
   getHooks(sessionId: string): HookRecordRow[];
   getSnapshots(sessionId: string): StorageSnapshotRow[];
+  saveReport(row: AiReportRow): void;
+  getReport(id: string): AiReportRow | null;
+  getReports(sessionId: string): AiReportRow[];
   close(): void;
 }
