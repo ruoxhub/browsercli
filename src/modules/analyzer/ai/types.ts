@@ -30,3 +30,14 @@ export interface PurifiedRequest {
   isStreaming: number;
   isWebSocket: number;
 }
+
+export interface CryptoSnippet {
+  functionName: string;
+  hookType: string;
+  file: string;
+  line?: number;
+  column?: number;
+  sourceSnippet: string;
+  argsPreview?: string;
+  resultPreview?: string;
+}
