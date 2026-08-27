@@ -31,6 +31,16 @@ const STATIC_EXTENSIONS = new Set([
   'tiff',
 ]);
 
+// 追踪/分析域名的聚焦集合，用于过滤「噪声请求」（分析埋点、监控、营销 SDK 等）。
+//
+// 刻意不复用 `PatternDetector.BLACKLIST_DOMAINS`：两者语义不同。
+// `BLACKLIST_DOMAINS` 混入了 CDN 域名（cdn.jsdelivr.net / unpkg.com /
+// cdnjs.cloudflare.com）以及 facebook.com/tr、googlesyndication.com；
+// 若机械复用，会让 TrafficPurifier 把逆向分析最需要保留的 JS bundle 请求
+// 也一并过滤掉，属于正确性回退。因此此处只保留追踪/分析语义的域名列表。
+//
+// 已知漂移：本表额外包含 `segment.io`（BLACKLIST_DOMAINS 中无此条目）。
+// 未来统一候选（P3）：提取共享的「噪声域名」单一来源，消除双表漂移。
 const TRACKING_DOMAINS = [
   'google-analytics.com',
   'googletagmanager.com',
