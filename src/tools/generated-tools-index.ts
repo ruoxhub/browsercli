@@ -578,6 +578,10 @@ export const GENERATED_TOOL_REGISTRY = [
     handlerName: 'sessionGetData',
   },
   {
+    modulePath: './session/session_analyze_purified.js',
+    handlerName: 'sessionAnalyzePurified',
+  },
+  {
     modulePath: './sourcemap/index.js',
     handlerName: 'sourcemapDiscover',
   },
