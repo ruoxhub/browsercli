@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import type {HookRecordRow} from '../../session/types.js';
+
 import type {CryptoSnippet} from './types.js';
 
 const LINE_PREFIX_WIDTH = 5;

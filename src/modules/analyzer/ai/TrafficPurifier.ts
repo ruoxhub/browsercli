@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import type {CapturedRequestRow} from '../../session/types.js';
+
 import type {PurifiedRequest} from './types.js';
 
 const STATIC_EXTENSIONS = new Set([

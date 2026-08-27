@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import type {CapturedRequestRow, HookRecordRow} from '../../session/types.js';
+
 import type {SceneHint} from './types.js';
 
 interface SceneCollector {
@@ -69,7 +70,7 @@ export class SceneDetector {
     requests: CapturedRequestRow[],
     hooks: HookRecordRow[] = [],
   ): SceneHint[] {
-    const collectors: Map<SceneHint['scene'], SceneCollector> = new Map();
+    const collectors = new Map<SceneHint['scene'], SceneCollector>();
 
     const recordScene = (
       scene: SceneHint['scene'],
