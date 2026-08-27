@@ -84,6 +84,18 @@ describe('CaptureSessionManager', () => {
     }
   });
 
+  it('throws when transitioning non-existent session', () => {
+    const {manager, db} = makeManager();
+    try {
+      assert.throws(
+        () => manager.transition('unknown-id', 'capturing'),
+        /Session not found: unknown-id/,
+      );
+    } finally {
+      db.close();
+    }
+  });
+
   it('throws when no active session', () => {
     const {manager, db} = makeManager();
     try {

@@ -67,7 +67,10 @@ export class CaptureSessionManager {
 
   transition(id: string, status: SessionStatus): void {
     const current = this.store.getSession(id);
-    if (current && !ALLOWED[current.status].includes(status)) {
+    if (!current) {
+      throw new Error(`Session not found: ${id}`);
+    }
+    if (!ALLOWED[current.status].includes(status)) {
       throw new Error(
         `Invalid session transition: ${current.status} -> ${status}`,
       );
