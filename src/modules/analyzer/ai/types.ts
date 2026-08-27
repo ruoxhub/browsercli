@@ -15,3 +15,18 @@ export interface SceneHint {
   evidence: string;
   matchedUrls?: string[];
 }
+
+export interface PurifiedRequest {
+  sequence: number;
+  method: string;
+  url: string;
+  source: 'cdp' | 'proxy';
+  statusCode: number;
+  durationMs: number;
+  contentType: string | null;
+  keyHeaders: Record<string, string>;
+  bodyPreview: string | null;
+  responsePreview: string | null;
+  isStreaming: number;
+  isWebSocket: number;
+}
