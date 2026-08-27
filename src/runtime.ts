@@ -18,6 +18,7 @@ import type {Deobfuscator} from './modules/deobfuscator/Deobfuscator.js';
 import {HookManager} from './modules/hook/HookManager.js';
 import type {NetworkModule} from './modules/network/index.js';
 import type {MitmModule} from './modules/proxy/index.js';
+import type {CaptureSessionManager} from './modules/session/index.js';
 import type {SourceMapService} from './modules/sourcemap/SourceMapService.js';
 import type {WasmAnalyzer} from './modules/wasm/WasmAnalyzer.js';
 import type {WasmCollector} from './modules/wasm/WasmCollector.js';
@@ -58,6 +59,7 @@ export interface Runtime {
   cryptoDetector: CryptoDetector;
   networkModule: NetworkModule;
   mitmModule: MitmModule;
+  captureSessionManager: CaptureSessionManager;
   wasmCollector: WasmCollector;
   wasmAnalyzer: WasmAnalyzer;
   wasmDecompiler: WasmDecompiler;
@@ -129,6 +131,9 @@ export function getRuntime(): Runtime {
     },
     get mitmModule() {
       return services.getMitmModule();
+    },
+    get captureSessionManager() {
+      return services.getCaptureSessionManager();
     },
     get wasmCollector() {
       return services.getWasmCollector();

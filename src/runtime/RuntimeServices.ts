@@ -5,6 +5,7 @@
  */
 
 import {getSourceMapConfig} from '../config/servicesConfig.js';
+import {DatabaseManager} from '../database/DatabaseManager.js';
 import {AISummarizer} from '../modules/analyzer/AISummarizer.js';
 import {CodeAnalyzer} from '../modules/analyzer/CodeAnalyzer.js';
 import type {PageController} from '../modules/collector/PageController.js';
@@ -12,6 +13,8 @@ import {CryptoDetector} from '../modules/crypto/CryptoDetector.js';
 import {Deobfuscator} from '../modules/deobfuscator/Deobfuscator.js';
 import {NetworkModule} from '../modules/network/index.js';
 import {MitmModule} from '../modules/proxy/index.js';
+import {CaptureSessionManager} from '../modules/session/index.js';
+import {SqliteSessionStore} from '../modules/session/SqliteSessionStore.js';
 import {SourceMapService} from '../modules/sourcemap/SourceMapService.js';
 import {WasmAnalyzer} from '../modules/wasm/WasmAnalyzer.js';
 import {WasmCollector} from '../modules/wasm/WasmCollector.js';
@@ -35,6 +38,7 @@ export class RuntimeServices {
   private cryptoDetector?: CryptoDetector;
   private networkModule?: NetworkModule;
   private mitmModule?: MitmModule;
+  private captureSessionManager?: CaptureSessionManager;
   private wasmAnalyzer?: WasmAnalyzer;
   private wasmDecompiler?: WasmDecompiler;
   private wasmRuntimeInspector?: WasmRuntimeInspector;
@@ -73,6 +77,12 @@ export class RuntimeServices {
 
   getMitmModule(): MitmModule {
     return (this.mitmModule ??= new MitmModule());
+  }
+
+  getCaptureSessionManager(): CaptureSessionManager {
+    return (this.captureSessionManager ??= new CaptureSessionManager(
+      new SqliteSessionStore(new DatabaseManager()),
+    ));
   }
 
   getWasmAnalyzer(): WasmAnalyzer {
