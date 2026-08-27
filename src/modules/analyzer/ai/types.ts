@@ -4,6 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+export type AnalysisMode =
+  | 'auto'
+  | 'api_reverse'
+  | 'security'
+  | 'perf'
+  | 'js_crypto';
+
 export interface SceneHint {
   scene:
     | 'auth-token'
