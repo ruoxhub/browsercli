@@ -21,6 +21,7 @@
 import type {CDPSession, Page} from '../../third_party/index.js';
 import type {CodeFile} from '../../types/index.js';
 import {logger} from '../../utils/logger.js';
+import {withTimeout} from '../../utils/withTimeout.js';
 
 import type {CollectedFileRegistry} from './CollectedFileRegistry.js';
 
@@ -128,7 +129,7 @@ export class CdpNetworkMonitor {
     if (!this.cdpSession) {
       throw new Error('CDP session not available');
     }
-    return this.withTimeout(
+    return withTimeout(
       this.cdpSession.send('Network.getResponseBody', {
         requestId,
       }) as Promise<{body: string; base64Encoded: boolean}>,
@@ -236,30 +237,5 @@ export class CdpNetworkMonitor {
         }
       }
     };
-  }
-
-  /**
-   * 带超时的 Promise 包装。提取自 CodeCollector.withTimeout。
-   */
-  private async withTimeout<T>(
-    promise: Promise<T>,
-    timeoutMs: number,
-    message: string,
-  ): Promise<T> {
-    let timeoutHandle: NodeJS.Timeout | undefined;
-    try {
-      return await Promise.race([
-        promise,
-        new Promise<T>((_, reject) => {
-          timeoutHandle = setTimeout(() => {
-            reject(new Error(message));
-          }, timeoutMs);
-        }),
-      ]);
-    } finally {
-      if (timeoutHandle) {
-        clearTimeout(timeoutHandle);
-      }
-    }
   }
 }
