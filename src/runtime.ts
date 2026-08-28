@@ -18,7 +18,10 @@ import type {Deobfuscator} from './modules/deobfuscator/Deobfuscator.js';
 import {HookManager} from './modules/hook/HookManager.js';
 import type {NetworkModule} from './modules/network/index.js';
 import type {MitmModule} from './modules/proxy/index.js';
-import type {CaptureSessionManager} from './modules/session/index.js';
+import type {
+  CaptureEngine,
+  CaptureSessionManager,
+} from './modules/session/index.js';
 import type {SourceMapService} from './modules/sourcemap/SourceMapService.js';
 import type {WasmAnalyzer} from './modules/wasm/WasmAnalyzer.js';
 import type {WasmCollector} from './modules/wasm/WasmCollector.js';
@@ -60,6 +63,11 @@ export interface Runtime {
   networkModule: NetworkModule;
   mitmModule: MitmModule;
   captureSessionManager: CaptureSessionManager;
+  /**
+   * 可选：Cdp/MITM 统一聚合点（spec §7 / D6）。
+   * 遵循 @stable 扩展约定——高扇入接口不新增强制字段，调用侧一律 `?.`。
+   */
+  captureEngine?: CaptureEngine;
   wasmCollector: WasmCollector;
   wasmAnalyzer: WasmAnalyzer;
   wasmDecompiler: WasmDecompiler;
@@ -134,6 +142,9 @@ export function getRuntime(): Runtime {
     },
     get captureSessionManager() {
       return services.getCaptureSessionManager();
+    },
+    get captureEngine() {
+      return services.getCaptureEngine();
     },
     get wasmCollector() {
       return services.getWasmCollector();

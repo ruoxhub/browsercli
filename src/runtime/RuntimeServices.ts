@@ -13,6 +13,7 @@ import {CryptoDetector} from '../modules/crypto/CryptoDetector.js';
 import {Deobfuscator} from '../modules/deobfuscator/Deobfuscator.js';
 import {NetworkModule} from '../modules/network/index.js';
 import {MitmModule} from '../modules/proxy/index.js';
+import {CaptureEngine} from '../modules/session/CaptureEngine.js';
 import {CaptureSessionManager} from '../modules/session/index.js';
 import {SqliteSessionStore} from '../modules/session/SqliteSessionStore.js';
 import {SourceMapService} from '../modules/sourcemap/SourceMapService.js';
@@ -39,13 +40,18 @@ export class RuntimeServices {
   private networkModule?: NetworkModule;
   private mitmModule?: MitmModule;
   private captureSessionManager?: CaptureSessionManager;
+  private captureEngine?: CaptureEngine;
+  private sessionStore?: SqliteSessionStore;
   private wasmAnalyzer?: WasmAnalyzer;
   private wasmDecompiler?: WasmDecompiler;
   private wasmRuntimeInspector?: WasmRuntimeInspector;
   private wasmCollector?: WasmCollector;
   private sourceMapService: SourceMapService | null = null;
 
-  constructor(private readonly pageController: PageController) {}
+  constructor(
+    private readonly pageController: PageController,
+    private readonly sessionDbPath?: string,
+  ) {}
 
   getLLMService(): LLMService {
     return (this.llmService ??= new LLMService());
@@ -79,9 +85,27 @@ export class RuntimeServices {
     return (this.mitmModule ??= new MitmModule());
   }
 
+  /**
+   * 会话存储的唯一实例来源：manager 与 engine 必须共享同一个
+   * DatabaseManager，否则两个 store 各开句柄、close() 互相踩（spec §7 约束 3）。
+   */
+  private ensureSessionStore(): SqliteSessionStore {
+    return (this.sessionStore ??= new SqliteSessionStore(
+      new DatabaseManager(this.sessionDbPath),
+    ));
+  }
+
   getCaptureSessionManager(): CaptureSessionManager {
     return (this.captureSessionManager ??= new CaptureSessionManager(
-      new SqliteSessionStore(new DatabaseManager()),
+      this.ensureSessionStore(),
+    ));
+  }
+
+  /** CDP + MITM 双链路的唯一聚合点（spec §3）。 */
+  getCaptureEngine(): CaptureEngine {
+    return (this.captureEngine ??= new CaptureEngine(
+      this.getCaptureSessionManager(),
+      this.ensureSessionStore(),
     ));
   }
 

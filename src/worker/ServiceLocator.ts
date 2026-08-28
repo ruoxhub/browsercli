@@ -14,6 +14,7 @@ import {PageController} from '../modules/collector/PageController.js';
 import {CryptoDetector} from '../modules/crypto/CryptoDetector.js';
 import {Deobfuscator} from '../modules/deobfuscator/Deobfuscator.js';
 import {HookManager} from '../modules/hook/HookManager.js';
+import type {CaptureEngine} from '../modules/session/index.js';
 import type {Runtime} from '../runtime.js';
 import {LLMService} from '../services/LLMService.js';
 
@@ -114,6 +115,15 @@ export class ServiceLocator {
       this._hookManager = new HookManager();
       return this._hookManager;
     });
+  }
+
+  /**
+   * 抓包聚合点的稳定访问缝：切片 2 的 SessionCaptureBridge 经此拿 engine，
+   * 不直接持有 _runtime。缺省 undefined —— mock runtime 没有该服务时
+   * 调用方必须能继续工作（spec §7 约束 1）。
+   */
+  getCaptureEngine(): CaptureEngine | undefined {
+    return this._runtime?.captureEngine;
   }
 
   getPageController(): PageController {
