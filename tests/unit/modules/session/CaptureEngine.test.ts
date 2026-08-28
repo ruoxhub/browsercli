@@ -9,26 +9,85 @@ import {describe, it} from 'node:test';
 import {DatabaseManager} from '../../../../src/database/DatabaseManager.js';
 import {CaptureEngine} from '../../../../src/modules/session/CaptureEngine.js';
 import {CaptureSessionManager} from '../../../../src/modules/session/CaptureSessionManager.js';
+import {
+  DEFAULT_SESSION_NAME,
+  TRIM_EVERY_INGESTS,
+} from '../../../../src/modules/session/constants.js';
+import type {SessionStore} from '../../../../src/modules/session/SessionStore.js';
 import {SqliteSessionStore} from '../../../../src/modules/session/SqliteSessionStore.js';
 import type {
   CapturedRequestInput,
   HookRecordInput,
+  SessionRow,
   StorageSnapshotInput,
 } from '../../../../src/modules/session/types.js';
 
 function setup(opts?: {
   emitToWs?: (event: {type: string; payload: unknown}) => void;
+  store?: SessionStore;
+  keepLast?: number;
+  trimEveryIngests?: number;
 }): {
   engine: CaptureEngine;
   manager: CaptureSessionManager;
-  store: SqliteSessionStore;
+  store: SessionStore;
   db: DatabaseManager;
 } {
   const db = new DatabaseManager(':memory:');
-  const store = new SqliteSessionStore(db);
+  const store = opts?.store ?? new SqliteSessionStore(db);
   const manager = new CaptureSessionManager(store);
   const engine = new CaptureEngine(manager, store, opts);
   return {engine, manager, store, db};
+}
+
+const defaultRequestInput: CapturedRequestInput = {
+  timestamp: 1700000000000,
+  method: 'POST',
+  url: 'https://example.com/api/data',
+  source: 'cdp',
+  requestHeaders: '{"Content-Type":"application/json"}',
+  requestBody: '{"q":1}',
+  statusCode: 200,
+  responseHeaders: '{"Content-Type":"application/json"}',
+  responseBody: '{"ok":true}',
+  contentType: 'application/json',
+  initiator: null,
+  durationMs: 0,
+  isStreaming: 0,
+  isWebSocket: 0,
+  truncated: 0,
+};
+
+function makeFakeStore(overrides: Partial<SessionStore> = {}): SessionStore {
+  const session: SessionRow = {
+    id: 'fake-session',
+    name: DEFAULT_SESSION_NAME,
+    targetUrl: null,
+    status: 'capturing',
+    createdAt: 1700000000000,
+    updatedAt: 1700000000000,
+    meta: null,
+  };
+  return {
+    createSession: () => session,
+    updateSessionStatus: () => undefined,
+    getSession: id => (id === session.id ? session : null),
+    listSessions: () => [session],
+    appendRequest: () => undefined,
+    appendHook: () => undefined,
+    appendSnapshot: () => undefined,
+    getRequests: () => [],
+    getRequest: () => null,
+    listRequestSummaries: () => [],
+    trimRequests: () => 0,
+    getHooks: () => [],
+    getSnapshots: () => [],
+    saveReport: () => undefined,
+    getReport: () => null,
+    getReports: () => [],
+    close: () => undefined,
+    ...overrides,
+  };
 }
 
 describe('CaptureEngine', () => {
@@ -90,6 +149,7 @@ describe('CaptureEngine', () => {
       };
 
       const hookRow = engine.ingestHook(hookInput);
+      assert.ok(hookRow);
       assert.strictEqual(hookRow.sessionId, session.id);
       assert.strictEqual(hookRow.functionName, 'window.fetch');
 
@@ -106,6 +166,7 @@ describe('CaptureEngine', () => {
       };
 
       const snapRow = engine.ingestSnapshot(snapshotInput);
+      assert.ok(snapRow);
       assert.strictEqual(snapRow.sessionId, session.id);
       assert.strictEqual(snapRow.key, 'auth_token');
 
@@ -115,9 +176,34 @@ describe('CaptureEngine', () => {
 
       assert.strictEqual(events.length, 4);
       assert.strictEqual(events[0]?.type, 'session.request');
-      assert.deepStrictEqual(events[0]?.payload, reqRow1);
+      assert.deepStrictEqual(events[0]?.payload, {
+        id: reqRow1.id,
+        sessionId: reqRow1.sessionId,
+        sequence: reqRow1.sequence,
+        timestamp: reqRow1.timestamp,
+        method: reqRow1.method,
+        url: reqRow1.url,
+        statusCode: reqRow1.statusCode,
+        contentType: reqRow1.contentType,
+        source: reqRow1.source,
+        truncated: reqRow1.truncated,
+        isStreaming: reqRow1.isStreaming,
+      });
+      assert.strictEqual(
+        'responseBody' in (events[0]?.payload as object),
+        false,
+        'WS payload 必须是摘要，不得含 body（spec §8 / R1）',
+      );
+      assert.strictEqual(
+        'initiator' in (events[0]?.payload as object),
+        false,
+        '摘要不含 initiator / durationMs（v2 的 source_ref 才恢复）',
+      );
       assert.strictEqual(events[1]?.type, 'session.request');
-      assert.deepStrictEqual(events[1]?.payload, reqRow2);
+      assert.strictEqual(
+        (events[1]?.payload as {sequence: number}).sequence,
+        reqRow2.sequence,
+      );
       assert.strictEqual(events[2]?.type, 'session.hook');
       assert.deepStrictEqual(events[2]?.payload, hookRow);
       assert.strictEqual(events[3]?.type, 'session.snapshot');
@@ -127,57 +213,58 @@ describe('CaptureEngine', () => {
     }
   });
 
-  it('rejects ingress with "No active session" error when no active session', () => {
-    const {engine, db} = setup();
-
+  it('auto-creates the default session on the first ingest', () => {
+    const {engine, manager, db} = setup();
     try {
-      const requestInput: CapturedRequestInput = {
-        timestamp: 1700000000000,
-        method: 'GET',
-        url: 'https://example.com',
-        source: 'cdp',
-        requestHeaders: '{}',
-        requestBody: null,
-        statusCode: 200,
-        responseHeaders: null,
-        responseBody: null,
-        contentType: null,
-        initiator: null,
-        durationMs: 10,
-        isStreaming: 0,
-        isWebSocket: 0,
-        truncated: 0,
-      };
+      assert.strictEqual(manager.getActiveSession(), null);
+      const row = engine.ingestRequest(defaultRequestInput);
+      const session = manager.getActiveSession();
+      assert.ok(row);
+      assert.ok(session);
+      assert.strictEqual(session.name, 'default');
+      assert.strictEqual(row?.sessionId, session.id);
+      assert.strictEqual(row?.sequence, 1);
+    } finally {
+      db.close();
+    }
+  });
 
-      assert.throws(
-        () => engine.ingestRequest(requestInput),
-        /No active session/,
-      );
+  it('isolates store failures from the producer and counts them', () => {
+    const failing = makeFakeStore({
+      appendRequest: () => {
+        throw new Error('SQLITE_BUSY');
+      },
+    });
+    const {engine, db} = setup({store: failing});
+    try {
+      assert.strictEqual(engine.ingestRequest(defaultRequestInput), null);
+      assert.strictEqual(engine.getFailureCount(), 1);
+      assert.strictEqual(engine.ingestRequest(defaultRequestInput), null);
+      assert.strictEqual(engine.getFailureCount(), 2);
+    } finally {
+      db.close();
+    }
+  });
 
-      assert.throws(
-        () =>
-          engine.ingestHook({
-            timestamp: 1700000000000,
-            hookType: 'fetch',
-            functionName: 'fetch',
-            arguments: '[]',
-            result: null,
-            callStack: null,
-          }),
-        /No active session/,
-      );
-
-      assert.throws(
-        () =>
-          engine.ingestSnapshot({
-            timestamp: 1700000000000,
-            kind: 'cookie',
-            origin: 'https://example.com',
-            key: 'session',
-            value: 'val',
-          }),
-        /No active session/,
-      );
+  it('trims to the quota every trimEveryIngests successful appends', () => {
+    let trimmed: number | null = null;
+    const tracking = makeFakeStore({
+      trimRequests: (_sessionId, keepLast) => {
+        trimmed = keepLast;
+        return 0;
+      },
+    });
+    const {engine, db} = setup({
+      store: tracking,
+      keepLast: 1234,
+      trimEveryIngests: 2,
+    });
+    try {
+      engine.ingestRequest(defaultRequestInput);
+      assert.strictEqual(trimmed, null, 'first ingest below the interval');
+      engine.ingestRequest(defaultRequestInput);
+      assert.strictEqual(trimmed, 1234, 'second ingest crosses the interval');
+      assert.strictEqual(TRIM_EVERY_INGESTS, 200, 'production default');
     } finally {
       db.close();
     }
@@ -204,6 +291,7 @@ describe('CaptureEngine', () => {
         isWebSocket: 0,
         truncated: 0,
       });
+      assert.ok(row);
       assert.strictEqual(row.sessionId, session.id);
     } finally {
       db.close();

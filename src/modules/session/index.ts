@@ -8,3 +8,5 @@ export type * from './SessionStore.js';
 export {SqliteSessionStore} from './SqliteSessionStore.js';
 export {CaptureSessionManager} from './CaptureSessionManager.js';
 export {CaptureEngine, type CaptureEngineOptions} from './CaptureEngine.js';
+export {toSummary} from './summary.js';
+export * from './constants.js';
