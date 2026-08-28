@@ -16,11 +16,13 @@ import * as url from 'node:url';
 import {brotliDecompressSync, gunzipSync, inflateSync} from 'node:zlib';
 
 import {logger} from '../../utils/logger.js';
+import {MAX_CAPTURED_BODY_BYTES} from '../network/constants.js';
 
 import type {CaManager} from './CaManager.js';
 import type {CapturedExchange} from './types.js';
 
-const MAX_BODY_SIZE = 1024 * 1024; // 1MB
+// 与 Session 侧共享上限（spec §5.1 / §9）。保留局部名避免全文件改名。
+const MAX_BODY_SIZE = MAX_CAPTURED_BODY_BYTES;
 const BINARY_CONTENT_TYPES = [
   'image/',
   'font/',

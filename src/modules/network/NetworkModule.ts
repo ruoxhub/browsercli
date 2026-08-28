@@ -33,6 +33,7 @@ import {
 import type {HTTPRequest, Page, ResourceType} from '../../third_party/index.js';
 import type {ResolvedPage} from '../browser/PageIdentity.js';
 
+import {isTextualContentType} from './contentType.js';
 import type {
   AnalyzeWebSocketMessagesData,
   AnalyzeWebSocketMessagesParams,
@@ -74,7 +75,6 @@ const WAIT_POLL_INTERVAL_MS = 50;
 const DEFAULT_GET_BODY_LENGTH = 300;
 const DEFAULT_REPLAY_BODY_LENGTH = 2000;
 const DEFAULT_BATCH_MAX_BODY_LENGTH = 500;
-const TEXTUAL_CONTENT_TYPES = ['json', 'text', 'javascript'];
 
 const NO_ACTIVE_PAGE_MESSAGE =
   '当前无活跃页面，请先通过 new_page 或 select_page 创建/选择页面';
@@ -94,10 +94,6 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => {
     setTimeout(resolve, ms);
   });
-}
-
-function isTextualContentType(contentType: string): boolean {
-  return TEXTUAL_CONTENT_TYPES.some(token => contentType.includes(token));
 }
 
 function getRequestHeaders(request: HTTPRequest): Record<string, string> {
