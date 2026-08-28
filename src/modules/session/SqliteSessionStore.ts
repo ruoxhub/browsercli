@@ -7,10 +7,13 @@ import type Database from 'better-sqlite3';
 
 import type {DatabaseManager} from '../../database/DatabaseManager.js';
 
+import {LIST_DEFAULT_LIMIT, LIST_MAX_LIMIT} from './constants.js';
 import type {SessionStore} from './SessionStore.js';
+import {toSummary} from './summary.js';
 import type {
   AiReportRow,
   CapturedRequestRow,
+  CapturedRequestSummary,
   HookRecordRow,
   RequestFilter,
   SessionRow,
@@ -48,6 +51,22 @@ interface RequestDbRow {
   is_websocket: number;
   truncated: number;
 }
+
+/** listRequestSummaries 的显式列投影结果：类型上刻意不含 body/headers，SELECT 也拿不到。 */
+type RequestSummaryDbRow = Pick<
+  RequestDbRow,
+  | 'id'
+  | 'session_id'
+  | 'sequence'
+  | 'timestamp'
+  | 'method'
+  | 'url'
+  | 'source'
+  | 'status_code'
+  | 'content_type'
+  | 'truncated'
+  | 'is_streaming'
+>;
 
 interface HookDbRow {
   session_id: string;
@@ -273,6 +292,82 @@ export class SqliteSessionStore implements SessionStore {
       )
       .all(...params) as RequestDbRow[];
     return rows.map(toRequest);
+  }
+
+  getRequest(id: string): CapturedRequestRow | null {
+    const row = this.db
+      .prepare(`SELECT * FROM captured_requests WHERE id = ?`)
+      .get(id) as RequestDbRow | undefined;
+    return row ? toRequest(row) : null;
+  }
+
+  listRequestSummaries(
+    sessionId: string,
+    filter: RequestFilter = {},
+    page: {limit?: number; offset?: number} = {},
+  ): CapturedRequestSummary[] {
+    const clauses: string[] = [`session_id = ?`];
+    const params: unknown[] = [sessionId];
+
+    if (filter.sources && filter.sources.length > 0) {
+      const placeholders = filter.sources.map(() => '?').join(', ');
+      clauses.push(`source IN (${placeholders})`);
+      params.push(...filter.sources);
+    }
+    if (filter.urlFilter) {
+      // 与 getRequests（:265-268）完全同款匹配语义，避免两条读路径行为分叉。
+      clauses.push('lower(url) LIKE ?');
+      params.push(`%${filter.urlFilter.toLowerCase()}%`);
+    }
+
+    const limit = Math.min(
+      Math.max(page.limit ?? LIST_DEFAULT_LIMIT, 1),
+      LIST_MAX_LIMIT,
+    );
+    const offset = Math.max(page.offset ?? 0, 0);
+
+    const rows = this.db
+      .prepare(
+        `SELECT id, session_id, sequence, timestamp, method, url, source,
+                status_code, content_type, truncated, is_streaming
+         FROM captured_requests
+         WHERE ${clauses.join(' AND ')}
+         ORDER BY sequence DESC
+         LIMIT ? OFFSET ?`,
+      )
+      .all(...params, limit, offset) as RequestSummaryDbRow[];
+
+    return rows.map(r =>
+      toSummary({
+        id: r.id,
+        sessionId: r.session_id,
+        sequence: r.sequence,
+        timestamp: r.timestamp,
+        method: r.method,
+        url: r.url,
+        statusCode: r.status_code,
+        contentType: r.content_type,
+        source: r.source,
+        truncated: r.truncated,
+        isStreaming: r.is_streaming,
+      }),
+    );
+  }
+
+  trimRequests(sessionId: string, keepLast: number): number {
+    const info = this.db
+      .prepare(
+        `DELETE FROM captured_requests
+         WHERE session_id = ?
+           AND sequence <= (
+             SELECT sequence FROM captured_requests
+             WHERE session_id = ?
+             ORDER BY sequence DESC
+             LIMIT 1 OFFSET ?
+           )`,
+      )
+      .run(sessionId, sessionId, keepLast);
+    return info.changes;
   }
 
   getHooks(sessionId: string): HookRecordRow[] {

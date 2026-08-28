@@ -6,6 +6,7 @@
 import type {
   AiReportRow,
   CapturedRequestRow,
+  CapturedRequestSummary,
   HookRecordRow,
   RequestFilter,
   SessionRow,
@@ -26,6 +27,14 @@ export interface SessionStore {
   appendHook(row: HookRecordRow): void;
   appendSnapshot(row: StorageSnapshotRow): void;
   getRequests(sessionId: string, filter?: RequestFilter): CapturedRequestRow[];
+  getRequest(id: string): CapturedRequestRow | null;
+  listRequestSummaries(
+    sessionId: string,
+    filter?: RequestFilter,
+    page?: {limit?: number; offset?: number},
+  ): CapturedRequestSummary[];
+  /** 按 sequence 淘汰最旧行，只保留最新 keepLast 条；返回删除行数。 */
+  trimRequests(sessionId: string, keepLast: number): number;
   getHooks(sessionId: string): HookRecordRow[];
   getSnapshots(sessionId: string): StorageSnapshotRow[];
   saveReport(row: AiReportRow): void;

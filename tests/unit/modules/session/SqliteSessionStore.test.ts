@@ -20,6 +20,34 @@ function makeStore(): {store: SqliteSessionStore; manager: DatabaseManager} {
   return {store: new SqliteSessionStore(manager), manager};
 }
 
+function makeRequestRow(
+  id: string,
+  sessionId: string,
+  sequence: number,
+  url: string,
+): CapturedRequestRow {
+  return {
+    id,
+    sessionId,
+    sequence,
+    timestamp: 100 + sequence,
+    method: 'GET',
+    url,
+    source: 'proxy',
+    requestHeaders: '{}',
+    requestBody: 'x'.repeat(2048),
+    statusCode: 200,
+    responseHeaders: '{}',
+    responseBody: 'y'.repeat(2048),
+    contentType: 'application/json',
+    initiator: null,
+    durationMs: 0,
+    isStreaming: 0,
+    isWebSocket: 0,
+    truncated: 1,
+  };
+}
+
 describe('SqliteSessionStore', () => {
   it('creates, lists, and updates a session', () => {
     const {store, manager} = makeStore();
@@ -160,6 +188,90 @@ describe('SqliteSessionStore', () => {
       assert.strictEqual(reports[1]?.id, 'rep-1');
       assert.deepStrictEqual(reports[0], r2);
       assert.deepStrictEqual(reports[1], r1);
+    } finally {
+      manager.close();
+    }
+  });
+
+  it('reads a single request by id', () => {
+    const {store, manager} = makeStore();
+    try {
+      store.createSession({id: 's1', name: 'demo'});
+      store.appendRequest(makeRequestRow('s1-1', 's1', 1, 'https://a.dev/one'));
+      store.appendRequest(makeRequestRow('s1-2', 's1', 2, 'https://a.dev/two'));
+
+      assert.strictEqual(store.getRequest('s1-2')?.url, 'https://a.dev/two');
+      assert.strictEqual(store.getRequest('missing'), null);
+    } finally {
+      manager.close();
+    }
+  });
+
+  it('lists summaries newest-first without body columns', () => {
+    const {store, manager} = makeStore();
+    try {
+      store.createSession({id: 's1', name: 'demo'});
+      for (let i = 1; i <= 5; i++) {
+        store.appendRequest(
+          makeRequestRow(`s1-${i}`, 's1', i, `https://a.dev/${i}`),
+        );
+      }
+
+      const page = store.listRequestSummaries('s1', undefined, {
+        limit: 3,
+        offset: 1,
+      });
+      assert.deepStrictEqual(
+        page.map(r => r.sequence),
+        [4, 3, 2],
+        'ORDER BY sequence DESC + LIMIT/OFFSET',
+      );
+      assert.strictEqual('requestBody' in (page[0] as object), false);
+      assert.strictEqual('responseBody' in (page[0] as object), false);
+      assert.strictEqual('requestHeaders' in (page[0] as object), false);
+      assert.strictEqual('responseHeaders' in (page[0] as object), false);
+      assert.strictEqual(page[0]?.truncated, 1, 'flag preserved as 0/1 number');
+
+      const filtered = store.listRequestSummaries('s1', {
+        sources: ['proxy'],
+        urlFilter: 'DEV/3',
+      });
+      assert.deepStrictEqual(
+        filtered.map(r => r.url),
+        ['https://a.dev/3'],
+        'sources + case-insensitive urlFilter',
+      );
+
+      const other = store.listRequestSummaries('other-session');
+      assert.deepStrictEqual(other, []);
+    } finally {
+      manager.close();
+    }
+  });
+
+  it('trims to the newest keepLast rows and is a no-op below quota', () => {
+    const {store, manager} = makeStore();
+    try {
+      store.createSession({id: 's1', name: 'demo'});
+      for (let i = 1; i <= 7; i++) {
+        store.appendRequest(
+          makeRequestRow(`s1-${i}`, 's1', i, `https://a.dev/${i}`),
+        );
+      }
+
+      assert.strictEqual(store.trimRequests('s1', 5), 2, 'deleted two oldest');
+      assert.deepStrictEqual(
+        store.getRequests('s1').map(r => r.sequence),
+        [3, 4, 5, 6, 7],
+      );
+
+      assert.strictEqual(store.trimRequests('s1', 5), 0, 'below quota: no-op');
+      assert.strictEqual(store.trimRequests('s1', 1), 4);
+      assert.deepStrictEqual(
+        store.getRequests('s1').map(r => r.sequence),
+        [7],
+        'keepLast=1 keeps only the newest',
+      );
     } finally {
       manager.close();
     }

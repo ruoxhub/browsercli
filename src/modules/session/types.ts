@@ -81,6 +81,24 @@ export type CapturedRequestInput = Omit<
   'id' | 'sessionId' | 'sequence'
 >;
 
+/**
+ * 列表/推送用的摘要投影：刻意排除 requestHeaders / requestBody /
+ * responseHeaders / responseBody，避免整行出网（spec §8 / §9 / R2）。
+ */
+export interface CapturedRequestSummary {
+  id: string;
+  sessionId: string;
+  sequence: number;
+  timestamp: number;
+  method: string;
+  url: string;
+  statusCode: number;
+  contentType: string | null;
+  source: CaptureSource;
+  truncated: number;
+  isStreaming: number;
+}
+
 export type HookRecordInput = Omit<HookRecordRow, 'sessionId'>;
 
 export type StorageSnapshotInput = Omit<StorageSnapshotRow, 'sessionId'>;
