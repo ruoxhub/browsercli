@@ -1,3 +1,9 @@
+
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 /** Internal router for non-flat Target child sessions. */
 import type {CDPSession} from 'patchright';
 

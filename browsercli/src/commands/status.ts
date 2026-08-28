@@ -42,9 +42,7 @@ export const statusCommand: AxiCliCommand<WorkerContext> = async (
       sessionsCount = Array.isArray(sessionsRes.sessions)
         ? sessionsRes.sessions.length
         : 0;
-      toolsCount = Array.isArray(toolsRes.tools)
-        ? toolsRes.tools.length
-        : 0;
+      toolsCount = Array.isArray(toolsRes.tools) ? toolsRes.tools.length : 0;
     } catch {
       online = false;
       healthStatus = 'offline';

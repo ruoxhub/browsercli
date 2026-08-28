@@ -26,7 +26,10 @@ describe('statusCommand', () => {
   });
 
   it('returns json format when --json flag is passed', async () => {
-    const output = (await statusCommand(['--json'], emptyCtx)) as AxiStructuredOutput;
+    const output = (await statusCommand(
+      ['--json'],
+      emptyCtx,
+    )) as AxiStructuredOutput;
     assert.strictEqual(output.command, 'status');
     assert.strictEqual(output.status, 'success');
     assert.strictEqual(output.online, false);
@@ -39,7 +42,9 @@ describe('statusCommand', () => {
       baseUrl: 'http://127.0.0.1:8765',
       health: async () => ({status: 'ok'}),
       listSessions: async () => ({sessions: [{id: 's1'}, {id: 's2'}]}),
-      listTools: async () => ({tools: [{name: 'tool1'}, {name: 'tool2'}, {name: 'tool3'}]}),
+      listTools: async () => ({
+        tools: [{name: 'tool1'}, {name: 'tool2'}, {name: 'tool3'}],
+      }),
     } as unknown as WorkerHttpClient;
 
     const output = (await statusCommand(['--json'], {

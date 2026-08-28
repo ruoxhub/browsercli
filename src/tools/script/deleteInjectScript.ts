@@ -5,6 +5,7 @@
  */
 
 import {createToolError, ErrorCodes} from '../../utils/errors.js';
+
 import {getInjectConfigStore} from './createInjectScript.js';
 import type {DeleteInjectScriptResult} from './types.js';
 

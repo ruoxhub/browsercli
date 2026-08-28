@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Frame} from '../../third_party/index.js';
 import type {RegisterPersistentHookResult} from '../../modules/hook/index.js';
+import type {Frame} from '../../third_party/index.js';
 import type {MessagesResult} from '../shared/types.js';
 
 // ─── Hook 安装函数返回类型 ─────────────────────────────
