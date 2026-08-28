@@ -109,6 +109,59 @@ describe('CaptureSessionManager', () => {
     }
   });
 
+  it('ensures a default session on first call and reuses it', () => {
+    const {manager, db} = makeManager();
+    try {
+      assert.strictEqual(manager.getActiveSession(), null);
+
+      const first = manager.ensureActiveSession();
+      assert.strictEqual(first.name, 'default');
+      assert.strictEqual(first.status, 'capturing');
+      assert.strictEqual(manager.listSessions().length, 1);
+
+      const second = manager.ensureActiveSession();
+      assert.strictEqual(second.id, first.id);
+      assert.strictEqual(
+        manager.listSessions().length,
+        1,
+        'no duplicate session',
+      );
+    } finally {
+      db.close();
+    }
+  });
+
+  it('honours an explicit name on auto-create', () => {
+    const {manager, db} = makeManager();
+    try {
+      const row = manager.ensureActiveSession({
+        name: 'autocase',
+        targetUrl: 'https://a.dev',
+      });
+      assert.strictEqual(row.name, 'autocase');
+      assert.strictEqual(row.targetUrl, 'https://a.dev');
+    } finally {
+      db.close();
+    }
+  });
+
+  it('recreates the session when the stored active row disappeared', () => {
+    const {manager, db} = makeManager();
+    try {
+      const created = manager.createSession({name: 'demo'});
+      assert.strictEqual(manager.ensureActiveSession().id, created.id);
+
+      manager.transition(created.id, 'stopped');
+      assert.strictEqual(
+        manager.ensureActiveSession().id,
+        created.id,
+        'a stopped-but-present session is still reused',
+      );
+    } finally {
+      db.close();
+    }
+  });
+
   it('delegates getRequests, getHooks, and getSnapshots to store', () => {
     const {manager, db} = makeManager();
     try {

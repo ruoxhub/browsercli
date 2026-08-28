@@ -5,6 +5,7 @@
  */
 import {randomUUID} from 'node:crypto';
 
+import {DEFAULT_SESSION_NAME} from './constants.js';
 import type {SessionStore} from './SessionStore.js';
 import type {
   AiReportInput,
@@ -57,6 +58,29 @@ export class CaptureSessionManager {
       throw new Error('No active session. Call session_create first.');
     }
     return session;
+  }
+
+  /**
+   * 返回活动会话；没有就按默认名自动创建一个并激活（spec §6）。
+   *
+   * 与 requireActiveSession() 的区别只在缺省行为：本方法不抛错，
+   * 供 CaptureEngine 的摄入路径使用；读工具仍用 require*，
+   * 以免"查询"产生创建会话的副作用（spec §13-D7）。
+   */
+  ensureActiveSession(
+    input: {
+      name?: string;
+      targetUrl?: string;
+    } = {},
+  ): SessionRow {
+    const existing = this.getActiveSession();
+    if (existing) {
+      return existing;
+    }
+    return this.createSession({
+      name: input.name ?? DEFAULT_SESSION_NAME,
+      targetUrl: input.targetUrl,
+    });
   }
 
   listSessions(): SessionRow[] {
