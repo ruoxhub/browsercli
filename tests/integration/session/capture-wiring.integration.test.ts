@@ -24,6 +24,7 @@ function cdpResponse(url: string): Response {
   return {
     status: () => 200,
     headers: () => ({'content-type': 'application/json'}),
+    url: () => url,
     request: () => ({
       method: () => 'GET',
       url: () => url,
@@ -103,6 +104,12 @@ describe('切片 2 双链路接线', () => {
         [1, 2],
         'sequence 由 manager 单调递增，两条链路共用计数器',
       );
+
+      // 取体路径必须真的跑过：夹具少了 response.url() 会让
+      // readCdpResponseBody 抛 TypeError、被降级成 null body，
+      // 而上面的行数断言照样成立 —— 那正是本用例存在的意义所在。
+      const cdpRow = all.find(r => r.source === 'cdp');
+      assert.strictEqual(cdpRow?.responseBody, '{"ok":true}');
 
       const cdpOnly = store.listRequestSummaries(session.id, {
         sources: ['cdp'],
