@@ -62,6 +62,15 @@ export class CaptureEngine {
     this.emitToWs = emitToWs;
   }
 
+  /**
+   * 只读暴露 store 引用（Task 6 的 REST 路由需要它）。
+   * 返回接口而非实现类：构造方注入的就是 `SessionStore`，
+   * 收窄成 `SqliteSessionStore` 会在相接处报 TS2739（缺 manager / db 私有字段）。
+   */
+  getStore(): SessionStore {
+    return this.store;
+  }
+
   /** 摄入失败累计次数（落库异常被隔离的次数）。 */
   getFailureCount(): number {
     return this.failureCount;
