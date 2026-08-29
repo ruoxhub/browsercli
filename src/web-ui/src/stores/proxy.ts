@@ -155,8 +155,16 @@ export const useProxyStore = create<ProxyState>((set, get) => ({
       // 复用 select_page 工具：bringPageToFront + 切 worker 选中页（spec §7）。
       // 切 tab 不清空（决策 C），也不重拉列表（列表是实时 WS 流，重拉只会
       // 把客户端上限 2000 静默截回 500）；仅重置悬空的选中态。
+      // detailLoading 必须一起清：否则切 tab 时若有在途的详情请求，
+      // selectRequest 的 get().selectedId === id 守卫两边都不成立，
+      // 详情面板会永久停在 loading。
       await api.callTool('select_page', {pageId});
-      set({selectedPageId: pageId, selectedId: null, selectedDetail: null});
+      set({
+        selectedPageId: pageId,
+        selectedId: null,
+        selectedDetail: null,
+        detailLoading: false,
+      });
     } catch (err) {
       console.error('切换页面失败:', err);
     }
