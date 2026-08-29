@@ -101,9 +101,13 @@ describe('CollectorContextProvider', () => {
     provider.start(context);
     assert.ok(provider.isStarted());
 
+    // url() 是 patchright Response 契约的一部分：readCdpResponseBody() 在任何
+    // await 之前就用它拼超时消息（CdpRequestAdapter.ts:43），缺失会在取体时抛
+    // TypeError 并被降级成「无 body」——断言仍能过，但走的是降级路径。
     const response = {
       status: () => 200,
       headers: () => ({'content-type': 'text/plain'}),
+      url: () => 'https://b.dev/probe',
       request: () => ({
         method: () => 'GET',
         url: () => 'https://b.dev/probe',
@@ -117,7 +121,13 @@ describe('CollectorContextProvider', () => {
 
     const session = manager.getActiveSession();
     assert.ok(session);
-    assert.strictEqual(manager.getRequests(session.id).length, 1);
+    const rows = manager.getRequests(session.id);
+    assert.strictEqual(rows.length, 1);
+    assert.strictEqual(
+      rows[0]!.responseBody,
+      'pong',
+      '正常取体路径（非降级）必须把 body 落库',
+    );
 
     provider.dispose();
     assert.strictEqual(listeners.size, 0, 'dispose 必须解挂 response 监听');
