@@ -7,6 +7,13 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
+import type {BrowserContext, Page, Response} from 'patchright';
+
+import {DatabaseManager} from '../../../src/database/DatabaseManager.js';
+import {CaptureEngine} from '../../../src/modules/session/CaptureEngine.js';
+import {CaptureSessionManager} from '../../../src/modules/session/CaptureSessionManager.js';
+import {SqliteSessionStore} from '../../../src/modules/session/SqliteSessionStore.js';
+import type {Runtime} from '../../../src/runtime.js';
 import {deobfuscateCode} from '../../../src/tools/analyzer/deobfuscate.js';
 import {ToolContextProvider} from '../../../src/worker/ToolContext.js';
 import {ToolResponseAccumulator} from '../../../src/worker/ToolResponse.js';
@@ -229,5 +236,82 @@ describe('ToolContextProvider', () => {
     assert.equal(runtime.getContextMeta().tabIndex, 0);
     assert.equal(runtime.resolvePage({pageId: stableId!}).page, selected);
     assert.equal(runtime.getSelectedPageIndex(), 0);
+  });
+
+  it('captures CDP traffic only from the selected page', async () => {
+    const db = new DatabaseManager(':memory:');
+    const store = new SqliteSessionStore(db);
+    const manager = new CaptureSessionManager(store);
+    const engine = new CaptureEngine(manager, store);
+    const runtime = new ToolContextProvider({
+      captureEngine: engine,
+    } as unknown as Runtime);
+
+    const listeners = new Set<(response: Response) => void>();
+    const context = {
+      on: (event: string, handler: (response: Response) => void) => {
+        if (event === 'response') listeners.add(handler);
+        return context;
+      },
+      off: (_event: string, handler: (response: Response) => void) => {
+        listeners.delete(handler);
+        return context;
+      },
+      pages: () => [],
+    } as unknown as BrowserContext;
+    runtime.setContext(context);
+
+    const pageA = {id: 'page-a', mainFrame: () => null} as unknown as Page;
+    const pageB = {id: 'page-b'} as unknown as Page;
+    const emit = (page: Page): void => {
+      const response = {
+        status: () => 200,
+        headers: () => ({'content-type': 'text/plain'}),
+        url: () => 'https://c.dev/probe',
+        frame: () => ({page: () => page}),
+        request: () => ({
+          method: () => 'GET',
+          url: () => 'https://c.dev/probe',
+          headers: () => ({}),
+          postData: () => null,
+        }),
+        text: async () => 'pong',
+      } as unknown as Response;
+      for (const listener of [...listeners]) listener(response);
+    };
+    const flush = (): Promise<void> =>
+      new Promise(resolve => setImmediate(resolve));
+
+    runtime.setSelectedPage(pageA);
+    emit(pageA);
+    await flush();
+    let session = manager.getActiveSession();
+    assert.ok(session, '选中页 A 的响应必须落库');
+    assert.strictEqual(manager.getRequests(session.id).length, 1);
+
+    emit(pageB);
+    await flush();
+    session = manager.getActiveSession();
+    assert.ok(session);
+    assert.strictEqual(
+      manager.getRequests(session.id).length,
+      1,
+      '非选中页 B 的响应必须被源头丢弃',
+    );
+
+    // 无选中页（setContext → syncPages 之间的窗口）必须降级为不过滤，
+    // 否则该窗口内的 CDP 响应会被静默全部丢弃。
+    runtime.setSelectedPage(null);
+    emit(pageB);
+    await flush();
+    session = manager.getActiveSession();
+    assert.ok(session);
+    assert.strictEqual(
+      manager.getRequests(session.id).length,
+      2,
+      '无选中页 = 不过滤（spec §4 缺省安全行为）',
+    );
+
+    db.close();
   });
 });
