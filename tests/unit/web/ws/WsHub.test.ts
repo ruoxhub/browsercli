@@ -193,4 +193,46 @@ describe('WsHub', () => {
     assert.strictEqual(snap.type, 'snapshot');
     assert.deepStrictEqual(snap.payload, {ok: true});
   });
+
+  it('accepts session.request as a registered stream channel', () => {
+    hub.subscribe(ws, 'session.request');
+    assert.strictEqual(hub.getSubscriberCount('session.request'), 1);
+
+    hub.broadcast('session.request', {
+      id: 's1-1',
+      sessionId: 's1',
+      sequence: 1,
+      timestamp: 1700000000000,
+      method: 'GET',
+      url: 'https://a.dev/api',
+      statusCode: 200,
+      contentType: 'application/json',
+      source: 'cdp',
+      truncated: 0,
+      isStreaming: 0,
+    });
+
+    assert.strictEqual(ws.sent.length, 1);
+    const evt = ws.sent[0] as {
+      channel: string;
+      payload: Record<string, unknown>;
+    };
+    assert.strictEqual(evt.channel, 'session.request');
+    assert.strictEqual(evt.payload['id'], 's1-1');
+    assert.strictEqual(
+      'responseBody' in evt.payload,
+      false,
+      'WS 面只承载摘要，不得带 body（spec §8 / R1）',
+    );
+  });
+
+  it('still rejects engine channels that are not registered', () => {
+    // ingestHook / ingestSnapshot 会 emit 这两个 type，但切片 2 不注册它们：
+    // WsHub 必须照旧拒绝，而不是静默接受后被 ConsoleServer 的桥接丢掉。
+    hub.subscribe(ws, 'session.hook' as never);
+    assert.strictEqual(ws.sent.length, 1);
+    const err = ws.sent[0] as {type: string; code: string};
+    assert.strictEqual(err.code, 'INVALID_CHANNEL');
+    assert.strictEqual(hub.getSubscriberCount('session.hook' as never), 0);
+  });
 });

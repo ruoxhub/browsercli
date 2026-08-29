@@ -40,7 +40,8 @@ export type StreamChannel =
   | 'hook.event'
   | 'hook.sample'
   | 'log'
-  | 'proxy.request';
+  | 'proxy.request'
+  | 'session.request';
 
 export type Channel = StateChannel | StreamChannel;
 
@@ -281,4 +282,49 @@ export interface GetMitmRequestData {
   truncated: boolean;
   timestamp: number;
   savedPath?: string;
+}
+
+// ==================== Session Capture Types (channel: session.request) ====================
+
+import type {
+  CapturedRequestSummary,
+  CaptureSource,
+} from '../modules/session/types.js';
+
+/**
+ * WS 推送与 REST 列表项的摘要投影。
+ *
+ * 别名到 session 领域的 CapturedRequestSummary —— 投影逻辑单点在
+ * src/modules/session/summary.ts，本文件只做重新导出（spec §8）。
+ * src/web-ui/src/lib/protocol.ts 会整体透传给前端。
+ */
+export type {CapturedRequestSummary as SessionRequestSummaryEvent};
+
+/**
+ * REST 详情响应体（GET /api/session/requests/:id）。
+ *
+ * 与摘要的区别只有一处：headers 已解析成对象，并额外带 body。
+ * `headersParseError` 为 true 表示库中 headers 不是合法 JSON 对象，
+ * 已降级为 `{}`（spec §9）——前端据此提示，而不是白屏。
+ */
+export interface SessionRequestDetail {
+  id: string;
+  sessionId: string;
+  sequence: number;
+  timestamp: number;
+  method: string;
+  url: string;
+  statusCode: number;
+  contentType: string | null;
+  source: CaptureSource;
+  durationMs: number;
+  initiator: string | null;
+  truncated: number;
+  isStreaming: number;
+  isWebSocket: number;
+  requestHeaders: Record<string, string>;
+  requestBody: string | null;
+  responseHeaders: Record<string, string>;
+  responseBody: string | null;
+  headersParseError?: true;
 }
