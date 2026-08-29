@@ -165,6 +165,9 @@ export const useProxyStore = create<ProxyState>((set, get) => ({
         selectedDetail: null,
         detailLoading: false,
       });
+      // 切页后重拉一次列表：挂载时的 loadPages 只是快照，新开的标签页
+      // 否则永远不会出现在下拉里（loadPages 内部自兜异常，不抛）。
+      void get().loadPages();
     } catch (err) {
       console.error('切换页面失败:', err);
     }
