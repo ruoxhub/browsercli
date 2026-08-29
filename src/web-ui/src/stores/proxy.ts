@@ -152,12 +152,11 @@ export const useProxyStore = create<ProxyState>((set, get) => ({
 
   selectTab: async pageId => {
     try {
-      // 复用 select_page 工具：bringPageToFront + 切 worker 选中页
+      // 复用 select_page 工具：bringPageToFront + 切 worker 选中页（spec §7）。
+      // 切 tab 不清空（决策 C），也不重拉列表（列表是实时 WS 流，重拉只会
+      // 把客户端上限 2000 静默截回 500）；仅重置悬空的选中态。
       await api.callTool('select_page', {pageId});
-      set({selectedPageId: pageId});
-      // 切 tab 不清空：只重拉历史刷新列表，旧 tab 数据保留
-      const res = await api.getSessionRequests();
-      set({requests: res.items});
+      set({selectedPageId: pageId, selectedId: null, selectedDetail: null});
     } catch (err) {
       console.error('切换页面失败:', err);
     }
