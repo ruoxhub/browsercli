@@ -7,10 +7,13 @@
 import {readFileSync} from 'node:fs';
 import {writeFile} from 'node:fs/promises';
 
+import {logger} from '../../utils/logger.js';
+
 import {CaManager, resolveMitmCertsDir} from './CaManager.js';
 import {MitmProxyServer} from './MitmProxyServer.js';
 import {ProxyStore} from './ProxyStore.js';
 import type {
+  CapturedExchange,
   CapturedRequest,
   ClearMitmRequestsData,
   ExportMitmCaData,
@@ -35,13 +38,35 @@ export class MitmModule {
   private readonly caManager: CaManager;
   private server: MitmProxyServer | null = null;
 
-  constructor(certsDir: string = resolveMitmCertsDir()) {
+  /**
+   * @param certsDir CA 证书目录
+   * @param onExchange 可选的 exchange 水槽（切片 2 的 Session 抓包链路）。
+   *   缺省表示只走旧链路；水槽内抛错被吞掉，不影响 ProxyStore（spec §4 / R3）。
+   */
+  constructor(
+    certsDir: string = resolveMitmCertsDir(),
+    private readonly onExchange?: (exchange: CapturedExchange) => void,
+  ) {
     this.store = new ProxyStore();
     this.caManager = new CaManager(certsDir);
   }
 
   getStore(): ProxyStore {
     return this.store;
+  }
+
+  /**
+   * 单条 exchange 的落点：先旧链路（ProxyStore），再新链路（水槽）。
+   * 顺序不可换 —— 新链路失败时旧链路必须已经落好（spec §4 / R3）。
+   */
+  recordExchange(exchange: CapturedExchange): void {
+    this.store.add(exchange);
+    if (!this.onExchange) return;
+    try {
+      this.onExchange(exchange);
+    } catch (error) {
+      logger.warn('[MitmModule] Session 水槽摄入失败，已忽略', error);
+    }
   }
 
   getCaManager(): CaManager {
@@ -55,7 +80,7 @@ export class MitmModule {
       await this.caManager.init();
       if (!this.server) {
         this.server = new MitmProxyServer(this.caManager, exchange => {
-          this.store.add(exchange);
+          this.recordExchange(exchange);
         });
       }
       await this.server.start(port);

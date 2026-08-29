@@ -12,7 +12,8 @@ import type {PageController} from '../modules/collector/PageController.js';
 import {CryptoDetector} from '../modules/crypto/CryptoDetector.js';
 import {Deobfuscator} from '../modules/deobfuscator/Deobfuscator.js';
 import {NetworkModule} from '../modules/network/index.js';
-import {MitmModule} from '../modules/proxy/index.js';
+import {MitmModule, resolveMitmCertsDir} from '../modules/proxy/index.js';
+import {fromMitmExchange} from '../modules/session/adapters/index.js';
 import {CaptureEngine} from '../modules/session/CaptureEngine.js';
 import {CaptureSessionManager} from '../modules/session/index.js';
 import {SqliteSessionStore} from '../modules/session/SqliteSessionStore.js';
@@ -82,7 +83,12 @@ export class RuntimeServices {
   }
 
   getMitmModule(): MitmModule {
-    return (this.mitmModule ??= new MitmModule());
+    return (this.mitmModule ??= new MitmModule(
+      resolveMitmCertsDir(),
+      exchange => {
+        this.getCaptureEngine().ingestRequest(fromMitmExchange(exchange));
+      },
+    ));
   }
 
   /**
