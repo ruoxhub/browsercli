@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import type {BrowserContext, Response} from 'patchright';
+import type {BrowserContext, Page, Response} from 'patchright';
 
 import {DatabaseManager} from '../../../src/database/DatabaseManager.js';
 import {CaptureEngine} from '../../../src/modules/session/CaptureEngine.js';
@@ -145,5 +145,53 @@ describe('CollectorContextProvider', () => {
     assert.doesNotThrow(() => provider.start(context));
     assert.ok(provider.isStarted());
     assert.doesNotThrow(() => provider.dispose());
+  });
+
+  it('filters CDP responses by selected page when a guard is provided', async () => {
+    const db = new DatabaseManager(':memory:');
+    const store = new SqliteSessionStore(db);
+    const manager = new CaptureSessionManager(store);
+    const engine = new CaptureEngine(manager, store);
+
+    const selected = {id: 'page-sel'} as unknown as Page;
+    const listeners = new Set<(response: Response) => void>();
+    const context = {
+      on: (event: string, handler: (response: Response) => void) => {
+        if (event === 'response') listeners.add(handler);
+        return context;
+      },
+      off: (_event: string, handler: (response: Response) => void) => {
+        listeners.delete(handler);
+        return context;
+      },
+      pages: () => [],
+    } as unknown as BrowserContext;
+
+    const provider = new CollectorContextProvider(
+      () => engine,
+      p => p === selected,
+    );
+    provider.start(context);
+
+    const response = {
+      status: () => 200,
+      headers: () => ({'content-type': 'text/plain'}),
+      url: () => 'https://b.dev/probe',
+      frame: () => ({page: () => ({id: 'page-other'})}),
+      request: () => ({
+        method: () => 'GET',
+        url: () => 'https://b.dev/probe',
+        headers: () => ({}),
+        postData: () => null,
+      }),
+      text: async () => 'pong',
+    } as unknown as Response;
+    for (const listener of [...listeners]) listener(response);
+    await new Promise(resolve => setImmediate(resolve));
+
+    assert.strictEqual(manager.getActiveSession(), null, '非选中页不建会话');
+    provider.dispose();
+    assert.strictEqual(listeners.size, 0, 'dispose 必须解挂 response 监听');
+    db.close();
   });
 });

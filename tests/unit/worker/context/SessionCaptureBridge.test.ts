@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import type {BrowserContext, Response} from 'patchright';
+import type {BrowserContext, Page, Response} from 'patchright';
 
 import {DatabaseManager} from '../../../../src/database/DatabaseManager.js';
 import {CaptureEngine} from '../../../../src/modules/session/CaptureEngine.js';
@@ -47,8 +47,12 @@ function makeContext(): {
   };
 }
 
+function makePage(id: string): Page {
+  return {id} as unknown as Page;
+}
+
 function makeResponse(
-  overrides: Partial<{url: string; body: string}> = {},
+  overrides: Partial<{url: string; body: string; page: Page}> = {},
 ): Response {
   const headers = {'content-type': 'application/json'};
   const request = {
@@ -62,6 +66,7 @@ function makeResponse(
     headers: () => headers,
     request: () => request,
     url: () => overrides.url ?? 'https://a.dev/api/sign',
+    frame: () => ({page: () => overrides.page}),
     text: async () => overrides.body ?? '{"ok":true}',
   } as unknown as Response;
 }
@@ -200,5 +205,74 @@ describe('SessionCaptureBridge', () => {
       'application/json',
       '关掉取体不该影响 contentType',
     );
+  });
+
+  it('drops responses from pages other than the selected one', async () => {
+    const {engine, manager} = makeEngine();
+    const {context, emit} = makeContext();
+    const selected = makePage('page-selected');
+    const other = makePage('page-other');
+    const bridge = new SessionCaptureBridge(
+      () => engine,
+      {},
+      page => page === selected,
+    );
+
+    bridge.attach(context);
+    emit(makeResponse({page: other}));
+    await flush();
+
+    assert.strictEqual(
+      manager.getActiveSession(),
+      null,
+      '非选中页不落库、不建会话',
+    );
+    assert.strictEqual(
+      bridge.getDroppedCount(),
+      0,
+      '源头过滤不是故障，不计 dropped',
+    );
+  });
+
+  it('ingests responses from the selected page', async () => {
+    const {engine, manager} = makeEngine();
+    const {context, emit} = makeContext();
+    const selected = makePage('page-selected');
+    const bridge = new SessionCaptureBridge(
+      () => engine,
+      {},
+      page => page === selected,
+    );
+
+    bridge.attach(context);
+    emit(makeResponse({page: selected}));
+    await flush();
+
+    const session = manager.getActiveSession();
+    assert.ok(session, '选中页必须正常落库');
+    assert.strictEqual(manager.getRequests(session.id).length, 1);
+  });
+
+  it('drops the response when frame() throws (disposed response)', async () => {
+    const {engine, manager} = makeEngine();
+    const {context, emit} = makeContext();
+    const bridge = new SessionCaptureBridge(
+      () => engine,
+      {},
+      () => true,
+    );
+    const response = {
+      ...makeResponse(),
+      frame: () => {
+        throw new Error('response disposed');
+      },
+    } as unknown as Response;
+
+    bridge.attach(context);
+    emit(response);
+    await flush();
+
+    assert.strictEqual(manager.getActiveSession(), null);
+    assert.strictEqual(bridge.getDroppedCount(), 0);
   });
 });

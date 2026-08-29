@@ -50,8 +50,9 @@ export {DefineToolContextFactory} from './DefineToolContextFactory.js';
 export class ToolContextProvider {
   private readonly _browserContext = new BrowserContextProvider();
   private readonly _debuggerContext = new DebuggerContextProvider();
-  private readonly _collectorContext = new CollectorContextProvider(() =>
-    this._serviceLocator.getCaptureEngine(),
+  private readonly _collectorContext = new CollectorContextProvider(
+    () => this._serviceLocator.getCaptureEngine(),
+    page => this._browserContext.getSelectedPage() === page,
   );
   private readonly _serviceLocator: ServiceLocator;
 

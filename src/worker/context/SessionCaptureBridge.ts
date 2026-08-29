@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {BrowserContext, Response} from 'patchright';
+import type {BrowserContext, Page, Response} from 'patchright';
 
 import {CDP_BODY_CAPTURE_ENABLED} from '../../modules/network/constants.js';
 import type {CdpBodyReader} from '../../modules/session/adapters/CdpRequestAdapter.js';
@@ -41,6 +41,7 @@ export class SessionCaptureBridge {
   constructor(
     private readonly getEngine: () => CaptureEngine | undefined,
     private readonly opts: SessionCaptureBridgeOptions = {},
+    private readonly isSelectedPage?: (page: Page) => boolean,
   ) {}
 
   attach(context: BrowserContext): void {
@@ -80,6 +81,16 @@ export class SessionCaptureBridge {
     // 漏罩会让 dropped 计不到，异常还会以 unhandled rejection 逃出
     // void this.ingest() —— 与 MITM 侧 recordExchange 的完全包含不对称。
     // engine 缺失仍走 return，不计入 dropped（那不是故障，是未就绪）。
+    // 源头过滤（spec §4）：非选中 tab 的响应在取体前直接丢弃。
+    // 放 try 之外：这是「有意过滤」不是「摄入故障」，不进 dropped 计数。
+    if (this.isSelectedPage) {
+      try {
+        if (!this.isSelectedPage(response.frame().page())) return;
+      } catch {
+        // frame()/page() 抛 = 响应已 dispose，无法归属；保守丢弃，避免全局噪声。
+        return;
+      }
+    }
     try {
       const engine = this.getEngine();
       if (!engine) return;

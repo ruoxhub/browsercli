@@ -48,8 +48,13 @@ export class CollectorContextProvider {
    */
   constructor(
     getCaptureEngine: () => CaptureEngine | undefined = () => undefined,
+    isSelectedPage?: (page: Page) => boolean,
   ) {
-    this._captureBridge = new SessionCaptureBridge(getCaptureEngine);
+    this._captureBridge = new SessionCaptureBridge(
+      getCaptureEngine,
+      {},
+      isSelectedPage,
+    );
   }
 
   /** 供测试与未来的手动挂载点使用。 */
