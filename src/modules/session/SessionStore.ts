@@ -35,6 +35,8 @@ export interface SessionStore {
   ): CapturedRequestSummary[];
   /** 按 sequence 淘汰最旧行，只保留最新 keepLast 条；返回删除行数。 */
   trimRequests(sessionId: string, keepLast: number): number;
+  /** 清空指定会话的全部捕获请求；返回删除行数。 */
+  clearRequests(sessionId: string): number;
   getHooks(sessionId: string): HookRecordRow[];
   getSnapshots(sessionId: string): StorageSnapshotRow[];
   saveReport(row: AiReportRow): void;

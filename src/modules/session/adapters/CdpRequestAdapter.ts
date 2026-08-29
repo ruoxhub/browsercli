@@ -67,12 +67,21 @@ export async function cdpResponseToInput(
   const timestamp = now();
 
   const request = response.request();
+  const statusCode = response.status();
   const contentType = response.headers()['content-type'] ?? null;
   const isStreaming = Boolean(contentType?.includes('text/event-stream'));
+  // 重定向响应在 Playwright 中不提供 body，调用 text() 会抛错（见 spec §5.1 之外
+  // 的降级说明）。3xx 本就不该取体，直接按无 body 摄入，避免 WARN 噪声。
+  const isRedirect = statusCode >= 300 && statusCode < 400;
 
   let responseBody: string | null = null;
   let truncated = 0;
-  if (!isStreaming && contentType && isTextualContentType(contentType)) {
+  if (
+    !isStreaming &&
+    !isRedirect &&
+    contentType &&
+    isTextualContentType(contentType)
+  ) {
     const raw = await readBody(response);
     if (raw !== null) {
       // 截断是取体之后的事：白名单才是成本控制，1MiB 只是入库上限（spec §5.1）。
@@ -89,7 +98,7 @@ export async function cdpResponseToInput(
     source: 'cdp',
     requestHeaders: safeJson(tryGet(() => request.headers())),
     requestBody: tryGet(() => request.postData()) ?? null,
-    statusCode: response.status(),
+    statusCode,
     responseHeaders: safeJson(tryGet(() => response.headers())),
     responseBody,
     contentType,

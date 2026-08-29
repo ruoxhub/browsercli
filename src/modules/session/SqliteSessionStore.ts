@@ -370,6 +370,13 @@ export class SqliteSessionStore implements SessionStore {
     return info.changes;
   }
 
+  clearRequests(sessionId: string): number {
+    const info = this.db
+      .prepare(`DELETE FROM captured_requests WHERE session_id = ?`)
+      .run(sessionId);
+    return info.changes;
+  }
+
   getHooks(sessionId: string): HookRecordRow[] {
     const rows = this.db
       .prepare(

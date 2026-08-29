@@ -80,10 +80,10 @@ export const ProxyControlBar: React.FC<ProxyControlBarProps> = ({
 
   const handleClear = async () => {
     try {
-      await api.clearProxyRequests();
+      await api.clearSessionRequests();
       clearRequests();
     } catch (err) {
-      console.error('Failed to clear proxy requests:', err);
+      console.error('Failed to clear session requests:', err);
     }
   };
 

@@ -11,7 +11,7 @@ import {ProxyRequestDetail} from '../components/proxy/ProxyRequestDetail';
 import {ProxyRequestList} from '../components/proxy/ProxyRequestList';
 import {api} from '../lib/api';
 import type {
-  ProxyRequestSummaryEvent,
+  SessionRequestSummaryEvent,
   ProxyStatusPayload,
 } from '../lib/protocol';
 import {wsClient} from '../lib/ws';
@@ -37,21 +37,21 @@ export default function ProxyPage() {
         console.error('Failed to get proxy status:', err);
       });
 
-    // 2. Fetch initial request history
+    // 2. Fetch initial request history（聚合源：CDP + MITM）
     api
-      .getProxyRequests()
+      .getSessionRequests()
       .then(res => {
-        if (mounted && res.requests) {
-          setRequests(res.requests);
+        if (mounted && res.items) {
+          setRequests(res.items);
         }
       })
       .catch(err => {
-        console.error('Failed to get proxy requests:', err);
+        console.error('Failed to get session requests:', err);
       });
 
     // 3. Subscribe to WebSocket events
-    const unsubRequest = wsClient.subscribe('proxy.request', msg => {
-      const payload = msg.payload as ProxyRequestSummaryEvent;
+    const unsubRequest = wsClient.subscribe('session.request', msg => {
+      const payload = msg.payload as SessionRequestSummaryEvent;
       addRequest(payload);
     });
 

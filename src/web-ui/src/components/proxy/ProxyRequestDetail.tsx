@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import React, {useState} from 'react';
 
-import type {GetMitmRequestData} from '../../lib/protocol';
+import type {SessionRequestDetail} from '../../lib/protocol';
 import {useProxyStore} from '../../stores/proxy';
 
 type DetailTab =
@@ -29,6 +29,22 @@ type DetailTab =
 
 const SENSITIVE_HEADER_PATTERN =
   /^(authorization|cookie|set-cookie|token|x-.*-token|sign|signature|x-sign|x-signature|x-s|a_bogus|xbogus|h5st|k-sign)/i;
+
+// session 存储层没有 is_static 列（adapter 刻意丢弃，spec §10），这里按 url
+// 后缀 + contentType 推导，仅供前端展示 Static 徽标。
+const STATIC_EXTENSIONS =
+  /\.(js|css|png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot|ico|map)(\?|$)/i;
+
+function isStaticRequest(req: SessionRequestDetail): boolean {
+  if (STATIC_EXTENSIONS.test(req.url)) return true;
+  const ct = req.contentType ?? '';
+  return (
+    ct.startsWith('image/') ||
+    ct.startsWith('font/') ||
+    ct.includes('javascript') ||
+    ct.includes('text/css')
+  );
+}
 
 export const ProxyRequestDetail: React.FC = () => {
   const {selectedDetail, detailLoading} = useProxyStore();
@@ -99,7 +115,7 @@ export const ProxyRequestDetail: React.FC = () => {
   };
 
   // Generate curl command
-  const generateCurl = (req: GetMitmRequestData): string => {
+  const generateCurl = (req: SessionRequestDetail): string => {
     let cmd = `curl -X ${req.method} '${req.url}'`;
     for (const [k, v] of Object.entries(req.requestHeaders || {})) {
       if (k.toLowerCase() === 'host') continue;
@@ -112,7 +128,7 @@ export const ProxyRequestDetail: React.FC = () => {
   };
 
   // Generate Python requests code
-  const generatePython = (req: GetMitmRequestData): string => {
+  const generatePython = (req: SessionRequestDetail): string => {
     let code = `import requests\n\nurl = '${req.url}'\n`;
     code += `headers = ${JSON.stringify(req.requestHeaders || {}, null, 4)}\n\n`;
 
@@ -283,22 +299,22 @@ export const ProxyRequestDetail: React.FC = () => {
                     Capture Properties
                   </span>
                   <div className="flex flex-wrap gap-1.5 pt-0.5">
-                    {selectedDetail.isWebSocket && (
+                    {selectedDetail.isWebSocket === 1 && (
                       <span className="px-1.5 py-0.5 rounded text-[9px] bg-purple-500/15 text-purple-400 border border-purple-500/30">
                         WebSocket
                       </span>
                     )}
-                    {selectedDetail.isStreaming && (
+                    {selectedDetail.isStreaming === 1 && (
                       <span className="px-1.5 py-0.5 rounded text-[9px] bg-blue-500/15 text-blue-400 border border-blue-500/30">
                         SSE
                       </span>
                     )}
-                    {selectedDetail.isStatic && (
+                    {isStaticRequest(selectedDetail) && (
                       <span className="px-1.5 py-0.5 rounded text-[9px] bg-zinc-500/15 text-zinc-400 border border-zinc-500/30">
                         Static
                       </span>
                     )}
-                    {selectedDetail.truncated && (
+                    {selectedDetail.truncated === 1 && (
                       <span className="px-1.5 py-0.5 rounded text-[9px] bg-amber-500/15 text-amber-400 border border-amber-500/30">
                         Truncated (&gt;1MB)
                       </span>

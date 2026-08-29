@@ -12,6 +12,7 @@ import {MAX_CAPTURED_BODY_BYTES} from '../../../../../src/modules/network/consta
 import {cdpResponseToInput} from '../../../../../src/modules/session/adapters/CdpRequestAdapter.js';
 
 interface FakeResponseOptions {
+  status?: number;
   contentType?: string | null;
   body?: string | null;
   postData?: string | null;
@@ -29,7 +30,7 @@ function makeResponse(opts: FakeResponseOptions): Response {
     postData: () => opts.postData ?? '{"q":1}',
   };
   return {
-    status: () => 204,
+    status: () => opts.status ?? 204,
     headers: () => headers,
     request: () => request,
     text: async () => opts.body ?? '',
@@ -126,6 +127,30 @@ describe('cdpResponseToInput', () => {
     );
     assert.strictEqual(input.responseBody, null);
     assert.strictEqual(input.truncated, 0);
+  });
+
+  it('skips the body for redirect responses without reading it', async () => {
+    let called = 0;
+    const input = await cdpResponseToInput(
+      makeResponse({status: 302, contentType: 'text/html'}),
+      {
+        readBody: async () => {
+          called += 1;
+          return 'redirect-body';
+        },
+      },
+    );
+    assert.strictEqual(called, 0, '重定向响应不该取体');
+    assert.strictEqual(input.responseBody, null);
+    assert.strictEqual(input.statusCode, 302);
+  });
+
+  it('still reads the body for a 2xx response', async () => {
+    const input = await cdpResponseToInput(
+      makeResponse({status: 200, contentType: 'text/html'}),
+      {readBody: async () => 'ok'},
+    );
+    assert.strictEqual(input.responseBody, 'ok');
   });
 
   it('survives a request whose headers/postData accessors throw', async () => {

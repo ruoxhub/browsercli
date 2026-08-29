@@ -6,11 +6,11 @@
 import {Globe, Inbox} from 'lucide-react';
 import React, {useEffect, useMemo, useRef} from 'react';
 
-import type {ProxyRequestSummaryEvent} from '../../lib/protocol';
+import type {SessionRequestSummaryEvent} from '../../lib/protocol';
 import {useProxyStore} from '../../stores/proxy';
 
 interface ProxyRequestListProps {
-  onSelect?: (id: number) => void;
+  onSelect?: (id: string) => void;
 }
 
 function getMethodBadgeClass(method: string): string {
@@ -55,6 +55,12 @@ function simplifyContentType(ct: string | null): string {
   if (ct.includes('application/octet-stream')) return 'BIN';
   if (ct.includes('text/event-stream')) return 'SSE';
   return ct.split(';')[0].split('/').pop()?.toUpperCase() || '-';
+}
+
+function sourceBadgeClass(source: string): string {
+  return source === 'proxy'
+    ? 'bg-purple-500/15 text-purple-400 border-purple-500/30'
+    : 'bg-sky-500/15 text-sky-400 border-sky-500/30';
 }
 
 export const ProxyRequestList: React.FC<ProxyRequestListProps> = ({
@@ -136,7 +142,7 @@ export const ProxyRequestList: React.FC<ProxyRequestListProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [filteredRequests, selectedId, selectRequest, onSelect]);
 
-  const handleItemClick = (req: ProxyRequestSummaryEvent) => {
+  const handleItemClick = (req: SessionRequestSummaryEvent) => {
     void selectRequest(req.id);
     onSelect?.(req.id);
   };
@@ -165,7 +171,7 @@ export const ProxyRequestList: React.FC<ProxyRequestListProps> = ({
             </p>
             <p className="text-[11px] text-[var(--color-text-muted)] max-w-[240px] leading-relaxed">
               {requests.length === 0
-                ? '启动代理并在被测客户端或设备配置 HTTP 代理后，流量将实时显示在此列表。'
+                ? '当浏览网页产生流量时，请求会自动显示在此列表（CDP + 代理）。'
                 : '请调整上方 Method 过滤或搜索关键词。'}
             </p>
           </div>
@@ -189,6 +195,15 @@ export const ProxyRequestList: React.FC<ProxyRequestListProps> = ({
             >
               {/* Left summary items */}
               <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-3">
+                {/* Source badge */}
+                <span
+                  className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold border uppercase shrink-0 ${sourceBadgeClass(
+                    req.source,
+                  )}`}
+                >
+                  {req.source === 'proxy' ? 'Proxy' : 'CDP'}
+                </span>
+
                 {/* Method badge */}
                 <span
                   className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border uppercase shrink-0 ${getMethodBadgeClass(

@@ -181,5 +181,22 @@ export function createSessionRoutes(
         }
       },
     ],
+    [
+      'DELETE /api/session/requests',
+      (_req, res) => {
+        const services = getServices();
+        const session = services?.manager.getActiveSession();
+        if (!services || !session) {
+          sendError(res, 'SESSION_UNAVAILABLE', '暂无活动抓包会话', 503);
+          return;
+        }
+        try {
+          const clearedCount = services.store.clearRequests(session.id);
+          sendJson(res, {clearedCount});
+        } catch (err) {
+          sendUnexpected(res, err);
+        }
+      },
+    ],
   ]);
 }

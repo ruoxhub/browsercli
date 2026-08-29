@@ -7,15 +7,15 @@ import {create} from 'zustand';
 
 import {api} from '../lib/api';
 import type {
-  GetMitmRequestData,
-  ProxyRequestSummaryEvent,
+  SessionRequestSummaryEvent,
+  SessionRequestDetail,
   ProxyStatusPayload,
 } from '../lib/protocol';
 
 export interface ProxyState {
-  requests: ProxyRequestSummaryEvent[];
-  selectedId: number | null;
-  selectedDetail: GetMitmRequestData | null;
+  requests: SessionRequestSummaryEvent[];
+  selectedId: string | null;
+  selectedDetail: SessionRequestDetail | null;
   detailLoading: boolean;
   status: ProxyStatusPayload | null;
   autoScroll: boolean;
@@ -24,10 +24,10 @@ export interface ProxyState {
     method: string;
     statusFilter: string;
   };
-  setRequests: (requests: ProxyRequestSummaryEvent[]) => void;
-  addRequest: (req: ProxyRequestSummaryEvent) => void;
+  setRequests: (requests: SessionRequestSummaryEvent[]) => void;
+  addRequest: (req: SessionRequestSummaryEvent) => void;
   clearRequests: () => void;
-  selectRequest: (id: number | null) => Promise<void>;
+  selectRequest: (id: string | null) => Promise<void>;
   setStatus: (status: ProxyStatusPayload) => void;
   setAutoScroll: (autoScroll: boolean) => void;
   setFilter: (filter: Partial<ProxyState['filter']>) => void;
@@ -80,7 +80,7 @@ export const useProxyStore = create<ProxyState>((set, get) => ({
 
     set({selectedId: id, detailLoading: true});
     try {
-      const detail = await api.getProxyRequestDetail(id);
+      const detail = await api.getSessionRequestDetail(id);
       if (get().selectedId === id) {
         set({selectedDetail: detail, detailLoading: false});
       }

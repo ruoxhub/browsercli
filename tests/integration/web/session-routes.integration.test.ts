@@ -252,6 +252,49 @@ describe('createSessionRoutes', () => {
     assert.strictEqual(res.statusCode, 404);
   });
 
+  it('clears all requests of the active session', async () => {
+    const res = mockRes();
+    await router.dispatch(
+      mockReq('DELETE', '/api/session/requests'),
+      res as unknown as ServerResponse,
+      '/api/session/requests',
+    );
+
+    assert.strictEqual(res.statusCode, 200);
+    const body = res.body as {data: {clearedCount: number}};
+    assert.strictEqual(body.data.clearedCount, 3);
+
+    const listRes = mockRes();
+    await router.dispatch(
+      mockReq('GET', '/api/session/requests'),
+      listRes as unknown as ServerResponse,
+      '/api/session/requests',
+    );
+    const listBody = listRes.body as {data: {items: unknown[]; total: number}};
+    assert.strictEqual(listBody.data.total, 0);
+    assert.strictEqual(listBody.data.items.length, 0);
+  });
+
+  it('returns 503 when clearing without an active session', async () => {
+    const freshDb = new DatabaseManager(':memory:');
+    const freshStore = new SqliteSessionStore(freshDb);
+    const freshManager = new CaptureSessionManager(freshStore);
+    const bare = new RestRouter();
+    bare.mount(
+      createSessionRoutes(() => ({manager: freshManager, store: freshStore})),
+    );
+
+    const res = mockRes();
+    await bare.dispatch(
+      mockReq('DELETE', '/api/session/requests'),
+      res as unknown as ServerResponse,
+      '/api/session/requests',
+    );
+
+    assert.strictEqual(res.statusCode, 503);
+    freshDb.close();
+  });
+
   it('returns 503 when session services are unavailable', async () => {
     const bare = new RestRouter();
     bare.mount(createSessionRoutes(() => undefined));

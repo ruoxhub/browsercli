@@ -14,6 +14,8 @@ import type {
   ProxyStatusPayload,
   ListMitmRequestsData,
   GetMitmRequestData,
+  SessionRequestSummaryEvent,
+  SessionRequestDetail,
 } from './protocol';
 
 export interface ToolSummary {
@@ -203,5 +205,35 @@ export const api = {
 
   getProxyLocalIps(): Promise<{ips: string[]}> {
     return request<{ips: string[]}>('GET', '/api/proxy/ips');
+  },
+
+  getSessionRequests(params?: {
+    sources?: string;
+    urlFilter?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{items: SessionRequestSummaryEvent[]; total: number}> {
+    const query = new URLSearchParams();
+    if (params?.sources) query.set('sources', params.sources);
+    if (params?.urlFilter) query.set('urlFilter', params.urlFilter);
+    if (params?.limit !== undefined) query.set('limit', String(params.limit));
+    if (params?.offset !== undefined)
+      query.set('offset', String(params.offset));
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return request<{items: SessionRequestSummaryEvent[]; total: number}>(
+      'GET',
+      `/api/session/requests${qs}`,
+    );
+  },
+
+  getSessionRequestDetail(id: string): Promise<SessionRequestDetail> {
+    return request<SessionRequestDetail>(
+      'GET',
+      `/api/session/requests/${encodeURIComponent(id)}`,
+    );
+  },
+
+  clearSessionRequests(): Promise<{clearedCount: number}> {
+    return request<{clearedCount: number}>('DELETE', '/api/session/requests');
   },
 };
