@@ -124,14 +124,22 @@ export function createSessionRoutes(
           // total 与本次分页无关（不受 limit/offset 影响），但跟随同一份 filter：
           // 过滤后 total 与 items 的口径必须一致，否则前端分页器会算出不存在的页数。
           const total = services.store.getRequests(session.id, filter).length;
-          // 库里按 sequence DESC 取最近 N 条（首屏只拉摘要），响应内反转成时间正序
-          // 交出去（spec §9）。[...items] 而非 items.reverse()——不改动 store 返回的数组。
+          // 库里按 sequence DESC 取最近 N 条（首屏只拉摘要），响应内反转成
+          // 落库顺序（sequence 升序）交出去（spec §9）。[...items] 而非
+          // items.reverse()——不改动 store 返回的数组。
           //
-          // 「反转」只保证**窗口内**时间正序：SQL 是「先 ORDER BY sequence DESC，
-          // 再 LIMIT/OFFSET」（SqliteSessionStore.ts:335-336）。所以 limit=1 拿到的是
-          // **最新**一条，不是最旧一条；翻页方向是「从最新往回」，第 2 页每一行都比
-          // 第 1 页旧。前端分页器必须按这个方向实现，不要照下面「items[0] 最旧」的
-          // 直觉写——那条直觉只在 limit >= total 时成立。
+          // 「落库顺序」≠「到达顺序」：sequence 在 ingestRequest 里分配，而 CDP
+          // 链路是 await 取体（含 response.text()）之后才调 ingestRequest，MITM
+          // 链路则完全同步 —— 先到的大响应若取体慢，会拿到比后到的快响应更大
+          // 的 sequence。行的 timestamp 仍是响应头到达时刻、准确；只是这个排序
+          // 键的语义不是到达序。切片 3 定稿语义（改为到达序 sequence，或按
+          // timestamp 排序、sequence 兜底平局）。
+          //
+          // 「反转」只保证**窗口内**落库顺序升序：SQL 是「先 ORDER BY sequence
+          // DESC，再 LIMIT/OFFSET」（SqliteSessionStore.ts:335-336）。所以
+          // limit=1 拿到的是**最新**一条，不是最旧一条；翻页方向是「从最新往回」，
+          // 第 2 页每一行都比第 1 页旧。前端分页器必须按这个方向实现，不要照
+          // 下面「items[0] 最旧」的直觉写——那条直觉只在 limit >= total 时成立。
           sendJson(res, {items: [...items].reverse(), total});
         } catch (err) {
           sendUnexpected(res, err);

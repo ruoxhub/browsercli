@@ -161,6 +161,27 @@ describe('SessionCaptureBridge', () => {
     );
   });
 
+  it('counts a drop when the engine accessor itself throws', async () => {
+    const {context, emit} = makeContext();
+    // getEngine() 首次调用会下钻到 RuntimeServices.getCaptureEngine()
+    // → ensureSessionStore() → new DatabaseManager(...)：SQLite 打开失败
+    // （权限/磁盘满/锁）就从这里抛。异常若发生在 try 之外，
+    // dropped 计不到、还会以 unhandled rejection 逃出 void this.ingest()。
+    const bridge = new SessionCaptureBridge(() => {
+      throw new Error('db open failed');
+    });
+
+    bridge.attach(context);
+    emit(makeResponse());
+    await flush();
+
+    assert.strictEqual(
+      bridge.getDroppedCount(),
+      1,
+      'engine 获取失败与落库失败必须同口径计数（spec §4 / R3）',
+    );
+  });
+
   it('skips the body when CDP body capture is disabled', async () => {
     const {engine, manager} = makeEngine();
     const {context, emit} = makeContext();

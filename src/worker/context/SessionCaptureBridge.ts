@@ -74,9 +74,15 @@ export class SessionCaptureBridge {
   }
 
   private async ingest(response: Response): Promise<void> {
-    const engine = this.getEngine();
-    if (!engine) return;
+    // try 必须罩住 getEngine()：首次调用会下钻到
+    // RuntimeServices.getCaptureEngine() → ensureSessionStore()
+    // → new DatabaseManager(...)，SQLite 打开失败（权限/磁盘满/锁）就在这里抛。
+    // 漏罩会让 dropped 计不到，异常还会以 unhandled rejection 逃出
+    // void this.ingest() —— 与 MITM 侧 recordExchange 的完全包含不对称。
+    // engine 缺失仍走 return，不计入 dropped（那不是故障，是未就绪）。
     try {
+      const engine = this.getEngine();
+      if (!engine) return;
       const input: CapturedRequestInput = await fromCdpResponse(response, {
         ...(this.opts.now ? {now: this.opts.now} : {}),
         ...(this.captureBodyEnabled() ? {} : {readBody: skipBody}),
