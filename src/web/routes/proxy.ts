@@ -144,6 +144,8 @@ export function createProxyRoutes(
         }
       },
     ],
+    // 旧链路（MITM-only 调试端点）：切片 3 之前 UI 仍读这里，请勿删除。
+    // 新链路见 GET /api/session/requests（createSessionRoutes）。
     [
       'GET /api/proxy/requests',
       (req, res) => {
