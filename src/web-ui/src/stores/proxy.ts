@@ -12,6 +12,13 @@ import type {
   ProxyStatusPayload,
 } from '../lib/protocol';
 
+export interface PageInfo {
+  pageId: string;
+  index: number;
+  url: string;
+  title: string;
+}
+
 export interface ProxyState {
   requests: SessionRequestSummaryEvent[];
   selectedId: string | null;
@@ -31,6 +38,12 @@ export interface ProxyState {
   setStatus: (status: ProxyStatusPayload) => void;
   setAutoScroll: (autoScroll: boolean) => void;
   setFilter: (filter: Partial<ProxyState['filter']>) => void;
+  sourceFilter: 'all' | 'cdp' | 'proxy';
+  pages: PageInfo[];
+  selectedPageId: string | null;
+  setSourceFilter: (sourceFilter: 'all' | 'cdp' | 'proxy') => void;
+  loadPages: () => Promise<void>;
+  selectTab: (pageId: string) => Promise<void>;
 }
 
 export const useProxyStore = create<ProxyState>((set, get) => ({
@@ -45,6 +58,9 @@ export const useProxyStore = create<ProxyState>((set, get) => ({
     method: '',
     statusFilter: '',
   },
+  sourceFilter: 'all',
+  pages: [],
+  selectedPageId: null,
 
   setRequests: requests => set({requests}),
 
@@ -102,4 +118,48 @@ export const useProxyStore = create<ProxyState>((set, get) => ({
         ...filter,
       },
     })),
+
+  setSourceFilter: sourceFilter => set({sourceFilter}),
+
+  loadPages: async () => {
+    try {
+      const res = (await api.callTool('list_pages', {})) as {
+        result?: {
+          structuredContent?: {
+            data?: {
+              pageInfos?: PageInfo[];
+              selectedPageId?: string | null;
+            };
+          };
+        };
+      };
+      const data = res?.result?.structuredContent?.data;
+      const pageInfos = (data?.pageInfos ?? []) as PageInfo[];
+      set({
+        pages: pageInfos.map(p => ({
+          pageId: p.pageId,
+          index: p.index,
+          url: p.url,
+          title: p.title,
+        })),
+        selectedPageId: data?.selectedPageId ?? null,
+      });
+    } catch (err) {
+      // 浏览器未连接时 list_pages 会抛；静默降级，不打断页面
+      console.error('加载页面列表失败:', err);
+    }
+  },
+
+  selectTab: async pageId => {
+    try {
+      // 复用 select_page 工具：bringPageToFront + 切 worker 选中页
+      await api.callTool('select_page', {pageId});
+      set({selectedPageId: pageId});
+      // 切 tab 不清空：只重拉历史刷新列表，旧 tab 数据保留
+      const res = await api.getSessionRequests();
+      set({requests: res.items});
+    } catch (err) {
+      console.error('切换页面失败:', err);
+    }
+  },
 }));

@@ -66,14 +66,23 @@ function sourceBadgeClass(source: string): string {
 export const ProxyRequestList: React.FC<ProxyRequestListProps> = ({
   onSelect,
 }) => {
-  const {requests, selectedId, autoScroll, filter, selectRequest} =
-    useProxyStore();
+  const {
+    requests,
+    selectedId,
+    autoScroll,
+    filter,
+    sourceFilter,
+    selectRequest,
+  } = useProxyStore();
   const listContainerRef = useRef<HTMLDivElement>(null);
   const activeItemRef = useRef<HTMLDivElement>(null);
 
-  // Filter requests based on method and search text
+  // Filter requests based on source, method and search text
   const filteredRequests = useMemo(() => {
     return requests.filter(req => {
+      if (sourceFilter !== 'all' && req.source !== sourceFilter) {
+        return false;
+      }
       if (
         filter.method &&
         req.method.toUpperCase() !== filter.method.toUpperCase()
@@ -91,7 +100,7 @@ export const ProxyRequestList: React.FC<ProxyRequestListProps> = ({
       }
       return true;
     });
-  }, [requests, filter]);
+  }, [requests, filter, sourceFilter]);
 
   // Handle auto-scroll to top/new requests
   useEffect(() => {

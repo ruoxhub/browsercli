@@ -41,9 +41,14 @@ export const ProxyControlBar: React.FC<ProxyControlBarProps> = ({
     status,
     autoScroll,
     filter,
+    sourceFilter,
+    pages,
+    selectedPageId,
     setStatus,
     setAutoScroll,
     setFilter,
+    setSourceFilter,
+    selectTab,
     clearRequests,
   } = useProxyStore();
 
@@ -121,6 +126,37 @@ export const ProxyControlBar: React.FC<ProxyControlBarProps> = ({
             )}
             <span>{isRunning ? '停止代理' : '启动抓包'}</span>
           </button>
+
+          {/* Tab Selector */}
+          <div className="flex items-center gap-1.5 bg-[var(--color-bg-primary)] border border-[var(--color-border-default)] px-2.5 py-1.5 rounded-xl">
+            <span className="text-[11px] text-[var(--color-text-muted)] font-mono">
+              标签页:
+            </span>
+            <select
+              value={selectedPageId ?? ''}
+              onChange={e => {
+                const id = e.target.value;
+                if (id) void selectTab(id);
+              }}
+              className="bg-transparent text-xs font-mono text-[var(--color-text-primary)] focus:outline-none"
+            >
+              <option
+                value=""
+                disabled
+              >
+                选择页面…
+              </option>
+              {pages.map(p => (
+                <option
+                  key={p.pageId}
+                  value={p.pageId}
+                  className="bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]"
+                >
+                  {`#${p.index} ${p.title}`}
+                </option>
+              ))}
+            </select>
+          </div>
 
           {/* Port Input */}
           <div className="flex items-center gap-1.5 bg-[var(--color-bg-primary)] border border-[var(--color-border-default)] px-2.5 py-1.5 rounded-xl">
@@ -200,6 +236,40 @@ export const ProxyControlBar: React.FC<ProxyControlBarProps> = ({
 
       {/* Bottom filter row */}
       <div className="flex flex-wrap items-center gap-2.5">
+        {/* Source Filter */}
+        <div className="relative">
+          <select
+            value={sourceFilter}
+            onChange={e =>
+              setSourceFilter(e.target.value as 'all' | 'cdp' | 'proxy')
+            }
+            className="appearance-none bg-[var(--color-bg-primary)] border border-[var(--color-border-default)] text-xs font-mono font-bold text-[var(--color-text-primary)] rounded-xl pl-3 pr-8 py-1.5 focus:outline-none focus:border-[var(--color-accent)] cursor-pointer"
+          >
+            <option
+              value="all"
+              className="bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]"
+            >
+              全部
+            </option>
+            <option
+              value="cdp"
+              className="bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]"
+            >
+              CDP
+            </option>
+            <option
+              value="proxy"
+              className="bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]"
+            >
+              MITM
+            </option>
+          </select>
+          <ChevronDown
+            size={12}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] pointer-events-none"
+          />
+        </div>
+
         {/* Method Filter Dropdown */}
         <div className="relative">
           <select

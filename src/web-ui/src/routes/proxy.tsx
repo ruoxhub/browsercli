@@ -19,7 +19,7 @@ import {useProxyStore} from '../stores/proxy';
 
 export default function ProxyPage() {
   const [caModalOpen, setCaModalOpen] = useState(false);
-  const {setRequests, setStatus, addRequest} = useProxyStore();
+  const {setRequests, setStatus, addRequest, loadPages} = useProxyStore();
 
   // Initial load
   useEffect(() => {
@@ -49,7 +49,10 @@ export default function ProxyPage() {
         console.error('Failed to get session requests:', err);
       });
 
-    // 3. Subscribe to WebSocket events
+    // 4. Load the initial page list for the tab selector
+    void loadPages();
+
+    // 5. Subscribe to WebSocket events
     const unsubRequest = wsClient.subscribe('session.request', msg => {
       const payload = msg.payload as SessionRequestSummaryEvent;
       addRequest(payload);
@@ -65,7 +68,7 @@ export default function ProxyPage() {
       unsubRequest();
       unsubStatus();
     };
-  }, [setRequests, setStatus, addRequest]);
+  }, [setRequests, setStatus, addRequest, loadPages]);
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-[var(--color-bg-primary)]">
