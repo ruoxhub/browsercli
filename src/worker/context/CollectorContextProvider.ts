@@ -17,6 +17,7 @@ import type {BrowserContext, ConsoleMessage, Page, Request} from 'patchright';
 
 import type {PageCollector} from '../../modules/collector/PageCollector.js';
 import type {WebSocketData} from '../../modules/network/NetworkTypes.js';
+import type {CaptureEngine} from '../../modules/session/index.js';
 import type {HTTPRequest} from '../../third_party/index.js';
 import {
   ConsoleMessageCollector,
@@ -27,15 +28,34 @@ import {
   type TrackedWebSocketData,
 } from '../collectors.js';
 
+import {SessionCaptureBridge} from './SessionCaptureBridge.js';
+
 export class CollectorContextProvider {
   private readonly _networkCollector = new NetworkRequestCollector();
   private readonly _consoleCollector = new ConsoleMessageCollector();
   private readonly _wsCollector = new WsCollector();
+  private readonly _captureBridge: SessionCaptureBridge;
 
   private readonly _maxNavigationSaved = 3;
   private _started = false;
 
   // ─── 生命周期 ────────────────────────────────────────
+
+  /**
+   * @param getCaptureEngine 抓包聚合点的延迟取值函数（worker 侧传
+   *   `() => serviceLocator.getCaptureEngine()`）。缺省表示不抓包——无 engine 时
+   *   bridge 对每个响应静默返回，不产生任何落库副作用（spec §7 约束 1）。
+   */
+  constructor(
+    getCaptureEngine: () => CaptureEngine | undefined = () => undefined,
+  ) {
+    this._captureBridge = new SessionCaptureBridge(getCaptureEngine);
+  }
+
+  /** 供测试与未来的手动挂载点使用。 */
+  get captureBridge(): SessionCaptureBridge {
+    return this._captureBridge;
+  }
 
   get networkCollector(): NetworkRequestCollector {
     return this._networkCollector;
@@ -56,6 +76,7 @@ export class CollectorContextProvider {
     this._networkCollector.startContextCollection(context);
     this._consoleCollector.startContextCollection(context);
     this._wsCollector.startContextCollection(context);
+    this._captureBridge.attach(context);
     this._started = true;
   }
 
@@ -72,6 +93,7 @@ export class CollectorContextProvider {
     this._networkCollector.dispose();
     this._consoleCollector.dispose();
     this._wsCollector.dispose();
+    this._captureBridge.detach();
     this._started = false;
   }
 

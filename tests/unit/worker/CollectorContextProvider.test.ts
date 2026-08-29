@@ -7,6 +7,12 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
+import type {BrowserContext, Response} from 'patchright';
+
+import {DatabaseManager} from '../../../src/database/DatabaseManager.js';
+import {CaptureEngine} from '../../../src/modules/session/CaptureEngine.js';
+import {CaptureSessionManager} from '../../../src/modules/session/CaptureSessionManager.js';
+import {SqliteSessionStore} from '../../../src/modules/session/SqliteSessionStore.js';
 import {CollectorContextProvider} from '../../../src/worker/context/CollectorContextProvider.js';
 
 describe('CollectorContextProvider', () => {
@@ -70,5 +76,64 @@ describe('CollectorContextProvider', () => {
       provider.getNetworkRequestStableId([mockPage as never], request),
       1,
     );
+  });
+
+  it('ingests CDP responses through the capture bridge when an engine is provided', async () => {
+    const db = new DatabaseManager(':memory:');
+    const store = new SqliteSessionStore(db);
+    const manager = new CaptureSessionManager(store);
+    const engine = new CaptureEngine(manager, store);
+
+    const listeners = new Set<(response: Response) => void>();
+    const context = {
+      on: (event: string, handler: (response: Response) => void) => {
+        if (event === 'response') listeners.add(handler);
+        return context;
+      },
+      off: (_event: string, handler: (response: Response) => void) => {
+        listeners.delete(handler);
+        return context;
+      },
+      pages: () => [],
+    } as unknown as BrowserContext;
+
+    const provider = new CollectorContextProvider(() => engine);
+    provider.start(context);
+    assert.ok(provider.isStarted());
+
+    const response = {
+      status: () => 200,
+      headers: () => ({'content-type': 'text/plain'}),
+      request: () => ({
+        method: () => 'GET',
+        url: () => 'https://b.dev/probe',
+        headers: () => ({}),
+        postData: () => null,
+      }),
+      text: async () => 'pong',
+    } as unknown as Response;
+    for (const listener of [...listeners]) listener(response);
+    await new Promise(resolve => setImmediate(resolve));
+
+    const session = manager.getActiveSession();
+    assert.ok(session);
+    assert.strictEqual(manager.getRequests(session.id).length, 1);
+
+    provider.dispose();
+    assert.strictEqual(listeners.size, 0, 'dispose 必须解挂 response 监听');
+    db.close();
+  });
+
+  it('starts without an engine and stays silent on responses', () => {
+    const provider = new CollectorContextProvider();
+    const context = {
+      on: () => context,
+      off: () => context,
+      pages: () => [],
+    } as unknown as BrowserContext;
+
+    assert.doesNotThrow(() => provider.start(context));
+    assert.ok(provider.isStarted());
+    assert.doesNotThrow(() => provider.dispose());
   });
 });
