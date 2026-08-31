@@ -14,6 +14,7 @@ import {CaptureEngine} from '../../../src/modules/session/CaptureEngine.js';
 import {CaptureSessionManager} from '../../../src/modules/session/CaptureSessionManager.js';
 import {SqliteSessionStore} from '../../../src/modules/session/SqliteSessionStore.js';
 import type {CapturedRequestInput} from '../../../src/modules/session/types.js';
+import type {LLMService} from '../../../src/services/LLMService.js';
 import {RestRouter} from '../../../src/web/RestRouter.js';
 import {createSessionRoutes} from '../../../src/web/routes/session.js';
 
@@ -57,6 +58,10 @@ function mockRes(): MockRes {
   };
   return res as MockRes;
 }
+
+const OFFLINE_LLM = {
+  isConfigured: () => false,
+} as unknown as LLMService;
 
 function input(
   overrides: Partial<CapturedRequestInput> = {},
@@ -102,7 +107,13 @@ describe('createSessionRoutes', () => {
       }),
     );
     router = new RestRouter();
-    router.mount(createSessionRoutes(() => ({manager, store})));
+    router.mount(
+      createSessionRoutes(() => ({
+        manager,
+        store,
+        llmService: OFFLINE_LLM,
+      })),
+    );
   });
 
   it('returns summaries without any body field', async () => {
@@ -278,10 +289,13 @@ describe('createSessionRoutes', () => {
   it('returns 503 when clearing without an active session', async () => {
     const freshDb = new DatabaseManager(':memory:');
     const freshStore = new SqliteSessionStore(freshDb);
-    const freshManager = new CaptureSessionManager(freshStore);
     const bare = new RestRouter();
     bare.mount(
-      createSessionRoutes(() => ({manager: freshManager, store: freshStore})),
+      createSessionRoutes(() => ({
+        manager: new CaptureSessionManager(freshStore),
+        store: freshStore,
+        llmService: OFFLINE_LLM,
+      })),
     );
 
     const res = mockRes();
@@ -313,10 +327,13 @@ describe('createSessionRoutes', () => {
   it('returns 503 with no active session instead of throwing', async () => {
     const freshDb = new DatabaseManager(':memory:');
     const freshStore = new SqliteSessionStore(freshDb);
-    const freshManager = new CaptureSessionManager(freshStore);
     const bare = new RestRouter();
     bare.mount(
-      createSessionRoutes(() => ({manager: freshManager, store: freshStore})),
+      createSessionRoutes(() => ({
+        manager: new CaptureSessionManager(freshStore),
+        store: freshStore,
+        llmService: OFFLINE_LLM,
+      })),
     );
 
     const res = mockRes();
@@ -332,5 +349,110 @@ describe('createSessionRoutes', () => {
       'spec §13-D7：查询不得创建会话；无活动会话是 503 不是 500',
     );
     freshDb.close();
+  });
+
+  describe('POST /api/session/analyze', () => {
+    // 自己构造：mockReq 会先排一次 'end'，POST 必须只发一次 end（先 data 后 end）。
+    function mockPost(bodyObj?: unknown): IncomingMessage {
+      const req = new EventEmitter() as unknown as IncomingMessage & {
+        method: string;
+        url: string;
+      };
+      req.method = 'POST';
+      req.url = '/api/session/analyze';
+      process.nextTick(() => {
+        req.emit('data', Buffer.from(JSON.stringify(bodyObj ?? {})));
+        req.emit('end');
+      });
+      return req;
+    }
+
+    it('analyzes the selected request ids and returns a report', async () => {
+      const listRes = mockRes();
+      await router.dispatch(
+        mockReq('GET', '/api/session/requests'),
+        listRes as unknown as ServerResponse,
+        '/api/session/requests',
+      );
+      const {items} = (
+        listRes.body as {data: {items: Array<{id: string; url: string}>}}
+      ).data;
+      const target = items.find(i => i.url === 'https://d.dev/api/y')!;
+
+      const res = mockRes();
+      await router.dispatch(
+        mockPost({requestIds: [target.id], mode: 'api_reverse'}),
+        res as unknown as ServerResponse,
+        '/api/session/analyze',
+      );
+
+      assert.strictEqual(res.statusCode, 200);
+      const data = (res.body as {data: Record<string, unknown>}).data;
+      assert.strictEqual(data['requestCount'], 1);
+      assert.strictEqual(data['mode'], 'api_reverse');
+      assert.strictEqual(data['llmUsed'], false);
+      assert.ok(String(data['reportMarkdown']).includes('https://d.dev/api/y'));
+      assert.ok(data['reportId'], '路由默认持久化报告');
+    });
+
+    it('analyzes the whole session when requestIds is omitted', async () => {
+      const res = mockRes();
+      await router.dispatch(
+        mockPost({}),
+        res as unknown as ServerResponse,
+        '/api/session/analyze',
+      );
+
+      assert.strictEqual(res.statusCode, 200);
+      const data = (res.body as {data: Record<string, unknown>}).data;
+      assert.strictEqual(data['requestCount'], 3);
+    });
+
+    it('returns 400 for a non-JSON body', async () => {
+      const req = new EventEmitter() as unknown as IncomingMessage & {
+        method: string;
+        url: string;
+      };
+      req.method = 'POST';
+      req.url = '/api/session/analyze';
+      process.nextTick(() => {
+        req.emit('data', Buffer.from('not-json'));
+        req.emit('end');
+      });
+      const res = mockRes();
+      await router.dispatch(
+        req,
+        res as unknown as ServerResponse,
+        '/api/session/analyze',
+      );
+
+      assert.strictEqual(res.statusCode, 400);
+    });
+
+    it('returns 404 for an unknown session id', async () => {
+      const res = mockRes();
+      await router.dispatch(
+        mockPost({sessionId: 'nope'}),
+        res as unknown as ServerResponse,
+        '/api/session/analyze',
+      );
+
+      assert.strictEqual(res.statusCode, 404);
+      const body = res.body as {error: {code: string}};
+      assert.strictEqual(body.error.code, 'NOT_FOUND');
+    });
+
+    it('returns 503 when session services are unavailable', async () => {
+      const bare = new RestRouter();
+      bare.mount(createSessionRoutes(() => undefined));
+      const res = mockRes();
+      await bare.dispatch(
+        mockPost({}),
+        res as unknown as ServerResponse,
+        '/api/session/analyze',
+      );
+
+      assert.strictEqual(res.statusCode, 503);
+    });
   });
 });

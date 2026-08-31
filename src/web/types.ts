@@ -328,3 +328,24 @@ export interface SessionRequestDetail {
   responseBody: string | null;
   headersParseError?: true;
 }
+
+// ==================== Session AI Analysis ====================
+
+export type SessionAnalysisMode =
+  | 'auto'
+  | 'api_reverse'
+  | 'security'
+  | 'perf'
+  | 'js_crypto';
+
+/**
+ * POST /api/session/analyze 的请求体与响应体。
+ * requestIds 为「已选数据包」列表，缺省分析整会话。
+ */
+export interface SessionAnalysisPayload {
+  reportId: string | null;
+  reportMarkdown: string;
+  mode: SessionAnalysisMode;
+  llmUsed: boolean;
+  requestCount: number;
+}

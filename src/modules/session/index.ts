@@ -8,5 +8,10 @@ export type * from './SessionStore.js';
 export {SqliteSessionStore} from './SqliteSessionStore.js';
 export {CaptureSessionManager} from './CaptureSessionManager.js';
 export {CaptureEngine, type CaptureEngineOptions} from './CaptureEngine.js';
+export {
+  runSessionAnalysis,
+  type RunSessionAnalysisOptions,
+  type SessionAnalysisResult,
+} from './analyzeRequests.js';
 export {toSummary} from './summary.js';
 export * from './constants.js';

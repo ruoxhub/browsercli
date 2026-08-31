@@ -6,9 +6,12 @@
 
 import type {IncomingMessage, ServerResponse} from 'node:http';
 
+import type {AnalysisMode} from '../../modules/analyzer/ai/types.js';
+import {runSessionAnalysis} from '../../modules/session/analyzeRequests.js';
 import type {CaptureSessionManager} from '../../modules/session/CaptureSessionManager.js';
 import type {SessionStore} from '../../modules/session/SessionStore.js';
 import type {CaptureSource} from '../../modules/session/types.js';
+import type {LLMService} from '../../services/LLMService.js';
 import {sendError, sendJson, sendUnexpected} from '../middleware/error.js';
 import type {SessionRequestDetail} from '../types.js';
 
@@ -26,6 +29,10 @@ export interface SessionServices {
   // 路由只用到 listRequestSummaries / getRequests / getRequest —— 三者都在
   // SessionStore 接口上（SessionStore.ts:31/29/35），放宽后行为零变化。
   store: SessionStore;
+  /** AI 分析用的 LLM 服务（可能未配置，由 runSessionAnalysis 内部降级）。 */
+  llmService: LLMService;
+  /** 依 url 取脚本正文（供 CryptoScriptExtractor 切片）。 */
+  getFileByUrl?: (url: string) => {content: string} | null;
 }
 
 /**
@@ -37,6 +44,42 @@ export interface SessionServices {
 export type SessionServicesAccessor = () => SessionServices | undefined;
 
 const SOURCES: CaptureSource[] = ['cdp', 'proxy'];
+
+const ANALYZE_MODES: AnalysisMode[] = [
+  'auto',
+  'api_reverse',
+  'security',
+  'perf',
+  'js_crypto',
+];
+
+const MAX_BODY_BYTES = 1 * 1024 * 1024;
+
+function readJsonBody(req: IncomingMessage): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    let received = 0;
+    const chunks: Buffer[] = [];
+    req.on('data', (chunk: Buffer) => {
+      received += chunk.length;
+      if (received > MAX_BODY_BYTES) {
+        req.destroy();
+        reject(new Error('PAYLOAD_TOO_LARGE'));
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on('end', () => {
+      const body = Buffer.concat(chunks).toString('utf-8');
+      if (!body) return resolve({});
+      try {
+        resolve(JSON.parse(body));
+      } catch {
+        reject(new Error('INVALID_JSON'));
+      }
+    });
+    req.on('error', reject);
+  });
+}
 
 const parseHeaders = (
   raw: string | null,
@@ -194,6 +237,62 @@ export function createSessionRoutes(
           const clearedCount = services.store.clearRequests(session.id);
           sendJson(res, {clearedCount});
         } catch (err) {
+          sendUnexpected(res, err);
+        }
+      },
+    ],
+    [
+      'POST /api/session/analyze',
+      async (req, res) => {
+        let body: Record<string, unknown>;
+        try {
+          body = (await readJsonBody(req)) as Record<string, unknown>;
+        } catch (err) {
+          const code = err instanceof Error ? err.message : 'INVALID_JSON';
+          sendError(
+            res,
+            code,
+            code === 'PAYLOAD_TOO_LARGE'
+              ? '请求体超过 1MB 上限'
+              : '请求体不是合法 JSON',
+            code === 'PAYLOAD_TOO_LARGE' ? 413 : 400,
+          );
+          return;
+        }
+
+        const sessionId =
+          typeof body.sessionId === 'string' ? body.sessionId : undefined;
+        const mode = ANALYZE_MODES.includes(body.mode as AnalysisMode)
+          ? (body.mode as AnalysisMode)
+          : undefined;
+        const requestIds =
+          Array.isArray(body.requestIds) &&
+          body.requestIds.every(id => typeof id === 'string')
+            ? (body.requestIds as string[])
+            : undefined;
+
+        const services = getServices();
+        if (!services) {
+          sendError(res, 'SESSION_UNAVAILABLE', '暂无活动抓包会话', 503);
+          return;
+        }
+        try {
+          const result = await runSessionAnalysis({
+            sessionId,
+            mode,
+            requestIds,
+            persist: true,
+            manager: services.manager,
+            llmService: services.llmService,
+            getFileByUrl: services.getFileByUrl,
+          });
+          sendJson(res, result);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          if (message.startsWith('No session found')) {
+            sendError(res, 'NOT_FOUND', message, 404);
+            return;
+          }
           sendUnexpected(res, err);
         }
       },

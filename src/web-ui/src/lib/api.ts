@@ -16,6 +16,7 @@ import type {
   GetMitmRequestData,
   SessionRequestSummaryEvent,
   SessionRequestDetail,
+  SessionAnalysisPayload,
 } from './protocol';
 
 export interface ToolSummary {
@@ -230,6 +231,18 @@ export const api = {
     return request<SessionRequestDetail>(
       'GET',
       `/api/session/requests/${encodeURIComponent(id)}`,
+    );
+  },
+
+  analyzeSession(body: {
+    sessionId?: string;
+    requestIds?: string[];
+    mode?: string;
+  }): Promise<SessionAnalysisPayload> {
+    return request<SessionAnalysisPayload>(
+      'POST',
+      '/api/session/analyze',
+      body,
     );
   },
 

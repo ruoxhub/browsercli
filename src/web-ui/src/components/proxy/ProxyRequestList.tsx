@@ -72,7 +72,11 @@ export const ProxyRequestList: React.FC<ProxyRequestListProps> = ({
     autoScroll,
     filter,
     sourceFilter,
+    selectedIds,
     selectRequest,
+    toggleSelect,
+    selectAllVisible,
+    clearSelection,
   } = useProxyStore();
   const listContainerRef = useRef<HTMLDivElement>(null);
   const activeItemRef = useRef<HTMLDivElement>(null);
@@ -157,105 +161,152 @@ export const ProxyRequestList: React.FC<ProxyRequestListProps> = ({
   };
 
   return (
-    <div
-      ref={listContainerRef}
-      tabIndex={0}
-      className="flex-1 flex flex-col h-full overflow-y-auto outline-none select-none bg-[var(--color-bg-primary)]/50 divide-y divide-[var(--color-border-muted)]"
-    >
-      {filteredRequests.length === 0 ? (
-        <div className="h-full flex flex-col items-center justify-center p-8 text-center space-y-3">
-          <div className="w-12 h-12 rounded-2xl bg-[var(--color-bg-tertiary)] border border-[var(--color-border-default)] flex items-center justify-center text-[var(--color-text-muted)]">
-            {requests.length === 0 ? (
-              <Globe
-                size={22}
-                className="animate-pulse"
-              />
-            ) : (
-              <Inbox size={22} />
-            )}
-          </div>
-          <div className="space-y-1">
-            <p className="text-xs font-semibold text-[var(--color-text-primary)]">
-              {requests.length === 0 ? '等待流量捕获...' : '没有匹配的请求'}
-            </p>
-            <p className="text-[11px] text-[var(--color-text-muted)] max-w-[240px] leading-relaxed">
-              {requests.length === 0
-                ? '当浏览网页产生流量时，请求会自动显示在此列表（CDP + 代理）。'
-                : '请调整上方 Method 过滤或搜索关键词。'}
-            </p>
-          </div>
-        </div>
-      ) : (
-        filteredRequests.map(req => {
-          const isSelected = selectedId === req.id;
-          const timeStr = new Date(req.timestamp).toLocaleTimeString();
-          const contentTypeTag = simplifyContentType(req.contentType);
-
-          return (
-            <div
-              key={req.id}
-              ref={isSelected ? activeItemRef : null}
-              onClick={() => handleItemClick(req)}
-              className={`group flex items-center justify-between px-3.5 py-2.5 cursor-pointer text-xs transition-all duration-150 border-l-2 ${
-                isSelected
-                  ? 'bg-[var(--color-accent)]/10 border-l-[var(--color-accent)] text-[var(--color-text-primary)] shadow-inner'
-                  : 'border-l-transparent hover:bg-[var(--color-bg-secondary)]/80 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-              }`}
+    <div className="flex-1 flex flex-col min-h-0 bg-[var(--color-bg-primary)]/50">
+      {/* 多选工具条：全选当前过滤结果 / 清空选择 */}
+      <div className="shrink-0 flex items-center gap-2 px-3.5 py-1.5 border-b border-[var(--color-border-muted)] bg-[var(--color-bg-secondary)]/40 text-[11px]">
+        <label className="flex items-center gap-1.5 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={
+              filteredRequests.length > 0 &&
+              filteredRequests.every(r => selectedIds.includes(r.id))
+            }
+            onChange={() => selectAllVisible(filteredRequests.map(r => r.id))}
+            disabled={filteredRequests.length === 0}
+            className="w-3.5 h-3.5 rounded border border-[var(--color-border-default)] accent-[var(--color-accent)] cursor-pointer disabled:opacity-40"
+          />
+          <span className="text-[var(--color-text-muted)]">全选</span>
+        </label>
+        {selectedIds.length > 0 && (
+          <>
+            <span className="text-[var(--color-accent)] font-mono">
+              已选 {selectedIds.length} 条
+            </span>
+            <button
+              onClick={clearSelection}
+              className="ml-auto text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
             >
-              {/* Left summary items */}
-              <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-3">
-                {/* Source badge */}
-                <span
-                  className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold border uppercase shrink-0 ${sourceBadgeClass(
-                    req.source,
-                  )}`}
-                >
-                  {req.source === 'proxy' ? 'Proxy' : 'CDP'}
-                </span>
+              清空选择
+            </button>
+          </>
+        )}
+      </div>
 
-                {/* Method badge */}
-                <span
-                  className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border uppercase shrink-0 ${getMethodBadgeClass(
-                    req.method,
-                  )}`}
-                >
-                  {req.method}
-                </span>
+      <div
+        ref={listContainerRef}
+        tabIndex={0}
+        className="flex-1 flex flex-col min-h-0 overflow-y-auto outline-none select-none divide-y divide-[var(--color-border-muted)]"
+      >
+        {filteredRequests.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center p-8 text-center space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-[var(--color-bg-tertiary)] border border-[var(--color-border-default)] flex items-center justify-center text-[var(--color-text-muted)]">
+              {requests.length === 0 ? (
+                <Globe
+                  size={22}
+                  className="animate-pulse"
+                />
+              ) : (
+                <Inbox size={22} />
+              )}
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-semibold text-[var(--color-text-primary)]">
+                {requests.length === 0 ? '等待流量捕获...' : '没有匹配的请求'}
+              </p>
+              <p className="text-[11px] text-[var(--color-text-muted)] max-w-[240px] leading-relaxed">
+                {requests.length === 0
+                  ? '当浏览网页产生流量时，请求会自动显示在此列表（CDP + 代理）。'
+                  : '请调整上方 Method 过滤或搜索关键词。'}
+              </p>
+            </div>
+          </div>
+        ) : (
+          filteredRequests.map(req => {
+            const isSelected = selectedId === req.id;
+            const isChecked = selectedIds.includes(req.id);
+            const timeStr = new Date(req.timestamp).toLocaleTimeString();
+            const contentTypeTag = simplifyContentType(req.contentType);
 
-                {/* Status code badge */}
-                <span
-                  className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${getStatusBadgeClass(
-                    req.statusCode,
-                  )}`}
-                >
-                  {req.statusCode || '-'}
-                </span>
-
-                {/* URL Display */}
-                <div className="min-w-0 flex-1">
-                  <p
-                    className="truncate font-mono text-[11px] text-[var(--color-text-primary)] group-hover:text-[var(--color-accent)] transition-colors"
-                    title={req.url}
+            return (
+              <div
+                key={req.id}
+                ref={isSelected ? activeItemRef : null}
+                onClick={() => handleItemClick(req)}
+                className={`group flex items-center justify-between px-3.5 py-2.5 cursor-pointer text-xs transition-all duration-150 border-l-2 ${
+                  isSelected
+                    ? 'bg-[var(--color-accent)]/10 border-l-[var(--color-accent)] text-[var(--color-text-primary)] shadow-inner'
+                    : 'border-l-transparent hover:bg-[var(--color-bg-secondary)]/80 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+                }`}
+              >
+                {/* Left summary items */}
+                <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-3">
+                  {/* Multi-select checkbox */}
+                  <span
+                    onClick={e => e.stopPropagation()}
+                    className="shrink-0 flex items-center"
                   >
-                    {req.url}
-                  </p>
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => toggleSelect(req.id)}
+                      className="w-3.5 h-3.5 rounded border border-[var(--color-border-default)] accent-[var(--color-accent)] cursor-pointer"
+                      title="勾选后参与 AI 分析"
+                    />
+                  </span>
+
+                  {/* Source badge */}
+                  <span
+                    className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold border uppercase shrink-0 ${sourceBadgeClass(
+                      req.source,
+                    )}`}
+                  >
+                    {req.source === 'proxy' ? 'Proxy' : 'CDP'}
+                  </span>
+
+                  {/* Method badge */}
+                  <span
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border uppercase shrink-0 ${getMethodBadgeClass(
+                      req.method,
+                    )}`}
+                  >
+                    {req.method}
+                  </span>
+
+                  {/* Status code badge */}
+                  <span
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${getStatusBadgeClass(
+                      req.statusCode,
+                    )}`}
+                  >
+                    {req.statusCode || '-'}
+                  </span>
+
+                  {/* URL Display */}
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className="truncate font-mono text-[11px] text-[var(--color-text-primary)] group-hover:text-[var(--color-accent)] transition-colors"
+                      title={req.url}
+                    >
+                      {req.url}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Right metadata items */}
+                <div className="flex items-center gap-2 shrink-0 font-mono text-[10px] text-[var(--color-text-muted)]">
+                  {/* Content-Type Tag */}
+                  <span className="px-1.5 py-0.5 rounded bg-[var(--color-bg-tertiary)] border border-[var(--color-border-default)] text-[9px] font-medium">
+                    {contentTypeTag}
+                  </span>
+
+                  {/* Timestamp */}
+                  <span>{timeStr}</span>
                 </div>
               </div>
-
-              {/* Right metadata items */}
-              <div className="flex items-center gap-2 shrink-0 font-mono text-[10px] text-[var(--color-text-muted)]">
-                {/* Content-Type Tag */}
-                <span className="px-1.5 py-0.5 rounded bg-[var(--color-bg-tertiary)] border border-[var(--color-border-default)] text-[9px] font-medium">
-                  {contentTypeTag}
-                </span>
-
-                {/* Timestamp */}
-                <span>{timeStr}</span>
-              </div>
-            </div>
-          );
-        })
-      )}
+            );
+          })
+        )}
+      </div>
     </div>
   );
 };

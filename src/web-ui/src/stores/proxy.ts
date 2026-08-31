@@ -44,6 +44,10 @@ export interface ProxyState {
   setSourceFilter: (sourceFilter: 'all' | 'cdp' | 'proxy') => void;
   loadPages: () => Promise<void>;
   selectTab: (pageId: string) => Promise<void>;
+  selectedIds: string[];
+  toggleSelect: (id: string) => void;
+  selectAllVisible: (ids: string[]) => void;
+  clearSelection: () => void;
 }
 
 export const useProxyStore = create<ProxyState>((set, get) => ({
@@ -61,6 +65,7 @@ export const useProxyStore = create<ProxyState>((set, get) => ({
   sourceFilter: 'all',
   pages: [],
   selectedPageId: null,
+  selectedIds: [],
 
   setRequests: requests => set({requests}),
 
@@ -86,7 +91,32 @@ export const useProxyStore = create<ProxyState>((set, get) => ({
     }),
 
   clearRequests: () =>
-    set({requests: [], selectedId: null, selectedDetail: null}),
+    set({
+      requests: [],
+      selectedId: null,
+      selectedDetail: null,
+      selectedIds: [],
+    }),
+
+  toggleSelect: id =>
+    set(state => ({
+      selectedIds: state.selectedIds.includes(id)
+        ? state.selectedIds.filter(x => x !== id)
+        : [...state.selectedIds, id],
+    })),
+
+  selectAllVisible: ids =>
+    set(state => {
+      const allSelected =
+        ids.length > 0 && ids.every(id => state.selectedIds.includes(id));
+      return {
+        selectedIds: allSelected
+          ? state.selectedIds.filter(id => !ids.includes(id))
+          : Array.from(new Set([...state.selectedIds, ...ids])),
+      };
+    }),
+
+  clearSelection: () => set({selectedIds: []}),
 
   selectRequest: async id => {
     if (id === null) {
@@ -164,6 +194,7 @@ export const useProxyStore = create<ProxyState>((set, get) => ({
         selectedId: null,
         selectedDetail: null,
         detailLoading: false,
+        selectedIds: [],
       });
       // 切页后重拉一次列表：挂载时的 loadPages 只是快照，新开的标签页
       // 否则永远不会出现在下拉里（loadPages 内部自兜异常，不抛）。

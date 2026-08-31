@@ -172,7 +172,13 @@ export class ConsoleServer {
         const engine = this.options.runtime.captureEngine;
         const manager = this.options.runtime.captureSessionManager;
         if (!engine || !manager) return undefined;
-        return {manager, store: engine.getStore()};
+        return {
+          manager,
+          store: engine.getStore(),
+          llmService: this.options.runtime.llmService,
+          getFileByUrl: (url: string) =>
+            this.options.runtime.collector.getFileByUrl(url) ?? null,
+        };
       }),
     );
     this.router.mount(
