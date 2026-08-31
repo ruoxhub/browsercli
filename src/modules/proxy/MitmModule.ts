@@ -8,39 +8,53 @@ import {readFileSync} from 'node:fs';
 import {writeFile} from 'node:fs/promises';
 
 import {logger} from '../../utils/logger.js';
+import type {BuiltReplayRequest} from '../network/NetworkTypes.js';
+import {formatCurl, stripManagedHeaders} from '../network/replayEngine.js';
 
 import {CaManager, resolveMitmCertsDir} from './CaManager.js';
 import {MitmProxyServer} from './MitmProxyServer.js';
 import {ProxyStore} from './ProxyStore.js';
+import {MitmRuleEngine, matchesPredicate} from './rewrite.js';
 import type {
+  AddMitmRuleData,
+  AddMitmRuleParams,
   CapturedExchange,
   CapturedRequest,
   ClearMitmRequestsData,
+  ClearMitmRulesData,
   ExportMitmCaData,
   ExportMitmCaParams,
+  ExportMitmHarData,
+  ExportMitmHarParams,
   GetMitmRequestData,
   GetMitmRequestParams,
   ListMitmRequestsData,
   ListMitmRequestsParams,
+  ListMitmRulesData,
   MitmMethodResult,
   MitmProxyStatusData,
+  MitmRewriteRule,
+  RemoveMitmRuleData,
+  RemoveMitmRuleParams,
   StartMitmProxyData,
 } from './types.js';
 
 const DEFAULT_PORT = 8888;
+const HAR_VERSION = '1.2';
 
 /**
- * MitmModule — MITM 抓包门面。协调 CaManager / MitmProxyServer / ProxyStore。
- * 通过 runtime.mitmModule 访问。
+ * MitmModule — MITM 抓包门面。协调 CaManager / MitmProxyServer / ProxyStore /
+ * MitmRuleEngine。通过 runtime.mitmModule 访问。
  */
 export class MitmModule {
   private readonly store: ProxyStore;
   private readonly caManager: CaManager;
+  private readonly rules: MitmRuleEngine;
   private server: MitmProxyServer | null = null;
 
   /**
    * @param certsDir CA 证书目录
-   * @param onExchange 可选的 exchange 水槽（切片 2 的 Session 抓包链路）。
+   * @param onExchange 可选的 exchange 水槽（Session 抓包链路）。
    *   缺省表示只走旧链路；水槽内抛错被吞掉，不影响 ProxyStore（spec §4 / R3）。
    */
   constructor(
@@ -49,19 +63,29 @@ export class MitmModule {
   ) {
     this.store = new ProxyStore();
     this.caManager = new CaManager(certsDir);
+    this.rules = new MitmRuleEngine();
   }
 
   getStore(): ProxyStore {
     return this.store;
   }
 
+  getRuleEngine(): MitmRuleEngine {
+    return this.rules;
+  }
+
   /**
    * 单条 exchange 的落点：先旧链路（ProxyStore），再新链路（水槽）。
    * 顺序不可换 —— 新链路失败时旧链路必须已经落好（spec §4 / R3）。
+   *
+   * 被改写规则命中的 exchange（modified=true）**不喂 Session 水槽**：
+   * Session 侧是「真实流量」证据链，被改流量只留 ProxyStore 并带
+   * appliedRuleIds 供追溯（gap-analysis §6 Evidence-first）。
+   * ponytail: Session 侧尚无 modified 列，需 user_version=2 迁移才能承载。
    */
   recordExchange(exchange: CapturedExchange): void {
     this.store.add(exchange);
-    if (!this.onExchange) return;
+    if (!this.onExchange || exchange.modified) return;
     try {
       this.onExchange(exchange);
     } catch (error) {
@@ -79,9 +103,13 @@ export class MitmModule {
     try {
       await this.caManager.init();
       if (!this.server) {
-        this.server = new MitmProxyServer(this.caManager, exchange => {
-          this.recordExchange(exchange);
-        });
+        this.server = new MitmProxyServer(
+          this.caManager,
+          exchange => {
+            this.recordExchange(exchange);
+          },
+          this.rules,
+        );
       }
       await this.server.start(port);
       return {
@@ -139,10 +167,26 @@ export class MitmModule {
   ): MitmMethodResult<ListMitmRequestsData> {
     let records = this.store.list();
 
-    if (params.urlFilter) {
-      const filter = params.urlFilter.toLowerCase();
-      records = records.filter(r => r.url.toLowerCase().includes(filter));
-    }
+    records = records.filter(r => {
+      return matchesPredicate(
+        {
+          urlFilter: params.urlFilter,
+          method: params.method,
+          host: params.host,
+          statusCode: params.statusCode,
+          headerContains: params.headerContains,
+          bodyContains: params.bodyContains,
+        },
+        {
+          method: r.method,
+          url: r.url,
+          headers: r.requestHeaders,
+          requestBody: r.requestBody,
+          responseBody: r.responseBody,
+          statusCode: r.statusCode,
+        },
+      );
+    });
 
     const pageIdx = params.pageIdx ?? 0;
     const pageSize = params.pageSize;
@@ -162,6 +206,8 @@ export class MitmModule {
           statusCode: r.statusCode,
           contentType: r.contentType,
           timestamp: r.timestamp,
+          modified: r.modified,
+          truncated: r.truncated,
         })),
         total,
         pageIdx,
@@ -194,11 +240,16 @@ export class MitmModule {
       }
     }
 
+    const data = this.toRequestData(record);
+    if (params.format === 'curl') {
+      data.curl = this.requestCurl(record);
+    }
+
     return {
       success: true,
       message: `捕获记录 id=${params.id} 获取成功`,
       data: {
-        ...this.toRequestData(record),
+        ...data,
         ...(params.saveTo !== undefined && {savedPath: params.saveTo}),
       },
     };
@@ -242,6 +293,187 @@ export class MitmModule {
     }
   }
 
+  // ─── 改写规则管理 ──────────────────────────────
+
+  addRule(params: AddMitmRuleParams): MitmMethodResult<AddMitmRuleData> {
+    const rule: MitmRewriteRule = {
+      id: params.id ?? this.rules.nextRuleId(),
+      action: params.action,
+      enabled: params.enabled ?? true,
+      ...(params.urlFilter !== undefined && {urlFilter: params.urlFilter}),
+      ...(params.method !== undefined && {method: params.method}),
+      ...(params.host !== undefined && {host: params.host}),
+      ...(params.headerContains !== undefined && {
+        headerContains: params.headerContains,
+      }),
+      ...(params.bodyContains !== undefined && {
+        bodyContains: params.bodyContains,
+      }),
+    };
+    this.rules.addRule(rule);
+    return {
+      success: true,
+      message: `改写规则 ${rule.id} 已生效`,
+      data: {rule},
+    };
+  }
+
+  listRules(): MitmMethodResult<ListMitmRulesData> {
+    const rules = this.rules.listRules();
+    return {
+      success: true,
+      message: `共 ${rules.length} 条改写规则`,
+      data: {rules},
+    };
+  }
+
+  removeRule(
+    params: RemoveMitmRuleParams,
+  ): MitmMethodResult<RemoveMitmRuleData> {
+    const removed = this.rules.removeRule(params.id);
+    return {
+      success: removed,
+      message: removed ? `已移除规则 ${params.id}` : `未找到规则 ${params.id}`,
+      data: {removed},
+    };
+  }
+
+  clearRules(): MitmMethodResult<ClearMitmRulesData> {
+    const clearedCount = this.rules.clearRules();
+    return {
+      success: true,
+      message: `已清空 ${clearedCount} 条改写规则`,
+      data: {clearedCount},
+    };
+  }
+
+  // ─── HAR 导出 ──────────────────────────────
+
+  async exportHar(
+    params: ExportMitmHarParams = {},
+  ): Promise<MitmMethodResult<ExportMitmHarData>> {
+    const records = this.store.list();
+    const har = this.buildHar(records);
+    if (params.outputPath) {
+      try {
+        await writeFile(
+          params.outputPath,
+          JSON.stringify(har, null, 2),
+          'utf-8',
+        );
+      } catch (error) {
+        return {
+          success: false,
+          message: `写 HAR 到 ${params.outputPath} 失败：${error instanceof Error ? error.message : String(error)}`,
+          data: {
+            har,
+            entryCount: records.length,
+            outputPath: params.outputPath,
+          },
+        };
+      }
+    }
+    return {
+      success: true,
+      message: `已导出 ${records.length} 条为 HAR`,
+      data: {
+        har,
+        entryCount: records.length,
+        ...(params.outputPath !== undefined && {outputPath: params.outputPath}),
+      },
+    };
+  }
+
+  private buildHar(records: CapturedRequest[]): Record<string, unknown> {
+    const entries = records.map(r => this.harEntry(r));
+    return {
+      log: {
+        version: HAR_VERSION,
+        creator: {name: 'browsercli-mitm', version: '0.1.0'},
+        entries,
+      },
+    };
+  }
+
+  private harEntry(r: CapturedRequest): Record<string, unknown> {
+    const responseBodyText = r.responseBody ?? '';
+    const isTextBody = r.responseBody !== null && !this.isBinary(r);
+    return {
+      startedDateTime: new Date(r.timestamp).toISOString(),
+      time: 0,
+      request: {
+        method: r.method,
+        url: r.url,
+        httpVersion: 'HTTP/1.1',
+        headers: this.headersToHar(r.requestHeaders),
+        queryString: [],
+        cookies: [],
+        headersSize: -1,
+        bodySize: r.requestBody ? r.requestBody.length : 0,
+        ...(r.requestBody !== null &&
+          r.method !== 'GET' && {
+            postData: {mimeType: r.contentType ?? '', text: r.requestBody},
+          }),
+      },
+      response: {
+        status: r.statusCode,
+        statusText: '',
+        httpVersion: 'HTTP/1.1',
+        headers: this.headersToHar(r.responseHeaders),
+        cookies: [],
+        content: {
+          size:
+            r.responseBodySize ?? (r.responseBody ? r.responseBody.length : 0),
+          mimeType: r.contentType ?? '',
+          ...(isTextBody && {text: responseBodyText}),
+          ...(r.responseBodyBase64 && {
+            text: r.responseBodyBase64,
+            encoding: 'base64',
+          }),
+        },
+        redirectURL: r.responseHeaders['location'] ?? '',
+        headersSize: -1,
+        bodySize:
+          r.responseBodySize ?? (r.responseBody ? r.responseBody.length : 0),
+      },
+      cache: {},
+      timings: {send: 0, wait: 0, receive: 0},
+      _mitm: {
+        modified: r.modified,
+        truncated: r.truncated,
+        isStatic: r.isStatic,
+        isWebSocket: r.isWebSocket,
+        ...(r.appliedRuleIds && {appliedRuleIds: r.appliedRuleIds}),
+      },
+    };
+  }
+
+  private isBinary(r: CapturedRequest): boolean {
+    return r.contentType
+      ? /^(image|font|audio|video)\//.test(r.contentType) ||
+          [
+            'application/octet-stream',
+            'application/pdf',
+            'application/zip',
+          ].includes(r.contentType)
+      : false;
+  }
+
+  private headersToHar(headers: Record<string, string>): unknown[] {
+    return Object.entries(headers).map(([name, value]) => ({name, value}));
+  }
+
+  /** 复用 network 的 formatCurl 生成 curl 命令（语义与重放一致）。 */
+  private requestCurl(r: CapturedRequest): string {
+    const built: BuiltReplayRequest = {
+      method: r.method,
+      url: r.url,
+      headers: stripManagedHeaders(r.requestHeaders),
+      ...(r.requestBody !== null && {body: r.requestBody}),
+    };
+    return formatCurl(built, {includeCookies: false});
+  }
+
   private statusData(): MitmProxyStatusData {
     return {
       running: this.server?.isRunning() ?? false,
@@ -251,7 +483,18 @@ export class MitmModule {
   }
 
   private toRequestData(r: CapturedRequest): GetMitmRequestData {
-    return {...r};
+    return {
+      ...r,
+      ...(r.responseBodySize !== undefined && {
+        responseBodySize: r.responseBodySize,
+      }),
+      ...(r.responseBodyBase64 !== undefined && {
+        responseBodyBase64: r.responseBodyBase64,
+      }),
+      ...(r.appliedRuleIds !== undefined && {
+        appliedRuleIds: r.appliedRuleIds,
+      }),
+    };
   }
 
   private emptyRequestData(id: number): GetMitmRequestData {
@@ -271,6 +514,7 @@ export class MitmModule {
       isWebSocket: false,
       truncated: false,
       timestamp: 0,
+      modified: false,
     };
   }
 }

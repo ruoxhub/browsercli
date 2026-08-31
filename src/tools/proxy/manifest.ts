@@ -35,5 +35,25 @@ export const manifest = {
       modulePath: './proxy/exportMitmCa.js',
       handlerName: 'exportMitmCa',
     },
+    {
+      modulePath: './proxy/addRewriteRule.js',
+      handlerName: 'addRewriteRule',
+    },
+    {
+      modulePath: './proxy/listMitmRules.js',
+      handlerName: 'listMitmRules',
+    },
+    {
+      modulePath: './proxy/removeMitmRule.js',
+      handlerName: 'removeMitmRule',
+    },
+    {
+      modulePath: './proxy/clearMitmRules.js',
+      handlerName: 'clearMitmRules',
+    },
+    {
+      modulePath: './proxy/exportMitmHar.js',
+      handlerName: 'exportMitmHar',
+    },
   ],
 } satisfies DomainManifest;

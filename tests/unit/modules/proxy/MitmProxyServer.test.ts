@@ -12,6 +12,7 @@ import {describe, it} from 'node:test';
 
 import {CaManager} from '../../../../src/modules/proxy/CaManager.js';
 import {MitmProxyServer} from '../../../../src/modules/proxy/MitmProxyServer.js';
+import {MitmRuleEngine} from '../../../../src/modules/proxy/rewrite.js';
 import type {CapturedExchange} from '../../../../src/modules/proxy/types.js';
 
 /** 启动一个本地真实 HTTP 源站，返回其端口和关闭函数。 */
@@ -96,5 +97,132 @@ describe('MitmProxyServer', () => {
     assert.strictEqual(proxy.isRunning(), true);
     await proxy.stop();
     assert.strictEqual(proxy.isRunning(), false);
+  });
+
+  it('block 规则（非 444）短路返回状态码且标记 modified', async () => {
+    const origin = await startOriginServer();
+    let captured: CapturedExchange | undefined;
+    const ca = new CaManager(mkdtempSync(path.join(os.tmpdir(), 'mitm-ca-')));
+    await ca.init();
+    const rules = new MitmRuleEngine();
+    rules.addRule({
+      id: 'block-1',
+      action: {type: 'block', statusCode: 403},
+      enabled: true,
+      urlFilter: 'block-me',
+    });
+    const proxy = new MitmProxyServer(
+      ca,
+      exchange => {
+        captured = exchange;
+      },
+      rules,
+    );
+    await proxy.start(0);
+
+    try {
+      const target = `http://127.0.0.1:${origin.port}/block-me`;
+      const res = await requestViaProxy(proxy.getPort()!, target);
+      assert.strictEqual(res.status, 403);
+      assert.ok(captured, '应产生捕获记录');
+      assert.strictEqual(captured.modified, true);
+      assert.deepStrictEqual(captured.appliedRuleIds, ['block-1']);
+    } finally {
+      await proxy.stop();
+      await origin.close();
+    }
+  });
+
+  it('modify_body(response) 改写回包且修正 content-length', async () => {
+    const origin = await startOriginServer();
+    let captured: CapturedExchange | undefined;
+    const ca = new CaManager(mkdtempSync(path.join(os.tmpdir(), 'mitm-ca-')));
+    await ca.init();
+    const rules = new MitmRuleEngine();
+    rules.addRule({
+      id: 'rb-1',
+      action: {
+        type: 'modify_body',
+        phase: 'response',
+        find: 'hello-from-origin',
+        replace: 'HELLO-FROM-ORIGIN',
+      },
+      enabled: true,
+    });
+    const proxy = new MitmProxyServer(
+      ca,
+      exchange => {
+        captured = exchange;
+      },
+      rules,
+    );
+    await proxy.start(0);
+
+    try {
+      const target = `http://127.0.0.1:${origin.port}/anything`;
+      const res = await requestViaProxy(proxy.getPort()!, target);
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.body, 'HELLO-FROM-ORIGIN');
+      assert.ok(captured);
+      assert.strictEqual(captured.modified, true);
+      assert.strictEqual(captured.responseBody, 'HELLO-FROM-ORIGIN');
+    } finally {
+      await proxy.stop();
+      await origin.close();
+    }
+  });
+
+  it('modify_header(response) 在 live-pipe 下增头', async () => {
+    const origin = await startOriginServer();
+    let captured: CapturedExchange | undefined;
+    const ca = new CaManager(mkdtempSync(path.join(os.tmpdir(), 'mitm-ca-')));
+    await ca.init();
+    const rules = new MitmRuleEngine();
+    rules.addRule({
+      id: 'hdr-1',
+      action: {
+        type: 'modify_header',
+        phase: 'response',
+        set: {'x-hook': '1'},
+      },
+      enabled: true,
+    });
+    const proxy = new MitmProxyServer(
+      ca,
+      exchange => {
+        captured = exchange;
+      },
+      rules,
+    );
+    await proxy.start(0);
+
+    try {
+      const target = `http://127.0.0.1:${origin.port}/anything`;
+      const body = await new Promise<string>((resolve, reject) => {
+        const req = http.request(
+          {
+            host: '127.0.0.1',
+            port: proxy.getPort()!,
+            path: target,
+            method: 'GET',
+            headers: {host: new URL(target).host},
+          },
+          (res: IncomingMessage) => {
+            assert.strictEqual(res.headers['x-hook'], '1');
+            let b = '';
+            res.on('data', c => (b += c.toString('utf-8')));
+            res.on('end', () => resolve(b));
+          },
+        );
+        req.on('error', reject);
+        req.end();
+      });
+      assert.strictEqual(body, 'hello-from-origin');
+      assert.ok(captured);
+      assert.strictEqual(captured.modified, true);
+    } finally {
+      await proxy.stop();
+      await origin.close();
+    }
   });
 });

@@ -15,6 +15,11 @@ const EXPECTED_TOOLS = [
   'get_mitm_request',
   'clear_mitm_requests',
   'export_mitm_ca',
+  'mitm_add_rule',
+  'mitm_list_rules',
+  'mitm_remove_rule',
+  'mitm_clear_rules',
+  'mitm_export_har',
 ];
 
 interface ToolLike {

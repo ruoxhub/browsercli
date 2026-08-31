@@ -10,3 +10,8 @@ export {listMitmRequests} from './listMitmRequests.js';
 export {getMitmRequest} from './getMitmRequest.js';
 export {clearMitmRequests} from './clearMitmRequests.js';
 export {exportMitmCa} from './exportMitmCa.js';
+export {addRewriteRule} from './addRewriteRule.js';
+export {listMitmRules} from './listMitmRules.js';
+export {removeMitmRule} from './removeMitmRule.js';
+export {clearMitmRules} from './clearMitmRules.js';
+export {exportMitmHar} from './exportMitmHar.js';

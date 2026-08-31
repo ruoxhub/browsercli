@@ -6,6 +6,7 @@
  * 移植自 anything-analyzer (MIT License):
  * open-source/anything-analyzer/src/main/proxy/mitm-proxy-server.ts
  * 裁剪：上游代理（SOCKS5/HTTP 上游）、证书下载页、uuid 依赖、EventEmitter。
+ * 扩展：注入 MitmInterceptor，承载 block/map_local/map_remote/modify_header/modify_body 改写。
  */
 import {randomUUID} from 'node:crypto';
 import * as http from 'node:http';
@@ -13,63 +14,25 @@ import * as https from 'node:https';
 import * as net from 'node:net';
 import * as tls from 'node:tls';
 import * as url from 'node:url';
-import {brotliDecompressSync, gunzipSync, inflateSync} from 'node:zlib';
 
 import {logger} from '../../utils/logger.js';
-import {MAX_CAPTURED_BODY_BYTES} from '../network/constants.js';
 
+import {
+  MAX_BODY_SIZE,
+  STATIC_EXTENSIONS,
+  bodyToUtf8,
+  fixHeadersAfterBodyRewrite,
+  headerToString,
+  isBinaryContentType,
+} from './body.js';
 import type {CaManager} from './CaManager.js';
-import type {CapturedExchange} from './types.js';
-
-// 与 Session 侧共享上限（spec §5.1 / §9）。保留局部名避免全文件改名。
-const MAX_BODY_SIZE = MAX_CAPTURED_BODY_BYTES;
-const BINARY_CONTENT_TYPES = [
-  'image/',
-  'font/',
-  'audio/',
-  'video/',
-  'application/octet-stream',
-  'application/pdf',
-  'application/zip',
-];
-const STATIC_EXTENSIONS =
-  /\.(js|css|png|jpg|jpeg|gif|ico|svg|woff2?|ttf|eot|map)$/i;
-
-function headerToString(value: string | string[] | undefined): string {
-  return Array.isArray(value) ? value.join(',') : value || '';
-}
-
-function decodeCapturedBody(
-  body: Buffer,
-  contentEncoding: string | string[] | undefined,
-): Buffer {
-  const encodings = headerToString(contentEncoding)
-    .toLowerCase()
-    .split(',')
-    .map(e => e.trim())
-    .filter(Boolean);
-
-  return encodings.reduceRight((decoded, encoding) => {
-    if (encoding === 'br') return brotliDecompressSync(decoded);
-    if (encoding === 'gzip' || encoding === 'x-gzip')
-      return gunzipSync(decoded);
-    if (encoding === 'deflate') return inflateSync(decoded);
-    return decoded;
-  }, body);
-}
-
-function bodyToUtf8(
-  body: Buffer,
-  contentEncoding: string | string[] | undefined,
-): string {
-  try {
-    return decodeCapturedBody(body, contentEncoding)
-      .toString('utf-8')
-      .substring(0, MAX_BODY_SIZE);
-  } catch {
-    return body.toString('utf-8').substring(0, MAX_BODY_SIZE);
-  }
-}
+import {applyHeaderChanges} from './rewrite.js';
+import type {
+  AfterResponseResult,
+  BeforeRequestResult,
+  CapturedExchange,
+  MitmInterceptor,
+} from './types.js';
 
 function parseRawHeaders(raw: string): Record<string, string> {
   const headers: Record<string, string> = {};
@@ -86,6 +49,13 @@ function parseRawHeaders(raw: string): Record<string, string> {
   return headers;
 }
 
+interface RequestFlow {
+  method: string;
+  url: string;
+  headers: Record<string, string>;
+  body: Buffer;
+}
+
 /**
  * MitmProxyServer — 嵌入式 HTTP/HTTPS 中间人代理。
  *
@@ -93,6 +63,7 @@ function parseRawHeaders(raw: string): Record<string, string> {
  * - HTTPS CONNECT 通过 CaManager 动态签证书拦截并解密。
  * - WS / WSS 流量隧道转发，不解密。
  * - 每个完成的事务通过 onCaptured 回调对外产生 CapturedExchange。
+ * - 可选 interceptor 在转发前（beforeRequest）与回传前（afterResponse）改写流量。
  */
 export class MitmProxyServer {
   private server: http.Server | null = null;
@@ -102,6 +73,7 @@ export class MitmProxyServer {
   constructor(
     private readonly caManager: CaManager,
     private readonly onCaptured: (exchange: CapturedExchange) => void,
+    private readonly interceptor?: MitmInterceptor,
   ) {}
 
   async start(port: number): Promise<void> {
@@ -184,25 +156,41 @@ export class MitmProxyServer {
     });
 
     clientReq.on('end', () => {
-      const reqBody = Buffer.concat(reqBodyChunks);
-      const headers = {...clientReq.headers};
-      delete headers['proxy-connection'];
+      const flow: RequestFlow = {
+        method: clientReq.method || 'GET',
+        url: targetUrl,
+        headers: this.headersToRecord(clientReq.headers),
+        body: Buffer.concat(reqBodyChunks),
+      };
+      delete flow.headers['proxy-connection'];
+
+      const before = this.interceptor?.beforeRequest?.(flow);
+      if (
+        before &&
+        this.handleBeforeRequest(before, requestId, startTime, flow, clientRes)
+      ) {
+        return;
+      }
+      if (before && before.action === 'forward') {
+        this.applyRequestModification(before, parsed, flow);
+      }
 
       const options: http.RequestOptions = {
         hostname: parsed.hostname ?? 'localhost',
         port: parseInt(parsed.port ?? '80', 10),
         path: parsed.path ?? '/',
-        method: clientReq.method,
-        headers,
+        method: flow.method,
+        headers: flow.headers,
       };
 
       const proxyReq = http.request(options, proxyRes => {
         this.relayResponse(
           requestId,
           startTime,
-          clientReq,
-          reqBody,
-          targetUrl,
+          flow,
+          before && before.action === 'forward'
+            ? before.appliedRuleIds
+            : undefined,
           proxyRes,
           clientRes,
         );
@@ -216,7 +204,7 @@ export class MitmProxyServer {
         }
       });
 
-      if (reqBody.length > 0) proxyReq.write(reqBody);
+      if (flow.body.length > 0) proxyReq.write(flow.body);
       proxyReq.end();
     });
   }
@@ -293,6 +281,7 @@ export class MitmProxyServer {
           isWebSocket: true,
           truncated: false,
           timestamp: startTime,
+          modified: false,
         });
       };
       serverSocket.on('data', onData);
@@ -369,14 +358,33 @@ export class MitmProxyServer {
     });
 
     clientReq.on('end', () => {
-      const reqBody = Buffer.concat(reqBodyChunks);
-      const hostHeader = port !== 443 ? `${hostname}:${port}` : hostname;
+      const flow: RequestFlow = {
+        method: clientReq.method || 'GET',
+        url: fullUrl,
+        headers: this.headersToRecord(clientReq.headers),
+        body: Buffer.concat(reqBodyChunks),
+      };
+      flow.headers.host = port !== 443 ? `${hostname}:${port}` : hostname;
+
+      const before = this.interceptor?.beforeRequest?.(flow);
+      if (
+        before &&
+        this.handleBeforeRequest(before, requestId, startTime, flow, clientRes)
+      ) {
+        return;
+      }
+
+      const parsed = url.parse(flow.url);
+      if (before && before.action === 'forward') {
+        this.applyRequestModification(before, parsed, flow);
+      }
+
       const options: https.RequestOptions = {
-        hostname,
-        port,
-        path: clientReq.url,
-        method: clientReq.method,
-        headers: {...clientReq.headers, host: hostHeader},
+        hostname: parsed.hostname ?? hostname,
+        port: parseInt(parsed.port ?? String(port), 10),
+        path: parsed.path ?? '/',
+        method: flow.method,
+        headers: flow.headers,
         rejectUnauthorized: false,
       };
 
@@ -384,9 +392,10 @@ export class MitmProxyServer {
         this.relayResponse(
           requestId,
           startTime,
-          clientReq,
-          reqBody,
-          fullUrl,
+          flow,
+          before && before.action === 'forward'
+            ? before.appliedRuleIds
+            : undefined,
           proxyRes,
           clientRes,
         );
@@ -400,61 +409,168 @@ export class MitmProxyServer {
         }
       });
 
-      if (reqBody.length > 0) proxyReq.write(reqBody);
+      if (flow.body.length > 0) proxyReq.write(flow.body);
       proxyReq.end();
     });
+  }
+
+  /**
+   * 处理 beforeRequest 的 terminal 结果（block / respond）。命中返回 true（已处理，无需转发）。
+   * forward 返回 false，由调用方走 apply-request-modification。
+   */
+  private handleBeforeRequest(
+    before: BeforeRequestResult,
+    requestId: string,
+    startTime: number,
+    flow: RequestFlow,
+    clientRes: http.ServerResponse,
+  ): boolean {
+    if (before.action === 'forward') return false;
+
+    const base = {
+      requestId,
+      method: flow.method,
+      url: flow.url,
+      requestHeaders: flow.headers,
+      requestBody: flow.body.length > 0 ? flow.body.toString('utf-8') : null,
+      contentType: null as string | null,
+      isOptions: flow.method === 'OPTIONS',
+      isStatic: false,
+      isStreaming: false,
+      isWebSocket: false,
+      truncated: false,
+      timestamp: startTime,
+      modified: true,
+      appliedRuleIds: before.appliedRuleIds,
+    };
+
+    if (before.action === 'block') {
+      const closeConnection =
+        before.closeConnection ?? before.statusCode === 444;
+      if (closeConnection) {
+        clientRes.destroy();
+        this.onCaptured({
+          ...base,
+          statusCode: before.statusCode,
+          responseHeaders: {},
+          responseBody: before.body ?? null,
+        });
+        return true;
+      }
+      clientRes.writeHead(before.statusCode, {connection: 'close'});
+      clientRes.end(before.body ?? '');
+      this.onCaptured({
+        ...base,
+        statusCode: before.statusCode,
+        responseHeaders: {connection: 'close'},
+        responseBody: before.body ?? null,
+      });
+      return true;
+    }
+
+    // respond（map_local）
+    const headers = before.headers ?? {};
+    clientRes.writeHead(before.statusCode, headers);
+    clientRes.end(before.body);
+    this.onCaptured({
+      ...base,
+      statusCode: before.statusCode,
+      responseHeaders: headers,
+      responseBody: before.body.toString('utf-8'),
+      contentType: (headers['content-type'] as string | undefined) ?? null,
+    });
+    return true;
+  }
+
+  /** 把 forward 的 modification 应用到 flow 与 parsed（原地更新，parsed 用于转发目标）。 */
+  private applyRequestModification(
+    before: Extract<BeforeRequestResult, {action: 'forward'}>,
+    parsed: url.UrlWithStringQuery,
+    flow: RequestFlow,
+  ): void {
+    const modification = before.modification;
+    if (!modification) return;
+    if (modification.method) flow.method = modification.method.toUpperCase();
+    if (modification.url) {
+      const rewritten = url.parse(modification.url);
+      parsed.hostname = rewritten.hostname ?? parsed.hostname;
+      parsed.port = rewritten.port ?? parsed.port;
+      parsed.path = rewritten.path ?? parsed.path;
+      flow.headers.host =
+        (rewritten.hostname ?? parsed.hostname) || 'localhost';
+    }
+    if (modification.setHeaders || modification.removeHeaders) {
+      flow.headers = applyHeaderChanges(flow.headers, {
+        set: modification.setHeaders,
+        remove: modification.removeHeaders,
+      });
+    }
+    if (modification.body !== undefined) {
+      flow.body = modification.body;
+      flow.headers = fixHeadersAfterBodyRewrite(
+        flow.headers,
+        flow.body.length,
+        {
+          stripContentEncoding: false,
+        },
+      );
+    }
   }
 
   private relayResponse(
     requestId: string,
     startTime: number,
-    clientReq: http.IncomingMessage,
-    reqBody: Buffer,
-    fullUrl: string,
+    flow: RequestFlow,
+    appliedRuleIds: string[] | undefined,
     proxyRes: http.IncomingMessage,
     clientRes: http.ServerResponse,
   ): void {
+    const contentType = (proxyRes.headers['content-type'] as string) || null;
+    const method = flow.method;
+    const isBinary = contentType ? isBinaryContentType(contentType) : false;
+    const isStreaming = contentType?.includes('text/event-stream') || false;
+    const isOptions = method === 'OPTIONS';
+    const isStatic = STATIC_EXTENSIONS.test(flow.url);
+    const statusCode = proxyRes.statusCode || 0;
+
     const resBodyChunks: Buffer[] = [];
     let totalResSize = 0;
     let truncated = false;
 
-    proxyRes.on('data', (chunk: Buffer) => {
+    // 有 response modify_body 规则且非二进制时，buffer-then-decide；否则 live-pipe。
+    const bufferBody =
+      !isBinary && this.interceptor?.hasResponseBodyRules() === true;
+
+    const onBodyData = (chunk: Buffer): void => {
       if (totalResSize < MAX_BODY_SIZE) resBodyChunks.push(chunk);
       else truncated = true;
       totalResSize += chunk.length;
-    });
+    };
 
-    proxyRes.on('end', () => {
-      const contentType = (proxyRes.headers['content-type'] as string) || null;
-      const method = clientReq.method || 'GET';
-      const isBinary = contentType
-        ? BINARY_CONTENT_TYPES.some(t => contentType.startsWith(t))
-        : false;
-      const isStreaming = contentType?.includes('text/event-stream') || false;
-      const isOptions = method === 'OPTIONS';
-      const isStatic = STATIC_EXTENSIONS.test(fullUrl);
-
+    const emit = (
+      responseHeaders: Record<string, string>,
+      responseBody: string | null,
+      modified: boolean,
+      ruleIds: string[],
+      buffered: Buffer | null,
+    ): void => {
       const requestBody =
-        reqBody.length > 0 && !isBinary
-          ? bodyToUtf8(reqBody, clientReq.headers['content-encoding'])
+        flow.body.length > 0 && !isBinary
+          ? bodyToUtf8(flow.body, flow.headers['content-encoding'])
           : null;
-      const responseBody =
-        resBodyChunks.length > 0 && !isBinary
-          ? bodyToUtf8(
-              Buffer.concat(resBodyChunks),
-              proxyRes.headers['content-encoding'],
-            )
-          : null;
-
       this.onCaptured({
         requestId,
         method,
-        url: fullUrl,
-        requestHeaders: this.headersToRecord(clientReq.headers),
+        url: flow.url,
+        requestHeaders: flow.headers,
         requestBody,
-        statusCode: proxyRes.statusCode || 0,
-        responseHeaders: this.headersToRecord(proxyRes.headers),
-        responseBody,
+        statusCode,
+        responseHeaders,
+        responseBody:
+          responseBody ??
+          (buffered && !isBinary
+            ? bodyToUtf8(buffered, proxyRes.headers['content-encoding'])
+            : null),
         contentType,
         isOptions,
         isStatic,
@@ -462,10 +578,110 @@ export class MitmProxyServer {
         isWebSocket: false,
         truncated,
         timestamp: startTime,
+        modified,
+        ...(ruleIds.length > 0 && {appliedRuleIds: ruleIds}),
+        responseBodySize: totalResSize,
+        responseBodyBase64:
+          isBinary && buffered && !truncated
+            ? buffered.toString('base64')
+            : null,
       });
-    });
+    };
 
-    clientRes.writeHead(proxyRes.statusCode || 200, proxyRes.headers);
+    if (bufferBody) {
+      proxyRes.on('data', onBodyData);
+      proxyRes.on('end', () => {
+        const buffered =
+          !truncated && resBodyChunks.length > 0
+            ? Buffer.concat(resBodyChunks)
+            : null;
+        const after = this.interceptor?.afterResponse?.({
+          requestId,
+          method,
+          url: flow.url,
+          requestHeaders: flow.headers,
+          requestBody: flow.body.length > 0 ? flow.body : null,
+          statusCode,
+          headers: this.headersToRecord(proxyRes.headers),
+          body: buffered,
+          truncated,
+        }) as AfterResponseResult | undefined;
+
+        let outHeaders = this.headersToRecord(proxyRes.headers);
+        const mod = after?.modification;
+        if (mod?.setHeaders || mod?.removeHeaders) {
+          outHeaders = applyHeaderChanges(outHeaders, {
+            set: mod.setHeaders,
+            remove: mod.removeHeaders,
+          });
+        }
+        const outBody: Buffer | null =
+          mod?.body !== undefined ? mod.body : buffered;
+        if (mod?.body !== undefined) {
+          outHeaders = fixHeadersAfterBodyRewrite(outHeaders, outBody!.length, {
+            stripContentEncoding: true,
+          });
+        }
+
+        const modified =
+          after !== undefined || (appliedRuleIds?.length ?? 0) > 0;
+        const ruleIds = [
+          ...(appliedRuleIds ?? []),
+          ...(after?.appliedRuleIds ?? []),
+        ];
+
+        clientRes.writeHead(statusCode, outHeaders);
+        if (outBody !== null) {
+          clientRes.end(outBody);
+        } else {
+          // 截断且无 body 修改：只能回传已缓冲前缀（buffer 模式下截断即丢尾部）。
+          clientRes.end();
+        }
+        emit(
+          outHeaders,
+          mod?.body !== undefined ? bodyToUtf8(mod.body, undefined) : null,
+          modified,
+          ruleIds,
+          buffered,
+        );
+      });
+      return;
+    }
+
+    // live-pipe：header-only 改写，body 边转发边 buffer 供 capture。
+    const after = this.interceptor?.afterResponse?.({
+      requestId,
+      method,
+      url: flow.url,
+      requestHeaders: flow.headers,
+      requestBody: flow.body.length > 0 ? flow.body : null,
+      statusCode,
+      headers: this.headersToRecord(proxyRes.headers),
+      body: null,
+      truncated: false,
+    }) as AfterResponseResult | undefined;
+
+    let outHeaders = this.headersToRecord(proxyRes.headers);
+    const mod = after?.modification;
+    if (mod?.setHeaders || mod?.removeHeaders) {
+      outHeaders = applyHeaderChanges(outHeaders, {
+        set: mod.setHeaders,
+        remove: mod.removeHeaders,
+      });
+    }
+    const modified = after !== undefined || (appliedRuleIds?.length ?? 0) > 0;
+    const ruleIds = [
+      ...(appliedRuleIds ?? []),
+      ...(after?.appliedRuleIds ?? []),
+    ];
+
+    clientRes.writeHead(statusCode, outHeaders);
+    proxyRes.on('data', onBodyData);
+    proxyRes.on('end', () => {
+      const buffered =
+        resBodyChunks.length > 0 ? Buffer.concat(resBodyChunks) : null;
+      emit(outHeaders, null, modified, ruleIds, buffered);
+    });
     proxyRes.pipe(clientRes);
   }
 

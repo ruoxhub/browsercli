@@ -21,6 +21,14 @@ export interface CapturedExchange {
   isWebSocket: boolean;
   truncated: boolean;
   timestamp: number;
+  /** 任一改写规则命中，默认 false。Session 水槽不摄入带此标记的 exchange（见 MitmModule.recordExchange）。 */
+  modified: boolean;
+  /** 命中的规则 id（可空），供证据追溯。 */
+  appliedRuleIds?: string[];
+  /** 响应体真实总字节数（二进制/截断时不丢证据）。 */
+  responseBodySize?: number;
+  /** 二进制且未截断时，缓冲字节的 base64（≤ MAX_BODY_SIZE）。 */
+  responseBodyBase64?: string | null;
 }
 
 /** ProxyStore 中带稳定 id 的存储记录。 */
@@ -31,6 +39,139 @@ export interface MitmMethodResult<T> {
   success: boolean;
   message: string;
   data: T;
+}
+
+// ─── 改写上下文与动作 ──────────────────────────────
+
+/** beforeRequest 入参：归一化后的转发前请求视图。 */
+export interface RequestContext {
+  method: string;
+  url: string;
+  headers: Record<string, string>;
+  /** 完整请求体缓冲（可能空）。 */
+  body: Buffer;
+}
+
+/** afterResponse 入参：响应视图。截断时 body 为 null。 */
+export interface ResponseContext {
+  requestId: string;
+  method: string;
+  url: string;
+  requestHeaders: Record<string, string>;
+  requestBody: Buffer | null;
+  statusCode: number;
+  headers: Record<string, string>;
+  /** ≤阈值且已完整 buffer 时为未解码字节；截断时为 null。 */
+  body: Buffer | null;
+  truncated: boolean;
+}
+
+export interface RequestModification {
+  method?: string;
+  /** map_remote：重写目标 URL（支持 $1..$n 捕获组替换）。 */
+  url?: string;
+  setHeaders?: Record<string, string>;
+  removeHeaders?: string[];
+  /** 替换整个请求体（Buffer 保证 content-length 正确）。 */
+  body?: Buffer;
+}
+
+export interface ResponseModification {
+  setHeaders?: Record<string, string>;
+  removeHeaders?: string[];
+  /** 替换整个响应体（utf8 编码后发 identity）。 */
+  body?: Buffer;
+}
+
+export type BeforeRequestResult =
+  | {
+      action: 'block';
+      statusCode: number;
+      /** true（或 statusCode===444）时直接断连不发响应。 */
+      closeConnection?: boolean;
+      body?: string;
+      appliedRuleIds: string[];
+    }
+  | {
+      action: 'respond';
+      statusCode: number;
+      headers?: Record<string, string>;
+      body: Buffer;
+      appliedRuleIds: string[];
+    }
+  | {
+      action: 'forward';
+      modification?: RequestModification;
+      appliedRuleIds: string[];
+    };
+
+export interface AfterResponseResult {
+  action: 'forward';
+  modification?: ResponseModification;
+  appliedRuleIds: string[];
+}
+
+/** MitmProxyServer 的改写插桩接口（构造第三参注入）。 */
+export interface MitmInterceptor {
+  beforeRequest?(ctx: RequestContext): BeforeRequestResult | void;
+  afterResponse?(ctx: ResponseContext): AfterResponseResult | void;
+  /** server 据此决定 relay 走 live-pipe 还是 buffer-then-decide。 */
+  hasResponseBodyRules(): boolean;
+}
+
+// ─── 规则模型（判别联合）────────────────────────────
+
+export type MitmRewriteAction =
+  | {type: 'block'; statusCode: number; closeConnection?: boolean}
+  | {
+      type: 'map_local';
+      /** 目标 URL 匹配正则（可含捕获组，指向本地文件路径尾部）。 */
+      urlRegex: string;
+      localPath: string;
+      statusCode?: number;
+      contentType?: string;
+    }
+  | {type: 'map_remote'; urlRegex: string; replacement: string}
+  | {
+      type: 'modify_header';
+      phase: 'request' | 'response';
+      set?: Record<string, string>;
+      remove?: string[];
+    }
+  | {
+      type: 'modify_body';
+      phase: 'request' | 'response';
+      find: string;
+      replace: string;
+      regex?: boolean;
+    };
+
+export interface MitmRewriteRule {
+  /** 工具层可显式给，缺省自动生成 rewrite-<n>。同 id 覆盖。 */
+  id: string;
+  action: MitmRewriteAction;
+  enabled: boolean;
+  /**
+   * 匹配谓词（AND 组合，全空 = 命中所有）。
+   * map_local / map_remote 专用 urlRegex 走 action 侧；此处 urlRegex 只作过滤。
+   */
+  urlFilter?: string;
+  method?: string;
+  host?: string;
+  headerContains?: {name: string; value: string};
+  bodyContains?: string;
+}
+
+// ─── 过滤谓词（list_mitm_requests 与规则匹配共用）────────────────────────────
+
+export interface RequestPredicate {
+  urlFilter?: string;
+  urlRegex?: string;
+  method?: string;
+  host?: string;
+  statusCode?: number;
+  headerContains?: {name: string; value: string};
+  bodyContains?: string;
 }
 
 // ─── 工具参数与结果类型 ──────────────────────────────
@@ -55,6 +196,11 @@ export interface ListMitmRequestsParams {
   pageSize?: number;
   pageIdx?: number;
   urlFilter?: string;
+  method?: string;
+  statusCode?: number;
+  host?: string;
+  headerContains?: {name: string; value: string};
+  bodyContains?: string;
 }
 
 export interface MitmRequestSummary {
@@ -64,6 +210,8 @@ export interface MitmRequestSummary {
   statusCode: number;
   contentType: string | null;
   timestamp: number;
+  modified: boolean;
+  truncated: boolean;
 }
 
 export interface ListMitmRequestsData {
@@ -76,6 +224,7 @@ export interface ListMitmRequestsData {
 export interface GetMitmRequestParams {
   id: number;
   saveTo?: string;
+  format?: 'curl';
 }
 
 export interface GetMitmRequestData {
@@ -95,6 +244,11 @@ export interface GetMitmRequestData {
   truncated: boolean;
   timestamp: number;
   savedPath?: string;
+  modified: boolean;
+  appliedRuleIds?: string[];
+  responseBodySize?: number;
+  responseBodyBase64?: string | null;
+  curl?: string;
 }
 
 export interface ClearMitmRequestsData {
@@ -110,4 +264,45 @@ export interface ExportMitmCaData {
   format: 'pem' | 'der';
   outputPath: string;
   bytes: number;
+}
+
+export interface AddMitmRuleParams {
+  action: MitmRewriteAction;
+  id?: string;
+  enabled?: boolean;
+  urlFilter?: string;
+  method?: string;
+  host?: string;
+  headerContains?: {name: string; value: string};
+  bodyContains?: string;
+}
+
+export interface AddMitmRuleData {
+  rule: MitmRewriteRule;
+}
+
+export interface RemoveMitmRuleParams {
+  id: string;
+}
+
+export interface RemoveMitmRuleData {
+  removed: boolean;
+}
+
+export interface ListMitmRulesData {
+  rules: MitmRewriteRule[];
+}
+
+export interface ClearMitmRulesData {
+  clearedCount: number;
+}
+
+export interface ExportMitmHarParams {
+  outputPath?: string;
+}
+
+export interface ExportMitmHarData {
+  har: Record<string, unknown>;
+  entryCount: number;
+  outputPath?: string;
 }

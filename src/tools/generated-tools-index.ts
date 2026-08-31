@@ -534,6 +534,26 @@ export const GENERATED_TOOL_REGISTRY = [
     handlerName: 'exportMitmCa',
   },
   {
+    modulePath: './proxy/addRewriteRule.js',
+    handlerName: 'addRewriteRule',
+  },
+  {
+    modulePath: './proxy/listMitmRules.js',
+    handlerName: 'listMitmRules',
+  },
+  {
+    modulePath: './proxy/removeMitmRule.js',
+    handlerName: 'removeMitmRule',
+  },
+  {
+    modulePath: './proxy/clearMitmRules.js',
+    handlerName: 'clearMitmRules',
+  },
+  {
+    modulePath: './proxy/exportMitmHar.js',
+    handlerName: 'exportMitmHar',
+  },
+  {
     modulePath: './rebuild/index.js',
     handlerName: 'exportRebuildBundle',
   },
