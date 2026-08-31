@@ -30,6 +30,23 @@ export const listMitmRequests = defineTool({
       .string()
       .optional()
       .describe('按 URL 包含片段过滤（大小写不敏感）。'),
+    method: zod
+      .string()
+      .optional()
+      .describe('HTTP 方法大写精确匹配（如 GET/POST）。'),
+    statusCode: zod.number().int().optional().describe('响应状态码精确匹配。'),
+    host: zod
+      .string()
+      .optional()
+      .describe('URL hostname 包含片段（大小写不敏感）。'),
+    headerContains: zod
+      .object({name: zod.string(), value: zod.string()})
+      .optional()
+      .describe('命中「header 名相等（大小写不敏感）且值包含」的请求记录。'),
+    bodyContains: zod
+      .string()
+      .optional()
+      .describe('请求体或响应体包含片段（大小写不敏感）。'),
   },
   handler: async (request, response) => {
     const result = getRuntime().mitmModule.listRequests(

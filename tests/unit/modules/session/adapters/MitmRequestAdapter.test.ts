@@ -28,6 +28,7 @@ function makeExchange(
     isWebSocket: false,
     truncated: false,
     timestamp: 1700000000000,
+    modified: false,
     ...overrides,
   };
 }

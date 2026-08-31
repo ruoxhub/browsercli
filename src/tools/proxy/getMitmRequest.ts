@@ -28,6 +28,10 @@ export const getMitmRequest = defineTool({
       .string()
       .optional()
       .describe('把响应体写入该文件路径，返回 savedPath，不写入响应内存。'),
+    format: zod
+      .enum(['curl'])
+      .optional()
+      .describe('只返回 curl 导出命令（data.curl），不复现完整详情。'),
   },
   handler: async (request, response) => {
     const result = await getRuntime().mitmModule.getRequest(

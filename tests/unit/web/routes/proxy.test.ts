@@ -186,6 +186,7 @@ describe('Proxy REST Routes', () => {
       isWebSocket: false,
       truncated: false,
       timestamp: Date.now(),
+      modified: false,
     });
     store.add({
       requestId: 'req-2',
@@ -203,6 +204,7 @@ describe('Proxy REST Routes', () => {
       isWebSocket: false,
       truncated: false,
       timestamp: Date.now(),
+      modified: false,
     });
 
     // List all
@@ -268,6 +270,7 @@ describe('Proxy REST Routes', () => {
       isWebSocket: false,
       truncated: false,
       timestamp: Date.now(),
+      modified: false,
     });
     assert.strictEqual(store.size(), 1);
 

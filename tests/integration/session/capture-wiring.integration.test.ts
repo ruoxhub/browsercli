@@ -52,6 +52,7 @@ function exchange(url: string): CapturedExchange {
     isWebSocket: false,
     truncated: false,
     timestamp: Date.now(),
+    modified: false,
   };
 }
 
