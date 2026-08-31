@@ -15,10 +15,16 @@
  * 5. 启动 Web 控制台，浏览器由面板显式触发连接
  */
 
+import {
+  loadCachedRuntimeConfig,
+  shouldAutoConnectOnStartup,
+} from './config/runtimeConfigPersistence.js';
 import {getRuntimeConfigStore} from './config/RuntimeConfigStore.js';
+import {getBrowserManagerConfig} from './config/servicesConfig.js';
 import {resolveConfig} from './config.js';
 import {getRuntime} from './runtime.js';
 import {ConsoleServer} from './web/ConsoleServer.js';
+import {connectBrowser} from './worker/BrowserConnectionManager.js';
 import {JobStore} from './worker/JobStore.js';
 import {SekiroInvoker} from './worker/SekiroInvoker.js';
 import {ToolAdapter} from './worker/ToolAdapter.js';
@@ -44,6 +50,11 @@ async function main(): Promise<void> {
   // 1. 解析 CLI 参数，播种 RuntimeConfigStore（CLI > env > 默认值）
   const cliConfig = parseWorkerArgs(process.argv.slice(2));
   getRuntimeConfigStore().update(cliConfig);
+  // 回填上次持久化的连接设置（仅填充 CLI/env 未覆盖的可写字段）
+  const cached = loadCachedRuntimeConfig();
+  if (cached) {
+    getRuntimeConfigStore().update(cached);
+  }
 
   // 2. 解析启动选项（rpcHost/group 等启动期固定值，不随面板变更）
   const resolved = resolveConfig(cliConfig);
@@ -65,7 +76,21 @@ async function main(): Promise<void> {
   runtime.contextProvider = contextProvider;
   await contextProvider.init();
 
-  // 5. 创建 ToolAdapter（HTTP 模式用 executeTool 供 /api/v1 复用）
+  // 5. 有缓存连接目标（wsEndpoint/browserURL）时，启动即连接
+  if (shouldAutoConnectOnStartup(getRuntimeConfigStore().get())) {
+    try {
+      const config = getBrowserManagerConfig();
+      await connectBrowser(contextProvider, config);
+      console.log('[Worker] 已按缓存连接配置自动连接浏览器');
+    } catch (err) {
+      console.warn(
+        '[Worker] 启动自动连接浏览器失败，可稍后在控制面板手动连接:',
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
+
+  // 6. 创建 ToolAdapter（HTTP 模式用 executeTool 供 /api/v1 复用）
   const toolAdapter = new ToolAdapter(contextProvider);
 
   console.log(

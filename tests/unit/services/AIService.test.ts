@@ -498,6 +498,36 @@ describe('AIService', () => {
       assert.strictEqual(attempts, 3);
     });
 
+    it('should rethrow the raw provider error when retries are disabled', async () => {
+      let attempts = 0;
+
+      const mockProvider: AIProvider = {
+        chat: async () => {
+          attempts++;
+          throw createRetryableError('OpenAI API error (503)', {status: 503});
+        },
+        analyzeImage: async () => 'test',
+      };
+
+      const service = new AIService(mockProvider, {maxRetries: 0});
+
+      await assert.rejects(
+        async () => {
+          await service.chat([{role: 'user', content: 'test'}]);
+        },
+        error => {
+          assert.ok(error instanceof Error);
+          // 直接抛原始错误，而不是 "failed after 0 retries" 包装
+          assert.strictEqual(error.message, 'OpenAI API error (503)');
+          assert.doesNotMatch(error.message, /failed after/);
+          return true;
+        },
+      );
+
+      // 仅尝试一次，不做重试
+      assert.strictEqual(attempts, 1);
+    });
+
     it('should use exponential backoff for retries', async () => {
       const delays: number[] = [];
       let attempts = 0;

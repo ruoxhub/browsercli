@@ -17,6 +17,7 @@
 
 import type {IncomingMessage, ServerResponse} from 'node:http';
 
+import {persistRuntimeConfig} from '../../config/runtimeConfigPersistence.js';
 import {getRuntimeConfigStore} from '../../config/RuntimeConfigStore.js';
 import type {AIConfig, GlobalConfig} from '../../config/schema.js';
 import {
@@ -28,7 +29,7 @@ import {
   getBrowserManagerConfig,
   getDefaultLLMProvider,
 } from '../../config/servicesConfig.js';
-import type {AIService} from '../../services/AIService.js';
+import type {AIService, RetryConfig} from '../../services/AIService.js';
 import {
   connectBrowser,
   disconnectBrowser,
@@ -53,7 +54,15 @@ export interface ConfigRoutesConfig {
    * LLM 连接测试用的 AIService 工厂，默认走真实 createAIService。
    * 测试时注入 fake 以避免真实网络请求。
    */
-  createAIService?: (config?: AIConfig) => AIService | undefined;
+  createAIService?: (
+    config?: AIConfig,
+    retryConfig?: Partial<RetryConfig>,
+  ) => AIService | undefined;
+  /**
+   * 配置保存后的持久化回调，默认走真实 persistRuntimeConfig。
+   * 测试注入 no-op 以避免污染 ~/.browsercli/runtime-config.json。
+   */
+  persist?: (config: GlobalConfig) => void;
 }
 
 // ==================== 敏感字段掩码 ====================
@@ -224,6 +233,7 @@ export function createConfigRoutes(
         const updated = getRuntimeConfigStore().update({
           browser: parseResult.data,
         });
+        (cfg.persist ?? persistRuntimeConfig)(updated);
         sendJson(res, maskSensitiveFields(updated));
       },
     ],
@@ -248,13 +258,16 @@ export function createConfigRoutes(
         }
 
         if (body.openai && typeof body.openai === 'object') {
-          update.openai = mergeLlmProvider(
+          // mergeOpenaiConfig：apiKey 为空字符串时保留已存值，
+          // 与「留空则不修改」的 UI 约定及 /api/llm/* 路径保持一致。
+          update.openai = mergeOpenaiConfig(
             body.openai as Record<string, unknown>,
             current.openai as Record<string, unknown> | undefined,
           ) as GlobalConfig['openai'];
         }
 
         const updated = getRuntimeConfigStore().update(update);
+        (cfg.persist ?? persistRuntimeConfig)(updated);
         sendJson(res, maskSensitiveFields(updated));
       },
     ],
@@ -291,7 +304,9 @@ export function createConfigRoutes(
 
         let service: AIService | undefined;
         try {
-          service = makeAIService({provider, openai});
+          // 连接测试只需验证配置可用性，禁用重试快速失败，
+          // 避免 5xx 时白等 3 轮退避（约 7s+）才反馈。
+          service = makeAIService({provider, openai}, {maxRetries: 0});
         } catch (err) {
           sendError(
             res,

@@ -15,6 +15,10 @@ import os from 'node:os';
 import {describe, it, beforeEach, afterEach, mock} from 'node:test';
 
 import {
+  getRuntimeConfigStore,
+  resetRuntimeConfigStore,
+} from '../../../src/config/RuntimeConfigStore.js';
+import {
   getDefaultLLMProvider,
   getAIConfig,
   getBrowserConfig,
@@ -26,10 +30,7 @@ import {
   type SystemConfig,
   type AIConfig,
 } from '../../../src/config.js';
-import {
-  getRuntimeConfigStore,
-  resetRuntimeConfigStore,
-} from '../../../src/config/RuntimeConfigStore.js';
+import '../../../src/config.js';
 
 describe('Configuration Management', () => {
   // Store original environment variables
@@ -137,6 +138,38 @@ describe('Configuration Management', () => {
 
       assert.ok(config);
       assert.strictEqual(config.provider, 'openai');
+    });
+
+    it('should prefer panel-saved RuntimeConfigStore values over env', () => {
+      process.env.OPENAI_API_KEY = 'sk-env-key';
+      process.env.OPENAI_MODEL = 'gpt-4o';
+      resetRuntimeConfigStore({
+        llmProvider: 'openai',
+        openai: {
+          apiKey: 'sk-panel-key',
+          baseURL: 'https://panel.example.com/v1',
+          model: 'panel-model',
+        },
+      });
+
+      const config = getAIConfig();
+
+      assert.ok(config?.openai);
+      assert.strictEqual(config.openai.apiKey, 'sk-panel-key');
+      assert.strictEqual(config.openai.baseURL, 'https://panel.example.com/v1');
+      assert.strictEqual(config.openai.model, 'panel-model');
+    });
+
+    it('should fall back to env when store has no apiKey', () => {
+      process.env.OPENAI_API_KEY = 'sk-env-key';
+      process.env.OPENAI_MODEL = 'gpt-3.5-turbo';
+      resetRuntimeConfigStore({llmProvider: 'openai'});
+
+      const config = getAIConfig();
+
+      assert.ok(config?.openai);
+      assert.strictEqual(config.openai.apiKey, 'sk-env-key');
+      assert.strictEqual(config.openai.model, 'gpt-3.5-turbo');
     });
   });
 
@@ -325,7 +358,9 @@ describe('Configuration Management', () => {
       const result = validateConfig(config);
 
       assert.strictEqual(result.valid, false);
-      assert.ok(result.errors.some(e => e.includes('OpenAI')));
+      // AIConfigSchema superRefine 报错信息为 "ai.openai: is required
+      // when provider is openai"，不含 "OpenAI" 字样
+      assert.ok(result.errors.some(e => e.includes('openai')));
     });
 
     it('should accept valid OpenAI configuration', () => {

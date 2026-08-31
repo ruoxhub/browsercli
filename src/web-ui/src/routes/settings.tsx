@@ -31,6 +31,7 @@ export default function SettingsPage() {
     Array<{id: string; object?: string; owned_by?: string}>
   >([]);
   const [loadingModels, setLoadingModels] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const fetchConfig = async () => {
     try {
@@ -54,8 +55,8 @@ export default function SettingsPage() {
   };
 
   useEffect(() => {
-    fetchConfig();
-    fetchStatus();
+    void fetchConfig();
+    void fetchStatus();
 
     const unsub = wsClient.subscribe('worker.status', msg => {
       if (msg.type === 'snapshot' || msg.type === 'event') {
@@ -125,6 +126,38 @@ export default function SettingsPage() {
     }
   };
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    // 清掉上一次「测试连接」的过期结果，避免刷新后仍显示旧错误
+    setLlmTest(null);
+    setError(null);
+    try {
+      await Promise.all([fetchConfig(), fetchStatus()]);
+      // 模型列表已加载过时同步重取，避免与最新 baseURL/apiKey 脱节
+      if (models.length > 0) {
+        await refetchModels();
+      }
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const refetchModels = async () => {
+    if (!config) return;
+    setLoadingModels(true);
+    try {
+      const result = await api.listLlmModels({
+        llmProvider: config.llmProvider,
+        openai: config.openai as Record<string, unknown>,
+      });
+      setModels(result.models);
+    } catch {
+      // 刷新时模型列表获取失败不打断主流程
+    } finally {
+      setLoadingModels(false);
+    }
+  };
+
   const handleFetchModels = async () => {
     if (!config) return;
     setLoadingModels(true);
@@ -185,7 +218,7 @@ export default function SettingsPage() {
         </h1>
         <p className="text-xs text-[var(--color-text-muted)] mt-1.5">
           配置浏览器连接、LLM
-          Provider。配置仅存于内存，重启后回落到环境变量种子值。
+          Provider。保存后自动缓存到本地，下次启动服务时自动加载并连接。
         </p>
       </div>
 
@@ -583,14 +616,15 @@ export default function SettingsPage() {
       </div>
 
       <button
-        onClick={() => {
-          fetchConfig();
-          fetchStatus();
-        }}
-        className="px-3 py-1.5 text-xs font-medium rounded-lg border border-[var(--color-border-default)] bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)] active:scale-95 transition-all flex items-center gap-2"
+        onClick={handleRefresh}
+        disabled={refreshing}
+        className="px-3 py-1.5 text-xs font-medium rounded-lg border border-[var(--color-border-default)] bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)] active:scale-95 transition-all flex items-center gap-2 disabled:opacity-50"
       >
-        <RefreshCw size={12} />
-        刷新配置
+        <RefreshCw
+          size={12}
+          className={refreshing ? 'animate-spin' : ''}
+        />
+        {refreshing ? '刷新中...' : '刷新配置'}
       </button>
     </div>
   );

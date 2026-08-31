@@ -18,6 +18,10 @@ import {
   validateLlmBaseUrl,
 } from '../../../../src/web/routes/config.js';
 
+/** 测试用 no-op 持久化回调（共享实例，避免每处写空函数触发 lint）。 */
+// eslint-disable-next-line @typescript-eslint/no-empty-function
+const noopPersist = (): void => {};
+
 function mockReqRes(method: string, body?: unknown) {
   const chunks: Buffer[] = [];
   if (body !== undefined) {
@@ -142,6 +146,7 @@ describe('config routes', () => {
       const routes = createConfigRoutes({
         contextProvider: null,
         wsHub: null,
+        persist: noopPersist,
       } as never);
 
       const handler = routes.get('GET /api/config')!;
@@ -166,6 +171,7 @@ describe('config routes', () => {
       const routes = createConfigRoutes({
         contextProvider: null,
         wsHub: null,
+        persist: noopPersist,
       } as never);
 
       const handler = routes.get('PUT /api/config/llm')!;
@@ -198,6 +204,7 @@ describe('config routes', () => {
       const routes = createConfigRoutes({
         contextProvider: null,
         wsHub: null,
+        persist: noopPersist,
       } as never);
 
       const handler = routes.get('PUT /api/config/llm')!;
@@ -217,6 +224,45 @@ describe('config routes', () => {
         'sk-newrealkey5678',
       );
     });
+
+    it('keeps stored apiKey when empty string is sent (留空则不修改)', async () => {
+      resetRuntimeConfigStore({
+        openai: {apiKey: 'sk-keepme9999', model: 'gpt-4o'},
+        llmProvider: 'openai',
+      });
+
+      const routes = createConfigRoutes({
+        contextProvider: null,
+        wsHub: null,
+        persist: noopPersist,
+      } as never);
+
+      const handler = routes.get('PUT /api/config/llm')!;
+      const {req, res, getBody} = mockReqRes('PUT', {
+        llmProvider: 'openai',
+        openai: {
+          apiKey: '',
+          baseURL: 'https://newapi.example.com/v1',
+          model: 'deepseek-v4-flash',
+        },
+      });
+
+      await handler(req, res);
+
+      const parsed = JSON.parse(getBody());
+      assert.ok(parsed.success);
+      // apiKey 未被清空（空字符串按「留空则不修改」处理）
+      assert.strictEqual(parsed.data.openai.apiKey, 'sk-***9999');
+      assert.strictEqual(
+        getRuntimeConfigStore().get().openai?.apiKey,
+        'sk-keepme9999',
+      );
+      // 其余字段正常更新
+      assert.strictEqual(
+        getRuntimeConfigStore().get().openai?.model,
+        'deepseek-v4-flash',
+      );
+    });
   });
 
   describe('PUT /api/config/browser validation', () => {
@@ -226,6 +272,7 @@ describe('config routes', () => {
       const routes = createConfigRoutes({
         contextProvider: null,
         wsHub: null,
+        persist: noopPersist,
       } as never);
 
       const handler = routes.get('PUT /api/config/browser')!;
@@ -258,6 +305,7 @@ describe('config routes', () => {
       const routes = createConfigRoutes({
         contextProvider: null,
         wsHub: null,
+        persist: noopPersist,
         ...fakeAIService(() => ({
           chat: async () => ({content: 'pong'}),
         })),
@@ -287,6 +335,7 @@ describe('config routes', () => {
       const routes = createConfigRoutes({
         contextProvider: null,
         wsHub: null,
+        persist: noopPersist,
         ...fakeAIService(() => ({
           chat: async () => {
             throw new Error('unauthorized');
@@ -314,6 +363,7 @@ describe('config routes', () => {
       const routes = createConfigRoutes({
         contextProvider: null,
         wsHub: null,
+        persist: noopPersist,
         createAIService: () => {
           throw new Error('OpenAI configuration not found');
         },
@@ -380,6 +430,7 @@ describe('config routes', () => {
       const routes = createConfigRoutes({
         contextProvider: null,
         wsHub: null,
+        persist: noopPersist,
       } as never);
 
       const handler = routes.get('POST /api/llm/models')!;
@@ -427,6 +478,7 @@ describe('config routes', () => {
       const routes = createConfigRoutes({
         contextProvider: null,
         wsHub: null,
+        persist: noopPersist,
       } as never);
 
       const handler = routes.get('POST /api/llm/models')!;
@@ -453,6 +505,7 @@ describe('config routes', () => {
       const routes = createConfigRoutes({
         contextProvider: null,
         wsHub: null,
+        persist: noopPersist,
       } as never);
 
       const handler = routes.get('POST /api/llm/models')!;
@@ -481,6 +534,7 @@ describe('config routes', () => {
       const routes = createConfigRoutes({
         contextProvider: null,
         wsHub: null,
+        persist: noopPersist,
       } as never);
 
       const handler = routes.get('POST /api/llm/models')!;

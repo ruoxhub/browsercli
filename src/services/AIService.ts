@@ -340,7 +340,12 @@ export class AIService {
 
         const isRetryable = this.isRetryableError(error);
         if (attempt === this.retryConfig.maxRetries || !isRetryable) {
-          if (!isRetryable && lastError instanceof Error) {
+          // 非重试错误，或重试被禁用（maxRetries 0，如连接测试）时
+          // 直接抛原始 provider 错误，避免 "failed after 0 retries" 包装噪音。
+          if (
+            (!isRetryable || this.retryConfig.maxRetries === 0) &&
+            lastError instanceof Error
+          ) {
             throw lastError;
           }
           break;

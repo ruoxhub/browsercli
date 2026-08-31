@@ -100,7 +100,7 @@ export class DatabaseManager {
   constructor(private readonly dbPath?: string) {}
 
   get path(): string {
-    return this.dbPath ?? resolveDefaultSessionDbFile(import.meta.url);
+    return this.dbPath ?? resolveDefaultSessionDbFile();
   }
 
   init(): Database.Database {

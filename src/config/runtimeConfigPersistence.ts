@@ -1,0 +1,91 @@
+/**
+ * @license
+ * Copyright 2026 Browser-CLI
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/**
+ * RuntimeConfigStore 持久化 — 把面板改动落盘到 ~/.browsercli/runtime-config.json，
+ * 下次启动时回填，避免重复配置连接参数。
+ *
+ * 只持久化「连接设置」相关的可写字段：llmProvider / openai / browser。
+ * rpcHost、group 等启动期固定值由 CLI/环境变量决定，不在此缓存。
+ *
+ * 注意：openai.apiKey 会明文写入该文件（与 browsercli 现有的 apiToken 行为一致）。
+ */
+
+import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
+import os from 'node:os';
+import {dirname, join} from 'node:path';
+
+import {type GlobalConfig, validateGlobalConfig} from './schema.js';
+
+export const RUNTIME_CONFIG_PATH = join(
+  os.homedir(),
+  '.browsercli',
+  'runtime-config.json',
+);
+
+/** 需要持久化的顶层字段 */
+const PERSISTED_KEYS = new Set<keyof GlobalConfig>([
+  'llmProvider',
+  'openai',
+  'browser',
+]);
+
+/** 从缓存文件提取可写字段，未命中或非法时返回 undefined。 */
+export function loadCachedRuntimeConfig(): Partial<GlobalConfig> | undefined {
+  if (!existsSync(RUNTIME_CONFIG_PATH)) return undefined;
+
+  let raw: unknown;
+  try {
+    raw = JSON.parse(readFileSync(RUNTIME_CONFIG_PATH, 'utf8'));
+  } catch {
+    return undefined;
+  }
+
+  try {
+    const validated = validateGlobalConfig({...(raw as object)});
+    const persisted: Partial<GlobalConfig> = {};
+    for (const key of PERSISTED_KEYS) {
+      if (validated[key] !== undefined) {
+        (persisted as Record<string, unknown>)[key] = validated[key];
+      }
+    }
+    return Object.keys(persisted).length > 0 ? persisted : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** 把当前配置的可写字段落盘（失败静默，仅记录到 console）。 */
+export function persistRuntimeConfig(config: GlobalConfig): void {
+  const persisted: Partial<GlobalConfig> = {};
+  for (const key of PERSISTED_KEYS) {
+    const value = config[key];
+    if (value !== undefined) {
+      (persisted as Record<string, unknown>)[key] = value;
+    }
+  }
+
+  try {
+    mkdirSync(dirname(RUNTIME_CONFIG_PATH), {recursive: true});
+    writeFileSync(
+      RUNTIME_CONFIG_PATH,
+      JSON.stringify(persisted, null, 2),
+      'utf8',
+    );
+  } catch (err) {
+    console.error('[runtime-config] 保存缓存失败:', err);
+  }
+}
+
+/**
+ * 判断启动时是否应自动连接浏览器。
+ * 仅当缓存里有「连接目标」信息（wsEndpoint / browserURL）才自动连接——
+ * 纯 launch 模式的本地浏览器无需（也不应）在启动时抢占。
+ */
+export function shouldAutoConnectOnStartup(config: GlobalConfig): boolean {
+  const browser = config.browser;
+  return Boolean(browser?.wsEndpoint || browser?.browserURL);
+}

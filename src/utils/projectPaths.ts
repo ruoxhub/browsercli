@@ -73,13 +73,8 @@ export function resolveDefaultEnvPath(moduleUrl: string): string {
   return path.join(resolvePackageRoot(moduleUrl), '.env');
 }
 
-export function resolveDefaultSessionDbFile(moduleUrl: string): string {
-  return path.join(
-    resolvePackageRoot(moduleUrl),
-    '.cache',
-    'reverser',
-    'reverser.db',
-  );
+export function resolveDefaultSessionDbFile(): string {
+  return path.join(os.homedir(), '.browsercli', 'cache', 'reverser.db');
 }
 
 function quoteShellArg(value: string): string {
