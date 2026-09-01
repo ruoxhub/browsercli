@@ -386,9 +386,20 @@ describe('MitmProxyServer', () => {
     async () => {
       const BIG = 3 * 1024 * 1024;
       const origin = await startChunkedBigOriginServer(BIG);
+      let captured: CapturedExchange | undefined;
       const ca = new CaManager(mkdtempSync(path.join(os.tmpdir(), 'mitm-ca-')));
       await ca.init();
       const rules = new MitmRuleEngine();
+      rules.addRule({
+        id: 'body-escape',
+        action: {
+          type: 'modify_body',
+          phase: 'response',
+          find: 'b',
+          replace: 'b',
+        },
+        enabled: true,
+      });
       rules.addRule({
         id: 'hdr-escape',
         action: {
@@ -398,7 +409,13 @@ describe('MitmProxyServer', () => {
         },
         enabled: true,
       });
-      const proxy = new MitmProxyServer(ca, () => {}, rules);
+      const proxy = new MitmProxyServer(
+        ca,
+        exchange => {
+          captured = exchange;
+        },
+        rules,
+      );
       await proxy.start(0);
 
       try {
@@ -411,7 +428,10 @@ describe('MitmProxyServer', () => {
                 path: `http://127.0.0.1:${origin.port}/big`,
                 method: 'GET',
               },
-              res => resolve(res.headers),
+              res => {
+                res.resume();
+                res.on('end', () => resolve(res.headers));
+              },
             );
             req.on('error', reject);
             req.end();
@@ -422,6 +442,8 @@ describe('MitmProxyServer', () => {
           '1',
           '叛逃时 header 改写必须生效',
         );
+        assert.ok(captured, '必须产生 capture 记录');
+        assert.strictEqual(captured.truncated, true, '必须真正经历了叛逃');
       } finally {
         await proxy.stop();
         await origin.close();
