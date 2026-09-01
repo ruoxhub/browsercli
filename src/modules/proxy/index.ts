@@ -22,6 +22,7 @@ export {
   fixHeadersAfterBodyRewrite,
   isBinaryContentType,
 } from './body.js';
+export {normalizeHost} from './hostFilter.js';
 
 // 类型
 export type {
@@ -55,6 +56,13 @@ export type {
   RemoveMitmRuleData,
   ListMitmRulesData,
   ClearMitmRulesData,
+  HostFilterAction,
+  AddHostFilterParams,
+  AddHostFilterData,
+  RemoveHostFilterParams,
+  RemoveHostFilterData,
+  ListHostFiltersData,
+  ClearHostFiltersData,
   ExportMitmHarParams,
   ExportMitmHarData,
 } from './types.js';

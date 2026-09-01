@@ -297,6 +297,38 @@ export interface ClearMitmRulesData {
   clearedCount: number;
 }
 
+// ─── 域名过滤 ──────────────────────────────
+
+export type HostFilterAction = 'allow' | 'block';
+
+export interface AddHostFilterParams {
+  action: HostFilterAction;
+  host: string;
+}
+
+export interface AddHostFilterData {
+  action: HostFilterAction;
+  host: string;
+}
+
+export interface RemoveHostFilterParams {
+  action: HostFilterAction;
+  host: string;
+}
+
+export interface RemoveHostFilterData {
+  removed: boolean;
+}
+
+export interface ListHostFiltersData {
+  allow: string[];
+  block: string[];
+}
+
+export interface ClearHostFiltersData {
+  clearedCount: number;
+}
+
 export interface ExportMitmHarParams {
   outputPath?: string;
 }

@@ -255,4 +255,51 @@ describe('MitmModule', () => {
       rmSync(dir, {recursive: true, force: true});
     }
   });
+
+  it('host filter 增删查清 + shouldBypass 白/黑名单语义', () => {
+    const mod = new MitmModule();
+
+    // 两表皆空 → 不过滤
+    assert.strictEqual(mod.shouldBypass('a.dev'), false);
+
+    mod.addHostFilter({action: 'block', host: 'ads.dev'});
+    assert.strictEqual(mod.shouldBypass('ads.dev'), true);
+    assert.strictEqual(mod.shouldBypass('ADS.DEV'), true, '大小写不敏感');
+    assert.strictEqual(mod.shouldBypass('sub.ads.dev'), true, '子串匹配');
+    assert.strictEqual(mod.shouldBypass('other.dev'), false);
+
+    // 白名单一旦非空 → 黑名单失效，不在白名单即旁路
+    mod.addHostFilter({action: 'allow', host: 'api.dev'});
+    assert.strictEqual(mod.shouldBypass('api.dev'), false);
+    assert.strictEqual(
+      mod.shouldBypass('ads.dev'),
+      true,
+      '白名单优先，黑名单失效',
+    );
+    assert.strictEqual(mod.shouldBypass('other.dev'), true);
+
+    assert.deepStrictEqual(mod.listHostFilters().data, {
+      allow: ['api.dev'],
+      block: ['ads.dev'],
+    });
+
+    assert.strictEqual(
+      mod.removeHostFilter({action: 'allow', host: 'api.dev'}).data.removed,
+      true,
+    );
+    assert.strictEqual(
+      mod.removeHostFilter({action: 'allow', host: 'nope.dev'}).data.removed,
+      false,
+    );
+
+    assert.strictEqual(mod.clearHostFilters().data.clearedCount, 1);
+    assert.strictEqual(mod.shouldBypass('ads.dev'), false, '清空后不过滤');
+  });
+
+  it('addHostFilter 拒绝空 host', () => {
+    const mod = new MitmModule();
+    const result = mod.addHostFilter({action: 'block', host: '  '});
+    assert.strictEqual(result.success, false);
+    assert.strictEqual(mod.shouldBypass('a.dev'), false, '不落 state');
+  });
 });

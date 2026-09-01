@@ -12,14 +12,18 @@ import type {BuiltReplayRequest} from '../network/NetworkTypes.js';
 import {formatCurl, stripManagedHeaders} from '../network/replayEngine.js';
 
 import {CaManager, resolveMitmCertsDir} from './CaManager.js';
+import {normalizeHost} from './hostFilter.js';
 import {MitmProxyServer} from './MitmProxyServer.js';
 import {ProxyStore} from './ProxyStore.js';
 import {MitmRuleEngine, matchesPredicate} from './rewrite.js';
 import type {
+  AddHostFilterData,
+  AddHostFilterParams,
   AddMitmRuleData,
   AddMitmRuleParams,
   CapturedExchange,
   CapturedRequest,
+  ClearHostFiltersData,
   ClearMitmRequestsData,
   ClearMitmRulesData,
   ExportMitmCaData,
@@ -28,12 +32,16 @@ import type {
   ExportMitmHarParams,
   GetMitmRequestData,
   GetMitmRequestParams,
+  ListHostFiltersData,
   ListMitmRequestsData,
   ListMitmRequestsParams,
   ListMitmRulesData,
+  MitmInterceptor,
   MitmMethodResult,
   MitmProxyStatusData,
   MitmRewriteRule,
+  RemoveHostFilterData,
+  RemoveHostFilterParams,
   RemoveMitmRuleData,
   RemoveMitmRuleParams,
   StartMitmProxyData,
@@ -50,6 +58,8 @@ export class MitmModule {
   private readonly store: ProxyStore;
   private readonly caManager: CaManager;
   private readonly rules: MitmRuleEngine;
+  private readonly allowHosts = new Set<string>();
+  private readonly blockHosts = new Set<string>();
   private server: MitmProxyServer | null = null;
 
   /**
@@ -72,6 +82,87 @@ export class MitmModule {
 
   getRuleEngine(): MitmRuleEngine {
     return this.rules;
+  }
+
+  // ─── 域名过滤 ──────────────────────────────
+
+  /**
+   * 是否旁路该 host（白名单优先，黑名单次之，两空不过滤）。
+   * 语义对齐 ProxyPin host_filter.dart:23-46。
+   */
+  shouldBypass(host: string): boolean {
+    const normalized = normalizeHost(host);
+    if (!normalized) return false;
+
+    if (this.allowHosts.size > 0) {
+      for (const entry of this.allowHosts) {
+        if (normalized.includes(entry)) return false;
+      }
+      return true;
+    }
+    if (this.blockHosts.size > 0) {
+      for (const entry of this.blockHosts) {
+        if (normalized.includes(entry)) return true;
+      }
+    }
+    return false;
+  }
+
+  addHostFilter(
+    params: AddHostFilterParams,
+  ): MitmMethodResult<AddHostFilterData> {
+    const host = normalizeHost(params.host);
+    if (!host) {
+      return {
+        success: false,
+        message: 'host 不能为空',
+        data: {action: params.action, host: ''},
+      };
+    }
+    (params.action === 'allow' ? this.allowHosts : this.blockHosts).add(host);
+    return {
+      success: true,
+      message: `已${params.action === 'allow' ? '允许' : '屏蔽'}域名 ${host}`,
+      data: {action: params.action, host},
+    };
+  }
+
+  removeHostFilter(
+    params: RemoveHostFilterParams,
+  ): MitmMethodResult<RemoveHostFilterData> {
+    const host = normalizeHost(params.host);
+    const removed = (
+      params.action === 'allow' ? this.allowHosts : this.blockHosts
+    ).delete(host);
+    return {
+      success: removed,
+      message: removed
+        ? `已移除${params.action === 'allow' ? '允许' : '屏蔽'}域名 ${host}`
+        : `未找到${params.action === 'allow' ? '允许' : '屏蔽'}域名 ${host}`,
+      data: {removed},
+    };
+  }
+
+  listHostFilters(): MitmMethodResult<ListHostFiltersData> {
+    return {
+      success: true,
+      message: `白名单 ${this.allowHosts.size} 条，黑名单 ${this.blockHosts.size} 条`,
+      data: {
+        allow: [...this.allowHosts],
+        block: [...this.blockHosts],
+      },
+    };
+  }
+
+  clearHostFilters(): MitmMethodResult<ClearHostFiltersData> {
+    const clearedCount = this.allowHosts.size + this.blockHosts.size;
+    this.allowHosts.clear();
+    this.blockHosts.clear();
+    return {
+      success: true,
+      message: `已清空 ${clearedCount} 条域名过滤`,
+      data: {clearedCount},
+    };
   }
 
   /**
@@ -103,12 +194,19 @@ export class MitmModule {
     try {
       await this.caManager.init();
       if (!this.server) {
-        this.server = new MitmProxyServer(
+        // SAFETY: MitmProxyServer constructor receives 4th argument (shouldBypass) wired here in Task 4 and consumed in Task 5.
+        this.server = new (MitmProxyServer as unknown as new (
+          caManager: CaManager,
+          onCaptured: (exchange: CapturedExchange) => void,
+          interceptor?: MitmInterceptor,
+          shouldBypass?: (host: string) => boolean,
+        ) => MitmProxyServer)(
           this.caManager,
           exchange => {
             this.recordExchange(exchange);
           },
           this.rules,
+          host => this.shouldBypass(host),
         );
       }
       await this.server.start(port);
