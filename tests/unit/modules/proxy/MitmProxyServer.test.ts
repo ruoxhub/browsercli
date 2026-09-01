@@ -11,7 +11,10 @@ import path from 'node:path';
 import {describe, it} from 'node:test';
 
 import {CaManager} from '../../../../src/modules/proxy/CaManager.js';
-import {MitmProxyServer} from '../../../../src/modules/proxy/MitmProxyServer.js';
+import {
+  MitmProxyServer,
+  parseConnectAuthority,
+} from '../../../../src/modules/proxy/MitmProxyServer.js';
 import {MitmRuleEngine} from '../../../../src/modules/proxy/rewrite.js';
 import type {CapturedExchange} from '../../../../src/modules/proxy/types.js';
 
@@ -450,5 +453,29 @@ describe('MitmProxyServer', () => {
       }
     },
   );
+
+  it('parseConnectAuthority 处理 IPv6 / IPv4 / 裸域名 / 畸形', () => {
+    assert.deepStrictEqual(parseConnectAuthority('[240c::1]:8080'), {
+      hostname: '240c::1',
+      port: 8080,
+    });
+    assert.deepStrictEqual(parseConnectAuthority('240c::1'), {
+      hostname: '240c::1',
+      port: 443,
+    });
+    assert.deepStrictEqual(parseConnectAuthority('[240c'), {
+      hostname: '[240c',
+      port: 443,
+    });
+    assert.deepStrictEqual(parseConnectAuthority('192.168.1.1:8080'), {
+      hostname: '192.168.1.1',
+      port: 8080,
+    });
+    assert.deepStrictEqual(parseConnectAuthority('example.com'), {
+      hostname: 'example.com',
+      port: 443,
+    });
+    assert.strictEqual(parseConnectAuthority(''), null);
+  });
 });
 

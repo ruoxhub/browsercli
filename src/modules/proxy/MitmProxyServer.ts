@@ -49,6 +49,51 @@ function parseRawHeaders(raw: string): Record<string, string> {
   return headers;
 }
 
+/**
+ * 解析 CONNECT 的 authority（RFC 7231 §4.3.6）。
+ * IPv6 必须带方括号且用 lastIndexOf(':') 分端口 —— 直接 split(':') 会把
+ * `[240c::1]:8080` 切成 hostname=`[240c`（ProxyPin temp_ipv6_test.dart 守护此坑）。
+ * hostname 一律剥掉方括号：签证书不需要，且 shouldBypass 的子串匹配需要。
+ */
+export function parseConnectAuthority(
+  url: string,
+): {hostname: string; port: number} | null {
+  const authority = url.trim();
+  if (!authority) return null;
+
+  const DEFAULT_PORT = 443;
+  let hostname = authority;
+  let port = DEFAULT_PORT;
+
+  if (authority.startsWith('[')) {
+    const close = authority.indexOf(']');
+    if (close !== -1) {
+      hostname = authority.slice(1, close);
+      if (authority[close + 1] === ':') {
+        const parsed = parseInt(authority.slice(close + 2), 10);
+        if (Number.isFinite(parsed)) port = parsed;
+      }
+    }
+    // 找不到 ']'（畸形如 "[240c"）：整个 authority 当 host，端口取默认。
+  } else if (authority.indexOf(':') !== authority.lastIndexOf(':')) {
+    // 多个冒号说明是未带方括号的裸 IPv6 地址，无端口，默认 443
+    hostname = authority;
+    port = DEFAULT_PORT;
+  } else {
+    const lastColon = authority.lastIndexOf(':');
+    if (lastColon !== -1) {
+      const parsed = parseInt(authority.slice(lastColon + 1), 10);
+      if (Number.isFinite(parsed)) {
+        hostname = authority.slice(0, lastColon);
+        port = parsed;
+      }
+    }
+  }
+
+  if (!hostname) return null;
+  return {hostname, port};
+}
+
 interface RequestFlow {
   method: string;
   url: string;
@@ -303,13 +348,12 @@ export class MitmProxyServer {
     clientSocket: net.Socket,
     head: Buffer,
   ): void {
-    const [hostname, portStr] = (req.url || '').split(':');
-    const port = parseInt(portStr, 10) || 443;
-
-    if (!hostname) {
+    const authority = parseConnectAuthority(req.url || '');
+    if (!authority) {
       clientSocket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
       return;
     }
+    const {hostname, port} = authority;
 
     clientSocket.write('HTTP/1.1 200 Connection Established\r\n\r\n');
 
