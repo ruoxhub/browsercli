@@ -39,6 +39,69 @@ async function startOriginServer() {
   );
 }
 
+/** 大 body 源站：固定 content-length（Node 不切 chunked）。 */
+async function startBigOriginServer(sizeBytes: number) {
+  return new Promise<{port: number; close: () => Promise<void>}>(
+    (resolve, reject) => {
+      const server = http.createServer((_req, res) => {
+        res.writeHead(200, {
+          'content-type': 'text/plain',
+          'content-length': String(sizeBytes),
+        });
+        res.end(Buffer.alloc(sizeBytes, 'a'));
+      });
+      server.on('error', reject);
+      server.listen(0, '127.0.0.1', () => {
+        const address = server.address();
+        if (address === null || typeof address === 'string') {
+          reject(new Error('bad address'));
+          return;
+        }
+        resolve({
+          port: address.port,
+          close: () => new Promise<void>(r => server.close(() => r())),
+        });
+      });
+    },
+  );
+}
+
+/**
+ * 大 body 源站：不设 content-length，分块写（Node 自动切 chunked）。
+ * 这条才走「数据期叛逃」路径 —— 少了它，escapeToPipe 零覆盖率。
+ */
+async function startChunkedBigOriginServer(
+  sizeBytes: number,
+  chunkBytes: number = 64 * 1024,
+) {
+  return new Promise<{port: number; close: () => Promise<void>}>(
+    (resolve, reject) => {
+      const server = http.createServer((_req, res) => {
+        res.writeHead(200, {'content-type': 'text/plain'});
+        let sent = 0;
+        while (sent < sizeBytes) {
+          const n = Math.min(chunkBytes, sizeBytes - sent);
+          res.write(Buffer.alloc(n, 'b'));
+          sent += n;
+        }
+        res.end();
+      });
+      server.on('error', reject);
+      server.listen(0, '127.0.0.1', () => {
+        const address = server.address();
+        if (address === null || typeof address === 'string') {
+          reject(new Error('bad address'));
+          return;
+        }
+        resolve({
+          port: address.port,
+          close: () => new Promise<void>(r => server.close(() => r())),
+        });
+      });
+    },
+  );
+}
+
 function requestViaProxy(
   proxyPort: number,
   targetUrl: string,
@@ -225,4 +288,96 @@ describe('MitmProxyServer', () => {
       await origin.close();
     }
   });
+
+  it(
+    '>1MB 响应带 content-length 时客户端收满且不挂',
+    {timeout: 10000},
+    async () => {
+      const BIG = 3 * 1024 * 1024;
+      const origin = await startBigOriginServer(BIG);
+      let captured: CapturedExchange | undefined;
+      const ca = new CaManager(mkdtempSync(path.join(os.tmpdir(), 'mitm-ca-')));
+      await ca.init();
+      const rules = new MitmRuleEngine();
+      rules.addRule({
+        id: 'body-1',
+        action: {
+          type: 'modify_body',
+          phase: 'response',
+          find: 'a',
+          replace: 'a',
+        },
+        enabled: true,
+      });
+      const proxy = new MitmProxyServer(
+        ca,
+        exchange => {
+          captured = exchange;
+        },
+        rules,
+      );
+      await proxy.start(0);
+
+      try {
+        const target = `http://127.0.0.1:${origin.port}/big`;
+        const res = await requestViaProxy(proxy.getPort()!, target);
+        assert.strictEqual(res.body.length, BIG, '客户端必须收满 3MB');
+        assert.ok(captured, '必须产生 capture 记录');
+        assert.strictEqual(captured.truncated, true);
+        assert.strictEqual(captured.responseBodySize, BIG);
+      } finally {
+        await proxy.stop();
+        await origin.close();
+      }
+    },
+  );
+
+  it(
+    '>1MB chunked 响应叛逃后客户端收满且 capture 保留前 1MB',
+    {timeout: 10000},
+    async () => {
+      const BIG = 3 * 1024 * 1024;
+      const origin = await startChunkedBigOriginServer(BIG);
+      let captured: CapturedExchange | undefined;
+      const ca = new CaManager(mkdtempSync(path.join(os.tmpdir(), 'mitm-ca-')));
+      await ca.init();
+      const rules = new MitmRuleEngine();
+      rules.addRule({
+        id: 'body-2',
+        action: {
+          type: 'modify_body',
+          phase: 'response',
+          find: 'b',
+          replace: 'b',
+        },
+        enabled: true,
+      });
+      const proxy = new MitmProxyServer(
+        ca,
+        exchange => {
+          captured = exchange;
+        },
+        rules,
+      );
+      await proxy.start(0);
+
+      try {
+        const target = `http://127.0.0.1:${origin.port}/big`;
+        const res = await requestViaProxy(proxy.getPort()!, target);
+        assert.strictEqual(res.body.length, BIG, '客户端必须收满 3MB');
+        assert.ok(captured, '必须产生 capture 记录');
+        assert.strictEqual(captured.truncated, true);
+        assert.strictEqual(captured.responseBodySize, BIG);
+        assert.strictEqual(
+          captured.responseBody?.length,
+          1024 * 1024,
+          'capture 保留前 1MB 文本（MAX_BODY_SIZE）',
+        );
+      } finally {
+        await proxy.stop();
+        await origin.close();
+      }
+    },
+  );
 });
+
