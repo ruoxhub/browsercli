@@ -379,5 +379,54 @@ describe('MitmProxyServer', () => {
       }
     },
   );
+
+  it(
+    '叛逃后 modify_header(response) 仍生效（与 live-pipe 语义一致）',
+    {timeout: 10000},
+    async () => {
+      const BIG = 3 * 1024 * 1024;
+      const origin = await startChunkedBigOriginServer(BIG);
+      const ca = new CaManager(mkdtempSync(path.join(os.tmpdir(), 'mitm-ca-')));
+      await ca.init();
+      const rules = new MitmRuleEngine();
+      rules.addRule({
+        id: 'hdr-escape',
+        action: {
+          type: 'modify_header',
+          phase: 'response',
+          set: {'x-escaped': '1'},
+        },
+        enabled: true,
+      });
+      const proxy = new MitmProxyServer(ca, () => {}, rules);
+      await proxy.start(0);
+
+      try {
+        const headers = await new Promise<http.IncomingHttpHeaders>(
+          (resolve, reject) => {
+            const req = http.request(
+              {
+                host: '127.0.0.1',
+                port: proxy.getPort()!,
+                path: `http://127.0.0.1:${origin.port}/big`,
+                method: 'GET',
+              },
+              res => resolve(res.headers),
+            );
+            req.on('error', reject);
+            req.end();
+          },
+        );
+        assert.strictEqual(
+          headers['x-escaped'],
+          '1',
+          '叛逃时 header 改写必须生效',
+        );
+      } finally {
+        await proxy.stop();
+        await origin.close();
+      }
+    },
+  );
 });
 

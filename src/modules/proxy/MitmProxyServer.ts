@@ -332,6 +332,7 @@ export class MitmProxyServer {
         true,
       );
     });
+    // SAFETY: TLSSocket extends net.Socket and fulfills the net.Socket interface for miniServer connection handling.
     miniServer.emit('connection', tlsSocket as unknown as net.Socket);
 
     tlsSocket.on('error', (err: Error) => {
@@ -536,14 +537,78 @@ export class MitmProxyServer {
     const resBodyChunks: Buffer[] = [];
     let totalResSize = 0;
     let truncated = false;
+    let escapedEmit: (() => void) | null = null;
+    let escapeCommitted = false;
 
-    // 有 response modify_body 规则且非二进制时，buffer-then-decide；否则 live-pipe。
+    // 判定期预判：响应头已声明 content-length 且超限 → 直接 live-pipe，连那 1MB 都不 buffer。
+    const declaredLength = Number(proxyRes.headers['content-length']);
+    const oversizedByHeader =
+      Number.isFinite(declaredLength) && declaredLength > MAX_BODY_SIZE;
     const bufferBody =
-      !isBinary && this.interceptor?.hasResponseBodyRules() === true;
+      !isBinary &&
+      !oversizedByHeader &&
+      this.interceptor?.hasResponseBodyRules() === true;
+
+    /**
+     * 越限叛逃到 live-pipe（spec §2.2）：已 buffer 的是压缩后原始字节，
+     * 不能只发一半 —— 把完整已 buffer 字节写给客户端后交给 pipe 接管。
+     * 语义与 live-pipe 完全同构：afterResponse 传 body:null，header 改写照常生效，
+     * body 改写由 rewrite.ts:356 的 body===null → continue 天然跳过。
+     */
+    const escapeToPipe = (currentChunk?: Buffer): void => {
+      if (escapeCommitted) return;
+      escapeCommitted = true;
+      truncated = true;
+
+      logger.warn(
+        `[MitmProxy] response body 超过 ${MAX_BODY_SIZE} 字节，跳过 response body 改写规则：${flow.url}`,
+      );
+
+      const after = this.interceptor?.afterResponse?.({
+        requestId,
+        method,
+        url: flow.url,
+        requestHeaders: flow.headers,
+        requestBody: flow.body.length > 0 ? flow.body : null,
+        statusCode,
+        headers: this.headersToRecord(proxyRes.headers),
+        body: null,
+        truncated: true,
+      }) as AfterResponseResult | undefined;
+
+      let outHeaders = this.headersToRecord(proxyRes.headers);
+      const mod = after?.modification;
+      if (mod?.setHeaders || mod?.removeHeaders) {
+        outHeaders = applyHeaderChanges(outHeaders, {
+          set: mod.setHeaders,
+          remove: mod.removeHeaders,
+        });
+      }
+
+      clientRes.writeHead(statusCode, outHeaders);
+      // 只写字节，不清空 resBodyChunks —— 它还要留给 emit 解码成 capture 文本。
+      for (const chunk of resBodyChunks) clientRes.write(chunk);
+      if (currentChunk) clientRes.write(currentChunk);
+      proxyRes.pipe(clientRes);
+
+      escapedEmit = () =>
+        emit(
+          outHeaders,
+          null,
+          after !== undefined || (appliedRuleIds?.length ?? 0) > 0,
+          [...(appliedRuleIds ?? []), ...(after?.appliedRuleIds ?? [])],
+          Buffer.concat(resBodyChunks),
+        );
+    };
 
     const onBodyData = (chunk: Buffer): void => {
-      if (totalResSize < MAX_BODY_SIZE) resBodyChunks.push(chunk);
-      else truncated = true;
+      if (totalResSize < MAX_BODY_SIZE) {
+        resBodyChunks.push(chunk);
+      } else if (bufferBody && !escapeCommitted) {
+        escapeToPipe(chunk);
+      } else {
+        truncated = true;
+      }
       totalResSize += chunk.length;
     };
 
@@ -591,6 +656,11 @@ export class MitmProxyServer {
     if (bufferBody) {
       proxyRes.on('data', onBodyData);
       proxyRes.on('end', () => {
+        // 叛逃后 socket 的结束归 pipe 管：这里只能 emit，再 writeHead/end 会抛错或截断流。
+        if (escapeCommitted) {
+          escapedEmit?.();
+          return;
+        }
         const buffered =
           !truncated && resBodyChunks.length > 0
             ? Buffer.concat(resBodyChunks)
