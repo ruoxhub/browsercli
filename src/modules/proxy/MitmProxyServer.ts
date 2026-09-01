@@ -119,6 +119,7 @@ export class MitmProxyServer {
     private readonly caManager: CaManager,
     private readonly onCaptured: (exchange: CapturedExchange) => void,
     private readonly interceptor?: MitmInterceptor,
+    private readonly shouldBypass?: (hostname: string) => boolean,
   ) {}
 
   async start(port: number): Promise<void> {
@@ -192,6 +193,7 @@ export class MitmProxyServer {
     const startTime = Date.now();
     const requestId = `proxy-${randomUUID()}`;
     const parsed = url.parse(targetUrl);
+    const shouldRecord = this.shouldBypass?.(parsed.hostname ?? '') !== true;
     const reqBodyChunks: Buffer[] = [];
     let reqBodySize = 0;
 
@@ -238,6 +240,7 @@ export class MitmProxyServer {
             : undefined,
           proxyRes,
           clientRes,
+          shouldRecord,
         );
       });
 
@@ -310,24 +313,26 @@ export class MitmProxyServer {
         serverSocket.on('close', () => clientSocket.destroy());
         clientSocket.on('close', () => serverSocket.destroy());
 
-        this.onCaptured({
-          requestId,
-          method: clientReq.method || 'GET',
-          url: fullUrl,
-          requestHeaders: this.headersToRecord(clientReq.headers),
-          requestBody: null,
-          statusCode,
-          responseHeaders: parseRawHeaders(responseHeader.toString('utf-8')),
-          responseBody: null,
-          contentType: null,
-          isOptions: false,
-          isStatic: false,
-          isStreaming: false,
-          isWebSocket: true,
-          truncated: false,
-          timestamp: startTime,
-          modified: false,
-        });
+        if (this.shouldBypass?.(hostname) !== true) {
+          this.onCaptured({
+            requestId,
+            method: clientReq.method || 'GET',
+            url: fullUrl,
+            requestHeaders: this.headersToRecord(clientReq.headers),
+            requestBody: null,
+            statusCode,
+            responseHeaders: parseRawHeaders(responseHeader.toString('utf-8')),
+            responseBody: null,
+            contentType: null,
+            isOptions: false,
+            isStatic: false,
+            isStreaming: false,
+            isWebSocket: true,
+            truncated: false,
+            timestamp: startTime,
+            modified: false,
+          });
+        }
       };
       serverSocket.on('data', onData);
     };
@@ -354,6 +359,22 @@ export class MitmProxyServer {
       return;
     }
     const {hostname, port} = authority;
+
+    // 旁路（spec §3.1）：不解密不签证书，纯传输层双向 pipe。
+    if (this.shouldBypass?.(hostname) === true) {
+      clientSocket.write('HTTP/1.1 200 Connection Established\r\n\r\n');
+      const tunnel = net.connect(port, hostname, () => {
+        if (head.length > 0) tunnel.write(head);
+        tunnel.pipe(clientSocket);
+        clientSocket.pipe(tunnel);
+      });
+      // 上游失败仅毁 socket，不写 capture、不打日志刷屏（spec §4）。
+      tunnel.on('error', () => clientSocket.destroy());
+      clientSocket.on('error', () => tunnel.destroy());
+      tunnel.on('close', () => clientSocket.destroy());
+      clientSocket.on('close', () => tunnel.destroy());
+      return;
+    }
 
     clientSocket.write('HTTP/1.1 200 Connection Established\r\n\r\n');
 
@@ -443,6 +464,7 @@ export class MitmProxyServer {
             : undefined,
           proxyRes,
           clientRes,
+          true,
         );
       });
 
@@ -569,6 +591,7 @@ export class MitmProxyServer {
     appliedRuleIds: string[] | undefined,
     proxyRes: http.IncomingMessage,
     clientRes: http.ServerResponse,
+    shouldRecord = true,
   ): void {
     const contentType = (proxyRes.headers['content-type'] as string) || null;
     const method = flow.method;
@@ -663,6 +686,7 @@ export class MitmProxyServer {
       ruleIds: string[],
       buffered: Buffer | null,
     ): void => {
+      if (!shouldRecord) return;
       const requestBody =
         flow.body.length > 0 && !isBinary
           ? bodyToUtf8(flow.body, flow.headers['content-encoding'])

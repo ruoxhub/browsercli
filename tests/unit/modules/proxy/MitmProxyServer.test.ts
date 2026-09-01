@@ -6,17 +6,23 @@
 import assert from 'node:assert';
 import {mkdtempSync} from 'node:fs';
 import http, {type IncomingMessage} from 'node:http';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
 import {CaManager} from '../../../../src/modules/proxy/CaManager.js';
+import {normalizeHost} from '../../../../src/modules/proxy/hostFilter.js';
 import {
   MitmProxyServer,
   parseConnectAuthority,
 } from '../../../../src/modules/proxy/MitmProxyServer.js';
 import {MitmRuleEngine} from '../../../../src/modules/proxy/rewrite.js';
 import type {CapturedExchange} from '../../../../src/modules/proxy/types.js';
+
+/** 只旁路 blocked.dev 的判定器（模拟 MitmModule.shouldBypass）。 */
+const bypassBlockedDev = (host: string): boolean =>
+  normalizeHost(host).includes('blocked.dev');
 
 /** 启动一个本地真实 HTTP 源站，返回其端口和关闭函数。 */
 async function startOriginServer() {
@@ -476,6 +482,136 @@ describe('MitmProxyServer', () => {
       port: 443,
     });
     assert.strictEqual(parseConnectAuthority(''), null);
+  });
+
+  it('命中的 HTTP 明文请求转发成功但不产生 capture', async () => {
+    const origin = await startOriginServer();
+    let captured: CapturedExchange | undefined;
+    const ca = new CaManager(mkdtempSync(path.join(os.tmpdir(), 'mitm-ca-')));
+    await ca.init();
+    const proxy = new MitmProxyServer(
+      ca,
+      exchange => {
+        captured = exchange;
+      },
+      undefined,
+      host => host === '127.0.0.1' || normalizeHost(host).includes('blocked.dev'),
+    );
+    await proxy.start(0);
+
+    try {
+      const target = `http://127.0.0.1:${origin.port}/anything`;
+      const res = await new Promise<{status: number; body: string}>(
+        (resolve, reject) => {
+          const req = http.request(
+            {
+              host: '127.0.0.1',
+              port: proxy.getPort()!,
+              path: target,
+              method: 'GET',
+              headers: {host: `127.0.0.1:${origin.port}`},
+            },
+            r => {
+              let body = '';
+              r.on('data', c => (body += c.toString('utf-8')));
+              r.on('end', () => resolve({status: r.statusCode ?? 0, body}));
+            },
+          );
+          req.on('error', reject);
+          req.end();
+        },
+      );
+      assert.strictEqual(res.status, 200, '连通性必须保留');
+      assert.strictEqual(res.body, 'hello-from-origin');
+      assert.strictEqual(captured, undefined, '命中过滤的域名不产生 capture');
+    } finally {
+      await proxy.stop();
+      await origin.close();
+    }
+  });
+
+  it('命中的 HTTPS CONNECT 走旁路且不产生 capture', async () => {
+    const origin = await startOriginServer();
+    let captured: CapturedExchange | undefined;
+    const ca = new CaManager(mkdtempSync(path.join(os.tmpdir(), 'mitm-ca-')));
+    await ca.init();
+    const proxy = new MitmProxyServer(
+      ca,
+      exchange => {
+        captured = exchange;
+      },
+      undefined,
+      bypassBlockedDev,
+    );
+    await proxy.start(0);
+
+    try {
+      const established = await new Promise<boolean>(resolve => {
+        const socket = net.connect(proxy.getPort()!, '127.0.0.1', () => {
+          socket.write(
+            `CONNECT blocked.dev:443 HTTP/1.1\r\nHost: blocked.dev:443\r\n\r\n`,
+          );
+        });
+        let buf = '';
+        socket.on('data', d => {
+          buf += d.toString('utf-8');
+          if (buf.includes('200 Connection Established')) {
+            socket.destroy();
+            resolve(true);
+          }
+        });
+        socket.on('error', () => resolve(false));
+        socket.setTimeout(5000, () => {
+          socket.destroy();
+          resolve(false);
+        });
+      });
+      assert.strictEqual(established, true, '旁路隧道也要回 200');
+      assert.strictEqual(captured, undefined);
+    } finally {
+      await proxy.stop();
+      await origin.close();
+    }
+  });
+
+  it('命中的明文 ws:// 建隧道但不产生 capture', async () => {
+    let captured: CapturedExchange | undefined;
+    const ca = new CaManager(mkdtempSync(path.join(os.tmpdir(), 'mitm-ca-')));
+    await ca.init();
+    const proxy = new MitmProxyServer(
+      ca,
+      exchange => {
+        captured = exchange;
+      },
+      undefined,
+      bypassBlockedDev,
+    );
+    await proxy.start(0);
+
+    try {
+      await new Promise<void>(resolve => {
+        const req = http.request({
+          host: '127.0.0.1',
+          port: proxy.getPort()!,
+          path: '/socket',
+          method: 'GET',
+          headers: {
+            host: 'blocked.dev',
+            connection: 'Upgrade',
+            upgrade: 'websocket',
+          },
+        });
+        req.on('upgrade', (_res, socket) => {
+          socket.destroy();
+          resolve();
+        });
+        req.on('error', () => resolve());
+        req.end();
+      });
+      assert.strictEqual(captured, undefined, '明文 ws:// 命中过滤不产生 capture');
+    } finally {
+      await proxy.stop();
+    }
   });
 });
 

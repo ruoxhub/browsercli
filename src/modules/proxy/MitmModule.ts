@@ -194,13 +194,7 @@ export class MitmModule {
     try {
       await this.caManager.init();
       if (!this.server) {
-        // SAFETY: MitmProxyServer constructor receives 4th argument (shouldBypass) wired here in Task 4 and consumed in Task 5.
-        this.server = new (MitmProxyServer as unknown as new (
-          caManager: CaManager,
-          onCaptured: (exchange: CapturedExchange) => void,
-          interceptor?: MitmInterceptor,
-          shouldBypass?: (host: string) => boolean,
-        ) => MitmProxyServer)(
+        this.server = new MitmProxyServer(
           this.caManager,
           exchange => {
             this.recordExchange(exchange);
