@@ -15,3 +15,7 @@ export {listMitmRules} from './listMitmRules.js';
 export {removeMitmRule} from './removeMitmRule.js';
 export {clearMitmRules} from './clearMitmRules.js';
 export {exportMitmHar} from './exportMitmHar.js';
+export {addHostFilter} from './addHostFilter.js';
+export {listHostFilters} from './listHostFilters.js';
+export {removeHostFilter} from './removeHostFilter.js';
+export {clearHostFilters} from './clearHostFilters.js';

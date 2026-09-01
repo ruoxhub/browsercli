@@ -554,6 +554,22 @@ export const GENERATED_TOOL_REGISTRY = [
     handlerName: 'exportMitmHar',
   },
   {
+    modulePath: './proxy/addHostFilter.js',
+    handlerName: 'addHostFilter',
+  },
+  {
+    modulePath: './proxy/listHostFilters.js',
+    handlerName: 'listHostFilters',
+  },
+  {
+    modulePath: './proxy/removeHostFilter.js',
+    handlerName: 'removeHostFilter',
+  },
+  {
+    modulePath: './proxy/clearHostFilters.js',
+    handlerName: 'clearHostFilters',
+  },
+  {
     modulePath: './rebuild/index.js',
     handlerName: 'exportRebuildBundle',
   },

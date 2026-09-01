@@ -20,6 +20,10 @@ const EXPECTED_TOOLS = [
   'mitm_remove_rule',
   'mitm_clear_rules',
   'mitm_export_har',
+  'mitm_add_host_filter',
+  'mitm_list_host_filters',
+  'mitm_remove_host_filter',
+  'mitm_clear_host_filters',
 ];
 
 interface ToolLike {

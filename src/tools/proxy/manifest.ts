@@ -55,5 +55,21 @@ export const manifest = {
       modulePath: './proxy/exportMitmHar.js',
       handlerName: 'exportMitmHar',
     },
+    {
+      modulePath: './proxy/addHostFilter.js',
+      handlerName: 'addHostFilter',
+    },
+    {
+      modulePath: './proxy/listHostFilters.js',
+      handlerName: 'listHostFilters',
+    },
+    {
+      modulePath: './proxy/removeHostFilter.js',
+      handlerName: 'removeHostFilter',
+    },
+    {
+      modulePath: './proxy/clearHostFilters.js',
+      handlerName: 'clearHostFilters',
+    },
   ],
 } satisfies DomainManifest;
