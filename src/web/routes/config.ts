@@ -13,6 +13,9 @@
  *  POST /api/llm/test             — 用当前/传入配置做一次最小 chat 调用验证可用性
  *  POST /api/browser/connect      — 调用 connectBrowser
  *  POST /api/browser/disconnect   — 调用 disconnectBrowser
+ *  GET  /api/config/export        — 导出已持久化配置快照（敏感字段掩码）
+ *  POST /api/config/import        — 校验并合并导入配置（缺失字段保留当前值）
+ *  POST /api/config/reset         — 删除配置缓存并重置为启动默认值
  */
 
 import type {IncomingMessage, ServerResponse} from 'node:http';

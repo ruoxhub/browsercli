@@ -129,8 +129,7 @@ export function GeneralSection({
   };
 
   const handleReset = async () => {
-    // 前端无 confirm 用法先例（全项目 window.confirm 零命中），
-    // 用两段式确认：首次点击把按钮切成「确认重置？」，再次点击才执行。
+    // 重置是破坏性操作，走原生 window.confirm 二次确认（本项目首例）。
     if (
       !window.confirm('确定重置为启动时的默认配置？这将删除本地缓存的配置。')
     ) {

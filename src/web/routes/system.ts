@@ -26,6 +26,7 @@ import {basename, isAbsolute, join, relative, resolve, sep} from 'node:path';
 import {RUNTIME_CONFIG_PATH} from '../../config/runtimeConfigPersistence.js';
 import {getLogDir} from '../../utils/logger.js';
 import {sendError, sendJson} from '../middleware/error.js';
+import type {LogContent, LogFileInfo, SystemInfo} from '../types.js';
 
 /** 单次日志读取上限（尾部截断） */
 const MAX_LOG_READ_BYTES = 1 * 1024 * 1024;
@@ -48,31 +49,6 @@ export interface SystemRoutesConfig {
   configPath?: string;
   /** 日志目录，默认 getLogDir()。测试注入 tmpdir。 */
   logDir?: string;
-}
-
-export interface LogFileInfo {
-  name: string;
-  sizeBytes: number;
-  mtimeMs: number;
-}
-
-export interface SystemInfo {
-  version: string;
-  node: string;
-  platform: string;
-  arch: string;
-  pid: number;
-  uptimeMs: number;
-  logDir: string;
-  logFiles: LogFileInfo[];
-  configPath: string;
-  configExists: boolean;
-}
-
-export interface LogContent {
-  fileName: string;
-  content: string;
-  truncated: boolean;
 }
 
 /**

@@ -286,7 +286,10 @@ export default function SettingsPage() {
 
       <div className="mt-4 flex items-center gap-1.5 text-[11px] text-[var(--color-text-muted)]">
         <Activity size={11} />
-        <span>分区独立保存：每区只提交本区字段，互不覆盖。</span>
+        <span>
+          浏览器与 LLM 两类配置分别提交、互不覆盖；浏览器连接 · 反检测 ·
+          采集三区共用同一份浏览器配置，任一区保存会一并提交当前浏览器配置。
+        </span>
       </div>
     </div>
   );
