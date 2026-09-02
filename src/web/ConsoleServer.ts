@@ -11,6 +11,7 @@ import {fileURLToPath} from 'node:url';
 
 import {WebSocketServer} from 'ws';
 
+import type {GlobalConfig} from '../config/schema.js';
 import type {Runtime} from '../runtime.js';
 import {
   ensureToolsMeta,
@@ -33,6 +34,7 @@ import {createHookRoutes} from './routes/hooks.js';
 import {createInvocationsRoutes} from './routes/invocations.js';
 import {createProxyRoutes} from './routes/proxy.js';
 import {createSessionRoutes} from './routes/session.js';
+import {createSystemRoutes} from './routes/system.js';
 import {createToolsRoutes} from './routes/tools.js';
 import {createWorkerRoutes, type WorkerRoutesConfig} from './routes/worker.js';
 import {WsHub} from './ws/WsHub.js';
@@ -46,6 +48,11 @@ export interface ConsoleServerOptions {
   invoker: SekiroInvoker;
   toolAdapter: ToolAdapter;
   apiToken?: string;
+  /**
+   * 重置配置时的 CLI 种子值；src/index.ts 传入 parseWorkerArgs() 结果。
+   * 与启动时 update(cliConfig) 的语义对齐：只有 WorkerArgs 认识的 flag 会保留。
+   */
+  configSeed?: Partial<GlobalConfig>;
   jobStore?: JobStore;
 }
 
@@ -150,6 +157,13 @@ export class ConsoleServer {
       createConfigRoutes({
         contextProvider: this.options.runtime.contextProvider!,
         wsHub: this.wsHub,
+        configSeed: this.options.configSeed,
+      }),
+    );
+    this.router.mount(
+      createSystemRoutes({
+        version,
+        startedAt: this.startedAt,
       }),
     );
     this.router.mount(

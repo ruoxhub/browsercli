@@ -124,6 +124,7 @@ async function main(): Promise<void> {
         toolAdapter,
         jobStore: new JobStore(),
         apiToken: process.env.WORKER_API_TOKEN,
+        configSeed: cliConfig,
       });
       await consoleServer.start();
       console.log(

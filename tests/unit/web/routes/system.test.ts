@@ -252,6 +252,19 @@ describe('system routes', () => {
       assert.strictEqual(json(mock).error?.code, 'LOG_FILE_NOT_FOUND');
     });
 
+    // Task 2 遗留补测：/logs 对非 ENOENT 的目录错误必须**传播**（抛出 →
+    // RestRouter 兜底 500 INTERNAL），不能被吞成空列表 —— 那会把 info 的
+    // 降级语义（见上方 info 用例）扭到 logs 头上，用户再也无从得知日志目录坏了。
+    // 这里把 logDir 指向一个普通文件：readdirSync 抛 ENOTDIR（非 ENOENT）。
+    it('propagates a non-ENOENT log dir error to the caller', () => {
+      const logDir = freshLogDir();
+      const notADir = path.join(logDir, 'plain-file.log');
+      writeFileSync(notADir, 'x', 'utf8');
+      const handler = routes(notADir).get('GET /api/system/logs')!;
+      const mock = mockReqRes('GET', '/api/system/logs');
+      assert.throws(() => handler(mock.req, mock.res), /ENOTDIR/);
+    });
+
     it('truncates to the last 1 MiB for a larger file', () => {
       const logDir = freshLogDir();
       const suffix = Buffer.from('TAIL-MARKER-OK', 'utf8');
