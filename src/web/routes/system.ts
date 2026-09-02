@@ -143,9 +143,10 @@ function listLogFiles(logDir: string): LogFileInfo[] {
     entries = readdirSync(logDir);
   } catch (err) {
     // 目录不存在 = 还没产生过日志，是正常状态；
-    // 其它错误（EACCES / EIO）必须抛出 → 由 RestRouter.dispatch 的 try/catch 转成 500
+    // 其它错误（EACCES / EIO）必须抛出，由调用方决定后果：
+    // /logs 让它冒到 RestRouter.dispatch 转 500；info 自己接住、降级成空列表。
     // （实际错码是 INTERNAL，不是 spec 里写的 LOG_DIR_READ_FAILED —— 要拿到后者
-    // 得在路由里自己包一层，本轮不加）。
+    // 得在路由里自己包一层，本轮不加。）
     // 早先这里是 `catch { return [] }`，把“目录不可读”伪装成“暂无日志文件”，
     // 用户在通用页看到空列表，而日志其实存在且读不出来。
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [];
@@ -181,6 +182,14 @@ export function createSystemRoutes(
     [
       'GET /api/system/info',
       (_req, res) => {
+        // 日志列表是环境信息里的次要数据：目录读不出来不应该把
+        // version / node / pid / configPath 一起赔进去。
+        let logFiles: LogFileInfo[] = [];
+        try {
+          logFiles = listLogFiles(logDir);
+        } catch {
+          // 保留空列表（与“目录不存在”同构）；错误本身仍由 /api/system/logs 暴露
+        }
         sendJson(res, {
           version: cfg.version,
           node: process.version,
@@ -189,7 +198,7 @@ export function createSystemRoutes(
           pid: process.pid,
           uptimeMs: Date.now() - cfg.startedAt,
           logDir,
-          logFiles: listLogFiles(logDir),
+          logFiles,
           configPath,
           configExists: existsSync(configPath),
         } satisfies SystemInfo);

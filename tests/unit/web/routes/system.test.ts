@@ -151,6 +151,27 @@ describe('system routes', () => {
       assert.ok(!names.includes('f20.log')); // 最旧的那条被切掉
       assert.strictEqual(names[0], 'f00.log'); // mtime 倒序，f00 最新
     });
+
+    // 日志列表只是环境信息里的次要数据：目录读不出来（这里用 ENOTDIR 模拟 ——
+    // 把 logDir 指向一个普通文件）不该把 version / node / pid / configPath 一起带走。
+    // 修复前 handler 直接抛 ENOTDIR → RestRouter 转 500 INTERNAL，整个 payload 丢光。
+    it('still returns 200 with an empty file list when the log dir is unreadable', () => {
+      const notADir = path.join(freshLogDir(), 'afile');
+      writeFileSync(notADir, 'not a directory', 'utf8');
+
+      const mock = call(notADir, '/api/system/info');
+      const parsed = json(mock);
+
+      assert.strictEqual(mock.status(), 200);
+      assert.ok(parsed.success);
+      assert.deepStrictEqual(parsed.data.logFiles, []);
+      assert.strictEqual(parsed.data.version, '9.9.9');
+      assert.strictEqual(parsed.data.node, process.version);
+      assert.strictEqual(parsed.data.pid, process.pid);
+      assert.strictEqual(parsed.data.logDir, notADir);
+      assert.strictEqual(parsed.data.configExists, false);
+      assert.ok(parsed.data.uptimeMs >= 5000);
+    });
   });
 
   describe('log path traversal defense', () => {
