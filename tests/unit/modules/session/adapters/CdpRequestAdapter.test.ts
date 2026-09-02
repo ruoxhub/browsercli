@@ -9,13 +9,19 @@ import {describe, it} from 'node:test';
 import type {Response} from 'patchright';
 
 import {MAX_CAPTURED_BODY_BYTES} from '../../../../../src/modules/network/constants.js';
-import {cdpResponseToInput} from '../../../../../src/modules/session/adapters/CdpRequestAdapter.js';
+import {
+  cdpResponseToInput,
+  readCdpResponseBody,
+} from '../../../../../src/modules/session/adapters/CdpRequestAdapter.js';
 
 interface FakeResponseOptions {
+  method?: string;
   status?: number;
   contentType?: string | null;
+  contentLength?: string;
   body?: string | null;
   postData?: string | null;
+  textThrows?: boolean;
 }
 
 function makeResponse(opts: FakeResponseOptions): Response {
@@ -23,17 +29,26 @@ function makeResponse(opts: FakeResponseOptions): Response {
   if (opts.contentType) {
     headers['content-type'] = opts.contentType;
   }
+  if (opts.contentLength !== undefined) {
+    headers['content-length'] = opts.contentLength;
+  }
   const request = {
-    method: () => 'POST',
+    method: () => opts.method ?? 'POST',
     url: () => 'https://a.dev/sign',
     headers: () => ({cookie: 'x=1'}),
     postData: () => opts.postData ?? '{"q":1}',
   };
   return {
-    status: () => opts.status ?? 204,
+    status: () => opts.status ?? 200,
     headers: () => headers,
+    url: () => 'https://a.dev/sign',
     request: () => request,
-    text: async () => opts.body ?? '',
+    text: async () => {
+      if (opts.textThrows) {
+        throw new Error('disposed');
+      }
+      return opts.body ?? '';
+    },
   } as unknown as Response;
 }
 
@@ -46,7 +61,7 @@ describe('cdpResponseToInput', () => {
     assert.strictEqual(input.source, 'cdp');
     assert.strictEqual(input.method, 'POST');
     assert.strictEqual(input.url, 'https://a.dev/sign');
-    assert.strictEqual(input.statusCode, 204);
+    assert.strictEqual(input.statusCode, 200);
     assert.strictEqual(input.requestBody, '{"q":1}');
     assert.strictEqual(input.responseBody, '{"ok":true}');
     assert.strictEqual(input.contentType, 'application/json');
@@ -153,6 +168,58 @@ describe('cdpResponseToInput', () => {
     assert.strictEqual(input.responseBody, 'ok');
   });
 
+  it('skips the body for 204, 205, 304, and 1xx responses without reading it', async () => {
+    for (const status of [204, 205, 304, 101]) {
+      let called = 0;
+      const input = await cdpResponseToInput(
+        makeResponse({status, contentType: 'application/json'}),
+        {
+          readBody: async () => {
+            called += 1;
+            return 'no-content-body';
+          },
+        },
+      );
+      assert.strictEqual(called, 0, `HTTP ${status} 不该取体`);
+      assert.strictEqual(input.responseBody, null);
+      assert.strictEqual(input.statusCode, status);
+    }
+  });
+
+  it('skips the body for HEAD requests without reading it', async () => {
+    let called = 0;
+    const input = await cdpResponseToInput(
+      makeResponse({method: 'HEAD', contentType: 'application/json'}),
+      {
+        readBody: async () => {
+          called += 1;
+          return 'head-body';
+        },
+      },
+    );
+    assert.strictEqual(called, 0, 'HEAD 请求不该取体');
+    assert.strictEqual(input.responseBody, null);
+  });
+
+  it('sets empty body for Content-Length 0 without reading it', async () => {
+    let called = 0;
+    const input = await cdpResponseToInput(
+      makeResponse({
+        status: 200,
+        contentType: 'application/json',
+        contentLength: '0',
+      }),
+      {
+        readBody: async () => {
+          called += 1;
+          return 'zero-body';
+        },
+      },
+    );
+    assert.strictEqual(called, 0, 'Content-Length: 0 不该发起 CDP 取体');
+    assert.strictEqual(input.responseBody, '');
+  });
+
   it('survives a request whose headers/postData accessors throw', async () => {
     const broken = {
       status: () => 500,
@@ -174,5 +241,19 @@ describe('cdpResponseToInput', () => {
     assert.strictEqual(input.requestHeaders, '{}');
     assert.strictEqual(input.requestBody, null);
     assert.strictEqual(input.statusCode, 500);
+  });
+});
+
+describe('readCdpResponseBody', () => {
+  it('reads response body text successfully', async () => {
+    const res = makeResponse({body: '{"status":"healthy"}'});
+    const result = await readCdpResponseBody(res);
+    assert.strictEqual(result, '{"status":"healthy"}');
+  });
+
+  it('returns null gracefully when response.text() throws', async () => {
+    const res = makeResponse({textThrows: true});
+    const result = await readCdpResponseBody(res);
+    assert.strictEqual(result, null);
   });
 });

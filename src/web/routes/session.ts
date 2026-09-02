@@ -8,6 +8,7 @@ import type {IncomingMessage, ServerResponse} from 'node:http';
 
 import type {AnalysisMode} from '../../modules/analyzer/ai/types.js';
 import {runSessionAnalysis} from '../../modules/session/analyzeRequests.js';
+import type {CaptureEngine} from '../../modules/session/CaptureEngine.js';
 import type {CaptureSessionManager} from '../../modules/session/CaptureSessionManager.js';
 import type {SessionStore} from '../../modules/session/SessionStore.js';
 import type {CaptureSource} from '../../modules/session/types.js';
@@ -33,6 +34,8 @@ export interface SessionServices {
   llmService: LLMService;
   /** 依 url 取脚本正文（供 CryptoScriptExtractor 切片）。 */
   getFileByUrl?: (url: string) => {content: string} | null;
+  /** 抓包聚合点，供双源开关路由读写 enabledSources。缺省则开关路由 503。 */
+  engine?: CaptureEngine;
 }
 
 /**
@@ -239,6 +242,59 @@ export function createSessionRoutes(
         } catch (err) {
           sendUnexpected(res, err);
         }
+      },
+    ],
+    [
+      'GET /api/session/capture-sources',
+      (_req, res) => {
+        const engine = getServices()?.engine;
+        if (!engine) {
+          sendError(res, 'SESSION_UNAVAILABLE', '抓包引擎未就绪', 503);
+          return;
+        }
+        sendJson(res, {sources: engine.getEnabledSources()});
+      },
+    ],
+    [
+      'POST /api/session/capture-sources',
+      async (req, res) => {
+        let source: string | undefined;
+        let enabled: boolean | undefined;
+        try {
+          const body = (await readJsonBody(req)) as {
+            source?: string;
+            enabled?: boolean;
+          };
+          if (body && typeof body.source === 'string') source = body.source;
+          if (body && typeof body.enabled === 'boolean') enabled = body.enabled;
+        } catch (err) {
+          const code = err instanceof Error ? err.message : 'INVALID_JSON';
+          sendError(res, code, '请求体不是合法 JSON', 400);
+          return;
+        }
+        if (
+          source === undefined ||
+          !(SOURCES as string[]).includes(source) ||
+          enabled === undefined
+        ) {
+          sendError(
+            res,
+            'BAD_REQUEST',
+            'source 必须是 cdp | proxy，enabled 必须是布尔值',
+            400,
+          );
+          return;
+        }
+        const engine = getServices()?.engine;
+        if (!engine) {
+          sendError(res, 'SESSION_UNAVAILABLE', '抓包引擎未就绪', 503);
+          return;
+        }
+        const sources = engine.setSourceEnabled(
+          source as CaptureSource,
+          enabled,
+        );
+        sendJson(res, {sources});
       },
     ],
     [

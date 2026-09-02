@@ -52,7 +52,7 @@ describe('console and network formatters', () => {
     const body = await Promise.race([
       formatter(
         {
-          buffer: async () => await new Promise<Buffer>(() => undefined),
+          body: async () => await new Promise<Buffer>(() => undefined),
         } as unknown as Parameters<typeof getFormattedResponseBody>[0],
         1000,
         10,

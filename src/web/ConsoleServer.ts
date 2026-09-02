@@ -178,6 +178,7 @@ export class ConsoleServer {
           llmService: this.options.runtime.llmService,
           getFileByUrl: (url: string) =>
             this.options.runtime.collector.getFileByUrl(url) ?? null,
+          engine,
         };
       }),
     );

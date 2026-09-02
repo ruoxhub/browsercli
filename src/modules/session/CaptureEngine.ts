@@ -10,6 +10,7 @@ import {DEFAULT_SESSION_KEEP, TRIM_EVERY_INGESTS} from './constants.js';
 import type {SessionStore} from './SessionStore.js';
 import {toSummary} from './summary.js';
 import type {
+  CaptureSource,
   CapturedRequestInput,
   CapturedRequestRow,
   HookRecordInput,
@@ -34,6 +35,9 @@ export interface CaptureEngineOptions {
  *    避免异常冒泡进 Playwright / MITM 的事件回调（spec §4 / R3）。
  * 2. WS 只推摘要（`toSummary`），body 的唯一出口是 REST 详情（spec §8 / R1）。
  * 3. 配额由本类（唯一写入方）按 ingest 计数摊销维护（spec §9 / D4）。
+ * 4. 双源独立开关：`enabledSources` 是 CDP / MITM 两条链路共用的总闸，
+ *    关闭某源后该源的 ingestRequest 静默早退（不落库、不建会话、不推 WS）。
+ *    默认双源开启，保持既有行为与测试兼容。
  */
 export class CaptureEngine {
   private emitToWs?: (event: {type: string; payload: unknown}) => void;
@@ -41,6 +45,10 @@ export class CaptureEngine {
   private readonly trimEveryIngests: number;
   private ingestsSinceTrim = 0;
   private failureCount = 0;
+  private readonly enabledSources = new Set<CaptureSource>([
+    'cdp',
+    'proxy',
+  ]);
 
   constructor(
     private readonly manager: CaptureSessionManager,
@@ -76,7 +84,28 @@ export class CaptureEngine {
     return this.failureCount;
   }
 
+  /** 该源是否开启捕获（默认 true）。 */
+  isSourceEnabled(source: CaptureSource): boolean {
+    return this.enabledSources.has(source);
+  }
+
+  /** 当前开启的捕获源快照（路由返回给前端渲染开关状态）。 */
+  getEnabledSources(): CaptureSource[] {
+    return [...this.enabledSources];
+  }
+
+  /** 开/关某条捕获源的摄入。返回更新后的开关集合。 */
+  setSourceEnabled(source: CaptureSource, enabled: boolean): CaptureSource[] {
+    if (enabled) this.enabledSources.add(source);
+    else this.enabledSources.delete(source);
+    return this.getEnabledSources();
+  }
+
   ingestRequest(input: CapturedRequestInput): CapturedRequestRow | null {
+    // 双源独立开关：关闭的源静默丢弃，不落库、不建会话、不推 WS。
+    if (!this.enabledSources.has(input.source)) {
+      return null;
+    }
     let row: CapturedRequestRow;
     try {
       const session = this.manager.ensureActiveSession();

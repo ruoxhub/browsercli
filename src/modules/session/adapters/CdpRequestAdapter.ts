@@ -43,7 +43,7 @@ export async function readCdpResponseBody(
       `Timed out reading CDP response body for ${response.url()}`,
     );
   } catch (error) {
-    logger.warn('[CaptureEngine][cdp] 响应体读取失败，按无 body 摄入', error);
+    logger.debug('[CaptureEngine][cdp] 响应体读取失败，按无 body 摄入', error);
     return null;
   }
 }
@@ -68,17 +68,31 @@ export async function cdpResponseToInput(
 
   const request = response.request();
   const statusCode = response.status();
-  const contentType = response.headers()['content-type'] ?? null;
+  const responseHeaders = tryGet(() => response.headers()) ?? {};
+  const contentType = responseHeaders['content-type'] ?? null;
   const isStreaming = Boolean(contentType?.includes('text/event-stream'));
   // 重定向响应在 Playwright 中不提供 body，调用 text() 会抛错（见 spec §5.1 之外
   // 的降级说明）。3xx 本就不该取体，直接按无 body 摄入，避免 WARN 噪声。
   const isRedirect = statusCode >= 300 && statusCode < 400;
+  // 1xx (信息响应), 204 (No Content), 205 (Reset Content), 304 (Not Modified) 等状态码按 HTTP 规范无响应体
+  const isNoContentStatus =
+    statusCode === 204 ||
+    statusCode === 205 ||
+    statusCode === 304 ||
+    (statusCode >= 100 && statusCode < 200);
+  const isHead = request.method().toUpperCase() === 'HEAD';
+  const contentLength = responseHeaders['content-length'];
+  const isZeroLength = contentLength === '0';
 
   let responseBody: string | null = null;
   let truncated = 0;
-  if (
+  if (isZeroLength) {
+    responseBody = '';
+  } else if (
     !isStreaming &&
     !isRedirect &&
+    !isNoContentStatus &&
+    !isHead &&
     contentType &&
     isTextualContentType(contentType)
   ) {
@@ -99,7 +113,7 @@ export async function cdpResponseToInput(
     requestHeaders: safeJson(tryGet(() => request.headers())),
     requestBody: tryGet(() => request.postData()) ?? null,
     statusCode,
-    responseHeaders: safeJson(tryGet(() => response.headers())),
+    responseHeaders: safeJson(responseHeaders),
     responseBody,
     contentType,
     initiator: null,
@@ -114,7 +128,7 @@ function tryGet<T>(accessor: () => T): T | undefined {
   try {
     return accessor();
   } catch (error) {
-    logger.warn('[CaptureEngine][cdp] 请求对象不可读，按缺省值摄入', error);
+    logger.debug('[CaptureEngine][cdp] 请求对象不可读，按缺省值摄入', error);
     return undefined;
   }
 }
