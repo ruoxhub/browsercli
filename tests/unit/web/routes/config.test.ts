@@ -7,6 +7,7 @@
 import assert from 'node:assert';
 import {afterEach, describe, it} from 'node:test';
 
+import {configFromEnv} from '../../../../src/config/resolver.js';
 import {
   resetRuntimeConfigStore,
   getRuntimeConfigStore,
@@ -549,6 +550,224 @@ describe('config routes', () => {
       assert.strictEqual(parsed.success, false);
       assert.strictEqual(parsed.error.code, 'LLM_MODELS_FETCH_FAILED');
       assert.ok(parsed.error.message.includes('401'));
+    });
+  });
+
+  describe('GET /api/config/export', () => {
+    it('contains only PERSISTED_KEYS with a masked apiKey', () => {
+      resetRuntimeConfigStore({
+        openai: {apiKey: 'sk-export1234', model: 'gpt-4o'},
+        llmProvider: 'openai',
+        browser: {headless: true},
+        rpcHost: 'ws://fixed:5612',
+      });
+
+      const routes = createConfigRoutes({
+        contextProvider: null,
+        wsHub: null,
+        persist: noopPersist,
+      } as never);
+
+      const handler = routes.get('GET /api/config/export')!;
+      const {req, res, getBody} = mockReqRes('GET');
+      handler(req, res);
+
+      const parsed = JSON.parse(getBody());
+      assert.ok(parsed.success);
+      // 只含白名单三项
+      assert.deepStrictEqual(Object.keys(parsed.data).sort(), [
+        'browser',
+        'llmProvider',
+        'openai',
+      ]);
+      // apiKey 恒掩码
+      assert.strictEqual(parsed.data.openai.apiKey, 'sk-***1234');
+      // 启动期固定值不导出
+      assert.strictEqual(parsed.data.rpcHost, undefined);
+    });
+  });
+
+  describe('POST /api/config/import', () => {
+    it('merges with current values instead of replacing', async () => {
+      resetRuntimeConfigStore({
+        openai: {apiKey: 'sk-current1234', model: 'gpt-4o'},
+        llmProvider: 'openai',
+        browser: {headless: true, channel: 'stable'},
+      });
+
+      const routes = createConfigRoutes({
+        contextProvider: null,
+        wsHub: null,
+        persist: noopPersist,
+      } as never);
+
+      const handler = routes.get('POST /api/config/import')!;
+      const {req, res, getBody} = mockReqRes('POST', {
+        llmProvider: 'openai',
+        openai: {model: 'gpt-4o-mini'},
+      });
+      await handler(req, res);
+
+      const parsed = JSON.parse(getBody());
+      assert.ok(parsed.success);
+      // 传入的 model 覆盖
+      assert.strictEqual(
+        getRuntimeConfigStore().get().openai?.model,
+        'gpt-4o-mini',
+      );
+      // 未传入的 browser 保留当前值（合并语义，非替换）
+      assert.deepStrictEqual(getRuntimeConfigStore().get().browser, {
+        headless: true,
+        channel: 'stable',
+      });
+    });
+
+    it('keeps the stored apiKey when the payload carries a mask placeholder', async () => {
+      resetRuntimeConfigStore({
+        openai: {apiKey: 'sk-real1234', model: 'gpt-4o'},
+        llmProvider: 'openai',
+      });
+
+      const routes = createConfigRoutes({
+        contextProvider: null,
+        wsHub: null,
+        persist: noopPersist,
+      } as never);
+
+      const handler = routes.get('POST /api/config/import')!;
+      const {req, res, getBody} = mockReqRes('POST', {
+        llmProvider: 'openai',
+        openai: {apiKey: 'sk-***1234', model: 'gpt-4o-mini'},
+      });
+      await handler(req, res);
+
+      const parsed = JSON.parse(getBody());
+      assert.ok(parsed.success);
+      // 掩码占位符不覆盖真实密钥
+      assert.strictEqual(
+        getRuntimeConfigStore().get().openai?.apiKey,
+        'sk-real1234',
+      );
+      assert.strictEqual(
+        getRuntimeConfigStore().get().openai?.model,
+        'gpt-4o-mini',
+      );
+    });
+
+    it('rejects a payload that fails schema validation with 400', async () => {
+      resetRuntimeConfigStore({llmProvider: 'openai'});
+
+      const routes = createConfigRoutes({
+        contextProvider: null,
+        wsHub: null,
+        persist: noopPersist,
+      } as never);
+
+      const handler = routes.get('POST /api/config/import')!;
+      const {req, res, getBody} = mockReqRes('POST', {
+        llmProvider: 'not-a-provider',
+      });
+      await handler(req, res);
+
+      const parsed = JSON.parse(getBody());
+      assert.strictEqual(parsed.success, false);
+      assert.strictEqual(parsed.error.code, 'VALIDATION');
+    });
+
+    it('calls the injected persist callback after importing', async () => {
+      resetRuntimeConfigStore({
+        openai: {apiKey: 'sk-persist1234', model: 'gpt-4o'},
+        llmProvider: 'openai',
+      });
+
+      let persistCalls = 0;
+      const routes = createConfigRoutes({
+        contextProvider: null,
+        wsHub: null,
+        persist: () => {
+          persistCalls += 1;
+        },
+      } as never);
+
+      const handler = routes.get('POST /api/config/import')!;
+      const {req, res} = mockReqRes('POST', {
+        llmProvider: 'openai',
+        openai: {model: 'gpt-4o-mini'},
+      });
+      await handler(req, res);
+
+      assert.strictEqual(persistCalls, 1);
+    });
+  });
+
+  describe('POST /api/config/reset', () => {
+    it('deletes the cache file and reseeds from env plus the CLI seed', () => {
+      resetRuntimeConfigStore({
+        openai: {apiKey: 'sk-dirty1234', model: 'dirty-model'},
+        browser: {headless: false},
+      });
+
+      let deleteCalls = 0;
+      const routes = createConfigRoutes({
+        contextProvider: null,
+        wsHub: null,
+        persist: noopPersist,
+        deleteConfig: () => {
+          deleteCalls += 1;
+          return true;
+        },
+        configSeed: {headless: true},
+      } as never);
+
+      const handler = routes.get('POST /api/config/reset')!;
+      const {req, res, getBody} = mockReqRes('POST', {});
+      handler(req, res);
+
+      const parsed = JSON.parse(getBody());
+      assert.ok(parsed.success);
+      assert.strictEqual(deleteCalls, 1);
+
+      // 重置后回到 configFromEnv() + configSeed 的合并结果，旧值被丢弃。
+      // 注意：configFromEnv() 会读开发者机器上真实的 OPENAI_* / BROWSER_* 环境变量，
+      // 所以断言必须拿 configFromEnv() 的返回值当基准，不能写死 undefined ——
+      // 否则任何设置了 OPENAI_MODEL 的机器都会让这条测试红。
+      const stored = getRuntimeConfigStore().get();
+      const envSeed = configFromEnv();
+      assert.strictEqual(stored.openai?.model, envSeed.openai?.model);
+      // configSeed 覆盖 env / 旧值
+      assert.strictEqual(stored.headless, true);
+      // 旧值已被丢弃（'dirty-model' 不是 env 值时才有意义，故用不等断言兜底）
+      assert.notStrictEqual(stored.openai?.apiKey, 'sk-dirty1234');
+    });
+
+    it('returns 500 and skips the reset when the cache delete fails', () => {
+      // 注意 headless 必须放在顶层（与 configSeed 同一层），否则这条断言无法
+      // 见证“半重置”：错误地把 configSeed 落下去只会改顶层 headless。
+      resetRuntimeConfigStore({
+        openai: {apiKey: 'sk-keepme1234', model: 'keep-model'},
+        headless: false,
+      });
+
+      const routes = createConfigRoutes({
+        contextProvider: null,
+        wsHub: null,
+        persist: noopPersist,
+        // 模拟 EPERM/EBUSY：文件删不掉
+        deleteConfig: () => false,
+        configSeed: {headless: true},
+      } as never);
+
+      const handler = routes.get('POST /api/config/reset')!;
+      const {req, res, getBody} = mockReqRes('POST', {});
+      handler(req, res);
+
+      const parsed = JSON.parse(getBody());
+      assert.strictEqual(parsed.success, false);
+      assert.strictEqual(parsed.error.code, 'CONFIG_DELETE_FAILED');
+      // 关键：删除失败时 store 必须原封不动（不能“半重置”）
+      const stored = getRuntimeConfigStore().get();
+      assert.strictEqual(stored.openai?.apiKey, 'sk-keepme1234');
+      assert.strictEqual(stored.headless, false);
     });
   });
 });

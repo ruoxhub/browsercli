@@ -17,12 +17,21 @@
 
 import type {IncomingMessage, ServerResponse} from 'node:http';
 
-import {persistRuntimeConfig} from '../../config/runtimeConfigPersistence.js';
-import {getRuntimeConfigStore} from '../../config/RuntimeConfigStore.js';
+import {configFromEnv} from '../../config/resolver.js';
+import {
+  deleteRuntimeConfig,
+  persistRuntimeConfig,
+  PERSISTED_KEYS,
+} from '../../config/runtimeConfigPersistence.js';
+import {
+  getRuntimeConfigStore,
+  resetRuntimeConfigStore,
+} from '../../config/RuntimeConfigStore.js';
 import type {AIConfig, GlobalConfig} from '../../config/schema.js';
 import {
   BrowserConfigSchema,
   formatConfigValidationError,
+  GlobalConfigSchema,
 } from '../../config/schema.js';
 import {
   createAIService,
@@ -63,6 +72,18 @@ export interface ConfigRoutesConfig {
    * 测试注入 no-op 以避免污染 ~/.browsercli/runtime-config.json。
    */
   persist?: (config: GlobalConfig) => void;
+  /**
+   * 重置时的 CLI 种子值；src/index.ts 传入 parseWorkerArgs() 结果。
+   * 未注入时 reset 只回到 configFromEnv()。
+   */
+  configSeed?: Partial<GlobalConfig>;
+  /**
+   * 删除缓存文件，默认 deleteRuntimeConfig。测试注入 no-op。
+   * 返回 false 表示删除失败（EPERM/EBUSY 等）—— reset 路由必须据此报错，
+   * 不能仍返回 200，否则“重置”是假的：文件还在，下次启动会重新播种旧配置
+   * （含 apiKey）。
+   */
+  deleteConfig?: () => boolean;
 }
 
 // ==================== 敏感字段掩码 ====================
@@ -197,6 +218,101 @@ export function createConfigRoutes(
       (_req, res) => {
         const config = getRuntimeConfigStore().get();
         sendJson(res, maskSensitiveFields(config));
+      },
+    ],
+
+    [
+      'GET /api/config/export',
+      (_req, res) => {
+        const current = getRuntimeConfigStore().get() as Record<
+          string,
+          unknown
+        >;
+        const exported: Record<string, unknown> = {};
+        for (const key of PERSISTED_KEYS) {
+          if (current[key] !== undefined) exported[key] = current[key];
+        }
+        sendJson(res, maskSensitiveFields(exported as GlobalConfig));
+      },
+    ],
+
+    [
+      'POST /api/config/import',
+      async (req, res) => {
+        let body: Record<string, unknown>;
+        try {
+          body = (await readJsonBody(req)) as Record<string, unknown>;
+        } catch (err) {
+          const code = err instanceof Error ? err.message : 'INVALID_JSON';
+          sendError(
+            res,
+            code,
+            code === 'PAYLOAD_TOO_LARGE'
+              ? '请求体超过 1MB 上限'
+              : '请求体不是合法 JSON',
+            code === 'PAYLOAD_TOO_LARGE' ? 413 : 400,
+          );
+          return;
+        }
+
+        const parseResult = GlobalConfigSchema.safeParse(body);
+        if (!parseResult.success) {
+          sendError(
+            res,
+            'VALIDATION',
+            formatConfigValidationError(parseResult.error),
+            400,
+          );
+          return;
+        }
+
+        const validated = parseResult.data as Record<string, unknown>;
+        const current = getRuntimeConfigStore().get() as Record<
+          string,
+          unknown
+        >;
+        const update: Record<string, unknown> = {};
+
+        for (const key of PERSISTED_KEYS) {
+          if (validated[key] === undefined) continue;
+          const incoming = validated[key] as Record<string, unknown>;
+          if (key === 'openai') {
+            // 掩码占位符不覆盖真实密钥（与 PUT /api/config/llm 一致）
+            update.openai = mergeLlmProvider(
+              incoming,
+              current.openai as Record<string, unknown> | undefined,
+            );
+          } else {
+            update[key] = incoming;
+          }
+        }
+
+        const updated = getRuntimeConfigStore().update(
+          update as Partial<GlobalConfig>,
+        );
+        (cfg.persist ?? persistRuntimeConfig)(updated);
+        sendJson(res, maskSensitiveFields(updated));
+      },
+    ],
+
+    [
+      'POST /api/config/reset',
+      (_req, res) => {
+        // 删除失败必须中断：否则返回 200 而文件仍在，下次启动重新播种旧配置
+        if (!(cfg.deleteConfig ?? deleteRuntimeConfig)()) {
+          sendError(
+            res,
+            'CONFIG_DELETE_FAILED',
+            '配置缓存文件删除失败，未执行重置',
+            500,
+          );
+          return;
+        }
+        resetRuntimeConfigStore({
+          ...configFromEnv(),
+          ...cfg.configSeed,
+        });
+        sendJson(res, maskSensitiveFields(getRuntimeConfigStore().get()));
       },
     ],
 
