@@ -121,16 +121,20 @@ describe('runtimeConfigPersistence', () => {
   });
 
   describe('deleteRuntimeConfig', () => {
-    it('removes an existing cache file', () => {
+    it('removes an existing cache file and reports success', () => {
       seedFile({llmProvider: 'openai'});
       assert.ok(existsSync(RUNTIME_CONFIG_PATH));
-      deleteRuntimeConfig();
+      assert.strictEqual(deleteRuntimeConfig(), true);
       assert.strictEqual(existsSync(RUNTIME_CONFIG_PATH), false);
     });
 
-    it('does not throw when the cache file is absent', () => {
+    // 返回 boolean 是给 Task 3 的 reset 路由用的：Windows 上 EPERM/EBUSY
+    // （另一个进程抱着文件）很常见，吐掉错误会让 reset 假成功 200，
+    // apiKey 留在盘上且下次启动回填。ENOENT = 本来就没有缓存 → true。
+    it('returns true without throwing when the cache file is absent', () => {
       if (existsSync(RUNTIME_CONFIG_PATH)) rmSync(RUNTIME_CONFIG_PATH);
-      assert.doesNotThrow(() => deleteRuntimeConfig());
+      assert.strictEqual(deleteRuntimeConfig(), true);
+      assert.strictEqual(existsSync(RUNTIME_CONFIG_PATH), false);
     });
   });
 });

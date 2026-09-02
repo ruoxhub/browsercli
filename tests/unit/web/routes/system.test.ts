@@ -5,18 +5,14 @@
  */
 
 import assert from 'node:assert';
-import {
-  existsSync,
-  mkdtempSync,
-  rmSync,
-  utimesSync,
-  writeFileSync,
-} from 'node:fs';
+import {mkdtempSync, rmSync, utimesSync, writeFileSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {after, before, describe, it} from 'node:test';
+import {after, describe, it} from 'node:test';
 
 import {createSystemRoutes} from '../../../../src/web/routes/system.js';
+
+const ONE_MIB = 1024 * 1024;
 
 function mockReqRes(method: string, url: string) {
   const req = {
@@ -52,17 +48,28 @@ function mockReqRes(method: string, url: string) {
 }
 
 describe('system routes', () => {
-  let logDir: string;
+  const tmpDirs: string[] = [];
 
-  before(() => {
-    logDir = mkdtempSync(path.join(os.tmpdir(), 'system-route-test-'));
-  });
+  /**
+   * 每条用例一个独立 tmpdir（而不是整个 describe 共享一个）。
+   * 早先共享目录时，info 用例断言“目录里恰好只有 new.log/old.log”，
+   * 只是因为它恰好排在写 read.log / dl.log 的用例前面才通过 —— 顺序一换就红。
+   */
+  function freshLogDir(): string {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'system-route-test-'));
+    tmpDirs.push(dir);
+    return dir;
+  }
 
-  after(() => {
-    if (existsSync(logDir)) rmSync(logDir, {recursive: true, force: true});
-  });
+  /** 把 mtime 往前挪 `ms`，用来造出确定的新旧顺序（同毫秒会平局）。 */
+  function age(file: string, ms: number): void {
+    const past = Date.now() - ms;
+    // 用顶部 import 的 utimesSync —— swc 编译产物是 ESM，
+    // 文件内 require('node:fs') 会抛 "require is not defined"（已实测）。
+    utimesSync(file, new Date(past), new Date(past));
+  }
 
-  function routes() {
+  function routes(logDir: string) {
     return createSystemRoutes({
       version: '9.9.9',
       startedAt: Date.now() - 5000,
@@ -71,21 +78,31 @@ describe('system routes', () => {
     });
   }
 
+  /** 取 handler、直接调用，返回读响应的三个 getter。 */
+  function call(logDir: string, url: string) {
+    const handler = routes(logDir).get(`GET ${url.split('?')[0]}`)!;
+    const mock = mockReqRes('GET', url);
+    handler(mock.req, mock.res);
+    return mock;
+  }
+
+  /** 解析响应体（沿用原测试里 `JSON.parse(getBody())` 的宽松程度）。 */
+  function json(mock: ReturnType<typeof call>) {
+    return JSON.parse(mock.getBody());
+  }
+
+  after(() => {
+    for (const dir of tmpDirs) rmSync(dir, {recursive: true, force: true});
+  });
+
   describe('GET /api/system/info', () => {
     it('returns environment fields and log files sorted by mtime desc', () => {
+      const logDir = freshLogDir();
       writeFileSync(path.join(logDir, 'old.log'), 'old', 'utf8');
       writeFileSync(path.join(logDir, 'new.log'), 'new', 'utf8');
-      // 保证 mtime 严格递增：直接改写 mtime，避免同毫秒内的平局。
-      // 用顶部 import 的 utimesSync —— swc 编译产物是 ESM，
-      // 文件内 require('node:fs') 会抛 "require is not defined"（已实测）。
-      const past = Date.now() - 60_000;
-      utimesSync(path.join(logDir, 'old.log'), new Date(past), new Date(past));
+      age(path.join(logDir, 'old.log'), 60_000);
 
-      const handler = routes().get('GET /api/system/info')!;
-      const {req, res, getBody} = mockReqRes('GET', '/api/system/info');
-      handler(req, res);
-
-      const parsed = JSON.parse(getBody());
+      const parsed = json(call(logDir, '/api/system/info'));
       assert.ok(parsed.success);
       assert.strictEqual(parsed.data.version, '9.9.9');
       assert.strictEqual(parsed.data.node, process.version);
@@ -100,7 +117,7 @@ describe('system routes', () => {
       );
       assert.strictEqual(parsed.data.configExists, false);
       assert.deepStrictEqual(
-        parsed.data.logFiles.map((f: {name: string}) => f.name).sort(),
+        parsed.data.logFiles.map((f: {name: string}) => f.name),
         ['new.log', 'old.log'],
       );
       // mtime 倒序：new.log 在前
@@ -108,81 +125,77 @@ describe('system routes', () => {
     });
 
     it('returns empty logFiles when the log directory is absent', () => {
-      const missing = path.join(logDir, 'no-such-subdir');
-      const handler = createSystemRoutes({
-        version: '1.0.0',
-        startedAt: Date.now(),
-        logDir: missing,
-      }).get('GET /api/system/info')!;
-      const {req, res, getBody} = mockReqRes('GET', '/api/system/info');
-      handler(req, res);
-
-      const parsed = JSON.parse(getBody());
+      const missing = path.join(freshLogDir(), 'no-such-subdir');
+      const parsed = json(call(missing, '/api/system/info'));
       assert.ok(parsed.success);
       assert.deepStrictEqual(parsed.data.logFiles, []);
+    });
+
+    it('caps the list at 20 files and skips non-.log entries', () => {
+      const logDir = freshLogDir();
+      for (let i = 0; i < 21; i++) {
+        const name = `f${String(i).padStart(2, '0')}.log`;
+        writeFileSync(path.join(logDir, name), name, 'utf8');
+        age(path.join(logDir, name), i * 1000);
+      }
+      // 目录里混进非日志文件：既不该进列表，也不该能被读出来
+      writeFileSync(path.join(logDir, 'notes.txt'), 'txt', 'utf8');
+      writeFileSync(path.join(logDir, 'runtime-config.json'), '{}', 'utf8');
+
+      const parsed = json(call(logDir, '/api/system/info'));
+      const names: string[] = parsed.data.logFiles.map(
+        (f: {name: string}) => f.name,
+      );
+      assert.strictEqual(names.length, 20);
+      assert.ok(names.every(name => name.endsWith('.log')));
+      assert.ok(!names.includes('f20.log')); // 最旧的那条被切掉
+      assert.strictEqual(names[0], 'f00.log'); // mtime 倒序，f00 最新
     });
   });
 
   describe('log path traversal defense', () => {
     it('rejects ../ traversal', () => {
-      const handler = routes().get('GET /api/system/logs')!;
-      const {req, res, getBody, status} = mockReqRes(
-        'GET',
+      const mock = call(
+        freshLogDir(),
         '/api/system/logs?file=../runtime-config.json',
       );
-      handler(req, res);
-
-      assert.strictEqual(status(), 400);
-      assert.strictEqual(
-        JSON.parse(getBody()).error.code,
-        'LOG_PATH_FORBIDDEN',
-      );
+      assert.strictEqual(mock.status(), 400);
+      assert.strictEqual(json(mock).error?.code, 'LOG_PATH_FORBIDDEN');
     });
 
     it('rejects absolute paths', () => {
-      const handler = routes().get('GET /api/system/logs')!;
-      const {req, res, getBody, status} = mockReqRes(
-        'GET',
-        '/api/system/logs?file=/etc/passwd',
-      );
-      handler(req, res);
-
-      assert.strictEqual(status(), 400);
-      assert.strictEqual(
-        JSON.parse(getBody()).error.code,
-        'LOG_PATH_FORBIDDEN',
-      );
+      const mock = call(freshLogDir(), '/api/system/logs?file=/etc/passwd');
+      assert.strictEqual(mock.status(), 400);
+      assert.strictEqual(json(mock).error?.code, 'LOG_PATH_FORBIDDEN');
     });
 
     // 形状校验单独挡不住 `..`（不含分隔符、也不绝对），join 后会落到
     // logDir 的父目录（= ~/.browsercli）。实测修复前返回 200。
     it('rejects bare .. which resolves outside the log dir', () => {
-      const handler = routes().get('GET /api/system/logs')!;
-      const {req, res, getBody, status} = mockReqRes(
-        'GET',
-        '/api/system/logs?file=..',
-      );
-      handler(req, res);
+      const mock = call(freshLogDir(), '/api/system/logs?file=..');
+      assert.strictEqual(mock.status(), 400);
+      assert.strictEqual(json(mock).error?.code, 'LOG_PATH_FORBIDDEN');
+    });
 
-      assert.strictEqual(status(), 400);
-      assert.strictEqual(
-        JSON.parse(getBody()).error.code,
-        'LOG_PATH_FORBIDDEN',
-      );
+    // listLogFiles 只广播 *.log，但修复前 `?file=notes.txt` 能把目录里
+    // 任意真文件读出来（实测 200 + 全文）。现在两边口径一致。
+    it('rejects a real non-.log file inside the log dir', () => {
+      const logDir = freshLogDir();
+      writeFileSync(path.join(logDir, 'notes.txt'), 'SECRET-NOTES', 'utf8');
+      const mock = call(logDir, '/api/system/logs?file=notes.txt');
+
+      assert.strictEqual(mock.status(), 400);
+      assert.strictEqual(json(mock).error?.code, 'LOG_PATH_FORBIDDEN');
+      assert.ok(!mock.getBody().includes('SECRET-NOTES'));
     });
   });
 
   describe('GET /api/system/logs', () => {
     it('returns file content', () => {
+      const logDir = freshLogDir();
       writeFileSync(path.join(logDir, 'read.log'), 'hello log', 'utf8');
-      const handler = routes().get('GET /api/system/logs')!;
-      const {req, res, getBody} = mockReqRes(
-        'GET',
-        '/api/system/logs?file=read.log',
-      );
-      handler(req, res);
+      const parsed = json(call(logDir, '/api/system/logs?file=read.log'));
 
-      const parsed = JSON.parse(getBody());
       assert.ok(parsed.success);
       assert.strictEqual(parsed.data.fileName, 'read.log');
       assert.strictEqual(parsed.data.content, 'hello log');
@@ -190,51 +203,84 @@ describe('system routes', () => {
     });
 
     it('returns 404 when the file does not exist', () => {
-      const handler = routes().get('GET /api/system/logs')!;
-      const {req, res, getBody, status} = mockReqRes(
-        'GET',
-        '/api/system/logs?file=nope.log',
-      );
-      handler(req, res);
+      const mock = call(freshLogDir(), '/api/system/logs?file=nope.log');
+      assert.strictEqual(mock.status(), 404);
+      assert.strictEqual(json(mock).error?.code, 'LOG_FILE_NOT_FOUND');
+    });
 
-      assert.strictEqual(status(), 404);
-      assert.strictEqual(
-        JSON.parse(getBody()).error.code,
-        'LOG_FILE_NOT_FOUND',
-      );
+    // 面板初次进「日志」区走的就是这条无 file 的路径，此前零覆盖。
+    it('falls back to the newest log when file is omitted', () => {
+      const logDir = freshLogDir();
+      writeFileSync(path.join(logDir, 'older.log'), 'older body', 'utf8');
+      writeFileSync(path.join(logDir, 'latest.log'), 'latest body', 'utf8');
+      age(path.join(logDir, 'older.log'), 60_000);
+
+      const parsed = json(call(logDir, '/api/system/logs'));
+      assert.ok(parsed.success);
+      assert.strictEqual(parsed.data.fileName, 'latest.log');
+      assert.strictEqual(parsed.data.content, 'latest body');
+      assert.strictEqual(parsed.data.truncated, false);
+    });
+
+    it('returns 404 when the log dir has no .log file', () => {
+      const logDir = freshLogDir();
+      writeFileSync(path.join(logDir, 'notes.txt'), 'txt', 'utf8');
+      const mock = call(logDir, '/api/system/logs');
+
+      assert.strictEqual(mock.status(), 404);
+      assert.strictEqual(json(mock).error?.code, 'LOG_FILE_NOT_FOUND');
+    });
+
+    it('truncates to the last 1 MiB for a larger file', () => {
+      const logDir = freshLogDir();
+      const suffix = Buffer.from('TAIL-MARKER-OK', 'utf8');
+      const file = path.join(logDir, 'big.log');
+      writeFileSync(file, Buffer.concat([Buffer.alloc(ONE_MIB, 0x41), suffix]));
+
+      const parsed = json(call(logDir, '/api/system/logs?file=big.log'));
+      assert.ok(parsed.success);
+      assert.strictEqual(parsed.data.truncated, true);
+      assert.ok(parsed.data.content.length <= ONE_MIB);
+      assert.ok(parsed.data.content.endsWith('TAIL-MARKER-OK'));
+      assert.ok(parsed.data.content.startsWith('A'));
+      // 短读（statSync 与 readSync 之间文件变短）留下的 NUL 填充也归到这里断
+      assert.ok(!parsed.data.content.includes('\u0000'));
     });
   });
 
   describe('GET /api/system/logs/download', () => {
     it('sets attachment headers and returns plain text', () => {
+      const logDir = freshLogDir();
       writeFileSync(path.join(logDir, 'dl.log'), 'download me', 'utf8');
-      const handler = routes().get('GET /api/system/logs/download')!;
-      const {req, res, getBody, headers} = mockReqRes(
-        'GET',
-        '/api/system/logs/download?file=dl.log',
-      );
-      handler(req, res);
+      const mock = call(logDir, '/api/system/logs/download?file=dl.log');
 
+      assert.strictEqual(mock.status(), 200);
       assert.strictEqual(
-        headers()['content-type'],
+        mock.headers()['content-type'],
         'text/plain; charset=utf-8',
       );
       assert.strictEqual(
-        headers()['content-disposition'],
+        mock.headers()['content-disposition'],
         'attachment; filename="dl.log"',
       );
-      assert.strictEqual(getBody(), 'download me');
+      assert.strictEqual(mock.getBody(), 'download me');
     });
 
     it('returns 400 on traversal attempts', () => {
-      const handler = routes().get('GET /api/system/logs/download')!;
-      const {req, res, status} = mockReqRes(
-        'GET',
+      const mock = call(
+        freshLogDir(),
         '/api/system/logs/download?file=../secret.log',
       );
-      handler(req, res);
+      assert.strictEqual(mock.status(), 400);
+    });
 
-      assert.strictEqual(status(), 400);
+    it('returns 404 for a missing .log file', () => {
+      const mock = call(
+        freshLogDir(),
+        '/api/system/logs/download?file=nope.log',
+      );
+      assert.strictEqual(mock.status(), 404);
+      assert.strictEqual(json(mock).error?.code, 'LOG_FILE_NOT_FOUND');
     });
   });
 });

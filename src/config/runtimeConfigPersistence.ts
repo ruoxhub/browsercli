@@ -96,14 +96,19 @@ export function shouldAutoConnectOnStartup(config: GlobalConfig): boolean {
 
 /**
  * 删除缓存文件（供「重置配置」使用）。
- * ENOENT 视为成功（本来就没有缓存），其余错误仅记录到 console 后继续 ——
- * 与 persistRuntimeConfig 的静默风格一致。
+ * 返回是否真的删干净：ENOENT 本来就没有缓存，算成功；其余错误（Windows 上
+ * 文件被其它进程抱着时 EPERM/EBUSY 很常见）记录到 console 并返回 false，
+ * 让调用方（Task 3 的 reset 路由）能区分“已重置”和“没删掉”。
+ * 之前返回 void 吐掉所有错误 → reset 永远回 200，实际 apiKey 还在盘上，
+ * 下次进程启动又把用户刚删的配置回填。
  */
-export function deleteRuntimeConfig(): void {
+export function deleteRuntimeConfig(): boolean {
   try {
     unlinkSync(RUNTIME_CONFIG_PATH);
+    return true;
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return;
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return true;
     console.error('[runtime-config] 删除缓存失败:', err);
+    return false;
   }
 }

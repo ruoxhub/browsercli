@@ -77,7 +77,11 @@ export interface LogContent {
 
 /**
  * 把用户提供的文件名解析为日志目录内的绝对路径。
- * 返回 undefined 表示路径穿越（调用方返回 400）。
+ * 返回 undefined 表示非法输入（调用方返回 400）。
+ *
+ * 只接受 `*.log`：listLogFiles 也只广播 `.log`，两边口径一致。
+ * 实测修复前 `?file=notes.txt`（logDir 内的真文件）返回 200 + 内容，
+ * 一个列表里从不出现、也没理由进面板的文件被读出来了。
  *
  * 注意顺序：**先校验形状，再 basename**。
  * 早先的写法是 `join(logDir, basename(file))` —— 但 `basename('../x.json')`
@@ -93,7 +97,14 @@ export interface LogContent {
  * `../runtime-config.json` 已被形状校验拒掉），但这里不该靠巧合说话。
  */
 function resolveLogFile(logDir: string, file: string): string | undefined {
-  if (!file || isAbsolute(file) || file !== basename(file)) return undefined;
+  if (
+    !file ||
+    !file.endsWith('.log') ||
+    isAbsolute(file) ||
+    file !== basename(file)
+  ) {
+    return undefined;
+  }
   const root = resolve(logDir);
   const resolved = resolve(join(root, file));
   const rel = relative(root, resolved);
@@ -111,10 +122,13 @@ function readLogTail(filePath: string): LogContent {
   const fd = openSync(filePath, 'r');
   try {
     const buf = Buffer.alloc(size);
-    readSync(fd, buf, 0, size, start);
+    // 必须按实际读到的字节数切片：statSync 与 readSync 之间日志轮转/截断
+    // 会让文件变短，buf 是 Buffer.alloc 零初始化的，剩下的就是 U+0000，
+    // 面板会渲染一排 NUL（reviewer 实测：bytesRead=4 / staleSize=10 → "ABCD\u0000…"）。
+    const bytesRead = readSync(fd, buf, 0, size, start);
     return {
       fileName: basename(filePath),
-      content: buf.toString('utf8'),
+      content: buf.subarray(0, bytesRead).toString('utf8'),
       truncated: start > 0,
     };
   } finally {
