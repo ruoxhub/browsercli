@@ -46,15 +46,15 @@ Web 控制台的「连接设置」页（`src/web-ui/src/routes/settings.tsx`，6
 
 ## 2. 决策纪要（已拍板）
 
-| 议题 | 决策 |
-|---|---|
-| 改造范围 | C 档：结构 + 字段 + 新后端能力 |
-| 导出 apiKey | 恒为掩码占位符（`sk-***1234`），复用现有 `isMaskPlaceholder()` |
-| 日志能力 | 后端返回路径 + 文件列表 + 下载；不 spawn 桌面文件管理器 |
-| 重置语义 | 删除缓存文件 + 回到启动种子值（`configFromEnv()` + CLI seed） |
+| 议题           | 决策                                                                            |
+| -------------- | ------------------------------------------------------------------------------- |
+| 改造范围       | C 档：结构 + 字段 + 新后端能力                                                  |
+| 导出 apiKey    | 恒为掩码占位符（`sk-***1234`），复用现有 `isMaskPlaceholder()`                  |
+| 日志能力       | 后端返回路径 + 文件列表 + 下载；不 spawn 桌面文件管理器                         |
+| 重置语义       | 删除缓存文件 + 回到启动种子值（`configFromEnv()` + CLI seed）                   |
 | CLI 参数保不保 | 保 —— `ConsoleServerOptions` 新增 `configSeed`，`src/index.ts` 传入 `cliConfig` |
-| 分区保存 | 每区独立保存按钮，只提交本区字段（复用 `update()` 浅合并） |
-| 验证边界 | 后端 node:test 单测 + 前端 `web:typecheck` |
+| 分区保存       | 每区独立保存按钮，只提交本区字段（复用 `update()` 浅合并）                      |
+| 验证边界       | 后端 node:test 单测 + 前端 `web:typecheck`                                      |
 
 ---
 
@@ -79,11 +79,11 @@ export interface SystemRoutesConfig {
 }
 ```
 
-| 接口 | 方法 | 说明 |
-|---|---|---|
-| `/api/system/info` | GET | 见 §3.2 |
-| `/api/system/logs` | GET | `?file=<name>`，省略取最新。JSON 信封 `LogContent` |
-| `/api/system/logs/download` | GET | `?file=<name>`。`text/plain` + `Content-Disposition: attachment`，走浏览器原生下载 |
+| 接口                        | 方法 | 说明                                                                               |
+| --------------------------- | ---- | ---------------------------------------------------------------------------------- |
+| `/api/system/info`          | GET  | 见 §3.2                                                                            |
+| `/api/system/logs`          | GET  | `?file=<name>`，省略取最新。JSON 信封 `LogContent`                                 |
+| `/api/system/logs/download` | GET  | `?file=<name>`。`text/plain` + `Content-Disposition: attachment`，走浏览器原生下载 |
 
 ```ts
 export interface LogContent {
@@ -97,9 +97,16 @@ export interface LogContent {
 超出则 `truncated: true`。日志目录会随每次启动累积文件，不加限制会让一个请求吃满
 内存。download 接口同样受此上限约束 —— 它返回的不是完整原始文件（见 §8 风险 2）。
 
-**路径穿越防御（两个接口共用）**：`path.basename(file)` → `join(logDir, base)` →
-`path.relative(logDir, resolved)`，凡以 `..` 开头或为绝对路径一律 400
-（`LOG_PATH_FORBIDDEN`）。与 `ConsoleServer` 静态资源分派（`:242-247`）同一套手法。
+**路径穿越防御（两个接口共用）**：先形状检查（`!file || !file.endsWith('.log') ||
+`isAbsolute(file) || file !== path.basename(file)`一律拒绝），再做`path.relative`
+包含性检查。顺序不能反：`basename('../x')`是`'x'`，若先 basename 后 relative，
+穿越检查永远不可达（实现中发现的真实漏洞，已用测试钉死）。凡拒绝一律 400
+（`LOG_PATH_FORBIDDEN`）。另外`.endsWith('.log')`同时把`notes.txt` 这类
+非日志文件挡在外面（即使它们真的在日志目录里）。
+
+> **实现与初稿的偏差**（以实现为准）：单次 `readSync` 可能短读（日志轮转/截断
+> 发生在 `statSync` 与 `readSync` 之间时，残余 `Buffer.alloc` 会解码成 U+0000 填充），
+> 实现按返回的 `bytesRead` 切片。`deleteRuntimeConfig()` 的签名与错误码见 §3.4/§6。
 
 日志读取上限：单次最多读 1 MiB（`MAX_LOG_READ_BYTES`），超出按尾部截断并在响应里带
 `truncated: true`。日志目录可能积累大量文件，不加限制会让一个请求吃满内存。
@@ -112,13 +119,13 @@ export interface LogContent {
 ```ts
 export interface SystemInfo {
   version: string;
-  node: string;        // process.version
-  platform: string;    // process.platform
-  arch: string;        // process.arch
+  node: string; // process.version
+  platform: string; // process.platform
+  arch: string; // process.arch
   pid: number;
-  uptimeMs: number;    // Date.now() - startedAt
+  uptimeMs: number; // Date.now() - startedAt
   logDir: string;
-  logFiles: LogFileInfo[];   // mtime 倒序，最多 20 条
+  logFiles: LogFileInfo[]; // mtime 倒序，最多 20 条
   configPath: string;
   configExists: boolean;
 }
@@ -141,8 +148,11 @@ export interface LogFileInfo {
 ### 3.4 `src/config/runtimeConfigPersistence.ts` 改动
 
 - 导出 `PERSISTED_KEYS`（现有模块私有常量，`export`/`import` 需共用同一份白名单）。
-- 新增 `deleteRuntimeConfig(): void` —— `unlinkSync(RUNTIME_CONFIG_PATH)`，`ENOENT` 静默，
-  其他错误 `console.error` 后继续（与 `persistRuntimeConfig` 的静默风格一致）。
+- 新增 `deleteRuntimeConfig(): boolean` —— `unlinkSync(RUNTIME_CONFIG_PATH)`，
+  `ENOENT` 视为成功返回 `true`（幂等）；其他错误（Windows 上 EPERM/EBUSY 常见，
+  例如另一进程正持有文件）`console.error` 后返回 `false`。
+  返回值不是装饰：reset 路由必须据此中断，否则“删除失败但返回 200”意味着
+  文件（含 apiKey）留在盘上，下次启动重新播种旧配置，重置形同虚设。
 
 ### 3.5 `src/web/routes/config.ts` 追加三条路由
 
@@ -155,11 +165,11 @@ configSeed?: Partial<GlobalConfig>;
 deleteConfig?: () => void;
 ```
 
-| 接口 | 方法 | 行为 |
-|---|---|---|
-| `/api/config/export` | GET | 从 `store.get()` 中按 `PERSISTED_KEYS` 过滤 → `maskSensitiveFields()` → 返回。apiKey 恒掩码 |
+| 接口                 | 方法 | 行为                                                                                                                                                                                         |
+| -------------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/api/config/export` | GET  | 从 `store.get()` 中按 `PERSISTED_KEYS` 过滤 → `maskSensitiveFields()` → 返回。apiKey 恒掩码                                                                                                  |
 | `/api/config/import` | POST | body 经 `GlobalConfigSchema.safeParse` 校验（失败 400 `VALIDATION`）→ 按 `PERSISTED_KEYS` 过滤 → `mergeLlmProvider()` 跳过掩码占位符 → `store.update()` → `persist()` → 返回掩码后的最新配置 |
-| `/api/config/reset` | POST | `deleteConfig()` → `resetRuntimeConfigStore({...configFromEnv(), ...configSeed})` → 返回重置后配置 |
+| `/api/config/reset`  | POST | `deleteConfig()` → `resetRuntimeConfigStore({...configFromEnv(), ...configSeed})` → 返回重置后配置                                                                                           |
 
 **`import` 是合并语义，不是替换。** 选定理由：替换需要给 `RuntimeConfigStore` 新增
 `replace()` 方法（新代码 + 新语义）；合并直接复用现有 `update()` 的 `DEEP_MERGE_KEYS`
@@ -218,13 +228,13 @@ className 常量，输入控件仍是原生 `<input>` / `<select>` —— 不造
 
 ### 4.3 分区与字段
 
-| 分区 | 字段 | 保存目标 |
-|---|---|---|
-| 通用 | 版本 / Node / 平台 / 架构 / PID / uptime、配置路径 + 文件是否存在、日志目录路径 + 复制按钮、日志文件列表（名称/大小/时间）+ 下载、导出配置 / 导入配置 / 重置配置 | — |
-| 浏览器连接 | headless、channel、browserURL、wsEndpoint、executablePath、isolated；顶部连接状态徽标 + 连接/断开按钮 | `PUT /api/config/browser` |
-| 反检测 | cloak、jsStealth、fullStealthArgs、minimalStealth、useStealthScripts、userAgent、viewport（宽 × 高） | `PUT /api/config/browser` |
-| LLM Provider | provider、apiKey、baseURL、model；获取模型列表 + 测试连接 | `PUT /api/config/llm` |
-| 采集与限制 | maxCollectedUrls、maxFilesPerCollect、maxTotalContentSize、maxSingleFileSize、timeout、waitForBrowserTimeoutMs | `PUT /api/config/browser` |
+| 分区         | 字段                                                                                                                                                             | 保存目标                  |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| 通用         | 版本 / Node / 平台 / 架构 / PID / uptime、配置路径 + 文件是否存在、日志目录路径 + 复制按钮、日志文件列表（名称/大小/时间）+ 下载、导出配置 / 导入配置 / 重置配置 | —                         |
+| 浏览器连接   | headless、channel、browserURL、wsEndpoint、executablePath、isolated；顶部连接状态徽标 + 连接/断开按钮                                                            | `PUT /api/config/browser` |
+| 反检测       | cloak、jsStealth、fullStealthArgs、minimalStealth、useStealthScripts、userAgent、viewport（宽 × 高）                                                             | `PUT /api/config/browser` |
+| LLM Provider | provider、apiKey、baseURL、model；获取模型列表 + 测试连接                                                                                                        | `PUT /api/config/llm`     |
+| 采集与限制   | maxCollectedUrls、maxFilesPerCollect、maxTotalContentSize、maxSingleFileSize、timeout、waitForBrowserTimeoutMs                                                   | `PUT /api/config/browser` |
 
 **viewport 的「未设置」处理**：schema 里 `viewport` 是 `{width, height}` 正整数，
 无 null 分支。UI 上空字符串视为「不提交该字段」—— 两个数字框任一为空，整个
@@ -269,14 +279,22 @@ className 常量，输入控件仍是原生 `<input>` / `<select>` —— 不造
 
 ## 6. 错误处理约定
 
-| 场景 | code | HTTP |
-|---|---|---|
-| 日志文件路径穿越 | `LOG_PATH_FORBIDDEN` | 400 |
-| 日志文件不存在 | `LOG_FILE_NOT_FOUND` | 404 |
-| 日志目录读取失败 | `LOG_DIR_READ_FAILED` | 500 |
-| 日志文件读取失败 | `LOG_FILE_READ_FAILED` | 500 |
-| 导入 payload 非法 JSON | `INVALID_JSON` | 400 |
-| 导入 payload 校验失败 | `VALIDATION` | 400 |
+| 场景                   | code                   | HTTP |
+| ---------------------- | ---------------------- | ---- |
+| 日志文件路径穿越       | `LOG_PATH_FORBIDDEN`   | 400  |
+| 日志文件不存在         | `LOG_FILE_NOT_FOUND`   | 404  |
+| 日志文件读取失败       | `LOG_FILE_READ_FAILED` | 500  |
+| 导入 payload 非法 JSON | `INVALID_JSON`         | 400  |
+| 导入 payload 校验失败  | `VALIDATION`           | 400  |
+| reset 缓存删除失败     | `CONFIG_DELETE_FAILED` | 500  |
+
+与初稿的两处偏差（以实现为准）：
+
+1. **没有 `LOG_DIR_READ_FAILED`**。`listLogFiles` 对非 `ENOENT` 的 `readdir`
+   错误直接抛出，落入 `RestRouter` 的兑底 → `INTERNAL`。消费方分支应判
+   `status === 500` 而不是判错误码（Task 7 据此实现）。
+2. **`/api/system/info` 对列表错误单独降级为 `logFiles: []`**（不抛）：
+   环境端点的次要数据不拖垮整个负载；真正的错误仍由 `/api/system/logs` 暴露。
 
 全部经 `sendError()`（`src/web/middleware/error.js`）返回统一信封，与
 `config.ts` 现有路由一致。
@@ -285,11 +303,11 @@ className 常量，输入控件仍是原生 `<input>` / `<select>` —— 不造
 
 ## 7. 测试计划
 
-| 文件 | 新增用例 |
-|---|---|
-| `tests/unit/web/routes/system.test.ts`（新） | info 字段齐全且 `logFiles` 按 mtime 倒序；日志目录不存在时 `logFiles: []`；路径穿越（`../`、绝对路径）被拒；正常读取返回内容；文件不存在 404 |
-| `tests/unit/web/routes/config.test.ts` | export 只含 `PERSISTED_KEYS` 三项且 apiKey 掩码；import 与现有值合并（非替换）；import 遇掩码占位符保留真值；import 非法 payload 400；import 后调用 `persist`；reset 删缓存文件 + 回到 `configFromEnv()` + `configSeed` 合并结果 |
-| `tests/unit/config/runtimeConfigPersistence.test.ts` | `deleteRuntimeConfig()` 删除已存在文件；文件不存在时不抛 |
+| 文件                                                 | 新增用例                                                                                                                                                                                                                         |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tests/unit/web/routes/system.test.ts`（新）         | info 字段齐全且 `logFiles` 按 mtime 倒序；日志目录不存在时 `logFiles: []`；路径穿越（`../`、绝对路径）被拒；正常读取返回内容；文件不存在 404                                                                                     |
+| `tests/unit/web/routes/config.test.ts`               | export 只含 `PERSISTED_KEYS` 三项且 apiKey 掩码；import 与现有值合并（非替换）；import 遇掩码占位符保留真值；import 非法 payload 400；import 后调用 `persist`；reset 删缓存文件 + 回到 `configFromEnv()` + `configSeed` 合并结果 |
+| `tests/unit/config/runtimeConfigPersistence.test.ts` | `deleteRuntimeConfig()` 删除已存在文件；文件不存在时不抛                                                                                                                                                                         |
 
 测试注入约定沿用 `config.test.ts` 现状：`persist` 注入 no-op 避免污染
 `~/.browsercli/runtime-config.json`；`system.ts` 的 `logDir` 注入 `node:os.tmpdir()`
