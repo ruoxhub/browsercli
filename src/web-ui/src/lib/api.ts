@@ -249,4 +249,19 @@ export const api = {
   clearSessionRequests(): Promise<{clearedCount: number}> {
     return request<{clearedCount: number}>('DELETE', '/api/session/requests');
   },
+
+  getCaptureSources(): Promise<{sources: string[]}> {
+    return request<{sources: string[]}>('GET', '/api/session/capture-sources');
+  },
+
+  setCaptureSource(
+    source: 'cdp' | 'proxy',
+    enabled: boolean,
+  ): Promise<{sources: string[]}> {
+    return request<{sources: string[]}>(
+      'POST',
+      '/api/session/capture-sources',
+      {source, enabled},
+    );
+  },
 };

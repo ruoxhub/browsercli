@@ -47,7 +47,11 @@ function isStaticRequest(req: SessionRequestDetail): boolean {
 }
 
 export const ProxyRequestDetail: React.FC = () => {
-  const {selectedDetail, detailLoading} = useProxyStore();
+  // 字段级订阅：只依赖 detail 与 loading 两个慢变字段。
+  // 若改用无选择器的 useProxyStore()，任何 requests/status 变化都会令
+  // 详情面板重渲染，渲染成本随流量线性放大。
+  const selectedDetail = useProxyStore(s => s.selectedDetail);
+  const detailLoading = useProxyStore(s => s.detailLoading);
   const [activeTab, setActiveTab] = useState<DetailTab>('general');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 

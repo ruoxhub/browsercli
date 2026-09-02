@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import {Globe, Inbox} from 'lucide-react';
-import React, {useEffect, useMemo, useRef} from 'react';
+import React, {memo, useEffect, useMemo, useRef} from 'react';
 
 import type {SessionRequestSummaryEvent} from '../../lib/protocol';
 import {useProxyStore} from '../../stores/proxy';
@@ -63,30 +63,133 @@ function sourceBadgeClass(source: string): string {
     : 'bg-sky-500/15 text-sky-400 border-sky-500/30';
 }
 
+interface RequestRowProps {
+  req: SessionRequestSummaryEvent;
+  selected: boolean;
+  checked: boolean;
+  timeStr: string;
+  contentTypeTag: string;
+  onSelectRow: (id: string) => void;
+  onToggle: (id: string) => void;
+}
+
+/**
+ * 单行 memo 化：请求对象在 store 里按 id 保持引用稳定（addBatch 只替换
+ * 变更项），列表中未变化的行在本组件后续渲染中直接跳过 DOM 重建，只对
+ * 新增/更新的行做 diff。
+ */
+const RequestRow = memo(function RequestRow({
+  req,
+  selected,
+  checked,
+  timeStr,
+  contentTypeTag,
+  onSelectRow,
+  onToggle,
+}: RequestRowProps) {
+  return (
+    <div
+      onClick={() => onSelectRow(req.id)}
+      className={`group flex items-center justify-between px-3.5 py-2.5 cursor-pointer text-xs transition-all duration-150 border-l-2 ${
+        selected
+          ? 'bg-[var(--color-accent)]/10 border-l-[var(--color-accent)] text-[var(--color-text-primary)] shadow-inner'
+          : 'border-l-transparent hover:bg-[var(--color-bg-secondary)]/80 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+      }`}
+    >
+      {/* Left summary items */}
+      <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-3">
+        {/* Multi-select checkbox */}
+        <span
+          onClick={e => e.stopPropagation()}
+          className="shrink-0 flex items-center"
+        >
+          <input
+            type="checkbox"
+            checked={checked}
+            onChange={() => onToggle(req.id)}
+            className="w-3.5 h-3.5 rounded border border-[var(--color-border-default)] accent-[var(--color-accent)] cursor-pointer"
+            title="勾选后参与 AI 分析"
+          />
+        </span>
+
+        {/* Source badge */}
+        <span
+          className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold border uppercase shrink-0 ${sourceBadgeClass(
+            req.source,
+          )}`}
+        >
+          {req.source === 'proxy' ? 'Proxy' : 'CDP'}
+        </span>
+
+        {/* Method badge */}
+        <span
+          className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border uppercase shrink-0 ${getMethodBadgeClass(
+            req.method,
+          )}`}
+        >
+          {req.method}
+        </span>
+
+        {/* Status code badge */}
+        <span
+          className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${getStatusBadgeClass(
+            req.statusCode,
+          )}`}
+        >
+          {req.statusCode || '-'}
+        </span>
+
+        {/* URL Display */}
+        <div className="min-w-0 flex-1">
+          <p
+            className="truncate font-mono text-[11px] text-[var(--color-text-primary)] group-hover:text-[var(--color-accent)] transition-colors"
+            title={req.url}
+          >
+            {req.url}
+          </p>
+        </div>
+      </div>
+
+      {/* Right metadata items */}
+      <div className="flex items-center gap-2 shrink-0 font-mono text-[10px] text-[var(--color-text-muted)]">
+        {/* Content-Type Tag */}
+        <span className="px-1.5 py-0.5 rounded bg-[var(--color-bg-tertiary)] border border-[var(--color-border-default)] text-[9px] font-medium">
+          {contentTypeTag}
+        </span>
+
+        {/* Timestamp */}
+        <span>{timeStr}</span>
+      </div>
+    </div>
+  );
+});
+
 export const ProxyRequestList: React.FC<ProxyRequestListProps> = ({
   onSelect,
 }) => {
-  const {
-    requests,
-    selectedId,
-    autoScroll,
-    filter,
-    sourceFilter,
-    selectedIds,
-    selectRequest,
-    toggleSelect,
-    selectAllVisible,
-    clearSelection,
-  } = useProxyStore();
-  const listContainerRef = useRef<HTMLDivElement>(null);
-  const activeItemRef = useRef<HTMLDivElement>(null);
+  // 字段级订阅：任何单一字段变化都只触发本组件渲染，而非无选择器订阅时的
+  // 「任何一次 requests/status/filter 喷发都全量重渲染」。
+  const requests = useProxyStore(s => s.requests);
+  const selectedId = useProxyStore(s => s.selectedId);
+  const autoScroll = useProxyStore(s => s.autoScroll);
+  const filter = useProxyStore(s => s.filter);
+  // 双源开关：展示哪些 source 由后端开关决定（CDP 开关 + MITM 运行态）。
+  const cdpEnabled = useProxyStore(s => s.cdpEnabled);
+  const mitmRunning = useProxyStore(s => s.status?.running ?? false);
+  const selectedIds = useProxyStore(s => s.selectedIds);
+  const selectRequest = useProxyStore(s => s.selectRequest);
+  const toggleSelect = useProxyStore(s => s.toggleSelect);
+  const selectAllVisible = useProxyStore(s => s.selectAllVisible);
+  const clearSelection = useProxyStore(s => s.clearSelection);
 
-  // Filter requests based on source, method and search text
+  const listContainerRef = useRef<HTMLDivElement>(null);
+
+  // Filter requests based on enabled sources, method and search text
   const filteredRequests = useMemo(() => {
     return requests.filter(req => {
-      if (sourceFilter !== 'all' && req.source !== sourceFilter) {
-        return false;
-      }
+      // 双源开关：未被开启的 source 不展示（源自后端开关，非临时显示过滤）。
+      if (req.source === 'cdp' && !cdpEnabled) return false;
+      if (req.source === 'proxy' && !mitmRunning) return false;
       if (
         filter.method &&
         req.method.toUpperCase() !== filter.method.toUpperCase()
@@ -104,7 +207,26 @@ export const ProxyRequestList: React.FC<ProxyRequestListProps> = ({
       }
       return true;
     });
-  }, [requests, filter, sourceFilter]);
+  }, [requests, filter, cdpEnabled, mitmRunning]);
+
+  // 预计算每行展示的派生字符串：Date 格式化与 content-type 归一化搬到
+  // 渲染前一次完成，行组件拿到的都是标量，render 阶段零额外计算。
+  const rows = useMemo(
+    () =>
+      filteredRequests.map(req => ({
+        req,
+        timeStr: new Date(req.timestamp).toLocaleTimeString(),
+        contentTypeTag: simplifyContentType(req.contentType),
+      })),
+    [filteredRequests],
+  );
+
+  const visibleIdsCount = filteredRequests.length;
+
+  const handleSelectRow = (id: string) => {
+    void selectRequest(id);
+    onSelect?.(id);
+  };
 
   // Handle auto-scroll to top/new requests
   useEffect(() => {
@@ -145,8 +267,7 @@ export const ProxyRequestList: React.FC<ProxyRequestListProps> = ({
 
         const nextReq = filteredRequests[nextIndex];
         if (nextReq) {
-          void selectRequest(nextReq.id);
-          onSelect?.(nextReq.id);
+          handleSelectRow(nextReq.id);
         }
       }
     };
@@ -154,11 +275,6 @@ export const ProxyRequestList: React.FC<ProxyRequestListProps> = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [filteredRequests, selectedId, selectRequest, onSelect]);
-
-  const handleItemClick = (req: SessionRequestSummaryEvent) => {
-    void selectRequest(req.id);
-    onSelect?.(req.id);
-  };
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-[var(--color-bg-primary)]/50">
@@ -168,11 +284,11 @@ export const ProxyRequestList: React.FC<ProxyRequestListProps> = ({
           <input
             type="checkbox"
             checked={
-              filteredRequests.length > 0 &&
+              visibleIdsCount > 0 &&
               filteredRequests.every(r => selectedIds.includes(r.id))
             }
             onChange={() => selectAllVisible(filteredRequests.map(r => r.id))}
-            disabled={filteredRequests.length === 0}
+            disabled={visibleIdsCount === 0}
             className="w-3.5 h-3.5 rounded border border-[var(--color-border-default)] accent-[var(--color-accent)] cursor-pointer disabled:opacity-40"
           />
           <span className="text-[var(--color-text-muted)]">全选</span>
@@ -197,7 +313,7 @@ export const ProxyRequestList: React.FC<ProxyRequestListProps> = ({
         tabIndex={0}
         className="flex-1 flex flex-col min-h-0 overflow-y-auto outline-none select-none divide-y divide-[var(--color-border-muted)]"
       >
-        {filteredRequests.length === 0 ? (
+        {visibleIdsCount === 0 ? (
           <div className="h-full flex flex-col items-center justify-center p-8 text-center space-y-3">
             <div className="w-12 h-12 rounded-2xl bg-[var(--color-bg-tertiary)] border border-[var(--color-border-default)] flex items-center justify-center text-[var(--color-text-muted)]">
               {requests.length === 0 ? (
@@ -221,90 +337,18 @@ export const ProxyRequestList: React.FC<ProxyRequestListProps> = ({
             </div>
           </div>
         ) : (
-          filteredRequests.map(req => {
-            const isSelected = selectedId === req.id;
-            const isChecked = selectedIds.includes(req.id);
-            const timeStr = new Date(req.timestamp).toLocaleTimeString();
-            const contentTypeTag = simplifyContentType(req.contentType);
-
-            return (
-              <div
-                key={req.id}
-                ref={isSelected ? activeItemRef : null}
-                onClick={() => handleItemClick(req)}
-                className={`group flex items-center justify-between px-3.5 py-2.5 cursor-pointer text-xs transition-all duration-150 border-l-2 ${
-                  isSelected
-                    ? 'bg-[var(--color-accent)]/10 border-l-[var(--color-accent)] text-[var(--color-text-primary)] shadow-inner'
-                    : 'border-l-transparent hover:bg-[var(--color-bg-secondary)]/80 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-                }`}
-              >
-                {/* Left summary items */}
-                <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-3">
-                  {/* Multi-select checkbox */}
-                  <span
-                    onClick={e => e.stopPropagation()}
-                    className="shrink-0 flex items-center"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isChecked}
-                      onChange={() => toggleSelect(req.id)}
-                      className="w-3.5 h-3.5 rounded border border-[var(--color-border-default)] accent-[var(--color-accent)] cursor-pointer"
-                      title="勾选后参与 AI 分析"
-                    />
-                  </span>
-
-                  {/* Source badge */}
-                  <span
-                    className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold border uppercase shrink-0 ${sourceBadgeClass(
-                      req.source,
-                    )}`}
-                  >
-                    {req.source === 'proxy' ? 'Proxy' : 'CDP'}
-                  </span>
-
-                  {/* Method badge */}
-                  <span
-                    className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border uppercase shrink-0 ${getMethodBadgeClass(
-                      req.method,
-                    )}`}
-                  >
-                    {req.method}
-                  </span>
-
-                  {/* Status code badge */}
-                  <span
-                    className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${getStatusBadgeClass(
-                      req.statusCode,
-                    )}`}
-                  >
-                    {req.statusCode || '-'}
-                  </span>
-
-                  {/* URL Display */}
-                  <div className="min-w-0 flex-1">
-                    <p
-                      className="truncate font-mono text-[11px] text-[var(--color-text-primary)] group-hover:text-[var(--color-accent)] transition-colors"
-                      title={req.url}
-                    >
-                      {req.url}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Right metadata items */}
-                <div className="flex items-center gap-2 shrink-0 font-mono text-[10px] text-[var(--color-text-muted)]">
-                  {/* Content-Type Tag */}
-                  <span className="px-1.5 py-0.5 rounded bg-[var(--color-bg-tertiary)] border border-[var(--color-border-default)] text-[9px] font-medium">
-                    {contentTypeTag}
-                  </span>
-
-                  {/* Timestamp */}
-                  <span>{timeStr}</span>
-                </div>
-              </div>
-            );
-          })
+          rows.map(({req, timeStr, contentTypeTag}) => (
+            <RequestRow
+              key={req.id}
+              req={req}
+              selected={selectedId === req.id}
+              checked={selectedIds.includes(req.id)}
+              timeStr={timeStr}
+              contentTypeTag={contentTypeTag}
+              onSelectRow={handleSelectRow}
+              onToggle={toggleSelect}
+            />
+          ))
         )}
       </div>
     </div>

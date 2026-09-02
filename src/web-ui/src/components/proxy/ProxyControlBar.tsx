@@ -41,21 +41,19 @@ const METHODS = [
 export const ProxyControlBar: React.FC<ProxyControlBarProps> = ({
   onOpenCaModal,
 }) => {
-  const {
-    status,
-    autoScroll,
-    filter,
-    sourceFilter,
-    pages,
-    selectedPageId,
-    selectedIds,
-    setStatus,
-    setAutoScroll,
-    setFilter,
-    setSourceFilter,
-    selectTab,
-    clearRequests,
-  } = useProxyStore();
+  const status = useProxyStore(s => s.status);
+  const autoScroll = useProxyStore(s => s.autoScroll);
+  const filter = useProxyStore(s => s.filter);
+  const cdpEnabled = useProxyStore(s => s.cdpEnabled);
+  const pages = useProxyStore(s => s.pages);
+  const selectedPageId = useProxyStore(s => s.selectedPageId);
+  const selectedIds = useProxyStore(s => s.selectedIds);
+  const setStatus = useProxyStore(s => s.setStatus);
+  const setAutoScroll = useProxyStore(s => s.setAutoScroll);
+  const setFilter = useProxyStore(s => s.setFilter);
+  const setCdpEnabled = useProxyStore(s => s.setCdpEnabled);
+  const selectTab = useProxyStore(s => s.selectTab);
+  const clearRequests = useProxyStore(s => s.clearRequests);
 
   const analysisMode = useAnalysisStore(state => state.mode);
   const setAnalysisMode = useAnalysisStore(state => state.setMode);
@@ -124,6 +122,18 @@ export const ProxyControlBar: React.FC<ProxyControlBarProps> = ({
     }
   };
 
+  const handleToggleCdp = async () => {
+    const target = !cdpEnabled;
+    // 乐观更新，失败回滚。
+    setCdpEnabled(target);
+    try {
+      await api.setCaptureSource('cdp', target);
+    } catch (err) {
+      console.error('Failed to toggle CDP capture:', err);
+      setCdpEnabled(!target);
+    }
+  };
+
   return (
     <div className="flex flex-col border-b border-[var(--color-border-default)] bg-[var(--color-bg-secondary)]/80 backdrop-blur-md px-4 py-2.5 gap-2.5">
       {/* Top action row */}
@@ -157,6 +167,26 @@ export const ProxyControlBar: React.FC<ProxyControlBarProps> = ({
               />
             )}
             <span>{isRunning ? '停止代理' : '启动抓包'}</span>
+          </button>
+
+          {/* CDP 采集开关（独立于 MITM 的启动/停止） */}
+          <button
+            onClick={handleToggleCdp}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm ${
+              cdpEnabled
+                ? 'bg-sky-500/15 border border-sky-500/30 text-sky-400 hover:bg-sky-500/25 hover:border-sky-500/50'
+                : 'bg-[var(--color-bg-primary)]/70 border border-[var(--color-border-default)] text-[var(--color-text-muted)] hover:border-sky-500/30 hover:text-sky-400'
+            }`}
+            title="采集浏览器（CDP）流量"
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${
+                cdpEnabled
+                  ? 'bg-sky-400 animate-pulse'
+                  : 'bg-[var(--color-text-muted)]'
+              }`}
+            />
+            <span>CDP 采集</span>
           </button>
 
           {/* Tab Selector */}
@@ -343,40 +373,6 @@ export const ProxyControlBar: React.FC<ProxyControlBarProps> = ({
 
       {/* Bottom filter row */}
       <div className="flex flex-wrap items-center gap-2.5">
-        {/* Source Filter */}
-        <div className="relative">
-          <select
-            value={sourceFilter}
-            onChange={e =>
-              setSourceFilter(e.target.value as 'all' | 'cdp' | 'proxy')
-            }
-            className="appearance-none bg-[var(--color-bg-primary)] border border-[var(--color-border-default)] text-xs font-mono font-bold text-[var(--color-text-primary)] rounded-xl pl-3 pr-8 py-1.5 focus:outline-none focus:border-[var(--color-accent)] cursor-pointer"
-          >
-            <option
-              value="all"
-              className="bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]"
-            >
-              全部
-            </option>
-            <option
-              value="cdp"
-              className="bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]"
-            >
-              CDP
-            </option>
-            <option
-              value="proxy"
-              className="bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]"
-            >
-              MITM
-            </option>
-          </select>
-          <ChevronDown
-            size={12}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] pointer-events-none"
-          />
-        </div>
-
         {/* Method Filter Dropdown */}
         <div className="relative">
           <select

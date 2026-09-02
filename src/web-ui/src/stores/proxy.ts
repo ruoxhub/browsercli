@@ -33,15 +33,18 @@ export interface ProxyState {
   };
   setRequests: (requests: SessionRequestSummaryEvent[]) => void;
   addRequest: (req: SessionRequestSummaryEvent) => void;
+  /** 批量合并同帧推送，一次 set 落地，避免高频频道每条一次渲染。 */
+  addBatch: (reqs: SessionRequestSummaryEvent[]) => void;
   clearRequests: () => void;
   selectRequest: (id: string | null) => Promise<void>;
   setStatus: (status: ProxyStatusPayload) => void;
   setAutoScroll: (autoScroll: boolean) => void;
   setFilter: (filter: Partial<ProxyState['filter']>) => void;
-  sourceFilter: 'all' | 'cdp' | 'proxy';
+  /** CDP 采集是否开启（后端双源开关，默认关）。 */
+  cdpEnabled: boolean;
   pages: PageInfo[];
   selectedPageId: string | null;
-  setSourceFilter: (sourceFilter: 'all' | 'cdp' | 'proxy') => void;
+  setCdpEnabled: (cdpEnabled: boolean) => void;
   loadPages: () => Promise<void>;
   selectTab: (pageId: string) => Promise<void>;
   selectedIds: string[];
@@ -62,7 +65,7 @@ export const useProxyStore = create<ProxyState>((set, get) => ({
     method: '',
     statusFilter: '',
   },
-  sourceFilter: 'all',
+  cdpEnabled: false,
   pages: [],
   selectedPageId: null,
   selectedIds: [],
@@ -87,6 +90,25 @@ export const useProxyStore = create<ProxyState>((set, get) => ({
         newRequests = newRequests.slice(0, 2000);
       }
 
+      return {requests: newRequests};
+    }),
+
+  addBatch: reqs =>
+    set(state => {
+      if (reqs.length === 0) return {};
+      // 同帧去重：以 id 为键，后到的 update（如 statusCode 落位）覆盖先到的 insert。
+      const byId = new Map(state.requests.map(r => [r.id, r]));
+      const order: string[] = [];
+
+      for (const req of reqs) {
+        if (!byId.has(req.id)) order.push(req.id);
+        byId.set(req.id, {...byId.get(req.id), ...req});
+      }
+
+      let newRequests = [...order.map(id => byId.get(id)!), ...state.requests];
+      if (newRequests.length > 2000) {
+        newRequests = newRequests.slice(0, 2000);
+      }
       return {requests: newRequests};
     }),
 
@@ -149,7 +171,7 @@ export const useProxyStore = create<ProxyState>((set, get) => ({
       },
     })),
 
-  setSourceFilter: sourceFilter => set({sourceFilter}),
+  setCdpEnabled: cdpEnabled => set({cdpEnabled}),
 
   loadPages: async () => {
     try {
