@@ -17,6 +17,7 @@ import {
 import {useEffect, useState} from 'react';
 import {HashRouter as Router, Routes, Route, NavLink} from 'react-router-dom';
 
+import {ErrorBoundary} from './components/ErrorBoundary';
 import wsClient from './lib/ws';
 import HooksPage from './routes/hooks';
 import OverviewPage from './routes/overview';
@@ -154,32 +155,34 @@ function Layout() {
 
       {/* Main Container */}
       <main className="flex-1 flex flex-col min-w-0 h-full pt-16 md:pt-0 overflow-hidden relative">
-        <Routes>
-          <Route
-            path="/"
-            element={<OverviewPage />}
-          />
-          <Route
-            path="/tools"
-            element={<ToolsPage />}
-          />
-          <Route
-            path="/proxy"
-            element={<ProxyPage />}
-          />
-          <Route
-            path="/hooks"
-            element={<HooksPage />}
-          />
-          <Route
-            path="/report"
-            element={<ReportPage />}
-          />
-          <Route
-            path="/settings"
-            element={<SettingsPage />}
-          />
-        </Routes>
+        <ErrorBoundary fallbackTitle="页面加载出错">
+          <Routes>
+            <Route
+              path="/"
+              element={<OverviewPage />}
+            />
+            <Route
+              path="/tools"
+              element={<ToolsPage />}
+            />
+            <Route
+              path="/proxy"
+              element={<ProxyPage />}
+            />
+            <Route
+              path="/hooks"
+              element={<HooksPage />}
+            />
+            <Route
+              path="/report"
+              element={<ReportPage />}
+            />
+            <Route
+              path="/settings"
+              element={<SettingsPage />}
+            />
+          </Routes>
+        </ErrorBoundary>
       </main>
     </div>
   );
