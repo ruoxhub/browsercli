@@ -698,6 +698,38 @@ describe('config routes', () => {
 
       assert.strictEqual(persistCalls, 1);
     });
+
+    it('treats an empty apiKey as “留空则不修改” instead of throwing', async () => {
+      // store 里 llmProvider 已是 openai，但 payload 不带 llmProvider ——
+      // 这样 GlobalConfigSchema 的 superRefine 不会在入口拦住 ''，
+      // 空串会一路走到 store.update 里的 validateGlobalConfig 抛错（修复前）。
+      resetRuntimeConfigStore({
+        openai: {apiKey: 'sk-keepme1234', model: 'gpt-4o'},
+        llmProvider: 'openai',
+      });
+
+      const routes = createConfigRoutes({
+        contextProvider: null,
+        wsHub: null,
+        persist: noopPersist,
+      } as never);
+
+      const handler = routes.get('POST /api/config/import')!;
+      const {req, res, getBody} = mockReqRes('POST', {
+        openai: {apiKey: ''},
+      });
+      // 修复前：此处抛出（handler 逸出），由 RestRouter 兜底成 500 INTERNAL + 裸 zod 文本。
+      await handler(req, res);
+
+      const parsed = JSON.parse(getBody());
+      assert.ok(parsed.success);
+      assert.strictEqual((res as {statusCode: number}).statusCode, 200);
+      // 密钥不得被清空
+      assert.strictEqual(
+        getRuntimeConfigStore().get().openai?.apiKey,
+        'sk-keepme1234',
+      );
+    });
   });
 
   describe('POST /api/config/reset', () => {

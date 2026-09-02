@@ -277,11 +277,13 @@ export function createConfigRoutes(
           if (validated[key] === undefined) continue;
           const incoming = validated[key] as Record<string, unknown>;
           if (key === 'openai') {
-            // 掩码占位符不覆盖真实密钥（与 PUT /api/config/llm 一致）
-            update.openai = mergeLlmProvider(
+            // 与 PUT /api/config/llm 同一个合并助手：掩码占位符不覆盖真实密钥，
+            // 空串按「留空则不修改」保留存量值（否则 '' 会透到 store.update 的
+            // validateGlobalConfig 里抛错，被 RestRouter 兜底成 500 INTERNAL）。
+            update.openai = mergeOpenaiConfig(
               incoming,
               current.openai as Record<string, unknown> | undefined,
-            );
+            ) as GlobalConfig['openai'];
           } else {
             update[key] = incoming;
           }
