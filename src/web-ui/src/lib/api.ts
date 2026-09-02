@@ -5,9 +5,12 @@
  */
 import type {
   ApiResponse,
+  ExportedConfig,
+  LogContent,
+  RuntimeConfig,
+  SystemInfo,
   WorkerFullStatus,
   InvocationRecord,
-  RuntimeConfig,
   BrowserConfig,
   ConnectResult,
   LlmTestResult,
@@ -137,6 +140,27 @@ export const api = {
     openai?: Record<string, unknown>;
   }): Promise<RuntimeConfig> {
     return request<RuntimeConfig>('PUT', '/api/config/llm', config);
+  },
+
+  getSystemInfo(): Promise<SystemInfo> {
+    return request<SystemInfo>('GET', '/api/system/info');
+  },
+
+  getSystemLog(file?: string): Promise<LogContent> {
+    const query = file ? `?file=${encodeURIComponent(file)}` : '';
+    return request<LogContent>('GET', `/api/system/logs${query}`);
+  },
+
+  exportConfig(): Promise<ExportedConfig> {
+    return request<ExportedConfig>('GET', '/api/config/export');
+  },
+
+  importConfig(config: ExportedConfig): Promise<RuntimeConfig> {
+    return request<RuntimeConfig>('POST', '/api/config/import', config);
+  },
+
+  resetConfig(): Promise<RuntimeConfig> {
+    return request<RuntimeConfig>('POST', '/api/config/reset', {});
   },
 
   testLlmConfig(config: {

@@ -286,6 +286,7 @@ export interface GetMitmRequestData {
 
 // ==================== Session Capture Types (channel: session.request) ====================
 
+import type {BrowserConfig, GlobalConfig} from '../config/schema.js';
 import type {
   CapturedRequestSummary,
   CaptureSource,
@@ -348,4 +349,44 @@ export interface SessionAnalysisPayload {
   mode: SessionAnalysisMode;
   llmUsed: boolean;
   requestCount: number;
+}
+
+// ==================== System Info & Logs ====================
+
+export interface LogFileInfo {
+  name: string;
+  sizeBytes: number;
+  mtimeMs: number;
+}
+
+export interface SystemInfo {
+  version: string;
+  node: string;
+  platform: string;
+  arch: string;
+  pid: number;
+  uptimeMs: number;
+  logDir: string;
+  logFiles: LogFileInfo[];
+  configPath: string;
+  configExists: boolean;
+}
+
+export interface LogContent {
+  fileName: string;
+  content: string;
+  truncated: boolean;
+}
+
+/**
+ * `GET /api/config/export` 的响应体 —— 只含 PERSISTED_KEYS 三项，apiKey 恒掩码。
+ * import 直接把这个结构 POST 回去（合并语义）。
+ *
+ * 类型取自 schema 导出的 GlobalConfig / BrowserConfig：后端 types.ts 看不到前端
+ * protocol.ts 的 RuntimeConfig，且这两项本就是配置文件的真理源。
+ */
+export interface ExportedConfig {
+  llmProvider?: GlobalConfig['llmProvider'];
+  openai?: GlobalConfig['openai'];
+  browser?: BrowserConfig;
 }

@@ -33,6 +33,14 @@ export interface BrowserConfig {
   devtools?: boolean;
   autoLaunch?: boolean;
   userAgent?: string;
+  // ↓ 本次新增：补齐 schema 已有但 UI 不可达的字段
+  viewport?: {width: number; height: number};
+  waitForBrowserTimeoutMs?: number;
+  timeout?: number;
+  maxCollectedUrls?: number;
+  maxFilesPerCollect?: number;
+  maxTotalContentSize?: number;
+  maxSingleFileSize?: number;
 }
 
 export interface OpenAIConfig {
