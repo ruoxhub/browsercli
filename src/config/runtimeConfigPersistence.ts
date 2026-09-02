@@ -14,7 +14,13 @@
  * 注意：openai.apiKey 会明文写入该文件（与 browsercli 现有的 apiToken 行为一致）。
  */
 
-import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import os from 'node:os';
 import {dirname, join} from 'node:path';
 
@@ -27,11 +33,9 @@ export const RUNTIME_CONFIG_PATH = join(
 );
 
 /** 需要持久化的顶层字段 */
-const PERSISTED_KEYS = new Set<keyof GlobalConfig>([
-  'llmProvider',
-  'openai',
-  'browser',
-]);
+export const PERSISTED_KEYS: ReadonlySet<keyof GlobalConfig> = new Set<
+  keyof GlobalConfig
+>(['llmProvider', 'openai', 'browser']);
 
 /** 从缓存文件提取可写字段，未命中或非法时返回 undefined。 */
 export function loadCachedRuntimeConfig(): Partial<GlobalConfig> | undefined {
@@ -88,4 +92,18 @@ export function persistRuntimeConfig(config: GlobalConfig): void {
 export function shouldAutoConnectOnStartup(config: GlobalConfig): boolean {
   const browser = config.browser;
   return Boolean(browser?.wsEndpoint || browser?.browserURL);
+}
+
+/**
+ * 删除缓存文件（供「重置配置」使用）。
+ * ENOENT 视为成功（本来就没有缓存），其余错误仅记录到 console 后继续 ——
+ * 与 persistRuntimeConfig 的静默风格一致。
+ */
+export function deleteRuntimeConfig(): void {
+  try {
+    unlinkSync(RUNTIME_CONFIG_PATH);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return;
+    console.error('[runtime-config] 删除缓存失败:', err);
+  }
 }

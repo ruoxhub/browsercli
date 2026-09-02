@@ -61,18 +61,23 @@ function getConsoleState(): LoggerConsoleState {
   return globalWithState[LOGGER_CONSOLE_STATE];
 }
 
+/**
+ * 默认日志目录：~/.browsercli/log。
+ *
+ * 纯函数 —— 不参与 `defaultLogHome` 状态判断。导出供 Web 控制台展示
+ * （`GET /api/system/info`）与写入共用同一份定义，避免两处目录字面量各自漂移。
+ */
+export function getLogDir(): string {
+  return path.join(os.homedir(), '.browsercli', 'log');
+}
+
 function createDefaultLogFileName(now = new Date()): string {
   const state = getConsoleState();
   const home = os.homedir();
   if (!state.defaultLogFileName || state.defaultLogHome !== home) {
     const datetime = now.toISOString().replace(/[:.]/g, '-');
     state.defaultLogHome = home;
-    state.defaultLogFileName = path.join(
-      home,
-      '.browsercli',
-      'log',
-      `${datetime}.log`,
-    );
+    state.defaultLogFileName = path.join(getLogDir(), `${datetime}.log`);
   }
   return state.defaultLogFileName;
 }

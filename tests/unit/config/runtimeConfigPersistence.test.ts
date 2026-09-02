@@ -16,6 +16,7 @@ import {dirname} from 'node:path';
 import {after, before, describe, it} from 'node:test';
 
 import {
+  deleteRuntimeConfig,
   loadCachedRuntimeConfig,
   persistRuntimeConfig,
   RUNTIME_CONFIG_PATH,
@@ -116,6 +117,20 @@ describe('runtimeConfigPersistence', () => {
 
     it('false when no browser config', () => {
       assert.strictEqual(shouldAutoConnectOnStartup({}), false);
+    });
+  });
+
+  describe('deleteRuntimeConfig', () => {
+    it('removes an existing cache file', () => {
+      seedFile({llmProvider: 'openai'});
+      assert.ok(existsSync(RUNTIME_CONFIG_PATH));
+      deleteRuntimeConfig();
+      assert.strictEqual(existsSync(RUNTIME_CONFIG_PATH), false);
+    });
+
+    it('does not throw when the cache file is absent', () => {
+      if (existsSync(RUNTIME_CONFIG_PATH)) rmSync(RUNTIME_CONFIG_PATH);
+      assert.doesNotThrow(() => deleteRuntimeConfig());
     });
   });
 });
