@@ -4,20 +4,16 @@ import {AxiError} from 'axi-sdk-js';
 
 import {cliCommands} from '../../src/app.js';
 import {browserCommand} from '../../src/commands/browser.js';
+import type {DaemonEvent, DaemonLike} from '../../src/daemonClient.js';
 import type {AxiStructuredOutput} from '../../src/output.js';
-import type {WorkerContext} from '../../src/types.js';
 import type {
   BrowserConnectOptions,
   BrowserConnectionStatus,
-  BrowserDisconnectOptions,
-  WorkerHttpClient,
-} from '../../src/WorkerHttpClient.js';
+  WorkerContext,
+} from '../../src/types.js';
 
 function context() {
-  const calls: Array<{
-    action: string;
-    options?: BrowserConnectOptions | BrowserDisconnectOptions;
-  }> = [];
+  const calls: Array<{method: string; params?: Record<string, unknown>}> = [];
   const connected: BrowserConnectionStatus = {
     connected: true,
     mode: 'ws-endpoint',
@@ -28,27 +24,23 @@ function context() {
     mode: 'disconnected',
     pages: 0,
   };
-  const client = {
-    connectBrowser: async (options: BrowserConnectOptions) => {
-      calls.push({action: 'connect', options});
-      return connected;
+  const client: DaemonLike = {
+    async request<T>(method: string, params?: Record<string, unknown>) {
+      calls.push({method, params});
+      if (method === 'browser.connect') return connected as T;
+      if (method === 'browser.disconnect') return disconnected as T;
+      return connected as T;
     },
-    disconnectBrowser: async (options?: BrowserDisconnectOptions) => {
-      calls.push({
-        action: 'disconnect',
-        ...(options === undefined ? {} : {options}),
-      });
-      return disconnected;
+    onEvent(_cb: (event: DaemonEvent) => void) {
+      return () => undefined;
     },
-    getBrowserStatus: async () => {
-      calls.push({action: 'status'});
-      return connected;
-    },
-  } as unknown as WorkerHttpClient;
-  return {
-    calls,
-    ctx: {httpClient: client, transport: 'http'} as WorkerContext,
+    close() {},
   };
+  const ctx: WorkerContext = {
+    session: 'default',
+    connect: async () => client,
+  };
+  return {calls, ctx};
 }
 
 describe('browserCommand', () => {
@@ -56,7 +48,7 @@ describe('browserCommand', () => {
     assert.strictEqual(cliCommands.browser, browserCommand);
   });
 
-  it('maps approved connect flags to the HTTP payload', async () => {
+  it('maps approved connect flags to the browser.connect body', async () => {
     const {calls, ctx} = context();
     const output = (await browserCommand(
       [
@@ -82,19 +74,21 @@ describe('browserCommand', () => {
 
     assert.deepEqual(calls, [
       {
-        action: 'connect',
-        options: {
-          wsEndpoint: 'wss://host/devtools',
-          wsHeaders: {Authorization: 'Bearer token'},
-          headless: false,
-          isolated: true,
-          userDataDir: 'profile-dir',
-          viewport: {width: 1280, height: 720},
-          acceptInsecureCerts: true,
-          cloak: false,
-          jsStealth: true,
-          minimalStealth: true,
-          fullStealthArgs: false,
+        method: 'browser.connect',
+        params: {
+          body: {
+            wsEndpoint: 'wss://host/devtools',
+            wsHeaders: {Authorization: 'Bearer token'},
+            headless: false,
+            isolated: true,
+            userDataDir: 'profile-dir',
+            viewport: {width: 1280, height: 720},
+            acceptInsecureCerts: true,
+            cloak: false,
+            jsStealth: true,
+            minimalStealth: true,
+            fullStealthArgs: false,
+          } satisfies BrowserConnectOptions,
         },
       },
     ]);
@@ -112,39 +106,45 @@ describe('browserCommand', () => {
     );
     assert.deepEqual(executable.calls, [
       {
-        action: 'connect',
-        options: {executablePath: 'C:\\Chrome\\chrome.exe'},
+        method: 'browser.connect',
+        params: {body: {executablePath: 'C:\\Chrome\\chrome.exe'}},
       },
     ]);
 
     const channel = context();
     await browserCommand(['connect', '--channel', 'stable'], channel.ctx);
     assert.deepEqual(channel.calls, [
-      {action: 'connect', options: {channel: 'stable'}},
+      {method: 'browser.connect', params: {body: {channel: 'stable'}}},
     ]);
 
     const current = context();
     await browserCommand(['connect'], current.ctx);
-    assert.deepEqual(current.calls, [{action: 'connect', options: {}}]);
+    assert.deepEqual(current.calls, [
+      {method: 'browser.connect', params: {body: {}}},
+    ]);
   });
 
   it('dispatches status and disconnect', async () => {
     const first = context();
     await browserCommand(['status', '--json'], first.ctx);
-    assert.deepEqual(first.calls, [{action: 'status'}]);
+    assert.deepEqual(first.calls, [
+      {method: 'browser.status', params: undefined},
+    ]);
 
     const second = context();
     await browserCommand(['disconnect'], second.ctx);
-    assert.deepEqual(second.calls, [{action: 'disconnect'}]);
+    assert.deepEqual(second.calls, [
+      {method: 'browser.disconnect', params: {body: {}}},
+    ]);
 
     const forced = context();
     await browserCommand(['disconnect', '--force'], forced.ctx);
     assert.deepEqual(forced.calls, [
-      {action: 'disconnect', options: {force: true}},
+      {method: 'browser.disconnect', params: {body: {force: true}}},
     ]);
   });
 
-  it('rejects conflicting targets and invalid values before HTTP', async () => {
+  it('rejects conflicting targets and invalid values before connecting', async () => {
     const invalid: string[][] = [
       ['connect', '--browser-url', 'http://host', '--ws-endpoint', 'ws://host'],
       ['connect', '--browser-url', 'ftp://host'],

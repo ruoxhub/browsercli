@@ -9,7 +9,7 @@ import type {
   BrowserConnectOptions,
   BrowserConnectionStatus,
   BrowserDisconnectOptions,
-} from '../WorkerHttpClient.js';
+} from '../types.js';
 
 const CONNECT_FLAGS = new Set([
   'accept-insecure-certs',
@@ -239,22 +239,27 @@ export const browserCommand: AxiCliCommand<WorkerContext> = async (
     typedAction === 'disconnect'
       ? booleanFlag(parsed.flags, 'force')
       : undefined;
-  const client = ctx?.httpClient;
+  const client = ctx ? await ctx.connect() : undefined;
   if (!client) throw new AxiError('Worker 未运行', 'WORKER_NOT_RUNNING');
 
   try {
     const state =
       typedAction === 'connect'
-        ? await client.connectBrowser(connectOptions(parsed.flags))
+        ? await client.request<BrowserConnectionStatus>('browser.connect', {
+            body: connectOptions(parsed.flags),
+          })
         : typedAction === 'disconnect'
-          ? await client.disconnectBrowser(
+          ? await client.request<BrowserConnectionStatus>(
+              'browser.disconnect',
               force === undefined
-                ? undefined
-                : ({force} satisfies BrowserDisconnectOptions),
+                ? {body: {}}
+                : {body: {force} satisfies BrowserDisconnectOptions},
             )
-          : await client.getBrowserStatus();
+          : await client.request<BrowserConnectionStatus>('browser.status');
     return renderBrowserStatus(typedAction, state, json);
   } catch (error) {
     throw toAxiError(error, 'BROWSER_ERROR');
+  } finally {
+    client.close();
   }
 };

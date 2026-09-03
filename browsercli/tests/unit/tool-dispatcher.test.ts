@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2026 JSReverser-MCP
+ * Copyright 2026 Browser-CLI
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
@@ -10,10 +10,14 @@ import {AxiError} from 'axi-sdk-js';
 
 import {parseArgs} from '../../src/args-parser.js';
 import {buildToolArgs} from '../../src/commands/shared/tool-args.js';
-import {toolDispatcherCommand} from '../../src/commands/tool-dispatcher.js';
+import {
+  BUSY_RETRY_DELAYS_MS,
+  invokeWithBusyRetry,
+  toolDispatcherCommand,
+} from '../../src/commands/tool-dispatcher.js';
+import type {DaemonEvent, DaemonLike} from '../../src/daemonClient.js';
 import type {ToolMeta} from '../../src/tool-meta-types.js';
 import type {WorkerContext} from '../../src/types.js';
-import {WorkerHttpClient} from '../../src/WorkerHttpClient.js';
 
 const SAMPLE_TOOLS: ToolMeta[] = [
   {
@@ -81,59 +85,63 @@ const ALL_TOOLS: ToolMeta[] = [
   SELECT_FRAME_TOOL,
 ];
 
-class MockHttpClient extends WorkerHttpClient {
-  listToolsCalls = 0;
-  invokeCalls: Array<[string | undefined, string, Record<string, unknown>]> =
-    [];
-  openStreamCalls = 0;
-  streamCloseCalls = 0;
-  callOrder: string[] = [];
+class FakeDaemon implements DaemonLike {
+  calls: Array<{method: string; params?: Record<string, unknown>}> = [];
+  closeCalls = 0;
+  eventCallbacks = 0;
   invokeError?: Error;
+  busyFailures = 0;
 
   constructor(
     private readonly tools: ToolMeta[],
     private readonly result: unknown,
-  ) {
-    super({baseUrl: 'http://127.0.0.1:8765'});
+  ) {}
+
+  async request<T = unknown>(
+    method: string,
+    params?: Record<string, unknown>,
+  ): Promise<T> {
+    this.calls.push({method, params});
+    if (method === 'tools.list') return {tools: this.tools} as T;
+    if (method === 'subscribe')
+      return {subscribed: (params?.channels as string[]) ?? []} as T;
+    if (method === 'tool.invoke') {
+      if (this.busyFailures > 0) {
+        this.busyFailures--;
+        throw new Error('[WORKER_BUSY] worker is busy');
+      }
+      if (this.invokeError) throw this.invokeError;
+      return this.result as T;
+    }
+    return {} as T;
   }
 
-  async listTools(): Promise<{tools: ToolMeta[]}> {
-    this.listToolsCalls++;
-    return {tools: this.tools};
+  onEvent(_cb: (event: DaemonEvent) => void): () => void {
+    this.eventCallbacks++;
+    return () => undefined;
   }
 
-  async invoke(
-    sessionId: string | undefined,
-    tool: string,
-    params: Record<string, unknown>,
-  ): Promise<unknown> {
-    this.callOrder.push('invoke');
-    this.invokeCalls.push([sessionId, tool, params]);
-    if (this.invokeError) throw this.invokeError;
-    return this.result;
+  close(): void {
+    this.closeCalls++;
   }
 
-  async ensureSession(explicitId?: string): Promise<string> {
-    this.callOrder.push('ensureSession');
-    return explicitId ?? 'sess_auto';
+  methodOrder(): string[] {
+    return this.calls.map(c => c.method);
   }
 
-  async openStream(): Promise<() => void> {
-    this.callOrder.push('openStream');
-    this.openStreamCalls++;
-    return () => {
-      this.streamCloseCalls++;
-    };
+  invokeParams(): Record<string, unknown> | undefined {
+    const call = this.calls.find(c => c.method === 'tool.invoke');
+    return call?.params as Record<string, unknown> | undefined;
   }
 }
 
-function ctxWith(client: WorkerHttpClient): WorkerContext {
-  return {httpClient: client, transport: 'http'};
+function ctxWith(client: DaemonLike): WorkerContext {
+  return {session: 'default', connect: async () => client};
 }
 
-describe('tool-dispatcher (pure HTTP)', () => {
+describe('tool-dispatcher (daemon socket)', () => {
   it('throws VALIDATION_ERROR when tool name is missing', async () => {
-    const client = new MockHttpClient(SAMPLE_TOOLS, {ok: true});
+    const client = new FakeDaemon(SAMPLE_TOOLS, {ok: true});
     await assert.rejects(
       async () => toolDispatcherCommand([], ctxWith(client)),
       (err: unknown) => {
@@ -147,8 +155,22 @@ describe('tool-dispatcher (pure HTTP)', () => {
     );
   });
 
+  it('throws WORKER_NOT_RUNNING when connect fails', async () => {
+    const ctx: WorkerContext = {
+      session: 'default',
+      connect: async () => {
+        throw new AxiError('Worker 未运行：boom', 'WORKER_NOT_RUNNING');
+      },
+    };
+    await assert.rejects(
+      async () => toolDispatcherCommand(['my_tool'], ctx),
+      (err: unknown) =>
+        err instanceof AxiError && err.code === 'WORKER_NOT_RUNNING',
+    );
+  });
+
   it('throws UNKNOWN_TOOL with suggestions for an unknown tool', async () => {
-    const client = new MockHttpClient(SAMPLE_TOOLS, {ok: true});
+    const client = new FakeDaemon(SAMPLE_TOOLS, {ok: true});
     await assert.rejects(
       async () => toolDispatcherCommand(['nope'], ctxWith(client)),
       (err: unknown) => {
@@ -158,8 +180,8 @@ describe('tool-dispatcher (pure HTTP)', () => {
     );
   });
 
-  it('resolves dashed names to canonical snake_case and invokes over HTTP', async () => {
-    const client = new MockHttpClient(SAMPLE_TOOLS, {hello: 'world'});
+  it('resolves dashed names and requests tool.invoke with {tool, params}', async () => {
+    const client = new FakeDaemon(SAMPLE_TOOLS, {hello: 'world'});
     const result = (await toolDispatcherCommand(
       ['my-tool', '--foo', 'bar'],
       ctxWith(client),
@@ -170,16 +192,16 @@ describe('tool-dispatcher (pure HTTP)', () => {
     assert.strictEqual(result.tool, 'my_tool');
     assert.deepStrictEqual(result.result, {hello: 'world'});
 
-    assert.strictEqual(client.invokeCalls.length, 1);
-    assert.deepStrictEqual(client.invokeCalls[0], [
-      undefined,
-      'my_tool',
-      {foo: 'bar'},
-    ]);
+    const invoke = client.calls.filter(c => c.method === 'tool.invoke');
+    assert.strictEqual(invoke.length, 1);
+    assert.deepStrictEqual(invoke[0].params, {
+      tool: 'my_tool',
+      params: {foo: 'bar'},
+    });
   });
 
   it('throws TOOL_FAILURE when the tool structured content reports failure', async () => {
-    const client = new MockHttpClient(SAMPLE_TOOLS, {
+    const client = new FakeDaemon(SAMPLE_TOOLS, {
       structuredContent: {
         success: false,
         message: 'operation failed',
@@ -196,7 +218,7 @@ describe('tool-dispatcher (pure HTTP)', () => {
   });
 
   it('throws TOOL_FAILURE when the MCP result sets isError', async () => {
-    const client = new MockHttpClient(SAMPLE_TOOLS, {
+    const client = new FakeDaemon(SAMPLE_TOOLS, {
       isError: true,
       content: [{type: 'text', text: 'boom'}],
     });
@@ -210,27 +232,18 @@ describe('tool-dispatcher (pure HTTP)', () => {
     );
   });
 
-  it('wires --session to the invoke call', async () => {
-    const client = new MockHttpClient(SAMPLE_TOOLS, {done: true});
-    await toolDispatcherCommand(
-      ['my_tool', '--session', 'sess_abc'],
-      ctxWith(client),
-    );
-    assert.deepStrictEqual(client.invokeCalls[0][0], 'sess_abc');
-  });
-
   it('does not send CLI control flags as tool params', async () => {
-    const client = new MockHttpClient(SAMPLE_TOOLS, {done: true});
+    const client = new FakeDaemon(SAMPLE_TOOLS, {done: true});
     await toolDispatcherCommand(
       ['my_tool', '--session', 'sess_abc', '--watch', '--foo', 'bar'],
       ctxWith(client),
     );
 
-    assert.deepStrictEqual(client.invokeCalls[0][2], {foo: 'bar'});
+    assert.deepStrictEqual(client.invokeParams()?.params, {foo: 'bar'});
   });
 
   it('emits raw tool result when --json is set', async () => {
-    const client = new MockHttpClient(SAMPLE_TOOLS, {hello: 'world'});
+    const client = new FakeDaemon(SAMPLE_TOOLS, {hello: 'world'});
     const result = await toolDispatcherCommand(
       ['my_tool', '--json'],
       ctxWith(client),
@@ -239,25 +252,31 @@ describe('tool-dispatcher (pure HTTP)', () => {
   });
 
   it('does not send --json as a tool param', async () => {
-    const client = new MockHttpClient(SAMPLE_TOOLS, {done: true});
+    const client = new FakeDaemon(SAMPLE_TOOLS, {done: true});
     await toolDispatcherCommand(['my_tool', '--json'], ctxWith(client));
-    assert.deepStrictEqual(client.invokeCalls[0][2], {});
+    assert.deepStrictEqual(client.invokeParams()?.params, {});
   });
 
-  it('opens the watch stream before invoking the tool', async () => {
-    const client = new MockHttpClient(SAMPLE_TOOLS, {done: true});
+  it('subscribes to the watch channels before invoking the tool', async () => {
+    const client = new FakeDaemon(SAMPLE_TOOLS, {done: true});
     await toolDispatcherCommand(['my_tool', '--watch'], ctxWith(client));
 
-    assert.deepStrictEqual(client.callOrder, [
-      'ensureSession',
-      'openStream',
-      'invoke',
+    assert.deepStrictEqual(client.methodOrder(), [
+      'tools.list',
+      'subscribe',
+      'tool.invoke',
     ]);
-    assert.strictEqual(client.invokeCalls[0][0], 'sess_auto');
+    assert.deepStrictEqual(client.calls[1].params?.channels, [
+      'tool.invoke',
+      'hook.event',
+      'hook.sample',
+      'log',
+    ]);
+    assert.strictEqual(client.eventCallbacks, 1);
   });
 
-  it('closes an opened watch stream when invocation fails', async () => {
-    const client = new MockHttpClient(SAMPLE_TOOLS, {done: true});
+  it('closes the daemon connection when invocation fails', async () => {
+    const client = new FakeDaemon(SAMPLE_TOOLS, {done: true});
     client.invokeError = new Error('invoke failed');
 
     await assert.rejects(
@@ -266,40 +285,47 @@ describe('tool-dispatcher (pure HTTP)', () => {
       /invoke failed/,
     );
 
-    assert.strictEqual(client.openStreamCalls, 1);
-    assert.strictEqual(client.streamCloseCalls, 1);
+    assert.strictEqual(client.closeCalls, 1);
+  });
+
+  it('closes the daemon connection on the success path too', async () => {
+    const client = new FakeDaemon(SAMPLE_TOOLS, {done: true});
+    await toolDispatcherCommand(['my_tool'], ctxWith(client));
+    assert.strictEqual(client.closeCalls, 1);
   });
 
   it('keeps a comma-containing --function as a string (no array split)', async () => {
-    const client = new MockHttpClient(ALL_TOOLS, {ok: true});
+    const client = new FakeDaemon(ALL_TOOLS, {ok: true});
     await toolDispatcherCommand(
       ['evaluate_script', '--function', '(a, b) => a + b'],
       ctxWith(client),
     );
-    assert.deepStrictEqual(client.invokeCalls[0][2], {
+    assert.deepStrictEqual(client.invokeParams()?.params, {
       function: '(a, b) => a + b',
     });
   });
 
   it('does not convert --function "true"/"false"/"42" to boolean/number', async () => {
-    const client = new MockHttpClient(ALL_TOOLS, {ok: true});
+    const client = new FakeDaemon(ALL_TOOLS, {ok: true});
     await toolDispatcherCommand(
       ['evaluate_script', '--function', 'true'],
       ctxWith(client),
     );
+    const first = client.invokeParams()?.params as Record<string, unknown>;
     assert.strictEqual(
-      typeof client.invokeCalls[0][2].function,
+      typeof first.function,
       'string',
       'function "true" should stay string, not boolean',
     );
-    assert.strictEqual(client.invokeCalls[0][2].function, 'true');
+    assert.strictEqual(first.function, 'true');
 
     await toolDispatcherCommand(
       ['evaluate_script', '--function', 'false'],
       ctxWith(client),
     );
+    const second = client.invokeParams()?.params as Record<string, unknown>;
     assert.strictEqual(
-      typeof client.invokeCalls[1][2].function,
+      typeof second.function,
       'string',
       'function "false" should stay string, not boolean',
     );
@@ -308,31 +334,32 @@ describe('tool-dispatcher (pure HTTP)', () => {
       ['evaluate_script', '--function', '42'],
       ctxWith(client),
     );
+    const third = client.invokeParams()?.params as Record<string, unknown>;
     assert.strictEqual(
-      typeof client.invokeCalls[2][2].function,
+      typeof third.function,
       'string',
       'function "42" should stay string, not number',
     );
   });
 
   it('supports positional function: call evaluate_script "<fn>"', async () => {
-    const client = new MockHttpClient(ALL_TOOLS, {ok: true});
+    const client = new FakeDaemon(ALL_TOOLS, {ok: true});
     await toolDispatcherCommand(
       ['evaluate_script', '(a, b) => a + b'],
       ctxWith(client),
     );
-    assert.deepStrictEqual(client.invokeCalls[0][2], {
+    assert.deepStrictEqual(client.invokeParams()?.params, {
       function: '(a, b) => a + b',
     });
   });
 
   it('parses string[] as JSON array literals and does not split on commas', async () => {
-    const client = new MockHttpClient(ALL_TOOLS, {ok: true});
+    const client = new FakeDaemon(ALL_TOOLS, {ok: true});
     await toolDispatcherCommand(
       ['evaluate_script', '--function', '() => 1', '--args', '["u1","u2"]'],
       ctxWith(client),
     );
-    assert.deepStrictEqual(client.invokeCalls[0][2], {
+    assert.deepStrictEqual(client.invokeParams()?.params, {
       function: '() => 1',
       args: ['u1', 'u2'],
     });
@@ -341,32 +368,77 @@ describe('tool-dispatcher (pure HTTP)', () => {
       ['evaluate_script', '--function', '() => 1', '--args', 'u1,u2'],
       ctxWith(client),
     );
-    assert.deepStrictEqual(client.invokeCalls[1][2], {
+    const second = client.calls.filter(c => c.method === 'tool.invoke')[1];
+    assert.deepStrictEqual((second.params as Record<string, unknown>).params, {
       function: '() => 1',
       args: 'u1,u2',
     });
   });
 
   it('disambiguates `select` to select_page via --pageId', async () => {
-    const client = new MockHttpClient(ALL_TOOLS, {ok: true});
+    const client = new FakeDaemon(ALL_TOOLS, {ok: true});
     await toolDispatcherCommand(['select', '--pageId', '0'], ctxWith(client));
-    assert.strictEqual(client.invokeCalls[0][1], 'select_page');
+    assert.strictEqual(
+      (client.invokeParams()?.tool as string) ?? '',
+      'select_page',
+    );
   });
 
   it('disambiguates `select` to select_frame via --frameId', async () => {
-    const client = new MockHttpClient(ALL_TOOLS, {ok: true});
+    const client = new FakeDaemon(ALL_TOOLS, {ok: true});
     await toolDispatcherCommand(['select', '--frameId', 'f1'], ctxWith(client));
-    assert.strictEqual(client.invokeCalls[0][1], 'select_frame');
+    assert.strictEqual(client.invokeParams()?.tool, 'select_frame');
   });
 
   it('still throws UNKNOWN_TOOL when `select` has no disambiguating flag', async () => {
-    const client = new MockHttpClient(ALL_TOOLS, {ok: true});
+    const client = new FakeDaemon(ALL_TOOLS, {ok: true});
     await assert.rejects(
       async () => toolDispatcherCommand(['select'], ctxWith(client)),
       (err: unknown) => {
         const e = err as AxiError;
         return e instanceof AxiError && e.code === 'UNKNOWN_TOOL';
       },
+    );
+  });
+});
+
+describe('invokeWithBusyRetry', () => {
+  it('uses the documented [200, 500, 1000] backoff sequence', () => {
+    assert.deepStrictEqual(BUSY_RETRY_DELAYS_MS, [200, 500, 1000]);
+  });
+
+  it('retries WORKER_BUSY then returns the result', async () => {
+    const client = new FakeDaemon(SAMPLE_TOOLS, {ok: true});
+    client.busyFailures = 2;
+    const started = Date.now();
+    const result = await invokeWithBusyRetry(client, 'my_tool', {}, [1, 1]);
+    assert.deepStrictEqual(result, {ok: true});
+    assert.ok(Date.now() - started >= 2);
+    const invokes = client.calls.filter(c => c.method === 'tool.invoke');
+    assert.strictEqual(invokes.length, 3);
+  });
+
+  it('gives up after the backoff sequence is exhausted', async () => {
+    const client = new FakeDaemon(SAMPLE_TOOLS, {ok: true});
+    client.busyFailures = 10;
+    await assert.rejects(
+      () => invokeWithBusyRetry(client, 'my_tool', {}, [1, 1]),
+      /WORKER_BUSY/,
+    );
+    const invokes = client.calls.filter(c => c.method === 'tool.invoke');
+    assert.strictEqual(invokes.length, 3);
+  });
+
+  it('does not retry non-busy errors', async () => {
+    const client = new FakeDaemon(SAMPLE_TOOLS, {ok: true});
+    client.invokeError = new Error('[TOOL_NOT_FOUND] nope');
+    await assert.rejects(
+      () => invokeWithBusyRetry(client, 'my_tool', {}, [1, 1]),
+      /TOOL_NOT_FOUND/,
+    );
+    assert.strictEqual(
+      client.calls.filter(c => c.method === 'tool.invoke').length,
+      1,
     );
   });
 });

@@ -42,20 +42,25 @@ export const listToolsCommand: AxiCliCommand<WorkerContext> = async (
   const parsed = parseArgs(args);
   const json = getBoolFlag(parsed, 'json');
 
-  const httpClient = ctx?.httpClient;
-  if (!httpClient) {
+  if (!ctx) {
     throw new AxiError('Worker 未运行', 'WORKER_NOT_RUNNING');
   }
 
   let tools: ToolMeta[];
+  const client = await ctx.connect();
   try {
-    const listed = await httpClient.listTools();
-    tools = listed.tools as ToolMeta[];
+    const listed = await client.request<{tools?: unknown[]}>('tools.list');
+    // 归一化：防御旧版本/代理直接返回数组或省略 tools 字段
+    tools = (
+      Array.isArray(listed) ? listed : (listed?.tools ?? [])
+    ) as ToolMeta[];
   } catch (error) {
     throw new AxiError(
       `Worker 未运行：${error instanceof Error ? error.message : error}`,
       'WORKER_NOT_RUNNING',
     );
+  } finally {
+    client.close();
   }
 
   if (json) {

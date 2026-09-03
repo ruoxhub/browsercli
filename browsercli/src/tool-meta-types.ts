@@ -13,11 +13,7 @@
  */
 
 export type ToolArgType =
-  | 'string'
-  | 'number'
-  | 'boolean'
-  | 'string[]'
-  | 'object';
+  'string' | 'number' | 'boolean' | 'string[]' | 'object';
 
 export interface ToolArgSpec {
   type: ToolArgType;

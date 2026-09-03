@@ -11,7 +11,7 @@ import {parseArgs} from '../args-parser.js';
 import {toAxiError} from '../errors.js';
 import {successOutput, tableOutput} from '../output.js';
 import type {WorkerContext} from '../types.js';
-import type {JobStatus} from '../WorkerHttpClient.js';
+import type {JobStatus} from '../types.js';
 
 const ALLOWED_FLAGS = new Set(['json']);
 
@@ -84,17 +84,21 @@ export const jobsCommand: AxiCliCommand<WorkerContext> = async (args, ctx) => {
     invalid('jobs 动作必须是 list，或 cancel <job-id>');
   }
 
-  const client = ctx?.httpClient;
-  if (!client) throw new AxiError('Worker 未运行', 'WORKER_NOT_RUNNING');
+  if (!ctx) throw new AxiError('Worker 未运行', 'WORKER_NOT_RUNNING');
 
+  const client = await ctx.connect();
   try {
     if (action === 'list') {
-      const {jobs} = await client.listJobs();
+      const {jobs} = await client.request<{jobs: JobStatus[]}>('jobs.list');
       return renderJobs('list', jobs, json);
     }
-    const job = await client.cancelJob(parsed.positionals[1]);
+    const job = await client.request<JobStatus>('jobs.cancel', {
+      jobId: parsed.positionals[1],
+    });
     return renderJobs('cancel', [job], json);
   } catch (error) {
     throw toAxiError(error, 'JOB_ERROR');
+  } finally {
+    client.close();
   }
 };

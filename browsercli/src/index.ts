@@ -5,6 +5,13 @@
  */
 
 export {type WorkerContext} from './types.js';
+export type {
+  JobStatus,
+  ToolRecovery,
+  BrowserConnectOptions,
+  BrowserConnectionStatus,
+  BrowserDisconnectOptions,
+} from './types.js';
 export {
   successOutput,
   tableOutput,
@@ -21,12 +28,32 @@ export {
   type ParsedArgs,
 } from './args-parser.js';
 export {generateTopLevelHelp, generateCommandHelp} from './help.js';
-export {WorkerHttpClient} from './WorkerHttpClient.js';
-export type {
-  WorkerHttpClientOptions,
-  JobStatus,
-  ToolRecovery,
-} from './WorkerHttpClient.js';
+export {
+  DaemonConnection,
+  ensureDaemon,
+  spawnDaemon,
+  stopSession,
+  killAllDaemons,
+  resolveEntryPath,
+  collectDaemonPids,
+  PROTOCOL_VERSION,
+  DEFAULT_INVOKE_TIMEOUT_MS,
+  type DaemonEvent,
+  type DaemonLike,
+  type EnsureDaemonOptions,
+} from './daemonClient.js';
+export {
+  computeClientInfo,
+  computeWorkspaceDir,
+  makePipePath,
+  resolveSessionName,
+  explicitSessionName,
+  loadSession,
+  listSessions,
+  deleteSession,
+  type SessionConfig,
+  type ClientInfo,
+} from './sessionPaths.js';
 export type {
   ToolMeta,
   ToolArgSpec,

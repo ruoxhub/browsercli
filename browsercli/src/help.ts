@@ -15,7 +15,11 @@ const commandDescriptions: Record<string, string> = {
   config: '查看/设置/初始化全局配置',
   'list-tools': '列出所有可用的 MCP 工具及旧技能兼容映射',
   scaffold: '创建新的逆向任务脚手架',
-  status: '查看 Worker 服务运行状态与统计信息',
+  status: '查看 daemon 会话运行状态',
+  open: '拉起（或探活）daemon 会话',
+  close: '停止 daemon 会话',
+  list: '列出注册表中的全部 daemon 会话',
+  'kill-all': '强杀全部 daemon 进程并清理会话注册表',
 };
 
 export function generateTopLevelHelp(options?: {
@@ -28,6 +32,10 @@ export function generateTopLevelHelp(options?: {
   const description = options?.description ?? '逆向工程CLI服务';
   const version = options?.version ?? '1.0.0';
   const commands = options?.commands ?? [
+    'open',
+    'close',
+    'list',
+    'kill-all',
     'call',
     'list-tools',
     'browser',
@@ -99,8 +107,25 @@ export function generateCommandHelp(command: string): string | null {
         'browsercli scaffold --name <name> [--desc <description>] [--url <url>] [--output <directory>]',
     },
     status: {
-      description: '查看 Worker 服务运行状态与统计信息',
+      description: '查看 daemon 会话运行状态（读注册表并逐会话探活）',
       usage: 'browsercli status [--json]',
+    },
+    open: {
+      description:
+        '拉起（或探活）daemon 会话。连不上注册表里的 socket 时自动 spawn detached daemon',
+      usage: 'browsercli [-s=<session>] open',
+    },
+    close: {
+      description: '停止 daemon 会话（请求 stop，兜底 pid 探活清理注册表）',
+      usage: 'browsercli [-s=<session>] close',
+    },
+    list: {
+      description: '列出当前 workspace 注册表中的全部 daemon 会话',
+      usage: 'browsercli list',
+    },
+    'kill-all': {
+      description: '强杀全部 --browsercli-daemon 进程并清理会话注册表',
+      usage: 'browsercli kill-all',
     },
   };
 

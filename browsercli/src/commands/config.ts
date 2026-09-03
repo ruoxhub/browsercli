@@ -7,35 +7,33 @@
 /**
  * config 命令 — 自包含实现，仅管理本地 JSON 配置文件
  *
- * 配置文件路径：~/.browsercli/config.json
+ * 配置文件路径：~/.browsercli/config.json（BROWSERCLI_CONFIG_DIR 覆盖，供测试隔离）
  * 支持的键：
- *   workerUrl  → 映射到环境变量 WORKER_URL
- *   apiToken   → 映射到环境变量 WORKER_API_TOKEN
+ *   workerEntry → daemon 入口脚本路径（映射到环境变量 BROWSERCLI_ENTRY）
  *
- * 环境变量 WORKER_URL / WORKER_API_TOKEN 优先级高于配置文件。
+ * 环境变量 BROWSERCLI_ENTRY 优先级高于配置文件。
  */
 
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
-import os from 'node:os';
-import {dirname, join} from 'node:path';
+import {dirname} from 'node:path';
 
 import {AxiError} from 'axi-sdk-js';
 import type {AxiCliCommand} from 'axi-sdk-js';
 
+import {cliConfigPath} from '../daemonClient.js';
 import {parseArgs, getFlag, hasFlag} from '../args-parser.js';
 import {successOutput} from '../output.js';
 import type {WorkerContext} from '../types.js';
 
 /** 合法配置键 */
-const VALID_KEYS = new Set<string>(['workerUrl', 'apiToken']);
+const VALID_KEYS = new Set<string>(['workerEntry']);
 
 interface CliConfig {
-  workerUrl?: string;
-  apiToken?: string;
+  workerEntry?: string;
 }
 
 function getConfigPath(): string {
-  return join(os.homedir(), '.browsercli', 'config.json');
+  return cliConfigPath();
 }
 
 function loadConfigFile(): CliConfig {
@@ -64,7 +62,7 @@ function parseSetValue(raw: string): {key: string; value: string} {
   if (eqIdx === -1) {
     throw new AxiError(`--set 格式错误：${raw}`, 'VALIDATION_ERROR', [
       '正确格式：--set key=value',
-      '示例：--set workerUrl=http://127.0.0.1:8765',
+      '示例：--set workerEntry=D:/work/Reverser-CLI/build/src/index.js',
     ]);
   }
   return {key: raw.slice(0, eqIdx), value: raw.slice(eqIdx + 1)};
@@ -81,8 +79,7 @@ function validateKey(key: string): void {
 function resolveMerged(): CliConfig {
   const file = loadConfigFile();
   return {
-    workerUrl: process.env.WORKER_URL ?? file.workerUrl,
-    apiToken: process.env.WORKER_API_TOKEN ?? file.apiToken,
+    workerEntry: process.env.BROWSERCLI_ENTRY ?? file.workerEntry,
   };
 }
 
@@ -172,7 +169,7 @@ export const configCommand: AxiCliCommand<WorkerContext> = async (
       path,
       exists,
       envOverrides: Object.keys(process.env).filter(
-        k => k === 'WORKER_URL' || k === 'WORKER_API_TOKEN',
+        k => k === 'BROWSERCLI_ENTRY',
       ),
     });
   }
@@ -185,7 +182,7 @@ export const configCommand: AxiCliCommand<WorkerContext> = async (
     resolved,
     file: getConfigPath(),
     envOverrides: Object.keys(process.env).filter(
-      k => k === 'WORKER_URL' || k === 'WORKER_API_TOKEN',
+      k => k === 'BROWSERCLI_ENTRY',
     ),
   });
 };

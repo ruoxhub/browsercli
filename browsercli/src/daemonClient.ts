@@ -37,6 +37,17 @@ export interface DaemonEvent {
   ts?: number;
 }
 
+/** DaemonConnection 的鸭子类型面：命令层与测试 fake 共用（类含私有字段无法直接冒充）。 */
+export interface DaemonLike {
+  request<T = unknown>(
+    method: string,
+    params?: Record<string, unknown>,
+    timeoutMs?: number,
+  ): Promise<T>;
+  onEvent(cb: (event: DaemonEvent) => void): () => void;
+  close(): void;
+}
+
 interface Pending {
   resolve: (value: unknown) => void;
   reject: (err: Error) => void;
@@ -197,7 +208,7 @@ export class DaemonConnection {
 }
 
 /** CLI 配置文件路径；BROWSERCLI_CONFIG_DIR 供测试隔离（与 commands/config.ts 同步）。 */
-function cliConfigPath(): string {
+export function cliConfigPath(): string {
   const dir =
     process.env.BROWSERCLI_CONFIG_DIR ?? path.join(os.homedir(), '.browsercli');
   return path.join(dir, 'config.json');
@@ -327,8 +338,11 @@ export async function ensureDaemon(
   return spawnDaemon({...opts, daemonDir});
 }
 
-/** 请求 stop；连不上视为已死；兜底 pid 探活清理。 */
-export async function stopSession(cfg: SessionConfig): Promise<void> {
+/** 请求 stop；连不上视为已死；轮询 pid 探活，死了即清理 session 文件。 */
+export async function stopSession(
+  cfg: SessionConfig,
+  daemonDir?: string,
+): Promise<void> {
   try {
     const conn = await DaemonConnection.connect(cfg.socketPath, 3000);
     await conn.request('stop', undefined, 5000).catch(() => undefined);
@@ -336,17 +350,24 @@ export async function stopSession(cfg: SessionConfig): Promise<void> {
   } catch {
     // ECONNREFUSED/EOF = daemon 已死，走兜底清理
   }
-  let alive = true;
-  try {
-    process.kill(cfg.pid, 0);
-  } catch {
-    alive = false;
+  let alive = false;
+  for (let i = 0; i < 10; i++) {
+    try {
+      process.kill(cfg.pid, 0);
+      alive = true;
+    } catch {
+      alive = false;
+      break;
+    }
+    await new Promise(r => setTimeout(r, 100));
   }
-  if (!alive && cfg.workspaceDir) {
-    await deleteSession(
-      computeClientInfo(cfg.workspaceDir).daemonDir,
-      cfg.name,
-    );
+  if (!alive) {
+    const dir =
+      daemonDir ??
+      (cfg.workspaceDir
+        ? computeClientInfo(cfg.workspaceDir).daemonDir
+        : undefined);
+    if (dir) await deleteSession(dir, cfg.name);
   }
 }
 

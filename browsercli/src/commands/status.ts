@@ -7,8 +7,8 @@
 import type {AxiCliCommand} from 'axi-sdk-js';
 
 import {getBoolFlag, parseArgs} from '../args-parser.js';
+import {collectSessionRows} from './sessions.js';
 import {successOutput, tableOutput} from '../output.js';
-import type {ToolMeta} from '../tool-meta-types.js';
 import type {WorkerContext} from '../types.js';
 
 export const statusCommand: AxiCliCommand<WorkerContext> = async (
@@ -18,62 +18,24 @@ export const statusCommand: AxiCliCommand<WorkerContext> = async (
   const parsed = parseArgs(args);
   const json = getBoolFlag(parsed, 'json');
 
-  const httpClient = ctx?.httpClient;
-  const workerUrl =
-    httpClient?.baseUrl ?? process.env.WORKER_URL ?? 'http://127.0.0.1:8765';
-  const transport = ctx?.transport ?? 'http';
-
-  let online = false;
-  let healthStatus = 'offline';
-  let sessionsCount = 0;
-  let toolsCount = 0;
-
-  if (httpClient) {
-    try {
-      const healthRes = await httpClient.health();
-      healthStatus = healthRes.status ?? 'ok';
-      online = true;
-
-      const [sessionsRes, toolsRes] = await Promise.all([
-        httpClient.listSessions().catch(() => ({sessions: []})),
-        httpClient.listTools().catch(() => ({tools: [] as ToolMeta[]})),
-      ]);
-
-      sessionsCount = Array.isArray(sessionsRes.sessions)
-        ? sessionsRes.sessions.length
-        : 0;
-      toolsCount = Array.isArray(toolsRes.tools) ? toolsRes.tools.length : 0;
-    } catch {
-      online = false;
-      healthStatus = 'offline';
-    }
-  }
+  const rows = await collectSessionRows(ctx?.daemonDir);
+  const openCount = rows.filter(r => r.status === 'open').length;
 
   if (json) {
     return successOutput({
       command: 'status',
-      online,
-      workerUrl,
-      status: healthStatus,
-      sessionsCount,
-      toolsCount,
-      transport,
-      ...(online ? {} : {message: 'Worker 服务未运行或无法连接'}),
+      online: openCount > 0,
+      sessions: rows,
+      ...(openCount === 0 ? {message: '没有运行中的 daemon 会话'} : {}),
     });
   }
 
-  const headers = ['Property', 'Value'];
-  const rows = [
-    ['Worker URL', workerUrl],
-    ['Status', online ? `Online (${healthStatus})` : 'Offline (Unreachable)'],
-    ['Transport', transport],
-    ['Active Sessions', online ? String(sessionsCount) : '-'],
-    ['Available Tools', online ? String(toolsCount) : '-'],
-  ];
-
   return {
-    ...tableOutput(headers, rows),
+    ...tableOutput(
+      ['Session', 'PID', 'Console', 'Status'],
+      rows.map(r => [r.session, String(r.pid), r.console, r.status]),
+    ),
     command: 'status',
-    online,
+    online: openCount > 0,
   };
 };

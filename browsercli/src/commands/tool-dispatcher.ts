@@ -8,18 +8,48 @@ import type {AxiCliCommand} from 'axi-sdk-js';
 import {AxiError} from 'axi-sdk-js';
 import path from 'node:path';
 
-import {
-  getBoolFlag,
-  getFlag,
-  parseArgs,
-  type ParsedArgs,
-} from '../args-parser.js';
+import {getBoolFlag, parseArgs, type ParsedArgs} from '../args-parser.js';
+import type {DaemonLike} from '../daemonClient.js';
 import {successOutput} from '../output.js';
 import type {ToolMeta} from '../tool-meta-types.js';
 import type {WorkerContext} from '../types.js';
-import {WorkerHttpClient} from '../WorkerHttpClient.js';
 
 import {buildToolArgs, TOOL_CONTROL_FLAGS} from './shared/tool-args.js';
+
+/** WORKER_BUSY 退避序列（ms），与旧 submit 重试语义一致 */
+export const BUSY_RETRY_DELAYS_MS = [200, 500, 1000];
+
+/** --watch 订阅的事件频道 */
+export const WATCH_CHANNELS = [
+  'tool.invoke',
+  'hook.event',
+  'hook.sample',
+  'log',
+];
+
+function isWorkerBusyError(err: unknown): boolean {
+  return err instanceof Error && /WORKER_BUSY/.test(err.message);
+}
+
+/** tool.invoke + WORKER_BUSY 退避重发 */
+export async function invokeWithBusyRetry(
+  client: DaemonLike,
+  tool: string,
+  params: Record<string, unknown>,
+  delays: number[] = BUSY_RETRY_DELAYS_MS,
+): Promise<unknown> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await client.request('tool.invoke', {tool, params});
+    } catch (err) {
+      if (attempt < delays.length && isWorkerBusyError(err)) {
+        await new Promise(r => setTimeout(r, delays[attempt]));
+        continue;
+      }
+      throw err;
+    }
+  }
+}
 
 /**
  * 当请求的工具名模糊匹配到多个候选（如 `select` → select_frame / select_page）
@@ -108,86 +138,82 @@ export const toolDispatcherCommand: AxiCliCommand<WorkerContext> = async (
     ]);
   }
 
-  const httpClient = ctx?.httpClient;
-  if (!httpClient) {
+  if (!ctx) {
     throw new AxiError('Worker 未运行', 'WORKER_NOT_RUNNING');
   }
 
-  // 通过 GET /api/v1/tools 解析工具名 + 提供候选建议
-  const listed = await httpClient.listTools();
-  const allTools = listed.tools as ToolMeta[];
-  const normalizedName = requestedName.replaceAll('-', '_');
-  let candidate =
-    allTools.find(t => t.name === requestedName) ??
-    allTools.find(t => t.name === normalizedName);
-
-  if (!candidate) {
-    // 子串候选：requestedName 是某个工具名的一部分（如 `select` 同时是
-    // select_frame / select_page 的前缀）。单个候选直接采用；多个候选时
-    // 用用户提供的 flag 做参数消歧，命中参数最多的工具胜出。
-    const subs = allTools.filter(t => t.name.includes(normalizedName));
-    if (subs.length === 1) {
-      candidate = subs[0];
-    } else if (subs.length > 1) {
-      candidate = disambiguateByArgs(subs, parsed);
-    }
-  }
-
-  if (!candidate) {
-    const suggestions = allTools
-      .map(t => t.name)
-      .filter(name => name.includes(normalizedName))
-      .slice(0, 5);
-    throw new AxiError(
-      `未知工具：${requestedName}`,
-      'UNKNOWN_TOOL',
-      suggestions,
-    );
-  }
-
-  const toolArgs = buildToolArgs(parsed, candidate.argSpecs);
-
-  // 人体工学：支持 `call evaluate_script "<fn>"` 式的位置参数，
-  // 对齐 chrome-devtools 的 `evaluate_script "<fn>"` 调用方式。
-  // positionals[0] 是工具名本身，函数体位于其后的剩余位置参数。
-  // 同时处理 consumeFlagValue 将 --function 误设为 true（下一参数以 '-' 开头）的情况。
-  if (
-    (toolArgs.function === undefined || toolArgs.function === true) &&
-    parsed.positionals.length > 1 &&
-    candidate.argSpecs?.function?.type === 'string'
-  ) {
-    toolArgs.function = parsed.positionals.slice(1).join(' ');
-  }
-
-  // get_script_source / search_in_sources 默认把源码保存到当前工作目录（pwd）。
-  // - get_script_source：filePath 为文件，文件名取脚本 ID（<pwd>/<scriptId>.js）。
-  // - search_in_sources：filePath 为目录，每个匹配脚本写入 <pwd>/<scriptId>.js。
-  // 调用方仍可用 --file-path 显式覆盖保存位置。
-  if (toolArgs.filePath === undefined) {
-    if (candidate.name === 'get_script_source') {
-      const scriptId = String(toolArgs.scriptId ?? 'script');
-      toolArgs.filePath = path.join(process.cwd(), `${scriptId}.js`);
-    } else if (candidate.name === 'search_in_sources') {
-      toolArgs.filePath = process.cwd();
-    }
-  }
-
-  const requestedSessionId = getFlag(parsed, 'session');
   const watch = getBoolFlag(parsed, 'watch');
-  let closeStream: (() => void) | undefined;
+  // 会话路由由 -s/--session 在上下文层完成（createWorkerContext 扫全量 argv）；
+  // 命令段的 --session 作为控制 flag 被 buildToolArgs 过滤，不再透传给工具。
 
+  const client = await ctx.connect();
   try {
-    const sessionId = watch
-      ? await httpClient.ensureSession(requestedSessionId)
-      : requestedSessionId;
+    // 通过 tools.list 解析工具名 + 提供候选建议
+    const listed = await client.request<{tools?: unknown[]}>('tools.list');
+    const allTools = (
+      Array.isArray(listed) ? listed : (listed?.tools ?? [])
+    ) as ToolMeta[];
+    const normalizedName = requestedName.replaceAll('-', '_');
+    let candidate =
+      allTools.find(t => t.name === requestedName) ??
+      allTools.find(t => t.name === normalizedName);
+
+    if (!candidate) {
+      // 子串候选：requestedName 是某个工具名的一部分（如 `select` 同时是
+      // select_frame / select_page 的前缀）。单个候选直接采用；多个候选时
+      // 用用户提供的 flag 做参数消歧，命中参数最多的工具胜出。
+      const subs = allTools.filter(t => t.name.includes(normalizedName));
+      if (subs.length === 1) {
+        candidate = subs[0];
+      } else if (subs.length > 1) {
+        candidate = disambiguateByArgs(subs, parsed);
+      }
+    }
+
+    if (!candidate) {
+      const suggestions = allTools
+        .map(t => t.name)
+        .filter(name => name.includes(normalizedName))
+        .slice(0, 5);
+      throw new AxiError(
+        `未知工具：${requestedName}`,
+        'UNKNOWN_TOOL',
+        suggestions,
+      );
+    }
+
+    const toolArgs = buildToolArgs(parsed, candidate.argSpecs);
+
+    // 人体工学：支持 `call evaluate_script "<fn>"` 式的位置参数，
+    // 对齐 chrome-devtools 的 `evaluate_script "<fn>"` 调用方式。
+    // positionals[0] 是工具名本身，函数体位于其后的剩余位置参数。
+    // 同时处理 consumeFlagValue 将 --function 误设为 true（下一参数以 '-' 开头）的情况。
+    if (
+      (toolArgs.function === undefined || toolArgs.function === true) &&
+      parsed.positionals.length > 1 &&
+      candidate.argSpecs?.function?.type === 'string'
+    ) {
+      toolArgs.function = parsed.positionals.slice(1).join(' ');
+    }
+
+    // get_script_source / search_in_sources 默认把源码保存到当前工作目录（pwd）。
+    // - get_script_source：filePath 为文件，文件名取脚本 ID（<pwd>/<scriptId>.js）。
+    // - search_in_sources：filePath 为目录，每个匹配脚本写入 <pwd>/<scriptId>.js。
+    // 调用方仍可用 --file-path 显式覆盖保存位置。
+    if (toolArgs.filePath === undefined) {
+      if (candidate.name === 'get_script_source') {
+        const scriptId = String(toolArgs.scriptId ?? 'script');
+        toolArgs.filePath = path.join(process.cwd(), `${scriptId}.js`);
+      } else if (candidate.name === 'search_in_sources') {
+        toolArgs.filePath = process.cwd();
+      }
+    }
 
     // --watch 必须先完成订阅，才能观察本次工具调用产生的事件。
     if (watch) {
       try {
-        closeStream = await httpClient.openStream(sessionId, ev =>
-          console.log('[stream]', JSON.stringify(ev)),
-        );
-        process.once('exit', closeStream);
+        await client.request('subscribe', {channels: WATCH_CHANNELS});
+        client.onEvent(ev => console.log('[stream]', JSON.stringify(ev)));
       } catch (streamErr) {
         console.warn(
           '[call] --watch 流不可用:',
@@ -196,7 +222,7 @@ export const toolDispatcherCommand: AxiCliCommand<WorkerContext> = async (
       }
     }
 
-    const result = await httpClient.invoke(sessionId, candidate.name, toolArgs);
+    const result = await invokeWithBusyRetry(client, candidate.name, toolArgs);
 
     const failure = extractToolFailure(result);
     if (failure) {
@@ -214,14 +240,12 @@ export const toolDispatcherCommand: AxiCliCommand<WorkerContext> = async (
       result,
     });
   } catch (error) {
-    if (closeStream) {
-      process.removeListener('exit', closeStream);
-      closeStream();
-    }
     if (error instanceof AxiError) throw error;
     throw new AxiError(
       `工具调用失败：${error instanceof Error ? error.message : error}`,
       'TOOL_INVOCATION_ERROR',
     );
+  } finally {
+    client.close();
   }
 };
