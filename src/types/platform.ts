@@ -12,10 +12,6 @@
 
 /** Worker 启动选项 */
 interface WorkerStartOptions {
-  /** rpc Server 地址 */
-  rpcHost: string;
-  /** 分组名 */
-  group: string;
   /** 浏览器调试 URL */
   browserUrl?: string;
   /** WebSocket 端点 */

@@ -173,8 +173,6 @@ export interface WorkerStatus {
   version: string;
   uptime: number;
   pid: number;
-  rpcHost: string;
-  group: string;
 }
 
 export interface WorkerFullStatus extends WorkerStatus {

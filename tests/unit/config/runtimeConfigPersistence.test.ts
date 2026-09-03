@@ -48,15 +48,15 @@ describe('runtimeConfigPersistence', () => {
         llmProvider: 'openai',
         openai: {apiKey: 'sk-abc', baseURL: 'https://x/v1', model: 'gpt-4o'},
         browser: {browserURL: 'http://127.0.0.1:9222', headless: false},
-        rpcHost: 'ws://ignored:1',
+        debug: true,
       });
       const loaded = loadCachedRuntimeConfig();
       assert.ok(loaded);
       assert.strictEqual(loaded?.llmProvider, 'openai');
       assert.strictEqual(loaded?.openai?.apiKey, 'sk-abc');
       assert.strictEqual(loaded?.browser?.browserURL, 'http://127.0.0.1:9222');
-      // 启动期固定值不应回填
-      assert.strictEqual(loaded?.rpcHost, undefined);
+      // 非连接设置字段不应回填
+      assert.strictEqual(loaded?.debug, undefined);
     });
 
     it('returns undefined on malformed JSON', () => {
@@ -76,7 +76,7 @@ describe('runtimeConfigPersistence', () => {
         llmProvider: 'openai',
         openai: {apiKey: 'sk-secret', model: 'gpt-4o'},
         browser: {wsEndpoint: 'ws://127.0.0.1:9222/devtools/browser/x'},
-        rpcHost: 'ws://fixed:5612',
+        debug: true,
       };
       persistRuntimeConfig(config);
 
@@ -87,7 +87,7 @@ describe('runtimeConfigPersistence', () => {
         raw.browser.wsEndpoint,
         'ws://127.0.0.1:9222/devtools/browser/x',
       );
-      assert.strictEqual(raw.rpcHost, undefined);
+      assert.strictEqual(raw.debug, undefined);
     });
   });
 

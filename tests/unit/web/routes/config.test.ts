@@ -559,7 +559,7 @@ describe('config routes', () => {
         openai: {apiKey: 'sk-export1234', model: 'gpt-4o'},
         llmProvider: 'openai',
         browser: {headless: true},
-        rpcHost: 'ws://fixed:5612',
+        browserUrl: 'http://fixed:9222',
       });
 
       const routes = createConfigRoutes({
@@ -582,8 +582,8 @@ describe('config routes', () => {
       ]);
       // apiKey 恒掩码
       assert.strictEqual(parsed.data.openai.apiKey, 'sk-***1234');
-      // 启动期固定值不导出
-      assert.strictEqual(parsed.data.rpcHost, undefined);
+      // 白名单外的键不导出
+      assert.strictEqual(parsed.data.browserUrl, undefined);
     });
   });
 

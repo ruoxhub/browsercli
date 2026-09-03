@@ -7,14 +7,17 @@
 import assert from 'node:assert';
 import {afterEach, beforeEach, describe, it} from 'node:test';
 
-import {getRuntimeConfigStore, resetRuntimeConfigStore} from '../../src/config/RuntimeConfigStore.js';
+import {
+  getRuntimeConfigStore,
+  resetRuntimeConfigStore,
+} from '../../src/config/RuntimeConfigStore.js';
 import {parseWorkerArgs} from '../../src/worker/WorkerArgs.js';
 
 describe('Worker main() startup', () => {
   const originalEnv = {...process.env};
 
   beforeEach(() => {
-    delete process.env.RPC_HOST;
+    delete process.env.BROWSER_URL;
   });
 
   afterEach(() => {
@@ -23,14 +26,17 @@ describe('Worker main() startup', () => {
   });
 
   it('seeds store with CLI overrides on top of env', () => {
-    process.env.RPC_HOST = 'ws://env:5612';
+    process.env.BROWSER_URL = 'http://env:9222';
     resetRuntimeConfigStore();
 
-    const cliConfig = parseWorkerArgs(['--rpcHost', 'ws://cli:5612']);
+    const cliConfig = parseWorkerArgs(['--browserUrl', 'http://cli:9222']);
     getRuntimeConfigStore().update(cliConfig);
 
     // CLI 覆盖 env
-    assert.strictEqual(getRuntimeConfigStore().get().rpcHost, 'ws://cli:5612');
+    assert.strictEqual(
+      getRuntimeConfigStore().get().browserUrl,
+      'http://cli:9222',
+    );
   });
 
   it('does not auto-connect browser on startup (store has no browser context)', () => {

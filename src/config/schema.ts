@@ -138,8 +138,6 @@ export type ToolResultRecordingConfig = zodType.infer<
 
 export const GlobalConfigSchema = zod
   .object({
-    rpcHost: optionalStringSchema.optional(),
-    group: optionalStringSchema.optional(),
     browserUrl: optionalStringSchema.optional(),
     wsEndpoint: optionalStringSchema.optional(),
     headless: booleanSchema.optional(),

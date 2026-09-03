@@ -256,25 +256,6 @@ export default function OverviewPage() {
               </div>
               <div className="flex justify-between items-center text-xs">
                 <span className="text-[var(--color-text-secondary)]">
-                  RPC Host
-                </span>
-                <span
-                  className="font-mono text-[var(--color-text-primary)] truncate max-w-[140px]"
-                  title={status?.rpcHost}
-                >
-                  {status?.rpcHost}
-                </span>
-              </div>
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-[var(--color-text-secondary)]">
-                  Seciro Group
-                </span>
-                <span className="font-mono text-[var(--color-text-primary)] text-right">
-                  {status?.group}
-                </span>
-              </div>
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-[var(--color-text-secondary)]">
                   进程 PID
                 </span>
                 <span className="font-mono text-[var(--color-text-primary)]">

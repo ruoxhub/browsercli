@@ -370,7 +370,7 @@ export class CodeCache {
             });
           }
           // 每处理 SEARCH_LINE_YIELD_INTERVAL 行让出一次事件循环，
-          // 让心跳 / 重连 timer 能穿插执行，避免 RPC 因长阻塞被 Sekiro 断开。
+          // 让心跳 / 重连 timer 能穿插执行，避免长阻塞饿死 socket 心跳。
           if ((i + 1) % SEARCH_LINE_YIELD_INTERVAL === 0) {
             await waitForImmediate();
           }

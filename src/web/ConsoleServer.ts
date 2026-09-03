@@ -13,22 +13,14 @@ import {WebSocketServer} from 'ws';
 
 import type {GlobalConfig} from '../config/schema.js';
 import type {Runtime} from '../runtime.js';
-import {
-  ensureToolsMeta,
-  getAllToolNames,
-  getAllToolsMeta,
-  getToolMeta,
-} from '../tools/tools-meta.js';
+import {ensureToolsMeta, getAllToolNames} from '../tools/tools-meta.js';
 import {logger} from '../utils/logger.js';
-import {JobStore} from '../worker/JobStore.js';
-import type {SekiroInvoker} from '../worker/SekiroInvoker.js';
+import type {JobStore} from '../worker/JobStore.js';
 import type {ToolAdapter} from '../worker/ToolAdapter.js';
 
 import {InvocationStore} from './adapters/InvocationStore.js';
-import {bearerAuth} from './middleware/bearerAuth.js';
 import {rejectIfNotLocal} from './middleware/localOnly.js';
 import {RestRouter} from './RestRouter.js';
-import {createApiV1Routes} from './routes/apiV1.js';
 import {createConfigRoutes} from './routes/config.js';
 import {createHookRoutes} from './routes/hooks.js';
 import {createInvocationsRoutes} from './routes/invocations.js';
@@ -42,25 +34,14 @@ import {WsHub} from './ws/WsHub.js';
 export interface ConsoleServerOptions {
   port: number;
   host?: string;
-  group: string;
-  rpcHost: string;
   runtime: Runtime;
-  invoker: SekiroInvoker;
   toolAdapter: ToolAdapter;
-  apiToken?: string;
   /**
    * 重置配置时的 CLI 种子值；src/index.ts 传入 parseWorkerArgs() 结果。
    * 与启动时 update(cliConfig) 的语义对齐：只有 WorkerArgs 认识的 flag 会保留。
    */
   configSeed?: Partial<GlobalConfig>;
   jobStore?: JobStore;
-}
-
-// 调用方未显式注入时使用的兜底实例（保持 /api/v1 路由可挂载）。
-let defaultJobStore: JobStore | undefined;
-function getDefaultJobStore(): JobStore {
-  defaultJobStore ??= new JobStore();
-  return defaultJobStore;
 }
 
 const MIME_TYPES: Record<string, string> = {
@@ -133,8 +114,6 @@ export class ConsoleServer {
     const workerConfig: WorkerRoutesConfig = {
       runtime: this.options.runtime,
       contextProvider: this.options.runtime.contextProvider,
-      group: this.options.group,
-      rpcHost: this.options.rpcHost,
       version,
       startedAt: this.startedAt,
       get browserMode(): string {
@@ -196,17 +175,6 @@ export class ConsoleServer {
         };
       }),
     );
-    this.router.mount(
-      createApiV1Routes({
-        contextProvider: this.options.runtime.contextProvider!,
-        toolAdapter: this.options.toolAdapter,
-        jobStore: this.options.jobStore ?? getDefaultJobStore(),
-        wsHub: this.wsHub,
-        getToolMeta: name => getToolMeta(name),
-        listToolsMeta: () => getAllToolsMeta(),
-        ensureToolsMeta,
-      }),
-    );
     void ensureToolsMeta().catch(err =>
       console.warn('[ConsoleServer] ensureToolsMeta 失败:', err),
     );
@@ -222,17 +190,7 @@ export class ConsoleServer {
       try {
         const pathname = (req.url ?? '').split('?')[0] || '/';
 
-        // /api/v1/* 豁免本地校验，改走 Bearer Token 认证
-        if (pathname.startsWith('/api/v1/')) {
-          if (
-            bearerAuth(req, res, {
-              apiToken: this.options.apiToken,
-              bindHost: this.options.host ?? '127.0.0.1',
-            })
-          ) {
-            return;
-          }
-        } else if (rejectIfNotLocal(req, res)) {
+        if (rejectIfNotLocal(req, res)) {
           return;
         }
 

@@ -38,13 +38,13 @@ describe('RuntimeConfigStore', () => {
   });
 
   it('update merges top-level fields', () => {
-    resetRuntimeConfigStore({rpcHost: 'ws://old', group: 'g1'});
+    resetRuntimeConfigStore({browserUrl: 'http://old:9222', headless: true});
 
     const store = getRuntimeConfigStore();
-    store.update({rpcHost: 'ws://new'});
+    store.update({browserUrl: 'http://new:9222'});
 
-    assert.strictEqual(store.get().rpcHost, 'ws://new');
-    assert.strictEqual(store.get().group, 'g1');
+    assert.strictEqual(store.get().browserUrl, 'http://new:9222');
+    assert.strictEqual(store.get().headless, true);
   });
 
   it('update shallow-merges nested browser field', () => {
@@ -76,24 +76,30 @@ describe('RuntimeConfigStore', () => {
     resetRuntimeConfigStore();
 
     assert.throws(
-      () => getRuntimeConfigStore().update({llmProvider: 'invalid-provider' as never}),
+      () =>
+        getRuntimeConfigStore().update({
+          llmProvider: 'invalid-provider' as never,
+        }),
       /llmProvider/,
     );
   });
 
   it('reset re-seeds the store', () => {
     const store = getRuntimeConfigStore();
-    store.update({rpcHost: 'ws://modified'});
+    store.update({browserUrl: 'http://modified:9222'});
 
-    resetRuntimeConfigStore({rpcHost: 'ws://reset'});
+    resetRuntimeConfigStore({browserUrl: 'http://reset:9222'});
 
-    assert.strictEqual(getRuntimeConfigStore().get().rpcHost, 'ws://reset');
+    assert.strictEqual(
+      getRuntimeConfigStore().get().browserUrl,
+      'http://reset:9222',
+    );
   });
 
   it('get returns a readonly snapshot', () => {
-    resetRuntimeConfigStore({rpcHost: 'ws://x'});
+    resetRuntimeConfigStore({browserUrl: 'http://x:9222'});
     const snapshot = getRuntimeConfigStore().get();
 
-    assert.strictEqual(snapshot.rpcHost, 'ws://x');
+    assert.strictEqual(snapshot.browserUrl, 'http://x:9222');
   });
 });

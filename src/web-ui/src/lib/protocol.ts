@@ -50,8 +50,6 @@ export interface OpenAIConfig {
 }
 
 export interface RuntimeConfig {
-  rpcHost?: string;
-  group?: string;
   browserUrl?: string;
   wsEndpoint?: string;
   headless?: boolean;

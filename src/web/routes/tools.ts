@@ -11,7 +11,7 @@
  *  POST /api/tools/:name       — 调用工具（body ≤ 1MB），结果落 InvocationStore
  *
  * 调用路径：ConsoleServer 嵌在 Worker 进程内，直接走 ToolAdapter.executeTool，
- * 复用与 /api/v1 同一条内部执行管线，不再经过 Sekiro。
+ * 与 daemon socket 服务复用同一条内部执行管线。
  */
 
 import type {IncomingMessage, ServerResponse} from 'node:http';

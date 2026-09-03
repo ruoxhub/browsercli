@@ -9,11 +9,37 @@ import {readFileSync, readdirSync, statSync} from 'node:fs';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
-import {createToolError, ErrorCodes} from '../../../src/utils/errors.js';
-import {createApiV1Routes} from '../../../src/web/routes/apiV1.js';
-import {WsHub} from '../../../src/web/ws/WsHub.js';
+import {
+  createToolError,
+  ErrorCodes,
+  ToolError,
+} from '../../../src/utils/errors.js';
 import {JobStore} from '../../../src/worker/JobStore.js';
-import type {ToolAdapter} from '../../../src/worker/ToolAdapter.js';
+
+/**
+ * Job 错误包装契约（原 HTTP 路由 runJob 的语义，现由 daemonServer 沿用）：
+ * ToolError 抛错时按 code/message/retryable/recovery/details 结构化落盘。
+ */
+async function runJobOnce(
+  jobStore: JobStore,
+  execute: () => Promise<unknown>,
+): Promise<string> {
+  const job = jobStore.create('s1', 'failing_tool', {});
+  jobStore.markRunning(job.jobId);
+  try {
+    jobStore.complete(job.jobId, await execute());
+  } catch (error) {
+    const e = error as Partial<ToolError>;
+    jobStore.fail(job.jobId, {
+      code: e.code ?? ErrorCodes.RUNTIME,
+      message: e.message ?? String(error),
+      ...(e.retryable !== undefined ? {retryable: e.retryable} : {}),
+      ...(e.recovery !== undefined ? {recovery: e.recovery} : {}),
+      ...(e.details !== undefined ? {details: e.details} : {}),
+    });
+  }
+  return job.jobId;
+}
 
 function collectSourceFiles(dir: string): string[] {
   const results: string[] = [];
@@ -72,17 +98,6 @@ describe('Tool Failure Contract & Job Failed Guarantee', () => {
 
   it('ensures Job transitions to failed with all structured ToolError details when handler throws', async () => {
     const jobStore = new JobStore();
-    const mockToolMeta = {
-      name: 'failing_tool',
-      description: 'failing tool for contract test',
-      schema: {},
-      argSpecs: {},
-      modulePath: './failing.js',
-      handlerName: 'failingTool',
-      callMode: 'defineTool' as const,
-      domain: 'test',
-      profile: 'full' as const,
-    };
 
     const recovery = {
       tool: 'resume',
@@ -91,89 +106,18 @@ describe('Tool Failure Contract & Job Failed Guarantee', () => {
     };
     const details = {pageId: 'page_123', reason: 'paused_at_breakpoint'};
 
-    const mockToolAdapter = {
-      executeTool: async () => {
-        throw createToolError(
-          ErrorCodes.DEBUGGER_PAUSED,
-          'Page execution is paused at breakpoint',
-          {toolName: 'failing_tool'},
-          {
-            retryable: true,
-            recovery,
-            details,
-          },
-        );
-      },
-    } as unknown as ToolAdapter;
-
-    const routes = createApiV1Routes({
-      contextProvider: {
-        isBrowserConnected: () => true,
-        getContext: () => null,
-      } as never,
-      toolAdapter: mockToolAdapter,
-      jobStore,
-      wsHub: new WsHub(),
-      getToolMeta: name => (name === mockToolMeta.name ? mockToolMeta : undefined),
-      listToolsMeta: () => [mockToolMeta],
-      ensureToolsMeta: async () => undefined,
+    const jobId = await runJobOnce(jobStore, async () => {
+      throw createToolError(
+        ErrorCodes.DEBUGGER_PAUSED,
+        'Page execution is paused at breakpoint',
+        {toolName: 'failing_tool'},
+        {
+          retryable: true,
+          recovery,
+          details,
+        },
+      );
     });
-
-    // 1. Create session
-    let sessionResBody = '';
-    const sessionRes = {
-      statusCode: 0,
-      headers: {} as Record<string, string>,
-      setHeader(k: string, v: string) {
-        this.headers[k] = v;
-      },
-      end(payload: string) {
-        sessionResBody = payload;
-      },
-    };
-    await routes.get('POST /api/v1/sessions')!({} as never, sessionRes as never);
-    const sessionId = JSON.parse(sessionResBody).data.sessionId;
-
-    // 2. Invoke tool
-    let invokeResBody = '';
-    const invokeRes = {
-      statusCode: 0,
-      headers: {} as Record<string, string>,
-      setHeader(k: string, v: string) {
-        this.headers[k] = v;
-      },
-      end(payload: string) {
-        invokeResBody = payload;
-      },
-    };
-
-    const reqMock = {
-      on(event: string, cb: (data?: unknown) => void) {
-        if (event === 'data') {
-          cb(Buffer.from(JSON.stringify({tool: 'failing_tool', params: {}})));
-        }
-        if (event === 'end') {
-          cb();
-        }
-        return this;
-      },
-    };
-
-    await routes.get('POST /api/v1/sessions/:id/invoke')!(
-      reqMock as never,
-      invokeRes as never,
-      {id: sessionId},
-    );
-
-    const jobId = JSON.parse(invokeResBody).data.jobId;
-    assert.ok(jobId);
-
-    // Wait for job to fail
-    for (let i = 0; i < 50; i++) {
-      const job = jobStore.get(jobId);
-      if (job.status === 'failed') break;
-      await new Promise(r => setTimeout(r, 5));
-    }
 
     const failedJob = jobStore.get(jobId);
     assert.equal(failedJob.status, 'failed');

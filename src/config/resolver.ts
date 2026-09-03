@@ -10,8 +10,8 @@
  * 核心配置基础设施 — 环境变量工具、CLI 配置解析、RuntimeConfigStore 播种
  *
  * 配置优先级（高 → 低）：
- * 1. CLI 参数（--rpcHost 等）
- * 2. 环境变量（RPC_HOST, OPENAI_API_KEY 等）
+ * 1. CLI 参数（--browserUrl 等）
+ * 2. 环境变量（BROWSER_URL, OPENAI_API_KEY 等）
  * 3. 内置默认值
  *
  * config.json 文件加载已移除，配置改为 RuntimeConfigStore 内存态，
@@ -26,11 +26,7 @@ import {config as dotenvConfig} from 'dotenv';
 
 import {resolveDefaultEnvPath} from '../utils/projectPaths.js';
 
-import {
-  DEFAULT_GROUP,
-  DEFAULT_RPC_HOST,
-  RUNTIME_DIR_NAME,
-} from './constants.js';
+import {RUNTIME_DIR_NAME} from './constants.js';
 import {getRuntimeConfigStore} from './RuntimeConfigStore.js';
 import {
   type AIConfig,
@@ -64,8 +60,6 @@ export type {SystemConfig};
 
 /** CLI 层解析后的完整配置 */
 export interface ResolvedConfig {
-  rpcHost: string;
-  group: string;
   browserUrl?: string;
   wsEndpoint?: string;
   headless: boolean;
@@ -87,8 +81,6 @@ export interface ResolvedToolResultRecordingConfig {
 
 /** 内置默认值 */
 const DEFAULTS: Readonly<ResolvedConfig> = {
-  rpcHost: DEFAULT_RPC_HOST,
-  group: DEFAULT_GROUP,
   headless: false,
   runtimeDirName: RUNTIME_DIR_NAME,
   debug: false,
@@ -103,8 +95,6 @@ const DEFAULTS: Readonly<ResolvedConfig> = {
 
 /** 所有已知环境变量 → GlobalConfig 键映射 */
 const ENV_MAP: Readonly<Record<string, keyof GlobalConfig>> = {
-  RPC_HOST: 'rpcHost',
-  RPC_GROUP: 'group',
   BROWSER_URL: 'browserUrl',
   BROWSER_WS_ENDPOINT: 'wsEndpoint',
   BROWSER_HEADLESS: 'headless',
@@ -307,8 +297,6 @@ export function resolveConfig(envArgs?: Partial<GlobalConfig>): ResolvedConfig {
   const merged = validateGlobalConfig({...envConfig, ...envArgs});
 
   return {
-    rpcHost: merged.rpcHost ?? DEFAULTS.rpcHost,
-    group: merged.group ?? DEFAULTS.group,
     browserUrl: merged.browserUrl || undefined,
     wsEndpoint: merged.wsEndpoint || undefined,
     headless: merged.headless ?? DEFAULTS.headless,

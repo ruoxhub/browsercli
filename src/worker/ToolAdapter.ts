@@ -14,7 +14,6 @@
 
 import {ToolPrerequisiteChecker} from '../tools/prerequisites/ToolPrerequisiteChecker.js';
 import type {ToolMeta} from '../tools/tools-meta.js';
-import type {ActionHandler} from '../types/rpc.js';
 import type {ToolInvokeEvent} from '../web/types.js';
 
 import {ToolCallContextGuard} from './ToolCallContextGuard.js';
@@ -61,21 +60,8 @@ export class ToolAdapter {
   }
 
   /**
-   * 将 Tool handler 包装为 Sekiro ActionHandler
-   */
-  wrapTool(meta: ToolMeta): ActionHandler {
-    return async (rpcRequest, resolve, reject) => {
-      try {
-        resolve(await this.pipeline.execute(meta, rpcRequest.params || {}));
-      } catch (error) {
-        reject(error);
-      }
-    };
-  }
-
-  /**
-   * 直接经内部 pipeline 执行工具（绕过 Sekiro Action 包装）。
-   * 供 /api/v1 路由复用同一 pipeline 实例。
+   * 直接经内部 pipeline 执行工具。
+   * 供 daemon socket 服务（src/ipc/daemonServer.ts）与 Web 控制台复用同一 pipeline 实例。
    * sessionId 在执行前后注入/清除 active session（v1 逻辑命名空间）。
    */
   async executeTool(

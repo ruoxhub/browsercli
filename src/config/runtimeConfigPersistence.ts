@@ -9,7 +9,7 @@
  * 下次启动时回填，避免重复配置连接参数。
  *
  * 只持久化「连接设置」相关的可写字段：llmProvider / openai / browser。
- * rpcHost、group 等启动期固定值由 CLI/环境变量决定，不在此缓存。
+ * 启动期固定值由 CLI/环境变量决定，不在此缓存。
  *
  * 注意：openai.apiKey 会明文写入该文件（与 browsercli 现有的 apiToken 行为一致）。
  */

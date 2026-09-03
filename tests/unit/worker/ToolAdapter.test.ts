@@ -10,7 +10,6 @@ import {describe, it, mock} from 'node:test';
 import {BrowserManager} from '../../../src/modules/browser/index.js';
 import {ensureToolsMeta, getToolMeta} from '../../../src/tools/tools-meta.js';
 import type {ToolMeta} from '../../../src/tools/tools-meta.js';
-import type {RpcRequest} from '../../../src/types/rpc.js';
 import {ErrorCodes, ToolError} from '../../../src/utils/errors.js';
 import {connectBrowser} from '../../../src/worker/BrowserConnectionManager.js';
 import {ToolAdapter} from '../../../src/worker/ToolAdapter.js';
@@ -54,21 +53,11 @@ async function invokeTool(
   meta: ToolMeta,
   params: Record<string, unknown> = {},
 ): Promise<unknown> {
-  return await new Promise((resolve, reject) => {
-    void adapter.wrapTool(meta)(
-      {
-        __sekiro_seq__: 'test',
-        action: meta.name,
-        params,
-      } satisfies RpcRequest,
-      resolve,
-      reject,
-    );
-  });
+  return await adapter.executeTool(meta, params);
 }
 
 describe('ToolAdapter', () => {
-  it('keeps browser lifecycle changes out while a wrapped tool is running', async () => {
+  it('keeps browser lifecycle changes out while a tool is running', async () => {
     let releaseTool!: () => void;
     const toolGate = new Promise<void>(resolve => {
       releaseTool = resolve;
@@ -176,7 +165,7 @@ describe('ToolAdapter', () => {
     }
   });
 
-  it('wrapTool executes default function handlers with validated params', async () => {
+  it('executes default function handlers with validated params', async () => {
     const provider = new ToolContextProvider();
     const adapter = new ToolAdapter(provider);
     const meta = legacyFixtureMeta({
@@ -198,7 +187,7 @@ describe('ToolAdapter', () => {
     });
   });
 
-  it('wrapTool executes context handlers with ToolContextProvider', async () => {
+  it('executes context handlers with ToolContextProvider', async () => {
     const provider = new ToolContextProvider();
     const adapter = new ToolAdapter(provider);
     const meta = legacyFixtureMeta({
@@ -218,7 +207,7 @@ describe('ToolAdapter', () => {
     });
   });
 
-  it('wrapTool executes frame handlers with selected frame', async () => {
+  it('executes frame handlers with selected frame', async () => {
     const provider = new ToolContextProvider();
     const frame = {
       evaluate: async (script: string) => `evaluated:${script}`,
@@ -242,7 +231,7 @@ describe('ToolAdapter', () => {
     });
   });
 
-  it('wrapTool executes defineTool handlers with accumulated response', async () => {
+  it('executes defineTool handlers with accumulated response', async () => {
     const provider = new ToolContextProvider();
     provider.setPages([
       {mainFrame: () => ({}), isClosed: () => false} as never,
@@ -265,7 +254,7 @@ describe('ToolAdapter', () => {
     });
   });
 
-  it('wrapTool rejects validation errors as ToolError VALIDATION', async () => {
+  it('rejects validation errors as ToolError VALIDATION', async () => {
     await ensureToolsMeta();
     const provider = new ToolContextProvider();
     const adapter = new ToolAdapter(provider);
@@ -279,7 +268,7 @@ describe('ToolAdapter', () => {
     );
   });
 
-  it('wrapTool rejects missing handlers as ToolError NOT_FOUND', async () => {
+  it('rejects missing handlers as ToolError NOT_FOUND', async () => {
     const provider = new ToolContextProvider();
     const adapter = new ToolAdapter(provider);
     const meta = fixtureMeta({
@@ -294,7 +283,7 @@ describe('ToolAdapter', () => {
     );
   });
 
-  it('wrapTool emits tool:error for thrown errors', async () => {
+  it('emits tool:error for thrown errors', async () => {
     const provider = new ToolContextProvider();
     const events: Array<{
       name: string;
@@ -340,17 +329,9 @@ describe('ToolAdapter', () => {
     const meta = getToolMeta('explain_reverse_stage');
     assert.ok(meta, 'missing meta for explain_reverse_stage');
 
-    const result = await new Promise<ResolvePayload>((resolve, reject) => {
-      void adapter.wrapTool(meta!)(
-        {
-          __sekiro_seq__: 'test',
-          action: meta!.name,
-          params: {stage: 'Observe'},
-        },
-        value => resolve(value as ResolvePayload),
-        reject,
-      );
-    });
+    const result = (await adapter.executeTool(meta!, {
+      stage: 'Observe',
+    })) as ResolvePayload;
 
     assert.strictEqual(result.structuredContent?.success, true);
     assert.strictEqual(
@@ -402,17 +383,9 @@ describe('ToolAdapter', () => {
       const meta = getToolMeta(toolName);
       assert.ok(meta, `missing meta for ${toolName}`);
 
-      return await new Promise<ResolvePayload>((resolve, reject) => {
-        void adapter.wrapTool(meta!)(
-          {
-            __sekiro_seq__: 'test',
-            action: meta!.name,
-            params: {hookId: 'hook_from_params'},
-          },
-          value => resolve(value as ResolvePayload),
-          reject,
-        );
-      });
+      return (await adapter.executeTool(meta!, {
+        hookId: 'hook_from_params',
+      })) as ResolvePayload;
     };
 
     const getResult = await runTool('get_hook_data');

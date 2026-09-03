@@ -23,9 +23,6 @@ export interface WorkerRoutesConfig {
   runtime: Runtime;
   /** 工具上下文提供者，用于读取重连后的 browser 状态 */
   contextProvider?: ToolContextProvider;
-  /** 启动时传入的 RPC 连接信息（来自 src/index.ts 的 workerStartContext） */
-  group: string;
-  rpcHost: string;
   /** package.json 版本号；ConsoleServer 启动时读出后注入 */
   version: string;
   /** 进程启动时间（ms）；用于计算 uptime */
@@ -45,8 +42,6 @@ function buildWorkerStatus(cfg: WorkerRoutesConfig): WorkerStatus {
     version: cfg.version,
     uptime: Date.now() - cfg.startedAt,
     pid: process.pid,
-    rpcHost: cfg.rpcHost,
-    group: cfg.group,
   };
 }
 

@@ -23,8 +23,6 @@ describe('config schema validation', {concurrency: false}, () => {
 
   it('parses valid global config and coerces numeric strings', () => {
     const config = validateGlobalConfig({
-      rpcHost: 'ws://127.0.0.1:5620',
-      group: 'reverse',
       llmProvider: 'openai',
       openai: {
         apiKey: 'sk-test',

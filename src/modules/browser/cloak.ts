@@ -41,8 +41,8 @@ async function loadCloakBrowser(): Promise<CloakBrowserModule> {
 /**
  * Redirect `console.log` / `console.info` to stderr for the duration of `fn`.
  *
- * Browser worker 的 stdout 是 Sekiro RPC 协议通道 —— 任何非协议字节
- * 都会让 Server 端断帧、客户端掉线。cloakbrowser 的 `ensureBinary()` 把
+ * daemon 的 stdout 是就绪握手通道 —— 任何非协议字节会破坏 CLI 的启动检测。
+ * cloakbrowser 的 `ensureBinary()` 把
  * 下载进度写进 `console.log`（stdout），所以必须在它运行时重定向到 stderr。
  * 进度仍然可见（stderr 会进入 worker 日志面板）。
  */

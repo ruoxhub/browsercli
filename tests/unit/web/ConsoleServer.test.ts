@@ -17,7 +17,6 @@ import type {CapturedRequestInput} from '../../../src/modules/session/types.js';
 import type {Runtime} from '../../../src/runtime.js';
 import {ConsoleServer} from '../../../src/web/ConsoleServer.js';
 import type {WsHub} from '../../../src/web/ws/WsHub.js';
-import type {SekiroInvoker} from '../../../src/worker/SekiroInvoker.js';
 import type {ToolAdapter} from '../../../src/worker/ToolAdapter.js';
 
 function bridgeInput(): CapturedRequestInput {
@@ -66,10 +65,6 @@ describe('ConsoleServer', () => {
     },
   } as unknown as Runtime;
 
-  const mockInvoker = {
-    invoke: async () => ({ok: true}),
-  } as unknown as SekiroInvoker;
-
   const mockToolAdapter = {
     onInvoke: () => () => {
       /* no-op unsubscribe stub */
@@ -80,10 +75,7 @@ describe('ConsoleServer', () => {
   before(async () => {
     server = new ConsoleServer({
       port: 0, // 自动挑选空闲端口
-      group: 'test-group',
-      rpcHost: 'test-host',
       runtime: mockRuntime,
-      invoker: mockInvoker,
       toolAdapter: mockToolAdapter,
     });
     await server.start();
@@ -148,10 +140,7 @@ describe('ConsoleServer', () => {
     // 这里再显式跑一次，把「缺失服务不抛」变成一条会红的断言而不是隐含前提。
     const bare = new ConsoleServer({
       port: 0,
-      group: 'test-group',
-      rpcHost: 'test-host',
       runtime: mockRuntime,
-      invoker: mockInvoker,
       toolAdapter: mockToolAdapter,
     });
     await assert.doesNotReject(async () => {
@@ -174,10 +163,7 @@ describe('ConsoleServer', () => {
 
     const srv = new ConsoleServer({
       port: 0,
-      group: 'test-group',
-      rpcHost: 'test-host',
       runtime: capturingRuntime,
-      invoker: mockInvoker,
       toolAdapter: mockToolAdapter,
     });
     await srv.start();
@@ -229,10 +215,7 @@ describe('ConsoleServer', () => {
 
     const srv = new ConsoleServer({
       port: 0,
-      group: 'test-group',
-      rpcHost: 'test-host',
       runtime: capturingRuntime,
-      invoker: mockInvoker,
       toolAdapter: mockToolAdapter,
     });
     await srv.start();
