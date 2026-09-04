@@ -389,8 +389,17 @@ export function collectDaemonPids(lines: string[]): number[] {
 export async function killAllDaemons(): Promise<number[]> {
   let pids: number[];
   if (process.platform === 'win32') {
+    // 用 SystemRoot 全路径解析 powershell.exe：WindowsPowerShell\v1.0 不在某些
+    // 精简环境的 PATH 里时，裸命令名会 spawnSync ENOENT（SystemRoot 必存在）。
+    const powershellExe = path.join(
+      process.env.SystemRoot ?? 'C:\\Windows',
+      'System32',
+      'WindowsPowerShell',
+      'v1.0',
+      'powershell.exe',
+    );
     const out = execFileSync(
-      'powershell',
+      powershellExe,
       [
         '-NoProfile',
         '-NonInteractive',
