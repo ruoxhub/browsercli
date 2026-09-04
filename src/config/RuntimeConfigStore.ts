@@ -14,7 +14,7 @@
  * 时做浅合并，避免面板只改一个字段却清空其余字段。
  */
 
-/* eslint-disable import/no-cycle -- store seeds from configFromEnv() (resolver) while resolver reads store state via getRuntimeConfigStore(); the mutual dependency is intentional (same as resolver <-> servicesConfig). */
+/* eslint-disable import/no-cycle -- 已知例外：configFromEnv() 播种 store 与 getRuntimeConfigStore() 读回 store 的初始化时序契约。见 spec §2.1 目标 2 与 §5.1 环 1 决议 A，Phase 4 复核。 */
 import {configFromEnv} from './resolver.js';
 import {type GlobalConfig, validateGlobalConfig} from './schema.js';
 

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/* eslint-disable import/no-cycle -- resolver re-exports servicesConfig factories for backward compat while servicesConfig consumes core resolver helpers (getEnvValue/configFromEnv). The mutual dependency is intentional. */
+/* eslint-disable import/no-cycle -- 已知例外：configFromEnv() 播种 store 与 getRuntimeConfigStore() 读回 store 的初始化时序契约。见 spec §2.1 目标 2 与 §5.1 环 1 决议 A，Phase 4 复核。 */
 
 /**
  * 核心配置基础设施 — 环境变量工具、CLI 配置解析、RuntimeConfigStore 播种
