@@ -14,13 +14,13 @@
  * 仍保留在 resolver.ts 中。
  */
 
+import {type RetryConfig, AIService} from '../services/AIService.js';
+import {OpenAIProvider} from '../services/OpenAIProvider.js';
 import type {BrowserManagerConfig} from '../types/browser.js';
 import {
   type SourceMapConfig,
   SourceMapError,
-} from '../modules/sourcemap/types.js';
-import {type RetryConfig, AIService} from '../services/AIService.js';
-import {OpenAIProvider} from '../services/OpenAIProvider.js';
+} from '../types/sourcemap.js';
 
 import {
   getEnvBoolean,
