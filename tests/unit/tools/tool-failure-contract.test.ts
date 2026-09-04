@@ -9,11 +9,8 @@ import {readFileSync, readdirSync, statSync} from 'node:fs';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
-import {
-  createToolError,
-  ErrorCodes,
-  ToolError,
-} from '../../../src/utils/errors.js';
+import {createToolError, ErrorCodes} from '../../../src/utils/errors.js';
+import type {ToolError} from '../../../src/utils/errors.js';
 import {JobStore} from '../../../src/worker/JobStore.js';
 
 /**
