@@ -7,8 +7,6 @@ import {createHash} from 'node:crypto';
 import {mkdir, readFile, rename, rm, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 
-import {getEnvValue} from '../config.js';
-
 import {ErrorCodes, ToolError} from './errors.js';
 
 /**
@@ -31,7 +29,8 @@ export function validateOutputPath(userPath: string): string {
   }
 
   // Relative paths: check for traversal outside allowed directory
-  const allowedBase = getEnvValue('BROWSER_OUTPUT_DIR') ?? process.cwd();
+  const allowedBase =
+    process.env.BROWSER_OUTPUT_DIR?.trim() || process.cwd();
   const normalizedBase = path.resolve(allowedBase) + path.sep;
   const resolvedWithTrailingSep = resolved + path.sep;
 

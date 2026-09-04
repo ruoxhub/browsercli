@@ -9,43 +9,16 @@ import type {
   WebSocketData,
   WebSocketFrame,
 } from '../modules/network/NetworkTypes.js';
+import type {
+  MessageGroupV2,
+  SizeCategory,
+  TrafficSummary,
+  WsDecodeMode,
+} from '../modules/network/types.js';
+
+export type {MessageGroupV2, SizeCategory, TrafficSummary, WsDecodeMode};
 
 const PAYLOAD_SIZE_LIMIT = 5000;
-
-/**
- * Size category for message grouping
- */
-export type SizeCategory = 'tiny' | 'small' | 'medium' | 'large' | 'xlarge';
-
-/**
- * Message group with simplified grouping key: Direction + Head4B + SizeCategory
- */
-export interface MessageGroupV2 {
-  id: string; // A, B, C, ...
-  direction: 'sent' | 'received';
-  head4B: string; // First 4 bytes as hex
-  sizeCategory: SizeCategory;
-  count: number;
-  minSize: number;
-  maxSize: number;
-  hint: string; // Guessed type based on head4B
-  sampleIndices: number[]; // Sample frame indices
-}
-
-/**
- * Traffic summary for a WebSocket connection
- */
-export interface TrafficSummary {
-  wsid: number;
-  url: string;
-  durationMs: number;
-  totalFrames: number;
-  sentCount: number;
-  receivedCount: number;
-  groups: MessageGroupV2[];
-  // Map from group ID to frame indices for quick lookup
-  groupToIndices: Map<string, number[]>;
-}
 
 /**
  * Format a WebSocket connection for short list display.
@@ -587,8 +560,6 @@ export function formatRecentMessages(
 // Zero-schema payload decoding
 // ============================================================================
 
-export type WsDecodeMode = 'auto' | 'protobuf' | 'json' | 'raw';
-
 export interface WsDecodeResult {
   decodeType: 'json' | 'protobuf-embedded-json' | 'protobuf' | 'text' | 'raw';
   decodedJson?: unknown;
@@ -635,7 +606,15 @@ function findJsonEnd(s: string): number {
   return -1;
 }
 
-function extractEmbeddedJson(bytes: Uint8Array): unknown {
+type DecodedJsonObject =
+  | Record<string, unknown>
+  | unknown[]
+  | string
+  | number
+  | boolean
+  | null;
+
+function extractEmbeddedJson(bytes: Uint8Array): DecodedJsonObject | undefined {
   for (let i = 0; i < bytes.length; i++) {
     if (bytes[i] !== 0x7b && bytes[i] !== 0x5b) continue;
     const tail = bytesToUtf8(bytes.subarray(i));

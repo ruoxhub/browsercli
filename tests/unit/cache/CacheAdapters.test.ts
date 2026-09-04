@@ -6,14 +6,14 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
+import {
+  CodeCacheAdapter,
+  CodeCompressorAdapter,
+  createCacheAdapters,
+  DetailedDataManagerAdapter,
+} from '../../../src/modules/collector/adapters/CacheAdapters.js';
 import type {CodeCache} from '../../../src/modules/collector/CodeCache.js';
 import type {CodeCompressor} from '../../../src/modules/collector/CodeCompressor.js';
-import {
-  CodeCompressorAdapter,
-  CodeCacheAdapter,
-  DetailedDataManagerAdapter,
-  createCacheAdapters,
-} from '../../../src/utils/CacheAdapters.js';
 import type {DetailedDataManager} from '../../../src/utils/detailedDataManager.js';
 
 interface DetailedDataManagerStatsSource {

@@ -15,12 +15,13 @@
  * `TrafficSummary` 仍由 `formatters/websocketFormatter.ts` 拥有，这里仅 type-only re-export。
  */
 
+import type {HTTPRequest, Page, ResourceType} from '../../third_party/index.js';
+import type {PageSelector, ResolvedPage} from '../browser/PageIdentity.js';
+
 import type {
   TrafficSummary,
   WsDecodeMode,
-} from '../../formatters/websocketFormatter.js';
-import type {HTTPRequest, Page, ResourceType} from '../../third_party/index.js';
-import type {PageSelector, ResolvedPage} from '../browser/PageIdentity.js';
+} from './types.js';
 
 // ─── 可过滤的资源类型 ──────────────────────────────────
 
@@ -517,5 +518,5 @@ export interface NetworkMethodResult<T> {
   data: T;
 }
 
-/** 重新导出 TrafficSummary（由 formatters/websocketFormatter 拥有） */
-export type {TrafficSummary};
+/** 重新导出共享 WebSocket 类型 */
+export type {TrafficSummary, WsDecodeMode};
