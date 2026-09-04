@@ -12,11 +12,10 @@
  * - 支持异步和同步方法
  */
 
-import type {CodeCache} from '../modules/collector/CodeCache.js';
-import type {CodeCompressor} from '../modules/collector/CodeCompressor.js';
-
-import type {DetailedDataManager} from './detailedDataManager.js';
-import type {CacheInstance, CacheStats} from './UnifiedCacheManager.js';
+import type {DetailedDataManager} from '../../../utils/detailedDataManager.js';
+import type {CacheInstance, CacheStats} from '../../../utils/UnifiedCacheManager.js';
+import type {CodeCache} from '../CodeCache.js';
+import type {CodeCompressor} from '../CodeCompressor.js';
 
 /**
  * DetailedDataManager 适配器

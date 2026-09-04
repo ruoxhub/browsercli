@@ -10,6 +10,11 @@ import {
   BrowserManager,
   type BrowserManagerConfig,
 } from './modules/browser/index.js';
+import {
+  CodeCacheAdapter,
+  CodeCompressorAdapter,
+  DetailedDataManagerAdapter,
+} from './modules/collector/adapters/CacheAdapters.js';
 import {CodeCollector} from './modules/collector/CodeCollector.js';
 import {DOMInspector} from './modules/collector/DOMInspector.js';
 import {PageController} from './modules/collector/PageController.js';
@@ -32,11 +37,6 @@ import {RuntimeServices} from './runtime/RuntimeServices.js';
 import type {LLMService} from './services/LLMService.js';
 import type {Page} from './third_party/index.js';
 import {createAppEventBusOptions, type AppEventMap} from './types/events.js';
-import {
-  CodeCacheAdapter,
-  CodeCompressorAdapter,
-  DetailedDataManagerAdapter,
-} from './utils/CacheAdapters.js';
 import {DetailedDataManager} from './utils/detailedDataManager.js';
 import {EventBus} from './utils/EventBus.js';
 import {UnifiedCacheManager} from './utils/UnifiedCacheManager.js';
