@@ -37,11 +37,11 @@ import {
   GlobalConfigSchema,
 } from '../../config/schema.js';
 import {
-  createAIService,
   getBrowserManagerConfig,
   getDefaultLLMProvider,
 } from '../../config/servicesConfig.js';
 import type {AIService, RetryConfig} from '../../services/AIService.js';
+import {createAIService} from '../../services/createAIService.js';
 import {
   connectBrowser,
   disconnectBrowser,

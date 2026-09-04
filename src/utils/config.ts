@@ -22,5 +22,4 @@ export {
   validateConfig,
   getEnv,
   isDebugEnabled,
-  createAIService,
 } from '../config.js';

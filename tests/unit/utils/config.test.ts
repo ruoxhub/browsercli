@@ -26,10 +26,10 @@ import {
   validateConfig,
   getEnv,
   isDebugEnabled,
-  createAIService,
   type SystemConfig,
   type AIConfig,
 } from '../../../src/config.js';
+import {createAIService} from '../../../src/services/createAIService.js';
 import '../../../src/config.js';
 
 describe('Configuration Management', () => {

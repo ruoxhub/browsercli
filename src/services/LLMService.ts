@@ -3,8 +3,6 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import {createAIService} from '../config.js';
-
 import {
   AIServiceError,
   type AIAvailability,
@@ -12,6 +10,8 @@ import {
   type AIResponse,
   type ChatOptions,
 } from './AIService.js';
+import {createAIService} from './createAIService.js';
+
 
 export interface LLMChatOptions {
   temperature?: number;

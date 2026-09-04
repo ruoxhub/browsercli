@@ -331,7 +331,6 @@ export function getToolResultRecordingConfig(): ResolvedToolResultRecordingConfi
 // ==========================================================================
 
 export {
-  createAIService,
   getAIConfig,
   getBrowserConfig,
   getBrowserManagerConfig,
