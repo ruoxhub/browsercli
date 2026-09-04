@@ -14,7 +14,7 @@
  * 仍保留在 resolver.ts 中。
  */
 
-import type {BrowserManagerConfig} from '../modules/browser/browser.js';
+import type {BrowserManagerConfig} from '../types/browser.js';
 import {
   type SourceMapConfig,
   SourceMapError,
