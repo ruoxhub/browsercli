@@ -20,9 +20,11 @@ import {
 } from './config/runtimeConfigPersistence.js';
 import {getRuntimeConfigStore} from './config/RuntimeConfigStore.js';
 import {getBrowserManagerConfig} from './config/servicesConfig.js';
+import {buildDaemonArgPlan} from './ipc/daemonArgs.js';
 import {getRuntime} from './runtime.js';
 import {ConsoleServer} from './web/ConsoleServer.js';
 import {connectBrowser} from './worker/BrowserConnectionManager.js';
+import {runDaemon} from './worker/daemonMain.js';
 import {ToolAdapter} from './worker/ToolAdapter.js';
 import {ToolContextProvider} from './worker/ToolContext.js';
 import {parseWorkerArgs} from './worker/WorkerArgs.js';
@@ -32,6 +34,13 @@ import {createGracefulShutdown} from './worker/WorkerLifecycle.js';
  * Worker 主函数
  */
 async function main(): Promise<void> {
+  // 0. daemon 模式：CLI spawn 与手动 --daemon 都走这条路径（stdout 为就绪握手通道）
+  const daemonPlan = buildDaemonArgPlan(process.argv.slice(2));
+  if (daemonPlan.daemon) {
+    await runDaemon(daemonPlan);
+    return;
+  }
+
   // 1. 解析 CLI 参数，播种 RuntimeConfigStore（CLI > env > 默认值）
   const cliConfig = parseWorkerArgs(process.argv.slice(2));
   getRuntimeConfigStore().update(cliConfig);

@@ -9,7 +9,7 @@
  * PROTOCOL_VERSION 两侧必须同步修改。
  */
 
-import net from 'node:net';
+import type net from 'node:net';
 
 export const PROTOCOL_VERSION = 1;
 

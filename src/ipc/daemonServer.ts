@@ -15,6 +15,7 @@ import net from 'node:net';
 
 import {getRuntimeConfigStore} from '../config/RuntimeConfigStore.js';
 import type {ToolMeta} from '../tools/tools-meta.js';
+import type {ToolRecovery} from '../utils/errors.js';
 import type {Channel} from '../web/types.js';
 import type {MinimalWebSocket, WsHub} from '../web/ws/WsHub.js';
 import {
@@ -36,6 +37,7 @@ import {
   WorkerBusyError,
   workerActivityCoordinator,
 } from '../worker/WorkerActivityCoordinator.js';
+
 import {PROTOCOL_VERSION, SocketConnection} from './socketConnection.js';
 
 export interface DaemonDeps {
@@ -447,7 +449,7 @@ async function runJob(
       code?: string;
       message?: string;
       retryable?: boolean;
-      recovery?: import('../utils/errors.js').ToolRecovery;
+      recovery?: ToolRecovery;
       details?: Record<string, unknown>;
     };
     const error = {

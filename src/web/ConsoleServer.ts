@@ -42,6 +42,11 @@ export interface ConsoleServerOptions {
    */
   configSeed?: Partial<GlobalConfig>;
   jobStore?: JobStore;
+  /**
+   * 注入共享 WsHub：daemon 模式下 socket 客户端与 HTTP 控制台共用一个 hub，
+   * browser.status 等广播才能同时到达两类订阅者。缺省时自建（独立运行场景）。
+   */
+  wsHub?: WsHub;
 }
 
 const MIME_TYPES: Record<string, string> = {
@@ -65,21 +70,28 @@ const MIME_TYPES: Record<string, string> = {
 export class ConsoleServer {
   private readonly options: ConsoleServerOptions;
   private readonly invocationStore = new InvocationStore();
-  private readonly wsHub = new WsHub();
+  private readonly wsHub: WsHub;
   private readonly router = new RestRouter();
   private readonly startedAt = Date.now();
   private readonly projectRoot: string;
 
   private httpServer?: HttpServer;
   private wsServer?: WebSocketServer;
+  private actualPort = 0;
   private unsubscribeToolInvoke?: () => void;
   private onSampleListener?: (hookId: string, sample: unknown) => void;
   private onProxyCaptureListener?: (record: any) => void;
 
   constructor(options: ConsoleServerOptions) {
     this.options = options;
+    this.wsHub = options.wsHub ?? new WsHub();
     this.projectRoot = this.findProjectRoot();
     this.setupRoutes();
+  }
+
+  /** 实际监听端口（port=0 时由系统分配）；start() 之前返回 0。 */
+  getActualPort(): number {
+    return this.actualPort;
   }
 
   private findProjectRoot(): string {
@@ -331,6 +343,11 @@ export class ConsoleServer {
         this.options.port,
         this.options.host ?? '127.0.0.1',
         () => {
+          const address = this.httpServer?.address();
+          this.actualPort =
+            typeof address === 'object' && address !== null
+              ? address.port
+              : this.options.port;
           resolve();
         },
       );

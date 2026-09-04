@@ -19,9 +19,9 @@ import {
   SocketConnection,
   type DaemonMessage,
 } from '../../../src/ipc/socketConnection.js';
+import type {ToolMeta} from '../../../src/tools/tools-meta.js';
 import {WsHub} from '../../../src/web/ws/WsHub.js';
 import {JobStore} from '../../../src/worker/JobStore.js';
-import type {ToolMeta} from '../../../src/tools/tools-meta.js';
 
 interface Gate {
   resolve: (value: unknown) => void;
