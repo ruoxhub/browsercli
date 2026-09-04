@@ -3,7 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import {getBrowserManagerConfig} from './config.js';
+import {getBrowserManagerConfig} from './config/servicesConfig.js';
 import type {AISummarizer} from './modules/analyzer/AISummarizer.js';
 import type {CodeAnalyzer} from './modules/analyzer/CodeAnalyzer.js';
 import {

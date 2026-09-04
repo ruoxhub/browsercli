@@ -326,17 +326,3 @@ export function getToolResultRecordingConfig(): ResolvedToolResultRecordingConfi
   };
 }
 
-// ==========================================================================
-// 第三部分：服务配置（AI / Browser / System）— 已拆分至 servicesConfig.ts
-// ==========================================================================
-
-export {
-  getAIConfig,
-  getBrowserConfig,
-  getBrowserManagerConfig,
-  getDefaultLLMProvider,
-  getEnv,
-  getSystemConfig,
-  isDebugEnabled,
-  validateConfig,
-} from './servicesConfig.js';

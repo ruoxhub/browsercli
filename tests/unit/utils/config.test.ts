@@ -19,16 +19,18 @@ import {
   resetRuntimeConfigStore,
 } from '../../../src/config/RuntimeConfigStore.js';
 import {
-  getDefaultLLMProvider,
+  type AIConfig,
+  type SystemConfig,
+} from '../../../src/config/schema.js';
+import {
   getAIConfig,
   getBrowserConfig,
-  getSystemConfig,
-  validateConfig,
+  getDefaultLLMProvider,
   getEnv,
+  getSystemConfig,
   isDebugEnabled,
-  type SystemConfig,
-  type AIConfig,
-} from '../../../src/config.js';
+  validateConfig,
+} from '../../../src/config/servicesConfig.js';
 import {createAIService} from '../../../src/services/createAIService.js';
 import '../../../src/config.js';
 

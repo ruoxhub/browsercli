@@ -10,11 +10,13 @@
  * @see src/config.ts — 所有配置逻辑的统一入口
  */
 
+export {type LLMProvider} from '../config/resolver.js';
 export {
-  type LLMProvider,
   type AIConfig,
   type BrowserConfig,
   type SystemConfig,
+} from '../config/schema.js';
+export {
   getDefaultLLMProvider,
   getAIConfig,
   getBrowserConfig,
@@ -22,4 +24,4 @@ export {
   validateConfig,
   getEnv,
   isDebugEnabled,
-} from '../config.js';
+} from '../config/servicesConfig.js';

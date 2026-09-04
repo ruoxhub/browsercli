@@ -7,7 +7,7 @@
 import {accessSync, constants, existsSync} from 'node:fs';
 import path from 'node:path';
 
-import {getDefaultLLMProvider, getAIConfig} from '../config/resolver.js';
+import {getDefaultLLMProvider, getAIConfig} from '../config/servicesConfig.js';
 import {
   resolvePackageRoot,
   resolveArtifactsTasksDirForPackageRoot,
