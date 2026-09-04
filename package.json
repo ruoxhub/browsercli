@@ -16,6 +16,7 @@
     "typecheck": "tsc --noEmit",
     "format": "eslint --cache --fix src/ scripts/ || true; prettier --write --cache src/ scripts/",
     "check-format": "eslint --cache . && prettier --check --cache .;",
+    "check-arch": "node --experimental-strip-types scripts/check-arch.ts",
     "docs": "npm run build && npm run docs:generate && npm run format",
     "docs:generate": "node --experimental-strip-types scripts/generate-docs.ts",
     "debugger-lab": "node scripts/debugger-lab/server.mjs",

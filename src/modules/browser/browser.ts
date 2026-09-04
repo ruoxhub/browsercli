@@ -14,6 +14,7 @@ import {
   type Page,
 } from 'patchright';
 
+import type {BrowserManagerConfig, Channel} from '../../types/browser.js';
 import {logger} from '../../utils/logger.js';
 import {
   StealthScripts2025,
@@ -50,7 +51,6 @@ import {setupCloak} from './cloak.js';
  * @see AGENTS.md — 反检测分层架构
  */
 
-import type {BrowserManagerConfig, Channel} from '../../types/browser.js';
 // Re-export for backward compatibility
 export {resolveAutoConnectTarget};
 export type {BrowserManagerConfig, Channel};
