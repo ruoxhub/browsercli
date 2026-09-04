@@ -45,7 +45,7 @@ Browser-CLI 是一个**前端 JavaScript 逆向流程标准化的 MCP（Model Co
 | **构建**         | SWC (编译) + Rollup (打包)                 |
 | **CDP 协议**     | Chrome DevTools Protocol 原生集成          |
 | **AI 集成**      | OpenAI / Anthropic / Gemini (可选)         |
-| **RPC 协议**     | Sekiro (WebSocket)                         |
+| **IPC 协议**     | 本地命名管道 NDJSON (daemon socket)        |
 | **CLI 框架**     | yargs                                      |
 | **运行时校验**   | Zod                                        |
 | **代码分析**     | Babel (parser/traverse/generator)          |
@@ -99,14 +99,14 @@ Browser-CLI 与兄弟项目 [jshookmcp](https://github.com/zhizhuodemao/js-rever
 ```
 Browser-CLI/
 ├── src/                              # 核心源码
-│   ├── index.ts                      # ★ Worker 进程入口 — RPC Worker 启动主函数
+│   ├── index.ts                      # ★ Worker 进程入口 — daemon 模式 + MCP stdio 双入口
 │   ├── runtime.ts                    # ★ 运行时核心 — 单例，聚合所有模块实例
 │   ├── config.ts                     # 配置出口 (re-export config/index)
 │   ├── PageCollector.ts              # ★ 泛型页面数据收集器基类 (模板方法)
 │   │
 │   │
-│   ├── (CLI 客户端已抽离)            # `browsercli` → 独立包 `js-reverser-cli/`
-│   │                              #   纯 HTTP 客户端，经 worker `/api/v1` 调用；
+│   ├── (CLI 客户端已抽离)            # `browsercli` → 独立包 `browsercli/`
+│   │                              #   daemon socket 客户端，经本地命名管道调用 detached daemon；
 │   │                              #   本地 worker 进程管理(start/stop/status/repl)已删除
 │   │
 
@@ -115,13 +115,17 @@ Browser-CLI/
 │   │   ├── constants.ts             # 文件名常量与默认值
 │   │   └── schema.ts                # 占位 — 尚未实现
 │   │
-│   ├── protocol/                     # RPC 协议层
-│   │   └── Client.ts                # ★ RpcClient — Sekiro WebSocket 客户端 (508行)
+│   ├── ipc/                          # Daemon IPC 层
+│   │   ├── socketConnection.ts      # ★ NDJSON 帧协议 + PROTOCOL_VERSION
+│   │   ├── registry.ts              # 会话注册表（workspace-hash / session 文件）
+│   │   ├── daemonArgs.ts            # --daemon 参数解析
+│   │   └── daemonServer.ts          # ★ 命名管道服务端 — 方法分发 (tools/browser/jobs/events)
 │   │
 │   ├── worker/                       # Worker 层
-│   │   ├── ToolAdapter.ts           # ★ 工具适配器 — defineTool → Sekiro Action (464行)
-│   │   ├── ToolContextProvider.ts   # ★ 执行上下文 Facade — 聚合4个子模块 (420行)
-│   │   ├── BuiltinActions.ts        # 内置 Sekiro Action (_list_tools, _status)
+│   │   ├── daemonMain.ts            # ★ daemon 模式启动（ConsoleServer + socket + 就绪握手）
+│   │   ├── ToolAdapter.ts           # ★ 工具适配器 — defineTool → 管线执行
+│   │   ├── ToolContext.ts           # ★ 执行上下文 Facade — 聚合4个子模块
+│   │   ├── JobStore.ts              # 异步 Job 状态存储
 │   │   ├── ToolResponseAccumulator.ts # 工具响应累加器
 │   │   ├── WorkerArgs.ts            # Worker 参数解析
 │   │   ├── WorkerLifecycle.ts       # ★ 优雅关闭生命周期
@@ -243,7 +247,6 @@ Browser-CLI/
 │   │   ├── index.ts                # ★ ~860行, 85+接口, 核心类型
 │   │   ├── events.ts               #   AppEventMap + Zod 校验器
 │   │   ├── platform.ts             #   平台类型
-│   │   ├── rpc.ts                  #   Sekiro RPC 协议类型
 │   │   ├── devtools.ts             #   DevTools 抽象类型
 │   │   └── chrome-devtools-frontend.d.ts
 │   │
@@ -298,23 +301,25 @@ Browser-CLI/
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│            CLI 层 (js-reverser-cli/ · browsercli)         │
-│   纯 HTTP 客户端：yargs 解析 → WorkerHttpClient → /api/v1 │
+│            CLI 层 (browsercli/ 独立包)                   │
+│   daemon socket 客户端：yargs 解析 → daemonClient →      │
+│   本地命名管道 (NDJSON)，连不上自动 spawn detached daemon │
 │   (本地 worker 进程管理 start/stop/status/repl 已删除)    │
 └────────────────────┬────────────────────────────────────┘
                      │
 ┌────────────────────▼────────────────────────────────────┐
-│                  RPC 协议层 (src/protocol/)              │
-│            RpcClient — Sekiro WebSocket 通信             │
-│      心跳/重连(指数退避)/Action 注册/消息路由            │
+│              Daemon IPC 层 (src/ipc/)                    │
+│   daemonServer — 命名管道 NDJSON 方法分发                │
+│   (hello/tools.list/tool.invoke/browser.*/jobs.*/       │
+│    subscribe/stop) + registry 会话注册表                  │
 └────────────────────┬────────────────────────────────────┘
                      │
 ┌────────────────────▼────────────────────────────────────┐
 │                  Worker 层 (src/worker/)                 │
 │  ┌──────────────┐  ┌──────────────┐  ┌───────────────┐ │
-│  │ ToolAdapter   │  │ ToolContext  │  │  Builtin      │ │
-│  │ defineTool →  │  │  Provider    │  │  Actions      │ │
-│  │ Sekiro Action │  │ (Facade)     │  │ (_list_tools) │ │
+│  │ daemonMain    │  │ ToolAdapter  │  │ ToolContext   │ │
+│  │ 就绪握手/会话 │  │ defineTool → │  │  Provider     │ │
+│  │ 文件/优雅关闭 │  │ 管线执行     │  │ (Facade)      │ │
 │  └──────┬───────┘  └──────┬───────┘  └───────────────┘ │
 └─────────┼─────────────────┼──────────────────────────────┘
           │                 │
@@ -356,14 +361,14 @@ Browser-CLI/
 
 #### 3.2.3 MCP 工具层 (src/tools/)
 
-| 方面         | 分析                                                                                                                                                                                                                                      |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **职责**     | 实现 100+ 个 MCP 工具，覆盖页面观察、Hook、断点、网络分析、WebSocket、代码分析、反混淆、加密检测、WASM、设备仿真、性能分析等全部能力                                                                                                      |
-| **实现逻辑** | 工具通过 `defineTool()` DSL 定义 (name + description + Zod schema + handler)。索引在 `generated-tools-index.ts` 中自动生成，通过 `tools-meta.ts` 动态加载并缓存。`ToolAdapter.wrapTool()` 将 `ToolDefinition` 包装为 Sekiro ActionHandler |
-| **关键文件** | `ToolDefinition.ts` — 工具定义接口; `generated-tools-index.ts` — 索引; `categories.ts` — 10 个分类枚举; `ToolAdapter.ts` — 包装器                                                                                                         |
-| **被调用方** | RpcClient 收到 Sekiro 请求 → 路由到对应 ActionHandler                                                                                                                                                                                     |
-| **边界问题** | 定义和使用之间有一层间接性 (modulePath → 动态 import)，加载失败时以警告非阻断方式处理                                                                                                                                                     |
-| **改进空间** | 考虑将工具调用模式 (`frame`/`context`/`direct`) 表示为统一的 DSL 属性, 而非 ToolAdapter 中的条件分支                                                                                                                                      |
+| 方面         | 分析                                                                                                                                                                                                                                         |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **职责**     | 实现 100+ 个 MCP 工具，覆盖页面观察、Hook、断点、网络分析、WebSocket、代码分析、反混淆、加密检测、WASM、设备仿真、性能分析等全部能力                                                                                                         |
+| **实现逻辑** | 工具通过 `defineTool()` DSL 定义 (name + description + Zod schema + handler)。索引在 `generated-tools-index.ts` 中自动生成，通过 `tools-meta.ts` 动态加载并缓存。`ToolAdapter.executeTool()` 经 `ToolExecutionPipeline` 完成校验→上下文→执行 |
+| **关键文件** | `ToolDefinition.ts` — 工具定义接口; `generated-tools-index.ts` — 索引; `categories.ts` — 10 个分类枚举; `ToolAdapter.ts` — 执行入口                                                                                                          |
+| **被调用方** | daemon socket 服务端 (`src/ipc/daemonServer.ts`) 收到 `tool.invoke` → 路由到 `ToolAdapter.executeTool()`；MCP stdio 路径经 `ToolExecutionPipeline` 直接调用                                                                                  |
+| **边界问题** | 定义和使用之间有一层间接性 (modulePath → 动态 import)，加载失败时以警告非阻断方式处理                                                                                                                                                        |
+| **改进空间** | 考虑将工具调用模式 (`frame`/`context`/`direct`) 表示为统一的 DSL 属性, 而非 ToolAdapter 中的条件分支                                                                                                                                         |
 
 #### 3.2.4 代码收集模块 (src/modules/collector/)
 
@@ -437,26 +442,25 @@ Browser-CLI/
 | **设计模式** | **单例模式、适配器模式 (3 个异构缓存统一接口)、协调者模式**                                                                                                                                                     |
 | **改进空间** | 500MB 上限未软配置; `DetailedDataManager` 的大小估算不精确 (50KB/条固定); 预热 `preheat()` 仅为空壳                                                                                                             |
 
-#### 3.2.11 RPC 协议层 (src/protocol/)
+#### 3.2.11 Daemon IPC 层 (src/ipc/)
 
-| 方面         | 分析                                                                                                                                                                                                                                                                     |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **职责**     | Worker 与 RPC Server 之间的 WebSocket 通信                                                                                                                                                                                                                               |
-| **实现逻辑** | `RpcClient` 通过 Sekiro 协议连接到 RPC Server。Action 注册表管理 `Map<string, ActionHandler>`。心跳 30s 一次 ping，10s pong 超时断开触发重连。重连策略: 指数退避 (2s base × 2^attempts, max 30s)。请求处理: JSON.parse → action 路由 → handler(request, resolve, reject) |
-| **关键类**   | `RpcClient` — 508 行                                                                                                                                                                                                                                                     |
-| **被调用方** | Worker 主函数 `registerBuiltinActions()` + `ToolAdapter.registerAll()`                                                                                                                                                                                                   |
-| **设计模式** | **命令模式 (Action Handler 注册表)、指数退避重连**                                                                                                                                                                                                                       |
-| **改进空间** | `_execjsHandler` 的安全性 (使用 `new Function()` 执行任意代码); 无请求超时机制; 响应序列化可优化                                                                                                                                                                         |
+| 方面         | 分析                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **职责**     | CLI 与 detached daemon 之间的本地 socket 通信：会话注册表发现 + NDJSON 行协议请求/响应 + 事件推送                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| **实现逻辑** | win32 命名管道 / POSIX unix socket，地址 `browsercli-<workspaceHash16>-<session>`。`SocketConnection` 做 NDJSON 分帧与重组；`registry.ts` 按 workspace-hash 目录读写 `<session>.session`（含 pid/socketPath/consolePort/protocol）。`daemonServer.ts` 分发 `hello`/`tools.list`/`tool.invoke`/`browser.*`/`jobs.*`/`subscribe`/`stop`；客户端断线 ⇒ `AbortController` 中止该连接上的运行中 job。CLI 侧连不上就 spawn detached daemon，等 stdout 就绪行 `Daemon listening on <pipePath>` 完成握手。`PROTOCOL_VERSION = 1` 两侧各自定义（与 `browsercli/src/daemonClient.ts` 注释互指保持同步），不匹配时报错提示 `close` + 重新 `open` |
+| **关键文件** | `socketConnection.ts`（帧协议）、`registry.ts`（注册表）、`daemonArgs.ts`（参数解析）、`daemonServer.ts`（方法分发）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **被调用方** | `worker/daemonMain.ts` 启动时创建 `startDaemonServer()`；`browsercli` 包经 `daemonClient.ts` 连接                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| **设计模式** | **行协议 RPC（请求-响应 + 无 id 推送共用一条连接）、注册表服务发现**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 #### 3.2.12 Worker 层 (src/worker/)
 
-| 方面         | 分析                                                                                                                                                                                                                                                                                                                                                            |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **职责**     | 将所有 MCP 工具注册为 Sekiro Actions，管理执行上下文和生命周期                                                                                                                                                                                                                                                                                                  |
-| **实现逻辑** | `ToolAdapter` 从 `generated-tools-index.ts` 动态加载工具定义，`wrapTool()` 建立 `defineTool → Sekiro ActionHandler` 的桥接。三个调用模式: `frame` (在页面 frame 上执行)、`context` (在 contextProvider 上执行)、`direct` (仅参数)。`ToolContextProvider` (Facade) 聚合 4 个子模块: PageManager + DebuggerSessionManager + DataCollectorManager + ServiceLocator |
-| **关键类**   | `ToolAdapter` (464 行)、`ToolContextProvider` (420 行)、`WorkerLifecycle.createGracefulShutdown()`                                                                                                                                                                                                                                                              |
-| **设计模式** | **外观模式 (ToolContextProvider 统一 4 个子模块)、桥接模式 (ToolAdapter 桥接工具定义与 Sekiro 协议)**                                                                                                                                                                                                                                                           |
-| **改进空间** | Frame evaluate 超时 (10s) 通过 Proxy 实现，调试器暂停时 10s 可能不够                                                                                                                                                                                                                                                                                            |
+| 方面         | 分析                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **职责**     | 提供 MCP 工具的运行时执行入口（daemon socket 与 MCP stdio 两条路径共享），管理执行上下文和生命周期                                                                                                                                                                                                                                                                                                                    |
+| **实现逻辑** | `ToolAdapter` 从 `generated-tools-index.ts` 动态加载工具定义，`executeTool()` 经 `ToolExecutionPipeline`（校验→上下文→执行→响应）运行。`daemonMain.ts` 编排 daemon 启动顺序：config 播种 → runtime 初始化 → ConsoleServer(127.0.0.1) → `startDaemonServer` → 写 session 文件 → 打就绪行。`ToolContextProvider` (Facade) 聚合 4 个子模块: PageManager + DebuggerSessionManager + DataCollectorManager + ServiceLocator |
+| **关键类**   | `ToolAdapter`、`ToolContextProvider`、`daemonMain.runDaemon()`、`WorkerLifecycle.createGracefulShutdown()`                                                                                                                                                                                                                                                                                                            |
+| **设计模式** | **外观模式 (ToolContextProvider 统一 4 个子模块)、模板/编排 (daemonMain 固定启动顺序)**                                                                                                                                                                                                                                                                                                                               |
+| **改进空间** | Frame evaluate 超时 (10s) 通过 Proxy 实现，调试器暂停时 10s 可能不够                                                                                                                                                                                                                                                                                                                                                  |
 
 ---
 
@@ -473,8 +477,8 @@ Browser-CLI/
 | **模板方法模式** | `PageCollector<T>` 抽象基类: `attachListeners()` / `detachListeners()` 由子类实现                                                                                          | 多个收集器 (Network/Console/WSC) 共享导航分组和生命周期逻辑    | ✅ 减少大量重复代码                        |
 | **管道模式**     | `Deobfuscator` 反混淆管线: 检测 → 解包 → JSVMP → 高级 → 基础 → AST → 重命名 → AI                                                                                           | 多阶段处理，每阶段独立失败                                     | ✅ 高容错: 每步独立 try-catch              |
 | **观察者模式**   | `EventBus` (Pub/Sub 9 个事件); `DebuggerManager` CDP 事件监听 (scriptParsed/paused/resumed); `BrowserManager.on('disconnected')` 崩溃监听                                  | 模块间松散通信，事件驱动                                       | ✅ EventBus 有 Zod 校验加分                |
-| **桥接模式**     | `ToolAdapter` 将 `defineTool` 定义桥接到 Sekiro ActionHandler 协议                                                                                                         | 分离工具定义和传输协议                                         | ✅ 可独立替换协议层                        |
-| **命令模式**     | `RpcClient` 注册 `Map<string, ActionHandler>`, 按 action 名路由                                                                                                            | 请求封装为命令对象，支持注册/注销/路由                         | ✅ 标准实现                                |
+| **桥接模式**     | `ToolAdapter` 将 `defineTool` 定义桥接到传输层（daemon socket `tool.invoke` / MCP stdio）                                                                                  | 分离工具定义和传输协议                                         | ✅ 可独立替换协议层                        |
+| **命令模式**     | `daemonServer.ts` 按 `method` 名路由到分发函数（`hello`/`tools.list`/`tool.invoke`/...）                                                                                   | 请求封装为命令对象，支持注册/路由                              | ✅ 标准实现                                |
 | **工厂模式**     | `createAIService()` 根据 provider 创建对应实现; `getRuntime()` 首次创建所有实例                                                                                            | 对象创建的集中管理                                             | ✅ 创建逻辑集中                            |
 | **Builder 模式** | `HookManager.createWithBuilder()` 链式构建 Hook                                                                                                                            | 复杂 Hook 配置的逐步构建                                       | ✅ 链式 API 清晰                           |
 | **协调者模式**   | `UnifiedCacheManager` 协调 3 个缓存实例                                                                                                                                    | 多个缓存的全局管理，不替代它们                                 | ✅ 非侵入式                                |
@@ -483,25 +487,25 @@ Browser-CLI/
 
 ### 4.2 可以引入但尚未使用的设计模式
 
-| 模式             | 建议位置                                    | 理由                                                                                                                        |
-| ---------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| **工厂方法模式** | `ToolAdapter.loadHandler()`                 | 当前动态 import + `if-else` 分派创建不同模式 handler，可抽象为 `HandlerFactory.create(meta)`                                |
-| **访问者模式**   | JS AST 分析 (CodeAnalyzer / CryptoDetector) | Babel traverse 已隐含访问者模式，但 `CodeAnalyzer` 的静态分析可封装为更细粒度的 AST Visitor                                 |
-| **状态模式**     | `BrowserManager` 状态管理                   | 当前通过布尔 flags (`isRestarting`/`isConnected`) 控制，可引入显式状态机 (disconnected/connecting/connected/closing/closed) |
-| **责任链模式**   | `ToolAdapter.wrapTool()` 的调用前/后处理    | 当前参数校验、执行、日志记录在单个函数中线性展开，可拆为独立中间件                                                          |
-| **命令队列模式** | `ToolExecutionScheduler`                    | 当前只有简单读写分离，未来可扩展为带优先级、延迟执行、取消的任务队列                                                        |
-| **规格模式**     | `CryptoDetector` 规则引擎                   | 当前规则是简单 if-else 判断，可用规格模式组合复杂检测条件                                                                   |
+| 模式             | 建议位置                                            | 理由                                                                                                                        |
+| ---------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| **工厂方法模式** | `ToolAdapter.loadHandler()`                         | 当前动态 import + `if-else` 分派创建不同模式 handler，可抽象为 `HandlerFactory.create(meta)`                                |
+| **访问者模式**   | JS AST 分析 (CodeAnalyzer / CryptoDetector)         | Babel traverse 已隐含访问者模式，但 `CodeAnalyzer` 的静态分析可封装为更细粒度的 AST Visitor                                 |
+| **状态模式**     | `BrowserManager` 状态管理                           | 当前通过布尔 flags (`isRestarting`/`isConnected`) 控制，可引入显式状态机 (disconnected/connecting/connected/closing/closed) |
+| **责任链模式**   | `ToolExecutionPipeline` 的校验/上下文/执行/响应阶段 | 当前参数校验、执行、日志记录在线性管线中分阶段展开，可拆为独立中间件                                                        |
+| **命令队列模式** | `ToolExecutionScheduler`                            | 当前只有简单读写分离，未来可扩展为带优先级、延迟执行、取消的任务队列                                                        |
+| **规格模式**     | `CryptoDetector` 规则引擎                           | 当前规则是简单 if-else 判断，可用规格模式组合复杂检测条件                                                                   |
 
 ### 4.3 架构层级模式分析
 
 项目采用一种**改良的分层架构**，接近于 **Hexagonal Architecture (Ports and Adapters)** 的变体:
 
-| 层级           | 对应目录                                | Ports (接口)                                            | Adapters (实现)                                    |
-| -------------- | --------------------------------------- | ------------------------------------------------------- | -------------------------------------------------- |
-| **基础设施层** | `src/modules/browser/`, `src/protocol/` | CDPSession, RPC protocol                                | BrowserManager (Chrome CDP), RpcClient (Sekiro WS) |
-| **核心领域层** | `src/modules/`                          | HookTypePlugin, AIProvider, DeobfuscatorStrategy (隐式) | HookManager, CodeAnalyzer, Deobfuscator            |
-| **应用层**     | `src/tools/` + `src/worker/`            | ToolDefinition, Context                                 | ~100 个具体工具 + ToolAdapter                      |
-| **配置层**     | `src/config/`                           | —                                                       | 多源合并 + 环境变量                                |
+| 层级           | 对应目录                           | Ports (接口)                                            | Adapters (实现)                                             |
+| -------------- | ---------------------------------- | ------------------------------------------------------- | ----------------------------------------------------------- |
+| **基础设施层** | `src/modules/browser/`, `src/ipc/` | CDPSession, socket 帧协议                               | BrowserManager (Chrome CDP), daemonServer (命名管道 NDJSON) |
+| **核心领域层** | `src/modules/`                     | HookTypePlugin, AIProvider, DeobfuscatorStrategy (隐式) | HookManager, CodeAnalyzer, Deobfuscator                     |
+| **应用层**     | `src/tools/` + `src/worker/`       | ToolDefinition, Context                                 | ~100 个具体工具 + ToolAdapter                               |
+| **配置层**     | `src/config/`                      | —                                                       | 多源合并 + 环境变量                                         |
 
 **不符合纯 Hexagonal 的地方**:
 
@@ -517,22 +521,22 @@ Browser-CLI/
 
 ```mermaid
 graph TB
-    subgraph CLI_SRC["CLI层 (js-reverser-cli/ · browsercli)"]
+    subgraph CLI_SRC["CLI层 (browsercli/ 独立包)"]
         BRC[browsercli 命令]
         YARGS[yargs CLI解析]
-        HTTP[WorkerHttpClient]
-        CALL[call 命令 → /api/v1]
+        DC[daemonClient<br/>socket 客户端]
+        CALL[call 命令 → tool.invoke]
     end
 
-    subgraph RPC["RPC协议层 (src/protocol/)"]
-        CLIENT[RpcClient<br/>Sekiro WebSocket]
-        WS[WebSocket 连接]
-        HB[心跳 30s/ping<br/>10s pong超时]
-        RECONNECT[指数退避重连<br/>2s base × 2^n, max 30s]
+    subgraph IPC["Daemon IPC层 (src/ipc/)"]
+        SERVER[daemonServer<br/>命名管道 NDJSON]
+        REG[registry<br/>workspace-hash 会话注册表]
+        READY[就绪握手<br/>Daemon listening on pipe]
+        BUSY[WORKER_BUSY<br/>单活动 job + 退避重试]
     end
 
     subgraph WORKER["Worker层 (src/worker/)"]
-        ADAPTER[ToolAdapter<br/>defineTool → Sekiro Action]
+        ADAPTER[ToolAdapter<br/>defineTool → 管线执行]
         CONTEXTPROV[ToolContextProvider<br/>(Facade)]
         subgraph SUBMODULES["子模块"]
             PM[PageManager]
@@ -613,15 +617,14 @@ graph TB
     %% 连接关系
     BRC --> YARGS
     YARGS --> CALL
-    CALL --> HTTP
-    HTTP -->|HTTP /api/v1| ADAPTER
+    CALL --> DC
+    DC -->|注册表发现 / 自动 spawn| REG
+    DC --- READY
+    DC -->|NDJSON tool.invoke| SERVER
+    SERVER -->|WORKER_BUSY 退避| BUSY
     RESOLVER --> ENV & FILE & DEF
-    START --> CLIENT
-    CLIENT --- WS
-    WS --- HB
-    WS --> RECONNECT
+    SERVER --> ADAPTER
     RESOLVER --> RUNTIME
-    CALL --> ADAPTER
     ADAPTER -.- TG
     TG --> TD
     TD --> CAT
@@ -647,7 +650,7 @@ graph TB
     HK --> LLM
     CONFIG --> BM
     CONFIG --> RUNTIME
-    LIFECYCLE --> BM & CLIENT
+    LIFECYCLE --> BM & SERVER
     THIRDPARTY --- PW & CDP & PP & STUBS
     THIRDPARTY --> TOOLS
 ```
@@ -657,19 +660,19 @@ graph TB
 ```mermaid
 sequenceDiagram
     participant Client as MCP Client<br/>(IDE/CLI)
-    participant Sekiro as Sekiro RPC Server
-    participant RPC as RpcClient<br/>(Worker端)
+    participant Daemon as daemonServer<br/>(命名管道 NDJSON)
+    participant Job as JobStore +<br/>WorkerActivityCoordinator
     participant Adapter as ToolAdapter
     participant Meta as tools-meta.ts
     participant Handler as Tool Handler
     participant CP as ToolContextProvider
     participant Page as Browser Page
 
-    Client->>Sekiro: WebSocket 请求<br/>{action: "hook_function", params: {...}}
-    Sekiro->>RPC: 向分组内广播请求
-    RPC->>RPC: handleRpcRequest()<br/>JSON解析 + action路由
+    Client->>Daemon: tool.invoke {id, tool, params}<br/>(连不上先 spawn daemon + 等就绪行)
+    Daemon->>Job: 单活动 job 检查（忙则回 WORKER_BUSY，客户端退避重试）
+    Daemon->>Daemon: create job + AbortController
 
-    RPC->>Adapter: wrapTool() 入口
+    Daemon->>Adapter: executeTool(meta, params, session, signal)
     Adapter->>Meta: loadHandler(meta)<br/>动态 import defineTool
     Meta-->>Adapter: ToolDefinition 对象
     Adapter->>Adapter: validateToolArgs()<br/>Zod schema 参数校验
@@ -698,11 +701,9 @@ sequenceDiagram
 
     Adapter->>Adapter: 记录成功调用<br/>TokenBudgetManager.recordToolCall()
     Adapter->>CP: eventBus.emit('tool:called',<br/>{name, durationMs, success})
-    Adapter-->>RPC: resolve(responsePayload)
+    Adapter-->>Daemon: job.complete(result)
 
-    RPC->>RPC: sendSuccess()<br/>序列化为 JSON
-    RPC-->>Sekiro: WebSocket 响应
-    Sekiro-->>Client: 返回结果
+    Daemon-->>Client: {id, result}（客户端断线 ⇒ controller.abort() 中止 job）
 ```
 
 ### 5.3 页面逆向标准流程
@@ -829,10 +830,10 @@ npm run start -- --browserUrl http://127.0.0.1:9222
 
 # 4. 查看 CLI 交互 (新终端)
 # 查看可用命令
-node js-reverser-cli/build/bin/browsercli.js --help
+node browsercli/build/bin/browsercli.js --help
 
-# 查看所有可用工具
-node js-reverser-cli/build/bin/browsercli.js list-tools
+# 查看所有可用工具（会话未运行时自动拉起 daemon）
+node browsercli/build/bin/browsercli.js list-tools
 ```
 
 ### 7.3 最小改动示例 (Hello World)
@@ -884,11 +885,11 @@ export const getPageTitle = defineTool({
 npm run build
 
 # 验证工具已注册
-node js-reverser-cli/build/bin/browsercli.js call get_page_title --help
+node browsercli/build/bin/browsercli.js call get_page_title --help
 
 # 启动 Worker 并调用
 npm run start  # 后台运行
-node js-reverser-cli/build/bin/browsercli.js call get_page_title
+node browsercli/build/bin/browsercli.js call get_page_title
 ```
 
 ### 7.4 常见开发任务

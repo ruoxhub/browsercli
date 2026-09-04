@@ -85,8 +85,6 @@ js-reverse start --cloak --js-stealth
 
 ```json
 {
-  "rpcHost": "127.0.0.1:5612",
-  "group": "default",
   "cloak": true
 }
 ```

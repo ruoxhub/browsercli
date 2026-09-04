@@ -117,6 +117,6 @@ browsercli browser connect
 
 已知 job ID 时也可以只取消 job：
 
-```http
-POST /api/v1/jobs/<job-id>/cancel
+```bash
+browsercli jobs cancel <job-id>
 ```
