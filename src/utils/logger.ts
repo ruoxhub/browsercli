@@ -17,8 +17,6 @@ import path from 'node:path';
 
 import chalk from 'chalk';
 
-import {getEnvValue} from '../config.js';
-
 import {safeStringify} from './safeJson.js';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
@@ -137,8 +135,8 @@ function installConsoleFileBridge(): void {
   state.installed = true;
 }
 
-class Logger {
-  private level: LogLevel;
+export class Logger {
+  level: LogLevel;
 
   private fileStream: fs.WriteStream | null = null;
 
@@ -291,7 +289,7 @@ function parseLogLevel(value: string | undefined): LogLevel {
   return 'info';
 }
 
-export const logger = new Logger(parseLogLevel(getEnvValue('LOG_LEVEL')));
+export const logger = new Logger(parseLogLevel(process.env.LOG_LEVEL));
 
 if (process.env.NODE_ENV !== 'test') {
   installConsoleFileBridge();
