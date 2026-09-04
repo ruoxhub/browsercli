@@ -140,8 +140,34 @@ export async function runDaemon(plan: DaemonPlan): Promise<DaemonRunResult> {
       await consoleServer.start();
       consolePort = consoleServer.getActualPort();
     } catch (err) {
-      console.error('[Daemon] 启动 Web 控制台服务失败:', err);
-      consoleServer = undefined;
+      if (
+        preferredPort !== 0 &&
+        plan.consolePort === undefined &&
+        (err as {code?: string})?.code === 'EADDRINUSE'
+      ) {
+        try {
+          consoleServer = new ConsoleServer({
+            port: 0,
+            host: process.env.WORKER_HOST ?? '127.0.0.1',
+            runtime,
+            toolAdapter,
+            configSeed: cliConfig,
+            jobStore,
+            wsHub,
+          });
+          await consoleServer.start();
+          consolePort = consoleServer.getActualPort();
+          console.warn(
+            `[Daemon] 默认 Web 控制台端口 ${preferredPort} 被占用，已回退到临时端口: ${consolePort}`,
+          );
+        } catch (fallbackErr) {
+          console.error('[Daemon] 启动 Web 控制台回退服务失败:', fallbackErr);
+          consoleServer = undefined;
+        }
+      } else {
+        console.error('[Daemon] 启动 Web 控制台服务失败:', err);
+        consoleServer = undefined;
+      }
     }
   }
 

@@ -271,6 +271,9 @@ export class ConsoleServer {
 
     // 2. 启动 WebSocket Server
     this.wsServer = new WebSocketServer({server: this.httpServer});
+    this.wsServer.on('error', err => {
+      logger.debug(`[ConsoleServer] WS server error: ${err.message}`);
+    });
     this.wsServer.on('connection', ws => {
       ws.on('message', data => {
         try {
