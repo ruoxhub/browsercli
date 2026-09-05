@@ -1,7 +1,7 @@
 # Local Applications 进程级透明代理设计 Spec
 
 - **日期**：2026-09-05
-- **状态**：已获批准（经 4 轮需求对齐与 3 节架构/接口/UI 分段设计），待 writing-plans 拆解。2026-09-05 评审后修订：修复 P0 ×4（上游代理泄漏、缓存模型失效、退出钩子冲突、注册表四项还原与 marker 端口依赖）及 P1/P2 若干，修订点已内联至各节。
+- **状态**：已实施（plan: docs/superpowers/plans/2026-09-05-local-applications-proxy.md）。经 4 轮需求对齐与 3 节架构/接口/UI 分段设计，2026-09-05 评审修订并全量交付。
 - **上游参照**：`open-source/mitmproxy`（MIT License，Web UI `Modes/Local.tsx` 与 `LocalRedirector` 交互语义）
 - **目标模块**：
   - `src/modules/proxy/SystemProxyManager.ts`（新建：系统代理生命周期与防断网兜底）
