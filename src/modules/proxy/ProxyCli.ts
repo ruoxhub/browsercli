@@ -8,6 +8,7 @@ import readline from 'node:readline';
 import type {Readable, Writable} from 'node:stream';
 
 import type {MitmModule} from './MitmModule.js';
+import type {CapturedRequest} from './types.js';
 
 export function tokenizeLine(line: string): string[] {
   const tokens: string[] = [];
@@ -55,12 +56,19 @@ export class ProxyCli {
   protected rl: readline.Interface | null = null;
   protected tailEnabled = false;
   protected selectedId: string | null = null;
+  private readonly onCapture = (record: CapturedRequest): void => {
+    if (this.tailEnabled) {
+      this.safeLog(this.formatTailRecord(record));
+    }
+  };
 
   constructor(
     protected readonly module: MitmModule,
     protected readonly input: NodeJS.ReadableStream = process.stdin,
     protected readonly output: NodeJS.WritableStream = process.stdout,
-  ) {}
+  ) {
+    this.module.getStore().events.on('capture', this.onCapture);
+  }
 
   write(message: string): void {
     this.output.write(message);
@@ -70,7 +78,38 @@ export class ProxyCli {
     this.output.write(line + '\n');
   }
 
+  safeLog(message: string): void {
+    if (!this.rl) {
+      this.output.write(message + '\n');
+      return;
+    }
+    this.output.write('\r\x1b[K');
+    this.output.write(message + '\n');
+    this.rl.prompt(true);
+  }
+
+  private formatTailRecord(record: CapturedRequest): string {
+    const code = record.statusCode;
+    let colorCode = String(code);
+    if (code >= 200 && code < 300) {
+      colorCode = `\x1b[32m${code}\x1b[0m`;
+    } else if (code >= 300 && code < 400) {
+      colorCode = `\x1b[34m${code}\x1b[0m`;
+    } else if (code >= 400 && code < 500) {
+      colorCode = `\x1b[33m${code}\x1b[0m`;
+    } else if (code >= 500) {
+      colorCode = `\x1b[31m${code}\x1b[0m`;
+    }
+
+    const duration = record.durationMs !== undefined ? `${record.durationMs}ms` : '0ms';
+    const size = record.responseBody ? `${record.responseBody.length}B` : `${record.responseBodySize ?? 0}B`;
+    const modifiedTag = record.modified ? ' \x1b[35m[MODIFIED]\x1b[0m' : '';
+
+    return `[#${record.id}] ${colorCode} ${record.method} ${record.url} (${duration}, ${size})${modifiedTag}`;
+  }
+
   close(): void {
+    this.module.getStore().events.off('capture', this.onCapture);
     if (this.rl) {
       this.rl.close();
       this.rl = null;
@@ -281,6 +320,23 @@ export class ProxyCli {
     this.writeLine(`[INFO] Cleared ${res.data.clearedCount} captured requests.`);
   }
 
+  handleTail(args: string[]): void {
+    if (args.length > 0) {
+      const mode = args[0].toLowerCase();
+      if (mode === 'on') {
+        this.tailEnabled = true;
+      } else if (mode === 'off') {
+        this.tailEnabled = false;
+      } else {
+        this.writeLine(`[ERROR] Invalid tail argument: ${args[0]}. Use 'on' or 'off'.`);
+        return;
+      }
+    } else {
+      this.tailEnabled = !this.tailEnabled;
+    }
+    this.writeLine(`[INFO] Tail is now ${this.tailEnabled ? 'ON' : 'OFF'}.`);
+  }
+
   handleStatus(): void {
     const status = this.module.status().data;
     const sysProxyActive = this.module.getSystemProxyManager().isActive();
@@ -336,6 +392,9 @@ export class ProxyCli {
       case 'clear':
         this.handleClear();
         return true;
+      case 'tail':
+        this.handleTail(args);
+        return true;
       case 'help':
       case 'h':
       case '?':
@@ -363,6 +422,7 @@ export class ProxyCli {
     this.writeLine('  ls [limit] [filter]    List captured requests (alias: l, list)');
     this.writeLine('  show [id] [part]       Show request/response details (alias: s)');
     this.writeLine('  curl [id]              Generate curl replay command (alias: c)');
+    this.writeLine('  tail [on|off]          Toggle or set real-time traffic streaming');
     this.writeLine('  clear                  Clear captured requests memory buffer');
     this.writeLine('  help [cmd]             Show help message');
     this.writeLine('  exit / quit / q        Exit CLI');

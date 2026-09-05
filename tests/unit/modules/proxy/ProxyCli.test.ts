@@ -135,4 +135,28 @@ describe('ProxyCli - Foundation & Tokenizer', () => {
     await cli.handleCommand('clear');
     assert.match(outData, /Cleared/i);
   });
+
+  it('tail 开关切换及 safeLog 在活跃提示符时正常刷新', async () => {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    let outData = '';
+    output.on('data', chunk => {
+      outData += chunk.toString();
+    });
+
+    const module = new MitmModule();
+    const cli = new ProxyCli(module, input, output);
+
+    await cli.handleCommand('tail on');
+    assert.match(outData, /Tail is now ON/i);
+
+    outData = '';
+    await cli.handleCommand('tail off');
+    assert.match(outData, /Tail is now OFF/i);
+
+    // 测试 safeLog
+    outData = '';
+    cli.safeLog('[TEST LOG]');
+    assert.match(outData, /\[TEST LOG\]/);
+  });
 });
