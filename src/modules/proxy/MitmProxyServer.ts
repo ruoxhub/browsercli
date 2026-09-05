@@ -453,39 +453,7 @@ export class MitmProxyServer {
 
     // 旁路（spec §3.1）：不解密不签证书，纯传输层双向 pipe。
     if (this.shouldBypass?.(hostname) === true) {
-      if (this.upstreamSocks5) {
-        connectSocks5(this.upstreamSocks5, {host: hostname, port})
-          .then(tunnel => {
-            clientSocket.write('HTTP/1.1 200 Connection Established\r\n\r\n');
-            if (head.length > 0) tunnel.write(head);
-            tunnel.pipe(clientSocket);
-            clientSocket.pipe(tunnel);
-            tunnel.on('error', () => clientSocket.destroy());
-            clientSocket.on('error', () => tunnel.destroy());
-            tunnel.on('close', () => clientSocket.destroy());
-            clientSocket.on('close', () => tunnel.destroy());
-          })
-          .catch(err => {
-            logger.warn(
-              `[MitmProxy] Bypass SOCKS5 connect error for ${hostname}:`,
-              err.message,
-            );
-            clientSocket.destroy();
-          });
-        return;
-      }
-
-      clientSocket.write('HTTP/1.1 200 Connection Established\r\n\r\n');
-      const tunnel = net.connect(port, hostname, () => {
-        if (head.length > 0) tunnel.write(head);
-        tunnel.pipe(clientSocket);
-        clientSocket.pipe(tunnel);
-      });
-      // 上游失败仅毁 socket，不写 capture、不打日志刷屏（spec §4）。
-      tunnel.on('error', () => clientSocket.destroy());
-      clientSocket.on('error', () => tunnel.destroy());
-      tunnel.on('close', () => clientSocket.destroy());
-      clientSocket.on('close', () => tunnel.destroy());
+      this.relayDirectConnect(hostname, port, clientSocket, head);
       return;
     }
 
@@ -517,6 +485,48 @@ export class MitmProxyServer {
       logger.warn(`[MitmProxy] TLS error for ${hostname}:`, err.message);
     });
     clientSocket.on('error', () => tlsSocket.destroy());
+  }
+
+  /** 纯传输层盲转发（原 hostname-bypass 分支提取，spec §3.3）。含上游 SOCKS5 分支。 */
+  private relayDirectConnect(
+    hostname: string,
+    port: number,
+    clientSocket: net.Socket,
+    head: Buffer,
+  ): void {
+    if (this.upstreamSocks5) {
+      connectSocks5(this.upstreamSocks5, {host: hostname, port})
+        .then(tunnel => {
+          clientSocket.write('HTTP/1.1 200 Connection Established\r\n\r\n');
+          if (head.length > 0) tunnel.write(head);
+          tunnel.pipe(clientSocket);
+          clientSocket.pipe(tunnel);
+          tunnel.on('error', () => clientSocket.destroy());
+          clientSocket.on('error', () => tunnel.destroy());
+          tunnel.on('close', () => clientSocket.destroy());
+          clientSocket.on('close', () => tunnel.destroy());
+        })
+        .catch(err => {
+          logger.warn(
+            `[MitmProxy] Bypass SOCKS5 connect error for ${hostname}:`,
+            err.message,
+          );
+          clientSocket.destroy();
+        });
+      return;
+    }
+
+    clientSocket.write('HTTP/1.1 200 Connection Established\r\n\r\n');
+    const tunnel = net.connect(port, hostname, () => {
+      if (head.length > 0) tunnel.write(head);
+      tunnel.pipe(clientSocket);
+      clientSocket.pipe(tunnel);
+    });
+    // 上游失败仅毁 socket，不写 capture、不打日志刷屏（spec §4）。
+    tunnel.on('error', () => clientSocket.destroy());
+    clientSocket.on('error', () => tunnel.destroy());
+    tunnel.on('close', () => clientSocket.destroy());
+    clientSocket.on('close', () => tunnel.destroy());
   }
 
   private handleDecryptedRequest(
