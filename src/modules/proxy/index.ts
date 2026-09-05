@@ -33,6 +33,11 @@ export {
   type RunCommand,
 } from './ProcessConnectionTracker.js';
 export {
+  SystemProxyManager,
+  type SystemProxyState,
+  type SystemProxyManagerOpts,
+} from './SystemProxyManager.js';
+export {
   parseSocks5Url,
   connectSocks5,
   createSocks5HttpConnector,
