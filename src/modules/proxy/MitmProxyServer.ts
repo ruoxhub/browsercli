@@ -26,6 +26,8 @@ import {
   isBinaryContentType,
 } from './body.js';
 import type {CaManager} from './CaManager.js';
+import type {ProcessConnectionTracker} from './ProcessConnectionTracker.js';
+import {matchesProcessName} from './processMatch.js';
 import {applyHeaderChanges} from './rewrite.js';
 import {
   connectSocks5,
@@ -38,6 +40,8 @@ import type {
   AfterResponseResult,
   BeforeRequestResult,
   CapturedExchange,
+  ClientProcessMeta,
+  LocalAppsConfig,
   MitmInterceptor,
 } from './types.js';
 
@@ -130,6 +134,8 @@ export class MitmProxyServer {
     private readonly interceptor?: MitmInterceptor,
     private readonly shouldBypass?: (hostname: string) => boolean,
     upstreamProxy?: string,
+    private readonly processTracker?: ProcessConnectionTracker,
+    private readonly localAppsConfigProvider?: () => LocalAppsConfig,
   ) {
     if (upstreamProxy) {
       this.upstreamSocks5 = parseSocks5Url(upstreamProxy);
@@ -197,6 +203,28 @@ export class MitmProxyServer {
     return this.upstreamProxyUrl;
   }
 
+  /**
+   * 进程分流判定（spec §3.3）。纯内存同步，无子进程开销。
+   * bypass=true 时调用方走 relayDirectConnect；clientProcess 供 capture 注入。
+   */
+  private resolveClientProcess(remotePort: number | undefined): {
+    clientProcess?: ClientProcessMeta;
+    bypass: boolean;
+  } {
+    const config = this.localAppsConfigProvider?.();
+    if (!config?.enabled) return {bypass: false};
+    const clientProcess = remotePort
+      ? (this.processTracker?.getProcessByPortSync(remotePort) ?? undefined)
+      : undefined;
+    if (config.targets.length > 0) {
+      const isTarget =
+        clientProcess != null &&
+        config.targets.some(t => matchesProcessName(t, clientProcess.name));
+      if (!isTarget) return {clientProcess, bypass: true};
+    }
+    return {clientProcess, bypass: false};
+  }
+
   // ── HTTP（非 CONNECT）──
 
   private handleHttpRequest(
@@ -209,10 +237,12 @@ export class MitmProxyServer {
       clientRes.end('Bad Request');
       return;
     }
+    const localApps = this.resolveClientProcess(clientReq.socket.remotePort);
     const startTime = Date.now();
     const requestId = `proxy-${randomUUID()}`;
     const parsed = url.parse(targetUrl);
-    const shouldRecord = this.shouldBypass?.(parsed.hostname ?? '') !== true;
+    const shouldRecord =
+      !localApps.bypass && this.shouldBypass?.(parsed.hostname ?? '') !== true;
     const reqBodyChunks: Buffer[] = [];
     let reqBodySize = 0;
 
@@ -233,7 +263,15 @@ export class MitmProxyServer {
       const before = this.interceptor?.beforeRequest?.(flow);
       if (
         before &&
-        this.handleBeforeRequest(before, requestId, startTime, flow, clientRes)
+        this.handleBeforeRequest(
+          before,
+          requestId,
+          startTime,
+          flow,
+          clientRes,
+          shouldRecord,
+          localApps.clientProcess,
+        )
       ) {
         return;
       }
@@ -267,6 +305,7 @@ export class MitmProxyServer {
           proxyRes,
           clientRes,
           shouldRecord,
+          localApps.clientProcess,
         );
       });
 
@@ -451,6 +490,12 @@ export class MitmProxyServer {
     }
     const {hostname, port} = authority;
 
+    const localApps = this.resolveClientProcess(clientSocket.remotePort);
+    if (localApps.bypass) {
+      this.relayDirectConnect(hostname, port, clientSocket, head);
+      return;
+    }
+
     // 旁路（spec §3.1）：不解密不签证书，纯传输层双向 pipe。
     if (this.shouldBypass?.(hostname) === true) {
       this.relayDirectConnect(hostname, port, clientSocket, head);
@@ -468,7 +513,13 @@ export class MitmProxyServer {
     if (head.length > 0) tlsSocket.unshift(head);
 
     const miniServer = http.createServer((decryptedReq, decryptedRes) => {
-      this.handleDecryptedRequest(hostname, port, decryptedReq, decryptedRes);
+      this.handleDecryptedRequest(
+        hostname,
+        port,
+        decryptedReq,
+        decryptedRes,
+        localApps.clientProcess,
+      );
     });
     miniServer.on('upgrade', (upgradeReq, upgradeSocket, upgradeHead) => {
       this.handleWsUpgrade(
@@ -534,6 +585,7 @@ export class MitmProxyServer {
     port: number,
     clientReq: http.IncomingMessage,
     clientRes: http.ServerResponse,
+    clientProcess?: ClientProcessMeta,
   ): void {
     const startTime = Date.now();
     const requestId = `proxy-${randomUUID()}`;
@@ -558,7 +610,15 @@ export class MitmProxyServer {
       const before = this.interceptor?.beforeRequest?.(flow);
       if (
         before &&
-        this.handleBeforeRequest(before, requestId, startTime, flow, clientRes)
+        this.handleBeforeRequest(
+          before,
+          requestId,
+          startTime,
+          flow,
+          clientRes,
+          true,
+          clientProcess,
+        )
       ) {
         return;
       }
@@ -598,6 +658,7 @@ export class MitmProxyServer {
           proxyRes,
           clientRes,
           true,
+          clientProcess,
         );
       });
 
@@ -624,8 +685,28 @@ export class MitmProxyServer {
     startTime: number,
     flow: RequestFlow,
     clientRes: http.ServerResponse,
+    shouldRecord = true,
+    clientProcess?: ClientProcessMeta,
   ): boolean {
     if (before.action === 'forward') return false;
+
+    if (!shouldRecord) {
+      if (before.action === 'block') {
+        const closeConnection =
+          before.closeConnection ?? before.statusCode === 444;
+        if (closeConnection) {
+          clientRes.destroy();
+        } else {
+          clientRes.writeHead(before.statusCode, {connection: 'close'});
+          clientRes.end(before.body ?? '');
+        }
+        return true;
+      }
+      const headers = before.headers ?? {};
+      clientRes.writeHead(before.statusCode, headers);
+      clientRes.end(before.body);
+      return true;
+    }
 
     const base = {
       requestId,
@@ -642,6 +723,7 @@ export class MitmProxyServer {
       timestamp: startTime,
       modified: true,
       appliedRuleIds: before.appliedRuleIds,
+      ...(clientProcess && {clientProcess}),
     };
 
     if (before.action === 'block') {
@@ -725,6 +807,7 @@ export class MitmProxyServer {
     proxyRes: http.IncomingMessage,
     clientRes: http.ServerResponse,
     shouldRecord = true,
+    clientProcess?: ClientProcessMeta,
   ): void {
     const contentType = (proxyRes.headers['content-type'] as string) || null;
     const method = flow.method;
@@ -851,6 +934,7 @@ export class MitmProxyServer {
           isBinary && buffered && !truncated
             ? buffered.toString('base64')
             : null,
+        ...(clientProcess && {clientProcess}),
       });
     };
 
