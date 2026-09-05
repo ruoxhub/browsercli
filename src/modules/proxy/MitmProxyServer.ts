@@ -502,6 +502,12 @@ export class MitmProxyServer {
       return;
     }
 
+    // 80 端口为明文 HTTP 隧道（如 Android tun2socks/Postern 转发的明文流量），走传输层盲转发，不包装 TLS
+    if (port === 80) {
+      this.relayDirectConnect(hostname, port, clientSocket, head);
+      return;
+    }
+
     clientSocket.write('HTTP/1.1 200 Connection Established\r\n\r\n');
 
     const secureContext = this.caManager.getSecureContextForHost(hostname);
@@ -534,6 +540,7 @@ export class MitmProxyServer {
 
     tlsSocket.on('error', (err: Error) => {
       logger.warn(`[MitmProxy] TLS error for ${hostname}:`, err.message);
+      clientSocket.destroy();
     });
     clientSocket.on('error', () => tlsSocket.destroy());
   }

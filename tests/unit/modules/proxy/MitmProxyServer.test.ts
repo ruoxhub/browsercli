@@ -712,4 +712,48 @@ describe('MitmProxyServer', () => {
       await new Promise<void>(r => socksServer.close(() => r()));
     }
   });
+
+  it('CONNECT 80 端口走 relayDirectConnect 盲转发，不进入 TLS 包装流程', async () => {
+    const ca = new CaManager(mkdtempSync(path.join(os.tmpdir(), 'mitm-ca-')));
+    await ca.init();
+    const proxy = new MitmProxyServer(ca, () => undefined);
+    await proxy.start(0);
+
+    let relayCalled = false;
+    let relayHost = '';
+    let relayPort = 0;
+    (
+      proxy as unknown as {
+        relayDirectConnect: (
+          host: string,
+          port: number,
+          socket: net.Socket,
+          head: Buffer,
+        ) => void;
+      }
+    ).relayDirectConnect = (host: string, port: number, socket: net.Socket) => {
+      relayCalled = true;
+      relayHost = host;
+      relayPort = port;
+      socket.destroy();
+    };
+
+    try {
+      await new Promise<void>(resolve => {
+        const socket = net.connect(proxy.getPort()!, '127.0.0.1', () => {
+          socket.write(
+            'CONNECT tx1.douguo.net:80 HTTP/1.1\r\nHost: tx1.douguo.net:80\r\n\r\n',
+          );
+        });
+        socket.on('close', () => resolve());
+        socket.on('error', () => resolve());
+      });
+
+      assert.strictEqual(relayCalled, true, '80 端口必须走 relayDirectConnect');
+      assert.strictEqual(relayHost, 'tx1.douguo.net');
+      assert.strictEqual(relayPort, 80, '转发的目标端口必须是 80');
+    } finally {
+      await proxy.stop();
+    }
+  });
 });

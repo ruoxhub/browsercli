@@ -40,7 +40,10 @@ import {PassThrough} from 'node:stream';
 import {describe, it} from 'node:test';
 
 import {MitmModule} from '../../../../src/modules/proxy/MitmModule.js';
-import {ProxyCli, tokenizeLine} from '../../../../src/modules/proxy/ProxyCli.js';
+import {
+  ProxyCli,
+  tokenizeLine,
+} from '../../../../src/modules/proxy/ProxyCli.js';
 
 describe('ProxyCli - Foundation & Tokenizer', () => {
   it('tokenizeLine 正确拆分单双引号与空格参数', () => {
@@ -50,7 +53,11 @@ describe('ProxyCli - Foundation & Tokenizer', () => {
       tokenizeLine('rule add mock "/api/v1/user info" 200 \'{"code": 0}\''),
       ['rule', 'add', 'mock', '/api/v1/user info', '200', '{"code": 0}'],
     );
-    assert.deepStrictEqual(tokenizeLine('   ls   10   auth   '), ['ls', '10', 'auth']);
+    assert.deepStrictEqual(tokenizeLine('   ls   10   auth   '), [
+      'ls',
+      '10',
+      'auth',
+    ]);
   });
 
   it('handleCommand 支持 help 与 exit 命令', async () => {
@@ -153,7 +160,9 @@ export class ProxyCli {
         this.writeLine('[INFO] Exiting proxy CLI...');
         return false;
       default:
-        this.writeLine(`[ERROR] Unknown command: ${tokens[0]}. Type 'help' for guidance.`);
+        this.writeLine(
+          `[ERROR] Unknown command: ${tokens[0]}. Type 'help' for guidance.`,
+        );
         return true;
     }
   }
