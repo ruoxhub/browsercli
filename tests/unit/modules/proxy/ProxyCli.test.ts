@@ -159,4 +159,44 @@ describe('ProxyCli - Foundation & Tokenizer', () => {
     cli.safeLog('[TEST LOG]');
     assert.match(outData, /\[TEST LOG\]/);
   });
+
+  it('支持 rule 与 filter 的增删查清命令', async () => {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    let outData = '';
+    output.on('data', chunk => {
+      outData += chunk.toString();
+    });
+
+    const module = new MitmModule();
+    const cli = new ProxyCli(module, input, output);
+
+    // 1. rule add mock
+    await cli.handleCommand('rule add mock /api/v1 200 {"ok":true}');
+    assert.match(outData, /Rule added/i);
+
+    // 2. rule ls
+    outData = '';
+    await cli.handleCommand('rule ls');
+    assert.match(outData, /mock/i);
+    assert.match(outData, /\/api\/v1/);
+
+    // 3. filter allow & filter ls
+    outData = '';
+    await cli.handleCommand('filter allow api.github.com');
+    assert.match(outData, /Filter added/i);
+
+    outData = '';
+    await cli.handleCommand('filter ls');
+    assert.match(outData, /api\.github\.com/);
+
+    // 4. rule rm & filter rm
+    outData = '';
+    await cli.handleCommand('rule clear');
+    assert.match(outData, /Cleared/i);
+
+    outData = '';
+    await cli.handleCommand('filter clear');
+    assert.match(outData, /Cleared/i);
+  });
 });

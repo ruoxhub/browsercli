@@ -152,7 +152,12 @@ export interface MitmInterceptor {
 // ─── 规则模型（判别联合）────────────────────────────
 
 export type MitmRewriteAction =
-  | {type: 'block'; statusCode: number; closeConnection?: boolean}
+  | {
+      type: 'block';
+      statusCode: number;
+      closeConnection?: boolean;
+      body?: string;
+    }
   | {
       type: 'map_local';
       /** 目标 URL 匹配正则（可含捕获组，指向本地文件路径尾部）。 */

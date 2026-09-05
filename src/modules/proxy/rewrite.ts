@@ -240,6 +240,7 @@ export class MitmRuleEngine implements MitmInterceptor {
             action: 'block',
             statusCode: action.statusCode,
             closeConnection: action.closeConnection,
+            body: action.body,
             appliedRuleIds: [rule.id],
           };
         case 'map_local': {

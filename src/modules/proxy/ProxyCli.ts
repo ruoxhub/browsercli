@@ -337,6 +337,222 @@ export class ProxyCli {
     this.writeLine(`[INFO] Tail is now ${this.tailEnabled ? 'ON' : 'OFF'}.`);
   }
 
+  handleRule(args: string[]): void {
+    if (args.length === 0) {
+      this.writeLine(
+        "[ERROR] Missing rule subcommand. Use 'rule ls', 'rule add', 'rule rm', 'rule clear'.",
+      );
+      return;
+    }
+
+    const sub = args[0].toLowerCase();
+    switch (sub) {
+      case 'ls':
+      case 'list': {
+        const rules = this.module.listRules().data.rules;
+        if (rules.length === 0) {
+          this.writeLine('No rewrite rules configured.');
+          return;
+        }
+        this.writeLine(
+          `${'ID'.padEnd(14)} ${'TYPE'.padEnd(10)} ${'URL_PATTERN'.padEnd(25)} DETAILS`,
+        );
+        this.writeLine('-'.repeat(75));
+        for (const r of rules) {
+          const idStr = r.id.padEnd(14);
+          let typeStr: string = r.action.type;
+          let details = '';
+          if (r.action.type === 'block') {
+            typeStr = r.action.body !== undefined ? 'mock' : 'block';
+            details = `status: ${r.action.statusCode}${r.action.body ? `, body: ${r.action.body}` : ''}`;
+          } else if (r.action.type === 'map_remote') {
+            typeStr = 'redirect';
+            details = `-> ${r.action.replacement}`;
+          } else if (r.action.type === 'modify_header') {
+            typeStr = 'header';
+            details = JSON.stringify(r.action.set ?? {});
+          } else if (r.action.type === 'map_local') {
+            typeStr = 'map_local';
+            details = r.action.localPath;
+          }
+          const ruleRegex = 'urlRegex' in r.action ? r.action.urlRegex : undefined;
+          const pattern = (r.urlFilter ?? ruleRegex ?? '*').padEnd(25);
+          this.writeLine(`${idStr} ${typeStr.padEnd(10)} ${pattern} ${details}`);
+        }
+        return;
+      }
+      case 'add': {
+        if (args.length < 3) {
+          this.writeLine(
+            '[ERROR] Usage: rule add <mock|redirect|header> <urlPattern> ...',
+          );
+          return;
+        }
+        const actionType = args[1].toLowerCase();
+        const pattern = args[2];
+        if (actionType === 'mock') {
+          const status = args[3] !== undefined ? Number(args[3]) : 200;
+          const body = args.slice(4).join(' ') || undefined;
+          const res = this.module.addRule({
+            urlFilter: pattern,
+            action: {
+              type: 'block',
+              statusCode: status,
+              body,
+            },
+          });
+          this.writeLine(
+            `[INFO] Rule added: ${res.data.rule.id} (mock ${pattern} -> ${status}).`,
+          );
+        } else if (actionType === 'redirect') {
+          const target = args[3];
+          if (!target) {
+            this.writeLine('[ERROR] Missing target URL for redirect rule.');
+            return;
+          }
+          const res = this.module.addRule({
+            urlFilter: pattern,
+            action: {
+              type: 'map_remote',
+              urlRegex: pattern,
+              replacement: target,
+            },
+          });
+          this.writeLine(
+            `[INFO] Rule added: ${res.data.rule.id} (redirect ${pattern} -> ${target}).`,
+          );
+        } else if (actionType === 'header') {
+          const key = args[3];
+          const val = args[4] ?? '';
+          if (!key) {
+            this.writeLine('[ERROR] Missing header key for header rule.');
+            return;
+          }
+          const res = this.module.addRule({
+            urlFilter: pattern,
+            action: {
+              type: 'modify_header',
+              phase: 'request',
+              set: {[key]: val},
+            },
+          });
+          this.writeLine(
+            `[INFO] Rule added: ${res.data.rule.id} (header ${key}: ${val}).`,
+          );
+        } else {
+          this.writeLine(
+            `[ERROR] Unknown rule action type: ${actionType}. Supported: mock, redirect, header.`,
+          );
+        }
+        return;
+      }
+      case 'rm':
+      case 'remove': {
+        const id = args[1];
+        if (!id) {
+          this.writeLine('[ERROR] Usage: rule rm <ruleId>');
+          return;
+        }
+        const res = this.module.removeRule({id});
+        if (res.success) {
+          this.writeLine(`[INFO] Rule ${id} removed.`);
+        } else {
+          this.writeLine(`[ERROR] Rule ${id} not found.`);
+        }
+        return;
+      }
+      case 'clear': {
+        const res = this.module.clearRules();
+        this.writeLine(`[INFO] Cleared ${res.data.clearedCount} rewrite rules.`);
+        return;
+      }
+      default:
+        this.writeLine(
+          `[ERROR] Unknown rule subcommand: ${sub}. Use 'ls', 'add', 'rm', 'clear'.`,
+        );
+    }
+  }
+
+  handleFilter(args: string[]): void {
+    if (args.length === 0) {
+      this.writeLine(
+        "[ERROR] Missing filter subcommand. Use 'filter ls', 'filter allow', 'filter block', 'filter rm', 'filter clear'.",
+      );
+      return;
+    }
+
+    const sub = args[0].toLowerCase();
+    switch (sub) {
+      case 'ls':
+      case 'list': {
+        const data = this.module.listHostFilters().data;
+        this.writeLine('=== Host Filters ===');
+        this.writeLine(`Allow list (${data.allow.length}):`);
+        for (const h of data.allow) {
+          this.writeLine(`  - ${h}`);
+        }
+        this.writeLine(`Block list (${data.block.length}):`);
+        for (const h of data.block) {
+          this.writeLine(`  - ${h}`);
+        }
+        return;
+      }
+      case 'allow': {
+        const host = args[1];
+        if (!host) {
+          this.writeLine('[ERROR] Usage: filter allow <host>');
+          return;
+        }
+        const res = this.module.addHostFilter({action: 'allow', host});
+        if (res.success) {
+          this.writeLine(`[INFO] Filter added: allow ${host}`);
+        } else {
+          this.writeLine(`[ERROR] Failed to add filter: ${res.message}`);
+        }
+        return;
+      }
+      case 'block': {
+        const host = args[1];
+        if (!host) {
+          this.writeLine('[ERROR] Usage: filter block <host>');
+          return;
+        }
+        const res = this.module.addHostFilter({action: 'block', host});
+        if (res.success) {
+          this.writeLine(`[INFO] Filter added: block ${host}`);
+        } else {
+          this.writeLine(`[ERROR] Failed to add filter: ${res.message}`);
+        }
+        return;
+      }
+      case 'rm':
+      case 'remove': {
+        const host = args[1];
+        if (!host) {
+          this.writeLine('[ERROR] Usage: filter rm <host>');
+          return;
+        }
+        const r1 = this.module.removeHostFilter({action: 'allow', host});
+        const r2 = this.module.removeHostFilter({action: 'block', host});
+        if (r1.success || r2.success) {
+          this.writeLine(`[INFO] Filter removed: ${host}`);
+        } else {
+          this.writeLine(`[ERROR] Filter not found: ${host}`);
+        }
+        return;
+      }
+      case 'clear': {
+        const res = this.module.clearHostFilters();
+        this.writeLine(`[INFO] Cleared ${res.data.clearedCount} host filters.`);
+        return;
+      }
+      default:
+        this.writeLine(
+          `[ERROR] Unknown filter subcommand: ${sub}. Use 'ls', 'allow', 'block', 'rm', 'clear'.`,
+        );
+    }
+  }
+
   handleStatus(): void {
     const status = this.module.status().data;
     const sysProxyActive = this.module.getSystemProxyManager().isActive();
@@ -395,6 +611,12 @@ export class ProxyCli {
       case 'tail':
         this.handleTail(args);
         return true;
+      case 'rule':
+        this.handleRule(args);
+        return true;
+      case 'filter':
+        this.handleFilter(args);
+        return true;
       case 'help':
       case 'h':
       case '?':
@@ -423,6 +645,14 @@ export class ProxyCli {
     this.writeLine('  show [id] [part]       Show request/response details (alias: s)');
     this.writeLine('  curl [id]              Generate curl replay command (alias: c)');
     this.writeLine('  tail [on|off]          Toggle or set real-time traffic streaming');
+    this.writeLine('  rule ls                List rewrite rules');
+    this.writeLine('  rule add <type> ...    Add rewrite rule (mock, redirect, header)');
+    this.writeLine('  rule rm <id>           Remove rewrite rule');
+    this.writeLine('  rule clear             Clear all rewrite rules');
+    this.writeLine('  filter ls              List host filters (allow/block)');
+    this.writeLine('  filter allow/block <h> Add host filter');
+    this.writeLine('  filter rm <h>          Remove host filter');
+    this.writeLine('  filter clear           Clear all host filters');
     this.writeLine('  clear                  Clear captured requests memory buffer');
     this.writeLine('  help [cmd]             Show help message');
     this.writeLine('  exit / quit / q        Exit CLI');
