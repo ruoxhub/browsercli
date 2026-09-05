@@ -230,4 +230,25 @@ describe('ProxyCli - Foundation & Tokenizer', () => {
     await cli.handleCommand('har export');
     assert.match(outData, /HAR exported/i);
   });
+
+  it('completer 正确补全一级命令与二级子命令', () => {
+    const module = new MitmModule();
+    const cli = new ProxyCli(module);
+
+    // 1. 一级命令补全
+    const [hits1] = cli.completer('st');
+    assert.ok(hits1.includes('start'));
+    assert.ok(hits1.includes('status'));
+
+    // 2. 二级子命令补全
+    const [hits2] = cli.completer('rule ');
+    assert.ok(hits2.includes('ls'));
+    assert.ok(hits2.includes('add'));
+    assert.ok(hits2.includes('rm'));
+    assert.ok(hits2.includes('clear'));
+
+    const [hits3] = cli.completer('sysproxy ');
+    assert.ok(hits3.includes('on'));
+    assert.ok(hits3.includes('off'));
+  });
 });

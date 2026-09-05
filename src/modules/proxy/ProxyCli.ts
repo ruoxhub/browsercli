@@ -688,6 +688,149 @@ export class ProxyCli {
     }
   }
 
+  completer(line: string): [string[], string] {
+    const topCommands = [
+      'start',
+      'stop',
+      'status',
+      'ls',
+      'show',
+      'tail',
+      'rule',
+      'filter',
+      'sysproxy',
+      'ca',
+      'proc',
+      'har',
+      'curl',
+      'clear',
+      'help',
+      'exit',
+      'quit',
+    ];
+
+    const trimmed = line.trimStart();
+    const endsWithSpace = line.endsWith(' ');
+    const parts = trimmed.split(/\s+/).filter(Boolean);
+
+    // Case 1: Empty line or still completing top command
+    if (parts.length === 0 || (parts.length === 1 && !endsWithSpace)) {
+      const prefix = parts[0] ?? '';
+      const hits = topCommands.filter(c => c.startsWith(prefix.toLowerCase()));
+      return [hits.length ? hits : topCommands, prefix];
+    }
+
+    // Case 2: Subcommands
+    const [cmd, sub, ...rest] = parts;
+    const lowerCmd = cmd.toLowerCase();
+
+    // rule ...
+    if (lowerCmd === 'rule') {
+      const ruleSubs = ['ls', 'add', 'rm', 'clear'];
+      if (!sub || (parts.length === 1 && endsWithSpace)) {
+        return [ruleSubs, ''];
+      }
+      if (parts.length === 2 && !endsWithSpace) {
+        const hits = ruleSubs.filter(s => s.startsWith(sub.toLowerCase()));
+        return [hits, sub];
+      }
+      if (sub.toLowerCase() === 'add') {
+        const addTypes = ['mock', 'redirect', 'header'];
+        const third = rest[0];
+        if (!third || (parts.length === 2 && endsWithSpace)) {
+          return [addTypes, ''];
+        }
+        if (parts.length === 3 && !endsWithSpace) {
+          const hits = addTypes.filter(t => t.startsWith(third.toLowerCase()));
+          return [hits, third];
+        }
+      }
+      return [[], ''];
+    }
+
+    // filter ...
+    if (lowerCmd === 'filter') {
+      const filterSubs = ['ls', 'allow', 'block', 'rm', 'clear'];
+      if (!sub || (parts.length === 1 && endsWithSpace)) {
+        return [filterSubs, ''];
+      }
+      if (parts.length === 2 && !endsWithSpace) {
+        const hits = filterSubs.filter(s => s.startsWith(sub.toLowerCase()));
+        return [hits, sub];
+      }
+      return [[], ''];
+    }
+
+    // sysproxy ...
+    if (lowerCmd === 'sysproxy') {
+      const sysproxySubs = ['on', 'off', 'status'];
+      if (!sub || (parts.length === 1 && endsWithSpace)) {
+        return [sysproxySubs, ''];
+      }
+      if (parts.length === 2 && !endsWithSpace) {
+        const hits = sysproxySubs.filter(s => s.startsWith(sub.toLowerCase()));
+        return [hits, sub];
+      }
+      return [[], ''];
+    }
+
+    // ca ...
+    if (lowerCmd === 'ca') {
+      const caSubs = ['path', 'export'];
+      if (!sub || (parts.length === 1 && endsWithSpace)) {
+        return [caSubs, ''];
+      }
+      if (parts.length === 2 && !endsWithSpace) {
+        const hits = caSubs.filter(s => s.startsWith(sub.toLowerCase()));
+        return [hits, sub];
+      }
+      return [[], ''];
+    }
+
+    // proc ...
+    if (lowerCmd === 'proc') {
+      const procSubs = ['ls', 'target', 'clear'];
+      if (!sub || (parts.length === 1 && endsWithSpace)) {
+        return [procSubs, ''];
+      }
+      if (parts.length === 2 && !endsWithSpace) {
+        const hits = procSubs.filter(s => s.startsWith(sub.toLowerCase()));
+        return [hits, sub];
+      }
+      return [[], ''];
+    }
+
+    // tail ...
+    if (lowerCmd === 'tail') {
+      const tailSubs = ['on', 'off'];
+      if (!sub || (parts.length === 1 && endsWithSpace)) {
+        return [tailSubs, ''];
+      }
+      if (parts.length === 2 && !endsWithSpace) {
+        const hits = tailSubs.filter(s => s.startsWith(sub.toLowerCase()));
+        return [hits, sub];
+      }
+      return [[], ''];
+    }
+
+    // show / curl -> latest request IDs
+    if (lowerCmd === 'show' || lowerCmd === 'curl') {
+      const records = this.module.getStore().list();
+      const recentIds = records.slice(-5).reverse().map(r => `#${r.id}`);
+      const prefix = sub ?? '';
+      if (!sub || (parts.length === 1 && endsWithSpace)) {
+        return [recentIds, ''];
+      }
+      if (parts.length === 2 && !endsWithSpace) {
+        const hits = recentIds.filter(id => id.startsWith(prefix));
+        return [hits, prefix];
+      }
+      return [[], ''];
+    }
+
+    return [[], ''];
+  }
+
   handleStatus(): void {
     const status = this.module.status().data;
     const sysProxyActive = this.module.getSystemProxyManager().isActive();
@@ -819,6 +962,7 @@ export class ProxyCli {
       input: this.input as Readable,
       output: this.output as Writable,
       prompt: initialPrompt,
+      completer: (line: string) => this.completer(line),
     });
 
     this.rl.prompt();
