@@ -233,19 +233,19 @@ completer(line: string): [string[], string]
 
 补全查找树规则如下：
 
-| 用户当前输入行 | 触发 Tab 补全候选项 |
-| --- | --- |
+| 用户当前输入行  | 触发 Tab 补全候选项                                                                                                                                        |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 空字符串 / 空白 | 列出所有顶层核心命令 (`start`, `stop`, `status`, `ls`, `show`, `tail`, `rule`, `filter`, `sysproxy`, `ca`, `proc`, `har`, `curl`, `clear`, `help`, `exit`) |
-| `st` | `start`, `status` |
-| `s` | `start`, `status`, `show`, `stop`, `sysproxy` |
-| `rule` | `ls`, `add`, `rm`, `clear` |
-| `rule add` | `mock`, `redirect`, `header` |
-| `filter` | `ls`, `allow`, `block`, `rm`, `clear` |
-| `sysproxy` | `on`, `off`, `status` |
-| `ca` | `path`, `export` |
-| `proc` | `ls`, `target`, `clear` |
-| `tail` | `on`, `off` |
-| `show` / `curl` | 动态扫描当前 `ProxyStore` 中最新的 5 个请求 ID（形如 `#42`, `#41`），支持免手工输入 ID 补全 |
+| `st`            | `start`, `status`                                                                                                                                          |
+| `s`             | `start`, `status`, `show`, `stop`, `sysproxy`                                                                                                              |
+| `rule`          | `ls`, `add`, `rm`, `clear`                                                                                                                                 |
+| `rule add`      | `mock`, `redirect`, `header`                                                                                                                               |
+| `filter`        | `ls`, `allow`, `block`, `rm`, `clear`                                                                                                                      |
+| `sysproxy`      | `on`, `off`, `status`                                                                                                                                      |
+| `ca`            | `path`, `export`                                                                                                                                           |
+| `proc`          | `ls`, `target`, `clear`                                                                                                                                    |
+| `tail`          | `on`, `off`                                                                                                                                                |
+| `show` / `curl` | 动态扫描当前 `ProxyStore` 中最新的 5 个请求 ID（形如 `#42`, `#41`），支持免手工输入 ID 补全                                                                |
 
 ---
 
@@ -299,7 +299,7 @@ async function cleanupAndExit(code = 0) {
 
 process.on('SIGINT', () => cleanupAndExit(0));
 process.on('SIGTERM', () => cleanupAndExit(0));
-process.on('uncaughtException', (err) => {
+process.on('uncaughtException', err => {
   console.error('[FATAL]', err);
   cleanupAndExit(1);
 });
