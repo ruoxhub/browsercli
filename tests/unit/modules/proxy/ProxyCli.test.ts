@@ -199,4 +199,35 @@ describe('ProxyCli - Foundation & Tokenizer', () => {
     await cli.handleCommand('filter clear');
     assert.match(outData, /Cleared/i);
   });
+
+  it('支持 ca, sysproxy, proc 与 har 命令分发', async () => {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    let outData = '';
+    output.on('data', chunk => {
+      outData += chunk.toString();
+    });
+
+    const module = new MitmModule();
+    const cli = new ProxyCli(module, input, output);
+
+    // 1. ca path
+    await cli.handleCommand('ca path');
+    assert.match(outData, /ca\.crt/);
+
+    // 2. sysproxy status
+    outData = '';
+    await cli.handleCommand('sysproxy status');
+    assert.match(outData, /System proxy/i);
+
+    // 3. proc ls
+    outData = '';
+    await cli.handleCommand('proc ls');
+    assert.match(outData, /Local processes/i);
+
+    // 4. har export
+    outData = '';
+    await cli.handleCommand('har export');
+    assert.match(outData, /HAR exported/i);
+  });
 });

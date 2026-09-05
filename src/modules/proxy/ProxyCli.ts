@@ -553,6 +553,141 @@ export class ProxyCli {
     }
   }
 
+  async handleCa(args: string[]): Promise<void> {
+    const sub = args[0]?.toLowerCase() ?? 'path';
+    switch (sub) {
+      case 'path': {
+        const certPath = this.module.getCaManager().getCaCertPath();
+        this.writeLine(`CA Root Certificate Path: ${certPath}`);
+        this.writeLine('Manual Trust Commands:');
+        this.writeLine(`  Windows: certutil -addstore -f "ROOT" "${certPath}"`);
+        this.writeLine(
+          `  macOS  : sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "${certPath}"`,
+        );
+        this.writeLine(
+          `  Linux  : sudo cp "${certPath}" /usr/local/share/ca-certificates/mitm-ca.crt && sudo update-ca-certificates`,
+        );
+        return;
+      }
+      case 'export': {
+        const dest = args[1] ?? 'ca.crt';
+        const res = await this.module.exportCa({outputPath: dest, format: 'pem'});
+        if (res.success) {
+          this.writeLine(`[INFO] CA certificate exported to ${dest}.`);
+        } else {
+          this.writeLine(`[ERROR] Failed to export CA certificate: ${res.message}`);
+        }
+        return;
+      }
+      default:
+        this.writeLine(`[ERROR] Unknown ca subcommand: ${sub}. Use 'path' or 'export'.`);
+    }
+  }
+
+  async handleSysproxy(args: string[]): Promise<void> {
+    const sub = args[0]?.toLowerCase() ?? 'status';
+    switch (sub) {
+      case 'status': {
+        const active = this.module.getSystemProxyManager().isActive();
+        this.writeLine(`System proxy is currently ${active ? 'ENABLED' : 'DISABLED'}.`);
+        return;
+      }
+      case 'on': {
+        const status = this.module.status().data;
+        if (!status.running || !status.port) {
+          this.writeLine('[ERROR] Proxy server is not running. Start proxy first.');
+          return;
+        }
+        try {
+          await this.module.getSystemProxyManager().enable(status.port);
+          this.writeLine(`[INFO] System proxy enabled on 127.0.0.1:${status.port}.`);
+        } catch (err) {
+          this.writeLine(
+            `[ERROR] Failed to enable system proxy: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+        return;
+      }
+      case 'off': {
+        try {
+          await this.module.getSystemProxyManager().restore();
+          this.writeLine('[INFO] System proxy disabled.');
+        } catch (err) {
+          this.writeLine(
+            `[ERROR] Failed to disable system proxy: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+        return;
+      }
+      default:
+        this.writeLine(
+          `[ERROR] Unknown sysproxy subcommand: ${sub}. Use 'on', 'off', or 'status'.`,
+        );
+    }
+  }
+
+  async handleProc(args: string[]): Promise<void> {
+    const sub = args[0]?.toLowerCase() ?? 'ls';
+    switch (sub) {
+      case 'ls':
+      case 'list': {
+        const res = await this.module.listLocalProcesses();
+        const processes = res.data.processes;
+        this.writeLine(`Local processes (${processes.length}):`);
+        if (processes.length === 0) {
+          this.writeLine('  No network processes detected.');
+          return;
+        }
+        this.writeLine(`  ${'PID'.padEnd(8)} ${'NAME'.padEnd(25)} DISPLAY_NAME`);
+        this.writeLine(`  ${'-'.repeat(50)}`);
+        for (const p of processes) {
+          this.writeLine(
+            `  ${String(p.pid).padEnd(8)} ${p.name.padEnd(25)} ${p.displayName ?? '-'}`,
+          );
+        }
+        return;
+      }
+      case 'target': {
+        const target = args[1];
+        if (!target) {
+          this.writeLine('[ERROR] Usage: proc target <name|PID>');
+          return;
+        }
+        await this.module.configureLocalApps({enabled: true, targets: [target]});
+        this.writeLine(`[INFO] Targeted process traffic capture: ${target}`);
+        return;
+      }
+      case 'clear': {
+        await this.module.configureLocalApps({enabled: false, targets: []});
+        this.writeLine('[INFO] Cleared process targets, capturing all traffic.');
+        return;
+      }
+      default:
+        this.writeLine(`[ERROR] Unknown proc subcommand: ${sub}. Use 'ls', 'target', or 'clear'.`);
+    }
+  }
+
+  async handleHar(args: string[]): Promise<void> {
+    const sub = args[0]?.toLowerCase() ?? 'export';
+    let dest: string | undefined;
+    if (sub === 'export') {
+      dest = args[1];
+    } else {
+      dest = args[0];
+    }
+
+    if (!dest) {
+      dest = `./artifacts/proxy-${Date.now()}.har`;
+    }
+
+    const res = await this.module.exportHar({outputPath: dest});
+    if (res.success) {
+      this.writeLine(`[INFO] HAR exported ${res.data.entryCount} entries to ${dest}.`);
+    } else {
+      this.writeLine(`[ERROR] Failed to export HAR: ${res.message}`);
+    }
+  }
+
   handleStatus(): void {
     const status = this.module.status().data;
     const sysProxyActive = this.module.getSystemProxyManager().isActive();
@@ -617,6 +752,18 @@ export class ProxyCli {
       case 'filter':
         this.handleFilter(args);
         return true;
+      case 'ca':
+        await this.handleCa(args);
+        return true;
+      case 'sysproxy':
+        await this.handleSysproxy(args);
+        return true;
+      case 'proc':
+        await this.handleProc(args);
+        return true;
+      case 'har':
+        await this.handleHar(args);
+        return true;
       case 'help':
       case 'h':
       case '?':
@@ -653,6 +800,10 @@ export class ProxyCli {
     this.writeLine('  filter allow/block <h> Add host filter');
     this.writeLine('  filter rm <h>          Remove host filter');
     this.writeLine('  filter clear           Clear all host filters');
+    this.writeLine('  sysproxy [on|off|stat] Control system proxy interception');
+    this.writeLine('  ca [path|export]       Show root CA cert path or export cert');
+    this.writeLine('  proc [ls|target|clear] Inspect/filter local processes');
+    this.writeLine('  har [export] [path]    Export captured traffic to HAR file');
     this.writeLine('  clear                  Clear captured requests memory buffer');
     this.writeLine('  help [cmd]             Show help message');
     this.writeLine('  exit / quit / q        Exit CLI');

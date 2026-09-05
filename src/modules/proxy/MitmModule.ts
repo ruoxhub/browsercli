@@ -101,6 +101,14 @@ export class MitmModule {
     return this.systemProxy;
   }
 
+  async restoreSystemProxy(): Promise<void> {
+    await this.systemProxy.restore();
+  }
+
+  restoreSystemProxySync(): void {
+    this.systemProxy.restoreSync();
+  }
+
   getProcessConnectionTracker(): ProcessConnectionTracker {
     return this.processTracker;
   }
