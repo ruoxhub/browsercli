@@ -14,6 +14,8 @@ import type {
   BrowserConfig,
   ConnectResult,
   LlmTestResult,
+  LocalAppsStatus,
+  ProcessInfo,
   ProxyStatusPayload,
   ListMitmRequestsData,
   GetMitmRequestData,
@@ -230,6 +232,21 @@ export const api = {
 
   getProxyLocalIps(): Promise<{ips: string[]}> {
     return request<{ips: string[]}>('GET', '/api/proxy/ips');
+  },
+
+  getLocalApps(): Promise<LocalAppsStatus> {
+    return request<LocalAppsStatus>('GET', '/api/proxy/local-apps');
+  },
+
+  configureLocalApps(body: {
+    enabled?: boolean;
+    targets?: string[];
+  }): Promise<LocalAppsStatus> {
+    return request<LocalAppsStatus>('POST', '/api/proxy/local-apps', body);
+  },
+
+  listLocalProcesses(): Promise<{processes: ProcessInfo[]}> {
+    return request<{processes: ProcessInfo[]}>('GET', '/api/proxy/processes');
   },
 
   getSessionRequests(params?: {

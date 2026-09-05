@@ -10,6 +10,8 @@ import type {
   SessionRequestSummaryEvent,
   SessionRequestDetail,
   ProxyStatusPayload,
+  LocalAppsStatus,
+  ProcessInfo,
 } from '../lib/protocol';
 
 export interface PageInfo {
@@ -51,6 +53,11 @@ export interface ProxyState {
   toggleSelect: (id: string) => void;
   selectAllVisible: (ids: string[]) => void;
   clearSelection: () => void;
+  localApps: LocalAppsStatus | null;
+  processes: ProcessInfo[];
+  setLocalApps: (s: LocalAppsStatus | null) => void;
+  setProcesses: (list: ProcessInfo[]) => void;
+  refreshProcesses: () => Promise<void>;
 }
 
 export const useProxyStore = create<ProxyState>((set, get) => ({
@@ -69,6 +76,18 @@ export const useProxyStore = create<ProxyState>((set, get) => ({
   pages: [],
   selectedPageId: null,
   selectedIds: [],
+  localApps: null,
+  processes: [],
+  setLocalApps: localApps => set({localApps}),
+  setProcesses: processes => set({processes}),
+  refreshProcesses: async () => {
+    try {
+      const res = await api.listLocalProcesses();
+      set({processes: res.processes ?? []});
+    } catch {
+      set({processes: []});
+    }
+  },
 
   setRequests: requests => set({requests}),
 

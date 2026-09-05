@@ -22,6 +22,7 @@ import {api} from '../../lib/api';
 import type {SessionAnalysisMode} from '../../lib/protocol';
 import {useAnalysisStore} from '../../stores/analysis';
 import {useProxyStore} from '../../stores/proxy';
+import {LocalAppsControl} from './LocalAppsControl';
 
 interface ProxyControlBarProps {
   onOpenCaModal: () => void;
@@ -237,6 +238,8 @@ export const ProxyControlBar: React.FC<ProxyControlBarProps> = ({
               className="w-16 bg-transparent text-xs font-mono text-[var(--color-text-primary)] focus:outline-none disabled:text-[var(--color-text-muted)]"
             />
           </div>
+
+          <LocalAppsControl />
 
           {/* Status Badge */}
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[var(--color-bg-primary)]/70 border border-[var(--color-border-default)]">
