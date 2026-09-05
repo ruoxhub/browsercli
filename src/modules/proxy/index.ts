@@ -23,6 +23,7 @@ export {
   isBinaryContentType,
 } from './body.js';
 export {normalizeHost} from './hostFilter.js';
+export {matchesProcessName} from './processMatch.js';
 export {
   parseSocks5Url,
   connectSocks5,
@@ -34,6 +35,9 @@ export {
 
 // 类型
 export type {
+  ClientProcessMeta,
+  LocalAppsConfig,
+  LocalAppsStatus,
   CapturedExchange,
   CapturedRequest,
   MitmMethodResult,

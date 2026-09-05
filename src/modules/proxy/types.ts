@@ -4,6 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+export interface ClientProcessMeta {
+  pid: number;
+  name: string;
+  path?: string;
+}
+
 /** 服务器回调产生的原始捕获记录（无稳定 id）。 */
 export interface CapturedExchange {
   requestId: string;
@@ -29,6 +35,19 @@ export interface CapturedExchange {
   responseBodySize?: number;
   /** 二进制且未截断时，缓冲字节的 base64（≤ MAX_BODY_SIZE）。 */
   responseBodyBase64?: string | null;
+  /** 发起请求的客户端本地进程元数据（Local Apps 模式填充）。 */
+  clientProcess?: ClientProcessMeta;
+}
+
+export interface LocalAppsConfig {
+  enabled: boolean;
+  targets: string[]; // 空数组代表全部进程
+  systemProxyActive: boolean;
+}
+
+export interface LocalAppsStatus extends LocalAppsConfig {
+  trackerDegraded: boolean;
+  systemProxyUnsupported: boolean;
 }
 
 /** ProxyStore 中带稳定 id 的存储记录。 */
