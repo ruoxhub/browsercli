@@ -33,12 +33,27 @@ export class ProxyStore {
     return record;
   }
 
+  addRequest(request: CapturedExchange | CapturedRequest): CapturedRequest {
+    // SAFETY: Allows test payloads or external consumers to inject pre-assigned ids.
+    const customId = (request as {id?: unknown}).id;
+    const record = {
+      ...request,
+      id: customId !== undefined ? (customId as number) : this.nextId++,
+    } as CapturedRequest;
+    if (this.records.length >= this.maxRecords) {
+      this.records.shift();
+    }
+    this.records.push(record);
+    this.events.emit('capture', record);
+    return record;
+  }
+
   list(): CapturedRequest[] {
     return [...this.records];
   }
 
-  get(id: number): CapturedRequest | undefined {
-    return this.records.find(r => r.id === id);
+  get(id: number | string): CapturedRequest | undefined {
+    return this.records.find(r => String(r.id) === String(id));
   }
 
   clear(): void {

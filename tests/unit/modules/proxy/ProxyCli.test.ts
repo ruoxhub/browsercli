@@ -83,4 +83,56 @@ describe('ProxyCli - Foundation & Tokenizer', () => {
     await cli.handleCommand('status');
     assert.match(outData, /STOPPED/i);
   });
+
+  it('支持 ls, show, curl, clear 命令', async () => {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    let outData = '';
+    output.on('data', chunk => {
+      outData += chunk.toString();
+    });
+
+    const module = new MitmModule();
+    // 注入一条测试请求到 store
+    // SAFETY: Access private store for mock data injection in unit test.
+    const store = (module as unknown as {store: {addRequest: (r: unknown) => void}}).store;
+    store.addRequest({
+      id: 'req_1',
+      timestamp: Date.now(),
+      method: 'POST',
+      url: 'https://api.example.com/v1/login',
+      clientIp: '127.0.0.1',
+      statusCode: 200,
+      requestHeaders: {'content-type': 'application/json'},
+      requestBody: '{"user":"admin"}',
+      responseHeaders: {'content-type': 'application/json'},
+      responseBody: '{"code":0,"token":"abc"}',
+      durationMs: 45,
+    });
+
+    const cli = new ProxyCli(module, input, output);
+
+    // 1. ls
+    outData = '';
+    await cli.handleCommand('ls');
+    assert.match(outData, /req_1/);
+    assert.match(outData, /POST/);
+    assert.match(outData, /200/);
+
+    // 2. show req_1
+    outData = '';
+    await cli.handleCommand('show req_1');
+    assert.match(outData, /Request #req_1/);
+    assert.match(outData, /token/);
+
+    // 3. curl req_1
+    outData = '';
+    await cli.handleCommand('curl req_1');
+    assert.match(outData, /curl -X POST/);
+
+    // 4. clear
+    outData = '';
+    await cli.handleCommand('clear');
+    assert.match(outData, /Cleared/i);
+  });
 });

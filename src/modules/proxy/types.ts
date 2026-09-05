@@ -27,6 +27,10 @@ export interface CapturedExchange {
   isWebSocket: boolean;
   truncated: boolean;
   timestamp: number;
+  /** 客户端 IP 地址（若可用）。 */
+  clientIp?: string;
+  /** 请求往返耗时（毫秒）。 */
+  durationMs?: number;
   /** 任一改写规则命中，默认 false。Session 水槽不摄入带此标记的 exchange（见 MitmModule.recordExchange）。 */
   modified: boolean;
   /** 命中的规则 id（可空），供证据追溯。 */

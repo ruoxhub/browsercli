@@ -35,6 +35,22 @@ export function tokenizeLine(line: string): string[] {
   return tokens;
 }
 
+function formatBody(body: string | null): string {
+  if (body === null || body === '') return '(empty)';
+  if (body.length > 65536) {
+    return (
+      body.slice(0, 65536) +
+      '\n... [Truncated: >64KB, use "har export" for full payload]'
+    );
+  }
+  try {
+    const parsed = JSON.parse(body);
+    return JSON.stringify(parsed, null, 2);
+  } catch {
+    return body;
+  }
+}
+
 export class ProxyCli {
   protected rl: readline.Interface | null = null;
   protected tailEnabled = false;
@@ -110,6 +126,161 @@ export class ProxyCli {
     await this.handleStart(args);
   }
 
+  handleLs(args: string[]): void {
+    let limit = 15;
+    let filterStr = '';
+
+    if (args.length > 0) {
+      const parsedNum = Number(args[0]);
+      if (!Number.isNaN(parsedNum) && parsedNum > 0) {
+        limit = Math.min(100, parsedNum);
+        filterStr = args.slice(1).join(' ');
+      } else {
+        filterStr = args.join(' ');
+      }
+    }
+
+    let records = this.module.getStore().list();
+    if (filterStr) {
+      const f = filterStr.toLowerCase();
+      records = records.filter(
+        r =>
+          r.url.toLowerCase().includes(f) ||
+          r.method.toLowerCase().includes(f) ||
+          String(r.id).toLowerCase().includes(f) ||
+          String(r.statusCode).includes(f),
+      );
+    }
+
+    const items = records.slice(-limit);
+    if (items.length === 0) {
+      this.writeLine('No captured requests found.');
+      return;
+    }
+
+    this.writeLine(
+      `${'ID'.padEnd(8)} ${'METHOD'.padEnd(7)} ${'STATUS'.padEnd(7)} ${'DURATION'.padEnd(9)} ${'SIZE'.padEnd(8)} URL`,
+    );
+    this.writeLine('-'.repeat(80));
+
+    for (const r of items) {
+      const idStr = `#${r.id}`.padEnd(8);
+      const methodStr = r.method.padEnd(7);
+      const statusStr = String(r.statusCode).padEnd(7);
+      const durationStr = (r.durationMs !== undefined ? `${r.durationMs}ms` : '-').padEnd(9);
+      const bodyLen = r.responseBody ? r.responseBody.length : (r.responseBodySize ?? 0);
+      const sizeStr = `${bodyLen}B`.padEnd(8);
+      const maxUrlLen = 80 - 45;
+      const urlStr = r.url.length > maxUrlLen ? `${r.url.slice(0, maxUrlLen - 3)}...` : r.url;
+
+      this.writeLine(
+        `${idStr} ${methodStr} ${statusStr} ${durationStr} ${sizeStr} ${urlStr}`,
+      );
+    }
+  }
+
+  handleShow(args: string[]): void {
+    const records = this.module.getStore().list();
+    if (records.length === 0) {
+      this.writeLine('[WARN] No requests captured yet.');
+      return;
+    }
+
+    let targetId: string | null = null;
+    let part = 'all';
+
+    const validParts = ['all', 'req', 'res', 'headers', 'body'];
+    if (args.length > 0) {
+      if (validParts.includes(args[0].toLowerCase())) {
+        part = args[0].toLowerCase();
+        targetId = this.selectedId ?? String(records.at(-1)?.id);
+      } else {
+        targetId = args[0].replace(/^#/, '');
+        if (args.length > 1 && validParts.includes(args[1].toLowerCase())) {
+          part = args[1].toLowerCase();
+        }
+      }
+    } else {
+      targetId = this.selectedId ?? String(records.at(-1)?.id);
+    }
+
+    const record = this.module.getStore().get(targetId);
+    if (!record) {
+      this.writeLine(`[ERROR] Request #${targetId} not found.`);
+      return;
+    }
+
+    this.selectedId = String(record.id);
+
+    this.writeLine(`=== Request #${record.id} [${record.method} ${record.url}] ===`);
+    this.writeLine('[General]');
+    this.writeLine(`  URL         : ${record.url}`);
+    this.writeLine(`  Method      : ${record.method}`);
+    this.writeLine(`  Status      : ${record.statusCode}`);
+    this.writeLine(`  Duration    : ${record.durationMs ?? 0}ms`);
+    this.writeLine(`  Client IP   : ${record.clientIp ?? '-'}`);
+    this.writeLine(`  Time        : ${new Date(record.timestamp).toISOString()}`);
+
+    const showReq = part === 'all' || part === 'req';
+    const showRes = part === 'all' || part === 'res';
+    const showHeaders = part === 'headers';
+    const showBody = part === 'body';
+
+    if (showReq || showHeaders) {
+      this.writeLine('[Request Headers]');
+      for (const [k, v] of Object.entries(record.requestHeaders)) {
+        this.writeLine(`  ${k}: ${v}`);
+      }
+    }
+
+    if (showReq || showBody) {
+      this.writeLine('[Request Body]');
+      this.writeLine(formatBody(record.requestBody));
+    }
+
+    if (showRes || showHeaders) {
+      this.writeLine('[Response Headers]');
+      for (const [k, v] of Object.entries(record.responseHeaders)) {
+        this.writeLine(`  ${k}: ${v}`);
+      }
+    }
+
+    if (showRes || showBody) {
+      this.writeLine('[Response Body]');
+      this.writeLine(formatBody(record.responseBody));
+    }
+  }
+
+  async handleCurl(args: string[]): Promise<void> {
+    const records = this.module.getStore().list();
+    if (records.length === 0) {
+      this.writeLine('[WARN] No requests captured yet.');
+      return;
+    }
+
+    const targetId = args[0]
+      ? args[0].replace(/^#/, '')
+      : (this.selectedId ?? String(records.at(-1)?.id));
+
+    // SAFETY: Delegate to MitmModule getRequest which accepts number or injected string id at runtime.
+    const res = await this.module.getRequest({
+      id: targetId as unknown as number,
+      format: 'curl',
+    });
+
+    if (res.success && res.data.curl) {
+      this.writeLine(res.data.curl);
+    } else {
+      this.writeLine(`[ERROR] Failed to generate curl for request #${targetId}: ${res.message}`);
+    }
+  }
+
+  handleClear(): void {
+    const res = this.module.clear();
+    this.selectedId = null;
+    this.writeLine(`[INFO] Cleared ${res.data.clearedCount} captured requests.`);
+  }
+
   handleStatus(): void {
     const status = this.module.status().data;
     const sysProxyActive = this.module.getSystemProxyManager().isActive();
@@ -149,6 +320,22 @@ export class ProxyCli {
       case 'status':
         this.handleStatus();
         return true;
+      case 'ls':
+      case 'l':
+      case 'list':
+        this.handleLs(args);
+        return true;
+      case 'show':
+      case 's':
+        this.handleShow(args);
+        return true;
+      case 'curl':
+      case 'c':
+        await this.handleCurl(args);
+        return true;
+      case 'clear':
+        this.handleClear();
+        return true;
       case 'help':
       case 'h':
       case '?':
@@ -173,6 +360,10 @@ export class ProxyCli {
     this.writeLine('  stop                   Stop MITM proxy server');
     this.writeLine('  restart [port] [upstr] Restart MITM proxy server');
     this.writeLine('  status                 Show proxy runtime status dashboard');
+    this.writeLine('  ls [limit] [filter]    List captured requests (alias: l, list)');
+    this.writeLine('  show [id] [part]       Show request/response details (alias: s)');
+    this.writeLine('  curl [id]              Generate curl replay command (alias: c)');
+    this.writeLine('  clear                  Clear captured requests memory buffer');
     this.writeLine('  help [cmd]             Show help message');
     this.writeLine('  exit / quit / q        Exit CLI');
   }
