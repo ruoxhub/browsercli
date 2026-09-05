@@ -266,5 +266,67 @@ export function createProxyRoutes(
         }
       },
     ],
+    [
+      'GET /api/proxy/processes',
+      async (_req, res) => {
+        try {
+          const result = await mitmModule.listLocalProcesses();
+          sendJson(res, result.data);
+        } catch (err) {
+          sendUnexpected(res, err);
+        }
+      },
+    ],
+    [
+      'GET /api/proxy/local-apps',
+      (_req, res) => {
+        try {
+          sendJson(res, mitmModule.getLocalAppsStatus());
+        } catch (err) {
+          sendUnexpected(res, err);
+        }
+      },
+    ],
+    [
+      'POST /api/proxy/local-apps',
+      async (req, res) => {
+        let enabled: boolean | undefined;
+        let targets: string[] | undefined;
+        try {
+          const body = (await readJsonBody(req)) as {
+            enabled?: boolean;
+            targets?: string[];
+          };
+          if (typeof body === 'object' && body !== null) {
+            if (typeof body.enabled === 'boolean') enabled = body.enabled;
+            if (Array.isArray(body.targets)) {
+              targets = body.targets.filter(
+                (t): t is string => typeof t === 'string',
+              );
+            }
+          }
+        } catch {
+          sendError(res, 'INVALID_JSON', '请求体不是合法 JSON', 400);
+          return;
+        }
+        try {
+          const result = await mitmModule.configureLocalApps({
+            enabled,
+            targets,
+          });
+          wsHub.broadcast('proxy.status', {
+            ...mitmModule.status().data,
+            localApps: result.data,
+          });
+          if (!result.success) {
+            sendError(res, 'LOCAL_APPS_ERROR', result.message, 400);
+            return;
+          }
+          sendJson(res, result.data);
+        } catch (err) {
+          sendUnexpected(res, err);
+        }
+      },
+    ],
   ]);
 }

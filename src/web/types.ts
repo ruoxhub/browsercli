@@ -14,6 +14,13 @@
  * 任何字段变更需同步前端协议引用方（如 ws.ts / api.ts 的使用处）。
  */
 
+import type {BrowserConfig, GlobalConfig} from '../config/schema.js';
+import type {LocalAppsStatus} from '../modules/proxy/types.js';
+import type {
+  CapturedRequestSummary,
+  CaptureSource,
+} from '../modules/session/types.js';
+
 // ==================== HTTP API ====================
 
 export interface ApiResponse<T = unknown> {
@@ -154,6 +161,7 @@ export interface ProxyStatusPayload {
   capturedCount: number;
   caInitialized: boolean;
   caCertPath: string;
+  localApps?: LocalAppsStatus;
 }
 
 export interface ProxyRequestSummaryEvent {
@@ -247,6 +255,13 @@ export interface InvocationRecord {
 
 // ==================== MITM Proxy Data Types ====================
 
+export type {
+  ClientProcessMeta,
+  LocalAppsConfig,
+  LocalAppsStatus,
+  ProcessInfo,
+} from '../modules/proxy/types.js';
+
 export interface MitmRequestSummary {
   id: number;
   method: string;
@@ -283,12 +298,6 @@ export interface GetMitmRequestData {
 }
 
 // ==================== Session Capture Types (channel: session.request) ====================
-
-import type {BrowserConfig, GlobalConfig} from '../config/schema.js';
-import type {
-  CapturedRequestSummary,
-  CaptureSource,
-} from '../modules/session/types.js';
 
 /**
  * WS 推送与 REST 列表项的摘要投影。

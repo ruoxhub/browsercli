@@ -50,6 +50,13 @@ export interface LocalAppsStatus extends LocalAppsConfig {
   systemProxyUnsupported: boolean;
 }
 
+export interface ProcessInfo {
+  pid: number;
+  name: string;
+  path?: string;
+  displayName?: string;
+}
+
 /** ProxyStore 中带稳定 id 的存储记录。 */
 export type CapturedRequest = CapturedExchange & {id: number};
 

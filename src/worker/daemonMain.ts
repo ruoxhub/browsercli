@@ -102,6 +102,18 @@ export async function runDaemon(plan: DaemonPlan): Promise<DaemonRunResult> {
   runtime.contextProvider = contextProvider;
   await contextProvider.init();
 
+  // Local Apps 残留自检（spec §6.1）：上次崩溃未还原的系统代理在此清理。
+  try {
+    const cleaned = await runtime.mitmModule
+      .getSystemProxyManager()
+      .checkResidual();
+    if (cleaned) {
+      console.warn('[Daemon] 检测到上次会话残留的系统代理配置，已自动还原');
+    }
+  } catch {
+    // 非 Windows 平台直接跳过
+  }
+
   if (shouldAutoConnectOnStartup(getRuntimeConfigStore().get())) {
     try {
       await connectBrowser(contextProvider, getBrowserManagerConfig());

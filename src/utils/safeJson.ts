@@ -31,7 +31,7 @@ export function safeStringify(
   const seen = new WeakSet();
   let depth = 0;
 
-  const replacer = (key: string, value: any): any => {
+  const replacer = (_key: string, value: any): any => {
     if (value === undefined) {
       return '[undefined]';
     }

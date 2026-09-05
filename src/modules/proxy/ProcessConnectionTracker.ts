@@ -9,18 +9,13 @@ import {promisify} from 'node:util';
 
 import {logger} from '../../utils/logger.js';
 
-import type {ClientProcessMeta} from './types.js';
+import type {ClientProcessMeta, ProcessInfo} from './types.js';
 
 const execFileAsync = promisify(execFile);
 
 export type RunCommand = (cmd: string, args: string[]) => Promise<string>;
 
-export interface ProcessInfo {
-  pid: number;
-  name: string;
-  path?: string;
-  displayName?: string;
-}
+export type {ProcessInfo};
 
 const PORT_TTL_MS = 1500;
 const PID_INFO_TTL_MS = 30_000;

@@ -13,6 +13,7 @@ import path from 'node:path';
 import {afterEach, beforeEach, describe, it} from 'node:test';
 
 import {MitmModule} from '../../../../src/modules/proxy/MitmModule.js';
+import type {SystemProxyManager} from '../../../../src/modules/proxy/SystemProxyManager.js';
 import {RestRouter} from '../../../../src/web/RestRouter.js';
 import {createProxyRoutes} from '../../../../src/web/routes/proxy.js';
 import {WsHub} from '../../../../src/web/ws/WsHub.js';
@@ -76,7 +77,14 @@ describe('Proxy REST Routes', () => {
 
   beforeEach(() => {
     tmpDir = mkdtempSync(path.join(os.tmpdir(), 'proxy-route-test-'));
-    mitmModule = new MitmModule(tmpDir);
+    const mockSystemProxy = {
+      isActive: () => false,
+      enable: async () => undefined,
+      restore: async () => undefined,
+      restoreSync: () => undefined,
+      checkResidual: async () => false,
+    } as unknown as SystemProxyManager;
+    mitmModule = new MitmModule(tmpDir, undefined, mockSystemProxy);
     wsHub = new WsHub();
     router = new RestRouter();
     router.mount(createProxyRoutes(mitmModule, wsHub));
@@ -99,6 +107,9 @@ describe('Proxy REST Routes', () => {
     assert.ok(routes.has('DELETE /api/proxy/requests'));
     assert.ok(routes.has('GET /api/proxy/ca/download'));
     assert.ok(routes.has('GET /api/proxy/ips'));
+    assert.ok(routes.has('GET /api/proxy/processes'));
+    assert.ok(routes.has('GET /api/proxy/local-apps'));
+    assert.ok(routes.has('POST /api/proxy/local-apps'));
   });
 
   it('GET /api/proxy/status returns status and CA info', async () => {
@@ -368,5 +379,79 @@ describe('Proxy REST Routes', () => {
     const parsed = JSON.parse(res.body.toString());
     assert.strictEqual(parsed.success, true);
     assert.ok(Array.isArray(parsed.data.ips));
+  });
+});
+
+describe('Local Apps REST endpoints', () => {
+  let tmpDir: string;
+  let mitmModule: MitmModule;
+  let wsHub: WsHub;
+  let router: RestRouter;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(
+      path.join(os.tmpdir(), 'proxy-route-local-apps-test-'),
+    );
+    const mockSystemProxy = {
+      isActive: () => false,
+      enable: async () => undefined,
+      restore: async () => undefined,
+      restoreSync: () => undefined,
+      checkResidual: async () => false,
+    } as unknown as SystemProxyManager;
+    mitmModule = new MitmModule(tmpDir, undefined, mockSystemProxy);
+    wsHub = new WsHub();
+    router = new RestRouter();
+    router.mount(createProxyRoutes(mitmModule, wsHub));
+  });
+
+  afterEach(async () => {
+    await mitmModule.stop();
+    if (existsSync(tmpDir)) {
+      rmSync(tmpDir, {recursive: true, force: true});
+    }
+  });
+
+  it('GET /api/proxy/local-apps 返回初始配置', async () => {
+    const res = mockRes();
+    const matched = await router.dispatch(
+      mockReq('GET', '/api/proxy/local-apps'),
+      res as unknown as ServerResponse,
+      '/api/proxy/local-apps',
+    );
+    assert.strictEqual(matched, true);
+    const body = JSON.parse(res.body.toString());
+    assert.strictEqual(body.success, true);
+    assert.strictEqual(body.data.enabled, false);
+    assert.deepStrictEqual(body.data.targets, []);
+    assert.strictEqual(body.data.systemProxyActive, false);
+  });
+
+  it('POST /api/proxy/local-apps 只更新 targets 时返回更新后配置', async () => {
+    const res = mockRes();
+    const matched = await router.dispatch(
+      mockReq('POST', '/api/proxy/local-apps', {targets: ['wechat.exe']}),
+      res as unknown as ServerResponse,
+      '/api/proxy/local-apps',
+    );
+    assert.strictEqual(matched, true);
+    assert.strictEqual(res.statusCode, 200);
+    const body = JSON.parse(res.body.toString());
+    assert.strictEqual(body.success, true);
+    assert.strictEqual(body.data.enabled, false);
+    assert.deepStrictEqual(body.data.targets, ['wechat.exe']);
+  });
+
+  it('GET /api/proxy/processes 返回列表结构', async () => {
+    const res = mockRes();
+    const matched = await router.dispatch(
+      mockReq('GET', '/api/proxy/processes'),
+      res as unknown as ServerResponse,
+      '/api/proxy/processes',
+    );
+    assert.strictEqual(matched, true);
+    const body = JSON.parse(res.body.toString());
+    assert.strictEqual(body.success, true);
+    assert.ok(Array.isArray(body.data.processes));
   });
 });

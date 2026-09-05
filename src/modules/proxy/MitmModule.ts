@@ -15,8 +15,13 @@ import {formatCurl, stripManagedHeaders} from '../network/replayEngine.js';
 import {CaManager, resolveMitmCertsDir} from './CaManager.js';
 import {normalizeHost} from './hostFilter.js';
 import {MitmProxyServer} from './MitmProxyServer.js';
+import {
+  ProcessConnectionTracker,
+  type ProcessInfo,
+} from './ProcessConnectionTracker.js';
 import {ProxyStore} from './ProxyStore.js';
 import {MitmRuleEngine, matchesPredicate} from './rewrite.js';
+import {SystemProxyManager} from './SystemProxyManager.js';
 import type {
   AddHostFilterData,
   AddHostFilterParams,
@@ -37,6 +42,8 @@ import type {
   ListMitmRequestsData,
   ListMitmRequestsParams,
   ListMitmRulesData,
+  LocalAppsConfig,
+  LocalAppsStatus,
   MitmMethodResult,
   MitmProxyStatusData,
   MitmRewriteRule,
@@ -61,19 +68,120 @@ export class MitmModule {
   private readonly allowHosts = new Set<string>();
   private readonly blockHosts = new Set<string>();
   private server: MitmProxyServer | null = null;
+  private readonly systemProxy: SystemProxyManager;
+  private readonly processTracker: ProcessConnectionTracker;
+  private localApps: LocalAppsConfig = {
+    enabled: false,
+    targets: [],
+    systemProxyActive: false,
+  };
+  private systemProxyUnsupported = false;
 
   /**
    * @param certsDir CA 证书目录
    * @param onExchange 可选的 exchange 水槽（Session 抓包链路）。
    *   缺省表示只走旧链路；水槽内抛错被吞掉，不影响 ProxyStore（spec §4 / R3）。
+   * @param systemProxy 可选的系统代理管理器（测试注入用）。
+   * @param processTracker 可选的进程连接跟踪器（测试注入用）。
    */
   constructor(
     certsDir: string = resolveMitmCertsDir(),
     private readonly onExchange?: (exchange: CapturedExchange) => void,
+    systemProxy?: SystemProxyManager,
+    processTracker?: ProcessConnectionTracker,
   ) {
     this.store = new ProxyStore();
     this.caManager = new CaManager(certsDir);
     this.rules = new MitmRuleEngine();
+    this.systemProxy = systemProxy ?? new SystemProxyManager();
+    this.processTracker = processTracker ?? new ProcessConnectionTracker();
+  }
+
+  getSystemProxyManager(): SystemProxyManager {
+    return this.systemProxy;
+  }
+
+  getProcessConnectionTracker(): ProcessConnectionTracker {
+    return this.processTracker;
+  }
+
+  getLocalAppsStatus(): LocalAppsStatus {
+    return {
+      ...this.localApps,
+      trackerDegraded: this.processTracker.isDegraded(),
+      systemProxyUnsupported:
+        this.systemProxyUnsupported || process.platform !== 'win32',
+    };
+  }
+
+  async configureLocalApps(params: {
+    enabled?: boolean;
+    targets?: string[];
+    port?: number;
+  }): Promise<MitmMethodResult<LocalAppsStatus>> {
+    try {
+      if (params.targets !== undefined) this.localApps.targets = params.targets;
+      if (params.enabled === undefined) {
+        return {
+          success: true,
+          message: 'Local Apps 配置已更新',
+          data: this.getLocalAppsStatus(),
+        };
+      }
+      if (params.enabled) {
+        if (!this.server) {
+          const started = await this.start(params.port);
+          if (!started.success) {
+            return {
+              success: false,
+              message: started.message,
+              data: this.getLocalAppsStatus(),
+            };
+          }
+        }
+        const port = this.server?.getPort();
+        if (port === null || port === undefined) {
+          throw new Error('代理端口未知');
+        }
+        await this.systemProxy.enable(port);
+        this.processTracker.startBackgroundRefresh();
+        this.localApps.enabled = true;
+        this.localApps.systemProxyActive = true;
+      } else {
+        await this.systemProxy.restore();
+        this.processTracker.stopBackgroundRefresh();
+        this.localApps.enabled = false;
+        this.localApps.systemProxyActive = false;
+      }
+      return {
+        success: true,
+        message: `Local Apps 已${params.enabled ? '开启' : '关闭'}`,
+        data: this.getLocalAppsStatus(),
+      };
+    } catch (err) {
+      if (
+        err instanceof Error &&
+        err.message.includes('systemProxyUnsupported')
+      ) {
+        this.systemProxyUnsupported = true;
+      }
+      return {
+        success: false,
+        message: err instanceof Error ? err.message : String(err),
+        data: this.getLocalAppsStatus(),
+      };
+    }
+  }
+
+  async listLocalProcesses(): Promise<
+    MitmMethodResult<{processes: ProcessInfo[]}>
+  > {
+    const processes = await this.processTracker.listActiveNetworkProcesses();
+    return {
+      success: true,
+      message: `共 ${processes.length} 个联网进程`,
+      data: {processes},
+    };
   }
 
   getStore(): ProxyStore {
@@ -208,6 +316,8 @@ export class MitmModule {
           this.rules,
           host => this.shouldBypass(host),
           effectiveUpstreamProxy,
+          this.processTracker,
+          () => this.localApps,
         );
       }
       await this.server.start(port);
@@ -240,6 +350,16 @@ export class MitmModule {
 
   async stop(): Promise<MitmMethodResult<MitmProxyStatusData>> {
     try {
+      if (this.localApps.enabled || this.systemProxy.isActive()) {
+        try {
+          await this.systemProxy.restore();
+        } catch {
+          /* 已尽力 */
+        }
+        this.processTracker.stopBackgroundRefresh();
+        this.localApps.enabled = false;
+        this.localApps.systemProxyActive = false;
+      }
       await this.server?.stop();
       this.server = null;
       return {
