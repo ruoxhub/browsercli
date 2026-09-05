@@ -317,6 +317,12 @@ export class ConsoleServer {
           statusCode: record.statusCode,
           contentType: record.contentType,
           timestamp: record.timestamp,
+          ...(record.clientProcess && {
+            clientProcess: {
+              pid: record.clientProcess.pid,
+              name: record.clientProcess.name,
+            },
+          }),
         });
       };
       proxyStore.events.on('capture', this.onProxyCaptureListener);

@@ -172,6 +172,7 @@ export interface ProxyRequestSummaryEvent {
   contentType: string | null;
   timestamp: number;
   contentLength?: number;
+  clientProcess?: {pid: number; name: string};
 }
 
 // ==================== Worker Status (state channel: worker.status) ====================

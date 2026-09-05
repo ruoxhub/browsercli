@@ -84,4 +84,30 @@ describe('MitmRequestAdapter', () => {
     );
     assert.strictEqual(input.requestHeaders, '{}');
   });
+
+  it('clientProcess 存在时序列化进 initiator', () => {
+    const input = toCapturedRequestInput(
+      makeExchange({
+        clientProcess: {
+          pid: 14220,
+          name: 'WeChat.exe',
+          path: 'C:\\x\\WeChat.exe',
+        },
+      }),
+    );
+    assert.strictEqual(
+      input.initiator,
+      JSON.stringify({
+        type: 'clientProcess',
+        pid: 14220,
+        name: 'WeChat.exe',
+        path: 'C:\\x\\WeChat.exe',
+      }),
+    );
+  });
+
+  it('无 clientProcess 时 initiator 保持 null', () => {
+    const input = toCapturedRequestInput(makeExchange());
+    assert.strictEqual(input.initiator, null);
+  });
 });

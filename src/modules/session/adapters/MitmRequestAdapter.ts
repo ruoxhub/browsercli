@@ -34,7 +34,9 @@ export function toCapturedRequestInput(
     responseHeaders: stringifyHeaders(exchange.responseHeaders),
     responseBody: exchange.responseBody,
     contentType: exchange.contentType,
-    initiator: null,
+    initiator: exchange.clientProcess
+      ? JSON.stringify({type: 'clientProcess', ...exchange.clientProcess})
+      : null,
     durationMs: 0,
     isStreaming: toFlag(exchange.isStreaming),
     isWebSocket: toFlag(exchange.isWebSocket),
