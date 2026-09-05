@@ -8,6 +8,7 @@ import React, {memo, useEffect, useMemo, useRef} from 'react';
 
 import type {SessionRequestSummaryEvent} from '../../lib/protocol';
 import {useProxyStore} from '../../stores/proxy';
+import {parseClientProcess} from './clientProcess';
 
 interface ProxyRequestListProps {
   onSelect?: (id: string) => void;
@@ -138,6 +139,19 @@ const RequestRow = memo(function RequestRow({
         >
           {req.statusCode || '-'}
         </span>
+
+        {/* Client Process badge */}
+        {(() => {
+          const cp = parseClientProcess(req.initiator);
+          return cp ? (
+            <span
+              className="px-1.5 py-0.5 rounded text-[9px] font-mono border shrink-0 bg-[var(--color-bg-secondary)] text-[var(--color-text-secondary)] border-[var(--color-border-default)]"
+              title={`pid: ${cp.pid}`}
+            >
+              💬 {cp.name}
+            </span>
+          ) : null;
+        })()}
 
         {/* URL Display */}
         <div className="min-w-0 flex-1">

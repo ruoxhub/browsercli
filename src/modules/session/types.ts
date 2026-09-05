@@ -95,6 +95,7 @@ export interface CapturedRequestSummary {
   statusCode: number;
   contentType: string | null;
   source: CaptureSource;
+  initiator: string | null;
   truncated: number;
   isStreaming: number;
 }

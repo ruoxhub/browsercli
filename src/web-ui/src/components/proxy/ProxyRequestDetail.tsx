@@ -19,6 +19,7 @@ import React, {useState} from 'react';
 
 import type {SessionRequestDetail} from '../../lib/protocol';
 import {useProxyStore} from '../../stores/proxy';
+import {parseClientProcess} from './clientProcess';
 
 type DetailTab =
   | 'general'
@@ -327,6 +328,46 @@ export const ProxyRequestDetail: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {(() => {
+              const cp = parseClientProcess(selectedDetail.initiator);
+              if (!cp) return null;
+              return (
+                <div className="p-4 rounded-xl bg-[var(--color-bg-secondary)] border border-[var(--color-border-default)] space-y-3">
+                  <h3 className="text-xs font-bold text-[var(--color-text-secondary)] uppercase tracking-wider">
+                    Client Process
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs font-mono">
+                    <div>
+                      <span className="text-[var(--color-text-muted)] block text-[10px]">
+                        Process Name
+                      </span>
+                      <span className="text-[var(--color-text-primary)] font-bold">
+                        {cp.name}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[var(--color-text-muted)] block text-[10px]">
+                        PID
+                      </span>
+                      <span className="text-[var(--color-text-primary)]">
+                        {cp.pid}
+                      </span>
+                    </div>
+                    {cp.path && (
+                      <div className="col-span-2">
+                        <span className="text-[var(--color-text-muted)] block text-[10px]">
+                          Executable Path
+                        </span>
+                        <span className="text-[var(--color-text-primary)] break-all select-all">
+                          {cp.path}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
 

@@ -62,6 +62,7 @@ type RequestSummaryDbRow = Pick<
   | 'method'
   | 'url'
   | 'source'
+  | 'initiator'
   | 'status_code'
   | 'content_type'
   | 'truncated'
@@ -328,7 +329,7 @@ export class SqliteSessionStore implements SessionStore {
 
     const rows = this.db
       .prepare(
-        `SELECT id, session_id, sequence, timestamp, method, url, source,
+        `SELECT id, session_id, sequence, timestamp, method, url, source, initiator,
                 status_code, content_type, truncated, is_streaming
          FROM captured_requests
          WHERE ${clauses.join(' AND ')}
@@ -348,6 +349,7 @@ export class SqliteSessionStore implements SessionStore {
         statusCode: r.status_code,
         contentType: r.content_type,
         source: r.source,
+        initiator: r.initiator,
         truncated: r.truncated,
         isStreaming: r.is_streaming,
       }),

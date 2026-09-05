@@ -17,6 +17,7 @@ export type SummarySource = Pick<
   | 'statusCode'
   | 'contentType'
   | 'source'
+  | 'initiator'
   | 'truncated'
   | 'isStreaming'
 >;
@@ -36,6 +37,7 @@ export function toSummary(row: SummarySource): CapturedRequestSummary {
     statusCode: row.statusCode,
     contentType: row.contentType,
     source: row.source,
+    initiator: row.initiator,
     truncated: row.truncated,
     isStreaming: row.isStreaming,
   };
