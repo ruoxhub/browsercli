@@ -7,6 +7,7 @@
 import {readFileSync} from 'node:fs';
 import {writeFile} from 'node:fs/promises';
 
+import {getEnvValue} from '../../config/resolver.js';
 import {logger} from '../../utils/logger.js';
 import type {BuiltReplayRequest} from '../network/NetworkTypes.js';
 import {formatCurl, stripManagedHeaders} from '../network/replayEngine.js';
@@ -36,7 +37,6 @@ import type {
   ListMitmRequestsData,
   ListMitmRequestsParams,
   ListMitmRulesData,
-  MitmInterceptor,
   MitmMethodResult,
   MitmProxyStatusData,
   MitmRewriteRule,
@@ -190,7 +190,13 @@ export class MitmModule {
 
   async start(
     port: number = DEFAULT_PORT,
+    upstreamProxy?: string,
   ): Promise<MitmMethodResult<StartMitmProxyData>> {
+    const effectiveUpstreamProxy =
+      upstreamProxy ??
+      getEnvValue('BROWSER_MITM_UPSTREAM_PROXY') ??
+      getEnvValue('ALL_PROXY');
+
     try {
       await this.caManager.init();
       if (!this.server) {
@@ -201,16 +207,21 @@ export class MitmModule {
           },
           this.rules,
           host => this.shouldBypass(host),
+          effectiveUpstreamProxy,
         );
       }
       await this.server.start(port);
+      const upstreamNote = this.server.getUpstreamProxy()
+        ? `（上游代理：${this.server.getUpstreamProxy()}）`
+        : '';
       return {
         success: true,
-        message: `MITM 代理已启动，端口 ${this.server.getPort()}`,
+        message: `MITM 代理已启动，端口 ${this.server.getPort()}${upstreamNote}`,
         data: {
-          port: this.server.getPort()!,
+          port: this.server.getPort() ?? port,
           caCertPath: this.caManager.getCaCertPath(),
           caInitialized: this.caManager.isInitialized(),
+          upstreamProxy: this.server.getUpstreamProxy(),
         },
       };
     } catch (error) {
@@ -221,6 +232,7 @@ export class MitmModule {
           port,
           caCertPath: this.caManager.getCaCertPath(),
           caInitialized: this.caManager.isInitialized(),
+          upstreamProxy: effectiveUpstreamProxy ?? null,
         },
       };
     }
@@ -571,6 +583,7 @@ export class MitmModule {
       running: this.server?.isRunning() ?? false,
       port: this.server?.getPort() ?? null,
       capturedCount: this.store.size(),
+      upstreamProxy: this.server?.getUpstreamProxy() ?? null,
     };
   }
 

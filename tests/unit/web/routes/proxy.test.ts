@@ -168,6 +168,37 @@ describe('Proxy REST Routes', () => {
     assert.strictEqual(broadcastStatus?.running, false);
   });
 
+  it('POST /api/proxy/start 支持透传 upstreamProxy 参数', async () => {
+    const startRes = mockRes();
+    const startMatched = await router.dispatch(
+      mockReq('POST', '/api/proxy/start', {
+        port: 0,
+        upstreamProxy: 'socks5://127.0.0.1:1080',
+      }),
+      startRes as unknown as ServerResponse,
+      '/api/proxy/start',
+    );
+    assert.strictEqual(startMatched, true);
+    assert.strictEqual(startRes.statusCode, 200);
+    const startData = JSON.parse(startRes.body.toString());
+    assert.strictEqual(startData.success, true);
+    assert.strictEqual(startData.data.upstreamProxy, 'socks5://127.0.0.1:1080');
+
+    const statusRes = mockRes();
+    await router.dispatch(
+      mockReq('GET', '/api/proxy/status'),
+      statusRes as unknown as ServerResponse,
+      '/api/proxy/status',
+    );
+    const statusData = JSON.parse(statusRes.body.toString());
+    assert.strictEqual(
+      statusData.data.upstreamProxy,
+      'socks5://127.0.0.1:1080',
+    );
+
+    await mitmModule.stop();
+  });
+
   it('GET /api/proxy/requests and GET /api/proxy/requests/:id manage request query', async () => {
     const store = mitmModule.getStore();
     store.add({

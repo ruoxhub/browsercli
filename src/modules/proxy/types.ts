@@ -178,18 +178,21 @@ export interface RequestPredicate {
 
 export interface StartMitmProxyParams {
   port?: number;
+  upstreamProxy?: string;
 }
 
 export interface StartMitmProxyData {
   port: number;
   caCertPath: string;
   caInitialized: boolean;
+  upstreamProxy?: string | null;
 }
 
 export interface MitmProxyStatusData {
   running: boolean;
   port: number | null;
   capturedCount: number;
+  upstreamProxy?: string | null;
 }
 
 export interface ListMitmRequestsParams {

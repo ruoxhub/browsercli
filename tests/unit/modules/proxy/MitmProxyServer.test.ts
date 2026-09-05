@@ -495,7 +495,8 @@ describe('MitmProxyServer', () => {
         captured = exchange;
       },
       undefined,
-      host => host === '127.0.0.1' || normalizeHost(host).includes('blocked.dev'),
+      host =>
+        host === '127.0.0.1' || normalizeHost(host).includes('blocked.dev'),
     );
     await proxy.start(0);
 
@@ -608,10 +609,107 @@ describe('MitmProxyServer', () => {
         req.on('error', () => resolve());
         req.end();
       });
-      assert.strictEqual(captured, undefined, '明文 ws:// 命中过滤不产生 capture');
+      assert.strictEqual(
+        captured,
+        undefined,
+        '明文 ws:// 命中过滤不产生 capture',
+      );
     } finally {
       await proxy.stop();
     }
   });
-});
 
+  it('配置 upstreamProxy 时 HTTP 请求经由 SOCKS5 代理转发并捕获', async () => {
+    const origin = await startOriginServer();
+    let socksHit = 0;
+    const socksServer = net.createServer(client => {
+      let stage = 0;
+      let remote: net.Socket | null = null;
+      client.on('data', data => {
+        if (stage === 0) {
+          client.write(Buffer.from([0x05, 0x00]));
+          stage = 1;
+        } else if (stage === 1) {
+          socksHit++;
+          let destHost = '';
+          let destPort = 0;
+          const atyp = data[3];
+          if (atyp === 0x01) {
+            destHost = `${data[4]}.${data[5]}.${data[6]}.${data[7]}`;
+            destPort = data.readUInt16BE(8);
+          } else if (atyp === 0x03) {
+            const len = data[4];
+            destHost = data.subarray(5, 5 + len).toString();
+            destPort = data.readUInt16BE(5 + len);
+          }
+          remote = net.connect(destPort, destHost, () => {
+            client.write(
+              Buffer.from([0x05, 0x00, 0x00, 0x01, 127, 0, 0, 1, 0x12, 0x34]),
+            );
+            stage = 2;
+            client.pipe(remote!);
+            remote!.pipe(client);
+          });
+          remote.on('error', () => client.destroy());
+          client.on('error', () => remote?.destroy());
+        }
+      });
+    });
+    await new Promise<void>(r => socksServer.listen(0, '127.0.0.1', () => r()));
+    const socksPort = (socksServer.address() as net.AddressInfo).port;
+
+    let captured: CapturedExchange | undefined;
+    const ca = new CaManager(mkdtempSync(path.join(os.tmpdir(), 'mitm-ca-')));
+    await ca.init();
+    const proxy = new MitmProxyServer(
+      ca,
+      exchange => {
+        captured = exchange;
+      },
+      undefined,
+      undefined,
+      `socks5://127.0.0.1:${socksPort}`,
+    );
+    await proxy.start(0);
+
+    try {
+      assert.strictEqual(
+        proxy.getUpstreamProxy(),
+        `socks5://127.0.0.1:${socksPort}`,
+      );
+
+      const target = `http://127.0.0.1:${origin.port}/socks-test`;
+      const res = await new Promise<{status: number; body: string}>(
+        (resolve, reject) => {
+          const req = http.request(
+            {
+              host: '127.0.0.1',
+              port: proxy.getPort()!,
+              path: target,
+              method: 'GET',
+              headers: {host: `127.0.0.1:${origin.port}`},
+            },
+            r => {
+              let body = '';
+              r.on('data', c => (body += c.toString('utf-8')));
+              r.on('end', () => resolve({status: r.statusCode ?? 0, body}));
+            },
+          );
+          req.on('error', reject);
+          req.end();
+        },
+      );
+
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.body, 'hello-from-origin');
+      assert.strictEqual(socksHit, 1, '请求应实际经由 SOCKS5 上游代理转发');
+      assert.ok(captured);
+      assert.strictEqual(captured.url, target);
+      assert.strictEqual(captured.statusCode, 200);
+    } finally {
+      await proxy.stop();
+      await origin.close();
+      await new Promise<void>(r => socksServer.close(() => r()));
+    }
+  });
+});

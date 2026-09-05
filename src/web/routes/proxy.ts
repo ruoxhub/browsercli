@@ -71,14 +71,19 @@ export function createProxyRoutes(
       'POST /api/proxy/start',
       async (req, res) => {
         let port: number | undefined;
+        let upstreamProxy: string | undefined;
         try {
-          const body = (await readJsonBody(req)) as {port?: number};
-          if (
-            typeof body === 'object' &&
-            body !== null &&
-            typeof body.port === 'number'
-          ) {
-            port = body.port;
+          const body = (await readJsonBody(req)) as {
+            port?: number;
+            upstreamProxy?: string;
+          };
+          if (typeof body === 'object' && body !== null) {
+            if (typeof body.port === 'number') {
+              port = body.port;
+            }
+            if (typeof body.upstreamProxy === 'string') {
+              upstreamProxy = body.upstreamProxy;
+            }
           }
         } catch (err) {
           const code = err instanceof Error ? err.message : 'INVALID_JSON';
@@ -91,7 +96,7 @@ export function createProxyRoutes(
         }
 
         try {
-          const result = await mitmModule.start(port);
+          const result = await mitmModule.start(port, upstreamProxy);
           const caManager = mitmModule.getCaManager();
           const currentStatus = mitmModule.status();
           wsHub.broadcast('proxy.status', {

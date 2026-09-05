@@ -302,4 +302,27 @@ describe('MitmModule', () => {
     assert.strictEqual(result.success, false);
     assert.strictEqual(mod.shouldBypass('a.dev'), false, '不落 state');
   });
+
+  it('start 传递 upstreamProxy 参数在 start 和 status 中正确反映', async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'mitm-mod-socks-'));
+    const mod = new MitmModule(dir);
+    try {
+      const res = await mod.start(0, 'socks5://127.0.0.1:1080');
+      assert.strictEqual(res.success, true);
+      assert.strictEqual(res.data.upstreamProxy, 'socks5://127.0.0.1:1080');
+      assert.match(res.message, /上游代理：socks5:\/\/127\.0\.0\.1:1080/);
+
+      const status = mod.status();
+      assert.strictEqual(status.data.running, true);
+      assert.strictEqual(status.data.upstreamProxy, 'socks5://127.0.0.1:1080');
+
+      await mod.stop();
+      const stoppedStatus = mod.status();
+      assert.strictEqual(stoppedStatus.data.running, false);
+      assert.strictEqual(stoppedStatus.data.upstreamProxy, null);
+    } finally {
+      await mod.stop();
+      rmSync(dir, {recursive: true, force: true});
+    }
+  });
 });

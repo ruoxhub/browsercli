@@ -23,6 +23,14 @@ export {
   isBinaryContentType,
 } from './body.js';
 export {normalizeHost} from './hostFilter.js';
+export {
+  parseSocks5Url,
+  connectSocks5,
+  createSocks5HttpConnector,
+  createSocks5HttpsConnector,
+  type Socks5Config,
+  type Socks5Target,
+} from './socks5.js';
 
 // 类型
 export type {

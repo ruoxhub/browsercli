@@ -5,8 +5,8 @@
  *
  * 移植自 anything-analyzer (MIT License):
  * open-source/anything-analyzer/src/main/proxy/mitm-proxy-server.ts
- * 裁剪：上游代理（SOCKS5/HTTP 上游）、证书下载页、uuid 依赖、EventEmitter。
- * 扩展：注入 MitmInterceptor，承载 block/map_local/map_remote/modify_header/modify_body 改写。
+ * 裁剪：证书下载页、uuid 依赖、EventEmitter。
+ * 扩展：注入 MitmInterceptor，承载 block/map_local/map_remote/modify_header/modify_body 改写；支持上游 SOCKS5 代理。
  */
 import {randomUUID} from 'node:crypto';
 import * as http from 'node:http';
@@ -27,6 +27,13 @@ import {
 } from './body.js';
 import type {CaManager} from './CaManager.js';
 import {applyHeaderChanges} from './rewrite.js';
+import {
+  connectSocks5,
+  createSocks5HttpConnector,
+  createSocks5HttpsConnector,
+  parseSocks5Url,
+  type Socks5Config,
+} from './socks5.js';
 import type {
   AfterResponseResult,
   BeforeRequestResult,
@@ -114,13 +121,21 @@ export class MitmProxyServer {
   private server: http.Server | null = null;
   private port: number | null = null;
   private readonly connections = new Set<net.Socket>();
+  private readonly upstreamSocks5: Socks5Config | null = null;
+  private readonly upstreamProxyUrl: string | null = null;
 
   constructor(
     private readonly caManager: CaManager,
     private readonly onCaptured: (exchange: CapturedExchange) => void,
     private readonly interceptor?: MitmInterceptor,
     private readonly shouldBypass?: (hostname: string) => boolean,
-  ) {}
+    upstreamProxy?: string,
+  ) {
+    if (upstreamProxy) {
+      this.upstreamSocks5 = parseSocks5Url(upstreamProxy);
+      this.upstreamProxyUrl = upstreamProxy;
+    }
+  }
 
   async start(port: number): Promise<void> {
     if (this.server) return;
@@ -178,6 +193,10 @@ export class MitmProxyServer {
     return this.port;
   }
 
+  getUpstreamProxy(): string | null {
+    return this.upstreamProxyUrl;
+  }
+
   // ── HTTP（非 CONNECT）──
 
   private handleHttpRequest(
@@ -229,6 +248,13 @@ export class MitmProxyServer {
         method: flow.method,
         headers: flow.headers,
       };
+
+      if (this.upstreamSocks5) {
+        options.createConnection = createSocks5HttpConnector(
+          this.upstreamSocks5,
+          80,
+        );
+      }
 
       const proxyReq = http.request(options, proxyRes => {
         this.relayResponse(
@@ -337,13 +363,78 @@ export class MitmProxyServer {
       serverSocket.on('data', onData);
     };
 
-    const serverSocket = net.connect(port, hostname, () =>
-      connectAndTunnel(serverSocket),
-    );
-    serverSocket.on('error', (err: Error) => {
-      logger.warn(`[MitmProxy] WS connect error for ${hostname}:`, err.message);
-      clientSocket.destroy();
-    });
+    const onConnected = (serverSocket: net.Socket): void => {
+      serverSocket.on('error', (err: Error) => {
+        logger.warn(
+          `[MitmProxy] WS connect error for ${hostname}:`,
+          err.message,
+        );
+        clientSocket.destroy();
+      });
+      connectAndTunnel(serverSocket);
+    };
+
+    if (this.upstreamSocks5) {
+      connectSocks5(this.upstreamSocks5, {host: hostname, port})
+        .then(rawSocket => {
+          if (isTls) {
+            const servername = net.isIP(hostname) ? undefined : hostname;
+            const tlsSocket = tls.connect(
+              {
+                socket: rawSocket,
+                servername,
+                rejectUnauthorized: false,
+              },
+              () => onConnected(tlsSocket),
+            );
+            tlsSocket.on('error', (err: Error) => {
+              logger.warn(
+                `[MitmProxy] WSS TLS connect error for ${hostname}:`,
+                err.message,
+              );
+              clientSocket.destroy();
+            });
+          } else {
+            onConnected(rawSocket);
+          }
+        })
+        .catch(err => {
+          logger.warn(
+            `[MitmProxy] WS upstream SOCKS5 connect error for ${hostname}:`,
+            err.message,
+          );
+          clientSocket.destroy();
+        });
+    } else if (isTls) {
+      const servername = net.isIP(hostname) ? undefined : hostname;
+      const tlsSocket = tls.connect(
+        {
+          port,
+          host: hostname,
+          servername,
+          rejectUnauthorized: false,
+        },
+        () => onConnected(tlsSocket),
+      );
+      tlsSocket.on('error', (err: Error) => {
+        logger.warn(
+          `[MitmProxy] WSS connect error for ${hostname}:`,
+          err.message,
+        );
+        clientSocket.destroy();
+      });
+    } else {
+      const serverSocket = net.connect(port, hostname, () =>
+        onConnected(serverSocket),
+      );
+      serverSocket.on('error', (err: Error) => {
+        logger.warn(
+          `[MitmProxy] WS connect error for ${hostname}:`,
+          err.message,
+        );
+        clientSocket.destroy();
+      });
+    }
   }
 
   // ── HTTPS CONNECT 拦截 ──
@@ -362,6 +453,28 @@ export class MitmProxyServer {
 
     // 旁路（spec §3.1）：不解密不签证书，纯传输层双向 pipe。
     if (this.shouldBypass?.(hostname) === true) {
+      if (this.upstreamSocks5) {
+        connectSocks5(this.upstreamSocks5, {host: hostname, port})
+          .then(tunnel => {
+            clientSocket.write('HTTP/1.1 200 Connection Established\r\n\r\n');
+            if (head.length > 0) tunnel.write(head);
+            tunnel.pipe(clientSocket);
+            clientSocket.pipe(tunnel);
+            tunnel.on('error', () => clientSocket.destroy());
+            clientSocket.on('error', () => tunnel.destroy());
+            tunnel.on('close', () => clientSocket.destroy());
+            clientSocket.on('close', () => tunnel.destroy());
+          })
+          .catch(err => {
+            logger.warn(
+              `[MitmProxy] Bypass SOCKS5 connect error for ${hostname}:`,
+              err.message,
+            );
+            clientSocket.destroy();
+          });
+        return;
+      }
+
       clientSocket.write('HTTP/1.1 200 Connection Established\r\n\r\n');
       const tunnel = net.connect(port, hostname, () => {
         if (head.length > 0) tunnel.write(head);
@@ -445,14 +558,24 @@ export class MitmProxyServer {
         this.applyRequestModification(before, parsed, flow);
       }
 
+      const targetHost = parsed.hostname ?? hostname;
+      const targetPort = parseInt(parsed.port ?? String(port), 10);
       const options: https.RequestOptions = {
-        hostname: parsed.hostname ?? hostname,
-        port: parseInt(parsed.port ?? String(port), 10),
+        hostname: targetHost,
+        port: targetPort,
         path: parsed.path ?? '/',
         method: flow.method,
         headers: flow.headers,
         rejectUnauthorized: false,
       };
+
+      if (this.upstreamSocks5) {
+        options.createConnection = createSocks5HttpsConnector(
+          this.upstreamSocks5,
+          targetHost,
+          targetPort,
+        );
+      }
 
       const proxyReq = https.request(options, proxyRes => {
         this.relayResponse(
