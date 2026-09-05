@@ -6,6 +6,7 @@
 
 // Facade
 export {MitmModule} from './MitmModule.js';
+export {ProxyCli, tokenizeLine} from './ProxyCli.js';
 export {CaManager, resolveMitmCertsDir} from './CaManager.js';
 export {MitmProxyServer} from './MitmProxyServer.js';
 export {ProxyStore} from './ProxyStore.js';

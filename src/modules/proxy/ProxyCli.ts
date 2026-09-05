@@ -101,8 +101,11 @@ export class ProxyCli {
       colorCode = `\x1b[31m${code}\x1b[0m`;
     }
 
-    const duration = record.durationMs !== undefined ? `${record.durationMs}ms` : '0ms';
-    const size = record.responseBody ? `${record.responseBody.length}B` : `${record.responseBodySize ?? 0}B`;
+    const duration =
+      record.durationMs !== undefined ? `${record.durationMs}ms` : '0ms';
+    const size = record.responseBody
+      ? `${record.responseBody.length}B`
+      : `${record.responseBodySize ?? 0}B`;
     const modifiedTag = record.modified ? ' \x1b[35m[MODIFIED]\x1b[0m' : '';
 
     return `[#${record.id}] ${colorCode} ${record.method} ${record.url} (${duration}, ${size})${modifiedTag}`;
@@ -117,7 +120,10 @@ export class ProxyCli {
   }
 
   protected updatePrompt(port?: number | null): void {
-    const promptStr = port !== undefined && port !== null ? `proxy[${port}]> ` : 'proxy[stopped]> ';
+    const promptStr =
+      port !== undefined && port !== null
+        ? `proxy[${port}]> `
+        : 'proxy[stopped]> ';
     if (this.rl) {
       this.rl.setPrompt(promptStr);
     }
@@ -142,8 +148,12 @@ export class ProxyCli {
     const res = await this.module.start(port, upstream);
     if (res.success) {
       const actualPort = res.data.port;
-      const upstreamNote = res.data.upstreamProxy ? ` (upstream: ${res.data.upstreamProxy})` : '';
-      this.writeLine(`[INFO] MITM Proxy started on port ${actualPort}${upstreamNote}.`);
+      const upstreamNote = res.data.upstreamProxy
+        ? ` (upstream: ${res.data.upstreamProxy})`
+        : '';
+      this.writeLine(
+        `[INFO] MITM Proxy started on port ${actualPort}${upstreamNote}.`,
+      );
       this.updatePrompt(actualPort);
     } else {
       this.writeLine(`[ERROR] Failed to start MITM proxy: ${res.message}`);
@@ -206,11 +216,18 @@ export class ProxyCli {
       const idStr = `#${r.id}`.padEnd(8);
       const methodStr = r.method.padEnd(7);
       const statusStr = String(r.statusCode).padEnd(7);
-      const durationStr = (r.durationMs !== undefined ? `${r.durationMs}ms` : '-').padEnd(9);
-      const bodyLen = r.responseBody ? r.responseBody.length : (r.responseBodySize ?? 0);
+      const durationStr = (
+        r.durationMs !== undefined ? `${r.durationMs}ms` : '-'
+      ).padEnd(9);
+      const bodyLen = r.responseBody
+        ? r.responseBody.length
+        : (r.responseBodySize ?? 0);
       const sizeStr = `${bodyLen}B`.padEnd(8);
       const maxUrlLen = 80 - 45;
-      const urlStr = r.url.length > maxUrlLen ? `${r.url.slice(0, maxUrlLen - 3)}...` : r.url;
+      const urlStr =
+        r.url.length > maxUrlLen
+          ? `${r.url.slice(0, maxUrlLen - 3)}...`
+          : r.url;
 
       this.writeLine(
         `${idStr} ${methodStr} ${statusStr} ${durationStr} ${sizeStr} ${urlStr}`,
@@ -251,14 +268,18 @@ export class ProxyCli {
 
     this.selectedId = String(record.id);
 
-    this.writeLine(`=== Request #${record.id} [${record.method} ${record.url}] ===`);
+    this.writeLine(
+      `=== Request #${record.id} [${record.method} ${record.url}] ===`,
+    );
     this.writeLine('[General]');
     this.writeLine(`  URL         : ${record.url}`);
     this.writeLine(`  Method      : ${record.method}`);
     this.writeLine(`  Status      : ${record.statusCode}`);
     this.writeLine(`  Duration    : ${record.durationMs ?? 0}ms`);
     this.writeLine(`  Client IP   : ${record.clientIp ?? '-'}`);
-    this.writeLine(`  Time        : ${new Date(record.timestamp).toISOString()}`);
+    this.writeLine(
+      `  Time        : ${new Date(record.timestamp).toISOString()}`,
+    );
 
     const showReq = part === 'all' || part === 'req';
     const showRes = part === 'all' || part === 'res';
@@ -310,14 +331,18 @@ export class ProxyCli {
     if (res.success && res.data.curl) {
       this.writeLine(res.data.curl);
     } else {
-      this.writeLine(`[ERROR] Failed to generate curl for request #${targetId}: ${res.message}`);
+      this.writeLine(
+        `[ERROR] Failed to generate curl for request #${targetId}: ${res.message}`,
+      );
     }
   }
 
   handleClear(): void {
     const res = this.module.clear();
     this.selectedId = null;
-    this.writeLine(`[INFO] Cleared ${res.data.clearedCount} captured requests.`);
+    this.writeLine(
+      `[INFO] Cleared ${res.data.clearedCount} captured requests.`,
+    );
   }
 
   handleTail(args: string[]): void {
@@ -328,7 +353,9 @@ export class ProxyCli {
       } else if (mode === 'off') {
         this.tailEnabled = false;
       } else {
-        this.writeLine(`[ERROR] Invalid tail argument: ${args[0]}. Use 'on' or 'off'.`);
+        this.writeLine(
+          `[ERROR] Invalid tail argument: ${args[0]}. Use 'on' or 'off'.`,
+        );
         return;
       }
     } else {
@@ -375,9 +402,12 @@ export class ProxyCli {
             typeStr = 'map_local';
             details = r.action.localPath;
           }
-          const ruleRegex = 'urlRegex' in r.action ? r.action.urlRegex : undefined;
+          const ruleRegex =
+            'urlRegex' in r.action ? r.action.urlRegex : undefined;
           const pattern = (r.urlFilter ?? ruleRegex ?? '*').padEnd(25);
-          this.writeLine(`${idStr} ${typeStr.padEnd(10)} ${pattern} ${details}`);
+          this.writeLine(
+            `${idStr} ${typeStr.padEnd(10)} ${pattern} ${details}`,
+          );
         }
         return;
       }
@@ -463,7 +493,9 @@ export class ProxyCli {
       }
       case 'clear': {
         const res = this.module.clearRules();
-        this.writeLine(`[INFO] Cleared ${res.data.clearedCount} rewrite rules.`);
+        this.writeLine(
+          `[INFO] Cleared ${res.data.clearedCount} rewrite rules.`,
+        );
         return;
       }
       default:
@@ -571,16 +603,23 @@ export class ProxyCli {
       }
       case 'export': {
         const dest = args[1] ?? 'ca.crt';
-        const res = await this.module.exportCa({outputPath: dest, format: 'pem'});
+        const res = await this.module.exportCa({
+          outputPath: dest,
+          format: 'pem',
+        });
         if (res.success) {
           this.writeLine(`[INFO] CA certificate exported to ${dest}.`);
         } else {
-          this.writeLine(`[ERROR] Failed to export CA certificate: ${res.message}`);
+          this.writeLine(
+            `[ERROR] Failed to export CA certificate: ${res.message}`,
+          );
         }
         return;
       }
       default:
-        this.writeLine(`[ERROR] Unknown ca subcommand: ${sub}. Use 'path' or 'export'.`);
+        this.writeLine(
+          `[ERROR] Unknown ca subcommand: ${sub}. Use 'path' or 'export'.`,
+        );
     }
   }
 
@@ -589,18 +628,24 @@ export class ProxyCli {
     switch (sub) {
       case 'status': {
         const active = this.module.getSystemProxyManager().isActive();
-        this.writeLine(`System proxy is currently ${active ? 'ENABLED' : 'DISABLED'}.`);
+        this.writeLine(
+          `System proxy is currently ${active ? 'ENABLED' : 'DISABLED'}.`,
+        );
         return;
       }
       case 'on': {
         const status = this.module.status().data;
         if (!status.running || !status.port) {
-          this.writeLine('[ERROR] Proxy server is not running. Start proxy first.');
+          this.writeLine(
+            '[ERROR] Proxy server is not running. Start proxy first.',
+          );
           return;
         }
         try {
           await this.module.getSystemProxyManager().enable(status.port);
-          this.writeLine(`[INFO] System proxy enabled on 127.0.0.1:${status.port}.`);
+          this.writeLine(
+            `[INFO] System proxy enabled on 127.0.0.1:${status.port}.`,
+          );
         } catch (err) {
           this.writeLine(
             `[ERROR] Failed to enable system proxy: ${err instanceof Error ? err.message : String(err)}`,
@@ -638,7 +683,9 @@ export class ProxyCli {
           this.writeLine('  No network processes detected.');
           return;
         }
-        this.writeLine(`  ${'PID'.padEnd(8)} ${'NAME'.padEnd(25)} DISPLAY_NAME`);
+        this.writeLine(
+          `  ${'PID'.padEnd(8)} ${'NAME'.padEnd(25)} DISPLAY_NAME`,
+        );
         this.writeLine(`  ${'-'.repeat(50)}`);
         for (const p of processes) {
           this.writeLine(
@@ -653,17 +700,24 @@ export class ProxyCli {
           this.writeLine('[ERROR] Usage: proc target <name|PID>');
           return;
         }
-        await this.module.configureLocalApps({enabled: true, targets: [target]});
+        await this.module.configureLocalApps({
+          enabled: true,
+          targets: [target],
+        });
         this.writeLine(`[INFO] Targeted process traffic capture: ${target}`);
         return;
       }
       case 'clear': {
         await this.module.configureLocalApps({enabled: false, targets: []});
-        this.writeLine('[INFO] Cleared process targets, capturing all traffic.');
+        this.writeLine(
+          '[INFO] Cleared process targets, capturing all traffic.',
+        );
         return;
       }
       default:
-        this.writeLine(`[ERROR] Unknown proc subcommand: ${sub}. Use 'ls', 'target', or 'clear'.`);
+        this.writeLine(
+          `[ERROR] Unknown proc subcommand: ${sub}. Use 'ls', 'target', or 'clear'.`,
+        );
     }
   }
 
@@ -682,7 +736,9 @@ export class ProxyCli {
 
     const res = await this.module.exportHar({outputPath: dest});
     if (res.success) {
-      this.writeLine(`[INFO] HAR exported ${res.data.entryCount} entries to ${dest}.`);
+      this.writeLine(
+        `[INFO] HAR exported ${res.data.entryCount} entries to ${dest}.`,
+      );
     } else {
       this.writeLine(`[ERROR] Failed to export HAR: ${res.message}`);
     }
@@ -816,7 +872,10 @@ export class ProxyCli {
     // show / curl -> latest request IDs
     if (lowerCmd === 'show' || lowerCmd === 'curl') {
       const records = this.module.getStore().list();
-      const recentIds = records.slice(-5).reverse().map(r => `#${r.id}`);
+      const recentIds = records
+        .slice(-5)
+        .toReversed()
+        .map(r => `#${r.id}`);
       const prefix = sub ?? '';
       if (!sub || (parts.length === 1 && endsWithSpace)) {
         return [recentIds, ''];
@@ -838,16 +897,30 @@ export class ProxyCli {
     const filters = this.module.listHostFilters().data;
     const localApps = this.module.getLocalAppsStatus();
 
-    this.writeLine('┌──────────────────────── Proxy Status ────────────────────────┐');
-    this.writeLine(`│ Server Status    : ${status.running ? 'RUNNING' : 'STOPPED'}`);
-    this.writeLine(`│ Port             : ${status.port !== null ? status.port : '-'}`);
+    this.writeLine(
+      '┌──────────────────────── Proxy Status ────────────────────────┐',
+    );
+    this.writeLine(
+      `│ Server Status    : ${status.running ? 'RUNNING' : 'STOPPED'}`,
+    );
+    this.writeLine(
+      `│ Port             : ${status.port !== null ? status.port : '-'}`,
+    );
     this.writeLine(`│ Upstream Proxy   : ${status.upstreamProxy ?? 'None'}`);
-    this.writeLine(`│ System Proxy     : ${sysProxyActive ? 'ENABLED' : 'DISABLED'}`);
+    this.writeLine(
+      `│ System Proxy     : ${sysProxyActive ? 'ENABLED' : 'DISABLED'}`,
+    );
     this.writeLine(`│ Captured Requests: ${status.capturedCount}`);
     this.writeLine(`│ Rewrite Rules    : ${rulesCount} active`);
-    this.writeLine(`│ Host Filters     : ${filters.allow.length} allowed, ${filters.block.length} blocked`);
-    this.writeLine(`│ Local Apps       : ${localApps.enabled ? `Enabled (${localApps.targets.join(', ') || 'all'})` : 'Disabled'}`);
-    this.writeLine('└──────────────────────────────────────────────────────────────┘');
+    this.writeLine(
+      `│ Host Filters     : ${filters.allow.length} allowed, ${filters.block.length} blocked`,
+    );
+    this.writeLine(
+      `│ Local Apps       : ${localApps.enabled ? `Enabled (${localApps.targets.join(', ') || 'all'})` : 'Disabled'}`,
+    );
+    this.writeLine(
+      '└──────────────────────────────────────────────────────────────┘',
+    );
   }
 
   async handleCommand(rawLine: string): Promise<boolean> {
@@ -927,36 +1000,59 @@ export class ProxyCli {
 
   printHelp(_command?: string): void {
     this.writeLine('Available commands:');
-    this.writeLine('  start [port] [upstr]   Start MITM proxy server (default port 8888)');
+    this.writeLine(
+      '  start [port] [upstr]   Start MITM proxy server (default port 8888)',
+    );
     this.writeLine('  stop                   Stop MITM proxy server');
     this.writeLine('  restart [port] [upstr] Restart MITM proxy server');
-    this.writeLine('  status                 Show proxy runtime status dashboard');
-    this.writeLine('  ls [limit] [filter]    List captured requests (alias: l, list)');
-    this.writeLine('  show [id] [part]       Show request/response details (alias: s)');
-    this.writeLine('  curl [id]              Generate curl replay command (alias: c)');
-    this.writeLine('  tail [on|off]          Toggle or set real-time traffic streaming');
+    this.writeLine(
+      '  status                 Show proxy runtime status dashboard',
+    );
+    this.writeLine(
+      '  ls [limit] [filter]    List captured requests (alias: l, list)',
+    );
+    this.writeLine(
+      '  show [id] [part]       Show request/response details (alias: s)',
+    );
+    this.writeLine(
+      '  curl [id]              Generate curl replay command (alias: c)',
+    );
+    this.writeLine(
+      '  tail [on|off]          Toggle or set real-time traffic streaming',
+    );
     this.writeLine('  rule ls                List rewrite rules');
-    this.writeLine('  rule add <type> ...    Add rewrite rule (mock, redirect, header)');
+    this.writeLine(
+      '  rule add <type> ...    Add rewrite rule (mock, redirect, header)',
+    );
     this.writeLine('  rule rm <id>           Remove rewrite rule');
     this.writeLine('  rule clear             Clear all rewrite rules');
     this.writeLine('  filter ls              List host filters (allow/block)');
     this.writeLine('  filter allow/block <h> Add host filter');
     this.writeLine('  filter rm <h>          Remove host filter');
     this.writeLine('  filter clear           Clear all host filters');
-    this.writeLine('  sysproxy [on|off|stat] Control system proxy interception');
-    this.writeLine('  ca [path|export]       Show root CA cert path or export cert');
+    this.writeLine(
+      '  sysproxy [on|off|stat] Control system proxy interception',
+    );
+    this.writeLine(
+      '  ca [path|export]       Show root CA cert path or export cert',
+    );
     this.writeLine('  proc [ls|target|clear] Inspect/filter local processes');
-    this.writeLine('  har [export] [path]    Export captured traffic to HAR file');
-    this.writeLine('  clear                  Clear captured requests memory buffer');
+    this.writeLine(
+      '  har [export] [path]    Export captured traffic to HAR file',
+    );
+    this.writeLine(
+      '  clear                  Clear captured requests memory buffer',
+    );
     this.writeLine('  help [cmd]             Show help message');
     this.writeLine('  exit / quit / q        Exit CLI');
   }
 
   async start(): Promise<void> {
     const initialStatus = this.module.status().data;
-    const initialPrompt = initialStatus.running && initialStatus.port
-      ? `proxy[${initialStatus.port}]> `
-      : 'proxy[stopped]> ';
+    const initialPrompt =
+      initialStatus.running && initialStatus.port
+        ? `proxy[${initialStatus.port}]> `
+        : 'proxy[stopped]> ';
 
     this.rl = readline.createInterface({
       input: this.input as Readable,

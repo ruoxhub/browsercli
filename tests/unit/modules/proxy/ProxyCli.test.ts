@@ -95,7 +95,9 @@ describe('ProxyCli - Foundation & Tokenizer', () => {
     const module = new MitmModule();
     // 注入一条测试请求到 store
     // SAFETY: Access private store for mock data injection in unit test.
-    const store = (module as unknown as {store: {addRequest: (r: unknown) => void}}).store;
+    const store = (
+      module as unknown as {store: {addRequest: (r: unknown) => void}}
+    ).store;
     store.addRequest({
       id: 'req_1',
       timestamp: Date.now(),

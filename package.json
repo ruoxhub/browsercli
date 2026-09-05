@@ -1,18 +1,19 @@
 {
-  "name": "browsercli",
+  "name": "proxycli",
   "version": "2.0.3",
   "description": "JavaScript reverse engineering and debugging",
   "type": "module",
   "bin": {
-    "js-reverse-worker": "./build/src/index.js"
+    "js-reverse-worker": "./build/src/index.js",
+    "proxycli": "./build/src/cli/bin/proxycli.js",
+    "browsercli": "./build/src/cli/bin/proxycli.js"
   },
   "main": "index.js",
   "scripts": {
     "clean": "node -e \"require('fs').rmSync('build', {recursive: true, force: true})\"",
     "bundle": "npm run clean && npm run build && rollup -c rollup.config.mjs",
     "build:dev": "swc src tests scripts -d build --extensions .ts",
-    "build:cli": "npm --prefix browsercli run build",
-    "build": "npm run build:index && npm run build:compile && npm run web:build && npm run build:cli && npm run build:post",
+    "build": "npm run build:index && npm run build:compile && npm run web:build && npm run build:post",
     "typecheck": "tsc --noEmit",
     "format": "eslint --cache --fix src/ scripts/ || true; prettier --write --cache src/ scripts/",
     "check-format": "eslint --cache . && prettier --check --cache .;",
@@ -48,9 +49,10 @@
     "prepare": "node --experimental-strip-types scripts/prepare.ts",
     "verify-server-json-version": "node --experimental-strip-types scripts/verify-server-json-version.ts",
     "case:jd:h5st:pure-node": "node scripts/cases/jd-h5st-pure-node.mjs",
-    "cli:start": "node build/src/index.js --daemon --browsercli-daemon",
-    "cli:worker:stop": "browsercli close",
-    "cli:worker:status": "browsercli list",
+    "cli:start": "node build/src/index.js --daemon --proxycli-daemon --browsercli-daemon",
+    "cli:worker:stop": "proxycli close",
+    "cli:worker:status": "proxycli list",
+    "proxy:cli": "node --no-warnings=ExperimentalWarning build/src/modules/proxy/cli.js",
     "web:build": "tsc --noEmit -p src/web-ui/tsconfig.json && vite build --config vite.web-ui.config.ts",
     "web:dev": "vite --config vite.web-ui.config.ts",
     "web:typecheck": "tsc --noEmit -p src/web-ui/tsconfig.json",
@@ -58,6 +60,7 @@
     "build:compile": "swc src tests scripts -d build --extensions .ts --ignore \"src/web-ui/**\"",
     "build:post": "node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/post-build.ts",
     "verify-skills": "node --experimental-strip-types scripts/verify-skills-schema.ts",
+    "test:cli": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/unit/cli/**/*.test.js",
     "test:worker": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/unit/worker/**/*.test.js",
     "test:registry": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/unit/tools/ToolRegistry*.test.js"
   },
@@ -75,7 +78,7 @@
     "url": "https://github.com/zhizhuodemao/js-reverse-mcp/issues"
   },
   "homepage": "https://github.com/zhizhuodemao/js-reverse-mcp#readme",
-  "mcpName": "io.github.zhizhuodemao/browsercli",
+  "mcpName": "io.github.zhizhuodemao/proxycli",
   "dependencies": {
     "@babel/generator": "^7.26.5",
     "@babel/parser": "^7.26.5",
