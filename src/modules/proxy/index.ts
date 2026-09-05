@@ -25,6 +25,14 @@ export {
 export {normalizeHost} from './hostFilter.js';
 export {matchesProcessName} from './processMatch.js';
 export {
+  ProcessConnectionTracker,
+  parseNetstatOutput,
+  parseTasklistLine,
+  parseTasklistOutput,
+  type ProcessInfo,
+  type RunCommand,
+} from './ProcessConnectionTracker.js';
+export {
   parseSocks5Url,
   connectSocks5,
   createSocks5HttpConnector,
