@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import path from 'node:path';
+
 import type {AxiCliCommand} from 'axi-sdk-js';
 import {AxiError} from 'axi-sdk-js';
-import path from 'node:path';
 
 import {getBoolFlag, parseArgs, type ParsedArgs} from '../args-parser.js';
 import type {DaemonLike} from '../daemonClient.js';
@@ -134,7 +135,7 @@ export const toolDispatcherCommand: AxiCliCommand<WorkerContext> = async (
 
   if (!requestedName) {
     throw new AxiError('缺少工具名称', 'VALIDATION_ERROR', [
-      `用法：browsercli call <tool-name> [--param value] [--url <url>] [--data <json>] [--file <path>]`,
+      `用法：proxycli call <tool-name> [--param value] [--url <url>] [--data <json>] [--file <path>]`,
     ]);
   }
 

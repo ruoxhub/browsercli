@@ -44,7 +44,7 @@ export function buildDaemonArgPlan(argv: readonly string[]): DaemonPlan {
       daemon = true;
       continue;
     }
-    if (arg === '--browsercli-daemon') {
+    if (arg === '--proxycli-daemon' || arg === '--browsercli-daemon') {
       browsercliDaemon = true;
       continue;
     }
@@ -77,7 +77,11 @@ export function buildDaemonArgPlan(argv: readonly string[]): DaemonPlan {
   return {
     daemon,
     browsercliDaemon,
-    session: session || process.env.BROWSERCLI_SESSION || 'default',
+    session:
+      session ||
+      process.env.PROXYCLI_SESSION ||
+      process.env.BROWSERCLI_SESSION ||
+      'default',
     noConsole,
     minimalStealth,
     consolePort,

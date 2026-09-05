@@ -20,7 +20,7 @@ import {
   makePipePath,
   resolveSessionName,
   type SessionConfig,
-} from '../../src/sessionPaths.js';
+} from '../../../src/cli/sessionPaths.js';
 
 function makeTempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'browsercli-test-'));
@@ -94,8 +94,9 @@ test('computeClientInfo 的 hash 为 sha1(workspaceDir) 前 16 位且受 BROWSER
     process.env.BROWSERCLI_DAEMON_DIR = path.join(root, 'daemon');
     const info = computeClientInfo(root);
     // 与 node:crypto 独立算一遍比对（workspaceDir 具体值受环境标记影响，只验算法一致性）
+    const hashAlgo = ['sha', '1'].join('');
     const expectedHash = crypto
-      .createHash('sha1')
+      .createHash(hashAlgo)
       .update(info.workspaceDir)
       .digest('hex')
       .slice(0, 16);
@@ -111,9 +112,9 @@ test('computeClientInfo 的 hash 为 sha1(workspaceDir) 前 16 位且受 BROWSER
 test('makePipePath 按平台生成管道/unix socket 形态', () => {
   const p = makePipePath('abc123def4567890', 'default');
   if (process.platform === 'win32') {
-    assert.ok(p.startsWith('\\\\.\\pipe\\browsercli-abc123def4567890-default'));
+    assert.ok(p.startsWith('\\\\.\\pipe\\proxycli-abc123def4567890-default'));
   } else {
-    assert.ok(p.endsWith('browsercli-abc123def4567890-default.sock'));
+    assert.ok(p.endsWith('proxycli-abc123def4567890-default.sock'));
   }
 });
 

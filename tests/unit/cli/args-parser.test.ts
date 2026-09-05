@@ -11,7 +11,7 @@ import {
   getFlag,
   hasFlag,
   parseArgs,
-} from '../../src/args-parser.js';
+} from '../../../src/cli/args-parser.js';
 
 describe('args-parser', () => {
   describe('parseArgs', () => {

@@ -12,7 +12,6 @@
 import type {AxiCliCommand} from 'axi-sdk-js';
 import {AxiError} from 'axi-sdk-js';
 
-import {successOutput, tableOutput} from '../output.js';
 import {
   DaemonConnection,
   ensureDaemon,
@@ -20,6 +19,7 @@ import {
   stopSession,
   type DaemonLike,
 } from '../daemonClient.js';
+import {successOutput, tableOutput} from '../output.js';
 import {
   computeClientInfo,
   deleteSession,
@@ -95,7 +95,7 @@ export const openCommand: AxiCliCommand<WorkerContext> = async (_args, ctx) => {
       throw new AxiError(
         `会话 ${ctx.session} 已在运行 (pid=${existing.pid})`,
         'SESSION_ALREADY_OPEN',
-        [`先关闭：browsercli -s=${ctx.session} close`],
+        [`先关闭：proxycli -s=${ctx.session} close`],
       );
     }
     // 陈旧注册：ensureDaemon 会自行 GC 并重新拉起

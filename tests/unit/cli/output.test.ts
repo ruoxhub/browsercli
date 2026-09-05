@@ -6,7 +6,11 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {listOutput, successOutput, tableOutput} from '../../src/output.js';
+import {
+  listOutput,
+  successOutput,
+  tableOutput,
+} from '../../../src/cli/output.js';
 
 describe('output', () => {
   describe('successOutput', () => {

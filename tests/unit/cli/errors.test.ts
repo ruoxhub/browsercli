@@ -8,7 +8,7 @@ import {describe, it} from 'node:test';
 
 import {AxiError} from 'axi-sdk-js';
 
-import {daemonError, toAxiError, toolError} from '../../src/errors.js';
+import {daemonError, toAxiError, toolError} from '../../../src/cli/errors.js';
 
 describe('errors', () => {
   describe('toAxiError', () => {
@@ -69,7 +69,7 @@ describe('errors', () => {
     it('always includes daemon launch hint', () => {
       const result = daemonError('stop');
       assert.ok(
-        result.suggestions.some((s: string) => s.includes('browsercli start')),
+        result.suggestions.some((s: string) => s.includes('proxycli start')),
       );
     });
   });

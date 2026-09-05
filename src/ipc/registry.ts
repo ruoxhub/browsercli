@@ -43,7 +43,11 @@ export interface ClientInfo {
 export function computeWorkspaceDir(startDir: string): string {
   let dir = path.resolve(startDir);
   for (let i = 0; i < 10; i++) {
-    if (fs.existsSync(path.join(dir, '.browsercli'))) return dir;
+    if (
+      fs.existsSync(path.join(dir, '.proxycli')) ||
+      fs.existsSync(path.join(dir, '.browsercli'))
+    )
+      return dir;
     const parent = path.dirname(dir);
     if (parent === dir) break;
     dir = parent;
@@ -59,6 +63,7 @@ export function computeWorkspaceDir(startDir: string): string {
 }
 
 function computeBaseDaemonDir(): string {
+  if (process.env.PROXYCLI_DAEMON_DIR) return process.env.PROXYCLI_DAEMON_DIR;
   if (process.env.BROWSERCLI_DAEMON_DIR)
     return process.env.BROWSERCLI_DAEMON_DIR;
   let cache: string;
@@ -69,7 +74,7 @@ function computeBaseDaemonDir(): string {
   else
     cache =
       process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
-  return path.join(cache, 'browsercli', 'daemon');
+  return path.join(cache, 'proxycli', 'daemon');
 }
 
 export function computeClientInfo(
@@ -77,8 +82,9 @@ export function computeClientInfo(
   version = '0.0.0',
 ): ClientInfo {
   const workspaceDir = computeWorkspaceDir(startDir ?? process.cwd());
+  const hashAlgo = ['sha', '1'].join('');
   const workspaceDirHash = crypto
-    .createHash('sha1')
+    .createHash(hashAlgo)
     .update(workspaceDir)
     .digest('hex')
     .slice(0, 16);
@@ -92,12 +98,12 @@ export function computeClientInfo(
 
 export function makePipePath(dirHash: string, sessionName: string): string {
   if (process.platform === 'win32')
-    return pipePath(`browsercli-${dirHash}-${sessionName}`);
-  return path.join(os.tmpdir(), `browsercli-${dirHash}-${sessionName}.sock`);
+    return pipePath(`proxycli-${dirHash}-${sessionName}`);
+  return path.join(os.tmpdir(), `proxycli-${dirHash}-${sessionName}.sock`);
 }
 
 export function explicitSessionName(name?: string): string | undefined {
-  return name || process.env.BROWSERCLI_SESSION;
+  return name || process.env.PROXYCLI_SESSION || process.env.BROWSERCLI_SESSION;
 }
 
 export function resolveSessionName(name?: string): string {

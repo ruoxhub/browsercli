@@ -17,8 +17,8 @@
 
 ### 1.2 核心目标 (Goals)
 
-1. **开箱即用的独立进程 REPL**：无需启动后台 Worker 或依赖外部服务，单个命令 `npm run proxy:cli` 即可在当前进程启动代理并进入交互式命令行。
-2. **极简高效与零外部依赖**：严格基于 Node.js 原生 `node:readline/promises` 与标准 I/O 构建，遵循 KISS 与标准库优先（Ponytail）原则，无多余第三方重型 TUI 依赖。
+1. **开箱即用的 REPL**：支持通过 `proxycli proxy` 或 `npm run proxy:cli` 快速在当前进程启动代理并进入交互式命令行，无缝融入统一的 `proxycli` 命令行工具体系。
+2. **极简高效与零外部依赖**：严格基于 Node.js 原生 `node:readline` 与标准 I/O 构建，遵循 KISS 与标准库优先（Ponytail）原则，无多余第三方重型 TUI 依赖。
 3. **全功能命令覆盖**：提供对齐 `MitmModule` 底层能力的一站式交互指令，包括服务启停、实时流量流控（tail）、请求检索与报文详情、cURL 重放生成、改写规则配置、主机过滤、系统代理切换、HAR 导出与本地进程追踪。
 4. **Prompt-Safe 非阻塞流式回显**：在开启实时流量监控（tail）时，异步到达的请求日志输出绝不打乱用户正在终端编辑的命令字符。
 5. **系统代理四重安全退出门禁**：建立退出生命周期钩子，确保在任何异常、终止信号或正常退出时恢复宿主机系统代理，守住网络不中断的红线。
@@ -39,9 +39,12 @@
 ```text
 src/modules/proxy/
 ├── ProxyCli.ts          # [新增] REPL 核心类：命令分发、补全、流控打印与状态机
-├── cli.ts               # [新增] CLI 入口脚本：启动参数解析、信号监听与生命周期管控
+├── cli.ts               # [新增] 独立可执行入口脚本：启动参数解析、信号监听与生命周期管控
 ├── MitmModule.ts        # [已有] MITM 抓包核心门面
 ├── index.ts             # [更新] 导出 ProxyCli 等核心类型
+src/cli/commands/
+└── proxy.ts             # [新增] proxycli proxy 子命令：桥接 proxycli 与 ProxyCli
+src/cli/app.ts           # [更新] 注册 proxy 子命令
 package.json             # [更新] 新增 "proxy:cli" 脚本
 tests/unit/modules/proxy/
 └── ProxyCli.test.ts     # [新增] ProxyCli 独立单元测试
@@ -50,25 +53,26 @@ tests/unit/modules/proxy/
 ### 2.2 模块职责划分
 
 ```text
-┌──────────────────────────────────────────────────────────────────┐
-│                      src/modules/proxy/cli.ts                    │
-│  - 解析启动参数 (--port, --sysproxy, --upstream, --no-auto-start) │
-│  - 注册 SIGINT / SIGTERM / uncaughtException / exit 清理拦截器   │
-│  - 实例化 MitmModule & ProxyCli 并启动 REPL                      │
-└─────────────────────────────────┬────────────────────────────────┘
-                                  │ 依赖注入 (MitmModule, stdin, stdout)
-┌─────────────────────────────────▼────────────────────────────────┐
-│                   src/modules/proxy/ProxyCli.ts                  │
-│  - 词法分词与命令分发器 (Tokenizer & Command Registry)            │
-│  - Tab 自动补全器 (Completer)                                    │
-│  - 终端安全日志输出 (Prompt-Safe Logger: \r\x1b[K + 恢复 Prompt) │
-│  - 会话交互状态机 (tailEnabled, selectedId, isPrompting)         │
-└─────────────────────────────────┬────────────────────────────────┘
-                                  │ 委托调用
-┌─────────────────────────────────▼────────────────────────────────┐
-│                  src/modules/proxy/MitmModule.ts                 │
-│  (MitmProxyServer, CaManager, ProxyStore, MitmRuleEngine...)     │
-└──────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────┐  ┌──────────────────────────────────────┐
+│       src/cli/commands/proxy.ts      │  │       src/modules/proxy/cli.ts       │
+│  - 作为 proxycli proxy 子命令挂载    │  │  - 作为独立脚本运行 (npm run proxy:cli) │
+│  - 解析命令行参数并启动 REPL 会话    │  │  - 注册退出清理拦截器与信号守卫       │
+└──────────────────┬───────────────────┘  └──────────────────┬───────────────────┘
+                   │                                         │
+                   └────────────────────┬────────────────────┘
+                                        │ 依赖注入 (MitmModule, stdin, stdout)
+┌───────────────────────────────────────▼────────────────────────────────────────┐
+│                        src/modules/proxy/ProxyCli.ts                           │
+│  - 词法分词与命令分发器 (Tokenizer & Command Registry)                         │
+│  - Tab 自动补全器 (Completer)                                                 │
+│  - 终端安全日志输出 (Prompt-Safe Logger: \r\x1b[K + 恢复 Prompt)              │
+│  - 会话交互状态机 (tailEnabled, selectedId, isPrompting)                      │
+└───────────────────────────────────────┬────────────────────────────────────────┘
+                                        │ 委托调用真实业务方法
+┌───────────────────────────────────────▼────────────────────────────────────────┐
+│                       src/modules/proxy/MitmModule.ts                          │
+│  (startMitmProxy, stopMitmProxy, listMitmRequests, enableSystemProxy...)       │
+└────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -279,7 +283,7 @@ private safeLog(message: string): void {
 
 ### 6.3 四重系统代理退出恢复门禁
 
-在 `src/modules/proxy/cli.ts` 中注册进程事件：
+在 `src/modules/proxy/cli.ts` 与 `src/cli/commands/proxy.ts` 中注册进程事件：
 
 ```typescript
 let isExiting = false;
@@ -288,8 +292,8 @@ async function cleanupAndExit(code = 0) {
   isExiting = true;
   try {
     cli.close();
-    await mitmModule.stop();
-    await mitmModule.getSystemProxyManager().restore();
+    await mitmModule.stopMitmProxy();
+    await mitmModule.restoreSystemProxy();
   } catch (err) {
     // 强制兜底
   } finally {
@@ -304,7 +308,7 @@ process.on('uncaughtException', err => {
   cleanupAndExit(1);
 });
 process.on('exit', () => {
-  mitmModule.getSystemProxyManager().restore();
+  void mitmModule.restoreSystemProxy();
 });
 ```
 
@@ -327,12 +331,13 @@ process.on('exit', () => {
 ## 7. 质量保障与验收标准 (Quality Gate & Verification)
 
 1. **类型检查门禁**：运行 `npm run typecheck`，0 错误，TypeScript 严格模式通过。
-2. **格式与 Lint 门禁**：运行 `npm run check-format`，符合 Prettier 与 ESLint 规范。
-3. **单元测试门禁**：新增 `tests/unit/modules/proxy/ProxyCli.test.ts`，涵盖：
-   - 命令解析与 Tokenizer（双引号、转义、异常语法）
+2. **架构规则检查**：运行 `npm run check-arch`，Layer L1 与 L3 调用关系合规，0 环路。
+3. **格式与 Lint 门禁**：运行 `npx eslint src/modules/proxy/ src/cli/`，符合 Prettier 与 ESLint 规范。
+4. **单元测试门禁**：新增 `tests/unit/modules/proxy/ProxyCli.test.ts`，运行 `node --experimental-strip-types --test tests/unit/modules/proxy/ProxyCli.test.ts` 或编译后 `node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/ProxyCli.test.js`，涵盖：
+   - 命令解析与 Tokenizer（双引号、单引号、空格、异常语法）
    - Tab 补全器（一级与二级命令联动）
-   - 代理启停与状态切换
+   - 代理启停与状态切换（对齐 `MitmModule` API）
    - 规则与过滤器的增删查清
    - Prompt-Safe 流控打印输出
    - 优雅退出与资源清理
-4. **端到端功能验证**：通过构建产物在沙箱环境中真实执行 `node build/src/modules/proxy/cli.js --no-auto-start` 进行全流程冒烟测试。
+5. **端到端功能验证**：通过构建产物在终端环境中真实执行 `node build/src/cli/bin/proxycli.js proxy --no-auto-start` 及 `npm run proxy:cli -- --no-auto-start` 进行全流程冒烟测试。

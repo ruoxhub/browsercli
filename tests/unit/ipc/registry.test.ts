@@ -116,9 +116,9 @@ describe('makePipePath', () => {
   it('uses the windows pipe form on win32, a .sock file elsewhere', () => {
     const p = makePipePath('abc123', 'default');
     if (process.platform === 'win32') {
-      assert.equal(p, '\\\\.\\pipe\\browsercli-abc123-default');
+      assert.equal(p, '\\\\.\\pipe\\proxycli-abc123-default');
     } else {
-      assert.ok(p.endsWith('browsercli-abc123-default.sock'));
+      assert.ok(p.endsWith('proxycli-abc123-default.sock'));
       assert.ok(p.startsWith(os.tmpdir()));
     }
   });

@@ -6,13 +6,14 @@
 
 import assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
+
 import {AxiError} from 'axi-sdk-js';
 
-import {cliCommands} from '../../src/app.js';
-import {jobsCommand} from '../../src/commands/jobs.js';
-import type {DaemonEvent, DaemonLike} from '../../src/daemonClient.js';
-import type {AxiStructuredOutput} from '../../src/output.js';
-import type {JobStatus, WorkerContext} from '../../src/types.js';
+import {cliCommands} from '../../../src/cli/app.js';
+import {jobsCommand} from '../../../src/cli/commands/jobs.js';
+import type {DaemonEvent, DaemonLike} from '../../../src/cli/daemonClient.js';
+import type {AxiStructuredOutput} from '../../../src/cli/output.js';
+import type {JobStatus, WorkerContext} from '../../../src/cli/types.js';
 
 const runningJob: JobStatus = {
   jobId: 'job_1',
@@ -43,6 +44,7 @@ function context() {
     onEvent(_cb: (event: DaemonEvent) => void) {
       return () => undefined;
     },
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
     close() {},
   };
   const ctx: WorkerContext = {

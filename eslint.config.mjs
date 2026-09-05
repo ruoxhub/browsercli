@@ -21,7 +21,6 @@ export default defineConfig([
     '**/scratch/**',
     '**/example/Obfuscation/**',
     '**/artifacts/**',
-    'browsercli/**',
     'scripts/cases/**',
     'src/web-ui/**',
     'test-load.mjs',

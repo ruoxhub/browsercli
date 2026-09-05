@@ -1,3 +1,8 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import {AxiError} from 'axi-sdk-js';
 import type {AxiCliCommand} from 'axi-sdk-js';
 
@@ -51,7 +56,7 @@ const CHANNELS = new Set([
 
 function invalid(message: string): never {
   throw new AxiError(message, 'VALIDATION_ERROR', [
-    '用法：browsercli browser connect|disconnect|status [options]',
+    '用法：proxycli browser connect|disconnect|status [options]',
   ]);
 }
 

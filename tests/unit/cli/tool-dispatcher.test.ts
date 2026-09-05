@@ -8,16 +8,16 @@ import {describe, it} from 'node:test';
 
 import {AxiError} from 'axi-sdk-js';
 
-import {parseArgs} from '../../src/args-parser.js';
-import {buildToolArgs} from '../../src/commands/shared/tool-args.js';
+import {parseArgs} from '../../../src/cli/args-parser.js';
+import {buildToolArgs} from '../../../src/cli/commands/shared/tool-args.js';
 import {
   BUSY_RETRY_DELAYS_MS,
   invokeWithBusyRetry,
   toolDispatcherCommand,
-} from '../../src/commands/tool-dispatcher.js';
-import type {DaemonEvent, DaemonLike} from '../../src/daemonClient.js';
-import type {ToolMeta} from '../../src/tool-meta-types.js';
-import type {WorkerContext} from '../../src/types.js';
+} from '../../../src/cli/commands/tool-dispatcher.js';
+import type {DaemonEvent, DaemonLike} from '../../../src/cli/daemonClient.js';
+import type {ToolMeta} from '../../../src/cli/tool-meta-types.js';
+import type {WorkerContext} from '../../../src/cli/types.js';
 
 const SAMPLE_TOOLS: ToolMeta[] = [
   {

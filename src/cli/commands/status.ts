@@ -7,9 +7,10 @@
 import type {AxiCliCommand} from 'axi-sdk-js';
 
 import {getBoolFlag, parseArgs} from '../args-parser.js';
-import {collectSessionRows} from './sessions.js';
 import {successOutput, tableOutput} from '../output.js';
 import type {WorkerContext} from '../types.js';
+
+import {collectSessionRows} from './sessions.js';
 
 export const statusCommand: AxiCliCommand<WorkerContext> = async (
   args,

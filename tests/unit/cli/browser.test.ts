@@ -1,16 +1,22 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
+
 import {AxiError} from 'axi-sdk-js';
 
-import {cliCommands} from '../../src/app.js';
-import {browserCommand} from '../../src/commands/browser.js';
-import type {DaemonEvent, DaemonLike} from '../../src/daemonClient.js';
-import type {AxiStructuredOutput} from '../../src/output.js';
+import {cliCommands} from '../../../src/cli/app.js';
+import {browserCommand} from '../../../src/cli/commands/browser.js';
+import type {DaemonEvent, DaemonLike} from '../../../src/cli/daemonClient.js';
+import type {AxiStructuredOutput} from '../../../src/cli/output.js';
 import type {
   BrowserConnectOptions,
   BrowserConnectionStatus,
   WorkerContext,
-} from '../../src/types.js';
+} from '../../../src/cli/types.js';
 
 function context() {
   const calls: Array<{method: string; params?: Record<string, unknown>}> = [];
@@ -34,6 +40,7 @@ function context() {
     onEvent(_cb: (event: DaemonEvent) => void) {
       return () => undefined;
     },
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
     close() {},
   };
   const ctx: WorkerContext = {

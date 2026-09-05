@@ -21,7 +21,7 @@ export function toAxiError(
   if (error instanceof AxiError) return error;
   if (error instanceof Error) {
     return new AxiError(error.message, fallbackCode, [
-      'Check Worker status with "browsercli status"',
+      'Check Worker status with "proxycli status"',
       'Ensure browser is running with --remote-debugging-port=9222',
     ]);
   }
@@ -30,7 +30,7 @@ export function toAxiError(
 
 export function daemonError(action: string, details?: string): AxiError {
   const suggestions = [
-    'Run "browsercli start" to launch the Worker',
+    'Run "proxycli start" to launch the Worker',
     'Check Worker logs for more details',
   ];
   if (details) suggestions.unshift(details);

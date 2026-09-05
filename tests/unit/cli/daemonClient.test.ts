@@ -18,8 +18,8 @@ import {
   DaemonConnection,
   resolveEntryPath,
   spawnDaemon,
-} from '../../src/daemonClient.js';
-import {makePipePath} from '../../src/sessionPaths.js';
+} from '../../../src/cli/daemonClient.js';
+import {makePipePath} from '../../../src/cli/sessionPaths.js';
 
 /** 起一个假 daemon：逐行解析请求，按 handler 回包。 */
 async function startFakeDaemon(
@@ -148,8 +148,10 @@ test('resolveEntryPath 优先取 BROWSERCLI_ENTRY，缺失时报错带恢复建�
         const e = err as Error & {suggestions?: string[]};
         return (
           e.message.includes('workerEntry') &&
-          (e.suggestions ?? []).some(s =>
-            s.includes('browsercli config --set workerEntry='),
+          (e.suggestions ?? []).some(
+            s =>
+              s.includes('proxycli config --set workerEntry=') ||
+              s.includes('browsercli config --set workerEntry='),
           )
         );
       },
@@ -216,10 +218,10 @@ test('spawnDaemon 用假 entry 走通就绪握手并写出 session 文件', asyn
   }
 });
 
-test('collectDaemonPids 只命中含 --browsercli-daemon 的行（pid 为首列）', () => {
+test('collectDaemonPids 命中含 --proxycli-daemon 或 --browsercli-daemon 的行（pid 为首列）', () => {
   assert.deepStrictEqual(
     collectDaemonPids([
-      '111 node build/src/index.js --daemon --browsercli-daemon --session default',
+      '111 node build/src/index.js --daemon --proxycli-daemon --session default',
       '222 node build/src/index.js --daemon',
       '333 grep --browsercli-daemon',
       '444 node other.js --browsercli-daemon',

@@ -20,8 +20,8 @@ import {dirname} from 'node:path';
 import {AxiError} from 'axi-sdk-js';
 import type {AxiCliCommand} from 'axi-sdk-js';
 
-import {cliConfigPath} from '../daemonClient.js';
 import {parseArgs, getFlag, hasFlag} from '../args-parser.js';
+import {cliConfigPath} from '../daemonClient.js';
 import {successOutput} from '../output.js';
 import type {WorkerContext} from '../types.js';
 

@@ -50,7 +50,8 @@ function getLayer(filePath: string): Layer {
   if (
     norm.startsWith('src/tools/') ||
     norm.startsWith('src/web/') ||
-    norm.startsWith('src/ipc/')
+    norm.startsWith('src/ipc/') ||
+    norm.startsWith('src/cli/')
   ) {
     return Layer.L3;
   }
@@ -99,7 +100,9 @@ function parseImports(filePath: string): ImportEdge[] {
 
     // Resolve target path
     const fileDir = path.dirname(filePath);
-    let resolved = path.normalize(path.join(fileDir, targetSpecifier)).replace(/\\/g, '/');
+    let resolved = path
+      .normalize(path.join(fileDir, targetSpecifier))
+      .replace(/\\/g, '/');
     if (resolved.endsWith('.js')) {
       resolved = resolved.slice(0, -3) + '.ts';
     } else if (!resolved.endsWith('.ts')) {
@@ -221,7 +224,9 @@ function main() {
 
   console.log('\n[Rule D1: Level 0 Layering Purity]');
   if (l0Violations.length === 0) {
-    console.log('  PASS: 0 violations (Level 0 does not import from Level 1, 2, or 3)');
+    console.log(
+      '  PASS: 0 violations (Level 0 does not import from Level 1, 2, or 3)',
+    );
   } else {
     hasError = true;
     console.error(`  FAIL: ${l0Violations.length} violations found:`);
@@ -234,7 +239,9 @@ function main() {
 
   console.log('\n[Rule D1: Level 1 Layering Purity]');
   if (l1Violations.length === 0) {
-    console.log('  PASS: 0 violations (Level 1 does not import from Level 2 or 3)');
+    console.log(
+      '  PASS: 0 violations (Level 1 does not import from Level 2 or 3)',
+    );
   } else {
     hasError = true;
     console.error(`  FAIL: ${l1Violations.length} violations found:`);
@@ -284,7 +291,9 @@ function main() {
     console.error('Architecture Check: FAILED');
     process.exit(1);
   } else {
-    console.log('Architecture Check: PASSED (All Phase 1 invariants satisfied)');
+    console.log(
+      'Architecture Check: PASSED (All Phase 1 invariants satisfied)',
+    );
   }
 }
 

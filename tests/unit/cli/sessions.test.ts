@@ -12,20 +12,21 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import {after, before, describe, it} from 'node:test';
+
 import {AxiError} from 'axi-sdk-js';
 
 import {
   closeCommand,
   listSessionsCommand,
   openCommand,
-} from '../../src/commands/sessions.js';
+} from '../../../src/cli/commands/sessions.js';
+import type {AxiStructuredOutput} from '../../../src/cli/output.js';
 import {
   loadSession,
   makePipePath,
   type SessionConfig,
-} from '../../src/sessionPaths.js';
-import type {AxiStructuredOutput} from '../../src/output.js';
-import type {WorkerContext} from '../../src/types.js';
+} from '../../../src/cli/sessionPaths.js';
+import type {WorkerContext} from '../../../src/cli/types.js';
 
 function killPid(pid: number): void {
   try {
@@ -36,8 +37,9 @@ function killPid(pid: number): void {
         : [String(pid)],
       {stdio: 'ignore'},
     );
-  } catch {
-    // 已退出
+  } catch (err) {
+    void err;
+    // 已退出或无权限时忽略
   }
 }
 

@@ -12,11 +12,14 @@ import os from 'node:os';
 import path from 'node:path';
 import {after, before, describe, it} from 'node:test';
 
-import {statusCommand} from '../../src/commands/status.js';
-import {loadSession} from '../../src/sessionPaths.js';
-import {makePipePath, type SessionConfig} from '../../src/sessionPaths.js';
-import type {AxiStructuredOutput} from '../../src/output.js';
-import type {WorkerContext} from '../../src/types.js';
+import {statusCommand} from '../../../src/cli/commands/status.js';
+import type {AxiStructuredOutput} from '../../../src/cli/output.js';
+import {loadSession} from '../../../src/cli/sessionPaths.js';
+import {
+  makePipePath,
+  type SessionConfig,
+} from '../../../src/cli/sessionPaths.js';
+import type {WorkerContext} from '../../../src/cli/types.js';
 
 function fakeSession(name: string, socketPath: string): SessionConfig {
   return {
