@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 为 `src/modules/proxy` 构建开箱即用的轻量级独立交互式终端 REPL（`ProxyCli` 及 `cli.ts`），支持服务启停、实时流量 tail、报文查看/curl 重放、规则改写、主机过滤、系统代理控制、HAR 导出与 Tab 智能补全，并提供 Prompt-Safe 流控打印与四重异常退出清理保障。
+**Goal:** 为 `src/modules/proxy` 构建轻量级交互式终端 REPL（`ProxyCli` 及 `cli.ts`），同时接入统一的 `proxycli` 工具链（`proxycli proxy`），支持服务启停、实时流量 tail、报文查看/curl 重放、规则改写、主机过滤、系统代理控制、HAR 导出与 Tab 智能补全，并提供 Prompt-Safe 流控打印与四重异常退出清理保障。
 
-**Architecture:** 基于 Node.js 原生 `node:readline` 模块构建零第三方 UI 依赖的行式交互引擎，`ProxyCli` 类负责命令分发、补全和状态机，`cli.ts` 提供独立可执行入口及系统信号兜底。所有 I/O 流通过依赖注入抽象，便于 100% 隔离单元测试。
+**Architecture:** 基于 Node.js 原生 `node:readline` 模块构建零第三方 UI 依赖的行式交互引擎，`ProxyCli` 类负责命令分发、补全和状态机，`cli.ts` 提供独立可执行入口，`src/cli/commands/proxy.ts` 接入 `proxycli` 命令分发。所有 I/O 流通过依赖注入抽象，便于 100% 隔离单元测试。
 
 **Tech Stack:** TypeScript (ESM), Node.js `node:readline`, `node:stream`, `node:test`, `node:assert`, ANSI escape codes.
 
@@ -15,7 +15,8 @@
 - 遵循 Node.js ESM 规范与项目严格 TypeScript 约束。
 - 零额外第三方 UI 依赖，使用标准库 `node:readline`。
 - I/O 可测试：`ProxyCli` 构造器必须允许注入自定义 `input` 与 `output` 流。
-- 退出安全红线：任何退出路径（正常退出、Ctrl+C、SIGTERM、未捕获异常）必须执行系统代理还原 `SystemProxyManager.restore()`。
+- 退出安全红线：任何退出路径（正常退出、Ctrl+C、SIGTERM、未捕获异常）必须执行系统代理还原 `MitmModule.restoreSystemProxy()`。
+- 测试执行规范：编译后运行 `npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/ProxyCli.test.js`（或直接全量单元测试），不使用未安装的外部运行器。
 
 ---
 
@@ -31,7 +32,7 @@
 - Consumes: `MitmModule` from `src/modules/proxy/MitmModule.js`
 - Produces: `ProxyCli` class with `tokenize(line: string): string[]`, `handleCommand(line: string): Promise<boolean>`, and `start(): Promise<void>`
 
-- [ ] **Step 1: 编写分词与命令分发单元测试**
+- [x] **Step 1: 编写分词与命令分发单元测试**
 
 ```typescript
 // tests/unit/modules/proxy/ProxyCli.test.ts
@@ -81,12 +82,12 @@ describe('ProxyCli - Foundation & Tokenizer', () => {
 });
 ```
 
-- [ ] **Step 2: 运行测试以验证其失败**
+- [x] **Step 2: 运行测试以验证其失败**
 
-运行：`npx tsx --test tests/unit/modules/proxy/ProxyCli.test.ts`
+运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/ProxyCli.test.js`
 预期：FAIL，提示找不到模块 `ProxyCli.js` 或导出不存在。
 
-- [ ] **Step 3: 实现分词器与 ProxyCli 基础类**
+- [x] **Step 3: 实现分词器与 ProxyCli 基础类**
 
 ```typescript
 // src/modules/proxy/ProxyCli.ts
@@ -193,12 +194,12 @@ export class ProxyCli {
 }
 ```
 
-- [ ] **Step 4: 运行测试验证通过**
+- [x] **Step 4: 运行测试验证通过**
 
-运行：`npx tsx --test tests/unit/modules/proxy/ProxyCli.test.ts`
+运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/ProxyCli.test.js`
 预期：PASS，所有用例通过。
 
-- [ ] **Step 5: 提交代码**
+- [x] **Step 5: 提交代码**
 
 ```bash
 git add src/modules/proxy/ProxyCli.ts tests/unit/modules/proxy/ProxyCli.test.ts
@@ -216,10 +217,10 @@ git commit -m "feat(proxy): add ProxyCli base class and command tokenizer"
 
 **Interfaces:**
 
-- Consumes: `MitmModule.start()`, `MitmModule.stop()`, `MitmModule.getStatus()`
+- Consumes: `MitmModule.startMitmProxy()`, `MitmModule.stopMitmProxy()`, `MitmModule.getMitmProxyStatus()`, `MitmModule.getSystemProxyStatus()`
 - Produces: `ProxyCli.handleStart()`, `ProxyCli.handleStop()`, `ProxyCli.handleRestart()`, `ProxyCli.handleStatus()`
 
-- [ ] **Step 1: 编写服务控制命令测试**
+- [x] **Step 1: 编写服务控制命令测试**
 
 ```typescript
 // 在 tests/unit/modules/proxy/ProxyCli.test.ts 中追加测试
@@ -255,27 +256,27 @@ it('支持 start, stop, restart 与 status 生命周期流转', async () => {
 });
 ```
 
-- [ ] **Step 2: 运行测试以验证其失败**
+- [x] **Step 2: 运行测试以验证其失败**
 
-运行：`npx tsx --test tests/unit/modules/proxy/ProxyCli.test.ts`
+运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/ProxyCli.test.js`
 预期：FAIL，未知命令 `start`。
 
-- [ ] **Step 3: 在 ProxyCli 中实现 start, stop, restart, status**
+- [x] **Step 3: 在 ProxyCli 中实现 start, stop, restart, status**
 
 在 `ProxyCli.ts` 中补充逻辑：
 
 - 增加 `updatePrompt()` 方法：代理运行中设置为 `proxy[<port>]>`，未运行时设置为 `proxy[stopped]>`。
-- `handleStart(args)`：解析端口和 upstream，调用 `module.start(port, upstream)`，更新 prompt。
-- `handleStop()`：调用 `module.stop()`，更新 prompt。
-- `handleRestart(args)`：按序执行 stop 和 start。
-- `handleStatus()`：调用 `module.getStatus()`，使用方框/制表符排版输出运行状态。
+- `handleStart(args)`：解析端口和 upstream，调用 `module.startMitmProxy({ port, upstreamProxy })`，更新 prompt。
+- `handleStop()`：调用 `module.stopMitmProxy()`，更新 prompt。
+- `handleRestart(args)`：按序执行 stopMitmProxy 和 startMitmProxy。
+- `handleStatus()`：调用 `module.getMitmProxyStatus()` 与 `module.getSystemProxyStatus()`，使用方框/制表符排版输出运行状态。
 
-- [ ] **Step 4: 运行测试验证通过**
+- [x] **Step 4: 运行测试验证通过**
 
-运行：`npx tsx --test tests/unit/modules/proxy/ProxyCli.test.ts`
+运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/ProxyCli.test.js`
 预期：PASS。
 
-- [ ] **Step 5: 提交代码**
+- [x] **Step 5: 提交代码**
 
 ```bash
 git add src/modules/proxy/ProxyCli.ts tests/unit/modules/proxy/ProxyCli.test.ts
@@ -293,10 +294,10 @@ git commit -m "feat(proxy): add start, stop, restart and status commands to Prox
 
 **Interfaces:**
 
-- Consumes: `MitmModule.listRequests()`, `MitmModule.getRequest()`, `MitmModule.clearRequests()`, `formatCurl()`
+- Consumes: `MitmModule.listMitmRequests()`, `MitmModule.getMitmRequest()`, `MitmModule.clearMitmRequests()`, `MitmModule.formatRequestCurl()`
 - Produces: `ProxyCli.handleLs()`, `ProxyCli.handleShow()`, `ProxyCli.handleCurl()`, `ProxyCli.handleClear()`
 
-- [ ] **Step 1: 编写流量操作单元测试**
+- [x] **Step 1: 编写流量操作单元测试**
 
 ```typescript
 // tests/unit/modules/proxy/ProxyCli.test.ts
@@ -352,26 +353,26 @@ it('支持 ls, show, curl, clear 命令', async () => {
 });
 ```
 
-- [ ] **Step 2: 运行测试验证失败**
+- [x] **Step 2: 运行测试验证失败**
 
-运行：`npx tsx --test tests/unit/modules/proxy/ProxyCli.test.ts`
+运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/ProxyCli.test.js`
 预期：FAIL，未知命令 `ls`。
 
-- [ ] **Step 3: 实现 ls, show, curl 与 clear 逻辑**
+- [x] **Step 3: 实现 ls, show, curl 与 clear 逻辑**
 
 在 `ProxyCli.ts` 中：
 
-- `handleLs(args)`：解析 `limit`（默认 15）和 `filter`，调用 `module.listRequests()`，输出对齐表格。
-- `handleShow(args)`：解析 `id`（默认为 `selectedId` 或最近一条）与 `part`，调用 `module.getRequest(id)`，分块渲染 General、Headers、Body（带 JSON 格式化与大报文截断保护）。设置 `this.selectedId = id`。
-- `handleCurl(args)`：调用 `module.getRequest(id)`，利用 `formatCurl` 输出。
-- `handleClear()`：调用 `module.clearRequests()`，清空 `selectedId`。
+- `handleLs(args)`：解析 `limit`（默认 15）和 `filter`，调用 `module.listMitmRequests({ limit, filter })`，输出对齐表格。
+- `handleShow(args)`：解析 `id`（默认为 `selectedId` 或最近一条）与 `part`，调用 `module.getMitmRequest({ id })`，分块渲染 General、Headers、Body（带 JSON 格式化与大报文截断保护）。设置 `this.selectedId = id`。
+- `handleCurl(args)`：调用 `module.formatRequestCurl({ id })` 输出 cURL 命令。
+- `handleClear()`：调用 `module.clearMitmRequests()`，清空 `selectedId`。
 
-- [ ] **Step 4: 运行测试验证通过**
+- [x] **Step 4: 运行测试验证通过**
 
-运行：`npx tsx --test tests/unit/modules/proxy/ProxyCli.test.ts`
+运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/ProxyCli.test.js`
 预期：PASS。
 
-- [ ] **Step 5: 提交代码**
+- [x] **Step 5: 提交代码**
 
 ```bash
 git add src/modules/proxy/ProxyCli.ts tests/unit/modules/proxy/ProxyCli.test.ts
@@ -392,7 +393,7 @@ git commit -m "feat(proxy): add ls, show, curl and clear commands to ProxyCli"
 - Consumes: `CapturedExchange` 事件流
 - Produces: `ProxyCli.handleTail()`, `ProxyCli.safeLog(message: string)`
 
-- [ ] **Step 1: 编写 tail 与 safeLog 单元测试**
+- [x] **Step 1: 编写 tail 与 safeLog 单元测试**
 
 ```typescript
 // tests/unit/modules/proxy/ProxyCli.test.ts
@@ -421,25 +422,25 @@ it('tail 开关切换及 safeLog 在活跃提示符时正常刷新', async () =>
 });
 ```
 
-- [ ] **Step 2: 运行测试验证失败**
+- [x] **Step 2: 运行测试验证失败**
 
-运行：`npx tsx --test tests/unit/modules/proxy/ProxyCli.test.ts`
+运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/ProxyCli.test.js`
 预期：FAIL，未知命令 `tail`。
 
-- [ ] **Step 3: 实现 tail 与 safeLog**
+- [x] **Step 3: 实现 tail 与 safeLog**
 
 在 `ProxyCli.ts` 中：
 
 - `safeLog(msg)`：若 `rl` 存在，通过 `\r\x1b[K` 清除当前行，写入 `msg + '\n'`，再调用 `this.rl.prompt(true)` 重绘用户正在键入的字符。
 - `handleTail(args)`：支持 `on` / `off` / 无参数 toggle。
-- 在 `module` 收到 exchange 时，若 `tailEnabled` 为 true，调用 `safeLog` 输出单行紧凑日志（状态码带颜色渲染）。
+- 在 `module.on('exchange', ...)` 回调中，若 `tailEnabled` 为 true，调用 `safeLog` 输出单行紧凑日志（状态码带颜色渲染）。
 
-- [ ] **Step 4: 运行测试验证通过**
+- [x] **Step 4: 运行测试验证通过**
 
-运行：`npx tsx --test tests/unit/modules/proxy/ProxyCli.test.ts`
+运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/ProxyCli.test.js`
 预期：PASS。
 
-- [ ] **Step 5: 提交代码**
+- [x] **Step 5: 提交代码**
 
 ```bash
 git add src/modules/proxy/ProxyCli.ts tests/unit/modules/proxy/ProxyCli.test.ts
@@ -457,10 +458,10 @@ git commit -m "feat(proxy): add tail command with prompt-safe logging"
 
 **Interfaces:**
 
-- Consumes: `MitmModule.addRule()`, `MitmModule.listRules()`, `MitmModule.removeRule()`, `MitmModule.clearRules()`, `MitmModule.addHostFilter()`, `MitmModule.listHostFilters()`, `MitmModule.removeHostFilter()`, `MitmModule.clearHostFilters()`
+- Consumes: `MitmModule.addMitmRule()`, `MitmModule.listMitmRules()`, `MitmModule.removeMitmRule()`, `MitmModule.clearMitmRules()`, `MitmModule.addHostFilter()`, `MitmModule.listHostFilters()`, `MitmModule.removeHostFilter()`, `MitmModule.clearHostFilters()`
 - Produces: `ProxyCli.handleRule()`, `ProxyCli.handleFilter()`
 
-- [ ] **Step 1: 编写 rule 与 filter 测试用例**
+- [x] **Step 1: 编写 rule 与 filter 测试用例**
 
 ```typescript
 // tests/unit/modules/proxy/ProxyCli.test.ts
@@ -496,24 +497,24 @@ it('支持 rule 与 filter 的增删查清命令', async () => {
 });
 ```
 
-- [ ] **Step 2: 运行测试验证失败**
+- [x] **Step 2: 运行测试验证失败**
 
-运行：`npx tsx --test tests/unit/modules/proxy/ProxyCli.test.ts`
+运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/ProxyCli.test.js`
 预期：FAIL，未知命令 `rule`。
 
-- [ ] **Step 3: 实现 rule 与 filter 命令处理器**
+- [x] **Step 3: 实现 rule 与 filter 命令处理器**
 
 在 `ProxyCli.ts` 中：
 
-- `handleRule(args)`：实现 `ls`, `add mock`, `add redirect`, `add header`, `rm`, `clear` 子命令分发。
-- `handleFilter(args)`：实现 `ls`, `allow`, `block`, `rm`, `clear` 子命令分发。
+- `handleRule(args)`：实现 `ls`, `add mock`, `add redirect`, `add header`, `rm`, `clear` 子命令分发，调用 `module.addMitmRule()`, `module.listMitmRules()`, `module.removeMitmRule()`, `module.clearMitmRules()`。
+- `handleFilter(args)`：实现 `ls`, `allow`, `block`, `rm`, `clear` 子命令分发，调用 `module.addHostFilter()`, `module.listHostFilters()`, `module.removeHostFilter()`, `module.clearHostFilters()`。
 
-- [ ] **Step 4: 运行测试验证通过**
+- [x] **Step 4: 运行测试验证通过**
 
-运行：`npx tsx --test tests/unit/modules/proxy/ProxyCli.test.ts`
+运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/ProxyCli.test.js`
 预期：PASS。
 
-- [ ] **Step 5: 提交代码**
+- [x] **Step 5: 提交代码**
 
 ```bash
 git add src/modules/proxy/ProxyCli.ts tests/unit/modules/proxy/ProxyCli.test.ts
@@ -531,10 +532,10 @@ git commit -m "feat(proxy): add rule and filter commands to ProxyCli"
 
 **Interfaces:**
 
-- Consumes: `MitmModule.getSystemProxyManager()`, `MitmModule.exportCa()`, `MitmModule.listLocalProcesses()`, `MitmModule.exportHar()`
+- Consumes: `MitmModule.enableSystemProxy()`, `MitmModule.restoreSystemProxy()`, `MitmModule.getSystemProxyStatus()`, `MitmModule.exportMitmCa()`, `MitmModule.exportMitmHar()`, `MitmModule.listLocalProcesses()`, `MitmModule.updateLocalAppsConfig()`
 - Produces: `ProxyCli.handleSysproxy()`, `ProxyCli.handleCa()`, `ProxyCli.handleProc()`, `ProxyCli.handleHar()`
 
-- [ ] **Step 1: 编写高级系统命令测试**
+- [x] **Step 1: 编写高级系统命令测试**
 
 ```typescript
 // tests/unit/modules/proxy/ProxyCli.test.ts
@@ -570,26 +571,26 @@ it('支持 ca, sysproxy, proc 与 har 命令分发', async () => {
 });
 ```
 
-- [ ] **Step 2: 运行测试验证失败**
+- [x] **Step 2: 运行测试验证失败**
 
-运行：`npx tsx --test tests/unit/modules/proxy/ProxyCli.test.ts`
+运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/ProxyCli.test.js`
 预期：FAIL，未知命令 `ca`。
 
-- [ ] **Step 3: 实现 sysproxy, ca, proc, har 命令**
+- [x] **Step 3: 实现 sysproxy, ca, proc, har 命令**
 
 在 `ProxyCli.ts` 中：
 
-- `handleSysproxy(args)`：实现 `on`, `off`, `status`。
-- `handleCa(args)`：实现 `path`, `export`。
-- `handleProc(args)`：实现 `ls`, `target`, `clear`。
-- `handleHar(args)`：解析目标路径，调用 `module.exportHar()` 写入文件。
+- `handleSysproxy(args)`：实现 `on`, `off`, `status`，调用 `module.enableSystemProxy()`, `module.restoreSystemProxy()`, `module.getSystemProxyStatus()`。
+- `handleCa(args)`：实现 `path`, `export`，调用 `module.exportMitmCa()`。
+- `handleProc(args)`：实现 `ls`, `target`, `clear`，调用 `module.listLocalProcesses()`, `module.updateLocalAppsConfig()`。
+- `handleHar(args)`：解析目标路径，调用 `module.exportMitmHar()` 写入文件。
 
-- [ ] **Step 4: 运行测试验证通过**
+- [x] **Step 4: 运行测试验证通过**
 
-运行：`npx tsx --test tests/unit/modules/proxy/ProxyCli.test.ts`
+运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/ProxyCli.test.js`
 预期：PASS。
 
-- [ ] **Step 5: 提交代码**
+- [x] **Step 5: 提交代码**
 
 ```bash
 git add src/modules/proxy/ProxyCli.ts tests/unit/modules/proxy/ProxyCli.test.ts
@@ -609,7 +610,7 @@ git commit -m "feat(proxy): add sysproxy, ca, proc and har commands to ProxyCli"
 
 - Produces: `ProxyCli.completer(line: string): [string[], string]`
 
-- [ ] **Step 1: 编写 Tab 补全单元测试**
+- [x] **Step 1: 编写 Tab 补全单元测试**
 
 ```typescript
 // tests/unit/modules/proxy/ProxyCli.test.ts
@@ -635,24 +636,24 @@ it('completer 正确补全一级命令与二级子命令', () => {
 });
 ```
 
-- [ ] **Step 2: 运行测试验证失败**
+- [x] **Step 2: 运行测试验证失败**
 
-运行：`npx tsx --test tests/unit/modules/proxy/ProxyCli.test.ts`
+运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/ProxyCli.test.js`
 预期：FAIL，`cli.completer` 不存在。
 
-- [ ] **Step 3: 实现 completer 并挂载到 readline**
+- [x] **Step 3: 实现 completer 并挂载到 readline**
 
 在 `ProxyCli.ts` 中实现 `completer(line: string)`：
 
 - 解析前缀，根据上下文匹配命令字典树及当前活跃的请求 ID。
 - 在 `start()` 的 `readline.createInterface` 配置中传入 `completer: (line) => this.completer(line)`。
 
-- [ ] **Step 4: 运行测试验证通过**
+- [x] **Step 4: 运行测试验证通过**
 
-运行：`npx tsx --test tests/unit/modules/proxy/ProxyCli.test.ts`
+运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/ProxyCli.test.js`
 预期：PASS。
 
-- [ ] **Step 5: 提交代码**
+- [x] **Step 5: 提交代码**
 
 ```bash
 git add src/modules/proxy/ProxyCli.ts tests/unit/modules/proxy/ProxyCli.test.ts
@@ -661,47 +662,58 @@ git commit -m "feat(proxy): implement intelligent tab completer in ProxyCli"
 
 ---
 
-### Task 8: 独立可执行入口、信号安全门禁与脚本集成 (CLI Entry & Safety Guard)
+### Task 8: 统一 CLI 挂载、独立可执行入口与信号安全门禁 (CLI Integration & Safety Guard)
 
 **Files:**
 
 - Create: `src/modules/proxy/cli.ts`
+- Create: `src/cli/commands/proxy.ts`
+- Modify: `src/cli/app.ts`
 - Modify: `src/modules/proxy/index.ts`
 - Modify: `package.json`
 
 **Interfaces:**
 
 - Consumes: `ProxyCli`, `MitmModule`
-- Produces: CLI 入口二进制执行流、`package.json` `"proxy:cli"` script
+- Produces: `proxycli proxy` 子命令、独立可执行脚本、`package.json` `"proxy:cli"` script
 
-- [ ] **Step 1: 编写 CLI 入口脚本及参数解析**
+- [x] **Step 1: 编写 CLI 入口脚本及参数解析**
 
 创建 `src/modules/proxy/cli.ts`：
 
 - 解析 `--port <num>`, `-p <num>`, `--upstream <url>`, `--sysproxy`, `--no-auto-start`。
 - 实例化 `MitmModule` 与 `ProxyCli`。
-- 注册 `SIGINT`, `SIGTERM`, `uncaughtException`, `exit` 四重清理守卫（保证执行 `systemProxy.restore()` 与 `module.stop()`）。
+- 注册 `SIGINT`, `SIGTERM`, `uncaughtException`, `exit` 四重清理守卫（保证执行 `mitmModule.restoreSystemProxy()` 与 `mitmModule.stopMitmProxy()`）。
 - 若未带 `--no-auto-start`，默认自启代理并进入 REPL。
 
-- [ ] **Step 2: 在 index.ts 中导出 ProxyCli**
+- [x] **Step 2: 创建 proxycli proxy 子命令**
+
+创建 `src/cli/commands/proxy.ts`：
+
+- 挂载 `proxycli proxy` 命令，支持直接进入 REPL 或执行一次性状态检查。
+- 在 `src/cli/app.ts` 中注册 `proxy` 子命令到 `cliCommands`。
+
+- [x] **Step 3: 在 index.ts 中导出 ProxyCli**
 
 在 `src/modules/proxy/index.ts` 中导出 `ProxyCli`, `tokenizeLine`。
 
-- [ ] **Step 3: 在 package.json 中注册 proxy:cli 脚本**
+- [x] **Step 4: 在 package.json 中注册 proxy:cli 脚本**
 
 在 `package.json` 的 `"scripts"` 中添加：
 `"proxy:cli": "node --no-warnings=ExperimentalWarning build/src/modules/proxy/cli.js"`
 
-- [ ] **Step 4: 运行项目类型检查与格式校验**
+- [x] **Step 5: 运行项目类型检查与完整回归校验**
 
 运行：
 `npm run typecheck`
-`npm run check-format`
+`npm run check-arch`
+`npm run test:cli`
+`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/ProxyCli.test.js`
 预期：全部通过，0 error。
 
-- [ ] **Step 5: 提交代码**
+- [x] **Step 6: 提交代码**
 
 ```bash
-git add src/modules/proxy/cli.ts src/modules/proxy/index.ts package.json
-git commit -m "feat(proxy): add cli executable entry and npm script"
+git add src/modules/proxy/cli.ts src/cli/commands/proxy.ts src/cli/app.ts src/modules/proxy/index.ts package.json
+git commit -m "feat(proxy): add proxycli proxy command and standalone cli entry"
 ```
