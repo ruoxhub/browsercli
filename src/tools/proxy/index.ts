@@ -19,3 +19,5 @@ export {addHostFilter} from './addHostFilter.js';
 export {listHostFilters} from './listHostFilters.js';
 export {removeHostFilter} from './removeHostFilter.js';
 export {clearHostFilters} from './clearHostFilters.js';
+export {mitmListLocalProcesses} from './mitmListLocalProcesses.js';
+export {mitmConfigureLocalApps} from './mitmConfigureLocalApps.js';

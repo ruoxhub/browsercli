@@ -30,6 +30,9 @@ export const addHostFilter = defineTool({
     const result = getRuntime().mitmModule.addHostFilter(
       request.params as AddHostFilterParams,
     );
-    response.setStructuredContent({...result, tooltype: 'mitm_add_host_filter'});
+    response.setStructuredContent({
+      ...result,
+      tooltype: 'mitm_add_host_filter',
+    });
   },
 });

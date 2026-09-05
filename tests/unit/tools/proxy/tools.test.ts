@@ -24,6 +24,8 @@ const EXPECTED_TOOLS = [
   'mitm_list_host_filters',
   'mitm_remove_host_filter',
   'mitm_clear_host_filters',
+  'mitm_list_local_processes',
+  'mitm_configure_local_apps',
 ];
 
 interface ToolLike {

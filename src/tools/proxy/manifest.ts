@@ -71,5 +71,13 @@ export const manifest = {
       modulePath: './proxy/clearHostFilters.js',
       handlerName: 'clearHostFilters',
     },
+    {
+      modulePath: './proxy/mitmListLocalProcesses.js',
+      handlerName: 'mitmListLocalProcesses',
+    },
+    {
+      modulePath: './proxy/mitmConfigureLocalApps.js',
+      handlerName: 'mitmConfigureLocalApps',
+    },
   ],
 } satisfies DomainManifest;

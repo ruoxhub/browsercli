@@ -570,6 +570,14 @@ export const GENERATED_TOOL_REGISTRY = [
     handlerName: 'clearHostFilters',
   },
   {
+    modulePath: './proxy/mitmListLocalProcesses.js',
+    handlerName: 'mitmListLocalProcesses',
+  },
+  {
+    modulePath: './proxy/mitmConfigureLocalApps.js',
+    handlerName: 'mitmConfigureLocalApps',
+  },
+  {
     modulePath: './rebuild/index.js',
     handlerName: 'exportRebuildBundle',
   },
