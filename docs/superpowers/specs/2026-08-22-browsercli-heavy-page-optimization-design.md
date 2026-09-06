@@ -2,7 +2,7 @@
 
 - **Date:** 2026-08-22
 - **Status:** In Review (已按代码现状回填修订)
-- **Target Subsystems:** `browsercli/`, `src/worker/`, `src/modules/debugger/`, `src/modules/network/`, `src/modules/hook/`, `src/tools/`
+- **Target Subsystems:** `proxycli/`, `src/worker/`, `src/modules/debugger/`, `src/modules/network/`, `src/modules/hook/`, `src/tools/`
 
 > 修订说明：原稿将本规范写成“将要实现的改造”，但经与 `refactor` 分支代码比对，原问题
 > 列表中的多数项**已经落地**，且部分设计项与既有实现直接冲突。本版先回填现状，再仅保留
@@ -16,7 +16,7 @@
 
 | # | 原始问题 | 状态 | 现状证据 |
 |---|---|---|---|
-| 1 | Worker 死锁 / `409 WORKER_BUSY` 泄漏 | **已解决** | `WorkerActivityCoordinator`（runTool 允许并发 + runBrowserOperation 互斥门 + `raceWithAbort`）：`src/worker/WorkerActivityCoordinator.ts:66-116`；`WorkerHttpClient.invoke` 超时自动 `cancelJob`：`browsercli/src/WorkerHttpClient.ts:236-243`；`apiV1.rejectIfBusy` 结构化 409：`src/web/routes/apiV1.ts:279-311` |
+| 1 | Worker 死锁 / `409 WORKER_BUSY` 泄漏 | **已解决** | `WorkerActivityCoordinator`（runTool 允许并发 + runBrowserOperation 互斥门 + `raceWithAbort`）：`src/worker/WorkerActivityCoordinator.ts:66-116`；`WorkerHttpClient.invoke` 超时自动 `cancelJob`：`proxycli/src/WorkerHttpClient.ts:236-243`；`apiV1.rejectIfBusy` 结构化 409：`src/web/routes/apiV1.ts:279-311` |
 | 2 | 脚本搜索下载全部脚本超时 | **已解决** | `ScriptManager.searchInScripts` 已做 cached 本地搜索 + `Debugger.searchInContent` 预筛 + 仅命中脚本加载源码：`src/modules/debugger/ScriptManager.ts:540-691`；两套搜索工具共存：`search_in_sources`（`src/tools/debugger/index.ts:943`）、`search_in_scripts`（`src/tools/collector/searchInScripts.ts:26`） |
 | 3 | 大响应体阻塞 | **部分解决** | `NetworkModule.getRequest` 已按 `maxBodyLength`（默认 `DEFAULT_GET_BODY_LENGTH=300`）截断并追加 `... [truncated]`：`src/modules/network/NetworkModule.ts:414-463`；但缺 `fullBody/saveTo` 与 `isTruncated/totalBodyLength/previewLength/savedPath` 元数据（见增量 2） |
 | 4 | fetch hook 漏 XHR | **已解决** | `HookTypeRegistry` 提供分离的 `fetch` 与 `xhr` 类型；xhr 已 patch open/send 并捕获 status/responseText：`src/modules/hook/HookTypeRegistry.ts:126,278` |
@@ -46,7 +46,7 @@
 
 ### 增量 1：`WorkerHttpClient` 409 退避重试（P1→P2）
 
-- 位置：`browsercli/src/WorkerHttpClient.ts::invoke`（`224-261`）。
+- 位置：`proxycli/src/WorkerHttpClient.ts::invoke`（`224-261`）。
 - 行为：当任务返回错误码 `WORKER_BUSY` 且当前工具为 probe 型（`readOnlyHint` 为真）时，按 `[200ms, 500ms, 1000ms]` 退避重试（最多 3 次，总预算 3s）。
 - 仍忙：抛结构化错误，携带当前 `jobId` / `operation`（复用 `JobStatus.error.recovery` 通道，见 `WorkerHttpClient.ts:251-257`）。
 - 依赖：任务返回体需带 `error.code === 'WORKER_BUSY'`（现状 `WorkerBusyError.code` 已为此值）。
@@ -93,8 +93,8 @@
 
 ### 增量 6：CLI `call --json` 纯数据输出（P2）
 
-- 位置：`browsercli/src/commands/tool-dispatcher.ts` + `browsercli/src/commands/shared/tool-args.ts`（`TOOL_CONTROL_FLAGS`）。
-- 语义澄清：list 类工具（`list_network_requests`/`list_pages`/`list_frames`/`list_scripts`）经 `browsercli call <tool>` 统一入口调用；`--json` 是 CLI 输出层 flag，非 MCP 工具参数。为 `call --json` 时直接输出工具的原始 structuredContent（纯 JSON，无 `command/target/tool` 包装），便于 jq/grep 自动化。
+- 位置：`proxycli/src/commands/tool-dispatcher.ts` + `proxycli/src/commands/shared/tool-args.ts`（`TOOL_CONTROL_FLAGS`）。
+- 语义澄清：list 类工具（`list_network_requests`/`list_pages`/`list_frames`/`list_scripts`）经 `proxycli call <tool>` 统一入口调用；`--json` 是 CLI 输出层 flag，非 MCP 工具参数。为 `call --json` 时直接输出工具的原始 structuredContent（纯 JSON，无 `command/target/tool` 包装），便于 jq/grep 自动化。
 
 ---
 

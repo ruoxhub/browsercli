@@ -170,7 +170,7 @@ export class ToolPrerequisiteChecker {
               retryable: true,
               recovery: {
                 tool: 'resume',
-                command: 'browsercli call resume',
+                command: 'proxycli call resume',
                 reason: 'Resume execution or evaluate the current call frame.',
               },
             },
@@ -186,7 +186,7 @@ export class ToolPrerequisiteChecker {
               retryable: false,
               recovery: {
                 tool: 'pause',
-                command: 'browsercli call pause',
+                command: 'proxycli call pause',
                 reason: 'Pause page execution before inspecting call frames.',
               },
             },

@@ -173,7 +173,7 @@ describe('get_script_source filePath param', () => {
   });
 
   it('returns the built-in cache path when filePath is omitted', async () => {
-    const cachePath = path.join(os.tmpdir(), 'browsercli-scripts', 'abc.js');
+    const cachePath = path.join(os.tmpdir(), 'proxycli-scripts', 'abc.js');
     const context = {
       getDebuggerContext: async () => makeDebuggerContext(cachePath),
       getSelectedPage: () => null,
@@ -195,14 +195,14 @@ describe('get_script_source filePath param', () => {
   });
 
   it('accepts a numeric scriptId (CLI coerces IDs to number) and normalizes to string', async () => {
-    const cachePath = path.join(os.tmpdir(), 'browsercli-scripts', 'num.js');
+    const cachePath = path.join(os.tmpdir(), 'proxycli-scripts', 'num.js');
     const context = {
       getDebuggerContext: async () => makeDebuggerContext(cachePath, '185205'),
       getSelectedPage: () => null,
     };
     const response = makeResponse();
 
-    // browsercli 会把纯数字 ID 推断为 number，工具须能接受并归一化为 string。
+    // proxycli 会把纯数字 ID 推断为 number，工具须能接受并归一化为 string。
     await getScriptSource.handler(
       {params: {scriptId: 185205} as never} as never,
       response as never,

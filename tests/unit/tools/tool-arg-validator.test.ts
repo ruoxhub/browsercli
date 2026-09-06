@@ -87,7 +87,7 @@ describe('validateToolArgs array-of-object (json) param', () => {
   });
 });
 
-describe('validateToolArgs browsercli regression contracts', () => {
+describe('validateToolArgs proxycli regression contracts', () => {
   before(async () => {
     await ensureToolsMeta();
   });

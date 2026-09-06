@@ -74,7 +74,7 @@ Level 3: 接口与接入层 (Ingress Layer)
   ├── src/tools/                # MCP 工具定义与实现
   ├── src/web/                  # REST API 与 WebSocket 路由
   ├── src/ipc/                  # 守护进程 IPC 服务端
-  └── browsercli/               # 独立 CLI 客户端包 (零耦合，独立构建)
+  └── proxycli/               # 独立 CLI 客户端包 (零耦合，独立构建)
          │
          ▼ (单向依赖)
 Level 2: 编排与运行调度层 (Orchestration & Worker Layer)
@@ -410,7 +410,7 @@ reverse/ReverseTaskCheckpoint.ts ⇄ reverse/ReverseTaskExecutor.ts
 - **⚠️ 原 spec 的 `IDisposable` 抽象待证据（降级为待定）**：
   `src/worker/WorkerLifecycle.ts`（63 行）已有 `createGracefulShutdown()`，处理 `browserManager.close()` 与 `contextProvider.dispose()`，带 10s 超时与重入保护（`isShuttingDown`）。
 
-  新增 `LifecycleManager` 统管 `BrowserManager`/`DebuggerManager`/`CodeCollector`/`WsHub`/`DatabaseManager` 五个组件的拓扑倒序释放，**必须先给出孤儿 Chrome 进程或端口泄漏的可复现证据**（例如 `browsercli list` 显示残留会话、`netstat` 显示端口占用）。
+  新增 `LifecycleManager` 统管 `BrowserManager`/`DebuggerManager`/`CodeCollector`/`WsHub`/`DatabaseManager` 五个组件的拓扑倒序释放，**必须先给出孤儿 Chrome 进程或端口泄漏的可复现证据**（例如 `proxycli list` 显示残留会话、`netstat` 显示端口占用）。
   - 若证据成立 → Phase 4 实施，接口定义于 `src/types/lifecycle.ts`。
   - 若证据不成立 → 本轮**不做**，仅保留现状。这符合 YAGNI：现有实现已覆盖主要泄漏面。
 
@@ -444,9 +444,9 @@ reverse/ReverseTaskCheckpoint.ts ⇄ reverse/ReverseTaskExecutor.ts
 
    > 实际落配置时，规则应写入 `eslint.config.mjs` 的独立 config block（`files: ['src/**/*.ts']`），而不是长命令行——上例仅示意。
 
-6. **必须显式排除**：`src/web-ui/**`（React/Vite 独立构建，不受本分层约束）、`browsercli/**`（已在 `globalIgnores`）。
+6. **必须显式排除**：`src/web-ui/**`（React/Vite 独立构建，不受本分层约束）、`proxycli/**`（已在 `globalIgnores`）。
 
-**升级条件**：若 `import/no-restricted-paths` 无法表达"按层分组 + 逐文件白名单"（例如需要按 glob 集合而非单路径配置），再评估引入 `dependency-cruiser`。届时补入 `--ignore src/web-ui` 与 `browsercli` 独立门禁。
+**升级条件**：若 `import/no-restricted-paths` 无法表达"按层分组 + 逐文件白名单"（例如需要按 glob 集合而非单路径配置），再评估引入 `dependency-cruiser`。届时补入 `--ignore src/web-ui` 与 `proxycli` 独立门禁。
 
 ### 6.2 核心拦截规则集
 
@@ -479,7 +479,7 @@ reverse/ReverseTaskCheckpoint.ts ⇄ reverse/ReverseTaskExecutor.ts
 > 5. `npm run check-arch` —— Phase 1 引入后每个 Phase 必跑
 >
 > 涉及工具路径变更的 Phase（2、3）额外跑 **`npm run test:integration`**。
-> 涉及 `browsercli` 的变更额外跑 `npm run test:ipc`。
+> 涉及 `proxycli` 的变更额外跑 `npm run test:ipc`。
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐

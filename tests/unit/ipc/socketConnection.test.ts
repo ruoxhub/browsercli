@@ -12,7 +12,7 @@ import {SocketConnection, pipePath} from '../../../src/ipc/socketConnection.js';
 
 function tempPipe(): string {
   return pipePath(
-    `browsercli-test-${process.pid}-${Math.random().toString(36).slice(2)}`,
+    `proxycli-test-${process.pid}-${Math.random().toString(36).slice(2)}`,
   );
 }
 

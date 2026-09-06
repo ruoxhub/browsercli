@@ -621,7 +621,7 @@ export class MitmModule {
     return {
       log: {
         version: HAR_VERSION,
-        creator: {name: 'browsercli-mitm', version: '0.1.0'},
+        creator: {name: 'proxycli-mitm', version: '0.1.0'},
         entries,
       },
     };

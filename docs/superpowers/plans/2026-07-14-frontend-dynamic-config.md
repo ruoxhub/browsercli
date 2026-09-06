@@ -14,7 +14,7 @@
 - 配置纯内存，Worker 重启后回落到 env/CLI 种子值（§11 已确认）。
 - 不做配置磁盘持久化；不实现多用户隔离；不加密存储敏感字段。
 - 不改动 `BrowserManager` 内部实现（stealth/CDP 等逻辑不动）。
-- `browsercli/` 独立 CLI 包不在本次范围（§3 末尾已确认）。
+- `proxycli/` 独立 CLI 包不在本次范围（§3 末尾已确认）。
 - 敏感字段（apiKey）在 `GET /api/config` 响应中掩码，`PUT` 时掩码占位符不覆盖真实值（§6）。
 - 测试框架 `node:test`；源码目录与测试目录镜像；提交前至少运行 `npm run test:unit` 与 `npm run check-format`。
 - 提交遵循 Conventional Commits；不提交真实 apiKey / databaseUrl。
@@ -1847,13 +1847,13 @@ export function resolveConfig(envArgs?: Partial<GlobalConfig>): ResolvedConfig {
 
 ```ts
 /** 用户级配置目录名 */
-export const USER_CONFIG_DIR_NAME = '.browsercli';
+export const USER_CONFIG_DIR_NAME = '.proxycli';
 
 /** 用户级配置文件名 */
 export const USER_CONFIG_FILENAME = 'config.json';
 
 /** 项目级配置文件名 */
-export const PROJECT_CONFIG_FILENAME = 'browsercli.config.json';
+export const PROJECT_CONFIG_FILENAME = 'proxycli.config.json';
 
 /** 项目根目录 config.json 文件名 */
 export const ROOT_CONFIG_FILENAME = 'config.json';
@@ -1863,10 +1863,10 @@ export const ROOT_CONFIG_FILENAME = 'config.json';
 
 ```ts
 /** Sekiro 默认分组名 */
-export const DEFAULT_GROUP = 'browsercli';
+export const DEFAULT_GROUP = 'proxycli';
 
 /** Worker 进程运行时目录 */
-export const RUNTIME_DIR_NAME = 'browsercli';
+export const RUNTIME_DIR_NAME = 'proxycli';
 
 /** Sekiro 默认 RPC (WebSocket) 地址 */
 export const DEFAULT_RPC_HOST = 'ws://127.0.0.1:5612';
@@ -1884,7 +1884,7 @@ const outputDir =
   fileConfig.toolResultRecording?.outputDir ??
   (fileConfig.outputDir
     ? path.join(fileConfig.outputDir, 'tool-results')
-    : path.join(os.homedir(), '.browsercli', 'tool-results'));
+    : path.join(os.homedir(), '.proxycli', 'tool-results'));
 ```
 
 并删除 `import {USER_CONFIG_DIR_NAME} from './constants.js';`（若已导入）。

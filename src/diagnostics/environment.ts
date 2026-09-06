@@ -47,7 +47,7 @@ function getBuildOutputStatus(packageRoot: string): DiagnosticCheck {
     'build',
     'src',
     'bin',
-    'browsercli.js',
+    'proxycli.js',
   );
   const exists = existsSync(buildEntry);
   return {

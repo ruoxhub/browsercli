@@ -7,7 +7,7 @@
 /**
  * Daemon 端 socket 服务：在本地命名管道（POSIX 为 unix socket）上提供
  * NDJSON 方法分发（tools/browser/jobs/events），替代原 /api/v1 HTTP 传输。
- * 客户端见 browsercli/src/daemonClient.ts，帧协议见 ./socketConnection.ts。
+ * 客户端见 proxycli/src/daemonClient.ts，帧协议见 ./socketConnection.ts。
  */
 
 import fs from 'node:fs';

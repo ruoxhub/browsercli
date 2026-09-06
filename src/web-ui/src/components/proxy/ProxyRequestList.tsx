@@ -242,10 +242,11 @@ export const ProxyRequestList: React.FC<ProxyRequestListProps> = ({
     onSelect?.(id);
   };
 
-  // Handle auto-scroll to top/new requests
+  // Handle auto-scroll to latest requests at bottom
   useEffect(() => {
     if (autoScroll && listContainerRef.current) {
-      listContainerRef.current.scrollTop = 0;
+      listContainerRef.current.scrollTop =
+        listContainerRef.current.scrollHeight;
     }
   }, [requests.length, autoScroll]);
 

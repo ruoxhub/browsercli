@@ -123,6 +123,7 @@ describe('help', () => {
         'scaffold',
         'status',
         'proxy',
+        'web',
       ];
       for (const cmd of commands) {
         const result = generateCommandHelp(cmd);

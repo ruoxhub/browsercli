@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 把 `browsercli` 与 `js-reverse-worker` 之间的 Sekiro broker 解耦，改为 Worker 直接暴露原生 HTTP `/api/v1` API（tools/sessions/invoke/jobs + WS 流），CLI 作为纯 HTTP 客户端以 request-response 方式调用，Worker 可跨网络部署并带 Bearer Token 认证。
+**Goal:** 把 `proxycli` 与 `js-reverse-worker` 之间的 Sekiro broker 解耦，改为 Worker 直接暴露原生 HTTP `/api/v1` API（tools/sessions/invoke/jobs + WS 流），CLI 作为纯 HTTP 客户端以 request-response 方式调用，Worker 可跨网络部署并带 Bearer Token 认证。
 
 **Architecture:** 扩展现有 `ConsoleServer`（`src/web/ConsoleServer.ts`）新增 `/api/v1` 分层路由 + Bearer 中间件 + 内存异步 Job 层；工具执行复用 `ToolAdapter` 内已有的 `ToolExecutionPipeline`（新增 `executeTool` 公共方法）。CLI 端新增 `WorkerHttpClient`，把"提交 Job + 轮询"封装为单个 `await`，对命令代码呈现 request-response；并通过**会话缓存**与**首轮立即轮询**把额外延迟压到 ≤1 个轮询间隔。Sekiro 代码保留，由 `WORKER_TRANSPORT` 环境变量可选回退。
 
@@ -1213,7 +1213,7 @@ git commit -m "feat(cli): 新增 WorkerHttpClient（request-response 封装 + �
 **Interfaces:**
 
 - Consumes: `WorkerHttpClient`（Task 7）、`WORKER_URL`/`WORKER_API_TOKEN`/`WORKER_TRANSPORT` 环境变量、`WORKER_HOST`/`WORKER_PORT`（worker 端读取）。
-- Produces: `browsercli` 命令经 HTTP 调用 worker；`call` 命令为单 `await httpClient.invoke(...)`（内部已会话缓存，仅首次付建会话 RTT）；`index.ts` 默认 `http` 跳过 RpcClient/registerAll 旧路径，保留 `sekiro` 回退。
+- Produces: `proxycli` 命令经 HTTP 调用 worker；`call` 命令为单 `await httpClient.invoke(...)`（内部已会话缓存，仅首次付建会话 RTT）；`index.ts` 默认 `http` 跳过 RpcClient/registerAll 旧路径，保留 `sekiro` 回退。
 
 - [ ] **Step1: 改造 app.ts 的 resolveContext**
 
@@ -1294,7 +1294,7 @@ Expected: 全部通过。
 
 ```bash
 git add src/cli/app.ts src/cli/commands/call.ts src/index.ts
-git commit -m "feat(cli): browsercli 改为纯 HTTP 客户端，index.ts 默认 HTTP 传输"
+git commit -m "feat(cli): proxycli 改为纯 HTTP 客户端，index.ts 默认 HTTP 传输"
 ```
 
 ---
@@ -1315,7 +1315,7 @@ git commit -m "feat(cli): browsercli 改为纯 HTTP 客户端，index.ts 默认 
 包含：
 
 1. **启动 worker 服务**：`WORKER_HOST=0.0.0.0 WORKER_PORT=8765 WORKER_API_TOKEN=<token> node build/src/index.js`（默认 `WORKER_TRANSPORT=http`，不连 Sekiro）。
-2. **客户端配置**：`WORKER_URL=http://<host>:8765 WORKER_API_TOKEN=<token> browsercli call <tool> ...`。
+2. **客户端配置**：`WORKER_URL=http://<host>:8765 WORKER_API_TOKEN=<token> proxycli call <tool> ...`。
 3. **nginx HTTPS 示例**：`location /api/v1/ { proxy_pass http://127.0.0.1:8765; proxy_set_header Authorization $http_authorization; }` + `listen 443 ssl;`。
 4. **回退 Sekiro**：`WORKER_TRANSPORT=sekiro node build/src/index.js`（旧路径）。
 5. **API 速查**：`GET /health`、`GET /tools`、`POST /sessions`、`POST /sessions/:id/invoke`、`GET /jobs/:id`、`WS /sessions/:id/stream`。

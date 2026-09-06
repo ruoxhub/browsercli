@@ -3,7 +3,7 @@
 - **日期**：2026-08-30
 - **状态**：差距分析（结论导向，供分波决策；非可执行实现 spec）
 - **文档路径**：`docs/superpowers/specs/2026-08-30-jshookmcp-gap-analysis.md`
-- **目标项目**：Reverser-CLI（browsercli）
+- **目标项目**：Reverser-CLI（proxycli）
 - **上游参照**：`open-source/jshookmcp`（`@jshookmcp/jshook` v0.3.5，AGPL-3.0-only）
 - **前序文档**：`2026-08-11-jshookmcp-migration-design.md`（SourceMap 首期，已交付）
 
@@ -23,7 +23,7 @@
 
 ## 2. 规模与坐标对齐
 
-| 维度   | jshookmcp                               | Reverser-CLI（browsercli）                    |
+| 维度   | jshookmcp                               | Reverser-CLI（proxycli）                    |
 | :----- | :-------------------------------------- | :-------------------------------------------- |
 | 工具数 | 668（`generated-tool-catalog.ts` 实测） | 157（`generated-tools-index.ts` 实测，29 域） |
 | 域数   | 34                                      | 29 个工具目录 + 16 个 `src/modules/`          |

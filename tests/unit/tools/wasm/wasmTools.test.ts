@@ -261,7 +261,7 @@ describe('wasm_memory_inspect', () => {
 
 describe('native WASM tool failures', () => {
   it('reports every missing runtime and optimizer by name', async () => {
-    const tempDir = await mkdtemp(join(tmpdir(), 'browsercli-wasm-tools-'));
+    const tempDir = await mkdtemp(join(tmpdir(), 'proxycli-wasm-tools-'));
     const inputPath = join(tempDir, 'input.wasm');
     await writeFile(
       inputPath,

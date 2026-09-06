@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 把 browsercli ↔ worker 的通信从 HTTP `/api/v1` 换成「本地命名管道 + detached daemon 自动拉起」模型（对齐 playwright-cli），并彻底删除 Sekiro RPC 路径。
+**Goal:** 把 proxycli ↔ worker 的通信从 HTTP `/api/v1` 换成「本地命名管道 + detached daemon 自动拉起」模型（对齐 playwright-cli），并彻底删除 Sekiro RPC 路径。
 
-**Architecture:** worker 以 daemon 模式启动时监听 Windows 命名管道（POSIX 用 unix socket），NDJSON 行协议做 `{id, method, params}` 请求/响应；CLI 侧按 workspace-hash 注册表（`%LOCALAPPDATA%\browsercli\daemon\<hash>\<name>.session`）发现会话，连不上就自动 spawn detached daemon 并等 stdout 就绪行。Web 控制台保留，只绑 127.0.0.1：default 会话固定 8765，其余会话用临时端口并记录到 session 文件。
+**Architecture:** worker 以 daemon 模式启动时监听 Windows 命名管道（POSIX 用 unix socket），NDJSON 行协议做 `{id, method, params}` 请求/响应；CLI 侧按 workspace-hash 注册表（`%LOCALAPPDATA%\proxycli\daemon\<hash>\<name>.session`）发现会话，连不上就自动 spawn detached daemon 并等 stdout 就绪行。Web 控制台保留，只绑 127.0.0.1：default 会话固定 8765，其余会话用临时端口并记录到 session 文件。
 
 **Tech Stack:** Node `net`（命名管道/unix socket）、`child_process.spawn`、`node:test`；无新增运行时依赖。
 
@@ -14,19 +14,19 @@
 
 - Node `^20.19.0 || ^22.12.0 || >=23`；TypeScript ESM，导入带 `.js` 后缀、`node:` 前缀、显式 type import、按 ESLint 字母序分组。
 - Prettier：`singleQuote`、`trailingComma: all`、`arrowParens: avoid`、`endOfLine: lf`。
-- 不新增任何运行时依赖（`net`/`child_process`/`crypto` 均 stdlib；browsercli 已有 `ws` 但改造后 socket 路径不再需要新库）。
-- 协议版本号 `PROTOCOL_VERSION = 1` 在 `src/ipc/` 与 `browsercli/src/` 两侧各定义一份（两包零耦合，靠注释互指保持同步）；不匹配时报错并给出 `close` + 重新 `open` 的恢复命令。
-- 测试镜像目录：`src/ipc/Foo.ts` ↔ `tests/unit/ipc/Foo.test.ts`；browsercli 测试在 `browsercli/tests/unit/`。
+- 不新增任何运行时依赖（`net`/`child_process`/`crypto` 均 stdlib；proxycli 已有 `ws` 但改造后 socket 路径不再需要新库）。
+- 协议版本号 `PROTOCOL_VERSION = 1` 在 `src/ipc/` 与 `proxycli/src/` 两侧各定义一份（两包零耦合，靠注释互指保持同步）；不匹配时报错并给出 `close` + 重新 `open` 的恢复命令。
+- 测试镜像目录：`src/ipc/Foo.ts` ↔ `tests/unit/ipc/Foo.test.ts`；proxycli 测试在 `proxycli/tests/unit/`。
 - 每结束一个 Task 提交一次，Conventional Commits（`feat(ipc):`、`refactor(web):`、`chore(cli):` 等），不加 agent 署名。
 - 已知限制（明确接受，不做过度设计）：`runtimeConfigPersistence` 缓存文件全局共享，多会话会读到同一份上次连接配置；daemon 无空闲自杀计时器，靠 `close`/`kill-all` 管理生命周期。
 
 ## 会话与协议设计（所有 Task 共享的语境）
 
-**管道地址**：win32 `\\.\pipe\browsercli-<hash16>-<session>`；POSIX `path.join(os.tmpdir(), 'browsercli-<hash16>-<session>.sock')`（启动前 unlink 残留）。`<hash16>` = `sha1(workspaceRoot).hex.slice(0,16)`。
+**管道地址**：win32 `\\.\pipe\proxycli-<hash16>-<session>`；POSIX `path.join(os.tmpdir(), 'proxycli-<hash16>-<session>.sock')`（启动前 unlink 残留）。`<hash16>` = `sha1(workspaceRoot).hex.slice(0,16)`。
 
-**workspaceRoot**：从 cwd 向上最多 10 级找含 `.browsercli` 目录的层级，否则回退 `package.json` 所在层，都没有则用 cwd。CLI 侧与 daemon 侧必须用同一算法（daemon spawn 时 cwd 即 CLI 的 cwd）。
+**workspaceRoot**：从 cwd 向上最多 10 级找含 `.proxycli` 目录的层级，否则回退 `package.json` 所在层，都没有则用 cwd。CLI 侧与 daemon 侧必须用同一算法（daemon spawn 时 cwd 即 CLI 的 cwd）。
 
-**注册表目录**：win32 `%LOCALAPPDATA%\browsercli\daemon`；linux `$XDG_CACHE_HOME || ~/.cache` + `/browsercli/daemon`；darwin `~/Library/Caches/browsercli/daemon`；env `BROWSERCLI_DAEMON_DIR` 覆盖（测试用）。会话文件名 `<session>.session`（JSON），字段：
+**注册表目录**：win32 `%LOCALAPPDATA%\proxycli\daemon`；linux `$XDG_CACHE_HOME || ~/.cache` + `/proxycli/daemon`；darwin `~/Library/Caches/proxycli/daemon`；env `BROWSERCLI_DAEMON_DIR` 覆盖（测试用）。会话文件名 `<session>.session`（JSON），字段：
 
 ```ts
 interface SessionConfig {
@@ -54,12 +54,12 @@ interface SessionConfig {
 | 新建 | `src/worker/browserRequests.ts` | 从 apiV1.ts 抽出的 `parseBrowserConnectBody`/`parseBrowserDisconnectBody`/`effectiveBrowserConfig` |
 | 修改 | `src/index.ts` | `--daemon` 分支、就绪行输出、stop 处理 |
 | 修改 | `src/web/ConsoleServer.ts` | 删 apiV1/bearerAuth/invoker；接受注入 wsHub；暴露实际端口 |
-| 修改 | `src/worker/WorkerArgs.ts` | 增加 `--daemon/--session/--browsercli-daemon`，删除 `--group/--rpcHost` |
+| 修改 | `src/worker/WorkerArgs.ts` | 增加 `--daemon/--session/--proxycli-daemon`，删除 `--group/--rpcHost` |
 | 删除 | `src/worker/SekiroInvoker.ts`、`src/types/rpc.ts`、`src/web/routes/apiV1.ts`、`src/web/middleware/bearerAuth.ts` 及对应测试 | 远程路径下线 |
-| 新建 | `browsercli/src/daemonClient.ts` | 客户端连接、ensure/spawn/stop、kill-all、注册表读取 |
-| 新建 | `browsercli/src/sessionPaths.ts` | 与 src/ipc/registry.ts 同步的路径/哈希计算（注释互指） |
-| 修改 | `browsercli/src/{app,types,help}.ts`、`commands/*` | 全部命令切到 daemon 客户端；新增 open/close/list/kill-all |
-| 删除 | `browsercli/src/WorkerHttpClient.ts` 及其测试 | HTTP 客户端下线 |
+| 新建 | `proxycli/src/daemonClient.ts` | 客户端连接、ensure/spawn/stop、kill-all、注册表读取 |
+| 新建 | `proxycli/src/sessionPaths.ts` | 与 src/ipc/registry.ts 同步的路径/哈希计算（注释互指） |
+| 修改 | `proxycli/src/{app,types,help}.ts`、`commands/*` | 全部命令切到 daemon 客户端；新增 open/close/list/kill-all |
+| 删除 | `proxycli/src/WorkerHttpClient.ts` 及其测试 | HTTP 客户端下线 |
 | 修改 | 文档/脚本：`CLAUDE.md`、`package.json` scripts、`README`（提及处） | 契约描述同步 |
 
 ---
@@ -75,7 +75,7 @@ interface SessionConfig {
 
 - [ ] **Step 1: 写失败测试**
 
-`tests/unit/ipc/socketConnection.test.ts`（node:test，起一对 `net` socket 用内存管道 `net.createServer` + 随机 unix/pipe 路径太长，改用 `socketPair()`：`const server = net.createServer(...)` listen 到 `pipePath('browsercli-test-' + Date.now())`，测试后 close+unlink）：
+`tests/unit/ipc/socketConnection.test.ts`（node:test，起一对 `net` socket 用内存管道 `net.createServer` + 随机 unix/pipe 路径太长，改用 `socketPair()`：`const server = net.createServer(...)` listen 到 `pipePath('proxycli-test-' + Date.now())`，测试后 close+unlink）：
 
 ```ts
 import assert from 'node:assert/strict';
@@ -84,7 +84,7 @@ import test from 'node:test';
 import { SocketConnection, pipePath } from '../../../src/ipc/socketConnection.js';
 
 function tempPipe(): string {
-  return pipePath(`browsercli-test-${process.pid}-${Math.random().toString(36).slice(2)}`);
+  return pipePath(`proxycli-test-${process.pid}-${Math.random().toString(36).slice(2)}`);
 }
 
 test('sends and receives NDJSON messages', async () => {
@@ -158,7 +158,7 @@ Expected: FAIL（模块不存在）
  */
 
 /**
- * NDJSON socket 帧协议。与 browsercli/src/daemonClient.ts 中客户端配对，
+ * NDJSON socket 帧协议。与 proxycli/src/daemonClient.ts 中客户端配对，
  * PROTOCOL_VERSION 两侧必须同步修改。
  */
 
@@ -166,7 +166,7 @@ import net from 'node:net';
 
 export const PROTOCOL_VERSION = 1;
 
-/** 根 package.json version；与 browsercli 各自独立版本化，兼容性只看 PROTOCOL_VERSION。 */
+/** 根 package.json version；与 proxycli 各自独立版本化，兼容性只看 PROTOCOL_VERSION。 */
 
 export interface DaemonRequest {
   id: number;
@@ -297,11 +297,11 @@ export async function deleteSessionFile(sf: SessionFile): Promise<void>
 
 ```ts
 // 关键用例（每个 test 独立 temp dir，t.after 清理）：
-// 1. computeWorkspaceDir：造 tmp/a/.browsercli/ 与 tmp/a/b/c/，从 c 出发命中 tmp/a；
+// 1. computeWorkspaceDir：造 tmp/a/.proxycli/ 与 tmp/a/b/c/，从 c 出发命中 tmp/a；
 //    无标记目录时向上命中含 package.json 的层；全无则返回 startDir 本身。
 // 2. computeClientInfo：workspaceDirHash 为 sha1(workspaceDir) 前 16 位（用 node:crypto 独立算一遍比对）；
 //    BROWSERCLI_DAEMON_DIR 生效时 daemonDir 即该值。
-// 3. makePipePath('abc123','default') 在 win32 以 '\\\\.\\pipe\\browsercli-abc123-default' 断言，
+// 3. makePipePath('abc123','default') 在 win32 以 '\\\\.\\pipe\\proxycli-abc123-default' 断言，
 //    其余平台以 .sock 结尾断言（用 process.platform 分支写断言）。
 // 4. resolveSessionName(undefined) 先设 process.env.BROWSERCLI_SESSION='envx' 得 'envx'，finally 删除后得 'default'。
 // 5. saveSessionFile → loadSessionFile 往返一致；loadSessionFile 不存在的名字返回 undefined；
@@ -327,7 +327,7 @@ Expected: FAIL（模块不存在）
  */
 
 /**
- * Daemon 会话注册表。与 browsercli/src/sessionPaths.ts 配对，
+ * Daemon 会话注册表。与 proxycli/src/sessionPaths.ts 配对，
  * 两侧的路径算法（base dir / workspace 探测 / hash / 管道名）必须保持同步。
  */
 
@@ -365,7 +365,7 @@ export interface ClientInfo {
 export function computeWorkspaceDir(startDir: string): string {
   let dir = path.resolve(startDir);
   for (let i = 0; i < 10; i++) {
-    if (fs.existsSync(path.join(dir, '.browsercli'))) return dir;
+    if (fs.existsSync(path.join(dir, '.proxycli'))) return dir;
     const parent = path.dirname(dir);
     if (parent === dir) break;
     dir = parent;
@@ -388,7 +388,7 @@ function computeBaseDaemonDir(): string {
   else if (process.platform === 'darwin')
     cache = path.join(os.homedir(), 'Library', 'Caches');
   else cache = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
-  return path.join(cache, 'browsercli', 'daemon');
+  return path.join(cache, 'proxycli', 'daemon');
 }
 
 export function computeClientInfo(startDir?: string, version = '0.0.0'): ClientInfo {
@@ -408,8 +408,8 @@ export function computeClientInfo(startDir?: string, version = '0.0.0'): ClientI
 
 export function makePipePath(dirHash: string, sessionName: string): string {
   if (process.platform === 'win32')
-    return pipePath(`browsercli-${dirHash}-${sessionName}`);
-  return path.join(os.tmpdir(), `browsercli-${dirHash}-${sessionName}.sock`);
+    return pipePath(`proxycli-${dirHash}-${sessionName}`);
+  return path.join(os.tmpdir(), `proxycli-${dirHash}-${sessionName}.sock`);
 }
 
 export function explicitSessionName(name?: string): string | undefined {
@@ -780,7 +780,7 @@ git commit -m "feat(ipc): add daemon socket server exposing tools/browser/jobs"
 `tests/unit/ipc/daemonMode.test.ts` 测 `buildDaemonArgPlan`（见 Step 3 的导出纯函数）：
 
 ```ts
-// 1. buildDaemonArgPlan(['--daemon','--session','proj-a','--no-console','--browsercli-daemon'])
+// 1. buildDaemonArgPlan(['--daemon','--session','proj-a','--no-console','--proxycli-daemon'])
 //    → { daemon:true, session:'proj-a', noConsole:true }
 // 2. session 缺省 → 'default'；env BROWSERCLI_SESSION='e1' 时 → 'e1'
 // 3. 非 --daemon 数组 → { daemon:false }
@@ -791,7 +791,7 @@ Expected: FAIL
 
 - [ ] **Step 2: 实现入口分支**
 
-`src/worker/WorkerArgs.ts`：`BOOLEAN_FLAGS` 加 `'--daemon': 'daemon'`? —— 不污染 GlobalConfig：daemon 参数**不走** parseWorkerArgs，单独放新文件 `src/ipc/daemonArgs.ts` 导出 `buildDaemonArgPlan(argv: string[]): { daemon: boolean; session: string; noConsole: boolean; consolePort?: number }`（`--session` 取下一 token 或 `--session=x`；`--console-port` 同理；`--browsercli-daemon`、`--no-console` 布尔识别）。
+`src/worker/WorkerArgs.ts`：`BOOLEAN_FLAGS` 加 `'--daemon': 'daemon'`? —— 不污染 GlobalConfig：daemon 参数**不走** parseWorkerArgs，单独放新文件 `src/ipc/daemonArgs.ts` 导出 `buildDaemonArgPlan(argv: string[]): { daemon: boolean; session: string; noConsole: boolean; consolePort?: number }`（`--session` 取下一 token 或 `--session=x`；`--console-port` 同理；`--proxycli-daemon`、`--no-console` 布尔识别）。
 
 `src/index.ts` 顶部：
 
@@ -860,17 +860,17 @@ git commit -m "feat(ipc): add detached daemon mode entry with pipe readiness han
 
 ```powershell
 $env:BROWSERCLI_DAEMON_DIR="$env:TEMP\bcli-test"
-node build/src/index.js --daemon --browsercli-daemon --session smoke --no-console
-# 预期 stdout: Daemon listening on \\.\pipe\browsercli-<hash>-smoke；Ctrl+C 后 <hash>\smoke.session 文件消失
+node build/src/index.js --daemon --proxycli-daemon --session smoke --no-console
+# 预期 stdout: Daemon listening on \\.\pipe\proxycli-<hash>-smoke；Ctrl+C 后 <hash>\smoke.session 文件消失
 ```
 
 ---
 
-### Task 6: browsercli 客户端 `daemonClient.ts` + `sessionPaths.ts`
+### Task 6: proxycli 客户端 `daemonClient.ts` + `sessionPaths.ts`
 
 **Files:**
-- Create: `browsercli/src/sessionPaths.ts`、`browsercli/src/daemonClient.ts`
-- Test: `browsercli/tests/unit/sessionPaths.test.ts`、`browsercli/tests/unit/daemonClient.test.ts`
+- Create: `proxycli/src/sessionPaths.ts`、`proxycli/src/daemonClient.ts`
+- Test: `proxycli/tests/unit/sessionPaths.test.ts`、`proxycli/tests/unit/daemonClient.test.ts`
 
 **Interfaces:**
 - Consumes: 仅 stdlib（`net`/`node:crypto`/`node:child_process`/`node:fs`）；协议常量 `PROTOCOL_VERSION = 1`（本侧复制，注释互指 `src/ipc/socketConnection.ts`）
@@ -906,11 +906,11 @@ export const DEFAULT_INVOKE_TIMEOUT_MS = 300_000
 
 - [ ] **Step 1: 失败测试 — sessionPaths**
 
-`browsercli/tests/unit/sessionPaths.test.ts`：复制 worker 侧 Task 2 的 5 个关键用例（workspace 探测、hash 稳定性、pipePath 形态、env session 解析、load/list/delete 往返），import 路径改为 `../../src/sessionPaths.js`。
+`proxycli/tests/unit/sessionPaths.test.ts`：复制 worker 侧 Task 2 的 5 个关键用例（workspace 探测、hash 稳定性、pipePath 形态、env session 解析、load/list/delete 往返），import 路径改为 `../../src/sessionPaths.js`。
 
 - [ ] **Step 2: 失败测试 — daemonClient 核心逻辑**
 
-`browsercli/tests/unit/daemonClient.test.ts`：
+`proxycli/tests/unit/daemonClient.test.ts`：
 
 ```ts
 // 用真实 net server 当假 daemon（手写 SocketConnection 帧或裸 write JSON 行）：
@@ -919,15 +919,15 @@ export const DEFAULT_INVOKE_TIMEOUT_MS = 300_000
 // 3. 超时：server 不回包，request(…, 200) 以 'timeout' 类错误 reject
 // 4. onEvent：server 主动 write 一行 {type:'event',...} → 回调收到；off 后不再收
 // 5. resolveEntryPath：设 BROWSERCLI_ENTRY 指向任意存在文件 → 返回它；
-//    未设且配置文件无 workerEntry → 抛错且 suggestions 含 "browsercli config --set workerEntry="
+//    未设且配置文件无 workerEntry → 抛错且 suggestions 含 "proxycli config --set workerEntry="
 // 6. spawnDaemon：entry 用 `node -e` 内联脚本 —— 打印 'Daemon listening on fake' 后挂起；
 //    断言 resolve 的 session 文件已写入（测试注入 daemonDir 参数版本 spawnDaemon，
 //    故签名多一个 opts.daemonDir?: string 供测试隔离 BROWSERCLI_DAEMON_DIR）
 // 7. killAllDaemons 纯测模式匹配函数 collectDaemonPids(lines: string[]): number[]（导出，
-//    喂 fake `ps auxww`/PowerShell 输出断言只命中含 '--browsercli-daemon' 的行）
+//    喂 fake `ps auxww`/PowerShell 输出断言只命中含 '--proxycli-daemon' 的行）
 ```
 
-Run: `npm --prefix browsercli test`
+Run: `npm --prefix proxycli test`
 Expected: FAIL（模块不存在；既有用例保持 PASS）
 
 - [ ] **Step 3: 实现**
@@ -944,7 +944,7 @@ export async function spawnDaemon(opts: EnsureDaemonOptions & { daemonDir?: stri
   await fs.promises.mkdir(daemonDir, { recursive: true });
   const errLog = path.join(daemonDir, `${opts.session}.err`);
   const err = fs.openSync(errLog, 'w');
-  const child = spawn(process.execPath, [entry, '--daemon', '--browsercli-daemon', '--session', opts.session, ...opts.spawnFlags],
+  const child = spawn(process.execPath, [entry, '--daemon', '--proxycli-daemon', '--session', opts.session, ...opts.spawnFlags],
     { detached: true, stdio: ['ignore', 'pipe', err], cwd, windowsHide: true });
   let outLog = '';
   const ready = await new Promise<'ok' | 'exit'>((resolveP) => {
@@ -965,33 +965,33 @@ export async function spawnDaemon(opts: EnsureDaemonOptions & { daemonDir?: stri
   const cfg = await loadSession(daemonDir, opts.session);
   if (!cfg) throw new Error('daemon 就绪但 session 文件缺失');
   if (cfg.protocol !== PROTOCOL_VERSION)
-    throw new Error(`协议不匹配: daemon v${cfg.protocol} vs cli v${PROTOCOL_VERSION}，运行 browsercli -s=${opts.session} close 后重新 open`);
+    throw new Error(`协议不匹配: daemon v${cfg.protocol} vs cli v${PROTOCOL_VERSION}，运行 proxycli -s=${opts.session} close 后重新 open`);
   return cfg;
 }
 ```
 
 `ensureDaemon` = `loadSession` → 无则 `spawnDaemon`；有则 `DaemonConnection.connect(cfg.socketPath, 3000)`，失败（陈旧注册）→ `deleteSession` + `spawnDaemon`。
 `stopSession` = `request('stop', {}, 5000)`（吞掉 ECONNREFUSED/EOF = 已死）→ 兜底 `process.kill(cfg.pid, 0)` 探不到即清理 session 文件。
-`killAllDaemons`：win32 用 `execSync('powershell -NoProfile -NonInteractive -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like \'*--browsercli-daemon*\' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force; $_.ProcessId }"')`，POSIX 用 `ps auxww` 行过滤 + `process.kill(pid,'SIGKILL')`；纯函数 `collectDaemonPids(lines)` 供测试。
+`killAllDaemons`：win32 用 `execSync('powershell -NoProfile -NonInteractive -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like \'*--proxycli-daemon*\' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force; $_.ProcessId }"')`，POSIX 用 `ps auxww` 行过滤 + `process.kill(pid,'SIGKILL')`；纯函数 `collectDaemonPids(lines)` 供测试。
 
-Run: `npm --prefix browsercli test` → 新用例 PASS，旧用例（仍引用 WorkerHttpClient 的）暂不动。
+Run: `npm --prefix proxycli test` → 新用例 PASS，旧用例（仍引用 WorkerHttpClient 的）暂不动。
 
 - [ ] **Step 4: 提交**
 
 ```bash
-git add browsercli/src/sessionPaths.ts browsercli/src/daemonClient.ts browsercli/tests/unit/sessionPaths.test.ts browsercli/tests/unit/daemonClient.test.ts
+git add proxycli/src/sessionPaths.ts proxycli/src/daemonClient.ts proxycli/tests/unit/sessionPaths.test.ts proxycli/tests/unit/daemonClient.test.ts
 git commit -m "feat(cli): add daemon socket client, session registry and spawn logic"
 ```
 
 ---
 
-### Task 7: browsercli 命令全量切换 + 会话命令
+### Task 7: proxycli 命令全量切换 + 会话命令
 
 **Files:**
-- Modify: `browsercli/src/types.ts`、`app.ts`、`bin/browsercli.ts`、`help.ts`、`commands/tool-dispatcher.ts`、`commands/browser.ts`、`commands/jobs.ts`、`commands/status.ts`、`commands/list-tools.ts`、`commands/config.ts`
-- Create: `browsercli/src/commands/sessions.ts`（open/close/list/kill-all）
-- Delete: `browsercli/src/WorkerHttpClient.ts`、`browsercli/tests/unit/WorkerHttpClient.test.ts`、`browsercli/tests/unit/WorkerHttpClient.browser.test.ts`、`browsercli/index.ts` 中相关导出
-- Test: 更新 `browsercli/tests/unit/{tool-dispatcher,browser,jobs,status}.test.ts`；新建 `browsercli/tests/unit/sessions.test.ts`
+- Modify: `proxycli/src/types.ts`、`app.ts`、`bin/proxycli.ts`、`help.ts`、`commands/tool-dispatcher.ts`、`commands/browser.ts`、`commands/jobs.ts`、`commands/status.ts`、`commands/list-tools.ts`、`commands/config.ts`
+- Create: `proxycli/src/commands/sessions.ts`（open/close/list/kill-all）
+- Delete: `proxycli/src/WorkerHttpClient.ts`、`proxycli/tests/unit/WorkerHttpClient.test.ts`、`proxycli/tests/unit/WorkerHttpClient.browser.test.ts`、`proxycli/index.ts` 中相关导出
+- Test: 更新 `proxycli/tests/unit/{tool-dispatcher,browser,jobs,status}.test.ts`；新建 `proxycli/tests/unit/sessions.test.ts`
 
 **Interfaces:**
 - Consumes: Task 6 全部导出
@@ -1006,7 +1006,7 @@ export interface WorkerContext {
 }
 ```
 
-- [ ] **Step 1: 逐个命令改造（每步后 `npm --prefix browsercli test`）**
+- [ ] **Step 1: 逐个命令改造（每步后 `npm --prefix proxycli test`）**
 
 1. **types/app**：`WorkerContext` 换上面形状；`createWorkerContext()` 自己扫 `process.argv` 找 `-s=x`/`--session x`（args-parser 的 `parseArgs` 对全 argv 跑一遍取 `session`/`s`），`connect` 闭包 = `ensureDaemon({session, spawnFlags: browserSpawnFlagsFromArgv(argv)}) → DaemonConnection.connect(socketPath)`；`spawnFlags` 透传 `--no-console`、`--console-port`、`--cloak`、`--headless` 等 worker flag（白名单数组：`['--no-console','--cloak','--js-stealth','--full-stealth-args','--minimal-stealth','--headless']`，另支持 `--console-port` 取值）。删 `transport`/`WORKER_URL`/`WORKER_API_TOKEN` 语义。
 2. **list-tools**：`await ctx.connect().then(c => c.request('tools.list'))` → `{tools}`；错误映射 `WORKER_NOT_RUNNING`（connect 失败）保持现有报错形状。删 cachedSessionId 概念。
@@ -1017,7 +1017,7 @@ export interface WorkerContext {
 7. **config**：`VALID_KEYS = new Set(['workerEntry'])`；`resolveMerged` 改为 `process.env.BROWSERCLI_ENTRY ?? file.workerEntry`；帮助示例同步。
 8. **sessions.ts（新建）**：四个命令 `open`（`ensureDaemon` + `hello` 回显 `{session, pid, consolePort}`；已在运行则报错提示 `-s=x close` 先关）、`close`（`stopSession`）、`list`（status 的数据函数复用）、`kill-all`（`killAllDaemons` + 清 stale session 文件）。
 9. **app.ts cliCommands**：注册 `open, close, list, 'kill-all'`；**help.ts** 补四个命令的 description/usage；**index.ts** 导出面去掉 WorkerHttpClient 类型，新增 daemonClient 导出。
-10. **删除** `WorkerHttpClient.ts`、其两个测试、`STREAM_CHANNELS` 的 ws 依赖；`browsercli/package.json` 依赖删 `ws`（先 `grep -rn "from 'ws'" browsercli/src` 确认 daemonClient 之外无引用；`open-browser.ts` 不受影响）。
+10. **删除** `WorkerHttpClient.ts`、其两个测试、`STREAM_CHANNELS` 的 ws 依赖；`proxycli/package.json` 依赖删 `ws`（先 `grep -rn "from 'ws'" proxycli/src` 确认 daemonClient 之外无引用；`open-browser.ts` 不受影响）。
 
 - [ ] **Step 2: 更新单测断言到新接口**
 
@@ -1026,10 +1026,10 @@ export interface WorkerContext {
 - [ ] **Step 3: 验证 + 提交**
 
 ```bash
-npm --prefix browsercli test
-npm --prefix browsercli run typecheck
-npx prettier --write browsercli
-git add browsercli
+npm --prefix proxycli test
+npm --prefix proxycli run typecheck
+npx prettier --write proxycli
+git add proxycli
 git commit -m "refactor(cli)!: switch all commands from HTTP client to daemon socket sessions"
 ```
 
@@ -1039,30 +1039,30 @@ git commit -m "refactor(cli)!: switch all commands from HTTP client to daemon so
 
 **Files:**
 - Create: `tests/integration/daemonSocket.integration.test.ts`
-- Test: 复用 `browsercli` 构建产物
+- Test: 复用 `proxycli` 构建产物
 
 **Interfaces:**
-- Consumes: `build/src/index.js`（daemon 模式）、`browsercli/build`（CLI）
+- Consumes: `build/src/index.js`（daemon 模式）、`proxycli/build`（CLI）
 - Produces: CI 可运行的 socket 链路回归锚点
 
 - [ ] **Step 1: 写集成测试**
 
 ```ts
 // tests/integration/daemonSocket.integration.test.ts（node:test）
-// before: tmp workspace 目录（含 .browsercli/ 标记）；env 注入
+// before: tmp workspace 目录（含 .proxycli/ 标记）；env 注入
 //   BROWSERCLI_DAEMON_DIR=<tmp>/daemon, BROWSERCLI_ENTRY=<repo>/build/src/index.js
-// 1. spawn 真实 CLI: node browsercli/build/bin/browsercli.js -s=itest open （execFileSync + env）
+// 1. spawn 真实 CLI: node proxycli/build/bin/proxycli.js -s=itest open （execFileSync + env）
 //    断言 <daemonDir>/<hash>/itest.session 出现且含 consolePort
-// 2. browsercli -s=itest list-tools --json → stdout JSON tools 数组非空（无需浏览器）
-// 3. browsercli -s=itest call <某个不依赖浏览器的工具> —— 若全仓库无此类工具则跳过此步，
+// 2. proxycli -s=itest list-tools --json → stdout JSON tools 数组非空（无需浏览器）
+// 3. proxycli -s=itest call <某个不依赖浏览器的工具> —— 若全仓库无此类工具则跳过此步，
 //    保底断言改为 call 不存在工具时 exit code 1 且 stderr 含 UNKNOWN_TOOL
-// 4. browsercli -s=itest close → session 文件消失；daemon 进程 process.kill(pid,0) 抛 ESRCH（轮询 5s）
+// 4. proxycli -s=itest close → session 文件消失；daemon 进程 process.kill(pid,0) 抛 ESRCH（轮询 5s）
 // after: kill -9 兜底清理 + rm tmp
 ```
 
 Run: `npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/integration/daemonSocket.integration.test.js`
 
-- [ ] **Step 2: 处理 `browsercli-reliability.integration.test.ts`**
+- [ ] **Step 2: 处理 `proxycli-reliability.integration.test.ts`**
 
 读该文件：凡走 `WorkerHttpClient`/HTTP 断言的用例，改为经 `daemonClient`（`ensureDaemon` + `request('tool.invoke')`）等价断言；纯 JobStore/WorkerActivityCoordinator 断言不动。无法等价迁移的用例删除并在 PR 描述注明。
 
@@ -1081,12 +1081,12 @@ git commit -m "test(ipc): add end-to-end daemon socket integration coverage"
 ### Task 9: 文档、脚本与最终验证闭环
 
 **Files:**
-- Modify: `CLAUDE.md`（browsercli 段落 + 架构表）、`package.json` scripts、`docs/`（涉及 worker 启动的文档）、`browsercli/README*`（若存在）
+- Modify: `CLAUDE.md`（proxycli 段落 + 架构表）、`package.json` scripts、`docs/`（涉及 worker 启动的文档）、`proxycli/README*`（若存在）
 
 - [ ] **Step 1: 同步描述**
 
-1. `CLAUDE.md`：「仅通过 worker 的 `/api/v1` HTTP 契约通信」→「通过本地命名管道与 detached daemon 会话通信（`%LOCALAPPDATA%\browsercli\daemon` 注册表，自动拉起）」；架构表新增一行 `Daemon IPC | src/ipc/daemonServer.ts | 命名管道 NDJSON 方法分发（tools/browser/jobs/events）`。
-2. `package.json` scripts：`cli:start`→`node build/src/index.js --daemon --browsercli-daemon`，`cli:worker:stop`→`browsercli close`，`cli:worker:status`→`browsercli list`；新增 `test:ipc`: `npm run build && node --require ./build/tests/setup.js --test build/tests/unit/ipc/*.test.js build/tests/integration/daemonSocket.integration.test.js`。
+1. `CLAUDE.md`：「仅通过 worker 的 `/api/v1` HTTP 契约通信」→「通过本地命名管道与 detached daemon 会话通信（`%LOCALAPPDATA%\proxycli\daemon` 注册表，自动拉起）」；架构表新增一行 `Daemon IPC | src/ipc/daemonServer.ts | 命名管道 NDJSON 方法分发（tools/browser/jobs/events）`。
+2. `package.json` scripts：`cli:start`→`node build/src/index.js --daemon --proxycli-daemon`，`cli:worker:stop`→`proxycli close`，`cli:worker:status`→`proxycli list`；新增 `test:ipc`: `npm run build && node --require ./build/tests/setup.js --test build/tests/unit/ipc/*.test.js build/tests/integration/daemonSocket.integration.test.js`。
 3. grep `docs/` 与 `README.md` 中 `/api/v1`、`Sekiro`、`rpcHost`、`WORKER_URL`，逐处更新（只改描述，不重写无关内容）。
 
 - [ ] **Step 2: 最终变更验证闭环（CLAUDE.md 硬性要求，以最终 diff 为边界）**
@@ -1095,7 +1095,7 @@ git commit -m "test(ipc): add end-to-end daemon socket integration coverage"
 npm run typecheck
 npm run test:unit
 npm run test:integration
-npm --prefix browsercli test
+npm --prefix proxycli test
 npm run check-format
 ```
 
@@ -1105,14 +1105,14 @@ npm run check-format
 
 ```powershell
 npm run build
-browsercli open                # 拉起 default daemon，回显 pid/consolePort
-browsercli list                # 显示 default · 127.0.0.1:8765 · open
+proxycli open                # 拉起 default daemon，回显 pid/consolePort
+proxycli list                # 显示 default · 127.0.0.1:8765 · open
 Start-Process http://127.0.0.1:8765   # Web 控制台可用
-browsercli browser connect --channel=chrome --headless
-browsercli call get_page_info  # 或任一工具，返回结果
-browsercli -s=proj open; browsercli list   # 两个会话并存、端口不同
-browsercli close-all           # 或逐个 close
-browsercli kill-all            # 强杀兜底
+proxycli browser connect --channel=chrome --headless
+proxycli call get_page_info  # 或任一工具，返回结果
+proxycli -s=proj open; proxycli list   # 两个会话并存、端口不同
+proxycli close-all           # 或逐个 close
+proxycli kill-all            # 强杀兜底
 ```
 
 - [ ] **Step 4: 提交**

@@ -191,7 +191,7 @@ describe('system routes', () => {
     });
 
     // 形状校验单独挡不住 `..`（不含分隔符、也不绝对），join 后会落到
-    // logDir 的父目录（= ~/.browsercli）。实测修复前返回 200。
+    // logDir 的父目录（= ~/.proxycli）。实测修复前返回 200。
     it('rejects bare .. which resolves outside the log dir', () => {
       const mock = call(freshLogDir(), '/api/system/logs?file=..');
       assert.strictEqual(mock.status(), 400);

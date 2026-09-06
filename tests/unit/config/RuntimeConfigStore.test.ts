@@ -5,6 +5,9 @@
  */
 
 import assert from 'node:assert';
+import {mkdtempSync, rmSync, writeFileSync} from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import {afterEach, beforeEach, describe, it} from 'node:test';
 
 import {
@@ -26,15 +29,28 @@ describe('RuntimeConfigStore', () => {
     resetRuntimeConfigStore();
   });
 
-  it('seeds from configFromEnv on first access', () => {
-    process.env.OPENAI_API_KEY = 'sk-seed';
-    process.env.DEFAULT_LLM_PROVIDER = 'openai';
-    resetRuntimeConfigStore();
+  it('seeds from loadUserConfig on first access', () => {
+    const tmpDir = mkdtempSync(path.join(os.tmpdir(), 'proxycli-store-test-'));
+    process.env.PROXYCLI_CONFIG_DIR = tmpDir;
+    try {
+      writeFileSync(
+        path.join(tmpDir, 'config.json'),
+        JSON.stringify({
+          openai: {apiKey: 'sk-seed'},
+          llmProvider: 'openai',
+        }),
+        'utf-8',
+      );
+      resetRuntimeConfigStore();
 
-    const config = getRuntimeConfigStore().get();
+      const config = getRuntimeConfigStore().get();
 
-    assert.strictEqual(config.openai?.apiKey, 'sk-seed');
-    assert.strictEqual(config.llmProvider, 'openai');
+      assert.strictEqual(config.openai?.apiKey, 'sk-seed');
+      assert.strictEqual(config.llmProvider, 'openai');
+    } finally {
+      delete process.env.PROXYCLI_CONFIG_DIR;
+      rmSync(tmpDir, {recursive: true, force: true});
+    }
   });
 
   it('update merges top-level fields', () => {

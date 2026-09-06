@@ -35,6 +35,9 @@ describe('parseBrowserConnectBody', () => {
     assert.strictEqual(http.wsEndpoint, undefined);
     assert.strictEqual(http.remoteDebuggingUrl, undefined);
 
+    const unadorned = parseBrowserConnectBody({browserURL: '127.0.0.1:53687'});
+    assert.strictEqual(unadorned.browserURL, 'http://127.0.0.1:53687');
+
     const channel = parseBrowserConnectBody({channel: 'stable'});
     assert.strictEqual(channel.channel, 'stable');
     assert.strictEqual(channel.browserURL, undefined);

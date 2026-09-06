@@ -19,7 +19,7 @@
 - 工具 category 固定 `ToolCategory.NETWORK`（复用现有枚举，不新增）。
 - 代码风格：singleQuote、trailingComma all、`arrowParens: avoid`、interface 优先、无 `any`（未知输入用 `unknown`）。文件头带 `@license` 注释块（`Copyright 2026 Google LLC / Browser-CLI`）。
 - 测试框架 `node:test`，测试文件放镜像目录 `tests/unit/modules/proxy/`、`tests/unit/tools/proxy/`，import 相对路径 `../../../../src/...`。
-- 不碰 `web/`、`worker/`、`browsercli/`、`src/web-ui/`、`apiV1.ts`；不改浏览器 CDP 链路。
+- 不碰 `web/`、`worker/`、`proxycli/`、`src/web-ui/`、`apiV1.ts`；不改浏览器 CDP 链路。
 
 ---
 
@@ -33,7 +33,7 @@
 **Interfaces:**
 - Consumes: `getEnvValue`（`src/config/resolver.ts`）、`node-forge`、`node:tls`、`node:fs` `node:path` `node:os`。
 - Produces（后续 Task 3/4 依赖）:
-  - `resolveMitmCertsDir(): string` — 返回 `BROWSER_MITM_CERTS_DIR` 或 `~/.browsercli/mitm-certs`。
+  - `resolveMitmCertsDir(): string` — 返回 `BROWSER_MITM_CERTS_DIR` 或 `~/.proxycli/mitm-certs`。
   - `class CaManager` — `constructor(certsDir: string)`；`async init(): Promise<void>`；`isInitialized(): boolean`；`getCaCertPath(): string`；`getCaCertDer(): Buffer`；`getSecureContextForHost(hostname: string): tls.SecureContext`；`async regenerate(): Promise<void>`。
 
 - [ ] **Step 1: 安装依赖**
@@ -141,11 +141,11 @@ const CA_VALIDITY_YEARS = 10;
 const LEAF_VALIDITY_DAYS = 365;
 const CACHE_MAX_SIZE = 500;
 
-/** 证书目录：BROWSER_MITM_CERTS_DIR 或 ~/.browsercli/mitm-certs。 */
+/** 证书目录：BROWSER_MITM_CERTS_DIR 或 ~/.proxycli/mitm-certs。 */
 export function resolveMitmCertsDir(): string {
   const explicit = getEnvValue('BROWSER_MITM_CERTS_DIR');
   if (explicit && explicit.trim().length > 0) return explicit;
-  return path.join(os.homedir(), '.browsercli', 'mitm-certs');
+  return path.join(os.homedir(), '.proxycli', 'mitm-certs');
 }
 
 interface KeyPairLike {

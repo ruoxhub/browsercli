@@ -119,7 +119,7 @@ export async function runDaemon(plan: DaemonPlan): Promise<DaemonRunResult> {
       await connectBrowser(contextProvider, getBrowserManagerConfig());
     } catch (err) {
       console.warn(
-        '[Daemon] 启动自动连接浏览器失败，可稍后通过 browsercli browser connect 重连:',
+        '[Daemon] 启动自动连接浏览器失败，可稍后通过 proxycli browser connect 重连:',
         err instanceof Error ? err.message : err,
       );
     }

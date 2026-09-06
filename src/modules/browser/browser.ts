@@ -182,8 +182,6 @@ export async function ensureBrowserLaunched(
   return manager.ensureBrowser();
 }
 
-
-
 /**
  * Wrap 'The browser is already running' errors with a user-facing hint.
  * Returns null for any other error so callers can apply their own wrapping.
@@ -202,6 +200,16 @@ function wrapAlreadyRunningError(
     );
   }
   return null;
+}
+
+function normalizeBrowserUrl(url?: string): string | undefined {
+  if (!url) return undefined;
+  const trimmed = url.trim();
+  if (!trimmed) return undefined;
+  if (/^https?:\/\//i.test(trimmed) || /^wss?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+  return `http://${trimmed}`;
 }
 
 /**
@@ -280,6 +288,7 @@ export class BrowserManager {
       ) {
         return this.connectToRemoteBrowser();
       }
+
       return this.launchBrowser();
     };
 
@@ -373,6 +382,7 @@ export class BrowserManager {
 
       return this.browser;
     } catch (error) {
+      this.removeDetachedFrameGuard();
       if (this.config.autoLaunch) {
         logger.debug(
           'Remote browser connection failed, attempting auto-launch...',
@@ -399,13 +409,20 @@ export class BrowserManager {
   }
 
   private async resolveConnectEndpoint(): Promise<string | undefined> {
-    if (this.config.wsEndpoint) return this.config.wsEndpoint;
+    if (this.config.wsEndpoint) {
+      const ws = normalizeBrowserUrl(this.config.wsEndpoint);
+      if (ws) return ws.startsWith('http') ? ws.replace(/^http/, 'ws') : ws;
+    }
     const versionInfo = await this.fetchVersionInfo();
-    return (
-      versionInfo.webSocketDebuggerUrl ||
-      this.config.browserURL ||
-      this.config.remoteDebuggingUrl
-    );
+    if (versionInfo.webSocketDebuggerUrl) {
+      return versionInfo.webSocketDebuggerUrl;
+    }
+    const rawUrl = this.config.browserURL || this.config.remoteDebuggingUrl;
+    const fallback = this.buildDevToolsActivePortFallback(rawUrl);
+    if (fallback) {
+      return fallback;
+    }
+    return normalizeBrowserUrl(rawUrl);
   }
 
   private async fetchVersionInfo(): Promise<{
@@ -413,9 +430,14 @@ export class BrowserManager {
     Browser?: string;
     'Protocol-Version'?: string;
   }> {
-    const browserURL = this.config.browserURL || this.config.remoteDebuggingUrl;
+    const rawUrl = this.config.browserURL || this.config.remoteDebuggingUrl;
+    const browserURL = normalizeBrowserUrl(rawUrl);
     if (!browserURL) {
       return {};
+    }
+
+    if (/^wss?:\/\//i.test(browserURL)) {
+      return {webSocketDebuggerUrl: browserURL};
     }
 
     try {
@@ -450,36 +472,56 @@ export class BrowserManager {
       return versionInfo;
     } catch (err) {
       logger.debug('Warning: Could not fetch browser version:', err);
+      const fallback = this.buildDevToolsActivePortFallback(browserURL);
+      if (fallback) {
+        logger.debug(
+          `[fetchVersionInfo] falling back to DevToolsActivePort wsPath after error: ${fallback}`,
+        );
+        return {webSocketDebuggerUrl: fallback};
+      }
       return {};
     }
   }
 
   /**
    * Build a `ws://127.0.0.1:<port><wsPath>` endpoint from the local Chrome
-   * profile's `DevToolsActivePort` file, but only when its port matches the
-   * one in `browserURL`. Returns `null` when there's no live Chrome profile
-   * on disk, the port doesn't match (would attach to a different browser
-   * instance than the user asked for), or the file is malformed.
+   * profile's `DevToolsActivePort` file.
    */
-  private buildDevToolsActivePortFallback(browserURL: string): string | null {
-    let urlPort: number;
+  private buildDevToolsActivePortFallback(browserURL?: string): string | null {
+    const active = readDevToolsActivePort();
+    if (!active || !active.wsPath || !active.port) {
+      return null;
+    }
+
+    if (!browserURL) {
+      return `ws://127.0.0.1:${active.port}${active.wsPath}`;
+    }
+
+    const normalized = normalizeBrowserUrl(browserURL);
+    if (!normalized) {
+      return null;
+    }
+
+    let urlPort = 0;
     try {
-      const parsed = new URL(browserURL);
+      const parsed = new URL(normalized);
       if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
         return null;
       }
       urlPort = parsed.port ? Number(parsed.port) : 0;
     } catch {
-      return null;
+      urlPort = 0;
     }
-    if (!Number.isFinite(urlPort) || urlPort <= 0) {
-      return null;
+
+    if (urlPort > 0 && active.port === urlPort) {
+      return `ws://127.0.0.1:${active.port}${active.wsPath}`;
     }
-    const active = readDevToolsActivePort();
-    if (!active || active.port !== urlPort || !active.wsPath) {
-      return null;
+
+    if (urlPort === 0 || urlPort === 9222) {
+      return `ws://127.0.0.1:${active.port}${active.wsPath}`;
     }
-    return `ws://127.0.0.1:${active.port}${active.wsPath}`;
+
+    return null;
   }
 
   private async configureRemoteViewport(): Promise<void> {
@@ -566,6 +608,7 @@ export class BrowserManager {
     }
 
     if (
+      errorMessage.includes('Invalid URL') ||
       /does not look like a devtools server/i.test(errorMessage) ||
       /404 when connecting to .*\/json\/version/i.test(errorMessage)
     ) {
@@ -924,14 +967,14 @@ export class BrowserManager {
   }
 
   async close(): Promise<void> {
-    if (!this.browser) return;
-
     if (this.crashCheckInterval) {
       clearInterval(this.crashCheckInterval);
       this.crashCheckInterval = undefined;
     }
 
     this.removeDetachedFrameGuard();
+
+    if (!this.browser) return;
 
     const browser = this.browser;
     this.browser = undefined;
@@ -949,9 +992,13 @@ export class BrowserManager {
       logger.debug('Browser closed successfully');
     } catch (error) {
       // SAFETY: Patchright Browser exposes internal process() accessor for pid recovery on hung close
-      const pid = (
-        browser as unknown as {process(): {pid?: number} | null}
-      ).process()?.pid;
+      const browserObj = browser as unknown as {
+        process?(): {pid?: number} | null;
+      };
+      const pid =
+        typeof browserObj.process === 'function'
+          ? browserObj.process()?.pid
+          : undefined;
       if (pid) {
         try {
           process.kill(pid, 'SIGKILL');

@@ -4,29 +4,29 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/* eslint-disable import/no-cycle -- 已知例外：configFromEnv() 播种 store 与 getRuntimeConfigStore() 读回 store 的初始化时序契约。见 spec §2.1 目标 2 与 §5.1 环 1 决议 A，Phase 4 复核。 */
+/* eslint-disable import/no-cycle -- 已知例外：loadUserConfig() 播种 store 与 getRuntimeConfigStore() 读回 store 的初始化时序契约。见 spec §2.1 目标 2 与 §5.1 环 1 决议 A，Phase 4 复核。 */
 
 /**
- * 核心配置基础设施 — 环境变量工具、CLI 配置解析、RuntimeConfigStore 播种
+ * 核心配置基础设施 — 配置文件读写、环境变量工具、CLI 配置解析、RuntimeConfigStore 播种
  *
  * 配置优先级（高 → 低）：
  * 1. CLI 参数（--browserUrl 等）
- * 2. 环境变量（BROWSER_URL, OPENAI_API_KEY 等）
+ * 2. 配置文件（~/.proxycli/config.json）
  * 3. 内置默认值
  *
- * config.json 文件加载已移除，配置改为 RuntimeConfigStore 内存态，
- * 由前端控制面板管理（见 RuntimeConfigStore.ts）。
+ * 默认使用 ~/.proxycli/config.json 配置，不再支持 .env。
+ * 配置载入后存入 RuntimeConfigStore 内存态，由前端控制面板管理。
  */
 
-import {existsSync} from 'node:fs';
+import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import {config as dotenvConfig} from 'dotenv';
-
-import {resolveDefaultEnvPath} from '../utils/projectPaths.js';
-
-import {RUNTIME_DIR_NAME} from './constants.js';
+import {
+  RUNTIME_DIR_NAME,
+  USER_CONFIG_DIR_NAME,
+  USER_CONFIG_FILENAME,
+} from './constants.js';
 import {getRuntimeConfigStore} from './RuntimeConfigStore.js';
 import {
   type AIConfig,
@@ -34,13 +34,6 @@ import {
   type SystemConfig,
   validateGlobalConfig,
 } from './schema.js';
-
-// ==================== .env 加载 ====================
-
-const envPath = resolveDefaultEnvPath(import.meta.url);
-if (existsSync(envPath)) {
-  dotenvConfig({path: envPath});
-}
 
 // ==========================================================================
 // 第一部分：类型定义与默认值
@@ -250,7 +243,11 @@ export function configFromEnv(): GlobalConfig {
 
   const envWsHeaders = getEnvValue('BROWSER_WS_HEADERS');
   if (envWsHeaders !== undefined) {
-    browser.wsHeaders = JSON.parse(envWsHeaders) as Record<string, string>;
+    try {
+      browser.wsHeaders = JSON.parse(envWsHeaders) as Record<string, string>;
+    } catch {
+      // 忽略非法 JSON
+    }
   }
 
   const envArgs = getEnvValue('BROWSER_ARGS');
@@ -285,16 +282,51 @@ export function configFromEnv(): GlobalConfig {
   return validateGlobalConfig(result);
 }
 
+/** 获取用户级配置文件路径 (~/.proxycli/config.json，支持 PROXYCLI_CONFIG_DIR 覆盖) */
+export function getUserConfigPath(): string {
+  const custom = process.env.PROXYCLI_CONFIG_DIR;
+  if (custom) return path.join(custom, USER_CONFIG_FILENAME);
+  return path.join(os.homedir(), USER_CONFIG_DIR_NAME, USER_CONFIG_FILENAME);
+}
+
+/** 加载用户级配置文件 (~/.proxycli/config.json) */
+export function loadUserConfig(filePath = getUserConfigPath()): GlobalConfig {
+  try {
+    if (!existsSync(filePath)) return {};
+    const content = readFileSync(filePath, 'utf-8').trim();
+    if (!content) return {};
+    return validateGlobalConfig(JSON.parse(content));
+  } catch (error) {
+    console.warn(
+      `[Config] 读取配置文件失败: ${filePath} — ${error instanceof Error ? error.message : error}`,
+    );
+    return {};
+  }
+}
+
+/** 写入用户级配置文件 (~/.proxycli/config.json) */
+export function writeUserConfig(
+  config: GlobalConfig,
+  filePath = getUserConfigPath(),
+): void {
+  const dir = path.dirname(filePath);
+  if (!existsSync(dir)) {
+    mkdirSync(dir, {recursive: true});
+  }
+  const parsed = validateGlobalConfig(config);
+  writeFileSync(filePath, JSON.stringify(parsed, null, 2) + '\n', 'utf-8');
+}
+
 /**
- * 解析最终 CLI 配置 — 合并环境变量与 CLI 参数，应用默认值
+ * 解析最终 CLI 配置 — 合并配置文件与 CLI 参数，应用默认值
  *
- * 优先级（高→低）：envArgs > 环境变量 > 默认值
+ * 优先级（高→低）：envArgs > ~/.proxycli/config.json > 默认值
  *
  * @param envArgs CLI 参数或显式传入的覆盖值
  */
 export function resolveConfig(envArgs?: Partial<GlobalConfig>): ResolvedConfig {
-  const envConfig = configFromEnv();
-  const merged = validateGlobalConfig({...envConfig, ...envArgs});
+  const fileConfig = loadUserConfig();
+  const merged = validateGlobalConfig({...fileConfig, ...envArgs});
 
   return {
     browserUrl: merged.browserUrl || undefined,
@@ -318,11 +350,10 @@ export function getToolResultRecordingConfig(): ResolvedToolResultRecordingConfi
     fileConfig.toolResultRecording?.outputDir ??
     (fileConfig.outputDir
       ? path.join(fileConfig.outputDir, 'tool-results')
-      : path.join(os.homedir(), '.browsercli', 'tool-results'));
+      : path.join(os.homedir(), '.proxycli', 'tool-results'));
 
   return {
     enabled: envEnabled ?? fileConfig.toolResultRecording?.enabled ?? false,
     outputDir,
   };
 }
-

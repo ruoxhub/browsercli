@@ -16,6 +16,7 @@ import {scaffoldCommand} from './commands/scaffold.js';
 import {sessionCommands} from './commands/sessions.js';
 import {statusCommand} from './commands/status.js';
 import {toolDispatcherCommand} from './commands/tool-dispatcher.js';
+import {webCommand} from './commands/web.js';
 import {DaemonConnection, ensureDaemon} from './daemonClient.js';
 import {generateTopLevelHelp} from './help.js';
 import {sessionFromArgv, spawnFlagsFromArgv} from './sessionArgs.js';
@@ -34,6 +35,7 @@ export const cliCommands: Record<string, AxiCliCommand<WorkerContext>> = {
   scaffold: scaffoldCommand,
   status: statusCommand,
   proxy: proxyCommand,
+  web: webCommand,
   ...sessionCommands,
 };
 

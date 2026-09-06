@@ -93,38 +93,29 @@ export class ProcessConnectionTracker {
       }
 
       if (newPids.size > 0) {
-        await Promise.allSettled(
-          Array.from(newPids).map(async pid => {
-            try {
-              const tasklistOut = await this.runCommand('tasklist', [
-                '/FI',
-                `PID eq ${pid}`,
-                '/FO',
-                'CSV',
-                '/NH',
-              ]);
-              const entries = parseTasklistOutput(tasklistOut);
-              const match = entries.find(e => e.pid === pid);
-              if (match) {
-                this.pidInfo.set(pid, {
-                  info: {pid, name: match.name},
-                  at: now,
-                });
-              } else {
-                this.pidInfo.set(pid, {
-                  info: {pid, name: `pid-${pid}`},
-                  at: now,
-                });
-              }
-            } catch {
+        try {
+          // 单次全量拉取系统进程快照，避免针对几十个 PID 并发执行几十个 tasklist 子进程导致超时与句柄耗尽
+          const tasklistOut = await this.runCommand('tasklist', [
+            '/FO',
+            'CSV',
+            '/NH',
+          ]);
+          const entries = parseTasklistOutput(tasklistOut);
+          if (entries.length > 0) {
+            const map = new Map(entries.map(e => [e.pid, e.name]));
+            for (const pid of newPids) {
+              const name = map.get(pid);
               this.pidInfo.set(pid, {
-                info: {pid, name: `pid-${pid}`},
+                info: {pid, name: name ?? `pid-${pid}`},
                 at: now,
               });
             }
-            return pid;
-          }),
-        );
+          } else {
+            await this.resolvePidsWithFilter(newPids, now);
+          }
+        } catch {
+          await this.resolvePidsWithFilter(newPids, now);
+        }
       }
 
       this.lastRefreshAt = now;
@@ -133,6 +124,37 @@ export class ProcessConnectionTracker {
       this.consecutiveFailures += 1;
       logger.debug('[ProcessTracker] refresh 失败，保留上次快照:', err);
     }
+  }
+
+  private async resolvePidsWithFilter(
+    newPids: Set<number>,
+    now: number,
+  ): Promise<void> {
+    await Promise.allSettled(
+      Array.from(newPids).map(async pid => {
+        try {
+          const tasklistOut = await this.runCommand('tasklist', [
+            '/FI',
+            `PID eq ${pid}`,
+            '/FO',
+            'CSV',
+            '/NH',
+          ]);
+          const entries = parseTasklistOutput(tasklistOut);
+          const match = entries.find(e => e.pid === pid);
+          this.pidInfo.set(pid, {
+            info: {pid, name: match ? match.name : `pid-${pid}`},
+            at: now,
+          });
+        } catch {
+          this.pidInfo.set(pid, {
+            info: {pid, name: `pid-${pid}`},
+            at: now,
+          });
+        }
+        return pid;
+      }),
+    );
   }
 
   /** 纯内存查询；过期（>1500ms）或未命中返回 null。绝不 fork 子进程。 */
@@ -186,7 +208,7 @@ export class ProcessConnectionTracker {
 
 async function defaultRunCommand(cmd: string, args: string[]): Promise<string> {
   const {stdout} = await execFileAsync(cmd, args, {
-    timeout: 3000,
+    timeout: 5000,
     windowsHide: true,
   });
   return stdout;

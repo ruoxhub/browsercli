@@ -100,16 +100,20 @@ function urlFlag(
 ): string | undefined {
   const value = stringFlag(flags, key);
   if (value === undefined) return undefined;
+  let normalized = value;
+  if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(value)) {
+    normalized = protocols.includes('http:') ? `http://${value}` : value;
+  }
   let protocol: string;
   try {
-    protocol = new URL(value).protocol;
+    protocol = new URL(normalized).protocol;
   } catch {
     return invalid(`--${key} 不是合法 URL`);
   }
   if (!protocols.includes(protocol)) {
     return invalid(`--${key} 必须使用 ${protocols.join(' 或 ')}`);
   }
-  return value;
+  return normalized;
 }
 
 function headersFlag(

@@ -5,9 +5,9 @@
  */
 
 /**
- * Daemon 模式 argv 解析（纯函数）。与 browsercli/src/sessionArgs.ts 的
+ * Daemon 模式 argv 解析（纯函数）。与 proxycli/src/sessionArgs.ts 的
  * spawnFlagsFromArgv 白名单配对：CLI 侧透传的 flag 必须在这里被识别。
- * daemon 专属 token（--daemon/--browsercli-daemon/--session/--no-console/
+ * daemon 专属 token（--daemon/--proxycli-daemon/--session/--no-console/
  * --console-port）在此消费掉，其余参数进 plan.spawnFlags 交由
  * parseWorkerArgs 播种配置 —— 与非 daemon 模式的未知参数告警语义一致。
  */
@@ -15,7 +15,7 @@
 export interface DaemonPlan {
   daemon: boolean;
   /** CLI spawn 时必带；手动起的 daemon 没有该标记（kill-all 靠它识别）。 */
-  browsercliDaemon: boolean;
+  proxycliDaemon: boolean;
   session: string;
   noConsole: boolean;
   /** --minimal-stealth：daemonMain 播种到 browser 配置（GlobalConfig 顶层无此键） */
@@ -31,7 +31,7 @@ function flagName(arg: string): string {
 
 export function buildDaemonArgPlan(argv: readonly string[]): DaemonPlan {
   let daemon = false;
-  let browsercliDaemon = false;
+  let proxycliDaemon = false;
   let noConsole = false;
   let minimalStealth = false;
   let session: string | undefined;
@@ -44,8 +44,8 @@ export function buildDaemonArgPlan(argv: readonly string[]): DaemonPlan {
       daemon = true;
       continue;
     }
-    if (arg === '--proxycli-daemon' || arg === '--browsercli-daemon') {
-      browsercliDaemon = true;
+    if (arg === '--proxycli-daemon' || arg === '--proxycli-daemon') {
+      proxycliDaemon = true;
       continue;
     }
     const name = flagName(arg);
@@ -76,11 +76,11 @@ export function buildDaemonArgPlan(argv: readonly string[]): DaemonPlan {
 
   return {
     daemon,
-    browsercliDaemon,
+    proxycliDaemon,
     session:
       session ||
       process.env.PROXYCLI_SESSION ||
-      process.env.BROWSERCLI_SESSION ||
+      process.env.PROXYCLI_SESSION ||
       'default',
     noConsole,
     minimalStealth,

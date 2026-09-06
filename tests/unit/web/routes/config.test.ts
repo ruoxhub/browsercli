@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import {afterEach, describe, it} from 'node:test';
 
-import {configFromEnv} from '../../../../src/config/resolver.js';
+import {loadUserConfig} from '../../../../src/config/resolver.js';
 import {
   resetRuntimeConfigStore,
   getRuntimeConfigStore,
@@ -759,14 +759,11 @@ describe('config routes', () => {
       assert.ok(parsed.success);
       assert.strictEqual(deleteCalls, 1);
 
-      // 重置后回到 configFromEnv() + configSeed 的合并结果，旧值被丢弃。
-      // 注意：configFromEnv() 会读开发者机器上真实的 OPENAI_* / BROWSER_* 环境变量，
-      // 所以断言必须拿 configFromEnv() 的返回值当基准，不能写死 undefined ——
-      // 否则任何设置了 OPENAI_MODEL 的机器都会让这条测试红。
+      // 重置后回到 loadUserConfig() + configSeed 的合并结果，旧值被丢弃。
       const stored = getRuntimeConfigStore().get();
-      const envSeed = configFromEnv();
-      assert.strictEqual(stored.openai?.model, envSeed.openai?.model);
-      // configSeed 覆盖 env / 旧值
+      const expectedSeed = loadUserConfig();
+      assert.strictEqual(stored.openai?.model, expectedSeed.openai?.model);
+      // configSeed 覆盖 loadUserConfig / 旧值
       assert.strictEqual(stored.headless, true);
       // 旧值已被丢弃（'dirty-model' 不是 env 值时才有意义，故用不等断言兜底）
       assert.notStrictEqual(stored.openai?.apiKey, 'sk-dirty1234');

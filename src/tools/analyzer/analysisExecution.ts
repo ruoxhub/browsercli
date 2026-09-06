@@ -50,7 +50,7 @@ export async function executeAnalysis<TLocal, TAi = TLocal>(
         recovery: {
           tool: 'config_set',
           command:
-            'browsercli config set --key OPENAI_API_KEY --value <your_key>',
+            'proxycli config set --key OPENAI_API_KEY --value <your_key>',
           reason:
             'Configure an AI provider (e.g. OPENAI_API_KEY) to use this tool.',
         },

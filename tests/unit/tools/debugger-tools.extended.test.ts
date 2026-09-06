@@ -222,7 +222,7 @@ function makeContext(
     getScripts: () => [],
     getScriptsByUrlPattern: () => [],
     getScriptSource: async () => '',
-    getScriptSourcePath: async () => '/tmp/browsercli-scripts/test.js',
+    getScriptSourcePath: async () => '/tmp/proxycli-scripts/test.js',
     getScriptById: () => ({
       scriptId: '1',
       url: 'https://a.js',
@@ -371,7 +371,7 @@ describe('debugger tools extended', () => {
       {scriptId: '2', url: 'https://b.js'},
     ];
     context.debuggerContext.getScriptSourcePath = async () =>
-      '/tmp/browsercli-scripts/test.js';
+      '/tmp/proxycli-scripts/test.js';
 
     await listScripts.handler(
       {params: {}},
@@ -1110,7 +1110,7 @@ describe('debugger tools extended', () => {
         getScripts: () => [],
         getScriptsByUrlPattern: () => [],
         getScriptSource: async () => '',
-        getScriptSourcePath: async () => '/tmp/browsercli-scripts/test.js',
+        getScriptSourcePath: async () => '/tmp/proxycli-scripts/test.js',
         getScriptById: () => ({scriptId: '1', url: 'https://app.js'}),
         searchInScripts: async () => ({matches: []}),
         setBreakpoint: async () => {
@@ -1213,7 +1213,7 @@ describe('debugger tools extended', () => {
     // 新契约：返回 sourcePath 而非源码片段/URL，避免上下文臃肿
     assert.strictEqual(
       match.sourcePath,
-      '/tmp/browsercli-scripts/test.js',
+      '/tmp/proxycli-scripts/test.js',
       '应返回 sourcePath',
     );
     // URL 相关字段已移除，不再出现在响应中

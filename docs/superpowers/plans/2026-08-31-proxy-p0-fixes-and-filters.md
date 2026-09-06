@@ -21,7 +21,7 @@
 - 生产代码禁 `console.log`，一律用 `logger`（`src/utils/logger.ts`）。
 - 工具定义用 `defineTool`（`src/tools/ToolDefinition.ts`），category 固定 `ToolCategory.NETWORK`，schema 用 `zod`。
 - 根 `tsconfig.json` 是松配置（`strict:false`、`noUnusedLocals:false`），**漏掉的可选链只能靠测试暴露** —— 红灯必须真跑、必须真红。
-- **红线（本轮不动）**：`src/web/`、`src/web-ui/`、`browsercli/`、`worker/`、`src/modules/session/**`、`src/modules/network/**`、数据库迁移（spec §6）。
+- **红线（本轮不动）**：`src/web/`、`src/web-ui/`、`proxycli/`、`worker/`、`src/modules/session/**`、`src/modules/network/**`、数据库迁移（spec §6）。
 - **不要用 `npm run check-format` 当门禁**：`eslint --cache .` 会连 `open-source/` 一起扫 OOM，`prettier --check .` 有既有 warn。文件级门禁用 `npx prettier --check <file>` + `npx eslint <file>`。
 - 提交信息 Conventional Commits（`fix(proxy): ...` / `feat(proxy): ...`）。
 - **工作区卫生**：每个 Task 的 `git add` 只列本 Task 显式文件，禁止 `git add -A`；提交前 `git status --porcelain` 核对。

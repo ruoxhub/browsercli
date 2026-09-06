@@ -5,7 +5,7 @@
  */
 
 /**
- * NDJSON socket 帧协议。与 browsercli/src/daemonClient.ts 中客户端配对，
+ * NDJSON socket 帧协议。与 proxycli/src/daemonClient.ts 中客户端配对，
  * PROTOCOL_VERSION 两侧必须同步修改。
  */
 

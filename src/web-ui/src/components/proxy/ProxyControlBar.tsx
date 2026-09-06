@@ -6,6 +6,7 @@
 import {
   ArrowDown,
   ChevronDown,
+  Globe,
   Loader2,
   Play,
   Search,
@@ -49,6 +50,7 @@ export const ProxyControlBar: React.FC<ProxyControlBarProps> = ({
   const pages = useProxyStore(s => s.pages);
   const selectedPageId = useProxyStore(s => s.selectedPageId);
   const selectedIds = useProxyStore(s => s.selectedIds);
+  const totalRequests = useProxyStore(s => s.requests.length);
   const setStatus = useProxyStore(s => s.setStatus);
   const setAutoScroll = useProxyStore(s => s.setAutoScroll);
   const setFilter = useProxyStore(s => s.setFilter);
@@ -136,52 +138,76 @@ export const ProxyControlBar: React.FC<ProxyControlBarProps> = ({
   };
 
   return (
-    <div className="flex flex-col border-b border-[var(--color-border-default)] bg-[var(--color-bg-secondary)]/80 backdrop-blur-md px-4 py-2.5 gap-2.5">
-      {/* Top action row */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        {/* Left: Start/Stop + Port + Status */}
-        <div className="flex items-center gap-3">
-          {/* Start/Stop Button */}
+    <div className="flex flex-col border-b border-[var(--color-border-default)] bg-[var(--color-bg-secondary)]/90 backdrop-blur-md">
+      {/* 顶栏主操作区 */}
+      <div className="flex items-center justify-between gap-3 px-4 py-2">
+        {/* 左侧：抓包源与目标配置 */}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* 启动 / 停止代理按钮 */}
           <button
             onClick={handleToggleProxy}
             disabled={loading}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm ${
+            className={`h-8 flex items-center gap-2 px-3.5 rounded-lg text-xs font-bold transition-all shadow-sm shrink-0 whitespace-nowrap ${
               isRunning
-                ? 'bg-rose-500/15 border border-rose-500/30 text-rose-400 hover:bg-rose-500/25 hover:border-rose-500/50'
-                : 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25 hover:border-emerald-500/50'
+                ? 'bg-rose-500/15 border border-rose-500/35 text-rose-400 hover:bg-rose-500/25'
+                : 'bg-emerald-500/15 border border-emerald-500/35 text-emerald-400 hover:bg-emerald-500/25 hover:border-emerald-500/50'
             } disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             {loading ? (
               <Loader2
-                size={14}
+                size={13}
                 className="animate-spin"
               />
             ) : isRunning ? (
               <Square
-                size={14}
+                size={13}
                 className="fill-current"
               />
             ) : (
               <Play
-                size={14}
+                size={13}
                 className="fill-current"
               />
             )}
             <span>{isRunning ? '停止代理' : '启动抓包'}</span>
           </button>
 
-          {/* CDP 采集开关（独立于 MITM 的启动/停止） */}
+          {/* 端口配置 */}
+          <div className="h-8 flex items-center gap-1.5 bg-[var(--color-bg-primary)] border border-[var(--color-border-default)] px-2.5 rounded-lg text-xs shrink-0 whitespace-nowrap">
+            <span className="text-[11px] text-[var(--color-text-muted)] font-mono">
+              端口:
+            </span>
+            <input
+              type="number"
+              min={1}
+              max={65535}
+              value={isRunning ? (status?.port ?? inputPort) : inputPort}
+              onChange={e =>
+                setInputPort(Number.parseInt(e.target.value, 10) || 8888)
+              }
+              disabled={isRunning || loading}
+              className="w-14 bg-transparent text-xs font-mono text-[var(--color-text-primary)] focus:outline-none disabled:text-[var(--color-text-muted)]"
+            />
+          </div>
+
+          {/* 本地应用拦截控制 */}
+          <LocalAppsControl />
+
+          {/* 分隔线 */}
+          <div className="h-4 w-px bg-[var(--color-border-default)] shrink-0 mx-0.5" />
+
+          {/* CDP 采集开关 */}
           <button
             onClick={handleToggleCdp}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm ${
+            className={`h-8 flex items-center gap-2 px-3 rounded-lg text-xs font-bold transition-all shrink-0 whitespace-nowrap ${
               cdpEnabled
-                ? 'bg-sky-500/15 border border-sky-500/30 text-sky-400 hover:bg-sky-500/25 hover:border-sky-500/50'
-                : 'bg-[var(--color-bg-primary)]/70 border border-[var(--color-border-default)] text-[var(--color-text-muted)] hover:border-sky-500/30 hover:text-sky-400'
+                ? 'bg-sky-500/15 border border-sky-500/35 text-sky-400 hover:bg-sky-500/25'
+                : 'bg-[var(--color-bg-primary)] border border-[var(--color-border-default)] text-[var(--color-text-secondary)] hover:border-sky-500/30 hover:text-sky-400'
             }`}
-            title="采集浏览器（CDP）流量"
+            title="采集自动化浏览器（CDP）协议流量"
           >
             <span
-              className={`w-2 h-2 rounded-full ${
+              className={`w-2 h-2 rounded-full shrink-0 ${
                 cdpEnabled
                   ? 'bg-sky-400 animate-pulse'
                   : 'bg-[var(--color-text-muted)]'
@@ -190,18 +216,25 @@ export const ProxyControlBar: React.FC<ProxyControlBarProps> = ({
             <span>CDP 采集</span>
           </button>
 
-          {/* Tab Selector */}
-          <div className="flex items-center gap-1.5 bg-[var(--color-bg-primary)] border border-[var(--color-border-default)] px-2.5 py-1.5 rounded-xl">
-            <span className="text-[11px] text-[var(--color-text-muted)] font-mono">
-              标签页:
-            </span>
+          {/* 目标标签页下拉 */}
+          <div
+            className="h-8 flex items-center gap-1.5 bg-[var(--color-bg-primary)] border border-[var(--color-border-default)] px-2.5 rounded-lg text-xs shrink-0 whitespace-nowrap max-w-[220px]"
+            title={
+              pages.find(p => p.pageId === selectedPageId)?.title ||
+              '选择监控页面'
+            }
+          >
+            <Globe
+              size={13}
+              className="text-[var(--color-text-muted)] shrink-0"
+            />
             <select
               value={selectedPageId ?? ''}
               onChange={e => {
                 const id = e.target.value;
                 if (id) void selectTab(id);
               }}
-              className="bg-transparent text-xs font-mono text-[var(--color-text-primary)] focus:outline-none"
+              className="bg-transparent text-xs font-mono text-[var(--color-text-primary)] focus:outline-none truncate max-w-[170px] cursor-pointer"
             >
               <option
                 value=""
@@ -220,164 +253,138 @@ export const ProxyControlBar: React.FC<ProxyControlBarProps> = ({
               ))}
             </select>
           </div>
-
-          {/* Port Input */}
-          <div className="flex items-center gap-1.5 bg-[var(--color-bg-primary)] border border-[var(--color-border-default)] px-2.5 py-1.5 rounded-xl">
-            <span className="text-[11px] text-[var(--color-text-muted)] font-mono">
-              端口:
-            </span>
-            <input
-              type="number"
-              min={1}
-              max={65535}
-              value={isRunning ? (status?.port ?? inputPort) : inputPort}
-              onChange={e =>
-                setInputPort(Number.parseInt(e.target.value, 10) || 8888)
-              }
-              disabled={isRunning || loading}
-              className="w-16 bg-transparent text-xs font-mono text-[var(--color-text-primary)] focus:outline-none disabled:text-[var(--color-text-muted)]"
-            />
-          </div>
-
-          <LocalAppsControl />
-
-          {/* Status Badge */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[var(--color-bg-primary)]/70 border border-[var(--color-border-default)]">
-            <span
-              className={`w-2 h-2 rounded-full ${
-                isRunning
-                  ? 'bg-emerald-400 animate-pulse shadow-sm shadow-emerald-400/50'
-                  : 'bg-[var(--color-text-muted)]'
-              }`}
-            />
-            <span className="text-xs font-mono font-medium text-[var(--color-text-secondary)]">
-              {isRunning ? `运行中 :${status?.port}` : '已停止'}
-            </span>
-          </div>
         </div>
 
-        {/* Right: CA modal button + Auto scroll + Clear */}
-        <div className="flex items-center gap-2.5">
-          {/* AI analysis mode */}
-          <div className="relative">
-            <select
-              value={analysisMode}
-              onChange={e =>
-                setAnalysisMode(e.target.value as SessionAnalysisMode)
-              }
-              className="appearance-none bg-[var(--color-bg-primary)] border border-[var(--color-border-default)] text-xs font-mono text-[var(--color-text-primary)] rounded-xl pl-3 pr-8 py-1.5 focus:outline-none focus:border-[var(--color-accent)] cursor-pointer"
-              title="AI 分析模式"
-            >
-              <option
-                value="auto"
-                className="bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]"
-              >
-                自动检测
-              </option>
-              <option
-                value="api_reverse"
-                className="bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]"
-              >
-                接口逆向
-              </option>
-              <option
-                value="security"
-                className="bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]"
-              >
-                安全审查
-              </option>
-              <option
-                value="perf"
-                className="bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]"
-              >
-                性能分析
-              </option>
-              <option
-                value="js_crypto"
-                className="bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]"
-              >
-                JS 加密
-              </option>
-            </select>
-            <ChevronDown
-              size={12}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] pointer-events-none"
-            />
-          </div>
-
-          {/* AI analyze selected button */}
-          <button
-            onClick={handleAnalyzeSelected}
-            disabled={analyzing || selectedIds.length === 0}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--color-accent)]/15 border border-[var(--color-accent)]/40 text-[var(--color-accent)] text-xs font-medium hover:bg-[var(--color-accent)]/25 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-            title={
-              selectedIds.length > 0
-                ? `AI 分析已选 ${selectedIds.length} 条请求`
-                : '勾选左侧请求后发起 AI 分析'
-            }
-          >
-            {analyzing ? (
-              <Loader2
-                size={13}
-                className="animate-spin"
-              />
-            ) : (
-              <Sparkles size={13} />
-            )}
-            <span>
-              {analyzing
-                ? '分析中…'
-                : selectedIds.length > 0
-                  ? `分析已选 ${selectedIds.length} 条`
-                  : 'AI 分析'}
-            </span>
-          </button>
-
-          {/* CA Certificate Button */}
+        {/* 右侧：快捷工具与 AI 分析 */}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* CA 证书 */}
           <button
             onClick={onOpenCaModal}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--color-bg-tertiary)] border border-[var(--color-border-default)] text-xs font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)] hover:border-[var(--color-accent)]/50 transition-all"
+            className="h-8 flex items-center gap-1.5 px-2.5 rounded-lg bg-[var(--color-bg-tertiary)] border border-[var(--color-border-default)] text-xs font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)] hover:border-[var(--color-accent)]/50 transition-all shrink-0 whitespace-nowrap"
+            title="查看或下载 CA 根证书"
           >
             <Shield
               size={13}
-              className="text-amber-400"
+              className="text-amber-400 shrink-0"
             />
             <span>CA 证书</span>
           </button>
 
-          {/* Auto Scroll Toggle */}
+          {/* 自动滚动 */}
           <button
             onClick={() => setAutoScroll(!autoScroll)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${
+            className={`h-8 flex items-center gap-1.5 px-2.5 rounded-lg border text-xs font-medium transition-all shrink-0 whitespace-nowrap ${
               autoScroll
                 ? 'bg-[var(--color-accent)]/15 border-[var(--color-accent)]/40 text-[var(--color-accent)]'
                 : 'bg-[var(--color-bg-tertiary)] border-[var(--color-border-default)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]'
             }`}
-            title={autoScroll ? '已启用自动滚动到最新请求' : '已暂停自动滚动'}
+            title={autoScroll ? '已启用自动滚动' : '已暂停自动滚动'}
           >
             <ArrowDown
               size={13}
-              className={autoScroll ? 'animate-bounce' : ''}
+              className={autoScroll ? 'animate-bounce shrink-0' : 'shrink-0'}
             />
             <span>自动滚动</span>
           </button>
 
-          {/* Clear Requests Button */}
+          {/* 清空请求 */}
           <button
             onClick={handleClear}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--color-bg-tertiary)] border border-[var(--color-border-default)] text-xs font-medium text-[var(--color-text-secondary)] hover:text-rose-400 hover:border-rose-500/30 hover:bg-rose-500/10 transition-all"
+            className="h-8 flex items-center gap-1.5 px-2.5 rounded-lg bg-[var(--color-bg-tertiary)] border border-[var(--color-border-default)] text-xs font-medium text-[var(--color-text-secondary)] hover:text-rose-400 hover:border-rose-500/30 hover:bg-rose-500/10 transition-all shrink-0 whitespace-nowrap"
             title="清空当前所有捕获请求"
           >
-            <Trash2 size={13} />
+            <Trash2
+              size={13}
+              className="shrink-0"
+            />
             <span>清空</span>
           </button>
+
+          {/* 分隔线 */}
+          <div className="h-4 w-px bg-[var(--color-border-default)] shrink-0 mx-0.5" />
+
+          {/* AI 智能分析模式与执行 */}
+          <div className="flex items-center bg-[var(--color-bg-primary)] border border-[var(--color-border-default)] rounded-lg p-0.5 shrink-0 whitespace-nowrap">
+            <div className="relative">
+              <select
+                value={analysisMode}
+                onChange={e =>
+                  setAnalysisMode(e.target.value as SessionAnalysisMode)
+                }
+                className="appearance-none h-7 bg-transparent text-xs font-mono text-[var(--color-text-secondary)] pl-2.5 pr-6 py-0 focus:outline-none cursor-pointer hover:text-[var(--color-text-primary)]"
+                title="AI 分析模式"
+              >
+                <option
+                  value="auto"
+                  className="bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]"
+                >
+                  自动检测
+                </option>
+                <option
+                  value="api_reverse"
+                  className="bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]"
+                >
+                  接口逆向
+                </option>
+                <option
+                  value="security"
+                  className="bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]"
+                >
+                  安全审查
+                </option>
+                <option
+                  value="perf"
+                  className="bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]"
+                >
+                  性能分析
+                </option>
+                <option
+                  value="js_crypto"
+                  className="bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]"
+                >
+                  JS 加密
+                </option>
+              </select>
+              <ChevronDown
+                size={11}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] pointer-events-none"
+              />
+            </div>
+
+            <button
+              onClick={handleAnalyzeSelected}
+              disabled={analyzing || selectedIds.length === 0}
+              className="h-7 flex items-center gap-1.5 px-2.5 rounded-md bg-[var(--color-accent)]/15 border border-[var(--color-accent)]/40 text-[var(--color-accent)] text-xs font-medium hover:bg-[var(--color-accent)]/25 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
+              title={
+                selectedIds.length > 0
+                  ? `AI 分析已选 ${selectedIds.length} 条请求`
+                  : '勾选左侧请求后发起 AI 分析'
+              }
+            >
+              {analyzing ? (
+                <Loader2
+                  size={12}
+                  className="animate-spin"
+                />
+              ) : (
+                <Sparkles size={12} />
+              )}
+              <span>
+                {analyzing
+                  ? '分析中…'
+                  : selectedIds.length > 0
+                    ? `分析 (${selectedIds.length})`
+                    : 'AI 分析'}
+              </span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Bottom filter row */}
-      <div className="flex flex-wrap items-center gap-2.5">
-        {/* Method Filter Dropdown */}
-        <div className="relative">
+      {/* 搜索与过滤行 */}
+      <div className="flex items-center gap-2.5 px-4 py-1.5 bg-[var(--color-bg-secondary)]/40 border-t border-[var(--color-border-muted)]">
+        {/* Method Filter 下拉 */}
+        <div className="relative shrink-0">
           <select
             value={filter.method || 'ALL'}
             onChange={e =>
@@ -385,7 +392,7 @@ export const ProxyControlBar: React.FC<ProxyControlBarProps> = ({
                 method: e.target.value === 'ALL' ? '' : e.target.value,
               })
             }
-            className="appearance-none bg-[var(--color-bg-primary)] border border-[var(--color-border-default)] text-xs font-mono font-bold text-[var(--color-text-primary)] rounded-xl pl-3 pr-8 py-1.5 focus:outline-none focus:border-[var(--color-accent)] cursor-pointer"
+            className="appearance-none h-7 bg-[var(--color-bg-primary)] border border-[var(--color-border-default)] text-xs font-mono font-bold text-[var(--color-text-primary)] rounded-lg pl-2.5 pr-6 py-0 focus:outline-none focus:border-[var(--color-accent)] cursor-pointer"
           >
             {METHODS.map(m => (
               <option
@@ -398,38 +405,66 @@ export const ProxyControlBar: React.FC<ProxyControlBarProps> = ({
             ))}
           </select>
           <ChevronDown
-            size={12}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] pointer-events-none"
+            size={11}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] pointer-events-none"
           />
         </div>
 
-        {/* URL Search input */}
+        {/* URL / 路径 / 状态码搜索输入框 */}
         <div className="flex-1 relative min-w-[200px]">
           <Search
             size={13}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]"
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]"
           />
           <input
             type="text"
-            placeholder="过滤请求 URL、路径或域名 (例如 /api/v1 或 example.com)..."
+            placeholder="过滤请求 URL、路径、域名或状态码 (例如 /api/v1, 200, example.com)..."
             value={filter.search}
             onChange={e => setFilter({search: e.target.value})}
-            className="w-full bg-[var(--color-bg-primary)] border border-[var(--color-border-default)] rounded-xl pl-8 pr-8 py-1.5 text-xs text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)] transition-all font-mono"
+            className="w-full h-7 bg-[var(--color-bg-primary)] border border-[var(--color-border-default)] rounded-lg pl-7 pr-7 text-xs text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)] transition-all font-mono"
           />
           {filter.search && (
             <button
               onClick={() => setFilter({search: ''})}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
             >
               <X size={12} />
             </button>
           )}
         </div>
+
+        {/* 统计与状态指示区 */}
+        <div className="flex items-center gap-3 text-xs font-mono text-[var(--color-text-muted)] shrink-0 whitespace-nowrap">
+          {isRunning && (
+            <span className="flex items-center gap-1.5 text-emerald-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              代理 :{status?.port ?? inputPort}
+            </span>
+          )}
+          {cdpEnabled && (
+            <span className="flex items-center gap-1.5 text-sky-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
+              CDP 活跃
+            </span>
+          )}
+          <span>
+            共{' '}
+            <strong className="text-[var(--color-text-primary)]">
+              {totalRequests}
+            </strong>{' '}
+            条
+          </span>
+          {selectedIds.length > 0 && (
+            <span className="text-[var(--color-accent)] font-medium">
+              · 已选 {selectedIds.length} 条
+            </span>
+          )}
+        </div>
       </div>
 
-      {/* Error prompt if any */}
+      {/* 错误提示条 */}
       {errorMsg && (
-        <div className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs">
+        <div className="flex items-center justify-between px-4 py-1.5 bg-rose-500/10 border-t border-rose-500/20 text-rose-400 text-xs">
           <span>{errorMsg}</span>
           <button
             onClick={() => setErrorMsg(null)}

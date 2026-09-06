@@ -10,7 +10,7 @@
 
 ## Project Structure &amp; Module Organization
 
-核心源码位于 `src/`。其中 `src/tools/` 提供 MCP 工具实现，`src/modules/` 放逆向分析、Hook、调试、去混淆等核心模块，`src/services/` 负责外部 AI 与服务集成；`src/worker/` 是后台 worker 运行时（`src/index.ts` 为进程入口）。命令行客户端位于 `src/cli/`（`browsercli` 可执行命令），通过本地命名管道（POSIX 为 unix socket）与 detached daemon 会话通信：CLI 按 workspace-hash 注册表（`%LOCALAPPDATA%\browsercli\daemon`）发现会话，连不上就自动 spawn daemon 并等 stdout 就绪行握手（不再内置本地 worker 进程管理，start/stop/status/repl 等命令已删除；原 `/api/v1` HTTP 契约与 Sekiro RPC 均已下线）。构建产物输出到 `build/`，不要手改。文档集中在 `docs/`，公开案例与脚本入口在 `scripts/cases/`。真实任务证据默认保留在 `artifacts/tasks/<task-id>/`，仓库只跟踪模板目录。
+核心源码位于 `src/`。其中 `src/tools/` 提供 MCP 工具实现，`src/modules/` 放逆向分析、Hook、调试、去混淆等核心模块，`src/services/` 负责外部 AI 与服务集成；`src/worker/` 是后台 worker 运行时（`src/index.ts` 为进程入口）。命令行客户端位于 `src/cli/`（`proxycli` 可执行命令），通过本地命名管道（POSIX 为 unix socket）与 detached daemon 会话通信：CLI 按 workspace-hash 注册表（`%LOCALAPPDATA%\proxycli\daemon`）发现会话，连不上就自动 spawn daemon 并等 stdout 就绪行握手（不再内置本地 worker 进程管理，start/stop/status/repl 等命令已删除；原 `/api/v1` HTTP 契约与 Sekiro RPC 均已下线）。构建产物输出到 `build/`，不要手改。文档集中在 `docs/`，公开案例与脚本入口在 `scripts/cases/`。真实任务证据默认保留在 `artifacts/tasks/<task-id>/`，仓库只跟踪模板目录。
 
 ## Build, Test, and Development Commands
 

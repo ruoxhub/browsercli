@@ -158,7 +158,7 @@ describe('analysisExecution coordinator', () => {
       (error: unknown) => {
         assert.ok(error instanceof ToolError);
         assert.strictEqual(error.code, ErrorCodes.AI_REQUIRED);
-        assert.ok(error.recovery?.command?.includes('browsercli config set'));
+        assert.ok(error.recovery?.command?.includes('proxycli config set'));
         return true;
       },
     );

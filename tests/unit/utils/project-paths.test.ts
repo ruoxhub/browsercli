@@ -18,11 +18,11 @@ import {
 } from '../../../src/utils/projectPaths.js';
 
 describe('project path resolution', () => {
-  it('resolves session db under user home .browsercli/cache', () => {
+  it('resolves session db under user home .proxycli/cache', () => {
     const repoRoot = resolvePackageRoot(import.meta.url);
     assert.strictEqual(
       resolveDefaultSessionDbFile(),
-      path.join(os.homedir(), '.browsercli', 'cache', 'reverser.db'),
+      path.join(os.homedir(), '.proxycli', 'cache', 'reverser.db'),
     );
     // 不应再落到项目根目录的 .cache
     assert.ok(!resolveDefaultSessionDbFile().startsWith(repoRoot));

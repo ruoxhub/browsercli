@@ -30,7 +30,7 @@ class WebSocketClient {
 
   private getWsUrl(): string {
     const {protocol, host, port} = window.location;
-    if (port === '5173') {
+    if (port === '5173' || port === '5174') {
       return 'ws://127.0.0.1:8765/ws';
     }
     const wsProtocol = protocol === 'https:' ? 'wss:' : 'ws:';
@@ -52,15 +52,19 @@ class WebSocketClient {
       this.reconnectTimer = null;
     }
 
+    this.url = this.getWsUrl();
+    let socket: WebSocket;
     try {
-      this.ws = new WebSocket(this.url);
+      socket = new WebSocket(this.url);
+      this.ws = socket;
     } catch (err) {
       console.error('Failed to create WebSocket instance:', err);
       this.scheduleReconnect();
       return;
     }
 
-    this.ws.onopen = () => {
+    socket.onopen = () => {
+      if (this.ws !== socket) return;
       console.log('WebSocket connected to', this.url);
       // 重新发送现有的所有订阅
       for (const [channel, filter] of this.activeFilters.entries()) {
@@ -68,7 +72,8 @@ class WebSocketClient {
       }
     };
 
-    this.ws.onmessage = event => {
+    socket.onmessage = event => {
+      if (this.ws !== socket) return;
       try {
         const msg: ServerMsg = JSON.parse(event.data);
         if (msg.type === 'event' || msg.type === 'snapshot') {
@@ -91,7 +96,8 @@ class WebSocketClient {
       }
     };
 
-    this.ws.onclose = event => {
+    socket.onclose = event => {
+      if (this.ws !== socket) return;
       console.log(
         `WebSocket closed (code: ${event.code}, reason: ${event.reason})`,
       );
@@ -101,7 +107,8 @@ class WebSocketClient {
       }
     };
 
-    this.ws.onerror = err => {
+    socket.onerror = err => {
+      if (this.ws !== socket) return;
       console.error('WebSocket error:', err);
     };
   }
@@ -113,8 +120,17 @@ class WebSocketClient {
       this.reconnectTimer = null;
     }
     if (this.ws) {
-      this.ws.close();
+      const socket = this.ws;
       this.ws = null;
+      socket.onopen = null;
+      socket.onmessage = null;
+      socket.onclose = null;
+      socket.onerror = () => {};
+      try {
+        socket.close();
+      } catch {
+        // ignore
+      }
     }
   }
 

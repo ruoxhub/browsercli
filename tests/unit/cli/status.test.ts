@@ -35,7 +35,7 @@ function fakeSession(name: string, socketPath: string): SessionConfig {
 
 describe('statusCommand (registry probe + stale GC)', () => {
   const daemonDir = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'browsercli-status-'),
+    path.join(os.tmpdir(), 'proxycli-status-'),
   );
   let liveServer: net.Server;
   let livePath: string;
@@ -124,7 +124,7 @@ describe('statusCommand (registry probe + stale GC)', () => {
   });
 
   it('无会话时输出空表且 online=false', async () => {
-    const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'browsercli-empty-'));
+    const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'proxycli-empty-'));
     try {
       const ctx: WorkerContext = {
         session: 'default',

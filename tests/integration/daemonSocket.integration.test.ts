@@ -6,7 +6,7 @@
 
 /**
  * 端到端集成测试：真实 detached daemon（build/src/index.js --daemon）
- * + 真实 browsercli CLI（browsercli/build/bin/browsercli.js），
+ * + 真实 proxycli CLI（proxycli/build/bin/proxycli.js），
  * 走本地命名管道 / unix socket 的完整生命周期：
  * open → list-tools → call(未知工具) → close。
  */
@@ -24,10 +24,10 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '../../..');
 const cliBin = path.join(
   repoRoot,
-  'browsercli',
+  'proxycli',
   'build',
   'bin',
-  'browsercli.js',
+  'proxycli.js',
 );
 const daemonEntry = path.join(repoRoot, 'build', 'src', 'index.js');
 
@@ -135,7 +135,7 @@ describe('daemon socket end-to-end', () => {
   before(() => {
     tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bcli-daemon-e2e-'));
     workspace = path.join(tmpRoot, 'ws');
-    fs.mkdirSync(path.join(workspace, '.browsercli'), {recursive: true});
+    fs.mkdirSync(path.join(workspace, '.proxycli'), {recursive: true});
     daemonDir = path.join(tmpRoot, 'daemon');
     cliEnv = {
       ...process.env,
@@ -144,7 +144,7 @@ describe('daemon socket end-to-end', () => {
     };
     assert.ok(
       fs.existsSync(cliBin),
-      `browsercli bin missing: ${cliBin} (run npm run build first)`,
+      `proxycli bin missing: ${cliBin} (run npm run build first)`,
     );
     assert.ok(
       fs.existsSync(daemonEntry),

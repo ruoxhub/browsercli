@@ -17,8 +17,8 @@ This AGENTS.md scopes guidance to `skills`. Parent AGENTS guidance still applies
 ### Subdirectories
 - `ast-deobfuscation/`
 - `browser-qa/`
-- `browsercli/`
-- `browsercli-playbook/`
+- `proxycli/`
+- `proxycli-playbook/`
 - `hello_js_reverse_skill/`
 - `js-reverse-automation/`
 - `protocol-reverse/`

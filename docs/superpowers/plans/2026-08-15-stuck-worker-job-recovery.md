@@ -14,7 +14,7 @@
 - Do not add dependencies, commit, push, or modify generated `build/` output.
 - Keep normal connect/disconnect mutually exclusive with tool execution.
 - Force-disconnect must require an explicit `force: true` request or `--force` CLI flag.
-- The default server job deadline is exactly `300_000` ms, matching the current browsercli timeout.
+- The default server job deadline is exactly `300_000` ms, matching the current proxycli timeout.
 - Timed-out and cancelled jobs are terminal and retain an error code/message plus `finishedAt`.
 
 ---
@@ -261,25 +261,25 @@ Use the command from Step 4; expect all selected tests to pass.
 
 ---
 
-### Task 4: Expose Recovery Through browsercli
+### Task 4: Expose Recovery Through proxycli
 
 **Files:**
 
-- Modify: `browsercli/src/WorkerHttpClient.ts`
-- Modify: `browsercli/src/commands/browser.ts`
-- Modify: `browsercli/src/help.ts`
-- Modify: `browsercli/tests/unit/WorkerHttpClient.test.ts`
-- Modify: `browsercli/tests/unit/WorkerHttpClient.browser.test.ts`
-- Modify: `browsercli/tests/unit/browser.test.ts`
-- Modify: `browsercli/tests/unit/help.test.ts`
-- Modify: `skills/browsercli/SKILL.md`
+- Modify: `proxycli/src/WorkerHttpClient.ts`
+- Modify: `proxycli/src/commands/browser.ts`
+- Modify: `proxycli/src/help.ts`
+- Modify: `proxycli/tests/unit/WorkerHttpClient.test.ts`
+- Modify: `proxycli/tests/unit/WorkerHttpClient.browser.test.ts`
+- Modify: `proxycli/tests/unit/browser.test.ts`
+- Modify: `proxycli/tests/unit/help.test.ts`
+- Modify: `skills/proxycli/SKILL.md`
 
 **Interfaces:**
 
 - Job status adds `timed_out | cancelled`.
 - Adds `cancelJob(jobId): Promise<JobStatus>`.
 - `disconnectBrowser(options?: {force?: boolean})` sends JSON only when force is requested.
-- `browsercli browser disconnect --force` is the explicit recovery command.
+- `proxycli browser disconnect --force` is the explicit recovery command.
 
 - [ ] **Step 1: Write failing HTTP-client contract tests**
 
@@ -293,19 +293,19 @@ assert.deepEqual(calls, [{action: 'disconnect', options: {force: true}}]);
 assert.ok(helpText.includes('browser disconnect [--force] [--json]'));
 ```
 
-- [ ] **Step 3: Run browsercli tests and verify RED**
+- [ ] **Step 3: Run proxycli tests and verify RED**
 
 ```powershell
-npm --prefix browsercli test
+npm --prefix proxycli test
 ```
 
 - [ ] **Step 4: Implement the minimal client, flag, and help changes**
 
 Keep status strict (`--force` invalid for status), omit the disconnect body for the default path, and document that force cancels the active HTTP job before detaching the browser.
 
-- [ ] **Step 5: Run browsercli tests and verify GREEN**
+- [ ] **Step 5: Run proxycli tests and verify GREEN**
 
-Use the command from Step 3; expect all browsercli tests to pass.
+Use the command from Step 3; expect all proxycli tests to pass.
 
 ---
 
@@ -315,12 +315,12 @@ Use the command from Step 3; expect all browsercli tests to pass.
 
 - [ ] **Step 1: Inspect the scoped diff and run `git diff --check`**
 
-- [ ] **Step 2: Run focused Worker and browsercli regressions after the last edit**
+- [ ] **Step 2: Run focused Worker and proxycli regressions after the last edit**
 
 ```powershell
 npm run build:compile
 node --require ./build/tests/setup.js --test build/tests/unit/tools/input/fill.test.js build/tests/unit/worker/WorkerActivityCoordinator.test.js build/tests/unit/worker/ToolAdapter.test.js build/tests/unit/worker/BrowserConnectionManager.test.js build/tests/unit/web/JobStore.test.js build/tests/unit/web/routes/apiV1.test.js build/tests/unit/web/routes/apiV1.browser.test.js
-npm --prefix browsercli test
+npm --prefix proxycli test
 ```
 
 - [ ] **Step 3: Run repository gates**
@@ -329,7 +329,7 @@ npm --prefix browsercli test
 npm run typecheck
 npm run test:unit
 npm run check-format
-npm --prefix browsercli run typecheck
+npm --prefix proxycli run typecheck
 ```
 
 - [ ] **Step 4: Re-read the final diff**

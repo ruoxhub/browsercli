@@ -23,7 +23,7 @@ import {
 } from '../../../src/cli/sessionPaths.js';
 
 function makeTempDir(): string {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'browsercli-test-'));
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'proxycli-test-'));
 }
 
 function fakeSession(name: string): SessionConfig {
@@ -37,12 +37,12 @@ function fakeSession(name: string): SessionConfig {
   };
 }
 
-test('computeWorkspaceDir 优先命中含 .browsercli 的祖先目录', () => {
+test('computeWorkspaceDir 优先命中含 .proxycli 的祖先目录', () => {
   const root = makeTempDir();
   try {
     const marker = path.join(root, 'a');
     const deep = path.join(marker, 'b', 'c');
-    fs.mkdirSync(path.join(marker, '.browsercli'), {recursive: true});
+    fs.mkdirSync(path.join(marker, '.proxycli'), {recursive: true});
     fs.mkdirSync(deep, {recursive: true});
     assert.strictEqual(
       path.resolve(computeWorkspaceDir(deep)),
@@ -58,7 +58,7 @@ test('computeWorkspaceDir 无标记目录时回退 package.json 层，全无则�
   try {
     // win32 下 resolve(cwd) 可能得到 8.3 短路径（Administrator→ADMINI~1），
     // 断言统一经 realpath 归一化为长路径再比较。
-    // mock existsSync 隔离环境：本机 home 层就有 ~/.browsercli，直接向上搜会命中。
+    // mock existsSync 隔离环境：本机 home 层就有 ~/.proxycli，直接向上搜会命中。
     const pkgDir = path.join(root, 'pkg');
     const deep = path.join(pkgDir, 'x', 'y');
     fs.mkdirSync(deep, {recursive: true});

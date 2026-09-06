@@ -114,7 +114,7 @@ describe('ToolPrerequisiteChecker', () => {
         assert.equal(error.retryable, true);
         assert.deepEqual(error.recovery, {
           tool: 'resume',
-          command: 'browsercli call resume',
+          command: 'proxycli call resume',
           reason: 'Resume execution or evaluate the current call frame.',
         });
         return true;
@@ -163,7 +163,7 @@ describe('ToolPrerequisiteChecker', () => {
         assert.equal(error.retryable, false);
         assert.deepEqual(error.recovery, {
           tool: 'pause',
-          command: 'browsercli call pause',
+          command: 'proxycli call pause',
           reason: 'Pause page execution before inspecting call frames.',
         });
         return true;

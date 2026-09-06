@@ -108,8 +108,8 @@ deadline。超时 job 会进入 `timed_out` 终态，不会继续占用 Worker �
 浏览器上下文，然后重新连接：
 
 ```bash
-browsercli browser disconnect --force
-browsercli browser connect
+proxycli browser disconnect --force
+proxycli browser connect
 ```
 
 强制断连会把当前 job 标记为 `cancelled`，并中断正在进行的页面操作；需要保留的
@@ -118,5 +118,5 @@ browsercli browser connect
 已知 job ID 时也可以只取消 job：
 
 ```bash
-browsercli jobs cancel <job-id>
+proxycli jobs cancel <job-id>
 ```

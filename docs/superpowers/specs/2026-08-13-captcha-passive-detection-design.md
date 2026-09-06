@@ -517,7 +517,7 @@ URL、标题和文本规则均属于弱证据：
 - 没有 AI、截图、文件写入、自动输入、浏览器模式切换、启动脚本或 eager CDP 调用；
 - 没有新增依赖；
 - 没有修改 `build/`；
-- 没有纳入用户已有的 debugger、worker、browsercli 等未提交修改。
+- 没有纳入用户已有的 debugger、worker、proxycli 等未提交修改。
 
 ## 17. 完成标准
 

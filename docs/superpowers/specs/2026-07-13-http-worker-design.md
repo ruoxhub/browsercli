@@ -2,7 +2,7 @@
 
 - **日期**：2026-07-13
 - **状态**：已与用户确认（含会话模型与 Sekiro 去留两项决策）
-- **范围**：把现有 `browsercli`（CLI）与 `js-reverse-worker`（Worker）之间的 Sekiro(rpc-go) broker 解耦，改为 Worker 直接暴露原生 HTTP API，CLI 作为纯 HTTP 客户端调用。Worker 成为可跨网络部署的独立服务。
+- **范围**：把现有 `proxycli`（CLI）与 `js-reverse-worker`（Worker）之间的 Sekiro(rpc-go) broker 解耦，改为 Worker 直接暴露原生 HTTP API，CLI 作为纯 HTTP 客户端调用。Worker 成为可跨网络部署的独立服务。
 
 ---
 
@@ -12,7 +12,7 @@
 
 仓库当前已把 CLI 与 Worker 解耦，但传输层依赖外部 broker **Sekiro (rpc-go)**：
 
-- CLI 端 `browsercli` 通过 `SekiroInvoker` 向 `POST /business/invoke` 发 HTTP 请求。
+- CLI 端 `proxycli` 通过 `SekiroInvoker` 向 `POST /business/invoke` 发 HTTP 请求。
 - Worker 端 `js-reverse-worker`（`src/index.ts` 的 `main()`）启动 `RpcClient` 经 WebSocket 注册到 Sekiro，由 Sekiro 转发请求给 `ToolAdapter` 包装的 Action。
 - Worker 内的 `ConsoleServer`（`src/web/ConsoleServer.ts`）已自带一套 HTTP REST + WebSocket 服务（默认 `127.0.0.1:8765`，路由在 `src/web/routes/*`，事件经 `WsHub` 广播），但其 `tools` 路由当前仍通过 `SekiroInvoker` 代理转发。
 
@@ -37,7 +37,7 @@
 
 ```
 ┌──────────────┐            HTTP /api/v1              ┌──────────────────────────────┐
-│  browsercli  │  POST /sessions/:id/invoke          │  js-reverse-worker           │
+│  proxycli  │  POST /sessions/:id/invoke          │  js-reverse-worker           │
 │ (HTTP 客户端) │ ──────────────────────────────────▶ │  (独立服务, 可跨网络)         │
 │              │ ◀── GET /jobs/:id (轮询) ────────── │  ConsoleServer (扩展)         │
 │ + WS 流式     │ ◀── WS /sessions/:id/stream ────── │   ├─ /api/v1  对外稳定 API    │
@@ -48,7 +48,7 @@
 ```
 
 - **Worker 端**：扩展现有 `ConsoleServer`，新增 `/api/v1` 分层路由 + Bearer Token 中间件 + 异步 Job 层。工具执行复用现有 `ToolAdapter` 内的 `ToolExecutionPipeline`，不再经 Sekiro broker。
-- **CLI 端**：`browsercli` 瘦身为纯 HTTP 客户端，移除 `SekiroInvoker` / `WorkerManager` 主路径（保留代码用于可选回退，见 §7）。
+- **CLI 端**：`proxycli` 瘦身为纯 HTTP 客户端，移除 `SekiroInvoker` / `WorkerManager` 主路径（保留代码用于可选回退，见 §7）。
 - **复用基础**：`RestRouter`、`WsHub`、`ToolAdapter`、`ToolExecutionPipeline`、`tools-meta` 的 `getToolMeta()` 全部直接复用，不重写。
 
 ---
@@ -181,7 +181,7 @@ interface Job {
 
 ## 7. Sekiro 去留（已确认决策）
 
-- **默认路径移除 Sekiro**：`js-reverse-worker` 默认不再创建 `RpcClient` / 连接 Sekiro；`browsercli` 默认不再使用 `SekiroInvoker`。
+- **默认路径移除 Sekiro**：`js-reverse-worker` 默认不再创建 `RpcClient` / 连接 Sekiro；`proxycli` 默认不再使用 `SekiroInvoker`。
 - **代码保留 + 可选回退**：`src/modules/protocol/Client.ts`（RpcClient）、`src/cli/sekiro-invoker.ts`、`ToolAdapter.wrapTool` 等 Sekiro 相关代码**保留不删除**，通过环境变量 `WORKER_TRANSPORT=sekiro` 可选回退到旧传输，保证可回滚。默认 `WORKER_TRANSPORT=http`。
 - **`index.ts` 改造**：`main()` 仅在 `WORKER_TRANSPORT !== 'http'`（即显式 `sekiro`）时创建并连接 `RpcClient`、走 `toolAdapter.registerAll(...)` 旧路径；默认 `http` 时跳过，仅启动 `ConsoleServer` 的 `/api/v1`。
 - **CLI `app.ts` 改造**：`resolveContext` 不再构造 `SekiroInvoker` + `WorkerManager`，改为构造 `WorkerHttpClient`（见 §8）。Sekiro 路径在 `WORKER_TRANSPORT=sekiro` 时仍可经旧的 `SekiroInvoker` 分支启用。
@@ -222,7 +222,7 @@ interface Job {
   - `bearerAuth` 中间件在 loopback/非 loopback、有/无 token 下的放行/拒绝矩阵。
   - 复用现有 `tool-args.ts` 参数强制测试。
 - **integration**（`tests/integration/`）：
-  - 起 loopback Worker → `browsercli call <简单工具>` 经 HTTP 拿到 Job 结果。
+  - 起 loopback Worker → `proxycli call <简单工具>` 经 HTTP 拿到 Job 结果。
   - 非 loopback 绑定 + 无 token → `401`；带 token → 正常。
   - `WS /sessions/:id/stream` 能收到 `tool.invoke` 事件。
 - **回归**：原 Sekiro 传输测试在 `WORKER_TRANSPORT=sekiro` 下仍可通过；默认 `http` 下的旧 Sekiro 调用测试更新为走 HTTP 路径。

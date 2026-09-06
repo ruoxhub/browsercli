@@ -6,7 +6,7 @@
   "bin": {
     "js-reverse-worker": "./build/src/index.js",
     "proxycli": "./build/src/cli/bin/proxycli.js",
-    "browsercli": "./build/src/cli/bin/proxycli.js"
+    "proxycli": "./build/src/cli/bin/proxycli.js"
   },
   "main": "index.js",
   "scripts": {
@@ -28,7 +28,7 @@
     "test": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test-reporter spec --test-force-exit --test \"build/tests/**/*.test.js\"",
     "test:unit": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/unit/**/*.test.js",
     "test:contracts": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/unit/tools/all-tools-contract.test.js build/tests/unit/tools/tool-failure-contract.test.js",
-    "test:reliability:integration": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/integration/tool-categories.integration.test.js build/tests/integration/browsercli-reliability.integration.test.js",
+    "test:reliability:integration": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/integration/tool-categories.integration.test.js build/tests/integration/proxycli-reliability.integration.test.js",
     "test:quick": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/unit/tools/**/*.test.js build/tests/unit/services/**/*.test.js build/tests/unit/utils/**/*.test.js",
     "test:property": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/property/**/*.test.js",
     "test:integration": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/integration/**/*.test.js",
@@ -49,7 +49,7 @@
     "prepare": "node --experimental-strip-types scripts/prepare.ts",
     "verify-server-json-version": "node --experimental-strip-types scripts/verify-server-json-version.ts",
     "case:jd:h5st:pure-node": "node scripts/cases/jd-h5st-pure-node.mjs",
-    "cli:start": "node build/src/index.js --daemon --proxycli-daemon --browsercli-daemon",
+    "cli:start": "node build/src/index.js --daemon --proxycli-daemon --proxycli-daemon",
     "cli:worker:stop": "proxycli close",
     "cli:worker:status": "proxycli list",
     "proxy:cli": "node --no-warnings=ExperimentalWarning build/src/modules/proxy/cli.js",
@@ -92,7 +92,6 @@
     "cheerio": "^1.2.0",
     "clsx": "^2.1.1",
     "diff": "^8.0.4",
-    "dotenv": "^16.4.7",
     "express": "^5.2.1",
     "javascript-obfuscator": "^5.4.1",
     "lucide-react": "^1.16.0",

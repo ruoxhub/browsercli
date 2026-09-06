@@ -23,11 +23,11 @@ const CA_VALIDITY_YEARS = 10;
 const LEAF_VALIDITY_DAYS = 365;
 const CACHE_MAX_SIZE = 500;
 
-/** 证书目录：BROWSER_MITM_CERTS_DIR 或 ~/.browsercli/mitm-certs。 */
+/** 证书目录：BROWSER_MITM_CERTS_DIR 或 ~/.proxycli/mitm-certs。 */
 export function resolveMitmCertsDir(): string {
   const explicit = getEnvValue('BROWSER_MITM_CERTS_DIR');
   if (explicit && explicit.trim().length > 0) return explicit;
-  return path.join(os.homedir(), '.browsercli', 'mitm-certs');
+  return path.join(os.homedir(), '.proxycli', 'mitm-certs');
 }
 
 interface KeyPairLike {

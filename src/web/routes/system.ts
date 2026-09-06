@@ -68,7 +68,7 @@ export interface SystemRoutesConfig {
  *
  * 形状校验之后的 relative 检查不是冗余：`file=.` / `file=..` 不含分隔符、
  * 也不绝对，能过上面三道，但 join 后落在 logDir 之外（父目录，即
- * `~/.browsercli`）。实测 `file=..` 在 Windows 上返回 200 + 空内容。
+ * `~/.proxycli`）。实测 `file=..` 在 Windows 上返回 200 + 空内容。
  * 凭据文件仍不可达（`runtime-config.json` 不在 logDir 内，且
  * `../runtime-config.json` 已被形状校验拒掉），但这里不该靠巧合说话。
  */

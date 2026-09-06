@@ -43,7 +43,7 @@ function buildDefaultEnvCode(): string {
     'globalThis.self = globalThis;',
     'globalThis.global = globalThis;',
     'globalThis.document ??= {cookie: "", location: {href: ""}};',
-    'globalThis.navigator ??= {userAgent: "browsercli-mcp"};',
+    'globalThis.navigator ??= {userAgent: "proxycli-mcp"};',
     'globalThis.location ??= {href: ""};',
     'globalThis.atob ??= (value) => Buffer.from(value, "base64").toString("utf8");',
     'globalThis.btoa ??= (value) => Buffer.from(value, "utf8").toString("base64");',

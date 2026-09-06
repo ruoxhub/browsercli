@@ -74,7 +74,7 @@ export function resolveDefaultEnvPath(moduleUrl: string): string {
 }
 
 export function resolveDefaultSessionDbFile(): string {
-  return path.join(os.homedir(), '.browsercli', 'cache', 'reverser.db');
+  return path.join(os.homedir(), '.proxycli', 'cache', 'reverser.db');
 }
 
 function quoteShellArg(value: string): string {

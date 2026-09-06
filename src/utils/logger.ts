@@ -60,13 +60,13 @@ function getConsoleState(): LoggerConsoleState {
 }
 
 /**
- * 默认日志目录：~/.browsercli/log。
+ * 默认日志目录：~/.proxycli/log。
  *
  * 纯函数 —— 不参与 `defaultLogHome` 状态判断。导出供 Web 控制台展示
  * （`GET /api/system/info`）与写入共用同一份定义，避免两处目录字面量各自漂移。
  */
 export function getLogDir(): string {
-  return path.join(os.homedir(), '.browsercli', 'log');
+  return path.join(os.homedir(), '.proxycli', 'log');
 }
 
 function createDefaultLogFileName(now = new Date()): string {

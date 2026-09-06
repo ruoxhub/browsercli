@@ -35,9 +35,13 @@ interface PageLike {
 
 interface BrowserLike {
   connected: boolean;
+  isConnected?(): boolean;
   process?(): ProcessLike;
   pages(): Promise<unknown[]>;
-  contexts(): Array<{pages(): unknown[]}>;
+  contexts(): Array<{
+    pages(): unknown[];
+    on?: (event: string, handler: unknown) => void;
+  }>;
   version(): string;
   on(event: string, handler: unknown): void;
   close(): Promise<void>;
@@ -109,7 +113,17 @@ describe('browser.ts mocked', () => {
           },
         } satisfies PageLike,
       ],
-      contexts: () => [{pages: () => []}],
+      contexts: () => [
+        {
+          pages: () => [
+            {
+              setViewportSize: async () => {
+                resized += 1;
+              },
+            },
+          ],
+        },
+      ],
       version: () => 'Chrome/144.0.0.0',
       on: () => undefined,
       close: async () => undefined,
@@ -224,6 +238,7 @@ describe('browser.ts mocked', () => {
 
     const browser: BrowserLike = {
       connected: true,
+      isConnected: () => true,
       on: () => undefined,
       pages: async () => [],
       contexts: () => [{pages: () => []}],
@@ -264,7 +279,12 @@ describe('browser.ts mocked', () => {
       connected: true,
       on: () => undefined,
       pages: async () => [],
-      contexts: () => [] as unknown[],
+      contexts: () => [
+        {
+          pages: () => [],
+          newPage: async () => ({once: () => undefined, isClosed: () => false}),
+        },
+      ],
       close: async () => undefined,
       isConnected: () => true,
     };
@@ -331,7 +351,7 @@ describe('browser.ts mocked', () => {
       connected: true,
       on: () => undefined,
       pages: async () => [],
-      contexts: () => [] as unknown[],
+      contexts: () => [{pages: () => []}],
       close: async () => undefined,
       isConnected: () => true,
     };
@@ -360,8 +380,24 @@ describe('browser.ts mocked', () => {
     let createdHandler: TargetCreatedHandler | null = null;
     const browser: BrowserLike = {
       connected: true,
+      isConnected: () => true,
       pages: async () => [{id: 'a'}],
-      contexts: () => [{pages: () => [{id: 'a'}]}],
+      contexts: () => [
+        {
+          pages: () => [{id: 'a'}],
+          on: (event: string, handler: unknown) => {
+            if (event === 'page') {
+              createdHandler = (async (target: {
+                type(): string;
+                page(): Promise<{id: string}>;
+              }) => {
+                const p = await target.page();
+                await (handler as (p: {id: string}) => Promise<void>)(p);
+              }) as TargetCreatedHandler;
+            }
+          },
+        },
+      ],
       version: () => 'Chrome/144.0.0.0',
       on: (event: string, handler: unknown) => {
         if (event === 'targetcreated') {
@@ -538,6 +574,148 @@ describe('browser.ts mocked', () => {
       const active = readDevToolsActivePort();
       assert.deepStrictEqual(active, {port, wsPath});
     } finally {
+      fs.readFileSync = originalReadFileSync;
+    }
+  });
+
+  it('connectToRemoteBrowser handles unadorned host:port without protocol', async () => {
+    // 场景：用户从 chrome://inspect/#remote-debugging 直接复制 "127.0.0.1:53687"
+    const originalFetch = globalThis.fetch;
+    const originalReadFileSync = fs.readFileSync;
+    const wsPath = '/devtools/browser/abc-inspect-uuid';
+    const port = 53687;
+    globalThis.fetch = (async () => ({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+      json: async () => ({}),
+    })) as unknown as typeof fetch;
+    fs.readFileSync = ((p: fs.PathOrFileDescriptor) => {
+      if (String(p).endsWith('DevToolsActivePort')) {
+        return `${port}\n${wsPath}\n`;
+      }
+      throw Object.assign(new Error('ENOENT'), {code: 'ENOENT'});
+    }) as typeof fs.readFileSync;
+
+    try {
+      const manager = BrowserManager.getInstance({
+        browserURL: `127.0.0.1:${port}`, // 无 http:// 前缀
+        isolated: true,
+        headless: true,
+      });
+
+      let capturedEndpoint: string | undefined;
+      const browser: BrowserLike = {
+        connected: true,
+        contexts: () => [{pages: () => []}],
+        version: () => 'Chrome/152.0.0.0',
+        on: () => undefined,
+        pages: async () => [],
+        close: async () => undefined,
+      };
+      chromium.connectOverCDP = (async (endpoint: string) => {
+        capturedEndpoint = endpoint;
+        return browser as unknown as Awaited<
+          ReturnType<typeof chromium.connectOverCDP>
+        >;
+      }) as typeof chromium.connectOverCDP;
+
+      const connected = await (
+        manager as unknown as BrowserManagerLike
+      ).connectToRemoteBrowser();
+      assert.strictEqual(connected, browser);
+      assert.strictEqual(capturedEndpoint, `ws://127.0.0.1:${port}${wsPath}`);
+    } finally {
+      globalThis.fetch = originalFetch;
+      fs.readFileSync = originalReadFileSync;
+    }
+  });
+
+  it('connectToRemoteBrowser does not leak uncaughtException listener on failure', async () => {
+    // 场景：连接反复失败，不应产生 EventEmitter memory leak
+    const beforeListeners = process.listenerCount('uncaughtException');
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () => {
+      throw new Error('connect ECONNREFUSED 127.0.0.1:9999');
+    }) as unknown as typeof fetch;
+
+    try {
+      const manager = BrowserManager.getInstance({
+        browserURL: 'http://127.0.0.1:9999',
+        isolated: true,
+        headless: true,
+      });
+      chromium.connectOverCDP = (async () => {
+        throw new Error('connect ECONNREFUSED 127.0.0.1:9999');
+      }) as typeof chromium.connectOverCDP;
+
+      for (let i = 0; i < 15; i++) {
+        await assert.rejects(async () => {
+          await (
+            manager as unknown as BrowserManagerLike
+          ).connectToRemoteBrowser();
+        });
+        await manager.close();
+      }
+
+      const afterListeners = process.listenerCount('uncaughtException');
+      assert.strictEqual(afterListeners, beforeListeners);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it('connectToRemoteBrowser falls back to DevToolsActivePort when 9222 is connection-refused', async () => {
+    // 场景：配置了默认的 9222，但 Chrome 在 chrome://inspect/#remote-debugging 分配了动态端口
+    const originalFetch = globalThis.fetch;
+    const originalReadFileSync = fs.readFileSync;
+    const activePort = 53687;
+    const wsPath = '/devtools/browser/dynamic-port-uuid';
+
+    globalThis.fetch = (async () => {
+      throw new Error('connect ECONNREFUSED 127.0.0.1:9222');
+    }) as unknown as typeof fetch;
+
+    fs.readFileSync = ((p: fs.PathOrFileDescriptor) => {
+      if (String(p).endsWith('DevToolsActivePort')) {
+        return `${activePort}\n${wsPath}\n`;
+      }
+      throw Object.assign(new Error('ENOENT'), {code: 'ENOENT'});
+    }) as typeof fs.readFileSync;
+
+    try {
+      const manager = BrowserManager.getInstance({
+        browserURL: 'http://127.0.0.1:9222',
+        isolated: true,
+        headless: true,
+      });
+
+      let capturedEndpoint: string | undefined;
+      const browser: BrowserLike = {
+        connected: true,
+        contexts: () => [{pages: () => []}],
+        version: () => 'Chrome/152.0.0.0',
+        on: () => undefined,
+        pages: async () => [],
+        close: async () => undefined,
+      };
+      chromium.connectOverCDP = (async (endpoint: string) => {
+        capturedEndpoint = endpoint;
+        return browser as unknown as Awaited<
+          ReturnType<typeof chromium.connectOverCDP>
+        >;
+      }) as typeof chromium.connectOverCDP;
+
+      const connected = await (
+        manager as unknown as BrowserManagerLike
+      ).connectToRemoteBrowser();
+      assert.strictEqual(connected, browser);
+      assert.strictEqual(
+        capturedEndpoint,
+        `ws://127.0.0.1:${activePort}${wsPath}`,
+      );
+    } finally {
+      globalThis.fetch = originalFetch;
       fs.readFileSync = originalReadFileSync;
     }
   });

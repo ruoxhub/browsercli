@@ -17,6 +17,7 @@ const commandDescriptions: Record<string, string> = {
   scaffold: '创建新的逆向任务脚手架',
   status: '查看 daemon 会话运行状态',
   proxy: '启动交互式 MITM 代理抓包终端（REPL）或查看代理状态',
+  web: '启动或在浏览器中打开 Web 控制台',
   open: '拉起（或探活）daemon 会话',
   close: '停止 daemon 会话',
   list: '列出注册表中的全部 daemon 会话',
@@ -45,6 +46,7 @@ export function generateTopLevelHelp(options?: {
     'scaffold',
     'status',
     'proxy',
+    'web',
   ];
 
   const lines = [
@@ -133,6 +135,12 @@ export function generateCommandHelp(command: string): string | null {
     'kill-all': {
       description: '强杀全部 --proxycli-daemon 进程并清理会话注册表',
       usage: 'proxycli kill-all',
+    },
+    web: {
+      description:
+        '启动 Web 控制台并在默认浏览器中打开（如果 daemon 未运行则自动拉起）',
+      usage:
+        'proxycli [-s=<session>] web [status] [--port=<port>] [--no-open] [--json]',
     },
   };
 

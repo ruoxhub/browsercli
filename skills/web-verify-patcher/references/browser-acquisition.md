@@ -1,6 +1,6 @@
 # 浏览器取证与打开网页规则
 
-本文件用于验证码识别任务中必须打开真实网页、截图、抓包、收集脚本或观察验证组件时。默认优先离线分析用户已提供的 HTML、截图、URL、脚本片段和页面文案；只有证据不足且用户确认授权范围后，才进入浏览器取证。通过 BrowserCLI / Worker 采集证据时，还必须读取 `browsercli-tools.md`。
+本文件用于验证码识别任务中必须打开真实网页、截图、抓包、收集脚本或观察验证组件时。默认优先离线分析用户已提供的 HTML、截图、URL、脚本片段和页面文案；只有证据不足且用户确认授权范围后，才进入浏览器取证。通过 BrowserCLI / Worker 采集证据时，还必须读取 `proxycli-tools.md`。
 
 ## 何时读取
 
@@ -21,7 +21,7 @@
 - 启动任何浏览器前，先让用户确认取证模式。
 - 用户未确认前，只能做离线材料分析和缺失证据提示。
 - BrowserCLI 是 JSReverser Worker 的 HTTP 控制面，不是独立的反检测浏览器模式；不得用它绕过模式确认或静默连接默认浏览器。
-- 只有用户确认浏览器模式且同意由 BrowserCLI / Worker 控制后，才按 `browsercli-tools.md` 取证；已有浏览器连接时先核对状态，不要重新连接或更换模式。新建 BrowserCLI Cloak 连接前，必须另外说明它不提供 `humanize` 参数且可能下载二进制，再取得用户确认。
+- 只有用户确认浏览器模式且同意由 BrowserCLI / Worker 控制后，才按 `proxycli-tools.md` 取证；已有浏览器连接时先核对状态，不要重新连接或更换模式。新建 BrowserCLI Cloak 连接前，必须另外说明它不提供 `humanize` 参数且可能下载二进制，再取得用户确认。
 - 不要直接使用普通 Playwright、Puppeteer、Selenium、系统 Chrome、系统 Firefox 或 CDP 路线打开目标页。
 - 已选模式后，后续所有浏览器取证动作都沿用该模式。
 - 工具不可用、路径缺失、runtime 不合格、需要登录或必须更换工具时，暂停并让用户确认；不要静默 fallback 到普通浏览器自动化。
@@ -72,10 +72,10 @@
 ### BrowserCLI / Worker（CloakBrowser 的可选控制面）
 
 - BrowserCLI 只通过 `/api/v1` 调用已运行的 Worker，不负责启动或停止本地 Worker 进程。
-- 用户确认 CloakBrowser 与 BrowserCLI / Worker 控制方式前，只能运行 `browsercli status`、`browsercli browser status` 和 `browsercli list-tools --json` 做只读能力检查。
+- 用户确认 CloakBrowser 与 BrowserCLI / Worker 控制方式前，只能运行 `proxycli status`、`proxycli browser status` 和 `proxycli list-tools --json` 做只读能力检查。
 - Worker 离线、浏览器模式不符或工具缺失时暂停；不要自动启动 Worker、连接默认浏览器或切换到普通 Chrome / CDP。
-- 用户确认后，按 `browsercli-tools.md` 的最小命令集采集证据；完整、实时契约以 `browsercli list-tools --json` 为准。
-- `browsercli browser connect --cloak true --headless false` 使用 Worker 的 Patchright + Cloak 二进制路线，不暴露 CloakBrowser 官方包装器的 `humanize` 参数，并可能在二进制缺失时下载约 200 MB 文件。只有用户单独确认这两项差异后才能执行；如果任务硬性要求官方包装器 + `humanize`，不要使用该连接命令。
+- 用户确认后，按 `proxycli-tools.md` 的最小命令集采集证据；完整、实时契约以 `proxycli list-tools --json` 为准。
+- `proxycli browser connect --cloak true --headless false` 使用 Worker 的 Patchright + Cloak 二进制路线，不暴露 CloakBrowser 官方包装器的 `humanize` 参数，并可能在二进制缺失时下载约 200 MB 文件。只有用户单独确认这两项差异后才能执行；如果任务硬性要求官方包装器 + `humanize`，不要使用该连接命令。
 - 使用 BrowserCLI 时仍默认保持零 JS stealth 注入和系统真实 viewport；不要主动传 `--js-stealth`、`--viewport` 或 `--full-stealth-args`。
 
 ## 工具缺失时的引导

@@ -78,7 +78,7 @@
 
 ```ts
 // src/utils/logger.ts（新增导出）
-export function getLogDir(): string; // path.join(os.homedir(), '.browsercli', 'log')
+export function getLogDir(): string; // path.join(os.homedir(), '.proxycli', 'log')
 
 // src/config/runtimeConfigPersistence.ts
 export const PERSISTED_KEYS: ReadonlySet<keyof GlobalConfig>; // {'llmProvider','openai','browser'}
@@ -162,13 +162,13 @@ Expected: FAIL —— `SyntaxError: The requested module does not provide an exp
 
 ```ts
 /**
- * 默认日志目录：~/.browsercli/log。
+ * 默认日志目录：~/.proxycli/log。
  *
  * 纯函数 —— 不参与 `defaultLogHome` 状态判断。导出供 Web 控制台展示
  * （`GET /api/system/info`）与写入共用同一份定义，避免两处目录字面量各自漂移。
  */
 export function getLogDir(): string {
-  return path.join(os.homedir(), '.browsercli', 'log');
+  return path.join(os.homedir(), '.proxycli', 'log');
 }
 ```
 
@@ -2381,7 +2381,7 @@ export function GeneralSection({
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `browsercli-config-${new Date()
+      link.download = `proxycli-config-${new Date()
         .toISOString()
         .slice(0, 19)
         .replace(/[:T]/g, '-')}.json`;

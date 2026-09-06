@@ -84,7 +84,7 @@ describe('ToolError and options', () => {
   it('supports options object with retryable, recovery, and details', () => {
     const recovery: ToolRecovery = {
       tool: 'launch_browser',
-      command: 'browsercli browser connect',
+      command: 'proxycli browser connect',
       reason: 'Browser must be running before attaching debugger',
     };
     const options: ToolErrorOptions = {
@@ -130,7 +130,7 @@ describe('ToolError and options', () => {
 
   it('createToolError passes options to ToolError', () => {
     const recovery: ToolRecovery = {
-      command: 'browsercli restart',
+      command: 'proxycli restart',
       reason: 'Restart required',
     };
     const err = createToolError(

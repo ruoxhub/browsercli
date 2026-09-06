@@ -20,7 +20,7 @@
 
 import type {IncomingMessage, ServerResponse} from 'node:http';
 
-import {configFromEnv} from '../../config/resolver.js';
+import {loadUserConfig} from '../../config/resolver.js';
 import {
   deleteRuntimeConfig,
   persistRuntimeConfig,
@@ -72,12 +72,12 @@ export interface ConfigRoutesConfig {
   ) => AIService | undefined;
   /**
    * 配置保存后的持久化回调，默认走真实 persistRuntimeConfig。
-   * 测试注入 no-op 以避免污染 ~/.browsercli/runtime-config.json。
+   * 测试注入 no-op 以避免污染 ~/.proxycli/runtime-config.json。
    */
   persist?: (config: GlobalConfig) => void;
   /**
    * 重置时的 CLI 种子值；src/index.ts 传入 parseWorkerArgs() 结果。
-   * 未注入时 reset 只回到 configFromEnv()。
+   * 未注入时 reset 只回到 loadUserConfig()。
    */
   configSeed?: Partial<GlobalConfig>;
   /**
@@ -314,7 +314,7 @@ export function createConfigRoutes(
           return;
         }
         resetRuntimeConfigStore({
-          ...configFromEnv(),
+          ...loadUserConfig(),
           ...cfg.configSeed,
         });
         sendJson(res, maskSensitiveFields(getRuntimeConfigStore().get()));

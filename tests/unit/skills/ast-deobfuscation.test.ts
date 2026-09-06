@@ -113,8 +113,8 @@ while (!![]) console.log("\x68\x69", 1 + 2);`,
     }
   });
 
-  it('references current browsercli tools for source collection and runtime verification', async () => {
-    const [skill, browsercliReference] = await Promise.all([
+  it('references current proxycli tools for source collection and runtime verification', async () => {
+    const [skill, proxycliReference] = await Promise.all([
       readFile(
         path.join(repoRoot, 'skills/ast-deobfuscation/SKILL.md'),
         'utf8',
@@ -122,32 +122,32 @@ while (!![]) console.log("\x68\x69", 1 + 2);`,
       readFile(
         path.join(
           repoRoot,
-          'skills/ast-deobfuscation/references/browsercli-tools.md',
+          'skills/ast-deobfuscation/references/proxycli-tools.md',
         ),
         'utf8',
       ),
     ]);
 
-    assert.match(skill, /references\/browsercli-tools\.md/);
-    assert.match(skill, /browsercli/);
+    assert.match(skill, /references\/proxycli-tools\.md/);
+    assert.match(skill, /proxycli/);
     for (const command of [
-      'browsercli status',
-      'browsercli call list_pages',
-      'browsercli call list_scripts',
-      'browsercli call search_in_sources --query',
-      'browsercli call get_script_source --scriptId',
+      'proxycli status',
+      'proxycli call list_pages',
+      'proxycli call list_scripts',
+      'proxycli call search_in_sources --query',
+      'proxycli call get_script_source --scriptId',
       '--filePath',
-      'browsercli call list_targets',
-      'browsercli call dump_target_scripts --targetId',
-      'browsercli call hook_function --target',
-      'browsercli call get_hook_data',
-      'browsercli call record_reverse_evidence',
+      'proxycli call list_targets',
+      'proxycli call dump_target_scripts --targetId',
+      'proxycli call hook_function --target',
+      'proxycli call get_hook_data',
+      'proxycli call record_reverse_evidence',
     ]) {
       assert.ok(
-        browsercliReference.includes(command),
-        `missing browsercli reference: ${command}`,
+        proxycliReference.includes(command),
+        `missing proxycli reference: ${command}`,
       );
     }
-    assert.doesNotMatch(browsercliReference, /--prettyPrint|--offset/);
+    assert.doesNotMatch(proxycliReference, /--prettyPrint|--offset/);
   });
 });

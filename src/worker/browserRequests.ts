@@ -41,10 +41,6 @@ export class BrowserConfigRequestError extends Error {
   }
 }
 
-function hasOwn(value: object, key: string): boolean {
-  return Object.prototype.hasOwnProperty.call(value, key);
-}
-
 function requireProtocol(
   key: string,
   value: string | undefined,
@@ -53,7 +49,11 @@ function requireProtocol(
   if (value === undefined) return;
   let protocol: string;
   try {
-    protocol = new URL(value).protocol;
+    let urlString = value;
+    if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(value)) {
+      urlString = protocols.includes('http:') ? `http://${value}` : value;
+    }
+    protocol = new URL(urlString).protocol;
   } catch {
     throw new BrowserConfigRequestError('VALIDATION', `${key} is not a URL`);
   }
@@ -72,11 +72,13 @@ export function parseBrowserConnectBody(body: unknown): BrowserConfig {
       'request body must be an object',
     );
   }
-  const remote = hasOwn(body, 'browserURL') || hasOwn(body, 'wsEndpoint');
-  const local = hasOwn(body, 'channel') || hasOwn(body, 'executablePath');
+  const remote =
+    Object.hasOwn(body, 'browserURL') || Object.hasOwn(body, 'wsEndpoint');
+  const local =
+    Object.hasOwn(body, 'channel') || Object.hasOwn(body, 'executablePath');
   if (
-    (hasOwn(body, 'browserURL') && hasOwn(body, 'wsEndpoint')) ||
-    (hasOwn(body, 'channel') && hasOwn(body, 'executablePath')) ||
+    (Object.hasOwn(body, 'browserURL') && Object.hasOwn(body, 'wsEndpoint')) ||
+    (Object.hasOwn(body, 'channel') && Object.hasOwn(body, 'executablePath')) ||
     (remote && local)
   ) {
     throw new BrowserConfigRequestError(
@@ -104,22 +106,28 @@ export function parseBrowserConnectBody(body: unknown): BrowserConfig {
   }
 
   const patch: BrowserConfig = {...parsed.data};
-  if (hasOwn(parsed.data, 'browserURL')) {
+  if (
+    patch.browserURL &&
+    !/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(patch.browserURL)
+  ) {
+    patch.browserURL = `http://${patch.browserURL}`;
+  }
+  if (Object.hasOwn(parsed.data, 'browserURL')) {
     patch.wsEndpoint = undefined;
     patch.channel = undefined;
     patch.executablePath = undefined;
     patch.remoteDebuggingUrl = undefined;
-  } else if (hasOwn(parsed.data, 'wsEndpoint')) {
+  } else if (Object.hasOwn(parsed.data, 'wsEndpoint')) {
     patch.browserURL = undefined;
     patch.channel = undefined;
     patch.executablePath = undefined;
     patch.remoteDebuggingUrl = undefined;
-  } else if (hasOwn(parsed.data, 'channel')) {
+  } else if (Object.hasOwn(parsed.data, 'channel')) {
     patch.browserURL = undefined;
     patch.wsEndpoint = undefined;
     patch.executablePath = undefined;
     patch.remoteDebuggingUrl = undefined;
-  } else if (hasOwn(parsed.data, 'executablePath')) {
+  } else if (Object.hasOwn(parsed.data, 'executablePath')) {
     patch.browserURL = undefined;
     patch.wsEndpoint = undefined;
     patch.channel = undefined;

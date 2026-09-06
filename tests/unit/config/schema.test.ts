@@ -5,6 +5,9 @@
  */
 
 import assert from 'node:assert';
+import {mkdtempSync, rmSync, writeFileSync} from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import {afterEach, describe, it} from 'node:test';
 
 import {
@@ -119,13 +122,51 @@ describe('config schema validation', {concurrency: false}, () => {
     assert.strictEqual(config.browser?.channel, 'bidi-chromium');
   });
 
-  it('validates and coerces environment-backed config before resolution', () => {
-    process.env.BROWSER_HEADLESS = 'false';
-    process.env.REMOTE_DEBUGGING_PORT = '9223';
-    process.env.OPENAI_API_KEY = 'sk-env';
+  it('resolves config from user config file (~/.proxycli/config.json)', () => {
+    const tmpDir = mkdtempSync(
+      path.join(os.tmpdir(), 'proxycli-resolve-test-'),
+    );
+    process.env.PROXYCLI_CONFIG_DIR = tmpDir;
+    try {
+      writeFileSync(
+        path.join(tmpDir, 'config.json'),
+        JSON.stringify({
+          headless: true,
+          browserUrl: 'http://127.0.0.1:9222',
+        }),
+        'utf-8',
+      );
 
-    const config = resolveConfig();
+      const config = resolveConfig();
+      assert.strictEqual(config.headless, true);
+      assert.strictEqual(config.browserUrl, 'http://127.0.0.1:9222');
+    } finally {
+      delete process.env.PROXYCLI_CONFIG_DIR;
+      rmSync(tmpDir, {recursive: true, force: true});
+    }
+  });
 
-    assert.strictEqual(config.headless, false);
+  it('allows overriding user config file with explicit arguments', () => {
+    const tmpDir = mkdtempSync(
+      path.join(os.tmpdir(), 'proxycli-resolve-test-'),
+    );
+    process.env.PROXYCLI_CONFIG_DIR = tmpDir;
+    try {
+      writeFileSync(
+        path.join(tmpDir, 'config.json'),
+        JSON.stringify({
+          headless: true,
+          browserUrl: 'http://127.0.0.1:9222',
+        }),
+        'utf-8',
+      );
+
+      const config = resolveConfig({headless: false});
+      assert.strictEqual(config.headless, false);
+      assert.strictEqual(config.browserUrl, 'http://127.0.0.1:9222');
+    } finally {
+      delete process.env.PROXYCLI_CONFIG_DIR;
+      rmSync(tmpDir, {recursive: true, force: true});
+    }
   });
 });

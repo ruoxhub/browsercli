@@ -7,15 +7,15 @@
 /**
  * RuntimeConfigStore — 进程内存态配置单例。
  *
- * 启动时用 configFromEnv() + CLI 参数播种，不读任何 JSON 文件。
+ * 启动时默认用 loadUserConfig() (~/.proxycli/config.json) + CLI 参数播种。
  * 面板通过 update() 修改配置，重启后回落到种子值。
  *
  * 深层字段（browser/openai/toolResultRecording）在 update()
  * 时做浅合并，避免面板只改一个字段却清空其余字段。
  */
 
-/* eslint-disable import/no-cycle -- 已知例外：configFromEnv() 播种 store 与 getRuntimeConfigStore() 读回 store 的初始化时序契约。见 spec §2.1 目标 2 与 §5.1 环 1 决议 A，Phase 4 复核。 */
-import {configFromEnv} from './resolver.js';
+/* eslint-disable import/no-cycle -- 已知例外：loadUserConfig() 播种 store 与 getRuntimeConfigStore() 读回 store 的初始化时序契约。见 spec §2.1 目标 2 与 §5.1 环 1 决议 A，Phase 4 复核。 */
+import {loadUserConfig} from './resolver.js';
 import {type GlobalConfig, validateGlobalConfig} from './schema.js';
 
 /** 需要浅合并的深层对象字段 */
@@ -24,7 +24,7 @@ const DEEP_MERGE_KEYS = new Set(['browser', 'openai', 'toolResultRecording']);
 export class RuntimeConfigStore {
   private config: GlobalConfig;
 
-  constructor(seed: GlobalConfig = configFromEnv()) {
+  constructor(seed: GlobalConfig = loadUserConfig()) {
     this.config = validateGlobalConfig(seed);
   }
 
@@ -57,7 +57,7 @@ export class RuntimeConfigStore {
   }
 
   reset(seed?: GlobalConfig): void {
-    this.config = validateGlobalConfig(seed ?? configFromEnv());
+    this.config = validateGlobalConfig(seed ?? loadUserConfig());
   }
 }
 
@@ -71,7 +71,7 @@ export function getRuntimeConfigStore(): RuntimeConfigStore {
 }
 
 /**
- * 重置 store（测试用）。传入 seed 则用 seed 重建；不传则从当前 env 重新播种。
+ * 重置 store（测试用）。传入 seed 则用 seed 重建；不传则从 ~/.proxycli/config.json 重新播种。
  */
 export function resetRuntimeConfigStore(seed?: GlobalConfig): void {
   store = new RuntimeConfigStore(seed);

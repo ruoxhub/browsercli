@@ -1,12 +1,12 @@
-# browsercli 浏览器连接控制设计
+# proxycli 浏览器连接控制设计
 
 - 日期：2026-08-14
 - 状态：已确认，待实现
-- 范围：为纯远程 `browsercli` 增加 `browser connect|disconnect|status` 命令，并通过稳定的 `/api/v1` 契约控制 Worker 的全局浏览器连接。
+- 范围：为纯远程 `proxycli` 增加 `browser connect|disconnect|status` 命令，并通过稳定的 `/api/v1` 契约控制 Worker 的全局浏览器连接。
 
 ## 1. 背景
 
-`browsercli` 只通过 Worker 的 `/api/v1` HTTP 契约通信，不管理本地 Worker 进程。Worker 已有供本地 Web 控制台使用的 `/api/browser/connect` 与 `/api/browser/disconnect`，但这些路由受 loopback 边界保护，不属于可跨网络使用的稳定 API。
+`proxycli` 只通过 Worker 的 `/api/v1` HTTP 契约通信，不管理本地 Worker 进程。Worker 已有供本地 Web 控制台使用的 `/api/browser/connect` 与 `/api/browser/disconnect`，但这些路由受 loopback 边界保护，不属于可跨网络使用的稳定 API。
 
 本设计新增受 Bearer Token 保护的 `/api/v1/browser/*` 路由。新路由复用现有 `RuntimeConfigStore`、`BrowserConfigSchema` 和 `BrowserConnectionManager`，不复制浏览器生命周期逻辑，也不改变 Web 控制台现有接口。
 
@@ -14,7 +14,7 @@
 
 ### 目标
 
-1. 提供 `browsercli browser connect|disconnect|status` 命令组。
+1. 提供 `proxycli browser connect|disconnect|status` 命令组。
 2. `connect` 可使用 Worker 当前配置，也可用常用 CLI 参数增量更新 Worker 的内存配置后连接。
 3. 连接目标切换时清除互斥的旧配置，避免旧目标继续取得优先级。
 4. 浏览器生命周期变更与工具 Job 串行，防止执行期间替换或关闭浏览器。
@@ -32,7 +32,7 @@
 ## 3. 总体架构
 
 ```text
-browsercli browser ...
+proxycli browser ...
         |
         v
 WorkerHttpClient
@@ -119,9 +119,9 @@ WorkerHttpClient
 ## 5. CLI 接口
 
 ```text
-browsercli browser connect [options]
-browsercli browser disconnect [--json]
-browsercli browser status [--json]
+proxycli browser connect [options]
+proxycli browser disconnect [--json]
+proxycli browser status [--json]
 ```
 
 ### `connect` 参数
@@ -211,7 +211,7 @@ CLI 先做同样的快速校验以提供直接错误提示；Worker 仍执行完
 - 已连接时重连、已断开时幂等断开。
 - Job 与浏览器操作之间双向 `409 WORKER_BUSY`。
 
-### browsercli 测试
+### proxycli 测试
 
 - `WorkerHttpClient` 三个方法的路径、方法、请求体、Bearer Token 与错误解包。
 - `browserCommand` 三个动作的分发和参数映射。
@@ -227,8 +227,8 @@ CLI 先做同样的快速校验以提供直接错误提示；Worker 仍执行完
 最终代码修改后运行：
 
 ```text
-npm --prefix browsercli test
-npm --prefix browsercli run typecheck
+npm --prefix proxycli test
+npm --prefix proxycli run typecheck
 npm run typecheck
 npm run test:unit
 npm run check-format

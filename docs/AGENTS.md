@@ -12,7 +12,7 @@ This AGENTS.md scopes guidance to `docs`. Parent AGENTS guidance still applies u
 ## Current Layout
 
 ### Files
-- `browsercli-http-signature-pitfalls.md`
+- `proxycli-http-signature-pitfalls.md`
 - `cloak.md`
 - `deploy-worker.md`
 - `toutiao_reverse.md`

@@ -96,7 +96,7 @@ export function GeneralSection({
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `browsercli-config-${new Date()
+      link.download = `proxycli-config-${new Date()
         .toISOString()
         .slice(0, 19)
         .replace(/[:T]/g, '-')}.json`;

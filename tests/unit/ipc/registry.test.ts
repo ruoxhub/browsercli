@@ -30,7 +30,7 @@ function tempDir(): string {
 
 /**
  * 造 root/x1/.../xn 深链并返回最深目录。深链保证 computeWorkspaceDir 的
- * 10 级上溯不会逃出 temp 区碰到主机上真实的 package.json / .browsercli。
+ * 10 级上溯不会逃出 temp 区碰到主机上真实的 package.json / .proxycli。
  */
 function deepChain(root: string, depth: number): string {
   let dir = root;
@@ -53,11 +53,11 @@ function testConfig(name: string): SessionConfig {
 }
 
 describe('computeWorkspaceDir', () => {
-  it('finds the ancestor containing .browsercli', () => {
+  it('finds the ancestor containing .proxycli', () => {
     const root = tempDir();
     const marker = path.join(root, 'a');
     const deep = path.join(marker, 'b', 'c');
-    fs.mkdirSync(path.join(marker, '.browsercli'), {recursive: true});
+    fs.mkdirSync(path.join(marker, '.proxycli'), {recursive: true});
     fs.mkdirSync(deep, {recursive: true});
     assert.equal(computeWorkspaceDir(deep), marker);
   });

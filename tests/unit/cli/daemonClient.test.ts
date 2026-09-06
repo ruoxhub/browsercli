@@ -133,7 +133,7 @@ test('onEvent 收到推送，off 后不再收', async () => {
 test('resolveEntryPath 优先取 BROWSERCLI_ENTRY，缺失时报错带恢复建议', () => {
   const prevEntry = process.env.BROWSERCLI_ENTRY;
   const prevConfigDir = process.env.BROWSERCLI_CONFIG_DIR;
-  const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'browsercli-cfg-'));
+  const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'proxycli-cfg-'));
   try {
     const probe = path.join(configDir, 'entry.js');
     fs.writeFileSync(probe, '', 'utf-8');
@@ -151,7 +151,7 @@ test('resolveEntryPath 优先取 BROWSERCLI_ENTRY，缺失时报错带恢复建�
           (e.suggestions ?? []).some(
             s =>
               s.includes('proxycli config --set workerEntry=') ||
-              s.includes('browsercli config --set workerEntry='),
+              s.includes('proxycli config --set workerEntry='),
           )
         );
       },
@@ -173,7 +173,7 @@ test('resolveEntryPath 优先取 BROWSERCLI_ENTRY，缺失时报错带恢复建�
 });
 
 test('spawnDaemon 用假 entry 走通就绪握手并写出 session 文件', async () => {
-  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'browsercli-ws-'));
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'proxycli-ws-'));
   const daemonDir = path.join(workspace, 'daemon');
   const session = `sp-${process.pid}`;
   const socketPath = makePipePath('fixturespawn', session);
@@ -218,13 +218,13 @@ test('spawnDaemon 用假 entry 走通就绪握手并写出 session 文件', asyn
   }
 });
 
-test('collectDaemonPids 命中含 --proxycli-daemon 或 --browsercli-daemon 的行（pid 为首列）', () => {
+test('collectDaemonPids 命中含 --proxycli-daemon 或 --proxycli-daemon 的行（pid 为首列）', () => {
   assert.deepStrictEqual(
     collectDaemonPids([
       '111 node build/src/index.js --daemon --proxycli-daemon --session default',
       '222 node build/src/index.js --daemon',
-      '333 grep --browsercli-daemon',
-      '444 node other.js --browsercli-daemon',
+      '333 grep --proxycli-daemon',
+      '444 node other.js --proxycli-daemon',
     ]),
     [111, 444],
   );

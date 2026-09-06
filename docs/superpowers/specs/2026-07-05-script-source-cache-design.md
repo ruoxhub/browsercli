@@ -18,13 +18,13 @@
 source?: string;
 
 // 新增
-sourcePath?: string; // 指向 os.tmpdir()/browsercli-scripts/<MD5(url)>.js
+sourcePath?: string; // 指向 os.tmpdir()/proxycli-scripts/<MD5(url)>.js
 ```
 
 ## 临时缓存目录
 
 ```
-os.tmpdir()/browsercli-scripts/
+os.tmpdir()/proxycli-scripts/
 ├── a1b2c3d4e5f6....js   ← MD5("https://example.com/app.js")
 ├── f6e5d4c3b2a1....js   ← MD5("https://cdn.example.com/lib.js")
 └── ...

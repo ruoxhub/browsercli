@@ -2,7 +2,7 @@
 
 - **日期**：2026-07-14
 - **状态**：已与用户确认（配置范围 / 启动时机 / 持久化策略 / 环境变量去留四项决策）
-- **范围**：移除 `config.json`（用户级 `~/.browsercli/config.json`、项目级 `browsercli.config.json`、根目录 `config.json`）文件加载链路，改为 Worker 进程内存态的运行时配置，由前端控制面板读取/修改。浏览器连接实例（`BrowserManager`）改为完全懒启动，由面板显式触发连接/断开。
+- **范围**：移除 `config.json`（用户级 `~/.proxycli/config.json`、项目级 `proxycli.config.json`、根目录 `config.json`）文件加载链路，改为 Worker 进程内存态的运行时配置，由前端控制面板读取/修改。浏览器连接实例（`BrowserManager`）改为完全懒启动，由面板显式触发连接/断开。
 
 ---
 
@@ -64,7 +64,7 @@
 | `src/services/DatabaseService.ts` | 不改动实现，仅改变调用时机（由自动连接改为面板触发，见 §5）                                                                                                                                  |
 | `tests/unit/utils/config.test.ts` | 删除针对文件加载/合并优先级的用例，保留/新增针对 `RuntimeConfigStore` 与 env 播种的用例                                                                                                      |
 
-`browsercli/src/commands/config.ts`（独立 CLI 包里管理 `workerUrl`/`apiToken` 的本地文件）不在本次范围内 —— 它管理的是 **CLI 连哪个 Worker**，与本设计要移除的 **Worker 自身业务配置** 是两个不同的文件，且用户未要求变更 CLI 包的行为。
+`proxycli/src/commands/config.ts`（独立 CLI 包里管理 `workerUrl`/`apiToken` 的本地文件）不在本次范围内 —— 它管理的是 **CLI 连哪个 Worker**，与本设计要移除的 **Worker 自身业务配置** 是两个不同的文件，且用户未要求变更 CLI 包的行为。
 
 ---
 
@@ -217,4 +217,4 @@ export async function disconnectBrowser(): Promise<void> {
 - 配置纯内存，Worker 重启后面板配置丢失，回落到 env/CLI 种子值（已与用户确认为期望行为）。
 - 敏感字段（apiKey、databaseUrl）明文存于进程内存，未做额外加密，风险级别与现状（明文写入 config.json）相当，不在本设计范围内加固。
 - 未实现多会话/多用户各自独立配置；面板配置是进程级全局态。
-- `browsercli` 独立 CLI 包中管理 `workerUrl`/`apiToken` 的本地文件配置不受本设计影响。
+- `proxycli` 独立 CLI 包中管理 `workerUrl`/`apiToken` 的本地文件配置不受本设计影响。

@@ -124,7 +124,7 @@ function defineStepTool(config: {
               {
                 recovery: {
                   tool: 'pause',
-                  command: 'browsercli call pause',
+                  command: 'proxycli call pause',
                   reason: 'Pause execution first',
                 },
               },
@@ -783,7 +783,7 @@ export const getScriptSource = defineTool({
     readOnlyHint: true,
   },
   schema: {
-    // 接受字符串或数字：纯远程 CLI（browsercli）会把纯数字 ID 自动推断为
+    // 接受字符串或数字：纯远程 CLI（proxycli）会把纯数字 ID 自动推断为
     // number，这里统一归一化为 string，避免 [VALIDATION] 校验失败。
     scriptId: scriptIdSchema
       .optional()
@@ -818,7 +818,7 @@ export const getScriptSource = defineTool({
   },
   handler: async (request, response, context) => {
     const {filePath, startLine, endLine, locator} = request.params;
-    // scriptId 可能被 browsercli 推断为 number，统一归一化为 string。
+    // scriptId 可能被 proxycli 推断为 number，统一归一化为 string。
     // schema 的 transform 在生产管线会生效，但单测直接调用 handler 时不会经过
     // schema，这里再做一次兜底，保证 resolveScript 的精确匹配。scriptId 与
     // locator 均为可选，由 resolver 校验至少提供其一。
@@ -1769,7 +1769,7 @@ export const getPausedInfo = defineTool({
           {
             recovery: {
               tool: 'pause',
-              command: 'browsercli call pause',
+              command: 'proxycli call pause',
               reason: 'Pause execution first',
             },
           },
@@ -1835,7 +1835,7 @@ export const evaluateOnCallframe = defineTool({
           {
             recovery: {
               tool: 'pause',
-              command: 'browsercli call pause',
+              command: 'proxycli call pause',
               reason: 'Pause execution first',
             },
           },
@@ -1925,7 +1925,7 @@ export const inspectLocals = defineTool({
           {
             recovery: {
               tool: 'pause',
-              command: 'browsercli call pause',
+              command: 'proxycli call pause',
               reason: 'Pause execution first',
             },
           },

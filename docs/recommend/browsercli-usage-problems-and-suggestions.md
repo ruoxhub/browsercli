@@ -1,8 +1,8 @@
-# browsercli 工具问题分析与优化建议
+# proxycli 工具问题分析与优化建议
 
 > 基于 browser-rpc 项目中浏览器 RPC / 平台验证实战的体验总结
 > 日期：2026-08-24
-> 工具版本：browsercli v1.0.0（Worker 报告 146 个工具）
+> 工具版本：proxycli v1.0.0（Worker 报告 146 个工具）
 > Worker：`http://127.0.0.1:8765`（transport: http）
 
 ---
@@ -13,11 +13,11 @@
 
 **证据来源**（均为本会话实际执行的命令输出，非推断）：
 
-- `browsercli status` —— 表格型输出，`Active Sessions: 100`
-- `browsercli call list_pages` —— 嵌套 YAML 输出，23 个页面，出现 `selectedIndex: 10` ↔ `selectedPageId: "page-11"` 的错位
-- `browsercli jobs list` —— 89 条 job，多次 `evaluate_script failed`，但 job 行无错误原因
-- `browsercli list-tools` —— 146 个工具，与 SKILL.md 记录的工具面严重不符
-- `browsercli call --help` —— 存在 `--param` / `--data` / `--file` / `--stdin` 四种调用方式
+- `proxycli status` —— 表格型输出，`Active Sessions: 100`
+- `proxycli call list_pages` —— 嵌套 YAML 输出，23 个页面，出现 `selectedIndex: 10` ↔ `selectedPageId: "page-11"` 的错位
+- `proxycli jobs list` —— 89 条 job，多次 `evaluate_script failed`，但 job 行无错误原因
+- `proxycli list-tools` —— 146 个工具，与 SKILL.md 记录的工具面严重不符
+- `proxycli call --help` —— 存在 `--param` / `--data` / `--file` / `--stdin` 四种调用方式
 
 **不做假设**：
 
@@ -48,7 +48,7 @@
 
 `evaluate_script` 的返回值官方文档自己都写了「JSON 值在 `data.value`，兼容字符串在 `result`」这种双路径。
 
-**影响**：消费方必须写脆弱的解析链路。`browser-rpc/scripts/verify_platforms_browsercli.py` 里塞满了保底逻辑——PyYAML 读 stdout → `data.value` 取不到再回退 `result` 字符串 → 再 `json.loads`，还要 `res.get('results') or res.get('results[109]')` 硬编码兜底。
+**影响**：消费方必须写脆弱的解析链路。`browser-rpc/scripts/verify_platforms_proxycli.py` 里塞满了保底逻辑——PyYAML 读 stdout → `data.value` 取不到再回退 `result` 字符串 → 再 `json.loads`，还要 `res.get('results') or res.get('results[109]')` 硬编码兜底。
 
 **最小修复建议**：
 
@@ -69,7 +69,7 @@
 
 **最小修复建议**：
 
-- job 行加一列 `error`，或提供 `browsercli jobs log <job-id>` 查看失败详情。
+- job 行加一列 `error`，或提供 `proxycli jobs log <job-id>` 查看失败详情。
 - `evaluate_script` 失败时至少把 JS 异常的 `message`/`stack` 回填进 job 记录或 stdout。
 
 **验收标准**：
@@ -83,7 +83,7 @@
 
 ### 3.1 SKILL.md 严重滞后于真实工具面
 
-**现象**：`~/.claude/skills/browsercli/SKILL.md` 只覆盖一部分工具，且部分是旧签名。真实 `list-tools` 有 146 个工具，以下整块领域 SKILL.md 完全未记录：
+**现象**：`~/.claude/skills/proxycli/SKILL.md` 只覆盖一部分工具，且部分是旧签名。真实 `list-tools` 有 146 个工具，以下整块领域 SKILL.md 完全未记录：
 
 - **JSVMP**：`hook_jsvmp_interpreter`、`analyze_jsvmp_vm`、`analyze_pipeline`
 - **性能**：`start_performance_trace` / `stop_performance_trace` / `get_performance_metrics` / `performance_analyze_insight`
@@ -106,13 +106,13 @@
 
 ### 3.2 三种调用风格并存，文档只教了最脆弱的一种
 
-**现象**：`browsercli call --help` 显示有 `--param value` / `--data <json>` / `--file <params.json>` / `--stdin` 四种。SKILL.md 通篇只用内联 `--flag value`。
+**现象**：`proxycli call --help` 显示有 `--param value` / `--data <json>` / `--file <params.json>` / `--stdin` 四种。SKILL.md 通篇只用内联 `--flag value`。
 
-**影响**：多行 JS 走内联 flag 会被 shell 转义打爆。`verify_platforms_browsercli.py` 是被迫走 `--stdin` + `shell=True` 的活例，而 `--file`（脚本存文件再执行）这种最稳妥方式反而没在文档里突出。
+**影响**：多行 JS 走内联 flag 会被 shell 转义打爆。`verify_platforms_proxycli.py` 是被迫走 `--stdin` + `shell=True` 的活例，而 `--file`（脚本存文件再执行）这种最稳妥方式反而没在文档里突出。
 
 **最小修复建议**：
 
-- 把 `--file` / `--stdin` 立为多行 JS 的标准姿势，示例优先 `browsercli call evaluate_script --file hook.js`。
+- 把 `--file` / `--stdin` 立为多行 JS 的标准姿势，示例优先 `proxycli call evaluate_script --file hook.js`。
 - 内联 flag 只保留给真正一行能写完的参数。
 
 **验收标准**：
@@ -124,7 +124,7 @@
 
 **现象**：`list_pages` 返回 23 个页面，却出现 `selectedIndex: 10` 对应 `selectedPageId: "page-11"`。index 与 pageId 不是同一套编号。
 
-**影响**：自动化脚本按 index 选页会对错页；`verify_platforms_browsercli.py` 这类全平台验证在页面多开时极易踩坑。
+**影响**：自动化脚本按 index 选页会对错页；`verify_platforms_proxycli.py` 这类全平台验证在页面多开时极易踩坑。
 
 **最小修复建议**：
 
@@ -155,7 +155,7 @@
 
 ## 四、P2：仓库侧验证脚本硬编码
 
-**现象**：`browser-rpc/scripts/verify_platforms_browsercli.py` 硬编码了平台数 `109`、端口 `8766`、输出格式串 `[3d}/109]`；平台一旦增减，脚本即漂移误报。
+**现象**：`browser-rpc/scripts/verify_platforms_proxycli.py` 硬编码了平台数 `109`、端口 `8766`、输出格式串 `[3d}/109]`；平台一旦增减，脚本即漂移误报。
 
 **影响**：验证脚本对平台数量敏感，无法作为稳定守卫。
 
@@ -177,7 +177,7 @@
 | 5 | 页面寻址单一化（pageId，消除 off-by-one） | 3.3 |
 | 6 | `evaluate_script` 失败回填异常信息 | 2.2 |
 | 7 | 暴露 Worker lane 排队深度 / 独占选项 | 3.4 |
-| 8 | 去硬编码（`verify_platforms_browsercli.py`） | P2 |
+| 8 | 去硬编码（`verify_platforms_proxycli.py`） | P2 |
 
 ---
 
@@ -204,9 +204,9 @@ job_mt6xercr_76ylut,evaluate_script,failed,...
 job_mt6xexgi_a10mv2,evaluate_script,failed,...
 
 # 4. call --help —— 四种调用方式
-Usage: browsercli call <tool-or-skill-name> [--param value] [--data <json>] [--file <params.json>]
-       browsercli call evaluate_script --file <script.js>
-       browsercli call <tool-or-skill-name> --stdin
+Usage: proxycli call <tool-or-skill-name> [--param value] [--data <json>] [--file <params.json>]
+       proxycli call evaluate_script --file <script.js>
+       proxycli call <tool-or-skill-name> --stdin
 
 # 5. list-tools —— 146 工具；SKILL.md 未覆盖 JSVMP/性能/模拟等领域
 hook_jsvmp_interpreter / analyze_jsvmp_vm / analyze_pipeline

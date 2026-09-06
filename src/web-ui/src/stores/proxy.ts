@@ -102,11 +102,11 @@ export const useProxyStore = create<ProxyState>((set, get) => ({
           ...req,
         };
       } else {
-        newRequests.unshift(req);
+        newRequests.push(req);
       }
 
       if (newRequests.length > 2000) {
-        newRequests = newRequests.slice(0, 2000);
+        newRequests = newRequests.slice(-2000);
       }
 
       return {requests: newRequests};
@@ -117,16 +117,23 @@ export const useProxyStore = create<ProxyState>((set, get) => ({
       if (reqs.length === 0) return {};
       // 同帧去重：以 id 为键，后到的 update（如 statusCode 落位）覆盖先到的 insert。
       const byId = new Map(state.requests.map(r => [r.id, r]));
-      const order: string[] = [];
+      const newItems: SessionRequestSummaryEvent[] = [];
 
       for (const req of reqs) {
-        if (!byId.has(req.id)) order.push(req.id);
-        byId.set(req.id, {...byId.get(req.id), ...req});
+        const existing = byId.get(req.id);
+        if (existing) {
+          byId.set(req.id, {...existing, ...req});
+        } else {
+          byId.set(req.id, req);
+          newItems.push(req);
+        }
       }
 
-      let newRequests = [...order.map(id => byId.get(id)!), ...state.requests];
+      // 按序更新已有项，新到达的项正序追加到末尾
+      const updatedExisting = state.requests.map(r => byId.get(r.id) ?? r);
+      let newRequests = [...updatedExisting, ...newItems];
       if (newRequests.length > 2000) {
-        newRequests = newRequests.slice(0, 2000);
+        newRequests = newRequests.slice(-2000);
       }
       return {requests: newRequests};
     }),
@@ -178,7 +185,11 @@ export const useProxyStore = create<ProxyState>((set, get) => ({
     }
   },
 
-  setStatus: status => set({status}),
+  setStatus: status =>
+    set({
+      status,
+      ...(status.localApps !== undefined ? {localApps: status.localApps} : {}),
+    }),
 
   setAutoScroll: autoScroll => set({autoScroll}),
 

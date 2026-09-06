@@ -15,7 +15,7 @@
 2. **缺乏状态感知与级联等待**：当页面卡死后，上层调度往往连续尝试多个工具（如 `get_hook_data`、`collect_code`、`query_dom`），每个工具都会傻等 10s～300s，严重浪费 Agent 上下文与时间预算。
 3. **Cancel 与 Disconnect 自身被挂死**：`/api/v1/jobs/:id/cancel` 与 `/api/v1/browser/disconnect` 强依赖 `await current.execution`，若底层 Promise 永远不 settle，取消和断开请求自身也会永久挂起。
 4. **重连竞态 502**：`disconnect` 后立即 `connect` 时，因 Chrome 端口重启与 DevTools 协议栈就绪的时序延迟，易产生 502 错误。
-5. **客户端与 Worker 版本脱节**：`browsercli/` 与 Worker 独立构建，本地全局 CLI 可能缺失最新能力或参数。
+5. **客户端与 Worker 版本脱节**：`proxycli/` 与 Worker 独立构建，本地全局 CLI 可能缺失最新能力或参数。
 6. **文档与代码 Schema 不一致**：`skills/**/*.md` 中的命令行示例因代码重构而滞后，导致 LLM 生成不存在的参数（如 `--target`, `--force`）。
 
 ---
@@ -97,19 +97,19 @@
   1. 在 `connectBrowser` 引入 3 次指数退避重试（300ms $\rightarrow$ 600ms $\rightarrow$ 1200ms）。
   2. 在执行 `connectOverCDP` 前，调用 `waitForBrowserReady` 探测 `/json/version` 端点，确保 Target 列表已可访问后再进入 CDP 握手。
 
-### 3.5 建议 5：CLI 构建发布一致性 (package.json / browsercli/)
+### 3.5 建议 5：CLI 构建发布一致性 (package.json / proxycli/)
 
 * **目标**：避免本地全局 CLI 与 Worker 协议及能力脱节。
 * **机制**：
-  1. 根目录 `npm run build` 默认执行 `npm run build:cli`，确保 `browsercli/build` 同步生成。
-  2. `browsercli` 在请求 `GET /api/v1/health` 时校验 capabilities，如遇缺少特定路由，输出清晰的升级指令提示。
+  1. 根目录 `npm run build` 默认执行 `npm run build:cli`，确保 `proxycli/build` 同步生成。
+  2. `proxycli` 在请求 `GET /api/v1/health` 时校验 capabilities，如遇缺少特定路由，输出清晰的升级指令提示。
 
 ### 3.6 建议 6：Skill 文档与 Schema 自动化比对 (scripts/verify-skills-schema.ts)
 
 * **目标**：杜绝文档中手写命令参数产生的幻觉（如 `--target`, `--force`）。
 * **机制**：
   1. 编写 `scripts/verify-skills-schema.ts` 脚本：
-     * 正则解析 `skills/**/*.md` 中的 `browsercli call <toolName> [args...]`。
+     * 正则解析 `skills/**/*.md` 中的 `proxycli call <toolName> [args...]`。
      * 动态加载 `src/tools/generated-tools-index.ts` 中的工具定义，利用 Zod Schema 做参数合法性校验。
      * 集成至 `npm test`，一旦文档参数错误，CI/测试立即报错。
 
@@ -123,7 +123,7 @@
 | **健康度追踪** | `src/worker/context/PageHealthTracker.ts` (新增)<br>`src/worker/ToolExecutionPipeline.ts`<br>`src/tools/page/checkBrowserHealth.ts` | 增加页面健康状态机与 0ms 快速失败 |
 | **Job 与断开** | `src/web/routes/apiV1.ts`<br>`src/worker/BrowserConnectionManager.ts` | 增加 Force cancel 窗口，disconnect 强平释放 |
 | **重连探针** | `src/worker/BrowserConnectionManager.ts` | 增加重试机制与 `waitForBrowserReady` |
-| **CLI 联动** | `package.json`<br>`browsercli/src/WorkerHttpClient.ts` | 根构建联动与 capabilities 校验 |
+| **CLI 联动** | `package.json`<br>`proxycli/src/WorkerHttpClient.ts` | 根构建联动与 capabilities 校验 |
 | **文档校验** | `scripts/verify-skills-schema.ts` (新增)<br>`package.json` | 自动化扫描文档代码块与工具 Schema 比对 |
 
 ---

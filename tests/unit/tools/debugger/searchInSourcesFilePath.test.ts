@@ -73,7 +73,7 @@ function makeDebuggerContext() {
         writeFileSync(resolved, SAMPLE_SOURCE, 'utf-8');
         return resolved;
       }
-      return path.join(os.tmpdir(), 'browsercli-scripts', `${scriptId}.js`);
+      return path.join(os.tmpdir(), 'proxycli-scripts', `${scriptId}.js`);
     },
   };
 }
@@ -105,7 +105,7 @@ describe('search_in_sources filePath param', () => {
     };
     assert.equal(content.success, true);
     for (const m of content.data.matches) {
-      assert.equal(m.sourcePath, path.join(os.tmpdir(), 'browsercli-scripts', `${m.scriptId}.js`));
+      assert.equal(m.sourcePath, path.join(os.tmpdir(), 'proxycli-scripts', `${m.scriptId}.js`));
     }
   });
 

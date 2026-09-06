@@ -18,7 +18,7 @@ import {ErrorCodes, ToolError} from '../../src/utils/errors.js';
 import {DebuggerContextProvider} from '../../src/worker/context/DebuggerContextProvider.js';
 
 const runBrowserTests = process.env.RUN_BROWSER_TESTS === 'true';
-const fixtureRoot = path.resolve('tests/fixtures/browsercli-reliability');
+const fixtureRoot = path.resolve('tests/fixtures/proxycli-reliability');
 
 async function startFixtureServer(): Promise<{server: Server; url: string}> {
   const server = createServer(async (request, response) => {
@@ -97,7 +97,7 @@ async function waitFor<T>(
 }
 
 describe(
-  'browsercli reliability (Layer 3, local fixture)',
+  'proxycli reliability (Layer 3, local fixture)',
   {skip: !runBrowserTests},
   () => {
     let server: Server;
