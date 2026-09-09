@@ -114,17 +114,6 @@ export async function runDaemon(plan: DaemonPlan): Promise<DaemonRunResult> {
     // 非 Windows 平台直接跳过
   }
 
-  if (shouldAutoConnectOnStartup(getRuntimeConfigStore().get())) {
-    try {
-      await connectBrowser(contextProvider, getBrowserManagerConfig());
-    } catch (err) {
-      console.warn(
-        '[Daemon] 启动自动连接浏览器失败，可稍后通过 proxycli browser connect 重连:',
-        err instanceof Error ? err.message : err,
-      );
-    }
-  }
-
   const toolAdapter = new ToolAdapter(contextProvider);
   await ensureToolsMeta().catch(err =>
     console.warn('[Daemon] ensureToolsMeta 失败:', err),
@@ -236,6 +225,23 @@ export async function runDaemon(plan: DaemonPlan): Promise<DaemonRunResult> {
 
   // 就绪握手：stdout 精确一行，CLI 以此判定 daemon 可连接
   console.log(`Daemon listening on ${socketPath}`);
+  if (consolePort !== undefined) {
+    console.log(
+      `[Worker] 本地工作台 Web 控制台已启动: http://127.0.0.1:${consolePort} (session=${plan.session})`,
+    );
+  }
+
+  // 启动自动连接浏览器：在 IPC 服务就绪握手后异步执行，避免因等待 Chrome 弹窗授权阻塞 daemon 就绪
+  if (shouldAutoConnectOnStartup(getRuntimeConfigStore().get())) {
+    void connectBrowser(contextProvider, getBrowserManagerConfig()).catch(
+      err => {
+        console.warn(
+          '[Daemon] 启动自动连接浏览器失败，可稍后通过 proxycli browser connect 重连:',
+          err instanceof Error ? err.message : err,
+        );
+      },
+    );
+  }
 
   process.on(
     'SIGINT',

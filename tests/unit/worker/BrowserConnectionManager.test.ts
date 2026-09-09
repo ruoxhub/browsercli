@@ -306,6 +306,42 @@ describe('BrowserConnectionManager', () => {
     }
   });
 
+  it('does not retry by default when connecting to a remote browser', async () => {
+    const resetMock = mock.method(
+      BrowserManager,
+      'resetInstance',
+      async () => undefined,
+    );
+    let attempts = 0;
+    const getInstanceMock = mock.method(BrowserManager, 'getInstance', () => ({
+      ensureBrowser: async () => {
+        attempts += 1;
+        throw new Error('remote connect failed');
+      },
+    }));
+    const contextProvider = {
+      setBrowserManager: () => undefined,
+      setBrowser: () => undefined,
+      setContext: () => undefined,
+      clearContext: () => undefined,
+      init: async () => undefined,
+    };
+
+    try {
+      await assert.rejects(
+        connectBrowser(contextProvider as never, {
+          browserURL: 'http://127.0.0.1:9222',
+        }),
+        (error: unknown) =>
+          error instanceof Error && error.message === 'remote connect failed',
+      );
+      assert.strictEqual(attempts, 1);
+    } finally {
+      resetMock.mock.restore();
+      getInstanceMock.mock.restore();
+    }
+  });
+
   it('disconnectBrowser resets instance and clears contextProvider browser', async () => {
     const resetMock = mock.method(BrowserManager, 'resetInstance', () =>
       Promise.resolve(),

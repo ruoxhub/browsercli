@@ -81,7 +81,11 @@ export async function connectBrowser(
   config: BrowserManagerConfig,
   options: {maxRetries?: number; initialDelayMs?: number} = {},
 ): Promise<ConnectResult> {
-  const maxRetries = options.maxRetries ?? 3;
+  const mode = getBrowserConnectionMode(config);
+  // remote 模式（连接已存在的外部 Chrome/DevToolsActivePort）每次新连接都会触发 Chrome 弹窗询问，
+  // 严禁快速重试风暴导致 Chrome 反复弹窗，默认单次尝试即可。
+  const isRemote = mode === 'ws-endpoint' || mode === 'attach';
+  const maxRetries = options.maxRetries ?? (isRemote ? 1 : 3);
   const initialDelayMs = options.initialDelayMs ?? 200;
 
   return await workerActivityCoordinator.runBrowserOperation(

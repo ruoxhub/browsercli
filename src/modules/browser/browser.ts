@@ -44,9 +44,8 @@ import {setupCloak} from './cloak.js';
 /**
  * 浏览器生命周期管理：启动、连接、页面管理、反检测注入。
  *
- * @see {@link src/browser/SessionManager.ts} — 会话隔离
- * @see {@link src/browser/cloak.ts} — CloakBrowser 二进制层反检测
- * @see {@link src/browser/stealth-args.ts} — MINIMAL_STEALTH_ARGS
+ * @see {@link src/modules/browser/cloak.ts} — CloakBrowser 二进制层反检测
+ * @see {@link src/modules/browser/stealth-args.ts} — MINIMAL_STEALTH_ARGS
  * @see {@link src/modules/collector/CodeCollector.ts} — 通过 BrowserManager 获取页面
  * @see AGENTS.md — 反检测分层架构
  */
@@ -478,6 +477,14 @@ export class BrowserManager {
           `[fetchVersionInfo] falling back to DevToolsActivePort wsPath after error: ${fallback}`,
         );
         return {webSocketDebuggerUrl: fallback};
+      }
+      // 如果配置的端口连接失败（如历史动态端口已变），且本地存在有效的 DevToolsActivePort，优雅回退到当前活动的 ws 端点
+      const activeFallback = this.buildDevToolsActivePortFallback();
+      if (activeFallback) {
+        logger.debug(
+          `[fetchVersionInfo] configured URL unreachable, falling back to active DevToolsActivePort wsPath: ${activeFallback}`,
+        );
+        return {webSocketDebuggerUrl: activeFallback};
       }
       return {};
     }
