@@ -28,13 +28,13 @@ export interface PageRuntimeServices {
 
 /** clickElement 参数 */
 export interface ClickElementParams {
-  /** CSS 选择器 */
+  /** 元素定位器（CSS / role= / text= / xpath=） */
   selector: string;
 }
 
 /** typeText 参数 */
 export interface TypeTextParams {
-  /** CSS 选择器 */
+  /** 元素定位器（CSS / role= / text= / xpath=） */
   selector: string;
   /** 输入文本 */
   text: string;
@@ -44,7 +44,7 @@ export interface TypeTextParams {
 
 /** waitForElement 参数 */
 export interface WaitForElementParams {
-  /** CSS 选择器 */
+  /** 元素定位器（CSS / role= / text= / xpath=） */
   selector: string;
   /** 超时时间（毫秒） */
   timeout?: number;

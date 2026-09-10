@@ -8,12 +8,13 @@ import {zod} from '../../third_party/index.js';
 import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
 import {NO_ACTIVE_PAGE_MESSAGE} from '../shared/activePageResolver.js';
+import {toElementError} from '../shared/elementLocator.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 
 import type {ElementInfo} from './types.js';
 
 /**
- * 通过 CSS 选择器查询 DOM 元素。
+ * 通过定位器查询 DOM 元素。
  *
  * 在当前 Frame 中注入查询代码，返回匹配元素的结构化信息。
  * 默认查询第一个匹配元素（querySelector），设置 all=true 时查询所有匹配元素。
@@ -21,7 +22,7 @@ import type {ElementInfo} from './types.js';
 export const queryDom = defineTool({
   name: 'query_dom',
   description:
-    '通过 CSS 选择器查询一个或多个 DOM 元素，返回包含标签、属性、包围盒与可见性的结构化信息。',
+    '通过定位器查询一个或多个 DOM 元素，返回包含标签、属性、包围盒与可见性的结构化信息。定位器支持 CSS、role=、text=、xpath=。多匹配时用 >> nth=N 消歧。',
   annotations: {
     title: '查询DOM元素',
     category: ToolCategory.NAVIGATION,
@@ -30,7 +31,9 @@ export const queryDom = defineTool({
   schema: {
     selector: zod
       .string()
-      .describe('CSS 选择器，如 "#app"、".btn-primary"、"div[data-role=main]"'),
+      .describe(
+        '定位器：CSS（#id、.cls）、role=button[name="提交"]、text=登录、xpath=//button。多匹配时用 >> nth=N 消歧。不可与 CSS 逗号混写。',
+      ),
     all: zod
       .boolean()
       .optional()
@@ -47,16 +50,16 @@ export const queryDom = defineTool({
     const frame = (context as Context).getSelectedFrame();
 
     if (!frame) {
-      throw createToolError(
-        ErrorCodes.FRAME_REQUIRED,
-        NO_ACTIVE_PAGE_MESSAGE,
-        {toolName: 'query_dom'},
-      );
+      throw createToolError(ErrorCodes.FRAME_REQUIRED, NO_ACTIVE_PAGE_MESSAGE, {
+        toolName: 'query_dom',
+      });
     }
 
     try {
+      const locator = frame.locator(selector);
+
       if (all) {
-        const elements = await frame.evaluate(queryAllCode, {selector, limit});
+        const elements = await locator.evaluateAll(queryAllCode, limit);
         response.setStructuredContent({
           success: true,
           message: `Query returned ${elements.length} matching elements`,
@@ -66,7 +69,18 @@ export const queryDom = defineTool({
         return;
       }
 
-      const element = await frame.evaluate(queryOneCode, selector);
+      const count = await locator.count();
+      if (count === 0) {
+        response.setStructuredContent({
+          success: true,
+          message: `No matching element found: ${selector}`,
+          tooltype: 'query_dom',
+          data: null,
+        });
+        return;
+      }
+
+      const element = await locator.first().evaluate(queryOneCode);
       response.setStructuredContent({
         success: true,
         message: element.found
@@ -76,18 +90,13 @@ export const queryDom = defineTool({
         data: element.found ? element : null,
       });
     } catch (error) {
-      throw createToolError(
-        ErrorCodes.RUNTIME,
-        `Query failed: ${error instanceof Error ? error.message : String(error)}`,
-        {toolName: 'query_dom', selector},
-      );
+      throw toElementError(error, {toolName: 'query_dom', selector});
     }
   },
 });
 
-/** 注入代码：查询单个元素 */
-function queryOneCode(selector: string): ElementInfo {
-  const element = document.querySelector(selector);
+/** 注入代码：提取单个元素信息 */
+function queryOneCode(element: Element): ElementInfo {
   if (!element) {
     return {found: false};
   }
@@ -122,15 +131,8 @@ function queryOneCode(selector: string): ElementInfo {
   };
 }
 
-/** 注入代码：查询多个元素 */
-function queryAllCode({
-  selector,
-  limit: maxLimit,
-}: {
-  selector: string;
-  limit: number;
-}): ElementInfo[] {
-  const nodeList = document.querySelectorAll(selector);
+/** 注入代码：提取多个元素信息 */
+function queryAllCode(nodeList: Element[], maxLimit: number): ElementInfo[] {
   const results: ElementInfo[] = [];
 
   for (let i = 0; i < Math.min(nodeList.length, maxLimit); i++) {

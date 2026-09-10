@@ -5,8 +5,8 @@
  */
 
 import {zod} from '../../third_party/index.js';
-import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
+import {toElementError} from '../shared/elementLocator.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 
 /**
@@ -14,14 +14,19 @@ import {defineTool, type Context} from '../ToolDefinition.js';
  */
 export const hover = defineTool({
   name: 'hover',
-  description: '将鼠标悬停在匹配 CSS 选择器的元素上。',
+  description:
+    '将鼠标悬停在指定元素上。定位器支持 CSS、role=、text=、xpath=。多匹配时用 >> nth=N 消歧。',
   annotations: {
     title: '悬停元素',
     category: ToolCategory.NAVIGATION,
     readOnlyHint: false,
   },
   schema: {
-    selector: zod.string().describe('CSS 选择器。'),
+    selector: zod
+      .string()
+      .describe(
+        '定位器：CSS（#id、.cls）、role=button[name="提交"]、text=登录、xpath=//button。多匹配时用 >> nth=N 消歧。不可与 CSS 逗号混写。',
+      ),
   },
   handler: async (request, response, context) => {
     const {selector} = request.params;
@@ -29,16 +34,7 @@ export const hover = defineTool({
     const page = frame.page();
 
     try {
-      const element = await page.$(selector);
-      if (!element) {
-        throw createToolError(
-          ErrorCodes.NOT_FOUND,
-          `Element not found: ${selector}`,
-          {toolName: 'hover', selector},
-        );
-      }
-
-      await element.hover();
+      await page.locator(selector).hover();
       response.setStructuredContent({
         success: true,
         message: `Successfully hovered over element: ${selector}`,
@@ -46,12 +42,7 @@ export const hover = defineTool({
         data: {selector},
       });
     } catch (error) {
-      if (error && typeof error === 'object' && 'code' in error) throw error;
-      throw createToolError(
-        ErrorCodes.RUNTIME,
-        error instanceof Error ? error.message : String(error),
-        {toolName: 'hover', selector},
-      );
+      throw toElementError(error, {toolName: 'hover', selector});
     }
   },
 });

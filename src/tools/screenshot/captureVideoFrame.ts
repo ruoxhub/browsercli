@@ -10,6 +10,7 @@ import path from 'node:path';
 import {zod} from '../../third_party/index.js';
 import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
+import {toElementError} from '../shared/elementLocator.js';
 import {defineTool} from '../ToolDefinition.js';
 
 /**
@@ -22,20 +23,23 @@ import {defineTool} from '../ToolDefinition.js';
  */
 export const captureVideoFrame = defineTool({
   name: 'capture_video_frame',
-  description: `捕获视频元素的当前帧。可选地先定位到指定时间点。以图片形式返回该帧。`,
+  description:
+    '捕获视频元素的当前帧。定位器支持 CSS、role=、text=、xpath=。多匹配时用 >> nth=N 消歧。可选地先定位到指定时间点。以图片形式返回该帧。',
   annotations: {
     title: '捕获视频帧',
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
   },
   schema: {
-    selector: zod.string().describe('视频元素的 CSS 选择器。'),
+    selector: zod
+      .string()
+      .describe(
+        '定位器：CSS（#id、.cls）、role=button[name="提交"]、text=登录、xpath=//button。多匹配时用 >> nth=N 消歧。不可与 CSS 逗号混写。',
+      ),
     seekTime: zod
       .number()
       .optional()
-      .describe(
-        '捕获前定位到的时间点（秒，可选）。',
-      ),
+      .describe('捕获前定位到的时间点（秒，可选）。'),
     outputPath: zod
       .string()
       .optional()
@@ -49,9 +53,7 @@ export const captureVideoFrame = defineTool({
       .min(0)
       .max(100)
       .optional()
-      .describe(
-        'JPEG 格式的压缩质量（0-100）。PNG 格式忽略此参数。',
-      ),
+      .describe('JPEG 格式的压缩质量（0-100）。PNG 格式忽略此参数。'),
   },
   handler: async (request, response, context) => {
     const page = context.getSelectedPage();
@@ -62,26 +64,31 @@ export const captureVideoFrame = defineTool({
         {toolName: 'capture_video_frame'},
       );
     }
+    const selector = request.params.selector;
     try {
+      const loc = page.locator(selector);
+      const count = await loc.count();
+      if (count === 0) {
+        throw createToolError(
+          ErrorCodes.NOT_FOUND,
+          `视频元素未找到: ${selector}`,
+          {toolName: 'capture_video_frame', selector},
+        );
+      }
+
       // 先定位到指定时间点
       if (request.params.seekTime !== undefined) {
-        await page.evaluate(
-          ({sel, t}) => {
-            const video = document.querySelector(sel) as HTMLVideoElement;
-            if (video) {
-              video.currentTime = t;
-            }
-          },
-          {sel: request.params.selector, t: request.params.seekTime},
-        );
+        await loc.first().evaluate((el: Element, t: number) => {
+          const video = el as HTMLVideoElement;
+          video.currentTime = t;
+        }, request.params.seekTime);
         // 等待 seek 完成
         await new Promise(resolve => setTimeout(resolve, 300));
       }
 
       // 获取视频帧的边界框
-      const videoBox = await page.evaluate(sel => {
-        const video = document.querySelector(sel) as HTMLVideoElement;
-        if (!video) return null;
+      const videoBox = await loc.first().evaluate((el: Element) => {
+        const video = el as HTMLVideoElement;
         const rect = video.getBoundingClientRect();
         return {
           x: rect.x,
@@ -89,15 +96,7 @@ export const captureVideoFrame = defineTool({
           width: rect.width,
           height: rect.height,
         };
-      }, request.params.selector);
-
-      if (!videoBox) {
-        throw createToolError(
-          ErrorCodes.NOT_FOUND,
-          `视频元素未找到: ${request.params.selector}`,
-          {toolName: 'capture_video_frame', selector: request.params.selector},
-        );
-      }
+      });
 
       const format = request.params.format;
 
@@ -171,13 +170,7 @@ export const captureVideoFrame = defineTool({
         });
       }
     } catch (error) {
-      if (error && typeof error === 'object' && 'code' in error) throw error;
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      throw createToolError(
-        ErrorCodes.RUNTIME,
-        `捕获视频帧失败: ${errorMsg}`,
-        {toolName: 'capture_video_frame'},
-      );
+      throw toElementError(error, {toolName: 'capture_video_frame', selector});
     }
   },
 });

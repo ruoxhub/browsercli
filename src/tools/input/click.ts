@@ -12,6 +12,7 @@ import {
   withDebuggerTrapBypass,
   withOperationTimeout,
 } from '../shared/browserRuntime.js';
+import {toElementError} from '../shared/elementLocator.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 
 const DEFAULT_CLICK_TIMEOUT_MS = 10_000;
@@ -21,7 +22,8 @@ const DEFAULT_CLICK_TIMEOUT_MS = 10_000;
  */
 export const click = defineTool({
   name: 'click',
-  description: '通过 CSS 选择器匹配元素并点击，支持单击与双击。',
+  description:
+    '点击页面元素，支持单击与双击。定位器支持 CSS、role=、text=、xpath=。多匹配时用 >> nth=N 消歧。',
   annotations: {
     title: '点击元素',
     category: ToolCategory.NAVIGATION,
@@ -34,7 +36,11 @@ export const click = defineTool({
     },
   },
   schema: {
-    selector: zod.string().describe('CSS 选择器。'),
+    selector: zod
+      .string()
+      .describe(
+        '定位器：CSS（#id、.cls）、role=button[name="提交"]、text=登录、xpath=//button。多匹配时用 >> nth=N 消歧。不可与 CSS 逗号混写。',
+      ),
     dblClick: zod.boolean().optional().describe('是否双击，默认 false。'),
     timeoutMs: browserTimeoutSchema('页面操作超时（毫秒，默认 10000）。'),
   },
@@ -46,11 +52,9 @@ export const click = defineTool({
     } = request.params;
 
     if (!selector) {
-      throw createToolError(
-        ErrorCodes.VALIDATION,
-        'selector 参数不能为空',
-        {toolName: 'click'},
-      );
+      throw createToolError(ErrorCodes.VALIDATION, 'selector 参数不能为空', {
+        toolName: 'click',
+      });
     }
 
     const frame = (context as Context).getSelectedFrame();
@@ -58,7 +62,7 @@ export const click = defineTool({
     try {
       await withDebuggerTrapBypass(context, async () => {
         await withOperationTimeout(
-          frame.click(selector, {
+          frame.locator(selector).click({
             clickCount: dblClick ? 2 : 1,
             timeout: timeoutMs,
           }),
@@ -73,11 +77,7 @@ export const click = defineTool({
         data: {selector, dblClick},
       });
     } catch (error) {
-      throw createToolError(
-        ErrorCodes.RUNTIME,
-        error instanceof Error ? error.message : String(error),
-        {toolName: 'click', selector, dblClick},
-      );
+      throw toElementError(error, {toolName: 'click', selector, dblClick});
     }
   },
 });

@@ -38,7 +38,7 @@ export interface ClickableElement {
 
 /** queryDom 参数 */
 export interface QueryDomParams {
-  /** CSS 选择器 */
+  /** 元素定位器（CSS / role= / text= / xpath=） */
   selector: string;
   /** 是否查询所有匹配元素（默认 false，仅查询第一个） */
   all?: boolean;

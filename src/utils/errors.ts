@@ -49,6 +49,7 @@ export const ErrorCodes = {
   // Script locator resolution（spec §4 错误分类）
   SCRIPT_NOT_FOUND: 'SCRIPT_NOT_FOUND',
   SCRIPT_LOCATOR_AMBIGUOUS: 'SCRIPT_LOCATOR_AMBIGUOUS',
+  ELEMENT_LOCATOR_AMBIGUOUS: 'ELEMENT_LOCATOR_AMBIGUOUS',
   PAGE_NOT_FOUND: 'PAGE_NOT_FOUND',
   SCRIPT_ID_STALE: 'SCRIPT_ID_STALE',
   PAGE_UNRESPONSIVE: 'PAGE_UNRESPONSIVE',
@@ -79,6 +80,7 @@ const NON_RETRYABLE_CODES = new Set<string>([
   ErrorCodes.NOT_FOUND,
   ErrorCodes.PERMISSION,
   ErrorCodes.NATIVE_TOOL_MISSING,
+  ErrorCodes.ELEMENT_LOCATOR_AMBIGUOUS,
 ]);
 
 export class ToolError extends Error {

@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {withCdpSession} from '../../modules/browser/cdpUtils.js';
 import {zod} from '../../third_party/index.js';
-import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
+import {toElementError} from '../shared/elementLocator.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 
 /**
@@ -22,7 +23,11 @@ export const clickAt = defineTool({
     readOnlyHint: false,
   },
   schema: {
-    selector: zod.string().describe('CSS 选择器。'),
+    selector: zod
+      .string()
+      .describe(
+        '定位器：CSS（#id、.cls）、role=button[name="提交"]、text=登录、xpath=//button。多匹配时用 >> nth=N 消歧。不可与 CSS 逗号混写。',
+      ),
   },
   handler: async (request, response, context) => {
     const {selector} = request.params;
@@ -30,11 +35,7 @@ export const clickAt = defineTool({
     const page = frame.page();
 
     try {
-      const client = await page.context().newCDPSession(page);
-
-      const coords = await page.evaluate(sel => {
-        const el = document.querySelector(sel);
-        if (!el) throw new Error(`Element not found: ${sel}`);
+      const coords = await frame.locator(selector).evaluate((el: Element) => {
         el.scrollIntoView({block: 'center'});
         const rect = el.getBoundingClientRect();
         return {
@@ -43,22 +44,24 @@ export const clickAt = defineTool({
           tag: el.tagName,
           text: (el.textContent || '').slice(0, 100),
         };
-      }, selector);
-
-      await client.send('Input.dispatchMouseEvent', {
-        type: 'mousePressed',
-        x: coords.x,
-        y: coords.y,
-        button: 'left',
-        clickCount: 1,
       });
 
-      await client.send('Input.dispatchMouseEvent', {
-        type: 'mouseReleased',
-        x: coords.x,
-        y: coords.y,
-        button: 'left',
-        clickCount: 1,
+      await withCdpSession(page, async client => {
+        await client.send('Input.dispatchMouseEvent', {
+          type: 'mousePressed',
+          x: coords.x,
+          y: coords.y,
+          button: 'left',
+          clickCount: 1,
+        });
+
+        await client.send('Input.dispatchMouseEvent', {
+          type: 'mouseReleased',
+          x: coords.x,
+          y: coords.y,
+          button: 'left',
+          clickCount: 1,
+        });
       });
 
       response.setStructuredContent({
@@ -68,11 +71,7 @@ export const clickAt = defineTool({
         data: coords,
       });
     } catch (error) {
-      throw createToolError(
-        ErrorCodes.RUNTIME,
-        error instanceof Error ? error.message : String(error),
-        {toolName: 'click_at', selector},
-      );
+      throw toElementError(error, {toolName: 'click_at', selector});
     }
   },
 });

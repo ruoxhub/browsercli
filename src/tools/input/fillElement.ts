@@ -16,23 +16,22 @@ export async function fillElement(
   value: string,
   timeoutMs = DEFAULT_FILL_TIMEOUT_MS,
 ): Promise<{found: boolean; isSelect: boolean}> {
-  const element = await withOperationTimeout(
-    frame.$(selector),
+  const locator = frame.locator(selector);
+  const count = await withOperationTimeout(
+    locator.count(),
     '查找表单元素',
     timeoutMs,
   );
-  if (!element) return {found: false, isSelect: false};
+  if (count === 0) return {found: false, isSelect: false};
 
   const isSelect = await withOperationTimeout(
-    frame.evaluate(sel => {
-      return document.querySelector(sel)?.tagName === 'SELECT';
-    }, selector),
+    locator.first().evaluate((el: Element) => el.tagName === 'SELECT'),
     '检测表单元素类型',
     timeoutMs,
   );
   const operation: Promise<unknown> = isSelect
-    ? element.selectOption(value, {timeout: timeoutMs})
-    : element.fill(value, {timeout: timeoutMs});
+    ? locator.selectOption(value, {timeout: timeoutMs})
+    : locator.fill(value, {timeout: timeoutMs});
   await withOperationTimeout(operation, '填充表单元素', timeoutMs);
 
   return {found: true, isSelect};

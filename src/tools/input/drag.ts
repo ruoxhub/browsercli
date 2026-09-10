@@ -7,6 +7,7 @@
 import {zod} from '../../third_party/index.js';
 import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
+import {toElementError} from '../shared/elementLocator.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 
 /**
@@ -14,15 +15,24 @@ import {defineTool, type Context} from '../ToolDefinition.js';
  */
 export const drag = defineTool({
   name: 'drag',
-  description: '通过鼠标事件将元素从源 CSS 选择器拖拽到目标 CSS 选择器。',
+  description:
+    '通过鼠标事件将元素从源定位器拖拽到目标定位器。定位器支持 CSS、role=、text=、xpath=。多匹配时用 >> nth=N 消歧。',
   annotations: {
     title: '拖拽元素',
     category: ToolCategory.NAVIGATION,
     readOnlyHint: false,
   },
   schema: {
-    fromSelector: zod.string().describe('拖拽源 CSS 选择器。'),
-    toSelector: zod.string().describe('拖拽目标 CSS 选择器。'),
+    fromSelector: zod
+      .string()
+      .describe(
+        '拖拽源定位器：CSS（#id、.cls）、role=button[name="提交"]、text=登录、xpath=//button。多匹配时用 >> nth=N 消歧。不可与 CSS 逗号混写。',
+      ),
+    toSelector: zod
+      .string()
+      .describe(
+        '拖拽目标定位器：CSS（#id、.cls）、role=button[name="提交"]、text=登录、xpath=//button。多匹配时用 >> nth=N 消歧。不可与 CSS 逗号混写。',
+      ),
   },
   handler: async (request, response, context) => {
     const {fromSelector, toSelector} = request.params;
@@ -30,32 +40,20 @@ export const drag = defineTool({
     const page = frame.page();
 
     try {
-      const fromElement = await page.$(fromSelector);
-      const toElement = await page.$(toSelector);
-
-      if (!fromElement) {
+      const fromBox = await page.locator(fromSelector).boundingBox();
+      if (!fromBox) {
         throw createToolError(
           ErrorCodes.NOT_FOUND,
-          `Source element not found: ${fromSelector}`,
+          `Source element bounding box not available: ${fromSelector}`,
           {toolName: 'drag', fromSelector},
         );
       }
-      if (!toElement) {
+      const toBox = await page.locator(toSelector).boundingBox();
+      if (!toBox) {
         throw createToolError(
           ErrorCodes.NOT_FOUND,
-          `Target element not found: ${toSelector}`,
+          `Target element bounding box not available: ${toSelector}`,
           {toolName: 'drag', toSelector},
-        );
-      }
-
-      const fromBox = await fromElement.boundingBox();
-      const toBox = await toElement.boundingBox();
-
-      if (!fromBox || !toBox) {
-        throw createToolError(
-          ErrorCodes.RUNTIME,
-          'Element bounding box not available',
-          {toolName: 'drag', fromSelector, toSelector},
         );
       }
 
@@ -81,12 +79,12 @@ export const drag = defineTool({
         },
       });
     } catch (error) {
-      if (error && typeof error === 'object' && 'code' in error) throw error;
-      throw createToolError(
-        ErrorCodes.RUNTIME,
-        error instanceof Error ? error.message : String(error),
-        {toolName: 'drag', fromSelector, toSelector},
-      );
+      throw toElementError(error, {
+        toolName: 'drag',
+        selector: fromSelector,
+        fromSelector,
+        toSelector,
+      });
     }
   },
 });

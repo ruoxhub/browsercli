@@ -21,7 +21,7 @@ import {fillElement} from './fillElement.js';
 export const fillForm = defineTool({
   name: 'fill_form',
   description:
-    '在一次调用中批量填充多个表单元素，每个条目指定 CSS 选择器与值，<select> 通过 selectOption 自动处理。',
+    '在一次调用中批量填充多个表单元素，每个条目指定定位器与值，<select> 通过 selectOption 自动处理。定位器支持 CSS、role=、text=、xpath=。多匹配时用 >> nth=N 消歧。',
   annotations: {
     title: '批量填充表单',
     category: ToolCategory.NAVIGATION,
@@ -31,7 +31,11 @@ export const fillForm = defineTool({
     elements: zod
       .array(
         zod.object({
-          selector: zod.string().describe('CSS 选择器。'),
+          selector: zod
+            .string()
+            .describe(
+              '定位器：CSS（#id、.cls）、role=button[name="提交"]、text=登录、xpath=//button。多匹配时用 >> nth=N 消歧。不可与 CSS 逗号混写。',
+            ),
           value: zod.string().describe('填充值。'),
         }),
       )

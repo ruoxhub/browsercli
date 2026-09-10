@@ -11,6 +11,7 @@ import {
   browserTimeoutSchema,
   withDebuggerTrapBypass,
 } from '../shared/browserRuntime.js';
+import {toElementError} from '../shared/elementLocator.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 
 import {fillElement} from './fillElement.js';
@@ -21,7 +22,7 @@ import {fillElement} from './fillElement.js';
 export const fill = defineTool({
   name: 'fill',
   description:
-    '向匹配 CSS 选择器的 input、textarea 或 select 元素填入值，<select> 会通过 selectOption 自动处理。',
+    '向输入元素填入值，<select> 会通过 selectOption 自动处理。定位器支持 CSS、role=、text=、xpath=。多匹配时用 >> nth=N 消歧。',
   annotations: {
     title: '填充输入',
     category: ToolCategory.NAVIGATION,
@@ -30,7 +31,9 @@ export const fill = defineTool({
   schema: {
     selector: zod
       .string()
-      .describe('CSS 选择器（input / textarea / select）。'),
+      .describe(
+        '定位器：CSS（#id、.cls）、role=button[name="提交"]、text=登录、xpath=//button。多匹配时用 >> nth=N 消歧。不可与 CSS 逗号混写。',
+      ),
     value: zod.string().describe('填充值。'),
     timeoutMs: browserTimeoutSchema('单次页面操作超时（毫秒，默认 10000）。'),
   },
@@ -58,12 +61,7 @@ export const fill = defineTool({
         data: {selector, value, isSelect},
       });
     } catch (error) {
-      if (error && typeof error === 'object' && 'code' in error) throw error;
-      throw createToolError(
-        ErrorCodes.RUNTIME,
-        error instanceof Error ? error.message : String(error),
-        {toolName: 'fill', selector, value},
-      );
+      throw toElementError(error, {toolName: 'fill', selector, value});
     }
   },
 });

@@ -7,6 +7,7 @@
 import {zod} from '../../third_party/index.js';
 import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
+import {toElementError} from '../shared/elementLocator.js';
 import {sendJson} from '../shared/pageResponse.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -15,10 +16,15 @@ import {defineTool} from '../ToolDefinition.js';
  */
 export const clickElement = defineTool({
   name: 'click_element',
-  description: '通过 CSS 选择器点击页面元素。',
+  description:
+    '点击页面元素。定位器支持 CSS、role=、text=、xpath=。多匹配时用 >> nth=N 消歧。',
   annotations: {category: ToolCategory.INPUT, readOnlyHint: false},
   schema: {
-    selector: zod.string().describe('要点击元素的 CSS 选择器。'),
+    selector: zod
+      .string()
+      .describe(
+        '定位器：CSS（#id、.cls）、role=button[name="提交"]、text=登录、xpath=//button。多匹配时用 >> nth=N 消歧。不可与 CSS 逗号混写。',
+      ),
   },
   handler: async (request, response, context) => {
     const {selector} = request.params;
@@ -31,7 +37,7 @@ export const clickElement = defineTool({
       );
     }
     try {
-      await page.click(selector);
+      await page.locator(selector).click();
       sendJson(response, {
         success: true,
         message: `元素已点击: ${selector}`,
@@ -39,11 +45,7 @@ export const clickElement = defineTool({
         data: {selector, clicked: true},
       });
     } catch (error) {
-      throw createToolError(
-        ErrorCodes.RUNTIME,
-        `点击元素失败: ${error instanceof Error ? error.message : String(error)}`,
-        {toolName: 'click_element', selector},
-      );
+      throw toElementError(error, {toolName: 'click_element', selector});
     }
   },
 });

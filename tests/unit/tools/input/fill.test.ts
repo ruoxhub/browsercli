@@ -29,19 +29,28 @@ function captureResponse() {
 describe('input fill tools', () => {
   it('fills through the selected frame with a bounded action', async () => {
     const calls: Array<{kind: string; value?: unknown}> = [];
-    const element = {
+    const loc = {
+      count: async () => {
+        calls.push({kind: 'count', value: '#name'});
+        return 1;
+      },
+      first: () => ({
+        evaluate: async (_fn: unknown) => {
+          calls.push({kind: 'evaluate', value: '#name'});
+          return false;
+        },
+      }),
       fill: async (value: string, options: {timeout: number}) => {
         calls.push({kind: 'fill', value: {value, options}});
       },
+      selectOption: async (value: string, options: {timeout: number}) => {
+        calls.push({kind: 'selectOption', value: {value, options}});
+      },
     };
     const frame = {
-      $: async (selector: string) => {
-        calls.push({kind: 'query', value: selector});
-        return element;
-      },
-      evaluate: async (_fn: unknown, selector: string) => {
-        calls.push({kind: 'evaluate', value: selector});
-        return false;
+      locator: (selector: string) => {
+        calls.push({kind: 'locator', value: selector});
+        return loc;
       },
       page: () => {
         throw new Error('page() must not be used');
@@ -52,7 +61,8 @@ describe('input fill tools', () => {
 
     assert.deepEqual(result, {found: true, isSelect: false});
     assert.deepEqual(calls, [
-      {kind: 'query', value: '#name'},
+      {kind: 'locator', value: '#name'},
+      {kind: 'count', value: '#name'},
       {kind: 'evaluate', value: '#name'},
       {
         kind: 'fill',
@@ -63,7 +73,9 @@ describe('input fill tools', () => {
 
   it('rejects a debugger-stalled frame query at its deadline', async () => {
     const frame = {
-      $: async () => await new Promise<never>(() => undefined),
+      locator: () => ({
+        count: async () => await new Promise<never>(() => undefined),
+      }),
     };
 
     await assert.rejects(
@@ -74,14 +86,15 @@ describe('input fill tools', () => {
 
   it('fill preserves its structured response without using page()', async () => {
     let fillOptions: {timeout: number} | undefined;
-    const element = {
+    const loc = {
+      count: async () => 1,
+      first: () => ({evaluate: async () => false}),
       fill: async (_value: string, options: {timeout: number}) => {
         fillOptions = options;
       },
     };
     const frame = {
-      $: async () => element,
-      evaluate: async () => false,
+      locator: () => loc,
       page: () => {
         throw new Error('page() must not be used');
       },
@@ -105,10 +118,16 @@ describe('input fill tools', () => {
 
   it('fill resumes an existing debugger-statement trap before querying', async () => {
     const calls: string[] = [];
+    const loc = {
+      count: async () => {
+        calls.push('count');
+        return 0;
+      },
+    };
     const frame = {
-      $: async () => {
-        calls.push('query');
-        return null;
+      locator: () => {
+        calls.push('locator');
+        return loc;
       },
     };
     const output = captureResponse();
@@ -123,7 +142,10 @@ describe('input fill tools', () => {
             getExistingDebuggerContext: () => ({
               getPausedState: () => ({reason: 'debugCommand'}),
               getClient: () => ({
-                send: async (method: string, params: Record<string, unknown>) => {
+                send: async (
+                  method: string,
+                  params: Record<string, unknown>,
+                ) => {
                   calls.push(`${method}:${JSON.stringify(params)}`);
                 },
               }),
@@ -140,7 +162,8 @@ describe('input fill tools', () => {
     assert.deepEqual(calls, [
       'Debugger.setSkipAllPauses:{"skip":true}',
       'resume',
-      'query',
+      'locator',
+      'count',
       'Debugger.setSkipAllPauses:{"skip":false}',
     ]);
   });
@@ -148,14 +171,17 @@ describe('input fill tools', () => {
   it('fill_form counts selected-frame fills and skips missing elements', async () => {
     const selected: Array<{value: string; timeout: number}> = [];
     const frame = {
-      $: async (selector: string) =>
+      locator: (selector: string) =>
         selector === '#missing'
-          ? null
+          ? {
+              count: async () => 0,
+            }
           : {
+              count: async () => 1,
+              first: () => ({evaluate: async () => true}),
               selectOption: async (value: string, options: {timeout: number}) =>
                 selected.push({value, timeout: options.timeout}),
             },
-      evaluate: async () => true,
       page: () => {
         throw new Error('page() must not be used');
       },

@@ -7,6 +7,7 @@
 import {zod} from '../../third_party/index.js';
 import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
+import {toElementError} from '../shared/elementLocator.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 
 import {evaluateAndRespond} from './evaluateAndRespond.js';
@@ -43,7 +44,9 @@ export const monitorEvents = defineTool({
       .string()
       .optional()
       .default('window')
-      .describe('CSS 选择器或 "window"/"document"（默认: window）.'),
+      .describe(
+        '定位器：CSS（#id、.cls）、role=button[name="提交"]、text=登录、xpath=//button。多匹配时用 >> nth=N 消歧。不可与 CSS 逗号混写。保留值: "window" 与 "document"（默认: window）。',
+      ),
     events: zod
       .array(zod.string())
       .optional()
@@ -68,88 +71,83 @@ export const monitorEvents = defineTool({
       context: context as Context,
       response,
       tooltype: 'monitor_events',
-      evaluate: frame =>
-        frame.evaluate(
-          ({
-            selector,
-            events,
-            monitorId,
-          }: {
-            selector: string;
-            events: string[];
-            monitorId: string;
-          }) => {
-            const browserWindow = window as unknown as MonitorWindow;
-
-            browserWindow.__mcp_monitors__ =
-              browserWindow.__mcp_monitors__ || {};
+      evaluate: async frame => {
+        const installScript = `
+          (target, monitorId, events) => {
+            const browserWindow = window;
+            browserWindow.__mcp_monitors__ = browserWindow.__mcp_monitors__ || {};
             if (browserWindow.__mcp_monitors__[monitorId]) {
-              return {
-                error: `Monitor already exists: ${monitorId}`,
-              };
+              return { error: 'Monitor already exists: ' + monitorId };
             }
-
-            let target: EventTarget | null;
-            if (selector === 'window') {
-              target = window;
-            } else if (selector === 'document') {
-              target = document;
-            } else {
-              target = document.querySelector(selector);
-              if (!target) {
-                return {
-                  error: `Element not found: ${selector}`,
-                };
-              }
-            }
-
-            const listeners: Record<string, EventListener> = {};
-
+            const listeners = {};
             events.forEach(eventType => {
-              const handler: EventListener = event => {
-                const typedEvent = event as Event & {
-                  target?: EventTarget & {
-                    tagName?: string;
-                    id?: string;
-                    className?: string;
-                  };
-                  key?: string;
-                  code?: string;
-                  clientX?: number;
-                  clientY?: number;
-                };
-                const info: Record<string, unknown> = {
+              const handler = event => {
+                const info = {
                   monitor: monitorId,
                   event: eventType,
                   timestamp: new Date().toISOString(),
-                  target: typedEvent.target?.tagName || 'unknown',
+                  target: (event.target && event.target.tagName) || 'unknown',
                 };
-
-                if (typedEvent.target?.id) info.targetId = typedEvent.target.id;
-                if (typedEvent.target?.className) {
-                  info.targetClass = typedEvent.target.className;
+                if (event.target && event.target.id) info.targetId = event.target.id;
+                if (event.target && event.target.className) info.targetClass = event.target.className;
+                if (event.key) info.key = event.key;
+                if (event.code) info.code = event.code;
+                if (event.clientX !== undefined) {
+                  info.position = { x: event.clientX, y: event.clientY };
                 }
-                if (typedEvent.key) info.key = typedEvent.key;
-                if (typedEvent.code) info.code = typedEvent.code;
-                if (typedEvent.clientX !== undefined) {
-                  info.position = {
-                    x: typedEvent.clientX,
-                    y: typedEvent.clientY,
-                  };
-                }
-
                 console.log('[MCP Event]', info);
               };
-
               target.addEventListener(eventType, handler, true);
               listeners[eventType] = handler;
             });
-
             browserWindow.__mcp_monitors__[monitorId] = {target, listeners};
             return {success: true, monitorId, eventCount: events.length};
-          },
-          {selector, events: eventList, monitorId: id},
-        ),
+          }
+        `;
+
+        if (selector === 'window') {
+          return await frame.evaluate(
+            ({fn, monitorId, events}) => {
+              // eslint-disable-next-line no-eval
+              const installer = eval(fn);
+              return installer(window, monitorId, events);
+            },
+            {fn: installScript, monitorId: id, events: eventList},
+          );
+        }
+
+        if (selector === 'document') {
+          return await frame.evaluate(
+            ({fn, monitorId, events}) => {
+              // eslint-disable-next-line no-eval
+              const installer = eval(fn);
+              return installer(document, monitorId, events);
+            },
+            {fn: installScript, monitorId: id, events: eventList},
+          );
+        }
+
+        const loc = frame.locator(selector);
+        try {
+          const count = await loc.count();
+          if (count === 0) {
+            return {
+              error: `Element not found: ${selector}`,
+            };
+          }
+
+          return await loc.evaluate(
+            (target, {fn, monitorId, events}) => {
+              // eslint-disable-next-line no-eval
+              const installer = eval(fn);
+              return installer(target, monitorId, events);
+            },
+            {fn: installScript, monitorId: id, events: eventList},
+          );
+        } catch (error) {
+          throw toElementError(error, {toolName: 'monitor_events', selector});
+        }
+      },
       onSuccess: result => {
         response.setStructuredContent({
           success: true,
@@ -165,11 +163,10 @@ export const monitorEvents = defineTool({
         });
       },
       onEvaluateFail: () => {
-        throw createToolError(
-          ErrorCodes.RUNTIME,
-          '事件监控启动失败',
-          {toolName: 'monitor_events', selector},
-        );
+        throw createToolError(ErrorCodes.RUNTIME, '事件监控启动失败', {
+          toolName: 'monitor_events',
+          selector,
+        });
       },
     });
   },

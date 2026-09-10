@@ -7,7 +7,8 @@
 import {zod} from '../../third_party/index.js';
 import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
-import {errorMessage, sendJson} from '../shared/pageResponse.js';
+import {toElementError} from '../shared/elementLocator.js';
+import {sendJson} from '../shared/pageResponse.js';
 import {defineTool} from '../ToolDefinition.js';
 
 /**
@@ -15,10 +16,15 @@ import {defineTool} from '../ToolDefinition.js';
  */
 export const typeText = defineTool({
   name: 'type_text',
-  description: '通过 CSS 选择器向输入框键入文本。',
+  description:
+    '向输入框键入文本。定位器支持 CSS、role=、text=、xpath=。多匹配时用 >> nth=N 消歧。',
   annotations: {category: ToolCategory.INPUT, readOnlyHint: false},
   schema: {
-    selector: zod.string().describe('输入元素的 CSS 选择器。'),
+    selector: zod
+      .string()
+      .describe(
+        '定位器：CSS（#id、.cls）、role=button[name="提交"]、text=登录、xpath=//button。多匹配时用 >> nth=N 消歧。不可与 CSS 逗号混写。',
+      ),
     text: zod.string().describe('要输入的文本。'),
     delay: zod.number().optional().describe('每次按键之间的延迟（毫秒）。'),
   },
@@ -43,7 +49,7 @@ export const typeText = defineTool({
     }
 
     try {
-      await page.type(selector, text, {delay});
+      await page.locator(selector).pressSequentially(text, {delay});
       sendJson(response, {
         success: true,
         message: `文本已输入: ${selector}`,
@@ -51,11 +57,11 @@ export const typeText = defineTool({
         data: {selector, textLength: text.length, typed: true},
       });
     } catch (error) {
-      throw createToolError(
-        ErrorCodes.RUNTIME,
-        `输入文本失败: ${errorMessage(error)}`,
-        {toolName: 'type_text', selector, textLength: text.length},
-      );
+      throw toElementError(error, {
+        toolName: 'type_text',
+        selector,
+        textLength: text.length,
+      });
     }
   },
 });

@@ -28,9 +28,11 @@ describe('click', () => {
   it('clicks through the selected frame with the requested timeout', async () => {
     const calls: unknown[] = [];
     const frame = {
-      click: async (selector: string, options: unknown) => {
-        calls.push({selector, options});
-      },
+      locator: (selector: string) => ({
+        click: async (options: unknown) => {
+          calls.push({selector, options});
+        },
+      }),
       page: () => {
         throw new Error('page() must not be used');
       },
@@ -56,7 +58,9 @@ describe('click', () => {
 
   it('returns after the outer deadline when the frame stays blocked', async () => {
     const frame = {
-      click: async () => await new Promise<never>(() => undefined),
+      locator: () => ({
+        click: async () => await new Promise<never>(() => undefined),
+      }),
     };
     const output = captureResponse();
 

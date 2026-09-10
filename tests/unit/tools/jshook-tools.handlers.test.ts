@@ -11,10 +11,8 @@ import {describe, it} from 'node:test';
 
 import {StealthScripts2025} from '../../../src/modules/stealth/StealthScripts2025.js';
 import {getRuntime} from '../../../src/runtime.js';
-import {ToolError} from '../../../src/utils/errors.js';
 import {
   analyze_target,
-  deobfuscateCode,
   detectCrypto,
   export_session_report,
   riskPanel,
@@ -56,6 +54,7 @@ import {
   listStealthPresets,
   setUserAgent,
 } from '../../../src/tools/stealth/index.js';
+import {ToolError} from '../../../src/utils/errors.js';
 
 type RuntimeMethod = (...args: unknown[]) => unknown;
 
@@ -83,7 +82,6 @@ interface ToolDefinitionHarness {
 }
 
 interface RuntimeHarness {
-  deobfuscator: {deobfuscate: RuntimeMethod};
   analyzer: {understand: RuntimeMethod};
   summarizer: {
     summarizeFile: RuntimeMethod;
@@ -145,7 +143,39 @@ interface StealthStaticHarness {
   getPresets: RuntimeMethod;
 }
 
+const createMockLocator = () => ({
+  first: () => ({
+    evaluate: async (_fn: unknown) => ({
+      found: true,
+      nodeName: 'DIV',
+      attributes: {},
+      textContent: 'DIV content',
+      boundingBox: {x: 0, y: 0, width: 10, height: 10},
+      visible: true,
+      tagName: 'div',
+    }),
+    click: async () => undefined,
+    fill: async () => undefined,
+  }),
+  count: async () => 1,
+  evaluate: async (_fn: unknown) => ({
+    found: true,
+    nodeName: 'DIV',
+    tagName: 'div',
+  }),
+  evaluateAll: async (_fn: unknown) => [{found: true, nodeName: 'SPAN'}],
+  click: async () => undefined,
+  hover: async () => undefined,
+  fill: async () => undefined,
+  selectOption: async () => undefined,
+  pressSequentially: async () => undefined,
+  waitFor: async () => undefined,
+  boundingBox: async () => ({x: 10, y: 10, width: 100, height: 100}),
+  setInputFiles: async () => undefined,
+});
+
 const mockFrame = {
+  locator: () => createMockLocator(),
   evaluate: async (fnOrScript: unknown) => {
     if (typeof fnOrScript === 'function') {
       const fnStr = fnOrScript.toString();
@@ -170,6 +200,7 @@ const mockFrame = {
 };
 
 const defaultMockPage = {
+  locator: () => createMockLocator(),
   setUserAgent: async () => undefined,
   url: () => 'https://example.com/dashboard',
   title: async () => 'Dashboard',
@@ -235,7 +266,6 @@ describe('jshook tools handlers', () => {
     const stealth = StealthScripts2025 as unknown as StealthStaticHarness;
 
     const originals = {
-      deobfuscate: runtime.deobfuscator.deobfuscate,
       understand: runtime.analyzer.understand,
       summarizeFile: runtime.summarizer.summarizeFile,
       summarizeBatch: runtime.summarizer.summarizeBatch,
@@ -282,14 +312,6 @@ describe('jshook tools handlers', () => {
       getPresets: stealth.getPresets,
     };
 
-    runtime.deobfuscator.deobfuscate = async () => ({
-      code: 'deobf',
-      readabilityScore: 72,
-      confidence: 0.91,
-      obfuscationType: ['unknown'],
-      transformations: [{type: 'noop', description: 'x', success: true}],
-      analysis: 'ok',
-    });
     runtime.analyzer.understand = async () => ({
       ok: true,
       mode: 'understand',
@@ -513,12 +535,6 @@ describe('jshook tools handlers', () => {
     try {
       const res = makeResponse();
 
-      await invokeTool(
-        deobfuscateCode as unknown as ToolDefinitionHarness,
-        {code: 'x'},
-        res,
-        runtime,
-      );
       await invokeTool(
         understandCode as unknown as ToolDefinitionHarness,
         {code: 'x', focus: 'all'},
@@ -840,8 +856,7 @@ describe('jshook tools handlers', () => {
             res,
             runtime,
           ),
-        (err: unknown) =>
-          err instanceof ToolError && err.code === 'NOT_FOUND',
+        (err: unknown) => err instanceof ToolError && err.code === 'NOT_FOUND',
       );
 
       await invokeTool(
@@ -1183,7 +1198,6 @@ describe('jshook tools handlers', () => {
         ),
       );
     } finally {
-      runtime.deobfuscator.deobfuscate = originals.deobfuscate;
       runtime.analyzer.understand = originals.understand;
       runtime.summarizer.summarizeFile = originals.summarizeFile;
       runtime.summarizer.summarizeBatch = originals.summarizeBatch;

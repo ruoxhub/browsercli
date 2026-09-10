@@ -7,6 +7,7 @@
 import {zod} from '../../third_party/index.js';
 import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
+import {toElementError} from '../shared/elementLocator.js';
 import {sendJson} from '../shared/pageResponse.js';
 import {defineTool} from '../ToolDefinition.js';
 
@@ -15,10 +16,15 @@ import {defineTool} from '../ToolDefinition.js';
  */
 export const waitForElement = defineTool({
   name: 'wait_for_element',
-  description: '等待匹配 CSS 选择器的元素出现在页面中。',
+  description:
+    '等待定位器对应的元素出现在页面中。定位器支持 CSS、role=、text=、xpath=。多匹配时用 >> nth=N 消歧。',
   annotations: {category: ToolCategory.INPUT, readOnlyHint: true},
   schema: {
-    selector: zod.string().describe('要等待的 CSS 选择器。'),
+    selector: zod
+      .string()
+      .describe(
+        '定位器：CSS（#id、.cls）、role=button[name="提交"]、text=登录、xpath=//button。多匹配时用 >> nth=N 消歧。不可与 CSS 逗号混写。',
+      ),
     timeout: zod
       .number()
       .optional()
@@ -37,36 +43,37 @@ export const waitForElement = defineTool({
     }
 
     try {
-      await page.waitForSelector(selector, {
+      await page.locator(selector).waitFor({
+        state: 'visible',
         timeout: timeout ?? 30000,
       });
-    } catch {
-      throw createToolError(
-        ErrorCodes.TIMEOUT,
-        `等待元素超时: ${selector}`,
-        {toolName: 'wait_for_element', selector, timeout: timeout ?? 30000},
-        {retryable: true},
-      );
+    } catch (error) {
+      throw toElementError(error, {
+        toolName: 'wait_for_element',
+        selector,
+        timeout: timeout ?? 30000,
+      });
     }
 
-    const element = await page.evaluate((sel: string) => {
-      const el = document.querySelector(sel);
-      if (!el) return null;
-
-      return {
-        tagName: el.tagName.toLowerCase(),
-        id: el.id || undefined,
-        className: el.className || undefined,
-        textContent: el.textContent?.trim().substring(0, 100) || undefined,
-        attributes: Array.from(el.attributes).reduce(
-          (acc, attr) => {
-            acc[attr.name] = attr.value;
-            return acc;
-          },
-          {} as Record<string, string>,
-        ),
-      };
-    }, selector);
+    const element = await page
+      .locator(selector)
+      .first()
+      .evaluate((el: Element) => {
+        return {
+          tagName: el.tagName.toLowerCase(),
+          id: el.id || undefined,
+          className: el.className || undefined,
+          textContent: el.textContent?.trim().substring(0, 100) || undefined,
+          attributes: Array.from(el.attributes).reduce(
+            (acc, attr) => {
+              acc[attr.name] = attr.value;
+              return acc;
+            },
+            {} as Record<string, string>,
+          ),
+        };
+      })
+      .catch(() => null);
 
     sendJson(response, {
       success: true,
