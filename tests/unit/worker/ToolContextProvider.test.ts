@@ -14,26 +14,19 @@ import {CaptureEngine} from '../../../src/modules/session/CaptureEngine.js';
 import {CaptureSessionManager} from '../../../src/modules/session/CaptureSessionManager.js';
 import {SqliteSessionStore} from '../../../src/modules/session/SqliteSessionStore.js';
 import type {Runtime} from '../../../src/runtime.js';
-import {deobfuscateCode} from '../../../src/tools/analyzer/deobfuscate.js';
+import {understandCode} from '../../../src/tools/analyzer/understand.js';
 import {ToolContextProvider} from '../../../src/worker/ToolContext.js';
 import {ToolResponseAccumulator} from '../../../src/worker/ToolResponse.js';
 
 describe('ToolContextProvider', () => {
-  it('provides analyzer runtime services for deobfuscate_code', async () => {
+  it('provides analyzer runtime services for understand_code', async () => {
     const response = new ToolResponseAccumulator();
-    await deobfuscateCode.handler(
+    await understandCode.handler(
       {
         params: {
-          code: [
-            "function _0x5c1a(){const _0x2f8b=['log','Hello, JSReverser-MCP!'];",
-            '_0x5c1a=function(){return _0x2f8b;};return _0x5c1a();}',
-            'function _0x1f4d(_0x31f4f6,_0x4df9ff){const _0x5c1af4=_0x5c1a();',
-            'return _0x1f4d=function(_0x1f4d7d,_0x2dcf8d){_0x1f4d7d=_0x1f4d7d-0x0;',
-            'return _0x5c1af4[_0x1f4d7d];},_0x1f4d(_0x31f4f6,_0x4df9ff);}',
-            'console[_0x1f4d(0x0)](_0x1f4d(0x1));',
-          ].join(''),
-          aggressive: true,
-          renameVariables: true,
+          code: 'console.log("hello world");',
+          focus: 'structure',
+          useAI: false,
         },
       },
       response,
@@ -44,51 +37,12 @@ describe('ToolContextProvider', () => {
       success: boolean;
       tooltype: string;
       message: string;
-      data: {code: string};
+      data: unknown;
     };
     assert.equal(result.success, true);
-    assert.equal(result.tooltype, 'deobfuscate');
+    assert.equal(result.tooltype, 'understand');
     assert.match(result.message, /completed/i);
-    assert.ok(typeof result.data.code === 'string');
-    assert.ok(result.data.code.includes('console'));
-  });
-
-  it('provides analyzer runtime services for deobfuscate_code with scriptId', async () => {
-    const response = new ToolResponseAccumulator();
-    const mockDebugger = {
-      getScriptSource: async (id: string) => {
-        if (id === 'test-script-123') {
-          return 'console.log("deobfuscate this!");';
-        }
-        return null;
-      },
-    };
-    const mockContext = {
-      getDebuggerContext: async () => mockDebugger,
-    };
-
-    await deobfuscateCode.handler(
-      {
-        params: {
-          scriptId: 'test-script-123',
-          aggressive: true,
-          renameVariables: true,
-        },
-      },
-      response,
-      mockContext as any,
-    );
-
-    const result = response.toJSON().structuredContent as {
-      success: boolean;
-      tooltype: string;
-      message: string;
-      data: {code: string};
-    };
-    assert.equal(result.success, true);
-    assert.equal(result.tooltype, 'deobfuscate');
-    assert.match(result.message, /completed/i);
-    assert.ok(typeof result.data.code === 'string');
+    assert.ok(result.data !== null && result.data !== undefined);
   });
 
   it('reuses debugger context for the same page', async () => {

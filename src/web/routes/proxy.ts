@@ -9,6 +9,7 @@ import type {IncomingMessage, ServerResponse} from 'node:http';
 import os from 'node:os';
 
 import type {MitmModule} from '../../modules/proxy/MitmModule.js';
+import type {UpstreamProxyConfig} from '../../modules/proxy/types.js';
 import {sendError, sendJson, sendUnexpected} from '../middleware/error.js';
 import type {WsHub} from '../ws/WsHub.js';
 
@@ -71,17 +72,21 @@ export function createProxyRoutes(
       'POST /api/proxy/start',
       async (req, res) => {
         let port: number | undefined;
-        let upstreamProxy: string | undefined;
+        let upstreamProxy: string | UpstreamProxyConfig | undefined;
         try {
           const body = (await readJsonBody(req)) as {
             port?: number;
-            upstreamProxy?: string;
+            upstreamProxy?: string | UpstreamProxyConfig;
           };
           if (typeof body === 'object' && body !== null) {
             if (typeof body.port === 'number') {
               port = body.port;
             }
-            if (typeof body.upstreamProxy === 'string') {
+            if (
+              typeof body.upstreamProxy === 'string' ||
+              (typeof body.upstreamProxy === 'object' &&
+                body.upstreamProxy !== null)
+            ) {
               upstreamProxy = body.upstreamProxy;
             }
           }
@@ -157,6 +162,7 @@ export function createProxyRoutes(
         try {
           const url = new URL(req.url ?? '/', 'http://127.0.0.1');
           const urlFilter = url.searchParams.get('urlFilter') ?? undefined;
+          const filter = url.searchParams.get('filter') ?? undefined;
           const pageIdxRaw = url.searchParams.get('pageIdx');
           const pageSizeRaw = url.searchParams.get('pageSize');
           const pageIdx =
@@ -166,6 +172,7 @@ export function createProxyRoutes(
 
           const result = mitmModule.listRequests({
             urlFilter,
+            filter,
             pageIdx: Number.isFinite(pageIdx) ? pageIdx : undefined,
             pageSize: Number.isFinite(pageSize) ? pageSize : undefined,
           });

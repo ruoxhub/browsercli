@@ -16,6 +16,7 @@ import test from 'node:test';
 import {
   collectDaemonPids,
   DaemonConnection,
+  normalizeCandidatePath,
   resolveEntryPath,
   spawnDaemon,
 } from '../../../src/cli/daemonClient.js';
@@ -130,33 +131,47 @@ test('onEvent 收到推送，off 后不再收', async () => {
   await fake.close();
 });
 
-test('resolveEntryPath 优先取 BROWSERCLI_ENTRY，缺失时报错带恢复建议', () => {
-  const prevEntry = process.env.BROWSERCLI_ENTRY;
-  const prevConfigDir = process.env.BROWSERCLI_CONFIG_DIR;
+test('resolveEntryPath 优先取 PROXYCLI_ENTRY / BROWSERCLI_ENTRY，缺失时报错带恢复建议', () => {
+  const prevProxyEntry = process.env.PROXYCLI_ENTRY;
+  const prevBrowserEntry = process.env.BROWSERCLI_ENTRY;
+  const prevProxyConfigDir = process.env.PROXYCLI_CONFIG_DIR;
+  const prevBrowserConfigDir = process.env.BROWSERCLI_CONFIG_DIR;
   const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'proxycli-cfg-'));
   try {
+    delete process.env.PROXYCLI_ENTRY;
+    delete process.env.BROWSERCLI_ENTRY;
+    delete process.env.PROXYCLI_CONFIG_DIR;
+    delete process.env.BROWSERCLI_CONFIG_DIR;
+
     const probe = path.join(configDir, 'entry.js');
     fs.writeFileSync(probe, '', 'utf-8');
+
+    // 1. PROXYCLI_ENTRY
+    process.env.PROXYCLI_ENTRY = probe;
+    assert.strictEqual(resolveEntryPath(), probe);
+
+    // 2. BROWSERCLI_ENTRY 后向兼容
+    delete process.env.PROXYCLI_ENTRY;
     process.env.BROWSERCLI_ENTRY = probe;
     assert.strictEqual(resolveEntryPath(), probe);
 
+    // 3. 均未配置时报错且带恢复建议
     delete process.env.BROWSERCLI_ENTRY;
-    process.env.BROWSERCLI_CONFIG_DIR = configDir;
+    process.env.PROXYCLI_CONFIG_DIR = configDir;
     assert.throws(
       () => resolveEntryPath(),
       (err: unknown) => {
         const e = err as Error & {suggestions?: string[]};
         return (
           e.message.includes('workerEntry') &&
-          (e.suggestions ?? []).some(
-            s =>
-              s.includes('proxycli config --set workerEntry=') ||
-              s.includes('proxycli config --set workerEntry='),
+          (e.suggestions ?? []).some(s =>
+            s.includes('proxycli config --set workerEntry='),
           )
         );
       },
     );
 
+    // 4. 配置文件中的 workerEntry 生效
     fs.writeFileSync(
       path.join(configDir, 'config.json'),
       JSON.stringify({workerEntry: probe}),
@@ -164,11 +179,37 @@ test('resolveEntryPath 优先取 BROWSERCLI_ENTRY，缺失时报错带恢复建�
     );
     assert.strictEqual(resolveEntryPath(), probe);
   } finally {
-    if (prevEntry === undefined) delete process.env.BROWSERCLI_ENTRY;
-    else process.env.BROWSERCLI_ENTRY = prevEntry;
-    if (prevConfigDir === undefined) delete process.env.BROWSERCLI_CONFIG_DIR;
-    else process.env.BROWSERCLI_CONFIG_DIR = prevConfigDir;
+    if (prevProxyEntry === undefined) delete process.env.PROXYCLI_ENTRY;
+    else process.env.PROXYCLI_ENTRY = prevProxyEntry;
+    if (prevBrowserEntry === undefined) delete process.env.BROWSERCLI_ENTRY;
+    else process.env.BROWSERCLI_ENTRY = prevBrowserEntry;
+    if (prevProxyConfigDir === undefined)
+      delete process.env.PROXYCLI_CONFIG_DIR;
+    else process.env.PROXYCLI_CONFIG_DIR = prevProxyConfigDir;
+    if (prevBrowserConfigDir === undefined)
+      delete process.env.BROWSERCLI_CONFIG_DIR;
+    else process.env.BROWSERCLI_CONFIG_DIR = prevBrowserConfigDir;
     fs.rmSync(configDir, {recursive: true, force: true});
+  }
+});
+
+test('normalizeCandidatePath 跨平台路径转换', () => {
+  assert.strictEqual(normalizeCandidatePath(undefined), undefined);
+  assert.strictEqual(normalizeCandidatePath(''), undefined);
+
+  // 临时文件实际存在
+  const tmpFile = path.join(os.tmpdir(), `probe-${process.pid}.js`);
+  fs.writeFileSync(tmpFile, '', 'utf-8');
+  try {
+    assert.strictEqual(normalizeCandidatePath(tmpFile), tmpFile);
+    if (process.platform === 'linux' && tmpFile.startsWith('/mnt/')) {
+      // 构造 Windows 路径形如 D:\... 或 D:/...
+      const drive = tmpFile[5].toUpperCase();
+      const winPath = `${drive}:${tmpFile.slice(6)}`;
+      assert.strictEqual(normalizeCandidatePath(winPath), tmpFile);
+    }
+  } finally {
+    fs.rmSync(tmpFile, {force: true});
   }
 });
 
@@ -189,9 +230,11 @@ test('spawnDaemon 用假 entry 走通就绪握手并写出 session 文件', asyn
     ].join('\n'),
     'utf-8',
   );
-  const prevEntry = process.env.BROWSERCLI_ENTRY;
+  const prevProxyEntry = process.env.PROXYCLI_ENTRY;
+  const prevBrowserEntry = process.env.BROWSERCLI_ENTRY;
   try {
-    process.env.BROWSERCLI_ENTRY = entry;
+    delete process.env.BROWSERCLI_ENTRY;
+    process.env.PROXYCLI_ENTRY = entry;
     const cfg = await spawnDaemon({
       session,
       spawnFlags: [],
@@ -210,8 +253,10 @@ test('spawnDaemon 用假 entry 走通就绪握手并写出 session 文件', asyn
       {stdio: 'ignore'},
     );
   } finally {
-    if (prevEntry === undefined) delete process.env.BROWSERCLI_ENTRY;
-    else process.env.BROWSERCLI_ENTRY = prevEntry;
+    if (prevProxyEntry === undefined) delete process.env.PROXYCLI_ENTRY;
+    else process.env.PROXYCLI_ENTRY = prevProxyEntry;
+    if (prevBrowserEntry === undefined) delete process.env.BROWSERCLI_ENTRY;
+    else process.env.BROWSERCLI_ENTRY = prevBrowserEntry;
     if (process.platform !== 'win32')
       await fs.promises.unlink(socketPath).catch(() => undefined);
     fs.rmSync(workspace, {recursive: true, force: true});

@@ -16,6 +16,7 @@
 
 import type {Page} from '../../third_party/index.js';
 import {logger} from '../../utils/logger.js';
+import {withCdpSession} from '../browser/cdpUtils.js';
 
 // ==================== 类型定义 ====================
 
@@ -481,6 +482,7 @@ export class StealthScripts2025 {
       } else {
         skipped.push(feature.name);
       }
+      return feature.name;
     });
 
     await Promise.all(tasks);
@@ -617,9 +619,10 @@ export class StealthScripts2025 {
     const touchPoints = options.maxTouchPoints ?? 0;
 
     // Playwright: setUserAgent not available on Page, use CDP
-    const client = await page.context().newCDPSession(page);
-    await client.send('Network.setUserAgentOverride', {
-      userAgent: ua,
+    await withCdpSession(page, async client => {
+      await client.send('Network.setUserAgentOverride', {
+        userAgent: ua,
+      });
     });
 
     await page.addInitScript(
@@ -675,6 +678,7 @@ export class StealthScripts2025 {
         parameters: PermissionDescriptor,
       ): Promise<PermissionStatus> {
         if (parameters?.name === 'notifications') {
+          // SAFETY: 模拟 PermissionStatus 接口契约用于反检测伪装
           return Promise.resolve({
             state: Notification.permission,
             onchange: null,
@@ -707,12 +711,13 @@ export class StealthScripts2025 {
       Object.defineProperty(navigator, 'plugins', {
         get: () => {
           const list: any[] = pluginPayload.map((p: any) => {
-            const entry: Record<string, any> = {
+            const entry: Record<string, unknown> = {
               description: p.description,
               filename: p.filename,
               length: p.mimeTypes.length,
               name: p.name,
-              item: (idx: number) => entry[idx] ?? null,
+              item: (idx: number) =>
+                (entry as Record<string, unknown>)[idx] ?? null,
               namedItem: (name: string) => (entry.name === name ? entry : null),
               [Symbol.iterator]: function* () {
                 for (let i = 0; i < p.mimeTypes.length; i++) yield entry[i];

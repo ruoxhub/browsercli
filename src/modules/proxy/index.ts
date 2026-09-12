@@ -17,6 +17,15 @@ export {
   type RequestPredicateView,
 } from './rewrite.js';
 export {
+  compileFlowFilter,
+  matchesFlowFilter,
+  FLOW_FILTER_HELP,
+  hasDeepFilter,
+  type FilterableFlow,
+  type FlowFilterHelpItem,
+  type FlowFilterOptions,
+} from './flowFilter.js';
+export {
   MAX_BODY_SIZE,
   bodyToUtf8,
   decodeCapturedBody,
@@ -46,6 +55,20 @@ export {
   type Socks5Config,
   type Socks5Target,
 } from './socks5.js';
+export {
+  parseUpstreamProxyUrl,
+  normalizeUpstreamProxy,
+  formatUpstreamProxy,
+  shouldBypassUpstream,
+  parseNoProxy,
+  connectHttpProxy,
+  connectUpstream,
+  createUpstreamHttpConnector,
+  createUpstreamHttpsConnector,
+  type UpstreamProxyProtocol,
+  type UpstreamProxyConfig,
+  type UpstreamTarget,
+} from './upstream.js';
 
 // 类型
 export type {

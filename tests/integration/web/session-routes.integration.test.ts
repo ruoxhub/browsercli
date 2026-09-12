@@ -166,6 +166,22 @@ describe('createSessionRoutes', () => {
     assert.strictEqual(body.data.items[0]!.source, 'proxy');
   });
 
+  it('filters by flow filter expression', async () => {
+    const res = mockRes();
+    await router.dispatch(
+      mockReq('GET', '/api/session/requests?filter=~m%20POST'),
+      res as unknown as ServerResponse,
+      '/api/session/requests',
+    );
+
+    const body = res.body as {
+      data: {items: Array<{method: string; url: string}>; total: number};
+    };
+    assert.strictEqual(body.data.total, 1);
+    assert.strictEqual(body.data.items[0]?.method, 'POST');
+    assert.strictEqual(body.data.items[0]?.url, 'https://d.dev/api/y');
+  });
+
   it('clamps limit and offset without 500', async () => {
     const res = mockRes();
     await router.dispatch(

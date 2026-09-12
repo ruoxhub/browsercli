@@ -16,6 +16,7 @@ import path from 'node:path';
 
 import type {Page} from '../../third_party/index.js';
 import {logger} from '../../utils/logger.js';
+import {withCdpSession} from '../browser/cdpUtils.js';
 
 import type {ScreenshotOptions} from './PageControllerTypes.js';
 
@@ -354,9 +355,10 @@ export async function emulateDevice(
   await page.setViewportSize(device.viewport);
 
   // Playwright: setUserAgent via CDP
-  const client = await page.context().newCDPSession(page);
-  await client.send('Network.setUserAgentOverride', {
-    userAgent: device.userAgent,
+  await withCdpSession(page, async client => {
+    await client.send('Network.setUserAgentOverride', {
+      userAgent: device.userAgent,
+    });
   });
 
   logger.info(`Emulating ${deviceName}`);

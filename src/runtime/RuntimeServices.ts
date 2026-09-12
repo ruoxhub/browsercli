@@ -10,7 +10,6 @@ import {AISummarizer} from '../modules/analyzer/AISummarizer.js';
 import {CodeAnalyzer} from '../modules/analyzer/CodeAnalyzer.js';
 import type {PageController} from '../modules/collector/PageController.js';
 import {CryptoDetector} from '../modules/crypto/CryptoDetector.js';
-import {Deobfuscator} from '../modules/deobfuscator/Deobfuscator.js';
 import {NetworkModule} from '../modules/network/index.js';
 import {MitmModule, resolveMitmCertsDir} from '../modules/proxy/index.js';
 import {fromMitmExchange} from '../modules/session/adapters/index.js';
@@ -30,13 +29,11 @@ import {LLMService} from '../services/LLMService.js';
  * @see {@link src/runtime.ts} — getRuntime() 创建 RuntimeServices 并暴露 lazy getter
  * @see {@link src/services/AIService.ts} — AI 服务（lazy）
  * @see {@link src/modules/analyzer/CodeAnalyzer.ts} — 代码分析器（lazy）
- * @see {@link src/modules/deobfuscator/Deobfuscator.ts} — 去混淆器（lazy）
  */
 export class RuntimeServices {
   private llmService?: LLMService;
   private analyzer?: CodeAnalyzer;
   private summarizer?: AISummarizer;
-  private deobfuscator?: Deobfuscator;
   private cryptoDetector?: CryptoDetector;
   private networkModule?: NetworkModule;
   private mitmModule?: MitmModule;
@@ -68,10 +65,6 @@ export class RuntimeServices {
 
   getSummarizer(): AISummarizer {
     return (this.summarizer ??= new AISummarizer(this.getLLMService()));
-  }
-
-  getDeobfuscator(): Deobfuscator {
-    return (this.deobfuscator ??= new Deobfuscator(this.getLLMService()));
   }
 
   getCryptoDetector(): CryptoDetector {

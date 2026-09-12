@@ -26,6 +26,12 @@ export const listMitmRequests = defineTool({
       .optional()
       .describe('每页条数，省略返回全部。'),
     pageIdx: zod.number().int().min(0).optional().describe('页码，从 0 开始。'),
+    filter: zod
+      .string()
+      .optional()
+      .describe(
+        'mitmproxy 风格流过滤表达式（如 "~m POST & ~c 200"、"!~a ~d example.com"、"~bq keyword"、"~p node"）。',
+      ),
     urlFilter: zod
       .string()
       .optional()

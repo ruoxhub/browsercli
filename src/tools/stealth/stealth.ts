@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {withCdpSession} from '../../modules/browser/cdpUtils.js';
 import type {
   StealthInjectionOptions,
   StealthPreset,
@@ -137,8 +138,9 @@ export const setUserAgent = defineTool({
       );
     }
     try {
-      const client = await page.context().newCDPSession(page);
-      await client.send('Network.setUserAgentOverride', {userAgent});
+      await withCdpSession(page, async client => {
+        await client.send('Network.setUserAgentOverride', {userAgent});
+      });
       response.setStructuredContent({
         success: true,
         message: 'User-Agent updated.',

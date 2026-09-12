@@ -138,6 +138,70 @@ describe('ProxyCli - Foundation & Tokenizer', () => {
     assert.match(outData, /Cleared/i);
   });
 
+  it('支持使用 mitmproxy 过滤表达式执行 ls', async () => {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    let outData = '';
+    output.on('data', chunk => {
+      outData += chunk.toString();
+    });
+
+    const module = new MitmModule();
+    const store = (
+      module as unknown as {store: {addRequest: (r: unknown) => void}}
+    ).store;
+
+    store.addRequest({
+      id: 1,
+      timestamp: Date.now(),
+      method: 'POST',
+      url: 'https://api.example.com/v1/login',
+      statusCode: 200,
+      requestHeaders: {'content-type': 'application/json'},
+      responseHeaders: {'content-type': 'application/json'},
+      durationMs: 45,
+    });
+    store.addRequest({
+      id: 2,
+      timestamp: Date.now(),
+      method: 'GET',
+      url: 'https://cdn.example.com/static/bundle.js',
+      statusCode: 200,
+      contentType: 'application/javascript',
+      isStatic: true,
+      requestHeaders: {'content-type': 'application/javascript'},
+      responseHeaders: {'content-type': 'application/javascript'},
+      durationMs: 12,
+    });
+
+    const cli = new ProxyCli(module, input, output);
+
+    // 1. 过滤 ~m POST & ~c 200
+    outData = '';
+    await cli.handleCommand('ls ~m POST & ~c 200');
+    assert.match(outData, /#1/);
+    assert.doesNotMatch(outData, /#2/);
+
+    // 2. 排除静态资源 !~a
+    outData = '';
+    await cli.handleCommand('ls !~a');
+    assert.match(outData, /#1/);
+    assert.doesNotMatch(outData, /#2/);
+
+    // 3. 仅静态资源 ~a
+    outData = '';
+    await cli.handleCommand('ls ~a');
+    assert.match(outData, /#2/);
+    assert.doesNotMatch(outData, /#1/);
+
+    // 4. help ls 显示流过滤语法提示
+    outData = '';
+    await cli.handleCommand('help ls');
+    assert.match(outData, /mitmproxy/i);
+    assert.match(outData, /~a/);
+    assert.match(outData, /~m/);
+  });
+
   it('tail 开关切换及 safeLog 在活跃提示符时正常刷新', async () => {
     const input = new PassThrough();
     const output = new PassThrough();
@@ -252,5 +316,47 @@ describe('ProxyCli - Foundation & Tokenizer', () => {
     const [hits3] = cli.completer('sysproxy ');
     assert.ok(hits3.includes('on'));
     assert.ok(hits3.includes('off'));
+
+    const [hits4] = cli.completer('up');
+    assert.ok(hits4.includes('upstream'));
+
+    const [hits5] = cli.completer('upstream ');
+    assert.ok(hits5.includes('set'));
+    assert.ok(hits5.includes('clear'));
+  });
+
+  it('支持 upstream 命令查看、设置与清除二级代理', async () => {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    let outData = '';
+    output.on('data', chunk => {
+      outData += chunk.toString();
+    });
+
+    const mockModule = new MitmModule();
+    const cli = new ProxyCli(mockModule, input, output);
+
+    // 1. 默认无二级代理
+    await cli.handleCommand('upstream');
+    assert.match(outData, /Current upstream proxy: None/);
+    outData = '';
+
+    // 2. 设置二级代理
+    await cli.handleCommand('upstream set http://127.0.0.1:7890');
+    assert.match(outData, /Upstream proxy set to: http:\/\/127\.0\.0\.1:7890/);
+    outData = '';
+
+    // 3. 查看当前配置
+    await cli.handleCommand('upstream');
+    assert.match(outData, /Current upstream proxy: http:\/\/127\.0\.0\.1:7890/);
+    outData = '';
+
+    // 4. 清除二级代理
+    await cli.handleCommand('upstream clear');
+    assert.match(outData, /Upstream proxy cleared/);
+    outData = '';
+
+    await cli.handleCommand('upstream');
+    assert.match(outData, /Current upstream proxy: None/);
   });
 });

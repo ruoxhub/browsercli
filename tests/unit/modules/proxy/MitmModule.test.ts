@@ -325,4 +325,50 @@ describe('MitmModule', () => {
       rmSync(dir, {recursive: true, force: true});
     }
   });
+
+  it('listRequests 支持 mitmproxy 流过滤表达式', () => {
+    const mod = new MitmModule();
+    mod.recordExchange(
+      makeExchange({
+        requestId: 'r1',
+        method: 'POST',
+        url: 'https://api.example.com/login',
+        statusCode: 200,
+      }),
+    );
+    mod.recordExchange(
+      makeExchange({
+        requestId: 'r2',
+        method: 'GET',
+        url: 'https://cdn.example.com/app.js',
+        statusCode: 200,
+        isStatic: true,
+        contentType: 'application/javascript',
+      }),
+    );
+
+    const rAll = mod.listRequests({});
+    assert.strictEqual(rAll.data.total, 2);
+
+    const rFilterPost = mod.listRequests({filter: '~m POST & ~c 200'});
+    assert.strictEqual(rFilterPost.data.total, 1);
+    assert.strictEqual(
+      rFilterPost.data.requests[0].url,
+      'https://api.example.com/login',
+    );
+
+    const rFilterNoAsset = mod.listRequests({filter: '!~a'});
+    assert.strictEqual(rFilterNoAsset.data.total, 1);
+    assert.strictEqual(
+      rFilterNoAsset.data.requests[0].url,
+      'https://api.example.com/login',
+    );
+
+    const rFilterAsset = mod.listRequests({filter: '~a'});
+    assert.strictEqual(rFilterAsset.data.total, 1);
+    assert.strictEqual(
+      rFilterAsset.data.requests[0].url,
+      'https://cdn.example.com/app.js',
+    );
+  });
 });

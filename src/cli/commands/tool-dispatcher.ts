@@ -234,12 +234,15 @@ export const toolDispatcherCommand: AxiCliCommand<WorkerContext> = async (
       return result as Record<string, unknown>;
     }
 
-    return successOutput({
-      command: 'call',
-      target: requestedName,
-      tool: candidate.name,
-      result,
-    });
+    return successOutput(
+      {
+        command: 'call',
+        target: requestedName,
+        tool: candidate.name,
+        result,
+      },
+      ctx.session,
+    );
   } catch (error) {
     if (error instanceof AxiError) throw error;
     throw new AxiError(

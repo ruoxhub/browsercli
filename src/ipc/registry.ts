@@ -64,8 +64,8 @@ export function computeWorkspaceDir(startDir: string): string {
 
 function computeBaseDaemonDir(): string {
   if (process.env.PROXYCLI_DAEMON_DIR) return process.env.PROXYCLI_DAEMON_DIR;
-  if (process.env.PROXYCLI_DAEMON_DIR)
-    return process.env.PROXYCLI_DAEMON_DIR;
+  if (process.env.BROWSERCLI_DAEMON_DIR)
+    return process.env.BROWSERCLI_DAEMON_DIR;
   let cache: string;
   if (process.platform === 'linux')
     cache = process.env.XDG_CACHE_HOME || path.join(os.homedir(), '.cache');
@@ -103,7 +103,7 @@ export function makePipePath(dirHash: string, sessionName: string): string {
 }
 
 export function explicitSessionName(name?: string): string | undefined {
-  return name || process.env.PROXYCLI_SESSION || process.env.PROXYCLI_SESSION;
+  return name || process.env.PROXYCLI_SESSION || process.env.BROWSERCLI_SESSION;
 }
 
 export function resolveSessionName(name?: string): string {

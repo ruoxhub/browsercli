@@ -64,15 +64,18 @@ export const listToolsCommand: AxiCliCommand<WorkerContext> = async (
   }
 
   if (json) {
-    return successOutput({
-      command: 'list-tools',
-      tools: tools.map(t => ({
-        name: t.name,
-        description: t.description,
-        signature: formatArgSignature(t.argSpecs),
-      })),
-      offline: false,
-    });
+    return successOutput(
+      {
+        command: 'list-tools',
+        tools: tools.map(t => ({
+          name: t.name,
+          description: t.description,
+          signature: formatArgSignature(t.argSpecs),
+        })),
+        offline: false,
+      },
+      ctx.session,
+    );
   }
 
   const headers = ['Name', 'Signature', 'Description'];
@@ -85,6 +88,7 @@ export const listToolsCommand: AxiCliCommand<WorkerContext> = async (
   return {
     ...tableOutput(headers, toolRows),
     command: 'list-tools',
+    session: ctx.session,
     total: toolRows.length,
   };
 };

@@ -6,10 +6,12 @@
 import assert from 'node:assert';
 import {mkdtempSync} from 'node:fs';
 import http, {type IncomingMessage} from 'node:http';
+import https from 'node:https';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import {describe, it} from 'node:test';
+import tls from 'node:tls';
 
 import {CaManager} from '../../../../src/modules/proxy/CaManager.js';
 import {normalizeHost} from '../../../../src/modules/proxy/hostFilter.js';
@@ -754,6 +756,182 @@ describe('MitmProxyServer', () => {
       assert.strictEqual(relayPort, 80, '转发的目标端口必须是 80');
     } finally {
       await proxy.stop();
+    }
+  });
+
+  it('HTTPS CONNECT 隧道内的 WSS upgrade 正确转发到目标并被捕获', async () => {
+    const ca = new CaManager(mkdtempSync(path.join(os.tmpdir(), 'mitm-ca-')));
+    await ca.init();
+
+    // 启动一个监听在动态端口的源站 WSS 服务器
+    let originUpgraded = false;
+    const originServer = https.createServer({
+      SNICallback: (_serverName, cb) => {
+        cb(null, ca.getSecureContextForHost('127.0.0.1'));
+      },
+    });
+    originServer.on('upgrade', (_req, socket) => {
+      originUpgraded = true;
+      socket.write(
+        'HTTP/1.1 101 Switching Protocols\r\n' +
+          'Upgrade: websocket\r\n' +
+          'Connection: Upgrade\r\n' +
+          '\r\n',
+      );
+    });
+
+    const originPort = await new Promise<number>((resolve, reject) => {
+      originServer.on('error', reject);
+      originServer.listen(0, '127.0.0.1', () => {
+        const addr = originServer.address();
+        resolve((addr as net.AddressInfo).port);
+      });
+    });
+
+    let captured: CapturedExchange | undefined;
+    const proxy = new MitmProxyServer(ca, exchange => {
+      captured = exchange;
+    });
+    await proxy.start(0);
+
+    try {
+      const result = await new Promise<{upgraded: boolean; response: string}>(
+        (resolve, reject) => {
+          const rawSocket = net.connect(proxy.getPort()!, '127.0.0.1', () => {
+            rawSocket.write(
+              `CONNECT 127.0.0.1:${originPort} HTTP/1.1\r\nHost: 127.0.0.1:${originPort}\r\n\r\n`,
+            );
+          });
+
+          rawSocket.once('data', d => {
+            const connectRes = d.toString('utf-8');
+            if (!connectRes.includes('200 Connection Established')) {
+              rawSocket.destroy();
+              reject(new Error(`CONNECT 失败: ${connectRes}`));
+              return;
+            }
+
+            const tlsClient = tls.connect({
+              socket: rawSocket,
+              rejectUnauthorized: false,
+            });
+
+            tlsClient.on('secureConnect', () => {
+              tlsClient.write(
+                'GET /ws-test HTTP/1.1\r\n' +
+                  `Host: 127.0.0.1:${originPort}\r\n` +
+                  'Upgrade: websocket\r\n' +
+                  'Connection: Upgrade\r\n' +
+                  'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n' +
+                  'Sec-WebSocket-Version: 13\r\n' +
+                  '\r\n',
+              );
+            });
+
+            let responseData = '';
+            tlsClient.on('data', chunk => {
+              responseData += chunk.toString('utf-8');
+              if (responseData.includes('101 Switching Protocols')) {
+                tlsClient.destroy();
+                resolve({upgraded: true, response: responseData});
+              }
+            });
+
+            tlsClient.on('error', err => {
+              reject(err);
+            });
+          });
+
+          rawSocket.on('error', reject);
+        },
+      );
+
+      assert.strictEqual(
+        result.upgraded,
+        true,
+        '客户端应收到 101 Switching Protocols',
+      );
+      assert.strictEqual(originUpgraded, true, '源站应收到 upgrade 请求');
+      assert.ok(captured, '应捕获 WebSocket 握手记录');
+      assert.strictEqual(captured.isWebSocket, true);
+      assert.strictEqual(captured.statusCode, 101);
+      assert.strictEqual(captured.url, `wss://127.0.0.1:${originPort}/ws-test`);
+    } finally {
+      await proxy.stop();
+      await new Promise<void>(r => originServer.close(() => r()));
+    }
+  });
+
+  it('明文 HTTP 代理模式下通过 Host 请求头的 WebSocket upgrade 正确转发到目标并被捕获', async () => {
+    const ca = new CaManager(mkdtempSync(path.join(os.tmpdir(), 'mitm-ca-')));
+    await ca.init();
+
+    let originUpgraded = false;
+    const originServer = http.createServer();
+    originServer.on('upgrade', (_req, socket) => {
+      originUpgraded = true;
+      socket.write(
+        'HTTP/1.1 101 Switching Protocols\r\n' +
+          'Upgrade: websocket\r\n' +
+          'Connection: Upgrade\r\n' +
+          '\r\n',
+      );
+    });
+
+    const originPort = await new Promise<number>((resolve, reject) => {
+      originServer.on('error', reject);
+      originServer.listen(0, '127.0.0.1', () => {
+        const addr = originServer.address();
+        resolve((addr as net.AddressInfo).port);
+      });
+    });
+
+    let captured: CapturedExchange | undefined;
+    const proxy = new MitmProxyServer(ca, exchange => {
+      captured = exchange;
+    });
+    await proxy.start(0);
+
+    try {
+      const result = await new Promise<{upgraded: boolean}>(
+        (resolve, reject) => {
+          const socket = net.connect(proxy.getPort()!, '127.0.0.1', () => {
+            socket.write(
+              'GET /plain-ws HTTP/1.1\r\n' +
+                `Host: 127.0.0.1:${originPort}\r\n` +
+                'Upgrade: websocket\r\n' +
+                'Connection: Upgrade\r\n' +
+                'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n' +
+                'Sec-WebSocket-Version: 13\r\n' +
+                '\r\n',
+            );
+          });
+
+          let buf = '';
+          socket.on('data', chunk => {
+            buf += chunk.toString('utf-8');
+            if (buf.includes('101 Switching Protocols')) {
+              socket.destroy();
+              resolve({upgraded: true});
+            }
+          });
+          socket.on('error', reject);
+        },
+      );
+
+      assert.strictEqual(
+        result.upgraded,
+        true,
+        '客户端应收到 101 Switching Protocols',
+      );
+      assert.strictEqual(originUpgraded, true, '源站应收到 upgrade 请求');
+      assert.ok(captured, '应捕获 WebSocket 握手记录');
+      assert.strictEqual(captured.isWebSocket, true);
+      assert.strictEqual(captured.statusCode, 101);
+      assert.strictEqual(captured.url, `ws://127.0.0.1:${originPort}/plain-ws`);
+    } finally {
+      await proxy.stop();
+      await new Promise<void>(r => originServer.close(() => r()));
     }
   });
 });

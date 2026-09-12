@@ -29,13 +29,6 @@ import type {CaManager} from './CaManager.js';
 import type {ProcessConnectionTracker} from './ProcessConnectionTracker.js';
 import {matchesProcessName} from './processMatch.js';
 import {applyHeaderChanges} from './rewrite.js';
-import {
-  connectSocks5,
-  createSocks5HttpConnector,
-  createSocks5HttpsConnector,
-  parseSocks5Url,
-  type Socks5Config,
-} from './socks5.js';
 import type {
   AfterResponseResult,
   BeforeRequestResult,
@@ -44,6 +37,15 @@ import type {
   LocalAppsConfig,
   MitmInterceptor,
 } from './types.js';
+import {
+  connectUpstream,
+  createUpstreamHttpConnector,
+  createUpstreamHttpsConnector,
+  formatUpstreamProxy,
+  normalizeUpstreamProxy,
+  shouldBypassUpstream,
+  type UpstreamProxyConfig,
+} from './upstream.js';
 
 function parseRawHeaders(raw: string): Record<string, string> {
   const headers: Record<string, string> = {};
@@ -125,23 +127,27 @@ export class MitmProxyServer {
   private server: http.Server | null = null;
   private port: number | null = null;
   private readonly connections = new Set<net.Socket>();
-  private readonly upstreamSocks5: Socks5Config | null = null;
-  private readonly upstreamProxyUrl: string | null = null;
+  private upstreamConfig: UpstreamProxyConfig | null = null;
+  private upstreamProxyUrl: string | null = null;
 
   constructor(
     private readonly caManager: CaManager,
     private readonly onCaptured: (exchange: CapturedExchange) => void,
     private readonly interceptor?: MitmInterceptor,
     private readonly shouldBypass?: (hostname: string) => boolean,
-    upstreamProxy?: string,
+    upstreamProxy?: string | UpstreamProxyConfig,
     private readonly processTracker?: ProcessConnectionTracker,
     private readonly localAppsConfigProvider?: () => LocalAppsConfig,
   ) {
     if (upstreamProxy) {
-      this.upstreamSocks5 = parseSocks5Url(upstreamProxy);
-      this.upstreamProxyUrl = upstreamProxy;
+      this.setUpstreamProxy(upstreamProxy);
     }
   }
+
+  private readonly socketProcessMap = new WeakMap<
+    net.Socket,
+    {clientProcess?: ClientProcessMeta; bypass: boolean}
+  >();
 
   async start(port: number): Promise<void> {
     if (this.server) return;
@@ -150,7 +156,7 @@ export class MitmProxyServer {
       this.handleHttpRequest(req, res);
     });
     this.server.on('connect', (req, clientSocket, head) => {
-      this.handleConnect(req, clientSocket as net.Socket, head);
+      void this.handleConnect(req, clientSocket as net.Socket, head);
     });
     this.server.on('upgrade', (req, socket, head) => {
       this.handleWsUpgrade(req, socket as net.Socket, head, false);
@@ -199,30 +205,77 @@ export class MitmProxyServer {
     return this.port;
   }
 
+  setUpstreamProxy(upstreamProxy?: string | UpstreamProxyConfig | null): void {
+    if (!upstreamProxy) {
+      this.upstreamConfig = null;
+      this.upstreamProxyUrl = null;
+      return;
+    }
+    this.upstreamConfig = normalizeUpstreamProxy(upstreamProxy);
+    this.upstreamProxyUrl =
+      typeof upstreamProxy === 'string'
+        ? upstreamProxy
+        : formatUpstreamProxy(this.upstreamConfig);
+  }
+
   getUpstreamProxy(): string | null {
     return this.upstreamProxyUrl;
   }
 
+  getUpstreamConfig(): UpstreamProxyConfig | null {
+    return this.upstreamConfig;
+  }
+
   /**
-   * 进程分流判定（spec §3.3）。纯内存同步，无子进程开销。
+   * 进程分流判定（对标 mitmproxy Local Applications 机制）。
    * bypass=true 时调用方走 relayDirectConnect；clientProcess 供 capture 注入。
    */
-  private resolveClientProcess(remotePort: number | undefined): {
+  private async resolveClientProcess(
+    remotePort: number | undefined,
+    socket?: net.Socket,
+  ): Promise<{
     clientProcess?: ClientProcessMeta;
     bypass: boolean;
-  } {
+  }> {
+    if (socket && this.socketProcessMap.has(socket)) {
+      return this.socketProcessMap.get(socket)!;
+    }
+
     const config = this.localAppsConfigProvider?.();
-    if (!config?.enabled) return {bypass: false};
-    const clientProcess = remotePort
-      ? (this.processTracker?.getProcessByPortSync(remotePort) ?? undefined)
-      : undefined;
+    if (!config?.enabled) {
+      const res = {bypass: false};
+      if (socket) this.socketProcessMap.set(socket, res);
+      return res;
+    }
+
+    let clientProcess: ClientProcessMeta | undefined = undefined;
+    if (remotePort) {
+      const syncMeta = this.processTracker?.getProcessByPortSync(remotePort);
+      if (syncMeta) {
+        clientProcess = syncMeta;
+      } else if (this.processTracker) {
+        if (typeof this.processTracker.getProcessByPort === 'function') {
+          clientProcess =
+            (await this.processTracker.getProcessByPort(remotePort)) ??
+            undefined;
+        }
+      }
+    }
+
     if (config.targets.length > 0) {
       const isTarget =
         clientProcess != null &&
         config.targets.some(t => matchesProcessName(t, clientProcess.name));
-      if (!isTarget) return {clientProcess, bypass: true};
+      const res = isTarget
+        ? {clientProcess, bypass: false}
+        : {clientProcess, bypass: true};
+      if (socket) this.socketProcessMap.set(socket, res);
+      return res;
     }
-    return {clientProcess, bypass: false};
+
+    const res = {clientProcess, bypass: false};
+    if (socket) this.socketProcessMap.set(socket, res);
+    return res;
   }
 
   // ── HTTP（非 CONNECT）──
@@ -237,12 +290,13 @@ export class MitmProxyServer {
       clientRes.end('Bad Request');
       return;
     }
-    const localApps = this.resolveClientProcess(clientReq.socket.remotePort);
+    const localAppsPromise = this.resolveClientProcess(
+      clientReq.socket.remotePort,
+      clientReq.socket,
+    );
     const startTime = Date.now();
     const requestId = `proxy-${randomUUID()}`;
     const parsed = url.parse(targetUrl);
-    const shouldRecord =
-      !localApps.bypass && this.shouldBypass?.(parsed.hostname ?? '') !== true;
     const reqBodyChunks: Buffer[] = [];
     let reqBodySize = 0;
 
@@ -251,74 +305,91 @@ export class MitmProxyServer {
       reqBodySize += chunk.length;
     });
 
-    clientReq.on('end', () => {
-      const flow: RequestFlow = {
-        method: clientReq.method || 'GET',
-        url: targetUrl,
-        headers: this.headersToRecord(clientReq.headers),
-        body: Buffer.concat(reqBodyChunks),
-      };
-      delete flow.headers['proxy-connection'];
+    clientReq.on('end', async () => {
+      try {
+        const localApps = await localAppsPromise;
+        const shouldRecord =
+          !localApps.bypass &&
+          this.shouldBypass?.(parsed.hostname ?? '') !== true;
+        const flow: RequestFlow = {
+          method: clientReq.method || 'GET',
+          url: targetUrl,
+          headers: this.headersToRecord(clientReq.headers),
+          body: Buffer.concat(reqBodyChunks),
+        };
+        delete flow.headers['proxy-connection'];
 
-      const before = this.interceptor?.beforeRequest?.(flow);
-      if (
-        before &&
-        this.handleBeforeRequest(
-          before,
-          requestId,
-          startTime,
-          flow,
-          clientRes,
-          shouldRecord,
-          localApps.clientProcess,
-        )
-      ) {
-        return;
-      }
-      if (before && before.action === 'forward') {
-        this.applyRequestModification(before, parsed, flow);
-      }
+        const before = this.interceptor?.beforeRequest?.(flow);
+        if (
+          before &&
+          this.handleBeforeRequest(
+            before,
+            requestId,
+            startTime,
+            flow,
+            clientRes,
+            shouldRecord,
+            localApps.clientProcess,
+          )
+        ) {
+          return;
+        }
+        if (before && before.action === 'forward') {
+          this.applyRequestModification(before, parsed, flow);
+        }
 
-      const options: http.RequestOptions = {
-        hostname: parsed.hostname ?? 'localhost',
-        port: parseInt(parsed.port ?? '80', 10),
-        path: parsed.path ?? '/',
-        method: flow.method,
-        headers: flow.headers,
-      };
+        const options: http.RequestOptions = {
+          hostname: parsed.hostname ?? 'localhost',
+          port: parseInt(parsed.port ?? '80', 10),
+          path: parsed.path ?? '/',
+          method: flow.method,
+          headers: flow.headers,
+        };
 
-      if (this.upstreamSocks5) {
-        options.createConnection = createSocks5HttpConnector(
-          this.upstreamSocks5,
-          80,
-        );
-      }
+        const targetHost = parsed.hostname ?? 'localhost';
+        const useUpstream =
+          this.upstreamConfig !== null &&
+          !shouldBypassUpstream(targetHost, this.upstreamConfig.bypassHosts);
 
-      const proxyReq = http.request(options, proxyRes => {
-        this.relayResponse(
-          requestId,
-          startTime,
-          flow,
-          before && before.action === 'forward'
-            ? before.appliedRuleIds
-            : undefined,
-          proxyRes,
-          clientRes,
-          shouldRecord,
-          localApps.clientProcess,
-        );
-      });
+        if (useUpstream && this.upstreamConfig) {
+          options.createConnection = createUpstreamHttpConnector(
+            this.upstreamConfig,
+            80,
+          );
+        }
 
-      proxyReq.on('error', (err: Error) => {
-        logger.warn('[MitmProxy] HTTP proxy error:', err.message);
+        const proxyReq = http.request(options, proxyRes => {
+          this.relayResponse(
+            requestId,
+            startTime,
+            flow,
+            before && before.action === 'forward'
+              ? before.appliedRuleIds
+              : undefined,
+            proxyRes,
+            clientRes,
+            shouldRecord,
+            localApps.clientProcess,
+          );
+        });
+
+        proxyReq.on('error', (err: Error) => {
+          logger.warn('[MitmProxy] HTTP proxy error:', err.message);
+          if (!clientRes.headersSent) {
+            clientRes.writeHead(502);
+            clientRes.end('Bad Gateway');
+          }
+        });
+
+        if (flow.body.length > 0) proxyReq.write(flow.body);
+        proxyReq.end();
+      } catch (err) {
+        logger.warn('[MitmProxy] handleHttpRequest error:', err);
         if (!clientRes.headersSent) {
           clientRes.writeHead(502);
           clientRes.end('Bad Gateway');
         }
-      });
-
-      if (flow.body.length > 0) proxyReq.write(flow.body);
-      proxyReq.end();
+      }
     });
   }
 
@@ -329,13 +400,40 @@ export class MitmProxyServer {
     clientSocket: net.Socket,
     head: Buffer,
     isTls: boolean,
+    targetHostname?: string,
+    targetPort?: number,
+    clientProcess?: ClientProcessMeta,
   ): void {
     const startTime = Date.now();
     const requestId = `proxy-${randomUUID()}`;
     const targetUrl = clientReq.url || '/';
     const parsed = url.parse(targetUrl);
-    const hostname = parsed.hostname || 'localhost';
-    const port = parseInt(parsed.port || (isTls ? '443' : '80'), 10);
+
+    let hostname = targetHostname;
+    let port = targetPort;
+
+    if (!hostname) {
+      if (parsed.hostname) {
+        hostname = parsed.hostname;
+        port = parsed.port ? parseInt(parsed.port, 10) : (isTls ? 443 : 80);
+      } else if (clientReq.headers.host) {
+        const hostAuth = parseConnectAuthority(clientReq.headers.host);
+        if (hostAuth) {
+          hostname = hostAuth.hostname;
+          const hasExplicitPort =
+            clientReq.headers.host.includes(':') &&
+            !(
+              clientReq.headers.host.startsWith('[') &&
+              clientReq.headers.host.endsWith(']')
+            );
+          port = hasExplicitPort ? hostAuth.port : (isTls ? 443 : 80);
+        }
+      }
+    }
+
+    hostname = hostname || 'localhost';
+    port = port || (isTls ? 443 : 80);
+
     const scheme = isTls ? 'wss' : 'ws';
     const fullUrl = targetUrl.startsWith('ws')
       ? targetUrl
@@ -396,6 +494,7 @@ export class MitmProxyServer {
             truncated: false,
             timestamp: startTime,
             modified: false,
+            clientProcess,
           });
         }
       };
@@ -413,8 +512,12 @@ export class MitmProxyServer {
       connectAndTunnel(serverSocket);
     };
 
-    if (this.upstreamSocks5) {
-      connectSocks5(this.upstreamSocks5, {host: hostname, port})
+    const useUpstream =
+      this.upstreamConfig !== null &&
+      !shouldBypassUpstream(hostname, this.upstreamConfig.bypassHosts);
+
+    if (useUpstream && this.upstreamConfig) {
+      connectUpstream(this.upstreamConfig, {host: hostname, port})
         .then(rawSocket => {
           if (isTls) {
             const servername = net.isIP(hostname) ? undefined : hostname;
@@ -439,7 +542,7 @@ export class MitmProxyServer {
         })
         .catch(err => {
           logger.warn(
-            `[MitmProxy] WS upstream SOCKS5 connect error for ${hostname}:`,
+            `[MitmProxy] WS upstream connect error for ${hostname}:`,
             err.message,
           );
           clientSocket.destroy();
@@ -478,71 +581,82 @@ export class MitmProxyServer {
 
   // ── HTTPS CONNECT 拦截 ──
 
-  private handleConnect(
+  private async handleConnect(
     req: http.IncomingMessage,
     clientSocket: net.Socket,
     head: Buffer,
-  ): void {
-    const authority = parseConnectAuthority(req.url || '');
-    if (!authority) {
-      clientSocket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
-      return;
-    }
-    const {hostname, port} = authority;
+  ): Promise<void> {
+    try {
+      const authority = parseConnectAuthority(req.url || '');
+      if (!authority) {
+        clientSocket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
+        return;
+      }
+      const {hostname, port} = authority;
 
-    const localApps = this.resolveClientProcess(clientSocket.remotePort);
-    if (localApps.bypass) {
-      this.relayDirectConnect(hostname, port, clientSocket, head);
-      return;
-    }
-
-    // 旁路（spec §3.1）：不解密不签证书，纯传输层双向 pipe。
-    if (this.shouldBypass?.(hostname) === true) {
-      this.relayDirectConnect(hostname, port, clientSocket, head);
-      return;
-    }
-
-    // 80 端口为明文 HTTP 隧道（如 Android tun2socks/Postern 转发的明文流量），走传输层盲转发，不包装 TLS
-    if (port === 80) {
-      this.relayDirectConnect(hostname, port, clientSocket, head);
-      return;
-    }
-
-    clientSocket.write('HTTP/1.1 200 Connection Established\r\n\r\n');
-
-    const secureContext = this.caManager.getSecureContextForHost(hostname);
-    const tlsSocket = new tls.TLSSocket(clientSocket, {
-      isServer: true,
-      secureContext,
-    });
-
-    if (head.length > 0) tlsSocket.unshift(head);
-
-    const miniServer = http.createServer((decryptedReq, decryptedRes) => {
-      this.handleDecryptedRequest(
-        hostname,
-        port,
-        decryptedReq,
-        decryptedRes,
-        localApps.clientProcess,
+      const localApps = await this.resolveClientProcess(
+        clientSocket.remotePort,
+        clientSocket,
       );
-    });
-    miniServer.on('upgrade', (upgradeReq, upgradeSocket, upgradeHead) => {
-      this.handleWsUpgrade(
-        upgradeReq,
-        upgradeSocket as net.Socket,
-        upgradeHead,
-        true,
-      );
-    });
-    // SAFETY: TLSSocket extends net.Socket and fulfills the net.Socket interface for miniServer connection handling.
-    miniServer.emit('connection', tlsSocket as unknown as net.Socket);
+      if (localApps.bypass) {
+        this.relayDirectConnect(hostname, port, clientSocket, head);
+        return;
+      }
 
-    tlsSocket.on('error', (err: Error) => {
-      logger.warn(`[MitmProxy] TLS error for ${hostname}:`, err.message);
+      // 旁路（spec §3.1）：不解密不签证书，纯传输层双向 pipe。
+      if (this.shouldBypass?.(hostname) === true) {
+        this.relayDirectConnect(hostname, port, clientSocket, head);
+        return;
+      }
+
+      // 80 端口为明文 HTTP 隧道（如 Android tun2socks/Postern 转发的明文流量），走传输层盲转发，不包装 TLS
+      if (port === 80) {
+        this.relayDirectConnect(hostname, port, clientSocket, head);
+        return;
+      }
+
+      clientSocket.write('HTTP/1.1 200 Connection Established\r\n\r\n');
+
+      const secureContext = this.caManager.getSecureContextForHost(hostname);
+      const tlsSocket = new tls.TLSSocket(clientSocket, {
+        isServer: true,
+        secureContext,
+      });
+
+      if (head.length > 0) tlsSocket.unshift(head);
+
+      const miniServer = http.createServer((decryptedReq, decryptedRes) => {
+        this.handleDecryptedRequest(
+          hostname,
+          port,
+          decryptedReq,
+          decryptedRes,
+          localApps.clientProcess,
+        );
+      });
+      miniServer.on('upgrade', (upgradeReq, upgradeSocket, upgradeHead) => {
+        this.handleWsUpgrade(
+          upgradeReq,
+          upgradeSocket as net.Socket,
+          upgradeHead,
+          true,
+          hostname,
+          port,
+          localApps.clientProcess,
+        );
+      });
+      // SAFETY: TLSSocket extends net.Socket and fulfills the net.Socket interface for miniServer connection handling.
+      miniServer.emit('connection', tlsSocket as unknown as net.Socket);
+
+      tlsSocket.on('error', (err: Error) => {
+        logger.warn(`[MitmProxy] TLS error for ${hostname}:`, err.message);
+        clientSocket.destroy();
+      });
+      clientSocket.on('error', () => tlsSocket.destroy());
+    } catch (err) {
+      logger.warn('[MitmProxy] handleConnect error:', err);
       clientSocket.destroy();
-    });
-    clientSocket.on('error', () => tlsSocket.destroy());
+    }
   }
 
   /** 纯传输层盲转发（原 hostname-bypass 分支提取，spec §3.3）。含上游 SOCKS5 分支。 */
@@ -552,8 +666,12 @@ export class MitmProxyServer {
     clientSocket: net.Socket,
     head: Buffer,
   ): void {
-    if (this.upstreamSocks5) {
-      connectSocks5(this.upstreamSocks5, {host: hostname, port})
+    const useUpstream =
+      this.upstreamConfig !== null &&
+      !shouldBypassUpstream(hostname, this.upstreamConfig.bypassHosts);
+
+    if (useUpstream && this.upstreamConfig) {
+      connectUpstream(this.upstreamConfig, {host: hostname, port})
         .then(tunnel => {
           clientSocket.write('HTTP/1.1 200 Connection Established\r\n\r\n');
           if (head.length > 0) tunnel.write(head);
@@ -566,7 +684,7 @@ export class MitmProxyServer {
         })
         .catch(err => {
           logger.warn(
-            `[MitmProxy] Bypass SOCKS5 connect error for ${hostname}:`,
+            `[MitmProxy] Bypass upstream connect error for ${hostname}:`,
             err.message,
           );
           clientSocket.destroy();
@@ -646,9 +764,13 @@ export class MitmProxyServer {
         rejectUnauthorized: false,
       };
 
-      if (this.upstreamSocks5) {
-        options.createConnection = createSocks5HttpsConnector(
-          this.upstreamSocks5,
+      const useUpstream =
+        this.upstreamConfig !== null &&
+        !shouldBypassUpstream(targetHost, this.upstreamConfig.bypassHosts);
+
+      if (useUpstream && this.upstreamConfig) {
+        options.createConnection = createUpstreamHttpsConnector(
+          this.upstreamConfig,
           targetHost,
           targetPort,
         );

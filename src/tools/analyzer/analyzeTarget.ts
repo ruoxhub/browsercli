@@ -37,7 +37,6 @@ import type {
 const DEFAULT_TOP_N = 8;
 const COLLECT_TIMEOUT_MS = 30_000;
 const UNDERSTAND_TIMEOUT_MS = 180_000;
-const DEOBFUSCATION_CODE_LIMIT = 120_000;
 const ANALYSIS_CODE_LIMIT = 300_000;
 const DEFAULT_CORRELATION_WINDOW_MS = 1500;
 const DEFAULT_MAX_CORRELATED_FLOWS = 20;
@@ -56,7 +55,6 @@ export interface AnalyzeTargetParams {
   url: string;
   topN?: number;
   useAI?: boolean;
-  runDeobfuscation?: boolean;
   hookPreset?: HookPreset;
   autoInjectHooks?: boolean;
   waitAfterHookMs?: number;
@@ -224,7 +222,6 @@ export const analyze_target = defineTool({
     url: zod.string().url(),
     topN: zod.number().int().positive().optional(),
     useAI: zod.boolean().optional(),
-    runDeobfuscation: zod.boolean().optional(),
     hookPreset: zod.enum(['none', 'api-signature', 'network-core']).optional(),
     autoInjectHooks: zod.boolean().optional(),
     waitAfterHookMs: zod.number().int().nonnegative().optional(),
@@ -326,14 +323,6 @@ export const analyze_target = defineTool({
     });
     const understand = understandResult.data;
 
-    const deobfuscation = params.runDeobfuscation
-      ? await runtime.deobfuscator.deobfuscate({
-          code: analysisCode.slice(0, DEOBFUSCATION_CODE_LIMIT),
-          aggressive: true,
-          renameVariables: true,
-        })
-      : undefined;
-
     const hookRecords = injectedHooks.map(hook => ({
       hookId: hook.hookId,
       records: runtime.hookManager.getRecords(hook.hookId) as Array<
@@ -382,13 +371,7 @@ export const analyze_target = defineTool({
         securityRiskCount: understand.securityRisks?.length ?? 0,
         cryptoAlgorithms: crypto.algorithms.map(item => item.name),
       },
-      deobfuscation: deobfuscation
-        ? {
-            confidence: deobfuscation.confidence,
-            readabilityScore: deobfuscation.readabilityScore,
-            transformations: deobfuscation.transformations.length,
-          }
-        : null,
+      deobfuscation: null,
       hooks: {
         preset: hookPreset,
         autoInjected: autoInjectHooks,

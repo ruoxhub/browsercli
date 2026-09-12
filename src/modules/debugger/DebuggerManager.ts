@@ -287,7 +287,11 @@ export class DebuggerManager {
         // Ignore errors during cleanup
       }
 
-      await session.send('Debugger.disable');
+      try {
+        await session.send('Debugger.disable');
+      } catch {
+        // Ignore errors during cleanup
+      }
     } catch (error) {
       logger.error('Failed to disable debugger:', error);
     } finally {
@@ -300,8 +304,8 @@ export class DebuggerManager {
 
       try {
         await session.detach();
-      } catch (e) {
-        logger.warn('Failed to detach CDP session:', e);
+      } catch {
+        // Ignore detach errors when page or session is already closed
       }
       this.cdpSession = null;
 

@@ -167,6 +167,24 @@ export class ToolContextProvider {
     return this._browserContext.isBrowserConnected();
   }
 
+  async ensureConnectedBrowser(): Promise<Browser | null> {
+    const browser = await this._browserContext.ensureConnectedBrowser();
+    if (browser) {
+      const context = this._browserContext.getContext();
+      if (context) {
+        this._collectorContext.start(context);
+      }
+      if (!this._browserContext.getSelectedPage()) {
+        const mgr = this._browserContext.getBrowserManager();
+        const currentPage = mgr?.getCurrentPage();
+        if (currentPage && !currentPage.isClosed()) {
+          this._browserContext.setSelectedPage(currentPage);
+        }
+      }
+    }
+    return browser;
+  }
+
   async isCollectorRunning(): Promise<boolean> {
     return this._browserContext.getContext() !== null;
   }
@@ -283,10 +301,6 @@ export class ToolContextProvider {
     const activePage = page ?? this._browserContext.getSelectedPage();
     if (!activePage) return;
     await this._debuggerContext.dispose(activePage);
-  }
-
-  get deobfuscator() {
-    return this._serviceLocator.getDeobfuscator();
   }
 
   get analyzer() {

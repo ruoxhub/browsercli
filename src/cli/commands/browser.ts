@@ -206,9 +206,10 @@ function renderBrowserStatus(
   action: 'connect' | 'disconnect' | 'status',
   state: BrowserConnectionStatus,
   json: boolean,
+  session?: string,
 ) {
   const result = {command: 'browser', action, ...state};
-  if (json) return successOutput(result);
+  if (json) return successOutput(result, session);
   return {
     ...tableOutput(
       ['Property', 'Value'],
@@ -218,6 +219,7 @@ function renderBrowserStatus(
         ['Pages', String(state.pages)],
       ],
     ),
+    ...(session !== undefined ? {session} : {}),
     ...result,
   };
 }
@@ -265,7 +267,7 @@ export const browserCommand: AxiCliCommand<WorkerContext> = async (
                 : {body: {force} satisfies BrowserDisconnectOptions},
             )
           : await client.request<BrowserConnectionStatus>('browser.status');
-    return renderBrowserStatus(typedAction, state, json);
+    return renderBrowserStatus(typedAction, state, json, ctx?.session);
   } catch (error) {
     throw toAxiError(error, 'BROWSER_ERROR');
   } finally {

@@ -25,6 +25,8 @@ description: 使用 Babel AST 对 JavaScript 做分层、可回退的定向反�
 
 ## 入口脚本
 
+- `scripts/deobfuscate.js`
+  自包含一体化反混淆脚本。整合了通用解包（Packer / AAEncode / URLEncode）、十六进制/Unicode 字符串解码、字符串数组沙箱求值内联、AST 常量折叠与逻辑化简、虚假分支消除以及 while-switch 控制流拍平。支持单文件直接 CLI 执行（`node scripts/deobfuscate.js <input.js> [output.js]`）或模块导入。
 - `scripts/detect-patterns.js`
   根据文件路径、可选 hint 和源码症状判断最可能命中的站点或混淆家族。
 - `scripts/run-pipeline.js`
@@ -33,6 +35,24 @@ description: 使用 Babel AST 对 JavaScript 做分层、可回退的定向反�
   统计仍未解开的症状，例如 `split('|')`、直接 `loop/switch` 平坦化、opcode `if` 链、dispatcher wrapper 和 `_0x` 标识符。
 - `scripts/decode-obfuscator-pass.js`
   安全移植 decodeObfuscator 的字面量、常量、循环块和对象预处理；不执行输入源码，也不启用基于文本特征的删代码逻辑。
+- `scripts/strip-invisible-unicode.js`
+  零宽不可见字符（Zero-width Unicode）隐写解码、清理以及 `String.fromCharCode` / `atob` 常量表达式折叠。
+- `scripts/detect-obfuscator-types.js`
+  综合混淆特征探测器，识别 JavaScript-Obfuscator、JSFuck、Packer、AAEncode、控制流平坦化、VM 保护及站点防护类型。
+- `scripts/prune-opaque-predicates.js`
+  消除数学与代数不透明谓词（数值比较、`x * 0 === 0`、`x - x === 0` 等恒等式），清理不可达死代码分支。
+- `scripts/sandbox-evaluator.js`
+  受控隔离的 Node.js `vm` 沙箱求值基础设施，支持前置 Prelude 语句自动执行与最小浏览器环境 Mock。
+- `scripts/fold-wrappers.js`
+  识别并就地折叠局部 Dispatcher 对象、二元/逻辑运算代理函数及多层嵌套包装器。
+- `scripts/babelpack-enhancer-pass.js`
+  BabelPack 深度增强流水线，包含 `keyToLiteral`、声明拆分、分散属性归并、反调试代码清理与 `callExpressToLiteral` 沙箱动态求值。
+- `scripts/unpack-webcrack.js`
+  集成 Webcrack 与 AST 兜底方案，对 Webpack / Browserify 等巨型 Bundle 进行自动化模块拆解、切分与落盘。
+- `scripts/deobfuscate-vm-protection.js`
+  虚拟机保护（VM Protection）结构识别、指令计数、组件提取与逆向分析报告生成。
+- `scripts/deobfuscate-jsvmp.js`
+  JSVMP 虚拟机专项反混淆分析，涵盖字节码数组、操作数栈、寄存器环境与 Dispatch 循环逆向。
 - `scripts/compare-with-reference.js`
   将最新流水线输出与 `decode.js` 对比，汇总剩余差距。
 
@@ -43,6 +63,16 @@ description: 使用 Babel AST 对 JavaScript 做分层、可回退的定向反�
 - 任何逻辑想放进通用脚本前，先读 `references/safe-rewrite-rules.md`。
 - 处理字符串表、解码 stub、最小运行时求值时，读 `references/string-array-and-minimal-eval.md`。
 - 需要理解 decodeObfuscator 兼容能力和 `eval` 安全边界时，读 `references/decode-obfuscator.md`。
+- 深入 BabelPack AST 变换与动态求值时，读 `references/babelpack-enhancer.md`。
+- 零宽字符与特殊编码清洗时，读 `references/invisible-unicode.md`。
+- 混淆家族与加固手段全面特征检测时，读 `references/obfuscation-detector.md`。
+- 处理数学、代数恒等式与死分支时，读 `references/opaque-predicates.md`。
+- 使用安全隔离沙箱求值前置环境时，读 `references/sandbox-evaluator.md`。
+- 处理对象 Dispatcher 与复杂代理函数折叠时，读 `references/wrapper-folder.md`。
+- 进行 Webpack/Browserify 模块打包器拆包时，读 `references/webcrack-bundle-unpack.md`。
+- 分析商业 VM 保护与解释循环时，读 `references/vm-protection.md`。
+- 深度逆向与还原 JSVMP 虚拟机时，读 `references/jsvmp-deobfuscation.md`。
+- 运用 LLM 大模型辅助代码清洗、语义命名推导、VM 结构分析与思维链去虚拟化时，读 `references/llm-deobfuscation-prompts.md`。
 - 处理控制流平坦化、opcode 分发器和 VM 类 handler 时，读 `references/control-flow-and-opcode-patterns.md`。
 - 处理逗号表达式、IIFE、语句提升时，读 `references/sequence-normalization.md`。
 - 检测器命中后，只读取对应的一份站点规则文档：

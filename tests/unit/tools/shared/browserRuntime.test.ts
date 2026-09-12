@@ -9,10 +9,14 @@ import {describe, it} from 'node:test';
 
 import {withDebuggerTrapBypass} from '../../../../src/tools/shared/browserRuntime.js';
 
-function debuggerContext(reason: string, calls: string[]) {
+function debuggerContext(
+  reason: string,
+  calls: string[],
+  hitBreakpoints: string[] = [],
+) {
   return {
     getExistingDebuggerContext: () => ({
-      getPausedState: () => ({reason, hitBreakpoints: []}),
+      getPausedState: () => ({reason, hitBreakpoints}),
       getClient: () => ({
         send: async (method: string, params?: Record<string, unknown>) => {
           calls.push(`${method}:${JSON.stringify(params)}`);
@@ -47,11 +51,30 @@ describe('withDebuggerTrapBypass', () => {
   it('leaves ordinary breakpoint pauses untouched', async () => {
     const calls: string[] = [];
 
+    await withDebuggerTrapBypass(
+      debuggerContext('other', calls, ['bp:1']),
+      async () => {
+        calls.push('action');
+      },
+    );
+
+    assert.deepEqual(calls, ['action']);
+  });
+
+  it('skips an eval-ed debugger statement reported as reason other', async () => {
+    // Chrome 对 eval 里的 debugger 语句报 'other' 且不带命中断点, 与真断点命中区分开
+    const calls: string[] = [];
+
     await withDebuggerTrapBypass(debuggerContext('other', calls), async () => {
       calls.push('action');
     });
 
-    assert.deepEqual(calls, ['action']);
+    assert.deepEqual(calls, [
+      'Debugger.setSkipAllPauses:{"skip":true}',
+      'resume',
+      'action',
+      'Debugger.setSkipAllPauses:{"skip":false}',
+    ]);
   });
 
   it('restores pauses when the guarded operation fails', async () => {

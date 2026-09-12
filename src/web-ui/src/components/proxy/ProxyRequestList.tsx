@@ -4,9 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import {Globe, Inbox} from 'lucide-react';
-import React, {memo, useEffect, useMemo, useRef} from 'react';
+import React, {memo, useEffect, useMemo, useRef, useState} from 'react';
 
-import type {SessionRequestSummaryEvent} from '../../lib/protocol';
+import type {
+  SessionRequestDetail,
+  SessionRequestSummaryEvent,
+} from '../../lib/protocol';
+import {api} from '../../lib/api';
+import {compileFlowFilter} from '../../lib/flowFilter';
 import {useProxyStore} from '../../stores/proxy';
 import {parseClientProcess} from './clientProcess';
 
@@ -178,6 +183,29 @@ const RequestRow = memo(function RequestRow({
   );
 });
 
+function shouldIncludeRequest(
+  req: SessionRequestSummaryEvent,
+  filterFn: ((flow: SessionRequestSummaryEvent) => boolean) | null,
+  serverFilteredIds: Set<string> | null,
+  detailsCache: Record<string, SessionRequestDetail>,
+  selectedId: string | null,
+  selectedDetail: SessionRequestDetail | null,
+): boolean {
+  if (!filterFn) return true;
+
+  if (serverFilteredIds !== null) {
+    if (serverFilteredIds.has(req.id)) return true;
+    const detail =
+      detailsCache[req.id] || (selectedId === req.id ? selectedDetail : null);
+    return Boolean(detail && filterFn({...req, ...detail}));
+  }
+
+  const detail =
+    detailsCache[req.id] || (selectedId === req.id ? selectedDetail : null);
+  const flow = detail ? {...req, ...detail} : req;
+  return filterFn(flow);
+}
+
 export const ProxyRequestList: React.FC<ProxyRequestListProps> = ({
   onSelect,
 }) => {
@@ -185,6 +213,9 @@ export const ProxyRequestList: React.FC<ProxyRequestListProps> = ({
   // 「任何一次 requests/status/filter 喷发都全量重渲染」。
   const requests = useProxyStore(s => s.requests);
   const selectedId = useProxyStore(s => s.selectedId);
+  const selectedDetail = useProxyStore(s => s.selectedDetail);
+  const detailsCache = useProxyStore(s => s.detailsCache);
+  const addBatch = useProxyStore(s => s.addBatch);
   const autoScroll = useProxyStore(s => s.autoScroll);
   const filter = useProxyStore(s => s.filter);
   // 双源开关：展示哪些 source 由后端开关决定（CDP 开关 + MITM 运行态）。
@@ -196,10 +227,57 @@ export const ProxyRequestList: React.FC<ProxyRequestListProps> = ({
   const selectAllVisible = useProxyStore(s => s.selectAllVisible);
   const clearSelection = useProxyStore(s => s.clearSelection);
 
+  const [serverFilteredIds, setServerFilteredIds] =
+    useState<Set<string> | null>(null);
+
   const listContainerRef = useRef<HTMLDivElement>(null);
+
+  // 当搜索关键词变化时，防抖向服务端发起深度过滤检索（确保 ~b/~bs/~h 等深层字段能全库命中）
+  useEffect(() => {
+    const query = filter.search.trim();
+    if (!query) {
+      setServerFilteredIds(null);
+      return;
+    }
+
+    let active = true;
+    const timer = setTimeout(async () => {
+      try {
+        const sources: string[] = [];
+        if (cdpEnabled) sources.push('cdp');
+        if (mitmRunning) sources.push('proxy');
+        const res = await api.getSessionRequests({
+          filter: query,
+          sources: sources.length > 0 ? sources.join(',') : undefined,
+          limit: 1000,
+        });
+        if (active && res?.items) {
+          // 若有尚未灌入本地 store 的历史匹配项，补充合并
+          const currentStore = useProxyStore.getState().requests;
+          const currentIds = new Set(currentStore.map(r => r.id));
+          const missing = res.items.filter(r => !currentIds.has(r.id));
+          if (missing.length > 0) {
+            addBatch(missing);
+          }
+          setServerFilteredIds(new Set(res.items.map(r => r.id)));
+        }
+      } catch (err) {
+        console.error('流过滤服务端搜索失败:', err);
+      }
+    }, 200);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [filter.search, cdpEnabled, mitmRunning, addBatch]);
 
   // Filter requests based on enabled sources, method and search text
   const filteredRequests = useMemo(() => {
+    const filterFn = filter.search
+      ? compileFlowFilter(filter.search, {fallbackFuzzy: true})
+      : null;
+
     return requests.filter(req => {
       // 双源开关：未被开启的 source 不展示（源自后端开关，非临时显示过滤）。
       if (req.source === 'cdp' && !cdpEnabled) return false;
@@ -210,18 +288,25 @@ export const ProxyRequestList: React.FC<ProxyRequestListProps> = ({
       ) {
         return false;
       }
-      if (filter.search) {
-        const query = filter.search.toLowerCase();
-        const matchesUrl = req.url.toLowerCase().includes(query);
-        const matchesMethod = req.method.toLowerCase().includes(query);
-        const matchesStatus = String(req.statusCode).includes(query);
-        if (!matchesUrl && !matchesMethod && !matchesStatus) {
-          return false;
-        }
-      }
-      return true;
+      return shouldIncludeRequest(
+        req,
+        filterFn,
+        serverFilteredIds,
+        detailsCache,
+        selectedId,
+        selectedDetail,
+      );
     });
-  }, [requests, filter, cdpEnabled, mitmRunning]);
+  }, [
+    requests,
+    filter,
+    cdpEnabled,
+    mitmRunning,
+    serverFilteredIds,
+    detailsCache,
+    selectedId,
+    selectedDetail,
+  ]);
 
   // 预计算每行展示的派生字符串：Date 格式化与 content-type 归一化搬到
   // 渲染前一次完成，行组件拿到的都是标量，render 阶段零额外计算。

@@ -17,8 +17,6 @@ export type {BrowserManagerConfig, Channel} from './browser.js';
 
 export {PlaywrightDevToolsConnection as PuppeteerDevToolsConnection} from './DevToolsConnectionAdapter.js';
 
-export {SessionManager} from './SessionManager.js';
-
 export {HARMFUL_ARGS, DEFAULT_ARGS, STEALTH_ARGS} from './stealth-args.js';
 
 export {mapCDPError, isCDPSessionGone, wrapCDPCall} from './CDPErrorMapper.js';

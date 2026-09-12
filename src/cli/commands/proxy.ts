@@ -12,10 +12,7 @@ import {getBoolFlag, parseArgs} from '../args-parser.js';
 import {successOutput} from '../output.js';
 import type {WorkerContext} from '../types.js';
 
-export const proxyCommand: AxiCliCommand<WorkerContext> = async (
-  args,
-  _ctx,
-) => {
+export const proxyCommand: AxiCliCommand<WorkerContext> = async (args, ctx) => {
   const parsed = parseArgs(args);
   const sub = parsed.positionals[0]?.toLowerCase();
 
@@ -24,16 +21,20 @@ export const proxyCommand: AxiCliCommand<WorkerContext> = async (
   if (sub === 'status') {
     const st = mitmModule.status().data;
     if (getBoolFlag(parsed, 'json')) {
-      return successOutput({
-        command: 'proxy status',
-        proxyStatus: st,
-        exitCode: 0,
-      });
+      return successOutput(
+        {
+          command: 'proxy status',
+          proxyStatus: st,
+          exitCode: 0,
+        },
+        ctx?.session,
+      );
     }
     const cli = new ProxyCli(mitmModule);
     cli.handleStatus();
     return {
       command: 'proxy status',
+      ...(ctx?.session !== undefined ? {session: ctx.session} : {}),
       exitCode: 0,
     };
   }

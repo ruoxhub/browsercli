@@ -8,6 +8,7 @@
  */
 import {readFileSync} from 'node:fs';
 
+import {matchesFlowFilter} from './flowFilter.js';
 import type {
   AfterResponseResult,
   BeforeRequestResult,
@@ -62,6 +63,9 @@ export function matchesPredicate(
   p: RequestPredicate,
   view: RequestPredicateView,
 ): boolean {
+  if (p.filter && !matchesFlowFilter(view, p.filter)) {
+    return false;
+  }
   if (p.method && view.method.toUpperCase() !== p.method.toUpperCase()) {
     return false;
   }

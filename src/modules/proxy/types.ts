@@ -195,11 +195,14 @@ export interface MitmRewriteRule {
   host?: string;
   headerContains?: {name: string; value: string};
   bodyContains?: string;
+  /** mitmproxy 风格的流过滤表达式（如 "~m POST & ~c 200"）。 */
+  filter?: string;
 }
 
 // ─── 过滤谓词（list_mitm_requests 与规则匹配共用）────────────────────────────
 
 export interface RequestPredicate {
+  filter?: string;
   urlFilter?: string;
   urlRegex?: string;
   method?: string;
@@ -209,11 +212,32 @@ export interface RequestPredicate {
   bodyContains?: string;
 }
 
+// ─── 二级外部代理配置 ────────────────────────────────
+
+export type UpstreamProxyProtocol =
+  | 'http'
+  | 'https'
+  | 'socks5'
+  | 'socks5h'
+  | 'socks';
+
+export interface UpstreamProxyConfig {
+  protocol: UpstreamProxyProtocol;
+  host: string;
+  port: number;
+  username?: string;
+  password?: string;
+  /** 可选：不走二级代理的目标主机列表（支持通配符如 *.local, .corp.net 等） */
+  bypassHosts?: string[];
+  /** 连接超时时间（毫秒，默认 15000） */
+  timeoutMs?: number;
+}
+
 // ─── 工具参数与结果类型 ──────────────────────────────
 
 export interface StartMitmProxyParams {
   port?: number;
-  upstreamProxy?: string;
+  upstreamProxy?: string | UpstreamProxyConfig;
 }
 
 export interface StartMitmProxyData {
@@ -233,6 +257,8 @@ export interface MitmProxyStatusData {
 export interface ListMitmRequestsParams {
   pageSize?: number;
   pageIdx?: number;
+  /** mitmproxy 风格的流过滤表达式（如 "~m POST & ~c 200"、"!~a ~d example.com"）。 */
+  filter?: string;
   urlFilter?: string;
   method?: string;
   statusCode?: number;

@@ -70,11 +70,22 @@ export const listPages = defineTool({
           : null;
 
       if (pageInfos.length === 0) {
+        const isConnected =
+          typeof context.isBrowserConnected === 'function'
+            ? context.isBrowserConnected()
+            : true;
         response.setStructuredContent({
           success: true,
-          message: '当前没有打开的页面。',
+          message: isConnected
+            ? '当前没有打开的页面。'
+            : '当前没有打开的页面（浏览器连接已丢失或未连接，可使用 "proxycli browser connect" 重新连接）。',
           tooltype: 'list_pages',
-          data: {pageInfos: [], selectedIndex, selectedPageId},
+          data: {
+            pageInfos: [],
+            selectedIndex,
+            selectedPageId,
+            browserConnected: isConnected,
+          },
         });
         return;
       }

@@ -14,7 +14,7 @@ import {logger} from '../../utils/logger.js';
 /**
  * TCP 端口探测（避免触发 Chrome 安全弹窗）
  */
-function checkPort(port: number): Promise<boolean> {
+export function checkPort(port: number): Promise<boolean> {
   return new Promise(resolve => {
     const socket = net.createConnection(port, '127.0.0.1');
     const timer = setTimeout(() => {

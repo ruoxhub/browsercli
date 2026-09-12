@@ -73,11 +73,20 @@ export class ProcessConnectionTracker {
   private timer: ReturnType<typeof setInterval> | null = null;
   private consecutiveFailures = 0;
   private lastRefreshAt = 0;
+  private inFlightRefresh: Promise<void> | null = null;
 
   constructor(private readonly runCommand: RunCommand = defaultRunCommand) {}
 
-  /** 拉全量连接表重建端口索引（spec §3.2 后台刷新模型）。 */
+  /** 拉全量连接表重建端口索引（spec §3.2 后台刷新模型），并发调用合并为单次执行。 */
   async refresh(): Promise<void> {
+    if (this.inFlightRefresh) return this.inFlightRefresh;
+    this.inFlightRefresh = this.doRefresh().finally(() => {
+      this.inFlightRefresh = null;
+    });
+    return this.inFlightRefresh;
+  }
+
+  private async doRefresh(): Promise<void> {
     try {
       const out = await this.runCommand('netstat', ['-ano', '-p', 'tcp']);
       const now = Date.now();
@@ -167,6 +176,23 @@ export class ProcessConnectionTracker {
       return {pid: entry.pid, name: cached.info.name, path: cached.info.path};
     }
     return {pid: entry.pid, name: `pid-${entry.pid}`};
+  }
+
+  /**
+   * 异步按端口查询进程（对标 mitmproxy windows.py: 遇到未命中端口主动 refresh 溯源）。
+   * 优先查内存；未命中时主动触发 refresh()，并保留短暂重试以兼容内核 TCP 表落表延迟。
+   */
+  async getProcessByPort(port: number): Promise<ClientProcessMeta | null> {
+    const cached = this.getProcessByPortSync(port);
+    if (cached) return cached;
+
+    await this.refresh();
+    const afterRefresh = this.getProcessByPortSync(port);
+    if (afterRefresh) return afterRefresh;
+
+    await new Promise(resolve => setTimeout(resolve, 30));
+    await this.refresh();
+    return this.getProcessByPortSync(port);
   }
 
   async listActiveNetworkProcesses(selfPid?: number): Promise<ProcessInfo[]> {

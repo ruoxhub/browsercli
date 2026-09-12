@@ -80,7 +80,7 @@ export function buildDaemonArgPlan(argv: readonly string[]): DaemonPlan {
     session:
       session ||
       process.env.PROXYCLI_SESSION ||
-      process.env.PROXYCLI_SESSION ||
+      process.env.BROWSERCLI_SESSION ||
       'default',
     noConsole,
     minimalStealth,

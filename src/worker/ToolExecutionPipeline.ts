@@ -186,6 +186,17 @@ export class ToolExecutionPipeline {
     signal?: AbortSignal,
   ): Promise<unknown> {
     return await this.activityCoordinator.runTool(async () => {
+      if (
+        this.contextProvider &&
+        typeof this.contextProvider.isBrowserConnected === 'function' &&
+        !this.contextProvider.isBrowserConnected()
+      ) {
+        if (typeof this.contextProvider.ensureConnectedBrowser === 'function') {
+          await this.contextProvider
+            .ensureConnectedBrowser()
+            .catch(() => undefined);
+        }
+      }
       const startedAt = Date.now();
       const traceId = this.generateTraceId(startedAt);
       const toolName = meta.name;

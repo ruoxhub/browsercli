@@ -16,13 +16,11 @@ import type {
   SecurityIssue,
   CryptoStrength,
 } from '../../modules/crypto/CryptoDetectorEnhanced.js';
-import type {Deobfuscator} from '../../modules/deobfuscator/Deobfuscator.js';
 import type {HookManager} from '../../modules/hook/HookManager.js';
 import type {Frame} from '../../third_party/index.js';
 import type {
   CryptoAlgorithm,
   CryptoLibrary,
-  DeobfuscateResult,
   UnderstandCodeResult as UnderstandCodeResultType,
 } from '../../types/index.js';
 import type {MessagesResult} from '../shared/types.js';
@@ -147,7 +145,6 @@ export interface AnalyzeTargetResult extends AnalyzerDataResult<AnalyzeTargetDat
 }
 
 export interface AnalyzerRuntimeServices {
-  deobfuscator: Deobfuscator;
   analyzer: CodeAnalyzer;
   summarizer: AISummarizer;
   cryptoDetector: CryptoDetector;
@@ -189,10 +186,6 @@ export interface SummarizeProjectData {
   technologies: string[];
   securityConcerns: string[];
   recommendations: string[];
-}
-
-export interface DeobfuscateCodeResult extends AnalyzerDataResult<DeobfuscateResult> {
-  tooltype: 'deobfuscate';
 }
 
 export interface UnderstandCodeFnResult extends AnalyzerDataResult<UnderstandCodeResultType> {

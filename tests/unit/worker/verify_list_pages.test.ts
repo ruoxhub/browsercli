@@ -42,4 +42,40 @@ describe('listPages tool local verification', () => {
     assert.strictEqual(structured.data.pageInfos.length, 0);
     assert.strictEqual(structured.data.selectedPageId, null);
   });
+
+  it('reports normal empty message when browser is connected but has no pages', async () => {
+    const provider = new ToolContextProvider();
+    const fakeBrowser = {
+      isConnected: () => true,
+      once: () => undefined,
+    };
+    const fakeContext = {
+      pages: () => [],
+      on: () => undefined,
+      off: () => undefined,
+    };
+    provider.setBrowser(fakeBrowser as never);
+    provider.setContext(fakeContext as never);
+
+    const factory = new DefineToolContextFactory(provider);
+    const context = factory.create();
+    const response = new ToolResponseAccumulator();
+
+    await listPages.handler({params: {}}, response, context);
+    const result = response.toJSON();
+
+    assert.ok(result.structuredContent);
+    const structured = result.structuredContent as {
+      success: boolean;
+      message: string;
+      data: {
+        browserConnected?: boolean;
+        pageInfos: unknown[];
+      };
+    };
+    assert.strictEqual(structured.success, true);
+    assert.strictEqual(structured.message, '当前没有打开的页面。');
+    assert.strictEqual(structured.data.browserConnected, true);
+    assert.strictEqual(structured.data.pageInfos.length, 0);
+  });
 });

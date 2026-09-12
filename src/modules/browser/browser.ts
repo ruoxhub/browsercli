@@ -224,8 +224,12 @@ export class BrowserManager {
   private stealthInjected = false;
   private crashCheckInterval?: NodeJS.Timeout;
   private isRestarting = false;
+  private wasConnected = false;
   private detachedFrameGuard?: (error: Error) => void;
   private launchPromise: Promise<Browser> | null = null;
+
+  public onDisconnected?: () => void;
+  public onReconnected?: (browser: Browser, context?: BrowserContext) => void;
 
   private constructor(config: BrowserManagerConfig) {
     const remoteDebuggingUrl = config.remoteDebuggingUrl;
@@ -378,6 +382,9 @@ export class BrowserManager {
       if (this.config.useStealthScripts) {
         await this.injectStealth();
       }
+
+      this.wasConnected = true;
+      this.onReconnected?.(this.browser, this.context);
 
       return this.browser;
     } catch (error) {
@@ -776,6 +783,9 @@ export class BrowserManager {
         this.stealthInjected = true;
       }
 
+      this.wasConnected = true;
+      this.onReconnected?.(this.browser, this.context);
+
       return this.browser;
     } catch (error) {
       const wrapped = wrapAlreadyRunningError(error, userDataDir);
@@ -797,13 +807,32 @@ export class BrowserManager {
 
     this.browser.on('disconnected', () => {
       logger.debug('Browser closed');
-      if (!this.isRestarting) {
+      this.browser = undefined;
+      this.context = undefined;
+      this.currentPage = null;
+      this.onDisconnected?.();
+      if (this.wasConnected && !this.isRestarting) {
         void this.handleBrowserCrash();
       }
     });
 
-    this.crashCheckInterval = setInterval(() => {
-      if (this.browser && !this.browser.isConnected() && !this.isRestarting) {
+    this.crashCheckInterval = setInterval(async () => {
+      if (
+        !this.isRestarting &&
+        this.wasConnected &&
+        (!this.browser || !this.browser.isConnected())
+      ) {
+        const isRemote = Boolean(
+          this.config.browserURL ||
+          this.config.wsEndpoint ||
+          this.config.remoteDebuggingUrl,
+        );
+        if (isRemote) {
+          const endpoint = await this.resolveConnectEndpoint().catch(
+            () => undefined,
+          );
+          if (!endpoint) return;
+        }
         logger.debug('Browser connection lost, attempting restart');
         void this.handleBrowserCrash();
       }
@@ -811,7 +840,7 @@ export class BrowserManager {
   }
 
   private async handleBrowserCrash(): Promise<void> {
-    if (this.isRestarting || !this.browser) return;
+    if (this.isRestarting || !this.wasConnected) return;
 
     this.isRestarting = true;
     logger.debug('Attempting to restart browser after crash');
@@ -826,10 +855,14 @@ export class BrowserManager {
         this.browser = undefined;
         this.context = undefined;
       }
+      this.currentPage = null;
 
       await new Promise(resolve => setTimeout(resolve, 1000));
-      await this.ensureBrowser();
+      const browser = await this.ensureBrowser();
       logger.debug('Browser restarted successfully');
+      if (browser.isConnected()) {
+        this.onReconnected?.(browser, this.context);
+      }
     } catch (error) {
       logger.debug('Failed to restart browser:', error);
     } finally {
@@ -974,6 +1007,7 @@ export class BrowserManager {
   }
 
   async close(): Promise<void> {
+    this.wasConnected = false;
     if (this.crashCheckInterval) {
       clearInterval(this.crashCheckInterval);
       this.crashCheckInterval = undefined;

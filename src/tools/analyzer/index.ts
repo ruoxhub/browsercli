@@ -34,7 +34,6 @@ export {
 } from './analysisExecution.js';
 
 // MCP Tools (defined with defineTool)
-export {deobfuscateCode} from './deobfuscate.js';
 export {understandCode} from './understand.js';
 export {summarizeCode} from './summarize.js';
 export {detectCrypto} from './detectCrypto.js';
@@ -57,7 +56,6 @@ export type {
   CollectedFileEntry,
   AnalyzeTargetData,
   AnalyzeTargetResult,
-  DeobfuscateCodeResult,
   UnderstandCodeFnResult,
   SummarizeFileResult,
   SummarizeBatchResult,

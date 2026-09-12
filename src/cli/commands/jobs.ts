@@ -46,6 +46,7 @@ function renderJobs(
   action: 'list' | 'cancel',
   jobs: JobStatus[],
   json: boolean,
+  session?: string,
 ) {
   if (json) {
     const job = jobs[0];
@@ -59,6 +60,7 @@ function renderJobs(
             jobStatus: job?.status,
             job,
           },
+      session,
     );
   }
   return {
@@ -66,6 +68,7 @@ function renderJobs(
       ['Job', 'Tool', 'Status', 'Created', 'Finished'],
       jobRows(jobs),
     ),
+    ...(session !== undefined ? {session} : {}),
     command: 'jobs',
     action,
     jobs,
@@ -90,12 +93,12 @@ export const jobsCommand: AxiCliCommand<WorkerContext> = async (args, ctx) => {
   try {
     if (action === 'list') {
       const {jobs} = await client.request<{jobs: JobStatus[]}>('jobs.list');
-      return renderJobs('list', jobs, json);
+      return renderJobs('list', jobs, json, ctx?.session);
     }
     const job = await client.request<JobStatus>('jobs.cancel', {
       jobId: parsed.positionals[1],
     });
-    return renderJobs('cancel', [job], json);
+    return renderJobs('cancel', [job], json, ctx?.session);
   } catch (error) {
     throw toAxiError(error, 'JOB_ERROR');
   } finally {

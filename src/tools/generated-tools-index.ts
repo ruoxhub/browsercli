@@ -70,10 +70,6 @@ export const GENERATED_DOMAIN_MANIFESTS = [
 
 export const GENERATED_TOOL_REGISTRY = [
   {
-    modulePath: './analyzer/deobfuscate.js',
-    handlerName: 'deobfuscateCode',
-  },
-  {
     modulePath: './analyzer/understand.js',
     handlerName: 'understandCode',
   },

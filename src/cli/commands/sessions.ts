@@ -159,7 +159,13 @@ export const killAllCommand: AxiCliCommand<WorkerContext> = async (
   for (const cfg of await listSessions(daemonDir)) {
     await deleteSession(daemonDir, cfg.name);
   }
-  return successOutput({command: 'kill-all', killed: pids});
+  return successOutput(
+    {
+      command: 'kill-all',
+      killed: pids,
+    },
+    ctx?.session,
+  );
 };
 
 export const sessionCommands: Record<string, AxiCliCommand<WorkerContext>> = {

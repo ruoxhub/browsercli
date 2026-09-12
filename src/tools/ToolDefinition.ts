@@ -18,6 +18,7 @@ import type {
 } from '../modules/network/NetworkTypes.js';
 import {zod} from '../third_party/index.js';
 import type {
+  Browser,
   BrowserContext,
   Dialog,
   Frame,
@@ -137,6 +138,8 @@ export type Context = Readonly<{
   bringPageToFront(page: Page): Promise<void>;
   syncPageContext(page: Page): void;
   getPages(): Page[];
+  isBrowserConnected?(): boolean;
+  ensureConnectedBrowser?(): Promise<Browser | null>;
   getSelectedFrame(): Frame;
   selectFrame(frame: Frame): void;
   resetSelectedFrame(): void;

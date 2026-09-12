@@ -12,6 +12,7 @@
 
 import type {Page} from '../../third_party/index.js';
 import {logger} from '../../utils/logger.js';
+import {withCdpSession} from '../browser/cdpUtils.js';
 
 import type {
   ClickOptions,
@@ -50,8 +51,6 @@ export async function clickAt(
   tag: string;
   text: string;
 }> {
-  const client = await page.context().newCDPSession(page);
-
   // 获取元素坐标
   const coords = await page.evaluate(sel => {
     const el = document.querySelector(sel);
@@ -66,22 +65,24 @@ export async function clickAt(
     };
   }, selector);
 
-  // 发送真实鼠标按下事件
-  await client.send('Input.dispatchMouseEvent', {
-    type: 'mousePressed',
-    x: coords.x,
-    y: coords.y,
-    button: 'left',
-    clickCount: 1,
-  });
+  await withCdpSession(page, async client => {
+    // 发送真实鼠标按下事件
+    await client.send('Input.dispatchMouseEvent', {
+      type: 'mousePressed',
+      x: coords.x,
+      y: coords.y,
+      button: 'left',
+      clickCount: 1,
+    });
 
-  // 发送真实鼠标释放事件
-  await client.send('Input.dispatchMouseEvent', {
-    type: 'mouseReleased',
-    x: coords.x,
-    y: coords.y,
-    button: 'left',
-    clickCount: 1,
+    // 发送真实鼠标释放事件
+    await client.send('Input.dispatchMouseEvent', {
+      type: 'mouseReleased',
+      x: coords.x,
+      y: coords.y,
+      button: 'left',
+      clickCount: 1,
+    });
   });
 
   logger.info(`Real mouse click at: ${selector} (${coords.x}, ${coords.y})`);
@@ -100,28 +101,28 @@ export async function setFiles(
   success: boolean;
   files: number;
 }> {
-  const client = await page.context().newCDPSession(page);
+  await withCdpSession(page, async client => {
+    // 启用 DOM 域
+    await client.send('DOM.enable', {});
 
-  // 启用 DOM 域
-  await client.send('DOM.enable', {});
+    // 获取文档根节点
+    const doc = await client.send('DOM.getDocument', {});
 
-  // 获取文档根节点
-  const doc = await client.send('DOM.getDocument', {});
+    // 查找目标元素
+    const node = await client.send('DOM.querySelector', {
+      nodeId: doc.root.nodeId,
+      selector,
+    });
 
-  // 查找目标元素
-  const node = await client.send('DOM.querySelector', {
-    nodeId: doc.root.nodeId,
-    selector,
-  });
+    if (!node.nodeId) {
+      throw new Error(`Element not found: ${selector}`);
+    }
 
-  if (!node.nodeId) {
-    throw new Error(`Element not found: ${selector}`);
-  }
-
-  // 设置文件
-  await client.send('DOM.setFileInputFiles', {
-    nodeId: node.nodeId,
-    files: filePaths,
+    // 设置文件
+    await client.send('DOM.setFileInputFiles', {
+      nodeId: node.nodeId,
+      files: filePaths,
+    });
   });
 
   logger.info(`Set ${filePaths.length} file(s) to ${selector}`);

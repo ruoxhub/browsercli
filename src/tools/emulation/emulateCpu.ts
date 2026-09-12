@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {withCdpSession} from '../../modules/browser/cdpUtils.js';
 import {zod} from '../../third_party/index.js';
 import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
@@ -30,14 +31,15 @@ export const emulateCpu = defineTool({
     const page = frame.page();
 
     try {
-      const client = await page.context().newCDPSession(page);
-      await (
-        client.send as (
-          method: string,
-          params?: Record<string, unknown>,
-        ) => Promise<Record<string, unknown>>
-      )('Emulation.setCPUThrottlingRate', {
-        rate: throttlingRate,
+      await withCdpSession(page, async client => {
+        await (
+          client.send as (
+            method: string,
+            params?: Record<string, unknown>,
+          ) => Promise<Record<string, unknown>>
+        )('Emulation.setCPUThrottlingRate', {
+          rate: throttlingRate,
+        });
       });
       response.setStructuredContent({
         success: true,

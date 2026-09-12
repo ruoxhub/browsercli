@@ -71,8 +71,8 @@ test('does not mutate non-context-sensitive tools without repeat loops', () => {
     throw new Error('provider should not be called');
   });
 
-  guard.recordCall('deobfuscateCode');
+  guard.recordCall('understandCode');
   const response = {structuredContent: {ok: true}};
 
-  assert.equal(guard.enrichResponse('deobfuscateCode', response), response);
+  assert.equal(guard.enrichResponse('understandCode', response), response);
 });

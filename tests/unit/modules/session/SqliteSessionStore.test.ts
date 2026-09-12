@@ -249,6 +249,72 @@ describe('SqliteSessionStore', () => {
     }
   });
 
+  it('filters requests and summaries using flowFilter expressions', () => {
+    const {store, manager} = makeStore();
+    try {
+      store.createSession({id: 's1', name: 'demo'});
+
+      // 构造两行数据：一行响应体包含 Postgres，另一行包含 MySQL
+      const row1 = makeRequestRow(
+        's1-1',
+        's1',
+        1,
+        'https://api.bilibili.com/x/web-interface/view',
+      );
+      row1.responseBody = JSON.stringify({
+        data: {
+          title: '为什么PostgreSQL能超越MySQL',
+          desc: '为什么Postgres能超越Mysql登顶最受欢迎的数据库',
+        },
+      });
+      row1.method = 'GET';
+      row1.statusCode = 200;
+      store.appendRequest(row1);
+
+      const row2 = makeRequestRow(
+        's1-2',
+        's1',
+        2,
+        'https://api.bilibili.com/x/player/v2',
+      );
+      row2.responseBody = JSON.stringify({
+        data: {
+          title: 'Redis 进阶课程',
+          desc: '内存数据库深度解析',
+        },
+      });
+      row2.method = 'POST';
+      row2.statusCode = 200;
+      store.appendRequest(row2);
+
+      // 1. 测试 ~bs Postgres (响应正文匹配)
+      const bsMatch = store.listRequestSummaries('s1', {
+        filter: '~bs Postgres',
+      });
+      assert.strictEqual(bsMatch.length, 1);
+      assert.strictEqual(bsMatch[0]?.id, 's1-1');
+
+      // 2. 测试 getRequests 带 filter 的口径对齐
+      const getMatch = store.getRequests('s1', {filter: '~bs Postgres'});
+      assert.strictEqual(getMatch.length, 1);
+      assert.strictEqual(getMatch[0]?.id, 's1-1');
+
+      // 3. 测试复合流过滤 ~m POST & ~c 200
+      const postMatch = store.listRequestSummaries('s1', {
+        filter: '~m POST & ~c 200',
+      });
+      assert.strictEqual(postMatch.length, 1);
+      assert.strictEqual(postMatch[0]?.id, 's1-2');
+
+      // 4. 测试排除匹配 !~bs Redis
+      const notRedis = store.listRequestSummaries('s1', {filter: '!~bs Redis'});
+      assert.strictEqual(notRedis.length, 1);
+      assert.strictEqual(notRedis[0]?.id, 's1-1');
+    } finally {
+      manager.close();
+    }
+  });
+
   it('trims to the newest keepLast rows and is a no-op below quota', () => {
     const {store, manager} = makeStore();
     try {

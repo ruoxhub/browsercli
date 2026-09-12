@@ -25,6 +25,7 @@ export interface ProxyState {
   requests: SessionRequestSummaryEvent[];
   selectedId: string | null;
   selectedDetail: SessionRequestDetail | null;
+  detailsCache: Record<string, SessionRequestDetail>;
   detailLoading: boolean;
   status: ProxyStatusPayload | null;
   autoScroll: boolean;
@@ -64,6 +65,7 @@ export const useProxyStore = create<ProxyState>((set, get) => ({
   requests: [],
   selectedId: null,
   selectedDetail: null,
+  detailsCache: {},
   detailLoading: false,
   status: null,
   autoScroll: true,
@@ -144,6 +146,7 @@ export const useProxyStore = create<ProxyState>((set, get) => ({
       selectedId: null,
       selectedDetail: null,
       selectedIds: [],
+      detailsCache: {},
     }),
 
   toggleSelect: id =>
@@ -172,11 +175,21 @@ export const useProxyStore = create<ProxyState>((set, get) => ({
       return;
     }
 
+    const cached = get().detailsCache[id];
+    if (cached) {
+      set({selectedId: id, selectedDetail: cached, detailLoading: false});
+      return;
+    }
+
     set({selectedId: id, detailLoading: true});
     try {
       const detail = await api.getSessionRequestDetail(id);
       if (get().selectedId === id) {
-        set({selectedDetail: detail, detailLoading: false});
+        set(state => ({
+          selectedDetail: detail,
+          detailLoading: false,
+          detailsCache: {...state.detailsCache, [id]: detail},
+        }));
       }
     } catch {
       if (get().selectedId === id) {

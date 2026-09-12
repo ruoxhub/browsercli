@@ -123,4 +123,5 @@ export type AiReportInput = Omit<AiReportRow, 'id' | 'createdAt'> & {
 export interface RequestFilter {
   sources?: CaptureSource[];
   urlFilter?: string;
+  filter?: string;
 }

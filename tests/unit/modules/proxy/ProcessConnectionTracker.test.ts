@@ -117,4 +117,38 @@ describe('ProcessConnectionTracker', () => {
     assert.ok(!pids.includes(8940), '应排除代理自身 pid');
     assert.strictEqual(pids.filter(p => p === 14220).length, 1, 'pid 去重');
   });
+
+  it('getProcessByPort 未在同步缓存中时主动触发 refresh 溯源', async () => {
+    const {tracker, calls} = makeTracker([NETSTAT_SAMPLE]);
+    // 初始状态未刷新，端口 54321 尚未在内存
+    assert.strictEqual(tracker.getProcessByPortSync(54321), null);
+    assert.strictEqual(calls.length, 0);
+
+    const meta = await tracker.getProcessByPort(54321);
+    assert.deepStrictEqual(meta, {
+      pid: 14220,
+      name: 'WeChat.exe',
+      path: undefined,
+    });
+    assert.ok(calls.length > 0, '未命中时必须主动触发命令刷新');
+  });
+
+  it('refresh 并发调用时自动合并（单飞 promise coalescing）', async () => {
+    let netstatCount = 0;
+    const tracker = new ProcessConnectionTracker(async cmd => {
+      if (cmd === 'netstat') {
+        netstatCount += 1;
+        await new Promise(r => setTimeout(r, 10));
+        return NETSTAT_SAMPLE;
+      }
+      return TASKLIST_WECHAT;
+    });
+
+    await Promise.all([
+      tracker.refresh(),
+      tracker.refresh(),
+      tracker.refresh(),
+    ]);
+    assert.strictEqual(netstatCount, 1, '多次并发调用应合并为 1 次底层执行');
+  });
 });

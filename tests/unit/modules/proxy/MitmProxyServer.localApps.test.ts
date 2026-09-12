@@ -17,9 +17,16 @@ import type {ProcessConnectionTracker} from '../../../../src/modules/proxy/Proce
 import type {CapturedExchange} from '../../../../src/modules/proxy/types.js';
 
 /** 端口 → 进程 映射完全可控的 mock tracker。 */
-function makeTracker(mapping: Record<number, {pid: number; name: string}>) {
+function makeTracker(
+  mapping: Record<number, {pid: number; name: string}>,
+  asyncMapping?: (port: number) => Promise<{pid: number; name: string} | null>,
+) {
   return {
     getProcessByPortSync: (port: number) => mapping[port] ?? null,
+    getProcessByPort: async (port: number) => {
+      if (asyncMapping) return asyncMapping(port);
+      return mapping[port] ?? null;
+    },
   } as unknown as ProcessConnectionTracker;
 }
 
@@ -303,6 +310,112 @@ describe('MitmProxyServer local-apps 分流', () => {
     } finally {
       await proxy.stop();
       socksServer.close();
+      await origin.close();
+    }
+  });
+
+  it('目标应用首次建立 HTTP 请求时，即便未在同步缓存中，通过异步 getProcessByPort 主动溯源仍可命中并记录抓包', async () => {
+    const origin = await startOrigin();
+    const captured: CapturedExchange[] = [];
+    const ca = new CaManager(mkdtempSync(path.join(os.tmpdir(), 'mitm-ca-')));
+    await ca.init();
+    const tracker = makeTracker(
+      {}, // 同步缓存未命中（为空）
+      async () => ({pid: 9999, name: 'TRAE_SOLO_CN.exe'}), // 异步主动溯源命中
+    );
+    const proxy = new MitmProxyServer(
+      ca,
+      e => captured.push(e),
+      undefined,
+      undefined,
+      undefined,
+      tracker,
+      () => ({
+        enabled: true,
+        targets: ['TRAE_SOLO_CN.exe'],
+        systemProxyActive: true,
+      }),
+    );
+    await proxy.start(0);
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const req = http.request(
+          {
+            host: '127.0.0.1',
+            port: proxy.getPort()!,
+            path: `http://127.0.0.1:${origin.port}/test`,
+            method: 'GET',
+            headers: {host: `127.0.0.1:${origin.port}`},
+          },
+          res => {
+            res.resume();
+            res.on('end', () => resolve());
+          },
+        );
+        req.on('error', reject);
+        req.end();
+      });
+      assert.strictEqual(captured.length, 1, '目标应用必须被抓包记录');
+      assert.strictEqual(captured[0]?.clientProcess?.name, 'TRAE_SOLO_CN.exe');
+      assert.strictEqual(captured[0]?.clientProcess?.pid, 9999);
+    } finally {
+      await proxy.stop();
+      await origin.close();
+    }
+  });
+
+  it('目标应用建立 CONNECT 时，即便未在同步缓存中，通过异步 getProcessByPort 主动溯源仍放行解密而非盲转发', async () => {
+    const origin = await startOrigin();
+    const captured: CapturedExchange[] = [];
+    const ca = new CaManager(mkdtempSync(path.join(os.tmpdir(), 'mitm-ca-')));
+    await ca.init();
+    let asyncLookupCalled = false;
+    const tracker = makeTracker(
+      {}, // 同步缓存未命中（为空）
+      async () => {
+        asyncLookupCalled = true;
+        return {pid: 12345, name: 'TRAE_SOLO_CN.exe'};
+      },
+    );
+    const proxy = new MitmProxyServer(
+      ca,
+      e => captured.push(e),
+      undefined,
+      undefined,
+      undefined,
+      tracker,
+      () => ({
+        enabled: true,
+        targets: ['TRAE_SOLO_CN.exe'],
+        systemProxyActive: true,
+      }),
+    );
+    await proxy.start(0);
+    try {
+      const established = await new Promise<boolean>(resolve => {
+        const socket = net.connect(proxy.getPort()!, '127.0.0.1', () => {
+          socket.write(
+            `CONNECT 127.0.0.1:${origin.port} HTTP/1.1\r\nHost: 127.0.0.1:${origin.port}\r\n\r\n`,
+          );
+        });
+        let buf = '';
+        socket.on('data', d => {
+          buf += d.toString('utf-8');
+          if (buf.includes('200 Connection Established')) {
+            socket.destroy();
+            resolve(true);
+          }
+        });
+        socket.on('error', () => resolve(false));
+        socket.setTimeout(5000, () => {
+          socket.destroy();
+          resolve(false);
+        });
+      });
+      assert.strictEqual(established, true);
+      assert.strictEqual(asyncLookupCalled, true, '必须触发异步溯源查询');
+    } finally {
+      await proxy.stop();
       await origin.close();
     }
   });

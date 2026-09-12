@@ -11,7 +11,6 @@ export const manifest = {
   description: 'Static and AI-assisted JavaScript analysis tools.',
   profile: 'workflow',
   tools: [
-    {modulePath: './analyzer/deobfuscate.js', handlerName: 'deobfuscateCode'},
     {modulePath: './analyzer/understand.js', handlerName: 'understandCode'},
     {modulePath: './analyzer/summarize.js', handlerName: 'summarizeCode'},
     {modulePath: './analyzer/detectCrypto.js', handlerName: 'detectCrypto'},

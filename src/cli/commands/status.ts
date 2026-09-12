@@ -23,12 +23,15 @@ export const statusCommand: AxiCliCommand<WorkerContext> = async (
   const openCount = rows.filter(r => r.status === 'open').length;
 
   if (json) {
-    return successOutput({
-      command: 'status',
-      online: openCount > 0,
-      sessions: rows,
-      ...(openCount === 0 ? {message: '没有运行中的 daemon 会话'} : {}),
-    });
+    return successOutput(
+      {
+        command: 'status',
+        online: openCount > 0,
+        sessions: rows,
+        ...(openCount === 0 ? {message: '没有运行中的 daemon 会话'} : {}),
+      },
+      ctx?.session,
+    );
   }
 
   return {
@@ -37,6 +40,7 @@ export const statusCommand: AxiCliCommand<WorkerContext> = async (
       rows.map(r => [r.session, String(r.pid), r.console, r.status]),
     ),
     command: 'status',
+    session: ctx?.session,
     online: openCount > 0,
   };
 };

@@ -13,6 +13,7 @@ import type {BuiltReplayRequest} from '../network/NetworkTypes.js';
 import {formatCurl, stripManagedHeaders} from '../network/replayEngine.js';
 
 import {CaManager, resolveMitmCertsDir} from './CaManager.js';
+import {matchesFlowFilter} from './flowFilter.js';
 import {normalizeHost} from './hostFilter.js';
 import {MitmProxyServer} from './MitmProxyServer.js';
 import {
@@ -53,6 +54,12 @@ import type {
   RemoveMitmRuleParams,
   StartMitmProxyData,
 } from './types.js';
+import {
+  formatUpstreamProxy,
+  normalizeUpstreamProxy,
+  parseNoProxy,
+  type UpstreamProxyConfig,
+} from './upstream.js';
 
 const DEFAULT_PORT = 8888;
 const HAR_VERSION = '1.2';
@@ -70,6 +77,7 @@ export class MitmModule {
   private server: MitmProxyServer | null = null;
   private readonly systemProxy: SystemProxyManager;
   private readonly processTracker: ProcessConnectionTracker;
+  private configuredUpstreamProxy: string | UpstreamProxyConfig | null = null;
   private localApps: LocalAppsConfig = {
     enabled: false,
     targets: [],
@@ -152,6 +160,7 @@ export class MitmModule {
           throw new Error('代理端口未知');
         }
         await this.systemProxy.enable(port);
+        await this.processTracker.refresh();
         this.processTracker.startBackgroundRefresh();
         this.localApps.enabled = true;
         this.localApps.systemProxyActive = true;
@@ -304,14 +313,51 @@ export class MitmModule {
     return this.caManager;
   }
 
+  setUpstreamProxy(upstreamProxy?: string | UpstreamProxyConfig | null): void {
+    this.configuredUpstreamProxy = upstreamProxy ?? null;
+    if (this.server) {
+      this.server.setUpstreamProxy(upstreamProxy);
+    }
+  }
+
+  getUpstreamProxy(): string | null {
+    if (this.server) {
+      return this.server.getUpstreamProxy();
+    }
+    if (!this.configuredUpstreamProxy) return null;
+    return typeof this.configuredUpstreamProxy === 'string'
+      ? this.configuredUpstreamProxy
+      : formatUpstreamProxy(this.configuredUpstreamProxy);
+  }
+
   async start(
     port: number = DEFAULT_PORT,
-    upstreamProxy?: string,
+    upstreamProxy?: string | UpstreamProxyConfig,
   ): Promise<MitmMethodResult<StartMitmProxyData>> {
-    const effectiveUpstreamProxy =
-      upstreamProxy ??
+    const envUpstream =
       getEnvValue('BROWSER_MITM_UPSTREAM_PROXY') ??
-      getEnvValue('ALL_PROXY');
+      getEnvValue('ALL_PROXY') ??
+      getEnvValue('all_proxy') ??
+      getEnvValue('HTTPS_PROXY') ??
+      getEnvValue('https_proxy') ??
+      getEnvValue('HTTP_PROXY') ??
+      getEnvValue('http_proxy');
+
+    let effectiveUpstreamProxy: string | UpstreamProxyConfig | undefined =
+      upstreamProxy ?? this.configuredUpstreamProxy ?? envUpstream;
+
+    const envNoProxy = getEnvValue('NO_PROXY') ?? getEnvValue('no_proxy');
+    if (envNoProxy && effectiveUpstreamProxy) {
+      const parsedBypass = parseNoProxy(envNoProxy);
+      if (parsedBypass.length > 0) {
+        const normalized = normalizeUpstreamProxy(effectiveUpstreamProxy);
+        normalized.bypassHosts = [
+          ...(normalized.bypassHosts ?? []),
+          ...parsedBypass,
+        ];
+        effectiveUpstreamProxy = normalized;
+      }
+    }
 
     try {
       await this.caManager.init();
@@ -327,6 +373,8 @@ export class MitmModule {
           this.processTracker,
           () => this.localApps,
         );
+      } else if (effectiveUpstreamProxy !== undefined) {
+        this.server.setUpstreamProxy(effectiveUpstreamProxy);
       }
       await this.server.start(port);
       const upstreamNote = this.server.getUpstreamProxy()
@@ -350,7 +398,13 @@ export class MitmModule {
           port,
           caCertPath: this.caManager.getCaCertPath(),
           caInitialized: this.caManager.isInitialized(),
-          upstreamProxy: effectiveUpstreamProxy ?? null,
+          upstreamProxy:
+            this.server?.getUpstreamProxy() ??
+            (typeof effectiveUpstreamProxy === 'string'
+              ? effectiveUpstreamProxy
+              : effectiveUpstreamProxy
+                ? formatUpstreamProxy(effectiveUpstreamProxy)
+                : null),
         },
       };
     }
@@ -400,6 +454,9 @@ export class MitmModule {
     let records = this.store.list();
 
     records = records.filter(r => {
+      if (params.filter && !matchesFlowFilter(r, params.filter)) {
+        return false;
+      }
       return matchesPredicate(
         {
           urlFilter: params.urlFilter,

@@ -12,7 +12,6 @@ import type {BrowserManager} from '../modules/browser/index.js';
 import {CodeCollector} from '../modules/collector/CodeCollector.js';
 import {PageController} from '../modules/collector/PageController.js';
 import {CryptoDetector} from '../modules/crypto/CryptoDetector.js';
-import {Deobfuscator} from '../modules/deobfuscator/Deobfuscator.js';
 import {HookManager} from '../modules/hook/HookManager.js';
 import type {CaptureEngine} from '../modules/session/index.js';
 import type {Runtime} from '../runtime.js';
@@ -24,7 +23,6 @@ export class ServiceLocator {
   private _browserManager: BrowserManager | null = null;
   private _collector: CodeCollector | null = null;
   private _llmService: LLMService | null = null;
-  private _deobfuscator: Deobfuscator | null = null;
   private _analyzer: CodeAnalyzer | null = null;
   private _summarizer: AISummarizer | null = null;
   private _cryptoDetector: CryptoDetector | null = null;
@@ -79,13 +77,6 @@ export class ServiceLocator {
     return this.getOrCreate(this._llmService, 'llmService', () => {
       this._llmService = new LLMService();
       return this._llmService;
-    });
-  }
-
-  getDeobfuscator(): Deobfuscator {
-    return this.getOrCreate(this._deobfuscator, 'deobfuscator', () => {
-      this._deobfuscator = new Deobfuscator(this.getLlmService());
-      return this._deobfuscator;
     });
   }
 

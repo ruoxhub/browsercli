@@ -79,7 +79,10 @@ function validateKey(key: string): void {
 function resolveMerged(): CliConfig {
   const file = loadConfigFile();
   return {
-    workerEntry: process.env.PROXYCLI_ENTRY ?? file.workerEntry,
+    workerEntry:
+      process.env.PROXYCLI_ENTRY ??
+      process.env.BROWSERCLI_ENTRY ??
+      file.workerEntry,
   };
 }
 
@@ -94,22 +97,25 @@ function initUserConfig(): {path: string; created: boolean} {
 
 export const configCommand: AxiCliCommand<WorkerContext> = async (
   args,
-  _ctx,
+  ctx,
 ) => {
   const parsed = parseArgs(args);
 
   // --init: 初始化配置文件
   if (hasFlag(parsed, 'init')) {
     const result = initUserConfig();
-    return successOutput({
-      command: 'config',
-      action: 'init',
-      path: result.path,
-      created: result.created,
-      message: result.created
-        ? `配置文件已创建：${result.path}`
-        : `配置文件已存在：${result.path}`,
-    });
+    return successOutput(
+      {
+        command: 'config',
+        action: 'init',
+        path: result.path,
+        created: result.created,
+        message: result.created
+          ? `配置文件已创建：${result.path}`
+          : `配置文件已存在：${result.path}`,
+      },
+      ctx?.session,
+    );
   }
 
   // --set key=value: 设置配置项
@@ -120,13 +126,16 @@ export const configCommand: AxiCliCommand<WorkerContext> = async (
     const config = loadConfigFile();
     (config as Record<string, string>)[key] = value;
     writeConfigFile(config);
-    return successOutput({
-      command: 'config',
-      action: 'set',
-      key,
-      value,
-      path: getConfigPath(),
-    });
+    return successOutput(
+      {
+        command: 'config',
+        action: 'set',
+        key,
+        value,
+        path: getConfigPath(),
+      },
+      ctx?.session,
+    );
   }
 
   // --get key: 获取配置项
@@ -134,12 +143,15 @@ export const configCommand: AxiCliCommand<WorkerContext> = async (
   if (getKey) {
     validateKey(getKey);
     const resolved = resolveMerged();
-    return successOutput({
-      command: 'config',
-      action: 'get',
-      key: getKey,
-      value: (resolved as Record<string, unknown>)[getKey] ?? null,
-    });
+    return successOutput(
+      {
+        command: 'config',
+        action: 'get',
+        key: getKey,
+        value: (resolved as Record<string, unknown>)[getKey] ?? null,
+      },
+      ctx?.session,
+    );
   }
 
   // --unset key: 删除配置项
@@ -150,39 +162,48 @@ export const configCommand: AxiCliCommand<WorkerContext> = async (
     const deleted = unsetKey in config;
     delete (config as Record<string, unknown>)[unsetKey];
     writeConfigFile(config);
-    return successOutput({
-      command: 'config',
-      action: 'unset',
-      key: unsetKey,
-      deleted,
-      path: getConfigPath(),
-    });
+    return successOutput(
+      {
+        command: 'config',
+        action: 'unset',
+        key: unsetKey,
+        deleted,
+        path: getConfigPath(),
+      },
+      ctx?.session,
+    );
   }
 
   // --list: 列出配置文件路径和来源
   if (hasFlag(parsed, 'list')) {
     const path = getConfigPath();
     const exists = existsSync(path);
-    return successOutput({
-      command: 'config',
-      action: 'list',
-      path,
-      exists,
-      envOverrides: Object.keys(process.env).filter(
-        k => k === 'PROXYCLI_ENTRY',
-      ),
-    });
+    return successOutput(
+      {
+        command: 'config',
+        action: 'list',
+        path,
+        exists,
+        envOverrides: Object.keys(process.env).filter(
+          k => k === 'PROXYCLI_ENTRY',
+        ),
+      },
+      ctx?.session,
+    );
   }
 
   // 默认：显示当前生效的配置（环境变量覆盖配置文件）
   const resolved = resolveMerged();
-  return successOutput({
-    command: 'config',
-    action: 'show',
-    resolved,
-    file: getConfigPath(),
-    envOverrides: Object.keys(process.env).filter(
-      k => k === 'PROXYCLI_ENTRY',
-    ),
-  });
+  return successOutput(
+    {
+      command: 'config',
+      action: 'show',
+      resolved,
+      file: getConfigPath(),
+      envOverrides: Object.keys(process.env).filter(
+        k => k === 'PROXYCLI_ENTRY',
+      ),
+    },
+    ctx?.session,
+  );
 };

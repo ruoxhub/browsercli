@@ -252,12 +252,14 @@ export const api = {
   getSessionRequests(params?: {
     sources?: string;
     urlFilter?: string;
+    filter?: string;
     limit?: number;
     offset?: number;
   }): Promise<{items: SessionRequestSummaryEvent[]; total: number}> {
     const query = new URLSearchParams();
     if (params?.sources) query.set('sources', params.sources);
     if (params?.urlFilter) query.set('urlFilter', params.urlFilter);
+    if (params?.filter) query.set('filter', params.filter);
     if (params?.limit !== undefined) query.set('limit', String(params.limit));
     if (params?.offset !== undefined)
       query.set('offset', String(params.offset));

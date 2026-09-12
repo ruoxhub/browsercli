@@ -22,13 +22,7 @@ import {fileURLToPath} from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 // 运行时位置：<repo>/build/tests/integration —— 上溯三级即仓库根。
 const repoRoot = path.resolve(here, '../../..');
-const cliBin = path.join(
-  repoRoot,
-  'proxycli',
-  'build',
-  'bin',
-  'proxycli.js',
-);
+const cliBin = path.join(repoRoot, 'build', 'src', 'cli', 'bin', 'proxycli.js');
 const daemonEntry = path.join(repoRoot, 'build', 'src', 'index.js');
 
 interface SessionConfig {
@@ -207,6 +201,16 @@ describe('daemon socket end-to-end', () => {
     ]);
     assert.equal(status, 1);
     assert.match(output, /UNKNOWN_TOOL/);
+  });
+
+  it('call list_mitm_requests over socket returns valid structured data', () => {
+    const {stdout} = runCli([
+      `-s=${SESSION_NAME}`,
+      'call',
+      'list_mitm_requests',
+    ]);
+    assert.match(stdout, /list_mitm_requests/);
+    assert.match(stdout, /status:\s*success/);
   });
 
   it('close removes the session file and stops the daemon process', async () => {

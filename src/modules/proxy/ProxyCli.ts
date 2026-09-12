@@ -7,6 +7,7 @@
 import readline from 'node:readline';
 import type {Readable, Writable} from 'node:stream';
 
+import {compileFlowFilter} from './flowFilter.js';
 import type {MitmModule} from './MitmModule.js';
 import type {CapturedRequest} from './types.js';
 
@@ -175,6 +176,40 @@ export class ProxyCli {
     await this.handleStart(args);
   }
 
+  handleUpstream(args: string[]): void {
+    if (args.length === 0) {
+      const current = this.module.getUpstreamProxy();
+      this.writeLine(`[INFO] Current upstream proxy: ${current ?? 'None'}`);
+      return;
+    }
+
+    const sub = args[0].toLowerCase();
+    if (sub === 'clear' || sub === 'rm' || sub === 'none' || sub === 'off') {
+      this.module.setUpstreamProxy(null);
+      this.writeLine('[INFO] Upstream proxy cleared.');
+      return;
+    }
+
+    const target = sub === 'set' ? args[1] : args[0];
+    if (!target) {
+      this.writeLine(
+        '[ERROR] Missing upstream proxy URL. Example: upstream http://127.0.0.1:7890',
+      );
+      return;
+    }
+
+    try {
+      this.module.setUpstreamProxy(target);
+      this.writeLine(
+        `[INFO] Upstream proxy set to: ${this.module.getUpstreamProxy()}`,
+      );
+    } catch (err) {
+      this.writeLine(
+        `[ERROR] Failed to set upstream proxy: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
   handleLs(args: string[]): void {
     let limit = 15;
     let filterStr = '';
@@ -191,14 +226,19 @@ export class ProxyCli {
 
     let records = this.module.getStore().list();
     if (filterStr) {
-      const f = filterStr.toLowerCase();
-      records = records.filter(
-        r =>
-          r.url.toLowerCase().includes(f) ||
-          r.method.toLowerCase().includes(f) ||
-          String(r.id).toLowerCase().includes(f) ||
-          String(r.statusCode).includes(f),
-      );
+      if (filterStr.includes('~')) {
+        const filterFn = compileFlowFilter(filterStr);
+        records = records.filter(r => filterFn(r));
+      } else {
+        const f = filterStr.toLowerCase();
+        records = records.filter(
+          r =>
+            r.url.toLowerCase().includes(f) ||
+            r.method.toLowerCase().includes(f) ||
+            String(r.id).toLowerCase().includes(f) ||
+            String(r.statusCode).includes(f),
+        );
+      }
     }
 
     const items = records.slice(-limit);
@@ -748,6 +788,8 @@ export class ProxyCli {
     const topCommands = [
       'start',
       'stop',
+      'restart',
+      'upstream',
       'status',
       'ls',
       'show',
@@ -779,6 +821,19 @@ export class ProxyCli {
     // Case 2: Subcommands
     const [cmd, sub, ...rest] = parts;
     const lowerCmd = cmd.toLowerCase();
+
+    // upstream ...
+    if (lowerCmd === 'upstream' || lowerCmd === 'upstr') {
+      const upstreamSubs = ['set', 'clear'];
+      if (!sub || (parts.length === 1 && endsWithSpace)) {
+        return [upstreamSubs, ''];
+      }
+      if (parts.length === 2 && !endsWithSpace) {
+        const hits = upstreamSubs.filter(s => s.startsWith(sub.toLowerCase()));
+        return [hits, sub];
+      }
+      return [[], ''];
+    }
 
     // rule ...
     if (lowerCmd === 'rule') {
@@ -940,6 +995,10 @@ export class ProxyCli {
       case 'restart':
         await this.handleRestart(args);
         return true;
+      case 'upstream':
+      case 'upstr':
+        this.handleUpstream(args);
+        return true;
       case 'status':
         this.handleStatus();
         return true;
@@ -998,13 +1057,46 @@ export class ProxyCli {
     }
   }
 
-  printHelp(_command?: string): void {
+  printHelp(command?: string): void {
+    if (command === 'ls' || command === 'flow') {
+      this.writeLine('Usage: ls [limit] [filter]');
+      this.writeLine(
+        'List captured requests with mitmproxy-compatible flow filter expressions:',
+      );
+      this.writeLine(
+        '  ~a                   Match asset in response (CSS, JS, images, fonts)',
+      );
+      this.writeLine(
+        '  ~e                   Match error (4xx/5xx/network error)',
+      );
+      this.writeLine('  ~m <regex>           Match HTTP method (e.g. ~m post)');
+      this.writeLine(
+        '  ~c <int|regex>       Match HTTP status code (e.g. ~c 200, ~c 4..)',
+      );
+      this.writeLine('  ~u <regex>           Match URL');
+      this.writeLine('  ~d <regex>           Match domain / host');
+      this.writeLine('  ~b <regex>           Match body (request or response)');
+      this.writeLine('  ~bq / ~bs <regex>    Match request or response body');
+      this.writeLine('  ~h / ~hq / ~hs <re>  Match headers (name: value)');
+      this.writeLine('  ~t <regex>           Match Content-Type');
+      this.writeLine('  ~p <regex>           Match local process name or PID');
+      this.writeLine(
+        '  Operators: ! (NOT), & or space (AND), | (OR), ( ) (grouping)',
+      );
+      this.writeLine('  Example: ls ~m post & ~c 200');
+      this.writeLine('  Example: ls 50 !~a ~d api.example.com');
+      return;
+    }
+
     this.writeLine('Available commands:');
     this.writeLine(
       '  start [port] [upstr]   Start MITM proxy server (default port 8888)',
     );
     this.writeLine('  stop                   Stop MITM proxy server');
     this.writeLine('  restart [port] [upstr] Restart MITM proxy server');
+    this.writeLine(
+      '  upstream [url|clear]   View, set, or clear secondary external proxy',
+    );
     this.writeLine(
       '  status                 Show proxy runtime status dashboard',
     );

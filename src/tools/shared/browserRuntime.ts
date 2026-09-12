@@ -24,7 +24,7 @@ export function browserTimeoutSchema(description: string) {
 }
 
 interface DebuggerTrapManager {
-  getPausedState(): {reason: string} | null;
+  getPausedState(): {reason: string; hitBreakpoints?: string[]} | null;
   getClient(): {
     send(method: string, params?: Record<string, unknown>): Promise<unknown>;
   } | null;
@@ -79,7 +79,15 @@ export async function withDebuggerTrapBypass<T>(
   const manager = context.getExistingDebuggerContext?.() as
     | DebuggerTrapManager
     | undefined;
-  if (manager?.getPausedState()?.reason !== 'debugCommand') {
+  const paused = manager?.getPausedState();
+  // 无限 debugger 语句的暂停不带任何命中断点。Chrome 对 eval 里的 debugger 语句
+  // 报 reason 'other' 而不是 'debugCommand'，所以判据必须落在 hitBreakpoints 上，
+  // 同时把 'other' 限定在无命中断点的情形，避免误伤断点/异常暂停。
+  const isDebuggerTrap =
+    !!paused &&
+    (paused.reason === 'debugCommand' ||
+      (paused.reason === 'other' && !paused.hitBreakpoints?.length));
+  if (!isDebuggerTrap) {
     return await action();
   }
 

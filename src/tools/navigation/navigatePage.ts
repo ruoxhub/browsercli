@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {withCdpSession} from '../../modules/browser/cdpUtils.js';
 import {zod} from '../../third_party/index.js';
 import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import type {ToolContextProvider} from '../../worker/ToolContext.js';
@@ -54,6 +55,7 @@ export const navigatePage = defineTool({
       .describe('导航超时（毫秒），默认 10000。'),
   },
   handler: async (request, response, context) => {
+    // SAFETY: ToolContext 提供者在运行时保证注入的 context 实现了 ToolContextProvider 协议接口
     const runtime = context as unknown as ToolContextProvider;
     const navType: NavType = request.params.type ?? 'url';
     const timeout = request.params.timeout ?? DEFAULT_NAV_TIMEOUT;
@@ -92,8 +94,9 @@ export const navigatePage = defineTool({
             break;
           case 'reload':
             if (request.params.ignoreCache) {
-              const client = await page.context().newCDPSession(page);
-              await client.send('Page.reload', {ignoreCache: true});
+              await withCdpSession(page, async client => {
+                await client.send('Page.reload', {ignoreCache: true});
+              });
             } else {
               await page.reload(options);
             }

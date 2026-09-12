@@ -188,4 +188,77 @@ describe('BrowserContextProvider', () => {
       /当前没有选中的页面/,
     );
   });
+
+  it('cleans up state when browser emits disconnected event', () => {
+    const provider = new BrowserContextProvider();
+    let disconnectedListener: (() => void) | undefined;
+    const mockBrowser = {
+      isConnected: () => true,
+      once: (event: string, cb: () => void) => {
+        if (event === 'disconnected') disconnectedListener = cb;
+      },
+    };
+    const mockContext = {pages: () => []};
+
+    provider.setBrowser(mockBrowser as never);
+    provider.setContext(mockContext as never);
+    assert.strictEqual(provider.isBrowserConnected(), true);
+
+    disconnectedListener?.();
+    assert.strictEqual(provider.isBrowserConnected(), false);
+    assert.strictEqual(provider.getBrowser(), null);
+    assert.strictEqual(provider.getContext(), null);
+  });
+
+  it('syncs with browserManager when local browser is disconnected', () => {
+    const provider = new BrowserContextProvider();
+    let managerConnected = false;
+    const fakeManagerBrowser = {
+      isConnected: () => managerConnected,
+      contexts: () => [{pages: () => []}],
+    };
+    const mockManager = {
+      isConnected: () => managerConnected,
+      getBrowser: () => (managerConnected ? fakeManagerBrowser : null),
+      getContext: () =>
+        managerConnected ? fakeManagerBrowser.contexts()[0] : null,
+    };
+
+    provider.setBrowserManager(mockManager as never);
+    assert.strictEqual(provider.isBrowserConnected(), false);
+
+    managerConnected = true;
+    assert.strictEqual(provider.isBrowserConnected(), true);
+    assert.strictEqual(provider.getBrowser(), fakeManagerBrowser);
+    assert.ok(provider.getContext());
+  });
+
+  it('recovers connection via ensureConnectedBrowser', async () => {
+    const provider = new BrowserContextProvider();
+    const fakePage = createPage('restored');
+    const fakeContext = {pages: () => [fakePage.page]};
+    const fakeBrowser = {
+      isConnected: () => true,
+      contexts: () => [fakeContext],
+      once: () => undefined,
+    };
+    let ensureCalled = false;
+    const mockManager = {
+      isConnected: () => false,
+      ensureBrowser: async () => {
+        ensureCalled = true;
+        return fakeBrowser;
+      },
+      getContext: () => fakeContext,
+    };
+
+    provider.setBrowserManager(mockManager as never);
+    assert.strictEqual(provider.isBrowserConnected(), false);
+
+    const recovered = await provider.ensureConnectedBrowser();
+    assert.strictEqual(ensureCalled, true);
+    assert.strictEqual(recovered, fakeBrowser);
+    assert.strictEqual(provider.isBrowserConnected(), true);
+    assert.strictEqual(provider.getPages().length, 1);
+  });
 });

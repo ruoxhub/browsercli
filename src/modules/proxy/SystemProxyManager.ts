@@ -5,6 +5,8 @@
  */
 
 import {execFile, spawnSync} from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
 import {promisify} from 'node:util';
 
 import {logger} from '../../utils/logger.js';
@@ -45,6 +47,7 @@ export interface SystemProxyManagerOpts {
   platform?: NodeJS.Platform;
   runCommand?: (cmd: string, args: string[]) => Promise<string>;
   runCommandSync?: (cmd: string, args: string[]) => string;
+  powershellCmd?: string;
 }
 
 interface ResolvedDeps {
@@ -65,8 +68,28 @@ function parseDword(raw: string | null): boolean {
   return !Number.isNaN(num) && num !== 0;
 }
 
+export function resolvePowerShellPath(): string {
+  if (process.platform !== 'win32') return 'powershell';
+  const root = process.env.SystemRoot || process.env.windir || 'C:\\Windows';
+  const candidates = [
+    path.join(root, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
+    path.join(root, 'Sysnative', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
+    'pwsh.exe',
+    'powershell.exe',
+  ];
+  for (const c of candidates) {
+    try {
+      if (path.isAbsolute(c) && fs.existsSync(c)) return c;
+    } catch {
+      // 忽略检查异常
+    }
+  }
+  return 'powershell';
+}
+
 export class SystemProxyManager {
   private readonly deps: ResolvedDeps;
+  private readonly powershellCmd: string;
   private originalState: SystemProxyState | null = null;
   private hooked = false;
   private active = false;
@@ -86,6 +109,9 @@ export class SystemProxyManager {
       runCommand: opts.runCommand ?? defaultRunCommand,
       runCommandSync: opts.runCommandSync ?? defaultRunCommandSync,
     };
+    this.powershellCmd =
+      opts.powershellCmd ??
+      (opts.runCommand ? 'powershell' : resolvePowerShellPath());
   }
 
   /** 检查并清理上次崩溃遗留的系统代理残留配置。 */
@@ -416,27 +442,27 @@ export class SystemProxyManager {
 
   private async notifyOptions(): Promise<void> {
     try {
-      await this.deps.runCommand('powershell', [
+      await this.deps.runCommand(this.powershellCmd, [
         '-NoProfile',
         '-NonInteractive',
         '-Command',
         NOTIFY_POWERSHELL,
       ]);
     } catch (err) {
-      logger.debug('[SystemProxy] powershell 通知刷新失败:', err);
+      logger.warn('[SystemProxy] powershell 通知刷新失败:', err);
     }
   }
 
   private notifyOptionsSync(): void {
     try {
-      this.deps.runCommandSync('powershell', [
+      this.deps.runCommandSync(this.powershellCmd, [
         '-NoProfile',
         '-NonInteractive',
         '-Command',
         NOTIFY_POWERSHELL,
       ]);
     } catch (err) {
-      logger.debug('[SystemProxy] powershell 通知刷新失败:', err);
+      logger.warn('[SystemProxy] powershell 通知刷新失败:', err);
     }
   }
 }

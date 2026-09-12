@@ -59,6 +59,21 @@ describe('matchesPredicate', () => {
     assert.strictEqual(matchesPredicate({urlRegex: '['}, view()), false);
     assert.strictEqual(matchesPredicate({urlRegex: 'login$'}, view()), true);
   });
+
+  it('filter 支持 mitmproxy 流过滤表达式', () => {
+    assert.strictEqual(
+      matchesPredicate({filter: '~m POST & ~c 200'}, view()),
+      true,
+    );
+    assert.strictEqual(
+      matchesPredicate({filter: '~m GET | ~c 404'}, view()),
+      false,
+    );
+    assert.strictEqual(
+      matchesPredicate({filter: '!~a ~d api.example.com'}, view()),
+      true,
+    );
+  });
 });
 
 function rule(

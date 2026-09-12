@@ -19,6 +19,7 @@ export interface AxiStructuredOutput extends Record<string, unknown> {
   description?: string;
   version?: string;
   command?: string;
+  session?: string;
   title?: string;
   headers?: string[];
   rows?: string[][];
@@ -29,8 +30,24 @@ export interface AxiStructuredOutput extends Record<string, unknown> {
 
 export function successOutput(
   data: Record<string, unknown>,
+  session?: string,
 ): AxiStructuredOutput {
-  return {...data, status: 'success'};
+  const result: Record<string, unknown> = {};
+  if ('command' in data) {
+    result.command = data.command;
+  }
+  const resolvedSession =
+    session ?? (typeof data.session === 'string' ? data.session : undefined);
+  if (resolvedSession !== undefined) {
+    result.session = resolvedSession;
+  }
+  for (const [k, v] of Object.entries(data)) {
+    if (k !== 'command' && k !== 'session') {
+      result[k] = v;
+    }
+  }
+  result.status = 'success';
+  return result;
 }
 
 export function tableOutput(

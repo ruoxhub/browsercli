@@ -59,14 +59,46 @@ export class BrowserContextProvider {
 
   setBrowser(browser: Browser | null): void {
     this._browser = browser;
+    if (browser) {
+      browser.once('disconnected', () => {
+        if (this._browser === browser) {
+          this._browser = null;
+          this.clearContext();
+        }
+      });
+    }
   }
 
   getBrowser(): Browser | null {
-    return this._browser ?? this._browserManager?.getBrowser() ?? null;
+    if (this._browser && this._browser.isConnected()) {
+      return this._browser;
+    }
+    const mgrBrowser = this._browserManager?.getBrowser();
+    if (mgrBrowser && mgrBrowser.isConnected()) {
+      this._browser = mgrBrowser;
+      this._context =
+        this._browserManager?.getContext() ?? mgrBrowser.contexts()[0] ?? null;
+      return mgrBrowser;
+    }
+    return null;
   }
 
   setBrowserManager(browserManager: BrowserManager): void {
     this._browserManager = browserManager;
+    browserManager.onDisconnected = () => {
+      this._browser = null;
+      this.clearContext();
+    };
+    browserManager.onReconnected = (browser, context) => {
+      this.setBrowser(browser);
+      if (context) {
+        this.setContext(context);
+      } else {
+        const ctx = browser.contexts()[0];
+        if (ctx) this.setContext(ctx);
+      }
+      void this.syncPages().catch(() => undefined);
+    };
   }
 
   getBrowserManager(): BrowserManager | null {
@@ -86,11 +118,47 @@ export class BrowserContextProvider {
   }
 
   getContext(): BrowserContext | null {
-    return this._context;
+    if (this._context && this._browser?.isConnected()) {
+      return this._context;
+    }
+    const browser = this.getBrowser();
+    if (browser && browser.isConnected()) {
+      this._context =
+        this._browserManager?.getContext() ?? browser.contexts()[0] ?? null;
+      return this._context;
+    }
+    return null;
   }
 
   isBrowserConnected(): boolean {
-    return this._browser?.isConnected() ?? false;
+    return (
+      (this._browser?.isConnected() ?? false) ||
+      (this._browserManager?.isConnected() ?? false)
+    );
+  }
+
+  async ensureConnectedBrowser(): Promise<Browser | null> {
+    if (this.isBrowserConnected()) {
+      return this.getBrowser();
+    }
+    if (this._browserManager) {
+      try {
+        const browser = await this._browserManager.ensureBrowser();
+        if (browser && browser.isConnected()) {
+          this.setBrowser(browser);
+          const context =
+            this._browserManager.getContext() ?? browser.contexts()[0] ?? null;
+          if (context) {
+            this.setContext(context);
+          }
+          await this.syncPages();
+          return browser;
+        }
+      } catch {
+        // 连接失败保持未连接状态
+      }
+    }
+    return null;
   }
 
   // ─── Pages ──────────────────────────────────────────

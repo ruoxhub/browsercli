@@ -16,7 +16,7 @@ import * as parser from '@babel/parser';
 import traverseImport from '@babel/traverse';
 import * as t from '@babel/types';
 
-import {unwrapBabelDefault} from '../../modules/deobfuscator/astUtils.js';
+import {unwrapBabelDefault} from '../../utils/babelUtils.js';
 import {zod} from '../../third_party/index.js';
 import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';

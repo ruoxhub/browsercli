@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {withCdpSession} from '../../modules/browser/cdpUtils.js';
 import {zod} from '../../third_party/index.js';
 import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
@@ -111,9 +112,10 @@ export const emulateMobile = defineTool({
           height: profile.viewport.height,
         });
 
-        const client = await page.context().newCDPSession(page);
-        await client.send('Network.setUserAgentOverride', {
-          userAgent: profile.userAgent,
+        await withCdpSession(page, async client => {
+          await client.send('Network.setUserAgentOverride', {
+            userAgent: profile.userAgent,
+          });
         });
 
         response.setStructuredContent({
@@ -137,9 +139,10 @@ export const emulateMobile = defineTool({
         height: DESKTOP_VIEWPORT.height,
       });
 
-      const client = await page.context().newCDPSession(page);
-      await client.send('Network.setUserAgentOverride', {
-        userAgent: '',
+      await withCdpSession(page, async client => {
+        await client.send('Network.setUserAgentOverride', {
+          userAgent: '',
+        });
       });
 
       response.setStructuredContent({

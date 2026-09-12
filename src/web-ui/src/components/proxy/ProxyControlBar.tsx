@@ -6,6 +6,7 @@
 import {
   ArrowDown,
   ChevronDown,
+  Filter,
   Globe,
   Loader2,
   Play,
@@ -16,10 +17,11 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import React, {useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {useNavigate} from 'react-router-dom';
 
 import {api} from '../../lib/api';
+import {FLOW_FILTER_HELP, type FlowFilterHelpItem} from '../../lib/flowFilter';
 import type {SessionAnalysisMode} from '../../lib/protocol';
 import {useAnalysisStore} from '../../stores/analysis';
 import {useProxyStore} from '../../stores/proxy';
@@ -69,6 +71,53 @@ export const ProxyControlBar: React.FC<ProxyControlBarProps> = ({
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzingLocal] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [showFilterHelp, setShowFilterHelp] = useState(false);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        searchContainerRef.current &&
+        !searchContainerRef.current.contains(e.target as Node)
+      ) {
+        setShowFilterHelp(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSearchChange = (val: string) => {
+    setFilter({search: val});
+    if (val.endsWith('~') || (val.includes('~') && !showFilterHelp)) {
+      setShowFilterHelp(true);
+    }
+  };
+
+  const insertFilterSuggestion = (item: FlowFilterHelpItem) => {
+    let current = filter.search;
+    const lastTilde = current.lastIndexOf('~');
+    if (lastTilde !== -1 && lastTilde >= current.length - 4) {
+      current = current.slice(0, lastTilde);
+    }
+    const spacer = current.length > 0 && !current.endsWith(' ') ? ' ' : '';
+    const toInsert = `${item.code} `;
+    setFilter({search: `${current}${spacer}${toInsert}`});
+    setShowFilterHelp(false);
+  };
+
+  const filteredSuggestions = useMemo(() => {
+    const lastTildeIdx = filter.search.lastIndexOf('~');
+    if (lastTildeIdx === -1) return FLOW_FILTER_HELP;
+    const partial = filter.search.slice(lastTildeIdx).trim().toLowerCase();
+    if (!partial || partial === '~') return FLOW_FILTER_HELP;
+    return FLOW_FILTER_HELP.filter(
+      item =>
+        item.code.toLowerCase().startsWith(partial) ||
+        item.name.toLowerCase().includes(partial.slice(1)) ||
+        item.description.toLowerCase().includes(partial.slice(1)),
+    );
+  }, [filter.search]);
 
   const isRunning = status?.running ?? false;
 
@@ -411,25 +460,86 @@ export const ProxyControlBar: React.FC<ProxyControlBarProps> = ({
         </div>
 
         {/* URL / 路径 / 状态码搜索输入框 */}
-        <div className="flex-1 relative min-w-[200px]">
+        <div
+          ref={searchContainerRef}
+          className="flex-1 relative min-w-[200px]"
+        >
           <Search
             size={13}
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]"
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] pointer-events-none"
           />
           <input
             type="text"
-            placeholder="过滤请求 URL、路径、域名或状态码 (例如 /api/v1, 200, example.com)..."
+            placeholder="过滤请求 URL、路径或使用 mitmproxy 语法 (如 ~m POST & ~c 200, !~a, ~d)..."
             value={filter.search}
-            onChange={e => setFilter({search: e.target.value})}
-            className="w-full h-7 bg-[var(--color-bg-primary)] border border-[var(--color-border-default)] rounded-lg pl-7 pr-7 text-xs text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)] transition-all font-mono"
+            onChange={e => handleSearchChange(e.target.value)}
+            onFocus={() => {
+              if (filter.search.includes('~')) setShowFilterHelp(true);
+            }}
+            onKeyDown={e => {
+              if (e.key === 'Escape') setShowFilterHelp(false);
+            }}
+            className="w-full h-7 bg-[var(--color-bg-primary)] border border-[var(--color-border-default)] rounded-lg pl-7 pr-14 text-xs text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)] transition-all font-mono"
           />
-          {filter.search && (
+          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+            {filter.search && (
+              <button
+                onClick={() => setFilter({search: ''})}
+                className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] p-0.5"
+                title="清空搜索"
+              >
+                <X size={12} />
+              </button>
+            )}
             <button
-              onClick={() => setFilter({search: ''})}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
+              onClick={() => setShowFilterHelp(prev => !prev)}
+              className={`p-0.5 rounded transition-colors ${
+                showFilterHelp
+                  ? 'text-[var(--color-accent)] bg-[var(--color-accent)]/15'
+                  : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]'
+              }`}
+              title="查看 mitmproxy 过滤表达式语法帮助 (~)"
             >
-              <X size={12} />
+              <Filter size={12} />
             </button>
+          </div>
+
+          {/* 类似 mitmproxy 的过滤语法悬浮下拉面板 */}
+          {showFilterHelp && (
+            <div className="absolute left-0 top-full mt-1.5 w-[390px] max-w-[90vw] bg-[var(--color-bg-secondary)] border border-[var(--color-border-default)] rounded-lg shadow-2xl z-50 overflow-hidden">
+              <div className="flex items-center justify-between px-3 py-2 bg-[var(--color-bg-tertiary)] border-b border-[var(--color-border-default)] text-[11px] font-medium text-[var(--color-text-secondary)]">
+                <span className="flex items-center gap-1.5 font-mono">
+                  <span className="text-[var(--color-accent)] font-bold">
+                    ~
+                  </span>
+                  <span>Flow Filter 过滤表达式</span>
+                </span>
+                <span className="text-[10px] text-[var(--color-text-muted)] font-mono">
+                  支持 ! & | ()
+                </span>
+              </div>
+              <div className="max-h-64 overflow-y-auto divide-y divide-[var(--color-border-muted)]/40">
+                {filteredSuggestions.map(item => (
+                  <button
+                    key={item.code}
+                    onClick={() => insertFilterSuggestion(item)}
+                    className="w-full text-left px-3 py-1.5 flex items-center justify-between hover:bg-[var(--color-accent)]/10 transition-colors group cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-mono text-xs font-bold text-sky-400 group-hover:text-[var(--color-accent)] shrink-0">
+                        {item.syntax}
+                      </span>
+                      <span className="text-[11px] text-[var(--color-text-secondary)] truncate">
+                        {item.description}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-[var(--color-text-muted)] font-mono shrink-0 pl-2">
+                      {item.name}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
         </div>
 

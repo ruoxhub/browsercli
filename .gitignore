@@ -224,3 +224,5 @@ wiki/
 
 # Local agent-tool state
 .pi-glla/
+# Added by code-review-graph
+.code-review-graph/

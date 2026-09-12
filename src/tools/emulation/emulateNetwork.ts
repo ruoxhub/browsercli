@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {withCdpSession} from '../../modules/browser/cdpUtils.js';
 import {zod} from '../../third_party/index.js';
 import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
@@ -67,14 +68,14 @@ export const emulateNetwork = defineTool({
     const page = frame.page();
 
     try {
-      const client = await page.context().newCDPSession(page);
-
       if (throttlingOption === 'No emulation') {
-        await client.send('Network.emulateNetworkConditions', {
-          offline: false,
-          latency: 0,
-          downloadThroughput: -1,
-          uploadThroughput: -1,
+        await withCdpSession(page, async client => {
+          await client.send('Network.emulateNetworkConditions', {
+            offline: false,
+            latency: 0,
+            downloadThroughput: -1,
+            uploadThroughput: -1,
+          });
         });
         response.setStructuredContent({
           success: true,
@@ -85,11 +86,13 @@ export const emulateNetwork = defineTool({
       }
 
       if (throttlingOption === 'Offline') {
-        await client.send('Network.emulateNetworkConditions', {
-          offline: true,
-          latency: 0,
-          downloadThroughput: 0,
-          uploadThroughput: 0,
+        await withCdpSession(page, async client => {
+          await client.send('Network.emulateNetworkConditions', {
+            offline: true,
+            latency: 0,
+            downloadThroughput: 0,
+            uploadThroughput: 0,
+          });
         });
         response.setStructuredContent({
           success: true,
@@ -101,7 +104,9 @@ export const emulateNetwork = defineTool({
 
       if (throttlingOption in PREDEFINED_NETWORK_CONDITIONS) {
         const conditions = PREDEFINED_NETWORK_CONDITIONS[throttlingOption];
-        await client.send('Network.emulateNetworkConditions', conditions);
+        await withCdpSession(page, async client => {
+          await client.send('Network.emulateNetworkConditions', conditions);
+        });
         response.setStructuredContent({
           success: true,
           message: `网络模拟已设置为：${throttlingOption}`,

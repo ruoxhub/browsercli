@@ -6,6 +6,7 @@
 import type Database from 'better-sqlite3';
 
 import type {DatabaseManager} from '../../database/DatabaseManager.js';
+import {compileFlowFilter} from '../proxy/flowFilter.js';
 
 import {LIST_DEFAULT_LIMIT, LIST_MAX_LIMIT} from './constants.js';
 import type {SessionStore} from './SessionStore.js';
@@ -292,7 +293,25 @@ export class SqliteSessionStore implements SessionStore {
         `SELECT * FROM captured_requests WHERE ${clauses.join(' AND ')} ORDER BY sequence ASC`,
       )
       .all(...params) as RequestDbRow[];
-    return rows.map(toRequest);
+    const mapped = rows.map(toRequest);
+    if (filter.filter) {
+      const filterFn = compileFlowFilter(filter.filter, {fallbackFuzzy: true});
+      return mapped.filter(r =>
+        filterFn({
+          url: r.url,
+          method: r.method,
+          statusCode: r.statusCode,
+          contentType: r.contentType,
+          requestHeaders: r.requestHeaders,
+          requestBody: r.requestBody,
+          responseHeaders: r.responseHeaders,
+          responseBody: r.responseBody,
+          initiator: r.initiator,
+          isWebSocket: Boolean(r.isWebSocket),
+        }),
+      );
+    }
+    return mapped;
   }
 
   getRequest(id: string): CapturedRequestRow | null {
@@ -327,18 +346,73 @@ export class SqliteSessionStore implements SessionStore {
     );
     const offset = Math.max(page.offset ?? 0, 0);
 
-    const rows = this.db
+    if (!filter.filter) {
+      const rows = this.db
+        .prepare(
+          `SELECT id, session_id, sequence, timestamp, method, url, source, initiator,
+                  status_code, content_type, truncated, is_streaming
+           FROM captured_requests
+           WHERE ${clauses.join(' AND ')}
+           ORDER BY sequence DESC
+           LIMIT ? OFFSET ?`,
+        )
+        .all(...params, limit, offset) as RequestSummaryDbRow[];
+
+      return rows.map(r =>
+        toSummary({
+          id: r.id,
+          sessionId: r.session_id,
+          sequence: r.sequence,
+          timestamp: r.timestamp,
+          method: r.method,
+          url: r.url,
+          statusCode: r.status_code,
+          contentType: r.content_type,
+          source: r.source,
+          initiator: r.initiator,
+          truncated: r.truncated,
+          isStreaming: r.is_streaming,
+        }),
+      );
+    }
+
+    const filterFn = compileFlowFilter(filter.filter, {fallbackFuzzy: true});
+    const allRows = this.db
       .prepare(
         `SELECT id, session_id, sequence, timestamp, method, url, source, initiator,
-                status_code, content_type, truncated, is_streaming
+                status_code, content_type, truncated, is_streaming,
+                request_headers, request_body, response_headers, response_body, is_websocket
          FROM captured_requests
          WHERE ${clauses.join(' AND ')}
-         ORDER BY sequence DESC
-         LIMIT ? OFFSET ?`,
+         ORDER BY sequence DESC`,
       )
-      .all(...params, limit, offset) as RequestSummaryDbRow[];
+      .all(...params) as Array<
+      RequestSummaryDbRow & {
+        request_headers: string;
+        request_body: string | null;
+        response_headers: string | null;
+        response_body: string | null;
+        is_websocket: number;
+      }
+    >;
 
-    return rows.map(r =>
+    const matched = allRows.filter(r =>
+      filterFn({
+        url: r.url,
+        method: r.method,
+        statusCode: r.status_code,
+        contentType: r.content_type,
+        requestHeaders: r.request_headers,
+        requestBody: r.request_body,
+        responseHeaders: r.response_headers,
+        responseBody: r.response_body,
+        initiator: r.initiator,
+        isWebSocket: Boolean(r.is_websocket),
+      }),
+    );
+
+    const paged = matched.slice(offset, offset + limit);
+    return paged.map(r =>
       toSummary({
         id: r.id,
         sessionId: r.session_id,

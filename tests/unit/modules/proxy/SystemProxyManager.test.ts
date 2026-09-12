@@ -6,7 +6,10 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {SystemProxyManager} from '../../../../src/modules/proxy/SystemProxyManager.js';
+import {
+  SystemProxyManager,
+  resolvePowerShellPath,
+} from '../../../../src/modules/proxy/SystemProxyManager.js';
 
 /**
  * 内存注册表 mock：键值存 Map，reg query/add/delete 直接操作它。
@@ -180,5 +183,11 @@ describe('SystemProxyManager', () => {
   it('非 Windows 平台 enable 抛 systemProxyUnsupported', async () => {
     const manager = new SystemProxyManager({platform: 'linux'});
     await assert.rejects(() => manager.enable(8888), /unsupported/i);
+  });
+
+  it('resolvePowerShellPath 在 win32 下能返回合法路径或命令', () => {
+    const ps = resolvePowerShellPath();
+    assert.strictEqual(typeof ps, 'string');
+    assert.ok(ps.length > 0);
   });
 });

@@ -19,7 +19,6 @@ import {CodeCollector} from './modules/collector/CodeCollector.js';
 import {DOMInspector} from './modules/collector/DOMInspector.js';
 import {PageController} from './modules/collector/PageController.js';
 import type {CryptoDetector} from './modules/crypto/CryptoDetector.js';
-import type {Deobfuscator} from './modules/deobfuscator/Deobfuscator.js';
 import {HookManager} from './modules/hook/HookManager.js';
 import type {NetworkModule} from './modules/network/index.js';
 import type {MitmModule} from './modules/proxy/index.js';
@@ -58,7 +57,6 @@ export interface Runtime {
   llmService: LLMService;
   analyzer: CodeAnalyzer;
   summarizer: AISummarizer;
-  deobfuscator: Deobfuscator;
   cryptoDetector: CryptoDetector;
   networkModule: NetworkModule;
   mitmModule: MitmModule;
@@ -127,9 +125,6 @@ export function getRuntime(): Runtime {
     },
     get summarizer() {
       return services.getSummarizer();
-    },
-    get deobfuscator() {
-      return services.getDeobfuscator();
     },
     get cryptoDetector() {
       return services.getCryptoDetector();

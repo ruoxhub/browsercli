@@ -207,14 +207,14 @@ export class DaemonConnection {
   }
 }
 
-/** CLI 配置文件路径；PROXYCLI_CONFIG_DIR / PROXYCLI_CONFIG_DIR 供测试隔离（与 commands/config.ts 同步）。 */
+/** CLI 配置文件路径；PROXYCLI_CONFIG_DIR / BROWSERCLI_CONFIG_DIR 供测试隔离（与 commands/config.ts 同步）。 */
 export function cliConfigPath(): string {
   const custom =
-    process.env.PROXYCLI_CONFIG_DIR ?? process.env.PROXYCLI_CONFIG_DIR;
+    process.env.PROXYCLI_CONFIG_DIR ?? process.env.BROWSERCLI_CONFIG_DIR;
   if (custom) return path.join(custom, 'config.json');
   const proxyDir = path.join(os.homedir(), '.proxycli');
   if (fs.existsSync(proxyDir)) return path.join(proxyDir, 'config.json');
-  const browserDir = path.join(os.homedir(), '.proxycli');
+  const browserDir = path.join(os.homedir(), '.browsercli');
   if (fs.existsSync(browserDir)) return path.join(browserDir, 'config.json');
   return path.join(proxyDir, 'config.json');
 }
@@ -239,18 +239,39 @@ export interface EnsureDaemonOptions {
   daemonDir?: string;
 }
 
-/** 解析 worker daemon 入口：env PROXYCLI_ENTRY / PROXYCLI_ENTRY > 配置文件 workerEntry。 */
+/** 跨平台（Windows / WSL）规范化候选路径：在 Linux 下尝试将 Windows 盘符路径（如 D:/...）转为 /mnt/d/...，反之亦然。 */
+export function normalizeCandidatePath(rawPath?: string): string | undefined {
+  if (!rawPath) return undefined;
+  if (fs.existsSync(rawPath)) return rawPath;
+  if (process.platform === 'linux') {
+    const winMatch = rawPath.match(/^([A-Za-z]):[/\\](.*)/);
+    if (winMatch) {
+      const wslPath = `/mnt/${winMatch[1].toLowerCase()}/${winMatch[2].replaceAll('\\', '/')}`;
+      if (fs.existsSync(wslPath)) return wslPath;
+    }
+  } else if (process.platform === 'win32') {
+    const wslMatch = rawPath.match(/^\/mnt\/([A-Za-z])\/(.*)/);
+    if (wslMatch) {
+      const winPath = `${wslMatch[1].toUpperCase()}:\\${wslMatch[2].replaceAll('/', '\\')}`;
+      if (fs.existsSync(winPath)) return winPath;
+    }
+  }
+  return undefined;
+}
+
+/** 解析 worker daemon 入口：env PROXYCLI_ENTRY / BROWSERCLI_ENTRY > 配置文件 workerEntry。 */
 export function resolveEntryPath(): string {
   const candidates = [
     process.env.PROXYCLI_ENTRY,
-    process.env.PROXYCLI_ENTRY,
+    process.env.BROWSERCLI_ENTRY,
     loadCliConfig().workerEntry,
   ];
-  for (const value of candidates) {
-    if (value && fs.existsSync(value)) return value;
+  for (const raw of candidates) {
+    const normalized = normalizeCandidatePath(raw);
+    if (normalized) return normalized;
   }
   const error = new Error(
-    '无法定位 worker daemon 入口（PROXYCLI_ENTRY / PROXYCLI_ENTRY / workerEntry 均未配置或文件不存在）。',
+    '无法定位 worker daemon 入口（PROXYCLI_ENTRY / workerEntry 均未配置或文件不存在）。',
   ) as Error & {code?: string; suggestions?: string[]};
   error.code = 'ENTRY_NOT_CONFIGURED';
   error.suggestions = [
@@ -378,13 +399,13 @@ export async function stopSession(
   }
 }
 
-/** 从 ps/进程列表行提取 daemon pid：须同时含 node 进程特征与 --proxycli-daemon / --proxycli-daemon，排除 grep 自身。 */
+/** 从 ps/进程列表行提取 daemon pid：须同时含 node 进程特征与 --proxycli-daemon / --browsercli-daemon，排除 grep 自身。 */
 export function collectDaemonPids(lines: string[]): number[] {
   const result: number[] = [];
   for (const line of lines) {
     if (
       !line.includes('--proxycli-daemon') &&
-      !line.includes('--proxycli-daemon')
+      !line.includes('--browsercli-daemon')
     )
       continue;
     // 排除查询进程自身（grep/powershell/taskkill 命令行里也含该字符串）
@@ -415,7 +436,7 @@ export async function killAllDaemons(): Promise<number[]> {
         '-NoProfile',
         '-NonInteractive',
         '-Command',
-        "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*--proxycli-daemon*' -or $_.CommandLine -like '*--proxycli-daemon*' } | ForEach-Object { \"$($_.ProcessId) $($_.CommandLine)\" }",
+        "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*--proxycli-daemon*' -or $_.CommandLine -like '*--browsercli-daemon*' } | ForEach-Object { \"$($_.ProcessId) $($_.CommandLine)\" }",
       ],
       {encoding: 'utf-8'},
     );

@@ -156,9 +156,11 @@ export function createSessionRoutes(
           }
 
           const urlFilter = url.searchParams.get('urlFilter');
+          const flowFilter = url.searchParams.get('filter');
           const filter = {
             ...(sources && sources.length > 0 ? {sources} : {}),
             ...(urlFilter ? {urlFilter} : {}),
+            ...(flowFilter ? {filter: flowFilter} : {}),
           };
 
           const items = services.store.listRequestSummaries(

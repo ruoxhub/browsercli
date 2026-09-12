@@ -49,6 +49,8 @@ export class DefineToolContextFactory {
       bringPageToFront: page => provider.bringPageToFront(page),
       syncPageContext: page => provider.syncPageContext(page),
       getPages: () => provider.getPages(),
+      isBrowserConnected: () => provider.isBrowserConnected(),
+      ensureConnectedBrowser: () => provider.ensureConnectedBrowser(),
       getSelectedFrame: () => {
         const frame =
           provider.getSelectedFrame() ??
