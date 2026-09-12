@@ -73,7 +73,10 @@ describe('validateToolArgs numeric range enforcement (resize_page)', () => {
   });
 
   it('coerces numeric strings before range checking (CLI path)', () => {
-    const result = validateToolArgs('resize_page', {width: '1280', height: '720'});
+    const result = validateToolArgs('resize_page', {
+      width: '1280',
+      height: '720',
+    });
     assert.equal(result.ok, true);
     if (result.ok) {
       assert.equal(result.value.width, 1280);
