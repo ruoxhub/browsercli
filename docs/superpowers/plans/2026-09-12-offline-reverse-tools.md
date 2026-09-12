@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 将 5 大离线逆向工具分类（SourceMap还原、Wasm脱机工具链、逆向知识库与向导、Rebuild环境补齐、AST/算法审计）按设计规范重构为独立的技能与 CLI 脚本。
+**Goal:** 将 5 大离线逆向工具分类（SourceMap还原、Wasm脱机工具链、逆向知识库与向导、Rebuild环境补齐、AST/算法审计）按设计规范重构为独立的技能与 CLI 脚本，并彻底清理 `src/tools/` 中对应的原有 MCP 工具及关联冗余代码。
 
-**Architecture:** 采用“2 个全新独立技能 + 3 个现有技能注入”的混合架构。所有脚本采用原生 Node.js ESM (`node:*`) 编写，杜绝 `require` 错误，切断对全局 `getRuntime()` 与 `BrowserManager` 的耦合，支持标准 CLI 参数（`--help`、`--json`）与确定性单元自测。
+**Architecture:** 采用“2 个全新独立技能 + 3 个现有技能注入”的混合架构。所有脚本采用原生 Node.js ESM (`node:*`) 编写，杜绝 `require` 错误，切断对全局 `getRuntime()` 与 `BrowserManager` 的耦合。在离线脚本全部就绪并自测通过后，批量从 `src/tools/` 及其 domain manifest 中移除对应工具，重构关联调用方并重新生成 `generated-tools-index.ts`。
 
 **Tech Stack:** Node.js v22 (Native ESM), Babel (@babel/parser, @babel/traverse), WABT, source-map / @jridgewell/trace-mapping, native CLI (wasmtime/wasmer).
 
@@ -171,3 +171,72 @@
   - 执行 `npm run verify-skills` 确保所有技能文档格式正常，无未定义或缺失参数。
 - [ ] **Step 3: 整体提交**
   - `git add skills/AGENTS.md && git commit -m "docs(skills): register new skills in AGENTS.md"`
+
+---
+
+### Task 7: 清理 `src/tools/` 原有离线工具及强关联代码
+
+**Files:**
+- Delete: `src/tools/sourcemap/`
+- Delete: `src/tools/rebuild/`
+- Delete: `src/tools/workflow/parameterWorkflows.ts`
+- Delete: `src/tools/workflow/advisor.ts`
+- Delete: `src/tools/wasm/wasmDecompile.ts`
+- Delete: `src/tools/wasm/wasmDisassemble.ts`
+- Delete: `src/tools/wasm/wasmInspectSections.ts`
+- Delete: `src/tools/wasm/wasmOfflineRun.ts`
+- Delete: `src/tools/wasm/wasmOptimize.ts`
+- Delete: `src/tools/wasm/wasmCapabilities.ts`
+- Delete: `src/tools/wasm/nativeCommand.ts`
+- Delete: `src/tools/analyzer/detectCrypto.ts`
+- Delete: `src/tools/jsvmp/analyzeVm.ts`
+- Modify: `src/reverse/ExecutionAdapters.ts`
+- Modify: `scripts/generate-tools-index.ts`
+- Modify: `src/tools/workflow/manifest.ts`
+- Modify: `src/tools/workflow/index.ts`
+- Modify: `src/tools/wasm/manifest.ts`
+- Modify: `src/tools/wasm/index.ts`
+- Modify: `src/tools/analyzer/manifest.ts`
+- Modify: `src/tools/analyzer/index.ts`
+- Modify: `src/tools/jsvmp/manifest.ts`
+- Modify: `src/tools/jsvmp/index.ts`
+
+- [ ] **Step 1: 删除 `src/tools/sourcemap/` 并从索引生成器中移除域**
+  - 删除 `src/tools/sourcemap/` 目录。
+  - 从 `scripts/generate-tools-index.ts` 的 `DOMAIN_DESCRIPTIONS` 中移除 `sourcemap`。
+- [ ] **Step 2: 删除 `src/tools/rebuild/` 并解耦 `ExecutionAdapters.ts`**
+  - 删除 `src/tools/rebuild/` 目录。
+  - 从 `scripts/generate-tools-index.ts` 中移除 `rebuild` 域。
+  - 调整 `src/reverse/ExecutionAdapters.ts`，移除对 `../tools/rebuild/index.js` 的导入，将必要的本地环境推断逻辑收敛至 reverse 模块内部或直接生成标准 bundle。
+- [ ] **Step 3: 删除 workflow 域中已迁移的离线向导与蓝图**
+  - 删除 `src/tools/workflow/parameterWorkflows.ts` 与 `src/tools/workflow/advisor.ts`。
+  - 更新 `src/tools/workflow/manifest.ts` 与 `src/tools/workflow/index.ts`，注销对应的 5 个 MCP 工具导出。
+- [ ] **Step 4: 清理 wasm 域中已迁移的离线工具**
+  - 删除 `wasmDecompile.ts`、`wasmDisassemble.ts`、`wasmInspectSections.ts`、`wasmOfflineRun.ts`、`wasmOptimize.ts`、`wasmCapabilities.ts`、`nativeCommand.ts`。
+  - 更新 `src/tools/wasm/manifest.ts` 与 `src/tools/wasm/index.ts`，仅保留活体浏览器工具（`collectWasm`, `wasmDump`, `wasmMemoryInspect`, `wasmVmpTrace`）。
+- [ ] **Step 5: 删除 `detectCrypto.ts` 与 `analyzeVm.ts`**
+  - 删除 `src/tools/analyzer/detectCrypto.ts`，更新 `src/tools/analyzer/manifest.ts` 与 `src/tools/analyzer/index.ts`。
+  - 删除 `src/tools/jsvmp/analyzeVm.ts`，更新 `src/tools/jsvmp/manifest.ts` 与 `src/tools/jsvmp/index.ts`。
+- [ ] **Step 6: 提交代码**
+  - `git add -u src/tools src/reverse scripts && git commit -m "refactor(tools): remove migrated offline tools from src/tools"`
+
+---
+
+### Task 8: 重新生成注册表与全量类型/单测回归
+
+**Files:**
+- Modify: `src/tools/generated-tools-index.ts`
+- Modify: `tests/unit/` 相关单测文件
+
+- [ ] **Step 1: 重新生成 MCP 注册表**
+  - 执行 `npm run build:index` 重新生成 `src/tools/generated-tools-index.ts`。
+- [ ] **Step 2: 修复关联单测断言**
+  - 调整或清理针对已删除 MCP 工具的冗余单测（如 `tests/unit/tools/sourcemap/`、`tests/unit/functions/rebuild.test.ts`、`tests/unit/tools/jshook-tools.handlers.test.ts`）。
+- [ ] **Step 3: 运行完整类型检查与构建**
+  - 执行 `npm run typecheck`。
+  - 执行 `npm run build`。
+- [ ] **Step 4: 运行单元测试与格式门禁**
+  - 执行 `npm run test:unit`。
+  - 执行 `npm run check-format`。
+- [ ] **Step 5: 提交代码**
+  - `git add . && git commit -m "chore: regenerate tools index and update regression tests"`

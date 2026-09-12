@@ -138,4 +138,30 @@ skills/
 | `export-rebuild-bundle.js` | `node skills/web-reverse-env/scripts/export-rebuild-bundle.js -o ./test-bundle && node ./test-bundle/entry.js` | 生成工程且 node 执行正常退出 |
 | `wasm-inspect.js` | `node skills/wsam-reverse/scripts/wasm-inspect.js <sample.wasm>` | 输出节区映射与内嵌字符串 |
 | `detect-crypto.js` | `node skills/web-reverse-algorithm/scripts/detect-crypto.js <sample.js>` | 正确检出 CryptoJS 或散列算法 |
-| `analyze-jsvmp-vm.js` | `node skills/ast-deobfuscation/scripts/analyze-jsvmp-vm.js <vm.js>` | 正确输出分派器类型与 Opcode 数量 |
+## 6. src/tools 原有工具及其关联代码删除清单 (Tools & Associated Code Removal)
+
+为避免能力重复、消除冗余维护负担并彻底精简 MCP 注册表上下文，在技能与 CLI 脚本落地并通过验证后，必须彻底清理 `src/tools/` 中的原有 MCP 工具及强关联死代码：
+
+### 6.1 待完全删除的工具目录与文件
+1. **SourceMap 域**：
+   - 彻底删除目录 `src/tools/sourcemap/`（包含 `index.ts`, `manifest.ts` 等）。
+   - 从 `scripts/generate-tools-index.ts` 中移除 `sourcemap` 域配置。
+2. **Rebuild 域**：
+   - 彻底删除目录 `src/tools/rebuild/`（包含 `index.ts`, `manifest.ts`, `rebuildFn.ts`, `types.ts` 等）。
+   - 从 `scripts/generate-tools-index.ts` 中移除 `rebuild` 域配置。
+   - 适配重构 `src/reverse/ExecutionAdapters.ts`，移除对 `src/tools/rebuild/index.js` 的导入与调用绑定。
+3. **Workflow 域离线子模块**：
+   - 删除 `src/tools/workflow/parameterWorkflows.ts`（已迁移至 `reverse-knowledge`）。
+   - 删除 `src/tools/workflow/advisor.ts`（已迁移至 `reverse-knowledge`）。
+   - 更新 `src/tools/workflow/manifest.ts` 与 `src/tools/workflow/index.ts`，注销 `list_parameter_workflows`, `get_parameter_workflow`, `recommend_parameter_workflow`, `recommend_next_stepTool`, `explainReverseStage`。
+4. **Wasm 域离线工具**：
+   - 删除 `src/tools/wasm/wasmDecompile.ts`、`src/tools/wasm/wasmDisassemble.ts`、`src/tools/wasm/wasmInspectSections.ts`、`src/tools/wasm/wasmOfflineRun.ts`、`src/tools/wasm/wasmOptimize.ts`、`src/tools/wasm/wasmCapabilities.ts`、`src/tools/wasm/nativeCommand.ts`。
+   - 更新 `src/tools/wasm/manifest.ts` 与 `src/tools/wasm/index.ts`，仅保留依附活体浏览器的抓取工具（`collectWasm`, `wasmDump`, `wasmMemoryInspect`）。
+5. **Analyzer / JSVMP 离线分析工具**：
+   - 删除 `src/tools/analyzer/detectCrypto.ts`，并同步更新 `src/tools/analyzer/manifest.ts` 与 `index.ts`。
+   - 删除 `src/tools/jsvmp/analyzeVm.ts`，并同步更新 `src/tools/jsvmp/manifest.ts` 与 `index.ts`。
+
+### 6.2 索引与测试联动清理
+1. **重新生成注册表**：执行 `npm run build:index`，自动重新生成 `src/tools/generated-tools-index.ts`。
+2. **关联单测修剪**：清理或适配直接断言被删除 MCP 工具定义的单测文件（如 `tests/unit/tools/sourcemap/`、`tests/unit/functions/rebuild.test.ts`、`tests/unit/tools/jshook-tools.handlers.test.ts` 中针对已移除工具断言的分支）。
+3. **构建与类型验证**：执行 `npm run typecheck` 与 `npm run build`，确保无悬挂引用或破坏性破坏。
