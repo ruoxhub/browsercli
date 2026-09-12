@@ -45,6 +45,21 @@ describe('WorkerArgs', () => {
     });
   });
 
+  it('parses `--flag=value` form used by config-file spawn flags', () => {
+    const config = parseWorkerArgs([
+      '--browserUrl=http://127.0.0.1:9222',
+      '--wsEndpoint=ws://browser',
+      '--executablePath=C:/Chrome/chrome.exe',
+      '--browserUrl=',
+    ]);
+
+    assert.deepStrictEqual(config, {
+      browserUrl: 'http://127.0.0.1:9222',
+      executablePath: 'C:/Chrome/chrome.exe',
+      wsEndpoint: 'ws://browser',
+    });
+  });
+
   it('maps resolved config into WorkerStartOptions', () => {
     const options = toWorkerOptions({
       browserUrl: 'http://127.0.0.1:9222',

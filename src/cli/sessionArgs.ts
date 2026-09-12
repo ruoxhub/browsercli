@@ -21,7 +21,12 @@ export const DAEMON_SPAWN_FLAGS = [
 ] as const;
 
 /** 允许带值的 spawn flag */
-export const DAEMON_VALUE_FLAGS = ['--console-port'] as const;
+export const DAEMON_VALUE_FLAGS = [
+  '--console-port',
+  '--browserUrl',
+  '--wsEndpoint',
+  '--executablePath',
+] as const;
 
 /**
  * 从 argv 解析会话名：-s=x / -s x / --session=x / --session x。
@@ -91,4 +96,58 @@ export function spawnFlagsFromArgv(argv: readonly string[]): string[] {
     }
   }
   return result;
+}
+
+/** 配置文件可下发的 spawn 相关键（值均为字符串，布尔以 'true'/'false' 存储） */
+export interface CliSpawnConfig {
+  headless?: string;
+  cloak?: string;
+  jsStealth?: string;
+  fullStealthArgs?: string;
+  minimalStealth?: string;
+  browserUrl?: string;
+  wsEndpoint?: string;
+  executablePath?: string;
+}
+
+const CONFIG_BOOL_TO_FLAG: Record<string, string> = {
+  headless: '--headless',
+  cloak: '--cloak',
+  jsStealth: '--js-stealth',
+  fullStealthArgs: '--full-stealth-args',
+  minimalStealth: '--minimal-stealth',
+};
+
+const CONFIG_VALUE_TO_FLAG: Record<string, string> = {
+  browserUrl: '--browserUrl',
+  wsEndpoint: '--wsEndpoint',
+  executablePath: '--executablePath',
+};
+
+/**
+ * 合并 spawnFlagsFromArgv(argv) 与配置文件下发的 flag。
+ * argv 显式出现过的 flag 名以 argv 为准（不重复追加）。
+ */
+export function mergeSpawnFlagsFromConfig(
+  argv: readonly string[],
+  config: CliSpawnConfig,
+): string[] {
+  const merged = spawnFlagsFromArgv(argv);
+  const argvFlagNames = new Set(argv.map(arg => arg.split('=')[0]));
+
+  for (const [key, flag] of Object.entries(CONFIG_BOOL_TO_FLAG)) {
+    if (
+      config[key as keyof CliSpawnConfig] === 'true' &&
+      !argvFlagNames.has(flag)
+    ) {
+      merged.push(flag);
+    }
+  }
+  for (const [key, flag] of Object.entries(CONFIG_VALUE_TO_FLAG)) {
+    const value = config[key as keyof CliSpawnConfig];
+    if (value && !argvFlagNames.has(flag)) {
+      merged.push(`${flag}=${value}`);
+    }
+  }
+  return merged;
 }

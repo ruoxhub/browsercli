@@ -26,10 +26,28 @@ import {successOutput} from '../output.js';
 import type {WorkerContext} from '../types.js';
 
 /** 合法配置键 */
-const VALID_KEYS = new Set<string>(['workerEntry']);
+const VALID_KEYS = new Set<string>([
+  'workerEntry',
+  'headless',
+  'cloak',
+  'jsStealth',
+  'fullStealthArgs',
+  'minimalStealth',
+  'browserUrl',
+  'wsEndpoint',
+  'executablePath',
+]);
 
 interface CliConfig {
   workerEntry?: string;
+  headless?: string;
+  cloak?: string;
+  jsStealth?: string;
+  fullStealthArgs?: string;
+  minimalStealth?: string;
+  browserUrl?: string;
+  wsEndpoint?: string;
+  executablePath?: string;
 }
 
 function getConfigPath(): string {

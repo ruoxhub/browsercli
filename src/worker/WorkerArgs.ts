@@ -39,6 +39,17 @@ export function parseWorkerArgs(args: string[]): GlobalConfig {
 
     const targetKey = VALUE_FLAGS[arg];
     if (!targetKey) {
+      // 兼容 CLI 侧 `--flag=value` 形态（daemon spawn 白名单要求 `=` 形态）
+      const eq = arg.indexOf('=');
+      const inlineKey = eq > 0 ? VALUE_FLAGS[arg.slice(0, eq)] : undefined;
+      if (inlineKey) {
+        if (eq + 1 < arg.length) {
+          cliConfig[inlineKey] = arg.slice(eq + 1) as never;
+        } else {
+          console.warn(`[Worker] 参数 ${arg} 缺少值，已忽略`);
+        }
+        continue;
+      }
       console.warn(`[Worker] 未知参数: ${arg}，已忽略`);
       continue;
     }

@@ -219,7 +219,17 @@ export function cliConfigPath(): string {
   return path.join(proxyDir, 'config.json');
 }
 
-function loadCliConfig(): {workerEntry?: string} {
+export function loadCliConfig(): {
+  workerEntry?: string;
+  headless?: string;
+  cloak?: string;
+  jsStealth?: string;
+  fullStealthArgs?: string;
+  minimalStealth?: string;
+  browserUrl?: string;
+  wsEndpoint?: string;
+  executablePath?: string;
+} {
   try {
     const parsed = JSON.parse(fs.readFileSync(cliConfigPath(), 'utf-8'));
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {

@@ -17,9 +17,9 @@ import {sessionCommands} from './commands/sessions.js';
 import {statusCommand} from './commands/status.js';
 import {toolDispatcherCommand} from './commands/tool-dispatcher.js';
 import {webCommand} from './commands/web.js';
-import {DaemonConnection, ensureDaemon} from './daemonClient.js';
+import {DaemonConnection, ensureDaemon, loadCliConfig} from './daemonClient.js';
 import {generateTopLevelHelp} from './help.js';
-import {sessionFromArgv, spawnFlagsFromArgv} from './sessionArgs.js';
+import {mergeSpawnFlagsFromConfig, sessionFromArgv} from './sessionArgs.js';
 import {resolveSessionName} from './sessionPaths.js';
 import type {WorkerContext} from './types.js';
 
@@ -44,7 +44,7 @@ export const homeCommand: AxiCliCommand<WorkerContext> = async () =>
 
 export function createWorkerContext(argv: readonly string[]): WorkerContext {
   const session = resolveSessionName(sessionFromArgv(argv));
-  const spawnFlags = spawnFlagsFromArgv(argv);
+  const spawnFlags = mergeSpawnFlagsFromConfig(argv, loadCliConfig());
   return {
     session,
     spawnFlags,
