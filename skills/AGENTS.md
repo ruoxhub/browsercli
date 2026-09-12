@@ -16,16 +16,17 @@ This AGENTS.md scopes guidance to `skills`. Parent AGENTS guidance still applies
 
 ### Subdirectories
 - `ast-deobfuscation/`
-- `browser-qa/`
-- `proxycli/`
-- `proxycli-playbook/`
 - `hello_js_reverse_skill/`
-- `js-reverse-automation/`
 - `protocol-reverse/`
+- `proxycli/`
+- `reverse-knowledge/`
+- `sourcemap-reverse/`
 - `web-js-env-patcher/`
 - `web-reverse-algorithm/`
 - `web-reverse-env/`
 - `web-verify-patcher/`
+- `websocket-reverse/`
+- `wsam-reverse/`
 
 <!-- OMX:AGENTS-INIT:MANUAL:START -->
 ## Local Notes
