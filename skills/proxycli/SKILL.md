@@ -1,6 +1,6 @@
 ---
 name: proxycli
-description: Use when the user wants to control the browser, inspect HTTP/WebSocket traffic, trace signature generation, inject JavaScript hooks, disassemble or decompile Wasm, debug with breakpoints, bypass anti-debugging, recover SourceMaps, automate DOM interactions, extract and rebuild offline Node.js crypto algorithms, or operate the browser via proxycli CLI, even if they simply mention "browser reverse", "capture request", "deobfuscate", "hook crypto", "find sign", or "proxycli".
+description: Use when the user wants to control the browser, inspect HTTP/WebSocket traffic, trace signature generation, inject JavaScript hooks, capture or trace Wasm, debug with breakpoints, bypass anti-debugging, automate DOM interactions, extract and rebuild offline Node.js crypto algorithms, or operate the browser via proxycli CLI, even if they simply mention "browser reverse", "capture request", "hook crypto", "find sign", or "proxycli".
 ---
 
 # ProxyCLI Skill
@@ -84,7 +84,7 @@ Always adhere to the core philosophy: **Observe-first**, **Hook-preferred**, **B
 1. **Reconnaissance**: Discover target pages, collect loaded scripts, and monitor network requests without modifying page state.
 2. **Interception**: Prefer non-blocking hooks over breakpoints to capture dynamic runtime payloads, crypto arguments, and keys without pausing script execution.
 3. **Analysis**: Correlate network request initiators back to JavaScript source lines; use AST deobfuscation to unravel minified control flows.
-4. **Reconstruction**: Export self-contained offline Node.js execution bundles, audit browser API gaps with `diff_env_requirements`, and verify parity.
+4. **Reconstruction**: Export self-contained offline Node.js execution bundles and verify parity with the browser.
 
 ---
 
@@ -92,22 +92,22 @@ Always adhere to the core philosophy: **Observe-first**, **Hook-preferred**, **B
 
 Detailed parameters, signatures, and examples for each category are modularized under `references/`. Read the relevant reference document as needed:
 
-| Category / Model        | Reference File                                       | Key Capabilities & Tools                                                                                                              |
-| ----------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| **Browser & Pages**     | [`references/browser.md`](./references/browser.md)   | Tab navigation, URL switching, iframe selection, health check (`list_pages`, `new_page`, `navigate_page`, `select_frame`)             |
-| **Script & Source**     | [`references/script.md`](./references/script.md)     | Loaded scripts, source retrieval, keyword search, target snapshots (`list_scripts`, `get_script_source`, `collect_code`)              |
-| **Code Analyzer**       | [`references/analyzer.md`](./references/analyzer.md) | AST deobfuscation, CAPTCHA inspection (`deobfuscate_code`, `detect_captcha`)；代码理解/摘要/加密识别/风险评分见 skill `code-analysis` |
-| **Dynamic Hooks**       | [`references/hook.md`](./references/hook.md)         | Non-blocking runtime hooks, crypto presets (CryptoJS/RSA/SM), auto-hook (`create_hook`, `inject_hook`, `get_hook_data`, `auto_hook`)  |
-| **Debugger**            | [`references/debugger.md`](./references/debugger.md) | Line & XHR breakpoints, stepping, scope evaluation (`set_breakpoint`, `break_on_xhr`, `inspect_locals`, `evaluate_script`)            |
-| **Stealth**             | [`references/stealth.md`](./references/stealth.md)   | Anti-anti-debug, infinite debugger loop bypass, fingerprint stealth (`bypass_debugger`, `anti_anti_debug`, `inject_stealth`)          |
-| **WebAssembly**         | [`references/wasm.md`](./references/wasm.md)         | Wasm capture, dump, decompilation (C-like), disassembly (WAT), sandboxed execution (`collect_wasm`, `wasm_dump`, `wasm_decompile`)    |
-| **DOM & Input**         | [`references/dom.md`](./references/dom.md)           | Selector queries, click/type/drag simulation, screenshots (`query_dom`, `click_at`, `type_text`, `take_screenshot`)                   |
-| **Network & WS**        | [`references/network.md`](./references/network.md)   | Request sniffing, initiator stack trace, replay, cURL export, WebSocket frames (`list_network_requests`, `get_request_initiator`)     |
-| **MITM Proxy**          | [`references/proxy.md`](./references/proxy.md)       | Non-browser traffic capture, rewrite rules, HAR export (`start_mitm_proxy`, `list_mitm_requests`, `mitm_add_rule`)                    |
-| **Rebuild & SourceMap** | [`references/rebuild.md`](./references/rebuild.md)   | Offline bundle export, env diffing, SourceMap recovery (`record_reverse_evidence`, `rebuild_bundle`, `sourcemap_reconstruct_tree`)    |
-| **Workflow Guides**     | [`references/workflow.md`](./references/workflow.md) | Reverse-engineering next-step advisor, parameter workflow playbooks (`recommend_next_step`, `recommend_parameter_workflow`)           |
-| **Session & Storage**   | [`references/session.md`](./references/session.md)   | Cookie/Storage snapshots, session persistence, video frame capture (`get_storage`, `save_session_state`, `restore_session_state`)     |
-| **Full Model Index**    | [`references/model.md`](./references/model.md)       | Complete alphabetical tool-to-reference lookup dictionary                                                                             |
+| Category / Model       | Reference File                                       | Key Capabilities & Tools                                                                                                             |
+| ---------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| **Browser & Pages**    | [`references/browser.md`](./references/browser.md)   | Tab navigation, URL switching, iframe selection, health check (`list_pages`, `new_page`, `navigate_page`, `select_frame`)            |
+| **Script & Source**    | [`references/script.md`](./references/script.md)     | Loaded scripts, source retrieval, keyword search, target snapshots (`list_scripts`, `get_script_source`, `collect_code`)             |
+| **Code Analyzer**      | [`references/analyzer.md`](./references/analyzer.md) | CAPTCHA state inspection (`detect_captcha`)                                                                                          |
+| **Dynamic Hooks**      | [`references/hook.md`](./references/hook.md)         | Non-blocking runtime hooks, crypto presets (CryptoJS/RSA/SM), auto-hook (`create_hook`, `inject_hook`, `get_hook_data`, `auto_hook`) |
+| **Debugger**           | [`references/debugger.md`](./references/debugger.md) | Line & XHR breakpoints, stepping, scope evaluation (`set_breakpoint`, `break_on_xhr`, `inspect_locals`, `evaluate_script`)           |
+| **Stealth**            | [`references/stealth.md`](./references/stealth.md)   | Anti-anti-debug, infinite debugger loop bypass, fingerprint stealth (`bypass_debugger`, `anti_anti_debug`, `inject_stealth`)         |
+| **WebAssembly**        | [`references/wasm.md`](./references/wasm.md)         | Wasm capture, dump, boundary tracing, memory inspection (`collect_wasm`, `wasm_dump`, `wasm_vmp_trace`, `wasm_memory_inspect`)       |
+| **DOM & Input**        | [`references/dom.md`](./references/dom.md)           | Selector queries, click/type/drag simulation, screenshots (`query_dom`, `click_at`, `type_text`, `take_screenshot`)                  |
+| **Network & WS**       | [`references/network.md`](./references/network.md)   | Request sniffing, initiator stack trace, replay, cURL export, WebSocket frames (`list_network_requests`, `get_request_initiator`)    |
+| **MITM Proxy**         | [`references/proxy.md`](./references/proxy.md)       | Non-browser traffic capture, rewrite rules, HAR export (`start_mitm_proxy`, `list_mitm_requests`, `mitm_add_rule`)                   |
+| **Rebuild & Evidence** | [`references/rebuild.md`](./references/rebuild.md)   | Offline bundle building, evidence logging (`record_reverse_evidence`, `rebuild_bundle`, `trace_signature_generation`)                |
+| **Workflow**           | [`references/workflow.md`](./references/workflow.md) | Automated observe-and-collect workflow on a target page (`observe_flow`)                                                             |
+| **Session & Storage**  | [`references/session.md`](./references/session.md)   | Cookie/Storage snapshots, session persistence, video frame capture (`get_storage`, `save_session_state`, `restore_session_state`)    |
+| **Full Model Index**   | [`references/model.md`](./references/model.md)       | Complete alphabetical tool-to-reference lookup dictionary                                                                            |
 
 ---
 
@@ -146,23 +146,7 @@ Detailed parameters, signatures, and examples for each category are modularized 
    proxycli call get_hook_data --hookId "sign_hook"
    ```
 
-### Scenario B: Deobfuscating Obfuscator.io (`_0x`) Code
-
-1. Retrieve obfuscated code slice or function body:
-
-   ```bash
-   proxycli call get_script_source --scriptId <scriptId> --startLine 1 --endLine 100
-   ```
-
-2. Deobfuscate string array decoders and flatten control flow:
-
-   ```bash
-   proxycli call deobfuscate_code --code "<raw_code>" --aggressive true --renameVariables true
-   ```
-
-3. Scan for underlying standard crypto signatures（按 skill `code-analysis` 的加密识别规则自行分析，`detect_crypto` 工具已下线）。
-
-### Scenario C: Bypass Infinite Debugger & Anti-Debug
+### Scenario B: Bypass Infinite Debugger & Anti-Debug
 
 When execution is locked by an anti-debug timer or infinite `debugger;` statement:
 
@@ -174,7 +158,7 @@ proxycli call bypass_debugger
 proxycli call anti_anti_debug
 ```
 
-### Scenario D: Reverse-Engineer WebAssembly Encryption
+### Scenario C: Reverse-Engineer WebAssembly Encryption
 
 1. Capture runtime Wasm compilation (supports `--captureBase64 <bool>` for inline bytecode):
 
@@ -188,39 +172,14 @@ proxycli call anti_anti_debug
    proxycli call wasm_dump --moduleIndex 0 --outputPath "artifacts/wasm/core.wasm"
    ```
 
-3. Decompile to readable C-like pseudocode:
+3. Trace JS↔Wasm boundary calls and inspect linear memory:
 
    ```bash
-   proxycli call wasm_decompile --inputPath "artifacts/wasm/core.wasm" --outputPath "artifacts/wasm/core.c"
+   proxycli call wasm_vmp_trace --maxEvents 100
+   proxycli call wasm_memory_inspect --searchPattern "token=" --length 1024
    ```
 
-4. Verify function execution in a standalone local sandbox:
-
-   ```bash
-   proxycli call wasm_offline_run --inputPath "artifacts/wasm/core.wasm" --functionName "encrypt" --args '[123]'
-   ```
-
-### Scenario E: Full Project Recovery via SourceMap
-
-1. Check if scripts expose SourceMap URLs:
-
-   ```bash
-   proxycli call sourcemap_discover --urlPattern "main.js"
-   ```
-
-2. Parse the remote or inline SourceMap:
-
-   ```bash
-   proxycli call sourcemap_parse --mapUrl "https://example.com/static/js/main.js.map"
-   ```
-
-3. Reconstruct the original TypeScript / React source tree to disk:
-
-   ```bash
-   proxycli call sourcemap_reconstruct_tree --mapId <mapId> --outputDir "artifacts/src_recovered/" --overwrite true
-   ```
-
-### Scenario F: Non-Browser Traffic Interception & Rule Rewriting
+### Scenario D: Non-Browser Traffic Interception & Rule Rewriting
 
 When reverse-engineering desktop apps, mobile endpoints, or Node.js scripts outside the browser:
 
@@ -270,10 +229,10 @@ Once the algorithm is extracted, package and verify it locally:
    ```
 
 3. **Audit Environment Mismatches**:
-   If the offline script throws runtime missing-object errors in Node.js, run:
+   If the generated bundle throws missing-object errors in Node.js, diff the runtime log against browser capabilities:
 
    ```bash
-   proxycli call diff_env_requirements --runtimeError "ReferenceError: window is not defined"
+   node skills/web-reverse-env/scripts/diff-env-requirements.js --error "ReferenceError: window is not defined"
    ```
 
    Add minimal mocks based on the output until local output matches browser output exactly.
