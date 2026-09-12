@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {BrowserContext, Frame, Page} from 'patchright';
+import type {BrowserContext, CDPSession, Frame, Page} from 'patchright';
 
 /**
  * 泛型页面数据收集器基类
@@ -26,6 +26,14 @@ export abstract class PageCollector<T extends {stableId: number}> {
   private frameNavHandlers = new WeakMap<Page, (frame: Frame) => void>();
   private contextPageHandler: ((page: Page) => void) | null = null;
   private context: BrowserContext | null = null;
+
+  /** 每页的 CDP 会话与同文档导航计数（SPA 路由检测） */
+  private cdpSessions = new WeakMap<Page, CDPSession>();
+  private nwdListeners = new WeakMap<
+    Page,
+    (event: {frameId?: string}) => void
+  >();
+  private pendingSameDocNavs = new WeakMap<Page, number>();
 
   constructor(maxNavigationSaved = 3) {
     this.maxNavigationSaved = maxNavigationSaved;
@@ -67,14 +75,47 @@ export abstract class PageCollector<T extends {stableId: number}> {
 
     this.attachListeners(page, navigations);
 
-    // 主 frame 导航时分割存储
+    // 主 frame 导航时分割存储。
+    // SPA 同文档路由（pushState/hash）也会触发 framenavigated，不能分割——
+    // CDP Page.navigatedWithinDocument 与 framenavigated 在同一事件循环
+    // tick 内先后到达（实测 0ms），因此用 setImmediate 延迟分割，
+    // nwid 到达则取消（跨文档导航从不发 nwid）。
     const onFrameNavigated = (frame: Frame): void => {
-      if (frame === page.mainFrame()) {
-        this.splitOnNavigation(page);
-      }
+      if (frame !== page.mainFrame()) return;
+      // 用 -1 标记本 tick 内待决的主 frame 导航（nwid 到达会归零），
+      // setImmediate 里仍小于 0 才说明没有 nwid 抵消，是真实导航。
+      const pending = (this.pendingSameDocNavs.get(page) ?? 0) - 1;
+      this.pendingSameDocNavs.set(page, pending);
+      setImmediate(() => {
+        const remaining = this.pendingSameDocNavs.get(page) ?? 0;
+        if (remaining < 0) {
+          this.pendingSameDocNavs.set(page, 0);
+          this.splitOnNavigation(page);
+        }
+      });
     };
     page.on('framenavigated', onFrameNavigated);
     this.frameNavHandlers.set(page, onFrameNavigated);
+
+    // CDP 会话监听同文档导航（fire-and-forget，失败静默——无 CDP 时
+    // 退化为旧行为：一律分割）。
+    void page
+      .context()
+      .newCDPSession(page)
+      .then(client => {
+        this.cdpSessions.set(page, client);
+        const onNwid = (): void => {
+          // 本 tick 有未决导航（值为负）则归零，取消其分割；否则无害。
+          const pending = this.pendingSameDocNavs.get(page) ?? 0;
+          if (pending < 0) {
+            this.pendingSameDocNavs.set(page, 0);
+          }
+        };
+        client.on('Page.navigatedWithinDocument', onNwid as never);
+        this.nwdListeners.set(page, onNwid);
+        void client.send('Page.enable').catch(() => undefined);
+      })
+      .catch(() => undefined);
 
     // 页面关闭时自动清理
     page.once('close', () => {
@@ -96,6 +137,22 @@ export abstract class PageCollector<T extends {stableId: number}> {
         // Page might already be closed
       }
       this.frameNavHandlers.delete(page);
+    }
+
+    const nwdListener = this.nwdListeners.get(page);
+    const cdpSession = this.cdpSessions.get(page);
+    if (nwdListener && cdpSession) {
+      try {
+        cdpSession.off('Page.navigatedWithinDocument', nwdListener as never);
+      } catch {
+        // Session may already be detached
+      }
+    }
+    this.nwdListeners.delete(page);
+    this.cdpSessions.delete(page);
+    this.pendingSameDocNavs.delete(page);
+    if (cdpSession) {
+      void cdpSession.detach().catch(() => undefined);
     }
 
     this.storage.delete(page);
