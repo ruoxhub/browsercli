@@ -68,7 +68,11 @@ function readString(buffer, offset) {
   if (start + len.value > buffer.length) {
     return {value: '<invalid string>', bytesRead: len.bytesRead};
   }
-  const str = Buffer.from(buffer.buffer, buffer.byteOffset + start, len.value).toString('utf-8');
+  const str = Buffer.from(
+    buffer.buffer,
+    buffer.byteOffset + start,
+    len.value,
+  ).toString('utf-8');
   return {value: str, bytesRead: len.bytesRead + len.value};
 }
 
@@ -157,7 +161,11 @@ function extractPrintableStrings(buffer, minLength = 4) {
       if (start !== -1) {
         const len = i - start;
         if (len >= minLength) {
-          const str = Buffer.from(buffer.buffer, buffer.byteOffset + start, len).toString('ascii');
+          const str = Buffer.from(
+            buffer.buffer,
+            buffer.byteOffset + start,
+            len,
+          ).toString('ascii');
           strings.push({offset: start, length: len, string: str});
         }
         start = -1;
@@ -167,7 +175,11 @@ function extractPrintableStrings(buffer, minLength = 4) {
 
   if (start !== -1 && buffer.length - start >= minLength) {
     const len = buffer.length - start;
-    const str = Buffer.from(buffer.buffer, buffer.byteOffset + start, len).toString('ascii');
+    const str = Buffer.from(
+      buffer.buffer,
+      buffer.byteOffset + start,
+      len,
+    ).toString('ascii');
     strings.push({offset: start, length: len, string: str});
   }
 
@@ -229,7 +241,9 @@ async function main() {
       buffer[2] !== 0x73 ||
       buffer[3] !== 0x6d
     ) {
-      throw new Error('不是合法的 WebAssembly 二进制文件（Magic Number 不匹配）');
+      throw new Error(
+        '不是合法的 WebAssembly 二进制文件（Magic Number 不匹配）',
+      );
     }
 
     const version =
@@ -292,14 +306,20 @@ async function main() {
       console.log(JSON.stringify({success: true, data: result}, null, 2));
     } else {
       console.log('🔬 WebAssembly 二进制结构检查报告');
-      console.log('============================================================');
+      console.log(
+        '============================================================',
+      );
       console.log(`   文件: ${path.resolve(inputPath)}`);
       console.log(`   大小: ${buffer.length} 字节 | 版本: ${version}`);
-      console.log(`   节区: ${sections.length} 个 | 导入: ${importsList.length} 项 | 导出: ${exportsList.length} 项`);
+      console.log(
+        `   节区: ${sections.length} 个 | 导入: ${importsList.length} 项 | 导出: ${exportsList.length} 项`,
+      );
 
       console.log('\n📂 节区清单 (Sections):');
       for (const s of sections) {
-        console.log(`   - [ID ${s.id.toString().padStart(2, ' ')}] ${s.name.padEnd(12, ' ')} 偏移: 0x${s.offset.toString(16).padStart(6, '0')} | 大小: ${s.size} 字节`);
+        console.log(
+          `   - [ID ${s.id.toString().padStart(2, ' ')}] ${s.name.padEnd(12, ' ')} 偏移: 0x${s.offset.toString(16).padStart(6, '0')} | 大小: ${s.size} 字节`,
+        );
       }
 
       if (exportsList.length > 0) {
@@ -319,16 +339,22 @@ async function main() {
       if (includeStrings && strings.length > 0) {
         console.log(`\n🔤 内嵌常量字符串 (前 ${strings.length} 个):`);
         for (const s of strings.slice(0, 20)) {
-          console.log(`   [0x${s.offset.toString(16).padStart(5, '0')}] ${s.string}`);
+          console.log(
+            `   [0x${s.offset.toString(16).padStart(5, '0')}] ${s.string}`,
+          );
         }
         if (strings.length > 20) {
-          console.log(`   ... 还有 ${strings.length - 20} 个字符串未展开（使用 --json 查看完整列表）`);
+          console.log(
+            `   ... 还有 ${strings.length - 20} 个字符串未展开（使用 --json 查看完整列表）`,
+          );
         }
       }
     }
   } catch (error) {
     if (isJson) {
-      console.log(JSON.stringify({success: false, error: error.message}, null, 2));
+      console.log(
+        JSON.stringify({success: false, error: error.message}, null, 2),
+      );
     } else {
       console.error(`❌ 检查失败: ${error.message}`);
     }

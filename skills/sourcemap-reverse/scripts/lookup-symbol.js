@@ -47,7 +47,11 @@ async function main() {
         input: {type: 'string', short: 'i'},
         line: {type: 'string', short: 'l'},
         column: {type: 'string', short: 'c'},
-        direction: {type: 'string', short: 'd', default: 'generated_to_original'},
+        direction: {
+          type: 'string',
+          short: 'd',
+          default: 'generated_to_original',
+        },
         source: {type: 'string', short: 's'},
         bias: {type: 'string', short: 'b', default: 'greatest_lower_bound'},
         json: {type: 'boolean', default: false},
@@ -96,7 +100,9 @@ async function main() {
   }
 
   if (direction === 'original_to_generated' && !source) {
-    console.error('错误: 当方向为 original_to_generated 时，必须通过 --source 指定源文件路径');
+    console.error(
+      '错误: 当方向为 original_to_generated 时，必须通过 --source 指定源文件路径',
+    );
     process.exit(1);
   }
 
@@ -146,7 +152,9 @@ async function main() {
         console.log(`   生成坐标: 行 ${line}, 列 ${column}`);
         if (result.match.source) {
           console.log(`   原始源码: ${result.match.source}`);
-          console.log(`   原始坐标: 行 ${result.match.line}, 列 ${result.match.column}`);
+          console.log(
+            `   原始坐标: 行 ${result.match.line}, 列 ${result.match.column}`,
+          );
           if (result.match.name) {
             console.log(`   原始符号名: ${result.match.name}`);
           }
@@ -156,7 +164,9 @@ async function main() {
       } else {
         console.log(`   原始源码: ${source} (行 ${line}, 列 ${column})`);
         if (result.match.line !== null) {
-          console.log(`   生成坐标: 行 ${result.match.line}, 列 ${result.match.column}`);
+          console.log(
+            `   生成坐标: 行 ${result.match.line}, 列 ${result.match.column}`,
+          );
         } else {
           console.log('   未找到对应的生成代码映射');
         }
@@ -164,7 +174,9 @@ async function main() {
     }
   } catch (error) {
     if (isJson) {
-      console.log(JSON.stringify({success: false, error: error.message}, null, 2));
+      console.log(
+        JSON.stringify({success: false, error: error.message}, null, 2),
+      );
     } else {
       console.error(`❌ 查询失败: ${error.message}`);
     }

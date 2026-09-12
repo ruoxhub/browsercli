@@ -14,21 +14,22 @@ const CAPABILITY_RULES = [
     capability: 'window',
     patterns: [
       'window is not defined',
-      'cannot read properties of undefined (reading \'window\')',
+      "cannot read properties of undefined (reading 'window')",
       'self is not defined',
     ],
     reason: '目标脚本依赖浏览器全局 Window 顶层对象。',
     priority: 100,
-    patchCode: 'globalThis.window = globalThis;\nglobalThis.self = globalThis;\nglobalThis.top = globalThis;\nglobalThis.parent = globalThis;',
+    patchCode:
+      'globalThis.window = globalThis;\nglobalThis.self = globalThis;\nglobalThis.top = globalThis;\nglobalThis.parent = globalThis;',
   },
   {
     capability: 'document',
     patterns: [
       'document is not defined',
-      'cannot read properties of undefined (reading \'cookie\')',
-      'cannot read properties of undefined (reading \'createelement\')',
-      'cannot read properties of undefined (reading \'getelementbyid\')',
-      'cannot read properties of undefined (reading \'queryselector\')',
+      "cannot read properties of undefined (reading 'cookie')",
+      "cannot read properties of undefined (reading 'createelement')",
+      "cannot read properties of undefined (reading 'getelementbyid')",
+      "cannot read properties of undefined (reading 'queryselector')",
     ],
     reason: '目标脚本执行了 DOM 节点创建、查找或 Cookie 读取。',
     priority: 95,
@@ -56,12 +57,13 @@ const CAPABILITY_RULES = [
     capability: 'navigator',
     patterns: [
       'navigator is not defined',
-      'cannot read properties of undefined (reading \'useragent\')',
-      'cannot read properties of undefined (reading \'webdriver\')',
-      'cannot read properties of undefined (reading \'platform\')',
+      "cannot read properties of undefined (reading 'useragent')",
+      "cannot read properties of undefined (reading 'webdriver')",
+      "cannot read properties of undefined (reading 'platform')",
       'cannot set property navigator of #<object> which has only a getter',
     ],
-    reason: '目标脚本读取浏览器指纹（UA、platform、languages 等），注意 Node 21+ 必须使用 Object.defineProperty。',
+    reason:
+      '目标脚本读取浏览器指纹（UA、platform、languages 等），注意 Node 21+ 必须使用 Object.defineProperty。',
     priority: 90,
     patchCode: `Object.defineProperty(globalThis, 'navigator', {
   value: {
@@ -85,10 +87,10 @@ const CAPABILITY_RULES = [
     capability: 'location',
     patterns: [
       'location is not defined',
-      'cannot read properties of undefined (reading \'href\')',
-      'cannot read properties of undefined (reading \'host\')',
-      'cannot read properties of undefined (reading \'protocol\')',
-      'cannot read properties of undefined (reading \'pathname\')',
+      "cannot read properties of undefined (reading 'href')",
+      "cannot read properties of undefined (reading 'host')",
+      "cannot read properties of undefined (reading 'protocol')",
+      "cannot read properties of undefined (reading 'pathname')",
     ],
     reason: '目标脚本通过 location 获取当前网页 URL 地址或协议域名。',
     priority: 85,
@@ -110,7 +112,7 @@ const CAPABILITY_RULES = [
     capability: 'localStorage',
     patterns: [
       'localstorage is not defined',
-      'cannot read properties of undefined (reading \'getitem\')',
+      "cannot read properties of undefined (reading 'getitem')",
     ],
     reason: '目标脚本尝试从本地持久化 Storage 读写键值。',
     priority: 80,
@@ -126,9 +128,7 @@ const CAPABILITY_RULES = [
   },
   {
     capability: 'sessionStorage',
-    patterns: [
-      'sessionstorage is not defined',
-    ],
+    patterns: ['sessionstorage is not defined'],
     reason: '目标脚本尝试从 SessionStorage 读写会话键值。',
     priority: 75,
     patchCode: `globalThis.sessionStorage ??= {
@@ -144,12 +144,13 @@ const CAPABILITY_RULES = [
   {
     capability: 'crypto',
     patterns: [
-      'reading \'subtle\'',
+      "reading 'subtle'",
       'crypto is not defined',
       'getrandomvalues is not a function',
-      'cannot read properties of undefined (reading \'getrandomvalues\')',
+      "cannot read properties of undefined (reading 'getrandomvalues')",
     ],
-    reason: '目标脚本调用了 Web Cryptography API (crypto.getRandomValues 或 crypto.subtle)。',
+    reason:
+      '目标脚本调用了 Web Cryptography API (crypto.getRandomValues 或 crypto.subtle)。',
     priority: 88,
     patchCode: `import nodeCrypto from 'node:crypto';
 globalThis.crypto ??= nodeCrypto.webcrypto || {
@@ -159,10 +160,7 @@ globalThis.crypto ??= nodeCrypto.webcrypto || {
   },
   {
     capability: 'atob_btoa',
-    patterns: [
-      'atob is not defined',
-      'btoa is not defined',
-    ],
+    patterns: ['atob is not defined', 'btoa is not defined'],
     reason: '目标脚本使用了浏览器原生的 Base64 编解码方法。',
     priority: 70,
     patchCode: `globalThis.atob ??= (str) => Buffer.from(str, 'base64').toString('binary');
@@ -171,7 +169,7 @@ globalThis.btoa ??= (bin) => Buffer.from(bin, 'binary').toString('base64');`,
   {
     capability: 'addEventListener',
     patterns: [
-      'cannot read properties of undefined (reading \'addeventlistener\')',
+      "cannot read properties of undefined (reading 'addeventlistener')",
       'window.addeventlistener is not a function',
     ],
     reason: '目标脚本注册了全局事件监听器 (如 load, scroll, resize)。',
@@ -258,9 +256,17 @@ async function main() {
 
   if (matches.length === 0) {
     if (isJson) {
-      console.log(JSON.stringify({success: true, matchedCount: 0, recommendations: []}, null, 2));
+      console.log(
+        JSON.stringify(
+          {success: true, matchedCount: 0, recommendations: []},
+          null,
+          2,
+        ),
+      );
     } else {
-      console.log('🔍 未能在当前报错日志中精准匹配到常见内置浏览器环境缺失特征。');
+      console.log(
+        '🔍 未能在当前报错日志中精准匹配到常见内置浏览器环境缺失特征。',
+      );
       console.log('   报错原内容:\n   ' + errorText.slice(0, 300));
     }
     return;
@@ -280,14 +286,20 @@ async function main() {
     console.log(JSON.stringify(result, null, 2));
   } else {
     console.log(`💡 检测到 ${matches.length} 处浏览器能力缺失推断:`);
-    console.log('============================================================\n');
+    console.log(
+      '============================================================\n',
+    );
     for (const m of matches) {
       console.log(`📌 缺失能力: [${m.capability}]`);
       console.log(`   原因: ${m.reason}`);
       console.log(`   建议补丁 (写入 env.js 或 polyfills.js):`);
-      console.log('------------------------------------------------------------');
+      console.log(
+        '------------------------------------------------------------',
+      );
       console.log(m.patchCode);
-      console.log('------------------------------------------------------------\n');
+      console.log(
+        '------------------------------------------------------------\n',
+      );
     }
   }
 }

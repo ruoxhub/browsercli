@@ -59,9 +59,11 @@ function createRuntime() {
     }),
   };
 
+  const mockPage = {id: 0, isClosed: () => false};
+
   return {
-    getPages: () => [{id: 0}] as never[],
-    getSelectedPage: () => ({id: 0}) as never,
+    getPages: () => [mockPage] as never[],
+    getSelectedPage: () => mockPage as never,
     getSelectedPageIndex: () => 0,
     getNetworkRequests: () => [signedRequest] as never[],
     getNetworkRequestById: () => signedRequest as never,

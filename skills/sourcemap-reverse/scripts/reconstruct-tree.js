@@ -138,14 +138,23 @@ async function main() {
       const targetPath = path.resolve(outputDir, relPath);
 
       // 安全检查：防止路径穿越超出 outputDir
-      if (!targetPath.startsWith(outputDir + path.sep) && targetPath !== outputDir) {
-        skippedFiles.push({source: rawSource, reason: 'Path traversal prevented'});
+      if (
+        !targetPath.startsWith(outputDir + path.sep) &&
+        targetPath !== outputDir
+      ) {
+        skippedFiles.push({
+          source: rawSource,
+          reason: 'Path traversal prevented',
+        });
         continue;
       }
 
       const fileContent = sourcesContent[i];
       if (typeof fileContent !== 'string') {
-        skippedFiles.push({source: rawSource, reason: 'sourcesContent is empty or null'});
+        skippedFiles.push({
+          source: rawSource,
+          reason: 'sourcesContent is empty or null',
+        });
         continue;
       }
 
@@ -162,7 +171,10 @@ async function main() {
         writtenFiles.push({source: rawSource, relativePath: relPath, bytes});
       } catch (err) {
         if (err.code === 'EEXIST') {
-          skippedFiles.push({source: rawSource, reason: 'File exists (use --overwrite)'});
+          skippedFiles.push({
+            source: rawSource,
+            reason: 'File exists (use --overwrite)',
+          });
         } else {
           skippedFiles.push({source: rawSource, reason: err.message});
         }
@@ -186,14 +198,18 @@ async function main() {
     } else {
       console.log('✅ SourceMap 源码树还原完成！');
       console.log(`   目标目录: ${outputDir}`);
-      console.log(`   成功还原: ${writtenFiles.length} 个文件 (${(totalBytes / 1024).toFixed(2)} KB)`);
+      console.log(
+        `   成功还原: ${writtenFiles.length} 个文件 (${(totalBytes / 1024).toFixed(2)} KB)`,
+      );
       if (skippedFiles.length > 0) {
         console.log(`   跳过文件: ${skippedFiles.length} 个 (无内容或已存在)`);
       }
     }
   } catch (error) {
     if (isJson) {
-      console.log(JSON.stringify({success: false, error: error.message}, null, 2));
+      console.log(
+        JSON.stringify({success: false, error: error.message}, null, 2),
+      );
     } else {
       console.error(`❌ 还原失败: ${error.message}`);
     }
@@ -201,6 +217,12 @@ async function main() {
   }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname.replace(/^\/([a-zA-Z]:)/, '$1'))) {
+if (
+  process.argv[1] &&
+  path.resolve(process.argv[1]) ===
+    path.resolve(
+      new URL(import.meta.url).pathname.replace(/^\/([a-zA-Z]:)/, '$1'),
+    )
+) {
   main();
 }

@@ -155,9 +155,7 @@ const STAGES = {
       '完成交付产物（Python wheel, Go 绑定, 或本地 CLI 脚本）',
       '配套调用示例与持续验证脚本',
     ],
-    avoid: [
-      '未做异常捕获与版本探测直接交付上线',
-    ],
+    avoid: ['未做异常捕获与版本探测直接交付上线'],
     recommendedActions: [
       '打包为标准库或编写 Python subprocess / node-vm 调用封装',
       '编写自动化回归测试脚本',
@@ -256,7 +254,8 @@ function recommendNext(opts) {
     return {
       stage: 'Patch',
       confidence: 0.85,
-      action: '在本地运行 entry.js，观察报错并用 diff-env-requirements 针对性修复',
+      action:
+        '在本地运行 entry.js，观察报错并用 diff-env-requirements 针对性修复',
       why: '已建立本地脚手架但尚未完全跑通，需沿着报错链条逐步对齐浏览器环境真值。',
       avoid: ['无日志盲补', '一次性修改过多代码'],
     };
@@ -315,7 +314,9 @@ function main() {
         console.log(JSON.stringify({success: true, stages: STAGES}, null, 2));
       } else {
         console.log('🧭 逆向工程 6 大阶段决策向导与标准手册');
-        console.log('============================================================\n');
+        console.log(
+          '============================================================\n',
+        );
         for (const [key, s] of Object.entries(STAGES)) {
           console.log(`📌 [${key}] ${s.name}`);
           console.log(`   🎯 阶段目标: ${s.goal}`);
@@ -328,9 +329,13 @@ function main() {
       return;
     }
 
-    const matchedKey = Object.keys(STAGES).find(k => k.toLowerCase() === target.toLowerCase());
+    const matchedKey = Object.keys(STAGES).find(
+      k => k.toLowerCase() === target.toLowerCase(),
+    );
     if (!matchedKey) {
-      console.error(`错误: 未知阶段 "${target}"。可选: ${Object.keys(STAGES).join(', ')}, all`);
+      console.error(
+        `错误: 未知阶段 "${target}"。可选: ${Object.keys(STAGES).join(', ')}, all`,
+      );
       process.exit(1);
     }
 
@@ -354,7 +359,10 @@ function main() {
 
   // 状态机推荐下一步
   const hasTarget = parseBool(values['has-target']);
-  const hookRecords = values['hook-records'] !== undefined ? parseInt(values['hook-records'], 10) : undefined;
+  const hookRecords =
+    values['hook-records'] !== undefined
+      ? parseInt(values['hook-records'], 10)
+      : undefined;
   const hasRebuild = parseBool(values['has-rebuild']);
   const passing = parseBool(values.passing);
   const firstDivergenceKnown = parseBool(values['first-divergence']);
@@ -373,7 +381,9 @@ function main() {
   } else {
     console.log('🤖 逆向工作流决策向导建议:');
     console.log('------------------------------------------------------------');
-    console.log(`   当前推荐阶段: [${advice.stage}] (置信度: ${(advice.confidence * 100).toFixed(0)}%)`);
+    console.log(
+      `   当前推荐阶段: [${advice.stage}] (置信度: ${(advice.confidence * 100).toFixed(0)}%)`,
+    );
     console.log(`   👉 推荐动作: ${advice.action}`);
     console.log(`   💡 推荐原因: ${advice.why}`);
     if (advice.avoid && advice.avoid.length > 0) {

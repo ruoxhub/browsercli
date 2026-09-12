@@ -13,7 +13,10 @@ import {parseArgs} from 'node:util';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const REPO_ROOT = path.resolve(__dirname, '../../../');
-const BLUEPRINTS_DIR = path.join(REPO_ROOT, 'docs/knowledge/parameter-blueprints');
+const BLUEPRINTS_DIR = path.join(
+  REPO_ROOT,
+  'docs/knowledge/parameter-blueprints',
+);
 
 function printHelp() {
   console.log(`
@@ -97,7 +100,11 @@ function scoreWorkflow(item, queryLower) {
   if (Array.isArray(item.keywords)) {
     for (const kw of item.keywords) {
       if (kw.toLowerCase() === queryLower) score += 80;
-      else if (queryLower.includes(kw.toLowerCase()) || kw.toLowerCase().includes(queryLower)) score += 30;
+      else if (
+        queryLower.includes(kw.toLowerCase()) ||
+        kw.toLowerCase().includes(queryLower)
+      )
+        score += 30;
     }
   }
   if (item.summary && item.summary.toLowerCase().includes(queryLower)) {
@@ -125,7 +132,10 @@ async function main() {
   }
 
   const {values, positionals} = parsed;
-  if (values.help || (!values.list && !values.id && !values.query && positionals.length === 0)) {
+  if (
+    values.help ||
+    (!values.list && !values.id && !values.query && positionals.length === 0)
+  ) {
     printHelp();
     process.exit(0);
   }
@@ -136,10 +146,18 @@ async function main() {
 
   if (values.list) {
     if (isJson) {
-      console.log(JSON.stringify({success: true, count: workflows.length, workflows}, null, 2));
+      console.log(
+        JSON.stringify(
+          {success: true, count: workflows.length, workflows},
+          null,
+          2,
+        ),
+      );
     } else {
       console.log(`📋 已收录逆向算法蓝图库 (共 ${workflows.length} 个):`);
-      console.log('------------------------------------------------------------');
+      console.log(
+        '------------------------------------------------------------',
+      );
       for (const wf of workflows) {
         console.log(`🔹 [${wf.id}] (${wf.category} | ${wf.status})`);
         console.log(`   简介: ${wf.summary}`);
@@ -158,14 +176,23 @@ async function main() {
     const matched = workflows.find(
       w =>
         w.id.toLowerCase() === queryLower ||
-        (Array.isArray(w.aliases) && w.aliases.some(a => a.toLowerCase() === queryLower)),
+        (Array.isArray(w.aliases) &&
+          w.aliases.some(a => a.toLowerCase() === queryLower)),
     );
 
     if (!matched) {
       if (isJson) {
-        console.log(JSON.stringify({success: false, error: `未找到 ID 或别名为 "${targetId}" 的蓝图`}, null, 2));
+        console.log(
+          JSON.stringify(
+            {success: false, error: `未找到 ID 或别名为 "${targetId}" 的蓝图`},
+            null,
+            2,
+          ),
+        );
       } else {
-        console.error(`❌ 未找到 ID 或别名为 "${targetId}" 的蓝图。使用 --list 查看所有可用蓝图。`);
+        console.error(
+          `❌ 未找到 ID 或别名为 "${targetId}" 的蓝图。使用 --list 查看所有可用蓝图。`,
+        );
       }
       process.exit(1);
     }
@@ -174,8 +201,12 @@ async function main() {
     if (isJson) {
       console.log(JSON.stringify({success: true, data: detail}, null, 2));
     } else {
-      console.log(`📖 算法蓝图详情: ${detail.metadata.title} (${detail.metadata.id})`);
-      console.log(`   分类: ${detail.metadata.category} | 状态: ${detail.metadata.status} | 版本: ${detail.metadata.version}`);
+      console.log(
+        `📖 算法蓝图详情: ${detail.metadata.title} (${detail.metadata.id})`,
+      );
+      console.log(
+        `   分类: ${detail.metadata.category} | 状态: ${detail.metadata.status} | 版本: ${detail.metadata.version}`,
+      );
       console.log(`   描述: ${detail.metadata.summary}`);
       if (detail.metadata.aliases?.length) {
         console.log(`   别名: ${detail.metadata.aliases.join(', ')}`);
@@ -185,7 +216,9 @@ async function main() {
         const items = detail.parts.parts || detail.parts.items || detail.parts;
         if (Array.isArray(items)) {
           for (const p of items) {
-            console.log(`   - [${p.name || p.id}]: ${p.description || p.summary || ''}`);
+            console.log(
+              `   - [${p.name || p.id}]: ${p.description || p.summary || ''}`,
+            );
           }
         } else {
           console.log(JSON.stringify(detail.parts, null, 2));
@@ -202,7 +235,12 @@ async function main() {
       }
       if (detail.workflow) {
         console.log('\n📝 逆向排查工作流:');
-        console.log(detail.workflow.slice(0, 500) + (detail.workflow.length > 500 ? '\n... (详见 docs/knowledge/parameter-blueprints)' : ''));
+        console.log(
+          detail.workflow.slice(0, 500) +
+            (detail.workflow.length > 500
+              ? '\n... (详见 docs/knowledge/parameter-blueprints)'
+              : ''),
+        );
       }
     }
     return;
@@ -217,9 +255,17 @@ async function main() {
 
     if (scored.length === 0) {
       if (isJson) {
-        console.log(JSON.stringify({success: false, message: '未找到匹配的蓝图'}, null, 2));
+        console.log(
+          JSON.stringify(
+            {success: false, message: '未找到匹配的蓝图'},
+            null,
+            2,
+          ),
+        );
       } else {
-        console.log(`🔍 未找到与 "${values.query}" 相关的蓝图。可使用 --list 查看所有可用蓝图。`);
+        console.log(
+          `🔍 未找到与 "${values.query}" 相关的蓝图。可使用 --list 查看所有可用蓝图。`,
+        );
       }
       return;
     }
@@ -241,7 +287,9 @@ async function main() {
         ),
       );
     } else {
-      console.log(`✨ 针对 "${values.query}" 的最佳匹配蓝图: ${best.id} (匹配分: ${scored[0].score})`);
+      console.log(
+        `✨ 针对 "${values.query}" 的最佳匹配蓝图: ${best.id} (匹配分: ${scored[0].score})`,
+      );
       console.log(`   标题: ${detail.metadata.title}`);
       console.log(`   简介: ${detail.metadata.summary}`);
       console.log(`   查看详情命令: node query-blueprint.js --id ${best.id}`);

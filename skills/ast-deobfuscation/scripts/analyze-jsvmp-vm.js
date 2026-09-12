@@ -12,7 +12,8 @@
   const {parseArgs} = await import('node:util');
   const parser = await import('@babel/parser');
   const traverseImport = await import('@babel/traverse');
-  const traverse = traverseImport.default?.default || traverseImport.default || traverseImport;
+  const traverse =
+    traverseImport.default?.default || traverseImport.default || traverseImport;
   const t = await import('@babel/types');
 
   const BINARY_ARITHMETIC_OPS = new Set([
@@ -72,7 +73,10 @@ analyze-jsvmp-vm.js - 纯静态解剖 JSVMP 虚拟机骨架 (分派器结构、�
         const expr = stmt.expression;
         if (t.isCallExpression(expr)) hasCall = true;
         if (t.isAssignmentExpression(expr)) hasAssignment = true;
-        if (t.isBinaryExpression(expr) && BINARY_ARITHMETIC_OPS.has(expr.operator)) {
+        if (
+          t.isBinaryExpression(expr) &&
+          BINARY_ARITHMETIC_OPS.has(expr.operator)
+        ) {
           hasArithmetic = true;
         }
       }
@@ -122,7 +126,10 @@ analyze-jsvmp-vm.js - 纯静态解剖 JSVMP 虚拟机骨架 (分派器结构、�
       },
       CallExpression(p) {
         const callee = p.node.callee;
-        if (!t.isMemberExpression(callee) || !t.isMemberExpression(callee.property)) {
+        if (
+          !t.isMemberExpression(callee) ||
+          !t.isMemberExpression(callee.property)
+        ) {
           return;
         }
         const inner = callee.property;
@@ -136,7 +143,10 @@ analyze-jsvmp-vm.js - 纯静态解剖 JSVMP 虚拟机骨架 (分派器结构、�
           }
           return;
         }
-        if (t.isBinaryExpression(inner.property) && inner.property.operator === '+') {
+        if (
+          t.isBinaryExpression(inner.property) &&
+          inner.property.operator === '+'
+        ) {
           if (!dispatchExpression) {
             dispatchExpression = '[callee with index + offset]';
             dispatcherLine = nodeLine(p.node);
@@ -190,12 +200,18 @@ analyze-jsvmp-vm.js - 纯静态解剖 JSVMP 虚拟机骨架 (分派器结构、�
         }
       },
       CallExpression(p) {
-        if (t.isFunctionExpression(p.node.callee) || t.isArrowFunctionExpression(p.node.callee)) {
+        if (
+          t.isFunctionExpression(p.node.callee) ||
+          t.isArrowFunctionExpression(p.node.callee)
+        ) {
           const body = p.node.callee.body;
           const stmts = t.isBlockStatement(body) ? body.body : [];
           if (stmts.length > 3) {
             const returnsArray = stmts.some(
-              s => t.isReturnStatement(s) && t.isArrayExpression(s.argument) && (s.argument.elements.length > 20),
+              s =>
+                t.isReturnStatement(s) &&
+                t.isArrayExpression(s.argument) &&
+                s.argument.elements.length > 20,
             );
             if (returnsArray) {
               bestCandidate = {
@@ -226,7 +242,10 @@ analyze-jsvmp-vm.js - 纯静态解剖 JSVMP 虚拟机骨架 (分派器结构、�
         for (const e of elts) {
           if (e === null) {
             holes += 1;
-          } else if (t.isFunctionExpression(e) || t.isArrowFunctionExpression(e)) {
+          } else if (
+            t.isFunctionExpression(e) ||
+            t.isArrowFunctionExpression(e)
+          ) {
             funcCount += 1;
           }
         }
@@ -280,15 +299,23 @@ analyze-jsvmp-vm.js - 纯静态解剖 JSVMP 虚拟机骨架 (分派器结构、�
 
     const nextSteps = [];
     if (!isJsvmp) {
-      nextSteps.push('未检测到显著的 JSVMP 虚拟机特征，建议尝试 ast-deobfuscation 常规去混淆');
+      nextSteps.push(
+        '未检测到显著的 JSVMP 虚拟机特征，建议尝试 ast-deobfuscation 常规去混淆',
+      );
     } else {
       if (bytecode.encrypted) {
-        nextSteps.push('字节码来源于 IIFE 解密函数，建议运行 deobfuscate-jsvmp.js 做动态还原');
+        nextSteps.push(
+          '字节码来源于 IIFE 解密函数，建议运行 deobfuscate-jsvmp.js 做动态还原',
+        );
       } else if (bytecode.kind === 'array-literal') {
-        nextSteps.push(`检测到明文 Opcode 字节码数组 (长度 ~${bytecode.length})，可尝试静态反汇编提取控制流`);
+        nextSteps.push(
+          `检测到明文 Opcode 字节码数组 (长度 ~${bytecode.length})，可尝试静态反汇编提取控制流`,
+        );
       }
       if (dispatcher?.kind === 'while-switch') {
-        nextSteps.push(`分派器为经典 while-switch 架构 (拥有 ${dispatcher.maxSwitchCases} 个 case)，可针对分派循环入口进行插桩追踪`);
+        nextSteps.push(
+          `分派器为经典 while-switch 架构 (拥有 ${dispatcher.maxSwitchCases} 个 case)，可针对分派循环入口进行插桩追踪`,
+        );
       }
     }
 
@@ -339,7 +366,9 @@ analyze-jsvmp-vm.js - 纯静态解剖 JSVMP 虚拟机骨架 (分派器结构、�
   }
 
   if (!code || code.trim().length === 0) {
-    console.error('错误: 请提供待分析的 JS 源码 (--input <file> 或 --code "...")');
+    console.error(
+      '错误: 请提供待分析的 JS 源码 (--input <file> 或 --code "...")',
+    );
     printHelp();
     process.exit(1);
   }
@@ -353,32 +382,51 @@ analyze-jsvmp-vm.js - 纯静态解剖 JSVMP 虚拟机骨架 (分派器结构、�
       console.log(JSON.stringify({success: true, data: analysis}, null, 2));
     } else {
       console.log('🤖 JSVMP 虚拟机骨架静态分析报告');
-      console.log('============================================================');
-      console.log(`   判定为 JSVMP: ${analysis.isJsvmp ? '✅ 是' : '❌ 否'} (置信度: ${(analysis.confidence * 100).toFixed(0)}%)`);
+      console.log(
+        '============================================================',
+      );
+      console.log(
+        `   判定为 JSVMP: ${analysis.isJsvmp ? '✅ 是' : '❌ 否'} (置信度: ${(analysis.confidence * 100).toFixed(0)}%)`,
+      );
 
       if (analysis.dispatcher) {
         console.log(`\n🎛️  分派器架构 (Dispatcher):`);
         console.log(`   类型: ${analysis.dispatcher.kind}`);
-        console.log(`   最大分支数 (Switch Cases): ${analysis.dispatcher.maxSwitchCases}`);
-        console.log(`   while(true) 循环计数: ${analysis.dispatcher.whileTrueCount}`);
+        console.log(
+          `   最大分支数 (Switch Cases): ${analysis.dispatcher.maxSwitchCases}`,
+        );
+        console.log(
+          `   while(true) 循环计数: ${analysis.dispatcher.whileTrueCount}`,
+        );
         if (analysis.dispatcher.dispatcherLine) {
-          console.log(`   分派器所在行: 第 ${analysis.dispatcher.dispatcherLine} 行`);
+          console.log(
+            `   分派器所在行: 第 ${analysis.dispatcher.dispatcherLine} 行`,
+          );
         }
       }
 
       console.log(`\n📦 字节码来源 (Bytecode):`);
       console.log(`   形式: ${analysis.bytecode.kind}`);
-      if (analysis.bytecode.length) console.log(`   预估长度: ${analysis.bytecode.length} 元素`);
-      console.log(`   是否加密/动态生成: ${analysis.bytecode.encrypted ? '是' : '否'}`);
+      if (analysis.bytecode.length)
+        console.log(`   预估长度: ${analysis.bytecode.length} 元素`);
+      console.log(
+        `   是否加密/动态生成: ${analysis.bytecode.encrypted ? '是' : '否'}`,
+      );
 
       if (analysis.instructionTable.kind !== 'none') {
         console.log(`\n📑 指令函数表 (Instruction Table):`);
-        console.log(`   长度: ${analysis.instructionTable.length} | 空洞 (Holes): ${analysis.instructionTable.holes}`);
+        console.log(
+          `   长度: ${analysis.instructionTable.length} | 空洞 (Holes): ${analysis.instructionTable.holes}`,
+        );
       }
 
-      console.log(`\n🎯 识别到的 Opcode 分支: 共 ${analysis.opcodeCount} 个 (展示前 ${analysis.opcodes.length} 项):`);
+      console.log(
+        `\n🎯 识别到的 Opcode 分支: 共 ${analysis.opcodeCount} 个 (展示前 ${analysis.opcodes.length} 项):`,
+      );
       analysis.opcodes.slice(0, 15).forEach(op => {
-        console.log(`   - Op [${op.id}]: 类型 [${op.type.padEnd(10, ' ')}] (行: ${op.line || '未知'})`);
+        console.log(
+          `   - Op [${op.id}]: 类型 [${op.type.padEnd(10, ' ')}] (行: ${op.line || '未知'})`,
+        );
       });
 
       console.log('\n💡 后续逆向建议 (Next Steps):');
@@ -386,7 +434,9 @@ analyze-jsvmp-vm.js - 纯静态解剖 JSVMP 虚拟机骨架 (分派器结构、�
     }
   } catch (error) {
     if (isJson) {
-      console.log(JSON.stringify({success: false, error: error.message}, null, 2));
+      console.log(
+        JSON.stringify({success: false, error: error.message}, null, 2),
+      );
     } else {
       console.error(`❌ 分析失败: ${error.message}`);
     }

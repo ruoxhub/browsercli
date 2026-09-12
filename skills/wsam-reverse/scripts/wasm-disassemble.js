@@ -105,7 +105,9 @@ async function main() {
 
     const lineCount = wat.split('\n').length;
     const truncated = wat.length > maxChars;
-    const preview = truncated ? `${wat.slice(0, maxChars)}\n;; ... (总共 ${wat.length} 字符，已截断) ...` : wat;
+    const preview = truncated
+      ? `${wat.slice(0, maxChars)}\n;; ... (总共 ${wat.length} 字符，已截断) ...`
+      : wat;
 
     if (isJson) {
       console.log(
@@ -124,14 +126,18 @@ async function main() {
       );
     } else {
       if (outputPath) {
-        console.log(`✅ WAT 反汇编文件已写入: ${path.resolve(outputPath)} (共 ${lineCount} 行)`);
+        console.log(
+          `✅ WAT 反汇编文件已写入: ${path.resolve(outputPath)} (共 ${lineCount} 行)`,
+        );
       } else {
         console.log(preview);
       }
     }
   } catch (error) {
     if (isJson) {
-      console.log(JSON.stringify({success: false, error: error.message}, null, 2));
+      console.log(
+        JSON.stringify({success: false, error: error.message}, null, 2),
+      );
     } else {
       console.error(`❌ 反汇编失败: ${error.message}`);
     }

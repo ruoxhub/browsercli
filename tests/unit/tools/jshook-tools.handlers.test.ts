@@ -13,7 +13,6 @@ import {StealthScripts2025} from '../../../src/modules/stealth/StealthScripts202
 import {getRuntime} from '../../../src/runtime.js';
 import {
   analyze_target,
-  detectCrypto,
   export_session_report,
   riskPanel,
   summarizeCode,
@@ -561,12 +560,6 @@ describe('jshook tools handlers', () => {
         runtime,
       );
 
-      await invokeTool(
-        detectCrypto as unknown as ToolDefinitionHarness,
-        {code: 'md5(x)'},
-        res,
-        runtime,
-      );
       await invokeTool(
         analyze_target as unknown as ToolDefinitionHarness,
         {url: 'https://example.com', hookPreset: 'api-signature'},

@@ -96,7 +96,9 @@ function runWithCli(runtimeName, inputPath, functionName, args) {
   }
 
   if (res.status !== 0) {
-    throw new Error(`${runtimeName} 执行失败 (退出码 ${res.status}): ${res.stderr || res.stdout}`);
+    throw new Error(
+      `${runtimeName} 执行失败 (退出码 ${res.status}): ${res.stderr || res.stdout}`,
+    );
   }
 
   return {
@@ -150,7 +152,10 @@ async function main() {
 
     if (requestedRuntime === 'node') {
       result = await runWithNode(bytes, functionName, args);
-    } else if (requestedRuntime === 'wasmtime' || requestedRuntime === 'wasmer') {
+    } else if (
+      requestedRuntime === 'wasmtime' ||
+      requestedRuntime === 'wasmer'
+    ) {
       if (!probeCli(requestedRuntime)) {
         throw new Error(`本地环境中未找到 CLI 工具 "${requestedRuntime}"`);
       }
@@ -188,11 +193,15 @@ async function main() {
       console.log(`🚀 WebAssembly 函数脱机执行成功！`);
       console.log(`   引擎: ${result.runtime} | 耗时: ${result.durationMs}ms`);
       console.log(`   函数: ${functionName}(${args.join(', ')})`);
-      console.log(`   返回值: ${result.returnValue !== undefined ? result.returnValue : '(void)'}`);
+      console.log(
+        `   返回值: ${result.returnValue !== undefined ? result.returnValue : '(void)'}`,
+      );
     }
   } catch (error) {
     if (isJson) {
-      console.log(JSON.stringify({success: false, error: error.message}, null, 2));
+      console.log(
+        JSON.stringify({success: false, error: error.message}, null, 2),
+      );
     } else {
       console.error(`❌ 执行失败: ${error.message}`);
     }

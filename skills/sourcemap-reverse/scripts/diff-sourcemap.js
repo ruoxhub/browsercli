@@ -83,10 +83,16 @@ async function main() {
     const rightMap = JSON.parse(rightRaw);
 
     const leftSources = Array.isArray(leftMap.sources) ? leftMap.sources : [];
-    const rightSources = Array.isArray(rightMap.sources) ? rightMap.sources : [];
+    const rightSources = Array.isArray(rightMap.sources)
+      ? rightMap.sources
+      : [];
 
-    const leftContents = Array.isArray(leftMap.sourcesContent) ? leftMap.sourcesContent : [];
-    const rightContents = Array.isArray(rightMap.sourcesContent) ? rightMap.sourcesContent : [];
+    const leftContents = Array.isArray(leftMap.sourcesContent)
+      ? leftMap.sourcesContent
+      : [];
+    const rightContents = Array.isArray(rightMap.sourcesContent)
+      ? rightMap.sourcesContent
+      : [];
 
     const leftMapSet = new Map();
     for (let i = 0; i < leftSources.length; i++) {
@@ -178,13 +184,17 @@ async function main() {
         }
         if (mode === 'mappings') {
           console.log('\n[Mappings 状态]');
-          console.log(`  是否变化: ${leftMap.mappings !== rightMap.mappings ? '是' : '否'}`);
+          console.log(
+            `  是否变化: ${leftMap.mappings !== rightMap.mappings ? '是' : '否'}`,
+          );
         }
       }
     }
   } catch (error) {
     if (isJson) {
-      console.log(JSON.stringify({success: false, error: error.message}, null, 2));
+      console.log(
+        JSON.stringify({success: false, error: error.message}, null, 2),
+      );
     } else {
       console.error(`❌ 对比失败: ${error.message}`);
     }

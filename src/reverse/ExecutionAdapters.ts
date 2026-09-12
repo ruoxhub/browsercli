@@ -35,31 +35,6 @@ export type ExecutionAdapter = (
   context: ExecutionAdapterContext,
 ) => Promise<ExecutionAdapterResult>;
 
-function makeToolResponse(): {
-  lines: string[];
-  appendResponseLine(value: string): void;
-} {
-  const lines: string[] = [];
-  return {
-    lines,
-    appendResponseLine(value: string) {
-      lines.push(value);
-    },
-  };
-}
-
-function extractToolJson(lines: string[]): Record<string, unknown> | undefined {
-  const start = lines.indexOf('```json');
-  const end = lines.indexOf('```', start + 1);
-  if (start < 0 || end < 0) {
-    return undefined;
-  }
-  return JSON.parse(lines.slice(start + 1, end).join('\n')) as Record<
-    string,
-    unknown
-  >;
-}
-
 async function readTaskDescriptor(
   store: ReverseTaskStore,
   taskId: string,
@@ -191,12 +166,20 @@ const overrideAdapter: ExecutionAdapter = async ({
 function inferMissingCaps(runtimeError: string): string[] {
   const norm = runtimeError.toLowerCase();
   const caps: string[] = [];
-  if (norm.includes('window is not defined') || norm.includes('window')) caps.push('window');
-  if (norm.includes('document is not defined') || norm.includes('document')) caps.push('document');
-  if (norm.includes('navigator is not defined') || norm.includes('navigator')) caps.push('navigator');
+  if (norm.includes('window is not defined') || norm.includes('window'))
+    caps.push('window');
+  if (norm.includes('document is not defined') || norm.includes('document'))
+    caps.push('document');
+  if (norm.includes('navigator is not defined') || norm.includes('navigator'))
+    caps.push('navigator');
   if (norm.includes('localstorage is not defined')) caps.push('localStorage');
-  if (norm.includes('sessionstorage is not defined')) caps.push('sessionStorage');
-  if (norm.includes('crypto is not defined') || norm.includes("reading 'subtle'")) caps.push('crypto');
+  if (norm.includes('sessionstorage is not defined'))
+    caps.push('sessionStorage');
+  if (
+    norm.includes('crypto is not defined') ||
+    norm.includes("reading 'subtle'")
+  )
+    caps.push('crypto');
   return caps.length > 0 ? caps : ['unknown'];
 }
 

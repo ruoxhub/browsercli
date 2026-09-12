@@ -45,11 +45,7 @@ export const manifest = {
       /blueprint/i,
     ],
     priority: 90,
-    tools: [
-      'observeFlow',
-      'autoHook',
-      'traceSignatureGeneration',
-    ],
+    tools: ['observeFlow', 'autoHook', 'traceSignatureGeneration'],
     hint: 'Use workflow contracts to select observe, hook, rebuild, or signature tracing flows.',
   },
   tools: [

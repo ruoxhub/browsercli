@@ -91,12 +91,19 @@ function parseFunctionBlocks(wat) {
 }
 
 const VALUE_TYPES = 'i32|i64|f32|f64|v128';
-const MEMORY_LOAD_PATTERN = new RegExp(`\\b(?:${VALUE_TYPES})\\.(?:load|load8|load16|load32)`, 'g');
-const MEMORY_STORE_PATTERN = new RegExp(`\\b(?:${VALUE_TYPES})\\.(?:store|store8|store16|store32)`, 'g');
+const MEMORY_LOAD_PATTERN = new RegExp(
+  `\\b(?:${VALUE_TYPES})\\.(?:load|load8|load16|load32)`,
+  'g',
+);
+const MEMORY_STORE_PATTERN = new RegExp(
+  `\\b(?:${VALUE_TYPES})\\.(?:store|store8|store16|store32)`,
+  'g',
+);
 const CALL_PATTERN = /\bcall\b(?!_indirect)/g;
 const CALL_INDIRECT_PATTERN = /\bcall_indirect\b/g;
 const LOCAL_ACCESS_PATTERN = /\blocal\.(?:get|set|tee)\b/g;
-const CRYPTO_NAME_PATTERN = /(sign|hash|encrypt|decrypt|token|nonce|sha|aes|sm3|sm4|md5)/i;
+const CRYPTO_NAME_PATTERN =
+  /(sign|hash|encrypt|decrypt|token|nonce|sha|aes|sm3|sm4|md5)/i;
 
 function summarizeFunction(block) {
   const text = block.lines.join('\n');
@@ -109,14 +116,18 @@ function summarizeFunction(block) {
   const localAccessCount = countMatches(text, LOCAL_ACCESS_PATTERN);
   const instructionCount = block.lines
     .map(l => l.trim())
-    .filter(l => l.length > 0 && !l.startsWith('(func') && !l.startsWith(')')).length;
+    .filter(
+      l => l.length > 0 && !l.startsWith('(func') && !l.startsWith(')'),
+    ).length;
 
   const suspiciousTags = [];
-  if (memoryLoadCount + memoryStoreCount >= 8) suspiciousTags.push('memory-heavy');
+  if (memoryLoadCount + memoryStoreCount >= 8)
+    suspiciousTags.push('memory-heavy');
   if (indirectCallCount > 0) suspiciousTags.push('indirect-call');
   if (CRYPTO_NAME_PATTERN.test(block.name)) suspiciousTags.push('crypto-name');
   if (callCount >= 8) suspiciousTags.push('dispatcher-like');
-  if (paramCount >= 2 && resultCount <= 1 && memoryStoreCount > 0) suspiciousTags.push('ptr-len-transform');
+  if (paramCount >= 2 && resultCount <= 1 && memoryStoreCount > 0)
+    suspiciousTags.push('ptr-len-transform');
 
   return {
     name: block.name,
@@ -215,11 +226,19 @@ async function main() {
     }
 
     const blocks = parseFunctionBlocks(wat);
-    const functionSummaries = blocks.map(summarizeFunction).sort(
-      (a, b) =>
-        b.memoryLoadCount + b.memoryStoreCount + b.callCount + b.indirectCallCount -
-        (a.memoryLoadCount + a.memoryStoreCount + a.callCount + a.indirectCallCount),
-    );
+    const functionSummaries = blocks
+      .map(summarizeFunction)
+      .sort(
+        (a, b) =>
+          b.memoryLoadCount +
+          b.memoryStoreCount +
+          b.callCount +
+          b.indirectCallCount -
+          (a.memoryLoadCount +
+            a.memoryStoreCount +
+            a.callCount +
+            a.indirectCallCount),
+      );
 
     const importCount = countMatches(wat, /^\s*\(import\b/gm);
     const exportCount = countMatches(wat, /\(export\s+"/g);
@@ -233,32 +252,48 @@ async function main() {
       importCount,
       exportCount,
       functionSummaries,
-      watPreview: wat.length > maxWatChars ? `${wat.slice(0, maxWatChars)}\n;; ... (剩余 ${wat.length - maxWatChars} 字符已截断) ...` : wat,
+      watPreview:
+        wat.length > maxWatChars
+          ? `${wat.slice(0, maxWatChars)}\n;; ... (剩余 ${wat.length - maxWatChars} 字符已截断) ...`
+          : wat,
     };
 
     if (isJson) {
       console.log(JSON.stringify({success: true, data}, null, 2));
     } else {
       console.log('⚡ WebAssembly 反编译完成:');
-      console.log(`   文件: ${path.resolve(inputPath)} (${bytes.byteLength} 字节)`);
-      console.log(`   函数: ${functionSummaries.length} 个 | 导入: ${importCount} 个 | 导出: ${exportCount} 个`);
+      console.log(
+        `   文件: ${path.resolve(inputPath)} (${bytes.byteLength} 字节)`,
+      );
+      console.log(
+        `   函数: ${functionSummaries.length} 个 | 导入: ${importCount} 个 | 导出: ${exportCount} 个`,
+      );
       if (outputPath) {
         console.log(`   WAT 文件已保存至: ${path.resolve(outputPath)}`);
       }
 
       console.log('\n🔍 核心/高负载函数列表 (按复杂度排序):');
       functionSummaries.slice(0, 10).forEach(fn => {
-        const tags = fn.suspiciousTags.length > 0 ? ` [${fn.suspiciousTags.join(', ')}]` : '';
-        console.log(`   - ${fn.name}: 指令 ${fn.instructionCount} 条, 内存读写 ${fn.memoryLoadCount + fn.memoryStoreCount}, 调用 ${fn.callCount}${tags}`);
+        const tags =
+          fn.suspiciousTags.length > 0
+            ? ` [${fn.suspiciousTags.join(', ')}]`
+            : '';
+        console.log(
+          `   - ${fn.name}: 指令 ${fn.instructionCount} 条, 内存读写 ${fn.memoryLoadCount + fn.memoryStoreCount}, 调用 ${fn.callCount}${tags}`,
+        );
       });
 
       console.log('\n📄 WAT 代码片段预览:');
-      console.log('------------------------------------------------------------');
+      console.log(
+        '------------------------------------------------------------',
+      );
       console.log(data.watPreview);
     }
   } catch (error) {
     if (isJson) {
-      console.log(JSON.stringify({success: false, error: error.message}, null, 2));
+      console.log(
+        JSON.stringify({success: false, error: error.message}, null, 2),
+      );
     } else {
       console.error(`❌ 反编译失败: ${error.message}`);
     }

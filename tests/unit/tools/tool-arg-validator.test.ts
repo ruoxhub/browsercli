@@ -92,11 +92,8 @@ describe('validateToolArgs proxycli regression contracts', () => {
     await ensureToolsMeta();
   });
 
-  it('exposes task context arguments for evidence and rebuild tools', () => {
-    for (const toolName of [
-      'record_reverse_evidence',
-      'export_rebuild_bundle',
-    ]) {
+  it('exposes task context arguments for evidence tools', () => {
+    for (const toolName of ['record_reverse_evidence']) {
       const meta = getToolMeta(toolName);
       assert.ok(meta, `${toolName} meta 应存在`);
       assert.equal(meta.argSpecs.taskId?.type, 'string');

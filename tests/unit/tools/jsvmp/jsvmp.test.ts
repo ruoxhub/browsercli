@@ -338,7 +338,6 @@ describe('JSVMP tool manifest', () => {
     assert.deepEqual(jsvmpManifest.tools, [
       {modulePath: './jsvmp/jsvmp.js', handlerName: 'hookJsvmpInterpreter'},
       {modulePath: './jsvmp/jsvmp.js', handlerName: 'compareEnv'},
-      {modulePath: './jsvmp/analyzeVm.js', handlerName: 'analyzeJsvmpVm'},
     ]);
   });
 });

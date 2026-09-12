@@ -234,14 +234,14 @@ describe('ToolDefinition extended', () => {
         recovery: true,
       });
 
-      const wasmDisMeta = await loadToolMeta({
+      const wasmDumpMeta = await loadToolMeta({
         modulePath: './wasm/index.js',
-        handlerName: 'wasmDisassemble',
+        handlerName: 'wasmDump',
         domain: 'wasm',
         profile: 'full',
       });
-      assert.ok(wasmDisMeta);
-      assert.strictEqual(wasmDisMeta.requirements, undefined);
+      assert.ok(wasmDumpMeta);
+      assert.strictEqual(wasmDumpMeta.requirements, undefined);
     });
   });
 });

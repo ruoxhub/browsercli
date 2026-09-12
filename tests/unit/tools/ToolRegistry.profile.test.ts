@@ -9,7 +9,7 @@ import {describe, it} from 'node:test';
 
 import type {DomainManifest} from '../../../src/tools/manifest.js';
 import {ToolRegistry} from '../../../src/tools/registry/ToolRegistry.js';
-import {manifest as sourcemapManifest} from '../../../src/tools/sourcemap/manifest.js';
+import {manifest as wasmManifest} from '../../../src/tools/wasm/manifest.js';
 
 describe('ToolRegistry profile filtering', () => {
   it('includes workflow tools in workflow profile', () => {
@@ -138,18 +138,12 @@ describe('ToolRegistry profile filtering', () => {
     ]);
   });
 
-  it('exposes SourceMap tools only in the full profile', () => {
-    const registry = new ToolRegistry([sourcemapManifest]);
+  it('exposes Wasm tools only in the full profile', () => {
+    const registry = new ToolRegistry([wasmManifest]);
     assert.deepStrictEqual(registry.listTools('workflow'), []);
     assert.deepStrictEqual(
       registry.listTools('full').map(tool => tool.handlerName),
-      [
-        'sourcemapDiscover',
-        'sourcemapParse',
-        'sourcemapLookup',
-        'sourcemapReconstructTree',
-        'sourcemapDiff',
-      ],
+      ['collectWasm', 'wasmDump', 'wasmVmpTrace', 'wasmMemoryInspect'],
     );
   });
 });

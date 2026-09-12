@@ -18,8 +18,6 @@ import type {Context} from '../../../../src/tools/ToolDefinition.js';
 import {collectWasm} from '../../../../src/tools/wasm/collectWasm.js';
 import {manifest as wasmManifest} from '../../../../src/tools/wasm/manifest.js';
 import {wasmMemoryInspect} from '../../../../src/tools/wasm/wasmMemoryInspect.js';
-import {wasmOfflineRun} from '../../../../src/tools/wasm/wasmOfflineRun.js';
-import {wasmOptimize} from '../../../../src/tools/wasm/wasmOptimize.js';
 import {ErrorCodes, ToolError} from '../../../../src/utils/errors.js';
 import {ToolResponseAccumulator} from '../../../../src/worker/ToolResponse.js';
 
@@ -256,63 +254,5 @@ describe('wasm_memory_inspect', () => {
       ),
       (error: unknown) => error instanceof Error && /超时/.test(error.message),
     );
-  });
-});
-
-describe('native WASM tool failures', () => {
-  it('reports every missing runtime and optimizer by name', async () => {
-    const tempDir = await mkdtemp(join(tmpdir(), 'proxycli-wasm-tools-'));
-    const inputPath = join(tempDir, 'input.wasm');
-    await writeFile(
-      inputPath,
-      Uint8Array.from([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00]),
-    );
-    const pathKey =
-      Object.keys(process.env).find(key => key.toLowerCase() === 'path') ??
-      'PATH';
-    const originalPath = process.env[pathKey];
-    process.env[pathKey] = tempDir;
-
-    try {
-      const offlineResponse = new ToolResponseAccumulator();
-      await assert.rejects(
-        wasmOfflineRun.handler(
-          {
-            params: {
-              inputPath,
-              functionName: 'encrypt',
-              runtime: 'auto',
-            },
-          },
-          offlineResponse,
-          {} as never,
-        ),
-        (error: unknown) =>
-          error instanceof ToolError &&
-          error.code === ErrorCodes.NATIVE_TOOL_MISSING &&
-          /wasmtime/.test(error.message) &&
-          /wasmer/.test(error.message),
-      );
-
-      const optimizeResponse = new ToolResponseAccumulator();
-      await assert.rejects(
-        wasmOptimize.handler(
-          {params: {inputPath}},
-          optimizeResponse,
-          {} as never,
-        ),
-        (error: unknown) =>
-          error instanceof ToolError &&
-          error.code === ErrorCodes.NATIVE_TOOL_MISSING &&
-          /wasm-opt/.test(error.message),
-      );
-    } finally {
-      if (originalPath === undefined) {
-        delete process.env[pathKey];
-      } else {
-        process.env[pathKey] = originalPath;
-      }
-      await rm(tempDir, {recursive: true, force: true});
-    }
   });
 });

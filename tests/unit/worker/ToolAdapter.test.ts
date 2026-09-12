@@ -24,6 +24,7 @@ interface ResolvePayload {
     hookId?: string;
     syncedHookIds?: string[];
     data?: unknown;
+    received?: unknown;
   };
 }
 
@@ -258,11 +259,11 @@ describe('ToolAdapter', () => {
     await ensureToolsMeta();
     const provider = new ToolContextProvider();
     const adapter = new ToolAdapter(provider);
-    const meta = getToolMeta('recommend_next_step');
-    assert.ok(meta, 'missing meta for recommend_next_step');
+    const meta = getToolMeta('get_hook_data');
+    assert.ok(meta, 'missing meta for get_hook_data');
 
     await assert.rejects(
-      invokeTool(adapter, meta, {currentStage: 'INVALID'}),
+      invokeTool(adapter, meta, {view: 'INVALID'}),
       (error: unknown) =>
         error instanceof ToolError && error.code === ErrorCodes.VALIDATION,
     );
@@ -323,28 +324,33 @@ describe('ToolAdapter', () => {
     assert.match(events[0]!.traceId, /^tr_/);
   });
 
-  it('passes params objects through params-only workflow tools', async () => {
+  it('passes params objects through defineTool workflow tools', async () => {
     const runtime = new ToolContextProvider();
+    runtime.setPages([{mainFrame: () => ({}), isClosed: () => false} as never]);
     const adapter = new ToolAdapter(runtime);
-    const meta = getToolMeta('explain_reverse_stage');
-    assert.ok(meta, 'missing meta for explain_reverse_stage');
+    const meta = fixtureMeta({
+      name: 'define_tool_fixture',
+      handlerName: 'defineToolFixture',
+      callMode: 'defineTool',
+    });
 
-    const result = (await adapter.executeTool(meta!, {
-      stage: 'Observe',
+    const result = (await adapter.executeTool(meta, {
+      value: 'hello',
     })) as ResolvePayload;
 
-    assert.strictEqual(result.structuredContent?.success, true);
+    assert.strictEqual(
+      (result.structuredContent as unknown as {selectedPageAvailable?: boolean})
+        ?.selectedPageAvailable,
+      true,
+    );
     assert.strictEqual(
       result.structuredContent?.tooltype,
-      'explain_reverse_stage',
+      'define_tool_fixture',
     );
     assert.strictEqual(
-      result.structuredContent?.message,
-      '逆向阶段说明: Observe',
-    );
-    assert.strictEqual(
-      (result.structuredContent?.data as {stage?: string})?.stage,
-      'Observe',
+      (result.structuredContent as unknown as {received?: {value?: string}})
+        ?.received?.value,
+      'hello',
     );
   });
 

@@ -322,12 +322,12 @@ describe('ToolExecutionPipeline', () => {
 
   it('execute throws VALIDATION when args are invalid', async () => {
     await ensureToolsMeta();
-    const validationMeta = getToolMeta('recommend_next_step');
-    assert.ok(validationMeta, 'missing meta for recommend_next_step');
+    const validationMeta = getToolMeta('get_hook_data');
+    assert.ok(validationMeta, 'missing meta for get_hook_data');
     const {pipeline, telemetryState} = createPipeline();
 
     await assert.rejects(
-      pipeline.execute(validationMeta, {currentStage: 'INVALID'}),
+      pipeline.execute(validationMeta, {view: 'INVALID'}),
       (error: unknown) =>
         error instanceof ToolError && error.code === ErrorCodes.VALIDATION,
     );
@@ -346,11 +346,11 @@ describe('ToolExecutionPipeline', () => {
     });
 
     await ensureToolsMeta();
-    const validationMeta = getToolMeta('recommend_next_step');
-    assert.ok(validationMeta, 'missing meta for recommend_next_step');
+    const validationMeta = getToolMeta('get_hook_data');
+    assert.ok(validationMeta, 'missing meta for get_hook_data');
 
     await assert.rejects(
-      pipeline.execute(validationMeta, {currentStage: 'INVALID'}),
+      pipeline.execute(validationMeta, {view: 'INVALID'}),
       (error: unknown) =>
         error instanceof ToolError && error.code === ErrorCodes.VALIDATION,
     );
