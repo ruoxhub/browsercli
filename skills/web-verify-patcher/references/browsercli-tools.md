@@ -1,10 +1,10 @@
-# BrowserCLI 工具引用
+# proxycli 工具引用
 
 **REQUIRED SUB-SKILL:** 使用 `proxycli` 获取完整、最新的命令契约。本页只保留网页验证码取证所需的最小工具链；任何签名冲突都以 `proxycli list-tools --json` 为准。
 
 ## 定位与门禁
 
-BrowserCLI 是 JSReverser Worker 的 HTTP 控制面，不是独立的反检测浏览器。先按 `browser-acquisition.md` 让用户确认目标、授权范围和浏览器模式；这里只承接用户已确认的 **CloakBrowser + BrowserCLI / Worker** 路线，不能静默连接默认 Chrome、普通 Playwright 或其他 CDP 浏览器。
+proxycli 是 JSReverser Worker 的 HTTP 控制面，不是独立的反检测浏览器。先按 `browser-acquisition.md` 让用户确认目标、授权范围和浏览器模式；这里只承接用户已确认的 **CloakBrowser + proxycli / Worker** 路线，不能静默连接默认 Chrome、普通 Playwright 或其他 CDP 浏览器。
 
 确认前只做不启动浏览器的能力检查：
 
@@ -14,7 +14,7 @@ proxycli browser status
 proxycli list-tools --json
 ```
 
-Worker 离线或当前连接模式不符时，说明缺口并暂停。BrowserCLI 不管理 Worker 进程，不要自行启动 Worker、修改配置或切换浏览器模式。当前 CLI 可能把 `list-tools --json` 渲染成非 JSON 文本；它仍是权威清单，但不要未经校验就交给 JSON 解析器。
+Worker 离线或当前连接模式不符时，说明缺口并暂停。proxycli 不管理 Worker 进程，不要自行启动 Worker、修改配置或切换浏览器模式。当前 CLI 可能把 `list-tools --json` 渲染成非 JSON 文本；它仍是权威清单，但不要未经校验就交给 JSON 解析器。
 
 ## 连接与页面选择
 

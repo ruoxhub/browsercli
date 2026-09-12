@@ -88,6 +88,8 @@ export interface ListPagesData {
   pageInfos: PageInfo[];
   selectedIndex: number;
   selectedPageId: string | null;
+  /** 浏览器连接状态（与是否有页面无关，两个分支都会返回）。 */
+  browserConnected?: boolean;
 }
 
 /** selectPage 返回数据 */

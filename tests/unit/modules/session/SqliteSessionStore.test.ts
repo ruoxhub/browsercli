@@ -12,6 +12,7 @@ import type {
   AiReportRow,
   CapturedRequestRow,
   HookRecordRow,
+  RequestFilter,
   StorageSnapshotRow,
 } from '../../../../src/modules/session/types.js';
 
@@ -310,6 +311,21 @@ describe('SqliteSessionStore', () => {
       const notRedis = store.listRequestSummaries('s1', {filter: '!~bs Redis'});
       assert.strictEqual(notRedis.length, 1);
       assert.strictEqual(notRedis[0]?.id, 's1-1');
+
+      // 5. countRequests 与 getRequests/listRequestSummaries 口径一致
+      const parityFilters: RequestFilter[] = [
+        {},
+        {sources: ['proxy']},
+        {filter: '~bs Postgres'},
+        {filter: '~m POST & ~c 200'},
+      ];
+      for (const filter of parityFilters) {
+        assert.strictEqual(
+          store.countRequests('s1', filter),
+          store.getRequests('s1', filter).length,
+          `countRequests 应与 getRequests 一致：${JSON.stringify(filter)}`,
+        );
+      }
     } finally {
       manager.close();
     }

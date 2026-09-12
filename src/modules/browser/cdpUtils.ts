@@ -14,14 +14,17 @@ export async function withCdpSession<T>(
   page: Page,
   fn: (client: CDPSession) => Promise<T>,
 ): Promise<T> {
-  const client = await page.context().newCDPSession(page);
+  let client: CDPSession | undefined;
   try {
+    client = await page.context().newCDPSession(page);
     return await fn(client);
   } finally {
-    try {
-      await client.detach();
-    } catch {
-      // 忽略 Target closed / Session closed / Page closed 等预期清理错误
+    if (client) {
+      try {
+        await client.detach();
+      } catch {
+        // 忽略 Target closed / Session closed / Page closed 等预期清理错误
+      }
     }
   }
 }

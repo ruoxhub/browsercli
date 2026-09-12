@@ -254,11 +254,8 @@ export class MitmProxyServer {
       if (syncMeta) {
         clientProcess = syncMeta;
       } else if (this.processTracker) {
-        if (typeof this.processTracker.getProcessByPort === 'function') {
-          clientProcess =
-            (await this.processTracker.getProcessByPort(remotePort)) ??
-            undefined;
-        }
+        clientProcess =
+          (await this.processTracker.getProcessByPort(remotePort)) ?? undefined;
       }
     }
 
@@ -415,7 +412,7 @@ export class MitmProxyServer {
     if (!hostname) {
       if (parsed.hostname) {
         hostname = parsed.hostname;
-        port = parsed.port ? parseInt(parsed.port, 10) : (isTls ? 443 : 80);
+        port = parsed.port ? parseInt(parsed.port, 10) : isTls ? 443 : 80;
       } else if (clientReq.headers.host) {
         const hostAuth = parseConnectAuthority(clientReq.headers.host);
         if (hostAuth) {
@@ -426,7 +423,7 @@ export class MitmProxyServer {
               clientReq.headers.host.startsWith('[') &&
               clientReq.headers.host.endsWith(']')
             );
-          port = hasExplicitPort ? hostAuth.port : (isTls ? 443 : 80);
+          port = hasExplicitPort ? hostAuth.port : isTls ? 443 : 80;
         }
       }
     }

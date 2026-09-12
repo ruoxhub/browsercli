@@ -213,25 +213,11 @@ export interface RequestPredicate {
 }
 
 // ─── 二级外部代理配置 ────────────────────────────────
+// 单一来源：定义在 upstream.ts，此处仅重导出，避免两份结构漂移。
 
-export type UpstreamProxyProtocol =
-  | 'http'
-  | 'https'
-  | 'socks5'
-  | 'socks5h'
-  | 'socks';
+import type {UpstreamProxyConfig} from './upstream.js';
 
-export interface UpstreamProxyConfig {
-  protocol: UpstreamProxyProtocol;
-  host: string;
-  port: number;
-  username?: string;
-  password?: string;
-  /** 可选：不走二级代理的目标主机列表（支持通配符如 *.local, .corp.net 等） */
-  bypassHosts?: string[];
-  /** 连接超时时间（毫秒，默认 15000） */
-  timeoutMs?: number;
-}
+export type {UpstreamProxyConfig, UpstreamProxyProtocol} from './upstream.js';
 
 // ─── 工具参数与结果类型 ──────────────────────────────
 
@@ -339,6 +325,8 @@ export interface AddMitmRuleParams {
   host?: string;
   headerContains?: {name: string; value: string};
   bodyContains?: string;
+  /** mitmproxy 风格的流过滤表达式（如 "~m POST & ~c 200"）。 */
+  filter?: string;
 }
 
 export interface AddMitmRuleData {

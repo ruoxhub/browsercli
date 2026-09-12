@@ -271,12 +271,12 @@ export function resolveEntryPath(): string {
     if (normalized) return normalized;
   }
   const error = new Error(
-    '无法定位 worker daemon 入口（PROXYCLI_ENTRY / workerEntry 均未配置或文件不存在）。',
+    '无法定位 worker daemon 入口（PROXYCLI_ENTRY / BROWSERCLI_ENTRY / workerEntry 均未配置或文件不存在）。',
   ) as Error & {code?: string; suggestions?: string[]};
   error.code = 'ENTRY_NOT_CONFIGURED';
   error.suggestions = [
     'proxycli config --set workerEntry=<path to build/src/index.js>',
-    '或设置环境变量 PROXYCLI_ENTRY=<path to build/src/index.js>',
+    '或设置环境变量 PROXYCLI_ENTRY / BROWSERCLI_ENTRY=<path to build/src/index.js>',
   ];
   throw error;
 }
@@ -297,7 +297,6 @@ export async function spawnDaemon(
     [
       entry,
       '--daemon',
-      '--proxycli-daemon',
       '--proxycli-daemon',
       '--session',
       opts.session,

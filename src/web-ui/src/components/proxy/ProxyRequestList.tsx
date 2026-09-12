@@ -11,13 +11,16 @@ import type {
   SessionRequestSummaryEvent,
 } from '../../lib/protocol';
 import {api} from '../../lib/api';
-import {compileFlowFilter} from '../../lib/flowFilter';
+import {compileFlowFilter, hasDeepFilter} from '../../lib/flowFilter';
 import {useProxyStore} from '../../stores/proxy';
 import {parseClientProcess} from './clientProcess';
 
 interface ProxyRequestListProps {
   onSelect?: (id: string) => void;
 }
+
+/** 与服务端 LIST_MAX_LIMIT 对齐：服务端过滤结果须覆盖其权威上限。 */
+const SERVER_FILTER_LIMIT = 2000;
 
 function getMethodBadgeClass(method: string): string {
   switch (method.toUpperCase()) {
@@ -185,23 +188,24 @@ const RequestRow = memo(function RequestRow({
 
 function shouldIncludeRequest(
   req: SessionRequestSummaryEvent,
-  filterFn: ((flow: SessionRequestSummaryEvent) => boolean) | null,
+  filterFn: (flow: SessionRequestSummaryEvent) => boolean,
   serverFilteredIds: Set<string> | null,
   detailsCache: Record<string, SessionRequestDetail>,
   selectedId: string | null,
   selectedDetail: SessionRequestDetail | null,
+  deepFilter: boolean,
 ): boolean {
-  if (!filterFn) return true;
+  const detail =
+    detailsCache[req.id] || (selectedId === req.id ? selectedDetail : null);
 
   if (serverFilteredIds !== null) {
     if (serverFilteredIds.has(req.id)) return true;
-    const detail =
-      detailsCache[req.id] || (selectedId === req.id ? selectedDetail : null);
+    // 服务端已完成全库（含 body/headers）匹配，其结果权威：深层过滤表达式
+    // 不能在前端用不完整的摘要/过期详情复算，否则会把服务端已排除的请求加回。
+    if (deepFilter) return false;
     return Boolean(detail && filterFn({...req, ...detail}));
   }
 
-  const detail =
-    detailsCache[req.id] || (selectedId === req.id ? selectedDetail : null);
   const flow = detail ? {...req, ...detail} : req;
   return filterFn(flow);
 }
@@ -249,7 +253,7 @@ export const ProxyRequestList: React.FC<ProxyRequestListProps> = ({
         const res = await api.getSessionRequests({
           filter: query,
           sources: sources.length > 0 ? sources.join(',') : undefined,
-          limit: 1000,
+          limit: SERVER_FILTER_LIMIT,
         });
         if (active && res?.items) {
           // 若有尚未灌入本地 store 的历史匹配项，补充合并
@@ -277,6 +281,7 @@ export const ProxyRequestList: React.FC<ProxyRequestListProps> = ({
     const filterFn = filter.search
       ? compileFlowFilter(filter.search, {fallbackFuzzy: true})
       : null;
+    const deepFilter = filter.search ? hasDeepFilter(filter.search) : false;
 
     return requests.filter(req => {
       // 双源开关：未被开启的 source 不展示（源自后端开关，非临时显示过滤）。
@@ -288,6 +293,7 @@ export const ProxyRequestList: React.FC<ProxyRequestListProps> = ({
       ) {
         return false;
       }
+      if (!filterFn) return true;
       return shouldIncludeRequest(
         req,
         filterFn,
@@ -295,6 +301,7 @@ export const ProxyRequestList: React.FC<ProxyRequestListProps> = ({
         detailsCache,
         selectedId,
         selectedDetail,
+        deepFilter,
       );
     });
   }, [

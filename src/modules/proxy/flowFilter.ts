@@ -203,6 +203,22 @@ function testRegex(pattern: string, text: string | null | undefined): boolean {
   }
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function headerValueCaseInsensitive(
+  headers: Record<string, string> | null,
+  name: string,
+): string | undefined {
+  if (!headers) return undefined;
+  const lower = name.toLowerCase();
+  for (const [key, value] of Object.entries(headers)) {
+    if (key.toLowerCase() === lower) return value;
+  }
+  return undefined;
+}
+
 function parseHeaders(
   headers?: Record<string, string> | string | null,
 ): Record<string, string> | null {
@@ -288,7 +304,7 @@ function isAssetFlow(flow: FilterableFlow): boolean {
   if (ct && ASSET_CONTENT_TYPES.some(r => r.test(ct))) {
     return true;
   }
-  if (flow.url && STATIC_EXTENSIONS.test(flow.url)) {
+  if (flow.url && STATIC_EXTENSIONS.test(flow.url.split(/[?#]/)[0]!)) {
     return true;
   }
   return false;
@@ -569,8 +585,11 @@ function evaluatePredicate(
     case '~tq': {
       const parsed = parseHeaders(flow.requestHeaders);
       return (
-        matchHeader(`content-type:.*${param}`, flow.requestHeaders) ||
-        testRegex(param, parsed?.['content-type'])
+        matchHeader(
+          `content-type:.*${escapeRegExp(param)}`,
+          flow.requestHeaders,
+        ) ||
+        testRegex(param, headerValueCaseInsensitive(parsed, 'content-type'))
       );
     }
 
@@ -578,8 +597,11 @@ function evaluatePredicate(
       const parsed = parseHeaders(flow.responseHeaders);
       return (
         testRegex(param, flow.contentType) ||
-        matchHeader(`content-type:.*${param}`, flow.responseHeaders) ||
-        testRegex(param, parsed?.['content-type'])
+        matchHeader(
+          `content-type:.*${escapeRegExp(param)}`,
+          flow.responseHeaders,
+        ) ||
+        testRegex(param, headerValueCaseInsensitive(parsed, 'content-type'))
       );
     }
 
@@ -676,7 +698,14 @@ export function compileFlowFilter(
     const ast = parseTokens(tokens);
     return (flow: FilterableFlow) => evaluateNode(ast, flow);
   } catch {
-    // 解析异常降级为不报错并尽量匹配
+    // 解析异常降级为匹配全部：调用方约定「空/残缺表达式不过滤」，
+    // 报错会让 list_mitm_requests 等程序化调用中断。
+    // ponytail: 仅对含 ~ 的表达式打印一次告警，便于排查却避免刷屏。
+    if (trimmed.includes('~')) {
+      console.warn(
+        `[flowFilter] 无法解析过滤表达式，已降级为匹配全部：${trimmed}`,
+      );
+    }
     return () => true;
   }
 }

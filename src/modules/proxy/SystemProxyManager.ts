@@ -74,8 +74,6 @@ export function resolvePowerShellPath(): string {
   const candidates = [
     path.join(root, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
     path.join(root, 'Sysnative', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
-    'pwsh.exe',
-    'powershell.exe',
   ];
   for (const c of candidates) {
     try {

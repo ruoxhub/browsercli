@@ -24,7 +24,7 @@ import {WasmRuntimeInspector} from '../modules/wasm/WasmRuntimeInspector.js';
 import {LLMService} from '../services/LLMService.js';
 
 /**
- * 延迟初始化的运行时服务集合。通过 getter 属性按需创建 AI、分析器、去混淆器等重服务。
+ * 延迟初始化的运行时服务集合。通过 getter 属性按需创建 AI、分析器等重服务。
  *
  * @see {@link src/runtime.ts} — getRuntime() 创建 RuntimeServices 并暴露 lazy getter
  * @see {@link src/services/AIService.ts} — AI 服务（lazy）

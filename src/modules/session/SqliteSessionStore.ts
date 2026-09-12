@@ -335,7 +335,7 @@ export class SqliteSessionStore implements SessionStore {
       params.push(...filter.sources);
     }
     if (filter.urlFilter) {
-      // 与 getRequests（:265-268）完全同款匹配语义，避免两条读路径行为分叉。
+      // 与 getRequests 的 urlFilter 匹配语义保持一致，避免两条读路径行为分叉。
       clauses.push('lower(url) LIKE ?');
       params.push(`%${filter.urlFilter.toLowerCase()}%`);
     }
@@ -428,6 +428,29 @@ export class SqliteSessionStore implements SessionStore {
         isStreaming: r.is_streaming,
       }),
     );
+  }
+
+  countRequests(sessionId: string, filter: RequestFilter = {}): number {
+    if (filter.filter) {
+      // 含 flow filter 时必须加载深层字段（请求体/头）才能求值，取不到更轻的投影。
+      return this.getRequests(sessionId, filter).length;
+    }
+    const clauses: string[] = [`session_id = ?`];
+    const params: unknown[] = [sessionId];
+    if (filter.sources && filter.sources.length > 0) {
+      clauses.push(`source IN (${filter.sources.map(() => '?').join(', ')})`);
+      params.push(...filter.sources);
+    }
+    if (filter.urlFilter) {
+      clauses.push('lower(url) LIKE ?');
+      params.push(`%${filter.urlFilter.toLowerCase()}%`);
+    }
+    const row = this.db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM captured_requests WHERE ${clauses.join(' AND ')}`,
+      )
+      .get(...params) as {n: number};
+    return row.n;
   }
 
   trimRequests(sessionId: string, keepLast: number): number {

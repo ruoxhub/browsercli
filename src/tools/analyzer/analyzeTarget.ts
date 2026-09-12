@@ -213,7 +213,7 @@ function buildNextActions(input: {
 export const analyze_target = defineTool({
   name: 'analyze_target',
   description:
-    '一键式逆向工作流：收集代码、进行安全/加密分析、可选反混淆，并关联 Hook 时间线。',
+    '一键式逆向工作流：收集代码、进行安全/加密分析，并关联 Hook 时间线。',
   annotations: {
     category: ToolCategory.REVERSE_ENGINEERING,
     readOnlyHint: false,

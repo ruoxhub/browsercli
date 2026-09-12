@@ -72,6 +72,9 @@ export const ProxyControlBar: React.FC<ProxyControlBarProps> = ({
   const [analyzing, setAnalyzingLocal] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showFilterHelp, setShowFilterHelp] = useState(false);
+  // 用户主动关闭（Escape / 点击外部）后置 true，只有重新输入 `~` 才再次弹出，
+  // 避免在已含 `~` 的表达式上任意输入都让面板复活。
+  const filterHelpDismissedRef = useRef(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -80,6 +83,7 @@ export const ProxyControlBar: React.FC<ProxyControlBarProps> = ({
         searchContainerRef.current &&
         !searchContainerRef.current.contains(e.target as Node)
       ) {
+        filterHelpDismissedRef.current = true;
         setShowFilterHelp(false);
       }
     };
@@ -89,20 +93,31 @@ export const ProxyControlBar: React.FC<ProxyControlBarProps> = ({
 
   const handleSearchChange = (val: string) => {
     setFilter({search: val});
-    if (val.endsWith('~') || (val.includes('~') && !showFilterHelp)) {
+    // 仅在「刚输入 ~」时重置关闭标记，之后继续输入不会重开面板。
+    if (val.endsWith('~')) filterHelpDismissedRef.current = false;
+    if (val.includes('~') && !filterHelpDismissedRef.current) {
       setShowFilterHelp(true);
     }
   };
 
   const insertFilterSuggestion = (item: FlowFilterHelpItem) => {
-    let current = filter.search;
-    const lastTilde = current.lastIndexOf('~');
-    if (lastTilde !== -1 && lastTilde >= current.length - 4) {
-      current = current.slice(0, lastTilde);
-    }
-    const spacer = current.length > 0 && !current.endsWith(' ') ? ' ' : '';
+    const current = filter.search;
+    // 以最后一个 token 边界为准替换正在输入的 ~token，避免固定偏移量在
+    // 较长操作符（~websocket 等）上失效。
+    const boundary = Math.max(
+      current.lastIndexOf(' '),
+      current.lastIndexOf('('),
+      current.lastIndexOf('|'),
+      current.lastIndexOf('!'),
+    );
+    const tail = current.slice(boundary + 1);
+    const base = tail.startsWith('~')
+      ? current.slice(0, boundary + 1)
+      : current;
+    const spacer = base.length > 0 && !base.endsWith(' ') ? ' ' : '';
     const toInsert = `${item.code} `;
-    setFilter({search: `${current}${spacer}${toInsert}`});
+    filterHelpDismissedRef.current = true;
+    setFilter({search: `${base}${spacer}${toInsert}`});
     setShowFilterHelp(false);
   };
 
@@ -474,10 +489,18 @@ export const ProxyControlBar: React.FC<ProxyControlBarProps> = ({
             value={filter.search}
             onChange={e => handleSearchChange(e.target.value)}
             onFocus={() => {
-              if (filter.search.includes('~')) setShowFilterHelp(true);
+              if (
+                filter.search.includes('~') &&
+                !filterHelpDismissedRef.current
+              ) {
+                setShowFilterHelp(true);
+              }
             }}
             onKeyDown={e => {
-              if (e.key === 'Escape') setShowFilterHelp(false);
+              if (e.key === 'Escape') {
+                filterHelpDismissedRef.current = true;
+                setShowFilterHelp(false);
+              }
             }}
             className="w-full h-7 bg-[var(--color-bg-primary)] border border-[var(--color-border-default)] rounded-lg pl-7 pr-14 text-xs text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)] transition-all font-mono"
           />

@@ -94,6 +94,10 @@ export const listPages = defineTool({
         pageInfos,
         selectedIndex,
         selectedPageId,
+        browserConnected:
+          typeof context.isBrowserConnected === 'function'
+            ? context.isBrowserConnected()
+            : true,
       };
 
       response.setStructuredContent({

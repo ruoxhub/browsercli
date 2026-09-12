@@ -108,11 +108,8 @@ export interface AnalyzeTargetData {
     securityRiskCount: number;
     cryptoAlgorithms: string[];
   };
-  deobfuscation: {
-    confidence: number;
-    readabilityScore: number;
-    transformations: number;
-  } | null;
+  /** 去混淆子系统已从 MCP 工具面移除，此字段恒为 null（保留以兼容序列化契约）。 */
+  deobfuscation: null;
   hooks: {
     preset: HookPreset;
     autoInjected: boolean;

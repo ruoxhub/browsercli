@@ -24,6 +24,10 @@ export interface RequestPredicateView {
   method: string;
   url: string;
   headers: Record<string, string>;
+  /** 同一份 headers 的语义别名，供 flow filter 的 ~h 使用。 */
+  requestHeaders?: Record<string, string>;
+  responseHeaders?: Record<string, string>;
+  contentType?: string | null;
   requestBody: string | null;
   responseBody: string | null;
   statusCode: number;
@@ -401,6 +405,7 @@ export class MitmRuleEngine implements MitmInterceptor {
   ): boolean {
     return matchesPredicate(
       {
+        ...(rule.filter !== undefined && {filter: rule.filter}),
         urlFilter: rule.urlFilter,
         method: rule.method,
         host: rule.host,
@@ -411,6 +416,8 @@ export class MitmRuleEngine implements MitmInterceptor {
         method,
         url,
         headers,
+        requestHeaders: phase === 'request' ? headers : undefined,
+        responseHeaders: phase === 'response' ? headers : undefined,
         requestBody: phase === 'request' ? bodyText : null,
         responseBody: phase === 'response' ? bodyText : null,
         statusCode: 0,

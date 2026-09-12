@@ -44,7 +44,7 @@ export function buildDaemonArgPlan(argv: readonly string[]): DaemonPlan {
       daemon = true;
       continue;
     }
-    if (arg === '--proxycli-daemon' || arg === '--proxycli-daemon') {
+    if (arg === '--proxycli-daemon' || arg === '--browsercli-daemon') {
       proxycliDaemon = true;
       continue;
     }

@@ -79,6 +79,7 @@ function makeFakeStore(overrides: Partial<SessionStore> = {}): SessionStore {
     getRequests: () => [],
     getRequest: () => null,
     listRequestSummaries: () => [],
+    countRequests: () => 0,
     trimRequests: () => 0,
     clearRequests: () => 0,
     getHooks: () => [],

@@ -73,6 +73,11 @@ export class ToolContextProvider {
     this.eventBus =
       runtime?.eventBus ??
       new EventBus<AppEventMap>(createAppEventBusOptions());
+    // 重连/重启拿到新 BrowserContext 时，收集器必须挂到新 context，
+    // 否则网络/Console/WS 收集仍停留在已关闭的旧 context 上。
+    this._browserContext.onContextReplaced = context => {
+      this._collectorContext.start(context);
+    };
   }
 
   async init(): Promise<void> {
@@ -80,7 +85,11 @@ export class ToolContextProvider {
       throw new Error('ToolContextProvider 已销毁，无法重新初始化');
     }
     await this._browserContext.syncPages();
+    this.syncBrowserState();
+  }
 
+  /** 同步 collector 启动与选中页回填（init 与重连恢复共用）。 */
+  private syncBrowserState(): void {
     const context = this._browserContext.getContext();
     if (context) {
       this._collectorContext.start(context);
@@ -170,17 +179,7 @@ export class ToolContextProvider {
   async ensureConnectedBrowser(): Promise<Browser | null> {
     const browser = await this._browserContext.ensureConnectedBrowser();
     if (browser) {
-      const context = this._browserContext.getContext();
-      if (context) {
-        this._collectorContext.start(context);
-      }
-      if (!this._browserContext.getSelectedPage()) {
-        const mgr = this._browserContext.getBrowserManager();
-        const currentPage = mgr?.getCurrentPage();
-        if (currentPage && !currentPage.isClosed()) {
-          this._browserContext.setSelectedPage(currentPage);
-        }
-      }
+      this.syncBrowserState();
     }
     return browser;
   }

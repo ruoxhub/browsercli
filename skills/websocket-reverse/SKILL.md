@@ -54,8 +54,8 @@ proxycli call get_websocket_messages --wsid <id> --groupId <g> \
 proxycli call get_websocket_message --wsid <id> --frameIndex <idx>
 
 # 5. 拦截 / 伪造（如需）
-proxycli call create_hook --type websocket --description "WS capture" --hookId ws_hook
-proxycli call inject_hook --hookId ws_hook --script "<hook script>" --persistent true
+proxycli call create_hook --type websocket --description "WS capture"
+proxycli call inject_hook --persistent true
 ```
 
 ---
@@ -105,7 +105,7 @@ proxycli call analyze_websocket_messages --wsid 3
 #   }
 ```
 
-`proxycli call get_websocket_messages --wsid 3 --groupId B --show_content true` → 取 B 组的样本 raw bytes。
+`proxycli call get_websocket_messages --groupId B --show_content true` → 取 B 组的样本 raw bytes。
 
 ---
 

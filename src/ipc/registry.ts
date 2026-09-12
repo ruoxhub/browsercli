@@ -45,7 +45,7 @@ export function computeWorkspaceDir(startDir: string): string {
   for (let i = 0; i < 10; i++) {
     if (
       fs.existsSync(path.join(dir, '.proxycli')) ||
-      fs.existsSync(path.join(dir, '.proxycli'))
+      fs.existsSync(path.join(dir, '.browsercli'))
     )
       return dir;
     const parent = path.dirname(dir);

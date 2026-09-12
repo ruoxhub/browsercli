@@ -178,7 +178,7 @@ export class ProxyCli {
 
   handleUpstream(args: string[]): void {
     if (args.length === 0) {
-      const current = this.module.getUpstreamProxy();
+      const current = this.module.getUpstreamProxyDisplay();
       this.writeLine(`[INFO] Current upstream proxy: ${current ?? 'None'}`);
       return;
     }
@@ -201,7 +201,7 @@ export class ProxyCli {
     try {
       this.module.setUpstreamProxy(target);
       this.writeLine(
-        `[INFO] Upstream proxy set to: ${this.module.getUpstreamProxy()}`,
+        `[INFO] Upstream proxy set to: ${this.module.getUpstreamProxyDisplay()}`,
       );
     } catch (err) {
       this.writeLine(

@@ -482,7 +482,6 @@ export class StealthScripts2025 {
       } else {
         skipped.push(feature.name);
       }
-      return feature.name;
     });
 
     await Promise.all(tasks);

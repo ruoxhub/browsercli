@@ -195,6 +195,14 @@ export function formatUpstreamProxy(
 }
 
 /**
+ * 脱敏字符串形式的上游代理 URL 中的密码部分（user:pass@ → user:******@）。
+ * 非 URL / 无凭证时原样返回。
+ */
+export function maskUpstreamUrl(raw: string): string {
+  return raw.replace(/:\/\/([^/@:]+):([^/@]+)@/, '://$1:******@');
+}
+
+/**
  * 解析 NO_PROXY / no_proxy 环境变量为排除主机列表。
  */
 export function parseNoProxy(raw?: string): string[] {
@@ -214,8 +222,12 @@ export function shouldBypassUpstream(
 ): boolean {
   if (!bypassHosts || bypassHosts.length === 0) return false;
   const normalizedTarget = targetHost.toLowerCase().trim();
+  // 裸 IPv6（如 2001:db8::1）含 ':' 但不是 host:port，不能用 split(':')[0] 截断。
+  const bareIpv6 = net.isIP(normalizedTarget) === 6;
   const hostWithoutPort =
-    normalizedTarget.includes(':') && !normalizedTarget.includes(']')
+    !bareIpv6 &&
+    normalizedTarget.includes(':') &&
+    !normalizedTarget.includes(']')
       ? (normalizedTarget.split(':')[0] ?? normalizedTarget)
       : normalizedTarget.replace(/^\[(.*)\]$/, '$1');
 
@@ -515,12 +527,3 @@ export function createUpstreamHttpsConnector(
     return undefined as unknown as net.Socket;
   };
 }
-
-export {
-  connectSocks5,
-  createSocks5HttpConnector,
-  createSocks5HttpsConnector,
-  parseSocks5Url,
-  type Socks5Config,
-  type Socks5Target,
-} from './socks5.js';

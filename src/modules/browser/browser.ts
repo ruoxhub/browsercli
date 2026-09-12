@@ -810,8 +810,10 @@ export class BrowserManager {
       this.browser = undefined;
       this.context = undefined;
       this.currentPage = null;
-      this.onDisconnected?.();
+      // 仅在非预期断连时才对外广播；主动 close()/restart() 不应触发
+      // onDisconnected，否则消费者会把正常关闭当成崩溃并清理状态。
       if (this.wasConnected && !this.isRestarting) {
+        this.onDisconnected?.();
         void this.handleBrowserCrash();
       }
     });
@@ -831,7 +833,12 @@ export class BrowserManager {
           const endpoint = await this.resolveConnectEndpoint().catch(
             () => undefined,
           );
-          if (!endpoint) return;
+          if (!endpoint) {
+            logger.debug(
+              'Browser connection lost but no remote endpoint resolvable, skip restart',
+            );
+            return;
+          }
         }
         logger.debug('Browser connection lost, attempting restart');
         void this.handleBrowserCrash();
@@ -858,11 +865,10 @@ export class BrowserManager {
       this.currentPage = null;
 
       await new Promise(resolve => setTimeout(resolve, 1000));
-      const browser = await this.ensureBrowser();
+      // ensureBrowser() 内部（launch/connect 路径）已触发 onReconnected，
+      // 此处不再重复触发，避免消费者重复挂载监听器。
+      await this.ensureBrowser();
       logger.debug('Browser restarted successfully');
-      if (browser.isConnected()) {
-        this.onReconnected?.(browser, this.context);
-      }
     } catch (error) {
       logger.debug('Failed to restart browser:', error);
     } finally {

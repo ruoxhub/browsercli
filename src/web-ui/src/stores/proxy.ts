@@ -21,6 +21,27 @@ export interface PageInfo {
   title: string;
 }
 
+/** 列表环形缓冲上限（与后端 LIST_MAX_LIMIT 取同量级）。 */
+const REQUEST_BUFFER_LIMIT = 2000;
+
+/**
+ * 随请求列表裁剪同步淘汰详情缓存，避免长时间流式抓包内存无界增长。
+ * 仍被选中或已不在列表中的条目也一并清掉（选中项可从缓存重建）。
+ */
+function pruneDetailsCache(
+  requests: SessionRequestSummaryEvent[],
+  cache: Record<string, SessionRequestDetail>,
+): Record<string, SessionRequestDetail> {
+  const ids = new Set(requests.map(r => r.id));
+  const keys = Object.keys(cache);
+  if (keys.every(k => ids.has(k))) return cache;
+  const next: Record<string, SessionRequestDetail> = {};
+  for (const key of keys) {
+    if (ids.has(key)) next[key] = cache[key]!;
+  }
+  return next;
+}
+
 export interface ProxyState {
   requests: SessionRequestSummaryEvent[];
   selectedId: string | null;
@@ -107,11 +128,14 @@ export const useProxyStore = create<ProxyState>((set, get) => ({
         newRequests.push(req);
       }
 
-      if (newRequests.length > 2000) {
-        newRequests = newRequests.slice(-2000);
+      if (newRequests.length > REQUEST_BUFFER_LIMIT) {
+        newRequests = newRequests.slice(-REQUEST_BUFFER_LIMIT);
       }
 
-      return {requests: newRequests};
+      return {
+        requests: newRequests,
+        detailsCache: pruneDetailsCache(newRequests, state.detailsCache),
+      };
     }),
 
   addBatch: reqs =>
@@ -134,10 +158,13 @@ export const useProxyStore = create<ProxyState>((set, get) => ({
       // 按序更新已有项，新到达的项正序追加到末尾
       const updatedExisting = state.requests.map(r => byId.get(r.id) ?? r);
       let newRequests = [...updatedExisting, ...newItems];
-      if (newRequests.length > 2000) {
-        newRequests = newRequests.slice(-2000);
+      if (newRequests.length > REQUEST_BUFFER_LIMIT) {
+        newRequests = newRequests.slice(-REQUEST_BUFFER_LIMIT);
       }
-      return {requests: newRequests};
+      return {
+        requests: newRequests,
+        detailsCache: pruneDetailsCache(newRequests, state.detailsCache),
+      };
     }),
 
   clearRequests: () =>

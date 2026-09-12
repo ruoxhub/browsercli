@@ -38,6 +38,7 @@ export class CollectorContextProvider {
 
   private readonly _maxNavigationSaved = 3;
   private _started = false;
+  private _context: BrowserContext | null = null;
 
   // ─── 生命周期 ────────────────────────────────────────
 
@@ -78,10 +79,15 @@ export class CollectorContextProvider {
    * 启动上下文级别的收集（监听新页面创建、为已有页面注册收集器）。
    */
   start(context: BrowserContext): void {
+    // 幂等：同一 context 重复 start（重连路径）不应重复注册监听器。
+    if (this._started && this._context === context) return;
+    // context 已换（重连/重启）时先释放旧 context 上的监听与抓包桥。
+    if (this._started) this.dispose();
     this._networkCollector.startContextCollection(context);
     this._consoleCollector.startContextCollection(context);
     this._wsCollector.startContextCollection(context);
     this._captureBridge.attach(context);
+    this._context = context;
     this._started = true;
   }
 
@@ -99,6 +105,7 @@ export class CollectorContextProvider {
     this._consoleCollector.dispose();
     this._wsCollector.dispose();
     this._captureBridge.detach();
+    this._context = null;
     this._started = false;
   }
 

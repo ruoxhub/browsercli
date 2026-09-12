@@ -78,8 +78,9 @@ proxycli call wasm_optimize --inputPath ./target.wasm --level O2
 # 7) 离线执行（如需"试运行"）
 proxycli call wasm_offline_run --inputPath ./target.wasm \
   --functionName <name> --args '["1","2"]' --runtime wasmtime
-# 参数复杂时走输入文件：
-proxycli call wasm_offline_run --inputPath ./target.wasm --functionName sign --args '["a","b"]'
+# 参数复杂时走文件：
+proxycli call wasm_offline_run --file params.json
+# params.json: {"inputPath":"./target.wasm","functionName":"sign","args":["a","b"]}
 
 # 8) 内存 / 运行时追踪
 proxycli call wasm_memory_inspect --offset 0 --length 1024 --format hex --searchPattern "deadbeef"
@@ -117,7 +118,7 @@ proxycli call wasm_vmp_trace --maxEvents 100 --filterModule <name>
 如果 wasm 是**代码保护器**（如某些商业 VMP 用的 wasm 壳），反编译可能输出大量无意义指令（`i32.const` / `local.get` / `i32.xor` 循环）。这时：
 
 1. `proxycli call wasm_vmp_trace` 抓运行时事件（每次进入 / 退出函数 + 参数摘要）
-2. 用 `proxycli call wasm_offline_run --inputPath <path> --functionName <name>` 重放同一个输入多次，看哪条路径被命中
+2. 用 `proxycli call wasm_offline_run` 重放同一个输入多次，看哪条路径被命中
 3. 关注 **dispatcher**（最外层 switch 调度函数）的输入输出
 
 不要试图"完整还原 VMP" — 通常目标是**只提取目标算法**（如签名函数），其他外壳可以跳过。
@@ -135,7 +136,7 @@ proxycli call search_in_sources --query "WebAssembly.instantiate|compileStreamin
 # 找到 JS 调 wasm 的入口（search_in_sources 默认把命中脚本写入当前工作目录）
 
 # 2. 用 hook 拦截 JS 侧的 import（传入 wasm 的 JS 函数）
-proxycli call create_hook --type function --params '{"target":"<importedFuncName>"}'
+proxycli call create_hook --type function --target <importedFuncName>
 # 看 JS 给 wasm 传了什么
 
 # 3. 拦截 wasm 侧 export（wasm 调 JS）
@@ -154,7 +155,7 @@ proxycli call wasm_vmp_trace  # 看 wasm→JS 边界调用
 curl -s -o target.wasm 'https://target.com/static/app.wasm'
 # 2) 本地 Node 实例化下载的 wasm 重建加密逻辑（WebAssembly API 内置于 Node）
 node loader.js   # loader.js: WebAssembly.instantiate(fs.readFileSync('target.wasm')) → 调导出函数
-# 或走 worker：proxycli call wasm_offline_run --inputPath ./target.wasm --functionName sign --args '["a","b"]'
+# 或走 worker：proxycli call wasm_offline_run --file params.json
 
 # worker 一旦被卡死：先试取消任务，不行只能重启 worker 进程
 proxycli jobs list

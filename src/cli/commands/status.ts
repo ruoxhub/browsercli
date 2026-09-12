@@ -40,7 +40,7 @@ export const statusCommand: AxiCliCommand<WorkerContext> = async (
       rows.map(r => [r.session, String(r.pid), r.console, r.status]),
     ),
     command: 'status',
-    session: ctx?.session,
+    ...(ctx?.session !== undefined ? {session: ctx.session} : {}),
     online: openCount > 0,
   };
 };

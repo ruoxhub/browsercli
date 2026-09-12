@@ -5,7 +5,6 @@
   "type": "module",
   "bin": {
     "js-reverse-worker": "./build/src/index.js",
-    "proxycli": "./build/src/cli/bin/proxycli.js",
     "proxycli": "./build/src/cli/bin/proxycli.js"
   },
   "main": "index.js",

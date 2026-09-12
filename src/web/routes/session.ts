@@ -171,7 +171,7 @@ export function createSessionRoutes(
 
           // total 与本次分页无关（不受 limit/offset 影响），但跟随同一份 filter：
           // 过滤后 total 与 items 的口径必须一致，否则前端分页器会算出不存在的页数。
-          const total = services.store.getRequests(session.id, filter).length;
+          const total = services.store.countRequests(session.id, filter);
           // 库里按 sequence DESC 取最近 N 条（首屏只拉摘要），响应内反转成
           // 落库顺序（sequence 升序）交出去（spec §9）。[...items] 而非
           // items.reverse()——不改动 store 返回的数组。

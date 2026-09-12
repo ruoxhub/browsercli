@@ -56,6 +56,7 @@ import type {
 } from './types.js';
 import {
   formatUpstreamProxy,
+  maskUpstreamUrl,
   normalizeUpstreamProxy,
   parseNoProxy,
   type UpstreamProxyConfig,
@@ -314,10 +315,38 @@ export class MitmModule {
   }
 
   setUpstreamProxy(upstreamProxy?: string | UpstreamProxyConfig | null): void {
-    this.configuredUpstreamProxy = upstreamProxy ?? null;
+    // 先校验再落状态：非法值不应污染 configuredUpstreamProxy（否则 server
+    // 未运行时非法串会被静默接受，直到 start() 才失败）。
+    const next = upstreamProxy ?? null;
+    if (next !== null) normalizeUpstreamProxy(next);
+    this.configuredUpstreamProxy = next;
     if (this.server) {
-      this.server.setUpstreamProxy(upstreamProxy);
+      this.server.setUpstreamProxy(next);
     }
+  }
+
+  /**
+   * 对外展示用（已脱敏）的上游代理地址。
+   * 与 getUpstreamProxy() 的区别：面向 CLI/API/日志输出，永不泄露密码。
+   */
+  getUpstreamProxyDisplay(): string | null {
+    return this.upstreamProxyDisplay();
+  }
+
+  /** 对外展示用（脱敏）的上游代理地址。 */
+  private upstreamProxyDisplay(
+    fallback?: string | UpstreamProxyConfig,
+  ): string | null {
+    const source = this.server?.getUpstreamProxy() ?? fallback;
+    if (!source) {
+      if (!this.configuredUpstreamProxy) return null;
+      return typeof this.configuredUpstreamProxy === 'string'
+        ? maskUpstreamUrl(this.configuredUpstreamProxy)
+        : formatUpstreamProxy(this.configuredUpstreamProxy, true);
+    }
+    return typeof source === 'string'
+      ? maskUpstreamUrl(source)
+      : formatUpstreamProxy(source, true);
   }
 
   getUpstreamProxy(): string | null {
@@ -346,20 +375,21 @@ export class MitmModule {
     let effectiveUpstreamProxy: string | UpstreamProxyConfig | undefined =
       upstreamProxy ?? this.configuredUpstreamProxy ?? envUpstream;
 
-    const envNoProxy = getEnvValue('NO_PROXY') ?? getEnvValue('no_proxy');
-    if (envNoProxy && effectiveUpstreamProxy) {
-      const parsedBypass = parseNoProxy(envNoProxy);
-      if (parsedBypass.length > 0) {
-        const normalized = normalizeUpstreamProxy(effectiveUpstreamProxy);
-        normalized.bypassHosts = [
-          ...(normalized.bypassHosts ?? []),
-          ...parsedBypass,
-        ];
-        effectiveUpstreamProxy = normalized;
-      }
-    }
-
     try {
+      // NO_PROXY 合并可能解析 URL，非法值也须走结构化失败而非 reject。
+      const envNoProxy = getEnvValue('NO_PROXY') ?? getEnvValue('no_proxy');
+      if (envNoProxy && effectiveUpstreamProxy) {
+        const parsedBypass = parseNoProxy(envNoProxy);
+        if (parsedBypass.length > 0) {
+          const normalized = normalizeUpstreamProxy(effectiveUpstreamProxy);
+          normalized.bypassHosts = [
+            ...(normalized.bypassHosts ?? []),
+            ...parsedBypass,
+          ];
+          effectiveUpstreamProxy = normalized;
+        }
+      }
+
       await this.caManager.init();
       if (!this.server) {
         this.server = new MitmProxyServer(
@@ -377,8 +407,9 @@ export class MitmModule {
         this.server.setUpstreamProxy(effectiveUpstreamProxy);
       }
       await this.server.start(port);
-      const upstreamNote = this.server.getUpstreamProxy()
-        ? `（上游代理：${this.server.getUpstreamProxy()}）`
+      const upstreamDisplay = this.upstreamProxyDisplay();
+      const upstreamNote = upstreamDisplay
+        ? `（上游代理：${upstreamDisplay}）`
         : '';
       return {
         success: true,
@@ -387,7 +418,7 @@ export class MitmModule {
           port: this.server.getPort() ?? port,
           caCertPath: this.caManager.getCaCertPath(),
           caInitialized: this.caManager.isInitialized(),
-          upstreamProxy: this.server.getUpstreamProxy(),
+          upstreamProxy: upstreamDisplay,
         },
       };
     } catch (error) {
@@ -398,13 +429,7 @@ export class MitmModule {
           port,
           caCertPath: this.caManager.getCaCertPath(),
           caInitialized: this.caManager.isInitialized(),
-          upstreamProxy:
-            this.server?.getUpstreamProxy() ??
-            (typeof effectiveUpstreamProxy === 'string'
-              ? effectiveUpstreamProxy
-              : effectiveUpstreamProxy
-                ? formatUpstreamProxy(effectiveUpstreamProxy)
-                : null),
+          upstreamProxy: this.upstreamProxyDisplay(effectiveUpstreamProxy),
         },
       };
     }
@@ -598,6 +623,7 @@ export class MitmModule {
       ...(params.bodyContains !== undefined && {
         bodyContains: params.bodyContains,
       }),
+      ...(params.filter !== undefined && {filter: params.filter}),
     };
     this.rules.addRule(rule);
     return {
@@ -768,7 +794,7 @@ export class MitmModule {
       running: this.server?.isRunning() ?? false,
       port: this.server?.getPort() ?? null,
       capturedCount: this.store.size(),
-      upstreamProxy: this.server?.getUpstreamProxy() ?? null,
+      upstreamProxy: this.upstreamProxyDisplay(),
     };
   }
 

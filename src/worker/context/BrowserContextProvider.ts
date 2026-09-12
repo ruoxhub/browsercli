@@ -55,9 +55,19 @@ export class BrowserContextProvider {
   private _networkConditionsMap = new WeakMap<Page, string>();
   private _cpuThrottlingRateMap = new WeakMap<Page, number>();
 
+  /**
+   * context 被替换（重连/重启后拿到新 BrowserContext）时回调。
+   * ToolContextProvider 用它把收集器重新挂到新 context，否则重连后
+   * 网络/Console/WS 收集仍停留在已关闭的旧 context 上。
+   */
+  public onContextReplaced?: (context: BrowserContext) => void;
+
   // ─── Browser / Context ───────────────────────────────
 
   setBrowser(browser: Browser | null): void {
+    // 同一实例重复传入（重连 + ensureConnectedBrowser 两条路径）时跳过，
+    // 否则每次都会在同一个 browser 上叠加 disconnected 监听器。
+    if (this._browser === browser) return;
     this._browser = browser;
     if (browser) {
       browser.once('disconnected', () => {
@@ -108,6 +118,9 @@ export class BrowserContextProvider {
   setContext(context: BrowserContext): void {
     if (this._context !== context) {
       this.resetPageIdentityState();
+      this._context = context;
+      this.onContextReplaced?.(context);
+      return;
     }
     this._context = context;
   }

@@ -20,6 +20,8 @@ export type {ProcessInfo};
 const PORT_TTL_MS = 1500;
 const PID_INFO_TTL_MS = 30_000;
 const DEGRADED_THRESHOLD = 10;
+/** 未命中端口后二次 refresh 前的等待：兼容内核 TCP 表落表延迟（对标 mitmproxy windows.py）。 */
+const REFRESH_RETRY_DELAY_MS = 30;
 
 /** 解析 netstat -ano 输出的 ESTABLISHED/TCP 行 → {localPort, pid}[]（容错本地化）。 */
 export function parseNetstatOutput(
@@ -190,7 +192,7 @@ export class ProcessConnectionTracker {
     const afterRefresh = this.getProcessByPortSync(port);
     if (afterRefresh) return afterRefresh;
 
-    await new Promise(resolve => setTimeout(resolve, 30));
+    await new Promise(resolve => setTimeout(resolve, REFRESH_RETRY_DELAY_MS));
     await this.refresh();
     return this.getProcessByPortSync(port);
   }

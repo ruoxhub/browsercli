@@ -87,6 +87,12 @@ export const addRewriteRule = defineTool({
       .string()
       .optional()
       .describe('body 子串（大小写不敏感，按 phase 侧）。'),
+    filter: zod
+      .string()
+      .optional()
+      .describe(
+        'mitmproxy 风格流过滤表达式（如 "~m POST & ~c 200"），与离散谓词 AND 组合。',
+      ),
   },
   handler: async (request, response) => {
     const result = getRuntime().mitmModule.addRule(

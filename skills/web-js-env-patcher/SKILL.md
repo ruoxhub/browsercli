@@ -60,7 +60,6 @@ description: "面向网页端 JavaScript 的 Node.js 补环境 Skill。用于 en
 - Node 全局对象或宿主 WebAPI 泄露、静默失败：读取 `references/node-leakage-and-silent-failure.md`。
 - Level 1/2/3 模块划分：读取 `references/env-module-levels.md`。
 - 纯 JS、addon 和 xbs 都无法表达真实行为：读取 `references/native-capability-gap.md`。
-- 目标 JS 是 JSVMP / 字节码签名黑箱、需要在 jsdom / vm 沙箱中整体运行并伪装整套浏览器环境（喂入-截出、markNative 三层防御、Chrome/Firefox native code 格式、UA 分支矩阵、禁动清单）：读取 `references/jsdom-env-patching.md`。
 
 ### WebAPI、对象形状与指纹
 
