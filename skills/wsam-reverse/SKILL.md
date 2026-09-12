@@ -1,19 +1,42 @@
 ---
 name: wasm-reverse
-description: WebAssembly 模块逆向时使用，覆盖 捕获 → 反编译/反汇编 → 离线执行 → VMP 追踪 全链路（collect_wasm / wasm_dump / wasm_decompile / wasm_offline_run 等），所有工具统一经 proxycli CLI 调用。
+description: WebAssembly 模块逆向时使用，覆盖 捕获 → 反编译/反汇编 → 离线执行 → VMP 追踪 全链路。既包含依附活体浏览器的在线抓取与追踪（collect_wasm / wasm_dump / wasm_vmp_trace），也提供无需浏览器的 100% 离线 CLI 工具链（wasm-decompile / wasm-disassemble / wasm-inspect / wasm-run）。
 ---
 
 # Wasm 逆向
 
-WebAssembly 模块常用于：图像处理、加密算法（替代 JS 实现以提速）、反混淆（VMP）、核心算法保护。proxycli 提供从**捕获 → 反编译 → 离线执行**的完整链路。
+WebAssembly 模块常用于：图像处理、加密算法（替代 JS 实现以提速）、反混淆（VMP）、核心算法保护。提供从**捕获 → 反编译 → 离线执行**的完整链路。
 
-> **核心心法**：**反编译 > 反汇编**（默认）。除非你想看原始 WAT 指令，否则 `wasm_decompile` 的"函数摘要 + 可疑模式"能节省 80% 阅读时间。
+> **核心心法**：**反编译 > 反汇编**（默认）。除非你想看原始 WAT 指令，否则 `wasm-decompile` 的"函数摘要 + 可疑模式"能节省 80% 阅读时间。
 
 ---
 
-## proxycli 前置
+## 离线 CLI 工具（免启动浏览器）
 
-本技能所有工具都是 worker 侧的 MCP 工具，**必须通过 proxycli 调用**：
+对于已下载到本地的 `.wasm` 文件，推荐直接使用 `skills/wsam-reverse/scripts/` 中的独立 Node.js ESM 脚本，无需启动 Chromium 或连接 worker：
+
+```bash
+# 1) 二进制结构检查与字符串扫描（快速建立全局观）
+node skills/wsam-reverse/scripts/wasm-inspect.js --input ./target.wasm
+node skills/wsam-reverse/scripts/wasm-inspect.js -i ./target.wasm --json
+
+# 2) 高可读性反编译（带函数特征分析与可疑模式识别）
+node skills/wsam-reverse/scripts/wasm-decompile.js --input ./target.wasm
+node skills/wsam-reverse/scripts/wasm-decompile.js -i ./target.wasm -o ./target.wat --json
+
+# 3) 反汇编为标准 WAT 文本
+node skills/wsam-reverse/scripts/wasm-disassemble.js --input ./target.wasm -o ./target.wat
+
+# 4) 脱机调用导出函数（优先 Node 原生 WebAssembly，支持 wasmtime / wasmer）
+node skills/wsam-reverse/scripts/wasm-run.js --input ./target.wasm --invoke sign --args 10,20
+node skills/wsam-reverse/scripts/wasm-run.js -i ./target.wasm --invoke encrypt --runtime node --json
+```
+
+---
+
+## proxycli 在线捕获与追踪前置
+
+对于运行在线上网页中的 Wasm 模块，通过 proxycli 进行活体捕获与追踪：
 
 ```bash
 # 连接浏览器（headless 默认），并确认 worker 状态
@@ -43,46 +66,20 @@ proxycli call <tool-name> [--param value] [--data '{"k":"v"}'] [--file params.js
 ## 工作流
 
 ```bash
-# 0) 工具链自检（首次必做）
-proxycli call wasm_capabilities
-# → {wabt: true, binaryen: true, wasmtime: true, wasmer: false, ...}
-# 若关键工具缺失：见 "失败回退"
-
 # 1) 捕获模块（wasm_dump 的前置！重新导航目标页，抓网络加载 + 运行时创建的 wasm）
 proxycli call collect_wasm --url https://target.com/path
-# 模块通常不止一个：captureBase64 不需要 true，模块二进制由 wasm_dump 落盘
 
 # 2) 导出模块（从浏览器抓到 .wasm）
 proxycli call wasm_dump --moduleIndex 0 --outputPath ./target.wasm
-# 多模块时按 --moduleIndex 逐个导出（索引见 collect_wasm 返回）
 
-# 3) 段信息 + 字符串扫描（先建立全局观）
-proxycli call wasm_inspect_sections --inputPath ./target.wasm \
-  --includeFunctionSignatures true \
-  --includeStringScan true \
-  --maskSensitiveStrings true \
-  --maxSummaryLines 200
+# 3) 使用离线脚本检查与反编译（推荐）
+node skills/wsam-reverse/scripts/wasm-inspect.js --input ./target.wasm
+node skills/wsam-reverse/scripts/wasm-decompile.js --input ./target.wasm
 
-# 4) 反编译（推荐）
-proxycli call wasm_decompile --inputPath ./target.wasm --inlineExport true
-# 输出：每个函数的人类可读伪代码 + 可疑模式（大量 xor / look-up table / 大块算术）
+# 4) 离线单步执行与算法验证
+node skills/wsam-reverse/scripts/wasm-run.js --input ./target.wasm --invoke <functionName> --args <arg1,arg2>
 
-# 5) 反汇编（当反编译看不懂时）
-proxycli call wasm_disassemble --inputPath ./target.wasm --foldExprs true
-# 输出：WAT 文本格式（webassembly text format）
-
-# 6) 优化（可选：降低阅读难度 / 二次反编译 / 反混淆前先规整）
-proxycli call wasm_optimize --inputPath ./target.wasm --level O2
-# 输出：target.opt.O2.wasm；优化后再跑 4/5 步通常更易读
-
-# 7) 离线执行（如需"试运行"）
-proxycli call wasm_offline_run --inputPath ./target.wasm \
-  --functionName <name> --args '["1","2"]' --runtime wasmtime
-# 参数复杂时走文件：
-proxycli call wasm_offline_run --file params.json
-# params.json: {"inputPath":"./target.wasm","functionName":"sign","args":["a","b"]}
-
-# 8) 内存 / 运行时追踪
+# 5) 在线内存 / 运行时追踪
 proxycli call wasm_memory_inspect --offset 0 --length 1024 --format hex --searchPattern "deadbeef"
 proxycli call wasm_vmp_trace --maxEvents 100 --filterModule <name>
 ```
@@ -118,7 +115,7 @@ proxycli call wasm_vmp_trace --maxEvents 100 --filterModule <name>
 如果 wasm 是**代码保护器**（如某些商业 VMP 用的 wasm 壳），反编译可能输出大量无意义指令（`i32.const` / `local.get` / `i32.xor` 循环）。这时：
 
 1. `proxycli call wasm_vmp_trace` 抓运行时事件（每次进入 / 退出函数 + 参数摘要）
-2. 用 `proxycli call wasm_offline_run` 重放同一个输入多次，看哪条路径被命中
+2. 用 `node skills/wsam-reverse/scripts/wasm-run.js --input ./target.wasm --invoke <func>` 重放同一个输入多次，看哪条路径被命中
 3. 关注 **dispatcher**（最外层 switch 调度函数）的输入输出
 
 不要试图"完整还原 VMP" — 通常目标是**只提取目标算法**（如签名函数），其他外壳可以跳过。
@@ -136,7 +133,7 @@ proxycli call search_in_sources --query "WebAssembly.instantiate|compileStreamin
 # 找到 JS 调 wasm 的入口（search_in_sources 默认把命中脚本写入当前工作目录）
 
 # 2. 用 hook 拦截 JS 侧的 import（传入 wasm 的 JS 函数）
-proxycli call create_hook --type function --target <importedFuncName>
+proxycli call hook_function --target <importedFuncName>
 # 看 JS 给 wasm 传了什么
 
 # 3. 拦截 wasm 侧 export（wasm 调 JS）
