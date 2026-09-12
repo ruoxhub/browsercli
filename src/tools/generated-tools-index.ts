@@ -13,6 +13,7 @@ import {manifest as consoleManifest} from './console/manifest.js';
 import {manifest as cryptoManifest} from './crypto/manifest.js';
 import {manifest as cssManifest} from './css/manifest.js';
 import {manifest as debuggerManifest} from './debugger/manifest.js';
+import {manifest as devtoolsManifest} from './devtools/manifest.js';
 import {manifest as diagnosticsManifest} from './diagnostics/manifest.js';
 import {manifest as dialogManifest} from './dialog/manifest.js';
 import {manifest as domManifest} from './dom/manifest.js';
@@ -43,6 +44,7 @@ export const GENERATED_DOMAIN_MANIFESTS = [
   cryptoManifest,
   cssManifest,
   debuggerManifest,
+  devtoolsManifest,
   diagnosticsManifest,
   dialogManifest,
   domManifest,
@@ -242,6 +244,22 @@ export const GENERATED_TOOL_REGISTRY = [
   {
     modulePath: './debugger/index.js',
     handlerName: 'xhrToJsBreakpoint',
+  },
+  {
+    modulePath: './devtools/openDevtools.js',
+    handlerName: 'openDevtools',
+  },
+  {
+    modulePath: './devtools/getDevtoolsComments.js',
+    handlerName: 'getDevtoolsComments',
+  },
+  {
+    modulePath: './devtools/resolveDevtoolsComment.js',
+    handlerName: 'resolveDevtoolsComment',
+  },
+  {
+    modulePath: './devtools/revealInDevtools.js',
+    handlerName: 'revealInDevtools',
   },
   {
     modulePath: './diagnostics/diagnoseEnvironment.js',

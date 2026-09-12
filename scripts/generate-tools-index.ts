@@ -21,6 +21,7 @@ const DOMAIN_DESCRIPTIONS: Record<string, string> = {
   crypto: 'Crypto library hook and inspection tools.',
   css: 'CSS cascade inspection tools.',
   debugger: 'Debugger protocol inspection and breakpoint tools.',
+  devtools: 'DevTools window collaboration tools.',
   dialog: 'Browser dialog handling tools.',
   dom: 'DOM inspection and querying tools.',
   emulation: 'Device, CPU, network, and viewport emulation tools.',
