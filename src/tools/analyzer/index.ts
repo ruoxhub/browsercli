@@ -36,7 +36,6 @@ export {
 // MCP Tools (defined with defineTool)
 export {understandCode} from './understand.js';
 export {summarizeCode} from './summarize.js';
-export {detectCrypto} from './detectCrypto.js';
 export {riskPanel} from './riskPanel.js';
 export {record_reverse_evidence, export_session_report} from './reports.js';
 export {analyze_target} from './analyzeTarget.js';

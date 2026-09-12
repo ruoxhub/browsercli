@@ -34,11 +34,6 @@ export const manifest = {
     observeFlow: ['observe', 'network', 'console', 'flow'],
     autoHook: ['automatic hook', 'signature', 'runtime'],
     traceSignatureGeneration: ['signature', 'trace', 'request signing'],
-    recommendNextStepTool: ['next step', 'advise', 'workflow', 'stage'],
-    explainReverseStage: ['stage', 'explain', 'guide', 'criteria'],
-    listParameterWorkflowsTool: ['workflow', 'blueprint', 'parameter'],
-    getParameterWorkflowTool: ['workflow', 'blueprint', 'detail'],
-    recommendParameterWorkflowTool: ['workflow', 'recommend', 'match'],
   },
   workflowRule: {
     patterns: [
@@ -54,11 +49,6 @@ export const manifest = {
       'observeFlow',
       'autoHook',
       'traceSignatureGeneration',
-      'recommendNextStepTool',
-      'explainReverseStage',
-      'listParameterWorkflowsTool',
-      'getParameterWorkflowTool',
-      'recommendParameterWorkflowTool',
     ],
     hint: 'Use workflow contracts to select observe, hook, rebuild, or signature tracing flows.',
   },
@@ -69,26 +59,6 @@ export const manifest = {
     {
       modulePath: './workflow/traceSignatureGeneration.js',
       handlerName: 'traceSignatureGeneration',
-    },
-    {
-      modulePath: './workflow/advisor.js',
-      handlerName: 'recommendNextStepTool',
-    },
-    {
-      modulePath: './workflow/advisor.js',
-      handlerName: 'explainReverseStage',
-    },
-    {
-      modulePath: './workflow/parameterWorkflows.js',
-      handlerName: 'listParameterWorkflowsTool',
-    },
-    {
-      modulePath: './workflow/parameterWorkflows.js',
-      handlerName: 'getParameterWorkflowTool',
-    },
-    {
-      modulePath: './workflow/parameterWorkflows.js',
-      handlerName: 'recommendParameterWorkflowTool',
     },
   ],
 } satisfies DomainManifest;

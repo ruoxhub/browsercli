@@ -27,11 +27,9 @@ import {manifest as pageManifest} from './page/manifest.js';
 import {manifest as performanceManifest} from './performance/manifest.js';
 import {manifest as pipelineManifest} from './pipeline/manifest.js';
 import {manifest as proxyManifest} from './proxy/manifest.js';
-import {manifest as rebuildManifest} from './rebuild/manifest.js';
 import {manifest as screenshotManifest} from './screenshot/manifest.js';
 import {manifest as scriptManifest} from './script/manifest.js';
 import {manifest as sessionManifest} from './session/manifest.js';
-import {manifest as sourcemapManifest} from './sourcemap/manifest.js';
 import {manifest as stealthManifest} from './stealth/manifest.js';
 import {manifest as wasmManifest} from './wasm/manifest.js';
 import {manifest as workflowManifest} from './workflow/manifest.js';
@@ -58,11 +56,9 @@ export const GENERATED_DOMAIN_MANIFESTS = [
   performanceManifest,
   pipelineManifest,
   proxyManifest,
-  rebuildManifest,
   screenshotManifest,
   scriptManifest,
   sessionManifest,
-  sourcemapManifest,
   stealthManifest,
   wasmManifest,
   workflowManifest,
@@ -76,10 +72,6 @@ export const GENERATED_TOOL_REGISTRY = [
   {
     modulePath: './analyzer/summarize.js',
     handlerName: 'summarizeCode',
-  },
-  {
-    modulePath: './analyzer/detectCrypto.js',
-    handlerName: 'detectCrypto',
   },
   {
     modulePath: './analyzer/reports.js',
@@ -378,10 +370,6 @@ export const GENERATED_TOOL_REGISTRY = [
     handlerName: 'compareEnv',
   },
   {
-    modulePath: './jsvmp/analyzeVm.js',
-    handlerName: 'analyzeJsvmpVm',
-  },
-  {
     modulePath: './navigation/listPages.js',
     handlerName: 'listPages',
   },
@@ -574,14 +562,6 @@ export const GENERATED_TOOL_REGISTRY = [
     handlerName: 'mitmConfigureLocalApps',
   },
   {
-    modulePath: './rebuild/index.js',
-    handlerName: 'exportRebuildBundle',
-  },
-  {
-    modulePath: './rebuild/index.js',
-    handlerName: 'diffEnvRequirements',
-  },
-  {
     modulePath: './screenshot/takeScreenshot.js',
     handlerName: 'takeScreenshot',
   },
@@ -626,26 +606,6 @@ export const GENERATED_TOOL_REGISTRY = [
     handlerName: 'sessionGenerateReport',
   },
   {
-    modulePath: './sourcemap/index.js',
-    handlerName: 'sourcemapDiscover',
-  },
-  {
-    modulePath: './sourcemap/index.js',
-    handlerName: 'sourcemapParse',
-  },
-  {
-    modulePath: './sourcemap/index.js',
-    handlerName: 'sourcemapLookup',
-  },
-  {
-    modulePath: './sourcemap/index.js',
-    handlerName: 'sourcemapReconstructTree',
-  },
-  {
-    modulePath: './sourcemap/index.js',
-    handlerName: 'sourcemapDiff',
-  },
-  {
     modulePath: './stealth/stealth.js',
     handlerName: 'setUserAgent',
   },
@@ -663,35 +623,11 @@ export const GENERATED_TOOL_REGISTRY = [
   },
   {
     modulePath: './wasm/index.js',
-    handlerName: 'wasmCapabilities',
-  },
-  {
-    modulePath: './wasm/index.js',
     handlerName: 'collectWasm',
   },
   {
     modulePath: './wasm/index.js',
     handlerName: 'wasmDump',
-  },
-  {
-    modulePath: './wasm/index.js',
-    handlerName: 'wasmDisassemble',
-  },
-  {
-    modulePath: './wasm/index.js',
-    handlerName: 'wasmDecompile',
-  },
-  {
-    modulePath: './wasm/index.js',
-    handlerName: 'wasmInspectSections',
-  },
-  {
-    modulePath: './wasm/index.js',
-    handlerName: 'wasmOfflineRun',
-  },
-  {
-    modulePath: './wasm/index.js',
-    handlerName: 'wasmOptimize',
   },
   {
     modulePath: './wasm/index.js',
@@ -716,25 +652,5 @@ export const GENERATED_TOOL_REGISTRY = [
   {
     modulePath: './workflow/traceSignatureGeneration.js',
     handlerName: 'traceSignatureGeneration',
-  },
-  {
-    modulePath: './workflow/advisor.js',
-    handlerName: 'recommendNextStepTool',
-  },
-  {
-    modulePath: './workflow/advisor.js',
-    handlerName: 'explainReverseStage',
-  },
-  {
-    modulePath: './workflow/parameterWorkflows.js',
-    handlerName: 'listParameterWorkflowsTool',
-  },
-  {
-    modulePath: './workflow/parameterWorkflows.js',
-    handlerName: 'getParameterWorkflowTool',
-  },
-  {
-    modulePath: './workflow/parameterWorkflows.js',
-    handlerName: 'recommendParameterWorkflowTool',
   },
 ] as const;

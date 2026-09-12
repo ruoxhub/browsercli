@@ -32,11 +32,8 @@ const DOMAIN_DESCRIPTIONS: Record<string, string> = {
   page: 'Page interaction and state tools.',
   performance: 'Performance trace and metrics tools.',
   pipeline: 'Analysis pipeline example tools.',
-  rebuild: 'Bundle rebuilding and environment diff tools.',
   screenshot: 'Screenshot and video frame tools.',
   script: 'Page script evaluation and preload tools.',
-  sourcemap:
-    'SourceMap discovery, parsing, lookup, reconstruction, and diff tools.',
   stealth: 'Browser stealth and fingerprint tools.',
   wasm: 'WebAssembly reverse engineering tools.',
   workflow: 'High-level reverse engineering workflow tools.',
