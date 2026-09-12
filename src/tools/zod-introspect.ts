@@ -21,11 +21,19 @@ export type ToolArgType =
   // 校验层负责 JSON.parse。用于 array<object> 等复杂参数（如 variants）。
   | 'json';
 
+export interface NumberRange {
+  int?: boolean;
+  min?: {value: number; inclusive: boolean};
+  max?: {value: number; inclusive: boolean};
+}
+
 export interface ToolArgSpec {
   type: ToolArgType;
   required: boolean;
   defaultValue?: unknown;
   enum?: string[];
+  /** zod number 约束（.int()/.min()/.max()），由校验层强制执行 */
+  range?: NumberRange;
   description: string;
 }
 
@@ -117,6 +125,30 @@ function extractArgSpec(
   const resolved = resolveSimpleType(inner);
   if (!resolved || resolved === 'unknown') return null;
 
+  let range: NumberRange | undefined;
+  if (resolved === 'number' && inner instanceof zod.ZodNumber) {
+    const checks =
+      (
+        inner._def as {
+          checks?: Array<{kind: string; value?: number; inclusive?: boolean}>;
+        }
+      ).checks ?? [];
+    const int = checks.find(c => c.kind === 'int');
+    const min = checks.find(c => c.kind === 'min');
+    const max = checks.find(c => c.kind === 'max');
+    if (int || min || max) {
+      range = {
+        ...(int ? {int: true} : {}),
+        ...(min
+          ? {min: {value: min.value!, inclusive: min.inclusive !== false}}
+          : {}),
+        ...(max
+          ? {max: {value: max.value!, inclusive: max.inclusive !== false}}
+          : {}),
+      };
+    }
+  }
+
   let enumValues: string[] | undefined;
   if (inner instanceof zod.ZodEnum) {
     enumValues = inner._def.values as string[];
@@ -131,6 +163,7 @@ function extractArgSpec(
     required: !isOptional,
     ...(defaultValue !== undefined && {defaultValue}),
     ...(enumValues && {enum: enumValues}),
+    ...(range && {range}),
     description,
   };
 }

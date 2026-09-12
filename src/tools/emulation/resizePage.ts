@@ -17,8 +17,18 @@ export const resizePage = defineTool({
   description: '将页面视口调整为指定的宽度与高度。',
   annotations: {category: ToolCategory.EMULATION, readOnlyHint: false},
   schema: {
-    width: zod.number().describe('视口宽度（像素）。'),
-    height: zod.number().describe('视口高度（像素）。'),
+    width: zod
+      .number()
+      .int()
+      .min(1)
+      .max(10000)
+      .describe('视口宽度（像素），1-10000 的整数。'),
+    height: zod
+      .number()
+      .int()
+      .min(1)
+      .max(10000)
+      .describe('视口高度（像素），1-10000 的整数。'),
   },
   handler: async (request, response, context) => {
     const {width, height} = request.params;

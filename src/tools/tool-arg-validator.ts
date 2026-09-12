@@ -6,7 +6,11 @@
 
 import {suggestSimilarKeys} from './tool-aliases.js';
 import {getToolMeta} from './tools-meta.js';
-import {type ToolArgSpec, type ToolArgSpecMap} from './zod-introspect.js';
+import {
+  type NumberRange,
+  type ToolArgSpec,
+  type ToolArgSpecMap,
+} from './zod-introspect.js';
 
 export interface ValidationSuccess {
   ok: true;
@@ -102,9 +106,41 @@ function validateType(
     }
     case 'number': {
       const numValue = coerceNumber(value);
-      return typeof numValue === 'number' && Number.isFinite(numValue)
-        ? {ok: true, value: numValue}
-        : {ok: false, error: typeError(toolName, key, '数字')};
+      if (typeof numValue !== 'number' || !Number.isFinite(numValue)) {
+        return {ok: false, error: typeError(toolName, key, '数字')};
+      }
+      const range: NumberRange | undefined = spec.range;
+      if (range) {
+        if (range.int && !Number.isInteger(numValue)) {
+          return {
+            ok: false,
+            error: `${toolName} 的参数 ${key} 必须是整数`,
+          };
+        }
+        if (range.min) {
+          const violated = range.min.inclusive
+            ? numValue < range.min.value
+            : numValue <= range.min.value;
+          if (violated) {
+            return {
+              ok: false,
+              error: `${toolName} 的参数 ${key} 必须${range.min.inclusive ? '不小于' : '大于'} ${range.min.value}`,
+            };
+          }
+        }
+        if (range.max) {
+          const violated = range.max.inclusive
+            ? numValue > range.max.value
+            : numValue >= range.max.value;
+          if (violated) {
+            return {
+              ok: false,
+              error: `${toolName} 的参数 ${key} 必须${range.max.inclusive ? '不超过' : '小于'} ${range.max.value}`,
+            };
+          }
+        }
+      }
+      return {ok: true, value: numValue};
     }
     case 'boolean': {
       const boolValue = coerceBoolean(value);
