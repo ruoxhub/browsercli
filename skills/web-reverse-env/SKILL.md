@@ -37,6 +37,23 @@ description: 面向 Web/JS 逆向中的浏览器补环境技能，覆盖 Proxy �
 
 `scripts/` 下的本地脚本仅用于**没有真实浏览器 / worker 不可用**的离线分析场景，或对 proxycli 采集结果做二次加工；一旦 worker 可用，优先用 proxycli。
 
+### 离线脱机脚本与快速诊断（免浏览器）
+
+在脱离浏览器环境独立调试时，可直接使用 `scripts/` 中的离线诊断与导出脚手架：
+
+```bash
+# 1) 报错智能诊断与最小补丁建议（解决 window/document/navigator is not defined 等）
+node skills/web-reverse-env/scripts/diff-env-requirements.js --error "ReferenceError: window is not defined"
+node skills/web-reverse-env/scripts/diff-env-requirements.js -f ./node_error.log --json
+
+# 2) 一键导出独立的本地 Node.js 复现工程（含兼容 Node 21+ navigator 保护的 env.js）
+node skills/web-reverse-env/scripts/export-rebuild-bundle.js --output-dir ./my-rebuild
+node skills/web-reverse-env/scripts/export-rebuild-bundle.js -o ./my-rebuild -t ./dist/extracted_sign.js
+# 生成后直接本地试跑：node ./my-rebuild/entry.js
+```
+
+---
+
 ## 快速分流
 
 根据任务特点，优先读取对应参考文档：
