@@ -29,7 +29,15 @@ description: 面向 Web/JS 逆向中的纯算、验证码纯算、复杂 header/
 
 ### 1. 先判题型
 
-把目标先归到下面之一：
+优先使用内置脚本进行 AST 与常量特征探测（免人工盲猜）：
+
+```bash
+# 扫描目标脚本中的加密算法、第三方库、魔数与模式
+node skills/web-reverse-algorithm/scripts/detect-crypto.js --input <file.js>
+node skills/web-reverse-algorithm/scripts/detect-crypto.js -i ./dist/sign.js --json
+```
+
+根据探测结果将目标归到下面之一：
 
 - 标准签名 / 标准摘要题
 - 混合加密 / 密钥包装题

@@ -53,6 +53,8 @@ description: 使用 Babel AST 对 JavaScript 做分层、可回退的定向反�
   虚拟机保护（VM Protection）结构识别、指令计数、组件提取与逆向分析报告生成。
 - `scripts/deobfuscate-jsvmp.js`
   JSVMP 虚拟机专项反混淆分析，涵盖字节码数组、操作数栈、寄存器环境与 Dispatch 循环逆向。
+- `scripts/analyze-jsvmp-vm.js`
+  纯静态解剖 JSVMP 虚拟机骨架，提取 while-switch / index-dispatch 分派器结构、字节码数组来源、指令表空洞与 Opcode 语义分类，支持 `--json` 输出。
 - `scripts/compare-with-reference.js`
   将最新流水线输出与 `decode.js` 对比，汇总剩余差距。
 
