@@ -11,6 +11,7 @@ import {manifest as antiDebugManifest} from './anti-debug/manifest.js';
 import {manifest as collectorManifest} from './collector/manifest.js';
 import {manifest as consoleManifest} from './console/manifest.js';
 import {manifest as cryptoManifest} from './crypto/manifest.js';
+import {manifest as cssManifest} from './css/manifest.js';
 import {manifest as debuggerManifest} from './debugger/manifest.js';
 import {manifest as diagnosticsManifest} from './diagnostics/manifest.js';
 import {manifest as dialogManifest} from './dialog/manifest.js';
@@ -40,6 +41,7 @@ export const GENERATED_DOMAIN_MANIFESTS = [
   collectorManifest,
   consoleManifest,
   cryptoManifest,
+  cssManifest,
   debuggerManifest,
   diagnosticsManifest,
   dialogManifest,
@@ -120,6 +122,10 @@ export const GENERATED_TOOL_REGISTRY = [
   {
     modulePath: './crypto/hookSMCrypto.js',
     handlerName: 'hookSMCrypto',
+  },
+  {
+    modulePath: './css/getCssStyles.js',
+    handlerName: 'getCssStyles',
   },
   {
     modulePath: './debugger/index.js',

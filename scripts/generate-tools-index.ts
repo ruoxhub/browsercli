@@ -19,6 +19,7 @@ const DOMAIN_DESCRIPTIONS: Record<string, string> = {
   collector: 'Code and script collection tools.',
   console: 'Browser console inspection tools.',
   crypto: 'Crypto library hook and inspection tools.',
+  css: 'CSS cascade inspection tools.',
   debugger: 'Debugger protocol inspection and breakpoint tools.',
   dialog: 'Browser dialog handling tools.',
   dom: 'DOM inspection and querying tools.',
