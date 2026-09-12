@@ -40,7 +40,7 @@
     "test:perf:baseline": "RUN_PERF_TESTS=true npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/performance/baseline.test.js",
     "coverage": "npm run coverage:core",
     "coverage:vitest": "vitest run --coverage",
-    "coverage:core": "c8 --include=build/src/tools/dom/** --include=build/src/tools/hook/** --include=build/src/tools/stealth/** --include=build/src/services/AIService.js --include=build/src/services/LLMService.js --reporter=text --reporter=lcov node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/unit/**/*.test.js build/tests/property/**/*.test.js",
+    "coverage:core": "c8 --include=build/src/tools/dom/** --include=build/src/tools/hook/** --include=build/src/tools/stealth/** --reporter=text --reporter=lcov node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/unit/**/*.test.js build/tests/property/**/*.test.js",
     "coverage:strict": "c8 --reporter=text --reporter=lcov node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test-force-exit --test build/tests/unit/**/*.test.js build/tests/property/**/*.test.js",
     "test:only": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test-reporter spec --test-force-exit --test --test-only \"build/tests/**/*.test.js\"",
     "test:only:no-build": "node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test-reporter spec --test-force-exit --test --test-only \"build/tests/**/*.test.js\"",

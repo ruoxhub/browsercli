@@ -31,8 +31,6 @@ export interface AutoHookOptions {
   autoInject?: boolean;
   /** Hook 后等待时间（毫秒） */
   waitAfterHookMs?: number;
-  /** 是否使用 AI 分析 */
-  useAI?: boolean;
   /** 加密库 Hook */
   hookCrypto?: boolean;
   /** RSA 加密库 Hook */
@@ -1090,7 +1088,6 @@ export const autoHook = defineTool({
       .number()
       .optional()
       .describe('注入 Hook 后的等待时间（毫秒）'),
-    useAI: zod.boolean().optional().describe('使用 AI 分析'),
     hookCrypto: zod.boolean().optional().describe('Hook CryptoJS 库'),
     hookRsa: zod.boolean().optional().describe('Hook JSEncrypt/RSA 库'),
     hookSmCrypto: zod.boolean().optional().describe('Hook SM-Crypto 库'),

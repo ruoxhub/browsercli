@@ -43,19 +43,11 @@ export interface BrowserConfig {
   maxSingleFileSize?: number;
 }
 
-export interface OpenAIConfig {
-  apiKey?: string;
-  baseURL?: string;
-  model?: string;
-}
-
 export interface RuntimeConfig {
   browserUrl?: string;
   wsEndpoint?: string;
   headless?: boolean;
   executablePath?: string;
-  llmProvider?: 'openai';
-  openai?: OpenAIConfig;
   browser?: BrowserConfig;
   debug?: boolean;
 }
@@ -63,10 +55,4 @@ export interface RuntimeConfig {
 export interface ConnectResult {
   connected: boolean;
   mode?: string;
-}
-
-export interface LlmTestResult {
-  ok: boolean;
-  provider?: 'openai';
-  latencyMs?: number;
 }

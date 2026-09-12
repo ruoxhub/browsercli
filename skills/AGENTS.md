@@ -16,11 +16,13 @@ This AGENTS.md scopes guidance to `skills`. Parent AGENTS guidance still applies
 
 ### Subdirectories
 - `ast-deobfuscation/`
+- `code-analysis/`
 - `hello_js_reverse_skill/`
 - `protocol-reverse/`
 - `proxycli/`
 - `reverse-knowledge/`
 - `sourcemap-reverse/`
+- `target-analysis/`
 - `web-js-env-patcher/`
 - `web-reverse-algorithm/`
 - `web-reverse-env/`

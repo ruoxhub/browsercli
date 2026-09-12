@@ -52,7 +52,7 @@
 
 - 按 protobuf varint 规则反推 field_number
 - 不写完整 `.proto` 写进仓库 — 只写**字段编号 + 推测类型 + 样本引用**
-- 用 `summarize_code` / `understand_code` 辅助 JS 侧代码（如果 JS 侧也有同源 schema）
+- 用 skill `code-analysis` 辅助 JS 侧代码（如果 JS 侧也有同源 schema；原 `summarize_code` / `understand_code` 工具已下线）
 
 ### 6. 写解码器（站点无关）
 

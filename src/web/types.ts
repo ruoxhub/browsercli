@@ -14,7 +14,7 @@
  * 任何字段变更需同步前端协议引用方（如 ws.ts / api.ts 的使用处）。
  */
 
-import type {BrowserConfig, GlobalConfig} from '../config/schema.js';
+import type {BrowserConfig} from '../config/schema.js';
 import type {LocalAppsStatus} from '../modules/proxy/types.js';
 import type {
   CapturedRequestSummary,
@@ -220,22 +220,6 @@ export interface HookDetail extends HookSummary {
   samples: HookSampleEvent[];
 }
 
-// ==================== LLM Models ====================
-
-/**
- * /v1/models 返回的单个模型条目（OpenAI 兼容协议子集）。
- * 后端 POST /api/llm/models 代理上游 `/v1/models` 后裁剪为精简结构。
- */
-export interface ModelInfo {
-  id: string;
-  object?: string;
-  owned_by?: string;
-}
-
-export interface LlmModelsResponse {
-  models: ModelInfo[];
-}
-
 // ==================== Invocation History ====================
 
 /**
@@ -338,27 +322,6 @@ export interface SessionRequestDetail {
   headersParseError?: true;
 }
 
-// ==================== Session AI Analysis ====================
-
-export type SessionAnalysisMode =
-  | 'auto'
-  | 'api_reverse'
-  | 'security'
-  | 'perf'
-  | 'js_crypto';
-
-/**
- * POST /api/session/analyze 的请求体与响应体。
- * requestIds 为「已选数据包」列表，缺省分析整会话。
- */
-export interface SessionAnalysisPayload {
-  reportId: string | null;
-  reportMarkdown: string;
-  mode: SessionAnalysisMode;
-  llmUsed: boolean;
-  requestCount: number;
-}
-
 // ==================== System Info & Logs ====================
 
 export interface LogFileInfo {
@@ -387,14 +350,12 @@ export interface LogContent {
 }
 
 /**
- * `GET /api/config/export` 的响应体 —— 只含 PERSISTED_KEYS 三项，apiKey 恒掩码。
- * import 直接把这个结构 POST 回去（合并语义）。
+ * `GET /api/config/export` 的响应体 —— 只含 PERSISTED_KEYS，import 直接把这个结构
+ * POST 回去（合并语义）。
  *
- * 类型取自 schema 导出的 GlobalConfig / BrowserConfig：后端 types.ts 看不到前端
- * protocol.ts 的 RuntimeConfig，且这两项本就是配置文件的真理源。
+ * 类型取自 schema 导出的 BrowserConfig：后端 types.ts 看不到前端 protocol.ts 的
+ * RuntimeConfig，且该项本就是配置文件的真理源。
  */
 export interface ExportedConfig {
-  llmProvider?: GlobalConfig['llmProvider'];
-  openai?: GlobalConfig['openai'];
   browser?: BrowserConfig;
 }

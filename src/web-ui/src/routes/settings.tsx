@@ -7,7 +7,6 @@ import {
   Activity,
   Gauge,
   Globe,
-  Key,
   RefreshCw,
   Settings,
   Shield,
@@ -18,7 +17,6 @@ import {AntiDetectSection} from '../components/settings/AntiDetectSection';
 import {BrowserSection} from '../components/settings/BrowserSection';
 import {CollectionSection} from '../components/settings/CollectionSection';
 import {GeneralSection} from '../components/settings/GeneralSection';
-import {LlmSection} from '../components/settings/LlmSection';
 import {api} from '../lib/api';
 import type {
   BrowserConfig,
@@ -27,7 +25,7 @@ import type {
 } from '../lib/protocol';
 import {wsClient} from '../lib/ws';
 
-type SectionKey = 'general' | 'browser' | 'anti-detect' | 'llm' | 'collection';
+type SectionKey = 'general' | 'browser' | 'anti-detect' | 'collection';
 
 const NAV_ITEMS: Array<{
   key: SectionKey;
@@ -37,7 +35,6 @@ const NAV_ITEMS: Array<{
   {key: 'general', label: '通用', icon: Settings},
   {key: 'browser', label: '浏览器连接', icon: Globe},
   {key: 'anti-detect', label: '反检测', icon: Shield},
-  {key: 'llm', label: 'LLM Provider', icon: Key},
   {key: 'collection', label: '采集与限制', icon: Gauge},
 ];
 
@@ -94,10 +91,6 @@ export default function SettingsPage() {
     setConfig(prev =>
       prev ? {...prev, browser: {...(prev.browser ?? {}), ...patch}} : prev,
     );
-  };
-
-  const patchRoot = (patch: Partial<RuntimeConfig>) => {
-    setConfig(prev => (prev ? {...prev, ...patch} : prev));
   };
 
   // 三个 browser 分区（浏览器连接 / 反检测 / 采集限制）共用一个保存动作，
@@ -176,8 +169,7 @@ export default function SettingsPage() {
               系统设置
             </h1>
             <p className="text-xs text-[var(--color-text-muted)] mt-1.5">
-              配置浏览器连接、反检测、LLM Provider
-              与采集限制。保存后自动缓存到本地，下次启动服务时自动加载并连接。
+              配置浏览器连接、反检测与采集限制。保存后自动缓存到本地，下次启动服务时自动加载并连接。
             </p>
           </div>
           <button
@@ -262,17 +254,6 @@ export default function SettingsPage() {
             />
           )}
 
-          {activeSection === 'llm' && (
-            <LlmSection
-              config={config}
-              saving={saving === 'llm'}
-              setSaving={v => setSaving(v ? 'llm' : null)}
-              patchRoot={patchRoot}
-              onSaved={setConfig}
-              onError={setError}
-            />
-          )}
-
           {activeSection === 'collection' && (
             <CollectionSection
               browser={config?.browser}
@@ -287,8 +268,8 @@ export default function SettingsPage() {
       <div className="mt-4 flex items-center gap-1.5 text-[11px] text-[var(--color-text-muted)]">
         <Activity size={11} />
         <span>
-          浏览器与 LLM 两类配置分别提交、互不覆盖；浏览器连接 · 反检测 ·
-          采集三区共用同一份浏览器配置，任一区保存会一并提交当前浏览器配置。
+          浏览器连接 · 反检测 · 采集三区共用同一份浏览器配置，
+          任一区保存会一并提交当前浏览器配置。
         </span>
       </div>
     </div>

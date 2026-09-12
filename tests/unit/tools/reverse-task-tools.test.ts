@@ -12,16 +12,9 @@ import {describe, it, after} from 'node:test';
 
 import {ReverseTaskStore} from '../../../src/reverse/ReverseTaskStore.js';
 import {getRuntime} from '../../../src/runtime.js';
-import {
-  analyze_target,
-  record_reverse_evidence,
-} from '../../../src/tools/analyzer/index.js';
+import {record_reverse_evidence} from '../../../src/tools/analyzer/reports.js';
 import {getHookData} from '../../../src/tools/hook/index.js';
-import type {
-  CollectCodeResult,
-  DetectCryptoResult,
-  UnderstandCodeResult,
-} from '../../../src/types/index.js';
+import type {CollectCodeResult} from '../../../src/types/index.js';
 import {DetailedDataManager} from '../../../src/utils/detailedDataManager.js';
 
 interface ResponseShape {
@@ -198,9 +191,6 @@ describe('reverse task tools', () => {
     const originals = {
       reverseTaskStore: runtime.reverseTaskStore,
       collectorCollect: runtime.collector.collect,
-      collectorGetTopPriorityFiles: runtime.collector.getTopPriorityFiles,
-      analyzerUnderstand: runtime.analyzer.understand,
-      cryptoDetect: runtime.cryptoDetector.detect,
       hookCreate: runtime.hookManager.create,
       hookRecords: runtime.hookManager.getRecords,
       replayActions: runtime.pageController.replayActions,
@@ -219,50 +209,6 @@ describe('reverse task tools', () => {
       dependencies: {nodes: [], edges: []},
       totalSize: 32,
       collectTime: 1,
-    });
-    runtime.collector.getTopPriorityFiles = () => ({
-      files: [
-        {
-          url: 'top-sign.js',
-          content:
-            'function signToken(token, nonce){ return token + nonce; } fetch("/api/sign", {method: "POST"})',
-          size: 96,
-          type: 'external',
-        },
-      ],
-      totalSize: 96,
-      totalFiles: 1,
-    });
-    runtime.analyzer.understand = async (): Promise<UnderstandCodeResult> => ({
-      structure: {
-        functions: [],
-        classes: [],
-        modules: [],
-        callGraph: {nodes: [], edges: []},
-      },
-      techStack: {other: []},
-      businessLogic: {mainFeatures: [], entities: [], rules: [], dataModel: {}},
-      dataFlow: {
-        graph: {nodes: [], edges: []},
-        sources: [],
-        sinks: [],
-        taintPaths: [],
-      },
-      securityRisks: [],
-      qualityScore: 88,
-    });
-    runtime.cryptoDetector.detect = async (): Promise<DetectCryptoResult> => ({
-      algorithms: [
-        {
-          name: 'SHA256',
-          type: 'hash',
-          confidence: 0.9,
-          location: {file: 'top-sign.js', line: 1},
-          usage: 'signature',
-        },
-      ],
-      libraries: [],
-      confidence: 0.9,
     });
     runtime.hookManager.create = ({type}: {type: string}) => ({
       hookId: `${type}-hook-1`,
@@ -341,25 +287,6 @@ describe('reverse task tools', () => {
         targetActionDescription: 'click submit order button',
       });
 
-      const analyzeResponse = makeResponse();
-      await analyze_target.handler(
-        {
-          params: {
-            url: 'https://example.com',
-            hookPreset: 'api-signature',
-            autoInjectHooks: false,
-          },
-        } as Parameters<typeof analyze_target.handler>[0],
-        analyzeResponse as unknown as Parameters<
-          typeof analyze_target.handler
-        >[1],
-        {} as Parameters<typeof analyze_target.handler>[2],
-      );
-      const analyzeJson = extractFirstJsonBlock(analyzeResponse.lines);
-      assert.ok(Array.isArray(analyzeJson.recommendedNextSteps));
-      assert.ok(Array.isArray(analyzeJson.stopIf));
-      assert.ok(Array.isArray(analyzeJson.whyTheseSteps));
-
       const hookResponse = makeResponse();
       await getHookData.handler(
         {
@@ -378,10 +305,6 @@ describe('reverse task tools', () => {
     } finally {
       runtime.reverseTaskStore = originals.reverseTaskStore;
       runtime.collector.collect = originals.collectorCollect;
-      runtime.collector.getTopPriorityFiles =
-        originals.collectorGetTopPriorityFiles;
-      runtime.analyzer.understand = originals.analyzerUnderstand;
-      runtime.cryptoDetector.detect = originals.cryptoDetect;
       runtime.hookManager.create = originals.hookCreate;
       runtime.hookManager.getRecords = originals.hookRecords;
       runtime.pageController.replayActions = originals.replayActions;

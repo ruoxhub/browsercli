@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import {getBrowserManagerConfig} from './config/servicesConfig.js';
-import type {AISummarizer} from './modules/analyzer/AISummarizer.js';
-import type {CodeAnalyzer} from './modules/analyzer/CodeAnalyzer.js';
 import {
   BrowserManager,
   type BrowserManagerConfig,
@@ -18,7 +16,6 @@ import {
 import {CodeCollector} from './modules/collector/CodeCollector.js';
 import {DOMInspector} from './modules/collector/DOMInspector.js';
 import {PageController} from './modules/collector/PageController.js';
-import type {CryptoDetector} from './modules/crypto/CryptoDetector.js';
 import {HookManager} from './modules/hook/HookManager.js';
 import type {NetworkModule} from './modules/network/index.js';
 import type {MitmModule} from './modules/proxy/index.js';
@@ -33,7 +30,6 @@ import type {WasmDecompiler} from './modules/wasm/WasmDecompiler.js';
 import type {WasmRuntimeInspector} from './modules/wasm/WasmRuntimeInspector.js';
 import {ReverseTaskStore} from './reverse/ReverseTaskStore.js';
 import {RuntimeServices} from './runtime/RuntimeServices.js';
-import type {LLMService} from './services/LLMService.js';
 import type {Page} from './third_party/index.js';
 import {createAppEventBusOptions, type AppEventMap} from './types/events.js';
 import {DetailedDataManager} from './utils/detailedDataManager.js';
@@ -54,10 +50,6 @@ export interface Runtime {
   domInspector: DOMInspector;
   pageController: PageController;
   hookManager: HookManager;
-  llmService: LLMService;
-  analyzer: CodeAnalyzer;
-  summarizer: AISummarizer;
-  cryptoDetector: CryptoDetector;
   networkModule: NetworkModule;
   mitmModule: MitmModule;
   captureSessionManager: CaptureSessionManager;
@@ -117,18 +109,6 @@ export function getRuntime(): Runtime {
     domInspector,
     pageController,
     hookManager,
-    get llmService() {
-      return services.getLLMService();
-    },
-    get analyzer() {
-      return services.getAnalyzer();
-    },
-    get summarizer() {
-      return services.getSummarizer();
-    },
-    get cryptoDetector() {
-      return services.getCryptoDetector();
-    },
     get networkModule() {
       return services.getNetworkModule();
     },

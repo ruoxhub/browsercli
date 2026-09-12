@@ -26,12 +26,6 @@ describe('config schema validation', {concurrency: false}, () => {
 
   it('parses valid global config and coerces numeric strings', () => {
     const config = validateGlobalConfig({
-      llmProvider: 'openai',
-      openai: {
-        apiKey: 'sk-test',
-        baseURL: 'https://api.openai.com/v1',
-        model: 'gpt-4o',
-      },
       browser: {
         channel: 'chrome-beta',
         viewport: {width: '1440', height: '900'},
@@ -59,13 +53,6 @@ describe('config schema validation', {concurrency: false}, () => {
       '~/.jsreverse/tool-results',
     );
     assert.strictEqual(config.sessionStateTtlMs, 60000);
-  });
-
-  it('rejects unsupported providers at schema boundary', () => {
-    assert.throws(
-      () => GlobalConfigSchema.parse({llmProvider: 'gemni'}),
-      /llmProvider/,
-    );
   });
 
   it('rejects invalid browser port with readable path details', () => {

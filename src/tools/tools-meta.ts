@@ -112,7 +112,6 @@ export function areRequirementsEqual(
     a.page !== b.page ||
     a.frame !== b.frame ||
     a.debugger !== b.debugger ||
-    a.ai !== b.ai ||
     a.recovery !== b.recovery
   ) {
     return false;

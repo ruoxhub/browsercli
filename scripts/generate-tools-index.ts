@@ -14,7 +14,7 @@ const TOOLS_ROOT = path.join(REPO_ROOT, 'src/tools');
 const GENERATED_INDEX_PATH = path.join(TOOLS_ROOT, 'generated-tools-index.ts');
 
 const DOMAIN_DESCRIPTIONS: Record<string, string> = {
-  analyzer: 'Static and AI-assisted JavaScript analysis tools.',
+  analyzer: 'Reverse-engineering evidence and session report tools.',
   'anti-debug': 'Anti-debugging detection and bypass tools.',
   collector: 'Code and script collection tools.',
   console: 'Browser console inspection tools.',

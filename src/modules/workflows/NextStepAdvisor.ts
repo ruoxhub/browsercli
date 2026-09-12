@@ -24,9 +24,9 @@ export function recommendNextStep(input: NextStepAdvisorInput): NextStepAdvice {
     return {
       stage: 'PureExtraction',
       confidence: 0.88,
-      nextStep: 'understand_code',
-      why: '当前任务已进入 PureExtraction 且本地链路已通过，适合提炼纯算法边界。',
-      alternatives: ['deobfuscate_code', 'record_reverse_evidence'],
+      nextStep: 'manage_reverse_task:summarize',
+      why: '当前任务已进入 PureExtraction 且本地链路已通过，先汇总任务状态与证据，再决定提纯路径。',
+      alternatives: ['record_reverse_evidence', 'trace_signature_generation'],
       avoid: ['breakpoint'],
     };
   }
@@ -81,7 +81,7 @@ export function recommendNextStep(input: NextStepAdvisorInput): NextStepAdvice {
       confidence: 0.82,
       nextStep: 'diff_env_requirements',
       why: '已经进入本地复现，但还没有稳定通过或尚未明确 first divergence，应继续最小因果单元补环境。',
-      alternatives: ['record_reverse_evidence', 'understand_code'],
+      alternatives: ['record_reverse_evidence', 'observe_flow'],
       avoid: ['PureExtraction', 'Port'],
     };
   }
@@ -89,9 +89,9 @@ export function recommendNextStep(input: NextStepAdvisorInput): NextStepAdvice {
   return {
     stage: 'PureExtraction',
     confidence: 0.78,
-    nextStep: 'understand_code',
-    why: '本地链路已基本跑通，下一步适合提炼结构与边界，为纯算法提取做准备。',
-    alternatives: ['deobfuscate_code', 'risk_panel'],
+    nextStep: 'manage_reverse_task:summarize',
+    why: '本地链路已基本跑通，下一步适合汇总任务状态与证据，为纯算法提取做准备。',
+    alternatives: ['record_reverse_evidence', 'trace_signature_generation'],
     avoid: ['breakpoint'],
   };
 }

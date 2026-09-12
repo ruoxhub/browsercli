@@ -18,20 +18,14 @@ import {
   getRuntimeConfigStore,
   resetRuntimeConfigStore,
 } from '../../../src/config/RuntimeConfigStore.js';
+import {type SystemConfig} from '../../../src/config/schema.js';
 import {
-  type AIConfig,
-  type SystemConfig,
-} from '../../../src/config/schema.js';
-import {
-  getAIConfig,
   getBrowserConfig,
-  getDefaultLLMProvider,
   getEnv,
   getSystemConfig,
   isDebugEnabled,
   validateConfig,
 } from '../../../src/config/servicesConfig.js';
-import {createAIService} from '../../../src/services/createAIService.js';
 import '../../../src/config.js';
 
 describe('Configuration Management', () => {
@@ -44,10 +38,6 @@ describe('Configuration Management', () => {
     mock.method(process, 'cwd', () => '/nonexistent-cwd');
 
     // Clear environment variables before each test
-    delete process.env.DEFAULT_LLM_PROVIDER;
-    delete process.env.OPENAI_API_KEY;
-    delete process.env.OPENAI_BASE_URL;
-    delete process.env.OPENAI_MODEL;
     delete process.env.BROWSER_HEADLESS;
     delete process.env.BROWSER_ISOLATED;
     delete process.env.BROWSER_EXECUTABLE_PATH;
@@ -68,111 +58,6 @@ describe('Configuration Management', () => {
     // Restore original environment variables
     process.env = {...originalEnv};
     resetRuntimeConfigStore();
-  });
-
-  describe('getDefaultLLMProvider', () => {
-    it('should return openai as default when no provider is set', () => {
-      const provider = getDefaultLLMProvider();
-      assert.strictEqual(provider, 'openai');
-    });
-
-    it('should return openai when DEFAULT_LLM_PROVIDER is openai', () => {
-      process.env.DEFAULT_LLM_PROVIDER = 'openai';
-      const provider = getDefaultLLMProvider();
-      assert.strictEqual(provider, 'openai');
-    });
-
-    it('should handle case-insensitive provider names', () => {
-      process.env.DEFAULT_LLM_PROVIDER = 'OPENAI';
-      const provider = getDefaultLLMProvider();
-      assert.strictEqual(provider, 'openai');
-    });
-
-    it('should return openai for invalid provider names', () => {
-      process.env.DEFAULT_LLM_PROVIDER = 'invalid-provider';
-      const provider = getDefaultLLMProvider();
-      assert.strictEqual(provider, 'openai');
-    });
-
-    it('should reflect RuntimeConfigStore updates', () => {
-      resetRuntimeConfigStore({llmProvider: 'openai'});
-
-      assert.strictEqual(getDefaultLLMProvider(), 'openai');
-
-      getRuntimeConfigStore().update({llmProvider: 'openai'});
-      assert.strictEqual(getDefaultLLMProvider(), 'openai');
-    });
-  });
-
-  describe('getAIConfig', () => {
-    it('should configure OpenAI when OPENAI_API_KEY is set', () => {
-      process.env.OPENAI_API_KEY = 'sk-test-key';
-      const config = getAIConfig();
-
-      assert.ok(config);
-      assert.ok(config.openai);
-      assert.strictEqual(config.openai.apiKey, 'sk-test-key');
-      assert.strictEqual(config.openai.model, 'gpt-4o');
-    });
-
-    it('should use custom OpenAI base URL when set', () => {
-      process.env.OPENAI_API_KEY = 'sk-test-key';
-      process.env.OPENAI_BASE_URL = 'https://custom.openai.com/v1';
-      const config = getAIConfig();
-
-      assert.ok(config?.openai);
-      assert.strictEqual(config.openai.baseURL, 'https://custom.openai.com/v1');
-    });
-
-    it('should use custom OpenAI model when set', () => {
-      process.env.OPENAI_API_KEY = 'sk-test-key';
-      process.env.OPENAI_MODEL = 'gpt-3.5-turbo';
-      const config = getAIConfig();
-
-      assert.ok(config?.openai);
-      assert.strictEqual(config.openai.model, 'gpt-3.5-turbo');
-    });
-
-    it('should set correct provider based on DEFAULT_LLM_PROVIDER', () => {
-      process.env.OPENAI_API_KEY = 'sk-test-key';
-      process.env.DEFAULT_LLM_PROVIDER = 'openai';
-      const config = getAIConfig();
-
-      assert.ok(config);
-      assert.strictEqual(config.provider, 'openai');
-    });
-
-    it('should prefer panel-saved RuntimeConfigStore values over env', () => {
-      process.env.OPENAI_API_KEY = 'sk-env-key';
-      process.env.OPENAI_MODEL = 'gpt-4o';
-      resetRuntimeConfigStore({
-        llmProvider: 'openai',
-        openai: {
-          apiKey: 'sk-panel-key',
-          baseURL: 'https://panel.example.com/v1',
-          model: 'panel-model',
-        },
-      });
-
-      const config = getAIConfig();
-
-      assert.ok(config?.openai);
-      assert.strictEqual(config.openai.apiKey, 'sk-panel-key');
-      assert.strictEqual(config.openai.baseURL, 'https://panel.example.com/v1');
-      assert.strictEqual(config.openai.model, 'panel-model');
-    });
-
-    it('should fall back to env when store has no apiKey', () => {
-      process.env.OPENAI_API_KEY = 'sk-env-key';
-      process.env.OPENAI_MODEL = 'gpt-3.5-turbo';
-      resetRuntimeConfigStore({llmProvider: 'openai'});
-
-      const config = getAIConfig();
-
-      assert.ok(config?.openai);
-      assert.strictEqual(config.openai.apiKey, 'sk-env-key');
-      assert.strictEqual(config.openai.model, 'gpt-3.5-turbo');
-    });
   });
 
   describe('getBrowserConfig', () => {
@@ -256,26 +141,13 @@ describe('Configuration Management', () => {
 
   describe('getSystemConfig', () => {
     it('should return complete system configuration', () => {
-      process.env.OPENAI_API_KEY = 'sk-test-key';
       process.env.DEBUG = 'true';
 
       const config = getSystemConfig();
 
       assert.ok(config);
-      assert.ok(config.ai);
       assert.ok(config.browser);
       assert.strictEqual(config.debug, true);
-    });
-
-    it('should return system config with OpenAI when OPENAI_API_KEY is set', () => {
-      process.env.OPENAI_API_KEY = 'sk-test-key';
-      const config = getSystemConfig();
-
-      assert.ok(config);
-      assert.ok(config.ai);
-      assert.strictEqual(config.ai.provider, 'openai');
-      assert.ok(config.browser);
-      assert.strictEqual(config.debug, false);
     });
 
     it('should detect debug mode from DEBUG=true', () => {
@@ -349,47 +221,11 @@ describe('Configuration Management', () => {
       assert.strictEqual(result.errors.length, 0);
     });
 
-    it('should reject OpenAI provider without configuration', () => {
-      const config: SystemConfig = {
-        ai: {
-          provider: 'openai',
-        },
-        browser: {},
-      };
-
-      const result = validateConfig(config);
-
-      assert.strictEqual(result.valid, false);
-      // AIConfigSchema superRefine 报错信息为 "ai.openai: is required
-      // when provider is openai"，不含 "OpenAI" 字样
-      assert.ok(result.errors.some(e => e.includes('openai')));
-    });
-
-    it('should accept valid OpenAI configuration', () => {
-      const config: SystemConfig = {
-        ai: {
-          provider: 'openai',
-          openai: {
-            apiKey: 'sk-test-key',
-            model: 'gpt-4o',
-          },
-        },
-        browser: {},
-      };
-
-      const result = validateConfig(config);
-
-      assert.strictEqual(result.valid, true);
-      assert.strictEqual(result.errors.length, 0);
-    });
-
     it('should collect multiple validation errors', () => {
       const config: SystemConfig = {
-        ai: {
-          provider: 'openai',
-        },
         browser: {
           remoteDebuggingPort: 0,
+          timeout: -1,
         },
       };
 
@@ -454,47 +290,6 @@ describe('Configuration Management', () => {
       const enabled = isDebugEnabled();
 
       assert.strictEqual(enabled, false);
-    });
-  });
-
-  describe('createAIService', () => {
-    it('should return undefined when no AI configuration is provided', () => {
-      const service = createAIService();
-
-      assert.strictEqual(service, undefined);
-    });
-
-    it('should create OpenAI service when configured', () => {
-      process.env.OPENAI_API_KEY = 'sk-test-key';
-      process.env.DEFAULT_LLM_PROVIDER = 'openai';
-
-      const service = createAIService();
-
-      assert.ok(service);
-    });
-
-    it('should throw error when provider is configured but missing credentials', () => {
-      const config: AIConfig = {
-        provider: 'openai',
-      };
-
-      assert.throws(() => createAIService(config), {
-        message: /OpenAI configuration not found/,
-      });
-    });
-
-    it('should create service with custom configuration', () => {
-      const config: AIConfig = {
-        provider: 'openai',
-        openai: {
-          apiKey: 'sk-custom-key',
-          model: 'gpt-3.5-turbo',
-        },
-      };
-
-      const service = createAIService(config);
-
-      assert.ok(service);
     });
   });
 });

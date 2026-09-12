@@ -302,18 +302,6 @@ export class ToolContextProvider {
     await this._debuggerContext.dispose(activePage);
   }
 
-  get analyzer() {
-    return this._serviceLocator.getAnalyzer();
-  }
-
-  get summarizer() {
-    return this._serviceLocator.getSummarizer();
-  }
-
-  get cryptoDetector() {
-    return this._serviceLocator.getCryptoDetector();
-  }
-
   get hookManager() {
     return this._serviceLocator.getHookManager();
   }

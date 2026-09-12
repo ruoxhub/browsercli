@@ -1,20 +1,17 @@
 # JavaScript Code Analysis & Deobfuscation Reference
 
-Code understanding, AST deobfuscation, crypto detection, and CAPTCHA state inspection tools for `proxycli`.
+Code deobfuscation and CAPTCHA state inspection tools for `proxycli`.
 
 ## Overview
 
-Statically and dynamically inspect obfuscated JavaScript code, detect encryption schemes, and assess CAPTCHA status.
+Statically and dynamically inspect obfuscated JavaScript code and assess CAPTCHA status.
 
 | Tool Name          | Description                                                          | Key Parameters                                                        |
 | ------------------ | -------------------------------------------------------------------- | --------------------------------------------------------------------- |
 | `deobfuscate_code` | Deobfuscate JavaScript (string decryption, AST flattening, renaming) | `--code <str>`, `[--aggressive <bool>]`, `[--renameVariables <bool>]` |
-| `understand_code`  | Analyze code structure, business logic, and security                 | `--code <str>`, `[--focus <str>]`                                     |
-| `summarize_code`   | Summarize code files or project contexts                             | `[--mode <str>]`, `[--code <str>]`, `[--url <str>]`                   |
-| `detect_crypto`    | Detect crypto algorithms/libraries (MD5, AES, RSA, SM2/3/4)          | `--code <str>`, `[--useAI <bool>]`                                    |
 | `detect_captcha`   | Detect CAPTCHA challenge status or wait for clear                    | `[--action <str>]`, `[--timeout <num>]`                               |
-| `analyze_target`   | Rapid target fingerprinting and security risk evaluation             | `--url <str>`                                                         |
-| `risk_panel`       | Display security and risk control panel for current site             | `[--code <str>]`, `[--useAI <bool>]`, `[--includeHookSignals <bool>]` |
+
+> 代码理解、摘要、加密识别、风险评分、目标一键分析原由 `understand_code` / `summarize_code` / `detect_crypto` / `risk_panel` / `analyze_target` 工具提供，这些工具已下线；改由 `code-analysis` 与 `target-analysis` 技能指导 Agent 用基础工具自行分析。
 
 ---
 
@@ -32,33 +29,7 @@ proxycli call deobfuscate_code --code "var _0x1a2b = ['hello']; console.log(_0x1
 proxycli call deobfuscate_code --code "..." --aggressive true --renameVariables true
 ```
 
-### 2. understand_code
-
-Perform structural analysis on minified or reversed code snippets to extract business logic, inputs, outputs, and side-effects.
-
-```bash
-# Focus on business logic
-proxycli call understand_code --code "function e(t,n){...}" --focus business
-```
-
-### 3. summarize_code
-
-Summarize scripts or project modules to obtain high-level architecture before diving into details.
-
-```bash
-proxycli call summarize_code --mode single --url "https://example.com/assets/app.js"
-```
-
-### 4. detect_crypto
-
-Scan JavaScript source code for cryptographic signatures (S-boxes, IVs, constants, module exports) such as AES, DES, RSA, HMAC, SHA, SM2/3/4.
-
-```bash
-# Scan for crypto implementations
-proxycli call detect_crypto --code "..." --useAI true
-```
-
-### 5. detect_captcha
+### 2. detect_captcha
 
 Inspect the current page to determine if a CAPTCHA challenge is blocking navigation or execution. Note: this tool only evaluates status, it does NOT solve CAPTCHAs.
 
@@ -70,14 +41,10 @@ proxycli call detect_captcha --action detect
 proxycli call detect_captcha --action wait_for_clear --timeout 60000
 ```
 
-### 6. analyze_target & risk_panel
+## 代码分析替代路径
 
-Assess the target domain's bot detection, WAF type, and frontend protection posture before planning an attack.
+需要结构理解、摘要、加密识别或风险评分时：
 
-```bash
-# Analyze URL target profile
-proxycli call analyze_target --url "https://example.com"
-
-# View current page risk indicators
-proxycli call risk_panel
-```
+1. `collect_code` 采代码、`search_in_scripts` 定位、`get_script_source` 取全文；
+2. 按 skill `code-analysis` 的提示词与产出结构自行分析；
+3. 目标级工作流按 skill `target-analysis` 复现（采集 + Hook 时间线 + 行动方案）。

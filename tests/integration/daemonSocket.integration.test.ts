@@ -190,7 +190,7 @@ describe('daemon socket end-to-end', () => {
       `expected TOON rows table in stdout, got:\n${stdout.slice(0, 200)}`,
     );
     assert.ok(Number(match[1]) > 0, 'expected non-empty tools list');
-    assert.match(stdout, /deobfuscate_code/);
+    assert.match(stdout, /observe_flow/);
   });
 
   it('call on an unknown tool exits 1 with UNKNOWN_TOOL in output', () => {

@@ -4,40 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {CollectedFileEntry} from './types.js';
-
-export function normalizeCollectedFiles(result: unknown): CollectedFileEntry[] {
-  if (!result || typeof result !== 'object') {
-    return [];
-  }
-  const files = (result as {files?: unknown}).files;
-  if (!Array.isArray(files)) {
-    return [];
-  }
-  return files
-    .filter(
-      (
-        item,
-      ): item is {
-        url?: unknown;
-        content?: unknown;
-        size?: unknown;
-        type?: unknown;
-      } => Boolean(item && typeof item === 'object'),
-    )
-    .map(file => ({
-      url: typeof file.url === 'string' ? file.url : 'unknown',
-      content: typeof file.content === 'string' ? file.content : '',
-      size:
-        typeof file.size === 'number'
-          ? file.size
-          : typeof file.content === 'string'
-            ? file.content.length
-            : 0,
-      type: typeof file.type === 'string' ? file.type : 'external',
-    }));
-}
-
 export function toRecord(value: unknown): Record<string, unknown> | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return undefined;

@@ -6,6 +6,7 @@ description: >-
 ---
 
 <!-- code-review-graph MCP tools -->
+
 ## MCP Tools: code-review-graph
 
 **This project has a knowledge graph. Start with the code-review-graph
@@ -32,16 +33,16 @@ gives you structural context (callers, dependents, test coverage) that file sear
 
 ### Key Tools
 
-| Tool | Use when |
-| ------ | ---------- |
-| `detect_changes_tool` | Risk-scored change analysis |
-| `get_review_context_tool` | Token-efficient source snippets |
-| `get_impact_radius_tool` | Blast radius of a change |
-| `get_affected_flows_tool` | Impacted execution paths |
-| `query_graph_tool` | Trace callers, callees, imports, tests |
-| `semantic_search_nodes_tool` | Find functions/classes by keyword |
-| `get_architecture_overview_tool` | High-level structure |
-| `refactor_tool` | Rename planning, dead code |
+| Tool                             | Use when                               |
+| -------------------------------- | -------------------------------------- |
+| `detect_changes_tool`            | Risk-scored change analysis            |
+| `get_review_context_tool`        | Token-efficient source snippets        |
+| `get_impact_radius_tool`         | Blast radius of a change               |
+| `get_affected_flows_tool`        | Impacted execution paths               |
+| `query_graph_tool`               | Trace callers, callees, imports, tests |
+| `semantic_search_nodes_tool`     | Find functions/classes by keyword      |
+| `get_architecture_overview_tool` | High-level structure                   |
+| `refactor_tool`                  | Rename planning, dead code             |
 
 ### Workflow
 

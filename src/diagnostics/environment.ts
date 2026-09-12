@@ -7,7 +7,6 @@
 import {accessSync, constants, existsSync} from 'node:fs';
 import path from 'node:path';
 
-import {getDefaultLLMProvider, getAIConfig} from '../config/servicesConfig.js';
 import {
   resolvePackageRoot,
   resolveArtifactsTasksDirForPackageRoot,
@@ -63,23 +62,6 @@ function getBuildOutputStatus(packageRoot: string): DiagnosticCheck {
   };
 }
 
-function getAISelectionStatus(): DiagnosticCheck {
-  const provider = getDefaultLLMProvider();
-  const aiConfig = getAIConfig();
-  const configured = aiConfig !== undefined;
-  return {
-    name: 'ai_provider_selection',
-    status: configured ? 'ok' : 'warn',
-    reason: configured
-      ? `AI provider "${provider}" is configured.`
-      : `No AI provider configured. Default provider is "${provider}".`,
-    fix: configured
-      ? 'No action required.'
-      : `Configure credentials for ${provider} or set DEFAULT_LLM_PROVIDER.`,
-    details: {defaultProvider: provider, configured},
-  };
-}
-
 function getArtifactsDirectoryStatus(): DiagnosticCheck {
   const packageRoot = resolvePackageRoot(import.meta.url);
   const artifactsDir = resolveArtifactsTasksDirForPackageRoot(packageRoot);
@@ -128,7 +110,6 @@ export function runEnvironmentDiagnostics(): DiagnosticReport {
   const checks: DiagnosticCheck[] = [
     getNodeVersionStatus(process.version),
     getBuildOutputStatus(packageRoot),
-    getAISelectionStatus(),
     getArtifactsDirectoryStatus(),
   ];
 

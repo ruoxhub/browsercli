@@ -66,24 +66,8 @@ export const GENERATED_DOMAIN_MANIFESTS = [
 
 export const GENERATED_TOOL_REGISTRY = [
   {
-    modulePath: './analyzer/understand.js',
-    handlerName: 'understandCode',
-  },
-  {
-    modulePath: './analyzer/summarize.js',
-    handlerName: 'summarizeCode',
-  },
-  {
     modulePath: './analyzer/reports.js',
     handlerName: 'record_reverse_evidence',
-  },
-  {
-    modulePath: './analyzer/analyzeTarget.js',
-    handlerName: 'analyze_target',
-  },
-  {
-    modulePath: './analyzer/riskPanel.js',
-    handlerName: 'riskPanel',
   },
   {
     modulePath: './analyzer/reports.js',
@@ -596,14 +580,6 @@ export const GENERATED_TOOL_REGISTRY = [
   {
     modulePath: './session/session_get_data.js',
     handlerName: 'sessionGetData',
-  },
-  {
-    modulePath: './session/session_analyze_purified.js',
-    handlerName: 'sessionAnalyzePurified',
-  },
-  {
-    modulePath: './session/session_generate_report.js',
-    handlerName: 'sessionGenerateReport',
   },
   {
     modulePath: './stealth/stealth.js',

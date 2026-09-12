@@ -9,7 +9,6 @@ import {describe, it} from 'node:test';
 import fc from 'fast-check';
 
 import {zod} from '../../src/third_party/index.js';
-import {summarizeCode} from '../../src/tools/analyzer/summarize.js';
 import {collectCode} from '../../src/tools/collector/collectCode.js';
 import {queryDom} from '../../src/tools/dom/queryDom.js';
 import {createHook} from '../../src/tools/hook/CreateHook.js';
@@ -17,7 +16,6 @@ import {clickElement} from '../../src/tools/page/clickElement.js';
 import {injectStealth} from '../../src/tools/stealth/stealth.js';
 
 const collectSchema = zod.object(collectCode.schema);
-const summarizeSchema = zod.object(summarizeCode.schema);
 const hookSchema = zod.object(createHook.schema);
 const stealthSchema = zod.object(injectStealth.schema);
 const domSchema = zod.object(queryDom.schema);
@@ -46,15 +44,6 @@ describe('JSHook tool properties', () => {
       maxFileSize: 100,
     });
     assert.ok(parsed.url.startsWith('https://'));
-  });
-
-  it('Property 10: summarization mode support', () => {
-    fc.assert(
-      fc.property(fc.constantFrom('single', 'batch', 'project'), mode => {
-        const parsed = summarizeSchema.parse({mode});
-        assert.strictEqual(parsed.mode, mode);
-      }),
-    );
   });
 
   it('Property 12: hook type support', () => {

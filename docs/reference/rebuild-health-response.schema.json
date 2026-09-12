@@ -36,7 +36,7 @@
           "routeGuard": {
             "preferredToolClass": "rebuild",
             "routeHint": "switch_to_rebuild",
-            "avoidTools": ["understand_code"]
+            "avoidTools": ["collect_code"]
           },
           "continuation": {
             "ready": true,

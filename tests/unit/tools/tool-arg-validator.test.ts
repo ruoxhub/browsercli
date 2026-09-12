@@ -196,37 +196,34 @@ describe('validateToolArgs strict parameter validation and alias removal', () =>
   });
 
   it('enum validation error lists all accepted case-sensitive values', () => {
-    const caseResult = validateToolArgs('understand_code', {
-      code: 'var x = 1;',
-      focus: 'SECURITY',
+    const caseResult = validateToolArgs('export_session_report', {
+      format: 'JSON',
     });
     assert.equal(caseResult.ok, false);
     if (!caseResult.ok) {
       assert.equal(
         caseResult.error,
-        'understand_code 的参数 focus 仅支持：all, structure, business, security',
+        'export_session_report 的参数 format 仅支持：json, markdown',
       );
     }
 
-    const invalidResult = validateToolArgs('understand_code', {
-      code: 'var x = 1;',
-      focus: 'invalid_mode',
+    const invalidResult = validateToolArgs('export_session_report', {
+      format: 'invalid_mode',
     });
     assert.equal(invalidResult.ok, false);
     if (!invalidResult.ok) {
       assert.equal(
         invalidResult.error,
-        'understand_code 的参数 focus 仅支持：all, structure, business, security',
+        'export_session_report 的参数 format 仅支持：json, markdown',
       );
     }
 
-    const validResult = validateToolArgs('understand_code', {
-      code: 'var x = 1;',
-      focus: 'security',
+    const validResult = validateToolArgs('export_session_report', {
+      format: 'markdown',
     });
     assert.equal(validResult.ok, true);
     if (validResult.ok) {
-      assert.equal(validResult.value.focus, 'security');
+      assert.equal(validResult.value.format, 'markdown');
     }
   });
 });

@@ -46,7 +46,7 @@ Required workflow:
 4) Source correlation:
    - First use: \`search_in_sources\`
    - Then use: \`get_script_source\` or \`collect_code\`
-   - Optional: \`understand_code\`, \`summarize_code\`
+   - Optional: 按 skill \`code-analysis\` 自行分析（原 \`understand_code\` / \`summarize_code\` 工具已下线）
    - Collect:
      candidate function bodies, loader chain, security script URLs, dynamic dependency order.
    - Output:
@@ -114,7 +114,7 @@ Tool routing rules:
 - Want caller stack? Use \`get_request_initiator\`
 - Want parameter write point? Use \`hook_function\` / \`create_hook\` + \`get_hook_data\`
 - Want source location? Use \`search_in_sources\` / \`get_script_source\`
-- Want code summary? Use \`collect_code\` / \`summarize_code\`
+- Want code summary? Use \`collect_code\` + skill \`code-analysis\`
 - Want durable timeline? Use \`record_reverse_evidence\`
 - Want local reproducibility? Move to \`artifacts/tasks/<task-id>/run/\`
 

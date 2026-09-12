@@ -34,7 +34,6 @@ export interface ToolRuntimeRequirements {
   page?: 'selected';
   frame?: 'selected';
   debugger?: 'available' | 'paused' | 'running';
-  ai?: 'optional' | 'required';
   nativeTools?: string[];
   recovery?: boolean;
 }

@@ -66,8 +66,6 @@ function buildPrimaryStep(
     targetParam?: string;
     locatedFunctionName?: string;
     locatedScriptUrl?: string;
-    locatedScriptId?: string;
-    functionSliceCode?: string;
   } = {},
 ): OrchestrationStep {
   if (nextStepHint.startsWith('manage_reverse_task:')) {
@@ -84,36 +82,6 @@ function buildPrimaryStep(
     nextStepHint === 'locate_signature_function' ||
     nextStepHint === 'inject_hook'
   ) {
-    if (options.functionSliceCode && options.locatedFunctionName) {
-      return {
-        key: buildStepKey('understand_code', {
-          code: options.functionSliceCode,
-          focus: 'structure',
-        }),
-        tool: 'understand_code',
-        reason: `已拿到 ${options.locatedFunctionName} 的最小依赖闭包，优先进入结构理解而不是重复定位。`,
-        params: {
-          code: options.functionSliceCode,
-          focus: 'structure',
-        },
-      };
-    }
-    if (options.locatedFunctionName && options.locatedScriptId) {
-      return {
-        key: buildStepKey('extract_function_tree', {
-          scriptId: options.locatedScriptId,
-          functionName: options.locatedFunctionName,
-          maxDepth: 2,
-        }),
-        tool: 'extract_function_tree',
-        reason: `已定位到 ${options.locatedFunctionName} 的源码命中，直接提取最小依赖闭包。`,
-        params: {
-          scriptId: options.locatedScriptId,
-          functionName: options.locatedFunctionName,
-          maxDepth: 2,
-        },
-      };
-    }
     if (options.locatedFunctionName) {
       return {
         key: buildStepKey('search_in_sources', {
@@ -125,7 +93,7 @@ function buildPrimaryStep(
             : {}),
         }),
         tool: 'search_in_sources',
-        reason: `已存在候选签名函数 ${options.locatedFunctionName}，先复用定位结果缩小到具体源码位置。`,
+        reason: `已定位到 ${options.locatedFunctionName}，复用定位结果缩小到具体源码位置。`,
         params: {
           query: options.locatedFunctionName,
           isRegex: false,
@@ -197,8 +165,6 @@ function buildStrategyPrimaryStep(
     targetParam?: string;
     locatedFunctionName?: string;
     locatedScriptUrl?: string;
-    locatedScriptId?: string;
-    functionSliceCode?: string;
   } = {},
 ): OrchestrationStep {
   if (!strategy) {
@@ -351,10 +317,6 @@ export async function orchestrateReverseTask(
     timelineLimit: 20,
     evidenceLimit: 20,
   });
-  const functionSlice = await store.readSnapshot<Record<string, unknown>>(
-    taskId,
-    'function-slice.json',
-  );
   const successCriteria = (snapshot.state?.successCriteria ??
     snapshot.task?.successCriteria ??
     {}) as Record<string, unknown>;
@@ -474,11 +436,6 @@ export async function orchestrateReverseTask(
       locatedScriptUrl:
         targetContext?.locatedSource?.url ??
         targetContext?.locatedSignature?.scriptUrl,
-      locatedScriptId: targetContext?.locatedSource?.scriptId,
-      functionSliceCode:
-        typeof functionSlice?.code === 'string'
-          ? String(functionSlice.code).slice(0, 12000)
-          : undefined,
     },
   );
   if (

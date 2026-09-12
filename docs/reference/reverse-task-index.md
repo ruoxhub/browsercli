@@ -53,8 +53,8 @@
 
 - `find_in_script`
 - `set_breakpoint_on_text`
-- `understand_code`
 - `deobfuscate_code`
+- skill `code-analysis`（`understand_code` 已下线）
 
 常用关键词：`sign`、`token`、`nonce`、`encrypt`、`hmac`。
 
@@ -74,9 +74,8 @@
 
 ## 4) 一键分析目标站点（推荐入口）
 
-- `analyze_target`
-
-关键输出：
+原 `analyze_target` 工具已下线，改按 skill `target-analysis` 复现：`collect_code`
+采代码 + `create_hook`/`inject_hook` 采样 + `get_hook_data` 关联，产出同款：
 
 - `requestFingerprints`
 - `priorityTargets`
@@ -104,9 +103,8 @@
 
 ## 6) 评估风险和加密实现
 
-- `detect_crypto`
-- `risk_panel`
-- `understand_code`
+原 `detect_crypto` / `risk_panel` / `understand_code` 工具已下线，改按 skill
+`code-analysis` 用采集到的代码做加密识别、风险评分与结构理解。
 
 用于识别弱算法、可疑签名实现、安全风险点。
 
@@ -144,7 +142,7 @@
 
 1. `new_page`
 2. 先读 `docs/reference/reverse-bootstrap.md`，再按其要求继续读 `docs/reference/case-safety-policy.md` 与 `docs/reference/reverse-workflow.md`
-3. `analyze_target`
+3. 按 skill `target-analysis` 做目标初筛（原 `analyze_target`）
 4. 设定目标边界：`targetKeywords`、`targetUrlPatterns`、`targetFunctionNames`、`targetActionDescription`
 5. `search_in_scripts`
 6. `create_hook` + `inject_hook`
@@ -155,7 +153,7 @@
 11. 运行 `env/entry.js` 并读取代理 env log
 12. 记录 `first divergence`
 13. `diff_env_requirements`（仅辅助）
-14. `risk_panel`
+14. 按 skill `code-analysis` 做风险评估（原 `risk_panel`）
 15. `env-pass` 后再推进纯算法提纯
 
 ## 11) 参数总表

@@ -11,8 +11,7 @@ import {defineTool} from '../ToolDefinition.js';
 
 export const diagnoseEnvironmentTool = defineTool({
   name: 'diagnose_environment',
-  description:
-    '运行环境诊断，检查 Node 版本、构建产物、AI 配置与 artifacts 目录状态。',
+  description: '运行环境诊断，检查 Node 版本、构建产物与 artifacts 目录状态。',
   annotations: {
     category: ToolCategory.DIAGNOSTICS,
     readOnlyHint: true,
@@ -22,7 +21,7 @@ export const diagnoseEnvironmentTool = defineTool({
       .array(zod.string())
       .optional()
       .describe(
-        '可选的要运行的检查项名称列表；省略则运行全部检查。可选值：node_version、build_output、ai_provider_selection、artifacts_dir。',
+        '可选的要运行的检查项名称列表；省略则运行全部检查。可选值：node_version、build_output、artifacts_dir。',
       ),
   },
   handler: async (request, response) => {

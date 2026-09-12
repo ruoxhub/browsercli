@@ -12,7 +12,6 @@ import {
   X,
   Terminal,
   Settings,
-  Sparkles,
 } from 'lucide-react';
 import {useEffect, useState} from 'react';
 import {HashRouter as Router, Routes, Route, NavLink} from 'react-router-dom';
@@ -22,7 +21,6 @@ import wsClient from './lib/ws';
 import HooksPage from './routes/hooks';
 import OverviewPage from './routes/overview';
 import ProxyPage from './routes/proxy';
-import ReportPage from './routes/report';
 import SettingsPage from './routes/settings';
 import ToolsPage from './routes/tools';
 
@@ -120,14 +118,6 @@ function Layout() {
             <span>Hook 监控点</span>
           </NavLink>
           <NavLink
-            to="/report"
-            onClick={() => setSidebarOpen(false)}
-            className={getNavLinkClass}
-          >
-            <Sparkles size={16} />
-            <span>AI 流量分析</span>
-          </NavLink>
-          <NavLink
             to="/settings"
             onClick={() => setSidebarOpen(false)}
             className={getNavLinkClass}
@@ -172,10 +162,6 @@ function Layout() {
             <Route
               path="/hooks"
               element={<HooksPage />}
-            />
-            <Route
-              path="/report"
-              element={<ReportPage />}
             />
             <Route
               path="/settings"

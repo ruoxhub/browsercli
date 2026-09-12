@@ -12,18 +12,14 @@ import {
   Play,
   Search,
   Shield,
-  Sparkles,
   Square,
   Trash2,
   X,
 } from 'lucide-react';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
-import {useNavigate} from 'react-router-dom';
 
 import {api} from '../../lib/api';
 import {FLOW_FILTER_HELP, type FlowFilterHelpItem} from '../../lib/flowFilter';
-import type {SessionAnalysisMode} from '../../lib/protocol';
-import {useAnalysisStore} from '../../stores/analysis';
 import {useProxyStore} from '../../stores/proxy';
 import {LocalAppsControl} from './LocalAppsControl';
 
@@ -60,16 +56,8 @@ export const ProxyControlBar: React.FC<ProxyControlBarProps> = ({
   const selectTab = useProxyStore(s => s.selectTab);
   const clearRequests = useProxyStore(s => s.clearRequests);
 
-  const analysisMode = useAnalysisStore(state => state.mode);
-  const setAnalysisMode = useAnalysisStore(state => state.setMode);
-  const setReport = useAnalysisStore(state => state.setReport);
-  const setAnalyzing = useAnalysisStore(state => state.setAnalyzing);
-  const setAnalysisError = useAnalysisStore(state => state.setError);
-  const navigate = useNavigate();
-
   const [inputPort, setInputPort] = useState<number>(status?.port ?? 8888);
   const [loading, setLoading] = useState(false);
-  const [analyzing, setAnalyzingLocal] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showFilterHelp, setShowFilterHelp] = useState(false);
   // 用户主动关闭（Escape / 点击外部）后置 true，只有重新输入 `~` 才再次弹出，
@@ -135,25 +123,6 @@ export const ProxyControlBar: React.FC<ProxyControlBarProps> = ({
   }, [filter.search]);
 
   const isRunning = status?.running ?? false;
-
-  const handleAnalyzeSelected = async () => {
-    setAnalyzingLocal(true);
-    setAnalyzing(true);
-    setAnalysisError(null);
-    try {
-      const result = await api.analyzeSession({
-        mode: analysisMode,
-        requestIds: selectedIds,
-      });
-      setReport(result);
-      void navigate('/report');
-    } catch (err) {
-      setAnalysisError(err instanceof Error ? err.message : 'AI 分析失败');
-    } finally {
-      setAnalyzingLocal(false);
-      setAnalyzing(false);
-    }
-  };
 
   const handleToggleProxy = async () => {
     setLoading(true);
@@ -319,7 +288,7 @@ export const ProxyControlBar: React.FC<ProxyControlBarProps> = ({
           </div>
         </div>
 
-        {/* 右侧：快捷工具与 AI 分析 */}
+        {/* 右侧：快捷工具 */}
         <div className="flex items-center gap-2 shrink-0">
           {/* CA 证书 */}
           <button
@@ -363,85 +332,6 @@ export const ProxyControlBar: React.FC<ProxyControlBarProps> = ({
             />
             <span>清空</span>
           </button>
-
-          {/* 分隔线 */}
-          <div className="h-4 w-px bg-[var(--color-border-default)] shrink-0 mx-0.5" />
-
-          {/* AI 智能分析模式与执行 */}
-          <div className="flex items-center bg-[var(--color-bg-primary)] border border-[var(--color-border-default)] rounded-lg p-0.5 shrink-0 whitespace-nowrap">
-            <div className="relative">
-              <select
-                value={analysisMode}
-                onChange={e =>
-                  setAnalysisMode(e.target.value as SessionAnalysisMode)
-                }
-                className="appearance-none h-7 bg-transparent text-xs font-mono text-[var(--color-text-secondary)] pl-2.5 pr-6 py-0 focus:outline-none cursor-pointer hover:text-[var(--color-text-primary)]"
-                title="AI 分析模式"
-              >
-                <option
-                  value="auto"
-                  className="bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]"
-                >
-                  自动检测
-                </option>
-                <option
-                  value="api_reverse"
-                  className="bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]"
-                >
-                  接口逆向
-                </option>
-                <option
-                  value="security"
-                  className="bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]"
-                >
-                  安全审查
-                </option>
-                <option
-                  value="perf"
-                  className="bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]"
-                >
-                  性能分析
-                </option>
-                <option
-                  value="js_crypto"
-                  className="bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]"
-                >
-                  JS 加密
-                </option>
-              </select>
-              <ChevronDown
-                size={11}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] pointer-events-none"
-              />
-            </div>
-
-            <button
-              onClick={handleAnalyzeSelected}
-              disabled={analyzing || selectedIds.length === 0}
-              className="h-7 flex items-center gap-1.5 px-2.5 rounded-md bg-[var(--color-accent)]/15 border border-[var(--color-accent)]/40 text-[var(--color-accent)] text-xs font-medium hover:bg-[var(--color-accent)]/25 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
-              title={
-                selectedIds.length > 0
-                  ? `AI 分析已选 ${selectedIds.length} 条请求`
-                  : '勾选左侧请求后发起 AI 分析'
-              }
-            >
-              {analyzing ? (
-                <Loader2
-                  size={12}
-                  className="animate-spin"
-                />
-              ) : (
-                <Sparkles size={12} />
-              )}
-              <span>
-                {analyzing
-                  ? '分析中…'
-                  : selectedIds.length > 0
-                    ? `分析 (${selectedIds.length})`
-                    : 'AI 分析'}
-              </span>
-            </button>
-          </div>
         </div>
       </div>
 

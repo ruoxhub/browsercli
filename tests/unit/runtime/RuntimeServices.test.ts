@@ -15,8 +15,7 @@ describe('RuntimeServices', () => {
   it('returns stable analyzer instances', () => {
     const services = new RuntimeServices({} as PageController);
 
-    assert.strictEqual(services.getAnalyzer(), services.getAnalyzer());
-    assert.strictEqual(services.getLLMService(), services.getLLMService());
+    assert.strictEqual(services.getWasmAnalyzer(), services.getWasmAnalyzer());
   });
 
   it('does not create wasm collector until requested', () => {

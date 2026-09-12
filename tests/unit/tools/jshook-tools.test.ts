@@ -7,12 +7,7 @@ import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {zod} from '../../../src/third_party/index.js';
-import {
-  analyze_target,
-  riskPanel,
-  summarizeCode,
-  export_session_report,
-} from '../../../src/tools/analyzer/index.js';
+import {export_session_report} from '../../../src/tools/analyzer/reports.js';
 import {
   collectCode,
   collectionDiff,
@@ -61,34 +56,14 @@ describe('jshook tools schema', () => {
     assert.strictEqual(result.includeUnchanged, true);
   });
 
-  it('validates summarize_code schema', () => {
-    const schema = zod.object(summarizeCode.schema);
-    const result = schema.parse({mode: 'single', code: 'const x = 1;'});
-    assert.strictEqual(result.mode, 'single');
-  });
-
-  it('validates risk_panel and export_session_report schemas', () => {
-    const riskSchema = zod.object(riskPanel.schema);
-    const analyzeSchema = zod.object(analyze_target.schema);
+  it('validates export_session_report schema', () => {
     const reportSchema = zod.object(export_session_report.schema);
 
-    const risk = riskSchema.parse({code: 'md5(x)', includeHookSignals: true});
-    const workflow = analyzeSchema.parse({
-      url: 'https://example.com',
-      hookPreset: 'network-core',
-      autoInjectHooks: true,
-      correlationWindowMs: 800,
-      maxCorrelatedFlows: 5,
-      maxFingerprints: 6,
-    });
     const report = reportSchema.parse({
       format: 'markdown',
       includeHookData: true,
     });
 
-    assert.strictEqual(risk.includeHookSignals, true);
-    assert.strictEqual(workflow.hookPreset, 'network-core');
-    assert.strictEqual(workflow.maxFingerprints, 6);
     assert.strictEqual(report.format, 'markdown');
   });
 

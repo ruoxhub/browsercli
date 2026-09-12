@@ -24,7 +24,6 @@ const VALID_FIELDS: ReadonlyArray<keyof ToolRuntimeRequirements> = [
   'page',
   'frame',
   'debugger',
-  'ai',
   'nativeTools',
   'recovery',
 ];
@@ -56,9 +55,6 @@ function assertValidRequirements(
       ['available', 'paused', 'running'].includes(requirements.debugger),
       toolName,
     );
-  }
-  if (requirements.ai !== undefined) {
-    assert.ok(['optional', 'required'].includes(requirements.ai), toolName);
   }
   if (requirements.nativeTools !== undefined) {
     assert.ok(Array.isArray(requirements.nativeTools), toolName);

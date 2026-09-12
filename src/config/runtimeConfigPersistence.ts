@@ -8,10 +8,8 @@
  * RuntimeConfigStore 持久化 — 把面板改动落盘到 ~/.proxycli/runtime-config.json，
  * 下次启动时回填，避免重复配置连接参数。
  *
- * 只持久化「连接设置」相关的可写字段：llmProvider / openai / browser。
+ * 只持久化「连接设置」相关的可写字段：browser。
  * 启动期固定值由 CLI/环境变量决定，不在此缓存。
- *
- * 注意：openai.apiKey 会明文写入该文件（与 proxycli 现有的 apiToken 行为一致）。
  */
 
 import {
@@ -35,7 +33,7 @@ export const RUNTIME_CONFIG_PATH = join(
 /** 需要持久化的顶层字段 */
 export const PERSISTED_KEYS: ReadonlySet<keyof GlobalConfig> = new Set<
   keyof GlobalConfig
->(['llmProvider', 'openai', 'browser']);
+>(['browser']);
 
 /** 从缓存文件提取可写字段，未命中或非法时返回 undefined。 */
 export function loadCachedRuntimeConfig(): Partial<GlobalConfig> | undefined {

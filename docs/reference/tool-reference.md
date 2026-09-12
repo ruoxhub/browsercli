@@ -21,17 +21,37 @@
   - [`select_page`](#select_page)
   - [`set_files`](#set_files)
   - [`upload_file`](#upload_file)
-- **[Network](#network)** (10 tools)
+- **[Network](#network)** (30 tools)
   - [`analyze_websocket_messages`](#analyze_websocket_messages)
+  - [`clear_mitm_requests`](#clear_mitm_requests)
   - [`clear_network_requests`](#clear_network_requests)
+  - [`export_mitm_ca`](#export_mitm_ca)
   - [`export_request_as_curl`](#export_request_as_curl)
+  - [`get_mitm_request`](#get_mitm_request)
   - [`get_network_request`](#get_network_request)
   - [`get_websocket_message`](#get_websocket_message)
   - [`get_websocket_messages`](#get_websocket_messages)
+  - [`list_mitm_requests`](#list_mitm_requests)
   - [`list_network_requests`](#list_network_requests)
   - [`list_websocket_connections`](#list_websocket_connections)
+  - [`mitm_add_host_filter`](#mitm_add_host_filter)
+  - [`mitm_add_rule`](#mitm_add_rule)
+  - [`mitm_clear_host_filters`](#mitm_clear_host_filters)
+  - [`mitm_clear_rules`](#mitm_clear_rules)
+  - [`mitm_configure_local_apps`](#mitm_configure_local_apps)
+  - [`mitm_export_har`](#mitm_export_har)
+  - [`mitm_list_host_filters`](#mitm_list_host_filters)
+  - [`mitm_list_local_processes`](#mitm_list_local_processes)
+  - [`mitm_list_rules`](#mitm_list_rules)
+  - [`mitm_remove_host_filter`](#mitm_remove_host_filter)
+  - [`mitm_remove_rule`](#mitm_remove_rule)
   - [`replay_network_request`](#replay_network_request)
   - [`replay_network_request_batch`](#replay_network_request_batch)
+  - [`session_create`](#session_create)
+  - [`session_get_data`](#session_get_data)
+  - [`session_list`](#session_list)
+  - [`start_mitm_proxy`](#start_mitm_proxy)
+  - [`stop_mitm_proxy`](#stop_mitm_proxy)
 - **[Debugging](#debugging)** (22 tools)
   - [`capture_video_frame`](#capture_video_frame)
   - [`evaluate_on_callframe`](#evaluate_on_callframe)
@@ -55,9 +75,8 @@
   - [`step_out`](#step_out)
   - [`step_over`](#step_over)
   - [`take_screenshot`](#take_screenshot)
-- **[JS Reverse Engineering](#js-reverse-engineering)** (74 tools)
+- **[JS Reverse Engineering](#js-reverse-engineering)** (50 tools)
   - [`analyze_pipeline`](#analyze_pipeline)
-  - [`analyze_target`](#analyze_target)
   - [`anti_anti_debug`](#anti_anti_debug)
   - [`auto_hook`](#auto_hook)
   - [`break_on_xhr`](#break_on_xhr)
@@ -67,16 +86,10 @@
   - [`collection_diff`](#collection_diff)
   - [`compare_env`](#compare_env)
   - [`create_hook`](#create_hook)
-  - [`deobfuscate_code`](#deobfuscate_code)
-  - [`detect_crypto`](#detect_crypto)
-  - [`diff_env_requirements`](#diff_env_requirements)
   - [`dump_target_scripts`](#dump_target_scripts)
-  - [`explain_reverse_stage`](#explain_reverse_stage)
-  - [`export_rebuild_bundle`](#export_rebuild_bundle)
   - [`export_session_report`](#export_session_report)
   - [`find_in_script`](#find_in_script)
   - [`get_hook_data`](#get_hook_data)
-  - [`get_parameter_workflow`](#get_parameter_workflow)
   - [`get_request_initiator`](#get_request_initiator)
   - [`get_script_source`](#get_script_source)
   - [`get_storage`](#get_storage)
@@ -90,7 +103,6 @@
   - [`inspect_object`](#inspect_object)
   - [`list_created_hooks`](#list_created_hooks)
   - [`list_hooks`](#list_hooks)
-  - [`list_parameter_workflows`](#list_parameter_workflows)
   - [`list_persistent_hooks`](#list_persistent_hooks)
   - [`list_scripts`](#list_scripts)
   - [`list_stealth_features`](#list_stealth_features)
@@ -99,35 +111,19 @@
   - [`monitor_events`](#monitor_events)
   - [`observe_flow`](#observe_flow)
   - [`rebuild_bundle`](#rebuild_bundle)
-  - [`recommend_next_step`](#recommend_next_step)
-  - [`recommend_parameter_workflow`](#recommend_parameter_workflow)
   - [`record_reverse_evidence`](#record_reverse_evidence)
   - [`remove_hook`](#remove_hook)
   - [`remove_xhr_breakpoint`](#remove_xhr_breakpoint)
-  - [`risk_panel`](#risk_panel)
   - [`search_in_scripts`](#search_in_scripts)
   - [`search_in_sources`](#search_in_sources)
   - [`set_breakpoint_on_text`](#set_breakpoint_on_text)
   - [`set_user_agent`](#set_user_agent)
-  - [`sourcemap_diff`](#sourcemap_diff)
-  - [`sourcemap_discover`](#sourcemap_discover)
-  - [`sourcemap_lookup`](#sourcemap_lookup)
-  - [`sourcemap_parse`](#sourcemap_parse)
-  - [`sourcemap_reconstruct_tree`](#sourcemap_reconstruct_tree)
   - [`stop_monitor`](#stop_monitor)
-  - [`summarize_code`](#summarize_code)
   - [`trace_function`](#trace_function)
   - [`trace_signature_generation`](#trace_signature_generation)
-  - [`understand_code`](#understand_code)
   - [`unhook_function`](#unhook_function)
-  - [`wasm_capabilities`](#wasm_capabilities)
-  - [`wasm_decompile`](#wasm_decompile)
-  - [`wasm_disassemble`](#wasm_disassemble)
   - [`wasm_dump`](#wasm_dump)
-  - [`wasm_inspect_sections`](#wasm_inspect_sections)
   - [`wasm_memory_inspect`](#wasm_memory_inspect)
-  - [`wasm_offline_run`](#wasm_offline_run)
-  - [`wasm_optimize`](#wasm_optimize)
   - [`wasm_vmp_trace`](#wasm_vmp_trace)
   - [`xhr_to_js_breakpoint`](#xhr_to_js_breakpoint)
 - **[Input automation](#input-automation)** (4 tools)
@@ -163,7 +159,7 @@
 
 ### `click` — 点击元素
 
-**Description:** 通过 CSS 选择器匹配元素并点击，支持单击与双击。
+**Description:** 点击页面元素，支持单击与双击。定位器支持 CSS、role=、text=、xpath=。多匹配时用 >> nth=N 消歧。
 
 **Parameters:**
 
@@ -181,7 +177,7 @@
 
 ### `drag` — 拖拽元素
 
-**Description:** 通过鼠标事件将元素从源 CSS 选择器拖拽到目标 CSS 选择器。
+**Description:** 通过鼠标事件将元素从源定位器拖拽到目标定位器。定位器支持 CSS、role=、text=、xpath=。多匹配时用 >> nth=N 消歧。
 
 **Parameters:**
 
@@ -190,7 +186,7 @@
 
 ### `fill` — 填充输入
 
-**Description:** 向匹配 CSS 选择器的 input、textarea 或 select 元素填入值，<select> 会通过 selectOption 自动处理。
+**Description:** 向输入元素填入值，<select> 会通过 selectOption 自动处理。定位器支持 CSS、role=、text=、xpath=。多匹配时用 >> nth=N 消歧。
 
 **Parameters:**
 
@@ -200,7 +196,7 @@
 
 ### `fill_form` — 批量填充表单
 
-**Description:** 在一次调用中批量填充多个表单元素，每个条目指定 CSS 选择器与值，<select> 通过 selectOption 自动处理。
+**Description:** 在一次调用中批量填充多个表单元素，每个条目指定定位器与值，<select> 通过 selectOption 自动处理。定位器支持 CSS、role=、text=、xpath=。多匹配时用 >> nth=N 消歧。
 
 **Parameters:**
 
@@ -226,7 +222,7 @@
 
 ### `hover` — 悬停元素
 
-**Description:** 将鼠标悬停在匹配 CSS 选择器的元素上。
+**Description:** 将鼠标悬停在指定元素上。定位器支持 CSS、role=、text=、xpath=。多匹配时用 >> nth=N 消歧。
 
 **Parameters:**
 
@@ -268,7 +264,7 @@
 
 ### `query_dom` — 查询DOM元素
 
-**Description:** 通过 CSS 选择器查询一个或多个 DOM 元素，返回包含标签、属性、包围盒与可见性的结构化信息。
+**Description:** 通过定位器查询一个或多个 DOM 元素，返回包含标签、属性、包围盒与可见性的结构化信息。定位器支持 CSS、role=、text=、xpath=。多匹配时用 >> nth=N 消歧。
 
 **Parameters:**
 
@@ -314,6 +310,10 @@
 - `wsid`
 - `direction`
 
+### `clear_mitm_requests` — clear_mitm_requests
+
+**Description:** 清空 MITM 代理捕获的所有请求。清空后 id 从 1 重新编号。
+
 ### `clear_network_requests` — clear_network_requests
 
 **Description:** 清空当前选中页面（或指定页面）的缓存网络请求。清空后，list_network_requests 返回的请求列表将为空，稳定的请求 ID 将从 1 重新编号。
@@ -322,6 +322,15 @@
 
 - `targetPageIdx`
 - `targetPageId`
+
+### `export_mitm_ca` — export_mitm_ca
+
+**Description:** 导出 MITM 根 CA 证书（PEM 或 DER），供客户端信任以解密 HTTPS 流量。
+
+**Parameters:**
+
+- `format`
+- `outputPath`
 
 ### `export_request_as_curl` — export_request_as_curl
 
@@ -337,6 +346,16 @@
 - `replaceHeaders`
 - `includeCookies`
 
+### `get_mitm_request` — get_mitm_request
+
+**Description:** 获取单条 MITM 捕获请求的完整详情（请求头/请求体/响应头/响应体）。可选 saveTo 把响应体写入文件。
+
+**Parameters:**
+
+- `id`
+- `saveTo`
+- `format`
+
 ### `get_network_request` — get_network_request
 
 **Description:** 按可选的 reqid 获取网络请求；若省略则返回 DevTools Network 面板中当前选中的请求。
@@ -345,6 +364,8 @@
 
 - `reqid`
 - `maxBodyLength`
+- `fullBody`
+- `saveTo`
 
 ### `get_websocket_message` — get_websocket_message
 
@@ -354,6 +375,7 @@
 
 - `wsid`
 - `frameIndex`
+- `decode`
 
 ### `get_websocket_messages` — get_websocket_messages
 
@@ -368,9 +390,25 @@
 - `pageIdx`
 - `show_content`
 
+### `list_mitm_requests` — list_mitm_requests
+
+**Description:** 列出 MITM 代理捕获到的请求（内存环形缓冲，最多保留最近 2000 条）。支持 URL 过滤与分页。
+
+**Parameters:**
+
+- `pageSize`
+- `pageIdx`
+- `filter`
+- `urlFilter`
+- `method`
+- `statusCode`
+- `host`
+- `headerContains`
+- `bodyContains`
+
 ### `list_network_requests` — list_network_requests
 
-**Description:** 列出当前选中页面自上次导航以来的所有请求。支持按资源类型、请求头关键字、分页过滤，以及等待匹配的请求。
+**Description:** 列出当前选中页面自上次导航以来的请求。默认隐藏浏览器扩展请求；支持按资源类型、请求头关键字、分页过滤，以及等待匹配的请求。
 
 **Parameters:**
 
@@ -378,6 +416,7 @@
 - `pageIdx`
 - `resourceTypes`
 - `includePreservedRequests`
+- `includeExtensionRequests`
 - `targetPageIdx`
 - `targetPageId`
 - `waitForRequest`
@@ -396,6 +435,85 @@
 - `pageIdx`
 - `urlFilter`
 - `includePreservedConnections`
+
+### `mitm_add_host_filter` — mitm_add_host_filter
+
+**Description:** 新增一条 MITM 域名过滤（allow 白名单 / block 黑名单），进程内生效直到 stop 或 clear。白名单非空时黑名单失效：不在白名单里的域名全部旁路（不解密不抓包）。host 为子串匹配，大小写不敏感。
+
+**Parameters:**
+
+- `action`
+- `host`
+
+### `mitm_add_rule` — mitm_add_rule
+
+**Description:** 新增/覆盖一条 MITM 改写规则（block / map_local / map_remote / modify_header / modify_body），进程内生效直到 stop 或 clear。同 id 覆盖。
+
+**Parameters:**
+
+- `action`
+- `id`
+- `enabled`
+- `urlFilter`
+- `method`
+- `host`
+- `headerContains`
+- `bodyContains`
+- `filter`
+
+### `mitm_clear_host_filters` — mitm_clear_host_filters
+
+**Description:** 清空全部 MITM 域名过滤（白名单与黑名单一起清）。
+
+### `mitm_clear_rules` — mitm_clear_rules
+
+**Description:** 清空全部 MITM 改写规则。
+
+### `mitm_configure_local_apps` — mitm_configure_local_apps
+
+**Description:** 配置 Local Applications 透明拦截模式：接管 Windows 系统代理（127.0.0.1:<port>），仅对目标进程做 MITM 解密抓包，其余进程经盲转发正常上网。关闭时自动还原系统代理。targets 留空代表拦截全部本地应用。
+
+**Parameters:**
+
+- `enabled`
+- `targets`
+
+### `mitm_export_har` — mitm_export_har
+
+**Description:** 把当前捕获缓冲导出为 HAR 1.2（HTTP Archive）。outputPath 省略时直接返回 HAR 对象。
+
+**Parameters:**
+
+- `outputPath`
+
+### `mitm_list_host_filters` — mitm_list_host_filters
+
+**Description:** 列出当前生效的 MITM 域名过滤（白名单 allow 与黑名单 block）。
+
+### `mitm_list_local_processes` — mitm_list_local_processes
+
+**Description:** 列出当前正在发起或保持 TCP 连接的本地进程（pid/名称），辅助选取透明拦截目标。Windows 上基于 netstat 连接表。
+
+### `mitm_list_rules` — mitm_list_rules
+
+**Description:** 列出当前生效的全部 MITM 改写规则。
+
+### `mitm_remove_host_filter` — mitm_remove_host_filter
+
+**Description:** 移除一条 MITM 域名过滤（需与添加时相同的 action 与 host）。
+
+**Parameters:**
+
+- `action`
+- `host`
+
+### `mitm_remove_rule` — mitm_remove_rule
+
+**Description:** 按 id 移除一条 MITM 改写规则。
+
+**Parameters:**
+
+- `id`
 
 ### `replay_network_request` — replay_network_request
 
@@ -422,11 +540,49 @@
 - `concurrency`
 - `maxBodyLength`
 
+### `session_create` — session_create
+
+**Description:** 创建新的抓包会话并设为当前活跃会话。
+
+**Parameters:**
+
+- `name`
+- `targetUrl`
+
+### `session_get_data` — session_get_data
+
+**Description:** 获取指定会话的结构化请求、加解密 Hook 日志与 Storage 快照。默认取当前活动会话。
+
+**Parameters:**
+
+- `sessionId`
+- `sources`
+- `urlFilter`
+- `includeHooks`
+- `includeSnapshots`
+
+### `session_list` — session_list
+
+**Description:** 列出所有抓包会话。
+
+### `start_mitm_proxy` — start_mitm_proxy
+
+**Description:** 启动 MITM 抓包代理，拦截非浏览器流量（curl、脚本、桌面应用、手机 App）。启动后终端可通过 `-x http://127.0.0.1:<port>` 走代理；HTTPS 需信任返回的 CA 证书路径（--cacert）。可配置 upstreamProxy 将流量通过二级外部代理（HTTP/HTTPS/SOCKS5）转发。
+
+**Parameters:**
+
+- `port`
+- `upstreamProxy`
+
+### `stop_mitm_proxy` — stop_mitm_proxy
+
+**Description:** 停止 MITM 抓包代理并释放端口。
+
 ## Debugging
 
 ### `capture_video_frame` — 捕获视频帧
 
-**Description:** 捕获视频元素的当前帧。可选地先定位到指定时间点。以图片形式返回该帧。
+**Description:** 捕获视频元素的当前帧。定位器支持 CSS、role=、text=、xpath=。多匹配时用 >> nth=N 消歧。可选地先定位到指定时间点。以图片形式返回该帧。
 
 **Parameters:**
 
@@ -481,7 +637,7 @@
 
 ### `get_video_info` — 获取视频信息
 
-**Description:** 按 CSS 选择器获取视频元素信息。返回 duration、currentTime、暂停状态和 src。
+**Description:** 按定位器获取视频元素信息。返回 duration、currentTime、暂停状态和 src。定位器支持 CSS、role=、text=、xpath=。多匹配时用 >> nth=N 消歧。
 
 **Parameters:**
 
@@ -537,7 +693,7 @@
 
 ### `seek_video` — 跳转视频
 
-**Description:** 按 CSS 选择器将视频元素定位到指定时间点。
+**Description:** 按定位器将视频元素定位到指定时间点。定位器支持 CSS、role=、text=、xpath=。多匹配时用 >> nth=N 消歧。
 
 **Parameters:**
 
@@ -615,25 +771,6 @@
 - `url`
 - `deep`
 
-### `analyze_target` — analyze_target
-
-**Description:** 一键式逆向工作流：收集代码、进行安全/加密分析、可选反混淆，并关联 Hook 时间线。
-
-**Parameters:**
-
-- `url`
-- `topN`
-- `useAI`
-- `runDeobfuscation`
-- `hookPreset`
-- `autoInjectHooks`
-- `waitAfterHookMs`
-- `correlationWindowMs`
-- `maxCorrelatedFlows`
-- `maxFingerprints`
-- `autoReplayActions`
-- `collect`
-
 ### `anti_anti_debug` — Anti Anti-Debug
 
 **Description:** 反反调试工具集：固定窗口尺寸、冻结时间、阻止页面关闭、阻止历史导航、阻止控制台清除、隐藏 webdriver 标记。
@@ -652,7 +789,6 @@
 - `preset`
 - `autoInject`
 - `waitAfterHookMs`
-- `useAI`
 - `hookCrypto`
 - `hookRsa`
 - `hookSmCrypto`
@@ -742,35 +878,7 @@
 - `hookId`
 - `capture`
 - `condition`
-
-### `deobfuscate_code` — deobfuscate_code
-
-**Description:** AI 辅助的 JavaScript 反混淆。
-
-**Parameters:**
-
-- `code`
-- `scriptId`
-- `aggressive`
-- `renameVariables`
-
-### `detect_crypto` — detect_crypto
-
-**Description:** 从 JavaScript 源码中检测加密算法/库。
-
-**Parameters:**
-
-- `code`
-- `useAI`
-
-### `diff_env_requirements` — diff_env_requirements
-
-**Description:** 对比本地运行时失败与观察到的浏览器能力，并建议下一步的环境补丁。
-
-**Parameters:**
-
-- `runtimeError`
-- `observedCapabilities`
+- `protocolFallback`
 
 ### `dump_target_scripts` — dump_target_scripts
 
@@ -779,37 +887,6 @@
 **Parameters:**
 
 - `targetId`
-
-### `explain_reverse_stage` — explain_reverse_stage
-
-**Description:** 解释某个逆向工程阶段的目标、进入条件、避免事项与推荐工具。
-
-**Parameters:**
-
-- `stage`
-- `includeDocs`
-
-### `export_rebuild_bundle` — export_rebuild_bundle
-
-**Description:** 根据观察到的逆向工程证据，导出本地 Node 重建 Bundle。
-
-**Parameters:**
-
-- `taskId`
-- `taskSlug`
-- `targetUrl`
-- `goal`
-- `autoGenerate`
-- `targetKeywords`
-- `targetUrlPatterns`
-- `targetFunctionNames`
-- `targetActionDescription`
-- `maxEvidenceItems`
-- `entryCode`
-- `envCode`
-- `polyfillsCode`
-- `capture`
-- `notes`
 
 ### `export_session_report` — export_session_report
 
@@ -845,14 +922,6 @@
 - `event`
 - `phase`
 
-### `get_parameter_workflow` — get_parameter_workflow
-
-**Description:** 按 ID 或别名获取一个打包的参数化工作流。
-
-**Parameters:**
-
-- `id`
-
 ### `get_request_initiator` — 获取请求发起者
 
 **Description:** 获取网络请求的 JavaScript 调用栈（发起者）。帮助追踪哪个代码触发了 API 调用。
@@ -868,6 +937,7 @@
 **Parameters:**
 
 - `scriptId`
+- `locator`
 - `filePath`
 - `startLine`
 - `endLine`
@@ -973,14 +1043,13 @@
 - `hookId`
 - `verbose`
 - `syncFromBrowser`
+- `type`
+- `event`
+- `phase`
 
 ### `list_hooks` — 列出 Hook
 
 **Description:** 列出当前所有已安装的函数 Hook。
-
-### `list_parameter_workflows` — list_parameter_workflows
-
-**Description:** 列出可用于指导逆向工程与复现步骤的打包参数化工作流。
 
 ### `list_persistent_hooks` — List Persistent Hooks
 
@@ -1054,32 +1123,6 @@
 - `taskId`
 - `taskSlug`
 
-### `recommend_next_step` — recommend_next_step
-
-**Description:** 根据轻量级工作流信号，推荐下一步的逆向工程动作。
-
-**Parameters:**
-
-- `taskId`
-- `browserHealthy`
-- `pageReady`
-- `taskGoal`
-- `currentStage`
-- `taskStatus`
-- `hasTargetRequest`
-- `hookRecordCount`
-- `hasRebuildBundle`
-- `hasPassingRebuild`
-- `firstDivergenceKnown`
-
-### `recommend_parameter_workflow` — recommend_parameter_workflow
-
-**Description:** 根据关键字、别名或简短自然语言查询，推荐最匹配的参数化工作流。
-
-**Parameters:**
-
-- `query`
-
 ### `record_reverse_evidence` — record_reverse_evidence
 
 **Description:** 将结构化的逆向工程证据追加到任务产物日志中。
@@ -1113,18 +1156,6 @@
 **Parameters:**
 
 - `url`
-
-### `risk_panel` — risk_panel
-
-**Description:** 综合分析器、加密检测与 Hook 信号构建统一风险评分。
-
-**Parameters:**
-
-- `code`
-- `useAI`
-- `includeHookSignals`
-- `hookId`
-- `topN`
 
 ### `search_in_scripts` — search_in_scripts
 
@@ -1170,63 +1201,6 @@
 
 - `userAgent`
 
-### `sourcemap_diff` — sourcemap_diff
-
-**Description:** Compare two cached SourceMaps with bounded detail.
-
-**Parameters:**
-
-- `leftMapId`
-- `rightMapId`
-- `mode`
-- `maxChanges`
-
-### `sourcemap_discover` — sourcemap_discover
-
-**Description:** Discover SourceMap references from existing debugger metadata.
-
-**Parameters:**
-
-- `scriptId`
-- `urlPattern`
-- `limit`
-
-### `sourcemap_lookup` — sourcemap_lookup
-
-**Description:** Look up generated or original SourceMap coordinates.
-
-**Parameters:**
-
-- `mapId`
-- `direction`
-- `line`
-- `column`
-- `source`
-- `bias`
-
-### `sourcemap_parse` — sourcemap_parse
-
-**Description:** Parse one SourceMap source into a bounded process-local cache.
-
-**Parameters:**
-
-- `scriptId`
-- `mapUrl`
-- `mapContent`
-- `generatedUrl`
-- `allowCrossOrigin`
-
-### `sourcemap_reconstruct_tree` — sourcemap_reconstruct_tree
-
-**Description:** Explicitly reconstruct cached SourceMap sources to a safe tree.
-
-**Parameters:**
-
-- `mapId`
-- `taskId`
-- `outputDir`
-- `overwrite`
-
 ### `stop_monitor` — 停止监控
 
 **Description:** 停止指定的事件监控。
@@ -1234,17 +1208,6 @@
 **Parameters:**
 
 - `monitorId`
-
-### `summarize_code` — summarize_code
-
-**Description:** 对单个代码文件、多个文件或项目级上下文进行总结。
-
-**Parameters:**
-
-- `mode`
-- `code`
-- `url`
-- `files`
 
 ### `trace_function` — 追踪函数
 
@@ -1271,16 +1234,6 @@
 - `includeSensitiveValues`
 - `taskId`
 
-### `understand_code` — understand_code
-
-**Description:** 结合 AI 与静态分析，分析代码结构、业务逻辑与安全性。
-
-**Parameters:**
-
-- `code`
-- `focus`
-- `useAI`
-
 ### `unhook_function` — Unhook Function
 
 **Description:** 移除已安装的函数 Hook。
@@ -1288,32 +1241,6 @@
 **Parameters:**
 
 - `hookId`
-
-### `wasm_capabilities` — wasm_capabilities
-
-**Description:** 检测可用的原生 Wasm 工具链（wabt、binaryen、wasmtime、wasmer）与会话状态。
-
-### `wasm_decompile` — wasm_decompile
-
-**Description:** 反编译 .wasm 文件，提供函数级摘要与可疑模式检测。
-
-**Parameters:**
-
-- `inputPath`
-- `outputPath`
-- `foldExprs`
-- `inlineExport`
-- `maxWatChars`
-
-### `wasm_disassemble` — wasm_disassemble
-
-**Description:** 使用内置反编译器将 .wasm 文件反汇编为 WAT（WebAssembly 文本格式）。
-
-**Parameters:**
-
-- `inputPath`
-- `outputPath`
-- `foldExprs`
 
 ### `wasm_dump` — wasm_dump
 
@@ -1323,20 +1250,6 @@
 
 - `moduleIndex`
 - `outputPath`
-
-### `wasm_inspect_sections` — wasm_inspect_sections
-
-**Description:** 检查 Wasm 二进制节区：节区映射、函数签名、字符串扫描，以及导入/导出摘要。
-
-**Parameters:**
-
-- `inputPath`
-- `sections`
-- `includeFunctionSignatures`
-- `includeStringScan`
-- `maskSensitiveStrings`
-- `maxStringSlots`
-- `maxSummaryLines`
 
 ### `wasm_memory_inspect` — wasm_memory_inspect
 
@@ -1349,28 +1262,6 @@
 - `format`
 - `searchPattern`
 - `timeoutMs`
-
-### `wasm_offline_run` — wasm_offline_run
-
-**Description:** 使用 wasmtime 或 wasmer CLI 运行时离线执行 Wasm 函数。
-
-**Parameters:**
-
-- `inputPath`
-- `functionName`
-- `args`
-- `runtime`
-- `timeoutMs`
-
-### `wasm_optimize` — wasm_optimize
-
-**Description:** 使用 binaryen 的 wasm-opt 优化 .wasm 文件，可指定优化级别。
-
-**Parameters:**
-
-- `inputPath`
-- `outputPath`
-- `level`
 
 ### `wasm_vmp_trace` — wasm_vmp_trace
 
@@ -1393,7 +1284,7 @@
 
 ### `click_element` — click_element
 
-**Description:** 通过 CSS 选择器点击页面元素。
+**Description:** 点击页面元素。定位器支持 CSS、role=、text=、xpath=。多匹配时用 >> nth=N 消歧。
 
 **Parameters:**
 
@@ -1410,7 +1301,7 @@
 
 ### `type_text` — type_text
 
-**Description:** 通过 CSS 选择器向输入框键入文本。
+**Description:** 向输入框键入文本。定位器支持 CSS、role=、text=、xpath=。多匹配时用 >> nth=N 消歧。
 
 **Parameters:**
 
@@ -1420,7 +1311,7 @@
 
 ### `wait_for_element` — wait_for_element
 
-**Description:** 等待匹配 CSS 选择器的元素出现在页面中。
+**Description:** 等待定位器对应的元素出现在页面中。定位器支持 CSS、role=、text=、xpath=。多匹配时用 >> nth=N 消歧。
 
 **Parameters:**
 
@@ -1577,7 +1468,7 @@
 
 ### `diagnose_environment` — diagnose_environment
 
-**Description:** 运行环境诊断，检查 Node 版本、构建产物、AI 配置与 artifacts 目录状态。
+**Description:** 运行环境诊断，检查 Node 版本、构建产物与 artifacts 目录状态。
 
 **Parameters:**
 

@@ -70,9 +70,9 @@ const stageGuides: Record<ReverseStage, ReverseStageGuideEntry> = {
       '未对齐浏览器真值就宣称完成',
     ],
     recommendedTools: [
-      'diff_env_requirements',
+      'rebuild_bundle',
       'record_reverse_evidence',
-      'understand_code',
+      'observe_flow',
     ],
     docRefs: sharedDocRefs,
   },
@@ -84,7 +84,11 @@ const stageGuides: Record<ReverseStage, ReverseStageGuideEntry> = {
       '需要进一步理解复杂混淆/风控路径',
     ],
     avoid: ['没有基础证据就纯靠 AI 猜逻辑', '忽略浏览器真值直接重写结论'],
-    recommendedTools: ['deobfuscate_code', 'understand_code', 'risk_panel'],
+    recommendedTools: [
+      'observe_flow',
+      'trace_signature_generation',
+      'record_reverse_evidence',
+    ],
     docRefs: sharedDocRefs,
   },
   PureExtraction: {
@@ -97,8 +101,8 @@ const stageGuides: Record<ReverseStage, ReverseStageGuideEntry> = {
     ],
     avoid: ['env rebuild 未跑通就直接提纯', '提纯后不回看与浏览器结果是否一致'],
     recommendedTools: [
-      'understand_code',
-      'deobfuscate_code',
+      'observe_flow',
+      'trace_signature_generation',
       'record_reverse_evidence',
     ],
     docRefs: [...sharedDocRefs, 'docs/reference/pure-extraction.md'],
@@ -108,7 +112,7 @@ const stageGuides: Record<ReverseStage, ReverseStageGuideEntry> = {
     goal: '把已稳定的纯算法迁移到其他宿主，例如 Python。',
     entryCriteria: ['PureExtraction 已稳定', '接口和固定样本已验证'],
     avoid: ['Node pure 未稳定就直接迁移', '迁移后没有做回归比对'],
-    recommendedTools: ['understand_code', 'record_reverse_evidence'],
+    recommendedTools: ['observe_flow', 'record_reverse_evidence'],
     docRefs: [...sharedDocRefs, 'docs/reference/pure-extraction.md'],
   },
 };

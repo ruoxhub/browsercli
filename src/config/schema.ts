@@ -9,8 +9,6 @@
 import type {zod as zodType} from '../third_party/index.js';
 import {zod} from '../third_party/index.js';
 
-const nonEmptyStringSchema = zod.string().min(1);
-
 const optionalStringSchema = zod.string();
 
 const booleanSchema = zod.preprocess(value => {
@@ -37,18 +35,6 @@ const ViewportSchema: zodType.ZodType<{width: number; height: number}> = zod
     height: positiveIntSchema,
   })
   .strip() as zodType.ZodType<{width: number; height: number}>;
-
-export const LLMProviderSchema = zod.enum(['openai'], {
-  errorMap: () => ({message: 'must be one of: openai'}),
-});
-
-export const OpenAIConfigSchema = zod
-  .object({
-    apiKey: optionalStringSchema.optional(),
-    baseURL: optionalStringSchema.optional(),
-    model: optionalStringSchema.optional(),
-  })
-  .strip();
 
 export const BrowserConfigSchema = zod
   .object({
@@ -149,8 +135,6 @@ export const GlobalConfigSchema = zod
     /** `--full-stealth-args` CLI flag：回退到历史 60+ 启动参数集。 */
     fullStealthArgs: booleanSchema.optional(),
     runtimeDirName: optionalStringSchema.optional(),
-    llmProvider: LLMProviderSchema.optional(),
-    openai: OpenAIConfigSchema.optional(),
     browser: BrowserConfigSchema.optional(),
     debug: booleanSchema.optional(),
     logLevel: optionalStringSchema.optional(),
@@ -160,47 +144,12 @@ export const GlobalConfigSchema = zod
     sessionStateCleanupIntervalMs: positiveIntSchema.optional(),
     sessionStateEncryptionKey: optionalStringSchema.optional(),
   })
-  .strip()
-  .superRefine((config, ctx) => {
-    if (config.llmProvider === 'openai' && config.openai?.apiKey === '') {
-      ctx.addIssue({
-        code: zod.ZodIssueCode.custom,
-        path: ['openai', 'apiKey'],
-        message: 'must not be empty when llmProvider is openai',
-      });
-    }
-  });
+  .strip();
 
 export type GlobalConfig = zodType.infer<typeof GlobalConfigSchema>;
 
-const AIConfigSchema = zod
-  .object({
-    provider: LLMProviderSchema,
-    openai: zod
-      .object({
-        apiKey: nonEmptyStringSchema,
-        baseURL: optionalStringSchema.optional(),
-        model: optionalStringSchema.optional(),
-      })
-      .strip()
-      .optional(),
-  })
-  .strip()
-  .superRefine((config, ctx) => {
-    if (config.provider === 'openai' && !config.openai) {
-      ctx.addIssue({
-        code: zod.ZodIssueCode.custom,
-        path: ['openai'],
-        message: 'is required when provider is openai',
-      });
-    }
-  });
-
-export type AIConfig = zodType.infer<typeof AIConfigSchema>;
-
 export const SystemConfigSchema = zod
   .object({
-    ai: AIConfigSchema.optional(),
     browser: BrowserConfigSchema,
     debug: zod.boolean().optional(),
   })

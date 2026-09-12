@@ -45,15 +45,11 @@ describe('runtimeConfigPersistence', () => {
 
     it('loads persisted writable fields', () => {
       seedFile({
-        llmProvider: 'openai',
-        openai: {apiKey: 'sk-abc', baseURL: 'https://x/v1', model: 'gpt-4o'},
         browser: {browserURL: 'http://127.0.0.1:9222', headless: false},
         debug: true,
       });
       const loaded = loadCachedRuntimeConfig();
       assert.ok(loaded);
-      assert.strictEqual(loaded?.llmProvider, 'openai');
-      assert.strictEqual(loaded?.openai?.apiKey, 'sk-abc');
       assert.strictEqual(loaded?.browser?.browserURL, 'http://127.0.0.1:9222');
       // 非连接设置字段不应回填
       assert.strictEqual(loaded?.debug, undefined);
@@ -65,7 +61,7 @@ describe('runtimeConfigPersistence', () => {
     });
 
     it('returns undefined on invalid config', () => {
-      seedFile({openai: {apiKey: ''}, llmProvider: 'openai'});
+      seedFile({browser: {remoteDebuggingPort: 1}});
       assert.strictEqual(loadCachedRuntimeConfig(), undefined);
     });
   });
@@ -73,16 +69,12 @@ describe('runtimeConfigPersistence', () => {
   describe('persistRuntimeConfig', () => {
     it('writes only writable fields', () => {
       const config: GlobalConfig = {
-        llmProvider: 'openai',
-        openai: {apiKey: 'sk-secret', model: 'gpt-4o'},
         browser: {wsEndpoint: 'ws://127.0.0.1:9222/devtools/browser/x'},
         debug: true,
       };
       persistRuntimeConfig(config);
 
       const raw = JSON.parse(readFileSync(RUNTIME_CONFIG_PATH, 'utf8'));
-      assert.strictEqual(raw.llmProvider, 'openai');
-      assert.strictEqual(raw.openai.apiKey, 'sk-secret');
       assert.strictEqual(
         raw.browser.wsEndpoint,
         'ws://127.0.0.1:9222/devtools/browser/x',
@@ -122,7 +114,7 @@ describe('runtimeConfigPersistence', () => {
 
   describe('deleteRuntimeConfig', () => {
     it('removes an existing cache file and reports success', () => {
-      seedFile({llmProvider: 'openai'});
+      seedFile({browser: {browserURL: 'http://127.0.0.1:9222'}});
       assert.ok(existsSync(RUNTIME_CONFIG_PATH));
       assert.strictEqual(deleteRuntimeConfig(), true);
       assert.strictEqual(existsSync(RUNTIME_CONFIG_PATH), false);

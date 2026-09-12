@@ -89,7 +89,7 @@ export function buildManageTaskAgentHints(args: {
       recommendedTool: 'manage_reverse_task',
       toolClass: 'task',
       routeHint: 'stay_on_task_flow',
-      avoidTools: ['understand_code', 'collect_code'],
+      avoidTools: ['collect_code'],
       recommendedStrategy: 'observe-first',
       recommendedParams: {action: 'get'},
       confidence: 0.84,
@@ -109,7 +109,7 @@ export function buildManageTaskAgentHints(args: {
       recommendedTool: 'manage_reverse_task',
       toolClass: 'task',
       routeHint: 'stay_on_task_flow',
-      avoidTools: ['understand_code'],
+      avoidTools: ['export_rebuild_bundle'],
       recommendedStrategy: (itemCount ?? 0) > 0 ? 'observe-first' : undefined,
       recommendedParams: {action: (itemCount ?? 0) > 0 ? 'get' : 'list'},
       confidence: (itemCount ?? 0) > 0 ? 0.87 : 0.72,
@@ -187,7 +187,7 @@ export function buildManageTaskAgentHints(args: {
           : nextStepHint && !nextStepHint.startsWith('manage_reverse_task:')
             ? 'switch_to_analysis'
             : 'stay_on_task_flow',
-      avoidTools: nextStepHint ? ['list_pages'] : ['understand_code'],
+      avoidTools: nextStepHint ? ['list_pages'] : ['collect_code'],
       recommendedStrategy: nextStepHint
         ? inferStrategyFromStep(nextStepHint)
         : 'observe-first',
@@ -208,7 +208,7 @@ export function buildManageTaskAgentHints(args: {
     recommendedTool: taskId ? 'manage_reverse_task' : 'manage_reverse_task',
     toolClass: 'task',
     routeHint: 'stay_on_task_flow',
-    avoidTools: taskId ? ['understand_code'] : ['export_rebuild_bundle'],
+    avoidTools: taskId ? ['collect_code'] : ['export_rebuild_bundle'],
     recommendedStrategy: taskId ? 'evidence-only' : 'observe-first',
     recommendedParams: taskId
       ? {action: 'summarize', taskId}
@@ -300,7 +300,7 @@ export function buildRebuildHealthAgentHints(args: {
     toolClass: hasPatchSuggestions ? 'rebuild' : 'task',
     routeHint: hasPatchSuggestions ? 'switch_to_rebuild' : 'stay_on_task_flow',
     avoidTools: hasPatchSuggestions
-      ? ['understand_code']
+      ? ['collect_code']
       : ['export_rebuild_bundle'],
     recommendedStrategy: hasPatchSuggestions ? 'env-fix' : 'observe-first',
     recommendedParams: hasPatchSuggestions
@@ -343,9 +343,9 @@ export function buildRunReverseAgentHints(args: {
   if (stopReason === 'analysis_completed') {
     return {
       status: 'ok',
-      summary: `已跑到函数切片结构理解阶段，当前建议先看 summarize，再决定是否进入 deobfuscate / pure extraction。`,
+      summary: `已跑到函数切片结构理解阶段，当前建议先看 summarize，再决定是否进入 pure extraction。`,
       recommendedNextAction:
-        '先读取任务摘要和 understand-code 产物，再决定是否继续深挖。',
+        '先读取任务摘要和函数切片产物，再决定是否继续深挖。',
       recommendedTool: 'manage_reverse_task',
       toolClass: 'task',
       routeHint: 'stay_on_task_flow',

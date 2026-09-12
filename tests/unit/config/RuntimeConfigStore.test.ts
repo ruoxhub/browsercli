@@ -19,9 +19,7 @@ describe('RuntimeConfigStore', () => {
   const originalEnv = {...process.env};
 
   beforeEach(() => {
-    delete process.env.OPENAI_API_KEY;
     delete process.env.BROWSER_HEADLESS;
-    delete process.env.DEFAULT_LLM_PROVIDER;
   });
 
   afterEach(() => {
@@ -36,8 +34,7 @@ describe('RuntimeConfigStore', () => {
       writeFileSync(
         path.join(tmpDir, 'config.json'),
         JSON.stringify({
-          openai: {apiKey: 'sk-seed'},
-          llmProvider: 'openai',
+          browser: {browserURL: 'http://seed:9222'},
         }),
         'utf-8',
       );
@@ -45,8 +42,7 @@ describe('RuntimeConfigStore', () => {
 
       const config = getRuntimeConfigStore().get();
 
-      assert.strictEqual(config.openai?.apiKey, 'sk-seed');
-      assert.strictEqual(config.llmProvider, 'openai');
+      assert.strictEqual(config.browser?.browserURL, 'http://seed:9222');
     } finally {
       delete process.env.PROXYCLI_CONFIG_DIR;
       rmSync(tmpDir, {recursive: true, force: true});
@@ -76,16 +72,16 @@ describe('RuntimeConfigStore', () => {
     assert.strictEqual(store.get().browser?.channel, 'stable');
   });
 
-  it('update shallow-merges nested openai field', () => {
+  it('update shallow-merges nested toolResultRecording field', () => {
     resetRuntimeConfigStore({
-      openai: {apiKey: 'sk-orig', model: 'gpt-4o'},
+      toolResultRecording: {enabled: true, outputDir: '/tmp/orig'},
     });
 
     const store = getRuntimeConfigStore();
-    store.update({openai: {apiKey: 'sk-new'}});
+    store.update({toolResultRecording: {enabled: false}});
 
-    assert.strictEqual(store.get().openai?.apiKey, 'sk-new');
-    assert.strictEqual(store.get().openai?.model, 'gpt-4o');
+    assert.strictEqual(store.get().toolResultRecording?.enabled, false);
+    assert.strictEqual(store.get().toolResultRecording?.outputDir, '/tmp/orig');
   });
 
   it('update validates via zod and throws on invalid input', () => {
@@ -94,9 +90,9 @@ describe('RuntimeConfigStore', () => {
     assert.throws(
       () =>
         getRuntimeConfigStore().update({
-          llmProvider: 'invalid-provider' as never,
+          browser: {remoteDebuggingPort: 1},
         }),
-      /llmProvider/,
+      /REMOTE_DEBUGGING_PORT/,
     );
   });
 

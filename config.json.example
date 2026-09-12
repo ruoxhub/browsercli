@@ -1,12 +1,6 @@
 {
   "rpcHost": "ws://127.0.0.1:5612",
   "group": "js-reverse",
-  "llmProvider": "openai",
-  "openai": {
-    "baseURL": "",
-    "model": "deepseek-v4-flash",
-    "apiKey": ""
-  },
   "browser": {
     "headless": false,
     "isolated": true,

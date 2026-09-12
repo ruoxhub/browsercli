@@ -92,41 +92,19 @@ google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-mcp
 - `--browserUrl` 和 `--wsEndpoint` 二选一
 - 如果 `json/version` 都打不开，MCP 一定接管不了这个浏览器
 
-## AI 配置和 `useAI`
+## 代码分析没有内置 AI 了
 
-外部 AI 是分析增强层，不是所有工具的硬依赖。
+LLM 集成已彻底移除（`src/services/`、`understand_code` / `summarize_code` /
+`risk_panel` / `analyze_target` / `detect_crypto` 等工具、config 的 openai /
+llmProvider、Web 控制台 LLM 配置面板与 AI 流量分析页均已删除），因此：
 
-`useAI` 是工具参数，不是环境变量。需要在调用工具时显式传入，例如 `detect_crypto` 的 `useAI=true`。
+- 不存在 `useAI` 参数或 `aiRuntime` / provider 状态；
+- `diagnose_environment` 不再返回 AI selection 检查；
+- 不再需要 `DEFAULT_LLM_PROVIDER` / `OPENAI_API_KEY` 等环境变量。
 
-`understand_code` 的行为：
-
-- 总会先做本地静态分析
-- 会尝试调用默认 AI provider 做语义分析
-- 没有可用 provider 时，内部会捕获 AI 错误并回退为静态分析结果
-- 返回里会带 `aiRuntime`，用于说明当前 provider 是否可用、是否处于 CLI fallback 或未配置状态
-
-`detect_crypto` 的行为：
-
-- 不传 `useAI` 或传 `false` 时，主要使用本地规则和 AST 分析
-- 传 `useAI=true` 时，会附加 AI runtime 状态，AI 不可用时仍应先看本地检测结果
-
-推荐先调用：
-
-```text
-diagnose_environment
-```
-
-再看返回里的 AI selection / provider 状态。
-
-MCP 配置里的外部 AI 环境变量示例：
-
-```json
-"env": {
-  "DEFAULT_LLM_PROVIDER": "gemini",
-  "GEMINI_API_KEY": "your_key",
-  "GEMINI_MODEL": "gemini-2.0-flash-exp"
-}
-```
+需要分析时，用 `collect_code` / `search_in_scripts` / `get_script_source` /
+`get_hook_data` 采集证据，再按 skill `code-analysis`（静态分析）或
+skill `target-analysis`（目标/会话工作流）自行分析。
 
 ## Codex 不愿意继续分析
 

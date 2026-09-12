@@ -10,7 +10,7 @@
 
 ## Project Structure &amp; Module Organization
 
-核心源码位于 `src/`。其中 `src/tools/` 提供 MCP 工具实现，`src/modules/` 放逆向分析、Hook、调试、去混淆等核心模块，`src/services/` 负责外部 AI 与服务集成；`src/worker/` 是后台 worker 运行时（`src/index.ts` 为进程入口）。命令行客户端位于 `src/cli/`（`proxycli` 可执行命令），通过本地命名管道（POSIX 为 unix socket）与 detached daemon 会话通信：CLI 按 workspace-hash 注册表（`%LOCALAPPDATA%\proxycli\daemon`）发现会话，连不上就自动 spawn daemon 并等 stdout 就绪行握手（不再内置本地 worker 进程管理，start/stop/status/repl 等命令已删除；原 `/api/v1` HTTP 契约与 Sekiro RPC 均已下线）。构建产物输出到 `build/`，不要手改。文档集中在 `docs/`，公开案例与脚本入口在 `scripts/cases/`。真实任务证据默认保留在 `artifacts/tasks/<task-id>/`，仓库只跟踪模板目录。
+核心源码位于 `src/`。其中 `src/tools/` 提供 MCP 工具实现，`src/modules/` 放逆向分析、Hook、调试、去混淆等核心模块；`src/worker/` 是后台 worker 运行时（`src/index.ts` 为进程入口）。命令行客户端位于 `src/cli/`（`proxycli` 可执行命令），通过本地命名管道（POSIX 为 unix socket）与 detached daemon 会话通信：CLI 按 workspace-hash 注册表（`%LOCALAPPDATA%\proxycli\daemon`）发现会话，连不上就自动 spawn daemon 并等 stdout 就绪行握手（不再内置本地 worker 进程管理，start/stop/status/repl 等命令已删除；原 `/api/v1` HTTP 契约与 Sekiro RPC 均已下线）。构建产物输出到 `build/`，不要手改。文档集中在 `docs/`，公开案例与脚本入口在 `scripts/cases/`。真实任务证据默认保留在 `artifacts/tasks/<task-id>/`，仓库只跟踪模板目录。
 
 ## Build, Test, and Development Commands
 
@@ -30,7 +30,7 @@
 
 ## Testing Guidelines
 
-测试框架为 Node 内置 `node:test`，覆盖目录包括 `tests/unit/`、`tests/integration/`、`tests/property/`、`tests/performance/`。新增代码时至少补对应层级测试，并保持源码目录与测试目录镜像，例如 `src/services/Foo.ts` 对应 `tests/unit/services/Foo.test.ts`。覆盖率目标参考 `tests/README.md` 中的 80%；提交前至少运行 `npm run test:unit` 与 `npm run check-format`。
+测试框架为 Node 内置 `node:test`，覆盖目录包括 `tests/unit/`、`tests/integration/`、`tests/property/`、`tests/performance/`。新增代码时至少补对应层级测试，并保持源码目录与测试目录镜像，例如 `src/config/schema.ts` 对应 `tests/unit/config/schema.test.ts`。覆盖率目标参考 `tests/README.md` 中的 80%；提交前至少运行 `npm run test:unit` 与 `npm run check-format`。
 
 ### 最终变更验证闭环
 
@@ -55,7 +55,7 @@
 | 组件                  | 文件                                     | 职责                                                  |
 | --------------------- | ---------------------------------------- | ----------------------------------------------------- |
 | EventBus              | `src/utils/EventBus.ts`                  | 类型安全事件总线，全局单例                            |
-| RuntimeServices       | `src/runtime/RuntimeServices.ts`         | 延迟初始化服务集合（AI、分析器、去混淆器等）          |
+| RuntimeServices       | `src/runtime/RuntimeServices.ts`         | 延迟初始化服务集合（抓包、Wasm、SourceMap 等）        |
 | BrowserManager        | `src/modules/browser/browser.ts`         | 浏览器生命周期、页面管理、反检测注入                  |
 | CodeCollector         | `src/modules/collector/CodeCollector.ts` | 脚本收集 + 缓存 + 搜索                                |
 | HookManager           | `src/modules/hook/HookManager.ts`        | Hook 创建、管理、数据存取门面                         |

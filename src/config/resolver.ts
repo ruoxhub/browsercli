@@ -29,7 +29,6 @@ import {
 } from './constants.js';
 import {getRuntimeConfigStore} from './RuntimeConfigStore.js';
 import {
-  type AIConfig,
   type GlobalConfig,
   type SystemConfig,
   validateGlobalConfig,
@@ -39,16 +38,10 @@ import {
 // 第一部分：类型定义与默认值
 // ==========================================================================
 
-/** LLM 提供商类型 */
-export type LLMProvider = GlobalConfig['llmProvider'] & string;
-
 /** 用户级全局配置结构（配置文件可写的所有字段） */
 export type {GlobalConfig};
 
-/** AI Service 配置（运行时解析后的完整结构） */
-export type {AIConfig};
-
-/** 系统配置（AI + Browser + Debug） */
+/** 系统配置（Browser + Debug） */
 export type {SystemConfig};
 
 /** CLI 层解析后的完整配置 */
@@ -93,12 +86,7 @@ const ENV_MAP: Readonly<Record<string, keyof GlobalConfig>> = {
   BROWSER_HEADLESS: 'headless',
   BROWSER_EXECUTABLE_PATH: 'executablePath',
   BROWSER_RUNTIME_DIR: 'runtimeDirName',
-  DEFAULT_LLM_PROVIDER: 'llmProvider',
   BROWSER_DEBUG: 'debug',
-  // OpenAI
-  OPENAI_API_KEY: 'openai',
-  OPENAI_BASE_URL: 'openai',
-  OPENAI_MODEL: 'openai',
   // Browser 扩展
   BROWSER_ISOLATED: 'browser',
   USE_STEALTH_SCRIPTS: 'browser',
@@ -207,11 +195,7 @@ export function configFromEnv(): GlobalConfig {
   for (const [envKey, configKey] of Object.entries(ENV_MAP)) {
     const value = process.env[envKey];
     if (value === undefined || value === '') continue;
-    if (
-      configKey === 'openai' ||
-      configKey === 'browser' ||
-      configKey === 'toolResultRecording'
-    )
+    if (configKey === 'browser' || configKey === 'toolResultRecording')
       continue;
 
     if (BOOLEAN_CONFIG_KEYS.has(configKey)) {
@@ -221,15 +205,6 @@ export function configFromEnv(): GlobalConfig {
       (result as Record<string, unknown>)[configKey] = value;
     }
   }
-
-  const openai: GlobalConfig['openai'] = {};
-  const openaiApiKey = getEnvValue('OPENAI_API_KEY');
-  const openaiBaseURL = getEnvValue('OPENAI_BASE_URL');
-  const openaiModel = getEnvValue('OPENAI_MODEL');
-  if (openaiApiKey !== undefined) openai.apiKey = openaiApiKey;
-  if (openaiBaseURL !== undefined) openai.baseURL = openaiBaseURL;
-  if (openaiModel !== undefined) openai.model = openaiModel;
-  if (Object.keys(openai).length > 0) result.openai = openai;
 
   const browser: NonNullable<GlobalConfig['browser']> = {};
   for (const [envKey, browserKey] of Object.entries(BROWSER_ENV_MAP)) {

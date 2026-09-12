@@ -26,7 +26,6 @@ Index of all `proxycli` tool categories, domains, and their corresponding refere
 
 | Tool Name                                                     | Module Reference         |
 | ------------------------------------------------------------- | ------------------------ |
-| `analyze_target`                                              | `references/analyzer.md` |
 | `analyze_websocket_messages`                                  | `references/network.md`  |
 | `anti_anti_debug`                                             | `references/stealth.md`  |
 | `auto_hook`                                                   | `references/hook.md`     |
@@ -43,7 +42,6 @@ Index of all `proxycli` tool categories, domains, and their corresponding refere
 | `create_hook`                                                 | `references/hook.md`     |
 | `deobfuscate_code`                                            | `references/analyzer.md` |
 | `detect_captcha`                                              | `references/analyzer.md` |
-| `detect_crypto`                                               | `references/analyzer.md` |
 | `diff_env_requirements`                                       | `references/rebuild.md`  |
 | `dump_session_state`                                          | `references/session.md`  |
 | `dump_target_scripts`                                         | `references/script.md`   |
@@ -111,7 +109,6 @@ Index of all `proxycli` tool categories, domains, and their corresponding refere
 | `replay_network_request` / `replay_network_request_batch`     | `references/network.md`  |
 | `restore_session_state`                                       | `references/session.md`  |
 | `resume`                                                      | `references/debugger.md` |
-| `risk_panel`                                                  | `references/analyzer.md` |
 | `save_session_state`                                          | `references/session.md`  |
 | `scroll_by`                                                   | `references/dom.md`      |
 | `search_in_scripts` / `search_in_sources`                     | `references/script.md`   |
@@ -129,11 +126,9 @@ Index of all `proxycli` tool categories, domains, and their corresponding refere
 | `start_mitm_proxy`                                            | `references/proxy.md`    |
 | `step_into` / `step_out` / `step_over`                        | `references/debugger.md` |
 | `stop_mitm_proxy`                                             | `references/proxy.md`    |
-| `summarize_code`                                              | `references/analyzer.md` |
 | `take_screenshot`                                             | `references/dom.md`      |
 | `trace_signature_generation`                                  | `references/rebuild.md`  |
 | `type_text`                                                   | `references/dom.md`      |
-| `understand_code`                                             | `references/analyzer.md` |
 | `wait_for_element`                                            | `references/dom.md`      |
 | `wasm_capabilities`                                           | `references/wasm.md`     |
 | `wasm_decompile`                                              | `references/wasm.md`     |

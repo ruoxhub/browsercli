@@ -90,13 +90,13 @@ proxycli call wasm_vmp_trace --maxEvents 100 --filterModule <name>
 
 ### 反编译 vs 反汇编
 
-| 场景                     | 选                                       | 原因                     |
-| ------------------------ | ---------------------------------------- | ------------------------ |
-| 快速理解模块结构         | `wasm_decompile`                         | 函数级摘要，可疑模式标记 |
-| 看具体指令（VMP opcode） | `wasm_disassemble`                       | 原始 WAT，每条指令可追   |
-| 函数太多要快速定位       | `wasm_decompile --inlineExport true`     | 展开 export 链           |
-| 调试器单步               | `wasm_offline_run`                       | 不用启动完整运行时       |
-| 优化后再看               | `wasm_optimize` → 再 `wasm_decompile`    | 常量折叠后逻辑更直白     |
+| 场景                     | 选                                    | 原因                     |
+| ------------------------ | ------------------------------------- | ------------------------ |
+| 快速理解模块结构         | `wasm_decompile`                      | 函数级摘要，可疑模式标记 |
+| 看具体指令（VMP opcode） | `wasm_disassemble`                    | 原始 WAT，每条指令可追   |
+| 函数太多要快速定位       | `wasm_decompile --inlineExport true`  | 展开 export 链           |
+| 调试器单步               | `wasm_offline_run`                    | 不用启动完整运行时       |
+| 优化后再看               | `wasm_optimize` → 再 `wasm_decompile` | 常量折叠后逻辑更直白     |
 
 ### 段信息 vs 直接反编译
 
@@ -180,18 +180,18 @@ proxycli jobs cancel <job-id>
 
 ## 失败回退
 
-| 现象                                 | 解决                                                                                                     |
-| ------------------------------------ | -------------------------------------------------------------------------------------------------------- |
-| `wasm_capabilities` 报 wabt 缺失     | `npm i -g wabt` 或 `apt install wabt`                                                                    |
-| `wasm_capabilities` 报 wasmtime 缺失 | `curl https://wasmtime.dev/install.sh -sSf \| bash`                                                      |
-| `wasm_optimize` 报 wasm-opt 缺失     | 装 Binaryen（`brew install binaryen` / `apt install binaryen`）                                          |
-| `wasm_dump` 报"未捕获任何 WASM 模块" | 先 `proxycli call collect_wasm --url <url>` 重新导航捕获                                                |
-| `wasm_decompile` 慢 / 卡住           | 加 `--maxWatChars 500000` 限制输出                                                                       |
-| 反编译输出看不懂                     | 改用 `wasm_disassemble` 看原始 WAT；或 `wasm_offline_run` 重放输入                                       |
-| 找不到入口函数                       | 看 `wasm_inspect_sections` 的 export 段；用 `summarize_code` 辅助 JS 侧                                  |
-| 二进制字符串扫描报敏感               | `--maskSensitiveStrings true` 屏蔽，但记下索引回查                                                       |
-| 工具不可用（profile 报错）           | 在 worker 启动环境设置 `JS_REVERSE_TOOL_PROFILE=full` 并重启 worker                                      |
-| 页面反调试卡死 worker（409）         | 放弃 DOM 交互，走 curl 拉资源 + 本地 Node 重建；必要时 `proxycli jobs cancel` / 重启 worker            |
+| 现象                                 | 解决                                                                                        |
+| ------------------------------------ | ------------------------------------------------------------------------------------------- |
+| `wasm_capabilities` 报 wabt 缺失     | `npm i -g wabt` 或 `apt install wabt`                                                       |
+| `wasm_capabilities` 报 wasmtime 缺失 | `curl https://wasmtime.dev/install.sh -sSf \| bash`                                         |
+| `wasm_optimize` 报 wasm-opt 缺失     | 装 Binaryen（`brew install binaryen` / `apt install binaryen`）                             |
+| `wasm_dump` 报"未捕获任何 WASM 模块" | 先 `proxycli call collect_wasm --url <url>` 重新导航捕获                                    |
+| `wasm_decompile` 慢 / 卡住           | 加 `--maxWatChars 500000` 限制输出                                                          |
+| 反编译输出看不懂                     | 改用 `wasm_disassemble` 看原始 WAT；或 `wasm_offline_run` 重放输入                          |
+| 找不到入口函数                       | 看 `wasm_inspect_sections` 的 export 段；用 skill `code-analysis` 辅助 JS 侧                |
+| 二进制字符串扫描报敏感               | `--maskSensitiveStrings true` 屏蔽，但记下索引回查                                          |
+| 工具不可用（profile 报错）           | 在 worker 启动环境设置 `JS_REVERSE_TOOL_PROFILE=full` 并重启 worker                         |
+| 页面反调试卡死 worker（409）         | 放弃 DOM 交互，走 curl 拉资源 + 本地 Node 重建；必要时 `proxycli jobs cancel` / 重启 worker |
 
 ---
 

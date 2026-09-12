@@ -37,22 +37,22 @@ Browser-CLI 是一个**前端 JavaScript 逆向流程标准化的 MCP（Model Co
 
 ### 技术栈
 
-| 领域             | 技术选型                                   |
-| ---------------- | ------------------------------------------ |
-| **语言**         | TypeScript 5.9 (ESM, ES2023 target)        |
-| **运行时**       | Node.js ^20.19.0 \|\| ^22.12.0 \|\| >=23   |
-| **浏览器自动化** | patchright (Playwright fork)               |
-| **构建**         | SWC (编译) + Rollup (打包)                 |
-| **CDP 协议**     | Chrome DevTools Protocol 原生集成          |
-| **AI 集成**      | OpenAI / Anthropic / Gemini (可选)         |
-| **IPC 协议**     | 本地命名管道 NDJSON (daemon socket)        |
-| **CLI 框架**     | yargs                                      |
-| **运行时校验**   | Zod                                        |
-| **代码分析**     | Babel (parser/traverse/generator)          |
-| **混淆处理**     | javascript-obfuscator, terser              |
-| **WASM 处理**    | wabt                                       |
-| **国密**         | sm-crypto                                  |
-| **测试**         | node:test + fast-check (属性测试) + Vitest |
+| 领域             | 技术选型                                 |
+| ---------------- | ---------------------------------------- |
+| **语言**         | TypeScript 5.9 (ESM, ES2023 target)      |
+| **运行时**       | Node.js ^20.19.0 \|\| ^22.12.0 \|\| >=23 |
+| **浏览器自动化** | patchright (Playwright fork)             |
+| **构建**         | SWC (编译) + Rollup (打包)               |
+| **CDP 协议**     | Chrome DevTools Protocol 原生集成        |
+
+| **IPC 协议** | 本地命名管道 NDJSON (daemon socket) |
+| **CLI 框架** | yargs |
+| **运行时校验** | Zod |
+| **代码分析** | Babel (parser/traverse/generator) |
+| **混淆处理** | javascript-obfuscator, terser |
+| **WASM 处理** | wabt |
+| **国密** | sm-crypto |
+| **测试** | node:test + fast-check (属性测试) + Vitest |
 
 ---
 
@@ -155,8 +155,7 @@ Browser-CLI/
 │   │   ├── performance/            # 性能分析工具
 │   │   ├── websocket/ (network/)   # WebSocket 观察工具
 │   │   ├── storage/ (page/)        # 会话状态工具 (save_session_state...)
-│   │   ├── crypto/                  # 加密检测工具 (detect_crypto)
-│   │   ├── analyzer/               # 深度分析工具 (understand_code, risk_panel)
+│   │   ├── analyzer/               # 逆向证据与会话报告工具
 │   │   ├── collector/              # 代码采集工具 (collect_code)
 │   │   ├── rebuild/                # 本地复现工具 (export_rebuild_bundle, diff_env_requirements)
 │   │   ├── stealth/                # 隐身注入工具
@@ -190,19 +189,12 @@ Browser-CLI/
 │   │   │   ├── HookStore.ts        #   Hook 数据存储
 │   │   │   ├── HookHeartbeat.ts    #   心跳检测
 │   │   │   └── AIHookGenerator.ts  #   AI 辅助 Hook 生成
-│   │   ├── analyzer/               # 代码分析
-│   │   │   ├── CodeAnalyzer.ts     #   代码理解 (静态 + AI)
-│   │   │   └── AISummarizer.ts     #   AI 摘要
 │   │   ├── deobfuscator/           # 反混淆
 │   │   │   ├── Deobfuscator.ts     #   主管道 (策略调度)
 │   │   │   ├── PackerDeobfuscator.ts   # Packer/AAEncode
 │   │   │   ├── JSVMPDeobfuscator.ts    # JSVMP 虚拟机
 │   │   │   ├── AdvancedDeobfuscator.ts # 高级混淆
 │   │   │   └── ASTOptimizer.ts     #   AST 优化
-│   │   ├── crypto/                 # 加密检测
-│   │   │   ├── CryptoDetector.ts   #   加密检测器
-│   │   │   ├── CryptoDetectorEnhanced.ts # 增强检测
-│   │   │   └── CryptoRules.ts      #   规则引擎
 │   │   ├── wasm/                   # WASM 分析
 │   │   │   ├── WasmCollector.ts    #   WASM 收集 (CDP + 插桩)
 │   │   │   ├── WasmAnalyzer.ts     #   WASM 二进制分析
@@ -211,14 +203,6 @@ Browser-CLI/
 │   │   │   └── WasmTypes.ts        #   类型定义
 │   │   └── stealth/                # 隐身模块
 │   │       └── StealthScripts2025.ts # 反检测脚本引擎
-│   │
-│   ├── services/                    # 服务层
-│   │   ├── LLMService.ts           # ★ LLM 服务封装 (chat, 提示词生成)
-│   │   ├── AIService.ts            # ★ AI 服务基类 (重试, 错误分类)
-│   │   ├── OpenAIProvider.ts       #   OpenAI API 实现
-│   │   ├── AnthropicProvider.ts    #   Anthropic API 实现
-│   │   ├── GeminiProvider.ts       #   Gemini API + CLI 实现
-│   │   └── index.ts                #   导出
 │   │
 │   ├── reverse/                     # 逆向任务存储
 │   │   └── ReverseTaskStore.ts     # ★ 文件系统任务持久化
@@ -330,7 +314,7 @@ Browser-CLI/
    │      │      │      │      │      │      │      │
 ┌──▼──┐ ┌▼────┐ ┌▼───┐ ┌▼───┐ ┌▼──┐ ┌▼───┐ ┌▼──┐ ┌▼────┐
 │Tools │ │Modules│ │Svc │ │Brsr│ │Rev│ │Utils│ │Fmt│ │Types│
-│100+  │ │ 6域  │ │LLM │ │Mgr │ │Task│ │Cache│ │rtr│ │85+  │
+│100+  │ │ 6域  │ │    │ │Mgr │ │Task│ │Cache│ │rtr│ │85+  │
 │MCP   │ │分析  │ │    │ │CDP │ │FS  │ │Bus  │ │   │ │接口  │
 └──────┘ └──────┘ └────┘ └────┘ └───┘ └─────┘ └───┘ └─────┘
 ```
@@ -339,14 +323,12 @@ Browser-CLI/
 
 #### 3.2.1 配置系统 (src/config/)
 
-| 方面         | 分析                                                                                                                                                                                                        |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **职责**     | 统一管理所有运行时配置 — 浏览器连接、AI 提供商、RPC 通信                                                                                                                                                    |
-| **实现逻辑** | `resolveConfig()` 实现 CLI 参数 > 环境变量 (dotenv) > config.json > js-reverse.config.json > ~/.jsreverse/config.json > 内置默认值的优先级合并                                                              |
-| **关键函数** | `resolveConfig()` — 返回扁平 `ResolvedConfig`; `getSystemConfig()` — 构建 `SystemConfig` (AI+Browser+Debug); `getBrowserManagerConfig()` — 解析 25 个浏览器参数; `createAIService()` — 从配置实例化 AI 服务 |
-| **被调用方** | `src/index.ts` (Worker入口)、`src/worker/WorkerArgs.ts`、`src/runtime.ts`                                                                                                                                   |
-| **隐式耦合** | `LLMProvider` 类型仅限 `'openai'`，但 AI 层已支持 Anthropic/Gemini，配置系统尚未暴露对应选项; `schema.ts` 为空占位文件                                                                                      |
-| **改进空间** | 扩展 `LLMProvider` 联合类型; 使用 Zod 对 `GlobalConfig` 做运行时校验                                                                                                                                        |
+| 方面         | 分析                                                                                                                                                         |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **职责**     | 统一管理所有运行时配置 — 浏览器连接、调试与会话设置                                                                                                          |
+| **实现逻辑** | `resolveConfig()` 实现 CLI 参数 > 环境变量 (dotenv) > config.json > js-reverse.config.json > ~/.jsreverse/config.json > 内置默认值的优先级合并               |
+| **关键函数** | `resolveConfig()` — 返回扁平 `ResolvedConfig`; `getSystemConfig()` — 构建 `SystemConfig` (Browser+Debug); `getBrowserManagerConfig()` — 解析 25 个浏览器参数 |
+| **被调用方** | `src/index.ts` (Worker入口)、`src/worker/WorkerArgs.ts`、`src/runtime.ts`                                                                                    |
 
 #### 3.2.2 浏览器管理层 (src/modules/browser/)
 
@@ -410,18 +392,6 @@ Browser-CLI/
 | **设计模式** | **Facade + Strategy 模式** — DebuggerManager 统一入口，策略模块各管 CDP 子域                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | **改进空间** | 已统一：原 `DebuggerContext`（869 行）已迁移至 `DebuggerManager` + 策略模块，消除了职责重叠                                                                                                                                                                                                                                                                                                                                                                                                          |
 
-#### 3.2.8 AI 服务层 (src/services/)
-
-| 方面         | 分析                                                                                                                                                                                                                                                                       |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **职责**     | 提供统一的 LLM 调用封装，支持多提供商、重试、错误分类                                                                                                                                                                                                                      |
-| **实现逻辑** | `AIProvider` 接口定义 `chat()` 和 `analyzeImage()`。三个提供商实现: `OpenAIProvider`、`AnthropicProvider`、`GeminiProvider` (支持 API 和本地 CLI 两种模式)。`AIService` 包装器提供指数退避重试 (max 3 次) + 错误分类 (网络错误/429/5xx)。`LLMService` 提供业务级提示词模板 |
-| **关键类**   | `AIProvider` 接口、`AIService` (重试封装)、`LLMService` (提示词工厂)                                                                                                                                                                                                       |
-| **被调用方** | `CodeAnalyzer` / `AISummarizer` / `Deobfuscator` / `CryptoDetector` 等分析模块                                                                                                                                                                                             |
-| **设计模式** | **策略模式 (不同 LLM 提供商的统一接口)、装饰器模式 (AIService 封装重试逻辑)**                                                                                                                                                                                              |
-| **隐式耦合** | `GeminiProvider` 对 `DEFAULT_LLM_PROVIDER` 有圈复杂度较高的条件分支 (API vs CLI 模式)                                                                                                                                                                                      |
-| **改进空间** | 配置系统应暴露 Anthropic/Gemini 的配置键; 考虑引入请求缓存减少重复调用                                                                                                                                                                                                     |
-
 #### 3.2.9 事件总线 (src/utils/EventBus)
 
 | 方面         | 分析                                                                                                                                                                                                                    |
@@ -444,13 +414,13 @@ Browser-CLI/
 
 #### 3.2.11 Daemon IPC 层 (src/ipc/)
 
-| 方面         | 分析                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **职责**     | CLI 与 detached daemon 之间的本地 socket 通信：会话注册表发现 + NDJSON 行协议请求/响应 + 事件推送                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| 方面         | 分析                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **职责**     | CLI 与 detached daemon 之间的本地 socket 通信：会话注册表发现 + NDJSON 行协议请求/响应 + 事件推送                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | **实现逻辑** | win32 命名管道 / POSIX unix socket，地址 `proxycli-<workspaceHash16>-<session>`。`SocketConnection` 做 NDJSON 分帧与重组；`registry.ts` 按 workspace-hash 目录读写 `<session>.session`（含 pid/socketPath/consolePort/protocol）。`daemonServer.ts` 分发 `hello`/`tools.list`/`tool.invoke`/`browser.*`/`jobs.*`/`subscribe`/`stop`；客户端断线 ⇒ `AbortController` 中止该连接上的运行中 job。CLI 侧连不上就 spawn detached daemon，等 stdout 就绪行 `Daemon listening on <pipePath>` 完成握手。`PROTOCOL_VERSION = 1` 两侧各自定义（与 `proxycli/src/daemonClient.ts` 注释互指保持同步），不匹配时报错提示 `close` + 重新 `open` |
-| **关键文件** | `socketConnection.ts`（帧协议）、`registry.ts`（注册表）、`daemonArgs.ts`（参数解析）、`daemonServer.ts`（方法分发）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| **被调用方** | `worker/daemonMain.ts` 启动时创建 `startDaemonServer()`；`proxycli` 包经 `daemonClient.ts` 连接                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| **设计模式** | **行协议 RPC（请求-响应 + 无 id 推送共用一条连接）、注册表服务发现**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **关键文件** | `socketConnection.ts`（帧协议）、`registry.ts`（注册表）、`daemonArgs.ts`（参数解析）、`daemonServer.ts`（方法分发）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| **被调用方** | `worker/daemonMain.ts` 启动时创建 `startDaemonServer()`；`proxycli` 包经 `daemonClient.ts` 连接                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| **设计模式** | **行协议 RPC（请求-响应 + 无 id 推送共用一条连接）、注册表服务发现**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 
 #### 3.2.12 Worker 层 (src/worker/)
 
@@ -473,16 +443,16 @@ Browser-CLI/
 | **单例模式**     | `Runtime.getRuntime()`, `BrowserManager.getInstance()`, `UnifiedCacheManager.getInstance()`, `DetailedDataManager.getInstance()`, `TokenBudgetManager.getInstance()`       | 确保全局唯一实例，避免重复初始化浏览器连接、缓存               | ⚠️ 使测试略复杂，需 `resetInstance()` 方案 |
 | **外观模式**     | `ToolContextProvider` 聚合 PageManager / DebuggerSessionManager / DataCollectorManager / ServiceLocator; `HookManager` 聚合 HookCodeBuilder / HookTypeRegistry / HookStore | 为 Tool handler 提供统一入口，隐藏底部 4 个子模块的复杂性      | ✅ 职责分离好，单个入口降低耦合            |
 | **适配器模式**   | `DevToolsConnectionAdapter` (Playwright CDPSession → CDPConnection); `CacheAdapters` (3 个缓存 → CacheInstance); `third_party/puppeteer-compat.ts` (Puppeteer 兼容)        | 在不同接口间转换，实现 Puppeteer→Playwright 迁移、异构缓存统一 | ✅ 适配层干净，零侵入                      |
-| **策略模式**     | `BrowserManager` 双模式 (connect vs launch) + 端口发现三层策略; `Deobfuscator` 通过子模块实现不同混淆策略; `AIProvider` 接口 (OpenAI/Anthropic/Gemini)                     | 算法/策略的可替换性，运行时选择                                | ✅ Strategy 接口定义清晰                   |
+| **策略模式**     | `BrowserManager` 双模式 (connect vs launch) + 端口发现三层策略; `Deobfuscator` 通过子模块实现不同混淆策略                                                                  | 算法/策略的可替换性，运行时选择                                | ✅ Strategy 接口定义清晰                   |
 | **模板方法模式** | `PageCollector<T>` 抽象基类: `attachListeners()` / `detachListeners()` 由子类实现                                                                                          | 多个收集器 (Network/Console/WSC) 共享导航分组和生命周期逻辑    | ✅ 减少大量重复代码                        |
-| **管道模式**     | `Deobfuscator` 反混淆管线: 检测 → 解包 → JSVMP → 高级 → 基础 → AST → 重命名 → AI                                                                                           | 多阶段处理，每阶段独立失败                                     | ✅ 高容错: 每步独立 try-catch              |
+| **管道模式**     | `Deobfuscator` 反混淆管线: 检测 → 解包 → JSVMP → 高级 → 基础 → AST → 重命名                                                                                                | 多阶段处理，每阶段独立失败                                     | ✅ 高容错: 每步独立 try-catch              |
 | **观察者模式**   | `EventBus` (Pub/Sub 9 个事件); `DebuggerManager` CDP 事件监听 (scriptParsed/paused/resumed); `BrowserManager.on('disconnected')` 崩溃监听                                  | 模块间松散通信，事件驱动                                       | ✅ EventBus 有 Zod 校验加分                |
 | **桥接模式**     | `ToolAdapter` 将 `defineTool` 定义桥接到传输层（daemon socket `tool.invoke` / MCP stdio）                                                                                  | 分离工具定义和传输协议                                         | ✅ 可独立替换协议层                        |
 | **命令模式**     | `daemonServer.ts` 按 `method` 名路由到分发函数（`hello`/`tools.list`/`tool.invoke`/...）                                                                                   | 请求封装为命令对象，支持注册/路由                              | ✅ 标准实现                                |
-| **工厂模式**     | `createAIService()` 根据 provider 创建对应实现; `getRuntime()` 首次创建所有实例                                                                                            | 对象创建的集中管理                                             | ✅ 创建逻辑集中                            |
+| **工厂模式**     | `getRuntime()` 首次创建所有实例                                                                                                                                            | 对象创建的集中管理                                             | ✅ 创建逻辑集中                            |
 | **Builder 模式** | `HookManager.createWithBuilder()` 链式构建 Hook                                                                                                                            | 复杂 Hook 配置的逐步构建                                       | ✅ 链式 API 清晰                           |
 | **协调者模式**   | `UnifiedCacheManager` 协调 3 个缓存实例                                                                                                                                    | 多个缓存的全局管理，不替代它们                                 | ✅ 非侵入式                                |
-| **装饰器模式**   | `AIService` 封装重试逻辑 + 错误分类，不影响 `AIProvider` 实现                                                                                                              | 在透明外层添加重试能力                                         | ✅ 关注点分离好                            |
+| **装饰器模式**   | `ToolResultRecorder` 在不改动 handler 的前提下落盘每次工具结果                                                                                                             | 在透明外层添加记录能力                                         | ✅ 关注点分离好                            |
 | **代理模式**     | `Frame evaluateWithTimeout` Proxy 拦截 `frame.evaluate()` 添加超时保护                                                                                                     | 在不修改 Playwright 对象的情况下扩展超时                       | ✅ Proxy 方案轻量                          |
 
 ### 4.2 可以引入但尚未使用的设计模式
@@ -490,7 +460,7 @@ Browser-CLI/
 | 模式             | 建议位置                                            | 理由                                                                                                                        |
 | ---------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | **工厂方法模式** | `ToolAdapter.loadHandler()`                         | 当前动态 import + `if-else` 分派创建不同模式 handler，可抽象为 `HandlerFactory.create(meta)`                                |
-| **访问者模式**   | JS AST 分析 (CodeAnalyzer / CryptoDetector)         | Babel traverse 已隐含访问者模式，但 `CodeAnalyzer` 的静态分析可封装为更细粒度的 AST Visitor                                 |
+| **访问者模式**   | JS AST 分析（skill `code-analysis` 的脚本）         | Babel traverse 已隐含访问者模式                                                                                             |
 | **状态模式**     | `BrowserManager` 状态管理                           | 当前通过布尔 flags (`isRestarting`/`isConnected`) 控制，可引入显式状态机 (disconnected/connecting/connected/closing/closed) |
 | **责任链模式**   | `ToolExecutionPipeline` 的校验/上下文/执行/响应阶段 | 当前参数校验、执行、日志记录在线性管线中分阶段展开，可拆为独立中间件                                                        |
 | **命令队列模式** | `ToolExecutionScheduler`                            | 当前只有简单读写分离，未来可扩展为带优先级、延迟执行、取消的任务队列                                                        |
@@ -500,12 +470,12 @@ Browser-CLI/
 
 项目采用一种**改良的分层架构**，接近于 **Hexagonal Architecture (Ports and Adapters)** 的变体:
 
-| 层级           | 对应目录                           | Ports (接口)                                            | Adapters (实现)                                             |
-| -------------- | ---------------------------------- | ------------------------------------------------------- | ----------------------------------------------------------- |
-| **基础设施层** | `src/modules/browser/`, `src/ipc/` | CDPSession, socket 帧协议                               | BrowserManager (Chrome CDP), daemonServer (命名管道 NDJSON) |
-| **核心领域层** | `src/modules/`                     | HookTypePlugin, AIProvider, DeobfuscatorStrategy (隐式) | HookManager, CodeAnalyzer, Deobfuscator                     |
-| **应用层**     | `src/tools/` + `src/worker/`       | ToolDefinition, Context                                 | ~100 个具体工具 + ToolAdapter                               |
-| **配置层**     | `src/config/`                      | —                                                       | 多源合并 + 环境变量                                         |
+| 层级           | 对应目录                           | Ports (接口)                                | Adapters (实现)                                             |
+| -------------- | ---------------------------------- | ------------------------------------------- | ----------------------------------------------------------- |
+| **基础设施层** | `src/modules/browser/`, `src/ipc/` | CDPSession, socket 帧协议                   | BrowserManager (Chrome CDP), daemonServer (命名管道 NDJSON) |
+| **核心领域层** | `src/modules/`                     | HookTypePlugin, DeobfuscatorStrategy (隐式) | HookManager, Deobfuscator                                   |
+| **应用层**     | `src/tools/` + `src/worker/`       | ToolDefinition, Context                     | ~100 个具体工具 + ToolAdapter                               |
+| **配置层**     | `src/config/`                      | —                                           | 多源合并 + 环境变量                                         |
 
 **不符合纯 Hexagonal 的地方**:
 
@@ -551,7 +521,6 @@ graph TB
         BM[BrowserManager]
         COLL[CodeCollector]
         HM[HookManager]
-        AN[CodeAnalyzer]
         DEO[Deobfuscator]
         WD[WasmDetector]
         RT[ReverseTaskStore]
@@ -562,9 +531,8 @@ graph TB
     subgraph MODULES["核心模块 (src/modules/)"]
         CC[collector模块<br/>代码收集/缓存/压缩]
         HK[hook模块<br/>Hook注入/管理/存储]
-        AZ[analyzer模块<br/>静态+AI代码分析]
+        AZ[analyzer模块<br/>证据/报告工具]
         DO[deobfuscator模块<br/>Packer→JSVMP→AST管线]
-        CR[crypto模块<br/>加密检测/AST/AI]
         WS[wasm模块<br/>WASM收集/分析/反编译]
     end
 
@@ -581,14 +549,6 @@ graph TB
         OTHER[其他 20+ 子目录]
     end
 
-    subgraph SERVICES["服务层 (src/services/)"]
-        AI[AIService<br/>重试/错误分类]
-        LLM[LLMService<br/>提示词模板]
-        OP[OpenAIProvider]
-        ANP[AnthropicProvider]
-        GP[GeminiProvider<br/>API + CLI]
-    end
-
     subgraph THIRDPARTY["第三方层 (src/third_party/)"]
         PW[patchright<br/>Playwright fork]
         CDP[CDP Protocol Types]
@@ -601,12 +561,6 @@ graph TB
         FILE[JSON配置文件<br/>3个层级]
         DEF[内置默认值]
         RESOLVER[resolveConfig<br/>合并管线]
-    end
-
-    subgraph AI_SYSTEM["外部AI系统<br/>(可选)"]
-        OPENAI[OpenAI API]
-        ANTHROPIC[Anthropic API]
-        GEMINI[Gemini API/CLI]
     end
 
     subgraph BROWSER["浏览器引擎"]
@@ -631,23 +585,13 @@ graph TB
     TG --> HOOK & DEBUG & NET & DOM & PERF & WASM & OTHER
     ADAPTER --> CONTEXTPROV
     CONTEXTPROV --> PM & DSM & DCM & SL
-    RUNTIME --- BM & COLL & HM & AN & DEO & WD & RT & EB & CACHE
+    RUNTIME --- BM & COLL & HM & DEO & WD & RT & EB & CACHE
     BM --- THIRDPARTY
     BM <---> CHROME
     CHROME --- WS2
     BM --- STUBS
     SL --> MODULES
-    MODULES --- CC & HK & AZ & DO & CR & WS
-    SERVICES --> AI
-    AI --> OP & ANP & GP
-    GP -.- GEMINI
-    OP -.- OPENAI
-    ANP -.- ANTHROPIC
-    AI --- LLM
-    AZ --- AI
-    DO --- AI
-    CR --- AI
-    HK --> LLM
+    MODULES --- CC & HK & AZ & DO & WS
     CONFIG --> BM
     CONFIG --> RUNTIME
     LIFECYCLE --> BM & SERVER
@@ -720,7 +664,7 @@ flowchart TB
     EXPORT --> ENV[5. 逐项补环境<br/>diff_env_requirements<br/>env.js + polyfills.js]
     ENV --> VERIFY{运行 entry.js<br/>验证是否有分歧}
     VERIFY -->|有运行时错误| ENV
-    VERIFY -->|env-pass 通过| PURE[6. 纯算法提纯<br/>deobfuscate_code + understand_code<br/>剥离风控逻辑]
+    VERIFY -->|env-pass 通过| PURE[6. 纯算法提纯<br/>deobfuscate_code + 人工/AI Agent 分析<br/>剥离风控逻辑]
     PURE --> EVIDENCE[7. 证据沉淀<br/>record_reverse_evidence<br/>写入 task artifact]
     EVIDENCE --> DONE([完成])
 ```
@@ -754,13 +698,13 @@ flowchart TB
 
 ### 🏆 建议 3: 完善配置系统的 Zod schema 验证
 
-| 维度           | 内容                                                                                                                                                                                                                                           |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **目标模块**   | `src/config/schema.ts`                                                                                                                                                                                                                         |
-| **当前问题**   | `schema.ts` 为空占位文件; 配置验证分散在 `resolver.ts` 的条件分支中; 对无效配置仅在运行时暴露 (如 LLM Provider 拼写错误); 嵌套配置对象 (OpenAI/浏览器) 处理不统一                                                                              |
-| **具体方案**   | 使用 Zod 定义 `GlobalConfigSchema`, 在 `resolveConfig()` 最终合并后调用 `schema.parse()`; 利用 Zod 的能力: 默认值、类型强制、联合类型、`refine` 跨字段校验; 为空字段提供友好错误消息; 在 `getSystemConfig()` 和 `createAIService()` 中重复使用 |
-| **预期收益**   | 启动时验证, 配置错误立即暴露; 自文档化的 Schema (Zod 自动推导类型); 减少 `resolver.ts` 中 ~100 行条件校验代码                                                                                                                                  |
-| **风险与成本** | 低: 纯新增, 不影响现有功能; 项目已在广泛使用 Zod (仅工具层就 185+引用), 无新增依赖; 两个工时 + 测试时间                                                                                                                                        |
+| 维度           | 内容                                                                                                                                                                                                                                |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **目标模块**   | `src/config/schema.ts`                                                                                                                                                                                                              |
+| **当前问题**   | `schema.ts` 为空占位文件; 配置验证分散在 `resolver.ts` 的条件分支中; 对无效配置仅在运行时暴露; 嵌套配置对象 (browser) 处理不统一                                                                                                    |
+| **具体方案**   | 使用 Zod 定义 `GlobalConfigSchema`, 在 `resolveConfig()` 最终合并后调用 `schema.parse()`; 利用 Zod 的能力: 默认值、类型强制、联合类型、`refine` 跨字段校验; 为空字段提供友好错误消息; 在 `getSystemConfig()` 等高扇入入口中重复使用 |
+| **预期收益**   | 启动时验证, 配置错误立即暴露; 自文档化的 Schema (Zod 自动推导类型); 减少 `resolver.ts` 中 ~100 行条件校验代码                                                                                                                       |
+| **风险与成本** | 低: 纯新增, 不影响现有功能; 项目已在广泛使用 Zod (仅工具层就 185+引用), 无新增依赖; 两个工时 + 测试时间                                                                                                                             |
 
 ### 🏆 建议 4: 引入 Design System / UI 规范 (如未来构建前端的备选)
 
@@ -804,15 +748,11 @@ npm run build
 npm run typecheck
 ```
 
-**环境变量配置** (可选, 用于 LLM):
+**环境变量配置** (可选):
 
 ```bash
 # 复制 .env.example (如果存在) 或新建
-# 最少配置 — 只需浏览器调试功能则完全不需要
-
-# AI 提供商 (三选一)
-DEFAULT_LLM_PROVIDER=openai   # 或 anthropic / gemini
-OPENAI_API_KEY=sk-xxx
+# 浏览器调试等核心功能不需要任何环境变量
 ```
 
 ### 7.2 从 0 到运行

@@ -123,10 +123,6 @@ const INVOKE_HINT_TABLE: Record<string, InvokeHintRow> = {
     requiredParams: ['url', 'targetParam'],
     exampleDefaults: {url: 'https://example.com/api/sign', targetParam: 'sign'},
   },
-  extract_function_tree: {
-    requiredParams: ['scriptId', 'functionName'],
-    exampleDefaults: {scriptId: '<scriptId>', functionName: 'genSign'},
-  },
 };
 
 function buildInvokeHint(

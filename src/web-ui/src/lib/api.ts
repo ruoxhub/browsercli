@@ -13,7 +13,6 @@ import type {
   InvocationRecord,
   BrowserConfig,
   ConnectResult,
-  LlmTestResult,
   LocalAppsStatus,
   ProcessInfo,
   ProxyStatusPayload,
@@ -21,7 +20,6 @@ import type {
   GetMitmRequestData,
   SessionRequestSummaryEvent,
   SessionRequestDetail,
-  SessionAnalysisPayload,
 } from './protocol';
 
 export interface ToolSummary {
@@ -137,13 +135,6 @@ export const api = {
     return request<RuntimeConfig>('PUT', '/api/config/browser', config);
   },
 
-  updateLlmConfig(config: {
-    llmProvider?: string;
-    openai?: Record<string, unknown>;
-  }): Promise<RuntimeConfig> {
-    return request<RuntimeConfig>('PUT', '/api/config/llm', config);
-  },
-
   getSystemInfo(): Promise<SystemInfo> {
     return request<SystemInfo>('GET', '/api/system/info');
   },
@@ -163,24 +154,6 @@ export const api = {
 
   resetConfig(): Promise<RuntimeConfig> {
     return request<RuntimeConfig>('POST', '/api/config/reset', {});
-  },
-
-  testLlmConfig(config: {
-    llmProvider?: string;
-    openai?: Record<string, unknown>;
-  }): Promise<LlmTestResult> {
-    return request<LlmTestResult>('POST', '/api/llm/test', config);
-  },
-
-  listLlmModels(config?: {
-    llmProvider?: string;
-    openai?: Record<string, unknown>;
-  }): Promise<{
-    models: Array<{id: string; object?: string; owned_by?: string}>;
-  }> {
-    return request<{
-      models: Array<{id: string; object?: string; owned_by?: string}>;
-    }>('POST', '/api/llm/models', config ?? {});
   },
 
   connectBrowser(): Promise<ConnectResult> {
@@ -274,18 +247,6 @@ export const api = {
     return request<SessionRequestDetail>(
       'GET',
       `/api/session/requests/${encodeURIComponent(id)}`,
-    );
-  },
-
-  analyzeSession(body: {
-    sessionId?: string;
-    requestIds?: string[];
-    mode?: string;
-  }): Promise<SessionAnalysisPayload> {
-    return request<SessionAnalysisPayload>(
-      'POST',
-      '/api/session/analyze',
-      body,
     );
   },
 

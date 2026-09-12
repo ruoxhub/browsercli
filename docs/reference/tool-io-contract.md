@@ -15,20 +15,15 @@
 
 - 同一类数据只能有一个页面侧主键（例如 Hook 数据只能写 `__hookStore`）。
 - 工具读取路径必须对齐写入路径，禁止写 A 读 B。
-- 汇总工具（`get_hook_data`/`risk_panel`/`export_session_report`）必须使用 `hookManager.getAllKnownHookIds()` 口径。
+- 汇总工具（`get_hook_data`/`export_session_report`）必须使用 `hookManager.getAllKnownHookIds()` 口径。
 
 ## 工具读写契约（全量）
 
 | Tool                         | Read Sources                                                       | Write Sources                            | Canonical Store                                      |
 | ---------------------------- | ------------------------------------------------------------------ | ---------------------------------------- | ---------------------------------------------------- |
-| `analyze_target`             | `runtime.collector` + `runtime.hookManager` + 代码文本             | 分析结果；部分工具写 task artifact       | HookManager / Artifacts                              |
 | `deobfuscate_code`           | `runtime.collector` + `runtime.hookManager` + 代码文本             | 分析结果；部分工具写 task artifact       | HookManager / Artifacts                              |
-| `detect_crypto`              | `runtime.collector` + `runtime.hookManager` + 代码文本             | 分析结果；部分工具写 task artifact       | HookManager / Artifacts                              |
 | `export_session_report`      | `hookManager.getAllKnownHookIds()` + `getRecords()`                | Response report                          | HookManager                                          |
 | `record_reverse_evidence`    | 请求参数 + 当前上下文                                              | task artifact 文件                       | `artifacts/tasks/*`                                  |
-| `risk_panel`                 | `hookManager.getAllKnownHookIds()` + `getRecords()`                | Response report                          | HookManager                                          |
-| `summarize_code`             | `runtime.collector` + `runtime.hookManager` + 代码文本             | 分析结果；部分工具写 task artifact       | HookManager / Artifacts                              |
-| `understand_code`            | `runtime.collector` + `runtime.hookManager` + 代码文本             | 分析结果；部分工具写 task artifact       | HookManager / Artifacts                              |
 | `collect_code`               | `runtime.collector` + 页面脚本/网络                                | `runtime.collector` 缓存                 | Collector Cache / UnifiedCache                       |
 | `collection_diff`            | `runtime.collector` + 页面脚本/网络                                | `runtime.collector` 缓存                 | Collector Cache / UnifiedCache                       |
 | `search_in_scripts`          | `runtime.collector` + 页面脚本/网络                                | `runtime.collector` 缓存                 | Collector Cache / UnifiedCache                       |

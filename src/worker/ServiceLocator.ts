@@ -4,28 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {AISummarizer} from '../modules/analyzer/AISummarizer.js';
-import {AISummarizer as FallbackAISummarizer} from '../modules/analyzer/AISummarizer.js';
-import type {CodeAnalyzer} from '../modules/analyzer/CodeAnalyzer.js';
-import {CodeAnalyzer as FallbackCodeAnalyzer} from '../modules/analyzer/CodeAnalyzer.js';
 import type {BrowserManager} from '../modules/browser/index.js';
 import {CodeCollector} from '../modules/collector/CodeCollector.js';
 import {PageController} from '../modules/collector/PageController.js';
-import {CryptoDetector} from '../modules/crypto/CryptoDetector.js';
 import {HookManager} from '../modules/hook/HookManager.js';
 import type {CaptureEngine} from '../modules/session/index.js';
 import type {Runtime} from '../runtime.js';
-import {LLMService} from '../services/LLMService.js';
 
 export class ServiceLocator {
   private _runtime: Runtime | null = null;
 
   private _browserManager: BrowserManager | null = null;
   private _collector: CodeCollector | null = null;
-  private _llmService: LLMService | null = null;
-  private _analyzer: CodeAnalyzer | null = null;
-  private _summarizer: AISummarizer | null = null;
-  private _cryptoDetector: CryptoDetector | null = null;
   private _hookManager: HookManager | null = null;
   private _pageController: PageController | null = null;
 
@@ -71,34 +61,6 @@ export class ServiceLocator {
     };
     this._collector = new CodeCollector(config, this._browserManager);
     return this._collector;
-  }
-
-  getLlmService(): LLMService {
-    return this.getOrCreate(this._llmService, 'llmService', () => {
-      this._llmService = new LLMService();
-      return this._llmService;
-    });
-  }
-
-  getAnalyzer(): CodeAnalyzer {
-    return this.getOrCreate(this._analyzer, 'analyzer', () => {
-      this._analyzer = new FallbackCodeAnalyzer(this.getLlmService());
-      return this._analyzer;
-    });
-  }
-
-  getSummarizer(): AISummarizer {
-    return this.getOrCreate(this._summarizer, 'summarizer', () => {
-      this._summarizer = new FallbackAISummarizer(this.getLlmService());
-      return this._summarizer;
-    });
-  }
-
-  getCryptoDetector(): CryptoDetector {
-    return this.getOrCreate(this._cryptoDetector, 'cryptoDetector', () => {
-      this._cryptoDetector = new CryptoDetector(this.getLlmService());
-      return this._cryptoDetector;
-    });
   }
 
   getHookManager(): HookManager {

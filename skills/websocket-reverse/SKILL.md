@@ -66,11 +66,11 @@ proxycli call inject_hook --persistent true
 
 默认 `list_websocket_connections` 拿到的就是**已建立**的连接，但只读 message stream。如下场景才需要自己 hook：
 
-| 场景                     | 原因                            | 做法                                                                                                  |
-| ------------------------ | ------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| 拦截发送（伪造心跳）     | 默认只观察收发的 server message | hook `WebSocket.send` 拦截 client 帧（`create_hook --type websocket` → `inject_hook`）                |
-| 拦截构造（修改重连参数） | 默认只看到已建立连接            | hook `WebSocket` 构造函数记录 url/protocols（`create_hook --type websocket` → `inject_hook`）         |
-| 抓取握手 query 中的签名  | 默认不抓 HTTP 升级请求          | 配合 `proxycli call list_network_requests --urlFilter <wss-host>` 查升级前的 HTTP 请求               |
+| 场景                     | 原因                            | 做法                                                                                          |
+| ------------------------ | ------------------------------- | --------------------------------------------------------------------------------------------- |
+| 拦截发送（伪造心跳）     | 默认只观察收发的 server message | hook `WebSocket.send` 拦截 client 帧（`create_hook --type websocket` → `inject_hook`）        |
+| 拦截构造（修改重连参数） | 默认只看到已建立连接            | hook `WebSocket` 构造函数记录 url/protocols（`create_hook --type websocket` → `inject_hook`） |
+| 抓取握手 query 中的签名  | 默认不抓 HTTP 升级请求          | 配合 `proxycli call list_network_requests --urlFilter <wss-host>` 查升级前的 HTTP 请求        |
 
 ### 何时只读不 hook
 
@@ -146,14 +146,14 @@ WebSocket 逆向后建议沉淀：
 
 ## 失败回退
 
-| 现象                                | 解决                                                                                                                                         |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `analyze_websocket_messages` 返回空 | 连接已关闭，重建并立即抓                                                                                                                     |
-| `get_websocket_message` 超时        | 消息体太大，先 `analyze` 看 avgSize                                                                                                          |
-| 协议是 protobuf 但没 `.proto`       | 用 `summarize_code` / `understand_code` 反推；或用 [protoscope](https://github.com/square/protoscope) 试解                                   |
-| WS 加密（WSS + 自实现）             | 通常是 mTLS 或自定义 handshake 加密，先看 `list_network_requests` 找 handshake                                                              |
-| 心跳触发后立刻断连                  | 可能是 client 必须发特定心跳格式才能保活；用 `create_hook --type websocket` 看真实心跳                                                       |
-| 工具不可用（profile 报错）          | 本技能工具属默认 `workflow` profile；若报错先 `proxycli list-tools --json` 确认可用列表                                                  |
+| 现象                                | 解决                                                                                                                                                       |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `analyze_websocket_messages` 返回空 | 连接已关闭，重建并立即抓                                                                                                                                   |
+| `get_websocket_message` 超时        | 消息体太大，先 `analyze` 看 avgSize                                                                                                                        |
+| 协议是 protobuf 但没 `.proto`       | 用 skill `code-analysis` 反推 JS 侧；或用 [protoscope](https://github.com/square/protoscope) 试解                                                          |
+| WS 加密（WSS + 自实现）             | 通常是 mTLS 或自定义 handshake 加密，先看 `list_network_requests` 找 handshake                                                                             |
+| 心跳触发后立刻断连                  | 可能是 client 必须发特定心跳格式才能保活；用 `create_hook --type websocket` 看真实心跳                                                                     |
+| 工具不可用（profile 报错）          | 本技能工具属默认 `workflow` profile；若报错先 `proxycli list-tools --json` 确认可用列表                                                                    |
 | 页面反调试卡死 worker（409）        | 不要依赖 DOM 交互（fill/click）去触发 WS；优先 HTTP 侧路 + 本地 Node 重建，必要时 `proxycli jobs cancel` / 重启 worker（详见 wasm-reverse 技能"实战警示"） |
 
 ---

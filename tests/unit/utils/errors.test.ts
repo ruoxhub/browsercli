@@ -23,7 +23,6 @@ describe('error codes', () => {
     assert.strictEqual(ErrorCodes.DEBUGGER_PAUSED, 'DEBUGGER_PAUSED');
     assert.strictEqual(ErrorCodes.DEBUGGER_NOT_PAUSED, 'DEBUGGER_NOT_PAUSED');
     assert.strictEqual(ErrorCodes.NATIVE_TOOL_MISSING, 'NATIVE_TOOL_MISSING');
-    assert.strictEqual(ErrorCodes.AI_REQUIRED, 'AI_REQUIRED');
     assert.strictEqual(ErrorCodes.SCRIPT_ID_STALE, 'SCRIPT_ID_STALE');
     assert.strictEqual(ErrorCodes.PAGE_UNRESPONSIVE, 'PAGE_UNRESPONSIVE');
   });
@@ -62,7 +61,6 @@ describe('ToolError and options', () => {
       ErrorCodes.FRAME_REQUIRED,
       ErrorCodes.DEBUGGER_PAUSED,
       ErrorCodes.DEBUGGER_NOT_PAUSED,
-      ErrorCodes.AI_REQUIRED,
       ErrorCodes.SCRIPT_ID_STALE,
       ErrorCodes.PAGE_UNRESPONSIVE,
     ];

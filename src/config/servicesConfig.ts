@@ -4,37 +4,27 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-
 /**
- * 服务配置 — AI / Browser / System 配置读取与工厂函数
+ * 服务配置 — Browser / System 配置读取与工厂函数
  *
- * 从 resolver.ts 拆分而来，集中管理所有与外部服务（AI 提供商、浏览器管理器）
- * 相关的配置读取逻辑。核心配置基础设施（文件读写、环境变量工具、resolveConfig）
+ * 从 resolver.ts 拆分而来，集中管理浏览器管理器相关的配置读取逻辑。
+ * 核心配置基础设施（文件读写、环境变量工具、resolveConfig）
  * 仍保留在 resolver.ts 中。
  */
 
 import type {BrowserManagerConfig} from '../types/browser.js';
-import {
-  type SourceMapConfig,
-  SourceMapError,
-} from '../types/sourcemap.js';
+import {type SourceMapConfig, SourceMapError} from '../types/sourcemap.js';
 
-import {
-  getEnvBoolean,
-  getEnvNumber,
-  getEnvValue,
-  type LLMProvider,
-} from './resolver.js';
+import {getEnvBoolean, getEnvNumber, getEnvValue} from './resolver.js';
 import {getRuntimeConfigStore} from './RuntimeConfigStore.js';
 import {
-  type AIConfig,
   type SystemConfig,
   SystemConfigSchema,
   validateSystemConfig,
 } from './schema.js';
 
 // ==========================================================================
-// AI / Browser / System 配置
+// Browser / System 配置
 // ==========================================================================
 
 function getBoundedPositiveInteger(
@@ -98,68 +88,6 @@ export function getSourceMapConfig(): SourceMapConfig {
     maxIndexedSections: 1000,
     maxDiffChanges: 2000,
   };
-}
-
-/**
- * 获取默认 LLM 提供商
- *
- * 优先级：环境变量 > RuntimeConfigStore > 默认值
- */
-export function getDefaultLLMProvider(): LLMProvider {
-  const envProvider = getEnvValue('DEFAULT_LLM_PROVIDER')?.toLowerCase();
-  if (envProvider === 'openai') {
-    return envProvider as LLMProvider;
-  }
-
-  const fileConfig = getRuntimeConfigStore().get();
-  if (fileConfig.llmProvider) return fileConfig.llmProvider as LLMProvider;
-
-  return 'openai';
-}
-
-/**
- * 从环境变量 + RuntimeConfigStore 获取 AI 配置
- *
- * 优先级：RuntimeConfigStore（面板保存值，启动时已含 env 种子）> 环境变量。
- * 面板在「连接设置」保存的 LLM 配置必须覆盖 env 种子，否则改了密钥/模型
- * 后真正的 AI 调用（LLMService → createAIService）仍走 env 旧值。
- * store 无 apiKey 时回落 env，保证未用面板配置过的进程行为不变。
- */
-export function getAIConfig(): AIConfig | undefined {
-  const provider = getDefaultLLMProvider();
-  const fileConfig = getRuntimeConfigStore().get();
-
-  const config: AIConfig = {
-    provider,
-  };
-
-  // OpenAI：RuntimeConfigStore（面板/缓存） > 环境变量
-  if (fileConfig.openai?.apiKey) {
-    config.openai = {
-      apiKey: fileConfig.openai.apiKey,
-      baseURL: fileConfig.openai.baseURL,
-      model: fileConfig.openai.model || 'gpt-4o',
-    };
-  } else {
-    const openaiApiKey = getEnvValue('OPENAI_API_KEY');
-    if (openaiApiKey) {
-      config.openai = {
-        apiKey: openaiApiKey,
-        baseURL: getEnvValue('OPENAI_BASE_URL'),
-        model: getEnvValue('OPENAI_MODEL') || 'gpt-4o',
-      };
-    } else if (fileConfig.openai) {
-      config.openai = {
-        apiKey: fileConfig.openai.apiKey || '',
-        baseURL: fileConfig.openai.baseURL,
-        model: fileConfig.openai.model || 'gpt-4o',
-      };
-    }
-  }
-
-  const hasAnyProvider = config.openai;
-
-  return hasAnyProvider ? config : undefined;
 }
 
 /**
@@ -374,7 +302,6 @@ export const getBrowserConfig = getBrowserManagerConfig;
  */
 export function getSystemConfig(): SystemConfig {
   return validateSystemConfig({
-    ai: getAIConfig(),
     browser: getBrowserManagerConfig(),
     debug: isDebugEnabled(),
   });
@@ -418,5 +345,3 @@ export function isDebugEnabled(): boolean {
   const debug = getEnvValue('DEBUG');
   return debug === 'true' || debug?.includes('mcp') || false;
 }
-
-

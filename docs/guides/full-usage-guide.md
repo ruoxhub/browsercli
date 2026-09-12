@@ -12,8 +12,7 @@
 8. [补环境规范](#8-补环境规范)
 9. [纯算法提纯](#9-纯算法提纯)
 10. [任务产物管理](#10-任务产物管理)
-11. [外部 AI 配置](#11-外部-ai-配置)
-12. [常见问题](#12-常见问题)
+11. [常见问题](#12-常见问题)
 
 ---
 
@@ -292,12 +291,13 @@ args = [
 
 ### 6.9 深度分析
 
-| 工具               | 用途                             |
-| ------------------ | -------------------------------- |
-| `collect_code`     | 采集页面代码                     |
-| `understand_code`  | AI 分析代码结构（需配置外部 AI） |
-| `deobfuscate_code` | 去混淆处理                       |
-| `risk_panel`       | 综合风险评估                     |
+| 工具               | 用途         |
+| ------------------ | ------------ |
+| `collect_code`     | 采集页面代码 |
+| `deobfuscate_code` | 去混淆处理   |
+
+> 代码理解、摘要、加密识别、风险评分与目标一键分析工具已下线，改由 skill
+> `code-analysis` / `target-analysis` 指导 Agent 用基础工具自行分析。
 
 ### 6.10 会话与登录态复用
 
@@ -470,34 +470,19 @@ artifacts/tasks/
 
 ---
 
-## 11. 外部 AI 配置
+## 11. 代码分析（无内置 LLM）
 
-### 11.1 支持的 Provider
+仓库已彻底移除 LLM 集成：`src/services/`、`understand_code` / `summarize_code` /
+`risk_panel` / `analyze_target` / `detect_crypto` / `session_analyze_purified` /
+`session_generate_report` 工具，以及 Web 控制台的 LLM 配置面板与 AI 流量分析页
+均已删除。不再需要任何 provider 配置。
 
-- `openai` - GPT-4o
-- `anthropic` - Claude
-- `gemini` - Gemini
+需要代码理解、摘要、加密识别或风险评分时：
 
-### 11.2 配置方式
-
-通过 MCP server 的 `env` 传入：
-
-```toml
-[mcp_servers.js-reverse.env]
-DEFAULT_LLM_PROVIDER = "anthropic"
-ANTHROPIC_API_KEY = "your_key"
-ANTHROPIC_MODEL = "claude-3-5-sonnet-20241022"
-```
-
-### 11.3 功能依赖
-
-| 功能                         | AI 依赖        |
-| ---------------------------- | -------------- |
-| `understand_code`            | 强依赖         |
-| `detect_crypto(useAI=true)`  | 可选           |
-| `analyze_target(useAI=true)` | 可选           |
-| `deobfuscate_code`           | 有 AI 效果更好 |
-| 其他工具                     | 不依赖         |
+- 用 `collect_code` / `search_in_scripts` / `get_script_source` / `get_hook_data`
+  采集证据；
+- 按 skill `code-analysis` 的提示词模板与产出结构自行分析；
+- 目标级/会话级工作流按 skill `target-analysis` 复现。
 
 ---
 

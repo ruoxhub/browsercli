@@ -44,7 +44,6 @@ export const ErrorCodes = {
   DEBUGGER_PAUSED: 'DEBUGGER_PAUSED',
   DEBUGGER_NOT_PAUSED: 'DEBUGGER_NOT_PAUSED',
   NATIVE_TOOL_MISSING: 'NATIVE_TOOL_MISSING',
-  AI_REQUIRED: 'AI_REQUIRED',
 
   // Script locator resolution（spec §4 错误分类）
   SCRIPT_NOT_FOUND: 'SCRIPT_NOT_FOUND',
@@ -60,7 +59,6 @@ export const ErrorCodes = {
 
   TOOL_EXECUTION_ERROR: 'RUNTIME',
   VALIDATION_ERROR: 'VALIDATION',
-  AI_PROVIDER_ERROR: 'RUNTIME',
   BROWSER_ERROR: 'CONNECTION',
   INTERNAL_ERROR: 'RUNTIME',
 } as const;
@@ -68,7 +66,6 @@ export const ErrorCodes = {
 export const LegacyErrorCodeMap = {
   TOOL_EXECUTION_ERROR: ErrorCodes.RUNTIME,
   VALIDATION_ERROR: ErrorCodes.VALIDATION,
-  AI_PROVIDER_ERROR: ErrorCodes.RUNTIME,
   BROWSER_ERROR: ErrorCodes.CONNECTION,
   INTERNAL_ERROR: ErrorCodes.RUNTIME,
 } as const;

@@ -11,13 +11,7 @@ import {describe, it} from 'node:test';
 
 import {StealthScripts2025} from '../../../src/modules/stealth/StealthScripts2025.js';
 import {getRuntime} from '../../../src/runtime.js';
-import {
-  analyze_target,
-  export_session_report,
-  riskPanel,
-  summarizeCode,
-  understandCode,
-} from '../../../src/tools/analyzer/index.js';
+import {export_session_report} from '../../../src/tools/analyzer/reports.js';
 import {
   collectCode,
   collectionDiff,
@@ -81,13 +75,6 @@ interface ToolDefinitionHarness {
 }
 
 interface RuntimeHarness {
-  analyzer: {understand: RuntimeMethod};
-  summarizer: {
-    summarizeFile: RuntimeMethod;
-    summarizeBatch: RuntimeMethod;
-    summarizeProject: RuntimeMethod;
-  };
-  cryptoDetector: {detect: RuntimeMethod};
   collector: {
     collect: RuntimeMethod;
     getFilesByPattern: RuntimeMethod;
@@ -260,16 +247,11 @@ function makeResponse(): ToolResponseHarness {
 }
 
 describe('jshook tools handlers', () => {
-  it('covers analyzer/collector/dom/hook/page/stealth handlers', async () => {
+  it('covers collector/dom/hook/page/stealth handlers', async () => {
     const runtime = getRuntime() as unknown as RuntimeHarness;
     const stealth = StealthScripts2025 as unknown as StealthStaticHarness;
 
     const originals = {
-      understand: runtime.analyzer.understand,
-      summarizeFile: runtime.summarizer.summarizeFile,
-      summarizeBatch: runtime.summarizer.summarizeBatch,
-      summarizeProject: runtime.summarizer.summarizeProject,
-      detectCrypto: runtime.cryptoDetector.detect,
       collect: runtime.collector.collect,
       getFilesByPattern: runtime.collector.getFilesByPattern,
       getCollectedFilesSummary: runtime.collector.getCollectedFilesSummary,
@@ -310,22 +292,6 @@ describe('jshook tools handlers', () => {
       injectAll: stealth.injectAll,
       getPresets: stealth.getPresets,
     };
-
-    runtime.analyzer.understand = async () => ({
-      ok: true,
-      mode: 'understand',
-      qualityScore: 88,
-      securityRisks: [],
-    });
-    runtime.summarizer.summarizeFile = async () => ({scope: 'single'});
-    runtime.summarizer.summarizeBatch = async () => ({scope: 'batch'});
-    runtime.summarizer.summarizeProject = async () => ({scope: 'project'});
-    runtime.cryptoDetector.detect = async () => ({
-      algorithms: [{name: 'MD5', confidence: 0.9}],
-      libraries: [],
-      confidence: 0.9,
-      securityIssues: [],
-    });
 
     runtime.collector.collect = async () => ({
       files: [
@@ -534,155 +500,6 @@ describe('jshook tools handlers', () => {
     try {
       const res = makeResponse();
 
-      await invokeTool(
-        understandCode as unknown as ToolDefinitionHarness,
-        {code: 'x', focus: 'all'},
-        res,
-        runtime,
-      );
-
-      await invokeTool(
-        summarizeCode as unknown as ToolDefinitionHarness,
-        {mode: 'single', code: 'const x=1;'},
-        res,
-        runtime,
-      );
-      await invokeTool(
-        summarizeCode as unknown as ToolDefinitionHarness,
-        {mode: 'batch', files: []},
-        res,
-        runtime,
-      );
-      await invokeTool(
-        summarizeCode as unknown as ToolDefinitionHarness,
-        {mode: 'project', files: []},
-        res,
-        runtime,
-      );
-
-      await invokeTool(
-        analyze_target as unknown as ToolDefinitionHarness,
-        {url: 'https://example.com', hookPreset: 'api-signature'},
-        res,
-        runtime,
-      );
-      await invokeTool(
-        analyze_target as unknown as ToolDefinitionHarness,
-        {
-          url: 'https://example.com',
-          hookPreset: 'none',
-          autoInjectHooks: false,
-          autoReplayActions: [
-            {action: 'click', selector: '#submit'},
-            {action: 'type', selector: '#k', text: 'v'},
-          ],
-        },
-        res,
-        runtime,
-      );
-      runtime.collector.collect = async () => null;
-      await invokeTool(
-        analyze_target as unknown as ToolDefinitionHarness,
-        {
-          url: 'https://example.com',
-          hookPreset: 'none',
-          autoInjectHooks: false,
-        },
-        res,
-        runtime,
-      );
-      runtime.collector.collect = async () => ({files: 'bad-shape'});
-      await invokeTool(
-        analyze_target as unknown as ToolDefinitionHarness,
-        {
-          url: 'https://example.com',
-          hookPreset: 'none',
-          autoInjectHooks: false,
-        },
-        res,
-        runtime,
-      );
-      runtime.collector.collect = async () => ({
-        files: [
-          {url: 'a.js', content: 'const a = 1;', size: 10, type: 'external'},
-        ],
-        totalSize: 10,
-        collectTime: 1,
-      });
-      runtime.collector.getTopPriorityFiles = () => ({
-        files: [],
-        totalSize: 0,
-        totalFiles: 0,
-      });
-      await invokeTool(
-        analyze_target as unknown as ToolDefinitionHarness,
-        {
-          url: 'https://example.com',
-          hookPreset: 'none',
-          autoInjectHooks: false,
-          runDeobfuscation: true,
-          correlationWindowMs: 500,
-          maxCorrelatedFlows: 3,
-        },
-        res,
-        runtime,
-      );
-      runtime.collector.getTopPriorityFiles = () => ({
-        files: [
-          {
-            url: 'top-sign.js',
-            content:
-              'function signOnly(token, nonce){ return `${token}:${nonce}`; }',
-            size: 64,
-            type: 'external',
-          },
-        ],
-        totalSize: 64,
-        totalFiles: 1,
-      });
-      await invokeTool(
-        analyze_target as unknown as ToolDefinitionHarness,
-        {
-          url: 'https://example.com',
-          hookPreset: 'none',
-          autoInjectHooks: false,
-          waitAfterHookMs: 1,
-          maxFingerprints: 4,
-        },
-        res,
-        runtime,
-      );
-      await invokeTool(
-        riskPanel as unknown as ToolDefinitionHarness,
-        {code: 'md5(x)'},
-        res,
-        runtime,
-      );
-      await invokeTool(
-        riskPanel as unknown as ToolDefinitionHarness,
-        {hookId: 'h1'},
-        res,
-        runtime,
-      );
-      await invokeTool(
-        riskPanel as unknown as ToolDefinitionHarness,
-        {hookId: 'h1', includeHookSignals: false},
-        res,
-        runtime,
-      );
-      runtime.collector.getTopPriorityFiles = () => ({
-        files: [],
-        totalSize: 0,
-        totalFiles: 0,
-      });
-      await assert.rejects(async () => {
-        await invokeTool(
-          riskPanel as unknown as ToolDefinitionHarness,
-          {},
-          res,
-          runtime,
-        );
-      });
       runtime.collector.getTopPriorityFiles = () => ({
         files: [{url: 'top.js', content: 'x', size: 1, type: 'external'}],
         totalSize: 1,
@@ -1157,11 +974,6 @@ describe('jshook tools handlers', () => {
         ),
       );
       assert.ok(res.lines.some(line => line.includes('User-Agent updated.')));
-      assert.ok(res.lines.some(line => line.includes('"signatureChain"')));
-      assert.ok(res.lines.some(line => line.includes('"actionPlan"')));
-      assert.ok(res.lines.some(line => line.includes('"requestFingerprints"')));
-      assert.ok(res.lines.some(line => line.includes('"priorityTargets"')));
-      assert.ok(res.lines.some(line => line.includes('"replay"')));
       assert.ok(res.lines.some(line => line.includes('"healthy"')));
       assert.ok(res.lines.some(line => line.includes('BROWSER_DISCONNECTED')));
       assert.ok(res.lines.some(line => line.includes('"unique"')));
@@ -1177,25 +989,7 @@ describe('jshook tools handlers', () => {
       );
       assert.ok(res.lines.some(line => line.includes('"cleanedExpired":')));
       assert.ok(res.lines.some(line => line.includes('hook-data-export')));
-      assert.ok(
-        res.lines.some(
-          line =>
-            line.includes('"method": "WS"') || line.includes('"method":"WS"'),
-        ),
-      );
-      assert.ok(
-        res.lines.some(
-          line =>
-            line.includes('"type": "function"') ||
-            line.includes('"type":"function"'),
-        ),
-      );
     } finally {
-      runtime.analyzer.understand = originals.understand;
-      runtime.summarizer.summarizeFile = originals.summarizeFile;
-      runtime.summarizer.summarizeBatch = originals.summarizeBatch;
-      runtime.summarizer.summarizeProject = originals.summarizeProject;
-      runtime.cryptoDetector.detect = originals.detectCrypto;
       runtime.collector.collect = originals.collect;
       runtime.collector.getFilesByPattern = originals.getFilesByPattern;
       runtime.collector.getCollectedFilesSummary =

@@ -117,7 +117,7 @@ const RequestRow = memo(function RequestRow({
             checked={checked}
             onChange={() => onToggle(req.id)}
             className="w-3.5 h-3.5 rounded border border-[var(--color-border-default)] accent-[var(--color-accent)] cursor-pointer"
-            title="勾选后参与 AI 分析"
+            title="勾选请求"
           />
         </span>
 

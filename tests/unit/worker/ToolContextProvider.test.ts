@@ -14,37 +14,9 @@ import {CaptureEngine} from '../../../src/modules/session/CaptureEngine.js';
 import {CaptureSessionManager} from '../../../src/modules/session/CaptureSessionManager.js';
 import {SqliteSessionStore} from '../../../src/modules/session/SqliteSessionStore.js';
 import type {Runtime} from '../../../src/runtime.js';
-import {understandCode} from '../../../src/tools/analyzer/understand.js';
 import {ToolContextProvider} from '../../../src/worker/ToolContext.js';
-import {ToolResponseAccumulator} from '../../../src/worker/ToolResponse.js';
 
 describe('ToolContextProvider', () => {
-  it('provides analyzer runtime services for understand_code', async () => {
-    const response = new ToolResponseAccumulator();
-    await understandCode.handler(
-      {
-        params: {
-          code: 'console.log("hello world");',
-          focus: 'structure',
-          useAI: false,
-        },
-      },
-      response,
-      {} as never,
-    );
-
-    const result = response.toJSON().structuredContent as {
-      success: boolean;
-      tooltype: string;
-      message: string;
-      data: unknown;
-    };
-    assert.equal(result.success, true);
-    assert.equal(result.tooltype, 'understand');
-    assert.match(result.message, /completed/i);
-    assert.ok(result.data !== null && result.data !== undefined);
-  });
-
   it('reuses debugger context for the same page', async () => {
     const runtime = new ToolContextProvider();
     const client = {

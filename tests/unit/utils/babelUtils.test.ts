@@ -12,7 +12,10 @@ import {unwrapBabelDefault} from '../../../src/utils/babelUtils.js';
 describe('unwrapBabelDefault', () => {
   it('unwraps a nested default object (mod.default.default)', () => {
     const innermost = {marker: true};
-    assert.equal(unwrapBabelDefault({default: {default: innermost}}), innermost);
+    assert.equal(
+      unwrapBabelDefault({default: {default: innermost}}),
+      innermost,
+    );
   });
 
   it('unwraps a single default property', () => {

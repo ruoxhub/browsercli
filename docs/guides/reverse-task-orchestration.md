@@ -100,7 +100,7 @@
 {
   "taskId": "task-001",
   "execute": true,
-  "onlySteps": ["understand_code"]
+  "onlySteps": ["manage_reverse_task:progress"]
 }
 ```
 
@@ -346,7 +346,7 @@
   "routeGuard": {
     "preferredToolClass": "rebuild",
     "routeHint": "switch_to_rebuild",
-    "avoidTools": ["understand_code"]
+    "avoidTools": ["collect_code"]
   },
   "continuation": {
     "ready": true,
@@ -647,7 +647,7 @@ node build/src/index.js --orchestrateReverseTask task-001 --execute --stopOnErro
 node build/src/index.js --orchestrateReverseTask task-001 --execute --includeSummary
 
 # 只执行某一个步骤
-node build/src/index.js --orchestrateReverseTask task-001 --execute --onlyStep understand_code
+node build/src/index.js --orchestrateReverseTask task-001 --execute --onlyStep manage_reverse_task:progress
 
 # 从指定步骤开始
 node build/src/index.js --orchestrateReverseTask task-001 --execute --fromStep diff_env_requirements

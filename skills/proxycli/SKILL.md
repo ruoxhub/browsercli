@@ -92,22 +92,22 @@ Always adhere to the core philosophy: **Observe-first**, **Hook-preferred**, **B
 
 Detailed parameters, signatures, and examples for each category are modularized under `references/`. Read the relevant reference document as needed:
 
-| Category / Model        | Reference File                                       | Key Capabilities & Tools                                                                                                             |
-| ----------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| **Browser & Pages**     | [`references/browser.md`](./references/browser.md)   | Tab navigation, URL switching, iframe selection, health check (`list_pages`, `new_page`, `navigate_page`, `select_frame`)            |
-| **Script & Source**     | [`references/script.md`](./references/script.md)     | Loaded scripts, source retrieval, keyword search, target snapshots (`list_scripts`, `get_script_source`, `collect_code`)             |
-| **Code Analyzer**       | [`references/analyzer.md`](./references/analyzer.md) | AST deobfuscation, crypto detection, CAPTCHA inspection (`deobfuscate_code`, `detect_crypto`, `detect_captcha`)                      |
-| **Dynamic Hooks**       | [`references/hook.md`](./references/hook.md)         | Non-blocking runtime hooks, crypto presets (CryptoJS/RSA/SM), auto-hook (`create_hook`, `inject_hook`, `get_hook_data`, `auto_hook`) |
-| **Debugger**            | [`references/debugger.md`](./references/debugger.md) | Line & XHR breakpoints, stepping, scope evaluation (`set_breakpoint`, `break_on_xhr`, `inspect_locals`, `evaluate_script`)           |
-| **Stealth**             | [`references/stealth.md`](./references/stealth.md)   | Anti-anti-debug, infinite debugger loop bypass, fingerprint stealth (`bypass_debugger`, `anti_anti_debug`, `inject_stealth`)         |
-| **WebAssembly**         | [`references/wasm.md`](./references/wasm.md)         | Wasm capture, dump, decompilation (C-like), disassembly (WAT), sandboxed execution (`collect_wasm`, `wasm_dump`, `wasm_decompile`)   |
-| **DOM & Input**         | [`references/dom.md`](./references/dom.md)           | Selector queries, click/type/drag simulation, screenshots (`query_dom`, `click_at`, `type_text`, `take_screenshot`)                  |
-| **Network & WS**        | [`references/network.md`](./references/network.md)   | Request sniffing, initiator stack trace, replay, cURL export, WebSocket frames (`list_network_requests`, `get_request_initiator`)    |
-| **MITM Proxy**          | [`references/proxy.md`](./references/proxy.md)       | Non-browser traffic capture, rewrite rules, HAR export (`start_mitm_proxy`, `list_mitm_requests`, `mitm_add_rule`)                   |
-| **Rebuild & SourceMap** | [`references/rebuild.md`](./references/rebuild.md)   | Offline bundle export, env diffing, SourceMap recovery (`record_reverse_evidence`, `rebuild_bundle`, `sourcemap_reconstruct_tree`)   |
-| **Workflow Guides**     | [`references/workflow.md`](./references/workflow.md) | Reverse-engineering next-step advisor, parameter workflow playbooks (`recommend_next_step`, `recommend_parameter_workflow`)          |
-| **Session & Storage**   | [`references/session.md`](./references/session.md)   | Cookie/Storage snapshots, session persistence, video frame capture (`get_storage`, `save_session_state`, `restore_session_state`)    |
-| **Full Model Index**    | [`references/model.md`](./references/model.md)       | Complete alphabetical tool-to-reference lookup dictionary                                                                            |
+| Category / Model        | Reference File                                       | Key Capabilities & Tools                                                                                                              |
+| ----------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| **Browser & Pages**     | [`references/browser.md`](./references/browser.md)   | Tab navigation, URL switching, iframe selection, health check (`list_pages`, `new_page`, `navigate_page`, `select_frame`)             |
+| **Script & Source**     | [`references/script.md`](./references/script.md)     | Loaded scripts, source retrieval, keyword search, target snapshots (`list_scripts`, `get_script_source`, `collect_code`)              |
+| **Code Analyzer**       | [`references/analyzer.md`](./references/analyzer.md) | AST deobfuscation, CAPTCHA inspection (`deobfuscate_code`, `detect_captcha`)；代码理解/摘要/加密识别/风险评分见 skill `code-analysis` |
+| **Dynamic Hooks**       | [`references/hook.md`](./references/hook.md)         | Non-blocking runtime hooks, crypto presets (CryptoJS/RSA/SM), auto-hook (`create_hook`, `inject_hook`, `get_hook_data`, `auto_hook`)  |
+| **Debugger**            | [`references/debugger.md`](./references/debugger.md) | Line & XHR breakpoints, stepping, scope evaluation (`set_breakpoint`, `break_on_xhr`, `inspect_locals`, `evaluate_script`)            |
+| **Stealth**             | [`references/stealth.md`](./references/stealth.md)   | Anti-anti-debug, infinite debugger loop bypass, fingerprint stealth (`bypass_debugger`, `anti_anti_debug`, `inject_stealth`)          |
+| **WebAssembly**         | [`references/wasm.md`](./references/wasm.md)         | Wasm capture, dump, decompilation (C-like), disassembly (WAT), sandboxed execution (`collect_wasm`, `wasm_dump`, `wasm_decompile`)    |
+| **DOM & Input**         | [`references/dom.md`](./references/dom.md)           | Selector queries, click/type/drag simulation, screenshots (`query_dom`, `click_at`, `type_text`, `take_screenshot`)                   |
+| **Network & WS**        | [`references/network.md`](./references/network.md)   | Request sniffing, initiator stack trace, replay, cURL export, WebSocket frames (`list_network_requests`, `get_request_initiator`)     |
+| **MITM Proxy**          | [`references/proxy.md`](./references/proxy.md)       | Non-browser traffic capture, rewrite rules, HAR export (`start_mitm_proxy`, `list_mitm_requests`, `mitm_add_rule`)                    |
+| **Rebuild & SourceMap** | [`references/rebuild.md`](./references/rebuild.md)   | Offline bundle export, env diffing, SourceMap recovery (`record_reverse_evidence`, `rebuild_bundle`, `sourcemap_reconstruct_tree`)    |
+| **Workflow Guides**     | [`references/workflow.md`](./references/workflow.md) | Reverse-engineering next-step advisor, parameter workflow playbooks (`recommend_next_step`, `recommend_parameter_workflow`)           |
+| **Session & Storage**   | [`references/session.md`](./references/session.md)   | Cookie/Storage snapshots, session persistence, video frame capture (`get_storage`, `save_session_state`, `restore_session_state`)     |
+| **Full Model Index**    | [`references/model.md`](./references/model.md)       | Complete alphabetical tool-to-reference lookup dictionary                                                                             |
 
 ---
 
@@ -160,11 +160,7 @@ Detailed parameters, signatures, and examples for each category are modularized 
    proxycli call deobfuscate_code --code "<raw_code>" --aggressive true --renameVariables true
    ```
 
-3. Scan for underlying standard crypto signatures:
-
-   ```bash
-   proxycli call detect_crypto --code "<deobfuscated_code>" --useAI true
-   ```
+3. Scan for underlying standard crypto signatures（按 skill `code-analysis` 的加密识别规则自行分析，`detect_crypto` 工具已下线）。
 
 ### Scenario C: Bypass Infinite Debugger & Anti-Debug
 

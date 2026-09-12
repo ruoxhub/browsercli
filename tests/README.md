@@ -130,7 +130,7 @@ npm run coverage
 npm run coverage:core
 ```
 
-`coverage:core` includes `build/src/tools/dom/**`, `hook/**`, `stealth/**`, plus `AIService.js` and `LLMService.js`. For a full-src report use `npm run coverage:strict`.
+`coverage:core` includes `build/src/tools/dom/**`, `hook/**`, `stealth/**`. For a full-src report use `npm run coverage:strict`.
 
 ## CI/CD
 
