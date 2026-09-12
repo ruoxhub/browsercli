@@ -52,12 +52,14 @@
   - [`session_list`](#session_list)
   - [`start_mitm_proxy`](#start_mitm_proxy)
   - [`stop_mitm_proxy`](#stop_mitm_proxy)
-- **[Debugging](#debugging)** (22 tools)
+- **[Debugging](#debugging)** (27 tools)
   - [`capture_video_frame`](#capture_video_frame)
   - [`evaluate_on_callframe`](#evaluate_on_callframe)
   - [`evaluate_script`](#evaluate_script)
   - [`get_ai_debug_status`](#get_ai_debug_status)
   - [`get_console_message`](#get_console_message)
+  - [`get_css_styles`](#get_css_styles)
+  - [`get_devtools_comments`](#get_devtools_comments)
   - [`get_paused_info`](#get_paused_info)
   - [`get_video_info`](#get_video_info)
   - [`inject_preload_script`](#inject_preload_script)
@@ -65,9 +67,12 @@
   - [`list_breakpoints`](#list_breakpoints)
   - [`list_console_messages`](#list_console_messages)
   - [`list_frames`](#list_frames)
+  - [`open_devtools`](#open_devtools)
   - [`pause`](#pause)
   - [`remove_breakpoint`](#remove_breakpoint)
+  - [`resolve_devtools_comment`](#resolve_devtools_comment)
   - [`resume`](#resume)
+  - [`reveal_in_devtools`](#reveal_in_devtools)
   - [`seek_video`](#seek_video)
   - [`select_frame`](#select_frame)
   - [`set_breakpoint`](#set_breakpoint)
@@ -627,6 +632,20 @@
 
 - `msgid`
 
+### `get_css_styles` — 获取CSS层叠样式
+
+**Description:** 获取指定元素匹配的 CSS 规则、内联样式、伪元素与继承样式及层叠（cascade）信息，标注每个声明是生效（active）还是被覆盖（overloaded）。常用于排查元素隐藏/反爬样式与样式覆盖冲突。支持分页。
+
+**Parameters:**
+
+- `selector`
+- `pageSize`
+- `pageIdx`
+
+### `get_devtools_comments` — 读取DevTools评论
+
+**Description:** 读取 DevTools 窗口中针对当前页面的用户评论线程（CD4A）。当前 DevTools 前端未内置 CD4A 桥接，返回不支持提示。仅在 `full` profile 中暴露，默认 `workflow` profile 下不可见。
+
 ### `get_paused_info` — 获取暂停信息
 
 **Description:** 获取当前暂停状态信息，包括调用栈、当前位置和作用域变量。在断点命中后使用此工具了解执行上下文。
@@ -675,6 +694,10 @@
 
 **Description:** 以树形结构列出当前页面中的所有 Frame（含 iframe），显示索引、名称与 URL。使用 select_frame 可将执行上下文切换到指定 Frame。
 
+### `open_devtools` — 打开DevTools窗口
+
+**Description:** 为当前选中页面打开 Chrome DevTools 窗口（同一浏览器内新开 devtools:// 目标）。若浏览器以 pipe 启动（无 HTTP 调试端口），窗口不会自动附着到页面，需要人工选择 target。仅在 `full` profile 中暴露，默认 `workflow` profile 下不可见。
+
 ### `pause` — 暂停执行
 
 **Description:** 暂停 JavaScript 执行。用于中断运行中的代码。
@@ -687,9 +710,27 @@
 
 - `breakpointId`
 
+### `resolve_devtools_comment` — 解决DevTools评论
+
+**Description:** 向 DevTools 评论线程追加回复并标记已解决（CD4A）。当前 DevTools 前端未内置桥接，返回不支持提示。仅在 `full` profile 中暴露，默认 `workflow` profile 下不可见。
+
+**Parameters:**
+
+- `threadId`
+- `replyText`
+
 ### `resume` — 恢复执行
 
 **Description:** 从暂停状态恢复执行，直到下一个断点或执行结束。
+
+### `reveal_in_devtools` — 高亮元素
+
+**Description:** 在页面上高亮指定元素（相当于 DevTools Elements 面板的节点高亮），持续指定时间后自动消失。用于逆向分析时快速定位目标 DOM。仅在 `full` profile 中暴露，默认 `workflow` profile 下不可见。
+
+**Parameters:**
+
+- `selector`
+- `durationMs`
 
 ### `seek_video` — 跳转视频
 
