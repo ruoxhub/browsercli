@@ -136,14 +136,16 @@ function extractArgSpec(
     const int = checks.find(c => c.kind === 'int');
     const min = checks.find(c => c.kind === 'min');
     const max = checks.find(c => c.kind === 'max');
+    // zod 的 check 形状是内部实现细节：value 缺失时宁可忽略该约束，
+    // 也不要写入 undefined 让范围校验退化成 NaN 比较。
     if (int || min || max) {
       range = {
         ...(int ? {int: true} : {}),
-        ...(min
-          ? {min: {value: min.value!, inclusive: min.inclusive !== false}}
+        ...(typeof min?.value === 'number'
+          ? {min: {value: min.value, inclusive: min.inclusive !== false}}
           : {}),
-        ...(max
-          ? {max: {value: max.value!, inclusive: max.inclusive !== false}}
+        ...(typeof max?.value === 'number'
+          ? {max: {value: max.value, inclusive: max.inclusive !== false}}
           : {}),
       };
     }

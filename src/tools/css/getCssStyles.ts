@@ -7,6 +7,7 @@
 import {
   formatMatchedStyles,
   renderCssStylesReport,
+  type RawMatchedStyles,
 } from '../../formatters/cssFormatter.js';
 import {withCdpSession} from '../../modules/browser/cdpUtils.js';
 import {zod} from '../../third_party/index.js';
@@ -24,6 +25,9 @@ const PROBE_ATTR = 'data-pcli-css-probe';
  * 通过 locator 解析元素（支持 CSS/role=/text=/xpath=），注入一次性探针
  * 属性把元素桥接到 CDP CSS 域，再用 CSS.getMatchedStylesForNode 拉取
  * 完整层叠数据并格式化为 active/overloaded 报告。
+ *
+ * 注意：CDP 侧固定查询页面顶层文档，因此仅支持主 frame 中的元素；
+ * 选中子 frame（iframe）时会以「元素定位成功但 CDP 查询失败」收场。
  */
 export const getCssStyles = defineTool({
   name: 'get_css_styles',
@@ -62,6 +66,19 @@ export const getCssStyles = defineTool({
       });
     }
     const page = frame.page();
+    // 探针属性 + DOM.querySelector 基于 page 级顶层文档，子 frame 内的元素
+    // 无法桥接；显式报错好过最后以「CDP 查询失败」误导调用方。
+    // 仅当上下文确实暴露 parentFrame() 时才判定（测试替身可能没有）。
+    const parentFrame = (
+      frame as unknown as {parentFrame?: () => unknown}
+    ).parentFrame?.();
+    if (parentFrame) {
+      throw createToolError(
+        ErrorCodes.FRAME_REQUIRED,
+        'get_css_styles 仅支持主 frame 中的元素，请先用 select_frame 切回主 frame（index 0）。',
+        {toolName: 'get_css_styles', selector},
+      );
+    }
 
     const probe = `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
@@ -95,7 +112,7 @@ export const getCssStyles = defineTool({
         }
         return (await client.send('CSS.getMatchedStylesForNode', {
           nodeId,
-        })) as never;
+        })) as unknown as RawMatchedStyles;
       });
 
       const report = formatMatchedStyles(raw, {

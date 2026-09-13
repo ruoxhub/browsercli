@@ -50,6 +50,19 @@ export const revealInDevtools = defineTool({
       });
     }
     const page = frame.page();
+    // 探针属性 + DOM.querySelector 基于 page 级顶层文档，子 frame 内的元素
+    // 无法桥接；显式报错好过最后以「CDP 查询失败」误导调用方。
+    // 仅当上下文确实暴露 parentFrame() 时才判定（测试替身可能没有）。
+    const parentFrame = (
+      frame as unknown as {parentFrame?: () => unknown}
+    ).parentFrame?.();
+    if (parentFrame) {
+      throw createToolError(
+        ErrorCodes.FRAME_REQUIRED,
+        'reveal_in_devtools 仅支持主 frame 中的元素，请先用 select_frame 切回主 frame（index 0）。',
+        {toolName: 'reveal_in_devtools', selector},
+      );
+    }
 
     const probe = `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 

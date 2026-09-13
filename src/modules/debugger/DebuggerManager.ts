@@ -65,7 +65,7 @@ import type {
 import {WatchExpressionManager} from './WatchExpressionManager.js';
 import {XHRBreakpointManager} from './XHRBreakpointManager.js';
 
-// 重新导出共享类型，保持向后兼容（RuntimeInspector 等仍从此处导入）
+// 重新导出共享类型，保持向后兼容（外部可能仍从此处导入）
 export type {
   AutoRecoveryEvent,
   BreakLocation,

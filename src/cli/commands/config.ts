@@ -10,22 +10,25 @@
  * 配置文件路径：~/.proxycli/config.json（PROXYCLI_CONFIG_DIR / BROWSERCLI_CONFIG_DIR 覆盖，供测试隔离）
  * 支持的键：
  *   workerEntry → daemon 入口脚本路径（映射到环境变量 PROXYCLI_ENTRY）
+ *   headless / cloak / jsStealth / fullStealthArgs / minimalStealth → daemon spawn 布尔开关
+ *   browserUrl / wsEndpoint / executablePath → daemon spawn 连接参数
  *
- * 环境变量 PROXYCLI_ENTRY / BROWSERCLI_ENTRY 优先级高于配置文件。
+ * 环境变量 PROXYCLI_ENTRY / BROWSERCLI_ENTRY 仅覆盖 workerEntry，优先级高于配置文件。
  */
 
-import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, writeFileSync} from 'node:fs';
 import {dirname} from 'node:path';
 
 import {AxiError} from 'axi-sdk-js';
 import type {AxiCliCommand} from 'axi-sdk-js';
 
 import {parseArgs, getFlag, hasFlag} from '../args-parser.js';
-import {cliConfigPath} from '../daemonClient.js';
+import type {CliConfig} from '../daemonClient.js';
+import {cliConfigPath, loadCliConfig} from '../daemonClient.js';
 import {successOutput} from '../output.js';
 import type {WorkerContext} from '../types.js';
 
-/** 合法配置键 */
+/** 合法配置键（CliConfig 的键集合，避免两处漂移） */
 const VALID_KEYS = new Set<string>([
   'workerEntry',
   'headless',
@@ -38,35 +41,12 @@ const VALID_KEYS = new Set<string>([
   'executablePath',
 ]);
 
-interface CliConfig {
-  workerEntry?: string;
-  headless?: string;
-  cloak?: string;
-  jsStealth?: string;
-  fullStealthArgs?: string;
-  minimalStealth?: string;
-  browserUrl?: string;
-  wsEndpoint?: string;
-  executablePath?: string;
-}
-
 function getConfigPath(): string {
   return cliConfigPath();
 }
 
 function loadConfigFile(): CliConfig {
-  const path = getConfigPath();
-  if (!existsSync(path)) return {};
-  try {
-    const raw = readFileSync(path, 'utf8');
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      return parsed as CliConfig;
-    }
-    return {};
-  } catch {
-    return {};
-  }
+  return loadCliConfig();
 }
 
 function writeConfigFile(config: CliConfig): void {
@@ -93,10 +73,11 @@ function validateKey(key: string): void {
   ]);
 }
 
-/** 合并配置文件与环境变量，环境变量优先 */
+/** 合并配置文件与环境变量，环境变量仅覆盖 workerEntry */
 function resolveMerged(): CliConfig {
   const file = loadConfigFile();
   return {
+    ...file,
     workerEntry:
       process.env.PROXYCLI_ENTRY ??
       process.env.BROWSERCLI_ENTRY ??

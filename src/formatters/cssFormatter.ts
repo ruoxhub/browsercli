@@ -79,6 +79,11 @@ function dedupeProperties(props: RawCssProperty[]): CssPropertyLine[] {
 /**
  * 按已排好优先级（高 → 低）的规则列表标注 active/overloaded。
  * 传入独立的 seen 集合，使伪元素等不同层叠组互不干扰。
+ *
+ * ponytail: 只按来源优先级 + 源码顺序模拟层叠，不处理 !important
+ * 反转（低优先级规则里的 !important 应压过高优先级普通声明）与
+ * 简写/展开覆盖（margin vs margin-top）。已知局限，升级路径：
+ * 组内先按 important 分组排序，或直接用 CDP 的 computed style 验证。
  */
 function markCascade(rules: CssRuleReport[], seen: Set<string>): void {
   for (const rule of rules) {
@@ -115,12 +120,14 @@ export function formatMatchedStyles(
 ): CssStylesReport {
   const inlineRules: CssRuleReport[] = [];
   if (raw.inlineStyle) {
+    const properties = dedupeProperties(raw.inlineStyle.cssProperties);
     inlineRules.push({
       type: 'inline',
       selector: 'inline style',
       origin: 'inline',
       source: 'style attribute',
-      properties: dedupeProperties(raw.inlineStyle.cssProperties),
+      important: properties.some(p => p.important),
+      properties,
     });
   }
   const matchedRules = (raw.matchedCSSRules ?? []).map(entry =>

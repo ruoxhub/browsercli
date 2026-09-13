@@ -187,7 +187,7 @@ export function buildManageTaskAgentHints(args: {
           : nextStepHint && !nextStepHint.startsWith('manage_reverse_task:')
             ? 'switch_to_analysis'
             : 'stay_on_task_flow',
-      avoidTools: nextStepHint ? ['list_pages'] : ['collect_code'],
+      avoidTools: nextStepHint ? ['list_pages'] : undefined,
       recommendedStrategy: nextStepHint
         ? inferStrategyFromStep(nextStepHint)
         : 'observe-first',
@@ -208,7 +208,7 @@ export function buildManageTaskAgentHints(args: {
     recommendedTool: taskId ? 'manage_reverse_task' : 'manage_reverse_task',
     toolClass: 'task',
     routeHint: 'stay_on_task_flow',
-    avoidTools: taskId ? ['collect_code'] : ['export_rebuild_bundle'],
+    avoidTools: taskId ? undefined : ['export_rebuild_bundle'],
     recommendedStrategy: taskId ? 'evidence-only' : 'observe-first',
     recommendedParams: taskId
       ? {action: 'summarize', taskId}
@@ -299,9 +299,7 @@ export function buildRebuildHealthAgentHints(args: {
       : 'manage_reverse_task',
     toolClass: hasPatchSuggestions ? 'rebuild' : 'task',
     routeHint: hasPatchSuggestions ? 'switch_to_rebuild' : 'stay_on_task_flow',
-    avoidTools: hasPatchSuggestions
-      ? ['collect_code']
-      : ['export_rebuild_bundle'],
+    avoidTools: hasPatchSuggestions ? undefined : ['export_rebuild_bundle'],
     recommendedStrategy: hasPatchSuggestions ? 'env-fix' : 'observe-first',
     recommendedParams: hasPatchSuggestions
       ? {runtimeError, observedCapabilities}
@@ -343,9 +341,8 @@ export function buildRunReverseAgentHints(args: {
   if (stopReason === 'analysis_completed') {
     return {
       status: 'ok',
-      summary: `已跑到函数切片结构理解阶段，当前建议先看 summarize，再决定是否进入 pure extraction。`,
-      recommendedNextAction:
-        '先读取任务摘要和函数切片产物，再决定是否继续深挖。',
+      summary: `已完成代码结构理解阶段，当前建议先看 summarize，再决定是否进入 pure extraction。`,
+      recommendedNextAction: '先读取任务摘要，再决定是否继续深挖。',
       recommendedTool: 'manage_reverse_task',
       toolClass: 'task',
       routeHint: 'stay_on_task_flow',

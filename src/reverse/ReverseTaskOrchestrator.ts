@@ -402,12 +402,7 @@ export async function orchestrateReverseTask(
         candidateScripts?: string[];
         targetRequest?: {url?: string};
         locatedSignature?: {functionName?: string; scriptUrl?: string};
-        locatedSource?: {
-          scriptId?: string;
-          url?: string;
-          query?: string;
-          lineNumber?: number;
-        };
+        locatedSource?: {url?: string};
       }
     | undefined;
   const candidateScripts = Array.isArray(targetContext?.candidateScripts)

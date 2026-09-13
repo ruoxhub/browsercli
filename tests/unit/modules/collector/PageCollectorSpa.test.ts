@@ -38,12 +38,16 @@ function makePage() {
         off: () => undefined,
         send: async (method: string) => {
           sent.push(method);
+          if (method === 'Page.getFrameTree') {
+            return {frameTree: {frame: {id: 'main'}}};
+          }
           return {};
         },
         detach: async () => {
           detachCalls.push(1);
         },
       }),
+      pages: () => [page],
     }),
   };
   const sent: string[] = [];
@@ -136,6 +140,24 @@ describe('PageCollector SPA navigation handling', () => {
     assert.equal(collector.splitCount, 0);
   });
 
+  it('does not let a sub-frame nwid cancel a pending main-frame split', async () => {
+    const {page, emitFrameNav, emitNwid, mainFrame} = makePage();
+    const collector = new TestCollector();
+    collector.attachToPage(page as never);
+
+    await flush();
+    // 主 frame 跨文档导航，同 tick 内子 frame 发 nwid（如 iframe pushState）。
+    emitFrameNav(mainFrame);
+    emitNwid('iframe-1');
+    await flush();
+
+    assert.equal(
+      collector.splitCount,
+      1,
+      'sub-frame nwid must not cancel the main-frame cross-doc split',
+    );
+  });
+
   it('handles rapid successive same-doc navigations', async () => {
     const {page, emitFrameNav, emitNwid, mainFrame} = makePage();
     const collector = new TestCollector();
@@ -161,5 +183,26 @@ describe('PageCollector SPA navigation handling', () => {
     await flush();
     assert.equal(detachCalls.length, 1, 'late session must be detached');
     collector.dispose();
+  });
+
+  it('detaches every tracked page on dispose()', async () => {
+    const {page, detachCalls} = makePage();
+    const collector = new TestCollector();
+    const context = {
+      pages: () => [page],
+      on: () => undefined,
+      off: () => undefined,
+    };
+    collector.startContextCollection(context as never);
+    await flush();
+    detachCalls.length = 0; // 忽略 attach 期间可能发生的 detach
+
+    collector.dispose();
+
+    assert.equal(
+      detachCalls.length,
+      1,
+      'dispose 必须解挂已注册页面的 CDP 会话（重连路径不再泄漏）',
+    );
   });
 });

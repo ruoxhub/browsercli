@@ -10,6 +10,8 @@
  *
  * 只持久化「连接设置」相关的可写字段：browser。
  * 启动期固定值由 CLI/环境变量决定，不在此缓存。
+ *
+ * 注意：browser.wsEndpoint / browserURL 等连接目标会明文写入该文件。
  */
 
 import {
@@ -97,7 +99,7 @@ export function shouldAutoConnectOnStartup(config: GlobalConfig): boolean {
  * 返回是否真的删干净：ENOENT 本来就没有缓存，算成功；其余错误（Windows 上
  * 文件被其它进程抱着时 EPERM/EBUSY 很常见）记录到 console 并返回 false，
  * 让调用方（Task 3 的 reset 路由）能区分“已重置”和“没删掉”。
- * 之前返回 void 吐掉所有错误 → reset 永远回 200，实际 apiKey 还在盘上，
+ * 之前返回 void 吐掉所有错误 → reset 永远回 200，旧缓存仍在盘上，
  * 下次进程启动又把用户刚删的配置回填。
  */
 export function deleteRuntimeConfig(): boolean {

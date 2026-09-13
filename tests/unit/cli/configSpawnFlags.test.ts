@@ -47,6 +47,16 @@ describe('mergeSpawnFlagsFromConfig', () => {
     assert.ok(merged.includes('--console-port=9000'));
   });
 
+  it('does not let a space-form argv value flag silently drop the config value', () => {
+    // `--browserUrl http://x` 不是 `--flag=value` 形态，spawnFlagsFromArgv 不会
+    // 采纳它；此时不应连配置文件里的 browserUrl 一起丢掉。
+    const merged = mergeSpawnFlagsFromConfig(
+      ['--browserUrl', 'http://127.0.0.1:9999'],
+      {browserUrl: 'http://127.0.0.1:9222'},
+    );
+    assert.ok(merged.includes('--browserUrl=http://127.0.0.1:9222'));
+  });
+
   it('ignores config keys with falsy string values', () => {
     const merged = mergeSpawnFlagsFromConfig([], {
       headless: 'false',

@@ -10,6 +10,8 @@
  * 而不是解析命令段之后的 args。
  */
 
+import type {CliConfig} from './daemonClient.js';
+
 /** spawn detached daemon 时允许透传给 worker 的 flag 白名单 */
 export const DAEMON_SPAWN_FLAGS = [
   '--no-console',
@@ -99,16 +101,17 @@ export function spawnFlagsFromArgv(argv: readonly string[]): string[] {
 }
 
 /** 配置文件可下发的 spawn 相关键（值均为字符串，布尔以 'true'/'false' 存储） */
-export interface CliSpawnConfig {
-  headless?: string;
-  cloak?: string;
-  jsStealth?: string;
-  fullStealthArgs?: string;
-  minimalStealth?: string;
-  browserUrl?: string;
-  wsEndpoint?: string;
-  executablePath?: string;
-}
+export type CliSpawnConfig = Pick<
+  CliConfig,
+  | 'headless'
+  | 'cloak'
+  | 'jsStealth'
+  | 'fullStealthArgs'
+  | 'minimalStealth'
+  | 'browserUrl'
+  | 'wsEndpoint'
+  | 'executablePath'
+>;
 
 const CONFIG_BOOL_TO_FLAG: Record<string, string> = {
   headless: '--headless',
@@ -133,7 +136,9 @@ export function mergeSpawnFlagsFromConfig(
   config: CliSpawnConfig,
 ): string[] {
   const merged = spawnFlagsFromArgv(argv);
-  const argvFlagNames = new Set(argv.map(arg => arg.split('=')[0]));
+  // 只抑制「确已被 spawnFlagsFromArgv 采纳」的 flag：空格形态的带值 flag
+  // （`--browserUrl http://x`）不会被采纳，此时不应连配置文件的值一起丢。
+  const argvFlagNames = new Set(merged.map(arg => arg.split('=')[0]));
 
   for (const [key, flag] of Object.entries(CONFIG_BOOL_TO_FLAG)) {
     if (

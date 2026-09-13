@@ -80,6 +80,9 @@ export abstract class PageCollector<T extends {stableId: number}> {
     // CDP Page.navigatedWithinDocument 与 framenavigated 在同一事件循环
     // tick 内先后到达（实测 0ms），因此用 setImmediate 延迟分割，
     // nwid 到达则取消（跨文档导航从不发 nwid）。
+    // ponytail: 依赖 nwid 在同一 tick 内先于 setImmediate 到达；若 CDP
+    // 消息落到下一个循环轮次，SPA 路由会被误判为真实导航（误分割，非数据
+    // 丢失）。升级路径：改为收到 nwid 后回滚已做的分割。
     const onFrameNavigated = (frame: Frame): void => {
       if (frame !== page.mainFrame()) return;
       // 用 -1 标记本 tick 内待决的主 frame 导航（nwid 到达会归零），
@@ -90,7 +93,10 @@ export abstract class PageCollector<T extends {stableId: number}> {
         const remaining = this.pendingSameDocNavs.get(page) ?? 0;
         if (remaining < 0) {
           this.pendingSameDocNavs.set(page, 0);
-          this.splitOnNavigation(page);
+          // 页面可能已 detach/close；再确认一次，避免对已注销页面分割。
+          if (this.storage.has(page)) {
+            this.splitOnNavigation(page);
+          }
         }
       });
     };
@@ -102,7 +108,7 @@ export abstract class PageCollector<T extends {stableId: number}> {
     void page
       .context()
       .newCDPSession(page)
-      .then(client => {
+      .then(async client => {
         // Page 在会话解析前已 detach/close：此时 WeakMap 已清空，
         // 晚到的回调若不检查会存入永不回收的会话。直接丢弃并断开。
         if (!this.storage.has(page)) {
@@ -110,7 +116,24 @@ export abstract class PageCollector<T extends {stableId: number}> {
           return;
         }
         this.cdpSessions.set(page, client);
-        const onNwid = (): void => {
+        // 记录主 frame 的 CDP frameId：Page.navigatedWithinDocument 对每个
+        // frame 都会触发（携带 frameId），只有主 frame 的同文档导航才能
+        // 抵消主 frame 的待决分割；子 frame 的 pushState/hash 变化若被误当
+        // 抵消会吞掉真实的跨文档分割（即本次要修的历史丢失）。取不到 id 时
+        // 退化为不过滤（保守放行）。
+        let mainFrameId: string | undefined;
+        try {
+          const {frameTree} = (await client.send('Page.getFrameTree')) as {
+            frameTree?: {frame?: {id?: string}};
+          };
+          mainFrameId = frameTree?.frame?.id;
+        } catch {
+          // 忽略：无 frameId 时不做过滤
+        }
+        const onNwid = (event: {frameId?: string} = {}): void => {
+          if (mainFrameId && event.frameId && event.frameId !== mainFrameId) {
+            return;
+          }
           // 本 tick 有未决导航（值为负）则归零，取消其分割；否则无害。
           const pending = this.pendingSameDocNavs.get(page) ?? 0;
           if (pending < 0) {
@@ -192,6 +215,19 @@ export abstract class PageCollector<T extends {stableId: number}> {
       this.context.off('page', this.contextPageHandler);
     }
     this.contextPageHandler = null;
+    // 重连路径（旧 context → dispose → 新 context）必须逐页解挂，
+    // 否则旧页面的 CDP 会话与监听器会一直留到页面自身关闭。
+    if (this.context) {
+      let pages: Page[] = [];
+      try {
+        pages = this.context.pages();
+      } catch {
+        // context 已关闭
+      }
+      for (const page of pages) {
+        this.detachFromPage(page);
+      }
+    }
     this.context = null;
     // WeakMap 条目会在 Page GC 时自动清理
   }

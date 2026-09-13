@@ -219,7 +219,7 @@ export function cliConfigPath(): string {
   return path.join(proxyDir, 'config.json');
 }
 
-export function loadCliConfig(): {
+export interface CliConfig {
   workerEntry?: string;
   headless?: string;
   cloak?: string;
@@ -229,11 +229,13 @@ export function loadCliConfig(): {
   browserUrl?: string;
   wsEndpoint?: string;
   executablePath?: string;
-} {
+}
+
+export function loadCliConfig(): CliConfig {
   try {
     const parsed = JSON.parse(fs.readFileSync(cliConfigPath(), 'utf-8'));
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      return parsed as {workerEntry?: string};
+      return parsed as CliConfig;
     }
   } catch {
     // 无配置文件或损坏 → 视为空
