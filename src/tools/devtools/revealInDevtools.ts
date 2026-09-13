@@ -87,11 +87,10 @@ export const revealInDevtools = defineTool({
             contentColor: {r: 111, g: 168, b: 220, a: 1},
           },
         });
-        setTimeout(() => {
-          void withCdpSession(page, c => c.send('Overlay.hideHighlight')).catch(
-            () => undefined,
-          );
-        }, durationMs).unref?.();
+        // Overlay highlight 状态随 CDP session 存亡，必须在同一 session 内
+        // 等待后主动 hide，否则 session detach 会让高亮立即消失。
+        await new Promise(resolve => setTimeout(resolve, durationMs));
+        await client.send('Overlay.hideHighlight');
       });
 
       response.setStructuredContent({

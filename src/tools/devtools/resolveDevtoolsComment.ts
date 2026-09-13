@@ -17,7 +17,7 @@ import {defineTool} from '../ToolDefinition.js';
 export const resolveDevtoolsComment = defineTool({
   name: 'resolve_devtools_comment',
   description:
-    '向 DevTools 评论线程追加回复并标记已解决（CD4A）。当前 DevTools 前端未内置桥接，返回不支持提示。',
+    '向 DevTools 评论线程追加回复并标记已解决（CD4A）。当前 DevTools 前端未内置桥接，调用将抛出 NATIVE_TOOL_MISSING 提示。',
   annotations: {
     title: '解决DevTools评论',
     category: ToolCategory.DEBUGGING,

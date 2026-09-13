@@ -23,7 +23,7 @@ const CD4A_BRIDGE_MISSING_MESSAGE =
 export const getDevtoolsComments = defineTool({
   name: 'get_devtools_comments',
   description:
-    '读取 DevTools 窗口中针对当前页面的用户评论线程（CD4A）。当前 DevTools 前端未内置 CD4A 桥接，返回不支持提示。',
+    '读取 DevTools 窗口中针对当前页面的用户评论线程（CD4A）。当前 DevTools 前端未内置 CD4A 桥接，调用将抛出 NATIVE_TOOL_MISSING 提示。',
   annotations: {
     title: '读取DevTools评论',
     category: ToolCategory.DEBUGGING,

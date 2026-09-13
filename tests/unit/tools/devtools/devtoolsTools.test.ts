@@ -10,6 +10,7 @@ import {getDevtoolsComments} from '../../../../src/tools/devtools/getDevtoolsCom
 import {openDevtools} from '../../../../src/tools/devtools/openDevtools.js';
 import {resolveDevtoolsComment} from '../../../../src/tools/devtools/resolveDevtoolsComment.js';
 import {revealInDevtools} from '../../../../src/tools/devtools/revealInDevtools.js';
+import {ErrorCodes} from '../../../../src/utils/errors.js';
 
 function capture() {
   const lines: string[] = [];
@@ -46,7 +47,13 @@ describe('devtools comment stubs', () => {
           out.response as never,
           makeContext() as never,
         ),
-      /CD4A|不支持|not supported/i,
+      (err: unknown) => {
+        assert.equal(
+          (err as {code?: string}).code,
+          ErrorCodes.NATIVE_TOOL_MISSING,
+        );
+        return true;
+      },
     );
   });
 
@@ -59,7 +66,13 @@ describe('devtools comment stubs', () => {
           out.response as never,
           makeContext() as never,
         ),
-      /CD4A|不支持|not supported/i,
+      (err: unknown) => {
+        assert.equal(
+          (err as {code?: string}).code,
+          ErrorCodes.NATIVE_TOOL_MISSING,
+        );
+        return true;
+      },
     );
   });
 });
@@ -140,9 +153,6 @@ describe('reveal_in_devtools', () => {
         getSelectedPage: () => page,
       } as never,
     );
-
-    // The hide-highlight timer runs after `durationMs`; let it fire before asserting.
-    await new Promise(resolve => setTimeout(resolve, 30));
 
     const methods = calls.map(c => c.method);
     assert.ok(methods.includes('Overlay.enable'));
