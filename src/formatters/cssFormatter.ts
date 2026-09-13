@@ -88,7 +88,8 @@ function markStatuses(rules: CssRuleReport[]): void {
   ];
   const seen = new Set<string>();
   for (const rule of byPriority) {
-    for (const p of rule.properties) {
+    // 规则内部后声明的胜出，倒序扫描使最后一条声明先被认领为 active。
+    for (const p of [...rule.properties].reverse()) {
       if (seen.has(p.name)) {
         p.status = 'overloaded';
       } else {
@@ -134,9 +135,7 @@ export function formatMatchedStyles(
   }
   for (const pseudo of raw.pseudoElements ?? []) {
     for (const match of pseudo.matches ?? []) {
-      const report = ruleToReport(match, 'pseudo');
-      report.selector = `${report.selector}`; // selector text already includes ::pseudo
-      rules.push(report);
+      rules.push(ruleToReport(match, 'pseudo'));
     }
   }
   for (const inh of raw.inherited ?? []) {

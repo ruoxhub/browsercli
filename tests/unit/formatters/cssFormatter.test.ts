@@ -66,6 +66,20 @@ describe('formatMatchedStyles', () => {
     );
   });
 
+  it('marks the last duplicate declaration in a rule active', () => {
+    const raw = {
+      matchedCSSRules: [
+        rule('.a', [prop('padding', '1px'), prop('padding', '2px')]),
+      ],
+    };
+    const report = formatMatchedStyles(raw, {elementSelector: '.a'});
+    const props = report.rules[0]!.properties;
+    const last = props.find(p => p.name === 'padding' && p.value === '2px')!;
+    const first = props.find(p => p.name === 'padding' && p.value === '1px')!;
+    assert.ok(last.status === 'active');
+    assert.ok(first.status === 'overloaded');
+  });
+
   it('active/overloaded accounts for inline style having top priority', () => {
     const raw = {
       inlineStyle: {
@@ -159,7 +173,7 @@ describe('formatMatchedStyles', () => {
     assert.equal(p0.totalRules, 3);
   });
 
-  it('omits user-agent rules from the paginated report only when requested', () => {
+  it('includes user-agent rules by default', () => {
     // baseline: user-agent rules ARE included (they explain default styling)
     const raw = {
       matchedCSSRules: [
