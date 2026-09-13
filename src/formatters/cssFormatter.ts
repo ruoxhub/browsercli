@@ -76,18 +76,12 @@ function dedupeProperties(props: RawCssProperty[]): CssPropertyLine[] {
   }));
 }
 
-function markStatuses(rules: CssRuleReport[]): void {
-  // 优先级从高到低：inline > matched（CDP 升序返回，靠后的规则胜出）
-  // > pseudo > inherited。按此顺序首见者为 active，其余为 overloaded；
-  // 直接对 rules 倒序扫会把 inline（固定排在数组最前）误判为最低优先级。
-  const byPriority = [
-    ...rules.filter(r => r.type === 'inline'),
-    ...rules.filter(r => r.type === 'matched').reverse(),
-    ...rules.filter(r => r.type === 'pseudo').reverse(),
-    ...rules.filter(r => r.type === 'inherited').reverse(),
-  ];
-  const seen = new Set<string>();
-  for (const rule of byPriority) {
+/**
+ * 按已排好优先级（高 → 低）的规则列表标注 active/overloaded。
+ * 传入独立的 seen 集合，使伪元素等不同层叠组互不干扰。
+ */
+function markCascade(rules: CssRuleReport[], seen: Set<string>): void {
+  for (const rule of rules) {
     // 规则内部后声明的胜出，倒序扫描使最后一条声明先被认领为 active。
     for (const p of [...rule.properties].reverse()) {
       if (seen.has(p.name)) {
@@ -119,10 +113,9 @@ export function formatMatchedStyles(
   raw: RawMatchedStyles,
   options: {elementSelector: string; pageSize?: number; pageIdx?: number},
 ): CssStylesReport {
-  const rules: CssRuleReport[] = [];
-
+  const inlineRules: CssRuleReport[] = [];
   if (raw.inlineStyle) {
-    rules.push({
+    inlineRules.push({
       type: 'inline',
       selector: 'inline style',
       origin: 'inline',
@@ -130,24 +123,38 @@ export function formatMatchedStyles(
       properties: dedupeProperties(raw.inlineStyle.cssProperties),
     });
   }
-  for (const entry of raw.matchedCSSRules ?? []) {
-    rules.push(ruleToReport(entry, 'matched'));
-  }
-  for (const pseudo of raw.pseudoElements ?? []) {
-    for (const match of pseudo.matches ?? []) {
-      rules.push(ruleToReport(match, 'pseudo'));
-    }
-  }
-  for (const inh of raw.inherited ?? []) {
-    for (const entry of inh.matchedCSSRules ?? []) {
-      rules.push(ruleToReport(entry, 'inherited'));
-    }
-  }
+  const matchedRules = (raw.matchedCSSRules ?? []).map(entry =>
+    ruleToReport(entry, 'matched'),
+  );
+  const pseudoGroups = (raw.pseudoElements ?? []).map(pseudo =>
+    (pseudo.matches ?? []).map(match => ruleToReport(match, 'pseudo')),
+  );
+  // inherited[] 按最近祖先优先排列（immediate parent 在 index 0），
+  // 组内 matchedCSSRules 仍为 CDP 升序（后者胜出）。
+  const inheritedGroups = (raw.inherited ?? []).map(inh =>
+    (inh.matchedCSSRules ?? []).map(entry => ruleToReport(entry, 'inherited')),
+  );
 
-  // active/overloaded 判定：inline 优先，其次按 CDP 的升序 cascade 顺序。
-  // 注意 !important 跨规则的完整模拟交由 CDP 的排序保证——本格式化器
-  // 只负责标注"哪些声明最终没有生效"。
-  markStatuses(rules);
+  // 扁平输出保持 CDP payload 顺序：inline → matched → pseudo → inherited。
+  const rules: CssRuleReport[] = [
+    ...inlineRules,
+    ...matchedRules,
+    ...pseudoGroups.flat(),
+    ...inheritedGroups.flat(),
+  ];
+
+  // 宿主层叠：inline > matched（升序，后者胜）> inherited
+  //（按祖先由近到远，组内升序）。
+  const seen = new Set<string>();
+  markCascade(inlineRules, seen);
+  markCascade([...matchedRules].reverse(), seen);
+  for (const group of inheritedGroups) {
+    markCascade([...group].reverse(), seen);
+  }
+  // 伪元素是独立元素，各自使用独立的 seen 集合。
+  for (const group of pseudoGroups) {
+    markCascade([...group].reverse(), new Set<string>());
+  }
 
   const totalRules = rules.length;
   const pageSize = options.pageSize;

@@ -103,6 +103,12 @@ export abstract class PageCollector<T extends {stableId: number}> {
       .context()
       .newCDPSession(page)
       .then(client => {
+        // Page 在会话解析前已 detach/close：此时 WeakMap 已清空，
+        // 晚到的回调若不检查会存入永不回收的会话。直接丢弃并断开。
+        if (!this.storage.has(page)) {
+          void client.detach().catch(() => undefined);
+          return;
+        }
         this.cdpSessions.set(page, client);
         const onNwid = (): void => {
           // 本 tick 有未决导航（值为负）则归零，取消其分割；否则无害。

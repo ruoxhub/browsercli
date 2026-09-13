@@ -17,6 +17,7 @@ function makePage() {
   const pageListeners = new Map<string, (...args: unknown[]) => void>();
   const onceListeners = new Map<string, (...args: unknown[]) => void>();
   const cdpListeners = new Map<string, (event: unknown) => void>();
+  const detachCalls: number[] = [];
   const mainFrame = {frameId: 'main'};
   const page = {
     mainFrame: () => mainFrame,
@@ -39,7 +40,9 @@ function makePage() {
           sent.push(method);
           return {};
         },
-        detach: async () => undefined,
+        detach: async () => {
+          detachCalls.push(1);
+        },
       }),
     }),
   };
@@ -48,7 +51,16 @@ function makePage() {
     pageListeners.get('framenavigated')?.(frame);
   const emitNwid = (frameId = 'main') =>
     cdpListeners.get('Page.navigatedWithinDocument')?.({frameId});
-  return {page, emitFrameNav, emitNwid, mainFrame, sent};
+  const closePage = () => onceListeners.get('close')?.();
+  return {
+    page,
+    emitFrameNav,
+    emitNwid,
+    closePage,
+    mainFrame,
+    sent,
+    detachCalls,
+  };
 }
 
 class TestCollector extends PageCollector<Tracked> {
@@ -139,5 +151,15 @@ describe('PageCollector SPA navigation handling', () => {
     await flush();
 
     assert.equal(collector.splitCount, 0);
+  });
+
+  it('detaches a CDP session that resolves after the page closed', async () => {
+    const {page, closePage, detachCalls} = makePage();
+    const collector = new TestCollector();
+    collector.attachToPage(page as never);
+    closePage(); // page detaches before newCDPSession resolves
+    await flush();
+    assert.equal(detachCalls.length, 1, 'late session must be detached');
+    collector.dispose();
   });
 });

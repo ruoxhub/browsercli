@@ -644,7 +644,7 @@
 
 ### `get_devtools_comments` — 读取DevTools评论
 
-**Description:** 读取 DevTools 窗口中针对当前页面的用户评论线程（CD4A）。当前 DevTools 前端未内置 CD4A 桥接，返回不支持提示。仅在 `full` profile 中暴露，默认 `workflow` profile 下不可见。
+**Description:** 读取 DevTools 窗口中针对当前页面的用户评论线程（CD4A）。当前 DevTools 前端未内置 CD4A 桥接，调用将抛出 NATIVE_TOOL_MISSING 提示。
 
 ### `get_paused_info` — 获取暂停信息
 
@@ -696,7 +696,7 @@
 
 ### `open_devtools` — 打开DevTools窗口
 
-**Description:** 为当前选中页面打开 Chrome DevTools 窗口（同一浏览器内新开 devtools:// 目标）。若浏览器以 pipe 启动（无 HTTP 调试端口），窗口不会自动附着到页面，需要人工选择 target。仅在 `full` profile 中暴露，默认 `workflow` profile 下不可见。
+**Description:** 为当前选中页面打开 Chrome DevTools 窗口（同一浏览器内新开 devtools:// 目标）。窗口默认不附着到页面，需要在 DevTools 的 target 下拉框中手动选择目标。
 
 ### `pause` — 暂停执行
 
@@ -712,7 +712,7 @@
 
 ### `resolve_devtools_comment` — 解决DevTools评论
 
-**Description:** 向 DevTools 评论线程追加回复并标记已解决（CD4A）。当前 DevTools 前端未内置桥接，返回不支持提示。仅在 `full` profile 中暴露，默认 `workflow` profile 下不可见。
+**Description:** 向 DevTools 评论线程追加回复并标记已解决（CD4A）。当前 DevTools 前端未内置桥接，调用将抛出 NATIVE_TOOL_MISSING 提示。
 
 **Parameters:**
 
@@ -725,7 +725,7 @@
 
 ### `reveal_in_devtools` — 高亮元素
 
-**Description:** 在页面上高亮指定元素（相当于 DevTools Elements 面板的节点高亮），持续指定时间后自动消失。用于逆向分析时快速定位目标 DOM。仅在 `full` profile 中暴露，默认 `workflow` profile 下不可见。
+**Description:** 在页面上高亮指定元素（相当于 DevTools Elements 面板的节点高亮），持续指定时间后自动消失。用于逆向分析时快速定位目标 DOM。
 
 **Parameters:**
 

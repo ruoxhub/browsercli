@@ -147,6 +147,59 @@ describe('formatMatchedStyles', () => {
     );
   });
 
+  it('marks a pseudo-element declaration independently of the host element', () => {
+    const raw = {
+      matchedCSSRules: [rule('.a', [prop('color', 'red')])],
+      pseudoElements: [
+        {
+          pseudoType: 'before',
+          matches: [rule('.a::before', [prop('color', 'blue')])],
+        },
+      ],
+    };
+    const report = formatMatchedStyles(raw, {elementSelector: '.a'});
+    const host = report.rules.find(r => r.type === 'matched')!;
+    const pseudo = report.rules.find(r => r.type === 'pseudo')!;
+    assert.ok(host.properties[0]!.status === 'active');
+    assert.ok(pseudo.properties[0]!.status === 'active');
+  });
+
+  it('lets the nearest ancestor win inherited declarations', () => {
+    // inherited[] is ordered nearest-ancestor first: div (parent) before body.
+    const raw = {
+      inherited: [
+        {matchedCSSRules: [rule('div', [prop('color', 'blue')])]},
+        {matchedCSSRules: [rule('body', [prop('color', 'red')])]},
+      ],
+    };
+    const report = formatMatchedStyles(raw, {elementSelector: '.a'});
+    const div = report.rules.find(r => r.selector === 'div')!;
+    const body = report.rules.find(r => r.selector === 'body')!;
+    assert.ok(div.properties[0]!.status === 'active');
+    assert.ok(body.properties[0]!.status === 'overloaded');
+  });
+
+  it('keeps distinct pseudo-elements from affecting each other', () => {
+    const raw = {
+      pseudoElements: [
+        {
+          pseudoType: 'before',
+          matches: [rule('.a::before', [prop('color', 'blue')])],
+        },
+        {
+          pseudoType: 'after',
+          matches: [rule('.a::after', [prop('color', 'green')])],
+        },
+      ],
+    };
+    const report = formatMatchedStyles(raw, {elementSelector: '.a'});
+    const pseudos = report.rules.filter(r => r.type === 'pseudo');
+    assert.equal(pseudos.length, 2);
+    for (const p of pseudos) {
+      assert.ok(p.properties[0]!.status === 'active');
+    }
+  });
+
   it('paginates rules when pageSize is given', () => {
     const raw = {
       matchedCSSRules: [
