@@ -23,5 +23,9 @@ export const manifest = {
       modulePath: './session/session_get_data.js',
       handlerName: 'sessionGetData',
     },
+    {
+      modulePath: './session/session_export.js',
+      handlerName: 'sessionExport',
+    },
   ],
 } satisfies DomainManifest;

@@ -7,6 +7,10 @@ import {Globe, Loader2, Play, Radio, Shield} from 'lucide-react';
 import {useEffect, useState} from 'react';
 
 import {CaCertModal} from '../components/proxy/CaCertModal';
+import {
+  ExportTrafficModal,
+  type ExportScope,
+} from '../components/proxy/ExportTrafficModal';
 import {ProxyControlBar} from '../components/proxy/ProxyControlBar';
 import {ProxyRequestDetail} from '../components/proxy/ProxyRequestDetail';
 import {ProxyRequestList} from '../components/proxy/ProxyRequestList';
@@ -20,6 +24,12 @@ import {useProxyStore} from '../stores/proxy';
 
 export default function ProxyPage() {
   const [caModalOpen, setCaModalOpen] = useState(false);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [exportInitialScope, setExportInitialScope] =
+    useState<ExportScope>('all');
+  const [exportFilteredIds, setExportFilteredIds] = useState<
+    string[] | undefined
+  >(undefined);
   const [loadingMitm, setLoadingMitm] = useState(false);
   // 细粒度订阅：页面自身只依赖稳定 action 与低频状态。
   const setStatus = useProxyStore(s => s.setStatus);
@@ -164,14 +174,31 @@ export default function ProxyPage() {
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-[var(--color-bg-primary)]">
       {/* Top Control Bar */}
-      <ProxyControlBar onOpenCaModal={() => setCaModalOpen(true)} />
+      <ProxyControlBar
+        onOpenCaModal={() => setCaModalOpen(true)}
+        onOpenExport={() => {
+          setExportInitialScope(
+            useProxyStore.getState().selectedIds.length > 0
+              ? 'selected'
+              : 'all',
+          );
+          setExportFilteredIds(undefined);
+          setExportModalOpen(true);
+        }}
+      />
 
       {/* Main Split Pane Content */}
       {anySourceOn ? (
         <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden divide-y md:divide-y-0 md:divide-x divide-[var(--color-border-default)]">
           {/* Left Pane: Request List (40% - 45%) */}
           <div className="w-full md:w-[42%] lg:w-[40%] xl:w-[38%] h-1/2 md:h-full flex flex-col overflow-hidden">
-            <ProxyRequestList />
+            <ProxyRequestList
+              onOpenExport={(scope, visibleIds) => {
+                setExportInitialScope(scope);
+                setExportFilteredIds(visibleIds);
+                setExportModalOpen(true);
+              }}
+            />
           </div>
 
           {/* Right Pane: Request Detail (58% - 60%) */}
@@ -290,6 +317,15 @@ export default function ProxyPage() {
       <CaCertModal
         isOpen={caModalOpen}
         onClose={() => setCaModalOpen(false)}
+      />
+
+      {/* Traffic Export Modal */}
+      <ExportTrafficModal
+        isOpen={exportModalOpen}
+        onClose={() => setExportModalOpen(false)}
+        initialScope={exportInitialScope}
+        filteredCount={exportFilteredIds?.length}
+        filteredIds={exportFilteredIds}
       />
     </div>
   );

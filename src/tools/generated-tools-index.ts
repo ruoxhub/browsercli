@@ -606,6 +606,10 @@ export const GENERATED_TOOL_REGISTRY = [
     handlerName: 'sessionGetData',
   },
   {
+    modulePath: './session/session_export.js',
+    handlerName: 'sessionExport',
+  },
+  {
     modulePath: './stealth/stealth.js',
     handlerName: 'setUserAgent',
   },

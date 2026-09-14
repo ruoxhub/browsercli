@@ -76,23 +76,3 @@ export function resolveDefaultEnvPath(moduleUrl: string): string {
 export function resolveDefaultSessionDbFile(): string {
   return path.join(os.homedir(), '.proxycli', 'cache', 'reverser.db');
 }
-
-function quoteShellArg(value: string): string {
-  if (/^[A-Za-z0-9_./:=@+-]+$/.test(value)) {
-    return value;
-  }
-  return JSON.stringify(value);
-}
-
-export function buildLocalCliCommand(
-  moduleUrl: string,
-  args: string[],
-): string {
-  const cliEntry = path.join(
-    resolvePackageRoot(moduleUrl),
-    'build',
-    'src',
-    'index.js',
-  );
-  return ['node', cliEntry, ...args].map(quoteShellArg).join(' ');
-}

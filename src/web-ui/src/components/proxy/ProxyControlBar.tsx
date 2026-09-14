@@ -6,6 +6,7 @@
 import {
   ArrowDown,
   ChevronDown,
+  Download,
   Filter,
   Globe,
   Loader2,
@@ -25,6 +26,7 @@ import {LocalAppsControl} from './LocalAppsControl';
 
 interface ProxyControlBarProps {
   onOpenCaModal: () => void;
+  onOpenExport?: () => void;
 }
 
 const METHODS = [
@@ -40,6 +42,7 @@ const METHODS = [
 
 export const ProxyControlBar: React.FC<ProxyControlBarProps> = ({
   onOpenCaModal,
+  onOpenExport,
 }) => {
   const status = useProxyStore(s => s.status);
   const autoScroll = useProxyStore(s => s.autoScroll);
@@ -318,6 +321,20 @@ export const ProxyControlBar: React.FC<ProxyControlBarProps> = ({
               className={autoScroll ? 'animate-bounce shrink-0' : 'shrink-0'}
             />
             <span>自动滚动</span>
+          </button>
+
+          {/* 导出流量 */}
+          <button
+            onClick={onOpenExport}
+            disabled={totalRequests === 0}
+            className="h-8 flex items-center gap-1.5 px-2.5 rounded-lg bg-[var(--color-bg-tertiary)] border border-[var(--color-border-default)] text-xs font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)] hover:border-[var(--color-accent)]/50 transition-all shrink-0 whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            title="导出当前抓包流量 (HAR / JSON / cURL)"
+          >
+            <Download
+              size={13}
+              className="text-sky-400 shrink-0"
+            />
+            <span>导出</span>
           </button>
 
           {/* 清空请求 */}

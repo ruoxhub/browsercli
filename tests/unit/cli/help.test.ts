@@ -103,6 +103,14 @@ describe('help', () => {
       assert.ok(result!.includes('status'));
     });
 
+    it('returns help for web command', () => {
+      const result = generateCommandHelp('web');
+      assert.ok(result);
+      assert.ok(result!.includes('web [start]'));
+      assert.ok(result!.includes('web status'));
+      assert.ok(result!.includes('web stop'));
+    });
+
     it('returns null for removed commands', () => {
       assert.strictEqual(generateCommandHelp('start'), null);
       assert.strictEqual(generateCommandHelp('stop'), null);

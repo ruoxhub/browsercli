@@ -999,7 +999,7 @@ export class BrowserManager {
   }
 
   private async waitForBrowser(port: number): Promise<void> {
-    const timeoutMs = this.config.waitForBrowserTimeoutMs ?? 5000;
+    const timeoutMs = this.config.waitForBrowserTimeoutMs ?? 15000;
     const pollMs = this.config.waitForBrowserPollMs ?? 500;
     await waitForBrowserReady(port, timeoutMs, pollMs);
   }

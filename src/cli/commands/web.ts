@@ -8,22 +8,28 @@ import {AxiError} from 'axi-sdk-js';
 import type {AxiCliCommand} from 'axi-sdk-js';
 
 import {getBoolFlag, parseArgs} from '../args-parser.js';
-import {ensureDaemon} from '../daemonClient.js';
+import {ensureDaemon, stopSession} from '../daemonClient.js';
 import {openInBrowser} from '../open-browser.js';
 import {successOutput} from '../output.js';
-import {computeClientInfo, loadSession} from '../sessionPaths.js';
+import {
+  computeClientInfo,
+  loadSession,
+  type SessionConfig,
+} from '../sessionPaths.js';
 import type {WorkerContext} from '../types.js';
 
 import {probeSession} from './sessions.js';
 
 export interface WebCommandDeps {
   openBrowser?: (url: string) => boolean;
+  stopSession?: (cfg: SessionConfig, daemonDir?: string) => Promise<void>;
 }
 
 export function createWebCommand(
   deps: WebCommandDeps = {},
 ): AxiCliCommand<WorkerContext> {
   const openBrowser = deps.openBrowser ?? openInBrowser;
+  const stopSessionFn = deps.stopSession ?? stopSession;
 
   return async (args, ctx) => {
     if (!ctx) throw new AxiError('内部错误：缺少会话上下文', 'INTERNAL');
@@ -31,9 +37,16 @@ export function createWebCommand(
     const parsed = parseArgs(args);
     const sub = parsed.positionals[0]?.toLowerCase();
 
-    if (sub && sub !== 'status' && sub !== 'open' && sub !== 'start') {
+    if (
+      sub &&
+      sub !== 'status' &&
+      sub !== 'stop' &&
+      sub !== 'close' &&
+      sub !== 'open' &&
+      sub !== 'start'
+    ) {
       throw new AxiError(`未知子命令：${sub}`, 'VALIDATION_ERROR', [
-        '用法：proxycli web [status] [--port=<port>] [--no-open] [--json]',
+        '用法：proxycli web [status|stop] [--port=<port>] [--no-open] [--json]',
       ]);
     }
 
@@ -104,6 +117,55 @@ export function createWebCommand(
         url,
         pid,
         message: `Web 控制台运行中: ${url} (pid=${pid})`,
+      });
+    }
+
+    if (sub === 'stop' || sub === 'close') {
+      if (!isRunning || !cfg) {
+        if (cfg) {
+          await stopSessionFn(cfg, daemonDir).catch(() => undefined);
+        }
+        if (json) {
+          return successOutput({
+            command: 'web stop',
+            session: ctx.session,
+            stopped: false,
+            online: false,
+            message: `会话 ${ctx.session} 的 Web 控制台未运行`,
+          });
+        }
+        return successOutput({
+          command: 'web stop',
+          session: ctx.session,
+          stopped: false,
+          online: false,
+          message: `会话 ${ctx.session} 的 Web 控制台未运行`,
+        });
+      }
+
+      const pid = cfg.pid;
+      const port = cfg.consolePort ?? null;
+      await stopSessionFn(cfg, daemonDir);
+
+      if (json) {
+        return successOutput({
+          command: 'web stop',
+          session: ctx.session,
+          pid,
+          port,
+          stopped: true,
+          online: false,
+        });
+      }
+
+      return successOutput({
+        command: 'web stop',
+        session: ctx.session,
+        pid,
+        port,
+        stopped: true,
+        online: false,
+        message: `Web 控制台已停止 (session=${ctx.session}, pid=${pid})`,
       });
     }
 

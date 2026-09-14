@@ -33,6 +33,10 @@ export interface ClientInfo {
 }
 
 export function computeWorkspaceDir(startDir: string): string {
+  // 显式覆盖：任意目录/会话都路由到同一个 workspace（共享同一 daemon 注册表）
+  const override =
+    process.env.PROXYCLI_WORKSPACE ?? process.env.BROWSERCLI_WORKSPACE;
+  if (override) return path.resolve(override);
   let dir = path.resolve(startDir);
   for (let i = 0; i < 10; i++) {
     if (

@@ -3,7 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import {Globe, Inbox} from 'lucide-react';
+import {Download, Globe, Inbox} from 'lucide-react';
 import React, {memo, useEffect, useMemo, useRef, useState} from 'react';
 
 import type {
@@ -13,10 +13,13 @@ import type {
 import {api} from '../../lib/api';
 import {compileFlowFilter, hasDeepFilter} from '../../lib/flowFilter';
 import {useProxyStore} from '../../stores/proxy';
+
 import {parseClientProcess} from './clientProcess';
+import type {ExportScope} from './ExportTrafficModal';
 
 interface ProxyRequestListProps {
   onSelect?: (id: string) => void;
+  onOpenExport?: (scope: ExportScope, visibleIds?: string[]) => void;
 }
 
 /** 与服务端 LIST_MAX_LIMIT 对齐：服务端过滤结果须覆盖其权威上限。 */
@@ -212,6 +215,7 @@ function shouldIncludeRequest(
 
 export const ProxyRequestList: React.FC<ProxyRequestListProps> = ({
   onSelect,
+  onOpenExport,
 }) => {
   // 字段级订阅：任何单一字段变化都只触发本组件渲染，而非无选择器订阅时的
   // 「任何一次 requests/status/filter 喷发都全量重渲染」。
@@ -385,7 +389,7 @@ export const ProxyRequestList: React.FC<ProxyRequestListProps> = ({
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-[var(--color-bg-primary)]/50">
-      {/* 多选工具条：全选当前过滤结果 / 清空选择 */}
+      {/* 多选工具条：全选当前过滤结果 / 导出 / 清空选择 */}
       <div className="shrink-0 flex items-center gap-2 px-3.5 py-1.5 border-b border-[var(--color-border-muted)] bg-[var(--color-bg-secondary)]/40 text-[11px]">
         <label className="flex items-center gap-1.5 cursor-pointer select-none">
           <input
@@ -400,18 +404,47 @@ export const ProxyRequestList: React.FC<ProxyRequestListProps> = ({
           />
           <span className="text-[var(--color-text-muted)]">全选</span>
         </label>
-        {selectedIds.length > 0 && (
+        {selectedIds.length > 0 ? (
           <>
-            <span className="text-[var(--color-accent)] font-mono">
+            <span className="text-[var(--color-accent)] font-mono font-medium">
               已选 {selectedIds.length} 条
             </span>
-            <button
-              onClick={clearSelection}
-              className="ml-auto text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
-            >
-              清空选择
-            </button>
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => onOpenExport?.('selected')}
+                className="h-5 flex items-center gap-1 px-2 rounded bg-[var(--color-accent)]/15 border border-[var(--color-accent)]/35 text-[var(--color-accent)] hover:bg-[var(--color-accent)]/25 text-[10px] font-semibold transition-all cursor-pointer shadow-sm"
+                title="导出勾选的请求"
+              >
+                <Download size={10} />
+                <span>导出 ({selectedIds.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={clearSelection}
+                className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors cursor-pointer text-[10px]"
+              >
+                清空选择
+              </button>
+            </div>
           </>
+        ) : (
+          visibleIdsCount > 0 && (
+            <button
+              type="button"
+              onClick={() =>
+                onOpenExport?.(
+                  'filtered',
+                  filteredRequests.map(r => r.id),
+                )
+              }
+              className="ml-auto flex items-center gap-1 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors cursor-pointer text-[10px]"
+              title="导出当前列表显示的请求"
+            >
+              <Download size={10} />
+              <span>导出当前列表</span>
+            </button>
+          )
         )}
       </div>
 

@@ -11,6 +11,8 @@ import {AxiError} from 'axi-sdk-js';
 import {parseArgs} from '../../../src/cli/args-parser.js';
 import {buildToolArgs} from '../../../src/cli/commands/shared/tool-args.js';
 import {
+  BROWSER_CONNECT_POLL_INTERVAL_MS,
+  BROWSER_CONNECT_WAIT_TIMEOUT_MS,
   BUSY_RETRY_DELAYS_MS,
   invokeWithBusyRetry,
   toolDispatcherCommand,
@@ -91,6 +93,9 @@ class FakeDaemon implements DaemonLike {
   eventCallbacks = 0;
   invokeError?: Error;
   busyFailures = 0;
+  busyMessage = '[WORKER_BUSY] worker is busy';
+  /** 按序消耗的错误消息；为空时回退到 busyMessage。 */
+  busyMessages: string[] = [];
 
   constructor(
     private readonly tools: ToolMeta[],
@@ -108,7 +113,7 @@ class FakeDaemon implements DaemonLike {
     if (method === 'tool.invoke') {
       if (this.busyFailures > 0) {
         this.busyFailures--;
-        throw new Error('[WORKER_BUSY] worker is busy');
+        throw new Error(this.busyMessages.shift() ?? this.busyMessage);
       }
       if (this.invokeError) throw this.invokeError;
       return this.result as T;
@@ -405,6 +410,59 @@ describe('tool-dispatcher (daemon socket)', () => {
 describe('invokeWithBusyRetry', () => {
   it('uses the documented [200, 500, 1000] backoff sequence', () => {
     assert.deepStrictEqual(BUSY_RETRY_DELAYS_MS, [200, 500, 1000]);
+  });
+
+  it('uses 15s budget for browser connect busy timeout', () => {
+    assert.strictEqual(BROWSER_CONNECT_WAIT_TIMEOUT_MS, 15_000);
+    assert.strictEqual(BROWSER_CONNECT_POLL_INTERVAL_MS, 500);
+  });
+
+  it('retries browser connect WORKER_BUSY within timeout and succeeds', async () => {
+    const client = new FakeDaemon(SAMPLE_TOOLS, {ok: true});
+    client.busyFailures = 3;
+    client.busyMessage = '[WORKER_BUSY] worker is busy with browser connect';
+    const result = await invokeWithBusyRetry(
+      client,
+      'my_tool',
+      {},
+      BUSY_RETRY_DELAYS_MS,
+      1000,
+      1,
+    );
+    assert.deepStrictEqual(result, {ok: true});
+    const invokes = client.calls.filter(c => c.method === 'tool.invoke');
+    assert.strictEqual(invokes.length, 4);
+  });
+
+  it('gives up on browser connect WORKER_BUSY when connect timeout exceeded', async () => {
+    const client = new FakeDaemon(SAMPLE_TOOLS, {ok: true});
+    client.busyFailures = 100;
+    client.busyMessage = '[WORKER_BUSY] worker is busy with browser connect';
+    await assert.rejects(
+      () =>
+        invokeWithBusyRetry(client, 'my_tool', {}, BUSY_RETRY_DELAYS_MS, 10, 5),
+      /worker is busy with browser connect/,
+    );
+  });
+
+  it('does not let browser-connect polls consume the busy backoff budget', async () => {
+    const client = new FakeDaemon(SAMPLE_TOOLS, {ok: true});
+    client.busyFailures = 4;
+    client.busyMessages = [
+      '[WORKER_BUSY] worker is busy with browser connect',
+      '[WORKER_BUSY] worker is busy with browser connect',
+      '[WORKER_BUSY] worker is busy with browser connect',
+      '[WORKER_BUSY] worker is busy',
+    ];
+    const result = await invokeWithBusyRetry(
+      client,
+      'my_tool',
+      {},
+      [1, 1, 1],
+      1000,
+      1,
+    );
+    assert.deepStrictEqual(result, {ok: true});
   });
 
   it('retries WORKER_BUSY then returns the result', async () => {

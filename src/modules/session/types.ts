@@ -124,4 +124,9 @@ export interface RequestFilter {
   sources?: CaptureSource[];
   urlFilter?: string;
   filter?: string;
+  /**
+   * 指定请求 ID 集合。空数组等同于不过滤；超过 500 个按 500 分块拼 SQL，
+   * 结果顺序仍按 sequence ASC，不跟随 ids 传入顺序。
+   */
+  ids?: string[];
 }

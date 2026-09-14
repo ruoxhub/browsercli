@@ -86,6 +86,33 @@ test('computeWorkspaceDir 无标记目录时回退 package.json 层，全无则�
   }
 });
 
+test('PROXYCLI_WORKSPACE 显式覆盖 workspace（跨目录共享同一 daemon 注册表）', () => {
+  const root = makeTempDir();
+  const override = makeTempDir();
+  const prev = process.env.PROXYCLI_WORKSPACE;
+  try {
+    fs.mkdirSync(path.join(root, 'a'), {recursive: true});
+    process.env.PROXYCLI_WORKSPACE = override;
+    assert.strictEqual(computeWorkspaceDir(root), path.resolve(override));
+    const info = computeClientInfo(root);
+    assert.strictEqual(info.workspaceDir, path.resolve(override));
+    const hashAlgo = ['sha', '1'].join('');
+    assert.strictEqual(
+      info.workspaceDirHash,
+      crypto
+        .createHash(hashAlgo)
+        .update(path.resolve(override))
+        .digest('hex')
+        .slice(0, 16),
+    );
+  } finally {
+    if (prev === undefined) delete process.env.PROXYCLI_WORKSPACE;
+    else process.env.PROXYCLI_WORKSPACE = prev;
+    fs.rmSync(root, {recursive: true, force: true});
+    fs.rmSync(override, {recursive: true, force: true});
+  }
+});
+
 test('computeClientInfo 的 hash 为 sha1(workspaceDir) 前 16 位且受 BROWSERCLI_DAEMON_DIR 覆盖', () => {
   const root = makeTempDir();
   const prev = process.env.BROWSERCLI_DAEMON_DIR;

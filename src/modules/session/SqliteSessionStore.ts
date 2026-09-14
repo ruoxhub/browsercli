@@ -100,6 +100,29 @@ interface AiReportDbRow {
   created_at: number;
 }
 
+/**
+ * SQLite 单语句变量上限保守取 500（老版本上限 999，留出 sources/urlFilter 等
+ * 其它参数的余量）。超过则按 500 分块，用 OR 连接多个 `id IN (...)`，避免
+ * 超限时静默丢弃 id 过滤（此前 listRequestSummaries / countRequests 会返回
+ * 全量，与 getRequests 的结果分叉）。
+ */
+const MAX_ID_PARAMS = 500;
+
+function pushIdClause(
+  clauses: string[],
+  params: unknown[],
+  ids: string[] | undefined,
+): void {
+  if (!ids || ids.length === 0) return;
+  const groups: string[] = [];
+  for (let i = 0; i < ids.length; i += MAX_ID_PARAMS) {
+    const chunk = ids.slice(i, i + MAX_ID_PARAMS);
+    groups.push(`id IN (${chunk.map(() => '?').join(', ')})`);
+    params.push(...chunk);
+  }
+  clauses.push(`(${groups.join(' OR ')})`);
+}
+
 const toSession = (r: SessionDbRow): SessionRow => ({
   id: r.id,
   name: r.name,
@@ -287,6 +310,7 @@ export class SqliteSessionStore implements SessionStore {
       clauses.push('lower(url) LIKE ?');
       params.push(`%${filter.urlFilter.toLowerCase()}%`);
     }
+    pushIdClause(clauses, params, filter.ids);
 
     const rows = this.db
       .prepare(
@@ -339,6 +363,7 @@ export class SqliteSessionStore implements SessionStore {
       clauses.push('lower(url) LIKE ?');
       params.push(`%${filter.urlFilter.toLowerCase()}%`);
     }
+    pushIdClause(clauses, params, filter.ids);
 
     const limit = Math.min(
       Math.max(page.limit ?? LIST_DEFAULT_LIMIT, 1),
@@ -445,6 +470,7 @@ export class SqliteSessionStore implements SessionStore {
       clauses.push('lower(url) LIKE ?');
       params.push(`%${filter.urlFilter.toLowerCase()}%`);
     }
+    pushIdClause(clauses, params, filter.ids);
     const row = this.db
       .prepare(
         `SELECT COUNT(*) AS n FROM captured_requests WHERE ${clauses.join(' AND ')}`,

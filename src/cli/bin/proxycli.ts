@@ -24,7 +24,7 @@
  *   scaffold      创建新的逆向任务脚手架
  *   status        查看 daemon 会话状态
  *   proxy         启动交互式 MITM 代理抓包终端（REPL）或查看代理状态
- *   web           启动或在浏览器中打开 Web 控制台
+ *   web           启动、查看或停止 Web 控制台
  */
 
 import {runAxiCli} from 'axi-sdk-js';

@@ -41,13 +41,13 @@ node build/src/index.js --daemon --session default [--console-port 8765] [--no-c
 
 daemon 专属参数（`src/ipc/daemonArgs.ts`）：
 
-| 参数                  | 说明                                                           |
-| --------------------- | -------------------------------------------------------------- |
-| `--daemon`            | 进入 daemon 模式（否则是 MCP stdio 模式）                      |
-| `--session <name>`    | 会话名；缺省取 `BROWSERCLI_SESSION` 环境变量，再缺省 `default` |
-| `--no-console`        | 不启动回环 Web 控制台                                          |
-| `--console-port <p>`  | 覆盖控制台端口（空格与 `=` 两种形式均可）                      |
-| `--proxycli-daemon` | 由 CLI spawn 时自动携带；`kill-all` 靠该标记识别进程           |
+| 参数                 | 说明                                                           |
+| -------------------- | -------------------------------------------------------------- |
+| `--daemon`           | 进入 daemon 模式（否则是 MCP stdio 模式）                      |
+| `--session <name>`   | 会话名；缺省取 `BROWSERCLI_SESSION` 环境变量，再缺省 `default` |
+| `--no-console`       | 不启动回环 Web 控制台                                          |
+| `--console-port <p>` | 覆盖控制台端口（空格与 `=` 两种形式均可）                      |
+| `--proxycli-daemon`  | 由 CLI spawn 时自动携带；`kill-all` 靠该标记识别进程           |
 
 ### 会话命令
 
@@ -59,10 +59,11 @@ proxycli kill-all        # 强杀全部 proxycli daemon 进程 + 清理 stale �
 
 ## 3. 环境变量
 
-| 变量                    | 默认值         | 说明                                                               |
-| ----------------------- | -------------- | ------------------------------------------------------------------ |
-| `BROWSERCLI_DAEMON_DIR` | 平台注册表目录 | 覆盖会话注册表目录（测试隔离用）                                   |
-| `BROWSERCLI_SESSION`    | `default`      | 默认会话名                                                         |
+| 变量                    | 默认值         | 说明                                                             |
+| ----------------------- | -------------- | ---------------------------------------------------------------- |
+| `BROWSERCLI_DAEMON_DIR` | 平台注册表目录 | 覆盖会话注册表目录（测试隔离用）                                 |
+| `BROWSERCLI_SESSION`    | `default`      | 默认会话名                                                       |
+| `PROXYCLI_WORKSPACE`    | —              | 显式指定 workspaceRoot，跨目录/跨 shell 共享同一 daemon 注册表   |
 | `BROWSERCLI_ENTRY`      | —              | daemon 入口 js 路径；未设时读 `proxycli config` 的 `workerEntry` |
 
 注册表目录默认值：win32 `%LOCALAPPDATA%\proxycli\daemon`，linux
@@ -72,6 +73,15 @@ proxycli kill-all        # 强杀全部 proxycli daemon 进程 + 清理 stale �
 
 workspaceRoot 探测：从 cwd 向上最多 10 级找含 `.proxycli/` 的目录，否则找
 `package.json`，都没有用 cwd。CLI 与 daemon 两侧算法必须同步（注释互指）。
+
+覆盖：设置 `PROXYCLI_WORKSPACE`（或 `BROWSERCLI_WORKSPACE`）后跳过上面的探测，
+直接把该值当作 workspaceRoot。因此在任意目录、任意 shell 中执行都会路由到同一个
+daemon，例如：
+
+```bash
+export PROXYCLI_WORKSPACE=D:/work/Reverser-CLI
+proxycli call list_mitm_request   # 与在 D:/work/Reverser-CLI 下执行结果一致
+```
 
 ## 4. 协议速查
 

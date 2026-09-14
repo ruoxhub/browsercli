@@ -635,18 +635,6 @@ export interface ReverseTaskReadApi {
   ): Promise<Array<Record<string, unknown>>>;
 }
 
-export interface ReverseTaskState {
-  taskId: string;
-  currentStage: string;
-  status: string;
-  nextStepHint?: string;
-  successCriteria?: Record<string, unknown>;
-  currentSummary?: string;
-  signals?: Record<string, unknown>;
-  reasoning?: string[];
-  updatedAt: number;
-}
-
 // ==================== 全局类型扩展 ====================
 
 declare global {

@@ -20,6 +20,10 @@ import {buildToolArgs, TOOL_CONTROL_FLAGS} from './shared/tool-args.js';
 /** WORKER_BUSY 退避序列（ms），与旧 submit 重试语义一致 */
 export const BUSY_RETRY_DELAYS_MS = [200, 500, 1000];
 
+/** browser connect 忙时的总等待预算（ms），覆盖浏览器冷启动与 CDP 就绪 */
+export const BROWSER_CONNECT_WAIT_TIMEOUT_MS = 15_000;
+export const BROWSER_CONNECT_POLL_INTERVAL_MS = 500;
+
 /** --watch 订阅的事件频道 */
 export const WATCH_CHANNELS = [
   'tool.invoke',
@@ -32,19 +36,41 @@ function isWorkerBusyError(err: unknown): boolean {
   return err instanceof Error && /WORKER_BUSY/.test(err.message);
 }
 
+function isBrowserConnectBusyError(err: unknown): boolean {
+  return (
+    err instanceof Error &&
+    /WORKER_BUSY/.test(err.message) &&
+    /browser connect/.test(err.message)
+  );
+}
+
 /** tool.invoke + WORKER_BUSY 退避重发 */
 export async function invokeWithBusyRetry(
   client: DaemonLike,
   tool: string,
   params: Record<string, unknown>,
   delays: number[] = BUSY_RETRY_DELAYS_MS,
+  connectTimeoutMs = BROWSER_CONNECT_WAIT_TIMEOUT_MS,
+  connectPollMs = BROWSER_CONNECT_POLL_INTERVAL_MS,
 ): Promise<unknown> {
-  for (let attempt = 0; ; attempt++) {
+  const startTime = Date.now();
+  // browser-connect 轮询与 WORKER_BUSY 退避各自计数：轮询 continue 不应消耗
+  // 退避预算，否则先经历若干轮询后 attempt 超过 delays.length，退避会被整段跳过。
+  let busyAttempt = 0;
+  for (;;) {
     try {
       return await client.request('tool.invoke', {tool, params});
     } catch (err) {
-      if (attempt < delays.length && isWorkerBusyError(err)) {
-        await new Promise(r => setTimeout(r, delays[attempt]));
+      if (isBrowserConnectBusyError(err)) {
+        if (Date.now() - startTime < connectTimeoutMs) {
+          await new Promise(r => setTimeout(r, connectPollMs));
+          continue;
+        }
+        throw err;
+      }
+      if (busyAttempt < delays.length && isWorkerBusyError(err)) {
+        await new Promise(r => setTimeout(r, delays[busyAttempt]));
+        busyAttempt += 1;
         continue;
       }
       throw err;

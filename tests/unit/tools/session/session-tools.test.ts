@@ -10,6 +10,7 @@ import type {SessionRow} from '../../../../src/modules/session/types.js';
 import {getRuntime} from '../../../../src/runtime.js';
 import {ToolCategory} from '../../../../src/tools/categories.js';
 import {sessionCreate} from '../../../../src/tools/session/session_create.js';
+import {sessionExport} from '../../../../src/tools/session/session_export.js';
 import {sessionGetData} from '../../../../src/tools/session/session_get_data.js';
 import {sessionList} from '../../../../src/tools/session/session_list.js';
 
@@ -63,6 +64,14 @@ describe('session tools', () => {
       ToolCategory.NETWORK,
     );
     assert.strictEqual(sessionGetData.annotations?.readOnlyHint, true);
+
+    assert.strictEqual(sessionExport.name, 'session_export');
+    assert.strictEqual(
+      sessionExport.annotations?.category,
+      ToolCategory.NETWORK,
+    );
+    // 传入 outputPath 会写盘，必须声明为非只读。
+    assert.strictEqual(sessionExport.annotations?.readOnlyHint, false);
   });
 
   it('session_create activates session with status capturing', async () => {
@@ -228,5 +237,28 @@ describe('session tools', () => {
         );
       },
     );
+  });
+
+  it('session_export exports captured requests as HAR', async () => {
+    const capture = responseCapture();
+    await sessionExport.handler(
+      {
+        params: {
+          format: 'har',
+        },
+      },
+      capture.response as never,
+      {} as never,
+    );
+
+    const content = capture.getStructuredContent() as any;
+    assert.ok(content);
+    assert.strictEqual(content.tooltype, 'session_export');
+    assert.strictEqual(content.format, 'har');
+    assert.ok(typeof content.count === 'number');
+    assert.ok(content.filename.endsWith('.har'));
+    assert.ok(typeof content.content === 'string');
+    const parsed = JSON.parse(content.content);
+    assert.strictEqual(parsed.log.version, '1.2');
   });
 });

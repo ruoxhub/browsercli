@@ -51,6 +51,21 @@ proxycli proxy --sysproxy
 proxycli proxy status
 ```
 
+### Web Console Management
+
+To inspect requests, hooks, and browser state in the Web UI:
+
+```bash
+# Start and open Web console in default browser
+proxycli web
+
+# Check Web console running status
+proxycli web status
+
+# Stop Web console
+proxycli web stop
+```
+
 ### Worker Job Recovery & Emergency Teardown
 
 If a long-running tool call gets stuck:

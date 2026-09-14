@@ -358,4 +358,61 @@ describe('SqliteSessionStore', () => {
       manager.close();
     }
   });
+
+  it('filters requests and summaries by ids', () => {
+    const {store, manager} = makeStore();
+    try {
+      store.createSession({id: 's1', name: 'demo'});
+      for (let i = 1; i <= 5; i++) {
+        store.appendRequest(
+          makeRequestRow(`req-${i}`, 's1', i, `https://a.dev/${i}`),
+        );
+      }
+
+      const subset = store.getRequests('s1', {ids: ['req-2', 'req-4']});
+      assert.strictEqual(subset.length, 2);
+      assert.deepStrictEqual(
+        subset.map(r => r.id),
+        ['req-2', 'req-4'],
+      );
+
+      const summaries = store.listRequestSummaries('s1', {
+        ids: ['req-1', 'req-3'],
+      });
+      assert.strictEqual(summaries.length, 2);
+
+      const count = store.countRequests('s1', {ids: ['req-5']});
+      assert.strictEqual(count, 1);
+    } finally {
+      manager.close();
+    }
+  });
+
+  it('chunks id filters beyond the SQLite variable limit', () => {
+    const {store, manager} = makeStore();
+    try {
+      store.createSession({id: 's1', name: 'demo'});
+      const ids: string[] = [];
+      for (let i = 1; i <= 1201; i++) {
+        const id = `req-${i}`;
+        ids.push(id);
+        store.appendRequest(makeRequestRow(id, 's1', i, `https://a.dev/${i}`));
+      }
+      store.appendRequest(
+        makeRequestRow('other', 's1', 9999, 'https://a.dev/x'),
+      );
+
+      const subset = store.getRequests('s1', {ids});
+      assert.strictEqual(subset.length, 1201);
+      assert.ok(subset.every(r => r.id !== 'other'));
+
+      assert.strictEqual(store.countRequests('s1', {ids}), 1201);
+      assert.strictEqual(
+        store.listRequestSummaries('s1', {ids}, {limit: 2000}).length,
+        1201,
+      );
+    } finally {
+      manager.close();
+    }
+  });
 });

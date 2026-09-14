@@ -22,6 +22,16 @@ import type {
   SessionRequestDetail,
 } from './protocol';
 
+export interface ExportSessionTrafficParams {
+  format: 'har' | 'json' | 'curl';
+  ids?: string[];
+  filter?: string;
+  sources?: string[];
+  urlFilter?: string;
+  includeResponseBody?: boolean;
+  desensitize?: boolean;
+}
+
 export interface ToolSummary {
   name: string;
   description: string;
@@ -267,5 +277,70 @@ export const api = {
       '/api/session/capture-sources',
       {source, enabled},
     );
+  },
+
+  async downloadSessionTraffic(
+    params: ExportSessionTrafficParams,
+    suggestedFilename?: string,
+  ): Promise<{count: number; filename: string}> {
+    const response = await fetch('/api/session/export', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(params),
+    });
+
+    if (!response.ok) {
+      let msg = `导出失败: HTTP ${response.status}`;
+      try {
+        const errJson = (await response.json()) as {error?: {message?: string}};
+        if (errJson?.error?.message) {
+          msg = errJson.error.message;
+        }
+      } catch {
+        // ignore json parse error
+      }
+      throw new Error(msg);
+    }
+
+    const countHeader = response.headers.get('X-Export-Count');
+    const count = countHeader ? Number.parseInt(countHeader, 10) || 0 : 0;
+
+    let filename = suggestedFilename;
+    if (!filename) {
+      const disp = response.headers.get('Content-Disposition');
+      if (disp) {
+        // 优先 RFC 5987 filename*（含非 ASCII 时服务端会用它），回退普通 filename。
+        const extended = /filename\*=UTF-8''([^;]+)/i.exec(disp);
+        const plain = /filename="?([^";]+)"?/i.exec(disp);
+        const raw = extended?.[1] ?? plain?.[1];
+        if (raw) {
+          try {
+            filename = decodeURIComponent(raw);
+          } catch {
+            filename = raw;
+          }
+        }
+      }
+    }
+    if (!filename) {
+      const ext = params.format === 'curl' ? 'sh' : params.format;
+      filename = `traffic-export-${Date.now()}.${ext}`;
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    // 立即 revoke 会在部分浏览器（Firefox / 旧 Safari）中断尚未开始的下载，
+    // 延后一个宏任务再释放对象 URL。
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+
+    return {count, filename};
   },
 };

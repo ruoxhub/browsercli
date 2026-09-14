@@ -78,6 +78,24 @@ describe('computeWorkspaceDir', () => {
     const deep = deepChain(root, 12);
     assert.equal(computeWorkspaceDir(deep), deep);
   });
+
+  it('honors the PROXYCLI_WORKSPACE override', () => {
+    const root = tempDir();
+    const override = tempDir();
+    const prev = process.env.PROXYCLI_WORKSPACE;
+    process.env.PROXYCLI_WORKSPACE = override;
+    try {
+      const deep = deepChain(root, 3);
+      assert.equal(computeWorkspaceDir(deep), path.resolve(override));
+      assert.equal(
+        computeClientInfo(deep).workspaceDir,
+        path.resolve(override),
+      );
+    } finally {
+      if (prev === undefined) delete process.env.PROXYCLI_WORKSPACE;
+      else process.env.PROXYCLI_WORKSPACE = prev;
+    }
+  });
 });
 
 describe('computeClientInfo', () => {

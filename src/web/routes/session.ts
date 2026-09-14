@@ -8,6 +8,12 @@ import type {IncomingMessage, ServerResponse} from 'node:http';
 
 import type {CaptureEngine} from '../../modules/session/CaptureEngine.js';
 import type {CaptureSessionManager} from '../../modules/session/CaptureSessionManager.js';
+import {
+  buildRequestFilter,
+  EXPORT_FORMATS,
+  exportTraffic,
+  type SessionExportFormat,
+} from '../../modules/session/export.js';
 import type {SessionStore} from '../../modules/session/SessionStore.js';
 import type {CaptureSource} from '../../modules/session/types.js';
 import {sendError, sendJson, sendUnexpected} from '../middleware/error.js';
@@ -42,6 +48,42 @@ export type SessionServicesAccessor = () => SessionServices | undefined;
 const SOURCES: CaptureSource[] = ['cdp', 'proxy'];
 
 const MAX_BODY_BYTES = 1 * 1024 * 1024;
+
+/** 逗号分隔的 sources 参数 → 合法来源数组；非法 token 静默丢弃。 */
+function parseSourcesParam(raw: string | null): CaptureSource[] | undefined {
+  if (!raw) return undefined;
+  return raw
+    .split(',')
+    .map(s => s.trim())
+    .filter((s): s is CaptureSource => (SOURCES as string[]).includes(s));
+}
+
+/** 从请求体解析 sources 数组；非法 token 静默丢弃。 */
+function parseSourcesArray(raw: unknown): CaptureSource[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  return raw.filter((s): s is CaptureSource =>
+    (SOURCES as string[]).includes(s as string),
+  );
+}
+
+/** 导出响应统一头部：附件下载 + 暴露计数/格式给浏览器。 */
+function sendExportResponse(
+  res: ServerResponse,
+  result: {mimeType: string; filename: string; count: number; content: string},
+  format: SessionExportFormat,
+): void {
+  res.writeHead(200, {
+    'Content-Type': result.mimeType,
+    'Content-Disposition': `attachment; filename="${result.filename}"`,
+    // 响应体默认含未脱敏的 Cookie/Authorization，禁止中间层缓存。
+    'Cache-Control': 'no-store',
+    'X-Export-Count': String(result.count),
+    'X-Export-Format': format,
+    'Access-Control-Expose-Headers':
+      'Content-Disposition, X-Export-Count, X-Export-Format',
+  });
+  res.end(result.content);
+}
 
 function readJsonBody(req: IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
@@ -118,15 +160,7 @@ export function createSessionRoutes(
 
         try {
           const url = new URL(_req.url ?? '/', 'http://127.0.0.1');
-          const sourcesRaw = url.searchParams.get('sources');
-          const sources = sourcesRaw
-            ? (sourcesRaw
-                .split(',')
-                .map(s => s.trim())
-                .filter((s): s is CaptureSource =>
-                  (SOURCES as string[]).includes(s),
-                ) as CaptureSource[])
-            : undefined;
+          const sources = parseSourcesParam(url.searchParams.get('sources'));
 
           let badRequest = false;
           const limit = parseIntParam(url.searchParams.get('limit'), () => {
@@ -142,11 +176,11 @@ export function createSessionRoutes(
 
           const urlFilter = url.searchParams.get('urlFilter');
           const flowFilter = url.searchParams.get('filter');
-          const filter = {
-            ...(sources && sources.length > 0 ? {sources} : {}),
-            ...(urlFilter ? {urlFilter} : {}),
-            ...(flowFilter ? {filter: flowFilter} : {}),
-          };
+          const filter = buildRequestFilter({
+            sources,
+            urlFilter: urlFilter ?? undefined,
+            filter: flowFilter ?? undefined,
+          });
 
           const items = services.store.listRequestSummaries(
             session.id,
@@ -282,6 +316,140 @@ export function createSessionRoutes(
           enabled,
         );
         sendJson(res, {sources});
+      },
+    ],
+    [
+      'POST /api/session/export',
+      async (req, res) => {
+        const services = getServices();
+        const session = services?.manager.getActiveSession();
+        if (!services || !session) {
+          sendError(res, 'SESSION_UNAVAILABLE', '暂无活动抓包会话', 503);
+          return;
+        }
+
+        try {
+          const parsed = await readJsonBody(req);
+          if (
+            parsed === null ||
+            typeof parsed !== 'object' ||
+            Array.isArray(parsed)
+          ) {
+            sendError(res, 'BAD_REQUEST', '请求体必须是 JSON 对象', 400);
+            return;
+          }
+          const body = parsed as {
+            format?: string;
+            ids?: string[];
+            filter?: string;
+            sources?: string[];
+            urlFilter?: string;
+            includeResponseBody?: boolean;
+            desensitize?: boolean;
+          };
+
+          const format = (body.format || 'har') as SessionExportFormat;
+          if (!EXPORT_FORMATS.includes(format)) {
+            sendError(
+              res,
+              'BAD_REQUEST',
+              'format 必须是 har | json | curl',
+              400,
+            );
+            return;
+          }
+
+          const requestFilter = buildRequestFilter({
+            sources: parseSourcesArray(body.sources),
+            urlFilter: body.urlFilter,
+            filter: body.filter,
+            ids: Array.isArray(body.ids) ? body.ids : undefined,
+          });
+
+          const rows = services.store.getRequests(session.id, requestFilter);
+          const exportResult = exportTraffic(rows, format, {
+            includeResponseBody: body.includeResponseBody ?? true,
+            desensitize: body.desensitize ?? false,
+          });
+
+          sendExportResponse(res, exportResult, format);
+        } catch (err) {
+          if (
+            err instanceof Error &&
+            (err.message === 'PAYLOAD_TOO_LARGE' ||
+              err.message === 'INVALID_JSON')
+          ) {
+            sendError(
+              res,
+              err.message,
+              err.message === 'PAYLOAD_TOO_LARGE'
+                ? '请求体过大'
+                : '请求体不是合法 JSON',
+              400,
+            );
+            return;
+          }
+          sendUnexpected(res, err);
+        }
+      },
+    ],
+    [
+      'GET /api/session/export',
+      (_req, res) => {
+        const services = getServices();
+        const session = services?.manager.getActiveSession();
+        if (!services || !session) {
+          sendError(res, 'SESSION_UNAVAILABLE', '暂无活动抓包会话', 503);
+          return;
+        }
+
+        try {
+          const url = new URL(_req.url ?? '/', 'http://127.0.0.1');
+          const formatParam = url.searchParams.get('format') || 'har';
+          if (!EXPORT_FORMATS.includes(formatParam as SessionExportFormat)) {
+            sendError(
+              res,
+              'BAD_REQUEST',
+              'format 必须是 har | json | curl',
+              400,
+            );
+            return;
+          }
+          const format = formatParam as SessionExportFormat;
+
+          const sources = parseSourcesParam(url.searchParams.get('sources'));
+
+          const idsRaw = url.searchParams.get('ids');
+          const ids = idsRaw
+            ? idsRaw
+                .split(',')
+                .map(s => s.trim())
+                .filter(Boolean)
+            : undefined;
+
+          const urlFilter = url.searchParams.get('urlFilter') || undefined;
+          const flowFilter = url.searchParams.get('filter') || undefined;
+          const includeResponseBody =
+            url.searchParams.get('includeResponseBody') !== 'false';
+          const desensitize = url.searchParams.get('desensitize') === 'true';
+
+          const requestFilter = buildRequestFilter({
+            sources,
+            urlFilter,
+            filter: flowFilter,
+            ids,
+          });
+
+          const rows = services.store.getRequests(session.id, requestFilter);
+          const exportResult = exportTraffic(rows, format, {
+            includeResponseBody,
+            desensitize,
+          });
+
+          sendExportResponse(res, exportResult, format);
+        } catch (err) {
+          sendUnexpected(res, err);
+        }
       },
     ],
   ]);

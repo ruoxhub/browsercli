@@ -93,7 +93,8 @@ describe('webCommand', () => {
       (err: unknown) =>
         err instanceof AxiError &&
         err.code === 'VALIDATION_ERROR' &&
-        err.message.includes('未知子命令'),
+        err.message.includes('未知子命令') &&
+        (err.suggestions ?? []).some(s => s.includes('web [status|stop]')),
     );
   });
 
@@ -164,6 +165,94 @@ describe('webCommand', () => {
       assert.strictEqual(resJson.online, false);
       assert.strictEqual(resJson.port, null);
       assert.strictEqual(resJson.url, null);
+    });
+
+    it('web stop 在会话未运行时报告 stopped=false', async () => {
+      const dir = path.join(baseDir, 'stop-not-running');
+      fs.mkdirSync(dir, {recursive: true});
+      const ctx: WorkerContext = {
+        session: 'offline-stop',
+        daemonDir: dir,
+        connect: async () => {
+          throw new Error('不应被调用');
+        },
+      };
+
+      let stoppedCalled = false;
+      const cmd = createWebCommand({
+        stopSession: async () => {
+          stoppedCalled = true;
+        },
+      });
+
+      const resText = (await cmd(['stop'], ctx)) as AxiStructuredOutput;
+      assert.strictEqual(resText.command, 'web stop');
+      assert.strictEqual(resText.stopped, false);
+      assert.strictEqual(resText.online, false);
+      assert.ok(
+        typeof resText.message === 'string' &&
+          resText.message.includes('未运行'),
+      );
+      assert.strictEqual(stoppedCalled, false);
+
+      const resJson = (await cmd(
+        ['stop', '--json'],
+        ctx,
+      )) as AxiStructuredOutput;
+      assert.strictEqual(resJson.command, 'web stop');
+      assert.strictEqual(resJson.stopped, false);
+      assert.strictEqual(resJson.online, false);
+    });
+
+    it('web stop / close 在会话运行时执行停止并清理', async () => {
+      const dir = path.join(baseDir, 'stop-running');
+      writeSession(dir, {
+        name: 'stopping-sess',
+        version: '0.0.0',
+        protocol: 1,
+        timestamp: Date.now(),
+        socketPath: live.socketPath,
+        pid: process.pid,
+        consolePort: 8765,
+      });
+      const ctx: WorkerContext = {
+        session: 'stopping-sess',
+        daemonDir: dir,
+        connect: async () => {
+          throw new Error('不应被调用');
+        },
+      };
+
+      let stoppedSessionName: string | undefined;
+      let stoppedDir: string | undefined;
+      const cmd = createWebCommand({
+        stopSession: async (cfg, d) => {
+          stoppedSessionName = cfg.name;
+          stoppedDir = d;
+        },
+      });
+
+      const res = (await cmd(['stop', '--json'], ctx)) as AxiStructuredOutput;
+      assert.strictEqual(res.command, 'web stop');
+      assert.strictEqual(res.session, 'stopping-sess');
+      assert.strictEqual(res.stopped, true);
+      assert.strictEqual(res.online, false);
+      assert.strictEqual(res.pid, process.pid);
+      assert.strictEqual(res.port, 8765);
+      assert.strictEqual(stoppedSessionName, 'stopping-sess');
+      assert.strictEqual(stoppedDir, dir);
+
+      // 测试 close 别名
+      stoppedSessionName = undefined;
+      const resClose = (await cmd(['close'], ctx)) as AxiStructuredOutput;
+      assert.strictEqual(resClose.command, 'web stop');
+      assert.strictEqual(resClose.stopped, true);
+      assert.strictEqual(resClose.online, false);
+      assert.ok(
+        typeof resClose.message === 'string' &&
+          resClose.message.includes('已停止'),
+      );
+      assert.strictEqual(stoppedSessionName, 'stopping-sess');
     });
 
     it('web status 在会话运行时报告 online=true 及端口信息', async () => {
