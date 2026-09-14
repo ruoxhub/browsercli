@@ -101,9 +101,10 @@ const SENSITIVE_AUTOCOMPLETE_PREFIXES = ['cc-', 'one-time-code'];
 function isSensitiveField(attributes: Record<string, string>): boolean {
   const type = (attributes.type ?? '').toLowerCase();
   if (SENSITIVE_INPUT_TYPES.has(type)) return true;
-  const autocomplete = (attributes.autocomplete ?? '').toLowerCase();
+  // HTML autocomplete 是空格分隔的 token 列表（如 "billing cc-number"），逐 token 前缀匹配。
+  const tokens = (attributes.autocomplete ?? '').toLowerCase().split(/\s+/);
   return SENSITIVE_AUTOCOMPLETE_PREFIXES.some(prefix =>
-    autocomplete.startsWith(prefix),
+    tokens.some(token => token.startsWith(prefix)),
   );
 }
 

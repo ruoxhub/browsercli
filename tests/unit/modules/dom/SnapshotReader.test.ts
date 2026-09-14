@@ -335,4 +335,43 @@ describe('interactivity and sensitive fields', () => {
     const [node] = parseSnapshot(raw, 1);
     assert.equal(JSON.stringify(node).includes('4111111111111111'), false);
   });
+
+  it('scrubs token-list autocomplete like "billing cc-number"', () => {
+    const raw = buildSnapshot([
+      {
+        backendNodeId: 1,
+        tagName: 'input',
+        attributes: {
+          autocomplete: 'billing cc-number',
+          value: '4111111111111111',
+        },
+        inputValue: '4111111111111111',
+        styles: VISIBLE_STYLES,
+        bounds: [0, 0, 120, 24],
+      },
+    ]);
+
+    const [node] = parseSnapshot(raw, 1);
+    assert.equal(JSON.stringify(node).includes('4111111111111111'), false);
+  });
+
+  it('scrubs one-time-code and valuetext in token-list autocomplete', () => {
+    const raw = buildSnapshot([
+      {
+        backendNodeId: 1,
+        tagName: 'input',
+        attributes: {
+          autocomplete: 'section-payment one-time-code',
+          valuetext: '123456',
+        },
+        inputValue: '123456',
+        styles: VISIBLE_STYLES,
+        bounds: [0, 0, 120, 24],
+      },
+    ]);
+
+    const [node] = parseSnapshot(raw, 1);
+    assert.equal(node?.attributes.valuetext, undefined);
+    assert.equal(JSON.stringify(node).includes('123456'), false);
+  });
 });
