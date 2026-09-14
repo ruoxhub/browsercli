@@ -221,3 +221,118 @@ describe('parseSnapshot', () => {
     assert.equal(nodes[2]?.isVisible, false);
   });
 });
+
+describe('interactivity and sensitive fields', () => {
+  it('marks nodes interactive from snapshot isClickable', () => {
+    const raw = buildSnapshot([
+      {
+        backendNodeId: 1,
+        tagName: 'div',
+        clickable: true,
+        styles: VISIBLE_STYLES,
+        bounds: [0, 0, 10, 10],
+      },
+    ]);
+    assert.equal(parseSnapshot(raw, 1)[0]?.isInteractive, true);
+  });
+
+  it('marks nodes interactive by cursor pointer, tag, role and tabindex', () => {
+    const raw = buildSnapshot([
+      {
+        backendNodeId: 1,
+        tagName: 'div',
+        bounds: [0, 0, 10, 10],
+        styles: {...VISIBLE_STYLES, cursor: 'pointer'},
+      },
+      {
+        backendNodeId: 2,
+        tagName: 'button',
+        bounds: [0, 0, 10, 10],
+        styles: VISIBLE_STYLES,
+      },
+      {
+        backendNodeId: 3,
+        tagName: 'div',
+        bounds: [0, 0, 10, 10],
+        attributes: {role: 'menuitem'},
+        styles: VISIBLE_STYLES,
+      },
+      {
+        backendNodeId: 4,
+        tagName: 'div',
+        bounds: [0, 0, 10, 10],
+        attributes: {tabindex: '0'},
+        styles: VISIBLE_STYLES,
+      },
+      {
+        backendNodeId: 5,
+        tagName: 'div',
+        bounds: [0, 0, 10, 10],
+        attributes: {onclick: 'go()'},
+        styles: VISIBLE_STYLES,
+      },
+      {
+        backendNodeId: 6,
+        tagName: 'div',
+        bounds: [0, 0, 10, 10],
+        styles: VISIBLE_STYLES,
+      },
+    ]);
+
+    const nodes = parseSnapshot(raw, 1);
+    assert.deepEqual(
+      nodes.map(node => node.isInteractive),
+      [true, true, true, true, true, false],
+    );
+  });
+
+  it('keeps zero-size file inputs visible', () => {
+    const raw = buildSnapshot([
+      {
+        backendNodeId: 1,
+        tagName: 'input',
+        attributes: {type: 'file'},
+        bounds: [0, 0, 0, 0],
+        styles: {...VISIBLE_STYLES, opacity: '0'},
+      },
+    ]);
+
+    const [node] = parseSnapshot(raw, 1);
+    assert.equal(node?.isVisible, true);
+    assert.equal(node?.isInteractive, true);
+  });
+
+  it('never exposes password values in attributes or text', () => {
+    const raw = buildSnapshot([
+      {
+        backendNodeId: 1,
+        tagName: 'input',
+        attributes: {type: 'password', value: 'hunter2', placeholder: '密码'},
+        inputValue: 'hunter2',
+        styles: VISIBLE_STYLES,
+        bounds: [0, 0, 120, 24],
+      },
+    ]);
+
+    const [node] = parseSnapshot(raw, 1);
+    assert.equal(node?.attributes.value, undefined);
+    assert.equal(node?.text, '');
+    assert.equal(JSON.stringify(node).includes('hunter2'), false);
+  });
+
+  it('scrubs credit-card and one-time-code autocomplete values', () => {
+    const raw = buildSnapshot([
+      {
+        backendNodeId: 1,
+        tagName: 'input',
+        attributes: {autocomplete: 'cc-number', value: '4111111111111111'},
+        inputValue: '4111111111111111',
+        styles: VISIBLE_STYLES,
+        bounds: [0, 0, 120, 24],
+      },
+    ]);
+
+    const [node] = parseSnapshot(raw, 1);
+    assert.equal(JSON.stringify(node).includes('4111111111111111'), false);
+  });
+});

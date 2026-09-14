@@ -53,6 +53,86 @@ export const REQUIRED_COMPUTED_STYLES = [
 const ELEMENT_NODE = 1;
 const TEXT_NODE = 3;
 
+const INTERACTIVE_TAGS = new Set([
+  'button',
+  'input',
+  'select',
+  'textarea',
+  'a',
+  'details',
+  'summary',
+  'option',
+  'optgroup',
+]);
+
+const INTERACTIVE_ROLES = new Set([
+  'button',
+  'link',
+  'menuitem',
+  'option',
+  'radio',
+  'checkbox',
+  'tab',
+  'textbox',
+  'combobox',
+  'slider',
+  'spinbutton',
+  'search',
+  'searchbox',
+  'row',
+  'cell',
+  'gridcell',
+  'listbox',
+  'switch',
+]);
+
+const EVENT_ATTRIBUTES = [
+  'onclick',
+  'onmousedown',
+  'onmouseup',
+  'onkeydown',
+  'onkeyup',
+  'ontouchstart',
+] as const;
+
+const SENSITIVE_INPUT_TYPES = new Set(['password', 'file', 'hidden']);
+const SENSITIVE_AUTOCOMPLETE_PREFIXES = ['cc-', 'one-time-code'];
+
+function isSensitiveField(attributes: Record<string, string>): boolean {
+  const type = (attributes.type ?? '').toLowerCase();
+  if (SENSITIVE_INPUT_TYPES.has(type)) return true;
+  const autocomplete = (attributes.autocomplete ?? '').toLowerCase();
+  return SENSITIVE_AUTOCOMPLETE_PREFIXES.some(prefix =>
+    autocomplete.startsWith(prefix),
+  );
+}
+
+function isFileInput(
+  tagName: string,
+  attributes: Record<string, string>,
+): boolean {
+  return (
+    tagName === 'input' && (attributes.type ?? '').toLowerCase() === 'file'
+  );
+}
+
+function computeInteractivity(
+  tagName: string,
+  attributes: Record<string, string>,
+  computedStyles: Record<string, string>,
+  fromSnapshot: boolean,
+): boolean {
+  if (fromSnapshot) return true;
+  if (computedStyles.cursor === 'pointer') return true;
+  if (INTERACTIVE_TAGS.has(tagName)) return true;
+  if (EVENT_ATTRIBUTES.some(name => attributes[name] !== undefined))
+    return true;
+  const role = (attributes.role ?? '').toLowerCase();
+  if (INTERACTIVE_ROLES.has(role)) return true;
+  if (attributes.tabindex !== undefined) return true;
+  return false;
+}
+
 interface RareData<T> {
   index?: number[];
   value?: T[];
@@ -150,9 +230,12 @@ function readStyles(
 }
 
 function computeVisibility(
+  tagName: string,
+  attributes: Record<string, string>,
   computedStyles: Record<string, string>,
   bounds: SnapshotBounds | undefined,
 ): boolean {
+  if (isFileInput(tagName, attributes)) return true;
   if (computedStyles.display === 'none') return false;
   if (computedStyles.visibility === 'hidden') return false;
   if (computedStyles.opacity === '0') return false;
@@ -235,12 +318,18 @@ export function parseSnapshot(
         layoutIndex === undefined
           ? undefined
           : layout.paintOrders?.[layoutIndex];
-      const liveValue =
-        textValueByIndex.get(index) ?? inputValueByIndex.get(index) ?? '';
+      const sensitive = isSensitiveField(attributes);
+      if (sensitive) {
+        delete attributes.value;
+        delete attributes.valuetext;
+      }
+      const liveValue = sensitive
+        ? ''
+        : (textValueByIndex.get(index) ?? inputValueByIndex.get(index) ?? '');
       const text =
         nodeType === TEXT_NODE
           ? str(nodeValues[index], strings).trim()
-          : liveValue || collectText(index);
+          : liveValue || (sensitive ? '' : collectText(index));
 
       result.push({
         backendNodeId,
@@ -249,8 +338,15 @@ export function parseSnapshot(
         text,
         isVisible:
           nodeType === ELEMENT_NODE &&
-          computeVisibility(computedStyles, bounds),
-        isInteractive: clickableIndexes.has(index),
+          computeVisibility(tagName, attributes, computedStyles, bounds),
+        isInteractive:
+          nodeType === ELEMENT_NODE &&
+          computeInteractivity(
+            tagName,
+            attributes,
+            computedStyles,
+            clickableIndexes.has(index),
+          ),
         bounds,
         cursor: computedStyles.cursor,
         paintOrder,
