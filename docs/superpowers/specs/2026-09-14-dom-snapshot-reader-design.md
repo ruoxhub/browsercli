@@ -1,14 +1,14 @@
 # DOM 快照读取与点击可靠性设计
 
-> 状态：已批准（待复核） · 日期：2026-09-14 · 交付方式：一个总设计、两阶段实施 · 参考方式：Clean-room 行为改写
+> 状态：已复核修订 · 日期：2026-09-14（修订） · 交付方式：一个总设计、两阶段实施 · 参考方式：Clean-room 行为改写
 
 ## 1. 摘要
 
 本设计把「页面交互元素读取」和「元素点击落点」两件事从启发式 JS 提升为 CDP 原生数据源：
 
-1. **DOM 快照读取层**：新增只读模块，单次 `DOMSnapshot.captureSnapshot` 产出扁平元素列表，替代 `find_clickable_elements` 当前的 `document.querySelectorAll('*')` + `getComputedStyle` 启发式。
-2. **点击落点解析**：把 CDP 四层降级（`DOM.getContentQuads` → `DOM.getBoxModel` → `getBoundingClientRect` → JS click）抽成一个共享 helper，修复 `click_at` 只取 `getBoundingClientRect` 中心导致点中被遮挡元素的问题。
-3. **遮挡过滤**：基于快照的 `paintOrders` 判定元素是否被上层不透明元素完全覆盖，供阶段 2 选择点解析使用。
+1. **DOM 快照读取层**：新增只读模块，单次 `DOMSnapshot.captureSnapshot` 产出扁平元素列表，基于 `parentIndex` 聚合子文本节点文本，替代 `find_clickable_elements` 当前的 `document.querySelectorAll('*')` + `getComputedStyle` 启发式。
+2. **点击落点解析**：通过 Playwright ElementHandle 获取 CDP `objectId`，打通全定位器（CSS/role/text/xpath）；先确保 `scrollIntoViewIfNeeded` 滚入视口，再走 CDP 四层降级（`DOM.getContentQuads` → `DOM.getBoxModel` → `getBoundingClientRect` → JS click）抽成共享 helper，彻底解决被遮挡元素及视口外边缘误触问题。
+3. **遮挡过滤**：阶段 2 在落点处直接通过原生 `document.elementFromPoint(x, y)` 快速判断最高层遮挡，消除 Node 侧繁重几何布尔运算。
 
 不引入新依赖，不改变现有工具返回契约，不移植 browser-use 的紧凑 `[index]` 树与 watchdog 事件架构。
 
@@ -48,7 +48,7 @@ tag === button || (tag === a && 有 href) || (input 且 type ∈ {button,submit}
 - 交互元素识别的数据源改为 CDP 快照的 `isClickable`、`cursor`、`computedStyles`。
 - 天然穿透 open/closed shadow DOM，并标注 shadow 边界。
 - open shadow 与 iframe 内元素可被读出（iframe 为 best-effort，见 §10）。
-- 点击落点按四层降级解析，优先视口内最大可见 quad。
+- 点击落点按四层降级解析，优先视口内最大可见 quad，且支持所有定位器（CSS/role/text/xpath/nth）。
 - 现有工具返回契约不变；现有测试仅换 mock。
 
 ### 非目标
@@ -57,7 +57,7 @@ tag === button || (tag === a && 有 href) || (input 且 type ∈ {button,submit}
 - 不移植 browser-use 的 watchdog / EventBus 架构（本项目已有 `EventBus` + `TargetSessionRouter`）。
 - 不移植 site-specific 启发式（search 类名关键词、icon 尺寸 10–50px 等）。
 - 不改变默认浏览器启动、Cloak、CDP 懒激活、零 JS 注入策略。
-- `click_at` 目前支持 `role=` / `text=` / `xpath=` 定位器；quad 路径**只对 CSS 选择器生效**（原因见 §10.1），非 CSS 定位器行为不变。
+- 阶段 2 遮挡过滤不在 Node 侧手写复杂几何矩形差集算法，使用浏览器轻量原生判定。
 
 ## 4. 总体设计
 
@@ -67,15 +67,17 @@ tag === button || (tag === a && 有 href) || (input 且 type ∈ {button,submit}
 find_clickable_elements (工具)
   └─ SnapshotReader.read(page)               [新模块, src/modules/dom/]
         └─ 1 次 DOMSnapshot.captureSnapshot
-        └─ 解析 → 交互性/可见性判定 → SnapshotNode[]
+        └─ 解析 (建立 parentIndex 文本聚合与 layoutIndex 映射) → 交互性/可见性判定 → SnapshotNode[]
   └─ 映射 SnapshotNode[] → ClickableElement[]   [契约不变]
 
 click_at / PageInteraction.clickAt
-  └─ resolveClickPoint(client, selector)     [新共享 helper]
-        └─ DOM.querySelector → backendNodeId
-        └─ DOM.getContentQuads → 选最大可见 quad
-        └─ 降级 DOM.getBoxModel
-        └─ 降级 getBoundingClientRect
+  └─ resolveClickPoint(frame, selector)      [新共享 helper, src/modules/browser/]
+        └─ frame.locator(selector) 先滚动入视口 (scrollIntoViewIfNeeded)
+        └─ 取 elementHandle._remoteObject().objectId
+        └─ withCdpSession → DOM.getContentQuads({objectId}) → 选最大可见 quad
+        └─ 降级 DOM.getBoxModel({objectId})
+        └─ 降级 getBoundingClientRect 中心
+        └─ 降级 jsClick
 ```
 
 ### 4.2 数据流（find_clickable_elements）
@@ -124,10 +126,10 @@ async function readSnapshot(page: Page): Promise<SnapshotNode[]>;
 
 **解析要点**：
 
-- `documents[].nodes` 是列式存储：`nodeName` / `backendNodeId` / `attributes`（扁平 name,value 对）按索引对齐，字符串表为顶层 `strings`。
-- `layout` 通过 `nodeIndex` 对齐 `nodes`，提供 `bounds`、`styles`、`paintOrders`、`clientRects`。**必须预建 `nodeIndex → layoutIndex` 映射**，否则退化为 O(n²)。坐标是设备像素，除以 `window.devicePixelRatio` 转 CSS 像素。
+- `documents[].nodes` 是列式存储：`nodeName` / `backendNodeId` / `nodeType` / `parentIndex` / `attributes`（扁平 name,value 对）按索引对齐，字符串表为顶层 `strings`。
+- `layout` 通过 `nodeIndex` 对齐 `nodes`，提供 `bounds`、`styles`、`paintOrders`、`clientRects`。**必须预建 `nodeIndex → layoutIndex` 映射**，否则退化为 O(n²)。坐标默认已为 CSS 视口像素。
 - `shadowRootType` 非空的节点为 shadow host；快照本身已包含 shadow 内容，无需额外遍历。
-- 文本提取：优先 `textValue` / `inputValue`（表单实际值），否则回退 `nodeValue`；截断到合理长度。
+- **文本提取**：DOM 快照中元素节点自身的 `nodeValue` 通常为 null，文本位于子文本节点（`nodeType === 3`）。解析时必须通过 `parentIndex` 树状结构将子文本节点的文字聚合给祖先交互元素（如 `<button><span>确定</span></button>`）；表单控件优先提取 `inputValue` / `textValue`；截断到合理长度（如 100 字符）。
 
 **交互性判定**（按代价从低到高，命中即返回）：
 
@@ -156,7 +158,7 @@ async function readSnapshot(page: Page): Promise<SnapshotNode[]>;
 
 **位置**：`src/modules/browser/clickPoint.ts`
 
-**动机**：`click_at` 存在两份独立实现，只修一处会留下同类 bug。按根因修复原则，逻辑收敛到一个 helper，两处都调。
+**动机**：`click_at` 存在两份独立实现，只修一处会留下同类 bug。按根因修复原则，逻辑收敛到一个 helper，两处都调；同时打通全定位器支持与视口防偏。
 
 ```ts
 interface ClickPoint {
@@ -167,33 +169,32 @@ interface ClickPoint {
 }
 
 async function resolveClickPoint(
-  client: CDPSession,
-  selector: string,          // 仅支持 CSS
-  viewport: {width: number; height: number},
+  frame: Frame,
+  selector: string,          // 支持 CSS / role= / text= / xpath= / >> nth=
 ): Promise<ClickPoint>;
 ```
 
-**降级链**：
+**关键机制与降级链**：
 
-1. `DOM.enable` → `DOM.getDocument` → `DOM.querySelector` 得 `nodeId`；拿不到 → `boundingRect`。
-2. `DOM.getContentQuads({nodeId})` → 多 quad 时选**与视口交集面积最大**者，取四顶点均值；全部在视口外则取首个 quad。
-3. 空 → `DOM.getBoxModel({nodeId})` 的 `content` 八元组转 quad。
-4. 空 → `boundingRect`：`Runtime.callFunctionOn` 取 `getBoundingClientRect` 中心。
-5. 仍失败 → `source: 'jsClick'`，由调用方决定是否走 `element.click()`。
-
-触发裁剪：将 quad 中心 clamp 到 `[0, width-1] × [0, height-1]`。
+1. **必须先滚动入视口**：通过 `const locator = frame.locator(selector); await locator.scrollIntoViewIfNeeded();` 确保元素处于可视区。若跳过此步直接取坐标，长页面底部元素被 clamp 截断会导致误触视口边缘空白或错误组件。
+2. **获取 CDP objectId**：`const handle = await locator.elementHandle(); const objectId = (handle as any)._remoteObject?.()?.objectId;`。通过 `objectId` 查询 CDP，免除 `DOM.querySelector` 仅支持 CSS 的限制，原生支持所有 Playwright 定位器以及子 iframe 内元素。
+3. **提取可见 quad**：`DOM.getContentQuads({objectId})`。多 quad 时选**与视口交集面积最大**者，取四顶点几何中心。若全部 quad 在视口外（不可见/隐藏），取首个 quad 并 clamp 到视口内。
+4. **降级 boxModel**：若无 quads，调 `DOM.getBoxModel({objectId})`，取 `content` 框顶点均值。
+5. **降级 boundingRect**：`handle.evaluate(el => el.getBoundingClientRect())` 取中心点。
+6. **最终降级 jsClick**：仍无法取得有效坐标时返回 `source: 'jsClick'`，由调用方决定是否直接调 `locator.click()`。
 
 **接入点**：
 
-- `src/tools/input/clickAt.ts`：CSS 选择器走 `resolveClickPoint`；非 CSS 定位器维持 Playwright 路径不变。
-- `src/modules/collector/PageInteraction.ts::clickAt`：改调 `resolveClickPoint`，消除重复实现。
+- `src/tools/input/clickAt.ts`：所有定位器统一走 `resolveClickPoint(frame, selector)`。
+- `src/modules/collector/PageInteraction.ts::clickAt`：改调 `resolveClickPoint(page.mainFrame(), selector)`，消除重复实现。
 
 ### 5.4 遮挡过滤（阶段 2）
 
-基于快照 `paintOrders`：按 paint order 从高到低累积矩形并集，若元素矩形被完全覆盖且其 `background-color` 不透明（非 `rgba(0,0,0,0)`）且 `opacity ≥ 0.8`，标记 `ignored_by_paint_order`。
+在落点 `(x, y)` 坐标计算出来后，验证该点是否被其它顶层图层覆盖：
 
-- 并集计算需要矩形差集分解，复杂度可能指数增长；设矩形数上限 `_MAX_RECTS = 5000`，触顶后保守返回「未遮挡」。
-- 应用到 `find_clickable_elements` 的 `visible` 字段与 `click_at` 的落点选择。
+- **实现方式**：直接通过 `frame.evaluate(({x, y}) => { const topEl = document.elementFromPoint(x, y); return topEl; }, {x, y})`，判断顶层元素是否是目标元素本身或其子节点。
+- **优点**：无需在 Node.js 端手写复杂的 2D 矩形差集/并集（避免 O(n²) 与 5000 矩形上限隐患），完美处理 CSS 层叠上下文、透明度、圆角、transform 变换与遮挡。
+- **结合**：若顶层命中元素不是目标节点，则尝试该元素的其余 quad，或标记 `isObscured: true`。
 
 ## 6. 错误处理与回退
 
@@ -217,10 +218,10 @@ async function resolveClickPoint(
 
 | 文件 | 断言 |
 | --- | --- |
-| `tests/unit/modules/dom/SnapshotReader.test.ts` | 扁平化正确；`isClickable`/cursor/tag/role 四条判定；可见性过滤；设备像素比换算；shadow 标注；密码字段值不出现 |
+| `tests/unit/modules/dom/SnapshotReader.test.ts` | 扁平化正确；`parentIndex` 子文本节点聚合；`isClickable`/cursor/tag/role 四条判定；可见性过滤；shadow 标注；密码字段值不出现 |
 | `tests/unit/tools/findClickableElements.test.ts` | 换 mock 为 CDP 快照；断言**旧返回契约不变**；回退路径 |
-| `tests/unit/modules/clickPoint.test.ts` | 降级顺序；选最大可见 quad；视口全外时取首 quad；坐标裁剪 |
-| `tests/unit/tools/input/clickAt.test.ts` | CSS 走 quad；非 CSS 走 Playwright；失败降级 |
+| `tests/unit/modules/clickPoint.test.ts` | 降级顺序；滚动入视口；选最大可见 quad；全定位器支持（CSS/text/role/xpath）；遮挡探测 |
+| `tests/unit/tools/input/clickAt.test.ts` | 各类定位器走 quad；失败降级 |
 
 交付前运行：`npm run typecheck`、`npm run test:unit`、`npm run check-format`。
 
@@ -240,19 +241,17 @@ async function resolveClickPoint(
 
 ## 10. 风险与限制
 
-### 10.1 quad 路径只支持 CSS 选择器
+### 10.1 定位器与 Frame 覆盖
 
-CDP `DOM.querySelector` 仅接受 CSS。`click_at` 的 `role=` / `text=` / `xpath=` 定位器无法解析为 nodeId，因此不进 quad 路径，维持现有 Playwright 行为。这是本设计接受的取舍，不假装全覆盖。
+通过 Playwright ElementHandle 的 `objectId` 直通 CDP，已支持全部定位器（CSS / role= / text= / xpath= / >> nth=）与子 iframe 元素。已知限制为：极端情况下若元素已被 DOM 移除导致 handle 失效时，优雅回退到 `jsClick`。
 
 ### 10.2 iframe 覆盖为 best-effort
 
-`captureSnapshot` 在 page 级 session 上返回各 frame 的独立 document，行为随 Chrome 版本而异。若拿不到 iframe 内元素，退回到「至少覆盖主文档」，不阻阻塞交付。
+`captureSnapshot` 在 page 级 session 上返回各 frame 的独立 document，行为随 Chrome 版本而异。若拿不到 iframe 内元素，退回到「至少覆盖主文档」，不阻塞交付。
 
-### 10.3 DOMInspector.findClickable 的重复实现
+### 10.3 DOMInspector.findClickable 的遗留处理
 
-`DOMInspector.findClickable()` 与工具层是同一套 JS 启发式的两份拷贝。本设计**不删除** `DOMInspector.findClickable`（避免无关重构），但其与工具层的行为会分叉：工具层用快照，运行时服务仍用旧启发式。
-
-**若 `runtime.domInspector` 在生产路径上无实际调用方，应作为后续清理项单独处理**——本设计不擅自删除。
+`DOMInspector.findClickable()` 在 `src/` 中除定义本身外无实际调用方。本设计在 `DOMInspector.ts` 中为其添加 `@deprecated` 注释，建议在阶段 1 交付完成后单开清理 PR 移除。
 
 ### 10.4 快照性能
 
@@ -268,6 +267,7 @@ CDP `DOM.querySelector` 仅接受 CSS。`click_at` 的 `role=` / `text=` / `xpat
 | --- | --- |
 | 是否输出紧凑 `[index]` 树 | 否，只升级数据源 |
 | 是否移植 watchdog 架构 | 否，已有 EventBus |
-| `click_at` 非 CSS 定位器 | 不升级，明确记录为限制 |
-| 是否删除 `DOMInspector.findClickable` | 否，标记为后续清理项 |
-| 遮挡过滤是否默认开启 | 阶段 2 接入后默认开启，设矩形上限防退化 |
+| `click_at` 非 CSS 定位器 | 已打通，通过 `objectId` 统一支持全定位器 |
+| 视口外元素点击偏离 | 统一增加 `scrollIntoViewIfNeeded` 保证落点正确 |
+| 遮挡过滤方案 | 采用原生 `elementFromPoint` 代替复杂的 5000 矩形几何差集分解 |
+| 是否删除 `DOMInspector.findClickable` | 阶段 1 标记 `@deprecated`，随后单独清理 |

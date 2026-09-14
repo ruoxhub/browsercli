@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 用 CDP `DOMSnapshot.captureSnapshot` 替代 `find_clickable_elements` 的 JS 启发式，并把 `click_at` 的落点解析升级为 CDP 四层降级。
+**Goal:** 用 CDP `DOMSnapshot.captureSnapshot` 替代 `find_clickable_elements` 的 JS 启发式，并把 `click_at` 的落点解析升级为 CDP 四层降级（支持全部定位器，滚动保护与原生遮挡检测）。
 
-**Architecture:** 新增纯函数解析层 `SnapshotReader`（快照 JSON → 扁平 `SnapshotNode[]`）与 `clickPoint` 落点解析器，两者都不依赖浏览器即可单测。工具层只做「读 → 映射 → 返回」，保持 `ClickableElement` 契约不变。
+**Architecture:** 新增纯函数解析层 `SnapshotReader`（快照 JSON → 扁平 `SnapshotNode[]`，聚合子文本节点）与 `clickPoint` 落点解析器（Playwright ElementHandle → CDP `objectId` → 可见 quad 降级）。工具层保持 `ClickableElement` 契约不变。
 
 **Tech Stack:** TypeScript ESM、Node `node:test`、Patchright `CDPSession`、CDP DOM/DOMSnapshot/Input/Page 域。
 
@@ -1153,11 +1153,11 @@ git commit -m "feat(dom): source clickable elements from CDP snapshot with JS fa
 - Test: `tests/unit/modules/browser/clickPoint.test.ts`
 
 **Interfaces:**
-- Consumes: `CDPSession`（`src/third_party/index.js`）。
+- Consumes: `CDPSession`、`Frame`、`Page`。
 - Produces:
   - `type ClickSource = 'contentQuads' | 'boxModel' | 'boundingRect'`
   - `type ClickResolution = {kind: 'point'; x: number; y: number; source: ClickSource; quadCount: number} | {kind: 'jsClick'}`
-  - `function resolveClickPoint(client: CDPSession, selector: string, viewport: {width: number; height: number}): Promise<ClickResolution>`
+  - `function resolveClickPoint(frame: Frame, selector: string, options?: {viewport?: Viewport}): Promise<ClickResolution>`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1195,17 +1195,42 @@ function makeClient(
 }
 
 const VIEWPORT = {width: 800, height: 600};
-const FOUND_NODE = {
-  'DOM.enable': () => ({}),
-  'DOM.getDocument': () => ({root: {nodeId: 1}}),
-  'DOM.querySelector': () => ({nodeId: 5}),
-  'DOM.scrollIntoViewIfNeeded': () => ({}),
-};
+
+function makeMockFrame(client: unknown, options?: {
+  scrollFails?: boolean;
+  boundingBox?: {x: number; y: number; width: number; height: number};
+  noElement?: boolean;
+}) {
+  let scrolled = false;
+  return {
+    getScrolled: () => scrolled,
+    page: () => ({
+      context: () => ({newCDPSession: async () => client}),
+      evaluate: async () => 1,
+    }),
+    locator: (selector: string) => ({
+      scrollIntoViewIfNeeded: async () => {
+        if (options?.scrollFails) throw new Error('scroll failed');
+        scrolled = true;
+      },
+      elementHandle: async () => {
+        if (options?.noElement) return null;
+        return {
+          _remoteObject: () => ({objectId: 'remote-obj-1'}),
+          evaluate: async (fn: (el: unknown) => unknown) => {
+            const rect = options?.boundingBox ?? {x: 10, y: 20, width: 100, height: 40};
+            return rect;
+          },
+        };
+      },
+    }),
+  };
+}
 
 describe('resolveClickPoint', () => {
-  it('picks the largest visible quad and clamps it into the viewport', async () => {
+  it('scrolls into view and picks largest visible quad for any locator (CSS/role/text)', async () => {
     const client = makeClient({
-      ...FOUND_NODE,
+      'Page.getLayoutMetrics': () => ({cssLayoutViewport: {clientWidth: 800, clientHeight: 600}}),
       'DOM.getContentQuads': () => ({
         quads: [
           [900, 900, 920, 900, 920, 920, 900, 920],
@@ -1213,13 +1238,11 @@ describe('resolveClickPoint', () => {
         ],
       }),
     });
+    const frame = makeMockFrame(client);
 
-    const result = await resolveClickPoint(
-      client as never,
-      '#btn',
-      VIEWPORT,
-    );
+    const result = await resolveClickPoint(frame as never, 'role=button[name="提交"]');
 
+    assert.equal(frame.getScrolled(), true);
     assert.equal(result.kind, 'point');
     if (result.kind !== 'point') return;
     assert.equal(result.source, 'contentQuads');
@@ -1228,16 +1251,17 @@ describe('resolveClickPoint', () => {
     assert.equal(result.y, 30);
   });
 
-  it('falls back to the box model when content quads are empty', async () => {
+  it('falls back to boxModel when content quads are empty', async () => {
     const client = makeClient({
-      ...FOUND_NODE,
+      'Page.getLayoutMetrics': () => ({cssLayoutViewport: {clientWidth: 800, clientHeight: 600}}),
       'DOM.getContentQuads': () => ({quads: []}),
       'DOM.getBoxModel': () => ({
         model: {content: [10, 20, 110, 20, 110, 60, 10, 60]},
       }),
     });
+    const frame = makeMockFrame(client);
 
-    const result = await resolveClickPoint(client as never, '#btn', VIEWPORT);
+    const result = await resolveClickPoint(frame as never, '#btn');
     assert.equal(result.kind, 'point');
     if (result.kind !== 'point') return;
     assert.equal(result.source, 'boxModel');
@@ -1245,20 +1269,17 @@ describe('resolveClickPoint', () => {
     assert.equal(result.y, 40);
   });
 
-  it('falls back to getBoundingClientRect when quads and box model fail', async () => {
+  it('falls back to getBoundingClientRect when quads and boxModel fail', async () => {
     const client = makeClient({
-      ...FOUND_NODE,
+      'Page.getLayoutMetrics': () => ({cssLayoutViewport: {clientWidth: 800, clientHeight: 600}}),
       'DOM.getContentQuads': () => ({quads: []}),
       'DOM.getBoxModel': () => {
         throw new Error('no box model');
       },
-      'DOM.resolveNode': () => ({object: {objectId: 'obj-1'}}),
-      'Runtime.callFunctionOn': () => ({
-        result: {value: {x: 100, y: 200, width: 50, height: 20}},
-      }),
     });
+    const frame = makeMockFrame(client, {boundingBox: {x: 100, y: 200, width: 50, height: 20}});
 
-    const result = await resolveClickPoint(client as never, '#btn', VIEWPORT);
+    const result = await resolveClickPoint(frame as never, '#btn');
     assert.equal(result.kind, 'point');
     if (result.kind !== 'point') return;
     assert.equal(result.source, 'boundingRect');
@@ -1266,19 +1287,15 @@ describe('resolveClickPoint', () => {
     assert.equal(result.y, 210);
   });
 
-  it('reports jsClick when the selector cannot be located', async () => {
-    const client = makeClient({
-      ...FOUND_NODE,
-      'DOM.querySelector': () => ({nodeId: 0}),
-    });
+  it('reports jsClick when locator cannot find element handle', async () => {
+    const client = makeClient({});
+    const frame = makeMockFrame(client, {noElement: true});
 
-    const result = await resolveClickPoint(client as never, '#missing', VIEWPORT);
+    const result = await resolveClickPoint(frame as never, '#missing');
     assert.deepEqual(result, {kind: 'jsClick'});
   });
 });
 ```
-
-**变更后需要同步更新的既有测试**：`tests/unit/modules/browser/` 下的 CDP mock 若已存在，需为 `send` 补 `detach`。本任务新建的文件不受影响。
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -1298,15 +1315,16 @@ Expected: FAIL — `Cannot find module '../../../../src/modules/browser/clickPoi
 /**
  * 点击落点解析：CDP 四层降级，优先返回元素实际可见区域的中心。
  *
- * 1. DOM.getContentQuads — 元素实际渲染四边形（可多个），选视口内可见面积最大者
- * 2. DOM.getBoxModel    — content 八元组
- * 3. getBoundingClientRect — JS 兜底
- * 4. 全部失败           — 返回 jsClick，由调用方决定是否走 element.click()
- *
- * 仅支持 CSS 选择器（DOM.querySelector 的限制）。
+ * 1. locator.scrollIntoViewIfNeeded() — 确保滚入视口，防止被截断误触
+ * 2. 通过 ElementHandle 获取 CDP objectId — 原生支持所有定位器（CSS/role/text/xpath）
+ * 3. DOM.getContentQuads — 选视口内最大可见 quad
+ * 4. DOM.getBoxModel    — 降级 content 八元组
+ * 5. getBoundingClientRect — 降级 JS 矩形
+ * 6. 全部失败           — 返回 jsClick
  */
 
-import type {CDPSession} from '../../third_party/index.js';
+import type {CDPSession, Frame} from '../../third_party/index.js';
+import {withCdpSession} from './cdpUtils.js';
 
 export type ClickSource = 'contentQuads' | 'boxModel' | 'boundingRect';
 
@@ -1363,7 +1381,6 @@ function quadBounds(quad: Quad): {
 function visibleArea(quad: Quad, viewport: Viewport): number {
   const {minX, minY, maxX, maxY} = quadBounds(quad);
   if (viewport.width <= 0 || viewport.height <= 0) {
-    // 视口未知时退化为四边形自身面积，保证仍能选出较大者。
     return Math.max(0, maxX - minX) * Math.max(0, maxY - minY);
   }
   const width = Math.min(viewport.width, maxX) - Math.max(0, minX);
@@ -1377,110 +1394,110 @@ function clamp(value: number, max: number): number {
   return Math.max(0, Math.min(max - 1, value));
 }
 
-async function locateNode(
-  client: CDPSession,
-  selector: string,
-): Promise<number | undefined> {
-  await client.send('DOM.enable', {});
-  const document = await client.send('DOM.getDocument', {depth: 0});
-  const found = await client.send('DOM.querySelector', {
-    nodeId: document.root.nodeId,
-    selector,
-  });
-  return found.nodeId ? found.nodeId : undefined;
-}
-
-async function pointFromBoundingRect(
-  client: CDPSession,
-  nodeId: number,
-  viewport: Viewport,
-): Promise<ClickResolution> {
-  const resolved = await client.send('DOM.resolveNode', {nodeId});
-  const objectId = resolved.object?.objectId;
-  if (!objectId) return {kind: 'jsClick'};
-  const call = await client.send('Runtime.callFunctionOn', {
-    objectId,
-    functionDeclaration: `function () {
-      const rect = this.getBoundingClientRect();
-      return {x: rect.left, y: rect.top, width: rect.width, height: rect.height};
-    }`,
-    returnByValue: true,
-  });
-  const rect = call.result?.value as
-    | {x: number; y: number; width: number; height: number}
-    | undefined;
-  if (!rect) return {kind: 'jsClick'};
-  return {
-    kind: 'point',
-    x: clamp(rect.x + rect.width / 2, viewport.width),
-    y: clamp(rect.y + rect.height / 2, viewport.height),
-    source: 'boundingRect',
-    quadCount: 0,
-  };
+async function readViewport(client: CDPSession): Promise<Viewport> {
+  try {
+    const metrics = await client.send('Page.getLayoutMetrics', {});
+    const viewport = metrics.cssLayoutViewport;
+    return {
+      width: viewport?.clientWidth ?? 0,
+      height: viewport?.clientHeight ?? 0,
+    };
+  } catch {
+    return {width: 0, height: 0};
+  }
 }
 
 export async function resolveClickPoint(
-  client: CDPSession,
+  frame: Frame,
   selector: string,
-  viewport: Viewport,
+  options?: {viewport?: Viewport},
 ): Promise<ClickResolution> {
-  let nodeId: number | undefined;
+  const locator = frame.locator(selector);
+
+  // 1. 强制滚动入视口，防止被视口 clamp 截断点偏
   try {
-    nodeId = await locateNode(client, selector);
+    await locator.scrollIntoViewIfNeeded({timeout: 3000});
+  } catch {
+    // 滚动超时或失败不直接打断，继续尝试获取 handle
+  }
+
+  let handle: any;
+  try {
+    handle = await locator.elementHandle({timeout: 3000});
   } catch {
     return {kind: 'jsClick'};
   }
-  if (nodeId === undefined) return {kind: 'jsClick'};
+  if (!handle) return {kind: 'jsClick'};
 
-  try {
-    await client.send('DOM.scrollIntoViewIfNeeded', {nodeId});
-  } catch {
-    // 滚动失败不阻断；后续 quad 仍可能可用
-  }
+  const objectId = handle._remoteObject?.()?.objectId;
 
-  try {
-    const quads = (await client.send('DOM.getContentQuads', {nodeId})).quads ?? [];
-    if (quads.length > 0) {
-      const best = quads.reduce((current, candidate) =>
-        visibleArea(candidate, viewport) > visibleArea(current, viewport)
-          ? candidate
-          : current,
-      );
-      const center = quadCenter(best);
-      return {
-        kind: 'point',
-        x: clamp(center.x, viewport.width),
-        y: clamp(center.y, viewport.height),
-        source: 'contentQuads',
-        quadCount: quads.length,
-      };
+  return await withCdpSession(frame.page(), async client => {
+    const viewport = options?.viewport ?? (await readViewport(client));
+
+    if (objectId) {
+      // 2. 优先尝试 DOM.getContentQuads
+      try {
+        const response = await client.send('DOM.getContentQuads', {objectId});
+        const quads = response.quads ?? [];
+        if (quads.length > 0) {
+          const best = quads.reduce((current, candidate) =>
+            visibleArea(candidate, viewport) > visibleArea(current, viewport)
+              ? candidate
+              : current,
+          );
+          const center = quadCenter(best);
+          return {
+            kind: 'point',
+            x: clamp(center.x, viewport.width),
+            y: clamp(center.y, viewport.height),
+            source: 'contentQuads',
+            quadCount: quads.length,
+          };
+        }
+      } catch {
+        // 继续降级到 boxModel
+      }
+
+      // 3. 降级 DOM.getBoxModel
+      try {
+        const model = await client.send('DOM.getBoxModel', {objectId});
+        const content = model.model?.content;
+        if (content && content.length >= 8) {
+          const center = quadCenter(content);
+          return {
+            kind: 'point',
+            x: clamp(center.x, viewport.width),
+            y: clamp(center.y, viewport.height),
+            source: 'boxModel',
+            quadCount: 1,
+          };
+        }
+      } catch {
+        // 继续降级到 boundingRect
+      }
     }
-  } catch {
-    // 落到 box model
-  }
 
-  try {
-    const model = await client.send('DOM.getBoxModel', {nodeId});
-    const content = model.model?.content;
-    if (content && content.length >= 8) {
-      const center = quadCenter(content);
-      return {
-        kind: 'point',
-        x: clamp(center.x, viewport.width),
-        y: clamp(center.y, viewport.height),
-        source: 'boxModel',
-        quadCount: 1,
-      };
+    // 4. 降级 getBoundingClientRect
+    try {
+      const rect = await handle.evaluate((el: Element) => {
+        const r = el.getBoundingClientRect();
+        return {x: r.left, y: r.top, width: r.width, height: r.height};
+      });
+      if (rect) {
+        return {
+          kind: 'point',
+          x: clamp(rect.x + rect.width / 2, viewport.width),
+          y: clamp(rect.y + rect.height / 2, viewport.height),
+          source: 'boundingRect',
+          quadCount: 0,
+        };
+      }
+    } catch {
+      // 失败转 jsClick
     }
-  } catch {
-    // 落到 bounding rect
-  }
 
-  try {
-    return await pointFromBoundingRect(client, nodeId, viewport);
-  } catch {
     return {kind: 'jsClick'};
-  }
+  });
 }
 ```
 
@@ -1493,7 +1510,7 @@ Expected: PASS（4 个用例）
 
 ```bash
 git add src/modules/browser/clickPoint.ts tests/unit/modules/browser/clickPoint.test.ts
-git commit -m "feat(browser): resolve click points via CDP quads with fallbacks"
+git commit -m "feat(browser): resolve click points via CDP quads supporting all locators"
 ```
 
 ---
@@ -1509,7 +1526,7 @@ git commit -m "feat(browser): resolve click points via CDP quads with fallbacks"
 **Interfaces:**
 - Consumes: `resolveClickPoint`（Task 4）。
 - Produces:
-  - `click_at` 对 CSS 选择器走 CDP quad 路径；`role=` / `text=` / `xpath=` 或含 `>>` 的定位器保持原 Playwright 行为。
+  - `click_at` 对全定位器（CSS / role= / text= / xpath= / >> nth=）统一走 CDP quad 精度解析。
   - `PageInteraction.clickAt` 返回结构不变：`{x: number; y: number; tag: string; text: string}`。
 
 - [ ] **Step 1: Write the failing test**
@@ -1547,14 +1564,6 @@ function makeCdpClient() {
       send: async (method: string, params?: Record<string, unknown>) => {
         calls.push({method, params});
         switch (method) {
-          case 'DOM.enable':
-            return {};
-          case 'DOM.getDocument':
-            return {root: {nodeId: 1}};
-          case 'DOM.querySelector':
-            return {nodeId: 5};
-          case 'DOM.scrollIntoViewIfNeeded':
-            return {};
           case 'DOM.getContentQuads':
             return {quads: [[0, 0, 100, 0, 100, 50, 0, 50]]};
           case 'Page.getLayoutMetrics':
@@ -1575,19 +1584,24 @@ function makeFrame(client: unknown) {
       evaluate: async () => 1,
     }),
     locator: () => ({
-      evaluate: async () => ({x: 1, y: 2, tag: 'DIV', text: 'x'}),
+      scrollIntoViewIfNeeded: async () => undefined,
+      elementHandle: async () => ({
+        _remoteObject: () => ({objectId: 'remote-1'}),
+        evaluate: async () => ({x: 0, y: 0, width: 100, height: 50}),
+      }),
+      evaluate: async () => ({x: 50, y: 25, tag: 'BUTTON', text: '提交'}),
       click: async () => undefined,
     }),
   };
 }
 
 describe('click_at', () => {
-  it('clicks at the resolved quad center for CSS selectors', async () => {
+  it('clicks at the resolved quad center for any locator', async () => {
     const {calls, client} = makeCdpClient();
     const {response, getContent} = makeResponse();
 
     await clickAt.handler(
-      {params: {selector: '#btn'}} as never,
+      {params: {selector: 'role=button[name="提交"]'}} as never,
       response as never,
       {getSelectedFrame: () => makeFrame(client)} as never,
     );
@@ -1600,29 +1614,13 @@ describe('click_at', () => {
       'contentQuads',
     );
   });
-
-  it('keeps the locator path for non-CSS selectors', async () => {
-    const {calls, client} = makeCdpClient();
-    const {response, getContent} = makeResponse();
-
-    await clickAt.handler(
-      {params: {selector: 'role=button[name="提交"]'}} as never,
-      response as never,
-      {getSelectedFrame: () => makeFrame(client)} as never,
-    );
-
-    const pressed = calls.find(call => call.params?.type === 'mousePressed');
-    assert.equal(pressed?.params?.x, 1);
-    assert.equal(pressed?.params?.y, 2);
-    assert.equal(getContent()?.data !== undefined, true);
-  });
 });
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/unit/tools/input/clickAt.test.js`
-Expected: FAIL — 当前实现只调 `locator.evaluate` + `getBoundingClientRect`，未产生 `DOM.getContentQuads` 调用
+Expected: FAIL — 当前实现只调 `getBoundingClientRect`，未产生 `DOM.getContentQuads` 调用
 
 - [ ] **Step 3: Write minimal implementation**
 
@@ -1636,66 +1634,22 @@ Expected: FAIL — 当前实现只调 `locator.evaluate` + `getBoundingClientRec
  */
 
 import {withCdpSession} from '../../modules/browser/cdpUtils.js';
-import {
-  resolveClickPoint,
-  type Viewport,
-} from '../../modules/browser/clickPoint.js';
-import {zod, type CDPSession} from '../../third_party/index.js';
+import {resolveClickPoint} from '../../modules/browser/clickPoint.js';
+import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {toElementError} from '../shared/elementLocator.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 
-const LOCATOR_PREFIX = /^(role|text|xpath)=/;
-
-/** DOM.querySelector 仅接受 CSS 选择器；其余定位器走 Playwright 路径。 */
-function isCssSelector(selector: string): boolean {
-  return !LOCATOR_PREFIX.test(selector) && !selector.includes('>>');
-}
-
-async function readViewport(client: CDPSession): Promise<Viewport> {
-  try {
-    const metrics = await client.send('Page.getLayoutMetrics', {});
-    const viewport = metrics.cssLayoutViewport;
-    return {
-      width: viewport?.clientWidth ?? 0,
-      height: viewport?.clientHeight ?? 0,
-    };
-  } catch {
-    return {width: 0, height: 0};
-  }
-}
-
-async function dispatchClick(
-  client: CDPSession,
-  x: number,
-  y: number,
-): Promise<void> {
-  await client.send('Input.dispatchMouseEvent', {
-    type: 'mousePressed',
-    x,
-    y,
-    button: 'left',
-    clickCount: 1,
-  });
-  await client.send('Input.dispatchMouseEvent', {
-    type: 'mouseReleased',
-    x,
-    y,
-    button: 'left',
-    clickCount: 1,
-  });
-}
-
 /**
  * 通过 CDP 在元素坐标处派发真实鼠标点击事件。
  *
- * CSS 选择器走 quad 降级解析（视口内最大可见区域中心）；
- * role= / text= / xpath= 等 Playwright 定位器维持原行为。
+ * 全定位器（CSS / role= / text= / xpath= / >> nth=）均通过 CDP quad 选取视口内可见区域中心；
+ * 并在点击前先滚动入视口以防点偏。
  */
 export const clickAt = defineTool({
   name: 'click_at',
   description:
-    '使用 CDP Input.dispatchMouseEvent 在元素中心坐标处派发真实鼠标点击事件，适用于 Playwright 点击被拦截的场景。CSS 选择器会选取元素在视口内的最大可见区域中心。',
+    '使用 CDP Input.dispatchMouseEvent 在元素中心坐标处派发真实鼠标点击事件，适用于 Playwright 点击被拦截的场景。会选取元素在视口内的最大可见区域中心。',
   annotations: {
     title: '坐标点击',
     category: ToolCategory.NAVIGATION,
@@ -1705,61 +1659,56 @@ export const clickAt = defineTool({
     selector: zod
       .string()
       .describe(
-        '定位器：CSS（#id、.cls）走 quad 解析；role= / text= / xpath= 走 Playwright 路径。多匹配时用 >> nth=N 消歧。',
+        '定位器：CSS（#id、.cls）、role=button[name="提交"]、text=登录、xpath=//button。多匹配时用 >> nth=N 消歧。',
       ),
   },
   handler: async (request, response, context) => {
     const {selector} = request.params;
     const frame = (context as Context).getSelectedFrame();
-    const page = frame.page();
 
     try {
-      const data = await withCdpSession(page, async client => {
-        if (!isCssSelector(selector)) {
-          const coords = await frame.locator(selector).evaluate((el: Element) => {
-            el.scrollIntoView({block: 'center'});
-            const rect = el.getBoundingClientRect();
-            return {
-              x: rect.x + rect.width / 2,
-              y: rect.y + rect.height / 2,
-              tag: el.tagName,
-              text: (el.textContent || '').slice(0, 100),
-            };
-          });
-          await dispatchClick(client, coords.x, coords.y);
-          return {...coords, source: 'locator'};
-        }
+      const resolution = await resolveClickPoint(frame, selector);
 
-        const viewport = await readViewport(client);
-        const resolution = await resolveClickPoint(client, selector, viewport);
-        if (resolution.kind === 'jsClick') {
-          const clicked = await page.evaluate((sel: string) => {
-            const el = document.querySelector(sel);
-            if (!el) return false;
-            (el as HTMLElement).click();
-            return true;
-          }, selector);
-          if (!clicked) {
-            throw new Error(`Element not found: ${selector}`);
-          }
-          return {x: 0, y: 0, tag: '', text: '', source: 'jsClick'};
-        }
+      if (resolution.kind === 'jsClick') {
+        await frame.locator(selector).click();
+        response.setStructuredContent({
+          success: true,
+          message: `JS fallback click at ${selector}`,
+          tooltype: 'click_at',
+          data: {x: 0, y: 0, tag: '', text: '', source: 'jsClick'},
+        });
+        return;
+      }
 
-        await dispatchClick(client, resolution.x, resolution.y);
-        return {
+      await withCdpSession(frame.page(), async client => {
+        await client.send('Input.dispatchMouseEvent', {
+          type: 'mousePressed',
+          x: resolution.x,
+          y: resolution.y,
+          button: 'left',
+          clickCount: 1,
+        });
+        await client.send('Input.dispatchMouseEvent', {
+          type: 'mouseReleased',
+          x: resolution.x,
+          y: resolution.y,
+          button: 'left',
+          clickCount: 1,
+        });
+      });
+
+      response.setStructuredContent({
+        success: true,
+        message: `Real mouse click at ${selector} (${resolution.x}, ${resolution.y}) via ${resolution.source}`,
+        tooltype: 'click_at',
+        data: {
           x: resolution.x,
           y: resolution.y,
           tag: '',
           text: '',
           source: resolution.source,
-        };
-      });
-
-      response.setStructuredContent({
-        success: true,
-        message: `Real mouse click at ${selector} (${data.x}, ${data.y})`,
-        tooltype: 'click_at',
-        data,
+          quadCount: resolution.quadCount,
+        },
       });
     } catch (error) {
       throw toElementError(error, {toolName: 'click_at', selector});
@@ -1768,14 +1717,9 @@ export const clickAt = defineTool({
 });
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [ ] **Step 4: Update PageInteraction.clickAt**
 
-Run: `npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/unit/tools/input/clickAt.test.js`
-Expected: PASS（2 个用例）
-
-- [ ] **Step 5: Eliminate the duplicate implementation in PageInteraction**
-
-把 `src/modules/collector/PageInteraction.ts` 的 `clickAt`（第 41-90 行）整体替换为：
+用以下内容替换 `src/modules/collector/PageInteraction.ts` 的 `clickAt`（第 41-90 行）：
 
 ```ts
 /**
@@ -1793,24 +1737,12 @@ export async function clickAt(
   tag: string;
   text: string;
 }> {
-  return withCdpSession(page, async client => {
-    const viewport = await (async (): Promise<{width: number; height: number}> => {
-      try {
-        const metrics = await client.send('Page.getLayoutMetrics', {});
-        return {
-          width: metrics.cssLayoutViewport?.clientWidth ?? 0,
-          height: metrics.cssLayoutViewport?.clientHeight ?? 0,
-        };
-      } catch {
-        return {width: 0, height: 0};
-      }
-    })();
+  const resolution = await resolveClickPoint(page.mainFrame(), selector);
+  if (resolution.kind === 'jsClick') {
+    throw new Error(`Element not found: ${selector}`);
+  }
 
-    const resolution = await resolveClickPoint(client, selector, viewport);
-    if (resolution.kind === 'jsClick') {
-      throw new Error(`Element not found: ${selector}`);
-    }
-
+  await withCdpSession(page, async client => {
     await client.send('Input.dispatchMouseEvent', {
       type: 'mousePressed',
       x: resolution.x,
@@ -1825,17 +1757,17 @@ export async function clickAt(
       button: 'left',
       clickCount: 1,
     });
-
-    const info = await page.evaluate(sel => {
-      const el = document.querySelector(sel);
-      return el
-        ? {tag: el.tagName, text: (el.textContent || '').slice(0, 100)}
-        : {tag: '', text: ''};
-    }, selector);
-
-    logger.info(`Real mouse click at: ${selector} (${resolution.x}, ${resolution.y})`);
-    return {x: resolution.x, y: resolution.y, ...info};
   });
+
+  const info = await page.evaluate(sel => {
+    const el = document.querySelector(sel);
+    return el
+      ? {tag: el.tagName, text: (el.textContent || '').slice(0, 100)}
+      : {tag: '', text: ''};
+  }, selector);
+
+  logger.info(`Real mouse click at: ${selector} (${resolution.x}, ${resolution.y}) via ${resolution.source}`);
+  return {x: resolution.x, y: resolution.y, ...info};
 }
 ```
 
@@ -1845,334 +1777,154 @@ export async function clickAt(
 import {resolveClickPoint} from '../browser/clickPoint.js';
 ```
 
-- [ ] **Step 6: Add PageController coverage**
+- [ ] **Step 5: Run tests to verify they pass**
 
-在 `tests/unit/modules/PageController.test.ts` 的 `makePage()` 返回对象中增加 CDP mock（**不要**改动现有的 `evaluate: async () => ({})`——第 75 行断言依赖它返回 `{}`）：
-
-```ts
-    context: () => ({
-      newCDPSession: async () => ({
-        send: async (method: string) => {
-          switch (method) {
-            case 'DOM.enable':
-              return {};
-            case 'DOM.getDocument':
-              return {root: {nodeId: 1}};
-            case 'DOM.querySelector':
-              return {nodeId: 5};
-            case 'DOM.getContentQuads':
-              return {quads: [[0, 0, 100, 0, 100, 50, 0, 50]]};
-            case 'Page.getLayoutMetrics':
-              return {cssLayoutViewport: {clientWidth: 800, clientHeight: 600}};
-            default:
-              return {};
-          }
-        },
-        detach: async () => undefined,
-      }),
-    }),
-```
-
-在同一 `it` 用例中、`controller.click('#btn', ...)` 之后追加：
-
-```ts
-    const clickedAt = await controller.clickAt('#btn');
-    assert.strictEqual(clickedAt.x, 50);
-    assert.strictEqual(clickedAt.y, 25);
-```
-
-注意：`PageInteraction.clickAt` 结尾会对 `page.evaluate` 取元素 `tag`/`text`，上一步的 `context()` mock 只覆盖 CDP 路径，需确认 `makePage()` 的 `evaluate: async () => ({})` 仍可用（返回 `{}` 时 `info.tag` 为 `undefined`，不影响 x/y 断言）。
-
-- [ ] **Step 7: Run tests to verify they pass**
-
-Run: `npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/unit/tools/input/clickAt.test.js build/tests/unit/modules/PageController.test.js`
+Run: `npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/unit/tools/input/clickAt.test.js`
 Expected: PASS
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add src/tools/input/clickAt.ts src/modules/collector/PageInteraction.ts tests/unit/tools/input/clickAt.test.ts tests/unit/modules/PageController.test.ts
-git commit -m "fix(browser): resolve click_at targets via CDP quads and drop duplicate path"
+git add src/tools/input/clickAt.ts src/modules/collector/PageInteraction.ts tests/unit/tools/input/clickAt.test.ts
+git commit -m "fix(browser): unify click_at and PageInteraction on resolveClickPoint"
 ```
 
 ---
 
-### Task 6: paint-order 遮挡过滤
+### Task 6: 原生 elementFromPoint 遮挡过滤
 
 **Files:**
-- Create: `src/modules/dom/occlusion.ts`
-- Test: `tests/unit/modules/dom/occlusion.test.ts`
-- Modify: `src/modules/dom/SnapshotReader.ts`（`readSnapshot` 接入过滤）
+- Modify: `src/modules/browser/clickPoint.ts`
+- Modify: `tests/unit/modules/browser/clickPoint.test.ts`（追加遮挡多 quad 切换用例）
 
 **Interfaces:**
-- Consumes: `SnapshotNode`（Task 1）。
-- Produces:
-  - `function applyPaintOrderFilter(nodes: SnapshotNode[]): void` — 就地标记 `ignoredByPaintOrder`。
-  - `readSnapshot` 在返回前调用该过滤，并把被遮挡节点标记为 `isVisible: false`。
+- Consumes: `ClickResolution`、`resolveClickPoint`。
+- Produces: 当元素有多个 quads 且最大 quad 中心被浮层/弹窗遮挡时，通过 `document.elementFromPoint(x, y)` 自动切换到未遮挡的备选 quad。
 
 - [ ] **Step 1: Write the failing test**
 
-创建 `tests/unit/modules/dom/occlusion.test.ts`：
+在 `tests/unit/modules/browser/clickPoint.test.ts` 追加用例：
 
 ```ts
-/**
- * @license
- * Copyright 2026 Browser-CLI
- * SPDX-License-Identifier: Apache-2.0
- */
-import assert from 'node:assert/strict';
-import {describe, it} from 'node:test';
+  it('selects alternative quad when the primary quad is obscured by another topmost element', async () => {
+    const client = makeClient({
+      'Page.getLayoutMetrics': () => ({cssLayoutViewport: {clientWidth: 800, clientHeight: 600}}),
+      'DOM.getContentQuads': () => ({
+        quads: [
+          [10, 10, 50, 10, 50, 50, 10, 50],   // quad 1: 面积 1600，但被遮挡
+          [60, 10, 90, 10, 90, 40, 60, 40],   // quad 2: 面积 900，未遮挡
+        ],
+      }),
+    });
 
-import {applyPaintOrderFilter} from '../../../../src/modules/dom/occlusion.js';
-import type {SnapshotNode} from '../../../../src/modules/dom/SnapshotReader.js';
+    const frame = {
+      page: () => ({
+        context: () => ({newCDPSession: async () => client}),
+        evaluate: async () => 1,
+      }),
+      locator: () => ({
+        scrollIntoViewIfNeeded: async () => undefined,
+        elementHandle: async () => ({
+          _remoteObject: () => ({objectId: 'remote-1'}),
+          evaluate: async (fn: any, args: any) => {
+            // 模拟 elementFromPoint 检查：quad 1 (x:30, y:30) 被遮挡，quad 2 (x:75, y:25) 未遮挡
+            if (args?.x === 30 && args?.y === 30) return false;
+            return true;
+          },
+        }),
+      }),
+    };
 
-function node(
-  backendNodeId: number,
-  bounds: {x: number; y: number; width: number; height: number},
-  paintOrder: number,
-  backgroundColor: string,
-  opacity = '1',
-): SnapshotNode {
-  return {
-    backendNodeId,
-    tagName: 'div',
-    attributes: {},
-    text: '',
-    isVisible: true,
-    isInteractive: false,
-    bounds,
-    paintOrder,
-    computedStyles: {'background-color': backgroundColor, opacity},
-    inIframe: false,
-    ignoredByPaintOrder: false,
-  };
-}
-
-describe('applyPaintOrderFilter', () => {
-  it('marks a node fully covered by a later-painted opaque node', () => {
-    const covered = node(1, {x: 0, y: 0, width: 100, height: 100}, 0, 'rgb(255, 255, 255)');
-    const cover = node(2, {x: 0, y: 0, width: 200, height: 200}, 1, 'rgb(0, 0, 0)');
-
-    applyPaintOrderFilter([covered, cover]);
-
-    assert.equal(covered.ignoredByPaintOrder, true);
-    assert.equal(cover.ignoredByPaintOrder, false);
+    const result = await resolveClickPoint(frame as never, '#btn');
+    assert.equal(result.kind, 'point');
+    if (result.kind !== 'point') return;
+    assert.equal(result.x, 75);
+    assert.equal(result.y, 25);
   });
-
-  it('does not mark a node covered by a transparent overlay', () => {
-    const covered = node(1, {x: 0, y: 0, width: 100, height: 100}, 0, 'rgb(255, 255, 255)');
-    const overlay = node(2, {x: 0, y: 0, width: 200, height: 200}, 1, 'rgba(0, 0, 0, 0)');
-
-    applyPaintOrderFilter([covered, overlay]);
-
-    assert.equal(covered.ignoredByPaintOrder, false);
-  });
-
-  it('does not mark a node covered by a low-opacity overlay', () => {
-    const covered = node(1, {x: 0, y: 0, width: 100, height: 100}, 0, 'rgb(0, 0, 0)');
-    const overlay = node(2, {x: 0, y: 0, width: 200, height: 200}, 1, 'rgb(0, 0, 0)', '0.5');
-
-    applyPaintOrderFilter([covered, overlay]);
-
-    assert.equal(covered.ignoredByPaintOrder, false);
-  });
-
-  it('keeps partially covered nodes visible', () => {
-    const partial = node(1, {x: 0, y: 0, width: 100, height: 100}, 0, 'rgb(255, 255, 255)');
-    const cover = node(2, {x: 0, y: 0, width: 50, height: 50}, 1, 'rgb(0, 0, 0)');
-
-    applyPaintOrderFilter([partial, cover]);
-
-    assert.equal(partial.ignoredByPaintOrder, false);
-  });
-});
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/unit/modules/dom/occlusion.test.js`
-Expected: FAIL — `Cannot find module '../../../../src/modules/dom/occlusion.js'`
+Run: `npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/unit/modules/browser/clickPoint.test.js`
+Expected: FAIL — 原实现直接取面积最大的 quad 1 (x:30, y:30)，没有遮挡回退。
 
-- [ ] **Step 3: Write minimal implementation**
+- [ ] **Step 3: Implement occlusion check in clickPoint.ts**
 
-创建 `src/modules/dom/occlusion.ts`：
+在 `src/modules/browser/clickPoint.ts` 中加入原生遮挡判定 helper：
 
 ```ts
-/**
- * @license
- * Copyright 2026 Browser-CLI
- * SPDX-License-Identifier: Apache-2.0
- */
-/**
- * 基于 paint order 的遮挡过滤。
- *
- * 按绘制顺序从后往前累积不透明矩形并集；若某节点矩形被并集完全覆盖，
- * 说明它被上层元素挡住，标记 ignoredByPaintOrder。
- */
-
-import type {SnapshotNode, SnapshotBounds} from './SnapshotReader.js';
-
-interface Rect {
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
+async function isQuadTopmost(
+  handle: any,
+  x: number,
+  y: number,
+): Promise<boolean> {
+  try {
+    return await handle.evaluate(
+      (el: Element, point: {x: number; y: number}) => {
+        const topEl = document.elementFromPoint(point.x, point.y);
+        if (!topEl) return true;
+        return el === topEl || el.contains(topEl) || topEl.contains(el);
+      },
+      {x, y},
+    );
+  } catch {
+    return true;
+  }
 }
+```
 
-const MAX_RECTS = 5000;
+在 `DOM.getContentQuads` 处理块中：
 
-function toRect(bounds: SnapshotBounds): Rect {
-  return {
-    x1: bounds.x,
-    y1: bounds.y,
-    x2: bounds.x + bounds.width,
-    y2: bounds.y + bounds.height,
-  };
-}
+```ts
+      try {
+        const response = await client.send('DOM.getContentQuads', {objectId});
+        const quads = response.quads ?? [];
+        if (quads.length > 0) {
+          // 按可见面积从大到小排序
+          const sorted = [...quads].sort(
+            (a, b) => visibleArea(b, viewport) - visibleArea(a, viewport),
+          );
 
-function contains(outer: Rect, inner: Rect): boolean {
-  return (
-    outer.x1 <= inner.x1 &&
-    outer.y1 <= inner.y1 &&
-    outer.x2 >= inner.x2 &&
-    outer.y2 >= inner.y2
-  );
-}
+          // 寻找第一个未被遮挡的 quad
+          let chosen = sorted[0];
+          for (const candidate of sorted) {
+            const center = quadCenter(candidate);
+            const topmost = await isQuadTopmost(handle, center.x, center.y);
+            if (topmost) {
+              chosen = candidate;
+              break;
+            }
+          }
 
-function intersects(a: Rect, b: Rect): boolean {
-  return !(
-    a.x2 <= b.x1 ||
-    b.x2 <= a.x1 ||
-    a.y2 <= b.y1 ||
-    b.y2 <= a.y1
-  );
-}
-
-/** a \ b，假设 a 与 b 相交，最多切成 4 块。 */
-function subtract(a: Rect, b: Rect): Rect[] {
-  const parts: Rect[] = [];
-  if (a.y1 < b.y1) parts.push({x1: a.x1, y1: a.y1, x2: a.x2, y2: b.y1});
-  if (b.y2 < a.y2) parts.push({x1: a.x1, y1: b.y2, x2: a.x2, y2: a.y2});
-  const y1 = Math.max(a.y1, b.y1);
-  const y2 = Math.min(a.y2, b.y2);
-  if (a.x1 < b.x1) parts.push({x1: a.x1, y1, x2: b.x1, y2});
-  if (b.x2 < a.x2) parts.push({x1: b.x2, y1, x2: a.x2, y2});
-  return parts;
-}
-
-class RectUnion {
-  private readonly rects: Rect[] = [];
-
-  contains(target: Rect): boolean {
-    let pieces: Rect[] = [target];
-    for (const rect of this.rects) {
-      const next: Rect[] = [];
-      for (const piece of pieces) {
-        if (contains(rect, piece)) continue;
-        if (intersects(piece, rect)) next.push(...subtract(piece, rect));
-        else next.push(piece);
+          const center = quadCenter(chosen);
+          return {
+            kind: 'point',
+            x: clamp(center.x, viewport.width),
+            y: clamp(center.y, viewport.height),
+            source: 'contentQuads',
+            quadCount: quads.length,
+          };
+        }
+      } catch {
+        // 继续降级到 boxModel
       }
-      if (next.length === 0) return true;
-      pieces = next;
-    }
-    return false;
-  }
-
-  add(rect: Rect): void {
-    // ponytail: 矩形数上限 5000，触顶后保守返回“未遮挡”，
-    // 代价是重叠加层的页面过滤变弱；需要更强过滤时按 stacking context 分桶。
-    if (this.rects.length >= MAX_RECTS) return;
-    if (this.contains(rect)) return;
-    const pending: Rect[] = [rect];
-    for (const existing of this.rects) {
-      const next: Rect[] = [];
-      for (const piece of pending) {
-        if (intersects(piece, existing)) next.push(...subtract(piece, existing));
-        else next.push(piece);
-      }
-      pending.length = 0;
-      pending.push(...next);
-    }
-    this.rects.push(...pending);
-  }
-}
-
-function isOpaque(node: SnapshotNode): boolean {
-  const background = node.computedStyles['background-color'];
-  if (!background || background === 'rgba(0, 0, 0, 0)') return false;
-  const opacity = Number(node.computedStyles.opacity ?? '1');
-  return Number.isFinite(opacity) ? opacity >= 0.8 : true;
-}
-
-export function applyPaintOrderFilter(nodes: SnapshotNode[]): void {
-  const candidates = nodes
-    .filter(node => node.bounds !== undefined && node.paintOrder !== undefined)
-    .sort((a, b) => (b.paintOrder ?? 0) - (a.paintOrder ?? 0));
-
-  const union = new RectUnion();
-  for (const node of candidates) {
-    const rect = toRect(node.bounds as SnapshotBounds);
-    if (union.contains(rect)) {
-      node.ignoredByPaintOrder = true;
-      continue;
-    }
-    if (isOpaque(node)) union.add(rect);
-  }
-}
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/unit/modules/dom/occlusion.test.js`
-Expected: PASS（4 个用例）
+Run: `npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/unit/modules/browser/clickPoint.test.js`
+Expected: PASS（5 个用例）
 
-- [ ] **Step 5: Wire the filter into readSnapshot**
-
-在 `src/modules/dom/SnapshotReader.ts` 导入区加入：
-
-```ts
-import {applyPaintOrderFilter} from './occlusion.js';
-```
-
-把 `readSnapshot` 改为：
-
-```ts
-export async function readSnapshot(
-  page: Page,
-  options?: {devicePixelRatio?: number; occlusionFilter?: boolean},
-): Promise<SnapshotNode[]> {
-  const devicePixelRatio =
-    options?.devicePixelRatio ?? (await readDevicePixelRatio(page));
-  const raw = await withCdpSession(page, client =>
-    client.send('DOMSnapshot.captureSnapshot', {
-      computedStyles: [...REQUIRED_COMPUTED_STYLES],
-      includePaintOrder: true,
-      includeDOMRects: true,
-    }),
-  );
-  const nodes = parseSnapshot(raw as unknown as RawSnapshot, devicePixelRatio);
-
-  if (options?.occlusionFilter !== false) {
-    applyPaintOrderFilter(nodes);
-    for (const node of nodes) {
-      if (node.ignoredByPaintOrder) node.isVisible = false;
-    }
-  }
-
-  return nodes;
-}
-```
-
-- [ ] **Step 6: Run the full suite**
+- [ ] **Step 5: Run full verification suite**
 
 Run: `npm run typecheck && npm run test:unit && npm run check-format`
-Expected: 全部 PASS。若有失败，先修到通过再提交。
+Expected: 全绿。
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add src/modules/dom/occlusion.ts src/modules/dom/SnapshotReader.ts tests/unit/modules/dom/occlusion.test.ts
-git commit -m "feat(dom): filter paint-order occluded elements from snapshots"
+git add src/modules/browser/clickPoint.ts tests/unit/modules/browser/clickPoint.test.ts
+git commit -m "feat(browser): add native elementFromPoint occlusion check for multi-quad targets"
 ```
 
 ---
@@ -2180,13 +1932,13 @@ git commit -m "feat(dom): filter paint-order occluded elements from snapshots"
 ## 完成标准
 
 - `npm run typecheck`、`npm run test:unit`、`npm run check-format` 全绿。
-- `find_clickable_elements` 在支持 `DOMSnapshot` 的浏览器上返回来自 CDP 的元素，快照失败时回退并在 `message` 标注。
-- `click_at` 对 CSS 选择器使用 quad 落点；非 CSS 定位器行为不变。
+- `find_clickable_elements` 在支持 `DOMSnapshot` 的浏览器上返回来自 CDP 的元素，基于 `parentIndex` 正确聚合文本，快照失败时回退并在 `message` 标注。
+- `click_at` 对所有定位器（CSS/role/text/xpath）优先使用 CDP quad 落点，强制先滚动入视口，且原生检测遮挡。
 - 密码 / 文件 / hidden / `cc-` / `one-time-code` 字段的值不出现在任何工具输出中。
 - `PageInteraction.clickAt` 不再重复实现落点逻辑。
 
 ## 遗留项（不在本计划范围）
 
-- `DOMInspector.findClickable()` 仍为旧 JS 启发式；若 `runtime.domInspector` 在生产路径无调用方，单独开任务清理（spec §10.3）。
+- `DOMInspector.findClickable()` 在阶段 1 标记 `@deprecated`；若 `runtime.domInspector` 在生产路径无调用方，单独开任务清理。
 - iframe 内元素覆盖为 best-effort（spec §10.2）。
 - 快照坐标空间需在 Task 1 Step 5 用真实浏览器确认（spec §10.4）。
