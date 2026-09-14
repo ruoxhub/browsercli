@@ -257,6 +257,8 @@ async function resolveClickPoint(
 
 重页面（2 万+ 元素）单次快照解析可能达数百毫秒。`nodeIndex` 映射与 rare data 的 set 化是避免 O(n²) 的必要措施（参考实现从 5.9s 降至 2ms）。若实测超时，需评估是否限制解析节点数并显式提示截断。
 
+备注：`parseSnapshot` 对 `bounds` 的 DPR 除数尚未在真实 Chrome 上实测（计划 Step 5 跳过）；若实测发现快照已返回 CSS px，则 `readSnapshot` 应传 `{devicePixelRatio: 1}`。
+
 ### 10.5 硬编码交互 role / tag 集合会随站点演化
 
 判定集合来自 CDP 语义与 ARIA 规范，属于通用规则；不接受 site-specific hack。新站点适配通过 `isClickable` 与 `cursor` 覆盖，不改判定表。
