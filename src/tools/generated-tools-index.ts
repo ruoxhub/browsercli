@@ -34,7 +34,6 @@ import {manifest as scriptManifest} from './script/manifest.js';
 import {manifest as sessionManifest} from './session/manifest.js';
 import {manifest as stealthManifest} from './stealth/manifest.js';
 import {manifest as wasmManifest} from './wasm/manifest.js';
-import {manifest as workflowManifest} from './workflow/manifest.js';
 
 export const GENERATED_DOMAIN_MANIFESTS = [
   analyzerManifest,
@@ -65,7 +64,6 @@ export const GENERATED_DOMAIN_MANIFESTS = [
   sessionManifest,
   stealthManifest,
   wasmManifest,
-  workflowManifest,
 ] as const;
 
 export const GENERATED_TOOL_REGISTRY = [
@@ -640,21 +638,5 @@ export const GENERATED_TOOL_REGISTRY = [
   {
     modulePath: './wasm/index.js',
     handlerName: 'wasmMemoryInspect',
-  },
-  {
-    modulePath: './workflow/observeFlow.js',
-    handlerName: 'observeFlow',
-  },
-  {
-    modulePath: './workflow/autoHook.js',
-    handlerName: 'autoHook',
-  },
-  {
-    modulePath: './workflow/rebuildBundle.js',
-    handlerName: 'rebuildBundle',
-  },
-  {
-    modulePath: './workflow/traceSignatureGeneration.js',
-    handlerName: 'traceSignatureGeneration',
   },
 ] as const;

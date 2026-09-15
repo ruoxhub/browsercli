@@ -38,7 +38,6 @@ const DOMAIN_DESCRIPTIONS: Record<string, string> = {
   script: 'Page script evaluation and preload tools.',
   stealth: 'Browser stealth and fingerprint tools.',
   wasm: 'WebAssembly reverse engineering tools.',
-  workflow: 'High-level reverse engineering workflow tools.',
 };
 
 function extractRegistryBlock(source: string, sourcePath: string): string {

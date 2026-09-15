@@ -161,7 +161,6 @@ Browser-CLI/
 │   │   ├── stealth/                # 隐身注入工具
 │   │   ├── pipeline/               # 工作流管道工具
 │   │   ├── wasm/                   # WASM 分析工具
-│   │   ├── workflow/               # 工作流编排工具
 │   │   ├── frames/                 # Frame 管理工具
 │   │   ├── dialog/                 # 弹窗处理工具
 │   │   ├── anti-debug/             # 反调试工具
