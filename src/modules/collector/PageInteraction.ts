@@ -13,6 +13,7 @@
 import type {Page} from '../../third_party/index.js';
 import {logger} from '../../utils/logger.js';
 import {withCdpSession} from '../browser/cdpUtils.js';
+import {resolveClickPoint} from '../browser/clickPoint.js';
 
 import type {
   ClickOptions,
@@ -41,6 +42,8 @@ export async function click(
 /**
  * 🆕 真实鼠标点击 — CDP Input.dispatchMouseEvent
  * 算作用户真实手势，能触发文件对话框、绕过部分反自动化检测
+ *
+ * 落点由 resolveClickPoint 解析：视口内最大可见 rect 中心，逐层降级。
  */
 export async function clickAt(
   page: Page,
@@ -51,42 +54,39 @@ export async function clickAt(
   tag: string;
   text: string;
 }> {
-  // 获取元素坐标
-  const coords = await page.evaluate(sel => {
-    const el = document.querySelector(sel);
-    if (!el) throw new Error(`Element not found: ${sel}`);
-    el.scrollIntoView({block: 'center'});
-    const rect = el.getBoundingClientRect();
-    return {
-      x: rect.x + rect.width / 2,
-      y: rect.y + rect.height / 2,
-      tag: el.tagName,
-      text: (el.textContent || '').slice(0, 100),
-    };
-  }, selector);
+  const resolution = await resolveClickPoint(page.mainFrame(), selector);
+  if (resolution.kind === 'jsClick') {
+    throw new Error(`Element not found: ${selector}`);
+  }
 
   await withCdpSession(page, async client => {
-    // 发送真实鼠标按下事件
     await client.send('Input.dispatchMouseEvent', {
       type: 'mousePressed',
-      x: coords.x,
-      y: coords.y,
+      x: resolution.x,
+      y: resolution.y,
       button: 'left',
       clickCount: 1,
     });
-
-    // 发送真实鼠标释放事件
     await client.send('Input.dispatchMouseEvent', {
       type: 'mouseReleased',
-      x: coords.x,
-      y: coords.y,
+      x: resolution.x,
+      y: resolution.y,
       button: 'left',
       clickCount: 1,
     });
   });
 
-  logger.info(`Real mouse click at: ${selector} (${coords.x}, ${coords.y})`);
-  return coords;
+  const info = await page.evaluate(sel => {
+    const el = document.querySelector(sel);
+    return el
+      ? {tag: el.tagName, text: (el.textContent || '').slice(0, 100)}
+      : {tag: '', text: ''};
+  }, selector);
+
+  logger.info(
+    `Real mouse click at: ${selector} (${resolution.x}, ${resolution.y}) via ${resolution.source}`,
+  );
+  return {x: resolution.x, y: resolution.y, ...info};
 }
 
 /**

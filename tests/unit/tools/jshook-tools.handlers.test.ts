@@ -160,7 +160,34 @@ const createMockLocator = () => ({
   setInputFiles: async () => undefined,
 });
 
+const defaultMockPage = {
+  locator: () => createMockLocator(),
+  setUserAgent: async () => undefined,
+  url: () => 'https://example.com/dashboard',
+  title: async () => 'Dashboard',
+  goto: async () => undefined,
+  click: async () => undefined,
+  type: async () => undefined,
+  waitForSelector: async () => ({}),
+  isClosed: () => false,
+  context: () => ({
+    cookies: async () => [],
+    clearCookies: async () => undefined,
+    addCookies: async () => undefined,
+    newCDPSession: async () => ({
+      send: async () => ({}),
+      detach: async () => undefined,
+    }),
+  }),
+  evaluate: async () => undefined,
+  once: () => undefined,
+  on: () => undefined,
+  off: () => undefined,
+  removeListener: () => undefined,
+};
+
 const mockFrame = {
+  page: () => defaultMockPage,
   locator: () => createMockLocator(),
   evaluate: async (fnOrScript: unknown) => {
     if (typeof fnOrScript === 'function') {
@@ -183,31 +210,6 @@ const mockFrame = {
       elements: [{found: true, nodeName: 'SPAN'}],
     };
   },
-};
-
-const defaultMockPage = {
-  locator: () => createMockLocator(),
-  setUserAgent: async () => undefined,
-  url: () => 'https://example.com/dashboard',
-  title: async () => 'Dashboard',
-  goto: async () => undefined,
-  click: async () => undefined,
-  type: async () => undefined,
-  waitForSelector: async () => ({}),
-  isClosed: () => false,
-  context: () => ({
-    cookies: async () => [],
-    clearCookies: async () => undefined,
-    addCookies: async () => undefined,
-    newCDPSession: async () => ({
-      send: async () => ({}),
-    }),
-  }),
-  evaluate: async () => undefined,
-  once: () => undefined,
-  on: () => undefined,
-  off: () => undefined,
-  removeListener: () => undefined,
 };
 
 const defaultTestContext = {
