@@ -257,7 +257,7 @@ async function resolveClickPoint(
 
 重页面（2 万+ 元素）单次快照解析可能达数百毫秒。`nodeIndex` 映射与 rare data 的 set 化是避免 O(n²) 的必要措施（参考实现从 5.9s 降至 2ms）。若实测超时，需评估是否限制解析节点数并显式提示截断。
 
-备注：`parseSnapshot` 对 `bounds` 的 DPR 除数尚未在真实 Chrome 上实测（计划 Step 5 跳过）；若实测发现快照已返回 CSS px，则 `readSnapshot` 应传 `{devicePixelRatio: 1}`。
+备注：Chromium 实测验证（在 `deviceScaleFactor: 2` 下，`getBoundingClientRect()` 与 `DOMSnapshot` `layout.bounds` 均返回 `[8, 8, 100, 50]`）快照返回的包围盒已是 CSS px，因此无需且不得对 bounds 做 DPR 除法，`parseSnapshot` 直接返回原始 bounds。
 
 ### 10.5 硬编码交互 role / tag 集合会随站点演化
 

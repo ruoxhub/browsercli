@@ -137,7 +137,7 @@ describe('parseSnapshot', () => {
       },
     ]);
 
-    const nodes = parseSnapshot(raw, 1);
+    const nodes = parseSnapshot(raw);
     const target = nodes.find(node => node.backendNodeId === 7);
 
     assert.ok(target);
@@ -148,7 +148,7 @@ describe('parseSnapshot', () => {
     assert.equal(target.inIframe, false);
   });
 
-  it('divides snapshot bounds by device pixel ratio', () => {
+  it('returns snapshot bounds verbatim without DPR scaling', () => {
     const raw = buildSnapshot([
       {
         backendNodeId: 3,
@@ -158,8 +158,8 @@ describe('parseSnapshot', () => {
       },
     ]);
 
-    const [node] = parseSnapshot(raw, 2);
-    assert.deepEqual(node?.bounds, {x: 10, y: 20, width: 100, height: 40});
+    const [node] = parseSnapshot(raw);
+    assert.deepEqual(node?.bounds, {x: 20, y: 40, width: 200, height: 80});
   });
 
   it('aggregates descendant text into the element text', () => {
@@ -179,8 +179,32 @@ describe('parseSnapshot', () => {
       },
     ]);
 
-    const [button] = parseSnapshot(raw, 1);
+    const [button] = parseSnapshot(raw);
     assert.equal(button?.text, '提交答案');
+  });
+
+  it('preserves inter-node whitespace in aggregated text', () => {
+    const raw = buildSnapshot([
+      {backendNodeId: 1, tagName: 'button', styles: VISIBLE_STYLES},
+      {
+        backendNodeId: 2,
+        tagName: 'span',
+        parentIndex: 0,
+        styles: VISIBLE_STYLES,
+      },
+      {backendNodeId: 3, nodeType: 3, nodeValue: 'Hello', parentIndex: 1},
+      {backendNodeId: 4, nodeType: 3, nodeValue: ' ', parentIndex: 0},
+      {
+        backendNodeId: 5,
+        tagName: 'span',
+        parentIndex: 0,
+        styles: VISIBLE_STYLES,
+      },
+      {backendNodeId: 6, nodeType: 3, nodeValue: 'World', parentIndex: 4},
+    ]);
+
+    const [button] = parseSnapshot(raw);
+    assert.equal(button?.text, 'Hello World');
   });
 
   it('prefers live form values over descendant text', () => {
@@ -194,7 +218,7 @@ describe('parseSnapshot', () => {
       },
     ]);
 
-    const [node] = parseSnapshot(raw, 1);
+    const [node] = parseSnapshot(raw);
     assert.equal(node?.text, '已输入内容');
   });
 
@@ -215,7 +239,7 @@ describe('parseSnapshot', () => {
       {backendNodeId: 3, tagName: 'div', styles: VISIBLE_STYLES},
     ]);
 
-    const nodes = parseSnapshot(raw, 1);
+    const nodes = parseSnapshot(raw);
     assert.equal(nodes[0]?.isVisible, false);
     assert.equal(nodes[1]?.isVisible, false);
     assert.equal(nodes[2]?.isVisible, false);
@@ -233,7 +257,7 @@ describe('interactivity and sensitive fields', () => {
         bounds: [0, 0, 10, 10],
       },
     ]);
-    assert.equal(parseSnapshot(raw, 1)[0]?.isInteractive, true);
+    assert.equal(parseSnapshot(raw)[0]?.isInteractive, true);
   });
 
   it('marks nodes interactive by cursor pointer, tag, role and tabindex', () => {
@@ -279,7 +303,7 @@ describe('interactivity and sensitive fields', () => {
       },
     ]);
 
-    const nodes = parseSnapshot(raw, 1);
+    const nodes = parseSnapshot(raw);
     assert.deepEqual(
       nodes.map(node => node.isInteractive),
       [true, true, true, true, true, false],
@@ -297,7 +321,7 @@ describe('interactivity and sensitive fields', () => {
       },
     ]);
 
-    const [node] = parseSnapshot(raw, 1);
+    const [node] = parseSnapshot(raw);
     assert.equal(node?.isVisible, true);
     assert.equal(node?.isInteractive, true);
   });
@@ -314,7 +338,7 @@ describe('interactivity and sensitive fields', () => {
       },
     ]);
 
-    const [node] = parseSnapshot(raw, 1);
+    const [node] = parseSnapshot(raw);
     assert.equal(node?.attributes.value, undefined);
     assert.equal(node?.text, '');
     assert.equal(JSON.stringify(node).includes('hunter2'), false);
@@ -332,7 +356,7 @@ describe('interactivity and sensitive fields', () => {
       },
     ]);
 
-    const [node] = parseSnapshot(raw, 1);
+    const [node] = parseSnapshot(raw);
     assert.equal(JSON.stringify(node).includes('4111111111111111'), false);
   });
 
@@ -351,7 +375,7 @@ describe('interactivity and sensitive fields', () => {
       },
     ]);
 
-    const [node] = parseSnapshot(raw, 1);
+    const [node] = parseSnapshot(raw);
     assert.equal(JSON.stringify(node).includes('4111111111111111'), false);
   });
 
@@ -370,8 +394,29 @@ describe('interactivity and sensitive fields', () => {
       },
     ]);
 
-    const [node] = parseSnapshot(raw, 1);
+    const [node] = parseSnapshot(raw);
     assert.equal(node?.attributes.valuetext, undefined);
     assert.equal(JSON.stringify(node).includes('123456'), false);
+  });
+
+  it('scrubs aria-valuetext on sensitive fields', () => {
+    const raw = buildSnapshot([
+      {
+        backendNodeId: 1,
+        tagName: 'input',
+        attributes: {
+          type: 'password',
+          'aria-valuetext': 'secret123',
+          value: 'secret123',
+        },
+        styles: VISIBLE_STYLES,
+        bounds: [0, 0, 120, 24],
+      },
+    ]);
+
+    const [node] = parseSnapshot(raw);
+    assert.equal(node?.attributes['aria-valuetext'], undefined);
+    assert.equal(node?.attributes.value, undefined);
+    assert.equal(JSON.stringify(node).includes('secret123'), false);
   });
 });

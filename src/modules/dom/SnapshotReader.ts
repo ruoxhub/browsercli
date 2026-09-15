@@ -203,17 +203,13 @@ function readAttributes(
   return attributes;
 }
 
-function readBounds(
-  bounds: number[] | undefined,
-  devicePixelRatio: number,
-): SnapshotBounds | undefined {
+function readBounds(bounds: number[] | undefined): SnapshotBounds | undefined {
   if (!bounds || bounds.length < 4) return undefined;
-  const ratio = devicePixelRatio > 0 ? devicePixelRatio : 1;
   return {
-    x: bounds[0] / ratio,
-    y: bounds[1] / ratio,
-    width: bounds[2] / ratio,
-    height: bounds[3] / ratio,
+    x: bounds[0],
+    y: bounds[1],
+    width: bounds[2],
+    height: bounds[3],
   };
 }
 
@@ -244,10 +240,7 @@ function computeVisibility(
   return true;
 }
 
-export function parseSnapshot(
-  raw: RawSnapshot,
-  devicePixelRatio = 1,
-): SnapshotNode[] {
+export function parseSnapshot(raw: RawSnapshot): SnapshotNode[] {
   const strings = raw.strings ?? [];
   const result: SnapshotNode[] = [];
 
@@ -282,22 +275,22 @@ export function parseSnapshot(
     });
 
     // ponytail: 递归聚合文本按节点记忆化，单页 O(总文本量)；若实测超时，改为只对交互元素按需聚合。
-    const textCache = new Map<number, string>();
-    const collectText = (index: number): string => {
-      const cached = textCache.get(index);
+    const rawTextCache = new Map<number, string>();
+    const collectRawText = (index: number): string => {
+      const cached = rawTextCache.get(index);
       if (cached !== undefined) return cached;
       let value = '';
       if (nodeTypes[index] === TEXT_NODE) {
-        value = str(nodeValues[index], strings).trim();
+        value = str(nodeValues[index], strings);
       } else {
         for (const child of childrenByParent.get(index) ?? []) {
-          value += collectText(child);
+          value += collectRawText(child);
         }
       }
-      const normalized = value.trim();
-      textCache.set(index, normalized);
-      return normalized;
+      rawTextCache.set(index, value);
+      return value;
     };
+    const collectText = (index: number): string => collectRawText(index).trim();
 
     for (let index = 0; index < backendIds.length; index += 1) {
       const backendNodeId = backendIds[index];
@@ -309,7 +302,6 @@ export function parseSnapshot(
       const layoutIndex = layoutIndexByNode.get(index);
       const bounds = readBounds(
         layoutIndex === undefined ? undefined : layout.bounds?.[layoutIndex],
-        devicePixelRatio,
       );
       const computedStyles = readStyles(
         layoutIndex === undefined ? undefined : layout.styles?.[layoutIndex],
@@ -323,6 +315,7 @@ export function parseSnapshot(
       if (sensitive) {
         delete attributes.value;
         delete attributes.valuetext;
+        delete attributes['aria-valuetext'];
       }
       const liveValue = sensitive
         ? ''
@@ -362,21 +355,7 @@ export function parseSnapshot(
   return result;
 }
 
-async function readDevicePixelRatio(page: Page): Promise<number> {
-  try {
-    const ratio = await page.evaluate(() => window.devicePixelRatio);
-    return typeof ratio === 'number' && ratio > 0 ? ratio : 1;
-  } catch {
-    return 1;
-  }
-}
-
-export async function readSnapshot(
-  page: Page,
-  options?: {devicePixelRatio?: number},
-): Promise<SnapshotNode[]> {
-  const devicePixelRatio =
-    options?.devicePixelRatio ?? (await readDevicePixelRatio(page));
+export async function readSnapshot(page: Page): Promise<SnapshotNode[]> {
   const raw = await withCdpSession(page, client =>
     client.send('DOMSnapshot.captureSnapshot', {
       computedStyles: [...REQUIRED_COMPUTED_STYLES],
@@ -384,5 +363,5 @@ export async function readSnapshot(
       includeDOMRects: true,
     }),
   );
-  return parseSnapshot(raw as unknown as RawSnapshot, devicePixelRatio);
+  return parseSnapshot(raw as unknown as RawSnapshot);
 }

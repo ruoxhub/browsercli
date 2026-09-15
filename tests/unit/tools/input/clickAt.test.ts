@@ -27,40 +27,57 @@ function makeCdpClient() {
     client: {
       send: async (method: string, params?: Record<string, unknown>) => {
         calls.push({method, params});
-        switch (method) {
-          case 'DOM.getContentQuads':
-            return {quads: [[0, 0, 100, 0, 100, 50, 0, 50]]};
-          case 'Page.getLayoutMetrics':
-            return {cssLayoutViewport: {clientWidth: 800, clientHeight: 600}};
-          default:
-            return {};
-        }
+        return {};
       },
       detach: async () => undefined,
     },
   };
 }
 
-function makeFrame(client: unknown) {
+function makeFrame(client: unknown, options?: {noElement?: boolean}) {
+  let clicked = false;
+  const mockEl = {
+    getClientRects: () => [
+      {left: 0, top: 0, right: 100, bottom: 50, width: 100, height: 50},
+    ],
+    getBoundingClientRect: () => ({x: 0, y: 0, width: 100, height: 50}),
+    contains: () => false,
+  };
+
   return {
+    getClicked: () => clicked,
     page: () => ({
       context: () => ({newCDPSession: async () => client}),
       evaluate: async () => 1,
     }),
     locator: () => ({
       scrollIntoViewIfNeeded: async () => undefined,
-      elementHandle: async () => ({
-        _remoteObject: () => ({objectId: 'remote-1'}),
-        evaluate: async () => ({x: 0, y: 0, width: 100, height: 50}),
-      }),
-      evaluate: async () => ({x: 50, y: 25, tag: 'BUTTON', text: '提交'}),
-      click: async () => undefined,
+      elementHandle: async () => {
+        if (options?.noElement) return null;
+        return {
+          evaluate: async (fn: any, args: any) => {
+            const prevWin = (globalThis as any).window;
+            const prevDoc = (globalThis as any).document;
+            (globalThis as any).window = {innerWidth: 800, innerHeight: 600};
+            (globalThis as any).document = {elementFromPoint: () => mockEl};
+            try {
+              return fn(mockEl, args);
+            } finally {
+              (globalThis as any).window = prevWin;
+              (globalThis as any).document = prevDoc;
+            }
+          },
+        };
+      },
+      click: async () => {
+        clicked = true;
+      },
     }),
   };
 }
 
 describe('click_at', () => {
-  it('clicks at the resolved quad center for any locator', async () => {
+  it('clicks at the resolved client rect center for any locator', async () => {
     const {calls, client} = makeCdpClient();
     const {response, getContent} = makeResponse();
 
@@ -75,7 +92,26 @@ describe('click_at', () => {
     assert.equal(pressed?.params?.y, 25);
     assert.equal(
       (getContent()?.data as Record<string, unknown>)?.source,
-      'contentQuads',
+      'clientRects',
+    );
+  });
+
+  it('falls back to locator.click() and reports jsClick when element handle is null', async () => {
+    const {calls, client} = makeCdpClient();
+    const {response, getContent} = makeResponse();
+    const frame = makeFrame(client, {noElement: true});
+
+    await clickAt.handler(
+      {params: {selector: '#missing'}} as never,
+      response as never,
+      {getSelectedFrame: () => frame} as never,
+    );
+
+    assert.equal(frame.getClicked(), true);
+    assert.equal(calls.length, 0);
+    assert.equal(
+      (getContent()?.data as Record<string, unknown>)?.source,
+      'jsClick',
     );
   });
 });
