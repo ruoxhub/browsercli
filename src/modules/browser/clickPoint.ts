@@ -86,6 +86,29 @@ function clamp(value: number, max: number): number {
   return Math.max(0, Math.min(max - 1, value));
 }
 
+/**
+ * 原生遮挡判定：用 document.elementFromPoint 检查 quad 中心是否被其他顶层元素覆盖。
+ * 任一环节失败（跨 iframe、evaluate 异常等）时按未遮挡处理，保持降级语义。
+ */
+async function isQuadTopmost(
+  handle: any,
+  x: number,
+  y: number,
+): Promise<boolean> {
+  try {
+    return await handle.evaluate(
+      (el: Element, point: {x: number; y: number}) => {
+        const topEl = document.elementFromPoint(point.x, point.y);
+        if (!topEl) return true;
+        return el === topEl || el.contains(topEl) || topEl.contains(el);
+      },
+      {x, y},
+    );
+  } catch {
+    return true;
+  }
+}
+
 async function readViewport(client: CDPSession): Promise<Viewport> {
   try {
     const metrics = await client.send('Page.getLayoutMetrics', {});
@@ -132,12 +155,23 @@ export async function resolveClickPoint(
         const response = await client.send('DOM.getContentQuads', {objectId});
         const quads = response.quads ?? [];
         if (quads.length > 0) {
-          const best = quads.reduce((current, candidate) =>
-            visibleArea(candidate, viewport) > visibleArea(current, viewport)
-              ? candidate
-              : current,
+          // 按可见面积从大到小排序
+          const sorted = [...quads].sort(
+            (a, b) => visibleArea(b, viewport) - visibleArea(a, viewport),
           );
-          const center = quadCenter(best);
+
+          // 寻找第一个未被遮挡的 quad
+          let chosen = sorted[0];
+          for (const candidate of sorted) {
+            const center = quadCenter(candidate);
+            const topmost = await isQuadTopmost(handle, center.x, center.y);
+            if (topmost) {
+              chosen = candidate;
+              break;
+            }
+          }
+
+          const center = quadCenter(chosen);
           return {
             kind: 'point',
             x: clamp(center.x, viewport.width),

@@ -148,4 +148,42 @@ describe('resolveClickPoint', () => {
     const result = await resolveClickPoint(frame as never, '#missing');
     assert.deepEqual(result, {kind: 'jsClick'});
   });
+
+  it('selects alternative quad when the primary quad is obscured by another topmost element', async () => {
+    const client = makeClient({
+      'Page.getLayoutMetrics': () => ({
+        cssLayoutViewport: {clientWidth: 800, clientHeight: 600},
+      }),
+      'DOM.getContentQuads': () => ({
+        quads: [
+          [10, 10, 50, 10, 50, 50, 10, 50], // quad 1: 面积 1600，但被遮挡
+          [60, 10, 90, 10, 90, 40, 60, 40], // quad 2: 面积 900，未遮挡
+        ],
+      }),
+    });
+
+    const frame = {
+      page: () => ({
+        context: () => ({newCDPSession: async () => client}),
+        evaluate: async () => 1,
+      }),
+      locator: () => ({
+        scrollIntoViewIfNeeded: async () => undefined,
+        elementHandle: async () => ({
+          _remoteObject: () => ({objectId: 'remote-1'}),
+          evaluate: async (_fn: any, args: any) => {
+            // 模拟 elementFromPoint 检查：quad 1 (x:30, y:30) 被遮挡，quad 2 (x:75, y:25) 未遮挡
+            if (args?.x === 30 && args?.y === 30) return false;
+            return true;
+          },
+        }),
+      }),
+    };
+
+    const result = await resolveClickPoint(frame as never, '#btn');
+    assert.equal(result.kind, 'point');
+    if (result.kind !== 'point') return;
+    assert.equal(result.x, 75);
+    assert.equal(result.y, 25);
+  });
 });
