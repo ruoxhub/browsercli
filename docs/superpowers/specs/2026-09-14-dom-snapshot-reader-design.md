@@ -73,12 +73,17 @@ find_clickable_elements (工具)
 click_at / PageInteraction.clickAt
   └─ resolveClickPoint(frame, selector)      [新共享 helper, src/modules/browser/]
         └─ frame.locator(selector) 先滚动入视口 (scrollIntoViewIfNeeded)
-        └─ 取 elementHandle._remoteObject().objectId
-        └─ withCdpSession → DOM.getContentQuads({objectId}) → 选最大可见 quad
-        └─ 降级 DOM.getBoxModel({objectId})
+        └─ elementHandle.evaluate → getClientRects() 视口裁剪面积降序
+        └─ elementFromPoint 遮挡探测，取首个未遮挡 rect 中心
         └─ 降级 getBoundingClientRect 中心
         └─ 降级 jsClick
 ```
+
+> 修订（2026-09-15）：原设计经 `elementHandle._remoteObject().objectId` 走 CDP
+> `DOM.getContentQuads` / `DOM.getBoxModel`。该访问器在 Patchright（Playwright 内核）
+> 上不存在，实测 `typeof handle._remoteObject === 'undefined'`，整条 CDP 层在生产环境
+> 恒被跳过。现改为页内原生几何 `getClientRects()` + `elementFromPoint`，同样支持全部
+> 定位器（handle 已由 locator 解析），且省去每次点击的 CDP session 往返。详见 §5.3。
 
 ### 4.2 数据流（find_clickable_elements）
 
@@ -161,27 +166,27 @@ async function readSnapshot(page: Page): Promise<SnapshotNode[]>;
 **动机**：`click_at` 存在两份独立实现，只修一处会留下同类 bug。按根因修复原则，逻辑收敛到一个 helper，两处都调；同时打通全定位器支持与视口防偏。
 
 ```ts
-interface ClickPoint {
-  x: number;
-  y: number;
-  source: 'contentQuads' | 'boxModel' | 'boundingRect' | 'jsClick';
-  quadCount: number;
-}
+type ClickSource = 'clientRects' | 'boundingRect';
+
+type ClickResolution =
+  | {kind: 'point'; x: number; y: number; source: ClickSource; quadCount: number}
+  | {kind: 'jsClick'};
 
 async function resolveClickPoint(
   frame: Frame,
   selector: string,          // 支持 CSS / role= / text= / xpath= / >> nth=
-): Promise<ClickPoint>;
+  options?: {viewport?: {width: number; height: number}},
+): Promise<ClickResolution>;
 ```
 
 **关键机制与降级链**：
 
 1. **必须先滚动入视口**：通过 `const locator = frame.locator(selector); await locator.scrollIntoViewIfNeeded();` 确保元素处于可视区。若跳过此步直接取坐标，长页面底部元素被 clamp 截断会导致误触视口边缘空白或错误组件。
-2. **获取 CDP objectId**：`const handle = await locator.elementHandle(); const objectId = (handle as any)._remoteObject?.()?.objectId;`。通过 `objectId` 查询 CDP，免除 `DOM.querySelector` 仅支持 CSS 的限制，原生支持所有 Playwright 定位器以及子 iframe 内元素。
-3. **提取可见 quad**：`DOM.getContentQuads({objectId})`。多 quad 时选**与视口交集面积最大**者，取四顶点几何中心。若全部 quad 在视口外（不可见/隐藏），取首个 quad 并 clamp 到视口内。
-4. **降级 boxModel**：若无 quads，调 `DOM.getBoxModel({objectId})`，取 `content` 框顶点均值。
-5. **降级 boundingRect**：`handle.evaluate(el => el.getBoundingClientRect())` 取中心点。
-6. **最终降级 jsClick**：仍无法取得有效坐标时返回 `source: 'jsClick'`，由调用方决定是否直接调 `locator.click()`。
+2. **获取 ElementHandle**：`const handle = await locator.elementHandle();`。handle 已由 locator 解析，因此原生支持所有 Playwright 定位器（CSS / role= / text= / xpath= / >> nth=），不需要额外的 `objectId`。
+3. **页内提取可见 rect**：`handle.evaluate` 内执行 `el.getClientRects()`，过滤零面积 rect，按**与视口交集面积**降序排序，取第一个未被遮挡者的中心。视口取 `options.viewport`，否则页内 `window.innerWidth/innerHeight`。
+4. **遮挡探测**：对候选中心调用 `document.elementFromPoint(x, y)`，未遮挡判定为 `topEl == null || el === topEl || el.contains(topEl)`。
+5. **降级 boundingRect**：rect 为空或上述探测整体失败时，`handle.evaluate(el => el.getBoundingClientRect())` 取中心点。
+6. **最终降级 jsClick**：仍无法取得有效坐标时返回 `{kind: 'jsClick'}`，由调用方决定是否直接调 `locator.click()`。
 
 **接入点**：
 
@@ -192,9 +197,9 @@ async function resolveClickPoint(
 
 在落点 `(x, y)` 坐标计算出来后，验证该点是否被其它顶层图层覆盖：
 
-- **实现方式**：直接通过 `frame.evaluate(({x, y}) => { const topEl = document.elementFromPoint(x, y); return topEl; }, {x, y})`，判断顶层元素是否是目标元素本身或其子节点。
+- **实现方式**：在元素的 `handle.evaluate` 内直接调用原生 `document.elementFromPoint(x, y)`，判断顶层元素是否是目标元素本身或其子节点（`el === topEl || el.contains(topEl)`）。**不采用** `topEl.contains(el)`——当目标 `pointer-events: none` 时它会误判为未遮挡。
 - **优点**：无需在 Node.js 端手写复杂的 2D 矩形差集/并集（避免 O(n²) 与 5000 矩形上限隐患），完美处理 CSS 层叠上下文、透明度、圆角、transform 变换与遮挡。
-- **结合**：若顶层命中元素不是目标节点，则尝试该元素的其余 quad，或标记 `isObscured: true`。
+- **结合**：若顶层命中元素不是目标节点，则尝试该元素的其余 rect；全部候选均被遮挡时回退面积最大者，不降级为 jsClick。
 
 ## 6. 错误处理与回退
 
@@ -243,7 +248,7 @@ async function resolveClickPoint(
 
 ### 10.1 定位器与 Frame 覆盖
 
-通过 Playwright ElementHandle 的 `objectId` 直通 CDP，已支持全部定位器（CSS / role= / text= / xpath= / >> nth=）与子 iframe 元素。已知限制为：极端情况下若元素已被 DOM 移除导致 handle 失效时，优雅回退到 `jsClick`。
+通过 Playwright `locator.elementHandle()` 拿到元素句柄后在元素所属 frame 内取几何，已支持全部定位器（CSS / role= / text= / xpath= / >> nth=）。已知限制为：极端情况下若元素已被 DOM 移除导致 handle 失效时，优雅回退到 `jsClick`。
 
 ### 10.2 iframe 覆盖为 best-effort
 

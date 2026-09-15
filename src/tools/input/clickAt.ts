@@ -14,8 +14,8 @@ import {defineTool, type Context} from '../ToolDefinition.js';
 /**
  * 通过 CDP 在元素坐标处派发真实鼠标点击事件。
  *
- * 全定位器（CSS / role= / text= / xpath= / >> nth=）均通过 CDP quad 选取视口内可见区域中心；
- * 并在点击前先滚动入视口以防点偏。
+ * 全定位器（CSS / role= / text= / xpath= / >> nth=）均通过页内 getClientRects 选取视口内
+ * 最大可见区域中心，并避开被遮挡的候选 rect；点击前先滚动入视口以防点偏。
  */
 export const clickAt = defineTool({
   name: 'click_at',

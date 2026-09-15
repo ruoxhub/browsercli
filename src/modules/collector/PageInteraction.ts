@@ -43,7 +43,7 @@ export async function click(
  * 🆕 真实鼠标点击 — CDP Input.dispatchMouseEvent
  * 算作用户真实手势，能触发文件对话框、绕过部分反自动化检测
  *
- * 落点由 resolveClickPoint 解析：视口内最大可见 quad 中心，逐层降级。
+ * 落点由 resolveClickPoint 解析：视口内最大可见 rect 中心，逐层降级。
  */
 export async function clickAt(
   page: Page,
