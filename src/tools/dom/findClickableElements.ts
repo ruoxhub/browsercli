@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {
+  readSnapshot,
+  type SnapshotNode,
+} from '../../modules/dom/SnapshotReader.js';
 import {zod} from '../../third_party/index.js';
 import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
@@ -38,18 +42,29 @@ export const findClickableElements = defineTool({
     const frame = (context as Context).getSelectedFrame();
 
     if (!frame) {
-      throw createToolError(
-        ErrorCodes.FRAME_REQUIRED,
-        NO_ACTIVE_PAGE_MESSAGE,
-        {toolName: 'find_clickable_elements'},
-      );
+      throw createToolError(ErrorCodes.FRAME_REQUIRED, NO_ACTIVE_PAGE_MESSAGE, {
+        toolName: 'find_clickable_elements',
+      });
+    }
+
+    let nodes: SnapshotNode[] = [];
+    let degraded = false;
+    try {
+      nodes = await readSnapshot(frame.page());
+    } catch {
+      degraded = true;
     }
 
     try {
-      const elements = await frame.evaluate(findClickableCode, filterText);
+      const elements = degraded
+        ? await frame.evaluate(findClickableCode, filterText)
+        : mapNodesToClickable(nodes, filterText);
       response.setStructuredContent({
         success: true,
-        message: `Found ${elements.length} clickable elements${filterText ? ` (filtered: "${filterText}")` : ''}`,
+        message:
+          `Found ${elements.length} clickable elements` +
+          `${filterText ? ` (filtered: "${filterText}")` : ''}` +
+          `${degraded ? ' (fallback: JS heuristic)' : ''}`,
         tooltype: 'find_clickable_elements',
         data: elements,
       });
@@ -62,6 +77,38 @@ export const findClickableElements = defineTool({
     }
   },
 });
+
+/** 由快照节点生成与旧实现一致的 CSS 选择器。 */
+function buildSelector(node: SnapshotNode): string {
+  const id = node.attributes.id;
+  if (id) return `#${id}`;
+  const firstClass = (node.attributes.class ?? '')
+    .split(/\s+/)
+    .filter(Boolean)[0];
+  if (firstClass) return `${node.tagName}.${firstClass}`;
+  return node.tagName;
+}
+
+/** 保持 ClickableElement 契约不变：a → link，其余 → button。 */
+function mapNodesToClickable(
+  nodes: SnapshotNode[],
+  filterText?: string,
+): ClickableElement[] {
+  const lowered = filterText?.toLowerCase();
+  const elements: ClickableElement[] = [];
+  for (const node of nodes) {
+    if (!node.isVisible || !node.isInteractive) continue;
+    if (lowered && !node.text.toLowerCase().includes(lowered)) continue;
+    elements.push({
+      selector: buildSelector(node),
+      text: node.text,
+      type: node.tagName === 'a' ? 'link' : 'button',
+      visible: node.isVisible,
+      boundingBox: node.bounds,
+    });
+  }
+  return elements;
+}
 
 /** 注入代码：查找可点击元素 */
 function findClickableCode(filter?: string): ClickableElement[] {
