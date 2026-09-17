@@ -64,6 +64,7 @@ export interface BrowserConnectOptions {
   channel?: string;
   cloak?: boolean;
   executablePath?: string;
+  force?: boolean;
   fullStealthArgs?: boolean;
   headless?: boolean;
   isolated?: boolean;

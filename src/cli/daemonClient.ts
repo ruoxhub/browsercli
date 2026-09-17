@@ -17,6 +17,7 @@ import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 
 import {
   computeClientInfo,
@@ -28,6 +29,33 @@ import {
 /** 与 src/ipc/socketConnection.ts 的 PROTOCOL_VERSION 同步修改 */
 export const PROTOCOL_VERSION = 1;
 
+export function readPackageVersion(): string {
+  try {
+    let dir = path.dirname(fileURLToPath(import.meta.url));
+    for (let i = 0; i < 10; i++) {
+      const candidate = path.join(dir, 'package.json');
+      if (fs.existsSync(candidate)) {
+        try {
+          const parsed = JSON.parse(fs.readFileSync(candidate, 'utf-8')) as {
+            version?: string;
+          };
+          if (typeof parsed.version === 'string') return parsed.version;
+        } catch {
+          // ignore
+        }
+      }
+      const parent = path.dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+  } catch {
+    // ignore
+  }
+  return '2.0.3';
+}
+
+export const CLI_VERSION = readPackageVersion();
+
 export const DEFAULT_INVOKE_TIMEOUT_MS = 300_000;
 
 export interface DaemonEvent {
@@ -35,6 +63,17 @@ export interface DaemonEvent {
   channel?: string;
   payload?: unknown;
   ts?: number;
+}
+
+export interface DaemonStatusResult {
+  version: string;
+  protocol: number;
+  pid: number;
+  session: string;
+  socketPath: string;
+  startDate: string;
+  uptimeMs: number;
+  args: string[];
 }
 
 /** DaemonConnection 的鸭子类型面：命令层与测试 fake 共用（类含私有字段无法直接冒充）。 */
@@ -301,7 +340,7 @@ export async function spawnDaemon(
   const cwd = opts.cwd ?? process.cwd();
   const info = computeClientInfo(cwd);
   const daemonDir = opts.daemonDir ?? info.daemonDir;
-  await fs.promises.mkdir(daemonDir, {recursive: true});
+  await fs.promises.mkdir(daemonDir, {recursive: true, mode: 0o700});
   const errLog = path.join(daemonDir, `${opts.session}.err`);
   const err = fs.openSync(errLog, 'w');
   const child = spawn(
@@ -317,24 +356,46 @@ export async function spawnDaemon(
     {detached: true, stdio: ['ignore', 'pipe', err], cwd, windowsHide: true},
   );
   let outLog = '';
-  const ready = await new Promise<'ok' | 'exit'>(resolveP => {
-    const timer = setTimeout(() => resolveP('exit'), 30_000);
-    child.stdout!.on('data', d => {
-      outLog += d.toString();
-      if (outLog.includes('Daemon listening on')) {
-        clearTimeout(timer);
-        resolveP('ok');
+  let pollTimer: NodeJS.Timeout | undefined;
+  const pollSession = new Promise<'ok'>(resolvePoll => {
+    pollTimer = setInterval(async () => {
+      const c = await loadSession(daemonDir, opts.session);
+      if (c && isPidAlive(c.pid)) {
+        try {
+          const conn = await DaemonConnection.connect(c.socketPath, 300);
+          conn.close();
+          clearInterval(pollTimer);
+          resolvePoll('ok');
+        } catch {
+          // 正在启动中
+        }
       }
-    });
-    child.once('close', () => {
-      clearTimeout(timer);
-      resolveP('exit');
-    });
+    }, 100);
   });
+
+  const ready = await Promise.race([
+    new Promise<'ok' | 'exit'>(resolveP => {
+      const timer = setTimeout(() => resolveP('exit'), 30_000);
+      child.stdout!.on('data', d => {
+        outLog += d.toString();
+        if (outLog.includes('Daemon listening on')) {
+          clearTimeout(timer);
+          resolveP('ok');
+        }
+      });
+      child.once('close', () => {
+        clearTimeout(timer);
+        resolveP('exit');
+      });
+    }),
+    pollSession,
+  ]);
+  if (pollTimer) clearInterval(pollTimer);
   child.stdout!.destroy();
   child.unref();
   fs.closeSync(err);
   if (ready !== 'ok') {
+    if (child.pid) killPidForce(child.pid);
     const errText = fs.existsSync(errLog)
       ? fs.readFileSync(errLog, 'utf-8')
       : '';
@@ -357,12 +418,41 @@ export async function spawnDaemon(
   return cfg;
 }
 
-/** 发现 → 探活 → 陈旧则清理并自动拉起。 */
+/** 检查系统进程列表中指定 PID 是否仍存活。 */
+export function isPidAlive(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
+
+/** 跨平台强杀指定 PID 的进程。 */
+export function killPidForce(pid: number): void {
+  if (!isPidAlive(pid)) return;
+  try {
+    if (process.platform === 'win32') {
+      execFileSync('taskkill', ['/PID', String(pid), '/F'], {
+        stdio: 'ignore',
+      });
+    } else {
+      process.kill(pid, 'SIGKILL');
+    }
+  } catch {
+    // 忽略进程退出竞争或无权限
+  }
+}
+
+/** 发现 → 探活 → 陈旧则清理并自动拉起（带跨进程并发互斥锁防重）。 */
 export async function ensureDaemon(
   opts: EnsureDaemonOptions,
 ): Promise<SessionConfig> {
   const info = computeClientInfo(opts.cwd);
   const daemonDir = opts.daemonDir ?? info.daemonDir;
+
+  // 1. 尝试直接复用已有正常会话
   const cfg = await loadSession(daemonDir, opts.session);
   if (cfg) {
     try {
@@ -370,14 +460,121 @@ export async function ensureDaemon(
       conn.close();
       return cfg;
     } catch {
-      // 陈旧注册：探活失败 → 删 session 文件后重新拉起
+      // 陈旧注册：探活失败。若旧进程仍然存活，强杀它避免变成孤儿 daemon
+      if (cfg.pid && cfg.pid !== process.pid && isPidAlive(cfg.pid)) {
+        killPidForce(cfg.pid);
+      }
       await deleteSession(daemonDir, opts.session);
     }
   }
-  return spawnDaemon({...opts, daemonDir});
+
+  // 2. 避免并发命令同时拉起多个 daemon：基于 session 的启动锁
+  await fs.promises.mkdir(daemonDir, {recursive: true, mode: 0o700});
+  const lockFile = path.join(daemonDir, `${opts.session}.spawn.lock`);
+
+  const acquireLock = async (): Promise<() => void> => {
+    const start = Date.now();
+    while (Date.now() - start < 30_000) {
+      try {
+        const fd = fs.openSync(lockFile, 'wx');
+        fs.writeFileSync(fd, `${process.pid}\n${Date.now()}`);
+        fs.closeSync(fd);
+        return () => {
+          try {
+            fs.unlinkSync(lockFile);
+          } catch {
+            // ignore
+          }
+        };
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code === 'EEXIST') {
+          // 检查锁是否过期（持有者已死，或超时 35s）
+          try {
+            const content = fs.readFileSync(lockFile, 'utf-8');
+            const [pidStr, tsStr] = content.split('\n');
+            const lockPid = Number(pidStr);
+            const lockTs = Number(tsStr);
+            if (
+              (lockPid && !isPidAlive(lockPid)) ||
+              (lockTs && Date.now() - lockTs > 35_000)
+            ) {
+              try {
+                fs.unlinkSync(lockFile);
+              } catch {
+                // ignore
+              }
+              continue;
+            }
+          } catch {
+            // ignore
+          }
+
+          // 等待期间检查是否有其他并发 CLI 已经成功启动了 daemon
+          const existing = await loadSession(daemonDir, opts.session);
+          if (existing) {
+            try {
+              const conn = await DaemonConnection.connect(
+                existing.socketPath,
+                3000,
+              );
+              conn.close();
+              throw {reusedConfig: existing};
+            } catch (probeErr) {
+              if ((probeErr as {reusedConfig?: SessionConfig}).reusedConfig) {
+                throw probeErr;
+              }
+            }
+          }
+
+          await new Promise(r => setTimeout(r, 200));
+          continue;
+        }
+        throw err;
+      }
+    }
+    throw new Error(`等待 daemon 启动锁超时 (${lockFile})`);
+  };
+
+  let releaseLock: (() => void) | undefined;
+  try {
+    releaseLock = await acquireLock();
+  } catch (lockErr) {
+    if ((lockErr as {reusedConfig?: SessionConfig}).reusedConfig) {
+      return (lockErr as {reusedConfig: SessionConfig}).reusedConfig;
+    }
+    throw lockErr;
+  }
+
+  try {
+    // 抢到锁后二次检查，防止在此期间已有可用会话
+    const doubleCheck = await loadSession(daemonDir, opts.session);
+    if (doubleCheck) {
+      try {
+        const conn = await DaemonConnection.connect(
+          doubleCheck.socketPath,
+          3000,
+        );
+        conn.close();
+        return doubleCheck;
+      } catch {
+        if (
+          doubleCheck.pid &&
+          doubleCheck.pid !== process.pid &&
+          isPidAlive(doubleCheck.pid)
+        ) {
+          killPidForce(doubleCheck.pid);
+        }
+        await deleteSession(daemonDir, opts.session);
+      }
+    }
+
+    return await spawnDaemon({...opts, daemonDir});
+  } finally {
+    releaseLock?.();
+  }
 }
 
-/** 请求 stop；连不上视为已死；轮询 pid 探活，死了即清理 session 文件。 */
+/** 请求 stop；连不上视为已死；轮询 pid 探活，超时强杀并清理 session 文件。 */
 export async function stopSession(
   cfg: SessionConfig,
   daemonDir?: string,
@@ -391,23 +588,19 @@ export async function stopSession(
   }
   let alive = false;
   for (let i = 0; i < 10; i++) {
-    try {
-      process.kill(cfg.pid, 0);
-      alive = true;
-    } catch {
-      alive = false;
-      break;
-    }
+    alive = isPidAlive(cfg.pid);
+    if (!alive) break;
     await new Promise(r => setTimeout(r, 100));
   }
-  if (!alive) {
-    const dir =
-      daemonDir ??
-      (cfg.workspaceDir
-        ? computeClientInfo(cfg.workspaceDir).daemonDir
-        : undefined);
-    if (dir) await deleteSession(dir, cfg.name);
+  if (alive) {
+    killPidForce(cfg.pid);
   }
+  const dir =
+    daemonDir ??
+    (cfg.workspaceDir
+      ? computeClientInfo(cfg.workspaceDir).daemonDir
+      : undefined);
+  if (dir) await deleteSession(dir, cfg.name);
 }
 
 /** 从 ps/进程列表行提取 daemon pid：须同时含 node 进程特征与 --proxycli-daemon / --browsercli-daemon，排除 grep 自身。 */
@@ -453,24 +646,110 @@ export async function killAllDaemons(): Promise<number[]> {
     );
     pids = collectDaemonPids(out.split(/\r?\n/));
     for (const pid of pids) {
-      try {
-        execFileSync('taskkill', ['/PID', String(pid), '/F'], {
-          stdio: 'ignore',
-        });
-      } catch {
-        // 已退出的进程忽略
-      }
+      killPidForce(pid);
     }
   } else {
     const out = execFileSync('ps', ['-eo', 'pid=,args='], {encoding: 'utf-8'});
     pids = collectDaemonPids(out.split('\n'));
     for (const pid of pids) {
-      try {
-        process.kill(pid, 'SIGKILL');
-      } catch {
-        // 已退出的进程忽略
-      }
+      killPidForce(pid);
     }
   }
   return pids;
+}
+
+/**
+ * 检查指定会话的 daemon 是否正在运行并存活（结合 session 注册与 socket 探活）。
+ * 对齐 chrome-devtools-mcp 的 isDaemonRunning。
+ */
+export async function isDaemonRunning(
+  session: string,
+  daemonDir?: string,
+): Promise<boolean> {
+  const dir = daemonDir ?? computeClientInfo().daemonDir;
+  const cfg = await loadSession(dir, session);
+  if (!cfg) return false;
+  if (!isPidAlive(cfg.pid)) return false;
+  try {
+    const conn = await DaemonConnection.connect(cfg.socketPath, 500);
+    conn.close();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 轮询等待 daemon 就绪（基于 session 文件生成与 socket 探活响应）。
+ * 对齐 chrome-devtools-mcp 的 waitForDaemonReady。
+ */
+export async function waitForDaemonReady(
+  session: string,
+  daemonDir?: string,
+  timeoutMs = 15_000,
+): Promise<SessionConfig> {
+  const dir = daemonDir ?? computeClientInfo().daemonDir;
+  const deadline = Date.now() + timeoutMs;
+  let lastError: unknown;
+
+  while (Date.now() < deadline) {
+    try {
+      const cfg = await loadSession(dir, session);
+      if (cfg && isPidAlive(cfg.pid)) {
+        const conn = await DaemonConnection.connect(cfg.socketPath, 500);
+        try {
+          const res = await conn.request<{protocol?: number}>(
+            'hello',
+            undefined,
+            1000,
+          );
+          conn.close();
+          if (res) return cfg;
+        } catch (reqErr) {
+          conn.close();
+          lastError = reqErr;
+        }
+      }
+    } catch (err) {
+      lastError = err;
+    }
+    const timeLeft = deadline - Date.now();
+    if (timeLeft > 0) {
+      await new Promise(r => setTimeout(r, Math.min(100, timeLeft)));
+    }
+  }
+  throw new Error(
+    `Timeout: daemon [${session}] not ready within ${timeoutMs}ms`,
+    lastError === undefined ? undefined : {cause: lastError},
+  );
+}
+
+/**
+ * 核验后台运行中 daemon 的版本与当前 CLI 版本是否一致。
+ * 对齐 chrome-devtools-mcp 的 verifyDaemonVersion。
+ * 若不一致返回警告提示，否则返回 undefined。
+ */
+export async function verifyDaemonVersion(
+  session: string,
+  cliVersion: string,
+  daemonDir?: string,
+): Promise<string | undefined> {
+  const dir = daemonDir ?? computeClientInfo().daemonDir;
+  const cfg = await loadSession(dir, session);
+  if (!cfg || !isPidAlive(cfg.pid)) return undefined;
+  try {
+    const conn = await DaemonConnection.connect(cfg.socketPath, 1000);
+    const status = await conn.request<DaemonStatusResult>(
+      'status',
+      undefined,
+      1000,
+    );
+    conn.close();
+    if (status?.version && status.version !== cliVersion) {
+      return `Warning: Daemon server version (${status.version}) does not match CLI version (${cliVersion}). Run 'proxycli -s=${session} close' to update and restart the daemon.`;
+    }
+  } catch {
+    // 忽略探活时的偶发通讯错误，由命令自身处理错误
+  }
+  return undefined;
 }

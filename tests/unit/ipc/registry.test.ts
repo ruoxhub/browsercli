@@ -12,6 +12,7 @@ import path from 'node:path';
 import {describe, it} from 'node:test';
 
 import {
+  assertValidSessionName,
   computeClientInfo,
   computeWorkspaceDir,
   deleteSessionFile,
@@ -139,6 +140,21 @@ describe('makePipePath', () => {
       assert.ok(p.endsWith('proxycli-abc123-default.sock'));
       assert.ok(p.startsWith(os.tmpdir()));
     }
+  });
+});
+
+describe('assertValidSessionName', () => {
+  it('validates session name format strictly', () => {
+    assert.doesNotThrow(() => assertValidSessionName('default'));
+    assert.doesNotThrow(() => assertValidSessionName('sess-01'));
+    assert.throws(
+      () => assertValidSessionName('../../evil'),
+      /Invalid session name/,
+    );
+    assert.throws(
+      () => assertValidSessionName('bad name'),
+      /Invalid session name/,
+    );
   });
 });
 

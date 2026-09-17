@@ -5,4 +5,12 @@
  */
 
 export {updateExtensions} from './updateExtensions.js';
+export {
+  extensionStatus,
+  extensionListTabs,
+  extensionClaimTab,
+  extensionCreateTab,
+  extensionExecuteCdp,
+  extensionMoveMouse,
+} from './extensionTools.js';
 export type {ExtensionsResult, Frame} from './types.js';

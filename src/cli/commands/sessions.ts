@@ -9,6 +9,9 @@
  * status 与 list 共享注册表探测逻辑（collectSessionRows）。
  */
 
+import fs from 'node:fs';
+import path from 'node:path';
+
 import type {AxiCliCommand} from 'axi-sdk-js';
 import {AxiError} from 'axi-sdk-js';
 
@@ -18,6 +21,7 @@ import {
   killAllDaemons,
   stopSession,
   type DaemonLike,
+  type DaemonStatusResult,
 } from '../daemonClient.js';
 import {successOutput, tableOutput} from '../output.js';
 import {
@@ -34,16 +38,43 @@ export interface SessionRow {
   pid: number;
   console: string;
   status: string;
+  version?: string;
+  uptimeMs?: number;
+  startDate?: string;
+  socketPath?: string;
 }
 
-/** 对单个会话探活（connect + hello）：成功返回连接，失败返回 undefined */
+export interface ProbeResult extends DaemonLike {
+  statusResult?: DaemonStatusResult;
+}
+
+/** 对单个会话探活（connect + status/hello）：成功返回连接对象，附带 statusResult */
 export async function probeSession(
   cfg: SessionConfig,
-): Promise<DaemonLike | undefined> {
+): Promise<ProbeResult | undefined> {
   try {
     const conn = await DaemonConnection.connect(cfg.socketPath, 500);
-    await conn.request('hello', undefined, 1000);
-    return conn;
+    let statusResult: DaemonStatusResult | undefined;
+    try {
+      statusResult = await conn.request<DaemonStatusResult>(
+        'status',
+        undefined,
+        1000,
+      );
+    } catch {
+      try {
+        statusResult = await conn.request<DaemonStatusResult>(
+          'hello',
+          undefined,
+          1000,
+        );
+      } catch {
+        // 兼容旧接口
+      }
+    }
+    const result = conn as ProbeResult;
+    result.statusResult = statusResult;
+    return result;
   } catch {
     return undefined;
   }
@@ -62,6 +93,7 @@ export async function collectSessionRows(
   for (const cfg of sessions) {
     const conn = await probeSession(cfg);
     if (conn) {
+      const st = conn.statusResult;
       conn.close();
       rows.push({
         session: cfg.name,
@@ -69,6 +101,10 @@ export async function collectSessionRows(
         console:
           cfg.consolePort === undefined ? '-' : `127.0.0.1:${cfg.consolePort}`,
         status: 'open',
+        version: st?.version ?? cfg.version,
+        uptimeMs: st?.uptimeMs,
+        startDate: st?.startDate,
+        socketPath: cfg.socketPath,
       });
     } else {
       await deleteSession(dir, cfg.name);
@@ -154,10 +190,22 @@ export const killAllCommand: AxiCliCommand<WorkerContext> = async (
   ctx,
 ) => {
   const pids = await killAllDaemons();
-  // 强杀后清掉当前 workspace 注册表里所有 session 文件
+  // 强杀后清掉当前 workspace 注册表里所有 session 文件及残余锁文件
   const daemonDir = ctx?.daemonDir ?? computeClientInfo().daemonDir;
   for (const cfg of await listSessions(daemonDir)) {
     await deleteSession(daemonDir, cfg.name);
+  }
+  try {
+    const files = await fs.promises.readdir(daemonDir);
+    for (const f of files) {
+      if (f.endsWith('.spawn.lock')) {
+        await fs.promises
+          .unlink(path.join(daemonDir, f))
+          .catch(() => undefined);
+      }
+    }
+  } catch {
+    // 忽略目录不存在等异常
   }
   return successOutput(
     {

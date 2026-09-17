@@ -56,8 +56,18 @@ export async function clickAt(
 }> {
   const resolution = await resolveClickPoint(page.mainFrame(), selector);
   if (resolution.kind === 'jsClick') {
-    throw new Error(`Element not found: ${selector}`);
+    throw new Error(`Unable to resolve click point for: ${selector}`);
   }
+
+  // 点击前取元数据：点击后元素可能已卸载/导航，且非 CSS 定位器不能走 querySelector
+  const info = await page
+    .mainFrame()
+    .locator(selector)
+    .evaluate((el: Element) => ({
+      tag: el.tagName,
+      text: (el.textContent || '').slice(0, 100),
+    }))
+    .catch(() => ({tag: '', text: ''}));
 
   await withCdpSession(page, async client => {
     await client.send('Input.dispatchMouseEvent', {
@@ -75,13 +85,6 @@ export async function clickAt(
       clickCount: 1,
     });
   });
-
-  const info = await page.evaluate(sel => {
-    const el = document.querySelector(sel);
-    return el
-      ? {tag: el.tagName, text: (el.textContent || '').slice(0, 100)}
-      : {tag: '', text: ''};
-  }, selector);
 
   logger.info(
     `Real mouse click at: ${selector} (${resolution.x}, ${resolution.y}) via ${resolution.source}`,

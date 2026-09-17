@@ -39,7 +39,10 @@ interface NodeSpec {
 }
 
 /** 按 CDP captureSnapshot 的列式结构拼装合成快照，测试无需浏览器。 */
-function buildSnapshot(specs: NodeSpec[]): RawSnapshot {
+function buildSnapshot(
+  specs: NodeSpec[],
+  scrollOffset?: {x: number; y: number},
+): RawSnapshot {
   const strings = new StringTable();
   const nodeType: number[] = [];
   const nodeName: number[] = [];
@@ -116,6 +119,8 @@ function buildSnapshot(specs: NodeSpec[]): RawSnapshot {
           shadowRootType: {index: shadowIndex, value: shadowValue},
         },
         layout: {nodeIndex: layoutNodeIndex, bounds, styles, paintOrders},
+        scrollOffsetX: scrollOffset?.x ?? 0,
+        scrollOffsetY: scrollOffset?.y ?? 0,
       },
     ],
   } as unknown as RawSnapshot;
@@ -148,7 +153,7 @@ describe('parseSnapshot', () => {
     assert.equal(target.inIframe, false);
   });
 
-  it('returns snapshot bounds verbatim without DPR scaling', () => {
+  it('does not divide snapshot bounds by DPR', () => {
     const raw = buildSnapshot([
       {
         backendNodeId: 3,
@@ -160,6 +165,23 @@ describe('parseSnapshot', () => {
 
     const [node] = parseSnapshot(raw);
     assert.deepEqual(node?.bounds, {x: 20, y: 40, width: 200, height: 80});
+  });
+
+  it('converts document-coordinate bounds to viewport coordinates', () => {
+    const raw = buildSnapshot(
+      [
+        {
+          backendNodeId: 3,
+          tagName: 'button',
+          bounds: [10, 1838, 100, 40],
+          styles: VISIBLE_STYLES,
+        },
+      ],
+      {x: 0, y: 1500},
+    );
+
+    const [node] = parseSnapshot(raw);
+    assert.deepEqual(node?.bounds, {x: 10, y: 338, width: 100, height: 40});
   });
 
   it('aggregates descendant text into the element text', () => {
@@ -324,6 +346,49 @@ describe('interactivity and sensitive fields', () => {
     const [node] = parseSnapshot(raw);
     assert.equal(node?.isVisible, true);
     assert.equal(node?.isInteractive, true);
+  });
+
+  it('treats anchors without href as non-interactive and keeps href ones', () => {
+    const raw = buildSnapshot([
+      {
+        backendNodeId: 1,
+        tagName: 'a',
+        bounds: [0, 0, 10, 10],
+        styles: VISIBLE_STYLES,
+      },
+      {
+        backendNodeId: 2,
+        tagName: 'a',
+        attributes: {href: '#top'},
+        bounds: [0, 0, 10, 10],
+        styles: VISIBLE_STYLES,
+      },
+    ]);
+
+    const nodes = parseSnapshot(raw);
+    assert.equal(nodes[0]?.isInteractive, false);
+    assert.equal(nodes[1]?.isInteractive, true);
+  });
+
+  it('scrubs text of descendants of a sensitive field', () => {
+    const raw = buildSnapshot([
+      {
+        backendNodeId: 1,
+        tagName: 'textarea',
+        attributes: {autocomplete: 'one-time-code'},
+        bounds: [0, 0, 120, 24],
+        styles: VISIBLE_STYLES,
+      },
+      {
+        backendNodeId: 2,
+        nodeType: 3,
+        nodeValue: '123456',
+        parentIndex: 0,
+      },
+    ]);
+
+    const nodes = parseSnapshot(raw);
+    assert.equal(JSON.stringify(nodes).includes('123456'), false);
   });
 
   it('never exposes password values in attributes or text', () => {

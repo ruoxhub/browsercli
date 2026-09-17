@@ -9,6 +9,7 @@ import {AxiError} from 'axi-sdk-js';
 
 import {browserCommand} from './commands/browser.js';
 import {configCommand} from './commands/config.js';
+import {extensionCommand} from './commands/extension.js';
 import {jobsCommand} from './commands/jobs.js';
 import {listToolsCommand} from './commands/list-tools.js';
 import {proxyCommand} from './commands/proxy.js';
@@ -17,14 +18,20 @@ import {sessionCommands} from './commands/sessions.js';
 import {statusCommand} from './commands/status.js';
 import {toolDispatcherCommand} from './commands/tool-dispatcher.js';
 import {webCommand} from './commands/web.js';
-import {DaemonConnection, ensureDaemon, loadCliConfig} from './daemonClient.js';
+import {
+  CLI_VERSION,
+  DaemonConnection,
+  ensureDaemon,
+  loadCliConfig,
+  verifyDaemonVersion,
+} from './daemonClient.js';
 import {generateTopLevelHelp} from './help.js';
 import {mergeSpawnFlagsFromConfig, sessionFromArgv} from './sessionArgs.js';
 import {resolveSessionName} from './sessionPaths.js';
 import type {WorkerContext} from './types.js';
 
 export const cliDescription = '逆向工程CLI服务';
-export const cliVersion = '1.0.0';
+export const cliVersion = CLI_VERSION;
 
 export const cliCommands: Record<string, AxiCliCommand<WorkerContext>> = {
   call: toolDispatcherCommand,
@@ -35,6 +42,7 @@ export const cliCommands: Record<string, AxiCliCommand<WorkerContext>> = {
   scaffold: scaffoldCommand,
   status: statusCommand,
   proxy: proxyCommand,
+  extension: extensionCommand,
   web: webCommand,
   ...sessionCommands,
 };
@@ -58,7 +66,13 @@ export function createWorkerContext(argv: readonly string[]): WorkerContext {
           'WORKER_NOT_RUNNING',
         );
       }
-      return DaemonConnection.connect(cfg.socketPath, 3000);
+      const conn = await DaemonConnection.connect(cfg.socketPath, 3000);
+      void verifyDaemonVersion(session, cliVersion)
+        .then(warn => {
+          if (warn) console.warn(warn);
+        })
+        .catch(() => undefined);
+      return conn;
     },
   };
 }

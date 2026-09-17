@@ -1,50 +1,10 @@
-# Environment Rebuilding & Evidence Reference
+# 离线环境重构与证据沉淀说明 (Rebuild & Evidence)
 
-Evidence recording and offline bundle rebuilding for `proxycli`.
-
-## Overview
-
-Reconstruct offline Node.js execution bundles from reverse-engineered algorithms and persist verifiable evidence to task artifacts.
-
-| Tool Name                    | Description                                         | Key Parameters                                                           |
-| ---------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------ |
-| `record_reverse_evidence`    | Append structured evidence to task audit log        | `--taskId <str>`, `--targetUrl <str>`, `--goal <str>`, `--entry <arr>`   |
-| `rebuild_bundle`             | Generate local Node.js environment emulation bundle | `[--targetUrl <str>]`, `[--targetFunctionNames <arr>]`, `[--goal <str>]` |
-| `trace_signature_generation` | Trace request-to-code signature generation pipeline | `[--requestUrlPattern <str>]`, `[--headerKeyword <str>]`                 |
-
----
-
-## Detailed Commands
-
-### 1. record_reverse_evidence
-
-Persist verifiable evidence (functions, encryption keys, sample inputs/outputs) to the task artifacts directory.
-
-```bash
-proxycli call record_reverse_evidence \
-  --taskId "task_demo_01" \
-  --taskSlug "demo-sign" \
-  --targetUrl "https://example.com/api" \
-  --goal "Extract sign algorithm" \
-  --entry '[{"type":"function","name":"window.getSign","evidence":"md5(salt+timestamp)"}]'
-```
-
-### 2. rebuild_bundle
-
-Generate an offline Node.js execution environment bundle with necessary polyfills and mocks (`window`, `document`, `navigator`).
-
-```bash
-# Auto-generate offline bundle structure from collected evidence
-proxycli call rebuild_bundle \
-  --targetUrl "https://example.com" \
-  --goal "Offline sign calculation" \
-  --autoGenerate true
-```
-
-### 3. trace_signature_generation
-
-Correlate HTTP requests, active hooks, and stack frames to reconstruct the complete signature generation chain from user action to network dispatch.
-
-```bash
-proxycli call trace_signature_generation --requestUrlPattern "/api/trade" --headerKeyword "X-Signature"
-```
+> **注意 (Deprecation Notice)**: 原实验性内置工具 `rebuild_bundle` 与 `trace_signature_generation` 已从 MCP 工具面下线并解耦。
+>
+> - **证据持久化与报告**：请查阅 [`references/evidence.md`](./evidence.md)，使用 `record_reverse_evidence` 与 `export_session_report`。
+> - **签名链路追踪**：请查阅 [`references/network.md`](./network.md)，使用 `get_request_initiator` 配合 [`references/hook.md`](./hook.md) 的非阻塞 Hook。
+> - **离线 Node.js 算法还原与补环境**：请调用专用技能：
+>   - `skills/web-reverse-algorithm`: 纯算法提取与 AST 精简
+>   - `skills/web-reverse-env`: Node.js 浏览器环境补齐与 Mock
+>   - `skills/web-js-env-patcher`: 动态环境补丁与验证

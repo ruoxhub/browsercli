@@ -12,6 +12,7 @@ import path from 'node:path';
 import test from 'node:test';
 
 import {
+  assertValidSessionName,
   computeClientInfo,
   computeWorkspaceDir,
   deleteSession,
@@ -154,6 +155,31 @@ test('resolveSessionName 依次取参数、BROWSERCLI_SESSION、default', () => 
     delete process.env.BROWSERCLI_SESSION;
   }
   assert.strictEqual(resolveSessionName(undefined), 'default');
+});
+
+test('assertValidSessionName 允许字母数字短横线下划线，拒绝非法字符与路径穿越', () => {
+  assert.doesNotThrow(() => assertValidSessionName(''));
+  assert.doesNotThrow(() => assertValidSessionName('default'));
+  assert.doesNotThrow(() => assertValidSessionName('session-01'));
+  assert.doesNotThrow(() => assertValidSessionName('test_session'));
+
+  assert.throws(
+    () => assertValidSessionName('../escape'),
+    /Invalid session name/,
+  );
+  assert.throws(
+    () => assertValidSessionName('dir/sub'),
+    /Invalid session name/,
+  );
+  assert.throws(
+    () => assertValidSessionName('bad name'),
+    /Invalid session name/,
+  );
+  assert.throws(
+    () => assertValidSessionName('bad@name'),
+    /Invalid session name/,
+  );
+  assert.throws(() => resolveSessionName('../../evil'), /Invalid session name/);
 });
 
 test('loadSession/listSessions/deleteSession 往返并忽略非 .session 文件', async () => {

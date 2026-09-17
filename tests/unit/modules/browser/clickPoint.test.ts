@@ -27,8 +27,17 @@ function makeMockFrame(options?: MockFrameOptions) {
   let scrolled = false;
   const mockEl = {
     getClientRects: () => options?.rects ?? [],
-    getBoundingClientRect: () =>
-      options?.boundingRect ?? {x: 10, y: 20, width: 100, height: 40},
+    getBoundingClientRect: () => {
+      const r = options?.boundingRect ?? {x: 10, y: 20, width: 100, height: 40};
+      return {
+        left: r.x,
+        top: r.y,
+        right: r.x + r.width,
+        bottom: r.y + r.height,
+        width: r.width,
+        height: r.height,
+      };
+    },
     contains: (_other: unknown) => false,
   };
 
@@ -153,6 +162,16 @@ describe('resolveClickPoint', () => {
     const frame = makeMockFrame({noElement: true});
 
     const result = await resolveClickPoint(frame as never, '#missing');
+    assert.deepEqual(result, {kind: 'jsClick'});
+  });
+
+  it('reports jsClick when both rects are zero-area instead of clicking the viewport origin', async () => {
+    const frame = makeMockFrame({
+      rects: [],
+      boundingRect: {x: 0, y: 0, width: 0, height: 0},
+    });
+
+    const result = await resolveClickPoint(frame as never, '#hidden');
     assert.deepEqual(result, {kind: 'jsClick'});
   });
 });

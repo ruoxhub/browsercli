@@ -13,6 +13,7 @@ import {
   disconnectBrowser,
   getBrowserConnectionMode,
   getBrowserConnectionStatus,
+  isSameBrowserTarget,
 } from '../../../src/worker/BrowserConnectionManager.js';
 import {workerActivityCoordinator} from '../../../src/worker/WorkerActivityCoordinator.js';
 
@@ -414,5 +415,167 @@ describe('BrowserConnectionManager', () => {
       await running;
       resetMock.mock.restore();
     }
+  });
+
+  it('reuses existing connected browser without reset when force is not specified', async () => {
+    const resetMock = mock.method(
+      BrowserManager,
+      'resetInstance',
+      async () => undefined,
+    );
+    const fakeBrowser = {
+      isConnected: () => true,
+    };
+    const contextProvider = {
+      isBrowserConnected: () => true,
+      getBrowser: () => fakeBrowser,
+    };
+
+    try {
+      const result = await connectBrowser(contextProvider as never, {
+        browserURL: 'http://127.0.0.1:9222',
+      });
+      assert.strictEqual(resetMock.mock.callCount(), 0);
+      assert.deepStrictEqual(result, {connected: true, mode: 'attach'});
+    } finally {
+      resetMock.mock.restore();
+    }
+  });
+
+  it('forces reconnect and resets instance when force: true is specified even if connected', async () => {
+    const resetMock = mock.method(
+      BrowserManager,
+      'resetInstance',
+      async () => undefined,
+    );
+    const fakeBrowser = {
+      contexts: () => [{pages: () => []}],
+      isConnected: () => true,
+    };
+    const getInstanceMock = mock.method(BrowserManager, 'getInstance', () => ({
+      ensureBrowser: async () => fakeBrowser,
+      getContext: () => fakeBrowser.contexts()[0],
+    }));
+    const contextProvider = {
+      isBrowserConnected: () => true,
+      getBrowser: () => fakeBrowser,
+      setBrowserManager: () => undefined,
+      setBrowser: () => undefined,
+      setContext: () => undefined,
+      clearContext: () => undefined,
+      init: async () => undefined,
+    };
+
+    try {
+      const result = await connectBrowser(
+        contextProvider as never,
+        {browserURL: 'http://127.0.0.1:9222'},
+        {force: true},
+      );
+      assert.strictEqual(resetMock.mock.callCount(), 1);
+      assert.deepStrictEqual(result, {connected: true, mode: 'attach'});
+    } finally {
+      resetMock.mock.restore();
+      getInstanceMock.mock.restore();
+    }
+  });
+
+  it('triggers reconnect when connected browser target changes even without force', async () => {
+    const resetMock = mock.method(
+      BrowserManager,
+      'resetInstance',
+      async () => undefined,
+    );
+    const fakeBrowser = {
+      contexts: () => [{pages: () => []}],
+      isConnected: () => true,
+    };
+    const getInstanceMock = mock.method(BrowserManager, 'getInstance', () => ({
+      ensureBrowser: async () => fakeBrowser,
+      getContext: () => fakeBrowser.contexts()[0],
+    }));
+    const contextProvider = {
+      isBrowserConnected: () => true,
+      getBrowser: () => fakeBrowser,
+      getBrowserManager: () => ({
+        getConfig: () => ({browserURL: 'http://127.0.0.1:9222'}),
+      }),
+      setBrowserManager: () => undefined,
+      setBrowser: () => undefined,
+      setContext: () => undefined,
+      clearContext: () => undefined,
+      init: async () => undefined,
+    };
+
+    try {
+      const result = await connectBrowser(
+        contextProvider as never,
+        {browserURL: 'http://127.0.0.1:9223'}, // target changed: 9222 -> 9223
+      );
+      assert.strictEqual(resetMock.mock.callCount(), 1);
+      assert.strictEqual(getInstanceMock.mock.callCount(), 1);
+      assert.deepStrictEqual(result, {connected: true, mode: 'attach'});
+    } finally {
+      resetMock.mock.restore();
+      getInstanceMock.mock.restore();
+    }
+  });
+
+  it('correctly compares browser target configurations with isSameBrowserTarget', () => {
+    // attach
+    assert.strictEqual(
+      isSameBrowserTarget(
+        {browserURL: 'http://127.0.0.1:9222'},
+        {browserURL: 'http://127.0.0.1:9222'},
+      ),
+      true,
+    );
+    assert.strictEqual(
+      isSameBrowserTarget(
+        {browserURL: 'http://127.0.0.1:9222'},
+        {browserURL: 'http://127.0.0.1:9223'},
+      ),
+      false,
+    );
+
+    // mode mismatch: attach vs ws-endpoint
+    assert.strictEqual(
+      isSameBrowserTarget(
+        {browserURL: 'http://127.0.0.1:9222'},
+        {wsEndpoint: 'ws://127.0.0.1/devtools'},
+      ),
+      false,
+    );
+
+    // launch
+    assert.strictEqual(
+      isSameBrowserTarget(
+        {channel: 'stable', headless: true},
+        {channel: 'stable', headless: true},
+      ),
+      true,
+    );
+    assert.strictEqual(
+      isSameBrowserTarget(
+        {channel: 'stable', headless: true},
+        {channel: 'canary', headless: true},
+      ),
+      false,
+    );
+  });
+
+  it('reports mode from active browser config when connected', () => {
+    const status = getBrowserConnectionStatus(
+      {
+        isBrowserConnected: () => true,
+        getContext: () => ({pages: () => [{}]}),
+        getBrowserManager: () => ({
+          getConfig: () => ({wsEndpoint: 'ws://127.0.0.1:9222/devtools'}),
+        }),
+      } as never,
+      {browserURL: 'http://127.0.0.1:9222'}, // store has attach, but live manager is ws-endpoint
+    );
+
+    assert.deepEqual(status, {connected: true, mode: 'ws-endpoint', pages: 1});
   });
 });

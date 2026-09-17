@@ -22,6 +22,7 @@ const CONNECT_FLAGS = new Set([
   'channel',
   'cloak',
   'executable-path',
+  'force',
   'full-stealth-args',
   'headless',
   'isolated',
@@ -188,6 +189,7 @@ function connectOptions(
   const booleans = {
     acceptInsecureCerts: booleanFlag(flags, 'accept-insecure-certs'),
     cloak: booleanFlag(flags, 'cloak'),
+    force: booleanFlag(flags, 'force'),
     fullStealthArgs: booleanFlag(flags, 'full-stealth-args'),
     headless: booleanFlag(flags, 'headless'),
     isolated: booleanFlag(flags, 'isolated'),

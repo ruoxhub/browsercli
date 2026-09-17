@@ -8,6 +8,7 @@ import {describe, it} from 'node:test';
 
 import {
   click,
+  clickAt,
   hover,
   pressKey,
   scroll,
@@ -192,6 +193,72 @@ describe('PageInteraction', () => {
       () => uploadFile(page as any, '#missing', '/a/b.txt'),
       /File input not found/,
     );
+  });
+
+  it('clickAt reads metadata before dispatching the CDP click', async () => {
+    const order: string[] = [];
+    const cdpSession = {
+      send: async (method: string) => {
+        order.push(method);
+        return {};
+      },
+      detach: async () => undefined,
+    };
+    const mockEl = {
+      getClientRects: () => [
+        {left: 0, top: 0, right: 100, bottom: 50, width: 100, height: 50},
+      ],
+      getBoundingClientRect: () => ({
+        left: 0,
+        top: 0,
+        right: 100,
+        bottom: 50,
+        width: 100,
+        height: 50,
+      }),
+      contains: () => false,
+    };
+    const frame = {
+      locator: () => ({
+        scrollIntoViewIfNeeded: async () => undefined,
+        elementHandle: async () => ({
+          evaluate: async (fn: (el: unknown) => unknown) => {
+            const globalObj = globalThis as Record<string, unknown>;
+            const prevWin = globalObj.window;
+            const prevDoc = globalObj.document;
+            globalObj.window = {innerWidth: 800, innerHeight: 600};
+            globalObj.document = {elementFromPoint: () => mockEl};
+            try {
+              return fn(mockEl);
+            } finally {
+              globalObj.window = prevWin;
+              globalObj.document = prevDoc;
+            }
+          },
+        }),
+        evaluate: async () => {
+          order.push('metadata');
+          return {tag: 'BUTTON', text: '提交'};
+        },
+      }),
+    };
+    const page = makePage({
+      mainFrame: () => frame,
+      context: () => ({newCDPSession: async () => cdpSession}),
+    });
+
+    const result = await clickAt(page as never, 'role=button');
+
+    assert.strictEqual(result.x, 50);
+    assert.strictEqual(result.y, 25);
+    assert.strictEqual(result.tag, 'BUTTON');
+    assert.strictEqual(result.text, '提交');
+    // 元数据读取必须早于鼠标事件，否则点击触发导航后取值会失败
+    assert.ok(
+      order.indexOf('metadata') < order.indexOf('Input.dispatchMouseEvent'),
+    );
+    // 不依赖 CSS：非 CSS 定位器不应回退到 document.querySelector
+    assert.strictEqual(order.filter(item => item === 'metadata').length, 1);
   });
 
   it('hover forwards selector', async () => {

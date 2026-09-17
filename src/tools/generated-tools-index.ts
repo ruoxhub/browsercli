@@ -300,6 +300,30 @@ export const GENERATED_TOOL_REGISTRY = [
     handlerName: 'updateExtensions',
   },
   {
+    modulePath: './extensions/extensionTools.js',
+    handlerName: 'extensionStatus',
+  },
+  {
+    modulePath: './extensions/extensionTools.js',
+    handlerName: 'extensionListTabs',
+  },
+  {
+    modulePath: './extensions/extensionTools.js',
+    handlerName: 'extensionClaimTab',
+  },
+  {
+    modulePath: './extensions/extensionTools.js',
+    handlerName: 'extensionCreateTab',
+  },
+  {
+    modulePath: './extensions/extensionTools.js',
+    handlerName: 'extensionExecuteCdp',
+  },
+  {
+    modulePath: './extensions/extensionTools.js',
+    handlerName: 'extensionMoveMouse',
+  },
+  {
     modulePath: './frames/listFrames.js',
     handlerName: 'listFrames',
   },

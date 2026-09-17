@@ -1,80 +1,82 @@
-# DOM Query & Element Interaction Reference
+# DOM 交互、拟人化操作与样式检查参考文档 (DOM & Interaction Reference)
 
-DOM inspection, click/input simulation, form automation, and page screenshots for `proxycli`.
+DOM 元素查询、拟人化模拟点击/打字/拖拽、物理坐标点击、表单批量填充、页面截图与样式层叠分析工具。
 
-## Overview
+## 概览 (Overview)
 
-Automate user interactions (clicks, keyboard input, drag & drop, file uploads) to trigger encryption routines and generate network traffic.
+用于触发页面交互（点击按钮、键入密码、拖拽滑块）以驱动前端加密逻辑运行并生成网络请求。定位器原生支持 CSS、`role=`、`text=`、`xpath=`，多项匹配时支持 `>> nth=N` 消歧。
 
-| Tool Name                   | Description                                                       | Key Parameters                                          |
-| --------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------- |
-| `query_dom`                 | Query elements by CSS selector (position, attributes, visibility) | `--selector <str>`, `[--all <bool>]`, `[--limit <num>]` |
-| `get_dom_structure`         | Retrieve simplified/compressed DOM hierarchy                      | `[--maxDepth <num>]`, `[--includeText <bool>]`          |
-| `find_clickable_elements`   | Search for clickable interactive elements                         | `[--filterText <str>]`                                  |
-| `click` / `click_element`   | Simulate mouse click on target element                            | `--selector <str>`, `[--timeoutMs <num>]`               |
-| `click_at`                  | Physical CDP coordinate click at element center (anti-hijack)     | `--selector <str>`                                      |
-| `fill` / `type_text`        | Fill value or simulate real keyboard typing                       | `--selector <str>`, `--value/--text <str>`              |
-| `fill_form`                 | Batch fill form fields                                            | `[--timeoutMs <num>]`                                   |
-| `press_key`                 | Dispatch specific physical keyboard key or combo                  | `--key <str>`                                           |
-| `hover` / `drag`            | Hover mouse over element or drag between elements                 | `--selector <str>`, `--fromSelector / --toSelector`     |
-| `set_files` / `upload_file` | Upload files via CDP or DOM input                                 | `--selector <str>`, `--filePath / --filePaths`          |
-| `scroll_by`                 | Scroll page and wait for lazy-loaded assets                       | `--direction <str>`, `[--pixels <num>]`                 |
-| `wait_for_element`          | Synchronously wait until selector appears                         | `--selector <str>`, `[--timeout <num>]`                 |
-| `handle_dialog`             | Auto-dismiss or accept alert/confirm/prompt                       | `--action <str>`, `[--promptText <str>]`                |
-| `take_screenshot`           | Capture full-page or viewport screenshot                          | `[--fullPage <bool>]`, `[--filePath <str>]`             |
+| 工具名称                    | 功能描述                                                                          | 核心参数                                                         |
+| :-------------------------- | :-------------------------------------------------------------------------------- | :--------------------------------------------------------------- |
+| `query_dom`                 | 通过定位器查询 DOM 元素属性、标签名、包围盒与可见性                               | `--selector <str>`, `[--all <bool>]`, `[--limit <num>]`          |
+| `get_dom_structure`         | 获取当前页面的精简 DOM 树结构（层级、类名、文本）                                 | `[--maxDepth <num>]`, `[--includeText <bool>]`                   |
+| `find_clickable_elements`   | 快速检索页面中所有可点击的按钮与链接                                              | `[--filterText <str>]`                                           |
+| `click` / `click_element`   | 模拟点击目标元素（支持单击、双击）                                                | `--selector <str>`, `[--dblClick <bool>]`, `[--timeoutMs <num>]` |
+| `click_at`                  | 通过 CDP 物理绝对坐标点击元素中心（彻底绕过 Playwright 自动化特征及元素覆盖检测） | `--selector <str>`                                               |
+| `fill` / `type_text`        | 填入值（支持 selectOption）或拟人化按键打字（支持延时）                           | `--selector <str>`, `--value/--text <str>`, `[--delay <num>]`    |
+| `fill_form`                 | 一次调用批量填充多个表单输入项                                                    | `--elements <arr>`, `[--timeoutMs <num>]`                        |
+| `press_key`                 | 触发物理键盘按键或组合快捷键（如 "Enter"、"Control+A"）                           | `--key <str>`                                                    |
+| `hover` / `drag`            | 鼠标悬停 / 元素间拖拽操作（滑块验证必备）                                         | `--selector <str>`, `--fromSelector / --toSelector`              |
+| `upload_file` / `set_files` | 文件上传操作（Playwright 模式或 CDP 底层模式）                                    | `--selector <str>`, `--filePath / --filePaths`                   |
+| `scroll_by`                 | 按方向滚动页面并自动延时触发懒加载资源                                            | `--direction <str>`, `[--pixels <num>]`                          |
+| `wait_for_element`          | 等待指定定位器的元素渲染出现                                                      | `--selector <str>`, `[--timeout <num>]`                          |
+| `handle_dialog`             | 自动接管 alert/confirm/prompt 弹窗（确定或取消）                                  | `--action <str>`, `[--promptText <str>]`                         |
+| `take_screenshot`           | 对全页面或指定元素进行截图截屏                                                    | `[--fullPage <bool>]`, `[--filePath <str>]`                      |
+| `get_css_styles`            | 获取元素匹配的 CSS 规则、内联样式与层叠状态（排查反爬隐藏样式/覆盖冲突）          | `--selector <str>`, `[--pageSize <num>]`                         |
+| `reveal_in_devtools`        | 在页面上高亮显示目标 DOM 元素数秒，便于直观定位                                   | `--selector <str>`, `[--durationMs <num>]`                       |
 
 ---
 
-## Detailed Commands
+## 详细命令与示例
 
-### 1. Element Querying
+### 1. 元素检索与排查
 
 ```bash
-# Query element visibility, bounds, and attributes
-proxycli call query_dom --selector "button#submit"
+# 查询登录按钮状态与坐标
+proxycli call query_dom --selector "button[type='submit']"
 
-# Find clickable elements containing specific text
-proxycli call find_clickable_elements --filterText "Login"
+# 查找所有包含“登录”或“下一步”的按钮
+proxycli call find_clickable_elements --filterText "登录"
 
-# Get simplified DOM structure (depth 3)
-proxycli call get_dom_structure --maxDepth 3
+# 排查元素隐藏样式（查看 display/visibility 是否被反爬样式覆盖）
+proxycli call get_css_styles --selector "#verify-code"
 ```
 
-### 2. Clicks & Input Simulation
+### 2. 拟人化点击与输入模拟
 
 ```bash
-# Standard click
-proxycli call click --selector "button#login-btn"
+# 普通模拟点击
+proxycli call click --selector "button#submit"
 
-# CDP physical coordinate click (recommended for sliders and anti-bot protected buttons)
-proxycli call click_at --selector "div.slider-handle"
+# CDP 真实物理坐标点击（滑块、反自动化按钮推荐）
+proxycli call click_at --selector "div.geetest_slider_btn"
 
-# Typing with realistic key delays
-proxycli call type_text --selector "input#username" --text "test_user" --delay 100
+# 拟人化打字输入（每个字符间隔 80ms，触发 input/keydown 事件）
+proxycli call type_text --selector "input#password" --text "mypassword123" --delay 80
 
-# Direct value fill (faster)
-proxycli call fill --selector "input#password" --value "P@ssw0rd123"
+# 批量填充表单
+proxycli call fill_form --elements '[
+  {"selector": "input#username", "value": "admin"},
+  {"selector": "input#password", "value": "123456"}
+]'
 ```
 
-### 3. Drag, Upload & Wait
+### 3. 滑块拖拽与滚动加载
 
 ```bash
-# Drag slider element across track
-proxycli call drag --fromSelector "div.slider-knob" --toSelector "div.slider-target"
+# 拖拽滑块通过验证
+proxycli call drag --fromSelector "div.slider-btn" --toSelector "div.slider-target"
 
-# Upload local file to file input
-proxycli call upload_file --selector "input[type=file]" --filePath "artifacts/sample.png"
-
-# Wait for dynamic element to render
-proxycli call wait_for_element --selector "div.verify-success" --timeout 10000
+# 向下滚动 800 像素以触发懒加载流
+proxycli call scroll_by --direction down --pixels 800
 ```
 
-### 4. Screenshots & Dialogs
+### 4. 截图与节点高亮
 
 ```bash
-# Take full-page screenshot
-proxycli call take_screenshot --fullPage true --filePath "artifacts/screenshots/page.png"
+# 截取整页为图片保存
+proxycli call take_screenshot --fullPage true --filePath "artifacts/page.png"
 
-# Automatically accept next dialog
-proxycli call handle_dialog --action accept
+# 高亮页面元素 3 秒协助肉眼核实
+proxycli call reveal_in_devtools --selector "form.login-box" --durationMs 3000
 ```

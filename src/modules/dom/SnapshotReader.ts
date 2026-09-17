@@ -27,13 +27,12 @@ export interface SnapshotNode {
   text: string;
   isVisible: boolean;
   isInteractive: boolean;
+  /** 视口坐标包围盒（CDP 的 bounds 为文档坐标，解析时已扣除所属文档滚动偏移）。 */
   bounds?: SnapshotBounds;
   cursor?: string;
-  paintOrder?: number;
   shadowRootType?: string;
   computedStyles: Record<string, string>;
   inIframe: boolean;
-  ignoredByPaintOrder: boolean;
 }
 
 /** 仅请求判定交互性与可见性所需的计算样式，避免重站点上快照体积膨胀。 */
@@ -41,13 +40,7 @@ export const REQUIRED_COMPUTED_STYLES = [
   'display',
   'visibility',
   'opacity',
-  'overflow',
-  'overflow-x',
-  'overflow-y',
   'cursor',
-  'pointer-events',
-  'position',
-  'background-color',
 ] as const;
 
 const ELEMENT_NODE = 1;
@@ -79,9 +72,6 @@ const INTERACTIVE_ROLES = new Set([
   'spinbutton',
   'search',
   'searchbox',
-  'row',
-  'cell',
-  'gridcell',
   'listbox',
   'switch',
 ]);
@@ -125,6 +115,8 @@ function computeInteractivity(
 ): boolean {
   if (fromSnapshot) return true;
   if (computedStyles.cursor === 'pointer') return true;
+  // 无 href 的 <a> 是占位/锚点，不可点击，与 JS 降级路径口径保持一致
+  if (tagName === 'a') return attributes.href !== undefined;
   if (INTERACTIVE_TAGS.has(tagName)) return true;
   if (EVENT_ATTRIBUTES.some(name => attributes[name] !== undefined))
     return true;
@@ -156,12 +148,14 @@ interface RawLayoutTree {
   nodeIndex?: number[];
   bounds?: number[][];
   styles?: number[][];
-  paintOrders?: number[];
 }
 
 interface RawDocument {
   nodes?: RawNodeTree;
   layout?: RawLayoutTree;
+  /** 文档滚动偏移，用于把 layout.bounds（文档坐标）换算为视口坐标。 */
+  scrollOffsetX?: number;
+  scrollOffsetY?: number;
 }
 
 export interface RawSnapshot {
@@ -203,11 +197,17 @@ function readAttributes(
   return attributes;
 }
 
-function readBounds(bounds: number[] | undefined): SnapshotBounds | undefined {
+function readBounds(
+  bounds: number[] | undefined,
+  scrollOffsetX: number,
+  scrollOffsetY: number,
+): SnapshotBounds | undefined {
   if (!bounds || bounds.length < 4) return undefined;
+  // layout.bounds 为文档坐标（含嵌套滚动容器偏移），扣除所属文档滚动偏移后即为视口坐标，
+  // 与 getBoundingClientRect() 及 CDP Input.dispatchMouseEvent 的坐标系一致。
   return {
-    x: bounds[0],
-    y: bounds[1],
+    x: bounds[0] - scrollOffsetX,
+    y: bounds[1] - scrollOffsetY,
     width: bounds[2],
     height: bounds[3],
   };
@@ -219,6 +219,7 @@ function readStyles(
 ): Record<string, string> {
   const styles: Record<string, string> = {};
   if (!styleIndexes) return styles;
+  // CDP 按请求顺序回填 styles，位置即 REQUIRED_COMPUTED_STYLES 的下标
   REQUIRED_COMPUTED_STYLES.forEach((name, position) => {
     const value = str(styleIndexes[position], strings);
     if (value) styles[name] = value;
@@ -232,6 +233,7 @@ function computeVisibility(
   computedStyles: Record<string, string>,
   bounds: SnapshotBounds | undefined,
 ): boolean {
+  // file input 常被刻意隐藏（opacity:0 / 零尺寸）以便自定义样式，按设计仍需暴露给上层 setFiles
   if (isFileInput(tagName, attributes)) return true;
   if (computedStyles.display === 'none') return false;
   if (computedStyles.visibility === 'hidden') return false;
@@ -274,7 +276,11 @@ export function parseSnapshot(raw: RawSnapshot): SnapshotNode[] {
       else childrenByParent.set(parent, [index]);
     });
 
-    // ponytail: 递归聚合文本按节点记忆化，单页 O(总文本量)；若实测超时，改为只对交互元素按需聚合。
+    const attributesByIndex = backendIds.map((_, index) =>
+      readAttributes(attributeLists[index], strings),
+    );
+
+    // 聚合文本按节点记忆化，单页 O(总文本量)。
     const rawTextCache = new Map<number, string>();
     const collectRawText = (index: number): string => {
       const cached = rawTextCache.get(index);
@@ -290,7 +296,17 @@ export function parseSnapshot(raw: RawSnapshot): SnapshotNode[] {
       rawTextCache.set(index, value);
       return value;
     };
-    const collectText = (index: number): string => collectRawText(index).trim();
+
+    // 敏感元素的后代文本节点同样要遮蔽：快照里 <textarea> 的服务端渲染内容
+    // 是独立文本节点，自身没有 attributes，仅按自身属性判定会原样泄出。
+    const isDescendantOfSensitive = (index: number): boolean => {
+      let current = parentIndexes[index];
+      while (typeof current === 'number' && current >= 0) {
+        if (isSensitiveField(attributesByIndex[current] ?? {})) return true;
+        current = parentIndexes[current];
+      }
+      return false;
+    };
 
     for (let index = 0; index < backendIds.length; index += 1) {
       const backendNodeId = backendIds[index];
@@ -298,20 +314,20 @@ export function parseSnapshot(raw: RawSnapshot): SnapshotNode[] {
 
       const nodeType = nodeTypes[index] ?? 0;
       const tagName = str(nodeNames[index], strings).toLowerCase();
-      const attributes = readAttributes(attributeLists[index], strings);
+      const attributes = attributesByIndex[index] ?? {};
       const layoutIndex = layoutIndexByNode.get(index);
       const bounds = readBounds(
         layoutIndex === undefined ? undefined : layout.bounds?.[layoutIndex],
+        document.scrollOffsetX ?? 0,
+        document.scrollOffsetY ?? 0,
       );
       const computedStyles = readStyles(
         layoutIndex === undefined ? undefined : layout.styles?.[layoutIndex],
         strings,
       );
-      const paintOrder =
-        layoutIndex === undefined
-          ? undefined
-          : layout.paintOrders?.[layoutIndex];
-      const sensitive = isSensitiveField(attributes);
+      const sensitive =
+        isSensitiveField(attributes) ||
+        (nodeType === TEXT_NODE && isDescendantOfSensitive(index));
       if (sensitive) {
         delete attributes.value;
         delete attributes.valuetext;
@@ -320,10 +336,11 @@ export function parseSnapshot(raw: RawSnapshot): SnapshotNode[] {
       const liveValue = sensitive
         ? ''
         : (textValueByIndex.get(index) ?? inputValueByIndex.get(index) ?? '');
-      const text =
-        nodeType === TEXT_NODE
+      const text = sensitive
+        ? ''
+        : nodeType === TEXT_NODE
           ? str(nodeValues[index], strings).trim()
-          : liveValue || (sensitive ? '' : collectText(index));
+          : liveValue || collectRawText(index).trim();
 
       result.push({
         backendNodeId,
@@ -343,11 +360,9 @@ export function parseSnapshot(raw: RawSnapshot): SnapshotNode[] {
           ),
         bounds,
         cursor: computedStyles.cursor,
-        paintOrder,
         shadowRootType: shadowTypeByIndex.get(index),
         computedStyles,
         inIframe: documentIndex > 0,
-        ignoredByPaintOrder: false,
       });
     }
   });
@@ -356,12 +371,13 @@ export function parseSnapshot(raw: RawSnapshot): SnapshotNode[] {
 }
 
 export async function readSnapshot(page: Page): Promise<SnapshotNode[]> {
+  // 当前只用 layout.bounds 与白名单 styles；includePaintOrder / includeDOMRects
+  // 会额外返回 paintOrders 与三组矩形，徒增重站点快照体积，暂不开启。
   const raw = await withCdpSession(page, client =>
     client.send('DOMSnapshot.captureSnapshot', {
       computedStyles: [...REQUIRED_COMPUTED_STYLES],
-      includePaintOrder: true,
-      includeDOMRects: true,
     }),
   );
+  // client.send 的结果未被 third_party 的 CDP 类型约束，此处按实际协议形状断言。
   return parseSnapshot(raw as unknown as RawSnapshot);
 }

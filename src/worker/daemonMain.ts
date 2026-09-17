@@ -12,7 +12,8 @@
  * 成功判据 —— 在此之前不得向 stdout 输出任何协议外内容。
  */
 
-import {existsSync, readFileSync} from 'node:fs';
+import {existsSync, readFileSync, rmSync} from 'node:fs';
+import net from 'node:net';
 import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
@@ -28,6 +29,9 @@ import {startDaemonServer, type DaemonHandle} from '../ipc/daemonServer.js';
 import {
   computeClientInfo,
   deleteSessionFile,
+  isPidAlive,
+  killPidForce,
+  loadSessionFile,
   makePipePath,
   saveSessionFile,
   type SessionFile,
@@ -94,6 +98,52 @@ function seedConfig(plan: DaemonPlan): GlobalConfig {
 
 export async function runDaemon(plan: DaemonPlan): Promise<DaemonRunResult> {
   const version = readPackageVersion();
+  const info = computeClientInfo(process.cwd(), version);
+
+  // 1. 同一会话排他性防重：检测已有实例，避免同一 session 启动多个 daemon 进程
+  const existing = await loadSessionFile(info, plan.session);
+  if (existing && existing.config.pid !== process.pid) {
+    if (isPidAlive(existing.config.pid)) {
+      let isResponsive = false;
+      try {
+        const testSocket = net.connect(existing.config.socketPath);
+        await new Promise<void>((resolve, reject) => {
+          const t = setTimeout(() => {
+            testSocket.destroy();
+            reject(new Error('timeout'));
+          }, 1500);
+          testSocket.once('connect', () => {
+            clearTimeout(t);
+            testSocket.destroy();
+            resolve();
+          });
+          testSocket.once('error', err => {
+            clearTimeout(t);
+            reject(err);
+          });
+        });
+        isResponsive = true;
+      } catch {
+        isResponsive = false;
+      }
+
+      if (isResponsive) {
+        console.warn(
+          `[Daemon] 会话 ${plan.session} 已有活跃 daemon 进程 (pid=${existing.config.pid}) 在运行，当前重复实例 (pid=${process.pid}) 退出`,
+        );
+        process.exit(0);
+      } else {
+        console.warn(
+          `[Daemon] 会话 ${plan.session} 的旧 daemon 进程 (pid=${existing.config.pid}) 无响应，清理并接管`,
+        );
+        killPidForce(existing.config.pid);
+        await deleteSessionFile(existing).catch(() => undefined);
+      }
+    } else {
+      await deleteSessionFile(existing).catch(() => undefined);
+    }
+  }
+
   const startedAt = Date.now();
   const cliConfig = seedConfig(plan);
 
@@ -172,7 +222,6 @@ export async function runDaemon(plan: DaemonPlan): Promise<DaemonRunResult> {
     }
   }
 
-  const info = computeClientInfo(process.cwd(), version);
   const socketPath = makePipePath(info.workspaceDirHash, plan.session);
   const gracefulShutdown = createGracefulShutdown({
     browserManager: runtime.browserManager,
@@ -251,6 +300,15 @@ export async function runDaemon(plan: DaemonPlan): Promise<DaemonRunResult> {
     'SIGTERM',
     () => void stop().then(() => gracefulShutdown('SIGTERM')),
   );
+  process.on('exit', () => {
+    if (state.sessionFile?.file && existsSync(state.sessionFile.file)) {
+      try {
+        rmSync(state.sessionFile.file, {force: true});
+      } catch {
+        // 忽略退出清理错误
+      }
+    }
+  });
 
   return {handle: state.handle!, stop};
 }

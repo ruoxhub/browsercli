@@ -16,9 +16,15 @@ import test from 'node:test';
 import {
   collectDaemonPids,
   DaemonConnection,
+  ensureDaemon,
+  isDaemonRunning,
+  isPidAlive,
+  killPidForce,
   normalizeCandidatePath,
   resolveEntryPath,
   spawnDaemon,
+  verifyDaemonVersion,
+  waitForDaemonReady,
 } from '../../../src/cli/daemonClient.js';
 import {makePipePath} from '../../../src/cli/sessionPaths.js';
 
@@ -273,4 +279,160 @@ test('collectDaemonPids 命中含 --proxycli-daemon 或 --proxycli-daemon 的行
     ]),
     [111, 444],
   );
+});
+
+test('isPidAlive 准确探测进程存活状态', () => {
+  assert.strictEqual(isPidAlive(process.pid), true);
+  assert.strictEqual(isPidAlive(99999999), false);
+  assert.strictEqual(isPidAlive(0), false);
+  assert.strictEqual(isPidAlive(-1), false);
+});
+
+test('killPidForce 对无效或不存在的 pid 幂等且不抛错', () => {
+  assert.doesNotThrow(() => killPidForce(99999999));
+  assert.doesNotThrow(() => killPidForce(0));
+});
+
+test('ensureDaemon 并发调用具备启动互斥锁，复用同一 session 不重复 spawn', async () => {
+  const workspace = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'proxycli-concur-ws-'),
+  );
+  const daemonDir = path.join(workspace, 'daemon');
+  const session = `concur-${process.pid}`;
+  const socketPath = makePipePath('concurtest', session);
+  const countFile = path.join(workspace, 'spawn-count.txt');
+
+  // 假 entry：每次拉起时 countFile 递增，监听 socket 并写 session
+  const entry = path.join(workspace, 'fake-concurrent-entry.js');
+  fs.writeFileSync(
+    entry,
+    [
+      'const fs = require("node:fs");',
+      'const net = require("node:net");',
+      `const countFile = ${JSON.stringify(countFile)};`,
+      'let count = 0;',
+      'try { count = Number(fs.readFileSync(countFile, "utf-8")) || 0; } catch {}',
+      'fs.writeFileSync(countFile, String(count + 1), "utf-8");',
+      `const socketPath = ${JSON.stringify(socketPath)};`,
+      'const server = net.createServer(socket => {',
+      '  socket.on("data", d => {',
+      '    try {',
+      '      const msg = JSON.parse(d.toString().trim());',
+      '      socket.write(JSON.stringify({id: msg.id, result: {ok: true}}) + "\\n");',
+      '    } catch {}',
+      '  });',
+      '});',
+      'server.listen(socketPath, () => {',
+      `  fs.writeFileSync(${JSON.stringify(path.join(daemonDir, `${session}.session`))}, JSON.stringify({name:${JSON.stringify(session)},version:"0.0.0",protocol:1,timestamp:Date.now(),socketPath,pid:process.pid}), "utf-8");`,
+      `  console.log("Daemon listening on " + socketPath);`,
+      '});',
+      'setInterval(() => {}, 1000);',
+    ].join('\n'),
+    'utf-8',
+  );
+
+  const prevProxyEntry = process.env.PROXYCLI_ENTRY;
+  const prevBrowserEntry = process.env.BROWSERCLI_ENTRY;
+  let pidToKill: number | undefined;
+  try {
+    delete process.env.BROWSERCLI_ENTRY;
+    process.env.PROXYCLI_ENTRY = entry;
+
+    // 并发触发 3 次 ensureDaemon
+    const [cfg1, cfg2, cfg3] = await Promise.all([
+      ensureDaemon({session, spawnFlags: [], cwd: workspace, daemonDir}),
+      ensureDaemon({session, spawnFlags: [], cwd: workspace, daemonDir}),
+      ensureDaemon({session, spawnFlags: [], cwd: workspace, daemonDir}),
+    ]);
+
+    assert.strictEqual(cfg1.name, session);
+    assert.strictEqual(cfg2.name, session);
+    assert.strictEqual(cfg3.name, session);
+    assert.strictEqual(cfg1.pid, cfg2.pid);
+    assert.strictEqual(cfg2.pid, cfg3.pid);
+    pidToKill = cfg1.pid;
+
+    // 关键断言：即使 3 个并发调用同时触发，fake entry 仅被真正 spawn 启动了 1 次！
+    const finalCount = Number(fs.readFileSync(countFile, 'utf-8'));
+    assert.strictEqual(finalCount, 1);
+  } finally {
+    if (pidToKill) killPidForce(pidToKill);
+    if (prevProxyEntry === undefined) delete process.env.PROXYCLI_ENTRY;
+    else process.env.PROXYCLI_ENTRY = prevProxyEntry;
+    if (prevBrowserEntry === undefined) delete process.env.BROWSERCLI_ENTRY;
+    else process.env.BROWSERCLI_ENTRY = prevBrowserEntry;
+    if (process.platform !== 'win32')
+      await fs.promises.unlink(socketPath).catch(() => undefined);
+    fs.rmSync(workspace, {recursive: true, force: true});
+  }
+});
+
+test('isDaemonRunning 与 verifyDaemonVersion 正确探活与核验版本', async () => {
+  const workspace = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'proxycli-verify-ws-'),
+  );
+  const daemonDir = path.join(workspace, 'daemon');
+  fs.mkdirSync(daemonDir, {recursive: true});
+  const session = `verify-${process.pid}`;
+
+  // 1. 无 session 文件时返回 false
+  assert.strictEqual(await isDaemonRunning(session, daemonDir), false);
+
+  // 2. 起一个 fake daemon 监听 status
+  const server = await startFakeDaemon((msg, socket) => {
+    if (msg.method === 'status' || msg.method === 'hello') {
+      socket.write(
+        JSON.stringify({
+          id: msg.id,
+          result: {
+            version: '2.0.0',
+            protocol: 1,
+            pid: process.pid,
+            session,
+            socketPath: server.socketPath,
+            startDate: new Date().toISOString(),
+            uptimeMs: 1234,
+            args: ['--test'],
+          },
+        }) + '\n',
+      );
+    }
+  });
+
+  try {
+    fs.writeFileSync(
+      path.join(daemonDir, `${session}.session`),
+      JSON.stringify({
+        name: session,
+        version: '2.0.0',
+        protocol: 1,
+        timestamp: Date.now(),
+        socketPath: server.socketPath,
+        pid: process.pid,
+      }),
+      'utf-8',
+    );
+
+    // 活跃状态下 isDaemonRunning 返回 true
+    assert.strictEqual(await isDaemonRunning(session, daemonDir), true);
+
+    // waitForDaemonReady 成功返回配置
+    const readyCfg = await waitForDaemonReady(session, daemonDir, 3000);
+    assert.strictEqual(readyCfg.name, session);
+
+    // verifyDaemonVersion: 版本一致时返回 undefined
+    const noWarn = await verifyDaemonVersion(session, '2.0.0', daemonDir);
+    assert.strictEqual(noWarn, undefined);
+
+    // verifyDaemonVersion: 版本不一致时返回 warning 文本
+    const warn = await verifyDaemonVersion(session, '1.0.0', daemonDir);
+    assert.ok(warn);
+    assert.match(
+      warn,
+      /Warning: Daemon server version \(2\.0\.0\) does not match CLI version \(1\.0\.0\)/,
+    );
+  } finally {
+    await server.close();
+    fs.rmSync(workspace, {recursive: true, force: true});
+  }
 });

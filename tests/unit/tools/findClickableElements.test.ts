@@ -70,8 +70,10 @@ function makeContext() {
   const page = {
     context: () => ({newCDPSession: async () => cdpClient}),
     evaluate: async () => 1,
+    mainFrame: () => frame,
   };
-  return {getSelectedFrame: () => ({page: () => page})} as never;
+  const frame = {page: () => page};
+  return {getSelectedFrame: () => frame} as never;
 }
 
 test('maps snapshot nodes to clickable elements', async () => {
@@ -91,7 +93,7 @@ test('maps snapshot nodes to clickable elements', async () => {
     data.map(item => item.text),
     ['提交答案', '查看详情'],
   );
-  assert.equal(data[0]?.selector, '#submit-btn');
+  assert.equal(data[0]?.selector, '[id="submit-btn"]');
   assert.equal(data[0]?.type, 'button');
   assert.equal(data[1]?.type, 'link');
   assert.deepEqual(data[0]?.boundingBox, {
@@ -110,11 +112,15 @@ test('filters by text and falls back to the JS heuristic when the snapshot fails
     },
     detach: async () => undefined,
   };
-  const fallbackFrame = {
-    page: () => ({
-      context: () => ({newCDPSession: async () => failingClient}),
-      evaluate: async () => 1,
-    }),
+  const fallbackFrame: {page: () => unknown; evaluate: () => unknown} = {
+    page: () => {
+      const page = {
+        context: () => ({newCDPSession: async () => failingClient}),
+        evaluate: async () => 1,
+        mainFrame: () => fallbackFrame,
+      };
+      return page;
+    },
     evaluate: async () => [
       {selector: '#fallback', text: '回退按钮', type: 'button', visible: true},
     ],

@@ -9,6 +9,7 @@
  * 两侧的路径算法（base dir / workspace 探测 / hash / 管道名）必须保持同步。
  */
 
+import {execFileSync} from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -100,7 +101,17 @@ export function computeClientInfo(
   };
 }
 
+export function assertValidSessionName(name: string): void {
+  if (!name) return;
+  if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
+    throw new Error(
+      `Invalid session name: "${name}". Session name must contain only alphanumeric characters, dashes, and underscores.`,
+    );
+  }
+}
+
 export function makePipePath(dirHash: string, sessionName: string): string {
+  assertValidSessionName(sessionName);
   if (process.platform === 'win32')
     return pipePath(`proxycli-${dirHash}-${sessionName}`);
   return path.join(os.tmpdir(), `proxycli-${dirHash}-${sessionName}.sock`);
@@ -111,14 +122,17 @@ export function explicitSessionName(name?: string): string | undefined {
 }
 
 export function resolveSessionName(name?: string): string {
-  return explicitSessionName(name) ?? 'default';
+  const resolved = explicitSessionName(name) ?? 'default';
+  assertValidSessionName(resolved);
+  return resolved;
 }
 
 export async function saveSessionFile(
   info: ClientInfo,
   config: SessionConfig,
 ): Promise<SessionFile> {
-  await fs.promises.mkdir(info.daemonDir, {recursive: true});
+  assertValidSessionName(config.name);
+  await fs.promises.mkdir(info.daemonDir, {recursive: true, mode: 0o700});
   const file = path.join(info.daemonDir, `${config.name}.session`);
   await fs.promises.writeFile(file, JSON.stringify(config, null, 2), 'utf-8');
   return {file, daemonDir: info.daemonDir, config};
@@ -128,6 +142,7 @@ export async function loadSessionFile(
   info: ClientInfo,
   name: string,
 ): Promise<SessionFile | undefined> {
+  assertValidSessionName(name);
   try {
     const file = path.join(info.daemonDir, `${name}.session`);
     const data = await fs.promises.readFile(file, 'utf-8');
@@ -155,4 +170,31 @@ export async function listSessionFiles(
 
 export async function deleteSessionFile(sf: SessionFile): Promise<void> {
   await fs.promises.rm(sf.file, {force: true}).catch(() => undefined);
+}
+
+/** 检查指定 PID 是否在当前系统运行。 */
+export function isPidAlive(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
+
+/** 跨平台强杀指定 PID 的进程。 */
+export function killPidForce(pid: number): void {
+  if (!isPidAlive(pid)) return;
+  try {
+    if (process.platform === 'win32') {
+      execFileSync('taskkill', ['/PID', String(pid), '/F'], {
+        stdio: 'ignore',
+      });
+    } else {
+      process.kill(pid, 'SIGKILL');
+    }
+  } catch {
+    // 忽略已退出或无权限
+  }
 }

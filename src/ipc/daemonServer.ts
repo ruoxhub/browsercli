@@ -59,6 +59,17 @@ export interface DaemonHandle {
   close: () => Promise<void>;
 }
 
+export interface DaemonStatusResult {
+  version: string;
+  protocol: number;
+  pid: number;
+  session: string;
+  socketPath: string;
+  startDate: string;
+  uptimeMs: number;
+  args: string[];
+}
+
 interface ActiveJob {
   jobId: string;
   controller: AbortController;
@@ -226,14 +237,18 @@ export async function startDaemonServer(
     params: Record<string, unknown>,
   ): Promise<unknown> {
     switch (method) {
+      case 'status':
       case 'hello':
         return {
           version: deps.version,
           protocol: PROTOCOL_VERSION,
           pid: process.pid,
           session: deps.sessionName,
+          socketPath,
+          startDate: new Date(deps.startedAt).toISOString(),
           uptimeMs: Date.now() - deps.startedAt,
-        };
+          args: process.argv.slice(2),
+        } satisfies DaemonStatusResult;
       case 'tools.list':
         return {tools: deps.listToolsMeta()};
       case 'tool.invoke':
@@ -319,9 +334,15 @@ export async function startDaemonServer(
   async function handleBrowserConnect(
     params: Record<string, unknown>,
   ): Promise<unknown> {
+    const rawBody = (params.body ?? params.options ?? {}) as Record<
+      string,
+      unknown
+    >;
+    const force = rawBody.force === true || params.force === true;
     let patch;
     try {
-      patch = parseBrowserConnectBody(params.body ?? {});
+      const {force: _ignoredForce, ...cleanBody} = rawBody;
+      patch = parseBrowserConnectBody(cleanBody);
     } catch (error) {
       if (error instanceof BrowserConfigRequestError) throw error;
       throw error;
@@ -330,7 +351,7 @@ export async function startDaemonServer(
     try {
       getRuntimeConfigStore().update({browser: patch});
       const config = effectiveBrowserConfig();
-      await connectBrowser(deps.contextProvider, config);
+      await connectBrowser(deps.contextProvider, config, {force});
       const status = getBrowserConnectionStatus(deps.contextProvider, config);
       deps.wsHub.broadcast('worker.status', {browser: status});
       return status;

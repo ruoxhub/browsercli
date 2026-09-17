@@ -314,6 +314,10 @@ export class BrowserManager {
     return this.context ?? null;
   }
 
+  getConfig(): BrowserManagerConfig {
+    return this.config;
+  }
+
   async newPage(): Promise<Page> {
     const browser = await this.ensureBrowser();
     let ctx = this.context ?? browser.contexts()[0];

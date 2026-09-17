@@ -51,7 +51,7 @@ void runAxiCli<WorkerContext>({
   topLevelHelp: generateTopLevelHelp(),
   commands: cliCommands,
   home: homeCommand,
-  getCommandHelp: command => generateCommandHelp(command),
+  getCommandHelp: command => generateCommandHelp(command, rest.slice(1)),
   argv: rest,
   resolveContext: () => createWorkerContext(rawArgv),
 });

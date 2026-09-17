@@ -176,6 +176,23 @@ describe('daemonServer', () => {
     });
   });
 
+  it('status returns full DaemonStatusResult with socketPath/startDate/args', async () => {
+    await withFixture(async (fixture, client) => {
+      const id = await client.request('status');
+      const response = await client.responseFor(id);
+      assert.deepStrictEqual(response['error'], undefined);
+      const result = response['result'] as Record<string, unknown>;
+      assert.equal(result.version, '9.9.9');
+      assert.equal(result.protocol, PROTOCOL_VERSION);
+      assert.equal(result.pid, process.pid);
+      assert.equal(result.session, 't');
+      assert.equal(result.socketPath, fixture.handle.socketPath);
+      assert.ok(typeof result.startDate === 'string');
+      assert.ok(typeof result.uptimeMs === 'number');
+      assert.ok(Array.isArray(result.args));
+    });
+  });
+
   it('tools.list passes through listToolsMeta', async () => {
     await withFixture(async (fixture, client) => {
       const id = await client.request('tools.list');

@@ -70,12 +70,55 @@ describe('help', () => {
       assert.ok(result!.includes('list-tools'));
     });
 
-    it('returns help for browser control', () => {
+    it('returns help for browser control with detailed connect options', () => {
       const result = generateCommandHelp('browser');
       assert.ok(result);
       assert.ok(result.includes('browser connect'));
+      assert.ok(result.includes('--browser-url'));
+      assert.ok(result.includes('--ws-endpoint'));
+      assert.ok(result.includes('--channel'));
+      assert.ok(result.includes('--executable-path'));
+      assert.ok(result.includes('--cloak'));
+      assert.ok(result.includes('--headless'));
       assert.ok(result.includes('browser disconnect [--force] [--json]'));
       assert.ok(result.includes('browser status'));
+    });
+
+    it('returns dedicated help for browser connect subcommand', () => {
+      const result = generateCommandHelp('browser', 'connect');
+      assert.ok(result);
+      assert.ok(result.includes('Usage: proxycli browser connect'));
+      assert.ok(!result.includes('browser disconnect'));
+      assert.ok(result.includes('--browser-url <url>'));
+      assert.ok(result.includes('--ws-endpoint <url>'));
+      assert.ok(result.includes('--channel <name>'));
+      assert.ok(result.includes('--executable-path <path>'));
+      assert.ok(result.includes('--user-data-dir <dir>'));
+      assert.ok(result.includes('--viewport <width>x<height>'));
+      assert.ok(result.includes('--cloak'));
+      assert.ok(result.includes('--minimal-stealth'));
+      assert.ok(result.includes('--full-stealth-args'));
+      assert.ok(result.includes('--js-stealth'));
+      assert.ok(result.includes('--force'));
+    });
+
+    it('returns dedicated help for browser disconnect and status subcommands', () => {
+      const disconnect = generateCommandHelp('browser', [
+        'disconnect',
+        '--help',
+      ]);
+      assert.ok(disconnect);
+      assert.ok(
+        disconnect.includes(
+          'Usage: proxycli browser disconnect [--force] [--json]',
+        ),
+      );
+      assert.ok(disconnect.includes('--force'));
+
+      const status = generateCommandHelp('browser', ['status']);
+      assert.ok(status);
+      assert.ok(status.includes('Usage: proxycli browser status [--json]'));
+      assert.ok(status.includes('--json'));
     });
 
     it('returns help for job recovery', () => {

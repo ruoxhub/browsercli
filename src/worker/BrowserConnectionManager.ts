@@ -34,6 +34,12 @@ export interface BrowserConnectionStatus {
   pages: number;
 }
 
+export interface ConnectBrowserOptions {
+  maxRetries?: number;
+  initialDelayMs?: number;
+  force?: boolean;
+}
+
 export interface DisconnectBrowserOptions {
   force?: boolean;
 }
@@ -52,6 +58,38 @@ export function getBrowserConnectionMode(
   return 'launch';
 }
 
+export function isSameBrowserTarget(
+  a: BrowserManagerConfig,
+  b: BrowserManagerConfig,
+): boolean {
+  if (getBrowserConnectionMode(a) !== getBrowserConnectionMode(b)) {
+    return false;
+  }
+  const mode = getBrowserConnectionMode(a);
+  if (mode === 'ws-endpoint') {
+    return (
+      (a.wsEndpoint ?? '') === (b.wsEndpoint ?? '') &&
+      (a.remoteDebuggingUrl ?? '') === (b.remoteDebuggingUrl ?? '')
+    );
+  }
+  if (mode === 'attach') {
+    return (
+      (a.browserURL ?? '') === (b.browserURL ?? '') &&
+      (a.remoteDebuggingUrl ?? '') === (b.remoteDebuggingUrl ?? '') &&
+      a.remoteDebuggingPort === b.remoteDebuggingPort
+    );
+  }
+  return (
+    a.channel === b.channel &&
+    (a.executablePath ?? '') === (b.executablePath ?? '') &&
+    (a.browserPath ?? '') === (b.browserPath ?? '') &&
+    (a.userDataDir ?? '') === (b.userDataDir ?? '') &&
+    Boolean(a.headless) === Boolean(b.headless) &&
+    Boolean(a.isolated) === Boolean(b.isolated) &&
+    Boolean(a.cloak) === Boolean(b.cloak)
+  );
+}
+
 export function getBrowserConnectionStatus(
   contextProvider: ToolContextProvider,
   config: BrowserManagerConfig,
@@ -60,9 +98,11 @@ export function getBrowserConnectionStatus(
     if (!contextProvider.isBrowserConnected()) {
       return {connected: false, mode: 'disconnected', pages: 0};
     }
+    const activeConfig =
+      contextProvider.getBrowserManager?.()?.getConfig?.() ?? config;
     return {
       connected: true,
-      mode: getBrowserConnectionMode(config),
+      mode: getBrowserConnectionMode(activeConfig),
       pages: contextProvider.getContext()?.pages().length ?? 0,
     };
   } catch {
@@ -79,9 +119,29 @@ export function getBrowserConnectionStatus(
 export async function connectBrowser(
   contextProvider: ToolContextProvider,
   config: BrowserManagerConfig,
-  options: {maxRetries?: number; initialDelayMs?: number} = {},
+  options: ConnectBrowserOptions = {},
 ): Promise<ConnectResult> {
   const mode = getBrowserConnectionMode(config);
+
+  // 幂等复用保护：若当前连接健康且未要求强制重连，且请求的目标配置与当前活跃连接一致，
+  // 直接复用已有会话，避免主动 resetInstance() 掐断 WebSocket 导致 Chrome 反复弹出远程调试安全授权确认框。
+  if (!options.force && contextProvider.isBrowserConnected?.()) {
+    const existingBrowser = contextProvider.getBrowser?.();
+    if (
+      existingBrowser &&
+      (typeof existingBrowser.isConnected !== 'function' ||
+        existingBrowser.isConnected())
+    ) {
+      const activeConfig = contextProvider.getBrowserManager?.()?.getConfig?.();
+      if (!activeConfig || isSameBrowserTarget(activeConfig, config)) {
+        return {
+          connected: true,
+          mode: getBrowserConnectionMode(activeConfig ?? config),
+        };
+      }
+    }
+  }
+
   // remote 模式（连接已存在的外部 Chrome/DevToolsActivePort）每次新连接都会触发 Chrome 弹窗询问，
   // 严禁快速重试风暴导致 Chrome 反复弹窗，默认单次尝试即可。
   const isRemote = mode === 'ws-endpoint' || mode === 'attach';

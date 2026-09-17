@@ -162,6 +162,7 @@ const createMockLocator = () => ({
 
 const defaultMockPage = {
   locator: () => createMockLocator(),
+  mainFrame: () => mockFrame,
   setUserAgent: async () => undefined,
   url: () => 'https://example.com/dashboard',
   title: async () => 'Dashboard',

@@ -1,110 +1,103 @@
-# Debugging & Breakpoints Reference
+# 调试器、断点与作用域检查参考文档 (Debugging Reference)
 
-Breakpoint control, execution stepping, call stack inspection, and runtime evaluation tools for `proxycli`.
+断点控制、单步步进、调用栈分析、局部作用域变量检查及条件日志点追踪工具。
 
-## Overview
+## 概览 (Overview)
 
-Use breakpoints when you must freeze execution to inspect local closures, obfuscated variable scopes, and call frames.
+> **原则提示 (Breakpoint-last)**：断点会冻结浏览器主线程并可能引发心跳超时或反爬检测。优先使用 `hook_function` 或 `trace_function` 进行非阻塞监控；仅在需要深入分析压缩混淆代码的局部闭包变量、控制流分支时使用断点。
 
-| Tool Name                              | Description                                          | Key Parameters                                               |
-| -------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------ |
-| `set_breakpoint`                       | Set breakpoint by script URL and line number         | `--url <str>`, `--lineNumber <num>`, `[--condition <str>]`   |
-| `remove_breakpoint`                    | Remove breakpoint by ID                              | `--breakpointId <str>`                                       |
-| `list_breakpoints`                     | List all active breakpoints                          | None                                                         |
-| `set_breakpoint_on_text`               | Find text pattern in scripts and place breakpoint    | `--text <str>`, `[--urlFilter <str>]`, `[--condition <str>]` |
-| `break_on_xhr`                         | Pause execution when XHR/Fetch URL matches substring | `--url <str>`                                                |
-| `remove_xhr_breakpoint`                | Remove XHR breakpoint                                | `--url <str>`                                                |
-| `xhr_to_js_breakpoint`                 | Automatically map XHR trigger to JS caller line      | `--url <str>`                                                |
-| `step_into` / `step_over` / `step_out` | Step through execution while paused                  | None                                                         |
-| `resume` / `pause`                     | Resume or force-pause script execution               | None                                                         |
-| `get_paused_info`                      | Get call stack and top frame scope when paused       | None                                                         |
-| `inspect_locals`                       | Inspect local variables across call stack frames     | None                                                         |
-| `inspect_object`                       | Deep inspection of a JavaScript object               | `--expression <str>`                                         |
-| `evaluate_on_callframe`                | Evaluate JS in the context of the paused frame       | `--expression <str>`                                         |
-| `evaluate_script`                      | Execute JS in page context without pause/breakpoint  | `--function <str>`, `[--context <str>]`                      |
+| 工具名称                               | 功能描述                                                                 | 核心参数                                                                           |
+| :------------------------------------- | :----------------------------------------------------------------------- | :--------------------------------------------------------------------------------- |
+| `set_breakpoint`                       | 按脚本 URL 或 scriptId 及行号设置 JS 断点（支持条件表达式）              | `--lineNumber <num>`, `[--url <str>]`, `[--scriptId <str>]`, `[--condition <str>]` |
+| `set_breakpoint_on_text`               | 根据代码文本片段自动搜索并在精确定位处打断点                             | `--text <str>`, `[--urlFilter <str>]`, `[--condition <str>]`                       |
+| `remove_breakpoint`                    | 移除指定 ID 的断点                                                       | `--breakpointId <str>`                                                             |
+| `list_breakpoints`                     | 列出当前调试会话中所有活跃断点                                           | 无                                                                                 |
+| `break_on_xhr`                         | 在 XHR/Fetch 请求 URL 包含指定子串时触发断点暂停                         | `--url <str>`                                                                      |
+| `remove_xhr_breakpoint`                | 移除指定的 XHR/Fetch 断点                                                | `--url <str>`                                                                      |
+| `xhr_to_js_breakpoint`                 | 设置 XHR 断点并在命中后联动定位到发起调用的 JS 源码行                    | `[--url <str>]`                                                                    |
+| `step_into` / `step_over` / `step_out` | 单步进入 / 单步跳过 / 单步跳出函数（自动返回暂停后调用栈）               | `[--includeScopes <bool>]`                                                         |
+| `resume` / `pause`                     | 恢复代码执行 / 强制暂停当前 JavaScript 运行                              | 无                                                                                 |
+| `get_paused_info`                      | 断点命中时获取当前调用栈、源码位置与作用域变量                           | `[--includeScopes <bool>]`                                                         |
+| `inspect_locals`                       | 检查当前暂停调用栈中所有栈帧的局部变量摘要                               | 无                                                                                 |
+| `inspect_object`                       | 深度展开检查一个 JS 对象的属性、原型链与方法                             | `--expression <str>`, `[--depth <num>]`                                            |
+| `evaluate_on_callframe`                | 在指定的暂停调用帧上下文中求值执行 JS 表达式                             | `--expression <str>`, `[--frameIndex <num>]`                                       |
+| `evaluate_script`                      | 在页面上下文或内容脚本中直接执行 JS（无需处于暂停状态）                  | `--function <str>`, `[--context <str>]`, `[--filePath <str>]`                      |
+| `trace_function`                       | 无需暂停，使用条件日志点（Logpoint）追踪记录指定名称函数的调用参数与结果 | `--target <str>`, `[--logArgs <bool>]`, `[--logResult <bool>]`                     |
+| `monitor_events`                       | 监听指定 DOM 元素或 window 上的事件并将流输出到控制台                    | `[--selector <str>]`, `[--events <arr>]`, `[--monitorId <str>]`                    |
+| `stop_monitor`                         | 停止指定的事件监控                                                       | `--monitorId <str>`                                                                |
+| `get_ai_debug_status`                  | 查看当前调试器状态（是否暂停、活跃断点数、加载脚本数等）                 | 无                                                                                 |
 
 ---
 
-## Detailed Commands
+## 详细命令与示例
 
-### 1. Setting and Managing Breakpoints
-
-Set breakpoints by URL and line number, or automatically by searching text content across loaded scripts.
+### 1. 设置与管理断点
 
 ```bash
-# Set line breakpoint with optional condition
-proxycli call set_breakpoint --url "https://example.com/static/js/app.js" --lineNumber 142 --condition "x > 0"
+# 1. 在指定脚本第 150 行设置条件断点
+proxycli call set_breakpoint --url "app.min.js" --lineNumber 150 --condition "token !== undefined"
 
-# Set breakpoint on matched code text
-proxycli call set_breakpoint_on_text --text "encryptPassword(" --urlFilter "login.js"
+# 2. 根据特征文本快速在压缩代码中下断
+proxycli call set_breakpoint_on_text --text "encryptPassword(" --urlFilter "main.js"
 
-# List and remove breakpoints
+# 3. 查看与清理断点
 proxycli call list_breakpoints
-proxycli call remove_breakpoint --breakpointId "1:142:0"
+proxycli call remove_breakpoint --breakpointId "1:150:0"
 ```
 
-### 2. XHR / Fetch Breakpoints
-
-Pause execution when a network request is dispatched.
+### 2. XHR / Fetch 断点拦截
 
 ```bash
-# Break whenever request URL contains '/api/v1/sign'
-proxycli call break_on_xhr --url "/api/v1/sign"
+# 拦截包含特定 API 路径的请求
+proxycli call break_on_xhr --url "/api/v2/trade/submit"
 
-# Remove XHR breakpoint
-proxycli call remove_xhr_breakpoint --url "/api/v1/sign"
-
-# Auto-locate JS caller for network request
-proxycli call xhr_to_js_breakpoint --url "/api/v1/sign"
+# 拦截并自动定位到发起请求的业务 JS 调用栈
+proxycli call xhr_to_js_breakpoint --url "/api/v2/trade/submit"
 ```
 
-### 3. Stepping and Execution Control
+### 3. 断点暂停后的步进与状态检查
 
-Execution control tools only work when the browser is in a paused state.
-
-```bash
-# Step into function
-proxycli call step_into
-
-# Step over current line
-proxycli call step_over
-
-# Step out of current function
-proxycli call step_out
-
-# Resume execution
-proxycli call resume
-
-# Force pause execution (e.g. to catch infinite loops or animations)
-proxycli call pause
-```
-
-### 4. Paused Inspection & Scope Variables
-
-Inspect the call stack, local variables, and closure scopes while frozen at a breakpoint.
+断点命中后，可使用单步控制并检查作用域内的混淆局部变量：
 
 ```bash
-# Get call stack frames and locations
-proxycli call get_paused_info
+# 获取当前暂停栈和作用域信息
+proxycli call get_paused_info --includeScopes true
 
-# Inspect local variables in current scope
+# 一览各栈帧的局部变量
 proxycli call inspect_locals
 
-# Inspect complex object structure in depth
-proxycli call inspect_object --expression "window._signatureContext"
+# 在栈顶帧求值混淆变量解密结果
+proxycli call evaluate_on_callframe --expression "_0x2b4a('0x12')" --frameIndex 0
 
-# Evaluate expression inside paused frame context
-proxycli call evaluate_on_callframe --expression "this.secretKey"
+# 深度展开对象结构（包括原型链）
+proxycli call inspect_object --expression "window.__INITIAL_STATE__" --depth 2
+
+# 单步控制
+proxycli call step_over
+proxycli call step_into
+proxycli call resume
 ```
 
-### 5. evaluate_script (Direct Page Execution)
+### 4. 非阻塞日志点追踪 (`trace_function`)
 
-Execute JavaScript in the page or content-script context without needing a breakpoint or paused state. The return value is in `data.value`.
+在不中断运行的情况下动态打印参数：
 
 ```bash
-# Read global variable or evaluate expression
-proxycli call evaluate_script --function "window.__INITIAL_STATE__"
+proxycli call trace_function \
+  --target "generateSignature" \
+  --logArgs true \
+  --logResult true \
+  --logStack true
+```
 
-# Execute multi-line function in page context
-proxycli call evaluate_script --function "(() => { return document.cookie; })()"
+### 5. 页面脚本直接执行 (`evaluate_script`)
+
+```bash
+# 直接获取全局变量或执行解密逻辑
+proxycli call evaluate_script --function "() => window.btoa(encodeURIComponent('test'))"
+
+# 执行较长代码并将返回数据直接持久化到文件
+proxycli call evaluate_script \
+  --function "() => JSON.stringify(window.__CONFIG__)" \
+  --filePath "artifacts/config.json"
 ```

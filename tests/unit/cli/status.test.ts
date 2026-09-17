@@ -13,6 +13,7 @@ import path from 'node:path';
 import {after, before, describe, it} from 'node:test';
 
 import {statusCommand} from '../../../src/cli/commands/status.js';
+import {CLI_VERSION} from '../../../src/cli/daemonClient.js';
 import type {AxiStructuredOutput} from '../../../src/cli/output.js';
 import {loadSession} from '../../../src/cli/sessionPaths.js';
 import {
@@ -24,7 +25,7 @@ import type {WorkerContext} from '../../../src/cli/types.js';
 function fakeSession(name: string, socketPath: string): SessionConfig {
   return {
     name,
-    version: '1.0.0',
+    version: CLI_VERSION,
     protocol: 1,
     timestamp: Date.now(),
     socketPath,
@@ -34,9 +35,7 @@ function fakeSession(name: string, socketPath: string): SessionConfig {
 }
 
 describe('statusCommand (registry probe + stale GC)', () => {
-  const daemonDir = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'proxycli-status-'),
-  );
+  const daemonDir = fs.mkdtempSync(path.join(os.tmpdir(), 'proxycli-status-'));
   let liveServer: net.Server;
   let livePath: string;
 
@@ -173,5 +172,34 @@ describe('statusCommand (registry probe + stale GC)', () => {
     assert.strictEqual(output.rows?.length, 2);
     const staleRow = output.rows?.find(r => r[0] === 'stale2');
     assert.strictEqual(staleRow?.[3], 'closed-stale');
+  });
+
+  it('当 daemon 版本与 CLI 版本不一致时输出 warnings', async () => {
+    // 构造一个版本为 0.9.0 的 session 文件，且 liveServer 存活
+    fs.writeFileSync(
+      path.join(daemonDir, 'diffver.session'),
+      JSON.stringify({
+        ...fakeSession('diffver', livePath),
+        version: '0.9.0',
+      }),
+      'utf-8',
+    );
+    const ctx: WorkerContext = {
+      session: 'default',
+      daemonDir,
+      connect: async () => {
+        throw new Error('不应被调用');
+      },
+    };
+    const output = (await statusCommand(
+      ['--json'],
+      ctx,
+    )) as AxiStructuredOutput;
+    assert.ok(Array.isArray(output.warnings));
+    assert.ok(
+      output.warnings.some((w: string) =>
+        w.includes('Daemon server version (0.9.0) does not match CLI version'),
+      ),
+    );
   });
 });

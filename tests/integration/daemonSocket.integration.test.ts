@@ -133,6 +133,8 @@ describe('daemon socket end-to-end', () => {
     daemonDir = path.join(tmpRoot, 'daemon');
     cliEnv = {
       ...process.env,
+      USERPROFILE: tmpRoot,
+      HOME: tmpRoot,
       BROWSERCLI_DAEMON_DIR: daemonDir,
       BROWSERCLI_ENTRY: daemonEntry,
     };
@@ -190,7 +192,7 @@ describe('daemon socket end-to-end', () => {
       `expected TOON rows table in stdout, got:\n${stdout.slice(0, 200)}`,
     );
     assert.ok(Number(match[1]) > 0, 'expected non-empty tools list');
-    assert.match(stdout, /observe_flow/);
+    assert.match(stdout, /list_pages/);
   });
 
   it('call on an unknown tool exits 1 with UNKNOWN_TOOL in output', () => {

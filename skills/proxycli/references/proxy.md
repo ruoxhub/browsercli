@@ -1,173 +1,88 @@
-# MITM Proxy & Traffic Capture Reference
+# MITM 代理抓包、规则改写与本地透明拦截参考文档 (MITM Proxy Reference)
 
-MITM proxy management, non-browser traffic sniffing, request/response rewrite rules, HAR export, and local process interception for `proxycli`.
+非浏览器流量抓取、HTTPS 解密、请求/响应实时动态改写、HAR 导出与本地进程级透明代理工具。
 
-## Overview
+## 概览 (Overview)
 
-Capture, inspect, and modify HTTP/HTTPS traffic from non-browser clients (scripts, curl, Python requests, mobile apps, desktop clients like WeChat/Electron) using the built-in MITM proxy.
+用于拦截非浏览器环境的流量（如 Python/cURL 爬虫脚本、移动端手机 App、微信小程序、Electron 桌面客户端、系统后台服务等）。支持动态生成/导出自签名根证书，支持配置二级 upstream 上游代理。
 
-| Tool Name                   | Description                                                                           | Key Parameters                                                                      |
-| --------------------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `start_mitm_proxy`          | Start MITM capture proxy server                                                       | `[--port <num>]`, `[--upstreamProxy <str>]`                                         |
-| `stop_mitm_proxy`           | Stop MITM proxy and release port                                                      | None                                                                                |
-| `export_mitm_ca`            | Export root CA cert (PEM/DER) to trust HTTPS                                          | `--outputPath <str>`, `[--format <str>]`                                            |
-| `list_mitm_requests`        | List captured proxy traffic (max 2000 in memory)                                      | `[--urlFilter <str>]`, `[--host <str>]`, `[--method <str>]`, `[--statusCode <num>]` |
-| `get_mitm_request`          | Get full headers/bodies for captured request                                          | `--id <num>`, `[--saveTo <str>]`, `[--format <str>]`                                |
-| `clear_mitm_requests`       | Clear all captured proxy traffic records                                              | None                                                                                |
-| `mitm_export_har`           | Export captured traffic buffer to standard HAR 1.2                                    | `[--outputPath <str>]`                                                              |
-| `mitm_add_rule`             | Add rewrite rule (`block`, `map_local`, `map_remote`, `modify_header`, `modify_body`) | `--action <obj>`, `[--id <str>]`, `[--urlFilter <str>]`, `[--host <str>]`           |
-| `mitm_list_rules`           | List all active rewrite rules                                                         | None                                                                                |
-| `mitm_remove_rule`          | Remove rewrite rule by ID                                                             | `--id <str>`                                                                        |
-| `mitm_clear_rules`          | Clear all rewrite rules                                                               | None                                                                                |
-| `mitm_add_host_filter`      | Add host filter (`allow` whitelist or `block` blacklist)                              | `--action <str>`, `--host <str>`                                                    |
-| `mitm_list_host_filters`    | List all active host filters                                                          | None                                                                                |
-| `mitm_remove_host_filter`   | Remove specific host filter                                                           | `--action <str>`, `--host <str>`                                                    |
-| `mitm_clear_host_filters`   | Clear all host filters                                                                | None                                                                                |
-| `mitm_list_local_processes` | List local processes holding TCP connections                                          | None                                                                                |
-| `mitm_configure_local_apps` | Configure system proxy interception for specific target apps                          | `[--enabled <bool>]`, `[--targets <arr>]`                                           |
+| 工具名称                    | 功能描述                                                                                     | 核心参数                                                      |
+| :-------------------------- | :------------------------------------------------------------------------------------------- | :------------------------------------------------------------ |
+| `start_mitm_proxy`          | 启动 MITM 抓包代理服务（默认端口 8888，支持二级 upstream 代理）                              | `[--port <num>]`, `[--upstreamProxy <str>]`                   |
+| `stop_mitm_proxy`           | 停止 MITM 代理服务并释放监听端口                                                             | 无                                                            |
+| `export_mitm_ca`            | 导出根 CA 证书文件（PEM 或 DER 格式），供客户端信任以解密 HTTPS                              | `--outputPath <str>`, `[--format <str>]`                      |
+| `list_mitm_requests`        | 列出 MITM 捕获的请求（内存环形缓冲，支持 URL/Host/Method/状态码多重过滤）                    | `[--urlFilter <str>]`, `[--host <str>]`, `[--pageSize <num>]` |
+| `get_mitm_request`          | 获取单条抓包请求的完整结构化详情（支持导出为 curl 命令或另存 Body）                          | `--id <num>`, `[--saveTo <str>]`, `[--format <str>]`          |
+| `clear_mitm_requests`       | 清空所有捕获记录，清空后请求 ID 从 1 重新开始递增                                            | 无                                                            |
+| `mitm_add_rule`             | 新增或覆盖改写规则（`block` / `map_local` / `map_remote` / `modify_header` / `modify_body`） | `--action <obj>`, `[--id <str>]`, `[--urlFilter <str>]`       |
+| `mitm_list_rules`           | 列出当前生效的全部改写规则                                                                   | 无                                                            |
+| `mitm_remove_rule`          | 按 ID 移除指定的改写规则                                                                     | `--id <str>`                                                  |
+| `mitm_clear_rules`          | 清空全部改写规则                                                                             | 无                                                            |
+| `mitm_add_host_filter`      | 配置域名过滤（`allow` 白名单 / `block` 黑名单；白名单非空时其余全部旁路）                    | `--action <str>`, `--host <str>`                              |
+| `mitm_list_host_filters`    | 列出当前生效的域名黑白名单                                                                   | 无                                                            |
+| `mitm_remove_host_filter`   | 移除指定的域名过滤规则                                                                       | `--action <str>`, `--host <str>`                              |
+| `mitm_clear_host_filters`   | 清空全部域名黑白名单                                                                         | 无                                                            |
+| `mitm_list_local_processes` | 列出当前持有 TCP 网络连接的本地进程（pid/名称），辅助选取拦截目标                            | 无                                                            |
+| `mitm_configure_local_apps` | 配置 Local Applications 透明拦截模式：接管 Windows 系统代理，仅解密目标进程                  | `[--enabled <bool>]`, `[--targets <arr>]`                     |
+| `mitm_export_har`           | 将当前捕获缓冲导出为标准 HAR 1.2 格式文件                                                    | `[--outputPath <str>]`                                        |
 
 ---
 
-## CLI Interactive Terminal (REPL)
+## 交互式终端抓包控制台 (REPL)
 
-In addition to programmatic tool calls, `proxycli` provides a dedicated interactive terminal command:
+除了通过 MCP 工具调用，`proxycli` 还提供了专门的独立交互式终端：
 
 ```bash
-# Start interactive MITM capture REPL (default port: 8888)
+# 启动交互式 MITM 抓包 REPL（默认端口 8888）
 proxycli proxy
 
-# Start with custom port and upstream SOCKS5 proxy
+# 自定义端口并配置二级上游 SOCKS5 代理
 proxycli proxy --port 9090 --upstream "socks5://127.0.0.1:1080"
 
-# Start with automatic Windows system proxy takeover
+# 自动接管 Windows 系统代理
 proxycli proxy --sysproxy
 
-# Query running proxy status
+# 查看代理运行状态
 proxycli proxy status
-proxycli proxy status --json
 ```
 
 ---
 
-## Detailed Tool Commands
+## 详细命令与示例
 
-### 1. Starting & Stopping the Proxy
+### 1. 启动服务与信任 CA 证书
 
 ```bash
-# Start MITM proxy listening on 127.0.0.1:8888
+# 1. 启动代理监听
 proxycli call start_mitm_proxy --port 8888
 
-# Start with upstream SOCKS5 forwarding
-proxycli call start_mitm_proxy --port 8888 --upstreamProxy "socks5://127.0.0.1:1080"
-
-# Stop proxy service
-proxycli call stop_mitm_proxy
-```
-
-### 2. Exporting and Trusting the CA Certificate
-
-To decrypt HTTPS traffic, clients or operating systems must trust the generated MITM root certificate.
-
-```bash
-# Export CA certificate to PEM format
+# 2. 导出 CA 证书给客户端安装
 proxycli call export_mitm_ca --outputPath "artifacts/mitm_ca.crt" --format pem
 
-# Example client verification with curl:
-# curl -x http://127.0.0.1:8888 --cacert artifacts/mitm_ca.crt https://example.com/api
+# 客户端验证示例（如 curl）：
+# curl -x http://127.0.0.1:8888 --cacert artifacts/mitm_ca.crt https://api.example.com/test
 ```
 
-### 3. Inspecting Captured Requests
+### 2. 动态修改与 Mock 请求响应 (`mitm_add_rule`)
 
 ```bash
-# List requests matching URL pattern
-proxycli call list_mitm_requests --urlFilter "/api/v1" --method "POST"
-
-# Filter by host
-proxycli call list_mitm_requests --host "api.target.com" --statusCode 200
-
-# Get complete request details, headers, and body
-proxycli call get_mitm_request --id 1
-
-# Export request directly to a ready-to-run curl command
-proxycli call get_mitm_request --id 1 --format curl
-
-# Save large response body directly to file
-proxycli call get_mitm_request --id 1 --saveTo "artifacts/response_01.json"
-
-# Clear captured requests
-proxycli call clear_mitm_requests
-```
-
-### 4. Traffic Filtering (Host Whitelist / Blacklist)
-
-When non-empty, whitelist (`allow`) takes precedence and causes non-whitelisted domains to pass through without interception.
-
-```bash
-# Whitelist only target API domain
-proxycli call mitm_add_host_filter --action allow --host "api.target.com"
-
-# Block noisy analytics domains
-proxycli call mitm_add_host_filter --action block --host "google-analytics.com"
-
-# View active host filters
-proxycli call mitm_list_host_filters
-
-# Clear all filters
-proxycli call mitm_clear_host_filters
-```
-
-### 5. Dynamic Rewrite Rules (Mock, Map, Header & Body Modification)
-
-Rewrite rules intercept and modify traffic on the fly:
-
-```bash
-# 1. Map remote request to local mock file
+# 本地 Mock 接口返回
 proxycli call mitm_add_rule \
-  --action '{"type":"map_local","urlRegex":"https://api\\.example\\.com/config","localPath":"artifacts/mock_config.json","statusCode":200}' \
-  --id "rule_mock_config"
+  --id "mock_user_info" \
+  --action '{"type":"map_local","urlRegex":"https://api\\.example\\.com/user","localPath":"artifacts/mock_user.json","statusCode":200}'
 
-# 2. Redirect request to another server (map_remote)
+# 篡改请求 Header（注入测试 Token）
 proxycli call mitm_add_rule \
-  --action '{"type":"map_remote","urlRegex":"https://prod\\.api\\.com/(.*)","replacement":"https://dev.api.com/$1"}' \
-  --id "rule_redirect_dev"
-
-# 3. Modify headers (e.g. inject custom auth token)
-proxycli call mitm_add_rule \
-  --urlFilter "/api" \
-  --action '{"type":"modify_header","phase":"request","set":{"X-Debug-Mode":"1"}}' \
-  --id "rule_inject_header"
-
-# 4. Modify response body (regex or literal replace)
-proxycli call mitm_add_rule \
-  --urlFilter "/bundle.js" \
-  --action '{"type":"modify_body","phase":"response","find":"debugger;","replace":"/* disabled */"}' \
-  --id "rule_remove_debugger"
-
-# 5. List and remove rules
-proxycli call mitm_list_rules
-proxycli call mitm_remove_rule --id "rule_mock_config"
-proxycli call mitm_clear_rules
+  --id "inject_auth" \
+  --action '{"type":"modify_header","urlRegex":".*","requestHeaders":{"Authorization":"Bearer test_token"}}'
 ```
 
-### 6. Exporting to HAR
-
-Export all captured requests and responses to a standard HAR 1.2 file for viewing in Charles, Fiddler, or Chrome DevTools.
+### 3. Windows 本地进程透明拦截
 
 ```bash
-proxycli call mitm_export_har --outputPath "artifacts/traffic.har"
-```
-
-### 7. Local App & Process Interception
-
-Intercept desktop applications or specific Windows executables.
-
-```bash
-# List local processes holding network connections
+# 1. 查找微信或目标桌面应用进程名
 proxycli call mitm_list_local_processes
 
-# Configure transparent system proxy to intercept target desktop application
-proxycli call mitm_configure_local_apps --enabled true --targets '["wechat.exe"]'
-
-# Disable system proxy takeover
-proxycli call mitm_configure_local_apps --enabled false
+# 2. 启用系统代理透明拦截，仅对 WeChat.exe 流量做 MITM 解密，其余正常直连
+proxycli call mitm_configure_local_apps --enabled true --targets '["WeChat.exe"]'
 ```

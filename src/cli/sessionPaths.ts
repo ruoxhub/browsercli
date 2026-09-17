@@ -88,7 +88,17 @@ export function computeClientInfo(startDir?: string): ClientInfo {
   };
 }
 
+export function assertValidSessionName(name: string): void {
+  if (!name) return;
+  if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
+    throw new Error(
+      `Invalid session name: "${name}". Session name must contain only alphanumeric characters, dashes, and underscores.`,
+    );
+  }
+}
+
 export function makePipePath(dirHash: string, sessionName: string): string {
+  assertValidSessionName(sessionName);
   if (process.platform === 'win32')
     return `\\\\.\\pipe\\proxycli-${dirHash}-${sessionName}`;
   return path.join(os.tmpdir(), `proxycli-${dirHash}-${sessionName}.sock`);
@@ -99,13 +109,16 @@ export function explicitSessionName(name?: string): string | undefined {
 }
 
 export function resolveSessionName(name?: string): string {
-  return explicitSessionName(name) ?? 'default';
+  const resolved = explicitSessionName(name) ?? 'default';
+  assertValidSessionName(resolved);
+  return resolved;
 }
 
 export async function loadSession(
   daemonDir: string,
   name: string,
 ): Promise<SessionConfig | undefined> {
+  assertValidSessionName(name);
   try {
     const data = await fs.promises.readFile(
       path.join(daemonDir, `${name}.session`),
@@ -133,6 +146,7 @@ export async function deleteSession(
   daemonDir: string,
   name: string,
 ): Promise<void> {
+  assertValidSessionName(name);
   await fs.promises
     .rm(path.join(daemonDir, `${name}.session`), {force: true})
     .catch(() => undefined);

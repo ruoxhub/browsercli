@@ -17,6 +17,7 @@ const commandDescriptions: Record<string, string> = {
   scaffold: '创建新的逆向任务脚手架',
   status: '查看 daemon 会话运行状态',
   proxy: '启动交互式 MITM 代理抓包终端（REPL）或查看代理状态',
+  extension: '管理浏览器扩展连接器（Native Host 安装、状态查看等）',
   web: '启动、查看或停止 Web 控制台',
   open: '拉起（或探活）daemon 会话',
   close: '停止 daemon 会话',
@@ -46,6 +47,7 @@ export function generateTopLevelHelp(options?: {
     'scaffold',
     'status',
     'proxy',
+    'extension',
     'web',
   ];
 
@@ -70,8 +72,90 @@ export function generateTopLevelHelp(options?: {
   return lines.join('\n');
 }
 
-export function generateCommandHelp(command: string): string | null {
-  const helpMap: Record<string, {description: string; usage: string}> = {
+const BROWSER_CONNECT_USAGE =
+  'proxycli browser connect [--browser-url <url> | --ws-endpoint <url> | --channel <name> | --executable-path <path>] [--user-data-dir <dir>] [--viewport <width>x<height>] [--ws-headers <json>] [--headless[=<bool>]] [--cloak] [--minimal-stealth] [--full-stealth-args] [--js-stealth] [--isolated] [--accept-insecure-certs] [--force] [--json]';
+
+const BROWSER_CONNECT_OPTIONS = [
+  '  目标参数（互斥）：',
+  '    --browser-url <url>            CDP HTTP 远程调试入口（如 http://127.0.0.1:9222）',
+  '    --ws-endpoint <url>            CDP WebSocket 远程连接地址',
+  '    --channel <name>               本地启动浏览器渠道（stable, beta, canary, chrome, firefox 等）',
+  '    --executable-path <path>       本地自定义浏览器可执行文件路径',
+  '',
+  '  运行与环境选项：',
+  '    --user-data-dir <dir>          浏览器 Profile 用户数据目录',
+  '    --viewport <width>x<height>    窗口视口尺寸（如 1280x720，默认跟随系统屏幕）',
+  '    --ws-headers <json>            远程 WebSocket 握手请求头（JSON 字符串）',
+  '    --headless[=<bool>]            是否以无头模式运行（默认 false）',
+  '    --isolated                     是否使用隔离会话上下文',
+  '    --accept-insecure-certs        允许不受信任的 HTTPS 证书',
+  '    --force                        若已存在活动连接，强制关闭后重新连接',
+  '',
+  '  反检测与伪装选项：',
+  '    --cloak                        启用 CloakBrowser 源码级反检测二进制（49 个 C++ patch，profile 物理隔离）',
+  '    --minimal-stealth              启用最小反爬检测启动参数（默认推荐）',
+  '    --full-stealth-args            启用全量隐身启动参数（包含历史反爬特征参数）',
+  '    --js-stealth                   注入 StealthScripts2025 JS 反反爬脚本',
+  '',
+  '  输出选项：',
+  '    --json                         以 JSON 格式输出结果',
+].join('\n');
+
+export function generateCommandHelp(
+  command: string,
+  subCommandOrArgs?: string | readonly string[],
+): string | null {
+  const subCommand =
+    typeof subCommandOrArgs === 'string'
+      ? subCommandOrArgs
+      : Array.isArray(subCommandOrArgs)
+        ? subCommandOrArgs.find(arg => !arg.startsWith('-'))
+        : undefined;
+
+  if (command === 'browser' && subCommand) {
+    if (subCommand === 'connect') {
+      return [
+        '',
+        `  Usage: ${BROWSER_CONNECT_USAGE}`,
+        '',
+        '  连接 Worker 浏览器（支持 CDP 远程附连、本地启动与反检测模式）',
+        '',
+        '  Options:',
+        BROWSER_CONNECT_OPTIONS,
+        '',
+      ].join('\n');
+    }
+    if (subCommand === 'disconnect') {
+      return [
+        '',
+        '  Usage: proxycli browser disconnect [--force] [--json]',
+        '',
+        '  断开 Worker 浏览器连接',
+        '',
+        '  Options:',
+        '    --force                        强制断开连接（忽略未完成的任务）',
+        '    --json                         以 JSON 格式输出结果',
+        '',
+      ].join('\n');
+    }
+    if (subCommand === 'status') {
+      return [
+        '',
+        '  Usage: proxycli browser status [--json]',
+        '',
+        '  查看 Worker 浏览器连接状态',
+        '',
+        '  Options:',
+        '    --json                         以 JSON 格式输出结果',
+        '',
+      ].join('\n');
+    }
+  }
+
+  const helpMap: Record<
+    string,
+    {description: string; usage: string; options?: string}
+  > = {
     call: {
       description:
         '调用 MCP 工具。复杂或多行 JavaScript 请保存为脚本文件后使用 --file，或通过 --stdin 传入 JSON 参数，避免 shell 转义破坏脚本。',
@@ -84,10 +168,11 @@ export function generateCommandHelp(command: string): string | null {
     browser: {
       description: '连接、断开或查看 Worker 浏览器状态',
       usage: [
-        'proxycli browser connect [options]',
+        BROWSER_CONNECT_USAGE,
         'proxycli browser disconnect [--force] [--json]',
         'proxycli browser status [--json]',
       ].join('\n         '),
+      options: BROWSER_CONNECT_OPTIONS,
     },
     jobs: {
       description: '列出 Worker 任务，或取消卡住的活动任务',
@@ -150,7 +235,10 @@ export function generateCommandHelp(command: string): string | null {
   const help = helpMap[command];
   if (!help) return null;
 
-  return ['', `  Usage: ${help.usage}`, '', `  ${help.description}`, ''].join(
-    '\n',
-  );
+  const lines = ['', `  Usage: ${help.usage}`, '', `  ${help.description}`];
+  if (help.options) {
+    lines.push('', '  Options:', help.options);
+  }
+  lines.push('');
+  return lines.join('\n');
 }

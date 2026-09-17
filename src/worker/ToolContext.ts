@@ -147,6 +147,10 @@ export class ToolContextProvider {
     this._serviceLocator.setBrowserManager(browserManager);
   }
 
+  getBrowserManager(): BrowserManager | null {
+    return this._browserContext.getBrowserManager();
+  }
+
   get collector() {
     return this._serviceLocator.getCollector();
   }

@@ -25,7 +25,7 @@
     "start-debug": "DEBUG=mcp:* DEBUG_COLORS=false npm run build && node build/src/index.js",
     "test:node20": "node --require ./build/tests/setup.js --test-reporter spec --test-force-exit --test build/tests",
     "test": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test-reporter spec --test-force-exit --test \"build/tests/**/*.test.js\"",
-    "test:unit": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/unit/**/*.test.js",
+    "test:unit": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test-force-exit --test-timeout=30000 --test build/tests/unit/**/*.test.js",
     "test:contracts": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/unit/tools/all-tools-contract.test.js build/tests/unit/tools/tool-failure-contract.test.js",
     "test:reliability:integration": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/integration/tool-categories.integration.test.js build/tests/integration/proxycli-reliability.integration.test.js",
     "test:quick": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/unit/tools/**/*.test.js build/tests/unit/services/**/*.test.js build/tests/unit/utils/**/*.test.js",

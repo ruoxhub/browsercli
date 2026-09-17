@@ -1,110 +1,58 @@
-# Script Collection & Search Reference
+# 脚本收集、缓存检索与源码定位参考文档 (Script & Source Reference)
 
-Script discovery, source retrieval, keyword matching, and target snapshots for `proxycli`.
+页面脚本探测、源码缓存提取、正则检索、智能收集及目标 Target 快照工具。
 
-## Overview
+## 概览 (Overview)
 
-Inspect and collect JavaScript source code loaded by Chromium targets.
+用于定位页面加载的业务 JS 脚本、Webpack 打包 chunk，提取代码片段并快速通过关键词匹配找到签名、加密及参数生成逻辑。
 
-| Tool Name             | Description                                       | Key Parameters                                                                  |
-| --------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `list_scripts`        | List all loaded scripts in the active page        | `[--filter <str>]`                                                              |
-| `get_script_source`   | Get JavaScript source code for a script ID        | `--scriptId <str>`, `[--filePath <str>]`, `[--startLine <num> --endLine <num>]` |
-| `search_in_sources`   | Search loaded scripts using regex or string       | `--query <str>`, `[--urlFilter <str>]`                                          |
-| `search_in_scripts`   | Search locally cached scripts                     | `--pattern <str>`, `[--limit <num>]`, `[--maxTotalSize <num>]`                  |
-| `find_in_script`      | Find text in specific script (exact line/col)     | `--scriptId <str>`, `--query <str>`                                             |
-| `collect_code`        | Smart collect scripts to local disk               | `--url <str>`, `[--smartMode <str>]`, `[--pattern <str>]`                       |
-| `collection_diff`     | Compare changes between collection runs           | `[--includeUnchanged <bool>]`                                                   |
-| `list_targets`        | List Chromium targets and script snapshot status  | None                                                                            |
-| `dump_target_scripts` | Dump scripts parsed by a specific Chromium target | `--targetId <str>`                                                              |
+| 工具名称                | 功能描述                                                                               | 核心参数                                                                        |
+| :---------------------- | :------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------ |
+| `list_scripts`          | 列出当前页面已加载的所有 JavaScript 脚本（包含 scriptId、URL 与 SourceMap）            | `[--filter <str>]`                                                              |
+| `get_script_source`     | 按 scriptId 获取 JS 源码本地缓存路径（触发 CDP 并写入临时文件，支持行号切片）          | `--scriptId <str>`, `[--filePath <str>]`, `[--startLine <num> --endLine <num>]` |
+| `search_in_sources`     | 在所有已加载的 JS 源码中全文正则/字符串搜索，返回 scriptId、行号及 sourcePath 缓存路径 | `--query <str>`, `[--urlFilter <str>]`, `[--isRegex <bool>]`                    |
+| `search_in_scripts`     | 使用正则表达式在本地已收集的脚本缓存中搜索                                             | `--pattern <str>`, `[--limit <num>]`, `[--maxTotalSize <num>]`                  |
+| `find_in_script`        | 在指定脚本内精确定位字符串出现位置（精确行列号及上下文字符）                           | `--scriptId <str>`, `--query <str>`, `[--contextChars <num>]`                   |
+| `collect_code`          | 智能收集页面关联脚本到本地磁盘（支持 summary/priority/incremental/full 模式）          | `--url <str>`, `[--smartMode <str>]`, `[--pattern <str>]`                       |
+| `collection_diff`       | 对比上一次与当前收集到的脚本文件摘要，探测动态加载或热更新脚本                         | `[--includeUnchanged <bool>]`                                                   |
+| `list_targets`          | 列出 Chromium 当前可见的所有 Target 及其脚本快照能力                                   | 无                                                                              |
+| `dump_target_scripts`   | 一次性读取指定 Chromium Target 当前已解析的全部脚本源码                                | `--targetId <str>`                                                              |
+| `inject_preload_script` | 为当前页面或上下文的后续文档注册预加载脚本（可使用预设 preset）                        | `[--script <str>]`, `[--preset <str>]`                                          |
 
 ---
 
-## Detailed Commands
+## 详细命令与示例
 
-### 1. list_scripts
-
-List all loaded scripts in the active page. Filter by script URL pattern or name.
+### 1. 查找并读取页面脚本源码
 
 ```bash
-# List all loaded scripts
-proxycli call list_scripts
-
-# List scripts matching a URL keyword
+# 1. 列出所有脚本，通过业务域名或关键词过滤
 proxycli call list_scripts --filter "app"
+
+# 2. 全局搜索关键函数或混淆变量特征（轻量高效，返回匹配文件路径）
+proxycli call search_in_sources --query "encryptPassword(" --urlFilter "bundle.js"
+
+# 3. 按 scriptId 截取指定行范围的代码并写入本地文件
+proxycli call get_script_source \
+  --scriptId "42" \
+  --startLine 120 \
+  --endLine 250 \
+  --filePath "artifacts/sources/app_slice.js"
 ```
 
-### 2. get_script_source
-
-Retrieve the source code of a specific script by its `scriptId`. Supports slicing by line range for large bundle files.
+### 2. 批量智能收集脚本 (`collect_code`)
 
 ```bash
-# Read full script source
-proxycli call get_script_source --scriptId "42"
+# 优先模式：挑出核心业务与非第三方库脚本
+proxycli call collect_code --url "https://example.com/target" --smartMode priority
 
-# Read lines 100 to 200 of a minified bundle
-proxycli call get_script_source --scriptId "42" --startLine 100 --endLine 200
-
-# Save script source directly to a local file
-proxycli call get_script_source --scriptId "42" --filePath "artifacts/scripts/vendor.js"
+# 增量模式：仅下载新增或变动脚本
+proxycli call collect_code --url "https://example.com/target" --smartMode incremental
 ```
 
-### 3. search_in_sources
-
-Search across all loaded script sources for sensitive function names, encryption keys, or parameter names (e.g. `signature`, `_0x`, `encrypt`).
+### 3. 注册前置预加载脚本 (`inject_preload_script`)
 
 ```bash
-# Search for signature calculation keyword
-proxycli call search_in_sources --query "sign("
-
-# Search with URL filter to isolate business logic
-proxycli call search_in_sources --query "encrypt" --urlFilter "main.js"
-```
-
-### 4. search_in_scripts
-
-Search inside locally collected/cached script files.
-
-```bash
-proxycli call search_in_scripts --pattern "AES" --limit 20
-```
-
-### 5. find_in_script
-
-Find a query string in a specific script and return the exact line and column numbers. Helpful before placing precise breakpoints.
-
-```bash
-proxycli call find_in_script --scriptId "42" --query "window.loginSign"
-```
-
-### 6. collect_code
-
-Collect and persist all JavaScript code related to the page. `smartMode` supports: `summary`, `priority`, `incremental`, `full`.
-
-```bash
-# Collect core business scripts
-proxycli call collect_code --url "https://example.com" --smartMode priority
-
-# Full dump of all scripts under size limit
-proxycli call collect_code --url "https://example.com" --smartMode full --maxTotalSize 10485760
-```
-
-### 7. collection_diff
-
-Compare code file summaries between different collection passes to detect dynamically loaded or mutated scripts.
-
-```bash
-proxycli call collection_diff --includeUnchanged false
-```
-
-### 8. list_targets & dump_target_scripts
-
-When regular debugger collection cannot cover ServiceWorkers, WebWorkers, or background pages, use Chromium Target snapshots.
-
-```bash
-# 1. Inspect targets and acquire targetId
-proxycli call list_targets
-
-# 2. Dump parsed scripts for that target
-proxycli call dump_target_scripts --targetId "CB8F8E32D9..."
+# 注入通用 Hook 预设，在目标页面任何首屏 JS 执行前生效
+proxycli call inject_preload_script --preset "anti-debugger"
 ```
