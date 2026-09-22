@@ -96,5 +96,5 @@ browsercli call list_websocket_connections
 browsercli call analyze_websocket_messages --wsid 1
 
 # 3. 读取并解码单条业务消息帧
-browsercli call get_websocket_message --wsid 1 --frameIndex 14 --decode utf8
+browsercli call get_websocket_message --wsid 1 --frameIndex 14 --decode auto
 ```

@@ -54,5 +54,5 @@ browsercli call collect_code --url "https://example.com/target" --smartMode incr
 
 ```bash
 # 注入通用 Hook 预设，在目标页面任何首屏 JS 执行前生效
-browsercli call inject_preload_script --preset "anti-debugger"
+browsercli call inject_preload_script --preset "capture-all-requests"
 ```

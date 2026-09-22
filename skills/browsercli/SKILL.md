@@ -1,9 +1,9 @@
 ---
 name: browsercli
-description: 当需要通过 browsercli CLI 控制浏览器自动化、抓取与重放 HTTP/WebSocket 网络请求、追踪请求发起者调用栈、动态注入 JavaScript Hook 与加密拦截、安装 JSVMP 运行时探针、捕获与追踪 WebAssembly、设置断点与单步调试、绕过无限 debugger 与反反调试、模拟真实 DOM 拟人化交互、启动 MITM 中间人代理拦截非浏览器流量（微信小程序/App/脚本）、提取 Cookie/Storage 快照、沉淀逆向证据时使用。只要用户提到“浏览器逆向”、“抓包分析”、“Hook 加密”、“查找签名”、“调试混淆代码”或“browsercli”均应使用。
+description: 当需要通过 browsercli CLI 控制浏览器自动化、抓取与重放 HTTP/WebSocket 网络请求、追踪请求发起者调用栈、动态注入 JavaScript Hook 与加密拦截、安装 JSVMP 运行时探针、捕获与追踪 WebAssembly、设置断点与单步调试、绕过无限 debugger 与反反调试、模拟真实 DOM 拟人化交互、提取 Cookie/Storage 快照、沉淀逆向证据时使用。只要用户提到“浏览器逆向”、“抓包分析”、“Hook 加密”、“查找签名”、“调试混淆代码”或“browsercli”均应使用。
 ---
 
-# ProxyCLI 逆向工程与浏览器自动化技能
+# BrowserCLI 逆向工程与浏览器自动化技能
 
 `browsercli` 是用于浏览器自动化操作、客户端 JavaScript/WebAssembly 逆向工程与流量拦截的核心命令行工具。基于本地命名管道（POSIX 为 Unix Socket）与后台常驻 Daemon 通信。
 
@@ -69,18 +69,9 @@ browsercli config get
 browsercli config set cloak=true
 ```
 
-### 交互式 MITM 代理与 Web 控制台
+### Web 控制台
 
 ```bash
-# 启动交互式终端 MITM 代理抓包控制台（REPL，默认端口 8888）
-browsercli proxy
-
-# 启动代理并自动接管 Windows 系统代理
-browsercli proxy --sysproxy
-
-# 查看代理运行状态
-browsercli proxy status
-
 # 启动并自动打开 Web 可视化控制台
 browsercli web
 
@@ -130,22 +121,21 @@ browsercli jobs cancel <job-id>
 
 各领域工具的详细参数签名与使用示例已模块化整理在 `references/` 目录中，可按需精读：
 
-| 分类 / 领域              | 详细参考文档                                               | 涵盖的核心能力与代表工具                                                                                                                                                             |
-| :----------------------- | :--------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **浏览器与页面控制**     | [`references/browser.md`](./references/browser.md)         | 多标签管理、iframe 切换、视口控制、设备/网络模拟、健康检查 (`list_pages`, `new_page`, `select_frame`, `emulate_mobile`, `check_browser_health`)                                      |
-| **脚本收集与源码定位**   | [`references/script.md`](./references/script.md)           | 脚本列举、源码按行截取、全局正则搜索、预加载脚本注入 (`list_scripts`, `get_script_source`, `search_in_sources`, `collect_code`)                                                      |
-| **动态 Hook 与加密拦截** | [`references/hook.md`](./references/hook.md)               | 非阻塞 Hook、Hook 生命周期管理、便捷函数 Hook (`create_hook`, `inject_hook`, `get_hook_data`, `hook_function`, `unhook_function`)。加密库 / JSVMP 专用拦截脚本见 `skills/web-reverse-hook`             |
-| **调试器与断点步进**     | [`references/debugger.md`](./references/debugger.md)       | 行/条件/XHR 断点、单步执行、局部变量检查、日志点追踪、表达式求值 (`set_breakpoint`, `break_on_xhr`, `step_into`, `inspect_locals`, `evaluate_script`, `trace_function`)              |
-| **DOM 交互与样式排查**   | [`references/dom.md`](./references/dom.md)                 | 多定位器查询、拟人化点击/打字、CDP 绝对坐标点击、表单填充、样式层叠排查 (`query_dom`, `click_at`, `type_text`, `fill_form`, `drag`, `take_screenshot`, `get_css_styles`)             |
-| **网络嗅探与 WebSocket** | [`references/network.md`](./references/network.md)         | 网络流量嗅探、**发起者调用栈定位**、请求重放覆写、cURL 导出、WebSocket 帧聚类 (`list_network_requests`, `get_request_initiator`, `replay_network_request`, `export_request_as_curl`) |
-| **MITM 抓包与透明代理**  | [`references/proxy.md`](./references/proxy.md)             | 非浏览器流量拦截、CA 根证书管理、动态改写规则、域名黑白名单、本地进程透明代理 (`start_mitm_proxy`, `export_mitm_ca`, `mitm_add_rule`, `mitm_configure_local_apps`)                   |
-| **反反调试与隐身伪装**   | [`references/stealth.md`](./references/stealth.md)         | 绕过无限 debugger 死循环、反反调试防护罩、User-Agent 自定义、按需隐身预设 (`bypass_debugger`, `anti_anti_debug`, `set_user_agent`, `inject_stealth`)                                 |
-| **WebAssembly 逆向**     | [`references/wasm.md`](./references/wasm.md)               | Wasm 模块捕获与磁盘 dump、JS-Wasm 跨边界调用追踪、线性内存搜索 (`collect_wasm`, `wasm_dump`, `wasm_vmp_trace`, `wasm_memory_inspect`)                                                |
-| **会话持久化与媒体控制** | [`references/session.md`](./references/session.md)         | HttpOnly Cookie/Storage 导出、会话快照持久化备份、多抓包会话隔离、视频帧截取 (`get_storage`, `save_session_state`, `session_export`, `capture_video_frame`)                          |
-| **环境诊断与验证码探测** | [`references/evidence.md`](./references/evidence.md)       | 运行环境自检、页面验证码只读探测 (`diagnose_environment`, `detect_captcha`)                                                                                                          |
-| **控制台消息日志**       | [`references/console.md`](./references/console.md)         | 控制台 Console 日志采集与单条消息结构化查询 (`list_console_messages`, `get_console_message`)                                                                                         |
-| **性能监控与分析**       | [`references/performance.md`](./references/performance.md) | Core Web Vitals 评估、CDP 性能轨迹录制与瓶颈 Insight 诊断 (`start_performance_trace`, `stop_performance_trace`, `get_performance_metrics`)                                           |
-| **全量工具速查字典**     | [`references/model.md`](./references/model.md)             | 全部 118 个 MCP 工具的 A-Z 快速检索字典与参数链接映射                                                                                                                                |
+| 分类 / 领域              | 详细参考文档                                               | 涵盖的核心能力与代表工具                                                                                                                                                                   |
+| :----------------------- | :--------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **浏览器与页面控制**     | [`references/browser.md`](./references/browser.md)         | 多标签管理、iframe 切换、视口控制、设备/网络模拟、健康检查 (`list_pages`, `new_page`, `select_frame`, `emulate_mobile`, `check_browser_health`)                                            |
+| **脚本收集与源码定位**   | [`references/script.md`](./references/script.md)           | 脚本列举、源码按行截取、全局正则搜索、预加载脚本注入 (`list_scripts`, `get_script_source`, `search_in_sources`, `collect_code`)                                                            |
+| **动态 Hook 与加密拦截** | [`references/hook.md`](./references/hook.md)               | 非阻塞 Hook、Hook 生命周期管理、便捷函数 Hook (`create_hook`, `inject_hook`, `get_hook_data`, `hook_function`, `unhook_function`)。加密库 / JSVMP 专用拦截脚本见 `skills/web-reverse-hook` |
+| **调试器与断点步进**     | [`references/debugger.md`](./references/debugger.md)       | 行/条件/XHR 断点、单步执行、局部变量检查、日志点追踪、表达式求值 (`set_breakpoint`, `break_on_xhr`, `step_into`, `inspect_locals`, `evaluate_script`, `trace_function`)                    |
+| **DOM 交互与样式排查**   | [`references/dom.md`](./references/dom.md)                 | 多定位器查询、拟人化点击/打字、CDP 绝对坐标点击、表单填充、样式层叠排查 (`query_dom`, `click_at`, `type_text`, `fill_form`, `drag`, `take_screenshot`, `get_css_styles`)                   |
+| **网络嗅探与 WebSocket** | [`references/network.md`](./references/network.md)         | 网络流量嗅探、**发起者调用栈定位**、请求重放覆写、cURL 导出、WebSocket 帧聚类 (`list_network_requests`, `get_request_initiator`, `replay_network_request`, `export_request_as_curl`)       |
+| **反反调试与隐身伪装**   | [`references/stealth.md`](./references/stealth.md)         | 绕过无限 debugger 死循环、反反调试防护罩、User-Agent 自定义、按需隐身预设 (`bypass_debugger`, `anti_anti_debug`, `set_user_agent`, `inject_stealth`)                                       |
+| **WebAssembly 逆向**     | [`references/wasm.md`](./references/wasm.md)               | Wasm 模块捕获与磁盘 dump、JS-Wasm 跨边界调用追踪、线性内存搜索 (`collect_wasm`, `wasm_dump`, `wasm_vmp_trace`, `wasm_memory_inspect`)                                                      |
+| **会话持久化与媒体控制** | [`references/session.md`](./references/session.md)         | HttpOnly Cookie/Storage 导出、会话快照持久化备份与恢复、视频帧截取 (`get_storage`, `save_session_state`, `restore_session_state`, `capture_video_frame`)                                   |
+| **环境诊断与验证码探测** | [`references/evidence.md`](./references/evidence.md)       | 运行环境自检、页面验证码只读探测 (`diagnose_environment`, `detect_captcha`)                                                                                                                |
+| **控制台消息日志**       | [`references/console.md`](./references/console.md)         | 控制台 Console 日志采集与单条消息结构化查询 (`list_console_messages`, `get_console_message`)                                                                                               |
+| **性能监控与分析**       | [`references/performance.md`](./references/performance.md) | Core Web Vitals 评估、CDP 性能轨迹录制与瓶颈 Insight 诊断 (`start_performance_trace`, `stop_performance_trace`, `get_performance_metrics`)                                                 |
+| **全量工具速查字典**     | [`references/model.md`](./references/model.md)             | 全部 113 个 MCP 工具的 A-Z 快速检索字典与参数链接映射                                                                                                                                      |
 
 ---
 
@@ -243,36 +233,6 @@ browsercli call anti_anti_debug
    ```
 
 4. 导出后可结合 `skills/wsam-reverse` 进行离线反编译（`wasm-decompile`）与静态代码审计。
-
-### 实战 E：非浏览器流量（微信小程序 / App / 脚本）中间人抓包
-
-拦截桌面端、移动设备或终端脚本发出的请求：
-
-1. 启动 MITM 中间人代理服务：
-
-   ```bash
-   browsercli call start_mitm_proxy --port 8888
-   ```
-
-2. 导出根 CA 证书供客户端安装并信任：
-
-   ```bash
-   browsercli call export_mitm_ca --outputPath "artifacts/mitm_ca.crt" --format pem
-   ```
-
-3. 配置动态 Mock 或请求头篡改规则：
-
-   ```bash
-   browsercli call mitm_add_rule \
-     --id "mock_trade" \
-     --action '{"type":"map_local","urlRegex":"https://api\\.example\\.com/trade","localPath":"artifacts/mock.json","statusCode":200}'
-   ```
-
-4. （Windows 可选）对指定客户端（如微信）开启透明接管：
-
-   ```bash
-   browsercli call mitm_configure_local_apps --enabled true --targets '["WeChat.exe"]'
-   ```
 
 ---
 
