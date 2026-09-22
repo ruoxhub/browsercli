@@ -204,7 +204,7 @@ export interface CDPErrorContext {
 
 `mapCDPError` 使用 `new ToolError(...)` 构造匹配错误，使该模式可覆盖 `NOT_FOUND` 的全局默认值；context 必须包含 `originalMessage`、调用方字段和 pattern 默认恢复提示。既有 stack/name 行为保持不变。
 
-恢复提示同时拼入稳定的 `Error.message`，确保 HTTP/proxycli 路径（只保留 code/message）也能看到；
+恢复提示同时拼入稳定的 `Error.message`，确保 HTTP/browsercli 路径（只保留 code/message）也能看到；
 不要只放在 `ToolError.context`。
 
 ```typescript

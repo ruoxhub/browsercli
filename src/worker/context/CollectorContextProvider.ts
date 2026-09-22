@@ -17,7 +17,6 @@ import type {BrowserContext, ConsoleMessage, Page, Request} from 'patchright';
 
 import type {PageCollector} from '../../modules/collector/PageCollector.js';
 import type {WebSocketData} from '../../modules/network/NetworkTypes.js';
-import type {CaptureEngine} from '../../modules/session/index.js';
 import type {HTTPRequest} from '../../third_party/index.js';
 import {
   ConsoleMessageCollector,
@@ -28,40 +27,16 @@ import {
   type TrackedWebSocketData,
 } from '../collectors.js';
 
-import {SessionCaptureBridge} from './SessionCaptureBridge.js';
-
 export class CollectorContextProvider {
   private readonly _networkCollector = new NetworkRequestCollector();
   private readonly _consoleCollector = new ConsoleMessageCollector();
   private readonly _wsCollector = new WsCollector();
-  private readonly _captureBridge: SessionCaptureBridge;
 
   private readonly _maxNavigationSaved = 3;
   private _started = false;
   private _context: BrowserContext | null = null;
 
   // ─── 生命周期 ────────────────────────────────────────
-
-  /**
-   * @param getCaptureEngine 抓包聚合点的延迟取值函数（worker 侧传
-   *   `() => serviceLocator.getCaptureEngine()`）。缺省表示不抓包——无 engine 时
-   *   bridge 对每个响应静默返回，不产生任何落库副作用（spec §7 约束 1）。
-   */
-  constructor(
-    getCaptureEngine: () => CaptureEngine | undefined = () => undefined,
-    isSelectedPage?: (page: Page) => boolean,
-  ) {
-    this._captureBridge = new SessionCaptureBridge(
-      getCaptureEngine,
-      {},
-      isSelectedPage,
-    );
-  }
-
-  /** 供测试与未来的手动挂载点使用。 */
-  get captureBridge(): SessionCaptureBridge {
-    return this._captureBridge;
-  }
 
   get networkCollector(): NetworkRequestCollector {
     return this._networkCollector;
@@ -81,12 +56,11 @@ export class CollectorContextProvider {
   start(context: BrowserContext): void {
     // 幂等：同一 context 重复 start（重连路径）不应重复注册监听器。
     if (this._started && this._context === context) return;
-    // context 已换（重连/重启）时先释放旧 context 上的监听与抓包桥。
+    // context 已换（重连/重启）时先释放旧 context 上的监听。
     if (this._started) this.dispose();
     this._networkCollector.startContextCollection(context);
     this._consoleCollector.startContextCollection(context);
     this._wsCollector.startContextCollection(context);
-    this._captureBridge.attach(context);
     this._context = context;
     this._started = true;
   }
@@ -104,7 +78,6 @@ export class CollectorContextProvider {
     this._networkCollector.dispose();
     this._consoleCollector.dispose();
     this._wsCollector.dispose();
-    this._captureBridge.detach();
     this._context = null;
     this._started = false;
   }

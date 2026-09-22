@@ -7,13 +7,13 @@
 /**
  * config 命令 — 自包含实现，仅管理本地 JSON 配置文件
  *
- * 配置文件路径：~/.proxycli/config.json（PROXYCLI_CONFIG_DIR / BROWSERCLI_CONFIG_DIR 覆盖，供测试隔离）
+ * 配置文件路径：~/.browsercli/config.json（BROWSERCLI_CONFIG_DIR / PROXYCLI_CONFIG_DIR 覆盖，供测试隔离）
  * 支持的键：
- *   workerEntry → daemon 入口脚本路径（映射到环境变量 PROXYCLI_ENTRY）
+ *   workerEntry → daemon 入口脚本路径（映射到环境变量 BROWSERCLI_ENTRY）
  *   headless / cloak / jsStealth / fullStealthArgs / minimalStealth → daemon spawn 布尔开关
  *   browserUrl / wsEndpoint / executablePath → daemon spawn 连接参数
  *
- * 环境变量 PROXYCLI_ENTRY / BROWSERCLI_ENTRY 仅覆盖 workerEntry，优先级高于配置文件。
+ * 环境变量 BROWSERCLI_ENTRY / PROXYCLI_ENTRY 仅覆盖 workerEntry，优先级高于配置文件。
  */
 
 import {existsSync, mkdirSync, writeFileSync} from 'node:fs';
@@ -79,7 +79,7 @@ function resolveMerged(): CliConfig {
   return {
     ...file,
     workerEntry:
-      process.env.PROXYCLI_ENTRY ??
+      process.env.BROWSERCLI_ENTRY ??
       process.env.BROWSERCLI_ENTRY ??
       file.workerEntry,
   };
@@ -184,7 +184,7 @@ export const configCommand: AxiCliCommand<WorkerContext> = async (
         path,
         exists,
         envOverrides: Object.keys(process.env).filter(
-          k => k === 'PROXYCLI_ENTRY' || k === 'BROWSERCLI_ENTRY',
+          k => k === 'BROWSERCLI_ENTRY' || k === 'PROXYCLI_ENTRY',
         ),
       },
       ctx?.session,
@@ -200,7 +200,7 @@ export const configCommand: AxiCliCommand<WorkerContext> = async (
       resolved,
       file: getConfigPath(),
       envOverrides: Object.keys(process.env).filter(
-        k => k === 'PROXYCLI_ENTRY' || k === 'BROWSERCLI_ENTRY',
+        k => k === 'BROWSERCLI_ENTRY' || k === 'PROXYCLI_ENTRY',
       ),
     },
     ctx?.session,

@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 为 `src/modules/proxy` 构建轻量级交互式终端 REPL（`ProxyCli` 及 `cli.ts`），同时接入统一的 `proxycli` 工具链（`proxycli proxy`），支持服务启停、实时流量 tail、报文查看/curl 重放、规则改写、主机过滤、系统代理控制、HAR 导出与 Tab 智能补全，并提供 Prompt-Safe 流控打印与四重异常退出清理保障。
+**Goal:** 为 `src/modules/proxy` 构建轻量级交互式终端 REPL（`BrowserCli` 及 `cli.ts`），同时接入统一的 `browsercli` 工具链（`browsercli proxy`），支持服务启停、实时流量 tail、报文查看/curl 重放、规则改写、主机过滤、系统代理控制、HAR 导出与 Tab 智能补全，并提供 Prompt-Safe 流控打印与四重异常退出清理保障。
 
-**Architecture:** 基于 Node.js 原生 `node:readline` 模块构建零第三方 UI 依赖的行式交互引擎，`ProxyCli` 类负责命令分发、补全和状态机，`cli.ts` 提供独立可执行入口，`src/cli/commands/proxy.ts` 接入 `proxycli` 命令分发。所有 I/O 流通过依赖注入抽象，便于 100% 隔离单元测试。
+**Architecture:** 基于 Node.js 原生 `node:readline` 模块构建零第三方 UI 依赖的行式交互引擎，`BrowserCli` 类负责命令分发、补全和状态机，`cli.ts` 提供独立可执行入口，`src/cli/commands/proxy.ts` 接入 `browsercli` 命令分发。所有 I/O 流通过依赖注入抽象，便于 100% 隔离单元测试。
 
 **Tech Stack:** TypeScript (ESM), Node.js `node:readline`, `node:stream`, `node:test`, `node:assert`, ANSI escape codes.
 
@@ -14,9 +14,9 @@
 
 - 遵循 Node.js ESM 规范与项目严格 TypeScript 约束。
 - 零额外第三方 UI 依赖，使用标准库 `node:readline`。
-- I/O 可测试：`ProxyCli` 构造器必须允许注入自定义 `input` 与 `output` 流。
+- I/O 可测试：`BrowserCli` 构造器必须允许注入自定义 `input` 与 `output` 流。
 - 退出安全红线：任何退出路径（正常退出、Ctrl+C、SIGTERM、未捕获异常）必须执行系统代理还原 `MitmModule.restoreSystemProxy()`。
-- 测试执行规范：编译后运行 `npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/ProxyCli.test.js`（或直接全量单元测试），不使用未安装的外部运行器。
+- 测试执行规范：编译后运行 `npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/BrowserCli.test.js`（或直接全量单元测试），不使用未安装的外部运行器。
 
 ---
 
@@ -24,29 +24,29 @@
 
 **Files:**
 
-- Create: `src/modules/proxy/ProxyCli.ts`
-- Test: `tests/unit/modules/proxy/ProxyCli.test.ts`
+- Create: `src/modules/proxy/BrowserCli.ts`
+- Test: `tests/unit/modules/proxy/BrowserCli.test.ts`
 
 **Interfaces:**
 
 - Consumes: `MitmModule` from `src/modules/proxy/MitmModule.js`
-- Produces: `ProxyCli` class with `tokenize(line: string): string[]`, `handleCommand(line: string): Promise<boolean>`, and `start(): Promise<void>`
+- Produces: `BrowserCli` class with `tokenize(line: string): string[]`, `handleCommand(line: string): Promise<boolean>`, and `start(): Promise<void>`
 
 - [x] **Step 1: 编写分词与命令分发单元测试**
 
 ```typescript
-// tests/unit/modules/proxy/ProxyCli.test.ts
+// tests/unit/modules/proxy/BrowserCli.test.ts
 import assert from 'node:assert';
 import {PassThrough} from 'node:stream';
 import {describe, it} from 'node:test';
 
 import {MitmModule} from '../../../../src/modules/proxy/MitmModule.js';
 import {
-  ProxyCli,
+  BrowserCli,
   tokenizeLine,
-} from '../../../../src/modules/proxy/ProxyCli.js';
+} from '../../../../src/modules/proxy/BrowserCli.js';
 
-describe('ProxyCli - Foundation & Tokenizer', () => {
+describe('BrowserCli - Foundation & Tokenizer', () => {
   it('tokenizeLine 正确拆分单双引号与空格参数', () => {
     assert.deepStrictEqual(tokenizeLine('help'), ['help']);
     assert.deepStrictEqual(tokenizeLine('start 8888'), ['start', '8888']);
@@ -70,7 +70,7 @@ describe('ProxyCli - Foundation & Tokenizer', () => {
     });
 
     const mockModule = new MitmModule();
-    const cli = new ProxyCli(mockModule, input, output);
+    const cli = new BrowserCli(mockModule, input, output);
 
     const helpHandled = await cli.handleCommand('help');
     assert.strictEqual(helpHandled, true);
@@ -84,13 +84,13 @@ describe('ProxyCli - Foundation & Tokenizer', () => {
 
 - [x] **Step 2: 运行测试以验证其失败**
 
-运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/ProxyCli.test.js`
-预期：FAIL，提示找不到模块 `ProxyCli.js` 或导出不存在。
+运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/BrowserCli.test.js`
+预期：FAIL，提示找不到模块 `BrowserCli.js` 或导出不存在。
 
-- [x] **Step 3: 实现分词器与 ProxyCli 基础类**
+- [x] **Step 3: 实现分词器与 BrowserCli 基础类**
 
 ```typescript
-// src/modules/proxy/ProxyCli.ts
+// src/modules/proxy/BrowserCli.ts
 import readline from 'node:readline';
 import type {Readable, Writable} from 'node:stream';
 
@@ -123,7 +123,7 @@ export function tokenizeLine(line: string): string[] {
   return tokens;
 }
 
-export class ProxyCli {
+export class BrowserCli {
   protected rl: readline.Interface | null = null;
   protected tailEnabled = false;
   protected selectedId: string | null = null;
@@ -196,14 +196,14 @@ export class ProxyCli {
 
 - [x] **Step 4: 运行测试验证通过**
 
-运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/ProxyCli.test.js`
+运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/BrowserCli.test.js`
 预期：PASS，所有用例通过。
 
 - [x] **Step 5: 提交代码**
 
 ```bash
-git add src/modules/proxy/ProxyCli.ts tests/unit/modules/proxy/ProxyCli.test.ts
-git commit -m "feat(proxy): add ProxyCli base class and command tokenizer"
+git add src/modules/proxy/BrowserCli.ts tests/unit/modules/proxy/BrowserCli.test.ts
+git commit -m "feat(proxy): add BrowserCli base class and command tokenizer"
 ```
 
 ---
@@ -212,18 +212,18 @@ git commit -m "feat(proxy): add ProxyCli base class and command tokenizer"
 
 **Files:**
 
-- Modify: `src/modules/proxy/ProxyCli.ts`
-- Modify: `tests/unit/modules/proxy/ProxyCli.test.ts`
+- Modify: `src/modules/proxy/BrowserCli.ts`
+- Modify: `tests/unit/modules/proxy/BrowserCli.test.ts`
 
 **Interfaces:**
 
 - Consumes: `MitmModule.startMitmProxy()`, `MitmModule.stopMitmProxy()`, `MitmModule.getMitmProxyStatus()`, `MitmModule.getSystemProxyStatus()`
-- Produces: `ProxyCli.handleStart()`, `ProxyCli.handleStop()`, `ProxyCli.handleRestart()`, `ProxyCli.handleStatus()`
+- Produces: `BrowserCli.handleStart()`, `BrowserCli.handleStop()`, `BrowserCli.handleRestart()`, `BrowserCli.handleStatus()`
 
 - [x] **Step 1: 编写服务控制命令测试**
 
 ```typescript
-// 在 tests/unit/modules/proxy/ProxyCli.test.ts 中追加测试
+// 在 tests/unit/modules/proxy/BrowserCli.test.ts 中追加测试
 it('支持 start, stop, restart 与 status 生命周期流转', async () => {
   const input = new PassThrough();
   const output = new PassThrough();
@@ -233,7 +233,7 @@ it('支持 start, stop, restart 与 status 生命周期流转', async () => {
   });
 
   const mockModule = new MitmModule();
-  const cli = new ProxyCli(mockModule, input, output);
+  const cli = new BrowserCli(mockModule, input, output);
 
   // 1. start
   await cli.handleCommand('start 0'); // 端口 0 随机分配
@@ -258,12 +258,12 @@ it('支持 start, stop, restart 与 status 生命周期流转', async () => {
 
 - [x] **Step 2: 运行测试以验证其失败**
 
-运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/ProxyCli.test.js`
+运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/BrowserCli.test.js`
 预期：FAIL，未知命令 `start`。
 
-- [x] **Step 3: 在 ProxyCli 中实现 start, stop, restart, status**
+- [x] **Step 3: 在 BrowserCli 中实现 start, stop, restart, status**
 
-在 `ProxyCli.ts` 中补充逻辑：
+在 `BrowserCli.ts` 中补充逻辑：
 
 - 增加 `updatePrompt()` 方法：代理运行中设置为 `proxy[<port>]>`，未运行时设置为 `proxy[stopped]>`。
 - `handleStart(args)`：解析端口和 upstream，调用 `module.startMitmProxy({ port, upstreamProxy })`，更新 prompt。
@@ -273,14 +273,14 @@ it('支持 start, stop, restart 与 status 生命周期流转', async () => {
 
 - [x] **Step 4: 运行测试验证通过**
 
-运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/ProxyCli.test.js`
+运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/BrowserCli.test.js`
 预期：PASS。
 
 - [x] **Step 5: 提交代码**
 
 ```bash
-git add src/modules/proxy/ProxyCli.ts tests/unit/modules/proxy/ProxyCli.test.ts
-git commit -m "feat(proxy): add start, stop, restart and status commands to ProxyCli"
+git add src/modules/proxy/BrowserCli.ts tests/unit/modules/proxy/BrowserCli.test.ts
+git commit -m "feat(proxy): add start, stop, restart and status commands to BrowserCli"
 ```
 
 ---
@@ -289,18 +289,18 @@ git commit -m "feat(proxy): add start, stop, restart and status commands to Prox
 
 **Files:**
 
-- Modify: `src/modules/proxy/ProxyCli.ts`
-- Modify: `tests/unit/modules/proxy/ProxyCli.test.ts`
+- Modify: `src/modules/proxy/BrowserCli.ts`
+- Modify: `tests/unit/modules/proxy/BrowserCli.test.ts`
 
 **Interfaces:**
 
 - Consumes: `MitmModule.listMitmRequests()`, `MitmModule.getMitmRequest()`, `MitmModule.clearMitmRequests()`, `MitmModule.formatRequestCurl()`
-- Produces: `ProxyCli.handleLs()`, `ProxyCli.handleShow()`, `ProxyCli.handleCurl()`, `ProxyCli.handleClear()`
+- Produces: `BrowserCli.handleLs()`, `BrowserCli.handleShow()`, `BrowserCli.handleCurl()`, `BrowserCli.handleClear()`
 
 - [x] **Step 1: 编写流量操作单元测试**
 
 ```typescript
-// tests/unit/modules/proxy/ProxyCli.test.ts
+// tests/unit/modules/proxy/BrowserCli.test.ts
 it('支持 ls, show, curl, clear 命令', async () => {
   const input = new PassThrough();
   const output = new PassThrough();
@@ -326,7 +326,7 @@ it('支持 ls, show, curl, clear 命令', async () => {
     durationMs: 45,
   });
 
-  const cli = new ProxyCli(module, input, output);
+  const cli = new BrowserCli(module, input, output);
 
   // 1. ls
   outData = '';
@@ -355,12 +355,12 @@ it('支持 ls, show, curl, clear 命令', async () => {
 
 - [x] **Step 2: 运行测试验证失败**
 
-运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/ProxyCli.test.js`
+运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/BrowserCli.test.js`
 预期：FAIL，未知命令 `ls`。
 
 - [x] **Step 3: 实现 ls, show, curl 与 clear 逻辑**
 
-在 `ProxyCli.ts` 中：
+在 `BrowserCli.ts` 中：
 
 - `handleLs(args)`：解析 `limit`（默认 15）和 `filter`，调用 `module.listMitmRequests({ limit, filter })`，输出对齐表格。
 - `handleShow(args)`：解析 `id`（默认为 `selectedId` 或最近一条）与 `part`，调用 `module.getMitmRequest({ id })`，分块渲染 General、Headers、Body（带 JSON 格式化与大报文截断保护）。设置 `this.selectedId = id`。
@@ -369,14 +369,14 @@ it('支持 ls, show, curl, clear 命令', async () => {
 
 - [x] **Step 4: 运行测试验证通过**
 
-运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/ProxyCli.test.js`
+运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/BrowserCli.test.js`
 预期：PASS。
 
 - [x] **Step 5: 提交代码**
 
 ```bash
-git add src/modules/proxy/ProxyCli.ts tests/unit/modules/proxy/ProxyCli.test.ts
-git commit -m "feat(proxy): add ls, show, curl and clear commands to ProxyCli"
+git add src/modules/proxy/BrowserCli.ts tests/unit/modules/proxy/BrowserCli.test.ts
+git commit -m "feat(proxy): add ls, show, curl and clear commands to BrowserCli"
 ```
 
 ---
@@ -385,18 +385,18 @@ git commit -m "feat(proxy): add ls, show, curl and clear commands to ProxyCli"
 
 **Files:**
 
-- Modify: `src/modules/proxy/ProxyCli.ts`
-- Modify: `tests/unit/modules/proxy/ProxyCli.test.ts`
+- Modify: `src/modules/proxy/BrowserCli.ts`
+- Modify: `tests/unit/modules/proxy/BrowserCli.test.ts`
 
 **Interfaces:**
 
 - Consumes: `CapturedExchange` 事件流
-- Produces: `ProxyCli.handleTail()`, `ProxyCli.safeLog(message: string)`
+- Produces: `BrowserCli.handleTail()`, `BrowserCli.safeLog(message: string)`
 
 - [x] **Step 1: 编写 tail 与 safeLog 单元测试**
 
 ```typescript
-// tests/unit/modules/proxy/ProxyCli.test.ts
+// tests/unit/modules/proxy/BrowserCli.test.ts
 it('tail 开关切换及 safeLog 在活跃提示符时正常刷新', async () => {
   const input = new PassThrough();
   const output = new PassThrough();
@@ -406,7 +406,7 @@ it('tail 开关切换及 safeLog 在活跃提示符时正常刷新', async () =>
   });
 
   const module = new MitmModule();
-  const cli = new ProxyCli(module, input, output);
+  const cli = new BrowserCli(module, input, output);
 
   await cli.handleCommand('tail on');
   assert.match(outData, /Tail is now ON/i);
@@ -424,12 +424,12 @@ it('tail 开关切换及 safeLog 在活跃提示符时正常刷新', async () =>
 
 - [x] **Step 2: 运行测试验证失败**
 
-运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/ProxyCli.test.js`
+运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/BrowserCli.test.js`
 预期：FAIL，未知命令 `tail`。
 
 - [x] **Step 3: 实现 tail 与 safeLog**
 
-在 `ProxyCli.ts` 中：
+在 `BrowserCli.ts` 中：
 
 - `safeLog(msg)`：若 `rl` 存在，通过 `\r\x1b[K` 清除当前行，写入 `msg + '\n'`，再调用 `this.rl.prompt(true)` 重绘用户正在键入的字符。
 - `handleTail(args)`：支持 `on` / `off` / 无参数 toggle。
@@ -437,13 +437,13 @@ it('tail 开关切换及 safeLog 在活跃提示符时正常刷新', async () =>
 
 - [x] **Step 4: 运行测试验证通过**
 
-运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/ProxyCli.test.js`
+运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/BrowserCli.test.js`
 预期：PASS。
 
 - [x] **Step 5: 提交代码**
 
 ```bash
-git add src/modules/proxy/ProxyCli.ts tests/unit/modules/proxy/ProxyCli.test.ts
+git add src/modules/proxy/BrowserCli.ts tests/unit/modules/proxy/BrowserCli.test.ts
 git commit -m "feat(proxy): add tail command with prompt-safe logging"
 ```
 
@@ -453,18 +453,18 @@ git commit -m "feat(proxy): add tail command with prompt-safe logging"
 
 **Files:**
 
-- Modify: `src/modules/proxy/ProxyCli.ts`
-- Modify: `tests/unit/modules/proxy/ProxyCli.test.ts`
+- Modify: `src/modules/proxy/BrowserCli.ts`
+- Modify: `tests/unit/modules/proxy/BrowserCli.test.ts`
 
 **Interfaces:**
 
 - Consumes: `MitmModule.addMitmRule()`, `MitmModule.listMitmRules()`, `MitmModule.removeMitmRule()`, `MitmModule.clearMitmRules()`, `MitmModule.addHostFilter()`, `MitmModule.listHostFilters()`, `MitmModule.removeHostFilter()`, `MitmModule.clearHostFilters()`
-- Produces: `ProxyCli.handleRule()`, `ProxyCli.handleFilter()`
+- Produces: `BrowserCli.handleRule()`, `BrowserCli.handleFilter()`
 
 - [x] **Step 1: 编写 rule 与 filter 测试用例**
 
 ```typescript
-// tests/unit/modules/proxy/ProxyCli.test.ts
+// tests/unit/modules/proxy/BrowserCli.test.ts
 it('支持 rule 与 filter 的增删查清命令', async () => {
   const input = new PassThrough();
   const output = new PassThrough();
@@ -474,7 +474,7 @@ it('支持 rule 与 filter 的增删查清命令', async () => {
   });
 
   const module = new MitmModule();
-  const cli = new ProxyCli(module, input, output);
+  const cli = new BrowserCli(module, input, output);
 
   // 1. rule add mock
   await cli.handleCommand('rule add mock /api/v1 200 {"ok":true}');
@@ -499,26 +499,26 @@ it('支持 rule 与 filter 的增删查清命令', async () => {
 
 - [x] **Step 2: 运行测试验证失败**
 
-运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/ProxyCli.test.js`
+运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/BrowserCli.test.js`
 预期：FAIL，未知命令 `rule`。
 
 - [x] **Step 3: 实现 rule 与 filter 命令处理器**
 
-在 `ProxyCli.ts` 中：
+在 `BrowserCli.ts` 中：
 
 - `handleRule(args)`：实现 `ls`, `add mock`, `add redirect`, `add header`, `rm`, `clear` 子命令分发，调用 `module.addMitmRule()`, `module.listMitmRules()`, `module.removeMitmRule()`, `module.clearMitmRules()`。
 - `handleFilter(args)`：实现 `ls`, `allow`, `block`, `rm`, `clear` 子命令分发，调用 `module.addHostFilter()`, `module.listHostFilters()`, `module.removeHostFilter()`, `module.clearHostFilters()`。
 
 - [x] **Step 4: 运行测试验证通过**
 
-运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/ProxyCli.test.js`
+运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/BrowserCli.test.js`
 预期：PASS。
 
 - [x] **Step 5: 提交代码**
 
 ```bash
-git add src/modules/proxy/ProxyCli.ts tests/unit/modules/proxy/ProxyCli.test.ts
-git commit -m "feat(proxy): add rule and filter commands to ProxyCli"
+git add src/modules/proxy/BrowserCli.ts tests/unit/modules/proxy/BrowserCli.test.ts
+git commit -m "feat(proxy): add rule and filter commands to BrowserCli"
 ```
 
 ---
@@ -527,18 +527,18 @@ git commit -m "feat(proxy): add rule and filter commands to ProxyCli"
 
 **Files:**
 
-- Modify: `src/modules/proxy/ProxyCli.ts`
-- Modify: `tests/unit/modules/proxy/ProxyCli.test.ts`
+- Modify: `src/modules/proxy/BrowserCli.ts`
+- Modify: `tests/unit/modules/proxy/BrowserCli.test.ts`
 
 **Interfaces:**
 
 - Consumes: `MitmModule.enableSystemProxy()`, `MitmModule.restoreSystemProxy()`, `MitmModule.getSystemProxyStatus()`, `MitmModule.exportMitmCa()`, `MitmModule.exportMitmHar()`, `MitmModule.listLocalProcesses()`, `MitmModule.updateLocalAppsConfig()`
-- Produces: `ProxyCli.handleSysproxy()`, `ProxyCli.handleCa()`, `ProxyCli.handleProc()`, `ProxyCli.handleHar()`
+- Produces: `BrowserCli.handleSysproxy()`, `BrowserCli.handleCa()`, `BrowserCli.handleProc()`, `BrowserCli.handleHar()`
 
 - [x] **Step 1: 编写高级系统命令测试**
 
 ```typescript
-// tests/unit/modules/proxy/ProxyCli.test.ts
+// tests/unit/modules/proxy/BrowserCli.test.ts
 it('支持 ca, sysproxy, proc 与 har 命令分发', async () => {
   const input = new PassThrough();
   const output = new PassThrough();
@@ -548,7 +548,7 @@ it('支持 ca, sysproxy, proc 与 har 命令分发', async () => {
   });
 
   const module = new MitmModule();
-  const cli = new ProxyCli(module, input, output);
+  const cli = new BrowserCli(module, input, output);
 
   // 1. ca path
   await cli.handleCommand('ca path');
@@ -573,12 +573,12 @@ it('支持 ca, sysproxy, proc 与 har 命令分发', async () => {
 
 - [x] **Step 2: 运行测试验证失败**
 
-运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/ProxyCli.test.js`
+运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/BrowserCli.test.js`
 预期：FAIL，未知命令 `ca`。
 
 - [x] **Step 3: 实现 sysproxy, ca, proc, har 命令**
 
-在 `ProxyCli.ts` 中：
+在 `BrowserCli.ts` 中：
 
 - `handleSysproxy(args)`：实现 `on`, `off`, `status`，调用 `module.enableSystemProxy()`, `module.restoreSystemProxy()`, `module.getSystemProxyStatus()`。
 - `handleCa(args)`：实现 `path`, `export`，调用 `module.exportMitmCa()`。
@@ -587,14 +587,14 @@ it('支持 ca, sysproxy, proc 与 har 命令分发', async () => {
 
 - [x] **Step 4: 运行测试验证通过**
 
-运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/ProxyCli.test.js`
+运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/BrowserCli.test.js`
 预期：PASS。
 
 - [x] **Step 5: 提交代码**
 
 ```bash
-git add src/modules/proxy/ProxyCli.ts tests/unit/modules/proxy/ProxyCli.test.ts
-git commit -m "feat(proxy): add sysproxy, ca, proc and har commands to ProxyCli"
+git add src/modules/proxy/BrowserCli.ts tests/unit/modules/proxy/BrowserCli.test.ts
+git commit -m "feat(proxy): add sysproxy, ca, proc and har commands to BrowserCli"
 ```
 
 ---
@@ -603,20 +603,20 @@ git commit -m "feat(proxy): add sysproxy, ca, proc and har commands to ProxyCli"
 
 **Files:**
 
-- Modify: `src/modules/proxy/ProxyCli.ts`
-- Modify: `tests/unit/modules/proxy/ProxyCli.test.ts`
+- Modify: `src/modules/proxy/BrowserCli.ts`
+- Modify: `tests/unit/modules/proxy/BrowserCli.test.ts`
 
 **Interfaces:**
 
-- Produces: `ProxyCli.completer(line: string): [string[], string]`
+- Produces: `BrowserCli.completer(line: string): [string[], string]`
 
 - [x] **Step 1: 编写 Tab 补全单元测试**
 
 ```typescript
-// tests/unit/modules/proxy/ProxyCli.test.ts
+// tests/unit/modules/proxy/BrowserCli.test.ts
 it('completer 正确补全一级命令与二级子命令', () => {
   const module = new MitmModule();
-  const cli = new ProxyCli(module);
+  const cli = new BrowserCli(module);
 
   // 1. 一级命令补全
   const [hits1] = cli.completer('st');
@@ -638,26 +638,26 @@ it('completer 正确补全一级命令与二级子命令', () => {
 
 - [x] **Step 2: 运行测试验证失败**
 
-运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/ProxyCli.test.js`
+运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/BrowserCli.test.js`
 预期：FAIL，`cli.completer` 不存在。
 
 - [x] **Step 3: 实现 completer 并挂载到 readline**
 
-在 `ProxyCli.ts` 中实现 `completer(line: string)`：
+在 `BrowserCli.ts` 中实现 `completer(line: string)`：
 
 - 解析前缀，根据上下文匹配命令字典树及当前活跃的请求 ID。
 - 在 `start()` 的 `readline.createInterface` 配置中传入 `completer: (line) => this.completer(line)`。
 
 - [x] **Step 4: 运行测试验证通过**
 
-运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/ProxyCli.test.js`
+运行：`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/BrowserCli.test.js`
 预期：PASS。
 
 - [x] **Step 5: 提交代码**
 
 ```bash
-git add src/modules/proxy/ProxyCli.ts tests/unit/modules/proxy/ProxyCli.test.ts
-git commit -m "feat(proxy): implement intelligent tab completer in ProxyCli"
+git add src/modules/proxy/BrowserCli.ts tests/unit/modules/proxy/BrowserCli.test.ts
+git commit -m "feat(proxy): implement intelligent tab completer in BrowserCli"
 ```
 
 ---
@@ -674,28 +674,28 @@ git commit -m "feat(proxy): implement intelligent tab completer in ProxyCli"
 
 **Interfaces:**
 
-- Consumes: `ProxyCli`, `MitmModule`
-- Produces: `proxycli proxy` 子命令、独立可执行脚本、`package.json` `"proxy:cli"` script
+- Consumes: `BrowserCli`, `MitmModule`
+- Produces: `browsercli proxy` 子命令、独立可执行脚本、`package.json` `"proxy:cli"` script
 
 - [x] **Step 1: 编写 CLI 入口脚本及参数解析**
 
 创建 `src/modules/proxy/cli.ts`：
 
 - 解析 `--port <num>`, `-p <num>`, `--upstream <url>`, `--sysproxy`, `--no-auto-start`。
-- 实例化 `MitmModule` 与 `ProxyCli`。
+- 实例化 `MitmModule` 与 `BrowserCli`。
 - 注册 `SIGINT`, `SIGTERM`, `uncaughtException`, `exit` 四重清理守卫（保证执行 `mitmModule.restoreSystemProxy()` 与 `mitmModule.stopMitmProxy()`）。
 - 若未带 `--no-auto-start`，默认自启代理并进入 REPL。
 
-- [x] **Step 2: 创建 proxycli proxy 子命令**
+- [x] **Step 2: 创建 browsercli proxy 子命令**
 
 创建 `src/cli/commands/proxy.ts`：
 
-- 挂载 `proxycli proxy` 命令，支持直接进入 REPL 或执行一次性状态检查。
+- 挂载 `browsercli proxy` 命令，支持直接进入 REPL 或执行一次性状态检查。
 - 在 `src/cli/app.ts` 中注册 `proxy` 子命令到 `cliCommands`。
 
-- [x] **Step 3: 在 index.ts 中导出 ProxyCli**
+- [x] **Step 3: 在 index.ts 中导出 BrowserCli**
 
-在 `src/modules/proxy/index.ts` 中导出 `ProxyCli`, `tokenizeLine`。
+在 `src/modules/proxy/index.ts` 中导出 `BrowserCli`, `tokenizeLine`。
 
 - [x] **Step 4: 在 package.json 中注册 proxy:cli 脚本**
 
@@ -708,12 +708,12 @@ git commit -m "feat(proxy): implement intelligent tab completer in ProxyCli"
 `npm run typecheck`
 `npm run check-arch`
 `npm run test:cli`
-`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/ProxyCli.test.js`
+`npm run build:compile && node --require ./build/tests/setup.js --test build/tests/unit/modules/proxy/BrowserCli.test.js`
 预期：全部通过，0 error。
 
 - [x] **Step 6: 提交代码**
 
 ```bash
 git add src/modules/proxy/cli.ts src/cli/commands/proxy.ts src/cli/app.ts src/modules/proxy/index.ts package.json
-git commit -m "feat(proxy): add proxycli proxy command and standalone cli entry"
+git commit -m "feat(proxy): add browsercli proxy command and standalone cli entry"
 ```

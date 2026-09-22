@@ -50,15 +50,7 @@ export {DefineToolContextFactory} from './DefineToolContextFactory.js';
 export class ToolContextProvider {
   private readonly _browserContext = new BrowserContextProvider();
   private readonly _debuggerContext = new DebuggerContextProvider();
-  // 无选中页（如 setContext()→resetPageIdentityState() 到 syncPages() 回填之间）
-  // 必须降级为「不过滤」，否则该窗口内的 CDP 响应会被全部丢弃。
-  private readonly _collectorContext = new CollectorContextProvider(
-    () => this._serviceLocator.getCaptureEngine(),
-    page => {
-      const selected = this._browserContext.getSelectedPage();
-      return selected === null || selected === page;
-    },
-  );
+  private readonly _collectorContext = new CollectorContextProvider();
   private readonly _serviceLocator: ServiceLocator;
 
   private _isRunningPerformanceTrace = false;

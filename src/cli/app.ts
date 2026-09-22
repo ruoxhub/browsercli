@@ -9,10 +9,8 @@ import {AxiError} from 'axi-sdk-js';
 
 import {browserCommand} from './commands/browser.js';
 import {configCommand} from './commands/config.js';
-import {extensionCommand} from './commands/extension.js';
 import {jobsCommand} from './commands/jobs.js';
 import {listToolsCommand} from './commands/list-tools.js';
-import {proxyCommand} from './commands/proxy.js';
 import {scaffoldCommand} from './commands/scaffold.js';
 import {sessionCommands} from './commands/sessions.js';
 import {statusCommand} from './commands/status.js';
@@ -41,8 +39,6 @@ export const cliCommands: Record<string, AxiCliCommand<WorkerContext>> = {
   config: configCommand,
   scaffold: scaffoldCommand,
   status: statusCommand,
-  proxy: proxyCommand,
-  extension: extensionCommand,
   web: webCommand,
   ...sessionCommands,
 };

@@ -29,7 +29,7 @@ describe('Profile coverage', () => {
     const domains = new Set(tools.map(t => t.domain));
     assert.ok(!domains.has('debugger'), 'debugger should be full-only');
     assert.ok(!domains.has('wasm'), 'wasm should be full-only');
-    assert.ok(domains.has('analyzer'), 'analyzer is workflow-tier');
+    assert.ok(domains.has('collector'), 'collector is workflow-tier');
   });
 
   it('full profile is the union of all domains', () => {

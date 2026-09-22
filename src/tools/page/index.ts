@@ -6,7 +6,6 @@
 
 // ─── Page 纯函数 ──────────────────────────────────────
 
-export {clickElement} from './clickElement.js';
 export {typeText} from './typeText.js';
 export {waitForElement} from './waitForElement.js';
 export {scrollBy} from './scrollBy.js';
@@ -24,7 +23,6 @@ export {
 
 export type {
   PageRuntimeServices,
-  ClickElementParams,
   TypeTextParams,
   WaitForElementParams,
   ScrollByParams,
@@ -36,7 +34,6 @@ export type {
   LoadSessionStateParams,
   CheckBrowserHealthParams,
   ElementInfo,
-  ClickElementData,
   TypeTextData,
   WaitForElementData,
   ScrollByData,
@@ -50,7 +47,6 @@ export type {
   HealthIssue,
   CheckBrowserHealthData,
   PageResult,
-  ClickElementResult,
   TypeTextResult,
   WaitForElementResult,
   ScrollByResult,

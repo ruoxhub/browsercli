@@ -60,31 +60,9 @@ export interface InjectHookResult extends HookManagementResult<InjectHookData> {
   tooltype: 'inject_hook';
 }
 
-/** 同步 Hook 数据返回数据 */
-export interface SyncHookRecordsData {
-  syncedHookIds: string[];
-  totalRecords: number;
-  hooks: unknown[];
-}
-
-/** 同步 Hook 数据结果 */
-export interface SyncHookRecordsResult extends HookManagementResult<SyncHookRecordsData> {
-  tooltype: 'list_created_hooks';
-}
-
 /** 获取 Hook 数据结果 */
 export interface GetHookDataResult extends HookManagementResult<unknown> {
   tooltype: 'get_hook_data';
-}
-
-/** 移除 Hook 返回数据（浏览器端清理） */
-export interface RemoveHookBrowserData {
-  hookId: string;
-}
-
-/** 移除 Hook 结果（浏览器端清理） */
-export interface RemoveHookBrowserResult extends HookManagementResult<RemoveHookBrowserData> {
-  tooltype: 'remove_hook';
 }
 
 /** 重新导出 Frame 类型，方便调用方导入 */

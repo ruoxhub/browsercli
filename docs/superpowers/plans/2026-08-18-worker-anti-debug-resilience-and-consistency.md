@@ -91,14 +91,14 @@
 ## Phase 3: 工程一致性闭环（构建联动与 Skill Schema 校验）
 
 ### Task 3.1: 根目录构建联动与 CLI 能力探测
-- **目标**: 构建主仓库时自动编译 `proxycli`，并在版本不匹配时给出升级指引。
+- **目标**: 构建主仓库时自动编译 `browsercli`，并在版本不匹配时给出升级指引。
 - **文件**:
   - `package.json`
   - `scripts/post-build.ts`
-  - `proxycli/src/WorkerHttpClient.ts`
+  - `browsercli/src/WorkerHttpClient.ts`
 - **实施要点**:
-  - 在 `package.json` 中配置 `build:cli: "cd proxycli && npm run build"`，并加入 `npm run build` 流程。
-  - `proxycli` 在请求时对比 Worker 版本，如遇 404/缺少路由输出 `Tip: 请运行 npm run build 重新编译`。
+  - 在 `package.json` 中配置 `build:cli: "cd browsercli && npm run build"`，并加入 `npm run build` 流程。
+  - `browsercli` 在请求时对比 Worker 版本，如遇 404/缺少路由输出 `Tip: 请运行 npm run build 重新编译`。
 
 ### Task 3.2: 编写 `scripts/verify-skills-schema.ts` 文档参数校验脚本
 - **目标**: 自动化检查 `skills/**/*.md` 中的命令行参数合法性。
@@ -106,7 +106,7 @@
   - `scripts/verify-skills-schema.ts` (新增)
   - `package.json` (加入 `npm run verify-skills`)
 - **实施要点**:
-  - 正则扫描 Markdown 代码块中的 `proxycli call <toolName> [args...]`。
+  - 正则扫描 Markdown 代码块中的 `browsercli call <toolName> [args...]`。
   - 提取工具名与参数名，与 `src/tools/generated-tools-index.ts` 动态加载的 Zod Schema 比对。
   - 发现非法参数输出文件路径、行号与详细差异并非 0 退出。
 - **验证**:

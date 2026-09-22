@@ -80,7 +80,7 @@ Allow reverse engineers and agents to inspect matched CSS rules, computed overri
 
 ### 3.2 CLI Configuration File Support (`--config`)
 
-> **Rev 2 correction:** Rev 1 assumed a Yargs CLI. In fact, the `proxycli` command layer is built on `axi-sdk-js` with a hand-rolled lightweight flag parser (`src/cli/args-parser.ts::parseArgs`), and only the legacy worker entry `parseArguments()` uses Yargs (and is dead code — no callers). Additionally, the project already has a config-file mechanism: `~/.proxycli/config.json` via `proxycli config --set key=value` (`src/cli/commands/config.ts`), currently only supporting the `workerEntry` key.
+> **Rev 2 correction:** Rev 1 assumed a Yargs CLI. In fact, the `browsercli` command layer is built on `axi-sdk-js` with a hand-rolled lightweight flag parser (`src/cli/args-parser.ts::parseArgs`), and only the legacy worker entry `parseArguments()` uses Yargs (and is dead code — no callers). Additionally, the project already has a config-file mechanism: `~/.browsercli/config.json` via `browsercli config --set key=value` (`src/cli/commands/config.ts`), currently only supporting the `workerEntry` key.
 
 #### Goal
 Allow users to define browser/runtime spawn options (headless, cloak, js-stealth, browserUrl, etc.) in a JSON configuration file so that they are passed through automatically when the daemon spawns, without having to repeat them on every command line.
@@ -88,14 +88,14 @@ Allow users to define browser/runtime spawn options (headless, cloak, js-stealth
 #### Implementation (grounded)
 1. **Extend config file**: in `src/cli/commands/config.ts`:
    - Extend `VALID_KEYS` to add spawn-related keys: `headless` (boolean), `cloak` (boolean), `jsStealth` (boolean), `fullStealthArgs` (boolean), `minimalStealth` (boolean), `browserUrl` (string), `wsEndpoint` (string), `executablePath` (string).
-   - Persist in the existing `~/.proxycli/config.json` (overridable via `PROXYCLI_CONFIG_DIR` for test isolation, mechanism already in place).
+   - Persist in the existing `~/.browsercli/config.json` (overridable via `PROXYCLI_CONFIG_DIR` for test isolation, mechanism already in place).
 2. **Merge configuration into spawnFlags**: in `src/cli/app.ts::createWorkerContext`, after `spawnFlagsFromArgv(argv)`, read config-file boolean keys and append the corresponding `--flag` (headless → `--headless`, jsStealth → `--js-stealth`, …); for value keys like `browserUrl`, append `--browserUrl <value>`. **Explicit command-line flags take precedence**: skip a config-derived flag if the same flag already exists in `argv`.
 3. **Worker-side consumption**: the flags are already recognized by `src/ipc/daemonArgs.ts::buildDaemonArgPlan` (daemon-specific tokens) and `src/worker/WorkerArgs.ts::parseWorkerArgs` (BOOLEAN_FLAGS / VALUE_FLAGS); only the three value keys `browserUrl` / `wsEndpoint` / `executablePath` need to be added to the `DAEMON_SPAWN_FLAGS` / `DAEMON_VALUE_FLAGS` whitelists in `src/cli/sessionArgs.ts` (they must be passed in `--flag=value` form to satisfy the whitelist check; the merge logic in step 2 must therefore output the `=` form).
 4. **Environment variables still take priority**: keeping the existing semantics, `PROXYCLI_ENTRY`/`BROWSERCLI_ENTRY` is not affected by the configuration file.
-5. **No new `--config` flag is introduced**: reusing the existing `proxycli config` command system avoids two configuration entry points. (If a "specify a config file in the current directory" need arises in the future, it can be added later — YAGNI.)
+5. **No new `--config` flag is introduced**: reusing the existing `browsercli config` command system avoids two configuration entry points. (If a "specify a config file in the current directory" need arises in the future, it can be added later — YAGNI.)
 
 #### Rationale for not using Yargs `.config()`
-`parseArguments()` is only called by dead code; the active CLI (bin/proxycli.js → axi-sdk-js → app.ts) doesn't go through Yargs. Introducing Yargs config would have to change the entire command-dispatch architecture, and the gain doesn't justify the cost.
+`parseArguments()` is only called by dead code; the active CLI (bin/browsercli.js → axi-sdk-js → app.ts) doesn't go through Yargs. Introducing Yargs config would have to change the entire command-dispatch architecture, and the gain doesn't justify the cost.
 
 ---
 

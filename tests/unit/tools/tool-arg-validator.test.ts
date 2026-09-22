@@ -87,20 +87,9 @@ describe('validateToolArgs array-of-object (json) param', () => {
   });
 });
 
-describe('validateToolArgs proxycli regression contracts', () => {
+describe('validateToolArgs browsercli regression contracts', () => {
   before(async () => {
     await ensureToolsMeta();
-  });
-
-  it('exposes task context arguments for evidence tools', () => {
-    for (const toolName of ['record_reverse_evidence']) {
-      const meta = getToolMeta(toolName);
-      assert.ok(meta, `${toolName} meta 应存在`);
-      assert.equal(meta.argSpecs.taskId?.type, 'string');
-      assert.equal(meta.argSpecs.taskSlug?.type, 'string');
-      assert.equal(meta.argSpecs.targetUrl?.type, 'string');
-      assert.equal(meta.argSpecs.goal?.type, 'string');
-    }
   });
 
   it('applies the default occurrence for set_breakpoint_on_text', () => {
@@ -196,34 +185,34 @@ describe('validateToolArgs strict parameter validation and alias removal', () =>
   });
 
   it('enum validation error lists all accepted case-sensitive values', () => {
-    const caseResult = validateToolArgs('export_session_report', {
-      format: 'JSON',
+    const caseResult = validateToolArgs('handle_dialog', {
+      action: 'ACCEPT',
     });
     assert.equal(caseResult.ok, false);
     if (!caseResult.ok) {
       assert.equal(
         caseResult.error,
-        'export_session_report 的参数 format 仅支持：json, markdown',
+        'handle_dialog 的参数 action 仅支持：accept, dismiss',
       );
     }
 
-    const invalidResult = validateToolArgs('export_session_report', {
-      format: 'invalid_mode',
+    const invalidResult = validateToolArgs('handle_dialog', {
+      action: 'invalid_mode',
     });
     assert.equal(invalidResult.ok, false);
     if (!invalidResult.ok) {
       assert.equal(
         invalidResult.error,
-        'export_session_report 的参数 format 仅支持：json, markdown',
+        'handle_dialog 的参数 action 仅支持：accept, dismiss',
       );
     }
 
-    const validResult = validateToolArgs('export_session_report', {
-      format: 'markdown',
+    const validResult = validateToolArgs('handle_dialog', {
+      action: 'dismiss',
     });
     assert.equal(validResult.ok, true);
     if (validResult.ok) {
-      assert.equal(validResult.value.format, 'markdown');
+      assert.equal(validResult.value.action, 'dismiss');
     }
   });
 });

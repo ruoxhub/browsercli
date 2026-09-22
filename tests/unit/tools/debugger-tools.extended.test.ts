@@ -4,12 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import {mkdtemp, readFile, rm} from 'node:fs/promises';
-import {tmpdir} from 'node:os';
-import path from 'node:path';
 import {describe, it} from 'node:test';
 
-import {ReverseTaskStore} from '../../../src/reverse/ReverseTaskStore.js';
 import {ToolError} from '../../../src/utils/errors.js';
 import {getRuntime as getJSHookRuntime} from '../../../src/runtime.js';
 import {
@@ -101,7 +97,10 @@ interface DebuggerContextHarness {
     lineNumber?: number,
     columnNumber?: number,
     condition?: string,
-  ): Promise<BreakpointHarness | {breakpointId: string; location?: unknown; locations?: unknown[]}>;
+  ): Promise<
+    | BreakpointHarness
+    | {breakpointId: string; location?: unknown; locations?: unknown[]}
+  >;
   setBreakpointByUrlRegex(
     params: unknown,
     lineNumber?: number,
@@ -222,7 +221,7 @@ function makeContext(
     getScripts: () => [],
     getScriptsByUrlPattern: () => [],
     getScriptSource: async () => '',
-    getScriptSourcePath: async () => '/tmp/proxycli-scripts/test.js',
+    getScriptSourcePath: async () => '/tmp/browsercli-scripts/test.js',
     getScriptById: () => ({
       scriptId: '1',
       url: 'https://a.js',
@@ -258,8 +257,7 @@ function makeContext(
     getClient: () => ({send: async () => undefined}),
   };
 
-  const effectiveDebuggerContext =
-    overrides.debuggerContext ?? debuggerContext;
+  const effectiveDebuggerContext = overrides.debuggerContext ?? debuggerContext;
 
   return {
     getSelectedPage: () => page,
@@ -371,7 +369,7 @@ describe('debugger tools extended', () => {
       {scriptId: '2', url: 'https://b.js'},
     ];
     context.debuggerContext.getScriptSourcePath = async () =>
-      '/tmp/proxycli-scripts/test.js';
+      '/tmp/browsercli-scripts/test.js';
 
     await listScripts.handler(
       {params: {}},
@@ -394,7 +392,11 @@ describe('debugger tools extended', () => {
         x => x.includes('Found') || x.includes('找到') || x.includes('个脚本'),
       ),
     );
-    assert.ok(response.lines.some(x => x.includes('sourcePath')));
+    assert.ok(
+      response.structuredContents.some(
+        sc => (sc as {data?: {sourcePath?: string}}).data?.sourcePath,
+      ),
+    );
   });
 
   it('covers find/search/source negative and formatting paths', async () => {
@@ -464,9 +466,19 @@ describe('debugger tools extended', () => {
       context as unknown as Parameters<typeof searchInSources.handler>[2],
     );
 
-    assert.ok(response.lines.some(x => x.includes('Found "abc"') || x.includes('找到 "abc"')));
     assert.ok(
-      response.lines.some(x => x.includes('Tip: Use get_script_source') || x.includes('get_script_source')),
+      response.structuredContents.some(
+        x =>
+          (x as {message?: string}).message?.includes('Found "abc"') ||
+          (x as {message?: string}).message?.includes('找到 1 个匹配 "abc"') ||
+          (x as {message?: string}).message?.includes('找到'),
+      ),
+    );
+    assert.ok(
+      response.structuredContents.some(x => {
+        const hint = (x as {data?: {hint?: string}}).data?.hint;
+        return hint?.includes('get_script_source');
+      }),
     );
   });
 
@@ -542,21 +554,16 @@ describe('debugger tools extended', () => {
     assert.ok(
       response.lines.some(
         x =>
-          x.includes('Breakpoint set successfully') ||
-          x.includes('断点已设置'),
+          x.includes('Breakpoint set successfully') || x.includes('断点已设置'),
       ),
     );
     assert.ok(
       response.lines.some(
-        x =>
-          x.includes('Active breakpoints') ||
-          x.includes('活跃断点'),
+        x => x.includes('Active breakpoints') || x.includes('活跃断点'),
       ),
     );
     assert.ok(
-      response.lines.some(
-        x => x.includes('Initiator') || x.includes('发起者'),
-      ),
+      response.lines.some(x => x.includes('Initiator') || x.includes('发起者')),
     );
   });
 
@@ -631,10 +638,22 @@ describe('debugger tools extended', () => {
       context as unknown as Parameters<typeof pause.handler>[2],
     );
 
-    assert.ok(response.lines.some(x => x.includes('Execution Paused') || x.includes('已暂停')));
-    assert.ok(response.lines.some(x => x.includes('执行成功') || x.includes('Result')));
-    assert.ok(response.lines.some(x => x.includes('单步跳过') || x.includes('stepOver')));
-    assert.ok(response.lines.some(x => x.includes('已恢复') || x.includes('resumed')));
+    assert.ok(
+      response.lines.some(
+        x => x.includes('Execution Paused') || x.includes('已暂停'),
+      ),
+    );
+    assert.ok(
+      response.lines.some(x => x.includes('执行成功') || x.includes('Result')),
+    );
+    assert.ok(
+      response.lines.some(
+        x => x.includes('单步跳过') || x.includes('stepOver'),
+      ),
+    );
+    assert.ok(
+      response.lines.some(x => x.includes('已恢复') || x.includes('resumed')),
+    );
   });
 
   it('covers set breakpoint on text and tracing workflows', async () => {
@@ -693,150 +712,18 @@ describe('debugger tools extended', () => {
 
     assert.ok(
       response.lines.some(
-        x => x.includes('Breakpoint set successfully') || x.includes('断点设置成功'),
+        x =>
+          x.includes('Breakpoint set successfully') ||
+          x.includes('断点设置成功'),
       ),
     );
     assert.ok(
       response.lines.some(
-        x => x.includes('Function trace installed') || x.includes('函数追踪已安装'),
+        x =>
+          x.includes('Function trace installed') ||
+          x.includes('函数追踪已安装'),
       ),
     );
-  });
-
-  it('records debugger fallback evidence into reverse task artifacts', async () => {
-    const rootDir = await mkdtemp(
-      path.join(tmpdir(), 'js-reverse-debugger-evidence-'),
-    );
-    const runtime = getJSHookRuntime();
-    const originalStore = runtime.reverseTaskStore;
-    runtime.reverseTaskStore = new ReverseTaskStore({rootDir});
-
-    try {
-      const response = makeResponse();
-      const context = makeContext({
-        getSelectedPage: () => ({
-          evaluate: async () => undefined,
-          frames: () => [],
-          mainFrame: () => undefined,
-        }),
-        getSelectedFrame: () => ({
-          evaluate: async () => ({
-            success: true,
-            monitorId: 'm-evidence',
-            eventCount: 1,
-          }),
-        }),
-        getRequestInitiator: () => ({
-          type: 'script',
-          url: 'https://a.js',
-          lineNumber: 4,
-          columnNumber: 2,
-          stack: {
-            callFrames: [
-              {
-                functionName: 'fn',
-                scriptId: '1',
-                url: 'https://a.js',
-                lineNumber: 1,
-                columnNumber: 1,
-              },
-            ],
-          },
-        }),
-      });
-      context.debuggerContext.searchInScripts = async () => ({
-        matches: [
-          {
-            scriptId: '1',
-            url: 'https://a.js',
-            lineNumber: 0,
-            lineContent: 'function targetFn(a){return a;}',
-          },
-        ],
-      });
-      context.debuggerContext.getScriptSource = async () =>
-        'function targetFn(a){return a;}';
-      context.debuggerContext.setBreakpoint = async () => ({
-        breakpointId: 'trace-bp',
-        locations: [{}],
-      });
-      context.debuggerContext.setBreakpointByUrl = async () => ({
-        breakpointId: 'trace-bp',
-        locations: [{}],
-      });
-
-      const taskParams = {
-        taskId: 'task-debugger-evidence',
-        taskSlug: 'debugger-evidence',
-        targetUrl: 'https://example.com',
-        goal: 'capture fallback evidence',
-      };
-
-      await runtime.reverseTaskStore.openTask({
-        taskId: 'task-debugger-evidence',
-        slug: 'debugger-evidence',
-        targetUrl: 'https://example.com',
-        goal: 'capture fallback evidence',
-      });
-
-      await getRequestInitiator.handler(
-        {params: {requestId: 1, ...taskParams}} as unknown as Parameters<
-          typeof getRequestInitiator.handler
-        >[0],
-        response as unknown as Parameters<
-          typeof getRequestInitiator.handler
-        >[1],
-        context as unknown as Parameters<typeof getRequestInitiator.handler>[2],
-      );
-      await monitorEvents.handler(
-        {
-          params: {
-            selector: 'window',
-            events: ['click'],
-            monitorId: 'm-evidence',
-            ...taskParams,
-          },
-        } as unknown as Parameters<typeof monitorEvents.handler>[0],
-        response as unknown as Parameters<typeof monitorEvents.handler>[1],
-        context as unknown as Parameters<typeof monitorEvents.handler>[2],
-      );
-      await traceFunction.handler(
-        {
-          params: {
-            target: 'targetFn',
-            pause: false,
-            logArgs: true,
-            logThis: false,
-            ...taskParams,
-          },
-        } as unknown as Parameters<typeof traceFunction.handler>[0],
-        response as unknown as Parameters<typeof traceFunction.handler>[1],
-        context as unknown as Parameters<typeof traceFunction.handler>[2],
-      );
-
-      const evidenceLog = (
-        await readFile(
-          path.join(
-            rootDir,
-            'task-debugger-evidence',
-            'runtime-evidence.jsonl',
-          ),
-          'utf8',
-        )
-      )
-        .trim()
-        .split('\n')
-        .map(line => JSON.parse(line) as Record<string, unknown>);
-
-      assert.ok(
-        evidenceLog.some(entry => entry.tool === 'get_request_initiator'),
-      );
-      assert.ok(evidenceLog.some(entry => entry.tool === 'monitor_events'));
-      assert.ok(evidenceLog.some(entry => entry.tool === 'trace_function'));
-    } finally {
-      runtime.reverseTaskStore = originalStore;
-      await rm(rootDir, {recursive: true, force: true});
-    }
   });
 
   it('covers page-eval tools: hook/list/unhook/inspect/storage/monitor', async () => {
@@ -872,6 +759,8 @@ describe('debugger tools extended', () => {
     };
     const context = makeContext({
       getSelectedPage: () => ({
+        url: () => 'https://example.com',
+        context: () => ({cookies: async () => []}),
         frames: () => [frame],
         mainFrame: () => frame,
         evaluate: async () => {
@@ -990,8 +879,7 @@ describe('debugger tools extended', () => {
     assert.ok(
       response.lines.some(
         x =>
-          x.includes('Event monitor started') ||
-          x.includes('事件监控已启动'),
+          x.includes('Event monitor started') || x.includes('事件监控已启动'),
       ),
     );
     assert.ok(
@@ -1000,7 +888,7 @@ describe('debugger tools extended', () => {
       ),
     );
     assert.strictEqual(pageEvalCount, 0);
-    assert.strictEqual(frameEvalCount, 7);
+    assert.strictEqual(frameEvalCount, 8);
   });
 
   it('lists frames and switches execution context', async () => {
@@ -1053,7 +941,13 @@ describe('debugger tools extended', () => {
     );
 
     assert.ok(response.lines.some(line => line.includes('Frames (2 total)')));
-    const listData = (response.structuredContents[0] as {data: {frameInfos: Array<{url: string; name?: string; selected: boolean}>}}).data;
+    const listData = (
+      response.structuredContents[0] as {
+        data: {
+          frameInfos: Array<{url: string; name?: string; selected: boolean}>;
+        };
+      }
+    ).data;
     assert.equal(listData.frameInfos[0].url, 'https://root.example.com');
     assert.equal(listData.frameInfos[1].name, 'auth-frame');
     assert.equal(listData.frameInfos[1].selected, true);
@@ -1086,10 +980,15 @@ describe('debugger tools extended', () => {
       context as unknown as Parameters<typeof removeXhrBreakpoint.handler>[2],
     );
     assert.ok(
-      response.lines.some(x => x.includes('XHR') && (x.includes('已设置') || x.includes('set'))),
+      response.lines.some(
+        x => x.includes('XHR') && (x.includes('已设置') || x.includes('set')),
+      ),
     );
     assert.ok(
-      response.lines.some(x => x.includes('XHR') && (x.includes('已移除') || x.includes('removed'))),
+      response.lines.some(
+        x =>
+          x.includes('XHR') && (x.includes('已移除') || x.includes('removed')),
+      ),
     );
   });
 
@@ -1110,7 +1009,7 @@ describe('debugger tools extended', () => {
         getScripts: () => [],
         getScriptsByUrlPattern: () => [],
         getScriptSource: async () => '',
-        getScriptSourcePath: async () => '/tmp/proxycli-scripts/test.js',
+        getScriptSourcePath: async () => '/tmp/browsercli-scripts/test.js',
         getScriptById: () => ({scriptId: '1', url: 'https://app.js'}),
         searchInScripts: async () => ({matches: []}),
         setBreakpoint: async () => {
@@ -1170,7 +1069,9 @@ describe('debugger tools extended', () => {
 
     assert.ok(xhrBreakpointSet, 'XHR breakpoint should be set');
     assert.ok(
-      response.lines.some(x => x.includes('XHR') && (x.includes('已设置') || x.includes('set'))),
+      response.lines.some(
+        x => x.includes('XHR') && (x.includes('已设置') || x.includes('set')),
+      ),
     );
   });
 
@@ -1213,7 +1114,7 @@ describe('debugger tools extended', () => {
     // 新契约：返回 sourcePath 而非源码片段/URL，避免上下文臃肿
     assert.strictEqual(
       match.sourcePath,
-      '/tmp/proxycli-scripts/test.js',
+      '/tmp/browsercli-scripts/test.js',
       '应返回 sourcePath',
     );
     // URL 相关字段已移除，不再出现在响应中

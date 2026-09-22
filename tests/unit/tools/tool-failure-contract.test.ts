@@ -98,7 +98,7 @@ describe('Tool Failure Contract & Job Failed Guarantee', () => {
 
     const recovery = {
       tool: 'resume',
-      command: 'proxycli call resume',
+      command: 'browsercli call resume',
       reason: 'Debugger is paused; resume execution first',
     };
     const details = {pageId: 'page_123', reason: 'paused_at_breakpoint'};

@@ -70,7 +70,7 @@ export interface ValidationError {
   message: string;
 }
 
-/** Recognized global CLI flags for proxycli call */
+/** Recognized global CLI flags for browsercli call */
 export const GLOBAL_FLAGS: ReadonlySet<string> = new Set([
   'data',
   'file',
@@ -112,7 +112,7 @@ function stripTrailingComment(line: string): string {
 }
 
 /**
- * Extracts proxycli call invocations from markdown content.
+ * Extracts browsercli call invocations from markdown content.
  */
 export function extractCallsFromMarkdown(
   filePath: string,
@@ -121,7 +121,7 @@ export function extractCallsFromMarkdown(
   const rawLines = content.split('\n');
   const calls: ExtractedCall[] = [];
 
-  const callRegex = /proxycli\s+call\s+([^\s`"'\\]+)(.*)/;
+  const callRegex = /browsercli\s+call\s+([^\s`"'\\]+)(.*)/;
 
   let i = 0;
   while (i < rawLines.length) {
@@ -129,7 +129,7 @@ export function extractCallsFromMarkdown(
     const startLineNum = i + 1;
 
     // Check if line contains a call
-    if (!line.includes('proxycli call')) {
+    if (!line.includes('browsercli call')) {
       i++;
       continue;
     }
@@ -712,7 +712,7 @@ export async function runVerification(options?: {
   const toolsDir = options?.toolsDir ?? BUILD_TOOLS_DIR;
 
   console.log(
-    '🔍 开始扫描 skills/**/*.md 文档中的 proxycli call 调用参数...',
+    '🔍 开始扫描 skills/**/*.md 文档中的 browsercli call 调用参数...',
   );
   const skillFiles = await collectSkillFiles(skillsDir);
   const toolMap = await loadToolDefinitions(toolsDir);
@@ -724,7 +724,7 @@ export async function runVerification(options?: {
   }
 
   console.log(
-    `📄 找到 ${skillFiles.length} 个 Skill 文档，共检测到 ${allCalls.length} 处 proxycli call 命令`,
+    `📄 找到 ${skillFiles.length} 个 Skill 文档，共检测到 ${allCalls.length} 处 browsercli call 命令`,
   );
 
   const allErrors: ValidationError[] = [];
@@ -747,7 +747,7 @@ export async function runVerification(options?: {
     );
   } else {
     console.log(
-      '✅ 所有 Skill 文档中的 proxycli call 参数与代码 Schema 完全一致！',
+      '✅ 所有 Skill 文档中的 browsercli call 参数与代码 Schema 完全一致！',
     );
   }
 

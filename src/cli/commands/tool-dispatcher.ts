@@ -161,7 +161,7 @@ export const toolDispatcherCommand: AxiCliCommand<WorkerContext> = async (
 
   if (!requestedName) {
     throw new AxiError('缺少工具名称', 'VALIDATION_ERROR', [
-      `用法：proxycli call <tool-name> [--param value] [--url <url>] [--data <json>] [--file <path>]`,
+      `用法：browsercli call <tool-name> [--param value] [--url <url>] [--data <json>] [--file <path>]`,
     ]);
   }
 

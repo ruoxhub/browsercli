@@ -21,37 +21,17 @@
   - [`select_page`](#select_page)
   - [`set_files`](#set_files)
   - [`upload_file`](#upload_file)
-- **[Network](#network)** (30 tools)
+- **[Network](#network)** (10 tools)
   - [`analyze_websocket_messages`](#analyze_websocket_messages)
-  - [`clear_mitm_requests`](#clear_mitm_requests)
   - [`clear_network_requests`](#clear_network_requests)
-  - [`export_mitm_ca`](#export_mitm_ca)
   - [`export_request_as_curl`](#export_request_as_curl)
-  - [`get_mitm_request`](#get_mitm_request)
   - [`get_network_request`](#get_network_request)
   - [`get_websocket_message`](#get_websocket_message)
   - [`get_websocket_messages`](#get_websocket_messages)
-  - [`list_mitm_requests`](#list_mitm_requests)
   - [`list_network_requests`](#list_network_requests)
   - [`list_websocket_connections`](#list_websocket_connections)
-  - [`mitm_add_host_filter`](#mitm_add_host_filter)
-  - [`mitm_add_rule`](#mitm_add_rule)
-  - [`mitm_clear_host_filters`](#mitm_clear_host_filters)
-  - [`mitm_clear_rules`](#mitm_clear_rules)
-  - [`mitm_configure_local_apps`](#mitm_configure_local_apps)
-  - [`mitm_export_har`](#mitm_export_har)
-  - [`mitm_list_host_filters`](#mitm_list_host_filters)
-  - [`mitm_list_local_processes`](#mitm_list_local_processes)
-  - [`mitm_list_rules`](#mitm_list_rules)
-  - [`mitm_remove_host_filter`](#mitm_remove_host_filter)
-  - [`mitm_remove_rule`](#mitm_remove_rule)
   - [`replay_network_request`](#replay_network_request)
   - [`replay_network_request_batch`](#replay_network_request_batch)
-  - [`session_create`](#session_create)
-  - [`session_get_data`](#session_get_data)
-  - [`session_list`](#session_list)
-  - [`start_mitm_proxy`](#start_mitm_proxy)
-  - [`stop_mitm_proxy`](#stop_mitm_proxy)
 - **[Debugging](#debugging)** (27 tools)
   - [`capture_video_frame`](#capture_video_frame)
   - [`evaluate_on_callframe`](#evaluate_on_callframe)
@@ -80,10 +60,8 @@
   - [`step_out`](#step_out)
   - [`step_over`](#step_over)
   - [`take_screenshot`](#take_screenshot)
-- **[JS Reverse Engineering](#js-reverse-engineering)** (50 tools)
-  - [`analyze_pipeline`](#analyze_pipeline)
+- **[JS Reverse Engineering](#js-reverse-engineering)** (43 tools)
   - [`anti_anti_debug`](#anti_anti_debug)
-  - [`auto_hook`](#auto_hook)
   - [`break_on_xhr`](#break_on_xhr)
   - [`bypass_debugger`](#bypass_debugger)
   - [`collect_code`](#collect_code)
@@ -92,7 +70,6 @@
   - [`compare_env`](#compare_env)
   - [`create_hook`](#create_hook)
   - [`dump_target_scripts`](#dump_target_scripts)
-  - [`export_session_report`](#export_session_report)
   - [`find_in_script`](#find_in_script)
   - [`get_hook_data`](#get_hook_data)
   - [`get_request_initiator`](#get_request_initiator)
@@ -114,9 +91,6 @@
   - [`list_stealth_presets`](#list_stealth_presets)
   - [`list_targets`](#list_targets)
   - [`monitor_events`](#monitor_events)
-  - [`observe_flow`](#observe_flow)
-  - [`rebuild_bundle`](#rebuild_bundle)
-  - [`record_reverse_evidence`](#record_reverse_evidence)
   - [`remove_hook`](#remove_hook)
   - [`remove_xhr_breakpoint`](#remove_xhr_breakpoint)
   - [`search_in_scripts`](#search_in_scripts)
@@ -125,14 +99,12 @@
   - [`set_user_agent`](#set_user_agent)
   - [`stop_monitor`](#stop_monitor)
   - [`trace_function`](#trace_function)
-  - [`trace_signature_generation`](#trace_signature_generation)
   - [`unhook_function`](#unhook_function)
   - [`wasm_dump`](#wasm_dump)
   - [`wasm_memory_inspect`](#wasm_memory_inspect)
   - [`wasm_vmp_trace`](#wasm_vmp_trace)
   - [`xhr_to_js_breakpoint`](#xhr_to_js_breakpoint)
-- **[Input automation](#input-automation)** (4 tools)
-  - [`click_element`](#click_element)
+- **[Input automation](#input-automation)** (3 tools)
   - [`scroll_by`](#scroll_by)
   - [`type_text`](#type_text)
   - [`wait_for_element`](#wait_for_element)
@@ -174,7 +146,7 @@
 
 ### `click_at` — 坐标点击
 
-**Description:** 使用 CDP Input.dispatchMouseEvent 在元素中心坐标处派发真实鼠标点击事件，适用于 Playwright 点击被拦截的场景。
+**Description:** 使用 CDP Input.dispatchMouseEvent 在元素中心坐标处派发真实鼠标点击事件，适用于 Playwright 点击被拦截的场景。会选取元素在视口内的最大可见区域中心。
 
 **Parameters:**
 
@@ -315,10 +287,6 @@
 - `wsid`
 - `direction`
 
-### `clear_mitm_requests` — clear_mitm_requests
-
-**Description:** 清空 MITM 代理捕获的所有请求。清空后 id 从 1 重新编号。
-
 ### `clear_network_requests` — clear_network_requests
 
 **Description:** 清空当前选中页面（或指定页面）的缓存网络请求。清空后，list_network_requests 返回的请求列表将为空，稳定的请求 ID 将从 1 重新编号。
@@ -327,15 +295,6 @@
 
 - `targetPageIdx`
 - `targetPageId`
-
-### `export_mitm_ca` — export_mitm_ca
-
-**Description:** 导出 MITM 根 CA 证书（PEM 或 DER），供客户端信任以解密 HTTPS 流量。
-
-**Parameters:**
-
-- `format`
-- `outputPath`
 
 ### `export_request_as_curl` — export_request_as_curl
 
@@ -350,16 +309,6 @@
 - `body`
 - `replaceHeaders`
 - `includeCookies`
-
-### `get_mitm_request` — get_mitm_request
-
-**Description:** 获取单条 MITM 捕获请求的完整详情（请求头/请求体/响应头/响应体）。可选 saveTo 把响应体写入文件。
-
-**Parameters:**
-
-- `id`
-- `saveTo`
-- `format`
 
 ### `get_network_request` — get_network_request
 
@@ -395,22 +344,6 @@
 - `pageIdx`
 - `show_content`
 
-### `list_mitm_requests` — list_mitm_requests
-
-**Description:** 列出 MITM 代理捕获到的请求（内存环形缓冲，最多保留最近 2000 条）。支持 URL 过滤与分页。
-
-**Parameters:**
-
-- `pageSize`
-- `pageIdx`
-- `filter`
-- `urlFilter`
-- `method`
-- `statusCode`
-- `host`
-- `headerContains`
-- `bodyContains`
-
 ### `list_network_requests` — list_network_requests
 
 **Description:** 列出当前选中页面自上次导航以来的请求。默认隐藏浏览器扩展请求；支持按资源类型、请求头关键字、分页过滤，以及等待匹配的请求。
@@ -441,85 +374,6 @@
 - `urlFilter`
 - `includePreservedConnections`
 
-### `mitm_add_host_filter` — mitm_add_host_filter
-
-**Description:** 新增一条 MITM 域名过滤（allow 白名单 / block 黑名单），进程内生效直到 stop 或 clear。白名单非空时黑名单失效：不在白名单里的域名全部旁路（不解密不抓包）。host 为子串匹配，大小写不敏感。
-
-**Parameters:**
-
-- `action`
-- `host`
-
-### `mitm_add_rule` — mitm_add_rule
-
-**Description:** 新增/覆盖一条 MITM 改写规则（block / map_local / map_remote / modify_header / modify_body），进程内生效直到 stop 或 clear。同 id 覆盖。
-
-**Parameters:**
-
-- `action`
-- `id`
-- `enabled`
-- `urlFilter`
-- `method`
-- `host`
-- `headerContains`
-- `bodyContains`
-- `filter`
-
-### `mitm_clear_host_filters` — mitm_clear_host_filters
-
-**Description:** 清空全部 MITM 域名过滤（白名单与黑名单一起清）。
-
-### `mitm_clear_rules` — mitm_clear_rules
-
-**Description:** 清空全部 MITM 改写规则。
-
-### `mitm_configure_local_apps` — mitm_configure_local_apps
-
-**Description:** 配置 Local Applications 透明拦截模式：接管 Windows 系统代理（127.0.0.1:<port>），仅对目标进程做 MITM 解密抓包，其余进程经盲转发正常上网。关闭时自动还原系统代理。targets 留空代表拦截全部本地应用。
-
-**Parameters:**
-
-- `enabled`
-- `targets`
-
-### `mitm_export_har` — mitm_export_har
-
-**Description:** 把当前捕获缓冲导出为 HAR 1.2（HTTP Archive）。outputPath 省略时直接返回 HAR 对象。
-
-**Parameters:**
-
-- `outputPath`
-
-### `mitm_list_host_filters` — mitm_list_host_filters
-
-**Description:** 列出当前生效的 MITM 域名过滤（白名单 allow 与黑名单 block）。
-
-### `mitm_list_local_processes` — mitm_list_local_processes
-
-**Description:** 列出当前正在发起或保持 TCP 连接的本地进程（pid/名称），辅助选取透明拦截目标。Windows 上基于 netstat 连接表。
-
-### `mitm_list_rules` — mitm_list_rules
-
-**Description:** 列出当前生效的全部 MITM 改写规则。
-
-### `mitm_remove_host_filter` — mitm_remove_host_filter
-
-**Description:** 移除一条 MITM 域名过滤（需与添加时相同的 action 与 host）。
-
-**Parameters:**
-
-- `action`
-- `host`
-
-### `mitm_remove_rule` — mitm_remove_rule
-
-**Description:** 按 id 移除一条 MITM 改写规则。
-
-**Parameters:**
-
-- `id`
-
 ### `replay_network_request` — replay_network_request
 
 **Description:** 重放一个捕获的网络请求（按 reqid），使用浏览器上下文的 Cookie 和存储。支持覆盖 method、url、headers 和 body。适用于验证签名字段效果与参数有效性。
@@ -544,44 +398,6 @@
 - `variants`
 - `concurrency`
 - `maxBodyLength`
-
-### `session_create` — session_create
-
-**Description:** 创建新的抓包会话并设为当前活跃会话。
-
-**Parameters:**
-
-- `name`
-- `targetUrl`
-
-### `session_get_data` — session_get_data
-
-**Description:** 获取指定会话的结构化请求、加解密 Hook 日志与 Storage 快照。默认取当前活动会话。
-
-**Parameters:**
-
-- `sessionId`
-- `sources`
-- `urlFilter`
-- `includeHooks`
-- `includeSnapshots`
-
-### `session_list` — session_list
-
-**Description:** 列出所有抓包会话。
-
-### `start_mitm_proxy` — start_mitm_proxy
-
-**Description:** 启动 MITM 抓包代理，拦截非浏览器流量（curl、脚本、桌面应用、手机 App）。启动后终端可通过 `-x http://127.0.0.1:<port>` 走代理；HTTPS 需信任返回的 CA 证书路径（--cacert）。可配置 upstreamProxy 将流量通过二级外部代理（HTTP/HTTPS/SOCKS5）转发。
-
-**Parameters:**
-
-- `port`
-- `upstreamProxy`
-
-### `stop_mitm_proxy` — stop_mitm_proxy
-
-**Description:** 停止 MITM 抓包代理并释放端口。
 
 ## Debugging
 
@@ -696,7 +512,7 @@
 
 ### `open_devtools` — 打开DevTools窗口
 
-**Description:** 为当前选中页面打开 Chrome DevTools 窗口（同一浏览器内新开 devtools:// 目标）。窗口默认不附着到页面，需要在 DevTools 的 target 下拉框中手动选择目标。
+**Description:** 为当前选中页面打开 Chrome DevTools 目标（同一浏览器内新建 devtools:// 标签页）。窗口默认不附着到页面，需要在 DevTools 的 target 下拉框中手动选择目标；headless 模式下该 scheme 可能不可用。
 
 ### `pause` — 暂停执行
 
@@ -803,15 +619,6 @@
 
 ## JS Reverse Engineering
 
-### `analyze_pipeline` — analyze_pipeline
-
-**Description:** 分析流水线：采集 → 并行分析(加密检测+混淆分析) → 生成报告。演示 Pipeline 编排模式的完整工作流。
-
-**Parameters:**
-
-- `url`
-- `deep`
-
 ### `anti_anti_debug` — Anti Anti-Debug
 
 **Description:** 反反调试工具集：固定窗口尺寸、冻结时间、阻止页面关闭、阻止历史导航、阻止控制台清除、隐藏 webdriver 标记。
@@ -819,27 +626,6 @@
 **Parameters:**
 
 - `features`
-
-### `auto_hook` — auto_hook
-
-**Description:** 自动 Hook：根据预设或自定义选项生成并注入调试 Hook 与加密库 Hook
-
-**Parameters:**
-
-- `url`
-- `preset`
-- `autoInject`
-- `waitAfterHookMs`
-- `hookCrypto`
-- `hookRsa`
-- `hookSmCrypto`
-- `hookTimers`
-- `hookEval`
-- `hookCookie`
-- `hookXhr`
-- `hookFetch`
-- `exportResults`
-- `exportWaitMs`
 
 ### `break_on_xhr` — 设置 XHR 断点
 
@@ -928,15 +714,6 @@
 **Parameters:**
 
 - `targetId`
-
-### `export_session_report` — export_session_report
-
-**Description:** 将当前逆向工程会话导出为 JSON 或 Markdown。
-
-**Parameters:**
-
-- `format`
-- `includeHookData`
 
 ### `find_in_script` — 在脚本中查找
 
@@ -1126,61 +903,6 @@
 - `events`
 - `monitorId`
 
-### `observe_flow` — observe_flow
-
-**Description:** 观察模式：收集并分析页面脚本，识别加密与混淆，生成风险评估报告
-
-**Parameters:**
-
-- `url`
-- `includeDynamic`
-- `includeExternal`
-- `includeInline`
-- `includeServiceWorker`
-- `includeWebWorker`
-- `maxFileSize`
-- `maxTotalSize`
-- `mode`
-- `smartMode`
-- `dynamicWaitMs`
-- `priorities`
-- `compress`
-- `timeout`
-
-### `rebuild_bundle` — rebuild_bundle
-
-**Description:** 根据捕获的证据与目标脚本，构建本地 Node.js 复现环境
-
-**Parameters:**
-
-- `url`
-- `targetUrl`
-- `targetFunctionNames`
-- `targetKeywords`
-- `targetUrlPatterns`
-- `goal`
-- `autoGenerate`
-- `maxEvidenceItems`
-- `taskId`
-- `taskSlug`
-
-### `record_reverse_evidence` — record_reverse_evidence
-
-**Description:** 将结构化的逆向工程证据追加到任务产物日志中。
-
-**Parameters:**
-
-- `taskId`
-- `taskSlug`
-- `targetUrl`
-- `goal`
-- `channel`
-- `targetKeywords`
-- `targetUrlPatterns`
-- `targetFunctionNames`
-- `targetActionDescription`
-- `entry`
-
 ### `remove_hook` — remove_hook
 
 **Description:** 按 ID 移除 hook。会从进程内 HookManager 删除，并可选地清理浏览器端数据。
@@ -1263,18 +985,6 @@
 - `logStack`
 - `hookId`
 
-### `trace_signature_generation` — trace_signature_generation
-
-**Description:** 签名追踪工作流：根据请求头/URL 线索，关联网络请求、Hook 诊断、XHR 断点与调用帧检查
-
-**Parameters:**
-
-- `requestUrlPattern`
-- `headerKeyword`
-- `maxResults`
-- `includeSensitiveValues`
-- `taskId`
-
 ### `unhook_function` — Unhook Function
 
 **Description:** 移除已安装的函数 Hook。
@@ -1322,14 +1032,6 @@
 - `url`
 
 ## Input automation
-
-### `click_element` — click_element
-
-**Description:** 点击页面元素。定位器支持 CSS、role=、text=、xpath=。多匹配时用 >> nth=N 消歧。
-
-**Parameters:**
-
-- `selector`
 
 ### `scroll_by` — scroll_by
 

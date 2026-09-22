@@ -16,8 +16,6 @@ const commandDescriptions: Record<string, string> = {
   'list-tools': '列出所有可用的 MCP 工具及旧技能兼容映射',
   scaffold: '创建新的逆向任务脚手架',
   status: '查看 daemon 会话运行状态',
-  proxy: '启动交互式 MITM 代理抓包终端（REPL）或查看代理状态',
-  extension: '管理浏览器扩展连接器（Native Host 安装、状态查看等）',
   web: '启动、查看或停止 Web 控制台',
   open: '拉起（或探活）daemon 会话',
   close: '停止 daemon 会话',
@@ -31,7 +29,7 @@ export function generateTopLevelHelp(options?: {
   version?: string;
   commands?: string[];
 }): string {
-  const bin = options?.bin ?? 'proxycli';
+  const bin = options?.bin ?? 'browsercli';
   const description = options?.description ?? '逆向工程CLI服务';
   const version = options?.version ?? '1.0.0';
   const commands = options?.commands ?? [
@@ -46,8 +44,6 @@ export function generateTopLevelHelp(options?: {
     'config',
     'scaffold',
     'status',
-    'proxy',
-    'extension',
     'web',
   ];
 
@@ -73,7 +69,7 @@ export function generateTopLevelHelp(options?: {
 }
 
 const BROWSER_CONNECT_USAGE =
-  'proxycli browser connect [--browser-url <url> | --ws-endpoint <url> | --channel <name> | --executable-path <path>] [--user-data-dir <dir>] [--viewport <width>x<height>] [--ws-headers <json>] [--headless[=<bool>]] [--cloak] [--minimal-stealth] [--full-stealth-args] [--js-stealth] [--isolated] [--accept-insecure-certs] [--force] [--json]';
+  'browsercli browser connect [--browser-url <url> | --ws-endpoint <url> | --channel <name> | --executable-path <path>] [--user-data-dir <dir>] [--viewport <width>x<height>] [--ws-headers <json>] [--headless[=<bool>]] [--cloak] [--minimal-stealth] [--full-stealth-args] [--js-stealth] [--isolated] [--accept-insecure-certs] [--force] [--json]';
 
 const BROWSER_CONNECT_OPTIONS = [
   '  目标参数（互斥）：',
@@ -128,7 +124,7 @@ export function generateCommandHelp(
     if (subCommand === 'disconnect') {
       return [
         '',
-        '  Usage: proxycli browser disconnect [--force] [--json]',
+        '  Usage: browsercli browser disconnect [--force] [--json]',
         '',
         '  断开 Worker 浏览器连接',
         '',
@@ -141,7 +137,7 @@ export function generateCommandHelp(
     if (subCommand === 'status') {
       return [
         '',
-        '  Usage: proxycli browser status [--json]',
+        '  Usage: browsercli browser status [--json]',
         '',
         '  查看 Worker 浏览器连接状态',
         '',
@@ -160,74 +156,69 @@ export function generateCommandHelp(
       description:
         '调用 MCP 工具。复杂或多行 JavaScript 请保存为脚本文件后使用 --file，或通过 --stdin 传入 JSON 参数，避免 shell 转义破坏脚本。',
       usage: [
-        'proxycli call <tool-or-skill-name> [--param value] [--data <json>] [--file <params.json>]',
-        'proxycli call evaluate_script --file <script.js>',
-        'proxycli call <tool-or-skill-name> --stdin',
+        'browsercli call <tool-or-skill-name> [--param value] [--data <json>] [--file <params.json>]',
+        'browsercli call evaluate_script --file <script.js>',
+        'browsercli call <tool-or-skill-name> --stdin',
       ].join('\n         '),
     },
     browser: {
       description: '连接、断开或查看 Worker 浏览器状态',
       usage: [
         BROWSER_CONNECT_USAGE,
-        'proxycli browser disconnect [--force] [--json]',
-        'proxycli browser status [--json]',
+        'browsercli browser disconnect [--force] [--json]',
+        'browsercli browser status [--json]',
       ].join('\n         '),
       options: BROWSER_CONNECT_OPTIONS,
     },
     jobs: {
       description: '列出 Worker 任务，或取消卡住的活动任务',
       usage: [
-        'proxycli jobs list [--json]',
-        'proxycli jobs cancel <job-id> [--json]',
+        'browsercli jobs list [--json]',
+        'browsercli jobs cancel <job-id> [--json]',
       ].join('\n         '),
     },
     config: {
       description: '查看/设置/初始化全局配置',
       usage:
-        'proxycli config [--init] [--set key=value] [--get key] [--unset key] [--list]',
+        'browsercli config [--init] [--set key=value] [--get key] [--unset key] [--list]',
     },
     'list-tools': {
       description: '列出所有可用的 MCP 工具及旧技能兼容映射',
-      usage: 'proxycli list-tools [--json]',
+      usage: 'browsercli list-tools [--json]',
     },
     scaffold: {
       description: '创建新的逆向任务脚手架',
       usage:
-        'proxycli scaffold --name <name> [--desc <description>] [--url <url>] [--output <directory>]',
+        'browsercli scaffold --name <name> [--desc <description>] [--url <url>] [--output <directory>]',
     },
     status: {
       description: '查看 daemon 会话运行状态（读注册表并逐会话探活）',
-      usage: 'proxycli status [--json]',
-    },
-    proxy: {
-      description: '启动交互式 MITM 代理抓包终端（REPL）或查看状态',
-      usage:
-        'proxycli proxy [status] [--port=<port>] [--upstream=<url>] [--sysproxy] [--no-auto-start]',
+      usage: 'browsercli status [--json]',
     },
     open: {
       description:
         '拉起（或探活）daemon 会话。连不上注册表里的 socket 时自动 spawn detached daemon',
-      usage: 'proxycli [-s=<session>] open',
+      usage: 'browsercli [-s=<session>] open',
     },
     close: {
       description: '停止 daemon 会话（请求 stop，兜底 pid 探活清理注册表）',
-      usage: 'proxycli [-s=<session>] close',
+      usage: 'browsercli [-s=<session>] close',
     },
     list: {
       description: '列出当前 workspace 注册表中的全部 daemon 会话',
-      usage: 'proxycli list',
+      usage: 'browsercli list',
     },
     'kill-all': {
-      description: '强杀全部 --proxycli-daemon 进程并清理会话注册表',
-      usage: 'proxycli kill-all',
+      description: '强杀全部 --browsercli-daemon 进程并清理会话注册表',
+      usage: 'browsercli kill-all',
     },
     web: {
       description:
         '启动、查看或停止 Web 控制台（启动时如果 daemon 未运行则自动拉起）',
       usage: [
-        'proxycli [-s=<session>] web [start] [--port=<port>] [--no-open] [--json]',
-        'proxycli [-s=<session>] web status [--json]',
-        'proxycli [-s=<session>] web stop [--json]',
+        'browsercli [-s=<session>] web [start] [--port=<port>] [--no-open] [--json]',
+        'browsercli [-s=<session>] web status [--json]',
+        'browsercli [-s=<session>] web stop [--json]',
       ].join('\n         '),
     },
   };

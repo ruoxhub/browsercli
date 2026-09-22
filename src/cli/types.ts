@@ -12,7 +12,7 @@
 import type {DaemonLike} from './daemonClient.js';
 
 export interface WorkerContext {
-  /** 会话名：argv -s/--session > env PROXYCLI_SESSION > 'default' */
+  /** 会话名：argv -s/--session > env BROWSERCLI_SESSION > 'default' */
   session: string;
   /** 测试注入：覆盖按 workspace-hash 计算的注册表目录 */
   daemonDir?: string;

@@ -7,7 +7,7 @@
 /**
  * RuntimeConfigStore — 进程内存态配置单例。
  *
- * 启动时默认用 loadUserConfig() (~/.proxycli/config.json) + CLI 参数播种。
+ * 启动时默认用 loadUserConfig() (~/.browsercli/config.json) + CLI 参数播种。
  * 面板通过 update() 修改配置，重启后回落到种子值。
  *
  * 深层字段（browser/toolResultRecording）在 update()
@@ -71,7 +71,7 @@ export function getRuntimeConfigStore(): RuntimeConfigStore {
 }
 
 /**
- * 重置 store（测试用）。传入 seed 则用 seed 重建；不传则从 ~/.proxycli/config.json 重新播种。
+ * 重置 store（测试用）。传入 seed 则用 seed 重建；不传则从 ~/.browsercli/config.json 重新播种。
  */
 export function resetRuntimeConfigStore(seed?: GlobalConfig): void {
   store = new RuntimeConfigStore(seed);

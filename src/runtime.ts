@@ -18,17 +18,11 @@ import {DOMInspector} from './modules/collector/DOMInspector.js';
 import {PageController} from './modules/collector/PageController.js';
 import {HookManager} from './modules/hook/HookManager.js';
 import type {NetworkModule} from './modules/network/index.js';
-import type {MitmModule} from './modules/proxy/index.js';
-import type {
-  CaptureEngine,
-  CaptureSessionManager,
-} from './modules/session/index.js';
 import type {SourceMapService} from './modules/sourcemap/SourceMapService.js';
 import type {WasmAnalyzer} from './modules/wasm/WasmAnalyzer.js';
 import type {WasmCollector} from './modules/wasm/WasmCollector.js';
 import type {WasmDecompiler} from './modules/wasm/WasmDecompiler.js';
 import type {WasmRuntimeInspector} from './modules/wasm/WasmRuntimeInspector.js';
-import {ReverseTaskStore} from './reverse/ReverseTaskStore.js';
 import {RuntimeServices} from './runtime/RuntimeServices.js';
 import type {Page} from './third_party/index.js';
 import {createAppEventBusOptions, type AppEventMap} from './types/events.js';
@@ -51,18 +45,10 @@ export interface Runtime {
   pageController: PageController;
   hookManager: HookManager;
   networkModule: NetworkModule;
-  mitmModule: MitmModule;
-  captureSessionManager: CaptureSessionManager;
-  /**
-   * 可选：Cdp/MITM 统一聚合点（spec §7 / D6）。
-   * 遵循 @stable 扩展约定——高扇入接口不新增强制字段，调用侧一律 `?.`。
-   */
-  captureEngine?: CaptureEngine;
   wasmCollector: WasmCollector;
   wasmAnalyzer: WasmAnalyzer;
   wasmDecompiler: WasmDecompiler;
   wasmRuntimeInspector: WasmRuntimeInspector;
-  reverseTaskStore: ReverseTaskStore;
   eventBus: EventBus<AppEventMap>;
   contextProvider?: ToolContextProvider;
   sourceMapService?: SourceMapService;
@@ -92,7 +78,6 @@ export function getRuntime(): Runtime {
   const services = new RuntimeServices(pageController);
   const detailedDataManager = DetailedDataManager.getInstance();
   const unifiedCacheManager = UnifiedCacheManager.getInstance();
-  const reverseTaskStore = new ReverseTaskStore();
   const eventBus = new EventBus<AppEventMap>(createAppEventBusOptions());
 
   unifiedCacheManager.registerCache(
@@ -112,15 +97,6 @@ export function getRuntime(): Runtime {
     get networkModule() {
       return services.getNetworkModule();
     },
-    get mitmModule() {
-      return services.getMitmModule();
-    },
-    get captureSessionManager() {
-      return services.getCaptureSessionManager();
-    },
-    get captureEngine() {
-      return services.getCaptureEngine();
-    },
     get wasmCollector() {
       return services.getWasmCollector();
     },
@@ -136,7 +112,6 @@ export function getRuntime(): Runtime {
     get sourceMapService() {
       return services.getSourceMapService();
     },
-    reverseTaskStore,
     eventBus,
     bindPageContext: resolver => {
       collector.setPageResolver(() => resolver());

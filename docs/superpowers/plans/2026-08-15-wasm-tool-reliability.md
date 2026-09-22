@@ -4,7 +4,7 @@
 
 **Goal:** Expose the existing WASM collector, make browser memory inspection bounded and side-effect safe, and return actionable native-tool failures.
 
-**Architecture:** Keep the fix inside `src/tools/wasm`: a thin `collect_wasm` adapter delegates to `WasmCollector`, memory inspection uses a descriptor-only frame probe with an operation timeout, and one `execFile` wrapper supplies consistent native command results. No Worker API or proxycli cancellation changes are required.
+**Architecture:** Keep the fix inside `src/tools/wasm`: a thin `collect_wasm` adapter delegates to `WasmCollector`, memory inspection uses a descriptor-only frame probe with an operation timeout, and one `execFile` wrapper supplies consistent native command results. No Worker API or browsercli cancellation changes are required.
 
 **Tech Stack:** TypeScript ESM, Node `execFile`, Patchright Frame evaluation, Zod, `node:test`.
 
@@ -12,7 +12,7 @@
 
 - Preserve the default zero-JavaScript-injection browser startup path.
 - Add no dependency and do not modify generated `build/` output by hand.
-- Preserve unrelated dirty-worktree changes, especially Worker/API/proxycli files.
+- Preserve unrelated dirty-worktree changes, especially Worker/API/browsercli files.
 - Use TDD and run focused checks after every production change.
 - Do not create a git commit unless the user explicitly requests one.
 
@@ -261,14 +261,14 @@ Expected: all WASM unit tests pass with actionable error messages.
 
 **Interfaces:**
 
-- Consumes: final working tree and local Worker/proxycli runtime.
+- Consumes: final working tree and local Worker/browsercli runtime.
 - Produces: fresh verification evidence tied to the final diff.
 
 - [ ] **Step 1: Inspect the scoped diff**
 
 Run: `git diff -- src/modules/wasm/WasmCollector.ts src/tools/wasm tests/unit/tools/wasm docs/superpowers/specs/2026-08-15-wasm-tool-reliability-design.md docs/superpowers/plans/2026-08-15-wasm-tool-reliability.md`
 
-Expected: no unrelated Worker/API/proxycli edits.
+Expected: no unrelated Worker/API/browsercli edits.
 
 - [ ] **Step 2: Run static and focused checks**
 

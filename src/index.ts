@@ -11,7 +11,7 @@
  * 1. 解析 CLI 参数并播种 RuntimeConfigStore
  * 2. 初始化 Runtime（创建 BrowserManager 实例但不自动连接）
  * 3. 初始化 ToolContextProvider（未连接状态）
- * 4. 启动 Web 控制台，以及供 CLI (proxycli) 通信的本机会话 IPC 命名管道
+ * 4. 启动 Web 控制台，以及供 CLI (browsercli) 通信的本机会话 IPC 命名管道
  */
 
 import {buildDaemonArgPlan} from './ipc/daemonArgs.js';

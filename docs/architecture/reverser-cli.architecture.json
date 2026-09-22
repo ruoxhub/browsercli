@@ -1,0 +1,199 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Reverser-CLI 架构",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "invoke-path",
+        "label": "工具调用主链路",
+        "focus": ["cli", "ipc", "pipeline", "runtime", "browser"],
+        "note": "从 browsercli 命令行到受控浏览器的主执行路径。"
+      },
+      {
+        "id": "console-path",
+        "label": "Web 控制台支路",
+        "focus": ["webui", "console", "pipeline", "registry"],
+        "note": "控制台通过 REST/WebSocket 复用同一套工具管线。"
+      },
+      {
+        "id": "capability-layer",
+        "label": "能力模块层",
+        "focus": ["debug", "capture", "wasm", "sqlite"],
+        "note": "Runtime 装配的逆向能力模块与落盘链路。"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "webui",
+      "type": "frontend",
+      "label": "Web 控制台",
+      "sublabel": "src/web-ui (React 19)",
+      "pos": [40, 100],
+      "size": [150, 60]
+    },
+    {
+      "id": "console",
+      "type": "backend",
+      "label": "ConsoleServer",
+      "sublabel": "Express + WsHub",
+      "tag": "src/web",
+      "pos": [260, 100],
+      "size": [160, 60]
+    },
+    {
+      "id": "registry",
+      "type": "backend",
+      "label": "ToolRegistry",
+      "sublabel": "32 类目 · toolProfile 过滤",
+      "tag": "defineTool",
+      "pos": [500, 100],
+      "size": [190, 60]
+    },
+    {
+      "id": "sqlite",
+      "type": "database",
+      "label": "SQLite SessionStore",
+      "sublabel": "抓包会话与任务持久化",
+      "pos": [750, 100],
+      "size": [180, 60]
+    },
+    {
+      "id": "cli",
+      "type": "frontend",
+      "label": "browsercli CLI",
+      "sublabel": "src/cli — 命令行客户端",
+      "pos": [40, 310],
+      "size": [150, 60]
+    },
+    {
+      "id": "ipc",
+      "type": "backend",
+      "label": "Daemon IPC",
+      "sublabel": "命名管道 NDJSON 分发",
+      "tag": "src/ipc/daemonServer.ts",
+      "pos": [260, 310],
+      "size": [160, 60]
+    },
+    {
+      "id": "pipeline",
+      "type": "backend",
+      "label": "ToolExecutionPipeline",
+      "sublabel": "校验 → 上下文 → 执行 → 响应",
+      "pos": [500, 310],
+      "size": [190, 60]
+    },
+    {
+      "id": "runtime",
+      "type": "backend",
+      "label": "Runtime",
+      "sublabel": "RuntimeServices 懒加载",
+      "tag": "getRuntime()",
+      "pos": [770, 310],
+      "size": [140, 60]
+    },
+    {
+      "id": "browser",
+      "type": "external",
+      "label": "Patchright / CloakBrowser",
+      "sublabel": "CDP 受控浏览器",
+      "pos": [990, 310],
+      "size": [180, 60]
+    },
+    {
+      "id": "debug",
+      "type": "backend",
+      "label": "调试与 Hook",
+      "sublabel": "debugger/ · hook/",
+      "pos": [560, 500],
+      "size": [180, 60]
+    },
+    {
+      "id": "capture",
+      "type": "backend",
+      "label": "抓包与代理",
+      "sublabel": "network/ · proxy/ · session/",
+      "pos": [770, 500],
+      "size": [180, 60]
+    },
+    {
+      "id": "wasm",
+      "type": "backend",
+      "label": "WASM 与 SourceMap",
+      "sublabel": "wasm/ · sourcemap/",
+      "pos": [980, 500],
+      "size": [180, 60]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Daemon 进程 · node src/index.js",
+      "wraps": [
+        "ipc",
+        "console",
+        "pipeline",
+        "registry",
+        "runtime",
+        "sqlite"
+      ]
+    },
+    {
+      "kind": "security-group",
+      "label": "src/modules 能力层",
+      "wraps": ["debug", "capture", "wasm"]
+    }
+  ],
+  "connections": [
+    {
+      "id": "cli-ipc",
+      "from": "cli",
+      "to": "ipc",
+      "label": "NDJSON / 命名管道",
+      "labelDy": 56,
+      "variant": "emphasis"
+    },
+    { "id": "webui-console", "from": "webui", "to": "console", "label": "REST + WebSocket", "labelDy": 56 },
+    { "id": "ipc-pipeline", "from": "ipc", "to": "pipeline", "label": "tool.invoke", "labelDy": 34 },
+    { "id": "console-pipeline", "from": "console", "to": "pipeline", "label": "callTool" },
+    { "id": "registry-pipeline", "from": "registry", "to": "pipeline", "label": "handler 与元数据", "labelDy": 24 },
+    { "id": "pipeline-runtime", "from": "pipeline", "to": "runtime", "label": "服务与上下文" },
+    { "id": "runtime-browser", "from": "runtime", "to": "browser", "label": "CDP 驱动" },
+    { "id": "runtime-sqlite", "from": "runtime", "to": "sqlite", "label": "会话落盘", "variant": "dashed", "fromSide": "top", "toSide": "bottom" },
+    { "id": "runtime-debug", "from": "runtime", "to": "debug" },
+    { "id": "runtime-capture", "from": "runtime", "to": "capture", "fromSide": "bottom", "toSide": "top" },
+    { "id": "runtime-wasm", "from": "runtime", "to": "wasm" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "接入面",
+      "items": [
+        "browsercli CLI 按 workspace-hash 注册表发现会话",
+        "连不上自动 spawn daemon 并等 stdout 就绪握手",
+        "Web 控制台走 REST + WebSocket 复用同一条管线"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "执行面",
+      "items": [
+        "daemonServer 分发 status / tool.invoke / browser.* / jobs.* / subscribe",
+        "ToolExecutionPipeline 负责校验、上下文、执行与响应归一化",
+        "Runtime 是 57+ 调用方依赖的 @stable 高扇入接口"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "能力面",
+      "items": [
+        "反检测四层：协议层始终启用，源码层 / 启动参数 / JS 注入逐级 opt-in",
+        "cloak profile 与默认 profile 物理隔离，viewport 默认暴露真实屏幕",
+        "关键运行时常量组件：EventBus、WsHub、JobStore、ReverseTaskStore"
+      ]
+    }
+  ]
+}

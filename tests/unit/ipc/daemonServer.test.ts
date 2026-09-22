@@ -267,6 +267,43 @@ describe('daemonServer', () => {
     }
   });
 
+  it('unrelated client disconnect does not abort running job', async () => {
+    const fixture = await startFixture();
+    const client1 = await TestClient.connect(fixture.handle.socketPath);
+    const client2 = await TestClient.connect(fixture.handle.socketPath);
+    try {
+      const invokeId = await client1.request('tool.invoke', {
+        tool: 'alpha',
+        params: {},
+      });
+      // 等 job 进入 running
+      for (let i = 0; i < 100 && !fixture.jobStore.list()[0]; i++) {
+        await new Promise(resolve => setTimeout(resolve, 5));
+      }
+      // client2 发送 status 请求并随后断开
+      const statusId = await client2.request('status');
+      await client2.responseFor(statusId);
+      client2.close();
+
+      // 等待确保 client2 的 close 事件已被服务端触发
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      // 验证 job 仍处于 running 状态，并未被 cancel
+      const job = fixture.jobStore.list()[0];
+      assert.equal(job.status, 'running');
+
+      // client1 正常完成 job
+      fixture.adapter.pending[0].resolve({success: true});
+      const response = await client1.responseFor(invokeId);
+      assert.deepStrictEqual(response['result'], {success: true});
+      assert.equal(fixture.jobStore.list()[0].status, 'done');
+    } finally {
+      client1.close();
+      client2.close();
+      await fixture.handle.close();
+    }
+  });
+
   it('subscribe forwards wsHub broadcasts as event frames', async () => {
     await withFixture(async (fixture, client) => {
       const subId = await client.request('subscribe', {channels: ['log']});

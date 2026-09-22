@@ -255,7 +255,7 @@ export async function printNativeIgnitionBytecode(
 
   const candidateNames = Array.from(new Set([requestedName, TARGET_NAME]));
   const bootstrapScript = buildBootstrapScript(context);
-  const workingDir = mkdtempSync(join(tmpdir(), 'proxycli-bytecode-'));
+  const workingDir = mkdtempSync(join(tmpdir(), 'browsercli-bytecode-'));
 
   try {
     for (const filterName of candidateNames) {

@@ -12,15 +12,15 @@
 
 原设计（方案 A）试图在单个 Daemon 进程内构建 `CdpSessionRegistry`，以 `(agentId, page)` 为键维护内存级 Session 复用表。然而在深度代码审计后发现存在严重冲突与过度设计：
 
-1. **CLI 命令短生命周期冲突**：`proxycli` 是单次命令独立执行即断开退出的短期进程。若每次生成随机 `agentId`，将破坏连续命令间的 `selectedPage` 状态；若手工透传或配置 `agentId`，则侵入了大量底层接口。
+1. **CLI 命令短生命周期冲突**：`browsercli` 是单次命令独立执行即断开退出的短期进程。若每次生成随机 `agentId`，将破坏连续命令间的 `selectedPage` 状态；若手工透传或配置 `agentId`，则侵入了大量底层接口。
 2. **长生命周期持有者事实偏差**：代码中仅 `DebuggerContextProvider` 具有跨调用持有 Session 的特性。原方案 A 将 `WasmCollector`、`CodeCollector` 误归类为长持有者并引入 `{ pinned: true }`、owner 校验、跳过 TTL 扫描等，造成了新的泄露风险与复杂度。
 3. **并发限制**：单 Daemon 内部受限于 `rejectIfBusy` / `WORKER_BUSY`，同一时刻仅能串行执行工具调用，无法真正服务多 Agent 并发。
 
 ### 1.2 架构选择：方案 1（Daemon Session 隔离）
 
-利用 proxycli 已有的会话架构（`src/cli/sessionPaths.ts` 及 `src/ipc/registry.ts`），天然支持多会话隔离：
+利用 browsercli 已有的会话架构（`src/cli/sessionPaths.ts` 及 `src/ipc/registry.ts`），天然支持多会话隔离：
 
-- 每个 Agent 指定或继承自己的会话名：`proxycli -s <agent-name>` 或环境变量 `PROXYCLI_SESSION=<agent-name>`。
+- 每个 Agent 指定或继承自己的会话名：`browsercli -s <agent-name>` 或环境变量 `PROXYCLI_SESSION=<agent-name>`。
 - 每个会话自动拥有一个独立的 Local Daemon 进程及本地命名管道（Named Pipe / Unix Domain Socket）。
 - 各 Daemon 拥有专属的 `BrowserManager`、`ToolContextProvider`、`DebuggerManager` 与页面选择状态，**在 OS 进程级实现彻底隔离**。
 - 天然支持多 Agent 并发调用，各 Agent 间零状态污染、零调试器互踩。
@@ -47,22 +47,22 @@
 
   ```bash
   export PROXYCLI_SESSION="agent-${SUBAGENT_ID}"
-  proxycli call select_page --index 0
-  proxycli call click_element --selector "#btn"
+  browsercli call select_page --index 0
+  browsercli call click_element --selector "#btn"
   ```
 
   或者通过命令行显式指定：
 
   ```bash
-  proxycli -s worker-1 call ...
+  browsercli -s worker-1 call ...
   ```
 
 - **共享单个物理 Chrome（可选资源优化）**：
   当多个 Agent 需轻量级共享同一浏览器实例时，启动主浏览器调试端口后，各 Agent 分别执行连接即可：
 
   ```bash
-  proxycli -s agent-1 browser connect --browser-url http://127.0.0.1:9222
-  proxycli -s agent-2 browser connect --browser-url http://127.0.0.1:9222
+  browsercli -s agent-1 browser connect --browser-url http://127.0.0.1:9222
+  browsercli -s agent-2 browser connect --browser-url http://127.0.0.1:9222
   ```
 
 ### 3.2 瞬态 CDP 会话辅助工具 `withCdpSession`

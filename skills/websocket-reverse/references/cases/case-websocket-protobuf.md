@@ -62,7 +62,6 @@
 
 ### 7. 写记录
 
-- `record_reverse_evidence --taskId <id> --taskSlug <ws-proto> ...`
 - 在 task artifact 写：
   - `ws-protocol.md`（分组表 + 心跳 + 认证）
   - `ws-samples/<group>.bin`（样本 base64）

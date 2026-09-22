@@ -9,7 +9,7 @@
 ## 1. 背景与目标
 
 ### 1.1 现状与痛点
-当前 `Reverser-CLI` 仓库在 MCP 注册表中注册了 167+ 个工具，全量暴露时会消耗 Agent 上下文 ~40K+ tokens。经系统性分析与 CodeGraph 拓扑探索，其中有 5 大核心分类（静态代码理解、WebAssembly 逆向、SourceMap 工程还原、脱机环境补齐推断、参数签名蓝图与逆向向导）在底层技术上**完全无需启动 Chromium / Patchright / Cloak 浏览器或 proxycli daemon 进程**。
+当前 `Reverser-CLI` 仓库在 MCP 注册表中注册了 167+ 个工具，全量暴露时会消耗 Agent 上下文 ~40K+ tokens。经系统性分析与 CodeGraph 拓扑探索，其中有 5 大核心分类（静态代码理解、WebAssembly 逆向、SourceMap 工程还原、脱机环境补齐推断、参数签名蓝图与逆向向导）在底层技术上**完全无需启动 Chromium / Patchright / Cloak 浏览器或 browsercli daemon 进程**。
 
 然而目前这部分工具：
 1. 缺乏直接可在本地终端或由 Agent 快速执行的独立 Node.js CLI 脚本；

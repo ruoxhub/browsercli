@@ -4,7 +4,7 @@
 
 **Goal:** 将 `ScriptInfo.source` 从内存字符串改为磁盘临时文件路径 `sourcePath`，降低运行时内存占用。
 
-**Architecture:** 仅修改 `ScriptManager.ts`，`loadScriptSource()` 中 CDP 获取的源码写入 `os.tmpdir()/proxycli-scripts/` 临时目录，其他方法通过新增的 `readSource()` 私有辅助方法从磁盘读取。
+**Architecture:** 仅修改 `ScriptManager.ts`，`loadScriptSource()` 中 CDP 获取的源码写入 `os.tmpdir()/browsercli-scripts/` 临时目录，其他方法通过新增的 `readSource()` 私有辅助方法从磁盘读取。
 
 **Tech Stack:** Node.js `fs`, `os`, `path`, `crypto` 内置模块。
 
@@ -83,7 +83,7 @@ private readSource(scriptId: string): string | null {
 
 private ensureCacheDir(): string {
   if (this.cacheDir) return this.cacheDir;
-  this.cacheDir = path.join(os.tmpdir(), 'proxycli-scripts');
+  this.cacheDir = path.join(os.tmpdir(), 'browsercli-scripts');
   if (!fs.existsSync(this.cacheDir)) {
     fs.mkdirSync(this.cacheDir, {recursive: true});
   }

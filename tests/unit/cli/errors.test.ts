@@ -69,7 +69,7 @@ describe('errors', () => {
     it('always includes daemon launch hint', () => {
       const result = daemonError('stop');
       assert.ok(
-        result.suggestions.some((s: string) => s.includes('proxycli start')),
+        result.suggestions.some((s: string) => s.includes('browsercli start')),
       );
     });
   });

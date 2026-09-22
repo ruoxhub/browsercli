@@ -1,8 +1,8 @@
-# proxycli HTTP 签名逆向避坑记录
+# browsercli HTTP 签名逆向避坑记录
 
 ## 郑和数据签名逆向复盘
 
-按致命程度排序，proxycli 在本次逆向中遇到以下问题。
+按致命程度排序，browsercli 在本次逆向中遇到以下问题。
 
 ### 会导致整页失效
 
@@ -16,7 +16,7 @@
 3. 页面包含 `debugger` 反调试语句。
    加载时调试器暂停，DOM 与网络均不可读。处理顺序为 `resume` → `bypass_debugger` → `anti_anti_debug`。
 4. 启动阶段命令路径解析异常。
-   `proxycli` 不在 PATH 中，skill 命令将模块路径错误解析为 `c:\d\...` 前缀。可直接使用 Node 和 CLI 入口的绝对路径：`node "D:/nvm/nodejs/node_modules/proxycli/build/bin/proxycli.js" <cmd>`。
+   `browsercli` 不在 PATH 中，skill 命令将模块路径错误解析为 `c:\d\...` 前缀。可直接使用 Node 和 CLI 入口的绝对路径：`node "D:/nvm/nodejs/node_modules/browsercli/build/bin/browsercli.js" <cmd>`。
 
 ### 工具行为与规避方式
 
@@ -30,4 +30,4 @@
 
 优先采用非侵入式 CDP 抓包：新建标签页，调用 `list_network_requests` 与 `get_network_request` 获取请求头；随后在 bundle 中搜索 `MD5(` 和 `x-` 拼接逻辑，最后用 Python 还原并验证签名。尽量避免 JavaScript 注入钩子，尤其是 RSA 钩子。
 
-这些经验已沉淀为用户级 skill：`reverse-http-signature-proxycli`。
+这些经验已沉淀为用户级 skill：`reverse-http-signature-browsercli`。

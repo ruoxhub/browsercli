@@ -68,10 +68,6 @@
 
 推荐先 Hook `fetch/xhr/websocket`，触发业务动作后再抓记录。
 
-同步记录：
-
-- `record_reverse_evidence`
-
 ## 4) 一键分析目标站点（推荐入口）
 
 原 `analyze_target` 工具已下线，改按 skill `target-analysis` 复现：`collect_code`
@@ -112,7 +108,7 @@
 
 - `navigate_page`
 - `query_dom`
-- `click_element`
+- `click`
 - `type_text`
 - `wait_for_element`
 - `take_screenshot`
@@ -121,11 +117,9 @@
 
 ## 8) 导出分析结果
 
-- `export_session_report`
 - `collection_diff`
-- `record_reverse_evidence`
 
-用于沉淀会话证据、对比两次采样差异，并把关键结论写入 task artifact。
+用于对比两次采样差异，并把关键结论写入 task artifact。
 
 ## 9) 登录态复用（需登录站点建议）
 
@@ -148,13 +142,12 @@
 6. `create_hook` + `inject_hook`
 7. 触发页面动作
 8. `get_hook_data`
-9. `record_reverse_evidence`
-10. `export_rebuild_bundle`
-11. 运行 `env/entry.js` 并读取代理 env log
-12. 记录 `first divergence`
-13. `diff_env_requirements`（仅辅助）
-14. 按 skill `code-analysis` 做风险评估（原 `risk_panel`）
-15. `env-pass` 后再推进纯算法提纯
+9. `export_rebuild_bundle`
+10. 运行 `env/entry.js` 并读取代理 env log
+11. 记录 `first divergence`
+12. `diff_env_requirements`（仅辅助）
+13. 按 skill `code-analysis` 做风险评估（原 `risk_panel`）
+14. `env-pass` 后再推进纯算法提纯
 
 ## 11) 参数总表
 

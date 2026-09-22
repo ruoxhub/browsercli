@@ -5,7 +5,7 @@
  */
 
 /**
- * RuntimeConfigStore 持久化 — 把面板改动落盘到 ~/.proxycli/runtime-config.json，
+ * RuntimeConfigStore 持久化 — 把面板改动落盘到 ~/.browsercli/runtime-config.json，
  * 下次启动时回填，避免重复配置连接参数。
  *
  * 只持久化「连接设置」相关的可写字段：browser。
@@ -28,7 +28,7 @@ import {type GlobalConfig, validateGlobalConfig} from './schema.js';
 
 export const RUNTIME_CONFIG_PATH = join(
   os.homedir(),
-  '.proxycli',
+  '.browsercli',
   'runtime-config.json',
 );
 

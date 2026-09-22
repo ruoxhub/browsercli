@@ -15,11 +15,6 @@
  */
 
 import type {BrowserConfig} from '../config/schema.js';
-import type {LocalAppsStatus} from '../modules/proxy/types.js';
-import type {
-  CapturedRequestSummary,
-  CaptureSource,
-} from '../modules/session/types.js';
 
 // ==================== HTTP API ====================
 
@@ -36,7 +31,7 @@ export interface ApiResponse<T = unknown> {
  * 状态类频道：订阅时立即回放最新快照（lastState），后续仅在状态变化时推送。
  * 适合 worker 状态、browser 状态这类「最新值」语义。
  */
-export type StateChannel = 'worker.status' | 'browser.event' | 'proxy.status';
+export type StateChannel = 'worker.status' | 'browser.event';
 
 /**
  * 流式频道：订阅后只推增量事件，不回放历史。
@@ -46,9 +41,7 @@ export type StreamChannel =
   | 'tool.invoke'
   | 'hook.event'
   | 'hook.sample'
-  | 'log'
-  | 'proxy.request'
-  | 'session.request';
+  | 'log';
 
 export type Channel = StateChannel | StreamChannel;
 
@@ -59,7 +52,6 @@ export type Channel = StateChannel | StreamChannel;
 export const STATE_CHANNELS: readonly StateChannel[] = [
   'worker.status',
   'browser.event',
-  'proxy.status',
 ];
 
 // ==================== WebSocket Messages ====================
@@ -153,28 +145,6 @@ export interface ToolInvokeEvent {
   error?: {code: string; message: string};
 }
 
-// ==================== Proxy Types (channel: proxy.status / proxy.request) ====================
-
-export interface ProxyStatusPayload {
-  running: boolean;
-  port: number | null;
-  capturedCount: number;
-  caInitialized: boolean;
-  caCertPath: string;
-  localApps?: LocalAppsStatus;
-}
-
-export interface ProxyRequestSummaryEvent {
-  id: number;
-  method: string;
-  url: string;
-  statusCode: number;
-  contentType: string | null;
-  timestamp: number;
-  contentLength?: number;
-  clientProcess?: {pid: number; name: string};
-}
-
 // ==================== Worker Status (state channel: worker.status) ====================
 
 export interface WorkerStatus {
@@ -236,90 +206,6 @@ export interface InvocationRecord {
   args?: Record<string, unknown>;
   result?: unknown;
   error?: {code: string; message: string};
-}
-
-// ==================== MITM Proxy Data Types ====================
-
-export type {
-  ClientProcessMeta,
-  LocalAppsConfig,
-  LocalAppsStatus,
-  ProcessInfo,
-} from '../modules/proxy/types.js';
-
-export interface MitmRequestSummary {
-  id: number;
-  method: string;
-  url: string;
-  statusCode: number;
-  contentType: string | null;
-  timestamp: number;
-}
-
-export interface ListMitmRequestsData {
-  requests: MitmRequestSummary[];
-  total: number;
-  pageIdx: number;
-  pageSize: number | undefined;
-}
-
-export interface GetMitmRequestData {
-  id: number;
-  requestId: string;
-  method: string;
-  url: string;
-  requestHeaders: Record<string, string>;
-  requestBody: string | null;
-  statusCode: number;
-  responseHeaders: Record<string, string>;
-  responseBody: string | null;
-  contentType: string | null;
-  isStatic: boolean;
-  isStreaming: boolean;
-  isWebSocket: boolean;
-  truncated: boolean;
-  timestamp: number;
-  savedPath?: string;
-}
-
-// ==================== Session Capture Types (channel: session.request) ====================
-
-/**
- * WS 推送与 REST 列表项的摘要投影。
- *
- * 别名到 session 领域的 CapturedRequestSummary —— 投影逻辑单点在
- * src/modules/session/summary.ts，本文件只做重新导出（spec §8）。
- * src/web-ui/src/lib/protocol.ts 会整体透传给前端。
- */
-export type {CapturedRequestSummary as SessionRequestSummaryEvent};
-
-/**
- * REST 详情响应体（GET /api/session/requests/:id）。
- *
- * 与摘要的区别只有一处：headers 已解析成对象，并额外带 body。
- * `headersParseError` 为 true 表示库中 headers 不是合法 JSON 对象，
- * 已降级为 `{}`（spec §9）——前端据此提示，而不是白屏。
- */
-export interface SessionRequestDetail {
-  id: string;
-  sessionId: string;
-  sequence: number;
-  timestamp: number;
-  method: string;
-  url: string;
-  statusCode: number;
-  contentType: string | null;
-  source: CaptureSource;
-  durationMs: number;
-  initiator: string | null;
-  truncated: number;
-  isStreaming: number;
-  isWebSocket: number;
-  requestHeaders: Record<string, string>;
-  requestBody: string | null;
-  responseHeaders: Record<string, string>;
-  responseBody: string | null;
-  headersParseError?: true;
 }
 
 // ==================== System Info & Logs ====================

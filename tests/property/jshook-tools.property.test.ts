@@ -12,14 +12,14 @@ import {zod} from '../../src/third_party/index.js';
 import {collectCode} from '../../src/tools/collector/collectCode.js';
 import {queryDom} from '../../src/tools/dom/queryDom.js';
 import {createHook} from '../../src/tools/hook/CreateHook.js';
-import {clickElement} from '../../src/tools/page/clickElement.js';
+import {click} from '../../src/tools/input/click.js';
 import {injectStealth} from '../../src/tools/stealth/stealth.js';
 
 const collectSchema = zod.object(collectCode.schema);
 const hookSchema = zod.object(createHook.schema);
 const stealthSchema = zod.object(injectStealth.schema);
 const domSchema = zod.object(queryDom.schema);
-const pageSchema = zod.object(clickElement.schema);
+const pageSchema = zod.object(click.schema);
 
 describe('JSHook tool properties', () => {
   it('Property 4: collection mode support', () => {

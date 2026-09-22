@@ -135,7 +135,7 @@ export class ScriptManager {
 
   /** 实例化时清空缓存目录,防止上次异常退出后残留文件堆积。 */
   private purgeCache(): void {
-    const dir = path.join(os.tmpdir(), 'proxycli-scripts');
+    const dir = path.join(os.tmpdir(), 'browsercli-scripts');
     if (!fs.existsSync(dir)) return;
 
     let removed = 0;
@@ -477,7 +477,7 @@ export class ScriptManager {
   /**
    * 返回脚本源码的本地文件路径。
    *
-   * - 未传 filePath 时返回内置临时缓存路径（os.tmpdir()/proxycli-scripts）。
+   * - 未传 filePath 时返回内置临时缓存路径（os.tmpdir()/browsercli-scripts）。
    * - 传 filePath 时，将已加载的源码内容写入该自定义路径（自动创建父目录、
    *   解析为绝对路径）并返回之，便于调用方在固定位置持久化脚本。
    *
@@ -525,7 +525,7 @@ export class ScriptManager {
 
   private ensureCacheDir(): string {
     if (this.cacheDir) return this.cacheDir;
-    this.cacheDir = path.join(os.tmpdir(), 'proxycli-scripts');
+    this.cacheDir = path.join(os.tmpdir(), 'browsercli-scripts');
     if (!fs.existsSync(this.cacheDir)) {
       fs.mkdirSync(this.cacheDir, {recursive: true});
     }

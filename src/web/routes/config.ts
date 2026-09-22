@@ -57,7 +57,7 @@ export interface ConfigRoutesConfig {
   wsHub: WsHub;
   /**
    * 配置保存后的持久化回调，默认走真实 persistRuntimeConfig。
-   * 测试注入 no-op 以避免污染 ~/.proxycli/runtime-config.json。
+   * 测试注入 no-op 以避免污染 ~/.browsercli/runtime-config.json。
    */
   persist?: (config: GlobalConfig) => void;
   /**

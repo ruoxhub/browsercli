@@ -246,16 +246,16 @@ export class DaemonConnection {
   }
 }
 
-/** CLI 配置文件路径；PROXYCLI_CONFIG_DIR / BROWSERCLI_CONFIG_DIR 供测试隔离（与 commands/config.ts 同步）。 */
+/** CLI 配置文件路径；BROWSERCLI_CONFIG_DIR / PROXYCLI_CONFIG_DIR 供测试隔离（与 commands/config.ts 同步）。 */
 export function cliConfigPath(): string {
   const custom =
-    process.env.PROXYCLI_CONFIG_DIR ?? process.env.BROWSERCLI_CONFIG_DIR;
+    process.env.BROWSERCLI_CONFIG_DIR ?? process.env.PROXYCLI_CONFIG_DIR;
   if (custom) return path.join(custom, 'config.json');
-  const proxyDir = path.join(os.homedir(), '.proxycli');
-  if (fs.existsSync(proxyDir)) return path.join(proxyDir, 'config.json');
   const browserDir = path.join(os.homedir(), '.browsercli');
   if (fs.existsSync(browserDir)) return path.join(browserDir, 'config.json');
-  return path.join(proxyDir, 'config.json');
+  const proxyDir = path.join(os.homedir(), '.proxycli');
+  if (fs.existsSync(proxyDir)) return path.join(proxyDir, 'config.json');
+  return path.join(browserDir, 'config.json');
 }
 
 export interface CliConfig {
@@ -310,11 +310,11 @@ export function normalizeCandidatePath(rawPath?: string): string | undefined {
   return undefined;
 }
 
-/** 解析 worker daemon 入口：env PROXYCLI_ENTRY / BROWSERCLI_ENTRY > 配置文件 workerEntry。 */
+/** 解析 worker daemon 入口：env BROWSERCLI_ENTRY / PROXYCLI_ENTRY > 配置文件 workerEntry。 */
 export function resolveEntryPath(): string {
   const candidates = [
-    process.env.PROXYCLI_ENTRY,
     process.env.BROWSERCLI_ENTRY,
+    process.env.PROXYCLI_ENTRY,
     loadCliConfig().workerEntry,
   ];
   for (const raw of candidates) {
@@ -322,12 +322,12 @@ export function resolveEntryPath(): string {
     if (normalized) return normalized;
   }
   const error = new Error(
-    '无法定位 worker daemon 入口（PROXYCLI_ENTRY / BROWSERCLI_ENTRY / workerEntry 均未配置或文件不存在）。',
+    '无法定位 worker daemon 入口（BROWSERCLI_ENTRY / PROXYCLI_ENTRY / workerEntry 均未配置或文件不存在）。',
   ) as Error & {code?: string; suggestions?: string[]};
   error.code = 'ENTRY_NOT_CONFIGURED';
   error.suggestions = [
-    'proxycli config --set workerEntry=<path to build/src/index.js>',
-    '或设置环境变量 PROXYCLI_ENTRY / BROWSERCLI_ENTRY=<path to build/src/index.js>',
+    'browsercli config --set workerEntry=<path to build/src/index.js>',
+    '或设置环境变量 BROWSERCLI_ENTRY / PROXYCLI_ENTRY=<path to build/src/index.js>',
   ];
   throw error;
 }
@@ -348,7 +348,7 @@ export async function spawnDaemon(
     [
       entry,
       '--daemon',
-      '--proxycli-daemon',
+      '--browsercli-daemon',
       '--session',
       opts.session,
       ...opts.spawnFlags,
@@ -412,7 +412,7 @@ export async function spawnDaemon(
   if (!cfg) throw new Error('daemon 就绪但 session 文件缺失');
   if (cfg.protocol !== PROTOCOL_VERSION) {
     throw new Error(
-      `协议不匹配: daemon v${cfg.protocol} vs cli v${PROTOCOL_VERSION}，运行 proxycli -s=${opts.session} close 后重新 open`,
+      `协议不匹配: daemon v${cfg.protocol} vs cli v${PROTOCOL_VERSION}，运行 browsercli -s=${opts.session} close 后重新 open`,
     );
   }
   return cfg;
@@ -603,13 +603,13 @@ export async function stopSession(
   if (dir) await deleteSession(dir, cfg.name);
 }
 
-/** 从 ps/进程列表行提取 daemon pid：须同时含 node 进程特征与 --proxycli-daemon / --browsercli-daemon，排除 grep 自身。 */
+/** 从 ps/进程列表行提取 daemon pid：须同时含 node 进程特征与 --browsercli-daemon / --proxycli-daemon，排除 grep 自身。 */
 export function collectDaemonPids(lines: string[]): number[] {
   const result: number[] = [];
   for (const line of lines) {
     if (
-      !line.includes('--proxycli-daemon') &&
-      !line.includes('--browsercli-daemon')
+      !line.includes('--browsercli-daemon') &&
+      !line.includes('--proxycli-daemon')
     )
       continue;
     // 排除查询进程自身（grep/powershell/taskkill 命令行里也含该字符串）
@@ -640,7 +640,7 @@ export async function killAllDaemons(): Promise<number[]> {
         '-NoProfile',
         '-NonInteractive',
         '-Command',
-        "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*--proxycli-daemon*' -or $_.CommandLine -like '*--browsercli-daemon*' } | ForEach-Object { \"$($_.ProcessId) $($_.CommandLine)\" }",
+        "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*--browsercli-daemon*' -or $_.CommandLine -like '*--proxycli-daemon*' } | ForEach-Object { \"$($_.ProcessId) $($_.CommandLine)\" }",
       ],
       {encoding: 'utf-8'},
     );
@@ -746,7 +746,7 @@ export async function verifyDaemonVersion(
     );
     conn.close();
     if (status?.version && status.version !== cliVersion) {
-      return `Warning: Daemon server version (${status.version}) does not match CLI version (${cliVersion}). Run 'proxycli -s=${session} close' to update and restart the daemon.`;
+      return `Warning: Daemon server version (${status.version}) does not match CLI version (${cliVersion}). Run 'browsercli -s=${session} close' to update and restart the daemon.`;
     }
   } catch {
     // 忽略探活时的偶发通讯错误，由命令自身处理错误

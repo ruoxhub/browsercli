@@ -117,7 +117,7 @@ describe('webCommand', () => {
   });
 
   describe('已有活跃会话场景', () => {
-    const baseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'proxycli-web-'));
+    const baseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'browsercli-web-'));
     let live: {server: net.Server; socketPath: string};
 
     before(async () => {
@@ -387,7 +387,7 @@ describe('webCommand', () => {
 
   describe('未运行拉起场景（假 entry）', () => {
     const workspace = fs.mkdtempSync(
-      path.join(os.tmpdir(), 'proxycli-web-spawn-'),
+      path.join(os.tmpdir(), 'browsercli-web-spawn-'),
     );
     const daemonDir = path.join(workspace, 'daemon');
     const session = `sess-web-${process.pid}`;

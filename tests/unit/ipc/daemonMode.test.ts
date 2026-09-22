@@ -17,11 +17,11 @@ describe('buildDaemonArgPlan', () => {
         '--session',
         'proj-a',
         '--no-console',
-        '--proxycli-daemon',
+        '--browsercli-daemon',
       ]),
       {
         daemon: true,
-        proxycliDaemon: true,
+        browsercliDaemon: true,
         session: 'proj-a',
         noConsole: true,
         minimalStealth: false,
@@ -34,7 +34,7 @@ describe('buildDaemonArgPlan', () => {
   it('accepts --session=x and --console-port=x; non-daemon argv returns daemon:false', () => {
     assert.deepEqual(buildDaemonArgPlan(['--daemon', '--session=x']), {
       daemon: true,
-      proxycliDaemon: false,
+      browsercliDaemon: false,
       session: 'x',
       noConsole: false,
       minimalStealth: false,
@@ -45,7 +45,7 @@ describe('buildDaemonArgPlan', () => {
       buildDaemonArgPlan(['--headless', '--console-port=9000']),
       {
         daemon: false,
-        proxycliDaemon: false,
+        browsercliDaemon: false,
         session: 'default',
         noConsole: false,
         minimalStealth: false,

@@ -78,7 +78,7 @@ export const listPages = defineTool({
           success: true,
           message: isConnected
             ? '当前没有打开的页面。'
-            : '当前没有打开的页面（浏览器连接已丢失或未连接，可使用 "proxycli browser connect" 重新连接）。',
+            : '当前没有打开的页面（浏览器连接已丢失或未连接，可使用 "browsercli browser connect" 重新连接）。',
           tooltype: 'list_pages',
           data: {
             pageInfos: [],

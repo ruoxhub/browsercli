@@ -17,7 +17,7 @@ const ALLOWED_FLAGS = new Set(['json']);
 
 function invalid(message: string): never {
   throw new AxiError(message, 'VALIDATION_ERROR', [
-    '用法：proxycli jobs list [--json] | proxycli jobs cancel <job-id> [--json]',
+    '用法：browsercli jobs list [--json] | browsercli jobs cancel <job-id> [--json]',
   ]);
 }
 

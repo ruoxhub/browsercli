@@ -27,7 +27,7 @@ export const statusCommand: AxiCliCommand<WorkerContext> = async (
     .filter(r => r.status === 'open' && r.version && r.version !== CLI_VERSION)
     .map(
       r =>
-        `Warning: Daemon server version (${r.version}) does not match CLI version (${CLI_VERSION}) for session '${r.session}'. Run 'proxycli -s=${r.session} close' to update and restart the daemon.`,
+        `Warning: Daemon server version (${r.version}) does not match CLI version (${CLI_VERSION}) for session '${r.session}'. Run 'browsercli -s=${r.session} close' to update and restart the daemon.`,
     );
 
   if (json) {

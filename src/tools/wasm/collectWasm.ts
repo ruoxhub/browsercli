@@ -67,7 +67,7 @@ export const collectWasm = defineTool({
           {
             recovery: {
               tool: 'select_page',
-              command: 'proxycli call select_page',
+              command: 'browsercli call select_page',
               reason: 'A page must be selected before collecting WASM',
             },
           },

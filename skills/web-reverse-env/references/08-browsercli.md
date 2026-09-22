@@ -1,15 +1,15 @@
-# proxycli 命令参考（补环境专用）
+# browsercli 命令参考（补环境专用）
 
-这份文档把补环境的每个阶段映射到具体的 `proxycli call` 命令。参数名以 `src/tools` 下各工具的 zod schema 为准（可通过 `proxycli list-tools` 查签名）。
+这份文档把补环境的每个阶段映射到具体的 `browsercli call` 命令。参数名以 `src/tools` 下各工具的 zod schema 为准（可通过 `browsercli list-tools` 查签名）。
 
 ## 0. 前提与通用 flag
 
-`proxycli` 只通过 worker 的 `/api/v1` HTTP 契约通信，调用前 worker 需在线：
+`browsercli` 只通过 worker 的 `/api/v1` HTTP 契约通信，调用前 worker 需在线：
 
 ```bash
-proxycli status            # 查看 worker 运行状态与统计
-proxycli browser connect   # 连接/启动 worker 浏览器
-proxycli list-tools        # 列出所有工具与参数签名
+browsercli status            # 查看 worker 运行状态与统计
+browsercli browser connect   # 连接/启动 worker 浏览器
+browsercli list-tools        # 列出所有工具与参数签名
 ```
 
 通用控制 flag（不属于工具参数本身）：
@@ -30,11 +30,11 @@ proxycli list-tools        # 列出所有工具与参数签名
 ## 1. 页面与导航
 
 ```bash
-proxycli call navigate_page --url "https://example.com" --type url
-proxycli call navigate_page --type reload --ignore-cache true
-proxycli call list_pages
-proxycli call select_page        # 切换活动页
-proxycli call new_page           # 新开页面
+browsercli call navigate_page --url "https://example.com" --type url
+browsercli call navigate_page --type reload --ignore-cache true
+browsercli call list_pages
+browsercli call select_page        # 切换活动页
+browsercli call new_page           # 新开页面
 ```
 
 | 参数 | 类型 | 说明 |
@@ -48,27 +48,36 @@ proxycli call new_page           # 新开页面
 
 这是补环境的第一手数据来源：先用真实浏览器把对象结构、描述符、原型链、存储态抓下来，再据此补本地环境。
 
-### 2.1 `compare_env` — 环境基准采集
+### 2.1 环境基准采集（`compare-env.js`）
+
+`compare_env` 工具已下线，改用技能内脚本生成采集表达式，再交给 `evaluate_script`：
 
 ```bash
-proxycli call compare_env
-proxycli call compare_env --properties '["navigator.userAgent","navigator.webdriver","navigator.plugins.length","document.all","document.cookie"]'
+# 不带额外属性
+node skills/web-reverse-env/scripts/compare-env.js --out env.js
+# 追加点分隔属性路径（不执行表达式）
+node skills/web-reverse-env/scripts/compare-env.js \
+  --properties navigator.userAgent,navigator.webdriver,navigator.plugins.length,document.all,document.cookie --out env.js
+
+browsercli call evaluate_script --file env.js
 ```
 
 | 参数 | 类型 | 说明 |
 | --- | --- | --- |
-| `--properties` | string[] | 额外读取的点分隔属性路径，不执行表达式 |
+| `--properties` | string（逗号分隔） | 额外读取的点分隔属性路径，不执行表达式 |
+| `--out` | string | 写入文件（默认打印到 stdout） |
+| `--json` | boolean | 包成 `{"function": "..."}` JSON，便于 `--stdin` 传入 |
 
-采集 `navigator`/`screen`/`canvas`/`webgl`/`audio`/`timing`/`misc`/`custom` 分组基准，用于与 Node/jsdom 环境对比。
+采集 `navigator`/`screen`/`timing`/`custom` 分组基准（`canvas`/`webgl`/`audio`/`misc` 保持空对象，与原工具一致），每项带 `value` + `type`（读取失败时带 `error`），用于与 Node/jsdom 环境对比。需要 canvas/webgl/audio 采样时用 [collect-browser-env.js](scripts/collect-browser-env.js)。
 
 ### 2.2 `evaluate_script` — 任意 JS 精确采集
 
 ```bash
-proxycli call evaluate_script --function "(() => JSON.stringify({ua:navigator.userAgent, wd:navigator.webdriver, p:navigator.plugins}))()"
-proxycli call evaluate_script --function "(() => Object.getOwnPropertyDescriptor(Navigator.prototype,'userAgent'))()"
-proxycli call evaluate_script --function "(() => Object.getPrototypeOf(navigator).constructor.name)()"
-proxycli call evaluate_script --file collect-env.js      # .js 文件内容作为 function
-proxycli call evaluate_script --function "..." --file-path out.json --timeout-ms 60000
+browsercli call evaluate_script --function "(() => JSON.stringify({ua:navigator.userAgent, wd:navigator.webdriver, p:navigator.plugins}))()"
+browsercli call evaluate_script --function "(() => Object.getOwnPropertyDescriptor(Navigator.prototype,'userAgent'))()"
+browsercli call evaluate_script --function "(() => Object.getPrototypeOf(navigator).constructor.name)()"
+browsercli call evaluate_script --file collect-env.js      # .js 文件内容作为 function
+browsercli call evaluate_script --function "..." --file-path out.json --timeout-ms 60000
 ```
 
 | 参数 | 类型 | 说明 |
@@ -80,13 +89,13 @@ proxycli call evaluate_script --function "..." --file-path out.json --timeout-ms
 | `--file-path` | string | 大结果保存到文件 |
 | `--timeout-ms` | number | 超时，默认 30000 |
 
-也可用位置参数写法：`proxycli call evaluate_script "() => document.title"`。
+也可用位置参数写法：`browsercli call evaluate_script "() => document.title"`。
 
 ### 2.3 `inspect_object` — 深查对象结构
 
 ```bash
-proxycli call inspect_object --expression "navigator" --depth 3
-proxycli call inspect_object --expression "document.all" --depth 2 --show-prototype true
+browsercli call inspect_object --expression "navigator" --depth 3
+browsercli call inspect_object --expression "document.all" --depth 2 --show-prototype true
 ```
 
 | 参数 | 类型 | 说明 |
@@ -99,8 +108,8 @@ proxycli call inspect_object --expression "document.all" --depth 2 --show-protot
 ### 2.4 `get_storage` — 存储运行态
 
 ```bash
-proxycli call get_storage --type all
-proxycli call get_storage --type cookies --filter "token"
+browsercli call get_storage --type all
+browsercli call get_storage --type cookies --filter "token"
 ```
 
 | 参数 | 类型 | 说明 |
@@ -118,15 +127,15 @@ Hook 不暂停页面执行，比断点更适合自动化工作流。优先用它
 
 ```bash
 # 1. 创建 hook 脚本（不注入）
-proxycli call create_hook --type cookie --action log --hook-id hook_cookie
-proxycli call create_hook --type fetch --action log --hook-id hook_fetch --capture '{"args":true,"returnValue":true,"stack":true}'
+browsercli call create_hook --type cookie --action log --hook-id hook_cookie
+browsercli call create_hook --type fetch --action log --hook-id hook_fetch --capture '{"args":true,"returnValue":true,"stack":true}'
 
 # 2. 注入页面（persistent=true 注册到当前 BrowserContext，跨导航保留）
-proxycli call inject_hook --hook-id hook_cookie --script "<hook script>" --persistent true
+browsercli call inject_hook --hook-id hook_cookie --script "<hook script>" --persistent true
 
 # 3. 触发目标业务动作后读取采样
-proxycli call get_hook_data --hook-id hook_cookie --view summary
-proxycli call get_hook_data --hook-id hook_cookie --view detail --max-records 20
+browsercli call get_hook_data --hook-id hook_cookie --view summary
+browsercli call get_hook_data --hook-id hook_cookie --view detail --max-records 20
 ```
 
 | 工具 | 关键参数 | 说明 |
@@ -140,8 +149,8 @@ proxycli call get_hook_data --hook-id hook_cookie --view detail --max-records 20
 ### 3.2 `hook_function` — 直接 Hook 单个函数
 
 ```bash
-proxycli call hook_function --target "XMLHttpRequest.prototype.open" --log-args true --log-stack true
-proxycli call hook_function --target "window.app.api.request"
+browsercli call hook_function --target "XMLHttpRequest.prototype.open" --log-args true --log-stack true
+browsercli call hook_function --target "window.app.api.request"
 ```
 
 | 参数 | 类型 | 说明 |
@@ -152,14 +161,14 @@ proxycli call hook_function --target "window.app.api.request"
 | `--log-stack` | boolean | 记录调用栈，默认 false |
 | `--hook-id` | string | 自定义标识，默认取 target |
 
-记录落到控制台，配合 `proxycli call list_console_messages` 查看。
+记录落到控制台，配合 `browsercli call list_console_messages` 查看。
 
 ### 3.3 `inject_preload_script` — 页面加载前注入
 
 ```bash
-proxycli call inject_preload_script --preset log-cookies
-proxycli call inject_preload_script --preset capture-all-fetch
-proxycli call inject_preload_script --script "<自定义脚本>"
+browsercli call inject_preload_script --preset log-cookies
+browsercli call inject_preload_script --preset capture-all-fetch
+browsercli call inject_preload_script --script "<自定义脚本>"
 ```
 
 | 参数 | 类型 | 说明 |
@@ -169,29 +178,32 @@ proxycli call inject_preload_script --script "<自定义脚本>"
 
 用于同步加载的 SDK 已持有原生引用、事后 Hook 太晚的场景；配合 `navigate_page --type reload` 重新初始化。
 
-### 3.4 `hook_jsvmp_interpreter` — JSVMP 站点专用
+### 3.4 JSVMP 站点专用探针（脚本化）
+
+`hook_jsvmp_interpreter` 工具已下线，改为生成探针脚本后注入：
 
 ```bash
-proxycli call hook_jsvmp_interpreter --mode transparent --script_url "app.js" --persistent true
-proxycli call hook_jsvmp_interpreter --mode proxy --track_props true --proxy_objects '["navigator","screen","performance"]'
+# transparent：只替换原型 getter，痕迹更小
+node skills/web-reverse-hook/scripts/build-hook.js jsvmp-transparent --script-url app.js --out jsvmp.js
+browsercli call evaluate_script --file jsvmp.js
+
+# proxy：覆盖调用 / Reflect / 全局属性，但可被检测
+node skills/web-reverse-hook/scripts/build-hook.js jsvmp-proxy --script-url app.js --track-props=false --out jsvmp.js
+browsercli call inject_hook --hookId jsvmp_probe:app.js --script "$(cat jsvmp.js)" --persistent true
+browsercli call navigate_page --type reload
 ```
 
-| 参数 | 类型 | 说明 |
-| --- | --- | --- |
-| `--script_url` | string | 用于调用栈过滤的目标脚本 URL 子串 |
-| `--mode` | enum `proxy`/`transparent` | proxy 覆盖全但可检测；transparent 仅观察原型 getter |
-| `--persistent` | boolean | 跨导航保留，默认 true |
-| `--track_calls` / `--track_props` / `--track_reflect` | boolean | proxy 模式下追踪开关 |
-| `--proxy_objects` | string[] | proxy 模式下要代理的 window 属性名 |
-| `--max_entries` | number | `window.__mcp_jsvmp_log` 最大记录数 |
+对应参数：`--script-url`（调用栈过滤）、`--max-entries`（`window.__mcp_jsvmp_log` 上限）、
+`--proxy-objects`（proxy 模式代理的 window 属性）、`--track-calls` / `--track-props` / `--track-reflect`（`=false` 关闭）。
+记录读法与检测面取舍见 `skills/web-reverse-hook/SKILL.md`。
 
 ## 4. 差异分析与补丁建议
 
 把本地运行时报错映射成缺失能力与下一步补丁：
 
 ```bash
-proxycli call diff_env_requirements --runtime-error "navigator is not defined" --observed-capabilities '["navigator","document","localStorage"]'
-proxycli call diagnose_environment
+browsercli call diff_env_requirements --runtime-error "navigator is not defined" --observed-capabilities '["navigator","document","localStorage"]'
+browsercli call diagnose_environment
 ```
 
 | 工具 | 参数 | 说明 |
@@ -204,8 +216,8 @@ proxycli call diagnose_environment
 把采集到的代码、环境补丁、入口文件打包为可独立运行的 Node 重建包：
 
 ```bash
-proxycli call export_rebuild_bundle --auto-generate true --task-id t1 --target-url "https://example.com" --goal "还原签名参数"
-proxycli call export_rebuild_bundle --task-id t1 --entry-code "<entry>" --env-code "<env>" --polyfills-code "<poly>" --capture '{"ua":"..."}'
+browsercli call export_rebuild_bundle --auto-generate true --task-id t1 --target-url "https://example.com" --goal "还原签名参数"
+browsercli call export_rebuild_bundle --task-id t1 --entry-code "<entry>" --env-code "<env>" --polyfills-code "<poly>" --capture '{"ua":"..."}'
 ```
 
 | 参数 | 类型 | 说明 |
@@ -227,11 +239,11 @@ proxycli call export_rebuild_bundle --task-id t1 --entry-code "<entry>" --env-co
 定位目标参数生成逻辑时用：
 
 ```bash
-proxycli call list_scripts
-proxycli call search_in_sources --query "webdriver" --file-path ./out
-proxycli call search_in_sources --query "getRandomValues" --is-regex true --max-results 50
-proxycli call get_script_source --script-id 42 --file-path ./out/target.js
-proxycli call get_script_source --script-id 42 --start-line 100 --end-line 200
+browsercli call list_scripts
+browsercli call search_in_sources --query "webdriver" --file-path ./out
+browsercli call search_in_sources --query "getRandomValues" --is-regex true --max-results 50
+browsercli call get_script_source --script-id 42 --file-path ./out/target.js
+browsercli call get_script_source --script-id 42 --start-line 100 --end-line 200
 ```
 
 | 工具 | 参数 | 说明 |
@@ -247,10 +259,10 @@ proxycli call get_script_source --script-id 42 --start-line 100 --end-line 200
 只有确认目标站点需要时才用，不要默认全开（代理本身可能成为检测信号）：
 
 ```bash
-proxycli call list_stealth_features
-proxycli call list_stealth_presets
-proxycli call inject_stealth --preset "<preset>"
-proxycli call set_user_agent --user-agent "<UA string>"
+browsercli call list_stealth_features
+browsercli call list_stealth_presets
+browsercli call inject_stealth --preset "<preset>"
+browsercli call set_user_agent --user-agent "<UA string>"
 ```
 
 | 工具 | 参数 | 说明 |
@@ -265,36 +277,38 @@ proxycli call set_user_agent --user-agent "<UA string>"
 补环境常需确认参数最终写到请求头/请求体还是 WebSocket：
 
 ```bash
-proxycli call list_network_requests
-proxycli call get_network_request --request-id "<id>"
-proxycli call list_websocket_connections
-proxycli call get_websocket_messages --connection-id "<id>"
+browsercli call list_network_requests
+browsercli call get_network_request --request-id "<id>"
+browsercli call list_websocket_connections
+browsercli call get_websocket_messages --connection-id "<id>"
 ```
 
 ## 9. 端到端最小流程
 
 ```bash
 # 0. 确认 worker 在线
-proxycli status
+browsercli status
 
 # 1. 打开目标站
-proxycli call navigate_page --url "https://example.com" --type url
+browsercli call navigate_page --url "https://example.com" --type url
 
-# 2. 采集真实环境基准
-proxycli call compare_env --properties '["navigator.userAgent","navigator.webdriver","document.all"]'
-proxycli call get_storage --type all
+# 2. 采集真实环境基准（compare-env.js 生成脚本，见 2.1）
+node skills/web-reverse-env/scripts/compare-env.js \
+  --properties navigator.userAgent,navigator.webdriver,document.all --out env.js
+browsercli call evaluate_script --file env.js
+browsercli call get_storage --type all
 
 # 3. Hook 定位参数生成入口
-proxycli call create_hook --type cookie --action log --hook-id hk_cookie
-proxycli call inject_hook --hook-id hk_cookie --script "<script>" --persistent true
-proxycli call navigate_page --type reload          # 让 hook 覆盖同步初始化
-proxycli call get_hook_data --hook-id hk_cookie --view detail
+browsercli call create_hook --type cookie --action log --hook-id hk_cookie
+browsercli call inject_hook --hook-id hk_cookie --script "<script>" --persistent true
+browsercli call navigate_page --type reload          # 让 hook 覆盖同步初始化
+browsercli call get_hook_data --hook-id hk_cookie --view detail
 
 # 4. 差异分析 → 补丁建议
-proxycli call diff_env_requirements --runtime-error "..." --observed-capabilities '["navigator","document"]'
+browsercli call diff_env_requirements --runtime-error "..." --observed-capabilities '["navigator","document"]'
 
 # 5. 导出重建 bundle
-proxycli call export_rebuild_bundle --auto-generate true --task-id t1 --target-url "https://example.com" --goal "还原签名"
+browsercli call export_rebuild_bundle --auto-generate true --task-id t1 --target-url "https://example.com" --goal "还原签名"
 ```
 
 补环境仍然遵循 `Observe-first` → `Hook-preferred` → `Breakpoint-last`：先用上面的采集/Hook 命令拿到真实证据，再决定补哪些模块；只有 Hook 不够时才下沉到断点（`set_breakpoint` 等 debugger 工具）。

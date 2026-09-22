@@ -105,7 +105,7 @@ Browser-CLI/
 │   ├── PageCollector.ts              # ★ 泛型页面数据收集器基类 (模板方法)
 │   │
 │   │
-│   ├── (CLI 客户端已抽离)            # `proxycli` → 独立包 `proxycli/`
+│   ├── (CLI 客户端已抽离)            # `browsercli` → 独立包 `browsercli/`
 │   │                              #   daemon socket 客户端，经本地命名管道调用 detached daemon；
 │   │                              #   本地 worker 进程管理(start/stop/status/repl)已删除
 │   │
@@ -155,11 +155,9 @@ Browser-CLI/
 │   │   ├── performance/            # 性能分析工具
 │   │   ├── websocket/ (network/)   # WebSocket 观察工具
 │   │   ├── storage/ (page/)        # 会话状态工具 (save_session_state...)
-│   │   ├── analyzer/               # 逆向证据与会话报告工具
 │   │   ├── collector/              # 代码采集工具 (collect_code)
 │   │   ├── rebuild/                # 本地复现工具 (export_rebuild_bundle, diff_env_requirements)
 │   │   ├── stealth/                # 隐身注入工具
-│   │   ├── pipeline/               # 工作流管道工具
 │   │   ├── wasm/                   # WASM 分析工具
 │   │   ├── frames/                 # Frame 管理工具
 │   │   ├── dialog/                 # 弹窗处理工具
@@ -202,9 +200,6 @@ Browser-CLI/
 │   │   │   └── WasmTypes.ts        #   类型定义
 │   │   └── stealth/                # 隐身模块
 │   │       └── StealthScripts2025.ts # 反检测脚本引擎
-│   │
-│   ├── reverse/                     # 逆向任务存储
-│   │   └── ReverseTaskStore.ts     # ★ 文件系统任务持久化
 │   │
 │   ├── utils/                       # 工具层
 │   │   ├── EventBus.ts             # ★ 事件总线 (Pub/Sub + Zod 校验)
@@ -284,7 +279,7 @@ Browser-CLI/
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│            CLI 层 (proxycli/ 独立包)                   │
+│            CLI 层 (browsercli/ 独立包)                   │
 │   daemon socket 客户端：yargs 解析 → daemonClient →      │
 │   本地命名管道 (NDJSON)，连不上自动 spawn detached daemon │
 │   (本地 worker 进程管理 start/stop/status/repl 已删除)    │
@@ -416,9 +411,9 @@ Browser-CLI/
 | 方面         | 分析                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **职责**     | CLI 与 detached daemon 之间的本地 socket 通信：会话注册表发现 + NDJSON 行协议请求/响应 + 事件推送                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| **实现逻辑** | win32 命名管道 / POSIX unix socket，地址 `proxycli-<workspaceHash16>-<session>`。`SocketConnection` 做 NDJSON 分帧与重组；`registry.ts` 按 workspace-hash 目录读写 `<session>.session`（含 pid/socketPath/consolePort/protocol）。`daemonServer.ts` 分发 `hello`/`tools.list`/`tool.invoke`/`browser.*`/`jobs.*`/`subscribe`/`stop`；客户端断线 ⇒ `AbortController` 中止该连接上的运行中 job。CLI 侧连不上就 spawn detached daemon，等 stdout 就绪行 `Daemon listening on <pipePath>` 完成握手。`PROTOCOL_VERSION = 1` 两侧各自定义（与 `proxycli/src/daemonClient.ts` 注释互指保持同步），不匹配时报错提示 `close` + 重新 `open` |
+| **实现逻辑** | win32 命名管道 / POSIX unix socket，地址 `browsercli-<workspaceHash16>-<session>`。`SocketConnection` 做 NDJSON 分帧与重组；`registry.ts` 按 workspace-hash 目录读写 `<session>.session`（含 pid/socketPath/consolePort/protocol）。`daemonServer.ts` 分发 `hello`/`tools.list`/`tool.invoke`/`browser.*`/`jobs.*`/`subscribe`/`stop`；客户端断线 ⇒ `AbortController` 中止该连接上的运行中 job。CLI 侧连不上就 spawn detached daemon，等 stdout 就绪行 `Daemon listening on <pipePath>` 完成握手。`PROTOCOL_VERSION = 1` 两侧各自定义（与 `browsercli/src/daemonClient.ts` 注释互指保持同步），不匹配时报错提示 `close` + 重新 `open` |
 | **关键文件** | `socketConnection.ts`（帧协议）、`registry.ts`（注册表）、`daemonArgs.ts`（参数解析）、`daemonServer.ts`（方法分发）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| **被调用方** | `worker/daemonMain.ts` 启动时创建 `startDaemonServer()`；`proxycli` 包经 `daemonClient.ts` 连接                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| **被调用方** | `worker/daemonMain.ts` 启动时创建 `startDaemonServer()`；`browsercli` 包经 `daemonClient.ts` 连接                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | **设计模式** | **行协议 RPC（请求-响应 + 无 id 推送共用一条连接）、注册表服务发现**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 
 #### 3.2.12 Worker 层 (src/worker/)
@@ -490,8 +485,8 @@ Browser-CLI/
 
 ```mermaid
 graph TB
-    subgraph CLI_SRC["CLI层 (proxycli/ 独立包)"]
-        BRC[proxycli 命令]
+    subgraph CLI_SRC["CLI层 (browsercli/ 独立包)"]
+        BRC[browsercli 命令]
         YARGS[yargs CLI解析]
         DC[daemonClient<br/>socket 客户端]
         CALL[call 命令 → tool.invoke]
@@ -522,7 +517,6 @@ graph TB
         HM[HookManager]
         DEO[Deobfuscator]
         WD[WasmDetector]
-        RT[ReverseTaskStore]
         EB[EventBus<br/>9 events]
         CACHE[UnifiedCacheManager<br/>500MB max]
     end
@@ -530,7 +524,6 @@ graph TB
     subgraph MODULES["核心模块 (src/modules/)"]
         CC[collector模块<br/>代码收集/缓存/压缩]
         HK[hook模块<br/>Hook注入/管理/存储]
-        AZ[analyzer模块<br/>证据/报告工具]
         DO[deobfuscator模块<br/>Packer→JSVMP→AST管线]
         WS[wasm模块<br/>WASM收集/分析/反编译]
     end
@@ -584,13 +577,13 @@ graph TB
     TG --> HOOK & DEBUG & NET & DOM & PERF & WASM & OTHER
     ADAPTER --> CONTEXTPROV
     CONTEXTPROV --> PM & DSM & DCM & SL
-    RUNTIME --- BM & COLL & HM & DEO & WD & RT & EB & CACHE
+    RUNTIME --- BM & COLL & HM & DEO & WD & EB & CACHE
     BM --- THIRDPARTY
     BM <---> CHROME
     CHROME --- WS2
     BM --- STUBS
     SL --> MODULES
-    MODULES --- CC & HK & AZ & DO & WS
+    MODULES --- CC & HK & DO & WS
     CONFIG --> BM
     CONFIG --> RUNTIME
     LIFECYCLE --> BM & SERVER
@@ -664,8 +657,7 @@ flowchart TB
     ENV --> VERIFY{运行 entry.js<br/>验证是否有分歧}
     VERIFY -->|有运行时错误| ENV
     VERIFY -->|env-pass 通过| PURE[6. 纯算法提纯<br/>deobfuscate_code + 人工/AI Agent 分析<br/>剥离风控逻辑]
-    PURE --> EVIDENCE[7. 证据沉淀<br/>record_reverse_evidence<br/>写入 task artifact]
-    EVIDENCE --> DONE([完成])
+    PURE --> DONE([完成])
 ```
 
 ---
@@ -769,10 +761,10 @@ npm run start -- --browserUrl http://127.0.0.1:9222
 
 # 4. 查看 CLI 交互 (新终端)
 # 查看可用命令
-node proxycli/build/bin/proxycli.js --help
+node browsercli/build/bin/browsercli.js --help
 
 # 查看所有可用工具（会话未运行时自动拉起 daemon）
-node proxycli/build/bin/proxycli.js list-tools
+node browsercli/build/bin/browsercli.js list-tools
 ```
 
 ### 7.3 最小改动示例 (Hello World)
@@ -824,11 +816,11 @@ export const getPageTitle = defineTool({
 npm run build
 
 # 验证工具已注册
-node proxycli/build/bin/proxycli.js call get_page_title --help
+node browsercli/build/bin/browsercli.js call get_page_title --help
 
 # 启动 Worker 并调用
 npm run start  # 后台运行
-node proxycli/build/bin/proxycli.js call get_page_title
+node browsercli/build/bin/browsercli.js call get_page_title
 ```
 
 ### 7.4 常见开发任务

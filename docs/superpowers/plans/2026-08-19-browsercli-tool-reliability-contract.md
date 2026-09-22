@@ -6,9 +6,9 @@
 
 **Architecture:** 继续以 `defineTool` 和生成的 `ToolMeta` 为唯一工具契约，不建立第二套注册中心。基础状态判断集中在 `ToolPrerequisiteChecker` 和 `ToolExecutionPipeline`，工具 handler 只负责业务；所有失败通过 `ToolError` 传播到 `JobStore.fail`，AI 增强失败时返回带执行元数据的本地分析结果。
 
-**Tech Stack:** TypeScript 5.9 ESM、Node.js `^20.19.0 || ^22.12.0 || >=23`、Zod、Patchright/CDP、Node `node:test`、SWC、独立 `proxycli/` TypeScript 包。
+**Tech Stack:** TypeScript 5.9 ESM、Node.js `^20.19.0 || ^22.12.0 || >=23`、Zod、Patchright/CDP、Node `node:test`、SWC、独立 `browsercli/` TypeScript 包。
 
-**Spec:** `docs/superpowers/specs/2026-08-19-proxycli-tool-reliability-contract-design.md`
+**Spec:** `docs/superpowers/specs/2026-08-19-browsercli-tool-reliability-contract-design.md`
 
 ## Global Constraints
 
@@ -32,18 +32,18 @@
 | `src/tools/manifest.ts`                              | 将声明式要求挂接到每个注册条目                          |
 | `src/tools/registry/ToolRegistry.ts`                 | 把 manifest 条目要求传给 `ToolMeta`                     |
 | `src/tools/tools-meta.ts`                            | 生成 Worker/CLI 共享的工具契约                          |
-| `proxycli/src/tool-meta-types.ts`                  | Worker 契约的远程只读镜像                               |
+| `browsercli/src/tool-meta-types.ts`                  | Worker 契约的远程只读镜像                               |
 | `src/tools/prerequisites/ToolPrerequisiteChecker.ts` | 唯一运行环境门禁                                        |
 | `src/worker/ToolExecutionPipeline.ts`                | 固定验证顺序、错误记录与 handler 调度                   |
 | `src/tools/tool-arg-validator.ts`                    | 严格规范参数验证，不执行别名转换                        |
-| `proxycli/src/commands/shared/tool-args.ts`        | 严格 CLI 值解析与 JSON 输入                             |
+| `browsercli/src/commands/shared/tool-args.ts`        | 严格 CLI 值解析与 JSON 输入                             |
 | `src/services/AIService.ts`                          | 有界 AI 请求、取消、错误分类                            |
 | `src/tools/analyzer/`                                | 本地结果与可选 AI 增强的统一响应                        |
 | `src/web/routes/apiV1.ts` / `src/worker/JobStore.ts` | Job 终态和结构化错误传输                                |
 | `scripts/verify-skills-schema.ts`                    | 文档示例与 Schema 的自动一致性门禁                      |
 | `tests/unit/`                                        | 全工具离线契约和组件行为                                |
 | `tests/integration/`                                 | 按领域运行的确定性集成验证                              |
-| `tests/fixtures/proxycli-reliability/`             | 高风险真实浏览器测试页、脚本、Wasm 和 WebSocket fixture |
+| `tests/fixtures/browsercli-reliability/`             | 高风险真实浏览器测试页、脚本、Wasm 和 WebSocket fixture |
 
 ## Dependency Waves
 
@@ -61,9 +61,9 @@ Wave 4: Task 8 Three-layer verification and final closure
 **Files:**
 
 - Modify: `src/utils/errors.ts`
-- Modify: `proxycli/src/WorkerHttpClient.ts`
+- Modify: `browsercli/src/WorkerHttpClient.ts`
 - Test: `tests/unit/utils/errors.test.ts`
-- Test: `proxycli/tests/unit/WorkerHttpClient.test.ts`
+- Test: `browsercli/tests/unit/WorkerHttpClient.test.ts`
 
 **Interfaces:**
 
@@ -75,7 +75,7 @@ Wave 4: Task 8 Three-layer verification and final closure
 Run:
 
 ```bash
-git diff -- src/utils/errors.ts proxycli/src/WorkerHttpClient.ts
+git diff -- src/utils/errors.ts browsercli/src/WorkerHttpClient.ts
 ```
 
 Then run the repository impact query for `ErrorCodes`, `ToolError`, `createToolError`, and `formatError`. Record callers that construct `ToolError` positionally; the implementation must retain the existing first three constructor arguments.
@@ -93,7 +93,7 @@ const error = createToolError(
     retryable: true,
     recovery: {
       tool: 'resume',
-      command: 'proxycli call resume',
+      command: 'browsercli call resume',
       reason: 'Resume execution or evaluate the current call frame.',
     },
   },
@@ -109,7 +109,7 @@ assert.deepEqual(formatError(error), {
   retryable: true,
   recovery: {
     tool: 'resume',
-    command: 'proxycli call resume',
+    command: 'browsercli call resume',
     reason: 'Resume execution or evaluate the current call frame.',
   },
 });
@@ -157,7 +157,7 @@ to `retryable`; do not store two independent booleans.
 
 - [ ] **Step 5: 扩展 HTTP Job 错误镜像**
 
-In `proxycli/src/WorkerHttpClient.ts`, change `JobStatus.error` to:
+In `browsercli/src/WorkerHttpClient.ts`, change `JobStatus.error` to:
 
 ```typescript
 error?: {
@@ -169,7 +169,7 @@ error?: {
 };
 ```
 
-Import or duplicate only the transport shape in `proxycli/`; do not import Worker source into the standalone CLI package.
+Import or duplicate only the transport shape in `browsercli/`; do not import Worker source into the standalone CLI package.
 
 - [ ] **Step 6: 验证 Task 1**
 
@@ -178,7 +178,7 @@ Run:
 ```bash
 npm run build:compile
 node --require ./build/tests/setup.js --test build/tests/unit/utils/errors.test.js
-npm --prefix proxycli test
+npm --prefix browsercli test
 ```
 
 Expected: all commands exit 0.
@@ -193,12 +193,12 @@ Expected: all commands exit 0.
 - Modify: `src/tools/manifest.ts`
 - Modify: `src/tools/registry/ToolRegistry.ts`
 - Modify: `src/tools/tools-meta.ts`
-- Modify: `proxycli/src/tool-meta-types.ts`
+- Modify: `browsercli/src/tool-meta-types.ts`
 - Modify: selected `src/tools/*/manifest.ts`
 - Test: `tests/unit/tools/ToolDefinition.extended.test.ts`
 - Test: `tests/unit/tools/ToolRegistry.test.ts`
 - Test: `tests/unit/tools/profile-coverage.test.ts`
-- Test: `proxycli/tests/unit/help.test.ts`
+- Test: `browsercli/tests/unit/help.test.ts`
 
 **Interfaces:**
 
@@ -282,7 +282,7 @@ Run:
 ```bash
 npm run build
 npm run test:registry
-npm --prefix proxycli test
+npm --prefix browsercli test
 ```
 
 Expected: metadata tests pass and CLI help can render tools with or without requirements.
@@ -397,10 +397,10 @@ and no test observes eager debugger activation.
 
 - Modify: `src/tools/tool-arg-validator.ts`
 - Modify: `src/tools/tool-aliases.ts`
-- Modify: `proxycli/src/commands/shared/tool-args.ts`
+- Modify: `browsercli/src/commands/shared/tool-args.ts`
 - Test: `tests/unit/tools/tool-arg-validator.test.ts`
-- Test: `proxycli/tests/unit/tool-dispatcher.test.ts`
-- Test: `proxycli/tests/unit/args-parser.test.ts`
+- Test: `browsercli/tests/unit/tool-dispatcher.test.ts`
+- Test: `browsercli/tests/unit/args-parser.test.ts`
 
 **Interfaces:**
 
@@ -419,7 +419,7 @@ Add cases proving:
 
 - [ ] **Step 2: 写 CLI 复杂参数测试**
 
-In `proxycli/tests/unit/tool-dispatcher.test.ts`, assert:
+In `browsercli/tests/unit/tool-dispatcher.test.ts`, assert:
 
 ```typescript
 buildToolArgs(parseArgs(['--events', '["click","submit"]']), {
@@ -438,7 +438,7 @@ Run:
 ```bash
 npm run build:compile
 node --require ./build/tests/setup.js --test build/tests/unit/tools/tool-arg-validator.test.js
-npm --prefix proxycli test
+npm --prefix browsercli test
 ```
 
 - [ ] **Step 4: 移除参数别名归一化**
@@ -462,7 +462,7 @@ Run:
 ```bash
 npm run build
 node --require ./build/tests/setup.js --test build/tests/unit/tools/tool-arg-validator.test.js
-npm --prefix proxycli test
+npm --prefix browsercli test
 ```
 
 ---
@@ -587,13 +587,13 @@ Expected: no external network, no unbounded timer, and all local fallback assert
 - Modify: `src/worker/ToolResponse.ts`
 - Modify: `src/worker/JobStore.ts`
 - Modify: `src/web/routes/apiV1.ts`
-- Modify: `proxycli/src/WorkerHttpClient.ts`
+- Modify: `browsercli/src/WorkerHttpClient.ts`
 - Modify: error branches under `src/tools/`
 - Create: `tests/unit/tools/tool-failure-contract.test.ts`
 - Test: `tests/unit/web/JobStore.test.ts`
 - Test: `tests/unit/web/routes/apiV1.test.ts`
 - Test: `tests/unit/worker/ToolResponseProcessor.test.ts`
-- Test: `proxycli/tests/unit/jobs.test.ts`
+- Test: `browsercli/tests/unit/jobs.test.ts`
 
 **Interfaces:**
 
@@ -643,7 +643,7 @@ Run:
 ```bash
 npm run build:compile
 node --require ./build/tests/setup.js --test build/tests/unit/tools/tool-failure-contract.test.js build/tests/unit/web/JobStore.test.js build/tests/unit/web/routes/apiV1.test.js
-npm --prefix proxycli test
+npm --prefix browsercli test
 ```
 
 - [ ] **Step 5: 迁移基础和页面交互领域**
@@ -682,7 +682,7 @@ Run:
 ```bash
 npm run build
 node --require ./build/tests/setup.js --test build/tests/unit/tools/tool-failure-contract.test.js build/tests/unit/web/JobStore.test.js build/tests/unit/web/routes/apiV1.test.js build/tests/unit/worker/ToolResponseProcessor.test.js
-npm --prefix proxycli test
+npm --prefix browsercli test
 ```
 
 Expected: the prohibited failure-response allowlist is empty and all failures produce terminal Job `failed`.
@@ -695,9 +695,9 @@ Expected: the prohibited failure-response allowlist is empty and all failures pr
 
 - Modify: `scripts/verify-skills-schema.ts`
 - Modify: `skills/**/*.md` only where verifier reports drift
-- Modify: `C:\Users\Administrator\.claude\skills\proxycli\SKILL.md` only if user explicitly authorizes editing the external installed skill
+- Modify: `C:\Users\Administrator\.claude\skills\browsercli\SKILL.md` only if user explicitly authorizes editing the external installed skill
 - Test: `tests/unit/scripts/verify-skills-schema.test.ts`
-- Test: `proxycli/tests/unit/help.test.ts`
+- Test: `browsercli/tests/unit/help.test.ts`
 
 **Interfaces:**
 
@@ -755,7 +755,7 @@ Run:
 npm run build
 npm run verify-skills
 node --require ./build/tests/setup.js --test build/tests/unit/scripts/verify-skills-schema.test.js
-npm --prefix proxycli test
+npm --prefix browsercli test
 ```
 
 Expected: all commands exit 0 and no normalized/alias argument is accepted.
@@ -768,11 +768,11 @@ Expected: all commands exit 0 and no normalized/alias argument is accepted.
 
 - Create: `tests/unit/tools/all-tools-contract.test.ts`
 - Create: `tests/integration/tool-categories.integration.test.ts`
-- Create: `tests/integration/proxycli-reliability.integration.test.ts`
-- Create: `tests/fixtures/proxycli-reliability/index.html`
-- Create: `tests/fixtures/proxycli-reliability/app.js`
-- Create: `tests/fixtures/proxycli-reliability/echo-server.mjs`
-- Create: `tests/fixtures/proxycli-reliability/add.wasm`
+- Create: `tests/integration/browsercli-reliability.integration.test.ts`
+- Create: `tests/fixtures/browsercli-reliability/index.html`
+- Create: `tests/fixtures/browsercli-reliability/app.js`
+- Create: `tests/fixtures/browsercli-reliability/echo-server.mjs`
+- Create: `tests/fixtures/browsercli-reliability/add.wasm`
 - Modify: `package.json`
 - Modify: manifests under `src/tools/*/manifest.ts` until requirement coverage is complete
 
@@ -826,7 +826,7 @@ subtest or intentionally marked offline-only with a reason in the test source.
 
 - [ ] **Step 5: 写 Layer 3 高风险真实浏览器流程**
 
-In `proxycli-reliability.integration.test.ts`:
+In `browsercli-reliability.integration.test.ts`:
 
 1. connect to or launch the test browser using existing integration harness patterns;
 2. open the local fixture;
@@ -850,7 +850,7 @@ Add scripts without changing existing meanings:
 ```json
 {
   "test:contracts": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/unit/tools/all-tools-contract.test.js build/tests/unit/tools/tool-failure-contract.test.js",
-  "test:reliability:integration": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/integration/tool-categories.integration.test.js build/tests/integration/proxycli-reliability.integration.test.js"
+  "test:reliability:integration": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/integration/tool-categories.integration.test.js build/tests/integration/browsercli-reliability.integration.test.js"
 }
 ```
 
@@ -861,7 +861,7 @@ Run in this order after the final code change:
 ```bash
 npm run test:contracts
 npm run test:reliability:integration
-npm --prefix proxycli test
+npm --prefix browsercli test
 npm run typecheck
 npm run test:unit
 npm run verify-skills
@@ -880,7 +880,7 @@ Run:
 git status --short
 git diff --check
 git diff --stat
-git diff -- docs/superpowers/specs/2026-08-19-proxycli-tool-reliability-contract-design.md docs/superpowers/plans/2026-08-19-proxycli-tool-reliability-contract.md src proxycli tests scripts package.json
+git diff -- docs/superpowers/specs/2026-08-19-browsercli-tool-reliability-contract-design.md docs/superpowers/plans/2026-08-19-browsercli-tool-reliability-contract.md src browsercli tests scripts package.json
 ```
 
 Confirm every changed line traces to the spec and that no generated `build/`, real

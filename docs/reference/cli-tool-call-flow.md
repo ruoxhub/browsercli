@@ -384,7 +384,7 @@ js-reverse call list-network-requests --preserve true
 js-reverse call get_network_request --id 3
 
 # boolean 类型自动转换
-js-reverse call click_element --selector "#btn" --doubleClick true
+js-reverse call click --selector "#btn" --dblClick true
 
 # 逗号分隔自动拆分为数组
 js-reverse call some_tool --items "a,b,c"

@@ -152,18 +152,6 @@ export async function runDaemon(plan: DaemonPlan): Promise<DaemonRunResult> {
   runtime.contextProvider = contextProvider;
   await contextProvider.init();
 
-  // Local Apps 残留自检（spec §6.1）：上次崩溃未还原的系统代理在此清理。
-  try {
-    const cleaned = await runtime.mitmModule
-      .getSystemProxyManager()
-      .checkResidual();
-    if (cleaned) {
-      console.warn('[Daemon] 检测到上次会话残留的系统代理配置，已自动还原');
-    }
-  } catch {
-    // 非 Windows 平台直接跳过
-  }
-
   const toolAdapter = new ToolAdapter(contextProvider);
   await ensureToolsMeta().catch(err =>
     console.warn('[Daemon] ensureToolsMeta 失败:', err),
@@ -285,7 +273,7 @@ export async function runDaemon(plan: DaemonPlan): Promise<DaemonRunResult> {
     void connectBrowser(contextProvider, getBrowserManagerConfig()).catch(
       err => {
         console.warn(
-          '[Daemon] 启动自动连接浏览器失败，可稍后通过 proxycli browser connect 重连:',
+          '[Daemon] 启动自动连接浏览器失败，可稍后通过 browsercli browser connect 重连:',
           err instanceof Error ? err.message : err,
         );
       },

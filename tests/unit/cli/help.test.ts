@@ -15,7 +15,7 @@ describe('help', () => {
   describe('generateTopLevelHelp', () => {
     it('returns default help with no options', () => {
       const result = generateTopLevelHelp();
-      assert.ok(result.includes('proxycli v1.0.0'));
+      assert.ok(result.includes('browsercli v1.0.0'));
       assert.ok(result.includes('逆向工程CLI服务'));
       assert.ok(result.includes('call'));
       assert.ok(result.includes('list-tools'));
@@ -50,7 +50,7 @@ describe('help', () => {
     it('includes all required fields in output', () => {
       const result = generateTopLevelHelp();
       assert.ok(result.includes('Commands:'));
-      assert.ok(result.includes('Run proxycli <command> --help'));
+      assert.ok(result.includes('Run browsercli <command> --help'));
     });
   });
 
@@ -87,7 +87,7 @@ describe('help', () => {
     it('returns dedicated help for browser connect subcommand', () => {
       const result = generateCommandHelp('browser', 'connect');
       assert.ok(result);
-      assert.ok(result.includes('Usage: proxycli browser connect'));
+      assert.ok(result.includes('Usage: browsercli browser connect'));
       assert.ok(!result.includes('browser disconnect'));
       assert.ok(result.includes('--browser-url <url>'));
       assert.ok(result.includes('--ws-endpoint <url>'));
@@ -110,14 +110,14 @@ describe('help', () => {
       assert.ok(disconnect);
       assert.ok(
         disconnect.includes(
-          'Usage: proxycli browser disconnect [--force] [--json]',
+          'Usage: browsercli browser disconnect [--force] [--json]',
         ),
       );
       assert.ok(disconnect.includes('--force'));
 
       const status = generateCommandHelp('browser', ['status']);
       assert.ok(status);
-      assert.ok(status.includes('Usage: proxycli browser status [--json]'));
+      assert.ok(status.includes('Usage: browsercli browser status [--json]'));
       assert.ok(status.includes('--json'));
     });
 
@@ -173,7 +173,6 @@ describe('help', () => {
         'config',
         'scaffold',
         'status',
-        'proxy',
         'web',
       ];
       for (const cmd of commands) {

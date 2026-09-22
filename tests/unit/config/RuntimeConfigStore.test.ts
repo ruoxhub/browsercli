@@ -28,7 +28,7 @@ describe('RuntimeConfigStore', () => {
   });
 
   it('seeds from loadUserConfig on first access', () => {
-    const tmpDir = mkdtempSync(path.join(os.tmpdir(), 'proxycli-store-test-'));
+    const tmpDir = mkdtempSync(path.join(os.tmpdir(), 'browsercli-store-test-'));
     process.env.PROXYCLI_CONFIG_DIR = tmpDir;
     try {
       writeFileSync(

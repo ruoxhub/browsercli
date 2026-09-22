@@ -184,7 +184,7 @@ describe('verify-skills-schema', () => {
 
   describe('extractCallsFromMarkdown', () => {
     it('extracts single-line executable call with arguments', () => {
-      const md = 'Run `proxycli call click --selector "#btn"` to click.';
+      const md = 'Run `browsercli call click --selector "#btn"` to click.';
       const calls = extractCallsFromMarkdown('test.md', md);
       assert.strictEqual(calls.length, 1);
       assert.strictEqual(calls[0]!.toolName, 'click');
@@ -196,7 +196,7 @@ describe('verify-skills-schema', () => {
 
     it('extracts multiline call with line continuation backslashes', () => {
       const md = `\`\`\`bash
-proxycli call create_hook --type fetch \\
+browsercli call create_hook --type fetch \\
   --action log \\
   --hookId fetch_hook
 \`\`\``;
@@ -212,7 +212,7 @@ proxycli call create_hook --type fetch \\
 
     it('detects bracketed synopsis signatures', () => {
       const md =
-        'proxycli call navigate_page [--type <str>] [--url <str>] [--ignoreCache <bool>]';
+        'browsercli call navigate_page [--type <str>] [--url <str>] [--ignoreCache <bool>]';
       const calls = extractCallsFromMarkdown('test.md', md);
       assert.strictEqual(calls.length, 1);
       assert.strictEqual(calls[0]!.toolName, 'navigate_page');
@@ -222,7 +222,7 @@ proxycli call create_hook --type fetch \\
     });
 
     it('strips shell comments from arguments', () => {
-      const md = 'proxycli call list_pages # list all pages';
+      const md = 'browsercli call list_pages # list all pages';
       const calls = extractCallsFromMarkdown('test.md', md);
       assert.strictEqual(calls.length, 1);
       assert.strictEqual(calls[0]!.toolName, 'list_pages');
@@ -231,7 +231,7 @@ proxycli call create_hook --type fetch \\
 
     it('parses --data JSON payload', () => {
       const md =
-        'proxycli call click --data \'{"selector":"#submit","timeoutMs":3000}\'';
+        'browsercli call click --data \'{"selector":"#submit","timeoutMs":3000}\'';
       const calls = extractCallsFromMarkdown('test.md', md);
       assert.strictEqual(calls.length, 1);
       assert.ok(calls[0]!.dataPayload);
@@ -242,7 +242,7 @@ proxycli call create_hook --type fetch \\
     });
 
     it('records dataPayloadError on invalid JSON in --data', () => {
-      const md = 'proxycli call click --data \'{"selector": invalid}\'';
+      const md = 'browsercli call click --data \'{"selector": invalid}\'';
       const calls = extractCallsFromMarkdown('test.md', md);
       assert.strictEqual(calls.length, 1);
       assert.ok(calls[0]!.dataPayloadError);
@@ -251,7 +251,7 @@ proxycli call create_hook --type fetch \\
 
   describe('validateCall & validateMarkdownContent', () => {
     it('strictly rejects unknown tool', () => {
-      const md = 'proxycli call nonexistent_tool --foo bar';
+      const md = 'browsercli call nonexistent_tool --foo bar';
       const errors = validateMarkdownContent('test.md', md, toolDefs);
       assert.strictEqual(errors.length, 1);
       assert.strictEqual(errors[0]!.type, 'unknown_tool');
@@ -260,13 +260,13 @@ proxycli call create_hook --type fetch \\
 
     it('ignores generic placeholder template <tool-name>', () => {
       const md =
-        'proxycli call <tool-name> [--param value] [--data \'{"k":"v"}\']';
+        'browsercli call <tool-name> [--param value] [--data \'{"k":"v"}\']';
       const errors = validateMarkdownContent('test.md', md, toolDefs);
       assert.strictEqual(errors.length, 0);
     });
 
     it('strictly rejects unknown parameters', () => {
-      const md = 'proxycli call click --selector "#btn" --invalidParam 123';
+      const md = 'browsercli call click --selector "#btn" --invalidParam 123';
       const errors = validateMarkdownContent('test.md', md, toolDefs);
       assert.strictEqual(errors.length, 1);
       assert.strictEqual(errors[0]!.type, 'unknown_param');
@@ -274,7 +274,7 @@ proxycli call create_hook --type fetch \\
     });
 
     it('disallows kebab-case and alias argument names', () => {
-      const md = 'proxycli call click --selector "#btn" --timeout-ms 5000';
+      const md = 'browsercli call click --selector "#btn" --timeout-ms 5000';
       const errors = validateMarkdownContent('test.md', md, toolDefs);
       assert.strictEqual(errors.length, 1);
       assert.strictEqual(errors[0]!.type, 'unknown_param');
@@ -282,7 +282,7 @@ proxycli call create_hook --type fetch \\
     });
 
     it('strictly rejects missing required parameters on executable examples', () => {
-      const md = 'proxycli call click --timeoutMs 5000';
+      const md = 'browsercli call click --timeoutMs 5000';
       const errors = validateMarkdownContent('test.md', md, toolDefs);
       assert.strictEqual(errors.length, 1);
       assert.strictEqual(errors[0]!.type, 'missing_required_param');
@@ -291,14 +291,14 @@ proxycli call create_hook --type fetch \\
 
     it('does not require all mandatory arguments on bracketed synopsis', () => {
       const md =
-        'proxycli call click [--selector <str>] [--dblClick <bool>] [--timeoutMs <num>]';
+        'browsercli call click [--selector <str>] [--dblClick <bool>] [--timeoutMs <num>]';
       const errors = validateMarkdownContent('test.md', md, toolDefs);
       assert.strictEqual(errors.length, 0);
     });
 
     it('strictly rejects invalid enum values', () => {
       const md =
-        'proxycli call create_hook --type cookie --action invalidAction';
+        'browsercli call create_hook --type cookie --action invalidAction';
       const errors = validateMarkdownContent('test.md', md, toolDefs);
       assert.strictEqual(errors.length, 1);
       assert.strictEqual(errors[0]!.type, 'invalid_enum');
@@ -306,14 +306,14 @@ proxycli call create_hook --type fetch \\
     });
 
     it('accepts valid enum values', () => {
-      const md = 'proxycli call create_hook --type cookie --action log';
+      const md = 'browsercli call create_hook --type cookie --action log';
       const errors = validateMarkdownContent('test.md', md, toolDefs);
       assert.strictEqual(errors.length, 0);
     });
 
     it('strictly rejects malformed JSON in arguments', () => {
       const md =
-        'proxycli call create_hook --type cookie --capture \'{"args": true, broken}\'';
+        'browsercli call create_hook --type cookie --capture \'{"args": true, broken}\'';
       const errors = validateMarkdownContent('test.md', md, toolDefs);
       assert.strictEqual(errors.length, 1);
       assert.strictEqual(errors[0]!.type, 'malformed_json');
@@ -321,28 +321,28 @@ proxycli call create_hook --type fetch \\
     });
 
     it('strictly rejects malformed JSON in --data', () => {
-      const md = 'proxycli call click --data \'{"selector": broken\'';
+      const md = 'browsercli call click --data \'{"selector": broken\'';
       const errors = validateMarkdownContent('test.md', md, toolDefs);
       assert.ok(errors.some(e => e.type === 'malformed_json'));
     });
 
     it('accepts valid global CLI flags (--data, --file, --stdin, --session, --json, --help)', () => {
       const md =
-        'proxycli call click --selector "#btn" --session s123 --json --file config.json';
+        'browsercli call click --selector "#btn" --session s123 --json --file config.json';
       const errors = validateMarkdownContent('test.md', md, toolDefs);
       assert.strictEqual(errors.length, 0);
     });
 
     it('satisfies required arguments via --data object', () => {
       const md =
-        'proxycli call click --data \'{"selector":"#btn"}\' --session s123';
+        'browsercli call click --data \'{"selector":"#btn"}\' --session s123';
       const errors = validateMarkdownContent('test.md', md, toolDefs);
       assert.strictEqual(errors.length, 0);
     });
 
     it('validates enum values inside --data object', () => {
       const md =
-        'proxycli call create_hook --data \'{"type":"cookie","action":"badAction"}\'';
+        'browsercli call create_hook --data \'{"type":"cookie","action":"badAction"}\'';
       const errors = validateMarkdownContent('test.md', md, toolDefs);
       assert.strictEqual(errors.length, 1);
       assert.strictEqual(errors[0]!.type, 'invalid_enum');

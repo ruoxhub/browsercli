@@ -92,7 +92,7 @@ export const scaffoldCommand: AxiCliCommand<WorkerContext> = async (
 
   if (!name) {
     throw new AxiError('缺少 --name 参数', 'VALIDATION_ERROR', [
-      '用法：proxycli scaffold --name <task-name> [--desc <desc>] [--url <url>]',
+      '用法：browsercli scaffold --name <task-name> [--desc <desc>] [--url <url>]',
     ]);
   }
 
@@ -177,7 +177,7 @@ ${desc}
 ## 使用说明
 
 \`\`\`bash
-proxycli call <tool-or-skill-name> --url ${url || 'https://example.com'}
+browsercli call <tool-or-skill-name> --url ${url || 'https://example.com'}
 \`\`\`
 `;
 

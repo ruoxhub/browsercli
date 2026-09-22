@@ -667,7 +667,7 @@ Context 原生 init script 已覆盖所需的未来文档生命周期，保留 H
 
 `Target not found` 这类瞬时错误必须保持可恢复语义，不能仅因使用 `NOT_FOUND` code 而被默认标成不可恢复。
 
-恢复提示必须对 HTTP/proxycli 调用方可见：除写入 `ToolError.context.recoveryHint` 外，
+恢复提示必须对 HTTP/browsercli 调用方可见：除写入 `ToolError.context.recoveryHint` 外，
 映射后的稳定 `Error.message` 必须包含短提示。本阶段不扩展传输 DTO，避免提示只留在 worker
 内部 context。
 

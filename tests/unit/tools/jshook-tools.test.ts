@@ -7,7 +7,6 @@ import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {zod} from '../../../src/third_party/index.js';
-import {export_session_report} from '../../../src/tools/analyzer/reports.js';
 import {
   collectCode,
   collectionDiff,
@@ -20,7 +19,6 @@ import {
   removeHook,
 } from '../../../src/tools/hook/index.js';
 import {
-  clickElement,
   checkBrowserHealth,
   deleteSessionState,
   dumpSessionState,
@@ -56,17 +54,6 @@ describe('jshook tools schema', () => {
     assert.strictEqual(result.includeUnchanged, true);
   });
 
-  it('validates export_session_report schema', () => {
-    const reportSchema = zod.object(export_session_report.schema);
-
-    const report = reportSchema.parse({
-      format: 'markdown',
-      includeHookData: true,
-    });
-
-    assert.strictEqual(report.format, 'markdown');
-  });
-
   it('validates hook and stealth schemas', () => {
     const hookSchema = zod.object(createHook.schema);
     const hookDataSchema = zod.object(getHookData.schema);
@@ -93,7 +80,6 @@ describe('jshook tools schema', () => {
 
   it('validates dom and page schemas', () => {
     const domSchema = zod.object(queryDom.schema);
-    const pageSchema = zod.object(clickElement.schema);
     const healthSchema = zod.object(checkBrowserHealth.schema);
     const saveSessionSchema = zod.object(saveSessionState.schema);
     const restoreSessionSchema = zod.object(restoreSessionState.schema);
@@ -103,7 +89,6 @@ describe('jshook tools schema', () => {
     const loadSessionSchema = zod.object(loadSessionState.schema);
 
     const dom = domSchema.parse({selector: 'button'});
-    const page = pageSchema.parse({selector: '#x'});
     const health = healthSchema.parse({});
     const saveSession = saveSessionSchema.parse({
       sessionId: 's1',
@@ -122,7 +107,6 @@ describe('jshook tools schema', () => {
     });
 
     assert.strictEqual(dom.selector, 'button');
-    assert.strictEqual(page.selector, '#x');
     assert.deepStrictEqual(health, {});
     assert.strictEqual(saveSession.sessionId, 's1');
     assert.strictEqual(restoreSession.clearStorageBeforeRestore, true);

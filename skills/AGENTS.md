@@ -19,7 +19,7 @@ This AGENTS.md scopes guidance to `skills`. Parent AGENTS guidance still applies
 - `code-analysis/`
 - `hello_js_reverse_skill/`
 - `protocol-reverse/`
-- `proxycli/`
+- `browsercli/`
 - `reverse-knowledge/`
 - `sourcemap-reverse/`
 - `target-analysis/`

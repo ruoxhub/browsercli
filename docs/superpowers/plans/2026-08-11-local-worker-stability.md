@@ -2,9 +2,9 @@
 
 > **For agentic workers:** Execute inline in the current `refactor` workspace. Do not dispatch subagents, create commits, or modify unrelated user changes.
 
-**Goal:** Bound local Worker state, reject overlapping HTTP tool jobs, and make `proxycli --watch` follow the existing WebSocket protocol without leaking CLI-only flags.
+**Goal:** Bound local Worker state, reject overlapping HTTP tool jobs, and make `browsercli --watch` follow the existing WebSocket protocol without leaking CLI-only flags.
 
-**Architecture:** Keep `proxycli/` independent and preserve the `/api/v1` boundary. Add small in-memory limits where state already lives, allow one API v1 job at a time with an explicit `WORKER_BUSY` response instead of a pending queue, and reuse the current `WsHub` subscribe protocol instead of introducing a new stream endpoint or dependency.
+**Architecture:** Keep `browsercli/` independent and preserve the `/api/v1` boundary. Add small in-memory limits where state already lives, allow one API v1 job at a time with an explicit `WORKER_BUSY` response instead of a pending queue, and reuse the current `WsHub` subscribe protocol instead of introducing a new stream endpoint or dependency.
 
 **Tech Stack:** TypeScript ESM, Node.js `node:test`, native `fetch`/`AbortSignal`, `ws`.
 
@@ -12,7 +12,7 @@
 
 - Local, single-user deployment; no cloud-grade WebSocket authentication work in this change.
 - Preserve the current BrowserManager and Runtime sharing model.
-- Do not merge `proxycli/` into `src/`.
+- Do not merge `browsercli/` into `src/`.
 - No new dependency or speculative abstraction.
 - Preserve the existing `CLAUDE.md` modification.
 
@@ -130,15 +130,15 @@ node --require ./build/tests/setup.js --test build/tests/unit/web/JobStore.test.
 
 ---
 
-### Task 2: Repair proxycli Request and Watch Contracts
+### Task 2: Repair browsercli Request and Watch Contracts
 
 **Files:**
 
-- Modify: `proxycli/src/WorkerHttpClient.ts`
-- Modify: `proxycli/src/commands/shared/tool-args.ts`
-- Modify: `proxycli/src/commands/tool-dispatcher.ts`
-- Modify: `proxycli/tests/unit/WorkerHttpClient.test.ts`
-- Modify: `proxycli/tests/unit/tool-dispatcher.test.ts`
+- Modify: `browsercli/src/WorkerHttpClient.ts`
+- Modify: `browsercli/src/commands/shared/tool-args.ts`
+- Modify: `browsercli/src/commands/tool-dispatcher.ts`
+- Modify: `browsercli/tests/unit/WorkerHttpClient.test.ts`
+- Modify: `browsercli/tests/unit/tool-dispatcher.test.ts`
 
 **Interfaces:**
 
@@ -163,9 +163,9 @@ assert.deepEqual(receivedMessages, [
 close();
 ```
 
-- [ ] **Step 2: Run proxycli tests and verify RED**
+- [ ] **Step 2: Run browsercli tests and verify RED**
 
-Run: `npm test` from `proxycli/`.
+Run: `npm test` from `browsercli/`.
 
 Expected: delayed HTTP response resolves instead of aborting, and WebSocket receives no subscriptions.
 
@@ -194,9 +194,9 @@ assert.deepEqual(client.invokeCalls[0][2], {foo: 'bar'});
 assert.deepEqual(client.callOrder, ['ensureSession', 'openStream', 'invoke']);
 ```
 
-- [ ] **Step 5: Run proxycli tests and verify RED**
+- [ ] **Step 5: Run browsercli tests and verify RED**
 
-Run: `npm test` from `proxycli/`.
+Run: `npm test` from `browsercli/`.
 
 Expected: `session`/`watch` appear in tool params and invoke happens before stream setup.
 
@@ -214,9 +214,9 @@ const sessionId = watch
 // Non-fatal openStream before invoke; close it if invoke fails.
 ```
 
-- [ ] **Step 7: Run proxycli tests and verify GREEN**
+- [ ] **Step 7: Run browsercli tests and verify GREEN**
 
-Run: `npm test` from `proxycli/`.
+Run: `npm test` from `browsercli/`.
 
 ---
 
@@ -230,7 +230,7 @@ Run `git diff --check` and Prettier on the changed files if required.
 
 - [ ] **Step 2: Run focused regression tests after the last edit**
 
-Run the Worker focused tests and `proxycli/npm test`.
+Run the Worker focused tests and `browsercli/npm test`.
 
 - [ ] **Step 3: Run repository gates after the final edit**
 
@@ -240,7 +240,7 @@ npm run test:unit
 npm run check-format
 ```
 
-From `proxycli/`:
+From `browsercli/`:
 
 ```powershell
 npm run typecheck

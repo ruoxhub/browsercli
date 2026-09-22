@@ -142,7 +142,7 @@ test('resolveEntryPath 优先取 PROXYCLI_ENTRY / BROWSERCLI_ENTRY，缺失时�
   const prevBrowserEntry = process.env.BROWSERCLI_ENTRY;
   const prevProxyConfigDir = process.env.PROXYCLI_CONFIG_DIR;
   const prevBrowserConfigDir = process.env.BROWSERCLI_CONFIG_DIR;
-  const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'proxycli-cfg-'));
+  const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'browsercli-cfg-'));
   try {
     delete process.env.PROXYCLI_ENTRY;
     delete process.env.BROWSERCLI_ENTRY;
@@ -171,7 +171,7 @@ test('resolveEntryPath 优先取 PROXYCLI_ENTRY / BROWSERCLI_ENTRY，缺失时�
         return (
           e.message.includes('workerEntry') &&
           (e.suggestions ?? []).some(s =>
-            s.includes('proxycli config --set workerEntry='),
+            s.includes('browsercli config --set workerEntry='),
           )
         );
       },
@@ -220,7 +220,7 @@ test('normalizeCandidatePath 跨平台路径转换', () => {
 });
 
 test('spawnDaemon 用假 entry 走通就绪握手并写出 session 文件', async () => {
-  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'proxycli-ws-'));
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'browsercli-ws-'));
   const daemonDir = path.join(workspace, 'daemon');
   const session = `sp-${process.pid}`;
   const socketPath = makePipePath('fixturespawn', session);
@@ -269,13 +269,13 @@ test('spawnDaemon 用假 entry 走通就绪握手并写出 session 文件', asyn
   }
 });
 
-test('collectDaemonPids 命中含 --proxycli-daemon 或 --proxycli-daemon 的行（pid 为首列）', () => {
+test('collectDaemonPids 命中含 --browsercli-daemon 或 --browsercli-daemon 的行（pid 为首列）', () => {
   assert.deepStrictEqual(
     collectDaemonPids([
-      '111 node build/src/index.js --daemon --proxycli-daemon --session default',
+      '111 node build/src/index.js --daemon --browsercli-daemon --session default',
       '222 node build/src/index.js --daemon',
-      '333 grep --proxycli-daemon',
-      '444 node other.js --proxycli-daemon',
+      '333 grep --browsercli-daemon',
+      '444 node other.js --browsercli-daemon',
     ]),
     [111, 444],
   );
@@ -295,7 +295,7 @@ test('killPidForce 对无效或不存在的 pid 幂等且不抛错', () => {
 
 test('ensureDaemon 并发调用具备启动互斥锁，复用同一 session 不重复 spawn', async () => {
   const workspace = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'proxycli-concur-ws-'),
+    path.join(os.tmpdir(), 'browsercli-concur-ws-'),
   );
   const daemonDir = path.join(workspace, 'daemon');
   const session = `concur-${process.pid}`;
@@ -369,7 +369,7 @@ test('ensureDaemon 并发调用具备启动互斥锁，复用同一 session 不�
 
 test('isDaemonRunning 与 verifyDaemonVersion 正确探活与核验版本', async () => {
   const workspace = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'proxycli-verify-ws-'),
+    path.join(os.tmpdir(), 'browsercli-verify-ws-'),
   );
   const daemonDir = path.join(workspace, 'daemon');
   fs.mkdirSync(daemonDir, {recursive: true});

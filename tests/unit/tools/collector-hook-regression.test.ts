@@ -14,7 +14,7 @@ import {
   inferCandidateEnvNeeds,
   listCreatedHooks as toolSyncHookRecords,
   normalizeHookRecord,
-  removeHookBrowser as toolRemoveHookBrowser,
+  removeHook as toolRemoveHook,
   summarizeHookRecords,
   toHookRecordArray,
 } from '../../../src/tools/hook/index.js';
@@ -82,7 +82,7 @@ async function syncHookRecords(frame: any, params?: any) {
   return response.structuredContent;
 }
 
-async function removeHookBrowser(frame: any, params?: any) {
+async function removeHook(frame: any, params?: any) {
   const request = {params: params || {}};
   const response = {
     structuredContent: null as any,
@@ -93,11 +93,7 @@ async function removeHookBrowser(frame: any, params?: any) {
   const context = {
     getSelectedFrame: () => frame,
   };
-  await toolRemoveHookBrowser.handler(
-    request as any,
-    response as any,
-    context as any,
-  );
+  await toolRemoveHook.handler(request as any, response as any, context as any);
   return response.structuredContent;
 }
 
@@ -466,9 +462,20 @@ describe('collector/hook regressions', () => {
     const syncResult = await syncHookRecords(frame as never, {
       hookId: 'hook_from_params',
     });
-    const removeResult = await removeHookBrowser(frame as never, {
-      hookId: 'hook_from_params',
-    });
+
+    setRuntime({
+      hookManager: {
+        remove: () => true,
+      },
+    } as never);
+    let removeResult;
+    try {
+      removeResult = await removeHook(frame as never, {
+        hookId: 'hook_from_params',
+      });
+    } finally {
+      setRuntime(undefined);
+    }
 
     assert.strictEqual(getResult.success, true);
     assert.match(getResult.message, /hook_from_params/);
@@ -485,8 +492,8 @@ describe('collector/hook regressions', () => {
     ]);
 
     assert.strictEqual(removeResult.success, true);
-    assert.strictEqual(removeResult.tooltype, 'remove_hook_browser');
-    assert.strictEqual(removeResult.data.hookId, 'hook_from_params');
+    assert.strictEqual(removeResult.tooltype, 'remove_hook');
+    assert.strictEqual(removeResult.hookId, 'hook_from_params');
     assert.match(removeResult.message, /hook_from_params/);
 
     const readerHookIds = evaluateCalls

@@ -46,7 +46,7 @@ export function createWebCommand(
       sub !== 'start'
     ) {
       throw new AxiError(`未知子命令：${sub}`, 'VALIDATION_ERROR', [
-        '用法：proxycli web [status|stop] [--port=<port>] [--no-open] [--json]',
+        '用法：browsercli web [status|stop] [--port=<port>] [--no-open] [--json]',
       ]);
     }
 
@@ -62,7 +62,7 @@ export function createWebCommand(
         throw new AxiError(
           `无效的端口号：${String(portRaw)}`,
           'VALIDATION_ERROR',
-          ['端口范围为 1-65535，如：proxycli web --port 8765'],
+          ['端口范围为 1-65535，如：browsercli web --port 8765'],
         );
       }
       customPort = portNum;
@@ -189,8 +189,8 @@ export function createWebCommand(
         `会话 ${ctx.session} 的 Web 控制台未启用（可能以 --no-console 启动）`,
         'WEB_CONSOLE_DISABLED',
         [
-          `先关闭该会话：proxycli -s=${ctx.session} close`,
-          `再重新启动：proxycli -s=${ctx.session} web`,
+          `先关闭该会话：browsercli -s=${ctx.session} close`,
+          `再重新启动：browsercli -s=${ctx.session} web`,
         ],
       );
     }

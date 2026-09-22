@@ -12,7 +12,7 @@
 
 - Preserve the default zero-JavaScript-injection and lazy-CDP-domain startup path.
 - Add no dependency and do not modify generated `build/` output by hand.
-- Preserve unrelated dirty-worktree changes, especially existing debugger, collector, WASM, worker, and proxycli edits.
+- Preserve unrelated dirty-worktree changes, especially existing debugger, collector, WASM, worker, and browsercli edits.
 - Keep the public source-module names and exports compatible with jshookmcp.
 - Use `.js` suffixes for relative ESM imports in TypeScript source.
 - Use TDD: every production batch starts with a focused failing test and ends with the same test passing.

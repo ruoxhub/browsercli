@@ -87,8 +87,8 @@ export const collectCode = defineTool({
             {toolName: 'collect_code'},
             {
               recovery: isNoPage
-                ? {tool: 'select_page', command: 'proxycli call select_page', reason: 'A page must be selected first'}
-                : {command: 'proxycli browser status', reason: 'Check browser connection'},
+                ? {tool: 'select_page', command: 'browsercli call select_page', reason: 'A page must be selected first'}
+                : {command: 'browsercli browser status', reason: 'Check browser connection'},
             },
           );
         }

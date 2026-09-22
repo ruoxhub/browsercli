@@ -5,7 +5,7 @@
  */
 
 /**
- * Daemon 会话注册表。与 proxycli/src/sessionPaths.ts 配对，
+ * Daemon 会话注册表。与 browsercli/src/sessionPaths.ts 配对，
  * 两侧的路径算法（base dir / workspace 探测 / hash / 管道名）必须保持同步。
  */
 
@@ -44,13 +44,13 @@ export interface ClientInfo {
 export function computeWorkspaceDir(startDir: string): string {
   // 显式覆盖：任意目录/会话都路由到同一个 workspace（与 CLI 侧 sessionPaths.ts 同步）
   const override =
-    process.env.PROXYCLI_WORKSPACE ?? process.env.BROWSERCLI_WORKSPACE;
+    process.env.BROWSERCLI_WORKSPACE ?? process.env.PROXYCLI_WORKSPACE;
   if (override) return path.resolve(override);
   let dir = path.resolve(startDir);
   for (let i = 0; i < 10; i++) {
     if (
-      fs.existsSync(path.join(dir, '.proxycli')) ||
-      fs.existsSync(path.join(dir, '.browsercli'))
+      fs.existsSync(path.join(dir, '.browsercli')) ||
+      fs.existsSync(path.join(dir, '.proxycli'))
     )
       return dir;
     const parent = path.dirname(dir);
@@ -68,9 +68,9 @@ export function computeWorkspaceDir(startDir: string): string {
 }
 
 function computeBaseDaemonDir(): string {
-  if (process.env.PROXYCLI_DAEMON_DIR) return process.env.PROXYCLI_DAEMON_DIR;
-  if (process.env.BROWSERCLI_DAEMON_DIR)
-    return process.env.BROWSERCLI_DAEMON_DIR;
+  const custom =
+    process.env.BROWSERCLI_DAEMON_DIR ?? process.env.PROXYCLI_DAEMON_DIR;
+  if (custom) return custom;
   let cache: string;
   if (process.platform === 'linux')
     cache = process.env.XDG_CACHE_HOME || path.join(os.homedir(), '.cache');
@@ -79,7 +79,7 @@ function computeBaseDaemonDir(): string {
   else
     cache =
       process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
-  return path.join(cache, 'proxycli', 'daemon');
+  return path.join(cache, 'browsercli', 'daemon');
 }
 
 export function computeClientInfo(
@@ -113,12 +113,12 @@ export function assertValidSessionName(name: string): void {
 export function makePipePath(dirHash: string, sessionName: string): string {
   assertValidSessionName(sessionName);
   if (process.platform === 'win32')
-    return pipePath(`proxycli-${dirHash}-${sessionName}`);
-  return path.join(os.tmpdir(), `proxycli-${dirHash}-${sessionName}.sock`);
+    return pipePath(`browsercli-${dirHash}-${sessionName}`);
+  return path.join(os.tmpdir(), `browsercli-${dirHash}-${sessionName}.sock`);
 }
 
 export function explicitSessionName(name?: string): string | undefined {
-  return name || process.env.PROXYCLI_SESSION || process.env.BROWSERCLI_SESSION;
+  return name || process.env.BROWSERCLI_SESSION || process.env.PROXYCLI_SESSION;
 }
 
 export function resolveSessionName(name?: string): string {

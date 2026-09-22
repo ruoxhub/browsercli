@@ -139,7 +139,7 @@ export interface LogFileInfo {
 
 ### 3.3 `src/utils/logger.ts` 改动（仅两处）
 
-1. 新增导出 `getLogDir(): string`，返回 `path.join(os.homedir(), '.proxycli', 'log')`。
+1. 新增导出 `getLogDir(): string`，返回 `path.join(os.homedir(), '.browsercli', 'log')`。
 2. `createDefaultLogFileName()`（`:70-75`）改为 `path.join(getLogDir(), \`${datetime}.log\`)`，
    消除目录字面量重复 —— 否则前端展示的目录和实际写入的目录会各自漂移。
 
@@ -267,7 +267,7 @@ className 常量，输入控件仍是原生 `<input>` / `<select>` —— 不造
 分区保存（每区独立）
   ├─ PUT /api/config/browser  → store.update({browser: patch})  浅合并
   ├─ PUT /api/config/llm      → store.update({openai, llmProvider}) 跳过掩码占位符
-  └─ persist()                → ~/.proxycli/runtime-config.json
+  └─ persist()                → ~/.browsercli/runtime-config.json
 
 通用区动作
   ├─ GET  /api/config/export  → 掩码 JSON → Blob 下载
@@ -310,7 +310,7 @@ className 常量，输入控件仍是原生 `<input>` / `<select>` —— 不造
 | `tests/unit/config/runtimeConfigPersistence.test.ts` | `deleteRuntimeConfig()` 删除已存在文件；文件不存在时不抛                                                                                                                                                                         |
 
 测试注入约定沿用 `config.test.ts` 现状：`persist` 注入 no-op 避免污染
-`~/.proxycli/runtime-config.json`；`system.ts` 的 `logDir` 注入 `node:os.tmpdir()`
+`~/.browsercli/runtime-config.json`；`system.ts` 的 `logDir` 注入 `node:os.tmpdir()`
 下的临时目录，`after` 中清理。
 
 **验证命令（收尾必跑）**：
@@ -332,4 +332,4 @@ npm run typecheck && npm run web:typecheck && npm run test:unit && npm run check
    `BOOLEAN_FLAGS` / `VALUE_FLAGS` 两张表）。未登记的 CLI 参数不会出现在种子值里，
    重置后丢失 —— 与启动时 `update(cliConfig)` 的行为一致，不算回归。
 4. **apiKey 掩码导出使导出文件不可用于迁移**（用户已在决策中选 A）。需要迁移时
-   手动填一次 key，或直接复制 `~/.proxycli/runtime-config.json`。
+   手动填一次 key，或直接复制 `~/.browsercli/runtime-config.json`。

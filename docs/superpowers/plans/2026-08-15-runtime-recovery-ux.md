@@ -20,7 +20,7 @@
 
 ---
 
-### Task 1: Expose Job Listing and Cancellation in proxycli
+### Task 1: Expose Job Listing and Cancellation in browsercli
 
 **Files:**
 
@@ -28,20 +28,20 @@
 - Modify: `src/web/routes/apiV1.ts`
 - Modify: `tests/unit/web/JobStore.test.ts`
 - Modify: `tests/unit/web/routes/apiV1.test.ts`
-- Modify: `proxycli/src/WorkerHttpClient.ts`
-- Create: `proxycli/src/commands/jobs.ts`
-- Modify: `proxycli/src/app.ts`
-- Modify: `proxycli/src/help.ts`
-- Modify: `proxycli/tests/unit/WorkerHttpClient.test.ts`
-- Create: `proxycli/tests/unit/jobs.test.ts`
-- Modify: `proxycli/tests/unit/help.test.ts`
+- Modify: `browsercli/src/WorkerHttpClient.ts`
+- Create: `browsercli/src/commands/jobs.ts`
+- Modify: `browsercli/src/app.ts`
+- Modify: `browsercli/src/help.ts`
+- Modify: `browsercli/tests/unit/WorkerHttpClient.test.ts`
+- Create: `browsercli/tests/unit/jobs.test.ts`
+- Modify: `browsercli/tests/unit/help.test.ts`
 
 **Interfaces:**
 
 - Produces: `JobStore.list(): Job[]`
 - Adds: `GET /api/v1/jobs` returning `{jobs: Job[]}`
 - Adds: `WorkerHttpClient.listJobs(): Promise<{jobs: JobStatus[]}>`
-- Adds: `proxycli jobs list [--json]` and `proxycli jobs cancel <job-id> [--json]`
+- Adds: `browsercli jobs list [--json]` and `browsercli jobs cancel <job-id> [--json]`
 
 - [ ] **Step 1: Write failing store and route tests**
 
@@ -75,7 +75,7 @@ Expected: `JobStore.list` and `GET /api/v1/jobs` are missing.
 
 `JobStore.list()` prunes expired jobs and returns insertion order. The route returns the existing job records in the repository's standard `{success,data}` envelope.
 
-- [ ] **Step 4: Write failing proxycli client, command, and help tests**
+- [ ] **Step 4: Write failing browsercli client, command, and help tests**
 
 ```ts
 assert.deepEqual(await client.listJobs(), {
@@ -88,15 +88,15 @@ assert.deepEqual(
 assert.match(generateCommandHelp('jobs')!, /jobs cancel <job-id>/);
 ```
 
-- [ ] **Step 5: Run proxycli tests and verify RED**
+- [ ] **Step 5: Run browsercli tests and verify RED**
 
-Run: `npm --prefix proxycli test`
+Run: `npm --prefix browsercli test`
 
 Expected: missing client method, command, and help entry.
 
 - [ ] **Step 6: Implement and verify the CLI**
 
-Use the existing `tableOutput`/`successOutput` patterns. Reject unknown flags and malformed actions before HTTP. Re-run `npm --prefix proxycli test`; expect all proxycli tests to pass.
+Use the existing `tableOutput`/`successOutput` patterns. Reject unknown flags and malformed actions before HTTP. Re-run `npm --prefix browsercli test`; expect all browsercli tests to pass.
 
 ---
 
@@ -178,7 +178,7 @@ Run the built shared/input/basic-tool tests and verify every new assertion passe
 - Modify: `src/tools/debugger/getStorage.ts`
 - Modify: `tests/unit/tools/script-eval-callback.test.ts`
 - Create: `tests/unit/tools/debugger/getStorage.test.ts`
-- Modify: `skills/proxycli/SKILL.md`
+- Modify: `skills/browsercli/SKILL.md`
 - Regenerate: `docs/reference/tool-reference.md`
 
 **Interfaces:**
@@ -216,7 +216,7 @@ Replace the invalid `get_script_source --prettyPrint/--offset` example with `scr
 
 - [ ] **Step 6: Re-run focused tests and verify GREEN**
 
-Verify the script, storage, metadata/docs, and proxycli tests after the last edit.
+Verify the script, storage, metadata/docs, and browsercli tests after the last edit.
 
 ---
 
@@ -225,7 +225,7 @@ Verify the script, storage, metadata/docs, and proxycli tests after the last edi
 **Files:** Review only the files changed by this plan plus the existing stuck-worker and WASM plans.
 
 - [ ] **Step 1: Run `git diff --check` and inspect the scoped diff**
-- [ ] **Step 2: Run all focused Worker, DOM, evaluate, storage, WASM, and proxycli tests after the last edit**
-- [ ] **Step 3: Run `npm run typecheck`, `npm run test:unit`, `npm run check-format`, and `npm --prefix proxycli run typecheck`**
+- [ ] **Step 2: Run all focused Worker, DOM, evaluate, storage, WASM, and browsercli tests after the last edit**
+- [ ] **Step 3: Run `npm run typecheck`, `npm run test:unit`, `npm run check-format`, and `npm --prefix browsercli run typecheck`**
 - [ ] **Step 4: Record any pre-existing unrelated failures separately; never claim a failing gate passed**
 - [ ] **Step 5: Re-read the user report requirement by requirement and record coverage or a remaining limitation**

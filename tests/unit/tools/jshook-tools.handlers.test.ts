@@ -11,7 +11,6 @@ import {describe, it} from 'node:test';
 
 import {StealthScripts2025} from '../../../src/modules/stealth/StealthScripts2025.js';
 import {getRuntime} from '../../../src/runtime.js';
-import {export_session_report} from '../../../src/tools/analyzer/reports.js';
 import {
   collectCode,
   collectionDiff,
@@ -28,11 +27,11 @@ import {
   injectHook,
   removeHook,
 } from '../../../src/tools/hook/index.js';
+import {click} from '../../../src/tools/input/click.js';
 import {
   checkBrowserHealth,
   deleteSessionState,
   dumpSessionState,
-  clickElement,
   listSessionStates,
   loadSessionState,
   restoreSessionState,
@@ -435,7 +434,6 @@ describe('jshook tools handlers', () => {
         },
       ];
     }) as RuntimeMethod;
-    runtime.hookManager.exportData = () => 'hook-data-export';
     runtime.hookManager.getStats = () => ({
       totalHooks: 1,
       enabledHooks: 1,
@@ -508,18 +506,6 @@ describe('jshook tools handlers', () => {
         totalSize: 1,
         totalFiles: 1,
       });
-      await invokeTool(
-        export_session_report as unknown as ToolDefinitionHarness,
-        {format: 'json'},
-        res,
-        runtime,
-      );
-      await invokeTool(
-        export_session_report as unknown as ToolDefinitionHarness,
-        {format: 'markdown', includeHookData: true},
-        res,
-        runtime,
-      );
 
       runtime.collector.collect = async () => ({files: [{url: 'a.js'}]});
       await invokeTool(
@@ -673,7 +659,7 @@ describe('jshook tools handlers', () => {
       );
 
       await invokeTool(
-        clickElement as unknown as ToolDefinitionHarness,
+        click as unknown as ToolDefinitionHarness,
         {selector: '#x'},
         res,
         runtime,
@@ -971,9 +957,8 @@ describe('jshook tools handlers', () => {
 
       assert.ok(res.lines.some(line => line.includes('Hook injected: h1')));
       assert.ok(
-        res.lines.some(
-          line =>
-            line.includes('Element clicked.') || line.includes('元素已点击'),
+        res.lines.some(line =>
+          line.includes('Successfully clicked on element'),
         ),
       );
       assert.ok(res.lines.some(line => line.includes('User-Agent updated.')));
@@ -991,7 +976,6 @@ describe('jshook tools handlers', () => {
         ),
       );
       assert.ok(res.lines.some(line => line.includes('"cleanedExpired":')));
-      assert.ok(res.lines.some(line => line.includes('hook-data-export')));
     } finally {
       runtime.collector.collect = originals.collect;
       runtime.collector.getFilesByPattern = originals.getFilesByPattern;

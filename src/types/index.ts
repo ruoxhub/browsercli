@@ -580,21 +580,6 @@ export interface GetScopeVariablesResult {
 
 // ==================== Reverse Task Artifacts ====================
 
-export interface ReverseTaskStoreOptions {
-  rootDir?: string;
-}
-
-export interface ReverseTaskOpenInput {
-  taskId: string;
-  slug: string;
-  targetUrl: string;
-  goal: string;
-  currentStage?: string;
-  currentSummary?: string;
-  successCriteria?: Record<string, unknown>;
-  targetContext?: Record<string, unknown>;
-}
-
 export interface ReverseTaskDescriptor {
   taskId: string;
   slug: string;
@@ -624,15 +609,6 @@ export interface ReverseTaskHandle {
   appendTimeline(event: ReverseTaskEvent): Promise<void>;
   appendLog(name: string, value: Record<string, unknown>): Promise<void>;
   writeSnapshot(name: string, value: unknown): Promise<void>;
-}
-
-export interface ReverseTaskReadApi {
-  getTaskDir(taskId: string): string;
-  readSnapshot<T>(taskId: string, name: string): Promise<T | undefined>;
-  readLog(
-    name: string,
-    taskId: string,
-  ): Promise<Array<Record<string, unknown>>>;
 }
 
 // ==================== 全局类型扩展 ====================

@@ -1,11 +1,11 @@
 {
-  "name": "proxycli",
+  "name": "browsercli",
   "version": "2.0.3",
   "description": "JavaScript reverse engineering and debugging",
   "type": "module",
   "bin": {
     "js-reverse-worker": "./build/src/index.js",
-    "proxycli": "./build/src/cli/bin/proxycli.js"
+    "browsercli": "./build/src/cli/bin/browsercli.js"
   },
   "main": "index.js",
   "scripts": {
@@ -27,7 +27,7 @@
     "test": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test-reporter spec --test-force-exit --test \"build/tests/**/*.test.js\"",
     "test:unit": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test-force-exit --test-timeout=30000 --test build/tests/unit/**/*.test.js",
     "test:contracts": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/unit/tools/all-tools-contract.test.js build/tests/unit/tools/tool-failure-contract.test.js",
-    "test:reliability:integration": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/integration/tool-categories.integration.test.js build/tests/integration/proxycli-reliability.integration.test.js",
+    "test:reliability:integration": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/integration/tool-categories.integration.test.js build/tests/integration/browsercli-reliability.integration.test.js",
     "test:quick": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/unit/tools/**/*.test.js build/tests/unit/services/**/*.test.js build/tests/unit/utils/**/*.test.js",
     "test:property": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/property/**/*.test.js",
     "test:integration": "npm run build && node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/integration/**/*.test.js",
@@ -48,10 +48,9 @@
     "prepare": "node --experimental-strip-types scripts/prepare.ts",
     "verify-server-json-version": "node --experimental-strip-types scripts/verify-server-json-version.ts",
     "case:jd:h5st:pure-node": "node scripts/cases/jd-h5st-pure-node.mjs",
-    "cli:start": "node build/src/index.js --daemon --proxycli-daemon --proxycli-daemon",
-    "cli:worker:stop": "proxycli close",
-    "cli:worker:status": "proxycli list",
-    "proxy:cli": "node --no-warnings=ExperimentalWarning build/src/modules/proxy/cli.js",
+    "cli:start": "node build/src/index.js --daemon --browsercli-daemon",
+    "cli:worker:stop": "browsercli close",
+    "cli:worker:status": "browsercli list",
     "web:build": "tsc --noEmit -p src/web-ui/tsconfig.json && vite build --config vite.web-ui.config.ts",
     "web:dev": "vite --config vite.web-ui.config.ts",
     "web:typecheck": "tsc --noEmit -p src/web-ui/tsconfig.json",
@@ -77,7 +76,7 @@
     "url": "https://github.com/zhizhuodemao/js-reverse-mcp/issues"
   },
   "homepage": "https://github.com/zhizhuodemao/js-reverse-mcp#readme",
-  "mcpName": "io.github.zhizhuodemao/proxycli",
+  "mcpName": "io.github.zhizhuodemao/browsercli",
   "dependencies": {
     "@babel/generator": "^7.26.5",
     "@babel/parser": "^7.26.5",
@@ -86,7 +85,6 @@
     "@jridgewell/trace-mapping": "^0.3.31",
     "axi-sdk-js": "^0.1.4",
     "axios": "^1.13.5",
-    "better-sqlite3": "^13.0.3",
     "chalk": "^5.6.2",
     "cheerio": "^1.2.0",
     "clsx": "^2.1.1",
@@ -122,7 +120,6 @@
     "@tailwindcss/vite": "^4.3.0",
     "@types/babel__generator": "^7.6.8",
     "@types/babel__traverse": "^7.20.6",
-    "@types/better-sqlite3": "^9.6.0",
     "@types/debug": "^4.1.12",
     "@types/express": "^5.0.6",
     "@types/filesystem": "^0.0.36",

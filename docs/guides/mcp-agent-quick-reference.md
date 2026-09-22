@@ -14,7 +14,6 @@
 | 查任务状态 / 摘要 / timeline / compare | `manage_reverse_task`       |
 | 自动推进 reverse 主链路                | `orchestrate_reverse_task`  |
 | 诊断 env gap / rebuild 缺口            | `get_rebuild_health_report` |
-| 把 hook / network / runtime 证据落盘   | `record_reverse_evidence`   |
 | 只拿轻量 next-step 建议                | `recommend_next_step`       |
 
 ## 2. 响应先读什么
@@ -87,11 +86,10 @@ read responseSummary
 
 ## 6. 最常见组合
 
-### 观察 -> 落盘 -> 摘要 -> 编排
+### 摘要 -> 编排
 
-1. `record_reverse_evidence`
-2. `manage_reverse_task` with `action="summarize"`
-3. `orchestrate_reverse_task`
+1. `manage_reverse_task` with `action="summarize"`
+2. `orchestrate_reverse_task`
 
 ### env error -> 体检 -> 补环境 -> 续跑
 
@@ -110,7 +108,6 @@ read responseSummary
 - 不要一上来就 `orchestrate_reverse_task`
 - 不要忽略 `blockedBy`
 - 不要把 `recommend_next_step` 当持久化编排器
-- 不要把证据只留在对话里，不落 `record_reverse_evidence`
 - 不要在 `continuation.ready=false` 时继续执行
 - 不要忽略 `routeGuard` 后乱切工具
 
@@ -119,7 +116,6 @@ read responseSummary
 - 查状态 -> `manage_reverse_task`
 - 自动推进 -> `orchestrate_reverse_task`
 - 补环境 -> `get_rebuild_health_report`
-- 落证据 -> `record_reverse_evidence`
 - 轻建议 -> `recommend_next_step`
 
 ## 9. 详细文档入口
@@ -147,7 +143,6 @@ read responseSummary
 - 查状态/摘要/timeline -> manage_reverse_task
 - 自动推进 -> orchestrate_reverse_task
 - env gap/补环境诊断 -> get_rebuild_health_report
-- 新证据落盘 -> record_reverse_evidence
 - 只要轻量建议 -> recommend_next_step
 
 读响应顺序：
@@ -170,14 +165,13 @@ read responseSummary
 - 不要一上来就 orchestrate_reverse_task
 - 不要忽略 blockedBy
 - 不要把 recommend_next_step 当持久化编排器
-- 不要把证据只留在对话里
 - 不要忽略 continuation.ready=false
 ```
 
 如果上下文再紧一点，可以继续压缩成：
 
 ```text
-JSReverser-MCP: 状态看 manage_reverse_task，自动推进用 orchestrate_reverse_task，env gap 用 get_rebuild_health_report，证据落盘用 record_reverse_evidence。先读 responseSummary，再读 outcome，再读 errorType/blockedBy，再读 routeGuard，最后执行 continuation.invoke。blocked 就先解阻塞，partial+retryable 就续跑，shouldSwitchStrategy=true 就换策略，continuation.ready=false 就停止。
+JSReverser-MCP: 状态看 manage_reverse_task，自动推进用 orchestrate_reverse_task，env gap 用 get_rebuild_health_report。先读 responseSummary，再读 outcome，再读 errorType/blockedBy，再读 routeGuard，最后执行 continuation.invoke。blocked 就先解阻塞，partial+retryable 就续跑，shouldSwitchStrategy=true 就换策略，continuation.ready=false 就停止。
 ```
 
 如果你要一版更完整、直接可复制到客户端配置里的提示词，看：

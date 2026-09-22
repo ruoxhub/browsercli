@@ -1,6 +1,6 @@
 ---
 name: websocket-reverse
-description: WebSocket 协议逆向时使用，覆盖 连接发现 → 消息分组分析 → 单条下钻 → protobuf/二进制解码 → hook 拦截 全链路（list_websocket_connections / analyze_websocket_messages / get_websocket_message 等），所有工具统一经 proxycli CLI 调用。
+description: WebSocket 协议逆向时使用，覆盖 连接发现 → 消息分组分析 → 单条下钻 → protobuf/二进制解码 → hook 拦截 全链路（list_websocket_connections / analyze_websocket_messages / get_websocket_message 等），所有工具统一经 browsercli CLI 调用。
 ---
 
 # WebSocket 协议逆向
@@ -11,21 +11,21 @@ WebSocket 在直播、IM、行情、协作工具里越来越常见。与 HTTP �
 
 ---
 
-## proxycli 前置
+## browsercli 前置
 
-本技能所有工具都是 worker 侧的 MCP 工具，**必须通过 proxycli 调用**：
+本技能所有工具都是 worker 侧的 MCP 工具，**必须通过 browsercli 调用**：
 
 ```bash
 # 连接浏览器（headless 默认），并确认 worker 状态
-proxycli browser connect
-proxycli status
+browsercli browser connect
+browsercli status
 
 # WebSocket / Hook / 网络工具都属于默认 workflow profile，无需切 profile。
 # 可用性自检（可选）：
-proxycli list-tools --json | jq -r '.[].name' | grep -E '^(list_websocket|analyze_websocket|get_websocket|create_hook|inject_hook)'
+browsercli list-tools --json | jq -r '.[].name' | grep -E '^(list_websocket|analyze_websocket|get_websocket|create_hook|inject_hook)'
 
 # 工具调用通用形式（连字符↔下划线自动转换：analyze-websocket-messages ⇄ analyze_websocket_messages）
-proxycli call <tool-name> [--param value] [--data '{"k":"v"}'] [--file params.json]
+browsercli call <tool-name> [--param value] [--data '{"k":"v"}'] [--file params.json]
 ```
 
 **参数约定**：
@@ -39,23 +39,23 @@ proxycli call <tool-name> [--param value] [--data '{"k":"v"}'] [--file params.js
 
 ```bash
 # 1. 列连接
-proxycli call list_websocket_connections --urlFilter "wss://api.target.com"
+browsercli call list_websocket_connections --urlFilter "wss://api.target.com"
 
 # 2. 必做：消息模式分析（按 fingerprint 分组 + 统计 + 样本）
-proxycli call analyze_websocket_messages --wsid <id> \
+browsercli call analyze_websocket_messages --wsid <id> \
   --direction <sent|received>   # 可选，默认全部方向
 
 # 3. 按分组查看
-proxycli call get_websocket_messages --wsid <id> --groupId <g> \
+browsercli call get_websocket_messages --wsid <id> --groupId <g> \
   --direction <sent|received> --pageSize 50
 # 看的是"某类型消息"在时间线上的分布
 
 # 4. 单条下钻（该工具返回单条完整消息，无需 show_content）
-proxycli call get_websocket_message --wsid <id> --frameIndex <idx>
+browsercli call get_websocket_message --wsid <id> --frameIndex <idx>
 
 # 5. 拦截 / 伪造（如需）
-proxycli call create_hook --type websocket --description "WS capture"
-proxycli call inject_hook --persistent true
+browsercli call create_hook --type websocket --description "WS capture"
+browsercli call inject_hook --persistent true
 ```
 
 ---
@@ -70,7 +70,7 @@ proxycli call inject_hook --persistent true
 | ------------------------ | ------------------------------- | --------------------------------------------------------------------------------------------- |
 | 拦截发送（伪造心跳）     | 默认只观察收发的 server message | hook `WebSocket.send` 拦截 client 帧（`create_hook --type websocket` → `inject_hook`）        |
 | 拦截构造（修改重连参数） | 默认只看到已建立连接            | hook `WebSocket` 构造函数记录 url/protocols（`create_hook --type websocket` → `inject_hook`） |
-| 抓取握手 query 中的签名  | 默认不抓 HTTP 升级请求          | 配合 `proxycli call list_network_requests --urlFilter <wss-host>` 查升级前的 HTTP 请求        |
+| 抓取握手 query 中的签名  | 默认不抓 HTTP 升级请求          | 配合 `browsercli call list_network_requests --urlFilter <wss-host>` 查升级前的 HTTP 请求        |
 
 ### 何时只读不 hook
 
@@ -88,14 +88,14 @@ proxycli call inject_hook --persistent true
 
 正确做法：
 
-1. `proxycli call analyze_websocket_messages --wsid <id>`
+1. `browsercli call analyze_websocket_messages --wsid <id>`
    → 返回每组的：消息数 / 平均大小 / 样本 indices
 2. 找**最少的、最规律的**那组（如心跳 / ack）→ 它们的 pattern 是稳定的
 3. 找**最大变化**的那组（payload 实际数据）→ 下钻样本
 4. 把样本 base64 拿出来，放到本地用 protobuf decoder / 自写脚本反序列化
 
 ```
-proxycli call analyze_websocket_messages --wsid 3
+browsercli call analyze_websocket_messages --wsid 3
 # → {
 #     groups: [
 #       {id: 'A', count: 1234, avgSize: 8,  samples: [0, 100, 200, ...]},  // 心跳
@@ -105,7 +105,7 @@ proxycli call analyze_websocket_messages --wsid 3
 #   }
 ```
 
-`proxycli call get_websocket_messages --groupId B --show_content true` → 取 B 组的样本 raw bytes。
+`browsercli call get_websocket_messages --groupId B --show_content true` → 取 B 组的样本 raw bytes。
 
 ---
 
@@ -135,12 +135,11 @@ proxycli call analyze_websocket_messages --wsid 3
 
 WebSocket 逆向后建议沉淀：
 
-| 文件                         | 内容                                              |
-| ---------------------------- | ------------------------------------------------- |
-| `ws-protocol.md`             | 消息分组表 + 心跳间隔 + 认证参数来源              |
-| `ws-samples/<group>.bin`     | 各分组的 raw 样本（base64 编码）                  |
-| `ws-decode.js`               | protobuf / 自定义格式的解码器（站点无关）         |
-| `ws-record-reverse-evidence` | 写一条 `record_reverse_evidence` 到 task artifact |
+| 文件                     | 内容                                      |
+| ------------------------ | ----------------------------------------- |
+| `ws-protocol.md`         | 消息分组表 + 心跳间隔 + 认证参数来源      |
+| `ws-samples/<group>.bin` | 各分组的 raw 样本（base64 编码）          |
+| `ws-decode.js`           | protobuf / 自定义格式的解码器（站点无关） |
 
 ---
 
@@ -153,8 +152,8 @@ WebSocket 逆向后建议沉淀：
 | 协议是 protobuf 但没 `.proto`       | 用 skill `code-analysis` 反推 JS 侧；或用 [protoscope](https://github.com/square/protoscope) 试解                                                          |
 | WS 加密（WSS + 自实现）             | 通常是 mTLS 或自定义 handshake 加密，先看 `list_network_requests` 找 handshake                                                                             |
 | 心跳触发后立刻断连                  | 可能是 client 必须发特定心跳格式才能保活；用 `create_hook --type websocket` 看真实心跳                                                                     |
-| 工具不可用（profile 报错）          | 本技能工具属默认 `workflow` profile；若报错先 `proxycli list-tools --json` 确认可用列表                                                                    |
-| 页面反调试卡死 worker（409）        | 不要依赖 DOM 交互（fill/click）去触发 WS；优先 HTTP 侧路 + 本地 Node 重建，必要时 `proxycli jobs cancel` / 重启 worker（详见 wasm-reverse 技能"实战警示"） |
+| 工具不可用（profile 报错）          | 本技能工具属默认 `workflow` profile；若报错先 `browsercli list-tools --json` 确认可用列表                                                                    |
+| 页面反调试卡死 worker（409）        | 不要依赖 DOM 交互（fill/click）去触发 WS；优先 HTTP 侧路 + 本地 Node 重建，必要时 `browsercli jobs cancel` / 重启 worker（详见 wasm-reverse 技能"实战警示"） |
 
 ---
 
@@ -168,6 +167,6 @@ WebSocket 逆向后建议沉淀：
 
 ## 关联
 
-- 完整六阶段工作流（Observe / Capture / Rebuild / Patch / PureExtraction / Port）：`skills/proxycli-playbook/SKILL.md` + `docs/reference/reverse-workflow.md`
-- 工具参数与 profile 门控：`skills/proxycli-playbook/references/tool-catalog.md` / `profile-tool-gating.md`
-- 失败回退决策树：`skills/proxycli-playbook/references/fallbacks.md`
+- 完整六阶段工作流（Observe / Capture / Rebuild / Patch / PureExtraction / Port）：`skills/browsercli-playbook/SKILL.md` + `docs/reference/reverse-workflow.md`
+- 工具参数与 profile 门控：`skills/browsercli-playbook/references/tool-catalog.md` / `profile-tool-gating.md`
+- 失败回退决策树：`skills/browsercli-playbook/references/fallbacks.md`

@@ -41,18 +41,6 @@
 - 日常查看状态：`manage_reverse_task`
 - 想减少 tool 选择、按阶段连续推进：`orchestrate_reverse_task`
 
-## `record_reverse_evidence` 在这套流程里的作用
-
-`record_reverse_evidence` 不是另一个编排器，它的作用是把本轮观察写回 task artifact，避免关键信息只留在对话里。
-
-典型用途：
-
-- 记录 hook / network / script 的关键命中
-- 给后续 `manage_reverse_task summarize` / `progress` 提供稳定输入
-- 让下次 `orchestrate_reverse_task` 规划时能复用已沉淀证据
-
-可以把它理解成“证据落盘”，而 `orchestrate_reverse_task` 负责“决定下一步并执行”。
-
 ## MCP 调用方式
 
 只做规划，不立即执行：
@@ -514,13 +502,12 @@ read responseSummary
 
 下面这张表适合在“还没决定先调哪个 MCP 工具”时直接套用：
 
-| 目标                                          | 优先工具                    | 什么时候用                                                                                     | 不要先用什么                           |
-| --------------------------------------------- | --------------------------- | ---------------------------------------------------------------------------------------------- | -------------------------------------- |
-| 看任务状态 / 摘要 / 标签 / timeline / compare | `manage_reverse_task`       | 你已经有 `taskId`，但还在查状态、补上下文、做轻量管理                                          | 不要先上 `orchestrate_reverse_task`    |
-| 想自动决定下一步并连续推进                    | `orchestrate_reverse_task`  | 你已经确认 task 目标稳定，想减少 tool 选择并直接续跑                                           | 不要先手工乱选 analysis 类工具         |
-| 想诊断补环境缺口                              | `get_rebuild_health_report` | 已经进入 rebuild / env-fix 阶段，或者报了典型 runtime env error                                | 不要先盲目重试 `export_rebuild_bundle` |
-| 想把观察结果正式写回 artifact                 | `record_reverse_evidence`   | 本轮拿到了 hook / network / script / runtime 证据，想沉淀给后续 summarize / orchestration 复用 | 不要把证据只留在对话里                 |
-| 只想拿一个轻量 next step 提示                 | `recommend_next_step`       | 你还不想跑完整编排，只想快速拿一个方向性建议                                                   | 不要把它当成持久化编排器               |
+| 目标                                          | 优先工具                    | 什么时候用                                                      | 不要先用什么                           |
+| --------------------------------------------- | --------------------------- | --------------------------------------------------------------- | -------------------------------------- |
+| 看任务状态 / 摘要 / 标签 / timeline / compare | `manage_reverse_task`       | 你已经有 `taskId`，但还在查状态、补上下文、做轻量管理           | 不要先上 `orchestrate_reverse_task`    |
+| 想自动决定下一步并连续推进                    | `orchestrate_reverse_task`  | 你已经确认 task 目标稳定，想减少 tool 选择并直接续跑            | 不要先手工乱选 analysis 类工具         |
+| 想诊断补环境缺口                              | `get_rebuild_health_report` | 已经进入 rebuild / env-fix 阶段，或者报了典型 runtime env error | 不要先盲目重试 `export_rebuild_bundle` |
+| 只想拿一个轻量 next step 提示                 | `recommend_next_step`       | 你还不想跑完整编排，只想快速拿一个方向性建议                    | 不要把它当成持久化编排器               |
 
 ### 简化决策树
 
@@ -533,14 +520,12 @@ read responseSummary
       只是想看状态? -> manage_reverse_task
       想自动推进?   -> orchestrate_reverse_task
       卡在 env error? -> get_rebuild_health_report
-      刚拿到新证据? -> record_reverse_evidence
       只想轻量建议? -> recommend_next_step
 ```
 
 ### 典型组合
 
-- **观察 -> 落盘 -> 摘要 -> 编排**
-  - `record_reverse_evidence`
+- **观察 -> 摘要 -> 编排**
   - `manage_reverse_task:summarize`
   - `orchestrate_reverse_task`
 
@@ -574,10 +559,6 @@ read responseSummary
   - 结果：拿到的只是轻量建议，没有 checkpoint / orchestration 上下文
   - 正解：它只适合轻量分流；真正连续推进用 `orchestrate_reverse_task`
 
-- **拿到新证据但不调用 `record_reverse_evidence`**
-  - 结果：关键观察只留在对话里，后续 summarize / orchestration 无法复用
-  - 正解：把 hook / network / runtime 证据正式落盘
-
 - **忽略 `continuation.ready=false` 还强行执行 `continuation.invoke`**
   - 结果：调用链会进入不一致状态
   - 正解：`ready=false` 就停下来，先处理错误或阻塞原因
@@ -591,7 +572,6 @@ read responseSummary
 - **查状态** 用 `manage_reverse_task`
 - **自动推进** 用 `orchestrate_reverse_task`
 - **补环境诊断** 用 `get_rebuild_health_report`
-- **证据落盘** 用 `record_reverse_evidence`
 - **轻量提示** 用 `recommend_next_step`
 
 ## CLI 调用方式

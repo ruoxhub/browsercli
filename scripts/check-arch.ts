@@ -33,8 +33,7 @@ function getLayer(filePath: string): Layer {
     norm.startsWith('src/services/') ||
     norm.startsWith('src/formatters/') ||
     norm.startsWith('src/trace-processing/') ||
-    norm.startsWith('src/diagnostics/') ||
-    norm.startsWith('src/database/')
+    norm.startsWith('src/diagnostics/')
   ) {
     return Layer.L1;
   }

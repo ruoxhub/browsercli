@@ -5,10 +5,10 @@
  */
 
 /** Worker 进程运行时目录 */
-export const RUNTIME_DIR_NAME = 'proxycli';
+export const RUNTIME_DIR_NAME = 'browsercli';
 
 /** 用户级配置目录名 */
-export const USER_CONFIG_DIR_NAME = '.proxycli';
+export const USER_CONFIG_DIR_NAME = '.browsercli';
 
 /** 用户级配置文件名 */
 export const USER_CONFIG_FILENAME = 'config.json';

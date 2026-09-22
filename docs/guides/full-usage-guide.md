@@ -273,11 +273,10 @@ args = [
 
 ### 6.7 本地复现与补环境
 
-| 工具                      | 用途               |
-| ------------------------- | ------------------ |
-| `export_rebuild_bundle`   | 导出本地复现工程   |
-| `diff_env_requirements`   | 比对缺失的环境能力 |
-| `record_reverse_evidence` | 写入 task artifact |
+| 工具                    | 用途               |
+| ----------------------- | ------------------ |
+| `export_rebuild_bundle` | 导出本地复现工程   |
+| `diff_env_requirements` | 比对缺失的环境能力 |
 
 ### 6.8 页面自动化
 
@@ -285,7 +284,7 @@ args = [
 | ----------------- | ------------------ |
 | `navigate_page`   | 跳转/回退/刷新页面 |
 | `query_dom`       | 查询页面元素       |
-| `click_element`   | 触发点击           |
+| `click`           | 触发点击           |
 | `type_text`       | 输入文本           |
 | `take_screenshot` | 截图取证           |
 

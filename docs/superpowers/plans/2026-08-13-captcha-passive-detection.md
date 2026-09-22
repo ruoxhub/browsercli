@@ -13,7 +13,7 @@
 - Source of truth: docs/superpowers/specs/2026-08-13-captcha-passive-detection-design.md.
 - Clean-room: do not open, copy, translate, import, or inspect open-source/jshookmcp source, types, rules, tests, fixtures, or build output during implementation.
 - Start in a fresh agent/session and create an isolated git worktree with the using-git-worktrees skill. The worktree must start clean from the commit containing this plan.
-- The current root checkout contains unrelated debugger, worker, proxycli, jsvmp, and generated-index edits. Do not copy, stage, revert, or overwrite them.
+- The current root checkout contains unrelated debugger, worker, browsercli, jsvmp, and generated-index edits. Do not copy, stage, revert, or overwrite them.
 - No subagent or remote agent dispatch unless the user explicitly grants that authority.
 - No automatic solving, clicks, drags, form input, token injection, screenshots, AI calls, network calls, file writes, browser restart, headless-mode switch, init script, eager CDP activation, background listener, or new dependency.
 - Keep top-level DOM plus suspicious iframe metadata as the first-version ceiling.

@@ -11,7 +11,7 @@ description: 目标级/会话级逆向分析工作流技能，替代已移除的
 
 - 无内置 LLM：所有生成式结论由 Agent 自己产出，不再有 `useAI` 参数或服务端模型调用。
 - 规则优先：场景推断、流量提纯、加密切片都是确定性规则，先跑规则再让 Agent 解读。
-- 证据落盘：结论写回 `record_reverse_evidence`，不要只留在对话里。
+- 证据落盘：结论写回 `artifacts/tasks/<task-id>/`，不要只留在对话里。
 
 ## A. 目标一键分析（对应 analyze_target）
 
@@ -42,15 +42,13 @@ description: 目标级/会话级逆向分析工作流技能，替代已移除的
 1. 复用 B 的提纯结果（同一套规则）。
 2. 按模式（auto/api_reverse/security/perf/js_crypto）选系统提示词，分析提纯数据。
 3. 生成 Markdown 报告；本技能取代了原「离线降级报告」，Agent 未产出时的兜底结构见 `references/prompt-templates.md` 的 fallback 小节。
-4. 需要持久化时写入会话报告存储（原 `ai_reports` 表已随工具移除，改由 `record_reverse_evidence` + `export_session_report` 落盘）。
+4. 需要持久化时写入 `artifacts/tasks/<task-id>/`（原 `ai_reports` 表与证据落盘工具均已移除）。
 
 ## 相关工具
 
 ```bash
-proxycli call session_create --name "<name>" --targetUrl "<url>"
-proxycli call session_get_data --sessionId "<id>"
-proxycli call collect_code --url "<url>" --smartMode priority
-proxycli call get_hook_data --hookId "<id>" --view detail
-proxycli call record_reverse_evidence --taskId "<task>" --entry '{"note":"..."}'
-proxycli call export_session_report --format markdown
+browsercli call session_create --name "<name>" --targetUrl "<url>"
+browsercli call session_get_data --sessionId "<id>"
+browsercli call collect_code --url "<url>" --smartMode priority
+browsercli call get_hook_data --hookId "<id>" --view detail
 ```

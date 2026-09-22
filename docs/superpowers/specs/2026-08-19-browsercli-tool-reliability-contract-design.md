@@ -3,7 +3,7 @@
 - **日期**: 2026-08-19
 - **模块**: 工具定义 / 执行管线 / 调试器 / AI 服务 / HTTP Job / CLI / 测试基础设施
 - **状态**: Approved (Design Stage)
-- **文档路径**: `docs/superpowers/specs/2026-08-19-proxycli-tool-reliability-contract-design.md`
+- **文档路径**: `docs/superpowers/specs/2026-08-19-browsercli-tool-reliability-contract-design.md`
 
 ---
 
@@ -175,7 +175,7 @@ interface ToolRuntimeRequirements {
 
 - Worker `ToolMeta.argSpecs`
 - `/api/v1/tools` 响应
-- `proxycli list-tools` 和 `proxycli call` 参数解析
+- `browsercli list-tools` 和 `browsercli call` 参数解析
 - BrowserCLI Skill 命令示例
 - 全工具契约测试向量
 
@@ -425,13 +425,13 @@ local analysis
 | 领域       | 主要文件或目录                                                                                                   |
 | ---------- | ---------------------------------------------------------------------------------------------------------------- |
 | 工具契约   | `src/tools/ToolDefinition.ts`, `src/tools/manifest.ts`, `src/tools/tools-meta.ts`, `src/tools/zod-introspect.ts` |
-| 参数校验   | `src/tools/tool-arg-validator.ts`, `src/tools/tool-aliases.ts`, `proxycli/src/commands/shared/tool-args.ts`    |
+| 参数校验   | `src/tools/tool-arg-validator.ts`, `src/tools/tool-aliases.ts`, `browsercli/src/commands/shared/tool-args.ts`    |
 | 前置条件   | `src/tools/prerequisites/ToolPrerequisiteChecker.ts`                                                             |
 | 执行与错误 | `src/worker/ToolExecutionPipeline.ts`, `src/worker/ToolResponse.ts`, `src/utils/errors.ts`                       |
 | Job 终态   | `src/web/routes/apiV1.ts`, `src/worker/JobStore.ts`                                                              |
 | 调试器状态 | `src/modules/debugger/DebuggerManager.ts`, `src/modules/debugger/types.ts`, `src/worker/ToolContext.ts`          |
 | AI 降级    | `src/services/AIService.ts`, `src/runtime/RuntimeServices.ts`, 对应分析工具                                      |
-| CLI 契约   | `proxycli/src/tool-meta-types.ts`, `proxycli/src/commands/`                                                  |
+| CLI 契约   | `browsercli/src/tool-meta-types.ts`, `browsercli/src/commands/`                                                  |
 | 文档校验   | `scripts/verify-skills-schema.ts`, BrowserCLI Skill 文档                                                         |
 | 测试       | `tests/unit/worker/`, `tests/unit/tools/`, `tests/integration/`, 浏览器 E2E fixture                              |
 

@@ -1020,7 +1020,7 @@ and include `...(range && {range})` in the returned spec object.
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `npm run build && node --require ./build/tests/setup.js --test build/tests/unit/tools/tool-arg-validator-range.test.js build/tests/unit/tools/tool-arg-validator.test.js`
-Expected: PASS — new range tests pass AND the pre-existing validator tests (`tool-arg-validator.test.ts`, which covers scriptId coercion, variants json, proxycli regression contracts) still pass, proving no regression in coercion paths.
+Expected: PASS — new range tests pass AND the pre-existing validator tests (`tool-arg-validator.test.ts`, which covers scriptId coercion, variants json, browsercli regression contracts) still pass, proving no regression in coercion paths.
 
 - [ ] **Step 5: Commit**
 
@@ -1318,7 +1318,7 @@ git commit -m "fix(collector): preserve history across SPA same-document navigat
 
 **Interfaces:**
 - Consumes: existing `cliConfigPath()` from `daemonClient.ts`; `spawnFlagsFromArgv`/`DAEMON_SPAWN_FLAGS`/`DAEMON_VALUE_FLAGS` from `sessionArgs.ts`; `parseWorkerArgs`' `BOOLEAN_FLAGS`/`VALUE_FLAGS` in `src/worker/WorkerArgs.ts` (downstream consumer of the flags).
-- Produces: new config keys (settable via `proxycli config --set key=value`, persisted in `~/.proxycli/config.json`): `headless`, `cloak`, `jsStealth`, `fullStealthArgs`, `minimalStealth` (booleans, stored as `'true'`/`'false'` strings — the config file only stores strings today; keep that) and `browserUrl`, `wsEndpoint`, `executablePath` (strings).
+- Produces: new config keys (settable via `browsercli config --set key=value`, persisted in `~/.browsercli/config.json`): `headless`, `cloak`, `jsStealth`, `fullStealthArgs`, `minimalStealth` (booleans, stored as `'true'`/`'false'` strings — the config file only stores strings today; keep that) and `browserUrl`, `wsEndpoint`, `executablePath` (strings).
 - New helper (exported for tests): `mergeSpawnFlagsFromConfig(argv: readonly string[], config: CliSpawnConfig): string[]` in `src/cli/sessionArgs.ts` — takes the raw argv and the loaded config, returns `spawnFlagsFromArgv(argv)` plus config-derived flags (skipping any flag name already present in argv). Boolean config keys map to flag names: `headless→--headless`, `cloak→--cloak`, `jsStealth→--js-stealth`, `fullStealthArgs→--full-stealth-args`, `minimalStealth→--minimal-stealth`; value keys map `browserUrl→--browserUrl`, `wsEndpoint→--wsEndpoint`, `executablePath→--executablePath` in `--flag=value` form.
 - `DAEMON_VALUE_FLAGS` gains `'--browserUrl'`, `'--wsEndpoint'`, `'--executablePath'` so they pass the whitelist (must be in `--flag=value` form).
 
@@ -2087,12 +2087,12 @@ Expected: all pass. If `test:unit` surfaces pre-existing failures in unrelated d
 - [ ] **Step 2: Verify tool registration end-to-end**
 
 ```bash
-node build/src/index.js --daemon --proxycli-daemon --session probe 2>/dev/null &
+node build/src/index.js --daemon --browsercli-daemon --session probe 2>/dev/null &
 sleep 3
-node build/src/cli/bin/proxycli.js list-tools 2>/dev/null | grep -E "get_css_styles|reveal_in_devtools|open_devtools"
+node build/src/cli/bin/browsercli.js list-tools 2>/dev/null | grep -E "get_css_styles|reveal_in_devtools|open_devtools"
 ```
 
-Expected: `get_css_styles` appears (workflow profile). `open_devtools` / `reveal_in_devtools` appear only when `JS_REVERSE_TOOL_PROFILE=full`. Kill the probe daemon afterwards (`node build/src/cli/bin/proxycli.js close` or taskkill the node process).
+Expected: `get_css_styles` appears (workflow profile). `open_devtools` / `reveal_in_devtools` appear only when `JS_REVERSE_TOOL_PROFILE=full`. Kill the probe daemon afterwards (`node build/src/cli/bin/browsercli.js close` or taskkill the node process).
 
 - [ ] **Step 3: Update docs**
 

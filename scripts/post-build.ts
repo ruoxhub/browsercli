@@ -152,7 +152,7 @@ export class PerformanceInsightFormatter {}
   copyThirdPartyLicenseFiles();
   copyDevToolsDescriptionFiles();
 
-  for (const binName of ['proxycli.js', 'proxycli.js']) {
+  for (const binName of ['browsercli.js', 'browsercli.js']) {
     const cliBin = path.join(BUILD_DIR, 'src', 'cli', 'bin', binName);
     if (fs.existsSync(cliBin)) {
       try {

@@ -88,7 +88,6 @@ js-reverse call list_hooks
 | 工具                    | 问题                                         | 正确用法                                |
 | ----------------------- | -------------------------------------------- | --------------------------------------- |
 | `observe_flow`          | 文档说支持 `--url`，实际需用 `--data` + JSON | `--data '{"url":"..."}'`                |
-| `export_session_report` | `--taskId`/`--taskSlug` 与实际参数不符       | 无需参数，直接调用                      |
 | `wait_for_request`      | `--waitForRequest` 参数名风格不一致          | `--data '{"waitForRequest":"playurl"}'` |
 | `list_network_requests` | `--headerFilter` 传参方式不明                | `--data '{"headerFilter":"playurl"}'`   |
 

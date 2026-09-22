@@ -23,7 +23,7 @@
 
 - 终端/脚本/桌面应用能通过本地代理端口（默认 `8888`）把 HTTP/HTTPS 流量汇入，由 MCP 工具列表/查看/导出。
 - 零外部进程、零跨语言运行时，仅新增 `node-forge` 一个运行时依赖。
-- 不改动浏览器 CDP 链路、`web/`/`worker/`/`proxycli/`。
+- 不改动浏览器 CDP 链路、`web/`/`worker/`/`browsercli/`。
 
 ## 架构
 
@@ -49,7 +49,7 @@ src/runtime/RuntimeServices.ts  新增 getMitmModule()
 职责：根 CA 生成/持久化、按域名签发叶子证书、`tls.SecureContext` 缓存。
 
 - node-forge RSA 2048 根 CA 自签，10 年有效期；叶子证书 **365 天**（Android Chrome 398 天上限）；保留原版 AKI 修复（`authorityKeyIdentifier` 手动取 CA 的 SKI，避免 Android CertPathValidator trust anchor 不匹配）。
-- 证书目录默认 `~/.proxycli/mitm-certs/`，可用 env `BROWSER_MITM_CERTS_DIR` 覆盖；读值用现有的 `getEnvValue`（`src/config/resolver.ts`）。
+- 证书目录默认 `~/.browsercli/mitm-certs/`，可用 env `BROWSER_MITM_CERTS_DIR` 覆盖；读值用现有的 `getEnvValue`（`src/config/resolver.ts`）。
 - LRU 缓存上限 500（越界淘汰最旧）。
 - 方法：`init()`、`isInitialized()`、`getCaCertPath()`、`getCaCertDer()`、`getSecureContextForHost(host)`、`regenerate()`。
 

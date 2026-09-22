@@ -33,8 +33,7 @@
 4. `list_scripts`
 5. `search_in_scripts`
 6. `hook_function` / `create_hook` / `inject_hook`
-7. `record_reverse_evidence`
-8. `export_rebuild_bundle`
+7. `export_rebuild_bundle`
 
 ## 步骤清单
 

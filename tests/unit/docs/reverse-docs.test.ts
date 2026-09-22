@@ -44,9 +44,6 @@ describe('reverse workflow docs', () => {
     const algorithmUpgradeTemplate = await readRepoFile(
       'docs/reference/algorithm-upgrade-template.md',
     );
-    const toolReference = await readRepoFile(
-      'docs/reference/tool-reference.md',
-    );
     const toolIoContract = await readRepoFile(
       'docs/reference/tool-io-contract.md',
     );
@@ -97,7 +94,6 @@ describe('reverse workflow docs', () => {
     assert.ok(caseIndex.includes('Runtime: pure-node'));
     assert.ok(caseIndex.includes('字段规范'));
     assert.ok(reverseIndex.includes('export_rebuild_bundle'));
-    assert.ok(reverseIndex.includes('record_reverse_evidence'));
     assert.ok(artifactsDoc.includes('timeline.jsonl'));
     assert.ok(artifactsDoc.includes('最小必备文件'));
     assert.ok(artifactsDoc.includes('可选文件'));
@@ -130,8 +126,6 @@ describe('reverse workflow docs', () => {
     assert.ok(algorithmUpgradeTemplate.includes('first divergence'));
     assert.ok(algorithmUpgradeTemplate.includes('targetFunctionNames'));
     assert.ok(algorithmUpgradeTemplate.includes('env rebuild'));
-    assert.ok(toolReference.includes('targetActionDescription'));
-    assert.ok(toolReference.includes('targetFunctionNames'));
     assert.ok(toolIoContract.includes('Canonical Store'));
     assert.ok(outputContract.includes('targetContext'));
     assert.ok(outputContract.includes('targetActionDescription'));

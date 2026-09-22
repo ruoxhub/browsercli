@@ -1,6 +1,6 @@
 ---
 name: ast-deobfuscation
-description: 使用 Babel AST 对 JavaScript 做分层、可回退的定向反混淆。适用于 `_0x` 标识符、字符串表、自执行解码包装、dispatcher 对象、虚假常量分支、`while/for + switch` 控制流平坦化、`if (literal === opcode)` 分发链，以及需要按站点或混淆家族命中特征切换专用脚本的场景。需要通过 proxycli 从页面定位、导出或运行时验证混淆脚本，以及用户明确提到 decodeObfuscator、reese84、顶象、极验4、同花顺、网易易盾、小红书、OB 变种或类似站点适配时也使用本 skill。
+description: 使用 Babel AST 对 JavaScript 做分层、可回退的定向反混淆。适用于 `_0x` 标识符、字符串表、自执行解码包装、dispatcher 对象、虚假常量分支、`while/for + switch` 控制流平坦化、`if (literal === opcode)` 分发链，以及需要按站点或混淆家族命中特征切换专用脚本的场景。需要通过 browsercli 从页面定位、导出或运行时验证混淆脚本，以及用户明确提到 decodeObfuscator、reese84、顶象、极验4、同花顺、网易易盾、小红书、OB 变种或类似站点适配时也使用本 skill。
 ---
 
 # AST 反混淆
@@ -9,7 +9,7 @@ description: 使用 Babel AST 对 JavaScript 做分层、可回退的定向反�
 
 ## 工作流
 
-1. 输入来自浏览器页面时，先按 `references/proxycli-tools.md` 定位并导出目标脚本；已有本地 JS 文件时跳过此步。
+1. 输入来自浏览器页面时，先按 `references/browsercli-tools.md` 定位并导出目标脚本；已有本地 JS 文件时跳过此步。
 2. 运行 `scripts/detect-patterns.js <input.js> [hint]` 做模式检测。
 3. 只读取命中的站点或混淆家族规则文档。
 4. 运行 `scripts/run-pipeline.js <input.js> <output-dir> [hint]` 执行选中的流水线。
@@ -60,7 +60,7 @@ description: 使用 Babel AST 对 JavaScript 做分层、可回退的定向反�
 
 ## 参考文档
 
-- 从浏览器页面采集源码、补抓 Worker 脚本或验证运行时行为时，读 `references/proxycli-tools.md`，并使用 `proxycli` skill 获取完整命令契约。
+- 从浏览器页面采集源码、补抓 Worker 脚本或验证运行时行为时，读 `references/browsercli-tools.md`，并使用 `browsercli` skill 获取完整命令契约。
 - 新增或调整适配器时，先读 `references/pattern-layering.md`。
 - 任何逻辑想放进通用脚本前，先读 `references/safe-rewrite-rules.md`。
 - 处理字符串表、解码 stub、最小运行时求值时，读 `references/string-array-and-minimal-eval.md`。

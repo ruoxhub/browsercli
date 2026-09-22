@@ -11,10 +11,10 @@
  *
  * 配置优先级（高 → 低）：
  * 1. CLI 参数（--browserUrl 等）
- * 2. 配置文件（~/.proxycli/config.json）
+ * 2. 配置文件（~/.browsercli/config.json）
  * 3. 内置默认值
  *
- * 默认使用 ~/.proxycli/config.json 配置，不再支持 .env。
+ * 默认使用 ~/.browsercli/config.json 配置，不再支持 .env。
  * 配置载入后存入 RuntimeConfigStore 内存态，由前端控制面板管理。
  */
 
@@ -257,14 +257,15 @@ export function configFromEnv(): GlobalConfig {
   return validateGlobalConfig(result);
 }
 
-/** 获取用户级配置文件路径 (~/.proxycli/config.json，支持 PROXYCLI_CONFIG_DIR 覆盖) */
+/** 获取用户级配置文件路径 (~/.browsercli/config.json，支持 BROWSERCLI_CONFIG_DIR 覆盖) */
 export function getUserConfigPath(): string {
-  const custom = process.env.PROXYCLI_CONFIG_DIR;
+  const custom =
+    process.env.BROWSERCLI_CONFIG_DIR ?? process.env.PROXYCLI_CONFIG_DIR;
   if (custom) return path.join(custom, USER_CONFIG_FILENAME);
   return path.join(os.homedir(), USER_CONFIG_DIR_NAME, USER_CONFIG_FILENAME);
 }
 
-/** 加载用户级配置文件 (~/.proxycli/config.json) */
+/** 加载用户级配置文件 (~/.browsercli/config.json) */
 export function loadUserConfig(filePath = getUserConfigPath()): GlobalConfig {
   try {
     if (!existsSync(filePath)) return {};
@@ -279,7 +280,7 @@ export function loadUserConfig(filePath = getUserConfigPath()): GlobalConfig {
   }
 }
 
-/** 写入用户级配置文件 (~/.proxycli/config.json) */
+/** 写入用户级配置文件 (~/.browsercli/config.json) */
 export function writeUserConfig(
   config: GlobalConfig,
   filePath = getUserConfigPath(),
@@ -295,7 +296,7 @@ export function writeUserConfig(
 /**
  * 解析最终 CLI 配置 — 合并配置文件与 CLI 参数，应用默认值
  *
- * 优先级（高→低）：envArgs > ~/.proxycli/config.json > 默认值
+ * 优先级（高→低）：envArgs > ~/.browsercli/config.json > 默认值
  *
  * @param envArgs CLI 参数或显式传入的覆盖值
  */
@@ -325,7 +326,7 @@ export function getToolResultRecordingConfig(): ResolvedToolResultRecordingConfi
     fileConfig.toolResultRecording?.outputDir ??
     (fileConfig.outputDir
       ? path.join(fileConfig.outputDir, 'tool-results')
-      : path.join(os.homedir(), '.proxycli', 'tool-results'));
+      : path.join(os.homedir(), '.browsercli', 'tool-results'));
 
   return {
     enabled: envEnabled ?? fileConfig.toolResultRecording?.enabled ?? false,

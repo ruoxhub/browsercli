@@ -52,8 +52,6 @@ const VALID_CHANNELS: ReadonlySet<Channel> = new Set<Channel>([
   'hook.event',
   'hook.sample',
   'log',
-  'proxy.request', // 切片 2 期间与 session.request 并存，切片 3 才下线
-  'session.request',
 ]);
 
 export class WsHub {

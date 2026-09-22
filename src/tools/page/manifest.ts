@@ -11,7 +11,6 @@ export const manifest = {
   description: 'Page interaction and state tools.',
   profile: 'workflow',
   tools: [
-    {modulePath: './page/clickElement.js', handlerName: 'clickElement'},
     {modulePath: './page/typeText.js', handlerName: 'typeText'},
     {modulePath: './page/waitForElement.js', handlerName: 'waitForElement'},
     {modulePath: './page/scrollBy.js', handlerName: 'scrollBy'},

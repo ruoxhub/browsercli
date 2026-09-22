@@ -15,15 +15,13 @@
 
 - 同一类数据只能有一个页面侧主键（例如 Hook 数据只能写 `__hookStore`）。
 - 工具读取路径必须对齐写入路径，禁止写 A 读 B。
-- 汇总工具（`get_hook_data`/`export_session_report`）必须使用 `hookManager.getAllKnownHookIds()` 口径。
+- 汇总工具（`get_hook_data`）必须使用 `hookManager.getAllKnownHookIds()` 口径。
 
 ## 工具读写契约（全量）
 
 | Tool                         | Read Sources                                                       | Write Sources                            | Canonical Store                                      |
 | ---------------------------- | ------------------------------------------------------------------ | ---------------------------------------- | ---------------------------------------------------- |
 | `deobfuscate_code`           | `runtime.collector` + `runtime.hookManager` + 代码文本             | 分析结果；部分工具写 task artifact       | HookManager / Artifacts                              |
-| `export_session_report`      | `hookManager.getAllKnownHookIds()` + `getRecords()`                | Response report                          | HookManager                                          |
-| `record_reverse_evidence`    | 请求参数 + 当前上下文                                              | task artifact 文件                       | `artifacts/tasks/*`                                  |
 | `collect_code`               | `runtime.collector` + 页面脚本/网络                                | `runtime.collector` 缓存                 | Collector Cache / UnifiedCache                       |
 | `collection_diff`            | `runtime.collector` + 页面脚本/网络                                | `runtime.collector` 缓存                 | Collector Cache / UnifiedCache                       |
 | `search_in_scripts`          | `runtime.collector` + 页面脚本/网络                                | `runtime.collector` 缓存                 | Collector Cache / UnifiedCache                       |
@@ -67,7 +65,7 @@
 | `get_network_request`        | Network 面板缓存                                                   | Response attach only                     | CDP Network                                          |
 | `list_network_requests`      | Network 面板缓存                                                   | Response attach only                     | CDP Network                                          |
 | `check_browser_health`       | PageController + 浏览器会话状态                                    | SessionState 快照/恢复                   | In-memory SessionState                               |
-| `click_element`              | PageController + 浏览器会话状态                                    | SessionState 快照/恢复                   | In-memory SessionState                               |
+| `click`                      | PageController + 浏览器会话状态                                    | SessionState 快照/恢复                   | In-memory SessionState                               |
 | `delete_session_state`       | SessionState 管理器                                                | SessionState 管理器                      | In-memory SessionState                               |
 | `dump_session_state`         | SessionState 管理器                                                | SessionState 管理器                      | In-memory SessionState                               |
 | `get_performance_metrics`    | PageController + 浏览器会话状态                                    | SessionState 快照/恢复                   | In-memory SessionState                               |

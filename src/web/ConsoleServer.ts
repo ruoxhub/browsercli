@@ -24,8 +24,6 @@ import {RestRouter} from './RestRouter.js';
 import {createConfigRoutes} from './routes/config.js';
 import {createHookRoutes} from './routes/hooks.js';
 import {createInvocationsRoutes} from './routes/invocations.js';
-import {createProxyRoutes} from './routes/proxy.js';
-import {createSessionRoutes} from './routes/session.js';
 import {createSystemRoutes} from './routes/system.js';
 import {createToolsRoutes} from './routes/tools.js';
 import {createWorkerRoutes, type WorkerRoutesConfig} from './routes/worker.js';
@@ -80,7 +78,6 @@ export class ConsoleServer {
   private actualPort = 0;
   private unsubscribeToolInvoke?: () => void;
   private onSampleListener?: (hookId: string, sample: unknown) => void;
-  private onProxyCaptureListener?: (record: any) => void;
 
   constructor(options: ConsoleServerOptions) {
     this.options = options;
@@ -169,21 +166,6 @@ export class ConsoleServer {
       }),
     );
     this.router.mount(createHookRoutes(this.options.toolAdapter));
-    this.router.mount(
-      createProxyRoutes(this.options.runtime.mitmModule, this.wsHub),
-    );
-    this.router.mount(
-      createSessionRoutes(() => {
-        const engine = this.options.runtime.captureEngine;
-        const manager = this.options.runtime.captureSessionManager;
-        if (!engine || !manager) return undefined;
-        return {
-          manager,
-          store: engine.getStore(),
-          engine,
-        };
-      }),
-    );
     void ensureToolsMeta().catch(err =>
       console.warn('[ConsoleServer] ensureToolsMeta 失败:', err),
     );
@@ -304,45 +286,6 @@ export class ConsoleServer {
       hookStore.events.on('sample', this.onSampleListener);
     }
 
-    const proxyStore = this.options.runtime.mitmModule?.getStore?.();
-    if (proxyStore) {
-      this.onProxyCaptureListener = (record: any) => {
-        this.wsHub.broadcast('proxy.request', {
-          id: record.id,
-          method: record.method,
-          url: record.url,
-          statusCode: record.statusCode,
-          contentType: record.contentType,
-          timestamp: record.timestamp,
-          ...(record.clientProcess && {
-            clientProcess: {
-              pid: record.clientProcess.pid,
-              name: record.clientProcess.name,
-            },
-          }),
-        });
-      };
-      proxyStore.events.on('capture', this.onProxyCaptureListener);
-    }
-
-    // Session 抓包摘要桥接（spec §8）。
-    // 白名单之外的 type（session.hook / session.snapshot）显式记日志 ——
-    // 它们来自 engine 的 ingestHook/ingestSnapshot，切片 2 不注册这两个频道，
-    // 静默丢弃要显式化，否则"忘了注册"和"没数据"看起来一模一样。
-    //
-    // 用 warn 而非 debug：logger 的默认级别是 info（src/utils/logger.ts:289），
-    // debug() 会被 shouldLog()（:151-153）短路成空操作，除非显式设 LOG_LEVEL=debug
-    // ——那正是"静默"本身，与 spec §8 的意图相反。ingestHook/ingestSnapshot 当前
-    // 无人调用，用 warn 不会刷屏；等它们真的接上、日志变吵时再降回 debug。
-    this.options.runtime.captureEngine?.setEmitToWs(event => {
-      if (event.type !== 'session.request') {
-        logger.warn(`[ConsoleServer] 忽略未注册的 session 事件: ${event.type}`);
-        return;
-      }
-      if (this.wsHub.getSubscriberCount('session.request') === 0) return;
-      this.wsHub.broadcast('session.request', event.payload);
-    });
-
     // 4. 开启监听（host 可配置，默认 127.0.0.1）
     await new Promise<void>((resolve, reject) => {
       this.httpServer!.listen(
@@ -375,12 +318,6 @@ export class ConsoleServer {
       hookStore?.events.off('sample', this.onSampleListener);
       this.onSampleListener = undefined;
     }
-    if (this.onProxyCaptureListener) {
-      const proxyStore = this.options.runtime.mitmModule?.getStore?.();
-      proxyStore?.events.off('capture', this.onProxyCaptureListener);
-      this.onProxyCaptureListener = undefined;
-    }
-    this.options.runtime.captureEngine?.setEmitToWs(undefined);
 
     // 2. 关闭所有活动的 WebSocket 并销毁 ws 服务
     if (this.wsServer) {

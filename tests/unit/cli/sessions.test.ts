@@ -75,7 +75,7 @@ async function startLiveDaemon(): Promise<{
 }
 
 describe('open 真实 spawn（假 entry + 注入 daemonDir）', () => {
-  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'proxycli-sess-'));
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'browsercli-sess-'));
   const daemonDir = path.join(workspace, 'daemon');
   const session = `sess-${process.pid}`;
 
@@ -126,7 +126,7 @@ describe('open 真实 spawn（假 entry + 注入 daemonDir）', () => {
 });
 
 describe('open/close/list 注册表分支', () => {
-  const baseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'proxycli-sess2-'));
+  const baseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'browsercli-sess2-'));
   let live: {server: net.Server; socketPath: string};
 
   before(async () => {

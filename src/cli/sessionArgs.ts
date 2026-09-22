@@ -6,7 +6,7 @@
 
 /**
  * 会话与 daemon spawn flag 的 argv 解析。runAxiCli 要求 flag 必须位于命令之后
- * （`proxycli <command> [...] -s=x`），因此这里对全量 argv 扫描，
+ * （`browsercli <command> [...] -s=x`），因此这里对全量 argv 扫描，
  * 而不是解析命令段之后的 args。
  */
 
@@ -51,7 +51,7 @@ export function sessionFromArgv(argv: readonly string[]): string | undefined {
 }
 
 /**
- * 提取命令之前的前置会话 flag（`proxycli -s=x open`）。
+ * 提取命令之前的前置会话 flag（`browsercli -s=x open`）。
  * runAxiCli 会以 "Flags must come after the command" 拒绝以 `-` 开头的
  * argv[0]，故 bin 入口先把前置 -s/--session 摘出来再把 rest 交给 SDK。
  */

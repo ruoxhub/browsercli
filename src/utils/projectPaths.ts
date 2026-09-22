@@ -72,7 +72,3 @@ export function resolveDefaultCodeCacheDir(moduleUrl: string): string {
 export function resolveDefaultEnvPath(moduleUrl: string): string {
   return path.join(resolvePackageRoot(moduleUrl), '.env');
 }
-
-export function resolveDefaultSessionDbFile(): string {
-  return path.join(os.homedir(), '.proxycli', 'cache', 'reverser.db');
-}

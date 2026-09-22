@@ -51,7 +51,7 @@ function inferArgValue(value: string | boolean, spec?: ToolArgSpec): unknown {
     if (Array.isArray(parsed)) return parsed;
     return value;
   }
-  // 对象参数（如 create_hook 的 params、record_reverse_evidence 的 entry）：
+  // 对象参数（如 create_hook 的 params）：
   // 若传入 JSON 对象字面量则解析为对象，否则原样返回交由服务端校验。
   if (spec?.type === 'object') {
     const parsed = maybeParseJsonLiteral(value);

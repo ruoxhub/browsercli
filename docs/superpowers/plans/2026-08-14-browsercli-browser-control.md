@@ -2,13 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add `proxycli browser connect|disconnect|status` commands backed by authenticated `/api/v1/browser/*` Worker routes, with incremental runtime configuration and safe lifecycle serialization.
+**Goal:** Add `browsercli browser connect|disconnect|status` commands backed by authenticated `/api/v1/browser/*` Worker routes, with incremental runtime configuration and safe lifecycle serialization.
 
-**Architecture:** Keep `proxycli` a pure remote client. The Worker owns validation, runtime configuration, browser lifecycle, and status; the CLI maps friendly kebab-case flags to the stable HTTP contract. Reuse `BrowserConnectionManager`, `RuntimeConfigStore`, `BrowserConfigSchema`, `ToolContextProvider`, and `WorkerHttpClient`; add no dependency and do not alter the legacy Web-console routes.
+**Architecture:** Keep `browsercli` a pure remote client. The Worker owns validation, runtime configuration, browser lifecycle, and status; the CLI maps friendly kebab-case flags to the stable HTTP contract. Reuse `BrowserConnectionManager`, `RuntimeConfigStore`, `BrowserConfigSchema`, `ToolContextProvider`, and `WorkerHttpClient`; add no dependency and do not alter the legacy Web-console routes.
 
 **Tech Stack:** TypeScript ESM, Node.js `node:test`, built-in `fetch`, Zod 3, `axi-sdk-js`, existing REST router and BrowserManager/Patchright runtime.
 
-**Design:** `docs/superpowers/specs/2026-08-14-proxycli-browser-control-design.md` (`0d3b593`)
+**Design:** `docs/superpowers/specs/2026-08-14-browsercli-browser-control-design.md` (`0d3b593`)
 
 ## Global Constraints
 
@@ -19,7 +19,7 @@
 - `/api/v1/browser/*` stays behind the existing Bearer Token boundary and never returns configuration or `wsHeaders`.
 - The request accepts only the approved common fields; Worker validation is authoritative even when the CLI validates first.
 - Do not start a real browser in tests. Mock `BrowserManager` and use loopback HTTP test servers.
-- The working tree already contains user changes in `src/web/routes/apiV1.ts`, `proxycli/src/WorkerHttpClient.ts`, and `proxycli/tests/unit/WorkerHttpClient.test.ts`, plus an untracked `tests/unit/web/routes/apiV1.test.ts`. Preserve them. Use the new browser-specific test files below and `git add -p` for overlapping source files.
+- The working tree already contains user changes in `src/web/routes/apiV1.ts`, `browsercli/src/WorkerHttpClient.ts`, and `browsercli/tests/unit/WorkerHttpClient.test.ts`, plus an untracked `tests/unit/web/routes/apiV1.test.ts`. Preserve them. Use the new browser-specific test files below and `git add -p` for overlapping source files.
 - Before every commit, inspect `git diff --cached --name-status` and `git diff --cached`; never stage an unrelated hunk.
 
 ## File Map
@@ -31,13 +31,13 @@
 | `src/web/routes/apiV1.ts`                                | Browser request validation, config merge, three v1 routes, and lifecycle/job serialization |
 | `src/web/ConsoleServer.ts`                               | Inject the current `ToolContextProvider` into v1 route dependencies                        |
 | `tests/unit/web/routes/apiV1.browser.test.ts`            | Isolated v1 browser route/config/concurrency tests                                         |
-| `proxycli/src/WorkerHttpClient.ts`                     | Typed client methods for browser status/connect/disconnect                                 |
-| `proxycli/tests/unit/WorkerHttpClient.browser.test.ts` | HTTP path/body/auth tests without touching the existing dirty client test                  |
-| `proxycli/src/commands/browser.ts`                     | Subcommand dispatch, approved flag parsing, validation, and output                         |
-| `proxycli/tests/unit/browser.test.ts`                  | CLI mapping, conflicts, dispatch, and output tests                                         |
-| `proxycli/src/app.ts`                                  | Register the new top-level command                                                         |
-| `proxycli/src/help.ts`                                 | Top-level and command-group help                                                           |
-| `proxycli/tests/unit/help.test.ts`                     | Help and kept-command coverage                                                             |
+| `browsercli/src/WorkerHttpClient.ts`                     | Typed client methods for browser status/connect/disconnect                                 |
+| `browsercli/tests/unit/WorkerHttpClient.browser.test.ts` | HTTP path/body/auth tests without touching the existing dirty client test                  |
+| `browsercli/src/commands/browser.ts`                     | Subcommand dispatch, approved flag parsing, validation, and output                         |
+| `browsercli/tests/unit/browser.test.ts`                  | CLI mapping, conflicts, dispatch, and output tests                                         |
+| `browsercli/src/app.ts`                                  | Register the new top-level command                                                         |
+| `browsercli/src/help.ts`                                 | Top-level and command-group help                                                           |
+| `browsercli/tests/unit/help.test.ts`                     | Help and kept-command coverage                                                             |
 
 ---
 
@@ -195,7 +195,7 @@ Run the dependency checks once before the feature commit sequence; no task chang
 
 ```powershell
 npm audit
-npm --prefix proxycli audit
+npm --prefix browsercli audit
 ```
 
 Record any pre-existing advisory without changing dependencies. Then stage and commit:
@@ -1053,8 +1053,8 @@ git commit -m "fix(api): serialize browser lifecycle operations"
 
 **Files:**
 
-- Modify: `proxycli/src/WorkerHttpClient.ts:18-114`
-- Create: `proxycli/tests/unit/WorkerHttpClient.browser.test.ts`
+- Modify: `browsercli/src/WorkerHttpClient.ts:18-114`
+- Create: `browsercli/tests/unit/WorkerHttpClient.browser.test.ts`
 
 **Interfaces:**
 
@@ -1066,7 +1066,7 @@ git commit -m "fix(api): serialize browser lifecycle operations"
 
 - [ ] **Step 1: Create a failing HTTP contract test**
 
-Create `proxycli/tests/unit/WorkerHttpClient.browser.test.ts`:
+Create `browsercli/tests/unit/WorkerHttpClient.browser.test.ts`:
 
 ```ts
 import assert from 'node:assert/strict';
@@ -1150,10 +1150,10 @@ describe('WorkerHttpClient browser control', () => {
 });
 ```
 
-- [ ] **Step 2: Run proxycli tests and verify RED**
+- [ ] **Step 2: Run browsercli tests and verify RED**
 
 ```powershell
-npm --prefix proxycli test
+npm --prefix browsercli test
 ```
 
 Expected: TypeScript fails because the three client methods do not exist.
@@ -1215,11 +1215,11 @@ async disconnectBrowser(): Promise<BrowserConnectionStatus> {
 }
 ```
 
-- [ ] **Step 4: Run proxycli tests and typecheck**
+- [ ] **Step 4: Run browsercli tests and typecheck**
 
 ```powershell
-npm --prefix proxycli test
-npm --prefix proxycli run typecheck
+npm --prefix browsercli test
+npm --prefix browsercli run typecheck
 ```
 
 Expected: both commands exit 0.
@@ -1229,24 +1229,24 @@ Expected: both commands exit 0.
 `WorkerHttpClient.ts` already contains user changes, so do not stage the whole file:
 
 ```powershell
-git add -p -- proxycli/src/WorkerHttpClient.ts
-git add -- proxycli/tests/unit/WorkerHttpClient.browser.test.ts
+git add -p -- browsercli/src/WorkerHttpClient.ts
+git add -- browsercli/tests/unit/WorkerHttpClient.browser.test.ts
 git diff --cached --check
 git diff --cached --name-status
 git diff --cached
-git commit -m "feat(proxycli): add browser HTTP client methods"
+git commit -m "feat(browsercli): add browser HTTP client methods"
 ```
 
 The cached diff must not include the existing stream subscription or timeout changes.
 
 ---
 
-### Task 5: Implement `proxycli browser` Parsing and Dispatch
+### Task 5: Implement `browsercli browser` Parsing and Dispatch
 
 **Files:**
 
-- Create: `proxycli/src/commands/browser.ts`
-- Create: `proxycli/tests/unit/browser.test.ts`
+- Create: `browsercli/src/commands/browser.ts`
+- Create: `browsercli/tests/unit/browser.test.ts`
 
 **Interfaces:**
 
@@ -1255,7 +1255,7 @@ The cached diff must not include the existing stream subscription or timeout cha
 
 - [ ] **Step 1: Write failing command tests**
 
-Create `proxycli/tests/unit/browser.test.ts` with a recording fake client:
+Create `browsercli/tests/unit/browser.test.ts` with a recording fake client:
 
 ```ts
 import assert from 'node:assert/strict';
@@ -1427,17 +1427,17 @@ describe('browserCommand', () => {
 });
 ```
 
-- [ ] **Step 2: Run proxycli tests and verify RED**
+- [ ] **Step 2: Run browsercli tests and verify RED**
 
 ```powershell
-npm --prefix proxycli test
+npm --prefix browsercli test
 ```
 
 Expected: FAIL because `commands/browser.ts` does not exist.
 
 - [ ] **Step 3: Create strict parsing helpers**
 
-Create `proxycli/src/commands/browser.ts`. Use these exact approved flag sets and value helpers:
+Create `browsercli/src/commands/browser.ts`. Use these exact approved flag sets and value helpers:
 
 ```ts
 import {AxiError} from 'axi-sdk-js';
@@ -1491,7 +1491,7 @@ const CHANNELS = new Set([
 
 function invalid(message: string): never {
   throw new AxiError(message, 'VALIDATION_ERROR', [
-    '用法：proxycli browser connect|disconnect|status [options]',
+    '用法：browsercli browser connect|disconnect|status [options]',
   ]);
 }
 
@@ -1694,11 +1694,11 @@ export const browserCommand: AxiCliCommand<WorkerContext> = async (
 };
 ```
 
-- [ ] **Step 5: Run proxycli tests and typecheck**
+- [ ] **Step 5: Run browsercli tests and typecheck**
 
 ```powershell
-npm --prefix proxycli test
-npm --prefix proxycli run typecheck
+npm --prefix browsercli test
+npm --prefix browsercli run typecheck
 ```
 
 Expected: all package tests and typecheck pass.
@@ -1706,10 +1706,10 @@ Expected: all package tests and typecheck pass.
 - [ ] **Step 6: Commit Task 5**
 
 ```powershell
-git add -- proxycli/src/commands/browser.ts proxycli/tests/unit/browser.test.ts
+git add -- browsercli/src/commands/browser.ts browsercli/tests/unit/browser.test.ts
 git diff --cached --check
 git diff --cached --name-status
-git commit -m "feat(proxycli): add browser control command"
+git commit -m "feat(browsercli): add browser control command"
 ```
 
 ---
@@ -1718,10 +1718,10 @@ git commit -m "feat(proxycli): add browser control command"
 
 **Files:**
 
-- Modify: `proxycli/src/app.ts:9-27`
-- Modify: `proxycli/src/help.ts:11-90`
-- Modify: `proxycli/tests/unit/help.test.ts:11-105`
-- Modify: `proxycli/tests/unit/browser.test.ts`
+- Modify: `browsercli/src/app.ts:9-27`
+- Modify: `browsercli/src/help.ts:11-90`
+- Modify: `browsercli/tests/unit/help.test.ts:11-105`
+- Modify: `browsercli/tests/unit/browser.test.ts`
 
 **Interfaces:**
 
@@ -1750,10 +1750,10 @@ it('registers browser as a top-level command', () => {
 });
 ```
 
-- [ ] **Step 2: Run proxycli tests and verify RED**
+- [ ] **Step 2: Run browsercli tests and verify RED**
 
 ```powershell
-npm --prefix proxycli test
+npm --prefix browsercli test
 ```
 
 Expected: help and registry assertions fail because `browser` is not registered.
@@ -1772,20 +1772,20 @@ In `help.ts`, add the description, include `browser` in the default list, and ad
 browser: {
   description: '连接、断开或查看 Worker 浏览器状态',
   usage: [
-    'proxycli browser connect [options]',
-    'proxycli browser disconnect [--json]',
-    'proxycli browser status [--json]',
+    'browsercli browser connect [options]',
+    'browsercli browser disconnect [--json]',
+    'browsercli browser status [--json]',
   ].join('\n         '),
 },
 ```
 
 The top-level order is `call`, `list-tools`, `browser`, `config`, `scaffold`, `status`.
 
-- [ ] **Step 4: Run proxycli tests and typecheck**
+- [ ] **Step 4: Run browsercli tests and typecheck**
 
 ```powershell
-npm --prefix proxycli test
-npm --prefix proxycli run typecheck
+npm --prefix browsercli test
+npm --prefix browsercli run typecheck
 ```
 
 Expected: both commands exit 0.
@@ -1793,10 +1793,10 @@ Expected: both commands exit 0.
 - [ ] **Step 5: Commit Task 6**
 
 ```powershell
-git add -- proxycli/src/app.ts proxycli/src/help.ts proxycli/tests/unit/help.test.ts proxycli/tests/unit/browser.test.ts
+git add -- browsercli/src/app.ts browsercli/src/help.ts browsercli/tests/unit/help.test.ts browsercli/tests/unit/browser.test.ts
 git diff --cached --check
 git diff --cached --name-status
-git commit -m "docs(proxycli): expose browser command help"
+git commit -m "docs(browsercli): expose browser command help"
 ```
 
 ---
@@ -1817,7 +1817,7 @@ git commit -m "docs(proxycli): expose browser command help"
 ```powershell
 git status --short
 git log --oneline -7
-git diff HEAD~6 -- src/worker/BrowserConnectionManager.ts src/web/routes/apiV1.ts src/web/ConsoleServer.ts tests/unit/worker/BrowserConnectionManager.test.ts tests/unit/web/routes/apiV1.browser.test.ts proxycli/src/WorkerHttpClient.ts proxycli/src/commands/browser.ts proxycli/src/app.ts proxycli/src/help.ts proxycli/tests/unit/WorkerHttpClient.browser.test.ts proxycli/tests/unit/browser.test.ts proxycli/tests/unit/help.test.ts
+git diff HEAD~6 -- src/worker/BrowserConnectionManager.ts src/web/routes/apiV1.ts src/web/ConsoleServer.ts tests/unit/worker/BrowserConnectionManager.test.ts tests/unit/web/routes/apiV1.browser.test.ts browsercli/src/WorkerHttpClient.ts browsercli/src/commands/browser.ts browsercli/src/app.ts browsercli/src/help.ts browsercli/tests/unit/WorkerHttpClient.browser.test.ts browsercli/tests/unit/browser.test.ts browsercli/tests/unit/help.test.ts
 ```
 
 Confirm each changed line maps to the feature and that pre-existing user hunks are neither reverted nor included in the six feature commits.
@@ -1827,7 +1827,7 @@ Confirm each changed line maps to the feature and that pre-existing user hunks a
 ```powershell
 npm run build:compile
 node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/unit/worker/BrowserConnectionManager.test.js build/tests/unit/web/routes/apiV1.browser.test.js
-npm --prefix proxycli test
+npm --prefix browsercli test
 ```
 
 Expected: every command exits 0 with zero failing tests.
@@ -1835,7 +1835,7 @@ Expected: every command exits 0 with zero failing tests.
 - [ ] **Step 3: Run required type and formatting gates**
 
 ```powershell
-npm --prefix proxycli run typecheck
+npm --prefix browsercli run typecheck
 npm run typecheck
 npm run test:unit
 npm run check-format
@@ -1847,7 +1847,7 @@ Expected: every command exits 0. If a command fails, repair only the task-owned 
 
 ```powershell
 npm audit
-npm --prefix proxycli audit
+npm --prefix browsercli audit
 ```
 
 Expected: no unresolved vulnerability introduced by this change. Because no dependency changes are planned, any pre-existing advisory must be recorded separately and must not be “fixed” by an unrelated dependency upgrade.

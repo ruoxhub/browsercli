@@ -26,12 +26,6 @@ export interface PageRuntimeServices {
 
 // ─── 参数类型 ──────────────────────────────────────────
 
-/** clickElement 参数 */
-export interface ClickElementParams {
-  /** 元素定位器（CSS / role= / text= / xpath=） */
-  selector: string;
-}
-
 /** typeText 参数 */
 export interface TypeTextParams {
   /** 元素定位器（CSS / role= / text= / xpath=） */
@@ -125,12 +119,6 @@ export interface ElementInfo {
   className?: string;
   textContent?: string;
   attributes: Record<string, string>;
-}
-
-/** clickElement 返回数据 */
-export interface ClickElementData {
-  selector: string;
-  clicked: boolean;
 }
 
 /** typeText 返回数据 */
@@ -257,11 +245,6 @@ export interface CheckBrowserHealthData {
 export interface PageResult<T = unknown> extends MessagesResult<T> {
   /** 使用的日志格式 */
   logFormat: string;
-}
-
-/** clickElement 结果 */
-export interface ClickElementResult extends PageResult<ClickElementData> {
-  tooltype: 'click_element';
 }
 
 /** typeText 结果 */

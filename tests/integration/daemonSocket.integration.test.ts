@@ -6,7 +6,7 @@
 
 /**
  * 端到端集成测试：真实 detached daemon（build/src/index.js --daemon）
- * + 真实 proxycli CLI（proxycli/build/bin/proxycli.js），
+ * + 真实 browsercli CLI（browsercli/build/bin/browsercli.js），
  * 走本地命名管道 / unix socket 的完整生命周期：
  * open → list-tools → call(未知工具) → close。
  */
@@ -22,7 +22,7 @@ import {fileURLToPath} from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 // 运行时位置：<repo>/build/tests/integration —— 上溯三级即仓库根。
 const repoRoot = path.resolve(here, '../../..');
-const cliBin = path.join(repoRoot, 'build', 'src', 'cli', 'bin', 'proxycli.js');
+const cliBin = path.join(repoRoot, 'build', 'src', 'cli', 'bin', 'browsercli.js');
 const daemonEntry = path.join(repoRoot, 'build', 'src', 'index.js');
 
 interface SessionConfig {
@@ -129,7 +129,7 @@ describe('daemon socket end-to-end', () => {
   before(() => {
     tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bcli-daemon-e2e-'));
     workspace = path.join(tmpRoot, 'ws');
-    fs.mkdirSync(path.join(workspace, '.proxycli'), {recursive: true});
+    fs.mkdirSync(path.join(workspace, '.browsercli'), {recursive: true});
     daemonDir = path.join(tmpRoot, 'daemon');
     cliEnv = {
       ...process.env,
@@ -140,7 +140,7 @@ describe('daemon socket end-to-end', () => {
     };
     assert.ok(
       fs.existsSync(cliBin),
-      `proxycli bin missing: ${cliBin} (run npm run build first)`,
+      `browsercli bin missing: ${cliBin} (run npm run build first)`,
     );
     assert.ok(
       fs.existsSync(daemonEntry),
@@ -205,13 +205,13 @@ describe('daemon socket end-to-end', () => {
     assert.match(output, /UNKNOWN_TOOL/);
   });
 
-  it('call list_mitm_requests over socket returns valid structured data', () => {
+  it('call list_stealth_presets over socket returns valid structured data', () => {
     const {stdout} = runCli([
       `-s=${SESSION_NAME}`,
       'call',
-      'list_mitm_requests',
+      'list_stealth_presets',
     ]);
-    assert.match(stdout, /list_mitm_requests/);
+    assert.match(stdout, /list_stealth_presets/);
     assert.match(stdout, /status:\s*success/);
   });
 

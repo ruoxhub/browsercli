@@ -2,13 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 交付修订版规范 `docs/superpowers/specs/2026-08-22-proxycli-heavy-page-optimization-design.md` 中 6 个剩余增量的最小可测实现。
+**Goal:** 交付修订版规范 `docs/superpowers/specs/2026-08-22-browsercli-heavy-page-optimization-design.md` 中 6 个剩余增量的最小可测实现。
 
-**Architecture:** 基于既有 `NetworkModule` / `websocketFormatter` / `HookManager` / `WorkerHttpClient` / proxycli `tool-dispatcher` 之上做增量；全部改动可 `node:test` 单测闭环，不引入新依赖。协议级 CDP `Fetch.enable` 运行时接线与 `analyze_websocket_messages` 的逐帧解码明确划出本计划边界。
+**Architecture:** 基于既有 `NetworkModule` / `websocketFormatter` / `HookManager` / `WorkerHttpClient` / browsercli `tool-dispatcher` 之上做增量；全部改动可 `node:test` 单测闭环，不引入新依赖。协议级 CDP `Fetch.enable` 运行时接线与 `analyze_websocket_messages` 的逐帧解码明确划出本计划边界。
 
-**Tech Stack:** TypeScript ESM + `node:test`（`node:assert`）+ swc 构建 + zod schema。proxycli 子包独立 `tsc` 构建。
+**Tech Stack:** TypeScript ESM + `node:test`（`node:assert`）+ swc 构建 + zod schema。browsercli 子包独立 `tsc` 构建。
 
-**Spec:** `docs/superpowers/specs/2026-08-22-proxycli-heavy-page-optimization-design.md`（第 3 节 6 个增量、第 4 节决策 D2/D3/D5，第 5 节验证策略）。
+**Spec:** `docs/superpowers/specs/2026-08-22-browsercli-heavy-page-optimization-design.md`（第 3 节 6 个增量、第 4 节决策 D2/D3/D5，第 5 节验证策略）。
 
 ## Global Constraints
 
@@ -24,8 +24,8 @@
 
 - 根项目单文件测试（快速）：`npm run build:dev` 然后 `node --require ./build/tests/setup.js --no-warnings=ExperimentalWarning --test build/tests/unit/<path>.test.js`
 - 根项目类型检查：`npm run typecheck`
-- proxycli 测试：`npm --prefix proxycli run test`
-- proxycli 类型检查：`npm --prefix proxycli run typecheck`
+- browsercli 测试：`npm --prefix browsercli run test`
+- browsercli 类型检查：`npm --prefix browsercli run typecheck`
 - 提交前全量：`npm run test:unit` + `npm run check-format`
 
 ---
@@ -33,8 +33,8 @@
 ### Task 1: WorkerHttpClient 409 退避重试
 
 **Files:**
-- Modify: `proxycli/src/WorkerHttpClient.ts`（`WorkerHttpClientOptions` 接口 `23-28`、constructor `88-93`、`invoke` `224-261`）
-- Test: `proxycli/tests/unit/WorkerHttpClient.test.ts`
+- Modify: `browsercli/src/WorkerHttpClient.ts`（`WorkerHttpClientOptions` 接口 `23-28`、constructor `88-93`、`invoke` `224-261`）
+- Test: `browsercli/tests/unit/WorkerHttpClient.test.ts`
 
 **Interfaces:**
 - Consumes: `submitInvoke`（`191-206`）、`json()` 对 `!res.ok` 抛 `HTTP 409: <body>`（body 含 `"code":"WORKER_BUSY"`）。
@@ -42,7 +42,7 @@
 
 - [ ] **Step 1: 写失败测试**
 
-在 `proxycli/tests/unit/WorkerHttpClient.test.ts` 末尾（`describe` 之外）追加：
+在 `browsercli/tests/unit/WorkerHttpClient.test.ts` 末尾（`describe` 之外）追加：
 
 ```typescript
 describe('WorkerHttpClient.invoke busy retry', () => {
@@ -126,12 +126,12 @@ describe('WorkerHttpClient.invoke busy retry', () => {
 
 - [ ] **Step 2: 运行测试确认为失败**
 
-Run: `npm --prefix proxycli run test`
+Run: `npm --prefix browsercli run test`
 Expected: FAIL — 第一个用例 `retries a WORKER_BUSY 409` 报 `HTTP 409`（`invoke` 无退避，直接抛出）；`busyRetryDelaysMs` 尚未被 `WorkerHttpClientOptions` 接受（TS 编译错误）。
 
 - [ ] **Step 3: 最小实现**
 
-在 `proxycli/src/WorkerHttpClient.ts` 做三处修改：
+在 `browsercli/src/WorkerHttpClient.ts` 做三处修改：
 
 1) `WorkerHttpClientOptions`（`23-28`）加字段：
 
@@ -211,13 +211,13 @@ function isWorkerBusyError(err: unknown): boolean {
 
 - [ ] **Step 4: 运行测试确认通过**
 
-Run: `npm --prefix proxycli run test`
+Run: `npm --prefix browsercli run test`
 Expected: PASS — 两个新用例通过；原有 `invoke` 用例不受影响。
 
 - [ ] **Step 5: 提交**
 
 ```bash
-cd proxycli && git add -A && git commit -m "feat(proxycli): retry WORKER_BUSY 409 with backoff in WorkerHttpClient" && cd ..
+cd browsercli && git add -A && git commit -m "feat(browsercli): retry WORKER_BUSY 409 with backoff in WorkerHttpClient" && cd ..
 ```
 
 ---
@@ -1073,12 +1073,12 @@ git add -A && git commit -m "feat(websocket): support direction=both in websocke
 
 ---
 
-### Task 7: proxycli `call --json` 纯数据输出
+### Task 7: browsercli `call --json` 纯数据输出
 
 **Files:**
-- Modify: `proxycli/src/commands/shared/tool-args.ts:13-19`（`TOOL_CONTROL_FLAGS`）
-- Modify: `proxycli/src/commands/tool-dispatcher.ts`（读 `json` flag + 输出分支）
-- Test: `proxycli/tests/unit/tool-dispatcher.test.ts`
+- Modify: `browsercli/src/commands/shared/tool-args.ts:13-19`（`TOOL_CONTROL_FLAGS`）
+- Modify: `browsercli/src/commands/tool-dispatcher.ts`（读 `json` flag + 输出分支）
+- Test: `browsercli/tests/unit/tool-dispatcher.test.ts`
 
 **Interfaces:**
 - Consumes: `getBoolFlag`（`tool-dispatcher.ts:12` 已 import）、`successOutput`、`TOOL_CONTROL_FLAGS`。
@@ -1086,7 +1086,7 @@ git add -A && git commit -m "feat(websocket): support direction=both in websocke
 
 - [ ] **Step 1: 写失败测试**
 
-在 `proxycli/tests/unit/tool-dispatcher.test.ts` 的 `describe('tool-dispatcher (pure HTTP)')` 内追加：
+在 `browsercli/tests/unit/tool-dispatcher.test.ts` 的 `describe('tool-dispatcher (pure HTTP)')` 内追加：
 
 ```typescript
   it('emits raw tool result when --json is set', async () => {
@@ -1107,12 +1107,12 @@ git add -A && git commit -m "feat(websocket): support direction=both in websocke
 
 - [ ] **Step 2: 运行测试确认为失败**
 
-Run: `npm --prefix proxycli run test`
+Run: `npm --prefix browsercli run test`
 Expected: FAIL — 第一个用例：返回仍是 `{status, command, target, tool, result}` 而非 `{hello:'world'}`；第二个用例：`invokeCalls[0][2]` 为 `{json: true}`（`json` 未被当作控制 flag 排除）。
 
 - [ ] **Step 3: 实现**
 
-1) `proxycli/src/commands/shared/tool-args.ts:13-19` 的 `TOOL_CONTROL_FLAGS` 追加 `json`：
+1) `browsercli/src/commands/shared/tool-args.ts:13-19` 的 `TOOL_CONTROL_FLAGS` 追加 `json`：
 
 ```typescript
 export const TOOL_CONTROL_FLAGS: ReadonlySet<string> = new Set([
@@ -1125,7 +1125,7 @@ export const TOOL_CONTROL_FLAGS: ReadonlySet<string> = new Set([
 ]);
 ```
 
-2) `proxycli/src/commands/tool-dispatcher.ts` 在 `try` 块末尾（`return successOutput({...})`，即 `199-211` 处）改为：
+2) `browsercli/src/commands/tool-dispatcher.ts` 在 `try` 块末尾（`return successOutput({...})`，即 `199-211` 处）改为：
 
 ```typescript
     const failure = extractToolFailure(result);
@@ -1147,13 +1147,13 @@ export const TOOL_CONTROL_FLAGS: ReadonlySet<string> = new Set([
 
 - [ ] **Step 4: 运行测试确认通过**
 
-Run: `npm --prefix proxycli run test`
+Run: `npm --prefix browsercli run test`
 Expected: PASS — 两个新用例通过；既有 `tool-dispatcher` 用例不受影响。
 
 - [ ] **Step 5: 提交**
 
 ```bash
-cd proxycli && git add -A && git commit -m "feat(proxycli): emit raw JSON from call --json" && cd ..
+cd browsercli && git add -A && git commit -m "feat(browsercli): emit raw JSON from call --json" && cd ..
 ```
 
 ---
@@ -1168,7 +1168,7 @@ cd proxycli && git add -A && git commit -m "feat(proxycli): emit raw JSON from c
 
 ## Execution Handoff
 
-计划已保存到 `docs/superpowers/plans/2026-08-22-proxycli-heavy-page-optimization.md`。
+计划已保存到 `docs/superpowers/plans/2026-08-22-browsercli-heavy-page-optimization.md`。
 
 **两种执行方式：**
 

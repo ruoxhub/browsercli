@@ -300,7 +300,7 @@ SP1 §2.2 的「越限叛逃」已经实现了流式阈值语义（大 body 停�
 - 不引入任何持久化层；域名过滤与 rewrite 规则同为进程内态。
 - 不做 SOCKS5 服务端、证书下载页、系统代理设置、HTTP/2 全量（沿 `2026-08-26` 裁剪与
   gap-analysis 结论）。
-- 不改 `src/web/`、`src/web-ui/`、`proxycli/`、`worker/`。
+- 不改 `src/web/`、`src/web-ui/`、`browsercli/`、`worker/`。
 - **沿用 1MB 阈值**（不跟 ProxyPin 的 4MB）：`MAX_BODY_SIZE` 来自
   `src/modules/network/constants.ts` 的 `MAX_CAPTURED_BODY_BYTES`，与浏览器抓包链路共用，
   调它会波及 network 域，本轮不动。

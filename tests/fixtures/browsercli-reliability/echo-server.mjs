@@ -1,11 +1,11 @@
 /**
- * Deterministic local fixture server for proxycli-reliability integration tests.
+ * Deterministic local fixture server for browsercli-reliability integration tests.
  *
  * Serves static fixture files over HTTP, a JSON fetch/XHR endpoint, and a WebSocket
  * echo endpoint. Binds loopback on an ephemeral port and closes all sockets in teardown.
  *
  * Usage:
- *   node tests/fixtures/proxycli-reliability/echo-server.mjs
+ *   node tests/fixtures/browsercli-reliability/echo-server.mjs
  * Prints the bound URL as the final line of stdout, e.g. "http://127.0.0.1:PORT".
  */
 

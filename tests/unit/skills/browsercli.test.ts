@@ -11,10 +11,10 @@ import {describe, it} from 'node:test';
 
 const repoRoot = process.cwd();
 
-describe('proxycli skill contract', () => {
+describe('browsercli skill contract', () => {
   it('documents recovery and runtime tools with supported parameters', async () => {
     const skill = await readFile(
-      path.join(repoRoot, 'skills/proxycli/SKILL.md'),
+      path.join(repoRoot, 'skills/browsercli/SKILL.md'),
       'utf8',
     );
     const sourceCommand = skill
@@ -28,14 +28,14 @@ describe('proxycli skill contract', () => {
     assert.doesNotMatch(sourceCommand, /--prettyPrint|--offset/);
 
     for (const command of [
-      'proxycli jobs list',
-      'proxycli jobs cancel',
-      'proxycli call evaluate_script',
-      'proxycli call get_storage',
-      'proxycli call collect_wasm',
+      'browsercli jobs list',
+      'browsercli jobs cancel',
+      'browsercli call evaluate_script',
+      'browsercli call get_storage',
+      'browsercli call collect_wasm',
       '--captureBase64 <bool>',
     ]) {
-      assert.ok(skill.includes(command), `missing proxycli docs: ${command}`);
+      assert.ok(skill.includes(command), `missing browsercli docs: ${command}`);
     }
   });
 });

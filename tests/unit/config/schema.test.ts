@@ -109,9 +109,9 @@ describe('config schema validation', {concurrency: false}, () => {
     assert.strictEqual(config.browser?.channel, 'bidi-chromium');
   });
 
-  it('resolves config from user config file (~/.proxycli/config.json)', () => {
+  it('resolves config from user config file (~/.browsercli/config.json)', () => {
     const tmpDir = mkdtempSync(
-      path.join(os.tmpdir(), 'proxycli-resolve-test-'),
+      path.join(os.tmpdir(), 'browsercli-resolve-test-'),
     );
     process.env.PROXYCLI_CONFIG_DIR = tmpDir;
     try {
@@ -135,7 +135,7 @@ describe('config schema validation', {concurrency: false}, () => {
 
   it('allows overriding user config file with explicit arguments', () => {
     const tmpDir = mkdtempSync(
-      path.join(os.tmpdir(), 'proxycli-resolve-test-'),
+      path.join(os.tmpdir(), 'browsercli-resolve-test-'),
     );
     process.env.PROXYCLI_CONFIG_DIR = tmpDir;
     try {
