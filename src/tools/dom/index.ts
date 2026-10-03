@@ -9,6 +9,7 @@
 export {queryDom} from './queryDom.js';
 export {getDomStructure} from './getDomStructure.js';
 export {findClickableElements} from './findClickableElements.js';
+export {takeSnapshot} from './takeSnapshot.js';
 
 // ─── 辅助类导出 ──────────────────────────────────────
 

@@ -17,5 +17,9 @@ export const manifest = {
       modulePath: './dom/findClickableElements.js',
       handlerName: 'findClickableElements',
     },
+    {
+      modulePath: './dom/takeSnapshot.js',
+      handlerName: 'takeSnapshot',
+    },
   ],
 } satisfies DomainManifest;

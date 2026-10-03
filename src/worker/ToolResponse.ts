@@ -12,6 +12,10 @@ import {
   type ResolvedToolResultRecordingConfig,
 } from '../config.js';
 import type {ImageContentData, Response} from '../tools/ToolDefinition.js';
+import {
+  ArtifactStorage,
+  type ArtifactStorageConfig,
+} from '../utils/ArtifactStorage.js';
 import type {ToolError} from '../utils/errors.js';
 import {logger} from '../utils/logger.js';
 import {safeStringify} from '../utils/safeJson.js';
@@ -124,10 +128,22 @@ function parseFencedJson(text: string): unknown {
 // Keep the symbol referenced so tree-shaking doesn't drop it for external consumers.
 export const _legacyParseFencedJson = parseFencedJson;
 
+export interface ToolResponseProcessorConfig extends ArtifactStorageConfig {
+  autoOffload?: boolean;
+}
+
 /**
- * ToolResponseProcessor — 统一的响应处理器，融合了规范化与大响应 Offload 逻辑
+ * ToolResponseProcessor — 统一的响应处理器，支持规范化与大响应 Reference over Value 文件落盘
  */
 export class ToolResponseProcessor {
+  private readonly storage: ArtifactStorage;
+  private readonly autoOffload: boolean;
+
+  constructor(config?: ToolResponseProcessorConfig) {
+    this.autoOffload = config?.autoOffload ?? false;
+    this.storage = new ArtifactStorage(config);
+  }
+
   /**
    * 将 handler 原始返回值规范化为标准 MCP Tool 响应结构
    */
@@ -142,15 +158,38 @@ export class ToolResponseProcessor {
   }
 
   /**
-   * 统一处理响应，原样返回。
-   *
-   * 历史上此处会对超过阈值的大响应做 Offload（替换为摘要 + detailId），
-   * 但那会破坏 MCP 工具响应的 `structuredContent` 契约，导致大模型拿不到
-   * 真实数据；且本仓库并未注册 `get_detailed_data` 取数工具，offload 出的
-   * detailId 永远无法被取回。现已取消该大小限制：响应原样返回，由调用方
-   * 自行决定是否需要分页 / 截断。
+   * 统一处理响应。如果启用了 autoOffload 且内容超过阈值，
+   * 自动落盘至 artifacts 目录并返回 Reference-over-Value 引用元数据。
    */
-  process(response: unknown): unknown {
+  process(response: unknown, toolName?: string): unknown {
+    if (!this.autoOffload) {
+      return response;
+    }
+
+    if (
+      typeof response === 'object' &&
+      response !== null &&
+      'structuredContent' in response
+    ) {
+      const respObj = response as Record<string, unknown>;
+      const content = respObj.structuredContent;
+      const effectiveToolName =
+        toolName ??
+        (typeof respObj.toolName === 'string'
+          ? respObj.toolName
+          : 'tool_output');
+
+      if (this.storage.shouldOffload(content)) {
+        return {
+          ...respObj,
+          structuredContent: this.storage.createReference(
+            effectiveToolName,
+            content,
+          ),
+        };
+      }
+    }
+
     return response;
   }
 
