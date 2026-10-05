@@ -32,5 +32,5 @@
     "ignoreDeprecations": "5.0"
   },
   "include": ["src/**/*.ts", "tests/**/*.ts"],
-  "exclude": ["node_modules/**", "src/web-ui/**"]
+  "exclude": ["node_modules/**"]
 }

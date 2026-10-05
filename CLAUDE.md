@@ -64,7 +64,7 @@
 | ToolRegistry          | `src/tools/registry/ToolRegistry.ts`     | MCP 工具注册表 + toolProfile 过滤                     |
 | ToolExecutionPipeline | `src/worker/ToolExecutionPipeline.ts`    | 工具执行管线（校验→上下文→执行→响应）                 |
 | Daemon IPC            | `src/ipc/daemonServer.ts`                | 命名管道 NDJSON 方法分发（tools/browser/jobs/events） |
-| WsHub                 | `src/web/ws/WsHub.ts`                    | WebSocket 连接中心                                    |
+| WsHub                 | `src/ipc/eventHub.ts`                    | IPC 事件分发中心                                      |
 
 ### 高扇入接口（@stable）
 
@@ -151,6 +151,7 @@ bot 信号，关掉它暴露真实 OS 屏幕。只有用户显式传 `config.vie
 - `python-anti-patterns` 仅用于 Python 专项审查或实现完成前的针对性检查，不与所有编码任务默认绑定。
 
 <!-- code-review-graph MCP tools -->
+
 ## MCP Tools: code-review-graph
 
 **This project has a knowledge graph. Start with the code-review-graph
@@ -177,16 +178,16 @@ gives you structural context (callers, dependents, test coverage) that file sear
 
 ### Key Tools
 
-| Tool | Use when |
-| ------ | ---------- |
-| `detect_changes_tool` | Reviewing code changes — gives risk-scored analysis |
-| `get_review_context_tool` | Need source snippets for review — token-efficient |
-| `get_impact_radius_tool` | Understanding blast radius of a change |
-| `get_affected_flows_tool` | Finding which execution paths are impacted |
-| `query_graph_tool` | Tracing callers, callees, imports, tests, dependencies |
-| `semantic_search_nodes_tool` | Finding functions/classes by name or keyword |
-| `get_architecture_overview_tool` | Understanding high-level codebase structure |
-| `refactor_tool` | Planning renames, finding dead code |
+| Tool                             | Use when                                               |
+| -------------------------------- | ------------------------------------------------------ |
+| `detect_changes_tool`            | Reviewing code changes — gives risk-scored analysis    |
+| `get_review_context_tool`        | Need source snippets for review — token-efficient      |
+| `get_impact_radius_tool`         | Understanding blast radius of a change                 |
+| `get_affected_flows_tool`        | Finding which execution paths are impacted             |
+| `query_graph_tool`               | Tracing callers, callees, imports, tests, dependencies |
+| `semantic_search_nodes_tool`     | Finding functions/classes by name or keyword           |
+| `get_architecture_overview_tool` | Understanding high-level codebase structure            |
+| `refactor_tool`                  | Planning renames, finding dead code                    |
 
 ### Workflow
 

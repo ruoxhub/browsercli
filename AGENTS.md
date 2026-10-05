@@ -52,18 +52,18 @@
 
 以下组件构成 MCP 工具的运行时基础。修改时请注意依赖链。
 
-| 组件                  | 文件                                     | 职责                                         |
-| --------------------- | ---------------------------------------- | -------------------------------------------- |
-| EventBus              | `src/utils/EventBus.ts`                  | 类型安全事件总线，全局单例                   |
+| 组件                  | 文件                                     | 职责                                           |
+| --------------------- | ---------------------------------------- | ---------------------------------------------- |
+| EventBus              | `src/utils/EventBus.ts`                  | 类型安全事件总线，全局单例                     |
 | RuntimeServices       | `src/runtime/RuntimeServices.ts`         | 延迟初始化服务集合（抓包、Wasm、SourceMap 等） |
-| BrowserManager        | `src/modules/browser/browser.ts`         | 浏览器生命周期、页面管理、反检测注入         |
-| CodeCollector         | `src/modules/collector/CodeCollector.ts` | 脚本收集 + 缓存 + 搜索                       |
-| HookManager           | `src/modules/hook/HookManager.ts`        | Hook 创建、管理、数据存取门面                |
-| HookStore             | `src/modules/hook/HookStore.ts`          | Hook 采样数据存储层                          |
-| HookCodeBuilder       | `src/modules/hook/HookCodeBuilder.ts`    | Hook 脚本链式构建器                          |
-| ToolRegistry          | `src/tools/registry/ToolRegistry.ts`     | MCP 工具注册表 + toolProfile 过滤            |
-| ToolExecutionPipeline | `src/worker/ToolExecutionPipeline.ts`    | 工具执行管线（校验→上下文→执行→响应）        |
-| WsHub                 | `src/web/ws/WsHub.ts`                    | WebSocket 连接中心                           |
+| BrowserManager        | `src/modules/browser/browser.ts`         | 浏览器生命周期、页面管理、反检测注入           |
+| CodeCollector         | `src/modules/collector/CodeCollector.ts` | 脚本收集 + 缓存 + 搜索                         |
+| HookManager           | `src/modules/hook/HookManager.ts`        | Hook 创建、管理、数据存取门面                  |
+| HookStore             | `src/modules/hook/HookStore.ts`          | Hook 采样数据存储层                            |
+| HookCodeBuilder       | `src/modules/hook/HookCodeBuilder.ts`    | Hook 脚本链式构建器                            |
+| ToolRegistry          | `src/tools/registry/ToolRegistry.ts`     | MCP 工具注册表 + toolProfile 过滤              |
+| ToolExecutionPipeline | `src/worker/ToolExecutionPipeline.ts`    | 工具执行管线（校验→上下文→执行→响应）          |
+| WsHub                 | `src/ipc/eventHub.ts`                    | IPC 事件分发中心                               |
 
 ### 高扇入接口（@stable）
 
@@ -150,6 +150,7 @@ bot 信号，关掉它暴露真实 OS 屏幕。只有用户显式传 `config.vie
 - `python-anti-patterns` 仅用于 Python 专项审查或实现完成前的针对性检查，不与所有编码任务默认绑定。
 
 <!-- code-review-graph MCP tools -->
+
 ## MCP Tools: code-review-graph
 
 **This project has a knowledge graph. Start with the code-review-graph
@@ -176,16 +177,16 @@ gives you structural context (callers, dependents, test coverage) that file sear
 
 ### Key Tools
 
-| Tool | Use when |
-| ------ | ---------- |
-| `detect_changes_tool` | Reviewing code changes — gives risk-scored analysis |
-| `get_review_context_tool` | Need source snippets for review — token-efficient |
-| `get_impact_radius_tool` | Understanding blast radius of a change |
-| `get_affected_flows_tool` | Finding which execution paths are impacted |
-| `query_graph_tool` | Tracing callers, callees, imports, tests, dependencies |
-| `semantic_search_nodes_tool` | Finding functions/classes by name or keyword |
-| `get_architecture_overview_tool` | Understanding high-level codebase structure |
-| `refactor_tool` | Planning renames, finding dead code |
+| Tool                             | Use when                                               |
+| -------------------------------- | ------------------------------------------------------ |
+| `detect_changes_tool`            | Reviewing code changes — gives risk-scored analysis    |
+| `get_review_context_tool`        | Need source snippets for review — token-efficient      |
+| `get_impact_radius_tool`         | Understanding blast radius of a change                 |
+| `get_affected_flows_tool`        | Finding which execution paths are impacted             |
+| `query_graph_tool`               | Tracing callers, callees, imports, tests, dependencies |
+| `semantic_search_nodes_tool`     | Finding functions/classes by name or keyword           |
+| `get_architecture_overview_tool` | Understanding high-level codebase structure            |
+| `refactor_tool`                  | Planning renames, finding dead code                    |
 
 ### Workflow
 

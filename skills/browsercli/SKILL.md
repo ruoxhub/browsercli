@@ -69,16 +69,6 @@ browsercli config get
 browsercli config set cloak=true
 ```
 
-### Web 控制台
-
-```bash
-# 启动并自动打开 Web 可视化控制台
-browsercli web
-
-# 停止 Web 控制台
-browsercli web stop
-```
-
 ### 长耗时任务救援与任务队列
 
 ```bash

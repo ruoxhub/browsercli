@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {readdirSync, readFileSync, statSync} from 'node:fs';
+import {readdirSync, readFileSync} from 'node:fs';
 import path from 'node:path';
 
 // Layer definitions matching §3 of 2026-09-04-architecture-master-spec.md
@@ -48,7 +48,6 @@ function getLayer(filePath: string): Layer {
   }
   if (
     norm.startsWith('src/tools/') ||
-    norm.startsWith('src/web/') ||
     norm.startsWith('src/ipc/') ||
     norm.startsWith('src/cli/')
   ) {
@@ -63,7 +62,6 @@ function getAllSourceFiles(dir: string): string[] {
   for (const entry of entries) {
     const full = path.join(dir, entry.name);
     const rel = full.replace(/\\/g, '/');
-    if (rel.includes('src/web-ui/')) continue;
     if (entry.isDirectory()) {
       results.push(...getAllSourceFiles(full));
     } else if (entry.name.endsWith('.ts') && !entry.name.endsWith('.d.ts')) {
@@ -192,7 +190,7 @@ function findSCCs(edges: ImportEdge[]): string[][] {
 function main() {
   console.log('--- Checking Architecture Layering & Cycles (Phase 1) ---');
   const files = getAllSourceFiles('src');
-  console.log(`Scanned ${files.length} source files (excluding src/web-ui)`);
+  console.log(`Scanned ${files.length} source files`);
 
   const allEdges: ImportEdge[] = [];
   for (const file of files) {
@@ -254,10 +252,6 @@ function main() {
   // 2. Check Value-only SCCs (Runtime cycles)
   console.log('\n[Rule no-circular: Runtime Value-only Cycles]');
   const sccs = findSCCs(allEdges);
-  const documentedException = [
-    'src/config/RuntimeConfigStore.ts',
-    'src/config/resolver.ts',
-  ];
 
   const unexpectedSCCs: string[][] = [];
   for (const scc of sccs) {

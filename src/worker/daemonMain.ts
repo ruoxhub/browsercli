@@ -26,6 +26,7 @@ import {type GlobalConfig} from '../config/schema.js';
 import {getBrowserManagerConfig} from '../config/servicesConfig.js';
 import type {DaemonPlan} from '../ipc/daemonArgs.js';
 import {startDaemonServer, type DaemonHandle} from '../ipc/daemonServer.js';
+import {WsHub} from '../ipc/eventHub.js';
 import {
   computeClientInfo,
   deleteSessionFile,
@@ -43,8 +44,6 @@ import {
   getAllToolsMeta,
   getToolMeta,
 } from '../tools/tools-meta.js';
-import {ConsoleServer} from '../web/ConsoleServer.js';
-import {WsHub} from '../web/ws/WsHub.js';
 
 import {connectBrowser} from './BrowserConnectionManager.js';
 import {JobStore} from './JobStore.js';
@@ -52,8 +51,6 @@ import {ToolAdapter} from './ToolAdapter.js';
 import {ToolContextProvider} from './ToolContext.js';
 import {parseWorkerArgs} from './WorkerArgs.js';
 import {createGracefulShutdown} from './WorkerLifecycle.js';
-
-const DEFAULT_CONSOLE_PORT = 8765;
 
 export interface DaemonRunResult {
   handle: DaemonHandle;
@@ -145,7 +142,7 @@ export async function runDaemon(plan: DaemonPlan): Promise<DaemonRunResult> {
   }
 
   const startedAt = Date.now();
-  const cliConfig = seedConfig(plan);
+  seedConfig(plan);
 
   const runtime = getRuntime();
   const contextProvider = new ToolContextProvider(runtime);
@@ -160,54 +157,19 @@ export async function runDaemon(plan: DaemonPlan): Promise<DaemonRunResult> {
   const jobStore = new JobStore();
   const wsHub = new WsHub();
 
-  let consoleServer: ConsoleServer | undefined;
-  let consolePort: number | undefined;
-  if (!plan.noConsole) {
-    const preferredPort =
-      plan.consolePort ??
-      (plan.session === 'default' ? DEFAULT_CONSOLE_PORT : 0);
-    try {
-      consoleServer = new ConsoleServer({
-        port: preferredPort,
-        host: process.env.WORKER_HOST ?? '127.0.0.1',
-        runtime,
-        toolAdapter,
-        configSeed: cliConfig,
-        jobStore,
-        wsHub,
-      });
-      await consoleServer.start();
-      consolePort = consoleServer.getActualPort();
-    } catch (err) {
-      if (
-        preferredPort !== 0 &&
-        plan.consolePort === undefined &&
-        (err as {code?: string})?.code === 'EADDRINUSE'
-      ) {
-        try {
-          consoleServer = new ConsoleServer({
-            port: 0,
-            host: process.env.WORKER_HOST ?? '127.0.0.1',
-            runtime,
-            toolAdapter,
-            configSeed: cliConfig,
-            jobStore,
-            wsHub,
-          });
-          await consoleServer.start();
-          consolePort = consoleServer.getActualPort();
-          console.warn(
-            `[Daemon] 默认 Web 控制台端口 ${preferredPort} 被占用，已回退到临时端口: ${consolePort}`,
-          );
-        } catch (fallbackErr) {
-          console.error('[Daemon] 启动 Web 控制台回退服务失败:', fallbackErr);
-          consoleServer = undefined;
-        }
-      } else {
-        console.error('[Daemon] 启动 Web 控制台服务失败:', err);
-        consoleServer = undefined;
-      }
-    }
+  const unsubscribeToolInvoke = toolAdapter.onInvoke(event => {
+    wsHub.broadcast('tool.invoke', event);
+  });
+  const hookStore = runtime.hookManager?.getHookStore?.();
+  const onSampleListener = (hookId: string, sample: unknown) => {
+    wsHub.broadcast(
+      'hook.sample',
+      {hookId, ...(sample as object)},
+      sub => !sub.filter?.hookId || sub.filter.hookId === hookId,
+    );
+  };
+  if (hookStore) {
+    hookStore.events.on('sample', onSampleListener);
   }
 
   const socketPath = makePipePath(info.workspaceDirHash, plan.session);
@@ -222,11 +184,14 @@ export async function runDaemon(plan: DaemonPlan): Promise<DaemonRunResult> {
   const stop = async (): Promise<void> => {
     if (stopped) return;
     stopped = true;
+    unsubscribeToolInvoke();
+    if (hookStore) {
+      hookStore.events.off('sample', onSampleListener);
+    }
     if (state.sessionFile) {
       await deleteSessionFile(state.sessionFile).catch(() => undefined);
     }
     await state.handle?.close().catch(() => undefined);
-    await consoleServer?.stop().catch(() => undefined);
   };
 
   state.handle = await startDaemonServer(
@@ -257,16 +222,10 @@ export async function runDaemon(plan: DaemonPlan): Promise<DaemonRunResult> {
     socketPath,
     pid: process.pid,
     workspaceDir: info.workspaceDir,
-    consolePort,
   });
 
   // 就绪握手：stdout 精确一行，CLI 以此判定 daemon 可连接
   console.log(`Daemon listening on ${socketPath}`);
-  if (consolePort !== undefined) {
-    console.log(
-      `[Worker] 本地工作台 Web 控制台已启动: http://127.0.0.1:${consolePort} (session=${plan.session})`,
-    );
-  }
 
   // 启动自动连接浏览器：在 IPC 服务就绪握手后异步执行，避免因等待 Chrome 弹窗授权阻塞 daemon 就绪
   if (shouldAutoConnectOnStartup(getRuntimeConfigStore().get())) {

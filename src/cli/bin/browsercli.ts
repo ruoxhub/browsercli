@@ -23,7 +23,6 @@
  *   config        查看/设置/初始化全局配置
  *   scaffold      创建新的逆向任务脚手架
  *   status        查看 daemon 会话状态
- *   web           启动、查看或停止 Web 控制台
  */
 
 import {runAxiCli} from 'axi-sdk-js';

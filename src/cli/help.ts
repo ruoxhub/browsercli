@@ -16,7 +16,6 @@ const commandDescriptions: Record<string, string> = {
   'list-tools': '列出所有可用的 MCP 工具及旧技能兼容映射',
   scaffold: '创建新的逆向任务脚手架',
   status: '查看 daemon 会话运行状态',
-  web: '启动、查看或停止 Web 控制台',
   open: '拉起（或探活）daemon 会话',
   close: '停止 daemon 会话',
   list: '列出注册表中的全部 daemon 会话',
@@ -44,7 +43,6 @@ export function generateTopLevelHelp(options?: {
     'config',
     'scaffold',
     'status',
-    'web',
   ];
 
   const lines = [
@@ -211,15 +209,6 @@ export function generateCommandHelp(
     'kill-all': {
       description: '强杀全部 --browsercli-daemon 进程并清理会话注册表',
       usage: 'browsercli kill-all',
-    },
-    web: {
-      description:
-        '启动、查看或停止 Web 控制台（启动时如果 daemon 未运行则自动拉起）',
-      usage: [
-        'browsercli [-s=<session>] web [start] [--port=<port>] [--no-open] [--json]',
-        'browsercli [-s=<session>] web status [--json]',
-        'browsercli [-s=<session>] web stop [--json]',
-      ].join('\n         '),
     },
   };
 

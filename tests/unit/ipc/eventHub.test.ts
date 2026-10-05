@@ -1,14 +1,17 @@
 /**
  * @license
- * Copyright 2026 JSReverser-MCP
+ * Copyright 2026 Browser-CLI
  * SPDX-License-Identifier: Apache-2.0
  */
 
 import assert from 'node:assert';
 import {beforeEach, describe, it} from 'node:test';
 
-import type {ServerMsg} from '../../../../src/web/types.js';
-import {WsHub, type MinimalWebSocket} from '../../../../src/web/ws/WsHub.js';
+import {
+  WsHub,
+  type MinimalWebSocket,
+  type ServerMsg,
+} from '../../../src/ipc/eventHub.js';
 
 interface MockWs extends MinimalWebSocket {
   sent: ServerMsg[];
@@ -31,7 +34,7 @@ function mockWs(readyState = 1): MockWs {
   };
 }
 
-describe('WsHub', () => {
+describe('EventHub (WsHub)', () => {
   let hub: WsHub;
   let ws: MockWs;
 

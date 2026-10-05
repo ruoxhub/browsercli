@@ -16,8 +16,6 @@ import net from 'node:net';
 import {getRuntimeConfigStore} from '../config/RuntimeConfigStore.js';
 import type {ToolMeta} from '../tools/tools-meta.js';
 import type {ToolRecovery} from '../utils/errors.js';
-import type {Channel} from '../web/types.js';
-import type {MinimalWebSocket, WsHub} from '../web/ws/WsHub.js';
 import {
   connectBrowser,
   disconnectBrowser,
@@ -38,6 +36,7 @@ import {
   workerActivityCoordinator,
 } from '../worker/WorkerActivityCoordinator.js';
 
+import type {Channel, MinimalWebSocket, WsHub} from './eventHub.js';
 import {PROTOCOL_VERSION, SocketConnection} from './socketConnection.js';
 
 export interface DaemonDeps {

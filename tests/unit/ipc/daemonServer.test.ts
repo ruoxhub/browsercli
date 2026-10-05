@@ -13,6 +13,7 @@ import {
   type DaemonDeps,
   type DaemonHandle,
 } from '../../../src/ipc/daemonServer.js';
+import {WsHub} from '../../../src/ipc/eventHub.js';
 import {makePipePath} from '../../../src/ipc/registry.js';
 import {
   PROTOCOL_VERSION,
@@ -20,7 +21,6 @@ import {
   type DaemonMessage,
 } from '../../../src/ipc/socketConnection.js';
 import type {ToolMeta} from '../../../src/tools/tools-meta.js';
-import {WsHub} from '../../../src/web/ws/WsHub.js';
 import {JobStore} from '../../../src/worker/JobStore.js';
 
 interface Gate {

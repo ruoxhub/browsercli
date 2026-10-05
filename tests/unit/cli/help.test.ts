@@ -146,15 +146,8 @@ describe('help', () => {
       assert.ok(result!.includes('status'));
     });
 
-    it('returns help for web command', () => {
-      const result = generateCommandHelp('web');
-      assert.ok(result);
-      assert.ok(result!.includes('web [start]'));
-      assert.ok(result!.includes('web status'));
-      assert.ok(result!.includes('web stop'));
-    });
-
     it('returns null for removed commands', () => {
+      assert.strictEqual(generateCommandHelp('web'), null);
       assert.strictEqual(generateCommandHelp('start'), null);
       assert.strictEqual(generateCommandHelp('stop'), null);
       assert.strictEqual(generateCommandHelp('repl'), null);
@@ -173,7 +166,6 @@ describe('help', () => {
         'config',
         'scaffold',
         'status',
-        'web',
       ];
       for (const cmd of commands) {
         const result = generateCommandHelp(cmd);

@@ -15,7 +15,6 @@ import {scaffoldCommand} from './commands/scaffold.js';
 import {sessionCommands} from './commands/sessions.js';
 import {statusCommand} from './commands/status.js';
 import {toolDispatcherCommand} from './commands/tool-dispatcher.js';
-import {webCommand} from './commands/web.js';
 import {
   CLI_VERSION,
   DaemonConnection,
@@ -39,7 +38,6 @@ export const cliCommands: Record<string, AxiCliCommand<WorkerContext>> = {
   config: configCommand,
   scaffold: scaffoldCommand,
   status: statusCommand,
-  web: webCommand,
   ...sessionCommands,
 };
 

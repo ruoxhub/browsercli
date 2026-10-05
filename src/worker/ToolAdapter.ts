@@ -12,9 +12,9 @@
  * @see {@link src/tools/ToolDefinition.ts} — defineTool 工具定义宏
  */
 
+import type {ToolInvokeEvent} from '../ipc/eventHub.js';
 import {ToolPrerequisiteChecker} from '../tools/prerequisites/ToolPrerequisiteChecker.js';
 import type {ToolMeta} from '../tools/tools-meta.js';
-import type {ToolInvokeEvent} from '../web/types.js';
 
 import {ToolCallContextGuard} from './ToolCallContextGuard.js';
 import type {ToolContextProvider} from './ToolContext.js';
