@@ -404,7 +404,9 @@ export class BrowserManager {
     const previousWsEndpoint = this.config.wsEndpoint;
     // Claimed *before* `start()`: a start that rejects half-way can still have
     // brought a bridge up, and only a successful `stop()` clears the claim, so a
-    // teardown that fails here is retried by `close()` instead of being lost.
+    // teardown that fails here is retried by a later `close()` instead of being
+    // lost. That retry only exists because `resetInstance()` keeps this manager
+    // when `close()` failed instead of dropping the only holder of the claim.
     this.egoBridgeOwned = true;
 
     try {
