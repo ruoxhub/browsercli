@@ -808,6 +808,44 @@ describe('EgoBridgeManager', () => {
     }
   });
 
+  it('decodes a multi-byte character split across a 64 KiB sink read (R2)', async () => {
+    // Diagnostics are read in 64 KiB chunks. Decoding each chunk on its own turns a
+    // character that straddles a boundary into U+FFFD; one decoder across chunks
+    // carries the partial sequence over instead.
+    const harness = harnessFor(fakeCliBody(READY_PREFIX));
+    const manager = new EgoBridgeManager(managerOptions(harness));
+
+    try {
+      await manager.start();
+      const sink = sinkOf(harness.records[0]);
+      // Padding of exactly 64 KiB - 1 bytes, so the first byte of a 3-byte character
+      // is the *last* byte of the manager's first read and the other two come from
+      // the second one.
+      const padding =
+        ('p'.repeat(1000) + '\n').repeat(65) + 'q'.repeat(469) + '\n';
+      assert.equal(Buffer.byteLength(padding), 64 * 1024 - 1);
+      fs.appendFileSync(
+        sink,
+        Buffer.from(`${padding}€-SPLIT-CHAR\nTAIL-END\n`, 'utf8'),
+      );
+      // Let the sink pump drain the whole burst.
+      await new Promise(resolve => setTimeout(resolve, 400));
+
+      const tail = manager.stderrTail();
+      assert.ok(
+        tail.includes('€-SPLIT-CHAR'),
+        `the split character must decode intact, tail was: ${JSON.stringify(tail.slice(-200))}`,
+      );
+      assert.ok(tail.includes('TAIL-END'), 'the burst must be fully drained');
+      assert.ok(
+        !tail.includes('\uFFFD'),
+        'no replacement character may appear where the character was split',
+      );
+    } finally {
+      await manager.stop();
+    }
+  });
+
   it('can retry start() after a failed start without leaving the first child alive', async () => {
     const harness = harnessFor(fakeCliBody(READY_PREFIX));
     let attempt = 0;
@@ -1254,6 +1292,39 @@ describe('EgoBridgeManager', () => {
     }
   });
 
+  it('isRunning() stays true after a failed stop() and goes false after a successful retry', async () => {
+    // A failed stop() keeps the bridge alive; reporting `false` there would let a
+    // caller believe the bridge is down while its port is still listening.
+    const harness = harnessFor(fakeCliBody(READY_PREFIX, {ignoreStop: true}));
+    let swallow = true;
+    const manager = new EgoBridgeManager(
+      managerOptions(harness, {
+        stopGraceMs: 40,
+        killGraceMs: 40,
+        kill: (child, signal) => {
+          if (!swallow) child.kill(signal);
+        },
+      }),
+    );
+
+    await manager.start();
+    try {
+      await assert.rejects(manager.stop(), /did not stop/i);
+      assert.equal(
+        manager.isRunning(),
+        true,
+        'a failed stop() must not report the bridge as down',
+      );
+
+      swallow = false;
+      await manager.stop();
+      assert.equal(manager.isRunning(), false);
+    } finally {
+      harness.records[0].child.kill('SIGKILL');
+      await waitForExit(harness.records[0].child);
+    }
+  });
+
   it('does not double-spawn when start() is called during an in-flight stop()', async () => {
     const harness = harnessFor(fakeCliBody(READY_PREFIX));
     const manager = new EgoBridgeManager(managerOptions(harness));
@@ -1279,6 +1350,84 @@ describe('EgoBridgeManager', () => {
     } finally {
       await manager.stop();
     }
+  });
+
+  it('stops the bridge when stop() follows an un-awaited start() in the same tick (R1)', async () => {
+    // A caller that never awaits start() must still get a real teardown: stop()
+    // used to read empty fields synchronously and resolve while the queued launch
+    // went on to leave a listening bridge, a sink file and a stop file behind.
+    const harness = harnessFor(fakeCliBody(READY_PREFIX));
+    const sinkDir = makeTempDir('ego-sink-');
+    const manager = new EgoBridgeManager(managerOptions(harness, {sinkDir}));
+
+    const started = manager.start();
+    await manager.stop();
+    // The launch still completed (the stop was queued behind it), so its endpoint
+    // is observable — which is exactly what makes "the port is free" assertable.
+    const connection = await started;
+
+    assert.equal(
+      manager.isRunning(),
+      false,
+      'no bridge this manager started may still be running',
+    );
+    assert.equal(harness.records.length, 1, 'the launch did happen');
+    assert.equal(hasExited(harness.records[0].child), true);
+    assert.equal(
+      await connectRefused(portOf(connection.wsEndpoint)),
+      true,
+      'the port the bridge bound must refuse connections',
+    );
+    assert.deepEqual(
+      fs.readdirSync(sinkDir),
+      [],
+      'the sink and stop files must be gone',
+    );
+  });
+
+  it('stops the bridge when start(); start(); stop() share one tick (R1)', async () => {
+    // The double start coalesces into one child; the stop must still own it.
+    const harness = harnessFor(fakeCliBody(READY_PREFIX));
+    const sinkDir = makeTempDir('ego-sink-');
+    const manager = new EgoBridgeManager(managerOptions(harness, {sinkDir}));
+
+    const first = manager.start();
+    const second = manager.start();
+    await manager.stop();
+    const [a, b] = await Promise.all([first, second]);
+
+    assert.equal(manager.isRunning(), false);
+    assert.equal(harness.records.length, 1, 'the two starts share one child');
+    assert.equal(a.wsEndpoint, b.wsEndpoint);
+    assert.equal(hasExited(harness.records[0].child), true);
+    assert.equal(await connectRefused(portOf(a.wsEndpoint)), true);
+    assert.deepEqual(fs.readdirSync(sinkDir), [], 'no files may be left');
+  });
+
+  it('stays usable after a same-tick start(); stop() (R1)', async () => {
+    // The teardown must not wedge the manager: a later start() has to work.
+    const harness = harnessFor(fakeCliBody(READY_PREFIX));
+    const manager = new EgoBridgeManager(managerOptions(harness));
+
+    const abandoned = manager.start();
+    await manager.stop();
+    await abandoned.catch(() => undefined);
+    assert.equal(manager.isRunning(), false);
+
+    try {
+      const connection = await manager.start();
+      assert.match(connection.wsEndpoint, /^ws:\/\/127\.0\.0\.1:\d+\//);
+      assert.equal(manager.isRunning(), true);
+      assert.equal(
+        harness.records.length,
+        2,
+        'a fresh child, not a reused one',
+      );
+      assert.equal(await connectRefused(portOf(connection.wsEndpoint)), false);
+    } finally {
+      await manager.stop();
+    }
+    assert.equal(manager.isRunning(), false);
   });
 
   it('rejects a repeated start() that would change keepPage instead of ignoring it', async () => {
