@@ -485,6 +485,221 @@ describe('ego-bridge-worker', () => {
     }
   });
 
+  it('forwards a child target announced on a session this bridge already owns', async () => {
+    // F8: `ego.listTabs()` only reports top-level tabs, so an OOPIF iframe or a
+    // dedicated worker can never match the whitelist by id — and because
+    // Patchright sends `waitForDebuggerOnStart: true`, a dropped child stays
+    // paused forever. The message-level `sessionId` of the owning page is the
+    // only trustworthy attribution, and it is latched once that page's attach
+    // was forwarded.
+    const fake = createFakeEgo();
+    const bridge = createEgoBridge({
+      ego: fake.ego,
+      taskSpaceName: 'unit-test',
+      listOwnTargetIds: async () => ['TAB1'],
+    });
+    const {wsEndpoint} = await bridge.start();
+    const ws = await connect(wsEndpoint);
+    try {
+      const received = collect(ws);
+      fake.emit({
+        method: 'Target.attachedToTarget',
+        params: {
+          sessionId: 'PAGE1',
+          targetInfo: {targetId: 'TAB1', type: 'page'},
+          waitingForDebugger: false,
+        },
+      });
+      // Both arrive on the page's own session with ids listTabs never reports.
+      fake.emit({
+        method: 'Target.attachedToTarget',
+        sessionId: 'PAGE1',
+        params: {
+          sessionId: 'IFRAME1',
+          targetInfo: {targetId: 'IFRAME1', type: 'iframe'},
+          waitingForDebugger: true,
+        },
+      });
+      fake.emit({
+        method: 'Target.attachedToTarget',
+        sessionId: 'PAGE1',
+        params: {
+          sessionId: 'WORKER1',
+          targetInfo: {targetId: 'WORKER1', type: 'worker'},
+          waitingForDebugger: true,
+        },
+      });
+
+      await waitFor(() => (received.parsed.length === 3 ? true : undefined));
+
+      // Same child shape on a session this bridge never latched: not proven
+      // mine, so it must stay dropped.
+      fake.emit({
+        method: 'Target.attachedToTarget',
+        sessionId: 'FOREIGN-PAGE',
+        params: {
+          sessionId: 'FOREIGN-IFRAME',
+          targetInfo: {targetId: 'FOREIGN-IFRAME', type: 'iframe'},
+          waitingForDebugger: true,
+        },
+      });
+      // A foreign top-level attach: no message-level sessionId at all.
+      fake.emit({
+        method: 'Target.attachedToTarget',
+        params: {
+          sessionId: 'PRIVATE1',
+          targetInfo: {
+            targetId: 'user-private-tab',
+            type: 'page',
+            url: 'https://mail.example.com/inbox',
+          },
+          waitingForDebugger: false,
+        },
+      });
+
+      await delay(150);
+      assert.deepEqual(
+        received.parsed.map(frame => frame.params?.targetInfo),
+        [
+          {targetId: 'TAB1', type: 'page'},
+          {targetId: 'IFRAME1', type: 'iframe'},
+          {targetId: 'WORKER1', type: 'worker'},
+        ],
+        'own children must be forwarded; unknown sessions and foreign tabs must not',
+      );
+      for (const frame of received.raw) {
+        assert.doesNotMatch(
+          frame,
+          /FOREIGN|user-private-tab|mail\.example\.com/,
+        );
+      }
+    } finally {
+      ws.close();
+      await bridge.stop();
+    }
+  });
+
+  it('refreshes the whitelist on the browser-level auto-attach only', async () => {
+    // F10: Patchright also sends `Target.setAutoAttach` per page session
+    // (crPage.js:440), which cannot surface a new top-level tab — every repeat
+    // would cost a native `listTabs()` round-trip per page init.
+    let lookups = 0;
+    const fake = createFakeEgo();
+    const bridge = createEgoBridge({
+      ego: fake.ego,
+      taskSpaceName: 'unit-test',
+      listOwnTargetIds: async () => {
+        lookups += 1;
+        return ['own-target'];
+      },
+    });
+    const {wsEndpoint} = await bridge.start();
+    const ws = await connect(wsEndpoint);
+    try {
+      const baseline = lookups;
+      ws.send(
+        '{"id":1,"method":"Target.setAutoAttach","params":{"autoAttach":true,"waitForDebuggerOnStart":true,"flatten":true}}',
+      );
+      await waitFor(() => (lookups > baseline ? true : undefined));
+      assert.equal(lookups - baseline, 1, 'browser-level attach must refresh');
+
+      for (let index = 0; index < 5; index++) {
+        ws.send(
+          JSON.stringify({
+            id: 10 + index,
+            method: 'Target.setAutoAttach',
+            sessionId: `page-${index}`,
+            params: {
+              autoAttach: true,
+              waitForDebuggerOnStart: true,
+              flatten: true,
+            },
+          }),
+        );
+      }
+      await waitFor(() => (fake.sent.length === 6 ? true : undefined));
+      await delay(100);
+      assert.equal(
+        lookups - baseline,
+        1,
+        `per-page auto-attach must not refresh, saw ${lookups - baseline} lookups`,
+      );
+    } finally {
+      ws.close();
+      await bridge.stop();
+    }
+  });
+
+  it('keeps dropped-event diagnostics off the ready-line stdout channel', async () => {
+    // F9: Task 2 parses stdout for the ready line, so diagnostics must go to
+    // stderr — and must never carry a private url or title.
+    const workerUrl = new URL(
+      '../../../../src/modules/browser/ego/ego-bridge-worker.js',
+      import.meta.url,
+    ).href;
+    const script = `
+      globalThis.ego = {
+        sendCDPMessage() {},
+        onCDPMessage: undefined,
+        onSendCDPMessageError: undefined,
+        listTabs: async () => ({tabs: []}),
+        createTaskSpace: async name => ({id: 1, name}),
+        useTaskSpace: () => 1,
+        closeTaskSpace: async () => {},
+      };
+      await import(${JSON.stringify(workerUrl)});
+      const foreign = JSON.stringify({
+        method: 'Target.targetCreated',
+        params: {
+          targetInfo: {
+            targetId: 'user-private-tab',
+            url: 'https://mail.example.com/inbox',
+            title: 'Private Inbox',
+          },
+        },
+      });
+      setInterval(() => globalThis.ego.onCDPMessage?.(foreign), 10);
+    `;
+    const child = spawn(
+      process.execPath,
+      ['--input-type=module', '-e', script],
+      {stdio: ['pipe', 'pipe', 'pipe']},
+    );
+    let stdout = '';
+    let stderr = '';
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+    child.stdout.on('data', (chunk: string) => {
+      stdout += chunk;
+    });
+    child.stderr.on('data', (chunk: string) => {
+      stderr += chunk;
+    });
+    try {
+      await waitFor(
+        () => (stdout.includes(READY_PREFIX) ? stdout : undefined),
+        15000,
+      );
+      await waitFor(
+        () => (/dropped Target\.targetCreated/.test(stderr) ? true : undefined),
+        15000,
+      );
+      assert.doesNotMatch(stdout, /\[ego-bridge\] dropped/);
+      assert.deepEqual(
+        stdout
+          .split('\n')
+          .filter(line => line.length > 0)
+          .filter(line => !line.startsWith(READY_PREFIX)),
+        [],
+        `stdout must carry only the ready line, got ${stdout}`,
+      );
+      assert.doesNotMatch(stderr, /mail\.example\.com|Private Inbox/);
+    } finally {
+      child.stdin.end();
+      child.kill();
+    }
+  });
+
   it('does not await a native round-trip per native event', async () => {
     // Finding 9: the whitelist must be cached and refreshed at most once per
     // unknown target, never once per event on the serialized native queue.

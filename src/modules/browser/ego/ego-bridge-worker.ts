@@ -65,6 +65,23 @@ const TARGET_LIFECYCLE_EVENTS = new Map<
   ['Target.targetDestroyed', params => [params?.targetId]],
 ]);
 
+/**
+ * Events whose *message-level* `sessionId` attributes them to a target this
+ * bridge already forwarded.
+ *
+ * In flattened mode a child target (an OOPIF iframe, a dedicated worker) is
+ * announced on the session of the page that owns it, while `ego.listTabs()`
+ * only reports top-level tabs — so the child's own id can never match the
+ * whitelist. The parent's session id is latched by `remember()` when its attach
+ * was forwarded, and that is the only thing that may authorize a child event.
+ * `Target.targetCreated` / `targetInfoChanged` / `targetDestroyed` carry no
+ * trustworthy owning-session attribution and stay params-only (fail closed).
+ */
+const SESSION_ATTRIBUTED_EVENTS = new Set([
+  'Target.attachedToTarget',
+  'Target.detachedFromTarget',
+]);
+
 /** Client requests that make the native side attach to new targets. */
 const WHITELIST_REFRESH_REQUESTS = new Set([
   'Target.setAutoAttach',
@@ -108,6 +125,10 @@ export interface EgoBridgeOptions {
   listOwnTargetIds?: () => Promise<string[]>;
   /** injectable task-finish hook; defaults to the native lifecycle bindings */
   finishTask?: EgoTaskFinish;
+  /**
+   * Diagnostic sink. Must not be stdout in production: stdout is the ready-line
+   * channel the manager parses.
+   */
   log?: (line: string) => void;
   /** injected so tests can drive the lifecycle without a live browser */
   onReady?: (wsEndpoint: string) => void;
@@ -457,7 +478,12 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
     }
     if (
       typeof request.method === 'string' &&
-      WHITELIST_REFRESH_REQUESTS.has(request.method)
+      WHITELIST_REFRESH_REQUESTS.has(request.method) &&
+      // Patchright also sends these on every page session (crPage.js), and a
+      // per-page auto-attach cannot surface a new top-level tab, so those
+      // repeats would cost a native `listTabs()` round-trip per page init for
+      // nothing. Only the browser-level call (no `sessionId`) refreshes.
+      request.sessionId === undefined
     ) {
       // The reply is about to make ego attach to targets; warm the cache now so
       // the attach events do not each wait for a native round-trip.
@@ -534,12 +560,14 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
    * Whether a native `Target.*` event may reach the client.
    *
    * Allow-list: unlisted `Target.*` events are dropped, because there is no
-   * target id to attribute them to. With the firewall on, an event whose ids are
-   * all unknown is dropped after one coalesced whitelist refresh.
+   * target id to attribute them to. Ids come from `params` and, for the events
+   * whose message-level `sessionId` says which target they were emitted on, from
+   * that session as well. With the firewall on, an event whose ids are all
+   * unknown is dropped after one coalesced whitelist refresh.
    */
   const allowTargetEvent = async (
     method: string,
-    params: CdpParams | undefined,
+    event: CdpMessage,
   ): Promise<boolean> => {
     const readIds = TARGET_LIFECYCLE_EVENTS.get(method);
     if (!readIds) {
@@ -547,9 +575,18 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
       return false;
     }
     const ids: string[] = [];
-    for (const value of readIds(params)) {
+    for (const value of readIds(event.params)) {
       const id = asString(value);
       if (id !== undefined) ids.push(id);
+    }
+    if (SESSION_ATTRIBUTED_EVENTS.has(method)) {
+      // Flattened child targets (OOPIF iframes, dedicated workers) are announced
+      // on the session of the page that owns them, and their ids never appear in
+      // `listTabs()`. The owning session is latched by `remember()` when that
+      // page's attach was forwarded, so a recorded session is proof of ownership;
+      // an unknown session proves nothing and stays dropped.
+      const ownerSessionId = asString(event.sessionId);
+      if (ownerSessionId !== undefined) ids.push(ownerSessionId);
     }
     if (ids.length === 0) {
       log(`[ego-bridge] dropped ${method} without a target id`);
@@ -590,7 +627,7 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
     const method = asString(event.method);
     if (method !== undefined && method.startsWith('Target.')) {
       // The user's own tabs must never surface in the client's context.pages().
-      if (!(await allowTargetEvent(method, event.params))) return;
+      if (!(await allowTargetEvent(method, event))) return;
     }
     broadcast(raw);
   };
@@ -887,7 +924,9 @@ function autostart(ego: EgoNativeBindings): void {
     // Production always supplies a whitelist: without one the firewall would be
     // off and the user's private tabs would reach the client.
     listOwnTargetIds: () => listTabsOwnTargetIds(ego),
-    log: line => process.stdout.write(`${line}\n`),
+    // Diagnostics go to stderr: stdout is the ready-line IPC channel the manager
+    // parses, and per-event churn on foreign targets must not pollute it.
+    log: line => process.stderr.write(`${line}\n`),
     onReady: wsEndpoint => {
       process.stdout.write(`${READY_PREFIX} ${wsEndpoint}\n`);
     },
