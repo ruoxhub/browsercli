@@ -25,9 +25,15 @@ export const READY_PREFIX = '[ego-bridge:ready]';
 
 const WS_ACCEPT_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 const MAX_FRAME_BYTES = 256 * 1024 * 1024;
-/** Used when ego lite does not advertise its Chromium build. */
+/** Used when ego lite does not advertise a Chromium build. */
 const FALLBACK_VERSION = '141.0.7390.0';
+/** Chromium majors below this are ego app versions (0.6.1.13), not Chromium. */
+const MIN_CHROMIUM_MAJOR = 100;
 const V8_VERSION = '14.1';
+/** Suffixes tried when a task-space name is already held by a user space. */
+const MAX_TASK_SPACE_ATTEMPTS = 8;
+/** Reported as `EGO_TASK_SPACE_NAME_IN_USE` when a name belongs to the user. */
+const NAME_IN_USE = 'EGO_TASK_SPACE_NAME_IN_USE';
 const OPCODE = {
   continuation: 0x0,
   text: 0x1,
@@ -37,6 +43,34 @@ const OPCODE = {
   pong: 0xa,
 } as const;
 
+/**
+ * The `Target.*` events the client may see, and where each one carries the
+ * target it is about. Deliberately an allow-list: an event shape not listed here
+ * has no known target attribution, so it is dropped rather than guessed at.
+ */
+const TARGET_LIFECYCLE_EVENTS = new Map<
+  string,
+  (params: CdpParams | undefined) => unknown[]
+>([
+  [
+    'Target.attachedToTarget',
+    params => [params?.targetInfo?.targetId, params?.sessionId],
+  ],
+  [
+    'Target.detachedFromTarget',
+    params => [params?.sessionId, params?.targetId],
+  ],
+  ['Target.targetCreated', params => [params?.targetInfo?.targetId]],
+  ['Target.targetInfoChanged', params => [params?.targetInfo?.targetId]],
+  ['Target.targetDestroyed', params => [params?.targetId]],
+]);
+
+/** Client requests that make the native side attach to new targets. */
+const WHITELIST_REFRESH_REQUESTS = new Set([
+  'Target.setAutoAttach',
+  'Target.setDiscoverTargets',
+]);
+
 /** The native bindings ego lite injects into its embedded Node runtime. */
 export interface EgoNativeBindings {
   sendCDPMessage(message: string): void;
@@ -45,6 +79,8 @@ export interface EgoNativeBindings {
     | ((message: string, errorCode?: string) => void)
     | undefined;
   getBrowserVersion?: () => unknown;
+  listTabs?: () => Promise<unknown>;
+  listTaskSpaces?: () => Promise<unknown>;
   createTaskSpace?: (name: string) => Promise<unknown>;
   useTaskSpace?: (id: number) => unknown;
   closeTaskSpace?: () => Promise<unknown>;
@@ -58,8 +94,17 @@ export type EgoTaskFinish = (options: {
 
 export interface EgoBridgeOptions {
   ego: EgoNativeBindings;
-  taskSpaceName: string;
+  /** Defaults to `browsercli-<workspace hash>` derived from `process.cwd()`. */
+  taskSpaceName?: string;
   keepPage?: boolean;
+  /**
+   * The target ids this bridge may forward `Target.*` events for.
+   *
+   * `undefined` (not supplied) disables the firewall — tests only. Supplied is
+   * the production contract: the returned list is authoritative, so an empty
+   * list means this space owns no tabs yet and every `Target.*` event is denied.
+   * It is cached; see `refreshOwnTargets`.
+   */
   listOwnTargetIds?: () => Promise<string[]>;
   /** injectable task-finish hook; defaults to the native lifecycle bindings */
   finishTask?: EgoTaskFinish;
@@ -80,18 +125,33 @@ interface WsClient {
   close(): void;
 }
 
+interface CdpParams {
+  sessionId?: unknown;
+  targetId?: unknown;
+  targetInfo?: {targetId?: unknown};
+}
+
 interface CdpMessage {
   id?: unknown;
   method?: unknown;
   sessionId?: unknown;
-  params?: {
-    sessionId?: unknown;
-    targetInfo?: {targetId?: unknown};
-  };
+  params?: CdpParams;
+}
+
+interface EgoTaskSpace {
+  id?: unknown;
+  name?: unknown;
+  error?: unknown;
+  error_code?: unknown;
+  ownership?: unknown;
 }
 
 function toText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function asString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
 
 function encodeFrame(opcode: number, payload: Buffer): Buffer {
@@ -120,6 +180,75 @@ function readVersion(value: unknown): string | undefined {
   return typeof version === 'string' && version.length > 0
     ? version
     : undefined;
+}
+
+/**
+ * The Chromium build this bridge reports to Patchright.
+ *
+ * `ego.getBrowserVersion()` reports ego's own app version (e.g. `0.6.1.13`).
+ * Patchright parses the major out of `product` and gates protocol behaviour on
+ * it (`majorVersion() >= 143`), so an ego app version would make every such
+ * branch permanently false. Only a plausible Chromium major is trusted here;
+ * anything else falls back to a real Chromium build.
+ */
+function chromiumVersionString(version: string | undefined): string {
+  if (version === undefined) return FALLBACK_VERSION;
+  const [major] = version.split('.');
+  return major !== undefined &&
+    /^\d+$/.test(major) &&
+    Number(major) >= MIN_CHROMIUM_MAJOR
+    ? version
+    : FALLBACK_VERSION;
+}
+
+function chromiumMajor(version: string): string {
+  return version.split('.')[0] ?? FALLBACK_VERSION;
+}
+
+/** Patchright's `_platform()` reads the UA, so it has to match the real host. */
+function platformUserAgentToken(): string {
+  switch (process.platform) {
+    case 'darwin':
+      return 'Macintosh; Intel Mac OS X 10_15_7';
+    case 'win32':
+      return 'Windows NT 10.0; Win64; x64';
+    default:
+      return 'X11; Linux x86_64';
+  }
+}
+
+/** Stable task-space name for a workspace directory. */
+export function workspaceTaskSpaceName(cwd: string): string {
+  const hash = createHash('sha256').update(cwd).digest('hex').slice(0, 12);
+  return `browsercli-${hash}`;
+}
+
+/**
+ * `listOwnTargetIds` backed by `ego.listTabs()`, which is task-space scoped and
+ * therefore returns exactly the tabs this agent owns.
+ *
+ * ego resolves `{error, error_code}` (rather than throwing) when the user holds
+ * control; that means the agent may see none of them, so it maps to an empty
+ * list — which denies every `Target.*` event.
+ */
+export async function listTabsOwnTargetIds(
+  ego: EgoNativeBindings,
+): Promise<string[]> {
+  if (typeof ego.listTabs !== 'function') return [];
+  const result = (await ego.listTabs()) as
+    | {tabs?: unknown; error?: unknown}
+    | null
+    | undefined;
+  if (!result || result.error !== undefined) return [];
+  if (!Array.isArray(result.tabs)) return [];
+  const ids: string[] = [];
+  for (const tab of result.tabs) {
+    const targetId = asString(
+      (tab as {targetId?: unknown} | undefined)?.targetId,
+    );
+    if (targetId !== undefined) ids.push(targetId);
+  }
+  return ids;
 }
 
 /**
@@ -226,18 +355,38 @@ function serveWebSocket(
 export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
   const ego = options.ego;
   const log = options.log ?? (() => undefined);
-  const listOwnTargetIds = options.listOwnTargetIds ?? (async () => []);
   const keepPage = options.keepPage === true;
+  const listOwnTargetIds = options.listOwnTargetIds;
+  const firewallEnabled = listOwnTargetIds !== undefined;
+  const taskSpaceName =
+    options.taskSpaceName ?? workspaceTaskSpaceName(process.cwd());
 
   const clients = new Set<WsClient>();
   /** requests forwarded to ego and still waiting for their response */
   const inFlight = new Map<number, string | undefined>();
   /** keeps native events in arrival order even while they are filtered */
   let nativeQueue: Promise<void> = Promise.resolve();
+  /** cached result of `listOwnTargetIds`; refreshed, never read synchronously */
+  let ownTargetIds: Set<string> | undefined;
+  /** ids this bridge already forwarded, so a later close event is not lost */
+  const knownOwnTargetIds = new Set<string>();
+  /**
+   * Negative verdicts keyed by target id, valid until the next explicit refresh.
+   * They keep repeated events for the same foreign target off the native channel,
+   * and are dropped by an explicit refresh so a tab that only shows up in
+   * `listTabs` later is not blacklisted forever.
+   */
+  const judgedForeign = new Set<string>();
+  let refreshInFlight: Promise<void> | undefined;
+  /** one lazy refresh per burst of native events, never one per event */
+  let lazyRefreshAvailable = true;
+  let pendingNativeEvents = 0;
 
   let server: Server | undefined;
   let guid = '';
   let started: Promise<{wsEndpoint: string}> | undefined;
+  /** set synchronously by `stop()`, so an in-flight `start()` can abort */
+  let stopRequested = false;
   let stopping: Promise<void> | undefined;
 
   const broadcast = (text: string) => {
@@ -266,19 +415,24 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
   };
 
   const browserVersion = async (): Promise<Record<string, string>> => {
-    let version = FALLBACK_VERSION;
+    let reported: string | undefined;
     try {
-      version = readVersion(await ego.getBrowserVersion?.()) ?? version;
+      reported = readVersion(await ego.getBrowserVersion?.());
     } catch (error) {
       log(`[ego-bridge] getBrowserVersion failed: ${toText(error)}`);
     }
-    return {
+    const chromium = chromiumVersionString(reported);
+    const major = chromiumMajor(chromium);
+    const result: Record<string, string> = {
       protocolVersion: '1.3',
-      product: `Chrome/${version}`,
-      revision: version,
-      userAgent: `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version} Safari/537.36`,
+      product: `Chrome/${major}`,
+      revision: chromium,
+      userAgent: `Mozilla/5.0 (${platformUserAgentToken()}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromium} Safari/537.36`,
       jsVersion: V8_VERSION,
     };
+    // Non-standard extra field: keeps ego's own app version recoverable.
+    if (reported !== undefined) result.egoVersion = reported;
+    return result;
   };
 
   const routeFromClient = (raw: string) => {
@@ -301,6 +455,14 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
       });
       return;
     }
+    if (
+      typeof request.method === 'string' &&
+      WHITELIST_REFRESH_REQUESTS.has(request.method)
+    ) {
+      // The reply is about to make ego attach to targets; warm the cache now so
+      // the attach events do not each wait for a native round-trip.
+      void refreshOwnTargets(true);
+    }
     if (typeof request.id === 'number') {
       inFlight.set(
         request.id,
@@ -317,21 +479,103 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
     }
   };
 
-  const isForeignAttach = async (event: CdpMessage): Promise<boolean> => {
-    const {targetId} = event.params?.targetInfo ?? {};
-    const {sessionId} = event.params ?? {};
-    let own: string[];
-    try {
-      own = await listOwnTargetIds();
-    } catch (error) {
-      log(`[ego-bridge] target whitelist unavailable: ${toText(error)}`);
+  /**
+   * Reload the target whitelist into the cache.
+   *
+   * `routeFromNative` reads a cache and never pays a native round-trip per
+   * event: it refreshes here at most once per burst of native events (and always
+   * on an explicit `Target.setAutoAttach` / `Target.setDiscoverTargets`).
+   * A failed read is fail-closed: an empty whitelist denies every `Target.*`
+   * event.
+   */
+  const refreshOwnTargets = (resetForeign = false): Promise<void> => {
+    if (!listOwnTargetIds) return Promise.resolve();
+    if (refreshInFlight) return refreshInFlight;
+    refreshInFlight = (async () => {
+      try {
+        const ids = await listOwnTargetIds();
+        const next = new Set<string>();
+        if (Array.isArray(ids)) {
+          for (const id of ids) {
+            const text = asString(id);
+            if (text !== undefined) next.add(text);
+          }
+        }
+        ownTargetIds = next;
+        if (resetForeign) judgedForeign.clear();
+        for (const id of next) judgedForeign.delete(id);
+      } catch (error) {
+        log(`[ego-bridge] target whitelist unavailable: ${toText(error)}`);
+        ownTargetIds = new Set();
+      } finally {
+        refreshInFlight = undefined;
+      }
+    })();
+    return refreshInFlight;
+  };
+
+  const isOwnTargetId = (id: string): boolean =>
+    knownOwnTargetIds.has(id) || ownTargetIds?.has(id) === true;
+
+  /**
+   * Latch the ids of a forwarded event: `detachedFromTarget` may carry only the
+   * `sessionId` of the earlier attach, and `listTabs` reports target ids, so the
+   * session id has to be remembered here to keep the detach forwardable.
+   */
+  const remember = (ids: string[]) => {
+    if (!firewallEnabled) return;
+    for (const id of ids) {
+      knownOwnTargetIds.add(id);
+      judgedForeign.delete(id);
+    }
+  };
+
+  /**
+   * Whether a native `Target.*` event may reach the client.
+   *
+   * Allow-list: unlisted `Target.*` events are dropped, because there is no
+   * target id to attribute them to. With the firewall on, an event whose ids are
+   * all unknown is dropped after one coalesced whitelist refresh.
+   */
+  const allowTargetEvent = async (
+    method: string,
+    params: CdpParams | undefined,
+  ): Promise<boolean> => {
+    const readIds = TARGET_LIFECYCLE_EVENTS.get(method);
+    if (!readIds) {
+      log(`[ego-bridge] dropped ${method}: not an attributable Target event`);
+      return false;
+    }
+    const ids: string[] = [];
+    for (const value of readIds(params)) {
+      const id = asString(value);
+      if (id !== undefined) ids.push(id);
+    }
+    if (ids.length === 0) {
+      log(`[ego-bridge] dropped ${method} without a target id`);
+      return false;
+    }
+    if (!firewallEnabled) {
+      remember(ids);
       return true;
     }
-    // An empty whitelist means "no restriction".
-    if (!Array.isArray(own) || own.length === 0) return false;
-    return (
-      !own.includes(targetId as string) && !own.includes(sessionId as string)
-    );
+    if (ids.some(isOwnTargetId)) {
+      remember(ids);
+      return true;
+    }
+    if (!ids.every(id => judgedForeign.has(id)) && lazyRefreshAvailable) {
+      // One native round-trip per burst of native events, never one per event:
+      // the verdicts below then keep the whole burst off the serialized queue.
+      lazyRefreshAvailable = false;
+      await refreshOwnTargets();
+      if (ids.some(isOwnTargetId)) {
+        remember(ids);
+        return true;
+      }
+      for (const id of ids) judgedForeign.add(id);
+    }
+    log(`[ego-bridge] dropped ${method} outside the task space`);
+    return false;
   };
 
   const routeFromNative = async (raw: string) => {
@@ -343,30 +587,33 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
       return;
     }
     if (typeof event.id === 'number') inFlight.delete(event.id);
-    if (
-      event.method === 'Target.attachedToTarget' &&
-      (await isForeignAttach(event))
-    ) {
+    const method = asString(event.method);
+    if (method !== undefined && method.startsWith('Target.')) {
       // The user's own tabs must never surface in the client's context.pages().
-      log(
-        '[ego-bridge] dropped Target.attachedToTarget outside the task space',
-      );
-      return;
+      if (!(await allowTargetEvent(method, event.params))) return;
     }
     broadcast(raw);
   };
 
   const onNativeMessage = (message: string) => {
+    if (pendingNativeEvents === 0) lazyRefreshAvailable = true;
+    pendingNativeEvents += 1;
     nativeQueue = nativeQueue
       .then(() => routeFromNative(message))
       .catch(error => {
         log(`[ego-bridge] native message routing failed: ${toText(error)}`);
+      })
+      .finally(() => {
+        pendingNativeEvents -= 1;
       });
   };
 
   const onNativeSendError = (message: string, errorCode?: string) => {
     const reason = `${errorCode ?? 'EGO_CDP_SEND_FAILED'}: ${message}`;
     log(`[ego-bridge] sendCDPMessage failed: ${reason}`);
+    // Everything in flight is rejected, not just the id native blamed: the
+    // native error carries no request id, and a hung caller is worse than a
+    // spurious failure that the client can retry.
     rejectInFlight(reason);
   };
 
@@ -392,29 +639,110 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
     }
   };
 
-  const enterTaskSpace = async () => {
-    if (typeof ego.createTaskSpace !== 'function') {
-      log('[ego-bridge] createTaskSpace unavailable; using the active space');
-      return;
-    }
+  const isAgentOwned = (ownership: unknown): boolean =>
+    ownership === 'agent' || ownership === 'agentDelegatedToUser';
+
+  /**
+   * The known task-space names: agent-owned ones are reusable, user-owned ones
+   * are off limits and get skipped without even asking native to create them.
+   */
+  const knownTaskSpaces = async (): Promise<{
+    reusable: Map<string, number>;
+    userOwned: Set<string>;
+  }> => {
+    const reusable = new Map<string, number>();
+    const userOwned = new Set<string>();
+    if (typeof ego.listTaskSpaces !== 'function') return {reusable, userOwned};
     try {
-      const space = (await ego.createTaskSpace(options.taskSpaceName)) as {
-        id?: number;
-        error?: string;
-        error_code?: string;
-      };
-      if (space?.error) {
-        log(
-          `[ego-bridge] task space ${options.taskSpaceName} unavailable: ${space.error} (${space.error_code ?? 'unknown'})`,
-        );
-        return;
-      }
-      if (typeof space?.id === 'number' && ego.useTaskSpace) {
-        ego.useTaskSpace(space.id);
+      const result = (await ego.listTaskSpaces()) as
+        | {taskSpaces?: unknown}
+        | null
+        | undefined;
+      if (!Array.isArray(result?.taskSpaces)) return {reusable, userOwned};
+      for (const raw of result.taskSpaces) {
+        const space = raw as EgoTaskSpace | undefined;
+        const name = asString(space?.name);
+        if (name === undefined) continue;
+        if (isAgentOwned(space?.ownership)) {
+          if (typeof space?.id === 'number') reusable.set(name, space.id);
+          continue;
+        }
+        if (space?.ownership === 'user') userOwned.add(name);
       }
     } catch (error) {
-      log(`[ego-bridge] task space setup failed: ${toText(error)}`);
+      log(`[ego-bridge] listTaskSpaces failed: ${toText(error)}`);
     }
+    return {reusable, userOwned};
+  };
+
+  /**
+   * Enter this workspace's own task space.
+   *
+   * Reuses `browsercli-<workspace-hash>` when the agent already owns it. A name
+   * held by a user-owned space is never taken over: `EGO_TASK_SPACE_NAME_IN_USE`
+   * moves to `-2`, `-3`, ... and a fresh space is created instead. Failing to
+   * enter a space at all throws, so `start()` rejects instead of printing a
+   * ready line for a bridge whose every command would fail with
+   * `EGO_TASK_SPACE_NOT_SELECTED`.
+   */
+  const enterTaskSpace = async (): Promise<void> => {
+    if (
+      typeof ego.createTaskSpace !== 'function' ||
+      typeof ego.useTaskSpace !== 'function'
+    ) {
+      throw new Error(
+        'ego task-space bindings unavailable (createTaskSpace/useTaskSpace)',
+      );
+    }
+    const {reusable, userOwned} = await knownTaskSpaces();
+    for (let attempt = 1; attempt <= MAX_TASK_SPACE_ATTEMPTS; attempt++) {
+      const name =
+        attempt === 1 ? taskSpaceName : `${taskSpaceName}-${attempt}`;
+      const existing = reusable.get(name);
+      if (existing !== undefined) {
+        ego.useTaskSpace(existing);
+        log(`[ego-bridge] reusing task space ${name} (${existing})`);
+        return;
+      }
+      if (userOwned.has(name)) {
+        // Never take over a user's space: move straight to the next suffix.
+        log(
+          `[ego-bridge] task space name ${name} belongs to the user; trying a new suffix`,
+        );
+        continue;
+      }
+      let space: EgoTaskSpace | undefined;
+      try {
+        space = (await ego.createTaskSpace(name)) as EgoTaskSpace | undefined;
+      } catch (error) {
+        const code = (error as {error_code?: unknown} | null)?.error_code;
+        if (code === NAME_IN_USE)
+          space = {error: toText(error), error_code: code};
+        else throw error;
+      }
+      if (space?.error === undefined) {
+        const id = space?.id;
+        if (typeof id !== 'number') {
+          throw new Error(
+            `ego.createTaskSpace(${name}) returned no task space id`,
+          );
+        }
+        ego.useTaskSpace(id);
+        log(`[ego-bridge] created task space ${name} (${id})`);
+        return;
+      }
+      if (space.error_code !== NAME_IN_USE) {
+        throw new Error(
+          `ego task space ${name} unavailable: ${String(space.error)} (${String(space.error_code ?? 'unknown')})`,
+        );
+      }
+      log(
+        `[ego-bridge] task space name ${name} belongs to the user; trying the next suffix`,
+      );
+    }
+    throw new Error(
+      `could not enter a task space named ${taskSpaceName} after ${MAX_TASK_SPACE_ATTEMPTS} attempts`,
+    );
   };
 
   const handleUpgrade = (request: IncomingMessage, socket: Duplex) => {
@@ -446,59 +774,89 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
     socket.on('close', () => clients.delete(client));
   };
 
+  /** Release everything `start()` may already have created; idempotent. */
+  const releaseListener = async (): Promise<void> => {
+    const listening = server;
+    server = undefined;
+    for (const client of clients) client.close();
+    clients.clear();
+    if (!listening) return;
+    await new Promise<void>(resolve => {
+      listening.close(() => resolve());
+      listening.closeAllConnections?.();
+    });
+  };
+
+  const releaseCallbacks = () => {
+    // Release only the callbacks this bridge installed.
+    if (ego.onCDPMessage === onNativeMessage) ego.onCDPMessage = undefined;
+    if (ego.onSendCDPMessageError === onNativeSendError) {
+      ego.onSendCDPMessageError = undefined;
+    }
+  };
+
+  const abortIfStopping = () => {
+    if (stopRequested) throw new Error('ego bridge stopped during start');
+  };
+
+  const releaseCallbacksAndListener = async (): Promise<void> => {
+    releaseCallbacks();
+    await releaseListener();
+  };
+
   const start = (): Promise<{wsEndpoint: string}> => {
     if (started) return started;
-    if (stopping) return Promise.reject(new Error('ego bridge is stopped'));
+    if (stopRequested) {
+      return Promise.reject(new Error('ego bridge is stopped'));
+    }
     started = (async () => {
-      await enterTaskSpace();
-      guid = randomUUID();
-      const listening = createServer((_request, response) => {
-        response.writeHead(404, {'content-type': 'text/plain'});
-        response.end('ego-bridge: websocket endpoint only');
-      });
-      listening.on('upgrade', handleUpgrade);
-      server = listening;
-      await new Promise<void>((resolve, reject) => {
-        listening.once('error', reject);
-        listening.listen(0, '127.0.0.1', () => {
-          listening.removeListener('error', reject);
-          resolve();
+      try {
+        await enterTaskSpace();
+        abortIfStopping();
+        await refreshOwnTargets(true);
+        abortIfStopping();
+        guid = randomUUID();
+        const listening = createServer((_request, response) => {
+          response.writeHead(404, {'content-type': 'text/plain'});
+          response.end('ego-bridge: websocket endpoint only');
         });
-      });
-      const address = listening.address();
-      if (!address || typeof address === 'string') {
-        throw new Error('ego bridge failed to bind a loopback port');
+        listening.on('upgrade', handleUpgrade);
+        server = listening;
+        await new Promise<void>((resolve, reject) => {
+          listening.once('error', reject);
+          listening.listen(0, '127.0.0.1', () => {
+            listening.removeListener('error', reject);
+            resolve();
+          });
+        });
+        abortIfStopping();
+        const address = listening.address();
+        if (!address || typeof address === 'string') {
+          throw new Error('ego bridge failed to bind a loopback port');
+        }
+        const wsEndpoint = `ws://127.0.0.1:${address.port}/devtools/browser/${guid}`;
+        ego.onCDPMessage = onNativeMessage;
+        ego.onSendCDPMessageError = onNativeSendError;
+        options.onReady?.(wsEndpoint);
+        return {wsEndpoint};
+      } catch (error) {
+        await releaseCallbacksAndListener();
+        throw error;
       }
-      const wsEndpoint = `ws://127.0.0.1:${address.port}/devtools/browser/${guid}`;
-      ego.onCDPMessage = onNativeMessage;
-      ego.onSendCDPMessageError = onNativeSendError;
-      options.onReady?.(wsEndpoint);
-      return {wsEndpoint};
     })();
     return started;
   };
 
   const stop = (): Promise<void> => {
     if (stopping) return stopping;
+    stopRequested = true;
     stopping = (async () => {
+      // Let an in-flight start() observe the flag and release its own socket
+      // before tearing down, so the port can never outlive stop().
+      const pending = started;
+      if (pending) await pending.catch(() => undefined);
       await finishTask();
-      // Release only the callbacks this bridge installed.
-      if (ego.onCDPMessage === onNativeMessage) ego.onCDPMessage = undefined;
-      if (ego.onSendCDPMessageError === onNativeSendError) {
-        ego.onSendCDPMessageError = undefined;
-      }
-      for (const client of clients) client.close();
-      clients.clear();
-      const listening = server;
-      server = undefined;
-      await new Promise<void>(resolve => {
-        if (!listening) {
-          resolve();
-          return;
-        }
-        listening.close(() => resolve());
-        listening.closeAllConnections?.();
-      });
+      await releaseCallbacksAndListener();
     })();
     return stopping;
   };
@@ -523,8 +881,12 @@ function autostart(ego: EgoNativeBindings): void {
   const bridge = createEgoBridge({
     ego,
     taskSpaceName:
-      process.env.EGO_BRIDGE_TASK_SPACE_NAME ?? `browsercli-${process.pid}`,
+      process.env.EGO_BRIDGE_TASK_SPACE_NAME ??
+      workspaceTaskSpaceName(process.cwd()),
     keepPage: process.env.EGO_BRIDGE_KEEP_PAGE === '1',
+    // Production always supplies a whitelist: without one the firewall would be
+    // off and the user's private tabs would reach the client.
+    listOwnTargetIds: () => listTabsOwnTargetIds(ego),
     log: line => process.stdout.write(`${line}\n`),
     onReady: wsEndpoint => {
       process.stdout.write(`${READY_PREFIX} ${wsEndpoint}\n`);
