@@ -8,7 +8,7 @@ import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
 import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
-import {errorMessage} from '../shared/pageResponse.js';
+import {getErrorMessage} from '../shared/pageResponse.js';
 import {defineTool, type Context} from '../ToolDefinition.js';
 
 import {
@@ -217,7 +217,7 @@ export const listCreatedHooks = defineTool({
       if (error && typeof error === 'object' && 'code' in error) throw error;
       throw createToolError(
         ErrorCodes.RUNTIME,
-        `列出 Hook 失败：${errorMessage(error)}`,
+        `列出 Hook 失败：${getErrorMessage(error)}`,
         {toolName: 'list_created_hooks'},
       );
     }

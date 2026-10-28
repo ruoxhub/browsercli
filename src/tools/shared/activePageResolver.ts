@@ -59,25 +59,3 @@ export function resolveActivePage<PageLike>(
     message: NO_ACTIVE_PAGE_MESSAGE,
   };
 }
-
-export function resolveActivePageIndex<PageLike>(
-  runtime: ActivePageResolverRuntime<PageLike>,
-):
-  | {
-      ok: true;
-      pageIdx: number;
-    }
-  | {
-      ok: false;
-      message: string;
-    } {
-  const resolved = resolveActivePage(runtime);
-  if (!resolved.ok) {
-    return resolved;
-  }
-
-  return {
-    ok: true,
-    pageIdx: resolved.pageIdx,
-  };
-}

@@ -114,14 +114,35 @@ test('PROXYCLI_WORKSPACE 显式覆盖 workspace（跨目录共享同一 daemon �
   }
 });
 
-test('computeClientInfo 的 hash 为 sha1(workspaceDir) 前 16 位且受 BROWSERCLI_DAEMON_DIR 覆盖', () => {
+test('computeClientInfo 默认使用 global 会话', () => {
+  const d1 = makeTempDir();
+  const d2 = makeTempDir();
+  try {
+    const info1 = computeClientInfo(d1);
+    const info2 = computeClientInfo(d2);
+    assert.strictEqual(info1.workspaceDirHash, 'global');
+    assert.strictEqual(info2.workspaceDirHash, 'global');
+    assert.strictEqual(info1.daemonDir, info2.daemonDir);
+  } finally {
+    fs.rmSync(d1, {recursive: true, force: true});
+    fs.rmSync(d2, {recursive: true, force: true});
+  }
+});
+
+test('computeClientInfo 在配置文件设置 isolate_workspace=true 时按 workspaceDir 的 sha1 计算 hash', () => {
   const root = makeTempDir();
-  const prev = process.env.BROWSERCLI_DAEMON_DIR;
+  const cfgDir = makeTempDir();
+  const prevDaemon = process.env.BROWSERCLI_DAEMON_DIR;
+  const prevCfg = process.env.BROWSERCLI_CONFIG_DIR;
+  process.env.BROWSERCLI_CONFIG_DIR = cfgDir;
+  fs.writeFileSync(
+    path.join(cfgDir, 'config.json'),
+    JSON.stringify({isolate_workspace: 'true'}),
+  );
   try {
     fs.writeFileSync(path.join(root, 'package.json'), '{}');
     process.env.BROWSERCLI_DAEMON_DIR = path.join(root, 'daemon');
     const info = computeClientInfo(root);
-    // 与 node:crypto 独立算一遍比对（workspaceDir 具体值受环境标记影响，只验算法一致性）
     const hashAlgo = ['sha', '1'].join('');
     const expectedHash = crypto
       .createHash(hashAlgo)
@@ -131,9 +152,12 @@ test('computeClientInfo 的 hash 为 sha1(workspaceDir) 前 16 位且受 BROWSER
     assert.strictEqual(info.workspaceDirHash, expectedHash);
     assert.strictEqual(info.daemonDir, path.join(root, 'daemon', expectedHash));
   } finally {
-    if (prev === undefined) delete process.env.BROWSERCLI_DAEMON_DIR;
-    else process.env.BROWSERCLI_DAEMON_DIR = prev;
+    if (prevDaemon === undefined) delete process.env.BROWSERCLI_DAEMON_DIR;
+    else process.env.BROWSERCLI_DAEMON_DIR = prevDaemon;
+    if (prevCfg === undefined) delete process.env.BROWSERCLI_CONFIG_DIR;
+    else process.env.BROWSERCLI_CONFIG_DIR = prevCfg;
     fs.rmSync(root, {recursive: true, force: true});
+    fs.rmSync(cfgDir, {recursive: true, force: true});
   }
 });
 

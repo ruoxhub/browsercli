@@ -1,4 +1,0 @@
-{"ts":"<ISO8601>","stage":"observe","note":"target request + initiator found"}
-{"ts":"<ISO8601>","stage":"capture","note":"hook records captured (schema only)"}
-{"ts":"<ISO8601>","stage":"rebuild","note":"env patch delta"}
-{"ts":"<ISO8601>","stage":"verify","note":"single request result"}

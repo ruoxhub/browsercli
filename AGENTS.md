@@ -195,3 +195,17 @@ gives you structural context (callers, dependents, test coverage) that file sear
 3. Use `get_affected_flows_tool` to understand impact.
 4. Use `query_graph_tool` pattern="tests_for" to check coverage.
 <!-- /code-review-graph MCP tools -->
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues（`mrh30000/browsercli`，用 `gh` CLI）。见 `docs/agents/issue-tracker.md`。
+
+### Triage labels
+
+五个规范分诊角色映射到同名标签字符串。见 `docs/agents/triage-labels.md`。
+
+### Domain docs
+
+单上下文：根目录 `GLOSSARY.md` + `docs/adr/`。见 `docs/agents/domain.md`。

@@ -5,17 +5,10 @@
  */
 
 import {createToolError, ErrorCodes} from '../../utils/errors.js';
+import {getErrorMessage} from '../shared/pageResponse.js';
 import type {Response} from '../ToolDefinition.js';
 
 import type {HookResult} from './types.js';
-
-/** 从任意 unknown 中提取安全的错误消息 */
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return String(error);
-}
 
 /**
  * 包装一个异步工具调用，统一处理成功 / 失败结构化响应。

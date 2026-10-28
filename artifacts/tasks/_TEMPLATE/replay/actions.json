@@ -1,4 +1,0 @@
-[
-  {"action":"navigate","url":"<url>"},
-  {"action":"click","selector":"<selector>"}
-]

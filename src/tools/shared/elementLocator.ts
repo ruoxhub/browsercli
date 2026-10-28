@@ -25,6 +25,17 @@ export interface ClassifiedElementError {
   candidatesCount?: number;
 }
 
+/** 读取错误对象的 name，非对象或缺失时返回空串。 */
+function readErrorName(error: unknown): string {
+  if (error instanceof Error) {
+    return error.name;
+  }
+  if (typeof error === 'object' && error !== null && 'name' in error) {
+    return String((error as {name: unknown}).name);
+  }
+  return '';
+}
+
 /**
  * 分类 Playwright / Patchright 抛出的元素定位与动作错误。
  *
@@ -37,12 +48,7 @@ export interface ClassifiedElementError {
  * 4. 兜底错误 → `permanent` (RUNTIME)。
  */
 export function classifyElementError(error: unknown): ClassifiedElementError {
-  const errorName =
-    error instanceof Error
-      ? error.name
-      : typeof error === 'object' && error !== null && 'name' in error
-        ? String((error as {name: unknown}).name)
-        : '';
+  const errorName = readErrorName(error);
   const rawMessage = error instanceof Error ? error.message : String(error);
 
   // 1. 超时 / 0 匹配：优先比对稳定类名 Error.name === 'TimeoutError'，正则兜底
