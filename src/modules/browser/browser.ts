@@ -265,15 +265,30 @@ export class BrowserManager {
     return browserManager;
   }
 
-  static async resetInstance(): Promise<void> {
-    if (browserManager) {
-      try {
-        await browserManager.close();
-      } catch (err) {
-        logger.debug('Error closing browser during reset:', err);
-      }
-      browserManager = undefined;
+  /**
+   * Close and forget the singleton browser.
+   *
+   * @returns `true` when no instance is left behind (nothing to close, or the
+   * close succeeded), `false` when `close()` failed and the instance was kept.
+   *
+   * A failing `close()` means a resource survived it — in ego mode that is the
+   * bridge, and with it the task space it holds. This manager is the only object
+   * holding the claim that can stop it, so it is kept instead of discarded and a
+   * later `resetInstance()`/`close()` retries the teardown. Callers observe an
+   * instance whose `isConnected()` is false but which still owns a live bridge.
+   * This method still never rejects (callers fire it and forget); a caller that
+   * gave up on the old instance must look at the return value.
+   */
+  static async resetInstance(): Promise<boolean> {
+    if (!browserManager) return true;
+    try {
+      await browserManager.close();
+    } catch (err) {
+      logger.debug('Error closing browser during reset:', err);
+      return false;
     }
+    browserManager = undefined;
+    return true;
   }
 
   async ensureBrowser(): Promise<Browser> {

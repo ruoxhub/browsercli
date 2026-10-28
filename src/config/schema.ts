@@ -82,6 +82,13 @@ export const BrowserConfigSchema = zod
     jsStealth: booleanSchema.optional(),
     /** 启用 CloakBrowser 二进制 + 49 个 C++ 源码层指纹 patch；profile 目录切到 `cloak-profile`。 */
     cloak: booleanSchema.optional(),
+    /**
+     * 使用正在运行的 ego lite 浏览器（经 `EgoBridgeManager` 的本地 CDP 桥接）。
+     * 与 `cloak` 同类：一个互斥的浏览器来源开关，而不是 `channel` 值。
+     * 本 schema 用 `.strip()`，不在这里声明就会被**静默丢弃**。CLI flag 与环境变量
+     * 接线（`--browser ego` / `BROWSER_EGO`）仍属 Task 4。
+     */
+    ego: booleanSchema.optional(),
     /** 使用历史 60+ 启动参数集（`FULL_STEALTH_ARGS`）。默认 false：其中多个 flag 已是反爬检测信号。 */
     fullStealthArgs: booleanSchema.optional(),
     /** 启用最小启动参数集（`MINIMAL_STEALTH_ARGS`：`--test-type` + `--hide-crash-restore-bubble`）。默认 true。 */

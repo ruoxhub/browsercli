@@ -25,6 +25,7 @@ export interface ConnectResult {
 export type BrowserConnectionMode =
   | 'attach'
   | 'ws-endpoint'
+  | 'ego'
   | 'launch'
   | 'disconnected';
 
@@ -44,9 +45,18 @@ export interface DisconnectBrowserOptions {
   force?: boolean;
 }
 
+/**
+ * 连接方式判定。
+ *
+ * `ego` 必须最先判断：`BrowserManager.connectEgoBrowser()` 会把桥接发布的 ws 端点
+ * 写进 `config.wsEndpoint`，所以活跃的 ego 配置看起来就是一个 ws-endpoint 配置。
+ * 按 `wsEndpoint` 判定会让同一个 ego 目标在"连接前/连接后"读到不同 mode
+ * （入参 `launch` vs 活跃 `ws-endpoint`），从而每次都误判为换了目标。
+ */
 export function getBrowserConnectionMode(
   config: BrowserManagerConfig,
 ): Exclude<BrowserConnectionMode, 'disconnected'> {
+  if (config.ego) return 'ego';
   if (
     config.wsEndpoint ||
     config.remoteDebuggingUrl?.startsWith('ws://') ||
@@ -66,6 +76,15 @@ export function isSameBrowserTarget(
     return false;
   }
   const mode = getBrowserConnectionMode(a);
+  if (mode === 'ego') {
+    // 故意不比较 `wsEndpoint`：ego 的端点是 `start()` 之后才发现并回写进 config
+    // 的，入参与活跃配置天然不对称，拿它比较必然失败（→ resetInstance → 毁掉
+    // 任务空间）。ego 目标身份 = "ego 开关 + 工作区"，而工作区由
+    // `EgoBridgeManager` 用自身 cwd 派生的任务空间名固定，同一进程内的 ego 配置
+    // 因此天然是同一个工作区；`cloak`/`channel` 之类对 ego 无意义（不会本地启动），
+    // 不参与比较。
+    return true;
+  }
   if (mode === 'ws-endpoint') {
     return (
       (a.wsEndpoint ?? '') === (b.wsEndpoint ?? '') &&
@@ -154,7 +173,16 @@ export async function connectBrowser(
       let lastError: unknown;
       for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
-          await BrowserManager.resetInstance();
+          // A `false` here means the old instance could not be torn down and was
+          // deliberately kept (it still owns e.g. an ego bridge). Continuing would
+          // silently reconnect on top of it, because `getInstance()` returns the
+          // survivor; fail this attempt instead so the retry re-enters
+          // `resetInstance()` and retries the teardown.
+          if ((await BrowserManager.resetInstance()) === false) {
+            throw new Error(
+              'Failed to tear down the previous browser before reconnecting',
+            );
+          }
           contextProvider.setBrowser(null);
           contextProvider.clearContext();
           const manager = BrowserManager.getInstance(config);

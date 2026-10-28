@@ -28,6 +28,7 @@ import {
   type EgoBridgeConnection,
 } from '../../../../src/modules/browser/ego/EgoBridgeManager.js';
 import {BrowserManager} from '../../../../src/modules/browser/index.js';
+import {connectBrowser} from '../../../../src/worker/BrowserConnectionManager.js';
 
 interface FakePage {
   id: string;
@@ -339,5 +340,92 @@ describe('BrowserManager ego mode', () => {
     assert.equal(manager.getCurrentPage(), bridgePage as never);
     assert.equal(manager.getContext(), bridgeContext as never);
     assert.equal(launchCalls, 0);
+  });
+
+  it('a second connect while the ego bridge is live reuses it (no reset, no stop)', async () => {
+    const bridge = makeBridge();
+    useBridge(bridge);
+    connectTo(makeBrowser([makeContext([makePage('ego-tab')])]));
+
+    let manager: BrowserManager | null = null;
+    const contextProvider = {
+      isBrowserConnected: () => manager?.isConnected() ?? false,
+      getBrowser: () => manager?.getBrowser() ?? null,
+      getBrowserManager: () => manager,
+      getContext: () => manager?.getContext() ?? null,
+      setBrowserManager: (next: BrowserManager) => {
+        manager = next;
+      },
+      setBrowser: () => undefined,
+      setContext: () => undefined,
+      clearContext: () => undefined,
+      init: async () => undefined,
+    };
+
+    const first = await connectBrowser(contextProvider as never, {ego: true});
+    // The live config now carries the discovered endpoint; the incoming one never
+    // does. The target identity must survive that rewrite.
+    assert.equal(manager?.getConfig().wsEndpoint, bridge.endpoint);
+
+    const second = await connectBrowser(contextProvider as never, {ego: true});
+
+    assert.deepEqual(first, {connected: true, mode: 'ego'});
+    assert.deepEqual(second, {connected: true, mode: 'ego'});
+    assert.equal(bridge.startCalls, 1, 'no second bridge');
+    assert.equal(
+      bridge.stopCalls,
+      0,
+      'a repeat connect must not tear the bridge (and its task space) down',
+    );
+    assert.equal(
+      BrowserManager.getInstance(),
+      manager,
+      'the instance must not be recreated',
+    );
+  });
+
+  it('keeps the manager when a failed close cannot stop the bridge (I2)', async () => {
+    const bridge = makeBridge();
+    useBridge(bridge);
+    connectTo(makeBrowser([makeContext([makePage('ego-tab')])]));
+
+    const manager = egoManager();
+    await manager.ensureBrowser();
+
+    // The first teardown fails: the bridge stays alive, so the claim must survive.
+    const realStop = bridge.stop.bind(bridge);
+    let stopAttempts = 0;
+    bridge.stop = async () => {
+      stopAttempts += 1;
+      if (stopAttempts === 1) throw new Error('bridge did not stop');
+      await realStop();
+    };
+
+    assert.equal(
+      await BrowserManager.resetInstance(),
+      false,
+      'a failed close must be reported, not hidden',
+    );
+    assert.equal(
+      BrowserManager.getInstance(),
+      manager,
+      'the manager holds the only claim that can retry the teardown',
+    );
+    assert.equal(
+      manager.isConnected(),
+      false,
+      'it no longer reports connected',
+    );
+    assert.equal(stopAttempts, 1);
+
+    // The retry that the comment promises actually happens.
+    assert.equal(await BrowserManager.resetInstance(), true);
+    assert.equal(stopAttempts, 2, 'the retry really stopped the bridge');
+    assert.equal(bridge.running, false);
+    assert.throws(
+      () => BrowserManager.getInstance(),
+      /must be initialized with config/,
+      'only a successful teardown drops the instance',
+    );
   });
 });

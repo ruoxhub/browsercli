@@ -564,6 +564,86 @@ describe('BrowserConnectionManager', () => {
     );
   });
 
+  it('gives ego its own connection identity (I1)', () => {
+    // An ego config is its own mode, not 'launch': otherwise a connected local
+    // launch would swallow a `{ego: true}` request and the bridge would never start.
+    assert.strictEqual(getBrowserConnectionMode({ego: true}), 'ego');
+    assert.notStrictEqual(getBrowserConnectionMode({ego: true}), 'launch');
+
+    // An ego config and a launch config are never the same target, even when both
+    // look like "no endpoint yet".
+    assert.strictEqual(
+      isSameBrowserTarget({ego: true}, {channel: 'stable', headless: true}),
+      false,
+    );
+    assert.strictEqual(isSameBrowserTarget({ego: true}, {}), false);
+    // Nor is ego the same target as an explicit ws endpoint.
+    assert.strictEqual(
+      isSameBrowserTarget({ego: true}, {wsEndpoint: 'ws://127.0.0.1/devtools'}),
+      false,
+    );
+  });
+
+  it('treats two ego configs for the same workspace as the same target (I1)', () => {
+    // `connectEgoBrowser()` rewrites the live config's `wsEndpoint` with the
+    // endpoint the bridge discovered, so the active config and the incoming one
+    // never carry the same endpoint. Keying on the endpoint would make every
+    // reconnect look like a target change → resetInstance() → stop() → the
+    // agent's task space is destroyed.
+    const active = {
+      ego: true,
+      wsEndpoint: 'ws://127.0.0.1:5599/devtools/browser/x',
+    };
+    assert.strictEqual(isSameBrowserTarget(active, {ego: true}), true);
+    // Stable across the rewrite in either direction.
+    assert.strictEqual(isSameBrowserTarget({ego: true}, active), true);
+    // Repeated identical ego requests are idempotent.
+    assert.strictEqual(isSameBrowserTarget({ego: true}, {ego: true}), true);
+    assert.strictEqual(
+      getBrowserConnectionMode(active),
+      'ego',
+      'a connected ego config must not be classified as ws-endpoint',
+    );
+  });
+
+  it('reuses a live ego connection on a second connect without reset or stop (I1)', async () => {
+    const resetMock = mock.method(BrowserManager, 'resetInstance', () =>
+      Promise.resolve(true),
+    );
+    const fakeBrowser = {
+      contexts: () => [{pages: () => [{}]}],
+      isConnected: () => true,
+      version: () => 'test',
+    };
+    const activeConfig = {
+      ego: true,
+      wsEndpoint: 'ws://127.0.0.1:5599/devtools/browser/ego-test',
+    };
+    const contextProvider = {
+      isBrowserConnected: () => true,
+      getBrowser: () => fakeBrowser,
+      getBrowserManager: () => ({getConfig: () => activeConfig}),
+      getContext: () => fakeBrowser.contexts()[0],
+      setBrowserManager: () => undefined,
+      setBrowser: () => undefined,
+      setContext: () => undefined,
+      clearContext: () => undefined,
+      init: async () => undefined,
+    };
+
+    const result = await connectBrowser(contextProvider as never, {
+      ego: true,
+    });
+
+    assert.deepStrictEqual(result, {connected: true, mode: 'ego'});
+    assert.strictEqual(
+      resetMock.mock.callCount(),
+      0,
+      'a repeat ego connect must not reset the instance (that would stop the bridge)',
+    );
+    resetMock.mock.restore();
+  });
+
   it('reports mode from active browser config when connected', () => {
     const status = getBrowserConnectionStatus(
       {

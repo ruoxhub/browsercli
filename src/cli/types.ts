@@ -49,6 +49,7 @@ export interface JobStatus {
 export type BrowserConnectionMode =
   | 'attach'
   | 'ws-endpoint'
+  | 'ego'
   | 'launch'
   | 'disconnected';
 
