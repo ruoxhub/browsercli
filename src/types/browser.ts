@@ -43,6 +43,15 @@ export interface BrowserManagerConfig {
    */
   cloak?: boolean;
   /**
+   * 使用正在运行的 ego lite 浏览器（经 `EgoBridgeManager` 发布的本地 CDP 桥接）。
+   *
+   * 与 `cloak` / `isolated` 同类：一个互斥的浏览器来源开关，而不是 `channel`
+   * 那样的启动策略值 —— `channel` 会原样传给 Patchright 的 `launch({channel})`
+   * 和配置 schema 的枚举，把 `'ego'` 混进去会污染每一处按 channel 分支的逻辑。
+   * 开启时跳过本地启动：先由桥接进程发布 ws 端点，再走既有的远程连接路径。
+   */
+  ego?: boolean;
+  /**
    * Opt-in 注入 StealthScripts2025（覆盖 navigator/canvas/WebGL/audio 等）。
    * 默认不开：与 jshookmcp 的"零 JS 注入"哲学对齐 —— `Object.defineProperty`
    * hack 本身就是检测信号。需要显式 opt-in 才注入。

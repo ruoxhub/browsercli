@@ -40,6 +40,7 @@ import {
   getIgnoreDefaultArgs,
 } from './browser-helpers.js';
 import {setupCloak} from './cloak.js';
+import {EgoBridgeManager} from './ego/EgoBridgeManager.js';
 
 /**
  * 浏览器生命周期管理：启动、连接、页面管理、反检测注入。
@@ -227,6 +228,8 @@ export class BrowserManager {
   private wasConnected = false;
   private detachedFrameGuard?: (error: Error) => void;
   private launchPromise: Promise<Browser> | null = null;
+  /** True while this manager is the thing that must stop the ego bridge. */
+  private egoBridgeOwned = false;
 
   public onDisconnected?: () => void;
   public onReconnected?: (browser: Browser, context?: BrowserContext) => void;
@@ -284,6 +287,12 @@ export class BrowserManager {
     }
 
     const doLaunch = async (): Promise<Browser> => {
+      // ego 是"连接"模式而非"启动"模式：桥接进程先发布标准 CDP 端点，之后
+      // 完全复用下面的远程连接路径。显式 `ego: true` 优先于其它端点配置。
+      if (this.config.ego) {
+        return this.connectEgoBrowser();
+      }
+
       if (
         this.config.browserURL ||
         this.config.wsEndpoint ||
@@ -359,6 +368,75 @@ export class BrowserManager {
 
   // ─── Remote Connection ───────────────────────────────────────────────
 
+  /**
+   * Connect to the ego lite browser through its CDP bridge.
+   *
+   * ego lite publishes no debugging port, so the transport has to be started
+   * first: `EgoBridgeManager` spawns the worker that republishes ego's native
+   * CDP as a standard `ws://` endpoint. Everything after that is the *existing*
+   * remote path — the endpoint is published as `config.wsEndpoint` and
+   * `connectToRemoteBrowser()` does the verification/normalization, so there is
+   * no second connect implementation to keep in sync.
+   *
+   * A bridge this method leaves running is a leaked process that holds a port,
+   * so any failure here — including a `start()` that rejects before an endpoint
+   * exists — tears it down before the error is rethrown.
+   */
+  private async connectEgoBrowser(): Promise<Browser> {
+    logger.debug('Connecting to the ego lite browser via its CDP bridge');
+
+    const bridge = EgoBridgeManager.getInstance();
+    const previousWsEndpoint = this.config.wsEndpoint;
+    // Claimed *before* `start()`: a start that rejects half-way can still have
+    // brought a bridge up, and only a successful `stop()` clears the claim, so a
+    // teardown that fails here is retried by `close()` instead of being lost.
+    this.egoBridgeOwned = true;
+
+    try {
+      const connection = await bridge.start();
+      this.config = {...this.config, wsEndpoint: connection.wsEndpoint};
+
+      const browser = await this.connectToRemoteBrowser();
+      this.bindEgoPage(browser);
+      return browser;
+    } catch (error) {
+      // Do not leave a dead endpoint in the config: it would make a retry look
+      // already-configured and mislead anything reading getConfig().
+      this.config = {...this.config, wsEndpoint: previousWsEndpoint};
+      try {
+        await this.stopEgoBridge();
+      } catch (stopError) {
+        // The connect error is the one the caller needs; report the leaked
+        // teardown instead of replacing it.
+        logger.debug(
+          'Failed to stop the ego bridge after a failed connect:',
+          stopError,
+        );
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Bind the manager to a page of the connection it just made.
+   *
+   * The bridge's Target firewall already keeps the user's own tabs out of
+   * `contexts()`, but the first context can still be empty (a fresh task space
+   * has no tab until one is opened), so the first context that actually holds a
+   * page wins instead of blindly adopting `contexts()[0]`. Only contexts of
+   * `browser` are scanned, and that browser was replaced a moment ago by
+   * `connectOverCDP`, so no page from an earlier connection can be adopted.
+   */
+  private bindEgoPage(browser: Browser): void {
+    for (const ctx of browser.contexts()) {
+      const page = ctx.pages()[0];
+      if (!page) continue;
+      this.context = ctx;
+      this.trackCurrentPage(page);
+      return;
+    }
+  }
+
   private async connectToRemoteBrowser(): Promise<Browser> {
     try {
       logger.debug('Connecting to remote browser at:', this.debugUrl());
@@ -393,7 +471,10 @@ export class BrowserManager {
       return this.browser;
     } catch (error) {
       this.removeDetachedFrameGuard();
-      if (this.config.autoLaunch) {
+      // auto-launch spawns a *local* Chrome on `remoteDebuggingPort`; in ego mode
+      // there is no local browser to start and retrying against the bridge
+      // endpoint would only hide the bridge's own failure.
+      if (this.config.autoLaunch && !this.config.ego) {
         logger.debug(
           'Remote browser connection failed, attempting auto-launch...',
         );
@@ -1025,7 +1106,14 @@ export class BrowserManager {
 
     this.removeDetachedFrameGuard();
 
-    if (!this.browser) return;
+    // The bridge is only touched when this manager started it: a stray `stop()`
+    // in the non-ego path would queue behind unrelated work in the singleton.
+    const ownedBridge = this.egoBridgeOwned;
+
+    if (!this.browser) {
+      if (ownedBridge) await this.stopEgoBridge();
+      return;
+    }
 
     const browser = this.browser;
     this.browser = undefined;
@@ -1058,6 +1146,29 @@ export class BrowserManager {
         }
       }
       logger.debug('Browser close forced:', error);
+    } finally {
+      // After the CDP connection is gone: the bridge is the transport it used.
+      if (ownedBridge) await this.stopEgoBridge();
+    }
+  }
+
+  /**
+   * Stop the ego bridge, surfacing a failed teardown.
+   *
+   * `stop()` resolves only once the launcher exited and its port stopped
+   * accepting, and it keeps its state on failure so it can be retried — so its
+   * rejection must reach the caller instead of being swallowed here, and
+   * ownership is dropped only on success so a retry still stops it.
+   */
+  private async stopEgoBridge(): Promise<void> {
+    try {
+      await EgoBridgeManager.getInstance().stop();
+      this.egoBridgeOwned = false;
+    } catch (error) {
+      throw new Error(
+        `Failed to stop the ego bridge: ${(error as Error).message}`,
+        {cause: error},
+      );
     }
   }
 }
