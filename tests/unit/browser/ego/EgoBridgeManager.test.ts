@@ -27,8 +27,12 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import {after, describe, it} from 'node:test';
+import {pathToFileURL} from 'node:url';
 
-import {READY_PREFIX} from '../../../../src/modules/browser/ego/ego-bridge-worker.js';
+import {
+  READY_PREFIX,
+  workspaceTaskSpaceName,
+} from '../../../../src/modules/browser/ego/ego-bridge-worker.js';
 import {findEgoBrowserBinary} from '../../../../src/modules/browser/ego/ego-detect.js';
 import {
   EgoBridgeManager,
@@ -152,6 +156,191 @@ function managerOptions(
   };
 }
 
+/**
+ * A stub worker module, imported by the manager-generated bootstrap in the
+ * `-e` execution tests (I3).
+ *
+ * It stands in for `ego-bridge-worker.js` and asserts the *contract the bootstrap
+ * provides to it* from inside the process that actually ran the bootstrap: the
+ * four baked values are present, stdin was replaced by a never-ending stream, and
+ * readiness travels through the sink file. Then it opens a real loopback listener
+ * and exits when the stop file appears.
+ */
+function stubWorkerBody(): string {
+  const NL = `String.fromCharCode(10)`;
+  const lines = [
+    "const fs = require('node:fs');",
+    "const http = require('node:http');",
+    'const out = process.env.EGO_BRIDGE_STUB_ASSERTIONS;',
+    'const fail = function (why) {',
+    `  fs.appendFileSync(out, 'FAIL ' + why + ${NL});`,
+    '  process.exit(9);',
+    '};',
+    'const required = [',
+    "  'EGO_BRIDGE_READY_FILE',",
+    "  'EGO_BRIDGE_STOP_FILE',",
+    "  'EGO_BRIDGE_PARENT_PID',",
+    "  'EGO_BRIDGE_TASK_SPACE_NAME',",
+    '];',
+    'for (const name of required) {',
+    '  const value = process.env[name];',
+    "  if (typeof value !== 'string' || value.length === 0) {",
+    "    fail(name + ' is missing or empty');",
+    '  }',
+    '}',
+    'if (!/^[0-9]+$/.test(process.env.EGO_BRIDGE_PARENT_PID)) {',
+    "  fail('parent pid is not a pid');",
+    '}',
+    'if (!/^browsercli-[0-9a-f]{12}$/.test(process.env.EGO_BRIDGE_TASK_SPACE_NAME)) {',
+    "  fail('task space name is not a workspace name');",
+    '}',
+    // The bootstrap must have replaced stdin with a never-ending stream, otherwise
+    // the worker's legacy stdin-EOF shutdown path would fire immediately.
+    "if (process.stdin.readableEnded) fail('stdin was not replaced');",
+    "process.stdin.on('end', function () { fail('stdin ended'); });",
+    'process.stdin.resume();',
+    'const stopFile = process.env.EGO_BRIDGE_STOP_FILE;',
+    'const server = http.createServer(function (_req, res) {',
+    '  res.end(process.env.EGO_BRIDGE_TASK_SPACE_NAME);',
+    '});',
+    "server.listen(0, '127.0.0.1', function () {",
+    '  const port = server.address().port;',
+    // The bootstrap must prefix stderr lines and append them to the same sink; the
+    // check runs before the ready line so the manager cannot have truncated yet.
+    "  process.stderr.write('stub-diagnostic-marker' + " + NL + ');',
+    '  const sinkText = fs',
+    '    .readFileSync(process.env.EGO_BRIDGE_READY_FILE)',
+    "    .toString('utf8');",
+    "  if (sinkText.indexOf('[ERR] stub-diagnostic-marker') < 0) {",
+    "    fail('stderr was not prefixed with [ERR] and redirected into the sink');",
+    '  }',
+    // Written to stdout on purpose: the bootstrap must redirect it into the sink,
+    // otherwise the manager can never observe readiness on the real host.
+    "  process.stdout.write('[ego-bridge:ready] ws://127.0.0.1:' + port +",
+    "    '/devtools/browser/stub-' + process.pid + " + NL + ');',
+    '});',
+    'const timer = setInterval(function () {',
+    '  if (!fs.existsSync(stopFile)) return;',
+    '  clearInterval(timer);',
+    '  server.close(function () { process.exit(0); });',
+    '  setTimeout(function () { process.exit(0); }, 250);',
+    '}, 25);',
+  ];
+  return lines.join(String.fromCharCode(10));
+}
+
+/** Write the stub worker as a real `.mjs` file the bootstrap can import. */
+function writeStubWorker(): string {
+  const file = path.join(makeTempDir('ego-stub-'), 'stub-worker.cjs');
+  fs.writeFileSync(file, stubWorkerBody());
+  return file;
+}
+
+/**
+ * Run the manager's own bootstrap under the current node. `args[0]` is ego's
+ * `nodejs` subcommand, which is ego's CLI syntax rather than node's, so only the
+ * `-e <bootstrap>` tail is passed on.
+ */
+function spawnRecordedArgs(args: readonly string[], options: SpawnOptions) {
+  return spawn(process.execPath, [...args.slice(1)], {
+    stdio: options.stdio ?? ['ignore', 'pipe', 'pipe'],
+    env: options.env as NodeJS.ProcessEnv,
+    windowsHide: true,
+  });
+}
+
+interface BootstrapHarness extends SpawnHarness {
+  /** The worker URL to inject, so the bootstrap imports the stub. */
+  workerUrl: string;
+  /** Where the stub records its own assertion failures. */
+  assertionFile: string;
+}
+
+/**
+ * A harness that runs the *manager's own* bootstrap instead of a test body:
+ * `process.execPath -e <args[2]>`, with the worker URL pointed at a stub module.
+ * Nothing about the bootstrap is re-implemented here (I3).
+ */
+function bootstrapHarness(): BootstrapHarness {
+  const records: SpawnRecord[] = [];
+  const binaryPath = path.join(makeTempDir('ego-bin-'), 'ego-browser.exe');
+  const assertionFile = path.join(makeTempDir('ego-assert-'), 'stub.log');
+  fs.writeFileSync(assertionFile, '');
+  const workerUrl = pathToFileURL(writeStubWorker()).href;
+  const spawnFn: EgoSpawn = (command, args, options) => {
+    const env = {...(options.env as NodeJS.ProcessEnv)};
+    env.EGO_BRIDGE_STUB_ASSERTIONS = assertionFile;
+    const child = spawnRecordedArgs(args, {...options, env});
+    records.push({command, args, options, child});
+    return child;
+  };
+  return {records, spawn: spawnFn, binaryPath, workerUrl, assertionFile};
+}
+
+/** The stub's own view of the bootstrap contract: empty means it was satisfied. */
+function stubAssertions(harness: BootstrapHarness): string {
+  return fs.readFileSync(harness.assertionFile, 'utf8').trim();
+}
+
+/**
+ * A fake CLI whose bridge lives in a *separate, detached* process, exactly like the
+ * real host: the `-e` script runs in ego's persistent utility process, so killing
+ * our launcher does not stop the bridge. `EGO_BRIDGE_READY_FILE` /
+ * `EGO_BRIDGE_STOP_FILE` are inherited by the detached bridge, so the ready line and
+ * the shutdown request still travel through the manager's files (I2a).
+ */
+function independentBridgeHarness(): SpawnHarness {
+  const records: SpawnRecord[] = [];
+  const binaryPath = path.join(makeTempDir('ego-bin-'), 'ego-browser.exe');
+  const bridgeFile = path.join(makeTempDir('ego-bridge-'), 'bridge.cjs');
+  fs.writeFileSync(
+    bridgeFile,
+    [
+      "const fs = require('node:fs');",
+      "const http = require('node:http');",
+      'const sink = process.env.EGO_BRIDGE_READY_FILE;',
+      'const stopFile = process.env.EGO_BRIDGE_STOP_FILE;',
+      'const prefix = process.env.EGO_STUB_PREFIX;',
+      'const server = http.createServer(function (_req, res) { res.end(prefix); });',
+      "server.listen(0, '127.0.0.1', function () {",
+      '  const port = server.address().port;',
+      '  fs.appendFileSync(sink, prefix +',
+      "    ' ws://127.0.0.1:' + port + '/devtools/browser/detached-' + process.pid + ",
+      '    String.fromCharCode(10));',
+      '});',
+      'setInterval(function () {',
+      '  if (!fs.existsSync(stopFile)) return;',
+      '  server.close(function () { process.exit(0); });',
+      '  setTimeout(function () { process.exit(0); }, 250);',
+      '}, 25);',
+    ].join(String.fromCharCode(10)),
+  );
+  // The launcher: spawn the detached bridge, then stay alive doing nothing (it is
+  // not the bridge, so its death must not be mistaken for the bridge dying).
+  const launcher = [
+    "const {spawn} = require('node:child_process');",
+    `const bridge = spawn(process.execPath, [${JSON.stringify(bridgeFile)}], {`,
+    "  detached: true, stdio: 'ignore', env: process.env,",
+    '});',
+    'bridge.unref();',
+    'setInterval(function () {}, 1000);',
+  ].join(String.fromCharCode(10));
+  const spawnFn: EgoSpawn = (command, args, options) => {
+    const env = {
+      ...(options.env as NodeJS.ProcessEnv),
+      EGO_STUB_PREFIX: READY_PREFIX,
+    };
+    const child = spawn(process.execPath, ['-e', launcher], {
+      stdio: options.stdio ?? ['ignore', 'pipe', 'pipe'],
+      env,
+      windowsHide: true,
+    });
+    records.push({command, args, options, child});
+    return child;
+  };
+  return {records, spawn: spawnFn, binaryPath};
+}
+
 function connectRefused(port: number): Promise<boolean> {
   return new Promise(resolve => {
     const request = http
@@ -167,6 +356,25 @@ function connectRefused(port: number): Promise<boolean> {
 
 function portOf(wsEndpoint: string): number {
   return Number(new URL(wsEndpoint).port);
+}
+
+/** The HTTP body the stub worker serves: the task-space name it was given. */
+function bodyOf(wsEndpoint: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    http
+      .get(
+        {host: '127.0.0.1', port: portOf(wsEndpoint), path: '/', timeout: 1000},
+        response => {
+          let body = '';
+          response.setEncoding('utf8');
+          response.on('data', (chunk: string) => {
+            body += chunk;
+          });
+          response.on('end', () => resolve(body));
+        },
+      )
+      .on('error', reject);
+  });
 }
 
 function hasExited(child: ChildProcess): boolean {
@@ -423,7 +631,9 @@ describe('EgoBridgeManager', () => {
     });
   });
 
-  it('rejects with the sink tail when the child exits before the ready line', async () => {
+  // This exercises the launcher's own stderr pipe (`drainStream`), not the sink
+  // file: the child never reaches the `-e` bootstrap's sink redirection.
+  it('rejects with the launcher stderr tail when the child exits before the ready line', async () => {
     const harness = harnessFor(
       [
         "const fs = require('node:fs');",
@@ -550,6 +760,49 @@ describe('EgoBridgeManager', () => {
         manager.stderrTail().includes('y'.repeat(100)),
         'newest line kept',
       );
+    } finally {
+      await manager.stop();
+    }
+  });
+
+  it('drains a burst larger than one sink read without losing lines (Minors)', async () => {
+    // The single read is capped (64 KiB x 64), so a burst past that is drained over
+    // several polls. Nothing may be lost in between: the newest line must survive
+    // and the ring buffer must stay inside its budget.
+    const harness = harnessFor(
+      fakeCliBody(READY_PREFIX, {
+        extra: [
+          '// ~1 MiB in one synchronous burst, plus a numbered last line.',
+          'const chunk = "BURST-" + "z".repeat(990) + String.fromCharCode(10);',
+          'let burst = "";',
+          'for (let i = 0; i < 1050; i++) burst += chunk;',
+          'fs.appendFileSync(sink, burst);',
+          'fs.appendFileSync(sink, "LAST-BURST-LINE" + String.fromCharCode(10));',
+        ].join(String.fromCharCode(10)),
+      }),
+    );
+    const manager = new EgoBridgeManager(managerOptions(harness));
+
+    try {
+      await manager.start();
+      const sink = sinkOf(harness.records[0]);
+      // Give the pump time to work through the burst and truncate.
+      await new Promise(resolve => setTimeout(resolve, 600));
+      assert.equal(
+        manager.isRunning(),
+        true,
+        'draining must not stall the child',
+      );
+      assert.ok(
+        manager.stderrTail().includes('LAST-BURST-LINE'),
+        'the newest line must be reached across the capped reads',
+      );
+      assert.ok(
+        manager.stderrTail().length <= 8 * 1024,
+        'the retained tail must stay inside its byte budget',
+      );
+      const size = fs.existsSync(sink) ? fs.statSync(sink).size : 0;
+      assert.ok(size < 1024 * 1024, `the sink must be recycled, got ${size}`);
     } finally {
       await manager.stop();
     }
@@ -755,6 +1008,338 @@ describe('EgoBridgeManager', () => {
       assert.notEqual(second.wsEndpoint, first.wsEndpoint);
       assert.equal(harness.records.length, 2);
       assert.equal(manager.isRunning(), true);
+    } finally {
+      await manager.stop();
+    }
+  });
+
+  it('bakes a per-workspace task-space name into the bootstrap (I1)', async () => {
+    // The worker runs in ego's persistent utility process, where cwd is ego's
+    // application directory for every workspace. Two workspaces must still get
+    // two different task spaces, so the manager hashes its own cwd.
+    const workspaceA = makeTempDir('ego-ws-a-');
+    const workspaceB = makeTempDir('ego-ws-b-');
+    const harness = bootstrapHarness();
+    const managerA = new EgoBridgeManager(
+      managerOptions(harness, {
+        workerUrl: harness.workerUrl,
+        cwd: workspaceA,
+      }),
+    );
+    const managerB = new EgoBridgeManager(
+      managerOptions(harness, {
+        workerUrl: harness.workerUrl,
+        cwd: workspaceB,
+      }),
+    );
+
+    try {
+      const a = await managerA.start();
+      const b = await managerB.start();
+      const [recordA, recordB] = harness.records;
+
+      const nameA = workspaceTaskSpaceName(workspaceA);
+      const nameB = workspaceTaskSpaceName(workspaceB);
+      assert.notEqual(
+        nameA,
+        nameB,
+        'different workspaces must not share a name',
+      );
+      assert.match(nameA, /^browsercli-[0-9a-f]{12}$/);
+
+      // It reaches the runtime as an unconditional literal, not as an env lookup:
+      // the spawn env never arrives and `process.env` leaks across `-e` runs.
+      for (const [record, name] of [
+        [recordA, nameA],
+        [recordB, nameB],
+      ] as const) {
+        assert.ok(
+          record.args[2].includes(
+            `process.env.EGO_BRIDGE_TASK_SPACE_NAME = '${name}';`,
+          ),
+          'the task-space name must be baked into the bootstrap',
+        );
+        assert.ok(
+          !record.args[2].includes('|| workspaceTaskSpaceName'),
+          'the bootstrap must assign the name, never fall back to a previous run',
+        );
+      }
+
+      // And the runtime really sees it: the stub worker fails closed when the
+      // value is missing or malformed, and it echoes the name it was given.
+      assert.equal(stubAssertions(harness), '');
+      assert.equal(await bodyOf(a.wsEndpoint), nameA);
+      assert.equal(await bodyOf(b.wsEndpoint), nameB);
+    } finally {
+      await managerA.stop();
+      await managerB.stop();
+    }
+  });
+
+  it('runs the manager-generated bootstrap under node -e and talks to it (I3)', async () => {
+    // The only executing test of the real bootstrap that does not need ego: the
+    // stub worker stands in for the worker module, everything else is the
+    // manager's own argv, sink, stdin replacement and env literals.
+    const harness = bootstrapHarness();
+    const manager = new EgoBridgeManager(
+      managerOptions(harness, {workerUrl: harness.workerUrl}),
+    );
+
+    try {
+      const connection = await manager.start();
+      const [record] = harness.records;
+
+      // The bootstrap was executed, not merely generated: the stub only runs if
+      // the import at the end of it succeeded.
+      assert.equal(
+        stubAssertions(harness),
+        '',
+        'the stub saw the full contract',
+      );
+      assert.equal(manager.isRunning(), true);
+      assert.match(
+        connection.wsEndpoint,
+        /^ws:\/\/127\.0\.0\.1:\d+\/devtools\/browser\/stub-\d+$/,
+      );
+      // Readiness really came through the sink the manager polls.
+      const sink = sinkOf(record);
+      assert.equal(
+        (record.options.env as NodeJS.ProcessEnv).EGO_BRIDGE_TASK_SPACE_NAME,
+        workspaceTaskSpaceName(process.cwd()),
+      );
+      assert.ok(
+        fs.existsSync(sink),
+        'the sink must exist while the bridge lives',
+      );
+      const port = portOf(connection.wsEndpoint);
+      assert.equal(await connectRefused(port), false, 'the endpoint serves');
+
+      await manager.stop();
+
+      assert.equal(manager.isRunning(), false);
+      assert.equal(
+        await connectRefused(port),
+        true,
+        'stop() must close the port the stub was listening on',
+      );
+    } finally {
+      await manager.stop();
+    }
+  });
+
+  it('stop() still closes the bridge after the launcher died (I2a)', async () => {
+    // The bridge lives in ego's persistent utility process, so killing the launcher
+    // demonstrably leaves it listening. The stop file is then the only mechanism,
+    // which means it may not be deleted when the launcher exits.
+    const harness = independentBridgeHarness();
+    const manager = new EgoBridgeManager(managerOptions(harness));
+    const connection = await manager.start();
+    const port = portOf(connection.wsEndpoint);
+    const stopPath = `${sinkOf(harness.records[0])}.stop`;
+
+    // Simulate the launcher dying on its own: the bridge keeps its port.
+    harness.records[0].child.kill('SIGKILL');
+    await waitForExit(harness.records[0].child);
+
+    assert.equal(manager.isRunning(), false, 'the launcher is gone');
+    assert.equal(
+      await connectRefused(port),
+      false,
+      'the bridge is still listening, which is the whole problem',
+    );
+
+    try {
+      await manager.stop();
+
+      assert.equal(
+        await connectRefused(port),
+        true,
+        'stop() must shut down a bridge whose launcher is already dead',
+      );
+      assert.equal(fs.existsSync(stopPath), false, 'then clean it up');
+    } finally {
+      // The detached bridge has no manager watching it: leave it a stop request so
+      // a failed assertion cannot strand a listening port.
+      fs.writeFileSync(stopPath, 'stop');
+    }
+  });
+
+  it('rejects stop() when the bridge survives every shutdown channel (I2b)', async () => {
+    // A launcher that never actually receives a signal: the child stays alive.
+    const harness = harnessFor(fakeCliBody(READY_PREFIX, {ignoreStop: true}));
+    const manager = new EgoBridgeManager(
+      managerOptions(harness, {
+        stopGraceMs: 40,
+        killGraceMs: 40,
+        kill: () => {
+          // Swallow every signal: nothing can stop this bridge.
+        },
+      }),
+    );
+
+    const connection = await manager.start();
+    const stopPath = `${sinkOf(harness.records[0])}.stop`;
+
+    try {
+      await assert.rejects(manager.stop(), (error: Error) => {
+        assert.match(error.message, /did not stop/i);
+        assert.match(error.message, /stop file/);
+        assert.match(error.message, /SIGTERM/);
+        assert.match(error.message, /SIGKILL/);
+        return true;
+      });
+      // A failed shutdown must stay retryable: the stop file is the mechanism.
+      assert.equal(
+        fs.existsSync(stopPath),
+        true,
+        'a failed stop() must not delete the stop file',
+      );
+      assert.equal(
+        await connectRefused(portOf(connection.wsEndpoint)),
+        false,
+        'the port must still be listening, so the failure was real',
+      );
+    } finally {
+      // Now really tear it down, so the runner exits.
+      harness.records[0].child.kill('SIGKILL');
+      await waitForExit(harness.records[0].child);
+    }
+  });
+
+  it('lets a failed stop() be retried, keeping the stop file it needs (I2b)', async () => {
+    // A shutdown that reports failure must stay actionable: the tracked bridge, the
+    // exit hook and the stop file survive, so a second stop() can finish the job.
+    const harness = harnessFor(fakeCliBody(READY_PREFIX, {ignoreStop: true}));
+    const signals: NodeJS.Signals[] = [];
+    let swallow = true;
+    const manager = new EgoBridgeManager(
+      managerOptions(harness, {
+        stopGraceMs: 40,
+        killGraceMs: 40,
+        kill: (child, signal) => {
+          signals.push(signal);
+          if (!swallow) child.kill(signal);
+        },
+      }),
+    );
+    const exitHookBaseline = process.listenerCount('exit');
+
+    const connection = await manager.start();
+    const stopPath = `${sinkOf(harness.records[0])}.stop`;
+
+    try {
+      await assert.rejects(manager.stop(), /did not stop/i);
+      assert.equal(fs.existsSync(stopPath), true);
+      assert.equal(
+        process.listenerCount('exit'),
+        exitHookBaseline + 1,
+        'the exit hook must survive a failed stop, or nothing could retry',
+      );
+
+      // Second attempt, this time the launcher really receives its signals.
+      swallow = false;
+      await manager.stop();
+
+      assert.equal(manager.isRunning(), false);
+      assert.equal(
+        await connectRefused(portOf(connection.wsEndpoint)),
+        true,
+        'the retry must actually release the port',
+      );
+      assert.equal(fs.existsSync(stopPath), false, 'and then clean up');
+      assert.equal(process.listenerCount('exit'), exitHookBaseline);
+    } finally {
+      harness.records[0].child.kill('SIGKILL');
+      await waitForExit(harness.records[0].child);
+    }
+  });
+
+  it('does not double-spawn when start() is called during an in-flight stop()', async () => {
+    const harness = harnessFor(fakeCliBody(READY_PREFIX));
+    const manager = new EgoBridgeManager(managerOptions(harness));
+
+    const first = await manager.start();
+    const stopping = manager.stop();
+    // Two callers racing for a new bridge while the old one is still tearing down.
+    const [a, b] = await Promise.all([manager.start(), manager.start()]);
+    await stopping;
+
+    try {
+      assert.equal(harness.records.length, 2, 'exactly one new child');
+      assert.equal(a.wsEndpoint, b.wsEndpoint);
+      assert.notEqual(a.wsEndpoint, first.wsEndpoint);
+      assert.equal(manager.isRunning(), true);
+      assert.equal(
+        hasExited(harness.records[0].child),
+        true,
+        'the stopped child must be gone',
+      );
+      assert.equal(await connectRefused(portOf(first.wsEndpoint)), true);
+      assert.equal(await connectRefused(portOf(a.wsEndpoint)), false);
+    } finally {
+      await manager.stop();
+    }
+  });
+
+  it('rejects a repeated start() that would change keepPage instead of ignoring it', async () => {
+    const harness = harnessFor(fakeCliBody(READY_PREFIX));
+    const manager = new EgoBridgeManager(managerOptions(harness));
+
+    try {
+      const live = await manager.start({keepPage: false});
+      // Repeating the same options is fine: the bridge is reused.
+      const again = await manager.start();
+      assert.equal(again.wsEndpoint, live.wsEndpoint);
+
+      await assert.rejects(manager.start({keepPage: true}), (error: Error) => {
+        assert.match(error.message, /keepPage=false/);
+        assert.match(error.message, /keepPage=true/);
+        assert.match(error.message, /stop\(\)/);
+        return true;
+      });
+      assert.equal(harness.records.length, 1, 'nothing may be respawned');
+    } finally {
+      await manager.stop();
+    }
+  });
+
+  it('keeps a ready line that straddles a sink truncation (Minors)', async () => {
+    // The sink is capped while the worker keeps appending, so a cut can land in
+    // the middle of a line. Zeroing the file *and* the buffered half-line would
+    // lose that ready line for good; only the consumed prefix may be dropped.
+    const body = [
+      "const fs = require('node:fs');",
+      "const http = require('node:http');",
+      'const NL = String.fromCharCode(10);',
+      `const PREFIX = '${READY_PREFIX}';`,
+      'const sink = process.env.EGO_BRIDGE_READY_FILE;',
+      'const stopFile = process.env.EGO_BRIDGE_STOP_FILE;',
+      "const server = http.createServer(function (_req, res) { res.end('ok'); });",
+      "server.on('listening', function () {",
+      '  const port = server.address().port;',
+      '  // Past SINK_MAX_BYTES (256 KiB) in one burst, so the manager truncates.',
+      "  fs.appendFileSync(sink, ('d'.repeat(1000) + NL).repeat(300));",
+      '  // The ready line arrives split across that truncation.',
+      "  fs.appendFileSync(sink, PREFIX + ' ws://127.0.0.1:' + port + '/devtools/browser/straddle' + '-' + process.pid);",
+      '  setTimeout(function () { fs.appendFileSync(sink, NL); }, 400);',
+      '});',
+      "server.listen(0, '127.0.0.1');",
+      'setInterval(function () {',
+      '  if (!fs.existsSync(stopFile)) return;',
+      '  server.close(function () { process.exit(0); });',
+      '  setTimeout(function () { process.exit(0); }, 250);',
+      '}, 25);',
+    ].join(String.fromCharCode(10));
+    const harness = harnessFor(body);
+    const manager = new EgoBridgeManager(managerOptions(harness));
+
+    try {
+      const connection = await manager.start();
+      assert.match(
+        connection.wsEndpoint,
+        /^ws:\/\/127\.0\.0\.1:\d+\/devtools\/browser\/straddle-\d+$/,
+        'a ready line split by the sink cap must still be parsed',
+      );
     } finally {
       await manager.stop();
     }

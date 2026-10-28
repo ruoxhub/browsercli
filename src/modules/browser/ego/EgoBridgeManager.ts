@@ -34,10 +34,11 @@ import {
   type SpawnOptions,
 } from 'node:child_process';
 import fs from 'node:fs';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 
-import {READY_PREFIX} from './ego-bridge-worker.js';
+import {READY_PREFIX, workspaceTaskSpaceName} from './ego-bridge-worker.js';
 import {findEgoBrowserBinary, egoSearchRoots} from './ego-detect.js';
 
 /** `[ego-bridge:fatal] <message>` in the sink means the worker gave up. */
@@ -56,6 +57,12 @@ const STDERR_MAX_BYTES = 8 * 1024;
 const SINK_MAX_BYTES = 256 * 1024;
 /** How long a failed start waits for its killed child to be reaped. */
 const REAP_TIMEOUT_MS = 2_000;
+/** How long the shutdown port probe may take before it counts as "not closed". */
+const PORT_PROBE_TIMEOUT_MS = 1_000;
+/** Bytes per `readSync` when draining the sink; a single read never allocates more. */
+const SINK_READ_CHUNK_BYTES = 64 * 1024;
+/** At most this many reads per drain, so one poll stays bounded even when behind. */
+const SINK_READ_CHUNKS = 64;
 
 export interface EgoBridgeStartOptions {
   /** Keep the task space's pages when the bridge stops (the worker's `keep:'all'`). */
@@ -93,6 +100,10 @@ export interface EgoBridgeManagerOptions {
   kill?: (child: ChildProcess, signal: NodeJS.Signals) => void;
   /** Directory for the sink/stop files; defaults to `os.tmpdir()`. */
   sinkDir?: string;
+  /** Worker module the bootstrap imports; defaults to this build's worker. */
+  workerUrl?: string;
+  /** Workspace the task space is derived from; defaults to `process.cwd()`. */
+  cwd?: string;
 }
 
 interface BridgeFiles {
@@ -131,10 +142,24 @@ export class EgoBridgeManager {
   private readonly killGraceMs: number;
   private readonly kill: (child: ChildProcess, signal: NodeJS.Signals) => void;
   private readonly sinkDir: string;
+  private readonly workerUrl: string;
+  private readonly workspaceCwd: string;
 
   private live: LiveChild | undefined;
+  /**
+   * The launch whose bridge may still be listening. Deliberately *not* cleared
+   * when the launcher dies: killing the launcher demonstrably does not stop the
+   * bridge (it runs in ego's persistent utility process), so only a successful
+   * `stop()` — or a failed start, which reaps what it launched — may forget it.
+   * Everything needed to request a shutdown lives here.
+   */
+  private tracked: LiveChild | undefined;
   private startPromise: Promise<EgoBridgeConnection> | undefined;
   private stopPromise: Promise<void> | undefined;
+  /** Serializes `start()` so a launch cannot begin while another is resolving. */
+  private startQueue: Promise<unknown> = Promise.resolve();
+  /** Options of the live bridge, so a differing `start()` can be rejected. */
+  private liveOptions: EgoBridgeStartOptions | undefined;
   /** Bounded diagnostic ring, fed from the sink file and the launcher's stderr. */
   private stderrLines: string[] = [];
   private stderrBytes = 0;
@@ -162,6 +187,12 @@ export class EgoBridgeManager {
     this.killGraceMs = options.killGraceMs ?? DEFAULT_KILL_GRACE_MS;
     this.kill = options.kill ?? ((child, signal) => child.kill(signal));
     this.sinkDir = options.sinkDir ?? os.tmpdir();
+    this.workerUrl =
+      options.workerUrl ??
+      new URL('./ego-bridge-worker.js', import.meta.url).href;
+    // The manager runs in the workspace; the worker does not (its `cwd` is ego's
+    // own application directory), so the task-space identity is computed here.
+    this.workspaceCwd = options.cwd ?? process.cwd();
   }
 
   /** True while a spawned child is still alive and serving the bridge. */
@@ -184,15 +215,38 @@ export class EgoBridgeManager {
    *
    * Idempotent while a child is live: a second call returns the same
    * `wsEndpoint` instead of spawning a second bridge.
+   *
+   * `start()` calls are serialized through {@link startQueue}: a caller that
+   * arrives while another launch is in flight (or while a `stop()` is finishing)
+   * waits its turn instead of racing it and leaking a second child. A live bridge
+   * is only reused for the same options — the retention policy is baked into the
+   * bootstrap, so a differing `keepPage` rejects rather than being ignored.
    */
   async start(
     options: EgoBridgeStartOptions = {},
   ): Promise<EgoBridgeConnection> {
-    if (this.startPromise) return this.startPromise;
-    if (this.live) return this.live.connection;
-    // A stop() in flight owns the teardown; starting underneath it would race the
-    // child's exit and leak a process.
+    const queued = this.startQueue.then(() => this.startExclusive(options));
+    // The queue must survive a failed start: a rejection is the caller's, not the
+    // next caller's.
+    this.startQueue = queued.catch(() => undefined);
+    return queued;
+  }
+
+  private async startExclusive(
+    options: EgoBridgeStartOptions,
+  ): Promise<EgoBridgeConnection> {
+    // A stop() in flight owns the teardown, so it must be *finished* before the
+    // live child is even consulted: otherwise `start()` hands back a connection
+    // that is already being torn down.
     if (this.stopPromise) await this.stopPromise;
+    if (this.live) {
+      assertSameOptions(this.liveOptions, options);
+      return this.live.connection;
+    }
+    // The launcher died but the bridge may still be listening (it lives in ego's
+    // utility process). Shut it down before `createFiles()` recycles its stop file,
+    // or that bridge could never be asked to stop.
+    if (this.tracked) await this.stop();
 
     const starting = this.launch(options);
     this.startPromise = starting;
@@ -206,7 +260,8 @@ export class EgoBridgeManager {
   /**
    * Shut the bridge down: request a stop through the stop file (the only channel
    * that reaches the embedded runtime), wait, then escalate through SIGTERM and
-   * SIGKILL against the launcher. Resolves only after the child exited.
+   * SIGKILL against the launcher. Resolves only after the child exited *and* the
+   * bridge stopped listening.
    */
   async stop(): Promise<void> {
     if (this.stopPromise) return this.stopPromise;
@@ -214,7 +269,7 @@ export class EgoBridgeManager {
       await this.startPromise.catch(() => undefined);
     }
 
-    const live = this.live;
+    const live = this.tracked;
     if (!live) {
       this.removeExitHook();
       this.stopSinkPump();
@@ -222,15 +277,23 @@ export class EgoBridgeManager {
       return;
     }
 
+    let stopped = false;
     const stopping = this.terminate(live);
     this.stopPromise = stopping;
     try {
       await stopping;
+      stopped = true;
     } finally {
       if (this.live === live) this.live = undefined;
-      this.removeExitHook();
+      this.liveOptions = undefined;
       this.stopSinkPump();
-      this.removeFiles();
+      if (stopped) {
+        if (this.tracked === live) this.tracked = undefined;
+        this.removeExitHook();
+        this.removeFiles();
+      }
+      // A failed shutdown keeps `tracked`, the exit hook and the stop file, so a
+      // retry can still ask the bridge to stop (and the process exit hook can too).
       this.stopPromise = undefined;
     }
   }
@@ -258,7 +321,11 @@ export class EgoBridgeManager {
 
     const child = this.spawnChild(
       binary,
-      ['nodejs', '-e', workerBootstrap(files, options)],
+      [
+        'nodejs',
+        '-e',
+        workerBootstrap(files, options, this.workerUrl, this.taskSpaceName()),
+      ],
       {
         // `-e` only runs once stdin is at EOF, and stdin is not a control channel
         // for the embedded runtime at all, so keep it out of the way entirely.
@@ -289,7 +356,12 @@ export class EgoBridgeManager {
         wsEndpoint,
         childPid: child.pid,
       };
-      this.live = {child, connection, ...files};
+      const launched: LiveChild = {child, connection, ...files};
+      this.live = launched;
+      // Tracked *before* any await: from here on the bridge may be listening, so
+      // a `stop()` must be able to request a shutdown even if the launcher dies.
+      this.tracked = launched;
+      this.liveOptions = {...options};
       // The ready line is the sink's one job; recycling it here means a long
       // session starts from an empty file instead of inheriting the startup log.
       this.truncateSink();
@@ -301,6 +373,7 @@ export class EgoBridgeManager {
       // Never leave a half-started child behind: a retry must be able to spawn
       // a fresh one, and a stuck runtime would hold the port.
       await this.reap(child, files.stopPath);
+      if (this.tracked?.child === child) this.tracked = undefined;
       this.removeExitHook();
       this.removeFiles();
       throw error;
@@ -308,16 +381,22 @@ export class EgoBridgeManager {
   }
 
   /**
-   * Adopt the child's death: clear the connection so the next `start()` spawns a
-   * fresh bridge instead of handing out an endpoint nobody is listening on.
+   * Adopt the child's death.
+   *
+   * Clearing `live` makes the next `start()` spawn a fresh bridge instead of
+   * handing out an endpoint nobody listens on. The stop file, however, is *kept*:
+   * the launcher dying does not stop the bridge that runs in ego's utility
+   * process, so `stop()` still needs a way to request the shutdown (I2a).
    */
   private watchForEarlyExit(child: ChildProcess): void {
     child.once('exit', () => {
       if (this.live?.child !== child) return;
       this.live = undefined;
-      this.removeExitHook();
+      this.liveOptions = undefined;
+      // The exit hook stays: it is the only thing that can still write the stop
+      // file from a `process.on('exit')` handler, and the bridge may well outlive
+      // its launcher.
       this.stopSinkPump();
-      this.removeFiles();
       // Any consumer still holding the old endpoint gets a connection error from
       // the closed port instead of a hang: the child's listener died with it.
     });
@@ -342,6 +421,7 @@ export class EgoBridgeManager {
     // The manager's own pid: the runtime's real parent is the ego app, so its
     // `process.ppid` points at a process that outlives the manager.
     env['EGO_BRIDGE_PARENT_PID'] = String(process.pid);
+    env['EGO_BRIDGE_TASK_SPACE_NAME'] = this.taskSpaceName();
     if (options.keepPage) {
       env['EGO_BRIDGE_KEEP_PAGE'] = '1';
     } else {
@@ -349,6 +429,19 @@ export class EgoBridgeManager {
       delete env['EGO_BRIDGE_KEEP_PAGE'];
     }
     return env;
+  }
+
+  /**
+   * The task space this workspace's bridge owns.
+   *
+   * Hashed from the *manager's* cwd, which is the workspace. The worker cannot do
+   * this itself: it runs in ego's persistent utility process, where `process.cwd()`
+   * is ego's application directory for every session, so hashing there would put
+   * every workspace in one task space and let a second session silently take over
+   * the first session's tabs (I1).
+   */
+  private taskSpaceName(): string {
+    return workspaceTaskSpaceName(this.workspaceCwd);
   }
 
   private drainStream(stream: NodeJS.ReadableStream | null): void {
@@ -457,12 +550,13 @@ export class EgoBridgeManager {
    *
    * A file append cannot block the worker the way a full pipe can, so the only
    * requirement is that the file stays small: every line lands in the ring
-   * buffer and the file is truncated once it passes {@link SINK_MAX_BYTES}.
+   * buffer and the consumed prefix is dropped once it passes
+   * {@link SINK_MAX_BYTES}.
    */
   private readSinkLines(): string[] {
     const sinkPath = this.files?.sinkPath;
     if (!sinkPath) return [];
-    let text: string;
+    let text = '';
     try {
       const size = fs.statSync(sinkPath).size;
       if (size < this.sinkOffset) {
@@ -473,11 +567,22 @@ export class EgoBridgeManager {
       if (size <= this.sinkOffset) return [];
       const handle = fs.openSync(sinkPath, 'r');
       try {
-        const length = size - this.sinkOffset;
-        const buffer = Buffer.alloc(length);
-        const read = fs.readSync(handle, buffer, 0, length, this.sinkOffset);
-        text = buffer.subarray(0, read).toString('utf8');
-        this.sinkOffset += read;
+        // Capped per read: the file cap bounds this in practice, but one poll must
+        // never allocate whatever the worker managed to append.
+        let budget = size - this.sinkOffset;
+        for (
+          let chunks = 0;
+          budget > 0 && chunks < SINK_READ_CHUNKS;
+          chunks++
+        ) {
+          const want = Math.min(budget, SINK_READ_CHUNK_BYTES);
+          const buffer = Buffer.allocUnsafe(want);
+          const read = fs.readSync(handle, buffer, 0, want, this.sinkOffset);
+          if (read === 0) break;
+          text += buffer.subarray(0, read).toString('utf8');
+          this.sinkOffset += read;
+          budget -= read;
+        }
       } finally {
         fs.closeSync(handle);
       }
@@ -496,13 +601,32 @@ export class EgoBridgeManager {
     return complete;
   }
 
+  /**
+   * Drop only the part of the sink already consumed.
+   *
+   * Truncating to zero loses anything the worker appended after our last read, and
+   * a ready line straddling the cut would never be seen. So the unconsumed tail is
+   * read first (bounded by {@link SINK_MAX_BYTES}) and written back, keeping
+   * `sinkOffset` — and a half-written {@link sinkPartial} — aligned with the file.
+   */
   private truncateSink(): void {
     const sinkPath = this.files?.sinkPath;
     if (!sinkPath) return;
     try {
-      fs.truncateSync(sinkPath, 0);
+      const size = fs.statSync(sinkPath).size;
+      const unconsumed = size - Math.min(this.sinkOffset, size);
+      // Keep only what has not been consumed yet, and never more than the file cap
+      // (which is already in the ring buffer): the whole point of the cut is size.
+      const keep = Math.min(unconsumed, SINK_MAX_BYTES);
+      const tail = readAt(sinkPath, size - keep, keep);
+      if (tail.length === 0) fs.truncateSync(sinkPath, 0);
+      else fs.writeFileSync(sinkPath, tail);
+      // The unconsumed bytes — including any half-written ready line — are now at
+      // the start of the file, so the read offset restarts with them.
       this.sinkOffset = 0;
-      this.sinkPartial = '';
+      // ponytail: the worker appends by path, so a byte appended between the read
+      // above and this write is lost. Closing that window needs the worker to
+      // rotate the file itself; the cost today is one drop of diagnostics.
     } catch {
       // Diagnostics are best effort: losing the file must not fail a session.
     }
@@ -552,17 +676,50 @@ export class EgoBridgeManager {
    * runs in a utility process of the ego app, so neither stdin EOF nor a signal
    * to our launcher reaches it (killing the launcher leaves the port listening).
    * The signals remain as a backstop for a host where the launcher does own it.
+   *
+   * Rejects when the bridge is still listening after the last escalation: the
+   * caller must not report a successful stop for a bridge that survived (I2b).
    */
   private async terminate(live: LiveChild): Promise<void> {
-    const exited = waitForExit(live.child);
+    const attempted = ['stop file'];
     this.requestStop(live.stopPath);
-    if (await settlesWithin(exited, this.stopGraceMs)) return;
+    if (await this.settled(live, this.stopGraceMs)) return;
 
+    attempted.push('SIGTERM');
     this.kill(live.child, 'SIGTERM');
-    if (await settlesWithin(exited, this.killGraceMs)) return;
+    if (await this.settled(live, this.killGraceMs)) return;
 
+    attempted.push('SIGKILL');
     this.kill(live.child, 'SIGKILL');
-    await settlesWithin(exited, REAP_TIMEOUT_MS);
+    if (await this.settled(live, REAP_TIMEOUT_MS)) return;
+
+    throw new Error(
+      `ego bridge did not stop: ${attempted.join(', ')} were tried and ` +
+        `${describeBridgeAfterStop(live)}` +
+        this.diagnosticsSuffix(),
+    );
+  }
+
+  /**
+   * True once both the launcher exited and the bridge port stopped accepting.
+   *
+   * Neither half is proof on its own: the launcher's exit does not stop the script
+   * (it runs in ego's utility process), and the worker keeps its listener while it
+   * runs the cleanup policy. Both are polled within one budget, so a `stop()` that
+   * resolved really did leave nothing listening.
+   */
+  private async settled(live: LiveChild, ms: number): Promise<boolean> {
+    const deadline = Date.now() + ms;
+    for (;;) {
+      if (
+        hasExited(live.child) &&
+        (await portClosed(live.connection.wsEndpoint))
+      ) {
+        return true;
+      }
+      if (Date.now() >= deadline) return false;
+      await new Promise<void>(resolve => setTimeout(resolve, POLL_MS));
+    }
   }
 
   /** Ask the worker to run its cleanup policy and exit. */
@@ -658,11 +815,13 @@ export class EgoBridgeManager {
 function workerBootstrap(
   files: BridgeFiles,
   options: EgoBridgeStartOptions,
+  workerUrl: string,
+  taskSpaceName: string,
 ): string {
-  const workerUrl = new URL('./ego-bridge-worker.js', import.meta.url);
   const sink = stringLiteral(files.sinkPath);
   const stop = stringLiteral(files.stopPath);
   const managerPid = stringLiteral(String(process.pid));
+  const taskSpace = stringLiteral(taskSpaceName);
   return [
     "const fs = await import('node:fs');",
     `const sink = ${sink};`,
@@ -693,16 +852,33 @@ function workerBootstrap(
     `process.env.EGO_BRIDGE_READY_FILE = ${sink};`,
     `process.env.EGO_BRIDGE_STOP_FILE = ${stop};`,
     `process.env.EGO_BRIDGE_PARENT_PID = ${managerPid};`,
+    // The workspace identity: hashed here, in the manager's own cwd. The runtime's
+    // cwd is ego's application directory for every session, so the worker can
+    // never derive it (I1).
+    `process.env.EGO_BRIDGE_TASK_SPACE_NAME = ${taskSpace};`,
     options.keepPage
       ? "process.env.EGO_BRIDGE_KEEP_PAGE = '1';"
       : 'delete process.env.EGO_BRIDGE_KEEP_PAGE;',
-    `await import('${workerUrl.href}');`,
+    `await import('${workerUrl}');`,
   ].join('\n');
 }
 
 /** A single-quoted JS string literal: ASCII-safe and free of double quotes. */
 function stringLiteral(value: string): string {
   return `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+}
+
+/** Read at most one chunk of the file at `offset`; a missing file reads as empty. */
+function readAt(target: string, offset: number, length: number): Buffer {
+  if (length <= 0) return Buffer.alloc(0);
+  const handle = fs.openSync(target, 'r');
+  try {
+    const buffer = Buffer.allocUnsafe(length);
+    const read = fs.readSync(handle, buffer, 0, length, offset);
+    return buffer.subarray(0, read);
+  } finally {
+    fs.closeSync(handle);
+  }
 }
 
 function describeExit(
@@ -730,4 +906,54 @@ function settlesWithin(promise: Promise<void>, ms: number): Promise<boolean> {
       resolve(true);
     });
   });
+}
+
+/** True when nothing accepts a TCP connection on the endpoint's port. */
+function portClosed(wsEndpoint: string): Promise<boolean> {
+  let port: number;
+  try {
+    port = Number(new URL(wsEndpoint).port);
+  } catch {
+    // An endpoint we cannot parse cannot be confirmed either; treat it as a
+    // failure so `stop()` reports rather than assuming success.
+    return Promise.resolve(false);
+  }
+  if (!Number.isInteger(port) || port <= 0) return Promise.resolve(false);
+  return new Promise<boolean>(resolve => {
+    const socket = net.createConnection({host: '127.0.0.1', port});
+    const done = (closed: boolean): void => {
+      socket.destroy();
+      resolve(closed);
+    };
+    socket.setTimeout(PORT_PROBE_TIMEOUT_MS, () => done(false));
+    socket.once('connect', () => done(false));
+    socket.once('error', (error: NodeJS.ErrnoException) =>
+      // Only a refused connection proves the port is free; a transient error must
+      // not be reported as a clean shutdown.
+      done(error.code === 'ECONNREFUSED'),
+    );
+  });
+}
+
+function describeBridgeAfterStop(live: LiveChild): string {
+  return hasExited(live.child)
+    ? `the bridge on ${live.connection.wsEndpoint} is still listening`
+    : `the launcher (pid ${live.child.pid ?? 'unknown'}) is still alive`;
+}
+
+/**
+ * A second `start()` on a live bridge must not silently change its options: the
+ * retention policy is baked into a running bridge and cannot be applied later.
+ */
+function assertSameOptions(
+  live: EgoBridgeStartOptions | undefined,
+  requested: EgoBridgeStartOptions,
+): void {
+  const before = live?.keepPage === true;
+  const after = requested.keepPage === true;
+  if (before === after) return;
+  throw new Error(
+    `ego bridge is already running with keepPage=${before}; ` +
+      `stop() it before starting with keepPage=${after}`,
+  );
 }

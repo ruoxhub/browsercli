@@ -1313,6 +1313,72 @@ describe('ego-bridge-worker', () => {
     }
   });
 
+  it('names the task space from EGO_BRIDGE_TASK_SPACE_NAME, not the cwd (I1)', async () => {
+    // In ego's persistent utility process `process.cwd()` is ego's application
+    // directory for every workspace, so hashing it would collapse every session
+    // into one task space. The manager bakes the workspace identity into the
+    // bootstrap; autostart must prefer it over the cwd fallback.
+    const workerUrl = new URL(
+      '../../../../src/modules/browser/ego/ego-bridge-worker.js',
+      import.meta.url,
+    ).href;
+    const created: string[] = [];
+    const script = `
+      globalThis.ego = {
+        sendCDPMessage() {},
+        onCDPMessage: undefined,
+        onSendCDPMessageError: undefined,
+        listTabs: async () => ({tabs: []}),
+        createTaskSpace: async name => {
+          process.stdout.write('[created] ' + name + String.fromCharCode(10));
+          return {id: 1, name};
+        },
+        useTaskSpace: () => 1,
+        closeTaskSpace: async () => {},
+      };
+      await import(${JSON.stringify(workerUrl)});
+      setInterval(() => {}, 1000);
+    `;
+    const child = spawn(
+      process.execPath,
+      ['--input-type=module', '-e', script],
+      {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: {
+          ...process.env,
+          EGO_BRIDGE_TASK_SPACE_NAME: 'browsercli-frommanager',
+          EGO_BRIDGE_PARENT_PID: String(process.pid),
+        },
+      },
+    );
+    let stdout = '';
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', (chunk: string) => {
+      stdout += chunk;
+      const match = /\[created\] (\S+)/.exec(stdout);
+      if (match) created.push(match[1]);
+    });
+    try {
+      await waitFor(
+        () => (stdout.includes(READY_PREFIX) ? stdout : undefined),
+        15000,
+      );
+      assert.deepEqual(
+        [...new Set(created)],
+        ['browsercli-frommanager'],
+        'the baked name must win over the cwd fallback',
+      );
+      assert.ok(
+        !stdout.includes(workspaceTaskSpaceName(process.cwd())),
+        'the cwd hash must not be used when the manager supplied a name',
+      );
+      // The fallback is still there for a directly imported worker.
+      assert.equal(typeof workspaceTaskSpaceName(process.cwd()), 'string');
+    } finally {
+      child.kill();
+    }
+  });
+
   it('derives the workspace task-space name from the cwd hash', () => {
     const first = workspaceTaskSpaceName('C:\\work\\project-a');
     assert.match(first, /^browsercli-[0-9a-f]{12}$/);

@@ -927,8 +927,13 @@ function importedByTest(): boolean {
 function autostart(ego: EgoNativeBindings): void {
   const bridge = createEgoBridge({
     ego,
+    // The manager always bakes the workspace identity into the bootstrap: in ego's
+    // persistent utility process `process.cwd()` is ego's application directory
+    // for *every* workspace, so hashing it here would give every session the same
+    // task space and let a second session take over the first one's tabs. The
+    // `cwd` fallback below only serves a directly-imported (foreground) worker.
     taskSpaceName:
-      process.env.EGO_BRIDGE_TASK_SPACE_NAME ??
+      process.env.EGO_BRIDGE_TASK_SPACE_NAME ||
       workspaceTaskSpaceName(process.cwd()),
     keepPage: process.env.EGO_BRIDGE_KEEP_PAGE === '1',
     // Production always supplies a whitelist: without one the firewall would be
