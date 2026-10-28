@@ -17,7 +17,10 @@
 
 import assert from 'node:assert';
 import {spawn} from 'node:child_process';
+import fs from 'node:fs';
 import net from 'node:net';
+import os from 'node:os';
+import path from 'node:path';
 import {describe, it} from 'node:test';
 
 import WebSocket from 'ws';
@@ -1379,7 +1382,12 @@ describe('ego-bridge-worker', () => {
       ['--input-type=module', '-e', script],
       {
         stdio: ['pipe', 'pipe', 'inherit'],
-        env: {...process.env, NODE_ENV: 'test'},
+        env: {
+          ...process.env,
+          NODE_ENV: 'test',
+          // The real parent signals pi.
+          EGO_BRIDGE_PARENT_PID: String(process.pid),
+        },
       },
     );
     let stdout = '';
@@ -1427,6 +1435,224 @@ describe('ego-bridge-worker', () => {
       assert.match(stdout, /\[finish:close\]/);
     } finally {
       child.kill();
+    }
+  });
+
+  it('shuts down when the parent pid disappears (the only channel the real host has)', async () => {
+    // W3: in production stdin is at EOF immediately and never fires again, so
+    // process.ppid polling is what actually detects a dead manager. Here the
+    // manager pid is deliberately one that cannot exist.
+    const workerUrl = new URL(
+      '../../../../src/modules/browser/ego/ego-bridge-worker.js',
+      import.meta.url,
+    ).href;
+    const finishes: string[] = [];
+    const script = `
+      globalThis.ego = {
+        sendCDPMessage() {},
+        onCDPMessage: undefined,
+        onSendCDPMessageError: undefined,
+        listTabs: async () => ({tabs: []}),
+        createTaskSpace: async name => ({id: 1, name}),
+        useTaskSpace: () => 1,
+        closeTaskSpace: async () => {},
+        completeTaskSpace: async () => {},
+      };
+      await import(${JSON.stringify(workerUrl)});
+      setInterval(() => {}, 1000);
+    `;
+    const child = spawn(
+      process.execPath,
+      ['--input-type=module', '-e', script],
+      {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: {
+          ...process.env,
+          // A pid that is essentially guaranteed to be vacant.
+          EGO_BRIDGE_PARENT_PID: '4294967290',
+          EGO_BRIDGE_LIVENESS_POLL_MS: '50',
+        },
+      },
+    );
+    let stdout = '';
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', (chunk: string) => {
+      stdout += chunk;
+    });
+    child.on('exit', code => finishes.push(`exit:${code}`));
+    try {
+      await waitFor(
+        () => (stdout.includes(READY_PREFIX) ? stdout : undefined),
+        15000,
+      );
+      await waitFor(() => (finishes.length > 0 ? finishes : undefined), 5000);
+      assert.deepEqual(
+        finishes,
+        ['exit:0'],
+        'a lost parent must run the graceful shutdown, not crash',
+      );
+    } finally {
+      child.kill();
+    }
+  });
+
+  it('shuts down when the stop file appears', async () => {
+    // W4: a file, not a signal: on Windows the embedded runtime does not receive
+    // signals sent to the launcher, and stdin is already at EOF.
+    const workerUrl = new URL(
+      '../../../../src/modules/browser/ego/ego-bridge-worker.js',
+      import.meta.url,
+    ).href;
+    const stopDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ego-stop-'));
+    const stopFile = path.join(stopDir, 'stop');
+    const script = `
+      globalThis.ego = {
+        sendCDPMessage() {},
+        onCDPMessage: undefined,
+        onSendCDPMessageError: undefined,
+        listTabs: async () => ({tabs: []}),
+        createTaskSpace: async name => ({id: 1, name}),
+        useTaskSpace: () => 1,
+        closeTaskSpace: async () => { process.stdout.write('[finish:close]'); },
+        completeTaskSpace: async () => {},
+      };
+      await import(${JSON.stringify(workerUrl)});
+      setInterval(() => {}, 1000);
+    `;
+    const child = spawn(
+      process.execPath,
+      ['--input-type=module', '-e', script],
+      {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: {
+          ...process.env,
+          EGO_BRIDGE_PARENT_PID: String(process.pid),
+          EGO_BRIDGE_STOP_FILE: stopFile,
+          EGO_BRIDGE_LIVENESS_POLL_MS: '50',
+        },
+      },
+    );
+    let stdout = '';
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', (chunk: string) => {
+      stdout += chunk;
+    });
+    try {
+      await waitFor(
+        () => (stdout.includes(READY_PREFIX) ? stdout : undefined),
+        15000,
+      );
+      fs.writeFileSync(stopFile, 'stop');
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(
+          () => reject(new Error(`worker did not exit; stdout: ${stdout}`)),
+          10000,
+        );
+        child.on('exit', () => {
+          clearTimeout(timer);
+          resolve();
+        });
+      });
+      // The stop file must run the same cleanup as the stdin path.
+      assert.match(stdout, /\[finish:close\]/);
+    } finally {
+      child.kill();
+      fs.rmSync(stopDir, {recursive: true, force: true});
+    }
+  });
+
+  it('runs the cleanup policy when SIGTERM arrives', async () => {
+    // W4: signal handling is the graceful path where the host delivers signals.
+    //
+    // On win32 `child.kill('SIGTERM')` is TerminateProcess: the handler can never
+    // run (verified — the process dies with signalCode 'SIGTERM' and no cleanup).
+    // So on Windows the signal is emitted in-process instead, which still fails
+    // if the handler is not wired; on POSIX the real signal is used.
+    const workerUrl = new URL(
+      '../../../../src/modules/browser/ego/ego-bridge-worker.js',
+      import.meta.url,
+    ).href;
+    // The retention policy is recorded in a file: `process.exit()` after the stop
+    // would truncate a pending stdout write, and the policy is the point here.
+    const markerDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ego-sigterm-'));
+    const marker = path.join(markerDir, 'finish.txt');
+    const script = `
+      const fs = await import('node:fs');
+      globalThis.ego = {
+        sendCDPMessage() {},
+        onCDPMessage: undefined,
+        onSendCDPMessageError: undefined,
+        listTabs: async () => ({tabs: []}),
+        createTaskSpace: async name => ({id: 1, name}),
+        useTaskSpace: () => 1,
+        // The retention policy picks one of these two bindings: with keepPage the
+        // worker must complete the space, and must not close it.
+        closeTaskSpace: async () => {
+          fs.appendFileSync(${JSON.stringify(marker)}, 'closeTaskSpace;');
+        },
+        completeTaskSpace: async () => {
+          fs.appendFileSync(${JSON.stringify(marker)}, 'completeTaskSpace;');
+        },
+      };
+      await import(${JSON.stringify(workerUrl)});
+      const emitWhenAsked = setInterval(() => {
+        if (!fs.existsSync(${JSON.stringify(marker)}.trigger)) return;
+        clearInterval(emitWhenAsked);
+        process.emit('SIGTERM');
+      }, 20);
+      setInterval(() => {}, 1000);
+    `;
+    const child = spawn(
+      process.execPath,
+      ['--input-type=module', '-e', script],
+      {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: {
+          ...process.env,
+          EGO_BRIDGE_PARENT_PID: String(process.pid),
+          EGO_BRIDGE_KEEP_PAGE: '1',
+          EGO_BRIDGE_LIVENESS_POLL_MS: '60000',
+        },
+      },
+    );
+    let stdout = '';
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', (chunk: string) => {
+      stdout += chunk;
+    });
+    try {
+      await waitFor(
+        () => (stdout.includes(READY_PREFIX) ? stdout : undefined),
+        15000,
+      );
+      if (process.platform === 'win32') {
+        // TerminateProcess would skip the handler, so ask the child to emit it.
+        fs.writeFileSync(`${marker}.trigger`, 'go');
+      } else {
+        child.kill('SIGTERM');
+      }
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(
+          () =>
+            reject(
+              new Error(`worker did not exit on SIGTERM; stdout: ${stdout}`),
+            ),
+          10000,
+        );
+        child.on('exit', () => {
+          clearTimeout(timer);
+          resolve();
+        });
+      });
+      // `keepPage` must reach the retention policy, not just close the socket.
+      assert.equal(
+        fs.readFileSync(marker, 'utf8'),
+        'completeTaskSpace;',
+        'SIGTERM must run the keep-all cleanup policy',
+      );
+    } finally {
+      child.kill();
+      fs.rmSync(markerDir, {recursive: true, force: true});
     }
   });
 });

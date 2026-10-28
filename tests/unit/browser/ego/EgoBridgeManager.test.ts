@@ -7,13 +7,17 @@
  * Unit tests for the ego bridge process-lifecycle manager and the binary
  * detector.
  *
- * `start()` is driven against a *fake CLI*: the injected spawn function launches
+ * `start()` is driven against a *fake CLI*: the injected spawn launches
  * `process.execPath -e '<script>'` instead of a real ego lite install, so the
- * ready-line parsing, stderr draining, timeout handling, kill escalation and
- * exit-hook teardown all run for real against a real child process with real
- * pipes. The fake CLI binds a real loopback server and prints the port it
- * actually bound in the ready line, so "the endpoint serves while alive and
- * refuses once stopped" is asserted against a real listening socket.
+ * readiness-file parsing, sink draining, timeout handling, kill escalation and
+ * exit-hook teardown all run for real against a real child process.
+ *
+ * The fake CLI mirrors the contract the real host was probed into: it reports
+ * readiness by appending to `EGO_BRIDGE_READY_FILE`, and it shuts down when
+ * `EGO_BRIDGE_STOP_FILE` appears — never via stdin, which the embedded runtime
+ * does not provide as a control channel. It binds a real loopback server, so
+ * "the endpoint serves while alive and refuses once stopped" is asserted against
+ * a real listening socket.
  */
 
 import assert from 'node:assert/strict';
@@ -49,34 +53,56 @@ function makeTempDir(prefix: string): string {
   return dir;
 }
 
+interface FakeCliOptions {
+  /** Runs after the ready line, i.e. it can make the child misbehave. */
+  extra?: string;
+  /** Ignore the stop file, so only signals can stop the child. */
+  ignoreStop?: boolean;
+  /** Write the ready line to the sink at all. */
+  ready?: boolean;
+}
+
 /**
- * Body of a fake ego CLI: bind a real loopback server, print the ready line with
- * the port it really bound, then exit on stdin EOF (the worker's graceful path).
- * `extra` runs after the ready line, i.e. it can make the child misbehave.
+ * Body of a fake ego CLI: bind a real loopback server, append the ready line
+ * with the port it really bound to the sink file, then exit when the stop file
+ * appears (the real worker's shutdown channel).
  */
 function fakeCliBody(
   prefix: string,
-  extra = '',
-  {ignoreStdin = false}: {ignoreStdin?: boolean} = {},
+  {extra = '', ignoreStop = false, ready = true}: FakeCliOptions = {},
 ): string {
   const body = [
+    "const fs = require('node:fs');",
     "const http = require('node:http');",
     `const NL = ${NL};`,
     `const PREFIX = '${prefix}';`,
+    'const sink = process.env.EGO_BRIDGE_READY_FILE;',
+    'const stopFile = process.env.EGO_BRIDGE_STOP_FILE;',
+    'const w = s => { try { fs.appendFileSync(sink, s + NL); } catch (e) {} };',
     "const server = http.createServer(function (_req, res) { res.end('ok'); });",
     "server.listen(0, '127.0.0.1', function () {",
     '  const port = server.address().port;',
-    "  process.stdout.write(PREFIX + ' ws://127.0.0.1:' + port +",
-    "    '/devtools/browser/fake-' + process.pid + NL);",
+    ready
+      ? "  w(PREFIX + ' ws://127.0.0.1:' + port + '/devtools/browser/fake-' + process.pid);"
+      : '  void port;',
     '});',
     extra,
-    'process.stdin.resume();',
   ];
-  if (!ignoreStdin) {
-    // The worker's graceful path: stdin EOF means "parent is gone".
+  if (!ignoreStop) {
+    // The manager's shutdown channel: a file, not a signal or stdin EOF.
     body.push(
-      "process.stdin.on('end', function () { server.close(function () { process.exit(0); }); });",
-      "process.stdin.on('close', function () { server.close(function () { process.exit(0); }); });",
+      'const timer = setInterval(function () {',
+      '  if (!fs.existsSync(stopFile)) return;',
+      '  clearInterval(timer);',
+      '  server.close(function () { process.exit(0); });',
+      '  setTimeout(function () { process.exit(0); }, 250);',
+      '}, 25);',
+    );
+  } else {
+    // Signals are ignored too, so escalation is the only way out.
+    body.push(
+      "process.on('SIGTERM', function () {});",
+      'setInterval(function () {}, 1000);',
     );
   }
   return body.join('\n');
@@ -101,7 +127,7 @@ function harnessFor(body: string): SpawnHarness {
   const binaryPath = path.join(makeTempDir('ego-bin-'), 'ego-browser.exe');
   const spawnFn: EgoSpawn = (command, args, options) => {
     const child = spawn(process.execPath, ['-e', body], {
-      stdio: ['pipe', 'pipe', 'pipe'],
+      stdio: options.stdio ?? ['ignore', 'pipe', 'pipe'],
       env: options.env as NodeJS.ProcessEnv,
       windowsHide: true,
     });
@@ -121,6 +147,7 @@ function managerOptions(
     startTimeoutMs: 4000,
     stopGraceMs: 1000,
     killGraceMs: 1000,
+    sinkDir: makeTempDir('ego-sink-'),
     ...overrides,
   };
 }
@@ -149,6 +176,13 @@ function hasExited(child: ChildProcess): boolean {
 function waitForExit(child: ChildProcess): Promise<void> {
   if (hasExited(child)) return Promise.resolve();
   return new Promise<void>(resolve => child.once('exit', () => resolve()));
+}
+
+/** The sink file the manager handed to this launch. */
+function sinkOf(record: SpawnRecord): string {
+  const value = (record.options.env as NodeJS.ProcessEnv).EGO_BRIDGE_READY_FILE;
+  assert.ok(value, 'the manager must hand the child a readiness sink file');
+  return value;
 }
 
 describe('findEgoBrowserBinary', () => {
@@ -239,7 +273,7 @@ describe('findEgoBrowserBinary', () => {
 });
 
 describe('EgoBridgeManager', () => {
-  it('resolves the ready line and reuses a live child on a second start()', async () => {
+  it('resolves the ready line from the sink file and reuses a live child', async () => {
     const harness = harnessFor(fakeCliBody(READY_PREFIX));
     const manager = new EgoBridgeManager(managerOptions(harness));
 
@@ -254,7 +288,17 @@ describe('EgoBridgeManager', () => {
       assert.equal(second.wsEndpoint, first.wsEndpoint);
       assert.equal(harness.records.length, 1, 'a live child must be reused');
       assert.equal(first.childPid, harness.records[0].child.pid);
-      assert.equal(await connectRefused(portOf(first.wsEndpoint)), false);
+      assert.equal(
+        await connectRefused(portOf(first.wsEndpoint)),
+        false,
+        'the reported endpoint must really be listening',
+      );
+      // W5: the sink must outlive startup so later diagnostics stay drained.
+      assert.equal(
+        fs.existsSync(sinkOf(harness.records[0])),
+        true,
+        'the sink must survive a successful start, so it can keep draining',
+      );
     } finally {
       await manager.stop();
     }
@@ -273,30 +317,61 @@ describe('EgoBridgeManager', () => {
     }
   });
 
-  it('spawns `nodejs -e <ascii bootstrap>` with piped stdio and the keepPage env', async () => {
+  it('spawns the file-sink bootstrap with stdin ignored', async () => {
     const harness = harnessFor(fakeCliBody(READY_PREFIX));
     const manager = new EgoBridgeManager(managerOptions(harness));
 
     try {
       await manager.start({keepPage: true});
       const [record] = harness.records;
+      const bootstrap = record.args[2];
 
       assert.equal(record.command, harness.binaryPath);
       assert.equal(record.args[0], 'nodejs');
       assert.equal(record.args[1], '-e');
+      // W1: stdin is at EOF from the start, and is not a control channel.
+      assert.deepEqual(record.options.stdio, ['ignore', 'pipe', 'pipe']);
+      // W2: the worker URL is still a file:/// URL.
       assert.match(
-        record.args[2],
-        /^await import\('file:\/\/\/.+ego-bridge-worker\.js'\)$/,
+        bootstrap,
+        /await import\('file:\/\/\/.+ego-bridge-worker\.js'\)/,
+      );
+      // W2: readiness travels through the env-named sink file.
+      const sink = sinkOf(record);
+      assert.match(sink, new RegExp(`ego-bridge-${process.pid}-`));
+      assert.ok(
+        bootstrap.includes(path.basename(sink)),
+        'the sink path must be baked into the bootstrap: the embedded runtime does not inherit the spawn env',
+      );
+      // W2/W5: the bootstrap must redirect both streams into that sink, in order.
+      assert.ok(bootstrap.includes('process.stdout.write'));
+      assert.ok(bootstrap.includes('process.stderr.write'));
+      assert.ok(bootstrap.includes('[ERR] '), 'stderr lines must be prefixed');
+      const workerImportAt = bootstrap.indexOf("await import('file:///");
+      assert.ok(workerImportAt > 0, 'the worker must be imported last');
+      assert.ok(
+        bootstrap.indexOf('process.stdout.write') < workerImportAt,
+        'streams must be redirected before the worker is imported',
+      );
+      // W3: the never-ending stdin must be installed before the import, or the
+      // worker's legacy EOF path fires immediately.
+      assert.ok(
+        bootstrap.indexOf('PassThrough') < workerImportAt,
+        'stdin must be replaced before the worker is imported',
       );
       assert.ok(
-        !record.args[2].includes('"'),
-        'the bootstrap must contain no double quotes',
+        bootstrap.lastIndexOf('await import(') === workerImportAt,
+        'the worker import must be the final statement',
       );
+      // Survives the Windows command line.
+      assert.ok(!bootstrap.includes('"'), 'no double quotes in the bootstrap');
       assert.ok(
-        /^[\x20-\x7e]+$/.test(record.args[2]),
+        /^[\x20-\x7e\n]+$/.test(bootstrap),
         'the bootstrap must be ASCII only',
       );
-      assert.deepEqual(record.options.stdio, ['pipe', 'pipe', 'pipe']);
+      // The values the embedded runtime cannot receive via its environment.
+      assert.ok(bootstrap.includes('EGO_BRIDGE_STOP_FILE'));
+      assert.ok(bootstrap.includes('EGO_BRIDGE_PARENT_PID'));
       assert.equal(
         (record.options.env as NodeJS.ProcessEnv).EGO_BRIDGE_KEEP_PAGE,
         '1',
@@ -312,10 +387,15 @@ describe('EgoBridgeManager', () => {
 
     try {
       await manager.start();
+      const [record] = harness.records;
       assert.equal(
-        (harness.records[0].options.env as NodeJS.ProcessEnv)
-          .EGO_BRIDGE_KEEP_PAGE,
+        (record.options.env as NodeJS.ProcessEnv).EGO_BRIDGE_KEEP_PAGE,
         undefined,
+      );
+      // The bootstrap must actively delete an inherited value, not merely omit it.
+      assert.ok(
+        record.args[2].includes('delete process.env.EGO_BRIDGE_KEEP_PAGE'),
+        'an inherited EGO_BRIDGE_KEEP_PAGE must not change the cleanup policy',
       );
     } finally {
       await manager.stop();
@@ -343,10 +423,11 @@ describe('EgoBridgeManager', () => {
     });
   });
 
-  it('rejects with the stderr tail when the child exits before the ready line', async () => {
+  it('rejects with the sink tail when the child exits before the ready line', async () => {
     const harness = harnessFor(
       [
-        "process.stderr.write('native bindings unavailable' + String.fromCharCode(10));",
+        "const fs = require('node:fs');",
+        `process.stderr.write('native bindings unavailable' + ${NL});`,
         'process.exit(3);',
       ].join('\n'),
     );
@@ -365,7 +446,9 @@ describe('EgoBridgeManager', () => {
   it('rejects with the fatal message when the child reports a fatal error', async () => {
     const harness = harnessFor(
       [
-        `process.stdout.write('${FATAL_PREFIX} ego bridge stopped during start' + String.fromCharCode(10));`,
+        "const fs = require('node:fs');",
+        'const sink = process.env.EGO_BRIDGE_READY_FILE;',
+        `fs.appendFileSync(sink, '${FATAL_PREFIX} ego bridge stopped during start' + ${NL});`,
         'process.exit(1);',
       ].join('\n'),
     );
@@ -378,10 +461,11 @@ describe('EgoBridgeManager', () => {
     await waitForExit(harness.records[0].child);
   });
 
-  it('rejects on timeout with the stderr tail and kills the child', async () => {
+  it('rejects on timeout with the sink tail and kills the child', async () => {
     const harness = harnessFor(
       [
-        "process.stderr.write('waiting for a task space' + String.fromCharCode(10));",
+        "const fs = require('node:fs');",
+        `process.stderr.write('waiting for a task space' + ${NL});`,
         'setInterval(function () {}, 1000);',
       ].join('\n'),
     );
@@ -399,12 +483,13 @@ describe('EgoBridgeManager', () => {
     assert.equal(hasExited(harness.records[0].child), true);
   });
 
-  it('keeps the stderr buffer bounded while a chatty child streams', async () => {
+  it('keeps the diagnostic buffer bounded while a chatty child writes the sink', async () => {
     const harness = harnessFor(
       [
-        "const line = 'x'.repeat(400) + String.fromCharCode(10);",
+        "const fs = require('node:fs');",
+        `const line = 'x'.repeat(400) + ${NL};`,
         'for (let i = 0; i < 500; i++) process.stderr.write(line);',
-        "process.stderr.write('LAST-DIAGNOSTIC-LINE' + String.fromCharCode(10));",
+        `process.stderr.write('LAST-DIAGNOSTIC-LINE' + ${NL});`,
         'setInterval(function () {}, 1000);',
       ].join('\n'),
     );
@@ -412,8 +497,8 @@ describe('EgoBridgeManager', () => {
       managerOptions(harness, {startTimeoutMs: 2000}),
     );
 
-    // ~200 KiB of diagnostics (far past an OS pipe buffer) must be drained, and
-    // the error text handed to a user must stay bounded but keep the newest line.
+    // ~200 KiB of diagnostics must be drained, and the error text handed to a
+    // user must stay bounded while keeping the newest line.
     await assert.rejects(manager.start(), (error: Error) => {
       assert.match(error.message, /timed out/i);
       assert.match(error.message, /LAST-DIAGNOSTIC-LINE/);
@@ -426,6 +511,50 @@ describe('EgoBridgeManager', () => {
     await waitForExit(harness.records[0].child);
   });
 
+  it('caps the sink file so a long-lived session cannot grow it (W5)', async () => {
+    const harness = harnessFor(
+      fakeCliBody(READY_PREFIX, {
+        extra: [
+          '// ~4 MB of diagnostics, far past the 256 KiB cap.',
+          "const chunk = 'y'.repeat(1000) + String.fromCharCode(10);",
+          'const writer = setInterval(function () {',
+          '  for (let i = 0; i < 200; i++) fs.appendFileSync(sink, "[ERR] " + chunk);',
+          '}, 20);',
+          'setTimeout(function () { clearInterval(writer); }, 3000);',
+        ].join('\n'),
+      }),
+    );
+    const manager = new EgoBridgeManager(managerOptions(harness));
+
+    try {
+      await manager.start();
+      const sink = sinkOf(harness.records[0]);
+      // Let the writer outrun the manager's 50 ms pump for a while.
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      const size = fs.existsSync(sink) ? fs.statSync(sink).size : 0;
+      assert.ok(
+        size < 1024 * 1024,
+        `the sink must be recycled, but it grew to ${size} bytes`,
+      );
+      assert.equal(
+        manager.isRunning(),
+        true,
+        'draining must not stall the child',
+      );
+      // The ring buffer keeps the newest lines and never grows.
+      assert.ok(
+        manager.stderrTail().length <= 8 * 1024,
+        'the retained tail must stay inside its byte budget',
+      );
+      assert.ok(
+        manager.stderrTail().includes('y'.repeat(100)),
+        'newest line kept',
+      );
+    } finally {
+      await manager.stop();
+    }
+  });
+
   it('can retry start() after a failed start without leaving the first child alive', async () => {
     const harness = harnessFor(fakeCliBody(READY_PREFIX));
     let attempt = 0;
@@ -435,7 +564,7 @@ describe('EgoBridgeManager', () => {
       const child = spawn(
         process.execPath,
         ['-e', "process.stderr.write('first attempt died'); process.exit(7);"],
-        {stdio: ['pipe', 'pipe', 'pipe']},
+        {stdio: ['ignore', 'pipe', 'pipe']},
       );
       harness.records.push({command, args, options, child});
       return child;
@@ -462,13 +591,15 @@ describe('EgoBridgeManager', () => {
       assert.equal(hasExited(harness.records[0].child), true);
       assert.equal(await connectRefused(portOf(connection.wsEndpoint)), false);
       assert.equal(process.listenerCount('exit'), exitHookBaseline + 1);
+      // A retry gets its own sink, not the failed attempt's.
+      assert.notEqual(sinkOf(harness.records[0]), sinkOf(harness.records[1]));
     } finally {
       await manager.stop();
     }
     assert.equal(process.listenerCount('exit'), exitHookBaseline);
   });
 
-  it('stop() closes stdin first, waits for the exit, and is idempotent', async () => {
+  it('stop() requests shutdown through the stop file and is idempotent', async () => {
     const harness = harnessFor(fakeCliBody(READY_PREFIX));
     const signals: NodeJS.Signals[] = [];
     const manager = new EgoBridgeManager(
@@ -483,8 +614,10 @@ describe('EgoBridgeManager', () => {
 
     const connection = await manager.start();
     const child = harness.records[0].child;
+    const stopPath = `${sinkOf(harness.records[0])}.stop`;
     assert.equal(hasExited(child), false);
     assert.equal(process.listenerCount('exit'), exitHookBaseline + 1);
+    assert.equal(fs.existsSync(stopPath), false);
 
     await manager.stop();
 
@@ -497,28 +630,29 @@ describe('EgoBridgeManager', () => {
     assert.deepEqual(
       signals,
       [],
-      'a cooperative child must shut down on the stdin close, with no signal',
+      'a cooperative child must shut down on the stop file, with no signal',
     );
     assert.equal(
       await connectRefused(portOf(connection.wsEndpoint)),
       true,
-      'the graceful stdin path must have released the port',
+      'the stop-file path must have released the port',
     );
     assert.equal(process.listenerCount('exit'), exitHookBaseline);
+    assert.equal(
+      fs.existsSync(stopPath),
+      false,
+      'stop file must be cleaned up',
+    );
 
     await manager.stop();
     assert.equal(harness.records.length, 1);
     assert.equal(process.listenerCount('exit'), exitHookBaseline);
   });
 
-  it('escalates SIGTERM then SIGKILL when the child ignores the stdin close', async () => {
+  it('escalates SIGTERM then SIGKILL when the child ignores the stop file', async () => {
     const signals: NodeJS.Signals[] = [];
-    // A child that ignores the stdin close: only signals can stop it.
-    const harness = harnessFor(
-      fakeCliBody(READY_PREFIX, 'setInterval(function () {}, 1000);', {
-        ignoreStdin: true,
-      }),
-    );
+    // A child that ignores the stop file and SIGTERM: only SIGKILL remains.
+    const harness = harnessFor(fakeCliBody(READY_PREFIX, {ignoreStop: true}));
     const manager = new EgoBridgeManager(
       managerOptions(harness, {
         stopGraceMs: 40,
@@ -540,11 +674,10 @@ describe('EgoBridgeManager', () => {
   });
 
   it('registers exactly one process exit hook and tears the child down from it', async () => {
-    const harness = harnessFor(fakeCliBody(READY_PREFIX));
+    const harness = harnessFor(fakeCliBody(READY_PREFIX, {ignoreStop: true}));
     const signals: NodeJS.Signals[] = [];
     const manager = new EgoBridgeManager(
       managerOptions(harness, {
-        // The fake CLI ignores stdin, so only the exit hook's signal can stop it.
         kill: (child, signal) => {
           signals.push(signal);
           child.kill(signal);
@@ -601,10 +734,9 @@ describe('EgoBridgeManager', () => {
 
   it('spawns a fresh child after the worker dies on its own', async () => {
     const harness = harnessFor(
-      fakeCliBody(
-        READY_PREFIX,
-        'setTimeout(function () { process.exit(0); }, 60);',
-      ),
+      fakeCliBody(READY_PREFIX, {
+        extra: 'setTimeout(function () { process.exit(0); }, 60);',
+      }),
     );
     const manager = new EgoBridgeManager(managerOptions(harness));
 

@@ -17,11 +17,21 @@
  */
 
 import {createHash, randomUUID} from 'node:crypto';
+import fs from 'node:fs';
 import {createServer, type IncomingMessage, type Server} from 'node:http';
 import type {Duplex} from 'node:stream';
 
-/** Line prefix the EgoBridgeManager parses off stdout. */
+/**
+ * Line prefix the EgoBridgeManager looks for in its readiness sink file.
+ *
+ * The manager cannot read this off a pipe: ego lite's embedded runtime does not
+ * stream `process.stdout` to the parent while it is alive, so the bootstrap
+ * shim redirects stdout into a file and the manager polls that file instead.
+ */
 export const READY_PREFIX = '[ego-bridge:ready]';
+
+/** Default parent-liveness poll interval, overridable for fast tests. */
+const DEFAULT_LIVENESS_POLL_MS = 1_000;
 
 const WS_ACCEPT_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 const MAX_FRAME_BYTES = 256 * 1024 * 1024;
@@ -924,8 +934,7 @@ function autostart(ego: EgoNativeBindings): void {
     // Production always supplies a whitelist: without one the firewall would be
     // off and the user's private tabs would reach the client.
     listOwnTargetIds: () => listTabsOwnTargetIds(ego),
-    // Diagnostics go to stderr: stdout is the ready-line IPC channel the manager
-    // parses, and per-event churn on foreign targets must not pollute it.
+    // Diagnostics go to stderr, never stdout: stdout carries the ready line.
     log: line => process.stderr.write(`${line}\n`),
     onReady: wsEndpoint => {
       process.stdout.write(`${READY_PREFIX} ${wsEndpoint}\n`);
@@ -933,21 +942,82 @@ function autostart(ego: EgoNativeBindings): void {
   });
 
   let shuttingDown = false;
+  let watcher: NodeJS.Timeout | undefined;
+  const stopWatcher = () => {
+    if (!watcher) return;
+    clearInterval(watcher);
+    watcher = undefined;
+  };
   const shutdown = () => {
     if (shuttingDown) return;
     shuttingDown = true;
+    stopWatcher();
     void bridge.stop().finally(() => process.exit(0));
   };
-  // The manager passes the bootstrap code with `-e`, so stdin carries no script:
-  // EOF on it unambiguously means the parent process is gone.
+
+  // Local/foreground path: a directly spawned worker dies with its stdin. In the
+  // real host stdin is already at EOF and is not a control channel at all, so
+  // this must not be the only shutdown path (see the poller below).
   process.stdin.on('end', shutdown);
   process.stdin.on('close', shutdown);
   process.stdin.resume();
+
+  // Signals: works where ego forwards them to the embedded runtime. On Windows
+  // the runtime is a utility process of the ego app, so neither our launcher's
+  // death nor a signal reaches it — the poller is what actually stops it there.
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', shutdown);
+
+  // The authoritative shutdown channel: poll for the manager's stop file and for
+  // the manager's own death. `unref()` so a finished bridge cannot be kept alive
+  // by its own watchdog.
+  const stopFile = process.env.EGO_BRIDGE_STOP_FILE;
+  const watchedPid = watchedParentPid();
+  watcher = setInterval(() => {
+    if (shuttingDown) return;
+    if (stopFile && fileExists(stopFile)) {
+      shutdown();
+      return;
+    }
+    if (!isAlive(watchedPid)) shutdown();
+  }, livenessPollMs());
+  watcher.unref();
 
   void bridge.start().catch(error => {
     process.stdout.write(`[ego-bridge:fatal] ${toText(error)}\n`);
     process.exit(1);
   });
+}
+
+/** The manager's own pid when the bootstrap supplied it, else the real parent. */
+function watchedParentPid(): number {
+  const supplied = Number(process.env.EGO_BRIDGE_PARENT_PID);
+  return Number.isInteger(supplied) && supplied > 0 ? supplied : process.ppid;
+}
+
+/** Parent-loss test: `EPERM` still means the pid exists, so it counts as alive. */
+function isAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
+
+function fileExists(target: string): boolean {
+  try {
+    return fs.existsSync(target);
+  } catch {
+    return false;
+  }
+}
+
+function livenessPollMs(): number {
+  const supplied = Number(process.env.EGO_BRIDGE_LIVENESS_POLL_MS);
+  return Number.isInteger(supplied) && supplied > 0
+    ? supplied
+    : DEFAULT_LIVENESS_POLL_MS;
 }
 
 const nativeEgo = (globalThis as {ego?: EgoNativeBindings}).ego;
