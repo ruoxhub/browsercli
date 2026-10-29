@@ -8,7 +8,10 @@ import {afterEach, beforeEach, describe, test} from 'node:test';
 
 import {BrowserConfigInvariantError} from '../../../src/config/browserInvariants.js';
 import {resetRuntimeConfigStore} from '../../../src/config/RuntimeConfigStore.js';
-import {getBrowserManagerConfig} from '../../../src/config/servicesConfig.js';
+import {
+  buildBrowserManagerConfig,
+  getBrowserManagerConfig,
+} from '../../../src/config/servicesConfig.js';
 import type {BrowserManagerConfig} from '../../../src/types/browser.js';
 
 test('getBrowserManagerConfig returns valid BrowserManagerConfig typed from L0', () => {
@@ -121,6 +124,20 @@ describe('getBrowserManagerConfig ego fields (W3)', () => {
     // so the file config below can still win when no env var is present.
     assert.ok(!config.ego);
     assert.ok(!config.keepPage);
+  });
+
+  test('the env-layer builder does not assert (C1)', () => {
+    // `buildBrowserManagerConfig()` is an *intermediate* layer on the IPC path:
+    // browserRequests wraps it in the store overlay plus the request patch, and
+    // only the finished object is asserted. Asserting here made
+    // `BROWSER_KEEP_PAGE=true` + `browser connect --ego` unrecoverable — the
+    // request's own ego never got a chance to complete the pair.
+    process.env.BROWSER_KEEP_PAGE = 'true';
+    const config = buildBrowserManagerConfig();
+    assert.strictEqual(config.keepPage, true);
+    assert.strictEqual(config.ego, undefined);
+    // ...while the entry point for consumers that genuinely end here still does.
+    assert.throws(() => getBrowserManagerConfig(), BrowserConfigInvariantError);
   });
 
   test('reads the file config keys when the env vars are absent', () => {

@@ -11,6 +11,7 @@ import {describe, it, mock} from 'node:test';
 import {
   getRuntimeConfigStore,
   resetRuntimeConfigStore,
+  RuntimeConfigStore,
 } from '../../../src/config/RuntimeConfigStore.js';
 import {
   startDaemonServer,
@@ -558,6 +559,186 @@ describe('daemonServer', () => {
         assert.match(error.message ?? '', /keepPage/);
       });
     } finally {
+      stub.restore();
+      resetRuntimeConfigStore({});
+    }
+  });
+
+  it('env BROWSER_KEEP_PAGE is rescued by `connect --ego` (C1)', async () => {
+    // THE regression this round exists to fix. `BROWSER_KEEP_PAGE=true` with no
+    // BROWSER_EGO used to make `candidateBrowserConfig()` throw before the
+    // request's own `ego: true` could contribute anything: the invariant was
+    // asserted on the env-only intermediate that the patch was supposed to
+    // complete. The user is told "add ego" and then `connect --ego` is refused —
+    // unrecoverable over IPC, because browser.status throws too.
+    const stub = stubBrowserManager();
+    const savedKeepPage = process.env.BROWSER_KEEP_PAGE;
+    const savedEgo = process.env.BROWSER_EGO;
+    process.env.BROWSER_KEEP_PAGE = 'true';
+    delete process.env.BROWSER_EGO;
+    resetRuntimeConfigStore({});
+    try {
+      await withFixture(async (_fixture, client) => {
+        const id = await client.request('browser.connect', {
+          body: {ego: true},
+        });
+        const response = await client.responseFor(id);
+        assert.deepStrictEqual(
+          response['error'],
+          undefined,
+          'the request ego must complete the env-supplied keepPage',
+        );
+        assert.strictEqual((response['result'] as {mode?: string}).mode, 'ego');
+        // The env-supplied retention policy must reach the bridge start options,
+        // not merely survive validation.
+        const connected = stub.configs.at(-1) as {
+          ego?: boolean;
+          keepPage?: boolean;
+        };
+        assert.strictEqual(connected.ego, true);
+        assert.strictEqual(connected.keepPage, true);
+      });
+    } finally {
+      stub.restore();
+      if (savedKeepPage === undefined) delete process.env.BROWSER_KEEP_PAGE;
+      else process.env.BROWSER_KEEP_PAGE = savedKeepPage;
+      if (savedEgo === undefined) delete process.env.BROWSER_EGO;
+      else process.env.BROWSER_EGO = savedEgo;
+      resetRuntimeConfigStore({});
+    }
+  });
+
+  it('browser.status still works after the env keepPage connect (C1)', async () => {
+    // The second half of the regression: the refused connect left the daemon
+    // unable to answer anything, because status reads the same merged config.
+    const stub = stubBrowserManager();
+    const savedKeepPage = process.env.BROWSER_KEEP_PAGE;
+    const savedEgo = process.env.BROWSER_EGO;
+    process.env.BROWSER_KEEP_PAGE = 'true';
+    delete process.env.BROWSER_EGO;
+    resetRuntimeConfigStore({});
+    try {
+      await withFixture(async (_fixture, client) => {
+        const connectId = await client.request('browser.connect', {
+          body: {ego: true},
+        });
+        const connect = await client.responseFor(connectId);
+        assert.deepStrictEqual(connect['error'], undefined);
+
+        const statusId = await client.request('browser.status');
+        const status = await client.responseFor(statusId);
+        assert.deepStrictEqual(
+          status['error'],
+          undefined,
+          'browser.status must survive a config that only became legal via the request',
+        );
+        assert.strictEqual((status['result'] as {mode?: string}).mode, 'ego');
+      });
+    } finally {
+      stub.restore();
+      if (savedKeepPage === undefined) delete process.env.BROWSER_KEEP_PAGE;
+      else process.env.BROWSER_KEEP_PAGE = savedKeepPage;
+      if (savedEgo === undefined) delete process.env.BROWSER_EGO;
+      else process.env.BROWSER_EGO = savedEgo;
+      resetRuntimeConfigStore({});
+    }
+  });
+
+  it('a store-supplied keepPage is rescued by `connect --ego` (C1)', async () => {
+    // Same shape with the value coming from the persisted store instead of the
+    // environment — e.g. a `browser.keepPage: true` left in config.json.
+    const stub = stubBrowserManager();
+    resetRuntimeConfigStore({browser: {keepPage: true}});
+    try {
+      await withFixture(async (_fixture, client) => {
+        const id = await client.request('browser.connect', {
+          body: {ego: true},
+        });
+        const response = await client.responseFor(id);
+        assert.deepStrictEqual(
+          response['error'],
+          undefined,
+          'the request ego must complete the store-supplied keepPage',
+        );
+        assert.strictEqual((response['result'] as {mode?: string}).mode, 'ego');
+        const connected = stub.configs.at(-1) as {keepPage?: boolean};
+        assert.strictEqual(connected.keepPage, true);
+      });
+    } finally {
+      stub.restore();
+      resetRuntimeConfigStore({});
+    }
+  });
+
+  it('keepPage with ego absent from every layer is still rejected (C1)', async () => {
+    // The other direction, and the reason the assertion cannot simply be dropped:
+    // with no ego anywhere in the merged config the pair is the silent no-op the
+    // invariant forbids, whether keepPage came from the env or the store.
+    const stub = stubBrowserManager();
+    const savedKeepPage = process.env.BROWSER_KEEP_PAGE;
+    const savedEgo = process.env.BROWSER_EGO;
+    delete process.env.BROWSER_EGO;
+    try {
+      await withFixture(async (_fixture, client) => {
+        const cases: Array<{label: string; seed: Record<string, unknown>}> = [
+          {label: 'env only', seed: {}},
+          {label: 'store only', seed: {browser: {keepPage: true}}},
+        ];
+        for (const {label, seed} of cases) {
+          if (label === 'env only') process.env.BROWSER_KEEP_PAGE = 'true';
+          else delete process.env.BROWSER_KEEP_PAGE;
+          resetRuntimeConfigStore(seed);
+
+          const id = await client.request('browser.connect', {body: {}});
+          const response = await client.responseFor(id);
+          const error = response['error'] as {
+            code?: string;
+            message?: string;
+          };
+          assert.equal(error.code, 'VALIDATION', label);
+          assert.match(error.message ?? '', /keepPage/, label);
+        }
+        // ...and a rejected config still leaves a usable daemon behind.
+        delete process.env.BROWSER_KEEP_PAGE;
+        resetRuntimeConfigStore({});
+        const statusId = await client.request('browser.status');
+        const status = await client.responseFor(statusId);
+        assert.deepStrictEqual(status['error'], undefined);
+      });
+    } finally {
+      stub.restore();
+      if (savedKeepPage === undefined) delete process.env.BROWSER_KEEP_PAGE;
+      else process.env.BROWSER_KEEP_PAGE = savedKeepPage;
+      if (savedEgo === undefined) delete process.env.BROWSER_EGO;
+      else process.env.BROWSER_EGO = savedEgo;
+      resetRuntimeConfigStore({});
+    }
+  });
+
+  it('a store commit failure is not reported as a connect failure (loose end 1)', async () => {
+    // `commit()` used to run inside the same try as `connectBrowser()`, so any
+    // write failure was folded into BROWSER_CONNECT_FAILED and the user went
+    // looking at a browser that was never even started. The store write happens
+    // before the connect, and its failure has to say so.
+    const stub = stubBrowserManager();
+    const commit = mock.method(RuntimeConfigStore.prototype, 'commit', () => {
+      throw new Error('disk is full');
+    });
+    resetRuntimeConfigStore({});
+    try {
+      await withFixture(async (_fixture, client) => {
+        const id = await client.request('browser.connect', {
+          body: {ego: true},
+        });
+        const response = await client.responseFor(id);
+        const error = response['error'] as {code?: string; message?: string};
+        assert.equal(error.code, 'BROWSER_CONFIG_COMMIT_FAILED');
+        assert.match(error.message ?? '', /persist/);
+        // Nothing was spawned: the connect never ran.
+        assert.strictEqual(stub.configs.length, 0);
+      });
+    } finally {
+      commit.mock.restore();
       stub.restore();
       resetRuntimeConfigStore({});
     }

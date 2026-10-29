@@ -92,15 +92,19 @@ export function getSourceMapConfig(): SourceMapConfig {
 }
 
 /**
- * 从环境变量 + RuntimeConfigStore 获取浏览器配置
+ * 环境变量 + 配置文件（RuntimeConfigStore 的 browser 字段）合并出来的浏览器配置。
  *
- * 优先级：环境变量 > RuntimeConfigStore 中的 browser 字段
+ * 优先级：环境变量 > RuntimeConfigStore 中的 browser 字段。
  *
- * 出口处强制 ego 的不变量（见 `browserInvariants.ts`）：这是 env / 文件 /
- * store 三者唯一的合并点，`runtime.ts`、daemon 启动自动连接与 IPC
- * `effectiveBrowserConfig()` 都从这里取配置，所以守卫放这里覆盖全部入口。
+ * **这里不断言不变量**（见 `browserInvariants.ts`），因为在 IPC 这条链上它只是
+ * 一个中间层：`worker/browserRequests` 还要把 store 覆盖层和本次请求的 patch 叠
+ * 上去。若在这里断言，`BROWSER_KEEP_PAGE=true` + `browser connect --ego` 会先
+ * 因为「缺 ego」被拒，而 ego 恰恰是下一次调用要补上的 —— 用户被告知「加 ego」，
+ * 而加了 ego 仍然被拒，无从自救。断言只做在最终合并对象上（`browserRequests`
+ * 的 `toBrowserConfig()`），需要一份「到此为止就是生效配置」的调用方改用
+ * `getBrowserManagerConfig()`。
  */
-export function getBrowserManagerConfig(): BrowserManagerConfig {
+export function buildBrowserManagerConfig(): BrowserManagerConfig {
   const fileConfig = getRuntimeConfigStore().get();
   const fileBrowser = fileConfig.browser;
 
@@ -304,18 +308,28 @@ export function getBrowserManagerConfig(): BrowserManagerConfig {
     config.viewport = fileBrowser.viewport;
   }
 
-  // ── 不变量：ego 的附带选项不许被静默忽略 ──────────────────────────────
-  // 这里是环境变量 / 配置文件 / RuntimeConfigStore 三者唯一的合并点，覆盖面是
-  // `runtime.ts` 与 daemon 启动自动连接。**但这里不是唯一的判定点**：
-  // `worker/browserRequests.effectiveBrowserConfig()` 会把 store 的 browser
-  // 覆盖层再叠在这个返回值之上（快照里 store 比 env 优先级高），叠加后的对象
-  // 可能重新变成自相矛盾的组合，所以那里必须再断言一次 —— 见该函数的注释。
-  //
-  // 只查 `keepPage`：ego 与目标参数的互斥是**请求级**约束（同一份配置里
-  // 留着旧的 `channel` 并不矛盾，ego 模式下它只是不参与），所以那一条在 CLI
-  // 与 IPC 请求层各自校验，不在这里。
-  assertBrowserConfigInvariants(config);
+  return config;
+}
 
+/**
+ * 环境变量 / 配置文件合并后的浏览器配置，**并在出口处断言不变量**。
+ *
+ * 给「到此为止就是最终生效配置」的调用方用：`runtime.ts`（MCP 工具看到的
+ * 那份）、daemon 启动自动连接、`getSystemConfig()`。它们之后没有别的层再补
+ * 字段，所以在这里断言既完整又不会误伤。
+ *
+ * IPC 的 `browser.connect` 不适用：它还要叠 store 覆盖层与本次请求的 patch，
+ * 中间态缺 ego 是正常的（ego 就在同一份请求里），所以它走
+ * `buildBrowserManagerConfig()` 并在**合并完成的最终对象**上断言 —— 见
+ * `worker/browserRequests.toBrowserConfig()`。
+ *
+ * 只查 `keepPage`：ego 与目标参数的互斥是**请求级**约束（同一份配置里留着
+ * 旧的 `channel` 并不矛盾，ego 模式下它只是不参与），所以那一条在 CLI 与 IPC
+ * 请求层各自校验，不在这里。
+ */
+export function getBrowserManagerConfig(): BrowserManagerConfig {
+  const config = buildBrowserManagerConfig();
+  assertBrowserConfigInvariants(config);
   return config;
 }
 

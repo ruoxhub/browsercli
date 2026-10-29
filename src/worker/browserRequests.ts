@@ -24,7 +24,7 @@ import {
   BrowserConfigSchema,
   type GlobalConfig,
 } from '../config/schema.js';
-import {getBrowserManagerConfig} from '../config/servicesConfig.js';
+import {buildBrowserManagerConfig} from '../config/servicesConfig.js';
 import type {BrowserManagerConfig} from '../modules/browser/index.js';
 
 const BrowserConnectSchema = BrowserConfigSchema.pick({
@@ -216,24 +216,42 @@ export function effectiveBrowserConfig(): BrowserManagerConfig {
  * 校验会把 store 永久卡在自相矛盾的状态 —— 从那以后每个 `browser.status` /
  * `browser.disconnect` 都跟着抛。调用方先拿候选、校验，通过后才 `update()`，
  * 被拒绝的请求因此不留痕迹。
+ *
+ * `commit()` **写的就是这里预览出来的那份对象**，不重新合并：分开算会留下一个
+ * 「校验的 A、提交的 B」的窗口 —— 今天只在 preview 与 commit 之间没有 `await`
+ * 时才安全，将来中间插一个异步操作就会重新打开它。因而 `commit` 直接吃掉
+ * `previewed`，合并逻辑只在 `RuntimeConfigStore` 里存在一份。
  */
 export function candidateBrowserConfig(patch: BrowserConfig): {
   commit: () => void;
   config: BrowserManagerConfig;
 } {
   const store = getRuntimeConfigStore();
+  // `preview()` 走的就是 `update()` 的合并逻辑，`config` 由它派生，`commit`
+  // 提交的也是它，三者不可能再分叉。
+  const previewed = store.preview({browser: patch});
   return {
     commit: () => {
-      store.update({browser: patch});
+      store.commit(previewed);
     },
-    // `preview()` 走的就是 `update()` 的合并逻辑，所以校验对象与提交后读到的一致。
-    config: toBrowserConfig(store.preview({browser: patch})),
+    config: toBrowserConfig(previewed),
   };
 }
 
-/** 合并层 + store 覆盖层，断言不变量后返回（唯一读点）。 */
+/**
+ * 合并层 + store 覆盖层，断言不变量后返回（唯一读点）。
+ *
+ * 合并顺序：环境变量/配置文件（`buildBrowserManagerConfig()`）→ store 覆盖层
+ * → 本次请求 patch（已经含在 `store` 快照里）。断言在**合并结束之后**，这是
+ * 唯一能同时满足两条规则的位置：
+ * - `BROWSER_KEEP_PAGE=true` + `connect --ego`：中间态缺 ego，最终对象有 ego，
+ *   所以合法 —— 用户能用 ego 自救；
+ * - `keepPage` 有、各层都没有 ego：最终对象仍自相矛盾，照样拒绝。
+ *
+ * 断言不能下沉到 `buildBrowserManagerConfig()`，那样中间态就会被拒（C1 回归）。
+ */
 function toBrowserConfig(store: Readonly<GlobalConfig>): BrowserManagerConfig {
-  const config = {...getBrowserManagerConfig(), ...(store.browser ?? {})};
+  const config = {...buildBrowserManagerConfig(), ...(store.browser ?? {})};
   assertBrowserConfigInvariants(config);
   return {
     ...config,

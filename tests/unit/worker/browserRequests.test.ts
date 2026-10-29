@@ -318,3 +318,86 @@ describe('parseBrowserConnectBody with BROWSER_EGO in the environment (B3)', () 
     );
   });
 });
+
+describe('candidateBrowserConfig asserts only the final merged config (C1)', () => {
+  const savedEgo = process.env.BROWSER_EGO;
+  const savedKeepPage = process.env.BROWSER_KEEP_PAGE;
+
+  afterEach(() => {
+    if (savedEgo === undefined) delete process.env.BROWSER_EGO;
+    else process.env.BROWSER_EGO = savedEgo;
+    if (savedKeepPage === undefined) delete process.env.BROWSER_KEEP_PAGE;
+    else process.env.BROWSER_KEEP_PAGE = savedKeepPage;
+    resetRuntimeConfigStore({});
+  });
+
+  it('accepts an env keepPage completed by the request ego (C1)', () => {
+    // The regression: the env-layer builder asserted the invariant before the
+    // request patch was applied, so `connect --ego` could not rescue
+    // BROWSER_KEEP_PAGE=true — the exact advice the error message gives.
+    delete process.env.BROWSER_EGO;
+    process.env.BROWSER_KEEP_PAGE = 'true';
+    resetRuntimeConfigStore({});
+    const candidate = candidateBrowserConfig({ego: true});
+    assert.strictEqual(candidate.config.ego, true);
+    assert.strictEqual(candidate.config.keepPage, true);
+    candidate.commit();
+    // The request's `ego` was written; `keepPage` stays in the env layer, so the
+    // post-commit read is the proof that both halves survive together.
+    assert.strictEqual(getRuntimeConfigStore().get().browser?.ego, true);
+    assert.strictEqual(effectiveBrowserConfig().keepPage, true);
+    assert.strictEqual(effectiveBrowserConfig().ego, true);
+  });
+
+  it('accepts a store keepPage completed by the request ego (C1)', () => {
+    delete process.env.BROWSER_EGO;
+    delete process.env.BROWSER_KEEP_PAGE;
+    resetRuntimeConfigStore({browser: {keepPage: true}});
+    const candidate = candidateBrowserConfig({ego: true});
+    assert.strictEqual(candidate.config.keepPage, true);
+    assert.strictEqual(candidate.config.ego, true);
+  });
+
+  it('still rejects keepPage when ego is absent from every layer (C1)', () => {
+    // The other direction: with no ego in env, store or patch the intermediate
+    // and the final object agree, so the rejection must survive the move.
+    delete process.env.BROWSER_EGO;
+    process.env.BROWSER_KEEP_PAGE = 'true';
+    resetRuntimeConfigStore({});
+    assert.throws(
+      () => candidateBrowserConfig({keepPage: true}),
+      BrowserConfigInvariantError,
+    );
+    // ...and the request layer still refuses it one layer earlier.
+    assert.throws(
+      () => parseBrowserConnectBody({keepPage: true, ego: undefined}),
+      BrowserConfigRequestError,
+    );
+  });
+
+  it('commit writes the validated object instead of re-merging (loose end 1)', () => {
+    // Preview and commit used to be two separate merges, safe only because no
+    // `await` sat between them. A writer that sneaks in between them must not
+    // change what gets committed: `commit()` stores the object that was
+    // validated, byte for byte.
+    delete process.env.BROWSER_EGO;
+    delete process.env.BROWSER_KEEP_PAGE;
+    resetRuntimeConfigStore({});
+    const {commit, config} = candidateBrowserConfig({
+      ego: true,
+      keepPage: true,
+    });
+    assert.strictEqual(config.ego, true);
+
+    // Stand-in for a future `await` reopening the check-then-act window.
+    getRuntimeConfigStore().update({browser: {headless: false}});
+
+    commit();
+    // The validated snapshot wins: the interleaved `headless: false` was not
+    // merged in, because `commit()` writes the previewed object verbatim.
+    assert.deepStrictEqual(getRuntimeConfigStore().get().browser, {
+      ego: true,
+      keepPage: true,
+    });
+  });
+});

@@ -32,6 +32,17 @@ describe('env boolean vocabulary', () => {
     else process.env[KEY] = original;
   });
 
+  it('pins the accepted values', () => {
+    // The parity test below only proves the two readers agree with each other, so
+    // deleting `'on'` from the shared list would still pass everywhere — every
+    // reader would simply stop accepting it. Pin the content itself so a silent
+    // vocabulary change fails: BROWSER_EGO / BROWSER_KEEP_PAGE are documented as
+    // accepting these words, and a shell exporting `BROWSER_EGO=on` must keep
+    // meaning "ego on".
+    assert.deepStrictEqual([...ENV_TRUE_VALUES], ['true', '1', 'yes', 'on']);
+    assert.deepStrictEqual([...ENV_FALSE_VALUES], ['false', '0', 'no', 'off']);
+  });
+
   it('parses the same accepted values through getEnvBoolean and getEnvFlag', () => {
     // Both readers used to carry their own copy of the vocabulary, which could
     // drift silently: BROWSER_EGO/BROWSER_KEEP_PAGE go through getEnvFlag (the CLI
