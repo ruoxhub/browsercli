@@ -1472,6 +1472,374 @@ describe('ego-bridge-worker', () => {
     assert.deepEqual(used, [9], 'never select a space that was not claimed');
   });
 
+  it('creates -2 and logs unavailability when a leftover exists but claimTaskSpace does not (I1 minor)', async () => {
+    // The `claimTaskSpace: undefined` branch of the reclaim had no coverage: every
+    // other test pairing it with an absent binding also had all spaces created by
+    // the user, so the branch was never entered.
+    const base = 'browsercli-testhash';
+    const created: string[] = [];
+    const used: number[] = [];
+    const logs: string[] = [];
+    const fake = createFakeEgo({
+      listTaskSpaces: async () => ({
+        taskSpaces: [
+          {id: 7, name: base, createdBy: 'agent', ownership: 'user'},
+        ],
+      }),
+      claimTaskSpace: undefined,
+      createTaskSpace: async (name: string) => {
+        created.push(name);
+        return {id: 9, name};
+      },
+      useTaskSpace: (id: number) => {
+        used.push(id);
+        return id;
+      },
+    });
+    const bridge = createEgoBridge({
+      ego: fake.ego,
+      taskSpaceName: base,
+      log: line => logs.push(line),
+    });
+    await bridge.start();
+    await bridge.stop();
+    assert.deepEqual(created, [`${base}-2`]);
+    assert.deepEqual(used, [9]);
+    assert.ok(
+      logs.some(line =>
+        /agent leftover but ego\.claimTaskSpace is unavailable/.test(line),
+      ),
+      `expected an unavailability log, got ${JSON.stringify(logs)}`,
+    );
+  });
+
+  it('treats agentDelegatedToUser as reusable, not reclaimed or skipped', async () => {
+    // `isAgentOwned()` accepts three ownerships; only 'agent' had a test. A
+    // delegated space is the user holding the wheel, so `useTaskSpace` reuses it
+    // in place: claiming it would be a hostile takeover and skipping it would
+    // burn a suffix.
+    const base = 'browsercli-testhash';
+    const used: number[] = [];
+    const claimed: number[] = [];
+    const created: string[] = [];
+    const fake = createFakeEgo({
+      listTaskSpaces: async () => ({
+        taskSpaces: [
+          {
+            id: 7,
+            name: base,
+            createdBy: 'agent',
+            ownership: 'agentDelegatedToUser',
+          },
+        ],
+      }),
+      claimTaskSpace: async (id: number) => {
+        claimed.push(id);
+        return {id, name: base};
+      },
+      createTaskSpace: async (name: string) => {
+        created.push(name);
+        return {id: 9, name};
+      },
+      useTaskSpace: (id: number) => {
+        used.push(id);
+        return id;
+      },
+    });
+    const logs: string[] = [];
+    const bridge = createEgoBridge({
+      ego: fake.ego,
+      taskSpaceName: base,
+      log: line => logs.push(line),
+    });
+    await bridge.start();
+    await bridge.stop();
+    assert.deepEqual(used, [7], 'a delegated space is selected as-is');
+    assert.deepEqual(claimed, [], 'never claimed');
+    assert.deepEqual(created, [], 'never skipped to a new suffix');
+    assert.ok(
+      logs.some(line => /reusing task space/.test(line)),
+      `expected a reuse log, got ${JSON.stringify(logs)}`,
+    );
+  });
+
+  it('reclaims every duplicate under one name, not just the last (I1 minor)', async () => {
+    // `reclaimable.set(name, id)` used to be last-wins: a second leftover under
+    // the same name silently disappeared from the map and became a permanent
+    // orphan. Each reclaimable id is now attempted in a bounded pass.
+    const base = 'browsercli-testhash';
+    const claimed: number[] = [];
+    const used: number[] = [];
+    const logs: string[] = [];
+    const fake = createFakeEgo({
+      listTaskSpaces: async () => ({
+        taskSpaces: [
+          {id: 7, name: base, createdBy: 'agent', ownership: 'user'},
+          {id: 8, name: base, createdBy: 'agent', ownership: 'user'},
+        ],
+      }),
+      claimTaskSpace: async (id: number) => {
+        claimed.push(id);
+        // The first duplicate is unclaimable, so the pass must fall through to
+        // the second rather than giving up on the name.
+        if (id === 7) {
+          return {
+            error: 'still busy',
+            error_code: 'EGO_TASK_SPACE_INACTIVE',
+          };
+        }
+        return {id, name: base};
+      },
+      createTaskSpace: async () => {
+        throw new Error('a reclaimable leftover must be reused, not copied');
+      },
+      useTaskSpace: (id: number) => {
+        used.push(id);
+        return id;
+      },
+    });
+    const bridge = createEgoBridge({
+      ego: fake.ego,
+      taskSpaceName: base,
+      log: line => logs.push(line),
+    });
+    await bridge.start();
+    await bridge.stop();
+    assert.deepEqual(claimed, [7, 8], 'both duplicates must be attempted');
+    assert.deepEqual(used, [8], 'the one that could be claimed is selected');
+    assert.ok(
+      logs.some(line => /2 agent-created spaces share the name/.test(line)),
+      `expected a duplicate log, got ${JSON.stringify(logs)}`,
+    );
+  });
+
+  it('claims a leftover whose name equals the last suffix, not a -1', async () => {
+    // The suffix walk is `base`, `base-2` … `base-8`; the bound is names tried,
+    // not the last suffix number.
+    const base = 'browsercli-testhash';
+    const used: number[] = [];
+    const fake = createFakeEgo({
+      listTaskSpaces: async () => ({
+        taskSpaces: Array.from({length: 8}, (_, index) => ({
+          id: 100 + index,
+          name: index === 0 ? base : `${base}-${index + 1}`,
+          createdBy: index === 7 ? 'agent' : 'user',
+          ownership: 'user',
+        })),
+      }),
+      claimTaskSpace: async (id: number) => ({id, name: `${base}-8`}),
+      createTaskSpace: async () => {
+        throw new Error('the -8 leftover must be reclaimed');
+      },
+      useTaskSpace: (id: number) => {
+        used.push(id);
+        return id;
+      },
+    });
+    const bridge = createEgoBridge({ego: fake.ego, taskSpaceName: base});
+    await bridge.start();
+    await bridge.stop();
+    assert.deepEqual(used, [107]);
+  });
+
+  it('completes a reclaimed space even without keepPage, so a later plain run cannot delete it (I1)', async () => {
+    // The data-loss sequence: an earlier --keep-page run retained the user's tabs
+    // and left the space user-owned with createdBy 'agent'; this run reclaimed it
+    // with the default keepPage:false. Closing would remove the retained scene, so
+    // the retention decision that created it wins over this run's default.
+    const base = 'browsercli-testhash';
+    const fake = createFakeEgo({
+      listTaskSpaces: async () => ({
+        taskSpaces: [
+          {id: 7, name: base, createdBy: 'agent', ownership: 'user'},
+        ],
+      }),
+      claimTaskSpace: async (id: number) => ({id, name: base}),
+      createTaskSpace: async () => {
+        throw new Error('the leftover must be reclaimed, not recreated');
+      },
+    });
+    const logs: string[] = [];
+    const bridge = createEgoBridge({
+      ego: fake.ego,
+      taskSpaceName: base,
+      log: line => logs.push(line),
+    });
+    await bridge.start();
+    await bridge.stop();
+    assert.deepEqual(
+      fake.calls,
+      ['completeTaskSpace'],
+      'a reclaimed space must be detached, never closed',
+    );
+    assert.ok(
+      logs.some(line => /reclaimed space is completed, not closed/.test(line)),
+      `expected an explicit retention log, got ${JSON.stringify(logs)}`,
+    );
+  });
+
+  it('completes a reclaimed space when keepPage is set too (I1)', async () => {
+    const base = 'browsercli-testhash';
+    const fake = createFakeEgo({
+      listTaskSpaces: async () => ({
+        taskSpaces: [
+          {id: 7, name: base, createdBy: 'agent', ownership: 'user'},
+        ],
+      }),
+      claimTaskSpace: async (id: number) => ({id, name: base}),
+      createTaskSpace: async () => {
+        throw new Error('the leftover must be reclaimed, not recreated');
+      },
+    });
+    const bridge = createEgoBridge({
+      ego: fake.ego,
+      taskSpaceName: base,
+      keepPage: true,
+    });
+    await bridge.start();
+    await bridge.stop();
+    assert.deepEqual(fake.calls, ['completeTaskSpace']);
+  });
+
+  it('closes a space this run created when keepPage is false (I1)', async () => {
+    // The unchanged half of the contract: a space created by this run has no
+    // pre-existing scene, so a plain run still deletes it.
+    const base = 'browsercli-testhash';
+    const fake = createFakeEgo({
+      listTaskSpaces: async () => ({taskSpaces: []}),
+      createTaskSpace: async (name: string) => ({id: 4, name}),
+    });
+    const bridge = createEgoBridge({ego: fake.ego, taskSpaceName: base});
+    await bridge.start();
+    await bridge.stop();
+    assert.deepEqual(fake.calls, ['closeTaskSpace']);
+  });
+
+  it('completes a space this run created when keepPage is true (I1)', async () => {
+    const base = 'browsercli-testhash';
+    const fake = createFakeEgo({
+      listTaskSpaces: async () => ({taskSpaces: []}),
+      createTaskSpace: async (name: string) => ({id: 4, name}),
+    });
+    const bridge = createEgoBridge({
+      ego: fake.ego,
+      taskSpaceName: base,
+      keepPage: true,
+    });
+    await bridge.start();
+    await bridge.stop();
+    assert.deepEqual(fake.calls, ['completeTaskSpace']);
+  });
+
+  it('reports the retained tabs a reclaim adds to the whitelist, and still drops foreign ones (I2)', async () => {
+    // Reclaim widens the fence to the whole retained space: right per the
+    // `createdBy: 'agent'` contract, but a boundary that moved has to be visible.
+    // The floor stays put — a tab from another space is still dropped.
+    const base = 'browsercli-testhash';
+    const fake = createFakeEgo({
+      listTaskSpaces: async () => ({
+        taskSpaces: [
+          {id: 7, name: base, createdBy: 'agent', ownership: 'user'},
+        ],
+      }),
+      claimTaskSpace: async (id: number) => ({id, name: base}),
+      createTaskSpace: async () => {
+        throw new Error('the leftover must be reclaimed, not recreated');
+      },
+      listTabs: async () => ({
+        tabs: [{targetId: 'RETAINED-1'}, {targetId: 'RETAINED-2'}],
+      }),
+    });
+    const logs: string[] = [];
+    const bridge = createEgoBridge({
+      ego: fake.ego,
+      taskSpaceName: base,
+      listOwnTargetIds: () => listTabsOwnTargetIds(fake.ego),
+      log: line => logs.push(line),
+    });
+    const {wsEndpoint} = await bridge.start();
+    const ws = await connect(wsEndpoint);
+    try {
+      const received = collect(ws);
+      // A tab the reclaimed space does not contain: its id must still be denied.
+      fake.emit({
+        method: 'Target.targetCreated',
+        params: {
+          targetInfo: {
+            targetId: 'FOREIGN-TAB',
+            type: 'page',
+            url: 'https://mail.example.com/inbox',
+          },
+        },
+      });
+      fake.emit({
+        method: 'Target.targetCreated',
+        params: {targetInfo: {targetId: 'RETAINED-1', type: 'page'}},
+      });
+      fake.emit({
+        method: 'Target.targetCreated',
+        params: {targetInfo: {targetId: 'RETAINED-2', type: 'page'}},
+      });
+
+      await waitFor(() => (received.parsed.length >= 2 ? true : undefined));
+      await delay(100);
+      const ids = received.parsed.map(
+        frame => (frame.params?.targetInfo as {targetId?: string}).targetId,
+      );
+      assert.deepEqual(
+        ids,
+        ['RETAINED-1', 'RETAINED-2'],
+        'exactly the reclaimed space tabs, in order',
+      );
+      for (const frame of received.raw) {
+        assert.doesNotMatch(frame, /FOREIGN-TAB|mail\.example\.com/);
+      }
+      assert.ok(
+        logs.some(line =>
+          /reclaimed task space contributes 2 tab\(s\) that predate this run to the target whitelist/.test(
+            line,
+          ),
+        ),
+        `expected a reclaim-whitelist log, got ${JSON.stringify(logs)}`,
+      );
+    } finally {
+      ws.close();
+      await bridge.stop();
+    }
+  });
+
+  it('stays silent about retained tabs when a reclaim finds an empty space (I2)', async () => {
+    const base = 'browsercli-testhash';
+    const fake = createFakeEgo({
+      listTaskSpaces: async () => ({
+        taskSpaces: [
+          {id: 7, name: base, createdBy: 'agent', ownership: 'user'},
+        ],
+      }),
+      claimTaskSpace: async (id: number) => ({id, name: base}),
+      createTaskSpace: async () => {
+        throw new Error('the leftover must be reclaimed, not recreated');
+      },
+      listTabs: async () => ({tabs: []}),
+    });
+    const logs: string[] = [];
+    const bridge = createEgoBridge({
+      ego: fake.ego,
+      taskSpaceName: base,
+      listOwnTargetIds: () => listTabsOwnTargetIds(fake.ego),
+      log: line => logs.push(line),
+    });
+    await bridge.start();
+    await bridge.stop();
+    assert.equal(
+      logs.some(line =>
+        /contributes .* tab\(s\) that predate this run/.test(line),
+      ),
+      false,
+      'nothing pre-existed, so nothing was added to the fence',
+    );
+  });
+
   it('names the workspace and the leftovers when every attempt is exhausted', async () => {
     const base = 'browsercli-deadbeef';
     const fake = createFakeEgo({
@@ -1494,14 +1862,57 @@ describe('ego-bridge-worker', () => {
     );
     await bridge.stop();
     assert.match(error.message, new RegExp(`workspace ${base}`));
-    assert.match(error.message, /leftover/i);
-    assert.match(error.message, /createdBy "agent"/);
-    assert.match(error.message, /ego\.claimTaskSpace/);
+    // Truthful for this case: every space in the way is the user's. The message
+    // must not claim they are this bridge's leftovers (that would tell a user to
+    // delete their own spaces), and it must not describe the suffix walk as a
+    // contiguous `base`..`base-8` range: there is no `-1`.
+    assert.doesNotMatch(error.message, /leftover/i);
+    assert.doesNotMatch(error.message, /createdBy "agent"/);
+    assert.match(error.message, /8 of them are not this bridge's/);
+    assert.match(error.message, /never taken over/);
+    assert.match(
+      error.message,
+      new RegExp(`${base}, ${base}-2, ${base}-3.*${base}-8`, 's'),
+      'the message must list the names actually tried, including -2 and not -1',
+    );
+    assert.doesNotMatch(error.message, new RegExp(`${base}-1\\b`));
     assert.match(
       error.message,
       new RegExp(`Delete the spaces named ${base}\\*`),
       'the message must say how to clear them',
     );
+  });
+
+  it('reports agent leftovers, not user spaces, when those are what it found', async () => {
+    // The other shape: every name is the bridge's own leftover, but this ego
+    // build has no claimTaskSpace, so none can be taken back.
+    const base = 'browsercli-deadbeef';
+    const fake = createFakeEgo({
+      listTaskSpaces: async () => ({
+        taskSpaces: Array.from({length: 8}, (_, index) => ({
+          id: 100 + index,
+          name: index === 0 ? base : `${base}-${index + 1}`,
+          createdBy: 'agent',
+          ownership: 'user',
+        })),
+      }),
+      claimTaskSpace: undefined,
+    });
+    const logs: string[] = [];
+    const bridge = createEgoBridge({
+      ego: fake.ego,
+      taskSpaceName: base,
+      log: line => logs.push(line),
+    });
+    const error = await bridge.start().then(
+      () => assert.fail('start() must reject when no space can be entered'),
+      (caught: Error) => caught,
+    );
+    await bridge.stop();
+    assert.match(error.message, /8 of them are this bridge's own/);
+    assert.match(error.message, /createdBy "agent"/);
+    assert.match(error.message, /ego\.claimTaskSpace could not reclaim/);
+    assert.doesNotMatch(error.message, /not this bridge's/);
   });
 
   it('rejects and releases cleanly when stop() lands during the refresh', async () => {
