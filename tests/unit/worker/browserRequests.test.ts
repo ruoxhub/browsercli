@@ -86,6 +86,21 @@ describe('parseBrowserConnectBody', () => {
   it('returns an empty patch for an empty body', () => {
     assert.deepEqual(parseBrowserConnectBody({}), {});
   });
+
+  it('accepts the ego mode selectors instead of rejecting them as unknown', () => {
+    // The schema is a `.strict()` pick(): an unlisted key is a VALIDATION error,
+    // so `browser connect --ego` could never work over IPC without these two.
+    assert.deepEqual(parseBrowserConnectBody({ego: true}), {ego: true});
+    assert.deepEqual(parseBrowserConnectBody({ego: true, keepPage: true}), {
+      ego: true,
+      keepPage: true,
+    });
+    assert.deepEqual(
+      parseBrowserConnectBody({ego: 'false'}),
+      {ego: false},
+      'the shared boolean preprocessor applies, like cloak',
+    );
+  });
 });
 
 describe('parseBrowserDisconnectBody', () => {

@@ -143,6 +143,16 @@ export function getBrowserManagerConfig(): BrowserManagerConfig {
       extraFallback: 'cloak',
     },
     {
+      key: 'ego',
+      envKey: 'BROWSER_EGO',
+      kind: 'boolean',
+    },
+    {
+      key: 'keepPage',
+      envKey: 'BROWSER_KEEP_PAGE',
+      kind: 'boolean',
+    },
+    {
       key: 'fullStealthArgs',
       envKey: 'BROWSER_FULL_STEALTH_ARGS',
       kind: 'boolean',

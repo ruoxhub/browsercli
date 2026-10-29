@@ -64,12 +64,15 @@ export interface BrowserConnectOptions {
   browserURL?: string;
   channel?: string;
   cloak?: boolean;
+  ego?: boolean;
   executablePath?: string;
   force?: boolean;
   fullStealthArgs?: boolean;
   headless?: boolean;
   isolated?: boolean;
   jsStealth?: boolean;
+  /** ego 任务空间保留策略；必须与 `ego: true` 同时出现。 */
+  keepPage?: boolean;
   minimalStealth?: boolean;
   userDataDir?: string;
   viewport?: {width: number; height: number};

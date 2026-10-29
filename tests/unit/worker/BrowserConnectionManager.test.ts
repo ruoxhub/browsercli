@@ -606,6 +606,44 @@ describe('BrowserConnectionManager', () => {
     );
   });
 
+  it('treats ego configs differing only in keepPage as different targets (Ruling K)', () => {
+    // `keepPage` is baked into the running bridge (the bootstrap reads it once),
+    // so a config requiring a different retention must NOT compare equal: equal
+    // would make connectBrowser() short-circuit with `connected: true` and the
+    // user's `--keep-page` would be silently ignored, never reaching
+    // EgoBridgeManager.start()'s own assertSameOptions() conflict check.
+    assert.strictEqual(
+      isSameBrowserTarget(
+        {ego: true, keepPage: true},
+        {ego: true, keepPage: true},
+      ),
+      true,
+    );
+    assert.strictEqual(
+      isSameBrowserTarget({ego: true}, {ego: true}),
+      true,
+      'both absent means the same (default) retention',
+    );
+    assert.strictEqual(
+      isSameBrowserTarget({ego: true, keepPage: true}, {ego: true}),
+      false,
+      'requesting retention differs from the default teardown',
+    );
+    assert.strictEqual(
+      isSameBrowserTarget({ego: true}, {ego: true, keepPage: true}),
+      false,
+      'and it differs in either direction',
+    );
+    assert.strictEqual(
+      isSameBrowserTarget(
+        {ego: true, keepPage: true, wsEndpoint: 'ws://127.0.0.1:5599/x'},
+        {ego: true, keepPage: false},
+      ),
+      false,
+      'a live endpoint must not mask a retention change',
+    );
+  });
+
   it('reuses a live ego connection on a second connect without reset or stop (I1)', async () => {
     const resetMock = mock.method(BrowserManager, 'resetInstance', () =>
       Promise.resolve(true),

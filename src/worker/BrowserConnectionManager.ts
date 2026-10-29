@@ -83,7 +83,12 @@ export function isSameBrowserTarget(
     // `EgoBridgeManager` 用自身 cwd 派生的任务空间名固定，同一进程内的 ego 配置
     // 因此天然是同一个工作区；`cloak`/`channel` 之类对 ego 无意义（不会本地启动），
     // 不参与比较。
-    return true;
+    //
+    // `keepPage` 必须比较：它被烘进运行中桥接的启动 bootstrap，改不了。两个只差
+    // 它的 ego 配置若比较相等，`connectBrowser()` 会短路返回 connected:true，
+    // `EgoBridgeManager.start()` 自己的 assertSameOptions() 冲突检查永远到不了，
+    // 用户的 `--keep-page` 被静默吞掉（Ruling K）。
+    return (a.keepPage === true) === (b.keepPage === true);
   }
   if (mode === 'ws-endpoint') {
     return (

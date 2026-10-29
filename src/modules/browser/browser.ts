@@ -410,7 +410,13 @@ export class BrowserManager {
     this.egoBridgeOwned = true;
 
     try {
-      const connection = await bridge.start();
+      // The retention policy is baked into the bridge's bootstrap, so it can only
+      // be applied here, once per manager. `isSameBrowserTarget()` compares it for
+      // the same reason: a differing `keepPage` must not be treated as the same
+      // target, or this call would never be reached and the flag would be lost.
+      const connection = await bridge.start({
+        keepPage: this.config.keepPage === true,
+      });
       this.config = {...this.config, wsEndpoint: connection.wsEndpoint};
 
       const browser = await this.connectToRemoteBrowser();

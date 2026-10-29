@@ -52,6 +52,18 @@ export interface BrowserManagerConfig {
    */
   ego?: boolean;
   /**
+   * ego 任务空间的保留策略（`--keep-page` / `BROWSER_KEEP_PAGE`）。
+   *
+   * 只在 `ego: true` 下有意义，并且必须随 `EgoBridgeManager.start({keepPage})`
+   * 传入：策略被烘进桥接进程的启动 bootstrap，运行期无法更改（对不同的
+   * keepPage 重复 `start()` 会被拒绝，而不是静默沿用旧值）。
+   *
+   * true = 桥接停止时执行 `task.finish({keep: 'all'})`，把 agent 的分析标签页
+   * 留在 ego 里供人工复核；false/缺省 = `finish({keep: []})`，任务空间关闭、
+   * 标签页一并消失。
+   */
+  keepPage?: boolean;
+  /**
    * Opt-in 注入 StealthScripts2025（覆盖 navigator/canvas/WebGL/audio 等）。
    * 默认不开：与 jshookmcp 的"零 JS 注入"哲学对齐 —— `Object.defineProperty`
    * hack 本身就是检测信号。需要显式 opt-in 才注入。

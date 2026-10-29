@@ -21,6 +21,7 @@ const CONNECT_FLAGS = new Set([
   'browser-url',
   'channel',
   'cloak',
+  'ego',
   'executable-path',
   'force',
   'full-stealth-args',
@@ -28,6 +29,7 @@ const CONNECT_FLAGS = new Set([
   'isolated',
   'js-stealth',
   'json',
+  'keep-page',
   'minimal-stealth',
   'user-data-dir',
   'viewport',
@@ -189,13 +191,21 @@ function connectOptions(
   const booleans = {
     acceptInsecureCerts: booleanFlag(flags, 'accept-insecure-certs'),
     cloak: booleanFlag(flags, 'cloak'),
+    ego: booleanFlag(flags, 'ego'),
     force: booleanFlag(flags, 'force'),
     fullStealthArgs: booleanFlag(flags, 'full-stealth-args'),
     headless: booleanFlag(flags, 'headless'),
     isolated: booleanFlag(flags, 'isolated'),
     jsStealth: booleanFlag(flags, 'js-stealth'),
+    keepPage: booleanFlag(flags, 'keep-page'),
     minimalStealth: booleanFlag(flags, 'minimal-stealth'),
   };
+  // `--keep-page` 只在 ego 模式下有意义：ego 任务空间的保留策略是烘进桥接
+  // bootstrap 的一次性选项。没有选中 ego 时它既不会被使用、也不会报错，直接
+  // 拒绝（与 `--cloak` 等模式专属 flag 的处理一致：不接受"静默忽略"）。
+  if (booleans.keepPage !== undefined && booleans.ego !== true) {
+    invalid('--keep-page 只在 ego 模式下有效，请同时指定 --ego');
+  }
   for (const [key, value] of Object.entries(booleans)) {
     if (value !== undefined) {
       (options as Record<string, unknown>)[key] = value;
@@ -252,6 +262,10 @@ export const browserCommand: AxiCliCommand<WorkerContext> = async (
     typedAction === 'disconnect'
       ? booleanFlag(parsed.flags, 'force')
       : undefined;
+  // Parsed before connecting so an invalid flag combination (`--keep-page`
+  // without `--ego`) is rejected locally instead of spawning a daemon first.
+  const connectBody =
+    typedAction === 'connect' ? connectOptions(parsed.flags) : undefined;
   const client = ctx ? await ctx.connect() : undefined;
   if (!client) throw new AxiError('Worker 未运行', 'WORKER_NOT_RUNNING');
 
@@ -259,7 +273,7 @@ export const browserCommand: AxiCliCommand<WorkerContext> = async (
     const state =
       typedAction === 'connect'
         ? await client.request<BrowserConnectionStatus>('browser.connect', {
-            body: connectOptions(parsed.flags),
+            body: connectBody,
           })
         : typedAction === 'disconnect'
           ? await client.request<BrowserConnectionStatus>(

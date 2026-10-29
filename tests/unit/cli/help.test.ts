@@ -102,6 +102,18 @@ describe('help', () => {
       assert.ok(result.includes('--force'));
     });
 
+    it('documents the ego flags and what --keep-page retains', () => {
+      const result = generateCommandHelp('browser', 'connect');
+      assert.ok(result);
+      assert.ok(result.includes('--ego'));
+      assert.ok(result.includes('--keep-page'));
+      // The retention flag must say what it actually does: keep the analysis
+      // tabs in ego; without it the task space (and its tabs) are closed.
+      assert.match(result, /--keep-page.*保留/);
+      assert.match(result, /标签页/);
+      assert.match(result, /--ego/);
+    });
+
     it('returns dedicated help for browser disconnect and status subcommands', () => {
       const disconnect = generateCommandHelp('browser', [
         'disconnect',
