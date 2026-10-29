@@ -907,6 +907,245 @@ describe('ego-bridge-worker', () => {
     }
   });
 
+  it('answers Target.createTarget from the native tab API instead of forwarding it', async () => {
+    // ego refuses Target.createTarget outright, so the bridge has to satisfy it
+    // with ego.createTab — the binding ego-browser's own task.newPage() uses.
+    const created: Array<string> = [];
+    const fake = createFakeEgo({
+      createTab: async (url: string) => {
+        created.push(url);
+        return {targetId: 'new-target'};
+      },
+    });
+    const bridge = createEgoBridge({
+      ego: fake.ego,
+      taskSpaceName: 'unit-test',
+      listOwnTargetIds: async () => ['new-target'],
+    });
+    const {wsEndpoint} = await bridge.start();
+    const ws = await connect(wsEndpoint);
+    try {
+      const received = collect(ws);
+      // The attach must be reported before the reply: Patchright resolves the
+      // reply by looking the target up in the map that event fills.
+      ws.send(
+        '{"id":11,"method":"Target.createTarget","params":{"url":"about:blank","browserContextId":"ctx-1"}}',
+      );
+      await waitFor(() => created[0]);
+      fake.emit({
+        method: 'Target.attachedToTarget',
+        params: {
+          sessionId: 'new-session',
+          targetInfo: {targetId: 'new-target', type: 'page'},
+          waitingForDebugger: true,
+        },
+      });
+
+      const attach = await waitFor(() => received.parsed[0]);
+      assert.equal(attach.method, 'Target.attachedToTarget');
+      const reply = await waitFor(() => received.parsed[1]);
+      assert.deepEqual(reply, {id: 11, result: {targetId: 'new-target'}});
+      assert.deepEqual(created, ['about:blank']);
+      assert.deepEqual(
+        fake.sent,
+        [],
+        'the refused method must never reach ego',
+      );
+    } finally {
+      ws.close();
+      await bridge.stop();
+    }
+  });
+
+  it('passes the requested url to ego.createTab rather than hardcoding about:blank', async () => {
+    const created: Array<string> = [];
+    const fake = createFakeEgo({
+      createTab: async (url: string) => {
+        created.push(url);
+        return {targetId: 'devtools-target'};
+      },
+    });
+    const bridge = createEgoBridge({
+      ego: fake.ego,
+      taskSpaceName: 'unit-test',
+      listOwnTargetIds: async () => ['devtools-target'],
+    });
+    const {wsEndpoint} = await bridge.start();
+    const ws = await connect(wsEndpoint);
+    try {
+      const received = collect(ws);
+      ws.send(
+        '{"id":12,"method":"Target.createTarget","params":{"url":"devtools://devtools/bundled/inspector.html"}}',
+      );
+      await waitFor(() => created[0]);
+      fake.emit({
+        method: 'Target.attachedToTarget',
+        params: {
+          sessionId: 'dt-session',
+          targetInfo: {targetId: 'devtools-target', type: 'page'},
+          waitingForDebugger: true,
+        },
+      });
+      assert.deepEqual(await waitFor(() => received.parsed[1]), {
+        id: 12,
+        result: {targetId: 'devtools-target'},
+      });
+      assert.deepEqual(
+        created,
+        ['devtools://devtools/bundled/inspector.html'],
+        'open_devtools depends on the devtools:// url reaching ego intact',
+      );
+    } finally {
+      ws.close();
+      await bridge.stop();
+    }
+  });
+
+  it('reports a CDP error when ego.createTab fails, never a fake targetId', async () => {
+    const fake = createFakeEgo({
+      createTab: async () => {
+        throw new Error('task space inactive');
+      },
+    });
+    const bridge = createEgoBridge({ego: fake.ego, taskSpaceName: 'unit-test'});
+    const {wsEndpoint} = await bridge.start();
+    const ws = await connect(wsEndpoint);
+    try {
+      const received = collect(ws);
+      ws.send(
+        '{"id":13,"method":"Target.createTarget","params":{"url":"about:blank"}}',
+      );
+      const reply = await waitFor(() => received.parsed[0]);
+      assert.equal(reply.id, 13);
+      assert.equal(reply.result, undefined);
+      assert.match(reply.error.message, /task space inactive/);
+    } finally {
+      ws.close();
+      await bridge.stop();
+    }
+  });
+
+  it('reports a CDP error when the created target is never attached', async () => {
+    // A reply the client cannot resolve (no attach => no page object) must fail
+    // as an error rather than hand back a targetId that throws downstream.
+    const fake = createFakeEgo({
+      createTab: async () => ({targetId: 'ghost-target'}),
+    });
+    const bridge = createEgoBridge({
+      ego: fake.ego,
+      taskSpaceName: 'unit-test',
+      listOwnTargetIds: async () => ['ghost-target'],
+    });
+    const {wsEndpoint} = await bridge.start();
+    const ws = await connect(wsEndpoint);
+    try {
+      const received = collect(ws);
+      ws.send(
+        '{"id":14,"method":"Target.createTarget","params":{"url":"about:blank"}}',
+      );
+      const reply = await waitFor(() => received.parsed[0], 8000);
+      assert.equal(reply.result, undefined);
+      assert.match(reply.error.message, /never attached/);
+    } finally {
+      ws.close();
+      await bridge.stop();
+    }
+  });
+
+  it('restores the request sessionId on a reply ego sent without one', async () => {
+    // ego answers a refused Target.createTarget with no sessionId. Patchright
+    // routes by that field and asserts on an id it cannot route, which crashed
+    // the daemon when open_devtools hit it.
+    const fake = createFakeEgo();
+    const bridge = createEgoBridge({ego: fake.ego, taskSpaceName: 'unit-test'});
+    const {wsEndpoint} = await bridge.start();
+    const ws = await connect(wsEndpoint);
+    try {
+      const received = collect(ws);
+      ws.send(
+        '{"id":15,"method":"Page.navigate","params":{"url":"https://example.com"},"sessionId":"session-9"}',
+      );
+      await waitFor(() => fake.sent[0]);
+      fake.emit({
+        id: 15,
+        error: {code: -32000, message: 'some ego refusal'},
+      });
+      const reply = await waitFor(() => received.parsed[0]);
+      assert.equal(reply.id, 15);
+      assert.equal(
+        reply.sessionId,
+        'session-9',
+        'a session-less reply must be put back on the session that asked',
+      );
+    } finally {
+      ws.close();
+      await bridge.stop();
+    }
+  });
+
+  it('leaves a reply that already names a session untouched', async () => {
+    const fake = createFakeEgo();
+    const bridge = createEgoBridge({ego: fake.ego, taskSpaceName: 'unit-test'});
+    const {wsEndpoint} = await bridge.start();
+    const ws = await connect(wsEndpoint);
+    try {
+      const received = collect(ws);
+      ws.send(
+        '{"id":16,"method":"Page.navigate","params":{"url":"https://example.com"},"sessionId":"asked-on"}',
+      );
+      await waitFor(() => fake.sent[0]);
+      fake.emit({
+        id: 16,
+        result: {},
+        sessionId: 'ego-chose-this',
+      });
+      const reply = await waitFor(() => received.parsed[0]);
+      assert.equal(reply.sessionId, 'ego-chose-this');
+    } finally {
+      ws.close();
+      await bridge.stop();
+    }
+  });
+
+  it('answers Target.createTarget without waiting out the timeout when no firewall is configured', async () => {
+    // Without `listOwnTargetIds` the firewall is off, so `knownOwnTargetIds`
+    // never fills. The attach bookkeeping must not depend on it, or every page
+    // would pay the full attach timeout.
+    const fake = createFakeEgo({
+      createTab: async () => ({targetId: 'no-firewall-target'}),
+    });
+    const bridge = createEgoBridge({ego: fake.ego, taskSpaceName: 'unit-test'});
+    const {wsEndpoint} = await bridge.start();
+    const ws = await connect(wsEndpoint);
+    try {
+      const received = collect(ws);
+      ws.send(
+        '{"id":17,"method":"Target.createTarget","params":{"url":"about:blank"}}',
+      );
+      fake.emit({
+        method: 'Target.attachedToTarget',
+        params: {
+          sessionId: 'nf-session',
+          targetInfo: {targetId: 'no-firewall-target', type: 'page'},
+          waitingForDebugger: true,
+        },
+      });
+      const started = Date.now();
+      const reply = await waitFor(() => received.parsed[1], 2000);
+      assert.deepEqual(reply, {
+        id: 17,
+        result: {targetId: 'no-firewall-target'},
+      });
+      assert.ok(
+        Date.now() - started < 4000,
+        'the reply must not wait out ATTACH_FORWARD_TIMEOUT_MS',
+      );
+    } finally {
+      ws.close();
+      await bridge.stop();
+    }
+  });
+
   it('finishes with keep: [] by default and closes the listener once', async () => {
     const fake = createFakeEgo();
     const finishes: Array<{keep: 'all' | string[]}> = [];
@@ -1023,7 +1262,7 @@ describe('ego-bridge-worker', () => {
     );
   });
 
-  it('completes with keep: "all" so a keepPage stop does not close the page', async () => {
+            it('completes with keep: "all" so a keepPage stop does not close the page', async () => {
     // Pins the mechanism F2 relies on for the keepPage policy: the space is
     // completed (page kept), and the next run reclaims that completed space
     // instead of creating a suffixed new one.

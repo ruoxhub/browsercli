@@ -99,6 +99,36 @@ const WHITELIST_REFRESH_REQUESTS = new Set([
 ]);
 
 /**
+ * The one CDP method that makes a page, and the one ego refuses outright.
+ *
+ * Every variant answers `-32000 Target.createTarget is not allowed`: with
+ * `about:blank` or a real URL, with `newWindow`, with or without a
+ * `browserContextId`, sent on the root session or on a page session. This is not
+ * the protocol gap the `Browser` domain has (a `-32601` the fallback table can
+ * answer with an empty object) — it is a permission ego withholds, so a reply the
+ * client can act on has to be synthesized from the native tab API instead.
+ *
+ * ego-browser, the shipped Node harness, never sends this method either: its
+ * `task.newPage()` goes straight to `ego.createTab("about:blank")`
+ * (`src/page-model.ts:1246`) and its `newTab()` helper to `ego.createTab(url)`
+ * (`src/driver/nav.ts:159`). This is that same route, at the CDP boundary.
+ */
+const CREATE_TARGET_METHOD = 'Target.createTarget';
+
+/**
+ * How long to wait for the new tab's `Target.attachedToTarget` to be forwarded
+ * before answering a synthesized `Target.createTarget`.
+ *
+ * Patchright resolves the reply by looking the target up in a map it fills from
+ * that attach event (`crBrowser.js:320-323`: `this._crPages.get(targetId)._page`
+ * — an unguarded lookup), so replying first is not "a bit early", it throws in
+ * the client and takes the host process with it. ego emits the attach before
+ * `createTab()` resolves, so the normal path never waits; this bound only exists
+ * so a genuinely missing attach fails as a CDP error instead of hanging.
+ */
+const ATTACH_FORWARD_TIMEOUT_MS = 5_000;
+
+/**
  * `Browser.*` methods ego does not implement, and what answering them locally
  * costs. ego has no Browser domain at all, so Patchright's own browser-level
  * calls fail with `-32601 '<method>' wasn't found` and abort whatever it was
@@ -177,6 +207,12 @@ export interface EgoNativeBindings {
     | undefined;
   getBrowserVersion?: () => unknown;
   listTabs?: () => Promise<unknown>;
+  /**
+   * The only way to open a tab. Resolves `{targetId}` (ego sometimes nests it
+   * under `.result`), and activates the new tab as a side effect. Used to answer
+   * `Target.createTarget`, which ego refuses — see `CREATE_TARGET_METHOD`.
+   */
+  createTab?: (url: string) => Promise<unknown>;
   listTaskSpaces?: () => Promise<unknown>;
   createTaskSpace?: (name: string) => Promise<unknown>;
   /**
@@ -511,6 +547,18 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
   /** one lazy refresh per burst of native events, never one per event */
   let lazyRefreshAvailable = true;
   let pendingNativeEvents = 0;
+  /**
+   * Resolvers waiting for the `Target.attachedToTarget` of a target id, keyed by
+   * that id. A synthesized `Target.createTarget` reply may only go out after the
+   * client has been told about the target — see `ATTACH_FORWARD_TIMEOUT_MS`.
+   */
+  const attachWaiters = new Map<string, () => void>();
+  /**
+   * Ids whose attach event has been broadcast, kept regardless of the firewall:
+   * `knownOwnTargetIds` only fills when the firewall is on, so reusing it here
+   * would make a firewall-less bridge wait out the timeout on every page.
+   */
+  const forwardedAttaches = new Set<string>();
 
   let server: Server | undefined;
   let guid = '';
@@ -580,6 +628,121 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
     return result;
   };
 
+  /**
+   * Resolve once the attach event for `targetId` has been broadcast, or after
+   * `ATTACH_FORWARD_TIMEOUT_MS`.
+   *
+   * The waiter is registered BEFORE the tab is created, so an attach that is
+   * forwarded first cannot be missed. Returns `true` when the event was seen:
+   * the caller must not claim success on a target the client never learned about.
+   */
+  const awaitAttachForwarded = (targetId: string): Promise<boolean> => {
+    if (forwardedAttaches.has(targetId)) return Promise.resolve(true);
+    return new Promise<boolean>(resolve => {
+      const settle = (forwarded: boolean) => {
+        attachWaiters.delete(targetId);
+        clearTimeout(timer);
+        resolve(forwarded);
+      };
+      const timer = setTimeout(() => settle(false), ATTACH_FORWARD_TIMEOUT_MS);
+      attachWaiters.set(targetId, () => settle(true));
+    });
+  };
+
+  /**
+   * Answer `Target.createTarget` from ego's native tab API.
+   *
+   * ego rejects this method outright (see `CREATE_TARGET_METHOD`), so the page is
+   * made with `ego.createTab(url)` — the same binding ego-browser's
+   * `task.newPage()` uses — and the standard `{targetId}` reply is synthesized.
+   *
+   * Two ordering rules make the synthesized reply safe for a real client:
+   *
+   *  1. The attach event must be broadcast before the reply. Patchright resolves
+   *     `page = _crPages.get(targetId)._page` with no guard, so a reply that
+   *     lands first throws a TypeError inside its message handler and kills the
+   *     host process — the failure mode that made `open_devtools` take the daemon
+   *     down. ego emits the attach before `createTab()` resolves, so this is
+   *     normally already satisfied.
+   *  2. The new target must enter the whitelist first, or the firewall drops the
+   *     very attach the client is waiting for. `refreshOwnTargets` runs against a
+   *     task-space-scoped `listTabs()`, which already reports the new tab by the
+   *     time the attach arrives.
+   */
+  const createTargetLocally = async (request: CdpMessage): Promise<void> => {
+    const {id} = request;
+    if (typeof id !== 'number') return;
+    const sessionId =
+      typeof request.sessionId === 'string' ? request.sessionId : undefined;
+    const requestedUrl = readParam(request.params, 'url');
+    // Patchright always sends `about:blank` and navigates afterwards
+    // (`crBrowser.js:321`), but the reply must still honour whatever a client
+    // asked for. An absent url is about:blank, per the CDP schema.
+    const url = asString(requestedUrl) ?? 'about:blank';
+    if (typeof ego.createTab !== 'function') {
+      replyWithError(
+        id,
+        sessionId,
+        `${CREATE_TARGET_METHOD} is not allowed by ego lite and this build exposes no ego.createTab to emulate it`,
+      );
+      log(
+        `[ego-bridge] ${CREATE_TARGET_METHOD} refused: ego.createTab is unavailable`,
+      );
+      return;
+    }
+    // The new tab is not in the whitelist yet and cannot be warmed into it — it
+    // does not exist until `createTab` runs. Its attach event is admitted by the
+    // refresh-on-unknown path in `allowTargetEvent`, which `listTabs()` already
+    // reports the tab for by then (measured on 0.6.1.13).
+    let targetId: string | undefined;
+    try {
+      const created = (await ego.createTab(url)) as
+        | {targetId?: unknown; result?: {targetId?: unknown}; error?: unknown}
+        | undefined;
+      if (created?.error !== undefined) {
+        replyWithError(id, sessionId, String(created.error));
+        log(
+          `[ego-bridge] ${CREATE_TARGET_METHOD} refused by ego: ${String(created.error)}`,
+        );
+        return;
+      }
+      // ego resolves `{targetId}` flat, but its own harness reads both shapes
+      // (`page-model.ts:687`: `result?.targetId || result?.result?.targetId`),
+      // so accept both rather than depend on one.
+      targetId =
+        asString(created?.targetId) ?? asString(created?.result?.targetId);
+    } catch (error) {
+      replyWithError(id, sessionId, toText(error));
+      log(`[ego-bridge] ${CREATE_TARGET_METHOD} failed: ${toText(error)}`);
+      return;
+    }
+    if (targetId === undefined) {
+      replyWithError(
+        id,
+        sessionId,
+        `${CREATE_TARGET_METHOD}: ego.createTab returned no targetId`,
+      );
+      log(`[ego-bridge] ${CREATE_TARGET_METHOD}: no targetId in the reply`);
+      return;
+    }
+    const attached = await awaitAttachForwarded(targetId);
+    if (!attached) {
+      replyWithError(
+        id,
+        sessionId,
+        `${CREATE_TARGET_METHOD}: target ${targetId} was created but never attached; the client cannot see it`,
+      );
+      log(
+        `[ego-bridge] ${CREATE_TARGET_METHOD}: no attach forwarded for ${targetId} after ${ATTACH_FORWARD_TIMEOUT_MS}ms`,
+      );
+      return;
+    }
+    replyWithResult(id, sessionId, {targetId});
+    log(
+      `[ego-bridge] ${CREATE_TARGET_METHOD} answered locally via ego.createTab: ${targetId}`,
+    );
+  };
+
   const replyWithResult = (
     id: unknown,
     sessionId: unknown,
@@ -606,6 +769,14 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
       void browserVersion().then(result =>
         replyWithResult(id, sessionId, result),
       );
+      return;
+    }
+    if (request.method === CREATE_TARGET_METHOD) {
+      // ego refuses this one and there is no honest empty reply (the client
+      // reads `targetId`), so it is satisfied natively instead of forwarded.
+      // Deliberately before the firewall: the target does not exist yet, so
+      // there is nothing to attribute.
+      void createTargetLocally(request);
       return;
     }
     if (typeof request.method === 'string') {
@@ -806,6 +977,40 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
   };
 
   /**
+   * Give a reply back the `sessionId` it was asked on when ego omitted it.
+   *
+   * ego routes most replies back on the session they were sent on, but its
+   * error for a refused `Target.createTarget` comes back with no `sessionId` at
+   * all. Patchright reads a reply's `sessionId` to pick the session that owns
+   * the callback (`crConnection.js`), and a reply with no id behind it on that
+   * session falls through to `assert(!object.id, ...)` in the root session —
+   * which throws inside its message handler and takes the whole host process
+   * down. That is not a hypothetical: `open_devtools` on ego killed the daemon
+   * this way. Restoring the id the client used keeps the reply on the session
+   * that is waiting for it, so the caller gets a normal CDP error instead.
+   *
+   * Inbound requests are matched to replies by id alone, so this only repairs
+   * the field; it never re-routes a frame.
+   */
+  const restoreReplySessionId = (raw: string, request: CdpMessage): string => {
+    const requested = asString(request.sessionId);
+    if (requested === undefined) return raw;
+    let frame: {sessionId?: unknown; [key: string]: unknown};
+    try {
+      frame = JSON.parse(raw) as typeof frame;
+    } catch {
+      return raw;
+    }
+    // A reply that already names a session is ego's own routing decision.
+    if (frame.sessionId !== undefined) return raw;
+    frame.sessionId = requested;
+    log(
+      `[ego-bridge] restored the request sessionId on a session-less reply to ${String(request.method)}`,
+    );
+    return JSON.stringify(frame);
+  };
+
+  /**
    * Latch the ids of a forwarded event: `detachedFromTarget` may carry only the
    * `sessionId` of the earlier attach, and `listTabs` reports target ids, so the
    * session id has to be remembered here to keep the detach forwardable.
@@ -907,6 +1112,7 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
         }
       } else {
         outgoing = filterTargetListReply(raw, answered);
+        outgoing = restoreReplySessionId(outgoing, answered);
       }
     }
     const method = asString(event.method);
@@ -915,6 +1121,15 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
       if (!(await allowTargetEvent(method, event))) return;
     }
     broadcast(outgoing);
+    // Only after the broadcast: a synthesized `Target.createTarget` may now be
+    // answered, because the client has the target the reply refers to.
+    if (method === 'Target.attachedToTarget') {
+      const targetId = asString(event.params?.targetInfo?.targetId);
+      if (targetId !== undefined) {
+        forwardedAttaches.add(targetId);
+        attachWaiters.get(targetId)?.();
+      }
+    }
   };
 
   const onNativeMessage = (message: string) => {
