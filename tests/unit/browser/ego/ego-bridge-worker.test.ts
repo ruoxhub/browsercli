@@ -2653,55 +2653,63 @@ describe('ego-bridge-worker', () => {
     }
   });
 
-  it('reclaims the callback slot when its previous owner is dead', async () => {
-    // A realm that dies without stop() (SIGKILL, an ego crash, a killed manager)
-    // leaves its callback on the shared `globalThis.ego`. Refusing on that would
-    // brick ego bridging until ego itself restarts, and tell the user to stop a
-    // session that does not exist. The advertised owner pid is what separates
-    // "someone is using ego" from "a dead realm left a function behind".
-    const dead = createFakeEgo();
-    dead.ego.onCDPMessage = () => undefined;
-    process.env.EGO_BRIDGE_OWNER_PID = '999999999'; // no such process
-    try {
-      const bridge = createEgoBridge({
-        ego: dead.ego,
-        taskSpaceName: 'unit-test',
-      });
-      const {wsEndpoint} = await bridge.start();
-      assert.match(wsEndpoint, /^ws:\/\/127\.0\.0\.1:\d+\//);
-      assert.equal(
-        process.env.EGO_BRIDGE_OWNER_PID,
-        String(process.pid),
-        'the new owner must advertise itself',
-      );
-      await bridge.stop();
-      assert.equal(
-        process.env.EGO_BRIDGE_OWNER_PID,
-        undefined,
-        'a clean stop must clear the marker so the next run is not refused',
-      );
-    } finally {
-      delete process.env.EGO_BRIDGE_OWNER_PID;
-    }
+  it('refuses to install a second callback in the same realm', async () => {
+    // `globalThis.ego` is per-run (probed: same utility pid across runs, fresh
+    // globalThis, only process.env leaks), so a stale callback from a dead realm
+    // cannot exist. What this catches is a second bridge in the SAME realm, or a
+    // host that already installed its own callbacks — overwriting either would
+    // starve its owner.
+    const fake = createFakeEgo();
+    const foreign = () => undefined;
+    fake.ego.onCDPMessage = foreign;
+    const bridge = createEgoBridge({ego: fake.ego, taskSpaceName: 'unit-test'});
+    await assert.rejects(
+      () => bridge.start(),
+      /CDP callback is already installed/,
+    );
+    assert.equal(
+      fake.ego.onCDPMessage,
+      foreign,
+      'the existing callback must be left untouched, not cleared',
+    );
+    assert.deepEqual(fake.calls, [], 'no task space may be touched');
   });
 
-  it('refuses the slot when its advertised owner is still alive', async () => {
-    const fake = createFakeEgo();
-    fake.ego.onCDPMessage = () => undefined;
-    // Our own pid is definitionally alive.
-    process.env.EGO_BRIDGE_OWNER_PID = String(process.pid);
+  it('drops a Target.getTargets reply it cannot attribute rather than forward it', async () => {
+    // A send failure clears the request bookkeeping, so a late reply can arrive
+    // with nothing behind it. That reply is the one carrying the user's tabs, so
+    // it must be dropped, not broadcast; the caller was already told the send
+    // failed.
+    const fake = createFakeEgo({
+      listTabs: async () => ({tabs: [{targetId: 'OWN-TAB'}]}),
+    });
+    const bridge = createEgoBridge({
+      ego: fake.ego,
+      taskSpaceName: 'unit-test',
+      listOwnTargetIds: () => listTabsOwnTargetIds(fake.ego),
+    });
+    const {wsEndpoint} = await bridge.start();
+    const ws = await connect(wsEndpoint);
     try {
-      const bridge = createEgoBridge({
-        ego: fake.ego,
-        taskSpaceName: 'unit-test',
+      const received = collect(ws);
+      // An unsolicited reply the bridge never asked for.
+      fake.emit({
+        id: 4242,
+        result: {
+          targetInfos: [
+            {targetId: 'USER-PRIVATE-TAB', url: 'https://mail.example.com/'},
+          ],
+        },
       });
-      await assert.rejects(
-        () => bridge.start(),
-        /already owns this ego runtime/,
+      await delay(50);
+      assert.equal(
+        received.raw.some(text => text.includes('mail.example.com')),
+        false,
+        'an unattributable reply must never reach the client',
       );
-      assert.deepEqual(fake.calls, [], 'no task space may be touched');
     } finally {
-      delete process.env.EGO_BRIDGE_OWNER_PID;
+      ws.close();
+      await bridge.stop();
     }
   });
 });

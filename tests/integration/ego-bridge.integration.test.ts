@@ -241,33 +241,34 @@ describe('ego bridge end-to-end integration', () => {
           infos.length > 0,
           'the bridge must report at least the page this test drives',
         );
-        // Identity, not URL shape: a user's own blank or new-tab page would pass a
-        // shape check, which is the exact weakness an earlier review rejected.
-        const ownIds = new Set(
+
+        // Identity, not URL shape. The old check accepted any target whose URL
+        // was empty / about:blank / chrome://new-tab-page, so a user's own blank
+        // page would have sailed through. Instead: every target the reply names
+        // must correspond to a page the manager itself exposes, and the page this
+        // test drives must be one of them.
+        const ownUrls = new Set(
           browser
             .contexts()
             .flatMap(context => context.pages())
             .map(visible => visible.url()),
         );
-        assert.ok(ownIds.size > 0, 'the page this test drives must be visible');
-        for (const info of infos) {
+        assert.ok(
+          ownUrls.size > 0,
+          'the page this test drives must be visible to the manager',
+        );
+        const listedUrls = infos.map(info => info.url ?? '');
+        for (const url of listedUrls) {
           assert.ok(
-            typeof info.targetId === 'string' && info.targetId.length > 0,
-            'every listed target must carry an id',
-          );
-          assert.ok(
-            (info.url ?? '').length === 0 ||
-              info.url === 'about:blank' ||
-              info.url === 'chrome://new-tab-page/' ||
-              (info.url ?? '').startsWith(fixture.url),
-            `a target outside this task space is enumerable through the bridge: ${info.url}`,
+            ownUrls.has(url),
+            `Target.getTargets named a target the manager does not expose: ${url}`,
           );
         }
-        // And the count must match what the page model exposes: a scoped reply
-        // cannot list targets the client cannot otherwise see.
         assert.ok(
-          infos.length >= 1,
-          'the reply must include at least the page under test',
+          listedUrls.some(
+            url => url === fixture.url || url.startsWith(fixture.url),
+          ),
+          'the page under test must appear in the reply',
         );
       } finally {
         await session.detach();

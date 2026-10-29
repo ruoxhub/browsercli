@@ -114,22 +114,17 @@ export class BrowserConfigInvariantError extends Error {
 export function assertBrowserConfigInvariants(config: {
   ego?: boolean | null;
   keepPage?: boolean | null;
-  cloak?: unknown;
-  headless?: unknown;
-  userDataDir?: unknown;
-  isolated?: unknown;
-  minimalStealth?: unknown;
-  fullStealthArgs?: unknown;
-  jsStealth?: unknown;
-  acceptInsecureCerts?: unknown;
 }): void {
-  // Only `keepPage` is checked HERE, and the launch-only flags deliberately are
-  // not. This function runs on the raw env layer as well, where `headless` and
-  // friends carry their defaults, so checking them would reject every plain
-  // `BROWSER_EGO=true`. The launch-only rule lives where the FINAL merged object
-  // exists: the CLI flag guard and `parseBrowserConnectBody`. A launch-only key
-  // written into `config.json` alongside `ego: true` is therefore still accepted
-  // at startup and ignored — a known gap, recorded rather than guessed at.
+  // Only `keepPage` is checked HERE. The launch-only flags deliberately are not:
+  // this function also runs on the raw env layer, where `headless` and friends
+  // carry their defaults, so checking them rejected every plain
+  // `BROWSER_EGO=true` (measured — the attempt was reverted).
+  //
+  // Known gaps, stated rather than implied closed: a launch-only key written in
+  // `config.json` next to `ego: true`, `BROWSER_CLOAK=true` alongside `--ego`, and
+  // `BROWSER_EGO=true` with `{cloak:true}` in an IPC body (that check reads the
+  // body, not the env) are all accepted and then ignored. Closing them needs the
+  // check somewhere that sees one already-merged, already-defaulted object.
   if (isKeepPageWithoutEgo(config)) {
     throw new BrowserConfigInvariantError(KEEP_PAGE_WITHOUT_EGO_MESSAGE);
   }
