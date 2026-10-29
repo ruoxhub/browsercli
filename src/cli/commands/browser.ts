@@ -6,6 +6,19 @@
 import {AxiError} from 'axi-sdk-js';
 import type {AxiCliCommand} from 'axi-sdk-js';
 
+/**
+ * ego 的两条「不许静默忽略」不变量与提示语来自配置层的零依赖模块
+ * （`browserInvariants.ts`）：配置合并层与 IPC 请求层用的是同一份判定，避免
+ * 三处各写一套词表后漂移。该模块不 import 任何东西，不会把 zod / patchright
+ * 拉进 CLI 进程。
+ */
+import {
+  EGO_TARGET_CONFLICT_MESSAGE,
+  getEnvFlag,
+  isEgoWithTarget,
+  isKeepPageWithoutEgo,
+  KEEP_PAGE_WITHOUT_EGO_MESSAGE,
+} from '../../config/browserInvariants.js';
 import {parseArgs} from '../args-parser.js';
 import {toAxiError} from '../errors.js';
 import {successOutput, tableOutput} from '../output.js';
@@ -200,11 +213,30 @@ function connectOptions(
     keepPage: booleanFlag(flags, 'keep-page'),
     minimalStealth: booleanFlag(flags, 'minimal-stealth'),
   };
-  // `--keep-page` 只在 ego 模式下有意义：ego 任务空间的保留策略是烘进桥接
-  // bootstrap 的一次性选项。没有选中 ego 时它既不会被使用、也不会报错，直接
-  // 拒绝（与 `--cloak` 等模式专属 flag 的处理一致：不接受"静默忽略"）。
-  if (booleans.keepPage !== undefined && booleans.ego !== true) {
-    invalid('--keep-page 只在 ego 模式下有效，请同时指定 --ego');
+  // ego 的两条不变量在这里先挡一次，用的是**生效值**（flag 优先，其次同名
+  // 环境变量），因为它们最终都会进入同一份配置：`--keep-page` 或
+  // `BROWSER_KEEP_PAGE` 在没有 ego 时不会被任何分支读取，`--ego` 与四个目标
+  // 参数则是 help 里已经声明的互斥关系。终端路径在 spawn daemon 之前就报错，
+  // 用户不会看到「连接成功但其实没生效」。合并层与 IPC 请求层另有同一守卫。
+  const effectiveEgo = booleans.ego ?? getEnvFlag('BROWSER_EGO');
+  if (
+    isKeepPageWithoutEgo({
+      ego: effectiveEgo,
+      keepPage: booleans.keepPage ?? getEnvFlag('BROWSER_KEEP_PAGE'),
+    })
+  ) {
+    invalid(KEEP_PAGE_WITHOUT_EGO_MESSAGE);
+  }
+  if (
+    isEgoWithTarget({
+      ego: effectiveEgo,
+      browserURL,
+      wsEndpoint,
+      channel,
+      executablePath,
+    })
+  ) {
+    invalid(EGO_TARGET_CONFLICT_MESSAGE);
   }
   for (const [key, value] of Object.entries(booleans)) {
     if (value !== undefined) {

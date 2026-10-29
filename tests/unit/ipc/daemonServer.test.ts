@@ -329,4 +329,36 @@ describe('daemonServer', () => {
       assert.equal(fixture.stopCalls.count, 1);
     });
   });
+
+  it('browser.connect rejects the two silent-ignore shapes as validation errors', async () => {
+    // The daemon socket is reachable without the CLI (panel, scripts), so the
+    // invariant has to hold here too — and it must surface as a validation
+    // error, not the generic BROWSER_CONNECT_FAILED wrapper that hides the cause.
+    await withFixture(async (_fixture, client) => {
+      const keepPageId = await client.request('browser.connect', {
+        body: {keepPage: true},
+      });
+      const keepPage = await client.responseFor(keepPageId);
+      const keepPageError = keepPage['error'] as {
+        code?: string;
+        message?: string;
+      };
+      assert.equal(keepPageError.code, 'VALIDATION');
+      assert.match(keepPageError.message ?? '', /keepPage/);
+      assert.match(keepPageError.message ?? '', /ego/);
+      assert.strictEqual(keepPage['result'], undefined);
+
+      const conflictId = await client.request('browser.connect', {
+        body: {ego: true, wsEndpoint: 'ws://127.0.0.1:1/x'},
+      });
+      const conflict = await client.responseFor(conflictId);
+      const conflictError = conflict['error'] as {
+        code?: string;
+        message?: string;
+      };
+      assert.equal(conflictError.code, 'BROWSER_CONFIG_CONFLICT');
+      assert.match(conflictError.message ?? '', /ego/);
+      assert.strictEqual(conflict['result'], undefined);
+    });
+  });
 });

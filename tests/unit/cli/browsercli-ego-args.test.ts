@@ -103,6 +103,95 @@ describe('browser connect --ego / --keep-page parsing', () => {
     }
   });
 
+  it('rejects the env-only BROWSER_KEEP_PAGE before spawning a daemon (I1)', async () => {
+    // The original rejection lived only in the CLI flag layer, so this exact
+    // scenario (env var, no flag) sailed through: the daemon stored keepPage,
+    // `ensureBrowser()` took the local-launch branch and never read it.
+    const saved = process.env.BROWSER_KEEP_PAGE;
+    process.env.BROWSER_KEEP_PAGE = '1';
+    try {
+      const {bodies, ctx} = recordingContext();
+      await assert.rejects(
+        async () => browserCommand(['connect'], ctx),
+        (error: unknown) => {
+          assert.ok(error instanceof AxiError);
+          assert.strictEqual(error.code, 'VALIDATION_ERROR');
+          assert.match(error.message, /keepPage/);
+          assert.match(error.message, /BROWSER_KEEP_PAGE/);
+          assert.match(error.message, /BROWSER_EGO/);
+          return true;
+        },
+      );
+      assert.deepEqual(bodies, [], 'nothing may reach the daemon');
+    } finally {
+      if (saved === undefined) delete process.env.BROWSER_KEEP_PAGE;
+      else process.env.BROWSER_KEEP_PAGE = saved;
+    }
+  });
+
+  it('accepts --keep-page when BROWSER_EGO selects the mode (I1)', async () => {
+    const saved = process.env.BROWSER_EGO;
+    process.env.BROWSER_EGO = 'true';
+    try {
+      const {bodies, ctx} = recordingContext();
+      await browserCommand(['connect', '--keep-page'], ctx);
+      assert.deepEqual(bodies, [{keepPage: true}]);
+    } finally {
+      if (saved === undefined) delete process.env.BROWSER_EGO;
+      else process.env.BROWSER_EGO = saved;
+    }
+  });
+
+  it('rejects --ego combined with each mutually exclusive target (I2)', async () => {
+    // `BROWSER_CONNECT_USAGE` lists `[... | --ego]`, i.e. ego is one of the
+    // mutually exclusive members of the target group. `ensureBrowser()` gives
+    // ego priority, so an endpoint passed alongside it was silently dropped.
+    const targetArgs = [
+      ['--browser-url', 'http://127.0.0.1:9222'],
+      ['--ws-endpoint', 'ws://127.0.0.1:1/x'],
+      ['--channel', 'stable'],
+      ['--executable-path', 'C:/browser.exe'],
+    ];
+    for (const target of targetArgs) {
+      const args = ['connect', '--ego', ...target];
+      const {bodies, ctx} = recordingContext();
+      await assert.rejects(
+        async () => browserCommand(args, ctx),
+        (error: unknown) => {
+          assert.ok(
+            error instanceof AxiError,
+            `expected an AxiError for ${args.join(' ')}`,
+          );
+          assert.strictEqual(error.code, 'VALIDATION_ERROR');
+          assert.match(error.message, /--ego/);
+          assert.match(error.message, new RegExp(target[0]));
+          return true;
+        },
+        args.join(' '),
+      );
+      assert.deepEqual(bodies, [], 'nothing may reach the daemon');
+    }
+
+    // The valid shapes still work.
+    const egoOnly = recordingContext();
+    await browserCommand(['connect', '--ego'], egoOnly.ctx);
+    assert.deepEqual(egoOnly.bodies, [{ego: true}]);
+
+    const withKeepPage = recordingContext();
+    await browserCommand(['connect', '--ego', '--keep-page'], withKeepPage.ctx);
+    assert.deepEqual(withKeepPage.bodies, [{ego: true, keepPage: true}]);
+
+    // `--ego=false` does not select the mode, so targets remain legal.
+    const disabled = recordingContext();
+    await browserCommand(
+      ['connect', '--ego=false', '--ws-endpoint', 'ws://127.0.0.1:1/x'],
+      disabled.ctx,
+    );
+    assert.deepEqual(disabled.bodies, [
+      {ego: false, wsEndpoint: 'ws://127.0.0.1:1/x'},
+    ]);
+  });
+
   it('keeps the existing non-ego surface unchanged', async () => {
     const {bodies, ctx} = recordingContext();
     await browserCommand(['connect', '--channel', 'stable', '--cloak'], ctx);

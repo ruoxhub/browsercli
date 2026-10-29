@@ -15,6 +15,11 @@
 import type {BrowserManagerConfig} from '../types/browser.js';
 import {type SourceMapConfig, SourceMapError} from '../types/sourcemap.js';
 
+import {
+  BrowserConfigInvariantError,
+  isKeepPageWithoutEgo,
+  KEEP_PAGE_WITHOUT_EGO_MESSAGE,
+} from './browserInvariants.js';
 import {getEnvBoolean, getEnvNumber, getEnvValue} from './resolver.js';
 import {getRuntimeConfigStore} from './RuntimeConfigStore.js';
 import {
@@ -94,6 +99,10 @@ export function getSourceMapConfig(): SourceMapConfig {
  * 从环境变量 + RuntimeConfigStore 获取浏览器配置
  *
  * 优先级：环境变量 > RuntimeConfigStore 中的 browser 字段
+ *
+ * 出口处强制 ego 的不变量（见 `browserInvariants.ts`）：这是 env / 文件 /
+ * store 三者唯一的合并点，`runtime.ts`、daemon 启动自动连接与 IPC
+ * `effectiveBrowserConfig()` 都从这里取配置，所以守卫放这里覆盖全部入口。
  */
 export function getBrowserManagerConfig(): BrowserManagerConfig {
   const fileConfig = getRuntimeConfigStore().get();
@@ -297,6 +306,20 @@ export function getBrowserManagerConfig(): BrowserManagerConfig {
 
   if (fileBrowser?.viewport) {
     config.viewport = fileBrowser.viewport;
+  }
+
+  // ── 不变量：ego 的附带选项不许被静默忽略 ──────────────────────────────
+  // 这里是环境变量 / 配置文件 / RuntimeConfigStore 三者唯一的合并点，也是
+  // `runtime.ts`、daemon 启动自动连接、IPC `effectiveBrowserConfig()` 唯一的
+  // 取值口，所以把守卫放这儿，所有入口（CLI flag 经 IPC body → store 合并、
+  // BROWSER_* 环境变量、config.json）一次覆盖 —— 放在 `parseBrowserConnectBody`
+  // 只挡 IPC，放在 CLI 只挡终端。
+  //
+  // 只查 `keepPage`：ego 与目标参数的互斥是**请求级**约束（同一份配置里
+  // 留着旧的 `channel` 并不矛盾，ego 模式下它只是不参与），所以那一条在 CLI
+  // 与 IPC 请求层各自校验，不在这里。
+  if (isKeepPageWithoutEgo(config)) {
+    throw new BrowserConfigInvariantError(KEEP_PAGE_WITHOUT_EGO_MESSAGE);
   }
 
   return config;

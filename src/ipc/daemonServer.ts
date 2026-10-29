@@ -13,6 +13,7 @@
 import fs from 'node:fs';
 import net from 'node:net';
 
+import {BrowserConfigInvariantError} from '../config/browserInvariants.js';
 import {getRuntimeConfigStore} from '../config/RuntimeConfigStore.js';
 import type {ToolMeta} from '../tools/tools-meta.js';
 import type {ToolRecovery} from '../utils/errors.js';
@@ -359,6 +360,9 @@ export async function startDaemonServer(
       return status;
     } catch (error) {
       if (error instanceof WorkerBusyError) throw error;
+      // 生效配置自相矛盾（如环境变量只给了 BROWSER_KEEP_PAGE）必须原样上报：
+      // 吞成 "failed to connect browser" 就又变回"用户看不出哪里错"的静默忽略。
+      if (error instanceof BrowserConfigInvariantError) throw error;
       throw Object.assign(new Error('failed to connect browser'), {
         code: 'BROWSER_CONNECT_FAILED',
       });

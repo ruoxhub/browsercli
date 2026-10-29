@@ -7,6 +7,7 @@
 import assert from 'node:assert/strict';
 import {afterEach, describe, it} from 'node:test';
 
+import {BrowserConfigInvariantError} from '../../../src/config/browserInvariants.js';
 import {resetRuntimeConfigStore} from '../../../src/config/RuntimeConfigStore.js';
 import {
   BrowserConfigRequestError,
@@ -101,6 +102,73 @@ describe('parseBrowserConnectBody', () => {
       'the shared boolean preprocessor applies, like cloak',
     );
   });
+
+  it('rejects keepPage without ego over IPC (I1)', () => {
+    // The CLI layer already rejected this, but the invariant lived *only* there:
+    // a panel or script posting `browser.connect {keepPage:true}` stored it and
+    // `ensureBrowser()` then took the local-launch branch, where `keepPage` is
+    // never read. Every entry path needs the guard, this one included.
+    for (const body of [
+      {keepPage: true},
+      {ego: false, keepPage: true},
+      {channel: 'stable', keepPage: true},
+    ]) {
+      assert.throws(
+        () => parseBrowserConnectBody(body),
+        (error: unknown) => {
+          assert.ok(
+            error instanceof BrowserConfigRequestError,
+            `expected BrowserConfigRequestError for ${JSON.stringify(body)}`,
+          );
+          assert.strictEqual(error.code, 'VALIDATION');
+          assert.match(error.message, /keepPage/);
+          assert.match(error.message, /ego/);
+          return true;
+        },
+        JSON.stringify(body),
+      );
+    }
+    // `keepPage: false` is not a request to retain anything, so it is harmless
+    // alongside a non-ego target.
+    assert.deepEqual(parseBrowserConnectBody({keepPage: false}), {
+      keepPage: false,
+    });
+  });
+
+  it('rejects ego together with each mutually exclusive target (I2)', () => {
+    // `BROWSER_CONNECT_USAGE` declares `[... | --ego]`; the four target flags and
+    // ego are one group. `ensureBrowser()` gives ego priority, so without this
+    // the explicitly supplied endpoint/channel would be silently dropped.
+    const targets: Array<Record<string, unknown>> = [
+      {browserURL: 'http://127.0.0.1:9222'},
+      {wsEndpoint: 'ws://127.0.0.1:1/x'},
+      {channel: 'stable'},
+      {executablePath: 'C:/browser.exe'},
+    ];
+    for (const target of targets) {
+      const body = {ego: true, ...target};
+      assert.throws(
+        () => parseBrowserConnectBody(body),
+        (error: unknown) => {
+          assert.ok(
+            error instanceof BrowserConfigRequestError,
+            `expected BrowserConfigRequestError for ${JSON.stringify(body)}`,
+          );
+          assert.strictEqual(error.code, 'BROWSER_CONFIG_CONFLICT');
+          assert.match(error.message, /ego/);
+          assert.match(error.message, /browser-url/);
+          assert.match(error.message, /ws-endpoint/);
+          return true;
+        },
+        JSON.stringify(body),
+      );
+    }
+    // `ego: false` does not select the mode, so the same targets stay legal.
+    assert.strictEqual(
+      parseBrowserConnectBody({ego: false, channel: 'stable'}).channel,
+      'stable',
+    );
+  });
 });
 
 describe('parseBrowserDisconnectBody', () => {
@@ -135,5 +203,28 @@ describe('effectiveBrowserConfig', () => {
     const config = effectiveBrowserConfig();
     assert.strictEqual(config.headless, true);
     assert.strictEqual(config.wsEndpoint, 'ws://runtime/devtools');
+  });
+
+  it('rejects a store that only carries keepPage (I1)', () => {
+    // `handleBrowserConnect` writes the parsed patch into the store and then
+    // reads `effectiveBrowserConfig()`. A store seeded from config.json (or a
+    // body that slipped past the request layer) must not be able to smuggle a
+    // retention policy in without ego mode.
+    resetRuntimeConfigStore({browser: {keepPage: true}});
+    assert.throws(
+      () => effectiveBrowserConfig(),
+      (error: unknown) => {
+        assert.ok(error instanceof BrowserConfigInvariantError);
+        assert.match(error.message, /keepPage/);
+        return true;
+      },
+    );
+  });
+
+  it('keeps an ego + keepPage store config usable', () => {
+    resetRuntimeConfigStore({browser: {ego: true, keepPage: true}});
+    const config = effectiveBrowserConfig();
+    assert.strictEqual(config.ego, true);
+    assert.strictEqual(config.keepPage, true);
   });
 });

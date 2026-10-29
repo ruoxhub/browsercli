@@ -10,6 +10,12 @@
  * 行为与下线前的 HTTP 路由版本一致。
  */
 
+import {
+  EGO_TARGET_CONFLICT_MESSAGE,
+  isEgoWithTarget,
+  isKeepPageWithoutEgo,
+  KEEP_PAGE_WITHOUT_EGO_MESSAGE,
+} from '../config/browserInvariants.js';
 import {getRuntimeConfigStore} from '../config/RuntimeConfigStore.js';
 import {type BrowserConfig, BrowserConfigSchema} from '../config/schema.js';
 import {getBrowserManagerConfig} from '../config/servicesConfig.js';
@@ -104,6 +110,22 @@ export function parseBrowserConnectBody(body: unknown): BrowserConfig {
     throw new BrowserConfigRequestError(
       'VALIDATION',
       'executablePath must not be empty',
+    );
+  }
+  // ego 的两条不变量在请求层也要挡：IPC 不只从本 CLI 进来，面板/脚本都能直接
+  // 发 `browser.connect`。合并层（`getBrowserManagerConfig`）另有同一守卫兜住
+  // 环境变量与配置文件，两层都必要 —— 请求层给出的是「你这次请求写错了」，
+  // 合并层给出的是「生效配置自相矛盾」。
+  if (isEgoWithTarget(parsed.data)) {
+    throw new BrowserConfigRequestError(
+      'BROWSER_CONFIG_CONFLICT',
+      EGO_TARGET_CONFLICT_MESSAGE,
+    );
+  }
+  if (isKeepPageWithoutEgo(parsed.data)) {
+    throw new BrowserConfigRequestError(
+      'VALIDATION',
+      KEEP_PAGE_WITHOUT_EGO_MESSAGE,
     );
   }
 
