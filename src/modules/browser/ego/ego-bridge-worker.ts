@@ -397,6 +397,9 @@ function serveWebSocket(
   };
 }
 
+/** How this run entered its task space; only `'created'` licenses destroying it. */
+type SpaceOrigin = 'created' | 'reused' | 'reclaimed';
+
 export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
   const ego = options.ego;
   const log = options.log ?? (() => undefined);
@@ -438,11 +441,11 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
   /** `enterTaskSpace()` succeeded, so the cleanup policy has a space to release */
   let spaceEntered = false;
   /**
-   * The entered space is one this bridge created in an *earlier* run and
-   * reclaimed now. Its tabs are the user's retained scene, so this run must not
-   * destroy them: the retention decision was made by the run that created it.
+   * How this run entered its task space — the one thing that licenses
+   * destroying it. A single value rather than a pair of flags, so the retention
+   * decision in `finishTask` cannot be re-derived as a disjunction of exceptions.
    */
-  let spaceReclaimed = false;
+  let spaceOrigin: SpaceOrigin | undefined;
 
   const broadcast = (text: string) => {
     for (const client of clients) client.send(text);
@@ -712,7 +715,7 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
     if (finished) return;
     // Latched before the guards below run. That is only safe because every caller
     // waits for a pending `start()` first (`stop()` awaits `started`; the failed
-    // start path is already inside `start`), so `spaceEntered`/`spaceReclaimed`
+    // start path is already inside `start`), so `spaceEntered`/`spaceOrigin`
     // are settled by the time this latches. A third caller that skipped that
     // await would latch `finished` against a half-visited space and the cleanup
     // would silently never run.
@@ -725,14 +728,15 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
       log('[ego-bridge] no task space entered; skipping cleanup');
       return;
     }
-    // A reclaimed space was created by an earlier run, so its tabs are that
-    // run's retained scene and this run's `keepPage` is not a decision about
-    // them: `closeTaskSpace()` ("removes the task-owned browser state") would
-    // destroy exactly what `--keep-page` exists to preserve. Detach instead.
-    const retain = keepPage || spaceReclaimed;
-    if (spaceReclaimed && !keepPage) {
+    // One invariant, no exceptions: a run may only destroy a task space it
+    // CREATED in that same run; any space it merely entered (reused or
+    // reclaimed) is detached with `completeTaskSpace` ("removes agent task state
+    // while leaving the Space open") and never `closeTaskSpace` ("removes the
+    // task-owned browser state", i.e. the tabs — which would be someone else's).
+    const retain = keepPage || spaceOrigin !== 'created';
+    if (retain && !keepPage) {
       log(
-        '[ego-bridge] reclaimed space is completed, not closed: its tabs predate this run',
+        `[ego-bridge] ${String(spaceOrigin)} space is completed, not closed: this run did not create it`,
       );
     }
     const keep: 'all' | string[] = retain ? 'all' : [];
@@ -873,11 +877,12 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
    * `start()` rejects instead of printing a ready line for a bridge whose every
    * command would fail with `EGO_TASK_SPACE_NOT_SELECTED`.
    *
-   * `reclaimed` reports whether the entered space is one of this bridge's own
-   * leftovers rather than one this run created: its tabs predate this run, so
-   * `finishTask()` must not close it (see the decision there).
+   * `origin` reports how the space was entered — created by this run, reused
+   * because an agent already owned it, or reclaimed from one of this bridge's
+   * own leftovers. `finishTask()` destroys only the `'created'` case; the other
+   * two are detached (see the invariant there).
    */
-  const enterTaskSpace = async (): Promise<{reclaimed: boolean}> => {
+  const enterTaskSpace = async (): Promise<{origin: SpaceOrigin}> => {
     if (
       typeof ego.createTaskSpace !== 'function' ||
       typeof ego.useTaskSpace !== 'function'
@@ -898,7 +903,7 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
       if (existing !== undefined) {
         ego.useTaskSpace(existing);
         log(`[ego-bridge] reusing task space ${name} (${existing})`);
-        return {reclaimed: false};
+        return {origin: 'reused'};
       }
       const leftovers = reclaimable.get(name);
       // A reclaimable name is never user-owned; `createdBy` is what decides, so
@@ -915,7 +920,7 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
           );
         }
         for (const id of leftovers) {
-          if (await reclaimTaskSpace(name, id)) return {reclaimed: true};
+          if (await reclaimTaskSpace(name, id)) return {origin: 'reclaimed'};
         }
         continue;
       }
@@ -945,7 +950,7 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
         }
         ego.useTaskSpace(id);
         log(`[ego-bridge] created task space ${name} (${id})`);
-        return {reclaimed: false};
+        return {origin: 'created'};
       }
       if (space.error_code !== NAME_IN_USE) {
         throw new Error(
@@ -1064,20 +1069,20 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
     started = (async () => {
       try {
         const entry = await enterTaskSpace();
-        // `spaceEntered`/`spaceReclaimed` are set before the await below so the
+        // `spaceEntered`/`spaceOrigin` are set before the await below so the
         // failure path can release the space; that ordering is safe only because
         // `stop()` awaits this pending `start()` before running the cleanup
         // policy, so a concurrent stop cannot read a half-initialised state. A
         // third caller must keep awaiting `started` too.
         spaceEntered = true;
-        spaceReclaimed = entry.reclaimed;
+        spaceOrigin = entry.origin;
         abortIfStopping();
         await refreshOwnTargets(true);
         // I2: a reclaimed space hands the client every tab the user left in the
         // retained scene. The fence did not disappear (the tabs are inside this
         // space, and `createdBy: 'agent'` says the bridge owns the space), but its
         // boundary moved, so say so where a user reading diagnostics will see it.
-        if (spaceReclaimed) {
+        if (spaceOrigin === 'reclaimed') {
           const retained = ownTargetIds?.size ?? 0;
           if (retained > 0) {
             log(

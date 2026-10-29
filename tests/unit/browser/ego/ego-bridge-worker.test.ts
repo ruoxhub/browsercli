@@ -1731,6 +1731,70 @@ describe('ego-bridge-worker', () => {
     assert.deepEqual(fake.calls, ['completeTaskSpace']);
   });
 
+  it('completes a REUSED space on a plain run, because this run did not create it (2g)', async () => {
+    // The guard for the whole invariant, and the cell `keepPage || spaceReclaimed`
+    // got wrong: an agent-owned space an earlier run left behind (it died before
+    // its cleanup, so `finishTask` never ran and the space is still `agent`) is
+    // only REUSED here. Its tabs are not this run's work, so closing it would
+    // destroy the same data class the reclaimed case destroys. Narrowing the rule
+    // back to `keepPage || spaceReclaimed` flips this test to `closeTaskSpace`.
+    const base = 'browsercli-testhash';
+    const fake = createFakeEgo({
+      listTaskSpaces: async () => ({
+        taskSpaces: [
+          {id: 7, name: base, createdBy: 'agent', ownership: 'agent'},
+        ],
+      }),
+      claimTaskSpace: async () => {
+        throw new Error(
+          'a space the agent already owns is reused, not claimed',
+        );
+      },
+      createTaskSpace: async () => {
+        throw new Error('the existing space must be reused, not recreated');
+      },
+    });
+    const logs: string[] = [];
+    const bridge = createEgoBridge({
+      ego: fake.ego,
+      taskSpaceName: base,
+      log: line => logs.push(line),
+    });
+    await bridge.start();
+    await bridge.stop();
+    assert.deepEqual(
+      fake.calls,
+      ['completeTaskSpace'],
+      'a reused space must be detached, never closed',
+    );
+    assert.ok(
+      logs.some(line => /reused space is completed, not closed/.test(line)),
+      `expected an explicit retention log, got ${JSON.stringify(logs)}`,
+    );
+  });
+
+  it('completes a REUSED space when keepPage is set too (2g)', async () => {
+    const base = 'browsercli-testhash';
+    const fake = createFakeEgo({
+      listTaskSpaces: async () => ({
+        taskSpaces: [
+          {id: 7, name: base, createdBy: 'agent', ownership: 'agent'},
+        ],
+      }),
+      createTaskSpace: async () => {
+        throw new Error('the existing space must be reused, not recreated');
+      },
+    });
+    const bridge = createEgoBridge({
+      ego: fake.ego,
+      taskSpaceName: base,
+      keepPage: true,
+    });
+    await bridge.start();
+    await bridge.stop();
+    assert.deepEqual(fake.calls, ['completeTaskSpace']);
+  });
+
   it('reports the retained tabs a reclaim adds to the whitelist, and still drops foreign ones (I2)', async () => {
     // Reclaim widens the fence to the whole retained space: right per the
     // `createdBy: 'agent'` contract, but a boundary that moved has to be visible.
