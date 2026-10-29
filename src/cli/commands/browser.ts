@@ -23,6 +23,7 @@ import {
   KEEP_PAGE_WITHOUT_EGO_MESSAGE,
   PROFILE_WITHOUT_EGO_MESSAGE,
 } from '../../config/browserInvariants.js';
+import {queryEgoSpaces} from '../../modules/browser/ego/ego-spaces.js';
 import {parseArgs} from '../args-parser.js';
 import {toAxiError} from '../errors.js';
 import {successOutput, tableOutput} from '../output.js';
@@ -282,6 +283,90 @@ function connectOptions(
   return options;
 }
 
+const SPACE_FLAGS = new Set(['json']);
+
+/**
+ * `browser space list` — show ego's task spaces and profiles.
+ *
+ * Answers the question `--profile` raises ("which id do I pass?") without
+ * requiring the user to read ego's UI. Runs locally against ego rather than
+ * through the daemon, because it must also work when no browser is connected.
+ */
+async function runSpaceCommand(
+  rest: string[],
+  flags: Record<string, string | boolean>,
+  ctx: WorkerContext | undefined,
+) {
+  const sub = rest[0];
+  if (rest.length !== 1 || sub !== 'list') {
+    invalid('space 的子命令只有 list（如 browsercli browser space list）');
+  }
+  assertFlags(flags, SPACE_FLAGS);
+  const json = booleanFlag(flags, 'json') ?? false;
+
+  let snapshot;
+  try {
+    snapshot = await queryEgoSpaces();
+  } catch (error) {
+    throw toAxiError(error, 'BROWSER_ERROR');
+  }
+
+  const spaces = snapshot.spaces;
+  const profiles = snapshot.profiles;
+  const currentProfile = profiles.find(profile => profile.isDefault);
+
+  const result = {
+    command: 'browser',
+    action: 'space',
+    subaction: 'list',
+    spaces: spaces.map(space => ({
+      id: space.id,
+      name: space.name ?? '',
+      ownership: space.ownership ?? 'unknown',
+      createdBy: space.createdBy ?? 'unknown',
+      profileId: space.profileId ?? '',
+      profileName: space.profileName ?? '',
+    })),
+    profiles: profiles.map(profile => ({
+      id: profile.id,
+      name: profile.name,
+      isDefault: profile.isDefault,
+    })),
+    ...(currentProfile === undefined
+      ? {}
+      : {defaultProfileId: currentProfile.id}),
+  };
+  if (json) return successOutput(result, ctx?.session);
+
+  // Human table: the profile columns are what `--profile` consumes, so they are
+  // shown, and the default profile is marked where it appears.
+  const rows = spaces.map(space => [
+    String(space.id),
+    space.name === '' ? '(未命名)' : space.name,
+    space.ownership ?? 'unknown',
+    space.profileId === undefined || space.profileId === ''
+      ? '(未知)'
+      : `${space.profileId}${space.profileName ? ` / ${space.profileName}` : ''}`,
+  ]);
+  const profileRows = profiles.map(profile => [
+    profile.id,
+    profile.name,
+    profile.isDefault ? '是（--profile 省略时使用）' : '',
+  ]);
+
+  return {
+    ...tableOutput(['ID', '名称', '归属', 'Profile'], rows),
+    profiles: profileRows,
+    profileHeaders: ['Profile ID', '名称', '默认'],
+    ...(currentProfile === undefined
+      ? {}
+      : {
+          hint: `新建任务空间默认使用 ${currentProfile.id}；用 --profile <id> 指定别的`,
+        }),
+    ...result,
+  };
+}
+
 function renderBrowserStatus(
   action: 'connect' | 'disconnect' | 'status',
   state: BrowserConnectionStatus,
@@ -310,11 +395,19 @@ export const browserCommand: AxiCliCommand<WorkerContext> = async (
 ) => {
   const parsed = parseArgs(args);
   const action = parsed.positionals[0];
+  // `space list` is a read-only question about ego's own state (which task
+  // spaces and profiles exist), not an operation on a browser connection, so it
+  // is dispatched before anything touches the daemon.
+  if (action === 'space') {
+    return runSpaceCommand(parsed.positionals.slice(1), parsed.flags, ctx);
+  }
   if (
     parsed.positionals.length !== 1 ||
     !['connect', 'disconnect', 'status'].includes(action)
   ) {
-    invalid('浏览器动作必须是 connect、disconnect 或 status');
+    invalid(
+      '浏览器动作必须是 connect、disconnect、status 或 space（如 space list）',
+    );
   }
   const typedAction = action as 'connect' | 'disconnect' | 'status';
   assertFlags(

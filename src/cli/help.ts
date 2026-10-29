@@ -150,6 +150,21 @@ export function generateCommandHelp(
         '',
       ].join('\n');
     }
+    if (subCommand === 'space') {
+      return [
+        '',
+        '  Usage: browsercli browser space list [--json]',
+        '',
+        '  列出 ego 里的任务空间与可用 Profile（不需要已连接浏览器）',
+        '',
+        '  输出里的 Profile ID 就是 browser connect --ego --profile <id> 的取值；',
+        '  标记为默认的那个在不指定 --profile 时使用。',
+        '',
+        '  Options:',
+        '    --json                         以 JSON 格式输出结果',
+        '',
+      ].join('\n');
+    }
   }
 
   const helpMap: Record<
@@ -166,11 +181,13 @@ export function generateCommandHelp(
       ].join('\n         '),
     },
     browser: {
-      description: '连接、断开或查看 Worker 浏览器状态',
+      description:
+        '连接、断开或查看 Worker 浏览器状态，或列出 ego 任务空间与 Profile',
       usage: [
         BROWSER_CONNECT_USAGE,
         'browsercli browser disconnect [--force] [--json]',
         'browsercli browser status [--json]',
+        'browsercli browser space list [--json]',
       ].join('\n         '),
       options: BROWSER_CONNECT_OPTIONS,
     },
