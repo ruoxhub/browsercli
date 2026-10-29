@@ -14,7 +14,6 @@ import fs from 'node:fs';
 import net from 'node:net';
 
 import {BrowserConfigInvariantError} from '../config/browserInvariants.js';
-import {getRuntimeConfigStore} from '../config/RuntimeConfigStore.js';
 import type {ToolMeta} from '../tools/tools-meta.js';
 import type {ToolRecovery} from '../utils/errors.js';
 import {
@@ -24,6 +23,7 @@ import {
 } from '../worker/BrowserConnectionManager.js';
 import {
   BrowserConfigRequestError,
+  candidateBrowserConfig,
   effectiveBrowserConfig,
   parseBrowserConnectBody,
   parseBrowserDisconnectBody,
@@ -352,8 +352,14 @@ export async function startDaemonServer(
     }
     rejectIfBusy('browser', getActiveJob());
     try {
-      getRuntimeConfigStore().update({browser: patch});
-      const config = effectiveBrowserConfig();
+      // 先算候选、校验，再提交（B1）。`RuntimeConfigStore.update()` 深合并
+      // `browser`，所以上一次请求留下的字段会活到这一次：两个各自合法的请求
+      // `connect --ego --keep-page` → `connect --ego=false` 会让 store 停在
+      // `{ego:false, keepPage:true}`。若先提交再校验，那条不变量会抛在这里，
+      // store 却已经脏了 —— 之后**每个** `browser.status` / `browser.disconnect`
+      // 都会跟着抛，daemon 被永久卡死。校验放在写入之前，被拒绝的请求不留痕迹。
+      const {commit, config} = candidateBrowserConfig(patch);
+      commit();
       await connectBrowser(deps.contextProvider, config, {force});
       const status = getBrowserConnectionStatus(deps.contextProvider, config);
       deps.wsHub.broadcast('worker.status', {browser: status});
@@ -393,6 +399,10 @@ export async function startDaemonServer(
       return status;
     } catch (error) {
       if (error instanceof WorkerBusyError) throw error;
+      // 与 `handleBrowserConnect` 同一条理由：生效配置自相矛盾时，把
+      // BrowserConfigInvariantError 折成 BROWSER_DISCONNECT_FAILED 就等于把
+      // 唯一的诊断信息换成一句"断开浏览器失败"，用户无从知道该改哪个配置。
+      if (error instanceof BrowserConfigInvariantError) throw error;
       throw Object.assign(new Error('failed to disconnect browser'), {
         code: 'BROWSER_DISCONNECT_FAILED',
       });

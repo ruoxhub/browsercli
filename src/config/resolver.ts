@@ -22,6 +22,7 @@ import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+import {parseEnvBoolean} from './browserInvariants.js';
 import {
   RUNTIME_DIR_NAME,
   USER_CONFIG_DIR_NAME,
@@ -170,6 +171,9 @@ export function getEnvNumber(
  *
  * 支持 'true' / '1' / 'yes' / 'on' 为 true，'false' / '0' / 'no' / 'off' 为 false
  *
+ * 词表与解析逻辑来自 `browserInvariants.parseEnvBoolean`（CLI 也要读同一批
+ * 布尔环境变量，但不能引入本模块的依赖图）—— 只此一份，不会漂移。
+ *
  * @param key 环境变量名
  * @param defaultValue 默认值
  * @returns 解析后的布尔值或默认值
@@ -178,11 +182,7 @@ export function getEnvBoolean(
   key: string,
   defaultValue?: boolean,
 ): boolean | undefined {
-  const value = process.env[key]?.toLowerCase().trim();
-  if (value === undefined || value === '') return defaultValue;
-  if (['true', '1', 'yes', 'on'].includes(value)) return true;
-  if (['false', '0', 'no', 'off'].includes(value)) return false;
-  return defaultValue;
+  return parseEnvBoolean(process.env[key]) ?? defaultValue;
 }
 
 /** GlobalConfig keys that must be coerced to boolean when read from env. */

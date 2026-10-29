@@ -72,16 +72,60 @@ export class BrowserConfigInvariantError extends Error {
 }
 
 /**
- * 读布尔环境变量：`true/1/yes/on` → true，`false/0/no/off` → false，其余（含
- * 未设置、空串、无法识别）→ undefined。
- *
- * 词表与 `config/resolver.ts::getEnvBoolean` 一致（后者只是再加一层 `?? default`）；
- * 单列在此是为了让 CLI 能读这两个环境变量而不引入 resolver 的依赖图。
+ * 对**生效配置**断言不变量：出口处只调这一个函数，别处不再各写一遍判定。
+ * 零依赖，CLI 与 `worker/browserRequests` 都能安全 import。
  */
-export function getEnvFlag(key: string): boolean | undefined {
-  const value = process.env[key]?.toLowerCase().trim();
-  if (value === undefined || value === '') return undefined;
-  if (['true', '1', 'yes', 'on'].includes(value)) return true;
-  if (['false', '0', 'no', 'off'].includes(value)) return false;
+export function assertBrowserConfigInvariants(config: {
+  ego?: boolean | null;
+  keepPage?: boolean | null;
+}): void {
+  if (isKeepPageWithoutEgo(config)) {
+    throw new BrowserConfigInvariantError(KEEP_PAGE_WITHOUT_EGO_MESSAGE);
+  }
+}
+
+/** 环境变量布尔真值词表 —— 唯一来源，`resolver.getEnvBoolean` 也用这一份。 */
+export const ENV_TRUE_VALUES: readonly string[] = ['true', '1', 'yes', 'on'];
+/** 环境变量布尔假值词表 —— 唯一来源。 */
+export const ENV_FALSE_VALUES: readonly string[] = ['false', '0', 'no', 'off'];
+
+/**
+ * 解析布尔环境变量值：`true/1/yes/on` → true，`false/0/no/off` → false，其余
+ * （含 undefined、空串、无法识别）→ undefined。
+ *
+ * `config/resolver.ts::getEnvBoolean` 只是在本函数之上加一层 `?? default`，
+ * 词表因此只有一份、不会漂移。单列在此是为了让 CLI 能读这两个环境变量而不
+ * 引入 resolver 的依赖图。
+ */
+export function parseEnvBoolean(
+  value: string | undefined,
+): boolean | undefined {
+  const normalized = value?.toLowerCase().trim();
+  if (normalized === undefined || normalized === '') return undefined;
+  if (ENV_TRUE_VALUES.includes(normalized)) return true;
+  if (ENV_FALSE_VALUES.includes(normalized)) return false;
   return undefined;
+}
+
+/** 读布尔环境变量：`parseEnvBoolean(process.env[key])` 的便捷形式。 */
+export function getEnvFlag(key: string): boolean | undefined {
+  return parseEnvBoolean(process.env[key]);
+}
+
+/**
+ * 给生效配置的不变量错误补上「该改哪儿」：配置文件路径 + 环境变量名。
+ *
+ * `KEEP_PAGE_WITHOUT_EGO_MESSAGE` 只点出两个 key，不说是哪份文件 —— daemon 启动
+ * 时它会让进程直接退出，用户只看到 "启动失败" 却不知道该编辑什么。路径由调用方
+ * 传入（本模块是零依赖的，不能 import resolver 去取 `getUserConfigPath()`）。
+ */
+export function withConfigFileHint(
+  error: BrowserConfigInvariantError,
+  paths: {configFile: string; runtimeFile: string},
+): BrowserConfigInvariantError {
+  return new BrowserConfigInvariantError(
+    `${error.message}\n请修改配置文件 ${paths.configFile} 或 ${paths.runtimeFile}` +
+      `（删掉 browser.keepPage，或补上 "ego": true）；` +
+      '由环境变量引入时改 BROWSER_KEEP_PAGE / BROWSER_EGO。',
+  );
 }

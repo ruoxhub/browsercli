@@ -8,9 +8,13 @@ import assert from 'node:assert/strict';
 import {afterEach, describe, it} from 'node:test';
 
 import {BrowserConfigInvariantError} from '../../../src/config/browserInvariants.js';
-import {resetRuntimeConfigStore} from '../../../src/config/RuntimeConfigStore.js';
+import {
+  getRuntimeConfigStore,
+  resetRuntimeConfigStore,
+} from '../../../src/config/RuntimeConfigStore.js';
 import {
   BrowserConfigRequestError,
+  candidateBrowserConfig,
   effectiveBrowserConfig,
   parseBrowserConnectBody,
   parseBrowserDisconnectBody,
@@ -226,5 +230,91 @@ describe('effectiveBrowserConfig', () => {
     const config = effectiveBrowserConfig();
     assert.strictEqual(config.ego, true);
     assert.strictEqual(config.keepPage, true);
+  });
+
+  it('applies the invariant to the config after the store overlay (B2)', () => {
+    // The guard inside `getBrowserManagerConfig()` sees `ego: true` from the env
+    // and lets this through; the store overlay then flips it to `ego: false` and
+    // leaves `keepPage: true`, i.e. exactly the combination the guard exists to
+    // reject. `ensureBrowser()` would take the local-launch branch and never read
+    // `keepPage` — the silent ignore, one layer below the fixed one.
+    process.env.BROWSER_EGO = 'true';
+    try {
+      resetRuntimeConfigStore({browser: {ego: false, keepPage: true}});
+      assert.throws(
+        () => effectiveBrowserConfig(),
+        (error: unknown) => {
+          assert.ok(error instanceof BrowserConfigInvariantError);
+          assert.match(error.message, /keepPage/);
+          return true;
+        },
+      );
+    } finally {
+      delete process.env.BROWSER_EGO;
+      resetRuntimeConfigStore({});
+    }
+  });
+
+  it('rejects the same shape through the connect candidate (B1/B2)', () => {
+    // Same overlay, reached the way the daemon reaches it: a connect patch that
+    // flips ego off while an earlier request left keepPage in the store.
+    process.env.BROWSER_EGO = 'true';
+    try {
+      resetRuntimeConfigStore({browser: {ego: true, keepPage: true}});
+      assert.throws(
+        () => candidateBrowserConfig({ego: false}),
+        BrowserConfigInvariantError,
+      );
+      // ...and the store is untouched by the rejected candidate.
+      assert.deepStrictEqual(getRuntimeConfigStore().get().browser, {
+        ego: true,
+        keepPage: true,
+      });
+    } finally {
+      delete process.env.BROWSER_EGO;
+      resetRuntimeConfigStore({});
+    }
+  });
+});
+
+describe('parseBrowserConnectBody with BROWSER_EGO in the environment (B3)', () => {
+  afterEach(() => {
+    delete process.env.BROWSER_EGO;
+  });
+
+  it('accepts {keepPage:true} when the env selects ego', () => {
+    // `browsercli browser connect --keep-page` passes the CLI's env-aware check
+    // and sends exactly `{keepPage:true}`; the daemon inherits BROWSER_EGO
+    // (spawned with no `env` option), so the body alone is not the whole story.
+    process.env.BROWSER_EGO = 'true';
+    assert.deepStrictEqual(parseBrowserConnectBody({keepPage: true}), {
+      keepPage: true,
+    });
+  });
+
+  it('still rejects {keepPage:true} when the env does not select ego', () => {
+    // The body-only reading must not become a blanket allowance: without the env
+    // the pair is still the silent no-op the invariant forbids.
+    assert.throws(
+      () => parseBrowserConnectBody({keepPage: true}),
+      (error: unknown) =>
+        error instanceof BrowserConfigRequestError &&
+        error.code === 'VALIDATION',
+    );
+    process.env.BROWSER_EGO = 'false';
+    assert.throws(() => parseBrowserConnectBody({keepPage: true}));
+  });
+
+  it('lets an explicit body ego:false override the env (B3 corollary)', () => {
+    // An explicit false in the request is the more specific signal: the merged
+    // store value wins over env in `effectiveBrowserConfig()`, so the pair is
+    // rejected here rather than left to fail after the write.
+    process.env.BROWSER_EGO = 'true';
+    assert.throws(
+      () => parseBrowserConnectBody({ego: false, keepPage: true}),
+      (error: unknown) =>
+        error instanceof BrowserConfigRequestError &&
+        error.code === 'VALIDATION',
+    );
   });
 });

@@ -6,8 +6,12 @@
 
 import assert from 'node:assert/strict';
 import net from 'node:net';
-import {describe, it} from 'node:test';
+import {describe, it, mock} from 'node:test';
 
+import {
+  getRuntimeConfigStore,
+  resetRuntimeConfigStore,
+} from '../../../src/config/RuntimeConfigStore.js';
 import {
   startDaemonServer,
   type DaemonDeps,
@@ -20,6 +24,7 @@ import {
   SocketConnection,
   type DaemonMessage,
 } from '../../../src/ipc/socketConnection.js';
+import {BrowserManager} from '../../../src/modules/browser/index.js';
 import type {ToolMeta} from '../../../src/tools/tools-meta.js';
 import {JobStore} from '../../../src/worker/JobStore.js';
 
@@ -118,6 +123,68 @@ interface Fixture {
   stopCalls: {count: number};
 }
 
+/**
+ * A contextProvider that satisfies `connectBrowser()` without touching a browser.
+ *
+ * `connectBrowser()` only ever calls these methods, so a plain object is enough.
+ * `isBrowserConnected()` reports whatever manager `connectBrowser()` installed, so
+ * the idempotent-reuse fast path never short-circuits the connect under test while
+ * `browser.status` still sees the resulting mode.
+ */
+function createStubContextProvider(): DaemonDeps['contextProvider'] {
+  let manager: {getConfig: () => unknown; isConnected: () => boolean} | null =
+    null;
+  return {
+    isBrowserConnected: () => manager?.isConnected() === true,
+    getBrowser: () => null,
+    getBrowserManager: () => manager,
+    getContext: () => ({pages: () => []}),
+    setBrowser: () => undefined,
+    setBrowserManager: (next: typeof manager) => {
+      manager = next;
+    },
+    setContext: () => undefined,
+    clearContext: () => {
+      manager = null;
+    },
+    init: async () => undefined,
+  } as unknown as DaemonDeps['contextProvider'];
+}
+
+/**
+ * Booby-trap the browser lifecycle: a real `ensureBrowser()` would launch Chrome.
+ * Every `browser.connect` test goes through these two statics.
+ */
+function stubBrowserManager(): {restore: () => void; configs: unknown[]} {
+  const configs: unknown[] = [];
+  const fakeBrowser = {
+    isConnected: () => true,
+    contexts: () => [{pages: () => []}],
+  };
+  const reset = mock.method(BrowserManager, 'resetInstance', async () => true);
+  const getInstance = mock.method(
+    BrowserManager,
+    'getInstance',
+    (config: unknown) => {
+      configs.push(config);
+      return {
+        ensureBrowser: async () => fakeBrowser,
+        getContext: () => fakeBrowser.contexts()[0],
+        getBrowser: () => fakeBrowser,
+        getConfig: () => config,
+        isConnected: () => true,
+      };
+    },
+  );
+  return {
+    configs,
+    restore: () => {
+      reset.mock.restore();
+      getInstance.mock.restore();
+    },
+  };
+}
+
 async function startFixture(): Promise<Fixture> {
   const adapter = createStubAdapter();
   const jobStore = new JobStore();
@@ -127,7 +194,7 @@ async function startFixture(): Promise<Fixture> {
     version: '9.9.9',
     startedAt: Date.now(),
     runtime: {contextProvider: {}, browserManager: {}},
-    contextProvider: {},
+    contextProvider: createStubContextProvider(),
     toolAdapter: adapter,
     jobStore,
     wsHub: new WsHub(),
@@ -360,5 +427,139 @@ describe('daemonServer', () => {
       assert.match(conflictError.message ?? '', /ego/);
       assert.strictEqual(conflict['result'], undefined);
     });
+  });
+
+  it('a rejected connect leaves no trace: later status/disconnect still work (B1)', async () => {
+    // Two individually-legal requests leave the store at {ego:false, keepPage:true}:
+    // `update()` deep-merges `browser`, so the `keepPage` from request one survives
+    // request two. Before the fix the guard threw *after* the commit, and from then
+    // on every browser.status / browser.disconnect threw too — a daemon-wide wedge
+    // that no client could recover from without a restart.
+    const stub = stubBrowserManager();
+    const savedEgo = process.env.BROWSER_EGO;
+    delete process.env.BROWSER_EGO;
+    resetRuntimeConfigStore({});
+    try {
+      await withFixture(async (_fixture, client) => {
+        const firstId = await client.request('browser.connect', {
+          body: {ego: true, keepPage: true},
+        });
+        const first = await client.responseFor(firstId);
+        assert.deepStrictEqual(
+          first['error'],
+          undefined,
+          'the ego + keepPage connect must be accepted',
+        );
+
+        const secondId = await client.request('browser.connect', {
+          body: {ego: false},
+        });
+        const second = await client.responseFor(secondId);
+        const secondError = second['error'] as {
+          code?: string;
+          message?: string;
+        };
+        // The merged pair is self-contradictory even though each body was legal.
+        assert.equal(secondError.code, 'VALIDATION');
+        assert.match(secondError.message ?? '', /keepPage/);
+
+        // THE REGRESSION CHECK: the rejection must not stick. Both of these read
+        // the effective config, which is what used to throw forever.
+        const statusId = await client.request('browser.status');
+        const status = await client.responseFor(statusId);
+        assert.deepStrictEqual(
+          status['error'],
+          undefined,
+          'browser.status must keep working after a rejected connect',
+        );
+
+        const disconnectId = await client.request('browser.disconnect', {
+          body: {},
+        });
+        const disconnect = await client.responseFor(disconnectId);
+        assert.deepStrictEqual(
+          disconnect['error'],
+          undefined,
+          'browser.disconnect must keep working after a rejected connect',
+        );
+
+        // ...and the rejected request really left nothing behind.
+        const stored = getRuntimeConfigStore().get().browser ?? {};
+        assert.strictEqual(
+          stored.keepPage,
+          true,
+          'request one committed what it was allowed to',
+        );
+        assert.strictEqual(
+          stored.ego,
+          true,
+          'the rejected ego:false must not have been written',
+        );
+      });
+    } finally {
+      stub.restore();
+      if (savedEgo === undefined) delete process.env.BROWSER_EGO;
+      else process.env.BROWSER_EGO = savedEgo;
+      resetRuntimeConfigStore({});
+    }
+  });
+
+  it('accepts `connect --keep-page` when BROWSER_EGO supplies the mode (B3)', async () => {
+    // The exact daemon-side path of `BROWSER_EGO=true browsercli browser connect
+    // --keep-page`: the CLI is env-aware and sends only `{keepPage:true}`, and the
+    // daemon inherits BROWSER_EGO (spawnDaemon passes no `env` option). A body-only
+    // request-layer check rejected this legal request; the CLI test could not see
+    // it because it uses a fake daemon.
+    const stub = stubBrowserManager();
+    const savedEgo = process.env.BROWSER_EGO;
+    process.env.BROWSER_EGO = 'true';
+    resetRuntimeConfigStore({});
+    try {
+      await withFixture(async (_fixture, client) => {
+        const id = await client.request('browser.connect', {
+          body: {keepPage: true},
+        });
+        const response = await client.responseFor(id);
+        assert.deepStrictEqual(
+          response['error'],
+          undefined,
+          'env-derived ego must make keepPage legal',
+        );
+        const status = response['result'] as {mode?: string};
+        assert.strictEqual(status.mode, 'ego');
+        // The retention policy reached the manager config, not just the store.
+        const connected = stub.configs.at(-1) as {
+          ego?: boolean;
+          keepPage?: boolean;
+        };
+        assert.strictEqual(connected.ego, true);
+        assert.strictEqual(connected.keepPage, true);
+      });
+    } finally {
+      stub.restore();
+      if (savedEgo === undefined) delete process.env.BROWSER_EGO;
+      else process.env.BROWSER_EGO = savedEgo;
+      resetRuntimeConfigStore({});
+    }
+  });
+
+  it('browser.disconnect surfaces a config invariant instead of masking it', async () => {
+    // Same masking the last round removed from handleBrowserConnect: folding
+    // BrowserConfigInvariantError into BROWSER_DISCONNECT_FAILED throws away the
+    // only diagnostic that says which key to edit.
+    const stub = stubBrowserManager();
+    resetRuntimeConfigStore({browser: {keepPage: true}});
+    try {
+      await withFixture(async (_fixture, client) => {
+        const id = await client.request('browser.disconnect', {body: {}});
+        const response = await client.responseFor(id);
+        const error = response['error'] as {code?: string; message?: string};
+        assert.strictEqual(error.code, 'VALIDATION');
+        assert.match(error.message ?? '', /keepPage/);
+      });
+    } finally {
+      stub.restore();
+      resetRuntimeConfigStore({});
+    }
   });
 });

@@ -32,7 +32,14 @@ export class RuntimeConfigStore {
     return this.config;
   }
 
-  update(partial: Partial<GlobalConfig>): GlobalConfig {
+  /**
+   * 算出 `update(partial)` 会得到的那份配置，但**不提交**。
+   *
+   * 给「先校验、后写入」的调用方用：`update()` 的深合并会让上一次请求留下的
+   * 字段活到这一次，所以校验必须针对合并后的结果，而校验一旦抛就不能让 store
+   * 脏掉。
+   */
+  preview(partial: Partial<GlobalConfig>): GlobalConfig {
     const merged: GlobalConfig = {...this.config};
 
     for (const [key, value] of Object.entries(partial)) {
@@ -52,7 +59,11 @@ export class RuntimeConfigStore {
       }
     }
 
-    this.config = validateGlobalConfig(merged);
+    return validateGlobalConfig(merged);
+  }
+
+  update(partial: Partial<GlobalConfig>): GlobalConfig {
+    this.config = this.preview(partial);
     return this.config;
   }
 

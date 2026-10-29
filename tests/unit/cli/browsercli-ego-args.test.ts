@@ -130,6 +130,13 @@ describe('browser connect --ego / --keep-page parsing', () => {
   });
 
   it('accepts --keep-page when BROWSER_EGO selects the mode (I1)', async () => {
+    // This asserts only what the CLI can see: it does not reject locally, and it
+    // sends `{keepPage:true}`. The daemon inherits BROWSER_EGO, so the body alone
+    // does not describe the request — the real acceptance of exactly this body is
+    // covered end to end (real handler, real socket) by `accepts connect
+    // --keep-page when BROWSER_EGO supplies the mode (B3)` in
+    // tests/unit/ipc/daemonServer.test.ts. A fake daemon here cannot see a
+    // request-layer refusal, which is why that test exists.
     const saved = process.env.BROWSER_EGO;
     process.env.BROWSER_EGO = 'true';
     try {

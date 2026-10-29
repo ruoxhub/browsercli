@@ -28,7 +28,9 @@ describe('RuntimeConfigStore', () => {
   });
 
   it('seeds from loadUserConfig on first access', () => {
-    const tmpDir = mkdtempSync(path.join(os.tmpdir(), 'browsercli-store-test-'));
+    const tmpDir = mkdtempSync(
+      path.join(os.tmpdir(), 'browsercli-store-test-'),
+    );
     process.env.PROXYCLI_CONFIG_DIR = tmpDir;
     try {
       writeFileSync(
@@ -70,6 +72,36 @@ describe('RuntimeConfigStore', () => {
     // headless 被覆盖，channel 被保留（浅合并）
     assert.strictEqual(store.get().browser?.headless, false);
     assert.strictEqual(store.get().browser?.channel, 'stable');
+  });
+
+  it('preview returns what update would produce without committing', () => {
+    // The daemon validates the merged candidate before writing it, so a rejected
+    // request cannot leave the store in a state every later request also rejects.
+    // `preview()` must be exactly `update()` minus the commit.
+    resetRuntimeConfigStore({browser: {headless: true, channel: 'stable'}});
+    const store = getRuntimeConfigStore();
+
+    const preview = store.preview({browser: {headless: false}});
+
+    assert.strictEqual(preview.browser?.headless, false);
+    assert.strictEqual(preview.browser?.channel, 'stable');
+    // Nothing was written...
+    assert.strictEqual(store.get().browser?.headless, true);
+    // ...and committing produces the previewed object.
+    store.update({browser: {headless: false}});
+    assert.deepStrictEqual(store.get(), preview);
+  });
+
+  it('preview throws on invalid input and leaves the store untouched', () => {
+    resetRuntimeConfigStore({browser: {headless: true}});
+    const store = getRuntimeConfigStore();
+
+    assert.throws(
+      () => store.preview({browser: {remoteDebuggingPort: 1}}),
+      /REMOTE_DEBUGGING_PORT/,
+    );
+    assert.strictEqual(store.get().browser?.headless, true);
+    assert.strictEqual(store.get().browser?.remoteDebuggingPort, undefined);
   });
 
   it('update shallow-merges nested toolResultRecording field', () => {
