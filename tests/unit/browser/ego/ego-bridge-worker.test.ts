@@ -2653,17 +2653,55 @@ describe('ego-bridge-worker', () => {
     }
   });
 
-  it('refuses to start when another bridge already owns the ego callback slot', async () => {
-    // Every `-e` run gets its own realm over ONE ego utility process, so a second
-    // bridge assigning onCDPMessage would silently starve the first: its pending
-    // requests would never be answered and its events would go to the new client.
+  it('reclaims the callback slot when its previous owner is dead', async () => {
+    // A realm that dies without stop() (SIGKILL, an ego crash, a killed manager)
+    // leaves its callback on the shared `globalThis.ego`. Refusing on that would
+    // brick ego bridging until ego itself restarts, and tell the user to stop a
+    // session that does not exist. The advertised owner pid is what separates
+    // "someone is using ego" from "a dead realm left a function behind".
+    const dead = createFakeEgo();
+    dead.ego.onCDPMessage = () => undefined;
+    process.env.EGO_BRIDGE_OWNER_PID = '999999999'; // no such process
+    try {
+      const bridge = createEgoBridge({
+        ego: dead.ego,
+        taskSpaceName: 'unit-test',
+      });
+      const {wsEndpoint} = await bridge.start();
+      assert.match(wsEndpoint, /^ws:\/\/127\.0\.0\.1:\d+\//);
+      assert.equal(
+        process.env.EGO_BRIDGE_OWNER_PID,
+        String(process.pid),
+        'the new owner must advertise itself',
+      );
+      await bridge.stop();
+      assert.equal(
+        process.env.EGO_BRIDGE_OWNER_PID,
+        undefined,
+        'a clean stop must clear the marker so the next run is not refused',
+      );
+    } finally {
+      delete process.env.EGO_BRIDGE_OWNER_PID;
+    }
+  });
+
+  it('refuses the slot when its advertised owner is still alive', async () => {
     const fake = createFakeEgo();
     fake.ego.onCDPMessage = () => undefined;
-    const bridge = createEgoBridge({ego: fake.ego, taskSpaceName: 'unit-test'});
-    await assert.rejects(
-      () => bridge.start(),
-      /another ego bridge already owns this ego runtime/,
-    );
-    assert.deepEqual(fake.calls, [], 'no task space may be touched');
+    // Our own pid is definitionally alive.
+    process.env.EGO_BRIDGE_OWNER_PID = String(process.pid);
+    try {
+      const bridge = createEgoBridge({
+        ego: fake.ego,
+        taskSpaceName: 'unit-test',
+      });
+      await assert.rejects(
+        () => bridge.start(),
+        /already owns this ego runtime/,
+      );
+      assert.deepEqual(fake.calls, [], 'no task space may be touched');
+    } finally {
+      delete process.env.EGO_BRIDGE_OWNER_PID;
+    }
   });
 });

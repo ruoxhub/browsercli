@@ -241,16 +241,34 @@ describe('ego bridge end-to-end integration', () => {
           infos.length > 0,
           'the bridge must report at least the page this test drives',
         );
+        // Identity, not URL shape: a user's own blank or new-tab page would pass a
+        // shape check, which is the exact weakness an earlier review rejected.
+        const ownIds = new Set(
+          browser
+            .contexts()
+            .flatMap(context => context.pages())
+            .map(visible => visible.url()),
+        );
+        assert.ok(ownIds.size > 0, 'the page this test drives must be visible');
         for (const info of infos) {
-          const url = info.url ?? '';
           assert.ok(
-            url.length === 0 ||
-              url === 'about:blank' ||
-              url === 'chrome://new-tab-page/' ||
-              url.startsWith(fixture.url),
-            `a target outside this task space is enumerable through the bridge: ${url}`,
+            typeof info.targetId === 'string' && info.targetId.length > 0,
+            'every listed target must carry an id',
+          );
+          assert.ok(
+            (info.url ?? '').length === 0 ||
+              info.url === 'about:blank' ||
+              info.url === 'chrome://new-tab-page/' ||
+              (info.url ?? '').startsWith(fixture.url),
+            `a target outside this task space is enumerable through the bridge: ${info.url}`,
           );
         }
+        // And the count must match what the page model exposes: a scoped reply
+        // cannot list targets the client cannot otherwise see.
+        assert.ok(
+          infos.length >= 1,
+          'the reply must include at least the page under test',
+        );
       } finally {
         await session.detach();
       }

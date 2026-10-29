@@ -86,11 +86,6 @@ describe('ego bridge live smoke check', () => {
           `ws://127.0.0.1:${port} must accept connections`,
         );
 
-        // 2b. The task-space lifecycle, on the real product. This is the
-        //     highest-risk logic in the branch (five revisions: leak, reclaim,
-        //     reclaimed retention, destruction invariant) and until now only the
-        //     fake ego and throwaway probes exercised it. `listTaskSpaces()` is
-        //     the real ego view, and a plain run must leave nothing behind.
         const stopStartedAt = Date.now();
         await manager.stop();
         const stopElapsed = Date.now() - stopStartedAt;

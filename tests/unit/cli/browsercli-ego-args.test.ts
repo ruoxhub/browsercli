@@ -319,4 +319,71 @@ describe('CLI flags reach EgoBridgeManager.start', () => {
     assert.equal(bridge.startOptions.length, 1);
     assert.notEqual(bridge.startOptions[0]?.keepPage, true);
   });
+
+  it('rejects every launch-only flag in ego mode, before any daemon call', async () => {
+    // These are read only by `launchBrowser()`, which ego mode never reaches.
+    // The list is spelled out one flag at a time because `booleans` is keyed by
+    // CONFIG names (camelCase) while flags are kebab-case: a mismatch reads
+    // `undefined` and silently disables the check rather than failing loudly.
+    const launchOnly = [
+      ['--cloak'],
+      ['--headless'],
+      ['--headless=false'],
+      ['--user-data-dir', 'profile-dir'],
+      ['--isolated'],
+      ['--minimal-stealth'],
+      ['--full-stealth-args'],
+      ['--js-stealth'],
+      ['--accept-insecure-certs'],
+    ];
+    for (const extra of launchOnly) {
+      const args = ['connect', '--ego', ...extra];
+      const {bodies, ctx} = recordingContext();
+      await assert.rejects(
+        async () => browserCommand(args, ctx),
+        (error: unknown) => {
+          assert.ok(
+            error instanceof AxiError,
+            `expected an AxiError for ${args.join(' ')}`,
+          );
+          assert.strictEqual(
+            error.code,
+            'VALIDATION_ERROR',
+            `${args.join(' ')} must be rejected locally, not by the daemon`,
+          );
+          assert.match(error.message, /不生效|ego/);
+          return true;
+        },
+        args.join(' '),
+      );
+      assert.deepEqual(bodies, [], 'nothing may reach the daemon');
+    }
+  });
+
+  it('does not reject ego alone, ego with --keep-page, or a non-ego launch', async () => {
+    // The guard must not fire on the absence of these flags. `--ego` alone and
+    // `--ego --keep-page` are the supported shapes; a non-ego launch may carry
+    // all of them because there `launchBrowser()` really does read them.
+    for (const args of [
+      ['connect', '--ego'],
+      ['connect', '--ego', '--keep-page'],
+      [
+        'connect',
+        '--cloak',
+        '--headless=false',
+        '--isolated',
+        '--js-stealth',
+        '--minimal-stealth',
+      ],
+    ]) {
+      const {ctx} = recordingContext();
+      try {
+        await browserCommand(args, ctx);
+      } catch (error) {
+        assert.fail(
+          `${args.join(' ')} must not be rejected, got: ${String((error as Error)?.message)}`,
+        );
+      }
+    }
+  });
 });

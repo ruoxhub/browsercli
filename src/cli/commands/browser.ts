@@ -240,32 +240,24 @@ function connectOptions(
   ) {
     invalid(EGO_TARGET_CONFLICT_MESSAGE);
   }
-  if (
-    isEgoWithLaunchOnly({
-      ego: effectiveEgo,
-      cloak: booleans.cloak,
-      headless: booleans.headless,
-      userDataDir: stringFlag(flags, 'user-data-dir'),
-      isolated: booleans.isolated,
-      minimalStealth: booleans['minimal-stealth'],
-      fullStealthArgs: booleans['full-stealth-args'],
-      jsStealth: booleans['js-stealth'],
-      acceptInsecureCerts: booleans['accept-insecure-certs'],
-    })
-  ) {
-    // Only for an explicitly written flag: `--ego` alone must not trip on the
-    // defaults the parser fills in.
-    const written = new Set(Object.keys(booleans));
-    const egoLaunchOnlyWritten =
-      written.has('cloak') ||
-      written.has('headless') ||
-      written.has('isolated') ||
-      written.has('minimal-stealth') ||
-      written.has('full-stealth-args') ||
-      written.has('js-stealth') ||
-      written.has('accept-insecure-certs') ||
-      stringFlag(flags, 'user-data-dir') !== undefined;
-    if (egoLaunchOnlyWritten) invalid(EGO_LAUNCH_ONLY_FLAGS_MESSAGE);
+  // These eight flags are read only by `launchBrowser()`, which ego mode never
+  // reaches, so accepting them would be the same silent ignore as `keepPage`
+  // without `ego`. `booleans` is keyed by CONFIG names (camelCase) while the
+  // flags are kebab-case — reading one with the other's spelling yields
+  // `undefined` and disables the check without failing, so each entry below is
+  // spelled explicitly and a test pins every one of them.
+  const launchOnlyFlags = {
+    cloak: booleans.cloak,
+    headless: booleans.headless,
+    userDataDir: stringFlag(flags, 'user-data-dir'),
+    isolated: booleans.isolated,
+    minimalStealth: booleans.minimalStealth,
+    fullStealthArgs: booleans.fullStealthArgs,
+    jsStealth: booleans.jsStealth,
+    acceptInsecureCerts: booleans.acceptInsecureCerts,
+  };
+  if (isEgoWithLaunchOnly({ego: effectiveEgo, ...launchOnlyFlags})) {
+    invalid(EGO_LAUNCH_ONLY_FLAGS_MESSAGE);
   }
   for (const [key, value] of Object.entries(booleans)) {
     if (value !== undefined) {

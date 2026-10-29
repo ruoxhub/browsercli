@@ -420,9 +420,17 @@ export async function startDaemonServer(
       // BrowserConfigInvariantError 折成 BROWSER_DISCONNECT_FAILED 就等于把
       // 唯一的诊断信息换成一句"断开浏览器失败"，用户无从知道该改哪个配置。
       if (error instanceof BrowserConfigInvariantError) throw error;
-      throw Object.assign(new Error('failed to disconnect browser'), {
-        code: 'BROWSER_DISCONNECT_FAILED',
-      });
+      // Same reason as the connect handler: `disconnectBrowser` now throws
+      // BROWSER_DISCONNECT_INCOMPLETE when the bridge survived teardown, and that
+      // sentence is the only thing that tells a user their bridge is still up.
+      const detail = error instanceof Error ? error.message : String(error);
+      throw Object.assign(
+        new Error(`failed to disconnect browser: ${detail}`),
+        {
+          code: 'BROWSER_DISCONNECT_FAILED',
+          cause: error,
+        },
+      );
     }
   }
 

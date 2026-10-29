@@ -112,9 +112,13 @@ const WHITELIST_REFRESH_REQUESTS = new Set([
  * destructuring further downstream.
  *
  * Each row also names the capability being given up, because the reply itself
- * cannot: the client is told its request succeeded. `degraded` capabilities are
- * reported to the client over `EGO_BRIDGE_DEGRADED_METHOD`, not just logged —
- * see `degradedMethods`.
+ * cannot: the reply says "succeeded", which is a lie by omission. The gap is
+ * surfaced in two places, neither of which is a guarantee to the client:
+ * a one-per-method stderr line (visible via `stderrTail()` on an error path) and
+ * a synthesized `EGO_BRIDGE_DEGRADED_METHOD` CDP frame. That frame is an AUDIT
+ * TRAIL, not a notification: Patchright routes an unknown method to its root
+ * `CRSession`, and `CRBrowser` subscribes to only a fixed set of events, so the
+ * browsercli tool layer will NOT see it. Do not rely on it to tell a user.
  *
  * If ego ever implements the Browser domain, these four stay shadowed here; this
  * table is the thing to delete when that happens.
@@ -151,11 +155,16 @@ const BROWSER_DOMAIN_FALLBACKS: Record<
  * Name of the synthesized CDP event that carries a degraded `Browser.*` method
  * to the client.
  *
- * The human-readable log is not enough: the worker's stderr only reaches a
- * caller through `stderrTail()` on an ERROR path, so in a healthy session a
- * silently dropped download policy was invisible to the MCP client that relied
- * on it. Events reach the client unconditionally, so the gap travels with the
- * session.
+ * The human-readable log is not enough on its own: the worker's stderr only
+ * reaches a caller through `stderrTail()` on an ERROR path, so in a healthy
+ * session a silently dropped download policy would otherwise leave no trace.
+ *
+ * Honest limits of this frame: it is emitted on the root WebSocket session, and
+ * Patchright's `CRBrowser` subscribes to a fixed event set that does not include
+ * it, so this is an audit trail for anyone reading the CDP stream (or the sink),
+ * NOT a promise that the tool layer learns about the gap. The operator-facing
+ * record of degradation is the stderr line; this frame exists so the wire itself
+ * carries the fact rather than only a log file.
  */
 export const DEGRADED_METHOD_EVENT = 'EGO_BRIDGE_DEGRADED_METHOD';
 
@@ -258,6 +267,32 @@ function toText(error: unknown): string {
 
 function asString(value: unknown): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+/**
+ * Env key carrying the pid of the realm that currently owns the CDP callback
+ * slot. `process.env` survives across `-e` runs in ego's utility process, which
+ * is a liability everywhere else but exactly what this needs: the marker outlives
+ * the realm that wrote it, so a later run can ask "is that owner still alive?".
+ */
+const OWNER_PID_ENV = 'EGO_BRIDGE_OWNER_PID';
+
+/** The pid the slot owner advertised, if any. */
+function readOwnerPid(): number | undefined {
+  const raw = process.env[OWNER_PID_ENV];
+  const pid = Number(raw);
+  return Number.isInteger(pid) && pid > 0 ? pid : undefined;
+}
+
+/** `true` when a process with that pid exists and we may signal it. */
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    // EPERM means the pid exists but belongs to someone else: still alive.
+    return (error as {code?: string} | null)?.code === 'EPERM';
+  }
 }
 
 /** Read one named field out of a CDP `params` object, tolerating junk. */
@@ -542,6 +577,9 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
   const rejectInFlight = (message: string) => {
     const pending = [...inFlight.entries()];
     inFlight.clear();
+    // The paired bookkeeping must be cleared too: a stranded request would be
+    // attributed to a later frame that happens to reuse the id.
+    requestMethods.clear();
     for (const [id, sessionId] of pending) {
       replyWithError(id, sessionId, message);
     }
@@ -1256,6 +1294,9 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
   };
 
   const releaseCallbacks = () => {
+    if (process.env[OWNER_PID_ENV] === String(process.pid)) {
+      delete process.env[OWNER_PID_ENV];
+    }
     // Release only the callbacks this bridge installed.
     if (ego.onCDPMessage === onNativeMessage) ego.onCDPMessage = undefined;
     if (ego.onSendCDPMessageError === onNativeSendError) {
@@ -1285,12 +1326,33 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
         // requests would never be answered and its events would be delivered to
         // this client instead. Two browsercli workspaces on one machine is normal
         // usage, so refuse loudly rather than steal the slot.
+        //
+        // A slot is only "owned" if its owner is still ALIVE. `globalThis.ego`
+        // outlives a realm that died without running `stop()` (SIGKILL, an ego
+        // crash, a killed manager), and in that case the callback is a dead
+        // function into a discarded context — refusing on it would brick ego
+        // bridging until the user restarts ego, while telling them to "stop the
+        // other session" when no such session exists. `isAlive` is the owner's
+        // advertised pid; it is absent for the dead case, and checking it costs
+        // one `process.kill(pid, 0)`.
         if (typeof ego.onCDPMessage === 'function') {
-          throw new Error(
-            "another ego bridge already owns this ego runtime's CDP callback " +
-              '(one ego lite runtime serves one browsercli session; stop the ' +
-              'other session first)',
+          const ownerPid = readOwnerPid();
+          const ownerAlive = ownerPid !== undefined && isProcessAlive(ownerPid);
+          if (ownerAlive) {
+            throw new Error(
+              "another ego bridge already owns this ego runtime's CDP callback " +
+                `(pid ${ownerPid}; one ego lite runtime serves one browsercli ` +
+                'session — stop that session first)',
+            );
+          }
+          // The previous owner is gone. Its callback still points into a
+          // discarded realm, so it must be cleared before claiming the slot; a
+          // frame delivered to it would throw inside native code.
+          log(
+            '[ego-bridge] taking over the CDP callback slot from a dead bridge',
           );
+          ego.onCDPMessage = undefined;
+          ego.onSendCDPMessageError = undefined;
         }
         const entry = await enterTaskSpace();
         // `spaceEntered`/`spaceOrigin` are set before the await below so the
@@ -1337,6 +1399,10 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
         const wsEndpoint = `ws://127.0.0.1:${address.port}/devtools/browser/${guid}`;
         ego.onCDPMessage = onNativeMessage;
         ego.onSendCDPMessageError = onNativeSendError;
+        // Advertise the owner so a later run can tell "someone is using ego" from
+        // "a dead realm left a function behind". Persisted in the env because that
+        // is the only channel that outlives this realm (see OWNER_PID_ENV).
+        process.env[OWNER_PID_ENV] = String(process.pid);
         options.onReady?.(wsEndpoint);
         return {wsEndpoint};
       } catch (error) {
