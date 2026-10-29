@@ -21,6 +21,8 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import net from 'node:net';
+import os from 'node:os';
+import path from 'node:path';
 import {describe, it} from 'node:test';
 
 import {findEgoBrowserBinary} from '../../../../src/modules/browser/ego/ego-detect.js';
@@ -54,7 +56,24 @@ describe('ego bridge live smoke check', () => {
       assert.ok(binary, 'the skip guard should have caught a missing install');
       assert.equal(fs.existsSync(binary), true, `${binary} must exist`);
 
-      const manager = new EgoBridgeManager({startTimeoutMs: 30_000});
+      // Isolate this bridge's task space from the other live ego test.
+      //
+      // The task-space name is `browsercli-<hash of the workspace cwd>`, and
+      // `ego.useTaskSpace()` selects process-globally. `npm test` runs test
+      // FILES concurrently, so two live ego tests sharing `process.cwd()` derive
+      // the SAME name, enter the SAME space, and the slower one detaches the
+      // faster one's — which surfaces as `EGO_TASK_SPACE_INACTIVE` from a
+      // `page.goto` in whichever suite lost the race (`--test-concurrency=8`
+      // failed, `=1` passed). A private temp cwd gives each live test its own
+      // space, which also stops the run from leaving a shared space behind.
+      const workspace = fs.mkdtempSync(
+        path.join(os.tmpdir(), 'ego-bridge-live-'),
+      );
+
+      const manager = new EgoBridgeManager({
+        startTimeoutMs: 30_000,
+        cwd: workspace,
+      });
       const startedAt = Date.now();
       let connection: {wsEndpoint: string; childPid?: number} | undefined;
 
@@ -103,6 +122,7 @@ describe('ego bridge live smoke check', () => {
         );
       } finally {
         await manager.stop();
+        fs.rmSync(workspace, {recursive: true, force: true});
       }
     },
   );
