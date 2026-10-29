@@ -1262,7 +1262,126 @@ describe('ego-bridge-worker', () => {
     );
   });
 
-            it('completes with keep: "all" so a keepPage stop does not close the page', async () => {
+  it('creates the task space in the requested profile', async () => {
+    // `--profile` is a creation-time property. The two-argument form is the only
+    // way to pass it, and an explicit `undefined` would break older bindings
+    // that reject extra arguments, so the call shape itself is asserted.
+    const seen: Array<{name: string; profileId?: string}> = [];
+    const fake = createFakeEgo({
+      createTaskSpace: async (name: string, profileId?: string) => {
+        seen.push(profileId === undefined ? {name} : {name, profileId});
+        return {id: 7, name};
+      },
+    });
+    const logs: string[] = [];
+    const bridge = createEgoBridge({
+      ego: fake.ego,
+      taskSpaceName: 'unit-test',
+      profileId: 'Profile 7',
+      log: line => logs.push(line),
+    });
+    await bridge.start();
+    await bridge.stop();
+
+    assert.deepEqual(seen, [{name: 'unit-test', profileId: 'Profile 7'}]);
+  });
+
+  it('never passes a profile argument when none was requested', async () => {
+    const argCounts: number[] = [];
+    const fake = createFakeEgo({
+      createTaskSpace: async (...args: unknown[]) => {
+        argCounts.push(args.length);
+        return {id: 7, name: String(args[0])};
+      },
+    });
+    const bridge = createEgoBridge({ego: fake.ego, taskSpaceName: 'unit-test'});
+    await bridge.start();
+    await bridge.stop();
+
+    assert.deepEqual(argCounts, [1], 'an explicit undefined is not acceptable');
+  });
+
+  it('reports --profile as ignored when an existing space is reused', async () => {
+    // A reused space keeps the profile it was created in. Staying silent would
+    // let the user believe the identity changed while the tabs in front of them
+    // are still logged into the old one.
+    const fake = createFakeEgo({
+      listTaskSpaces: async () => ({
+        taskSpaces: [{id: 9, name: 'unit-test', ownership: 'agent'}],
+      }),
+    });
+    const logs: string[] = [];
+    const bridge = createEgoBridge({
+      ego: fake.ego,
+      taskSpaceName: 'unit-test',
+      profileId: 'Profile 7',
+      log: line => logs.push(line),
+    });
+    await bridge.start();
+    await bridge.stop();
+
+    const ignored = logs.find(line => line.includes('ignored'));
+    assert.ok(
+      ignored !== undefined,
+      `expected an "ignored" diagnostic, got: ${JSON.stringify(logs)}`,
+    );
+    assert.match(ignored, /Profile 7/);
+    assert.match(ignored, /only applies when a new space is created/);
+  });
+
+  it('says nothing about the profile when none was requested', async () => {
+    const fake = createFakeEgo({
+      listTaskSpaces: async () => ({
+        taskSpaces: [{id: 9, name: 'unit-test', ownership: 'agent'}],
+      }),
+    });
+    const logs: string[] = [];
+    const bridge = createEgoBridge({
+      ego: fake.ego,
+      taskSpaceName: 'unit-test',
+      log: line => logs.push(line),
+    });
+    await bridge.start();
+    await bridge.stop();
+
+    assert.equal(
+      logs.some(line => line.includes('ignored')),
+      false,
+      'an absent flag must not produce an ignore notice',
+    );
+  });
+
+  it('warns that --profile will land on a new suffixed space when the name is user-owned', async () => {
+    // Without this the user sees "connected" and a space that is NOT the one
+    // already open in front of them, with no explanation.
+    const fake = createFakeEgo({
+      listTaskSpaces: async () => ({
+        taskSpaces: [{id: 9, name: 'unit-test', ownership: 'user'}],
+      }),
+      createTaskSpace: async (name: string) => ({id: 10, name}),
+    });
+    const logs: string[] = [];
+    const bridge = createEgoBridge({
+      ego: fake.ego,
+      taskSpaceName: 'unit-test',
+      profileId: 'Profile 7',
+      log: line => logs.push(line),
+    });
+    await bridge.start();
+    await bridge.stop();
+
+    const warning = logs.find(line =>
+      line.includes('will apply to a NEW space'),
+    );
+    assert.ok(
+      warning !== undefined,
+      `expected a suffixed-space warning, got: ${JSON.stringify(logs)}`,
+    );
+    assert.match(warning, /Profile 7/);
+    assert.match(warning, /unit-test-\*/);
+  });
+
+  it('completes with keep: "all" so a keepPage stop does not close the page', async () => {
     // Pins the mechanism F2 relies on for the keepPage policy: the space is
     // completed (page kept), and the next run reclaims that completed space
     // instead of creating a suffixed new one.

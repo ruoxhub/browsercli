@@ -214,7 +214,17 @@ export interface EgoNativeBindings {
    */
   createTab?: (url: string) => Promise<unknown>;
   listTaskSpaces?: () => Promise<unknown>;
-  createTaskSpace?: (name: string) => Promise<unknown>;
+  /**
+   * Create an agent-owned space. The optional second argument is a profile id
+   * from `listProfiles()` and is honoured ONLY at creation, never when reusing
+   * an existing space — ego's own SDK enforces the same rule
+   * (`helpers.ts::taskSpace`: "profileId only applies when creating a new task
+   * space"). Probed on 0.6.1.13: the two-argument form creates the space inside
+   * the named profile and `listTaskSpaces()` reports it back as `profileId`.
+   */
+  createTaskSpace?: (name: string, profileId?: string) => Promise<unknown>;
+  /** Profiles a new task space may be created in. */
+  listProfiles?: () => Promise<unknown>;
   /**
    * Turns a listed Space into an agent-owned task space without creating a
    * replacement one. Required to reclaim the bridge's own leftovers: after
@@ -237,6 +247,15 @@ export interface EgoBridgeOptions {
   ego: EgoNativeBindings;
   /** Defaults to `browsercli-<workspace hash>` derived from `process.cwd()`. */
   taskSpaceName?: string;
+  /**
+   * Profile id to create the space in (`--profile`). Applies ONLY when this run
+   * creates a new space: reusing or reclaiming an existing one keeps whatever
+   * profile it already has, which is the rule ego's own SDK enforces. Ignored
+   * (with a log line) when the space is reused, because silently moving an
+   * existing space to another profile would change the identity behind tabs the
+   * user may already be logged into.
+   */
+  profileId?: string;
   keepPage?: boolean;
   /**
    * The target ids this bridge may forward `Target.*` events for.
@@ -520,6 +539,8 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
   const firewallEnabled = listOwnTargetIds !== undefined;
   const taskSpaceName =
     options.taskSpaceName ?? workspaceTaskSpaceName(process.cwd());
+  /** Only consumed by the create branch of `enterTaskSpace`; see the option doc. */
+  const requestedProfileId = options.profileId;
 
   const clients = new Set<WsClient>();
   /** requests forwarded to ego and still waiting for their response */
@@ -1320,6 +1341,23 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
   };
 
   /**
+   * Say so when `--profile` had no effect.
+   *
+   * `profileId` is a creation-time property: an existing space keeps the profile
+   * it was made in. Staying quiet would let a user believe they had switched
+   * identity while the tabs in front of them are still logged into the old one,
+   * which is the kind of silence this feature exists to remove.
+   */
+  const noteProfileIgnored = (name: string, how: string): void => {
+    if (requestedProfileId === undefined) return;
+    log(
+      `[ego-bridge] --profile ${requestedProfileId} ignored: task space ${name} ` +
+        `was ${how}, and a profile only applies when a new space is created. ` +
+        `Delete the space (or connect with a different workspace) to create one in that profile.`,
+    );
+  };
+
+  /**
    * Enter this workspace's own task space.
    *
    * Reuses `browsercli-<workspace-hash>` when the agent already owns it, and
@@ -1356,6 +1394,7 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
       if (existing !== undefined) {
         ego.useTaskSpace(existing);
         log(`[ego-bridge] reusing task space ${name} (${existing})`);
+        noteProfileIgnored(name, 'reused');
         return {origin: 'reused'};
       }
       const leftovers = reclaimable.get(name);
@@ -1373,7 +1412,10 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
           );
         }
         for (const id of leftovers) {
-          if (await reclaimTaskSpace(name, id)) return {origin: 'reclaimed'};
+          if (await reclaimTaskSpace(name, id)) {
+            noteProfileIgnored(name, 'reclaimed');
+            return {origin: 'reclaimed'};
+          }
         }
         continue;
       }
@@ -1383,11 +1425,27 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
         log(
           `[ego-bridge] task space name ${name} belongs to the user; trying a new suffix`,
         );
+        // With `--profile` this fallback is surprising: the user asked for an
+        // identity and instead gets a *second* space beside the one already in
+        // front of them. Name the consequence once, here, rather than leave
+        // them to discover the `-2` on their own.
+        if (requestedProfileId !== undefined) {
+          log(
+            `[ego-bridge] --profile ${requestedProfileId} will apply to a NEW space ` +
+              `named ${taskSpaceName}-*; the user-owned ${name} is left untouched.`,
+          );
+        }
         continue;
       }
       let space: EgoTaskSpace | undefined;
       try {
-        space = (await ego.createTaskSpace(name)) as EgoTaskSpace | undefined;
+        // Do not pass an explicit `undefined`: older bindings reject extra
+        // arguments, while builds that know profiles accept the second one.
+        space = (await (requestedProfileId === undefined
+          ? ego.createTaskSpace(name)
+          : ego.createTaskSpace(name, requestedProfileId))) as
+          | EgoTaskSpace
+          | undefined;
       } catch (error) {
         const code = (error as {error_code?: unknown} | null)?.error_code;
         if (code === NAME_IN_USE)
@@ -1641,6 +1699,9 @@ function autostart(ego: EgoNativeBindings): void {
       process.env.EGO_BRIDGE_TASK_SPACE_NAME ||
       workspaceTaskSpaceName(process.cwd()),
     keepPage: process.env.EGO_BRIDGE_KEEP_PAGE === '1',
+    // Empty means "no preference", which is distinct from an explicit profile id
+    // named '' (impossible: ego profile ids are non-empty).
+    profileId: process.env.EGO_BRIDGE_PROFILE_ID || undefined,
     // Production always supplies a whitelist: without one the firewall would be
     // off and the user's private tabs would reach the client.
     listOwnTargetIds: () => listTabsOwnTargetIds(ego),
