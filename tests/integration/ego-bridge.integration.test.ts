@@ -117,10 +117,26 @@ describe('ego bridge end-to-end integration', () => {
     fixture = await startFixtureServer();
   });
 
+  /**
+   * R3: never leak a bridge — it holds a real port and a real ego task space.
+   *
+   * This runs even when an assertion throws mid-body, and the port probe is part
+   * of the teardown rather than the happy path so that a failing run still
+   * produces the evidence that says whether the bridge actually died. A probe
+   * decides, never `isRunning()`: that is only a launcher-alive check and has
+   * read false while the port kept listening.
+   */
   after(async () => {
-    // R3: never leak a bridge — it holds a real port and a real ego task space.
+    const port = wsEndpoint === undefined ? undefined : portOf(wsEndpoint);
     try {
       await BrowserManager.resetInstance();
+      if (port !== undefined) {
+        assert.equal(
+          await portAccepts(port),
+          false,
+          'the bridge port must refuse connections after teardown',
+        );
+      }
     } finally {
       wsEndpoint = undefined;
       if (fixture?.server) await closeServer(fixture.server);
@@ -160,22 +176,29 @@ describe('ego bridge end-to-end integration', () => {
       const page = manager.getCurrentPage() ?? (await manager.newPage());
       assert.ok(page, 'the manager must expose a page');
 
-      // 3. The firewall, from the client side: everything visible belongs to the
-      //    bridge's own task space. Anything else would be a user tab leaking in.
-      //    The bridge's own new tab starts on ego's internal new-tab page, which
-      //    is ours; a user's tab would be an `http(s)://` URL we never opened.
+      // 3. The firewall, from the client side. Two things must hold, and the
+      //    first one is what makes the second meaningful: the bridge must expose
+      //    at least one page at all (an empty list would make the loop below
+      //    vacuous — "nothing visible" must not read as "firewall verified"),
+      //    and every visible page must be one this test created.
       const browser = manager.getBrowser();
       assert.ok(browser, 'the manager must hold a browser');
-      const visibleUrls = browser
+      const visible = browser
         .contexts()
         .flatMap(context => context.pages())
-        .map(visible => visible.url());
-      for (const url of visibleUrls) {
+        .filter(visiblePage => !visiblePage.isClosed());
+      assert.ok(
+        visible.length > 0,
+        'the bridge must expose the page this test is about to drive',
+      );
+      assert.ok(
+        visible.includes(page),
+        'the manager page must be among the pages the bridge exposes',
+      );
+      for (const visiblePage of visible) {
         assert.ok(
-          url === 'about:blank' ||
-            url === 'chrome://new-tab-page/' ||
-            url.startsWith(fixture.url),
-          `unexpected page visible through the bridge: ${url}`,
+          visiblePage === page,
+          `a page this test did not create is visible through the bridge: ${visiblePage.url()}`,
         );
       }
 
@@ -203,11 +226,14 @@ describe('ego bridge end-to-end integration', () => {
         'clicking must compute 1+2+3 then multiply by 7',
       );
 
-      // 6. Page evaluation in the PAGE's own world. `page.evaluate()` runs in
-      //    Patchright's utility world, which is isolated from the page — that is
-      //    Playwright's design, not the bridge's, and it is why this repo has a
-      //    dedicated main-world helper. Reverse-engineering work needs the page
-      //    world, so that is what this test proves here.
+      // 6. Page evaluation in the PAGE's own world.
+      //
+      //    `page.evaluate()` cannot do this: Patchright defaults it to an
+      //    isolated context (`evaluate(pageFunction, arg, isolatedContext = true)`
+      //    in patchright-core's client/page.js and client/frame.js), i.e. a
+      //    utility world with its own `window`. A reverse-engineering hook has to
+      //    land in the page's world, which is why this repo ships a dedicated
+      //    main-world helper — so that is the path this test proves.
       const frame = page.mainFrame();
       const direct = await evaluateInPageRuntime<number>(
         frame,
@@ -253,20 +279,6 @@ describe('ego bridge end-to-end integration', () => {
       assert.deepEqual(
         {ok: payload.ok, source: payload.source},
         {ok: true, source: 'fixture-api'},
-      );
-
-      // 9. Teardown must actually take the bridge down. A TCP probe decides —
-      //    `isRunning()` is only a launcher-alive probe and can read false while
-      //    the port still listens (see EgoBridgeManager's doc block).
-      const endpoint = wsEndpoint;
-      const port = portOf(endpoint);
-      await BrowserManager.resetInstance();
-      manager = undefined as unknown as BrowserManager;
-      wsEndpoint = undefined;
-      assert.equal(
-        await portAccepts(port),
-        false,
-        'the bridge port must refuse connections after teardown',
       );
     },
   );

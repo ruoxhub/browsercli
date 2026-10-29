@@ -27,6 +27,7 @@ import WebSocket from 'ws';
 
 import {
   createEgoBridge,
+  DEGRADED_METHOD_EVENT,
   listTabsOwnTargetIds,
   READY_PREFIX,
   workspaceTaskSpaceName,
@@ -2450,6 +2451,79 @@ describe('ego-bridge-worker', () => {
     } finally {
       child.kill();
       fs.rmSync(markerDir, {recursive: true, force: true});
+    }
+  });
+
+  it('answers every Browser.* method ego lacks, and reports each gap to the client', async () => {
+    // ego has no Browser domain at all, and Patchright sends four more
+    // browser-level calls besides getVersion while it connects and initialises a
+    // context. Missing any of them aborts the connect with an opaque `-32601`,
+    // which is exactly how this gap reached a real browser before the polyfill.
+    const methods = [
+      'Browser.setDownloadBehavior',
+      'Browser.grantPermissions',
+      'Browser.resetPermissions',
+      'Browser.cancelDownload',
+    ];
+    const fake = createFakeEgo();
+    const bridge = createEgoBridge({ego: fake.ego, taskSpaceName: 'unit-test'});
+    const {wsEndpoint} = await bridge.start();
+    const ws = await connect(wsEndpoint);
+    try {
+      const received = collect(ws);
+      for (const [index, method] of methods.entries()) {
+        ws.send(JSON.stringify({id: 100 + index, method, params: {}}));
+      }
+      // One reply and one degraded notification per method, plus the repeats
+      // below must not add a second notification.
+      await waitFor(() =>
+        received.parsed.length >= methods.length * 2 ? true : undefined,
+      );
+
+      const replies = received.parsed.filter(
+        frame => typeof frame.id === 'number',
+      );
+      assert.deepEqual(
+        replies.map(reply => reply.id),
+        [100, 101, 102, 103],
+        'each call must be answered locally',
+      );
+      for (const reply of replies) {
+        assert.deepEqual(reply.result, {}, 'these CDP methods return {}');
+        assert.equal(reply.error, undefined, 'no method-not-found error');
+      }
+
+      const degraded = received.parsed
+        .filter(frame => frame.method === DEGRADED_METHOD_EVENT)
+        .map(frame => frame.params as {method: string; degraded: string});
+      assert.deepEqual(
+        degraded.map(entry => entry.method),
+        methods,
+        'the client must be told what each local answer dropped',
+      );
+      // The download policy is the one where the client stated an intent, so its
+      // gap has to say the policy was not applied rather than just "unavailable".
+      const download = degraded.find(
+        entry => entry.method === 'Browser.setDownloadBehavior',
+      );
+      assert.match(download?.degraded ?? '', /NOT applied/);
+
+      assert.deepEqual(fake.sent, [], 'no Browser.* call may reach native CDP');
+
+      // Repeats are answered but not re-announced: context init re-sends these.
+      ws.send(JSON.stringify({id: 200, method: 'Browser.setDownloadBehavior'}));
+      await waitFor(() =>
+        received.parsed.some(frame => frame.id === 200) ? true : undefined,
+      );
+      assert.equal(
+        received.parsed.filter(frame => frame.method === DEGRADED_METHOD_EVENT)
+          .length,
+        methods.length,
+        'a repeated call must not re-announce the same gap',
+      );
+    } finally {
+      ws.close();
+      await bridge.stop();
     }
   });
 });

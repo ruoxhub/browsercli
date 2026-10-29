@@ -98,6 +98,67 @@ const WHITELIST_REFRESH_REQUESTS = new Set([
   'Target.setDiscoverTargets',
 ]);
 
+/**
+ * `Browser.*` methods ego does not implement, and what answering them locally
+ * costs. ego has no Browser domain at all, so Patchright's own browser-level
+ * calls fail with `-32601 '<method>' wasn't found` and abort whatever it was
+ * doing — the connect handshake, context initialisation, or a download.
+ *
+ * Every method here returns an empty object in real CDP, so `{}` is the honest
+ * reply shape and Patchright does not read a value from any of them. The table
+ * is an explicit allow-list on purpose: a catch-all would answer methods whose
+ * results Patchright DOES read (`Browser.getWindowForTarget` returns
+ * `{windowId, bounds}`), turning a clean "method not found" into an undefined
+ * destructuring further downstream.
+ *
+ * Each row also names the capability being given up, because the reply itself
+ * cannot: the client is told its request succeeded. `degraded` capabilities are
+ * reported to the client over `EGO_BRIDGE_DEGRADED_METHOD`, not just logged —
+ * see `degradedMethods`.
+ *
+ * If ego ever implements the Browser domain, these four stay shadowed here; this
+ * table is the thing to delete when that happens.
+ */
+const BROWSER_DOMAIN_FALLBACKS: Record<
+  string,
+  {result: Record<string, unknown>; degraded: string}
+> = {
+  // Patchright sends this once per context with the client's download policy
+  // (`allowAndName`/`deny`, `downloadPath`, `eventsEnabled`). ego has no switch
+  // to apply it, so the policy is NOT enforced: downloads land wherever ego
+  // puts them and no Download event is delivered. This is the one row where the
+  // client's own intent is dropped, so it is called out by name.
+  'Browser.setDownloadBehavior': {
+    result: {},
+    degraded:
+      'download policy NOT applied: the client asked for a specific download behaviour and ego ignored it',
+  },
+  'Browser.grantPermissions': {
+    result: {},
+    degraded: 'browser permissions cannot be granted through the bridge',
+  },
+  'Browser.resetPermissions': {
+    result: {},
+    degraded: 'browser permissions cannot be reset through the bridge',
+  },
+  'Browser.cancelDownload': {
+    result: {},
+    degraded: 'downloads cannot be cancelled through the bridge',
+  },
+};
+
+/**
+ * Name of the synthesized CDP event that carries a degraded `Browser.*` method
+ * to the client.
+ *
+ * The human-readable log is not enough: the worker's stderr only reaches a
+ * caller through `stderrTail()` on an ERROR path, so in a healthy session a
+ * silently dropped download policy was invisible to the MCP client that relied
+ * on it. Events reach the client unconditionally, so the gap travels with the
+ * session.
+ */
+export const DEGRADED_METHOD_EVENT = 'EGO_BRIDGE_DEGRADED_METHOD';
+
 /** The native bindings ego lite injects into its embedded Node runtime. */
 export interface EgoNativeBindings {
   sendCDPMessage(message: string): void;
@@ -495,43 +556,6 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
     return result;
   };
 
-  /**
-   * `Browser.*` methods ego does not implement, and what answering them locally
-   * costs. ego has no Browser domain at all, so Patchright's own browser-level
-   * calls fail with `-32601 '<method>' wasn't found` and abort whatever it was
-   * doing — the connect handshake, context initialisation, or a download.
-   *
-   * Each entry carries the result shape Patchright expects (`{}` where the CDP
-   * reply is empty) plus the capability the bridge is giving up. The caller logs
-   * that line once per method, because a silent empty reply would surface much
-   * later as an unexplainable failure — the point of the polyfill is that a gap
-   * stays visible.
-   */
-  const BROWSER_DOMAIN_FALLBACKS: Record<
-    string,
-    {result: Record<string, unknown>; degraded: string}
-  > = {
-    // Patchright calls this once per context when `acceptDownloads` is unset.
-    // ego exposes no download switch, so the documented default applies and a
-    // real download then fails at the click instead of at connect.
-    'Browser.setDownloadBehavior': {
-      result: {},
-      degraded: 'download behaviour is not configurable on ego; defaults apply',
-    },
-    'Browser.grantPermissions': {
-      result: {},
-      degraded: 'browser permissions cannot be granted through the bridge',
-    },
-    'Browser.resetPermissions': {
-      result: {},
-      degraded: 'browser permissions cannot be reset through the bridge',
-    },
-    'Browser.cancelDownload': {
-      result: {},
-      degraded: 'downloads cannot be cancelled through the bridge',
-    },
-  };
-
   const replyWithResult = (
     id: unknown,
     sessionId: unknown,
@@ -568,6 +592,17 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
           degradedBrowserMethods.add(request.method);
           log(
             `[ego-bridge] ${request.method} answered locally: ${fallback.degraded}`,
+          );
+          // The reply says "succeeded"; only this event says what was lost, and
+          // events reach the client even when the session stays healthy.
+          broadcast(
+            JSON.stringify({
+              method: DEGRADED_METHOD_EVENT,
+              params: {
+                method: request.method,
+                degraded: fallback.degraded,
+              },
+            }),
           );
         }
         replyWithResult(request.id, request.sessionId, fallback.result);
