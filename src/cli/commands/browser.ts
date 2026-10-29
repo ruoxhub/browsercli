@@ -19,7 +19,9 @@ import {
   isEgoWithLaunchOnly,
   isEgoWithTarget,
   isKeepPageWithoutEgo,
+  isProfileWithoutEgo,
   KEEP_PAGE_WITHOUT_EGO_MESSAGE,
+  PROFILE_WITHOUT_EGO_MESSAGE,
 } from '../../config/browserInvariants.js';
 import {parseArgs} from '../args-parser.js';
 import {toAxiError} from '../errors.js';
@@ -46,6 +48,7 @@ const CONNECT_FLAGS = new Set([
   'json',
   'keep-page',
   'minimal-stealth',
+  'profile',
   'user-data-dir',
   'viewport',
   'ws-endpoint',
@@ -229,6 +232,18 @@ function connectOptions(
   ) {
     invalid(KEEP_PAGE_WITHOUT_EGO_MESSAGE);
   }
+  // `--profile` names an ego task-space identity; without ego nothing reads it,
+  // so accepting it would be the same silent ignore as `--keep-page`.
+  const profile = stringFlag(flags, 'profile');
+  if (
+    isProfileWithoutEgo({
+      ego: effectiveEgo,
+      egoProfile: profile ?? process.env.BROWSER_EGO_PROFILE,
+    })
+  ) {
+    invalid(PROFILE_WITHOUT_EGO_MESSAGE);
+  }
+  if (profile !== undefined) options.egoProfile = profile;
   if (
     isEgoWithTarget({
       ego: effectiveEgo,

@@ -65,6 +65,8 @@ export interface BrowserConnectOptions {
   channel?: string;
   cloak?: boolean;
   ego?: boolean;
+  /** ego 任务空间使用的 Profile id；只在**新建**空间时生效。 */
+  egoProfile?: string;
   executablePath?: string;
   force?: boolean;
   fullStealthArgs?: boolean;

@@ -113,6 +113,7 @@ export class BrowserConfigInvariantError extends Error {
  */
 export function assertBrowserConfigInvariants(config: {
   ego?: boolean | null;
+  egoProfile?: string | null;
   keepPage?: boolean | null;
 }): void {
   // Only `keepPage` is checked HERE. The launch-only flags deliberately are not:
@@ -127,6 +128,11 @@ export function assertBrowserConfigInvariants(config: {
   // check somewhere that sees one already-merged, already-defaulted object.
   if (isKeepPageWithoutEgo(config)) {
     throw new BrowserConfigInvariantError(KEEP_PAGE_WITHOUT_EGO_MESSAGE);
+  }
+  // Same layer, same reasoning as `keepPage`: a profile only exists to shape an
+  // ego task space, so without ego nothing would read it.
+  if (isProfileWithoutEgo(config)) {
+    throw new BrowserConfigInvariantError(PROFILE_WITHOUT_EGO_MESSAGE);
   }
 }
 
@@ -175,3 +181,26 @@ export function withConfigFileHint(
       '由环境变量引入时改 BROWSER_KEEP_PAGE / BROWSER_EGO。',
   );
 }
+
+/**
+ * `egoProfile` 脱离 `ego` 时同样没人读：profile 只被
+ * `BrowserManager.connectEgoBrowser()` → `EgoBridgeManager.start({profileId})`
+ * 这一条分支消费，本地启动与远程附连都不看它。
+ *
+ * 空字符串按「没指定」处理：`--profile ""` 与 `--profile=` 产生的是同一个
+ * 空值，若当成指定了 profile，用户会拿到一条关于 ego 的报错来诊断一个
+ * 拼写失误。
+ */
+export function isProfileWithoutEgo(config: {
+  ego?: boolean | null;
+  egoProfile?: string | null;
+}): boolean {
+  const profile = config.egoProfile;
+  return (
+    typeof profile === 'string' && profile.trim() !== '' && config.ego !== true
+  );
+}
+
+/** 同时点出 flag、环境变量与配置键，用户才知道该改哪一个。 */
+export const PROFILE_WITHOUT_EGO_MESSAGE =
+  'egoProfile 需要 ego：--profile / BROWSER_EGO_PROFILE 只在 ego 模式（--ego / BROWSER_EGO）下生效';

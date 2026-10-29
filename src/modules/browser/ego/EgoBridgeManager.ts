@@ -68,6 +68,12 @@ const SINK_READ_CHUNKS = 64;
 export interface EgoBridgeStartOptions {
   /** Keep the task space's pages when the bridge stops (the worker's `keep:'all'`). */
   keepPage?: boolean;
+  /**
+   * Create the task space in this ego profile (`--profile`). Only meaningful
+   * when a new space is created this run; a reused or reclaimed space keeps its
+   * own profile and the worker reports the flag as ignored.
+   */
+  profileId?: string;
 }
 
 export interface EgoBridgeConnection {
@@ -443,6 +449,13 @@ export class EgoBridgeManager {
     } else {
       // An inherited value would silently change the cleanup policy.
       delete env['EGO_BRIDGE_KEEP_PAGE'];
+    }
+    if (options.profileId === undefined) {
+      // Same reason as keepPage: an inherited profile id would pick an identity
+      // the caller never asked for.
+      delete env['EGO_BRIDGE_PROFILE_ID'];
+    } else {
+      env['EGO_BRIDGE_PROFILE_ID'] = options.profileId;
     }
     return env;
   }
@@ -886,6 +899,11 @@ function workerBootstrap(
     options.keepPage
       ? "process.env.EGO_BRIDGE_KEEP_PAGE = '1';"
       : 'delete process.env.EGO_BRIDGE_KEEP_PAGE;',
+    // An inherited value from the manager's own environment would silently pick
+    // a profile, so it is always written or cleared here rather than left alone.
+    options.profileId === undefined
+      ? 'delete process.env.EGO_BRIDGE_PROFILE_ID;'
+      : `process.env.EGO_BRIDGE_PROFILE_ID = ${stringLiteral(options.profileId)};`,
     `await import('${workerUrl}');`,
   ].join('\n');
 }

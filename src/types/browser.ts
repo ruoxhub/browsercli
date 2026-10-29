@@ -64,6 +64,18 @@ export interface BrowserManagerConfig {
    */
   keepPage?: boolean;
   /**
+   * ego 任务空间使用的 Profile（`--profile <id>` / `BROWSER_EGO_PROFILE`）。
+   *
+   * 决定新建任务空间继承哪个身份（cookies、登录态、storage）。只在**新建**
+   * 空间时生效：复用或认领已有空间会保留它原本的 profile，此时桥接进程会在
+   * 诊断日志里明说该 flag 被忽略——静默切换会让用户以为换了身份，而眼前的
+   * 标签页其实还登录在旧身份下。
+   *
+   * 取值来自 `ego.listProfiles()` 的 `id`（如 `Profile 1`），不是 `name`
+   * （name 可能重复，不能作定位符）。
+   */
+  egoProfile?: string;
+  /**
    * Opt-in 注入 StealthScripts2025（覆盖 navigator/canvas/WebGL/audio 等）。
    * 默认不开：与 jshookmcp 的"零 JS 注入"哲学对齐 —— `Object.defineProperty`
    * hack 本身就是检测信号。需要显式 opt-in 才注入。

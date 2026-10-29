@@ -67,7 +67,7 @@ export function generateTopLevelHelp(options?: {
 }
 
 const BROWSER_CONNECT_USAGE =
-  'browsercli browser connect [--browser-url <url> | --ws-endpoint <url> | --channel <name> | --executable-path <path> | --ego] [--keep-page] [--user-data-dir <dir>] [--viewport <width>x<height>] [--ws-headers <json>] [--headless[=<bool>]] [--cloak] [--minimal-stealth] [--full-stealth-args] [--js-stealth] [--isolated] [--accept-insecure-certs] [--force] [--json]';
+  'browsercli browser connect [--browser-url <url> | --ws-endpoint <url> | --channel <name> | --executable-path <path> | --ego] [--keep-page] [--profile <id>] [--user-data-dir <dir>] [--viewport <width>x<height>] [--ws-headers <json>] [--headless[=<bool>]] [--cloak] [--minimal-stealth] [--full-stealth-args] [--js-stealth] [--isolated] [--accept-insecure-certs] [--force] [--json]';
 
 const BROWSER_CONNECT_OPTIONS = [
   '  目标参数（互斥）：',
@@ -79,6 +79,8 @@ const BROWSER_CONNECT_OPTIONS = [
   '  ego lite 模式：',
   '    --ego                          连接正在运行的 ego lite 浏览器（经本地 CDP 桥接），不本地启动浏览器',
   '    --keep-page                    停止桥接时保留 ego 里的分析标签页，不加则关闭任务空间、标签页消失（仅 --ego）',
+  '    --profile <id>                 新建任务空间时使用的 Profile id（如 `Profile 1`，见 `browser space list`）；',
+  '                                   只在新建时生效，复用已有空间时会保留其原 Profile 并在诊断日志中提示（仅 --ego）',
   '',
   '  运行与环境选项：',
   '    --user-data-dir <dir>          浏览器 Profile 用户数据目录',

@@ -94,6 +94,11 @@ export const BrowserConfigSchema = zod
      * 只在 `ego: true` 下有含义；CLI 在 non-ego 下直接拒绝该 flag。
      */
     keepPage: booleanSchema.optional(),
+    /**
+     * ego 任务空间使用的 Profile id（`--profile` / `BROWSER_EGO_PROFILE`）。
+     * 只在 `ego: true` 下有含义，且只在**新建**任务空间时生效。
+     */
+    egoProfile: optionalStringSchema.optional(),
     /** 使用历史 60+ 启动参数集（`FULL_STEALTH_ARGS`）。默认 false：其中多个 flag 已是反爬检测信号。 */
     fullStealthArgs: booleanSchema.optional(),
     /** 启用最小启动参数集（`MINIMAL_STEALTH_ARGS`：`--test-type` + `--hide-crash-restore-bubble`）。默认 true。 */

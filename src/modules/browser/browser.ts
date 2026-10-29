@@ -416,6 +416,9 @@ export class BrowserManager {
       // target, or this call would never be reached and the flag would be lost.
       const connection = await bridge.start({
         keepPage: this.config.keepPage === true,
+        ...(this.config.egoProfile === undefined
+          ? {}
+          : {profileId: this.config.egoProfile}),
       });
       this.config = {...this.config, wsEndpoint: connection.wsEndpoint};
 

@@ -314,6 +314,23 @@ describe('CLI flags reach EgoBridgeManager.start', () => {
     assert.equal(bridge.startOptions[0]?.keepPage, true);
   });
 
+  it('passes --profile to start({profileId})', async () => {
+    const bridge = await connectThroughCli([
+      'connect',
+      '--ego',
+      '--profile',
+      'Profile 7',
+    ]);
+    assert.equal(bridge.startOptions.length, 1);
+    assert.equal(bridge.startOptions[0]?.profileId, 'Profile 7');
+  });
+
+  it('starts ego without a profile when --profile is absent', async () => {
+    const bridge = await connectThroughCli(['connect', '--ego']);
+    assert.equal(bridge.startOptions.length, 1);
+    assert.equal(bridge.startOptions[0]?.profileId, undefined);
+  });
+
   it('starts ego without retention when --keep-page is absent', async () => {
     const bridge = await connectThroughCli(['connect', '--ego']);
     assert.equal(bridge.startOptions.length, 1);
@@ -385,5 +402,64 @@ describe('CLI flags reach EgoBridgeManager.start', () => {
         );
       }
     }
+  });
+});
+
+/**
+ * `--profile` follows the same three layers as `--keep-page`: CLI flag set →
+ * IPC `.strict()` body → `EgoBridgeManager.start({profileId})`. Each one drops
+ * an unknown field silently, so each gets its own assertion.
+ */
+describe('browser connect --profile', () => {
+  it('maps --profile to the connect body', async () => {
+    const {bodies, ctx} = recordingContext();
+    await browserCommand(['connect', '--ego', '--profile', 'Profile 7'], ctx);
+
+    assert.deepEqual(bodies, [{ego: true, egoProfile: 'Profile 7'}]);
+  });
+
+  it('rejects --profile without ego, before any daemon call', async () => {
+    const {bodies, ctx} = recordingContext();
+    await assert.rejects(
+      async () => browserCommand(['connect', '--profile', 'Profile 7'], ctx),
+      (error: unknown) => {
+        assert.ok(error instanceof AxiError);
+        assert.strictEqual(error.code, 'VALIDATION_ERROR');
+        assert.match(error.message, /egoProfile/);
+        assert.match(error.message, /--profile/);
+        assert.match(error.message, /BROWSER_EGO_PROFILE/);
+        return true;
+      },
+    );
+    assert.deepEqual(bodies, [], 'nothing may reach the daemon');
+  });
+
+  it('rejects the env-only BROWSER_EGO_PROFILE without ego', async () => {
+    const saved = process.env.BROWSER_EGO_PROFILE;
+    process.env.BROWSER_EGO_PROFILE = 'Profile 7';
+    try {
+      const {bodies, ctx} = recordingContext();
+      await assert.rejects(
+        async () => browserCommand(['connect'], ctx),
+        (error: unknown) => {
+          assert.ok(error instanceof AxiError);
+          assert.strictEqual(error.code, 'VALIDATION_ERROR');
+          assert.match(error.message, /egoProfile/);
+          return true;
+        },
+      );
+      assert.deepEqual(bodies, [], 'nothing may reach the daemon');
+    } finally {
+      if (saved === undefined) delete process.env.BROWSER_EGO_PROFILE;
+      else process.env.BROWSER_EGO_PROFILE = saved;
+    }
+  });
+
+  it('carries the profile through the IPC body schema', () => {
+    const parsed = parseBrowserConnectBody({
+      ego: true,
+      egoProfile: 'Profile 7',
+    });
+    assert.equal(parsed.egoProfile, 'Profile 7');
   });
 });

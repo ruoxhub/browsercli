@@ -35,6 +35,7 @@ const BrowserConnectSchema = BrowserConfigSchema.pick({
   channel: true,
   cloak: true,
   ego: true,
+  egoProfile: true,
   executablePath: true,
   fullStealthArgs: true,
   headless: true,
