@@ -260,6 +260,12 @@ function asString(value: unknown): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
 
+/** Read one named field out of a CDP `params` object, tolerating junk. */
+function readParam(params: unknown, key: string): unknown {
+  if (params === null || typeof params !== 'object') return undefined;
+  return (params as Record<string, unknown>)[key];
+}
+
 function encodeFrame(opcode: number, payload: Buffer): Buffer {
   const length = payload.length;
   let header: Buffer;
@@ -473,6 +479,12 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
   const clients = new Set<WsClient>();
   /** requests forwarded to ego and still waiting for their response */
   const inFlight = new Map<number, string | undefined>();
+  /**
+   * The request behind each in-flight id, kept only so a reply with no `method`
+   * can be attributed — `Target.getTargets` replies need filtering, and the
+   * response frame does not say what it answers.
+   */
+  const requestMethods = new Map<number, CdpMessage>();
   /** keeps native events in arrival order even while they are filtered */
   let nativeQueue: Promise<void> = Promise.resolve();
   /** cached result of `listOwnTargetIds`; refreshed, never read synchronously */
@@ -622,11 +634,31 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
       // the attach events do not each wait for a native round-trip.
       void refreshOwnTargets(true);
     }
+    // Request-side firewall. The event filter below cannot protect what the
+    // client ASKS for: a `Target.getTargets` reply is a plain response frame, and
+    // shipped tools (`list_targets`, `dump_target_scripts`) do ask. Deny a
+    // request that names a target outside this task space, and remember the
+    // method so its reply can be filtered.
+    if (targetRequestVerdict(request) === 'deny') {
+      if (typeof request.id === 'number') {
+        replyWithError(
+          request.id,
+          typeof request.sessionId === 'string' ? request.sessionId : undefined,
+          `target outside the task space: ${String(request.method)}`,
+        );
+      }
+      log(
+        `[ego-bridge] refused ${String(request.method)}: target outside the task space`,
+      );
+      return;
+    }
     if (typeof request.id === 'number') {
       inFlight.set(
         request.id,
         typeof request.sessionId === 'string' ? request.sessionId : undefined,
       );
+      const method = asString(request.method);
+      if (method !== undefined) requestMethods.set(request.id, request);
     }
     try {
       // Byte-for-byte: the client's own JSON text is what ego receives, so the
@@ -685,6 +717,79 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
 
   const isOwnTargetId = (id: string): boolean =>
     knownOwnTargetIds.has(id) || ownTargetIds?.has(id) === true;
+
+  /**
+   * `Target.*` requests that name a target, and where the id lives.
+   *
+   * The event firewall is not enough on its own: the client can also ASK for
+   * targets, and the reply is a response frame with no `method` for the event
+   * filter to look at. Shipped tools do exactly this — `list_targets` sends
+   * `Target.getTargets` and `dump_target_scripts` sends `Target.attachToTarget`
+   * (`src/modules/browser/BrowserTargetInspector.ts`) — so without a request-side
+   * check the firewall would only hide the user's tabs from `context.pages()`
+   * while leaving them enumerable and attachable.
+   */
+  const TARGET_REQUEST_IDS = new Map<string, (params: unknown) => unknown[]>([
+    ['Target.attachToTarget', params => [readParam(params, 'targetId')]],
+    ['Target.closeTarget', params => [readParam(params, 'targetId')]],
+    ['Target.activateTarget', params => [readParam(params, 'targetId')]],
+    ['Target.getTargetInfo', params => [readParam(params, 'targetId')]],
+    ['Target.detachFromTarget', () => []],
+  ]);
+
+  /**
+   * Whether a `Target.*` request may go to ego at all. `Target.getTargets` is
+   * allowed through but its reply is rewritten by `filterTargetListReply`,
+   * because dropping it would break Patchright's own discovery.
+   */
+  const targetRequestVerdict = (request: CdpMessage): 'allow' | 'deny' => {
+    if (!firewallEnabled) return 'allow';
+    const method = asString(request.method);
+    if (method === undefined || !method.startsWith('Target.')) return 'allow';
+    if (method === 'Target.getTargets') return 'allow';
+    const readIds = TARGET_REQUEST_IDS.get(method);
+    if (!readIds) return 'allow';
+    const ids = readIds(request.params)
+      .map(asString)
+      .filter((id): id is string => id !== undefined);
+    if (ids.length === 0) return 'allow';
+    return ids.every(isOwnTargetId) ? 'allow' : 'deny';
+  };
+
+  /**
+   * Rewrite a `Target.getTargets` reply so only this task space's targets are
+   * visible. Applied to the response, because the response is what carries the
+   * list; the request itself has nothing to filter.
+   */
+  const filterTargetListReply = (
+    raw: string,
+    request: CdpMessage,
+  ): string | undefined => {
+    if (!firewallEnabled) return raw;
+    if (asString(request.method) !== 'Target.getTargets') return raw;
+    let frame: {
+      id?: unknown;
+      result?: {targetInfos?: unknown};
+      [key: string]: unknown;
+    };
+    try {
+      frame = JSON.parse(raw) as typeof frame;
+    } catch {
+      return raw;
+    }
+    const infos = frame.result?.targetInfos;
+    if (!Array.isArray(infos)) return raw;
+    const kept = infos.filter(info => {
+      const id = asString((info as {targetId?: unknown} | null)?.targetId);
+      return id !== undefined && isOwnTargetId(id);
+    });
+    if (kept.length === infos.length) return raw;
+    log(
+      `[ego-bridge] Target.getTargets reply filtered: ${infos.length - kept.length} target(s) outside the task space hidden`,
+    );
+    frame.result = {...frame.result, targetInfos: kept};
+    return JSON.stringify(frame);
+  };
 
   /**
    * Latch the ids of a forwarded event: `detachedFromTarget` may carry only the
@@ -766,13 +871,23 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
       log('[ego-bridge] dropping non-JSON CDP message from ego');
       return;
     }
-    if (typeof event.id === 'number') inFlight.delete(event.id);
+    // A response frame carries no `method`, so it is matched back to the request
+    // that produced it. `Target.getTargets` answers with the full target list,
+    // which is exactly what the event filter exists to keep to this task space.
+    let outgoing = raw;
+    if (typeof event.id === 'number') {
+      const answered = requestMethods.get(event.id);
+      requestMethods.delete(event.id);
+      inFlight.delete(event.id);
+      if (answered !== undefined)
+        outgoing = filterTargetListReply(raw, answered);
+    }
     const method = asString(event.method);
     if (method !== undefined && method.startsWith('Target.')) {
       // The user's own tabs must never surface in the client's context.pages().
       if (!(await allowTargetEvent(method, event))) return;
     }
-    broadcast(raw);
+    broadcast(outgoing);
   };
 
   const onNativeMessage = (message: string) => {
@@ -1164,6 +1279,19 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
     }
     started = (async () => {
       try {
+        // One ego utility process hosts exactly one `globalThis.ego`, and every
+        // `-e` run gets its own realm over it. Taking `onCDPMessage` while another
+        // bridge holds it would silently starve that bridge: its in-flight
+        // requests would never be answered and its events would be delivered to
+        // this client instead. Two browsercli workspaces on one machine is normal
+        // usage, so refuse loudly rather than steal the slot.
+        if (typeof ego.onCDPMessage === 'function') {
+          throw new Error(
+            "another ego bridge already owns this ego runtime's CDP callback " +
+              '(one ego lite runtime serves one browsercli session; stop the ' +
+              'other session first)',
+          );
+        }
         const entry = await enterTaskSpace();
         // `spaceEntered`/`spaceOrigin` are set before the await below so the
         // failure path can release the space; that ordering is safe only because

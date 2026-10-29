@@ -644,6 +644,10 @@ export class EgoBridgeManager {
       // The unconsumed bytes — including any half-written ready line — are now at
       // the start of the file, so the read offset restarts with them.
       this.sinkOffset = 0;
+      // The decoder carries a partial multi-byte character across chunks; the
+      // bytes it was holding were just rewritten at offset 0, so keeping that
+      // state would prefix the first line of the new window with U+FFFD.
+      this.sinkDecoder = new StringDecoder('utf8');
       // ponytail: the worker appends by path, so a byte appended between the read
       // above and this write is lost. Closing that window needs the worker to
       // rotate the file itself; the cost today is one drop of diagnostics.

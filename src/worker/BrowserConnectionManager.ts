@@ -226,7 +226,18 @@ export async function disconnectBrowser(
   options: DisconnectBrowserOptions = {},
 ): Promise<void> {
   const disconnect = async () => {
-    await BrowserManager.resetInstance();
+    // `false` means close() failed and the instance (with its bridge) was kept so
+    // a later call can retry. Reporting a clean disconnect over a bridge that is
+    // still listening would throw away the honesty `stop()` was built for.
+    const cleared = await BrowserManager.resetInstance();
+    if (cleared === false) {
+      throw Object.assign(
+        new Error(
+          'browser disconnect incomplete: the bridge could not be stopped and was kept for retry',
+        ),
+        {code: 'BROWSER_DISCONNECT_INCOMPLETE'},
+      );
+    }
     contextProvider.setBrowser(null);
     contextProvider.clearContext();
   };

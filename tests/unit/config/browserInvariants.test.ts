@@ -13,6 +13,7 @@ import {
   ENV_FALSE_VALUES,
   ENV_TRUE_VALUES,
   getEnvFlag,
+  isEgoWithLaunchOnly,
   isEgoWithTarget,
   isKeepPageWithoutEgo,
   withConfigFileHint,
@@ -146,5 +147,39 @@ describe('ego config predicates', () => {
     );
     assert.match(hinted.message, /BROWSER_KEEP_PAGE/);
     assert.match(hinted.message, /browser\.keepPage/);
+  });
+});
+
+describe('ego with launch-only flags', () => {
+  it('flags every flag that only the local launch path reads', () => {
+    // ego mode never runs `launchBrowser()`, so these are accepted-and-ignored
+    // unless something rejects them. One case per flag, so a new flag that joins
+    // the family without joining the guard fails here.
+    for (const flag of [
+      {cloak: true},
+      {headless: false},
+      {userDataDir: '/tmp/x'},
+      {isolated: true},
+      {minimalStealth: true},
+      {fullStealthArgs: true},
+      {jsStealth: true},
+      {acceptInsecureCerts: true},
+    ]) {
+      assert.equal(
+        isEgoWithLaunchOnly({ego: true, ...flag}),
+        true,
+        `${Object.keys(flag)[0]} must be rejected in ego mode`,
+      );
+    }
+  });
+
+  it('leaves ego alone, and leaves every other mode alone', () => {
+    assert.equal(isEgoWithLaunchOnly({ego: true}), false);
+    assert.equal(
+      isEgoWithLaunchOnly({ego: false, cloak: true, headless: false}),
+      false,
+      'without ego these flags are live, not ignored',
+    );
+    assert.equal(isEgoWithLaunchOnly({cloak: true}), false);
   });
 });

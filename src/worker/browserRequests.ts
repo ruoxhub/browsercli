@@ -14,6 +14,8 @@ import {
   assertBrowserConfigInvariants,
   EGO_TARGET_CONFLICT_MESSAGE,
   getEnvFlag,
+  EGO_LAUNCH_ONLY_FLAGS_MESSAGE,
+  isEgoWithLaunchOnly,
   isEgoWithTarget,
   isKeepPageWithoutEgo,
   KEEP_PAGE_WITHOUT_EGO_MESSAGE,
@@ -126,6 +128,14 @@ export function parseBrowserConnectBody(body: unknown): BrowserConfig {
     throw new BrowserConfigRequestError(
       'BROWSER_CONFIG_CONFLICT',
       EGO_TARGET_CONFLICT_MESSAGE,
+    );
+  }
+  // Same class of silent ignore: flags only `launchBrowser()` reads must not be
+  // accepted in ego mode, where that path never runs.
+  if (isEgoWithLaunchOnly(parsed.data)) {
+    throw new BrowserConfigRequestError(
+      'BROWSER_CONFIG_CONFLICT',
+      EGO_LAUNCH_ONLY_FLAGS_MESSAGE,
     );
   }
   // `keepPage` 的判定必须用**生效的 ego**，不能只看 body：daemon 继承

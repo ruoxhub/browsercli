@@ -2526,4 +2526,144 @@ describe('ego-bridge-worker', () => {
       await bridge.stop();
     }
   });
+
+  it('filters Target.getTargets replies down to this task space', async () => {
+    // The event firewall cannot protect what the client ASKS for: a
+    // Target.getTargets reply is a response frame with no `method`, and
+    // `list_targets` / `dump_target_scripts` really do send it. Without this,
+    // the firewall would only hide user tabs from context.pages() while leaving
+    // them enumerable.
+    const fake = createFakeEgo({
+      listTabs: async () => ({tabs: [{targetId: 'OWN-TAB'}]}),
+    });
+    const bridge = createEgoBridge({
+      ego: fake.ego,
+      taskSpaceName: 'unit-test',
+      listOwnTargetIds: () => listTabsOwnTargetIds(fake.ego),
+    });
+    const {wsEndpoint} = await bridge.start();
+    const ws = await connect(wsEndpoint);
+    try {
+      const received = collect(ws);
+      ws.send(JSON.stringify({id: 77, method: 'Target.getTargets'}));
+      await waitFor(() => (fake.sent.length > 0 ? true : undefined));
+      assert.equal(fake.sent.length, 1, 'the request itself is forwarded');
+      assert.equal(
+        (JSON.parse(fake.sent[0]) as {method?: string}).method,
+        'Target.getTargets',
+      );
+
+      // ego answers with everything it knows about, including a user's tab.
+      fake.emit({
+        id: 77,
+        result: {
+          targetInfos: [
+            {targetId: 'OWN-TAB', type: 'page', url: 'http://127.0.0.1/'},
+            {
+              targetId: 'USER-PRIVATE-TAB',
+              type: 'page',
+              url: 'https://mail.example.com/inbox',
+            },
+          ],
+        },
+      });
+      await waitFor(() =>
+        received.parsed.some(frame => frame.id === 77) ? true : undefined,
+      );
+      const reply = received.parsed.find(frame => frame.id === 77);
+      const infos = (reply?.result as {targetInfos?: Array<{targetId: string}>})
+        ?.targetInfos;
+      assert.deepEqual(
+        infos?.map(info => info.targetId),
+        ['OWN-TAB'],
+        'only this task space may appear in the reply',
+      );
+      // And the private URL must not survive anywhere in the frame.
+      assert.ok(
+        !received.raw.some(text => text.includes('mail.example.com')),
+        'a user URL must never reach the client',
+      );
+    } finally {
+      ws.close();
+      await bridge.stop();
+    }
+  });
+
+  it('refuses to attach to or close a target outside this task space', async () => {
+    const fake = createFakeEgo({
+      listTabs: async () => ({tabs: [{targetId: 'OWN-TAB'}]}),
+    });
+    const bridge = createEgoBridge({
+      ego: fake.ego,
+      taskSpaceName: 'unit-test',
+      listOwnTargetIds: () => listTabsOwnTargetIds(fake.ego),
+    });
+    const {wsEndpoint} = await bridge.start();
+    const ws = await connect(wsEndpoint);
+    try {
+      const received = collect(ws);
+      for (const [id, method] of [
+        [201, 'Target.attachToTarget'],
+        [202, 'Target.closeTarget'],
+        [203, 'Target.activateTarget'],
+      ] as const) {
+        ws.send(
+          JSON.stringify({
+            id,
+            method,
+            params: {targetId: 'USER-PRIVATE-TAB', flatten: true},
+          }),
+        );
+      }
+      await waitFor(() =>
+        received.parsed.filter(frame => typeof frame.id === 'number').length >=
+        3
+          ? true
+          : undefined,
+      );
+      assert.deepEqual(
+        fake.sent,
+        [],
+        'a request naming a foreign target must never reach ego',
+      );
+      for (const frame of received.parsed) {
+        assert.ok(
+          frame.error,
+          'the client must be told the request was denied',
+        );
+      }
+
+      // The bridge's own target still works.
+      ws.send(
+        JSON.stringify({
+          id: 204,
+          method: 'Target.attachToTarget',
+          params: {targetId: 'OWN-TAB', flatten: true},
+        }),
+      );
+      await waitFor(() => (fake.sent.length > 0 ? true : undefined));
+      assert.equal(
+        (JSON.parse(fake.sent[0]) as {id: number}).id,
+        204,
+        'an owned target is still attachable',
+      );
+    } finally {
+      ws.close();
+      await bridge.stop();
+    }
+  });
+
+  it('refuses to start when another bridge already owns the ego callback slot', async () => {
+    // Every `-e` run gets its own realm over ONE ego utility process, so a second
+    // bridge assigning onCDPMessage would silently starve the first: its pending
+    // requests would never be answered and its events would go to the new client.
+    const fake = createFakeEgo();
+    fake.ego.onCDPMessage = () => undefined;
+    const bridge = createEgoBridge({ego: fake.ego, taskSpaceName: 'unit-test'});
+    await assert.rejects(
+      () => bridge.start(),
+      /another ego bridge already owns this ego runtime/,
+    );
+    assert.deepEqual(fake.calls, [], 'no task space may be touched');
+  });
 });

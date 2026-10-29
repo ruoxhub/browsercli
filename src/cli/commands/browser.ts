@@ -15,6 +15,8 @@ import type {AxiCliCommand} from 'axi-sdk-js';
 import {
   EGO_TARGET_CONFLICT_MESSAGE,
   getEnvFlag,
+  EGO_LAUNCH_ONLY_FLAGS_MESSAGE,
+  isEgoWithLaunchOnly,
   isEgoWithTarget,
   isKeepPageWithoutEgo,
   KEEP_PAGE_WITHOUT_EGO_MESSAGE,
@@ -237,6 +239,33 @@ function connectOptions(
     })
   ) {
     invalid(EGO_TARGET_CONFLICT_MESSAGE);
+  }
+  if (
+    isEgoWithLaunchOnly({
+      ego: effectiveEgo,
+      cloak: booleans.cloak,
+      headless: booleans.headless,
+      userDataDir: stringFlag(flags, 'user-data-dir'),
+      isolated: booleans.isolated,
+      minimalStealth: booleans['minimal-stealth'],
+      fullStealthArgs: booleans['full-stealth-args'],
+      jsStealth: booleans['js-stealth'],
+      acceptInsecureCerts: booleans['accept-insecure-certs'],
+    })
+  ) {
+    // Only for an explicitly written flag: `--ego` alone must not trip on the
+    // defaults the parser fills in.
+    const written = new Set(Object.keys(booleans));
+    const egoLaunchOnlyWritten =
+      written.has('cloak') ||
+      written.has('headless') ||
+      written.has('isolated') ||
+      written.has('minimal-stealth') ||
+      written.has('full-stealth-args') ||
+      written.has('js-stealth') ||
+      written.has('accept-insecure-certs') ||
+      stringFlag(flags, 'user-data-dir') !== undefined;
+    if (egoLaunchOnlyWritten) invalid(EGO_LAUNCH_ONLY_FLAGS_MESSAGE);
   }
   for (const [key, value] of Object.entries(booleans)) {
     if (value !== undefined) {

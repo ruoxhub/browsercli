@@ -226,6 +226,35 @@ describe('ego bridge end-to-end integration', () => {
         'clicking must compute 1+2+3 then multiply by 7',
       );
 
+      // 5b. The request-side firewall. `context.pages()` only proves the EVENT
+      //     filter; the client can also ask, and a `Target.getTargets` reply is a
+      //     response frame with no method for the event filter to inspect. Shipped
+      //     tools (`list_targets`, `dump_target_scripts`) do exactly that, so the
+      //     reply must already be scoped to this task space.
+      const session = await page.context().newCDPSession(page);
+      try {
+        const listed = (await session.send('Target.getTargets' as never)) as {
+          targetInfos?: Array<{targetId: string; url?: string}>;
+        };
+        const infos = listed.targetInfos ?? [];
+        assert.ok(
+          infos.length > 0,
+          'the bridge must report at least the page this test drives',
+        );
+        for (const info of infos) {
+          const url = info.url ?? '';
+          assert.ok(
+            url.length === 0 ||
+              url === 'about:blank' ||
+              url === 'chrome://new-tab-page/' ||
+              url.startsWith(fixture.url),
+            `a target outside this task space is enumerable through the bridge: ${url}`,
+          );
+        }
+      } finally {
+        await session.detach();
+      }
+
       // 6. Page evaluation in the PAGE's own world.
       //
       //    `page.evaluate()` cannot do this: Patchright defaults it to an

@@ -1360,29 +1360,40 @@ describe('EgoBridgeManager', () => {
     const sinkDir = makeTempDir('ego-sink-');
     const manager = new EgoBridgeManager(managerOptions(harness, {sinkDir}));
 
-    const started = manager.start();
-    await manager.stop();
-    // The launch still completed (the stop was queued behind it), so its endpoint
-    // is observable — which is exactly what makes "the port is free" assertable.
-    const connection = await started;
+    try {
+      const started = manager.start();
+      await manager.stop();
+      // The launch still completed (the stop was queued behind it), so its
+      // endpoint is observable — which is what makes "the port is free"
+      // assertable.
+      const connection = await started;
 
-    assert.equal(
-      manager.isRunning(),
-      false,
-      'no bridge this manager started may still be running',
-    );
-    assert.equal(harness.records.length, 1, 'the launch did happen');
-    assert.equal(hasExited(harness.records[0].child), true);
-    assert.equal(
-      await connectRefused(portOf(connection.wsEndpoint)),
-      true,
-      'the port the bridge bound must refuse connections',
-    );
-    assert.deepEqual(
-      fs.readdirSync(sinkDir),
-      [],
-      'the sink and stop files must be gone',
-    );
+      assert.equal(
+        manager.isRunning(),
+        false,
+        'no bridge this manager started may still be running',
+      );
+      assert.equal(harness.records.length, 1, 'the launch did happen');
+      assert.equal(hasExited(harness.records[0].child), true);
+      assert.equal(
+        await connectRefused(portOf(connection.wsEndpoint)),
+        true,
+        'the port the bridge bound must refuse connections',
+      );
+      assert.deepEqual(
+        fs.readdirSync(sinkDir),
+        [],
+        'the sink and stop files must be gone',
+      );
+    } finally {
+      // A regression here is exactly when an orphan bridge is most likely: the
+      // assertion above throws, and without this the child would outlive the
+      // runner still holding its port. Same shape as the failed-stop test.
+      for (const record of harness.records) {
+        record.child.kill('SIGKILL');
+        await waitForExit(record.child);
+      }
+    }
   });
 
   it('stops the bridge when start(); start(); stop() share one tick (R1)', async () => {
@@ -1391,17 +1402,24 @@ describe('EgoBridgeManager', () => {
     const sinkDir = makeTempDir('ego-sink-');
     const manager = new EgoBridgeManager(managerOptions(harness, {sinkDir}));
 
-    const first = manager.start();
-    const second = manager.start();
-    await manager.stop();
-    const [a, b] = await Promise.all([first, second]);
+    try {
+      const first = manager.start();
+      const second = manager.start();
+      await manager.stop();
+      const [a, b] = await Promise.all([first, second]);
 
-    assert.equal(manager.isRunning(), false);
-    assert.equal(harness.records.length, 1, 'the two starts share one child');
-    assert.equal(a.wsEndpoint, b.wsEndpoint);
-    assert.equal(hasExited(harness.records[0].child), true);
-    assert.equal(await connectRefused(portOf(a.wsEndpoint)), true);
-    assert.deepEqual(fs.readdirSync(sinkDir), [], 'no files may be left');
+      assert.equal(manager.isRunning(), false);
+      assert.equal(harness.records.length, 1, 'the two starts share one child');
+      assert.equal(a.wsEndpoint, b.wsEndpoint);
+      assert.equal(hasExited(harness.records[0].child), true);
+      assert.equal(await connectRefused(portOf(a.wsEndpoint)), true);
+      assert.deepEqual(fs.readdirSync(sinkDir), [], 'no files may be left');
+    } finally {
+      for (const record of harness.records) {
+        record.child.kill('SIGKILL');
+        await waitForExit(record.child);
+      }
+    }
   });
 
   it('stays usable after a same-tick start(); stop() (R1)', async () => {

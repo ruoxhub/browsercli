@@ -379,8 +379,15 @@ export async function startDaemonServer(
       return status;
     } catch (error) {
       if (error instanceof WorkerBusyError) throw error;
-      throw Object.assign(new Error('failed to connect browser'), {
+      // Keep the original message: the bridge's diagnostics ("ego lite binary
+      // not found at <paths>", "could not enter a task space ... after 8
+      // attempts", a CDP method ego does not implement) are the only thing that
+      // tells a user what to do next. Folding them into one sentence is how a
+      // well-diagnosed failure becomes an unexplained one.
+      const detail = error instanceof Error ? error.message : String(error);
+      throw Object.assign(new Error(`failed to connect browser: ${detail}`), {
         code: 'BROWSER_CONNECT_FAILED',
+        cause: error,
       });
     }
   }

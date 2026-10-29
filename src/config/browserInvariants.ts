@@ -48,6 +48,42 @@ export function isEgoWithTarget(config: {
   );
 }
 
+/**
+ * ego 模式下**只在本地启动路径读取**的 flag。
+ *
+ * `ensureBrowser()` 在 ego 分支直接走 `connectToRemoteBrowser()`，`launchBrowser()`
+ * 一行都不会执行，所以这些 flag 被接受却完全没人读 —— 与 `keepPage` 脱离 `ego`
+ * 是同一类「静默忽略」，区别只是它们人多。`--js-stealth` 也算在内：远程路径只看
+ * `config.useStealthScripts`，而 CLI 的 `--js-stealth` 从不写它。
+ */
+export function isEgoWithLaunchOnly(config: {
+  ego?: boolean | null;
+  cloak?: unknown;
+  headless?: unknown;
+  userDataDir?: unknown;
+  isolated?: unknown;
+  minimalStealth?: unknown;
+  fullStealthArgs?: unknown;
+  jsStealth?: unknown;
+  acceptInsecureCerts?: unknown;
+}): boolean {
+  if (config.ego !== true) return false;
+  return (
+    config.cloak === true ||
+    config.headless !== undefined ||
+    config.userDataDir !== undefined ||
+    config.isolated === true ||
+    config.minimalStealth === true ||
+    config.fullStealthArgs === true ||
+    config.jsStealth === true ||
+    config.acceptInsecureCerts !== undefined
+  );
+}
+
+/** 逐个点名，因为「你写的那几个 flag 在 ego 下不生效」比一句「互斥」有用得多。 */
+export const EGO_LAUNCH_ONLY_FLAGS_MESSAGE =
+  'ego 模式不启动本地浏览器，以下参数在 ego 下不生效：--cloak / --headless / --user-data-dir / --isolated / --minimal-stealth / --full-stealth-args / --js-stealth / --accept-insecure-certs';
+
 /** 同时点出两个 key（CLI flag、环境变量、配置键），用户才知道该改哪一个。 */
 export const KEEP_PAGE_WITHOUT_EGO_MESSAGE =
   'keepPage 需要 ego：--keep-page / BROWSER_KEEP_PAGE 只在 ego 模式（--ego / BROWSER_EGO）下生效';
