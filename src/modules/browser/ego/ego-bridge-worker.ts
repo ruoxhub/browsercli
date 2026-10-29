@@ -109,6 +109,14 @@ export interface EgoNativeBindings {
   listTabs?: () => Promise<unknown>;
   listTaskSpaces?: () => Promise<unknown>;
   createTaskSpace?: (name: string) => Promise<unknown>;
+  /**
+   * Turns a listed Space into an agent-owned task space without creating a
+   * replacement one. Required to reclaim the bridge's own leftovers: after
+   * `completeTaskSpace()` ego reports them as `ownership: 'user'`, and both
+   * `useTaskSpace()` and `closeTaskSpace()` refuse them
+   * (`EGO_TASK_SPACE_INACTIVE`) until they are claimed back.
+   */
+  claimTaskSpace?: (id: number) => Promise<unknown>;
   useTaskSpace?: (id: number) => unknown;
   closeTaskSpace?: () => Promise<unknown>;
   completeTaskSpace?: () => Promise<unknown>;
@@ -174,6 +182,12 @@ interface EgoTaskSpace {
   name?: unknown;
   error?: unknown;
   error_code?: unknown;
+  /**
+   * `'agent'` for a space the bridge created, `'user'` for one a human made in
+   * the ego UI. This is the only field that survives `completeTaskSpace()` and
+   * still tells the two apart, so it is what licenses a reclaim.
+   */
+  createdBy?: unknown;
   ownership?: unknown;
 }
 
@@ -419,6 +433,10 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
   /** set synchronously by `stop()`, so an in-flight `start()` can abort */
   let stopRequested = false;
   let stopping: Promise<void> | undefined;
+  /** the cleanup policy ran (or is running); see `finishTask` */
+  let finished = false;
+  /** `enterTaskSpace()` succeeded, so the cleanup policy has a space to release */
+  let spaceEntered = false;
 
   const broadcast = (text: string) => {
     for (const client of clients) client.send(text);
@@ -668,8 +686,23 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
    * Cleanup policy: `keep: []` closes the agent's task space, `keep: 'all'`
    * leaves the page open for the user. Never throws — a failed cleanup must not
    * keep the worker from releasing its socket.
+   *
+   * Runs at most once, because both a failed `start()` and `stop()` call it: the
+   * space is created before most startup failures, so a bridge that dies in
+   * `start()` still owns it and has to release it. Without the guard the space
+   * would be completed/closed twice.
    */
   const finishTask = async () => {
+    if (finished) return;
+    finished = true;
+    // Only a bridge that actually entered a space has anything to release.
+    // `closeTaskSpace()` acts on whatever ego currently has selected, and in the
+    // persistent utility process that may be a space an earlier run chose, so a
+    // failed enter must never reach the cleanup policy.
+    if (!spaceEntered) {
+      log('[ego-bridge] no task space entered; skipping cleanup');
+      return;
+    }
     const keep: 'all' | string[] = keepPage ? 'all' : [];
     const native = keepPage ? ego.completeTaskSpace : ego.closeTaskSpace;
     const finish: EgoTaskFinish | undefined =
@@ -690,22 +723,39 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
     ownership === 'agent' || ownership === 'agentDelegatedToUser';
 
   /**
-   * The known task-space names: agent-owned ones are reusable, user-owned ones
-   * are off limits and get skipped without even asking native to create them.
+   * The known task-space names, in three buckets.
+   *
+   * - `reusable`: already agent-owned, so `useTaskSpace(id)` is enough.
+   * - `reclaimable`: created by an agent (`createdBy: 'agent'`) but no longer
+   *   agent-owned. `completeTaskSpace()` — the `keepPage` cleanup policy — leaves
+   *   exactly this behind, so these are the bridge's own leftovers. They are
+   *   reclaimable, but only through `claimTaskSpace`: selecting one directly is
+   *   refused by ego (`EGO_TASK_SPACE_INACTIVE`) because ownership moved to the
+   *   user.
+   * - `userOwned`: a Space a human created. Off limits, no exceptions.
+   *
+   * `ownership` alone cannot separate the last two — a completed agent space
+   * reads `ownership: 'user'` — so `createdBy` is what licenses a reclaim.
    */
   const knownTaskSpaces = async (): Promise<{
     reusable: Map<string, number>;
+    reclaimable: Map<string, number>;
     userOwned: Set<string>;
   }> => {
     const reusable = new Map<string, number>();
+    const reclaimable = new Map<string, number>();
     const userOwned = new Set<string>();
-    if (typeof ego.listTaskSpaces !== 'function') return {reusable, userOwned};
+    if (typeof ego.listTaskSpaces !== 'function') {
+      return {reusable, reclaimable, userOwned};
+    }
     try {
       const result = (await ego.listTaskSpaces()) as
         | {taskSpaces?: unknown}
         | null
         | undefined;
-      if (!Array.isArray(result?.taskSpaces)) return {reusable, userOwned};
+      if (!Array.isArray(result?.taskSpaces)) {
+        return {reusable, reclaimable, userOwned};
+      }
       for (const raw of result.taskSpaces) {
         const space = raw as EgoTaskSpace | undefined;
         const name = asString(space?.name);
@@ -714,23 +764,69 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
           if (typeof space?.id === 'number') reusable.set(name, space.id);
           continue;
         }
+        if (space?.createdBy === 'agent') {
+          if (typeof space?.id === 'number') reclaimable.set(name, space.id);
+          continue;
+        }
+        // No `createdBy`, or anything else: assume a human made it.
         if (space?.ownership === 'user') userOwned.add(name);
       }
     } catch (error) {
       log(`[ego-bridge] listTaskSpaces failed: ${toText(error)}`);
     }
-    return {reusable, userOwned};
+    return {reusable, reclaimable, userOwned};
+  };
+
+  /**
+   * Take back one of the bridge's own leftovers.
+   *
+   * `claimTaskSpace` is the only supported way: it transfers a listed Space back
+   * to the agent without creating a replacement, and the following
+   * `useTaskSpace` selects it. Returns false when this ego build cannot claim or
+   * the claim was refused, so the caller falls through to a fresh suffix instead
+   * of selecting a space it does not own.
+   */
+  const reclaimTaskSpace = async (
+    name: string,
+    id: number,
+  ): Promise<boolean> => {
+    if (typeof ego.claimTaskSpace !== 'function') {
+      log(
+        `[ego-bridge] task space ${name} (${id}) is an agent leftover but ego.claimTaskSpace is unavailable; trying a new suffix`,
+      );
+      return false;
+    }
+    try {
+      const claimed = (await ego.claimTaskSpace(id)) as
+        | EgoTaskSpace
+        | undefined;
+      if (claimed?.error !== undefined) {
+        log(
+          `[ego-bridge] could not reclaim task space ${name} (${id}): ${String(claimed.error)} (${String(claimed.error_code ?? 'unknown')})`,
+        );
+        return false;
+      }
+    } catch (error) {
+      log(
+        `[ego-bridge] could not reclaim task space ${name} (${id}): ${toText(error)}`,
+      );
+      return false;
+    }
+    ego.useTaskSpace(id);
+    log(`[ego-bridge] reclaimed its own task space ${name} (${id})`);
+    return true;
   };
 
   /**
    * Enter this workspace's own task space.
    *
-   * Reuses `browsercli-<workspace-hash>` when the agent already owns it. A name
-   * held by a user-owned space is never taken over: `EGO_TASK_SPACE_NAME_IN_USE`
-   * moves to `-2`, `-3`, ... and a fresh space is created instead. Failing to
-   * enter a space at all throws, so `start()` rejects instead of printing a
-   * ready line for a bridge whose every command would fail with
-   * `EGO_TASK_SPACE_NOT_SELECTED`.
+   * Reuses `browsercli-<workspace-hash>` when the agent already owns it, and
+   * reclaims it when an earlier run left it behind as a user-owned space that
+   * `createdBy: 'agent'` proves the bridge created. A space a human created is
+   * never taken over: `EGO_TASK_SPACE_NAME_IN_USE` moves to `-2`, `-3`, ... and a
+   * fresh space is created instead. Failing to enter a space at all throws, so
+   * `start()` rejects instead of printing a ready line for a bridge whose every
+   * command would fail with `EGO_TASK_SPACE_NOT_SELECTED`.
    */
   const enterTaskSpace = async (): Promise<void> => {
     if (
@@ -741,7 +837,7 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
         'ego task-space bindings unavailable (createTaskSpace/useTaskSpace)',
       );
     }
-    const {reusable, userOwned} = await knownTaskSpaces();
+    const {reusable, reclaimable, userOwned} = await knownTaskSpaces();
     for (let attempt = 1; attempt <= MAX_TASK_SPACE_ATTEMPTS; attempt++) {
       const name =
         attempt === 1 ? taskSpaceName : `${taskSpaceName}-${attempt}`;
@@ -750,6 +846,13 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
         ego.useTaskSpace(existing);
         log(`[ego-bridge] reusing task space ${name} (${existing})`);
         return;
+      }
+      const leftover = reclaimable.get(name);
+      // A reclaimable name is never user-owned; `createdBy` is what decides, so
+      // this cannot shadow the privacy guarantee below.
+      if (leftover !== undefined) {
+        if (await reclaimTaskSpace(name, leftover)) return;
+        continue;
       }
       if (userOwned.has(name)) {
         // Never take over a user's space: move straight to the next suffix.
@@ -787,8 +890,21 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
         `[ego-bridge] task space name ${name} belongs to the user; trying the next suffix`,
       );
     }
+    // Actionable on purpose. The bound is kept at 8 because it is also the
+    // number of suffixes the loop may legitimately walk, so nothing is gained by
+    // raising it: a bigger bound only creates more spaces per run on the one
+    // host that can still hit this (an ego build without `claimTaskSpace`, where
+    // the bridge's own leftovers cannot be reclaimed).
     throw new Error(
-      `could not enter a task space named ${taskSpaceName} after ${MAX_TASK_SPACE_ATTEMPTS} attempts`,
+      `could not enter a task space for workspace ${taskSpaceName} after ` +
+        `${MAX_TASK_SPACE_ATTEMPTS} attempts: every name from ` +
+        `${taskSpaceName} to ${taskSpaceName}-${MAX_TASK_SPACE_ATTEMPTS} is ` +
+        `already taken. These are normally this bridge's own agent-created ` +
+        `leftovers (spaces with createdBy "agent" that an earlier run left ` +
+        `behind); they could not be reclaimed because ego.claimTaskSpace is ` +
+        `unavailable or refused, and genuine user spaces are never taken over. ` +
+        `Delete the spaces named ${taskSpaceName}* in the ego lite UI ` +
+        `(or quit ego lite to drop them) and retry.`,
     );
   };
 
@@ -859,6 +975,7 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
     started = (async () => {
       try {
         await enterTaskSpace();
+        spaceEntered = true;
         abortIfStopping();
         await refreshOwnTargets(true);
         abortIfStopping();
@@ -888,6 +1005,10 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
         return {wsEndpoint};
       } catch (error) {
         await releaseCallbacksAndListener();
+        // A start() that failed after entering the space still owns it: release
+        // it now, or the next run finds it as a user-owned leftover and burns a
+        // suffix. `finishTask` is exactly-once, so a later stop() is a no-op.
+        if (spaceEntered) await finishTask();
         throw error;
       }
     })();
