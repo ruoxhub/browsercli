@@ -446,6 +446,8 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
    * decision in `finishTask` cannot be re-derived as a disjunction of exceptions.
    */
   let spaceOrigin: SpaceOrigin | undefined;
+  /** Browser-domain methods already reported as degraded, so the log stays bounded. */
+  const degradedBrowserMethods = new Set<string>();
 
   const broadcast = (text: string) => {
     for (const client of clients) client.send(text);
@@ -493,6 +495,53 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
     return result;
   };
 
+  /**
+   * `Browser.*` methods ego does not implement, and what answering them locally
+   * costs. ego has no Browser domain at all, so Patchright's own browser-level
+   * calls fail with `-32601 '<method>' wasn't found` and abort whatever it was
+   * doing — the connect handshake, context initialisation, or a download.
+   *
+   * Each entry carries the result shape Patchright expects (`{}` where the CDP
+   * reply is empty) plus the capability the bridge is giving up. The caller logs
+   * that line once per method, because a silent empty reply would surface much
+   * later as an unexplainable failure — the point of the polyfill is that a gap
+   * stays visible.
+   */
+  const BROWSER_DOMAIN_FALLBACKS: Record<
+    string,
+    {result: Record<string, unknown>; degraded: string}
+  > = {
+    // Patchright calls this once per context when `acceptDownloads` is unset.
+    // ego exposes no download switch, so the documented default applies and a
+    // real download then fails at the click instead of at connect.
+    'Browser.setDownloadBehavior': {
+      result: {},
+      degraded: 'download behaviour is not configurable on ego; defaults apply',
+    },
+    'Browser.grantPermissions': {
+      result: {},
+      degraded: 'browser permissions cannot be granted through the bridge',
+    },
+    'Browser.resetPermissions': {
+      result: {},
+      degraded: 'browser permissions cannot be reset through the bridge',
+    },
+    'Browser.cancelDownload': {
+      result: {},
+      degraded: 'downloads cannot be cancelled through the bridge',
+    },
+  };
+
+  const replyWithResult = (
+    id: unknown,
+    sessionId: unknown,
+    result: Record<string, unknown>,
+  ) => {
+    const reply: Record<string, unknown> = {id, result};
+    if (typeof sessionId === 'string') reply.sessionId = sessionId;
+    broadcast(JSON.stringify(reply));
+  };
+
   const routeFromClient = (raw: string) => {
     let request: CdpMessage;
     try {
@@ -506,12 +555,24 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
       // Patchright connectOverCDP handshake from crashing. The reply must carry
       // the request's sessionId, or the client routes it to the wrong session.
       const {id, sessionId} = request;
-      void browserVersion().then(result => {
-        const reply: Record<string, unknown> = {id, result};
-        if (typeof sessionId === 'string') reply.sessionId = sessionId;
-        broadcast(JSON.stringify(reply));
-      });
+      void browserVersion().then(result =>
+        replyWithResult(id, sessionId, result),
+      );
       return;
+    }
+    if (typeof request.method === 'string') {
+      const fallback = BROWSER_DOMAIN_FALLBACKS[request.method];
+      if (fallback) {
+        // Once per method per run: context init repeats the same call.
+        if (!degradedBrowserMethods.has(request.method)) {
+          degradedBrowserMethods.add(request.method);
+          log(
+            `[ego-bridge] ${request.method} answered locally: ${fallback.degraded}`,
+          );
+        }
+        replyWithResult(request.id, request.sessionId, fallback.result);
+        return;
+      }
     }
     if (
       typeof request.method === 'string' &&
