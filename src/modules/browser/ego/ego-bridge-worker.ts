@@ -161,10 +161,10 @@ const BROWSER_DOMAIN_FALLBACKS: Record<
  *
  * Honest limits of this frame: it is emitted on the root WebSocket session, and
  * Patchright's `CRBrowser` subscribes to a fixed event set that does not include
- * it, so this is an audit trail for anyone reading the CDP stream (or the sink),
- * NOT a promise that the tool layer learns about the gap. The operator-facing
- * record of degradation is the stderr line; this frame exists so the wire itself
- * carries the fact rather than only a log file.
+ * it, so this is an audit trail for anyone reading the raw CDP stream on the
+ * WebSocket, NOT a promise that the tool layer learns about the gap. It does not
+ * enter the sink either: only `log()` does, and this goes out via `broadcast()`.
+ * The operator-facing record of degradation is the stderr line.
  */
 export const DEGRADED_METHOD_EVENT = 'EGO_BRIDGE_DEGRADED_METHOD';
 
@@ -618,8 +618,9 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
             `[ego-bridge] ${request.method} answered locally: ${fallback.degraded}`,
           );
           // The reply says "succeeded". This frame records what was lost on the
-          // wire, for whoever reads the CDP stream or the sink — it does NOT reach
-          // the browsercli tool layer (see the note on this event above).
+          // wire, for whoever reads the raw CDP stream — it does NOT reach the
+          // browsercli tool layer and does not enter the sink (only `log()` does).
+          // See the note on this event above.
           broadcast(
             JSON.stringify({
               method: DEGRADED_METHOD_EVENT,
@@ -1305,14 +1306,19 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
     }
     started = (async () => {
       try {
-        // `globalThis.ego` is per-run: a probe against ego 0.6.1.13 (two `-e`
-        // runs, same utility pid, deliberately exiting) showed `globalThis` FRESH
-        // each run while `process.env` leaks across runs. So a previous run's
-        // callback cannot survive into this one, and there is no "dead realm"
-        // whose callback needs reclaiming. What this check does catch is the same
-        // realm being asked twice — a second `createEgoBridge()` in one realm, or
-        // an embedded host that already installed its own callbacks. Overwriting
-        // those would starve whoever installed them, so refuse instead.
+        // `globalThis.ego` is PER REALM, not per ego process. Two probes against
+        // ego 0.6.1.13 settled it: (1) two sequential `-e` runs share one utility
+        // pid but each gets a fresh `globalThis`; (2) with run A still alive and
+        // ticking, run B saw `globalThis.ego.onCDPMessage === undefined` and
+        // installed its own callback without disturbing A's (A's identity check
+        // stayed true for its whole life). So concurrent realms own their slots
+        // independently and a second browsercli session steals nothing.
+        //
+        // What remains is a second bridge in the SAME realm — a repeated
+        // `createEgoBridge()`, or an embedded host that already installed its own
+        // callbacks (ego's own SDK installs them and documents releasing only what
+        // it installed). Overwriting either would starve its owner, so refuse and
+        // leave the existing callback untouched.
         if (typeof ego.onCDPMessage === 'function') {
           throw new Error(
             "this ego runtime's CDP callback is already installed (one bridge " +

@@ -242,11 +242,13 @@ describe('ego bridge end-to-end integration', () => {
           'the bridge must report at least the page this test drives',
         );
 
-        // Identity, not URL shape. The old check accepted any target whose URL
-        // was empty / about:blank / chrome://new-tab-page, so a user's own blank
-        // page would have sailed through. Instead: every target the reply names
-        // must correspond to a page the manager itself exposes, and the page this
-        // test drives must be one of them.
+        // Scope, not URL shape. The old check accepted any target whose URL was
+        // empty / about:blank / chrome://new-tab-page, so a user's own blank page
+        // sailed through. Now the reply is compared against the set of URLs the
+        // manager itself exposes: a target outside this space has a URL absent
+        // from that set, so it fails. (Same-URL collision remains possible in
+        // principle; a true identity check would compare target ids, which `Page`
+        // does not expose.)
         const ownUrls = new Set(
           browser
             .contexts()
