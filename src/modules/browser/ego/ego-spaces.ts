@@ -23,6 +23,7 @@ import {spawn} from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {pathToFileURL} from 'node:url';
 
 import {findEgoBrowserBinary} from './ego-detect.js';
 
@@ -55,7 +56,11 @@ export interface EgoSpaceQueryOptions {
   /** How long the whole query may take. */
   timeoutMs?: number;
   /** Injected for tests; defaults to the real implementation. */
-  runScript?: (binary: string, script: string) => Promise<string>;
+  runScript?: (
+    binary: string,
+    script: string,
+    timeoutMs?: number,
+  ) => Promise<string>;
 }
 
 const DEFAULT_TIMEOUT_MS = 20_000;
@@ -128,7 +133,7 @@ export async function queryEgoSpaces(
   }
 
   const runScript = options.runScript ?? defaultRunScript;
-  const raw = await runScript(binary, QUERY_SCRIPT);
+  const raw = await runScript(binary, QUERY_SCRIPT, options.timeoutMs);
   return parseResult(raw);
 }
 
@@ -189,7 +194,11 @@ function asRows<T>(raw: unknown, isRow: (row: T) => boolean): T[] {
  * ego's runtime only executes `-e` at stdin EOF and never forwards the script's
  * stdout to the spawner, so a pipe would come back empty.
  */
-function defaultRunScript(binary: string, script: string): Promise<string> {
+function defaultRunScript(
+  binary: string,
+  script: string,
+  timeoutMs: number = DEFAULT_TIMEOUT_MS,
+): Promise<string> {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ego-spaces-'));
   const scriptPath = path.join(dir, 'query.mjs');
   const resultPath = path.join(dir, 'result.txt');
@@ -218,8 +227,8 @@ function defaultRunScript(binary: string, script: string): Promise<string> {
     let stderr = '';
     const timer = setTimeout(() => {
       child.kill('SIGKILL');
-      reject(new Error(`查询 ego 任务空间超时（${DEFAULT_TIMEOUT_MS}ms）`));
-    }, DEFAULT_TIMEOUT_MS);
+      reject(new Error(`查询 ego 任务空间超时（${timeoutMs}ms）`));
+    }, timeoutMs);
 
     child.stderr?.setEncoding('utf8');
     child.stderr?.on('data', (chunk: string) => {
@@ -228,7 +237,10 @@ function defaultRunScript(binary: string, script: string): Promise<string> {
     // Drain stdout so a chatty child cannot block on a full pipe.
     child.stdout?.resume();
 
+    let settled = false;
     const finish = (error: Error | undefined): void => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
       let result = '';
       try {
@@ -261,7 +273,5 @@ ${stderr}`,
 }
 
 function pathToFileUrl(target: string): string {
-  const normalized = target.replace(/\\/g, '/');
-  const withSlash = normalized.startsWith('/') ? normalized : `/${normalized}`;
-  return `file://${withSlash}`;
+  return pathToFileURL(target).href;
 }

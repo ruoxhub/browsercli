@@ -59,7 +59,7 @@ export const listConsoleMessages = defineTool({
     let result: ListConsoleMessagesResult;
     try {
       const provider = getRuntime().contextProvider;
-      await (provider as any)?.ensureConsoleEnabled?.();
+      await provider?.ensureConsoleEnabled();
       const includePreserved = request.params.includePreservedMessages ?? false;
       let messages = provider!.getConsoleData(includePreserved);
 

@@ -403,4 +403,37 @@ describe('candidateBrowserConfig asserts only the final merged config (C1)', () 
       keepPage: true,
     });
   });
+
+  it('suppresses env-supplied ego profile/keepPage when connecting to explicit target', () => {
+    process.env.BROWSER_EGO_PROFILE = 'Profile 1';
+    process.env.BROWSER_KEEP_PAGE = 'true';
+    resetRuntimeConfigStore({});
+    try {
+      const {config} = candidateBrowserConfig({
+        browserURL: 'http://127.0.0.1:9222',
+      });
+      assert.strictEqual(config.browserURL, 'http://127.0.0.1:9222');
+      assert.strictEqual(config.egoProfile, undefined);
+      assert.strictEqual(config.keepPage, undefined);
+    } finally {
+      delete process.env.BROWSER_EGO_PROFILE;
+      delete process.env.BROWSER_KEEP_PAGE;
+      resetRuntimeConfigStore({});
+    }
+  });
+
+  it('suppresses env-supplied target when connecting to ego', () => {
+    process.env.BROWSER_URL = 'http://127.0.0.1:9222';
+    resetRuntimeConfigStore({});
+    try {
+      const {config} = candidateBrowserConfig({
+        ego: true,
+      });
+      assert.strictEqual(config.ego, true);
+      assert.strictEqual(config.browserURL, undefined);
+    } finally {
+      delete process.env.BROWSER_URL;
+      resetRuntimeConfigStore({});
+    }
+  });
 });

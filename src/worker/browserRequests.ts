@@ -174,7 +174,12 @@ export function parseBrowserConnectBody(body: unknown): BrowserConfig {
   ) {
     patch.browserURL = `http://${patch.browserURL}`;
   }
-  if (Object.hasOwn(parsed.data, 'browserURL')) {
+
+  const clearEgoAndOtherTargets = (
+    keepKey: keyof BrowserConfig,
+    keepValue: unknown,
+  ) => {
+    patch.browserURL = undefined;
     patch.wsEndpoint = undefined;
     patch.channel = undefined;
     patch.executablePath = undefined;
@@ -187,30 +192,17 @@ export function parseBrowserConnectBody(body: unknown): BrowserConfig {
     // 下次无参 connect 又带着别人的 keepPage/profile 连上 ego。
     patch.keepPage = undefined;
     patch.egoProfile = undefined;
+    (patch as Record<string, unknown>)[keepKey] = keepValue;
+  };
+
+  if (Object.hasOwn(parsed.data, 'browserURL')) {
+    clearEgoAndOtherTargets('browserURL', patch.browserURL);
   } else if (Object.hasOwn(parsed.data, 'wsEndpoint')) {
-    patch.browserURL = undefined;
-    patch.channel = undefined;
-    patch.executablePath = undefined;
-    patch.remoteDebuggingUrl = undefined;
-    patch.ego = undefined;
-    patch.keepPage = undefined;
-    patch.egoProfile = undefined;
+    clearEgoAndOtherTargets('wsEndpoint', patch.wsEndpoint);
   } else if (Object.hasOwn(parsed.data, 'channel')) {
-    patch.browserURL = undefined;
-    patch.wsEndpoint = undefined;
-    patch.executablePath = undefined;
-    patch.remoteDebuggingUrl = undefined;
-    patch.ego = undefined;
-    patch.keepPage = undefined;
-    patch.egoProfile = undefined;
+    clearEgoAndOtherTargets('channel', patch.channel);
   } else if (Object.hasOwn(parsed.data, 'executablePath')) {
-    patch.browserURL = undefined;
-    patch.wsEndpoint = undefined;
-    patch.channel = undefined;
-    patch.remoteDebuggingUrl = undefined;
-    patch.ego = undefined;
-    patch.keepPage = undefined;
-    patch.egoProfile = undefined;
+    clearEgoAndOtherTargets('executablePath', patch.executablePath);
   }
   return patch;
 }
@@ -291,7 +283,26 @@ export function candidateBrowserConfig(patch: BrowserConfig): {
  * 断言不能下沉到 `buildBrowserManagerConfig()`，那样中间态就会被拒（C1 回归）。
  */
 function toBrowserConfig(store: Readonly<GlobalConfig>): BrowserManagerConfig {
-  const config = {...buildBrowserManagerConfig(), ...(store.browser ?? {})};
+  const base = buildBrowserManagerConfig();
+  const storeBrowser = store.browser ?? {};
+  if (storeBrowser.ego === true) {
+    base.browserURL = undefined;
+    base.wsEndpoint = undefined;
+    base.channel = undefined;
+    base.executablePath = undefined;
+    base.remoteDebuggingUrl = undefined;
+  }
+  const hasExplicitTarget =
+    storeBrowser.browserURL !== undefined ||
+    storeBrowser.wsEndpoint !== undefined ||
+    storeBrowser.channel !== undefined ||
+    storeBrowser.executablePath !== undefined;
+  if (hasExplicitTarget || storeBrowser.ego === false) {
+    base.ego = undefined;
+    base.keepPage = undefined;
+    base.egoProfile = undefined;
+  }
+  const config = {...base, ...storeBrowser};
   assertBrowserConfigInvariants(config);
   return {
     ...config,

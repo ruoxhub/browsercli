@@ -165,6 +165,7 @@ export function buildBrowserManagerConfig(): BrowserManagerConfig {
       key: 'egoProfile',
       envKey: 'BROWSER_EGO_PROFILE',
       kind: 'value',
+      cast: (v: string) => v.trim() || undefined,
     },
     {
       key: 'fullStealthArgs',

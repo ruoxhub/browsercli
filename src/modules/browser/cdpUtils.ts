@@ -49,10 +49,16 @@ export async function getPersistentCdpSession(page: Page): Promise<CDPSession> {
       await existing.send('Runtime.evaluate', {
         expression: '1',
         returnByValue: true,
-      } as never);
+      });
       return existing;
-    } catch {
-      persistentSessions.delete(page);
+    } catch (error) {
+      // 仅在明确连接断开/会话销毁时淘汰缓存，避免导航等瞬态错误导致 UA 等持久状态被误清
+      const msg = error instanceof Error ? error.message : String(error);
+      if (/closed|detached|destroyed|not found/i.test(msg)) {
+        persistentSessions.delete(page);
+      } else {
+        return existing;
+      }
     }
   }
 

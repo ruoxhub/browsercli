@@ -1171,6 +1171,15 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
         forwardedAttaches.add(targetId);
         attachWaiters.get(targetId)?.();
       }
+    } else if (
+      method === 'Target.targetDestroyed' ||
+      method === 'Target.detachedFromTarget'
+    ) {
+      const targetId = asString(event.params?.targetId);
+      if (targetId !== undefined) {
+        forwardedAttaches.delete(targetId);
+        knownOwnTargetIds.delete(targetId);
+      }
     }
   };
 

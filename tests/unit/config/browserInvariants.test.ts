@@ -148,6 +148,18 @@ describe('ego config predicates', () => {
     assert.match(hinted.message, /BROWSER_KEEP_PAGE/);
     assert.match(hinted.message, /browser\.keepPage/);
   });
+
+  it('names the files and env vars a stale egoProfile needs edited', () => {
+    const original = new BrowserConfigInvariantError('egoProfile 需要 ego');
+    const hinted = withConfigFileHint(original, {
+      configFile: 'C:/Users/x/.browsercli/config.json',
+      runtimeFile: 'C:/Users/x/.browsercli/runtime-config.json',
+    });
+    assert.ok(hinted instanceof BrowserConfigInvariantError);
+    assert.strictEqual(hinted.code, 'VALIDATION');
+    assert.match(hinted.message, /BROWSER_EGO_PROFILE/);
+    assert.match(hinted.message, /browser\.egoProfile/);
+  });
 });
 
 describe('ego with launch-only flags', () => {

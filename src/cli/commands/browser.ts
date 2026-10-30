@@ -280,10 +280,19 @@ function connectOptions(
   // 参数则是 help 里已经声明的互斥关系。终端路径在 spawn daemon 之前就报错，
   // 用户不会看到「连接成功但其实没生效」。合并层与 IPC 请求层另有同一守卫。
   const effectiveEgo = booleans.ego ?? getEnvFlag('BROWSER_EGO');
+  const explicitTarget =
+    browserURL !== undefined ||
+    wsEndpoint !== undefined ||
+    channel !== undefined ||
+    executablePath !== undefined;
+
+  const candidateKeepPage =
+    booleans.keepPage ??
+    (explicitTarget ? undefined : getEnvFlag('BROWSER_KEEP_PAGE'));
   if (
     isKeepPageWithoutEgo({
       ego: effectiveEgo,
-      keepPage: booleans.keepPage ?? getEnvFlag('BROWSER_KEEP_PAGE'),
+      keepPage: candidateKeepPage,
     })
   ) {
     invalid(KEEP_PAGE_WITHOUT_EGO_MESSAGE);
@@ -291,10 +300,12 @@ function connectOptions(
   // `--profile` names an ego task-space identity; without ego nothing reads it,
   // so accepting it would be the same silent ignore as `--keep-page`.
   const profile = stringFlag(flags, 'profile');
+  const candidateProfile =
+    profile ?? (explicitTarget ? undefined : envString('BROWSER_EGO_PROFILE'));
   if (
     isProfileWithoutEgo({
       ego: effectiveEgo,
-      egoProfile: profile ?? envString('BROWSER_EGO_PROFILE'),
+      egoProfile: candidateProfile,
     })
   ) {
     invalid(PROFILE_WITHOUT_EGO_MESSAGE);

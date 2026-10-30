@@ -210,10 +210,13 @@ export function withConfigFileHint(
   error: BrowserConfigInvariantError,
   paths: {configFile: string; runtimeFile: string},
 ): BrowserConfigInvariantError {
+  const isProfile =
+    error.message.includes('egoProfile') || error.message.includes('--profile');
+  const advice = isProfile
+    ? '（删掉 browser.egoProfile，或补上 "ego": true）；由环境变量引入时改 BROWSER_EGO_PROFILE / BROWSER_EGO。'
+    : '（删掉 browser.keepPage，或补上 "ego": true）；由环境变量引入时改 BROWSER_KEEP_PAGE / BROWSER_EGO。';
   return new BrowserConfigInvariantError(
-    `${error.message}\n请修改配置文件 ${paths.configFile} 或 ${paths.runtimeFile}` +
-      `（删掉 browser.keepPage，或补上 "ego": true）；` +
-      '由环境变量引入时改 BROWSER_KEEP_PAGE / BROWSER_EGO。',
+    `${error.message}\n请修改配置文件 ${paths.configFile} 或 ${paths.runtimeFile}${advice}`,
   );
 }
 

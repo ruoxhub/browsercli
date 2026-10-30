@@ -165,4 +165,17 @@ describe('queryEgoSpaces', () => {
     assert.match(seen, /listProfiles/);
     assert.match(seen, /emit\(/);
   });
+
+  it('forwards timeoutMs to runScript', async () => {
+    let capturedTimeout: number | undefined;
+    await queryEgoSpaces({
+      binary: process.execPath,
+      timeoutMs: 12_345,
+      runScript: async (_binary, _script, timeoutMs) => {
+        capturedTimeout = timeoutMs;
+        return payload({spaces: [], profiles: []});
+      },
+    });
+    assert.equal(capturedTimeout, 12_345);
+  });
 });

@@ -35,7 +35,7 @@ export const getConsoleMessage = defineTool({
     let message;
     try {
       const provider = getRuntime().contextProvider;
-      await (provider as any)?.ensureConsoleEnabled?.();
+      await provider?.ensureConsoleEnabled();
       const consoleMessage = provider!.getConsoleMessageById(
         request.params.msgid,
       );
