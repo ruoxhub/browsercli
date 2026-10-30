@@ -145,6 +145,11 @@ export class CollectorContextProvider {
 
   // ─── Console 数据查询 ────────────────────────────────
 
+  async ensureConsoleEnabled(page: Page | null): Promise<void> {
+    if (!page) return;
+    await this._consoleCollector.ensureCdpSession(page);
+  }
+
   getConsoleData(
     page: Page | null,
     includePreservedMessages = false,

@@ -90,10 +90,45 @@ export const getStorage = defineTool({
           );
         }
 
-        const cookies = (await page.context().cookies(page.url())).filter(
-          cookie =>
-            !filter || cookie.name.toLowerCase().includes(filter.toLowerCase()),
-        );
+        let cookies: any[] = [];
+        try {
+          cookies = (await page.context().cookies(page.url())).filter(
+            cookie =>
+              !filter ||
+              cookie.name.toLowerCase().includes(filter.toLowerCase()),
+          );
+        } catch {
+          // 某些运行环境（如 ego 桥接）未暴露 Storage.getCookies，允许捕获失败并降级
+        }
+
+        // 降级回退：当 CDP cookies 为空时，尝试从页面 document.cookie 补充非 HttpOnly 的 cookie
+        if (cookies.length === 0) {
+          try {
+            const rawCookie = await page.evaluate(() => document.cookie);
+            if (rawCookie) {
+              cookies = rawCookie
+                .split(';')
+                .map(pair => {
+                  const [name, ...rest] = pair.trim().split('=');
+                  return {
+                    name,
+                    value: rest.join('='),
+                    domain: '',
+                    path: '/',
+                  };
+                })
+                .filter(
+                  c =>
+                    Boolean(c.name) &&
+                    (!filter ||
+                      c.name.toLowerCase().includes(filter.toLowerCase())),
+                );
+            }
+          } catch {
+            // 忽略 evaluate 错误
+          }
+        }
+
         result.cookies = Object.fromEntries(
           cookies.map(cookie => [cookie.name, cookie.value]),
         );

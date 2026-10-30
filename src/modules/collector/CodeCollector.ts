@@ -30,7 +30,8 @@ import type {
   DependencyGraph,
 } from '../../types/index.js';
 import {logger} from '../../utils/logger.js';
-import type {BrowserManager, BrowserManagerConfig} from '../browser/index.js';
+import {BrowserManager} from '../browser/index.js';
+import type {BrowserManagerConfig} from '../browser/index.js';
 
 import {CdpNetworkMonitor} from './CdpNetworkMonitor.js';
 import {CodeCache} from './CodeCache.js';
@@ -47,7 +48,8 @@ import {
 
 export class CodeCollector {
   private config: BrowserManagerConfig;
-  private readonly browserManager: BrowserManager;
+  /** 构造时注入的实例；单例被 reset 后仅作回退，实际使用见 activeManager() */
+  private readonly injectedBrowserManager: BrowserManager;
   private browser: Browser | null = null;
   private browserListenerAttached = false;
 
@@ -69,9 +71,23 @@ export class CodeCollector {
 
   private pageResolver?: () => Page | null | undefined;
 
+  /**
+   * 当前活跃的 BrowserManager。
+   *
+   * `browser connect` 会 `resetInstance()` 后重建单例，构造时注入的引用可能
+   * 已经 close。优先取单例，取不到再退回注入值（单测常注入 fake）。
+   */
+  private get browserManager(): BrowserManager {
+    try {
+      return BrowserManager.getInstance();
+    } catch {
+      return this.injectedBrowserManager;
+    }
+  }
+
   constructor(config: BrowserManagerConfig, browserManager: BrowserManager) {
     this.config = config;
-    this.browserManager = browserManager;
+    this.injectedBrowserManager = browserManager;
 
     this.fileRegistry = new CollectedFileRegistry({
       maxCollectedUrls: config.maxCollectedUrls,
@@ -194,6 +210,10 @@ export class CodeCollector {
     }
 
     logger.info('Initializing browser via BrowserModeManager...');
+    // 不能用构造时捕获的 manager 引用：`browser connect` 会先
+    // `BrowserManager.resetInstance()` 再建新实例，旧的已被 close。继续用旧引用
+    // 会让 `launch()` 在已关闭的实例上重新按**启动时快照的配置**连接
+    // （例如 daemon 启动时连不上的 19222），而不是复用当前活跃的浏览器。
     this.browser = await this.browserManager.launch();
 
     if (!this.browser) {

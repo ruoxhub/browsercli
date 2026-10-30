@@ -104,6 +104,8 @@ export interface ConsoleRuntimeServices {
   getConsoleData: (includePreservedMessages?: boolean) => ConsoleMessageEntry[];
   /** 通过 ID 获取单条 console 消息 */
   getConsoleMessageById: (id: number) => ConsoleMessageEntry;
+  /** 确保 Console 收集会话已就绪（按需激活 CDP Runtime.enable） */
+  ensureConsoleEnabled?: () => Promise<void>;
   /** 获取消息的稳定 ID */
   getConsoleMessageStableId: (message: ConsoleMessageEntry) => number;
   /** SourceMap 提示获取（可选） */

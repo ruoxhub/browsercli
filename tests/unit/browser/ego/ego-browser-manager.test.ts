@@ -335,11 +335,24 @@ describe('BrowserManager ego mode', () => {
     connectTo(browser);
 
     const manager = egoManager();
+    const notified: unknown[] = [];
+    manager.onReconnected = (_browser, context) => {
+      notified.push(context);
+    };
     await manager.ensureBrowser();
 
     assert.equal(manager.getCurrentPage(), bridgePage as never);
     assert.equal(manager.getContext(), bridgeContext as never);
     assert.equal(launchCalls, 0);
+    // The last notification must name the context that is actually bound. The
+    // remote-connect path notifies first with `contexts()[0]` — the empty one this
+    // binding exists to replace — so a provider that only saw that first call
+    // would keep an empty context while the manager holds the page.
+    assert.equal(
+      notified.at(-1),
+      bridgeContext as never,
+      'subscribers must end up on the context the manager bound',
+    );
   });
 
   it('a second connect while the ego bridge is live reuses it (no reset, no stop)', async () => {

@@ -102,7 +102,10 @@ describe('parseBrowserConnectBody', () => {
     });
     assert.deepEqual(
       parseBrowserConnectBody({ego: 'false'}),
-      {ego: false},
+      // The two ego-only keys are present at `undefined` on purpose: the store
+      // merges shallowly, so a missing key would keep the previous request's
+      // `keepPage`/`egoProfile` alive and wedge the switch back to non-ego.
+      {ego: false, keepPage: undefined, egoProfile: undefined},
       'the shared boolean preprocessor applies, like cloak',
     );
   });

@@ -51,6 +51,12 @@ const DEFAULT_STOP_GRACE_MS = 5_000;
 const DEFAULT_KILL_GRACE_MS = 2_000;
 /** How often the manager re-reads the sink file. */
 const POLL_MS = 50;
+/**
+ * Owner read/write only. The sink briefly holds the ready line — a live ws
+ * endpoint — and the stop file is a shutdown channel, so neither may be readable
+ * or creatable by other local users of a shared `os.tmpdir()`.
+ */
+const FILE_MODE = 0o600;
 /** Bounded diagnostics retention: enough for a diagnosis, never a leak. */
 const STDERR_MAX_LINES = 64;
 const STDERR_MAX_BYTES = 8 * 1024;
@@ -58,6 +64,16 @@ const STDERR_MAX_BYTES = 8 * 1024;
 const SINK_MAX_BYTES = 256 * 1024;
 /** How long a failed start waits for its killed child to be reaped. */
 const REAP_TIMEOUT_MS = 2_000;
+/**
+ * How long a failed start leaves its stop request in place before the file is
+ * recycled.
+ *
+ * The worker polls its stop file about once a second, and that request is the
+ * only channel that reaches a worker whose launcher was just killed. One poll is
+ * what makes the difference between "the bridge stopped" and "a listening bridge
+ * nothing can be asked to stop".
+ */
+const STOP_GRACE_MS = 1_200;
 /** How long the shutdown port probe may take before it counts as "not closed". */
 const PORT_PROBE_TIMEOUT_MS = 1_000;
 /** Bytes per `readSync` when draining the sink; a single read never allocates more. */
@@ -270,7 +286,6 @@ export class EgoBridgeManager {
     // or that bridge could never be asked to stop. Called directly, not through
     // `stop()`: that would queue the teardown behind this very launch.
     if (this.tracked) await this.stopExclusive();
-
     return this.launch(options);
   }
 
@@ -396,6 +411,13 @@ export class EgoBridgeManager {
       // a fresh one, and a stuck runtime would hold the port.
       await this.reap(child, files.stopPath);
       if (this.tracked?.child === child) this.tracked = undefined;
+      // `reap()` leaves a stop request in the file, and the worker polls it about
+      // once a second — but killing the launcher does not stop the worker (it runs
+      // in ego's utility process). Deleting the file right here is what left a
+      // listening bridge that nothing could ask to stop, while the next start()
+      // spawned a second one on the same task space. So give that poll one
+      // interval before recycling the channel.
+      await new Promise<void>(resolve => setTimeout(resolve, STOP_GRACE_MS));
       this.removeExitHook();
       this.removeFiles();
       throw error;
@@ -762,7 +784,7 @@ export class EgoBridgeManager {
   /** Ask the worker to run its cleanup policy and exit. */
   private requestStop(stopPath: string): void {
     try {
-      fs.writeFileSync(stopPath, 'stop');
+      fs.writeFileSync(stopPath, 'stop', {mode: FILE_MODE});
     } catch {
       // The signal escalation is the only remaining option.
     }
@@ -821,7 +843,11 @@ export class EgoBridgeManager {
     );
     const stopPath = `${sinkPath}.stop`;
     this.removeFiles();
-    fs.writeFileSync(sinkPath, '');
+    // Owner-only: the sink briefly carries the ready line — a live ws endpoint
+    // anyone on the machine could connect to — and the stop file is a channel any
+    // local user could otherwise create to kill another user's bridge. `os.tmpdir()`
+    // is world-readable, so the default mode is not good enough here.
+    fs.writeFileSync(sinkPath, '', {mode: FILE_MODE});
     fs.rmSync(stopPath, {force: true});
     return {sinkPath, stopPath};
   }
@@ -904,13 +930,26 @@ function workerBootstrap(
     options.profileId === undefined
       ? 'delete process.env.EGO_BRIDGE_PROFILE_ID;'
       : `process.env.EGO_BRIDGE_PROFILE_ID = ${stringLiteral(options.profileId)};`,
-    `await import('${workerUrl}');`,
+    `await import(${stringLiteral(workerUrl)});`,
   ].join('\n');
 }
 
-/** A single-quoted JS string literal: ASCII-safe and free of double quotes. */
+/**
+ * A single-quoted JS string literal: ASCII-safe and free of double quotes.
+ *
+ * Line terminators are escaped explicitly. `\n` / `\r` / `\u2028` / `\u2029` all
+ * end a line in JS source, so a value carrying one would break out of the
+ * literal: `--profile` is user input, and the bootstrap then dies with a syntax
+ * error that names none of the real cause and never prints a ready line.
+ */
 function stringLiteral(value: string): string {
-  return `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+  return `'${value
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/\r/g, '\\r')
+    .replace(/\n/g, '\\n')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029')}'`;
 }
 
 /** Read at most one chunk of the file at `offset`; a missing file reads as empty. */
@@ -987,18 +1026,39 @@ function describeBridgeAfterStop(live: LiveChild): string {
 }
 
 /**
- * A second `start()` on a live bridge must not silently change its options: the
- * retention policy is baked into a running bridge and cannot be applied later.
+ * A second `start()` on a live bridge must not silently change its options: both
+ * the retention policy and the profile are creation-time state baked into the
+ * running bridge and cannot be applied later.
+ *
+ * `profileId` is checked too, and only when both sides name one: a live bridge
+ * started without a profile is not in conflict with a caller that now asks for
+ * one — the requested profile would have no effect either way, and the worker
+ * already logs that in `noteProfileIgnored`. Refusing that pair would turn
+ * "started without --profile, then added it" into a hard error for a flag whose
+ * only effect is on a newly created space.
  */
 function assertSameOptions(
   live: EgoBridgeStartOptions | undefined,
   requested: EgoBridgeStartOptions,
 ): void {
-  const before = live?.keepPage === true;
-  const after = requested.keepPage === true;
-  if (before === after) return;
-  throw new Error(
-    `ego bridge is already running with keepPage=${before}; ` +
-      `stop() it before starting with keepPage=${after}`,
-  );
+  const beforeKeepPage = live?.keepPage === true;
+  const afterKeepPage = requested.keepPage === true;
+  if (beforeKeepPage !== afterKeepPage) {
+    throw new Error(
+      `ego bridge is already running with keepPage=${beforeKeepPage}; ` +
+        `stop() it before starting with keepPage=${afterKeepPage}`,
+    );
+  }
+  const beforeProfile = live?.profileId;
+  const afterProfile = requested.profileId;
+  if (
+    beforeProfile !== undefined &&
+    afterProfile !== undefined &&
+    beforeProfile !== afterProfile
+  ) {
+    throw new Error(
+      `ego bridge is already running with profileId=${beforeProfile}; ` +
+        `stop() it before starting with profileId=${afterProfile}`,
+    );
+  }
 }

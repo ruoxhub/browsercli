@@ -430,12 +430,12 @@ describe('daemonServer', () => {
     });
   });
 
-  it('a rejected connect leaves no trace: later status/disconnect still work (B1)', async () => {
-    // Two individually-legal requests leave the store at {ego:false, keepPage:true}:
-    // `update()` deep-merges `browser`, so the `keepPage` from request one survives
-    // request two. Before the fix the guard threw *after* the commit, and from then
-    // on every browser.status / browser.disconnect threw too — a daemon-wide wedge
-    // that no client could recover from without a restart.
+  it('connect --ego=false clears a stored keepPage, so the mode switch is not a dead end', async () => {
+    // The store merges `browser` shallowly, so the `keepPage` from request one used
+    // to survive request two and leave `{ego:false, keepPage:true}` — a pair the
+    // invariant rejects, permanently: the only way out was a daemon restart. Both
+    // routes out are checked here (`--ego=false` and an explicit target), because
+    // `keepPage` and `egoProfile` are cleared by two different branches.
     const stub = stubBrowserManager();
     const savedEgo = process.env.BROWSER_EGO;
     delete process.env.BROWSER_EGO;
@@ -443,29 +443,88 @@ describe('daemonServer', () => {
     try {
       await withFixture(async (_fixture, client) => {
         const firstId = await client.request('browser.connect', {
-          body: {ego: true, keepPage: true},
+          body: {ego: true, keepPage: true, egoProfile: 'Profile 7'},
         });
         const first = await client.responseFor(firstId);
         assert.deepStrictEqual(
           first['error'],
           undefined,
-          'the ego + keepPage connect must be accepted',
+          'the ego + keepPage + profile connect must be accepted',
         );
 
         const secondId = await client.request('browser.connect', {
           body: {ego: false},
         });
         const second = await client.responseFor(secondId);
-        const secondError = second['error'] as {
+        assert.deepStrictEqual(
+          second['error'],
+          undefined,
+          'ego:false must clear the stored keepPage/egoProfile instead of being rejected',
+        );
+        const stored = getRuntimeConfigStore().get().browser ?? {};
+        assert.strictEqual(stored.ego, false);
+        assert.strictEqual(
+          stored.keepPage,
+          undefined,
+          'the stale keepPage must not survive the merge',
+        );
+        assert.strictEqual(
+          stored.egoProfile,
+          undefined,
+          'the stale egoProfile must not survive the merge',
+        );
+
+        // The seeded-ego pair still works, and status/disconnect keep reading the
+        // effective config afterwards — the wedge this test used to cover.
+        const statusId = await client.request('browser.status');
+        const status = await client.responseFor(statusId);
+        assert.deepStrictEqual(
+          status['error'],
+          undefined,
+          'browser.status must keep working',
+        );
+
+        const disconnectId = await client.request('browser.disconnect', {
+          body: {},
+        });
+        const disconnect = await client.responseFor(disconnectId);
+        assert.deepStrictEqual(
+          disconnect['error'],
+          undefined,
+          'browser.disconnect must keep working',
+        );
+      });
+    } finally {
+      stub.restore();
+      if (savedEgo === undefined) delete process.env.BROWSER_EGO;
+      else process.env.BROWSER_EGO = savedEgo;
+      resetRuntimeConfigStore({});
+    }
+  });
+
+  it('a rejected connect leaves no trace: later status/disconnect still work (B1)', async () => {
+    // Validating before committing is what makes this hold: a rejection must not
+    // dirty the store, or every later browser.status / browser.disconnect would
+    // throw and the daemon would be wedged until restart.
+    const stub = stubBrowserManager();
+    const savedEgo = process.env.BROWSER_EGO;
+    delete process.env.BROWSER_EGO;
+    resetRuntimeConfigStore({});
+    try {
+      await withFixture(async (_fixture, client) => {
+        // Rejected at the request layer: `keepPage` without ego is the silent
+        // no-op the invariant forbids.
+        const rejectedId = await client.request('browser.connect', {
+          body: {keepPage: true},
+        });
+        const rejected = await client.responseFor(rejectedId);
+        const rejectedError = rejected['error'] as {
           code?: string;
           message?: string;
         };
-        // The merged pair is self-contradictory even though each body was legal.
-        assert.equal(secondError.code, 'VALIDATION');
-        assert.match(secondError.message ?? '', /keepPage/);
+        assert.equal(rejectedError.code, 'VALIDATION');
+        assert.match(rejectedError.message ?? '', /keepPage/);
 
-        // THE REGRESSION CHECK: the rejection must not stick. Both of these read
-        // the effective config, which is what used to throw forever.
         const statusId = await client.request('browser.status');
         const status = await client.responseFor(statusId);
         assert.deepStrictEqual(
@@ -485,16 +544,9 @@ describe('daemonServer', () => {
         );
 
         // ...and the rejected request really left nothing behind.
-        const stored = getRuntimeConfigStore().get().browser ?? {};
         assert.strictEqual(
-          stored.keepPage,
-          true,
-          'request one committed what it was allowed to',
-        );
-        assert.strictEqual(
-          stored.ego,
-          true,
-          'the rejected ego:false must not have been written',
+          getRuntimeConfigStore().get().browser?.keepPage,
+          undefined,
         );
       });
     } finally {
@@ -560,6 +612,35 @@ describe('daemonServer', () => {
       });
     } finally {
       stub.restore();
+      resetRuntimeConfigStore({});
+    }
+  });
+
+  it('browser.disconnect keeps BROWSER_DISCONNECT_INCOMPLETE instead of flattening it', async () => {
+    // A teardown that failed leaves the bridge listening. Its own code is what lets
+    // a client tell "retryable, the bridge is still up" from an ordinary failure —
+    // `toErrorCode()` reports `error.code` verbatim — so wrapping it into
+    // BROWSER_DISCONNECT_FAILED would throw away exactly that distinction.
+    const incomplete = Object.assign(
+      new Error(
+        'browser disconnect incomplete: the bridge could not be stopped and was kept for retry',
+      ),
+      {code: 'BROWSER_DISCONNECT_INCOMPLETE'},
+    );
+    const reset = mock.method(BrowserManager, 'resetInstance', async () => {
+      throw incomplete;
+    });
+    resetRuntimeConfigStore({});
+    try {
+      await withFixture(async (_fixture, client) => {
+        const id = await client.request('browser.disconnect', {body: {}});
+        const response = await client.responseFor(id);
+        const error = response['error'] as {code?: string; message?: string};
+        assert.strictEqual(error.code, 'BROWSER_DISCONNECT_INCOMPLETE');
+        assert.match(error.message, /retry/);
+      });
+    } finally {
+      reset.mock.restore();
       resetRuntimeConfigStore({});
     }
   });

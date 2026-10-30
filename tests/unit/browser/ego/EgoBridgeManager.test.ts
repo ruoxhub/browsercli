@@ -890,6 +890,89 @@ describe('EgoBridgeManager', () => {
     assert.equal(process.listenerCount('exit'), exitHookBaseline);
   });
 
+  it('leaves the stop request readable after a failed start, so a live worker can stop', async () => {
+    // The launcher's death does not stop the worker (it runs in ego's utility
+    // process). A start that failed before its ready line therefore has no
+    // endpoint to probe and no `tracked` entry — the stop file is the only thing
+    // that still reaches that worker. Deleting it immediately (as the cleanup once
+    // did) left a listening bridge nothing could ask to stop, while the next
+    // start() spawned a second one on the same task space.
+    const harness = harnessFor(fakeCliBody(READY_PREFIX));
+    // The launcher exits at once but leaves a marker behind, so we can observe how
+    // long its stop file survives without needing a live bridge.
+    const spawnFn: EgoSpawn = (command, args, options) => {
+      const child = spawn(process.execPath, ['-e', 'process.exit(9)'], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      harness.records.push({command, args, options, child});
+      return child;
+    };
+    const manager = new EgoBridgeManager(
+      managerOptions(harness, {spawn: spawnFn, startTimeoutMs: 3_000}),
+    );
+
+    const started = manager.start();
+    const startedAt = Date.now();
+    let seen = false;
+    let stopPath: string | undefined;
+    const watcher = setInterval(() => {
+      if (stopPath === undefined) {
+        const record = harness.records[0];
+        if (!record) return;
+        stopPath = `${sinkOf(record)}.stop`;
+      }
+      if (fs.existsSync(stopPath)) seen = true;
+    }, 20);
+    try {
+      await assert.rejects(started, /exited before/i);
+    } finally {
+      clearInterval(watcher);
+    }
+    const elapsedMs = Date.now() - startedAt;
+
+    // `reap()` asked for a stop; that request must outlive the launcher long
+    // enough for a worker polling once a second to notice, instead of vanishing in
+    // the same tick and leaving a bridge nothing can shut down.
+    assert.equal(
+      seen,
+      true,
+      'the only channel that can still stop the worker must not be dropped',
+    );
+    assert.ok(
+      elapsedMs >= 1_000,
+      `a failed start must give the worker one poll to see the request, took ${elapsedMs}ms`,
+    );
+    // ...and it must be gone afterwards, so temp files do not accumulate.
+    assert.equal(fs.existsSync(stopPath!), false);
+  });
+
+  it('creates the sink and stop files owner-only, in a shared tmpdir', async () => {
+    // The sink briefly carries the ready line — a live ws endpoint — and the stop
+    // file is a shutdown channel. Both live in `os.tmpdir()`, which is world
+    // readable, so the default 0644 would expose the endpoint and let another
+    // local user kill this bridge. POSIX only: Windows has no mode bits, and
+    // `statSync().mode` reports a synthesized value there.
+    if (process.platform === 'win32') return;
+    const harness = harnessFor(fakeCliBody(READY_PREFIX));
+    const manager = new EgoBridgeManager(managerOptions(harness));
+    try {
+      await manager.start();
+      const sink = sinkOf(harness.records[0]);
+      const stopPath = `${sink}.stop`;
+      assert.equal(
+        fs.statSync(sink).mode & 0o777,
+        0o600,
+        'the sink must be owner-only',
+      );
+      // The stop file does not exist until a shutdown is requested; asking for one
+      // and then letting the bridge die on it is what exercises `requestStop()`.
+      await manager.stop();
+      assert.equal(fs.existsSync(stopPath), false);
+    } finally {
+      await manager.stop().catch(() => undefined);
+    }
+  });
+
   it('stop() requests shutdown through the stop file and is idempotent', async () => {
     const harness = harnessFor(fakeCliBody(READY_PREFIX));
     const signals: NodeJS.Signals[] = [];

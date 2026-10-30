@@ -156,15 +156,17 @@ export function parseBrowserConnectBody(body: unknown): BrowserConfig {
   }
 
   const patch: BrowserConfig = {...parsed.data};
-  // 显式关掉 ego 时，把只服务于 ego 的两项一起清掉。store 是深合并的，
-  // 上一次的 `{ego:true, keepPage:true}` 会活到这一次；只写 `ego:false` 会让
-  // 合并结果变成 `{ego:false, keepPage:true}` —— 一个自相矛盾的组合，
-  // `effectiveBrowserConfig()` 的断言会把它拒在提交之后。
-  // 用 `delete` 而不是赋 `undefined`：后者会在 patch 上留下一个显式键，
-  // 让「请求体里只有 ego:false」变成三个键，语义没变、形状却变了。
+  // 显式关掉 ego 时，把只服务于 ego 的两项一起清掉。store 的合并是
+  // `{...oldBrowser, ...patch}`（浅合并），所以「键缺失」等于「保留上一次的值」：
+  // `delete patch.keepPage` 挡不住上一次 `--ego --keep-page` 留下的
+  // `keepPage: true`，合并结果会变成 `{ego:false, keepPage:true}` —— 断言一抛，
+  // 用户就再也无法通过 IPC/CLI 退出 ego 模式（`--profile` 更糟：连
+  // `--profile ""` 都被参数解析判成缺值），只能重启 daemon。
+  // 因此与下面四个分支一致，赋 `undefined`：那是**显式覆盖成未设置**，与
+  // 「键缺失 → 保留旧值」是两件事。
   if (parsed.data.ego === false) {
-    delete patch.keepPage;
-    delete patch.egoProfile;
+    patch.keepPage = undefined;
+    patch.egoProfile = undefined;
   }
   if (
     patch.browserURL &&

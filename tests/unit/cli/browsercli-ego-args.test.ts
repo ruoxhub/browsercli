@@ -410,6 +410,49 @@ describe('CLI flags reach EgoBridgeManager.start', () => {
       }
     }
   });
+
+  it('leaves a launch-only flag alone as a local launch, without injecting ego', async () => {
+    // Regression: the implicit ego default used to ignore these flags, so
+    // `browsercli browser connect --headless` — a working local launch before ego
+    // became the default source — was flipped into ego and then failed the
+    // `isEgoWithLaunchOnly` check. A launch-only flag is an intent for the local
+    // launch path, so the default must step aside for it.
+    const cases: Array<[string[], Record<string, unknown>]> = [
+      [['--headless'], {headless: true}],
+      [['--headless=false'], {headless: false}],
+      [['--isolated'], {isolated: true}],
+      [['--js-stealth'], {jsStealth: true}],
+      [['--minimal-stealth'], {minimalStealth: true}],
+      [['--full-stealth-args'], {fullStealthArgs: true}],
+      [['--accept-insecure-certs'], {acceptInsecureCerts: true}],
+      [['--user-data-dir', 'profile-dir'], {userDataDir: 'profile-dir'}],
+      [['--cloak'], {cloak: true}],
+    ];
+    for (const [extra, expected] of cases) {
+      const {bodies, ctx} = recordingContext();
+      await browserCommand(['connect', ...extra], ctx);
+      assert.deepEqual(
+        bodies,
+        [expected],
+        `${extra.join(' ')} must reach the daemon as a local launch, with no ego key`,
+      );
+    }
+  });
+
+  it('names the way back when an explicit --ego conflicts with a launch-only flag', async () => {
+    // Refusing a previously working call is only defensible if the message says
+    // how to get the old behaviour back.
+    const {bodies, ctx} = recordingContext();
+    await assert.rejects(
+      async () => browserCommand(['connect', '--ego', '--headless'], ctx),
+      (error: unknown) => {
+        assert.ok(error instanceof AxiError);
+        assert.match(error.message, /--ego=false/);
+        return true;
+      },
+    );
+    assert.deepEqual(bodies, [], 'nothing may reach the daemon');
+  });
 });
 
 /**

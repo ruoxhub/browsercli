@@ -910,7 +910,7 @@ describe('ego-bridge-worker', () => {
   it('answers Target.createTarget from the native tab API instead of forwarding it', async () => {
     // ego refuses Target.createTarget outright, so the bridge has to satisfy it
     // with ego.createTab — the binding ego-browser's own task.newPage() uses.
-    const created: Array<string> = [];
+    const created: string[] = [];
     const fake = createFakeEgo({
       createTab: async (url: string) => {
         created.push(url);
@@ -957,8 +957,56 @@ describe('ego-bridge-worker', () => {
     }
   });
 
+  it('forwards the attach of the tab it just created even when the whitelist never reports it', async () => {
+    // The new tab is latched as ours the moment `ego.createTab` names it. Relying
+    // on the whitelist refresh instead made this path depend on a single lazy
+    // refresh that one unrelated target event in the same burst can consume — the
+    // attach was then dropped and the reply said "created but never attached"
+    // after a 5s stall, for a tab that existed.
+    const created: string[] = [];
+    const fake = createFakeEgo({
+      createTab: async (url: string) => {
+        created.push(url);
+        return {targetId: 'new-target'};
+      },
+    });
+    const bridge = createEgoBridge({
+      ego: fake.ego,
+      taskSpaceName: 'unit-test',
+      // ego's own `listTabs()` never reports this tab, so the lazy whitelist
+      // refresh cannot admit its attach — the latch is the only thing that can.
+      listOwnTargetIds: async () => [],
+    });
+    const {wsEndpoint} = await bridge.start();
+    const ws = await connect(wsEndpoint);
+    try {
+      const received = collect(ws);
+      ws.send(
+        '{"id":21,"method":"Target.createTarget","params":{"url":"about:blank"}}',
+      );
+      // After `createTab` resolves, i.e. after the id is latched: this is the
+      // ordering ego produces when the attach is not the very first frame.
+      await waitFor(() => created[0]);
+      fake.emit({
+        method: 'Target.attachedToTarget',
+        params: {
+          sessionId: 'new-session',
+          targetInfo: {targetId: 'new-target', type: 'page'},
+        },
+      });
+
+      const attach = await waitFor(() => received.parsed[0]);
+      assert.equal(attach.method, 'Target.attachedToTarget');
+      const reply = await waitFor(() => received.parsed[1]);
+      assert.deepEqual(reply, {id: 21, result: {targetId: 'new-target'}});
+    } finally {
+      ws.close();
+      await bridge.stop();
+    }
+  });
+
   it('passes the requested url to ego.createTab rather than hardcoding about:blank', async () => {
-    const created: Array<string> = [];
+    const created: string[] = [];
     const fake = createFakeEgo({
       createTab: async (url: string) => {
         created.push(url);

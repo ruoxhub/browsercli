@@ -424,6 +424,12 @@ export class BrowserManager {
 
       const browser = await this.connectToRemoteBrowser();
       this.bindEgoPage(browser);
+      // `connectToRemoteBrowser()` already notified subscribers with
+      // `contexts()[0]`, which is exactly the context `bindEgoPage()` exists to
+      // replace (a fresh task space has no tab, so the page lives in a later
+      // context). Notify again with the context that is actually bound, or the
+      // provider keeps the empty one and `syncPages()` runs against it.
+      this.onReconnected?.(browser, this.context);
       return browser;
     } catch (error) {
       // Do not leave a dead endpoint in the config: it would make a retry look
@@ -557,6 +563,18 @@ export class BrowserManager {
       return {webSocketDebuggerUrl: browserURL};
     }
 
+    // 显式配置的端口（非 9222 默认）代表用户的明确意图，不得被
+    // DevToolsActivePort 里的残留端口顶替。9222 与"未写端口"仍视为自动发现。
+    const explicitPort = (() => {
+      try {
+        const parsed = new URL(browserURL);
+        return parsed.port ? Number(parsed.port) : 0;
+      } catch {
+        return 0;
+      }
+    })();
+    const hasExplicitPort = explicitPort > 0 && explicitPort !== 9222;
+
     try {
       const response = await fetch(`${browserURL}/json/version`);
       if (!response.ok) {
@@ -596,13 +614,21 @@ export class BrowserManager {
         );
         return {webSocketDebuggerUrl: fallback};
       }
-      // 如果配置的端口连接失败（如历史动态端口已变），且本地存在有效的 DevToolsActivePort，优雅回退到当前活动的 ws 端点
-      const activeFallback = this.buildDevToolsActivePortFallback();
-      if (activeFallback) {
-        logger.debug(
-          `[fetchVersionInfo] configured URL unreachable, falling back to active DevToolsActivePort wsPath: ${activeFallback}`,
-        );
-        return {webSocketDebuggerUrl: activeFallback};
+      // 如果配置的端口连接失败（如历史动态端口已变），且本地存在有效的 DevToolsActivePort，优雅回退到当前活动的 ws 端点。
+      //
+      // 仅限于「没有显式配置端口」的情形（自动发现）。用户显式给了
+      // browserURL/remoteDebuggingUrl 时绝不回退：那些 profile 文件里的端口
+      // 常常是上一次运行（或 ego 桥接）留下的残留值，跟着它走会把连接导向一个
+      // 已经关闭的端点，报出与被配置端口毫无关系的 ECONNREFUSED，而用户配置
+      // 的端口根本没被尝试过。
+      if (!hasExplicitPort) {
+        const activeFallback = this.buildDevToolsActivePortFallback();
+        if (activeFallback) {
+          logger.debug(
+            `[fetchVersionInfo] configured URL unreachable, falling back to active DevToolsActivePort wsPath: ${activeFallback}`,
+          );
+          return {webSocketDebuggerUrl: activeFallback};
+        }
       }
       return {};
     }

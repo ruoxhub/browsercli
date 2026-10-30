@@ -101,18 +101,57 @@ export const hostConfig = {};
   const mcpFile = path.join(mcpDir, 'mcp.js');
   const mcpContent = `
 // Mock MCP module for chrome-devtools-frontend (ESM format)
-export const AgentFocus = { Session: class {} };
+export const AgentFocus = {
+  Session: {
+    fromParsedTrace: (trace) => trace,
+  },
+};
 export const TraceEngine = {
   TraceModel: {
-    Model: { createWithAllHandlers: () => ({}) },
-    ParsedTrace: class {}
+    Model: {
+      createWithAllHandlers: () => ({
+        parse: async () => {},
+        parsedTrace: () => ({
+          insights: new Map([
+            [
+              'default',
+              {
+                model: new Proxy(
+                  {},
+                  {
+                    has: () => true,
+                    get: (_target, prop) => ({ name: String(prop) }),
+                  },
+                ),
+              },
+            ],
+          ]),
+        }),
+      }),
+    },
+    ParsedTrace: class {},
   },
   Insights: {
-    Types: {}
-  }
+    Types: {},
+  },
 };
-export class PerformanceTraceFormatter {}
-export class PerformanceInsightFormatter {}
+export class PerformanceTraceFormatter {
+  formatTraceSummary() {
+    return 'Performance trace recorded and parsed successfully.';
+  }
+}
+export class PerformanceInsightFormatter {
+  focus;
+  insight;
+  constructor(focus, insight) {
+    this.focus = focus;
+    this.insight = insight;
+  }
+  formatInsight() {
+    const name = this.insight?.name ?? 'Insight';
+    return \`Analysis for \${name}: trace analysis complete.\`;
+  }
+}
 `;
   writeFile(mcpFile, mcpContent);
 

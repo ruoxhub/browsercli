@@ -88,7 +88,15 @@ export function isSameBrowserTarget(
     // 它的 ego 配置若比较相等，`connectBrowser()` 会短路返回 connected:true，
     // `EgoBridgeManager.start()` 自己的 assertSameOptions() 冲突检查永远到不了，
     // 用户的 `--keep-page` 被静默吞掉（Ruling K）。
-    return (a.keepPage === true) === (b.keepPage === true);
+    //
+    // `egoProfile` 同理，而且更隐蔽：它只在**新建**任务空间时被消费，所以在
+    // 已有 live 桥接时换 profile 本就是"改不了"的；这里若判成同一目标，
+    // `--profile B` 会静默沿用 A，连 worker 里那条"profile 被忽略"的诊断都不会
+    // 打印。空串按「未指定」处理，与 `isProfileWithoutEgo` 的语义一致。
+    return (
+      (a.keepPage === true) === (b.keepPage === true) &&
+      (a.egoProfile?.trim() ?? '') === (b.egoProfile?.trim() ?? '')
+    );
   }
   if (mode === 'ws-endpoint') {
     return (

@@ -80,9 +80,44 @@ export function isEgoWithLaunchOnly(config: {
   );
 }
 
-/** 逐个点名，因为「你写的那几个 flag 在 ego 下不生效」比一句「互斥」有用得多。 */
+/**
+ * 这些 flag 是否被显式写过（不看值），用来判定「用户想要的是本地启动」。
+ *
+ * 与 {@link isEgoWithLaunchOnly} 分开：那个要求 `ego === true` 才判冲突，这里
+ * 只看这批参数本身。CLI 的隐式 ego 默认值要用它 —— 只排除目标参数和 `--cloak`
+ * 不够，`browser connect --headless` 这类「本来就只想本地启动」的调用会被默认值
+ * 翻成 ego 再被上面的互斥判死。
+ */
+export function hasLaunchOnlyConfig(config: {
+  cloak?: unknown;
+  headless?: unknown;
+  userDataDir?: unknown;
+  isolated?: unknown;
+  minimalStealth?: unknown;
+  fullStealthArgs?: unknown;
+  jsStealth?: unknown;
+  acceptInsecureCerts?: unknown;
+}): boolean {
+  return (
+    config.cloak !== undefined ||
+    config.headless !== undefined ||
+    config.userDataDir !== undefined ||
+    config.isolated !== undefined ||
+    config.minimalStealth !== undefined ||
+    config.fullStealthArgs !== undefined ||
+    config.jsStealth !== undefined ||
+    config.acceptInsecureCerts !== undefined
+  );
+}
+
+/**
+ * 逐个点名，因为「你写的那几个 flag 在 ego 下不生效」比一句「互斥」有用得多。
+ *
+ * 末尾那一句是退出方式：拒绝了一个原本能用的调用，必须告诉用户怎么回到本地启动，
+ * 否则他们只会以为这个 flag 坏了。
+ */
 export const EGO_LAUNCH_ONLY_FLAGS_MESSAGE =
-  'ego 模式不启动本地浏览器，以下参数在 ego 下不生效：--cloak / --headless / --user-data-dir / --isolated / --minimal-stealth / --full-stealth-args / --js-stealth / --accept-insecure-certs';
+  'ego 模式不启动本地浏览器，以下参数在 ego 下不生效：--cloak / --headless / --user-data-dir / --isolated / --minimal-stealth / --full-stealth-args / --js-stealth / --accept-insecure-certs；要本地启动浏览器请加 --ego=false（或设 BROWSER_EGO=false）';
 
 /** 同时点出两个 key（CLI flag、环境变量、配置键），用户才知道该改哪一个。 */
 export const KEEP_PAGE_WITHOUT_EGO_MESSAGE =

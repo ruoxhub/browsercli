@@ -17,6 +17,7 @@ process.env.NODE_ENV = 'test';
 // `--require tests/setup.js` would otherwise get different results.
 delete process.env.BROWSER_EGO;
 delete process.env.BROWSER_KEEP_PAGE;
+delete process.env.BROWSER_EGO_PROFILE;
 
 // Suppress console output during tests unless DEBUG is set
 if (!process.env.DEBUG) {

@@ -28,18 +28,17 @@ export const getConsoleMessage = defineTool({
   schema: {
     msgid: zod
       .number()
-      .describe(
-        '页面 Console 消息的 msgid，来自已列出的 Console 消息列表。',
-      ),
+      .describe('页面 Console 消息的 msgid，来自已列出的 Console 消息列表。'),
   },
   handler: async (request, response) => {
     let data;
     let message;
     try {
-      const consoleMessage =
-        getRuntime().contextProvider!.getConsoleMessageById(
-          request.params.msgid,
-        );
+      const provider = getRuntime().contextProvider;
+      await (provider as any)?.ensureConsoleEnabled?.();
+      const consoleMessage = provider!.getConsoleMessageById(
+        request.params.msgid,
+      );
       const consoleMessageStableId = request.params.msgid;
 
       if (

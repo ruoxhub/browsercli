@@ -16,6 +16,7 @@ import {
   EGO_TARGET_CONFLICT_MESSAGE,
   getEnvFlag,
   EGO_LAUNCH_ONLY_FLAGS_MESSAGE,
+  hasLaunchOnlyConfig,
   isEgoWithLaunchOnly,
   isEgoWithTarget,
   isKeepPageWithoutEgo,
@@ -23,7 +24,10 @@ import {
   KEEP_PAGE_WITHOUT_EGO_MESSAGE,
   PROFILE_WITHOUT_EGO_MESSAGE,
 } from '../../config/browserInvariants.js';
-import {queryEgoSpaces} from '../../modules/browser/ego/ego-spaces.js';
+import {
+  type EgoSpaceSnapshot,
+  queryEgoSpaces,
+} from '../../modules/browser/ego/ego-spaces.js';
 import {parseArgs} from '../args-parser.js';
 import {toAxiError} from '../errors.js';
 import {successOutput, tableOutput} from '../output.js';
@@ -113,6 +117,12 @@ function booleanFlag(
   if (['true', '1', 'yes', 'on'].includes(normalized)) return true;
   if (['false', '0', 'no', 'off'].includes(normalized)) return false;
   return invalid(`--${key} 必须是 true 或 false`);
+}
+
+/** 读一个字符串环境变量：只有 trim 后非空才算「写了」，与 flag 的缺省语义一致。 */
+function envString(key: string): string | undefined {
+  const value = process.env[key]?.trim();
+  return value ? value : undefined;
 }
 
 function urlFlag(
@@ -219,15 +229,36 @@ function connectOptions(
     keepPage: booleanFlag(flags, 'keep-page'),
     minimalStealth: booleanFlag(flags, 'minimal-stealth'),
   };
+  // 只在本地启动路径被读取的那批 flag（含同名环境变量）。
+  //
+  // 用途只有一个：判断「用户其实想要本地启动」。必须带环境变量，否则
+  // `BROWSER_HEADLESS=true browsercli browser connect` 会被下面那个默认值翻成
+  // ego，再被 `isEgoWithLaunchOnly` 判成互斥而失败 —— 一个原本能用的调用因为
+  // 默认值而报错，且错误里原本没说怎么退回去。
+  const launchOnlyIntent = {
+    cloak: booleans.cloak ?? getEnvFlag('BROWSER_CLOAK'),
+    headless: booleans.headless ?? getEnvFlag('BROWSER_HEADLESS'),
+    userDataDir: userDataDir ?? envString('BROWSER_USER_DATA_DIR'),
+    isolated: booleans.isolated ?? getEnvFlag('BROWSER_ISOLATED'),
+    minimalStealth:
+      booleans.minimalStealth ?? getEnvFlag('BROWSER_MINIMAL_STEALTH'),
+    fullStealthArgs:
+      booleans.fullStealthArgs ?? getEnvFlag('BROWSER_FULL_STEALTH_ARGS'),
+    jsStealth: booleans.jsStealth ?? getEnvFlag('BROWSER_JS_STEALTH'),
+    acceptInsecureCerts:
+      booleans.acceptInsecureCerts ??
+      getEnvFlag('BROWSER_ACCEPT_INSECURE_CERTS'),
+  };
   // ego lite 是默认浏览器来源：既不显式给出 `--ego`，也没有指定任何其它连接
   // 目标与浏览器来源开关时，`browsercli browser connect` 就连 ego。
   //
   // 只在「完全没得选」时成立 —— `BROWSER_EGO=false` 这类环境变量、显式
   // `--ego=false`、任何一个目标参数（`--browser-url` / `--ws-endpoint` /
-  // `--channel` / `--executable-path`），或 `--cloak` 都算用户表达了别的意图，
-  // 此时不注入默认值。环境变量必须参与判断：否则 `BROWSER_EGO=false` 会被这个
-  // 默认值反手盖成 true，用户意图被静默翻转。这样也不会触发 `isEgoWithTarget`
-  // 那条互斥：默认值只在那些参数与环境变量全缺时出现。
+  // `--channel` / `--executable-path`），或任何一个只在本地启动路径被读取的
+  // flag 都算用户表达了别的意图，此时不注入默认值。环境变量必须参与判断：否则
+  // `BROWSER_EGO=false` 会被这个默认值反手盖成 true，用户意图被静默翻转。这样
+  // 也不会触发 `isEgoWithTarget` / `isEgoWithLaunchOnly` 那两条互斥：默认值只在
+  // 那些参数与环境变量全缺时出现。
   //
   // 无参 connect 在未安装 ego 的机器上会报错（`ego lite is not installed: ...`
   // 并给出 `EGO_BROWSER_CLI`），而不是静默降级成本地 Chromium —— 静默回退会
@@ -239,7 +270,7 @@ function connectOptions(
     wsEndpoint === undefined &&
     channel === undefined &&
     executablePath === undefined &&
-    booleans.cloak !== true
+    !hasLaunchOnlyConfig(launchOnlyIntent)
   ) {
     booleans.ego = true;
   }
@@ -263,7 +294,7 @@ function connectOptions(
   if (
     isProfileWithoutEgo({
       ego: effectiveEgo,
-      egoProfile: profile ?? process.env.BROWSER_EGO_PROFILE,
+      egoProfile: profile ?? envString('BROWSER_EGO_PROFILE'),
     })
   ) {
     invalid(PROFILE_WITHOUT_EGO_MESSAGE);
@@ -282,14 +313,14 @@ function connectOptions(
   }
   // These eight flags are read only by `launchBrowser()`, which ego mode never
   // reaches, so accepting them would be the same silent ignore as `keepPage`
-  // without `ego`. `booleans` is keyed by CONFIG names (camelCase) while the
-  // flags are kebab-case — reading one with the other's spelling yields
-  // `undefined` and disables the check without failing, so each entry below is
-  // spelled explicitly and a test pins every one of them.
+  // without `ego`. Only the explicitly passed flags are checked here: the env
+  // vars in `launchOnlyIntent` only decide the default above (a daemon-side env
+  // check would need the same list on the merge layer, which is a known gap —
+  // see `browserInvariants.ts`).
   const launchOnlyFlags = {
     cloak: booleans.cloak,
     headless: booleans.headless,
-    userDataDir: stringFlag(flags, 'user-data-dir'),
+    userDataDir,
     isolated: booleans.isolated,
     minimalStealth: booleans.minimalStealth,
     fullStealthArgs: booleans.fullStealthArgs,
@@ -315,11 +346,16 @@ const SPACE_FLAGS = new Set(['json']);
  * Answers the question `--profile` raises ("which id do I pass?") without
  * requiring the user to read ego's UI. Runs locally against ego rather than
  * through the daemon, because it must also work when no browser is connected.
+ *
+ * `query` is injectable so the command's own branches (rejection, JSON shape,
+ * human table, the ego error mapping) can be tested without a live ego — the same
+ * seam `queryEgoSpaces` already offers through `runScript`.
  */
-async function runSpaceCommand(
+export async function runSpaceCommand(
   rest: string[],
   flags: Record<string, string | boolean>,
   ctx: WorkerContext | undefined,
+  query: typeof queryEgoSpaces = queryEgoSpaces,
 ) {
   const sub = rest[0];
   if (rest.length !== 1 || sub !== 'list') {
@@ -328,9 +364,9 @@ async function runSpaceCommand(
   assertFlags(flags, SPACE_FLAGS);
   const json = booleanFlag(flags, 'json') ?? false;
 
-  let snapshot;
+  let snapshot: EgoSpaceSnapshot;
   try {
-    snapshot = await queryEgoSpaces();
+    snapshot = await query();
   } catch (error) {
     throw toAxiError(error, 'BROWSER_ERROR');
   }
@@ -363,7 +399,10 @@ async function runSpaceCommand(
   if (json) return successOutput(result, ctx?.session);
 
   // Human table: the profile columns are what `--profile` consumes, so they are
-  // shown, and the default profile is marked where it appears.
+  // shown, and the default profile is marked where it appears. The profile list
+  // itself is not duplicated here: `result.profiles` above already carries it, and
+  // the renderer prints an array of objects as its own table — a second
+  // `profiles`/`profileHeaders` pair only shadowed that one with dead data.
   const rows = spaces.map(space => [
     String(space.id),
     space.name === '' ? '(未命名)' : space.name,
@@ -372,16 +411,9 @@ async function runSpaceCommand(
       ? '(未知)'
       : `${space.profileId}${space.profileName ? ` / ${space.profileName}` : ''}`,
   ]);
-  const profileRows = profiles.map(profile => [
-    profile.id,
-    profile.name,
-    profile.isDefault ? '是（--profile 省略时使用）' : '',
-  ]);
 
   return {
     ...tableOutput(['ID', '名称', '归属', 'Profile'], rows),
-    profiles: profileRows,
-    profileHeaders: ['Profile ID', '名称', '默认'],
     ...(currentProfile === undefined
       ? {}
       : {

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {withCdpSession} from '../../modules/browser/cdpUtils.js';
+import {getPersistentCdpSession} from '../../modules/browser/cdpUtils.js';
 import type {
   StealthInjectionOptions,
   StealthPreset,
@@ -138,9 +138,12 @@ export const setUserAgent = defineTool({
       );
     }
     try {
-      await withCdpSession(page, async client => {
-        await client.send('Network.setUserAgentOverride', {userAgent});
-      });
+      // 必须把 CDP 会话**保持存活**：`Network.setUserAgentOverride` 是会话级
+      // 状态，会话一 detach 覆写就被撤销（实测 detach 后 navigator.userAgent
+      // 立刻回到原值）。这里为每个页面缓存一个长期存活的会话，重复调用只
+      // 复用同一个会话改值，避免每调一次就多留一个会话。
+      const client = await getPersistentCdpSession(page);
+      await client.send('Network.setUserAgentOverride', {userAgent});
       response.setStructuredContent({
         success: true,
         message: 'User-Agent updated.',

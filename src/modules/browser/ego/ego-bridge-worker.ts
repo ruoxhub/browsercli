@@ -179,6 +179,20 @@ const BROWSER_DOMAIN_FALLBACKS: Record<
     result: {},
     degraded: 'downloads cannot be cancelled through the bridge',
   },
+  'Storage.getCookies': {
+    result: {cookies: []},
+    degraded:
+      'cookies cannot be read via Storage.getCookies through the bridge',
+  },
+  'Storage.setCookies': {
+    result: {},
+    degraded: 'cookies cannot be set via Storage.setCookies through the bridge',
+  },
+  'Storage.clearCookies': {
+    result: {},
+    degraded:
+      'cookies cannot be cleared via Storage.clearCookies through the bridge',
+  },
 };
 
 /**
@@ -746,6 +760,13 @@ export function createEgoBridge(options: EgoBridgeOptions): EgoBridge {
       log(`[ego-bridge] ${CREATE_TARGET_METHOD}: no targetId in the reply`);
       return;
     }
+    // Latch the id BEFORE waiting. This tab was just created by us, so its attach
+    // is provably ours; the firewall would otherwise have to admit it through the
+    // single lazy whitelist refresh in `allowTargetEvent`, which one unrelated
+    // target event in the same native burst can consume. When that happened, the
+    // attach was dropped and this path reported "created but never attached" after
+    // a 5s stall — for a tab that existed and was visible in ego's own UI.
+    knownOwnTargetIds.add(targetId);
     const attached = await awaitAttachForwarded(targetId);
     if (!attached) {
       replyWithError(
