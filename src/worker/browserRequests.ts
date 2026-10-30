@@ -156,6 +156,16 @@ export function parseBrowserConnectBody(body: unknown): BrowserConfig {
   }
 
   const patch: BrowserConfig = {...parsed.data};
+  // 显式关掉 ego 时，把只服务于 ego 的两项一起清掉。store 是深合并的，
+  // 上一次的 `{ego:true, keepPage:true}` 会活到这一次；只写 `ego:false` 会让
+  // 合并结果变成 `{ego:false, keepPage:true}` —— 一个自相矛盾的组合，
+  // `effectiveBrowserConfig()` 的断言会把它拒在提交之后。
+  // 用 `delete` 而不是赋 `undefined`：后者会在 patch 上留下一个显式键，
+  // 让「请求体里只有 ego:false」变成三个键，语义没变、形状却变了。
+  if (parsed.data.ego === false) {
+    delete patch.keepPage;
+    delete patch.egoProfile;
+  }
   if (
     patch.browserURL &&
     !/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(patch.browserURL)
@@ -167,21 +177,38 @@ export function parseBrowserConnectBody(body: unknown): BrowserConfig {
     patch.channel = undefined;
     patch.executablePath = undefined;
     patch.remoteDebuggingUrl = undefined;
+    // 目标与 ego 互斥，而 store 是深合并的：上一次 `connect --ego` 留下的
+    // `ego: true` 会活到这一次，让显式指定的目标撞进 `isEgoWithTarget`。
+    // 用户这次既然点名了目标，就是放弃了 ego。
+    patch.ego = undefined;
+    // 连同只在 ego 下有含义的两项一起清，否则它们会活到后续合并结果里，
+    // 下次无参 connect 又带着别人的 keepPage/profile 连上 ego。
+    patch.keepPage = undefined;
+    patch.egoProfile = undefined;
   } else if (Object.hasOwn(parsed.data, 'wsEndpoint')) {
     patch.browserURL = undefined;
     patch.channel = undefined;
     patch.executablePath = undefined;
     patch.remoteDebuggingUrl = undefined;
+    patch.ego = undefined;
+    patch.keepPage = undefined;
+    patch.egoProfile = undefined;
   } else if (Object.hasOwn(parsed.data, 'channel')) {
     patch.browserURL = undefined;
     patch.wsEndpoint = undefined;
     patch.executablePath = undefined;
     patch.remoteDebuggingUrl = undefined;
+    patch.ego = undefined;
+    patch.keepPage = undefined;
+    patch.egoProfile = undefined;
   } else if (Object.hasOwn(parsed.data, 'executablePath')) {
     patch.browserURL = undefined;
     patch.wsEndpoint = undefined;
     patch.channel = undefined;
     patch.remoteDebuggingUrl = undefined;
+    patch.ego = undefined;
+    patch.keepPage = undefined;
+    patch.egoProfile = undefined;
   }
   return patch;
 }

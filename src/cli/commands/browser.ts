@@ -219,6 +219,30 @@ function connectOptions(
     keepPage: booleanFlag(flags, 'keep-page'),
     minimalStealth: booleanFlag(flags, 'minimal-stealth'),
   };
+  // ego lite 是默认浏览器来源：既不显式给出 `--ego`，也没有指定任何其它连接
+  // 目标与浏览器来源开关时，`browsercli browser connect` 就连 ego。
+  //
+  // 只在「完全没得选」时成立 —— `BROWSER_EGO=false` 这类环境变量、显式
+  // `--ego=false`、任何一个目标参数（`--browser-url` / `--ws-endpoint` /
+  // `--channel` / `--executable-path`），或 `--cloak` 都算用户表达了别的意图，
+  // 此时不注入默认值。环境变量必须参与判断：否则 `BROWSER_EGO=false` 会被这个
+  // 默认值反手盖成 true，用户意图被静默翻转。这样也不会触发 `isEgoWithTarget`
+  // 那条互斥：默认值只在那些参数与环境变量全缺时出现。
+  //
+  // 无参 connect 在未安装 ego 的机器上会报错（`ego lite is not installed: ...`
+  // 并给出 `EGO_BROWSER_CLI`），而不是静默降级成本地 Chromium —— 静默回退会
+  // 让"到底连上了哪个浏览器"变成隐式，而这两者的登录态与反检测面完全不同。
+  if (
+    booleans.ego === undefined &&
+    getEnvFlag('BROWSER_EGO') === undefined &&
+    browserURL === undefined &&
+    wsEndpoint === undefined &&
+    channel === undefined &&
+    executablePath === undefined &&
+    booleans.cloak !== true
+  ) {
+    booleans.ego = true;
+  }
   // ego 的两条不变量在这里先挡一次，用的是**生效值**（flag 优先，其次同名
   // 环境变量），因为它们最终都会进入同一份配置：`--keep-page` 或
   // `BROWSER_KEEP_PAGE` 在没有 ego 时不会被任何分支读取，`--ego` 与四个目标

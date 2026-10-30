@@ -77,38 +77,43 @@ describe('browser connect --ego / --keep-page parsing', () => {
     assert.deepEqual(disabled.bodies, [{ego: false}]);
   });
 
-  it('rejects --keep-page without --ego instead of silently ignoring it', async () => {
-    const cases = [
-      ['connect', '--keep-page'],
-      // An explicit `--ego=false` does not select ego mode either.
-      ['connect', '--ego=false', '--keep-page'],
-    ];
-    for (const args of cases) {
-      const {bodies, ctx} = recordingContext();
-      await assert.rejects(
-        async () => browserCommand(args, ctx),
-        (error: unknown) => {
-          assert.ok(
-            error instanceof AxiError,
-            `expected an AxiError for ${args.join(' ')}`,
-          );
-          assert.strictEqual(error.code, 'VALIDATION_ERROR');
-          assert.match(error.message, /--keep-page/);
-          assert.match(error.message, /--ego/);
-          return true;
-        },
-        args.join(' '),
-      );
-      assert.deepEqual(bodies, [], 'nothing may reach the daemon');
-    }
+  it('treats --keep-page alone as ego, because ego is the default source', async () => {
+    // ego lite 是默认浏览器来源，所以 `--keep-page` 单独出现时不再自相矛盾：
+    // CLI 把它和隐式 ego 一起下发。真正需要拒绝的只剩显式关掉 ego 的情形。
+    const {bodies, ctx} = recordingContext();
+    await browserCommand(['connect', '--keep-page'], ctx);
+    assert.deepEqual(
+      bodies,
+      [{ego: true, keepPage: true}],
+      'the implicit default must travel with the flag that needs it',
+    );
   });
 
-  it('rejects the env-only BROWSER_KEEP_PAGE before spawning a daemon (I1)', async () => {
-    // The original rejection lived only in the CLI flag layer, so this exact
-    // scenario (env var, no flag) sailed through: the daemon stored keepPage,
-    // `ensureBrowser()` took the local-launch branch and never read it.
+  it('rejects --keep-page when ego is explicitly switched off', async () => {
+    // `--ego=false` 明确要求非 ego 模式，此时 keepPage 不会被任何分支读取，
+    // 仍然属于「写明了却静默忽略」，必须拒绝。
+    const {bodies, ctx} = recordingContext();
+    await assert.rejects(
+      async () =>
+        browserCommand(['connect', '--ego=false', '--keep-page'], ctx),
+      (error: unknown) => {
+        assert.ok(error instanceof AxiError, 'expected an AxiError');
+        assert.strictEqual(error.code, 'VALIDATION_ERROR');
+        assert.match(error.message, /--keep-page/);
+        assert.match(error.message, /--ego/);
+        return true;
+      },
+    );
+    assert.deepEqual(bodies, [], 'nothing may reach the daemon');
+  });
+
+  it('rejects the env-only BROWSER_KEEP_PAGE when ego is switched off', async () => {
+    // 同一个「不许静默忽略」规则的环境变量版本。ego 默认开启后，只有显式
+    // 关掉 ego 的组合才继续构成矛盾。
     const saved = process.env.BROWSER_KEEP_PAGE;
+    const savedEgo = process.env.BROWSER_EGO;
     process.env.BROWSER_KEEP_PAGE = '1';
+    process.env.BROWSER_EGO = 'false';
     try {
       const {bodies, ctx} = recordingContext();
       await assert.rejects(
@@ -126,6 +131,8 @@ describe('browser connect --ego / --keep-page parsing', () => {
     } finally {
       if (saved === undefined) delete process.env.BROWSER_KEEP_PAGE;
       else process.env.BROWSER_KEEP_PAGE = saved;
+      if (savedEgo === undefined) delete process.env.BROWSER_EGO;
+      else process.env.BROWSER_EGO = savedEgo;
     }
   });
 
@@ -418,10 +425,22 @@ describe('browser connect --profile', () => {
     assert.deepEqual(bodies, [{ego: true, egoProfile: 'Profile 7'}]);
   });
 
-  it('rejects --profile without ego, before any daemon call', async () => {
+  it('treats --profile alone as ego, because ego is the default source', async () => {
+    // `--profile` 只在 ego 的任务空间里有含义。ego 默认开启后它不再需要显式
+    // `--ego` 陪伴，CLI 会把隐式 ego 一起下发。
+    const {bodies, ctx} = recordingContext();
+    await browserCommand(['connect', '--profile', 'Profile 7'], ctx);
+    assert.deepEqual(bodies, [{ego: true, egoProfile: 'Profile 7'}]);
+  });
+
+  it('rejects --profile when ego is explicitly switched off', async () => {
     const {bodies, ctx} = recordingContext();
     await assert.rejects(
-      async () => browserCommand(['connect', '--profile', 'Profile 7'], ctx),
+      async () =>
+        browserCommand(
+          ['connect', '--ego=false', '--profile', 'Profile 7'],
+          ctx,
+        ),
       (error: unknown) => {
         assert.ok(error instanceof AxiError);
         assert.strictEqual(error.code, 'VALIDATION_ERROR');
@@ -434,9 +453,11 @@ describe('browser connect --profile', () => {
     assert.deepEqual(bodies, [], 'nothing may reach the daemon');
   });
 
-  it('rejects the env-only BROWSER_EGO_PROFILE without ego', async () => {
-    const saved = process.env.BROWSER_EGO_PROFILE;
+  it('rejects the env-only BROWSER_EGO_PROFILE when ego is switched off', async () => {
+    const savedProfile = process.env.BROWSER_EGO_PROFILE;
+    const savedEgo = process.env.BROWSER_EGO;
     process.env.BROWSER_EGO_PROFILE = 'Profile 7';
+    process.env.BROWSER_EGO = 'false';
     try {
       const {bodies, ctx} = recordingContext();
       await assert.rejects(
@@ -450,8 +471,10 @@ describe('browser connect --profile', () => {
       );
       assert.deepEqual(bodies, [], 'nothing may reach the daemon');
     } finally {
-      if (saved === undefined) delete process.env.BROWSER_EGO_PROFILE;
-      else process.env.BROWSER_EGO_PROFILE = saved;
+      if (savedProfile === undefined) delete process.env.BROWSER_EGO_PROFILE;
+      else process.env.BROWSER_EGO_PROFILE = savedProfile;
+      if (savedEgo === undefined) delete process.env.BROWSER_EGO;
+      else process.env.BROWSER_EGO = savedEgo;
     }
   });
 
