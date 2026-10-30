@@ -1,1 +1,0 @@
-{"ts":"<ISO8601>","stage":"capture","request":{"method":"<GET|POST>","url":"<url>","queryKeys":["<k1>","<k2>"]},"response":{"status":200,"bodyPreview":"<first 200 chars>"},"note":"sanitized"}

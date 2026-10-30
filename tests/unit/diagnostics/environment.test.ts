@@ -5,6 +5,7 @@
  */
 
 import assert from 'node:assert/strict';
+import path from 'node:path';
 import {describe, it} from 'node:test';
 
 import {runEnvironmentDiagnostics} from '../../../src/diagnostics/environment.js';
@@ -27,6 +28,19 @@ describe('runEnvironmentDiagnostics', () => {
     const report = runEnvironmentDiagnostics();
     const buildCheck = report.checks.find(c => c.name === 'build_output');
     assert.ok(buildCheck);
+  });
+
+  it('points build_output at the real CLI entry from package.json bin', () => {
+    const report = runEnvironmentDiagnostics();
+    const buildCheck = report.checks.find(c => c.name === 'build_output');
+    assert.ok(buildCheck);
+    // 必须与实际产物一致：build/src/cli/bin/browsercli.js
+    assert.ok(
+      String(buildCheck.details?.buildEntry).endsWith(
+        path.join('build', 'src', 'cli', 'bin', 'browsercli.js'),
+      ),
+      `buildEntry 应指向 CLI 真实入口，实际=${String(buildCheck.details?.buildEntry)}`,
+    );
   });
 
   it('includes artifacts_dir check', () => {

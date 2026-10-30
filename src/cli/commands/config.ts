@@ -39,6 +39,7 @@ const VALID_KEYS = new Set<string>([
   'browserUrl',
   'wsEndpoint',
   'executablePath',
+  'isolate_workspace',
 ]);
 
 function getConfigPath(): string {

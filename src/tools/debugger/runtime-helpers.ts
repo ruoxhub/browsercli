@@ -51,11 +51,10 @@ export async function runTool<P = unknown>(
     if (error instanceof ToolError) throw error;
     const raw = getErrorMessage(error);
     const message = errorPrefix ? `${errorPrefix}: ${raw}` : raw;
-    throw createToolError(
-      ErrorCodes.RUNTIME,
-      message,
-      {toolName: tooltype, ...errorData(request.params)},
-    );
+    throw createToolError(ErrorCodes.RUNTIME, message, {
+      toolName: tooltype,
+      ...errorData(request.params),
+    });
   }
 }
 
@@ -73,6 +72,4 @@ export function filterMatchesByUrl<T>(
 }
 
 export const MINIFIED_LINE_THRESHOLD = 100_000;
-export const LARGE_FILE_THRESHOLD = 50_000;
-export const DEFAULT_PREVIEW_LENGTH = 1_000;
 export const SCOPE_VAR_LIMIT = 20;

@@ -6,7 +6,12 @@
 
 import {createPreloadHookId} from '../../modules/hook/index.js';
 import {getRuntime} from '../../runtime.js';
-import type {CDPSession, Frame, JSHandle} from '../../third_party/index.js';
+import type {
+  CDPSession,
+  Frame,
+  JSHandle,
+  Page,
+} from '../../third_party/index.js';
 import {zod} from '../../third_party/index.js';
 import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
@@ -76,28 +81,58 @@ function getUnknownErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function getFrameId(frame: Frame | null): string | undefined {
-  if (!frame || typeof frame !== 'object') {
+/**
+ * 把选中的 Frame 解析成 CDP 的 frameId。
+ *
+ * Frame 对象上并没有 `frameId` 字段：patchright 的 Frame 只暴露 `_guid`
+ * （形如 `frame@<hash>`），与 CDP `Page.getFrameTree` / `auxData.frameId`
+ * 使用的十六进制 frameId 不是同一值域，直接拿来比较永远不相等 —— 这正是
+ * 历史上 `select_frame` 报告成功、执行上下文却仍不切换的原因。
+ *
+ * 可靠做法是向 CDP 要一次 frame 树，再用 Playwright 稳定的 DFS 顺序
+ * （`page.frames()` 与 `Page.getFrameTree` 同为深度优先）定位到同一帧。
+ * 顺序对不上时返回 undefined，退回"由调用方按多候选报歧义"的旧行为，
+ * 而不是猜一个可能指向别的 frame 的 id。
+ */
+async function resolveSelectedFrameId(
+  frame: Frame | null,
+): Promise<string | undefined> {
+  if (!frame) return undefined;
+
+  let page: Page;
+  try {
+    page = frame.page();
+  } catch {
     return undefined;
   }
 
-  const candidateFrame = frame as {
-    frameId?: string;
-    _frameId?: string;
-    _id?: string;
-    _initializer?: {id?: string; frameId?: string};
-    _channel?: {_initializer?: {id?: string; frameId?: string}};
-  };
+  const frames = page.frames();
+  const index = frames.indexOf(frame);
+  if (index < 0) return undefined;
 
-  return (
-    candidateFrame.frameId ||
-    candidateFrame._frameId ||
-    candidateFrame._id ||
-    candidateFrame._initializer?.frameId ||
-    candidateFrame._initializer?.id ||
-    candidateFrame._channel?._initializer?.frameId ||
-    candidateFrame._channel?._initializer?.id
-  );
+  try {
+    const client = await page.context().newCDPSession(page);
+    try {
+      const {frameTree} = (await client.send('Page.getFrameTree')) as {
+        frameTree?: {frame?: {id?: string}; childFrames?: unknown[]};
+      };
+      const ordered: Array<{id?: string}> = [];
+      const walk = (node?: {
+        frame?: {id?: string};
+        childFrames?: Array<typeof node>;
+      }): void => {
+        if (!node) return;
+        ordered.push(node.frame ?? {});
+        for (const child of node.childFrames ?? []) walk(child);
+      };
+      walk(frameTree as never);
+      return ordered[index]?.id;
+    } finally {
+      await client.detach().catch(() => undefined);
+    }
+  } catch {
+    return undefined;
+  }
 }
 
 function describeContextSelectionFailure(
@@ -326,7 +361,9 @@ async function runOnDebuggerContext(
   try {
     const debuggerContext = await ctx.getDebuggerContext!();
     const executionContexts = debuggerContext.getExecutionContexts();
-    const selectedFrameId = getFrameId(ctx.getSelectedFrame());
+    const selectedFrameId = await resolveSelectedFrameId(
+      ctx.getSelectedFrame(),
+    );
     const effectiveFrameId = request.explicitFrameId ?? selectedFrameId;
     const executionContext = selectExecutionContext(executionContexts, {
       context: request.desiredContext,
@@ -413,11 +450,9 @@ async function runOnFrame(
 
   const frame = ctx.getSelectedFrame();
   if (!frame) {
-    throw createToolError(
-      ErrorCodes.FRAME_REQUIRED,
-      '当前没有可用的 Frame',
-      {toolName: 'evaluate_script'},
-    );
+    throw createToolError(ErrorCodes.FRAME_REQUIRED, '当前没有可用的 Frame', {
+      toolName: 'evaluate_script',
+    });
   }
 
   try {
@@ -500,11 +535,9 @@ export const evaluateScript = defineTool({
     }
 
     if (!functionCode || functionCode.trim().length === 0) {
-      throw createToolError(
-        ErrorCodes.VALIDATION,
-        'function 参数不能为空',
-        {toolName: 'evaluate_script'},
-      );
+      throw createToolError(ErrorCodes.VALIDATION, 'function 参数不能为空', {
+        toolName: 'evaluate_script',
+      });
     }
 
     const syntaxIssue = checkScriptSyntaxBalance(functionCode);
@@ -576,11 +609,9 @@ export const injectPreloadScript = defineTool({
       : (request.params.script ?? '');
 
     if (!script || script.trim().length === 0) {
-      throw createToolError(
-        ErrorCodes.VALIDATION,
-        '脚本内容不能为空',
-        {toolName: tooltype},
-      );
+      throw createToolError(ErrorCodes.VALIDATION, '脚本内容不能为空', {
+        toolName: tooltype,
+      });
     }
 
     const browserContext = toolContext.getBrowserContext();

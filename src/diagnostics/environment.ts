@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {accessSync, constants, existsSync} from 'node:fs';
+import {accessSync, constants, existsSync, readFileSync} from 'node:fs';
 import path from 'node:path';
 
 import {
@@ -40,14 +40,31 @@ function getNodeVersionStatus(version: string): DiagnosticCheck {
   };
 }
 
+/**
+ * 解析 CLI 构建产物入口。
+ *
+ * 直接从 package.json 的 `bin.browsercli` 读取，而不是在代码里再写一份路径：
+ * 该字段本来就是构建产物位置的唯一事实来源，写死路径会在目录迁移后静默失配
+ * （历史上曾把 `build/src/cli/bin/browsercli.js` 误写为 `build/src/bin/...`，
+ * 导致诊断恒定 fail）。读不到 package.json 时退回同一约定路径。
+ */
+function resolveBuildEntry(packageRoot: string): string {
+  const pkgPath = path.join(packageRoot, 'package.json');
+  try {
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as {
+      bin?: string | Record<string, string>;
+    };
+    const bin = pkg.bin;
+    const declared = typeof bin === 'string' ? bin : bin?.['browsercli'];
+    if (declared) return path.resolve(packageRoot, declared);
+  } catch {
+    // package.json 缺失或非法：退回约定路径，由 existsSync 给出结论。
+  }
+  return path.join(packageRoot, 'build', 'src', 'cli', 'bin', 'browsercli.js');
+}
+
 function getBuildOutputStatus(packageRoot: string): DiagnosticCheck {
-  const buildEntry = path.join(
-    packageRoot,
-    'build',
-    'src',
-    'bin',
-    'browsercli.js',
-  );
+  const buildEntry = resolveBuildEntry(packageRoot);
   const exists = existsSync(buildEntry);
   return {
     name: 'build_output',

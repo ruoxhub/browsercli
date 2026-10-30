@@ -248,9 +248,32 @@ export const saveSessionState = defineTool({
         );
       }
       const sid = sessionId ?? `session_${Date.now()}`;
-      const cookies = includeCookies
-        ? await withOperationTimeout(page.context().cookies(), '读取 cookies')
-        : [];
+      let cookies: Array<Record<string, unknown>> = [];
+      if (includeCookies) {
+        try {
+          cookies = (await withOperationTimeout(
+            page.context().cookies(),
+            '读取 cookies',
+          )) as unknown as Array<Record<string, unknown>>;
+        } catch {
+          try {
+            const rawCookie = await page.evaluate(() => document.cookie);
+            if (rawCookie) {
+              cookies = rawCookie
+                .split(';')
+                .map(pair => {
+                  const [name, ...rest] = pair.trim().split('=');
+                  return {name, value: rest.join('=')};
+                })
+                .filter(c => Boolean(c.name)) as unknown as Array<
+                Record<string, unknown>
+              >;
+            }
+          } catch {
+            // ignore
+          }
+        }
+      }
       const localStorageData: Record<string, string> = includeLocalStorage
         ? await withOperationTimeout(
             page.evaluate(() => {

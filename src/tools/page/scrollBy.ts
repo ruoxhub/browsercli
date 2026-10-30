@@ -7,7 +7,7 @@
 import {zod} from '../../third_party/index.js';
 import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
-import {errorMessage, sendJson} from '../shared/pageResponse.js';
+import {getErrorMessage, sendJson} from '../shared/pageResponse.js';
 import {defineTool} from '../ToolDefinition.js';
 
 /**
@@ -19,9 +19,7 @@ export const scrollBy = defineTool({
     '按方向（up/down/top/bottom）滚动页面，并自动等待 800ms 以触发懒加载内容。',
   annotations: {category: ToolCategory.INPUT, readOnlyHint: true},
   schema: {
-    direction: zod
-      .enum(['up', 'down', 'top', 'bottom'])
-      .describe('滚动方向。'),
+    direction: zod.enum(['up', 'down', 'top', 'bottom']).describe('滚动方向。'),
     pixels: zod
       .number()
       .optional()
@@ -74,7 +72,7 @@ export const scrollBy = defineTool({
     } catch (error) {
       throw createToolError(
         ErrorCodes.RUNTIME,
-        `滚动页面失败: ${errorMessage(error)}`,
+        `滚动页面失败: ${getErrorMessage(error)}`,
         {toolName: 'scroll_by', direction, pixels},
       );
     }

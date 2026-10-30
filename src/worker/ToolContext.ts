@@ -204,8 +204,39 @@ export class ToolContextProvider {
     this._browserContext.setSelectedPage(page);
   }
 
+  /**
+   * 返回当前执行上下文 Frame。
+   *
+   * 未显式 `select_frame` 时回退到主 frame：与
+   * `DefineToolContextFactory.getSelectedFrame()` 语义保持一致。否则前置条件
+   * 检查（ToolPrerequisiteChecker 直接读本方法）会把 `frame: 'selected'` 的
+   * 工具在主 frame 上误拦成 FRAME_REQUIRED，而工具实现自身拿到的却是带回退
+   * 的 frame —— 声明与实现互相矛盾。
+   *
+   * 已选中的 frame 可能因页面导航而 detach（`locator.click: Frame was
+   * detached`）。此时它已不在当前页面的 frame 列表里，继续返回它会让后续每个
+   * 定位类工具都失败一次；丢弃它并回退到主 frame，与"用户没有显式选择"等价。
+   *
+   * 只有在能取到页面时才做存活校验：没有页面（或测试注入的裸 frame 替身）时
+   * 无从判断，此时信任调用方显式设置的值。
+   */
   getSelectedFrame(): Frame | null {
-    return this._browserContext.getSelectedFrame();
+    const page = this._browserContext.getSelectedPage();
+    const selected = this._browserContext.getSelectedFrame();
+
+    if (!page) return selected ?? null;
+
+    if (selected) {
+      try {
+        // 仍在当前页面的 frame 列表内才算有效（导航后旧 frame 会被移出）。
+        if (page.frames().includes(selected)) return selected;
+      } catch {
+        // frames() 在页面关闭时可能抛错，按失效处理。
+      }
+      this._browserContext.setSelectedFrame(null);
+    }
+
+    return page.mainFrame() ?? null;
   }
 
   setSelectedFrame(frame: Frame | null): void {
@@ -395,6 +426,12 @@ export class ToolContextProvider {
 
   resolveCdpRequestId(_cdpRequestId: string): undefined {
     return undefined;
+  }
+
+  async ensureConsoleEnabled(): Promise<void> {
+    await this._collectorContext.ensureConsoleEnabled(
+      this._browserContext.getSelectedPage(),
+    );
   }
 
   getConsoleData(

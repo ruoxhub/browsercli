@@ -40,6 +40,7 @@ import {
   getIgnoreDefaultArgs,
 } from './browser-helpers.js';
 import {setupCloak} from './cloak.js';
+import {EgoBridgeManager} from './ego/EgoBridgeManager.js';
 
 /**
  * 浏览器生命周期管理：启动、连接、页面管理、反检测注入。
@@ -227,6 +228,8 @@ export class BrowserManager {
   private wasConnected = false;
   private detachedFrameGuard?: (error: Error) => void;
   private launchPromise: Promise<Browser> | null = null;
+  /** True while this manager is the thing that must stop the ego bridge. */
+  private egoBridgeOwned = false;
 
   public onDisconnected?: () => void;
   public onReconnected?: (browser: Browser, context?: BrowserContext) => void;
@@ -262,15 +265,30 @@ export class BrowserManager {
     return browserManager;
   }
 
-  static async resetInstance(): Promise<void> {
-    if (browserManager) {
-      try {
-        await browserManager.close();
-      } catch (err) {
-        logger.debug('Error closing browser during reset:', err);
-      }
-      browserManager = undefined;
+  /**
+   * Close and forget the singleton browser.
+   *
+   * @returns `true` when no instance is left behind (nothing to close, or the
+   * close succeeded), `false` when `close()` failed and the instance was kept.
+   *
+   * A failing `close()` means a resource survived it — in ego mode that is the
+   * bridge, and with it the task space it holds. This manager is the only object
+   * holding the claim that can stop it, so it is kept instead of discarded and a
+   * later `resetInstance()`/`close()` retries the teardown. Callers observe an
+   * instance whose `isConnected()` is false but which still owns a live bridge.
+   * This method still never rejects (callers fire it and forget); a caller that
+   * gave up on the old instance must look at the return value.
+   */
+  static async resetInstance(): Promise<boolean> {
+    if (!browserManager) return true;
+    try {
+      await browserManager.close();
+    } catch (err) {
+      logger.debug('Error closing browser during reset:', err);
+      return false;
     }
+    browserManager = undefined;
+    return true;
   }
 
   async ensureBrowser(): Promise<Browser> {
@@ -284,6 +302,12 @@ export class BrowserManager {
     }
 
     const doLaunch = async (): Promise<Browser> => {
+      // ego 是"连接"模式而非"启动"模式：桥接进程先发布标准 CDP 端点，之后
+      // 完全复用下面的远程连接路径。显式 `ego: true` 优先于其它端点配置。
+      if (this.config.ego) {
+        return this.connectEgoBrowser();
+      }
+
       if (
         this.config.browserURL ||
         this.config.wsEndpoint ||
@@ -359,6 +383,92 @@ export class BrowserManager {
 
   // ─── Remote Connection ───────────────────────────────────────────────
 
+  /**
+   * Connect to the ego lite browser through its CDP bridge.
+   *
+   * ego lite publishes no debugging port, so the transport has to be started
+   * first: `EgoBridgeManager` spawns the worker that republishes ego's native
+   * CDP as a standard `ws://` endpoint. Everything after that is the *existing*
+   * remote path — the endpoint is published as `config.wsEndpoint` and
+   * `connectToRemoteBrowser()` does the verification/normalization, so there is
+   * no second connect implementation to keep in sync.
+   *
+   * A bridge this method leaves running is a leaked process that holds a port,
+   * so any failure here — including a `start()` that rejects before an endpoint
+   * exists — tears it down before the error is rethrown.
+   */
+  private async connectEgoBrowser(): Promise<Browser> {
+    logger.debug('Connecting to the ego lite browser via its CDP bridge');
+
+    const bridge = EgoBridgeManager.getInstance();
+    const previousWsEndpoint = this.config.wsEndpoint;
+    // Claimed *before* `start()`: a start that rejects half-way can still have
+    // brought a bridge up, and only a successful `stop()` clears the claim, so a
+    // teardown that fails here is retried by a later `close()` instead of being
+    // lost. That retry only exists because `resetInstance()` keeps this manager
+    // when `close()` failed instead of dropping the only holder of the claim.
+    this.egoBridgeOwned = true;
+
+    try {
+      // The retention policy is baked into the bridge's bootstrap, so it can only
+      // be applied here, once per manager. `isSameBrowserTarget()` compares it for
+      // the same reason: a differing `keepPage` must not be treated as the same
+      // target, or this call would never be reached and the flag would be lost.
+      const connection = await bridge.start({
+        keepPage: this.config.keepPage === true,
+        ...(this.config.egoProfile === undefined
+          ? {}
+          : {profileId: this.config.egoProfile}),
+      });
+      this.config = {...this.config, wsEndpoint: connection.wsEndpoint};
+
+      const browser = await this.connectToRemoteBrowser();
+      this.bindEgoPage(browser);
+      // `connectToRemoteBrowser()` already notified subscribers with
+      // `contexts()[0]`, which is exactly the context `bindEgoPage()` exists to
+      // replace (a fresh task space has no tab, so the page lives in a later
+      // context). Notify again with the context that is actually bound, or the
+      // provider keeps the empty one and `syncPages()` runs against it.
+      this.onReconnected?.(browser, this.context);
+      return browser;
+    } catch (error) {
+      // Do not leave a dead endpoint in the config: it would make a retry look
+      // already-configured and mislead anything reading getConfig().
+      this.config = {...this.config, wsEndpoint: previousWsEndpoint};
+      try {
+        await this.stopEgoBridge();
+      } catch (stopError) {
+        // The connect error is the one the caller needs; report the leaked
+        // teardown instead of replacing it.
+        logger.debug(
+          'Failed to stop the ego bridge after a failed connect:',
+          stopError,
+        );
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Bind the manager to a page of the connection it just made.
+   *
+   * The bridge's Target firewall already keeps the user's own tabs out of
+   * `contexts()`, but the first context can still be empty (a fresh task space
+   * has no tab until one is opened), so the first context that actually holds a
+   * page wins instead of blindly adopting `contexts()[0]`. Only contexts of
+   * `browser` are scanned, and that browser was replaced a moment ago by
+   * `connectOverCDP`, so no page from an earlier connection can be adopted.
+   */
+  private bindEgoPage(browser: Browser): void {
+    for (const ctx of browser.contexts()) {
+      const page = ctx.pages()[0];
+      if (!page) continue;
+      this.context = ctx;
+      this.trackCurrentPage(page);
+      return;
+    }
+  }
+
   private async connectToRemoteBrowser(): Promise<Browser> {
     try {
       logger.debug('Connecting to remote browser at:', this.debugUrl());
@@ -393,7 +503,10 @@ export class BrowserManager {
       return this.browser;
     } catch (error) {
       this.removeDetachedFrameGuard();
-      if (this.config.autoLaunch) {
+      // auto-launch spawns a *local* Chrome on `remoteDebuggingPort`; in ego mode
+      // there is no local browser to start and retrying against the bridge
+      // endpoint would only hide the bridge's own failure.
+      if (this.config.autoLaunch && !this.config.ego) {
         logger.debug(
           'Remote browser connection failed, attempting auto-launch...',
         );
@@ -450,6 +563,18 @@ export class BrowserManager {
       return {webSocketDebuggerUrl: browserURL};
     }
 
+    // 显式配置的端口（非 9222 默认）代表用户的明确意图，不得被
+    // DevToolsActivePort 里的残留端口顶替。9222 与"未写端口"仍视为自动发现。
+    const explicitPort = (() => {
+      try {
+        const parsed = new URL(browserURL);
+        return parsed.port ? Number(parsed.port) : 0;
+      } catch {
+        return 0;
+      }
+    })();
+    const hasExplicitPort = explicitPort > 0 && explicitPort !== 9222;
+
     try {
       const response = await fetch(`${browserURL}/json/version`);
       if (!response.ok) {
@@ -489,13 +614,21 @@ export class BrowserManager {
         );
         return {webSocketDebuggerUrl: fallback};
       }
-      // 如果配置的端口连接失败（如历史动态端口已变），且本地存在有效的 DevToolsActivePort，优雅回退到当前活动的 ws 端点
-      const activeFallback = this.buildDevToolsActivePortFallback();
-      if (activeFallback) {
-        logger.debug(
-          `[fetchVersionInfo] configured URL unreachable, falling back to active DevToolsActivePort wsPath: ${activeFallback}`,
-        );
-        return {webSocketDebuggerUrl: activeFallback};
+      // 如果配置的端口连接失败（如历史动态端口已变），且本地存在有效的 DevToolsActivePort，优雅回退到当前活动的 ws 端点。
+      //
+      // 仅限于「没有显式配置端口」的情形（自动发现）。用户显式给了
+      // browserURL/remoteDebuggingUrl 时绝不回退：那些 profile 文件里的端口
+      // 常常是上一次运行（或 ego 桥接）留下的残留值，跟着它走会把连接导向一个
+      // 已经关闭的端点，报出与被配置端口毫无关系的 ECONNREFUSED，而用户配置
+      // 的端口根本没被尝试过。
+      if (!hasExplicitPort) {
+        const activeFallback = this.buildDevToolsActivePortFallback();
+        if (activeFallback) {
+          logger.debug(
+            `[fetchVersionInfo] configured URL unreachable, falling back to active DevToolsActivePort wsPath: ${activeFallback}`,
+          );
+          return {webSocketDebuggerUrl: activeFallback};
+        }
       }
       return {};
     }
@@ -1025,7 +1158,14 @@ export class BrowserManager {
 
     this.removeDetachedFrameGuard();
 
-    if (!this.browser) return;
+    // The bridge is only touched when this manager started it: a stray `stop()`
+    // in the non-ego path would queue behind unrelated work in the singleton.
+    const ownedBridge = this.egoBridgeOwned;
+
+    if (!this.browser) {
+      if (ownedBridge) await this.stopEgoBridge();
+      return;
+    }
 
     const browser = this.browser;
     this.browser = undefined;
@@ -1058,6 +1198,29 @@ export class BrowserManager {
         }
       }
       logger.debug('Browser close forced:', error);
+    } finally {
+      // After the CDP connection is gone: the bridge is the transport it used.
+      if (ownedBridge) await this.stopEgoBridge();
+    }
+  }
+
+  /**
+   * Stop the ego bridge, surfacing a failed teardown.
+   *
+   * `stop()` resolves only once the launcher exited and its port stopped
+   * accepting, and it keeps its state on failure so it can be retried — so its
+   * rejection must reach the caller instead of being swallowed here, and
+   * ownership is dropped only on success so a retry still stops it.
+   */
+  private async stopEgoBridge(): Promise<void> {
+    try {
+      await EgoBridgeManager.getInstance().stop();
+      this.egoBridgeOwned = false;
+    } catch (error) {
+      throw new Error(
+        `Failed to stop the ego bridge: ${(error as Error).message}`,
+        {cause: error},
+      );
     }
   }
 }

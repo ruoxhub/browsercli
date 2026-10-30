@@ -15,14 +15,16 @@
 import {execFileSync, spawn} from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
-import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 import {
+  cliConfigPath,
   computeClientInfo,
   deleteSession,
+  loadCliConfig,
   loadSession,
+  type CliConfig,
   type SessionConfig,
 } from './sessionPaths.js';
 
@@ -246,41 +248,8 @@ export class DaemonConnection {
   }
 }
 
-/** CLI 配置文件路径；BROWSERCLI_CONFIG_DIR / PROXYCLI_CONFIG_DIR 供测试隔离（与 commands/config.ts 同步）。 */
-export function cliConfigPath(): string {
-  const custom =
-    process.env.BROWSERCLI_CONFIG_DIR ?? process.env.PROXYCLI_CONFIG_DIR;
-  if (custom) return path.join(custom, 'config.json');
-  const browserDir = path.join(os.homedir(), '.browsercli');
-  if (fs.existsSync(browserDir)) return path.join(browserDir, 'config.json');
-  const proxyDir = path.join(os.homedir(), '.proxycli');
-  if (fs.existsSync(proxyDir)) return path.join(proxyDir, 'config.json');
-  return path.join(browserDir, 'config.json');
-}
-
-export interface CliConfig {
-  workerEntry?: string;
-  headless?: string;
-  cloak?: string;
-  jsStealth?: string;
-  fullStealthArgs?: string;
-  minimalStealth?: string;
-  browserUrl?: string;
-  wsEndpoint?: string;
-  executablePath?: string;
-}
-
-export function loadCliConfig(): CliConfig {
-  try {
-    const parsed = JSON.parse(fs.readFileSync(cliConfigPath(), 'utf-8'));
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      return parsed as CliConfig;
-    }
-  } catch {
-    // 无配置文件或损坏 → 视为空
-  }
-  return {};
-}
+/** CLI 配置文件路径与读取函数，已收敛至 sessionPaths.ts 统一管理 */
+export {cliConfigPath, loadCliConfig, type CliConfig};
 
 export interface EnsureDaemonOptions {
   session: string;

@@ -8,7 +8,7 @@ import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
 import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
-import {errorMessage} from '../shared/pageResponse.js';
+import {getErrorMessage} from '../shared/pageResponse.js';
 import {defineTool} from '../ToolDefinition.js';
 
 /**
@@ -35,10 +35,7 @@ export const createHook = defineTool({
       .unknown()
       .optional()
       .describe('类型相关参数（对象、数组或任意值）'),
-    description: zod
-      .string()
-      .optional()
-      .describe('该 Hook 的可读描述'),
+    description: zod.string().optional().describe('该 Hook 的可读描述'),
     action: zod
       .enum(['log', 'block', 'modify', 'passthrough'])
       .optional()
@@ -97,11 +94,9 @@ export const createHook = defineTool({
       });
     } catch (error) {
       if (error && typeof error === 'object' && 'code' in error) throw error;
-      throw createToolError(
-        ErrorCodes.RUNTIME,
-        errorMessage(error),
-        {toolName: 'create_hook'},
-      );
+      throw createToolError(ErrorCodes.RUNTIME, getErrorMessage(error), {
+        toolName: 'create_hook',
+      });
     }
   },
 });

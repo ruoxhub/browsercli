@@ -102,6 +102,18 @@ describe('help', () => {
       assert.ok(result.includes('--force'));
     });
 
+    it('documents the ego flags and what --keep-page retains', () => {
+      const result = generateCommandHelp('browser', 'connect');
+      assert.ok(result);
+      assert.ok(result.includes('--ego'));
+      assert.ok(result.includes('--keep-page'));
+      // The retention flag must say what it actually does: keep the analysis
+      // tabs in ego; without it the task space (and its tabs) are closed.
+      assert.match(result, /--keep-page.*保留/);
+      assert.match(result, /标签页/);
+      assert.match(result, /--ego/);
+    });
+
     it('returns dedicated help for browser disconnect and status subcommands', () => {
       const disconnect = generateCommandHelp('browser', [
         'disconnect',
@@ -146,15 +158,8 @@ describe('help', () => {
       assert.ok(result!.includes('status'));
     });
 
-    it('returns help for web command', () => {
-      const result = generateCommandHelp('web');
-      assert.ok(result);
-      assert.ok(result!.includes('web [start]'));
-      assert.ok(result!.includes('web status'));
-      assert.ok(result!.includes('web stop'));
-    });
-
     it('returns null for removed commands', () => {
+      assert.strictEqual(generateCommandHelp('web'), null);
       assert.strictEqual(generateCommandHelp('start'), null);
       assert.strictEqual(generateCommandHelp('stop'), null);
       assert.strictEqual(generateCommandHelp('repl'), null);
@@ -173,7 +178,6 @@ describe('help', () => {
         'config',
         'scaffold',
         'status',
-        'web',
       ];
       for (const cmd of commands) {
         const result = generateCommandHelp(cmd);

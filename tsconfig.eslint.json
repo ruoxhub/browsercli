@@ -10,5 +10,5 @@
     "*.mjs",
     "*.js"
   ],
-  "exclude": ["node_modules", "build", "src/web-ui"]
+  "exclude": ["node_modules", "build"]
 }

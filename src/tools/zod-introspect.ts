@@ -111,6 +111,12 @@ function resolveSimpleType(
     if (first instanceof zod.ZodBoolean) return 'boolean';
     return null;
   }
+  // zod.unknown()（含 z.any()）表示"任意 JSON 值"，归为 'json' 而不是丢弃：
+  // 丢掉会让 buildToolArgs 把该参数当未知参数拒绝，例如 create_hook 的
+  // `params`（承载 target / object / property 等类型相关字段），一旦缺失
+  // function / property 类 hook 就完全无法创建。
+  if (inner instanceof zod.ZodUnknown || inner instanceof zod.ZodAny)
+    return 'json';
   return null;
 }
 

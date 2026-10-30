@@ -4,12 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {Locator} from 'patchright';
+
+import {globalPageSnapshotManager} from '../../modules/snapshot/PageSnapshotManager.js';
 import {
   createToolError,
   ErrorCodes,
   ToolError,
   type ToolErrorCode,
 } from '../../utils/errors.js';
+import type {Context} from '../ToolDefinition.js';
 
 export type ElementFailureKind = 'transient' | 'permanent';
 
@@ -19,6 +23,17 @@ export interface ClassifiedElementError {
   message: string;
   suggestion?: string;
   candidatesCount?: number;
+}
+
+/** 读取错误对象的 name，非对象或缺失时返回空串。 */
+function readErrorName(error: unknown): string {
+  if (error instanceof Error) {
+    return error.name;
+  }
+  if (typeof error === 'object' && error !== null && 'name' in error) {
+    return String((error as {name: unknown}).name);
+  }
+  return '';
 }
 
 /**
@@ -33,12 +48,7 @@ export interface ClassifiedElementError {
  * 4. 兜底错误 → `permanent` (RUNTIME)。
  */
 export function classifyElementError(error: unknown): ClassifiedElementError {
-  const errorName =
-    error instanceof Error
-      ? error.name
-      : typeof error === 'object' && error !== null && 'name' in error
-        ? String((error as {name: unknown}).name)
-        : '';
+  const errorName = readErrorName(error);
   const rawMessage = error instanceof Error ? error.message : String(error);
 
   // 1. 超时 / 0 匹配：优先比对稳定类名 Error.name === 'TimeoutError'，正则兜底
@@ -96,7 +106,13 @@ export function classifyElementError(error: unknown): ClassifiedElementError {
  */
 export function toElementError(
   error: unknown,
-  context: {toolName: string; selector: string; [key: string]: unknown},
+  context: {
+    toolName: string;
+    selector?: string;
+    uid?: string;
+    target?: string;
+    [key: string]: unknown;
+  },
 ): ToolError {
   if (error instanceof ToolError) {
     return error;
@@ -120,5 +136,52 @@ export function toElementError(
     classification.message,
     errorContext,
     classification.kind === 'transient',
+  );
+}
+
+export interface ResolveTargetOptions {
+  uid?: string;
+  selector?: string;
+  toolName?: string;
+}
+
+/**
+ * 解析交互目标定位器（支持 uid 与 selector 双模）。
+ */
+export function resolveTargetLocator(
+  context: Context,
+  options: ResolveTargetOptions,
+): {locator: Locator; targetDescription: string} {
+  const {uid, selector, toolName = 'element_action'} = options;
+
+  if (uid) {
+    const page = context.getSelectedPage?.();
+    if (!page) {
+      throw createToolError(
+        ErrorCodes.PAGE_REQUIRED,
+        '当前没有活动的页面，无法解析元素 uid。',
+        {toolName, uid},
+      );
+    }
+    const locator = globalPageSnapshotManager.getLocatorByUid(page, uid);
+    return {locator, targetDescription: `uid=${uid}`};
+  }
+
+  if (selector) {
+    const frame = context.getSelectedFrame?.();
+    if (!frame) {
+      throw createToolError(
+        ErrorCodes.FRAME_REQUIRED,
+        '当前没有活动的 Frame，无法解析选择器。',
+        {toolName, selector},
+      );
+    }
+    return {locator: frame.locator(selector), targetDescription: selector};
+  }
+
+  throw createToolError(
+    ErrorCodes.VALIDATION,
+    'uid 与 selector 至少需要提供一项。',
+    {toolName},
   );
 }

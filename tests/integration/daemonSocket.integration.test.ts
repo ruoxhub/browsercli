@@ -22,7 +22,14 @@ import {fileURLToPath} from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 // 运行时位置：<repo>/build/tests/integration —— 上溯三级即仓库根。
 const repoRoot = path.resolve(here, '../../..');
-const cliBin = path.join(repoRoot, 'build', 'src', 'cli', 'bin', 'browsercli.js');
+const cliBin = path.join(
+  repoRoot,
+  'build',
+  'src',
+  'cli',
+  'bin',
+  'browsercli.js',
+);
 const daemonEntry = path.join(repoRoot, 'build', 'src', 'index.js');
 
 interface SessionConfig {
@@ -176,9 +183,6 @@ describe('daemon socket end-to-end', () => {
     assert.equal(cfg.name, SESSION_NAME);
     assert.equal(cfg.protocol, 1);
     assert.ok(cfg.socketPath.length > 0);
-    assert.ok(
-      Number.isFinite(cfg.consolePort) && (cfg.consolePort as number) > 0,
-    );
   });
 
   it('list-tools returns a non-empty tool list over the socket', () => {

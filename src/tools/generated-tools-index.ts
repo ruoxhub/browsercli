@@ -248,6 +248,10 @@ export const GENERATED_TOOL_REGISTRY = [
     handlerName: 'findClickableElements',
   },
   {
+    modulePath: './dom/takeSnapshot.js',
+    handlerName: 'takeSnapshot',
+  },
+  {
     modulePath: './emulation/emulateMobile.js',
     handlerName: 'emulateMobile',
   },

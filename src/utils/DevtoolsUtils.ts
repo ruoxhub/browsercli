@@ -5,7 +5,6 @@
  */
 
 import {
-  type Issue,
   type AggregatedIssue,
   Marked,
   MarkdownIssueDescription,
@@ -14,91 +13,6 @@ import {
 
 import {ISSUE_UTILS} from './issue-descriptions.js';
 import {logger} from './logger.js';
-
-export function extractUrlLikeFromDevToolsTitle(
-  title: string,
-): string | undefined {
-  const match = title.match(new RegExp(`DevTools - (.*)`));
-  return match?.[1] ?? undefined;
-}
-
-export function urlsEqual(url1: string, url2: string): boolean {
-  const normalizedUrl1 = normalizeUrl(url1);
-  const normalizedUrl2 = normalizeUrl(url2);
-  return normalizedUrl1 === normalizedUrl2;
-}
-
-/**
- * For the sake of the MCP server, when we determine if two URLs are equal we
- * remove some parts:
- *
- * 1. We do not care about the protocol.
- * 2. We do not care about trailing slashes.
- * 3. We do not care about "www".
- * 4. We ignore the hash parts.
- *
- * For example, if the user types "record a trace on foo.com", we would want to
- * match a tab in the connected Chrome instance that is showing "www.foo.com/"
- */
-function normalizeUrl(url: string): string {
-  let result = url.trim();
-
-  // Remove protocols
-  if (result.startsWith('https://')) {
-    result = result.slice(8);
-  } else if (result.startsWith('http://')) {
-    result = result.slice(7);
-  }
-
-  // Remove 'www.'. This ensures that we find the right URL regardless of if the user adds `www` or not.
-  if (result.startsWith('www.')) {
-    result = result.slice(4);
-  }
-
-  // We use target URLs to locate DevTools but those often do
-  // no include hash.
-  const hashIdx = result.lastIndexOf('#');
-  if (hashIdx !== -1) {
-    result = result.slice(0, hashIdx);
-  }
-
-  // Remove trailing slash
-  if (result.endsWith('/')) {
-    result = result.slice(0, -1);
-  }
-
-  return result;
-}
-
-/**
- * A mock implementation of an issues manager that only implements the methods
- * that are actually used by the IssuesAggregator
- *
- * Note: This is a standalone class to avoid circular dependency issues with
- * third-party Common.ObjectWrapper in ES module loading.
- */
-export class FakeIssuesManager {
-  #listeners = new Map<string, Set<(...args: any[]) => void>>();
-
-  addEventListener(event: string, listener: (...args: any[]) => void): void {
-    if (!this.#listeners.has(event)) {
-      this.#listeners.set(event, new Set());
-    }
-    this.#listeners.get(event)!.add(listener);
-  }
-
-  removeEventListener(event: string, listener: (...args: any[]) => void): void {
-    this.#listeners.get(event)?.delete(listener);
-  }
-
-  emit(event: string, ...args: any[]): void {
-    this.#listeners.get(event)?.forEach(listener => listener(...args));
-  }
-
-  issues(): Issue[] {
-    return [];
-  }
-}
 
 export function mapIssueToMessageObject(issue: AggregatedIssue) {
   const count = issue.getAggregatedIssuesCount();

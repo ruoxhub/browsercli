@@ -719,4 +719,57 @@ describe('browser.ts mocked', () => {
       fs.readFileSync = originalReadFileSync;
     }
   });
+  it('does NOT fall back to a stale DevToolsActivePort when the configured port differs', async () => {
+    // 回归：配置了 browserURL=127.0.0.1:19222，但本机 DevToolsActivePort 里残留着
+    // 一个早已关闭的端口（例如 ego 桥接上一次运行留下的 53687）。旧实现在
+    // fetch 抛错时无条件回退到该文件，把连接导向死端点，表现为
+    // "connect ECONNREFUSED 127.0.0.1:53687" —— 用户配置的端口完全没被使用。
+    // 正确行为：端口不一致时不得回退，应回到配置的 browserURL。
+    const originalFetch = globalThis.fetch;
+    const originalReadFileSync = fs.readFileSync;
+    globalThis.fetch = (async () => {
+      throw new TypeError('fetch failed');
+    }) as unknown as typeof fetch;
+    fs.readFileSync = ((p: fs.PathOrFileDescriptor) => {
+      if (String(p).endsWith('DevToolsActivePort')) {
+        return ['53687', '/devtools/browser/stale-uuid', ''].join(
+          String.fromCharCode(10),
+        );
+      }
+      throw Object.assign(new Error('ENOENT'), {code: 'ENOENT'});
+    }) as typeof fs.readFileSync;
+
+    try {
+      const manager = BrowserManager.getInstance({
+        browserURL: 'http://127.0.0.1:19222',
+        isolated: true,
+        headless: true,
+      });
+
+      let capturedEndpoint: string | undefined;
+      chromium.connectOverCDP = (async (endpoint: string) => {
+        capturedEndpoint = String(endpoint);
+        return {
+          isConnected: () => true,
+          contexts: () => [{pages: () => []}],
+          on: () => undefined,
+        };
+      }) as unknown as typeof chromium.connectOverCDP;
+
+      await (manager as unknown as BrowserManagerLike).connectToRemoteBrowser();
+
+      assert.ok(capturedEndpoint, 'connectOverCDP should have been called');
+      assert.ok(
+        !capturedEndpoint!.includes('53687'),
+        `不得连接残留端口，实际=${capturedEndpoint}`,
+      );
+      assert.ok(
+        capturedEndpoint!.includes('19222'),
+        `应使用配置端口，实际=${capturedEndpoint}`,
+      );
+    } finally {
+      globalThis.fetch = originalFetch;
+      fs.readFileSync = originalReadFileSync;
+    }
+  });
 });

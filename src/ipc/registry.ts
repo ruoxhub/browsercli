@@ -82,10 +82,56 @@ function computeBaseDaemonDir(): string {
   return path.join(cache, 'browsercli', 'daemon');
 }
 
+function cliConfigPath(): string {
+  const custom =
+    process.env.BROWSERCLI_CONFIG_DIR ?? process.env.PROXYCLI_CONFIG_DIR;
+  if (custom) return path.join(custom, 'config.json');
+  const browserDir = path.join(os.homedir(), '.browsercli');
+  if (fs.existsSync(browserDir)) return path.join(browserDir, 'config.json');
+  const proxyDir = path.join(os.homedir(), '.proxycli');
+  if (fs.existsSync(proxyDir)) return path.join(proxyDir, 'config.json');
+  return path.join(browserDir, 'config.json');
+}
+
+function loadCliConfig(): Record<string, string> {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(cliConfigPath(), 'utf-8'));
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, string>;
+    }
+  } catch {
+    // 无配置文件或损坏 → 视为空
+  }
+  return {};
+}
+
+export function isWorkspaceIsolationEnabled(): boolean {
+  if (process.env.BROWSERCLI_WORKSPACE || process.env.PROXYCLI_WORKSPACE) {
+    return true;
+  }
+  const envOverride =
+    process.env.BROWSERCLI_ISOLATE_WORKSPACE ??
+    process.env.PROXYCLI_ISOLATE_WORKSPACE;
+  if (envOverride !== undefined) {
+    return envOverride === 'true' || envOverride === '1';
+  }
+  const cfg = loadCliConfig();
+  return cfg.isolate_workspace === 'true' || cfg.isolate_workspace === '1';
+}
+
 export function computeClientInfo(
   startDir?: string,
   version = '0.0.0',
 ): ClientInfo {
+  if (!isWorkspaceIsolationEnabled()) {
+    const baseDir = computeBaseDaemonDir();
+    return {
+      version,
+      workspaceDir: baseDir,
+      workspaceDirHash: 'global',
+      daemonDir: path.join(baseDir, 'global'),
+    };
+  }
   const workspaceDir = computeWorkspaceDir(startDir ?? process.cwd());
   const hashAlgo = ['sha', '1'].join('');
   const workspaceDirHash = crypto

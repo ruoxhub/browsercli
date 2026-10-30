@@ -100,20 +100,37 @@ describe('computeWorkspaceDir', () => {
 });
 
 describe('computeClientInfo', () => {
-  it('hashes the workspace dir with sha1 (16 hex chars)', () => {
-    const root = tempDir();
-    fs.writeFileSync(path.join(root, 'package.json'), '{}');
-    // 深链 6 级：root 在上溯 10 级窗口内
-    const deep = deepChain(root, 6);
-    const info = computeClientInfo(deep);
-    const expected = crypto
-      .createHash('sha1')
-      .update(root)
-      .digest('hex')
-      .slice(0, 16);
-    assert.equal(info.workspaceDir, root);
-    assert.equal(info.workspaceDirHash, expected);
-    assert.ok(info.daemonDir.endsWith(expected));
+  it('defaults to global workspaceDirHash across directories', () => {
+    const d1 = tempDir();
+    const d2 = tempDir();
+    const info1 = computeClientInfo(d1);
+    const info2 = computeClientInfo(d2);
+    assert.equal(info1.workspaceDirHash, 'global');
+    assert.equal(info2.workspaceDirHash, 'global');
+    assert.equal(info1.daemonDir, info2.daemonDir);
+  });
+
+  it('hashes the workspace dir with sha1 when isolation is enabled', () => {
+    const prev = process.env.BROWSERCLI_ISOLATE_WORKSPACE;
+    process.env.BROWSERCLI_ISOLATE_WORKSPACE = 'true';
+    try {
+      const root = tempDir();
+      fs.writeFileSync(path.join(root, 'package.json'), '{}');
+      // 深链 6 级：root 在上溯 10 级窗口内
+      const deep = deepChain(root, 6);
+      const info = computeClientInfo(deep);
+      const expected = crypto
+        .createHash('sha1')
+        .update(root)
+        .digest('hex')
+        .slice(0, 16);
+      assert.equal(info.workspaceDir, root);
+      assert.equal(info.workspaceDirHash, expected);
+      assert.ok(info.daemonDir.endsWith(expected));
+    } finally {
+      if (prev === undefined) delete process.env.BROWSERCLI_ISOLATE_WORKSPACE;
+      else process.env.BROWSERCLI_ISOLATE_WORKSPACE = prev;
+    }
   });
 
   it('honors BROWSERCLI_DAEMON_DIR', () => {

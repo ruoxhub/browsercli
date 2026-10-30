@@ -11,6 +11,14 @@
 // Set test environment
 process.env.NODE_ENV = 'test';
 
+// Keep in sync with tests/setup.ts: the browser config parsers read these
+// directly, so a machine that exports them would change test verdicts. Every
+// npm script loads the COMPILED build/tests/setup.js, but a hand-run
+// `--require tests/setup.js` would otherwise get different results.
+delete process.env.BROWSER_EGO;
+delete process.env.BROWSER_KEEP_PAGE;
+delete process.env.BROWSER_EGO_PROFILE;
+
 // Suppress console output during tests unless DEBUG is set
 if (!process.env.DEBUG) {
   global.console = {

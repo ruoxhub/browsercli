@@ -6,6 +6,28 @@
 import {AxiError} from 'axi-sdk-js';
 import type {AxiCliCommand} from 'axi-sdk-js';
 
+/**
+ * ego 的两条「不许静默忽略」不变量与提示语来自配置层的零依赖模块
+ * （`browserInvariants.ts`）：配置合并层与 IPC 请求层用的是同一份判定，避免
+ * 三处各写一套词表后漂移。该模块不 import 任何东西，不会把 zod / patchright
+ * 拉进 CLI 进程。
+ */
+import {
+  EGO_TARGET_CONFLICT_MESSAGE,
+  getEnvFlag,
+  EGO_LAUNCH_ONLY_FLAGS_MESSAGE,
+  hasLaunchOnlyConfig,
+  isEgoWithLaunchOnly,
+  isEgoWithTarget,
+  isKeepPageWithoutEgo,
+  isProfileWithoutEgo,
+  KEEP_PAGE_WITHOUT_EGO_MESSAGE,
+  PROFILE_WITHOUT_EGO_MESSAGE,
+} from '../../config/browserInvariants.js';
+import {
+  type EgoSpaceSnapshot,
+  queryEgoSpaces,
+} from '../../modules/browser/ego/ego-spaces.js';
 import {parseArgs} from '../args-parser.js';
 import {toAxiError} from '../errors.js';
 import {successOutput, tableOutput} from '../output.js';
@@ -21,6 +43,7 @@ const CONNECT_FLAGS = new Set([
   'browser-url',
   'channel',
   'cloak',
+  'ego',
   'executable-path',
   'force',
   'full-stealth-args',
@@ -28,7 +51,9 @@ const CONNECT_FLAGS = new Set([
   'isolated',
   'js-stealth',
   'json',
+  'keep-page',
   'minimal-stealth',
+  'profile',
   'user-data-dir',
   'viewport',
   'ws-endpoint',
@@ -92,6 +117,12 @@ function booleanFlag(
   if (['true', '1', 'yes', 'on'].includes(normalized)) return true;
   if (['false', '0', 'no', 'off'].includes(normalized)) return false;
   return invalid(`--${key} 必须是 true 或 false`);
+}
+
+/** 读一个字符串环境变量：只有 trim 后非空才算「写了」，与 flag 的缺省语义一致。 */
+function envString(key: string): string | undefined {
+  const value = process.env[key]?.trim();
+  return value ? value : undefined;
 }
 
 function urlFlag(
@@ -189,19 +220,218 @@ function connectOptions(
   const booleans = {
     acceptInsecureCerts: booleanFlag(flags, 'accept-insecure-certs'),
     cloak: booleanFlag(flags, 'cloak'),
+    ego: booleanFlag(flags, 'ego'),
     force: booleanFlag(flags, 'force'),
     fullStealthArgs: booleanFlag(flags, 'full-stealth-args'),
     headless: booleanFlag(flags, 'headless'),
     isolated: booleanFlag(flags, 'isolated'),
     jsStealth: booleanFlag(flags, 'js-stealth'),
+    keepPage: booleanFlag(flags, 'keep-page'),
     minimalStealth: booleanFlag(flags, 'minimal-stealth'),
   };
+  // 只在本地启动路径被读取的那批 flag（含同名环境变量）。
+  //
+  // 用途只有一个：判断「用户其实想要本地启动」。必须带环境变量，否则
+  // `BROWSER_HEADLESS=true browsercli browser connect` 会被下面那个默认值翻成
+  // ego，再被 `isEgoWithLaunchOnly` 判成互斥而失败 —— 一个原本能用的调用因为
+  // 默认值而报错，且错误里原本没说怎么退回去。
+  const launchOnlyIntent = {
+    cloak: booleans.cloak ?? getEnvFlag('BROWSER_CLOAK'),
+    headless: booleans.headless ?? getEnvFlag('BROWSER_HEADLESS'),
+    userDataDir: userDataDir ?? envString('BROWSER_USER_DATA_DIR'),
+    isolated: booleans.isolated ?? getEnvFlag('BROWSER_ISOLATED'),
+    minimalStealth:
+      booleans.minimalStealth ?? getEnvFlag('BROWSER_MINIMAL_STEALTH'),
+    fullStealthArgs:
+      booleans.fullStealthArgs ?? getEnvFlag('BROWSER_FULL_STEALTH_ARGS'),
+    jsStealth: booleans.jsStealth ?? getEnvFlag('BROWSER_JS_STEALTH'),
+    acceptInsecureCerts:
+      booleans.acceptInsecureCerts ??
+      getEnvFlag('BROWSER_ACCEPT_INSECURE_CERTS'),
+  };
+  // ego lite 是默认浏览器来源：既不显式给出 `--ego`，也没有指定任何其它连接
+  // 目标与浏览器来源开关时，`browsercli browser connect` 就连 ego。
+  //
+  // 只在「完全没得选」时成立 —— `BROWSER_EGO=false` 这类环境变量、显式
+  // `--ego=false`、任何一个目标参数（`--browser-url` / `--ws-endpoint` /
+  // `--channel` / `--executable-path`），或任何一个只在本地启动路径被读取的
+  // flag 都算用户表达了别的意图，此时不注入默认值。环境变量必须参与判断：否则
+  // `BROWSER_EGO=false` 会被这个默认值反手盖成 true，用户意图被静默翻转。这样
+  // 也不会触发 `isEgoWithTarget` / `isEgoWithLaunchOnly` 那两条互斥：默认值只在
+  // 那些参数与环境变量全缺时出现。
+  //
+  // 无参 connect 在未安装 ego 的机器上会报错（`ego lite is not installed: ...`
+  // 并给出 `EGO_BROWSER_CLI`），而不是静默降级成本地 Chromium —— 静默回退会
+  // 让"到底连上了哪个浏览器"变成隐式，而这两者的登录态与反检测面完全不同。
+  if (
+    booleans.ego === undefined &&
+    getEnvFlag('BROWSER_EGO') === undefined &&
+    browserURL === undefined &&
+    wsEndpoint === undefined &&
+    channel === undefined &&
+    executablePath === undefined &&
+    !hasLaunchOnlyConfig(launchOnlyIntent)
+  ) {
+    booleans.ego = true;
+  }
+  // ego 的两条不变量在这里先挡一次，用的是**生效值**（flag 优先，其次同名
+  // 环境变量），因为它们最终都会进入同一份配置：`--keep-page` 或
+  // `BROWSER_KEEP_PAGE` 在没有 ego 时不会被任何分支读取，`--ego` 与四个目标
+  // 参数则是 help 里已经声明的互斥关系。终端路径在 spawn daemon 之前就报错，
+  // 用户不会看到「连接成功但其实没生效」。合并层与 IPC 请求层另有同一守卫。
+  const effectiveEgo = booleans.ego ?? getEnvFlag('BROWSER_EGO');
+  const explicitTarget =
+    browserURL !== undefined ||
+    wsEndpoint !== undefined ||
+    channel !== undefined ||
+    executablePath !== undefined;
+
+  const candidateKeepPage =
+    booleans.keepPage ??
+    (explicitTarget ? undefined : getEnvFlag('BROWSER_KEEP_PAGE'));
+  if (
+    isKeepPageWithoutEgo({
+      ego: effectiveEgo,
+      keepPage: candidateKeepPage,
+    })
+  ) {
+    invalid(KEEP_PAGE_WITHOUT_EGO_MESSAGE);
+  }
+  // `--profile` names an ego task-space identity; without ego nothing reads it,
+  // so accepting it would be the same silent ignore as `--keep-page`.
+  const profile = stringFlag(flags, 'profile');
+  const candidateProfile =
+    profile ?? (explicitTarget ? undefined : envString('BROWSER_EGO_PROFILE'));
+  if (
+    isProfileWithoutEgo({
+      ego: effectiveEgo,
+      egoProfile: candidateProfile,
+    })
+  ) {
+    invalid(PROFILE_WITHOUT_EGO_MESSAGE);
+  }
+  if (profile !== undefined) options.egoProfile = profile;
+  if (
+    isEgoWithTarget({
+      ego: effectiveEgo,
+      browserURL,
+      wsEndpoint,
+      channel,
+      executablePath,
+    })
+  ) {
+    invalid(EGO_TARGET_CONFLICT_MESSAGE);
+  }
+  // These eight flags are read only by `launchBrowser()`, which ego mode never
+  // reaches, so accepting them would be the same silent ignore as `keepPage`
+  // without `ego`. Only the explicitly passed flags are checked here: the env
+  // vars in `launchOnlyIntent` only decide the default above (a daemon-side env
+  // check would need the same list on the merge layer, which is a known gap —
+  // see `browserInvariants.ts`).
+  const launchOnlyFlags = {
+    cloak: booleans.cloak,
+    headless: booleans.headless,
+    userDataDir,
+    isolated: booleans.isolated,
+    minimalStealth: booleans.minimalStealth,
+    fullStealthArgs: booleans.fullStealthArgs,
+    jsStealth: booleans.jsStealth,
+    acceptInsecureCerts: booleans.acceptInsecureCerts,
+  };
+  if (isEgoWithLaunchOnly({ego: effectiveEgo, ...launchOnlyFlags})) {
+    invalid(EGO_LAUNCH_ONLY_FLAGS_MESSAGE);
+  }
   for (const [key, value] of Object.entries(booleans)) {
     if (value !== undefined) {
       (options as Record<string, unknown>)[key] = value;
     }
   }
   return options;
+}
+
+const SPACE_FLAGS = new Set(['json']);
+
+/**
+ * `browser space list` — show ego's task spaces and profiles.
+ *
+ * Answers the question `--profile` raises ("which id do I pass?") without
+ * requiring the user to read ego's UI. Runs locally against ego rather than
+ * through the daemon, because it must also work when no browser is connected.
+ *
+ * `query` is injectable so the command's own branches (rejection, JSON shape,
+ * human table, the ego error mapping) can be tested without a live ego — the same
+ * seam `queryEgoSpaces` already offers through `runScript`.
+ */
+export async function runSpaceCommand(
+  rest: string[],
+  flags: Record<string, string | boolean>,
+  ctx: WorkerContext | undefined,
+  query: typeof queryEgoSpaces = queryEgoSpaces,
+) {
+  const sub = rest[0];
+  if (rest.length !== 1 || sub !== 'list') {
+    invalid('space 的子命令只有 list（如 browsercli browser space list）');
+  }
+  assertFlags(flags, SPACE_FLAGS);
+  const json = booleanFlag(flags, 'json') ?? false;
+
+  let snapshot: EgoSpaceSnapshot;
+  try {
+    snapshot = await query();
+  } catch (error) {
+    throw toAxiError(error, 'BROWSER_ERROR');
+  }
+
+  const spaces = snapshot.spaces;
+  const profiles = snapshot.profiles;
+  const currentProfile = profiles.find(profile => profile.isDefault);
+
+  const result = {
+    command: 'browser',
+    action: 'space',
+    subaction: 'list',
+    spaces: spaces.map(space => ({
+      id: space.id,
+      name: space.name ?? '',
+      ownership: space.ownership ?? 'unknown',
+      createdBy: space.createdBy ?? 'unknown',
+      profileId: space.profileId ?? '',
+      profileName: space.profileName ?? '',
+    })),
+    profiles: profiles.map(profile => ({
+      id: profile.id,
+      name: profile.name,
+      isDefault: profile.isDefault,
+    })),
+    ...(currentProfile === undefined
+      ? {}
+      : {defaultProfileId: currentProfile.id}),
+  };
+  if (json) return successOutput(result, ctx?.session);
+
+  // Human table: the profile columns are what `--profile` consumes, so they are
+  // shown, and the default profile is marked where it appears. The profile list
+  // itself is not duplicated here: `result.profiles` above already carries it, and
+  // the renderer prints an array of objects as its own table — a second
+  // `profiles`/`profileHeaders` pair only shadowed that one with dead data.
+  const rows = spaces.map(space => [
+    String(space.id),
+    space.name === '' ? '(未命名)' : space.name,
+    space.ownership ?? 'unknown',
+    space.profileId === undefined || space.profileId === ''
+      ? '(未知)'
+      : `${space.profileId}${space.profileName ? ` / ${space.profileName}` : ''}`,
+  ]);
+
+  return {
+    ...tableOutput(['ID', '名称', '归属', 'Profile'], rows),
+    ...(currentProfile === undefined
+      ? {}
+      : {
+          hint: `新建任务空间默认使用 ${currentProfile.id}；用 --profile <id> 指定别的`,
+        }),
+    ...result,
+  };
 }
 
 function renderBrowserStatus(
@@ -232,11 +462,19 @@ export const browserCommand: AxiCliCommand<WorkerContext> = async (
 ) => {
   const parsed = parseArgs(args);
   const action = parsed.positionals[0];
+  // `space list` is a read-only question about ego's own state (which task
+  // spaces and profiles exist), not an operation on a browser connection, so it
+  // is dispatched before anything touches the daemon.
+  if (action === 'space') {
+    return runSpaceCommand(parsed.positionals.slice(1), parsed.flags, ctx);
+  }
   if (
     parsed.positionals.length !== 1 ||
     !['connect', 'disconnect', 'status'].includes(action)
   ) {
-    invalid('浏览器动作必须是 connect、disconnect 或 status');
+    invalid(
+      '浏览器动作必须是 connect、disconnect、status 或 space（如 space list）',
+    );
   }
   const typedAction = action as 'connect' | 'disconnect' | 'status';
   assertFlags(
@@ -252,6 +490,10 @@ export const browserCommand: AxiCliCommand<WorkerContext> = async (
     typedAction === 'disconnect'
       ? booleanFlag(parsed.flags, 'force')
       : undefined;
+  // Parsed before connecting so an invalid flag combination (`--keep-page`
+  // without `--ego`) is rejected locally instead of spawning a daemon first.
+  const connectBody =
+    typedAction === 'connect' ? connectOptions(parsed.flags) : undefined;
   const client = ctx ? await ctx.connect() : undefined;
   if (!client) throw new AxiError('Worker 未运行', 'WORKER_NOT_RUNNING');
 
@@ -259,7 +501,7 @@ export const browserCommand: AxiCliCommand<WorkerContext> = async (
     const state =
       typedAction === 'connect'
         ? await client.request<BrowserConnectionStatus>('browser.connect', {
-            body: connectOptions(parsed.flags),
+            body: connectBody,
           })
         : typedAction === 'disconnect'
           ? await client.request<BrowserConnectionStatus>(

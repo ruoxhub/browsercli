@@ -8,7 +8,7 @@ import {getRuntime} from '../../runtime.js';
 import {zod} from '../../third_party/index.js';
 import {createToolError, ErrorCodes} from '../../utils/errors.js';
 import {ToolCategory} from '../categories.js';
-import {errorMessage} from '../shared/pageResponse.js';
+import {getErrorMessage} from '../shared/pageResponse.js';
 import {defineTool} from '../ToolDefinition.js';
 
 import type {InjectHookData} from './types.js';
@@ -41,8 +41,7 @@ export const injectHook = defineTool({
     const {hookId} = request.params;
     const runtime = getRuntime();
     const resolvedScript =
-      request.params.script ??
-      runtime.hookManager.getHook(hookId)?.script;
+      request.params.script ?? runtime.hookManager.getHook(hookId)?.script;
 
     if (
       !resolvedScript ||
@@ -123,7 +122,7 @@ export const injectHook = defineTool({
       if (error && typeof error === 'object' && 'code' in error) throw error;
       throw createToolError(
         ErrorCodes.RUNTIME,
-        `注入失败：${errorMessage(error)}`,
+        `注入失败：${getErrorMessage(error)}`,
         {toolName: 'inject_hook', ...base},
       );
     }

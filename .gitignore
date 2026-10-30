@@ -226,3 +226,4 @@ wiki/
 .pi-glla/
 # Added by code-review-graph
 .code-review-graph/
+artifacts/

@@ -15,7 +15,7 @@ browsercli call <tool_name> [arguments]
 
 ---
 
-## 1. 快速入门与 Daemon 会话运维
+## 快速入门与 Daemon 会话运维
 
 在展开逆向分析前，优先确保 Daemon 会话与浏览器连接处于健康状态：
 
@@ -41,22 +41,105 @@ browsercli kill-all
 
 ### 浏览器连接与反检测控制
 
+**ego lite 是默认浏览器来源。** 不带任何目标参数的 `browsercli browser connect` 直接连接正在运行的 ego lite，复用其真实登录态：
+
 ```bash
-# 查看当前 Worker 的浏览器连接状态
+# 查看当前 Worker 的浏览器连接状态（期望 Mode=ego）
 browsercli browser status
 
-# 默认启动 Chromium 浏览器连接
+# 默认连接 ego lite（无需 --ego，它是默认值）
 browsercli browser connect
+
+# 显式写 --ego 等价，便于脚本自证意图
+browsercli browser connect --ego
+
+# 显式关闭 ego，改走远程/本地浏览器
+browsercli browser connect --ego=false --browser-url "http://127.0.0.1:9222"
 
 # 以源码级防检测 CloakBrowser 启动（强反爬站点推荐，独立 profile 隔离）
 browsercli browser connect --cloak
 
-# 无头模式与自定义执行路径
-browsercli browser connect --headless --executable-path "/path/to/chrome"
+# 本地启动指定渠道 / 自定义执行路径
+browsercli browser connect --channel stable
+browsercli browser connect --executable-path "/path/to/chrome"
 
 # 强制断开卡死的浏览器连接
 browsercli browser disconnect --force
 ```
+
+默认值只在**完全没得选**时生效：显式 `--ego=false`、`BROWSER_EGO=false`、任一目标参数（`--browser-url` / `--ws-endpoint` / `--channel` / `--executable-path`），或 `--cloak`，都会让默认值让位。未安装 ego lite 的机器上无参 `connect` 会**直接报错并提示设置 `EGO_BROWSER_CLI`**，不会静默降级成本地 Chromium——因为两者的登录态与反检测面完全不同，"连上了哪个浏览器"不能是隐式的。
+
+### ego lite 接管细节（默认来源，复用真实登录态）
+
+ego 不启动新浏览器，而是通过本地 CDP 桥接接管**正在运行的 ego lite**，直接使用其中已登录的真实会话，无需重新配置 Cookie 或应对反爬审批弹窗。
+
+```bash
+# 1. 连上 ego —— 无参 connect 就是它，写 --ego 只是把默认值写明
+browsercli browser connect
+
+# 2. 确认已进入 ego 模式
+browsercli browser status          # 期望 Mode=ego
+
+# 3. 之后的工具调用与普通模式完全一致
+browsercli call new_page --url "https://www.baidu.com"
+```
+
+**标签页归属与保留策略**
+
+ego 会在独立的 Agent 任务空间（TaskSpace）里建页，与用户私人标签页物理隔离——工具只能看到、也只能操作自己空间内的页面。
+
+```bash
+# 断开时保留分析现场，标签页交还给用户手动接管
+browsercli browser connect --ego --keep-page
+
+# 不传 --keep-page（默认）：本次新建的任务空间被关闭，其标签页一并消失
+browsercli browser disconnect
+```
+
+保留策略有一条不在文档表面上的规则：**只有本次运行「新建」的任务空间会被关闭**。若复用了工作区已有的同名空间，或回收了上次遗留的空间，断开时一律保留（转为 `user` 归属），因为其中的标签页不全是本次创建的。所以"默认关闭"只在全新空间上成立。
+
+需要人工复核 Hook 采样结果、断点现场或抓包证据时用 `--keep-page`；纯自动化跑完即弃则保持默认。
+
+**查看任务空间与 Profile**
+
+```bash
+# 列出 ego 里的任务空间归属与全部可用 Profile（无需已连接浏览器）
+browsercli browser space list
+```
+
+输出中的 `Profile ID` 就是 `--profile` 的取值；标记为默认的那个在不指定时使用。
+
+```bash
+# 指定新任务空间使用的 Profile（仅在新建空间时生效）
+browsercli browser connect --ego --profile "Profile 1"
+```
+
+复用已有空间时会保留其原 Profile，并在诊断日志中提示，不会静默切换。
+
+**ego 模式下的参数约束**
+
+```bash
+# ❌ 以下参数在 ego 下不生效，会被直接拒绝：
+#    --cloak / --headless / --user-data-dir / --isolated
+#    --minimal-stealth / --full-stealth-args / --js-stealth / --accept-insecure-certs
+browsercli browser connect --ego --cloak
+
+# ❌ ego 与连接目标互斥，不能同时指定：
+#    --browser-url / --ws-endpoint / --channel / --executable-path
+browsercli browser connect --ego --browser-url http://127.0.0.1:9222
+```
+
+ego 模式既不本地启动浏览器，也不附连指定端点，因此上述两类参数都被视为自相矛盾而拒绝。
+
+**已知能力边界**
+
+- ego lite 未实现 `Storage` 域，`get_storage --type cookies` 会失败；`localStorage` / `sessionStorage` 正常。
+- 截图要求 ego 窗口处于非最小化状态，否则 `take_screenshot` 报 `Cannot capture a screenshot while the window is minimized`。
+- 若工具报 `Task space N does not exist`，说明桥接持有的任务空间已被外部关闭（ego 的 selected task space 是进程级全局状态，其他 ego 客户端可将其切走）。恢复方式：
+
+  ```bash
+  browsercli browser disconnect && browsercli browser connect --ego
+  ```
 
 ### 任务脚手架与全局配置
 
@@ -67,16 +150,6 @@ browsercli scaffold my-task --url "https://example.com" --goal "提取签名算�
 # 查看与修改全局配置（~/.browsercli/config.json）
 browsercli config get
 browsercli config set cloak=true
-```
-
-### Web 控制台
-
-```bash
-# 启动并自动打开 Web 可视化控制台
-browsercli web
-
-# 停止 Web 控制台
-browsercli web stop
 ```
 
 ### 长耗时任务救援与任务队列
@@ -90,40 +163,15 @@ browsercli jobs list --json
 browsercli jobs cancel <job-id>
 ```
 
----
 
-## 2. 核心逆向方法论与反检测哲学
 
-严格遵循四大核心逆向准则：**Observe-first（观察优先）**、**Hook-preferred（Hook 优于断点）**、**Breakpoint-last（断点兜底）** 与 **Evidence-first（证据沉淀）**。
-
-```text
-┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐     ┌───────────────────────┐
-│ 1. 观察流量      │ ──> │ 2. 非阻塞拦截     │ ──> │ 3. 分析与追踪   │ ──> │ 4. 算法复现与证据     │
-│ 接口与发起栈定位 │     │ 动态 Hook / 探针 │     │ AST反混淆/断点  │     │ 离线补环境 / 报告闭环 │
-└─────────────────┘     └──────────────────┘     └─────────────────┘     └───────────────────────┘
-```
-
-1. **Observe-first（观察优先）**：先通过网络嗅探 `list_network_requests` 锁定目标接口，调用 `get_request_initiator` 获取发起者调用栈，使用 `list_scripts` / `collect_code` 收集脚本，不破坏页面运行状态。
-2. **Hook-preferred（Hook 优于断点）**：优先使用非阻塞 Hook（`hook_function`、`create_hook` + `inject_hook`）截取动态参数、密钥与返回值，避免冻结主线程导致心跳超时或触发防调试检测。加密库与 JSVMP 的专用拦截脚本见 `skills/web-reverse-hook`。
-3. **Breakpoint-last（断点兜底）**：仅在深层控制流混淆、动态作用域变量检查时才使用断点（`set_breakpoint`、`break_on_xhr`、`step_into`、`inspect_locals`）。
-4. **Evidence-first（证据沉淀）**：逆向产出必须可验证，把结构化结论写入 `artifacts/tasks/<task-id>/`（证据落盘工具已随 `src/tools/analyzer` 下线）。
-
-### 反检测分层哲学（零 JS 注入防护）
-
-- **协议层（Patchright）**：默认启用。不预先开启 `Runtime.enable`，保持 CDP 域干净无特征。
-- **源码层（CloakBrowser 二进制）**：`browsercli browser connect --cloak` 启用，49 个 C++ patch，profile 与普通模式物理隔离。
-- **启动参数层**：默认走最小集 `MINIMAL_STEALTH_ARGS`，严禁在默认启动路径上追加已废弃的被检自动化 flag。
-- **JS 注入层（StealthScripts）**：默认**不**注入。严禁隐式全局注入，仅在特定场景由用户通过 `inject_stealth` 或 `--js-stealth` 显式 opt-in。
-
----
-
-## 3. 模块化工具速查索引 (Tool Reference Index)
+## 模块化工具速查索引 (Tool Reference Index)
 
 各领域工具的详细参数签名与使用示例已模块化整理在 `references/` 目录中，可按需精读：
 
 | 分类 / 领域              | 详细参考文档                                               | 涵盖的核心能力与代表工具                                                                                                                                                                   |
 | :----------------------- | :--------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **浏览器与页面控制**     | [`references/browser.md`](./references/browser.md)         | 多标签管理、iframe 切换、视口控制、设备/网络模拟、健康检查 (`list_pages`, `new_page`, `select_frame`, `emulate_mobile`, `check_browser_health`)                                            |
+| **浏览器与页面控制**     | [`references/browser.md`](./references/browser.md)         | ego lite 默认接管、多标签管理、iframe 切换、视口控制、设备/网络模拟、健康检查 (`browser connect`, `list_pages`, `new_page`, `select_frame`, `emulate_mobile`, `check_browser_health`)       |
 | **脚本收集与源码定位**   | [`references/script.md`](./references/script.md)           | 脚本列举、源码按行截取、全局正则搜索、预加载脚本注入 (`list_scripts`, `get_script_source`, `search_in_sources`, `collect_code`)                                                            |
 | **动态 Hook 与加密拦截** | [`references/hook.md`](./references/hook.md)               | 非阻塞 Hook、Hook 生命周期管理、便捷函数 Hook (`create_hook`, `inject_hook`, `get_hook_data`, `hook_function`, `unhook_function`)。加密库 / JSVMP 专用拦截脚本见 `skills/web-reverse-hook` |
 | **调试器与断点步进**     | [`references/debugger.md`](./references/debugger.md)       | 行/条件/XHR 断点、单步执行、局部变量检查、日志点追踪、表达式求值 (`set_breakpoint`, `break_on_xhr`, `step_into`, `inspect_locals`, `evaluate_script`, `trace_function`)                    |
@@ -136,110 +184,3 @@ browsercli jobs cancel <job-id>
 | **控制台消息日志**       | [`references/console.md`](./references/console.md)         | 控制台 Console 日志采集与单条消息结构化查询 (`list_console_messages`, `get_console_message`)                                                                                               |
 | **性能监控与分析**       | [`references/performance.md`](./references/performance.md) | Core Web Vitals 评估、CDP 性能轨迹录制与瓶颈 Insight 诊断 (`start_performance_trace`, `stop_performance_trace`, `get_performance_metrics`)                                                 |
 | **全量工具速查字典**     | [`references/model.md`](./references/model.md)             | 全部 113 个 MCP 工具的 A-Z 快速检索字典与参数链接映射                                                                                                                                      |
-
----
-
-## 4. 典型逆向实战手册 (Playbooks)
-
-### 实战 A：请求签名逆向全链路定位（从接口到源码与 Hook）
-
-1. 过滤网络请求定位签名字段所在的接口：
-
-   ```bash
-   browsercli call list_network_requests --urlFilter "/api/v1/order"
-   ```
-
-2. **核心破局**：查询该网络请求的 JavaScript 发起者调用栈：
-
-   ```bash
-   browsercli call get_request_initiator --requestId <reqid>
-   ```
-
-3. 依据调用栈返回的 `scriptId` 和行号范围截取源码：
-
-   ```bash
-   browsercli call get_script_source --scriptId <scriptId> --startLine 120 --endLine 180 --filePath "artifacts/sources/sign_logic.js"
-   ```
-
-4. 安装非阻塞 Hook 截获签名函数参数与密钥：
-
-   ```bash
-   browsercli call hook_function --target "window.calcSign" --hookId "sign_hook" --logArgs true --logResult true
-   ```
-
-5. 触发页面交互并提取运行时拦截数据：
-
-   ```bash
-   browsercli call click --selector "button#submit"
-   browsercli call get_hook_data --hookId "sign_hook" --view detail
-   ```
-
-6. 导出当前会话的 Cookie 与 Storage 状态快照：
-
-   ```bash
-   browsercli call get_storage --type cookies
-   ```
-
-### 实战 B：绕过定时器死循环 debugger 与反反调试
-
-当页面遭遇 `setInterval` 触发的无限 `debugger;` 陷阱或窗口检测时：
-
-```bash
-# 1. 动态过滤并消除 eval/Function 构造器中的 debugger 关键字
-browsercli call bypass_debugger
-
-# 2. 启用反反调试防护罩（固定视口、冻结时间偏差、阻止历史导航）
-browsercli call anti_anti_debug
-```
-
-### 实战 C：JSVMP 虚拟机加固保护逆向分析
-
-面对复杂字节码解释执行的 JSVMP 防护（如高强度风控 Token 计算）：
-
-1. 在目标页面或 SDK 初始化前注入运行时探针（探针脚本由 `skills/web-reverse-hook` 生成）：
-
-   ```bash
-   node skills/web-reverse-hook/scripts/build-hook.js jsvmp-transparent --script-url app.js --out jsvmp.js
-   browsercli call evaluate_script --file jsvmp.js
-   ```
-
-2. 采集当前环境基准指纹，用于离线环境比对（生成器见 `skills/web-reverse-env/scripts/compare-env.js`）：
-
-   ```bash
-   node skills/web-reverse-env/scripts/compare-env.js \
-     --properties navigator.userAgent,screen.width,devicePixelRatio --out env.js
-   browsercli call evaluate_script --file env.js
-   ```
-
-### 实战 D：WebAssembly (Wasm) 核心加密模块分析
-
-1. 重导航并拦截网络加载与运行时动态编译的 Wasm 模块：
-
-   ```bash
-   browsercli call collect_wasm --url "https://example.com/security" --waitAfterLoadMs 3000 --captureBase64 <bool>
-   ```
-
-2. 将 Wasm 导出到磁盘本地文件：
-
-   ```bash
-   browsercli call wasm_dump --moduleIndex 0 --outputPath "artifacts/wasm/core.wasm"
-   ```
-
-3. 追踪 JS 与 Wasm 跨边界参数传递，或搜索线性内存：
-
-   ```bash
-   browsercli call wasm_vmp_trace --maxEvents 100
-   browsercli call wasm_memory_inspect --searchPattern "token=" --length 1024
-   ```
-
-4. 导出后可结合 `skills/wsam-reverse` 进行离线反编译（`wasm-decompile`）与静态代码审计。
-
----
-
-## 5. 离线算法还原与交付闭环
-
-逆向分析提取出核心算法后，交付标准化闭环流程：
-
-1. **沉淀结构化证据**：把调用关系、入参、出参和密钥常量写入 `artifacts/tasks/<task-id>/`。
-2. **纯算法提取与精简**：调用 `skills/web-reverse-algorithm` 与 `skills/ast-deobfuscation` 剥离无用的混淆分支和冗余包装器。
-3. **Node.js 离线环境对齐**：使用 `skills/web-reverse-env` 与 `skills/web-js-env-patcher`，对照真实浏览器采集的环境基准（`skills/web-reverse-env/scripts/compare-env.js` 生成采集脚本）进行最小化 Mock，确保离线执行计算结果与浏览器输出 100% 严格一致。

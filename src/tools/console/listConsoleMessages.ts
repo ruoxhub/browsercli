@@ -38,37 +38,30 @@ export const listConsoleMessages = defineTool({
       .int()
       .positive()
       .optional()
-      .describe(
-        '返回的最大消息数量。省略时返回全部消息。',
-      ),
+      .describe('返回的最大消息数量。省略时返回全部消息。'),
     pageIdx: zod
       .number()
       .int()
       .min(0)
       .optional()
-      .describe(
-        '要返回的页码（从 0 开始）。省略时返回第一页。',
-      ),
+      .describe('要返回的页码（从 0 开始）。省略时返回第一页。'),
     types: zod
       .array(zod.enum(FILTERABLE_MESSAGE_TYPES))
       .optional()
-      .describe(
-        '仅返回指定类型的消息。省略或为空时返回全部消息。',
-      ),
+      .describe('仅返回指定类型的消息。省略或为空时返回全部消息。'),
     includePreservedMessages: zod
       .boolean()
       .default(false)
       .optional()
-      .describe(
-        '设为 true 可返回最近 3 次导航内保留的消息。',
-      ),
+      .describe('设为 true 可返回最近 3 次导航内保留的消息。'),
   },
   handler: async (request, response) => {
     let result: ListConsoleMessagesResult;
     try {
+      const provider = getRuntime().contextProvider;
+      await provider?.ensureConsoleEnabled();
       const includePreserved = request.params.includePreservedMessages ?? false;
-      let messages =
-        getRuntime().contextProvider!.getConsoleData(includePreserved);
+      let messages = provider!.getConsoleData(includePreserved);
 
       // 按类型过滤
       if (request.params.types?.length) {
