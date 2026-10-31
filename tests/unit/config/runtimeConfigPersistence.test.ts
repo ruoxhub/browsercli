@@ -110,6 +110,14 @@ describe('runtimeConfigPersistence', () => {
       );
     });
 
+    it('true when top-level browserUrl present', () => {
+      assert.ok(shouldAutoConnectOnStartup({browserUrl: 'http://x:9222'}));
+    });
+
+    it('true when top-level wsEndpoint present', () => {
+      assert.ok(shouldAutoConnectOnStartup({wsEndpoint: 'ws://x'}));
+    });
+
     it('false when only launch-mode fields present', () => {
       assert.strictEqual(
         shouldAutoConnectOnStartup({

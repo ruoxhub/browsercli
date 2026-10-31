@@ -134,6 +134,7 @@ export const GlobalConfigSchema = zod
     jsStealth: booleanSchema.optional(),
     /** `--full-stealth-args` CLI flag：回退到历史 60+ 启动参数集。 */
     fullStealthArgs: booleanSchema.optional(),
+    minimalStealth: booleanSchema.optional(),
     runtimeDirName: optionalStringSchema.optional(),
     browser: BrowserConfigSchema.optional(),
     debug: booleanSchema.optional(),

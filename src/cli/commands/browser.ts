@@ -9,6 +9,7 @@ import type {AxiCliCommand} from 'axi-sdk-js';
 import {parseArgs} from '../args-parser.js';
 import {toAxiError} from '../errors.js';
 import {successOutput, tableOutput} from '../output.js';
+import {loadCliConfig} from '../sessionPaths.js';
 import type {WorkerContext} from '../types.js';
 import type {
   BrowserConnectOptions,
@@ -94,13 +95,21 @@ function booleanFlag(
   return invalid(`--${key} 必须是 true 或 false`);
 }
 
-function urlFlag(
-  flags: Record<string, string | boolean>,
-  key: string,
+function parseBooleanValue(val: unknown): boolean | undefined {
+  if (typeof val === 'boolean') return val;
+  if (typeof val === 'string') {
+    const normalized = val.toLowerCase();
+    if (['true', '1', 'yes', 'on'].includes(normalized)) return true;
+    if (['false', '0', 'no', 'off'].includes(normalized)) return false;
+  }
+  return undefined;
+}
+
+function normalizeTargetUrl(
+  value: string,
   protocols: string[],
-): string | undefined {
-  const value = stringFlag(flags, key);
-  if (value === undefined) return undefined;
+  sourceName: string,
+): string {
   let normalized = value;
   if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(value)) {
     normalized = protocols.includes('http:') ? `http://${value}` : value;
@@ -109,12 +118,22 @@ function urlFlag(
   try {
     protocol = new URL(normalized).protocol;
   } catch {
-    return invalid(`--${key} 不是合法 URL`);
+    return invalid(`${sourceName} 不是合法 URL`);
   }
   if (!protocols.includes(protocol)) {
-    return invalid(`--${key} 必须使用 ${protocols.join(' 或 ')}`);
+    return invalid(`${sourceName} 必须使用 ${protocols.join(' 或 ')}`);
   }
   return normalized;
+}
+
+function urlFlag(
+  flags: Record<string, string | boolean>,
+  key: string,
+  protocols: string[],
+): string | undefined {
+  const value = stringFlag(flags, key);
+  if (value === undefined) return undefined;
+  return normalizeTargetUrl(value, protocols, `--${key}`);
 }
 
 function headersFlag(
@@ -156,10 +175,65 @@ function connectOptions(
   flags: Record<string, string | boolean>,
 ): BrowserConnectOptions {
   assertFlags(flags, CONNECT_FLAGS);
-  const browserURL = urlFlag(flags, 'browser-url', ['http:', 'https:']);
-  const wsEndpoint = urlFlag(flags, 'ws-endpoint', ['ws:', 'wss:']);
-  const channel = stringFlag(flags, 'channel');
-  const executablePath = stringFlag(flags, 'executable-path');
+  let browserURL = urlFlag(flags, 'browser-url', ['http:', 'https:']);
+  let wsEndpoint = urlFlag(flags, 'ws-endpoint', ['ws:', 'wss:']);
+  let channel = stringFlag(flags, 'channel');
+  let executablePath = stringFlag(flags, 'executable-path');
+
+  const cliHasTarget =
+    browserURL !== undefined ||
+    wsEndpoint !== undefined ||
+    channel !== undefined ||
+    executablePath !== undefined;
+
+  const rawConfig = loadCliConfig() as Record<string, unknown>;
+  const nestedBrowser =
+    rawConfig.browser &&
+    typeof rawConfig.browser === 'object' &&
+    !Array.isArray(rawConfig.browser)
+      ? (rawConfig.browser as Record<string, unknown>)
+      : undefined;
+
+  if (!cliHasTarget) {
+    const rawBrowserUrl =
+      (nestedBrowser?.browserURL as string | undefined) ??
+      (nestedBrowser?.browserUrl as string | undefined) ??
+      (rawConfig.browserUrl as string | undefined) ??
+      (rawConfig.browserURL as string | undefined);
+    if (rawBrowserUrl) {
+      browserURL = normalizeTargetUrl(
+        rawBrowserUrl,
+        ['http:', 'https:'],
+        'browserUrl',
+      );
+    }
+
+    const rawWsEndpoint =
+      (nestedBrowser?.wsEndpoint as string | undefined) ??
+      (rawConfig.wsEndpoint as string | undefined);
+    if (rawWsEndpoint) {
+      wsEndpoint = normalizeTargetUrl(
+        rawWsEndpoint,
+        ['ws:', 'wss:'],
+        'wsEndpoint',
+      );
+    }
+
+    const rawChannel =
+      (nestedBrowser?.channel as string | undefined) ??
+      (rawConfig.channel as string | undefined);
+    if (rawChannel) {
+      channel = rawChannel;
+    }
+
+    const rawExecutablePath =
+      (nestedBrowser?.executablePath as string | undefined) ??
+      (rawConfig.executablePath as string | undefined);
+    if (rawExecutablePath) {
+      executablePath = rawExecutablePath;
+    }
+  }
+
   const remote = browserURL !== undefined || wsEndpoint !== undefined;
   const local = channel !== undefined || executablePath !== undefined;
   if (
@@ -179,26 +253,43 @@ function connectOptions(
   if (channel !== undefined) options.channel = channel;
   if (executablePath !== undefined) options.executablePath = executablePath;
 
-  const wsHeaders = headersFlag(flags);
-  const viewport = viewportFlag(flags);
-  const userDataDir = stringFlag(flags, 'user-data-dir');
+  const wsHeaders =
+    headersFlag(flags) ??
+    (nestedBrowser?.wsHeaders as Record<string, string> | undefined) ??
+    (rawConfig.wsHeaders as Record<string, string> | undefined);
+  const viewport =
+    viewportFlag(flags) ??
+    (nestedBrowser?.viewport as {width: number; height: number} | undefined) ??
+    (rawConfig.viewport as {width: number; height: number} | undefined);
+  const userDataDir =
+    stringFlag(flags, 'user-data-dir') ??
+    (nestedBrowser?.userDataDir as string | undefined) ??
+    (rawConfig.userDataDir as string | undefined);
+
   if (wsHeaders !== undefined) options.wsHeaders = wsHeaders;
   if (viewport !== undefined) options.viewport = viewport;
   if (userDataDir !== undefined) options.userDataDir = userDataDir;
 
-  const booleans = {
-    acceptInsecureCerts: booleanFlag(flags, 'accept-insecure-certs'),
-    cloak: booleanFlag(flags, 'cloak'),
-    force: booleanFlag(flags, 'force'),
-    fullStealthArgs: booleanFlag(flags, 'full-stealth-args'),
-    headless: booleanFlag(flags, 'headless'),
-    isolated: booleanFlag(flags, 'isolated'),
-    jsStealth: booleanFlag(flags, 'js-stealth'),
-    minimalStealth: booleanFlag(flags, 'minimal-stealth'),
-  };
-  for (const [key, value] of Object.entries(booleans)) {
-    if (value !== undefined) {
-      (options as Record<string, unknown>)[key] = value;
+  const booleanKeys = [
+    ['acceptInsecureCerts', 'accept-insecure-certs'],
+    ['cloak', 'cloak'],
+    ['force', 'force'],
+    ['fullStealthArgs', 'full-stealth-args'],
+    ['headless', 'headless'],
+    ['isolated', 'isolated'],
+    ['jsStealth', 'js-stealth'],
+    ['minimalStealth', 'minimal-stealth'],
+  ] as const;
+
+  for (const [prop, flagName] of booleanKeys) {
+    let val = booleanFlag(flags, flagName);
+    if (val === undefined) {
+      val =
+        parseBooleanValue(nestedBrowser?.[prop]) ??
+        parseBooleanValue(rawConfig[prop]);
+    }
+    if (val !== undefined) {
+      (options as Record<string, unknown>)[prop] = val;
     }
   }
   return options;

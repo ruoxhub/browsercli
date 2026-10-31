@@ -4,7 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert/strict';
-import {describe, it} from 'node:test';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {describe, it, beforeEach, afterEach} from 'node:test';
 
 import {AxiError} from 'axi-sdk-js';
 
@@ -51,6 +54,21 @@ function context() {
 }
 
 describe('browserCommand', () => {
+  let tmpConfigDir: string;
+  let prevConfigDir: string | undefined;
+
+  beforeEach(() => {
+    tmpConfigDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bcli-browser-test-'));
+    prevConfigDir = process.env.BROWSERCLI_CONFIG_DIR;
+    process.env.BROWSERCLI_CONFIG_DIR = tmpConfigDir;
+  });
+
+  afterEach(() => {
+    if (prevConfigDir === undefined) delete process.env.BROWSERCLI_CONFIG_DIR;
+    else process.env.BROWSERCLI_CONFIG_DIR = prevConfigDir;
+    fs.rmSync(tmpConfigDir, {recursive: true, force: true});
+  });
+
   it('registers browser as a top-level command', () => {
     assert.strictEqual(cliCommands.browser, browserCommand);
   });
@@ -193,5 +211,85 @@ describe('browserCommand', () => {
     assert.strictEqual(jsonOutput.status, 'success');
     assert.strictEqual(jsonOutput.mode, 'ws-endpoint');
     assert.strictEqual(jsonOutput.pages, 2);
+  });
+
+  it('falls back to ~/.browsercli/config.json when CLI flags are omitted', async () => {
+    fs.writeFileSync(
+      path.join(tmpConfigDir, 'config.json'),
+      JSON.stringify({
+        browserUrl: 'http://127.0.0.1:9222',
+        headless: 'false',
+        cloak: 'true',
+      }),
+      'utf-8',
+    );
+
+    const {calls, ctx} = context();
+    await browserCommand(['connect'], ctx);
+    assert.deepEqual(calls, [
+      {
+        method: 'browser.connect',
+        params: {
+          body: {
+            browserURL: 'http://127.0.0.1:9222',
+            headless: false,
+            cloak: true,
+          },
+        },
+      },
+    ]);
+  });
+
+  it('suppresses config file target when CLI provides a conflicting target flag', async () => {
+    fs.writeFileSync(
+      path.join(tmpConfigDir, 'config.json'),
+      JSON.stringify({
+        browserUrl: 'http://127.0.0.1:9222',
+      }),
+      'utf-8',
+    );
+
+    const {calls, ctx} = context();
+    await browserCommand(
+      ['connect', '--ws-endpoint', 'wss://override.host/devtools'],
+      ctx,
+    );
+    assert.deepEqual(calls, [
+      {
+        method: 'browser.connect',
+        params: {
+          body: {
+            wsEndpoint: 'wss://override.host/devtools',
+          },
+        },
+      },
+    ]);
+  });
+
+  it('supports nested browser object in config file', async () => {
+    fs.writeFileSync(
+      path.join(tmpConfigDir, 'config.json'),
+      JSON.stringify({
+        browser: {
+          browserURL: 'http://127.0.0.1:9333',
+          isolated: false,
+        },
+      }),
+      'utf-8',
+    );
+
+    const {calls, ctx} = context();
+    await browserCommand(['connect'], ctx);
+    assert.deepEqual(calls, [
+      {
+        method: 'browser.connect',
+        params: {
+          body: {
+            browserURL: 'http://127.0.0.1:9333',
+            isolated: false,
+          },
+        },
+      },
+    ]);
   });
 });

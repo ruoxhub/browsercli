@@ -19,3 +19,11 @@ _Avoid_: Action trace, click-request mapping, interaction log, event linkage
 **Structured Extraction**:
 The passive extraction capability that traverses Document Object Model or ARIA grid hierarchies, normalizes two-dimensional cell spans (rowspan/colspan) and nested header paths into canonical rows and columns, and optionally serializes them directly to CSV or JSON.
 _Avoid_: Table scraper, DOM table dumper, grid parser
+
+**Browser Connection Target**:
+The resolved remote endpoint (`browserUrl` or `wsEndpoint`) or local binary selection (`channel` or `executablePath`) directing how Browser-CLI attaches to or launches a browser instance.
+_Avoid_: Browser endpoint, connection URI, attach target, launch mode target
+
+**Connection Fallback**:
+The resolution cascade that sources browser connection options across CLI flags, environment variables, user configuration (`~/.browsercli/config.json`), and system defaults in strict precedence order.
+_Avoid_: Config cascade, default connection lookup, fallback resolver

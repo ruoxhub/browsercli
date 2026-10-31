@@ -116,6 +116,7 @@ export function buildBrowserManagerConfig(): BrowserManagerConfig {
       envKey: 'BROWSER_HEADLESS',
       kind: 'boolean',
       default: true,
+      extraFallback: 'headless',
     },
     {
       key: 'isolated',
@@ -134,6 +135,7 @@ export function buildBrowserManagerConfig(): BrowserManagerConfig {
       envKey: 'BROWSER_JS_STEALTH',
       kind: 'boolean',
       default: false,
+      extraFallback: 'jsStealth',
     },
     {
       key: 'cloak',
@@ -154,8 +156,14 @@ export function buildBrowserManagerConfig(): BrowserManagerConfig {
       envKey: 'BROWSER_MINIMAL_STEALTH',
       kind: 'boolean',
       default: true,
+      extraFallback: 'minimalStealth',
     },
-    {key: 'executablePath', envKey: 'BROWSER_EXECUTABLE_PATH', kind: 'value'},
+    {
+      key: 'executablePath',
+      envKey: 'BROWSER_EXECUTABLE_PATH',
+      kind: 'value',
+      extraFallback: 'executablePath',
+    },
     {
       key: 'channel',
       envKey: 'BROWSER_CHANNEL',
@@ -241,26 +249,26 @@ export function buildBrowserManagerConfig(): BrowserManagerConfig {
 
   for (const field of fields) {
     const fbKey = field.fileKey ?? (field.key as string);
-    let envVal = getters[field.kind](field.envKey) as unknown;
-    if (envVal === undefined && field.default !== undefined) {
-      envVal = field.default;
-    }
+    const envVal = getters[field.kind](field.envKey) as unknown;
     const fileVal = fileBrowser?.[fbKey as keyof typeof fileBrowser] as unknown;
+    const extraVal =
+      field.extraFallback && fileConfig[field.extraFallback] !== undefined
+        ? fileConfig[field.extraFallback]
+        : undefined;
 
-    if (envVal !== undefined) {
+    const chosenVal =
+      envVal !== undefined
+        ? envVal
+        : fileVal !== undefined
+          ? fileVal
+          : extraVal !== undefined
+            ? extraVal
+            : field.default;
+
+    if (chosenVal !== undefined) {
       (config as Record<string, unknown>)[field.key as string] = field.cast
-        ? field.cast(envVal as string)
-        : envVal;
-    } else if (fileVal !== undefined) {
-      (config as Record<string, unknown>)[field.key as string] = field.cast
-        ? field.cast(fileVal as string)
-        : fileVal;
-    } else if (
-      field.extraFallback &&
-      fileConfig[field.extraFallback] !== undefined
-    ) {
-      (config as Record<string, unknown>)[field.key as string] =
-        fileConfig[field.extraFallback];
+        ? field.cast(chosenVal as string)
+        : chosenVal;
     }
   }
 
