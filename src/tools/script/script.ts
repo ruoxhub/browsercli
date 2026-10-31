@@ -94,7 +94,7 @@ function getUnknownErrorMessage(error: unknown): string {
  * 顺序对不上时返回 undefined，退回"由调用方按多候选报歧义"的旧行为，
  * 而不是猜一个可能指向别的 frame 的 id。
  */
-async function resolveSelectedFrameId(
+export async function resolveSelectedFrameId(
   frame: Frame | null,
 ): Promise<string | undefined> {
   if (!frame) return undefined;
