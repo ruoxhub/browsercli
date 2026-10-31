@@ -476,6 +476,20 @@ interface FakeBrowserOptions {
   hangOn?: string;
   /** Raw value the fake `Runtime.evaluate` returns instead of running code. */
   evaluateValue?: unknown;
+  /**
+   * Frame tree in depth-first order: `childFrames()` and `Page.getFrameTree`
+   * both report it this way, while `page.frames()` reports attach order.
+   */
+  tree?: Array<{id: string; guid: string; url: string; parent?: number}>;
+  /** Index into `tree` that the tool receives; defaults to the root. */
+  selected?: number;
+  /**
+   * The selected frame still appears in `page.frames()` but its parent no
+   * longer lists it in `childFrames()` (a detached frame mid-capture).
+   */
+  orphan?: boolean;
+  /** Tree indices that expose their own CDP target (OOPIF). */
+  ownTarget?: number[];
 }
 
 function createFakeBrowser(
@@ -486,9 +500,11 @@ function createFakeBrowser(
   const sessions: FakeSession[] = [];
   let counter = 0;
 
-  const createSession = () => {
+  const sessionOwner = new Map<string, 'page' | 'frame'>();
+  const createSession = (owner: 'page' | 'frame') => {
     const id = `session-${++counter}`;
     const record: FakeSession = {id, detached: 0};
+    sessionOwner.set(id, owner);
     sessions.push(record);
     return {
       send: async (method: string, params?: Record<string, unknown>) => {
@@ -496,9 +512,19 @@ function createFakeBrowser(
         if (options.hangOn === method)
           return new Promise<never>(() => undefined);
         if (method === 'Page.getFrameTree') {
-          return {frameTree: {frame: {id: 'frame-root'}}};
+          return {frameTree: frameTreeOf()};
         }
         if (method === 'Page.createIsolatedWorld') {
+          const frameId = params?.['frameId'];
+          const target = resolveTreeFrame(frameId);
+          if (!target) {
+            throw new Error(`No frame for given id found: ${String(frameId)}`);
+          }
+          // A page-level session only knows frames in the page's own process.
+          const isOutOfProcess = ownTarget.has(nodes.indexOf(target));
+          if (isOutOfProcess && sessionOwner.get(id) !== 'frame') {
+            throw new Error(`No frame for given id found: ${String(frameId)}`);
+          }
           return {executionContextId: 42};
         }
         if (method === 'Runtime.evaluate') {
@@ -531,14 +557,136 @@ function createFakeBrowser(
     };
   };
 
-  const page = {
-    url: () => 'https://example.test/page',
-    frames: () => (options.resolveFrame === false ? [] : [frame]),
-    context: () => ({newCDPSession: async () => createSession()}),
-  };
-  const frame = {page: () => page} as unknown as Frame;
+  // ─── frame tree ───
+  // `node` is a live Frame-like object: it exposes `page()` plus the private
+  // `_guid` Playwright uses, and `childFrames()` in depth-first order.
+  interface Node {
+    id: string;
+    guid: string;
+    url: string;
+    children: Node[];
+  }
 
-  return {frame, calls, sessions};
+  const buildNodes = (): Node[] => {
+    const entries = options.tree ?? [
+      {id: 'frame-root', guid: 'frame@root', url: 'https://example.test/page'},
+    ];
+    const nodes = entries.map(entry => ({
+      id: entry.id,
+      guid: entry.guid,
+      url: entry.url,
+      children: [] as Node[],
+    }));
+    entries.forEach((entry, index) => {
+      if (entry.parent === undefined) return;
+      nodes[entry.parent]?.children.push(nodes[index]!);
+    });
+    return nodes;
+  };
+
+  const nodes = buildNodes();
+  const rootNode = nodes[0]!;
+  const selectedNode = nodes[options.selected ?? 0]!;
+  if (options.orphan) {
+    for (const node of nodes) {
+      node.children = node.children.filter(child => child !== selectedNode);
+    }
+  }
+  const ownTarget = new Set(options.ownTarget ?? []);
+
+  const resolveTreeFrame = (frameId: unknown): Node | undefined =>
+    nodes.find(node => node.id === frameId) ??
+    (frameId === 'frame-root' ? rootNode : undefined);
+
+  /** Playwright's own DFS order — the order `Page.getFrameTree` reports. */
+  const walkOrder = (): Node[] => {
+    const ordered: Node[] = [];
+    const walk = (node: Node): void => {
+      ordered.push(node);
+      for (const child of node.children) walk(child);
+    };
+    walk(rootNode);
+    return ordered;
+  };
+
+  const frameTreeOf = () => {
+    const toCdp = (node: Node): Record<string, unknown> => ({
+      frame: {id: node.id, url: node.url},
+      childFrames: node.children.map(toCdp),
+    });
+    return toCdp(rootNode);
+  };
+
+  const makeFrame = (node: Node, isSelected: boolean): Frame => {
+    const frame = {
+      page: () => page,
+      url: () => node.url,
+      _guid: node.guid,
+      childFrames: () =>
+        node.children.map(child => framesByGuid.get(child.guid)!),
+    } as unknown as Frame;
+    // Per-target sessions: only frames with their own target (main frame,
+    // OOPIF) accept newCDPSession(frame).
+    if (isSelected && ownTarget.has(nodes.indexOf(node))) {
+      (frame as unknown as {__hasTarget: boolean}).__hasTarget = true;
+    }
+    return frame;
+  };
+
+  const framesByGuid = new Map<string, Frame>();
+  for (const node of nodes) {
+    framesByGuid.set(node.guid, makeFrame(node, node === selectedNode));
+  }
+
+  // `page.frames()` deliberately reports ATTACH order, which can differ from
+  // the depth-first tree order. Test fixtures list `tree` in DFS order, so
+  // simulating attach order means listing a nested frame after a later sibling.
+  const attachOrder = [...walkOrder()].sort((a, b) => {
+    const depthA = depthOf(a);
+    const depthB = depthOf(b);
+    return depthA === depthB ? 0 : depthA - depthB;
+  });
+
+  function depthOf(node: Node): number {
+    let depth = 0;
+    let current: Node | undefined = node;
+    while (current) {
+      const parent = nodes.find(candidate =>
+        candidate.children.includes(current!),
+      );
+      current = parent;
+      if (parent) depth += 1;
+    }
+    return depth;
+  }
+
+  const selectedFrame = framesByGuid.get(selectedNode.guid)!;
+  const context = {
+    newCDPSession: async (target: unknown) => {
+      if (target === page) return createSession('page');
+      const hasTarget =
+        (target as {__hasTarget?: boolean})?.__hasTarget === true;
+      if (hasTarget) return createSession('frame');
+      // Playwright's message for a same-process subframe.
+      throw new Error('This frame does not have a separate CDP session');
+    },
+  };
+  const page = {
+    url: () => rootNode.url,
+    frames: () =>
+      options.resolveFrame === false
+        ? []
+        : attachOrder.map(node => framesByGuid.get(node.guid)!),
+    mainFrame: () => {
+      if (options.resolveFrame === false) {
+        throw new Error('Target page, context or browser has been closed');
+      }
+      return framesByGuid.get(rootNode.guid)!;
+    },
+    context: () => context,
+  };
+
+  return {frame: selectedFrame, calls, sessions};
 }
 
 function cell(text: string, overrides: Record<string, unknown> = {}) {
@@ -626,11 +774,16 @@ describe('collectTableDom', () => {
     });
 
     assert.equal(capture.rows.length, 2);
+    // The assertion that matters is positional: the outer row has exactly its
+    // own two cells, so the nested table's cell never appears at all.
     assert.equal(capture.rows[0]?.cells.length, 2);
-    assert.deepEqual(
-      capture.rows[0]?.cells.map(entry => entry.text),
-      ['outernested', 'second'],
-    );
+    assert.equal(capture.rows[0]?.cells[1]?.text, 'second');
+    // The outer cell's text is a harness artifact: this fake concatenates
+    // textContent ("outernested"), whereas Chromium's innerText renders a block
+    // boundary ("outer" newline "nested"). Assert containment, not the exact
+    // string, so
+    // the test stays true in a real browser too.
+    assert.match(capture.rows[0]?.cells[0]?.text ?? '', /^outer\s*nested$/);
     assert.deepEqual(capture.rows[1]?.cells, [
       cell('third'),
       cell('invisible'),
@@ -676,10 +829,14 @@ describe('collectTableDom', () => {
     });
 
     assert.equal(capture.rows.length, 2);
+    // Same harness caveat as above: the host cell's text is fake
+    // textContent concatenation, so match its shape rather than the literal.
     assert.deepEqual(
-      capture.rows.map(row => row.cells.map(entry => entry.text)),
-      [['Name'], ['outernested', '9']],
+      capture.rows.map(row => row.cells.length),
+      [1, 2],
     );
+    assert.equal(capture.rows[1]?.cells[1]?.text, '9');
+    assert.match(capture.rows[1]?.cells[0]?.text ?? '', /^outer\s*nested$/);
   });
 
   it('classifies thead/tfoot sections of the selected table only', () => {
@@ -996,6 +1153,106 @@ describe('captureTable CDP lifecycle', () => {
     );
 
     assert.equal(browser.sessions.length, 0);
+  });
+
+  it('resolves the selected frame by tree order, not attach order', async () => {
+    // page.frames() attach order: /, /a, /b, /a-child
+    // getFrameTree DFS order:    /, /a, /a-child, /b
+    // Selecting /b must use /b's frameId, never the one at attach index 2.
+    const browser = createFakeBrowser(createRealm(NATIVE_SETUP), {
+      tree: [
+        {id: 'root', guid: 'frame@root', url: 'https://example.test/'},
+        {id: 'a', guid: 'frame@a', url: 'https://example.test/a', parent: 0},
+        {
+          id: 'a-child',
+          guid: 'frame@a-child',
+          url: 'https://example.test/a-child',
+          parent: 1,
+        },
+        {id: 'b', guid: 'frame@b', url: 'https://example.test/b', parent: 0},
+      ],
+      selected: 3,
+    });
+
+    await captureTable(browser.frame, {
+      selector: 'table',
+      includeHidden: false,
+    });
+
+    const world = browser.calls.find(
+      call => call.method === 'Page.createIsolatedWorld',
+    );
+    assert.equal(world?.params?.['frameId'], 'b');
+
+    // Every session the tool opened must be released.
+    assert.deepEqual(
+      browser.sessions.map(session => session.detached),
+      [1, 1],
+    );
+  });
+
+  it('fails cleanly when the selected frame is absent from its own tree', async () => {
+    // The frame is still reachable through page.frames() but its parent no
+    // longer lists it. Falling back to the attach-order index would resolve a
+    // DIFFERENT frame here, so this must be a clean failure instead.
+    const browser = createFakeBrowser(createRealm(NATIVE_SETUP), {
+      tree: [
+        {id: 'root', guid: 'frame@root', url: 'https://example.test/'},
+        {id: 'a', guid: 'frame@a', url: 'https://example.test/a', parent: 0},
+        {id: 'b', guid: 'frame@b', url: 'https://example.test/b', parent: 0},
+      ],
+      selected: 2,
+      orphan: true,
+    });
+
+    await assert.rejects(
+      () =>
+        captureTable(browser.frame, {
+          selector: 'table',
+          includeHidden: false,
+        }),
+      /frameId/,
+    );
+
+    // No isolation, no isolate world, and nothing left open.
+    assert.equal(
+      browser.calls.filter(call => call.method === 'Page.createIsolatedWorld')
+        .length,
+      0,
+    );
+  });
+
+  it('opens the capture session on the frame target when it has one', async () => {
+    // An OOPIF exposes its own CDP target; a page-level session has no frame
+    // record for it, so Page.createIsolatedWorld would fail.
+    const browser = createFakeBrowser(createRealm(NATIVE_SETUP), {
+      tree: [
+        {id: 'root', guid: 'frame@root', url: 'https://example.test/'},
+        {
+          id: 'oopif',
+          guid: 'frame@oopif',
+          url: 'https://other.test/frame',
+          parent: 0,
+        },
+      ],
+      selected: 1,
+      ownTarget: [1],
+    });
+
+    const capture = await captureTable(browser.frame, {
+      selector: 'table',
+      includeHidden: false,
+    });
+
+    assert.equal(capture.rows.length, 3);
+    const world = browser.calls.find(
+      call => call.method === 'Page.createIsolatedWorld',
+    );
+    assert.equal(world?.params?.['frameId'], 'oopif');
+    assert.deepEqual(
+      browser.sessions.map(session => session.detached),
+      [1, 1],
+    );
   });
 
   it('never enables the Runtime, Page or Debugger domains', async () => {

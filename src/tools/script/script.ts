@@ -89,10 +89,11 @@ function getUnknownErrorMessage(error: unknown): string {
  * 使用的十六进制 frameId 不是同一值域，直接拿来比较永远不相等 —— 这正是
  * 历史上 `select_frame` 报告成功、执行上下文却仍不切换的原因。
  *
- * 可靠做法是向 CDP 要一次 frame 树，再用 Playwright 稳定的 DFS 顺序
- * （`page.frames()` 与 `Page.getFrameTree` 同为深度优先）定位到同一帧。
- * 顺序对不上时返回 undefined，退回"由调用方按多候选报歧义"的旧行为，
- * 而不是猜一个可能指向别的 frame 的 id。
+ * 可靠做法是向 CDP 要一次 frame 树，并且**用 Playwright 自己的树**
+ * （`mainFrame().childFrames()` 深度优先）建立顺序索引：`page.frames()` 是
+ * 附加顺序，一旦嵌套帧晚于同级帧 attach，两个顺序就会错位，用其中一个的
+ * 下标去查另一个会静默选中别的 frame 并把它的数据当作成功结果返回。
+ * 目标帧不在自己的树里（已被 detach）时返回 undefined，绝不猜下标。
  */
 export async function resolveSelectedFrameId(
   frame: Frame | null,
@@ -106,17 +107,33 @@ export async function resolveSelectedFrameId(
     return undefined;
   }
 
-  const frames = page.frames();
   // Worker mode hands tools a Proxy-wrapped Frame (frame.evaluate timeout
   // guard), so identity comparison fails even though frame.page() still works.
-  // `_guid` (`frame@<hash>`) is stable across the wrapper and both objects.
+  // `_guid` (`frame@<hash>`) is stable across the wrapper and both objects; it
+  // is only used to LOCATE the frame, never as a CDP frameId.
   const guid = (frame as Frame & {_guid?: string})._guid;
-  const index = frames.findIndex(
-    candidate =>
-      candidate === frame ||
-      (guid !== undefined &&
-        (candidate as Frame & {_guid?: string})._guid === guid),
-  );
+  const matchesTarget = (candidate: Frame): boolean =>
+    candidate === frame ||
+    (guid !== undefined &&
+      (candidate as Frame & {_guid?: string})._guid === guid);
+
+  // Depth-first from Playwright's own tree. `page.frames()` is ATTACH order,
+  // which diverges from `Page.getFrameTree`'s DFS order as soon as a nested
+  // frame attaches after a sibling — indexing one with the other silently
+  // selects a different frame and returns its data as a success.
+  const ordered: Frame[] = [];
+  const walk = (node: Frame | null): void => {
+    if (!node) return;
+    ordered.push(node);
+    for (const child of node.childFrames()) walk(child);
+  };
+  try {
+    walk(page.mainFrame());
+  } catch {
+    return undefined;
+  }
+  const index = ordered.findIndex(matchesTarget);
+  // A frame absent from its own page's tree is detached; never guess an index.
   if (index < 0) return undefined;
 
   try {
@@ -125,17 +142,17 @@ export async function resolveSelectedFrameId(
       const {frameTree} = (await client.send('Page.getFrameTree')) as {
         frameTree?: {frame?: {id?: string}; childFrames?: unknown[]};
       };
-      const ordered: Array<{id?: string}> = [];
-      const walk = (node?: {
+      const ids: Array<string | undefined> = [];
+      const walkTree = (node?: {
         frame?: {id?: string};
         childFrames?: Array<typeof node>;
       }): void => {
         if (!node) return;
-        ordered.push(node.frame ?? {});
-        for (const child of node.childFrames ?? []) walk(child);
+        ids.push(node.frame?.id);
+        for (const child of node.childFrames ?? []) walkTree(child);
       };
-      walk(frameTree as never);
-      return ordered[index]?.id;
+      walkTree(frameTree as never);
+      return ids[index];
     } finally {
       await client.detach().catch(() => undefined);
     }
