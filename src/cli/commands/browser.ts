@@ -9,6 +9,7 @@ import type {AxiCliCommand} from 'axi-sdk-js';
 import {parseArgs} from '../args-parser.js';
 import {toAxiError} from '../errors.js';
 import {successOutput, tableOutput} from '../output.js';
+import type {CliConfig} from '../sessionPaths.js';
 import {loadCliConfig} from '../sessionPaths.js';
 import type {WorkerContext} from '../types.js';
 import type {
@@ -56,6 +57,33 @@ const CHANNELS = new Set([
   'moz-firefox',
 ]);
 
+interface ExtendedCliConfig extends CliConfig {
+  browserURL?: string;
+  channel?: string;
+  wsHeaders?: Record<string, string>;
+  viewport?: {width: number; height: number};
+  userDataDir?: string;
+  acceptInsecureCerts?: boolean | string;
+  isolated?: boolean | string;
+  browser?: {
+    browserURL?: string;
+    browserUrl?: string;
+    wsEndpoint?: string;
+    channel?: string;
+    executablePath?: string;
+    wsHeaders?: Record<string, string>;
+    viewport?: {width: number; height: number};
+    userDataDir?: string;
+    headless?: boolean | string;
+    cloak?: boolean | string;
+    jsStealth?: boolean | string;
+    minimalStealth?: boolean | string;
+    fullStealthArgs?: boolean | string;
+    isolated?: boolean | string;
+    acceptInsecureCerts?: boolean | string;
+  };
+}
+
 function invalid(message: string): never {
   throw new AxiError(message, 'VALIDATION_ERROR', [
     '用法：browsercli browser connect|disconnect|status [options]',
@@ -82,19 +110,6 @@ function stringFlag(
   return value;
 }
 
-function booleanFlag(
-  flags: Record<string, string | boolean>,
-  key: string,
-): boolean | undefined {
-  if (!(key in flags)) return undefined;
-  const value = flags[key];
-  if (typeof value === 'boolean') return value;
-  const normalized = value.toLowerCase();
-  if (['true', '1', 'yes', 'on'].includes(normalized)) return true;
-  if (['false', '0', 'no', 'off'].includes(normalized)) return false;
-  return invalid(`--${key} 必须是 true 或 false`);
-}
-
 function parseBooleanValue(val: unknown): boolean | undefined {
   if (typeof val === 'boolean') return val;
   if (typeof val === 'string') {
@@ -103,6 +118,16 @@ function parseBooleanValue(val: unknown): boolean | undefined {
     if (['false', '0', 'no', 'off'].includes(normalized)) return false;
   }
   return undefined;
+}
+
+function booleanFlag(
+  flags: Record<string, string | boolean>,
+  key: string,
+): boolean | undefined {
+  if (!(key in flags)) return undefined;
+  const parsed = parseBooleanValue(flags[key]);
+  if (parsed !== undefined) return parsed;
+  return invalid(`--${key} 必须是 true 或 false`);
 }
 
 function normalizeTargetUrl(
@@ -186,20 +211,20 @@ function connectOptions(
     channel !== undefined ||
     executablePath !== undefined;
 
-  const rawConfig = loadCliConfig() as Record<string, unknown>;
+  const rawConfig = loadCliConfig() as ExtendedCliConfig;
   const nestedBrowser =
     rawConfig.browser &&
     typeof rawConfig.browser === 'object' &&
     !Array.isArray(rawConfig.browser)
-      ? (rawConfig.browser as Record<string, unknown>)
+      ? rawConfig.browser
       : undefined;
 
   if (!cliHasTarget) {
     const rawBrowserUrl =
-      (nestedBrowser?.browserURL as string | undefined) ??
-      (nestedBrowser?.browserUrl as string | undefined) ??
-      (rawConfig.browserUrl as string | undefined) ??
-      (rawConfig.browserURL as string | undefined);
+      nestedBrowser?.browserURL ??
+      nestedBrowser?.browserUrl ??
+      rawConfig.browserUrl ??
+      rawConfig.browserURL;
     if (rawBrowserUrl) {
       browserURL = normalizeTargetUrl(
         rawBrowserUrl,
@@ -208,9 +233,7 @@ function connectOptions(
       );
     }
 
-    const rawWsEndpoint =
-      (nestedBrowser?.wsEndpoint as string | undefined) ??
-      (rawConfig.wsEndpoint as string | undefined);
+    const rawWsEndpoint = nestedBrowser?.wsEndpoint ?? rawConfig.wsEndpoint;
     if (rawWsEndpoint) {
       wsEndpoint = normalizeTargetUrl(
         rawWsEndpoint,
@@ -219,16 +242,13 @@ function connectOptions(
       );
     }
 
-    const rawChannel =
-      (nestedBrowser?.channel as string | undefined) ??
-      (rawConfig.channel as string | undefined);
+    const rawChannel = nestedBrowser?.channel ?? rawConfig.channel;
     if (rawChannel) {
       channel = rawChannel;
     }
 
     const rawExecutablePath =
-      (nestedBrowser?.executablePath as string | undefined) ??
-      (rawConfig.executablePath as string | undefined);
+      nestedBrowser?.executablePath ?? rawConfig.executablePath;
     if (rawExecutablePath) {
       executablePath = rawExecutablePath;
     }
@@ -254,17 +274,13 @@ function connectOptions(
   if (executablePath !== undefined) options.executablePath = executablePath;
 
   const wsHeaders =
-    headersFlag(flags) ??
-    (nestedBrowser?.wsHeaders as Record<string, string> | undefined) ??
-    (rawConfig.wsHeaders as Record<string, string> | undefined);
+    headersFlag(flags) ?? nestedBrowser?.wsHeaders ?? rawConfig.wsHeaders;
   const viewport =
-    viewportFlag(flags) ??
-    (nestedBrowser?.viewport as {width: number; height: number} | undefined) ??
-    (rawConfig.viewport as {width: number; height: number} | undefined);
+    viewportFlag(flags) ?? nestedBrowser?.viewport ?? rawConfig.viewport;
   const userDataDir =
     stringFlag(flags, 'user-data-dir') ??
-    (nestedBrowser?.userDataDir as string | undefined) ??
-    (rawConfig.userDataDir as string | undefined);
+    nestedBrowser?.userDataDir ??
+    rawConfig.userDataDir;
 
   if (wsHeaders !== undefined) options.wsHeaders = wsHeaders;
   if (viewport !== undefined) options.viewport = viewport;
