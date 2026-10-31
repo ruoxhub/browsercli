@@ -97,6 +97,7 @@ function getUnknownErrorMessage(error: unknown): string {
  */
 export async function resolveSelectedFrameId(
   frame: Frame | null,
+  options: {client?: CDPSession} = {},
 ): Promise<string | undefined> {
   if (!frame) return undefined;
 
@@ -136,8 +137,9 @@ export async function resolveSelectedFrameId(
   // A frame absent from its own page's tree is detached; never guess an index.
   if (index < 0) return undefined;
 
+  const ownedClient = options.client;
   try {
-    const client = await page.context().newCDPSession(page);
+    const client = ownedClient ?? (await page.context().newCDPSession(page));
     try {
       const {frameTree} = (await client.send('Page.getFrameTree')) as {
         frameTree?: {frame?: {id?: string}; childFrames?: unknown[]};
@@ -154,7 +156,9 @@ export async function resolveSelectedFrameId(
       walkTree(frameTree as never);
       return ids[index];
     } finally {
-      await client.detach().catch(() => undefined);
+      // Only close the session this call opened; a caller-supplied one is
+      // owned (and detached) by the caller.
+      if (!ownedClient) await client.detach().catch(() => undefined);
     }
   } catch {
     return undefined;

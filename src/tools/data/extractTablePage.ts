@@ -359,13 +359,28 @@ async function withTimeout<T>(
  * a separate CDP session" for same-process subframes — where the page session
  * is exactly right.
  */
-async function openFrameSession(frame: Frame, page: Page): Promise<CDPSession> {
+async function openFrameSession(
+  frame: Frame,
+  page: Page,
+): Promise<{client: CDPSession; ownTarget: boolean}> {
   const context = page.context();
   try {
-    return await context.newCDPSession(frame);
+    // Succeeds only when the frame is its own target (main frame, OOPIF).
+    return {client: await context.newCDPSession(frame), ownTarget: true};
   } catch {
-    return context.newCDPSession(page);
+    // Same-process subframe: the page session covers it.
+    return {client: await context.newCDPSession(page), ownTarget: false};
   }
+}
+
+/** Root frame id of a session bound to the frame's own target. */
+async function ownTargetFrameId(
+  client: CDPSession,
+): Promise<string | undefined> {
+  const {frameTree} = (await client.send('Page.getFrameTree')) as {
+    frameTree?: {frame?: {id?: string}};
+  };
+  return frameTree?.frame?.id;
 }
 
 /**
@@ -378,21 +393,30 @@ export async function captureTable(
   options: TableCaptureOptions,
 ): Promise<RawTableCapture> {
   const page = frame.page();
-  const frameId = await withTimeout(
-    resolveSelectedFrameId(frame),
-    '解析 Frame 的 CDP frameId',
-  );
-  if (!frameId) {
-    throw new Error(
-      '无法解析当前 Frame 的 CDP frameId，无法创建隔离执行上下文；请先重新选择 Frame',
-    );
-  }
-
-  const client = await withTimeout(
+  // The session must be the frame's OWN target when it has one: a page-target
+  // session does not list a cross-process child in its frame tree at all, so
+  // the frameId could never be resolved from there.
+  const {client, ownTarget} = await withTimeout(
     openFrameSession(frame, page),
     '创建 CDP 会话',
   );
   try {
+    const frameId = await withTimeout(
+      ownTarget
+        ? // Bound to the frame's own target, so the session's frame tree is
+          // rooted at that very frame.
+          ownTargetFrameId(client)
+        : // Same-process subframe: the shared resolver indexes the page's
+          // frame tree with Playwright's depth-first order.
+          resolveSelectedFrameId(frame, {client}),
+      '解析 Frame 的 CDP frameId',
+    );
+    if (!frameId) {
+      throw new Error(
+        '无法解析当前 Frame 的 CDP frameId，无法创建隔离执行上下文；请先重新选择 Frame',
+      );
+    }
+
     const world = (await withTimeout(
       client.send('Page.createIsolatedWorld', {
         frameId,

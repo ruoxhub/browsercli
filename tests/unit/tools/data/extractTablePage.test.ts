@@ -501,18 +501,30 @@ function createFakeBrowser(
   let counter = 0;
 
   const sessionOwner = new Map<string, 'page' | 'frame'>();
+  const frameOwners = new Map<string, Node>();
   const createSession = (owner: 'page' | 'frame') => {
     const id = `session-${++counter}`;
     const record: FakeSession = {id, detached: 0};
     sessionOwner.set(id, owner);
     sessions.push(record);
-    return {
+    const client = {
       send: async (method: string, params?: Record<string, unknown>) => {
         calls.push({session: id, method, params});
         if (options.hangOn === method)
           return new Promise<never>(() => undefined);
         if (method === 'Page.getFrameTree') {
-          return {frameTree: frameTreeOf()};
+          // A page-target session does not list a cross-process child: the
+          // OOPIF has its own target and its own root-only frame tree.
+          if (sessionOwner.get(id) === 'frame') {
+            const owner = frameOwners.get(id);
+            return {
+              frameTree: {frame: {id: owner?.id, url: owner?.url}},
+            };
+          }
+          const visible = walkOrder().filter(
+            node => !ownTarget.has(nodes.indexOf(node)),
+          );
+          return {frameTree: pageTreeOf(visible)};
         }
         if (method === 'Page.createIsolatedWorld') {
           const frameId = params?.['frameId'];
@@ -555,6 +567,7 @@ function createFakeBrowser(
         record.detached += 1;
       },
     };
+    return {client, id};
   };
 
   // ─── frame tree ───
@@ -609,10 +622,13 @@ function createFakeBrowser(
     return ordered;
   };
 
-  const frameTreeOf = () => {
+  /** Renders the DFS `visible` list back into a CDP frame tree. */
+  const pageTreeOf = (visible: Node[]) => {
     const toCdp = (node: Node): Record<string, unknown> => ({
       frame: {id: node.id, url: node.url},
-      childFrames: node.children.map(toCdp),
+      childFrames: node.children
+        .filter(child => visible.includes(child))
+        .map(toCdp),
     });
     return toCdp(rootNode);
   };
@@ -628,7 +644,9 @@ function createFakeBrowser(
     // Per-target sessions: only frames with their own target (main frame,
     // OOPIF) accept newCDPSession(frame).
     if (isSelected && ownTarget.has(nodes.indexOf(node))) {
-      (frame as unknown as {__hasTarget: boolean}).__hasTarget = true;
+      const tagged = frame as unknown as {__hasTarget: boolean; __node: Node};
+      tagged.__hasTarget = true;
+      tagged.__node = node;
     }
     return frame;
   };
@@ -663,10 +681,17 @@ function createFakeBrowser(
   const selectedFrame = framesByGuid.get(selectedNode.guid)!;
   const context = {
     newCDPSession: async (target: unknown) => {
-      if (target === page) return createSession('page');
+      if (target === page) return createSession('page').client;
       const hasTarget =
         (target as {__hasTarget?: boolean})?.__hasTarget === true;
-      if (hasTarget) return createSession('frame');
+      if (hasTarget) {
+        const ownerNode = nodes.find(
+          node => node === (target as unknown as {__node?: Node}).__node,
+        );
+        const session = createSession('frame');
+        if (ownerNode) frameOwners.set(session.id, ownerNode);
+        return session.client;
+      }
       // Playwright's message for a same-process subframe.
       throw new Error('This frame does not have a separate CDP session');
     },
@@ -1108,12 +1133,11 @@ describe('captureTable CDP lifecycle', () => {
       /^\(function collectTableDom\(/,
     );
 
-    // Two sessions: the short-lived one the shared frameId resolver opens and
-    // closes, plus the single session this tool owns. Both must be detached.
-    assert.equal(browser.sessions.length, 2);
+    // Exactly one session per extraction (the frameId is resolved through it),
+    // detached exactly once.
     assert.deepEqual(
       browser.sessions.map(session => session.detached),
-      [1, 1],
+      [1],
     );
   });
 
@@ -1131,10 +1155,9 @@ describe('captureTable CDP lifecycle', () => {
       /CDP runtime blew up/,
     );
 
-    assert.equal(browser.sessions.length, 2);
     assert.deepEqual(
       browser.sessions.map(session => session.detached),
-      [1, 1],
+      [1],
     );
   });
 
@@ -1152,7 +1175,11 @@ describe('captureTable CDP lifecycle', () => {
       /frameId/,
     );
 
-    assert.equal(browser.sessions.length, 0);
+    // The session opened before resolution is released on this path too.
+    assert.deepEqual(
+      browser.sessions.map(session => session.detached),
+      [1],
+    );
   });
 
   it('resolves the selected frame by tree order, not attach order', async () => {
@@ -1187,7 +1214,7 @@ describe('captureTable CDP lifecycle', () => {
     // Every session the tool opened must be released.
     assert.deepEqual(
       browser.sessions.map(session => session.detached),
-      [1, 1],
+      [1],
     );
   });
 
@@ -1214,11 +1241,16 @@ describe('captureTable CDP lifecycle', () => {
       /frameId/,
     );
 
-    // No isolation, no isolate world, and nothing left open.
+    // No isolated world is created, and the session opened for resolution is
+    // released rather than leaked on the failure path.
     assert.equal(
       browser.calls.filter(call => call.method === 'Page.createIsolatedWorld')
         .length,
       0,
+    );
+    assert.deepEqual(
+      browser.sessions.map(session => session.detached),
+      [1],
     );
   });
 
@@ -1251,7 +1283,7 @@ describe('captureTable CDP lifecycle', () => {
     assert.equal(world?.params?.['frameId'], 'oopif');
     assert.deepEqual(
       browser.sessions.map(session => session.detached),
-      [1, 1],
+      [1],
     );
   });
 
@@ -1296,7 +1328,7 @@ describe('captureTable CDP lifecycle', () => {
       // The session must be released even though the CDP call never settled.
       assert.deepEqual(
         browser.sessions.map(session => session.detached),
-        [1, 1],
+        [1],
       );
     } finally {
       clock.restore();
@@ -1325,7 +1357,7 @@ describe('captureTable CDP lifecycle', () => {
 
       assert.deepEqual(
         browser.sessions.map(session => session.detached),
-        [1, 1],
+        [1],
       );
     } finally {
       clock.restore();
@@ -1348,7 +1380,7 @@ describe('captureTable CDP lifecycle', () => {
 
     assert.deepEqual(
       browser.sessions.map(session => session.detached),
-      [1, 1],
+      [1],
     );
   });
 });
