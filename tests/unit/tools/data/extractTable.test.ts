@@ -77,16 +77,20 @@ function createFakeFrame(
     detach: async () => undefined,
   });
 
+  // `Page.getFrameTree` and Playwright's own tree both report depth-first, so
+  // the single-frame fixture doubles as its own main frame.
   const page = {
     url: () => 'https://example.test/page',
     // `page.frames()` always yields the raw frames; only the frame handed to
     // the tool may be the worker's Proxy wrapper.
     frames: () => [rawFrame],
+    mainFrame: () => rawFrame,
     context: () => ({newCDPSession: async () => createSession()}),
   };
   const rawFrame = {
     page: () => page,
     ...(stripGuid ? {} : {_guid: 'frame@abc'}),
+    childFrames: () => [],
     evaluate: async () => undefined,
   } as unknown as Frame;
   // Worker mode wraps every frame in this Proxy (frame.evaluate timeout guard),
@@ -443,6 +447,15 @@ describe('extract_table capture failures', () => {
 });
 
 describe('extract_table registration', () => {
+  it('declares browser and page runtime requirements', () => {
+    // Without this the pipeline cannot reject a call before it reaches the
+    // handler, and the tool shows as runnable with no browser attached.
+    assert.deepEqual(extractTable.annotations.requirements, {
+      browser: 'connected',
+      page: 'selected',
+    });
+  });
+
   it('is annotated as a data tool that may write files', () => {
     assert.equal(extractTable.name, 'extract_table');
     assert.equal(extractTable.annotations.category, ToolCategory.DATA);

@@ -57,6 +57,10 @@ export const extractTable = defineTool({
     title: '提取表格数据',
     category: ToolCategory.DATA,
     readOnlyHint: false,
+    requirements: {
+      browser: 'connected',
+      page: 'selected',
+    },
   },
   schema: {
     selector: zod

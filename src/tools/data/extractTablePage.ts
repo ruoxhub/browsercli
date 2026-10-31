@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Frame} from '../../third_party/index.js';
+import type {CDPSession, Frame, Page} from '../../third_party/index.js';
 import {resolveSelectedFrameId} from '../script/script.js';
 
 import type {
@@ -103,8 +103,18 @@ export function collectTableDom(
 
   const textOf = (element: Element): string => {
     const innerText = (element as HTMLElement).innerText;
-    const raw = typeof innerText === 'string' ? innerText : element.textContent;
-    return (raw ?? '').trim();
+    const rendered = typeof innerText === 'string' ? innerText : '';
+    if (rendered !== '') return rendered.trim();
+    // Chromium returns empty `innerText` for an offscreen content-visibility:auto
+    // subtree and for a visibility:hidden element, but the markup still carries
+    // the text. Both keep their position in the table (see layoutStateOf), so
+    // fall back to `textContent` there instead of emitting empty cells. The
+    // guard keeps text from display:none descendants out.
+    const paintsNothing =
+      element.checkVisibility({visibilityProperty: true}) === false ||
+      element.checkVisibility({contentVisibilityAuto: true}) === false;
+    if (!paintsNothing) return '';
+    return (element.textContent ?? '').trim();
   };
 
   /**
@@ -340,6 +350,25 @@ async function withTimeout<T>(
 }
 
 /**
+ * Opens the CDP session for this extraction.
+ *
+ * A page-level session only knows frames in the page's own process: for a
+ * cross-process iframe (OOPIF) `Page.createIsolatedWorld` fails with
+ * "No frame for given id found". Playwright can hand out a session bound to
+ * the frame's own target when it has one, and throws "This frame does not have
+ * a separate CDP session" for same-process subframes — where the page session
+ * is exactly right.
+ */
+async function openFrameSession(frame: Frame, page: Page): Promise<CDPSession> {
+  const context = page.context();
+  try {
+    return await context.newCDPSession(frame);
+  } catch {
+    return context.newCDPSession(page);
+  }
+}
+
+/**
  * Collects raw table facts from the given frame in a throwaway isolated world.
  * Creates its own CDP session and always detaches it; never enables Runtime,
  * Page or Debugger domains, so no debugger state or listener is left behind.
@@ -359,7 +388,10 @@ export async function captureTable(
     );
   }
 
-  const client = await page.context().newCDPSession(page);
+  const client = await withTimeout(
+    openFrameSession(frame, page),
+    '创建 CDP 会话',
+  );
   try {
     const world = (await withTimeout(
       client.send('Page.createIsolatedWorld', {
