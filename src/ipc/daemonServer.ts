@@ -13,7 +13,6 @@
 import fs from 'node:fs';
 import net from 'node:net';
 
-import {BrowserConfigInvariantError} from '../config/browserInvariants.js';
 import type {ToolMeta} from '../tools/tools-meta.js';
 import type {ToolRecovery} from '../utils/errors.js';
 import {
@@ -351,22 +350,10 @@ export async function startDaemonServer(
       throw error;
     }
     rejectIfBusy('browser', getActiveJob());
-    // 先算候选、校验，再提交（B1）。`RuntimeConfigStore.update()` 深合并
-    // `browser`，所以上一次请求留下的字段会活到这一次：两个各自合法的请求
-    // `connect --ego --keep-page` → `connect --ego=false` 会让 store 停在
-    // `{ego:false, keepPage:true}`。若先提交再校验，那条不变量会抛出，store 却
-    // 已经脏了 —— 之后**每个** `browser.status` / `browser.disconnect` 都会跟着
-    // 抛，daemon 被永久卡死。校验放在写入之前，被拒绝的请求不留痕迹。
-    //
-    // 候选与提交都在连接的那个 try 之外：不变量错误（如 BROWSER_KEEP_PAGE 单独
-    // 存在且本次请求也没给 ego）必须原样上报成 VALIDATION，不能被下面的
-    // `BROWSER_CONNECT_FAILED` 折掉 —— 那时连接根本还没开始。
     const {commit, config} = candidateBrowserConfig(patch);
     try {
       commit();
     } catch (error) {
-      // 写 store 失败也不是连接失败：连接压根没尝试，用户需要知道是配置没写
-      // 进去，而不是「浏览器起不来」。
       throw Object.assign(new Error('failed to persist browser config'), {
         code: 'BROWSER_CONFIG_COMMIT_FAILED',
         cause: error,
@@ -379,11 +366,6 @@ export async function startDaemonServer(
       return status;
     } catch (error) {
       if (error instanceof WorkerBusyError) throw error;
-      // Keep the original message: the bridge's diagnostics ("ego lite binary
-      // not found at <paths>", "could not enter a task space ... after 8
-      // attempts", a CDP method ego does not implement) are the only thing that
-      // tells a user what to do next. Folding them into one sentence is how a
-      // well-diagnosed failure becomes an unexplained one.
       const detail = error instanceof Error ? error.message : String(error);
       throw Object.assign(new Error(`failed to connect browser: ${detail}`), {
         code: 'BROWSER_CONNECT_FAILED',
@@ -416,22 +398,6 @@ export async function startDaemonServer(
       return status;
     } catch (error) {
       if (error instanceof WorkerBusyError) throw error;
-      // 与 `handleBrowserConnect` 同一条理由：生效配置自相矛盾时，把
-      // BrowserConfigInvariantError 折成 BROWSER_DISCONNECT_FAILED 就等于把
-      // 唯一的诊断信息换成一句"断开浏览器失败"，用户无从知道该改哪个配置。
-      if (error instanceof BrowserConfigInvariantError) throw error;
-      // Same reason as the connect handler: `disconnectBrowser` throws
-      // BROWSER_DISCONNECT_INCOMPLETE when the bridge survived teardown, and its
-      // code is what lets a client tell "retryable, the bridge is still listening"
-      // from an ordinary failure. `toErrorCode()` reports `error.code` verbatim, so
-      // folding it into the generic code here would throw away exactly the
-      // distinction it exists for.
-      if (
-        (error as {code?: unknown} | null)?.code ===
-        'BROWSER_DISCONNECT_INCOMPLETE'
-      ) {
-        throw error;
-      }
       const detail = error instanceof Error ? error.message : String(error);
       throw Object.assign(
         new Error(`failed to disconnect browser: ${detail}`),

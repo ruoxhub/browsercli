@@ -49,7 +49,6 @@ export interface JobStatus {
 export type BrowserConnectionMode =
   | 'attach'
   | 'ws-endpoint'
-  | 'ego'
   | 'launch'
   | 'disconnected';
 
@@ -64,17 +63,12 @@ export interface BrowserConnectOptions {
   browserURL?: string;
   channel?: string;
   cloak?: boolean;
-  ego?: boolean;
-  /** ego 任务空间使用的 Profile id；只在**新建**空间时生效。 */
-  egoProfile?: string;
   executablePath?: string;
   force?: boolean;
   fullStealthArgs?: boolean;
   headless?: boolean;
   isolated?: boolean;
   jsStealth?: boolean;
-  /** ego 任务空间保留策略；必须与 `ego: true` 同时出现。 */
-  keepPage?: boolean;
   minimalStealth?: boolean;
   userDataDir?: string;
   viewport?: {width: number; height: number};

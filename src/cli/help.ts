@@ -67,7 +67,7 @@ export function generateTopLevelHelp(options?: {
 }
 
 const BROWSER_CONNECT_USAGE =
-  'browsercli browser connect [--browser-url <url> | --ws-endpoint <url> | --channel <name> | --executable-path <path> | --ego] [--keep-page] [--profile <id>] [--user-data-dir <dir>] [--viewport <width>x<height>] [--ws-headers <json>] [--headless[=<bool>]] [--cloak] [--minimal-stealth] [--full-stealth-args] [--js-stealth] [--isolated] [--accept-insecure-certs] [--force] [--json]';
+  'browsercli browser connect [--browser-url <url> | --ws-endpoint <url> | --channel <name> | --executable-path <path>] [--user-data-dir <dir>] [--viewport <width>x<height>] [--ws-headers <json>] [--headless[=<bool>]] [--cloak] [--minimal-stealth] [--full-stealth-args] [--js-stealth] [--isolated] [--accept-insecure-certs] [--force] [--json]';
 
 const BROWSER_CONNECT_OPTIONS = [
   '  目标参数（互斥）：',
@@ -75,13 +75,6 @@ const BROWSER_CONNECT_OPTIONS = [
   '    --ws-endpoint <url>            CDP WebSocket 远程连接地址',
   '    --channel <name>               本地启动浏览器渠道（stable, beta, canary, chrome, firefox 等）',
   '    --executable-path <path>       本地自定义浏览器可执行文件路径',
-  '',
-  '  ego lite 模式（默认浏览器来源）：',
-  '    --ego                          连接正在运行的 ego lite 浏览器（经本地 CDP 桥接），不本地启动浏览器。',
-  '                                   不指定任何目标且未用 --cloak 时这是默认值；--ego=false 可显式关闭',
-  '    --keep-page                    停止桥接时保留 ego 里的分析标签页，不加则关闭任务空间、标签页消失（仅 --ego）',
-  '    --profile <id>                 新建任务空间时使用的 Profile id（如 `Profile 1`，见 `browser space list`）；',
-  '                                   只在新建时生效，复用已有空间时会保留其原 Profile 并在诊断日志中提示（仅 --ego）',
   '',
   '  运行与环境选项：',
   '    --user-data-dir <dir>          浏览器 Profile 用户数据目录',
@@ -151,21 +144,6 @@ export function generateCommandHelp(
         '',
       ].join('\n');
     }
-    if (subCommand === 'space') {
-      return [
-        '',
-        '  Usage: browsercli browser space list [--json]',
-        '',
-        '  列出 ego 里的任务空间与可用 Profile（不需要已连接浏览器）',
-        '',
-        '  输出里的 Profile ID 就是 browser connect --ego --profile <id> 的取值；',
-        '  标记为默认的那个在不指定 --profile 时使用。',
-        '',
-        '  Options:',
-        '    --json                         以 JSON 格式输出结果',
-        '',
-      ].join('\n');
-    }
   }
 
   const helpMap: Record<
@@ -182,13 +160,11 @@ export function generateCommandHelp(
       ].join('\n         '),
     },
     browser: {
-      description:
-        '连接、断开或查看 Worker 浏览器状态，或列出 ego 任务空间与 Profile',
+      description: '连接、断开或查看 Worker 浏览器状态',
       usage: [
         BROWSER_CONNECT_USAGE,
         'browsercli browser disconnect [--force] [--json]',
         'browsercli browser status [--json]',
-        'browsercli browser space list [--json]',
       ].join('\n         '),
       options: BROWSER_CONNECT_OPTIONS,
     },

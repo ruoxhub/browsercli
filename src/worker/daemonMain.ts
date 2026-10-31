@@ -18,13 +18,7 @@ import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 import {
-  BrowserConfigInvariantError,
-  withConfigFileHint,
-} from '../config/browserInvariants.js';
-import {getUserConfigPath} from '../config/resolver.js';
-import {
   loadCachedRuntimeConfig,
-  RUNTIME_CONFIG_PATH,
   shouldAutoConnectOnStartup,
 } from '../config/runtimeConfigPersistence.js';
 import {getRuntimeConfigStore} from '../config/RuntimeConfigStore.js';
@@ -150,22 +144,7 @@ export async function runDaemon(plan: DaemonPlan): Promise<DaemonRunResult> {
   const startedAt = Date.now();
   seedConfig(plan);
 
-  // 合并层的不变量守卫会在这里抛（`getRuntime()` → `getBrowserManagerConfig()`）。
-  // 它只点出两个 key，不说是哪份文件，于是「daemon 起不来」只剩猜 —— 补一行指
-  // 明该改哪个文件 / 哪个环境变量。重抛保留 `BrowserConfigInvariantError`
-  // 类型，`code: VALIDATION` 才不会丢。
-  let runtime: ReturnType<typeof getRuntime>;
-  try {
-    runtime = getRuntime();
-  } catch (error) {
-    if (error instanceof BrowserConfigInvariantError) {
-      throw withConfigFileHint(error, {
-        configFile: getUserConfigPath(),
-        runtimeFile: RUNTIME_CONFIG_PATH,
-      });
-    }
-    throw error;
-  }
+  const runtime = getRuntime();
   const contextProvider = new ToolContextProvider(runtime);
   runtime.contextProvider = contextProvider;
   await contextProvider.init();

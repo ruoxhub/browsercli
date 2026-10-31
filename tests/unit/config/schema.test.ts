@@ -109,19 +109,6 @@ describe('config schema validation', {concurrency: false}, () => {
     assert.strictEqual(config.browser?.channel, 'bidi-chromium');
   });
 
-  it('keeps the ego browser flag instead of stripping it', () => {
-    // BrowserConfigSchema uses `.strip()`, so an undeclared field disappears
-    // silently. Task 4 wires the CLI flag on top of this field, so it must
-    // survive validation already.
-    const config = validateGlobalConfig({browser: {ego: true}});
-    assert.strictEqual(config.browser?.ego, true);
-    assert.strictEqual(
-      validateGlobalConfig({browser: {ego: 'true' as never}}).browser?.ego,
-      true,
-      'the shared boolean preprocessor applies, like cloak',
-    );
-  });
-
   it('resolves config from user config file (~/.browsercli/config.json)', () => {
     const tmpDir = mkdtempSync(
       path.join(os.tmpdir(), 'browsercli-resolve-test-'),

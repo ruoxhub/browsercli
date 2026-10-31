@@ -126,10 +126,8 @@ describe('browserCommand', () => {
 
     const current = context();
     await browserCommand(['connect'], current.ctx);
-    // ego lite 是默认浏览器来源（本次改动之前就已如此），所以"一个来源参数都不
-    // 给"的 connect 会显式下发 `{ego:true}`，而不是空 body 让 daemon 去猜。
     assert.deepEqual(current.calls, [
-      {method: 'browser.connect', params: {body: {ego: true}}},
+      {method: 'browser.connect', params: {body: {}}},
     ]);
   });
 

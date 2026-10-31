@@ -25,7 +25,6 @@ export interface ConnectResult {
 export type BrowserConnectionMode =
   | 'attach'
   | 'ws-endpoint'
-  | 'ego'
   | 'launch'
   | 'disconnected';
 
@@ -47,16 +46,10 @@ export interface DisconnectBrowserOptions {
 
 /**
  * 连接方式判定。
- *
- * `ego` 必须最先判断：`BrowserManager.connectEgoBrowser()` 会把桥接发布的 ws 端点
- * 写进 `config.wsEndpoint`，所以活跃的 ego 配置看起来就是一个 ws-endpoint 配置。
- * 按 `wsEndpoint` 判定会让同一个 ego 目标在"连接前/连接后"读到不同 mode
- * （入参 `launch` vs 活跃 `ws-endpoint`），从而每次都误判为换了目标。
  */
 export function getBrowserConnectionMode(
   config: BrowserManagerConfig,
 ): Exclude<BrowserConnectionMode, 'disconnected'> {
-  if (config.ego) return 'ego';
   if (
     config.wsEndpoint ||
     config.remoteDebuggingUrl?.startsWith('ws://') ||
@@ -76,28 +69,6 @@ export function isSameBrowserTarget(
     return false;
   }
   const mode = getBrowserConnectionMode(a);
-  if (mode === 'ego') {
-    // 故意不比较 `wsEndpoint`：ego 的端点是 `start()` 之后才发现并回写进 config
-    // 的，入参与活跃配置天然不对称，拿它比较必然失败（→ resetInstance → 毁掉
-    // 任务空间）。ego 目标身份 = "ego 开关 + 工作区"，而工作区由
-    // `EgoBridgeManager` 用自身 cwd 派生的任务空间名固定，同一进程内的 ego 配置
-    // 因此天然是同一个工作区；`cloak`/`channel` 之类对 ego 无意义（不会本地启动），
-    // 不参与比较。
-    //
-    // `keepPage` 必须比较：它被烘进运行中桥接的启动 bootstrap，改不了。两个只差
-    // 它的 ego 配置若比较相等，`connectBrowser()` 会短路返回 connected:true，
-    // `EgoBridgeManager.start()` 自己的 assertSameOptions() 冲突检查永远到不了，
-    // 用户的 `--keep-page` 被静默吞掉（Ruling K）。
-    //
-    // `egoProfile` 同理，而且更隐蔽：它只在**新建**任务空间时被消费，所以在
-    // 已有 live 桥接时换 profile 本就是"改不了"的；这里若判成同一目标，
-    // `--profile B` 会静默沿用 A，连 worker 里那条"profile 被忽略"的诊断都不会
-    // 打印。空串按「未指定」处理，与 `isProfileWithoutEgo` 的语义一致。
-    return (
-      (a.keepPage === true) === (b.keepPage === true) &&
-      (a.egoProfile?.trim() ?? '') === (b.egoProfile?.trim() ?? '')
-    );
-  }
   if (mode === 'ws-endpoint') {
     return (
       (a.wsEndpoint ?? '') === (b.wsEndpoint ?? '') &&
@@ -186,11 +157,6 @@ export async function connectBrowser(
       let lastError: unknown;
       for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
-          // A `false` here means the old instance could not be torn down and was
-          // deliberately kept (it still owns e.g. an ego bridge). Continuing would
-          // silently reconnect on top of it, because `getInstance()` returns the
-          // survivor; fail this attempt instead so the retry re-enters
-          // `resetInstance()` and retries the teardown.
           if ((await BrowserManager.resetInstance()) === false) {
             throw new Error(
               'Failed to tear down the previous browser before reconnecting',
@@ -234,18 +200,7 @@ export async function disconnectBrowser(
   options: DisconnectBrowserOptions = {},
 ): Promise<void> {
   const disconnect = async () => {
-    // `false` means close() failed and the instance (with its bridge) was kept so
-    // a later call can retry. Reporting a clean disconnect over a bridge that is
-    // still listening would throw away the honesty `stop()` was built for.
-    const cleared = await BrowserManager.resetInstance();
-    if (cleared === false) {
-      throw Object.assign(
-        new Error(
-          'browser disconnect incomplete: the bridge could not be stopped and was kept for retry',
-        ),
-        {code: 'BROWSER_DISCONNECT_INCOMPLETE'},
-      );
-    }
+    await BrowserManager.resetInstance();
     contextProvider.setBrowser(null);
     contextProvider.clearContext();
   };
