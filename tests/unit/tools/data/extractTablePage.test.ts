@@ -1412,6 +1412,37 @@ describe('captureTable CDP lifecycle', () => {
     );
   });
 
+  it('pairs same-URL siblings in order while an OOPIF is present', async () => {
+    // Two frames share a URL. A URL determines the site and therefore the
+    // process, so same-URL siblings are same-process together; the k-th
+    // same-URL child must pair with the k-th same-URL CDP node.
+    const browser = createFakeBrowser(createRealm(NATIVE_SETUP), {
+      tree: [
+        {id: 'root', guid: 'frame@root', url: 'https://example.test/'},
+        {
+          id: 'oopif',
+          guid: 'frame@oopif',
+          url: 'https://other.test/frame',
+          parent: 0,
+        },
+        {id: 'x1', guid: 'frame@x1', url: 'https://example.test/x', parent: 0},
+        {id: 'x2', guid: 'frame@x2', url: 'https://example.test/x', parent: 0},
+      ],
+      selected: 3,
+      ownTarget: [1],
+    });
+
+    await captureTable(browser.frame, {
+      selector: 'table',
+      includeHidden: false,
+    });
+
+    const world = browser.calls.find(
+      call => call.method === 'Page.createIsolatedWorld',
+    );
+    assert.equal(world?.params?.['frameId'], 'x2');
+  });
+
   it('opens the capture session on the frame target when it has one', async () => {
     // An OOPIF exposes its own CDP target; a page-level session has no frame
     // record for it, so Page.createIsolatedWorld would fail.
