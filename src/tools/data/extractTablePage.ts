@@ -73,18 +73,26 @@ export function collectTableDom(
   options: CollectOptions,
 ): RawTableCapture | CollectFailure {
   /**
-   * Ancestor-aware visibility. `display` is not inherited, so a row inside
-   * `<div hidden>` or `<tbody style="display:none">` still reports
-   * `display: table-row` for itself; only a chain check catches the container.
-   * Chromium's `checkVisibility` does exactly that, with the options that make
-   * it account for inherited `visibility` and `content-visibility`.
+   * How an element takes part in table layout, with ancestor awareness
+   * (`display` is not inherited, so a row inside `<div hidden>` still reports
+   * `display: table-row` for itself).
+   *
+   * - `removed`: `display:none` somewhere on the chain — the box leaves the
+   *   layout entirely, so its column/row slot genuinely collapses.
+   * - `invisible`: `visibility:hidden|collapse` — the slot is still occupied.
+   *   Splicing it out shifts every later cell under the wrong header.
+   * - `visible`: collected normally.
+   *
+   * `contentVisibilityAuto` is deliberately NOT requested: Chromium reports a
+   * below-the-fold `content-visibility:auto` subtree as not visible, which is
+   * a lazily-rendered table, not a hidden container.
    */
-  const isHidden = (element: Element): boolean => {
-    if (element.hasAttribute('hidden')) return true;
-    return !element.checkVisibility({
-      visibilityProperty: true,
-      contentVisibilityAuto: true,
-    });
+  type LayoutState = 'visible' | 'invisible' | 'removed';
+  const layoutStateOf = (element: Element): LayoutState => {
+    if (!element.checkVisibility({visibilityProperty: false})) return 'removed';
+    if (!element.checkVisibility({visibilityProperty: true}))
+      return 'invisible';
+    return 'visible';
   };
 
   /** Native `rowSpan`/`colSpan` and ARIA spans both collapse 0 into 1. */
@@ -130,6 +138,28 @@ export function collectTableDom(
     id: element.getAttribute('id') ?? '',
   });
 
+  /**
+   * Collects one cell while preserving positional occupancy. A `removed` cell
+   * collapses its column (nothing to hold); an `invisible` cell keeps the
+   * column with empty text so later cells do not slide under the wrong header.
+   */
+  const collectCell = (
+    cells: RawTableCell[],
+    element: Element,
+    header: boolean,
+    rowSpan: number,
+    colSpan: number,
+  ): void => {
+    const state = layoutStateOf(element);
+    if (!options.includeHidden && state === 'removed') return;
+    const facts = cellFacts(element, header, rowSpan, colSpan);
+    cells.push(
+      !options.includeHidden && state === 'invisible'
+        ? {...facts, text: ''}
+        : facts,
+    );
+  };
+
   // An invalid CSS selector throws SyntaxError in the page; report it as a
   // selector problem so the adapter can map it to VALIDATION, not RUNTIME.
   let matches: NodeListOf<Element>;
@@ -168,7 +198,7 @@ export function collectTableDom(
 
   // "隐藏容器始终拒绝": a hidden container is a hard refusal, never widened by
   // includeHidden — that option only governs hidden rows and cells.
-  if (isHidden(root)) {
+  if (layoutStateOf(root) !== 'visible') {
     return {
       reason: 'hidden',
       message: `选择器 "${options.selector}" 命中的表格位于隐藏容器内，拒绝采集`,
@@ -180,7 +210,9 @@ export function collectTableDom(
   if (isNativeTable) {
     const table = root as HTMLTableElement;
     for (const row of Array.from(table.rows)) {
-      if (!options.includeHidden && isHidden(row)) continue;
+      // Only a `display:none` row leaves the layout; a `visibility:hidden` row
+      // keeps its slot, so its cells are emitted with empty text instead.
+      if (!options.includeHidden && layoutStateOf(row) === 'removed') continue;
       // Defensive only: `HTMLTableRowElement.cells` already excludes nested
       // tables. The filter that actually matters is the ARIA one below.
       const rawCells = Array.from(row.cells).filter(
@@ -198,33 +230,40 @@ export function collectTableDom(
             : 'data';
       const cells: RawTableCell[] = [];
       for (const cell of rawCells) {
-        if (!options.includeHidden && isHidden(cell)) continue;
-        cells.push(
-          cellFacts(
-            cell,
-            cell.tagName.toLowerCase() === 'th',
-            positiveSpan(cell.rowSpan),
-            positiveSpan(cell.colSpan),
-          ),
+        collectCell(
+          cells,
+          cell,
+          cell.tagName.toLowerCase() === 'th',
+          positiveSpan(cell.rowSpan),
+          positiveSpan(cell.colSpan),
         );
       }
-      rows.push({kind, cells});
+      // A row with no collectable cell carries no data; emitting it would
+      // inflate coverage.rowsReturned with an all-null ghost row.
+      if (cells.length > 0) rows.push({kind, cells});
     }
   } else {
     const rowSelector = '[role="row"]';
+    // `rowheader` is the standard ARIA grid row-header cell; omitting it drops
+    // the first column and shifts every later cell left.
     const cellSelector =
-      '[role="cell"], [role="gridcell"], [role="columnheader"], th';
+      '[role="cell"], [role="gridcell"], [role="columnheader"], [role="rowheader"], th';
     const tableBoundary = 'table, [role="table"], [role="grid"]';
-    const isHeaderCell = (cell: Element): boolean =>
-      cell.tagName.toLowerCase() === 'th' ||
-      (cell.getAttribute('role') ?? '').toLowerCase() === 'columnheader';
+    const isHeaderCell = (cell: Element): boolean => {
+      const role = (cell.getAttribute('role') ?? '').toLowerCase();
+      return (
+        cell.tagName.toLowerCase() === 'th' ||
+        role === 'columnheader' ||
+        role === 'rowheader'
+      );
+    };
 
     const rowElements = Array.from(root.querySelectorAll(rowSelector)).filter(
       row => row.closest(tableBoundary) === root,
     );
 
     for (const row of rowElements) {
-      if (!options.includeHidden && isHidden(row)) continue;
+      if (!options.includeHidden && layoutStateOf(row) === 'removed') continue;
       const rawCells = Array.from(row.querySelectorAll(cellSelector)).filter(
         cell =>
           cell.closest(rowSelector) === row &&
@@ -235,17 +274,15 @@ export function collectTableDom(
       const kind: RawTableSection = allHeaders ? 'header' : 'data';
       const cells: RawTableCell[] = [];
       for (const cell of rawCells) {
-        if (!options.includeHidden && isHidden(cell)) continue;
-        cells.push(
-          cellFacts(
-            cell,
-            isHeaderCell(cell),
-            positiveSpan(cell.getAttribute('aria-rowspan')),
-            positiveSpan(cell.getAttribute('aria-colspan')),
-          ),
+        collectCell(
+          cells,
+          cell,
+          isHeaderCell(cell),
+          positiveSpan(cell.getAttribute('aria-rowspan')),
+          positiveSpan(cell.getAttribute('aria-colspan')),
         );
       }
-      rows.push({kind, cells});
+      if (cells.length > 0) rows.push({kind, cells});
     }
   }
 

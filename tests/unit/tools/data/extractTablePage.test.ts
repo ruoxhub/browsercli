@@ -11,6 +11,7 @@ import vm from 'node:vm';
 import type {Frame} from 'patchright';
 import sinon from 'sinon';
 
+import {normalizeTable} from '../../../../src/tools/data/extractTableModel.js';
 import {
   captureTable,
   collectTableDom,
@@ -57,6 +58,11 @@ class FakeElement {
     this.parentElement = null;
     this.children = [];
     this.style = {display: 'block', visibility: 'visible'};
+    // UA stylesheet: [hidden] { display: none }. A page override that sets
+    // display:block again must win, exactly as in Chromium.
+    if (Object.prototype.hasOwnProperty.call(this.attributes, 'hidden')) {
+      this.style.display = 'none';
+    }
   }
   append(...nodes) {
     for (const node of nodes) {
@@ -101,18 +107,27 @@ class FakeElement {
     );
   }
   /**
-   * Mirrors Chromium's ancestor-aware visibility: display is not inherited,
-   * so only a chain walk can see a hidden container.
+   * Mirrors Chromium's ancestor-aware checkVisibility: display is not
+   * inherited, so only a chain walk sees a hidden container. The options are
+   * honoured the way Chromium honours them: visibilityProperty adds
+   * visibility:hidden|collapse, contentVisibilityAuto additionally treats a
+   * skipped content-visibility:auto subtree as not visible (this fake models
+   * such a subtree as always skipped, i.e. the offscreen worst case).
    */
-  checkVisibility() {
+  checkVisibility(options) {
+    const checkVisibilityProperty = options?.visibilityProperty === true;
+    const checkContentVisibility = options?.contentVisibilityAuto === true;
     let node = this;
     while (node) {
-      if (node.hasAttribute('hidden')) return false;
       if (node.style.display === 'none') return false;
       if (
-        node.style.visibility === 'hidden' ||
-        node.style.visibility === 'collapse'
+        checkVisibilityProperty &&
+        (node.style.visibility === 'hidden' ||
+          node.style.visibility === 'collapse')
       ) {
+        return false;
+      }
+      if (checkContentVisibility && node.style.contentVisibility === 'auto') {
         return false;
       }
       node = node.parentElement;
@@ -272,6 +287,125 @@ hiddenBody.append(
 table.append(hiddenBody);
 const wrapper = __element('div', {});
 wrapper.append(table);
+globalThis.__roots = [table];
+`;
+
+const VISIBILITY_HIDDEN_CELL_SETUP = `
+const table = __element('table', {});
+table.append(
+  __element('thead', {}).append(
+    __element('tr', {}).append(
+      __element('th', {}, 'Name'),
+      __element('th', {}, 'Age'),
+      __element('th', {}, 'City'),
+    ),
+  ),
+  __element('tbody', {}).append(
+    __element('tr', {}).append(
+      __element('td', {}, 'Ann'),
+      Object.assign(__element('td', {}, '42'), {style: {display: 'block', visibility: 'hidden'}}),
+      __element('td', {}, 'Oslo'),
+    ),
+  ),
+);
+globalThis.__roots = [table];
+`;
+
+/** Row-spanning cell in row 1 plus a visibility:hidden row in between. */
+const VISIBILITY_HIDDEN_ROW_SETUP = `
+const table = __element('table', {});
+const body = __element('tbody', {});
+body.append(
+  __element('tr', {}).append(
+    __element('td', {rowspan: '3'}, 'Ann'),
+    __element('td', {}, '1'),
+    __element('td', {}, 'Oslo'),
+  ),
+);
+const hiddenRow = __element('tr', {});
+hiddenRow.append(
+  Object.assign(__element('td', {}, 'hidden-1'), {style: {display: 'block', visibility: 'hidden'}}),
+  Object.assign(__element('td', {}, 'hidden-2'), {style: {display: 'block', visibility: 'hidden'}}),
+);
+body.append(hiddenRow);
+body.append(__element('tr', {}).append(__element('td', {}, '3'), __element('td', {}, 'Bergen')));
+table.append(body);
+globalThis.__roots = [table];
+`;
+
+/** ARIA grid whose first column is row headers. */
+const ARIA_ROWHEADER_SETUP = `
+const grid = __element('div', {role: 'grid'});
+const headerRow = __element('div', {role: 'row'});
+headerRow.append(
+  __element('div', {role: 'columnheader'}, 'Name'),
+  __element('div', {role: 'columnheader'}, 'Score'),
+);
+const dataRow = __element('div', {role: 'row'});
+dataRow.append(
+  __element('div', {role: 'rowheader'}, 'Ann'),
+  __element('div', {role: 'gridcell'}, '9'),
+);
+grid.append(headerRow, dataRow);
+globalThis.__roots = [grid];
+`;
+
+/** All-th banner row between data rows, inside tbody. */
+const BANNER_ROW_SETUP = `
+const table = __element('table', {});
+const body = __element('tbody', {});
+body.append(
+  __element('tr', {}).append(__element('th', {}, 'Name'), __element('th', {}, 'Amount')),
+);
+body.append(__element('tr', {}).append(__element('td', {}, 'Ann'), __element('td', {}, '1')));
+body.append(
+  __element('tr', {}).append(__element('th', {colspan: '2'}, 'Q1 2024')),
+);
+body.append(__element('tr', {}).append(__element('td', {}, 'Bob'), __element('td', {}, '2')));
+table.append(body);
+globalThis.__roots = [table];
+`;
+
+/** Table inside a content-visibility:auto subtree that is off-screen. */
+const OFFSCREEN_SETUP = `
+const table = __element('table', {});
+table.append(
+  __element('tbody', {}).append(
+    __element('tr', {}).append(__element('td', {}, 'offscreen')),
+  ),
+);
+const lazy = __element('div', {});
+lazy.style.contentVisibility = 'auto';
+lazy.append(table);
+globalThis.__roots = [table];
+`;
+
+/** <div hidden> whose display is forced back to block by page CSS. */
+const HIDDEN_OVERRIDE_SETUP = `
+const table = __element('table', {});
+table.append(
+  __element('tbody', {}).append(
+    __element('tr', {}).append(__element('td', {}, 'visible-again')),
+  ),
+);
+const container = __element('div', {hidden: ''});
+container.style.display = 'block';
+container.append(table);
+globalThis.__roots = [table];
+`;
+
+/** Row whose cells are all display:none — it must not survive as a ghost. */
+const GHOST_ROW_SETUP = `
+const table = __element('table', {});
+const body = __element('tbody', {});
+body.append(__element('tr', {}).append(__element('td', {}, 'keep'), __element('td', {}, 'me')));
+const ghost = __element('tr', {});
+ghost.append(
+  Object.assign(__element('td', {}, 'gone-1'), {style: {display: 'none', visibility: 'visible'}}),
+  Object.assign(__element('td', {}, 'gone-2'), {style: {display: 'none', visibility: 'visible'}}),
+);
+body.append(ghost);
+table.append(body);
 globalThis.__roots = [table];
 `;
 
@@ -503,14 +637,16 @@ describe('collectTableDom', () => {
     ]);
   });
 
-  it('skips hidden cells by default and includes them with includeHidden', () => {
+  it('keeps a visibility:hidden cell as an empty placeholder by default', () => {
     const realm = createRealm(NESTED_SETUP);
 
+    // visibility:hidden still occupies its column, so dropping it would shift
+    // later cells; includeHidden:true is the only mode that reveals the text.
     const visibleOnly = runCollector(realm, {
       selector: 'table',
       includeHidden: false,
     });
-    assert.deepEqual(visibleOnly.rows[1]?.cells, [cell('third')]);
+    assert.deepEqual(visibleOnly.rows[1]?.cells, [cell('third'), cell('')]);
 
     const withHidden = runCollector(realm, {
       selector: 'table',
@@ -519,6 +655,17 @@ describe('collectTableDom', () => {
     assert.deepEqual(withHidden.rows[1]?.cells, [
       cell('third'),
       cell('invisible'),
+    ]);
+  });
+
+  it('drops a display:none cell so its column genuinely collapses', () => {
+    const capture = runCollector(createRealm(GHOST_ROW_SETUP), {
+      selector: 'table',
+      includeHidden: false,
+    });
+
+    assert.deepEqual(capture.rows, [
+      {kind: 'data', cells: [cell('keep'), cell('me')]},
     ]);
   });
 
@@ -550,6 +697,131 @@ describe('collectTableDom', () => {
         ['footer', 'inner-foot'],
       ],
     );
+  });
+
+  it('keeps a visibility:hidden cell in its column instead of shifting', () => {
+    const capture = runCollector(createRealm(VISIBILITY_HIDDEN_CELL_SETUP), {
+      selector: 'table',
+      includeHidden: false,
+    });
+
+    // The hidden cell still occupies its column: it must contribute an empty
+    // placeholder so "Oslo" stays in the third column.
+    assert.deepEqual(
+      capture.rows[1]?.cells.map(entry => entry.text),
+      ['Ann', '', 'Oslo'],
+    );
+
+    const table = normalizeTable(capture);
+    assert.deepEqual(table.rows, [{c1: 'Ann', c2: null, c3: 'Oslo'}]);
+    assert.deepEqual(
+      table.columns.map(column => column.name),
+      ['Name', 'Age', 'City'],
+    );
+  });
+
+  it('keeps row-span alignment when a visibility:hidden row is skipped', () => {
+    const capture = runCollector(createRealm(VISIBILITY_HIDDEN_ROW_SETUP), {
+      selector: 'table',
+      includeHidden: false,
+    });
+
+    const table = normalizeTable(capture);
+    // The hidden row occupies its row slot with empty cells, so the row-span
+    // anchor keeps covering it and "3"/"Bergen" stay in c2/c3.
+    assert.deepEqual(table.rows, [
+      {c1: 'Ann', c2: '1', c3: 'Oslo'},
+      {c1: null, c2: null, c3: null},
+      {c1: null, c2: '3', c3: 'Bergen'},
+    ]);
+    assert.deepEqual(table.spans, [
+      {columnKey: 'c1', section: 'data', row: 0, rowSpan: 3, colSpan: 1},
+    ]);
+  });
+
+  it('collects an ARIA rowheader as the first data column', () => {
+    const capture = runCollector(createRealm(ARIA_ROWHEADER_SETUP), {
+      selector: '[role="grid"]',
+      includeHidden: false,
+    });
+
+    assert.deepEqual(capture.rows[1]?.cells, [
+      cell('Ann', {header: true}),
+      cell('9'),
+    ]);
+
+    const table = normalizeTable(capture);
+    assert.deepEqual(table.rows, [{c1: 'Ann', c2: '9'}]);
+  });
+
+  it('warns instead of extending header paths with an all-th banner row', () => {
+    const capture = runCollector(createRealm(BANNER_ROW_SETUP), {
+      selector: 'table',
+      includeHidden: false,
+    });
+
+    const table = normalizeTable(capture);
+    assert.deepEqual(
+      table.columns.map(column => column.name),
+      ['Name', 'Amount'],
+    );
+    assert.deepEqual(table.rows, [
+      {c1: 'Ann', c2: '1'},
+      {c1: 'Bob', c2: '2'},
+    ]);
+    assert.ok(
+      table.warnings.some(warning => /banner|header/i.test(warning)),
+      `expected a banner-row warning, got ${JSON.stringify(table.warnings)}`,
+    );
+  });
+
+  it('collects a table inside an offscreen content-visibility:auto subtree', () => {
+    const capture = runCollector(createRealm(OFFSCREEN_SETUP), {
+      selector: 'table',
+      includeHidden: false,
+    });
+
+    assert.ok(
+      'rows' in capture,
+      `expected a capture, got ${JSON.stringify(capture)}`,
+    );
+    assert.deepEqual(
+      (capture as RawTableCapture).rows.map(row =>
+        row.cells.map(entry => entry.text),
+      ),
+      [['offscreen']],
+    );
+  });
+
+  it('respects a page override that makes a [hidden] container visible', () => {
+    const capture = runCollector(createRealm(HIDDEN_OVERRIDE_SETUP), {
+      selector: 'table',
+      includeHidden: false,
+    });
+
+    assert.ok(
+      'rows' in capture,
+      `expected a capture, got ${JSON.stringify(capture)}`,
+    );
+    assert.deepEqual(
+      (capture as RawTableCapture).rows.map(row =>
+        row.cells.map(entry => entry.text),
+      ),
+      [['visible-again']],
+    );
+  });
+
+  it('drops a row that has no collectable cells instead of emitting a ghost', () => {
+    const capture = runCollector(createRealm(GHOST_ROW_SETUP), {
+      selector: 'table',
+      includeHidden: false,
+    });
+
+    assert.deepEqual(
+      capture.rows.map(row => row.cells.map(entry => entry.text)),
+      [['keep', 'me']],
+    );
+    assert.equal(normalizeTable(capture).coverage.rowsReturned, 1);
   });
 
   it('skips rows under a hidden ancestor unless includeHidden is set', () => {

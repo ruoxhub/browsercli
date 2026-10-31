@@ -172,9 +172,21 @@ export function normalizeTable(raw: RawTableCapture): ExtractedTable {
   const rowsOf = (kind: RawTableSection): RawTableRow[] =>
     raw.rows.filter(row => row.kind === kind);
 
-  const headerRows = rowsOf('header');
   const dataRows = rowsOf('data');
   const footerRows = rowsOf('footer');
+
+  // Only header rows that come before the first data row are column levels. An
+  // all-th row after data has begun is a row-group banner ("Q1 2024"), and
+  // letting it into `headerPath` would rename every column beneath it.
+  const firstDataIndex = raw.rows.findIndex(row => row.kind === 'data');
+  const isLeadingHeader = (row: RawTableRow, index: number): boolean =>
+    row.kind === 'header' && (firstDataIndex < 0 || index < firstDataIndex);
+  const headerRows = raw.rows.filter((row, index) =>
+    isLeadingHeader(row, index),
+  );
+  const bannerRows = raw.rows.filter(
+    (row, index) => row.kind === 'header' && !isLeadingHeader(row, index),
+  );
 
   const header = fillSection(headerRows, true);
   const body = fillSection(dataRows, false);
@@ -192,10 +204,29 @@ export function normalizeTable(raw: RawTableCapture): ExtractedTable {
     const record: Record<string, string | null> = {};
     keys.forEach((key, column) => {
       const value = line[column];
-      record[key] = typeof value === 'string' ? value : null;
+      // A `visibility:hidden` cell holds its column with empty text but has no
+      // value, so it maps to null like any other unoccupied position.
+      record[key] = typeof value === 'string' && value !== '' ? value : null;
     });
     return record;
   });
+
+  if (bannerRows.length > 0) {
+    const labels = bannerRows
+      .map(row =>
+        row.cells
+          .map(cell => cell.text)
+          .filter(Boolean)
+          .join(' '),
+      )
+      .filter(Boolean)
+      .slice(0, 3);
+    warnings.push(
+      `Ignored ${bannerRows.length} all-header row(s) that appear after data rows` +
+        (labels.length > 0 ? ` (${labels.join('; ')})` : '') +
+        '; they are row-group banners, not column headers.',
+    );
+  }
 
   if (footerRows.length > 0) {
     // The plan does not define footer projection, so footer rows stay out of
