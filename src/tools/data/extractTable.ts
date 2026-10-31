@@ -37,7 +37,10 @@ const CAPTURE_FAILURE_CODES: Record<TableCaptureFailureReason, ToolErrorCode> =
 function isCaptureFailureReason(
   value: unknown,
 ): value is TableCaptureFailureReason {
-  return typeof value === 'string' && value in CAPTURE_FAILURE_CODES;
+  // `in` would also accept inherited keys such as "constructor".
+  return (
+    typeof value === 'string' && Object.hasOwn(CAPTURE_FAILURE_CODES, value)
+  );
 }
 
 /**

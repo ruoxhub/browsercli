@@ -25,6 +25,7 @@ import {GENERATED_DOMAIN_MANIFESTS} from '../../../../src/tools/generated-tools-
 import {ToolRegistry} from '../../../../src/tools/registry/ToolRegistry.js';
 import {loadToolMeta} from '../../../../src/tools/tools-meta.js';
 import {ErrorCodes, ToolError} from '../../../../src/utils/errors.js';
+import {wrapFrameWithTimeout} from '../../../../src/worker/timeoutUtils.js';
 
 interface CdpCall {
   method: string;
@@ -49,7 +50,10 @@ type HarnessOptions =
  */
 function createFakeFrame(
   options: HarnessOptions,
-  {wrapFrame = false}: {wrapFrame?: boolean} = {},
+  {
+    wrapFrame = false,
+    stripGuid = false,
+  }: {wrapFrame?: boolean; stripGuid?: boolean} = {},
 ): FakeHarness {
   const calls: CdpCall[] = [];
 
@@ -80,17 +84,16 @@ function createFakeFrame(
     frames: () => [rawFrame],
     context: () => ({newCDPSession: async () => createSession()}),
   };
-  const rawFrame = {page: () => page, _guid: 'frame@abc'} as unknown as Frame;
+  const rawFrame = {
+    page: () => page,
+    ...(stripGuid ? {} : {_guid: 'frame@abc'}),
+    evaluate: async () => undefined,
+  } as unknown as Frame;
   // Worker mode wraps every frame in this Proxy (frame.evaluate timeout guard),
-  // which breaks identity comparison against `page.frames()`.
-  const frame = wrapFrame
-    ? (new Proxy(rawFrame, {
-        get(target, prop, receiver) {
-          const value = Reflect.get(target, prop, receiver);
-          return typeof value === 'function' ? value.bind(target) : value;
-        },
-      }) as Frame)
-    : rawFrame;
+  // which breaks identity comparison against `page.frames()`. Use the real
+  // wrapper so a rename of the private field the locator relies on regresses
+  // here instead of silently in production.
+  const frame = wrapFrame ? wrapFrameWithTimeout(rawFrame) : rawFrame;
 
   return {frame, calls};
 }
@@ -206,6 +209,21 @@ describe('extract_table JSON payload', () => {
     assert.deepEqual(output.content.data, expectedTable);
   });
 
+  it('resolves the frameId by identity when the frame carries no _guid', async () => {
+    // The identity fast path must keep working on its own: not every frame
+    // (e.g. a future patchright rename) exposes `_guid`.
+    const harness = createFakeFrame({capture: rawCapture}, {stripGuid: true});
+    const output = captureResponse();
+
+    await extractTable.handler(
+      {params: {selector: '#grid'}} as any,
+      output.response as any,
+      createContext(harness.frame),
+    );
+
+    assert.deepEqual(output.content.data, expectedTable);
+  });
+
   it('returns the normalized table without a CSV copy', async () => {
     const {content} = await runExtractTable(
       {selector: '#grid'},
@@ -217,7 +235,31 @@ describe('extract_table JSON payload', () => {
     assert.equal(typeof content.message, 'string');
     assert.deepEqual(content.data, expectedTable);
     assert.equal(content.data.outputPath, undefined);
-    assert.ok(!JSON.stringify(content).includes(expectedCsv));
+
+    // The payload must carry the table and nothing else: an exact key set
+    // catches any extra field, including a `csv` copy.
+    assert.deepEqual(
+      Object.keys(content.data).sort(),
+      [
+        'columns',
+        'coverage',
+        'kind',
+        'rows',
+        'schemaVersion',
+        'source',
+        'spans',
+        'warnings',
+      ],
+      'data must expose exactly the ExtractedTable keys',
+    );
+
+    // A leaked CSV reaches the wire JSON-escaped (CRLF becomes \r\n), so
+    // comparing the raw CSV string never matches. Compare the escaped form.
+    const escapedCsv = JSON.stringify(expectedCsv).slice(1, -1);
+    assert.ok(
+      !JSON.stringify(content).includes(escapedCsv),
+      'payload must not embed the CSV body',
+    );
   });
 
   it('keeps the normalized shape when includeHidden widens collection', async () => {
@@ -338,6 +380,29 @@ describe('extract_table capture failures', () => {
       );
     });
   }
+
+  it('does not treat an inherited property name as a failure reason', async () => {
+    // "constructor" is in the lookup object's prototype chain; the guard must
+    // not accept it and emit `Object` as the error code.
+    const harness = createFakeFrame({
+      failure: {reason: 'constructor', message: 'bogus reason'},
+    });
+    const output = captureResponse();
+
+    await assert.rejects(
+      () =>
+        extractTable.handler(
+          {params: {selector: '#grid'}} as any,
+          output.response as any,
+          createContext(harness.frame),
+        ),
+      (error: unknown) => {
+        assert.ok(error instanceof ToolError);
+        assert.equal(error.code, ErrorCodes.RUNTIME);
+        return true;
+      },
+    );
+  });
 
   it('maps an unexpected CDP failure to RUNTIME', async () => {
     const harness = createFakeFrame({
