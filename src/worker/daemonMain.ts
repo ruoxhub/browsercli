@@ -149,6 +149,11 @@ export async function runDaemon(plan: DaemonPlan): Promise<DaemonRunResult> {
   runtime.contextProvider = contextProvider;
   await contextProvider.init();
 
+  contextProvider.setBrowserConnector(async () => {
+    await connectBrowser(contextProvider, getBrowserManagerConfig());
+    return contextProvider.getBrowser();
+  });
+
   const toolAdapter = new ToolAdapter(contextProvider);
   await ensureToolsMeta().catch(err =>
     console.warn('[Daemon] ensureToolsMeta 失败:', err),

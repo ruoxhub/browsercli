@@ -168,12 +168,21 @@ export class ToolContextProvider {
     return this.hookManager.getPersistentHookRegistry();
   }
 
+  private _browserConnector?: () => Promise<Browser | null>;
+
+  setBrowserConnector(connector: () => Promise<Browser | null>): void {
+    this._browserConnector = connector;
+  }
+
   isBrowserConnected(): boolean {
     return this._browserContext.isBrowserConnected();
   }
 
   async ensureConnectedBrowser(): Promise<Browser | null> {
-    const browser = await this._browserContext.ensureConnectedBrowser();
+    let browser = await this._browserContext.ensureConnectedBrowser();
+    if (!browser && this._browserConnector) {
+      browser = await this._browserConnector().catch(() => null);
+    }
     if (browser) {
       this.syncBrowserState();
     }

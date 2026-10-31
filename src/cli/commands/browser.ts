@@ -255,32 +255,27 @@ function connectOptions(
         nestedBrowser?.browserUrl ??
         rawConfig.browserUrl ??
         rawConfig.browserURL;
+      const rawWsEndpoint = nestedBrowser?.wsEndpoint ?? rawConfig.wsEndpoint;
+      const rawExecutablePath =
+        nestedBrowser?.executablePath ?? rawConfig.executablePath;
+      const rawChannel = nestedBrowser?.channel ?? rawConfig.channel;
+
       if (rawBrowserUrl) {
         browserURL = normalizeTargetUrl(
           rawBrowserUrl,
           ['http:', 'https:'],
           'browserUrl',
         );
-      }
-
-      const rawWsEndpoint = nestedBrowser?.wsEndpoint ?? rawConfig.wsEndpoint;
-      if (rawWsEndpoint) {
+      } else if (rawWsEndpoint) {
         wsEndpoint = normalizeTargetUrl(
           rawWsEndpoint,
           ['ws:', 'wss:'],
           'wsEndpoint',
         );
-      }
-
-      const rawChannel = nestedBrowser?.channel ?? rawConfig.channel;
-      if (rawChannel) {
-        channel = rawChannel;
-      }
-
-      const rawExecutablePath =
-        nestedBrowser?.executablePath ?? rawConfig.executablePath;
-      if (rawExecutablePath) {
+      } else if (rawExecutablePath) {
         executablePath = rawExecutablePath;
+      } else if (rawChannel) {
+        channel = rawChannel;
       }
     }
   }

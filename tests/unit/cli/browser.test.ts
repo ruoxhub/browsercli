@@ -293,6 +293,32 @@ describe('browserCommand', () => {
     ]);
   });
 
+  it('resolves remote target over default local channel when both exist in config file', async () => {
+    fs.writeFileSync(
+      path.join(tmpConfigDir, 'config.json'),
+      JSON.stringify({
+        browser: {
+          channel: 'stable',
+          browserURL: 'http://127.0.0.1:19222',
+        },
+      }),
+      'utf-8',
+    );
+
+    const {calls, ctx} = context();
+    await browserCommand(['connect'], ctx);
+    assert.deepEqual(calls, [
+      {
+        method: 'browser.connect',
+        params: {
+          body: {
+            browserURL: 'http://127.0.0.1:19222',
+          },
+        },
+      },
+    ]);
+  });
+
   it('honors environment variables over config file but yields to CLI flags', async () => {
     fs.writeFileSync(
       path.join(tmpConfigDir, 'config.json'),
