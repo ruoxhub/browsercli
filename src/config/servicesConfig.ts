@@ -292,7 +292,9 @@ export function buildBrowserManagerConfig(): BrowserManagerConfig {
   const envWsHeaders = getEnvValue('BROWSER_WS_HEADERS');
   if (envWsHeaders) {
     try {
-      config.wsHeaders = JSON.parse(envWsHeaders) as Record<string, string>;
+      config.wsHeaders = JSON.parse(
+        envWsHeaders.replace(/^\uFEFF/, ''),
+      ) as Record<string, string>;
     } catch {
       // 忽略非法 JSON
     }

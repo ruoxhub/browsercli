@@ -72,6 +72,7 @@ export class NetworkRequestCollector extends PageCollector<TrackedRequest> {
     Page,
     Map<string, RequestInitiator[]>
   >();
+  private readonly _lastNavigationRequests = new WeakMap<Page, Request>();
 
   private _getUrlPath(urlStr: string): string {
     try {
@@ -87,17 +88,22 @@ export class NetworkRequestCollector extends PageCollector<TrackedRequest> {
     if (!navigations) return;
 
     const requests = navigations[0]!;
+    const lastNavRequest = this._lastNavigationRequests.get(page);
     const lastNavIdx = requests.findLastIndex(tracked => {
       const req = tracked.request;
       return (
-        req.frame() === page.mainFrame() && req.resourceType() === 'document'
+        req !== lastNavRequest &&
+        req.frame() === page.mainFrame() &&
+        req.resourceType() === 'document'
       );
     });
 
     if (lastNavIdx !== -1) {
+      this._lastNavigationRequests.set(page, requests[lastNavIdx]!.request);
       const fromCurrentNavigation = requests.splice(lastNavIdx);
       navigations.unshift(fromCurrentNavigation);
     } else {
+      this._lastNavigationRequests.delete(page);
       navigations.unshift([]);
     }
     navigations.splice(this.maxNavigationSaved);
@@ -134,6 +140,11 @@ export class NetworkRequestCollector extends PageCollector<TrackedRequest> {
         const MAX_QUEUE_PER_KEY = 50;
         const onCdpRequest = (event: any): void => {
           if (event.request && event.initiator) {
+            const initiator = event.initiator as RequestInitiator;
+            // 剪裁深层异步调用栈，避免内存随长时间抓包线性膨胀（详见 ADR-0001）
+            if (initiator.stack) {
+              delete initiator.stack.parent;
+            }
             const key = `${event.request.method}:${this._getUrlPath(
               event.request.url,
             )}`;
@@ -142,7 +153,7 @@ export class NetworkRequestCollector extends PageCollector<TrackedRequest> {
               queue = [];
               initiatorQueueMap.set(key, queue);
             }
-            queue.push(event.initiator as RequestInitiator);
+            queue.push(initiator);
             // 防止无匹配请求消费时队列无界增长：
             // 队列满时丢弃最旧的 initiator，极端情况下后续匹配可能取到较新的 initiator（错配）。
             if (queue.length > MAX_QUEUE_PER_KEY) {
@@ -186,6 +197,7 @@ export class NetworkRequestCollector extends PageCollector<TrackedRequest> {
       this._cdpSessions.delete(page);
     }
     this._initiatorQueues.delete(page);
+    this._lastNavigationRequests.delete(page);
   }
 }
 

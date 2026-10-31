@@ -176,6 +176,10 @@ export class WebSocketCollector {
       const e = event as WebSocketCreatedEvent & {
         initiator?: RequestInitiator;
       };
+      // 剪裁深层异步调用栈，避免内存随长连接或持续抓包膨胀（详见 ADR-0001）
+      if (e.initiator?.stack) {
+        delete e.initiator.stack.parent;
+      }
       const wsData: WebSocketDataWithId = {
         connection: {
           requestId: e.requestId,

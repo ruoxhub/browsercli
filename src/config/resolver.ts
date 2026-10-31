@@ -219,7 +219,9 @@ export function configFromEnv(): GlobalConfig {
   const envWsHeaders = getEnvValue('BROWSER_WS_HEADERS');
   if (envWsHeaders !== undefined) {
     try {
-      browser.wsHeaders = JSON.parse(envWsHeaders) as Record<string, string>;
+      browser.wsHeaders = JSON.parse(
+        envWsHeaders.replace(/^\uFEFF/, ''),
+      ) as Record<string, string>;
     } catch {
       // 忽略非法 JSON
     }
@@ -269,7 +271,9 @@ export function getUserConfigPath(): string {
 export function loadUserConfig(filePath = getUserConfigPath()): GlobalConfig {
   try {
     if (!existsSync(filePath)) return {};
-    const content = readFileSync(filePath, 'utf-8').trim();
+    const content = readFileSync(filePath, 'utf-8')
+      .trim()
+      .replace(/^\uFEFF/, '');
     if (!content) return {};
     return validateGlobalConfig(JSON.parse(content));
   } catch (error) {
