@@ -20,6 +20,7 @@ import type {
 
 const CONNECT_FLAGS = new Set([
   'accept-insecure-certs',
+  'auto-connect',
   'browser-url',
   'channel',
   'cloak',
@@ -58,6 +59,7 @@ const CHANNELS = new Set([
 ]);
 
 interface ExtendedCliConfig extends CliConfig {
+  autoConnect?: boolean | string;
   browserURL?: string;
   channel?: string;
   wsHeaders?: Record<string, string>;
@@ -66,6 +68,7 @@ interface ExtendedCliConfig extends CliConfig {
   acceptInsecureCerts?: boolean | string;
   isolated?: boolean | string;
   browser?: {
+    autoConnect?: boolean | string;
     browserURL?: string;
     browserUrl?: string;
     wsEndpoint?: string;
@@ -202,23 +205,27 @@ function connectOptions(
   assertFlags(flags, CONNECT_FLAGS);
   let browserURL = urlFlag(flags, 'browser-url', ['http:', 'https:']);
   let wsEndpoint = urlFlag(flags, 'ws-endpoint', ['ws:', 'wss:']);
+  let autoConnect = booleanFlag(flags, 'auto-connect');
   let channel = stringFlag(flags, 'channel');
   let executablePath = stringFlag(flags, 'executable-path');
 
   const cliHasTarget =
     browserURL !== undefined ||
     wsEndpoint !== undefined ||
+    autoConnect !== undefined ||
     channel !== undefined ||
     executablePath !== undefined;
 
   const envTargetUrl = process.env.BROWSER_URL;
   const envWsEndpoint = process.env.BROWSER_WS_ENDPOINT;
+  const envAutoConnect = process.env.BROWSER_AUTO_CONNECT;
   const envChannel = process.env.BROWSER_CHANNEL;
   const envExecutablePath = process.env.BROWSER_EXECUTABLE_PATH;
 
   const envHasTarget =
     Boolean(envTargetUrl) ||
     Boolean(envWsEndpoint) ||
+    Boolean(envAutoConnect) ||
     Boolean(envChannel) ||
     Boolean(envExecutablePath);
 
@@ -244,6 +251,8 @@ function connectOptions(
           ['ws:', 'wss:'],
           'BROWSER_WS_ENDPOINT',
         );
+      } else if (parseBooleanValue(envAutoConnect)) {
+        autoConnect = true;
       } else if (envChannel) {
         channel = envChannel;
       } else if (envExecutablePath) {
@@ -256,6 +265,8 @@ function connectOptions(
         rawConfig.browserUrl ??
         rawConfig.browserURL;
       const rawWsEndpoint = nestedBrowser?.wsEndpoint ?? rawConfig.wsEndpoint;
+      const rawAutoConnect =
+        nestedBrowser?.autoConnect ?? rawConfig.autoConnect;
       const rawExecutablePath =
         nestedBrowser?.executablePath ?? rawConfig.executablePath;
       const rawChannel = nestedBrowser?.channel ?? rawConfig.channel;
@@ -272,6 +283,8 @@ function connectOptions(
           ['ws:', 'wss:'],
           'wsEndpoint',
         );
+      } else if (parseBooleanValue(rawAutoConnect)) {
+        autoConnect = true;
       } else if (rawExecutablePath) {
         executablePath = rawExecutablePath;
       } else if (rawChannel) {
@@ -280,7 +293,10 @@ function connectOptions(
     }
   }
 
-  const remote = browserURL !== undefined || wsEndpoint !== undefined;
+  const remote =
+    browserURL !== undefined ||
+    wsEndpoint !== undefined ||
+    autoConnect === true;
   const local = channel !== undefined || executablePath !== undefined;
   if (
     (browserURL !== undefined && wsEndpoint !== undefined) ||
@@ -296,6 +312,7 @@ function connectOptions(
   const options: BrowserConnectOptions = {};
   if (browserURL !== undefined) options.browserURL = browserURL;
   if (wsEndpoint !== undefined) options.wsEndpoint = wsEndpoint;
+  if (autoConnect !== undefined) options.autoConnect = autoConnect;
   if (channel !== undefined) options.channel = channel;
   if (executablePath !== undefined) options.executablePath = executablePath;
 
@@ -414,19 +431,39 @@ export const browserCommand: AxiCliCommand<WorkerContext> = async (
   if (!client) throw new AxiError('Worker 未运行', 'WORKER_NOT_RUNNING');
 
   try {
-    const state =
-      typedAction === 'connect'
-        ? await client.request<BrowserConnectionStatus>('browser.connect', {
-            body: connectBody,
-          })
-        : typedAction === 'disconnect'
-          ? await client.request<BrowserConnectionStatus>(
-              'browser.disconnect',
-              force === undefined
-                ? {body: {}}
-                : {body: {force} satisfies BrowserDisconnectOptions},
-            )
-          : await client.request<BrowserConnectionStatus>('browser.status');
+    let state: BrowserConnectionStatus;
+    if (typedAction === 'connect') {
+      const startTime = Date.now();
+      for (;;) {
+        try {
+          state = await client.request<BrowserConnectionStatus>(
+            'browser.connect',
+            {body: connectBody},
+          );
+          break;
+        } catch (err) {
+          if (
+            err instanceof Error &&
+            /WORKER_BUSY/.test(err.message) &&
+            /browser connect/.test(err.message) &&
+            Date.now() - startTime < 15_000
+          ) {
+            await new Promise(r => setTimeout(r, 400));
+            continue;
+          }
+          throw err;
+        }
+      }
+    } else if (typedAction === 'disconnect') {
+      state = await client.request<BrowserConnectionStatus>(
+        'browser.disconnect',
+        force === undefined
+          ? {body: {}}
+          : {body: {force} satisfies BrowserDisconnectOptions},
+      );
+    } else {
+      state = await client.request<BrowserConnectionStatus>('browser.status');
+    }
     return renderBrowserStatus(typedAction, state, json, ctx?.session);
   } catch (error) {
     throw toAxiError(error, 'BROWSER_ERROR');

@@ -28,8 +28,10 @@ import {
   waitForBrowserReady,
 } from './browser-detect.js';
 import {
-  resolveAutoConnectTarget,
+  findActiveDevToolsPort,
+  getDevToolsActivePortPaths,
   readDevToolsActivePort,
+  resolveAutoConnectTarget,
 } from './browser-discovery.js';
 import {
   resolveEngine,
@@ -51,7 +53,12 @@ import {setupCloak} from './cloak.js';
  */
 
 // Re-export for backward compatibility
-export {resolveAutoConnectTarget};
+export {
+  resolveAutoConnectTarget,
+  findActiveDevToolsPort,
+  readDevToolsActivePort,
+  getDevToolsActivePortPaths,
+};
 export type {BrowserManagerConfig, Channel};
 
 let browserManager: BrowserManager | undefined;
@@ -292,6 +299,7 @@ export class BrowserManager {
 
     const doLaunch = async (): Promise<Browser> => {
       if (
+        this.config.autoConnect ||
         this.config.browserURL ||
         this.config.wsEndpoint ||
         this.config.remoteDebuggingUrl
@@ -380,7 +388,7 @@ export class BrowserManager {
 
       this.installDetachedFrameGuard();
       this.browser = await chromium.connectOverCDP(connectEndpoint, {
-        timeout: 30000,
+        timeout: this.config.timeout ?? 10000,
         ...(this.config.wsHeaders ? {headers: this.config.wsHeaders} : {}),
       });
       logger.debug('Connected to remote browser via Playwright');
@@ -421,7 +429,8 @@ export class BrowserManager {
     return (
       this.config.wsEndpoint ||
       this.config.browserURL ||
-      this.config.remoteDebuggingUrl
+      this.config.remoteDebuggingUrl ||
+      (this.config.autoConnect ? 'auto-connect' : undefined)
     );
   }
 
@@ -430,12 +439,33 @@ export class BrowserManager {
       const ws = normalizeBrowserUrl(this.config.wsEndpoint);
       if (ws) return ws.startsWith('http') ? ws.replace(/^http/, 'ws') : ws;
     }
+    if (this.config.autoConnect) {
+      const active = await findActiveDevToolsPort({
+        userDataDir: this.config.userDataDir,
+      });
+      if (active) {
+        logger.debug(
+          `[resolveConnectEndpoint] autoConnect 发现活跃 DevTools 端口: ${active.port}`,
+        );
+        return `ws://127.0.0.1:${active.port}${active.wsPath}`;
+      }
+      const autoTarget = await resolveAutoConnectTarget({
+        userDataDir: this.config.userDataDir,
+      });
+      if (autoTarget?.wsEndpoint) return autoTarget.wsEndpoint;
+      if (autoTarget?.browserURL) {
+        const fb = await this.buildDevToolsActivePortFallback(
+          autoTarget.browserURL,
+        );
+        return fb || autoTarget.browserURL;
+      }
+    }
     const versionInfo = await this.fetchVersionInfo();
     if (versionInfo.webSocketDebuggerUrl) {
       return versionInfo.webSocketDebuggerUrl;
     }
     const rawUrl = this.config.browserURL || this.config.remoteDebuggingUrl;
-    const fallback = this.buildDevToolsActivePortFallback(rawUrl);
+    const fallback = await this.buildDevToolsActivePortFallback(rawUrl);
     if (fallback) {
       return fallback;
     }
@@ -480,7 +510,7 @@ export class BrowserManager {
         // 模式下禁用了 HTTP /json/* 发现端点——它仍把端口与 ws path 写到
         // DevToolsActivePort。读文件兜底合成 ws:// 端点，让 Playwright
         // 不再做二次 /json/version 探测。这是 Way 1 模式能跑通 cdp 的关键。
-        const fallback = this.buildDevToolsActivePortFallback(browserURL);
+        const fallback = await this.buildDevToolsActivePortFallback(browserURL);
         if (fallback) {
           logger.debug(
             `[fetchVersionInfo] falling back to DevToolsActivePort wsPath: ${fallback}`,
@@ -501,7 +531,7 @@ export class BrowserManager {
       return versionInfo;
     } catch (err) {
       logger.debug('Warning: Could not fetch browser version:', err);
-      const fallback = this.buildDevToolsActivePortFallback(browserURL);
+      const fallback = await this.buildDevToolsActivePortFallback(browserURL);
       if (fallback) {
         logger.debug(
           `[fetchVersionInfo] falling back to DevToolsActivePort wsPath after error: ${fallback}`,
@@ -516,7 +546,7 @@ export class BrowserManager {
       // 已经关闭的端点，报出与被配置端口毫无关系的 ECONNREFUSED，而用户配置
       // 的端口根本没被尝试过。
       if (!hasExplicitPort) {
-        const activeFallback = this.buildDevToolsActivePortFallback();
+        const activeFallback = await this.buildDevToolsActivePortFallback();
         if (activeFallback) {
           logger.debug(
             `[fetchVersionInfo] configured URL unreachable, falling back to active DevToolsActivePort wsPath: ${activeFallback}`,
@@ -532,38 +562,40 @@ export class BrowserManager {
    * Build a `ws://127.0.0.1:<port><wsPath>` endpoint from the local Chrome
    * profile's `DevToolsActivePort` file.
    */
-  private buildDevToolsActivePortFallback(browserURL?: string): string | null {
-    const active = readDevToolsActivePort();
-    if (!active || !active.wsPath || !active.port) {
-      return null;
-    }
-
-    if (!browserURL) {
-      return `ws://127.0.0.1:${active.port}${active.wsPath}`;
-    }
-
-    const normalized = normalizeBrowserUrl(browserURL);
-    if (!normalized) {
-      return null;
-    }
-
+  private async buildDevToolsActivePortFallback(
+    browserURL?: string,
+  ): Promise<string | null> {
     let urlPort = 0;
-    try {
-      const parsed = new URL(normalized);
-      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-        return null;
+    if (browserURL) {
+      const normalized = normalizeBrowserUrl(browserURL);
+      if (normalized) {
+        try {
+          const parsed = new URL(normalized);
+          if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+            urlPort = parsed.port ? Number(parsed.port) : 9222;
+          }
+        } catch {
+          urlPort = 0;
+        }
       }
-      urlPort = parsed.port ? Number(parsed.port) : 0;
-    } catch {
-      urlPort = 0;
     }
 
-    if (urlPort > 0 && active.port === urlPort) {
+    // 优先通过 TCP 探活查找精确匹配 urlPort（或任意活跃端口，当未指定具体端口时）
+    const active = await findActiveDevToolsPort({
+      userDataDir: this.config.userDataDir,
+      expectedPort: urlPort > 0 ? urlPort : undefined,
+    });
+    if (active && active.port && active.wsPath) {
       return `ws://127.0.0.1:${active.port}${active.wsPath}`;
     }
 
-    if (urlPort === 0 || urlPort === 9222) {
-      return `ws://127.0.0.1:${active.port}${active.wsPath}`;
+    // 测试模式或离线兜底：使用 readDevToolsActivePort
+    const staticActive = readDevToolsActivePort(
+      this.config.userDataDir,
+      urlPort > 0 ? urlPort : undefined,
+    );
+    if (staticActive && staticActive.port && staticActive.wsPath) {
+      return `ws://127.0.0.1:${staticActive.port}${staticActive.wsPath}`;
     }
 
     return null;

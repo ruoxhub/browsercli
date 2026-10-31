@@ -27,3 +27,11 @@ _Avoid_: Browser endpoint, connection URI, attach target, launch mode target
 **Connection Fallback**:
 The resolution cascade that sources browser connection options across CLI flags, environment variables, user configuration (`~/.browsercli/config.json`), and system defaults in strict precedence order.
 _Avoid_: Config cascade, default connection lookup, fallback resolver
+
+**Active Port Record**:
+A validated, TCP-reachable browser debugging descriptor parsed directly from a user data directory's `DevToolsActivePort` file, specifying the active listening port and DevTools WebSocket path.
+_Avoid_: Debug port file entry, port record, DevTools port snapshot, active port entry
+
+**Auto-Connect Probe**:
+The automatic discovery mechanism that locates and attaches to an active, running Chromium instance via its `Active Port Record` (specifically for `chrome://inspect/#remote-debugging` mode where HTTP discovery endpoints return 404), bypassing explicit host and port specification.
+_Avoid_: Automatic debugger scan, background browser hook, port sniffer, auto-attacher

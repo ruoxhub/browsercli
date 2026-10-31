@@ -17,6 +17,7 @@ interface BrowserLike {
 
 interface BrowserManagerCrashHarness {
   browser?: BrowserLike;
+  wasConnected?: boolean;
   crashCheckInterval?: ReturnType<typeof setInterval>;
   isRestarting: boolean;
   setupCrashDetection(): void;
@@ -57,6 +58,7 @@ describe('BrowserManager crash handling', () => {
     }) as unknown as BrowserManagerCrashHarness;
 
     let disconnectedHandler: (() => void) | undefined;
+    manager.wasConnected = true;
     manager.browser = {
       connected: true,
       isConnected() {
@@ -87,7 +89,14 @@ describe('BrowserManager crash handling', () => {
     disconnectedHandler!();
     assert.strictEqual(crashed, 1);
 
-    manager.browser.connected = false;
+    manager.browser = {
+      connected: false,
+      isConnected() {
+        return false;
+      },
+      on: () => undefined,
+      close: async () => undefined,
+    };
     intervalTick!();
     assert.strictEqual(crashed, 2);
   });
@@ -130,6 +139,7 @@ describe('BrowserManager crash handling', () => {
       headless: true,
       isolated: true,
     }) as unknown as BrowserManagerCrashHarness;
+    manager.wasConnected = true;
     let closed = 0;
     manager.browser = {
       connected: false,

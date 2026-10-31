@@ -370,4 +370,49 @@ describe('browserCommand', () => {
       delete process.env.BROWSER_HEADLESS;
     }
   });
+
+  it('supports --auto-connect and --user-data-dir flags', async () => {
+    const {calls, ctx} = context();
+    await browserCommand(
+      ['connect', '--auto-connect', '--user-data-dir', 'C:\\profile'],
+      ctx,
+    );
+    assert.deepEqual(calls, [
+      {
+        method: 'browser.connect',
+        params: {
+          body: {
+            autoConnect: true,
+            userDataDir: 'C:\\profile',
+          },
+        },
+      },
+    ]);
+  });
+
+  it('supports autoConnect from config.json and suppresses local channel', async () => {
+    fs.writeFileSync(
+      path.join(tmpConfigDir, 'config.json'),
+      JSON.stringify({
+        autoConnect: true,
+        channel: 'stable',
+        userDataDir: 'C:\\citro-profile',
+      }),
+      'utf-8',
+    );
+
+    const {calls, ctx} = context();
+    await browserCommand(['connect'], ctx);
+    assert.deepEqual(calls, [
+      {
+        method: 'browser.connect',
+        params: {
+          body: {
+            autoConnect: true,
+            userDataDir: 'C:\\citro-profile',
+          },
+        },
+      },
+    ]);
+  });
 });

@@ -7,6 +7,9 @@
 export {
   ensureBrowserConnected,
   resolveAutoConnectTarget,
+  findActiveDevToolsPort,
+  readDevToolsActivePort,
+  getDevToolsActivePortPaths,
   launch,
   ensureBrowserLaunched,
   BrowserManager,

@@ -60,6 +60,7 @@ export interface BrowserConnectionStatus {
 
 export interface BrowserConnectOptions {
   acceptInsecureCerts?: boolean;
+  autoConnect?: boolean;
   browserURL?: string;
   channel?: string;
   cloak?: boolean;

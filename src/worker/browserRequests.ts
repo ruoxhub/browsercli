@@ -21,6 +21,7 @@ import type {BrowserManagerConfig} from '../modules/browser/index.js';
 
 const BrowserConnectSchema = BrowserConfigSchema.pick({
   acceptInsecureCerts: true,
+  autoConnect: true,
   browserURL: true,
   channel: true,
   cloak: true,
@@ -77,7 +78,10 @@ export function parseBrowserConnectBody(body: unknown): BrowserConfig {
     );
   }
   const remote =
-    Object.hasOwn(body, 'browserURL') || Object.hasOwn(body, 'wsEndpoint');
+    Object.hasOwn(body, 'browserURL') ||
+    Object.hasOwn(body, 'wsEndpoint') ||
+    (Object.hasOwn(body, 'autoConnect') &&
+      (body as Record<string, unknown>).autoConnect === true);
   const local =
     Object.hasOwn(body, 'channel') || Object.hasOwn(body, 'executablePath');
   if (
@@ -133,6 +137,11 @@ export function parseBrowserConnectBody(body: unknown): BrowserConfig {
     clearOtherTargets('browserURL', patch.browserURL);
   } else if (Object.hasOwn(parsed.data, 'wsEndpoint')) {
     clearOtherTargets('wsEndpoint', patch.wsEndpoint);
+  } else if (
+    Object.hasOwn(parsed.data, 'autoConnect') &&
+    patch.autoConnect === true
+  ) {
+    clearOtherTargets('autoConnect', true);
   } else if (Object.hasOwn(parsed.data, 'channel')) {
     clearOtherTargets('channel', patch.channel);
   } else if (Object.hasOwn(parsed.data, 'executablePath')) {

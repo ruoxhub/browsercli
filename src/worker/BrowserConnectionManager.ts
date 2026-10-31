@@ -57,7 +57,9 @@ export function getBrowserConnectionMode(
   ) {
     return 'ws-endpoint';
   }
-  if (config.browserURL || config.remoteDebuggingUrl) return 'attach';
+  if (config.browserURL || config.remoteDebuggingUrl || config.autoConnect) {
+    return 'attach';
+  }
   return 'launch';
 }
 
@@ -79,7 +81,9 @@ export function isSameBrowserTarget(
     return (
       (a.browserURL ?? '') === (b.browserURL ?? '') &&
       (a.remoteDebuggingUrl ?? '') === (b.remoteDebuggingUrl ?? '') &&
-      a.remoteDebuggingPort === b.remoteDebuggingPort
+      a.remoteDebuggingPort === b.remoteDebuggingPort &&
+      Boolean(a.autoConnect) === Boolean(b.autoConnect) &&
+      (a.userDataDir ?? '') === (b.userDataDir ?? '')
     );
   }
   return (

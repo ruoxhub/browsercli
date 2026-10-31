@@ -171,6 +171,12 @@ export function buildBrowserManagerConfig(): BrowserManagerConfig {
       cast: v => v as BrowserManagerConfig['channel'],
     },
     {
+      key: 'autoConnect',
+      envKey: 'BROWSER_AUTO_CONNECT',
+      kind: 'boolean',
+      extraFallback: 'autoConnect',
+    },
+    {
       key: 'browserURL',
       envKey: 'BROWSER_URL',
       kind: 'value',

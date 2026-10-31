@@ -94,8 +94,10 @@ export function persistRuntimeConfig(config: GlobalConfig): void {
 export function shouldAutoConnectOnStartup(config: GlobalConfig): boolean {
   const browser = config.browser;
   return Boolean(
+    browser?.autoConnect ||
     browser?.wsEndpoint ||
     browser?.browserURL ||
+    (config as Record<string, unknown>).autoConnect ||
     config.wsEndpoint ||
     config.browserUrl,
   );

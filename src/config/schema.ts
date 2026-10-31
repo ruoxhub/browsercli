@@ -86,6 +86,7 @@ export const BrowserConfigSchema = zod
     fullStealthArgs: booleanSchema.optional(),
     /** 启用最小启动参数集（`MINIMAL_STEALTH_ARGS`：`--test-type` + `--hide-crash-restore-bubble`）。默认 true。 */
     minimalStealth: booleanSchema.optional(),
+    autoConnect: booleanSchema.optional(),
     viewport: ViewportSchema.optional(),
     browserURL: optionalStringSchema.optional(),
     wsEndpoint: optionalStringSchema.optional(),
@@ -124,10 +125,12 @@ export type ToolResultRecordingConfig = zodType.infer<
 
 export const GlobalConfigSchema = zod
   .object({
+    autoConnect: booleanSchema.optional(),
     browserUrl: optionalStringSchema.optional(),
     wsEndpoint: optionalStringSchema.optional(),
     headless: booleanSchema.optional(),
     executablePath: optionalStringSchema.optional(),
+    userDataDir: optionalStringSchema.optional(),
     /** `--cloak` CLI flag：启用 CloakBrowser + 49 C++ patch + cloak-profile。 */
     cloak: booleanSchema.optional(),
     /** `--js-stealth` CLI flag：opt-in StealthScripts2025 JS 注入。 */

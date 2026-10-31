@@ -25,6 +25,7 @@ export type Channel =
  * Configuration options for BrowserManager
  */
 export interface BrowserManagerConfig {
+  autoConnect?: boolean;
   headless?: boolean;
   executablePath?: string;
   channel?: Channel;
