@@ -166,6 +166,7 @@ function toSpans(
  * Turns raw browser capture facts into a normalized table: fixed positional
  * column keys, display names derived from header paths, data rows keyed by
  * column, merged-cell anchors as spans, and null for every covered position.
+ * Footer rows are excluded from `rows` and disclosed via `warnings`.
  */
 export function normalizeTable(raw: RawTableCapture): ExtractedTable {
   const rowsOf = (kind: RawTableSection): RawTableRow[] =>
@@ -195,6 +196,15 @@ export function normalizeTable(raw: RawTableCapture): ExtractedTable {
     });
     return record;
   });
+
+  if (footerRows.length > 0) {
+    // The plan does not define footer projection, so footer rows stay out of
+    // `rows` (the data-row contract later tasks build on) while their anchors
+    // are retained in `spans`. Disclose the dropped text instead of losing it.
+    warnings.push(
+      `Excluded ${footerRows.length} footer row(s) from "rows"; their spans are retained in "spans".`,
+    );
+  }
 
   return {
     schemaVersion: 1,

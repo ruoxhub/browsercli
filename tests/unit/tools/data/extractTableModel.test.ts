@@ -112,6 +112,26 @@ describe('normalizeTable', () => {
     assert.deepEqual(table.rows, [{c1: '1', c2: 'A', c3: '2'}]);
   });
 
+  it('excludes footer rows from rows but keeps their spans and warns', () => {
+    const table = normalizeTable({
+      source,
+      rows: [
+        header([cell('Item', {header: true}), cell('Amount', {header: true})]),
+        data([cell('A'), cell('1')]),
+        {kind: 'footer', cells: [cell('Total', {colSpan: 2})]},
+      ],
+    });
+
+    assert.deepEqual(table.rows, [{c1: 'A', c2: '1'}]);
+    assert.equal(table.coverage.rowsReturned, 1);
+    assert.deepEqual(table.spans, [
+      {columnKey: 'c1', section: 'footer', row: 0, rowSpan: 1, colSpan: 2},
+    ]);
+    assert.equal(table.warnings.length, 1);
+    assert.match(table.warnings[0], /footer/i);
+    assert.match(table.warnings[0], /rows/);
+  });
+
   it('derives collision-free names for duplicate and blank headers', () => {
     const table = normalizeTable({
       source,

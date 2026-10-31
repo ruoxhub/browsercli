@@ -21,11 +21,15 @@ export interface RawTableSource {
  */
 export interface RawTableCell {
   text: string;
+  /** Reserved for Task 2's collector; normalization uses the row `kind`. */
   header: boolean;
   rowSpan: number;
   colSpan: number;
+  /** Reserved for Task 2's collector (ARIA `headers`); not consumed yet. */
   headers: string[];
+  /** Reserved for Task 2's collector (`scope` attribute); not consumed yet. */
   scope: string;
+  /** Reserved for Task 2's collector (cell `id`); not consumed yet. */
   id: string;
 }
 
