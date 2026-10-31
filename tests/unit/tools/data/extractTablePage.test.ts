@@ -409,6 +409,52 @@ table.append(body);
 globalThis.__roots = [table];
 `;
 
+/**
+ * Exactly the reported shape: an upstream `rowspan` whose coverage spans a row
+ * that collects no cell. Dropping that middle row would hand the span to the
+ * next surviving row and shift every later value one column left.
+ */
+const ROWSPAN_OVER_HIDDEN_ROW_SETUP = `
+const table = __element('table', {});
+const body = __element('tbody', {});
+body.append(
+  __element('tr', {}).append(
+    __element('td', {rowspan: '2'}, 'Ann'),
+    __element('td', {}, '1'),
+    __element('td', {}, 'Oslo'),
+  ),
+);
+const hiddenRow = __element('tr', {});
+hiddenRow.append(
+  Object.assign(__element('td', {}, 'gone-1'), {style: {display: 'none', visibility: 'visible'}}),
+  Object.assign(__element('td', {}, 'gone-2'), {style: {display: 'none', visibility: 'visible'}}),
+  Object.assign(__element('td', {}, 'gone-3'), {style: {display: 'none', visibility: 'visible'}}),
+);
+body.append(hiddenRow);
+body.append(
+  __element('tr', {}).append(
+    __element('td', {}, '3'),
+    __element('td', {}, 'Bergen'),
+  ),
+);
+table.append(body);
+globalThis.__roots = [table];
+`;
+
+/** A genuinely empty visible cell next to a visibility:hidden placeholder. */
+const EMPTY_VS_HIDDEN_SETUP = `
+const table = __element('table', {});
+table.append(
+  __element('tbody', {}).append(
+    __element('tr', {}).append(
+      __element('td', {}),
+      Object.assign(__element('td', {}, 'secret'), {style: {display: 'block', visibility: 'hidden'}}),
+    ),
+  ),
+);
+globalThis.__roots = [table];
+`;
+
 const SECTION_SETUP = `
 const outer = __element('table', {});
 const outerFoot = __element('tfoot', {});
@@ -490,6 +536,11 @@ interface FakeBrowserOptions {
   orphan?: boolean;
   /** Tree indices that expose their own CDP target (OOPIF). */
   ownTarget?: number[];
+  /**
+   * Error thrown by `context.newCDPSession(frame)` instead of the normal
+   * "no separate CDP session" message, e.g. a closed browser.
+   */
+  frameSessionError?: Error;
 }
 
 function createFakeBrowser(
@@ -633,7 +684,7 @@ function createFakeBrowser(
     return toCdp(rootNode);
   };
 
-  const makeFrame = (node: Node, isSelected: boolean): Frame => {
+  const makeFrame = (node: Node): Frame => {
     const frame = {
       page: () => page,
       url: () => node.url,
@@ -643,7 +694,7 @@ function createFakeBrowser(
     } as unknown as Frame;
     // Per-target sessions: only frames with their own target (main frame,
     // OOPIF) accept newCDPSession(frame).
-    if (isSelected && ownTarget.has(nodes.indexOf(node))) {
+    if (ownTarget.has(nodes.indexOf(node))) {
       const tagged = frame as unknown as {__hasTarget: boolean; __node: Node};
       tagged.__hasTarget = true;
       tagged.__node = node;
@@ -653,7 +704,7 @@ function createFakeBrowser(
 
   const framesByGuid = new Map<string, Frame>();
   for (const node of nodes) {
-    framesByGuid.set(node.guid, makeFrame(node, node === selectedNode));
+    framesByGuid.set(node.guid, makeFrame(node));
   }
 
   // `page.frames()` deliberately reports ATTACH order, which can differ from
@@ -692,6 +743,7 @@ function createFakeBrowser(
         if (ownerNode) frameOwners.set(session.id, ownerNode);
         return session.client;
       }
+      if (options.frameSessionError) throw options.frameSessionError;
       // Playwright's message for a same-process subframe.
       throw new Error('This frame does not have a separate CDP session');
     },
@@ -824,7 +876,10 @@ describe('collectTableDom', () => {
       selector: 'table',
       includeHidden: false,
     });
-    assert.deepEqual(visibleOnly.rows[1]?.cells, [cell('third'), cell('')]);
+    assert.deepEqual(visibleOnly.rows[1]?.cells, [
+      cell('third'),
+      cell('', {hidden: true}),
+    ]);
 
     const withHidden = runCollector(realm, {
       selector: 'table',
@@ -878,6 +933,25 @@ describe('collectTableDom', () => {
         ['data', 'inner-data'],
         ['footer', 'inner-foot'],
       ],
+    );
+  });
+
+  it('distinguishes an empty visible cell from a hidden placeholder', () => {
+    const capture = runCollector(createRealm(EMPTY_VS_HIDDEN_SETUP), {
+      selector: 'table',
+      includeHidden: false,
+    });
+
+    const [emptyVisible, hiddenPlaceholder] = capture.rows[0]!.cells;
+    // Both normalize to null (there is no value either way) ...
+    assert.equal(emptyVisible?.text, '');
+    assert.equal(hiddenPlaceholder?.text, '');
+    // ... but the raw facts keep them distinguishable for the adapter/CSV.
+    assert.equal(emptyVisible?.header, false);
+    assert.equal(hiddenPlaceholder?.header, false);
+    assert.notEqual(
+      JSON.stringify(emptyVisible),
+      JSON.stringify(hiddenPlaceholder),
     );
   });
 
@@ -991,6 +1065,25 @@ describe('collectTableDom', () => {
       ),
       [['visible-again']],
     );
+  });
+
+  it('keeps a zero-cell row that an upstream rowspan covers', () => {
+    const capture = runCollector(createRealm(ROWSPAN_OVER_HIDDEN_ROW_SETUP), {
+      selector: 'table',
+      includeHidden: false,
+    });
+
+    // The browser renders "3"/"Bergen" in c1/c2: the rowspan covers the
+    // middle row, so that row must still occupy a row in the matrix.
+    const table = normalizeTable(capture);
+    assert.deepEqual(table.rows, [
+      {c1: 'Ann', c2: '1', c3: 'Oslo'},
+      {c1: null, c2: null, c3: null},
+      {c1: '3', c2: 'Bergen', c3: null},
+    ]);
+    assert.deepEqual(table.spans, [
+      {columnKey: 'c1', section: 'data', row: 0, rowSpan: 2, colSpan: 1},
+    ]);
   });
 
   it('drops a row that has no collectable cells instead of emitting a ghost', () => {
@@ -1251,6 +1344,71 @@ describe('captureTable CDP lifecycle', () => {
     assert.deepEqual(
       browser.sessions.map(session => session.detached),
       [1],
+    );
+  });
+
+  it('resolves a same-site sibling correctly while an OOPIF is present', async () => {
+    // The page-session frame tree OMITS the cross-process child, while
+    // Playwright's own DFS list CONTAINS it. Indexing one with the other
+    // therefore shifts by one for every frame after the OOPIF: selecting /a
+    // here used to return /b's data as a success.
+    const browser = createFakeBrowser(createRealm(NATIVE_SETUP), {
+      tree: [
+        {id: 'root', guid: 'frame@root', url: 'https://example.test/'},
+        {
+          id: 'oopif',
+          guid: 'frame@oopif',
+          url: 'https://other.test/frame',
+          parent: 0,
+        },
+        {id: 'a', guid: 'frame@a', url: 'https://example.test/a', parent: 0},
+        {id: 'b', guid: 'frame@b', url: 'https://example.test/b', parent: 0},
+      ],
+      selected: 2,
+      ownTarget: [1],
+    });
+
+    const capture = await captureTable(browser.frame, {
+      selector: 'table',
+      includeHidden: false,
+    });
+
+    assert.equal(capture.rows.length, 3);
+    const world = browser.calls.find(
+      call => call.method === 'Page.createIsolatedWorld',
+    );
+    assert.equal(
+      world?.params?.['frameId'],
+      'a',
+      'must isolate /a, never the sibling that follows the OOPIF',
+    );
+    assert.deepEqual(
+      browser.sessions.map(session => session.detached),
+      [1],
+    );
+  });
+
+  it('rethrows a frame-session error that is not the same-process signal', async () => {
+    // Only "no separate CDP session" means "fall back to the page". A closed
+    // browser must surface instead of being retried against the page.
+    const browser = createFakeBrowser(createRealm(NATIVE_SETUP), {
+      frameSessionError: new Error(
+        'Target page, context or browser has been closed',
+      ),
+    });
+
+    await assert.rejects(
+      () =>
+        captureTable(browser.frame, {
+          selector: 'table',
+          includeHidden: false,
+        }),
+      /browser has been closed/,
+    );
+
+    assert.deepEqual(
+      browser.sessions.map(session => session.detached),
+      [],
     );
   });
 

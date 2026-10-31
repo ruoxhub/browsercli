@@ -133,9 +133,9 @@ export async function resolveSelectedFrameId(
   } catch {
     return undefined;
   }
-  const index = ordered.findIndex(matchesTarget);
+  const selected = ordered.findIndex(matchesTarget);
   // A frame absent from its own page's tree is detached; never guess an index.
-  if (index < 0) return undefined;
+  if (selected < 0) return undefined;
 
   const ownedClient = options.client;
   try {
@@ -144,17 +144,15 @@ export async function resolveSelectedFrameId(
       const {frameTree} = (await client.send('Page.getFrameTree')) as {
         frameTree?: {frame?: {id?: string}; childFrames?: unknown[]};
       };
-      const ids: Array<string | undefined> = [];
-      const walkTree = (node?: {
-        frame?: {id?: string};
-        childFrames?: Array<typeof node>;
-      }): void => {
-        if (!node) return;
-        ids.push(node.frame?.id);
-        for (const child of node.childFrames ?? []) walkTree(child);
-      };
-      walkTree(frameTree as never);
-      return ids[index];
+
+      // Playwright's list CONTAINS cross-process children (OOPIFs) while a
+      // page-session frame tree OMITS them — they live in their own target.
+      // Comparing raw indices therefore shifted by one per out-of-process
+      // frame, returning a neighbouring frame's data as a success. Match the
+      // two trees node by node instead, and report "cannot tell" rather than
+      // ever returning a frame that is not the selected one.
+      const located = locateInFrameTree(frameTree as never, frame, guid);
+      return located?.id;
     } finally {
       // Only close the session this call opened; a caller-supplied one is
       // owned (and detached) by the caller.
@@ -163,6 +161,91 @@ export async function resolveSelectedFrameId(
   } catch {
     return undefined;
   }
+}
+
+interface CdpFrameNode {
+  frame?: {id?: string; url?: string};
+  childFrames?: CdpFrameNode[];
+}
+
+/**
+ * Finds the CDP node for `target` by walking Playwright's own tree and the CDP
+ * frame tree side by side.
+ *
+ * The two trees describe the same document tree, except that a page-session
+ * CDP tree omits cross-process children (they belong to their own target). At
+ * each level the surviving CDP children are matched to Playwright's children in
+ * order by URL, so an out-of-process child simply consumes no CDP node and
+ * every frame after it stays aligned. Anything ambiguous — a sibling URL that
+ * matches more than one remaining CDP node, or a selected frame with no CDP
+ * counterpart — yields undefined instead of a guess.
+ */
+function locateInFrameTree(
+  cdpRoot: CdpFrameNode | undefined,
+  target: Frame,
+  guid: string | undefined,
+): {id?: string} | undefined {
+  let mainFrame: Frame;
+  try {
+    mainFrame = target.page().mainFrame();
+  } catch {
+    return undefined;
+  }
+
+  const descent = (
+    pwNode: Frame,
+    cdpNode: CdpFrameNode | undefined,
+  ): {id?: string} | undefined => {
+    if (!cdpNode) return undefined;
+    if (pwNode === target || (guid !== undefined && pwGuid(pwNode) === guid)) {
+      return {id: cdpNode.frame?.id};
+    }
+    let pwChildren: Frame[];
+    try {
+      pwChildren = pwNode.childFrames();
+    } catch {
+      return undefined;
+    }
+    const cdpChildren = cdpNode.childFrames ?? [];
+    let next = 0;
+    for (const pwChild of pwChildren) {
+      const isTarget =
+        pwChild === target || (guid !== undefined && pwGuid(pwChild) === guid);
+      // Pair this child with the first still-unclaimed CDP sibling of the same
+      // URL. A child with no counterpart is out of process (or otherwise not
+      // in this tree), which is fine as long as it is not the frame we want.
+      const url = safeUrl(pwChild);
+      const matchAt = cdpChildren.findIndex(
+        (candidate, offset) => offset >= next && safeCdpUrl(candidate) === url,
+      );
+      if (matchAt < 0) {
+        if (isTarget) return undefined;
+        continue;
+      }
+      next = matchAt + 1;
+      const found = descent(pwChild, cdpChildren[matchAt]);
+      if (found) return found;
+    }
+    return undefined;
+  };
+
+  return descent(mainFrame, cdpRoot);
+}
+
+function pwGuid(frame: Frame): string | undefined {
+  return (frame as Frame & {_guid?: string})._guid;
+}
+
+function safeUrl(frame: Frame): string {
+  try {
+    return frame.url();
+  } catch {
+    return '';
+  }
+}
+
+function safeCdpUrl(node: CdpFrameNode): string {
+  return node.frame?.url ?? '';
 }
 
 function describeContextSelectionFailure(
