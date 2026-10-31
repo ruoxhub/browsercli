@@ -191,6 +191,37 @@ function toBrowserConfig(store: Readonly<GlobalConfig>): BrowserManagerConfig {
   const base = buildBrowserManagerConfig();
   const storeBrowser = store.browser ?? {};
   const config = {...base, ...storeBrowser};
+
+  const hasStoreTarget =
+    Boolean(storeBrowser.browserURL) ||
+    Boolean(storeBrowser.wsEndpoint) ||
+    Boolean(storeBrowser.channel) ||
+    Boolean(storeBrowser.executablePath);
+
+  if (hasStoreTarget) {
+    if (storeBrowser.browserURL) {
+      delete config.wsEndpoint;
+      delete config.channel;
+      delete config.executablePath;
+      delete config.remoteDebuggingUrl;
+    } else if (storeBrowser.wsEndpoint) {
+      delete config.browserURL;
+      delete config.channel;
+      delete config.executablePath;
+      delete config.remoteDebuggingUrl;
+    } else if (storeBrowser.channel) {
+      delete config.browserURL;
+      delete config.wsEndpoint;
+      delete config.executablePath;
+      delete config.remoteDebuggingUrl;
+    } else if (storeBrowser.executablePath) {
+      delete config.browserURL;
+      delete config.wsEndpoint;
+      delete config.channel;
+      delete config.remoteDebuggingUrl;
+    }
+  }
+
   return {
     ...config,
     channel: config.channel as BrowserManagerConfig['channel'],

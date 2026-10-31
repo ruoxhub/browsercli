@@ -211,6 +211,17 @@ function connectOptions(
     channel !== undefined ||
     executablePath !== undefined;
 
+  const envTargetUrl = process.env.BROWSER_URL;
+  const envWsEndpoint = process.env.BROWSER_WS_ENDPOINT;
+  const envChannel = process.env.BROWSER_CHANNEL;
+  const envExecutablePath = process.env.BROWSER_EXECUTABLE_PATH;
+
+  const envHasTarget =
+    Boolean(envTargetUrl) ||
+    Boolean(envWsEndpoint) ||
+    Boolean(envChannel) ||
+    Boolean(envExecutablePath);
+
   const rawConfig = loadCliConfig() as ExtendedCliConfig;
   const nestedBrowser =
     rawConfig.browser &&
@@ -220,37 +231,57 @@ function connectOptions(
       : undefined;
 
   if (!cliHasTarget) {
-    const rawBrowserUrl =
-      nestedBrowser?.browserURL ??
-      nestedBrowser?.browserUrl ??
-      rawConfig.browserUrl ??
-      rawConfig.browserURL;
-    if (rawBrowserUrl) {
-      browserURL = normalizeTargetUrl(
-        rawBrowserUrl,
-        ['http:', 'https:'],
-        'browserUrl',
-      );
-    }
+    if (envHasTarget) {
+      if (envTargetUrl) {
+        browserURL = normalizeTargetUrl(
+          envTargetUrl,
+          ['http:', 'https:'],
+          'BROWSER_URL',
+        );
+      } else if (envWsEndpoint) {
+        wsEndpoint = normalizeTargetUrl(
+          envWsEndpoint,
+          ['ws:', 'wss:'],
+          'BROWSER_WS_ENDPOINT',
+        );
+      } else if (envChannel) {
+        channel = envChannel;
+      } else if (envExecutablePath) {
+        executablePath = envExecutablePath;
+      }
+    } else {
+      const rawBrowserUrl =
+        nestedBrowser?.browserURL ??
+        nestedBrowser?.browserUrl ??
+        rawConfig.browserUrl ??
+        rawConfig.browserURL;
+      if (rawBrowserUrl) {
+        browserURL = normalizeTargetUrl(
+          rawBrowserUrl,
+          ['http:', 'https:'],
+          'browserUrl',
+        );
+      }
 
-    const rawWsEndpoint = nestedBrowser?.wsEndpoint ?? rawConfig.wsEndpoint;
-    if (rawWsEndpoint) {
-      wsEndpoint = normalizeTargetUrl(
-        rawWsEndpoint,
-        ['ws:', 'wss:'],
-        'wsEndpoint',
-      );
-    }
+      const rawWsEndpoint = nestedBrowser?.wsEndpoint ?? rawConfig.wsEndpoint;
+      if (rawWsEndpoint) {
+        wsEndpoint = normalizeTargetUrl(
+          rawWsEndpoint,
+          ['ws:', 'wss:'],
+          'wsEndpoint',
+        );
+      }
 
-    const rawChannel = nestedBrowser?.channel ?? rawConfig.channel;
-    if (rawChannel) {
-      channel = rawChannel;
-    }
+      const rawChannel = nestedBrowser?.channel ?? rawConfig.channel;
+      if (rawChannel) {
+        channel = rawChannel;
+      }
 
-    const rawExecutablePath =
-      nestedBrowser?.executablePath ?? rawConfig.executablePath;
-    if (rawExecutablePath) {
-      executablePath = rawExecutablePath;
+      const rawExecutablePath =
+        nestedBrowser?.executablePath ?? rawConfig.executablePath;
+      if (rawExecutablePath) {
+        executablePath = rawExecutablePath;
+      }
     }
   }
 
@@ -273,32 +304,55 @@ function connectOptions(
   if (channel !== undefined) options.channel = channel;
   if (executablePath !== undefined) options.executablePath = executablePath;
 
-  const wsHeaders =
-    headersFlag(flags) ?? nestedBrowser?.wsHeaders ?? rawConfig.wsHeaders;
+  let wsHeaders = headersFlag(flags);
+  if (wsHeaders === undefined && process.env.BROWSER_WS_HEADERS) {
+    try {
+      wsHeaders = JSON.parse(
+        process.env.BROWSER_WS_HEADERS.replace(/^\uFEFF/, ''),
+      ) as Record<string, string>;
+    } catch {
+      // 忽略非法 JSON
+    }
+  }
+  if (wsHeaders === undefined) {
+    wsHeaders = nestedBrowser?.wsHeaders ?? rawConfig.wsHeaders;
+  }
+
   const viewport =
     viewportFlag(flags) ?? nestedBrowser?.viewport ?? rawConfig.viewport;
-  const userDataDir =
-    stringFlag(flags, 'user-data-dir') ??
-    nestedBrowser?.userDataDir ??
-    rawConfig.userDataDir;
+
+  let userDataDir = stringFlag(flags, 'user-data-dir');
+  if (userDataDir === undefined) {
+    userDataDir =
+      process.env.BROWSER_USER_DATA_DIR ??
+      nestedBrowser?.userDataDir ??
+      rawConfig.userDataDir;
+  }
 
   if (wsHeaders !== undefined) options.wsHeaders = wsHeaders;
   if (viewport !== undefined) options.viewport = viewport;
   if (userDataDir !== undefined) options.userDataDir = userDataDir;
 
   const booleanKeys = [
-    ['acceptInsecureCerts', 'accept-insecure-certs'],
-    ['cloak', 'cloak'],
-    ['force', 'force'],
-    ['fullStealthArgs', 'full-stealth-args'],
-    ['headless', 'headless'],
-    ['isolated', 'isolated'],
-    ['jsStealth', 'js-stealth'],
-    ['minimalStealth', 'minimal-stealth'],
+    [
+      'acceptInsecureCerts',
+      'accept-insecure-certs',
+      'BROWSER_ACCEPT_INSECURE_CERTS',
+    ],
+    ['cloak', 'cloak', 'BROWSER_CLOAK'],
+    ['force', 'force', ''],
+    ['fullStealthArgs', 'full-stealth-args', 'BROWSER_FULL_STEALTH_ARGS'],
+    ['headless', 'headless', 'BROWSER_HEADLESS'],
+    ['isolated', 'isolated', 'BROWSER_ISOLATED'],
+    ['jsStealth', 'js-stealth', 'BROWSER_JS_STEALTH'],
+    ['minimalStealth', 'minimal-stealth', 'BROWSER_MINIMAL_STEALTH'],
   ] as const;
 
-  for (const [prop, flagName] of booleanKeys) {
+  for (const [prop, flagName, envKey] of booleanKeys) {
     let val = booleanFlag(flags, flagName);
+    if (val === undefined && envKey && process.env[envKey] !== undefined) {
+      val = parseBooleanValue(process.env[envKey]);
+    }
     if (val === undefined) {
       val =
         parseBooleanValue(nestedBrowser?.[prop]) ??

@@ -292,4 +292,56 @@ describe('browserCommand', () => {
       },
     ]);
   });
+
+  it('honors environment variables over config file but yields to CLI flags', async () => {
+    fs.writeFileSync(
+      path.join(tmpConfigDir, 'config.json'),
+      JSON.stringify({
+        browserUrl: 'http://127.0.0.1:9222',
+        headless: 'true',
+      }),
+      'utf-8',
+    );
+
+    process.env.BROWSER_URL = 'http://127.0.0.1:9555';
+    process.env.BROWSER_HEADLESS = 'false';
+
+    try {
+      // 1. Env takes precedence over config file
+      const envWinner = context();
+      await browserCommand(['connect'], envWinner.ctx);
+      assert.deepEqual(envWinner.calls, [
+        {
+          method: 'browser.connect',
+          params: {
+            body: {
+              browserURL: 'http://127.0.0.1:9555',
+              headless: false,
+            },
+          },
+        },
+      ]);
+
+      // 2. CLI flag takes precedence over env
+      const cliWinner = context();
+      await browserCommand(
+        ['connect', '--browser-url', 'http://127.0.0.1:9888'],
+        cliWinner.ctx,
+      );
+      assert.deepEqual(cliWinner.calls, [
+        {
+          method: 'browser.connect',
+          params: {
+            body: {
+              browserURL: 'http://127.0.0.1:9888',
+              headless: false,
+            },
+          },
+        },
+      ]);
+    } finally {
+      delete process.env.BROWSER_URL;
+      delete process.env.BROWSER_HEADLESS;
+    }
+  });
 });

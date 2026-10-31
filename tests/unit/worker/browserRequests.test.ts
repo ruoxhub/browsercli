@@ -129,4 +129,14 @@ describe('effectiveBrowserConfig and candidateBrowserConfig', () => {
     commit();
     assert.strictEqual(effectiveBrowserConfig().headless, false);
   });
+
+  it('suppresses base target when patch provides a mutually exclusive target', () => {
+    resetRuntimeConfigStore({
+      browserUrl: 'http://127.0.0.1:9222',
+    });
+    const {config} = candidateBrowserConfig({channel: 'stable'});
+    assert.strictEqual(config.channel, 'stable');
+    assert.strictEqual(config.browserURL, undefined);
+    assert.strictEqual(config.wsEndpoint, undefined);
+  });
 });
