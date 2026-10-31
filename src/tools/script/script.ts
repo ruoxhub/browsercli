@@ -107,7 +107,16 @@ export async function resolveSelectedFrameId(
   }
 
   const frames = page.frames();
-  const index = frames.indexOf(frame);
+  // Worker mode hands tools a Proxy-wrapped Frame (frame.evaluate timeout
+  // guard), so identity comparison fails even though frame.page() still works.
+  // `_guid` (`frame@<hash>`) is stable across the wrapper and both objects.
+  const guid = (frame as Frame & {_guid?: string})._guid;
+  const index = frames.findIndex(
+    candidate =>
+      candidate === frame ||
+      (guid !== undefined &&
+        (candidate as Frame & {_guid?: string})._guid === guid),
+  );
   if (index < 0) return undefined;
 
   try {
