@@ -9,6 +9,7 @@ import {describe, it} from 'node:test';
 import vm from 'node:vm';
 
 import type {Frame} from 'patchright';
+import sinon from 'sinon';
 
 import {
   captureTable,
@@ -99,6 +100,25 @@ class FakeElement {
       child => child.tagName === 'TD' || child.tagName === 'TH',
     );
   }
+  /**
+   * Mirrors Chromium's ancestor-aware visibility: display is not inherited,
+   * so only a chain walk can see a hidden container.
+   */
+  checkVisibility() {
+    let node = this;
+    while (node) {
+      if (node.hasAttribute('hidden')) return false;
+      if (node.style.display === 'none') return false;
+      if (
+        node.style.visibility === 'hidden' ||
+        node.style.visibility === 'collapse'
+      ) {
+        return false;
+      }
+      node = node.parentElement;
+    }
+    return true;
+  }
   closest(selector) {
     let node = this;
     while (node) {
@@ -120,15 +140,19 @@ class FakeElement {
   }
 }
 
-globalThis.window = globalThis;
 globalThis.__element = (tagName, attributes, text) =>
   new FakeElement(tagName, attributes, text);
-globalThis.getComputedStyle = target =>
-  target.style || {display: 'block', visibility: 'visible'};
 globalThis.location = {href: 'https://example.test/frame'};
 globalThis.document = {
   title: 'Fixture page',
-  querySelectorAll: () => globalThis.__roots || [],
+  querySelectorAll: selector => {
+    if (selector === '[[invalid]]') {
+      throw new Error(
+        "Failed to execute 'querySelectorAll' on 'Document': '[[invalid]]' is not a valid selector.",
+      );
+    }
+    return globalThis.__roots || [];
+  },
 };
 `;
 
@@ -221,6 +245,36 @@ grid.append(headerRow, dataRow);
 globalThis.__roots = [grid];
 `;
 
+const HIDDEN_ROOT_SETUP = `
+const table = __element('table', {});
+table.append(
+  __element('tbody', {}).append(
+    __element('tr', {}).append(__element('td', {}, 'never-visible')),
+  ),
+);
+const container = __element('div', {hidden: ''});
+container.append(table);
+globalThis.__roots = [table];
+`;
+
+const HIDDEN_ANCESTOR_SETUP = `
+const table = __element('table', {});
+table.append(
+  __element('tbody', {}).append(
+    __element('tr', {}).append(__element('td', {}, 'under-hidden-tbody')),
+  ),
+);
+const hiddenBody = __element('tbody', {});
+hiddenBody.style.display = 'none';
+hiddenBody.append(
+  __element('tr', {}).append(__element('td', {}, 'under-hidden-ancestor')),
+);
+table.append(hiddenBody);
+const wrapper = __element('div', {});
+wrapper.append(table);
+globalThis.__roots = [table];
+`;
+
 const SECTION_SETUP = `
 const outer = __element('table', {});
 const outerFoot = __element('tfoot', {});
@@ -284,6 +338,10 @@ interface FakeBrowser {
 interface FakeBrowserOptions {
   failEvaluate?: boolean;
   resolveFrame?: boolean;
+  /** CDP method whose `send` never settles, to exercise the timeout. */
+  hangOn?: string;
+  /** Raw value the fake `Runtime.evaluate` returns instead of running code. */
+  evaluateValue?: unknown;
 }
 
 function createFakeBrowser(
@@ -301,6 +359,8 @@ function createFakeBrowser(
     return {
       send: async (method: string, params?: Record<string, unknown>) => {
         calls.push({session: id, method, params});
+        if (options.hangOn === method)
+          return new Promise<never>(() => undefined);
         if (method === 'Page.getFrameTree') {
           return {frameTree: {frame: {id: 'frame-root'}}};
         }
@@ -309,6 +369,9 @@ function createFakeBrowser(
         }
         if (method === 'Runtime.evaluate') {
           if (options.failEvaluate) throw new Error('CDP runtime blew up');
+          if ('evaluateValue' in options) {
+            return {result: {value: options.evaluateValue}};
+          }
           const expression = String(params?.['expression'] ?? '');
           try {
             const value = vm.runInContext(expression, realm);
@@ -488,6 +551,30 @@ describe('collectTableDom', () => {
       ],
     );
   });
+
+  it('skips rows under a hidden ancestor unless includeHidden is set', () => {
+    const realm = createRealm(HIDDEN_ANCESTOR_SETUP);
+
+    // display does not inherit, so only an ancestor-chain check sees that the
+    // row inside the hidden <tbody> is invisible.
+    const visibleOnly = runCollector(realm, {
+      selector: 'table',
+      includeHidden: false,
+    });
+    assert.deepEqual(
+      visibleOnly.rows.map(row => row.cells[0]?.text),
+      ['under-hidden-tbody'],
+    );
+
+    const withHidden = runCollector(realm, {
+      selector: 'table',
+      includeHidden: true,
+    });
+    assert.deepEqual(
+      withHidden.rows.map(row => row.cells[0]?.text),
+      ['under-hidden-tbody', 'under-hidden-ancestor'],
+    );
+  });
 });
 
 describe('captureTable selection failures', () => {
@@ -511,6 +598,18 @@ describe('captureTable selection failures', () => {
       selector: 'div',
       reason: 'not_a_table',
     },
+    {
+      name: 'reports hidden when the matched root is inside a hidden container',
+      setup: HIDDEN_ROOT_SETUP,
+      selector: 'table',
+      reason: 'hidden',
+    },
+    {
+      name: 'reports bad_selector when the selector is not valid CSS',
+      setup: 'globalThis.__roots = [];',
+      selector: '[[invalid]]',
+      reason: 'bad_selector',
+    },
   ];
 
   for (const testCase of cases) {
@@ -529,6 +628,24 @@ describe('captureTable selection failures', () => {
       );
     });
   }
+
+  it('rejects a table under a hidden ancestor even with includeHidden', async () => {
+    const browser = createFakeBrowser(createRealm(HIDDEN_ROOT_SETUP));
+
+    // "隐藏容器始终拒绝": includeHidden only widens row/cell inclusion, never
+    // the container rule.
+    await assert.rejects(
+      () =>
+        captureTable(browser.frame, {
+          selector: 'table',
+          includeHidden: true,
+        }),
+      (error: unknown) => {
+        assert.equal((error as {reason?: string}).reason, 'hidden');
+        return true;
+      },
+    );
+  });
 });
 
 describe('captureTable CDP lifecycle', () => {
@@ -622,5 +739,87 @@ describe('captureTable CDP lifecycle', () => {
       'Page.getFrameTree',
       'Runtime.evaluate',
     ]);
+  });
+
+  it('times out and still detaches when Runtime.evaluate never settles', async () => {
+    const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
+    try {
+      const browser = createFakeBrowser(createRealm(NATIVE_SETUP), {
+        hangOn: 'Runtime.evaluate',
+      });
+
+      const pending = assert.rejects(
+        () =>
+          captureTable(browser.frame, {
+            selector: 'table',
+            includeHidden: false,
+          }),
+        (error: unknown) => {
+          assert.match((error as Error).message, /超时/);
+          return true;
+        },
+      );
+
+      await clock.tickAsync(0);
+      await clock.tickAsync(30_000);
+      await pending;
+
+      // The session must be released even though the CDP call never settled.
+      assert.deepEqual(
+        browser.sessions.map(session => session.detached),
+        [1, 1],
+      );
+    } finally {
+      clock.restore();
+    }
+  });
+
+  it('times out and still detaches when createIsolatedWorld never settles', async () => {
+    const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
+    try {
+      const browser = createFakeBrowser(createRealm(NATIVE_SETUP), {
+        hangOn: 'Page.createIsolatedWorld',
+      });
+
+      const pending = assert.rejects(
+        () =>
+          captureTable(browser.frame, {
+            selector: 'table',
+            includeHidden: false,
+          }),
+        /超时/,
+      );
+
+      await clock.tickAsync(0);
+      await clock.tickAsync(30_000);
+      await pending;
+
+      assert.deepEqual(
+        browser.sessions.map(session => session.detached),
+        [1, 1],
+      );
+    } finally {
+      clock.restore();
+    }
+  });
+
+  it('rejects a malformed collector result with a clear message', async () => {
+    const browser = createFakeBrowser(createRealm(NATIVE_SETUP), {
+      evaluateValue: {source: {selector: 'table'}},
+    });
+
+    await assert.rejects(
+      () =>
+        captureTable(browser.frame, {
+          selector: 'table',
+          includeHidden: false,
+        }),
+      /rows/,
+    );
+
+    assert.deepEqual(
+      browser.sessions.map(session => session.detached),
+      [1, 1],
+    );
   });
 });

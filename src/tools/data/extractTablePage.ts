@@ -21,7 +21,9 @@ const EXTRACT_TABLE_WORLD = 'browsercli-extract-table';
 export type TableCaptureFailureReason =
   | 'not_found'
   | 'ambiguous'
-  | 'not_a_table';
+  | 'not_a_table'
+  | 'hidden'
+  | 'bad_selector';
 
 interface CollectFailure {
   reason: TableCaptureFailureReason;
@@ -70,15 +72,19 @@ function captureError(
 export function collectTableDom(
   options: CollectOptions,
 ): RawTableCapture | CollectFailure {
+  /**
+   * Ancestor-aware visibility. `display` is not inherited, so a row inside
+   * `<div hidden>` or `<tbody style="display:none">` still reports
+   * `display: table-row` for itself; only a chain check catches the container.
+   * Chromium's `checkVisibility` does exactly that, with the options that make
+   * it account for inherited `visibility` and `content-visibility`.
+   */
   const isHidden = (element: Element): boolean => {
     if (element.hasAttribute('hidden')) return true;
-    if (typeof getComputedStyle !== 'function') return false;
-    const style = getComputedStyle(element);
-    return (
-      style.display === 'none' ||
-      style.visibility === 'hidden' ||
-      style.visibility === 'collapse'
-    );
+    return !element.checkVisibility({
+      visibilityProperty: true,
+      contentVisibilityAuto: true,
+    });
   };
 
   /** Native `rowSpan`/`colSpan` and ARIA spans both collapse 0 into 1. */
@@ -124,7 +130,19 @@ export function collectTableDom(
     id: element.getAttribute('id') ?? '',
   });
 
-  const matches = document.querySelectorAll(options.selector);
+  // An invalid CSS selector throws SyntaxError in the page; report it as a
+  // selector problem so the adapter can map it to VALIDATION, not RUNTIME.
+  let matches: NodeListOf<Element>;
+  try {
+    matches = document.querySelectorAll(options.selector);
+  } catch (error) {
+    return {
+      reason: 'bad_selector',
+      message: `选择器 "${options.selector}" 不是合法的 CSS 选择器：${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    };
+  }
   if (matches.length === 0) {
     return {
       reason: 'not_found',
@@ -148,13 +166,23 @@ export function collectTableDom(
     };
   }
 
+  // "隐藏容器始终拒绝": a hidden container is a hard refusal, never widened by
+  // includeHidden — that option only governs hidden rows and cells.
+  if (isHidden(root)) {
+    return {
+      reason: 'hidden',
+      message: `选择器 "${options.selector}" 命中的表格位于隐藏容器内，拒绝采集`,
+    };
+  }
+
   const rows: RawTableRow[] = [];
 
   if (isNativeTable) {
     const table = root as HTMLTableElement;
     for (const row of Array.from(table.rows)) {
       if (!options.includeHidden && isHidden(row)) continue;
-      // Nested tables own their cells; never let them leak into the parent.
+      // Defensive only: `HTMLTableRowElement.cells` already excludes nested
+      // tables. The filter that actually matters is the ARIA one below.
       const rawCells = Array.from(row.cells).filter(
         cell => cell.closest('table') === root,
       );
@@ -240,6 +268,40 @@ function isCollectFailure(value: unknown): value is CollectFailure {
   );
 }
 
+/** Mirrors `evaluateInPageRuntime`'s guard against a paused/hung page. */
+const CAPTURE_TIMEOUT_MS = 10_000;
+
+/**
+ * Takes no dependency on `evaluateInPageRuntime` (which enables Runtime), and
+ * races a bare timer instead. Without it a `Runtime.evaluate` that never
+ * settles would hold the CDP session open forever: `finally` only runs once the
+ * promise does, so the session and isolated world would both leak.
+ */
+async function withTimeout<T>(
+  operation: Promise<T>,
+  label: string,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () =>
+            reject(
+              new Error(
+                `${label} 超时 (${CAPTURE_TIMEOUT_MS}ms)，页面可能已被 debugger 暂停或进入死循环`,
+              ),
+            ),
+          CAPTURE_TIMEOUT_MS,
+        );
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 /**
  * Collects raw table facts from the given frame in a throwaway isolated world.
  * Creates its own CDP session and always detaches it; never enables Runtime,
@@ -250,7 +312,10 @@ export async function captureTable(
   options: TableCaptureOptions,
 ): Promise<RawTableCapture> {
   const page = frame.page();
-  const frameId = await resolveSelectedFrameId(frame);
+  const frameId = await withTimeout(
+    resolveSelectedFrameId(frame),
+    '解析 Frame 的 CDP frameId',
+  );
   if (!frameId) {
     throw new Error(
       '无法解析当前 Frame 的 CDP frameId，无法创建隔离执行上下文；请先重新选择 Frame',
@@ -259,10 +324,13 @@ export async function captureTable(
 
   const client = await page.context().newCDPSession(page);
   try {
-    const world = (await client.send('Page.createIsolatedWorld', {
-      frameId,
-      worldName: EXTRACT_TABLE_WORLD,
-    })) as {executionContextId: number};
+    const world = (await withTimeout(
+      client.send('Page.createIsolatedWorld', {
+        frameId,
+        worldName: EXTRACT_TABLE_WORLD,
+      }) as Promise<{executionContextId: number}>,
+      '创建隔离执行上下文',
+    )) as {executionContextId: number};
 
     const argument = JSON.stringify({
       pageUrl: page.url(),
@@ -271,12 +339,15 @@ export async function captureTable(
     });
     const expression = `(${collectTableDom.toString()})(${argument})`;
 
-    const evaluated = (await client.send('Runtime.evaluate', {
-      expression,
-      contextId: world.executionContextId,
-      returnByValue: true,
-      awaitPromise: true,
-    })) as RuntimeEvaluateResult;
+    const evaluated = (await withTimeout(
+      client.send('Runtime.evaluate', {
+        expression,
+        contextId: world.executionContextId,
+        returnByValue: true,
+        awaitPromise: true,
+      }) as Promise<RuntimeEvaluateResult>,
+      '执行表格采集脚本',
+    )) as RuntimeEvaluateResult;
 
     if (evaluated.exceptionDetails) {
       const description =
@@ -289,6 +360,11 @@ export async function captureTable(
     const value = evaluated.result.value;
     if (isCollectFailure(value)) {
       throw captureError(value.reason, value.message);
+    }
+    if (!value || !Array.isArray((value as RawTableCapture).rows)) {
+      throw new Error(
+        '表格采集脚本返回了非预期结果：缺少 rows 数组，无法生成表格数据',
+      );
     }
     return value as RawTableCapture;
   } finally {
