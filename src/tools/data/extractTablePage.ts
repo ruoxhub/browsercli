@@ -165,7 +165,7 @@ export function collectTableDom(
     const facts = cellFacts(element, header, rowSpan, colSpan);
     cells.push(
       !options.includeHidden && state === 'invisible'
-        ? {...facts, text: ''}
+        ? {...facts, text: '', hidden: true}
         : facts,
     );
   };
@@ -217,6 +217,31 @@ export function collectTableDom(
 
   const rows: RawTableRow[] = [];
 
+  // The model lays each section out positionally, so a row that carries an
+  // upstream rowspan must exist in the capture even when it contributes no
+  // cell of its own; dropping it would hand the span to the next surviving row
+  // and shift every later value one column left. Track coverage per section,
+  // matching the model's own per-section layout.
+  const remainingSpanRows = new Map<string, number>();
+  /** True when a span from an earlier row of this section still covers here. */
+  const rowSpanActive = (kind: string): boolean =>
+    (remainingSpanRows.get(kind) ?? 0) > 0;
+  /**
+   * Advances the coverage of one section by one row: this row consumes a
+   * pending span and contributes its own.
+   */
+  const noteRow = (kind: string, cells: RawTableCell[]): void => {
+    const pending = Math.max((remainingSpanRows.get(kind) ?? 0) - 1, 0);
+    let coverage = 0;
+    for (const cell of cells) {
+      const rows = Number(cell.rowSpan);
+      if (Number.isFinite(rows) && rows > 1) {
+        coverage = Math.max(coverage, rows - 1);
+      }
+    }
+    remainingSpanRows.set(kind, Math.max(pending, coverage));
+  };
+
   if (isNativeTable) {
     const table = root as HTMLTableElement;
     for (const row of Array.from(table.rows)) {
@@ -248,9 +273,12 @@ export function collectTableDom(
           positiveSpan(cell.colSpan),
         );
       }
-      // A row with no collectable cell carries no data; emitting it would
-      // inflate coverage.rowsReturned with an all-null ghost row.
-      if (cells.length > 0) rows.push({kind, cells});
+      // A row with no collectable cell normally carries no data and would be
+      // an all-null ghost row — unless an upstream rowspan still covers it.
+      if (cells.length > 0 || rowSpanActive(kind)) {
+        rows.push({kind, cells});
+        noteRow(kind, cells);
+      }
     }
   } else {
     const rowSelector = '[role="row"]';
@@ -292,7 +320,10 @@ export function collectTableDom(
           positiveSpan(cell.getAttribute('aria-colspan')),
         );
       }
-      if (cells.length > 0) rows.push({kind, cells});
+      if (cells.length > 0 || rowSpanActive(kind)) {
+        rows.push({kind, cells});
+        noteRow(kind, cells);
+      }
     }
   }
 
@@ -367,8 +398,12 @@ async function openFrameSession(
   try {
     // Succeeds only when the frame is its own target (main frame, OOPIF).
     return {client: await context.newCDPSession(frame), ownTarget: true};
-  } catch {
-    // Same-process subframe: the page session covers it.
+  } catch (error) {
+    // Only "no separate session" means "same-process subframe, use the page".
+    // Anything else (closed browser, detached target) must surface instead of
+    // being retried against a page that will fail the same way.
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/does not have a separate CDP session/i.test(message)) throw error;
     return {client: await context.newCDPSession(page), ownTarget: false};
   }
 }

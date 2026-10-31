@@ -204,8 +204,11 @@ export function normalizeTable(raw: RawTableCapture): ExtractedTable {
     const record: Record<string, string | null> = {};
     keys.forEach((key, column) => {
       const value = line[column];
-      // A `visibility:hidden` cell holds its column with empty text but has no
-      // value, so it maps to null like any other unoccupied position.
+      // CONTRACT: an empty or placeholder-only position is reported as null,
+      // not "". A `visibility:hidden` cell keeps its column with empty text so
+      // later cells do not shift (the raw cell carries `hidden: true` for
+      // that), and a genuinely empty `<td>` is equally valueless. CSV output
+      // is unchanged either way: null encodes as an empty field.
       record[key] = typeof value === 'string' && value !== '' ? value : null;
     });
     return record;

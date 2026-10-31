@@ -23,6 +23,14 @@ export interface RawTableCell {
   text: string;
   /** Reserved for Task 2's collector; normalization uses the row `kind`. */
   header: boolean;
+  /**
+   * True when the cell occupies its column but paints nothing
+   * (`visibility:hidden` / `visibility:collapse`), which is why `text` is
+   * empty. Distinguishes that placeholder from a genuinely empty `<td>`: both
+   * normalize to a `null` value, but only the placeholder means "this column
+   * holds data the caller asked to exclude".
+   */
+  hidden?: boolean;
   rowSpan: number;
   colSpan: number;
   /** Reserved for Task 2's collector (ARIA `headers`); not consumed yet. */
