@@ -60,6 +60,18 @@ describe('runtimeConfigPersistence', () => {
       assert.strictEqual(loadCachedRuntimeConfig(), undefined);
     });
 
+    it('accepts cache file with UTF-8 BOM', () => {
+      writeFileSync(
+        RUNTIME_CONFIG_PATH,
+        '\uFEFF' +
+          JSON.stringify({browser: {browserURL: 'http://127.0.0.1:9222'}}),
+        'utf8',
+      );
+      const loaded = loadCachedRuntimeConfig();
+      assert.ok(loaded);
+      assert.strictEqual(loaded?.browser?.browserURL, 'http://127.0.0.1:9222');
+    });
+
     it('returns undefined on invalid config', () => {
       seedFile({browser: {remoteDebuggingPort: 1}});
       assert.strictEqual(loadCachedRuntimeConfig(), undefined);

@@ -10,6 +10,7 @@ import {manifest as antiDebugManifest} from './anti-debug/manifest.js';
 import {manifest as collectorManifest} from './collector/manifest.js';
 import {manifest as consoleManifest} from './console/manifest.js';
 import {manifest as cssManifest} from './css/manifest.js';
+import {manifest as dataManifest} from './data/manifest.js';
 import {manifest as debuggerManifest} from './debugger/manifest.js';
 import {manifest as devtoolsManifest} from './devtools/manifest.js';
 import {manifest as diagnosticsManifest} from './diagnostics/manifest.js';
@@ -34,6 +35,7 @@ export const GENERATED_DOMAIN_MANIFESTS = [
   collectorManifest,
   consoleManifest,
   cssManifest,
+  dataManifest,
   debuggerManifest,
   devtoolsManifest,
   diagnosticsManifest,
@@ -94,6 +96,10 @@ export const GENERATED_TOOL_REGISTRY = [
   {
     modulePath: './css/getCssStyles.js',
     handlerName: 'getCssStyles',
+  },
+  {
+    modulePath: './data/extractTable.js',
+    handlerName: 'extractTable',
   },
   {
     modulePath: './debugger/index.js',

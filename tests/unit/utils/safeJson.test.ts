@@ -73,4 +73,8 @@ describe('safeJson', () => {
     assert.deepStrictEqual(safeParse('{"ok":true}'), {ok: true});
     assert.strictEqual(safeParse('{"bad":'), null);
   });
+
+  it('parses JSON with leading UTF-8 BOM', () => {
+    assert.deepStrictEqual(safeParse('\uFEFF{"bom":true}'), {bom: true});
+  });
 });

@@ -43,7 +43,9 @@ export function loadCachedRuntimeConfig(): Partial<GlobalConfig> | undefined {
 
   let raw: unknown;
   try {
-    raw = JSON.parse(readFileSync(RUNTIME_CONFIG_PATH, 'utf8'));
+    raw = JSON.parse(
+      readFileSync(RUNTIME_CONFIG_PATH, 'utf8').replace(/^\uFEFF/, ''),
+    );
   } catch {
     return undefined;
   }
