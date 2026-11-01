@@ -8,18 +8,12 @@ import type {DomainManifest} from '../manifest.js';
 
 export const manifest = {
   name: 'screenshot',
-  description: 'Screenshot and video frame tools.',
+  description: 'Screenshot tools.',
   profile: 'workflow',
   tools: [
     {
       modulePath: './screenshot/takeScreenshot.js',
       handlerName: 'takeScreenshot',
     },
-    {
-      modulePath: './screenshot/captureVideoFrame.js',
-      handlerName: 'captureVideoFrame',
-    },
-    {modulePath: './screenshot/getVideoInfo.js', handlerName: 'getVideoInfo'},
-    {modulePath: './screenshot/seekVideo.js', handlerName: 'seekVideo'},
   ],
 } satisfies DomainManifest;
