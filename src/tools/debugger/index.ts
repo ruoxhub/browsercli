@@ -155,7 +155,7 @@ function defineStepTool(config: {
 }
 
 /**
- * break_on_xhr / remove_xhr_breakpoint / xhr_to_js_breakpoint 共享的
+ * break_on_xhr / remove_xhr_breakpoint 共享的
  * CDP 调用与响应结构。
  */
 function defineXhrBreakpointTool(config: {
@@ -2163,19 +2163,3 @@ export const setBreakpointOnText = defineTool({
   },
 });
 
-/**
- * XHR 到 JS 断点转换。
- */
-export const xhrToJsBreakpoint = defineXhrBreakpointTool({
-  name: 'xhr_to_js_breakpoint',
-  description:
-    '设置 XHR 断点；命中后可结合 get_paused_info / set_breakpoint 完成 JS 断点定位。',
-  title: 'XHR 到 JS 断点',
-  cdpMethod: 'DOMDebugger.setXHRBreakpoint',
-  buildSuccessMessage: url => `XHR 断点已设置: ${url}`,
-  successData: url => ({
-    url,
-    hint: '命中后可结合 get_paused_info / set_breakpoint 完成 JS 断点定位',
-  }),
-  failurePrefix: '设置 XHR 断点失败',
-});

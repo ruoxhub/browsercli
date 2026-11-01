@@ -465,7 +465,7 @@ describe('listNetworkRequests', () => {
         },
         nextSteps: [
           '调用 get_request_initiator 查看完整调用栈',
-          '调用 xhr_to_js_breakpoint 在请求发送前暂停',
+          '调用 break_on_xhr 在请求发送前暂停',
           '暂停后调用 get_paused_info 和 evaluate_on_callframe 查看局部变量',
         ],
       },

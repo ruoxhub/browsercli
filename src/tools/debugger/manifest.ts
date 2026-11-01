@@ -87,6 +87,5 @@ export const manifest = {
     {modulePath: './debugger/index.js', handlerName: 'setBreakpointOnText'},
     {modulePath: './debugger/hookFunction.js', handlerName: 'hookFunction'},
     {modulePath: './debugger/unhookFunction.js', handlerName: 'unhookFunction'},
-    {modulePath: './debugger/index.js', handlerName: 'xhrToJsBreakpoint'},
   ],
 } satisfies DomainManifest;

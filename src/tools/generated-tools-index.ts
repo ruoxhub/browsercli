@@ -202,10 +202,6 @@ export const GENERATED_TOOL_REGISTRY = [
     handlerName: 'unhookFunction',
   },
   {
-    modulePath: './debugger/index.js',
-    handlerName: 'xhrToJsBreakpoint',
-  },
-  {
     modulePath: './diagnostics/diagnoseEnvironment.js',
     handlerName: 'diagnoseEnvironmentTool',
   },
