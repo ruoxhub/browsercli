@@ -19,7 +19,7 @@
   - [`press_key`](#press_key)
   - [`query_dom`](#query_dom)
   - [`select_page`](#select_page)
-  - [`set_files`](#set_files)
+  - [`take_snapshot`](#take_snapshot)
   - [`upload_file`](#upload_file)
 - **[Network](#network)** (10 tools)
   - [`analyze_websocket_messages`](#analyze_websocket_messages)
@@ -32,42 +32,34 @@
   - [`list_websocket_connections`](#list_websocket_connections)
   - [`replay_network_request`](#replay_network_request)
   - [`replay_network_request_batch`](#replay_network_request_batch)
-- **[Debugging](#debugging)** (27 tools)
-  - [`capture_video_frame`](#capture_video_frame)
+- **[Debugging](#debugging)** (20 tools)
   - [`evaluate_on_callframe`](#evaluate_on_callframe)
   - [`evaluate_script`](#evaluate_script)
-  - [`get_ai_debug_status`](#get_ai_debug_status)
   - [`get_console_message`](#get_console_message)
   - [`get_css_styles`](#get_css_styles)
-  - [`get_devtools_comments`](#get_devtools_comments)
   - [`get_paused_info`](#get_paused_info)
-  - [`get_video_info`](#get_video_info)
   - [`inject_preload_script`](#inject_preload_script)
   - [`inspect_locals`](#inspect_locals)
   - [`list_breakpoints`](#list_breakpoints)
   - [`list_console_messages`](#list_console_messages)
   - [`list_frames`](#list_frames)
-  - [`open_devtools`](#open_devtools)
   - [`pause`](#pause)
   - [`remove_breakpoint`](#remove_breakpoint)
-  - [`resolve_devtools_comment`](#resolve_devtools_comment)
   - [`resume`](#resume)
   - [`reveal_in_devtools`](#reveal_in_devtools)
-  - [`seek_video`](#seek_video)
   - [`select_frame`](#select_frame)
   - [`set_breakpoint`](#set_breakpoint)
   - [`step_into`](#step_into)
   - [`step_out`](#step_out)
   - [`step_over`](#step_over)
   - [`take_screenshot`](#take_screenshot)
-- **[JS Reverse Engineering](#js-reverse-engineering)** (43 tools)
+- **[JS Reverse Engineering](#js-reverse-engineering)** (37 tools)
   - [`anti_anti_debug`](#anti_anti_debug)
   - [`break_on_xhr`](#break_on_xhr)
   - [`bypass_debugger`](#bypass_debugger)
   - [`collect_code`](#collect_code)
   - [`collect_wasm`](#collect_wasm)
   - [`collection_diff`](#collection_diff)
-  - [`compare_env`](#compare_env)
   - [`create_hook`](#create_hook)
   - [`dump_target_scripts`](#dump_target_scripts)
   - [`find_in_script`](#find_in_script)
@@ -75,11 +67,7 @@
   - [`get_request_initiator`](#get_request_initiator)
   - [`get_script_source`](#get_script_source)
   - [`get_storage`](#get_storage)
-  - [`hook_cryptojs`](#hook_cryptojs)
   - [`hook_function`](#hook_function)
-  - [`hook_jsencrypt`](#hook_jsencrypt)
-  - [`hook_jsvmp_interpreter`](#hook_jsvmp_interpreter)
-  - [`hook_smcrypto`](#hook_smcrypto)
   - [`inject_hook`](#inject_hook)
   - [`inject_stealth`](#inject_stealth)
   - [`inspect_object`](#inspect_object)
@@ -103,22 +91,14 @@
   - [`wasm_dump`](#wasm_dump)
   - [`wasm_memory_inspect`](#wasm_memory_inspect)
   - [`wasm_vmp_trace`](#wasm_vmp_trace)
-  - [`xhr_to_js_breakpoint`](#xhr_to_js_breakpoint)
-- **[Input automation](#input-automation)** (3 tools)
+- **[Input automation](#input-automation)** (2 tools)
   - [`scroll_by`](#scroll_by)
-  - [`type_text`](#type_text)
   - [`wait_for_element`](#wait_for_element)
-- **[Emulation](#emulation)** (4 tools)
-  - [`emulate_cpu`](#emulate_cpu)
+- **[Emulation](#emulation)** (3 tools)
   - [`emulate_mobile`](#emulate_mobile)
   - [`emulate_network`](#emulate_network)
   - [`resize_page`](#resize_page)
-- **[Performance](#performance)** (4 tools)
-  - [`get_performance_metrics`](#get_performance_metrics)
-  - [`performance_analyze_insight`](#performance_analyze_insight)
-  - [`start_performance_trace`](#start_performance_trace)
-  - [`stop_performance_trace`](#stop_performance_trace)
-- **[Pages](#pages)** (10 tools)
+- **[Pages](#pages)** (9 tools)
   - [`check_browser_health`](#check_browser_health)
   - [`delete_session_state`](#delete_session_state)
   - [`detect_captcha`](#detect_captcha)
@@ -128,7 +108,6 @@
   - [`load_session_state`](#load_session_state)
   - [`restore_session_state`](#restore_session_state)
   - [`save_session_state`](#save_session_state)
-  - [`update_extensions`](#update_extensions)
 - **[Diagnostics](#diagnostics)** (1 tools)
   - [`diagnose_environment`](#diagnose_environment)
 
@@ -136,10 +115,11 @@
 
 ### `click` — 点击元素
 
-**Description:** 点击页面元素，支持单击与双击。定位器支持 CSS、role=、text=、xpath=。多匹配时用 >> nth=N 消歧。
+**Description:** 点击页面元素，支持单击与双击。支持由 take_snapshot 产生的 uid（推荐）或传统定位器（CSS、role=、text=、xpath=）。
 
 **Parameters:**
 
+- `uid`
 - `selector`
 - `dblClick`
 - `timeoutMs`
@@ -163,10 +143,11 @@
 
 ### `fill` — 填充输入
 
-**Description:** 向输入元素填入值，<select> 会通过 selectOption 自动处理。定位器支持 CSS、role=、text=、xpath=。多匹配时用 >> nth=N 消歧。
+**Description:** 向输入元素填入值，<select> 会通过 selectOption 自动处理。支持由 take_snapshot 产生的 uid（推荐）或传统定位器（CSS、role=、text=、xpath=）。
 
 **Parameters:**
 
+- `uid`
 - `selector`
 - `value`
 - `timeoutMs`
@@ -199,10 +180,11 @@
 
 ### `hover` — 悬停元素
 
-**Description:** 将鼠标悬停在指定元素上。定位器支持 CSS、role=、text=、xpath=。多匹配时用 >> nth=N 消歧。
+**Description:** 将鼠标悬停在指定元素上。支持由 take_snapshot 产生的 uid（推荐）或传统定位器（CSS、role=、text=、xpath=）。
 
 **Parameters:**
 
+- `uid`
 - `selector`
 
 ### `list_pages` — 列出页面
@@ -258,18 +240,18 @@
 - `pageId`
 - `pageIdx`
 
-### `set_files` — 设置文件
+### `take_snapshot` — 获取页面语义快照
 
-**Description:** 使用 CDP DOM.setFileInputFiles 为 file input 元素设置文件，适用于 Playwright setInputFiles 被拦截的场景。
+**Description:** 获取当前页面的紧凑无障碍语义快照（TextSnapshot）。为每个交互控件分配数字 UID（如 1_4），可直接用于 click、fill、hover 等操作，Token 开销极低且免疫动态 Class 混淆。
 
 **Parameters:**
 
-- `selector`
-- `filePaths`
+- `verbose`
+- `interestingOnly`
 
 ### `upload_file` — 上传文件
 
-**Description:** 向 file input 元素上传文件，优先使用 Playwright setInputFiles，失败则回退到 filechooser 事件模式。
+**Description:** 向 file input 元素上传文件，依次尝试 Playwright 原生 setInputFiles、filechooser 事件模式及 CDP DOM.setFileInputFiles 三级降级。
 
 **Parameters:**
 
@@ -401,18 +383,6 @@
 
 ## Debugging
 
-### `capture_video_frame` — 捕获视频帧
-
-**Description:** 捕获视频元素的当前帧。定位器支持 CSS、role=、text=、xpath=。多匹配时用 >> nth=N 消歧。可选地先定位到指定时间点。以图片形式返回该帧。
-
-**Parameters:**
-
-- `selector`
-- `seekTime`
-- `outputPath`
-- `format`
-- `quality`
-
 ### `evaluate_on_callframe` — 在调用帧上执行
 
 **Description:** 在暂停时的指定调用帧上下文中执行 JavaScript 表达式。允许检查变量和执行代码。
@@ -436,10 +406,6 @@
 - `filePath`
 - `timeoutMs`
 
-### `get_ai_debug_status` — 获取 AI 调试状态
-
-**Description:** 获取当前调试状态，包括暂停状态、断点数量、脚本数量等。
-
 ### `get_console_message` — get_console_message
 
 **Description:** 按 ID 获取单条 Console 消息，返回包含类型、文本与参数的结构化数据。
@@ -458,10 +424,6 @@
 - `pageSize`
 - `pageIdx`
 
-### `get_devtools_comments` — 读取DevTools评论
-
-**Description:** 读取 DevTools 窗口中针对当前页面的用户评论线程（CD4A）。当前 DevTools 前端未内置 CD4A 桥接，调用将抛出 NATIVE_TOOL_MISSING 提示。
-
 ### `get_paused_info` — 获取暂停信息
 
 **Description:** 获取当前暂停状态信息，包括调用栈、当前位置和作用域变量。在断点命中后使用此工具了解执行上下文。
@@ -469,14 +431,6 @@
 **Parameters:**
 
 - `includeScopes`
-
-### `get_video_info` — 获取视频信息
-
-**Description:** 按定位器获取视频元素信息。返回 duration、currentTime、暂停状态和 src。定位器支持 CSS、role=、text=、xpath=。多匹配时用 >> nth=N 消歧。
-
-**Parameters:**
-
-- `selector`
 
 ### `inject_preload_script` — inject_preload_script
 
@@ -510,10 +464,6 @@
 
 **Description:** 以树形结构列出当前页面中的所有 Frame（含 iframe），显示索引、名称与 URL。使用 select_frame 可将执行上下文切换到指定 Frame。
 
-### `open_devtools` — 打开DevTools窗口
-
-**Description:** 为当前选中页面打开 Chrome DevTools 目标（同一浏览器内新建 devtools:// 标签页）。窗口默认不附着到页面，需要在 DevTools 的 target 下拉框中手动选择目标；headless 模式下该 scheme 可能不可用。
-
 ### `pause` — 暂停执行
 
 **Description:** 暂停 JavaScript 执行。用于中断运行中的代码。
@@ -525,15 +475,6 @@
 **Parameters:**
 
 - `breakpointId`
-
-### `resolve_devtools_comment` — 解决DevTools评论
-
-**Description:** 向 DevTools 评论线程追加回复并标记已解决（CD4A）。当前 DevTools 前端未内置桥接，调用将抛出 NATIVE_TOOL_MISSING 提示。
-
-**Parameters:**
-
-- `threadId`
-- `replyText`
 
 ### `resume` — 恢复执行
 
@@ -547,15 +488,6 @@
 
 - `selector`
 - `durationMs`
-
-### `seek_video` — 跳转视频
-
-**Description:** 按定位器将视频元素定位到指定时间点。定位器支持 CSS、role=、text=、xpath=。多匹配时用 >> nth=N 消歧。
-
-**Parameters:**
-
-- `selector`
-- `time`
 
 ### `select_frame` — 选择 Frame
 
@@ -684,14 +616,6 @@
 - `current`
 - `includeUnchanged`
 
-### `compare_env` — Compare Browser Environment
-
-**Description:** 采集当前 Frame 的浏览器环境基准，用于与 Node.js/jsdom 环境对比。可额外读取安全的点分隔属性路径。
-
-**Parameters:**
-
-- `properties`
-
 ### `create_hook` — create_hook
 
 **Description:** 推荐：为 function/fetch/xhr/property/cookie/websocket/eval/timer 创建 hook 脚本。Hook 运行时不会暂停页面执行，相比断点是更优的监控与拦截手段。返回 hookId 与 script，供 inject_hook 使用。
@@ -769,15 +693,6 @@
 - `type`
 - `filter`
 
-### `hook_cryptojs` — hook_cryptojs
-
-**Description:** Hook CryptoJS 加密库：拦截 AES、DES、MD5、SHA、HMAC 等对称/哈希算法。
-
-**Parameters:**
-
-- `algorithms`
-- `logFormat`
-
 ### `hook_function` — Hook Function
 
 **Description:** 逆向工程推荐工具：Hook 一个 JavaScript 函数，记录其调用、参数与返回值，且不暂停执行。相比断点更适用于自动化工作流，建议作为监控函数的默认手段。
@@ -789,38 +704,6 @@
 - `logResult`
 - `logStack`
 - `hookId`
-
-### `hook_jsencrypt` — hook_jsencrypt
-
-**Description:** Hook JSEncrypt RSA 加密库：拦截公钥/私钥、明文、密文。
-
-**Parameters:**
-
-- `logFormat`
-
-### `hook_jsvmp_interpreter` — Hook JSVMP Interpreter
-
-**Description:** 安装 JSVMP 运行时探针。proxy 模式覆盖调用、Reflect 与全局属性但可检测；transparent 模式仅替换可配置的原型 getter，痕迹更少。应在目标 SDK 加载前调用。
-
-**Parameters:**
-
-- `script_url`
-- `persistent`
-- `mode`
-- `track_calls`
-- `track_props`
-- `track_reflect`
-- `proxy_objects`
-- `max_entries`
-
-### `hook_smcrypto` — hook_smcrypto
-
-**Description:** Hook SM-crypto 国密库：拦截 SM2、SM3、SM4 算法。
-
-**Parameters:**
-
-- `algorithms`
-- `logFormat`
 
 ### `inject_hook` — Inject Hook
 
@@ -1023,14 +906,6 @@
 - `maxEvents`
 - `filterModule`
 
-### `xhr_to_js_breakpoint` — XHR 到 JS 断点
-
-**Description:** 设置 XHR 断点；命中后可结合 get_paused_info / set_breakpoint 完成 JS 断点定位。
-
-**Parameters:**
-
-- `url`
-
 ## Input automation
 
 ### `scroll_by` — scroll_by
@@ -1042,16 +917,6 @@
 - `direction`
 - `pixels`
 
-### `type_text` — type_text
-
-**Description:** 向输入框键入文本。定位器支持 CSS、role=、text=、xpath=。多匹配时用 >> nth=N 消歧。
-
-**Parameters:**
-
-- `selector`
-- `text`
-- `delay`
-
 ### `wait_for_element` — wait_for_element
 
 **Description:** 等待定位器对应的元素出现在页面中。定位器支持 CSS、role=、text=、xpath=。多匹配时用 >> nth=N 消歧。
@@ -1062,14 +927,6 @@
 - `timeout`
 
 ## Emulation
-
-### `emulate_cpu` — emulate_cpu
-
-**Description:** 通过 CDP Performance.setCPUThrottlingRate 模拟 CPU 节流。
-
-**Parameters:**
-
-- `throttlingRate`
 
 ### `emulate_mobile` — emulate_mobile
 
@@ -1096,33 +953,6 @@
 
 - `width`
 - `height`
-
-## Performance
-
-### `get_performance_metrics` — get_performance_metrics
-
-**Description:** 通过 Performance API 获取页面性能指标，包括导航时序、资源时序与绘制事件。
-
-### `performance_analyze_insight` — performance_analyze_insight
-
-**Description:** 针对追踪录制结果中高亮的某个性能 Insight 提供更详细的信息。
-
-**Parameters:**
-
-- `insightName`
-
-### `start_performance_trace` — start_performance_trace
-
-**Description:** 在当前选中页面上启动性能追踪录制，用于发现性能问题与可优化点，并报告页面的 Core Web Vitals (CWV) 评分。
-
-**Parameters:**
-
-- `reload`
-- `autoStop`
-
-### `stop_performance_trace` — stop_performance_trace
-
-**Description:** 停止性能追踪录制并通过 CDP Tracing.end 分析其结果。
 
 ## Pages
 
@@ -1202,10 +1032,6 @@
 - `includeCookies`
 - `includeLocalStorage`
 - `includeSessionStorage`
-
-### `update_extensions` — update_extensions
-
-**Description:** 通过点击 chrome://extensions/ 页面的更新按钮来更新 Chrome 扩展。
 
 ## Diagnostics
 
