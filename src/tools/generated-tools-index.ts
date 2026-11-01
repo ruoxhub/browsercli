@@ -158,10 +158,6 @@ export const GENERATED_TOOL_REGISTRY = [
     handlerName: 'traceFunction',
   },
   {
-    modulePath: './debugger/index.js',
-    handlerName: 'getAiDebugStatus',
-  },
-  {
     modulePath: './debugger/inspectObject.js',
     handlerName: 'inspectObject',
   },

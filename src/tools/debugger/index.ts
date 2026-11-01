@@ -1467,54 +1467,6 @@ export const traceFunction = defineTool({
 });
 
 /**
- * 获取 AI 调试状态。
- */
-export const getAiDebugStatus = defineTool({
-  name: 'get_ai_debug_status',
-  description: '获取当前调试状态，包括暂停状态、断点数量、脚本数量等。',
-  annotations: {
-    title: '获取 AI 调试状态',
-    category: ToolCategory.DEBUGGING,
-    readOnlyHint: true,
-  },
-  schema: {},
-  handler: async (request, response, context) => {
-    try {
-      const debuggerContext = await getDebuggerFromContext(context);
-      const breakpoints = debuggerContext.getBreakpoints();
-      const scripts = debuggerContext.getScripts();
-
-      response.setStructuredContent({
-        success: true,
-        message: '已获取调试状态',
-        tooltype: 'get_ai_debug_status',
-        data: {
-          isPaused: debuggerContext.isPaused(),
-          breakpointsCount: breakpoints.length,
-          scriptsCount: scripts.length,
-          lastAutoRecoveryEvent:
-            debuggerContext.getLastAutoRecoveryEvent() ?? null,
-          debuggerStatus: '已启用',
-        },
-      });
-    } catch {
-      response.setStructuredContent({
-        success: true,
-        message: '调试器尚未初始化',
-        tooltype: 'get_ai_debug_status',
-        data: {
-          isPaused: false,
-          breakpointsCount: 0,
-          scriptsCount: 0,
-          lastAutoRecoveryEvent: null,
-          debuggerStatus: '未启用',
-        },
-      });
-    }
-  },
-});
-
-/**
  * 在脚本中查找文本。
  */
 export const findInScript = defineTool({
