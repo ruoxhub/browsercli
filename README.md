@@ -22,7 +22,7 @@
 
 ## 1. 项目概览
 
-Browser-CLI 是一个**前端 JavaScript 逆向流程标准化的 MCP（Model Context Protocol）服务**。其核心目标不是简单的页面调试，而是将**页面观察→运行时采样→本地复现→补环境→证据沉淀**串成一套可复用工作流。
+Browser-CLI 是一个**前端 JavaScript 逆向流程标准化的浏览器自动化与调试工具集**，通过本地命名管道（POSIX 为 unix socket）暴露给 `browsercli` 命令行调用。其核心目标不是简单的页面调试，而是将**页面观察→运行时采样→本地复现→补环境→证据沉淀**串成一套可复用工作流。
 
 ### 核心方法论
 
@@ -88,7 +88,7 @@ Browser-CLI 与兄弟项目 [jshookmcp](https://github.com/zhizhuodemao/js-rever
 | `--js-stealth`        | 页面里 opt-in 注入 `StealthScripts2025`（覆盖 navigator/canvas/WebGL/audio） | `false` |
 | `--full-stealth-args` | 使用历史 60+ Chromium 启动参数集                                             | `false` |
 
-`--cloak` 是强反爬的逃生通道，详见 [`docs/cloak.md`](./docs/cloak.md)。
+`--cloak` 是强反爬的逃生通道，会启用 CloakBrowser 源码级反检测二进制（49 个 C++ patch，profile 与默认物理隔离）。
 `--js-stealth` 是历史兼容 opt-in（旧代码依赖 `navigator.webdriver === false`
 等覆盖时显式启用）。`--full-stealth-args` 不推荐：多个 flag 已是反爬检测信号。
 
@@ -99,7 +99,7 @@ Browser-CLI 与兄弟项目 [jshookmcp](https://github.com/zhizhuodemao/js-rever
 ```
 Browser-CLI/
 ├── src/                              # 核心源码
-│   ├── index.ts                      # ★ Worker 进程入口 — daemon 模式 + MCP stdio 双入口
+│   ├── index.ts                      # ★ Worker 进程入口 — 仅 daemon 模式（MCP stdio 入口已移除）
 │   ├── runtime.ts                    # ★ 运行时核心 — 单例，聚合所有模块实例
 │   ├── config.ts                     # 配置出口 (re-export config/index)
 │   ├── PageCollector.ts              # ★ 泛型页面数据收集器基类 (模板方法)
@@ -113,7 +113,7 @@ Browser-CLI/
 │   ├── config/                       # 配置系统
 │   │   ├── resolver.ts              # ★ 核心解析管线 (830行) — CLI > Env > JSON > 默认值
 │   │   ├── constants.ts             # 文件名常量与默认值
-│   │   └── schema.ts                # 占位 — 尚未实现
+│   │   └── schema.ts                #   Zod 配置校验 schema
 │   │
 │   ├── ipc/                          # Daemon IPC 层
 │   │   ├── socketConnection.ts      # ★ NDJSON 帧协议 + PROTOCOL_VERSION
@@ -136,14 +136,14 @@ Browser-CLI/
 │   │       ├── DataCollectorManager.ts   # Network/Console/WebSocket 收集与查询
 │   │       └── ServiceLocator.ts    #   分析服务惰性装配
 │   │
-│   ├── tools/                        # ★ MCP 工具实现 (33个子目录, ~100+ 工具)
+│   ├── tools/                        # ★ 工具实现 (26个子目录, 114 个工具)
 │   │   ├── ToolDefinition.ts        # ★ defineTool() — 工具定义 DSL
-│   │   ├── categories.ts            # ★ ToolCategory 枚举 (10个分类)
+│   │   ├── categories.ts            # ★ ToolCategory 枚举 (11个分类)
 │   │   ├── manifest.ts              # 工具清单接口
 │   │   ├── generated-tools-index.ts # ★ 自动生成工具索引 — 引用所有工具文件
 │   │   ├── hook/                    # Hook 工具 (create_hook, inject_hook, get_hook_data...)
 │   │   ├── debugger/                # 调试器工具 (set_breakpoint, resume, step_into...)
-│   │   ├── network/                 # 网络分析工具 (list_network_requests, trace_signature_generation...)
+│   │   ├── network/                 # 网络分析工具 (list_network_requests, get_request_initiator...)
 │   │   ├── script/                  # 脚本管理工具 (list_scripts, get_script_source...)
 │   │   ├── dom/                     # DOM 操作工具
 │   │   ├── page/                    # 页面管理工具 (navigate_page, query_dom...)
@@ -155,7 +155,6 @@ Browser-CLI/
 │   │   ├── websocket/ (network/)   # WebSocket 观察工具
 │   │   ├── storage/ (page/)        # 会话状态工具 (save_session_state...)
 │   │   ├── collector/              # 代码采集工具 (collect_code)
-│   │   ├── rebuild/                # 本地复现工具 (export_rebuild_bundle, diff_env_requirements)
 │   │   ├── stealth/                # 隐身注入工具
 │   │   ├── wasm/                   # WASM 分析工具
 │   │   ├── frames/                 # Frame 管理工具
@@ -306,8 +305,8 @@ Browser-CLI/
    │      │      │      │      │      │      │      │
 ┌──▼──┐ ┌▼────┐ ┌▼───┐ ┌▼───┐ ┌▼──┐ ┌▼───┐ ┌▼──┐ ┌▼────┐
 │Tools │ │Modules│ │Svc │ │Brsr│ │Rev│ │Utils│ │Fmt│ │Types│
-│100+  │ │ 6域  │ │    │ │Mgr │ │Task│ │Cache│ │rtr│ │85+  │
-│MCP   │ │分析  │ │    │ │CDP │ │FS  │ │Bus  │ │   │ │接口  │
+│114   │ │ 6域  │ │    │ │Mgr │ │Task│ │Cache│ │rtr│ │85+  │
+│Tools │ │分析  │ │    │ │CDP │ │FS  │ │Bus  │ │   │ │接口  │
 └──────┘ └──────┘ └────┘ └────┘ └───┘ └─────┘ └───┘ └─────┘
 ```
 
@@ -333,14 +332,14 @@ Browser-CLI/
 | **隐式耦合** | `BrowserManager` 直接依赖 `patchright` 的 `Browser` / `BrowserContext` / `Page` 具体类型, 而不是抽象接口; 测试通过 `resetInstance()` 进行，但方案较脆弱                                                       |
 | **设计模式** | **单例模式、适配器模式 (Playwright→CDPConnection)、策略模式 (端口发现三层策略)、观察者模式 (崩溃监听)**                                                                                                       |
 
-#### 3.2.3 MCP 工具层 (src/tools/)
+#### 3.2.3 工具层 (src/tools/)
 
 | 方面         | 分析                                                                                                                                                                                                                                         |
 | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **职责**     | 实现 100+ 个 MCP 工具，覆盖页面观察、Hook、断点、网络分析、WebSocket、代码分析、反混淆、加密检测、WASM、设备仿真、性能分析等全部能力                                                                                                         |
+| **职责**     | 实现 114 个工具，覆盖页面观察、Hook、断点、网络分析、WebSocket、代码分析、反混淆、加密检测、WASM、设备仿真、性能分析等全部能力                                                                                                               |
 | **实现逻辑** | 工具通过 `defineTool()` DSL 定义 (name + description + Zod schema + handler)。索引在 `generated-tools-index.ts` 中自动生成，通过 `tools-meta.ts` 动态加载并缓存。`ToolAdapter.executeTool()` 经 `ToolExecutionPipeline` 完成校验→上下文→执行 |
-| **关键文件** | `ToolDefinition.ts` — 工具定义接口; `generated-tools-index.ts` — 索引; `categories.ts` — 10 个分类枚举; `ToolAdapter.ts` — 执行入口                                                                                                          |
-| **被调用方** | daemon socket 服务端 (`src/ipc/daemonServer.ts`) 收到 `tool.invoke` → 路由到 `ToolAdapter.executeTool()`；MCP stdio 路径经 `ToolExecutionPipeline` 直接调用                                                                                  |
+| **关键文件** | `ToolDefinition.ts` — 工具定义接口; `generated-tools-index.ts` — 索引; `categories.ts` — 12 个分类枚举; `ToolAdapter.ts` — 执行入口                                                                                                          |
+| **被调用方** | daemon socket 服务端 (`src/ipc/daemonServer.ts`) 收到 `tool.invoke` → 路由到 `ToolAdapter.executeTool()`；`ToolExecutionPipeline` 执行                                                                                                       |
 | **边界问题** | 定义和使用之间有一层间接性 (modulePath → 动态 import)，加载失败时以警告非阻断方式处理                                                                                                                                                        |
 | **改进空间** | 考虑将工具调用模式 (`frame`/`context`/`direct`) 表示为统一的 DSL 属性, 而非 ToolAdapter 中的条件分支                                                                                                                                         |
 
@@ -418,7 +417,7 @@ Browser-CLI/
 
 | 方面         | 分析                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **职责**     | 提供 MCP 工具的运行时执行入口（daemon socket 与 MCP stdio 两条路径共享），管理执行上下文和生命周期                                                                                                                                                                                                                                                                                                                    |
+| **职责**     | 提供工具的运行时执行入口（daemon socket `tool.invoke` 路径），管理执行上下文和生命周期                                                                                                                                                                                                                                                                                                                                |
 | **实现逻辑** | `ToolAdapter` 从 `generated-tools-index.ts` 动态加载工具定义，`executeTool()` 经 `ToolExecutionPipeline`（校验→上下文→执行→响应）运行。`daemonMain.ts` 编排 daemon 启动顺序：config 播种 → runtime 初始化 → ConsoleServer(127.0.0.1) → `startDaemonServer` → 写 session 文件 → 打就绪行。`ToolContextProvider` (Facade) 聚合 4 个子模块: PageManager + DebuggerSessionManager + DataCollectorManager + ServiceLocator |
 | **关键类**   | `ToolAdapter`、`ToolContextProvider`、`daemonMain.runDaemon()`、`WorkerLifecycle.createGracefulShutdown()`                                                                                                                                                                                                                                                                                                            |
 | **设计模式** | **外观模式 (ToolContextProvider 统一 4 个子模块)、模板/编排 (daemonMain 固定启动顺序)**                                                                                                                                                                                                                                                                                                                               |
@@ -439,7 +438,7 @@ Browser-CLI/
 | **模板方法模式** | `PageCollector<T>` 抽象基类: `attachListeners()` / `detachListeners()` 由子类实现                                                                                          | 多个收集器 (Network/Console/WSC) 共享导航分组和生命周期逻辑    | ✅ 减少大量重复代码                        |
 | **管道模式**     | `Deobfuscator` 反混淆管线: 检测 → 解包 → JSVMP → 高级 → 基础 → AST → 重命名                                                                                                | 多阶段处理，每阶段独立失败                                     | ✅ 高容错: 每步独立 try-catch              |
 | **观察者模式**   | `EventBus` (Pub/Sub 9 个事件); `DebuggerManager` CDP 事件监听 (scriptParsed/paused/resumed); `BrowserManager.on('disconnected')` 崩溃监听                                  | 模块间松散通信，事件驱动                                       | ✅ EventBus 有 Zod 校验加分                |
-| **桥接模式**     | `ToolAdapter` 将 `defineTool` 定义桥接到传输层（daemon socket `tool.invoke` / MCP stdio）                                                                                  | 分离工具定义和传输协议                                         | ✅ 可独立替换协议层                        |
+| **桥接模式**     | `ToolAdapter` 将 `defineTool` 定义桥接到传输层（daemon socket `tool.invoke`）                                                                                              | 分离工具定义和传输协议                                         | ✅ 可独立替换协议层                        |
 | **命令模式**     | `daemonServer.ts` 按 `method` 名路由到分发函数（`hello`/`tools.list`/`tool.invoke`/...）                                                                                   | 请求封装为命令对象，支持注册/路由                              | ✅ 标准实现                                |
 | **工厂模式**     | `getRuntime()` 首次创建所有实例                                                                                                                                            | 对象创建的集中管理                                             | ✅ 创建逻辑集中                            |
 | **Builder 模式** | `HookManager.createWithBuilder()` 链式构建 Hook                                                                                                                            | 复杂 Hook 配置的逐步构建                                       | ✅ 链式 API 清晰                           |
@@ -466,7 +465,7 @@ Browser-CLI/
 | -------------- | ---------------------------------- | ------------------------------------------- | ----------------------------------------------------------- |
 | **基础设施层** | `src/modules/browser/`, `src/ipc/` | CDPSession, socket 帧协议                   | BrowserManager (Chrome CDP), daemonServer (命名管道 NDJSON) |
 | **核心领域层** | `src/modules/`                     | HookTypePlugin, DeobfuscatorStrategy (隐式) | HookManager, Deobfuscator                                   |
-| **应用层**     | `src/tools/` + `src/worker/`       | ToolDefinition, Context                     | ~100 个具体工具 + ToolAdapter                               |
+| **应用层**     | `src/tools/` + `src/worker/`       | ToolDefinition, Context                     | 114 个具体工具 + ToolAdapter                                |
 | **配置层**     | `src/config/`                      | —                                           | 多源合并 + 环境变量                                         |
 
 **不符合纯 Hexagonal 的地方**:
@@ -526,15 +525,14 @@ graph TB
         WS[wasm模块<br/>WASM收集/分析/反编译]
     end
 
-    subgraph TOOLS["MCP工具层 (~100+工具)"]
+    subgraph TOOLS["工具层 (114 工具)"]
         TG[generated-tools-index<br/>自动生成索引]
         TD[ToolDefinition<br/>defineTool DSL]
-        CAT[ToolCategory<br/>10个分类]
+        CAT[ToolCategory<br/>11个分类]
         HOOK[hook/ 工具集]
         DEBUG[debugger/ 工具集]
         NET[network/ 工具集]
         DOM[dom/ 工具集]
-        PERF[performance/ 工具集]
         WASM[wasm/ 工具集]
         OTHER[其他 20+ 子目录]
     end
@@ -589,11 +587,11 @@ graph TB
     THIRDPARTY --> TOOLS
 ```
 
-### 5.2 核心业务流程图 — 一次 MCP 工具调用的完整生命周期
+### 5.2 核心业务流程图 — 一次工具调用的完整生命周期
 
 ```mermaid
 sequenceDiagram
-    participant Client as MCP Client<br/>(IDE/CLI)
+    participant Client as browsercli<br/>(CLI)
     participant Daemon as daemonServer<br/>(命名管道 NDJSON)
     participant Job as JobStore +<br/>WorkerActivityCoordinator
     participant Adapter as ToolAdapter
@@ -650,8 +648,8 @@ flowchart TB
     CHECK_HOOK -->|已采集到数据| NETWORK[3. 网络分析<br/>trace_signature_generation<br/>从请求追踪签名生成过程]
     CHECK_HOOK -->|无数据| DEBUG[3b. 断点调试<br/>break_on_xhr<br/>set_breakpoint + resume]
     DEBUG --> NETWORK
-    NETWORK --> EXPORT[4. 导出本地复现<br/>export_rebuild_bundle<br/>导出入口+补环境+证据]
-    EXPORT --> ENV[5. 逐项补环境<br/>diff_env_requirements<br/>env.js + polyfills.js]
+    NETWORK --> EXPORT[4. 导出本地复现<br/>手工导出入口+补环境+证据]
+    EXPORT --> ENV[5. 逐项补环境<br/>手工补环境<br/>env.js + polyfills.js]
     ENV --> VERIFY{运行 entry.js<br/>验证是否有分歧}
     VERIFY -->|有运行时错误| ENV
     VERIFY -->|env-pass 通过| PURE[6. 纯算法提纯<br/>deobfuscate_code + 人工/AI Agent 分析<br/>剥离风控逻辑]
@@ -690,20 +688,20 @@ flowchart TB
 | 维度           | 内容                                                                                                                                                                                                                                |
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **目标模块**   | `src/config/schema.ts`                                                                                                                                                                                                              |
-| **当前问题**   | `schema.ts` 为空占位文件; 配置验证分散在 `resolver.ts` 的条件分支中; 对无效配置仅在运行时暴露; 嵌套配置对象 (browser) 处理不统一                                                                                                    |
+| **当前问题**   | 配置验证曾分散在 `resolver.ts` 的条件分支中; 对无效配置仅在运行时暴露; 嵌套配置对象 (browser) 处理不统一（`schema.ts` 现已提供 Zod 校验，仍有收敛空间）                                                                             |
 | **具体方案**   | 使用 Zod 定义 `GlobalConfigSchema`, 在 `resolveConfig()` 最终合并后调用 `schema.parse()`; 利用 Zod 的能力: 默认值、类型强制、联合类型、`refine` 跨字段校验; 为空字段提供友好错误消息; 在 `getSystemConfig()` 等高扇入入口中重复使用 |
 | **预期收益**   | 启动时验证, 配置错误立即暴露; 自文档化的 Schema (Zod 自动推导类型); 减少 `resolver.ts` 中 ~100 行条件校验代码                                                                                                                       |
 | **风险与成本** | 低: 纯新增, 不影响现有功能; 项目已在广泛使用 Zod (仅工具层就 185+引用), 无新增依赖; 两个工时 + 测试时间                                                                                                                             |
 
 ### 🏆 建议 4: 引入 Design System / UI 规范 (如未来构建前端的备选)
 
-| 维度           | 内容                                                                                                                            |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| **目标模块**   | 跨架构 — 构建 Web UI 时                                                                                                         |
-| **当前问题**   | 当前项目为纯 CLI/MCP 模式; 如果未来需要构建 Dashboard/Web UI, 目前无 UI 架构约定                                                |
-| **具体方案**   | 预留前端架构: 独立前端包 (如 `frontend/`); 使用 React + Tailwind CSS; MCP 工具 API 作为后端数据源; 工具执行结果标准化 JSON 格式 |
-| **预期收益**   | 前端/后端分离; MCP 工具层天然是 RESTful 数据源                                                                                  |
-| **风险与成本** | 仅备选建议; 当前无需实施                                                                                                        |
+| 维度           | 内容                                                                                                                                      |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| **目标模块**   | 跨架构 — 构建 Web UI 时                                                                                                                   |
+| **当前问题**   | 当前项目为纯 CLI + daemon 模式（Web 控制台已于 `c7dcd107` 移除）; 如果未来需要构建 Dashboard/Web UI, 目前无 UI 架构约定                   |
+| **具体方案**   | 预留前端架构: 独立前端包 (如 `frontend/`); 使用 React + Tailwind CSS; daemon socket 工具 API 作为后端数据源; 工具执行结果标准化 JSON 格式 |
+| **预期收益**   | 前端/后端分离; 工具层天然是 RESTful 数据源                                                                                                |
+| **风险与成本** | 仅备选建议; 当前无需实施                                                                                                                  |
 
 ---
 
@@ -767,7 +765,7 @@ node browsercli/build/bin/browsercli.js list-tools
 
 ### 7.3 最小改动示例 (Hello World)
 
-**场景**: 新增一个获取当前页面标题的 MCP 工具
+**场景**: 新增一个获取当前页面标题的工具
 
 **步骤 1: 定义工具**
 
@@ -848,10 +846,10 @@ node browsercli/build/bin/browsercli.js call get_page_title
 
 `Browser-CLI` 通过 `JS_REVERSE_TOOL_PROFILE` 环境变量在两档工具集中切换，用 token 成本换取覆盖范围。
 
-| Profile    | 工具数     | 适用场景                                               |
-| ---------- | ---------- | ------------------------------------------------------ |
-| `workflow` | ~110       | 浏览器自动化 + JS 逆向日常：分析、Hook、采集、网络观察 |
-| `full`     | 全量 (126) | 加上 debugger / wasm / anti-debug / perf / rebuild     |
+| Profile    | 工具数 | 适用场景                                               |
+| ---------- | ------ | ------------------------------------------------------ |
+| `workflow` | 62     | 浏览器自动化 + JS 逆向日常：分析、Hook、采集、网络观察 |
+| `full`     | 114    | 加上 debugger / wasm / anti-debug / perf / devtools    |
 
 默认值是 `full`，与既有行为一致。示例：
 
@@ -860,6 +858,39 @@ JS_REVERSE_TOOL_PROFILE=workflow npm run cli:start
 ```
 
 档位继承关系：`workflow ⊂ full`。即 `full` 包含所有 `workflow` 工具。
+
+---
+
+## 文档入口
+
+### Guides
+
+- 快速开始：[docs/guides/getting-started.md](docs/guides/getting-started.md)
+- 浏览器连接：[docs/guides/browser-connection.md](docs/guides/browser-connection.md)
+- 故障排查：[docs/guides/troubleshooting.md](docs/guides/troubleshooting.md)
+- 完整使用指南：[docs/guides/full-usage-guide.md](docs/guides/full-usage-guide.md)
+
+### Reference
+
+- 全量工具参考（自动生成）：[docs/reference/tool-reference.md](docs/reference/tool-reference.md)
+- 工具读写契约：[docs/reference/tool-io-contract.md](docs/reference/tool-io-contract.md)
+- 模型首读入口：[docs/reference/reverse-bootstrap.md](docs/reference/reverse-bootstrap.md)
+- 逆向任务索引：[docs/reference/reverse-task-index.md](docs/reference/reverse-task-index.md)
+- 补环境规范：[docs/reference/env-patching.md](docs/reference/env-patching.md)
+- 更新提示词模板：[docs/reference/reverse-update-prompt-template.md](docs/reference/reverse-update-prompt-template.md)
+- 逆向报告模板：[docs/reference/reverse-report-template.md](docs/reference/reverse-report-template.md)
+
+### 已沉淀链路
+
+仓库内公开的参数 / 链路沉淀入口统一放在 `scripts/cases/`，仅保留抽象 case、方法论与验收口径：
+
+- 案例索引：[scripts/cases/README.md](scripts/cases/README.md)
+- 某东 `h5st` 参数：[jd-h5st-pure-node.mjs](scripts/cases/jd-h5st-pure-node.mjs)
+- 某手 `falcon` 风控参数：[ks-hxfalcon-pure-node.mjs](scripts/cases/ks-hxfalcon-pure-node.mjs)
+- 某音 `a-bogus` 参数：[douyin-a-bogus-pure-node.mjs](scripts/cases/douyin-a-bogus-pure-node.mjs)
+- 通用工作流骨架：[mcp-reverse-pure-node-workflow.mjs](scripts/cases/mcp-reverse-pure-node-workflow.mjs)
+
+Git 默认只提交 `artifacts/tasks/_TEMPLATE/`；真实 `artifacts/tasks/<task-id>/` 视为本地私有任务目录。
 
 ---
 

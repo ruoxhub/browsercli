@@ -21,6 +21,9 @@ export default defineConfig([
     '**/scratch/**',
     '**/example/Obfuscation/**',
     '**/artifacts/**',
+    // Local checkout of upstream projects (2.3G, ~2k TS files). Gitignored and
+    // not part of this codebase; linting it exhausts the Node heap.
+    'open-source/**',
     'scripts/cases/**',
     'test-load.mjs',
   ]),

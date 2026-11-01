@@ -19,9 +19,6 @@ describe('reverse workflow docs', () => {
   it('documents task artifacts, local rebuild, and Codex workflow guidance', async () => {
     const readme = await readRepoFile('README.md');
     const caseIndex = await readRepoFile('scripts/cases/README.md');
-    const reverseIndex = await readRepoFile(
-      'docs/reference/reverse-task-index.md',
-    );
     const artifactsDoc = await readRepoFile(
       'docs/reference/reverse-artifacts.md',
     );
@@ -47,18 +44,6 @@ describe('reverse workflow docs', () => {
     const toolIoContract = await readRepoFile(
       'docs/reference/tool-io-contract.md',
     );
-    const outputContract = await readRepoFile(
-      'skills/mcp-js-reverse-playbook/references/output-contract.md',
-    );
-    const envTemplate = await readRepoFile(
-      'artifacts/tasks/_TEMPLATE/env/env.js',
-    );
-    const polyfillsTemplate = await readRepoFile(
-      'artifacts/tasks/_TEMPLATE/env/polyfills.js',
-    );
-    const entryTemplate = await readRepoFile(
-      'artifacts/tasks/_TEMPLATE/env/entry.js',
-    );
     const docsRootEntries = await readdir(path.join(repoRoot, 'docs'), {
       withFileTypes: true,
     });
@@ -69,9 +54,7 @@ describe('reverse workflow docs', () => {
 
     assert.ok(readme.includes('核心方法论'));
     assert.ok(readme.includes('已沉淀链路'));
-    assert.ok(readme.includes('支持的能力'));
     assert.ok(readme.includes('文档入口'));
-    assert.ok(readme.includes('参考项目'));
     assert.ok(readme.includes('某东 `h5st` 参数'));
     assert.ok(
       readme.includes('[scripts/cases/README.md](scripts/cases/README.md)'),
@@ -93,7 +76,6 @@ describe('reverse workflow docs', () => {
     assert.ok(caseIndex.includes('Status: abstract-case'));
     assert.ok(caseIndex.includes('Runtime: pure-node'));
     assert.ok(caseIndex.includes('字段规范'));
-    assert.ok(reverseIndex.includes('export_rebuild_bundle'));
     assert.ok(artifactsDoc.includes('timeline.jsonl'));
     assert.ok(artifactsDoc.includes('最小必备文件'));
     assert.ok(artifactsDoc.includes('可选文件'));
@@ -127,8 +109,6 @@ describe('reverse workflow docs', () => {
     assert.ok(algorithmUpgradeTemplate.includes('targetFunctionNames'));
     assert.ok(algorithmUpgradeTemplate.includes('env rebuild'));
     assert.ok(toolIoContract.includes('Canonical Store'));
-    assert.ok(outputContract.includes('targetContext'));
-    assert.ok(outputContract.includes('targetActionDescription'));
     assert.ok(envPatchingDoc.includes('MCP 页面取证'));
     assert.ok(envPatchingDoc.includes('capture.json'));
     assert.ok(envPatchingDoc.includes('不要猜环境'));
@@ -137,16 +117,5 @@ describe('reverse workflow docs', () => {
     assert.ok(envPatchingDoc.includes('负面示例'));
     assert.ok(envPatchingDoc.includes('两阶段目标'));
     assert.ok(envPatchingDoc.includes('可移植 JS 导出'));
-    assert.ok(envTemplate.includes('globalThis.window = globalThis'));
-    assert.ok(envTemplate.includes('globalThis.localStorage ??='));
-    assert.ok(polyfillsTemplate.includes('globalThis.watch = function watch'));
-    assert.ok(
-      polyfillsTemplate.includes(
-        'globalThis.makeFunction = function makeFunction',
-      ),
-    );
-    assert.ok(polyfillsTemplate.includes('[env:get]'));
-    assert.ok(entryTemplate.includes('import "./env.js";'));
-    assert.ok(entryTemplate.includes('import "./polyfills.js";'));
   });
 });
