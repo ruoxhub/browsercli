@@ -411,18 +411,6 @@ export const GENERATED_TOOL_REGISTRY = [
     handlerName: 'takeScreenshot',
   },
   {
-    modulePath: './screenshot/captureVideoFrame.js',
-    handlerName: 'captureVideoFrame',
-  },
-  {
-    modulePath: './screenshot/getVideoInfo.js',
-    handlerName: 'getVideoInfo',
-  },
-  {
-    modulePath: './screenshot/seekVideo.js',
-    handlerName: 'seekVideo',
-  },
-  {
     modulePath: './script/script.js',
     handlerName: 'evaluateScript',
   },
