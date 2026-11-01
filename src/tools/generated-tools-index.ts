@@ -16,7 +16,6 @@ import {manifest as diagnosticsManifest} from './diagnostics/manifest.js';
 import {manifest as dialogManifest} from './dialog/manifest.js';
 import {manifest as domManifest} from './dom/manifest.js';
 import {manifest as emulationManifest} from './emulation/manifest.js';
-import {manifest as extensionsManifest} from './extensions/manifest.js';
 import {manifest as framesManifest} from './frames/manifest.js';
 import {manifest as hookManifest} from './hook/manifest.js';
 import {manifest as inputManifest} from './input/manifest.js';
@@ -40,7 +39,6 @@ export const GENERATED_DOMAIN_MANIFESTS = [
   dialogManifest,
   domManifest,
   emulationManifest,
-  extensionsManifest,
   framesManifest,
   hookManifest,
   inputManifest,
@@ -260,16 +258,8 @@ export const GENERATED_TOOL_REGISTRY = [
     handlerName: 'emulateNetwork',
   },
   {
-    modulePath: './emulation/emulateCpu.js',
-    handlerName: 'emulateCpu',
-  },
-  {
     modulePath: './emulation/resizePage.js',
     handlerName: 'resizePage',
-  },
-  {
-    modulePath: './extensions/updateExtensions.js',
-    handlerName: 'updateExtensions',
   },
   {
     modulePath: './frames/listFrames.js',

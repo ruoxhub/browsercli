@@ -39,7 +39,6 @@ async function runTests() {
       'upload_file',
       'press_key',
       'emulate_network',
-      'emulate_cpu',
       'resize_page',
       'handle_dialog',
     ].includes(t.name),
@@ -178,28 +177,12 @@ async function runTests() {
     console.log(`✗ 批量填充失败：${err.message}\n`);
   }
 
-  // 测试 10: CPU 节流
-  console.log('=== 测试 10: emulate_cpu 工具 - CPU 节流 ===');
-  try {
-    await client.callTool({
-      name: 'emulate_cpu',
-      arguments: {throttlingRate: 2},
-    });
-    console.log('✓ 成功设置 CPU 节流为 2x\n');
-  } catch (err) {
-    console.log(`✗ CPU 节流失败：${err.message}\n`);
-  }
-
   // 禁用所有仿真
   console.log('=== 禁用所有仿真 ===');
   try {
     await client.callTool({
       name: 'emulate_network',
       arguments: {throttlingOption: 'No emulation'},
-    });
-    await client.callTool({
-      name: 'emulate_cpu',
-      arguments: {throttlingRate: 1},
     });
     console.log('✓ 已禁用所有仿真\n');
   } catch (err) {

@@ -83,10 +83,10 @@ describe('validateToolArgs numeric range enforcement (resize_page)', () => {
     }
   });
 
-  it('emulate_cpu still enforces its 1..20 range', () => {
-    const bad = validateToolArgs('emulate_cpu', {throttlingRate: 99});
+  it('resize_page enforces its 1..10000 range on height', () => {
+    const bad = validateToolArgs('resize_page', {width: 1280, height: 20000});
     assert.equal(bad.ok, false);
-    const good = validateToolArgs('emulate_cpu', {throttlingRate: 4});
+    const good = validateToolArgs('resize_page', {width: 1280, height: 720});
     assert.equal(good.ok, true);
   });
 });
