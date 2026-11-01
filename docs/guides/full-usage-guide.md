@@ -285,7 +285,7 @@ args = [
 | `navigate_page`   | 跳转/回退/刷新页面 |
 | `query_dom`       | 查询页面元素       |
 | `click`           | 触发点击           |
-| `type_text`       | 输入文本           |
+| `fill`            | 输入文本           |
 | `take_screenshot` | 截图取证           |
 
 ### 6.9 深度分析

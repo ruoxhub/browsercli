@@ -14,7 +14,6 @@
 | `list_breakpoints`                     | 列出当前调试会话中所有活跃断点                                           | 无                                                                                 |
 | `break_on_xhr`                         | 在 XHR/Fetch 请求 URL 包含指定子串时触发断点暂停                         | `--url <str>`                                                                      |
 | `remove_xhr_breakpoint`                | 移除指定的 XHR/Fetch 断点                                                | `--url <str>`                                                                      |
-| `xhr_to_js_breakpoint`                 | 设置 XHR 断点并在命中后联动定位到发起调用的 JS 源码行                    | `[--url <str>]`                                                                    |
 | `step_into` / `step_over` / `step_out` | 单步进入 / 单步跳过 / 单步跳出函数（自动返回暂停后调用栈）               | `[--includeScopes <bool>]`                                                         |
 | `resume` / `pause`                     | 恢复代码执行 / 强制暂停当前 JavaScript 运行                              | 无                                                                                 |
 | `get_paused_info`                      | 断点命中时获取当前调用栈、源码位置与作用域变量                           | `[--includeScopes <bool>]`                                                         |
@@ -25,7 +24,6 @@
 | `trace_function`                       | 无需暂停，使用条件日志点（Logpoint）追踪记录指定名称函数的调用参数与结果 | `--target <str>`, `[--logArgs <bool>]`, `[--logResult <bool>]`                     |
 | `monitor_events`                       | 监听指定 DOM 元素或 window 上的事件并将流输出到控制台                    | `[--selector <str>]`, `[--events <arr>]`, `[--monitorId <str>]`                    |
 | `stop_monitor`                         | 停止指定的事件监控                                                       | `--monitorId <str>`                                                                |
-| `get_ai_debug_status`                  | 查看当前调试器状态（是否暂停、活跃断点数、加载脚本数等）                 | 无                                                                                 |
 
 ---
 
@@ -50,9 +48,6 @@ browsercli call remove_breakpoint --breakpointId "1:150:0"
 ```bash
 # 拦截包含特定 API 路径的请求
 browsercli call break_on_xhr --url "/api/v2/trade/submit"
-
-# 拦截并自动定位到发起请求的业务 JS 调用栈
-browsercli call xhr_to_js_breakpoint --url "/api/v2/trade/submit"
 ```
 
 ### 3. 断点暂停后的步进与状态检查

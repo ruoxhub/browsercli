@@ -18,9 +18,6 @@
 | `resize_page`          | 将页面视口尺寸调整为指定的宽度与高度                             | `--width <num>`, `--height <num>`                           |
 | `emulate_mobile`       | 模拟移动设备视口、User-Agent 与 Touch 触摸事件，或恢复桌面模式   | `--enable <bool>`, `[--device <str>]`                       |
 | `emulate_network`      | 通过 CDP 模拟弱网环境或离线断网（如 2G/3G/4G/Offline）           | `--throttlingOption <str>`                                  |
-| `emulate_cpu`          | 通过 CDP 模拟 CPU 节流降速（如 4x/6x 慢速调试）                  | `--throttlingRate <num>`                                    |
-| `open_devtools`        | 为当前选中页面打开 Chrome DevTools 独立调试标签页                | 无                                                          |
-| `update_extensions`    | 触发 Chrome 扩展更新                                             | 无                                                          |
 
 ---
 
@@ -68,17 +65,13 @@ browsercli call emulate_mobile --enable false
 # 调整视口大小
 browsercli call resize_page --width 1920 --height 1080
 
-# 模拟 3G 网络与 CPU 4 倍降速（排查异步竞态与动态加载时序）
+# 模拟 3G 网络（排查异步竞态与动态加载时序）
 browsercli call emulate_network --throttlingOption "Regular3G"
-browsercli call emulate_cpu --throttlingRate 4
 ```
 
-### 4. 探活与开发辅助
+### 4. 探活与健康检查
 
 ```bash
 # 浏览器健康度检查
 browsercli call check_browser_health
-
-# 在浏览器内部开一个 devtools:// 调试页辅助人工排查
-browsercli call open_devtools
 ```
