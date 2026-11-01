@@ -208,10 +208,6 @@ export const GENERATED_TOOL_REGISTRY = [
     handlerName: 'unhookFunction',
   },
   {
-    modulePath: './debugger/index.js',
-    handlerName: 'xhrToJsBreakpoint',
-  },
-  {
     modulePath: './devtools/openDevtools.js',
     handlerName: 'openDevtools',
   },
