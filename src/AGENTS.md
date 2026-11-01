@@ -31,7 +31,6 @@ This AGENTS.md scopes guidance to `src`. Parent AGENTS guidance still applies un
 - `services/`
 - `third_party/`
 - `tools/`
-- `trace-processing/`
 - `types/`
 - ...and 4 more
 
